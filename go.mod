@@ -10,6 +10,7 @@ require (
 	github.com/dgraph-io/badger/v2 v2.0.0-rc2 // indirect
 	github.com/gogo/protobuf v1.2.1
 	github.com/ipfs/go-bitswap v0.0.7
+	github.com/ipfs/go-cid v0.0.2
 	github.com/ipfs/go-datastore v0.0.5
 	github.com/ipfs/go-ipfs v0.4.21
 	github.com/ipfs/go-ipfs-config v0.0.3
@@ -26,6 +27,7 @@ require (
 	github.com/libp2p/go-libp2p-protocol v0.0.1
 	github.com/libp2p/go-libp2p-record v0.0.1
 	github.com/libp2p/go-libp2p-routing v0.0.1
+	github.com/multiformats/go-base32 v0.0.3
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/tyler-smith/go-bip39 v1.0.0

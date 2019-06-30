@@ -21,6 +21,7 @@ require (
 	github.com/ipfs/interface-go-ipfs-core v0.0.8
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
 	github.com/jinzhu/gorm v1.9.9
+	github.com/libp2p/go-libp2p v0.0.28
 	github.com/libp2p/go-libp2p-core v0.0.1 // indirect
 	github.com/libp2p/go-libp2p-crypto v0.0.2
 	github.com/libp2p/go-libp2p-host v0.0.3

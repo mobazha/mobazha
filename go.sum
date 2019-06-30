@@ -216,6 +216,7 @@ github.com/ipfs/go-ipfs-blockstore v0.0.1/go.mod h1:d3WClOmRQKFnJ0Jz/jj/zmksX0ma
 github.com/ipfs/go-ipfs-blocksutil v0.0.1/go.mod h1:Yq4M86uIOmxmGPUHv/uI7uKqZNtLb449gwKqXjIsnRk=
 github.com/ipfs/go-ipfs-chunker v0.0.1 h1:cHUUxKFQ99pozdahi+uSC/3Y6HeRpi9oTeUHbE27SEw=
 github.com/ipfs/go-ipfs-chunker v0.0.1/go.mod h1:tWewYK0we3+rMbOh7pPFGDyypCtvGcBFymgY4rSDLAw=
+github.com/ipfs/go-ipfs-cmds v0.0.8 h1:ZMo0ZeQOr10ZKY4yxYA3lRHUbnF/ZYcV9cpU0IrlGFI=
 github.com/ipfs/go-ipfs-cmds v0.0.8/go.mod h1:TiK4e7/V31tuEb8YWDF8lN3qrnDH+BS7ZqWIeYJlAs8=
 github.com/ipfs/go-ipfs-config v0.0.1/go.mod h1:KDbHjNyg4e6LLQSQpkgQMBz6Jf4LXiWAcmnkcwmH0DU=
 github.com/ipfs/go-ipfs-config v0.0.3 h1:Ep4tRdP1iVK76BgOprD9B/qtOEdpno+1Xb57BqydgGk=

@@ -17,6 +17,7 @@ require (
 	github.com/ipfs/go-ipfs-config v0.0.3
 	github.com/ipfs/go-ipfs-files v0.0.3
 	github.com/ipfs/go-ipns v0.0.1
+	github.com/ipfs/go-merkledag v0.0.3
 	github.com/ipfs/go-path v0.0.4
 	github.com/ipfs/interface-go-ipfs-core v0.0.8
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99

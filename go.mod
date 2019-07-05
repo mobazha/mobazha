@@ -9,7 +9,7 @@ require (
 	github.com/OpenBazaar/jsonpb v0.0.0-20171123000858-37d32ddf4eef
 	github.com/OpenBazaar/multiwallet v0.0.0-20190704133557-52b6b512b299
 	github.com/OpenBazaar/spvwallet v0.0.0-20190417151124-49419d61fdff // indirect
-	github.com/OpenBazaar/wallet-interface v0.0.0-20190411204206-5b458c29c191 // indirect
+	github.com/OpenBazaar/wallet-interface v0.0.0-20190411204206-5b458c29c191
 	github.com/btcsuite/btcd v0.0.0-20190523000118-16327141da8c
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/btcsuite/btcwallet v0.0.0-20190628225330-4a9774585e57 // indirect

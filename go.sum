@@ -65,6 +65,14 @@ github.com/coreos/go-semver v0.3.0 h1:wkHLiw0WNATZnSG7epLsujiMCgPAc9xhjJ4tgnAxmf
 github.com/coreos/go-semver v0.3.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3EedlOD2RNk=
 github.com/cpacia/wallet-interface v0.0.0-20190707031038-462db36b5c65 h1:Mw2RThJ3OqpuhafRxr+95Tai6gsti0Zq1h6NE9WtWao=
 github.com/cpacia/wallet-interface v0.0.0-20190707031038-462db36b5c65/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
+github.com/cpacia/wallet-interface v0.0.0-20190707132349-9e1e9c0413cc h1:nUJurR3iHR2k7KgAUF0pd4Re+CzgBwTwZML4J8pxZtE=
+github.com/cpacia/wallet-interface v0.0.0-20190707132349-9e1e9c0413cc/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
+github.com/cpacia/wallet-interface v0.0.0-20190707142103-b9c3e02539ee h1:HkRSF2kI9fZBpV5FJao7BLLfaLgUA1ZPgijhiMseuhk=
+github.com/cpacia/wallet-interface v0.0.0-20190707142103-b9c3e02539ee/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
+github.com/cpacia/wallet-interface v0.0.0-20190707142207-c4b47ae78966 h1:BjAPRteYo6M5I2sJGXiOwqrM5oBfaCo+BKKBikMwHCs=
+github.com/cpacia/wallet-interface v0.0.0-20190707142207-c4b47ae78966/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
+github.com/cpacia/wallet-interface v0.0.0-20190707142616-73f128192ad4 h1:pc3fmswuLqN+U7IkGp0/P7t9kyV5Ejsphdt+tRleu9Q=
+github.com/cpacia/wallet-interface v0.0.0-20190707142616-73f128192ad4/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
 github.com/cskr/pubsub v1.0.2 h1:vlOzMhl6PFn60gRlTQQsIfVwaPB/B/8MziK8FhEPt/0=
 github.com/cskr/pubsub v1.0.2/go.mod h1:/8MzYXk/NJAz782G8RPkFzXTZVu63VotefPnR9TIRis=
 github.com/davecgh/go-spew v0.0.0-20171005155431-ecdeabc65495/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

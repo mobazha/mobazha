@@ -6,11 +6,10 @@ require github.com/jessevdk/go-flags v1.4.0
 
 require (
 	github.com/OpenBazaar/jsonpb v0.0.0-20171123000858-37d32ddf4eef
-	github.com/OpenBazaar/wallet-interface v0.0.0-20190706190207-05cabe8dd00c // indirect
 	github.com/btcsuite/btcd v0.0.0-20190629003639-c26ffa870fd8
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/coreos/go-semver v0.3.0 // indirect
-	github.com/cpacia/wallet-interface v0.0.0-20190707142616-73f128192ad4
+	github.com/cpacia/wallet-interface v0.0.0-20190707213128-cb75495c686d
 	github.com/dgraph-io/badger/v2 v2.0.0-rc2 // indirect
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/protobuf v1.3.1

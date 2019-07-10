@@ -24,6 +24,7 @@ require (
 	github.com/ipfs/go-merkledag v0.0.3
 	github.com/ipfs/go-path v0.0.4
 	github.com/ipfs/interface-go-ipfs-core v0.0.8
+	github.com/jarcoal/httpmock v1.0.4
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
 	github.com/jinzhu/gorm v1.9.9
 	github.com/libp2p/go-libp2p v0.0.28
@@ -43,6 +44,7 @@ require (
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be // indirect
 	github.com/tyler-smith/go-bip39 v1.0.0
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
+	golang.org/x/net v0.0.0-20190522135303-fa69b94a3b58
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 )
 

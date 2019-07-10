@@ -9,7 +9,7 @@ require (
 	github.com/btcsuite/btcd v0.0.0-20190629003639-c26ffa870fd8
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/coreos/go-semver v0.3.0 // indirect
-	github.com/cpacia/wallet-interface v0.0.0-20190707213128-cb75495c686d
+	github.com/cpacia/wallet-interface v0.0.0-20190709010727-00d59a43f73d
 	github.com/dgraph-io/badger/v2 v2.0.0-rc2 // indirect
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/protobuf v1.3.1

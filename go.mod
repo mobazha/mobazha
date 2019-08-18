@@ -6,6 +6,7 @@ require (
 	github.com/OpenBazaar/jsonpb v0.0.0-20171123000858-37d32ddf4eef
 	github.com/btcsuite/btcd v0.0.0-20190807005414-4063feeff79a
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
+	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/cpacia/wallet-interface v0.0.0-20190815183307-4fa7dc1fc46e
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/protobuf v1.3.2
@@ -34,6 +35,7 @@ require (
 	github.com/libp2p/go-libp2p-protocol v0.0.1
 	github.com/libp2p/go-libp2p-record v0.0.1
 	github.com/libp2p/go-libp2p-routing v0.0.1
+	github.com/libp2p/go-msgio v0.0.4 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.2
 	github.com/multiformats/go-multihash v0.0.6
 	github.com/natefinch/lumberjack v2.0.0+incompatible
@@ -41,6 +43,7 @@ require (
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
+	golang.org/x/crypto v0.0.0-20190618222545-ea8f1a30c443 // indirect
 	golang.org/x/net v0.0.0-20190724013045-ca1201d0de80
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 )

@@ -62,6 +62,8 @@ github.com/coreos/go-semver v0.3.0 h1:wkHLiw0WNATZnSG7epLsujiMCgPAc9xhjJ4tgnAxmf
 github.com/coreos/go-semver v0.3.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3EedlOD2RNk=
 github.com/cpacia/wallet-interface v0.0.0-20190815183307-4fa7dc1fc46e h1:HKJFZbfkn76upvd1epRF43/HotN/oajW/M8TkpR4v/I=
 github.com/cpacia/wallet-interface v0.0.0-20190815183307-4fa7dc1fc46e/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
+github.com/cpacia/wallet-interface v0.0.0-20190829023053-6b836d6d625b h1:ea15+XwzVPGp2XO9cd2HkgoEo78zk/+cLjaLk6VoE6M=
+github.com/cpacia/wallet-interface v0.0.0-20190829023053-6b836d6d625b/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
 github.com/cpuguy83/go-md2man v1.0.10/go.mod h1:SmD6nW6nTyfqj6ABTjUi3V3JVMnlJmwcJI5acqYI6dE=
 github.com/cskr/pubsub v1.0.2 h1:vlOzMhl6PFn60gRlTQQsIfVwaPB/B/8MziK8FhEPt/0=
 github.com/cskr/pubsub v1.0.2/go.mod h1:/8MzYXk/NJAz782G8RPkFzXTZVu63VotefPnR9TIRis=
@@ -95,6 +97,8 @@ github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5Kwzbycv
 github.com/fd/go-nat v1.0.0/go.mod h1:BTBu/CKvMmOMUPkKVef1pngt2WFH/lg7E6yQnulfp6E=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
+github.com/getlantern/deepcopy v0.0.0-20160317154340-7f45deb8130a h1:yU/FENpkHYISWsQrbr3pcZOBj0EuRjPzNc1+dTCLu44=
+github.com/getlantern/deepcopy v0.0.0-20160317154340-7f45deb8130a/go.mod h1:AEugkNu3BjBxyz958nJ5holD9PRjta6iprcoUauDbU4=
 github.com/go-check/check v0.0.0-20180628173108-788fd7840127 h1:0gkP6mzaMqkmpcJYCFOLkIBwI7xFExG03bbkOkCvUPI=
 github.com/go-check/check v0.0.0-20180628173108-788fd7840127/go.mod h1:9ES+weclKsC9YodN5RgxqK/VD9HM9JsCSh7rNhMZE98=
 github.com/go-critic/go-critic v0.0.0-20181204210945-c3db6069acc5/go.mod h1:Jc75BZJv2dNy7opKH6bF29VveDQHfGZ6Asn/3phBesg=

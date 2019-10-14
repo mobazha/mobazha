@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/OpenBazaar/jsonpb v0.0.0-20171123000858-37d32ddf4eef
+	github.com/OpenBazaar/wallet-interface v0.0.0-20190807004547-aa8e214acd9b // indirect
 	github.com/btcsuite/btcd v0.0.0-20190807005414-4063feeff79a
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/coreos/go-semver v0.3.0 // indirect

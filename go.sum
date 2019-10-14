@@ -14,6 +14,8 @@ github.com/Kubuxu/gocovmerge v0.0.0-20161216165753-7ecaa51963cd/go.mod h1:bqoB8k
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/OpenBazaar/jsonpb v0.0.0-20171123000858-37d32ddf4eef h1:+aqKrHtCJTRp8ziyrjfHbTF5puPQZfgRt65+iM7FD2w=
 github.com/OpenBazaar/jsonpb v0.0.0-20171123000858-37d32ddf4eef/go.mod h1:55mCznBcN9WQgrtgaAkv+p2LxeW/tQRdidyyE9D0I5k=
+github.com/OpenBazaar/wallet-interface v0.0.0-20190807004547-aa8e214acd9b h1:KjQH45msWRtDhb5JAbBW+eU4M/9xIm11rsOSgAaqDOs=
+github.com/OpenBazaar/wallet-interface v0.0.0-20190807004547-aa8e214acd9b/go.mod h1:KiLnq+35bzKd6Bq8EP8iGElNBU/++VxbDVg9zCvKMgU=
 github.com/OpenPeeDeeP/depguard v0.0.0-20180806142446-a69c782687b2/go.mod h1:7/4sitnI9YlQgTLLk734QlzXT8DuHVnAyztLplQjk+o=
 github.com/Quasilyte/go-consistent v0.0.0-20181230194409-8f8379e70f99/go.mod h1:ds1OLa3HF2x4OGKCx0pNTVL1s9Ii/2mT0Bg/8PtW6AM=
 github.com/Shopify/sarama v1.19.0/go.mod h1:FVkBWblsNy7DGZRfXLU0O9RCGt5g3g3yEuWXgklEdEo=

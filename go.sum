@@ -92,6 +92,8 @@ github.com/cpacia/wallet-interface v0.0.0-20191014142331-7c7b64e08f98 h1:U3kRq3n
 github.com/cpacia/wallet-interface v0.0.0-20191014142331-7c7b64e08f98/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
 github.com/cpacia/wallet-interface v0.0.0-20191102234951-4d1c3d7d2a13 h1:LSuPMDVu3NeaQn3Cm0ortF0jOk/GTDqpaacq8CHeXh0=
 github.com/cpacia/wallet-interface v0.0.0-20191102234951-4d1c3d7d2a13/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
+github.com/cpacia/wallet-interface v0.0.0-20191104022333-435715e6ec06 h1:Cb0/N/8uaeG+pFJ9cDJaqIrNI+2E8HRTHruxcPB0QMQ=
+github.com/cpacia/wallet-interface v0.0.0-20191104022333-435715e6ec06/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
 github.com/cpuguy83/go-md2man v1.0.10/go.mod h1:SmD6nW6nTyfqj6ABTjUi3V3JVMnlJmwcJI5acqYI6dE=
 github.com/cskr/pubsub v1.0.2 h1:vlOzMhl6PFn60gRlTQQsIfVwaPB/B/8MziK8FhEPt/0=
 github.com/cskr/pubsub v1.0.2/go.mod h1:/8MzYXk/NJAz782G8RPkFzXTZVu63VotefPnR9TIRis=

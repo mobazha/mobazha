@@ -30,5 +30,7 @@ func (x *Init) Execute(args []string) error {
 	} else {
 		_, err = repo.NewRepo(x.DataDir)
 	}
+
+	// TODO: initialize multiwallet with birthdate.
 	return err
 }

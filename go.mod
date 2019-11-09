@@ -11,6 +11,7 @@ require (
 	github.com/fatih/color v1.7.0
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/protobuf v1.3.2
+	github.com/gorilla/mux v1.7.3
 	github.com/gosimple/slug v1.6.0
 	github.com/ipfs/go-bitswap v0.0.8-0.20190704155249-cbb485998356
 	github.com/ipfs/go-cid v0.0.2
@@ -39,6 +40,8 @@ require (
 	github.com/libp2p/go-libp2p-routing v0.0.1
 	github.com/libp2p/go-msgio v0.0.4 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.2
+	github.com/multiformats/go-multiaddr v0.0.4
+	github.com/multiformats/go-multiaddr-net v0.0.1
 	github.com/multiformats/go-multihash v0.0.6
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7

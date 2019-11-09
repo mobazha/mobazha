@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/cpacia/openbazaar3.0/core"
+	"github.com/cpacia/openbazaar3.0/events"
 	"github.com/cpacia/openbazaar3.0/repo"
 	"github.com/cpacia/openbazaar3.0/version"
 	"github.com/fatih/color"
@@ -12,7 +13,6 @@ import (
 	"os"
 	"os/signal"
 	"sort"
-	"time"
 )
 
 var log = logging.MustGetLogger("CMD")
@@ -44,15 +44,18 @@ func (x *Start) Execute(args []string) error {
 
 	for range c {
 		if err := n.Stop(false); err == core.ErrPublishingActive {
+			sub, err := n.SubscribeEvent(&events.PublishFinished{})
+			if err != nil {
+				return err
+			}
 			log.Info("OpenBazaar is currently publishing. Press ctl +c again to force shutdown.")
 			select {
-			case <-time.After(time.Second * 10):
-				continue
 			case <-c:
-				log.Info("OpenBazaar shutting down...")
-				n.Stop(true)
-				os.Exit(1)
+			case <-sub.Out():
 			}
+			log.Info("OpenBazaar shutting down...")
+			n.Stop(true)
+			os.Exit(1)
 		} else if err == nil {
 			log.Info("OpenBazaar shutting down...")
 			os.Exit(1)

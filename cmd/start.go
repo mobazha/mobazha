@@ -2,9 +2,20 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"github.com/cpacia/openbazaar3.0/core"
 	"github.com/cpacia/openbazaar3.0/repo"
+	"github.com/cpacia/openbazaar3.0/version"
+	"github.com/fatih/color"
+	ipfscore "github.com/ipfs/go-ipfs/core"
+	"github.com/op/go-logging"
+	"os"
+	"os/signal"
+	"sort"
+	"time"
 )
+
+var log = logging.MustGetLogger("CMD")
 
 // Start is the main entry point for openbazaar-go. The options to this
 // command are the same as the OpenBazaar node config options.
@@ -19,10 +30,83 @@ func (x *Start) Execute(args []string) error {
 		return err
 	}
 
-	_, err = core.NewNode(context.Background(), cfg)
+	n, err := core.NewNode(context.Background(), cfg)
 	if err != nil {
 		return err
 	}
+	n.Start()
+	printSplashScreen()
+	log.Infof("PeerID: %s", n.Identity())
+	printSwarmAddrs(n.IPFSNode())
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+
+	for range c {
+		if err := n.Stop(false); err == core.ErrPublishingActive {
+			log.Info("OpenBazaar is currently publishing. Press ctl +c again to force shutdown.")
+			select {
+			case <-time.After(time.Second * 10):
+				continue
+			case <-c:
+				log.Info("OpenBazaar shutting down...")
+				n.Stop(true)
+				os.Exit(1)
+			}
+		} else if err == nil {
+			log.Info("OpenBazaar shutting down...")
+			os.Exit(1)
+		}
+	}
 
 	return nil
+}
+
+func printSwarmAddrs(node *ipfscore.IpfsNode) {
+	var addrs []string
+	for _, addr := range node.PeerHost.Addrs() {
+		addrs = append(addrs, addr.String())
+	}
+	sort.Strings(addrs)
+
+	for _, addr := range addrs {
+		log.Infof("Swarm listening on %s\n", addr)
+	}
+}
+
+func printSplashScreen() {
+	blue := color.New(color.FgBlue)
+	white := color.New(color.FgWhite)
+
+	for i, l := range []string{
+		"________             ",
+		"         __________",
+		`\_____  \ ______   ____   ____`,
+		`\______   \_____  _____________  _____ _______`,
+		` /   |   \\____ \_/ __ \ /    \`,
+		`|    |  _/\__  \ \___   /\__  \ \__  \\_  __ \ `,
+		`/    |    \  |_> >  ___/|   |  \    `,
+		`|   \ / __ \_/    /  / __ \_/ __ \|  | \/`,
+		`\_______  /   __/ \___  >___|  /`,
+		`______  /(____  /_____ \(____  (____  /__|`,
+		`        \/|__|        \/     \/  `,
+		`     \/      \/      \/     \/     \/`,
+	} {
+		if i%2 == 0 {
+			if _, err := white.Printf(l); err != nil {
+				log.Debug(err)
+				return
+			}
+			continue
+		}
+		if _, err := blue.Println(l); err != nil {
+			log.Debug(err)
+			return
+		}
+	}
+
+	blue.DisableColor()
+	white.DisableColor()
+	fmt.Println("")
+	fmt.Printf("\nopenbazaar-go v%s\n", version.String())
 }

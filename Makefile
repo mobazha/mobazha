@@ -22,6 +22,13 @@ protos:
 	cd orders/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=$(PKGMAP):./ *.proto
 
 ##
+## Sample config file
+##
+
+sample-config:
+	cd repo && go-bindata -pkg=repo sample-openbazaar.conf
+
+##
 ## Docker
 ##
 DOCKER_PROFILE ?= openbazaar

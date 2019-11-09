@@ -47,8 +47,7 @@ require (
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
-	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 	golang.org/x/crypto v0.0.0-20190618222545-ea8f1a30c443 // indirect
 	golang.org/x/net v0.0.0-20190724013045-ca1201d0de80
-	gopkg.in/natefinch/lumberjack.v2 v2.0.0
+	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 )

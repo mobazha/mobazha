@@ -39,6 +39,7 @@ require (
 	github.com/libp2p/go-libp2p-record v0.0.1
 	github.com/libp2p/go-libp2p-routing v0.0.1
 	github.com/libp2p/go-msgio v0.0.4 // indirect
+	github.com/libp2p/go-testutil v0.0.1
 	github.com/microcosm-cc/bluemonday v1.0.2
 	github.com/multiformats/go-multiaddr v0.0.4
 	github.com/multiformats/go-multiaddr-net v0.0.1

@@ -34,9 +34,9 @@ func (x *Start) Execute(args []string) error {
 	if err != nil {
 		return err
 	}
-	n.Start()
 	printSplashScreen()
 	log.Infof("PeerID: %s", n.Identity())
+	n.Start()
 	printSwarmAddrs(n.IPFSNode())
 
 	c := make(chan os.Signal, 1)

@@ -41,7 +41,6 @@ func (x *Start) Execute(args []string) error {
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
-
 	for range c {
 		if err := n.Stop(false); err == core.ErrPublishingActive {
 			sub, err := n.SubscribeEvent(&events.PublishFinished{})

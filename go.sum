@@ -66,6 +66,8 @@ github.com/coreos/go-semver v0.3.0 h1:wkHLiw0WNATZnSG7epLsujiMCgPAc9xhjJ4tgnAxmf
 github.com/coreos/go-semver v0.3.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3EedlOD2RNk=
 github.com/cpacia/wallet-interface v0.0.0-20191104022333-435715e6ec06 h1:Cb0/N/8uaeG+pFJ9cDJaqIrNI+2E8HRTHruxcPB0QMQ=
 github.com/cpacia/wallet-interface v0.0.0-20191104022333-435715e6ec06/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
+github.com/cpacia/wallet-interface v0.0.0-20191111210226-49484742c5e8 h1:1YioSeE8rdOXg25pKZA9ffHFa0om4HP9tCFT12m2WrE=
+github.com/cpacia/wallet-interface v0.0.0-20191111210226-49484742c5e8/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
 github.com/cpuguy83/go-md2man v1.0.10/go.mod h1:SmD6nW6nTyfqj6ABTjUi3V3JVMnlJmwcJI5acqYI6dE=
 github.com/cskr/pubsub v1.0.2 h1:vlOzMhl6PFn60gRlTQQsIfVwaPB/B/8MziK8FhEPt/0=
 github.com/cskr/pubsub v1.0.2/go.mod h1:/8MzYXk/NJAz782G8RPkFzXTZVu63VotefPnR9TIRis=

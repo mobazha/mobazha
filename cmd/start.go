@@ -42,7 +42,8 @@ func (x *Start) Execute(args []string) error {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	for range c {
-		if err := n.Stop(false); err == core.ErrPublishingActive {
+		switch n.Stop(false) {
+		case core.ErrPublishingActive:
 			sub, err := n.SubscribeEvent(&events.PublishFinished{})
 			if err != nil {
 				return err
@@ -55,7 +56,19 @@ func (x *Start) Execute(args []string) error {
 			log.Info("OpenBazaar shutting down...")
 			n.Stop(true)
 			os.Exit(1)
-		} else if err == nil {
+		case core.ErrIPFSDelayedShutdown:
+			sub, err := n.SubscribeEvent(&events.IPFSShutdown{})
+			if err != nil {
+				return err
+			}
+			log.Info("IPFS node is shutting down. Press ctl +c again to force shutdown.")
+			select {
+			case <-c:
+			case <-sub.Out():
+			}
+			log.Info("OpenBazaar shutting down...")
+			os.Exit(1)
+		case nil:
 			log.Info("OpenBazaar shutting down...")
 			os.Exit(1)
 		}

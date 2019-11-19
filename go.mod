@@ -46,6 +46,8 @@ require (
 	github.com/multiformats/go-multihash v0.0.6
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
+	github.com/pkg/errors v0.8.1
+	github.com/prometheus/common v0.4.0
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
 	golang.org/x/crypto v0.0.0-20190618222545-ea8f1a30c443 // indirect

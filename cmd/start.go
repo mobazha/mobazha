@@ -88,9 +88,8 @@ func printSwarmAddrs(node *ipfscore.IpfsNode) {
 	}
 	sort.Strings(lisAddrs)
 	for _, addr := range lisAddrs {
-		fmt.Printf("Swarm listening on %s\n", addr)
+		log.Infof("Swarm listening on %s\n", addr)
 	}
-
 }
 
 func printSplashScreen() {

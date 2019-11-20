@@ -78,15 +78,19 @@ func (x *Start) Execute(args []string) error {
 }
 
 func printSwarmAddrs(node *ipfscore.IpfsNode) {
-	var addrs []string
-	for _, addr := range node.PeerHost.Addrs() {
-		addrs = append(addrs, addr.String())
+	var lisAddrs []string
+	ifaceAddrs, err := node.PeerHost.Network().InterfaceListenAddresses()
+	if err != nil {
+		log.Errorf("failed to read listening addresses: %s", err)
 	}
-	sort.Strings(addrs)
+	for _, addr := range ifaceAddrs {
+		lisAddrs = append(lisAddrs, addr.String())
+	}
+	sort.Strings(lisAddrs)
+	for _, addr := range lisAddrs {
+		fmt.Printf("Swarm listening on %s\n", addr)
+	}
 
-	for _, addr := range addrs {
-		log.Infof("Swarm listening on %s\n", addr)
-	}
 }
 
 func printSplashScreen() {

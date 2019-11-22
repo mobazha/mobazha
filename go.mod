@@ -7,6 +7,7 @@ require (
 	github.com/btcsuite/btcd v0.0.0-20190807005414-4063feeff79a
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/coreos/go-semver v0.3.0 // indirect
+	github.com/cpacia/multiwallet v0.0.0-20191120204114-569db91e3ccd
 	github.com/cpacia/wallet-interface v0.0.0-20191120201009-b6e1a48420f9
 	github.com/fatih/color v1.7.0
 	github.com/gogo/protobuf v1.2.1
@@ -27,7 +28,7 @@ require (
 	github.com/jarcoal/httpmock v1.0.4
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
 	github.com/jessevdk/go-flags v1.4.0
-	github.com/jinzhu/gorm v1.9.10
+	github.com/jinzhu/gorm v1.9.11
 	github.com/libp2p/go-libp2p v0.0.28
 	github.com/libp2p/go-libp2p-crypto v0.0.2
 	github.com/libp2p/go-libp2p-host v0.0.3

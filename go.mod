@@ -7,8 +7,8 @@ require (
 	github.com/btcsuite/btcd v0.0.0-20190807005414-4063feeff79a
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/coreos/go-semver v0.3.0 // indirect
-	github.com/cpacia/multiwallet v0.0.0-20191120204114-569db91e3ccd
-	github.com/cpacia/wallet-interface v0.0.0-20191122184223-e88a3c7f4c88
+	github.com/cpacia/multiwallet v0.0.0-20191130144528-b16fac419703
+	github.com/cpacia/wallet-interface v0.0.0-20191129163644-3b6139725372
 	github.com/fatih/color v1.7.0
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/protobuf v1.3.2
@@ -48,10 +48,7 @@ require (
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pkg/errors v0.8.1
-	github.com/prometheus/common v0.4.0
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
-	golang.org/x/crypto v0.0.0-20190618222545-ea8f1a30c443 // indirect
-	golang.org/x/net v0.0.0-20190724013045-ca1201d0de80
-	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
+	golang.org/x/net v0.0.0-20190923162816-aa69164e4478
 )

@@ -20,11 +20,15 @@ func (x *Init) Execute(args []string) error {
 		x.DataDir = repo.DefaultHomeDir
 	}
 
-	if !fsrepo.IsInitialized(x.DataDir) && !x.Force {
+	if fsrepo.IsInitialized(x.DataDir) && !x.Force {
 		return errors.New("node is already initialized")
 	}
 
-	var err error
+	_, _, err := repo.LoadConfig()
+	if err != nil {
+		return err
+	}
+
 	if x.Mnemonic != "" {
 		_, err = repo.NewRepoWithCustomMnemonicSeed(x.DataDir, x.Mnemonic)
 	} else {

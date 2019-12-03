@@ -76,6 +76,8 @@ github.com/coreos/go-semver v0.3.0 h1:wkHLiw0WNATZnSG7epLsujiMCgPAc9xhjJ4tgnAxmf
 github.com/coreos/go-semver v0.3.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3EedlOD2RNk=
 github.com/cpacia/multiwallet v0.0.0-20191203140304-5575aa772a89 h1:3loNCoDQ3mVSZOv6v86oWgkMKeE5EKVHmIOCrzZcnS8=
 github.com/cpacia/multiwallet v0.0.0-20191203140304-5575aa772a89/go.mod h1:JplPiFcqEKxuelRvdoQFJKaTnBG/UlHqFVLmSr/O56g=
+github.com/cpacia/multiwallet v0.0.0-20191203205656-61902016a8ea h1:PKrAIVornQFywLPM03pmyml1UPJQ06x5vNKSizLP/JU=
+github.com/cpacia/multiwallet v0.0.0-20191203205656-61902016a8ea/go.mod h1:JplPiFcqEKxuelRvdoQFJKaTnBG/UlHqFVLmSr/O56g=
 github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4 h1:IUxL/wHaU/VgRZFVils7SduWVQjT8V8ObYTMZPWNbVc=
 github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
 github.com/cpuguy83/go-md2man v1.0.10/go.mod h1:SmD6nW6nTyfqj6ABTjUi3V3JVMnlJmwcJI5acqYI6dE=
@@ -893,6 +895,8 @@ golang.org/x/tools v0.0.0-20190524140312-2c0ae7006135/go.mod h1:RgjU9mgBXZiqYHBn
 golang.org/x/xerrors v0.0.0-20190212162355-a5947ffaace3/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20190513163551-3ee3066db522 h1:bhOzK9QyoD0ogCnFro1m2mz41+Ib0oOhfJnBp5MR4K4=
 golang.org/x/xerrors v0.0.0-20190513163551-3ee3066db522/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 h1:/atklqdjdhuosWIl6AIbOeHJjicWYPqR9bpxqxYG2pA=
+golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 google.golang.org/api v0.3.1/go.mod h1:6wY9I6uQWHQ8EM57III9mq/AjF+i8G65rmVagqKMtkk=
 google.golang.org/appengine v1.1.0/go.mod h1:EbEs0AVv82hx2wNQdGPgUI5lhzA/G0D9YwlJXL52JkM=
 google.golang.org/appengine v1.4.0 h1:/wp5JvzpHIxhs/dumFmF7BXTf3Z+dd4uXta4kVyO508=

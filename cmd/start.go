@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/cpacia/openbazaar3.0/core"
+	"github.com/cpacia/openbazaar3.0/core/coreiface"
 	"github.com/cpacia/openbazaar3.0/events"
 	"github.com/cpacia/openbazaar3.0/repo"
 	"github.com/cpacia/openbazaar3.0/version"
@@ -43,7 +44,7 @@ func (x *Start) Execute(args []string) error {
 	signal.Notify(c, os.Interrupt)
 	for range c {
 		switch n.Stop(false) {
-		case core.ErrPublishingActive:
+		case coreiface.ErrPublishingActive:
 			sub, err := n.SubscribeEvent(&events.PublishFinished{})
 			if err != nil {
 				return err
@@ -56,7 +57,7 @@ func (x *Start) Execute(args []string) error {
 			log.Info("OpenBazaar shutting down...")
 			n.Stop(true)
 			os.Exit(1)
-		case core.ErrIPFSDelayedShutdown:
+		case coreiface.ErrIPFSDelayedShutdown:
 			sub, err := n.SubscribeEvent(&events.IPFSShutdown{})
 			if err != nil {
 				return err

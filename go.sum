@@ -74,10 +74,10 @@ github.com/coreos/go-semver v0.2.1-0.20180108230905-e214231b295a h1:U0BbGfKnviqV
 github.com/coreos/go-semver v0.2.1-0.20180108230905-e214231b295a/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3EedlOD2RNk=
 github.com/coreos/go-semver v0.3.0 h1:wkHLiw0WNATZnSG7epLsujiMCgPAc9xhjJ4tgnAxmfM=
 github.com/coreos/go-semver v0.3.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3EedlOD2RNk=
-github.com/cpacia/multiwallet v0.0.0-20191203140304-5575aa772a89 h1:3loNCoDQ3mVSZOv6v86oWgkMKeE5EKVHmIOCrzZcnS8=
-github.com/cpacia/multiwallet v0.0.0-20191203140304-5575aa772a89/go.mod h1:JplPiFcqEKxuelRvdoQFJKaTnBG/UlHqFVLmSr/O56g=
-github.com/cpacia/multiwallet v0.0.0-20191203205656-61902016a8ea h1:PKrAIVornQFywLPM03pmyml1UPJQ06x5vNKSizLP/JU=
-github.com/cpacia/multiwallet v0.0.0-20191203205656-61902016a8ea/go.mod h1:JplPiFcqEKxuelRvdoQFJKaTnBG/UlHqFVLmSr/O56g=
+github.com/cpacia/multiwallet v0.0.0-20191204001909-076286b64368 h1:bAV0t2ZBIxhRSZ1mA90hsaxKTGtIw4wJLjLQ9RiYUMc=
+github.com/cpacia/multiwallet v0.0.0-20191204001909-076286b64368/go.mod h1:PQLl54r7fQNyF9O9bByQSlWLZDyjK95AkVF0t5ng13c=
+github.com/cpacia/multiwallet v0.0.0-20191204003033-89a5dca4b9b0 h1:XTClON3i0aSAHLxu73YcKIKHM52g7mdJwJCbOL9s3jU=
+github.com/cpacia/multiwallet v0.0.0-20191204003033-89a5dca4b9b0/go.mod h1:PQLl54r7fQNyF9O9bByQSlWLZDyjK95AkVF0t5ng13c=
 github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4 h1:IUxL/wHaU/VgRZFVils7SduWVQjT8V8ObYTMZPWNbVc=
 github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
 github.com/cpuguy83/go-md2man v1.0.10/go.mod h1:SmD6nW6nTyfqj6ABTjUi3V3JVMnlJmwcJI5acqYI6dE=

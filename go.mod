@@ -6,6 +6,7 @@ require (
 	github.com/OpenBazaar/jsonpb v0.0.0-20171123000858-37d32ddf4eef
 	github.com/btcsuite/btcd v0.0.0-20190807005414-4063feeff79a
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
+	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/cpacia/multiwallet v0.0.0-20191204003033-89a5dca4b9b0
 	github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4

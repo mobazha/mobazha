@@ -4,10 +4,12 @@ go 1.13
 
 require (
 	github.com/OpenBazaar/jsonpb v0.0.0-20171123000858-37d32ddf4eef
+	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
 	github.com/btcsuite/btcd v0.0.0-20190807005414-4063feeff79a
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/coreos/go-semver v0.3.0 // indirect
+	github.com/cpacia/go-store-and-forward v0.0.0-20191206213800-8df5d207575a
 	github.com/cpacia/multiwallet v0.0.0-20191204003033-89a5dca4b9b0
 	github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4
 	github.com/fatih/color v1.7.0
@@ -52,6 +54,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
+	golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392
 	golang.org/x/net v0.0.0-20190923162816-aa69164e4478
 	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 // indirect
 )

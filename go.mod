@@ -9,7 +9,7 @@ require (
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/coreos/go-semver v0.3.0 // indirect
-	github.com/cpacia/go-store-and-forward v0.0.0-20191206213800-8df5d207575a
+	github.com/cpacia/go-store-and-forward v0.0.0-20191206233228-4af4c3ab3b2c
 	github.com/cpacia/multiwallet v0.0.0-20191204003033-89a5dca4b9b0
 	github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4
 	github.com/fatih/color v1.7.0

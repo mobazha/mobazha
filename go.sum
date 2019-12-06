@@ -78,6 +78,10 @@ github.com/coreos/go-semver v0.3.0 h1:wkHLiw0WNATZnSG7epLsujiMCgPAc9xhjJ4tgnAxmf
 github.com/coreos/go-semver v0.3.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3EedlOD2RNk=
 github.com/cpacia/go-store-and-forward v0.0.0-20191206213800-8df5d207575a h1:GwD9DmBOYykx4jG1y0W9Is8pMEKF9X17GNU16hMTIU0=
 github.com/cpacia/go-store-and-forward v0.0.0-20191206213800-8df5d207575a/go.mod h1:Phbz2QdnH0q4QIt9tA7VXTPiye2U7EcpYlAb7bZhaXs=
+github.com/cpacia/go-store-and-forward v0.0.0-20191206232813-40feffef51c6 h1:JQ0tAehLRxftAc7pg33C9BCxKmYrcwzgyoDO3xPGkdQ=
+github.com/cpacia/go-store-and-forward v0.0.0-20191206232813-40feffef51c6/go.mod h1:Phbz2QdnH0q4QIt9tA7VXTPiye2U7EcpYlAb7bZhaXs=
+github.com/cpacia/go-store-and-forward v0.0.0-20191206233228-4af4c3ab3b2c h1:/R7L87DFGf+dxrVDDLGcQwrJZbg8tpoOuRxMO9sdLOQ=
+github.com/cpacia/go-store-and-forward v0.0.0-20191206233228-4af4c3ab3b2c/go.mod h1:Phbz2QdnH0q4QIt9tA7VXTPiye2U7EcpYlAb7bZhaXs=
 github.com/cpacia/multiwallet v0.0.0-20191204001909-076286b64368 h1:bAV0t2ZBIxhRSZ1mA90hsaxKTGtIw4wJLjLQ9RiYUMc=
 github.com/cpacia/multiwallet v0.0.0-20191204001909-076286b64368/go.mod h1:PQLl54r7fQNyF9O9bByQSlWLZDyjK95AkVF0t5ng13c=
 github.com/cpacia/multiwallet v0.0.0-20191204003033-89a5dca4b9b0 h1:XTClON3i0aSAHLxu73YcKIKHM52g7mdJwJCbOL9s3jU=

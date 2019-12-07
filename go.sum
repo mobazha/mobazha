@@ -85,6 +85,8 @@ github.com/cpacia/go-store-and-forward v0.0.0-20191207012433-82cc30cf9f03 h1:kKd
 github.com/cpacia/go-store-and-forward v0.0.0-20191207012433-82cc30cf9f03/go.mod h1:Phbz2QdnH0q4QIt9tA7VXTPiye2U7EcpYlAb7bZhaXs=
 github.com/cpacia/multiwallet v0.0.0-20191204003033-89a5dca4b9b0 h1:XTClON3i0aSAHLxu73YcKIKHM52g7mdJwJCbOL9s3jU=
 github.com/cpacia/multiwallet v0.0.0-20191204003033-89a5dca4b9b0/go.mod h1:PQLl54r7fQNyF9O9bByQSlWLZDyjK95AkVF0t5ng13c=
+github.com/cpacia/multiwallet v0.0.0-20191207022831-9c479a962e28 h1:/j5RIdEedCB6HH86DwmMHt4h10zdyMAJz8KejXfjJf0=
+github.com/cpacia/multiwallet v0.0.0-20191207022831-9c479a962e28/go.mod h1:PQLl54r7fQNyF9O9bByQSlWLZDyjK95AkVF0t5ng13c=
 github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4 h1:IUxL/wHaU/VgRZFVils7SduWVQjT8V8ObYTMZPWNbVc=
 github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
 github.com/cpuguy83/go-md2man v1.0.10/go.mod h1:SmD6nW6nTyfqj6ABTjUi3V3JVMnlJmwcJI5acqYI6dE=

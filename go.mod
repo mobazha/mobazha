@@ -7,9 +7,8 @@ require (
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
 	github.com/btcsuite/btcd v0.0.0-20190807005414-4063feeff79a
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
-	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/coreos/go-semver v0.3.0 // indirect
-	github.com/cpacia/go-store-and-forward v0.0.0-20191206233228-4af4c3ab3b2c
+	github.com/cpacia/go-store-and-forward v0.0.0-20191207012433-82cc30cf9f03
 	github.com/cpacia/multiwallet v0.0.0-20191204003033-89a5dca4b9b0
 	github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4
 	github.com/fatih/color v1.7.0
@@ -57,4 +56,9 @@ require (
 	golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392
 	golang.org/x/net v0.0.0-20190923162816-aa69164e4478
 	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 // indirect
+)
+
+replace (
+	github.com/go-critic/go-critic => github.com/go-critic/go-critic v0.4.0
+	github.com/golangci/golangci-lint => github.com/golangci/golangci-lint v1.21.0
 )

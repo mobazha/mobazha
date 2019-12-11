@@ -9,8 +9,8 @@ require (
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/cpacia/go-store-and-forward v0.0.0-20191207200637-6a44ca2c227f
-	github.com/cpacia/multiwallet v0.0.0-20191211012857-534c2c1a270a
-	github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4
+	github.com/cpacia/multiwallet v0.0.0-20191211192317-19efd00bcacf
+	github.com/cpacia/wallet-interface v0.0.0-20191211190928-d7ad7fbaf4ec
 	github.com/fatih/color v1.7.0
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/protobuf v1.3.2

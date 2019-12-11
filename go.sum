@@ -104,8 +104,16 @@ github.com/cpacia/multiwallet v0.0.0-20191209051057-431a5a71b450 h1:5jDsFNDIA1QU
 github.com/cpacia/multiwallet v0.0.0-20191209051057-431a5a71b450/go.mod h1:PQLl54r7fQNyF9O9bByQSlWLZDyjK95AkVF0t5ng13c=
 github.com/cpacia/multiwallet v0.0.0-20191211012857-534c2c1a270a h1:/zGbdPqrqxH4svSFDuW2KPHllRmj7t5EYrOUgmpEBno=
 github.com/cpacia/multiwallet v0.0.0-20191211012857-534c2c1a270a/go.mod h1:EYGQhLawPLZJf/tHfwqWJ1B6YVoXFBttKFsexQYtTGQ=
+github.com/cpacia/multiwallet v0.0.0-20191211191827-65b815edf7e8 h1:T7n/i/QLyvAFlA/kIAH4oCXQrrPPFtGLnf9/X9UCoTg=
+github.com/cpacia/multiwallet v0.0.0-20191211191827-65b815edf7e8/go.mod h1:WuscKUReHe84hbwa0RSuhSxD9Molld39jgYn5OLF2Os=
+github.com/cpacia/multiwallet v0.0.0-20191211192029-8fcca5164f5d h1:j60eldlu+oMmaHnBInogcBT/8HXSb6F6UfaKNuq5mfI=
+github.com/cpacia/multiwallet v0.0.0-20191211192029-8fcca5164f5d/go.mod h1:WuscKUReHe84hbwa0RSuhSxD9Molld39jgYn5OLF2Os=
+github.com/cpacia/multiwallet v0.0.0-20191211192317-19efd00bcacf h1:pWL58s7pZVxQVFi2mDxFydHLKbRQKWNt4/VwWtMP0GQ=
+github.com/cpacia/multiwallet v0.0.0-20191211192317-19efd00bcacf/go.mod h1:WuscKUReHe84hbwa0RSuhSxD9Molld39jgYn5OLF2Os=
 github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4 h1:IUxL/wHaU/VgRZFVils7SduWVQjT8V8ObYTMZPWNbVc=
 github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
+github.com/cpacia/wallet-interface v0.0.0-20191211190928-d7ad7fbaf4ec h1:8cd1omePj8G/5AR3QHNdpxbowRn+Ov1B0I1284/zFuw=
+github.com/cpacia/wallet-interface v0.0.0-20191211190928-d7ad7fbaf4ec/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
 github.com/cpuguy83/go-md2man v1.0.10/go.mod h1:SmD6nW6nTyfqj6ABTjUi3V3JVMnlJmwcJI5acqYI6dE=
 github.com/creack/pty v1.1.7/go.mod h1:lj5s0c3V2DBrqTV7llrYr5NG6My20zk30Fl46Y7DoTY=
 github.com/cskr/pubsub v1.0.2 h1:vlOzMhl6PFn60gRlTQQsIfVwaPB/B/8MziK8FhEPt/0=

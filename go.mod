@@ -5,11 +5,11 @@ go 1.13
 require (
 	github.com/OpenBazaar/jsonpb v0.0.0-20171123000858-37d32ddf4eef
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
-	github.com/btcsuite/btcd v0.0.0-20190807005414-4063feeff79a
+	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/cpacia/go-store-and-forward v0.0.0-20191207200637-6a44ca2c227f
-	github.com/cpacia/multiwallet v0.0.0-20191207022831-9c479a962e28
+	github.com/cpacia/multiwallet v0.0.0-20191211012857-534c2c1a270a
 	github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4
 	github.com/fatih/color v1.7.0
 	github.com/gogo/protobuf v1.2.1

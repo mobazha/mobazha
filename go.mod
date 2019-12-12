@@ -7,11 +7,13 @@ require (
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
-	github.com/coreos/go-semver v0.3.0 // indirect
+	github.com/cpacia/go-libtor v1.0.138-0.20191212055005-1e3e913c0ef9
+	github.com/cpacia/go-onion-transport v0.0.0-20191212094059-dd08e956eaa2
 	github.com/cpacia/go-store-and-forward v0.0.0-20191212030550-66dbb96ead2a
-	github.com/cpacia/multiwallet v0.0.0-20191212004439-8a5a7dc8bfec
-	github.com/cpacia/proxyclient v0.1.0
+	github.com/cpacia/multiwallet v0.0.0-20191212063608-34ed410821d4
+	github.com/cpacia/proxyclient v0.0.0-20191212063311-f03265f1fade
 	github.com/cpacia/wallet-interface v0.0.0-20191211190928-d7ad7fbaf4ec
+	github.com/cretz/bine v0.1.0
 	github.com/fatih/color v1.7.0
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/protobuf v1.3.2
@@ -34,11 +36,11 @@ require (
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/jinzhu/gorm v1.9.11
 	github.com/libp2p/go-libp2p v0.0.28
-	github.com/libp2p/go-libp2p-crypto v0.0.2
+	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-host v0.0.3
 	github.com/libp2p/go-libp2p-kad-dht v0.0.13
 	github.com/libp2p/go-libp2p-net v0.0.2
-	github.com/libp2p/go-libp2p-peer v0.1.1
+	github.com/libp2p/go-libp2p-peer v0.2.0
 	github.com/libp2p/go-libp2p-peerstore v0.0.6
 	github.com/libp2p/go-libp2p-protocol v0.0.1
 	github.com/libp2p/go-libp2p-record v0.0.1
@@ -54,9 +56,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
-	github.com/yawning/bulb v0.0.0-20170405033506-85d80d893c3d
 	golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392
-	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 // indirect
 )
 

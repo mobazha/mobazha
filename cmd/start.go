@@ -30,12 +30,11 @@ func (x *Start) Execute(args []string) error {
 	if err != nil {
 		return err
 	}
-
+	printSplashScreen()
 	n, err := core.NewNode(context.Background(), cfg)
 	if err != nil {
 		return err
 	}
-	printSplashScreen()
 	log.Infof("PeerID: %s", n.Identity())
 	n.Start()
 	printSwarmAddrs(n.IPFSNode())
@@ -49,7 +48,7 @@ func (x *Start) Execute(args []string) error {
 			if err != nil {
 				return err
 			}
-			log.Info("OpenBazaar is currently publishing. Press ctl +c again to force shutdown.")
+			log.Info("OpenBazaar is currently publishing. Press ctl+c again to force shutdown.")
 			select {
 			case <-c:
 			case <-sub.Out():
@@ -62,7 +61,7 @@ func (x *Start) Execute(args []string) error {
 			if err != nil {
 				return err
 			}
-			log.Info("IPFS node is shutting down. Press ctl +c again to force shutdown.")
+			log.Info("IPFS node is shutting down. Press ctl+c again to force shutdown.")
 			select {
 			case <-c:
 			case <-sub.Out():

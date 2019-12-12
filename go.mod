@@ -8,8 +8,9 @@ require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/coreos/go-semver v0.3.0 // indirect
-	github.com/cpacia/go-store-and-forward v0.0.0-20191207200637-6a44ca2c227f
-	github.com/cpacia/multiwallet v0.0.0-20191211192317-19efd00bcacf
+	github.com/cpacia/go-store-and-forward v0.0.0-20191211215122-e5086ce5d056
+	github.com/cpacia/multiwallet v0.0.0-20191212004439-8a5a7dc8bfec
+	github.com/cpacia/proxyclient v0.1.0
 	github.com/cpacia/wallet-interface v0.0.0-20191211190928-d7ad7fbaf4ec
 	github.com/fatih/color v1.7.0
 	github.com/gogo/protobuf v1.2.1
@@ -53,8 +54,9 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
+	github.com/yawning/bulb v0.0.0-20170405033506-85d80d893c3d
 	golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392
-	golang.org/x/net v0.0.0-20190923162816-aa69164e4478
+	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 // indirect
 )
 

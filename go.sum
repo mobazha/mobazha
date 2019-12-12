@@ -98,6 +98,8 @@ github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e/go.mod h1:F5haX7
 github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f/go.mod h1:E3G3o1h8I7cfcXa63jLwjI0eiQQMgzzUDFVpN/nH/eA=
 github.com/cpacia/go-store-and-forward v0.0.0-20191207200637-6a44ca2c227f h1:tOtHLajFwt1BlEXjOtOhNP2RhULdyuy0iCmCNJY17L0=
 github.com/cpacia/go-store-and-forward v0.0.0-20191207200637-6a44ca2c227f/go.mod h1:Phbz2QdnH0q4QIt9tA7VXTPiye2U7EcpYlAb7bZhaXs=
+github.com/cpacia/go-store-and-forward v0.0.0-20191211215122-e5086ce5d056 h1:DBCBMYxiyqVOtJOrIg0yAwm+A1qaGLUj52PIMBhvjVU=
+github.com/cpacia/go-store-and-forward v0.0.0-20191211215122-e5086ce5d056/go.mod h1:Phbz2QdnH0q4QIt9tA7VXTPiye2U7EcpYlAb7bZhaXs=
 github.com/cpacia/multiwallet v0.0.0-20191207022831-9c479a962e28 h1:/j5RIdEedCB6HH86DwmMHt4h10zdyMAJz8KejXfjJf0=
 github.com/cpacia/multiwallet v0.0.0-20191207022831-9c479a962e28/go.mod h1:PQLl54r7fQNyF9O9bByQSlWLZDyjK95AkVF0t5ng13c=
 github.com/cpacia/multiwallet v0.0.0-20191209051057-431a5a71b450 h1:5jDsFNDIA1QU3veesCk9qoyt7ZlCcPQ0sYxiNDIVS44=
@@ -110,6 +112,16 @@ github.com/cpacia/multiwallet v0.0.0-20191211192029-8fcca5164f5d h1:j60eldlu+oMm
 github.com/cpacia/multiwallet v0.0.0-20191211192029-8fcca5164f5d/go.mod h1:WuscKUReHe84hbwa0RSuhSxD9Molld39jgYn5OLF2Os=
 github.com/cpacia/multiwallet v0.0.0-20191211192317-19efd00bcacf h1:pWL58s7pZVxQVFi2mDxFydHLKbRQKWNt4/VwWtMP0GQ=
 github.com/cpacia/multiwallet v0.0.0-20191211192317-19efd00bcacf/go.mod h1:WuscKUReHe84hbwa0RSuhSxD9Molld39jgYn5OLF2Os=
+github.com/cpacia/multiwallet v0.0.0-20191211203420-154e17576786 h1:lIHpb5Tk+vvysWM4CoeXhpWrWwtbG84X59CmRSveB/U=
+github.com/cpacia/multiwallet v0.0.0-20191211203420-154e17576786/go.mod h1:WuscKUReHe84hbwa0RSuhSxD9Molld39jgYn5OLF2Os=
+github.com/cpacia/multiwallet v0.0.0-20191211203859-20861ee806c1 h1:NSqAK9PUXEakNCA4iLBRjWLt/OOac8pTf87Szdyjlr8=
+github.com/cpacia/multiwallet v0.0.0-20191211203859-20861ee806c1/go.mod h1:WuscKUReHe84hbwa0RSuhSxD9Molld39jgYn5OLF2Os=
+github.com/cpacia/multiwallet v0.0.0-20191212004255-fe3194a46f82 h1:7hzipDP6VIWwVOzI1exv0ePdz6Quk1qMOKxXjpJIUWU=
+github.com/cpacia/multiwallet v0.0.0-20191212004255-fe3194a46f82/go.mod h1:XEPiiMJn/M6XSbN87qUbTo/atXFvk091lFZSsspKscw=
+github.com/cpacia/multiwallet v0.0.0-20191212004439-8a5a7dc8bfec h1:r4JfK+svnOWTZkDA8f8lZVG9aK5HGxZHefg8kLzdzC0=
+github.com/cpacia/multiwallet v0.0.0-20191212004439-8a5a7dc8bfec/go.mod h1:XEPiiMJn/M6XSbN87qUbTo/atXFvk091lFZSsspKscw=
+github.com/cpacia/proxyclient v0.1.0 h1:ybhmNprqDoozdhYF9qGQiF/pnRsNEArvXnGuoyKJOcc=
+github.com/cpacia/proxyclient v0.1.0/go.mod h1:IF9edCuNRNUB3WGaKcXfep4Azx/GKONbQFVPZJ3OniE=
 github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4 h1:IUxL/wHaU/VgRZFVils7SduWVQjT8V8ObYTMZPWNbVc=
 github.com/cpacia/wallet-interface v0.0.0-20191203023315-fbe84fec42e4/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
 github.com/cpacia/wallet-interface v0.0.0-20191211190928-d7ad7fbaf4ec h1:8cd1omePj8G/5AR3QHNdpxbowRn+Ov1B0I1284/zFuw=
@@ -845,6 +857,8 @@ github.com/whyrusleeping/yamux v1.1.5/go.mod h1:E8LnQQ8HKx5KD29HZFUwM1PxCOdPRzGw
 github.com/whyrusleeping/yamux v1.2.0/go.mod h1:Cgw3gpb4DrDZ1FrP/5pxg/cpiY54Gr5uCXwUylwi2GE=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
+github.com/yawning/bulb v0.0.0-20170405033506-85d80d893c3d h1:74VDH65v2A5bu/HCyrRpGJ8tEZ6PY2MXUMDh9YilfPs=
+github.com/yawning/bulb v0.0.0-20170405033506-85d80d893c3d/go.mod h1:2ickkGiASLFhjpaFnwRS1qr2yaY7EgGk73v+DIOL5Bo=
 github.com/zquestz/grab v0.0.0-20190224022517-abcee96e61b1 h1:1qKTeMTSIEvRIjvVYzgcRp0xVp0eoiRTTiHSncb5gD8=
 github.com/zquestz/grab v0.0.0-20190224022517-abcee96e61b1/go.mod h1:bslhAiUxakrA6z6CHmVyvkfpnxx18RJBwVyx2TluJWw=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
@@ -916,6 +930,8 @@ golang.org/x/net v0.0.0-20190620200207-3b0461eec859/go.mod h1:z5CRVTTTmAJ677TzLL
 golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
 golang.org/x/net v0.0.0-20190923162816-aa69164e4478 h1:l5EDrHhldLYb3ZRHDUhXF7Om7MvYXnkV9/iQNo1lX6g=
 golang.org/x/net v0.0.0-20190923162816-aa69164e4478/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
+golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553 h1:efeOvDhwQ29Dj3SdAV/MJf8oukgn+8D8WgaCaRMchF8=
+golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
 golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be/go.mod h1:N/0e6XlmueqKjAGxoOufVs8QHGRruUQn6yWY3a++T0U=
 golang.org/x/oauth2 v0.0.0-20190226205417-e64efc72b421/go.mod h1:gOpvHmFTYa4IltrdGE7lF6nIHvwfUNPOp7c8zoXwtLw=
 golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=

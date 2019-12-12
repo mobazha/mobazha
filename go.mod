@@ -8,7 +8,7 @@ require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/coreos/go-semver v0.3.0 // indirect
-	github.com/cpacia/go-store-and-forward v0.0.0-20191211215122-e5086ce5d056
+	github.com/cpacia/go-store-and-forward v0.0.0-20191212030550-66dbb96ead2a
 	github.com/cpacia/multiwallet v0.0.0-20191212004439-8a5a7dc8bfec
 	github.com/cpacia/proxyclient v0.1.0
 	github.com/cpacia/wallet-interface v0.0.0-20191211190928-d7ad7fbaf4ec

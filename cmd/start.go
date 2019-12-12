@@ -40,8 +40,12 @@ func (x *Start) Execute(args []string) error {
 	printSwarmAddrs(n.IPFSNode())
 
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	for range c {
+	signal.Notify(c, os.Interrupt, os.Kill)
+	for sig := range c {
+		if sig == os.Kill {
+			log.Info("OpenBazaar killed")
+			os.Exit(1)
+		}
 		switch n.Stop(false) {
 		case coreiface.ErrPublishingActive:
 			sub, err := n.SubscribeEvent(&events.PublishFinished{})

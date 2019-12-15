@@ -4,13 +4,14 @@ go 1.13
 
 require (
 	github.com/OpenBazaar/jsonpb v0.0.0-20171123000858-37d32ddf4eef
+	github.com/Roasbeef/ltcutil v0.0.0-00010101000000-000000000000 // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/cpacia/go-libtor v1.0.138-0.20191212055005-1e3e913c0ef9
 	github.com/cpacia/go-onion-transport v0.0.0-20191212094059-dd08e956eaa2
 	github.com/cpacia/go-store-and-forward v0.0.0-20191212030550-66dbb96ead2a
-	github.com/cpacia/multiwallet v0.0.0-20191212063608-34ed410821d4
+	github.com/cpacia/multiwallet v0.0.0-20191215204621-ecf38048cce3
 	github.com/cpacia/proxyclient v0.0.0-20191212063311-f03265f1fade
 	github.com/cpacia/wallet-interface v0.0.0-20191211190928-d7ad7fbaf4ec
 	github.com/cretz/bine v0.1.0
@@ -61,6 +62,8 @@ require (
 )
 
 replace (
+	github.com/Roasbeef/ltcutil => github.com/ltcsuite/ltcutil v0.0.0-20181217130922-17f3b04680b6
 	github.com/go-critic/go-critic => github.com/go-critic/go-critic v0.4.0
 	github.com/golangci/golangci-lint => github.com/golangci/golangci-lint v1.21.0
+	github.com/lightninglabs/neutrino => github.com/lightninglabs/neutrino v0.11.0
 )

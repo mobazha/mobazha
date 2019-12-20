@@ -11,9 +11,9 @@ require (
 	github.com/cpacia/go-libtor v1.0.138-0.20191212055005-1e3e913c0ef9
 	github.com/cpacia/go-onion-transport v0.0.0-20191212094059-dd08e956eaa2
 	github.com/cpacia/go-store-and-forward v0.0.0-20191212030550-66dbb96ead2a
-	github.com/cpacia/multiwallet v0.0.0-20191215233034-353426506a46
+	github.com/cpacia/multiwallet v0.0.0-20191219213947-95f91680afe6
 	github.com/cpacia/proxyclient v0.0.0-20191212063311-f03265f1fade
-	github.com/cpacia/wallet-interface v0.0.0-20191211190928-d7ad7fbaf4ec
+	github.com/cpacia/wallet-interface v0.0.0-20191217232838-79018d77e07f
 	github.com/cretz/bine v0.1.0
 	github.com/fatih/color v1.7.0
 	github.com/gogo/protobuf v1.2.1

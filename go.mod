@@ -3,15 +3,17 @@ module github.com/cpacia/openbazaar3.0
 go 1.13
 
 require (
+	github.com/Bowery/prompt v0.0.0-20190916142128-fa8279994f75 // indirect
 	github.com/OpenBazaar/jsonpb v0.0.0-20171123000858-37d32ddf4eef
 	github.com/Roasbeef/ltcutil v0.0.0-00010101000000-000000000000 // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
+	github.com/btcsuite/btcwallet v0.11.0 // indirect
 	github.com/cpacia/go-libtor v1.0.138-0.20191212055005-1e3e913c0ef9
 	github.com/cpacia/go-onion-transport v0.0.0-20191212094059-dd08e956eaa2
 	github.com/cpacia/go-store-and-forward v0.0.0-20191212030550-66dbb96ead2a
-	github.com/cpacia/multiwallet v0.0.0-20191227155725-8af51afc9061
+	github.com/cpacia/multiwallet v0.0.0-20200109002742-ef05d74113c6
 	github.com/cpacia/proxyclient v0.0.0-20191212063311-f03265f1fade
 	github.com/cpacia/wallet-interface v0.0.0-20191217232838-79018d77e07f
 	github.com/cretz/bine v0.1.0
@@ -21,6 +23,7 @@ require (
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket v1.4.1
 	github.com/gosimple/slug v1.6.0
+	github.com/hunterlong/tokenbalance v0.0.11 // indirect
 	github.com/ipfs/go-bitswap v0.0.8-0.20190704155249-cbb485998356
 	github.com/ipfs/go-cid v0.0.2
 	github.com/ipfs/go-datastore v0.0.5
@@ -36,6 +39,7 @@ require (
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/jinzhu/gorm v1.9.11
+	github.com/labstack/gommon v0.3.0 // indirect
 	github.com/libp2p/go-libp2p v0.0.28
 	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-host v0.0.3
@@ -49,6 +53,8 @@ require (
 	github.com/libp2p/go-msgio v0.0.4 // indirect
 	github.com/libp2p/go-testutil v0.0.1
 	github.com/microcosm-cc/bluemonday v1.0.2
+	github.com/mkideal/cli v0.0.3 // indirect
+	github.com/mkideal/pkg v0.0.0-20170503154153-3e188c9e7ecc // indirect
 	github.com/multiformats/go-multiaddr v0.0.4
 	github.com/multiformats/go-multiaddr-net v0.0.1
 	github.com/multiformats/go-multihash v0.0.6

@@ -132,6 +132,8 @@ github.com/cpacia/go-onion-transport v0.0.0-20191212094059-dd08e956eaa2 h1:ZL/Vj
 github.com/cpacia/go-onion-transport v0.0.0-20191212094059-dd08e956eaa2/go.mod h1:LhJDF1qoUaWzYv0lhoIcRlnhlEvjmbO0Lo/D93PqhAI=
 github.com/cpacia/go-store-and-forward v0.0.0-20191212030550-66dbb96ead2a h1:Ma42G6BoKhEFziUunFoLrY4Xjtymj55UQz0bhbaeFss=
 github.com/cpacia/go-store-and-forward v0.0.0-20191212030550-66dbb96ead2a/go.mod h1:Phbz2QdnH0q4QIt9tA7VXTPiye2U7EcpYlAb7bZhaXs=
+github.com/cpacia/go-store-and-forward v0.0.0-20200121164237-a4a67c7eef82 h1:FrLvHtgpvuDNzDBFjwYDl60qJCqqCTHIG7prbfofVmI=
+github.com/cpacia/go-store-and-forward v0.0.0-20200121164237-a4a67c7eef82/go.mod h1:Phbz2QdnH0q4QIt9tA7VXTPiye2U7EcpYlAb7bZhaXs=
 github.com/cpacia/multiwallet v0.0.0-20200109002742-ef05d74113c6 h1:8cAgZYOY04I5Jn8p2B0gNvFZ84VFq5eA/GypUtVGZiQ=
 github.com/cpacia/multiwallet v0.0.0-20200109002742-ef05d74113c6/go.mod h1:i1NBFt7sf8Xwi3uivSW1UZWOtjI0JAk55ciC8DMw4dI=
 github.com/cpacia/proxyclient v0.0.0-20191212063311-f03265f1fade h1:dYWfCioY8ULYxnYd2D1trUa2oOeY5nHDBa9tR90LsU8=

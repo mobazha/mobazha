@@ -114,9 +114,6 @@ github.com/cheekybits/genny v1.0.0 h1:uGGa4nei+j20rOSeDeP5Of12XVm7TGUd4dJA9RDitf
 github.com/cheekybits/genny v1.0.0/go.mod h1:+tQajlRqAUrPI7DOSpB0XAqZYtQakVtB7wXkRAgjxjQ=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/cloudflare/cloudflare-go v0.10.2-0.20190916151808-a80f83b9add9/go.mod h1:1MxXX1Ux4x6mqPmjkUgTP1CdXIBXKX7T+Jk9Gxrmx+U=
-github.com/coreos/bbolt v0.0.0-20180223184059-7ee3ded59d4835e10f3e7d0f7603c42aa5e83820/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=
-github.com/coreos/bbolt v1.3.2/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=
-github.com/coreos/bbolt v1.3.3/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=
 github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
 github.com/coreos/go-etcd v2.0.0+incompatible/go.mod h1:Jez6KQU2B/sWsbdaef3ED8NzMklzPG4d5KIOhIy30Tk=
 github.com/coreos/go-semver v0.2.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3EedlOD2RNk=
@@ -130,8 +127,6 @@ github.com/cpacia/go-libtor v1.0.138-0.20191212055005-1e3e913c0ef9 h1:nRLekWLiIH
 github.com/cpacia/go-libtor v1.0.138-0.20191212055005-1e3e913c0ef9/go.mod h1:xtN2iQDfskHUvNYP+ZOCw3oHejHywyGgy7TPe9eCstc=
 github.com/cpacia/go-onion-transport v0.0.0-20191212094059-dd08e956eaa2 h1:ZL/VjUOgO5xDOb1m0GCc0h+dJ85KXzzihWxHUgB+dTY=
 github.com/cpacia/go-onion-transport v0.0.0-20191212094059-dd08e956eaa2/go.mod h1:LhJDF1qoUaWzYv0lhoIcRlnhlEvjmbO0Lo/D93PqhAI=
-github.com/cpacia/go-store-and-forward v0.0.0-20191212030550-66dbb96ead2a h1:Ma42G6BoKhEFziUunFoLrY4Xjtymj55UQz0bhbaeFss=
-github.com/cpacia/go-store-and-forward v0.0.0-20191212030550-66dbb96ead2a/go.mod h1:Phbz2QdnH0q4QIt9tA7VXTPiye2U7EcpYlAb7bZhaXs=
 github.com/cpacia/go-store-and-forward v0.0.0-20200121164237-a4a67c7eef82 h1:FrLvHtgpvuDNzDBFjwYDl60qJCqqCTHIG7prbfofVmI=
 github.com/cpacia/go-store-and-forward v0.0.0-20200121164237-a4a67c7eef82/go.mod h1:Phbz2QdnH0q4QIt9tA7VXTPiye2U7EcpYlAb7bZhaXs=
 github.com/cpacia/multiwallet v0.0.0-20200109002742-ef05d74113c6 h1:8cAgZYOY04I5Jn8p2B0gNvFZ84VFq5eA/GypUtVGZiQ=
@@ -977,6 +972,8 @@ github.com/zquestz/grab v0.0.0-20190224022517-abcee96e61b1 h1:1qKTeMTSIEvRIjvVYz
 github.com/zquestz/grab v0.0.0-20190224022517-abcee96e61b1/go.mod h1:bslhAiUxakrA6z6CHmVyvkfpnxx18RJBwVyx2TluJWw=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
+go.etcd.io/bbolt v1.3.4-0.20200121170514-da442c51f155 h1:78560rGUNA8YhDLXqvlqHf4OaqIZof7mxpissro+n8I=
+go.etcd.io/bbolt v1.3.4-0.20200121170514-da442c51f155/go.mod h1:LFKuADr6ZLKUTotDQbCSVz/Pl3TFiiQHsFt4Ni86lnw=
 go.opencensus.io v0.20.1/go.mod h1:6WKK9ahsWS3RSO+PY9ZHZUfv2irvY6gN279GOPZjmmk=
 go.opencensus.io v0.21.0 h1:mU6zScU4U1YAFPHEHYk+3JC4SY7JxgkqS10ZOSyksNg=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=

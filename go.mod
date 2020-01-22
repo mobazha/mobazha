@@ -57,11 +57,13 @@ require (
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
 	golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392
+	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 // indirect
 )
 
 replace (
 	github.com/Roasbeef/ltcutil => github.com/ltcsuite/ltcutil v0.0.0-20181217130922-17f3b04680b6
+	github.com/coreos/bbolt => go.etcd.io/bbolt v1.3.4-0.20200121170514-da442c51f155
 	github.com/go-critic/go-critic => github.com/go-critic/go-critic v0.4.0
 	github.com/golangci/golangci-lint => github.com/golangci/golangci-lint v1.21.0
 	github.com/lightninglabs/neutrino => github.com/lightninglabs/neutrino v0.11.0

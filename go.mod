@@ -14,6 +14,7 @@ require (
 	github.com/cpacia/proxyclient v0.0.0-20191212063311-f03265f1fade
 	github.com/cpacia/wallet-interface v0.0.0-20191217232838-79018d77e07f
 	github.com/cretz/bine v0.1.0
+	github.com/disintegration/imaging v1.6.2
 	github.com/fatih/color v1.7.0
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/protobuf v1.3.2

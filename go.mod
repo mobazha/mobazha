@@ -10,9 +10,9 @@ require (
 	github.com/cpacia/go-libtor v1.0.138-0.20191212055005-1e3e913c0ef9
 	github.com/cpacia/go-onion-transport v0.0.0-20191212094059-dd08e956eaa2
 	github.com/cpacia/go-store-and-forward v0.0.0-20200121164237-a4a67c7eef82
-	github.com/cpacia/multiwallet v0.0.0-20200109002742-ef05d74113c6
+	github.com/cpacia/multiwallet v0.0.0-20200229170431-cb00a6067c40
 	github.com/cpacia/proxyclient v0.0.0-20191212063311-f03265f1fade
-	github.com/cpacia/wallet-interface v0.0.0-20191217232838-79018d77e07f
+	github.com/cpacia/wallet-interface v0.0.0-20200229171801-8511c1248c5f
 	github.com/cretz/bine v0.1.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/fatih/color v1.7.0
@@ -60,7 +60,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
-	golang.org/x/crypto v0.0.0-20200115085410-6d4e4cb37c7d
+	golang.org/x/crypto v0.0.0-20200221231518-2aa609cf4a9d
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 )
 

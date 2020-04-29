@@ -41,6 +41,7 @@ require (
 	github.com/libp2p/go-libp2p-core v0.5.2
 	github.com/libp2p/go-libp2p-kad-dht v0.7.10
 	github.com/libp2p/go-libp2p-record v0.1.2
+	github.com/libp2p/go-libp2p-routing-helpers v0.2.2
 	github.com/libp2p/go-testutil v0.1.0
 	github.com/microcosm-cc/bluemonday v1.0.2
 	github.com/multiformats/go-multiaddr v0.2.1

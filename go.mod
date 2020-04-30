@@ -7,7 +7,6 @@ require (
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
-	github.com/cpacia/go-libtor v1.0.138-0.20191212055005-1e3e913c0ef9
 	github.com/cpacia/go-onion-transport v0.0.0-20200428212533-7c1e8c66b51f
 	github.com/cpacia/go-store-and-forward v0.0.0-20200428213215-21ab28fe0884
 	github.com/cpacia/multiwallet v0.0.0-20200229170431-cb00a6067c40
@@ -21,7 +20,6 @@ require (
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket v1.4.2
 	github.com/gosimple/slug v1.6.0
-	github.com/ipfs/go-bitswap v0.2.13
 	github.com/ipfs/go-cid v0.0.5
 	github.com/ipfs/go-datastore v0.4.4
 	github.com/ipfs/go-ipfs v0.5.0
@@ -32,6 +30,7 @@ require (
 	github.com/ipfs/go-merkledag v0.3.2
 	github.com/ipfs/go-path v0.0.7
 	github.com/ipfs/interface-go-ipfs-core v0.2.7
+	github.com/ipsn/go-libtor v1.0.222
 	github.com/jarcoal/httpmock v1.0.4
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
 	github.com/jessevdk/go-flags v1.4.0
@@ -41,7 +40,6 @@ require (
 	github.com/libp2p/go-libp2p-core v0.5.2
 	github.com/libp2p/go-libp2p-kad-dht v0.7.10
 	github.com/libp2p/go-libp2p-record v0.1.2
-	github.com/libp2p/go-libp2p-routing-helpers v0.2.2
 	github.com/libp2p/go-testutil v0.1.0
 	github.com/microcosm-cc/bluemonday v1.0.2
 	github.com/multiformats/go-multiaddr v0.2.1

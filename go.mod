@@ -7,7 +7,7 @@ require (
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
-	github.com/cpacia/go-onion-transport v0.0.0-20200428212533-7c1e8c66b51f
+	github.com/cpacia/go-onion-transport v0.1.0
 	github.com/cpacia/go-store-and-forward v0.0.0-20200428213215-21ab28fe0884
 	github.com/cpacia/multiwallet v0.0.0-20200229170431-cb00a6067c40
 	github.com/cpacia/proxyclient v0.0.0-20191212063311-f03265f1fade
@@ -43,6 +43,7 @@ require (
 	github.com/libp2p/go-testutil v0.1.0
 	github.com/microcosm-cc/bluemonday v1.0.2
 	github.com/multiformats/go-multiaddr v0.2.1
+	github.com/multiformats/go-multiaddr-dns v0.2.0
 	github.com/multiformats/go-multiaddr-net v0.1.4
 	github.com/multiformats/go-multihash v0.0.13
 	github.com/natefinch/lumberjack v2.0.0+incompatible

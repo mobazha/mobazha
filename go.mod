@@ -54,6 +54,7 @@ require (
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2
 	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
+	golang.org/x/mobile v0.0.0-20200329125638-4c31acba0007 // indirect
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	golang.org/x/tools v0.0.0-20200501205727-542909fd9944 // indirect
 )
@@ -64,5 +65,4 @@ replace (
 	github.com/go-critic/go-critic => github.com/go-critic/go-critic v0.4.0
 	github.com/golangci/golangci-lint => github.com/golangci/golangci-lint v1.21.0
 	github.com/lightninglabs/neutrino => github.com/lightninglabs/neutrino v0.11.0
-	gx/ipfs/QmNohiVssaPw3KVLZik59DBVGTSm2dGvYT9eoXt5DQ36Yz/go-ipfs-util => github.com/ipfs/go-ipfs-util v1.2.8
 )

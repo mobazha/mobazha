@@ -10,7 +10,7 @@ require (
 	github.com/cpacia/go-onion-transport v0.1.0
 	github.com/cpacia/go-store-and-forward v0.0.0-20200428213215-21ab28fe0884
 	github.com/cpacia/multiwallet v0.0.0-20200501224425-c8a0b7d9a3b6
-	github.com/cpacia/proxyclient v0.0.0-20191212063311-f03265f1fade
+	github.com/cpacia/proxyclient v0.0.0-20200503052644-89c0e5cb8be7
 	github.com/cpacia/wallet-interface v0.0.0-20200229171801-8511c1248c5f
 	github.com/cretz/bine v0.1.0
 	github.com/disintegration/imaging v1.6.2

@@ -26,7 +26,7 @@ type Start struct {
 
 // Execute starts the OpenBazaar node.
 func (x *Start) Execute(args []string) error {
-	cfg, _, err := repo.LoadConfig()
+	cfg, err := repo.LoadConfig()
 	if err != nil {
 		return err
 	}

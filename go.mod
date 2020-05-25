@@ -1,6 +1,6 @@
 module github.com/cpacia/openbazaar3.0
 
-go 1.13
+go 1.14
 
 require (
 	github.com/OpenBazaar/jsonpb v0.0.0-20171123000858-37d32ddf4eef
@@ -22,7 +22,7 @@ require (
 	github.com/gosimple/slug v1.6.0
 	github.com/ipfs/go-cid v0.0.5
 	github.com/ipfs/go-datastore v0.4.4
-	github.com/ipfs/go-ipfs v0.5.0
+	github.com/ipfs/go-ipfs v0.5.1
 	github.com/ipfs/go-ipfs-config v0.5.3
 	github.com/ipfs/go-ipfs-files v0.0.8
 	github.com/ipfs/go-ipns v0.0.2
@@ -37,14 +37,14 @@ require (
 	github.com/jinzhu/gorm v1.9.11
 	github.com/lib/pq v1.2.0 // indirect
 	github.com/libp2p/go-libp2p v0.8.3
-	github.com/libp2p/go-libp2p-core v0.5.2
-	github.com/libp2p/go-libp2p-kad-dht v0.7.10
+	github.com/libp2p/go-libp2p-core v0.5.3
+	github.com/libp2p/go-libp2p-kad-dht v0.7.11
 	github.com/libp2p/go-libp2p-record v0.1.2
 	github.com/libp2p/go-testutil v0.1.0
 	github.com/microcosm-cc/bluemonday v1.0.2
 	github.com/multiformats/go-multiaddr v0.2.1
 	github.com/multiformats/go-multiaddr-dns v0.2.0
-	github.com/multiformats/go-multiaddr-net v0.1.4
+	github.com/multiformats/go-multiaddr-net v0.1.5
 	github.com/multiformats/go-multihash v0.0.13
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
@@ -63,5 +63,6 @@ replace (
 	github.com/coreos/bbolt => go.etcd.io/bbolt v1.3.4-0.20200121170514-da442c51f155
 	github.com/go-critic/go-critic => github.com/go-critic/go-critic v0.4.0
 	github.com/golangci/golangci-lint => github.com/golangci/golangci-lint v1.21.0
+	github.com/ipfs/go-ipns => github.com/cpacia/go-ipns v0.0.2-fork
 	github.com/lightninglabs/neutrino => github.com/lightninglabs/neutrino v0.11.0
 )

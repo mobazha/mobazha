@@ -63,6 +63,5 @@ replace (
 	github.com/coreos/bbolt => go.etcd.io/bbolt v1.3.4-0.20200121170514-da442c51f155
 	github.com/go-critic/go-critic => github.com/go-critic/go-critic v0.4.0
 	github.com/golangci/golangci-lint => github.com/golangci/golangci-lint v1.21.0
-	github.com/ipfs/go-ipns => github.com/cpacia/go-ipns v0.0.2-fork
 	github.com/lightninglabs/neutrino => github.com/lightninglabs/neutrino v0.11.0
 )

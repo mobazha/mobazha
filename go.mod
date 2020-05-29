@@ -57,11 +57,3 @@ require (
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	golang.org/x/tools v0.0.0-20200501205727-542909fd9944 // indirect
 )
-
-replace (
-	github.com/Roasbeef/ltcutil => github.com/ltcsuite/ltcutil v0.0.0-20181217130922-17f3b04680b6
-	github.com/coreos/bbolt => go.etcd.io/bbolt v1.3.4-0.20200121170514-da442c51f155
-	github.com/go-critic/go-critic => github.com/go-critic/go-critic v0.4.0
-	github.com/golangci/golangci-lint => github.com/golangci/golangci-lint v1.21.0
-	github.com/lightninglabs/neutrino => github.com/lightninglabs/neutrino v0.11.0
-)

@@ -45,6 +45,8 @@ github.com/Shopify/sarama v1.19.0/go.mod h1:FVkBWblsNy7DGZRfXLU0O9RCGt5g3g3yEuWX
 github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMxUHB2q5Ap20/P/eIdh4G0pI=
 github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 h1:fLjPD/aNc3UIOA6tDi6QXUemppXK3P9BI7mr2hd6gx8=
 github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
+github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d h1:G0m3OIz70MZUWq3EgK3CesDbo8upS2Vm9/P3FtgI+Jk=
+github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
 github.com/Stebalien/go-bitfield v0.0.0-20180330043415-076a62f9ce6e/go.mod h1:3oM7gXIttpYDAJXpVNnSCiUMYBLIZ6cb1t+Ip982MRo=
 github.com/Stebalien/go-bitfield v0.0.1 h1:X3kbSSPUaJK60wV2hjOPZwmpljr6VGCqdq4cBLhbQBo=
 github.com/Stebalien/go-bitfield v0.0.1/go.mod h1:GNjFpasyUVkHMsfEOk8EFLJ9syQ6SI+XWrX9Wf2XH0s=
@@ -145,6 +147,8 @@ github.com/cpacia/go-store-and-forward v0.0.0-20200428213215-21ab28fe0884 h1:yGp
 github.com/cpacia/go-store-and-forward v0.0.0-20200428213215-21ab28fe0884/go.mod h1:TyTQsbKq1GYQMnoGgSOncP5aY8vHs9zJ6ZuDa5TGU+U=
 github.com/cpacia/multiwallet v0.0.0-20200501224425-c8a0b7d9a3b6 h1:Ow8roU4lI6r+4/y9ypUiLxxSlboEAOzy5sr+jSS5T9Q=
 github.com/cpacia/multiwallet v0.0.0-20200501224425-c8a0b7d9a3b6/go.mod h1:LfB1neaAIXyy+mm0fShspPwnGcbZOjyRs+QbmG4NOow=
+github.com/cpacia/multiwallet v0.0.0-20200531170959-5ec3cdcbb484 h1:LniRhDTxNkxsa99q6c2fVl0+bMp0OuCwrbhCS0Y98lk=
+github.com/cpacia/multiwallet v0.0.0-20200531170959-5ec3cdcbb484/go.mod h1:/uX/hal8u+l225ucO5BZi0lgmk6K4OjwS6MQG9ecd9A=
 github.com/cpacia/proxyclient v0.0.0-20191212063311-f03265f1fade h1:dYWfCioY8ULYxnYd2D1trUa2oOeY5nHDBa9tR90LsU8=
 github.com/cpacia/proxyclient v0.0.0-20191212063311-f03265f1fade/go.mod h1:IF9edCuNRNUB3WGaKcXfep4Azx/GKONbQFVPZJ3OniE=
 github.com/cpacia/proxyclient v0.0.0-20200503052644-89c0e5cb8be7 h1:qigJPdoFWERNQTs+0sIEZO5azCbhiG5p6LZpwogdpO4=
@@ -153,6 +157,8 @@ github.com/cpacia/wallet-interface v0.0.0-20191217232838-79018d77e07f h1:K2Ra3UW
 github.com/cpacia/wallet-interface v0.0.0-20191217232838-79018d77e07f/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
 github.com/cpacia/wallet-interface v0.0.0-20200229171801-8511c1248c5f h1:aBayGDKqkrMRELfe/bacaKJMrPHcOC8qFuqTKNWO5gs=
 github.com/cpacia/wallet-interface v0.0.0-20200229171801-8511c1248c5f/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
+github.com/cpacia/wallet-interface v0.0.0-20200531170832-fee73827229b h1:YGF9L9s6LJ6wZ/ZYP8df5TqPn9/UOnHzw3eYH7WpASQ=
+github.com/cpacia/wallet-interface v0.0.0-20200531170832-fee73827229b/go.mod h1:ax38EmXdy/eZ9dznU/Swn8qfrsUZtVSnrsSxmcq1xYY=
 github.com/cpuguy83/go-md2man v1.0.10/go.mod h1:SmD6nW6nTyfqj6ABTjUi3V3JVMnlJmwcJI5acqYI6dE=
 github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsrgA7czyZG/E6dU=
 github.com/crackcomm/go-gitignore v0.0.0-20170627025303-887ab5e44cc3 h1:HVTnpeuvF6Owjd5mniCL8DEXo7uYXdQEmOP4FJbV5tg=
@@ -257,6 +263,8 @@ github.com/go-logfmt/logfmt v0.4.0 h1:MP4Eh7ZCb31lleYCFuwm0oe4/YGak+5l1vA2NOE80n
 github.com/go-logfmt/logfmt v0.4.0/go.mod h1:3RMwSq7FuexP4Kalkev3ejPJsZTpXXBr9+V4qmtdjCk=
 github.com/go-ole/go-ole v1.2.1 h1:2lOsA72HgjxAuMlKpFiCbHTvu44PIVkZ5hqm3RSdI/E=
 github.com/go-ole/go-ole v1.2.1/go.mod h1:7FAglXiTm7HKlQRDeOQ6ZNUHidzCWXuZWq/1dTyBNF8=
+github.com/go-ole/go-ole v1.2.4 h1:nNBDSCOigTSiarFpYE9J/KtEA1IOW4CNeqT9TQDqCxI=
+github.com/go-ole/go-ole v1.2.4/go.mod h1:XCwSNxSkXRo4vlyPy93sltvi/qJq0jqQhjqQNIwKuxM=
 github.com/go-sql-driver/mysql v1.4.1 h1:g24URVg0OFbNUTx9qqY1IRZ9D9z3iPyi5zKhQZpNwpA=
 github.com/go-sql-driver/mysql v1.4.1/go.mod h1:zAC/RDZ24gD3HViQzih4MyKcchzm+sOG5ZlKdlhCg5w=
 github.com/go-stack/stack v1.8.0 h1:5SgMzNM5HxrEjV0ww2lTmX6E2Izsfxas4+YHWRs3Lsk=
@@ -971,6 +979,7 @@ github.com/mattn/go-isatty v0.0.11/go.mod h1:PhnuNfih5lzO57/f3n+odYbM4JtupLOxQOA
 github.com/mattn/go-runewidth v0.0.3/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=
 github.com/mattn/go-runewidth v0.0.4 h1:2BvfKmzob6Bmd4YsL0zygOqfdFnK7GR4QL06Do4/p7Y=
 github.com/mattn/go-runewidth v0.0.4/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=
+github.com/mattn/go-runewidth v0.0.7/go.mod h1:H031xJmbD/WCDINGzjvQ9THkh0rPKHF+m2gUSrubnMI=
 github.com/mattn/go-runewidth v0.0.8 h1:3tS41NlGYSmhhe/8fhGRzc+z3AYCw1Fe1WAyLuujKs0=
 github.com/mattn/go-runewidth v0.0.8/go.mod h1:H031xJmbD/WCDINGzjvQ9THkh0rPKHF+m2gUSrubnMI=
 github.com/mattn/go-sqlite3 v1.11.0 h1:LDdKkqtYlom37fkvqs8rMPFKAMe8+SgjbwZ6ex1/A/Q=
@@ -1462,6 +1471,7 @@ golang.org/x/sys v0.0.0-20191005200804-aed5e4c7ecf9/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20191026070338-33540a1f6037/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20191120155948-bd437916bb0e/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20191210023423-ac6580df4449/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20200107162124-548cf772de50/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200122134326-e047566fdf82/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200202164722-d101bd2416d5/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200223170610-d5e6a3e2c0ae h1:/WDfKMnPU+m5M4xB+6x4kaepxRw6jWvR5iDRdvjHgy8=

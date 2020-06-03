@@ -15,6 +15,7 @@ import (
 // Init initializes a new OpenBazaar node at the provided path.
 type Init struct {
 	DataDir            string `short:"d" long:"datadir" description:"Directory to store data"`
+	Testnet            bool   `short:"t" long:"testnet" description:"Configure this node to use the test network"`
 	Mnemonic           string `short:"m" long:"mnemonic" description:"A mnemonic seed to initialize the node with"`
 	Force              bool   `short:"f" long:"force" description:"Force overwrite existing repo (dangerous!)"`
 	WalletCreationDate string `short:"w" long:"walletcreationdate" description:"Specify the date the seed was created. If omitted the wallet will sync from the oldest checkpoint."`
@@ -52,6 +53,7 @@ func (x *Init) Execute(args []string) error {
 	opts := []multiwallet.Option{
 		multiwallet.DataDir(cfg.DataDir),
 		multiwallet.Wallets(enabledWallets),
+		multiwallet.Testnet(x.Testnet),
 	}
 	mw, err := multiwallet.NewMultiwallet(opts...)
 	if err != nil {

@@ -9,7 +9,7 @@ require (
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/cpacia/go-onion-transport v0.1.0
 	github.com/cpacia/go-store-and-forward v0.0.0-20200428213215-21ab28fe0884
-	github.com/cpacia/multiwallet v0.0.0-20200601171748-33c2cd86021f
+	github.com/cpacia/multiwallet v0.0.0-20200603202434-7f06b20fb7de
 	github.com/cpacia/proxyclient v0.0.0-20200503052644-89c0e5cb8be7
 	github.com/cpacia/wallet-interface v0.0.0-20200601142221-bffc35be13b2
 	github.com/cretz/bine v0.1.0

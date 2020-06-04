@@ -9,9 +9,9 @@ require (
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/cpacia/go-onion-transport v0.1.0
 	github.com/cpacia/go-store-and-forward v0.0.0-20200428213215-21ab28fe0884
-	github.com/cpacia/multiwallet v0.0.0-20200604033254-dda48023184f
+	github.com/cpacia/multiwallet v0.0.0-20200604163435-8ab39bc08104
 	github.com/cpacia/proxyclient v0.0.0-20200503052644-89c0e5cb8be7
-	github.com/cpacia/wallet-interface v0.0.0-20200601142221-bffc35be13b2
+	github.com/cpacia/wallet-interface v0.0.0-20200604163334-1be951c8f4bd
 	github.com/cretz/bine v0.1.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/fatih/color v1.9.0
@@ -35,7 +35,6 @@ require (
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/jinzhu/gorm v1.9.11
-	github.com/lib/pq v1.2.0 // indirect
 	github.com/libp2p/go-libp2p v0.8.3
 	github.com/libp2p/go-libp2p-core v0.5.3
 	github.com/libp2p/go-libp2p-kad-dht v0.7.11

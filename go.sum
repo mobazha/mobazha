@@ -164,6 +164,10 @@ github.com/cpacia/multiwallet v0.0.0-20200603201531-08efd0227249 h1:aJD3cXNuTNS4
 github.com/cpacia/multiwallet v0.0.0-20200603201531-08efd0227249/go.mod h1:R36fWGXTQw5YmWw3XF7fCQSYXsjURtw/H7X6QQmKejw=
 github.com/cpacia/multiwallet v0.0.0-20200603202434-7f06b20fb7de h1:ZCHGc4699PIutk0QnwWM4qvPld7rOpWz7k2FdHMlodw=
 github.com/cpacia/multiwallet v0.0.0-20200603202434-7f06b20fb7de/go.mod h1:R36fWGXTQw5YmWw3XF7fCQSYXsjURtw/H7X6QQmKejw=
+github.com/cpacia/multiwallet v0.0.0-20200603224136-07b84daec9de h1:mz6IIcgHicsFwLS7+YoibnZxp21vmHQNxJbe8/Xlkkg=
+github.com/cpacia/multiwallet v0.0.0-20200603224136-07b84daec9de/go.mod h1:R36fWGXTQw5YmWw3XF7fCQSYXsjURtw/H7X6QQmKejw=
+github.com/cpacia/multiwallet v0.0.0-20200604033254-dda48023184f h1:xjvfgdWLLmR0JYvnPay3jlBzkVCwGNdL+SzGUgeubtM=
+github.com/cpacia/multiwallet v0.0.0-20200604033254-dda48023184f/go.mod h1:R36fWGXTQw5YmWw3XF7fCQSYXsjURtw/H7X6QQmKejw=
 github.com/cpacia/proxyclient v0.0.0-20191212063311-f03265f1fade h1:dYWfCioY8ULYxnYd2D1trUa2oOeY5nHDBa9tR90LsU8=
 github.com/cpacia/proxyclient v0.0.0-20191212063311-f03265f1fade/go.mod h1:IF9edCuNRNUB3WGaKcXfep4Azx/GKONbQFVPZJ3OniE=
 github.com/cpacia/proxyclient v0.0.0-20200503052644-89c0e5cb8be7 h1:qigJPdoFWERNQTs+0sIEZO5azCbhiG5p6LZpwogdpO4=

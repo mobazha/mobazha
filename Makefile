@@ -22,6 +22,7 @@ PKGMAP = $(P_TIMESTAMP),$(P_ANY)
 protos:
 	cd net/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=$(PKGMAP):./ *.proto
 	cd orders/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=$(PKGMAP):./ *.proto
+	cd channels/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=$(PKGMAP):./ *.proto
 
 ##
 ## Sample config file

@@ -148,6 +148,8 @@ github.com/cpacia/go-store-and-forward v0.0.0-20200428213215-21ab28fe0884 h1:yGp
 github.com/cpacia/go-store-and-forward v0.0.0-20200428213215-21ab28fe0884/go.mod h1:TyTQsbKq1GYQMnoGgSOncP5aY8vHs9zJ6ZuDa5TGU+U=
 github.com/cpacia/multiwallet v0.0.0-20200604163435-8ab39bc08104 h1:/xuLzh8wmMZjA8tOa/vwfBVsfg7Vy5dEjOintIulJaU=
 github.com/cpacia/multiwallet v0.0.0-20200604163435-8ab39bc08104/go.mod h1:4rh7h6cARRbJCGp+sTRFcyeXk5VF6YqX2IR7Zx+qbMk=
+github.com/cpacia/multiwallet v0.0.0-20200719043649-ee1d8323adec h1:ro//zlNbXZfQ+19uID4/vMTC05jSIcat8rIIsnbLxRI=
+github.com/cpacia/multiwallet v0.0.0-20200719043649-ee1d8323adec/go.mod h1:4rh7h6cARRbJCGp+sTRFcyeXk5VF6YqX2IR7Zx+qbMk=
 github.com/cpacia/proxyclient v0.0.0-20191212063311-f03265f1fade h1:dYWfCioY8ULYxnYd2D1trUa2oOeY5nHDBa9tR90LsU8=
 github.com/cpacia/proxyclient v0.0.0-20191212063311-f03265f1fade/go.mod h1:IF9edCuNRNUB3WGaKcXfep4Azx/GKONbQFVPZJ3OniE=
 github.com/cpacia/proxyclient v0.0.0-20200503052644-89c0e5cb8be7 h1:qigJPdoFWERNQTs+0sIEZO5azCbhiG5p6LZpwogdpO4=

@@ -32,14 +32,14 @@ func NewDefaultConfig() *Config {
 	}
 }
 
-// MobileNode wraps an OpenBazaarNode in a way that can be compiled to mobile devices.
-type MobileNode struct {
+// Node wraps an OpenBazaarNode in a way that can be compiled to mobile devices.
+type Node struct {
 	node *core.OpenBazaarNode
 	done context.CancelFunc
 }
 
 // NewNode returns a new MobileNode instance.
-func NewNode(cfg *Config) (*MobileNode, error) {
+func NewNode(cfg *Config) (*Node, error) {
 	dataDir := defaultDataDir
 	if cfg.DataDir != "" {
 		dataDir = cfg.DataDir
@@ -79,21 +79,21 @@ func NewNode(cfg *Config) (*MobileNode, error) {
 		GatewayAddr:            cfg.GatewayAddress,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint
 	obNode, err := core.NewNode(ctx, rcfg)
 	if err != nil {
-		return nil, err
+		return nil, err //nolint
 	}
-	return &MobileNode{node: obNode, done: cancel}, nil
+	return &Node{node: obNode, done: cancel}, nil //nolint
 }
 
 // Start will start the MobileNode.
-func (n *MobileNode) Start() {
+func (n *Node) Start() {
 	n.node.Start()
 }
 
 // Stop will stop the MobileNode.
-func (n *MobileNode) Stop() {
+func (n *Node) Stop() {
 	n.done()
 	n.Stop()
 }

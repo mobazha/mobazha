@@ -13,16 +13,15 @@ android_framework: ## Build Android Framework for mobile
 ##
 ## Protobuf compilation
 ##
-P_TIMESTAMP = Mgoogle/protobuf/timestamp.proto=github.com/golang/protobuf/ptypes/timestamp
-P_ANY = Mgoogle/protobuf/any.proto=github.com/golang/protobuf/ptypes/any
-
-PKGMAP = $(P_TIMESTAMP),$(P_ANY)
 
 .PHONY: protos
 protos:
-	cd net/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=$(PKGMAP):./ *.proto
-	cd orders/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=$(PKGMAP):./ --proto_path=../../net/pb --proto_path=./ *.proto
-	cd channels/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=$(PKGMAP):./ *.proto
+	cd net/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ *.proto
+	cd orders/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ --proto_path=../../net/pb --proto_path=./ *.proto
+	cd orders/pb && sed -i 's/OrderList/pb.OrderList/' orders.pb.go
+	cd orders/pb && sed -i '11i\"github.com/cpacia/openbazaar3.0/net/pb"\' orders.pb.go
+	cd orders/pb && gofmt -s -w orders.pb.go
+	cd channels/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ *.proto
 
 ##
 ## Sample config file

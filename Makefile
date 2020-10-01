@@ -21,7 +21,7 @@ PKGMAP = $(P_TIMESTAMP),$(P_ANY)
 .PHONY: protos
 protos:
 	cd net/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=$(PKGMAP):./ *.proto
-	cd orders/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=$(PKGMAP):./ *.proto
+	cd orders/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=$(PKGMAP):./ --proto_path=../../net/pb --proto_path=./ *.proto
 	cd channels/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=$(PKGMAP):./ *.proto
 
 ##

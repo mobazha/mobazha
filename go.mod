@@ -36,8 +36,6 @@ require (
 	github.com/jarcoal/httpmock v1.0.4
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
 	github.com/jessevdk/go-flags v1.4.0
-	github.com/jinzhu/gorm v1.9.11 // indirect
-	github.com/jinzhu/now v1.1.1 // indirect
 	github.com/libp2p/go-libp2p v0.11.0
 	github.com/libp2p/go-libp2p-core v0.6.1
 	github.com/libp2p/go-libp2p-kad-dht v0.9.0

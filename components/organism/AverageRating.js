@@ -75,7 +75,7 @@ class AverageRating extends PureComponent {
               <Text style={styles.avgRating}>)</Text>
             </Text>
           ) : (
-            <Text style={styles.noReviews}>No reviews yet</Text>
+            <Text style={styles.noReviews}>{I18n.t('components.organism.AverageRating.no_reviews')}</Text>
           )}
         </View>
       </TouchableWithoutFeedback>

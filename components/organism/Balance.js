@@ -58,7 +58,7 @@ class Balance extends PureComponent {
             <Text style={styles.pendingBalance}>(</Text>
             <Ionicons style={styles.timerIcon} name="md-time" size={13} color={foregroundColor} />
             <Text style={styles.pendingBalance}>
-              {localLabelFromLocal(pendingBalance)} unconfirmed)
+              {I18n.t('components.organism.Balance.unconfirmed', {balance: localLabelFromLocal(pendingBalance)})})
             </Text>
           </View>
         )}

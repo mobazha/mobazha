@@ -110,10 +110,10 @@ export default withNavigation(({
         </View>
         <View style={styles.nameContainer}>
           <Stars score={overall} />
-          <Text style={styles.name}>{`From ${decode(name)}`}</Text>
+          <Text style={styles.name}>{I18n.t('components.molecules.ListingReview.from', { name: decode(name) })}</Text>
         </View>
         <Text style={[styles.review, isEmpty(review) ? styles.noMessage : {}]}>
-          {isEmpty(review) ? 'No review message from buyer' : decode(review)}
+          {isEmpty(review) ? I18n.t('components.molecules.ListingReview.no_message') : decode(review)}
         </Text>
       </View>
     </View>

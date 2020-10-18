@@ -147,12 +147,12 @@ class SellerInfo extends Component {
       const avgRating = _.get(profile, 'stats.averageRating') || 0;
       const ratingCount = _.get(profile, 'stats.ratingCount') || 0;
       return (
-        <ProductSection style={styles.wrapper} activeOpacity={1} title="About the Seller">
+        <ProductSection style={styles.wrapper} activeOpacity={1} title={I18n.t('components.molecules.SellerInfo.about')}>
           <TouchableWithoutFeedback onPress={toStore}>
             <View style={styles.avatarWrapper}>
               <AvatarImage style={styles.avatar} thumbnail={_.get(profile, 'avatarHashes.small')} />
               <View style={styles.contentWrapper}>
-                <Text style={styles.shopName}>{decode(profile.name) || 'Unknown'}</Text>
+                <Text style={styles.shopName}>{decode(profile.name) || I18n.t('components.molecules.SellerInfo.unknown')}</Text>
                 <View style={styles.positionWrapper}>
                   <Text style={styles.rating}>
                     <Ionicons name="md-star" size={16} color={starRatingColor} />
@@ -171,12 +171,12 @@ class SellerInfo extends Component {
           <View style={styles.buttonsWrapper}>
             <TouchableWithoutFeedback onPress={toMessage}>
               <View style={styles.showAllButton}>
-                <Text style={styles.showAllText}>Message</Text>
+                <Text style={styles.showAllText}>{I18n.t('components.molecules.SellerInfo.message')}</Text>
               </View>
             </TouchableWithoutFeedback>
             <TouchableWithoutFeedback onPress={toStore}>
               <View style={styles.showAllButton}>
-                <Text style={styles.showAllText}>Visit store</Text>
+                <Text style={styles.showAllText}>{I18n.t('components.molecules.SellerInfo.visit_store')}</Text>
               </View>
             </TouchableWithoutFeedback>
           </View>

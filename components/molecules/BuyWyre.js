@@ -134,8 +134,8 @@ class BuyWyre extends React.PureComponent {
           <View style={styles.wrapper}>
             <Image source={WyreLogo} style={styles.logo} />
             <View style={styles.wyreWrapper}>
-              <Text style={styles.wyreTitle}>Need crypto?</Text>
-              <Text style={styles.wyreText}>Top-up your wallet with Wyre!</Text>
+              <Text style={styles.wyreTitle}>{I18n.t('components.molecules.BuyWyre.ask_crypto')}</Text>
+              <Text style={styles.wyreText}>{I18n.t('components.molecules.BuyWyre.top_up')}</Text>
             </View>
             <View style={{ flex: 1 }} />
             <Entypo name="chevron-small-right" size={28} color={primaryTextColor} style={styles.icon} />

@@ -217,7 +217,7 @@ class ShopInfo extends Component {
 
   getProfileName = () => {
     const profile = this.getProfile();
-    return decode(profile.name) || 'Unknown';
+    return decode(profile.name) || I18n.t('components.molecules.ShopInfo.unknown');
   }
 
   handleClose = () => {
@@ -307,10 +307,10 @@ class ShopInfo extends Component {
                   {avgRating.toFixed(1)}
                 </Text>
               </SocialChip>
-              <SocialChip label="following" onPress={this.handlePressFollowings}>
+              <SocialChip label={I18n.t('components.molecules.ShopInfo.following')} onPress={this.handlePressFollowings}>
                 <Text style={styles.chipValue}>{followingCount}</Text>
               </SocialChip>
-              <SocialChip label="followers" onPress={this.handlePressFollowers}>
+              <SocialChip label={I18n.t('components.molecules.ShopInfo.followers')} onPress={this.handlePressFollowers}>
                 <Text style={styles.chipValue}>{followerCount}</Text>
               </SocialChip>
             </View>
@@ -323,7 +323,7 @@ class ShopInfo extends Component {
             <LocationPin style={styles.locationPin} location={decode(profile.location)} />
             {isMyStore ? (
               <View style={styles.buttonsContainer}>
-                <HollowButton title="Edit Profile" onPress={this.handleEdit} style={[styles.button, styles.editButton]} />
+                <HollowButton title={I18n.t('components.molecules.ShopInfo.edit_profile')} onPress={this.handleEdit} style={[styles.button, styles.editButton]} />
               </View>
             ) : (
               <View style={styles.buttonsContainer}>
@@ -331,7 +331,7 @@ class ShopInfo extends Component {
                   onPress={this.navigateToChatDetail}
                 >
                   <View style={[styles.button, styles.chatButton]}>
-                    <Text style={styles.chatButtonText}>Message</Text>
+                    <Text style={styles.chatButtonText}>{I18n.t('components.molecules.ShopInfo.message')}</Text>
                   </View>
                 </TouchableWithoutFeedback>
                 <FollowButton type="fullButton" style={styles.followButton} peerID={peerID} />

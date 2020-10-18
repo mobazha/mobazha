@@ -86,7 +86,7 @@ class WalletCoinItem extends PureComponent {
     const { coin, balance, onCoinSelected } = this.props;
     const { disabled } = COINS[coin];
     if (disabled || !balance) {
-      Alert.alert('Coming soon!');
+      Alert.alert(I18n.t('components.molecules.WalletCoinItem.coming_soon'));
     } else {
       onCoinSelected(coin);
     }
@@ -127,7 +127,7 @@ class WalletCoinItem extends PureComponent {
               </View>
               <Text style={styles.secondary}>
                 {(disabled || !balance) ? (
-                  'Coming Soon'
+                  I18n.t('components.molecules.WalletCoinItem.coming_soon')
                 ) : (
                     `${minUnitAmountToBCH(cAmount.plus(ucAmount), coin)} ${coin}`
                   )}

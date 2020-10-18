@@ -136,7 +136,7 @@ export default class RadioModalFilter extends PureComponent {
   onSubmit = () => {
     const { selectedOption: { option, value } } = this.state;
     if (!option || (option === 'Other' && !value)) {
-      Alert.alert('Ooops!', 'Please enter a reason for reporting this content.');
+      Alert.alert('Ooops!', I18n.t('components.molecules.RadioModalFilter.reason_reporting'));
       return;
     }
 
@@ -217,7 +217,7 @@ export default class RadioModalFilter extends PureComponent {
                 multiline
                 onChangeText={this.onChangeText(value)}
                 underlineColorAndroid="transparent"
-                placeholder="Other: please explain"
+                placeholder={I18n.t('components.molecules.RadioModalFilter.other')}
               />
             ) : (
               <Text

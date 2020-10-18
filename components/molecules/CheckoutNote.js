@@ -101,7 +101,7 @@ class CheckoutNote extends React.PureComponent {
         noBorder
       >
         {_.isEmpty(checkoutNote) ? (
-          <Text style={styles.noteTip}>Add a note to your order (optional)</Text>
+          <Text style={styles.noteTip}>{I18n.t('components.molecules.CheckoutNote.add_note')}</Text>
         ) : (
           <Text style={styles.note}>{checkoutNote}</Text>
         )}
@@ -124,7 +124,7 @@ class CheckoutNote extends React.PureComponent {
               thumbnail={_.get(profile, 'avatarHashes.tiny')}
             />
             <PlaceholderStyleTextInput
-              placeholder="Add a note for the seller"
+              placeholder={I18n.t('components.molecules.CheckoutNote.add_seller_note')}
               style={styles.input}
               onChangeText={note => this.setState({ note })}
               value={note}

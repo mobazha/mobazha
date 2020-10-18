@@ -270,7 +270,17 @@ export default {
             }, 
             ProductRatings: {
                 reviews: "Reviews",
-            }, QRScanner: {}, SearchFilterHeader: {}, SelectableModerator: {}, SelectorModal: {}, SendingAddressSelector: {}, SendingAmount: {}, ShippingMethod: {}, ShippingOptions: {}, ShippingPriceEditor: {}, SingleVariantEditor: {}, SupportHaven: {}, TagEditor: {}, TagSuggestion: {}, PanelView: { PanelViewBase: {} }
+            }, 
+            QRScanner: {
+                scan_qr_payment_address: "Scan the QR code of a payment address",
+                scan_qr_store: "Scan the QR code of a store,\na listing, or a payment address"
+            }, 
+            SearchFilterHeader: {
+                results: "%{total} results"
+            }, 
+            SelectableModerator: {
+                view_details:"View Details"
+            }, SelectorModal: {}, SendingAddressSelector: {}, SendingAmount: {}, ShippingMethod: {}, ShippingOptions: {}, ShippingPriceEditor: {}, SingleVariantEditor: {}, SupportHaven: {}, TagEditor: {}, TagSuggestion: {}, PanelView: { PanelViewBase: {} }
         },
 
         templates: {

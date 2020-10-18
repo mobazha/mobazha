@@ -149,7 +149,7 @@ class SelectableModerator extends React.PureComponent {
             <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
               {eatSpaces(he.decode(striptags.default(description)))}
             </Text>
-            <Text style={styles.toDetail}>View Details</Text>
+            <Text style={styles.toDetail}>{I18n.t('components.organism.SelectableModerator.view_details')}</Text>
           </View>
         </View>
       </LinearGradient>

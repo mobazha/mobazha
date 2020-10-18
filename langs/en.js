@@ -170,7 +170,107 @@ export default {
                 quantity_sold_out: 'If the quantity reaches 0, it will display as "sold out".',
                 quantity_unlimit: 'Consumers can purchase as much as they\'d like.'
             }, 
-            EmptyCoupons: {}, EmptyShippingMethods: {}, ErrorModal: {}, InventoryItem: {}, ItemDetail: {}, ModerationSettingsEditor: {}, Moderator: {}, ModeratorPreview: {}, MultiSelector: {}, OptionSelector: {}, OrderBrief: {}, OrderDispute: {}, OrderFooter: {}, OrderFulfillment: {}, OrderRating: {}, PayPanel: {}, ProductRatings: {}, QRScanner: {}, SearchFilterHeader: {}, SelectableModerator: {}, SelectorModal: {}, SendingAddressSelector: {}, SendingAmount: {}, ShippingMethod: {}, ShippingOptions: {}, ShippingPriceEditor: {}, SingleVariantEditor: {}, SupportHaven: {}, TagEditor: {}, TagSuggestion: {}, PanelView: { PanelViewBase: {} }
+            EmptyCoupons: {
+                empty_coupon: "You haven’t added any coupons",
+                add_coupon: "Add coupon"
+            }, 
+            EmptyShippingMethods: {
+                empty_shipping_option: "You haven’t added any shipping options",
+                add_shipping: "Add shipping option"
+            }, 
+            ErrorModal: {
+                error_message: "Error: %{error}"
+            }, 
+            InventoryItem: {
+                quantity_info: "QTY: %{quantity}",
+                Unlimited: "Unlimited"
+            }, 
+            ItemDetail: {
+                listing: "Listing",
+                type: "Type",
+                title: "Title",
+                ask_selling: "What are you selling?",
+                price: "Price",
+                condition: "Condition",
+                description: "Description",
+                description_hint: "Describe your listing here",
+                mature_hint: "Mature Content (NSFW, adult, 18+)"
+            }, 
+            ModerationSettingsEditor: {
+                profile_info: "Profile Information",
+                description: "Description",
+                terms: "Terms of Service",
+                languages: "Languages",
+                primary: "Primary",
+                secondary: "Secondary",
+                third: "Third"
+            }, 
+            Moderator: {
+                unknown_moderator: "Unknown moderator",
+                unknown_moderator_description: "Could not fetch moderator profile.",
+                verified: "verified"
+            }, 
+            ModeratorPreview: {
+                verified: "verified"
+            },
+            MultiSelector: {
+                select_info: "%{count} Selected"
+            },
+            OptionSelector: {
+            }, 
+            OrderBrief: {
+                tap_to: "Current market price, tap to ",
+                learn_more: "learn more"
+            }, 
+            OrderDispute: {
+                ask_payout: "Accept payout?",
+                payout_description: "Once accepted, the dispute will close and the funds will transfer",
+                cancel: "Cancel",
+                ok: "Ok",
+                dispute_expired: "Dispute expired",
+                memo_comment1: "The moderator has not proposed an outcome. The seller can claim the payment.",
+                dispute_payout: "Dispute payout",
+                will_be_issued: " will be issued to you.",
+                moderator_takes :"Moderator takes ",
+                seller_takes :"Seller takes ",
+                buyer_takes :"Buyer takes ",
+                accept_payout:"Accept payout",
+                started_by: "Dispute started by %{name}",
+                the_seller: "the seller",
+                the_buyer: "the buyer",
+                memo_comment2: "The moderator has stepped in to help. Start chatting to provide more details.",
+                message: "Message"
+            }, 
+            OrderFooter: {
+
+            }, OrderFulfillment: {
+                no_tracking_number: "No tracking number to copy!",
+                shipping_via: "Shipping via",
+                tracking_num: "Tracking #",
+                tracking_number_copied: "Tracking number copied!",
+                file_url: "File URL:",
+                password: "Password:",
+                fulfilled_info: "This order has been fulfilled!",
+                order_fulfilled: "Order fulfilled"
+            }, 
+            OrderRating: {
+                Overall:"Overall",
+                Quality:"Quality",
+                as_advertised: "As advertised",
+                Delivery: "Delivery",
+                Service: "Service",
+                no_feedback: "No feedback left by %{name}"
+            }, 
+            PayPanel: {
+                ask_pay: "How would you like to pay?",
+                external_wallet: "External Wallet",
+                not_available_eth: "Not available for ETH",
+                haven_wallet: "Haven Wallet",
+                not_enough_funds: "Not enough funds"
+            }, 
+            ProductRatings: {
+                reviews: "Reviews",
+            }, QRScanner: {}, SearchFilterHeader: {}, SelectableModerator: {}, SelectorModal: {}, SendingAddressSelector: {}, SendingAmount: {}, ShippingMethod: {}, ShippingOptions: {}, ShippingPriceEditor: {}, SingleVariantEditor: {}, SupportHaven: {}, TagEditor: {}, TagSuggestion: {}, PanelView: { PanelViewBase: {} }
         },
 
         templates: {

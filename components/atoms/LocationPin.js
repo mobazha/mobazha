@@ -42,7 +42,7 @@ class LocationPin extends PureComponent {
       >
         <Ionicons name="md-pin" size={14} color={locationPinColor} />
         &nbsp;
-        {location || 'Unknown'}
+        {location || I18n.t('components.atoms.LocationPin.unknown')}
       </Text>
     );
   }

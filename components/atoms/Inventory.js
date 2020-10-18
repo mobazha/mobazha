@@ -31,10 +31,10 @@ export default class Inventory extends PureComponent {
           {inventory.productId}
         </Text>
         <Text style={styles.surcharge}>
-          {`Surcharge: $${inventory.surcharge}`}
+          {`${I18n.t('components.atomsInventory.surcharge')}: $${inventory.surcharge}`}
         </Text>
         <Text style={styles.stock}>
-          {`Stock: ${inventory.quantity === -1 ? 'Unlimited' : inventory.quantity}`}
+          {`${I18n.t('components.atomsInventory.stock')}: ${inventory.quantity === -1 ? I18n.t('components.atomsInventory.unlimited') : inventory.quantity}`}
         </Text>
       </View>
     );

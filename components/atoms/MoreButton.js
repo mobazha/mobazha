@@ -15,7 +15,7 @@ const styles = {
 export default ({ onPress, title }) => (
   <TouchableWithoutFeedback onPress={onPress}>
     <View style={styles.wrapper}>
-      <Text style={styles.text}>+ {title || 'More'}</Text>
+      <Text style={styles.text}>+ {title || I18n.t('components.atoms.MoreButton.more')}</Text>
     </View>
   </TouchableWithoutFeedback>
 );

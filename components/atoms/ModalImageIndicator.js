@@ -22,7 +22,7 @@ const styles = {
 const ModalImageIndicator = ({ pos, size }) => (
   <View style={styles.modalClose}>
     <Text style={styles.text}>
-      {pos + 1} of {size}
+      {I18n.t('components.atoms.ModalImageIndicator.posInfo', { pos: pos + 1, size: size })}
     </Text>
   </View>
 );

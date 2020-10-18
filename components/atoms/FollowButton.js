@@ -155,7 +155,7 @@ class FollowButton extends Component {
           {isFollowing ? (
             <View style={fullButtonStyles.wrapper}>
               <Ionicons name="ios-checkmark" size={28} style={fullButtonStyles.checkmark} />
-              <Text style={fullButtonStyles.unfollowingButtonText}>Following</Text>
+              <Text style={fullButtonStyles.unfollowingButtonText}>{I18n.t('components.atoms.FollowButton.following')}</Text>
               {isInUnfollowQueue && (
                 <ActivityIndicator style={fullButtonStyles.activityIndicator} size="small" color={brandColor} />
               )}
@@ -163,7 +163,7 @@ class FollowButton extends Component {
           ) : (
             <View style={fullButtonStyles.wrapper}>
               <Ionicons size={16} color="#B7B7B7" name="md-person-add" style={fullButtonStyles.iconButton} />
-              <Text style={fullButtonStyles.followingButtonText}>  Follow</Text>
+              <Text style={fullButtonStyles.followingButtonText}>  {I18n.t('components.atoms.FollowButton.follow')}</Text>
               {isInFollowQueue && (
                 <ActivityIndicator style={fullButtonStyles.activityIndicator} size="small" color="white" />
               )}

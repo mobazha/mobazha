@@ -34,7 +34,7 @@ const styles = {
 
 export default ({ onPress }) => (
   <TouchableOpacity style={styles.wrapper} onPress={onPress}>
-    <Text style={styles.btnText}>Unavailable</Text>
+    <Text style={styles.btnText}>{I18n.t('components.atoms.UnavailableButton.unavailable')}</Text>
     <View style={styles.btnIcon}>
       <Ionicons
         name={Platform.OS === 'ios' ? 'ios-information-circle-outline' : 'md-information-circle-outline'}

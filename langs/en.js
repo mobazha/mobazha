@@ -637,7 +637,332 @@ export default {
     },
 
     screens: {
-        acceptedCoins: {}, addShippingMethod: {}, analytics: {}, backupProfileInit: {}, backupProfilePassword: {}, backupProfileUpload: {}, categoryOverview: {}, chats: {}, checkoutModerators: {}, editShippingAddress: {}, externalPay: {}, externalStore: {}, followers: {}, followings: {}, listing: {}, listingAdvancedOptions: {}, Me: {}, moderatorDetails: {}, onboarding: {}, orderDetails: {}, paymentMethod: {}, paymentSuccess: {}, policies: {}, privacy: {}, ProductRatings: {}, profileSettings: {}, purchaseSuccess: {}, receiveMoney: {}, restoreProfileInit: {}, restoreProfilePassword: {}, Resync: {}, searchFilter: {}, shippingAddress: {}, StoreRatings: {}
+        acceptedCoins: {
+            update_listings: "Update Listings?",
+            sure_about_update: "All your listings will be updated.\nAre you sure?",
+            cancel: "Cancel",
+            OK: "OK",
+            coins_accepted: "Coins accepted",
+            save: "Save",
+            clear_all: "Clear all"
+        },
+        addShippingMethod: {
+            fill_required: "Please fill out all the required fields",
+            must_be_less: "Shipping option name length must be less than the max of 40",
+            select_destination: "Please select a shipping destination",
+            add_shipping_option: "Add Shipping Option",
+            shipping_option: "Shipping option",
+            title: "Title",
+            option_description: "USA Shipping, International, etc",
+            destinations: "Destinations"
+        },
+        analytics: {
+            details1: 'Session information, such as how often you use the App and for how long.',
+            details2: 'Basic device information; e.g., which type of phone you are using.',
+            details3: 'The country you are accessing the App from.',
+            details4: 'Which version of the App you are using.',
+            details5: 'Which language you have selected.',
+            details6: 'When you enter checkout for a purchase (no information is collected about what is being purchased).',
+            details7: 'When you send funds, and which type of payment is used (no details are collected about the payment itself such as addresses or values).',
+            details8: 'When you create a listing (no information about the listing itself is collected).',
+            details9: 'Actions taken within Haven, such as tapping on the social feed or how often you make new posts. The content of the actions themselves are never recorded, only the fact that you took the action.',
+            Analytics: "Analytics",
+            Share_anonymous: "Share anonymous analytics",
+            description: "If you opt into sharing analytics, you agree to share the following information with the OB1 Company:"
+        },
+        backupProfileInit: {
+            back_up_profile: "Back up profile",
+            ensure_backup1: "Ensure your data is safe by backing it up\nfrequently.",
+            ensure_backup2: " For the time being, you\'re required to manually back up your data. ",
+            ensure_backup3: "We\'ll be rolling out a better backup system in the future.",
+            ensure_backup4: "Your backup will include all of your data, including wallet funds.",
+            next: "NEXT"
+        },
+        backupProfilePassword: {
+            password_empty: "Password empty",
+            password_empty_hint: "Please set a password",
+            password_mismatch: "Password mismatch",
+            password_mismatch_hint: "Please set a correct password",
+            take_a_minute: "It might take a minute...",
+            set_password: "Set a password",
+            password: "Password",
+            confirm: "Confirm",
+            confirm_password: "Confirm password",
+            hint1: "Set a password and ",
+            hint2: "make sure to write it down.",
+            hint3: "\nYou\'ll need your password to restore your profile.",
+            next: "NEXT"
+        },
+        backupProfileUpload: {
+            upload_1: "Please upload your backup to a secure\nexternal location ",
+            upload_2: " to ensure you can recover your\ndata if you lose your phone.",
+            upload_backup: "UPLOAD BACKUP",
+            done: "DONE"
+        },
+        blockedNodes: {
+            no_block: "You haven’t blocked anyone yet"
+        },
+        categoryOverview: {
+            see_all: "See all"
+        },
+        chats: {
+            start_conversation: "Start a conversation",
+            new_chat: "New Chat",
+            no_discussion: "No order discussions found"
+        },
+        checkoutModerators: {
+            select_moderator: "Select a moderator",
+            no_available: "No Available Moderators"
+        },
+        editShippingAddress: {
+            name_required: "Name is required",
+            address_required: "Address is required",
+            city_required: "City is required",
+            country_required: "Country is required",
+            new_address: "New Address",
+            done: "Done",
+            your_address: "Your Address",
+            name: "Name",
+            company: "Company",
+            address: "Address",
+            address2: "Address 2",
+            city: "City",
+            state: "State",
+            postal_code: "Postal Code",
+            country: "Country",
+            delivery_notes: "Delivery Notes"
+        },
+        externalPay: {
+            address_copied: "Address copied!",
+            amount_copied: "Amount copied!",
+            pay_order: "Pay to complete your order",
+            copy_address: "Copy Address"
+        },
+        externalStore: {
+            unblock_user: "Unblock this user to see their content",
+            loading: "Loading...",
+            failed_load: "Oops! This profile failed to load.",
+            reported: "Reported",
+
+        },
+        followers: {
+            followers: "Followers",
+            no_followers1: "%{name} doesn't have any followers",
+            no_followers2: "You don\'t have any followers"
+        },
+        followings: {
+            Following: "Following",
+            no_following1: "%{name} isn't following anyone",
+            no_following2: "You are not following anyone"
+        },
+        listing: {
+            are_you_sure: "Are you sure?",
+            ask_block: "Block this user?",
+            cancel: "Cancel",
+            OK: "OK",
+            ask_delete: "Delete listing?",
+            delete_hint: "You can't undo this action.",
+            cancel: "Cancel",
+            remove: "Remove",
+            failed_load: "Ooops! This listing failed to load.",
+            retry: "Retry",
+            loading: "Loading...",
+            add_wishlist: "Added to Wishlist!",
+            remove_wishlist: "Removed from Wishlist!",
+            reported: "Reported!"
+        },
+
+        listingAdvancedOptions: {
+            add_coupons: "Add coupons",
+            advanced: "Advanced",
+            Variants_Inventory: "Variants & Inventory",
+            add_hint: "Add variants and manage your store inventory",
+            store_policies: "Store Policies",
+            policies_hint: "Add a return policy or terms of service",
+            coupons: "Coupons"
+        },
+        Me: {
+            support1: "Have questions, feature suggestions or bugs to report? Please check our FAQs first. Our Telegram group is a great resource to report bugs or ask for support. ",
+            support2: "Our ability to offer email support is very limited. ",
+            support3: " Please attempt to use the FAQ or Telegram group primarily.",
+            description: "For any critical issues, concerns, or problems with the app and/or content in the marketplace, contact us via email."
+        },
+        moderatorDetails: {
+            remove_moderator: "Remove moderator?",
+            remove_hint: "This moderator will be removed from your store permanently. You won\'t be able to add them again",
+            cancel: "Cancel",
+            OK: "OK",
+            verified: "verified",
+            fee_description: "The fee only applies when a dispute is opened.",
+            moderator_verified: " This moderator has been verified",
+            terms: "Terms of Service",
+            selected: " Selected",
+            select: "SELECT"
+        },
+        newFeed: {
+            Create_failed: "Create post failed",
+            unknown_error_create: "Unknown error occured while creating post",
+            char_left: " char left",
+            what_going_on: "What's going on?"
+        },
+        onboarding: {
+            HELLO: "HELLO!",
+            restore_profile: "Restore profile",
+            name: "Name",
+            optional: "optional",
+            country: "Country",
+            currency: "Currency",
+            share_analytics: "Share anonymous analytics",
+            help_improve: "Help us improve Haven"
+        },
+        orderDetails: {
+            decline_order: "Decline order?",
+            decline_hint: "This order will be canceled and the money will be refunded to the buyer",
+            nevermind: "Nevermind",
+            ok: "Ok",
+            refund_order: "Refund order?",
+            refund_hint: "This order will be canceled and the money will be refunded to the buyer.",
+            cancel_order: "Cancel order?",
+            cancel_hint: "This order will be canceled and your money will be refunded in full.",
+            have_refunded: "You have refunded the order",
+            error_happened: "Error happened because of unknown issues",
+            fund_order: "Fund Order",
+            leave_notes: "Leave Notes",
+            number_copied: "Order number copied!",
+            learn_more: "Due to changes in the exchange rate, the current market price for an order may differ from the total price of the item at the time of purchase."
+        },
+        paymentMethod: {
+            select_fee_level: "Please select fee level",
+            not_accepted: "Not accepted",
+            coming_soon: "Coming Soon",
+            payment_method: "Payment Method",
+            done: "Done",
+            transaction_speed: "Transaction speed"
+        },
+        paymentSuccess: {
+            transaction_details: "Transaction details",
+            processing: "Processing…",
+            hang_tight: "Hang tight! This may take up to a minute.",
+            Uh_oh: "Uh oh!",
+            failed_go_through: "Your transaction failed to go through. Please try again.",
+            retry: "Retry",
+            error: "Error:"
+        },
+
+        policies: {
+            store_policies: "Store Policies",
+            save: "Save",
+            terms: "Terms and Conditions",
+            terms_hint: "What are the terms and conditions of the listing? What are you responsible for as the vendor? Is there a warranty?",
+            refunds: "Refunds",
+            refund_hint: "What is your return policy? How long are returns accepted for? Who pays for return shipping?"
+        },
+        privacy: {
+            privacy_policy: "Privacy Policy",
+            terms: "Terms of Service",
+            privacy: "PRIVACY",
+            privacyDescription1: "Haven is built to give you far more privacy in your commerce, messaging, and payments than other apps.It uses several advanced technologies to keep your information from prying eyes, such as peer-to-peer networking and end-to-end encryption.",
+            privacyDescription2: "There are ways to use Haven which improve or diminish your privacy. To learn more about how the underlying technology works, and what steps you can take to improve your privacy, tap the privacy policy link below.",
+            privacyDescription3: "Before you proceed, you must accept the Haven https://gethaven.app/terms and https://gethaven.app/privacy.",
+            cancel: "Cancel",
+            I_accept: "I Accept"
+        },
+        ProductRatings: {
+            reviews: "Reviews",
+            No_reviews: "No reviews yet"
+        },
+        profileSettings: {
+            warning: "Warning",
+            warning_info: "If you go back, you will lose your progress",
+            Cancel: "Cancel",
+            OK: "OK",
+            profile_information: "Profile Information",
+            name: "Name",
+            name_hint: "Satoshi Nakamoto",
+            bio: "Bio",
+            bio_hint: "Write a short description",
+            location: "Location",
+            location_hint: "e.g. Seattle",
+            contact: "Contact",
+            contact_hint: "satoshin@gmx.com",
+            phone_number: "Phone Number",
+            phone_hint: "+123456789",
+            website: "Website",
+            website_hint: "hello.com",
+            Aaout: "About",
+            about_hint: "Share more about yourself here"
+        },
+        purchaseSuccess: {
+            successfully_sent: "Successfully sent message",
+            received_message: "You have received a message!",
+            sent: "Sent",
+            close: "Close",
+            order_complete: "Order Complete",
+            view_transaction: "View Transaction",
+            message_for: "Message for %{handle}",
+            provide_details: "Provide additional details, ask a question, etc (optional)",
+            send: "Send"
+        },
+        receiveMoney: {
+            share_address: "Share Wallet Address",
+            copy_address: "Copy Address",
+            address_copied: "Address copied!"
+        },
+        restoreProfileInit: {
+            restore_profile: "Restore profile",
+            restore_hint: "Select your haven backup file to restore\nyour profile, including your wallet funds.",
+            select_file: "SELECT FILE"
+        },
+        restoreProfilePassword: {
+            Ooops: "Ooops!",
+            loading_hint: "It might take a minute...",
+            wrong_password: "Wrong password!",
+            failed_download: "Failed to download zip file",
+            enter_password: "Enter password",
+            password: "Password",
+            enter_password_hint: "Enter your password to proceed. You set this password when creating the backup.",
+            restore: "RESTORE"
+        },
+        Resync: {
+            unknown_error: "Unknown error!",
+            resync_transactions: "Resync transactions",
+            resync_content1: "If you believe you’re missing an order, or if your order details are out-of-sync with a buyer/seller, ",
+            resync_content2: "you can rescan the blockchain for transactions related to your order.",
+            resync_content3: "Resyncing transactions doesn’t need to be performed frequently. ",
+            resync_content4: "It should only be done if you think there’s a problem. A scan is performed each time you start the app.",
+            resync_content5: "You may leave this view while the resync process is active.",
+            resyncing: "Resyncing...",
+            resync_info: "Resynced %{lastSyncedAgo} ago",
+            resync: "Resync"
+        },
+        searchFilter: {
+            filter: "Filter",
+            sortBy: "Sort by",
+            accepts: "Accepts",
+            ships_to: "Ships to",
+            rating: "Rating",
+            listing_type: "Listing type",
+            item_condition: "Item Condition",
+            adult_content: "Adult content",
+            adult_content2: "Show adult content (18+)",
+            filters_reset: "Filters reset"
+        },
+        shippingAddress: {
+            are_you_sure: "Are you sure?",
+            remove_address: "Remove the address",
+            cancel: "Cancel",
+            OK: "OK",
+            free: "FREE",
+            cannot_ship: "Sorry, this item can not be shipped to the selected address",
+            Shipping: "Shipping",
+            ships_to: "Ship To",
+            no_address: "No shipping address",
+            add_address: "+ Add new address"
+        },
+        StoreRatings: {
+            Reviews: "Reviews",
+            no_reviews1: "%{user} hasn't received any reviews",
+            no_reviews2: "You haven\'t received any reviews"
+        }
     },
-    utils: { ratings: {} },
 }

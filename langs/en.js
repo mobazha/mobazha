@@ -146,7 +146,7 @@ export default {
             CheckoutSummary: {
                 add_link: "Add",
                 none_select: "none",
-                remove_ncoupo: "Remove coupon?",
+                remove_coupon: "Remove coupon?",
                 remove_coupon_description: "Are you sure you want to remove this coupon?",
                 cancel: "Cancel",
                 remove: "Remove",

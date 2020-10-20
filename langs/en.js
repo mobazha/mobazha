@@ -144,7 +144,9 @@ export default {
                 each_price: "%{price} / each"
             },
             CheckoutSummary: {
-                remove_coupon: "Remove coupon?",
+                add_link: "Add",
+                none_select: "none",
+                remove_ncoupo: "Remove coupon?",
                 remove_coupon_description: "Are you sure you want to remove this coupon?",
                 cancel: "Cancel",
                 remove: "Remove",
@@ -242,6 +244,7 @@ export default {
                 message: "Message"
             },
             OrderFooter: {
+                claim: "Claim",
 
             }, OrderFulfillment: {
                 no_tracking_number: "No tracking number to copy!",

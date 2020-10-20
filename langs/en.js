@@ -461,11 +461,178 @@ export default {
                 reported: "Reported"
             },
 
-            InfiniteProducts: {}, InventoryEditor: {}, InventoryList: {}, ListingAdvancedDetails: {}, ListingsTab: {}, NeedCoin: {}, OrderState: {},
+            InfiniteProducts: {
+                loading_listings: "Loading Listings..."
+            },
+            InventoryEditor: {
+                details: "Details",
+                surcharge: "Surcharge",
+                sku: "SKU",
+                sku_description: "SKU, ID, etc",
+                quantity: "quantity",
+                unlimited: "Unlimited",
+                quantity_sold_out: 'If the quantity reaches 0, it will display as "sold out".'
+            },
+            InventoryList: {
+                combos_info: "%{count} variant combos",
+            },
+            ListingAdvancedDetails: {
+                Return_Policy: "Return Policy",
+                Refunds: "Refunds",
+                refunds_description: "What is your return policy? How long are returns accepted for? Who pays for return shipping?",
+                terms: "Terms and Conditions",
+                terms2: "T&Cs",
+                terms_description: "What are the terms and conditions of the listing? What are you responsible for as the vendor? Is there a warranty?"
+            },
+            ListingsTab: {
+                loading: "Loading...",
+                no_sale: "There's nothing for sale at the moment.",
+                check_later: "Check back again later!",
+                store_empty: "Your store is empty",
+                put_for_sale: "Put something up for sale!",
+                create_listing: "Create listing",
 
-            OrderSummary: {}, PurchaseState: {}, RatingModal: {}, ReportTemplate: {}, SearchResults: {}, SendMoney: {}, SendReceiveMoney: {}, Settings: {}
+            },
+            NeedCoin: {
+                coinbase: "Coinbase",
+                cryptocurrency_exchange: "Cryptocurrency Exchange"
+            },
+            OrderState: {
+                no_orders: "No orders found",
+            },
 
-            , StoreModeratorList: {}, Toast: {}, TransactionHistory: {}, UserSearchResults: {}, wishlist: {}
+            OrderSummary: {
+                oops: "Oops!",
+                dispute_pending_alert: "You can\'t start a dispute while the order is still pending.",
+                dispute_not_fulfilled_alert: "You can\'t start a dispute until you\'ve fulfilled the order",
+                dispute_cancel_alert: "You can\'t start a dispute for canceled order.",
+                dispute_refund_alert: "You can\'t start a dispute for refunded order.",
+                dispute_resolved_alert: "You can\'t start a dispute for dispute-closed order.",
+                dispute_completed_alert: "You can\'t start a dispute for completed order.",
+                dispute_finalized_alert: "This order can\'t be disputed. The seller has claimed payment for this order.",
+                dispute_processing_alert: "This order can\'t be disputed. Please cancel your order to receive a full refund.",
+                quantity_info: "Quantity: {quantity}",
+                view: "View",
+                view_transaction: "View transaction",
+                payment: "Payment",
+                no_payment: "A payment has not been found for this order yet. It may take up to a minute for the payment to be detected.",
+                cannot_dispute: "The funds were sent directly to %{user}. You cannot dispute this order.",
+                escrow_released: "The funds have already been released from escrow. The order can no longer be disputed.",
+                order_in_dispute: "The order is in dispute for up to ",
+                until_accept: " or until a party accepts a payout.",
+                period_expired_claim: "The dispute period has expired. The seller can now claim the payment.",
+                period_expired_claim2: "The dispute period has expired. The funds can now be claimed in full.",
+                order_in_escrow1: "The order funds are being held in escrow for approximately ",
+                order_in_escrow2: " or until the buyer completes the order.\n\nIf you have any issues with this order, you can open a dispute with the moderator.",
+                dispute_order: "Dispute Order",
+                claim_payment: "Claim Payment",
+                dispute_error_possible: "An error occurred while processing this order.\nPlease start a dispute to recover your funds.",
+                dispute_error: "An error occurred while processing this order.",
+                order_refunded: "Order refunded",
+                full_refund: "The seller has issued a full refund for this order",
+                order_completed: "Order completed",
+                release_to_seller: "The payment has been released to the seller",
+                dispute_closed: "Dispute closed",
+                dispute_closed_info: "%{user} has accepted the payout. This dispute is now closed.`",
+                payment_claimed: "Payment claimed",
+                seller_claim: "The seller has claimed payment for this order.",
+                order_canceled: "Order canceled",
+                user_cancel_order: "The %{user} has canceled this order. The money has been refunded in full.",
+                period_expired: "Dispute period expired",
+                no_dispute: "No dispute was opened during the 45-day dispute period. The seller can now claim payment.",
+                Shipping: "Shipping",
+                no_buyer_note: "No note left by buyer",
+                address_copied: "Address copied!"
+            },
+            PurchaseState: {
+                thank_you: "Thank you!",
+                order_placed: "Your order has been placed. You can track or manage your order at any time.",
+                processing: "Processing...",
+                hang_tight: "Hang tight! This may take up to a minute.",
+                Uh_oh: "Uh oh!",
+                transaction_failed: "Your transaction failed to go through. Please try again.",
+                retry: "Retry",
+                order_details: "Order Details",
+                error: "Error:"
+            },
+            RatingModal: {
+                Overall: "Overall",
+                Quality: "Quality",
+                As_advertised: "As advertised",
+                Delivery: "Delivery",
+                Service: "Service",
+                Write_a_review: "Write a review here",
+                Post_anonymously: "Post anonymously"
+            },
+            ReportTemplate: {
+                Ooops: "Ooops!",
+                enter_reason: "Please enter a reason for reporting this content.",
+                why_report_profile: "Why are you reporting this profile?",
+                why_report: "Why are you reporting this?",
+                next: "Next",
+                submit: "Submit",
+                describe_issue: "Please describe the issue (optional)",
+                provide_details: "Provide as much details as possible"
+            },
+            SearchResults: {
+                loading_results: "Loading Search Results ...",
+                no_found: "No results found.",
+
+            },
+            SendMoney: {
+                NEXT: "NEXT",
+                send_to: "Send to",
+                paste_or_scan: "Paste or scan address"
+            },
+            SendReceiveMoney: {
+                Receive: "Receive",
+                Send: "Send"
+            },
+            Settings: {
+                are_you_sure: "Are you sure?",
+                check_backup: "Have you backed up your current store?",
+                cancel: "Cancel",
+                OK: "OK",
+                profile: "Profile",
+                currency: "Currency",
+                shipping_address: "Shipping address",
+                blocked: "Blocked",
+                notifications: "Notifications",
+                push_notifications: "Push notifications",
+                Policies: "Policies",
+                Moderators: "Moderators",
+                coins_accepted: "Coins accepted",
+                Advanced: "Advanced",
+                Analytics: "Analytics",
+                On: "On",
+                Off: "Off",
+                Backup_wallet: "Backup wallet",
+                Backup_profile: "Backup profile",
+                Restore_profile: "Restore profile",
+                Resync_transactions: "Resync transactions",
+                Server_Log: "Server Log",
+                Version: "Version 1.3.7"
+            },
+            StoreModeratorList: {
+                moderators_count: "%{count} moderators",
+                moderators_added: "New moderators are automatically added to your store"
+            },
+            Toast: {
+                post_created: "Post created",
+                view: "View"
+            },
+            TransactionHistory: {
+                no_transaction_recorded: "No transactions have been recorded yet",
+                no_transactions: "No transactions yet",
+                notes: "Please note some payments may not display in the transaction history. However, the total balance reflects all sent and received transactions."
+            },
+            UserSearchResults: {
+                loading_results: "Loading Search Results ...",
+                no_results: "No results found."
+            },
+            wishlist: {
+                wishlist_empty: "Your Wishlist is empty"
+            }
         }
     },
 

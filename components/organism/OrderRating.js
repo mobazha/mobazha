@@ -76,7 +76,7 @@ class OrderRating extends PureComponent {
     return (
       <View style={styles.emptyWrapper}>
         <Ionicons name="md-star" size={17} style={styles.icon} color="#f9d553" />
-        <Text style={styles.emptyText}>{I18n.t('components.organism.OrderRating.no_feedback')}</Text>
+        <Text style={styles.emptyText}>{I18n.t('components.organism.OrderRating.no_feedback', {name:name})}</Text>
       </View>
     );
   }

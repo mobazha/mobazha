@@ -111,7 +111,7 @@ class OrderFulfillment extends PureComponent {
     const { detail } = this.props;
     return (
       <InputGroup
-        title={{I18n.t('components.organism.OrderFulfillment.order_fulfilled')}}
+        title={I18n.t('components.organism.OrderFulfillment.order_fulfilled')}
         actionTitle={timeSince(new Date(detail.timestamp))}
         actionStyle={styles.timestamp}
       >

@@ -373,10 +373,10 @@ class CheckoutSummary extends PureComponent {
       <View style={styles.couponWrapper}>
         <View style={styles.couponInfo}>
           <Text style={styles.couponLabel}>
-            Coupon: {coupon ? selectedCoupon.couponCode : 'None'}
+            Coupon: {coupon ? selectedCoupon.couponCode : I18n.t('components.organism.CheckoutSummary.none_select')}
           </Text>
           <TouchableWithoutFeedback onPress={coupon ? this.handleRemoveCoupon : this.showCouponModal}>
-            <Text style={styles.couponLinkText}>{coupon ? 'Remove' : 'Add'}</Text>
+            <Text style={styles.couponLinkText}>{coupon ? I18n.t('components.organism.CheckoutSummary.remove') : I18n.t('components.organism.CheckoutSummary.add_link')}</Text>
           </TouchableWithoutFeedback>
         </View>
         {coupon && (

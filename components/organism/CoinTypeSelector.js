@@ -131,7 +131,7 @@ class CoinTypeSelector extends PureComponent {
                   {localLabelFromLocal(cBalance)}
                 </Text>
                 <Text style={styles.secondary}>
-                  {(disabled || !balance) ? 'Coming Soon' : `${minUnitAmountToBCH(balance.confirmed, coin)} ${coin}`}
+                  {(disabled || !balance) ? I18n.t('components.organism.CoinTypeSelector.coming_soon') : `${minUnitAmountToBCH(balance.confirmed, coin)} ${coin}`}
                 </Text>
               </View>
             )}

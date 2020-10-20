@@ -164,7 +164,7 @@ class OrderDispute extends PureComponent {
         actionStyle={styles.timestamp}
       >
         <Text style={styles.memoComment}>
-          {'The moderator has not proposed an outcome. The seller can claim the payment.'}
+          {I18n.t('components.organism.OrderDispute.memo_comment1')}
         </Text>
         <View style={styles.spacer} />
       </InputGroup>
@@ -196,13 +196,13 @@ class OrderDispute extends PureComponent {
           <Text style={styles.payoutMainAmount}>
             {localLabelFromBCH((amIBuyer ? buyerValue : sellerValue) || 0, coin)}
           </Text>
-          {' will be issued to you.'}
+          {I18n.t('components.organism.OrderDispute.will_be_issued')}
         </Text>
         <Text style={[styles.serviceFee, state !== 'DECIDED' && { marginBottom: 18 }]}>
-          {'Moderator takes '}
+          {I18n.t('components.organism.OrderDispute.moderator_takes')}
           <Text style={styles.payoutAmount}>{localLabelFromBCH(moderatorValue || 0, coin)}</Text>
           {'. '}
-          {amIBuyer ? 'Seller takes ' : 'Buyer takes '}
+          {amIBuyer ? I18n.t('components.organism.OrderDispute.seller_takes') : I18n.t('components.organism.OrderDispute.buyer_takes')}
           <Text style={styles.payoutAmount}>
             {localLabelFromBCH((amIBuyer ? sellerValue : buyerValue) || 0, coin)}
           </Text>
@@ -211,7 +211,7 @@ class OrderDispute extends PureComponent {
         {state === 'DECIDED' && !disputeAcceptance && (
           <TouchableWithoutFeedback onPress={this.handleAcceptPayout}>
             <View style={styles.acceptButton} >
-              <Text style={styles.acceptText}>Accept payout</Text>
+              <Text style={styles.acceptText}>{I18n.t('components.organism.OrderDispute.accept_payout')}</Text>
             </View>
           </TouchableWithoutFeedback>
         )}
@@ -237,7 +237,7 @@ class OrderDispute extends PureComponent {
         {this.renderDisputeExpire()}
         {!isEmpty(disputeResolution) && this.renderDisputePayout()}
         <InputGroup
-          title={`Dispute started by ${name || (sellerStarted ? 'the seller' : 'the buyer')}`}
+          title={`Dispute started by ${name || (sellerStarted ? I18n.t('components.organism.OrderDispute.seller_takes') : I18n.t('components.organism.OrderDispute.buyer_takes'))}`}
           actionTitle={timeSince(new Date(dispute.timestamp))}
           actionStyle={styles.timestamp}
         >
@@ -247,11 +247,11 @@ class OrderDispute extends PureComponent {
             </Text>
           </View>
           <Text style={styles.memoComment}>
-            {'The moderator has stepped in to help. Start chatting to provide more details.'}
+            {I18n.t('components.organism.OrderDispute.memo_comment2')}
           </Text>
           <TouchableWithoutFeedback onPress={onMessage}>
             <View style={styles.messageButton}>
-              <Text style={styles.messageText}>Message</Text>
+              <Text style={styles.messageText}>{I18n.t('components.organism.OrderDispute.message')}</Text>
             </View>
           </TouchableWithoutFeedback>
         </InputGroup>

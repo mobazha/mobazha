@@ -255,7 +255,7 @@ class OrderFooter extends PureComponent {
       } else {
         return (
           <Text style={styles.status}>
-            {'Claim '}
+            {I18n.t('components.organism.OrderFooter.claim')}
             <Text style={styles.statusBrandBold}>{localLabelFromBCH(total.amount, paymentCoin)}</Text>
             ?
           </Text>

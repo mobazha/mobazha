@@ -1,6 +1,6 @@
 export default {
     OnboardingWrapper: {
-        unknown: 'Unknown',
+        unknown: '未知',
     },
     components: {
         atoms: {
@@ -11,7 +11,7 @@ export default {
                 posting: '发送...'
             },
             FollowButton: {
-                following: 'Following',
+                following: '关注中',
                 follow: 'Follow',
             },
             Inventory: {
@@ -20,34 +20,34 @@ export default {
                 unlimited: 'Unlimited',
             },
             LocationPin: {
-                unknown: 'Unknown'
+                unknown: '未知'
             },
             ModalImageIndicator: {
                 posInfo: "%{pos} of %{size}"
             },
             MoreButton: {
-                more: 'More'
+                more: '更多'
             },
             PayBanner: {
-                calculating: 'calculating...',
+                calculating: '正在计算',
             },
             PaymentMethod: {
-                wallet_empty: 'Your wallet is empty',
-                add_funds: 'Add Funds'
+                wallet_empty: '你的钱包是空的',
+                add_funds: '添加资金'
             },
             PostButton: {
                 post: 'Post'
             },
             ProductPrice: {
-                free_shipping: 'Free shipping',
-                shipping: 'shipping',
+                free_shipping: '免费运送',
+                shipping: '运送',
             },
             ResetFilter: {
                 reset_filters: 'Reset filters'
             },
             SecureFund: {
                 secure_funds: 'Secure your funds',
-                backup_wallet: 'Backup wallet'
+                backup_wallet: '备份钱包'
             },
             UnavailableButton: {
                 unavailable: 'Unavailable'

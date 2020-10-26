@@ -5,19 +5,20 @@ export default {
     components: {
         atoms: {
             ChatBubble: {
-                fail_retry: 'Couldn\'t send. Tap to retry',
+                fail_retry: '不能发送、点击重试',
             },
             Comment: {
                 posting: '发送...'
             },
             FollowButton: {
                 following: '关注中',
-                follow: 'Follow',
+                follow: '关注',
             },
             Inventory: {
-                surcharge: 'Surcharge',
-                stock: 'Stock',
-                unlimited: 'Unlimited',
+                surcharge: '附加费用',
+                stock: '库存',
+                
+                unlimited: '没有限制的',
             },
             LocationPin: {
                 unknown: '未知'
@@ -43,132 +44,132 @@ export default {
                 shipping: '运送',
             },
             ResetFilter: {
-                reset_filters: 'Reset filters'
+                reset_filters: '重置过滤器'
             },
             SecureFund: {
-                secure_funds: 'Secure your funds',
+                secure_funds: '保护你的资金',
                 backup_wallet: '备份钱包'
             },
             UnavailableButton: {
-                unavailable: 'Unavailable'
+                unavailable: '不可用的'
             }
         },
 
         molecules: {
             BlockedNodeItem: {
-                unknown: 'Unknown',
-                unblock: 'Unblock',
-                block: 'Block'
+                unknown: '未知',
+                unblock: '没有屏蔽',
+                block: '屏蔽'
             },
             BuyerReview: {
-                from: "From %{content}",
-                no_review: "No review message from buyer"
+                from: "从%{content}",
+                no_review: "还没有收到买家的评论"
             },
             BuyWyre: {
-                ask_crypto: "Need crypto?",
-                top_up: "Top-up your wallet with Wyre!"
+                ask_crypto: "需要加密吗?",
+                top_up: "用Wyre充值您的钱包!"
             },
             CheckoutNote: {
-                add_note: "Add a note to your order (optional)",
-                add_seller_note: "Add a note for the seller"
+                add_note: "添加备注到订单上(可选)",
+                add_seller_note: "给买家添加一条附注"
             },
             DirectPaymentOption: {
-                direct_payment: "Direct Payment",
-                description: "Proceed without a moderator. Send funds directly to the vendor. Use with caution. Do not use unless you completely trust the vendor"
+                direct_payment: "直接支付",
+                description: "在没有仲裁者的情况下直接汇款给卖方请谨慎使用， 除非您完全信任卖家，否则请勿使用"
             },
             FeedItem: {
-                reposted: "reposted"
+                reposted: "重新发布"
             },
             FeedPreview: {
-                anonymous: "Anonymous"
+                anonymous: "匿名"
             },
             ListingPaymentOptions: {
-                not_accepted: "Not accepted",
-                payment_options: "Payment Options"
+                not_accepted: "没有接受",
+                payment_options: "支付选项"
             },
             ListingReview: {
-                from: "From %{name}",
-                no_message: "No review message from buyer"
+                from: "从 %{name}",
+                no_message: "买家没有留下评论"
             },
             ModerationFee: {
-                percentage: "Percentage (%)",
-                flat_fee: "Flat Fee (%)",
-                fee: "Fee ($)"
+                percentage: "百分比 (%)",
+                flat_fee: "法币费用 (%)",
+                fee: "费用 ($)"
             },
             ProductDescription: {
-                empty_text: "No description provided",
-                read_more: "Read more"
+                empty_text: "没有提供描述",
+                read_more: "阅读更多"
             },
             ProductPolicy: {
-                no_provided: "No %{policy} provided"
+                no_provided: "不提供%{policy} "
             },
             RadioModalFilter: {
-                reason_reporting: "Please enter a reason for reporting this content.",
-                other: "Other: please explain",
+                reason_reporting: "请输入报告此内容的原因.",
+                other: "其他: 请解释",
             },
             SellerInfo: {
-                about: "About the Seller",
-                unknown: "Unknown",
-                message: "Message",
-                visit_store: "Visit store"
+                about: "关于卖家",
+                unknown: "未知",
+                message: "消息",
+                visit_store: "访问商店"
             },
             ShopCard: {
-                unknown: "Unknown"
+                unknown: "未知"
             },
             ShopInfo: {
-                unknown: "Unknown",
-                following: "following",
-                followers: "followers",
-                edit_profile: "Edit Profile",
-                message: "Message",
+                unknown: "未知",
+                following: "关注中",
+                followers: "关注者",
+                edit_profile: "编辑文件",
+                message: "消息",
             }
         },
         WalletCoinItem: {
-            coming_soon: "Coming Soon"
+            coming_soon: "快来"
         },
 
         organism: {
             AverageRating: {
-                no_reviews: "No reviews yet"
+                no_reviews: "还没有评论"
             },
             Balance: {
-                unconfirmed: "%{balance} unconfirmed"
+                unconfirmed: "%{balance} 没有确认"
             },
             CategorySelector: {
-                category: "Category",
-                select_category: "Select a category"
+                category: "类别",
+                select_category: "选择一个类别" 
             },
             CheckoutHeader: {
-                anonymous: "Anonymous",
-                from_seller: "from %{seller}",
+                anonymous: "匿名",
+                from_seller: "从 %{seller}",
                 each_price: "%{price} / each"
             },
             CheckoutSummary: {
-                add_link: "Add",
-                none_select: "none",
-                remove_coupon: "Remove coupon?",
-                remove_coupon_description: "Are you sure you want to remove this coupon?",
-                cancel: "Cancel",
-                remove: "Remove",
-                quantity_info: "Quantity: %{quantity}",
-                coupon_info: "Coupon: %{info}",
+                add_link: "添加",
+                none_select: "无",
+                remove_coupon: "移除优惠券?",
+                remove_coupon_description: "你确定你想要移除优惠券?",
+                cancel: "取消",
+                remove: "移除",
+                quantity_info: "质量: %{quantity}",
+                coupon_info: "优惠券: %{info}",
                 change: "Change",
                 free: "FREE",
-                network_fee: "Network Fee",
+                network_fee: "网络费用",
                 fee_alert_description: "Fee is too high. Please use a lower fee level or a different coin.",
-                learn_more: "Learn more",
-                total: "Total",
-                calculating: "calculating..."
+                learn_more: "学习更多",
+                total: "总共",
+                calculating: "正在计算..."
             },
             CoinTypeSelector: {
-                coming_soon: "Coming Soon"
+                coming_soon: "快来"
             },
             DefaultInventoryItem: {
                 no_title: "No listing title",
                 sku: "SKU",
                 sku_info: "SKU, ID, etc",
                 quantity: "Quantity",
-                unlimited: "Unlimited",
+                unlimited: "没有限制的",
                 quantity_sold_out: 'If the quantity reaches 0, it will display as "sold out".',
                 quantity_unlimit: 'Consumers can purchase as much as they\'d like.'
             },
@@ -185,7 +186,7 @@ export default {
             },
             InventoryItem: {
                 quantity_info: "QTY: %{quantity}",
-                Unlimited: "Unlimited"
+                Unlimited: "没有限制的"
             },
             ItemDetail: {
                 listing: "Listing",
@@ -469,11 +470,11 @@ export default {
             },
             InventoryEditor: {
                 details: "Details",
-                surcharge: "Surcharge",
+                surcharge: "附加费用",
                 sku: "SKU",
                 sku_description: "SKU, ID, etc",
                 quantity: "quantity",
-                unlimited: "Unlimited",
+                unlimited: "没有限制的",
                 quantity_sold_out: 'If the quantity reaches 0, it will display as "sold out".'
             },
             InventoryList: {
@@ -592,7 +593,7 @@ export default {
                 Send: "Send"
             },
             Settings: {
-                are_you_sure: "Are you sure?",
+                are_you_sure: "你确定吗?",
                 check_backup: "Have you backed up your current store?",
                 cancel: "Cancel",
                 OK: "OK",
@@ -754,12 +755,12 @@ export default {
             no_followers2: "You don\'t have any followers"
         },
         followings: {
-            Following: "Following",
+            Following: "关注中",
             no_following1: "%{name} isn't following anyone",
             no_following2: "You are not following anyone"
         },
         listing: {
-            are_you_sure: "Are you sure?",
+            are_you_sure: "你确定吗?",
             ask_block: "Block this user?",
             cancel: "Cancel",
             OK: "OK",
@@ -951,7 +952,7 @@ export default {
             filters_reset: "Filters reset"
         },
         shippingAddress: {
-            are_you_sure: "Are you sure?",
+            are_you_sure: "你确定吗?",
             remove_address: "Remove the address",
             cancel: "Cancel",
             OK: "OK",

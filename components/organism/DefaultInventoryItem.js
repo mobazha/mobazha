@@ -156,8 +156,8 @@ class DefaultInventoryItem extends React.Component {
         </View>
         <Text style={styles.description}>
           {
-            isTracking ? 'If the quantity reaches 0, it will display as "sold out".'
-            : 'Consumers can purchase as much as they\'d like.'
+            isTracking ? I18n.t('components.organism.CheckoutSummary.quantity_sold_out')
+            : I18n.t('components.organism.CheckoutSummary.quantity_unlimit')
           }
         </Text>
       </React.Fragment>

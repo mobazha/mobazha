@@ -74,9 +74,9 @@ class SupportHaven extends PureComponent {
   render() {
     return (
       <View style={styles.wrapper}>
-        <Text style={styles.title}>Support Haven</Text>
+        <Text style={styles.title}>{I18n.t('components.organism.SupportHaven.support_haven')}</Text>
         <View style={styles.content}>
-          <Text style={styles.description}>Haven is completely free to use and relies on your support to help fund development.</Text>
+          <Text style={styles.description}>{I18n.t('components.organism.SupportHaven.description')}</Text>
           <View style={styles.buttons}>
             <TouchableOpacity style={styles.item} onPress={this.handleAmount1Selected}>
               <Text style={styles.text}>$1</Text>

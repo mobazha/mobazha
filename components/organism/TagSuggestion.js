@@ -53,7 +53,7 @@ export default class TagSuggestion extends React.Component {
           renderItem={this.renderItem}
           keyExtractor={this.keyExtractor}
           data={suggestions}
-          ListEmptyComponent={<Text style={styles.emptyText}>None</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>{I18n.t('components.organism.TagSuggestion.none')}</Text>}
         />
       </View>
     );

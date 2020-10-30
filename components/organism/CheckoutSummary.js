@@ -323,10 +323,10 @@ class CheckoutSummary extends PureComponent {
   }
 
   handleRemoveCoupon = () => {
-    Alert.alert('Remove coupon?', 'Are you sure you want to remove this coupon?', [
-      { text: 'Cancel' },
+    Alert.alert(I18n.t('components.organism.CheckoutSummary.remove_coupon'), I18n.t('components.organism.CheckoutSummary.remove_coupon_description'), [
+      { text: I18n.t('components.organism.CheckoutSummary.cancel') },
       {
-        text: 'Remove',
+        text: I18n.t('components.organism.CheckoutSummary.remove'),
         onPress: () => {
           this.props.onChangeCoupon({});
         },
@@ -434,9 +434,9 @@ class CheckoutSummary extends PureComponent {
               </View>
               <Text style={priceStyle}>
                 {isRough ? (
-                  !shippingOption.bigPrice ? 'FREE' : localLabelFromBCH(this.getShippingTotalPrice(this.props, true), currency)
+                  !shippingOption.bigPrice ? I18n.t('components.organism.CheckoutSummary.free'): localLabelFromBCH(this.getShippingTotalPrice(this.props, true), currency)
                 ) : (
-                  !shippingPrice ? 'FREE' : localLabelFromBCH(shippingPrice, paymentMethod)
+                  !shippingPrice ? I18n.t('components.organism.CheckoutSummary.free') : localLabelFromBCH(shippingPrice, paymentMethod)
                 )}
               </Text>
             </View>

@@ -20,12 +20,12 @@ export default class TagEditor extends React.PureComponent {
   render() {
     const { count } = this.props;
     return (
-      <InputGroup title="Tags" showPencil onPress={this.props.onPress}>
+      <InputGroup title={I18n.t('components.organism.TagEditor.tags')} showPencil onPress={this.props.onPress}>
         <OptionGroup noBorder noArrow>
           { count > 0 ?
-            <Text style={style}>{`${count} tag${count > 1 ? 's' : ''}`}</Text>
+            <Text style={style}>{I18n.t('components.organism.TagEditor.tags_info')}</Text>
           :
-            <FormLabelText text="Add #tags to get your listing discovered" />
+            <FormLabelText text={I18n.t('components.organism.TagEditor.add_hint')} />
           }
         </OptionGroup>
       </InputGroup>

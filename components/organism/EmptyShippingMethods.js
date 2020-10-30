@@ -27,7 +27,7 @@ const styles = {
 export default ({ onAdd }) => (
   <View style={styles.wrapper}>
     <Image style={styles.img} source={CouponIcon} />
-    <Text style={styles.text}>You haven’t added any shipping options</Text>
-    <HollowButton title="Add shipping option" onPress={onAdd} />
+    <Text style={styles.text}>{I18n.t('components.organism.EmptyShippingMethods.empty_shipping_option')}</Text>
+    <HollowButton title={I18n.t('components.organism.EmptyShippingMethods.add_shipping')} onPress={onAdd} />
   </View>
 );

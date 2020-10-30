@@ -265,7 +265,7 @@ class SendingAmount extends PureComponent {
           <View style={styles.actionRight}>
             <TouchableWithoutFeedback onPress={this.handlePressMax}>
               <Text style={[styles.actionButton, styles.sendAll]}>
-                Send all
+              {I18n.t('components.organism.SendingAmount.send_all')}
               </Text>
             </TouchableWithoutFeedback>
           </View>

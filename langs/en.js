@@ -185,7 +185,7 @@ export default {
             },
             InventoryItem: {
                 quantity_info: "QTY: %{quantity}",
-                Unlimited: "Unlimited"
+                unlimited: "Unlimited"
             },
             ItemDetail: {
                 listing: "Listing",
@@ -273,6 +273,8 @@ export default {
             },
             ProductRatings: {
                 reviews: "Reviews",
+                see_all_reviews: "See all %{ratings.length} reviews",
+                no_reviews_yet: "No reviews yet"
             },
             QRScanner: {
                 scan_qr_payment_address: "Scan the QR code of a payment address",
@@ -284,7 +286,9 @@ export default {
             SelectableModerator: {
                 view_details: "View Details"
             },
-            SelectorModal: {},
+            SelectorModal: {
+                
+            },
             SendingAddressSelector: {
                 send: "SEND"
             },

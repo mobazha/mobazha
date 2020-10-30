@@ -64,7 +64,7 @@ class ShippingMethod extends PureComponent {
   renderPrice = (price) => {
     const { localLabelFromLocal } = this.props;
     return parseFloat(price) === 0 ? (
-      <Text style={styles.price}>FREE</Text>
+      <Text style={styles.price}>{I18n.t('components.organism.ShippingMethod.free')}</Text>
     ) : (
       <Text style={styles.price}>{localLabelFromLocal(parseFloat(price))}</Text>
     );

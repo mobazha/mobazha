@@ -80,7 +80,7 @@ class InventoryItem extends React.Component {
               {localSymbol}
               {parseFloat(price || '0') + parseFloat(surcharge || '0')}
             </Text>
-            <Text style={styles.quantity}>QTY: {parseInt(quantity, 10) === -1 ? 'Unlimited' : quantity}</Text>
+            <Text style={styles.quantity}>QTY: {parseInt(quantity, 10) === -1 ? I18n.t('components.organism.InventoryItem.unlimited'): quantity}</Text>
           </View>
         </View>
       </TouchableWithoutFeedback>

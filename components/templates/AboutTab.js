@@ -159,7 +159,7 @@ class AboutTab extends PureComponent {
         !_.isEmpty(contactInfo[e]) && (
           <View style={styles.contactInfo} key={idx}>
             <Text style={styles.contactInfoLabel}>
-              {e === 'phoneNumber' ? 'Phone' : capitalizeFirstLetter(e)}
+              {e === 'phoneNumber' ? I18n.t('components.templates.AboutTab.phone') : capitalizeFirstLetter(e)}
             </Text>
             <TouchableWithoutFeedback onPress={() => this.handlePressContact(e, contactInfo[e])}>
               <View style={{ flex: 1 }}>
@@ -187,7 +187,7 @@ class AboutTab extends PureComponent {
           <Text style={styles.storeAddress}>{peerID}</Text>
           <TouchableWithoutFeedback onPress={this.handleCopyLink}>
             <View>
-              <Text style={styles.doCopy}>Copy</Text>
+              <Text style={styles.doCopy}>{I18n.t('components.templates.AboutTab.copy')}</Text>
             </View>
           </TouchableWithoutFeedback>
         </View>
@@ -201,7 +201,7 @@ class AboutTab extends PureComponent {
         </View>
         {copied && (
           <View style={styles.overlay}>
-            <Text style={styles.overlayText}>Store link copied!</Text>
+            <Text style={styles.overlayText}>{I18n.t('components.templates.AboutTab.link_copied')}</Text>
           </View>
         )}
       </View>

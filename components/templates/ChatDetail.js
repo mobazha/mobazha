@@ -630,7 +630,7 @@ class ChatDetail extends PureComponent {
         ]}
       >
         <AvatarImage thumbnail={avatar} style={styles.footerAvatar} />
-        <Text style={styles.footerText}>{peerProfile.name} is typing...</Text>
+        <Text style={styles.footerText}>{peerProfile.name}+{I18n.t('components.templates.ChatDetail.is_typing')}</Text>
       </View>
     );
   };
@@ -659,7 +659,7 @@ class ChatDetail extends PureComponent {
         {inDispute && moderatorJoined && this.renderModeratorJoinedIndicator(false, position)}
         {currentMessageId === firstUnread && (
           <View style={styles.unreadSeparator(moderatorJoined, position)}>
-            <Text style={styles.unreadText}>UNREAD</Text>
+            <Text style={styles.unreadText}>{I18n.t('components.templates.ChatDetail.unread')}</Text>
           </View>
         )}
         <ChatBubble
@@ -684,7 +684,7 @@ class ChatDetail extends PureComponent {
     if (this.props.isBlocked) {
       return (
         <View style={styles.blockedMessageInput}>
-          <Text style={styles.blockedMessage}>This user has been blocked.</Text>
+          <Text style={styles.blockedMessage}>{I18n.t('components.templates.ChatDetail.block_message')}</Text>
         </View>
       );
     } else {
@@ -707,7 +707,7 @@ class ChatDetail extends PureComponent {
       >
         <AvatarImage thumbnail={thumbnail} style={styles.emptyStateAvatar} />
         <Text style={styles.placeholderText}>
-          Start conversation with{' '}
+        {I18n.t('components.templates.ChatDetail.start_with')}+{' '}
           <Text style={styles.handle}>{handle ? `@${handle}` : decode(name)}</Text>
         </Text>
       </View>

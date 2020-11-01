@@ -287,7 +287,7 @@ export default {
                 view_details: "View Details"
             },
             SelectorModal: {
-                
+
             },
             SendingAddressSelector: {
                 send: "SEND"
@@ -343,6 +343,7 @@ export default {
 
         templates: {
             AboutTab: {
+                phone: "Phone",
                 copy: "Copy",
                 link_copied: "Store link copied!"
             },

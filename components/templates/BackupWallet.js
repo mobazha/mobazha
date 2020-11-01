@@ -167,19 +167,19 @@ export default class BackupWallet extends React.Component {
             <Header modal left={<NavCloseButton />} onLeft={onClose} />
             <ScrollView {...scrollStyleProps}>
               <View style={styles.content}>
-                <Text style={styles.title}>Backup wallet</Text>
+                <Text style={styles.title}>{I18n.t('components.templates.BackupWallet.backup_wallet')}</Text>
                 <Image style={styles.image} source={BackupImage} />
                 <DescriptionText style={styles.description}>
-                  Backing up your wallet is the only way to restore your funds if you ever lose access to your device.
+                {I18n.t('components.templates.BackupWallet.backup_description1')}
                 </DescriptionText>
                 <DescriptionText style={styles.description}>
-                  All you’ll need is a paper and pen to jot down your recovery phrase. When you’re ready, continue to the next step.
+                {I18n.t('components.templates.BackupWallet.backup_description2')}                  
                 </DescriptionText>
                 <View style={{ flex: 1 }} />
                 <View style={styles.buttonWrapper}>
                   <TouchableWithoutFeedback onPress={this.handleNext}>
                     <View style={styles.button}>
-                      <Text style={styles.buttonText}>Next</Text>
+                      <Text style={styles.buttonText}>{I18n.t('components.templates.BackupWallet.next')}</Text>
                     </View>
                   </TouchableWithoutFeedback>
                 </View>
@@ -202,9 +202,9 @@ export default class BackupWallet extends React.Component {
             <Header modal left={<NavBackButton />} onLeft={this.handleBack} />
             <ScrollView {...scrollStyleProps}>
               <View style={styles.content}>
-                <Text style={styles.title}>Your recovery phrase</Text>
+                <Text style={styles.title}>{I18n.t('components.templates.BackupWallet.recovery_phrase')}</Text>
                 <DescriptionText style={[styles.description, styles.noMarginTop]}>
-                  Please write down each word in order
+                {I18n.t('components.templates.BackupWallet.phrase_hint')}
                 </DescriptionText>
                 <FlatList
                   numColumns={3}
@@ -215,17 +215,13 @@ export default class BackupWallet extends React.Component {
                   renderItem={this.renderItem}
                 />
                 <DescriptionText style={styles.description}>
-                  Keep your recovery phrase safe. If you ever lose or replace your phone,
-                  you can use it to regain access to your funds.
-                  {'\n\n'}
-                  Never share your recovery phrase with anyone. To be safe, avoid screenshots
-                  and don’t store it on your mobile device.
+                {I18n.t('components.templates.BackupWallet.writedown_hint')}                  
                 </DescriptionText>
                 <View style={{ flex: 1 }} />
                 <View style={styles.buttonWrapper}>
                   <TouchableWithoutFeedback onPress={this.handleFinish}>
                     <View style={styles.button}>
-                      <Text style={styles.buttonText}>Done</Text>
+                      <Text style={styles.buttonText}>{I18n.t('components.templates.BackupWallet.done')}</Text>
                     </View>
                   </TouchableWithoutFeedback>
                 </View>

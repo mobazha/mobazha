@@ -17,7 +17,6 @@ export default {
             Inventory: {
                 surcharge: '附加费用',
                 stock: '库存',
-                
                 unlimited: '没有限制的',
             },
             LocationPin: {
@@ -37,7 +36,7 @@ export default {
                 add_funds: '添加资金'
             },
             PostButton: {
-                post: 'Post'
+                post: '发送'
             },
             ProductPrice: {
                 free_shipping: '免费运送',
@@ -154,9 +153,9 @@ export default {
                 quantity_info: "质量: %{quantity}",
                 coupon_info: "优惠券: %{info}",
                 change: "Change",
-                free: "FREE",
+                free: "免费",
                 network_fee: "网络费用",
-                fee_alert_description: "Fee is too high. Please use a lower fee level or a different coin.",
+                fee_alert_description: "费用太高， 请使用较低的费用级别或其他硬币.",
                 learn_more: "学习更多",
                 total: "总共",
                 calculating: "正在计算..."
@@ -165,267 +164,272 @@ export default {
                 coming_soon: "快来"
             },
             DefaultInventoryItem: {
-                no_title: "No listing title",
+                no_title: "产品页面没有标题",
                 sku: "SKU",
                 sku_info: "SKU, ID, etc",
-                quantity: "Quantity",
+                quantity: "数量",
                 unlimited: "没有限制的",
-                quantity_sold_out: 'If the quantity reaches 0, it will display as "sold out".',
+                quantity_sold_out: '如果数量达到0，它将显示为“已售完”。',
                 quantity_unlimit: 'Consumers can purchase as much as they\'d like.'
             },
             EmptyCoupons: {
-                empty_coupon: "You haven’t added any coupons",
-                add_coupon: "Add coupon"
+                empty_coupon: "您尚未添加任何优惠券",
+                add_coupon: "添加优惠券"
             },
             EmptyShippingMethods: {
-                empty_shipping_option: "You haven’t added any shipping options",
-                add_shipping: "Add shipping option"
+                empty_shipping_option: "您尚未添加任何运输选项",
+                add_shipping: "添加运输选项"
             },
             ErrorModal: {
-                error_message: "Error: %{error}"
+                error_message: "错误: %{error}"
             },
             InventoryItem: {
                 quantity_info: "QTY: %{quantity}",
                 Unlimited: "没有限制的"
             },
             ItemDetail: {
-                listing: "Listing",
-                type: "Type",
-                title: "Title",
-                ask_selling: "What are you selling?",
-                price: "Price",
-                condition: "Condition",
-                description: "Description",
-                description_hint: "Describe your listing here",
-                mature_hint: "Mature Content (NSFW, adult, 18+)"
+                listing: "产品页面",
+                type: "类型",
+                title: "标题",
+                ask_selling: "你售卖什么?",
+                price: "价格",
+                condition: "场景",
+                description: "描述",
+                description_hint: "在这里描述你的产品页面",
+                mature_hint: "成人内容 (NSFW, 成人, 18+)"
             },
             ModerationSettingsEditor: {
-                profile_info: "Profile Information",
-                description: "Description",
-                terms: "Terms of Service",
-                languages: "Languages",
-                primary: "Primary",
-                secondary: "Secondary",
-                third: "Third"
+                profile_info: "简要信息",
+                description: "描述",
+                terms: "服务条款",
+                languages: "语言",
+                primary: "首要",
+                secondary: "第二",
+                third: "第三"
             },
             Moderator: {
-                unknown_moderator: "Unknown moderator",
-                unknown_moderator_description: "Could not fetch moderator profile.",
-                verified: "verified"
+                unknown_moderator: "未知仲裁者",
+                unknown_moderator_description: "无法获取仲裁者的信息.",
+                verified: "已经验证"
             },
             ModeratorPreview: {
-                verified: "verified"
+                verified: "已经验证"
             },
             MultiSelector: {
-                select_info: "%{count} Selected"
+                select_info: "%{count} 筛选"
             },
             OptionSelector: {
             },
             OrderBrief: {
-                tap_to: "Current market price, tap to ",
-                learn_more: "learn more"
+                tap_to: "当前市场价格, 点击 ",
+                learn_more: "学习更多"
             },
             OrderDispute: {
-                ask_payout: "Accept payout?",
-                payout_description: "Once accepted, the dispute will close and the funds will transfer",
-                cancel: "Cancel",
-                ok: "Ok",
-                dispute_expired: "Dispute expired",
-                memo_comment1: "The moderator has not proposed an outcome. The seller can claim the payment.",
-                dispute_payout: "Dispute payout",
-                will_be_issued: " will be issued to you.",
-                moderator_takes: "Moderator takes ",
-                seller_takes: "Seller takes ",
-                buyer_takes: "Buyer takes ",
-                accept_payout: "Accept payout",
-                started_by: "Dispute started by %{name}",
-                the_seller: "the seller",
-                the_buyer: "the buyer",
-                memo_comment2: "The moderator has stepped in to help. Start chatting to provide more details.",
-                message: "Message"
+                ask_payout: "接受付款?",
+                payout_description: "一旦接受，争议将结束，资金将转移",
+                cancel: "取消",
+                ok: "OK",
+                dispute_expired: "争议过期",
+                memo_comment1: "仲裁员尚未提出结果。 卖方可以要求付款.",
+                dispute_payout: "争议结果",
+                will_be_issued: " 将发送给你.",
+                moderator_takes: "仲裁者取得",
+                seller_takes: "卖家取得 ",
+                buyer_takes: "买家取得 ",
+                accept_payout: "接受付款",
+                started_by: "纠纷开始于 %{name}",
+                the_seller: "卖家",
+                the_buyer: "买家",
+                memo_comment2: "主持人已介入以提供帮助。 开始聊天以提供更多详细信息.",
+                message: "消息"
             },
             OrderFooter: {
-                claim: "Claim",
+                claim: "声称",
 
             }, OrderFulfillment: {
-                no_tracking_number: "No tracking number to copy!",
-                shipping_via: "Shipping via",
-                tracking_num: "Tracking #",
-                tracking_number_copied: "Tracking number copied!",
-                file_url: "File URL:",
-                password: "Password:",
-                fulfilled_info: "This order has been fulfilled!",
-                order_fulfilled: "Order fulfilled"
+                no_tracking_number: "没有运单号码可以复制!",
+                shipping_via: "运输方式",
+                tracking_num: "运单跟踪#",
+                tracking_number_copied: "复制运单号!",
+                file_url: "文件链接:",
+                password: "密码:",
+                fulfilled_info: "订单已经完成!",
+                order_fulfilled: "订单完成"
             },
             OrderRating: {
-                Overall: "Overall",
-                Quality: "Quality",
-                as_advertised: "As advertised",
-                Delivery: "Delivery",
-                Service: "Service",
-                no_feedback: "No feedback left by %{name}"
+                Overall: "整体",
+                Quality: "质量",
+                as_advertised: "如广告所示",
+                Delivery: "运输",
+                Service: "服务",
+                no_feedback: "没有反馈留下来 %{name}"
             },
             PayPanel: {
-                ask_pay: "How would you like to pay?",
-                external_wallet: "External Wallet",
-                not_available_eth: "Not available for ETH",
-                haven_wallet: "Haven Wallet",
-                not_enough_funds: "Not enough funds"
+                ask_pay: "你要如何付款?",
+                external_wallet: "外部钱包",
+                not_available_eth: "不适用于ETH",
+                haven_wallet: "Haven 钱包",
+                not_enough_funds: "没有足够的资金"
             },
             ProductRatings: {
-                reviews: "Reviews",
+                reviews: "评论",
+                see_all_reviews: "查看所有 %{ratings.length} 评论",
+                no_reviews_yet: "还没有评论"
             },
             QRScanner: {
-                scan_qr_payment_address: "Scan the QR code of a payment address",
+                scan_qr_payment_address: "扫描付款地址的二维码",
                 scan_qr_store: "Scan the QR code of a store,\na listing, or a payment address"
             },
             SearchFilterHeader: {
-                results: "%{total} results"
+                results: "%{total} 结果"
             },
             SelectableModerator: {
-                view_details: "View Details"
+                view_details: "查看详情"
             },
-            SelectorModal: {},
+            SelectorModal: {
+
+            },
             SendingAddressSelector: {
-                send: "SEND"
+                send: "发送"
             },
             SendingAmount: {
-                send_all: "Send all"
+                send_all: "全部发送"
             },
             ShippingMethod: {
-                free: "FREE"
+                free: "免费"
             },
             ShippingOptions: {
-                add_option: "Add a shipping option",
-                options_count: "%{count} shipping options",
-                shipping: "Shipping",
+                add_option: "添加运输选项",
+                options_count: "%{count} 运输选项",
+                shipping: "运输",
             },
             ShippingPriceEditor: {
-                shipping_service: "Shipping service #${pos}",
-                delete: "Delete",
-                service: "Service",
-                shipping_hint: "Standard, Express, etc.",
-                Duration: "Duration",
-                Duration_hint: "5-7 days",
-                price: "Price",
-                additional_price: "Addl. Price"
+                shipping_service: "运输服务 #${pos}",
+                delete: "删除",
+                service: "服务",
+                shipping_hint: "标准，特快等",
+                Duration: "长短",
+                Duration_hint: "5-7 天",
+                price: "价格",
+                additional_price: "额外的价格"
             },
             SingleVariantEditor: {
-                variant_id: "Variant %{id}",
-                title: "Title",
-                title_hint: "e.g. Size",
-                description: "Description",
-                description_hint: "e.g. Size of Product",
-                choices: "Choices",
-                choices_hint: "e.g. Small, Medium, Large"
+                variant_id: "多样的 %{id}",
+                title: "标题",
+                title_hint: "例如大小",
+                description: "描述",
+                description_hint: "例如产品尺寸",
+                choices: "选项",
+                choices_hint: "例如 大小 ,材料, "
             },
             SupportHaven: {
-                support_haven: "Support Haven",
-                description: "Haven is completely free to use and relies on your support to help fund development."
+                support_haven: "支持 Haven",
+                description: "Haven完全免费，并依靠您的支持来帮助开发。"
             },
             TagEditor: {
-                tags: "Tags",
+                tags: "标签",
                 tags_info: "%{count} %{tag}",
-                add_hint: "Add #tags to get your listing discovered"
+                add_hint: "在你的商品列表上添加标签"
             },
             TagSuggestion: {
-                none: "None"
+                none: "无"
             },
             PanelView: {
                 PanelViewBase: {
-                    cancel: "Cancel"
+                    cancel: "取消"
                 }
             }
         },
 
         templates: {
             AboutTab: {
-                copy: "Copy",
-                link_copied: "Store link copied!"
+                phone: "手机",
+                copy: "复制",
+                link_copied: "店铺链接已经复制!"
             },
             BackupWallet: {
-                backup_wallet: "Backup wallet",
-                backup_description1: "Backing up your wallet is the only way to restore your funds if you ever lose access to your device.",
-                backup_description2: "All you’ll need is a paper and pen to jot down your recovery phrase. When you’re ready, continue to the next step.",
-                next: "Next",
-                recovery_phrase: "Your recovery phrase",
-                phrase_hint: "Please write down each word in order",
-                writedown_hint: "Keep your recovery phrase safe. If you ever lose or replace your phone, you can use it to regain access to your funds\n\nNever share your recovery phrase with anyone. To be safe, avoid screenshots and don’t store it on your mobile device.",
-                done: "Done"
+                backup_wallet: "备份钱包",
+                backup_description1: "如果您无法访问设备，备份钱包是恢复资金的唯一方法。",
+                backup_description2: "您只需要一支纸笔来记下您的助记词。 准备就绪后，请继续下一步。",
+                next: "下一个",
+                recovery_phrase: "你的助记词",
+                phrase_hint: "请按顺序写下每个单词",
+                writedown_hint: "确保您的助记词安全。 如果您丢失或更换了手机，则可以使用它来重新获得资金的使用权；从不与任何人分享助记词。 为了安全起见，请避免截图，也不要将其存储在移动设备上。",
+                done: "确定"
             },
             CategoryList: {
-                more: "More"
+                more: "更多"
             },
             ChatDetail: {
-                is_typing: "%{peer} is typing...",
-                unread: "UNREAD",
-                block_message: "This user has been blocked.",
-                start_with: "Start conversation with",
-                moderator_join: "(moderator) joined this discussion",
-                say_something: "Say something nice..."
+                is_typing: "%{peer} 正在书写...",
+                unread: "没有阅读",
+                block_message: "这个用户已经被屏蔽.",
+                start_with: "开始与。。会话",
+                moderator_join: "(仲裁者) 加入了讨论",
+                say_something: "说点好的..."
             },
             Checkout: {
-                address_required: "*Shipping address required for purchase",
-                new_address: "New Address",
-                cannot_ship: "This item can't be shipped to the selected address",
-                shipping: "Shipping",
-                payment_protection: "Payment Protection",
-                protect_up_to: "Protect my payment for up to ",
+                address_required: "*需要购买的送货地址",
+                new_address: "新地址",
+                cannot_ship: "此商品无法送到所选地址",
+                shipping: "送货",
+                payment_protection: "付款保护",
+                protect_up_to: "尽到保护我的付款责任 ",
                 protect_days: "45 days",
-                moderator_not_available: "Not available for this order",
-                change_moderator: "Change moderator",
-                no_moderator_description: "Your payment will be sent directly to the seller. If you experience problems with your order, you won't be able to open a dispute."
+                moderator_not_available: "不适用于此订单",
+                change_moderator: "变更仲裁者",
+                no_moderator_description: "您的付款将直接发送给卖方。 如果您的订单遇到问题，将无法提出争议。"
             },
             ContractModal: {
-                view_contract: "View Contract",
-                copied: "Copied!"
+                view_contract: "查看合同",
+                copied: "复制完毕!"
             },
             CouponApplyModal: {
-                apply: "Apply",
-                enter_coupon: "Enter a coupon code",
-                enter_hint: "e.g. COUPON123",
-                coupon: "Coupon ",
-                not_valid: " is not valid."
+                apply: "应用",
+                enter_coupon: "输入优惠券代码",
+                enter_hint: "例如 COUPON123",
+                coupon: "优惠券 ",
+                not_valid: " 无效."
 
             }, CouponModal: {
-                title_empty_alert: "Discount title cannot be empty",
-                code_empty_alert: "Discount code cannot be empty",
-                percentage_alert: "Sorry, but the value must be between 1 and 99.",
-                value_empty_alert: "Discount value cannot be empty",
-                exceed_alert: "Sorry, but the discount exceeds the value of the item.",
-                edit_coupon: "Edit Coupon",
-                new_coupon: "New Coupon",
-                title: "Title",
-                title_hint: "Enter a title",
-                code: "Code",
-                code_hint: "Enter a coupon code",
-                discount: "Discount",
-                discount_hint1: "e.g. 10%",
-                discount_hint2: "e.g. $10",
-                percent: "Percent"
+                title_empty_alert: "折扣标题不能为空",
+                code_empty_alert: "折扣代码不能为空",
+                percentage_alert: "抱歉，该值必须在1到99之间。",
+                value_empty_alert: "折扣数值不能空",
+                exceed_alert: "抱歉，折扣超出了商品的价值。",
+                edit_coupon: "编辑优惠券",
+                new_coupon: "新优惠券",
+                title: "标题",
+                title_hint: "输入一个标题", 
+                code: "代码",
+                code_hint: "输入一个优惠券代码",
+                discount: "折扣",
+                discount_hint1: "例如. 10%",
+                discount_hint2: "例如. $10",
+                percent: "百分比"
             },
             CovidModal: {
-                description11: "People, states and hospitals all around the world are running very low on essential supplies to stay safe in these difficult times. If you, or anyone you know, can quickly produce, source or dropship",
-                description12: "face masks, N95 masks, surgical masks, hand sanitizer, hand soaps, ventilators, thermometers, wet wipes, toilet paper",
-                description13: ", etc. Please get these items into circulation and into the right hands as soon as possible.",
-                description21: "Lives can be saved if we all do our part. The world needs your support to help get essential items into circulation. If you have access to a",
-                description22: " sewing machine, 3D printer",
-                description23: ", or even a",
-                description24: " distillery",
-                description25: ", please consider creating items and parts that can be donated and/or sold at a fair price.",
-                description31: "Your essential items can be immediately distributed on Haven without fees. No account needed. No questions asked. Please do your part to help."
+                description11: "为了在这些困难时期保持安全，世界各地的人们，州和医院的基本用品都非常少。 如果您或您认识的任何人可以快速生产，采购或运输",
+                description12: "口罩，N95口罩，外科口罩，洗手液，洗手液，呼吸机，温度计，湿纸巾，卫生纸",
+                description13: " 等,请尽快让这些物品流通并运到正确的人手中.",
+                description21: "如果我们全力以赴，就可以挽救生命。 世界需要您的支持，以帮助使重要物品流通。 如果您有权使用",
+                description22: "缝纫机，3D打印机",
+                description23: "，甚至",
+                description24: " 酒厂",
+                description25: "请考虑创建可以捐赠和/或以合理价格出售的物品和零件.",
+                description31: "您的基本物品可以立即在港口免费分发，不需要账户。不问任何问题。请尽你的责任来帮忙。"
             },
             DisputeModal: {
-                submit_dispute: "Submit dispute?",
-                submit_hint: "The moderator will step in to help resolve the dispute. You can\'t undo this action",
-                cancel: "Cancel",
+                submit_dispute: "提出争议?",
+                submit_hint: "仲裁者将介入以帮助解决争议。 您无法撤消此操作",
+                cancel: "取消",
                 ok: "Ok",
-                enter_reason: "Please enter dispute reason!",
-                content_hint: "Why are you starting a dispute? Provide as much detail as possible."
+                enter_reason: "请输入争议的原因!",
+                content_hint: "您为什么要提出争议？ 提供尽可能多的细节。"
             },
             EULAModal: {
-                eula: "EULA",
-                privacy_description3: "End User License Agreement terms and conditions governing download and use of this mobile application, downloaded by you via Apple, Inc.’s (“Apple”) App Store (the “App Store”) or Google Play. Please read this End User License Agreement terms and conditions carefully.",
+                eula: "最终用户许可协议",
+                privacy_description3: "End User License Agreement terms and conditions governing download and use of this mobile application, downloaded by you via Apple, Inc.’s (“Apple”) App Store (the “App Store”) or Google Play. Please read this End User License Agreement terms and conditions carefully",
                 privacy_description2: "This End User License Agreement sets forth the terms and conditions (“Terms”) under which OB1 (“OB1”) (alternatively referred to as “us,” “we,” or “our”) offers you the right to download and use the Haven mobile application (including any updates thereto, the “Application”) and your use of the Application is governed by these Terms. By accepting these Terms (i) you represent that you are of legal age to enter into a binding contract and (ii) you signify that you have read, understood and agree to these Terms (and that such Terms are enforceable like any other written negotiated agreement signed by you) and certify that you are at least 17 years old or older. If you do not agree to these Terms, or you are not at least 17 years old, you may not use the Application. Violations of these Terms will result in a permanent removal from the Application.",
                 privacy_description3: "These Terms constitute an agreement strictly between OB1 and you and you acknowledge that OB1 (in accordance with the limitations herein) rather than Apple and Google is responsible for any claim or liability arising from your use of the Application including, but not limited to, any third party claim of infringement of intellectual property rights. Nevertheless, you agree to abide by all terms, conditions or usage rules imposed by Apple and Google applicable to the use of this Application, including, but not limited to, any terms, conditions or usage rules set forth in the App Store Terms of Service.",
                 privacy_description4: "1. License and Restrictions",
@@ -434,54 +438,54 @@ export default {
                 privacy_description7: "We alone (and our licensors, where applicable) shall own all right, title and interest, including, without limitation, all intellectual property rights, in and to the Application and any suggestions, ideas, enhancement requests, feedback, recommendations or other information provided by you or any other party relating to the Application. Any copy, modification, revision, enhancement, adaptation, translation, or derivative work of or created from the Application shall be owned solely and exclusively by us, and/or, as applicable, our third-party vendors, as shall any and all patent rights, copyrights, trade secret rights, trademark rights, and all other proprietary rights, worldwide therein and thereto, and you hereby assign to OB1 any and all of your rights, title or interests that you may have or obtain in the Application or any modification to or derivative work of the Application. You shall not remove or authorize or permit any third party to remove any proprietary rights legend from the Application.",
 
             }, feed: {
-                not_post: "%{name} \nhasn\'t posted anything yet.",
-                post_hint1: "You haven’t posted anything yet.",
-                post_hint2: "Share something with the community!",
-                reported: "Reported"
+                not_post: "%{name} 还没有发布任何信息",
+                post_hint1: "你还没有发布任何信息.",
+                post_hint2: "在社区分享一些东西!",
+                reported: "报告"
             },
             FeedDetail: {
-                fail_to_load: "Ooops! This post failed to load.",
-                retry: "Retry",
-                Loading: "Loading...",
-                reported: "Reported"
+                fail_to_load: "糟糕！这个发布装载失败.",
+                retry: "重试",
+                Loading: "装载.....",
+                reported: "报告"
             },
             FulfillModal: {
-                shipping_carrier: "Shipping Carrier",
+                shipping_carrier: "货运公司",
                 carrier_hint: "USPS, FedEX, etc",
-                tracking_number: "Tracking No.",
-                tracking_number_hint: "Tracking number",
-                file_url: "File URL",
-                password: "Password",
-                password_hint: "Optional",
-                note: "Note",
-                note_hint: "Optional",
-                add_a_note: "Add a note (optional)"
+                tracking_number: "快递单号",
+                tracking_number_hint: "快递单号码",
+                file_url: "文件链接",
+                password: "密码",
+                password_hint: "可选",
+                note: "备注",
+                note_hint: "可选",
+                add_a_note: "添加备注（可选）"
             },
             GlobalFeed: {
-                customise_feed: "Follow some profiles to customise your feed!",
-                not_found: "No results found",
-                share_with_community: "Share something with the community!",
-                create_post: "Create post",
-                reported: "Reported"
+                customise_feed: "按照一些配置文件自定义！",
+                not_found: "什么都没有找到",
+                share_with_community: "在社区分享一些东西!",
+                create_post: "创建一个社交点",
+                reported: "报告"
             },
 
             InfiniteProducts: {
-                loading_listings: "Loading Listings..."
+                loading_listings: "正在加载商品页面....."
             },
             InventoryEditor: {
-                details: "Details",
+                details: "详细",
                 surcharge: "附加费用",
                 sku: "SKU",
                 sku_description: "SKU, ID, etc",
-                quantity: "quantity",
+                quantity: "数量",
                 unlimited: "没有限制的",
-                quantity_sold_out: 'If the quantity reaches 0, it will display as "sold out".'
+                quantity_sold_out: '如果数量达到0，它将显示为“已售完”.'
             },
             InventoryList: {
-                combos_info: "%{count} variant combos",
+                combos_info: "%{count} 各类组合",
             },
             ListingAdvancedDetails: {
-                Return_Policy: "Return Policy",
+                Return_Policy: "退款政策",
                 Refunds: "Refunds",
                 refunds_description: "What is your return policy? How long are returns accepted for? Who pays for return shipping?",
                 terms: "Terms and Conditions",
@@ -489,7 +493,7 @@ export default {
                 terms_description: "What are the terms and conditions of the listing? What are you responsible for as the vendor? Is there a warranty?"
             },
             ListingsTab: {
-                loading: "Loading...",
+                loading: "装载.....",
                 no_sale: "There's nothing for sale at the moment.",
                 check_later: "Check back again later!",
                 store_empty: "Your store is empty",
@@ -546,27 +550,27 @@ export default {
                 no_dispute: "No dispute was opened during the 45-day dispute period. The seller can now claim payment.",
                 Shipping: "Shipping",
                 no_buyer_note: "No note left by buyer",
-                address_copied: "Address copied!"
+                address_copied: "地址已经复制"
             },
             PurchaseState: {
-                thank_you: "Thank you!",
+                thank_you: "谢谢你!",
                 order_placed: "Your order has been placed. You can track or manage your order at any time.",
                 processing: "Processing...",
                 hang_tight: "Hang tight! This may take up to a minute.",
                 Uh_oh: "Uh oh!",
                 transaction_failed: "Your transaction failed to go through. Please try again.",
-                retry: "Retry",
+                retry: "重试",
                 order_details: "Order Details",
-                error: "Error:"
+                error: "错误:"
             },
             RatingModal: {
                 Overall: "Overall",
-                Quality: "Quality",
-                As_advertised: "As advertised",
-                Delivery: "Delivery",
-                Service: "Service",
-                Write_a_review: "Write a review here",
-                Post_anonymously: "Post anonymously"
+                Quality: "质量",
+                As_advertised: "如广告所示",
+                Delivery: "运输",
+                Service: "服务",
+                Write_a_review: "在这里写下评论",
+                Post_anonymously: "匿名发送"
             },
             ReportTemplate: {
                 Ooops: "Ooops!",
@@ -595,7 +599,7 @@ export default {
             Settings: {
                 are_you_sure: "你确定吗?",
                 check_backup: "Have you backed up your current store?",
-                cancel: "Cancel",
+                cancel: "取消",
                 OK: "OK",
                 profile: "Profile",
                 currency: "Currency",
@@ -644,10 +648,10 @@ export default {
         acceptedCoins: {
             update_listings: "Update Listings?",
             sure_about_update: "All your listings will be updated.\nAre you sure?",
-            cancel: "Cancel",
+            cancel: "取消",
             OK: "OK",
             coins_accepted: "Coins accepted",
-            save: "Save",
+            save: "保存",
             clear_all: "Clear all"
         },
         addShippingMethod: {
@@ -689,7 +693,7 @@ export default {
             password_mismatch_hint: "Please set a correct password",
             take_a_minute: "It might take a minute...",
             set_password: "Set a password",
-            password: "Password",
+            password: "密码",
             confirm: "Confirm",
             confirm_password: "Confirm password",
             hint1: "Set a password and ",
@@ -737,16 +741,16 @@ export default {
             delivery_notes: "Delivery Notes"
         },
         externalPay: {
-            address_copied: "Address copied!",
+            address_copied: "地址已经复制",
             amount_copied: "Amount copied!",
             pay_order: "Pay to complete your order",
-            copy_address: "Copy Address"
+            copy_address: "复制地址"
         },
         externalStore: {
             unblock_user: "Unblock this user to see their content",
-            loading: "Loading...",
+            loading: "装载.....",
             failed_load: "Oops! This profile failed to load.",
-            reported: "Reported",
+            reported: "报告",
 
         },
         followers: {
@@ -762,18 +766,18 @@ export default {
         listing: {
             are_you_sure: "你确定吗?",
             ask_block: "Block this user?",
-            cancel: "Cancel",
+            cancel: "取消",
             OK: "OK",
             ask_delete: "Delete listing?",
             delete_hint: "You can't undo this action.",
-            cancel: "Cancel",
+            cancel: "取消",
             remove: "Remove",
             failed_load: "Ooops! This listing failed to load.",
-            retry: "Retry",
-            loading: "Loading...",
+            retry: "重试",
+            loading: "装载.....",
             add_wishlist: "Added to Wishlist!",
             remove_wishlist: "Removed from Wishlist!",
-            reported: "Reported!"
+            reported: "报告!"
         },
 
         listingAdvancedOptions: {
@@ -781,7 +785,7 @@ export default {
             advanced: "Advanced",
             Variants_Inventory: "Variants & Inventory",
             add_hint: "Add variants and manage your store inventory",
-            store_policies: "Store Policies",
+            store_policies: "店铺规则",
             policies_hint: "Add a return policy or terms of service",
             coupons: "Coupons"
         },
@@ -794,7 +798,7 @@ export default {
         moderatorDetails: {
             remove_moderator: "Remove moderator?",
             remove_hint: "This moderator will be removed from your store permanently. You won\'t be able to add them again",
-            cancel: "Cancel",
+            cancel: "取消",
             OK: "OK",
             verified: "verified",
             fee_description: "The fee only applies when a dispute is opened.",
@@ -849,13 +853,13 @@ export default {
             hang_tight: "Hang tight! This may take up to a minute.",
             Uh_oh: "Uh oh!",
             failed_go_through: "Your transaction failed to go through. Please try again.",
-            retry: "Retry",
-            error: "Error:"
+            retry: "重试",
+            error: "错误:"
         },
 
         policies: {
-            store_policies: "Store Policies",
-            save: "Save",
+            store_policies: "店铺规则",
+            save: "保存",
             terms: "Terms and Conditions",
             terms_hint: "What are the terms and conditions of the listing? What are you responsible for as the vendor? Is there a warranty?",
             refunds: "Refunds",
@@ -868,7 +872,7 @@ export default {
             privacyDescription1: "Haven is built to give you far more privacy in your commerce, messaging, and payments than other apps.It uses several advanced technologies to keep your information from prying eyes, such as peer-to-peer networking and end-to-end encryption.",
             privacyDescription2: "There are ways to use Haven which improve or diminish your privacy. To learn more about how the underlying technology works, and what steps you can take to improve your privacy, tap the privacy policy link below.",
             privacyDescription3: "Before you proceed, you must accept the Haven https://gethaven.app/terms and https://gethaven.app/privacy.",
-            cancel: "Cancel",
+            cancel: "取消",
             I_accept: "I Accept"
         },
         ProductRatings: {
@@ -878,7 +882,7 @@ export default {
         profileSettings: {
             warning: "Warning",
             warning_info: "If you go back, you will lose your progress",
-            Cancel: "Cancel",
+            Cancel: "取消",
             OK: "OK",
             profile_information: "Profile Information",
             name: "Name",
@@ -908,9 +912,9 @@ export default {
             send: "Send"
         },
         receiveMoney: {
-            share_address: "Share Wallet Address",
-            copy_address: "Copy Address",
-            address_copied: "Address copied!"
+            share_address: "分享钱包地址",
+            copy_address: "复制地址",
+            address_copied: "地址已经复制"
         },
         restoreProfileInit: {
             restore_profile: "Restore profile",
@@ -954,7 +958,7 @@ export default {
         shippingAddress: {
             are_you_sure: "你确定吗?",
             remove_address: "Remove the address",
-            cancel: "Cancel",
+            cancel: "取消",
             OK: "OK",
             free: "FREE",
             cannot_ship: "Sorry, this item can not be shipped to the selected address",

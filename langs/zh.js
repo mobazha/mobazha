@@ -170,7 +170,7 @@ export default {
                 quantity: "数量",
                 unlimited: "没有限制的",
                 quantity_sold_out: '如果数量达到0，它将显示为“已售完”。',
-                quantity_unlimit: 'Consumers can purchase as much as they\'d like.'
+                quantity_unlimit: '消费者可以购买任意数量的商品.'
             },
             EmptyCoupons: {
                 empty_coupon: "您尚未添加任何优惠券",
@@ -486,85 +486,85 @@ export default {
             },
             ListingAdvancedDetails: {
                 Return_Policy: "退款政策",
-                Refunds: "Refunds",
-                refunds_description: "What is your return policy? How long are returns accepted for? Who pays for return shipping?",
-                terms: "Terms and Conditions",
+                Refunds: "退款",
+                refunds_description: "您的退货政策是什么？ 退货接受多长时间？ 谁为退货付款？",
+                terms: "条款和条件",
                 terms2: "T&Cs",
-                terms_description: "What are the terms and conditions of the listing? What are you responsible for as the vendor? Is there a warranty?"
+                terms_description: "上市的条款和条件是什么？ 您作为供应商负责什么？ 有保修吗？"
             },
             ListingsTab: {
                 loading: "装载.....",
-                no_sale: "There's nothing for sale at the moment.",
-                check_later: "Check back again later!",
-                store_empty: "Your store is empty",
-                put_for_sale: "Put something up for sale!",
-                create_listing: "Create listing",
+                no_sale: "目前无任何出售。",
+                check_later: "请稍后再检查！",
+                store_empty: "你的店铺是空的",
+                put_for_sale: "布置一些商品出售！",
+                create_listing: "建立商品页面",
 
             },
             NeedCoin: {
                 coinbase: "Coinbase",
-                cryptocurrency_exchange: "Cryptocurrency Exchange"
+                cryptocurrency_exchange: "加密货币交换"
             },
             OrderState: {
-                no_orders: "No orders found",
+                no_orders: "没有发现订单",
             },
 
             OrderSummary: {
-                oops: "Oops!",
-                dispute_pending_alert: "You can\'t start a dispute while the order is still pending.",
-                dispute_not_fulfilled_alert: "You can\'t start a dispute until you\'ve fulfilled the order",
-                dispute_cancel_alert: "You can\'t start a dispute for canceled order.",
-                dispute_refund_alert: "You can\'t start a dispute for refunded order.",
-                dispute_resolved_alert: "You can\'t start a dispute for dispute-closed order.",
-                dispute_completed_alert: "You can\'t start a dispute for completed order.",
-                dispute_finalized_alert: "This order can\'t be disputed. The seller has claimed payment for this order.",
-                dispute_processing_alert: "This order can\'t be disputed. Please cancel your order to receive a full refund.",
-                quantity_info: "Quantity: {quantity}",
-                view: "View",
-                view_transaction: "View transaction",
-                payment: "Payment",
-                no_payment: "A payment has not been found for this order yet. It may take up to a minute for the payment to be detected.",
-                cannot_dispute: "The funds were sent directly to %{user}. You cannot dispute this order.",
-                escrow_released: "The funds have already been released from escrow. The order can no longer be disputed.",
-                order_in_dispute: "The order is in dispute for up to ",
-                until_accept: " or until a party accepts a payout.",
-                period_expired_claim: "The dispute period has expired. The seller can now claim the payment.",
-                period_expired_claim2: "The dispute period has expired. The funds can now be claimed in full.",
-                order_in_escrow1: "The order funds are being held in escrow for approximately ",
-                order_in_escrow2: " or until the buyer completes the order.\n\nIf you have any issues with this order, you can open a dispute with the moderator.",
-                dispute_order: "Dispute Order",
-                claim_payment: "Claim Payment",
-                dispute_error_possible: "An error occurred while processing this order.\nPlease start a dispute to recover your funds.",
-                dispute_error: "An error occurred while processing this order.",
-                order_refunded: "Order refunded",
-                full_refund: "The seller has issued a full refund for this order",
-                order_completed: "Order completed",
-                release_to_seller: "The payment has been released to the seller",
-                dispute_closed: "Dispute closed",
-                dispute_closed_info: "%{user} has accepted the payout. This dispute is now closed.`",
-                payment_claimed: "Payment claimed",
-                seller_claim: "The seller has claimed payment for this order.",
-                order_canceled: "Order canceled",
-                user_cancel_order: "The %{user} has canceled this order. The money has been refunded in full.",
-                period_expired: "Dispute period expired",
-                no_dispute: "No dispute was opened during the 45-day dispute period. The seller can now claim payment.",
-                Shipping: "Shipping",
-                no_buyer_note: "No note left by buyer",
+                oops: "糟糕!",
+                dispute_pending_alert: "订单仍待处理时，您无法提出争议。",
+                dispute_not_fulfilled_alert: "您必须先完成订单，才能提出争议",
+                dispute_cancel_alert: "您无法对已取消的订单提出争议.",
+                dispute_refund_alert: "您无法对退款订单提出争议.",
+                dispute_resolved_alert: "您无法针对已结案的订单提出争议。",
+                dispute_completed_alert: "您无法对已完成的订单提出争议.",
+                dispute_finalized_alert: "此订单无异议。 卖方已要求为此订单付款。",
+                dispute_processing_alert: "此订单无异议。 请取消您的订单以全额退款。",
+                quantity_info: "数量: {quantity}",
+                view: "查看",
+                view_transaction: "查看交易",
+                payment: "支付",
+                no_payment: "尚未找到此订单的付款。 最多可能需要一分钟才能检测到付款。",
+                cannot_dispute: "资金直接发送给 %{user}. 您不能对此订单提出争议。",
+                escrow_released: "资金已从托管处释放。 订单不再有争议。",
+                order_in_dispute: "该订单有争议 ",
+                until_accept: "或直到一方接受付款为止。",
+                period_expired_claim: "争议期已过。 卖方现在可以要求付款。",
+                period_expired_claim2: "争议期已过。 现在可以全额领取资金.",
+                order_in_escrow1: " 订单资金正在第三方托管",
+                order_in_escrow2: "或直到买家完成订单为止。如果您对此订单有任何疑问，可以与主持人提出争议.",
+                dispute_order: "订单争议",
+                claim_payment: "索偿",
+                dispute_error_possible: "处理此订单时发生错误。 请提出争议以收回您的资金.",
+                dispute_error: "处理此订单时发生错误。",
+                order_refunded: "订单已经退款",
+                full_refund: "卖方已对此订单全额退款",
+                order_completed: "订单完成",
+                release_to_seller: "资金已发放给卖方",
+                dispute_closed: "争议关闭",
+                dispute_closed_info: "%{user} 已接受付款。 现在该纠纷已经结案。",
+                payment_claimed: "已付款",
+                seller_claim: "卖方已要求为此订单付款。",
+                order_canceled: "订单取消",
+                user_cancel_order: " %{user} 已经取消订单. 资金已经全额退还",
+                period_expired: "争议期限已过",
+                no_dispute: "在45天的争议期内，没有任何争议。 卖方现在可以要求付款。",
+                Shipping: "运输",
+                no_buyer_note: "买家没有留下附注",
                 address_copied: "地址已经复制"
             },
             PurchaseState: {
                 thank_you: "谢谢你!",
-                order_placed: "Your order has been placed. You can track or manage your order at any time.",
-                processing: "Processing...",
-                hang_tight: "Hang tight! This may take up to a minute.",
+                order_placed: "您的订单已下达。 您可以随时跟踪或管理您的订单。",
+                processing: "处理中...",
+                hang_tight: "等一下, 这可能需要一分钟的时间。",
                 Uh_oh: "Uh oh!",
-                transaction_failed: "Your transaction failed to go through. Please try again.",
+                transaction_failed: "您的交易失败, 请再试一次.",
                 retry: "重试",
-                order_details: "Order Details",
+                order_details: "订单详情",
                 error: "错误:"
             },
             RatingModal: {
-                Overall: "Overall",
+                Overall: "整体",
                 Quality: "质量",
                 As_advertised: "如广告所示",
                 Delivery: "运输",
@@ -573,86 +573,86 @@ export default {
                 Post_anonymously: "匿名发送"
             },
             ReportTemplate: {
-                Ooops: "Ooops!",
-                enter_reason: "Please enter a reason for reporting this content.",
-                why_report_profile: "Why are you reporting this profile?",
-                why_report: "Why are you reporting this?",
-                next: "Next",
+                Ooops: "糟糕！",
+                enter_reason: "请输入报告此内容的原因。",
+                why_report_profile: "您为什么要举报此个人资料？",
+                why_report: "你为什么要举报?",
+                next: "下一个",
                 submit: "Submit",
-                describe_issue: "Please describe the issue (optional)",
+                describe_issue: "请描述问题（可选）",
                 provide_details: "Provide as much details as possible"
             },
             SearchResults: {
-                loading_results: "Loading Search Results ...",
-                no_found: "No results found.",
+                loading_results: "正在加载搜索结果...",
+                no_found: "没有结果.",
 
             },
             SendMoney: {
-                NEXT: "NEXT",
-                send_to: "Send to",
-                paste_or_scan: "Paste or scan address"
+                NEXT: "下一个",
+                send_to: "发送到",
+                paste_or_scan: "请扫描二维码地址"
             },
             SendReceiveMoney: {
-                Receive: "Receive",
+                Receive: "接收",
                 Send: "Send"
             },
             Settings: {
                 are_you_sure: "你确定吗?",
-                check_backup: "Have you backed up your current store?",
+                check_backup: "您是否备份了当前商店？",
                 cancel: "取消",
                 OK: "OK",
-                profile: "Profile",
-                currency: "Currency",
-                shipping_address: "Shipping address",
-                blocked: "Blocked",
-                notifications: "Notifications",
-                push_notifications: "Push notifications",
-                Policies: "Policies",
-                Moderators: "Moderators",
-                coins_accepted: "Coins accepted",
-                Advanced: "Advanced",
-                Analytics: "Analytics",
-                On: "On",
-                Off: "Off",
-                Backup_wallet: "Backup wallet",
-                Backup_profile: "Backup profile",
-                Restore_profile: "Restore profile",
-                Resync_transactions: "Resync transactions",
-                Server_Log: "Server Log",
+                profile: "个人资料",
+                currency: "现金",
+                shipping_address: "邮寄地址",
+                blocked: "阻止",
+                notifications: "通知事项",
+                push_notifications: "推送通知事项",
+                Policies: "政策",
+                Moderators: "仲裁者",
+                coins_accepted: "接收货币",
+                Advanced: "高级",
+                Analytics: "分析",
+                On: "开",
+                Off: "关",
+                Backup_wallet: "备份钱包",
+                Backup_profile: "备份文件",
+                Restore_profile: "同步文件",
+                Resync_transactions: "同步交易",
+                Server_Log: "服务日志",
                 Version: "Version 1.3.7"
             },
             StoreModeratorList: {
-                moderators_count: "%{count} moderators",
-                moderators_added: "New moderators are automatically added to your store"
+                moderators_count: "%{count} 仲裁者",
+                moderators_added: "新的仲裁者会自动添加到您的商店"
             },
             Toast: {
-                post_created: "Post created",
-                view: "View"
+                post_created: "帖子已经创建",
+                view: "查看"
             },
             TransactionHistory: {
-                no_transaction_recorded: "No transactions have been recorded yet",
-                no_transactions: "No transactions yet",
-                notes: "Please note some payments may not display in the transaction history. However, the total balance reflects all sent and received transactions."
+                no_transaction_recorded: "尚无交易记录",
+                no_transactions: "还没有交易",
+                notes: "请注意，某些付款可能不会显示在交易记录中。 但是，总余额反映了所有已发送和已接收的交易."
             },
             UserSearchResults: {
-                loading_results: "Loading Search Results ...",
-                no_results: "No results found."
+                loading_results: "加载搜索结果 ...",
+                no_results: "没有结果."
             },
             wishlist: {
-                wishlist_empty: "Your Wishlist is empty"
+                wishlist_empty: "你的愿望清单是空的"
             }
         }
     },
 
     screens: {
         acceptedCoins: {
-            update_listings: "Update Listings?",
-            sure_about_update: "All your listings will be updated.\nAre you sure?",
+            update_listings: "更新商品页面?",
+            sure_about_update: "您确定所有列表都会更新吗？",
             cancel: "取消",
             OK: "OK",
-            coins_accepted: "Coins accepted",
+            coins_accepted: "接受货币",
             save: "保存",
-            clear_all: "Clear all"
+            clear_all: "全部清除"
         },
         addShippingMethod: {
             fill_required: "Please fill out all the required fields",
@@ -684,7 +684,7 @@ export default {
             ensure_backup2: " For the time being, you\'re required to manually back up your data. ",
             ensure_backup3: "We\'ll be rolling out a better backup system in the future.",
             ensure_backup4: "Your backup will include all of your data, including wallet funds.",
-            next: "NEXT"
+            next: "下一个"
         },
         backupProfilePassword: {
             password_empty: "Password empty",
@@ -699,7 +699,7 @@ export default {
             hint1: "Set a password and ",
             hint2: "make sure to write it down.",
             hint3: "\nYou\'ll need your password to restore your profile.",
-            next: "NEXT"
+            next: "下一个"
         },
         backupProfileUpload: {
             upload_1: "Please upload your backup to a secure\nexternal location ",
@@ -727,8 +727,8 @@ export default {
             address_required: "Address is required",
             city_required: "City is required",
             country_required: "Country is required",
-            new_address: "New Address",
-            done: "Done",
+            new_address: "新地址",
+            done: "确定",
             your_address: "Your Address",
             name: "Name",
             company: "Company",
@@ -819,7 +819,7 @@ export default {
             name: "Name",
             optional: "optional",
             country: "Country",
-            currency: "Currency",
+            currency: "现金",
             share_analytics: "Share anonymous analytics",
             help_improve: "Help us improve Haven"
         },
@@ -844,7 +844,7 @@ export default {
             not_accepted: "Not accepted",
             coming_soon: "Coming Soon",
             payment_method: "Payment Method",
-            done: "Done",
+            done: "确定",
             transaction_speed: "Transaction speed"
         },
         paymentSuccess: {
@@ -877,7 +877,7 @@ export default {
         },
         ProductRatings: {
             reviews: "Reviews",
-            No_reviews: "No reviews yet"
+            No_reviews: "还没有评论"
         },
         profileSettings: {
             warning: "Warning",
@@ -903,7 +903,7 @@ export default {
         purchaseSuccess: {
             successfully_sent: "Successfully sent message",
             received_message: "You have received a message!",
-            sent: "Sent",
+            sent: "发送",
             close: "Close",
             order_complete: "Order Complete",
             view_transaction: "View Transaction",
@@ -922,7 +922,7 @@ export default {
             select_file: "SELECT FILE"
         },
         restoreProfilePassword: {
-            Ooops: "Ooops!",
+            Ooops: "糟糕！",
             loading_hint: "It might take a minute...",
             wrong_password: "Wrong password!",
             failed_download: "Failed to download zip file",
@@ -962,7 +962,7 @@ export default {
             OK: "OK",
             free: "FREE",
             cannot_ship: "Sorry, this item can not be shipped to the selected address",
-            Shipping: "Shipping",
+            Shipping: "运输",
             ships_to: "Ship To",
             no_address: "No shipping address",
             add_address: "+ Add new address"

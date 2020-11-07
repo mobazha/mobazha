@@ -639,7 +639,7 @@ export default {
                 no_results: "没有结果."
             },
             wishlist: {
-                wishlist_empty: "你的愿望清单是空的"
+                wishlist_empty: "你的收藏夹是空的"
             }
         }
     },
@@ -655,176 +655,175 @@ export default {
             clear_all: "全部清除"
         },
         addShippingMethod: {
-            fill_required: "Please fill out all the required fields",
-            must_be_less: "Shipping option name length must be less than the max of 40",
-            select_destination: "Please select a shipping destination",
-            add_shipping_option: "Add Shipping Option",
-            shipping_option: "Shipping option",
-            title: "Title",
+            fill_required: "请填写所有必填字段",
+            must_be_less: "运输选项名称的长度必须小于40个最大值",
+            select_destination: "请选择一个运输选项",
+            add_shipping_option: "添加一个运输选项",
+            shipping_option: "运输选项",
+            title: "标题",
             option_description: "USA Shipping, International, etc",
-            destinations: "Destinations"
+            destinations: "目的地"
         },
         analytics: {
-            details1: 'Session information, such as how often you use the App and for how long.',
-            details2: 'Basic device information; e.g., which type of phone you are using.',
-            details3: 'The country you are accessing the App from.',
-            details4: 'Which version of the App you are using.',
-            details5: 'Which language you have selected.',
-            details6: 'When you enter checkout for a purchase (no information is collected about what is being purchased).',
-            details7: 'When you send funds, and which type of payment is used (no details are collected about the payment itself such as addresses or values).',
+            details1: '会话信息，例如您多久使用一次该应用程序以及持续多长时间。',
+            details2: '基本设备信息； 例如，您使用的是哪种电话。',
+            details3: '您从中访问应用程序的国家/地区。',
+            details4: '您正在使用哪个版本的应用程序。',
+            details5: '您选择了哪种语言.',
+            details6: '当您输入购买结帐时（不收集有关所购买商品的信息）。',
+            details7: '汇款时以及使用哪种付款方式（不会收集有关付款本身的详细信息，例如地址或值）。',
             details8: 'When you create a listing (no information about the listing itself is collected).',
-            details9: 'Actions taken within Haven, such as tapping on the social feed or how often you make new posts. The content of the actions themselves are never recorded, only the fact that you took the action.',
-            Analytics: "Analytics",
-            Share_anonymous: "Share anonymous analytics",
-            description: "If you opt into sharing analytics, you agree to share the following information with the OB1 Company:"
+            details9: '在haven内采取的动作，例如点击社交动态或您发新帖的频率。 这些动作本身的内容永远不会被记录，只会记录您执行该动作的事实。',
+            Analytics: "分析工具",
+            Share_anonymous: "分享匿名分析",
+            description: "如果您选择共享分析，则表示您同意与我们共享以下信息："
         },
         backupProfileInit: {
-            back_up_profile: "Back up profile",
-            ensure_backup1: "Ensure your data is safe by backing it up\nfrequently.",
-            ensure_backup2: " For the time being, you\'re required to manually back up your data. ",
-            ensure_backup3: "We\'ll be rolling out a better backup system in the future.",
-            ensure_backup4: "Your backup will include all of your data, including wallet funds.",
+            back_up_profile: "备份资料",
+            ensure_backup1: " 通过频繁备份确保您的数据安全。",
+            ensure_backup2: " 目前，您需要手动备份数据。 ",
+            ensure_backup3: "将来我们将推出更好的备份系统。",
+            ensure_backup4: "您的备份将包括您的所有数据，包括钱包资金。",
             next: "下一个"
         },
         backupProfilePassword: {
-            password_empty: "Password empty",
-            password_empty_hint: "Please set a password",
-            password_mismatch: "Password mismatch",
-            password_mismatch_hint: "Please set a correct password",
-            take_a_minute: "It might take a minute...",
-            set_password: "Set a password",
+            password_empty: "密码为空",
+            password_empty_hint: "请设置一个密码", 
+            password_mismatch: "密码不符合",
+            password_mismatch_hint: "请设置正确的密码",
+            take_a_minute: "这可能要花费一分钟...",
+            set_password: "设置一个密码",
             password: "密码",
-            confirm: "Confirm",
-            confirm_password: "Confirm password",
-            hint1: "Set a password and ",
-            hint2: "make sure to write it down.",
-            hint3: "\nYou\'ll need your password to restore your profile.",
+            confirm: "确认",
+            confirm_password: "确认密码",
+            hint1: "设置一个密码",
+            hint2: "确保写下来",
+            hint3: "您将需要密码来恢复您的个人资料。.",
             next: "下一个"
         },
         backupProfileUpload: {
-            upload_1: "Please upload your backup to a secure\nexternal location ",
-            upload_2: " to ensure you can recover your\ndata if you lose your phone.",
-            upload_backup: "UPLOAD BACKUP",
-            done: "DONE"
+            upload_1: "请将您的备份上传到安全的外部位置 ",
+            upload_2: " 以确保您在丢失手机后可以恢复数据.",
+            upload_backup: "上传备份",
+            done: "确定"
         },
         blockedNodes: {
-            no_block: "You haven’t blocked anyone yet"
+            no_block: "你还没有屏蔽任何人"
         },
         categoryOverview: {
             see_all: "See all"
         },
         chats: {
-            start_conversation: "Start a conversation",
-            new_chat: "New Chat",
-            no_discussion: "No order discussions found"
+            start_conversation: "开始一个会话",
+            new_chat: "新聊天",
+            no_discussion: "找不到订单讨论"
         },
         checkoutModerators: {
-            select_moderator: "Select a moderator",
-            no_available: "No Available Moderators"
+            select_moderator: "选择一个仲裁者",
+            no_available: "没有可用的仲裁者"
         },
         editShippingAddress: {
-            name_required: "Name is required",
-            address_required: "Address is required",
-            city_required: "City is required",
-            country_required: "Country is required",
+            name_required: "名称为必填项",
+            address_required: "地址为必填项",
+            city_required: "城市为必填项",
+            country_required: "国家为必填项",
             new_address: "新地址",
             done: "确定",
-            your_address: "Your Address",
-            name: "Name",
-            company: "Company",
-            address: "Address",
-            address2: "Address 2",
-            city: "City",
-            state: "State",
-            postal_code: "Postal Code",
-            country: "Country",
-            delivery_notes: "Delivery Notes"
+            your_address: "您的地址",
+            name: "姓名",
+            company: "公司",
+            address: "地址",
+            address2: "地址 2",
+            city: "城市",
+            state: "省",
+            postal_code: "邮政编码",
+            country: "国家",
+            delivery_notes: "交货单"
         },
         externalPay: {
             address_copied: "地址已经复制",
-            amount_copied: "Amount copied!",
-            pay_order: "Pay to complete your order",
+            amount_copied: "金额已经复制",
+            pay_order: "付款完成订单",
             copy_address: "复制地址"
         },
         externalStore: {
-            unblock_user: "Unblock this user to see their content",
-            loading: "装载.....",
-            failed_load: "Oops! This profile failed to load.",
+            unblock_user: "取消屏蔽该用户以查看其内容",
+            loading: "加载.....",
+            failed_load: "糟糕！ 此配置文件无法加载。",
             reported: "报告",
 
         },
         followers: {
-            followers: "Followers",
-            no_followers1: "%{name} doesn't have any followers",
-            no_followers2: "You don\'t have any followers"
+            followers: "关注者",
+            no_followers1: "%{name} 还没有任何关注者",
+            no_followers2: "你还没有任何关注者"
         },
         followings: {
             Following: "关注中",
-            no_following1: "%{name} isn't following anyone",
-            no_following2: "You are not following anyone"
+            no_following1: "%{name} 没有关注任何人",
+            no_following2: "你还没有关注任何人"
         },
         listing: {
             are_you_sure: "你确定吗?",
-            ask_block: "Block this user?",
+            ask_block: "屏蔽这个用户?",
             cancel: "取消",
             OK: "OK",
-            ask_delete: "Delete listing?",
-            delete_hint: "You can't undo this action.",
+            ask_delete: "删除商品页面?",
+            delete_hint: "你不能撤销这个操作.",
             cancel: "取消",
-            remove: "Remove",
-            failed_load: "Ooops! This listing failed to load.",
+            remove: "移除",
+            failed_load: "糟糕！ 此页码无法加载.",
             retry: "重试",
             loading: "装载.....",
-            add_wishlist: "Added to Wishlist!",
-            remove_wishlist: "Removed from Wishlist!",
+            add_wishlist: "添加到收藏夹!",
+            remove_wishlist: "从收藏夹移除!",
             reported: "报告!"
         },
 
         listingAdvancedOptions: {
-            add_coupons: "Add coupons",
-            advanced: "Advanced",
+            add_coupons: "添加优惠券",
+            advanced: "高级",
             Variants_Inventory: "Variants & Inventory",
-            add_hint: "Add variants and manage your store inventory",
+            add_hint: "添加variants并管理你店铺inventory",
             store_policies: "店铺规则",
-            policies_hint: "Add a return policy or terms of service",
-            coupons: "Coupons"
+            policies_hint: "添加退货政策或服务条款",
+            coupons: "优惠券"
         },
         Me: {
-            support1: "Have questions, feature suggestions or bugs to report? Please check our FAQs first. Our Telegram group is a great resource to report bugs or ask for support. ",
-            support2: "Our ability to offer email support is very limited. ",
-            support3: " Please attempt to use the FAQ or Telegram group primarily.",
-            description: "For any critical issues, concerns, or problems with the app and/or content in the marketplace, contact us via email."
+            support1: "有问题，功能建议或错误要报告吗？ 请先查看我们的常见问题解答。 我们的微信小组是报告错误或寻求支持的理想资源。",
+            support2: "我们提供电子邮件支持的能力非常有限。",
+            support3: " 请尝试主要使用FAQ或微信组.",
+            description: "对于市场中应用程序和/或内容的任何关键问题，疑虑或问题，请通过电子邮件与我们联系。."
         },
         moderatorDetails: {
-            remove_moderator: "Remove moderator?",
-            remove_hint: "This moderator will be removed from your store permanently. You won\'t be able to add them again",
+            remove_moderator: "移除仲裁者?",
+            remove_hint: "该主持人将从您的商店中永久删除。 您将无法再次添加它们",
             cancel: "取消",
             OK: "OK",
-            verified: "verified",
-            fee_description: "The fee only applies when a dispute is opened.",
-            moderator_verified: " This moderator has been verified",
-            terms: "Terms of Service",
-            selected: " Selected",
-            select: "SELECT"
+            verified: "验证的",
+            fee_description: "该费用仅在发生争议时适用。",
+            moderator_verified: "该仲裁者已经通过验证",
+            terms: "服务条款",
+            selected: "已选",
         },
         newFeed: {
-            Create_failed: "Create post failed",
-            unknown_error_create: "Unknown error occured while creating post",
+            Create_failed: "帖子创建失败",
+            unknown_error_create: "创建帖子时发生未知错误",
             char_left: " char left",
-            what_going_on: "What's going on?"
+            what_going_on: "发生了什么?"
         },
         onboarding: {
-            HELLO: "HELLO!",
-            restore_profile: "Restore profile",
-            name: "Name",
-            optional: "optional",
-            country: "Country",
+            HELLO: "您好!",
+            restore_profile: "恢复个人资料",
+            name: "姓名",
+            optional: "可选的",
+            country: "国家",
             currency: "现金",
-            share_analytics: "Share anonymous analytics",
-            help_improve: "Help us improve Haven"
+            share_analytics: "匿名分享分析",
+            help_improve: "帮助我们改进haven"
         },
         orderDetails: {
-            decline_order: "Decline order?",
+            decline_order: "拒绝下单?",
             decline_hint: "This order will be canceled and the money will be refunded to the buyer",
             nevermind: "Nevermind",
             ok: "Ok",
@@ -860,56 +859,56 @@ export default {
         policies: {
             store_policies: "店铺规则",
             save: "保存",
-            terms: "Terms and Conditions",
-            terms_hint: "What are the terms and conditions of the listing? What are you responsible for as the vendor? Is there a warranty?",
-            refunds: "Refunds",
-            refund_hint: "What is your return policy? How long are returns accepted for? Who pays for return shipping?"
+            terms: "",
+            terms_hint: "上市的条款和条件是什么？ 您作为供应商负责什么？ 有保修吗？",
+            refunds: "退款",
+            refund_hint: "您的退货政策是什么？ 退货接受多长时间？ 谁为退货付款？"
         },
         privacy: {
-            privacy_policy: "Privacy Policy",
-            terms: "Terms of Service",
-            privacy: "PRIVACY",
+            privacy_policy: "隐私政策",
+            terms: "服务条款",
+            privacy: "隐私",
             privacyDescription1: "Haven is built to give you far more privacy in your commerce, messaging, and payments than other apps.It uses several advanced technologies to keep your information from prying eyes, such as peer-to-peer networking and end-to-end encryption.",
             privacyDescription2: "There are ways to use Haven which improve or diminish your privacy. To learn more about how the underlying technology works, and what steps you can take to improve your privacy, tap the privacy policy link below.",
             privacyDescription3: "Before you proceed, you must accept the Haven https://gethaven.app/terms and https://gethaven.app/privacy.",
             cancel: "取消",
-            I_accept: "I Accept"
+            I_accept: "我接受"
         },
         ProductRatings: {
-            reviews: "Reviews",
+            reviews: "评论",
             No_reviews: "还没有评论"
         },
         profileSettings: {
-            warning: "Warning",
-            warning_info: "If you go back, you will lose your progress",
+            warning: "警告",
+            warning_info: "如果您返回，将会失去进度",
             Cancel: "取消",
-            OK: "OK",
-            profile_information: "Profile Information",
-            name: "Name",
+            OK: "好的",
+            profile_information: "档案信息",
+            name: "姓名",
             name_hint: "Satoshi Nakamoto",
             bio: "Bio",
-            bio_hint: "Write a short description",
-            location: "Location",
+            bio_hint: "写一个简短的描述",
+            location: "位置",
             location_hint: "e.g. Seattle",
-            contact: "Contact",
+            contact: "联系方式",
             contact_hint: "satoshin@gmx.com",
             phone_number: "Phone Number",
             phone_hint: "+123456789",
             website: "Website",
             website_hint: "hello.com",
-            Aaout: "About",
-            about_hint: "Share more about yourself here"
+            Aaout: "关于",
+            about_hint: "分享更多有关您自己的信息"
         },
         purchaseSuccess: {
-            successfully_sent: "Successfully sent message",
-            received_message: "You have received a message!",
+            successfully_sent: "成功发送信息",
+            received_message: "你接受了一条信息",
             sent: "发送",
-            close: "Close",
-            order_complete: "Order Complete",
-            view_transaction: "View Transaction",
-            message_for: "Message for %{handle}",
+            close: "关闭",
+            order_complete: "订单完成",
+            view_transaction: "查看交易",
+            message_for: " %{handle}的信息",
             provide_details: "Provide additional details, ask a question, etc (optional)",
-            send: "Send"
+            send: "发送"
         },
         receiveMoney: {
             share_address: "分享钱包地址",
@@ -917,8 +916,8 @@ export default {
             address_copied: "地址已经复制"
         },
         restoreProfileInit: {
-            restore_profile: "Restore profile",
-            restore_hint: "Select your haven backup file to restore\nyour profile, including your wallet funds.",
+            restore_profile: "恢复个人资料",
+            restore_hint: "选择您的haven备份文件以恢复您的个人资料，包括您的钱包资金。",
             select_file: "SELECT FILE"
         },
         restoreProfilePassword: {

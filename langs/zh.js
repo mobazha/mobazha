@@ -141,7 +141,7 @@ export default {
             CheckoutHeader: {
                 anonymous: "匿名",
                 from_seller: "从 %{seller}",
-                each_price: "%{price} / each"
+                each_price: "各个%{price} "
             },
             CheckoutSummary: {
                 add_link: "添加",
@@ -278,7 +278,7 @@ export default {
             },
             QRScanner: {
                 scan_qr_payment_address: "扫描付款地址的二维码",
-                scan_qr_store: "Scan the QR code of a store,\na listing, or a payment address"
+                scan_qr_store: "扫描商店，商家信息或付款地址的QR码"
             },
             SearchFilterHeader: {
                 results: "%{total} 结果"
@@ -711,11 +711,11 @@ export default {
             no_block: "你还没有屏蔽任何人"
         },
         categoryOverview: {
-            see_all: "See all"
+            see_all: "查看全部"
         },
         chats: {
             start_conversation: "开始一个会话",
-            new_chat: "新聊天",
+            new_chat: "新的聊天",
             no_discussion: "找不到订单讨论"
         },
         checkoutModerators: {
@@ -805,6 +805,7 @@ export default {
             moderator_verified: "该仲裁者已经通过验证",
             terms: "服务条款",
             selected: "已选",
+            select: "选择"
         },
         newFeed: {
             Create_failed: "帖子创建失败",
@@ -824,34 +825,34 @@ export default {
         },
         orderDetails: {
             decline_order: "拒绝下单?",
-            decline_hint: "This order will be canceled and the money will be refunded to the buyer",
-            nevermind: "Nevermind",
-            ok: "Ok",
-            refund_order: "Refund order?",
-            refund_hint: "This order will be canceled and the money will be refunded to the buyer.",
-            cancel_order: "Cancel order?",
-            cancel_hint: "This order will be canceled and your money will be refunded in full.",
-            have_refunded: "You have refunded the order",
-            error_happened: "Error happened because of unknown issues",
-            fund_order: "Fund Order",
-            leave_notes: "Leave Notes",
-            number_copied: "Order number copied!",
-            learn_more: "Due to changes in the exchange rate, the current market price for an order may differ from the total price of the item at the time of purchase."
+            decline_hint: "该订单将被取消，这笔钱将退还给买方",
+            nevermind: "没关系",
+            ok: "确定",
+            refund_order: "退款订单?",
+            refund_hint: "该订单将被取消，这笔钱将退还给买方.",
+            cancel_order: "取消订单?",
+            cancel_hint: "该订单将被取消，您的钱将全额退还.",
+            have_refunded: "您已退还订单",
+            error_happened: "由于未知问题而发生错误",
+            fund_order: "资金订单",
+            leave_notes: "留下附注",
+            number_copied: "订单编号已经复制",
+            learn_more: "由于汇率的变化，订单的当前市场价格可能与购买时商品的总价格不同."
         },
         paymentMethod: {
-            select_fee_level: "Please select fee level",
-            not_accepted: "Not accepted",
-            coming_soon: "Coming Soon",
-            payment_method: "Payment Method",
+            select_fee_level: "请选择费用等级",
+            not_accepted: "不接受",
+            coming_soon: "赶快",
+            payment_method: "支付方式",
             done: "确定",
-            transaction_speed: "Transaction speed"
+            transaction_speed: "交易速度"
         },
         paymentSuccess: {
-            transaction_details: "Transaction details",
-            processing: "Processing…",
-            hang_tight: "Hang tight! This may take up to a minute.",
+            transaction_details: "交易详情",
+            processing: "处理中…",
+            hang_tight: "等一下 这可能需要一分钟.",
             Uh_oh: "Uh oh!",
-            failed_go_through: "Your transaction failed to go through. Please try again.",
+            failed_go_through: "您的交易失败。 请再试一次.",
             retry: "重试",
             error: "错误:"
         },
@@ -859,7 +860,7 @@ export default {
         policies: {
             store_policies: "店铺规则",
             save: "保存",
-            terms: "",
+            terms: "条款和条件",
             terms_hint: "上市的条款和条件是什么？ 您作为供应商负责什么？ 有保修吗？",
             refunds: "退款",
             refund_hint: "您的退货政策是什么？ 退货接受多长时间？ 谁为退货付款？"
@@ -907,7 +908,7 @@ export default {
             order_complete: "订单完成",
             view_transaction: "查看交易",
             message_for: " %{handle}的信息",
-            provide_details: "Provide additional details, ask a question, etc (optional)",
+            provide_details: "提供其他详细信息，提出问题等（可选）",
             send: "发送"
         },
         receiveMoney: {
@@ -918,58 +919,58 @@ export default {
         restoreProfileInit: {
             restore_profile: "恢复个人资料",
             restore_hint: "选择您的haven备份文件以恢复您的个人资料，包括您的钱包资金。",
-            select_file: "SELECT FILE"
+            select_file: "选择文件"
         },
         restoreProfilePassword: {
             Ooops: "糟糕！",
-            loading_hint: "It might take a minute...",
-            wrong_password: "Wrong password!",
-            failed_download: "Failed to download zip file",
-            enter_password: "Enter password",
-            password: "Password",
-            enter_password_hint: "Enter your password to proceed. You set this password when creating the backup.",
-            restore: "RESTORE"
+            loading_hint: "这可能花费一分钟...",
+            wrong_password: "错误的密码!",
+            failed_download: "下载 zip 文件失败",
+            enter_password: "输入密码",
+            password: "密码",
+            enter_password_hint: "输入密码以继续，您在创建备份时设置此密码.",
+            restore: "恢复"
         },
         Resync: {
-            unknown_error: "Unknown error!",
-            resync_transactions: "Resync transactions",
-            resync_content1: "If you believe you’re missing an order, or if your order details are out-of-sync with a buyer/seller, ",
-            resync_content2: "you can rescan the blockchain for transactions related to your order.",
-            resync_content3: "Resyncing transactions doesn’t need to be performed frequently. ",
-            resync_content4: "It should only be done if you think there’s a problem. A scan is performed each time you start the app.",
-            resync_content5: "You may leave this view while the resync process is active.",
-            resyncing: "Resyncing...",
-            resync_info: "Resynced %{lastSyncedAgo} ago",
-            resync: "Resync"
+            unknown_error: "未知错误!",
+            resync_transactions: "同步交易",
+            resync_content1: "如果您认为您缺少订单，或者您的订单详细信息与买方/卖方不同步，",
+            resync_content2: "您可以重新扫描区块链以查找与您的订单相关的交易。",
+            resync_content3: " 不需要频繁地重新同步交易。",
+            resync_content4: "仅当您认为有问题时才应该这样做。 每次启动应用程序时都会执行一次扫描.",
+            resync_content5: "重新同步过程处于活动状态时，您可以离开此视图.",
+            resyncing: "同步中...",
+            resync_info: "在 %{lastSyncedAgo} 同步过",
+            resync: "重新同步"
         },
         searchFilter: {
-            filter: "Filter",
-            sortBy: "Sort by",
-            accepts: "Accepts",
-            ships_to: "Ships to",
-            rating: "Rating",
-            listing_type: "Listing type",
-            item_condition: "Item Condition",
-            adult_content: "Adult content",
-            adult_content2: "Show adult content (18+)",
-            filters_reset: "Filters reset"
+            filter: "过滤",
+            sortBy: "排序方式",
+            accepts: "接受",
+            ships_to: "运输到",
+            rating: "评分",
+            listing_type: "清单类型",
+            item_condition: "商品情况",
+            adult_content: "成人内容",
+            adult_content2: "显示成人内容(18+)",
+            filters_reset: "重启过滤"
         },
         shippingAddress: {
             are_you_sure: "你确定吗?",
-            remove_address: "Remove the address",
+            remove_address: "移除地址",
             cancel: "取消",
-            OK: "OK",
-            free: "FREE",
-            cannot_ship: "Sorry, this item can not be shipped to the selected address",
+            OK: "确定",
+            free: "免费",
+            cannot_ship: "抱歉，该商品无法运送到所选地址",
             Shipping: "运输",
-            ships_to: "Ship To",
-            no_address: "No shipping address",
-            add_address: "+ Add new address"
+            ships_to: "运输到",
+            no_address: "没有货运地址",
+            add_address: "添加新地址"
         },
         StoreRatings: {
-            Reviews: "Reviews",
-            no_reviews1: "%{user} hasn't received any reviews",
-            no_reviews2: "You haven\'t received any reviews"
+            Reviews: "评论",
+            no_reviews1: "%{user} 没有收到任何评论",
+            no_reviews2: "你还没有收到任何评论"
         }
     },
 }

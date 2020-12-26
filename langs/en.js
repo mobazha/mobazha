@@ -78,7 +78,7 @@ export default {
             },
             FeedItem: {
                 reposted: "reposted"
-            },
+            },            
             FeedPreview: {
                 anonymous: "Anonymous"
             },
@@ -219,6 +219,9 @@ export default {
                 select_info: "%{count} Selected"
             },
             OptionSelector: {
+                current_price: " Current market price, tap to",
+                learn_more: "learn more"
+
             },
             OrderBrief: {
                 tap_to: "Current market price, tap to ",

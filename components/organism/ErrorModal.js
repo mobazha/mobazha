@@ -26,7 +26,7 @@ export default function ErrorModal(props) {
     <Modal transparent >
       <View style={styles.wrapper}>
         <Text style={styles.title}>{title}</Text>
-        <Text style={styles.body}>Error: {error}</Text>
+        <Text style={styles.body}>{I18n.t('components.organism.ErrorModal.error_message')}</Text>
         <Button title={buttonText} onPress={onPress} />
       </View>
     </Modal>);

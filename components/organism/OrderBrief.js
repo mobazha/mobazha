@@ -231,7 +231,7 @@ class OrderBrief extends React.Component {
                     <TouchableWithoutFeedback onPress={onLearnMore}>
                       <View>
                         <Text style={styles.learnMore}>
-                          Current market price, tap to <Text style={styles.underline}>learn more</Text>.
+                          {I18n.t('components.organism.OptionSelector.current_price')}<Text style={styles.underline}>{I18n.t('components.organism.OptionSelector.learn_more')}</Text>.
                         </Text>
                       </View>
                     </TouchableWithoutFeedback>

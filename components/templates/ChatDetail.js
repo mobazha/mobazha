@@ -727,7 +727,7 @@ class ChatDetail extends PureComponent {
           )}
         >
           <Text style={styles.moderatorNotification}>
-            <Text style={styles.bold}>{name}</Text> (moderator) joined this discussion
+            <Text style={styles.bold}>{name}</Text> {I18n.t('components.templates.ChatDetail.moderator_join')}
           </Text>
         </View>
       </TouchableWithoutFeedback>

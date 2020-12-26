@@ -84,7 +84,7 @@ class PayPanel extends PureComponent {
     const insufficient = !balance[paymentMethod] || (BigNumber(amount).gt(BigNumber(confirmed).plus(BigNumber(unconfirmed))));
     return (
       <View style={styles.wrapper}>
-        <Text style={styles.question}>How would you like to pay?</Text>
+        <Text style={styles.question}>{I18n.t('components.organism.PayPanel.ask_pay')}</Text>
         <View style={styles.content}>
           <TouchableOpacity style={[styles.item, styles.itemContent]} onPressIn={onExternal} disabled={paymentMethod === 'ETH'}>
             <View style={styles.imageContainer}>
@@ -94,10 +94,10 @@ class PayPanel extends PureComponent {
                 color={brandColor}
               />
             </View>
-            <Text style={styles.title}>External Wallet</Text>
+            <Text style={styles.title}>{I18n.t('components.organism.PayPanel.external_wallet')}</Text>
             {paymentMethod === 'ETH' && (
               <View style={styles.insufficient}>
-                <Text style={styles.insufficientText}>Not available for ETH</Text>
+                <Text style={styles.insufficientText}>{I18n.t('components.organism.PayPanel.not_available_eth')}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -106,11 +106,11 @@ class PayPanel extends PureComponent {
               <View style={styles.imageContainer}>
                 <Image style={styles.logo} source={logoImg} resizeMode="stretch" />
               </View>
-              <Text style={styles.title}>Haven Wallet</Text>
+              <Text style={styles.title}>{I18n.t('components.organism.PayPanel.haven_wallet')}</Text>
             </View>
             {insufficient && (
               <View style={styles.insufficient}>
-                <Text style={styles.insufficientText}>Not enough funds</Text>
+                <Text style={styles.insufficientText}>{I18n.t('components.organism.PayPanel.not_enough_funds')}</Text>
               </View>
             )}
           </TouchableOpacity>

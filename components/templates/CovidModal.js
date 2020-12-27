@@ -46,31 +46,29 @@ export default class CovidModal extends React.Component {
         <InputGroup
           wrapperStyle={styles.contentWrapper}
           contentStyle={styles.contentWrapper}
-          title="Essential Supplies Needed (COVID-19)"
+          title={I18n.t('components.organism.CovidModal.input_groupon_title')}
           noBorder
         >
           <ScrollView {...scrollStyleProps}>
             <DescriptionText>
-                People, states and hospitals all around the world are running very low on essential supplies to stay safe in these difficult times.
-                If you, or anyone you know, can quickly produce, source or dropship
-              <Text style={styles.bold}> face masks, N95 masks, surgical masks, hand sanitizer, hand soaps, ventilators, thermometers, wet wipes, toilet paper</Text>
-                , etc. Please get these items into circulation and into the right hands as soon as possible.
+                {I18n.t('components.organism.CovidModal.description11')}                
+              <Text style={styles.bold}> {I18n.t('components.organism.CovidModal.description12')}</Text>
+                {I18n.t('components.organism.CovidModal.description13')}                
             </DescriptionText>
             <DescriptionText>
-                Lives can be saved if we all do our part. The world needs your support to help get essential items into circulation. If you have access to a
-              <Text style={styles.bold}> sewing machine, 3D printer</Text>
-                , or even a
-              <Text style={styles.bold}> distillery</Text>
-                , please consider creating items and parts that can be donated and/or sold at a fair price.
+                {I18n.t('components.organism.CovidModal.description21')}                
+              <Text style={styles.bold}> {I18n.t('components.organism.CovidModal.description22')}</Text>
+                {I18n.t('components.organism.CovidModal.description23')}
+              <Text style={styles.bold}> {I18n.t('components.organism.CovidModal.description214')}</Text>
+                {I18n.t('components.organism.CovidModal.description25')}
             </DescriptionText>
             <DescriptionText>
-                Your essential items can be immediately distributed on Haven without fees.
-                No account needed. No questions asked. Please do your part to help.
+                {I18n.t('components.organism.CovidModal.description31')}                
             </DescriptionText>
           </ScrollView>
         </InputGroup>
         <Button
-          title="Create Listing"
+          title={I18n.t('components.organism.CovidModal.create_listing_title')}
           wrapperStyle={styles.buttonWrapper}
           onPress={onCreateListing}
           style={styles.firstButton}

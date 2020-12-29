@@ -510,9 +510,10 @@ export default {
             InfiniteProducts: {
                 loading_listings: "Loading Listings..."
             },
-            InventoryEditor: {
+            InventoryEditor: {                
                 details: "Details",
                 surcharge: "Surcharge",
+                total: "Total",
                 sku: "SKU",
                 sku_description: "SKU, ID, etc",
                 quantity: "quantity",
@@ -536,8 +537,7 @@ export default {
                 check_later: "Check back again later!",
                 store_empty: "Your store is empty",
                 put_for_sale: "Put something up for sale!",
-                create_listing: "Create listing",
-
+                create_listing: "Create listing"
             },
             NeedCoin: {
                 coinbase: "Coinbase",
@@ -585,8 +585,9 @@ export default {
                 order_canceled: "Order canceled",
                 user_cancel_order: "The %{user} has canceled this order. The money has been refunded in full.",
                 period_expired: "Dispute period expired",
-                no_dispute: "No dispute was opened during the 45-day dispute period. The seller can now claim payment.",
+                no_dispute: "No dispute was opened during the 45-day dispute period. The seller can now claim payment.",                
                 Shipping: "Shipping",
+                total: "Total",
                 no_buyer_note: "No note left by buyer",
                 address_copied: "Address copied!"
             },

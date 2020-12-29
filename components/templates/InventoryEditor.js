@@ -141,7 +141,7 @@ class InventoryEditor extends PureComponent {
     const totalPrice = parseFloat(price) + parseFloat(surcharge || '0');
     return (
       <React.Fragment>
-        <InputGroup title="Details">
+        <InputGroup title={I18n.t('components.organism.InventoryEditor.details')}>
           <FlatList
             data={variants}
             keyExtractor={this.variantKeyExtractor}
@@ -149,8 +149,8 @@ class InventoryEditor extends PureComponent {
           />
           <View style={styles.surchargeHolder}>
             <View style={styles.surchargeInput}>
-              <TextInput
-                title="Surcharge"
+              <TextInput 
+                title={I18n.t('components.organism.InventoryEditor.surcharge')}
                 noBorder
                 placeholder={`${localSymbol}0.00`}
                 value={surcharge || ''}
@@ -160,13 +160,13 @@ class InventoryEditor extends PureComponent {
               />
             </View>
             <View style={styles.surChargePrice}>
-              <Text style={styles.totalPriceLabel}>Total </Text>
+              <Text style={styles.totalPriceLabel}>{I18n.t('components.organism.InventoryEditor.total')} </Text>
               <Text style={styles.totalPrice}>{localLabelFromLocal(totalPrice)}</Text>
             </View>
           </View>
           <TextInput
-            title="SKU"
-            placeholder="SKU, ID, etc"
+            title={I18n.t('components.organism.InventoryEditor.sku')}
+            placeholder={I18n.t('components.organism.InventoryEditor.sku_description')}
             value={productID}
             onChangeText={this.onChangeProductId}
           />
@@ -174,7 +174,7 @@ class InventoryEditor extends PureComponent {
             {parseInt(quantity, 10) !== -1 ? (
               <View style={styles.textEditPart}>
                 <TextInput
-                  title="Quantity"
+                  title={I18n.t('components.organism.InventoryEditor.quantity')}
                   editable={parseInt(quantity, 10) !== -1}
                   noBorder
                   value={`${quantity}`}
@@ -189,14 +189,14 @@ class InventoryEditor extends PureComponent {
               </View>
             )}
             <CheckBox
-              title="Unlimited"
+              title={I18n.t('components.organism.InventoryEditor.unlimited')}
               checked={parseInt(quantity, 10) === -1}
               onPress={this.onChangeUnlimited}
             />
           </View>
         </InputGroup>
         <Text style={styles.description}>
-          If the quantity reaches 0, it will display as "sold out".
+          {I18n.t('components.organism.InventoryEditor.quantity_sold_out')}          
         </Text>
       </React.Fragment>
     );

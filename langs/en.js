@@ -686,7 +686,7 @@ export default {
     screens: {
         acceptedCoins: {
             update_listings: "Update Listings?",
-            sure_about_update: "All your listings will be updated.\nAre you sure?",
+            sure_about_update: "All your listings will be updated. Are you sure?",
             cancel: "Cancel",
             OK: "OK",
             coins_accepted: "Coins accepted",
@@ -701,7 +701,8 @@ export default {
             shipping_option: "Shipping option",
             title: "Title",
             option_description: "USA Shipping, International, etc",
-            destinations: "Destinations"
+            destinations: "Destinations",
+            save: "Save",
         },
         analytics: {
             details1: 'Session information, such as how often you use the App and for how long.',

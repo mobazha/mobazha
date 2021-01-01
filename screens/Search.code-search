@@ -1,0 +1,2305 @@
+# Query: <text style
+# ContextLines: 1
+
+611 个结果 - 192 文件
+
+components\atoms\Badge.js:
+  23    <View style={[styles.wrapper, { backgroundColor }, style || {}]}>
+  24:     <Text style={[styles.text, { color }]}>{text}</Text>
+  25    </View>
+
+components\atoms\CatListItem.js:
+  31        <Image source={item.image} style={styles.image} />
+  32:       <Text style={styles.text}>{item.title}</Text>
+  33      </View>
+
+components\atoms\ChatBubble.js:
+  235        <View style={styles.orderInfoWrapper}>
+  236:         <Text style={styles.username} numberOfLines={1} ellipsizeMode="tail">{decode(name)}</Text>
+  237:         <Text style={styles.userType}>{userType}</Text>
+  238        </View>
+
+  281            {position === 'right' && !loading && !success && (
+  282:             <Text style={styles.errorMessage}>{I18n.t('components.atoms.ChatBubble.fail_retry')}</Text>
+  283            )}
+
+components\atoms\CheckBox.js:
+  33        </View>
+  34:       <Text style={styles.title}>{title}</Text>
+  35      </View>
+
+components\atoms\Comment.js:
+  134          <View style={styles.topPart}>
+  135:           <Text style={styles.name}>{decode(name)}</Text>
+  136            {loading ? (
+  137:             <Text style={styles.loading}>{I18n.t('components.atoms.Comment.posting')}</Text>
+  138            ) : (
+  139:             <Text style={styles.time}>{formatSeconds(timeDiff)}</Text>
+  140            )}
+
+components\atoms\DescriptionText.js:
+  11  export default ({ children, style }) => (
+  12:   <Text style={[textStyle, style]}>
+  13      {children}
+
+components\atoms\EditListingFooter.js:
+  42        <View style={styles.wrapper}>
+  43:         <Text style={[priceStyle, styles.price]}>
+  44            {localLabelFromLocal(parseFloat(amount) || 0.0)}
+
+components\atoms\Fee.js:
+  52        <FontAwesome name="dollar" size={14} color="#8cd985" />
+  53:       <Text style={style}>{serviceFee}</Text>
+  54      </View>
+
+components\atoms\FollowButton.js:
+  157                <Ionicons name="ios-checkmark" size={28} style={fullButtonStyles.checkmark} />
+  158:               <Text style={fullButtonStyles.unfollowingButtonText}>{I18n.t('components.atoms.FollowButton.following')}</Text>
+  159                {isInUnfollowQueue && (
+
+  165                <Ionicons size={16} color="#B7B7B7" name="md-person-add" style={fullButtonStyles.iconButton} />
+  166:               <Text style={fullButtonStyles.followingButtonText}>  {I18n.t('components.atoms.FollowButton.follow')}</Text>
+  167                {isInFollowQueue && (
+
+components\atoms\FormLabelText.js:
+  32        <View style={styles.wrapper}>
+  33:         <Text style={[styles.text, style]}>{text}</Text>
+  34          {isBeta && (
+
+  42      <View style={styles.wrapper}>
+  43:       <Text style={[styles.text, style]}>{text}</Text>
+  44:       <Text style={styles.coinsValue} numberOfLines={1}>{value}</Text>
+  45      </View>
+
+components\atoms\FullButton.js:
+  38        ) : (
+  39:         <Text style={[styles.text, textStyle]}>
+  40            {title}
+
+components\atoms\HollowButton.js:
+  36      <View style={[styles.wrapper, style, (small && styles.small) || []]}>
+  37:       <Text style={styles.title}>{title}</Text>
+  38      </View>
+
+components\atoms\InputGroup.js:
+  101    if (typeof right === 'string') {
+  102:     return <Text style={styles.title}>{right}</Text>;
+  103    }
+
+  134            {title && (
+  135:             <Text style={styles.title}>
+  136                {title}
+  137:               {required && <Text style={styles.requiredMark}>*</Text>}
+  138              </Text>
+  139            )}
+  140:           {description && <Text style={styles.description}>{description}</Text>}
+  141          </View>
+
+  172        </View>
+  173:       {!isEmpty(attachText) && <Text style={styles.attachText}>{attachText}</Text>}
+  174      </View>
+
+components\atoms\Inventory.js:
+  29        <View style={styles.wrapper}>
+  30:         <Text style={styles.sku}>
+  31            {inventory.productId}
+  32          </Text>
+  33:         <Text style={styles.surcharge}>
+  34            {`${I18n.t('components.atomsInventory.surcharge')}: $${inventory.surcharge}`}
+  35          </Text>
+  36:         <Text style={styles.stock}>
+  37            {`${I18n.t('components.atomsInventory.stock')}: ${inventory.quantity === -1 ? I18n.t('components.atomsInventory.unlimited') : inventory.quantity}`}
+
+components\atoms\ListingTitlePrice.js:
+  31    <View style={styles.wrapper}>
+  32:     <Text style={styles.title} numberOfLines={1}>
+  33        {title}
+  34      </Text>
+  35:     <Text style={priceStyle}>{localLabelFromBCH(price * quantity, currency)}</Text>
+  36    </View>
+
+components\atoms\MeActionItem.js:
+  65            )}
+  66:           <Text style={styles.text}>{caption}</Text>
+  67          </View>
+
+components\atoms\ModalImageIndicator.js:
+  23    <View style={styles.modalClose}>
+  24:     <Text style={styles.text}>
+  25        {I18n.t('components.atoms.ModalImageIndicator.posInfo', { pos: pos + 1, size: size })}
+
+components\atoms\ModalTooltip.js:
+  60          >
+  61:           <Text style={styles.text}>
+  62              {text}
+
+components\atoms\MoreButton.js:
+  17      <View style={styles.wrapper}>
+  18:       <Text style={styles.text}>+ {title || I18n.t('components.atoms.MoreButton.more')}</Text>
+  19      </View>
+
+components\atoms\NotificationBadge.js:
+  34      <View style={[styles.notifCount, noBorder && { borderColor: brandColor }, style]}>
+  35:       <Text style={styles.notifCountText}>
+  36          {`${notifCount}`}
+
+components\atoms\PayBanner.js:
+  71            <View style={styles.priceWrapper}>
+  72:             <Text style={[priceStyle, styles.localPrice]}>
+  73                {localLabelFromBCH(amount, paymentMethod)}
+
+  76                <Image style={styles.icon} source={COINS[paymentMethod].icon} resizeMode="cover" />
+  77:               <Text style={styles.crypto}>
+  78                  {`${minUnitAmountToBCH(amount, paymentMethod)} ${paymentMethod}`}
+
+  83            <View style={styles.priceWrapper}>
+  84:             <Text style={styles.calculating}>{I18n.t('components.atoms.PayBanner.calculating')}</Text>
+  85            </View>
+
+components\atoms\PaymentMethod.js:
+  83            <Image source={coin.icon} style={styles.coinImage} />
+  84:           <Text style={styles.coinName}>{coin.label}</Text>
+  85:           <Text style={styles.feeLevel}>{feeLevel.label}</Text>
+  86          </View>
+
+  89          <View style={styles.paymentMethodWrapper}>
+  90:           <Text style={styles.emptyWallet}>{I18n.t('components.atoms.PaymentMethod.wallet_empty')}</Text>
+  91            <TouchableWithoutFeedback onPress={() => toAddFund(paymentMethod)}>
+  92              <View style={styles.addFundButton}>
+  93:               <Text style={styles.addFundText}>{I18n.t('components.atoms.PaymentMethod.add_funds')}</Text>
+  94              </View>
+
+components\atoms\PostButton.js:
+  30        ) : (
+  31:         <Text style={styles.text}>{I18n.t('components.atoms.PostButton.post')}</Text>
+  32        )}
+
+components\atoms\ProductName.js:
+  23    <View style={styles.wrapper}>
+  24:     <Text style={styles.text}>{decode(prodName)}</Text>
+  25    </View>
+
+components\atoms\ProductPrice.js:
+   86          <View style={styles.freeShippingTextWrapper}>
+   87:           <Text style={[styles.freeShipping]}>{I18n.t('components.atoms.ProductPrice.free_shipping')}</Text>
+   88          </View>
+
+   96        return (
+   97:         <Text style={styles.shipping}>
+   98            {(localDecimalPointsIfCrypto ? ' + ' : ` +${localLabel} `) + I18n.t('components.atoms.ProductPrice.shipping')}
+
+  117            <View style={styles.priceWrapper}>
+  118:             <Text style={[priceStyle, styles.price]} numberOfLines={1}>
+  119                {localLabelFromBCH(amount, currency)}
+
+components\atoms\ProductSection.js:
+  64          <View style={styles.left}>
+  65:           <Text style={[styles.title, props.titleStyle]}>{props.title}</Text>
+  66:           {!isEmpty(props.subTitle) && <Text style={styles.subTitle}>{props.subTitle}</Text>}
+  67          </View>
+
+  70              <View style={styles.actionWrapper}>
+  71:               <Text style={styles.actionTitle}>{props.actionTitle}</Text>
+  72              </View>
+
+components\atoms\ProductState.js:
+  52      <View style={styles.wrapper}>
+  53:       <Text style={styles.label}>{typeText}</Text>
+  54        {typeText === 'Physical Good' && (
+  55:         <Text style={styles.label}>
+  56            {` - ${getProductConditionText(condition.toLowerCase())}`}
+
+components\atoms\ProductTag.js:
+  31      <View style={styles.wrapper}>
+  32:       <Text style={styles.text}>#{decode(tag)}</Text>
+  33      </View>
+
+components\atoms\Rating.js:
+  40      <View style={styles.wrapper}>
+  41:       <Text style={styles.title}>
+  42          {title}
+
+components\atoms\RatingInput.js:
+  53    <View style={[styles.wrapper, noBorder ? {} : styles.borderBottom]}>
+  54:     <Text style={styles.title}>
+  55        {title}
+
+components\atoms\RecentKeyword.js:
+  51      <View style={[styles.wrapper, isLast ? styles.last : null]}>
+  52:       <Text style={styles.text}>
+  53          {keyword}
+
+components\atoms\ResetFilter.js:
+  23    <TouchableWithoutFeedback onPress={onPress}>
+  24:     <View style={styles.wrapper}><Text style={styles.text}>{I18n.t('components.atoms.ResetFilter.reset_filters')}</Text></View>
+  25    </TouchableWithoutFeedback>
+
+components\atoms\SecureFund.js:
+  41    <View style={styles.wrapper}>
+  42:     <Text style={styles.secureText}>{I18n.t('components.atoms.SecureFund.secure_funds')}</Text>
+  43      <TouchableWithoutFeedback onPress={onBackup}>
+  44        <View style={styles.button}>
+  45:         <Text style={styles.btnText}>{I18n.t('components.atoms.SecureFund.backup_wallet')}</Text>
+  46        </View>
+
+components\atoms\SMRoundButton.js:
+  36        ) : (
+  37:         <Text style={[styles.text, textStyle]}>{title}</Text>
+  38        )}
+
+components\atoms\SMTextButton.js:
+  35      <View style={[styles.wrapper, wrapperStyle, disabled && styles.disabled]}>
+  36:       <Text style={[styles.text, textStyle]}>{loadingText || title}</Text>
+  37        {loadingText && <ActivityIndicator style={styles.loading} size="small" color={brandColor} />}
+
+components\atoms\StaticField.js:
+  58          <View style={styles.fieldWrapper}>
+  59:           <Text style={styles.fieldLabel} numberOfLines={1}>
+  60              {`${label} `}
+
+  63              <TouchableWithoutFeedback onPress={this.handleOpenURL}>
+  64:               <Text style={[styles.fieldValue, styles.linkText]} numberOfLines={1} ellipsizeMode="tail">
+  65                  {description}
+
+  68            ) : (
+  69:             <Text style={styles.fieldValue} numberOfLines={1} ellipsizeMode="tail">
+  70                {description}
+
+components\atoms\SwitchInput.js:
+  43        <View style={[styles.wrapper, noBorder && { borderBottomWidth: 0 }, wrapperStyle]}>
+  44:         <Text style={[styles.title, secondary && styles.secondaryText, style]}>{title}</Text>
+  45          {useNative ? (
+
+components\atoms\TagInput.js:
+  135            <View style={styles.inputPart}>
+  136:             <Text style={styles.title}>
+  137                {title}
+  138:               <Text style={required ? { color: 'red' } : {}}>{required ? '*' : ''}</Text>
+  139              </Text>
+
+  161                  <View>
+  162:                   <Text style={styles.placeholder}>{placeholder}</Text>
+  163                  </View>
+
+components\atoms\TextArea.js:
+  90        <View style={[styles.wrapper, !noBorder && { borderBottomWidth: 1, borderColor: '#E8E8E8' }, style]}>
+  91:         {title && <Text style={styles.title}>{title}</Text>}
+  92          <TextInput
+
+components\atoms\TextInput.js:
+  164              {!noTitle && (
+  165:               <Text style={[styles.title, titleWidth ? { width: titleWidth } : {}]}>
+  166                  {title}
+  167:                 <Text style={required ? { color: 'red' } : {}}>{required ? '*' : ''}</Text>
+  168                </Text>
+
+  214            </View>
+  215:           {unit && <Text style={styles.unit}>{unit}</Text>}
+  216          </View>
+
+components\atoms\TransactionItem.js:
+  78            {status === 'UNCONFIRMED' && <Ionicons size={13} color={staticLabelColor} style={styles.timerIcon} name="md-time" />}
+  79:           <Text style={[styles.amount, amount >= 0 ? {} : styles.sendingAmountColor]}>
+  80              {`${amount >= 0 ? '+' : '-'}${currencySymbol}${Math.abs(amount).toFixed(2)}`}
+  81            </Text>
+  82:           <Text style={styles.cryptoAmount}>
+  83              {cryptoInDecimal} {coin}
+
+  85          </View>
+  86:         <Text style={styles.time}>{time}</Text>
+  87        </View>
+
+components\atoms\UnavailableButton.js:
+  36    <TouchableOpacity style={styles.wrapper} onPress={onPress}>
+  37:     <Text style={styles.btnText}>{I18n.t('components.atoms.UnavailableButton.unavailable')}</Text>
+  38      <View style={styles.btnIcon}>
+
+components\molecules\BlockedNodeItem.js:
+  40            <View style={styles.textWrapper}>
+  41:             <Text style={styles.handle} numberOfLines={1}>
+  42                {decode(_.get(profile, 'name') || I18n.t('components.molecules.BlockedNodeItem.unknown'))}
+
+  47            <View style={styles.button}>
+  48:             <Text style={styles.buttonText}>{blocked ? I18n.t('components.molecules.BlockedNodeItem.unblock') : I18n.t('components.molecules.BlockedNodeItem.block')}</Text>
+  49            </View>
+
+components\molecules\BuyerReview.js:
+  87              <Stars score={overall} />
+  88:             <Text style={styles.past}>{past}</Text>
+  89            </View>
+  90          )}
+  91:         <Text style={styles.name}>{I18n.t('components.molecules.BuyerReview.from')}</Text>
+  92:         <Text style={[
+  93            styles.review,
+
+components\molecules\BuyWyre.js:
+  136              <View style={styles.wyreWrapper}>
+  137:               <Text style={styles.wyreTitle}>{I18n.t('components.molecules.BuyWyre.ask_crypto')}</Text>
+  138:               <Text style={styles.wyreText}>{I18n.t('components.molecules.BuyWyre.top_up')}</Text>
+  139              </View>
+
+components\molecules\ChatListItem.js:
+  63              <View style={styles.titleContainer}>
+  64:               <Text style={chatStyles.name} numberOfLines={1}>
+  65                  {decode(name)}
+
+  67                {!!handle && (
+  68:                 <Text style={chatStyles.handle} numberOfLines={1}>
+  69                    {` @${handle}`}
+
+  85              </View>
+  86:             <Text style={[chatStyles.handle, isUnread && chatStyles.unread]} numberOfLines={3}>
+  87                {decode(item.lastMessage)}
+
+  90            <View style={styles.timestampWrapper}>
+  91:             <Text style={isUnread && chatStyles.unread}>
+  92                {timeSince(new Date(item.timestamp), true)}
+
+components\molecules\CheckoutNote.js:
+  103          {_.isEmpty(checkoutNote) ? (
+  104:           <Text style={styles.noteTip}>{I18n.t('components.molecules.CheckoutNote.add_note')}</Text>
+  105          ) : (
+  106:           <Text style={styles.note}>{checkoutNote}</Text>
+  107          )}
+
+components\molecules\CoinListItem.js:
+  67              <View style={styles.leftWrapper}>
+  68:               <Text style={styles.coinName}>{label}</Text>
+  69:               <Text style={styles.secondary}>{coin}</Text>
+  70              </View>
+
+components\molecules\DirectPaymentOption.js:
+  62          <View style={styles.option}>
+  63:           <Text style={styles.optionTitle}>{I18n.t('components.molecules.DirectPaymentOption.direct_payment')}</Text>
+  64:           <Text style={styles.optionDescription}>{I18n.t('components.molecules.DirectPaymentOption.description')}</Text>
+  65          </View>
+
+components\molecules\ExternalStoreHeader.js:
+  59            </TouchableWithoutFeedback>
+  60:           <Text style={styles.title} numberOfLines={1}>
+  61              {decode(_.get(profile, 'name'))}
+
+components\molecules\FeedImageGrid.js:
+  82                <View style={styles.textContainer}>
+  83:                 <Text style={styles.moreOverlayText}>{`+${moreCount}`}</Text>
+  84                </View>
+
+components\molecules\FeedItem.js:
+  355            <TouchableWithoutFeedback onPress={this.handlePressAvatar}>
+  356:             <Text style={chatStyles.name} numberOfLines={1}>
+  357                {`${decode(name)}`}
+
+  359            </TouchableWithoutFeedback>
+  360:           <Text style={styles.timestamp}>
+  361              {timeSince(new Date(timestamp))}
+
+  449                  />
+  450:                 <Text style={styles.providerName}>{profileName}</Text>
+  451:                 <Text style={styles.repostText}>{I18n.t('components.molecules.FeedItem.reposted')}</Text>
+  452                </View>
+
+components\molecules\FeedItemFooter.js:
+  138              />
+  139:             {comment > 0 && <Text style={[styles.btnText, isCommented && styles.activeText]}>{comment}</Text>}
+  140            </View>
+
+  149              />
+  150:             {repost > 0 && <Text style={[styles.btnText, isReposted && styles.activeText]}>{repost}</Text>}
+  151            </View>
+
+  160              />
+  161:             {like > 0 && <Text style={[styles.btnText, isLiked && styles.activeText]}>{like}</Text>}
+  162            </View>
+
+components\molecules\FeedListItem.js:
+  69            <View style={styles.content}>
+  70:             <Text style={styles.name}>{decode(name)}</Text>
+  71              {!isEmpty(decode(shortDescription)) && (
+  72:               <Text style={styles.text} numberOfLines={2} ellipsizeMode="tail">{decode(shortDescription)}</Text>
+  73              )}
+
+components\molecules\FeedPreview.js:
+  161          <View style={styles.wrapper}>
+  162:           <Text style={styles.name} numberOfLines={1}>
+  163              {`${name || I18n.t('components.molecules.FeedItem.reposted')}`}
+
+components\molecules\FriendItem.js:
+  100              <View style={styles.descriptionContainer}>
+  101:               <Text style={styles.name} numberOfLines={1}>
+  102                  {decode(name)}
+
+  104                {!!handle && (
+  105:                 <Text style={chatStyles.handle} numberOfLines={1}>
+  106                    {` @${handle}`}
+
+  109                {!!shortDescription && (
+  110:               <Text style={styles.shortDescription} numberOfLines={2}>
+  111                  {`${decode(shortDescription)}`}
+
+components\molecules\Header.js:
+  60        <View style={styles.center}>
+  61:         <Text style={styles.title}>{title}</Text>
+  62        </View>
+
+components\molecules\ListingPaymentOptions.js:
+  64              <Image source={coin.icon} style={styles.coinImage} />
+  65:             <Text style={[styles.label, coin.disabled && { fontStyle: 'italic' }]}>
+  66                {coin.disabled ? (
+
+components\molecules\ListingPreview.js:
+  91          />
+  92:         <Text style={styles.title} numberOfLines={1}>{title}</Text>
+  93:         <Text style={[priceStyle, styles.price]}>
+  94            {amount ? localLabelFromBCH(amount, currencyCode) : ''}
+
+components\molecules\ListingReview.js:
+  105              <View style={styles.listingTitleBtn}>
+  106:               <Text style={styles.listingTitle}>{decode(listing.listingTitle)}</Text>
+  107              </View>
+  108            </TouchableWithoutFeedback>
+  109:           <Text style={styles.past}>{past}</Text>
+  110          </View>
+
+  112            <Stars score={overall} />
+  113:           <Text style={styles.name}>{I18n.t('components.molecules.ListingReview.from', { name: decode(name) })}</Text>
+  114          </View>
+  115:         <Text style={[styles.review, isEmpty(review) ? styles.noMessage : {}]}>
+  116            {isEmpty(review) ? I18n.t('components.molecules.ListingReview.no_message') : decode(review)}
+
+components\molecules\MainSlider.js:
+  111            <View style={styles.pagination}>
+  112:             <Text style={styles.paginationText}>{activeSlide + 1}/{items.length}</Text>
+  113            </View>
+
+components\molecules\ModerationFee.js:
+  62          <View style={focused ? styles.activeHeader : styles.deactiveHeader}>
+  63:           <Text style={styles.tabTitle}>
+  64              {title}
+
+components\molecules\MultiFilter.js:
+  88                    <View style={[styles.itemTextWrapper, !isLast && styles.bottomBorder]}>
+  89:                     <Text style={styles.itemText}>{val.label}</Text>
+  90                    </View>
+
+components\molecules\OrderNotification.js:
+  293            <View style={styles.content}>
+  294:             <Text style={styles.text}>
+  295:               <Text style={styles.name}>{decode(contentText.name)}</Text>
+  296                {contentText.text}
+
+  300                <View style={styles.productBrief}>
+  301:                 <Text style={styles.productName} numberOfLines={1}>
+  302                    {decode(productTitle)}
+
+  305                    {coinIcon && <Image source={coinIcon} style={styles.coinIcon} />}
+  306:                   <Text style={styles.price}>
+  307                      {localSymbol}
+
+  313            </View>
+  314:           <Text style={styles.timestamp}>{timeSince(new Date(timestamp).getTime())}</Text>
+  315          </View>
+
+components\molecules\ProductCard.js:
+  147              <View style={styles.textWrapper}>
+  148:               <Text style={styles.title} numberOfLines={1}>{title}</Text>
+  149              </View>
+
+  151            <View style={styles.ratingWrapper}>
+  152:             <Text style={[priceStyle, compact ? styles.compactPrice : styles.price]}>
+  153                {amount ? localLabelFromBCH(amount, currencyCode) : ''}
+
+  158                {averageRating > 0 && (
+  159:                 <Text style={styles.rating}>
+  160                    <Ionicons name="md-star" size={16} color={starRatingColor} />
+
+components\molecules\ProductDescription.js:
+  106          <ProductSection>
+  107:           <Text style={styles.emptyText}>{I18n.t('components.molecules.ProductDescription.empty_text')}</Text>
+  108          </ProductSection>
+
+  113        <ProductSection>
+  114:         <Text style={styles.content} numberOfLines={3}>
+  115            {eatSpaces(he.decode(striptags.default(description)))}
+
+  118            <View style={styles.showAllButton}>
+  119:             <Text style={styles.showAllText}>{I18n.t('components.molecules.ProductDescription.read_more')}</Text>
+  120            </View>
+
+components\molecules\ProductImageSlider.js:
+  82          <View style={styles.overlay}>
+  83:           <Text style={styles.overlayText}>{activeSlide + 1}/{images.length}</Text>
+  84          </View>
+
+components\molecules\ProductListItem.js:
+  173              <View>
+  174:               <Text style={styles.title} numberOfLines={2}>
+  175                  {decode(title)}
+
+  177                {!hideSellerName && (
+  178:                 <Text style={styles.fromText} numberOfLines={1}>
+  179                    {decode(this.getStoreName())}
+
+  183              <View style={styles.priceWrapper}>
+  184:               <Text style={priceStyle}>{`${localLabelFromBCH(amount, currencyCode)}  `}</Text>
+  185                {!isEmpty(freeShipping) && (
+  186                  <View style={styles.shippingTextWrapper}>
+  187:                   <Text style={[priceStyle, styles.shipping]}>{` ${freeShippingText} `}</Text>
+  188                  </View>
+
+  190              </View>
+  191:             <Text style={styles.rating}>
+  192                <Ionicons name="md-star" size={16} color={starRatingColor} />
+
+components\molecules\ProductPolicy.js:
+  75        <Ionicons style={styles.emptyIcon} name="ios-document" size={50} color="#8a8a8f" />
+  76:       <Text style={styles.emptyText}>
+  77          {I18n.t('components.molecules.ProductPolicy.no_provided', { policy: policy })}
+
+  87          <OptionGroup onPress={this.handleShowModal} noBorder>
+  88:           <Text style={styles.title}>{policy}</Text>
+  89          </OptionGroup>
+
+components\molecules\RadioFilter.js:
+  66      if (_.isString(label)) {
+  67:       return <Text style={[styles.itemText, selected === value ? styles.selectedText : {}]}>{label}</Text>;
+  68      }
+
+components\molecules\RadioModalFilter.js:
+  259            <View style={styles.secondaryWrapper}>
+  260:             <Text style={styles.secondaryTitle} numberOfLines={1}>
+  261                {title}
+  262:               <Text style={required ? { color: 'red' } : {}}>{required ? '*' : ''}</Text>
+  263              </Text>
+  264:             <Text style={styles.triggerLabel} numberOfLines={1}>{label}</Text>
+  265            </View>
+
+  273              {icon && <Image style={styles.optionIcon} source={icon} />}
+  274:             <View style={styles.itemLabelWrapper}><Text style={styles.label}>{label}</Text></View>
+  275            </View>
+
+components\molecules\Section.js:
+  27    <View style={[styles.section, style]}>
+  28:     <Text style={styles.title}>{title}</Text>
+  29      <View style={[styles.sectionBody, bodyStyle]}>{children}</View>
+
+components\molecules\SellerInfo.js:
+  154                <View style={styles.contentWrapper}>
+  155:                 <Text style={styles.shopName}>{decode(profile.name) || I18n.t('components.molecules.SellerInfo.unknown')}</Text>
+  156                  <View style={styles.positionWrapper}>
+  157:                   <Text style={styles.rating}>
+  158                      <Ionicons name="md-star" size={16} color={starRatingColor} />
+
+  164                  {!_.isEmpty(profile.shortDescription) && (
+  165:                   <Text style={styles.description}>
+  166                      {decode(profile.shortDescription)}
+
+  173                <View style={styles.showAllButton}>
+  174:                 <Text style={styles.showAllText}>{I18n.t('components.molecules.SellerInfo.message')}</Text>
+  175                </View>
+
+  178                <View style={styles.showAllButton}>
+  179:                 <Text style={styles.showAllText}>{I18n.t('components.molecules.SellerInfo.visit_store')}</Text>
+  180                </View>
+
+components\molecules\ShopCard.js:
+  186                    <FastImage style={styles.avatar} source={avatar} resizeMode="cover" />
+  187:                   <Text style={styles.shopName}>{decode(profile.name) || I18n.t('components.molecules.ShopCard.unknown')}</Text>
+  188:                   {/* <Text style={styles.handle}>
+  189                      &nbsp;&nbsp;@
+
+  192                  </View>
+  193:                 <Text style={styles.description} numberOfLines={2}>
+  194                    {decode(profile.shortDescription)}
+
+  197                    <LocationPin style={{ flex: 1 }} location={decode(profile.location)} />
+  198:                   <Text style={styles.rating}>
+  199                      &nbsp;
+
+components\molecules\ShopInfo.js:
+  171        {children}
+  172:       <Text style={styles.chipLabel}>{label}</Text>
+  173      </View>
+
+  296              />
+  297:             <Text style={styles.title} numberOfLines={1}>
+  298                {decode(_.get(profile, 'name'))}
+
+  303                <SocialChip label={`${ratingCount} reviews`} onPress={this.handlePressReviews}>
+  304:                 <Text style={styles.chipValue}>
+  305                    <Ionicons name="md-star" size={20} color={starRatingColor} />
+
+  310                <SocialChip label={I18n.t('components.molecules.ShopInfo.following')} onPress={this.handlePressFollowings}>
+  311:                 <Text style={styles.chipValue}>{followingCount}</Text>
+  312                </SocialChip>
+  313                <SocialChip label={I18n.t('components.molecules.ShopInfo.followers')} onPress={this.handlePressFollowers}>
+  314:                 <Text style={styles.chipValue}>{followerCount}</Text>
+  315                </SocialChip>
+
+  319              {!_.isEmpty(shortDescription) && (
+  320:             <Text style={styles.description}>
+  321                {decode(shortDescription)}
+
+  333                    <View style={[styles.button, styles.chatButton]}>
+  334:                     <Text style={styles.chatButtonText}>{I18n.t('components.molecules.ShopInfo.message')}</Text>
+  335                    </View>
+
+components\molecules\SocialNotification.js:
+  211              <View style={styles.textWrapper}>
+  212:               <Text style={styles.text}>
+  213:                 <Text style={styles.name}>{decode(name)}</Text>
+  214                  {this.getContentText()}
+
+  231            </View>
+  232:           <Text style={styles.timestamp}>{timeSince(new Date(created_at).getTime())}</Text>
+  233          </View>
+
+components\molecules\TextHeader.js:
+  19  export const renderTextHeader = text => ({ style }) => (
+  20:   <Text style={[styles.header, style]}>{text}</Text>
+  21  );
+
+components\molecules\VariantItem.js:
+  43    <View style={[styles.wrapper, (isLast && styles.noBorder) || {}]}>
+  44:     <Text style={styles.variantName}>{name}</Text>
+  45      <View style={styles.variantOptionsHolder}>
+  46        {variants.map((val, idx) => (
+  47:         <Text style={styles.variantOption} key={`variant_option_${idx}`}>
+  48            {val}
+
+components\molecules\WalletCoinItem.js:
+  108              <View style={styles.leftWrapper}>
+  109:               <Text style={styles.coinName}>{label}</Text>
+  110:               <Text style={styles.secondary}>{coin}</Text>
+  111              </View>
+
+  116                    <View style={styles.unconfirmedBalanceWrapper}>
+  117:                     <Text style={styles.unconfirmedBalance}>(</Text>
+  118                      <Ionicons style={styles.timerIcon} name="md-time" size={13} color={staticLabelColor} />
+  119:                     <Text style={styles.unconfirmedBalance}>
+  120                        {localLabelFromLocal(pending)})
+
+  123                  )}
+  124:                 <Text style={styles.priceByLocalCurrency}>
+  125                    {localLabelFromLocal(cBalance)}
+
+  127                </View>
+  128:               <Text style={styles.secondary}>
+  129                  {(disabled || !balance) ? (
+
+components\organism\AverageRating.js:
+  58      if (!ratings) {
+  59:       return <Text style={styles.noReviews}>...</Text>;
+  60      }
+
+  72                &nbsp;
+  73:               <Text style={styles.avgRating}>{`${avgRating.toFixed(1)} (`}</Text>
+  74:               <Text style={styles.count}>{count}</Text>
+  75:               <Text style={styles.avgRating}>)</Text>
+  76              </Text>
+  77            ) : (
+  78:             <Text style={styles.noReviews}>{I18n.t('components.organism.AverageRating.no_reviews')}</Text>
+  79            )}
+
+components\organism\Balance.js:
+  54        <View style={styles.wrapper}>
+  55:         <Text style={styles.balance}>{localLabelFromLocal(totalBalance)}</Text>
+  56          {pendingBalance > 0 && (
+  57            <View style={styles.pendingBalanceWrapper}>
+  58:             <Text style={styles.pendingBalance}>(</Text>
+  59              <Ionicons style={styles.timerIcon} name="md-time" size={13} color={foregroundColor} />
+  60:             <Text style={styles.pendingBalance}>
+  61                {I18n.t('components.organism.Balance.unconfirmed', {balance: localLabelFromLocal(pendingBalance)})})
+
+components\organism\CategorySelector.js:
+  88          <View style={styles.wrapper}>
+  89:           <Text style={styles.title} numberOfLines={1}>
+  90            {I18n.t('components.organism.CategorySelector.category')}
+
+  93              <View style={styles.value}>
+  94:               <Text style={styles.categoryLabel} numberOfLines={1}>{decode(category)}</Text>
+  95:               <Text style={styles.arrow}>{'>'}</Text>
+  96:               <Text style={styles.subCategoryLabel} numberOfLines={1}>{decode(subCategory)}</Text>
+  97              </View>
+  98            ) : (
+  99:             <Text style={styles.triggerLabel} numberOfLines={1}>{I18n.t('components.organism.CategorySelector.select_category')}</Text>
+  100            )}
+
+components\organism\CheckoutHeader.js:
+  104          <View style={styles.contentWrapper}>
+  105:           <Text style={styles.name} numberOfLines={2}>
+  106              {decode(title)}
+  107            </Text>
+  108:           <Text style={styles.handle}>{I18n.t('components.organism.CheckoutHeader.from_seller', { name: decode(sellerName) })}</Text>
+  109            <View style={styles.priceWrapper}>
+  110:             <Text style={priceStyle}>
+  111                {I18n.t('components.organism.CheckoutHeader.each_price', { price: localLabelFromBCH(getListingActualPrice(this.props, true)) })}
+
+components\organism\CheckoutSummary.js:
+  343          {combo && combo.map((val, idx) => (
+  344:           <Text style={styles.option} key={`option_${options[idx].variants[val].name}`}>
+  345              {`${decode(options[idx].name)}: ${decode(options[idx].variants[val].name)}`}
+
+  347          ))}
+  348:         <Text style={styles.option}>
+  349            Quantity: {quantity}
+
+  374          <View style={styles.couponInfo}>
+  375:           <Text style={styles.couponLabel}>
+  376              Coupon: {coupon ? selectedCoupon.couponCode : I18n.t('components.organism.CheckoutSummary.none_select')}
+
+  378            <TouchableWithoutFeedback onPress={coupon ? this.handleRemoveCoupon : this.showCouponModal}>
+  379:             <Text style={styles.couponLinkText}>{coupon ? I18n.t('components.organism.CheckoutSummary.remove') : I18n.t('components.organism.CheckoutSummary.add_link')}</Text>
+  380            </TouchableWithoutFeedback>
+
+  382          {coupon && (
+  383:           <Text style={styles.couponDiscountText}>
+  384              {isRough ? (
+
+  429                <View style={styles.optionLabelWrapper}>
+  430:                 <Text style={styles.optionLabel}>
+  431                    {`${decode(shippingOption.name)} ${decode(shippingOption.service)}  `}
+  432:                   <Text style={styles.changeText}>Change</Text>
+  433                  </Text>
+  434                </View>
+  435:               <Text style={priceStyle}>
+  436                  {isRough ? (
+
+  449                <Image source={COINS[paymentMethod].icon} style={styles.coinImage} />
+  450:                 <Text style={styles.feeLevel}>{I18n.t('components.organism.CheckoutSummary.network_fee')}&nbsp;&nbsp;</Text>
+  451:               <Text style={styles.changeText}>{I18n.t('components.organism.CheckoutSummary.change')}</Text>
+  452              </View>
+  453:             <Text style={priceStyle}>
+  454                {localLabelFromBCH(this.getCurrentFee(), paymentMethod)}
+
+  459            <View style={styles.feeAlertContainer}>
+  460:             <Text style={styles.feeAlertDescription}>
+  461              {I18n.t('components.organism.CheckoutSummary.fee_alert_description')}
+
+  463              <TouchableWithoutFeedback onPress={this.handleOpenHelp}>
+  464:               <Text style={styles.feeAlertLearnMore}>{I18n.t('components.organism.CheckoutSummary.learn_more')}</Text>
+  465              </TouchableWithoutFeedback>
+
+  469          <View style={styles.totalWrapper}>
+  470:           <Text style={styles.totalLabel}>{I18n.t('components.organism.CheckoutSummary.total')}</Text>
+  471:           <Text style={styles.totalValue}>
+  472              {totalPrice ? (
+
+components\organism\CoinBalance.js:
+  55          <Image style={styles.icon} source={icon} resizeMode="cover" />
+  56:         <Text style={styles.balance}>{localLabelFromLocal(cBalance)}</Text>
+  57:         <Text style={styles.pending}>{`${coinBalance} ${coin}`}</Text>
+  58        </View>
+
+components\organism\CoinTypeSelector.js:
+  123              <View style={styles.leftWrapper}>
+  124:               <Text style={styles.coinName}>{label}</Text>
+  125:               <Text style={styles.secondary}>{coin}</Text>
+  126              </View>
+
+  129                <View style={styles.rightWrapper}>
+  130:                 <Text style={styles.priceByLocalCurrency}>
+  131                    {localLabelFromLocal(cBalance)}
+  132                  </Text>
+  133:                 <Text style={styles.secondary}>
+  134                    {(disabled || !balance) ? I18n.t('components.organism.CoinTypeSelector.coming_soon') : `${minUnitAmountToBCH(balance.confirmed, coin)} ${coin}`}
+
+components\organism\CouponItem.js:
+  77            <View style={styles.titlePart}>
+  78:             <Text style={styles.title}>{title || discountText}</Text>
+  79              <OptionButton />
+
+  81            <View style={styles.detailPart}>
+  82:             <Text style={styles.couponCode}>{discountCode}</Text>
+  83:             <Text style={styles.discountText}>{discountText}</Text>
+  84            </View>
+
+components\organism\DefaultInventoryItem.js:
+  122              {isEmpty(title) ? (
+  123:               <Text style={styles.titlePlaceholder}>{I18n.t('components.organism.DefaultInventoryItem.no_title')}</Text>
+  124              ) : (
+  125:               <Text style={styles.title}>{title}</Text>
+  126              )}
+  127:             <Text style={styles.price}>
+  128                {localLabelFromLocal(isEmpty(price) ? 0 : price)}
+
+  151              <View style={styles.quantityPlaceholder}>
+  152:               <Text style={styles.label}>{I18n.t('components.organism.DefaultInventoryItem.quantity')}</Text>
+  153:               <Text style={styles.quantity}>{I18n.t('components.organism.DefaultInventoryItem.unlimited')}</Text>
+  154              </View>
+
+  156          </View>
+  157:         <Text style={styles.description}>
+  158            {
+
+components\organism\EmptyCoupons.js:
+  29      <Image style={styles.img} source={CouponIcon} />
+  30:     <Text style={styles.text}>{I18n.t('components.organism.EmptyCoupons.empty_coupon')}</Text>
+  31      <HollowButton title={I18n.t('components.organism.EmptyCoupons.add_coupon')} onPress={onAdd} />
+
+components\organism\EmptyShippingMethods.js:
+  29      <Image style={styles.img} source={CouponIcon} />
+  30:     <Text style={styles.text}>{I18n.t('components.organism.EmptyShippingMethods.empty_shipping_option')}</Text>
+  31      <HollowButton title={I18n.t('components.organism.EmptyShippingMethods.add_shipping')} onPress={onAdd} />
+
+components\organism\ErrorModal.js:
+  27        <View style={styles.wrapper}>
+  28:         <Text style={styles.title}>{title}</Text>
+  29:         <Text style={styles.body}>{I18n.t('components.organism.ErrorModal.error_message')}</Text>
+  30          <Button title={buttonText} onPress={onPress} />
+
+components\organism\ImageSelector.js:
+  276            <View style={styles.overlay}>
+  277:             <Text style={styles.overlayText}>{activeSlide + 1}/{images.length}</Text>
+  278            </View>
+
+components\organism\InventoryItem.js:
+  73                {variants.map((val, idx) => (
+  74:                 <Text style={styles.variant} key={`variant_${idx}`}>
+  75                    {val}
+
+  78              </View>
+  79:             <Text style={styles.price}>
+  80                {localSymbol}
+
+  82              </Text>
+  83:             <Text style={styles.quantity}>QTY: {parseInt(quantity, 10) === -1 ? I18n.t('components.organism.InventoryItem.unlimited'): quantity}</Text>
+  84            </View>
+
+components\organism\Moderator.js:
+  132            <View style={styles.mainContent}>
+  133:             <Text style={styles.name}>
+  134              {I18n.t('components.organism.Moderator.unknown_moderator')}
+  135              </Text>
+  136:             <Text style={styles.description}>
+  137              {I18n.t('components.organism.Moderator.unknown_moderator_description')}              
+
+  151            <View style={styles.rowContainer}>
+  152:             <Text style={styles.name}>
+  153                {decode(name)}
+
+  157                  <Octicons name="verified" size={14} color={brandColor} />
+  158:                 <Text style={styles.verified}>{I18n.t('components.organism.Moderator.verified')}  </Text>
+  159                </React.Fragment>
+
+  162  
+  163:           <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
+  164              {description && eatSpaces(decode(striptags.default(description)))}
+
+components\organism\ModeratorPreview.js:
+  169            <View style={styles.profileInfo}>
+  170:             <Text style={styles.name}>{decode(name)}</Text>
+  171              <View style={styles.verifiedWrapper}>
+  172                <Image style={styles.verifyIcon} source={CheckDecagramIcon} />
+  173:               <Text style={styles.verifiedText}>{I18n.t('components.organism.Moderator.verified')} </Text>
+  174              </View>
+  175            </View>
+  176:           <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
+  177              {eatSpaces(he.decode(striptags.default(description)))}
+
+  181              <FontAwesome style={styles.dollarSign} name="dollar" size={14} />
+  182:             <Text style={styles.fee}>{this.getFeeText()}</Text>
+  183            </View>
+
+components\organism\MultiSelector.js:
+  193            <View style={styles.itemLabelWrapper}>
+  194:             <Text style={[styles.itemText, isSelected ? styles.selectedText : {}]}>
+  195                {label}
+
+  228            <View style={styles.optionTrigger}>
+  229:             <Text style={styles.title}>
+  230                {title}
+  231:               <Text style={required ? { color: 'red' } : {}}>{required ? '*' : ''}</Text>
+  232              </Text>
+  233:             <Text style={styles.input} numberOfLines={1} ellipsizeMode="tail">{text}</Text>
+  234              <Ionicons
+
+  263              <View style={styles.selectionIndicatorWrapper}>
+  264:               <Text style={styles.selectedIndicator}>
+  265                  {I18n.t('components.organism.MultiSelector.select_info')} 
+
+components\organism\OrderBrief.js:
+  177          <View style={styles.button}>
+  178:           <Text style={styles.buttonText}>{label.toUpperCase()}</Text>
+  179          </View>
+  180:         {showOrderId && <Text style={styles.orderNumber} numberOfLines={1}>#{order.orderId.substring(0, 5)}...</Text>}
+  181        </View>
+
+  221                  <View style={styles.orderInfo}>
+  222:                   <Text style={styles.itemTitle} numberOfLines={1}>{title}</Text>
+  223:                   <Text style={styles.secondPartyInfo} numberOfLines={1}>
+  224                      {this.getSecondPartyLabel()}
+
+  227                      <Image style={styles.icon} source={COINS[paymentCoin].icon} resizeMode="cover" />
+  228:                     <Text style={styles.priceText}>{`${localLabelFromBCH(total.amount, paymentCoin)}`}</Text>
+  229                    </View>
+
+  232                        <View>
+  233:                         <Text style={styles.learnMore}>
+  234:                           {I18n.t('components.organism.OptionSelector.current_price')}<Text style={styles.underline}>{I18n.t('components.organism.OptionSelector.learn_more')}</Text>.
+  235                          </Text>
+
+  240                  {!hideTimestamp && (
+  241:                   <Text style={styles.timeInfo}>{timeSince(new Date(timestamp).getTime())}</Text>
+  242                  )}
+
+components\organism\OrderDispute.js:
+  165        >
+  166:         <Text style={styles.memoComment}>
+  167            {I18n.t('components.organism.OrderDispute.memo_comment1')}
+
+  191            <View style={styles.memoContainer}>
+  192:             <Text style={styles.memo}>{decode(memo)}</Text>
+  193            </View>
+  194          )}
+  195:         <Text style={styles.memoComment}>
+  196:           <Text style={styles.payoutMainAmount}>
+  197              {localLabelFromBCH((amIBuyer ? buyerValue : sellerValue) || 0, coin)}
+
+  200          </Text>
+  201:         <Text style={[styles.serviceFee, state !== 'DECIDED' && { marginBottom: 18 }]}>
+  202            {I18n.t('components.organism.OrderDispute.moderator_takes')}
+  203:           <Text style={styles.payoutAmount}>{localLabelFromBCH(moderatorValue || 0, coin)}</Text>
+  204            {'. '}
+  205            {amIBuyer ? I18n.t('components.organism.OrderDispute.seller_takes') : I18n.t('components.organism.OrderDispute.buyer_takes')}
+  206:           <Text style={styles.payoutAmount}>
+  207              {localLabelFromBCH((amIBuyer ? sellerValue : buyerValue) || 0, coin)}
+
+  213              <View style={styles.acceptButton} >
+  214:               <Text style={styles.acceptText}>{I18n.t('components.organism.OrderDispute.accept_payout')}</Text>
+  215              </View>
+
+  244            <View style={styles.memoContainer}>
+  245:             <Text style={styles.memo}>
+  246                {decode(dispute.claim)}
+
+  248            </View>
+  249:           <Text style={styles.memoComment}>
+  250              {I18n.t('components.organism.OrderDispute.memo_comment2')}
+
+  253              <View style={styles.messageButton}>
+  254:               <Text style={styles.messageText}>{I18n.t('components.organism.OrderDispute.message')}</Text>
+  255              </View>
+
+components\organism\OrderFooter.js:
+  131        >
+  132:         <Text style={showMainStyle ? styles.mainButtonText : styles.buttonText}>
+  133            {action}
+
+  160        return (
+  161:         <Text style={styles.disputeTimestamp}>
+  162            <Ionicons name="md-alarm" size={18} color={warningColor} />
+
+  172            <Ionicons name="md-star" size={22} color={starRatingColor} />
+  173:           <Text style={styles.status}>{` ${avgRating.toFixed(1)} `}</Text>
+  174          </View>
+
+  181        return (
+  182:         <Text style={styles.statusBrandBold}>
+  183            {localLabelFromBCH((orderType === 'purchases' ? buyerValue : sellerValue) || 0, paymentCoin)}
+
+  212              >
+  213:               <Text style={styles.buttonText}>{val}</Text>
+  214              </TouchableOpacity>
+
+  230          <View style={styles.priceWrapper}>
+  231:           <Text style={[styles.localPrice]}>
+  232              {localLabelFromBCH(total.amount, paymentCoin)}
+
+  235              <Image style={styles.icon} source={COINS[paymentCoin].icon} resizeMode="cover" />
+  236:             <Text style={styles.crypto}>
+  237                {`${minUnitAmountToBCH(total.amount, paymentCoin)} ${paymentCoin}`}
+
+  243        return (
+  244:         <Text style={styles.statusBrand}>{label}</Text>
+  245        );
+
+  247        return (
+  248:         <Text style={styles.statusRed}>{label}</Text>
+  249        );
+
+  252          return (
+  253:           <Text style={state === 'DISPUTE_EXPIRED' ? styles.statusRed : styles.status}>{label}</Text>
+  254          );
+
+  256          return (
+  257:           <Text style={styles.status}>
+  258              {I18n.t('components.organism.OrderFooter.claim')}
+  259:             <Text style={styles.statusBrandBold}>{localLabelFromBCH(total.amount, paymentCoin)}</Text>
+  260              ?
+
+  265        return (
+  266:         <Text style={styles.status}>{label}</Text>
+  267        );
+
+  270      return (
+  271:       <Text style={styles.status}>{label}</Text>
+  272      );
+
+components\organism\OrderFulfillment.js:
+   88              <View style={styles.overlay}>
+   89:               <Text style={styles.overlayText}>{I18n.t('components.organism.OrderFulfillment.tracking_number_copied')}</Text>
+   90              </View>
+
+  103      return (
+  104:       <Text style={styles.description}>
+  105          {I18n.t('components.organism.OrderFulfillment.fulfilled_info')}
+
+  121              <View style={styles.memoContainer}>
+  122:               <Text style={styles.description}>
+  123                  {decode(detail.note)}
+
+components\organism\OrderRating.js:
+  78          <Ionicons name="md-star" size={17} style={styles.icon} color="#f9d553" />
+  79:         <Text style={styles.emptyText}>{I18n.t('components.organism.OrderRating.no_feedback', {name:name})}</Text>
+  80        </View>
+
+components\organism\PayPanel.js:
+   86        <View style={styles.wrapper}>
+   87:         <Text style={styles.question}>{I18n.t('components.organism.PayPanel.ask_pay')}</Text>
+   88          <View style={styles.content}>
+
+   96              </View>
+   97:             <Text style={styles.title}>{I18n.t('components.organism.PayPanel.external_wallet')}</Text>
+   98              {paymentMethod === 'ETH' && (
+   99                <View style={styles.insufficient}>
+  100:                 <Text style={styles.insufficientText}>{I18n.t('components.organism.PayPanel.not_available_eth')}</Text>
+  101                </View>
+
+  108                </View>
+  109:               <Text style={styles.title}>{I18n.t('components.organism.PayPanel.haven_wallet')}</Text>
+  110              </View>
+
+  112                <View style={styles.insufficient}>
+  113:                 <Text style={styles.insufficientText}>{I18n.t('components.organism.PayPanel.not_enough_funds')}</Text>
+  114                </View>
+
+components\organism\ProductModeSelector.js:
+  37    <View style={[styles.wrapper, noBorder ? styles.noBorder : {}]}>
+  38:     <Text style={styles.counts}>{counts !== undefined ? `${counts} listings` : ''}</Text>
+  39      <TouchableWithoutFeedback
+
+components\organism\ProductRatings.js:
+  78              {`${avgRating.toFixed(1)} `}
+  79:             (<Text style={styles.count}>{count}</Text>)
+  80            </Text>
+
+  89                <View style={styles.showAllButton}>
+  90:                 <Text style={styles.showAllText}>{I18n.t('components.organism.ProductRatings.see_all_reviews')}</Text>
+  91                </View>
+
+  94          ) : (
+  95:           <Text style={styles.noReviews}>{I18n.t('components.organism.ProductRatings.no_reviews_yet')}</Text>
+  96          )}
+
+components\organism\QRScanner.js:
+  88              <Ionicons name="ios-qr-scanner" size={300} color="#FFF" />
+  89:             <Text style={styles.tooltip}>
+  90                {fromWallet ? (
+
+components\organism\SearchFilterHeader.js:
+  29        <View style={styles.wrapper}>
+  30:         {total ? (<Text style={styles.textStyle} numberOfLines={1}>{I18n.t('components.organism.SearchFilterHeader.results', {total: total})}</Text>)
+  31            : (<View style={{ flex: 1 }} />)}
+
+components\organism\SelectableModerator.js:
+  140              <View style={styles.profileInfo}>
+  141:               <Text style={styles.name}>{decode(name)}</Text>
+  142                <View style={styles.briefContainer}>
+  143:                 <Text style={styles.location}>📍 {decode(location)}</Text>
+  144:                 <Text style={styles.fee}>{this.getFeeText()}</Text>
+  145                </View>
+
+  148            <View style={styles.wholeDescription}>
+  149:             <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
+  150                {eatSpaces(he.decode(striptags.default(description)))}
+  151              </Text>
+  152:             <Text style={styles.toDetail}>{I18n.t('components.organism.SelectableModerator.view_details')}</Text>
+  153            </View>
+
+components\organism\SelectorModal.js:
+  183                {title}
+  184:               <Text style={required ? { color: 'red' } : {}}>{required ? '*' : ''}</Text>
+  185              </Text>
+
+  236                    <View style={styles.option}>
+  237:                     <Text style={[styles.optionText, isSelected ? styles.selected : null]}>
+  238                        {getLabel(val)}
+
+components\organism\SelectorPlaceholder.js:
+  92        >
+  93:         <Text style={styles.title}>
+  94            {title}
+  95:           <Text style={required ? { color: 'red' } : {}}>{required ? '*' : ''}</Text>
+  96          </Text>
+
+  98            <View style={styles.optionTrigger}>
+  99:             <Text style={styles.input}>{text}</Text>
+  100              <Entypo
+
+components\organism\SendingAddressSelector.js:
+  117        <View style={styles.wrapper}>
+  118:         <Text style={styles.title}>{title}</Text>
+  119          <View style={styles.content}>
+
+  132            <View style={[styles.sendButton, address === '' ? styles.sendDisabled : {}]}>
+  133:             <Text style={styles.sendButtonText}>{I18n.t('components.organism.SendingAddressSelector.send')}</Text>
+  134              <Ionicons size={16} name="md-send" color="white" style={styles.sendIcon} />
+
+components\organism\SendingAmount.js:
+  245          <Image style={styles.icon} source={COINS[baseCoin].icon} resizeMode="cover" />
+  246:         <Text style={styles.amountInput} numberOfLines={1}>
+  247:           {!isCrypto && <Text style={styles.localSymbol}>{localSymbol}</Text>}
+  248            {this.getClippedAmountStr(true)}
+  249:           {isCrypto && <Text style={styles.cryptoSymbol}>{` ${baseCoin}`}</Text>}
+  250          </Text>
+  251:         <Text style={styles.counterAmount}>
+  252            {isCrypto && <Text>{localSymbol}</Text>}
+
+  260            <TouchableWithoutFeedback onPress={this.handleSwitchCurrency}>
+  261:             <Text style={[styles.actionButton, styles.switch]}>
+  262                {isCrypto ? baseCoin : localCurrency}
+
+  266              <TouchableWithoutFeedback onPress={this.handlePressMax}>
+  267:               <Text style={[styles.actionButton, styles.sendAll]}>
+  268                {I18n.t('components.organism.SendingAmount.send_all')}
+
+components\organism\ShippingMethod.js:
+  66      return parseFloat(price) === 0 ? (
+  67:       <Text style={styles.price}>{I18n.t('components.organism.ShippingMethod.free')}</Text>
+  68      ) : (
+  69:       <Text style={styles.price}>{localLabelFromLocal(parseFloat(price))}</Text>
+  70      );
+
+  75        <View style={styles.fieldWrapper}>
+  76:         <Text style={styles.serviceName}>{get(item, 'name', '')}</Text>
+  77:         <Text style={styles.estDelivery}>{get(item, 'estimatedDelivery', '')}</Text>
+  78        </View>
+
+  87          <View style={styles.titleWrapper}>
+  88:           <Text style={styles.title}>{name}</Text>
+  89            <TouchableOpacity onPress={this.onPress}>
+
+components\organism\ShippingOptions.js:
+  31        case 1:
+  32:         return <Text style={style}>{shippingOptions[0].name}</Text>;
+  33        default:
+  34:         return <Text style={style}>{I18n.t('components.organism.ShippingOptions.options_count')}</Text>;
+  35      }
+
+components\organism\SupportHaven.js:
+  76        <View style={styles.wrapper}>
+  77:         <Text style={styles.title}>{I18n.t('components.organism.SupportHaven.support_haven')}</Text>
+  78          <View style={styles.content}>
+  79:           <Text style={styles.description}>{I18n.t('components.organism.SupportHaven.description')}</Text>
+  80            <View style={styles.buttons}>
+  81              <TouchableOpacity style={styles.item} onPress={this.handleAmount1Selected}>
+  82:               <Text style={styles.text}>$1</Text>
+  83              </TouchableOpacity>
+  84              <TouchableOpacity style={styles.item} onPress={this.handleAmount3Selected}>
+  85:               <Text style={styles.text}>$3</Text>
+  86              </TouchableOpacity>
+  87              <TouchableOpacity style={styles.item} onPress={this.handleAmount5Selected}>
+  88:               <Text style={styles.text}>$5</Text>
+  89              </TouchableOpacity>
+
+components\organism\TabHeader.js:
+  63            <View style={styles.center}>
+  64:             <Text style={styles.title}>{title}</Text>
+  65            </View>
+
+components\organism\Tabs.js:
+  111                </Text>
+  112:               {item.tag && (<Text style={styles.tag}>{item.tag}</Text>)}
+  113                {item.count > 0 && (
+  114                  <View style={styles.countWrapper}>
+  115:                   <Text style={styles.count}>{`${item.count}`}</Text>
+  116                  </View>
+
+components\organism\TagEditor.js:
+  25            { count > 0 ?
+  26:             <Text style={style}>{I18n.t('components.organism.TagEditor.tags_info')}</Text>
+  27            :
+
+components\organism\TagSuggestion.js:
+  49        <View style={styles.wrapper}>
+  50:         <Text style={styles.title}>{title}</Text>
+  51          <FlatList
+
+  55            data={suggestions}
+  56:           ListEmptyComponent={<Text style={styles.emptyText}>{I18n.t('components.organism.TagSuggestion.none')}</Text>}
+  57          />
+
+components\organism\UserSearchItem.js:
+  78          <View style={styles.content}>
+  79:           <Text style={styles.name}>{decode(name)}</Text>
+  80            <View style={styles.descriptionWrapper}>
+  81              {!isEmpty(decode(shortDescription)) && (
+  82:               <Text style={styles.description} numberOfLines={3}>{decode(shortDescription)}</Text>
+  83              )}
+
+  86              <LocationPin secondary location={decode(location)} style={styles.location} />
+  87:             <Text style={styles.rating}>
+  88                &nbsp;
+
+components\organism\VariantOptions.js:
+  49    renderItem = selected => (val, index) =>
+  50:     <Text style={[styles.text, selected === index && styles.selectedText]}>{decode(val.name)}</Text>
+  51  
+
+  65          {!_.isEmpty(description) && (
+  66:           <Text style={styles.description} numberOfLines={1}>
+  67              {decode(description)}
+
+components\organism\VirtualKeyboard.js:
+  112        >
+  113:         <Text style={[styles.number, { color }]}>{symbol}</Text>
+  114        </TouchableOpacity>
+
+components\organism\PanelView\PanelViewBase.js:
+  125            >
+  126:             <Text style={styles.menuTitle}>{title}</Text>
+  127              <View style={styles.iconGrid}>
+
+  131                <View style={styles.buttonWrapper}>
+  132:                 <Text style={styles.buttonText}>{I18n.t('components.organism.PanelView.cancle')}</Text>
+  133                </View>
+
+components\organism\PanelView\PlusPanelView.js:
+  89          </View>
+  90:         <Text style={styles.menuItemTitle}>{title}</Text>
+  91        </View>
+
+components\organism\PanelView\SharePanelView.js:
+  90          </View>
+  91:         <Text style={styles.menuItemTitle}>{title}</Text>
+  92        </View>
+
+components\templates\AboutTab.js:
+  160            <View style={styles.contactInfo} key={idx}>
+  161:             <Text style={styles.contactInfoLabel}>
+  162                {e === 'phoneNumber' ? I18n.t('components.templates.AboutTab.phone') : capitalizeFirstLetter(e)}
+
+  165                <View style={{ flex: 1 }}>
+  166:                 <Text style={styles.contactInfoContent} numberOfLines={3}>
+  167                    {contactInfo[e]}
+
+  186            </TouchableWithoutFeedback>
+  187:           <Text style={styles.storeAddress}>{peerID}</Text>
+  188            <TouchableWithoutFeedback onPress={this.handleCopyLink}>
+  189              <View>
+  190:               <Text style={styles.doCopy}>{I18n.t('components.templates.AboutTab.copy')}</Text>
+  191              </View>
+
+  197          <View style={about && styles.descriptionWrapper}>
+  198:           <Text style={styles.description}>
+  199              {about && eatSpaces(he.decode(striptags.default(about)))}
+
+  203            <View style={styles.overlay}>
+  204:             <Text style={styles.overlayText}>{I18n.t('components.templates.AboutTab.link_copied')}</Text>
+  205            </View>
+
+components\templates\BackupWallet.js:
+  151    renderItem = ({ item, index }) => (
+  152:     <Text style={styles.mnemonic}><Text style={styles.mnemonicIndex}>{index + 1}.</Text> {item}</Text>
+  153    )
+
+  169                <View style={styles.content}>
+  170:                 <Text style={styles.title}>{I18n.t('components.templates.BackupWallet.backup_wallet')}</Text>
+  171                  <Image style={styles.image} source={BackupImage} />
+
+  181                      <View style={styles.button}>
+  182:                       <Text style={styles.buttonText}>{I18n.t('components.templates.BackupWallet.next')}</Text>
+  183                      </View>
+
+  204                <View style={styles.content}>
+  205:                 <Text style={styles.title}>{I18n.t('components.templates.BackupWallet.recovery_phrase')}</Text>
+  206                  <DescriptionText style={[styles.description, styles.noMarginTop]}>
+
+  223                      <View style={styles.button}>
+  224:                       <Text style={styles.buttonText}>{I18n.t('components.templates.BackupWallet.done')}</Text>
+  225                      </View>
+
+components\templates\CategoryList.js:
+  79          </View>
+  80:         <Text style={styles.moreText}>{I18n.t('components.templates.CategoryList.more')}</Text>
+  81        </View>
+
+components\templates\ChatDetail.js:
+  632          <AvatarImage thumbnail={avatar} style={styles.footerAvatar} />
+  633:         <Text style={styles.footerText}>{peerProfile.name}+{I18n.t('components.templates.ChatDetail.is_typing')}</Text>
+  634        </View>
+
+  661            <View style={styles.unreadSeparator(moderatorJoined, position)}>
+  662:             <Text style={styles.unreadText}>{I18n.t('components.templates.ChatDetail.unread')}</Text>
+  663            </View>
+
+  686          <View style={styles.blockedMessageInput}>
+  687:           <Text style={styles.blockedMessage}>{I18n.t('components.templates.ChatDetail.block_message')}</Text>
+  688          </View>
+
+  708          <AvatarImage thumbnail={thumbnail} style={styles.emptyStateAvatar} />
+  709:         <Text style={styles.placeholderText}>
+  710          {I18n.t('components.templates.ChatDetail.start_with')}+{' '}
+  711:           <Text style={styles.handle}>{handle ? `@${handle}` : decode(name)}</Text>
+  712          </Text>
+
+  728          >
+  729:           <Text style={styles.moderatorNotification}>
+  730:             <Text style={styles.bold}>{name}</Text> {I18n.t('components.templates.ChatDetail.moderator_join')}
+  731            </Text>
+
+components\templates\Checkout.js:
+  159            <View style={styles.addrWrapper}>
+  160:             <Text style={[styles.emptyAddress, styles.cannotShip]}>{I18n.t('components.organism.Checkout.address_required')}</Text>
+  161              <View style={styles.fullButton}>
+  162:               <Text style={styles.fullText}>{I18n.t('components.organism.Checkout.new_address')}</Text>
+  163              </View>
+
+  174              <View style={styles.addrWrapper}>
+  175:               <Text style={[styles.emptyAddress, styles.cannotShip]}>
+  176                {I18n.t('components.organism.Checkout.cannot_ship')}
+
+  185            <View style={styles.addrWrapper}>
+  186:             <Text style={styles.addrName}>{addr.name}</Text>
+  187:             <Text style={styles.addrLine}>
+  188                {`${addr.addressLineOne} ${addr.addressLineTwo}`}
+  189              </Text>
+  190:             <Text style={styles.addrLine}>
+  191                {`${addr.city}`}
+
+  194              </Text>
+  195:             <Text style={styles.addrLine}>
+  196                {parseCountryName(addr.country)}
+
+  286                    checked={isProtected}
+  287:                   title={<Text>{I18n.t('components.organism.Checkout.protect_up_to')} <Text style={{ fontWeight: 'bold' }}>{I18n.t('components.organism.Checkout.protect_days')}</Text></Text>}
+  288                    onPress={this.handleProtectedToggle}
+
+  290                ) : (
+  291:                 <Text style={styles.moderatorNotAvailable}>{I18n.t('components.organism.Checkout.moderator_not_available')}</Text>
+  292                )}
+
+  301                      <View style={styles.fullButton}>
+  302:                       <Text style={styles.fullText}>{I18n.t('components.organism.Checkout.change_moderator')}</Text>
+  303                      </View>
+
+  306                ) : (
+  307:                 <Text style={styles.moderatorText}>
+  308                    {I18n.t('components.organism.Checkout.no_moderator_description')}                  
+
+components\templates\ContractModal.js:
+  89            <View style={styles.overlay}>
+  90:             <Text style={styles.overlayText}>{I18n.t('components.organism.ContractModal.copied')} </Text>
+  91            </View>
+
+components\templates\CouponApplyModal.js:
+  106              {invalid && (
+  107:               <Text style={styles.errorText}>
+  108:                 {I18n.t('components.organism.CouponApplyModal.coupon')} "<Text style={styles.couponHighlight}>{couponCode}</Text>" {I18n.t('components.organism.CouponApplyModal.not_valid')}
+  109                </Text>
+
+components\templates\CovidModal.js:
+  54                  {I18n.t('components.organism.CovidModal.description11')}                
+  55:               <Text style={styles.bold}> {I18n.t('components.organism.CovidModal.description12')}</Text>
+  56                  {I18n.t('components.organism.CovidModal.description13')}                
+
+  59                  {I18n.t('components.organism.CovidModal.description21')}                
+  60:               <Text style={styles.bold}> {I18n.t('components.organism.CovidModal.description22')}</Text>
+  61                  {I18n.t('components.organism.CovidModal.description23')}
+  62:               <Text style={styles.bold}> {I18n.t('components.organism.CovidModal.description214')}</Text>
+  63                  {I18n.t('components.organism.CovidModal.description25')}
+
+components\templates\EULAModal.js:
+  104          </View>
+  105:         <Text style={[styles.privacyText]}>
+  106          {I18n.t('components.organism.EULAModal.eula')}          
+
+  113            >
+  114:             <Text style={styles.privacyDescriptionBold}>
+  115                {I18n.t('components.organism.EULAModal.privacy_description1')}              
+  116              </Text>
+  117:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  118                {I18n.t('components.organism.EULAModal.privacy_description2')} 
+  119              </Text>
+  120:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  121                {I18n.t('components.organism.EULAModal.privacy_description3')} 
+
+  123  
+  124:             <Text style={styles.privacyDescriptionBold}>
+  125                {I18n.t('components.organism.EULAModal.privacy_description4')}             
+  126              </Text>
+  127:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  128                {I18n.t('components.organism.EULAModal.privacy_description5')}               
+
+  130  
+  131:             <Text style={styles.privacyDescriptionBold}>
+  132                {I18n.t('components.organism.EULAModal.privacy_description6')} 
+  133              </Text>
+  134:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  135                {I18n.t('components.organism.EULAModal.privacy_description7')} 
+
+  137  
+  138:             <Text style={styles.privacyDescriptionBold}>
+  139                {I18n.t('components.organism.EULAModal.privacy_description8')}  
+  140              </Text>
+  141:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  142                {I18n.t('components.organism.EULAModal.privacy_description9')}               
+
+  144  
+  145:             <Text style={styles.privacyDescriptionBold}>
+  146                {I18n.t('components.organism.EULAModal.privacy_description10')}               
+  147              </Text>
+  148:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  149                {I18n.t('components.organism.EULAModal.privacy_description11')} 
+
+  151  
+  152:             <Text style={styles.privacyDescriptionBold}>
+  153                {I18n.t('components.organism.EULAModal.privacy_description12')} 
+  154              </Text>
+  155:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  156                {I18n.t('components.organism.EULAModal.privacy_description13')}              
+
+  158  
+  159:             <Text style={styles.privacyDescriptionBold}>
+  160                {I18n.t('components.organism.EULAModal.privacy_description14')}
+  161              </Text>
+  162:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  163                {I18n.t('components.organism.EULAModal.privacy_description15')}
+
+  165  
+  166:             <Text style={styles.privacyDescriptionBold}>
+  167                {I18n.t('components.organism.EULAModal.privacy_description16')}
+  168              </Text>
+  169:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  170                {I18n.t('components.organism.EULAModal.privacy_description17')}              
+
+  172  
+  173:             <Text style={styles.privacyDescriptionBold}>
+  174                {I18n.t('components.organism.EULAModal.privacy_description18')}              
+  175              </Text>
+  176:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  177                {I18n.t('components.organism.EULAModal.privacy_description19')}               
+
+  179  
+  180:             <Text style={styles.privacyDescriptionBold}>
+  181                {I18n.t('components.organism.EULAModal.privacy_description20')}               
+  182              </Text>
+  183:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  184                {I18n.t('components.organism.EULAModal.privacy_description21')}               
+
+  186  
+  187:             <Text style={styles.privacyDescriptionBold}>
+  188                {I18n.t('components.organism.EULAModal.privacy_description22')} 
+
+  190              </Text>
+  191:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  192                {I18n.t('components.organism.EULAModal.privacy_description23')} 
+
+  194  
+  195:             <Text style={styles.privacyDescriptionBold}>
+  196                {I18n.t('components.organism.EULAModal.privacy_description24')}               
+  197              </Text>
+  198:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  199                {I18n.t('components.organism.EULAModal.privacy_description25')}               
+
+  201  
+  202:             <Text style={styles.privacyDescriptionBold}>
+  203                {I18n.t('components.organism.EULAModal.privacy_description26')}               
+  204              </Text>
+  205:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  206                {I18n.t('components.organism.EULAModal.privacy_description27')}               
+
+  208  
+  209:             <Text style={styles.privacyDescriptionBold}>
+  210                {I18n.t('components.organism.EULAModal.privacy_description28')}               
+  211              </Text>
+  212:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  213                {I18n.t('components.organism.EULAModal.privacy_description29')}               
+
+  215  
+  216:             <Text style={styles.privacyDescriptionBold}>
+  217                {I18n.t('components.organism.EULAModal.privacy_description30')}               
+  218              </Text>
+  219:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  220                {I18n.t('components.organism.EULAModal.privacy_description31')}               
+
+  222  
+  223:             <Text style={styles.privacyDescriptionBold}>
+  224                {I18n.t('components.organism.EULAModal.privacy_description32')}               
+  225              </Text>
+  226:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  227                {I18n.t('components.organism.EULAModal.privacy_description33')}               
+
+  229  
+  230:             <Text style={styles.privacyDescriptionBold}>
+  231                {I18n.t('components.organism.EULAModal.privacy_description34')}               
+  232              </Text>
+  233:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  234                {I18n.t('components.organism.EULAModal.privacy_description35')}               
+
+  236  
+  237:             <Text style={styles.privacyDescriptionBold}>
+  238              {I18n.t('components.organism.EULAModal.privacy_description36')}               
+  239              </Text>
+  240:             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
+  241              {I18n.t('components.organism.EULAModal.privacy_description37')}               
+
+components\templates\feed.js:
+  207          <View style={styles.wrapper}>
+  208:           <Text style={styles.description}>{name} {I18n.t('components.organism.feed.not_post')}</Text>
+  209          </View>
+
+  214        <View style={styles.wrapper}>
+  215:         <Text style={styles.mainText}>{I18n.t('components.organism.feed.post_hint1')} </Text>
+  216:         <Text style={styles.description}>{I18n.t('components.organism.feed.post_hint2')}</Text>
+  217          <HollowButton title="Create post" onPress={this.createPost} />
+
+  240            <View style={styles.overlay}>
+  241:             <Text style={styles.overlayText}>{I18n.t('components.organism.feed.reported')}</Text>
+  242            </View>
+
+components\templates\FeedDetail.js:
+  280        <Feather name="file-text" size={48} color={formLabelColor} />
+  281:       <Text style={styles.emptyText}>{I18n.t('components.organism.FeedDetail.fail_to_load')}</Text>
+  282        <HollowButton title={I18n.t('components.organism.FeedDetail.retry')} onPress={this.handleRetry} />
+
+  288        <ActivityIndicator size="large" color="#8a8a8f" />
+  289:       <Text style={styles.emptyText}>{I18n.t('components.organism.FeedDetail.Loading')}</Text>
+  290      </View>
+
+  370            <View style={styles.overlay}>
+  371:             <Text style={styles.overlayText}>
+  372                {I18n.t('components.organism.FeedDetail.reported')}
+
+components\templates\FeedTabContent.js:
+   99            />
+  100:           <Text style={styles.placeholderText}>{text}</Text>
+  101          </View>
+
+components\templates\GlobalFeed.js:
+  236            <Image source={PersonAddImage} style={styles.emptyIcon} />
+  237:           <Text style={styles.description}>{I18n.t('components.organism.GlobalFeed.customise_feed')}</Text>
+  238          </View>
+
+  244            <Ionicons style={styles.emptySearchIcon} name="md-search" size={50} color="#8a8a8f" />
+  245:           <Text style={styles.description}>{I18n.t('components.organism.GlobalFeed.not_found')}</Text>
+  246          </View>
+
+  251          <Image source={PersonAddImage} style={styles.emptyIcon} />
+  252:         <Text style={styles.description}>{I18n.t('components.organism.GlobalFeed.share_with_community')}</Text>
+  253          <HollowButton title="Create post" onPress={this.createPost} />
+
+  291            <View style={styles.overlay}>
+  292:             <Text style={styles.overlayText}>
+  293                {I18n.t('components.organism.GlobalFeed.reported')}
+
+components\templates\InfiniteProducts.js:
+  110        <ActivityIndicator style={styles.activityIndicator} size="large" color="#8a8a8f" />
+  111:       <Text style={styles.emptyText}>{I18n.t('components.organism.InfiniteProducts.loading_listings')}</Text>
+  112      </View>
+
+components\templates\InventoryEditor.js:
+  131      <View style={styles.variantHolder}>
+  132:       <Text style={styles.variantTitle}>{item.name}</Text>
+  133:       <Text style={styles.variant}>{item.value}</Text>
+  134      </View>
+
+  162              <View style={styles.surChargePrice}>
+  163:               <Text style={styles.totalPriceLabel}>{I18n.t('components.organism.InventoryEditor.total')} </Text>
+  164:               <Text style={styles.totalPrice}>{localLabelFromLocal(totalPrice)}</Text>
+  165              </View>
+
+  186                <View style={styles.quantityPlaceholder}>
+  187:                 <Text style={styles.label}>Quantity</Text>
+  188:                 <Text style={styles.quantity}>Unlimited</Text>
+  189                </View>
+
+  197          </InputGroup>
+  198:         <Text style={styles.description}>
+  199            {I18n.t('components.organism.InventoryEditor.quantity_sold_out')}          
+
+components\templates\InventoryList.js:
+  22      return (
+  23:       <Text style={styles.text}>
+  24          {I18n.t('components.organism.InventoryList.combos_info')}         
+
+components\templates\ListingsTab.js:
+  120            <ActivityIndicator size="large" color={brandColor} />
+  121:           <Text style={[styles.description, styles.loadingText]}>{I18n.t('components.organism.ListingsTab.load')}</Text>
+  122          </View>
+
+  128            <View style={styles.wrapper}>
+  129:             <Text style={[styles.description, { marginBottom: 2 }]}>
+  130                {I18n.t('components.organism.ListingsTab.no_sale')}              
+  131              </Text>
+  132:             <Text style={styles.description}>{I18n.t('components.organism.ListingsTab.check_later')} </Text>
+  133            </View>
+
+  137            <View style={styles.wrapper}>
+  138:             <Text style={styles.mainText}>{I18n.t('components.organism.ListingsTab.store_empty')} </Text>
+  139:             <Text style={styles.description}>{I18n.t('components.organism.ListingsTab.put_for_sale')} </Text>
+  140              <HollowButton title={I18n.t('components.organism.ListingsTab.create_listing')} onPress={this.createListing} />
+
+components\templates\NeedCoin.js:
+  55            <View style={styles.itemContent}>
+  56:             <Text style={styles.text}>{I18n.t('components.organism.NeedCoin.coinbase')}</Text>
+  57:             <Text style={styles.subtitle}>{I18n.t('components.organism.NeedCoin.cryptocurrency_exchange')}</Text>
+  58            </View>
+
+components\templates\Notification.js:
+  137          <Ionicons name="ios-notifications" size={50} color="#8a8a8f" />
+  138:         <Text style={styles.emptyText}>{emptyText[currentTab]}</Text>
+  139        </View>
+
+components\templates\OrderCategorySelector.js:
+  126          <TouchableOpacity style={styles.optionTrigger} onPress={this.handleShowModal}>
+  127:           <Text style={styles.categoryTitleCount}>
+  128:             <Text style={styles.categoryTitle}>{category}</Text>
+  129              {` (${categoryObject.totalCount})`}
+
+  156                  <View style={styles.descriptionWrapper}>
+  157:                   <Text style={styles.title}>{val.value}</Text>
+  158:                   <Text style={styles.description}>{val.description}</Text>
+  159                  </View>
+  160:                 <Text style={styles.count}>{val.totalCount}</Text>
+  161                </TouchableOpacity>
+
+components\templates\OrderState.js:
+  72          <Icon style={styles.emptyIcon} name={iconName} size={50} color={formLabelColor} />
+  73:         <Text style={styles.emptyText}>{I18n.t('components.organism.OrderState.no_orders')}</Text>
+  74        </View>
+
+components\templates\OrderStatus.js:
+  114                <View style={styles.descriptionWrapper}>
+  115:                 <Text style={styles.title}>
+  116                    {val.label} {val.totalCount > 0 ? `(${val.totalCount})` : ''}
+  117                  </Text>
+  118:                 <Text style={styles.description}>{val.description}</Text>
+  119                </View>
+
+  122                    <View style={styles.countWrapper}>
+  123:                     <Text style={styles.count}>{val.count}</Text>
+  124                    </View>
+
+components\templates\OrderSummary.js:
+  420          {options && options.map((item, idx) => (
+  421:           <Text style={styles.option} key={`option_${idx}`}>
+  422              {`${item.name}: ${item.value}`}
+
+  424          ))}
+  425:         <Text style={styles.option}>
+  426            {I18n.t('components.organism.OrderSummary.quantity_info')}
+
+  451            <Image source={coin.icon} style={styles.coinImage} />
+  452:           <Text style={styles.coinName}>
+  453              {`${getFixedCurrency(
+
+  465            <View>
+  466:             <Text style={styles.viewTransaction}>{coinName === 'ETH' ? {I18n.t('components.organism.OrderSummary.view')} : {I18n.t('components.organism.OrderSummary.view_transaction')}}</Text>
+  467            </View>
+
+  494          {!this.isPaid() ? (
+  495:           <Text style={styles.unpaidNotice}>
+  496               {I18n.t('components.organism.OrderSummary.no_payment')}            
+
+  498          ) : isEmpty(moderator) ? (
+  499:           <Text style={styles.description}>
+  500              {I18n.t('components.organism.OrderSummary.cannot_dispute')}
+
+  502          ) : this.isClosed() ? (
+  503:           <Text style={styles.description}>
+  504              {I18n.t('components.organism.OrderSummary.escrow_released')}
+
+  506          ) : this.isInDispute() ? (
+  507:           <Text style={styles.description}>
+  508              {{I18n.t('components.organism.OrderSummary.order_in_dispute')}}
+  509:             <Text style={styles.escrowDays}>{remaining}</Text>
+  510              {{I18n.t('components.organism.OrderSummary.until_accept')}}
+
+  513            amIBuyer ? (
+  514:             <Text style={styles.description}>
+  515                {{I18n.t('components.organism.OrderSummary.period_expired_claim')}}
+
+  517            ) : (
+  518:             <Text style={styles.description}>
+  519                {{I18n.t('components.organism.OrderSummary.period_expired_claim2')}}
+
+  522          ) : (
+  523:           <Text style={styles.description}>
+  524              {{I18n.t('components.organism.OrderSummary.order_in_escrow1')}}
+  525:             <Text style={styles.escrowDays}>{remaining}</Text>
+  526              {{I18n.t('components.organism.OrderSummary.order_in_escrow2')}}
+
+  550              <View style={styles.claimButton}>
+  551:               <Text style={styles.claimText}>
+  552                  {I18n.t('components.organism.OrderSummary.claim_payment')}
+
+  601        >
+  602:         <Text style={styles.description}>
+  603            {disputePossible ? (
+
+  716            {coinName !== 'ETH' && this.renderTransactionLinkRow(transaction)}
+  717:           {description && <Text style={styles.description}>{description}</Text>}
+  718            {state === 'COMPLETED' && !isEmpty(rating) && !transaction && (
+
+  742        <View style={styles.addrWrapper}>
+  743:         <Text style={styles.addrName}>{shipTo}</Text>
+  744:         <Text style={styles.addrLine}>{address}</Text>
+  745:         <Text style={styles.addrLine}>
+  746            {`${city}, ${state} ${postalCode}`}
+  747          </Text>
+  748:         <Text style={styles.addrLine}>
+  749            {parseCountryName(country)}
+
+  751          {!isEmpty(addressNotes) && (
+  752:           <Text style={styles.addrNote}>{decode(addressNotes)}</Text>
+  753          )}
+
+  772        >
+  773:         <Text style={styles.description}>
+  774            {I18n.t('components.organism.OrderSummary.no_dispute')}          
+
+  821                  <View style={styles.optionWrapper}>
+  822:                   <Text style={styles.optionPlaceholder}> {I18n.t('components.organism.OrderSummary.shipping')}</Text>
+  823                  </View>
+
+  825                  <View style={styles.optionWrapper}>
+  826:                   <Text style={styles.optionLabel}>
+  827                      {`${shippingDetails.optionName} ${shippingDetails.name}  `}
+  828:                     <Text style={styles.estDelivery}>{shippingDetails.estimatedDelivery}</Text>
+  829                    </Text>
+  830:                   <Text style={styles.price}>
+  831                      {isEmpty(shippingDetails.bigPrice) ? (
+
+  842            <View style={styles.totalWrapper}>
+  843:             <Text style={styles.totalLabel}> {I18n.t('components.organism.OrderSummary.total')}</Text>
+  844:             <Text style={styles.totalValue}>{this.renderPrice()}</Text>
+  845            </View>
+
+  880            {isEmpty(memo) ? (
+  881:             <Text style={styles.noMemoStyle}>{I18n.t('components.organism.OrderSummary.no_buyer_note')}</Text>
+  882            ) : (
+  883:             <Text style={styles.memoText}>{memo}</Text>
+  884            )}
+
+  887            <View style={styles.overlay}>
+  888:             <Text style={styles.overlayText}>{I18n.t('components.organism.OrderSummary.address_copied')}</Text>
+  889            </View>
+
+components\templates\ParallaxScrollView.js:
+  128          {navBarTitleComponent ||
+  129:         <Text style={[styles.navBarTitle, { color: navBarTitleColor || 'white' }]}>
+  130            {this.props.navBarTitle}
+
+components\templates\PurchaseState.js:
+  240          <View style={styles.iconWrapper}>{icon}</View>
+  241:         <Text style={styles.title}>{title}</Text>
+  242:         <Text style={styles.description}>{description}</Text>
+  243          {paymentState === 'error' && (
+
+  245              <View style={styles.retryButton} >
+  246:               <Text style={styles.buttonText}>{I18n.t('components.templates.purchaseState.retry')}</Text>
+  247              </View>
+
+  252              <View style={styles.orderDetailsButton}>
+  253:               <Text style={styles.buttonText}>{I18n.t('components.templates.purchaseState.order_details')}</Text>
+  254              </View>
+
+  261          {paymentState === 'error' && (
+  262:           <Text style={styles.errorDescription}>
+  263:             <Text style={styles.errorTitle}>Error:</Text>
+  264              {` ${reason}`}
+
+components\templates\SearchResults.js:
+  72        <ActivityIndicator style={styles.activityIndicator} size="large" color="#8a8a8f" />
+  73:       <Text style={styles.emptyText}>Loading Search Results ...</Text>
+  74      </View>
+
+  79        <Ionicons style={styles.emptyIcon} name="md-search" size={50} color="#8a8a8f" />
+  80:       <Text style={styles.emptyText}>No results found.</Text>
+  81      </View>
+
+  86        <Ionicons style={styles.emptyIcon} name="md-search" size={50} color="#8a8a8f" />
+  87:       <Text style={styles.emptyText}>{this.props.initialEmptyTip}</Text>
+  88      </View>
+
+components\templates\SendMoney.js:
+  121              ) : (
+  122:               <Text style={styles.nextButtonText}>NEXT</Text>
+  123              )}
+
+components\templates\SendReceiveMoney.js:
+  57        <View style={styles.left}>
+  58:         <Text style={styles.text}>{I18n.t('components.templates.SendReceiveMoney.Receive')}</Text>
+  59          <Ionicons
+
+  68        <View style={styles.right}>
+  69:         <Text style={styles.text}>{I18n.t('components.templates.SendReceiveMoney.Send')}</Text>
+  70          <Ionicons
+
+components\templates\Settings.js:
+  162                <FormLabelText text="Analytics" style={styles.formLabel} />
+  163:               <Text style={styles.formValue}>
+  164                  {isTrackingEvent ? 'On' : 'Off'}
+
+components\templates\StoreModeratorList.js:
+  53        <View style={styles.listHeader}>
+  54:         <Text style={styles.count}>
+  55            {count} moderators
+
+  63        <Ionicons name="md-color-wand" size={18} color={formLabelColor} />
+  64:       <Text style={styles.footerText}>
+  65        New moderators are automatically added to your store
+
+components\templates\Toast.js:
+  62              <View style={styles.textContainer}>
+  63:               <Text style={styles.normalText}>Post created</Text>
+  64:               <Text style={styles.highlight}>View</Text>
+  65              </View>
+
+  69        default:
+  70:         return <Text style={styles.normalText}>{message}</Text>;
+  71      }
+
+components\templates\TransactionHistory.js:
+   98            <Image style={styles.transactionIcon} source={TransactionIcon} />
+   99:           <Text style={[styles.emptyText, styles.centered]}>
+  100             {I18n.t('components.templates.TransactionHistory.no_transaction_recorded')} 
+
+  104      }
+  105:     return <Text style={styles.emptyText}> {I18n.t('components.templates.TransactionHistory.no_transactions')}</Text>;
+  106    };
+
+  142          {coin === 'ETH' && (
+  143:           <Text style={[styles.txnNotice, styles.centered]}>
+  144              {I18n.t('components.templates.TransactionHistory.notes')}
+components\templates\UserSearchResults.js:
+  54        <ActivityIndicator style={styles.activityIndicator} size="large" color="#8a8a8f" />
+  55:       <Text style={styles.emptyText}> {I18n.t('components.templates.UserSearchResults.loading_results')}</Text>
+  56      </View>
+
+  61        <Ionicons style={styles.emptyIcon} name="md-search" size={50} color="#8a8a8f" />
+  62:       <Text style={styles.emptyText}>{I18n.t('components.templates.UserSearchResults.no_results')}</Text>
+  63      </View>
+
+components\templates\wishlist.js:
+  38        <Ionicons style={styles.emptyIcon} name="md-heart" size={50} color="#8a8a8f" />
+  39:       <Text style={styles.emptyText}>{I18n.t('components.templates.wishlist.wishlist_empty')}</Text>
+  40      </View>
+
+screens\acceptedCoins.js:
+  120          <Image source={coin.icon} style={styles.coinImage} />
+  121:         <Text style={[styles.label, isSelected && styles.selectedLabel]}>
+  122            {coin.label} ({coin.value})
+
+  139          />
+  140:         <Text style={styles.header}>Coins accepted</Text>
+  141          <CheckGroup
+
+  148          <View style={styles.footer}>
+  149:           <Text style={styles.selectedCount}>{selectedCurrencies.length > 0 ? `${selectedCurrencies.length} selected` : ''}</Text>
+  150            <TouchableWithoutFeedback onPress={this.handleClear}>
+  151              <View>
+  152:               <Text style={styles.clearAll}>Clear all</Text>
+  153              </View>
+
+screens\analytics.js:
+  68      <View style={styles.text} key={`description_${idx}`}>
+  69:       <Text style={styles.numbering}>{idx + 1}. </Text>
+  70        <DescriptionText key={`description_${idx}`} style={styles.description}>
+
+screens\backupProfileInit.js:
+  81            <View style={styles.headerWrapper}>
+  82:             <Text style={styles.resyncTitle}>Back up profile</Text>
+  83            </View>
+
+  86            </View>
+  87:           <Text style={styles.resyncContent}>
+  88              {'Ensure your data is safe by backing it up\nfrequently.'}
+  89:             <Text style={styles.bold}>
+  90                {' For the time being, you\'re required to manually back up your data. '}
+
+  93            </Text>
+  94:           <Text style={styles.resyncContent}>
+  95              Your backup will include all of your data, including wallet funds.
+
+screens\backupProfilePassword.js:
+  136              </InputGroup>
+  137:             <Text style={styles.resyncContent}>
+  138:               Set a password and <Text style={styles.bold}>make sure to write it down.</Text>
+  139                {'\nYou\'ll need your password to restore your profile.'}
+
+screens\backupProfileUpload.js:
+  95            <Image style={styles.image} source={UploadImg} />
+  96:           <Text style={styles.resyncContent}>
+  97:             <Text style={styles.bold}>
+  98                {'Please upload your backup to a secure\nexternal location '}
+
+screens\blocked-nodes.js:
+  92        <Ionicons size={50} name="md-eye-off" color="#8a8a8f" />
+  93:       <Text style={styles.emptyText}>You haven’t blocked anyone yet</Text>
+  94      </View>
+
+screens\categoryOverview.js:
+  155        <View style={styles.subWrapper}>
+  156:         <Text style={styles.sub}>{item}</Text>
+  157        </View>
+
+  189                  <View style={styles.showAllButton}>
+  190:                   <Text style={styles.showAllText}>See all</Text>
+  191                  </View>
+
+screens\chats.js:
+  124          <Feather name="message-circle" size={50} color="#8a8a8f" />
+  125:         <Text style={styles.placeholderText}>Start a conversation</Text>
+  126          <View style={styles.buttonWrapper}>
+
+  132          <Foundation name="price-tag" size={50} color={formLabelColor} />
+  133:         <Text style={styles.placeholderText}>No order discussions found</Text>
+  134        </View>
+
+screens\checkoutModerators.js:
+  82          />
+  83:         <Text style={styles.title}>Select a moderator</Text>
+  84          {moderators.length > 0 ? (
+
+  90            <View style={styles.loadingWrapper}>
+  91:             <Text style={styles.loadingMessage}>No Available Moderators</Text>
+  92            </View>
+
+screens\externalPay.js:
+  158          <Header left={<NavBackButton />} onLeft={this.handleGoBack} />
+  159:         <Text style={styles.title}>Pay to complete your order</Text>
+  160          <TouchableOpacity onPress={this.handleCopyAmount}>
+
+  162              <Image style={styles.icon} source={icon} resizeMode="cover" />
+  163:             <Text style={styles.crypto}>
+  164                {` ${minUnitAmountToBCH(amount, coin)} ${coin}`}
+
+  170              <QRCode value={`${qrLabel}:${paymentAddress}?amount=${minUnitAmountToBCH(amount, coin)}`} size={200} />
+  171:             <Text style={styles.coinAddress}>{paymentAddress}</Text>
+  172            </View>
+
+  183            />
+  184:           <Text style={styles.doCopy}>Copy Address</Text>
+  185          </TouchableOpacity>
+
+  187            <View style={styles.overlay}>
+  188:             <Text style={styles.overlayText}>{copied}</Text>
+  189            </View>
+
+screens\externalStore.js:
+  207            <Ionicons size={50} name="md-eye-off" color="#8a8a8f" />
+  208:           <Text style={styles.emptyText}>Unblock this user to see their content</Text>
+  209            <HollowButton title="Unblock" onPress={this.unblockNode} />
+
+  219          <ActivityIndicator size="large" color={formLabelColor} />
+  220:         <Text style={styles.emptyText}>Loading...</Text>
+  221        </View>
+
+  229          <Feather size={50} name="user-x" color="#8a8a8f" />
+  230:         <Text style={styles.emptyText}>Oops! This profile failed to load.</Text>
+  231          <HollowButton title="Retry" onPress={this.loadProfile} />
+
+  254            <View style={styles.overlay}>
+  255:             <Text style={styles.overlayText}>
+  256                Reported
+
+screens\followers.js:
+  92            loaded && (
+  93:             <Text style={styles.placeholderText}>
+  94                {peerID ? `${name} doesn't have any followers` : 'You don\'t have any followers'}
+
+screens\followings.js:
+  92            loaded && (
+  93:             <Text style={styles.placeholderText}>
+  94                {peerID ? `${name} isn't following anyone` : 'You are not following anyone'}
+
+screens\listing.js:
+  439        <Image style={styles.listingFailImg} source={ListingFailImg} />
+  440:       <Text style={styles.emptyText}>Ooops! This listing failed to load.</Text>
+  441        <HollowButton title="Retry" onPress={this.handleRetry} />
+
+  447        <ActivityIndicator size="large" color={formLabelColor} />
+  448:       <Text style={styles.emptyText}>Loading...</Text>
+  449      </View>
+
+  578            <View style={[styles.overlay, reported && styles.overlayNarrow]}>
+  579:             <Text style={styles.overlayText}>
+  580                {liked ? 'Added to Wishlist!' : unliked ? 'Removed from Wishlist!' : 'Reported!'}
+
+screens\listingAdvancedOptions.js:
+  44      if (coupons.length > 0) {
+  45:       return <Text style={textStyle}>{`${coupons.length} coupon${coupons.lengt > 1 ? 's' : ''}`}</Text>;
+  46      }
+
+screens\Me.js:
+  176              <View style={styles.infoContainer}>
+  177:               <Text style={styles.text} numberOfLines={1}>{decode(name)}</Text>
+  178                <LocationPin location={decode(location)} />
+
+  204                  Have questions, feature suggestions or bugs to report? Please check our FAQs first.
+  205:                 Our Telegram group is a great resource to report bugs or ask for support. <Text style={styles.bold}> Our ability to offer email support is very limited. </Text> Please attempt to use the FAQ or Telegram group primarily.
+  206                </DescriptionText>
+
+screens\moderatorDetails.js:
+  274                <View style={styles.rowContainer}>
+  275:                 <Text style={styles.name}>
+  276                    {decode(name)}
+
+  278                  <Octicons name="verified" size={14} color={brandColor} />
+  279:                 <Text style={styles.verified}>verified</Text>
+  280                </View>
+  281:               <Text style={[styles.description, styles.descriptionText]}>
+  282                  {eatSpaces(he.decode(striptags.default(description)))}
+
+  288                  )}
+  289:                 <Text style={styles.feeDescription}>
+  290                    The fee only applies when a dispute is opened.
+
+  294                  <Octicons name="verified" size={14} color={brandColor} />
+  295:                 <Text style={styles.descriptionText}>
+  296                    {' This moderator has been verified'}
+
+  303                <View style={styles.languages}>
+  304:                 {languages.map(lang => <Text style={styles.language}>{`${lang}`}</Text>)}
+  305                </View>
+
+  318            >
+  319:             <Text style={showTermContent ? styles.termContent : styles.emptyTerm}>
+  320                {showTermContent && eatSpaces(he.decode(striptags.default(termsAndConditions)))}
+
+  326              {moderator === selectedModerator ? (
+  327:               <Text style={styles.selected}>
+  328                  <Ionicons name="md-checkmark" size={18} color={brandColor} />
+
+screens\new-chat.js:
+  122          }
+  123:         <Text style={styles.emptyText}>
+  124            {loading ? 'Loading' : text}
+
+screens\new-feed.js:
+  145        return (
+  146:         <Text style={styles.text}>
+  147:           <Text style={styles.boldCharacterCount}>{`${MAX_CHAR - text.length}`}</Text>{' char left'}
+  148          </Text>
+
+screens\onboarding.js:
+  194          </View>
+  195:         <Text style={styles.helloText}>HELLO!</Text>
+  196          <TouchableWithoutFeedback onPress={this.handleRestore} disabled={loggingIn}>
+  197            <View style={styles.restoreContainer}>
+  198:             <Text style={styles.restore}>
+  199                Restore profile
+
+  235              <View>
+  236:               <Text style={styles.analyticsTitle}>Share anonymous analytics</Text>
+  237:               <Text style={styles.analyticsText}>Help us improve Haven</Text>
+  238              </View>
+
+screens\orderDetails.js:
+  490        <Foundation name="price-tag" size={50} color={formLabelColor} />
+  491:       <Text style={styles.placeholderText}>No order discussions found</Text>
+  492      </View>
+
+  659            <View style={styles.overlay}>
+  660:             <Text style={styles.overlayText}>Order number copied!</Text>
+  661            </View>
+
+  674            <View style={styles.contentContainer}>
+  675:             <Text style={styles.learnMoreText}>
+  676                Due to changes in the exchange rate, the current market price for an order may differ from the total price of the item at the time of purchase.
+
+screens\paymentMethod.js:
+  102    <View style={styles.feeLevelWrapper}>
+  103:     <Text style={styles.label}>{fee.label}</Text>
+  104:     <Text style={styles.description}>{fee.description}</Text>
+  105    </View>
+
+  204              <View style={styles.leftWrapper}>
+  205:               <Text style={styles.label}>{coin.label}</Text>
+  206:               <Text style={styles.secondary}>{coinName}</Text>
+  207              </View>
+
+  210            {coin.disabled ? (
+  211:             <Text style={styles.explanation}>Not accepted</Text>
+  212            ) : (
+  213              <View style={styles.rightWrapper}>
+  214:               <Text style={styles.priceByLocalCurrency}>
+  215                  {localLabelFromLocal(cBalance)}
+  216                </Text>
+  217:               <Text style={styles.secondary}>
+  218                  {(coin.disabled || !balance) ? 'Coming Soon' : `${minUnitAmountToBCH(balance.confirmed, coinName)} ${coinName}`}
+
+screens\paymentSuccess.js:
+  184              <Image style={styles.coinImage} source={coinInfo.icon} />
+  185:             <Text style={styles.description}>{`${localLabelFromBCH(amount, coin)} sent`}</Text>
+  186            </View>
+
+  189            <View style={styles.buttonWrapper}>
+  190:             <Text style={styles.buttonText}>
+  191                Transaction details
+
+  217        </View>
+  218:       <Text style={styles.statusTitle}>Processing…</Text>
+  219:       <Text style={styles.statusDescription}>Hang tight! This may take up to a minute.</Text>
+  220      </View>
+
+  228        </View>
+  229:       <Text style={styles.statusTitle}>Uh oh!</Text>
+  230:       <Text style={styles.statusDescription}>
+  231          Your transaction failed to go through. Please try again.
+
+  234          <View style={styles.retryButton} >
+  235:           <Text style={styles.retryButtonText}>Retry</Text>
+  236          </View>
+
+  238        <View style={{ flex: 1 }} />
+  239:       <Text style={styles.errorDescription}>
+  240:         <Text style={styles.errorTitle}>Error:</Text>
+  241          {` ${this.props.reason}`}
+
+screens\privacy.js:
+  184            <View>
+  185:             <Text style={[styles.privacyText]}>
+  186                PRIVACY
+
+  193              >
+  194:               <Text style={styles.privacyDescription1}>
+  195                  Haven is built to give you far more privacy in your commerce, messaging, and payments than other apps.
+
+  197                </Text>
+  198:               <Text style={styles.privacyDescription2}>
+  199                  There are ways to use Haven which improve or diminish your privacy.
+
+  203                </Text>
+  204:               <Text style={styles.privacyDescription2}>
+  205                  Before you proceed, you must accept the Haven https://gethaven.app/terms and https://gethaven.app/privacy.
+
+  211                <View>
+  212:                 <Text style={styles.cancelButton}>Cancel</Text>
+  213                </View>
+
+screens\ProductRatings.js:
+  51            keyExtractor={this.keyExtractor}
+  52:           ListEmptyComponent={<Text style={styles.placeholderText}>No reviews yet</Text>}
+  53          />
+
+screens\purchaseSuccess.js:
+  151              <View style={styles.sentAmountWrapper}>
+  152:               <Text style={styles.sentAmount}>{localLabelFromBCH(price, coinInfo.value)}</Text>
+  153:               <Text style={styles.currencyCode}>{` ${localCurrency}`}</Text>
+  154              </View>
+
+  159                <Image style={styles.coinImage} source={coinInfo.icon} />
+  160:               <Text style={styles.description}>{`${coinInfo.label} Sent`}</Text>
+  161              </View>
+  162:             <Text style={styles.toTransaction}>View Transaction</Text>
+  163            </View>
+
+  184                <View style={styles.sendButton}>
+  185:                 <Text style={styles.sendButtonText}>Send</Text>
+  186                </View>
+
+screens\receiveMoney.js:
+  154                <QRCode value={coinAddress} size={200} />
+  155:               <Text style={styles.coinAddress}>{coinAddress}</Text>
+  156              </View>
+
+  160                <Ionicons name="md-copy" color={brandColor} size={24} />
+  161:               <Text style={styles.doCopy}>Copy Address</Text>
+  162              </View>
+
+  168            <View style={styles.overlay}>
+  169:             <Text style={styles.overlayText}>Address copied!</Text>
+  170            </View>
+
+screens\restoreProfileInit.js:
+  100            <View style={styles.headerWrapper}>
+  101:             <Text style={styles.resyncTitle}>Restore profile</Text>
+  102            </View>
+
+  105            </View>
+  106:           <Text style={styles.resyncContent}>
+  107              {'Select your haven backup file to restore\nyour profile, including your wallet funds.'}
+
+screens\restoreProfilePassword.js:
+  194            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.resyncContentContainer}>
+  195:             <Text style={styles.title}>Enter password</Text>
+  196              <TextInput
+
+  204              />
+  205:             <Text style={styles.resyncContent}>
+  206                Enter your password to proceed. You set this password when creating the backup.
+
+screens\Resync.js:
+  100            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flex: 1 }}>
+  101:             <Text style={styles.resyncTitle}>Resync transactions</Text>
+  102:             <Text style={styles.resyncContent}>
+  103                {'If you believe you’re missing an order, or if your order details are out-of-sync with a buyer/seller, '}
+
+  105              </Text>
+  106:             <Text style={styles.resyncContent}>
+  107                {'Resyncing transactions doesn’t need to be performed frequently. '}
+
+  109              </Text>
+  110:             <Text style={styles.resyncContent}>
+  111                {'You may leave this view while the resync process is active.'}
+
+  116              {resyncing ? (
+  117:               <Text style={styles.resyncing}>Resyncing...</Text>
+  118              ) : (
+  119:               <Text style={styles.resyncLastTime}>{lastSyncedAgo && `Resynced ${lastSyncedAgo} ago`}</Text>
+  120              )}
+
+screens\searchFilter.js:
+  218              <View style={toastStyle.wrapper}>
+  219:               <Text style={toastStyle.text}>
+  220                  Filters reset
+
+screens\shippingAddress.js:
+  219          {!isEmpty(addr.name) && (
+  220:           <Text style={styles.addrName}>{addr.name}</Text>
+  221          )}
+  222          {!isEmpty(addr.addressLineOne) && (
+  223:           <Text style={styles.addrLine}>{addr.addressLineOne}</Text>
+  224          )}
+  225          {!isEmpty(addr.addressLineTwo) && (
+  226:           <Text style={styles.addrLine}>{addr.addressLineTwo}</Text>
+  227          )}
+  228          {!(isEmpty(addr.city) && isEmpty(addr.state) && isEmpty(addr.postalCode)) && (
+  229:           <Text style={styles.addrLine}>
+  230              {`${addr.city}`}
+
+  235          {!isEmpty(addr.country) && (
+  236:           <Text style={styles.addrLine}>{parseCountryName(addr.country)}</Text>
+  237          )}
+
+  252          <View style={styles.optionDeliveryWrapper}>
+  253:           <Text style={styles.optionLabel}>{option.service}</Text>
+  254:           <Text style={styles.estDelivery}>{option.estimatedDelivery}</Text>
+  255          </View>
+  256:         <Text style={priceStyle}>
+  257            {option.bigPrice === 0 ? 'FREE' : `${localLabelFromBCH(option.bigPrice, currency)}`}
+
+  288        <Icons style={styles.emptyIcon} name="local-shipping" size={50} color="#8a8a8f" />
+  289:       <Text style={styles.emptyText}>
+  290          Sorry, this item can not be shipped to the selected address
+
+  316              {isEmpty(shippingAddresses) ? (
+  317:               <Text style={styles.noShipping}>No shipping address</Text>
+  318              ) : (
+
+  329                <View>
+  330:                 <Text style={styles.newAddress}>+ Add new address</Text>
+  331                </View>
+
+screens\StoreRatings.js:
+  66            {ratings && ratings.length === 0 && (
+  67:             <Text style={styles.placeholderText}>
+  68                {peerID ? (
+
+utils\ratings.js:
+  25      });
+  26:     stars.push(<Text style={ratingText} key="star_rating">{value.toFixed(1)}</Text>);
+  27      return { value, label: stars };

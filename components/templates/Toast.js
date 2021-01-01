@@ -60,8 +60,8 @@ class ToastTemplate extends React.Component {
         return (
           <TouchableWithoutFeedback onPress={this.handleTap}>
             <View style={styles.textContainer}>
-              <Text style={styles.normalText}>Post created</Text>
-              <Text style={styles.highlight}>View</Text>
+              <Text style={styles.normalText}>{I18n.t('components.templates.Toast.post_created')} </Text>
+              <Text style={styles.highlight}>{I18n.t('components.templates.Toast.view')}</Text>
             </View>
           </TouchableWithoutFeedback>
         );

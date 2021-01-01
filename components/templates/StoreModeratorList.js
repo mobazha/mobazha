@@ -52,7 +52,7 @@ class StoreModeratorList extends React.PureComponent {
     return (
       <View style={styles.listHeader}>
         <Text style={styles.count}>
-          {count} moderators
+          {count} {I18n.t('components. StoreModeratorList.moderators_count')}
         </Text>
       </View>
     );
@@ -62,7 +62,7 @@ class StoreModeratorList extends React.PureComponent {
     <View style={styles.footerDescription}>
       <Ionicons name="md-color-wand" size={18} color={formLabelColor} />
       <Text style={styles.footerText}>
-      New moderators are automatically added to your store
+      {I18n.t('components. StoreModeratorList.moderators_added')}
       </Text>
     </View>
   );

@@ -97,10 +97,10 @@ class AcceptedCoins extends PureComponent {
   };
 
   handleSave = () => {
-    Alert.alert('Update Listings?', 'All your listings will be updated.\nAre you sure?', [
-      { text: 'Cancel' },
+    Alert.alert('Update Listings?', 'All your listings will be updated. Are you sure?', [
+      { text: {I18n.t('screens.acceptedCoins.cancel')} },
       {
-        text: 'OK',
+        text: {I18n.t('screens.acceptedCoins.OK')},
         onPress: () => {
           this.props.updateAcceptedCoins({
             coins: this.getSelectedCurrencies(),
@@ -133,11 +133,11 @@ class AcceptedCoins extends PureComponent {
         <Header
           left={<NavBackButton />}
           onLeft={this.handleGoBack}
-          title="Coins accepted"
-          right={<LinkText text="Save" />}
+          title= {I18n.t('screens.acceptedCoins.coins_accepted')}
+          right={<LinkText text={I18n.t('screens.acceptedCoins.save')} />}
           onRight={this.handleSave}
         />
-        <Text style={styles.header}>Coins accepted</Text>
+        <Text style={styles.header}> {I18n.t('screens.acceptedCoins.coins_accepted')} </Text>
         <CheckGroup
           options={renderingCoins}
           selected={selectedCurrencies}
@@ -149,7 +149,7 @@ class AcceptedCoins extends PureComponent {
           <Text style={styles.selectedCount}>{selectedCurrencies.length > 0 ? `${selectedCurrencies.length} selected` : ''}</Text>
           <TouchableWithoutFeedback onPress={this.handleClear}>
             <View>
-              <Text style={styles.clearAll}>Clear all</Text>
+              <Text style={styles.clearAll}> {I18n.t('screens.acceptedCoins.clear_all')}</Text>
             </View>
           </TouchableWithoutFeedback>
         </View>

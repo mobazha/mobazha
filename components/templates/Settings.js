@@ -81,15 +81,16 @@ class Settings extends PureComponent {
 
   handleConfirmBeforeRestore = () => {
     Alert.alert(
-      'Are you sure?',
-      'Have you backed up your current store?',
+      text:{I18n.t('components.templates.Settings.are_you_sure')}, 
+      text:{I18n.t('components.templates.Settings.check_backup')}, 
+
       [
         {
-          text: 'Cancel',
+          text: {I18n.t('components.templates.Settings.cancel')},
           onPress: () => {},
-          style: 'cancel',
+          style: {I18n.t('components.templates.Settings.cancel')},
         },
-        { text: 'OK', onPress: this.handleRestoreProfile },
+        { text:{I18n.t('components.templates.Settings.OK')}, onPress: this.handleRestoreProfile },
       ],
       { cancelable: false },
     );
@@ -116,16 +117,16 @@ class Settings extends PureComponent {
 
     return (
       <ScrollView contentContainerStyle={styles.scrollView}>
-        <InputGroup title="Profile">
+        <InputGroup titlen= {I18n.t('components.templates.Settings.profile')} >
           <RadioModalFilter
-            title="Country"
+            title= {I18n.t('components.templates.Settings.Country')}
             secondary
             selected={_.isEmpty(country) ? '' : country.toLowerCase()}
             onChange={this.handleCountryChange}
             options={countries}
           />
           <RadioModalFilter
-            title="Currency"
+            title= {I18n.t('components.templates.Settings.currency')}
             secondary
             selected={_.isEmpty(localCurrency) ? '' : localCurrency === 'VEF' ? 'VES' : localCurrency}
             onChange={this.handleCurrencyChange}
@@ -134,53 +135,53 @@ class Settings extends PureComponent {
             getLabel={this.getCurrencyLabel}
           />
           <OptionGroup onPress={toShippingAddress} smallPadding>
-            <FormLabelText text="Shipping address" />
+            <FormLabelText text {I18n.t('components.templates.Settings.shipping_address')}/>
           </OptionGroup>
           <OptionGroup onPress={toBlockedNodes} noBorder smallPadding>
-            <FormLabelText text="Blocked" />
+            <FormLabelText text= {I18n.t('components.templates.Settings.blocked')}/>
           </OptionGroup>
         </InputGroup>
-        <InputGroup title="Notifications">
+        <InputGroup title= {I18n.t('components.templates.Settings.notifications')} >
           <OptionGroup onPress={this.handleGoToNotificationSettings} noBorder smallPadding>
-            <FormLabelText text="Push notifications" />
+            <FormLabelText text= {I18n.t('components.templates.Settings.push_notifications')}/> 
           </OptionGroup>
         </InputGroup>
-        <InputGroup title="Store">
+        <InputGroup title= {I18n.t('components.templates.Settings.store')}>
           <OptionGroup onPress={toPolicies} smallPadding>
-            <FormLabelText text="Policies" />
+            <FormLabelText text= {I18n.t('components.templates.Settings.Policies')} />
           </OptionGroup>
           <OptionGroup onPress={toModerators} smallPadding>
-            <FormLabelText text="Moderators" />
+            <FormLabelText text={I18n.t('components.templates.Settings.Moderators')} />
           </OptionGroup>
           <OptionGroup onPress={this.handleOpenCoinsAccepted} noBorder smallPadding>
-            <FormLabelText text="Coins accepted" value={acceptedCoins.length > 0 && `${acceptedCoins.length} selected`} />
+            <FormLabelText text={I18n.t('components.templates.Settings.coins_accepted')} value={acceptedCoins.length > 0 && `${acceptedCoins.length} selected`} />
           </OptionGroup>
         </InputGroup>
-        <InputGroup title="Advanced">
+        <InputGroup title={I18n.t('components.templates.Settings.Advanced')}>
           <OptionGroup onPress={toAnalytics} smallPadding>
             <View style={styles.optionWrapper}>
-              <FormLabelText text="Analytics" style={styles.formLabel} />
+              <FormLabelText text={I18n.t('components.templates.Settings.Analytics')} style={styles.formLabel} />
               <Text style={styles.formValue}>
                 {isTrackingEvent ? 'On' : 'Off'}
               </Text>
             </View>
           </OptionGroup>
           <OptionGroup onPress={toBackupWallet} smallPadding>
-            <FormLabelText text="Backup wallet" />
+            <FormLabelText text={I18n.t('components.templates.Settings.Backup_wallet')}  />
           </OptionGroup>
           <OptionGroup onPress={this.handleBackupProfile} smallPadding>
-            <FormLabelText text="Backup profile" />
+            <FormLabelText text= {I18n.t('components.templates.Settings.Backup_profile')} />
           </OptionGroup>
           <OptionGroup onPress={this.handleConfirmBeforeRestore} smallPadding>
-            <FormLabelText text="Restore profile" />
+            <FormLabelText text= {I18n.t('components.templates.Settings.Restore_profile')} />
           </OptionGroup>
           <OptionGroup onPress={this.handleOpenResync} smallPadding>
-            <FormLabelText text="Resync transactions" />
+            <FormLabelText text= {I18n.t('components.templates.Settings.Resync_transactions')} />
           </OptionGroup>
           <OptionGroup onPress={this.handleOpenServerLog} smallPadding>
-            <FormLabelText text="Server Log" />
+            <FormLabelText text= {I18n.t('components.templates.Settings.Server_Log')} />
           </OptionGroup>
-          <FormLabelText text="Version 1.3.7" />
+          <FormLabelText text= {I18n.t('components.templates.Settings.Version')} />
         </InputGroup>
       </ScrollView>
     );

@@ -720,9 +720,9 @@ export default {
         },
         backupProfileInit: {
             back_up_profile: "Back up profile",
-            ensure_backup1: "Ensure your data is safe by backing it up\nfrequently.",
-            ensure_backup2: " For the time being, you\'re required to manually back up your data. ",
-            ensure_backup3: "We\'ll be rolling out a better backup system in the future.",
+            ensure_backup1: "Ensure your data is safe by backing it upfrequently.",
+            ensure_backup2: " For the time being, you re required to manually back up your data. ",
+            ensure_backup3: "We'll be rolling out a better backup system in the future.",
             ensure_backup4: "Your backup will include all of your data, including wallet funds.",
             next: "NEXT"
         },
@@ -732,6 +732,9 @@ export default {
             password_mismatch: "Password mismatch",
             password_mismatch_hint: "Please set a correct password",
             take_a_minute: "It might take a minute...",
+            backup_done:"Backup done",
+            backup_failed:"Backup failed" ,
+            backupProfileUpload:"BackupProfileUpload",
             set_password: "Set a password",
             password: "Password",
             confirm: "Confirm",
@@ -742,6 +745,7 @@ export default {
             next: "NEXT"
         },
         backupProfileUpload: {
+            message:  "Here is the backup file!",
             upload_1: "Please upload your backup to a secure\nexternal location ",
             upload_2: " to ensure you can recover your\ndata if you lose your phone.",
             upload_backup: "UPLOAD BACKUP",
@@ -756,7 +760,8 @@ export default {
         chats: {
             start_conversation: "Start a conversation",
             new_chat: "New Chat",
-            no_discussion: "No order discussions found"
+            no_discussion: "No order discussions found" ,
+            chat:"Chat"
         },
         checkoutModerators: {
             select_moderator: "Select a moderator",
@@ -788,8 +793,11 @@ export default {
         },
         externalStore: {
             unblock_user: "Unblock this user to see their content",
+            unblock:"Unblock",
+            large:"Large",
             loading: "Loading...",
             failed_load: "Oops! This profile failed to load.",
+            retry:"Retry",
             reported: "Reported",
 
         },
@@ -815,6 +823,8 @@ export default {
             failed_load: "Ooops! This listing failed to load.",
             retry: "Retry",
             loading: "Loading...",
+            policy1: "Return policy",
+            policy2:"Terms and conditions",
             add_wishlist: "Added to Wishlist!",
             remove_wishlist: "Removed from Wishlist!",
             reported: "Reported!"

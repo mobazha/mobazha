@@ -90,7 +90,7 @@ class BlockedNodes extends PureComponent {
   renderEmptyState = () => (
     <View style={styles.emptyWrapper}>
       <Ionicons size={50} name="md-eye-off" color="#8a8a8f" />
-      <Text style={styles.emptyText}>You haven’t blocked anyone yet</Text>
+      <Text style={styles.emptyText}>{I18n.t('screens.blockedNodes.no_block')}</Text>
     </View>
   );
 

@@ -79,24 +79,24 @@ export default class BackupProfileInit extends PureComponent {
         <Header left={<NavBackButton />} onLeft={this.handleGoBack} />
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.headerWrapper}>
-            <Text style={styles.resyncTitle}>Back up profile</Text>
+            <Text style={styles.resyncTitle}>{I18n.t('screens.backupProfileInit.back_up_profile')}</Text>
           </View>
           <View style={styles.imageContainer}>
             <Image style={styles.image} source={UploadImg} />
           </View>
           <Text style={styles.resyncContent}>
-            {'Ensure your data is safe by backing it up\nfrequently.'}
+            {{I18n.t('screens.backupProfileInit.ensure_backup1')}}
             <Text style={styles.bold}>
-              {' For the time being, you\'re required to manually back up your data. '}
+              {{I18n.t('screens.backupProfileInit.ensure_backup2')}}
             </Text>
-            {'We\'ll be rolling out a better backup system in the future.'}
+            {{I18n.t('screens.backupProfileInit.ensure_backup3')}}
           </Text>
           <Text style={styles.resyncContent}>
-            Your backup will include all of your data, including wallet funds.
+          {I18n.t('screens.backupProfileInit.ensure_backup4')}
           </Text>
         </ScrollView>
         <View style={footerStyles.textButtonContainer}>
-          <SMTextButton title="NEXT" onPress={this.handleSetPassword} />
+          <SMTextButton title={I18n.t('screens.backupProfileInit.next')} onPress={this.handleSetPassword} />
         </View>
       </View>
     );

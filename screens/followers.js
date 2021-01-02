@@ -80,7 +80,7 @@ class FollowersScreen extends PureComponent {
 
     return (
       <View style={styles.wrapper}>
-        <Header left={<NavBackButton />} onLeft={this.onLeft} title="Followers" />
+        <Header left={<NavBackButton />} onLeft={this.onLeft} title={I18n.t('screens.followers.followers')}  />
         {!loaded && this.renderLoadingState()}
         {followers.length > 0 ? (
           <FlatList

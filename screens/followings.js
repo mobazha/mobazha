@@ -80,7 +80,7 @@ class FollowingsScreen extends PureComponent {
     const name = navigation.getParam('name');
     return (
       <View style={styles.wrapper}>
-        <Header left={<NavBackButton />} onLeft={this.onLeft} title="Following" />
+        <Header left={<NavBackButton />} onLeft={this.onLeft} title={I18n.t('screens.followings.following')} />
         {!loaded && this.renderLoadingState()}
         {followings.length > 0 ? (
           <FlatList

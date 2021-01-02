@@ -180,10 +180,10 @@ class ModeratorDetails extends React.PureComponent {
     const moderator = navigation.getParam('moderator');
     const newModerators = filter(storeModerators, o => o !== moderator);
     Alert.alert(
-      'Remove moderator?',
-      'This moderator will be removed from your store permanently. You won\'t be able to add them again',
+      {I18n.t('screens.moderatorDetails.remove_moderator')},
+      {I18n.t('screens.moderatorDetails.remove_hint')},
       [
-        { text: 'Cancel' },
+        { text:{I18n.t('screens.moderatorDetails.cancel')} },
         {
           text: 'OK',
           onPress: () => {
@@ -276,7 +276,7 @@ class ModeratorDetails extends React.PureComponent {
                   {decode(name)}
                 </Text>
                 <Octicons name="verified" size={14} color={brandColor} />
-                <Text style={styles.verified}>verified</Text>
+                <Text style={styles.verified}>{I18n.t('screens.moderatorDetails.verified')}</Text>
               </View>
               <Text style={[styles.description, styles.descriptionText]}>
                 {eatSpaces(he.decode(striptags.default(description)))}
@@ -287,13 +287,13 @@ class ModeratorDetails extends React.PureComponent {
                   <Fee style={styles.fee} moderatorInfo={fee} verbose />
                 )}
                 <Text style={styles.feeDescription}>
-                  The fee only applies when a dispute is opened.
+                {I18n.t('screens.moderatorDetails.fee_description')}
                 </Text>
               </View>
               <View style={[styles.rowContainer]}>
                 <Octicons name="verified" size={14} color={brandColor} />
                 <Text style={styles.descriptionText}>
-                  {' This moderator has been verified'}
+                  {{I18n.t('screens.moderatorDetails.moderator_verified')}}
                 </Text>
               </View>
             </View>
@@ -306,7 +306,7 @@ class ModeratorDetails extends React.PureComponent {
             </InputGroup>
           )}
           <InputGroup
-            title="Terms of Service"
+            title={I18n.t('screens.moderatorDetails.terms')}
             actionTitle={
               <Ionicons
                 name={showTermContent ? 'ios-arrow-down' : 'ios-arrow-forward'}
@@ -326,11 +326,10 @@ class ModeratorDetails extends React.PureComponent {
             {moderator === selectedModerator ? (
               <Text style={styles.selected}>
                 <Ionicons name="md-checkmark" size={18} color={brandColor} />
-                {' Selected'}
+                {{I18n.t('screens.moderatorDetails.selected')}}
               </Text>
             ) : (
-              <Button wrapperStyle={styles.selectButton} title="SELECT" onPress={this.selectModerator} />
-              )}
+              <Button wrapperStyle={styles.selectButton} title={I18n.t('screens.moderatorDetails.select')} onPress={this.selectModerator} />            
           </View>
         )}
         <OBActionSheet

@@ -187,7 +187,7 @@ class CategoryOverview extends PureComponent {
               )}
               <TouchableWithoutFeedback onPress={this.handleShowAll}>
                 <View style={styles.showAllButton}>
-                  <Text style={styles.showAllText}>See all</Text>
+                  <Text style={styles.showAllText}>{I18n.t('screens.categoryOverview.see_all')}</Text>
                 </View>
               </TouchableWithoutFeedback>
               <SubCategoriesHeader style={styles.subCategoriesHeader} />

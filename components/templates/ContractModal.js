@@ -70,7 +70,7 @@ export default class ContractModal extends React.Component {
           left={<NavCloseButton />}
           modal
           onLeft={onClose}
-          title={I18n.t('components.organism.ContractModal.view_contract')}
+          title={I18n.t('components.templates.ContractModal.view_contract')}
         />
         <View style={styles.webviewWrapper}>
           <WebView
@@ -87,7 +87,7 @@ export default class ContractModal extends React.Component {
         />
         {copied && (
           <View style={styles.overlay}>
-            <Text style={styles.overlayText}>{I18n.t('components.organism.ContractModal.copied')} </Text>
+            <Text style={styles.overlayText}>{I18n.t('components.templates.ContractModal.copied')} </Text>
           </View>
         )}
       </OBLightModal>

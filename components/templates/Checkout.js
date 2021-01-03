@@ -157,9 +157,9 @@ class Checkout extends PureComponent {
       return (
         <TouchableWithoutFeedback onPress={this.handleGoToAddAddress}>
           <View style={styles.addrWrapper}>
-            <Text style={[styles.emptyAddress, styles.cannotShip]}>{I18n.t('components.organism.Checkout.address_required')}</Text>
+            <Text style={[styles.emptyAddress, styles.cannotShip]}>{I18n.t('components.templates.Checkout.address_required')}</Text>
             <View style={styles.fullButton}>
-              <Text style={styles.fullText}>{I18n.t('components.organism.Checkout.new_address')}</Text>
+              <Text style={styles.fullText}>{I18n.t('components.templates.Checkout.new_address')}</Text>
             </View>
           </View>
         </TouchableWithoutFeedback>
@@ -173,7 +173,7 @@ class Checkout extends PureComponent {
           <TouchableWithoutFeedback onPress={toShippingAddress}>
             <View style={styles.addrWrapper}>
               <Text style={[styles.emptyAddress, styles.cannotShip]}>
-              {I18n.t('components.organism.Checkout.cannot_ship')}
+              {I18n.t('components.templates.Checkout.cannot_ship')}
               </Text>
             </View>
           </TouchableWithoutFeedback>
@@ -257,7 +257,7 @@ class Checkout extends PureComponent {
         />
         {contractType === 'PHYSICAL_GOOD' && (
           <InputGroup
-            title={I18n.t('components.organism.Checkout.shipping')}
+            title={I18n.t('components.templates.Checkout.shipping')}
             actionTitle={EditIcon}
             action={toShippingAddress}
           >
@@ -276,7 +276,7 @@ class Checkout extends PureComponent {
         />
         {!loadingModerators && (
           <InputGroup
-            title={I18n.t('components.organism.Checkout.payment_protection')}
+            title={I18n.t('components.templates.Checkout.payment_protection')}
             actionTitle={InfoIcon}
             action={this.handleOpenHelp}
           >
@@ -284,11 +284,11 @@ class Checkout extends PureComponent {
               {!isEmpty(moderator) ? (
                 <CheckBox
                   checked={isProtected}
-                  title={<Text>{I18n.t('components.organism.Checkout.protect_up_to')} <Text style={{ fontWeight: 'bold' }}>{I18n.t('components.organism.Checkout.protect_days')}</Text></Text>}
+                  title={<Text>{I18n.t('components.templates.Checkout.protect_up_to')} <Text style={{ fontWeight: 'bold' }}>{I18n.t('components.templates.Checkout.protect_days')}</Text></Text>}
                   onPress={this.handleProtectedToggle}
                 />
               ) : (
-                <Text style={styles.moderatorNotAvailable}>{I18n.t('components.organism.Checkout.moderator_not_available')}</Text>
+                <Text style={styles.moderatorNotAvailable}>{I18n.t('components.templates.Checkout.moderator_not_available')}</Text>
               )}
               {(isProtected && !isEmpty(moderator)) ? (
                 [
@@ -299,13 +299,13 @@ class Checkout extends PureComponent {
                   </TouchableWithoutFeedback>,
                   <TouchableWithoutFeedback onPress={toModerators}>
                     <View style={styles.fullButton}>
-                      <Text style={styles.fullText}>{I18n.t('components.organism.Checkout.change_moderator')}</Text>
+                      <Text style={styles.fullText}>{I18n.t('components.templates.Checkout.change_moderator')}</Text>
                     </View>
                   </TouchableWithoutFeedback>,
                 ]
               ) : (
                 <Text style={styles.moderatorText}>
-                  {I18n.t('components.organism.Checkout.no_moderator_description')}                  
+                  {I18n.t('components.templates.Checkout.no_moderator_description')}                  
                 </Text>
               )}
             </View>

@@ -46,29 +46,29 @@ export default class CovidModal extends React.Component {
         <InputGroup
           wrapperStyle={styles.contentWrapper}
           contentStyle={styles.contentWrapper}
-          title={I18n.t('components.organism.CovidModal.input_groupon_title')}
+          title={I18n.t('components.templates.CovidModal.input_groupon_title')}
           noBorder
         >
           <ScrollView {...scrollStyleProps}>
             <DescriptionText>
-                {I18n.t('components.organism.CovidModal.description11')}                
-              <Text style={styles.bold}> {I18n.t('components.organism.CovidModal.description12')}</Text>
-                {I18n.t('components.organism.CovidModal.description13')}                
+                {I18n.t('components.templates.CovidModal.description11')}                
+              <Text style={styles.bold}> {I18n.t('components.templates.CovidModal.description12')}</Text>
+                {I18n.t('components.templates.CovidModal.description13')}                
             </DescriptionText>
             <DescriptionText>
-                {I18n.t('components.organism.CovidModal.description21')}                
-              <Text style={styles.bold}> {I18n.t('components.organism.CovidModal.description22')}</Text>
-                {I18n.t('components.organism.CovidModal.description23')}
-              <Text style={styles.bold}> {I18n.t('components.organism.CovidModal.description214')}</Text>
-                {I18n.t('components.organism.CovidModal.description25')}
+                {I18n.t('components.templates.CovidModal.description21')}                
+              <Text style={styles.bold}> {I18n.t('components.templates.CovidModal.description22')}</Text>
+                {I18n.t('components.templates.CovidModal.description23')}
+              <Text style={styles.bold}> {I18n.t('components.templates.CovidModal.description214')}</Text>
+                {I18n.t('components.templates.CovidModal.description25')}
             </DescriptionText>
             <DescriptionText>
-                {I18n.t('components.organism.CovidModal.description31')}                
+                {I18n.t('components.templates.CovidModal.description31')}                
             </DescriptionText>
           </ScrollView>
         </InputGroup>
         <Button
-          title={I18n.t('components.organism.CovidModal.create_listing_title')}
+          title={I18n.t('components.templates.CovidModal.create_listing_title')}
           wrapperStyle={styles.buttonWrapper}
           onPress={onCreateListing}
           style={styles.firstButton}

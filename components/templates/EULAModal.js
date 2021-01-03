@@ -103,7 +103,7 @@ export default class EULAModal extends React.Component {
           <Image style={styles.logo} source={shieldImg} resizeMode="contain" />
         </View>
         <Text style={[styles.privacyText]}>
-        {I18n.t('components.organism.EULAModal.eula')}          
+        {I18n.t('components.templates.EULAModal.eula')}          
         </Text>
         <ScrollView {...scrollStyleProps}>
           <Hyperlink
@@ -112,133 +112,133 @@ export default class EULAModal extends React.Component {
             onPress={this.handleShowModal}
           >
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description1')}              
+              {I18n.t('components.templates.EULAModal.privacy_description1')}              
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description2')} 
+              {I18n.t('components.templates.EULAModal.privacy_description2')} 
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description3')} 
+              {I18n.t('components.templates.EULAModal.privacy_description3')} 
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description4')}             
+              {I18n.t('components.templates.EULAModal.privacy_description4')}             
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description5')}               
+              {I18n.t('components.templates.EULAModal.privacy_description5')}               
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description6')} 
+              {I18n.t('components.templates.EULAModal.privacy_description6')} 
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description7')} 
+              {I18n.t('components.templates.EULAModal.privacy_description7')} 
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description8')}  
+              {I18n.t('components.templates.EULAModal.privacy_description8')}  
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description9')}               
+              {I18n.t('components.templates.EULAModal.privacy_description9')}               
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description10')}               
+              {I18n.t('components.templates.EULAModal.privacy_description10')}               
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description11')} 
+              {I18n.t('components.templates.EULAModal.privacy_description11')} 
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description12')} 
+              {I18n.t('components.templates.EULAModal.privacy_description12')} 
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description13')}              
+              {I18n.t('components.templates.EULAModal.privacy_description13')}              
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description14')}
+              {I18n.t('components.templates.EULAModal.privacy_description14')}
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description15')}
+              {I18n.t('components.templates.EULAModal.privacy_description15')}
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description16')}
+              {I18n.t('components.templates.EULAModal.privacy_description16')}
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description17')}              
+              {I18n.t('components.templates.EULAModal.privacy_description17')}              
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description18')}              
+              {I18n.t('components.templates.EULAModal.privacy_description18')}              
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description19')}               
+              {I18n.t('components.templates.EULAModal.privacy_description19')}               
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description20')}               
+              {I18n.t('components.templates.EULAModal.privacy_description20')}               
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description21')}               
+              {I18n.t('components.templates.EULAModal.privacy_description21')}               
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description22')} 
+              {I18n.t('components.templates.EULAModal.privacy_description22')} 
               
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description23')} 
+              {I18n.t('components.templates.EULAModal.privacy_description23')} 
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description24')}               
+              {I18n.t('components.templates.EULAModal.privacy_description24')}               
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description25')}               
+              {I18n.t('components.templates.EULAModal.privacy_description25')}               
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description26')}               
+              {I18n.t('components.templates.EULAModal.privacy_description26')}               
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description27')}               
+              {I18n.t('components.templates.EULAModal.privacy_description27')}               
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description28')}               
+              {I18n.t('components.templates.EULAModal.privacy_description28')}               
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description29')}               
+              {I18n.t('components.templates.EULAModal.privacy_description29')}               
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description30')}               
+              {I18n.t('components.templates.EULAModal.privacy_description30')}               
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description31')}               
+              {I18n.t('components.templates.EULAModal.privacy_description31')}               
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description32')}               
+              {I18n.t('components.templates.EULAModal.privacy_description32')}               
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description33')}               
+              {I18n.t('components.templates.EULAModal.privacy_description33')}               
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-              {I18n.t('components.organism.EULAModal.privacy_description34')}               
+              {I18n.t('components.templates.EULAModal.privacy_description34')}               
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-              {I18n.t('components.organism.EULAModal.privacy_description35')}               
+              {I18n.t('components.templates.EULAModal.privacy_description35')}               
             </Text>
 
             <Text style={styles.privacyDescriptionBold}>
-            {I18n.t('components.organism.EULAModal.privacy_description36')}               
+            {I18n.t('components.templates.EULAModal.privacy_description36')}               
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
-            {I18n.t('components.organism.EULAModal.privacy_description37')}               
+            {I18n.t('components.templates.EULAModal.privacy_description37')}               
             </Text>
 
           </Hyperlink>
@@ -246,7 +246,7 @@ export default class EULAModal extends React.Component {
         <View style={footerStyles.roundButtonContainer}>
           <Button
             wrapperStyle={onboardingStyles.button}
-            title={I18n.t('components.organism.EULAModal.iaccept')}
+            title={I18n.t('components.templates.EULAModal.iaccept')}
             onPress={onClose}
           />
         </View>

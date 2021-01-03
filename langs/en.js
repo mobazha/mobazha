@@ -870,6 +870,7 @@ export default {
             optional: "optional",
             country: "Country",
             currency: "Currency",
+            code:"Code",
             share_analytics: "Share anonymous analytics",
             help_improve: "Help us improve Haven"
         },
@@ -884,6 +885,7 @@ export default {
             cancel_hint: "This order will be canceled and your money will be refunded in full.",
             have_refunded: "You have refunded the order",
             error_happened: "Error happened because of unknown issues",
+            order_discussions:"No order discussions found",
             fund_order: "Fund Order",
             leave_notes: "Leave Notes",
             number_copied: "Order number copied!",
@@ -942,6 +944,7 @@ export default {
             location: "Location",
             location_hint: "e.g. Seattle",
             contact: "Contact",
+            email:"Email",
             contact_hint: "satoshin@gmx.com",
             phone_number: "Phone Number",
             phone_hint: "+123456789",
@@ -1013,6 +1016,7 @@ export default {
             free: "FREE",
             cannot_ship: "Sorry, this item can not be shipped to the selected address",
             Shipping: "Shipping",
+            done:"Done",
             ships_to: "Ship To",
             no_address: "No shipping address",
             add_address: "+ Add new address"

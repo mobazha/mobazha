@@ -49,7 +49,7 @@ class StoreRatings extends PureComponent {
 
     return (
       <View style={screenWrapper.wrapper}>
-        <Header title="Reviews" left={<NavBackButton />} onLeft={this.handleBack} />
+        <Header title={I18n.t('screens.StoreRatings.Reviews')} left={<NavBackButton />} onLeft={this.handleBack} />
         <ScrollView style={styles.wrapper}>
           {ratings && ratings.length > 0 && (
             ratings.map((item, idx) => (
@@ -66,9 +66,9 @@ class StoreRatings extends PureComponent {
           {ratings && ratings.length === 0 && (
             <Text style={styles.placeholderText}>
               {peerID ? (
-                `${_.get(profile, 'name')} hasn't received any reviews`
+                `${_.get(profile, 'name')} {I18n.t('screens.StoreRatings.no_reviews1')}`
               ) : (
-                'You haven\'t received any reviews'
+                {I18n.t('screens.StoreRatings.no_reviews2')}
               )}
             </Text>
           )}

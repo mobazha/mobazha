@@ -34,9 +34,9 @@ class ProfileSettings extends PureComponent {
   }
 
   onLeft = () => {
-    Alert.alert('Warning', 'If you go back, you will lose your progress', [
-      { text: 'Cancel' },
-      { text: 'OK', onPress: () => { this.props.navigation.goBack(); } },
+    Alert.alert({I18n.t('screens.profileSettings.warning')}, {I18n.t('screens.profileSettings.warning_info')}, [
+      { text: ({I18n.t('screens.profileSettings.Cancel')}},
+      { text: ({I18n.t('screens.profileSettings.OK')}, onPress: () => { this.props.navigation.goBack(); } },
       { cancelable: false },
     ]);
   };
@@ -109,66 +109,66 @@ class ProfileSettings extends PureComponent {
             onChange={this.handleChange('imageHashes')}
           />
           <View style={screenWrapper.wrapper}>
-            <InputGroup title="Profile Information" noHeaderTopPadding>
+            <InputGroup title={I18n.t('screens.profileSettings.profile_information')} noHeaderTopPadding>
               <TextInput
-                title="Name"
+                title={I18n.t('screens.profileSettings.name')}
                 required
                 value={name}
                 onChangeText={this.handleChange('name')}
                 onFocus={this.findPosition}
-                placeholder="Satoshi Nakamoto"
+                placeholder={I18n.t('screens.profileSettings.name_hint')}
                 maxLength={40}
               />
               <TextInput
-                title="Bio"
+                title={I18n.t('screens.profileSettings.bio')}
                 value={shortDescription}
                 onChangeText={this.handleChange('shortDescription')}
                 onFocus={this.findPosition}
-                placeholder="Write a short description"
+                placeholder={I18n.t('screens.profileSettings.bio_hint')}
                 maxLength={140}
               />
               <TextInput
                 noBorder
-                title="Location"
+                title={I18n.t('screens.profileSettings.location')}
                 value={location}
                 onChangeText={this.handleChange('location')}
                 onFocus={this.findPosition}
-                placeholder="e.g. Seattle"
+                placeholder={I18n.t('screens.profileSettings.location_hint')}
               />
             </InputGroup>
-            <InputGroup title="Contact">
+            <InputGroup title= {I18n.t('screens.profileSettings.contact')} >
               <TextInput
-                title="Email"
+                title={I18n.t('screens.profileSettings.email')}
                 value={email}
                 onChangeText={this.handleContactChange('email')}
                 onFocus={this.findPosition}
-                placeholder="satoshin@gmx.com"
+                placeholder={I18n.t('screens.profileSettings.contact_hint')}
                 keyboardType="email-address"
               />
               <TextInput
-                title="Phone Number"
+                title={I18n.t('screens.profileSettings.phone_number')}
                 value={phoneNumber}
                 onChangeText={this.handleContactChange('phoneNumber')}
                 onFocus={this.findPosition}
-                placeholder="+123456789"
+                placeholder={I18n.t('screens.profileSettings.phone_hint')}
                 keyboardType="phone-pad"
               />
               <TextInput
                 noBorder
-                title="Website"
+                title={I18n.t('screens.profileSettings.website')}
                 value={website}
                 onChangeText={this.handleContactChange('website')}
                 onFocus={this.findPosition}
-                placeholder="hello.com"
+                placeholder={I18n.t('screens.profileSettings.website_hint')}
               />
             </InputGroup>
-            <InputGroup title="About">
+            <InputGroup title={I18n.t('screens.profileSettings.Aaout')}>
               <TextArea
                 noBorder
                 value={about}
                 onChangeText={this.handleChange('about')}
                 onFocus={this.findPosition}
-                placeholder="Share more about yourself here"
+                placeholder={I18n.t('screens.profileSettings.about_hint')}
               />
             </InputGroup>
           </View>

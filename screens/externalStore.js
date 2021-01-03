@@ -216,7 +216,7 @@ class ExternalStore extends Component {
     <View style={styles.emptyWrapper}>
       <ExternalStoreHeader onBack={this.handleGoBack} />
       <View style={styles.emptyContent}>
-        <ActivityIndicator {I18n.t('screens.externalStore.large')} color={formLabelColor} />
+        <ActivityIndicator size= "large" color={formLabelColor} />
         <Text style={styles.emptyText}>{I18n.t('screens.externalStore.loading')}</Text>
       </View>
     </View>

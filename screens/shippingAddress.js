@@ -194,9 +194,9 @@ class ShippingAddress extends PureComponent {
         break;
       }
       case 1: {
-        Alert.alert('Are you sure?', 'Remove the address', [
-          { text: 'Cancel' },
-          { text: 'OK', onPress: this.handleDelete },
+        Alert.alert({I18n.t('screens.shippingAddress.are_you_sure')}, {I18n.t('screens.shippingAddress.remove_address')}, [
+          { text:{I18n.t('screens.shippingAddress.cancel')}},
+          { text:{I18n.t('screens.shippingAddress.ok')}, onPress: this.handleDelete },
         ]);
         break;
       }
@@ -254,7 +254,7 @@ class ShippingAddress extends PureComponent {
           <Text style={styles.estDelivery}>{option.estimatedDelivery}</Text>
         </View>
         <Text style={priceStyle}>
-          {option.bigPrice === 0 ? 'FREE' : `${localLabelFromBCH(option.bigPrice, currency)}`}
+          {option.bigPrice === 0 ? {I18n.t('screens.shippingAddress.free')} : `${localLabelFromBCH(option.bigPrice, currency)}`}
         </Text>
       </View>
     );
@@ -287,7 +287,7 @@ class ShippingAddress extends PureComponent {
     <View style={styles.emptyWrapper}>
       <Icons style={styles.emptyIcon} name="local-shipping" size={50} color="#8a8a8f" />
       <Text style={styles.emptyText}>
-        Sorry, this item can not be shipped to the selected address
+      {I18n.t('screens.shippingAddress.cannot_ship')}
       </Text>
     </View>
   );
@@ -304,17 +304,17 @@ class ShippingAddress extends PureComponent {
           onLeft={() => {
             this.props.navigation.dispatch(NavigationActions.back());
           }}
-          title="Shipping"
-          right={<LinkText text="Done" color={linkTextColor} />}
+          title= {I18n.t('screens.shippingAddress.Shipping')}
+          right={<LinkText text={I18n.t('screens.shippingAddress.done')} color={linkTextColor} />}
           onRight={() => {
             this.toNextScreen();
           }}
         />
         <ScrollView>
           <Text>{isEmpty(shippingOptions)}</Text>
-          <InputGroup title="Ship To">
+          <InputGroup title= {I18n.t('screens.shippingAddress.ships_to')}>
             {isEmpty(shippingAddresses) ? (
-              <Text style={styles.noShipping}>No shipping address</Text>
+              <Text style={styles.noShipping}>{I18n.t('screens.shippingAddress.no_address')}</Text>
             ) : (
               <RadioGroup
                 alignTop
@@ -327,7 +327,7 @@ class ShippingAddress extends PureComponent {
             )}
             <TouchableWithoutFeedback onPress={this.onNewAddress}>
               <View>
-                <Text style={styles.newAddress}>+ Add new address</Text>
+                <Text style={styles.newAddress}>{I18n.t('screens.shippingAddress.add_address')} </Text>
               </View>
             </TouchableWithoutFeedback>
           </InputGroup>

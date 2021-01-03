@@ -145,42 +145,42 @@ class SearchFilter extends PureComponent {
         <Header
           left={<NavBackButton />}
           onLeft={this.onLeft}
-          title="Filter"
+          title={I18n.t('screens.searchFilter.filter')}
           right={<LinkText text="Done" />}
           onRight={this.onRight}
           noBorder
         />
         <ScrollView>
           <RadioFilter
-            title="Sort by"
+            title={I18n.t('screens.searchFilter.sortBy')}
             selected={sortBy}
             options={sortOptions}
             onChange={this.onChange('sortBy')}
             hasBorder
           />
           <RadioModalFilter
-            title="Accepts"
+            title={I18n.t('screens.searchFilter.accepts')}
             selected={acceptedCurrencies}
             options={ACCEPTED_COINS}
             onChange={this.onChange('acceptedCurrencies')}
             hasBorder
           />
           <RadioModalFilter
-            title="Ships to"
+            title={I18n.t('screens.searchFilter.ships_to')}
             options={shippingCountries}
             selected={shipping}
             onChange={this.onChange('shipping')}
             hasBorder
           />
           <RadioFilter
-            title="Rating"
+            title={I18n.t('screens.searchFilter.rating')}
             selected={rating}
             options={ratingOptions}
             onChange={this.onChange('rating')}
             hasBorder
           />
           <RadioFilter
-            title="Listing type"
+            title={I18n.t('screens.searchFilter.listing_type')}
             selected={type}
             options={showingProdTypes}
             onChange={this.onChange('type')}
@@ -188,19 +188,19 @@ class SearchFilter extends PureComponent {
           />
           {type === 'physical_good' && (
             <RadioFilter
-              title="Item Condition"
+              title={I18n.t('screens.searchFilter.item_condition')}
               selected={conditions}
               options={productConditionOptions}
               onChange={this.onChange('conditions')}
               hasBorder
             />
           )}
-          <Section title="Adult content" bodyStyle={optionStyle}>
+          <Section title= {I18n.t('screens.searchFilter.adult_content')} bodyStyle={optionStyle}>
             <SwitchInput
               secondary
               noBorder
               useNative
-              title="Show adult content (18+)"
+              title= {I18n.t('screens.searchFilter.adult_content2')} 
               value={nsfw}
               onChange={this.onChange('nsfw')}
             />
@@ -217,7 +217,7 @@ class SearchFilter extends PureComponent {
           >
             <View style={toastStyle.wrapper}>
               <Text style={toastStyle.text}>
-                Filters reset
+              {I18n.t('screens.searchFilter.filters_reset')} 
               </Text>
             </View>
           </Animated.View>

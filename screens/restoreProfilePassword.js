@@ -78,7 +78,7 @@ class RestoreProfilePassword extends PureComponent {
   }
 
   handleRestore = async () => {
-    this.setState({ loadingText: 'It might take a minute...' });
+    this.setState({ loadingText: {I18n.t('screens.restoreProfilePassword.failed_download')} });
 
     const { navigation } = this.props;
     let zipPath = navigation.getParam('path');
@@ -109,7 +109,7 @@ class RestoreProfilePassword extends PureComponent {
       const unzippedPath = await unzipWithPassword(zipPath, SERVER_UNZIP_PATH, password);
       console.warn('Succeed to unzip backup file', unzippedPath);
     } catch (err) {
-      this.handleUnzipFailed('Wrong password!');
+      this.handleUnzipFailed({I18n.t('screens.restoreProfilePassword.wrong_password')});
       return;
     }
 
@@ -117,7 +117,7 @@ class RestoreProfilePassword extends PureComponent {
   }
 
   handleZipFilePathFetchFailed = () => {
-    this.handleUnzipFailed('Failed to download zip file');
+    this.handleUnzipFailed({I18n.t('screens.restoreProfilePassword.wrong_password')});
   }
 
   handleServerStopped = async () => {
@@ -173,7 +173,7 @@ class RestoreProfilePassword extends PureComponent {
 
   handleUnzipFailed = async (errMsg) => {
     this.setState({ loadingText: null }, () => {
-      Alert.alert('Ooops!', errMsg);
+      Alert.alert({I18n.t('screens.restoreProfilePassword.Ooops')}, errMsg);
     });
   }
 
@@ -192,23 +192,23 @@ class RestoreProfilePassword extends PureComponent {
         <Header left={<NavBackButton />} onLeft={this.handleGoBack} />
         <KeyboardAvoidingView style={{ flex: 1 }} {...keyboardAvoidingViewSharedProps}>
           <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.resyncContentContainer}>
-            <Text style={styles.title}>Enter password</Text>
+            <Text style={styles.title}>{I18n.t('screens.restoreProfilePassword.enter_password')}</Text>
             <TextInput
-              title="Password"
+              title={I18n.t('screens.restoreProfilePassword.password')}
               value={password}
               onChangeText={this.handlePasswordChange}
               required
-              placeholder="Enter password"
+              placeholder={I18n.t('screens.restoreProfilePassword.enter_password')}
               autoFocus
               secureTextEntry
             />
             <Text style={styles.resyncContent}>
-              Enter your password to proceed. You set this password when creating the backup.
+            {I18n.t('screens.restoreProfilePassword.enter_password_hint')}
             </Text>
           </ScrollView>
           <View style={footerStyles.textButtonContainer}>
             <SMTextButton
-              title="RESTORE"
+              title={I18n.t('screens.restoreProfilePassword.restore')}
               onPress={this.handleRestore}
               loadingText={loadingText}
             />

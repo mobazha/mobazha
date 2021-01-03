@@ -123,7 +123,7 @@ class ReceiveMoney extends PureComponent {
     const coinAddress = this.getCoinAddress();
     Share.share({
       message: coinAddress,
-      title: 'Share Wallet Address',
+      title: {I18n.t('screens.receiveMoney.share_address')},
     });
   }
 
@@ -158,7 +158,7 @@ class ReceiveMoney extends PureComponent {
           <TouchableWithoutFeedback onPress={this.handleCopyLink}>
             <View style={styles.button}>
               <Ionicons name="md-copy" color={brandColor} size={24} />
-              <Text style={styles.doCopy}>Copy Address</Text>
+              <Text style={styles.doCopy}>{I18n.t('screens.receiveMoney.copy_address')}</Text>
             </View>
           </TouchableWithoutFeedback>
           <View style={{ flex: 1 }} />
@@ -166,7 +166,7 @@ class ReceiveMoney extends PureComponent {
         <CoinTypeSelector coin={coin} onChange={this.handleCoinChanged} />
         {copied && (
           <View style={styles.overlay}>
-            <Text style={styles.overlayText}>Address copied!</Text>
+            <Text style={styles.overlayText}>{I18n.t('screens.receiveMoney.address_copied')} </Text>
           </View>
         )}
       </View>

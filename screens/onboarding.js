@@ -192,27 +192,27 @@ class Onboarding extends PureComponent {
             <Image style={styles.logo} source={logoImg} resizeMode="contain" />
           </View>
         </View>
-        <Text style={styles.helloText}>HELLO!</Text>
+        <Text style={styles.helloText}>{I18n.t('screens.onboarding.HELLO')}</Text>
         <TouchableWithoutFeedback onPress={this.handleRestore} disabled={loggingIn}>
           <View style={styles.restoreContainer}>
             <Text style={styles.restore}>
-              Restore profile
+            {I18n.t('screens.onboarding.restore_profile')}
             </Text>
           </View>
         </TouchableWithoutFeedback>
         <InputGroup noBorder noHeaderPadding noHeaderTopPadding>
           <TextInput
             wrapperStyle={styles.nameContainer}
-            title="Name"
+            title={I18n.t('screens.onboarding.name')}
             value={name}
             onChangeText={this.onChangeName}
-            placeholder="optional"
+            placeholder={I18n.t('screens.onboarding.optional')}
             titleWidth={titleWidth}
             vertical
           />
           <SelectorModal
             wrapperStyle={styles.selectorContainer}
-            title="Country"
+            title={I18n.t('screens.onboarding.country')}
             value={country}
             onChange={this.onChangeCountry}
             options={countries}
@@ -221,20 +221,20 @@ class Onboarding extends PureComponent {
           />
           <SelectorModal
             wrapperStyle={styles.selectorContainer}
-            title="Currency"
+            title={I18n.t('screens.onboarding.currency')}
             value={currency}
             noBorder
             onChange={this.onChangeCurrency}
             options={currencies}
-            valueKey="code"
+            valueKey={I18n.t('screens.onboarding.code')}
             getLabel={option => `${option.name} (${option.symbol})`}
             titleWidth={titleWidth}
             vertical
           />
           <View style={styles.analyticsContainer}>
             <View>
-              <Text style={styles.analyticsTitle}>Share anonymous analytics</Text>
-              <Text style={styles.analyticsText}>Help us improve Haven</Text>
+              <Text style={styles.analyticsTitle}>{I18n.t('screens.onboarding.share_analytics')}</Text>
+              <Text style={styles.analyticsText}>{I18n.t('screens.onboarding.share_help_improve')}</Text>
             </View>
             <Switch
               onValueChange={this.handleToggleAnalytics}
@@ -246,7 +246,7 @@ class Onboarding extends PureComponent {
         <View style={footerStyles.roundButtonContainer}>
           <Button
             wrapperStyle={onboardingStyles.button}
-            title="Next"
+            title={I18n.t('screens.onboarding.HELLO')}
             onPress={this.handleGetStarted}
             disabled={loggingIn}
           />

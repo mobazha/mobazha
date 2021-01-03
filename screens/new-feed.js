@@ -89,7 +89,7 @@ class NewFeed extends PureComponent {
 
   onPostFeedFailure = () => {
     this.setState({ loading: false });
-    Alert.alert('Create post failed', 'Unknown error occured while creating post');
+    Alert.alert({I18n.t('screens.newFeed.Create_failed')}, {I18n.t('screens.newFeed.unknown_error_create')});
   }
 
   setInputFocus = () => {
@@ -144,7 +144,7 @@ class NewFeed extends PureComponent {
     if (text.length > 0) {
       return (
         <Text style={styles.text}>
-          <Text style={styles.boldCharacterCount}>{`${MAX_CHAR - text.length}`}</Text>{' char left'}
+          <Text style={styles.boldCharacterCount}>{`${MAX_CHAR - text.length}`}</Text>{{I18n.t('screens.newFeed.char_left')}}
         </Text>
       );
     }
@@ -170,7 +170,7 @@ class NewFeed extends PureComponent {
             <View style={styles.nonAvatarContainer}>
               <PlaceholderStyleTextInput
                 inputRef={this.setInputRef}
-                placeholder="What's going on?"
+                placeholder={I18n.t('screens.newFeed.what_going_on')}
                 style={styles.input}
                 onChangeText={value => this.setState({ text: value })}
                 value={text}

@@ -21,7 +21,7 @@ export default class InventoryList extends React.Component {
     const count = inventory.length;
     return (
       <Text style={styles.text}>
-        {I18n.t('components.organism.InventoryList.combos_info')}         
+        {I18n.t('components.templates.InventoryList.combos_info')}         
       </Text>
     );
   }

@@ -234,7 +234,7 @@ class Feed extends React.Component {
       return (
         <View style={styles.wrapper}>
           <Image source={PersonAddImage} style={styles.emptyIcon} />
-          <Text style={styles.description}>{I18n.t('components.organism.GlobalFeed.customise_feed')}</Text>
+          <Text style={styles.description}>{I18n.t('components.templates.GlobalFeed.customise_feed')}</Text>
         </View>
       );
     }
@@ -242,14 +242,14 @@ class Feed extends React.Component {
       return (
         <View style={styles.wrapper}>
           <Ionicons style={styles.emptySearchIcon} name="md-search" size={50} color="#8a8a8f" />
-          <Text style={styles.description}>{I18n.t('components.organism.GlobalFeed.not_found')}</Text>
+          <Text style={styles.description}>{I18n.t('components.templates.GlobalFeed.not_found')}</Text>
         </View>
       );
     }
     return (
       <View style={styles.wrapper}>
         <Image source={PersonAddImage} style={styles.emptyIcon} />
-        <Text style={styles.description}>{I18n.t('components.organism.GlobalFeed.share_with_community')}</Text>
+        <Text style={styles.description}>{I18n.t('components.templates.GlobalFeed.share_with_community')}</Text>
         <HollowButton title="Create post" onPress={this.createPost} />
       </View>
     );
@@ -290,7 +290,7 @@ class Feed extends React.Component {
         {reported && (
           <View style={styles.overlay}>
             <Text style={styles.overlayText}>
-              {I18n.t('components.organism.GlobalFeed.reported')}
+              {I18n.t('components.templates.GlobalFeed.reported')}
             </Text>
           </View>
         )}

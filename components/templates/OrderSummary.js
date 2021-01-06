@@ -368,29 +368,29 @@ class OrderSummary extends PureComponent {
     if (this.isDisputeDisabled()) {
       switch (state) {
         case 'PENDING':
-          Alert.alert({I18n.t('components.organism.OrderSummary.oops')}, {I18n.t('components.organism.OrderSummary.dispute_pending_alert')});
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_pending_alert')});
           break;
         case 'AWAITING_FULFILLMENT':
-          Alert.alert({I18n.t('components.organism.OrderSummary.oops')}, {I18n.t('components.organism.OrderSummary.dispute_not_fulfilled_alert')});
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_not_fulfilled_alert')});
           break;
         case 'CANCELED':
         case 'DECLINED':
-          Alert.alert({I18n.t('components.organism.OrderSummary.oops')}, {I18n.t('components.organism.OrderSummary.dispute_cancel_alert')});
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_cancel_alert')});
           break;
         case 'REFUNDED':
-          Alert.alert({I18n.t('components.organism.OrderSummary.oops')}, {I18n.t('components.organism.OrderSummary.dispute_refund_alert')});
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_refund_alert')});
           break;
         case 'RESOLVED':
-          Alert.alert({I18n.t('components.organism.OrderSummary.oops')}, {I18n.t('components.organism.OrderSummary.dispute_resolved_alert')});
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_resolved_alert')});
           break;
         case 'COMPLETED':
-          Alert.alert({I18n.t('components.organism.OrderSummary.oops')}, {I18n.t('components.organism.OrderSummary.dispute_completed_alert')});
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_completed_alert')});
           break;
         case 'PAYMENT_FINALIZED':
-          Alert.alert({I18n.t('components.organism.OrderSummary.oops')}, {I18n.t('components.organism.OrderSummary.dispute_finalized_alert')});
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_finalized_alert')});
           break;
         case 'PROCESSING_ERROR':
-          Alert.alert({I18n.t('components.organism.OrderSummary.oops')}, {I18n.t('components.organism.OrderSummary.dispute_processing_alert')});
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_processing_alert')});
           break;
         default:
           break;
@@ -423,7 +423,7 @@ class OrderSummary extends PureComponent {
           </Text>
         ))}
         <Text style={styles.option}>
-          {I18n.t('components.organism.OrderSummary.quantity_info')}
+          {I18n.t('components.templates.OrderSummary.quantity_info')}
         </Text>
       </View>
     );
@@ -463,7 +463,7 @@ class OrderSummary extends PureComponent {
           }}
         >
           <View>
-            <Text style={styles.viewTransaction}>{coinName === 'ETH' ? {I18n.t('components.organism.OrderSummary.view')} : {I18n.t('components.organism.OrderSummary.view_transaction')}}</Text>
+            <Text style={styles.viewTransaction}>{coinName === 'ETH' ? {I18n.t('components.templates.OrderSummary.view')} : {I18n.t('components.templates.OrderSummary.view_transaction')}}</Text>
           </View>
         </TouchableWithoutFeedback>
       </View>
@@ -486,44 +486,44 @@ class OrderSummary extends PureComponent {
     const remaining = this.getRemainingTime();
     return (
       <InputGroup
-        title={I18n.t('components.organism.OrderSummary.payment')}
+        title={I18n.t('components.templates.OrderSummary.payment')}
         actionTitle={timestamp && timeSince(new Date(timestamp))}
         actionStyle={styles.timestamp}
       >
         {this.renderTransactionLinkRow(transaction)}
         {!this.isPaid() ? (
           <Text style={styles.unpaidNotice}>
-             {I18n.t('components.organism.OrderSummary.no_payment')}            
+             {I18n.t('components.templates.OrderSummary.no_payment')}            
           </Text>
         ) : isEmpty(moderator) ? (
           <Text style={styles.description}>
-            {I18n.t('components.organism.OrderSummary.cannot_dispute')}
+            {I18n.t('components.templates.OrderSummary.cannot_dispute')}
           </Text>
         ) : this.isClosed() ? (
           <Text style={styles.description}>
-            {I18n.t('components.organism.OrderSummary.escrow_released')}
+            {I18n.t('components.templates.OrderSummary.escrow_released')}
           </Text>
         ) : this.isInDispute() ? (
           <Text style={styles.description}>
-            {{I18n.t('components.organism.OrderSummary.order_in_dispute')}}
+            {{I18n.t('components.templates.OrderSummary.order_in_dispute')}}
             <Text style={styles.escrowDays}>{remaining}</Text>
-            {{I18n.t('components.organism.OrderSummary.until_accept')}}
+            {{I18n.t('components.templates.OrderSummary.until_accept')}}
           </Text>
         ) : isClaimableBySeller ? (
           amIBuyer ? (
             <Text style={styles.description}>
-              {{I18n.t('components.organism.OrderSummary.period_expired_claim')}}
+              {{I18n.t('components.templates.OrderSummary.period_expired_claim')}}
             </Text>
           ) : (
             <Text style={styles.description}>
-              {{I18n.t('components.organism.OrderSummary.period_expired_claim2')}}
+              {{I18n.t('components.templates.OrderSummary.period_expired_claim2')}}
             </Text>
           )
         ) : (
           <Text style={styles.description}>
-            {{I18n.t('components.organism.OrderSummary.order_in_escrow1')}}
+            {{I18n.t('components.templates.OrderSummary.order_in_escrow1')}}
             <Text style={styles.escrowDays}>{remaining}</Text>
-            {{I18n.t('components.organism.OrderSummary.order_in_escrow2')}}
+            {{I18n.t('components.templates.OrderSummary.order_in_escrow2')}}
           </Text>
         )}
         {this.isPaid() && !isEmpty(moderator) && !this.isInDispute() && !this.isDisputeExpired() && !timeSinceTimeout && (
@@ -540,7 +540,7 @@ class OrderSummary extends PureComponent {
                   this.isDisputeDisabled() && styles.disabledDisputeText,
                 ]}
               >
-                {I18n.t('components.organism.OrderSummary.dispute_order')}                
+                {I18n.t('components.templates.OrderSummary.dispute_order')}                
               </Text>
             </View>
           </TouchableWithoutFeedback>
@@ -549,7 +549,7 @@ class OrderSummary extends PureComponent {
           <TouchableWithoutFeedback onPress={onClaim}>
             <View style={styles.claimButton}>
               <Text style={styles.claimText}>
-                {I18n.t('components.organism.OrderSummary.claim_payment')}
+                {I18n.t('components.templates.OrderSummary.claim_payment')}
               </Text>
             </View>
           </TouchableWithoutFeedback>)}
@@ -565,7 +565,7 @@ class OrderSummary extends PureComponent {
                 styles.fullText, styles.disabledDisputeText,
               ]}
             >
-              {I18n.t('components.organism.OrderSummary.dispute_order')}              
+              {I18n.t('components.templates.OrderSummary.dispute_order')}              
             </Text>
           </View>
         </TouchableWithoutFeedback>
@@ -601,9 +601,9 @@ class OrderSummary extends PureComponent {
       >
         <Text style={styles.description}>
           {disputePossible ? (
-            {I18n.t('components.organism.OrderSummary.dispute_error_possible')}            
+            {I18n.t('components.templates.OrderSummary.dispute_error_possible')}            
           ) : (
-            {I18n.t('components.organism.OrderSummary.dispute_error')}
+            {I18n.t('components.templates.OrderSummary.dispute_error')}
           )}
         </Text>
       </InputGroup>
@@ -632,17 +632,17 @@ class OrderSummary extends PureComponent {
 
     let title, transaction, timestamp, description;
     if (state === 'REFUNDED') {
-      title = {I18n.t('components.organism.OrderSummary.order_refunded')} ;
+      title = {I18n.t('components.templates.OrderSummary.order_refunded')} ;
       transaction = refundAddressTransaction;
       timestamp = (transaction || {}).timestamp;
-      description = {I18n.t('components.organism.OrderSummary.full_refund')};
+      description = {I18n.t('components.templates.OrderSummary.full_refund')};
     } else {
       transaction = paymentAddressTransactions[1];
       timestamp = (transaction || {}).timestamp;
       if (state === 'COMPLETED') {
-        title = {I18n.t('components.organism.OrderSummary.order_completed')};
+        title = {I18n.t('components.templates.OrderSummary.order_completed')};
 
-        description = transaction ?  {I18n.t('components.organism.OrderSummary.release_to_seller')} : null;
+        description = transaction ?  {I18n.t('components.templates.OrderSummary.release_to_seller')} : null;
         // timestamp = get(buyerOrderCompletion, 'timestamp');
         if (!isEmpty(dispute)) {
           transaction = null;
@@ -654,23 +654,23 @@ class OrderSummary extends PureComponent {
           };
         }
       } else if (state === 'RESOLVED') {
-        title = {I18n.t('components.organism.OrderSummary.dispute_closed')};
-        description = {I18n.t('components.organism.OrderSummary.dispute_closed_info')};
+        title = {I18n.t('components.templates.OrderSummary.dispute_closed')};
+        description = {I18n.t('components.templates.OrderSummary.dispute_closed_info')};
         transaction = {
           ...transaction,
           // bigValue: amIBuyer ? buyerValue : sellerValue,
         };
       } else if (state === 'PAYMENT_FINALIZED') {
-        title = {I18n.t('components.organism.OrderSummary.payment_claimed')};
-        description = {I18n.t('components.organism.OrderSummary.seller_claim')};
+        title = {I18n.t('components.templates.OrderSummary.payment_claimed')};
+        description = {I18n.t('components.templates.OrderSummary.seller_claim')};
 
         transaction = {
           ...transaction,
           // bigValue: get(vendorOrderConfirmation, 'bigRequestedAmount'),
         };
       } else {
-        title = {I18n.t('components.organism.OrderSummary.order_canceled')};
-        description = {I18n.t('components.organism.OrderSummary.user_cancel_order')};
+        title = {I18n.t('components.templates.OrderSummary.order_canceled')};
+        description = {I18n.t('components.templates.OrderSummary.user_cancel_order')};
 
         transaction = {
           ...transaction,
@@ -766,12 +766,12 @@ class OrderSummary extends PureComponent {
 
     return (
       <InputGroup
-        title={I18n.t('components.organism.OrderSummary.period_expired')}
+        title={I18n.t('components.templates.OrderSummary.period_expired')}
         actionTitle={timeSinceTimeout}
         actionStyle={styles.timestamp}
       >
         <Text style={styles.description}>
-          {I18n.t('components.organism.OrderSummary.no_dispute')}          
+          {I18n.t('components.templates.OrderSummary.no_dispute')}          
         </Text>
       </InputGroup>
     );
@@ -819,7 +819,7 @@ class OrderSummary extends PureComponent {
             <View>
               {isEmpty(shippingDetails) ? (
                 <View style={styles.optionWrapper}>
-                  <Text style={styles.optionPlaceholder}> {I18n.t('components.organism.OrderSummary.shipping')}</Text>
+                  <Text style={styles.optionPlaceholder}> {I18n.t('components.templates.OrderSummary.shipping')}</Text>
                 </View>
               ) : (
                 <View style={styles.optionWrapper}>
@@ -840,7 +840,7 @@ class OrderSummary extends PureComponent {
           )}
           <Dash dashColor={borderColor} dashGap={2} dashLength={8} dashThickness={1} />
           <View style={styles.totalWrapper}>
-            <Text style={styles.totalLabel}> {I18n.t('components.organism.OrderSummary.total')}</Text>
+            <Text style={styles.totalLabel}> {I18n.t('components.templates.OrderSummary.total')}</Text>
             <Text style={styles.totalValue}>{this.renderPrice()}</Text>
           </View>
         </InputGroup>
@@ -869,7 +869,7 @@ class OrderSummary extends PureComponent {
         )}
         {contractType === 'PHYSICAL_GOOD' && (
           <InputGroup
-            title={I18n.t('components.organism.OrderSummary.shipping')}
+            title={I18n.t('components.templates.OrderSummary.shipping')}
             actionTitle={<Ionicons name="md-copy" color={brandColor} size={24} />}
             action={this.handleCopyAddress}
           >
@@ -878,14 +878,14 @@ class OrderSummary extends PureComponent {
         )}
         <InputGroup title="Note" noBorder>
           {isEmpty(memo) ? (
-            <Text style={styles.noMemoStyle}>{I18n.t('components.organism.OrderSummary.no_buyer_note')}</Text>
+            <Text style={styles.noMemoStyle}>{I18n.t('components.templates.OrderSummary.no_buyer_note')}</Text>
           ) : (
             <Text style={styles.memoText}>{memo}</Text>
           )}
         </InputGroup>
         {copied && (
           <View style={styles.overlay}>
-            <Text style={styles.overlayText}>{I18n.t('components.organism.OrderSummary.address_copied')}</Text>
+            <Text style={styles.overlayText}>{I18n.t('components.templates.OrderSummary.address_copied')}</Text>
           </View>
         )}
       </View>

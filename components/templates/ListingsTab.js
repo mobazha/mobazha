@@ -118,7 +118,7 @@ class ListingsTab extends PureComponent {
       return (
         <View style={styles.wrapper}>
           <ActivityIndicator size="large" color={brandColor} />
-          <Text style={[styles.description, styles.loadingText]}>{I18n.t('components.organism.ListingsTab.load')}</Text>
+          <Text style={[styles.description, styles.loadingText]}>{I18n.t('components.templates.ListingsTab.load')}</Text>
         </View>
       );
     }
@@ -127,17 +127,17 @@ class ListingsTab extends PureComponent {
         return (
           <View style={styles.wrapper}>
             <Text style={[styles.description, { marginBottom: 2 }]}>
-              {I18n.t('components.organism.ListingsTab.no_sale')}              
+              {I18n.t('components.templates.ListingsTab.no_sale')}              
             </Text>
-            <Text style={styles.description}>{I18n.t('components.organism.ListingsTab.check_later')} </Text>
+            <Text style={styles.description}>{I18n.t('components.templates.ListingsTab.check_later')} </Text>
           </View>
         );
       } else {
         return (
           <View style={styles.wrapper}>
-            <Text style={styles.mainText}>{I18n.t('components.organism.ListingsTab.store_empty')} </Text>
-            <Text style={styles.description}>{I18n.t('components.organism.ListingsTab.put_for_sale')} </Text>
-            <HollowButton title={I18n.t('components.organism.ListingsTab.create_listing')} onPress={this.createListing} />
+            <Text style={styles.mainText}>{I18n.t('components.templates.ListingsTab.store_empty')} </Text>
+            <Text style={styles.description}>{I18n.t('components.templates.ListingsTab.put_for_sale')} </Text>
+            <HollowButton title={I18n.t('components.templates.ListingsTab.create_listing')} onPress={this.createListing} />
           </View>
         );
       }

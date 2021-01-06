@@ -53,8 +53,8 @@ export default NeedCoin = ({
         <Image style={styles.image} source={coinBase} />
         <TouchableWithoutFeedback delayPressIn={200} >
           <View style={styles.itemContent}>
-            <Text style={styles.text}>{I18n.t('components.organism.NeedCoin.coinbase')}</Text>
-            <Text style={styles.subtitle}>{I18n.t('components.organism.NeedCoin.cryptocurrency_exchange')}</Text>
+            <Text style={styles.text}>{I18n.t('components.templates.NeedCoin.coinbase')}</Text>
+            <Text style={styles.subtitle}>{I18n.t('components.templates.NeedCoin.cryptocurrency_exchange')}</Text>
           </View>
         </TouchableWithoutFeedback>
       </View>

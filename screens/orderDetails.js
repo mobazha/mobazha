@@ -171,10 +171,10 @@ class OrderDetails extends PureComponent {
         break;
       case 'Decline':
         Alert.alert(
-          'Decline order?',
-          'This order will be canceled and the money will be refunded to the buyer',
+          {I18n.t('screens.orderDetails.decline_order')},
+          {I18n.t('screens.orderDetails.decline_hin')},
           [
-            { text: 'Nevermind' },
+            { text:{I18n.t('screens.orderDetails.nevermindr')} },
             {
               text: 'Ok',
               onPress: () => {
@@ -189,10 +189,10 @@ class OrderDetails extends PureComponent {
         break;
       case 'Refund':
         Alert.alert(
-          'Refund order?',
-          'This order will be canceled and the money will be refunded to the buyer.',
+          {I18n.t('screens.orderDetails.refund_order')},
+          {I18n.t('screens.orderDetails.refund_hint')},
           [
-            { text: 'Nevermind' },
+            { text: {I18n.t('screens.orderDetails.nevermindr')} },
             {
               text: 'Ok',
               onPress: () => {
@@ -361,10 +361,10 @@ class OrderDetails extends PureComponent {
     const vendorID = this.getVendorId();
     const { cancelOrder } = this.props;
     Alert.alert(
-      'Cancel order?',
-      'This order will be canceled and your money will be refunded in full.',
+      {I18n.t('screens.orderDetails.cancel_order')},
+      {I18n.t('screens.orderDetails.cancel_hint')},
       [
-        { text: 'Nevermind' },
+        { text:  {I18n.t('screens.orderDetails.nevermindr')} },
         {
           text: 'Ok',
           onPress: () => cancelOrder({ orderId, vendorID }),
@@ -379,11 +379,11 @@ class OrderDetails extends PureComponent {
       if (hasIn(response, 'success') && response.success === false) {
         Alert.alert(response.reason);
       } else {
-        Alert.alert('You have refunded the order');
+        Alert.alert({I18n.t('screens.orderDetails.have_refunded')});
         this.updateOrderList();
       }
     }).catch((err) => {
-      Alert.alert('Error happened because of unknown issues');
+      Alert.alert({I18n.t('screens.orderDetails.error_happened')});
     });
   }
 
@@ -488,7 +488,7 @@ class OrderDetails extends PureComponent {
   renderEmptyState = () => (
     <View style={styles.placeholderWrapper}>
       <Foundation name="price-tag" size={50} color={formLabelColor} />
-      <Text style={styles.placeholderText}>No order discussions found</Text>
+      <Text style={styles.placeholderText}>({I18n.t('screens.orderDetails.order_discussions')})</Text>
     </View>
   );
 
@@ -610,8 +610,8 @@ class OrderDetails extends PureComponent {
           />
         )}
         <Dialog.Container visible={showFundDlg} blurComponentIOS={blurComponentIOS}>
-          <Dialog.Title>Fund Order</Dialog.Title>
-          <Dialog.Description>Leave Notes</Dialog.Description>
+          <Dialog.Title>{I18n.t('screens.orderDetails.fund_order')}</Dialog.Title>
+          <Dialog.Description>{I18n.t('screens.orderDetails.leave_notes')}</Dialog.Description>
           <Dialog.Input value={memo} onChangeText={this.updateState('memo')} />
           <Dialog.Button
             label="Cancel"
@@ -657,7 +657,7 @@ class OrderDetails extends PureComponent {
         />
         {copied && (
           <View style={styles.overlay}>
-            <Text style={styles.overlayText}>Order number copied!</Text>
+            <Text style={styles.overlayText}>{I18n.t('screens.orderDetails.number_copied')}</Text>
           </View>
         )}
         <OBLightModal
@@ -673,7 +673,7 @@ class OrderDetails extends PureComponent {
           />
           <View style={styles.contentContainer}>
             <Text style={styles.learnMoreText}>
-              Due to changes in the exchange rate, the current market price for an order may differ from the total price of the item at the time of purchase.
+            {I18n.t('screens.orderDetails.learn_more')}.
             </Text>
           </View>
         </OBLightModal>

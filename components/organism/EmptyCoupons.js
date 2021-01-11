@@ -27,7 +27,7 @@ const styles = {
 export default ({ onAdd }) => (
   <View style={styles.wrapper}>
     <Image style={styles.img} source={CouponIcon} />
-    <Text style={styles.text}>You haven’t added any coupons</Text>
-    <HollowButton title="Add coupon" onPress={onAdd} />
+    <Text style={styles.text}>{I18n.t('components.organism.EmptyCoupons.empty_coupon')}</Text>
+    <HollowButton title={I18n.t('components.organism.EmptyCoupons.add_coupon')} onPress={onAdd} />
   </View>
 );

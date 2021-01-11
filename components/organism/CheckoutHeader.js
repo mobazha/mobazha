@@ -91,7 +91,7 @@ class CheckoutHeader extends PureComponent {
     const image = images[0].tiny;
     const { profile = {}, quantity } = this.state;
 
-    const sellerName = get(profile, 'name', 'Anonymous');
+    const sellerName = get(profile, 'name', I18n.t('components.organism.CheckoutHeader.anonymous'));
 
     return (
       <View style={styles.wrapper}>
@@ -105,10 +105,10 @@ class CheckoutHeader extends PureComponent {
           <Text style={styles.name} numberOfLines={2}>
             {decode(title)}
           </Text>
-          <Text style={styles.handle}>{`from ${decode(sellerName)}`}</Text>
+          <Text style={styles.handle}>{I18n.t('components.organism.CheckoutHeader.from_seller', { name: decode(sellerName) })}</Text>
           <View style={styles.priceWrapper}>
             <Text style={priceStyle}>
-              {localLabelFromBCH(getListingActualPrice(this.props, true), currency)} / each
+              {I18n.t('components.organism.CheckoutHeader.each_price', { price: localLabelFromBCH(getListingActualPrice(this.props, true)) })}
             </Text>
           </View>
           <View style={{ flex: 1 }} />

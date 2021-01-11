@@ -131,10 +131,10 @@ class Moderator extends Component {
           <AvatarImage style={styles.img} />
           <View style={styles.mainContent}>
             <Text style={styles.name}>
-              Unknown moderator
+            {I18n.t('components.organism.Moderator.unknown_moderator')}
             </Text>
             <Text style={styles.description}>
-              Could not fetch moderator profile.
+            {I18n.t('components.organism.Moderator.unknown_moderator_description')}              
             </Text>
           </View>
         </View>
@@ -155,7 +155,7 @@ class Moderator extends Component {
             {isVerified && (
               <React.Fragment>
                 <Octicons name="verified" size={14} color={brandColor} />
-                <Text style={styles.verified}>verified</Text>
+                <Text style={styles.verified}>{I18n.t('components.organism.Moderator.verified')}  </Text>
               </React.Fragment>
             )}
           </View>

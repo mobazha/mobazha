@@ -38,7 +38,7 @@ class ProductRatings extends PureComponent {
     return (
       <View style={screenWrapper.wrapper}>
         <Header
-          title="Reviews"
+          title={I18n.t('screens.ProductRatings.reviews')}
           left={<NavBackButton />}
           onLeft={() => {
             this.props.navigation.goBack();
@@ -49,7 +49,7 @@ class ProductRatings extends PureComponent {
           data={ratings}
           renderItem={this.renderRatingItem}
           keyExtractor={this.keyExtractor}
-          ListEmptyComponent={<Text style={styles.placeholderText}>No reviews yet</Text>}
+          ListEmptyComponent={<Text style={styles.placeholderText}>{I18n.t('screens.ProductRatings.No_reviews')}</Text>}
         />
       </View>
     );

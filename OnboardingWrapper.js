@@ -131,7 +131,7 @@ class OnboardingWrapper extends PureComponent {
     } else if ((status === 'offline' && !guest) || status === 'onboarding') {
       return <OnboardingContainer />;
     } else {
-      return <Text>Unknown</Text>;
+      return <Text>{I18n.t('OnboardingWrapper.unknown')}</Text>;
     }
   }
 }

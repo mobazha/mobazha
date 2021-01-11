@@ -68,7 +68,7 @@ class Resync extends PureComponent {
       const secs = (new Date().getTime()).toString();
       await AsyncStorage.setItem('lastSyncedDate', secs);
     } catch (err) {
-      Alert.alert('Unknown error!');
+      Alert.alert({I18n.t('screens.Resync.unknown_error')});
     } finally {
       setTimeout(() => {
         this.setState({ resyncing: false });
@@ -98,29 +98,29 @@ class Resync extends PureComponent {
         />
         <View style={styles.resyncContentContainer}>
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flex: 1 }}>
-            <Text style={styles.resyncTitle}>Resync transactions</Text>
+            <Text style={styles.resyncTitle}>{I18n.t('screens.Resync.resync_transactionsr')}</Text>
             <Text style={styles.resyncContent}>
-              {'If you believe you’re missing an order, or if your order details are out-of-sync with a buyer/seller, '}
-              {'you can rescan the blockchain for transactions related to your order.'}
+              {{I18n.t('screens.Resync.resync_content1')}}
+              {{I18n.t('screens.Resync.resync_content2')}}
             </Text>
             <Text style={styles.resyncContent}>
-              {'Resyncing transactions doesn’t need to be performed frequently. '}
-              {'It should only be done if you think there’s a problem. A scan is performed each time you start the app.'}
+              {{I18n.t('screens.Resync.resync_content3')}}
+              {{I18n.t('screens.Resync.resync_content4')}}
             </Text>
             <Text style={styles.resyncContent}>
-              {'You may leave this view while the resync process is active.'}
+              {{I18n.t('screens.Resync.resync_content5')}}
             </Text>
             <View style={{ flex: 1 }} />
           </ScrollView>
           <View style={styles.resyncFooter}>
             {resyncing ? (
-              <Text style={styles.resyncing}>Resyncing...</Text>
+              <Text style={styles.resyncing}>{I18n.t('screens.Resync.resyncing')}</Text>
             ) : (
               <Text style={styles.resyncLastTime}>{lastSyncedAgo && `Resynced ${lastSyncedAgo} ago`}</Text>
             )}
             <FullButton
               wrapperStyle={styles.resyncButton}
-              title="Resync"
+              title={I18n.t('screens.Resync.resync')}
               onPress={this.handleResync}
               loading={resyncing}
             />

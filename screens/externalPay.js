@@ -123,7 +123,7 @@ class ExternalPay extends PureComponent {
       const paymentAddress = navigation.getParam('paymentAddress');
       Clipboard.setString(paymentAddress);
 
-      this.setState({ copied: 'Address copied!' });
+      this.setState({ copied: {I18n.t('screens.externalPay.address_copied')} });
       setTimeout(() => this.setState({ copied: null }), 2000);
     }
   };
@@ -134,7 +134,7 @@ class ExternalPay extends PureComponent {
     const coin = navigation.getParam('coin');
     Clipboard.setString(`${minUnitAmountToBCH(amount, coin)}`);
 
-    this.setState({ copied: 'Amount copied!' });
+    this.setState({ copied:{I18n.t('screens.externalPay.amount_copied')} });
     setTimeout(() => this.setState({ copied: null }), 2000);
   };
 
@@ -156,7 +156,7 @@ class ExternalPay extends PureComponent {
     return (
       <View style={[screenWrapper.wrapper, styles.wrapper]}>
         <Header left={<NavBackButton />} onLeft={this.handleGoBack} />
-        <Text style={styles.title}>Pay to complete your order</Text>
+        <Text style={styles.title}> {I18n.t('screens.externalPay.pay_order')}</Text>
         <TouchableOpacity onPress={this.handleCopyAmount}>
           <View style={styles.cryptoWrapper}>
             <Image style={styles.icon} source={icon} resizeMode="cover" />
@@ -181,7 +181,7 @@ class ExternalPay extends PureComponent {
             color={primaryTextColor}
             size={24}
           />
-          <Text style={styles.doCopy}>Copy Address</Text>
+          <Text style={styles.doCopy}>{I18n.t('screens.externalPay.copy_address')}</Text>
         </TouchableOpacity>
         {copied && (
           <View style={styles.overlay}>

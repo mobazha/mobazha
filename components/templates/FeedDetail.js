@@ -278,15 +278,15 @@ class FeedDetail extends React.PureComponent {
   renderDueState = () => (
     <View style={styles.fullWrapper}>
       <Feather name="file-text" size={48} color={formLabelColor} />
-      <Text style={styles.emptyText}>Ooops! This post failed to load.</Text>
-      <HollowButton title="Retry" onPress={this.handleRetry} />
+      <Text style={styles.emptyText}>{I18n.t('components.templates.FeedDetail.fail_to_load')}</Text>
+      <HollowButton title={I18n.t('components.templates.FeedDetail.retry')} onPress={this.handleRetry} />
     </View>
   );
 
   renderLoadingState = () => (
     <View style={styles.fullWrapper}>
       <ActivityIndicator size="large" color="#8a8a8f" />
-      <Text style={styles.emptyText}>Loading...</Text>
+      <Text style={styles.emptyText}>{I18n.t('components.templates.FeedDetail.Loading')}</Text>
     </View>
   );
 
@@ -369,7 +369,7 @@ class FeedDetail extends React.PureComponent {
         {reported && (
           <View style={styles.overlay}>
             <Text style={styles.overlayText}>
-              Reported
+              {I18n.t('components.templates.FeedDetail.reported')}
             </Text>
           </View>
         )}

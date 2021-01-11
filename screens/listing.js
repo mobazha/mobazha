@@ -291,8 +291,8 @@ class Listing extends PureComponent {
           break;
         }
         case 1: {
-          Alert.alert('Are you sure?', 'Block this user?', [
-            { text: 'Cancel' },
+          Alert.alert({I18n.t('screens.listing.are_you_sure')}, {I18n.t('screens.listing.ask_block')}, [
+            { text: {I18n.t('screens.listing.cancel')} },
             { text: 'OK', onPress: this.blockNode },
           ]);
           break;
@@ -337,10 +337,10 @@ class Listing extends PureComponent {
   };
 
   handleDelete = () => {
-    Alert.alert('Delete listing?', "You can't undo this action.", [
-      { text: 'Cancel' },
+    Alert.alert({I18n.t('screens.listing.ask_delete')}, {I18n.t('screens.listing.delete_hin')}, [
+      { text: {I18n.t('screens.listing.cancel')} },
       {
-        text: 'Remove',
+        text: {I18n.t('screens.listing.remove')},
         onPress: this.deleteListing,
       },
     ]);
@@ -437,15 +437,15 @@ class Listing extends PureComponent {
   renderDueState = () => (
     <View style={styles.fullWrapper}>
       <Image style={styles.listingFailImg} source={ListingFailImg} />
-      <Text style={styles.emptyText}>Ooops! This listing failed to load.</Text>
-      <HollowButton title="Retry" onPress={this.handleRetry} />
+      <Text style={styles.emptyText}>{I18n.t('screens.listing.failed_load')}.</Text>
+      <HollowButton title={I18n.t('screens.listing.retry')} onPress={this.handleRetry} />
     </View>
   );
 
   renderLoadingState = () => (
     <View style={styles.fullWrapper}>
       <ActivityIndicator size="large" color={formLabelColor} />
-      <Text style={styles.emptyText}>Loading...</Text>
+      <Text style={styles.emptyText}>{I18n.t('screens.listing.loading')}</Text>
     </View>
   );
 
@@ -518,13 +518,13 @@ class Listing extends PureComponent {
           <ProductRatings peerID={vendorPeerID} slug={listingSlug} />
           <ListingPaymentOptions listing={listing} />
           <ProductPolicy
-            policy="Return policy"
+            policy={I18n.t('screens.listing.policy1')}
             content={refundPolicy}
             peerID={vendorPeerID}
             slug={listingSlug}
           />
           <ProductPolicy
-            policy="Terms and conditions"
+            policy={I18n.t('screens.listing.policy2')}
             content={termsAndConditions}
             peerID={vendorPeerID}
             slug={listingSlug}
@@ -577,7 +577,7 @@ class Listing extends PureComponent {
         {(liked || unliked || reported) && (
           <View style={[styles.overlay, reported && styles.overlayNarrow]}>
             <Text style={styles.overlayText}>
-              {liked ? 'Added to Wishlist!' : unliked ? 'Removed from Wishlist!' : 'Reported!'}
+              {liked ? {I18n.t('screens.listing.add_wishlist')}: unliked ? {I18n.t('screens.listing.remove_wishlist')} : {I18n.t('screens.listing.reported')}}
             </Text>
           </View>
         )}

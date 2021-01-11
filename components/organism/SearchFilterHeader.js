@@ -27,7 +27,7 @@ export default class SearchFilterHeader extends PureComponent {
     } = this.props;
     return (
       <View style={styles.wrapper}>
-        {total ? (<Text style={styles.textStyle} numberOfLines={1}>{`${total} results`}</Text>)
+        {total ? (<Text style={styles.textStyle} numberOfLines={1}>{I18n.t('components.organism.SearchFilterHeader.results', {total: total})}</Text>)
           : (<View style={{ flex: 1 }} />)}
       </View>
     );

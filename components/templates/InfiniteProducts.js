@@ -108,7 +108,7 @@ class InfiniteProducts extends PureComponent {
   renderLoadingState = () => (
     <View style={styles.emptyWrapper}>
       <ActivityIndicator style={styles.activityIndicator} size="large" color="#8a8a8f" />
-      <Text style={styles.emptyText}>Loading Listings...</Text>
+      <Text style={styles.emptyText}>{I18n.t('components.templates.InfiniteProducts.loading_listings')}</Text>
     </View>
   );
 

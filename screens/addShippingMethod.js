@@ -85,18 +85,18 @@ class AddShippingMethod extends PureComponent {
             }
             navigation.goBack();
           } else {
-            Alert.alert('Please fill out all the required fields');
+            Alert.alert( {I18n.t('screens.addShippingMethod.fill_required')});
           }
         } else if (serviceValidFlgs[1]) {
-          Alert.alert('Shipping option service length must be less than the max of 40');
+          Alert.alert({I18n.t('screens.addShippingMethod.must_be_less')});
         } else {
-          Alert.alert('Please fill out all the required fields');
+          Alert.alert( {I18n.t('screens.addShippingMethod.fill_required')});
         }
       } else {
-        Alert.alert('Shipping option name length must be less than the max of 40');
+        Alert.alert({I18n.t('screens.addShippingMethod.must_be_less')});
       }
     } else {
-      Alert.alert('Please select a shipping destination');
+      Alert.alert({I18n.t('screens.addShippingMethod.select_destination')});
     }
   };
 
@@ -137,13 +137,13 @@ class AddShippingMethod extends PureComponent {
         <Header
           left={<NavBackButton />}
           onLeft={this.onLeft}
-          title="Add Shipping Option"
-          right={<LinkText text="Save" />}
+          title= {I18n.t('screens.addShippingMethod.add_shipping_option')}
+          right={<LinkText text={I18n.t('screens.addShippingMethod.save')} />}
           onRight={this.onRight}
         />
-        <InputGroup title="Shipping option">
+        <InputGroup title={I18n.t('screens.addShippingMethod.shipping_option')}>
           <TextInput
-            title="Title"
+            title= {I18n.t('screens.addShippingMethod.title')}
             required
             value={name}
             onChangeText={this.onChangeName}
@@ -151,7 +151,7 @@ class AddShippingMethod extends PureComponent {
             placeholder="USA Shipping, International, etc"
           />
           <MultiSelector
-            title="Destinations"
+            title={I18n.t('screens.addShippingMethod.destinations')}
             required
             selection={regions}
             options={selectableCountry}

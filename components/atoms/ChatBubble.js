@@ -279,7 +279,7 @@ export default class Bubble extends React.PureComponent {
             </TouchableWithoutFeedback>
           </View>
           {position === 'right' && !loading && !success && (
-            <Text style={styles.errorMessage}>Couldn't send. Tap to retry</Text>
+            <Text style={styles.errorMessage}>{I18n.t('components.atoms.ChatBubble.fail_retry')}</Text>
           )}
         </View>
         {position === 'right' && !loading && !success && (

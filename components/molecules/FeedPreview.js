@@ -160,7 +160,7 @@ class FeedPreview extends React.Component {
       <TouchableWithoutFeedback onPress={this.handlePress}>
         <View style={styles.wrapper}>
           <Text style={styles.name} numberOfLines={1}>
-            {`${name || 'Anonymous'}`}
+            {`${name || I18n.t('components.molecules.FeedItem.reposted')}`}
           </Text>
           {this.renderContentWithListingPreview(true)}
           {images.length > 0 && (

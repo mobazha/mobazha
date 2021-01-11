@@ -86,7 +86,7 @@ class OrderFulfillment extends PureComponent {
           />
           {copied && (
             <View style={styles.overlay}>
-              <Text style={styles.overlayText}>Tracking number copied!</Text>
+              <Text style={styles.overlayText}>{I18n.t('components.organism.OrderFulfillment.tracking_number_copied')}</Text>
             </View>
           )}
         </View>
@@ -94,15 +94,15 @@ class OrderFulfillment extends PureComponent {
     } else if (!isEmpty(digital)) {
       return (
         <View style={styles.detailWrapper}>
-          <StaticField label="File URL:" value={digital.url} isLink />
-          <StaticField label="Password:" value={digital.password} />
+          <StaticField label={I18n.t('components.organism.OrderFulfillment.file_url')} value={digital.url} isLink />
+          <StaticField label={I18n.t('components.organism.OrderFulfillment.password')} value={digital.password} />
         </View>
       );
     }
 
     return (
       <Text style={styles.description}>
-        This order has been fulfilled!
+        {I18n.t('components.organism.OrderFulfillment.fulfilled_info')}
       </Text>
     );
   }
@@ -111,7 +111,7 @@ class OrderFulfillment extends PureComponent {
     const { detail } = this.props;
     return (
       <InputGroup
-        title="Order fulfilled"
+        title={I18n.t('components.organism.OrderFulfillment.order_fulfilled')}
         actionTitle={timeSince(new Date(detail.timestamp))}
         actionStyle={styles.timestamp}
       >

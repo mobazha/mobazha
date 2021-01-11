@@ -205,8 +205,8 @@ class ExternalStore extends Component {
         <ExternalStoreHeader onBack={this.handleGoBack} profile={profile} isBlocked onMore={this.handlePressMore} />
         <View style={styles.emptyContent}>
           <Ionicons size={50} name="md-eye-off" color="#8a8a8f" />
-          <Text style={styles.emptyText}>Unblock this user to see their content</Text>
-          <HollowButton title="Unblock" onPress={this.unblockNode} />
+          <Text style={styles.emptyText}>{I18n.t('screens.externalStore.unblock_user')}</Text>
+          <HollowButton title={I18n.t('screens.externalStore.unblock')} onPress={this.unblockNode} />
         </View>
       </View>
     );
@@ -216,8 +216,8 @@ class ExternalStore extends Component {
     <View style={styles.emptyWrapper}>
       <ExternalStoreHeader onBack={this.handleGoBack} />
       <View style={styles.emptyContent}>
-        <ActivityIndicator size="large" color={formLabelColor} />
-        <Text style={styles.emptyText}>Loading...</Text>
+        <ActivityIndicator size= "large" color={formLabelColor} />
+        <Text style={styles.emptyText}>{I18n.t('screens.externalStore.loading')}</Text>
       </View>
     </View>
   );
@@ -227,8 +227,8 @@ class ExternalStore extends Component {
       <ExternalStoreHeader onBack={this.handleGoBack} />
       <View style={styles.emptyContent}>
         <Feather size={50} name="user-x" color="#8a8a8f" />
-        <Text style={styles.emptyText}>Oops! This profile failed to load.</Text>
-        <HollowButton title="Retry" onPress={this.loadProfile} />
+        <Text style={styles.emptyText}>{I18n.t('screens.externalStore.failed_load')}</Text>
+        <HollowButton title={I18n.t('screens.externalStore.retry')} onPress={this.loadProfile} />
       </View>
     </View>
   );
@@ -253,7 +253,7 @@ class ExternalStore extends Component {
         {reported && (
           <View style={styles.overlay}>
             <Text style={styles.overlayText}>
-              Reported
+            {I18n.t('screens.externalStore.reported')}
             </Text>
           </View>
         )}

@@ -188,7 +188,7 @@ class PaymentSuccess extends PureComponent {
         <TouchableWithoutFeedback onPress={this.toTransactionDetails}>
           <View style={styles.buttonWrapper}>
             <Text style={styles.buttonText}>
-              Transaction details
+            {I18n.t('screens.paymentSuccess.transaction_details')} 
             </Text>
           </View>
         </TouchableWithoutFeedback>
@@ -215,8 +215,8 @@ class PaymentSuccess extends PureComponent {
             ]}
         />
       </View>
-      <Text style={styles.statusTitle}>Processing…</Text>
-      <Text style={styles.statusDescription}>Hang tight! This may take up to a minute.</Text>
+      <Text style={styles.statusTitle}>{I18n.t('screens.paymentSuccess.processing')}</Text>
+      <Text style={styles.statusDescription}>{I18n.t('screens.paymentSuccess.hang_tight')}</Text>
     </View>
   )
 
@@ -226,18 +226,18 @@ class PaymentSuccess extends PureComponent {
       <View style={styles.iconWrapper}>
         <Ionicons name="md-close" color={warningColor} size={110} />
       </View>
-      <Text style={styles.statusTitle}>Uh oh!</Text>
+      <Text style={styles.statusTitle}>{I18n.t('screens.paymentSuccess.Uh_oh')}</Text>
       <Text style={styles.statusDescription}>
-        Your transaction failed to go through. Please try again.
+      {I18n.t('screens.paymentSuccess.failed_go_through')}
       </Text>
       <TouchableWithoutFeedback onPress={this.handleRetry}>
         <View style={styles.retryButton} >
-          <Text style={styles.retryButtonText}>Retry</Text>
+          <Text style={styles.retryButtonText}>{I18n.t('screens.paymentSuccess.retry')}</Text>
         </View>
       </TouchableWithoutFeedback>
       <View style={{ flex: 1 }} />
       <Text style={styles.errorDescription}>
-        <Text style={styles.errorTitle}>Error:</Text>
+        <Text style={styles.errorTitle}>{I18n.t('screens.paymentSuccess.error')}</Text>
         {` ${this.props.reason}`}
       </Text>
     </View>

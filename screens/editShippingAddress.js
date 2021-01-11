@@ -68,16 +68,16 @@ class EditShippingAddress extends PureComponent {
     } = this.state;
 
     if (_.isEmpty(name)) {
-      Alert.alert('Name is required');
+      Alert.alert( {I18n.t('screens.editShippingAddress.name_required')});
       return;
     } else if (_.isEmpty(addressLineOne)) {
-      Alert.alert('Address is required');
+      Alert.alert( {I18n.t('screens.editShippingAddress.address_required')});
       return;
     } else if (_.isEmpty(city)) {
-      Alert.alert('City is required');
+      Alert.alert( {I18n.t('screens.editShippingAddress.city_required')});
       return;
     } else if (_.isEmpty(country)) {
-      Alert.alert('Country is required');
+      Alert.alert( {I18n.t('screens.editShippingAddress.country_required')});
       return;
     }
 
@@ -120,15 +120,15 @@ class EditShippingAddress extends PureComponent {
         <Header
           left={<NavBackButton />}
           onLeft={this.goBack}
-          title="New Address"
-          right={<LinkText text="Done" color={linkTextColor} />}
+          title= {I18n.t('screens.editShippingAddress.new_address')}
+          right={<LinkText text= {I18n.t('screens.editShippingAddress.done')} color={linkTextColor} />}
           onRight={this.submitData}
         />
         <KeyboardAwareScrollView innerRef={this.setRef('scroll')}>
-          <InputGroup title="Your Address">
+          <InputGroup title= {I18n.t('screens.editShippingAddress.your_address')}>
             <TextInput
               value={name}
-              title="Name"
+              title= {I18n.t('screens.editShippingAddress.name')}
               required
               onChangeText={this.onChange('name')}
               onSubmit={this.setFocus('companyInput')}
@@ -137,7 +137,7 @@ class EditShippingAddress extends PureComponent {
             />
             <TextInput
               value={company}
-              title="Company"
+              title= {I18n.t('screens.editShippingAddress.company')}
               onChangeText={this.onChange('company')}
               onFocus={this.findNodePos}
               onSubmit={this.setFocus('addressInput')}
@@ -145,7 +145,7 @@ class EditShippingAddress extends PureComponent {
             />
             <TextInput
               value={addressLineOne}
-              title="Address"
+              title= {I18n.t('screens.editShippingAddress.address')}
               required
               onChangeText={this.onChange('addressLineOne')}
               onSubmit={this.setFocus('address2Input')}
@@ -154,7 +154,7 @@ class EditShippingAddress extends PureComponent {
             />
             <TextInput
               value={addressLineTwo}
-              title="Address 2"
+              title= {I18n.t('screens.editShippingAddress.address2')}
               onChangeText={this.onChange('addressLineTwo')}
               onSubmit={this.setFocus('cityInput')}
               onFocus={this.findNodePos}
@@ -162,7 +162,7 @@ class EditShippingAddress extends PureComponent {
             />
             <TextInput
               value={city}
-              title="City"
+              title= {I18n.t('screens.editShippingAddress.city')}
               required
               onChangeText={this.onChange('city')}
               onSubmit={this.setFocus('stateInput')}
@@ -171,7 +171,7 @@ class EditShippingAddress extends PureComponent {
             />
             <TextInput
               value={state}
-              title="State"
+              title= {I18n.t('screens.editShippingAddress.state')}
               onChangeText={this.onChange('state')}
               onFocus={this.findNodePos}
               ref={this.setRef('stateInput')}
@@ -179,13 +179,13 @@ class EditShippingAddress extends PureComponent {
             />
             <TextInput
               value={postalCode}
-              title="Postal Code"
+              title= {I18n.t('screens.editShippingAddress.postal_code')}
               onChangeText={this.onChange('postalCode')}
               onFocus={this.findNodePos}
               ref={this.setRef('postalCodeInput')}
             />
             <RadioModalFilter
-              title="Country"
+              title= {I18n.t('screens.editShippingAddress.country')}
               required
               secondary
               selected={_.isEmpty(country) ? '' : country.toLowerCase()}
@@ -195,7 +195,7 @@ class EditShippingAddress extends PureComponent {
             <TextArea
               noBorder
               value={addressNotes}
-              title="Delivery Notes"
+              title= {I18n.t('screens.editShippingAddress.delivery_notes')}
               onChangeText={this.onChange('addressNotes')}
               onFocus={this.findNodePos}
             />

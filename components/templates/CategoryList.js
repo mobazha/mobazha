@@ -77,7 +77,7 @@ class CategoryList extends PureComponent {
         <View style={styles.moreIconWrapper}>
           <Ionicons name="ios-more" size={26} color={brandColor} />
         </View>
-        <Text style={styles.moreText}>More</Text>
+        <Text style={styles.moreText}>{I18n.t('components.templates.CategoryList.more')}</Text>
       </View>
     </TouchableWithoutFeedback>
   )

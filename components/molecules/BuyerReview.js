@@ -88,14 +88,14 @@ export default withNavigation(({
             <Text style={styles.past}>{past}</Text>
           </View>
         )}
-        <Text style={styles.name}>{`From ${decode(name)}`}</Text>
+        <Text style={styles.name}>{I18n.t('components.molecules.BuyerReview.from')}</Text>
         <Text style={[
           styles.review,
           isEmpty(review) ? styles.noMessage : {},
           inDetail ? styles.reviewInDetail : {},
         ]}
         >
-          {isEmpty(review) ? 'No review message from buyer' : decode(review)}
+          {isEmpty(review) ? I18n.t('components.molecules.BuyerReview.no_review') : decode(review)}
         </Text>
       </View>
     </View>

@@ -70,7 +70,7 @@ class OrderState extends PureComponent {
     return (
       <View style={styles.emptyWrapper}>
         <Icon style={styles.emptyIcon} name={iconName} size={50} color={formLabelColor} />
-        <Text style={styles.emptyText}>No orders found</Text>
+        <Text style={styles.emptyText}>{I18n.t('components.templates.OrderState.no_orders')}</Text>
       </View>
     );
   }

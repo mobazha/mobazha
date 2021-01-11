@@ -84,7 +84,7 @@ class ProductPrice extends PureComponent {
     if (shippingOption.price === 0) {
       return (
         <View style={styles.freeShippingTextWrapper}>
-          <Text style={[styles.freeShipping]}>Free shipping</Text>
+          <Text style={[styles.freeShipping]}>{I18n.t('components.atoms.ProductPrice.free_shipping')}</Text>
         </View>
       );
     } else {
@@ -95,7 +95,7 @@ class ProductPrice extends PureComponent {
       }
       return (
         <Text style={styles.shipping}>
-          {localDecimalPointsIfCrypto ? ' + shipping' : ` +${localLabel} shipping`}
+          {(localDecimalPointsIfCrypto ? ' + ' : ` +${localLabel} `) + I18n.t('components.atoms.ProductPrice.shipping')}
         </Text>
       );
     }
@@ -125,15 +125,15 @@ class ProductPrice extends PureComponent {
           </View>
         </View>
         <View style={styles.buyButtonContainer}>
-          { productType === 'DIGITAL_GOOD' && Platform.OS === 'ios' ? (
+          {productType === 'DIGITAL_GOOD' && Platform.OS === 'ios' ? (
             <UnavailableButton onPress={this.onPressUnavailable} />
           ) : (
-            <BuyNowButton
-              wrapperStyle={styles.buyButton}
-              title="BUY NOW"
-              onPress={onBuy}
-            />
-          )}
+              <BuyNowButton
+                wrapperStyle={styles.buyButton}
+                title="BUY NOW"
+                onPress={onBuy}
+              />
+            )}
         </View>
       </View>
     );

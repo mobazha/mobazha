@@ -187,7 +187,7 @@ class PaymentMethod extends PureComponent {
       });
       this.props.navigation.goBack();
     } else {
-      Alert.alert('Please select fee level');
+      Alert.alert( {I18n.t('screens.paymentMethod.select_fee_level')});
     }
   };
 
@@ -208,14 +208,14 @@ class PaymentMethod extends PureComponent {
           </View>
           <View style={{ flex: 1 }} />
           {coin.disabled ? (
-            <Text style={styles.explanation}>Not accepted</Text>
+            <Text style={styles.explanation}>{I18n.t('screens.paymentMethod.not_accepted')}</Text>
           ) : (
             <View style={styles.rightWrapper}>
               <Text style={styles.priceByLocalCurrency}>
                 {localLabelFromLocal(cBalance)}
               </Text>
               <Text style={styles.secondary}>
-                {(coin.disabled || !balance) ? 'Coming Soon' : `${minUnitAmountToBCH(balance.confirmed, coinName)} ${coinName}`}
+                {(coin.disabled || !balance) ? {I18n.t('screens.paymentMethod.coming_soon')} : `${minUnitAmountToBCH(balance.confirmed, coinName)} ${coinName}`}
               </Text>
             </View>
           )}
@@ -235,13 +235,13 @@ class PaymentMethod extends PureComponent {
         <Header
           left={<NavBackButton />}
           onLeft={this.goBack}
-          title="Payment Method"
-          right={<LinkText color={isDisabled ? staticLabelColor : brandColor} text="Done" />}
+          title={I18n.t('screens.paymentMethod.payment_method')}
+          right={<LinkText color={isDisabled ? staticLabelColor : brandColor} text={I18n.t('screens.paymentMethod.done')} />}
           rightDisabled={isDisabled}
           onRight={this.toNextScreen}
         />
         <ScrollView>
-          <InputGroup title="Payment method">
+          <InputGroup title={I18n.t('screens.paymentMethod.payment_method')} >
             <RadioGroup
               options={renderingCoins}
               selected={methodIdx}
@@ -249,7 +249,7 @@ class PaymentMethod extends PureComponent {
               renderItem={this.renderPaymentMethod}
             />
           </InputGroup>
-          <InputGroup title="Transaction speed">
+          <InputGroup title={I18n.t('screens.paymentMethod transaction_speed')}>
             <RadioGroup
               options={chosenLevels}
               selected={feeLevel}

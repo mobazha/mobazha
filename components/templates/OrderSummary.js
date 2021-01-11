@@ -368,29 +368,29 @@ class OrderSummary extends PureComponent {
     if (this.isDisputeDisabled()) {
       switch (state) {
         case 'PENDING':
-          Alert.alert('Oops!', 'You can\'t start a dispute while the order is still pending.');
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_pending_alert')});
           break;
         case 'AWAITING_FULFILLMENT':
-          Alert.alert('Oops!', 'You can\'t start a dispute until you\'ve fulfilled the order');
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_not_fulfilled_alert')});
           break;
         case 'CANCELED':
         case 'DECLINED':
-          Alert.alert('Oops!', 'You can\'t start a dispute for canceled order.');
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_cancel_alert')});
           break;
         case 'REFUNDED':
-          Alert.alert('Oops!', 'You can\'t start a dispute for refunded order.');
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_refund_alert')});
           break;
         case 'RESOLVED':
-          Alert.alert('Oops!', 'You can\'t start a dispute for dispute-closed order.');
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_resolved_alert')});
           break;
         case 'COMPLETED':
-          Alert.alert('Oops!', 'You can\'t start a dispute for completed order.');
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_completed_alert')});
           break;
         case 'PAYMENT_FINALIZED':
-          Alert.alert('Oops!', 'This order can\'t be disputed. The seller has claimed payment for this order.');
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_finalized_alert')});
           break;
         case 'PROCESSING_ERROR':
-          Alert.alert('Oops!', 'This order can\'t be disputed. Please cancel your order to receive a full refund.');
+          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_processing_alert')});
           break;
         default:
           break;
@@ -423,7 +423,7 @@ class OrderSummary extends PureComponent {
           </Text>
         ))}
         <Text style={styles.option}>
-          Quantity: {bigQuantity}
+          {I18n.t('components.templates.OrderSummary.quantity_info')}
         </Text>
       </View>
     );
@@ -463,7 +463,7 @@ class OrderSummary extends PureComponent {
           }}
         >
           <View>
-            <Text style={styles.viewTransaction}>{coinName === 'ETH' ? 'View' : 'View transaction'}</Text>
+            <Text style={styles.viewTransaction}>{coinName === 'ETH' ? {I18n.t('components.templates.OrderSummary.view')} : {I18n.t('components.templates.OrderSummary.view_transaction')}}</Text>
           </View>
         </TouchableWithoutFeedback>
       </View>
@@ -486,45 +486,44 @@ class OrderSummary extends PureComponent {
     const remaining = this.getRemainingTime();
     return (
       <InputGroup
-        title="Payment"
+        title={I18n.t('components.templates.OrderSummary.payment')}
         actionTitle={timestamp && timeSince(new Date(timestamp))}
         actionStyle={styles.timestamp}
       >
         {this.renderTransactionLinkRow(transaction)}
         {!this.isPaid() ? (
           <Text style={styles.unpaidNotice}>
-            A payment has not been found for this order yet.
-            It may take up to a minute for the payment to be detected.
+             {I18n.t('components.templates.OrderSummary.no_payment')}            
           </Text>
         ) : isEmpty(moderator) ? (
           <Text style={styles.description}>
-            The funds were sent directly to {amIBuyer ? 'the seller' : 'you'}. You cannot dispute this order.
+            {I18n.t('components.templates.OrderSummary.cannot_dispute')}
           </Text>
         ) : this.isClosed() ? (
           <Text style={styles.description}>
-            The funds have already been released from escrow. The order can no longer be disputed.
+            {I18n.t('components.templates.OrderSummary.escrow_released')}
           </Text>
         ) : this.isInDispute() ? (
           <Text style={styles.description}>
-            {'The order is in dispute for up to '}
+            {{I18n.t('components.templates.OrderSummary.order_in_dispute')}}
             <Text style={styles.escrowDays}>{remaining}</Text>
-            {' or until a party accepts a payout.'}
+            {{I18n.t('components.templates.OrderSummary.until_accept')}}
           </Text>
         ) : isClaimableBySeller ? (
           amIBuyer ? (
             <Text style={styles.description}>
-              {'The dispute period has expired. The seller can now claim the payment.'}
+              {{I18n.t('components.templates.OrderSummary.period_expired_claim')}}
             </Text>
           ) : (
             <Text style={styles.description}>
-              {'The dispute period has expired. The funds can now be claimed in full.'}
+              {{I18n.t('components.templates.OrderSummary.period_expired_claim2')}}
             </Text>
           )
         ) : (
           <Text style={styles.description}>
-            {'The order funds are being held in escrow for approximately '}
+            {{I18n.t('components.templates.OrderSummary.order_in_escrow1')}}
             <Text style={styles.escrowDays}>{remaining}</Text>
-            {' or until the buyer completes the order.\n\nIf you have any issues with this order, you can open a dispute with the moderator.'}
+            {{I18n.t('components.templates.OrderSummary.order_in_escrow2')}}
           </Text>
         )}
         {this.isPaid() && !isEmpty(moderator) && !this.isInDispute() && !this.isDisputeExpired() && !timeSinceTimeout && (
@@ -541,7 +540,7 @@ class OrderSummary extends PureComponent {
                   this.isDisputeDisabled() && styles.disabledDisputeText,
                 ]}
               >
-                Dispute Order
+                {I18n.t('components.templates.OrderSummary.dispute_order')}                
               </Text>
             </View>
           </TouchableWithoutFeedback>
@@ -550,7 +549,7 @@ class OrderSummary extends PureComponent {
           <TouchableWithoutFeedback onPress={onClaim}>
             <View style={styles.claimButton}>
               <Text style={styles.claimText}>
-                Claim Payment
+                {I18n.t('components.templates.OrderSummary.claim_payment')}
               </Text>
             </View>
           </TouchableWithoutFeedback>)}
@@ -566,7 +565,7 @@ class OrderSummary extends PureComponent {
                 styles.fullText, styles.disabledDisputeText,
               ]}
             >
-              Dispute Order
+              {I18n.t('components.templates.OrderSummary.dispute_order')}              
             </Text>
           </View>
         </TouchableWithoutFeedback>
@@ -602,9 +601,9 @@ class OrderSummary extends PureComponent {
       >
         <Text style={styles.description}>
           {disputePossible ? (
-            'An error occurred while processing this order.\nPlease start a dispute to recover your funds.'
+            {I18n.t('components.templates.OrderSummary.dispute_error_possible')}            
           ) : (
-            'An error occurred while processing this order.'
+            {I18n.t('components.templates.OrderSummary.dispute_error')}
           )}
         </Text>
       </InputGroup>
@@ -633,17 +632,17 @@ class OrderSummary extends PureComponent {
 
     let title, transaction, timestamp, description;
     if (state === 'REFUNDED') {
-      title = 'Order refunded';
+      title = {I18n.t('components.templates.OrderSummary.order_refunded')} ;
       transaction = refundAddressTransaction;
       timestamp = (transaction || {}).timestamp;
-      description = 'The seller has issued a full refund for this order';
+      description = {I18n.t('components.templates.OrderSummary.full_refund')};
     } else {
       transaction = paymentAddressTransactions[1];
       timestamp = (transaction || {}).timestamp;
       if (state === 'COMPLETED') {
-        title = 'Order completed';
+        title = {I18n.t('components.templates.OrderSummary.order_completed')};
 
-        description = transaction ? 'The payment has been released to the seller' : null;
+        description = transaction ?  {I18n.t('components.templates.OrderSummary.release_to_seller')} : null;
         // timestamp = get(buyerOrderCompletion, 'timestamp');
         if (!isEmpty(dispute)) {
           transaction = null;
@@ -655,23 +654,23 @@ class OrderSummary extends PureComponent {
           };
         }
       } else if (state === 'RESOLVED') {
-        title = 'Dispute closed';
-        description = `${this.isDisputeClosedBySeller() ? 'The seller' : 'The buyer'} has accepted the payout. This dispute is now closed.`;
+        title = {I18n.t('components.templates.OrderSummary.dispute_closed')};
+        description = {I18n.t('components.templates.OrderSummary.dispute_closed_info')};
         transaction = {
           ...transaction,
           // bigValue: amIBuyer ? buyerValue : sellerValue,
         };
       } else if (state === 'PAYMENT_FINALIZED') {
-        title = 'Payment claimed';
-        description = 'The seller has claimed payment for this order.';
+        title = {I18n.t('components.templates.OrderSummary.payment_claimed')};
+        description = {I18n.t('components.templates.OrderSummary.seller_claim')};
 
         transaction = {
           ...transaction,
           // bigValue: get(vendorOrderConfirmation, 'bigRequestedAmount'),
         };
       } else {
-        title = 'Order canceled';
-        description = `The ${state === 'DECLINED' ? 'seller' : 'buyer'} has canceled this order. The money has been refunded in full.`;
+        title = {I18n.t('components.templates.OrderSummary.order_canceled')};
+        description = {I18n.t('components.templates.OrderSummary.user_cancel_order')};
 
         transaction = {
           ...transaction,
@@ -767,13 +766,12 @@ class OrderSummary extends PureComponent {
 
     return (
       <InputGroup
-        title="Dispute period expired"
+        title={I18n.t('components.templates.OrderSummary.period_expired')}
         actionTitle={timeSinceTimeout}
         actionStyle={styles.timestamp}
       >
         <Text style={styles.description}>
-          No dispute was opened during the 45-day dispute period.
-          The seller can now claim payment.
+          {I18n.t('components.templates.OrderSummary.no_dispute')}          
         </Text>
       </InputGroup>
     );
@@ -821,7 +819,7 @@ class OrderSummary extends PureComponent {
             <View>
               {isEmpty(shippingDetails) ? (
                 <View style={styles.optionWrapper}>
-                  <Text style={styles.optionPlaceholder}>Shipping</Text>
+                  <Text style={styles.optionPlaceholder}> {I18n.t('components.templates.OrderSummary.shipping')}</Text>
                 </View>
               ) : (
                 <View style={styles.optionWrapper}>
@@ -842,7 +840,7 @@ class OrderSummary extends PureComponent {
           )}
           <Dash dashColor={borderColor} dashGap={2} dashLength={8} dashThickness={1} />
           <View style={styles.totalWrapper}>
-            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalLabel}> {I18n.t('components.templates.OrderSummary.total')}</Text>
             <Text style={styles.totalValue}>{this.renderPrice()}</Text>
           </View>
         </InputGroup>
@@ -871,7 +869,7 @@ class OrderSummary extends PureComponent {
         )}
         {contractType === 'PHYSICAL_GOOD' && (
           <InputGroup
-            title="Shipping"
+            title={I18n.t('components.templates.OrderSummary.shipping')}
             actionTitle={<Ionicons name="md-copy" color={brandColor} size={24} />}
             action={this.handleCopyAddress}
           >
@@ -880,14 +878,14 @@ class OrderSummary extends PureComponent {
         )}
         <InputGroup title="Note" noBorder>
           {isEmpty(memo) ? (
-            <Text style={styles.noMemoStyle}>No note left by buyer</Text>
+            <Text style={styles.noMemoStyle}>{I18n.t('components.templates.OrderSummary.no_buyer_note')}</Text>
           ) : (
             <Text style={styles.memoText}>{memo}</Text>
           )}
         </InputGroup>
         {copied && (
           <View style={styles.overlay}>
-            <Text style={styles.overlayText}>Address copied!</Text>
+            <Text style={styles.overlayText}>{I18n.t('components.templates.OrderSummary.address_copied')}</Text>
           </View>
         )}
       </View>

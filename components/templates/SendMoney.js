@@ -119,7 +119,7 @@ class SendMoney extends PureComponent {
             {estimating ? (
               <ActivityIndicator size="small" color="white" />
             ) : (
-              <Text style={styles.nextButtonText}>NEXT</Text>
+              <Text style={styles.nextButtonText}>{I18n.t('components.templates.SendMoney.NEXT')}</Text>
             )}
           </View>
         </TouchableOpacity>
@@ -135,10 +135,10 @@ class SendMoney extends PureComponent {
               <View style={{ flex: 1 }} />
             </TouchableWithoutFeedback>
             <SendingAddressSelector
-              title="Send to"
+              title= {I18n.t('components.templates.SendMoney.send_to')}
               address={address}
               onChange={this.handleAddressChange}
-              placeholder="Paste or scan address"
+              placeholder={I18n.t('components.templates.SendMoney.paste_or_scan')}
               onSend={this.handleSend}
             />
           </KeyboardAvoidingView>

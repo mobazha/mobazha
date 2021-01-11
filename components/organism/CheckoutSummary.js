@@ -323,10 +323,10 @@ class CheckoutSummary extends PureComponent {
   }
 
   handleRemoveCoupon = () => {
-    Alert.alert('Remove coupon?', 'Are you sure you want to remove this coupon?', [
-      { text: 'Cancel' },
+    Alert.alert(I18n.t('components.organism.CheckoutSummary.remove_coupon'), I18n.t('components.organism.CheckoutSummary.remove_coupon_description'), [
+      { text: I18n.t('components.organism.CheckoutSummary.cancel') },
       {
-        text: 'Remove',
+        text: I18n.t('components.organism.CheckoutSummary.remove'),
         onPress: () => {
           this.props.onChangeCoupon({});
         },
@@ -373,10 +373,10 @@ class CheckoutSummary extends PureComponent {
       <View style={styles.couponWrapper}>
         <View style={styles.couponInfo}>
           <Text style={styles.couponLabel}>
-            Coupon: {coupon ? selectedCoupon.couponCode : 'None'}
+            Coupon: {coupon ? selectedCoupon.couponCode : I18n.t('components.organism.CheckoutSummary.none_select')}
           </Text>
           <TouchableWithoutFeedback onPress={coupon ? this.handleRemoveCoupon : this.showCouponModal}>
-            <Text style={styles.couponLinkText}>{coupon ? 'Remove' : 'Add'}</Text>
+            <Text style={styles.couponLinkText}>{coupon ? I18n.t('components.organism.CheckoutSummary.remove') : I18n.t('components.organism.CheckoutSummary.add_link')}</Text>
           </TouchableWithoutFeedback>
         </View>
         {coupon && (
@@ -434,9 +434,9 @@ class CheckoutSummary extends PureComponent {
               </View>
               <Text style={priceStyle}>
                 {isRough ? (
-                  !shippingOption.bigPrice ? 'FREE' : localLabelFromBCH(this.getShippingTotalPrice(this.props, true), currency)
+                  !shippingOption.bigPrice ? I18n.t('components.organism.CheckoutSummary.free'): localLabelFromBCH(this.getShippingTotalPrice(this.props, true), currency)
                 ) : (
-                  !shippingPrice ? 'FREE' : localLabelFromBCH(shippingPrice, paymentMethod)
+                  !shippingPrice ? I18n.t('components.organism.CheckoutSummary.free') : localLabelFromBCH(shippingPrice, paymentMethod)
                 )}
               </Text>
             </View>
@@ -447,8 +447,8 @@ class CheckoutSummary extends PureComponent {
           <View style={styles.paymentMethod}>
             <View style={styles.paymentLabel}>
               <Image source={COINS[paymentMethod].icon} style={styles.coinImage} />
-              <Text style={styles.feeLevel}>Network Fee&nbsp;&nbsp;</Text>
-              <Text style={styles.changeText}>Change</Text>
+                <Text style={styles.feeLevel}>{I18n.t('components.organism.CheckoutSummary.network_fee')}&nbsp;&nbsp;</Text>
+              <Text style={styles.changeText}>{I18n.t('components.organism.CheckoutSummary.change')}</Text>
             </View>
             <Text style={priceStyle}>
               {localLabelFromBCH(this.getCurrentFee(), paymentMethod)}
@@ -458,21 +458,21 @@ class CheckoutSummary extends PureComponent {
         {totalPrice && (totalPrice.multipliedBy(FEE_MAX_PERCENT).isLessThan(this.getCurrentFee())) && (
           <View style={styles.feeAlertContainer}>
             <Text style={styles.feeAlertDescription}>
-              Fee is too high. Please use a lower fee level or a different coin.
+            {I18n.t('components.organism.CheckoutSummary.fee_alert_description')}
             </Text>
             <TouchableWithoutFeedback onPress={this.handleOpenHelp}>
-              <Text style={styles.feeAlertLearnMore}>Learn more</Text>
+              <Text style={styles.feeAlertLearnMore}>{I18n.t('components.organism.CheckoutSummary.learn_more')}</Text>
             </TouchableWithoutFeedback>
           </View>
         )}
         <Dash dashColor={borderColor} dashGap={2} dashLength={8} dashThickness={1} />
         <View style={styles.totalWrapper}>
-          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalLabel}>{I18n.t('components.organism.CheckoutSummary.total')}</Text>
           <Text style={styles.totalValue}>
             {totalPrice ? (
               localLabelFromBCH(totalPrice, paymentMethod)
             ) : (
-              'calculating...'
+              {I18n.t('components.organism.CheckoutSummary.calculating')}
             )}
           </Text>
         </View>

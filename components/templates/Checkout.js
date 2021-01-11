@@ -157,9 +157,9 @@ class Checkout extends PureComponent {
       return (
         <TouchableWithoutFeedback onPress={this.handleGoToAddAddress}>
           <View style={styles.addrWrapper}>
-            <Text style={[styles.emptyAddress, styles.cannotShip]}>*Shipping address required for purchase</Text>
+            <Text style={[styles.emptyAddress, styles.cannotShip]}>{I18n.t('components.templates.Checkout.address_required')}</Text>
             <View style={styles.fullButton}>
-              <Text style={styles.fullText}>New Address</Text>
+              <Text style={styles.fullText}>{I18n.t('components.templates.Checkout.new_address')}</Text>
             </View>
           </View>
         </TouchableWithoutFeedback>
@@ -173,7 +173,7 @@ class Checkout extends PureComponent {
           <TouchableWithoutFeedback onPress={toShippingAddress}>
             <View style={styles.addrWrapper}>
               <Text style={[styles.emptyAddress, styles.cannotShip]}>
-                This item can't be shipped to the selected address
+              {I18n.t('components.templates.Checkout.cannot_ship')}
               </Text>
             </View>
           </TouchableWithoutFeedback>
@@ -257,7 +257,7 @@ class Checkout extends PureComponent {
         />
         {contractType === 'PHYSICAL_GOOD' && (
           <InputGroup
-            title="Shipping"
+            title={I18n.t('components.templates.Checkout.shipping')}
             actionTitle={EditIcon}
             action={toShippingAddress}
           >
@@ -276,7 +276,7 @@ class Checkout extends PureComponent {
         />
         {!loadingModerators && (
           <InputGroup
-            title="Payment Protection"
+            title={I18n.t('components.templates.Checkout.payment_protection')}
             actionTitle={InfoIcon}
             action={this.handleOpenHelp}
           >
@@ -284,11 +284,11 @@ class Checkout extends PureComponent {
               {!isEmpty(moderator) ? (
                 <CheckBox
                   checked={isProtected}
-                  title={<Text>Protect my payment for up to <Text style={{ fontWeight: 'bold' }}>45 days</Text></Text>}
+                  title={<Text>{I18n.t('components.templates.Checkout.protect_up_to')} <Text style={{ fontWeight: 'bold' }}>{I18n.t('components.templates.Checkout.protect_days')}</Text></Text>}
                   onPress={this.handleProtectedToggle}
                 />
               ) : (
-                <Text style={styles.moderatorNotAvailable}>Not available for this order</Text>
+                <Text style={styles.moderatorNotAvailable}>{I18n.t('components.templates.Checkout.moderator_not_available')}</Text>
               )}
               {(isProtected && !isEmpty(moderator)) ? (
                 [
@@ -299,15 +299,13 @@ class Checkout extends PureComponent {
                   </TouchableWithoutFeedback>,
                   <TouchableWithoutFeedback onPress={toModerators}>
                     <View style={styles.fullButton}>
-                      <Text style={styles.fullText}>Change moderator</Text>
+                      <Text style={styles.fullText}>{I18n.t('components.templates.Checkout.change_moderator')}</Text>
                     </View>
                   </TouchableWithoutFeedback>,
                 ]
               ) : (
                 <Text style={styles.moderatorText}>
-                  Your payment will be sent directly to the seller.
-                  If you experience problems with your order,
-                  you won't be able to open a dispute.
+                  {I18n.t('components.templates.Checkout.no_moderator_description')}                  
                 </Text>
               )}
             </View>

@@ -183,7 +183,7 @@ class Privacy extends PureComponent {
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent}>
           <View>
             <Text style={[styles.privacyText]}>
-              PRIVACY
+            {I18n.t('screens.privacy.privacy')}
             </Text>
             <Hyperlink
               style={styles.hyperlinkContainer}
@@ -192,29 +192,25 @@ class Privacy extends PureComponent {
               onPress={this.handleShowModal}
             >
               <Text style={styles.privacyDescription1}>
-                Haven is built to give you far more privacy in your commerce, messaging, and payments than other apps.
-                It uses several advanced technologies to keep your information from prying eyes, such as peer-to-peer networking and end-to-end encryption.
+              {I18n.t('screens.privacy.privacyDescription1')}
               </Text>
               <Text style={styles.privacyDescription2}>
-                There are ways to use Haven which improve or diminish your privacy.
-                To learn more about how the underlying technology works, and what steps you can take to improve your privacy,
-                {' '}
-                tap the privacy policy link below.
+              {I18n.t('screens.privacy.privacyDescription2')}
               </Text>
               <Text style={styles.privacyDescription2}>
-                Before you proceed, you must accept the Haven https://gethaven.app/terms and https://gethaven.app/privacy.
+              {I18n.t('screens.privacy.privacyDescription3')}
               </Text>
             </Hyperlink>
           </View>
           <View style={footerStyles.roundButtonContainer}>
             <TouchableWithoutFeedback onPress={this.handleGoBack}>
               <View>
-                <Text style={styles.cancelButton}>Cancel</Text>
+                <Text style={styles.cancelButton}>{I18n.t('screens.privacy.cancel')}</Text>
               </View>
             </TouchableWithoutFeedback>
             <Button
               wrapperStyle={onboardingStyles.button}
-              title="I Accept"
+              title={I18n.t('screens.privacy.I_accept')}
               onPress={this.handleGetStarted}
               disabled={loggingIn}
             />

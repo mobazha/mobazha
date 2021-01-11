@@ -21,6 +21,6 @@ const styles = {
 
 export default ({ onPress }) => (
   <TouchableWithoutFeedback onPress={onPress}>
-    <View style={styles.wrapper}><Text style={styles.text}>Reset filters</Text></View>
+    <View style={styles.wrapper}><Text style={styles.text}>{I18n.t('components.atoms.ResetFilter.reset_filters')}</Text></View>
   </TouchableWithoutFeedback>
 );

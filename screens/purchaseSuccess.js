@@ -122,10 +122,10 @@ class PurchaseSuccess extends PureComponent {
     const orderInfo = this.props.navigation.getParam('orderInfo');
     sendChat(username, password, peerID, orderInfo.orderId, message).then((response) => {
       if (hasIn(response, 'messageId')) {
-        Alert.alert('Successfully sent message');
+        Alert.alert({I18n.t('screens.purchaseSuccess.successfully_sent')});
       }
     });
-    sendNotification({ verb: 'chat', type: 'sent', peerID, content: { body: 'You have received a message!' } });
+    sendNotification({ verb: 'chat', type: 'sent', peerID, content: { body: {I18n.t('screens.purchaseSuccess.received_message')}} });
   }
 
   render() {
@@ -140,13 +140,13 @@ class PurchaseSuccess extends PureComponent {
           onLeft={() => {
             this.props.navigation.goBack();
           }}
-          title="Sent"
-          right={<LinkText text="Close" />}
+          title={I18n.t('screens.purchaseSuccess.sent')}
+          right={<LinkText text={I18n.t('screens.purchaseSuccess.close')} />}
           onRight={() => {
             this.props.navigation.navigate('Store');
           }}
         />
-        <InputGroup title="Order Complete">
+        <InputGroup title={I18n.t('screens.purchaseSuccess.order_complete')}>
           <View style={styles.wrapper}>
             <View style={styles.sentAmountWrapper}>
               <Text style={styles.sentAmount}>{localLabelFromBCH(price, coinInfo.value)}</Text>
@@ -159,13 +159,13 @@ class PurchaseSuccess extends PureComponent {
               <Image style={styles.coinImage} source={coinInfo.icon} />
               <Text style={styles.description}>{`${coinInfo.label} Sent`}</Text>
             </View>
-            <Text style={styles.toTransaction}>View Transaction</Text>
+            <Text style={styles.toTransaction}>{I18n.t('screens.purchaseSuccess.view_transaction')}</Text>
           </View>
         </InputGroup>
-        <InputGroup title={`Message for ${handle}`}>
+        <InputGroup title={`{I18n.t('screens.purchaseSuccess.message_for')} ${handle}`}>
           <View style={styles.messageWrapper}>
             <TextInput
-              placeholder="Provide additional details, ask a question, etc (optional)"
+              placeholder={I18n.t('screens.purchaseSuccess.provide_details')}
               placeholderTextColor="rgb(82, 82, 82)"
               multiline
               numberOfLines={4}
@@ -182,7 +182,7 @@ class PurchaseSuccess extends PureComponent {
               }}
             >
               <View style={styles.sendButton}>
-                <Text style={styles.sendButtonText}>Send</Text>
+                <Text style={styles.sendButtonText}>{I18n.t('screens.purchaseSuccess.send')}</Text>
               </View>
             </TouchableWithoutFeedback>
           </View>

@@ -87,10 +87,10 @@ export default ({
       </TouchableWithoutFeedback>
       {coinBalance <= 0 && false && (
         <View style={styles.paymentMethodWrapper}>
-          <Text style={styles.emptyWallet}>Your wallet is empty</Text>
+          <Text style={styles.emptyWallet}>{I18n.t('components.atoms.PaymentMethod.wallet_empty')}</Text>
           <TouchableWithoutFeedback onPress={() => toAddFund(paymentMethod)}>
             <View style={styles.addFundButton}>
-              <Text style={styles.addFundText}>Add Funds</Text>
+              <Text style={styles.addFundText}>{I18n.t('components.atoms.PaymentMethod.add_funds')}</Text>
             </View>
           </TouchableWithoutFeedback>
         </View>

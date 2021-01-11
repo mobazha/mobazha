@@ -81,7 +81,7 @@ class PayBanner extends PureComponent {
           </View>
         ) : (
           <View style={styles.priceWrapper}>
-            <Text style={styles.calculating}>calculating...</Text>
+            <Text style={styles.calculating}>{I18n.t('components.atoms.PayBanner.calculating')}</Text>
           </View>
         )}
         <View style={styles.buyButtonContainer}>

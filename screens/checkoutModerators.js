@@ -80,7 +80,7 @@ class CheckoutModerators extends PureComponent {
           left={<NavBackButton />}
           onLeft={() => this.props.navigation.goBack()}
         />
-        <Text style={styles.title}>Select a moderator</Text>
+        <Text style={styles.title}>{I18n.t('screens.checkoutModerators.select_moderator')}</Text>
         {moderators.length > 0 ? (
           <FlatList
             data={moderators}
@@ -88,7 +88,7 @@ class CheckoutModerators extends PureComponent {
           />
         ) : (
           <View style={styles.loadingWrapper}>
-            <Text style={styles.loadingMessage}>No Available Moderators</Text>
+            <Text style={styles.loadingMessage}>{I18n.t('screens.checkoutModerators.no_available')}</Text>
           </View>
         )}
       </View>

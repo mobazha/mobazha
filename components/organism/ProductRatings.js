@@ -87,12 +87,12 @@ class ProductRatings extends PureComponent {
             {nodes}
             <TouchableWithoutFeedback onPress={this.onShow}>
               <View style={styles.showAllButton}>
-                <Text style={styles.showAllText}>{`See all ${ratings.length} reviews`}</Text>
+                <Text style={styles.showAllText}>{I18n.t('components.organism.ProductRatings.see_all_reviews')}</Text>
               </View>
             </TouchableWithoutFeedback>
           </View>
         ) : (
-          <Text style={styles.noReviews}>No reviews yet</Text>
+          <Text style={styles.noReviews}>{I18n.t('components.organism.ProductRatings.no_reviews_yet')}</Text>
         )}
       </ProductSection>
     );

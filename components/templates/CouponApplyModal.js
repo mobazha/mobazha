@@ -89,23 +89,23 @@ export default class CouponApplyModal extends React.Component {
             modal
             left={<NavCloseButton />}
             onLeft={hideModal}
-            right={<LinkText text="Apply" color={linkTextColor} fontSize={16} />}
+            right={<LinkText text={I18n.t('components.templates.CouponApplyModal.apply')} color={linkTextColor} fontSize={16} />}
             onRight={this.handleSubmit}
           />
           <View style={styles.wrapper}>
-            <InputGroup title="Enter a coupon code" contentStyle={styles.couponInput}>
+            <InputGroup title={I18n.t('components.templates.CouponApplyModal.enter_coupon')} contentStyle={styles.couponInput}>
               <TextInput
                 noTitle
                 noBorder
                 value={couponCode}
-                placeholder="e.g. COUPON123"
+                placeholder={I18n.t('components.templates.CouponApplyModal.enter_hint')}
                 onChangeText={this.handleChangeCoupon}
                 autoFocus
               />
             </InputGroup>
             {invalid && (
               <Text style={styles.errorText}>
-                Coupon "<Text style={styles.couponHighlight}>{couponCode}</Text>" is not valid.
+                {I18n.t('components.templates.CouponApplyModal.coupon')} "<Text style={styles.couponHighlight}>{couponCode}</Text>" {I18n.t('components.templates.CouponApplyModal.not_valid')}
               </Text>
             )}
           </View>

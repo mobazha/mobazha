@@ -98,15 +98,15 @@ export default class RestoreProfileInit extends PureComponent {
         <Header left={<NavBackButton />} onLeft={this.handleGoBack} />
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.headerWrapper}>
-            <Text style={styles.resyncTitle}>Restore profile</Text>
+            <Text style={styles.resyncTitle}>{I18n.t('screens.restoreProfileInit.restore_profile')}</Text>
           </View>
           <View style={styles.imageContainer}>
             <Image style={styles.image} source={RestoreImg} />
           </View>
           <Text style={styles.resyncContent}>
-            {'Select your haven backup file to restore\nyour profile, including your wallet funds.'}
+            {{I18n.t('screens.restoreProfileInit.restore_hint')}}
           </Text>
-          <SMRoundButton title="SELECT FILE" onPress={this.handleSelectFile} loading={loading} />
+          <SMRoundButton title={I18n.t('screens.restoreProfileInit.select_file')} onPress={this.handleSelectFile} loading={loading} />
         </ScrollView>
       </View>
     );

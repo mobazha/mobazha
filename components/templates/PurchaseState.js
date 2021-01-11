@@ -222,16 +222,16 @@ export default class PurchaseState extends React.PureComponent {
     let description;
     if (paymentState === 'success') {
       icon = <Ionicons name="md-checkmark" color={brandColor} size={110} />;
-      title = 'Thank you!';
-      description = 'Your order has been placed. You can track or manage your order at any time.';
+      title = {I18n.t('components.templates.purchaseState.thank_you')};
+      description = {I18n.t('components.templates.purchaseState.order_placed')};
     } else if (paymentState === 'pending') {
       icon = this.renderLoading();
-      title = 'Processing...';
-      description = 'Hang tight! This may take up to a minute.';
+      title = {I18n.t('components.templates.purchaseState.processing')};
+      description = {I18n.t('components.templates.purchaseState.hang_tight')};
     } else { // in this case paymentState is 'error' always
       icon = <Ionicons name="md-close" color={warningColor} size={110} />;
       title = 'Uh oh!';
-      description = 'Your transaction failed to go through. Please try again.';
+      description ={I18n.t('components.templates.purchaseState.transaction_failed')};
     }
 
     return (
@@ -243,14 +243,14 @@ export default class PurchaseState extends React.PureComponent {
         {paymentState === 'error' && (
           <TouchableWithoutFeedback onPress={this.handleRetry}>
             <View style={styles.retryButton} >
-              <Text style={styles.buttonText}>Retry</Text>
+              <Text style={styles.buttonText}>{I18n.t('components.templates.purchaseState.retry')}</Text>
             </View>
           </TouchableWithoutFeedback>
         )}
         {paymentState === 'success' && (
           <TouchableWithoutFeedback onPress={this.handleGoToOrder}>
             <View style={styles.orderDetailsButton}>
-              <Text style={styles.buttonText}>Order Details</Text>
+              <Text style={styles.buttonText}>{I18n.t('components.templates.purchaseState.order_details')}</Text>
             </View>
           </TouchableWithoutFeedback>
         )}

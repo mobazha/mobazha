@@ -140,7 +140,7 @@ export default class ModerationFee extends PureComponent {
       <View style={[styles.tabContentWrapper, { height: 48 }]}>
         <TextInput
           noBorder
-          title="Percentage (%)"
+          title={I18n.t('components.molecules.ModerationFee.percentage')}
           keyboardType="numeric"
           defaultValue={orgPercentage}
           onChangeText={(percentage) => {
@@ -163,7 +163,7 @@ export default class ModerationFee extends PureComponent {
     return (
       <View style={styles.tabContentWrapper}>
         <TextInput
-          title="Flat Fee (%)"
+          title={I18n.t('components.molecules.ModerationFee.flat_fee')}
           keyboardType="numeric"
           defaultValue={orgFixedAmount}
           onChangeText={(fixedFee) => {
@@ -177,7 +177,7 @@ export default class ModerationFee extends PureComponent {
         />
         <TextInput
           noBorder
-          title="Percentage (%)"
+          title={I18n.t('components.molecules.ModerationFee.percentage')}
           keyboardType="numeric"
           defaultValue={orgPercentage}
           onChangeText={(percentage) => {
@@ -201,6 +201,7 @@ export default class ModerationFee extends PureComponent {
         <TextInput
           noBorder
           title="Fee ($)"
+          title={I18n.t('components.molecules.ModerationFee.fee')}
           keyboardType="numeric"
           defaultValue={orgFixedAmount}
           onChangeText={(fee) => {

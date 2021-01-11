@@ -44,7 +44,7 @@ class ListingAdvancedOptions extends PureComponent {
     if (coupons.length > 0) {
       return <Text style={textStyle}>{`${coupons.length} coupon${coupons.lengt > 1 ? 's' : ''}`}</Text>;
     }
-    return <FormLabelText text="Add coupons" />;
+    return <FormLabelText text={I18n.t('screens.listingAdvancedOptions.add_coupons')} />;
   }
 
   render() {
@@ -55,20 +55,20 @@ class ListingAdvancedOptions extends PureComponent {
           onLeft={() => {
             this.props.navigation.goBack();
           }}
-          title="Advanced"
+          title={I18n.t('screens.listingAdvancedOptions.advanced')}
         />
         <ScrollView>
-          <InputGroup title="Variants & Inventory" showPencil onPress={this.toVariants}>
+          <InputGroup title={I18n.t('screens.listingAdvancedOptions.Variants_Inventory')} showPencil onPress={this.toVariants}>
             <OptionGroup noBorder noArrow>
-              <FormLabelText text="Add variants and manage your store inventory" />
+              <FormLabelText text={I18n.t('screens.listingAdvancedOptions.add_hint')} />
             </OptionGroup>
           </InputGroup>
-          <InputGroup title="Store Policies" showPencil onPress={this.toStorePolicies}>
+          <InputGroup title={I18n.t('screens.listingAdvancedOptions.store_policies')}showPencil onPress={this.toStorePolicies}>
             <OptionGroup noBorder noArrow>
-              <FormLabelText text="Add a return policy or terms of service" />
+              <FormLabelText text={I18n.t('screens.listingAdvancedOptions.policies_hint')} />
             </OptionGroup>
           </InputGroup>
-          <InputGroup title="Coupons" showPencil onPress={this.toCoupons}>
+          <InputGroup title={I18n.t('screens.listingAdvancedOptions.coupons')}showPencil onPress={this.toCoupons}>
             <OptionGroup noBorder noArrow>
               {this.renderCouponText()}
             </OptionGroup>

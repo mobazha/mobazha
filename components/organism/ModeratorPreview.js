@@ -170,7 +170,7 @@ class ModeratorPreview extends React.PureComponent {
             <Text style={styles.name}>{decode(name)}</Text>
             <View style={styles.verifiedWrapper}>
               <Image style={styles.verifyIcon} source={CheckDecagramIcon} />
-              <Text style={styles.verifiedText}>verified</Text>
+              <Text style={styles.verifiedText}>{I18n.t('components.organism.Moderator.verified')} </Text>
             </View>
           </View>
           <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">

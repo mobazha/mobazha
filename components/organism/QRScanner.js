@@ -88,9 +88,9 @@ class QRScanner extends PureComponent {
             <Ionicons name="ios-qr-scanner" size={300} color="#FFF" />
             <Text style={styles.tooltip}>
               {fromWallet ? (
-                'Scan the QR code of a payment address'
+                I18n.t('components.organism.QRScanner.scan_qr_payment_address')
               ) : (
-                'Scan the QR code of a store,\na listing, or a payment address'
+                I18n.t('components.organism.QRScanner.scan_qr_store')
               )}
             </Text>
           </View>

@@ -62,15 +62,15 @@ class BackupProfilePassword extends PureComponent {
 
     const { password, cpassword } = this.state;
     if (_.isEmpty(password)) {
-      Alert.alert('Password empty', 'Please set a password');
+      Alert.alert({I18n.t('screens.backupProfilePassword.password_empty')}, {I18n.t('screens.backupProfilePassword.password_empty_hint')});
       return;
     }
     if (password !== cpassword) {
-      Alert.alert('Password mismatch', 'Please set a correct password');
+      Alert.alert({I18n.t('screens.backupProfilePassword.password_mismatch')}, {I18n.t('screens.backupProfilePassword.password_mismatch_hint')}) ;
       return;
     }
 
-    this.setState({ loadingText: 'It might take a minute...' });
+    this.setState({ loadingText: {I18n.t('screens.backupProfilePassword.take_a_minute')}});
 
     try {
       this.targetPath = `${RnFs.DocumentDirectoryPath}/havenBackup_${peerID.substring(0, 6)}_${moment().format('YYYYMMDDhhmmss')}.zip`;
@@ -84,9 +84,9 @@ class BackupProfilePassword extends PureComponent {
 
       const result = zipWithPassword(SERVER_PATH, this.targetPath, password, 'AES-256');
       subscribe(this.handleZipEvent);
-      console.warn('backup done', result);
+      console.warn({I18n.t('screens.backupProfilePassword.backup_done')}, result);
     } catch (err) {
-      console.warn('Backup failed', err);
+      console.warn({I18n.t('screens.backupProfilePassword.backup_failed')}, err);
       this.setState({ loadingText: null });
     }
   }
@@ -94,7 +94,7 @@ class BackupProfilePassword extends PureComponent {
   handleZipEvent = (event) => {
     if (event.progress === 1) {
       this.setState({ loadingText: null }, () => {
-        this.props.navigation.navigate('BackupProfileUpload', { targetPath: this.targetPath });
+        this.props.navigation.navigate({I18n.t('screens.backupProfilePassword.backup_failed')}, { targetPath: this.targetPath });
       });
     }
   }
@@ -114,20 +114,20 @@ class BackupProfilePassword extends PureComponent {
         <Header left={<NavBackButton />} onLeft={this.handleGoBack} />
         <KeyboardAvoidingView style={{ flex: 1 }} {...keyboardAvoidingViewSharedProps}>
           <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.resyncContentContainer}>
-            <InputGroup title="Set a password" noPadding noHeaderPadding>
+            <InputGroup title={I18n.t('screens.backupProfilePassword.backupProfileUpload')} noPadding noHeaderPadding>
               <TextInput
-                title="Password"
+                title={I18n.t('screens.backupProfilePassword.set_password')}
                 value={password}
-                placeholder="Set password"
+                placeholder={I18n.t('screens.backupProfilePassword.password')}
                 onChangeText={this.handlePasswordUpdate('password')}
                 required
                 secureTextEntry
                 autoFocus
               />
               <TextInput
-                title="Confirm"
+                title={I18n.t('screens.backupProfilePassword.confirm')}
                 value={cpassword}
-                placeholder="Confirm password"
+                placeholder={I18n.t('screens.backupProfilePassword.confirm_password')}
                 onChangeText={this.handlePasswordUpdate('cpassword')}
                 required
                 noBorder
@@ -135,12 +135,12 @@ class BackupProfilePassword extends PureComponent {
               />
             </InputGroup>
             <Text style={styles.resyncContent}>
-              Set a password and <Text style={styles.bold}>make sure to write it down.</Text>
-              {'\nYou\'ll need your password to restore your profile.'}
+            {I18n.t('screens.backupProfilePassword.hint1')} <Text style={styles.bold}>{I18n.t('screens.backupProfilePassword.hint2')}</Text>
+              {{I18n.t('screens.backupProfilePassword.hint3')}}
             </Text>
           </ScrollView>
           <View style={footerStyles.textButtonContainer}>
-            <SMTextButton title="NEXT" onPress={this.handleBackup} loadingText={loadingText} />
+            <SMTextButton title={I18n.t('screens.backupProfilePassword.next')} onPress={this.handleBackup} loadingText={loadingText} />
           </View>
         </KeyboardAvoidingView>
       </View>

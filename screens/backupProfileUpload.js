@@ -69,7 +69,7 @@ export default class BackupProfileUpload extends PureComponent {
     console.warn('-----------', targetPath);
 
     const shareOptions = {
-      message: 'Here is the backup file!',
+      message: {I18n.t('screens.backupProfileUpload.message')},
       url: `file://${targetPath}`,
     };
 
@@ -95,16 +95,16 @@ export default class BackupProfileUpload extends PureComponent {
           <Image style={styles.image} source={UploadImg} />
           <Text style={styles.resyncContent}>
             <Text style={styles.bold}>
-              {'Please upload your backup to a secure\nexternal location '}
+              {{I18n.t('screens.backupProfileUpload.upload_1')}}
             </Text>
-            {' to ensure you can recover your\ndata if you lose your phone.'}
+            {{I18n.t('screens.backupProfileUpload.upload_2')}}
           </Text>
           <View style={styles.buttonFooter}>
-            <SMRoundButton title="UPLOAD BACKUP" onPress={this.handleUpload} />
+            <SMRoundButton title= {I18n.t('screens.backupProfileUpload.upload_backup')}  onPress={this.handleUpload} />
           </View>
         </ScrollView>
         <View style={footerStyles.textButtonContainer}>
-          <SMTextButton title="DONE" onPress={this.handlePressDone} />
+          <SMTextButton title=  {I18n.t('screens.backupProfileUpload.done')} onPress={this.handlePressDone} />
         </View>
       </View>
     );

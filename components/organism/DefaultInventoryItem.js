@@ -120,7 +120,7 @@ class DefaultInventoryItem extends React.Component {
           <ProductImage images={images} />
           <View style={styles.content}>
             {isEmpty(title) ? (
-              <Text style={styles.titlePlaceholder}>No listing title</Text>
+              <Text style={styles.titlePlaceholder}>{I18n.t('components.organism.DefaultInventoryItem.no_title')}</Text>
             ) : (
               <Text style={styles.title}>{title}</Text>
             )}
@@ -149,15 +149,15 @@ class DefaultInventoryItem extends React.Component {
             </View>
           ) : (
             <View style={styles.quantityPlaceholder}>
-              <Text style={styles.label}>Quantity</Text>
-              <Text style={styles.quantity}>Unlimited</Text>
+              <Text style={styles.label}>{I18n.t('components.organism.DefaultInventoryItem.quantity')}</Text>
+              <Text style={styles.quantity}>{I18n.t('components.organism.DefaultInventoryItem.unlimited')}</Text>
             </View>
           )}
         </View>
         <Text style={styles.description}>
           {
-            isTracking ? 'If the quantity reaches 0, it will display as "sold out".'
-            : 'Consumers can purchase as much as they\'d like.'
+            isTracking ? I18n.t('components.organism.CheckoutSummary.quantity_sold_out')
+            : I18n.t('components.organism.CheckoutSummary.quantity_unlimit')
           }
         </Text>
       </React.Fragment>

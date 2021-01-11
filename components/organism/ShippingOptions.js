@@ -27,17 +27,17 @@ class ShippingOptions extends React.PureComponent {
     const { shippingOptions } = this.props;
     switch (shippingOptions.length) {
       case 0:
-        return <FormLabelText text="Add a shipping option" />;
+        return <FormLabelText text={I18n.t('components.organism.ShippingOptions.add_option')} />;
       case 1:
         return <Text style={style}>{shippingOptions[0].name}</Text>;
       default:
-        return <Text style={style}>{`${shippingOptions.length} shipping options`}</Text>;
+        return <Text style={style}>{I18n.t('components.organism.ShippingOptions.options_count')}</Text>;
     }
   }
 
   render() {
     return (
-      <InputGroup title="Shipping" required showPencil onPress={this.onPress}>
+      <InputGroup title={I18n.t('components.organism.ShippingOptions.shipping')} required showPencil onPress={this.onPress}>
         <OptionGroup noBorder noArrow>
           {this.renderLabel()}
         </OptionGroup>

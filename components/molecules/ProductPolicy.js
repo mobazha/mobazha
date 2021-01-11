@@ -74,7 +74,7 @@ export default class ProductPolicy extends PureComponent {
     <View style={styles.emptyWrapper}>
       <Ionicons style={styles.emptyIcon} name="ios-document" size={50} color="#8a8a8f" />
       <Text style={styles.emptyText}>
-        {`No ${policy.toLowerCase()} provided`}
+        {I18n.t('components.molecules.ProductPolicy.no_provided', { policy: policy })}
       </Text>
     </View>
   );
@@ -97,22 +97,22 @@ export default class ProductPolicy extends PureComponent {
           {_.isEmpty(content) ? (
             this.renderEmptyContent(policy)
           ) : (
-            <View style={styles.webviewWrapper}>
-              <WebView
-                onLoadStart={this.handleHideSpinner}
-                onError={this.handleHideSpinner}
-                originWhitelist={['*']}
-                source={{
-                  html: `${cssCode} ${content}`,
-                  baseUrl: '',
-                }}
-                // injectedJavaScript={jsCode}
-                // javaScriptEnabled
-                scalesPageToFit={Platform.OS === 'android'}
-                useWebKit={false}
-              />
-            </View>
-          )}
+              <View style={styles.webviewWrapper}>
+                <WebView
+                  onLoadStart={this.handleHideSpinner}
+                  onError={this.handleHideSpinner}
+                  originWhitelist={['*']}
+                  source={{
+                    html: `${cssCode} ${content}`,
+                    baseUrl: '',
+                  }}
+                  // injectedJavaScript={jsCode}
+                  // javaScriptEnabled
+                  scalesPageToFit={Platform.OS === 'android'}
+                  useWebKit={false}
+                />
+              </View>
+            )}
           {!_.isEmpty(content) && showSpinner && (
             <View style={styles.activityIndicator}>
               <ActivityIndicator size="large" color="#8a8a8f" />

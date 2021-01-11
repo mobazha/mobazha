@@ -262,7 +262,7 @@ export default class MultiSelector extends PureComponent {
           {selection.length > 0 && (
             <View style={styles.selectionIndicatorWrapper}>
               <Text style={styles.selectedIndicator}>
-                {selection.length} Selected
+                {I18n.t('components.organism.MultiSelector.select_info')} 
               </Text>
               <TouchableOpacity onPress={this.resetSelection}>
                 <LinkText text="Reset" />

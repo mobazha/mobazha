@@ -64,7 +64,7 @@ class ListingPaymentOptions extends PureComponent {
             <Image source={coin.icon} style={styles.coinImage} />
             <Text style={[styles.label, coin.disabled && { fontStyle: 'italic' }]}>
               {coin.disabled ? (
-                'Not accepted'
+                I18n.t('components.molecules.ListingPaymentOptions.not_accepted')
                ) : (
                 `${removeZeros(convertBetweenCurrencies(price, priceCurrency.code, coin.value).toFixed(8))} ${coin.value}`
               )}
@@ -79,7 +79,7 @@ class ListingPaymentOptions extends PureComponent {
     const { acceptedCurrencies } = this.props.listing.metadata;
     const renderingCoins = getRenderingCoins(acceptedCurrencies);
     return (
-      <ProductSection title="Payment Options">
+      <ProductSection title={I18n.t('components.molecules.ListingPaymentOptions.payment_options')}>
         {renderingCoins.map(this.renderPaymentMethod)}
       </ProductSection>
     );

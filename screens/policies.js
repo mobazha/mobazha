@@ -56,12 +56,12 @@ class Policies extends PureComponent {
         <Header
           left={<NavBackButton />}
           onLeft={this.onLeft}
-          title="Store Policies"
-          right={<LinkText text="Save" />}
+          title={I18n.t('screens.policies.store_policies')}
+          right={<LinkText text={I18n.t('screens.policies.save')} />}
           onRight={this.onRight}
         />
         <KeyboardAwareScrollView style={{ flex: 1 }}>
-          <InputGroup title="Terms and Conditions">
+          <InputGroup title={I18n.t('screens.policies.terms')} >
             <TextInput
               ref={this.setTermsRef}
               style={styles.input}
@@ -72,10 +72,10 @@ class Policies extends PureComponent {
               value={termsAndConditions}
               noBorder
               underlineColorAndroid="transparent"
-              placeholder="What are the terms and conditions of the listing? What are you responsible for as the vendor? Is there a warranty?"
+              placeholder={I18n.t('screens.policies.terms_hint')}
             />
           </InputGroup>
-          <InputGroup title="Refunds">
+          <InputGroup title={I18n.t('screens.policies.refunds')}>
             <TextInput
               ref={this.setRefundRef}
               style={styles.input}
@@ -85,7 +85,7 @@ class Policies extends PureComponent {
               value={refundPolicy}
               noBorder
               underlineColorAndroid="transparent"
-              placeholder="What is your return policy? How long are returns accepted for? Who pays for return shipping?"
+              placeholder={I18n.t('screens.policies.refund_hint')}
             />
           </InputGroup>
         </KeyboardAwareScrollView>

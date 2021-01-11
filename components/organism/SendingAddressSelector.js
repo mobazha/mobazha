@@ -130,7 +130,7 @@ export default class SendingAddressSelector extends PureComponent {
         </View>
         <TouchableOpacity activeOpacity={1} onPress={onSend} disabled={address === ''}>
           <View style={[styles.sendButton, address === '' ? styles.sendDisabled : {}]}>
-            <Text style={styles.sendButtonText}>SEND</Text>
+            <Text style={styles.sendButtonText}>{I18n.t('components.organism.SendingAddressSelector.send')}</Text>
             <Ionicons size={16} name="md-send" color="white" style={styles.sendIcon} />
           </View>
         </TouchableOpacity>

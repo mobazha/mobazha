@@ -87,7 +87,7 @@ class CategorySelector extends PureComponent {
       >
         <View style={styles.wrapper}>
           <Text style={styles.title} numberOfLines={1}>
-            Category
+          {I18n.t('components.organism.CategorySelector.category')}
           </Text>
           {category ? (
             <View style={styles.value}>
@@ -96,7 +96,7 @@ class CategorySelector extends PureComponent {
               <Text style={styles.subCategoryLabel} numberOfLines={1}>{decode(subCategory)}</Text>
             </View>
           ) : (
-            <Text style={styles.triggerLabel} numberOfLines={1}>Select a category</Text>
+            <Text style={styles.triggerLabel} numberOfLines={1}>{I18n.t('components.organism.CategorySelector.select_category')}</Text>
           )}
         </View>
       </OptionGroup>

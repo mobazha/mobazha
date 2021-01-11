@@ -134,7 +134,7 @@ class Comment extends React.Component {
         <View style={styles.topPart}>
           <Text style={styles.name}>{decode(name)}</Text>
           {loading ? (
-            <Text style={styles.loading}>Posting...</Text>
+            <Text style={styles.loading}>{I18n.t('components.atoms.Comment.posting')}</Text>
           ) : (
             <Text style={styles.time}>{formatSeconds(timeDiff)}</Text>
           )}

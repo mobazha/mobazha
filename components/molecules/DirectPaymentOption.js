@@ -60,11 +60,8 @@ export default ({ selected, onPress }) => (
           <View style={[styles.raidoButtonFill, selected ? styles.active : {}]} />
         </View>
         <View style={styles.option}>
-          <Text style={styles.optionTitle}>Direct Payment</Text>
-          <Text style={styles.optionDescription}>
-            Proceed without a moderator. Send funds directly to the vendor. Use with caution. Do not
-            use unless you completely trust the vendor.
-          </Text>
+          <Text style={styles.optionTitle}>{I18n.t('components.molecules.DirectPaymentOption.direct_payment')}</Text>
+          <Text style={styles.optionDescription}>{I18n.t('components.molecules.DirectPaymentOption.description')}</Text>
         </View>
       </View>
     </TouchableWithoutFeedback>

@@ -39,13 +39,13 @@ export default ({
         <TouchableWithoutFeedback onPress={onPress}>
           <View style={styles.textWrapper}>
             <Text style={styles.handle} numberOfLines={1}>
-              {decode(_.get(profile, 'name') || 'Unknown')}
+              {decode(_.get(profile, 'name') || I18n.t('components.molecules.BlockedNodeItem.unknown'))}
             </Text>
           </View>
         </TouchableWithoutFeedback>
         <TouchableWithoutFeedback onPress={onToggle}>
           <View style={styles.button}>
-            <Text style={styles.buttonText}>{blocked ? 'Unblock' : 'Block'}</Text>
+            <Text style={styles.buttonText}>{blocked ? I18n.t('components.molecules.BlockedNodeItem.unblock') : I18n.t('components.molecules.BlockedNodeItem.block')}</Text>
           </View>
         </TouchableWithoutFeedback>
       </View>

@@ -448,7 +448,7 @@ class FeedItem extends React.PureComponent {
                   color={brandColor}
                 />
                 <Text style={styles.providerName}>{profileName}</Text>
-                <Text style={styles.repostText}>reposted</Text>
+                <Text style={styles.repostText}>{I18n.t('components.molecules.FeedItem.reposted')}</Text>
               </View>
             </TouchableWithoutFeedback>
           )}

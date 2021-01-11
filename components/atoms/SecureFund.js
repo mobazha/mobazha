@@ -39,10 +39,10 @@ const styles = {
 
 export default ({ onBackup }) => (
   <View style={styles.wrapper}>
-    <Text style={styles.secureText}>Secure your funds</Text>
+    <Text style={styles.secureText}>{I18n.t('components.atoms.SecureFund.secure_funds')}</Text>
     <TouchableWithoutFeedback onPress={onBackup}>
       <View style={styles.button}>
-        <Text style={styles.btnText}>Backup wallet</Text>
+        <Text style={styles.btnText}>{I18n.t('components.atoms.SecureFund.backup_wallet')}</Text>
       </View>
     </TouchableWithoutFeedback>
   </View>

@@ -104,7 +104,7 @@ export default class ProductDescription extends PureComponent {
     if (_.isEmpty(description)) {
       return (
         <ProductSection>
-          <Text style={styles.emptyText}>No description provided</Text>
+          <Text style={styles.emptyText}>{I18n.t('components.molecules.ProductDescription.empty_text')}</Text>
         </ProductSection>
       );
     }
@@ -116,7 +116,7 @@ export default class ProductDescription extends PureComponent {
         </Text>
         <TouchableWithoutFeedback onPress={this.handleShowModal}>
           <View style={styles.showAllButton}>
-            <Text style={styles.showAllText}>Read more</Text>
+            <Text style={styles.showAllText}>{I18n.t('components.molecules.ProductDescription.read_more')}</Text>
           </View>
         </TouchableWithoutFeedback>
         <OBLightModal
@@ -137,8 +137,8 @@ export default class ProductDescription extends PureComponent {
               scalesPageToFit={false}
               automaticallyAdjustContentInsets
               useWebKit={false}
-              // injectedJavaScript={jsCode}
-              // javaScriptEnabled
+            // injectedJavaScript={jsCode}
+            // javaScriptEnabled
             />
           </View>
           {showSpinner && (

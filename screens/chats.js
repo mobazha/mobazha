@@ -122,15 +122,15 @@ class Chats extends PureComponent {
     return tab === 'conversations' ? (
       <View style={styles.placeholderWrapper}>
         <Feather name="message-circle" size={50} color="#8a8a8f" />
-        <Text style={styles.placeholderText}>Start a conversation</Text>
+        <Text style={styles.placeholderText}>{I18n.t('screens.chats.start_conversation')}</Text>
         <View style={styles.buttonWrapper}>
-          <HollowButton title="New Chat" onPress={this.toNewChat} />
+          <HollowButton title= >{I18n.t('screens.chats.new_chat')} onPress={this.toNewChat} />
         </View>
       </View>
     ) : (
       <View style={styles.placeholderWrapper}>
         <Foundation name="price-tag" size={50} color={formLabelColor} />
-        <Text style={styles.placeholderText}>No order discussions found</Text>
+        <Text style={styles.placeholderText}>{I18n.t('screens.chats.no_discussion')}</Text>
       </View>
     );
   };
@@ -145,7 +145,7 @@ class Chats extends PureComponent {
         <TabHeader
           left={<NavPlusButton />}
           onLeft={this.toNewChat}
-          title="Chat"
+          title={I18n.t('screens.chats.chat')}
           navigation={navigation}
         />
         {/* <Tabs

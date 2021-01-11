@@ -184,7 +184,7 @@ class ShopCard extends Component {
               <View style={[styles.contentWrapper, contentWrapperStyle]}>
                 <View style={styles.avatarWrapper}>
                   <FastImage style={styles.avatar} source={avatar} resizeMode="cover" />
-                  <Text style={styles.shopName}>{decode(profile.name) || 'Unknown'}</Text>
+                  <Text style={styles.shopName}>{decode(profile.name) || I18n.t('components.molecules.ShopCard.unknown')}</Text>
                   {/* <Text style={styles.handle}>
                     &nbsp;&nbsp;@
                     {profile.handle}

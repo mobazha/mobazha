@@ -205,15 +205,15 @@ class Feed extends PureComponent {
     if (profile.peerID !== peerID && peerID) {
       return (
         <View style={styles.wrapper}>
-          <Text style={styles.description}>{name} {'\nhasn\'t posted anything yet.'}</Text>
+          <Text style={styles.description}>{name} {I18n.t('components.templates.feed.not_post')}</Text>
         </View>
       );
     }
 
     return (
       <View style={styles.wrapper}>
-        <Text style={styles.mainText}>You haven’t posted anything yet.</Text>
-        <Text style={styles.description}>Share something with the community!</Text>
+        <Text style={styles.mainText}>{I18n.t('components.templates.feed.post_hint1')} </Text>
+        <Text style={styles.description}>{I18n.t('components.templates.feed.post_hint2')}</Text>
         <HollowButton title="Create post" onPress={this.createPost} />
       </View>
     );
@@ -238,7 +238,7 @@ class Feed extends PureComponent {
         />
         {reported && (
           <View style={styles.overlay}>
-            <Text style={styles.overlayText}>Reported</Text>
+            <Text style={styles.overlayText}>{I18n.t('components.templates.feed.reported')}</Text>
           </View>
         )}
         <ReportTemplate

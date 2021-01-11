@@ -28,7 +28,7 @@ export default ({ disabled, loading, onPress }) => (
       {loading ? (
         <ActivityIndicator size="small" color="white" />
       ) : (
-        <Text style={styles.text}>Post</Text>
+        <Text style={styles.text}>{I18n.t('components.atoms.PostButton.post')}</Text>
       )}
     </View>
   </TouchableWithoutFeedback>

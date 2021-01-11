@@ -55,6 +55,10 @@ func (x *DevNet) Execute(args []string) error {
 	vendor.Multiwallet()[iwallet.CtMock] = walletNet.Wallets()[1]
 	moderator.Multiwallet()[iwallet.CtMock] = walletNet.Wallets()[2]
 
+	walletNet.Wallets()[0].SetEventBus(buyer.EventBus())
+	walletNet.Wallets()[1].SetEventBus(vendor.EventBus())
+	walletNet.Wallets()[2].SetEventBus(moderator.EventBus())
+
 	if err := core.InitializeMultiwallet(buyer.Multiwallet(), buyer.DB(), time.Now()); err != nil {
 		return err
 	}

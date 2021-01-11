@@ -18,6 +18,8 @@ import {
 
 import { timeSinceInSeconds } from '../../utils/time';
 
+import {I18n} from '../../langs/I18n';
+
 const PROFILE_RECHECK_HOURS = 1;
 
 function* fetchProfile(action) {

@@ -3,6 +3,8 @@ import { TouchableWithoutFeedback, View } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { borderColor, formLabelColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   button: {
     width: 46,

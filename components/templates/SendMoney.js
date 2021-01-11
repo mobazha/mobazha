@@ -13,6 +13,8 @@ import { setSendMoneyCoin } from '../../reducers/appstate';
 import { OBLightModal } from './OBModal';
 import { keyboardAvoidingViewSharedProps } from '../../utils/keyboard';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: brandColor,

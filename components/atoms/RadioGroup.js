@@ -3,6 +3,8 @@ import { View, TouchableWithoutFeedback, FlatList } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { borderColor, greenColor, staticLabelColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     paddingVertical: 10,

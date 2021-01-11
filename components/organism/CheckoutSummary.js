@@ -23,6 +23,8 @@ import { getListingActualPrice } from '../../utils/stockManage';
 import { estimateFee } from '../../api/wallet';
 import CouponApplyModal from '../templates/CouponApplyModal';
 
+import {I18n} from '../../langs/I18n';
+
 const FEE_MAX_PERCENT = 0.25;
 
 const generateCheckoutObjectFromProps = (props) => {

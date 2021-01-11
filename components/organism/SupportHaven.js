@@ -6,6 +6,8 @@ import { ifIphoneX } from 'react-native-iphone-x-helper';
 import { formLabelColor, borderColor, warningColor, primaryTextColor, brandColor } from '../commonColors';
 import { convertorsMap } from '../../selectors/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     alignSelf: 'stretch',

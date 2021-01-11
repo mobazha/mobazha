@@ -8,6 +8,8 @@ import ProductRating from '../components/molecules/ProductRating';
 import Header from '../components/molecules/Header';
 import { screenWrapper } from '../utils/styles';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

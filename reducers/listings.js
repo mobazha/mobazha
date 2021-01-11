@@ -1,6 +1,8 @@
 import { createAction, handleActions } from 'redux-actions';
 import * as _ from 'lodash';
 
+import {I18n} from '../langs/I18n';
+
 const MAXIMUM_LISTING_COUNT = 100;
 
 export const actions = {

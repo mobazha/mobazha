@@ -25,6 +25,8 @@ import productConditionOptions from '../config/conditionFilter.json';
 
 import { eventTracker } from '../utils/EventTracker';
 
+import {I18n} from '../langs/I18n';
+
 const shippingCountries = [...countries];
 
 const showingProdTypes = Platform.OS === 'ios' ? prodTypes.filter(item => item.value !== 'digital_good') : prodTypes;

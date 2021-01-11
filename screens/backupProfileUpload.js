@@ -8,6 +8,8 @@ import SMTextButton from '../components/atoms/SMTextButton';
 import NavBackButton from '../components/atoms/NavBackButton';
 import Header from '../components/molecules/Header';
 
+import {I18n} from '../langs/I18n';
+
 const UploadImg = require('../assets/images/upload.png');
 
 const styles = {

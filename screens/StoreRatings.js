@@ -9,6 +9,8 @@ import Header from '../components/molecules/Header';
 import { getRatings } from '../api/products';
 import { screenWrapper } from '../utils/styles';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

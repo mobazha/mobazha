@@ -6,6 +6,8 @@ import InputGroup from '../atoms/InputGroup';
 import TextInput from '../atoms/TextInput';
 import ModerationFee from '../molecules/ModerationFee';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     paddingTop: 30,

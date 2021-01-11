@@ -14,6 +14,8 @@ import TextInput from '../atoms/TextInput';
 import LinkText from '../atoms/LinkText';
 import Header from '../molecules/Header';
 
+import {I18n} from '../../langs/I18n';
+
 const MAJOR_PADDING = chatStyles.avatarImage.marginLeft;
 
 const styles = {

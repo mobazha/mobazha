@@ -4,6 +4,8 @@ import Icons from 'react-native-vector-icons/MaterialIcons';
 import InputGroup from '../atoms/InputGroup';
 import { primaryTextColor, foregroundColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

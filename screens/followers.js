@@ -9,6 +9,8 @@ import Header from '../components/molecules/Header';
 import NavBackButton from '../components/atoms/NavBackButton';
 import FriendItem from '../components/molecules/FriendItem';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

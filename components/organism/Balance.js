@@ -7,6 +7,8 @@ import BigNumber from 'bignumber.js';
 import { brandColor, foregroundColor } from '../commonColors';
 import { convertorsMap } from '../../selectors/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: brandColor,

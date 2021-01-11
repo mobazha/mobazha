@@ -12,6 +12,8 @@ import { OBLightModal } from './OBModal';
 import LinkText from '../atoms/LinkText';
 import TextArea from '../atoms/TextArea';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   scrollview: {
     flex: 1,

@@ -1,6 +1,8 @@
 import { NavigationActions } from 'react-navigation';
 import AppNavigator from '../routes';
 
+import {I18n} from '../langs/I18n';
+
 const action = AppNavigator.router.getActionForPathAndParams(null);
 const initialState = AppNavigator.router.getStateForAction({});
 // const initialState = {};

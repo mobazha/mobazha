@@ -9,6 +9,8 @@ import { brandColor, bgHightlightColor } from '../components/commonColors';
 import { footerStyles } from '../utils/styles';
 import SMTextButton from '../components/atoms/SMTextButton';
 
+import {I18n} from '../langs/I18n';
+
 const UploadImg = require('../assets/images/upload.png');
 
 const styles = {

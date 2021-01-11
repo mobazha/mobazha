@@ -32,6 +32,8 @@ import { parseCountryName } from '../../utils/string';
 import { timeSinceOrderTimeout, getOrderBriefFromDetails, isFulfilled } from '../../utils/order';
 import { minUnitAmountToBCH, getFixedCurrency, getDecimalPoints } from '../../utils/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   optionWrapper: {
     flexDirection: 'row',

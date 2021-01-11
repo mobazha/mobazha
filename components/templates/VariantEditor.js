@@ -6,6 +6,8 @@ import MoreButton from '../atoms/MoreButton';
 import SingleVariantEditor from '../organism/SingleVariantEditor';
 import { eventTracker } from '../../utils/EventTracker';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   moreButtonWrapper: {
     paddingVertical: 20,

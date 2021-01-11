@@ -9,6 +9,8 @@ import { OBLightModal } from '../templates/OBModal';
 
 import InputGroup from '../atoms/InputGroup';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   contentWrapper: {
     flex: 1,

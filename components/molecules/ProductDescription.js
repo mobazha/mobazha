@@ -16,6 +16,8 @@ import { eatSpaces } from '../../utils/string';
 import { cssCode } from '../../utils/webview';
 import { eventTracker } from '../../utils/EventTracker';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   content: {
     fontSize: 15,

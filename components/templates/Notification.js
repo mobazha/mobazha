@@ -15,6 +15,8 @@ import { filterNotifications } from '../../utils/notification';
 import { getNetworkNotifications, getStreamNotifiactions } from '../../selectors/notifications';
 import { secondaryTextColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   emptyWrapper: {
     marginTop: 110,

@@ -13,6 +13,8 @@ import { timeSince } from '../../utils/time';
 import { primaryTextColor, brandColor, formLabelColor } from '../commonColors';
 import { eventTracker } from '../../utils/EventTracker';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     borderLeftWidth: 5,

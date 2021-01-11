@@ -12,6 +12,8 @@ import { fetchFeedItems } from '../reducers/stream';
 import { getActivity } from '../selectors/stream';
 import { keyboardAvoidingViewSharedProps } from '../utils/keyboard';
 
+import {I18n} from '../langs/I18n';
+
 const wrapperStyle = { flex: 1, backgroundColor: 'white' };
 
 class FeedDetail extends PureComponent {

@@ -8,6 +8,8 @@ import NavBackButton from '../components/atoms/NavBackButton';
 import { foregroundColor } from '../components/commonColors';
 import { eventTracker } from '../utils/EventTracker';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

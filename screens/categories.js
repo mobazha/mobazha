@@ -8,6 +8,8 @@ import NavBackButton from '../components/atoms/NavBackButton';
 import categories from '../config/categories';
 import CatListItem from '../components/atoms/CatListItem';
 
+import {I18n} from '../langs/I18n';
+
 const renderingCategories = Platform.select({
   ios: categories.filter(cat => cat.name !== 'Gift Cards'),
   android: categories,

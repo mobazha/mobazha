@@ -12,6 +12,8 @@ import { formLabelColor, secondaryTextColor } from '../components/commonColors';
 import { setKeyword } from '../reducers/appstate';
 import { appendUserSearch } from '../reducers/search';
 
+import {I18n} from '../langs/I18n';
+
 const { height } = Dimensions.get('window');
 
 const styles = {

@@ -5,6 +5,8 @@ import HollowButton from '../atoms/HollowButton';
 
 import CouponIcon from '../../assets/icons/shipping.png';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

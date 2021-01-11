@@ -9,6 +9,8 @@ import ProductListItem from '../molecules/ProductListItem';
 
 import { foregroundColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const listItemHeight = (Dimensions.get('screen').width / 3) + 1;
 
 const styles = {

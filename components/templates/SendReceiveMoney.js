@@ -5,6 +5,8 @@ import { ifIphoneX } from 'react-native-iphone-x-helper';
 
 import { brandColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

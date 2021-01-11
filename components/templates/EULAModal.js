@@ -9,6 +9,8 @@ import { onboardingStyles, footerStyles } from '../../utils/styles';
 import { brandColor } from '../commonColors';
 import { EMAIL_URL } from '../../config/supportUrls';
 
+import {I18n} from '../../langs/I18n';
+
 const shieldImg = require('../../assets/images/privacyShield.png');
 const bottomImg = require('../../assets/images/privacyBottom.png');
 

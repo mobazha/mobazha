@@ -19,6 +19,8 @@ import { parseCountryName } from '../../utils/string';
 import CheckBox from '../atoms/CheckBox';
 import { eventTracker } from '../../utils/EventTracker';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   addrWrapper: {
     paddingTop: 12,

@@ -6,6 +6,8 @@ import { ifIphoneX } from 'react-native-iphone-x-helper';
 import { formLabelColor, linkTextColor, primaryTextColor, borderColor, brandColor } from '../commonColors';
 import QRScanner from './QRScanner';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     borderTopLeftRadius: 8,

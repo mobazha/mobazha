@@ -20,6 +20,8 @@ import { priceStyle } from '../commonStyles';
 import { getImageSourceWithDefault } from '../../utils/files';
 import { convertorsMap } from '../../selectors/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const { width: screenWidth } = Dimensions.get('screen');
 
 const styles = {

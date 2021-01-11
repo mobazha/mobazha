@@ -14,6 +14,8 @@ import { screenWrapper } from '../utils/styles';
 import { fetchWalletBalance } from '../reducers/wallet';
 import { eventTracker } from '../utils/EventTracker';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   contentWrapper: {
     alignSelf: 'stretch',

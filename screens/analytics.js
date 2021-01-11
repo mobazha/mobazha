@@ -13,6 +13,8 @@ import { eventTracker } from '../utils/EventTracker';
 import { setTrackingStatus } from '../reducers/appstate';
 import { formLabelColor, primaryTextColor } from '../components/commonColors';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   text: {
     flexDirection: 'row',

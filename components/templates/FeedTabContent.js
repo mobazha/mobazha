@@ -7,6 +7,8 @@ import Comment from '../atoms/Comment';
 import { foregroundColor, secondaryTextColor } from '../commonColors';
 import FeedListItem from '../molecules/FeedListItem';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

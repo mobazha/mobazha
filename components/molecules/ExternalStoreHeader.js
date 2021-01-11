@@ -9,6 +9,8 @@ import NavBackButton from '../atoms/NavBackButton';
 import StoreMoreMenu from '../molecules/StoreMoreMenu';
 import StatusBarWrapper from '../../status-bar';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     alignSelf: 'stretch',

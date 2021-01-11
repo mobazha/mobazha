@@ -9,6 +9,8 @@ import { minUnitAmountToBCH } from '../../utils/currency';
 import { COINS } from '../../utils/coins';
 import { formLabelColor, brandColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: 'white',

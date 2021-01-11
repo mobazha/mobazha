@@ -16,6 +16,8 @@ import { eventTracker } from '../utils/EventTracker';
 import { screenWrapper } from '../utils/styles';
 import { COINS } from '../utils/coins';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   wrapper: {
     alignItems: 'center',

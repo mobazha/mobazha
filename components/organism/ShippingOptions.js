@@ -8,6 +8,8 @@ import OptionGroup from '../atoms/OptionGroup';
 import FormLabelText from '../atoms/FormLabelText';
 import { primaryTextColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const style = {
   fontSize: 15,
   fontWeight: 'normal',

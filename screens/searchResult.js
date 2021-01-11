@@ -16,6 +16,8 @@ import { setKeyword, removeKeyword } from '../reducers/appstate';
 import { getNavRouteAndParamsFromURL } from '../utils/navigation';
 import { eventTracker } from '../utils/EventTracker';
 
+import {I18n} from '../langs/I18n';
+
 const tabs = [
   {
     label: 'Listings',

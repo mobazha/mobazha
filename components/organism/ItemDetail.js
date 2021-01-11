@@ -19,6 +19,8 @@ import { eventTracker } from '../../utils/EventTracker';
 import CategorySelector from './CategorySelector';
 import { getFixedCurrency } from '../../utils/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const showingProdTypes = Platform.OS === 'ios' ?
   iosProdTypes.slice(1, iosProdTypes.length) : prodTypes.slice(1, prodTypes.length);
 

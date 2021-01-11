@@ -12,6 +12,8 @@ import { fetchStream, refreshStream, updateSort, STREAM_DEFAULT_FILTER } from '.
 import { setStreamBuildNotificationSeen } from '../reducers/appstate';
 import { getFilteredList } from '../selectors/stream';
 
+import {I18n} from '../langs/I18n';
+
 const filterOptions = [
   { label: 'My Feed', value: 'user', tag: 'NEW' },
   { label: 'Global', value: 'global' },

@@ -20,6 +20,8 @@ import ReportTemplate from '../components/templates/ReportTemplate';
 import { eventTracker } from '../utils/EventTracker';
 import { formLabelColor } from '../components/commonColors';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   emptyWrapper: {
     flex: 1,

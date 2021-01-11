@@ -2,6 +2,8 @@ import React from 'react';
 import { TouchableWithoutFeedback, ActivityIndicator, View, Text } from 'react-native';
 import { brandColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   button: {
     width: 118,

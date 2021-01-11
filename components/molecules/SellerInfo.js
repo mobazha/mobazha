@@ -16,6 +16,8 @@ import ProductSection from '../atoms/ProductSection';
 import { fetchProfile } from '../../reducers/profile';
 import AvatarImage from '../atoms/AvatarImage';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     marginBottom: 2,

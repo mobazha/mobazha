@@ -3,6 +3,8 @@ import { Text } from 'react-native';
 
 import { primaryTextColor } from '../../components/commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   header: {
     fontSize: 16,

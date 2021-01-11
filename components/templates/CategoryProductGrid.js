@@ -7,6 +7,8 @@ import { connect } from 'react-redux';
 import InputGroup from '../atoms/InputGroup';
 import ProductGrid from '../organism/ProductGrid';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     marginTop: 16,

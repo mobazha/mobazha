@@ -13,6 +13,8 @@ import QRScanner from '../organism/QRScanner';
 import { borderColor, primaryTextColor, formLabelColor } from '../commonColors';
 import LogoImage from '../../assets/images/logo/splash-logo.png';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

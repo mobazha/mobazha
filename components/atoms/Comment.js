@@ -18,6 +18,8 @@ import { formatSeconds } from '../../utils/time';
 import { getOBParsePatterns } from '../../utils/parseText';
 import { handleOBDeeplinkWithNavigation } from '../../utils/navigation';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

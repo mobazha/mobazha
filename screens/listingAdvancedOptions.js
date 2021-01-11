@@ -11,6 +11,8 @@ import { setDetails } from '../reducers/createListing';
 import NavBackButton from '../components/atoms/NavBackButton';
 import { primaryTextColor } from '../components/commonColors';
 
+import {I18n} from '../langs/I18n';
+
 const wrapperStyle = {
   backgroundColor: '#FFF',
   flex: 1,

@@ -10,6 +10,8 @@ import { setCategory, setCategoryKeyword } from '../reducers/appstate';
 import SearchHeader from '../components/organism/SearchHeader';
 import { eventTracker } from '../utils/EventTracker';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   header: {
     backgroundColor: 'white',

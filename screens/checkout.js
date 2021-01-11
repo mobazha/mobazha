@@ -26,6 +26,8 @@ import { screenWrapper } from '../utils/styles';
 import OBSlidingPanel from '../components/atoms/OBSlidingPanel';
 import { eventTracker } from '../utils/EventTracker';
 
+import {I18n} from '../langs/I18n';
+
 const FEE_MAX_PERCENT = 0.25;
 const styles = {
   bottomWrapper: {

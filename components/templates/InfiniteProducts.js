@@ -11,6 +11,8 @@ import { secondaryTextColor } from '../commonColors';
 import ProductModeSelector from '../organism/ProductModeSelector';
 import ProductListItem from '../molecules/ProductListItem';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   activityIndicator: {
     paddingBottom: 10,

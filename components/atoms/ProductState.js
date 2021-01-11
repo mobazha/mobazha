@@ -6,6 +6,8 @@ import prdType from '../../config/productTypes.json';
 import prdCondition from '../../config/productCondition.json';
 import { secondaryTextColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     paddingBottom: 16,

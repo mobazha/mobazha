@@ -4,6 +4,8 @@ import { withNavigation } from 'react-navigation';
 
 import { handleOBDeeplinkWithNavigation } from '../../utils/navigation';
 
+import {I18n} from '../../langs/I18n';
+
 const { width } = Dimensions.get('window');
 
 const IMAGE_RATIO = 328.0 / 750;

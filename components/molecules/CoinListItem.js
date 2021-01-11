@@ -8,6 +8,8 @@ import { COINS } from '../../utils/coins';
 import { convertorsMap } from '../../selectors/currency';
 import { cellStyles } from '../../utils/styles';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
   },

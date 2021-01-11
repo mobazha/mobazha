@@ -9,6 +9,8 @@ import { homeCategories } from '../../config/categories';
 import { secondaryTextColor, brandColor } from '../commonColors';
 import { eventTracker } from '../../utils/EventTracker';
 
+import {I18n} from '../../langs/I18n';
+
 const { width: screenWidth } = Dimensions.get('screen');
 
 const styles = {

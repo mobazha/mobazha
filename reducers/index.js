@@ -31,6 +31,8 @@ import storeListings from './storeListings';
 import config from './config';
 import ratings from './ratings';
 
+import {I18n} from '../langs/I18n';
+
 const loadPartialOrderFilter = createFilter(
   'orders',
   null,

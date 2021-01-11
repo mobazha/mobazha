@@ -13,6 +13,8 @@ import { timeUntil } from '../../utils/time';
 import { getOrderActions, getStatusInfo, isFulfilled, timeSinceOrderTimeout } from '../../utils/order';
 import { minUnitAmountToBCH } from '../../utils/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

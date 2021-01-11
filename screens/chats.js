@@ -19,6 +19,8 @@ import { formLabelColor } from '../components/commonColors';
 import NavPlusButton from '../components/atoms/NavPlusButton';
 import { chatsMap } from '../selectors/chat';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   placeholderWrapper: {
     flex: 1,

@@ -4,6 +4,8 @@ import { View } from 'react-native';
 import ProductTag from '../atoms/ProductTag';
 import ProductSection from '../atoms/ProductSection';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

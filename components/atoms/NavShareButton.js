@@ -4,6 +4,8 @@ import EvilIcons from 'react-native-vector-icons/EvilIcons';
 
 import { foregroundColor, primaryTextColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   container: {
     width: 32,

@@ -4,6 +4,8 @@ import { isEmpty } from 'lodash';
 
 import { primaryTextColor, formLabelColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

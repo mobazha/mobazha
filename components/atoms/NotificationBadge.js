@@ -4,6 +4,8 @@ import { View, Text } from 'react-native';
 import { brandColor } from '../commonColors';
 import { tabNotifBadgeSize } from '../../utils/navbar';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   notifCount: {
     ...tabNotifBadgeSize,

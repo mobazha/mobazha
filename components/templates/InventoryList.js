@@ -3,6 +3,8 @@ import { FlatList, Text } from 'react-native';
 
 import InventoryItem from '../organism/InventoryItem';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   text: {
     fontSize: 14,

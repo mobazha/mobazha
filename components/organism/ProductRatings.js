@@ -11,6 +11,8 @@ import ProductSection from '../atoms/ProductSection';
 import ProductRating from '../molecules/ProductRating';
 import { eventTracker } from '../../utils/EventTracker';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   showAllButton: {
     width: '100%',

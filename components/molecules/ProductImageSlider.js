@@ -4,6 +4,8 @@ import Carousel from 'react-native-snap-carousel';
 
 import { getImageSourceWithDefault } from '../../utils/files';
 
+import {I18n} from '../../langs/I18n';
+
 const { width } = Dimensions.get('window');
 
 const styles = {

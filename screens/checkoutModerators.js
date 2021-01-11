@@ -11,6 +11,8 @@ import { screenWrapper } from '../utils/styles';
 import { secondaryTextColor, borderColor, primaryTextColor } from '../components/commonColors';
 import { fetchModerators } from '../reducers/moderators';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   loadingWrapper: {
     flexDirection: 'row',

@@ -5,6 +5,8 @@ import Carousel from 'react-native-snap-carousel';
 import MainSliderItem from '../atoms/MainSliderItem';
 import MainSliderContentLoader from '../atoms/MainSliderContentLoader';
 
+import {I18n} from '../../langs/I18n';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const styles = {

@@ -2,6 +2,8 @@ import React from 'react';
 import { TouchableWithoutFeedback, Text, View } from 'react-native';
 import { primaryTextColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     minWidth: 250,

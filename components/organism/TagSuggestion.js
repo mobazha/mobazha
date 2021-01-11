@@ -3,6 +3,8 @@ import { View, Text, FlatList } from 'react-native';
 
 import ProductTag from '../atoms/ProductTag';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     borderTopWidth: 1,

@@ -15,6 +15,8 @@ import LocationPin from '../atoms/LocationPin';
 import Fee from '../atoms/Fee';
 import { eatSpaces } from '../../utils/string';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

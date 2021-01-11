@@ -9,6 +9,8 @@ import { greenColor, brandColor } from '../commonColors';
 import { eventTracker } from '../../utils/EventTracker';
 import { TOAST_OPTION } from '../../utils/toast';
 
+import {I18n} from '../../langs/I18n';
+
 const fullButtonStyles = {
   button: {
     height: 30,

@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     paddingHorizontal: 6,

@@ -9,6 +9,8 @@ import NavBackButton from '../components/atoms/NavBackButton';
 import Header from '../components/molecules/Header';
 import { brandColor, bgHightlightColor } from '../components/commonColors';
 
+import {I18n} from '../langs/I18n';
+
 const RestoreImg = require('../assets/images/restore.png');
 
 const styles = {

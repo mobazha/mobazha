@@ -5,6 +5,8 @@ import { formLabelColor, borderColor, primaryTextColor } from '../commonColors';
 
 import Switch from './Switch';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

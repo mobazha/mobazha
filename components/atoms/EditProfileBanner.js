@@ -3,6 +3,8 @@ import { View } from 'react-native';
 
 import SaveButton from './FullButton';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: 'white',

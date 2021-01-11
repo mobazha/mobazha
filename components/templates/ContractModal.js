@@ -8,6 +8,8 @@ import Button from '../atoms/FullButton';
 import Header from '../molecules/Header';
 import { OBLightModal } from '../templates/OBModal';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   buttonWrapper: {
     marginBottom: ifIphoneX(44, 10),

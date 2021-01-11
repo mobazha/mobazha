@@ -16,6 +16,8 @@ import { SERVER_PATH } from '../utils/server';
 import { keyboardAvoidingViewSharedProps } from '../utils/keyboard';
 import { purgeCache } from '../api/cache';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

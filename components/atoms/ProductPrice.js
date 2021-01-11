@@ -10,6 +10,8 @@ import BuyNowButton from './FullButton';
 import UnavailableButton from './UnavailableButton';
 import AverageRating from '../organism/AverageRating';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: 'white',

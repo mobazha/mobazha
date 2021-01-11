@@ -14,6 +14,8 @@ import { updateAcceptedCoins } from '../reducers/profile';
 import { getRenderingCoins, COINS } from '../utils/coins';
 import { screenWrapper } from '../utils/styles';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   wrapper: {
     flexGrow: 1,

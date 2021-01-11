@@ -8,6 +8,8 @@ import NotificationBadge from './NotificationBadge';
 import AvatarImage from '../atoms/AvatarImage';
 import { brandColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   imageHolder: {
     width: 29,

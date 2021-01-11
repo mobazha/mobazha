@@ -3,6 +3,8 @@ import { TouchableWithoutFeedback, Image, Text, View } from 'react-native';
 
 import { primaryTextColor, bgHightlightColor, borderColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

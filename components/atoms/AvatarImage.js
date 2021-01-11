@@ -9,6 +9,8 @@ import { getAvatarImageSource, getLocalAvatarImageSource } from '../../utils/fil
 
 import defaultAvatar from '../../assets/images/defaultAvatar.png';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   imageContainer: width => ({
     width,

@@ -9,6 +9,8 @@ import { minUnitAmountToBCH } from '../../utils/currency';
 import { convertorsMap } from '../../selectors/currency';
 import { COINS } from '../../utils/coins';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: foregroundColor,

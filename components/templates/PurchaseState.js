@@ -17,6 +17,8 @@ import SupportHaven from '../organism/SupportHaven';
 import OBSlidingPanel from '../atoms/OBSlidingPanel';
 import PayPanel from '../organism/PayPanel';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

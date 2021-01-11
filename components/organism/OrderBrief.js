@@ -15,6 +15,8 @@ import { COINS } from '../../utils/coins';
 import { timeSince } from '../../utils/time';
 import { fetchProfile } from '../../reducers/profile';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     borderTopWidth: 1,

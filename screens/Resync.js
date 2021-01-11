@@ -10,6 +10,8 @@ import { resyncBlockchain } from '../api/wallet';
 import { timeSince } from '../utils/time';
 import NavBackButton from '../components/atoms/NavBackButton';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

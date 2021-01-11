@@ -27,6 +27,8 @@ import { formLabelColor } from '../commonColors';
 
 import { eventTracker } from '../../utils/EventTracker';
 
+import {I18n} from '../../langs/I18n';
+
 const { height } = Dimensions.get('screen');
 
 const tabs = [

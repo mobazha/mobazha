@@ -12,6 +12,8 @@ import Header from '../molecules/Header';
 import NavCloseButton from '../atoms/NavCloseButton';
 import LinkText from '../atoms/LinkText';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: foregroundColor,

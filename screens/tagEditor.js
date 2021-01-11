@@ -23,6 +23,8 @@ import { setTags } from '../reducers/appstate';
 import { eventTracker } from '../utils/EventTracker';
 import { keyboardAvoidingViewSharedProps } from '../utils/keyboard';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   content: {
     flex: 1,

@@ -10,6 +10,8 @@ import { patchSettingsRequest } from '../reducers/settings';
 import NavBackButton from '../components/atoms/NavBackButton';
 import { screenWrapper } from '../utils/styles';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   input: {
     textAlignVertical: 'top',

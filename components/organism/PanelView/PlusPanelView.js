@@ -14,6 +14,8 @@ import { eventTracker } from '../../../utils/EventTracker';
 
 import PanelViewBase from './PanelViewBase';
 
+import {I18n} from '../../../langs/I18n';
+
 const styles = {
   menuItem: {
     flex: 1,

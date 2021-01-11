@@ -7,6 +7,8 @@ import { brandColor } from '../commonColors';
 import StatusBarWrapper from '../../status-bar';
 import SearchField from '../molecules/SearchField';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: { alignSelf: 'stretch' },
   contentWrapper: {

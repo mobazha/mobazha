@@ -41,6 +41,8 @@ import { initShippingOptionWithMinShippingPrice } from '../utils/stockManage';
 import { reportListing } from '../api/products';
 import { eventTracker } from '../utils/EventTracker';
 
+import {I18n} from '../langs/I18n';
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const ListingFailImg = require('../assets/images/listing_fail.png');
 

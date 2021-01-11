@@ -16,6 +16,8 @@ import { convertorsMap } from '../selectors/currency';
 import NavBackButton from '../components/atoms/NavBackButton';
 import { sendNotification } from '../reducers/stream';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'column',

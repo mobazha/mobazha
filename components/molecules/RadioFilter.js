@@ -8,6 +8,8 @@ import { foregroundColor, greenColor, primaryTextColor, linkTextColor, borderCol
 
 import Section from './Section';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: foregroundColor,

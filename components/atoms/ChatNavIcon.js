@@ -7,6 +7,8 @@ import NotificationBadge from './NotificationBadge';
 import { tabBadgeStyle } from '../../utils/navbar';
 import { chatsMap } from '../../selectors/chat';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   iconWrapper: {
     flex: 1,

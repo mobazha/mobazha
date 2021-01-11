@@ -10,6 +10,8 @@ import { screenWrapper } from '../utils/styles';
 
 import { blockNode, unblockNode } from '../reducers/settings';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   emptyBackground: {
     backgroundColor: '#FFFFFF',

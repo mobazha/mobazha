@@ -6,6 +6,8 @@ import { NavigationActions } from 'react-navigation';
 import { brandColor } from '../commonColors';
 import { hideToast } from '../../reducers/appstate';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   container: {
     position: 'absolute',

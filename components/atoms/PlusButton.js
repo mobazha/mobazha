@@ -7,6 +7,8 @@ import { brandColor } from '../commonColors';
 
 import { showPanel } from '../../reducers/appstate';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   container: {
     width: '100%',

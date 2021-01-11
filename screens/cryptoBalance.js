@@ -14,6 +14,8 @@ import NavBackButton from '../components/atoms/NavBackButton';
 import { COINS } from '../utils/coins';
 import QRScanner from '../components/organism/QRScanner';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   rightIcon: {
     padding: 10,

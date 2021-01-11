@@ -3,6 +3,8 @@ import { Animated, Dimensions, View, TouchableWithoutFeedback, Text, Platform } 
 
 import { primaryTextColor, foregroundColor, borderColor, brandColor } from '../../commonColors';
 
+import {I18n} from '../../../langs/I18n';
+
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window');
 
 const WRAPPER_HEIGHT = Platform.OS === 'ios' && WINDOW_HEIGHT < 800 ? 224 : 234;

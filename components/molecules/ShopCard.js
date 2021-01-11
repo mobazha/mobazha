@@ -17,6 +17,8 @@ import LocationPin from '../atoms/LocationPin';
 import { fetchProfile } from '../../reducers/profile';
 import { obGatewayAPI } from '../../api/const';
 
+import {I18n} from '../../langs/I18n';
+
 const defaultHeader = require('../../assets/images/defaultHeader.png');
 const defaultAvatar = require('../../assets/images/defaultAvatar.png');
 

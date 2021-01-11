@@ -26,6 +26,8 @@ import { getImageSourceForImageViewer } from '../../utils/files';
 
 import { eventTracker } from '../../utils/EventTracker';
 
+import {I18n} from '../../langs/I18n';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const styles = {

@@ -11,6 +11,8 @@ import { fetchListings } from '../../reducers/storeListings';
 import { getListings } from '../../api/products';
 import { foregroundColor, brandColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

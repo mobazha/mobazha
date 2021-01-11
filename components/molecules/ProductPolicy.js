@@ -13,6 +13,8 @@ import { OBLightModal } from '../templates/OBModal';
 import { cssCode } from '../../utils/webview';
 import { eventTracker } from '../../utils/EventTracker';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   title: {
     fontSize: 15,

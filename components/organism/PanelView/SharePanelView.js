@@ -11,6 +11,8 @@ import PanelViewBase from './PanelViewBase';
 import { createListingUrlFromPeerIDAndSlug } from '../../../utils/navigation';
 import PostListingTemplate from '../../templates/SocialPostTemplate/PostListingTemplate';
 
+import {I18n} from '../../../langs/I18n';
+
 const styles = {
   menuItem: {
     flex: 1,

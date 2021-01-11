@@ -11,6 +11,8 @@ import { primaryTextColor, formLabelColor, borderColor, brandColor } from '../co
 
 import CoinSelectorModal from '../organism/CoinSelectorModal';
 
+import {I18n} from '../../langs/I18n';
+
 const IN_APP_BROWSER_OPTIONS = {
   // iOS Properties
   dismissButtonStyle: 'cancel',

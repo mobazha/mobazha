@@ -5,6 +5,8 @@ import { connect } from 'react-redux';
 import { borderColor, greenColor, secondaryTextColor, primaryTextColor } from '../commonColors';
 import { convertorsMap } from '../../selectors/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

@@ -9,6 +9,8 @@ import { primaryTextColor, secondaryTextColor, linkTextColor, borderColor } from
 import { createStoreUrlFromPeerID } from '../../utils/navigation';
 import { eatSpaces } from '../../utils/string';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: 'white',

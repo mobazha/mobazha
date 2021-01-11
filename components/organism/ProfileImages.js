@@ -14,6 +14,8 @@ import AvatarImage from '../atoms/AvatarImage';
 import { navHeightStyle } from '../../utils/navbar';
 import { eventTracker } from '../../utils/EventTracker';
 
+import {I18n} from '../../langs/I18n';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const styles = {

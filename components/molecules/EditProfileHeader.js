@@ -6,6 +6,8 @@ import { backgroundColor } from '../commonColors';
 import NavBackButton from '../atoms/NavBackButton';
 import StatusBarWrapper from '../../status-bar';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     zIndex: 9999,

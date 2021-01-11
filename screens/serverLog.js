@@ -13,6 +13,8 @@ import Button from '../components/atoms/FullButton';
 import NavBackButton from '../components/atoms/NavBackButton';
 import { foregroundColor, borderColor, primaryTextColor } from '../components/commonColors';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   contentWrapper: {
     flex: 1,

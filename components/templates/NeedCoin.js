@@ -4,6 +4,8 @@ import { View, Text, TouchableWithoutFeedback, Image } from 'react-native';
 import InputGroup from '../atoms/InputGroup';
 import { foregroundColor, primaryTextColor, staticLabelColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const coinBase = require('../../assets/icons/crypto/coinbase.png');
 
 const styles = {

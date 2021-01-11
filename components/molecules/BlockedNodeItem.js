@@ -6,6 +6,8 @@ import decode from 'unescape';
 import { foregroundColor, linkTextColor } from '../commonColors';
 import { cellStyles } from '../../utils/styles';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     height: 64,

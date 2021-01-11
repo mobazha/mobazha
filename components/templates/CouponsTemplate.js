@@ -7,6 +7,8 @@ import EmptyCoupons from '../organism/EmptyCoupons';
 
 import OBActionSheet from '../organism/ActionSheet';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

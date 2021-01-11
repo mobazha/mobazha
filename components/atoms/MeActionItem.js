@@ -7,6 +7,8 @@ import { greenTintColor, brandColor } from '../commonColors';
 import NotificationBadge from './NotificationBadge';
 import { badgeStyle } from '../../utils/navbar';
 
+import {I18n} from '../../langs/I18n';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('screen');
 
 const styles = {

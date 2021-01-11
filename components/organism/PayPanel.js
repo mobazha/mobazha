@@ -7,6 +7,8 @@ import BigNumber from 'bignumber.js';
 import { brandColor, formLabelColor, borderColor, warningColor } from '../commonColors';
 import { convertorsMap } from '../../selectors/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const logoImg = require('../../assets/images/logo/brand-logo.png');
 
 const styles = {

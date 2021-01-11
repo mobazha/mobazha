@@ -10,6 +10,8 @@ import { convertorsMap } from '../../selectors/currency';
 import { COINS } from '../../utils/coins';
 import { renderTextHeader } from '../molecules/TextHeader';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   emptyText: {
     fontSize: 15,

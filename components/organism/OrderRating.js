@@ -10,6 +10,8 @@ import Rating from '../atoms/Rating';
 import { getProfile } from '../../api/profile';
 import { formLabelColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   reviewWrapper: {
     paddingVertical: 12,

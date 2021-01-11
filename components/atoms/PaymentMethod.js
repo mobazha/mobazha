@@ -9,6 +9,8 @@ import { primaryTextColor, foregroundColor, brandColor } from '../commonColors';
 import { COINS } from '../../utils/coins';
 import { EditIcon } from '../../utils/checkout';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   paymentMethodWrapper: {
     paddingVertical: 12,

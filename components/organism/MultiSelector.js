@@ -9,6 +9,8 @@ import NavBackButton from '../atoms/NavBackButton';
 import { OBLightModal } from '../templates/OBModal';
 import LinkText from '../atoms/LinkText';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

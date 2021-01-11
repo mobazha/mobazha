@@ -20,6 +20,8 @@ import { eventTracker } from '../utils/EventTracker';
 import { timeSinceInSeconds } from '../utils/time';
 import { resyncBlockchain } from '../api/wallet';
 
+import {I18n} from '../langs/I18n';
+
 const AWAITING_PAYMENT_EXPIRE_IN_HOURS = 24;
 
 const orderTabs = [

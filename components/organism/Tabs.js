@@ -3,6 +3,8 @@ import { Alert, View, Text, TouchableWithoutFeedback } from 'react-native';
 
 import { formLabelColor, foregroundColor, brandColor, borderColor, greenTintColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: foregroundColor,

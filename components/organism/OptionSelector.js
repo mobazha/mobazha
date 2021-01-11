@@ -4,6 +4,8 @@ import Reactotron from 'reactotron-react-native';
 
 import { formLabelColor, foregroundColor, brandColor, borderColor, greenTintColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: foregroundColor,

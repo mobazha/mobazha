@@ -5,6 +5,8 @@ import { navHeightStyle } from '../../utils/navbar';
 import { StatusBarSpacer } from '../../status-bar';
 import { keyboardAvoidingViewSharedProps } from '../../utils/keyboard';
 
+import {I18n} from '../../langs/I18n';
+
 const { height, width } = Dimensions.get('window');
 const styles = {
   wrapper: {

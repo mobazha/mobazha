@@ -10,6 +10,8 @@ import { formLabelColor, primaryTextColor, borderColor, brandColor, staticLabelC
 import NavCloseButton from '../atoms/NavCloseButton';
 import { OBLightModal } from '../templates/OBModal';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     height: 55,

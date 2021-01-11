@@ -28,6 +28,8 @@ import OBActionSheet from '../components/organism/ActionSheet';
 import { eventTracker } from '../utils/EventTracker';
 import { createStoreUrlFromPeerID } from '../utils/navigation';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   profileWrapper: {
     backgroundColor: '#ffffff',

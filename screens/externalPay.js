@@ -16,6 +16,8 @@ import NavBackButton from '../components/atoms/NavBackButton';
 
 import { simulatePayment } from '../reducers/notifications';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   wrapper: {
     alignItems: 'center',

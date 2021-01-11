@@ -3,6 +3,8 @@ import { TouchableWithoutFeedback, Image, Text, View, Dimensions } from 'react-n
 
 import { secondaryTextColor, borderColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const { width: screenWidth } = Dimensions.get('screen');
 
 const styles = {

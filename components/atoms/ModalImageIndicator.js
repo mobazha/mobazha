@@ -3,6 +3,8 @@ import { View, Text, Platform } from 'react-native';
 
 import { navHeightStyle } from '../../utils/navbar';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   modalClose: {
     position: 'absolute',

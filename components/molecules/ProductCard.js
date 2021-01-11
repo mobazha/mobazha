@@ -12,6 +12,8 @@ import { removeWishListing } from '../../reducers/wishlist';
 import { getImageSourceWithDefault } from '../../utils/files';
 import { convertorsMap } from '../../selectors/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const styles = {

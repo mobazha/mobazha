@@ -5,6 +5,8 @@ import * as _ from 'lodash';
 import ShopCard from '../molecules/ShopCard';
 import ShopGridLoader from '../atoms/ShopGridLoader';
 
+import {I18n} from '../../langs/I18n';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const CARD_WIDTH = (SCREEN_WIDTH - 40) / 2;

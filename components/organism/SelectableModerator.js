@@ -13,6 +13,8 @@ import { convertorsMap } from '../../selectors/currency';
 import { getCurrencySymbol } from '../../utils/currency';
 import { eatSpaces } from '../../utils/string';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: 'rgb(233, 131, 30)',

@@ -15,6 +15,8 @@ import { ordersMap } from '../../selectors/order';
 import OrderBrief from '../organism/OrderBrief';
 import { eventTracker } from '../../utils/EventTracker';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

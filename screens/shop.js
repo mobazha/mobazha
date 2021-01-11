@@ -36,6 +36,8 @@ import { PREVIEWING_CATEGORIES } from '../utils/listings';
 
 import { setEULAPopupSeen } from '../reducers/appstate';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   buttonText: {
     fontSize: 13,

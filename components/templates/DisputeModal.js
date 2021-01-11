@@ -13,6 +13,8 @@ import Header from '../molecules/Header';
 
 import { openDispute } from '../../reducers/order';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   contentContainer: {
     paddingHorizontal: 17,

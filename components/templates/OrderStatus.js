@@ -7,6 +7,8 @@ import orderStatus from '../../config/orderStatus.json';
 import { getStatusId } from '../../utils/order';
 import { primaryTextColor, secondaryTextColor, highlightColor, borderColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {},
   categoryWrapper: {

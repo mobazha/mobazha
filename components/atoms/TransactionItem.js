@@ -6,6 +6,8 @@ import { brandColor, staticLabelColor } from '../commonColors';
 import { minUnitAmountToBCH } from '../../utils/currency';
 import { transactionLinkDict } from '../../utils/coins';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

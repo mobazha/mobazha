@@ -8,6 +8,8 @@ import SearchFilterHeader from '../organism/SearchFilterHeader';
 import UserSearchItem from '../organism/UserSearchItem';
 import { foregroundColor, secondaryTextColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   resultWrapper: {
     backgroundColor: foregroundColor,

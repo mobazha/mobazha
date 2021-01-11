@@ -13,6 +13,8 @@ import { getRating } from '../../api/products';
 import ListingReview from './ListingReview';
 import { timeSince } from '../../utils/time';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     paddingVertical: 12,

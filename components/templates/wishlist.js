@@ -5,6 +5,8 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 
 import ProductCard, { styles as cardStyles } from '../molecules/ProductCard';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

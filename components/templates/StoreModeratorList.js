@@ -8,6 +8,8 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import ModeratorPreview from '../organism/ModeratorPreview';
 import { borderColor, foregroundColor, formLabelColor, primaryTextColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   listHeader: {
     height: 53,

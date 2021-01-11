@@ -7,6 +7,8 @@ import { primaryTextColor } from '../commonColors';
 import InputGroup from '../atoms/InputGroup';
 import TextInput from '../atoms/TextInput';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   initialLayout: {
     height: 150,

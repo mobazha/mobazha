@@ -10,6 +10,8 @@ import Header from '../molecules/Header';
 import RadioFilter from '../molecules/RadioFilter';
 import { OBLightModal } from './OBModal';
 
+import {I18n} from '../../langs/I18n';
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('screen');
 
 const reportProfileOptions = [

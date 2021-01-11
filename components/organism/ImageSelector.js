@@ -20,6 +20,8 @@ import { getImageSourceForImageViewer, getImageSourceWithDefault } from '../../u
 import { backgroundColor } from '../commonColors';
 import OBActionSheet from './ActionSheet';
 
+import {I18n} from '../../langs/I18n';
+
 const DEVICE_WIDTH = Dimensions.get('window').width;
 
 const styles = {

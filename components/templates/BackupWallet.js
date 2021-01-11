@@ -22,6 +22,8 @@ import { foregroundColor, primaryTextColor, brandColor, formLabelColor, borderCo
 import BackupImage from '../../assets/images/backup_image.png';
 import { getWalletMnemonic } from '../../api/wallet';
 
+import {I18n} from '../../langs/I18n';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('screen');
 
 const styles = {

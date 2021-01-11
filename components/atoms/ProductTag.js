@@ -4,6 +4,8 @@ import decode from 'unescape';
 
 import { primaryTextColor, foregroundColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     paddingHorizontal: 11,

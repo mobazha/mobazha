@@ -16,6 +16,8 @@ import { postFeed } from '../reducers/feed';
 import { eventTracker } from '../utils/EventTracker';
 import { keyboardAvoidingViewSharedProps } from '../utils/keyboard';
 
+import {I18n} from '../langs/I18n';
+
 const MAJOR_PADDING = chatStyles.avatarImage.marginLeft;
 const MAX_CHAR = 280;
 

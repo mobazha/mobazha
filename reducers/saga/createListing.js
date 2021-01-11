@@ -12,6 +12,8 @@ import { restructureListingInfo, parseCoupon } from '../../utils/dataMapping';
 import { createListing, updateListing, deleteListing } from '../../api/products';
 import { eventTracker } from '../../utils/EventTracker';
 
+import {I18n} from '../../langs/I18n';
+
 const parseOptions = (options) => {
   const parsedData = options.map((val) => {
     const { name, description, variants } = val;

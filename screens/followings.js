@@ -9,6 +9,8 @@ import NavBackButton from '../components/atoms/NavBackButton';
 import FriendItem from '../components/molecules/FriendItem';
 import { getFollowings } from '../api/follow';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

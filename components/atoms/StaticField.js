@@ -5,6 +5,8 @@ import * as _ from 'lodash';
 
 import { primaryTextColor, staticLabelColor, brandColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

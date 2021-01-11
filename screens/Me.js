@@ -22,6 +22,8 @@ import { OBLightModal } from '../components/templates/OBModal';
 import { eventTracker } from '../utils/EventTracker';
 import { FAQ_URL, EMAIL_URL, TELEGRAM_URL } from '../config/supportUrls';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

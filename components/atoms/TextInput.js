@@ -5,6 +5,8 @@ import TextInputMask from 'react-native-text-input-mask';
 
 import { primaryTextColor, formLabelColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

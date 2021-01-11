@@ -9,6 +9,8 @@ import { priceStyle } from '../commonStyles';
 import { convertorsMap } from '../../selectors/currency';
 import { getFixedCurrency } from '../../utils/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: 'white',

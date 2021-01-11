@@ -12,6 +12,8 @@ import NotificationBadge from '../atoms/NotificationBadge';
 import { formLabelColor } from '../commonColors';
 import { eventTracker } from '../../utils/EventTracker';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   titleContainer: {
     flexDirection: 'row',

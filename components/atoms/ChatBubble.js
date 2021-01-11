@@ -10,6 +10,8 @@ import decode from 'unescape';
 import { isSameDay, isSameUser } from '../../utils/chat';
 import { formLabelColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const Color = {
   backgroundTransparent: 'transparent',
   leftBubbleBackground: '#f0f0f0',

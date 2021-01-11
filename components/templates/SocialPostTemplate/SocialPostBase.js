@@ -14,6 +14,8 @@ import { primaryTextColor, secondaryTextColor } from '../../commonColors';
 
 import { keyboardAvoidingViewSharedProps } from '../../../utils/keyboard';
 
+import {I18n} from '../../../langs/I18n';
+
 const { height } = Dimensions.get('screen');
 
 const BUTTON_WRAPPER_PADDING = Platform.OS === 'ios' ? 15 : 10;

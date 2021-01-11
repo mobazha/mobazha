@@ -7,6 +7,8 @@ import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { getCurrencySymbol } from '../../utils/currency';
 import { convertorsMap } from '../../selectors/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   container: {
     flexDirection: 'row',

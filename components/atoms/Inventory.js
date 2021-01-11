@@ -2,6 +2,8 @@ import React, { PureComponent } from 'react';
 import { View, Text } from 'react-native';
 import { primaryTextColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'column',

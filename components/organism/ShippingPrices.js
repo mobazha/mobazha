@@ -5,6 +5,8 @@ import MoreButton from '../atoms/MoreButton';
 import ShippingPriceEditor from './ShippingPriceEditor';
 import { keyboardAvoidingViewSharedProps } from '../../utils/keyboard';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

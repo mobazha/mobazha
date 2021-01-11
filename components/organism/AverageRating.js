@@ -7,6 +7,8 @@ import { get } from 'lodash';
 
 import { starRatingColor, foregroundColor, primaryTextColor, secondaryTextColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   showAllButton: {
     width: '100%',

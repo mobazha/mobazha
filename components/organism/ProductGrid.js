@@ -6,6 +6,8 @@ import _ from 'lodash';
 import ProductCard from '../molecules/ProductCard';
 import ProductCardLoader from '../atoms/ProductCardLoader';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   compactWrapper: {
     paddingHorizontal: 16,

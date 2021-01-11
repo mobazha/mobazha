@@ -13,6 +13,8 @@ import { transactionLinkDict } from '../utils/coins';
 import { primaryTextColor, brandColor, borderColor, warningColor, formLabelColor, foregroundColor } from '../components/commonColors';
 import { convertorsMap } from '../selectors/currency';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

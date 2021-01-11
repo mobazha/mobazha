@@ -15,6 +15,8 @@ import NavCloseButton from '../atoms/NavCloseButton';
 import { minUnitAmountToBCH } from '../../utils/currency';
 import { convertorsMap } from '../../selectors/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

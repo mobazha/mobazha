@@ -25,6 +25,8 @@ import { borderColor, primaryTextColor, brandColor } from '../commonColors';
 import { fetchListing } from '../../reducers/listings';
 import { getActivity } from '../../selectors/stream';
 
+import {I18n} from '../../langs/I18n';
+
 const DEVICE_WIDTH = Dimensions.get('window').width;
 const RIGHT_PADDING = chatStyles.avatarImage.marginLeft;
 const LEFT_PADDING = chatStyles.avatarImage.width + chatStyles.avatarImage.marginLeft * 2;

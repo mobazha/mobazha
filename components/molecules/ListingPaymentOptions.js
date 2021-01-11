@@ -9,6 +9,8 @@ import { exchangeCurrency, removeZeros } from '../../utils/currency';
 import { getRenderingCoins } from '../../utils/coins';
 import { convertorsMap } from '../../selectors/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

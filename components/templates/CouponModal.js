@@ -16,6 +16,8 @@ import { parseCoupon } from '../../utils/dataMapping';
 import { getPriceInMinimumUnit, getFixedCurrency } from '../../utils/currency';
 import { convertorsMap } from '../../selectors/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

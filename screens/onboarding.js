@@ -18,7 +18,9 @@ import { StatusBarSpacer } from '../status-bar';
 
 import { eventTracker } from '../utils/EventTracker';
 
-const logoImg = require('../assets/images/logo/brand-logo.png');
+import {I18n} from '../langs/I18n'
+
+constlogoImg = require('../assets/images/logo/brand-logo.png');
 const onboardingImg = require('../assets/images/onboardingBackground.png');
 
 const titleWidth = 100;

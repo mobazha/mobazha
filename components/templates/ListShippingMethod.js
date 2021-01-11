@@ -9,6 +9,8 @@ import EmptyShippingMethods from '../organism/EmptyShippingMethods';
 
 import OBActionSheet from '../organism/ActionSheet';
 
+import {I18n} from '../../langs/I18n';
+
 const actionList = ['Edit', 'Delete', 'Cancel'];
 
 const styles = {

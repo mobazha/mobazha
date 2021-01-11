@@ -4,6 +4,8 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 
 import { primaryTextColor, borderColor, foregroundColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const wrapperStyle = {
   paddingHorizontal: 10,
 };

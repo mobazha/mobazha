@@ -13,6 +13,8 @@ import { linkTextColor, warningColor, borderColor } from '../commonColors';
 import { getHashCode } from '../../api/hash';
 import { convertorsMap } from '../../selectors/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flex: 1,

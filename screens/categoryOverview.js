@@ -17,6 +17,8 @@ import ProductCardLoader from '../components/atoms/ProductCardLoader';
 import { clearFilter } from '../reducers/search';
 import { eventTracker } from '../utils/EventTracker';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   showAllButton: {
     width: '100%',

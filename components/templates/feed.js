@@ -19,6 +19,8 @@ import { getActivity, getFilteredList } from '../../selectors/stream';
 import { eventTracker } from '../../utils/EventTracker';
 import { STREAM_FEED_PAGE_SIZE } from '../../config/stream';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   emptyHeader: {
     height: 0,

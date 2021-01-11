@@ -14,6 +14,8 @@ import { EXPIRE_IN_HOURS } from '../../utils/order';
 
 import { acceptPayout } from '../../reducers/order';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   acceptButton: {
     width: '100%',

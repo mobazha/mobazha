@@ -10,6 +10,8 @@ import Header from '../molecules/Header';
 import NavCloseButton from '../atoms/NavCloseButton';
 import { isOrderStatusInCategory } from '../../utils/order';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   optionTrigger: {
     marginHorizontal: 12,

@@ -3,6 +3,8 @@ import { View, Dimensions } from 'react-native';
 import ContentLoader, { Rect } from 'react-content-loader/native';
 import { foregroundColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const IMAGE_RATIO = 328.0 / 750;

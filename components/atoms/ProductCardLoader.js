@@ -5,6 +5,8 @@ import ContentLoader, { Rect } from 'react-content-loader/native';
 
 import { foregroundColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const COMPACT_WIDTH = (SCREEN_WIDTH - 32) * 0.31;

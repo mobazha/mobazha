@@ -16,6 +16,8 @@ import NavCloseButton from '../atoms/NavCloseButton';
 import LinkText from '../atoms/LinkText';
 import { setCheckoutNote } from '../../reducers/appstate';
 
+import {I18n} from '../../langs/I18n';
+
 const MAJOR_PADDING = chatStyles.avatarImage.marginLeft;
 
 const styles = {

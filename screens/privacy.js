@@ -24,6 +24,8 @@ import { eventTracker } from '../utils/EventTracker';
 
 import StreamClient from '../StreamClient';
 
+import {I18n} from '../langs/I18n';
+
 const shieldImg = require('../assets/images/privacyShield.png');
 const bottomImg = require('../assets/images/privacyBottom.png');
 

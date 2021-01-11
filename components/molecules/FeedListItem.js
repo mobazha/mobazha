@@ -9,6 +9,8 @@ import AvatarImage from '../atoms/AvatarImage';
 import FollowButton from '../atoms/FollowButton';
 import { primaryTextColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     flexDirection: 'row',

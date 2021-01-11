@@ -9,6 +9,8 @@ import InputTemplate from '../components/templates/ListingAdvancedDetails';
 import { setDetails } from '../reducers/createListing';
 import NavBackButton from '../components/atoms/NavBackButton';
 
+import {I18n} from '../langs/I18n';
+
 const style = {
   backgroundColor: '#FFF',
   flex: 1,

@@ -7,6 +7,8 @@ import { get, isEmpty } from 'lodash';
 import { getImageSourceForSelector } from '../../utils/files';
 import { borderColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   image: {
     width: 110,

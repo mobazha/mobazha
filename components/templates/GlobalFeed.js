@@ -23,6 +23,8 @@ import { eventTracker } from '../../utils/EventTracker';
 
 import PersonAddImage from '../../assets/icons/person_add.png';
 
+import {I18n} from '../../langs/I18n';
+
 const sortOptions = [
   { label: 'Trending', value: 'trending' },
   { label: 'Most Recent', value: 'recent' },

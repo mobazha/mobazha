@@ -8,6 +8,8 @@ import RecentKeyword from '../atoms/RecentKeyword';
 import { renderTextHeader } from '../molecules/TextHeader';
 import { backgroundColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const SUGGESTION_OPTIONS = ['Books', 'Art', 'Clothing', 'Bitcoin', 'Crypto', 'Handmade', 'Health', 'Toys', 'Electronics', 'Games', 'Music'];
 
 const styles = {

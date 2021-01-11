@@ -6,6 +6,8 @@ import { primaryTextColor, foregroundColor, borderColor } from '../commonColors'
 import { navHeightStyle } from '../../utils/navbar';
 import StatusBarWrapper from '../../status-bar';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     alignSelf: 'stretch',

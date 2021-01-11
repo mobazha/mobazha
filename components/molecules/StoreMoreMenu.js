@@ -4,6 +4,8 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 
 import { primaryTextColor, foregroundColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   moreIcon: {
     width: 32,

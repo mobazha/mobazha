@@ -1,6 +1,8 @@
 import React from 'react';
 import { Button, Modal, Text, View } from 'react-native';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',

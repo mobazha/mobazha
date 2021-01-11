@@ -7,6 +7,8 @@ import { chatStyles } from '../../utils/styles';
 import { getImageSourceForImageViewer } from '../../utils/files';
 import { serverConfig } from '../../utils/server';
 
+import {I18n} from '../../langs/I18n';
+
 const MAJOR_PADDING = chatStyles.avatarImage.marginLeft;
 
 const styles = {

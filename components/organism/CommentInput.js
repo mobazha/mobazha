@@ -8,6 +8,8 @@ import AvatarImage from '../atoms/AvatarImage';
 import LinkText from '../atoms/LinkText';
 import { foregroundColor, primaryTextColor, borderColor, formLabelColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: foregroundColor,

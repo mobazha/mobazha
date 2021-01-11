@@ -9,6 +9,8 @@ import CheckBox from '../atoms/CheckBox';
 import { borderColor, formLabelColor, primaryTextColor, greenColor } from '../commonColors';
 import { convertorsMap } from '../../selectors/currency';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   quantityEditor: {
     flexDirection: 'row',

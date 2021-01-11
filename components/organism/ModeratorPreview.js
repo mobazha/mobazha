@@ -16,6 +16,8 @@ import { eatSpaces } from '../../utils/string';
 
 import CheckDecagramIcon from '../../assets/icons/check-decagram.png';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: foregroundColor,

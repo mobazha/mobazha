@@ -34,6 +34,8 @@ import OBActionSheet from '../components/organism/ActionSheet';
 import { eventTracker } from '../utils/EventTracker';
 import ContractModal from '../components/templates/ContractModal';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   placeholderWrapper: {
     flex: 1,

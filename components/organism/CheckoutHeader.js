@@ -14,6 +14,8 @@ import { convertorsMap } from '../../selectors/currency';
 import { fetchProfile } from '../../reducers/profile';
 import { getListingActualPrice } from '../../utils/stockManage';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   wrapper: {
     backgroundColor: '#ffffff',

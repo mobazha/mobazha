@@ -23,6 +23,8 @@ import { convertorsMap } from '../selectors/currency';
 import { parseCountryName } from '../utils/string';
 import OBActionSheet from '../components/organism/ActionSheet';
 
+import {I18n} from '../langs/I18n';
+
 const styles = {
   addrName: {
     lineHeight: 15,

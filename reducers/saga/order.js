@@ -32,6 +32,8 @@ import { timeSinceInSeconds } from '../../utils/time';
 import { EXPIRE_IN_HOURS } from '../../utils/order';
 import { eventTracker } from '../../utils/EventTracker';
 
+import {I18n} from '../../langs/I18n';
+
 const TESTING_PAYMENT_FINALIZED = false;
 
 const delayedAlert = message => setTimeout(() => Alert.alert(message), 1500);

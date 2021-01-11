@@ -1,6 +1,8 @@
 import React from 'react';
 import { Animated, Dimensions, PanResponder, TouchableWithoutFeedback } from 'react-native';
 
+import {I18n} from '../../langs/I18n';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const DEFAULT_CONTENT_WRAPPER_HEIGHT = 200;

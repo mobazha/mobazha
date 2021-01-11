@@ -6,6 +6,8 @@ import decode from 'unescape';
 import { formLabelColor, primaryTextColor } from '../commonColors';
 import OptionGroup from '../atoms/OptionGroup';
 
+import {I18n} from '../../langs/I18n';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('screen');
 
 const styles = {

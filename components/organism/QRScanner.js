@@ -12,6 +12,8 @@ import { handleOBDeeplinkWithNavigation } from '../../utils/navigation';
 
 import qrcodeIcon from '../../assets/icons/qrcode.png';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   qrcodeIcon: {
     width: 20,

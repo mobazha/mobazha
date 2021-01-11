@@ -2,6 +2,8 @@ import React from 'react';
 import { View } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   container: {
     width: 32,

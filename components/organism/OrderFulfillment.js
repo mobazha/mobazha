@@ -9,6 +9,8 @@ import StaticField from '../atoms/StaticField';
 import { primaryTextColor, borderColor } from '../commonColors';
 import { timeSince } from '../../utils/time';
 
+import {I18n} from '../../langs/I18n';
+
 const styles = {
   fulfillWrapper: {
     paddingVertical: 12,

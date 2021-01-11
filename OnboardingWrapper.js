@@ -18,6 +18,8 @@ import { changeTrackingStatus } from './utils/EventTracker';
 import { COUNTLY_ROOT_URL, COUNTLY_APP_KEY } from './CountlyConfig';
 import { COINS } from './utils/coins';
 
+import {I18n} from './langs/I18n';
+
 const { ModuleWithEmitter } = NativeModules;
 const iOSeventEmitter = new NativeEventEmitter(ModuleWithEmitter);
 

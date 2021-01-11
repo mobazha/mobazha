@@ -19,6 +19,8 @@ import { foregroundColor } from '../commonColors';
 import { chatStyles } from '../../utils/styles';
 import OBActionSheet from '../organism/ActionSheet';
 
+import {I18n} from '../../langs/I18n';
+
 const MAJOR_PADDING = chatStyles.avatarImage.marginLeft;
 const IMAGE_ITEM_WIDTH = 100;
 const BUTTON_WRAPPER_PADDING = Platform.OS === 'ios' ? 15 : 10;

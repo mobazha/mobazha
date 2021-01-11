@@ -56,6 +56,7 @@
     "react-native-gesture-handler": "1.6.0",
     "react-native-gifted-chat": "0.9.11",
     "react-native-hyperlink": "0.0.14",
+    "react-native-i18n": "^2.0.15",
     "react-native-image-crop-picker": "0.28.0",
     "react-native-image-helper": "0.0.2",
     "react-native-image-zoom-viewer": "2.2.23",

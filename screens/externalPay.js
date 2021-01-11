@@ -123,7 +123,7 @@ class ExternalPay extends PureComponent {
       const paymentAddress = navigation.getParam('paymentAddress');
       Clipboard.setString(paymentAddress);
 
-      this.setState({ copied: {I18n.t('screens.externalPay.address_copied')} });
+      this.setState({ copied: I18n.t('screens.externalPay.address_copied')});
       setTimeout(() => this.setState({ copied: null }), 2000);
     }
   };
@@ -134,7 +134,7 @@ class ExternalPay extends PureComponent {
     const coin = navigation.getParam('coin');
     Clipboard.setString(`${minUnitAmountToBCH(amount, coin)}`);
 
-    this.setState({ copied:{I18n.t('screens.externalPay.amount_copied')} });
+    this.setState({ copied: I18n.t('screens.externalPay.amount_copied') });
     setTimeout(() => this.setState({ copied: null }), 2000);
   };
 

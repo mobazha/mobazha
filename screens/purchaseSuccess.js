@@ -122,10 +122,10 @@ class PurchaseSuccess extends PureComponent {
     const orderInfo = this.props.navigation.getParam('orderInfo');
     sendChat(username, password, peerID, orderInfo.orderId, message).then((response) => {
       if (hasIn(response, 'messageId')) {
-        Alert.alert({I18n.t('screens.purchaseSuccess.successfully_sent')});
+        Alert.alert(I18n.t('screens.purchaseSuccess.successfully_sent'));
       }
     });
-    sendNotification({ verb: 'chat', type: 'sent', peerID, content: { body: {I18n.t('screens.purchaseSuccess.received_message')}} });
+    sendNotification({ verb: 'chat', type: 'sent', peerID, content: { body: I18n.t('screens.purchaseSuccess.received_message')} });
   }
 
   render() {

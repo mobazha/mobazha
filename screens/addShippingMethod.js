@@ -85,18 +85,18 @@ class AddShippingMethod extends PureComponent {
             }
             navigation.goBack();
           } else {
-            Alert.alert( {I18n.t('screens.addShippingMethod.fill_required')});
+            Alert.alert(I18n.t('screens.addShippingMethod.fill_required'));
           }
         } else if (serviceValidFlgs[1]) {
-          Alert.alert({I18n.t('screens.addShippingMethod.must_be_less')});
+          Alert.alert(I18n.t('screens.addShippingMethod.must_be_less'));
         } else {
-          Alert.alert( {I18n.t('screens.addShippingMethod.fill_required')});
+          Alert.alert(I18n.t('screens.addShippingMethod.fill_required'));
         }
       } else {
-        Alert.alert({I18n.t('screens.addShippingMethod.must_be_less')});
+        Alert.alert(I18n.t('screens.addShippingMethod.must_be_less'));
       }
     } else {
-      Alert.alert({I18n.t('screens.addShippingMethod.select_destination')});
+      Alert.alert(I18n.t('screens.addShippingMethod.select_destination'));
     }
   };
 

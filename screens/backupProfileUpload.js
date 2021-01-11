@@ -69,7 +69,7 @@ export default class BackupProfileUpload extends PureComponent {
     console.warn('-----------', targetPath);
 
     const shareOptions = {
-      message: {I18n.t('screens.backupProfileUpload.message')},
+      message: I18n.t('screens.backupProfileUpload.message'),
       url: `file://${targetPath}`,
     };
 
@@ -95,9 +95,9 @@ export default class BackupProfileUpload extends PureComponent {
           <Image style={styles.image} source={UploadImg} />
           <Text style={styles.resyncContent}>
             <Text style={styles.bold}>
-              {{I18n.t('screens.backupProfileUpload.upload_1')}}
+              {I18n.t('screens.backupProfileUpload.upload_1')}
             </Text>
-            {{I18n.t('screens.backupProfileUpload.upload_2')}}
+            {I18n.t('screens.backupProfileUpload.upload_2')}
           </Text>
           <View style={styles.buttonFooter}>
             <SMRoundButton title= {I18n.t('screens.backupProfileUpload.upload_backup')}  onPress={this.handleUpload} />

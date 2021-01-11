@@ -81,16 +81,15 @@ class Settings extends PureComponent {
 
   handleConfirmBeforeRestore = () => {
     Alert.alert(
-      text:{I18n.t('components.templates.Settings.are_you_sure')}, 
-      text:{I18n.t('components.templates.Settings.check_backup')}, 
-
+      I18n.t('components.templates.Settings.are_you_sure'), 
+      I18n.t('components.templates.Settings.check_backup'), 
       [
         {
-          text: {I18n.t('components.templates.Settings.cancel')},
+          text: I18n.t('components.templates.Settings.cancel'),
           onPress: () => {},
-          style: {I18n.t('components.templates.Settings.cancel')},
+          style: 'cancel',
         },
-        { text:{I18n.t('components.templates.Settings.OK')}, onPress: this.handleRestoreProfile },
+        { text: I18n.t('components.templates.Settings.OK'), onPress: this.handleRestoreProfile },
       ],
       { cancelable: false },
     );
@@ -135,7 +134,7 @@ class Settings extends PureComponent {
             getLabel={this.getCurrencyLabel}
           />
           <OptionGroup onPress={toShippingAddress} smallPadding>
-            <FormLabelText text {I18n.t('components.templates.Settings.shipping_address')}/>
+            <FormLabelText text={I18n.t('components.templates.Settings.shipping_address')}/>
           </OptionGroup>
           <OptionGroup onPress={toBlockedNodes} noBorder smallPadding>
             <FormLabelText text= {I18n.t('components.templates.Settings.blocked')}/>

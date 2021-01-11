@@ -180,10 +180,10 @@ class ModeratorDetails extends React.PureComponent {
     const moderator = navigation.getParam('moderator');
     const newModerators = filter(storeModerators, o => o !== moderator);
     Alert.alert(
-      {I18n.t('screens.moderatorDetails.remove_moderator')},
-      {I18n.t('screens.moderatorDetails.remove_hint')},
+      I18n.t('screens.moderatorDetails.remove_moderator'),
+      I18n.t('screens.moderatorDetails.remove_hint'),
       [
-        { text:{I18n.t('screens.moderatorDetails.cancel')} },
+        { text:I18n.t('screens.moderatorDetails.cancel') },
         {
           text: 'OK',
           onPress: () => {
@@ -293,7 +293,7 @@ class ModeratorDetails extends React.PureComponent {
               <View style={[styles.rowContainer]}>
                 <Octicons name="verified" size={14} color={brandColor} />
                 <Text style={styles.descriptionText}>
-                  {{I18n.t('screens.moderatorDetails.moderator_verified')}}
+                  {I18n.t('screens.moderatorDetails.moderator_verified')}
                 </Text>
               </View>
             </View>
@@ -326,10 +326,11 @@ class ModeratorDetails extends React.PureComponent {
             {moderator === selectedModerator ? (
               <Text style={styles.selected}>
                 <Ionicons name="md-checkmark" size={18} color={brandColor} />
-                {{I18n.t('screens.moderatorDetails.selected')}}
+                {I18n.t('screens.moderatorDetails.selected')}
               </Text>
             ) : (
-              <Button wrapperStyle={styles.selectButton} title={I18n.t('screens.moderatorDetails.select')} onPress={this.selectModerator} />            
+              <Button wrapperStyle={styles.selectButton} title={I18n.t('screens.moderatorDetails.select')} onPress={this.selectModerator} />
+            )}        
           </View>
         )}
         <OBActionSheet

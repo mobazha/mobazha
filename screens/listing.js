@@ -291,8 +291,8 @@ class Listing extends PureComponent {
           break;
         }
         case 1: {
-          Alert.alert({I18n.t('screens.listing.are_you_sure')}, {I18n.t('screens.listing.ask_block')}, [
-            { text: {I18n.t('screens.listing.cancel')} },
+          Alert.alert(I18n.t('screens.listing.are_you_sure'), I18n.t('screens.listing.ask_block'), [
+            { text: I18n.t('screens.listing.cancel')},
             { text: 'OK', onPress: this.blockNode },
           ]);
           break;
@@ -337,10 +337,10 @@ class Listing extends PureComponent {
   };
 
   handleDelete = () => {
-    Alert.alert({I18n.t('screens.listing.ask_delete')}, {I18n.t('screens.listing.delete_hin')}, [
-      { text: {I18n.t('screens.listing.cancel')} },
+    Alert.alert(I18n.t('screens.listing.ask_delete'), I18n.t('screens.listing.delete_hin'), [
+      { text: I18n.t('screens.listing.cancel')},
       {
-        text: {I18n.t('screens.listing.remove')},
+        text: I18n.t('screens.listing.remove'),
         onPress: this.deleteListing,
       },
     ]);
@@ -577,7 +577,7 @@ class Listing extends PureComponent {
         {(liked || unliked || reported) && (
           <View style={[styles.overlay, reported && styles.overlayNarrow]}>
             <Text style={styles.overlayText}>
-              {liked ? {I18n.t('screens.listing.add_wishlist')}: unliked ? {I18n.t('screens.listing.remove_wishlist')} : {I18n.t('screens.listing.reported')}}
+              {liked ? I18n.t('screens.listing.add_wishlist'): unliked ? I18n.t('screens.listing.remove_wishlist') : I18n.t('screens.listing.reported')}
             </Text>
           </View>
         )}

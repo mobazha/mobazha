@@ -194,9 +194,9 @@ class ShippingAddress extends PureComponent {
         break;
       }
       case 1: {
-        Alert.alert({I18n.t('screens.shippingAddress.are_you_sure')}, {I18n.t('screens.shippingAddress.remove_address')}, [
-          { text:{I18n.t('screens.shippingAddress.cancel')}},
-          { text:{I18n.t('screens.shippingAddress.ok')}, onPress: this.handleDelete },
+        Alert.alert(I18n.t('screens.shippingAddress.are_you_sure'), I18n.t('screens.shippingAddress.remove_address'), [
+          { text:I18n.t('screens.shippingAddress.cancel')},
+          { text:I18n.t('screens.shippingAddress.ok'), onPress: this.handleDelete },
         ]);
         break;
       }
@@ -254,7 +254,7 @@ class ShippingAddress extends PureComponent {
           <Text style={styles.estDelivery}>{option.estimatedDelivery}</Text>
         </View>
         <Text style={priceStyle}>
-          {option.bigPrice === 0 ? {I18n.t('screens.shippingAddress.free')} : `${localLabelFromBCH(option.bigPrice, currency)}`}
+          {option.bigPrice === 0 ? I18n.t('screens.shippingAddress.free') : `${localLabelFromBCH(option.bigPrice, currency)}`}
         </Text>
       </View>
     );

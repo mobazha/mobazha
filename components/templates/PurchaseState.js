@@ -222,16 +222,16 @@ export default class PurchaseState extends React.PureComponent {
     let description;
     if (paymentState === 'success') {
       icon = <Ionicons name="md-checkmark" color={brandColor} size={110} />;
-      title = {I18n.t('components.templates.purchaseState.thank_you')};
-      description = {I18n.t('components.templates.purchaseState.order_placed')};
+      title = I18n.t('components.templates.purchaseState.thank_you');
+      description = I18n.t('components.templates.purchaseState.order_placed');
     } else if (paymentState === 'pending') {
       icon = this.renderLoading();
-      title = {I18n.t('components.templates.purchaseState.processing')};
-      description = {I18n.t('components.templates.purchaseState.hang_tight')};
+      title = I18n.t('components.templates.purchaseState.processing');
+      description = I18n.t('components.templates.purchaseState.hang_tight');
     } else { // in this case paymentState is 'error' always
       icon = <Ionicons name="md-close" color={warningColor} size={110} />;
       title = 'Uh oh!';
-      description ={I18n.t('components.templates.purchaseState.transaction_failed')};
+      description =I18n.t('components.templates.purchaseState.transaction_failed');
     }
 
     return (

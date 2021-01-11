@@ -368,29 +368,29 @@ class OrderSummary extends PureComponent {
     if (this.isDisputeDisabled()) {
       switch (state) {
         case 'PENDING':
-          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_pending_alert')});
+          Alert.alert(I18n.t('components.templates.OrderSummary.oops'), I18n.t('components.templates.OrderSummary.dispute_pending_alert'));
           break;
         case 'AWAITING_FULFILLMENT':
-          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_not_fulfilled_alert')});
+          Alert.alert(I18n.t('components.templates.OrderSummary.oops'), I18n.t('components.templates.OrderSummary.dispute_not_fulfilled_alert'));
           break;
         case 'CANCELED':
         case 'DECLINED':
-          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_cancel_alert')});
+          Alert.alert(I18n.t('components.templates.OrderSummary.oops'), I18n.t('components.templates.OrderSummary.dispute_cancel_alert'));
           break;
         case 'REFUNDED':
-          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_refund_alert')});
+          Alert.alert(I18n.t('components.templates.OrderSummary.oops'), I18n.t('components.templates.OrderSummary.dispute_refund_alert'));
           break;
         case 'RESOLVED':
-          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_resolved_alert')});
+          Alert.alert(I18n.t('components.templates.OrderSummary.oops'), I18n.t('components.templates.OrderSummary.dispute_resolved_alert'));
           break;
         case 'COMPLETED':
-          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_completed_alert')});
+          Alert.alert(I18n.t('components.templates.OrderSummary.oops'), I18n.t('components.templates.OrderSummary.dispute_completed_alert'));
           break;
         case 'PAYMENT_FINALIZED':
-          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_finalized_alert')});
+          Alert.alert(I18n.t('components.templates.OrderSummary.oops'), I18n.t('components.templates.OrderSummary.dispute_finalized_alert'));
           break;
         case 'PROCESSING_ERROR':
-          Alert.alert({I18n.t('components.templates.OrderSummary.oops')}, {I18n.t('components.templates.OrderSummary.dispute_processing_alert')});
+          Alert.alert(I18n.t('components.templates.OrderSummary.oops'), I18n.t('components.templates.OrderSummary.dispute_processing_alert'));
           break;
         default:
           break;
@@ -463,7 +463,7 @@ class OrderSummary extends PureComponent {
           }}
         >
           <View>
-            <Text style={styles.viewTransaction}>{coinName === 'ETH' ? {I18n.t('components.templates.OrderSummary.view')} : {I18n.t('components.templates.OrderSummary.view_transaction')}}</Text>
+            <Text style={styles.viewTransaction}>{coinName === 'ETH' ? I18n.t('components.templates.OrderSummary.view') : I18n.t('components.templates.OrderSummary.view_transaction')}</Text>
           </View>
         </TouchableWithoutFeedback>
       </View>
@@ -505,25 +505,25 @@ class OrderSummary extends PureComponent {
           </Text>
         ) : this.isInDispute() ? (
           <Text style={styles.description}>
-            {{I18n.t('components.templates.OrderSummary.order_in_dispute')}}
+            {I18n.t('components.templates.OrderSummary.order_in_dispute')}
             <Text style={styles.escrowDays}>{remaining}</Text>
-            {{I18n.t('components.templates.OrderSummary.until_accept')}}
+            {I18n.t('components.templates.OrderSummary.until_accept')}
           </Text>
         ) : isClaimableBySeller ? (
           amIBuyer ? (
             <Text style={styles.description}>
-              {{I18n.t('components.templates.OrderSummary.period_expired_claim')}}
+              {I18n.t('components.templates.OrderSummary.period_expired_claim')}
             </Text>
           ) : (
             <Text style={styles.description}>
-              {{I18n.t('components.templates.OrderSummary.period_expired_claim2')}}
+              {I18n.t('components.templates.OrderSummary.period_expired_claim2')}
             </Text>
           )
         ) : (
           <Text style={styles.description}>
-            {{I18n.t('components.templates.OrderSummary.order_in_escrow1')}}
+            {I18n.t('components.templates.OrderSummary.order_in_escrow1')}
             <Text style={styles.escrowDays}>{remaining}</Text>
-            {{I18n.t('components.templates.OrderSummary.order_in_escrow2')}}
+            {I18n.t('components.templates.OrderSummary.order_in_escrow2')}
           </Text>
         )}
         {this.isPaid() && !isEmpty(moderator) && !this.isInDispute() && !this.isDisputeExpired() && !timeSinceTimeout && (
@@ -601,9 +601,9 @@ class OrderSummary extends PureComponent {
       >
         <Text style={styles.description}>
           {disputePossible ? (
-            {I18n.t('components.templates.OrderSummary.dispute_error_possible')}            
+            I18n.t('components.templates.OrderSummary.dispute_error_possible')         
           ) : (
-            {I18n.t('components.templates.OrderSummary.dispute_error')}
+            I18n.t('components.templates.OrderSummary.dispute_error')
           )}
         </Text>
       </InputGroup>
@@ -632,17 +632,17 @@ class OrderSummary extends PureComponent {
 
     let title, transaction, timestamp, description;
     if (state === 'REFUNDED') {
-      title = {I18n.t('components.templates.OrderSummary.order_refunded')} ;
+      title = I18n.t('components.templates.OrderSummary.order_refunded') ;
       transaction = refundAddressTransaction;
       timestamp = (transaction || {}).timestamp;
-      description = {I18n.t('components.templates.OrderSummary.full_refund')};
+      description = I18n.t('components.templates.OrderSummary.full_refund');
     } else {
       transaction = paymentAddressTransactions[1];
       timestamp = (transaction || {}).timestamp;
       if (state === 'COMPLETED') {
-        title = {I18n.t('components.templates.OrderSummary.order_completed')};
+        title = I18n.t('components.templates.OrderSummary.order_completed');
 
-        description = transaction ?  {I18n.t('components.templates.OrderSummary.release_to_seller')} : null;
+        description = transaction ?  I18n.t('components.templates.OrderSummary.release_to_seller') : null;
         // timestamp = get(buyerOrderCompletion, 'timestamp');
         if (!isEmpty(dispute)) {
           transaction = null;
@@ -654,23 +654,23 @@ class OrderSummary extends PureComponent {
           };
         }
       } else if (state === 'RESOLVED') {
-        title = {I18n.t('components.templates.OrderSummary.dispute_closed')};
-        description = {I18n.t('components.templates.OrderSummary.dispute_closed_info')};
+        title = I18n.t('components.templates.OrderSummary.dispute_closed');
+        description = I18n.t('components.templates.OrderSummary.dispute_closed_info');
         transaction = {
           ...transaction,
           // bigValue: amIBuyer ? buyerValue : sellerValue,
         };
       } else if (state === 'PAYMENT_FINALIZED') {
-        title = {I18n.t('components.templates.OrderSummary.payment_claimed')};
-        description = {I18n.t('components.templates.OrderSummary.seller_claim')};
+        title = I18n.t('components.templates.OrderSummary.payment_claimed');
+        description = I18n.t('components.templates.OrderSummary.seller_claim');
 
         transaction = {
           ...transaction,
           // bigValue: get(vendorOrderConfirmation, 'bigRequestedAmount'),
         };
       } else {
-        title = {I18n.t('components.templates.OrderSummary.order_canceled')};
-        description = {I18n.t('components.templates.OrderSummary.user_cancel_order')};
+        title = I18n.t('components.templates.OrderSummary.order_canceled');
+        description = I18n.t('components.templates.OrderSummary.user_cancel_order');
 
         transaction = {
           ...transaction,

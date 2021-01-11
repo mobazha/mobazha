@@ -171,10 +171,10 @@ class OrderDetails extends PureComponent {
         break;
       case 'Decline':
         Alert.alert(
-          {I18n.t('screens.orderDetails.decline_order')},
-          {I18n.t('screens.orderDetails.decline_hin')},
+          I18n.t('screens.orderDetails.decline_order'),
+          I18n.t('screens.orderDetails.decline_hin'),
           [
-            { text:{I18n.t('screens.orderDetails.nevermindr')} },
+            { text:I18n.t('screens.orderDetails.nevermindr')},
             {
               text: 'Ok',
               onPress: () => {
@@ -189,10 +189,10 @@ class OrderDetails extends PureComponent {
         break;
       case 'Refund':
         Alert.alert(
-          {I18n.t('screens.orderDetails.refund_order')},
-          {I18n.t('screens.orderDetails.refund_hint')},
+          I18n.t('screens.orderDetails.refund_order'),
+          I18n.t('screens.orderDetails.refund_hint'),
           [
-            { text: {I18n.t('screens.orderDetails.nevermindr')} },
+            { text: I18n.t('screens.orderDetails.nevermindr') },
             {
               text: 'Ok',
               onPress: () => {
@@ -361,10 +361,10 @@ class OrderDetails extends PureComponent {
     const vendorID = this.getVendorId();
     const { cancelOrder } = this.props;
     Alert.alert(
-      {I18n.t('screens.orderDetails.cancel_order')},
-      {I18n.t('screens.orderDetails.cancel_hint')},
+      I18n.t('screens.orderDetails.cancel_order'),
+      I18n.t('screens.orderDetails.cancel_hint'),
       [
-        { text:  {I18n.t('screens.orderDetails.nevermindr')} },
+        { text:  I18n.t('screens.orderDetails.nevermindr') },
         {
           text: 'Ok',
           onPress: () => cancelOrder({ orderId, vendorID }),
@@ -379,11 +379,11 @@ class OrderDetails extends PureComponent {
       if (hasIn(response, 'success') && response.success === false) {
         Alert.alert(response.reason);
       } else {
-        Alert.alert({I18n.t('screens.orderDetails.have_refunded')});
+        Alert.alert(I18n.t('screens.orderDetails.have_refunded'));
         this.updateOrderList();
       }
     }).catch((err) => {
-      Alert.alert({I18n.t('screens.orderDetails.error_happened')});
+      Alert.alert(I18n.t('screens.orderDetails.error_happened'));
     });
   }
 

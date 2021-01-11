@@ -98,9 +98,9 @@ class AcceptedCoins extends PureComponent {
 
   handleSave = () => {
     Alert.alert('Update Listings?', 'All your listings will be updated. Are you sure?', [
-      { text: {I18n.t('screens.acceptedCoins.cancel')} },
+      { text: I18n.t('screens.acceptedCoins.cancel') },
       {
-        text: {I18n.t('screens.acceptedCoins.OK')},
+        text: I18n.t('screens.acceptedCoins.OK'),
         onPress: () => {
           this.props.updateAcceptedCoins({
             coins: this.getSelectedCurrencies(),

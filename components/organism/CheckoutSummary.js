@@ -472,7 +472,7 @@ class CheckoutSummary extends PureComponent {
             {totalPrice ? (
               localLabelFromBCH(totalPrice, paymentMethod)
             ) : (
-              {I18n.t('components.organism.CheckoutSummary.calculating')}
+              I18n.t('components.organism.CheckoutSummary.calculating')
             )}
           </Text>
         </View>

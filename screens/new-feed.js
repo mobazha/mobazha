@@ -89,7 +89,7 @@ class NewFeed extends PureComponent {
 
   onPostFeedFailure = () => {
     this.setState({ loading: false });
-    Alert.alert({I18n.t('screens.newFeed.Create_failed')}, {I18n.t('screens.newFeed.unknown_error_create')});
+    Alert.alert(I18n.t('screens.newFeed.Create_failed'), I18n.t('screens.newFeed.unknown_error_create'));
   }
 
   setInputFocus = () => {
@@ -144,7 +144,7 @@ class NewFeed extends PureComponent {
     if (text.length > 0) {
       return (
         <Text style={styles.text}>
-          <Text style={styles.boldCharacterCount}>{`${MAX_CHAR - text.length}`}</Text>{{I18n.t('screens.newFeed.char_left')}}
+          <Text style={styles.boldCharacterCount}>{`${MAX_CHAR - text.length}`}</Text>{I18n.t('screens.newFeed.char_left')}
         </Text>
       );
     }

@@ -18,6 +18,8 @@ import SMTextButton from '../components/atoms/SMTextButton';
 import { footerStyles } from '../utils/styles';
 import { SERVER_PATH, SERVER_UNZIP_PATH } from '../utils/server';
 import { keyboardAvoidingViewSharedProps } from '../utils/keyboard';
+import {I18n} from '../langs/I18n'
+
 
 const styles = {
   wrapper: {
@@ -78,7 +80,7 @@ class RestoreProfilePassword extends PureComponent {
   }
 
   handleRestore = async () => {
-    this.setState({ loadingText: {I18n.t('screens.restoreProfilePassword.failed_download')} });
+    this.setState({ loadingText: I18n.t('screens.restoreProfilePassword.failed_download') });
 
     const { navigation } = this.props;
     let zipPath = navigation.getParam('path');
@@ -109,7 +111,7 @@ class RestoreProfilePassword extends PureComponent {
       const unzippedPath = await unzipWithPassword(zipPath, SERVER_UNZIP_PATH, password);
       console.warn('Succeed to unzip backup file', unzippedPath);
     } catch (err) {
-      this.handleUnzipFailed({I18n.t('screens.restoreProfilePassword.wrong_password')});
+      this.handleUnzipFailed(I18n.t('screens.restoreProfilePassword.wrong_password'));
       return;
     }
 
@@ -117,7 +119,7 @@ class RestoreProfilePassword extends PureComponent {
   }
 
   handleZipFilePathFetchFailed = () => {
-    this.handleUnzipFailed({I18n.t('screens.restoreProfilePassword.wrong_password')});
+    this.handleUnzipFailed(I18n.t('screens.restoreProfilePassword.wrong_password'));
   }
 
   handleServerStopped = async () => {
@@ -173,7 +175,7 @@ class RestoreProfilePassword extends PureComponent {
 
   handleUnzipFailed = async (errMsg) => {
     this.setState({ loadingText: null }, () => {
-      Alert.alert({I18n.t('screens.restoreProfilePassword.Ooops')}, errMsg);
+      Alert.alert(I18n.t('screens.restoreProfilePassword.Ooops'), errMsg);
     });
   }
 

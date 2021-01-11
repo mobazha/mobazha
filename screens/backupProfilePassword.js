@@ -62,15 +62,15 @@ class BackupProfilePassword extends PureComponent {
 
     const { password, cpassword } = this.state;
     if (_.isEmpty(password)) {
-      Alert.alert({I18n.t('screens.backupProfilePassword.password_empty')}, {I18n.t('screens.backupProfilePassword.password_empty_hint')});
+      Alert.alert(I18n.t('screens.backupProfilePassword.password_empty'), I18n.t('screens.backupProfilePassword.password_empty_hint'));
       return;
     }
     if (password !== cpassword) {
-      Alert.alert({I18n.t('screens.backupProfilePassword.password_mismatch')}, {I18n.t('screens.backupProfilePassword.password_mismatch_hint')}) ;
+      Alert.alert(I18n.t('screens.backupProfilePassword.password_mismatch'), I18n.t('screens.backupProfilePassword.password_mismatch_hint')) ;
       return;
     }
 
-    this.setState({ loadingText: {I18n.t('screens.backupProfilePassword.take_a_minute')}});
+    this.setState({ loadingText: I18n.t('screens.backupProfilePassword.take_a_minute')});
 
     try {
       this.targetPath = `${RnFs.DocumentDirectoryPath}/havenBackup_${peerID.substring(0, 6)}_${moment().format('YYYYMMDDhhmmss')}.zip`;
@@ -84,9 +84,9 @@ class BackupProfilePassword extends PureComponent {
 
       const result = zipWithPassword(SERVER_PATH, this.targetPath, password, 'AES-256');
       subscribe(this.handleZipEvent);
-      console.warn({I18n.t('screens.backupProfilePassword.backup_done')}, result);
+      console.warn(I18n.t('screens.backupProfilePassword.backup_done'), result);
     } catch (err) {
-      console.warn({I18n.t('screens.backupProfilePassword.backup_failed')}, err);
+      console.warn(I18n.t('screens.backupProfilePassword.backup_failed'), err);
       this.setState({ loadingText: null });
     }
   }
@@ -94,7 +94,7 @@ class BackupProfilePassword extends PureComponent {
   handleZipEvent = (event) => {
     if (event.progress === 1) {
       this.setState({ loadingText: null }, () => {
-        this.props.navigation.navigate({I18n.t('screens.backupProfilePassword.backup_failed')}, { targetPath: this.targetPath });
+        this.props.navigation.navigate(I18n.t('screens.backupProfilePassword.backup_failed'), { targetPath: this.targetPath });
       });
     }
   }
@@ -136,7 +136,7 @@ class BackupProfilePassword extends PureComponent {
             </InputGroup>
             <Text style={styles.resyncContent}>
             {I18n.t('screens.backupProfilePassword.hint1')} <Text style={styles.bold}>{I18n.t('screens.backupProfilePassword.hint2')}</Text>
-              {{I18n.t('screens.backupProfilePassword.hint3')}}
+              {I18n.t('screens.backupProfilePassword.hint3')}
             </Text>
           </ScrollView>
           <View style={footerStyles.textButtonContainer}>

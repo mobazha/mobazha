@@ -123,7 +123,7 @@ class ReceiveMoney extends PureComponent {
     const coinAddress = this.getCoinAddress();
     Share.share({
       message: coinAddress,
-      title: {I18n.t('screens.receiveMoney.share_address')},
+      title: I18n.t('screens.receiveMoney.share_address'),
     });
   }
 

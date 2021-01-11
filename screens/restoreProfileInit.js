@@ -104,7 +104,7 @@ export default class RestoreProfileInit extends PureComponent {
             <Image style={styles.image} source={RestoreImg} />
           </View>
           <Text style={styles.resyncContent}>
-            {{I18n.t('screens.restoreProfileInit.restore_hint')}}
+            {I18n.t('screens.restoreProfileInit.restore_hint')}
           </Text>
           <SMRoundButton title={I18n.t('screens.restoreProfileInit.select_file')} onPress={this.handleSelectFile} loading={loading} />
         </ScrollView>

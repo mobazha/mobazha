@@ -187,7 +187,7 @@ class PaymentMethod extends PureComponent {
       });
       this.props.navigation.goBack();
     } else {
-      Alert.alert( {I18n.t('screens.paymentMethod.select_fee_level')});
+      Alert.alert(I18n.t('screens.paymentMethod.select_fee_level'));
     }
   };
 
@@ -215,7 +215,7 @@ class PaymentMethod extends PureComponent {
                 {localLabelFromLocal(cBalance)}
               </Text>
               <Text style={styles.secondary}>
-                {(coin.disabled || !balance) ? {I18n.t('screens.paymentMethod.coming_soon')} : `${minUnitAmountToBCH(balance.confirmed, coinName)} ${coinName}`}
+                {(coin.disabled || !balance) ? I18n.t('screens.paymentMethod.coming_soon') : `${minUnitAmountToBCH(balance.confirmed, coinName)} ${coinName}`}
               </Text>
             </View>
           )}

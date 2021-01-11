@@ -68,16 +68,16 @@ class EditShippingAddress extends PureComponent {
     } = this.state;
 
     if (_.isEmpty(name)) {
-      Alert.alert( {I18n.t('screens.editShippingAddress.name_required')});
+      Alert.alert( I18n.t('screens.editShippingAddress.name_required'));
       return;
     } else if (_.isEmpty(addressLineOne)) {
-      Alert.alert( {I18n.t('screens.editShippingAddress.address_required')});
+      Alert.alert( I18n.t('screens.editShippingAddress.address_required'));
       return;
     } else if (_.isEmpty(city)) {
-      Alert.alert( {I18n.t('screens.editShippingAddress.city_required')});
+      Alert.alert( I18n.t('screens.editShippingAddress.city_required'));
       return;
     } else if (_.isEmpty(country)) {
-      Alert.alert( {I18n.t('screens.editShippingAddress.country_required')});
+      Alert.alert( I18n.t('screens.editShippingAddress.country_required'));
       return;
     }
 

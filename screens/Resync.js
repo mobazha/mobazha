@@ -68,7 +68,7 @@ class Resync extends PureComponent {
       const secs = (new Date().getTime()).toString();
       await AsyncStorage.setItem('lastSyncedDate', secs);
     } catch (err) {
-      Alert.alert({I18n.t('screens.Resync.unknown_error')});
+      Alert.alert(I18n.t('screens.Resync.unknown_error'));
     } finally {
       setTimeout(() => {
         this.setState({ resyncing: false });
@@ -100,15 +100,15 @@ class Resync extends PureComponent {
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flex: 1 }}>
             <Text style={styles.resyncTitle}>{I18n.t('screens.Resync.resync_transactionsr')}</Text>
             <Text style={styles.resyncContent}>
-              {{I18n.t('screens.Resync.resync_content1')}}
-              {{I18n.t('screens.Resync.resync_content2')}}
+              {I18n.t('screens.Resync.resync_content1')}
+              {I18n.t('screens.Resync.resync_content2')}
             </Text>
             <Text style={styles.resyncContent}>
-              {{I18n.t('screens.Resync.resync_content3')}}
-              {{I18n.t('screens.Resync.resync_content4')}}
+              {I18n.t('screens.Resync.resync_content3')}
+              {I18n.t('screens.Resync.resync_content4')}
             </Text>
             <Text style={styles.resyncContent}>
-              {{I18n.t('screens.Resync.resync_content5')}}
+              {I18n.t('screens.Resync.resync_content5')}
             </Text>
             <View style={{ flex: 1 }} />
           </ScrollView>

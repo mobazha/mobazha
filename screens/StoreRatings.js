@@ -68,7 +68,7 @@ class StoreRatings extends PureComponent {
               {peerID ? (
                 `${_.get(profile, 'name')} {I18n.t('screens.StoreRatings.no_reviews1')}`
               ) : (
-                {I18n.t('screens.StoreRatings.no_reviews2')}
+                I18n.t('screens.StoreRatings.no_reviews2')
               )}
             </Text>
           )}

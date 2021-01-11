@@ -85,11 +85,11 @@ export default class BackupProfileInit extends PureComponent {
             <Image style={styles.image} source={UploadImg} />
           </View>
           <Text style={styles.resyncContent}>
-            {{I18n.t('screens.backupProfileInit.ensure_backup1')}}
+            {I18n.t('screens.backupProfileInit.ensure_backup1')}
             <Text style={styles.bold}>
-              {{I18n.t('screens.backupProfileInit.ensure_backup2')}}
+              {I18n.t('screens.backupProfileInit.ensure_backup2')}
             </Text>
-            {{I18n.t('screens.backupProfileInit.ensure_backup3')}}
+            {I18n.t('screens.backupProfileInit.ensure_backup3')}
           </Text>
           <Text style={styles.resyncContent}>
           {I18n.t('screens.backupProfileInit.ensure_backup4')}

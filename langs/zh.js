@@ -436,7 +436,7 @@ export default {
                 privacy_description5: "The Application is licensed, not sold, to you. All rights, title and interest (including, without limitation, all copyrights, trademarks and other intellectual property rights) in and to this Application belong to us or our licensors. Subject to your compliance with these Terms, we grant you a non-transferable, non-assignable, revocable, limited license to download and install one copy of this Application on a mobile device that you personally own or control and to use that copy of this Application on that mobile device solely for your own personal use. You may not install or use a copy of the Application on a device you do not own or control. You may not distribute or make the Application available over a network where it could be used by multiple devices at the same time. You may not sell, rent, lend, lease, redistribute, or sublicense the Application or circumvent any technical limitations in the Application or otherwise interfere in any manner with the operation of the Application, or the hardware or network used to operate the Application. You may not copy, reverse engineer, decompile, disassemble, modify, create derivative works or otherwise attempt to derive the source code of this Application. This Application and its content are protected by copyright under both United States and foreign laws. Any use of the Application and its content not explicitly permitted by these Terms is a breach of this agreement and may violate the law. If you violate these Terms, your license to use this Application automatically terminates and you must immediately cease using the Application and destroy all copies, full or partial, of the Application.",
                 privacy_description6: "2. Ownership",
                 privacy_description7: "We alone (and our licensors, where applicable) shall own all right, title and interest, including, without limitation, all intellectual property rights, in and to the Application and any suggestions, ideas, enhancement requests, feedback, recommendations or other information provided by you or any other party relating to the Application. Any copy, modification, revision, enhancement, adaptation, translation, or derivative work of or created from the Application shall be owned solely and exclusively by us, and/or, as applicable, our third-party vendors, as shall any and all patent rights, copyrights, trade secret rights, trademark rights, and all other proprietary rights, worldwide therein and thereto, and you hereby assign to OB1 any and all of your rights, title or interests that you may have or obtain in the Application or any modification to or derivative work of the Application. You shall not remove or authorize or permit any third party to remove any proprietary rights legend from the Application.",
-
+                iaccept: "我接受"
             }, feed: {
                 not_post: "%{name} 还没有发布任何信息",
                 post_hint1: "你还没有发布任何信息.",
@@ -602,11 +602,13 @@ export default {
                 cancel: "取消",
                 OK: "OK",
                 profile: "个人资料",
-                currency: "现金",
+                Country: "国家",
+                currency: "货币",
                 shipping_address: "邮寄地址",
                 blocked: "阻止",
                 notifications: "通知事项",
                 push_notifications: "推送通知事项",
+                store: "店铺",
                 Policies: "政策",
                 Moderators: "仲裁者",
                 coins_accepted: "接收货币",
@@ -716,7 +718,8 @@ export default {
         chats: {
             start_conversation: "开始一个会话",
             new_chat: "新的聊天",
-            no_discussion: "找不到订单讨论"
+            no_discussion: "找不到订单讨论",
+            chat: "聊天"
         },
         checkoutModerators: {
             select_moderator: "选择一个仲裁者",
@@ -820,7 +823,7 @@ export default {
             optional: "可选的",
             country: "国家",
             currency: "现金",
-            share_analytics: "匿名分享分析",
+            share_analytics: "分享匿名分析数据",
             help_improve: "帮助我们改进haven"
         },
         orderDetails: {

@@ -14,6 +14,8 @@ import currencies from '../../config/localCurrencies.json';
 import { patchSettingsRequest } from '../../reducers/settings';
 import { primaryTextColor } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 countries.splice(0, 1);
 
 const styles = {
@@ -116,7 +118,7 @@ class Settings extends PureComponent {
 
     return (
       <ScrollView contentContainerStyle={styles.scrollView}>
-        <InputGroup titlen= {I18n.t('components.templates.Settings.profile')} >
+        <InputGroup title= {I18n.t('components.templates.Settings.profile')} >
           <RadioModalFilter
             title= {I18n.t('components.templates.Settings.Country')}
             secondary

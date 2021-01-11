@@ -20,7 +20,7 @@ import { eventTracker } from '../utils/EventTracker';
 
 import {I18n} from '../langs/I18n'
 
-constlogoImg = require('../assets/images/logo/brand-logo.png');
+const logoImg = require('../assets/images/logo/brand-logo.png');
 const onboardingImg = require('../assets/images/onboardingBackground.png');
 
 const titleWidth = 100;
@@ -236,7 +236,7 @@ class Onboarding extends PureComponent {
           <View style={styles.analyticsContainer}>
             <View>
               <Text style={styles.analyticsTitle}>{I18n.t('screens.onboarding.share_analytics')}</Text>
-              <Text style={styles.analyticsText}>{I18n.t('screens.onboarding.share_help_improve')}</Text>
+              <Text style={styles.analyticsText}>{I18n.t('screens.onboarding.help_improve')}</Text>
             </View>
             <Switch
               onValueChange={this.handleToggleAnalytics}

@@ -143,14 +143,15 @@ func (x *DevNet) Execute(args []string) error {
 
 func newConfig(role, gatwayAddr, swarmAddr string) *repo.Config {
 	return &repo.Config{
-		DataDir:           path.Join(repo.DefaultHomeDir, "devnet", role),
-		GatewayAddr:       gatwayAddr,
-		SwarmAddrs:        []string{swarmAddr},
-		Testnet:           true,
-		BoostrapAddrs:     nil,
-		DisableNATPortMap: true,
-		IPNSQuorum:        2,
-		LogLevel:          "info",
+		DataDir:            path.Join(repo.DefaultHomeDir, "devnet", role),
+		GatewayAddr:        gatwayAddr,
+		SwarmAddrs:         []string{swarmAddr},
+		Testnet:            true,
+		BoostrapAddrs:      nil,
+		DisableNATPortMap:  true,
+		IPNSQuorum:         2,
+		LogLevel:           "info",
+		APIAllowAllOrigins: true,
 	}
 }
 

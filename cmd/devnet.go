@@ -208,7 +208,7 @@ func setupVendor(n *core.OpenBazaarNode, moderatorID peer.ID) error {
 	}
 
 	listings, err := n.GetMyListings()
-	if err != nil {
+	if err != nil && !errors.Is(err, coreiface.ErrNotFound) {
 		return err
 	}
 

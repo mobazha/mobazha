@@ -85,47 +85,47 @@ const styles = {
 
 const actions = [
   {
-    caption: 'My Profile',
+    caption: {I18n.t('screens.Me.My_Profile')},
     icon: props => <Feather name="user" color={greenColor} size={24} {...props} />,
-    screenName: 'Store',
+    screenName: {I18n.t('screens.Me.screenName1')},
   },
   {
-    caption: 'Wallet',
+    caption: {I18n.t('screens.Me.wallet')},
     icon: props => <MaterialIcons name="account-balance-wallet" color={greenColor} size={24} {...props} />,
-    screenName: 'Wallet',
+    screenName: {I18n.t('screens.Me.screenName2')},
   },
   {
-    caption: 'Purchases',
+    caption:  {I18n.t('screens.Me.purchases')},
     icon: props => <Feather name="shopping-cart" color={greenColor} size={24} {...props} />,
-    screenName: 'Orders',
+    screenName:{I18n.t('screens.Me.screenName3')},
     params: { orderType: 'purchases' },
   },
   {
-    caption: 'Sales',
+    caption: {I18n.t('screens.Me.sales')},
     icon: props => <Feather name="tag" color={greenColor} size={24} {...props} />,
-    screenName: 'Orders',
+    screenName: {I18n.t('screens.Me.screenName4')},
     params: { orderType: 'sales' },
   },
   {
-    caption: 'Wishlist',
+    caption: {I18n.t('screens.Me.wishlist')},
     icon: props => <Feather name="heart" color={greenColor} size={24} {...props} />,
-    screenName: 'WishList',
+    screenName: {I18n.t('screens.Me.screenName5')},
   },
   {
-    caption: 'Settings',
+    caption: {I18n.t('screens.Me.settings')},
     icon: props => <Feather name="settings" color={greenColor} size={24} {...props} />,
-    screenName: 'Settings',
+    screenName: {I18n.t('screens.Me.screenName6')},
   },
   {
-    caption: 'Notifications',
+    caption: {I18n.t('screens.Me.notifications')},
     icon: props => <Feather name="bell" color={greenColor} size={24} {...props} />,
-    screenName: 'Notifications',
+    screenName: {I18n.t('screens.Me.screenName7')},
     isNotif: true,
   },
   {
-    caption: 'Support',
+    caption: {I18n.t('screens.Me.support')},
     icon: props => <Feather name="info" color={greenColor} size={24} {...props} />,
-    screenName: 'Support',
+    screenName: {I18n.t('screens.Me.screenName8')},
   },
 ];
 
@@ -171,7 +171,7 @@ class Me extends PureComponent {
     const { showSupport } = this.state;
     return (
       <View style={styles.wrapper}>
-        <TabHeader title="Me" />
+        <TabHeader title={I18n.t('screens.Me.me')} />
         <OptionGroup contentStyle={styles.optionContent} onPress={this.handleGoToMyStore}>
           <View style={styles.optionWrapper}>
             <AvatarImage style={styles.imageWrapper} thumbnail={_.get(avatarHashes, 'tiny')} showLocal />
@@ -201,31 +201,31 @@ class Me extends PureComponent {
             onLeft={this.handleHideModal}
           />
           <ScrollView style={styles.contentWrapper} contentContainerStyle={styles.contentWrapper}>
-            <InputGroup title="Support" noBorder>
+            <InputGroup title={I18n.t('screens.Me.support2')} noBorder>
               <DescriptionText>
-                Have questions, feature suggestions or bugs to report? Please check our FAQs first.
-                Our Telegram group is a great resource to report bugs or ask for support. <Text style={styles.bold}> Our ability to offer email support is very limited. </Text> Please attempt to use the FAQ or Telegram group primarily.
+              {I18n.t('screens.Me.Description1')} 
+              {I18n.t('screens.Me.Description2')}  <Text style={styles.bold}>  {I18n.t('screens.Me.Description3')}  </Text>  {I18n.t('screens.Me.Description4')} 
               </DescriptionText>
               <DescriptionText>
-                For any critical issues, concerns, or problems with the app and/or content in the marketplace, contact us via email.
+              {I18n.t('screens.Me.Description5')}
               </DescriptionText>
             </InputGroup>
           </ScrollView>
           <Button
-            title="FAQs"
+            title={I18n.t('screens.Me.fAQs')}
             wrapperStyle={styles.buttonWrapper}
             textStyle={styles.buttonText}
             onPress={this.handlePressFaq}
             style={styles.firstButton}
           />
           <Button
-            title="Telegram"
+            title={I18n.t('screens.Me.telegram')}
             textStyle={styles.buttonText}
             wrapperStyle={styles.buttonWrapper}
             onPress={this.handlePressTelegram}
           />
           <Button
-            title="Email Support"
+            title={I18n.t('screens.Me.email_Support')}
             textStyle={styles.buttonText}
             wrapperStyle={[styles.buttonWrapper, styles.lastButton]}
             onPress={this.handlePressEmailSupport}

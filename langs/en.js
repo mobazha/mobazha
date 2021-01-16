@@ -1,3 +1,4 @@
+import Me from "../screens/Me";
 export default {
     OnboardingWrapper: {
         unknown: 'Unknown',
@@ -1027,6 +1028,36 @@ export default {
             Reviews: "Reviews",
             no_reviews1: "%{user} hasn't received any reviews",
             no_reviews2: "You haven\'t received any reviews"
+        },
+        Me:{
+            my_Profile :"My Profile",
+            screenName1 :"Store",
+            wallet: "Wallet",
+            screenName2:"Wallet",
+            purchases: "Purchases",
+            screenName3 :"Orders",
+            sales : "Sales",
+            screenName4 :"Orders",
+            wishlist:"Wishlist",
+            screenName5:"WishList",
+            settings:"Settings",
+            screenName6:"Settings",
+            notifications:"Notifications",
+            screenName7:"Notifications",
+            support:"Support",
+            screenName8 :"Support",
+            me:"Me",
+            support2:"Support",
+            Description1:"Have questions, feature suggestions or bugs to report? Please check our FAQs first." ,
+            Description2:"Our Telegram group is a great resource to report bugs or ask for support.",
+            Description3:"Our ability to offer email support is very limited." ,
+            Description4:"Please attempt to use the FAQ or Telegram group primarily.",
+            Description5:"For any critical issues, concerns, or problems with the app and/or content in the marketplace, contact us via email.",
+            fAQs:"FAQs",
+            telegram:"Telegram",
+            email_Support:"Email Support",
+
+
         }
     },
 }

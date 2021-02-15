@@ -367,7 +367,7 @@ export default {
                 is_typing: "%{peer} 正在书写...",
                 unread: "没有阅读",
                 block_message: "这个用户已经被屏蔽.",
-                start_with: "开始与。。会话",
+                start_with: "开始会话：",
                 moderator_join: "(仲裁者) 加入了讨论",
                 say_something: "请说点东西吧..."
             },

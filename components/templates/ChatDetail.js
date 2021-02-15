@@ -35,6 +35,8 @@ import {
   borderColor,
 } from '../commonColors';
 
+import {I18n} from '../../langs/I18n';
+
 const { width, height } = Dimensions.get('window');
 
 const styles = {
@@ -707,7 +709,7 @@ class ChatDetail extends PureComponent {
       >
         <AvatarImage thumbnail={thumbnail} style={styles.emptyStateAvatar} />
         <Text style={styles.placeholderText}>
-        {I18n.t('components.templates.ChatDetail.start_with')}+{' '}
+        {I18n.t('components.templates.ChatDetail.start_with') + ' '}
           <Text style={styles.handle}>{handle ? `@${handle}` : decode(name)}</Text>
         </Text>
       </View>

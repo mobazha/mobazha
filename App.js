@@ -4,7 +4,7 @@ import Messaging from '@react-native-firebase/messaging';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/lib/integration/react';
 import { MenuProvider } from 'react-native-popup-menu';
-import Countly from 'countly-sdk-react-native';
+import Countly from 'countly-sdk-react-native-bridge';
 import Reactotron from 'reactotron-react-native';
 
 import './ReactotronConfig';

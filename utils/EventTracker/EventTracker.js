@@ -1,4 +1,4 @@
-import Countly from 'countly-sdk-react-native';
+import Countly from 'countly-sdk-react-native-bridge';
 
 export default class EventTracker {
   constructor(isTracking = false) {
@@ -7,9 +7,13 @@ export default class EventTracker {
 
   changeTrackingStatus(isTracking) {
     if (!isTracking) {
-      Countly.stop();
+      if(this.isTracking) {
+        Countly.stop();
+      }
     } else {
-      Countly.start();
+      if(!this.isTracking) {
+        Countly.start();
+      }
     }
     this.isTracking = isTracking;
   }

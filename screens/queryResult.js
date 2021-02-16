@@ -20,7 +20,7 @@ class QueryResult extends PureComponent {
     const queryString = this.props.navigation.getParam('query');
     return (
       <View style={screenWrapper.wrapper}>
-        <Header left={<NavBackButton />} onLeft={this.goBack} title="Listings" />
+        <Header left={<NavBackButton />} onLeft={this.goBack} title="商品" />
         <InfiniteProducts
           queryString={queryString}
           toListingDetails={this.handleGoToListingDetails}

@@ -2,7 +2,7 @@ import React, { PureComponent } from 'react';
 import { Text, DeviceEventEmitter, NativeEventEmitter, NativeModules, Platform, Alert } from 'react-native';
 import SplashScreen from 'react-native-splash-screen';
 import { connect } from 'react-redux';
-import Countly from 'countly-sdk-react-native';
+import Countly from 'countly-sdk-react-native-bridge';
 
 import { getConfig, createProfile, createSettings } from './api/onboarding';
 import { getProfile } from './api/profile';

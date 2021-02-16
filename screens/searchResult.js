@@ -20,11 +20,11 @@ import {I18n} from '../langs/I18n';
 
 const tabs = [
   {
-    label: 'Listings',
+    label: '商品',
     value: 'listings',
   },
   {
-    label: 'Users',
+    label: '用户',
     value: 'users',
   },
 ];

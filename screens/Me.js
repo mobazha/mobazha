@@ -85,47 +85,47 @@ const styles = {
 
 const actions = [
   {
-    caption: {I18n.t('screens.Me.My_Profile')},
+    caption: I18n.t('screens.Me.My_Profile'),
     icon: props => <Feather name="user" color={greenColor} size={24} {...props} />,
-    screenName: {I18n.t('screens.Me.screenName1')},
+    screenName: I18n.t('screens.Me.screenName1'),
   },
   {
-    caption: {I18n.t('screens.Me.wallet')},
+    caption: I18n.t('screens.Me.wallet'),
     icon: props => <MaterialIcons name="account-balance-wallet" color={greenColor} size={24} {...props} />,
-    screenName: {I18n.t('screens.Me.screenName2')},
+    screenName: I18n.t('screens.Me.screenName2'),
   },
   {
-    caption:  {I18n.t('screens.Me.purchases')},
+    caption:  I18n.t('screens.Me.purchases'),
     icon: props => <Feather name="shopping-cart" color={greenColor} size={24} {...props} />,
-    screenName:{I18n.t('screens.Me.screenName3')},
+    screenName: I18n.t('screens.Me.screenName3'),
     params: { orderType: 'purchases' },
   },
   {
-    caption: {I18n.t('screens.Me.sales')},
+    caption: I18n.t('screens.Me.sales'),
     icon: props => <Feather name="tag" color={greenColor} size={24} {...props} />,
-    screenName: {I18n.t('screens.Me.screenName4')},
+    screenName: I18n.t('screens.Me.screenName4'),
     params: { orderType: 'sales' },
   },
   {
-    caption: {I18n.t('screens.Me.wishlist')},
+    caption: I18n.t('screens.Me.wishlist'),
     icon: props => <Feather name="heart" color={greenColor} size={24} {...props} />,
-    screenName: {I18n.t('screens.Me.screenName5')},
+    screenName: I18n.t('screens.Me.screenName5'),
   },
   {
-    caption: {I18n.t('screens.Me.settings')},
+    caption: I18n.t('screens.Me.settings'),
     icon: props => <Feather name="settings" color={greenColor} size={24} {...props} />,
-    screenName: {I18n.t('screens.Me.screenName6')},
+    screenName: I18n.t('screens.Me.screenName6'),
   },
   {
-    caption: {I18n.t('screens.Me.notifications')},
+    caption: I18n.t('screens.Me.notifications'),
     icon: props => <Feather name="bell" color={greenColor} size={24} {...props} />,
-    screenName: {I18n.t('screens.Me.screenName7')},
+    screenName: I18n.t('screens.Me.screenName7'),
     isNotif: true,
   },
   {
-    caption: {I18n.t('screens.Me.support')},
+    caption: I18n.t('screens.Me.support'),
     icon: props => <Feather name="info" color={greenColor} size={24} {...props} />,
-    screenName: {I18n.t('screens.Me.screenName8')},
+    screenName: I18n.t('screens.Me.screenName8'),
   },
 ];
 

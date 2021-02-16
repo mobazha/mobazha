@@ -1,4 +1,3 @@
-import Me from "../screens/Me";
 export default {
     OnboardingWrapper: {
         unknown: 'Unknown',

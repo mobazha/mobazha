@@ -1,4 +1,4 @@
-package com.nativebazaar;
+package mbz.nativebazaar;
 
 import android.app.Application;
 
@@ -49,8 +49,8 @@ import android.provider.Settings;
 import com.masteratul.exceptionhandler.ReactNativeExceptionHandlerModule;
 import com.masteratul.exceptionhandler.NativeExceptionHandlerIfc;
 
-import com.nativebazaar.serverbridge.ServerBridgePackage;
-import com.nativebazaar.serverbridge.ServerBridgeModule;
+import mbz.nativebazaar.serverbridge.ServerBridgePackage;
+import mbz.nativebazaar.serverbridge.ServerBridgeModule;
 
 public class MainApplication extends Application implements ShareApplication, ReactApplication {
   private static Context context;

@@ -1,4 +1,4 @@
-package com.nativebazaar.serverbridge;
+package mbz.nativebazaar.serverbridge;
 
 import com.facebook.react.ReactPackage;
 import com.facebook.react.bridge.JavaScriptModule;

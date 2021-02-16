@@ -1,4 +1,4 @@
-package com.nativebazaar.serverbridge;
+package mbz.nativebazaar.serverbridge;
 
 import androidx.annotation.NonNull;
 import android.os.AsyncTask;
@@ -20,8 +20,8 @@ import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
 
-import com.nativebazaar.MainApplication;
-import com.nativebazaar.ServerConfig;
+import mbz.nativebazaar.MainApplication;
+import mbz.nativebazaar.ServerConfig;
 import java.util.HashMap;
 import java.util.Map;
 

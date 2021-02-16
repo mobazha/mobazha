@@ -133,7 +133,7 @@ android {
     compileSdkVersion 28
     buildToolsVersion "28.0.3"
     defaultConfig {
-        applicationId "mbz.haven.nativeandroid"
+        applicationId "mbz.nativebazaar"
         minSdkVersion 16
         targetSdkVersion 28
         versionCode Integer.parseInt(VERSION_CODE)
@@ -143,7 +143,7 @@ android {
         ndk {
             abiFilters "armeabi-v7a", "arm64-v8a", "x86_64"
         }
-        resValue "string", "build_config_package", "com.nativebazaar"
+        resValue "string", "build_config_package", "mbz.nativebazaar"
         renderscriptTargetApi 23
         renderscriptSupportModeEnabled true
         multiDexEnabled true

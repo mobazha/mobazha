@@ -1,4 +1,4 @@
-package com.nativebazaar;
+package mbz.nativebazaar;
 
 import android.provider.Settings;
 

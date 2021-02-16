@@ -1,4 +1,4 @@
-package com.nativebazaar.serverbridge;
+package mbz.nativebazaar.serverbridge;
 
 import android.view.View;
 

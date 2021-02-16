@@ -189,12 +189,12 @@ class CheckoutSummary extends PureComponent {
     showCouponModal: false,
   }
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     const checkoutObj = generateCheckoutObjectFromProps(this.props);
     this.bouncedGetEstimation(checkoutObj, this.props);
   }
 
-  componentWillReceiveProps(nextProps) {
+  UNSAFE_componentWillReceiveProps(nextProps) {
     if (this.props.paymentMethod !== nextProps.paymentMethod) {
       this.setState({ price: undefined, shippingPrice: undefined, estimatedFee: undefined });
     }

@@ -17,7 +17,7 @@ import { copiedBackupPhrase } from '../reducers/appstate';
 class Settings extends PureComponent {
   state = { showBackup: false };
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     this.props.fetchSettings();
   }
 

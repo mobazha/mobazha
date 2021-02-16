@@ -12,7 +12,7 @@ import { shuffle } from '../../utils/listings';
 class VendorListings extends PureComponent {
   state = {}
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     const {
       peerID, username, password, slug,
     } = this.props;

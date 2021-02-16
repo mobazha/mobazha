@@ -67,7 +67,7 @@ class SearchFilter extends PureComponent {
     this.state = { ...filter, showFilterToast: false };
   }
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     const { filter } = this.props;
     this.setState({ ...filter });
   }

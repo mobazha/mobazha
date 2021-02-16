@@ -36,7 +36,7 @@ const styles = {
 class ProductRating extends PureComponent {
   state = {}
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     const { username, password, nodeID } = this.props;
     getRating(username, password, nodeID).then((response) => {
       if (response.success !== false) {

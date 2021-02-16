@@ -40,7 +40,7 @@ const styles = {
 };
 
 class OrderState extends PureComponent {
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     this.props.fetchExchangeRate();
     this.props.fetchWalletBalance();
   }

@@ -29,7 +29,7 @@ class StoreRatings extends PureComponent {
     ratings: null,
   };
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     const { username, password, profile } = this.props;
     let peerID = this.props.navigation.getParam('peerID');
     if (!peerID) { peerID = profile.peerID; }

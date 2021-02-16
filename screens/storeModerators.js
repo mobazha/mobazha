@@ -13,7 +13,7 @@ import { fetchModerators } from '../reducers/moderators';
 import { fetchProfile } from '../reducers/profile';
 
 class StoreModerators extends React.PureComponent {
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     const { fetchModerators } = this.props;
     fetchModerators();
   }

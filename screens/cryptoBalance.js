@@ -25,7 +25,7 @@ const styles = {
 class CryptoBalance extends PureComponent {
   state = { refreshing: false };
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     const coin = this.props.navigation.getParam('coin');
     this.props.fetchTransactions(coin);
   }

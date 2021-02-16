@@ -38,7 +38,7 @@ class OrderRating extends PureComponent {
     profile: {},
   };
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     const { buyerID } = this.props;
     getProfile(buyerID).then((response) => {
       this.setState({

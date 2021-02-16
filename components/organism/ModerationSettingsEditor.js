@@ -26,7 +26,7 @@ export default class ModerationSettingsEditor extends PureComponent {
     };
   }
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     Animated.timing(
       this.state.aniVal,
       {

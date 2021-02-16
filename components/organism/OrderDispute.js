@@ -100,7 +100,7 @@ class OrderDispute extends PureComponent {
     sellerProfile: {},
   };
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     const { orderDetails } = this.props;
     const dispute = get(orderDetails, 'contract.dispute');
     if (!isEmpty(dispute)) {

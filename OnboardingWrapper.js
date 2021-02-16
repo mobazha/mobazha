@@ -34,7 +34,7 @@ class OnboardingWrapper extends PureComponent {
     });
   }
 
-  async componentWillMount() {
+  async UNSAFE_componentWillMount() {
     const { setOnboardingStatus } = this.props;
     try {
       await getConfig();

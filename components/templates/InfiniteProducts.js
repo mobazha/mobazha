@@ -54,7 +54,7 @@ class InfiniteProducts extends PureComponent {
     );
   }
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     this.doInitialSearch();
   }
 

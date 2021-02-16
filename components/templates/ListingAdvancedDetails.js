@@ -17,7 +17,7 @@ class InputTemplate extends PureComponent {
     };
   }
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     const {
       details: { storeRefunds, storeTAndC },
     } = this.props;

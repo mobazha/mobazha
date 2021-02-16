@@ -62,7 +62,7 @@ class RestoreProfilePassword extends PureComponent {
     loadingText: null,
   }
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     if (Platform.OS === 'ios') {
       iOSeventEmitter.addListener('onServerStopped', this.handleServerStopped);
       iOSeventEmitter.addListener('onServerStopFailed', this.handleServerStopFailed);

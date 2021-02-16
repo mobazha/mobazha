@@ -94,7 +94,7 @@ const styles = {
 };
 
 class SocialNotification extends React.PureComponent {
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     const peerID = this.getPeerId();
     this.props.fetchProfile({ peerID, getLoaded: true });
   }

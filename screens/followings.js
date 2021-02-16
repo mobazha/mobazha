@@ -33,7 +33,7 @@ class FollowingsScreen extends PureComponent {
     loaded: false,
   };
 
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     const { navigation, myPeerID } = this.props;
 
     const peerID = navigation.getParam('peerID') || myPeerID;

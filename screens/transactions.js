@@ -9,7 +9,7 @@ import NavBackButton from '../components/atoms/NavBackButton';
 import { screenWrapper } from '../utils/styles';
 
 class Transactions extends PureComponent {
-  componentWillMount() {
+  UNSAFE_componentWillMount() {
     this.props.fetchTransactions();
   }
   render() {

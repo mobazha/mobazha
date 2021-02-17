@@ -35,11 +35,15 @@ class ProfileSettings extends PureComponent {
   }
 
   onLeft = () => {
-    Alert.alert(I18n.t('screens.profileSettings.warning'), I18n.t('screens.profileSettings.warning_info'), [
-      { text: I18n.t('screens.profileSettings.Cancel')},
-      { text: I18n.t('screens.profileSettings.OK'), onPress: () => { this.props.navigation.goBack(); } },
-      { cancelable: false },
-    ]);
+    Alert.alert(
+      I18n.t('screens.profileSettings.warning'),
+      I18n.t('screens.profileSettings.warning_info'),
+      [
+        { text: I18n.t('screens.profileSettings.Cancel')},
+        { text: I18n.t('screens.profileSettings.OK'), onPress: () => { this.props.navigation.goBack(); } },
+      ],
+      { cancelable: false }
+    );
   };
 
   onSuccess = () => {

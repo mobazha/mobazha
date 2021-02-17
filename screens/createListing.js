@@ -66,9 +66,8 @@ class CreateListing extends PureComponent {
           this.props.resetData();
           this.props.navigation.goBack(null);
         },
-      },
-      { cancelable: false },
-    ]);
+      }
+    ], { cancelable: false });
   };
 
   handleGoToOptions = (option) => {

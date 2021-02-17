@@ -122,8 +122,7 @@ class TagInput extends PureComponent {
           this.removeTag(index);
         },
       },
-      { cancelable: false },
-    ]);
+    ], { cancelable: false });
   };
 
   onSelectSuggestion = (tag) => {
@@ -180,9 +179,8 @@ class TagInput extends PureComponent {
         onPress: () => {
           this.props.navigation.goBack();
         },
-      },
-      { cancelable: false },
-    ]);
+      }
+    ], { cancelable: false });
   };
 
   save = () => {

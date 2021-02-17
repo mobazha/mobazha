@@ -8,6 +8,7 @@ import { fetchTransactions } from '../reducers/wallet';
 import NavBackButton from '../components/atoms/NavBackButton';
 import { screenWrapper } from '../utils/styles';
 
+import {I18n} from '../langs/I18n';
 class Transactions extends PureComponent {
   UNSAFE_componentWillMount() {
     this.props.fetchTransactions();

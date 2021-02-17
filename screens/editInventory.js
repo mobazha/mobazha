@@ -11,6 +11,7 @@ import { screenWrapper } from '../utils/styles';
 
 import { updateInventory } from '../reducers/createListing';
 
+import {I18n} from '../langs/I18n';
 class EditInventory extends PureComponent {
   constructor(props) {
     super(props);

@@ -21,6 +21,7 @@ import { linkTextColor } from '../components/commonColors';
 import RadioModalFilter from '../components/molecules/RadioModalFilter';
 import { eventTracker } from '../utils/EventTracker';
 
+import {I18n} from '../langs/I18n';
 class EditShippingAddress extends PureComponent {
   constructor(props) {
     super(props);

@@ -1,26 +1,26 @@
 [
   {
     "value": "any",
-    "label": "Any",
+    "label": "任意",
     "checked": true,
     "default": true,
     "exclusive": true
   },
   {
     "value": "physical_good",
-    "label": "Physical Good",
+    "label": "物理商品",
     "checked": false,
     "default": false
   },
   {
     "value": "digital_good",
-    "label": "Digital Good",
+    "label": "电子商品",
     "checked": false,
     "default": false
   },
   {
     "value": "service",
-    "label": "Service",
+    "label": "服务",
     "checked": false,
     "default": false
   }

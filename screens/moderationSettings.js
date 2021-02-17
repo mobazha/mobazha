@@ -11,6 +11,7 @@ import { screenWrapper } from '../utils/styles';
 import { updateModerationSettings } from '../reducers/moderationSettings';
 import NavBackButton from '../components/atoms/NavBackButton';
 
+import {I18n} from '../langs/I18n';
 class ModerationSettings extends PureComponent {
   state = {
     description: '',

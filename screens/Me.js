@@ -85,47 +85,47 @@ const styles = {
 
 const actions = [
   {
-    caption: I18n.t('screens.Me.My_Profile'),
+    caption: I18n.t('screens.Me.my_Profile'),
     icon: props => <Feather name="user" color={greenColor} size={24} {...props} />,
-    screenName: I18n.t('screens.Me.screenName1'),
+    screenName: 'Store',
   },
   {
     caption: I18n.t('screens.Me.wallet'),
     icon: props => <MaterialIcons name="account-balance-wallet" color={greenColor} size={24} {...props} />,
-    screenName: I18n.t('screens.Me.screenName2'),
+    screenName: 'Wallet',
   },
   {
     caption:  I18n.t('screens.Me.purchases'),
     icon: props => <Feather name="shopping-cart" color={greenColor} size={24} {...props} />,
-    screenName: I18n.t('screens.Me.screenName3'),
+    screenName: 'Orders',
     params: { orderType: 'purchases' },
   },
   {
     caption: I18n.t('screens.Me.sales'),
     icon: props => <Feather name="tag" color={greenColor} size={24} {...props} />,
-    screenName: I18n.t('screens.Me.screenName4'),
+    screenName: 'Orders',
     params: { orderType: 'sales' },
   },
   {
     caption: I18n.t('screens.Me.wishlist'),
     icon: props => <Feather name="heart" color={greenColor} size={24} {...props} />,
-    screenName: I18n.t('screens.Me.screenName5'),
+    screenName: 'WishList',
   },
   {
     caption: I18n.t('screens.Me.settings'),
     icon: props => <Feather name="settings" color={greenColor} size={24} {...props} />,
-    screenName: I18n.t('screens.Me.screenName6'),
+    screenName: 'Settings',
   },
   {
     caption: I18n.t('screens.Me.notifications'),
     icon: props => <Feather name="bell" color={greenColor} size={24} {...props} />,
-    screenName: I18n.t('screens.Me.screenName7'),
+    screenName: 'Notifications',
     isNotif: true,
   },
   {
     caption: I18n.t('screens.Me.support'),
     icon: props => <Feather name="info" color={greenColor} size={24} {...props} />,
-    screenName: I18n.t('screens.Me.screenName8'),
+    screenName: 'Support',
   },
 ];
 

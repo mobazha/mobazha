@@ -26,8 +26,8 @@ import PersonAddImage from '../../assets/icons/person_add.png';
 import {I18n} from '../../langs/I18n';
 
 const sortOptions = [
-  { label: 'Trending', value: 'trending' },
-  { label: 'Most Recent', value: 'recent' },
+  { label: I18n.t('components.templates.GlobalFeed.Trending'), value: 'trending' },
+  { label: I18n.t('components.templates.GlobalFeed.Most_Recent'), value: 'recent' },
 ];
 
 const styles = {

@@ -6,6 +6,7 @@ import InfiniteProducts from '../components/templates/InfiniteProducts';
 import NavBackButton from '../components/atoms/NavBackButton';
 import { screenWrapper } from '../utils/styles';
 
+import {I18n} from '../langs/I18n';
 class QueryResult extends PureComponent {
   goBack = () => {
     const { navigation } = this.props;

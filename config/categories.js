@@ -1,9 +1,12 @@
 import * as _ from 'lodash';
 
+import {I18n} from '../langs/I18n';
+
 const categories = [
   {
     name: 'Books',
-    title: 'Books',
+    title: I18n.t('config.categories.Books'),
+    short: I18n.t('config.categories.Books'),
     image: require('../assets/images/categories/Books.jpg'),
     subs: [
       'Arts & Photography',
@@ -40,7 +43,7 @@ const categories = [
   {
     name: 'Consumer Electronics',
     title: 'Consumer Electronics',
-    short: 'Electronics',
+    short: I18n.t('config.categories.Electronics'),
     image: require('../assets/images/categories/Consumer_Electronics.jpeg'),
     subs: [
       'Camera & Photo',
@@ -66,7 +69,7 @@ const categories = [
   {
     name: 'Toys & Hobbies',
     title: 'Toys & Hobbies',
-    short: 'Games',
+    short: I18n.t('config.categories.Games'),
     image: require('../assets/images/categories/Toys_Hobbies.jpg'),
     subs: [
       'Dolls & Stuffed Toys',
@@ -91,7 +94,7 @@ const categories = [
   {
     name: "Women's Clothing",
     title: 'Apparel for Women',
-    short: 'Clothing',
+    short: I18n.t('config.categories.Clothing'),
     image: require('../assets/images/categories/Womens_Clothing.jpg'),
     subs: [
       'Dresses',
@@ -109,7 +112,7 @@ const categories = [
   },
   {
     name: "Men's Clothing",
-    title: 'Apparel for Men',
+    title: I18n.t('config.categories.Apparel_for_Men'),
     image: require('../assets/images/categories/Mens_Clothing.jpg'),
     subs: [
       'Hoodies & Sweatshirts',
@@ -127,7 +130,7 @@ const categories = [
   },
   {
     name: 'Cellphones & Telecommunications',
-    title: 'Cellphones & Telecommunications',
+    title: I18n.t('config.categories.Cellphones_Telecommunications'),
     image: require('../assets/images/categories/Cellphones_Telecommunications.jpg'),
     subs: [
       'Cellphones',
@@ -144,7 +147,7 @@ const categories = [
   },
   {
     name: 'Computer & Office',
-    title: 'Computer & Office',
+    title: I18n.t('config.categories.Computer_Office'),
     image: require('../assets/images/categories/Computer_Office.jpg'),
     subs: [
       'Office Electronics',
@@ -171,7 +174,7 @@ const categories = [
   },
   {
     name: 'Jewelry & Accessories',
-    title: 'Jewelry & Accessories',
+    title: I18n.t('config.categories.Jewelry_Accessories'),
     image: require('../assets/images/categories/Jewelry_Accessories.jpg'),
     subs: [
       'Fine Jewelry',
@@ -186,7 +189,7 @@ const categories = [
   },
   {
     name: 'Home & Garden',
-    title: 'Home & Garden',
+    title: I18n.t('config.categories.Home_Garden'),
     image: require('../assets/images/categories/Home_Garden.jpeg'),
     subs: [
       'Kitchen,Dining & Bar',
@@ -204,7 +207,7 @@ const categories = [
   },
   {
     name: 'Luggage & Bags',
-    title: 'Luggage & Bags',
+    title: I18n.t('config.categories.Luggage_Bags'),
     image: require('../assets/images/categories/Luggage_Bags.jpg'),
     subs: [
       "Women's Bags",
@@ -220,7 +223,7 @@ const categories = [
   },
   {
     name: 'Shoes',
-    title: 'Shoes',
+    title: I18n.t('config.categories.Shoes'),
     image: require('../assets/images/categories/Shoes.jpeg'),
     subs: [
       "Women's Shoes",
@@ -237,7 +240,7 @@ const categories = [
   },
   {
     name: 'Mother & Kids',
-    title: 'Mother & Kids',
+    title: I18n.t('config.categories.Mother_Kids'),
     image: require('../assets/images/categories/Mother_Kids.jpg'),
     subs: [
       "Girls' Baby Clothing",
@@ -261,7 +264,7 @@ const categories = [
   },
   {
     name: 'Sports & Entertainment',
-    title: 'Sports & Entertainment',
+    title: I18n.t('config.categories.Sports_Entertainment'),
     image: require('../assets/images/categories/Sports_Entertainment.jpg'),
     subs: [
       'Sports Clothing',
@@ -285,7 +288,7 @@ const categories = [
   },
   {
     name: 'Beauty & Health',
-    title: 'Beauty & Health',
+    title: I18n.t('config.categories.Beauty_Health'),
     image: require('../assets/images/categories/Beauty_Health.jpg'),
     subs: [
       'Nails Art & Tools',
@@ -309,7 +312,7 @@ const categories = [
   },
   {
     name: 'Watches',
-    title: 'Watches',
+    title: I18n.t('config.categories.Watches'),
     image: require('../assets/images/categories/Watches.jpeg'),
     subs: [
       "Men's Watches",
@@ -354,7 +357,7 @@ const categories = [
   },
   {
     name: 'Automobiles & Motorcycles',
-    title: 'Automobiles & Motorcycles',
+    title: I18n.t('config.categories.Automobiles_Motorcycles'),
     image: require('../assets/images/categories/Automobiles_Motorcycles.jpg'),
     subs: [
       'Car Lights',
@@ -372,7 +375,7 @@ const categories = [
   },
   {
     name: 'Lights & Lighting',
-    title: 'Lights & Lighting',
+    title: I18n.t('config.categories.Lights_Lighting'),
     image: require('../assets/images/categories/Lights_Lighting.jpg'),
     subs: [
       'Lamps & Shades',
@@ -396,7 +399,7 @@ const categories = [
   },
   {
     name: 'Furniture',
-    title: 'Furniture',
+    title: I18n.t('config.categories.Furniture'),
     image: require('../assets/images/categories/Furniture.png'),
     subs: [
       'Home Furniture',
@@ -412,7 +415,7 @@ const categories = [
   },
   {
     name: 'Electronic Components & Supplies',
-    title: 'Electronic Components & Supplies',
+    title: I18n.t('config.categories.Electronic_Components_Supplies'),
     image: require('../assets/images/categories/Electronic_Components_Supplies.jpg'),
     subs: [
       'Active Components',

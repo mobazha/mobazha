@@ -90,9 +90,9 @@ class ItemDetail extends PureComponent {
       title, description, price, nsfw,
     } = this.state;
     return (
-      <InputGroup title="Listing">
+      <InputGroup title={I18n.t('components.organism.ItemDetail.listing')}>
         <RadioModalFilter
-          title="Type"
+          title={I18n.t('components.organism.ItemDetail.type')}
           required
           secondary
           selected={type}
@@ -101,14 +101,14 @@ class ItemDetail extends PureComponent {
           onChange={this.onChangeType}
         />
         <TextInput
-          title="Title"
+          title={I18n.t('components.organism.ItemDetail.title')}
           required
-          placeholder="What are you selling?"
+          placeholder={I18n.t('components.organism.ItemDetail.ask_selling')}
           value={title}
           onChangeText={this.onChangeTitle}
         />
         <TextInput
-          title="Price"
+          title={I18n.t('components.organism.ItemDetail.price')}
           required
           value={price}
           onChangeText={this.onChangePrice}
@@ -120,7 +120,7 @@ class ItemDetail extends PureComponent {
         <CategorySelector onChangeCategory={this.handleChangeCategory} categories={categories} />
         {(productType.value === 'physical_good' || productType === 'physical_good') && (
           <RadioModalFilter
-            title="Condition"
+            title={I18n.t('components.organism.ItemDetail.condition')}
             secondary
             selected={condition}
             options={productConditions.slice(1, productConditions.length)}
@@ -130,17 +130,17 @@ class ItemDetail extends PureComponent {
         )}
         <TextInput
           ref={r => (this.descriptionInput = r)}
-          title="Description"
+          title={I18n.t('components.organism.ItemDetail.description')}
           multiline
           noTitle
-          placeholder="Describe your listing here"
+          placeholder={I18n.t('components.organism.ItemDetail.description_hint')}
           value={description}
           onChangeText={this.onChangeDescription}
           onFocus={this.handleDescriptionFocus}
         />
         <CheckBox
           checked={nsfw}
-          title="Mature Content (NSFW, adult, 18+)"
+          title={I18n.t('components.organism.ItemDetail.mature_hint')}
           onPress={this.onChangeNsfw}
         />
       </InputGroup>

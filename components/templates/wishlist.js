@@ -38,7 +38,7 @@ export default class WishList extends PureComponent {
   renderEmptyState = () => (
     <View style={styles.emptyWrapper}>
       <Ionicons style={styles.emptyIcon} name="md-heart" size={50} color="#8a8a8f" />
-      <Text style={styles.emptyText}>Your Wishlist is empty</Text>
+      <Text style={styles.emptyText}>{I18n.t('components.templates.wishlist.wishlist_empty')}</Text>
     </View>
   );
 

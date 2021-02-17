@@ -7,6 +7,7 @@ import PurchaseStateTemplate from '../components/templates/PurchaseState';
 
 import { screenWrapper } from '../utils/styles';
 
+import {I18n} from '../langs/I18n';
 export default class ExternalPaySuccess extends PureComponent {
   handleGoBack = () => {
     const { navigation } = this.props;

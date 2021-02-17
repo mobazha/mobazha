@@ -131,7 +131,7 @@ class PanelViewBase extends React.Component {
             </View>
             <TouchableWithoutFeedback onPress={this.handleHideGrid}>
               <View style={styles.buttonWrapper}>
-                <Text style={styles.buttonText}>{I18n.t('components.organism.PanelView.cancle')}</Text>
+                <Text style={styles.buttonText}>{I18n.t('components.organism.PanelView.PanelViewBase.cancel')}</Text>
               </View>
             </TouchableWithoutFeedback>
           </Animated.View>

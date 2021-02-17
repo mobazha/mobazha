@@ -20,6 +20,7 @@ import { convertorsMap } from '../selectors/currency';
 import { screenWrapper } from '../utils/styles';
 import { eventTracker } from '../utils/EventTracker';
 
+import {I18n} from '../langs/I18n';
 class AddShippingMethod extends PureComponent {
   constructor(props) {
     super(props);

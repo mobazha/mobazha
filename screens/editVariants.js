@@ -13,6 +13,7 @@ import { updateOptions } from '../reducers/createListing';
 import NavBackButton from '../components/atoms/NavBackButton';
 import { eventTracker } from '../utils/EventTracker';
 
+import {I18n} from '../langs/I18n';
 class EditVariants extends PureComponent {
   constructor(props) {
     super(props);

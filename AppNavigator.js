@@ -17,6 +17,8 @@ import PlusPanelView from './components/organism/PanelView/PlusPanelView';
 import SharePanelView from './components/organism/PanelView/SharePanelView';
 import ToastTemplate from './components/templates/Toast';
 
+import {I18n} from './langs/I18n';
+
 const styles = {
   spinnerText: {
     color: 'white',
@@ -250,7 +252,7 @@ class AppNavigatorRedux extends React.PureComponent {
       <View style={{ flex: 1 }}>
         <Spinner
           visible={spinner}
-          textContent="Please wait..."
+          textContent={I18n.t('AppNavigator.Please_wait')}
           textStyle={styles.spinnerText}
         />
         <AppContainer

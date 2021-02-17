@@ -11,6 +11,7 @@ import { addCoupon, removeCoupon, editCoupon } from '../reducers/createListing';
 import { getCurrencySymbol } from '../utils/currency';
 import { screenWrapper } from '../utils/styles';
 
+import {I18n} from '../langs/I18n';
 class AddListingCoupon extends PureComponent {
   state = {
     mode: 'new',

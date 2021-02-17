@@ -89,7 +89,7 @@ export default class SearchHeader extends PureComponent {
           doSearch={doSearch}
           autoFocus={autoFocus}
           showQRButton={showQRButton}
-          placeholder="Search..."
+          placeholder={I18n.t('components.organism.SearchHeader.search')}
           toFilter={toFilter}
           disableFilter={disableFilter}
         />

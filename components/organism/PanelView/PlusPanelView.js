@@ -48,10 +48,10 @@ const CHAT_ICON = <Feather name="message-circle" size={24} style={styles.feather
 const POST_ICON = <Feather name="edit" size={24} style={styles.featherIcons} />;
 
 const MENU_ITEMS = [
-  { title: 'Sell', icon: SELL_ICON },
-  { title: 'Post', icon: POST_ICON },
-  { title: 'Chat', icon: CHAT_ICON },
-  { title: 'Pay', icon: PAY_ICON },
+  { title: I18n.t('components.organism.PanelView.PlusPanelView.Sell'), icon: SELL_ICON },
+  { title: I18n.t('components.organism.PanelView.PlusPanelView.Post'), icon: POST_ICON },
+  { title: I18n.t('components.organism.PanelView.PlusPanelView.Chat'), icon: CHAT_ICON },
+  { title: I18n.t('components.organism.PanelView.PlusPanelView.Pay'), icon: PAY_ICON },
 ];
 
 class PlusPanelView extends React.Component {
@@ -98,7 +98,7 @@ class PlusPanelView extends React.Component {
     const { currentPanel, hidePanel } = this.props;
     return (
       <PanelViewBase
-        title="Choose action"
+        title={I18n.t('components.organism.PanelView.PlusPanelView.Choose_action')}
         ref={this.gridBaseRef}
         isShowingPanel={currentPanel.type === 'plus'}
         hidePanel={hidePanel}

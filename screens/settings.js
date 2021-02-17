@@ -14,6 +14,7 @@ import NavBackButton from '../components/atoms/NavBackButton';
 
 import { copiedBackupPhrase } from '../reducers/appstate';
 
+import {I18n} from '../langs/I18n';
 class Settings extends PureComponent {
   state = { showBackup: false };
 

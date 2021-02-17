@@ -11,6 +11,7 @@ import SelectableModerator from '../components/organism/SelectableModerator';
 import { patchSettingsRequest } from '../reducers/settings';
 import { fetchModerators } from '../reducers/moderators';
 
+import {I18n} from '../langs/I18n';
 class AddModerator extends React.PureComponent {
   static getDerivedStateFromProps(props, state) {
     return {

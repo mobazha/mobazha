@@ -26,6 +26,7 @@ import { wrapperStyles } from '../utils/styles';
 import { getDefaultProfileFromPeerId } from '../utils/profile';
 import { TOAST_OPTION } from '../utils/toast';
 
+import {I18n} from '../langs/I18n';
 class ChatDetail extends PureComponent {
   state = {
   };

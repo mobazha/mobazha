@@ -9,6 +9,7 @@ import NavBackButton from '../components/atoms/NavBackButton';
 import { removeShippingOption } from '../reducers/createListing';
 import { screenWrapper } from '../utils/styles';
 
+import {I18n} from '../langs/I18n';
 class ShippingOptions extends PureComponent {
   onAdd = () => {
     this.props.navigation.navigate('AddShippingMethod');

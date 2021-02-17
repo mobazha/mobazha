@@ -11,6 +11,7 @@ import { COINS } from '../../utils/coins';
 import { borderColor } from '../commonColors';
 import FEE_PLANS from '../../config/feePlans';
 
+import {I18n} from '../../langs/I18n';
 
 const styles = {
   wrapper: {

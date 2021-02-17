@@ -13,6 +13,8 @@ import { screenWrapper } from '../utils/styles';
 import { isCrypto, getBigCurrencyInfo } from '../utils/currency';
 import { estimateFee, getWalletFailureMessage } from '../api/wallet';
 
+import {I18n} from '../langs/I18n';
+
 class SendMoney extends PureComponent {
   constructor(props) {
     super(props);

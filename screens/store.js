@@ -10,6 +10,7 @@ import { createStoreUrlFromPeerID } from '../utils/navigation';
 import OBActionSheet from '../components/organism/ActionSheet';
 import { eventTracker } from '../utils/EventTracker';
 
+import {I18n} from '../langs/I18n';
 class Store extends PureComponent {
   componentDidMount() {
     this.props.fetchProfile();

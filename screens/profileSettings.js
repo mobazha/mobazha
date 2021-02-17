@@ -16,6 +16,7 @@ import EditProfileHeader from '../components/molecules/EditProfileHeader';
 import { StatusBarSpacer } from '../status-bar';
 import { eventTracker } from '../utils/EventTracker';
 
+import {I18n} from '../langs/I18n';
 class ProfileSettings extends PureComponent {
   constructor(props) {
     super(props);

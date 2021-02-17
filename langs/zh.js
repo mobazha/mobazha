@@ -1,5 +1,11 @@
 
 export default {
+    AppNavigator: {
+        Please_wait: "请稍等..."
+    },
+    common: {
+        anonymous: '匿名',
+    },
     OnboardingWrapper: {
         unknown: '未知',
     },
@@ -178,8 +184,8 @@ export default {
                 add_coupon: "添加优惠券"
             },
             EmptyShippingMethods: {
-                empty_shipping_option: "您尚未添加任何运输选项",
-                add_shipping: "添加运输选项"
+                empty_shipping_option: "您尚未添加任何快递选项",
+                add_shipping: "添加快递选项"
             },
             ErrorModal: {
                 error_message: "错误: %{error}"
@@ -189,14 +195,14 @@ export default {
                 Unlimited: "没有限制的"
             },
             ItemDetail: {
-                listing: "商品页面",
+                listing: "商品",
                 type: "类型",
                 title: "标题",
                 ask_selling: "你售卖什么?",
                 price: "价格",
-                condition: "场景",
+                condition: "新旧程度",
                 description: "描述",
-                description_hint: "在这里描述你的产品页面",
+                description_hint: "在这里描述你的商品",
                 mature_hint: "成人内容 (NSFW, 成人, 18+)"
             },
             ModerationSettingsEditor: {
@@ -249,9 +255,10 @@ export default {
             OrderFooter: {
                 claim: "声称",
 
-            }, OrderFulfillment: {
+            }, 
+            OrderFulfillment: {
                 no_tracking_number: "没有运单号码可以复制!",
-                shipping_via: "运输方式",
+                shipping_via: "快递方式",
                 tracking_num: "运单跟踪#",
                 tracking_number_copied: "复制运单号!",
                 file_url: "文件链接:",
@@ -263,9 +270,18 @@ export default {
                 Overall: "整体",
                 Quality: "质量",
                 as_advertised: "如广告所示",
-                Delivery: "运输",
+                Delivery: "快递",
                 Service: "服务",
                 no_feedback: "没有反馈留下来 %{name}"
+            },
+            PanelView: {
+                PlusPanelView: {
+                    Sell: "出售",
+                    Post: "发帖",
+                    Chat: "聊天",
+                    Pay: "支付",
+                    Choose_action: "选择操作"
+                }
             },
             PayPanel: {
                 ask_pay: "你要如何付款?",
@@ -286,6 +302,9 @@ export default {
             SearchFilterHeader: {
                 results: "%{total} 结果"
             },
+            SearchHeader: {
+                search: "搜索..."
+            },
             SelectableModerator: {
                 view_details: "查看详情"
             },
@@ -302,12 +321,12 @@ export default {
                 free: "免费"
             },
             ShippingOptions: {
-                add_option: "添加运输选项",
-                options_count: "%{count} 运输选项",
-                shipping: "运输",
+                add_option: "添加快递选项",
+                options_count: "%{count} 快递选项",
+                shipping: "快递",
             },
             ShippingPriceEditor: {
-                shipping_service: "运输服务 #${pos}",
+                shipping_service: "快递服务 #${pos}",
                 delete: "删除",
                 service: "服务",
                 shipping_hint: "标准，特快等",
@@ -354,7 +373,7 @@ export default {
                 backup_wallet: "备份钱包",
                 backup_description1: "如果您无法访问设备，备份钱包是恢复资金的唯一方法。",
                 backup_description2: "您只需要一支纸笔来记下您的助记词。 准备就绪后，请继续下一步。",
-                next: "下一个",
+                next: "下一步",
                 recovery_phrase: "你的助记词",
                 phrase_hint: "请按顺序写下每个单词",
                 writedown_hint: "确保您的助记词安全。 如果您丢失或更换了手机，则可以使用它来重新获得资金的使用权；从不与任何人分享助记词。 为了安全起见，请避免截图，也不要将其存储在移动设备上。",
@@ -413,7 +432,7 @@ export default {
             },
             CovidModal: {
                 input_groupon_title: "所需的必需用品（COVID-19",
-                description11: "为了在这些困难时期保持安全，世界各地的人们，州和医院的基本用品都非常少。 如果您或您认识的任何人可以快速生产，采购或运输",
+                description11: "为了在这些困难时期保持安全，世界各地的人们，州和医院的基本用品都非常少。 如果您或您认识的任何人可以快速生产，采购或快递",
                 description12: "口罩，N95口罩，外科口罩，洗手液，洗手液，呼吸机，温度计，湿纸巾，卫生纸",
                 description13: " 等,请尽快让这些物品流通并运到正确的人手中.",
                 description21: "如果我们全力以赴，就可以挽救生命。 世界需要您的支持，以帮助使重要物品流通。 如果您有权使用",
@@ -501,10 +520,12 @@ export default {
                 add_a_note: "添加备注（可选）"
             },
             GlobalFeed: {
+                Trending: "流行",
+                Most_Recent: "最近",
                 customise_feed: "按照一些配置文件自定义！",
                 not_found: "什么都没有找到",
                 share_with_community: "在社区分享一些东西!",
-                create_post: "创建一个社交点",
+                create_post: "创建一个帖子",
                 reported: "报告"
             },
 
@@ -543,6 +564,12 @@ export default {
             NeedCoin: {
                 coinbase: "Coinbase",
                 cryptocurrency_exchange: "加密货币交换"
+            },
+            Notification: {
+                Social: "社交",
+                Orders: "订单",
+                social_empty: "如果有人关注您或者回复您的帖子，您会在这里看到。",
+                order_empty: "敬请关注。您的订单更新将显示在这里。"
             },
             OrderState: {
                 no_orders: "没有订单",
@@ -587,7 +614,7 @@ export default {
                 user_cancel_order: " %{user} 已经取消订单. 资金已经全额退还",
                 period_expired: "争议期限已过",
                 no_dispute: "在45天的争议期内，没有任何争议。 卖方现在可以要求付款。",
-                Shipping: "运输",
+                Shipping: "快递",
                 total: "总共",
                 no_buyer_note: "买家没有留下附注",
                 address_copied: "地址已经复制"
@@ -607,7 +634,7 @@ export default {
                 Overall: "整体",
                 Quality: "质量",
                 As_advertised: "如广告所示",
-                Delivery: "运输",
+                Delivery: "快递",
                 Service: "服务",
                 Write_a_review: "在这里写下评论",
                 Post_anonymously: "匿名发送"
@@ -617,8 +644,8 @@ export default {
                 enter_reason: "请输入报告此内容的原因。",
                 why_report_profile: "您为什么要举报此个人资料？",
                 why_report: "你为什么要举报?",
-                next: "下一个",
-                submit: "Submit",
+                next: "下一步",
+                submit: "提交",
                 describe_issue: "请描述问题（可选）",
                 provide_details: "尽可能提供详细资料"
             },
@@ -628,7 +655,7 @@ export default {
 
             },
             SendMoney: {
-                NEXT: "下一个",
+                NEXT: "下一步",
                 send_to: "发送到",
                 paste_or_scan: "请扫描二维码地址"
             },
@@ -645,7 +672,7 @@ export default {
                 Country: "国家",
                 currency: "货币",
                 shipping_address: "邮寄地址",
-                blocked: "阻止",
+                blocked: "屏蔽",
                 notifications: "通知事项",
                 push_notifications: "推送通知事项",
                 store: "店铺",
@@ -660,8 +687,8 @@ export default {
                 Backup_profile: "备份文件",
                 Restore_profile: "同步文件",
                 Resync_transactions: "同步交易",
-                Server_Log: "服务日志",
-                Version: "Version 1.3.7"
+                Server_Log: "后台日志",
+                Version: "版本号 1.3.7"
             },
             StoreModeratorList: {
                 moderators_count: "%{count} 仲裁者",
@@ -686,6 +713,36 @@ export default {
         }
     },
 
+    config: {
+        categories: {
+            Books: "书籍",
+            Electronics: "电子产品",
+            Games: "游戏",
+            Clothing: "女装",
+            Apparel_for_Men: "男装",
+            Cellphones_Telecommunications: "手机和通讯",
+            Computer_Office: "电脑和办公",
+            Jewelry_Accessories: "珠宝和配饰",
+            Home_Garden: "家居",
+            Luggage_Bags: "箱包",
+            Shoes: "鞋子",
+            Mother_Kids: "母婴",
+            Sports_Entertainment: "运动和娱乐",
+            Beauty_Health: "美容与健康",
+            Watches: "手表",
+            Automobiles_Motorcycles: "汽车和摩托车",
+            Lights_Lighting: "灯饰",
+            Furniture: "家具",
+            Electronic_Components_Supplies: "电子配件"
+        },
+        productTypes: {
+            Any: "任意",
+            Physical_Good: "物理商品",
+            Digital_Good: "数字商品",
+            Service: "服务"
+        }
+    },
+
     screens: {
         acceptedCoins: {
             update_listings: "更新商品页面?",
@@ -698,10 +755,10 @@ export default {
         },
         addShippingMethod: {
             fill_required: "请填写所有必填字段",
-            must_be_less: "运输选项名称的长度必须小于40个最大值",
-            select_destination: "请选择一个运输选项",
-            add_shipping_option: "添加一个运输选项",
-            shipping_option: "运输选项",
+            must_be_less: "快递选项名称的长度必须小于40个最大值",
+            select_destination: "请选择一个快递选项",
+            add_shipping_option: "添加一个快递选项",
+            shipping_option: "快递选项",
             title: "标题",
             option_description: "USA Shipping, International, etc",
             destinations: "目的地",
@@ -727,7 +784,7 @@ export default {
             ensure_backup2: " 目前，您需要手动备份数据。 ",
             ensure_backup3: "将来我们将推出更好的备份系统。",
             ensure_backup4: "您的备份将包括您的所有数据，包括钱包资金。",
-            next: "下一个"
+            next: "下一步"
         },
         backupProfilePassword: {
             password_empty: "密码为空",
@@ -745,7 +802,7 @@ export default {
             hint1: "设置一个密码",
             hint2: "确保写下来",
             hint3: "您将需要密码来恢复您的个人资料。.",
-            next: "下一个"
+            next: "下一步"
         },
         backupProfileUpload: {
             message:  "这里是备份文件!",
@@ -799,7 +856,7 @@ export default {
             unblock:"解除屏蔽",
             large:"大",
             loading: "加载中.....",
-            failed_load: "糟糕！ 此配置文件无法加载。",
+            failed_load: "糟糕！ 此用户信息无法加载。",
             retry:"重试",
             reported: "报告",
 
@@ -823,7 +880,7 @@ export default {
             delete_hint: "你不能撤销这个操作.",
             cancel: "取消",
             remove: "移除",
-            failed_load: "糟糕！ 此页码无法加载.",
+            failed_load: "糟糕！ 此商品无法加载.",
             retry: "重试",
             loading: "加载中.....",
             policy1: "返回规定",
@@ -1003,7 +1060,7 @@ export default {
             filter: "过滤",
             sortBy: "排序方式",
             accepts: "接受",
-            ships_to: "运输到",
+            ships_to: "快递到",
             rating: "评分",
             listing_type: "清单类型",
             item_condition: "商品情况",
@@ -1018,9 +1075,9 @@ export default {
             OK: "确定",
             free: "免费",
             cannot_ship: "抱歉，该商品无法运送到所选地址",
-            Shipping: "运输",
+            Shipping: "快递",
             done:"确定",
-            ships_to: "运输到",
+            ships_to: "快递到",
             no_address: "没有货运地址",
             add_address: "添加新地址"
         },
@@ -1036,7 +1093,7 @@ export default {
             screenName2:"钱包",
             purchases: "购买",
             screenName3 :"订单",
-            sales : "卖出",
+            sales : "出售",
             screenName4 :"订单",
             wishlist:"收藏夹",
             screenName5:"收藏夹",
@@ -1054,7 +1111,7 @@ export default {
             Description4:"Please attempt to use the FAQ or Telegram group primarily.",
             Description5:"For any critical issues, concerns, or problems with the app and/or content in the marketplace, contact us via email.",
             fAQs:"FAQs",
-            telegram:"电报",
+            telegram:"Telegram",
             email_Support:"邮箱"
 
         },

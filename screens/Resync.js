@@ -100,7 +100,7 @@ class Resync extends PureComponent {
         />
         <View style={styles.resyncContentContainer}>
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flex: 1 }}>
-            <Text style={styles.resyncTitle}>{I18n.t('screens.Resync.resync_transactionsr')}</Text>
+            <Text style={styles.resyncTitle}>{I18n.t('screens.Resync.resync_transactions')}</Text>
             <Text style={styles.resyncContent}>
               {I18n.t('screens.Resync.resync_content1')}
               {I18n.t('screens.Resync.resync_content2')}

@@ -57,7 +57,7 @@ export default ({ sendMoney, receiveMoney }) => (
   <View style={styles.wrapper}>
     <TouchableWithoutFeedback onPress={receiveMoney}>
       <View style={styles.left}>
-        <Text style={styles.text}>Receive</Text>
+        <Text style={styles.text}>{I18n.t('components.templates.SendReceiveMoney.Receive')}</Text>
         <Ionicons
           name="md-download"
           color={brandColor}
@@ -68,7 +68,7 @@ export default ({ sendMoney, receiveMoney }) => (
     </TouchableWithoutFeedback>
     <TouchableWithoutFeedback onPress={sendMoney}>
       <View style={styles.right}>
-        <Text style={styles.text}>Send</Text>
+        <Text style={styles.text}>{I18n.t('components.templates.SendReceiveMoney.Send')}</Text>
         <Ionicons
           name="md-send"
           color={brandColor}

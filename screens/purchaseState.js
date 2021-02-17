@@ -17,6 +17,7 @@ import PayPanel from '../components/organism/PayPanel';
 import { TIP_ADDRESSES } from '../utils/coins';
 import { TOAST_OPTION } from '../utils/toast';
 
+import {I18n} from '../langs/I18n';
 class PurchaseState extends PureComponent {
   state = {
     paymentState: 'pending',

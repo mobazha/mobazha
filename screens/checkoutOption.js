@@ -10,6 +10,7 @@ import { linkTextColor } from '../components/commonColors';
 import CheckoutHeader from '../components/organism/CheckoutHeader';
 import VariantOptions from '../components/organism/VariantOptions';
 
+import {I18n} from '../langs/I18n';
 class CheckoutOption extends PureComponent {
   constructor(props) {
     super(props);

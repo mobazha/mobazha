@@ -12,6 +12,7 @@ import { screenWrapper } from '../utils/styles';
 import { fetchModerators } from '../reducers/moderators';
 import { fetchProfile } from '../reducers/profile';
 
+import {I18n} from '../langs/I18n';
 class StoreModerators extends React.PureComponent {
   UNSAFE_componentWillMount() {
     const { fetchModerators } = this.props;

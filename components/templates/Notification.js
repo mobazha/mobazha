@@ -38,12 +38,12 @@ const styles = {
 };
 
 const socialTab = {
-  label: 'Social',
+  label: I18n.t('components.templates.Notification.Social'),
   value: 'social',
 };
 
 const orderTab = {
-  label: 'Orders',
+  label: I18n.t('components.templates.Notification.Orders'),
   value: 'order',
 };
 
@@ -131,8 +131,8 @@ class NotificationTemplate extends React.PureComponent {
       return <ActivityIndicator style={styles.loading} size="large" color={secondaryTextColor} />;
     }
     const emptyText = {
-      social: 'If someone follows you or interacts with your posts, you’ll see it here.',
-      order: 'Stay tuned. Updates on your orders will show up here.',
+      social: I18n.t('components.templates.Notification.social_empty'),
+      order: I18n.t('components.templates.Notification.order_empty'),
     };
     return (
       <View style={styles.emptyWrapper}>

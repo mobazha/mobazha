@@ -1,4 +1,7 @@
 export default {
+    AppNavigator: {
+        Please_wait: "Please wait..."
+    },
     OnboardingWrapper: {
         unknown: 'Unknown',
     },
@@ -266,6 +269,15 @@ export default {
                 Service: "Service",
                 no_feedback: "No feedback left by %{name}"
             },
+            PanelView: {
+                PlusPanelView: {
+                    Sell: "Sell",
+                    Post: "Post",
+                    Chat: "Chat",
+                    Pay: "Pay",
+                    Choose_action: "Choose action"
+                }
+            },
             PayPanel: {
                 ask_pay: "How would you like to pay?",
                 external_wallet: "External Wallet",
@@ -284,6 +296,9 @@ export default {
             },
             SearchFilterHeader: {
                 results: "%{total} results"
+            },
+            SearchHeader: {
+                search: "Search..."
             },
             SelectableModerator: {
                 view_details: "View Details"
@@ -500,6 +515,8 @@ export default {
                 add_a_note: "Add a note (optional)"
             },
             GlobalFeed: {
+                Trending: "Trending",
+                Most_Recent: "Most Recent",
                 customise_feed: "Follow some profiles to customise your feed!",
                 not_found: "No results found",
                 share_with_community: "Share something with the community!",
@@ -542,6 +559,12 @@ export default {
             NeedCoin: {
                 coinbase: "Coinbase",
                 cryptocurrency_exchange: "Cryptocurrency Exchange"
+            },
+            Notification: {
+                Social: "Social",
+                Orders: "Orders",
+                social_empty: "If someone follows you or interacts with your posts, you’ll see it here.",
+                order_empty: "Stay tuned. Updates on your orders will show up here."
             },
             OrderState: {
                 no_orders: "No orders found",
@@ -682,6 +705,36 @@ export default {
             wishlist: {
                 wishlist_empty: "Your Wishlist is empty"
             }
+        }
+    },
+
+    config: {
+        categories: {
+            Books: "Books",
+            Electronics: "Electronics",
+            Games: "Games",
+            Clothing: "Clothing",
+            Apparel_for_Men: "Apparel for Men",
+            Cellphones_Telecommunications: "Cellphones & Telecommunications",
+            Computer_Office: "Computer & Office",
+            Jewelry_Accessories: "Jewelry & Accessories",
+            Home_Garden: "Home & Garden",
+            Luggage_Bags: "Luggage & Bags",
+            Shoes: "Shoes",
+            Mother_Kids: "Mother & Kids",
+            Sports_Entertainment: "Sports & Entertainment",
+            Beauty_Health: "Beauty & Health",
+            Watches: "Watches",
+            Automobiles_Motorcycles: "Automobiles & Motorcycles",
+            Lights_Lighting: "Lights & Lighting",
+            Furniture: "Furniture",
+            Electronic_Components_Supplies: "Electronic Components & Supplies"
+        },
+        productTypes: {
+            Any: "Any",
+            Physical_Good: "Physical Good",
+            Digital_Good: "Digital Good",
+            Service: "Service"
         }
     },
 

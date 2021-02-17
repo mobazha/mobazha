@@ -9,6 +9,7 @@ import { createListing, updateListing, resetData } from '../reducers/createListi
 import { fetchListings } from '../reducers/storeListings';
 import { getConfiguration } from '../reducers/config';
 
+import {I18n} from '../langs/I18n';
 class CreateListing extends PureComponent {
   componentDidMount() {
     this.props.getConfiguration();

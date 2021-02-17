@@ -8,6 +8,7 @@ import ListingBasicInfo from '../components/templates/ListingBasicInfo';
 import { updateListing, resetData } from '../reducers/createListing';
 import { getConfiguration } from '../reducers/config';
 
+import {I18n} from '../langs/I18n';
 class EditListing extends PureComponent {
   componentDidMount() {
     this.props.getConfiguration();

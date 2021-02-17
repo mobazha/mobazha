@@ -10,6 +10,7 @@ import LinkText from '../components/atoms/LinkText';
 
 import { updateInventory } from '../reducers/createListing';
 
+import {I18n} from '../langs/I18n';
 class CustomOptions extends PureComponent {
   onUpdateInventory = (info) => {
     this.props.updateInventory({ idx: 0, value: info });

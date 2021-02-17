@@ -11,6 +11,7 @@ import NavBackButton from '../components/atoms/NavBackButton';
 import LinkText from '../components/atoms/LinkText';
 import Header from '../components/molecules/Header';
 
+import {I18n} from '../langs/I18n';
 class SubCategories extends PureComponent {
   constructor(props) {
     super(props);

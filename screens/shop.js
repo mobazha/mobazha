@@ -255,7 +255,7 @@ class ShopScreen extends PureComponent {
           )}
           <MainSlider items={promoData} />
           <CategoryList />
-          <Section title="Trending">
+          <Section title={I18n.t('screens.shop.Trending')}>
             <ProductGrid
               compact
               products={trendingListings}
@@ -263,14 +263,14 @@ class ShopScreen extends PureComponent {
               toListingDetails={this.toListingDetails('Latest')}
             />
           </Section>
-          <Section title="Featured stores">
+          <Section title={I18n.t('screens.shop.Featured_stores')}>
             <ShopGrid
               shops={this.getFeaturedStores()}
               onPress={this.toExternalStore}
               count={4}
             />
           </Section>
-          <Section title="Featured listings">
+          <Section title={I18n.t('screens.shop.Featured_listings')}>
             <ProductGrid
               compact
               products={featuredListings}
@@ -278,7 +278,7 @@ class ShopScreen extends PureComponent {
               toListingDetails={this.toListingDetails('Hot')}
             />
           </Section>
-          <Section title="Best Sellers">
+          <Section title={I18n.t('screens.shop.Best_Sellers')}>
             <ProductGrid
               compact
               products={bestsellersListings}
@@ -286,7 +286,7 @@ class ShopScreen extends PureComponent {
               toListingDetails={this.toListingDetails('Bestsellers')}
             />
           </Section>
-          <Section title="Gaming">
+          <Section title={I18n.t('screens.shop.Gaming')}>
             <ProductGrid
               compact
               products={gamingListings}
@@ -294,7 +294,7 @@ class ShopScreen extends PureComponent {
               toListingDetails={this.toListingDetails('Gaming')}
             />
           </Section>
-          <Section title="Munchies">
+          <Section title={I18n.t('screens.shop.Munchies')}>
             <ProductGrid
               compact
               products={munchiesListings}
@@ -302,7 +302,7 @@ class ShopScreen extends PureComponent {
               toListingDetails={this.toListingDetails('Munchies')}
             />
           </Section>
-          <Section title="Devices">
+          <Section title={I18n.t('screens.shop.Devices')}>
             <ProductGrid
               compact
               products={devicesListings}

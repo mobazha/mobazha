@@ -377,6 +377,9 @@ export default {
             CategoryList: {
                 more: "More"
             },
+            CategoryProductGrid: {
+                see_all: "SEE ALL"
+            },
             ChatDetail: {
                 is_typing: "%{peer} is typing...",
                 unread: "UNREAD",
@@ -694,6 +697,7 @@ export default {
                 view: "View"
             },
             TransactionHistory: {
+                Transactions: "Transactions",
                 no_transaction_recorded: "No transactions have been recorded yet",
                 no_transactions: "No transactions yet",
                 notes: "Please note some payments may not display in the transaction history. However, the total balance reflects all sent and received transactions."
@@ -856,6 +860,13 @@ export default {
             reported: "Reported",
 
         },
+        feed: {
+            My_Feed: "My Feed",
+            Global: "Global",
+            New_features: "New features",
+            feature_description: "Social has improved. Personalized feeds, in-app notifications, and more!",
+            Social: "Social"
+        },
         followers: {
             followers: "Followers",
             no_followers1: "%{name} doesn't have any followers",
@@ -912,11 +923,18 @@ export default {
             selected: " Selected",
             select: "SELECT"
         },
+        newChat: {
+            Search: "Search...",
+            Search_user: "Search for a user"
+        },
         newFeed: {
             Create_failed: "Create post failed",
             unknown_error_create: "Unknown error occured while creating post",
             char_left: " char left",
             what_going_on: "What's going on?"
+        },
+        notifications: {
+            Notifications: "Notifications"
         },
         onboarding: {
             HELLO: "HELLO!",
@@ -1063,6 +1081,10 @@ export default {
             adult_content2: "Show adult content (18+)",
             filters_reset: "Filters reset"
         },
+        searchResult: {
+            Listings: "Listings",
+            User: "User"
+        },
         shippingAddress: {
             are_you_sure: "Are you sure?",
             remove_address: "Remove the address",
@@ -1076,10 +1098,27 @@ export default {
             no_address: "No shipping address",
             add_address: "+ Add new address"
         },
+        shop: {
+            Trending: "Trending",
+            Featured_stores: "Featured stores",
+            Featured_listings: "Featured listings",
+            Best_Sellers: "Best Sellers",
+            Gaming: "Gaming",
+            Munchies: "Munchies",
+            Devices: "Devices"
+        },
         StoreRatings: {
             Reviews: "Reviews",
             no_reviews1: "%{user} hasn't received any reviews",
             no_reviews2: "You haven\'t received any reviews"
+        },
+        wallet: {
+            Wallet: "Wallet",
+            View_history: "View transaction history",
+            Cancel: "Cancel"
+        },
+        wishlist: {
+            Wishlist: "Wishlist"
         },
         Me:{
             my_Profile :"My Profile",
@@ -1112,4 +1151,16 @@ export default {
 
         }
     },
+
+    utils: {
+        listings: {
+            Electronics: "Electronics",
+            Women_Clothing: "Women's Clothing",
+            Men_Clothing: "Men's Clothing",
+            Toys_Games: "Toys and Games",
+            Jewelry: "Jewelry",
+            Tools: "Tools",
+            Gift_Cards: "Gift Cards",
+        }
+    }
 }

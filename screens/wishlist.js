@@ -28,7 +28,7 @@ class WishList extends PureComponent {
     const { wishlist } = this.props;
     return (
       <View style={styles.wrapper}>
-        <Header left={<NavBackButton />} onLeft={this.handleGoBack} title="Wishlist" />
+        <Header left={<NavBackButton />} onLeft={this.handleGoBack} title={I18n.t('screens.wishlist.Wishlist')} />
         <WishListView
           results={wishlist}
           toListingDetails={this.handleGoToListing}

@@ -39,7 +39,7 @@ class CategoryOverview extends PureComponent {
       <InputGroup
         title={title}
         action={onPress}
-        actionTitle="SEE ALL"
+        actionTitle={I18n.t('components.templates.CategoryProductGrid.see_all')}
         actionStyle={styles.actionTitle}
         noPadding
         noBorder

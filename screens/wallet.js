@@ -70,7 +70,7 @@ class Wallet extends PureComponent {
     return (
       <View style={screenWrapper.wrapper}>
         <TabHeader
-          title="Wallet"
+          title={I18n.t('screens.wallet.Wallet')}
           left={<NavBackButton white />}
           onLeft={this.handleGoBack}
           right={<NavOptionButton white />}
@@ -93,7 +93,7 @@ class Wallet extends PureComponent {
         <OBActionSheet
           ref={this.setActionSheet}
           onPress={this.handleActionSheet}
-          options={['View transaction history', 'Cancel']}
+          options={[I18n.t('screens.wallet.View_history'), I18n.t('screens.wallet.Cancel')]}
           cancelButtonIndex={1}
         />
       </View>

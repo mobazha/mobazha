@@ -382,6 +382,9 @@ export default {
             CategoryList: {
                 more: "更多"
             },
+            CategoryProductGrid: {
+                see_all: "查看全部"
+            },
             ChatDetail: {
                 is_typing: "%{peer} 正在书写...",
                 unread: "没有阅读",
@@ -699,6 +702,7 @@ export default {
                 view: "查看"
             },
             TransactionHistory: {
+                Transactions: "交易",
                 no_transaction_recorded: "尚无交易记录",
                 no_transactions: "还没有交易",
                 notes: "请注意，某些付款可能不会显示在交易记录中。 但是，总余额反映了所有已发送和已接收的交易."
@@ -861,6 +865,13 @@ export default {
             reported: "报告",
 
         },
+        feed: {
+            My_Feed: "我的订阅",
+            Global: "全球",
+            New_features: "新功能！",
+            feature_description: "社交改善。个性化的订阅，应用内提醒，以及更多！",
+            Social: "社交"
+        },
         followers: {
             followers: "关注者",
             no_followers1: "%{name} 还没有任何关注者",
@@ -917,11 +928,21 @@ export default {
             selected: "已选",
             select: "选择"
         },
+        newChat: {
+            Search: "搜索...",
+            Search_user: "查找用户"
+        },
         newFeed: {
             Create_failed: "帖子创建失败",
             unknown_error_create: "创建帖子时发生未知错误",
             char_left: " char left",
             what_going_on: "发生了什么?"
+        },
+        notifications: {
+            Notifications: "通知"
+        },
+        notificationSettings: {
+
         },
         onboarding: {
             HELLO: "您好!",
@@ -1068,6 +1089,10 @@ export default {
             adult_content2: "显示成人内容(18+)",
             filters_reset: "重启过滤"
         },
+        searchResult: {
+            Listings: "商品",
+            User: "商户"
+        },
         shippingAddress: {
             are_you_sure: "你确定吗?",
             remove_address: "移除地址",
@@ -1081,10 +1106,27 @@ export default {
             no_address: "没有货运地址",
             add_address: "添加新地址"
         },
+        shop: {
+            Trending: "流行",
+            Featured_stores: "特色商店",
+            Featured_listings: "特色商品",
+            Best_Sellers: "最佳商家",
+            Gaming: "游戏",
+            Munchies: "餐饮",
+            Devices: "设备"
+        },
         StoreRatings: {
             Reviews: "评论",
             no_reviews1: "%{user} 没有收到任何评论",
             no_reviews2: "你还没有收到任何评论"
+        },
+        wallet: {
+            Wallet: "钱包",
+            View_history: "查看交易历史",
+            Cancel: "取消"
+        },
+        wishlist: {
+            Wishlist: "收藏夹"
         },
         Me: {
             my_Profile :"个人信息",
@@ -1116,4 +1158,16 @@ export default {
 
         },
     },
+
+    utils: {
+        listings: {
+            Electronics: "电子商品",
+            Women_Clothing: "女装",
+            Men_Clothing: "男装",
+            Toys_Games: "玩具与游戏",
+            Jewelry: "珠宝",
+            Tools: "工具",
+            Gift_Cards: "礼品卡",
+        }
+    }
 }

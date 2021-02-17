@@ -15,8 +15,8 @@ import { getFilteredList } from '../selectors/stream';
 import {I18n} from '../langs/I18n';
 
 const filterOptions = [
-  { label: 'My Feed', value: 'user', tag: 'NEW' },
-  { label: 'Global', value: 'global' },
+  { label: I18n.t('screens.feed.My_Feed'), value: 'user', tag: 'NEW' },
+  { label: I18n.t('screens.feed.Global'), value: 'global' },
 ];
 
 class Feed extends PureComponent {
@@ -54,7 +54,7 @@ class Feed extends PureComponent {
   handleFocus = () => {
     const { streamBuildNotificationSeen, setStreamBuildNotificationSeen } = this.props;
     if (!streamBuildNotificationSeen) {
-      Alert.alert('New features!', 'Social has improved. Personalized feeds, in-app notifications, and more!');
+      Alert.alert(I18n.t('screens.feed.New_features'), I18n.t('screens.feed.feature_description'));
       setStreamBuildNotificationSeen(true);
     }
 
@@ -96,7 +96,7 @@ class Feed extends PureComponent {
         <TabHeader
           left={<NavPlusButton />}
           onLeft={this.toNewFeed}
-          title="Social"
+          title={I18n.t('screens.feed.Social')}
           navigation={navigation}
         />
         { Platform.OS === 'android' && (

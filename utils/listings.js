@@ -1,22 +1,24 @@
 import { Platform } from 'react-native';
 
+import {I18n} from '../langs/I18n';
+
 export const PREVIEWING_CATEGORIES = Platform.select({
   ios: [
-    { title: 'Electronics', shortName: 'electronics', categoryName: 'Consumer Electronics' },
-    { title: "Women's Clothing", shortName: 'wclothing', categoryName: "Women's Clothing" },
-    { title: "Men's Clothing", shortName: 'mclothing', categoryName: "Men's Clothing" },
-    { title: 'Toys and Games', shortName: 'toy', categoryName: 'Toys & Hobbies' },
-    { title: 'Jewelry', shortName: 'jewelry', categoryName: 'Jewelry & Accessories' },
-    { title: 'Tools', shortName: 'tools', categoryName: 'Tools' },
+    { title: I18n.t('utils.listings.Electronics'), shortName: 'electronics', categoryName: 'Consumer Electronics' },
+    { title: I18n.t('utils.listings.Women_Clothing'), shortName: 'wclothing', categoryName: "Women's Clothing" },
+    { title: I18n.t('utils.listings.Men_Clothing'), shortName: 'mclothing', categoryName: "Men's Clothing" },
+    { title: I18n.t('utils.listings.Toys_Games'), shortName: 'toy', categoryName: 'Toys & Hobbies' },
+    { title: I18n.t('utils.listings.Jewelry'), shortName: 'jewelry', categoryName: 'Jewelry & Accessories' },
+    { title: I18n.t('utils.listings.Tools'), shortName: 'tools', categoryName: 'Tools' },
   ],
   android: [
-    { title: 'Electronics', shortName: 'electronics', categoryName: 'Consumer Electronics' },
-    { title: 'Gift Cards', shortName: 'giftcards', categoryName: 'Gift Cards' },
-    { title: "Women's Clothing", shortName: 'wclothing', categoryName: "Women's Clothing" },
-    { title: "Men's Clothing", shortName: 'mclothing', categoryName: "Men's Clothing" },
-    { title: 'Toys and Games', shortName: 'toy', categoryName: 'Toys & Hobbies' },
-    { title: 'Jewelry', shortName: 'jewelry', categoryName: 'Jewelry & Accessories' },
-    { title: 'Tools', shortName: 'tools', categoryName: 'Tools' },
+    { title: I18n.t('utils.listings.Electronics'), shortName: 'electronics', categoryName: 'Consumer Electronics' },
+    { title: I18n.t('utils.listings.Gift_Cards'), shortName: 'giftcards', categoryName: 'Gift Cards' },
+    { title: I18n.t('utils.listings.Women_Clothing'), shortName: 'wclothing', categoryName: "Women's Clothing" },
+    { title: I18n.t('utils.listings.Men_Clothing'), shortName: 'mclothing', categoryName: "Men's Clothing" },
+    { title: I18n.t('utils.listings.Toys_Games'), shortName: 'toy', categoryName: 'Toys & Hobbies' },
+    { title: I18n.t('utils.listings.Jewelry'), shortName: 'jewelry', categoryName: 'Jewelry & Accessories' },
+    { title: I18n.t('utils.listings.Tools'), shortName: 'tools', categoryName: 'Tools' },
   ],
 });
 

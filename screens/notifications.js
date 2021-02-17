@@ -10,6 +10,7 @@ import { fetchNotifications, markAllAsRead } from '../reducers/notifications';
 import NavBackButton from '../components/atoms/NavBackButton';
 import { screenWrapper } from '../utils/styles';
 
+import {I18n} from '../langs/I18n';
 class Notifications extends PureComponent {
   initNotifications = () => {
     this.props.fetchNotifications();
@@ -36,7 +37,7 @@ class Notifications extends PureComponent {
         <Header
           left={<NavBackButton />}
           onLeft={this.handleBack}
-          title="Notifications"
+          title={I18n.t('screens.notifications.Notifications')}
         />
         <NavigationEvents onDidFocus={this.handleNavigationFocus} onDidBlur={this.markAllAsRead} />
         <NotificationTemplate />

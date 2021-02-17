@@ -101,7 +101,7 @@ class NewChat extends PureComponent {
         onChange={this.onChangeText}
         value={peerID}
         doSearch={this.handleSearch}
-        placeholder="Search..."
+        placeholder={I18n.t('screens.newChat.Search')}
         hasBorder
         autoFocus
         resetKeyword={this.resetKeyword}
@@ -109,7 +109,7 @@ class NewChat extends PureComponent {
     );
   }
 
-  renderEmptyState = (icon, text = 'Search for a user') => {
+  renderEmptyState = (icon, text = I18n.t('screens.newChat.Search_user')) => {
     const { loading } = this.props;
     return (
       <View style={styles.emptyWrapper}>

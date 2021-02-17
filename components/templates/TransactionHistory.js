@@ -99,12 +99,12 @@ class TransactionHistory extends PureComponent {
         <View style={styles.emptyWrapper}>
           <Image style={styles.transactionIcon} source={TransactionIcon} />
           <Text style={[styles.emptyText, styles.centered]}>
-            No transactions have been recorded yet
+            {I18n.t('components.templates.TransactionHistory.no_transaction_recorded')}
           </Text>
         </View>
       );
     }
-    return <Text style={styles.emptyText}>No transactions yet</Text>;
+    return <Text style={styles.emptyText}>{I18n.t('components.templates.TransactionHistory.no_transactions')}</Text>;
   };
 
   renderTransactions = () => {
@@ -130,7 +130,7 @@ class TransactionHistory extends PureComponent {
       this.renderEmptyState()
     ) : (
       <FlatList
-        ListHeaderComponent={renderTextHeader('Transactions')}
+        ListHeaderComponent={renderTextHeader(I18n.t('components.templates.TransactionHistory.Transactions'))}
         keyExtractor={this.keyExtractor}
         data={items}
         renderItem={this.renderItem}
@@ -143,8 +143,7 @@ class TransactionHistory extends PureComponent {
       <ScrollView>{this.renderTransactions()}
         {coin === 'ETH' && (
           <Text style={[styles.txnNotice, styles.centered]}>
-            Please note some payments may not display in the transaction history.
-            However, the total balance reflects all sent and received transactions.
+            {I18n.t('components.templates.TransactionHistory.notes')}
           </Text>
         )}
       </ScrollView>);

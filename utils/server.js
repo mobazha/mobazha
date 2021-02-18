@@ -22,6 +22,8 @@ class ServerConfig {
     return {
       authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
       cookie: `OpenBazaar_Auth_Cookie=${this.serverToken}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json'
     };
   }
 }

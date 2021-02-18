@@ -55,14 +55,14 @@ class Analytics extends PureComponent {
   handleToggle = (value) => {
     // If tracking was on, the event must be fired before it is turned back off.
     if (!value) {
-      eventTracker.trackEvent('Onboarding-OptedIntoAnalytics', { value });
+      eventTracker.trackEvent('Onboarding-OptedIntoAnalytics', { value: value.toString() });
     }
 
     this.props.setTrackingStatus(value);
 
     // If tracking was off, the event must be fired after it is turned back on.
     if (value) {
-      eventTracker.trackEvent('Onboarding-OptedIntoAnalytics', { value });
+      eventTracker.trackEvent('Onboarding-OptedIntoAnalytics', { value: value.toString() });
     }
   }
 

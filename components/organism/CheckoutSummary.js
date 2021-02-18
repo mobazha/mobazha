@@ -348,7 +348,7 @@ class CheckoutSummary extends PureComponent {
           </Text>
         ))}
         <Text style={styles.option}>
-          Quantity: {quantity}
+        {I18n.t('components.organism.CheckoutSummary.quantity')}: {quantity}
         </Text>
       </View>
     );
@@ -414,7 +414,7 @@ class CheckoutSummary extends PureComponent {
     const totalPrice = price && BigNumber(price).plus(this.getCurrentFee());
     return (
       <InputGroup
-        title="Summary"
+        title={I18n.t('components.organism.CheckoutSummary.summary')}
         // actionTitle="Add coupon"
         // action={this.handleGoToAddCoupons}
       >
@@ -431,7 +431,7 @@ class CheckoutSummary extends PureComponent {
               <View style={styles.optionLabelWrapper}>
                 <Text style={styles.optionLabel}>
                   {`${decode(shippingOption.name)} ${decode(shippingOption.service)}  `}
-                  <Text style={styles.changeText}>Change</Text>
+                  <Text style={styles.changeText}>{I18n.t('components.organism.CheckoutSummary.change')}</Text>
                 </Text>
               </View>
               <Text style={priceStyle}>

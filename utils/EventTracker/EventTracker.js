@@ -36,13 +36,13 @@ export default class EventTracker {
 
   asyncEventSuccess(event) {
     if (this.isTracking) {
-      Countly.recordEvent({ key: 'AsyncEventSuccess', segmentation: { event } });
+      Countly.recordEvent({ eventName: 'AsyncEventSuccess', segments: { event } });
     }
   }
 
-  trackEvent(key, segmentation = {}) {
+  trackEvent(eventName, segments = {}) {
     if (this.isTracking) {
-      Countly.recordEvent({ key, segmentation });
+      Countly.sendEvent({ eventName, segments });
     }
   }
 }

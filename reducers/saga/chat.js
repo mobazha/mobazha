@@ -1,5 +1,4 @@
-import { delay } from 'redux-saga';
-import { call, put, takeEvery, takeLatest, select } from 'redux-saga/effects';
+import { call, put, delay, takeEvery, takeLatest, select } from 'redux-saga/effects';
 import * as _ from 'lodash';
 
 import { actions as chatActions } from '../chat';

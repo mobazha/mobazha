@@ -153,6 +153,7 @@ export default {
                 remove_coupon_description: "Are you sure you want to remove this coupon?",
                 cancel: "Cancel",
                 remove: "Remove",
+                quantity:"Quantity",
                 quantity_info: "Quantity: %{quantity}",
                 coupon_info: "Coupon: %{info}",
                 change: "Change",
@@ -160,6 +161,7 @@ export default {
                 network_fee: "Network Fee",
                 fee_alert_description: "Fee is too high. Please use a lower fee level or a different coin.",
                 learn_more: "Learn more",
+                summary:"Summary",
                 total: "Total",
                 calculating: "calculating..."
             },
@@ -276,6 +278,9 @@ export default {
                     Chat: "Chat",
                     Pay: "Pay",
                     Choose_action: "Choose action"
+                },
+                PanelViewBase: {
+                    cancel: "Cancel"
                 }
             },
             PayPanel: {
@@ -350,12 +355,8 @@ export default {
             },
             TagSuggestion: {
                 none: "None"
-            },
-            PanelView: {
-                PanelViewBase: {
-                    cancel: "Cancel"
-                }
             }
+            
         },
 
         templates: {
@@ -541,7 +542,7 @@ export default {
                 quantity_sold_out: 'If the quantity reaches 0, it will display as "sold out".'
             },
             InventoryList: {
-                combos_info: "%{count} variant combos",
+                combos_info: "%{count} variant combos"
             },
             ListingAdvancedDetails: {
                 Return_Policy: "Return Policy",
@@ -550,6 +551,13 @@ export default {
                 terms: "Terms and Conditions",
                 terms2: "T&Cs",
                 terms_description: "What are the terms and conditions of the listing? What are you responsible for as the vendor? Is there a warranty?"
+            },
+            ListingCustomOptions:{
+                variant:"variant",
+               add_variant:"Add variant",
+               track_Inventory:"Track Inventory",
+               inventory:"Inventory",
+               ListEmptyComponent:  "Add sizes, colours, materials, etc."
             },
             ListingsTab: {
                 loading: "Loading...",

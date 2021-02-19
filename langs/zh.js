@@ -157,13 +157,15 @@ export default {
                 remove_coupon_description: "你确定你想要移除优惠券?",
                 cancel: "取消",
                 remove: "移除",
+                quantity:"质量",
                 quantity_info: "质量: %{quantity}",
                 coupon_info: "优惠券: %{info}",
-                change: "Change",
+                change: "改变",
                 free: "免费",
                 network_fee: "网络费用",
-                fee_alert_description: "费用太高， 请使用较低的费用级别或其他硬币.",
+                fee_alert_description: "费用太高，请使用较低的费用级别或其他币种.",
                 learn_more: "学习更多",
+                summary:"总结",
                 total: "总共",
                 calculating: "正在计算..."
             },
@@ -281,6 +283,9 @@ export default {
                     Chat: "聊天",
                     Pay: "支付",
                     Choose_action: "选择操作"
+                },
+                PanelViewBase: {
+                    cancel: "取消"
                 }
             },
             PayPanel: {
@@ -354,12 +359,7 @@ export default {
                 add_hint: "在你的商品列表上添加标签"
             },
             TagSuggestion: {
-                none: "无"
-            },
-            PanelView: {
-                PanelViewBase: {
-                    cancel: "取消"
-                }
+                none: "无",
             }
         },
 
@@ -555,6 +555,13 @@ export default {
                 terms: "条款和条件",
                 terms2: "T&Cs",
                 terms_description: "上市的条款和条件是什么？ 您作为供应商负责什么？ 有保修吗？"
+            },
+            ListingCustomOptions:{
+               variant:"变体",
+               add_variant:"添加变体",
+               track_Inventory:"跟踪存货",
+               inventory:"存货",
+               ListEmptyComponent:  "添加大小、颜色、材质等."
             },
             ListingsTab: {
                 loading: "加载中.....",

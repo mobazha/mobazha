@@ -1,18 +1,12 @@
 import { serverConfig } from '../utils/server';
 import { gatewayAPI } from './const';
 
-const base64 = require('base-64');
-
 // Fetch history of purchases
 export const getPurchases = (username, password, limit = '', offsetId = '') => {
   const apiURL = `${gatewayAPI}/ob/purchases?limit=${limit}&offsetId=${offsetId}`;
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'GET',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
   };
   return fetch(
     apiURL,
@@ -24,13 +18,9 @@ export const getPurchases = (username, password, limit = '', offsetId = '') => {
 // Fetch history of sales
 export const getSales = (username, password, limit = '', offsetId = '') => {
   const apiURL = `${gatewayAPI}/ob/sales?limit=${limit}&offsetId=${offsetId}`;
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'GET',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
   };
   return fetch(
     apiURL,
@@ -45,13 +35,9 @@ export const cancelOrder = (username, password, orderId) => {
   const body = {
     orderId,
   };
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'POST',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
     body: JSON.stringify(body),
   };
   return fetch(
@@ -66,7 +52,6 @@ export const fundOrder = (username, password, payload) => {
   const {
     coin, address, amount, orderId, memo,
   } = payload;
-  const serverToken = serverConfig.getServerToken();
   const apiURL = `${gatewayAPI}/ob/orderspend`;
   const body = {
     currencyCode: coin,
@@ -79,10 +64,7 @@ export const fundOrder = (username, password, payload) => {
   };
   const headers = {
     method: 'POST',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
     body: JSON.stringify(body),
   };
   return fetch(
@@ -98,13 +80,9 @@ export const refundOrder = (username, password, orderId) => {
   const body = {
     orderId,
   };
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'POST',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
     body: JSON.stringify(body),
   };
   return fetch(
@@ -117,13 +95,9 @@ export const refundOrder = (username, password, orderId) => {
 // Fulfill an order
 export const fulfillOrder = (username, password, fulfillObj) => {
   const apiURL = `${gatewayAPI}/ob/orderfulfillment`;
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'POST',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
     body: JSON.stringify(fulfillObj),
   };
   return fetch(
@@ -136,13 +110,9 @@ export const fulfillOrder = (username, password, fulfillObj) => {
 // Complete an order
 export const completeOrder = (username, password, payload) => {
   const apiURL = `${gatewayAPI}/ob/ordercompletion`;
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'POST',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
     body: JSON.stringify(payload),
   };
   return fetch(
@@ -159,13 +129,9 @@ export const openDispute = (username, password, orderId, claim) => {
     orderId,
     claim,
   };
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'POST',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
     body: JSON.stringify(body),
   };
   return fetch(
@@ -181,13 +147,9 @@ export const acceptDispute = (username, password, orderId) => {
   const body = {
     orderId,
   };
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'POST',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
     body: JSON.stringify(body),
   };
   return fetch(
@@ -203,13 +165,9 @@ export const claimPayment = (username, password, orderId) => {
   const body = {
     orderId,
   };
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'POST',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
     body: JSON.stringify(body),
   };
   return fetch(
@@ -222,13 +180,9 @@ export const claimPayment = (username, password, orderId) => {
 // Accept a dispute decision from the moderator
 export const confirmOrder = (username, password, payload) => {
   const apiURL = `${gatewayAPI}/ob/orderconfirmation`;
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'POST',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
     body: JSON.stringify(payload),
   };
   return fetch(
@@ -240,13 +194,9 @@ export const confirmOrder = (username, password, payload) => {
 // Fetch order details
 export const getOrderDetails = (username, password, orderId) => {
   const apiURL = `${gatewayAPI}/ob/order/${orderId}`;
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'GET',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
   };
   return fetch(
     apiURL,
@@ -258,13 +208,9 @@ export const getOrderDetails = (username, password, orderId) => {
 // Fetch order details
 export const scanOfflineMessages = (username, password) => {
   const apiURL = `${gatewayAPI}/ob/scanofflinemessages`;
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'GET',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
   };
   return fetch(
     apiURL,
@@ -276,14 +222,10 @@ export const scanOfflineMessages = (username, password) => {
 // Fetch order details
 export const resendOrderMessage = (username, password, orderId, messageType) => {
   const apiURL = `${gatewayAPI}/ob/resendordermessage`;
-  const serverToken = serverConfig.getServerToken();
   const body = { orderId, messageType };
   const headers = {
     method: 'POST',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
     body: JSON.stringify(body),
   };
   return fetch(

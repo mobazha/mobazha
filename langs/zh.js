@@ -277,6 +277,9 @@ export default {
                 no_feedback: "没有反馈留下来 %{name}"
             },
             PanelView: {
+                PanelViewBase: {
+                    cancel: "取消"
+                },
                 PlusPanelView: {
                     Sell: "出售",
                     Post: "发帖",
@@ -359,7 +362,7 @@ export default {
                 add_hint: "在你的商品列表上添加标签"
             },
             TagSuggestion: {
-                none: "无",
+                none: "无"
             }
         },
 

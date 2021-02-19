@@ -87,10 +87,10 @@ export const getRenderingCoins = (acceptedCurrencies) => {
 };
 
 export const transactionLinkDict = id => ({
-  BTC: `https://btc.blockbook.api.openbazaar.org/tx/${id}`,
-  BCH: `https://bch.blockbook.api.openbazaar.org/tx/${id}`,
-  LTC: `https://ltc.blockbook.api.openbazaar.org/tx/${id}`,
-  ZEC: `https://zec.blockbook.api.openbazaar.org/tx/${id}`,
+  BTC: `https://btc1.trezor.io/api/tx/${id}`,
+  BCH: `https://bch1.trezor.io/api/tx/${id}`,
+  LTC: `https://ltc1.trezor.io/api/tx/${id}`,
+  ZEC: `https://zec1.trezor.io/api/tx/${id}`,
   ETH: `https://etherscan.io/tx/${id}`,
 });
 

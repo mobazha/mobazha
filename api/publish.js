@@ -2,17 +2,10 @@
 import { gatewayAPI, searchAPI } from './const';
 import { serverConfig } from '../utils/server';
 
-const base64 = require('base-64');
-
 export const publish = (username, password) => {
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'POST',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-      'Content-Type': 'application/json',
-    },
+    headers: serverConfig.getAuthHeader(username, password),
   };
   return fetch(
     `${gatewayAPI}/ob/publish`,
@@ -35,14 +28,9 @@ export const ingestPeer = (peerID, body) => {
 };
 
 export const resolveIpns = (peerID, username, password) => {
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'GET',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-      'Content-Type': 'application/json',
-    },
+    headers: serverConfig.getAuthHeader(username, password),
   };
   return fetch(`${gatewayAPI}/ob/resolveipns`, headers)
     .then(response => (response.json()))

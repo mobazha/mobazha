@@ -1,18 +1,12 @@
 import { gatewayAPI } from './const';
 import { serverConfig } from '../utils/server';
 
-const base64 = require('base-64');
-
 // Fetch chat conversations
 export const fetchChats = (username, password) => {
   const apiURL = `${gatewayAPI}/ob/chatconversations`;
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'GET',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
   };
   return fetch(apiURL, headers)
     .then(response => response.json())
@@ -25,7 +19,6 @@ export const fetchChats = (username, password) => {
 // Fetch chat messages from a conversation
 export const fetchChatDetail = (username, password, peerID, subject) => {
   let apiURL;
-  const serverToken = serverConfig.getServerToken();
   if (peerID) {
     apiURL = `${gatewayAPI}/ob/chatmessages/${peerID}?subject=${subject}`;
   } else {
@@ -33,10 +26,7 @@ export const fetchChatDetail = (username, password, peerID, subject) => {
   }
   const headers = {
     method: 'GET',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
   };
   return fetch(apiURL, headers).then(response => response.json());
 };
@@ -45,7 +35,6 @@ export const fetchChatDetail = (username, password, peerID, subject) => {
 export const sendChat = (username, password, peerIds, subject = '', message) => {
   let apiURL;
   let peerIdPayload;
-  const serverToken = serverConfig.getServerToken();
   if (typeof peerIds === 'string') {
     apiURL = `${gatewayAPI}/ob/chat`;
     peerIdPayload = { peerId: peerIds };
@@ -62,10 +51,7 @@ export const sendChat = (username, password, peerIds, subject = '', message) => 
 
   const headers = {
     method: 'POST',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
     body,
   };
   return fetch(apiURL, headers).then(response => response.json());
@@ -79,26 +65,18 @@ export const setChatAsRead = (username, password, peerID, subject) => {
   } else {
     apiURL = `${gatewayAPI}/ob/markchatasread?subject=${subject}`;
   }
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'POST',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
   };
   return fetch(apiURL, headers).then(response => response.json());
 };
 
 export const deleteChatConversation = (username, password, peerID) => {
   const apiURL = `${gatewayAPI}/ob/chatconversation/${peerID}`;
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'DELETE',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
   };
   return fetch(apiURL, headers).then(response => response.json());
 };

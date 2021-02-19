@@ -15,8 +15,6 @@ import {
 import { serverConfig } from '../utils/server';
 import { filteroutCryptoFromSearch } from '../utils/listings';
 
-const base64 = require('base-64');
-
 const handleErrorWithEmptyArray = (err) => {
   console.warn(err);
   return [];
@@ -53,19 +51,15 @@ export const getListings = (username, password, peerID = '', countToPull = 10000
   let apiURL = '';
   if (isEmpty(peerID)) {
     apiURL = `${gatewayAPI}/ob/listings`;
-    const serverToken = serverConfig.getServerToken();
     const headers = {
       method: 'GET',
-      headers: {
-        authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-        cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-      },
+      headers: serverConfig.getAuthHeader(username, password),
     };
     return fetch(apiURL, headers)
       .then(response => response.json())
       .catch(handleErrorWithEmptyArray);
   } else {
-    apiURL = `${searchAPI}/listings/search?q=*&peerID=${peerID}&nsfw=false&network=mainnet&ps=${countToPull}`;
+    apiURL = `${searchAPI}/listings?q=*&peerID=${peerID}&nsfw=false&network=mainnet&ps=${countToPull}`;
     if (Platform.OS === 'ios') {
       apiURL = `${apiURL}&mobile`;
     }
@@ -87,26 +81,18 @@ export const getListing = (username, password, slug, peerID = '') => {
   } else {
     apiURL = `${obEthGatewayAPI}/ob/listing/${peerID}/${slug}?usecache=true&${timestamp}`;
   }
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'GET',
-    headers: isEmpty(peerID) ? {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    } : {},
+    headers: serverConfig.getAuthHeader(username, password),
   };
   return fetch(apiURL, headers).then(response => response.json());
 };
 
 export const getListingFromHash = (username, password, hash) => {
   const apiURL = `${gatewayAPI}/ob/listing/ipfs/${hash}`;
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'GET',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    },
+    headers: serverConfig.getAuthHeader(username, password),
   };
   return new Promise((resolve, reject) => {
     setTimeout(() => { reject('timeout'); }, 3000);
@@ -128,19 +114,10 @@ export const getRatings = (username, password, slug, peerID) => {
     apiURL = `${obEthGatewayAPI}/ob/ratings/${peerID}?usecache=true&${timestamp}`;
   } else if (!isEmpty(slug)) {
     apiURL = `${gatewayAPI}/ob/ratings/${slug}`;
-    const serverToken = serverConfig.getServerToken();
-    headers = {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    };
   } else {
     apiURL = `${gatewayAPI}/ob/ratings`;
-    const serverToken = serverConfig.getServerToken();
-    headers = {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-    };
   }
+  headers = serverConfig.getAuthHeader(username, password);
 
   const requestHeader = {
     method: 'GET',
@@ -162,14 +139,9 @@ export const getRating = (username, password, nodeId) => {
 // Create a listing
 export const createListing = (username, password, productDetails) => {
   const apiURL = `${gatewayAPI}/ob/listing`;
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'POST',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-      'Content-Type': 'application/json',
-    },
+    headers: serverConfig.getAuthHeader(username, password),
     body: JSON.stringify(productDetails),
   };
   return fetch(apiURL, headers).then(response => response.json());
@@ -178,14 +150,9 @@ export const createListing = (username, password, productDetails) => {
 // Update a listing
 export const updateListing = (username, password, productDetails) => {
   const apiURL = `${gatewayAPI}/ob/listing`;
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'PUT',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-      'Content-Type': 'application/json',
-    },
+    headers: serverConfig.getAuthHeader(username, password),
     body: JSON.stringify(productDetails),
   };
   return fetch(apiURL, headers).then(response => response.json());
@@ -194,14 +161,9 @@ export const updateListing = (username, password, productDetails) => {
 // Delete a listing
 export const deleteListing = (username, password, slug) => {
   const apiURL = `${gatewayAPI}/ob/listing/${slug}`;
-  const serverToken = serverConfig.getServerToken();
   const headers = {
     method: 'DELETE',
-    headers: {
-      authorization: `Basic ${base64.encode(`${username}:${password}`)}`,
-      cookie: `OpenBazaar_Auth_Cookie=${serverToken}`,
-      'Content-Type': 'application/json',
-    },
+    headers: serverConfig.getAuthHeader(username, password),
   };
   return fetch(apiURL, headers).then(response => response.json());
 };

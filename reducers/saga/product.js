@@ -49,7 +49,7 @@ export function* getFeatured() {
 export function* getBestsellers() {
   try {
     const response = yield call(fetchBestsellersListing);
-    const result = response.results.results.map(item => item.data);
+    const result = response.result.results.map(item => item.data);
     yield put({
       type: actions.setBestsellers,
       payload: shuffle(result),
@@ -66,7 +66,7 @@ export function* getBestsellers() {
 export function* getGaming() {
   try {
     const response = yield call(fetchGamingListing);
-    const result = response.results.results.map(item => item.data);
+    const result = response.result.results.map(item => item.data);
     yield put({
       type: actions.setGaming,
       payload: shuffle(result),
@@ -83,7 +83,7 @@ export function* getGaming() {
 export function* getMunchies() {
   try {
     const response = yield call(fetchMunchiesListing);
-    const result = response.results.results.map(item => item.data);
+    const result = response.result.results.map(item => item.data);
     yield put({
       type: actions.setMunchies,
       payload: shuffle(result),
@@ -100,7 +100,7 @@ export function* getMunchies() {
 export function* getDevices() {
   try {
     const response = yield call(fetchDevicesListing);
-    const result = response.results.results.map(item => item.data);
+    const result = response.result.results.map(item => item.data);
     yield put({
       type: actions.setDevices,
       payload: shuffle(result),

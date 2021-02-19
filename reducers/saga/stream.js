@@ -1,5 +1,5 @@
-import { call, put, takeEvery, select, take } from 'redux-saga/effects';
-import { eventChannel, delay } from 'redux-saga';
+import { call, put, delay, takeEvery, select, take } from 'redux-saga/effects';
+import { eventChannel } from 'redux-saga';
 import moment from 'moment';
 import { isEmpty, get } from 'lodash';
 

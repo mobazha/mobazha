@@ -31,7 +31,7 @@ export const fetchFeedItem = (slug, peerID = '') => {
   }
   const headers = {
     method: 'GET',
-    headers: _.isEmpty(peerID) ? serverConfig.getAuthHeader() : {},
+    headers: serverConfig.getAuthHeader(),
   };
   return fetch(apiURL, headers)
     .then(response => response.json())

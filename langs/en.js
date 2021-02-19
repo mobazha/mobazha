@@ -272,6 +272,9 @@ export default {
                 no_feedback: "No feedback left by %{name}"
             },
             PanelView: {
+                PanelViewBase: {
+                    cancel: "Cancel"
+                },
                 PlusPanelView: {
                     Sell: "Sell",
                     Post: "Post",

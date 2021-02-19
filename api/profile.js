@@ -12,7 +12,7 @@ export const getProfile = (peerID = '') => {
   if (isEmpty(peerID)) {
     apiURL = `${gatewayAPI}/ob/profile?async=true`;
   } else {
-    apiURL = `${searchAPI}/profile/${peerID}?${timestamp}`;
+    apiURL = `${gatewayAPI}/ob/profile/${peerID}?${timestamp}`;
   }
   const headers = {
     method: 'GET',

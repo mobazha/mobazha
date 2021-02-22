@@ -47,7 +47,7 @@ export const fetchDevicesListing = () => fetch(devicesListingAPI)
   .then(response => response.json());
 
 // Fetch an index of listings from a store
-export const getListings = (username, password, peerID = '', countToPull = 10000) => {
+export const getListings = (username, password, peerID = '', countToPull = 10000, page = 0) => {
   let apiURL = '';
   if (isEmpty(peerID)) {
     apiURL = `${gatewayAPI}/ob/listings`;
@@ -59,15 +59,13 @@ export const getListings = (username, password, peerID = '', countToPull = 10000
       .then(response => response.json())
       .catch(handleErrorWithEmptyArray);
   } else {
-    apiURL = `${searchAPI}/listings?q=*&peerID=${peerID}&nsfw=false&network=mainnet&ps=${countToPull}`;
+    apiURL = `${searchAPI}/listings?q=*&peerID=${peerID}&page=${page}&pageSize=${countToPull}`;
     if (Platform.OS === 'ios') {
       apiURL = `${apiURL}&mobile`;
     }
     const headers = { method: 'GET' };
     return fetch(apiURL, headers)
       .then(response => response.json())
-      .then(filteroutCryptoFromSearch)
-      .then(items => items.results.results.map(item => item.data))
       .catch(handleErrorWithEmptyArray);
   }
 };

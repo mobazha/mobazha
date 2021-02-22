@@ -72,3 +72,7 @@ havenBuildConfigFiles/appcenter-config.json
 havenBuildConfigFiles/AppCenter-Config.plist
 havenBuildConfigFiles/google-services.json
 havenBuildConfigFiles/GoogleService-Info.plist
+
+**/.project
+**/.classpath
+**/.settings

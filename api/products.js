@@ -59,7 +59,7 @@ export const getListings = (username, password, peerID = '', countToPull = 10000
       .then(response => response.json())
       .catch(handleErrorWithEmptyArray);
   } else {
-    apiURL = `${searchAPI}/listings?q=*&peerID=${peerID}&nsfw=false&network=mainnet&ps=${countToPull}`;
+    apiURL = `${searchAPI}/listings?q=*&peerID=${peerID}&page=${page}&pageSize=${countToPull}`;
     if (Platform.OS === 'ios') {
       apiURL = `${apiURL}&mobile`;
     }

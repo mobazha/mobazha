@@ -16,7 +16,7 @@ export const getProfile = (peerID = '') => {
   }
   const headers = {
     method: 'GET',
-    headers: isEmpty(peerID) ? serverConfig.getAuthHeader() : {},
+    headers: serverConfig.getAuthHeader(),
   };
   return fetch(
     apiURL,

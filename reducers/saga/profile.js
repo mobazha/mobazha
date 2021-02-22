@@ -20,7 +20,7 @@ import { timeSinceInSeconds } from '../../utils/time';
 
 import {I18n} from '../../langs/I18n';
 
-const PROFILE_RECHECK_HOURS = 1;
+const PROFILE_RECHECK_MINUTES = 10;
 
 function* fetchProfile(action) {
   const { usecache, async } = yield select(getProfileFetchMode);
@@ -45,7 +45,7 @@ function* fetchProfile(action) {
       const profileFailedQueue = yield select(getProfileFailedQueue);
       const timestamp = profileFailedQueue[peerID];
       if (timestamp) {
-        if ((timeSinceInSeconds(new Date(timestamp)) < PROFILE_RECHECK_HOURS * 3600)) {
+        if ((timeSinceInSeconds(new Date(timestamp)) < PROFILE_RECHECK_MINUTES * 60)) {
           return;
         } else {
           yield put({ type: failedQueueActions.removeFromFailedQueue, payload: peerID });
@@ -157,7 +157,7 @@ function* fetchProfiles(action) {
       // check failed profile queue and if it failed within the last 1 hr, gracefully return
       const timestamp = profileFailedQueue[peerID];
       if (timestamp) {
-        if ((timeSinceInSeconds(new Date(timestamp)) < PROFILE_RECHECK_HOURS * 3600)) {
+        if ((timeSinceInSeconds(new Date(timestamp)) < PROFILE_RECHECK_MINUTES * 60)) {
           yield put({ type: queueActions.removeFromQueue, payload: peerID });
           continue;
         } else {

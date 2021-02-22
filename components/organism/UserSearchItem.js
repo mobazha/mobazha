@@ -66,13 +66,13 @@ const styles = {
 };
 
 export default ({ profile, onPress }) => {
-  const avatarHash = get(profile, 'data.avatarHashes.small');
-  const name = decode(get(profile, 'data.name'));
-  const shortDescription = decode(get(profile, 'data.shortDescription'));
-  const location = decode(get(profile, 'data.location')) || '';
-  const averageRating = get(profile, 'data.stats.averageRating', 0);
-  const ratingCount = get(profile, 'data.stats.ratingCount', 0);
-  const peerID = get(profile, 'data.peerID');
+  const avatarHash = get(profile, 'data.profile.avatarHashes.small');
+  const name = decode(get(profile, 'data.profile.name'));
+  const shortDescription = decode(get(profile, 'data.profile.shortDescription'));
+  const location = decode(get(profile, 'data.profile.location')) || '';
+  const averageRating = get(profile, 'data.profile.stats.averageRating', 0);
+  const ratingCount = get(profile, 'data.profile.stats.ratingCount', 0);
+  const peerID = get(profile, 'data.profile.peerID');
   return (
     <TouchableWithoutFeedback onPress={() => onPress(peerID)}>
       <View style={styles.wrapper}>

@@ -641,6 +641,7 @@ export default {
                 error: "错误:"
             },
             RatingModal: {
+                done :"确定",
                 Overall: "整体",
                 Quality: "质量",
                 As_advertised: "如广告所示",

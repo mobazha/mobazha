@@ -637,6 +637,7 @@ export default {
                 error: "Error:"
             },
             RatingModal: {
+                done:"Done",
                 Overall: "Overall",
                 Quality: "Quality",
                 As_advertised: "As advertised",

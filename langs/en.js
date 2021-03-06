@@ -945,6 +945,30 @@ export default {
         notifications: {
             Notifications: "Notifications"
         },
+        NotificationSettings:{
+            notification_preferences:"Notification preferences",
+            all1:"All",
+            Receive_all:"Receive all push notifications", 
+            all2:"All",
+            featured_content: "Featured content",
+            notify1: "Notify me of deals, discounts, and other cool content on Haven",
+            promotions: "promotions",
+            giveaways1:"Giveaways",
+            Notify2:"Notify me of giveaways and other promotional events on Haven",
+            giveaways2:"giveaways",
+            announcements1: "Announcements",
+            notify3:'Notify me of new features, updates, and other app-related announcements',
+            announcements2: "announcements",
+            chat1: "Chat",
+            notify4:'Notify me when I receive a chat message.',
+            chat2: "chat",
+            likes1: "Likes",
+            notify5:"Notify me when someone likes my post.",
+            likes2: "likes",
+            comments1: "Comments",
+            notify6:"Notify me when someone comments on my post.",
+            comments2:"comments"
+        },
         onboarding: {
             HELLO: "HELLO!",
             restore_profile: "Restore profile",

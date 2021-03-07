@@ -37,6 +37,6 @@ export const devicesListingAPI = 'https://search.ob1.io/listings/random?peerID=Q
 export const trendListingAPI = 'https://raw.githubusercontent.com/OB1Company/HavenDiscover/master/trending.json';
 
 // export const tokenServerAPI = 'https://getstreamauth.dev.ob1.io/';
-export const streamTokenAPI = 'https://stream.ob1.io/';
+export const streamTokenAPI = 'https://stream.mobazha.com/';
 // export const streamTokenAPI = 'http://localhost:5001/';
 // export const streamTokenAPI = 'http://192.168.0.169:5001/';

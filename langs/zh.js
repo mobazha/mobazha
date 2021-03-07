@@ -30,7 +30,7 @@ export default {
                 unknown: '未知'
             },
             ModalImageIndicator: {
-                posInfo:/* "%{pos} of %{size}"*/
+                posInfo: "%{pos} of %{size}"
             },
             MoreButton: {
                 more: '更多'
@@ -68,7 +68,7 @@ export default {
                 block: '屏蔽'
             },
             BuyerReview: {
-                from:/* "从%{content}"*/,
+                from: "从%{content}",
                 no_review: "还没有收到买家的评论"
             },
             BuyWyre: {
@@ -107,7 +107,7 @@ export default {
                 read_more: "阅读更多"
             },
             ProductPolicy: {
-                no_provided:/* "不提供%{policy} "*/
+                no_provided: "不提供%{policy} "
             },
             RadioModalFilter: {
                 reason_reporting: "请输入报告此内容的原因.",
@@ -139,7 +139,7 @@ export default {
                 no_reviews: "没有评论"
             },
             Balance: {
-                unconfirmed:/* "%{balance} 没有确认"*/
+                unconfirmed: "%{balance} 没有确认"
             },
             CategorySelector: {
                 category: "类别",
@@ -147,8 +147,8 @@ export default {
             },
             CheckoutHeader: {
                 anonymous: "匿名",
-                from_seller:/* "从 %{seller}",*/,
-                each_price: /*"各个%{price} "*/
+                from_seller: "从 %{seller}",
+                each_price: "各个%{price} "
             },
             CheckoutSummary: {
                 add_link: "添加",
@@ -158,8 +158,8 @@ export default {
                 cancel: "取消",
                 remove: "移除",
                 quantity:"质量",
-                quantity_info:/* "质量: %{quantity}"*/,
-                coupon_info:/* "优惠券: %{info}"*/,
+                quantity_info: "质量: %{quantity}",
+                coupon_info: "优惠券: %{info}",
                 change: "改变",
                 free: "免费",
                 network_fee: "网络费用",
@@ -190,10 +190,10 @@ export default {
                 add_shipping: "添加快递选项"
             },
             ErrorModal: {
-                error_message: /*"错误: %{error}"*/
+                error_message: "错误: %{error}"
             },
             InventoryItem: {
-                quantity_info: /*"QTY: %{quantity}"*/,
+                quantity_info: "QTY: %{quantity}",
                 Unlimited: "没有限制的"
             },
             ItemDetail: {
@@ -225,7 +225,7 @@ export default {
                 verified: "已经验证"
             },
             MultiSelector: {
-                select_info: /*"%{count} 筛选"*/
+                select_info: "%{count} 筛选"
             },
             OptionSelector: {
                 current_price: "当前市场价格，请点击",
@@ -274,7 +274,7 @@ export default {
                 as_advertised: "如广告所示",
                 Delivery: "快递",
                 Service: "服务",
-                no_feedback:/* "没有反馈留下来 %{name}"*/
+                no_feedback: "没有反馈留下来 %{name}"
             },
             PanelView: {
                 PanelViewBase: {
@@ -300,7 +300,7 @@ export default {
             },
             ProductRatings: {
                 reviews: "评论",
-                see_all_reviews:/* "查看所有 %{ratings.length} 评论"*/,
+                see_all_reviews: "查看所有 %{ratings.length} 评论",
                 no_reviews_yet: "还没有评论"
             },
             QRScanner: {
@@ -308,7 +308,7 @@ export default {
                 scan_qr_store: "扫描商店，商家信息或付款地址的QR码"
             },
             SearchFilterHeader: {
-                results:/* "%{total} 结果"*/
+                results: "%{total} 结果"
             },
             SearchHeader: {
                 search: "搜索..."
@@ -330,11 +330,11 @@ export default {
             },
             ShippingOptions: {
                 add_option: "添加快递选项",
-                options_count:/* "%{count} 快递选项"*/,
+                options_count: "%{count} 快递选项",
                 shipping: "快递",
             },
             ShippingPriceEditor: {
-                shipping_service: /*"快递服务 #${pos}"*/,
+                shipping_service: "快递服务 #${pos}",
                 delete: "删除",
                 service: "服务",
                 shipping_hint: "标准，特快等",
@@ -344,7 +344,7 @@ export default {
                 additional_price: "额外的价格"
             },
             SingleVariantEditor: {
-                variant_id:/* "多样的 %{id}"*/,
+                variant_id: "多样的 %{id}",
                 title: "标题",
                 title_hint: "例如大小",
                 description: "描述",
@@ -358,7 +358,7 @@ export default {
             },
             TagEditor: {
                 tags: "标签",
-                tags_info: /*"%{count} %{tag}"*/,
+                tags_info: "%{count} %{tag}",
                 add_hint: "在你的商品列表上添加标签"
             },
             TagSuggestion: {
@@ -502,7 +502,7 @@ export default {
                 privacy_description36: "The Digital Millennium Copyright Act of 1998 (the “DMCA”) provides recourse for copyright owners who believe that material appearing on the Internet infringes their rights under US copyright law. If you believe in good faith that content or material on this Application infringes a copyright owned by you, you (or your agent) may send OB1 a notice requesting that the material be removed, or access to it blocked. This request should be sent to: haven@ob1.io. The notice must include the following information: (a) a physical or electronic signature of a person authorized to act on behalf of the owner of an exclusive right that is allegedly infringed; (b) identification of the copyrighted work claimed to have been infringed; (c) identification of the material that is claimed to be infringing or the subject of infringing activity; (d) the name, address, telephone number, and email address of the complaining party; (e) a statement that the complaining party has a good faith belief that use of the material in the manner complained of is not authorized by the copyright owner, its agent or the law; and (f) a statement that the information in the notification is accurate and, under penalty of perjury, that the complaining party is authorized to act on behalf of the owner of an exclusive right that is allegedly infringed. If you believe in good faith that a notice of copyright infringement has been wrongly filed against you, the DMCA permits you to send us a counter-notice. Notices and counter-notices must meet the then-current statutory requirements imposed by the DMCA. Notices and counternotices with respect to the Application should be sent to the address above.",
                 iaccept: "接受"
             }, feed: {
-                not_post: /*"%{name} 还没有发布任何信息"*/,
+                not_post: "%{name} 还没有发布任何信息",
                 post_hint1: "你还没有发布任何信息.",
                 post_hint2: "在社区分享一些东西!",
                 reported: "报告"
@@ -549,7 +549,7 @@ export default {
                 quantity_sold_out: '如果数量达到0，它将显示为“已售完”.'
             },
             InventoryList: {
-                combos_info:/* "%{count} 各类组合"*/,
+                combos_info: "%{count} 各类组合",
             },
             ListingAdvancedDetails: {
                 Return_Policy: "退款政策",
@@ -598,7 +598,7 @@ export default {
                 dispute_completed_alert: "您无法对已完成的订单提出争议.",
                 dispute_finalized_alert: "此订单无异议。 卖方已要求为此订单付款。",
                 dispute_processing_alert: "此订单无异议。 请取消您的订单以全额退款。",
-                quantity_info:/* "数量: {quantity}"*/,
+                quantity_info: "数量: {quantity}",
                 view: "查看",
                 view_transaction: "查看交易",
                 payment: "支付",
@@ -620,7 +620,7 @@ export default {
                 order_completed: "订单完成",
                 release_to_seller: "资金已发放给卖方",
                 dispute_closed: "争议关闭",
-                dispute_closed_info:/* "%{user} 已接受付款。 现在该纠纷已经结案."*/,
+                dispute_closed_info: "%{user} 已接受付款。 现在该纠纷已经结案.",
                 payment_claimed: "已付款",
                 seller_claim: "卖方已要求为此订单付款。",
                 order_canceled: "订单取消",
@@ -1074,7 +1074,7 @@ export default {
             close: "关闭",
             order_complete: "订单完成",
             view_transaction: "查看交易",
-            message_for:/* " %{handle}的信息"*/,
+            message_for: " %{handle}的信息",
             provide_details: "提供其他详细信息，提出问题等（可选）",
             send: "发送"
         },
@@ -1107,7 +1107,7 @@ export default {
             resync_content4: "仅当您认为有问题时才应该这样做。 每次启动应用程序时都会执行一次扫描.",
             resync_content5: "重新同步过程处于活动状态时，您可以离开此视图.",
             resyncing: "同步中...",
-            resync_info:/* "在 %{lastSyncedAgo} 同步过"*/,
+            resync_info: "在 %{lastSyncedAgo} 同步过",
             resync: "重新同步"
         },
         searchFilter: {
@@ -1150,7 +1150,7 @@ export default {
         },
         StoreRatings: {
             Reviews: "评价",
-            no_reviews1:/* "%{user} 没有收到任何评论"*/,
+            no_reviews1: "%{user} 没有收到任何评论",
             no_reviews2: "你还没有收到任何评价"
         },
         wallet: {

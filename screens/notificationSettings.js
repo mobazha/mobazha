@@ -68,29 +68,29 @@ class NotificationSettings extends PureComponent {
         <ScrollView>
           <InputGroup title={I18n.t('screens.notificationSettings.notification_preferences')} noBorder contentStyle={styles.content}>
             {this.renderItem(
-              {I18n.t('screens.notificationSettings.all1')},
-              {I18n.t('screens.notificationSettings.Receive_all')},
-              {I18n.t('screens.notificationSettings.all2')},
+              I18n.t('screens.notificationSettings.all1'),
+              I18n.t('screens.notificationSettings.Receive_all'),
+              'all',
             )}
             {this.renderItem(
-              {I18n.t('screens.notificationSettings.featured_content')},
-              {I18n.t('screens.notificationSettings.notify1')},
-              {I18n.t('screens.notificationSettings.promotions')},
+              I18n.t('screens.notificationSettings.featured_content'),
+              I18n.t('screens.notificationSettings.notify1'),
+              'promotions',
             )}
             {this.renderItem(
-              {I18n.t('screens.notificationSettings.giveaways1')},
-              {I18n.t('screens.notificationSettings.Notify2')},
-              {I18n.t('screens.notificationSettings.giveaways2')},
+              I18n.t('screens.notificationSettings.giveaways1'),
+              I18n.t('screens.notificationSettings.Notify2'),
+              'giveaways',
             )}
             {this.renderItem(
-              {I18n.t('screens.notificationSettings.announcements1')},
-              {I18n.t('screens.notificationSettings.notify3')},
-              {I18n.t('screens.notificationSettings.announcements2')},
+              I18n.t('screens.notificationSettings.announcements1'),
+              I18n.t('screens.notificationSettings.notify3'),
+              'announcements',
             )}
             {this.renderItem(
-              {I18n.t('screens.notificationSettings.chat1')},
-              {I18n.t('screens.notificationSettings.notify4')},
-              {I18n.t('screens.notificationSettings.chat2')},
+              I18n.t('screens.notificationSettings.chat1'),
+              I18n.t('screens.notificationSettings.notify4'),
+              'chat',
             )}
             {/* {this.renderItem(
               'Orders',
@@ -98,14 +98,14 @@ class NotificationSettings extends PureComponent {
               'orders',
             )} */}
             {this.renderItem(
-              {I18n.t('screens.notificationSettings.likes1')},
-              {I18n.t('screens.notificationSettings.notify5')},
-              {I18n.t('screens.notificationSettings.likes2')},
+              I18n.t('screens.notificationSettings.likes1'),
+              I18n.t('screens.notificationSettings.notify5'),
+              'likes',
             )}
             {this.renderItem(
-              {I18n.t('screens.notificationSettings.comments1')},
-              {I18n.t('screens.notificationSettings.notify6')},
-              {I18n.t('screens.notificationSettings.comments2')},
+              I18n.t('screens.notificationSettings.comments1'),
+              I18n.t('screens.notificationSettings.notify6'),
+              'comments',
             )}
           </InputGroup>
         </ScrollView>
@@ -115,13 +115,14 @@ class NotificationSettings extends PureComponent {
 }
 
 const mapStateToProps = (state) => {
-  const {
-    promotions, announcements, giveaways, chat, orders, likes, comments,
-  } = state.appstate.notifications;
-  const all = promotions && announcements && giveaways && chat && orders && likes && comments;
-  return {
-    promotions, announcements, giveaways, chat, orders, likes, comments, all,
-  };
+  // const {
+  //   promotions, announcements, giveaways, chat, orders, likes, comments,
+  // } = state.appstate.notifications;
+  // const all = promotions && announcements && giveaways && chat && orders && likes && comments;
+  // return {
+  //   promotions, announcements, giveaways, chat, orders, likes, comments, all,
+  // };
+  return {};
 };
 
 const mapDispatchToProps = {

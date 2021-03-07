@@ -194,7 +194,7 @@ export default {
             },
             InventoryItem: {
                 quantity_info: "QTY: %{quantity}",
-                Unlimited: "无限制的"
+                Unlimited: "没有限制的"
             },
             ItemDetail: {
                 listing: "商品",

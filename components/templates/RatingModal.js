@@ -84,7 +84,7 @@ export default class RatingModal extends PureComponent {
           modal
           left={<NavCloseButton />}
           onLeft={hideModal}
-          right={<LinkText text="Done" color={linkTextColor} />}
+          right={<LinkText text={I18n.t('components.templates.RatingModal.done')} color={linkTextColor} />}
           onRight={() => finishReview(order.orderId, [{ slug: order.slug, ...this.state }])}
         />
         <KeyboardAwareScrollView
@@ -95,27 +95,27 @@ export default class RatingModal extends PureComponent {
           }}
         >
           <RatingInput
-            title="Overall"
+            title={I18n.t('components.templates.RatingModal.Overall')}
             value={overall}
             onPress={this.handleChange('overall')}
           />
           <RatingInput
-            title="Quality"
+            title= {I18n.t('components.templates.RatingModal.Quality')}
             value={quality}
             onPress={this.handleChange('quality')}
           />
           <RatingInput
-            title="As advertised"
+            title={I18n.t('components.templates.RatingModal.As_advertised')}
             value={description}
             onPress={this.handleChange('description')}
           />
           <RatingInput
-            title="Delivery"
+            title= {I18n.t('components.templates.RatingModal.Delivery')}
             value={deliverySpeed}
             onPress={this.handleChange('deliverySpeed')}
           />
           <RatingInput
-            title="Service"
+            title={I18n.t('components.templates.RatingModal.Service')}
             value={customerService}
             onPress={this.handleChange('customerService')}
           />
@@ -124,12 +124,12 @@ export default class RatingModal extends PureComponent {
             noBorder
             value={review}
             onChangeText={this.handleChange('review')}
-            placeholder="Write a review here"
+            placeholder={I18n.t('components.templates.RatingModal.Write_a_review')}
             onFocus={this.handleFocus}
           />
           <CheckBox
             checked={anonymous}
-            title="Post anonymously"
+            title= {I18n.t('components.templates.RatingModal.Post_anonymously')}
             onPress={() => {
               this.setState({
                 anonymous: !anonymous,

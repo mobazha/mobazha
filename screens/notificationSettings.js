@@ -66,31 +66,31 @@ class NotificationSettings extends PureComponent {
       <View style={screenWrapper.wrapper}>
         <Header left={<NavBackButton />} onLeft={this.handleGoBack} />
         <ScrollView>
-          <InputGroup title="Notification preferences" noBorder contentStyle={styles.content}>
+          <InputGroup title={I18n.t('screens.notificationSettings.notification_preferences')} noBorder contentStyle={styles.content}>
             {this.renderItem(
-              'All',
-              'Receive all push notifications',
-              'all',
+              {I18n.t('screens.notificationSettings.all1')},
+              {I18n.t('screens.notificationSettings.Receive_all')},
+              {I18n.t('screens.notificationSettings.all2')},
             )}
             {this.renderItem(
-              'Featured content',
-              'Notify me of deals, discounts, and other cool content on Haven',
-              'promotions',
+              {I18n.t('screens.notificationSettings.featured_content')},
+              {I18n.t('screens.notificationSettings.notify1')},
+              {I18n.t('screens.notificationSettings.promotions')},
             )}
             {this.renderItem(
-              'Giveaways',
-              'Notify me of giveaways and other promotional events on Haven',
-              'giveaways',
+              {I18n.t('screens.notificationSettings.giveaways1')},
+              {I18n.t('screens.notificationSettings.Notify2')},
+              {I18n.t('screens.notificationSettings.giveaways2')},
             )}
             {this.renderItem(
-              'Announcements',
-              'Notify me of new features, updates, and other app-related announcements',
-              'announcements',
+              {I18n.t('screens.notificationSettings.announcements1')},
+              {I18n.t('screens.notificationSettings.notify3')},
+              {I18n.t('screens.notificationSettings.announcements2')},
             )}
             {this.renderItem(
-              'Chat',
-              'Notify me when I receive a chat message.',
-              'chat',
+              {I18n.t('screens.notificationSettings.chat1')},
+              {I18n.t('screens.notificationSettings.notify4')},
+              {I18n.t('screens.notificationSettings.chat2')},
             )}
             {/* {this.renderItem(
               'Orders',
@@ -98,14 +98,14 @@ class NotificationSettings extends PureComponent {
               'orders',
             )} */}
             {this.renderItem(
-              'Likes',
-              'Notify me when someone likes my post.',
-              'likes',
+              {I18n.t('screens.notificationSettings.likes1')},
+              {I18n.t('screens.notificationSettings.notify5')},
+              {I18n.t('screens.notificationSettings.likes2')},
             )}
             {this.renderItem(
-              'Comments',
-              'Notify me when someone comments on my post.',
-              'comments',
+              {I18n.t('screens.notificationSettings.comments1')},
+              {I18n.t('screens.notificationSettings.notify6')},
+              {I18n.t('screens.notificationSettings.comments2')},
             )}
           </InputGroup>
         </ScrollView>

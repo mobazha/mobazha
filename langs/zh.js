@@ -178,7 +178,7 @@ export default {
                 sku_info: "SKU, ID, etc",
                 quantity: "数量",
                 unlimited: "没有限制的",
-                quantity_sold_out: '如果数量达到0，它将显示为“已售完”。',
+                quantity_sold_out: '如果数量达到0，它将显示为“已售完”.',
                 quantity_unlimit: '消费者可以购买任意数量的商品.'
             },
             EmptyCoupons: {
@@ -194,13 +194,13 @@ export default {
             },
             InventoryItem: {
                 quantity_info: "QTY: %{quantity}",
-                Unlimited: "没有限制的"
+                Unlimited: "无限制的"
             },
             ItemDetail: {
                 listing: "商品",
                 type: "类型",
                 title: "标题",
-                ask_selling: "你售卖什么?",
+                ask_selling: "你卖什么?",
                 price: "价格",
                 condition: "新旧程度",
                 description: "描述",
@@ -251,7 +251,7 @@ export default {
                 started_by: "纠纷开始于 %{name}",
                 the_seller: "卖家",
                 the_buyer: "买家",
-                memo_comment2: "主持人已介入以提供帮助,开始聊天以提供更多详细信息.",
+                memo_comment2: "主持人已介入提供帮助,开始聊天以提供更多详细信息.",
                 message: "消息"
             },
             OrderFooter: {
@@ -533,7 +533,7 @@ export default {
             },
 
             InfiniteProducts: {
-                loading_listings: "正在加载商品页面....."
+                loading_listings: "正在加载商品....."
             },
             InventoryEditor: {
                 details: "详细",
@@ -824,15 +824,15 @@ export default {
             done: "确定"
         },
         blockedNodes: {
-            no_block: "你还没有屏蔽任何人"
+            no_block: "没有屏蔽任何人"
         },
         categoryOverview: {
             see_all: "查看全部"
         },
         chats: {
-            start_conversation: "开始一个会话",
-            new_chat: "新的聊天",
-            no_discussion: "找不到订单讨论",
+            start_conversation: "开始会话",
+            new_chat: "新聊天",
+            no_discussion: "无订单讨论",
             chat: "聊天"
         },
         checkoutModerators: {
@@ -1122,6 +1122,13 @@ export default {
         searchResult: {
             Listings: "商品",
             User: "商户"
+        },
+        Server_Logs:{
+            server_Logs:"后台日志",
+            details1:"您的后台日志有助于解决您遇到的问题及错误.",
+            details2:"点击下面的按钮将提示您共享日志，请仅与您信任的人共享，避免公开发布，它们包含敏感信息.",
+            share_Server_Log:"共享后台日志",
+            share_ifpS_Log:"共享IPFS日志"
         },
         shippingAddress: {
             are_you_sure: "你确定吗?",

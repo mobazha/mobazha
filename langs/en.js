@@ -697,6 +697,16 @@ export default {
                 Server_Log: "Server Log",
                 Version: "Version 1.3.7"
             },
+            SocialPostTemplate:{
+                RePostTemplate:{
+                    delete_repost:"Delete repost?",
+                    delete_feed:"Deleting your repost will remove it from your feed",
+                    cancel:"Cancel",
+                    delete:"Delete",
+                    repost:"Repost",
+                    repost_with_comment:"Repost with comment",
+                }
+            },
             StoreModeratorList: {
                 moderators_count: "%{count} moderators",
                 moderators_added: "New moderators are automatically added to your store"

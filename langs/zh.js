@@ -701,6 +701,16 @@ export default {
                 Server_Log: "后台日志",
                 Version: "版本号 1.3.7"
             },
+            SocialPostTemplate:{
+                RePostTemplate:{
+                    delete_repost:"删除转发?",
+                    delete_feed:"删除转发，将会从你的数据中清除",
+                    cancel:"取消",
+                    delete:"删除",
+                    repost:"转发",
+                    repost_with_comment:"转发并评论",
+                }
+            },
             StoreModeratorList: {
                 moderators_count: "%{count}仲裁者",
                 moderators_added: "新的仲裁者会自动添加到您的商店"

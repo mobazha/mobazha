@@ -54,10 +54,10 @@ class RepostTemplate extends React.Component {
 
   deleteRepost = (reference, activityId, reactionId, originalActivityId) => {
     this.setState({ reference, activityId, reactionId, originalActivityId });
-    Alert.alert('Delete repost?', 'Deleting your repost will remove it from your feed', [
-      { text: 'Cancel' },
+    Alert.alert({I18n.t('components.templates.SocialPostTemplate.RePostTemplate.delete_feed')}, {I18n.t('components.templates.SocialPostTemplate.RePostTemplate.delete_repost')}, [
+      { text: {I18n.t('components.templates.SocialPostTemplate.RePostTemplate.cancel')}},
       {
-        text: 'Delete',
+        text: {I18n.t('components.templates.SocialPostTemplate.RePostTemplate.delete')},
         onPress: this.doDeleteRepost,
       },
     ]);
@@ -87,7 +87,7 @@ class RepostTemplate extends React.Component {
         <OBActionSheet
           ref={this.setActionSheet}
           onPress={this.handleChange}
-          options={['Repost', 'Repost with comment', 'Cancel']}
+          options={[{I18n.t('components.templates.SocialPostTemplate.RePostTemplate.repost')}, {I18n.t('components.templates.SocialPostTemplate.RePostTemplate.repost_with_comment')}, {I18n.t('components.templates.SocialPostTemplate.RePostTemplate.cancel')}]}
           cancelButtonIndex={2}
         />
         <SocialPostBase

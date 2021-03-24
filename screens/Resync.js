@@ -1,6 +1,7 @@
 import React, { PureComponent } from 'react';
 import { connect } from 'react-redux';
-import { View, Text, Alert, AsyncStorage, ScrollView } from 'react-native';
+import { View, Text, Alert, ScrollView } from 'react-native';
+import AsyncStorage from '@react-native-community/async-storage';
 import { ifIphoneX } from 'react-native-iphone-x-helper';
 
 import Header from '../components/molecules/Header';

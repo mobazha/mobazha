@@ -1,5 +1,5 @@
 import { get, isEmpty } from 'lodash';
-import { AsyncStorage } from 'react-native'
+import AsyncStorage from '@react-native-community/async-storage';
 import Reactotron from 'reactotron-react-native';
 import * as _ from 'lodash';
 import Config from 'react-native-config';

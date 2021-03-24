@@ -132,9 +132,10 @@ android {
     }
     compileSdkVersion 28
     buildToolsVersion "28.0.3"
+    ndkVersion "21.3.6528147"
     defaultConfig {
         applicationId "mbz.nativebazaar"
-        minSdkVersion 16
+        minSdkVersion 17
         targetSdkVersion 28
         versionCode Integer.parseInt(VERSION_CODE)
         versionName VERSION_NAME

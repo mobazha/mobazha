@@ -17,7 +17,7 @@ buildscript {
 ext {
     compileSdkVersion=28
     buildToolsVersion='28.0.3'
-    minSdkVersion=16
+    minSdkVersion=17
     targetSdkVersion=28
     androidXAnnotation = "1.1.0"
     androidXBrowser = "1.0.0"
@@ -63,6 +63,7 @@ subprojects { project ->
             android {
                 compileSdkVersion 28
                 buildToolsVersion '28.0.3'
+                ndkVersion "21.3.6528147"
             }
         }
     }

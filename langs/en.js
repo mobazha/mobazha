@@ -1137,12 +1137,12 @@ export default {
             Listings: "Listings",
             User: "User"
         },
-        Server_Logs:{
-            server_Logs:"Server Logs",
+        serverLog:{
+            server_logs:"Server Logs",
             details1:"Your server logs contain information that can help troubleshoot issues and/or bugs you may be experiencing.",
             details2:"Tapping the buttons below will prompt you to share your logs. Please only share your logs with people you trust. Avoid posting your logs publicly; they contain sensitive information.",
-            share_Server_Log:"Share Server Log",
-            share_ifpS_Log:"Share IPFS Log"
+            share_server_log:"Share Server Log",
+            share_ifps_Log:"Share IPFS Log"
         },
         shippingAddress: {
             are_you_sure: "Are you sure?",

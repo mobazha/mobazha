@@ -56,7 +56,7 @@ class ServerLog extends PureComponent {
           onLeft={this.handleGoBack}
         />
         <ScrollView style={styles.contentWrapper} contentContainerStyle={styles.contentWrapper}>
-          <InputGroup title= {I18n.t('screens.serverLog.server_Logs')} noBorder>
+          <InputGroup title= {I18n.t('screens.serverLog.server_logs')} noBorder>
             <DescriptionText>
             {I18n.t('screens.serverLog.details1')}
             </DescriptionText>
@@ -66,14 +66,14 @@ class ServerLog extends PureComponent {
           </InputGroup>
         </ScrollView>
         <Button
-          title= {I18n.t('screens.serverLog.share_Server_Log')}
+          title= {I18n.t('screens.serverLog.share_server_log')}
           wrapperStyle={[styles.buttonWrapper, styles.topButton]}
           textStyle={styles.buttonText}
           onPress={this.handleShareLog('ob')}
           style={{ marginBottom: 10 }}
         />
         <Button
-          title= {I18n.t('screens.serverLog.share_ifpS_Log')}
+          title= {I18n.t('screens.serverLog.share_ifps_log')}
           textStyle={styles.buttonText}
           wrapperStyle={styles.buttonWrapper}
           onPress={this.handleShareLog('ipfs')}

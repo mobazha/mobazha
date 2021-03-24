@@ -11,6 +11,7 @@ import { eventTracker } from '../../../utils/EventTracker';
 import { convertFromReference } from '../../../utils/feed';
 import SocialPostBase from './SocialPostBase';
 
+import {I18n} from '../../../langs/I18n';
 class RepostTemplate extends React.Component {
   state = { comment: '', showModal: false, reference: '' };
 
@@ -54,10 +55,11 @@ class RepostTemplate extends React.Component {
 
   deleteRepost = (reference, activityId, reactionId, originalActivityId) => {
     this.setState({ reference, activityId, reactionId, originalActivityId });
-    Alert.alert({I18n.t('components.templates.SocialPostTemplate.RePostTemplate.delete_feed')}, {I18n.t('components.templates.SocialPostTemplate.RePostTemplate.delete_repost')}, [
-      { text: {I18n.t('components.templates.SocialPostTemplate.RePostTemplate.cancel')}},
+    Alert.alert(I18n.t('components.templates.SocialPostTemplate.RePostTemplate.delete_feed'),
+      I18n.t('components.templates.SocialPostTemplate.RePostTemplate.delete_repost'), [
+      { text: I18n.t('components.templates.SocialPostTemplate.RePostTemplate.cancel')},
       {
-        text: {I18n.t('components.templates.SocialPostTemplate.RePostTemplate.delete')},
+        text: I18n.t('components.templates.SocialPostTemplate.RePostTemplate.delete'),
         onPress: this.doDeleteRepost,
       },
     ]);
@@ -87,7 +89,9 @@ class RepostTemplate extends React.Component {
         <OBActionSheet
           ref={this.setActionSheet}
           onPress={this.handleChange}
-          options={[{I18n.t('components.templates.SocialPostTemplate.RePostTemplate.repost')}, {I18n.t('components.templates.SocialPostTemplate.RePostTemplate.repost_with_comment')}, {I18n.t('components.templates.SocialPostTemplate.RePostTemplate.cancel')}]}
+          options={[I18n.t('components.templates.SocialPostTemplate.RePostTemplate.repost'),
+          I18n.t('components.templates.SocialPostTemplate.RePostTemplate.repost_with_comment'),
+          I18n.t('components.templates.SocialPostTemplate.RePostTemplate.cancel')]}
           cancelButtonIndex={2}
         />
         <SocialPostBase

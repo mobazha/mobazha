@@ -1136,12 +1136,12 @@ export default {
             Listings: "商品",
             User: "商户"
         },
-        Server_Logs:{
-            server_Logs:"后台日志",
+        serverLog:{
+            server_logs:"后台日志",
             details1:"您的后台日志有助于解决您遇到的问题及错误.",
             details2:"点击下面的按钮将提示您共享日志，请仅与您信任的人共享，避免公开发布，它们包含敏感信息.",
-            share_Server_Log:"共享后台日志",
-            share_ifpS_Log:"共享IPFS日志"
+            share_server_log:"共享后台日志",
+            share_ifps_log:"共享IPFS日志"
         },
         shippingAddress: {
             are_you_sure: "你确定吗?",

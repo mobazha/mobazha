@@ -1,5 +1,6 @@
 import React, { PureComponent } from 'react';
-import { YellowBox, AsyncStorage } from 'react-native';
+import { YellowBox } from 'react-native';
+import AsyncStorage from '@react-native-community/async-storage';
 import Messaging from '@react-native-firebase/messaging';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/lib/integration/react';

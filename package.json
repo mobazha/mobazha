@@ -13,6 +13,7 @@
     "postinstall": "npx jetify; ./install_server.sh; cd ./node_modules/react-native; exec ./scripts/ios-install-third-party.sh"
   },
   "dependencies": {
+    "@react-native-community/async-storage": "^1.12.1",
     "@react-native-community/blur": "3.4.1",
     "@react-native-firebase/app": "7.1.4",
     "@react-native-firebase/auth": "8.0.3",

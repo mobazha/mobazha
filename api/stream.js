@@ -2,7 +2,7 @@ import moment from 'moment';
 import queryString from 'querystring';
 import Crypto from 'crypto-js';
 import { hasIn, get, isEmpty } from 'lodash';
-import { AsyncStorage } from 'react-native';
+import AsyncStorage from '@react-native-community/async-storage';
 import Config from 'react-native-config';
 import Reactotron from 'reactotron-react-native';
 

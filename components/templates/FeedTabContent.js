@@ -78,13 +78,13 @@ class FeedTabContent extends React.Component {
     let text = '';
     switch (type) {
       case 'comments':
-        text = 'Be the first to comment!';
+        text = {I18n.t('components.templates.FeedTabContent.first_comment')};
         break;
       case 'likes':
-        text = 'Be the first to likes!';
+        text = {I18n.t('components.templates.FeedTabContent.first_likes')};
         break;
       default:
-        text = 'Be the first to repost!';
+        text = {I18n.t('components.templates.FeedTabContent.first_repost')};
         break;
     }
     return fetching ? (

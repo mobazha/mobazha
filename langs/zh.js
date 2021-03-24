@@ -450,7 +450,7 @@ export default {
                 submit_dispute: "提出争议?",
                 submit_hint: "仲裁者将介入以帮助解决争议。 您无法撤消此操作",
                 cancel: "取消",
-                ok: "Ok",
+                ok: "确定",
                 enter_reason: "请输入争议的原因!",
                 content_hint: "您为什么要提出争议？ 提供尽可能多的细节。"
             },
@@ -510,6 +510,11 @@ export default {
                 Loading: "飞快加载中....",
                 reported: "报告"
             },
+            FeedTabContent:{
+                first_comment:"首次评论!",
+                first_likes: "首次置顶!",
+                first_repost:"首次转发!",
+                },
             FulfillModal: {
                 shipping_carrier: "货运公司",
                 carrier_hint: "USPS, FedEX, etc",

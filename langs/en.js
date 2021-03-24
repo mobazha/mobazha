@@ -506,6 +506,12 @@ export default {
                 Loading: "Loading...",
                 reported: "Reported"
             },
+            FeedTabContent:{
+                first_comment:"Be the first to comment!",
+                first_likes: "Be the first to likes!",
+                first_repost:"Be the first to repost!",
+
+            },
             FulfillModal: {
                 shipping_carrier: "Shipping Carrier",
                 carrier_hint: "USPS, FedEX, etc",

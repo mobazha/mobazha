@@ -110,7 +110,7 @@ class FeedPreview extends React.Component {
   getImageSize = () => {
     const { activityId, getActivity } = this.props;
     const activityItem = getActivity(activityId);
-    const postData = _.get(activityItem, 'object.data.post', {});
+    const postData = _.get(activityItem, 'objectEx.data.post', {});
     const images = postData.images || [];
     return getImageItemWidth(Math.min(3, images.length));
   }
@@ -152,7 +152,7 @@ class FeedPreview extends React.Component {
     if (_.isEmpty(item)) {
       return false;
     }
-    const postData = _.get(item, 'object.data.post', {});
+    const postData = _.get(item, 'objectEx.data.post', {});
     const { profile = {} } = this.state;
     const images = postData.images || [];
     const { name = 'Anonymous' } = profile;

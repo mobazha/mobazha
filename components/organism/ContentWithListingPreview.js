@@ -126,11 +126,11 @@ export function getStatusToDecode(propsFromParam) {
   const props = propsFromParam || this.props;
   let status;
   const item = this.getFeedInfo(props);
-  ({ status } = _.get(item, 'object.data.post', {}));
+  ({ status } = _.get(item, 'objectEx.data.post', {}));
 
   if (this.isRepost && this.isRepost(props) && status === '') {
     const originActivity = this.getRepostFeedInfo(props);
-    const originPost = _.get(originActivity, 'object.data.post', {});
+    const originPost = _.get(originActivity, 'objectEx.data.post', {});
     ({ status } = originPost || {});
   }
 

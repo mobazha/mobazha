@@ -48,7 +48,7 @@ const styles = {
 class FeedItemFooter extends React.PureComponent {
   getReference = () => {
     const { item } = this.props;
-    const postData = _.get(item, 'object.data.post') || _.get(item, 'data.post');
+    const postData = _.get(item, 'objectEx.data.post') || _.get(item, 'data.post');
     const { slug, vendorID: { peerID } } = postData;
     return `${peerID}/${slug}`;
   }
@@ -61,7 +61,7 @@ class FeedItemFooter extends React.PureComponent {
   share = () => {
     const { item } = this.props;
     const { actor: { id: peerID }, id } = item;
-    const { status } = _.get(item, 'object.data', {});
+    const { status } = _.get(item, 'objectEx.data', {});
     Share.share({
       message: createFeedUrlFromPeerIDAndSlug(peerID, id),
       title: status,

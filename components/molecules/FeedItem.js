@@ -204,7 +204,7 @@ class FeedItem extends React.PureComponent {
     const { profile: { peerID: currentPeerID }, navigation } = this.props;
     const item = this.getFeedInfo();
 
-    const { status } = _.get(item, 'object.data.post', {});
+    const { status } = _.get(item, 'objectEx.data.post', {});
     if (status === '') {
       const reposterProfile = this.getReposterProfile();
       if (reposterProfile.peerID === currentPeerID) {
@@ -222,7 +222,7 @@ class FeedItem extends React.PureComponent {
     const item = this.getFeedInfo();
     const { actor, id: activityId, verb } = item || {};
     const { id: peerID } = actor;
-    const slug = _.get(item, 'object.data.post.slug');
+    const slug = _.get(item, 'objectEx.data.post.slug');
     if (verb === 'POST') {
       deleteFeedItem({ peerID, slug, activityId });
     } else {
@@ -246,7 +246,7 @@ class FeedItem extends React.PureComponent {
     const item = this.getFeedInfo();
     const { actor, id: activityId, verb } = item || {};
     const { id: peerID } = actor;
-    const slug = _.get(item, 'object.data.post.slug');
+    const slug = _.get(item, 'objectEx.data.post.slug');
     if (verb === 'POST') {
       removeFeedItem({ peerID, slug, activityId });
     } else {
@@ -270,7 +270,7 @@ class FeedItem extends React.PureComponent {
     const item = this.getFeedInfo();
     const { actor, id } = item || {};
     const { id: peerID } = actor;
-    const { status } = _.get(item, 'object.data', {});
+    const { status } = _.get(item, 'objectEx.data', {});
     if (this.isFeedOwner()) {
       switch (index) {
         case 0:
@@ -331,7 +331,7 @@ class FeedItem extends React.PureComponent {
     const { onPress } = this.props;
     if (this.isRepost()) {
       const item = this.getFeedInfo();
-      const { status } = _.get(item, 'object.data.post', {});
+      const { status } = _.get(item, 'objectEx.data.post', {});
       const repostActivityId = item.id;
       const originActivityId = _.get(item, 'postData.activityId');
 
@@ -414,14 +414,14 @@ class FeedItem extends React.PureComponent {
 
     // Post variables
     const profile = this.getUserProfile();
-    const { timestamp, images = [], status } = _.get(item, 'object.data.post', {});
+    const { timestamp, images = [], status } = _.get(item, 'objectEx.data.post', {});
     const shouldRenderRepost = this.isRepost() && status === '';
 
     // Repost variables
     const { time } = item;
     const { activityId } = item.postData;
     const originActivity = this.getRepostFeedInfo();
-    const originPost = _.get(originActivity, 'object.data.post', {});
+    const originPost = _.get(originActivity, 'objectEx.data.post', {});
     const reposterProfile = this.getReposterProfile();
     const { name: profileName = 'Anonymous' } = profile || {};
     const { name: reposterName = 'Anonymous' } = reposterProfile || {};

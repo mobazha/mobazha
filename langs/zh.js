@@ -510,7 +510,7 @@ export default {
             FeedDetail: {
                 fail_to_load: "糟糕！这个发布装载失败.",
                 retry: "重试",
-                Loading: "飞快加载中....",
+                Loading: "加载中....",
                 reported: "报告"
             },
             FeedTabContent:{

@@ -76,7 +76,7 @@ class FeedImageGrid extends React.PureComponent {
           <View style={styles.imageItem(get(images, 'length', 0), index)}>
             <OBFastImage
               style={styles.image}
-              source={getImageSourceWithDefault(medium)}
+              hash={medium}
               resizeMode={FastImage.resizeMode.cover}
             />
             {showMoreOverlay && <View style={styles.moreOverlay} />}

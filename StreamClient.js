@@ -71,7 +71,7 @@ class OBStream {
       this.authHolder.followMany(followings);
     }
     this.tokens = tokens;
-    const { activityToken, feedToken, reactionToken, followToken } = tokens;
+    const { activityToken, feedToken, reactionsToken, followToken } = tokens;
     this.activityClient = stream.connect(STREAM_API_KEY, activityToken, STREAM_APP_ID, {'location': 'us-east'});
     this.feedClient = stream.connect(STREAM_API_KEY, feedToken, STREAM_APP_ID, {'location': 'us-east'});
     this.followClient = stream.connect(STREAM_API_KEY, followToken, STREAM_APP_ID, {'location': 'us-east'});
@@ -137,7 +137,7 @@ class OBStream {
       } else {
         const feed = this.feedClient.feed(filter === 'local' ? 'posts' : 'user', peerID, this.tokens.globalToken);
         const result = await feed.get(feedQuery);
-        const results = result.results.filter((feed) => feed.actor.id === peerID);
+        const results = result.results.filter((feed) => feed.actor === peerID);
         return { ...result, results };
       }
     } catch {

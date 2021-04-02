@@ -172,8 +172,8 @@ class FeedItem extends React.PureComponent {
   }
 
   getUserProfile = () => {
-    const { actor } = this.getFeedInfo() || {};
-    return actor.data || {};
+    const { actorEx } = this.getFeedInfo() || {};
+    return actorEx || {};
   }
 
   setActionSheet = (component) => {
@@ -220,8 +220,7 @@ class FeedItem extends React.PureComponent {
   handleDelete = () => {
     const { deleteFeedItem, navigation } = this.props;
     const item = this.getFeedInfo();
-    const { actor, id: activityId, verb } = item || {};
-    const { id: peerID } = actor;
+    const { actor: peerID, id: activityId, verb } = item || {};
     const slug = _.get(item, 'objectEx.data.post.slug');
     if (verb === 'POST') {
       deleteFeedItem({ peerID, slug, activityId });
@@ -244,8 +243,7 @@ class FeedItem extends React.PureComponent {
   handleRemove = () => {
     const { removeFeedItem, navigation, showToast, hideToast } = this.props;
     const item = this.getFeedInfo();
-    const { actor, id: activityId, verb } = item || {};
-    const { id: peerID } = actor;
+    const { actor: peerID, id: activityId, verb } = item || {};
     const slug = _.get(item, 'objectEx.data.post.slug');
     if (verb === 'POST') {
       removeFeedItem({ peerID, slug, activityId });
@@ -268,8 +266,7 @@ class FeedItem extends React.PureComponent {
   handleChange = (index) => {
     const { navigation, reportUser, blockNode } = this.props;
     const item = this.getFeedInfo();
-    const { actor, id } = item || {};
-    const { id: peerID } = actor;
+    const { actor: peerID, id } = item || {};
     const { status } = _.get(item, 'objectEx.data', {});
     if (this.isFeedOwner()) {
       switch (index) {
@@ -346,7 +343,7 @@ class FeedItem extends React.PureComponent {
   isFeedOwner = () => {
     const { profile: { peerID } } = this.props;
     const { actor } = this.getFeedInfo();
-    return actor.id === peerID || actor === peerID;
+    return actor === peerID;
   }
 
   renderHeader = (name, timestamp) => {

@@ -60,7 +60,7 @@ class FeedItemFooter extends React.PureComponent {
 
   share = () => {
     const { item } = this.props;
-    const { actor: { id: peerID }, id } = item;
+    const { actor: peerID , id } = item;
     const { status } = _.get(item, 'objectEx.data', {});
     Share.share({
       message: createFeedUrlFromPeerIDAndSlug(peerID, id),

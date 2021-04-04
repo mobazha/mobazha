@@ -4,7 +4,7 @@ import DataRepository from '../dao/DataRepository'
 import en from './en'
 import zh from './zh'
 
-I18n.defaultLocale = 'zh';
+I18n.defaultLocale = 'en';
 
 I18n.fallbacks = true;
 

@@ -258,8 +258,8 @@ class FeedDetail extends React.PureComponent {
   submitComment = (comment) => {
     const item = this.getActivity();
     const uuid = uuidv4();
-    const slug = _.get(item, 'objectEx.data.post.slug');
-    const peerID = _.get(item, 'objectEx.data.post.vendorID.peerID');
+    const slug = _.get(item, 'object.data.post.slug');
+    const peerID = _.get(item, 'object.data.post.vendorID.peerID');
     const { id: activityId } = item;
     eventTracker.trackEvent('Social-CommentedPost');
     this.props.commentFeed({

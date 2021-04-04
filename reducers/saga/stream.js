@@ -85,7 +85,7 @@ export function* likePost(action) {
   try {
     const peerID = yield select(getUserPeerID);
     const activityInfo = (yield select(getActivity))(activityId);
-    const status = get(activityInfo, 'objectEx.data.post.status', '');
+    const status = get(activityInfo, 'object.data.post.status', '');
     yield put({ type: streamActions.updateReaction, payload: { type: 'like', activityId, reaction: signature } });
     yield StreamClient.likePost(activityId, signature);
     if (peerID !== targetPeerID.id) {
@@ -126,7 +126,7 @@ export function* repostPost(action) {
     const item = yield StreamClient.repostPost(activityId, reference, post);
     const withoutComment = post.post.status === '';
     const originalActivifyInfo = (yield select(getActivity))(activityId);
-    const status = get(originalActivifyInfo, 'objectEx.data.post.status', '');
+    const status = get(originalActivifyInfo, 'object.data.post.status', '');
     if (targetPeerID !== userPeerID) {
       yield put({
         type: streamActions.sendSocialNotification,

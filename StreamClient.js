@@ -137,7 +137,7 @@ class OBStream {
       } else {
         const feed = this.feedClient.feed(filter === 'local' ? 'posts' : 'user', peerID, this.tokens.globalToken);
         const result = await feed.get(feedQuery);
-        const results = result.results.filter((feed) => feed.actor === peerID);
+        const results = result.results.filter((feed) => feed.actor.id === peerID);
         return { ...result, results };
       }
     } catch {

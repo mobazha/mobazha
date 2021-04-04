@@ -72,15 +72,15 @@ class OBStream {
     }
     this.tokens = tokens;
     const { activityToken, feedToken, reactionsToken, followToken } = tokens;
-    this.activityClient = stream.connect(STREAM_API_KEY, activityToken, STREAM_APP_ID, {'location': 'us-east'});
-    this.feedClient = stream.connect(STREAM_API_KEY, feedToken, STREAM_APP_ID, {'location': 'us-east'});
-    this.followClient = stream.connect(STREAM_API_KEY, followToken, STREAM_APP_ID, {'location': 'us-east'});
+    this.activityClient = stream.connect(STREAM_API_KEY, activityToken, STREAM_APP_ID, {'location': 'singapore'});
+    this.feedClient = stream.connect(STREAM_API_KEY, feedToken, STREAM_APP_ID, {'location': 'singapore'});
+    this.followClient = stream.connect(STREAM_API_KEY, followToken, STREAM_APP_ID, {'location': 'singapore'});
     this.followFeed = this.followClient.feed('user', peerID, followToken);
     this.localFeed = this.feedClient.feed('posts', peerID, feedToken);
     this.feed = this.feedClient.feed('user', peerID, feedToken);
     this.globalFeed = this.feedClient.feed('user', 'all', feedToken);
     this.notificationFeed = this.feedClient.feed('notifications', peerID, feedToken);
-    this.socketClient = stream.connect(STREAM_API_KEY, null, STREAM_APP_ID, {'location': 'us-east'});
+    this.socketClient = stream.connect(STREAM_API_KEY, null, STREAM_APP_ID, {'location': 'singapore'});
     Reactotron.log('connected to stream', new Date());
     this.initDone = true;
   }

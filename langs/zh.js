@@ -824,19 +824,20 @@ export default {
             take_a_minute: "这可能要花费一分钟...",
             backup_done: "备份完成",
             backup_failed:"备份失败",
+            backupProfileUpload: "备份个人资料上传",
             set_password: "设置一个密码",
             password: "密码",
             confirm: "确认",
             confirm_password: "确认密码",
             hint1: "设置一个密码",
             hint2: "确保写下来",
-            hint3: "您将需要密码来恢复您的个人资料。.",
+            hint3: "您将需要密码来恢复您的个人资料。",
             next: "下一步"
         },
         backupProfileUpload: {
             message:  "这里是备份文件!",
-            upload_1: "请将您的备份上传到安全的外部位置 ",
-            upload_2: " 以确保您在丢失手机后可以恢复数据.",
+            upload_1: "请将您的备份上传到安全的外部地址\n",
+            upload_2: " 以确保您在丢失手机后\n可以恢复数据。",
             upload_backup: "上传备份",
             done: "确定"
         },

@@ -281,10 +281,10 @@ class FeedItem extends React.PureComponent {
           });
           break;
         case 1:
-          Alert.alert({I18n.t('components.molecules.FeedItem.delete_post')}, {I18n.t('components.molecules.FeedItem.undo_action1')}, [
-            { text: {I18n.t('components.molecules.FeedItem.cancel1')} },
+          Alert.alert(I18n.t('components.molecules.FeedItem.delete_post'), I18n.t('components.molecules.FeedItem.undo_action1'), [
+            { text: I18n.t('components.molecules.FeedItem.cancel1')},
             {
-              text: {I18n.t('components.molecules.FeedItem.delete1')} ,
+              text: I18n.t('components.molecules.FeedItem.delete1'),
               onPress: this.handleDelete,
             },
           ]);
@@ -313,10 +313,10 @@ class FeedItem extends React.PureComponent {
           blockNode(peerID);
           break;
         case 4:
-          Alert.alert({I18n.t('components.molecules.FeedItem.hide_post')}, {I18n.t('components.molecules.FeedItem.undo_action2')}, [
-            { text: {I18n.t('components.molecules.FeedItem.cancel2')}},
+          Alert.alert(I18n.t('components.molecules.FeedItem.hide_post'), I18n.t('components.molecules.FeedItem.undo_action2'), [
+            { text: I18n.t('components.molecules.FeedItem.cancel2')},
             {
-              text: {I18n.t('components.molecules.FeedItem.hide')},
+              text: I18n.t('components.molecules.FeedItem.hide'),
               onPress: this.handleRemove,
             },
           ]);
@@ -386,9 +386,9 @@ class FeedItem extends React.PureComponent {
           onPress={this.handleChange}
           options={
             isFeedOwner ? (
-              [{I18n.t('components.molecules.FeedItem.share_to1')}, {I18n.t('components.molecules.FeedItem.delete2')}, {I18n.t('components.molecules.FeedItem.cancel3')}]
+              [I18n.t('components.molecules.FeedItem.share_to1'), I18n.t('components.molecules.FeedItem.delete2'), I18n.t('components.molecules.FeedItem.cancel3')]
             ) : (
-                [{I18n.t('components.molecules.FeedItem.share_to2')}, {I18n.t('components.molecules.FeedItem.go_to_profile')},{I18n.t('components.molecules.FeedItem.report_user')} , {I18n.t('components.molecules.FeedItem.block_user')} , {I18n.t('components.molecules.FeedItem.hide_post')}, {I18n.t('components.molecules.FeedItem.cancel4')}]
+                [I18n.t('components.molecules.FeedItem.share_to2'), I18n.t('components.molecules.FeedItem.go_to_profile'), I18n.t('components.molecules.FeedItem.report_user'), I18n.t('components.molecules.FeedItem.block_user'), I18n.t('components.molecules.FeedItem.hide_post'), I18n.t('components.molecules.FeedItem.cancel4')]
               )}
           destructiveButtonIndex={isFeedOwner ? 1 : 2}
           cancelButtonIndex={isFeedOwner ? 2 : 5}

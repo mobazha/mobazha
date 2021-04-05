@@ -51,23 +51,26 @@ export const getListings = (username, password, peerID = '', countToPull = 10000
   let apiURL = '';
   if (isEmpty(peerID)) {
     apiURL = `${gatewayAPI}/ob/listings`;
-    const headers = {
-      method: 'GET',
-      headers: serverConfig.getAuthHeader(username, password),
-    };
-    return fetch(apiURL, headers)
-      .then(response => response.json())
-      .catch(handleErrorWithEmptyArray);
   } else {
-    apiURL = `${searchAPI}/listings?q=*&peerID=${peerID}&page=${page}&pageSize=${countToPull}`;
-    if (Platform.OS === 'ios') {
-      apiURL = `${apiURL}&mobile`;
-    }
-    const headers = { method: 'GET' };
-    return fetch(apiURL, headers)
-      .then(response => response.json())
-      .catch(handleErrorWithEmptyArray);
+    apiURL = `${gatewayAPI}/ob/listings/`+peerID;
   }
+  const headers = {
+    method: 'GET',
+    headers: serverConfig.getAuthHeader(username, password),
+  };
+  return fetch(apiURL, headers)
+    .then(response => response.json())
+    .catch(handleErrorWithEmptyArray);
+  // } else {
+  //   apiURL = `${searchAPI}/listings?q=*&peerID=${peerID}&page=${page}&pageSize=${countToPull}`;
+  //   if (Platform.OS === 'ios') {
+  //     apiURL = `${apiURL}&mobile`;
+  //   }
+  //   const headers = { method: 'GET' };
+  //   return fetch(apiURL, headers)
+  //     .then(response => response.json())
+  //     .catch(handleErrorWithEmptyArray);
+  // }
 };
 
 // Fetch an individual listing

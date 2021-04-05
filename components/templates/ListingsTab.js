@@ -71,8 +71,13 @@ class ListingsTab extends PureComponent {
   }
 
   onFetchListings = (response) => {
-    this.setState({ listings: response, pos: 10, loading: false });
-    this.props.onListingCountChange(response.length);
+    if(response.success) {
+      this.setState({ listings: response, pos: 10, loading: false });
+      this.props.onListingCountChange(response.length);
+    } else {
+      this.setState({ listings: [], pos: 10, loading: false });
+      this.props.onListingCountChange(0);
+    }
   }
 
   updateListings() {
@@ -124,7 +129,7 @@ class ListingsTab extends PureComponent {
         </View>
       );
     }
-    if (listings.results.total === 0) {
+    if ((listings.results ? listings.results.total : listings.length) === 0 ) {
       if (externalStore) {
         return (
           <View style={styles.wrapper}>

@@ -80,6 +80,23 @@ export default {
                 description: "Proceed without a moderator. Send funds directly to the vendor. Use with caution. Do not use unless you completely trust the vendor"
             },
             FeedItem: {
+                delete_post:"Delete post",
+                undo_action1: "You can't undo this action.",
+                cancel1:"Cancel",
+                delete1:"Delete",
+                hide_post:"Hide post?",
+                undo_action2: "You can't undo this action.",
+                cancel2:"Cancel",
+                hide: "Hide",
+                share_to1:"Share to...",
+                share_to2:"Share to...",
+                delete2:"Delete",
+                cancel3:"Cancel",
+                go_to_profile:"Go to profile",
+                report_user:"Report user",
+                block_user:"Block user",
+                hide_post:"Hide post",
+                cancel4:"Cancel",
                 reposted: "reposted"
             },            
             FeedPreview: {

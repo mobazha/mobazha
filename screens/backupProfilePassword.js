@@ -96,7 +96,7 @@ class BackupProfilePassword extends PureComponent {
   handleZipEvent = (event) => {
     if (event.progress === 1) {
       this.setState({ loadingText: null }, () => {
-        this.props.navigation.navigate(I18n.t('screens.backupProfilePassword.backup_failed'), { targetPath: this.targetPath });
+        this.props.navigation.navigate('BackupProfileUpload', { targetPath: this.targetPath });
       });
     }
   }

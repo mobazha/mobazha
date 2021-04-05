@@ -821,7 +821,6 @@ export default {
             take_a_minute: "It might take a minute...",
             backup_done:"Backup done",
             backup_failed:"Backup failed" ,
-            backupProfileUpload:"BackupProfileUpload",
             set_password: "Set a password",
             password: "Password",
             confirm: "Confirm",

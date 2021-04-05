@@ -904,7 +904,7 @@ export default {
             no_followers2: "你还没有任何关注者"
         },
         followings: {
-            Following: "关注中",
+            following: "关注中",
             no_following1: "%{name} 没有关注任何人",
             no_following2: "你还没有关注任何人"
         },

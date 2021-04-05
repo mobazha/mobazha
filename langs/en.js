@@ -901,7 +901,7 @@ export default {
             no_followers2: "You don\'t have any followers"
         },
         followings: {
-            Following: "Following",
+            following: "Following",
             no_following1: "%{name} isn't following anyone",
             no_following2: "You are not following anyone"
         },

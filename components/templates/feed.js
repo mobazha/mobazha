@@ -100,7 +100,8 @@ class Feed extends PureComponent {
 
   getFeedList = () => {
     const { peerID, profile } = this.props;
-    const feedList = this.props.getFilteredList('local', 'recent', peerID || profile.peerID);
+    const filter = peerID === profile.peerID ? 'local' : 'global';
+    const feedList = this.props.getFilteredList(filter, 'recent', peerID || profile.peerID);
     return feedList;
   }
 

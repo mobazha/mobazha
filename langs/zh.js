@@ -84,13 +84,30 @@ export default {
                 description: "在没有仲裁者的情况下直接汇款给卖方请谨慎使用，除非您完全信任卖家，否则请勿使用"
             },
             FeedItem: {
-                reposted: "重新发布"
+                delete_post:"删除帖子",
+                undo_action1: "你不能撤销此操作.",
+                cancel1:"取消",
+                delete1:"删除",
+                hide_post:"隐藏帖子?",
+                undo_action2: "你不能撤销此操作.",
+                cancel2:"取消",
+                hide: "隐藏",
+                share_to1:"分享",
+                share_to2:"分享至....",
+                delete2:"删除",
+                cancel3:"取消",
+                go_to_profile:"转到个人信息页",
+                report_user:"举报",
+                block_user:"屏蔽",
+                hide_post:"影藏帖子",
+                cancel4:"取消",
+                reposted: "重发"
             },
             FeedPreview: {
                 anonymous: "匿名"
             },
             ListingPaymentOptions: {
-                not_accepted: "无接收",
+                not_accepted: "否",
                 payment_options: "支付选项"
             },
             ListingReview: {
@@ -577,7 +594,7 @@ export default {
                 check_later: "请稍后再检查！",
                 store_empty: "你的店铺是空的",
                 put_for_sale: "布置一些商品出售！",
-                create_listing: "创建商品页面",
+                create_listing: "创建商品",
             },
             NeedCoin: {
                 coinbase: "Coinbase",
@@ -920,7 +937,7 @@ export default {
             failed_load: "糟糕！ 此商品无法加载.",
             retry: "重试",
             loading: "加载中.....",
-            policy1: "返回",
+            policy1: "退款条件",
             policy2:"条款和条件",
             add_wishlist: "添加到收藏夹!",
             remove_wishlist: "从收藏夹移除!",
@@ -962,7 +979,7 @@ export default {
             Create_failed: "帖子创建失败",
             unknown_error_create: "创建帖子时发生未知错误",
             char_left: " char left",
-            what_going_on: "发生了什么?"
+            what_going_on: "分享一些好玩的事情"
         },
         notifications: {
             Notifications: "通知"
@@ -1202,14 +1219,14 @@ export default {
             screenName8 :"支持",
             me :"我",
             support2:"支持",
-            Description1:"Have questions, feature suggestions or bugs to report? Please check our FAQs first." ,
-            Description2:"Our Telegram group is a great resource to report bugs or ask for support.",
-            Description3:"Our ability to offer email support is very limited." ,
-            Description4:"Please attempt to use the FAQ or Telegram group primarily.",
-            Description5:"For any critical issues, concerns, or problems with the app and/or content in the marketplace, contact us via email.",
-            fAQs:"FAQs",
-            telegram:"Telegram",
-            email_Support:"Email"
+            Description1:"有问题，功能建议或错误要报告吗？ 请先查看我们的常见问题解答。" ,
+            Description2:"我们的电报组是报告错误或寻求支持的理想资源。",
+            Description3:"我们提供电子邮件支持的能力非常有限." ,
+            Description4:"请尝试主要使用FAQ或电报.",
+            Description5:"对于市场上应用程序或内容的任何关键问题，疑虑或问题，请通过电子邮件与我们联系。",
+            fAQs:"常见问答",
+            telegram:"电报",
+            email_Support:"邮箱"
 
         },
     },

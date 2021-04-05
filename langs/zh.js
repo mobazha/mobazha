@@ -502,7 +502,7 @@ export default {
                 privacy_description36: "The Digital Millennium Copyright Act of 1998 (the “DMCA”) provides recourse for copyright owners who believe that material appearing on the Internet infringes their rights under US copyright law. If you believe in good faith that content or material on this Application infringes a copyright owned by you, you (or your agent) may send OB1 a notice requesting that the material be removed, or access to it blocked. This request should be sent to: haven@ob1.io. The notice must include the following information: (a) a physical or electronic signature of a person authorized to act on behalf of the owner of an exclusive right that is allegedly infringed; (b) identification of the copyrighted work claimed to have been infringed; (c) identification of the material that is claimed to be infringing or the subject of infringing activity; (d) the name, address, telephone number, and email address of the complaining party; (e) a statement that the complaining party has a good faith belief that use of the material in the manner complained of is not authorized by the copyright owner, its agent or the law; and (f) a statement that the information in the notification is accurate and, under penalty of perjury, that the complaining party is authorized to act on behalf of the owner of an exclusive right that is allegedly infringed. If you believe in good faith that a notice of copyright infringement has been wrongly filed against you, the DMCA permits you to send us a counter-notice. Notices and counter-notices must meet the then-current statutory requirements imposed by the DMCA. Notices and counternotices with respect to the Application should be sent to the address above.",
                 iaccept: "接受"
             }, feed: {
-                not_post: "%{name} 还没有发布任何信息",
+                not_post: "\n还没有发布任何信息",
                 post_hint1: "你还没有发布任何信息.",
                 post_hint2: "在社区分享一些东西!",
                 reported: "报告"
@@ -573,7 +573,7 @@ export default {
             },
             ListingsTab: {
                 loading: "加载中.....",
-                no_sale: "目前无任何出售.",
+                no_sale: "目前无任何出售。",
                 check_later: "请稍后再检查！",
                 store_empty: "你的店铺是空的",
                 put_for_sale: "布置一些商品出售！",

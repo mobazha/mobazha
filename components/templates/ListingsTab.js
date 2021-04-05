@@ -120,11 +120,11 @@ class ListingsTab extends PureComponent {
       return (
         <View style={styles.wrapper}>
           <ActivityIndicator size="large" color={brandColor} />
-          <Text style={[styles.description, styles.loadingText]}>{I18n.t('components.templates.ListingsTab.load')}</Text>
+          <Text style={[styles.description, styles.loadingText]}>{I18n.t('components.templates.ListingsTab.loading')}</Text>
         </View>
       );
     }
-    if (listings.length === 0) {
+    if (listings.results.total === 0) {
       if (externalStore) {
         return (
           <View style={styles.wrapper}>

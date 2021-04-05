@@ -54,7 +54,7 @@ class Feed extends PureComponent {
   handleFocus = () => {
     const { streamBuildNotificationSeen, setStreamBuildNotificationSeen } = this.props;
     if (!streamBuildNotificationSeen) {
-      Alert.alert(I18n.t('screens.feed.New_features'), I18n.t('screens.feed.feature_description'));
+      // Alert.alert(I18n.t('screens.feed.New_features'), I18n.t('screens.feed.feature_description'));
       setStreamBuildNotificationSeen(true);
     }
 

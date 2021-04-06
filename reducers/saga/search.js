@@ -48,18 +48,18 @@ function* fetchUserSearchResult() {
   if (morePages) {
     const curPage = yield select(getUserPageNum);
     const result = yield call(searchProfile, keyword, curPage);
-    const searchResults = result.results.results.filter(
+    const searchResults = result.results.results? result.results.results.filter(
       userInfo => !endsWith(get(userInfo, 'data.userAgent'), 'could not resolve name\n'),
     ).filter(
       userInfo => !blockedNodes.includes(get(userInfo, 'data.peerID')),
-    );
+    ):[];
     yield put({
       type: actions.setUserSearchResult,
       payload: { ...result.results, results: searchResults },
     });
     yield put({
       type: profilesActions.setProfiles,
-      payload: result.results.results.map(result => get(result, 'data')),
+      payload: result.results.results? result.results.results.map(result => get(result, 'data')):[],
     });
   }
 }

@@ -71,7 +71,7 @@ class ListingsTab extends PureComponent {
   }
 
   onFetchListings = (response) => {
-    if(response.success) {
+    if(response.length) {
       this.setState({ listings: response, pos: 10, loading: false });
       this.props.onListingCountChange(response.length);
     } else {

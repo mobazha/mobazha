@@ -31,7 +31,7 @@ class CategoryOverview extends PureComponent {
   render() {
     const { title, productCount, onPress, listingsForCategories, name } = this.props;
     const { data: results, loading } = (listingsForCategories[name] || {});
-    if (loading === false && results.length === 0) {
+    if (loading === false && (results ==null || results.length === 0)) {
       return null;
     }
 

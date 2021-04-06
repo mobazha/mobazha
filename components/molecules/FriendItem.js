@@ -4,6 +4,7 @@ import { withNavigation } from 'react-navigation';
 import * as _ from 'lodash';
 import decode from 'unescape';
 
+import { getProfile } from '../../api/profile';
 import { cellStyles, chatStyles } from '../../utils/styles';
 import { foregroundColor } from '../commonColors';
 import AvatarImage from '../atoms/AvatarImage';
@@ -67,15 +68,27 @@ const styles = {
 };
 
 class FriendItem extends Component {
+  state = {}
+
   onPressAvatar = () => {
     const { item, navigation } = this.props;
     const { peerID } = item;
     navigation.push('ExternalStore', { peerID });
   }
 
+  UNSAFE_componentWillMount() {
+    const { peerID } = this.props;
+    getProfile(peerID).then((response) => {
+      this.setState({
+        profile: response,
+      });
+    });
+  }
+
   render() {
     const {
-      item: profile,
+      peerID,
+      // item: profile,
       style,
       onPress,
       isFirst,
@@ -84,11 +97,11 @@ class FriendItem extends Component {
       showMessageButton,
       fromFollowing,
     } = this.props;
-    const { peerID } = profile;
+    const { profile } = this.state;
 
-    const name = _.get(profile, 'name');
-    const handle = _.get(profile, 'handle');
-    const shortDescription = _.get(profile, 'shortDescription');
+    const name = _.get(profile, 'name', '');
+    const handle = _.get(profile, 'handle', '');
+    const shortDescription = _.get(profile, 'shortDescription', '');
     return (
       <TouchableWithoutFeedback onPress={onPress}>
         <View style={[styles.wrapper, style]}>
@@ -96,7 +109,7 @@ class FriendItem extends Component {
           <View style={[styles.contentContainer, showMessageButton && styles.bigPadding]}>
             <AvatarImage
               style={styles.avatarImage}
-              thumbnail={_.get(profile, 'avatarHashes.tiny') || _.get(profile, 'avatar.tiny')}
+              thumbnail={_.get(profile, 'avatarHashes.tiny', '') || _.get(profile, 'avatar.tiny', '')}
               onPress={this.onPressAvatar}
             />
             <View style={styles.descriptionContainer}>

@@ -1,6 +1,6 @@
 import { isEmpty } from 'lodash';
 
-import { gatewayAPI, searchAPI } from './const';
+import { obGatewayAPI, gatewayAPI, searchAPI } from './const';
 import { makeRequest } from './common';
 import { serverConfig } from '../utils/server';
 
@@ -8,14 +8,14 @@ import { serverConfig } from '../utils/server';
 export const getFollowers = (peerID = '') => {
   const timestamp = Date.now();
   const apiURL = `${gatewayAPI}/ob/followers/${peerID}?${timestamp}`;
-  return makeRequest(apiURL, isEmpty(peerID));
+  return makeRequest(apiURL, true);
 };
 
 // Fetch the following list of a user/store
 export const getFollowings = (peerID = '') => {
   const timestamp = Date.now();
   const apiURL = `${gatewayAPI}/ob/following/${peerID}?${timestamp}`;
-  return makeRequest(apiURL, isEmpty(peerID));
+  return makeRequest(apiURL, true);
 };
 
 // Check if the user is following the store

@@ -31,7 +31,8 @@ class PeerItem extends Component {
     const { peerID, ...props } = this.props;
     const profile = this.state.profile || getDefaultProfileFromPeerId(peerID);
 
-    return <FriendItem item={profile} {...props} />;
+    // return <FriendItem item={profile} {...props} />;
+    return <FriendItem {...props} />;
   }
 }
 

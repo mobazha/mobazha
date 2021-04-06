@@ -37,11 +37,10 @@ class FollowersScreen extends PureComponent {
     const { navigation, myPeerID } = this.props;
     const peerID = navigation.getParam('peerID') || myPeerID;
     getFollowers(peerID).then((result) => {
-      const { profiles } = result || {};
-      if (!Array.isArray(profiles)) {
+      if (!Array.isArray(result)) {
         this.setState({ followers: [], loaded: true });
       } else {
-        this.setState({ followers: profiles, loaded: true });
+        this.setState({ followers: result, loaded: true });
       }
     });
   }
@@ -60,9 +59,9 @@ class FollowersScreen extends PureComponent {
     const { navigation } = this.props;
     return (
       <FriendItem
-        item={item}
-        key={item.peerID}
-        onPress={this.handlePress.bind(this, item.peerID)}
+        peerID={item}
+        key={item}
+        onPress={this.handlePress.bind(this, item)}
         navigation={navigation}
         showFollowButton
         fromFollowing

@@ -1,6 +1,6 @@
 import { isEmpty } from 'lodash';
 
-import { gatewayAPI, searchAPI } from './const';
+import { obGatewayAPI, gatewayAPI, searchAPI } from './const';
 import { serverConfig } from '../utils/server';
 import { makeFetch } from './common';
 
@@ -12,7 +12,7 @@ export const getProfile = (peerID = '') => {
   if (isEmpty(peerID)) {
     apiURL = `${gatewayAPI}/ob/profile?async=true`;
   } else {
-    apiURL = `${gatewayAPI}/ob/profile/${peerID}?${timestamp}`;
+    apiURL = `${obGatewayAPI}/ob/profile/${peerID}?${timestamp}`;
   }
   const headers = {
     method: 'GET',

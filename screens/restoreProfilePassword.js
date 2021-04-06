@@ -80,7 +80,7 @@ class RestoreProfilePassword extends PureComponent {
   }
 
   handleRestore = async () => {
-    this.setState({ loadingText: I18n.t('screens.restoreProfilePassword.failed_download') });
+    this.setState({ loadingText: I18n.t('screens.restoreProfilePassword.loading_hint') });
 
     const { navigation } = this.props;
     let zipPath = navigation.getParam('path');
@@ -119,7 +119,7 @@ class RestoreProfilePassword extends PureComponent {
   }
 
   handleZipFilePathFetchFailed = () => {
-    this.handleUnzipFailed(I18n.t('screens.restoreProfilePassword.wrong_password'));
+    this.handleUnzipFailed(I18n.t('screens.restoreProfilePassword.failed_download'));
   }
 
   handleServerStopped = async () => {

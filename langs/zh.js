@@ -406,7 +406,7 @@ export default {
                 see_all: "查看全部"
             },
             ChatDetail: {
-                is_typing: "%{peer} 正在书写...",
+                is_typing: "%{peer}正在书写...",
                 unread: "没有阅读",
                 block_message: "这个用户已经被屏蔽.",
                 start_with: "开始会话：",

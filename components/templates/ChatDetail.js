@@ -632,7 +632,7 @@ class ChatDetail extends PureComponent {
         ]}
       >
         <AvatarImage thumbnail={avatar} style={styles.footerAvatar} />
-        <Text style={styles.footerText}>{peerProfile.name}+{I18n.t('components.templates.ChatDetail.is_typing')}</Text>
+        <Text style={styles.footerText}>{I18n.t('components.templates.ChatDetail.is_typing', {peer: peerProfile.name})}</Text>
       </View>
     );
   };

@@ -149,15 +149,15 @@ class ListingsTab extends PureComponent {
         );
       }
     } else {
-      if (externalStore) {
-        return (
-          <InfiniteProducts
-            queryString={`q=*&peerID=${peerID}&nsfw=false&network=mainnet`}
-            toListingDetails={this.handleGoToListingDetails}
-            showInitialLoading
-          />
-        );
-      } else {
+      // if (externalStore) {
+      //   return (
+      //     <InfiniteProducts
+      //       queryString={`q=*&peerID=${peerID}&nsfw=false&network=mainnet`}
+      //       toListingDetails={this.handleGoToListingDetails}
+      //       showInitialLoading
+      //     />
+      //   );
+      // } else {
         return (
           <Listings
             mode={mode}
@@ -169,7 +169,7 @@ class ListingsTab extends PureComponent {
             externalStore={externalStore}
           />
         );
-      }
+      // }
     }
   }
 }

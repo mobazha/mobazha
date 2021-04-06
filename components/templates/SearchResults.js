@@ -93,7 +93,7 @@ class SearchResults extends PureComponent {
   renderListItem = ({ item }) => {
     const { data, relationships } = item;
     const {
-      title, freeShipping, thumbnail, averageRating, ratingCount, bigPrice, slug, hash,
+      title, freeShipping, thumbnail, averageRating, ratingCount, price, slug, hash,
     } = data;
     const { data: vendorProfile } = relationships.vendor;
 
@@ -106,9 +106,9 @@ class SearchResults extends PureComponent {
         thumbnail={thumbnail.small}
         averageRating={averageRating}
         ratingCount={ratingCount}
-        currencyCode={bigPrice.currencyCode}
-        amount={bigPrice.amount}
-        peerID={vendorProfile.peerID}
+        currencyCode={price.currency?price.currency.code:price.currencyCode}
+        amount={price.amount}
+        peerID={vendorProfile?vendorProfile.peerID:""}
         fetchedProfile={vendorProfile}
         onPress={this.props.toListingDetails}
       />

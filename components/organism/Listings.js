@@ -39,9 +39,13 @@ export default class Listings extends PureComponent {
 
     const { peerID, onPress, externalStore } = this.props;
     const { slug, hash, title } = item;
+    // const priceProps = {
+    //   currencyCode: get(item, externalStore ? 'bigPrice.currencyCode' : 'price.currency.code', ''),
+    //   amount: get(item, externalStore ? 'bigPrice.amount' : 'price.amount', 0),
+    // };
     const priceProps = {
-      currencyCode: get(item, externalStore ? 'bigPrice.currencyCode' : 'price.currency.code', ''),
-      amount: get(item, externalStore ? 'bigPrice.amount' : 'price.amount', 0),
+      currencyCode: get(item, 'price.currency.code', ''),
+      amount: get(item, 'price.amount', 0),
     };
 
     return (
@@ -66,9 +70,13 @@ export default class Listings extends PureComponent {
     const {
       title, freeShipping, slug, hash,
     } = item;
+    // const priceProps = {
+    //   currencyCode: get(item, externalStore ? 'bigPrice.currencyCode' : 'price.currency.code', ''),
+    //   amount: get(item, externalStore ? 'bigPrice.amount' : 'price.amount', 0),
+    // };
     const priceProps = {
-      currencyCode: get(item, externalStore ? 'bigPrice.currencyCode' : 'price.currency.code', ''),
-      amount: get(item, externalStore ? 'bigPrice.amount' : 'price.amount', 0),
+      currencyCode: get(item, 'price.currency.code', ''),
+      amount: get(item, 'price.amount', 0),
     };
     return (
       <ProductListItem
@@ -80,8 +88,8 @@ export default class Listings extends PureComponent {
         thumbnail={get(item, 'thumbnail.small')}
         averageRating={get(item, 'averageRating', 0)}
         ratingCount={get(item, 'ratingCount', 0)}
-        currencyCode={get(item, 'bigPrice.currencyCode', '')}
-        amount={get(item, 'bigPrice.amount', 0)}
+        currencyCode={get(item, 'price.currency.code', '')}
+        amount={get(item, 'price.amount', 0)}
         onPress={onPress}
         hideSellerName
         {...priceProps}

@@ -569,7 +569,7 @@ function start() {
           app.loadingModal.close();
 
           // add the default search providers
-          app.searchProviders.add(defaultSearchProviders, { at: 0 });
+          app.searchProviders.add(defaultSearchProviders, { at: 1 });
 
           if (externalRoute) {
             // handle opening the app from an an external ob link

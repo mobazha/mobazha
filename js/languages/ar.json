@@ -485,8 +485,8 @@
     "helpTab": {
       "linkText": "مساعدة",
       "sectionHeader": "مساعدة",
-      "supportLink": "صفحة الدعم على OpenBazaar.org",
-      "text": "هل تحتاج مساعدة حول تطبيق اوبن بازار؟ يرجى زيارة %{supportLink}. هناك العديد من أدلة الدعم و الأسئلة الشائعة التي من المفترض أن تساعدك في حل مشكلتك."
+      "supportLink": "Telegram",
+      "text": "هل تحتاج مساعدة حول تطبيق اوبن بازار؟ يرجى زيارة %{supportLink}."
     }
   },
   "settings": {

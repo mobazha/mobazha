@@ -485,8 +485,8 @@
     "helpTab": {
       "linkText": "Ajuda",
       "sectionHeader": "Ajuda",
-      "supportLink": "página de ajuda em OpenBazaar.org",
-      "text": "Está com dificuldades com o software OpenBazaar? Por favor, visite a %{supportLink}. Lá você encontrará diversos guias para auxiliá-lo a resolver seus problemas."
+      "supportLink": "Telegram",
+      "text": "Está com dificuldades com o Mobazha? Por favor, visite a %{supportLink}."
     }
   },
   "settings": {

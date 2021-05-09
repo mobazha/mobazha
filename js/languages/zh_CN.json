@@ -485,8 +485,8 @@
     "helpTab": {
       "linkText": "帮助",
       "sectionHeader": "帮助",
-      "supportLink": "mulgore.me的支持页面",
-      "text": "需要获取OpenBazaar软件帮助？请访问%{supportLink}。上面有许多支持指南和常见问题解答可帮助您解决问题。"
+      "supportLink": "Telegram",
+      "text": "需要获取Mobazha帮助？请访问%{supportLink}。"
     }
   },
   "settings": {

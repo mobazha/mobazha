@@ -29,9 +29,9 @@ export default class extends baseVw {
     });
     this.options = opts;
 
-    const btcAddress = '3EN8kP3yW9MGvyiRMtGqKavQ9wYg4BspzR';
+    const btcAddress = '1FdcS33YKQUGRv8MTdpMJPLbMWR5gog4pM';
     const btcQRAddress = getCurrencyByCode('BTC').qrCodeText(btcAddress);
-    const bchAddress = 'prws8awqjg8l497x3h7qeu6jps4fdmk75vhlng8akj';
+    const bchAddress = '1JXdaaxsbn5X4fRsrQkkQF9oReVohSi4iq';
     const bchQRAddress = getCurrencyByCode('BCH').qrCodeText(bchAddress);
 
     this.dCoins = {

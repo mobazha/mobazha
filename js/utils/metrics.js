@@ -76,9 +76,9 @@ export function addMetrics() {
 
     window.Countly = {};
     window.Countly.q = [];
-    window.Countly.app_key = '979774c41bab3a6e5232a3630e6e151e439c412e';
+    window.Countly.app_key = 'f77b35c71e28e2490a73ea82d8e02b52efbc875d';
     window.Countly.app_version = `client_${version}|server_${app.settings.prettyServerVer}`;
-    window.Countly.url = 'https://countly.openbazaar.org';
+    window.Countly.url = 'https://countly.mobazha.com';
     window.Countly.interval = 30000;
     window.Countly.q.push(['track_sessions']);
     window.Countly.q.push(['track_errors']);
@@ -93,7 +93,7 @@ export function addMetrics() {
     scriptEl.id = 'metricsScrtipt';
     scriptEl.type = 'text/javascript';
     scriptEl.async = true;
-    scriptEl.src = 'https://countly.openbazaar.org/sdk/web/countly.min.js';
+    scriptEl.src = 'https://countly.mobazha.com/sdk/web/countly.min.js';
     scriptEl.onload = () => window.Countly.init();
     (document.getElementsByTagName('head')[0]).appendChild(scriptEl);
   }

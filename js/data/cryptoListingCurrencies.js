@@ -23,6 +23,7 @@ const baseCurrencies = [
   'BTCD',
   'BTG',
   'BTS',
+  'CFX',
   'DASH',
   'DCR',
   'DGB',

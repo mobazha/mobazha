@@ -63,7 +63,7 @@ export const walletCurDef = {
   CFX: {
     code: 'CFX',
     currencyType: 'crypto',
-    divisibility: 8,
+    divisibility: 18,
     name: 'Conflux',
     testnetCode: 'TCFX',
   },

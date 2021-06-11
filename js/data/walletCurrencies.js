@@ -77,6 +77,26 @@ let _currencies = [
     externallyFundableOrders: true,
   },
   {
+    code: 'CFX',
+    testnetCode: 'TCFX',
+    qrCodeText: address => `conflux:${address}`,
+    icon: 'imgs/cryptoIcons/CFX-icon.png',
+    url: 'https://confluxnetwork.org',
+    getBlockChainAddressUrl: (address, isTestnet) => (
+      isTestnet ?
+        `https://testnet.confluxscan.io/address/${address}` :
+        `https://confluxscan.io/address/${address}`
+    ),
+    getBlockChainTxUrl: (txid, isTestnet) => (
+      isTestnet ?
+        `https://testnet.confluxscan.io/transaction//${txid}` :
+        `https://confluxscan.io/transaction/${txid}`
+    ),
+    supportsEscrowTimeout: true,
+    blockTime: 1000 * 1,
+    externallyFundableOrders: false,
+  },
+  {
     code: 'ETH',
     testnetCode: 'TETH',
     qrCodeText: address => `ethereum:${address}`,

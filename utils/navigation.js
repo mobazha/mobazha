@@ -18,6 +18,8 @@ const LITECOIN_REGEX = /^[LM3][a-km-zA-HJ-NP-Z1-9]{26,33}$/;
 
 const ETHER_REGEX = /^0x[a-fA-F0-9]{40}$/;
 
+const CONFLUX_REGEX = /^cfx.*$/;
+
 export const UNIVERSAL_LINK_PREFIX = 'https://openbazaar.com/';
 
 export const getNavRouteAndParamsFromURL = (initialUrl) => {
@@ -62,6 +64,14 @@ export const getNavRouteAndParamsFromURL = (initialUrl) => {
       route: 'SendMoney',
       params: {
         coin: 'ETH',
+        address: initialUrl,
+      },
+    };
+  } else if (CONFLUX_REGEX.test(initialUrl)) {
+    return {
+      route: 'SendMoney',
+      params: {
+        coin: 'CFX',
         address: initialUrl,
       },
     };

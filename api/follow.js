@@ -7,14 +7,14 @@ import { serverConfig } from '../utils/server';
 // Fetch the followers of a user/store
 export const getFollowers = (peerID = '') => {
   const timestamp = Date.now();
-  const apiURL = `${gatewayAPI}/ob/followers/${peerID}?${timestamp}`;
+  const apiURL = `${gatewayAPI}/ob/followers/${peerID}?usecache=true&${timestamp}`;
   return makeRequest(apiURL, true);
 };
 
 // Fetch the following list of a user/store
 export const getFollowings = (peerID = '') => {
   const timestamp = Date.now();
-  const apiURL = `${gatewayAPI}/ob/following/${peerID}?${timestamp}`;
+  const apiURL = `${gatewayAPI}/ob/following/${peerID}?usecache=true&${timestamp}`;
   return makeRequest(apiURL, true);
 };
 

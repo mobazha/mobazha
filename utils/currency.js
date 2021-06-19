@@ -18,7 +18,7 @@ export const removeZeros = (before) => {
 export const getDecimalPoints = (coin) => {
   if (['BTC', 'BCH', 'LTC', 'ZEC'].includes(coin)) {
     return 8;
-  } else if (coin === 'ETH') {
+  } else if (coin === 'ETH' || coin === 'CFX') {
     return 18;
   } else {
     return 2;
@@ -35,7 +35,7 @@ export const parseCurrencyStr = amountStr => parseFloat(_.isEmpty(amountStr) ? 0
 export const isCrypto = currency => !!COINS[currency];
 
 const satoshiAmount = BigNumber(100000000);
-const weiAmount = BigNumber(1000000000000000000);
+const weiAmount = BigNumber(1000000000000000000); // dripAmount
 const centAmount = BigNumber(100);
 
 export const getCurrencySymbol = (localCurrency) => {
@@ -48,7 +48,7 @@ export const exchangeCurrency = (rates, localCurrency, currency, amount) => {
   const localRate = BigNumber(rates[localCurrency === 'VEF' ? 'VES' : localCurrency]);
   const bgAmount = BigNumber(amount);
   if (isCrypto(currency)) {
-    const minUnitAmount = currency === 'ETH' ? weiAmount : satoshiAmount;
+    const minUnitAmount = (currency === 'ETH' || currency === 'CFX') ? weiAmount : satoshiAmount;
     return bgAmount.dividedBy(rate).multipliedBy(localRate).dividedBy(minUnitAmount);
   } else {
     return bgAmount.dividedBy(rate).multipliedBy(localRate).dividedBy(centAmount);
@@ -56,7 +56,7 @@ export const exchangeCurrency = (rates, localCurrency, currency, amount) => {
 };
 
 export const exchangeToBCH = (rates, localCurrency, currency, amount) => {
-  const minUnitAmount = currency === 'ETH' ? weiAmount : satoshiAmount;
+  const minUnitAmount = (currency === 'ETH' || currency === 'CFX') ? weiAmount : satoshiAmount;
   const rate = BigNumber(rates[currency === 'VEF' ? 'VES' : currency]);
   const localRate = BigNumber(rates[localCurrency === 'VEF' ? 'VES' : localCurrency]);
   const bgAmount = BigNumber(amount);
@@ -77,7 +77,7 @@ export const calculateBalanceFromBCH = (rates, localCurrency, currency, balance)
 };
 
 export const minUnitAmountToBCH = (amount, coin, truncate = true) => {
-  const minUnitAmount = coin === 'ETH' ? weiAmount : satoshiAmount;
+  const minUnitAmount = (coin === 'ETH' || coin === 'CFX') ? weiAmount : satoshiAmount;
   return BigNumber(truncate ? BigNumber(amount).integerValue() : amount).dividedBy(minUnitAmount);
 };
 
@@ -89,7 +89,7 @@ export const getPriceInMinimumUnit = (price, currency) => {
     return bgPrice.multipliedBy(satoshiAmount).toFixed(0);
   }
 
-  if (currency === 'ETH') {
+  if (currency === 'ETH' || currency === 'CFX') {
     return bgPrice.multipliedBy(weiAmount).toFixed(0);
   }
 

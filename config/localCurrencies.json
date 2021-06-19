@@ -27,6 +27,15 @@
     "name_plural": "BCH"
   },
   {
+    "symbol": "Ξ",
+    "name": "Conflux",
+    "symbol_native": "Ξ",
+    "decimal_digits": 18,
+    "rounding": 0,
+    "code": "CFX",
+    "name_plural": "CFX"
+  },
+  {
     "symbol": "Ł",
     "name": "Litecoin",
     "symbol_native": "Ł",

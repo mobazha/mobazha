@@ -47,6 +47,17 @@ const initialState = {
       height: 0,
       unconfirmed: '0',
     },
+    CFX: {
+      confirmed: '0',
+      currency: {
+        code: 'CFX',
+        currencyType: 'crypto',
+        divisibility: 18,
+        name: 'Conflux',
+      },
+      height: 0,
+      unconfirmed: '0',
+    },
     LTC: {
       confirmed: '0',
       currency: {
@@ -87,6 +98,7 @@ const initialState = {
     LTC: {},
     ZEC: {},
     ETH: {},
+    CFX: {},
   },
   coinAddress: {
     BTC: '',
@@ -94,6 +106,7 @@ const initialState = {
     LTC: '',
     ZEC: '',
     ETH: '',
+    CFX: '',
   },
   fees: {},
   status: '',

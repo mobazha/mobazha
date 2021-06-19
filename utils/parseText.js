@@ -17,6 +17,8 @@ const LITECOIN_REGEX = /\b[LM3][a-km-zA-HJ-NP-Z1-9]{26,33}$/gm;
 
 const ETHER_REGEX = /\b0x[a-fA-F0-9]{40}$/gm;
 
+const CONFLUX_REGEX = /^cfx.*$/gm;
+
 const HASH_TAG_REGEX = /#(\w+)/;
 
 const handleUrlPress = onDeeplinkPress => (url) => {
@@ -63,6 +65,11 @@ export const getOBParsePatterns = (linkStyle, onDeeplinkPress, onCrypoLink, onHa
     pattern: ETHER_REGEX,
     style: linkStyle,
     onPress: onCrypoLink('ETH'),
+  },
+  {
+    pattern: CONFLUX_REGEX,
+    style: linkStyle,
+    onPress: onCrypoLink('CFX'),
   },
   {
     pattern: HASH_TAG_REGEX,

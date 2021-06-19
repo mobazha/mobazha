@@ -18,7 +18,7 @@ const localDecimalPointsIfCryptoSelector = createSelector(
   (localCurrency) => {
     if (['BTC', 'BCH', 'LTC', 'ZEC'].includes(localCurrency)) {
       return 8;
-    } else if (localCurrency === 'ETH') {
+    } else if (localCurrency === 'ETH' || localCurrency === 'CFX') {
       return 18;
     } else {
       return 0;

@@ -465,7 +465,7 @@ class OrderSummary extends PureComponent {
           }}
         >
           <View>
-            <Text style={styles.viewTransaction}>{coinName === 'ETH' ? I18n.t('components.templates.OrderSummary.view') : I18n.t('components.templates.OrderSummary.view_transaction')}</Text>
+            <Text style={styles.viewTransaction}>{(coinName === 'ETH' || coinName === 'CFX') ? I18n.t('components.templates.OrderSummary.view') : I18n.t('components.templates.OrderSummary.view_transaction')}</Text>
           </View>
         </TouchableWithoutFeedback>
       </View>

@@ -1,6 +1,6 @@
 import { isEmpty } from 'lodash';
 
-import { obGatewayAPI, gatewayAPI, searchAPI } from './const';
+import { mbzGatewayAPI, gatewayAPI, searchAPI } from './const';
 import { makeRequest } from './common';
 import { serverConfig } from '../utils/server';
 

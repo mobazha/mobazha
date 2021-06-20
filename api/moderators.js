@@ -1,5 +1,5 @@
 import * as _ from 'lodash';
-import { obEthGatewayAPI, gatewayAPI, searchAPI } from './const';
+import { mbzEthGatewayAPI, gatewayAPI, searchAPI } from './const';
 import { serverConfig } from '../utils/server';
 
 // Fetch OB1 verified moderators
@@ -36,7 +36,7 @@ export const setModerator = (username, password, body) => {
 export const getModerator = (username, password, peerID) => {
   const timestamp = Date.now();
   let url = '';
-  if (peerID) { url = `${obEthGatewayAPI}/ob/moderator/${peerID}?${timestamp}`; } else { url = `${gatewayAPI}/ob/moderator`; }
+  if (peerID) { url = `${mbzEthGatewayAPI}/ob/moderator/${peerID}?${timestamp}`; } else { url = `${gatewayAPI}/ob/moderator`; }
   const headers = {
     method: 'GET',
     headers: serverConfig.getAuthHeader(username, password),

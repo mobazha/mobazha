@@ -1,7 +1,7 @@
 import * as _ from 'lodash';
 import { Dimensions } from 'react-native';
 
-import { gatewayAPI, obGatewayAPI } from '../api/const';
+import { gatewayAPI, mbzGatewayAPI } from '../api/const';
 import defaultImage from '../assets/images/defaultItem.png';
 import defaultAvatar from '../assets/images/defaultAvatar.png';
 import defaultHeader from '../assets/images/defaultHeader.png';
@@ -12,7 +12,7 @@ import { serverConfig } from './server';
 const DEVICE_WIDTH = Dimensions.get('window').width;
 const DEVICE_HEIGHT = Dimensions.get('window').height;
 
-export const getImageSource = hash => `${obGatewayAPI}/ob/images/${hash}`;
+export const getImageSource = hash => `${mbzGatewayAPI}/ob/images/${hash}`;
 
 export const getLocalImageSource = hash => (hash === '' ? '' : `${gatewayAPI}/ob/images/${hash}`);
 

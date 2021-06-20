@@ -1,13 +1,13 @@
 import { stringify } from 'query-string';
 
-import { obEthGatewayAPI } from './const';
+import { mbzEthGatewayAPI } from './const';
 
 // Fetch batch profiles
 export const getProfiles = (peerIDList, async = false) => {
   const timestamp = Date.now();
   const searchQuery = { async };
   const queryString = stringify(searchQuery);
-  const apiURL = `${obEthGatewayAPI}/ob/fetchprofiles?${queryString}&${timestamp}`;
+  const apiURL = `${mbzEthGatewayAPI}/ob/fetchprofiles?${queryString}&${timestamp}`;
 
   const headers = {
     method: 'POST',

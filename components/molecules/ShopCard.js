@@ -15,7 +15,7 @@ import {
 } from '../commonColors';
 import LocationPin from '../atoms/LocationPin';
 import { fetchProfile } from '../../reducers/profile';
-import { obGatewayAPI } from '../../api/const';
+import { mbzGatewayAPI } from '../../api/const';
 
 import {I18n} from '../../langs/I18n';
 
@@ -167,10 +167,10 @@ class ShopCard extends Component {
     }
     if (!_.isEmpty(profile)) {
       const cover = _.hasIn(profile, 'headerHashes')
-        ? { uri: `${obGatewayAPI}/ob/images/${profile.headerHashes.large}` }
+        ? { uri: `${mbzGatewayAPI}/ob/images/${profile.headerHashes.large}` }
         : defaultHeader;
       const avatar = _.hasIn(profile, 'avatarHashes')
-        ? { uri: `${obGatewayAPI}/ob/images/${profile.avatarHashes.small}` }
+        ? { uri: `${mbzGatewayAPI}/ob/images/${profile.avatarHashes.small}` }
         : defaultAvatar;
       const avgRating = _.get(profile, 'stats.averageRating') || 0;
       const ratingCount = _.get(profile, 'stats.ratingCount') || 0;

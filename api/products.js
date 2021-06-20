@@ -4,7 +4,7 @@ import { isEmpty } from 'lodash';
 import {
   searchAPI,
   gatewayAPI,
-  obEthGatewayAPI,
+  mbzEthGatewayAPI,
   featuredListingAPI,
   bestsellersListingAPI,
   gamingListingAPI,
@@ -80,7 +80,7 @@ export const getListing = (username, password, slug, peerID = '') => {
   if (isEmpty(peerID)) {
     apiURL = `${gatewayAPI}/ob/listing/${slug}?`;
   } else {
-    apiURL = `${obEthGatewayAPI}/ob/listing/${peerID}/${slug}?usecache=true&${timestamp}`;
+    apiURL = `${mbzEthGatewayAPI}/ob/listing/${peerID}/${slug}?usecache=true&${timestamp}`;
   }
   const headers = {
     method: 'GET',
@@ -110,9 +110,9 @@ export const getRatings = (username, password, slug, peerID) => {
   let headers = {};
   const timestamp = Date.now();
   if (!isEmpty(peerID) && !isEmpty(slug)) {
-    apiURL = `${obEthGatewayAPI}/ob/ratings/${peerID}/${slug}?usecache=true&${timestamp}`;
+    apiURL = `${mbzEthGatewayAPI}/ob/ratings/${peerID}/${slug}?usecache=true&${timestamp}`;
   } else if (!isEmpty(peerID)) {
-    apiURL = `${obEthGatewayAPI}/ob/ratings/${peerID}?usecache=true&${timestamp}`;
+    apiURL = `${mbzEthGatewayAPI}/ob/ratings/${peerID}?usecache=true&${timestamp}`;
   } else if (!isEmpty(slug)) {
     apiURL = `${gatewayAPI}/ob/ratings/${slug}`;
   } else {
@@ -130,7 +130,7 @@ export const getRatings = (username, password, slug, peerID) => {
 // Fetch a specific rating
 export const getRating = (username, password, nodeId) => {
   const timestamp = Date.now();
-  const apiURL = `${obEthGatewayAPI}/ob/rating/${nodeId}?usecache=true&${timestamp}`;
+  const apiURL = `${mbzEthGatewayAPI}/ob/rating/${nodeId}?usecache=true&${timestamp}`;
   const headers = {
     method: 'GET',
   };

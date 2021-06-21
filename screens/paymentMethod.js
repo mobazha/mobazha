@@ -251,7 +251,7 @@ class PaymentMethod extends PureComponent {
               renderItem={this.renderPaymentMethod}
             />
           </InputGroup>
-          <InputGroup title={I18n.t('screens.paymentMethod transaction_speed')}>
+          <InputGroup title={I18n.t('screens.paymentMethod.transaction_speed')}>
             <RadioGroup
               options={chosenLevels}
               selected={feeLevel}

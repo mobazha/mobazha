@@ -224,16 +224,16 @@ export default class PurchaseState extends React.PureComponent {
     let description;
     if (paymentState === 'success') {
       icon = <Ionicons name="md-checkmark" color={brandColor} size={110} />;
-      title = I18n.t('components.templates.purchaseState.thank_you');
-      description = I18n.t('components.templates.purchaseState.order_placed');
+      title = I18n.t('components.templates.PurchaseState.thank_you');
+      description = I18n.t('components.templates.PurchaseState.order_placed');
     } else if (paymentState === 'pending') {
       icon = this.renderLoading();
-      title = I18n.t('components.templates.purchaseState.processing');
-      description = I18n.t('components.templates.purchaseState.hang_tight');
+      title = I18n.t('components.templates.PurchaseState.processing');
+      description = I18n.t('components.templates.PurchaseState.hang_tight');
     } else { // in this case paymentState is 'error' always
       icon = <Ionicons name="md-close" color={warningColor} size={110} />;
       title = 'Uh oh!';
-      description =I18n.t('components.templates.purchaseState.transaction_failed');
+      description =I18n.t('components.templates.PurchaseState.transaction_failed');
     }
 
     return (
@@ -245,14 +245,14 @@ export default class PurchaseState extends React.PureComponent {
         {paymentState === 'error' && (
           <TouchableWithoutFeedback onPress={this.handleRetry}>
             <View style={styles.retryButton} >
-              <Text style={styles.buttonText}>{I18n.t('components.templates.purchaseState.retry')}</Text>
+              <Text style={styles.buttonText}>{I18n.t('components.templates.PurchaseState.retry')}</Text>
             </View>
           </TouchableWithoutFeedback>
         )}
         {paymentState === 'success' && (
           <TouchableWithoutFeedback onPress={this.handleGoToOrder}>
             <View style={styles.orderDetailsButton}>
-              <Text style={styles.buttonText}>{I18n.t('components.templates.purchaseState.order_details')}</Text>
+              <Text style={styles.buttonText}>{I18n.t('components.templates.PurchaseState.order_details')}</Text>
             </View>
           </TouchableWithoutFeedback>
         )}

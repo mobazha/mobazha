@@ -5,6 +5,9 @@ export default {
     },
     common: {
         anonymous: '匿名',
+        buyer: "买家",
+        seller: "卖家",
+        you: "你"
     },
     OnboardingWrapper: {
         unknown: '未知',
@@ -145,12 +148,11 @@ export default {
                 followers: "关注者",
                 edit_profile: "个人信息",
                 message: "消息",
+            },
+            WalletCoinItem: {
+                coming_soon: "即将上线"
             }
         },
-        WalletCoinItem: {
-            coming_soon: "快来"
-        },
-
         organism: {
             AverageRating: {
                 no_reviews: "没有评论"
@@ -175,7 +177,7 @@ export default {
                 cancel: "取消",
                 remove: "移除",
                 quantity:"质量",
-                quantity_info: "质量: %{quantity}",
+                quantity_info: "数量: %{quantity}",
                 coupon_info: "优惠券: %{info}",
                 change: "改变",
                 free: "免费",
@@ -187,7 +189,7 @@ export default {
                 calculating: "正在计算..."
             },
             CoinTypeSelector: {
-                coming_soon: "快来"
+                coming_soon: "即将上线"
             },
             DefaultInventoryItem: {
                 no_title: "没有标题",
@@ -1040,7 +1042,7 @@ export default {
         paymentMethod: {
             select_fee_level: "请选择费用等级",
             not_accepted: "否",
-            coming_soon: "赶快",
+            coming_soon: "即将上线",
             payment_method: "支付方式",
             done: "确定",
             transaction_speed: "交易速度"

@@ -5,6 +5,13 @@ export default {
     OnboardingWrapper: {
         unknown: 'Unknown',
     },
+    common: {
+        anonymous: 'anonymous',
+        buyer: "buyer",
+        seller: "seller",
+        the_seller: "the seller",
+        you: "you"
+    },
     components: {
         atoms: {
             ChatBubble: {
@@ -64,7 +71,7 @@ export default {
                 block: 'Block'
             },
             BuyerReview: {
-                from: "From %{content}",
+                from: "From %{name}",
                 no_review: "No review message from buyer"
             },
             BuyWyre: {
@@ -141,12 +148,11 @@ export default {
                 followers: "followers",
                 edit_profile: "Edit Profile",
                 message: "Message",
+            },
+            WalletCoinItem: {
+                coming_soon: "Coming Soon"
             }
         },
-        WalletCoinItem: {
-            coming_soon: "Coming Soon"
-        },
-
         organism: {
             AverageRating: {
                 no_reviews: "No reviews yet"
@@ -617,7 +623,7 @@ export default {
                 dispute_completed_alert: "You can\'t start a dispute for completed order.",
                 dispute_finalized_alert: "This order can\'t be disputed. The seller has claimed payment for this order.",
                 dispute_processing_alert: "This order can\'t be disputed. Please cancel your order to receive a full refund.",
-                quantity_info: "Quantity: {quantity}",
+                quantity_info: "Quantity: %{quantity}",
                 view: "View",
                 view_transaction: "View transaction",
                 payment: "Payment",

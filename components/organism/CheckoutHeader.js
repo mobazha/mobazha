@@ -107,7 +107,7 @@ class CheckoutHeader extends PureComponent {
           <Text style={styles.name} numberOfLines={2}>
             {decode(title)}
           </Text>
-          <Text style={styles.handle}>{I18n.t('components.organism.CheckoutHeader.from_seller', { name: decode(sellerName) })}</Text>
+          <Text style={styles.handle}>{I18n.t('components.organism.CheckoutHeader.from_seller', { seller: decode(sellerName) })}</Text>
           <View style={styles.priceWrapper}>
             <Text style={priceStyle}>
               {I18n.t('components.organism.CheckoutHeader.each_price', { price: localLabelFromBCH(getListingActualPrice(this.props, true)) })}

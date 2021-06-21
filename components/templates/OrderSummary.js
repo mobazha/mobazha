@@ -425,7 +425,7 @@ class OrderSummary extends PureComponent {
           </Text>
         ))}
         <Text style={styles.option}>
-          {I18n.t('components.templates.OrderSummary.quantity_info')}
+          {I18n.t('components.templates.OrderSummary.quantity_info', {quantity:bigQuantity})}
         </Text>
       </View>
     );
@@ -499,7 +499,7 @@ class OrderSummary extends PureComponent {
           </Text>
         ) : isEmpty(moderator) ? (
           <Text style={styles.description}>
-            {I18n.t('components.templates.OrderSummary.cannot_dispute')}
+            {I18n.t('components.templates.OrderSummary.cannot_dispute', {user:amIBuyer ? I18n.t('common.the_seller') : I18n.t('common.you')})}
           </Text>
         ) : this.isClosed() ? (
           <Text style={styles.description}>

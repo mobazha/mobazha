@@ -99,7 +99,7 @@ export const transactionLinkDict = id => ({
   LTC: `https://ltc1.trezor.io/api/tx/${id}`,
   ZEC: `https://zec1.trezor.io/api/tx/${id}`,
   ETH: `https://etherscan.io/tx/${id}`,
-  CFX: `https://testnet.confluxscan.io/transaction/${id}`,
+  CFX: `https://testnet.confluxscan.io/transaction/`+(id.startsWith('0x')?id:('0x'+id)),
 });
 
 export const TIP_ADDRESSES = {

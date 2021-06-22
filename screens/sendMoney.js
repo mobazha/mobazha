@@ -112,7 +112,7 @@ class SendMoney extends PureComponent {
         amount: amount.toString(),
         currency: getBigCurrencyInfo(coin),
         currencyCode: coin,
-        address: address.includes(':') ? address.split(':')[1] : address,
+        address: (address.includes(':') && !address.includes('cfx')) ? address.split(':')[1] : address,
         feeLevel,
         memo,
         requireAssociatedOrder: false,

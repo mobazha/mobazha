@@ -722,8 +722,8 @@ export default {
                 On: "开",
                 Off: "关",
                 Backup_wallet: "备份钱包",
-                Backup_profile: "备份文件",
-                Restore_profile: "同步文件",
+                Backup_profile: "备份用户数据",
+                Restore_profile: "同步用户数据",
                 Resync_transactions: "同步交易",
                 Server_Log: "后台日志",
                 Version: "版本号 1.3.7"
@@ -854,7 +854,7 @@ export default {
             next: "下一步"
         },
         backupProfileUpload: {
-            message:  "这里是备份文件!",
+            message:  "这里是备份用户数据!",
             upload_1: "请将您的备份上传到安全的外部地址\n",
             upload_2: " 以确保您在丢失手机后\n可以恢复数据。",
             upload_backup: "上传备份",
@@ -1118,8 +1118,8 @@ export default {
             address_copied: "地址已经复制"
         },
         restoreProfileInit: {
-            restore_profile: "恢复个人资料",
-            restore_hint: "选择您的haven备份文件以恢复您的个人资料，包括您的钱包资金。",
+            restore_profile: "恢复用户数据",
+            restore_hint: "选择您的haven用户数据以恢复您的个人资料，包括您的钱包资金。",
             select_file: "选择文件"
         },
         restoreProfilePassword: {

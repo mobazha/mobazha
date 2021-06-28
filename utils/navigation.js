@@ -20,7 +20,7 @@ const ETHER_REGEX = /^0x[a-fA-F0-9]{40}$/;
 
 const CONFLUX_REGEX = /^cfx.*$/;
 
-export const UNIVERSAL_LINK_PREFIX = 'https://openbazaar.com/';
+export const UNIVERSAL_LINK_PREFIX = 'https://market.mobazha.com/';
 
 export const getNavRouteAndParamsFromURL = (initialUrl) => {
   if (!initialUrl) {
@@ -128,8 +128,8 @@ export const getNavRouteAndParamsFromURL = (initialUrl) => {
   return null;
 };
 
-export const createStoreUrlFromPeerID = peerID => `${UNIVERSAL_LINK_PREFIX}${peerID}/store`;
-export const createListingUrlFromPeerIDAndSlug = (peerID, slug) => `${UNIVERSAL_LINK_PREFIX}${peerID}/store/${slug}/`;
+export const createStoreUrlFromPeerID = peerID => `${UNIVERSAL_LINK_PREFIX}vendors/detail?peerID=${peerID}`;
+export const createListingUrlFromPeerIDAndSlug = (peerID, slug) => `${UNIVERSAL_LINK_PREFIX}products/detail?peerID=${peerID}&slug=${slug}/`;
 export const createFeedUrlFromPeerIDAndSlug = (peerID, slug) => `${UNIVERSAL_LINK_PREFIX}${peerID}/posts/${slug}`;
 
 export const getRouteNameFromState = (state) => {

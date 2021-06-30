@@ -211,13 +211,13 @@ class Me extends PureComponent {
               </DescriptionText>
             </InputGroup>
           </ScrollView>
-          <Button
+          {/* <Button
             title={I18n.t('screens.Me.fAQs')}
             wrapperStyle={styles.buttonWrapper}
             textStyle={styles.buttonText}
             onPress={this.handlePressFaq}
             style={styles.firstButton}
-          />
+          /> */}
           <Button
             title={I18n.t('screens.Me.telegram')}
             textStyle={styles.buttonText}

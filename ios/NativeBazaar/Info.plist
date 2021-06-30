@@ -53,7 +53,7 @@
 	<string>Haven would like access to your photo gallery in order to use images for products, the social feed, or for your avatar.</string>
 	<key>NSUbiquitousContainers</key>
 	<dict>
-		<key>iCloud.io.ob1.native-ios</key>
+		<key>iCloud.mbz.native-ios</key>
 		<dict>
 			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
 			<true/>

@@ -841,14 +841,14 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "io.ob1.native-ios";
+				PRODUCT_BUNDLE_IDENTIFIER = "mbz.native-ios";
 				PRODUCT_NAME = NativeBazaar;
 				PROVISIONING_PROFILE = "4711ec35-e5eb-4f4d-9d94-9b3a8923b6ea";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "NativeBazaar-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
-				VALID_ARCHS = "arm64 arm64e";
+				VALID_ARCHS = "arm64 arm64e x86_64";
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
@@ -905,13 +905,13 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "io.ob1.native-ios";
+				PRODUCT_BUNDLE_IDENTIFIER = "mbz.native-ios";
 				PRODUCT_NAME = NativeBazaar;
 				PROVISIONING_PROFILE = "9aac66cd-e0ed-4d12-a313-64df4b47c8d2";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "NativeBazaar-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
-				VALID_ARCHS = "arm64 arm64e";
+				VALID_ARCHS = "arm64 arm64e x86_64";
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;
@@ -920,6 +920,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = (
+					"$(ARCHS_STANDARD)",
+					"$(ARCHS_STANDARD_64_BIT)",
+				);
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
@@ -961,6 +965,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = (
+					"$(ARCHS_STANDARD)",
+					"$(ARCHS_STANDARD_64_BIT)",
+				);
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
@@ -1049,7 +1057,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "io.ob1.native-ios";
+				PRODUCT_BUNDLE_IDENTIFIER = "mbz.native-ios";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE = "4711ec35-e5eb-4f4d-9d94-9b3a8923b6ea";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1117,7 +1125,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "io.ob1.native-ios";
+				PRODUCT_BUNDLE_IDENTIFIER = "mbz.native-ios";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE = "b64792ae-f0b4-46c7-bea6-8fa1a7f89002";
 				PROVISIONING_PROFILE_SPECIFIER = "";

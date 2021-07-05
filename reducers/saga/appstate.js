@@ -3,7 +3,7 @@ import moment from 'moment';
 import Auth from '@react-native-firebase/auth';
 import Messaging from '@react-native-firebase/messaging';
 import Reactotron from 'reactotron-react-native';
-import { AsyncStorage } from 'react-native';
+import AsyncStorage from '@react-native-community/async-storage';
 import * as _ from 'lodash';
 
 import { actions } from '../appstate';

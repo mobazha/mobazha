@@ -97,10 +97,10 @@ class ProductRating extends PureComponent {
           )}
           {inDetail && (
             <View style={styles.scoreWrapper}>
-              <Rating title="Quality" value={quality} />
-              <Rating title="As advertised" value={description} />
-              <Rating title="Delivery" value={deliverySpeed} />
-              <Rating title="Service" value={customerService} />
+              <Rating title={I18n.t('components.molecules.ProductRating.Quality')} value={quality} />
+              <Rating title={I18n.t('components.molecules.ProductRating.as_advertised')} value={description} />
+              <Rating title={I18n.t('components.molecules.ProductRating.Delivery')} value={deliverySpeed} />
+              <Rating title={I18n.t('components.molecules.ProductRating.Service')} value={customerService} />
             </View>
           )}
         </View>

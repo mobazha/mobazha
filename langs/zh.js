@@ -723,7 +723,7 @@ export default {
                 Off: "关",
                 Backup_wallet: "备份钱包",
                 Backup_profile: "备份用户数据",
-                Restore_profile: "同步用户数据",
+                Restore_profile: "恢复用户数据",
                 Resync_transactions: "同步交易",
                 Server_Log: "后台日志",
                 Version: "版本号 1.3.7"

@@ -1,4 +1,4 @@
-import { delay } from 'redux-saga';
+import { delay } from 'redux-saga/effects';
 import { call, put, takeEvery, select } from 'redux-saga/effects';
 import { isEmpty, get } from 'lodash';
 

@@ -163,7 +163,7 @@ class OrderBrief extends React.Component {
   getSecondPartyLabel = () => {
     const { orderType } = this.props;
     const { profile = {} } = this.state;
-    return `${orderType === 'purchases' ? 'from' : 'to'} ${decode(profile.name) || 'Unknown'}`;
+    return `${orderType === 'purchases' ? I18n.t('components.organism.OrderBrief.from') : I18n.t('components.organism.OrderBrief.to')} ${decode(profile.name) || 'Unknown'}`;
   }
 
   renderStatus = () => {
@@ -233,7 +233,7 @@ class OrderBrief extends React.Component {
                     <TouchableWithoutFeedback onPress={onLearnMore}>
                       <View>
                         <Text style={styles.learnMore}>
-                          {I18n.t('components.organism.OptionSelector.current_price')}<Text style={styles.underline}>{I18n.t('components.organism.OptionSelector.learn_more')}</Text>.
+                          {I18n.t('components.organism.OrderBrief.tap_to')}<Text style={styles.underline}>{I18n.t('components.organism.OrderBrief.learn_more')}</Text>.
                         </Text>
                       </View>
                     </TouchableWithoutFeedback>

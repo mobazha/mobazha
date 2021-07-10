@@ -129,6 +129,13 @@ export default {
             ProductPolicy: {
                 no_provided: "No %{policy} provided"
             },
+            ProductRating: {
+                Overall: "Overall",
+                Quality: "Quality",
+                as_advertised: "As advertised",
+                Delivery: "Delivery",
+                Service: "Service"
+            },
             RadioModalFilter: {
                 reason_reporting: "Please enter a reason for reporting this content.",
                 other: "Other: please explain",
@@ -251,6 +258,8 @@ export default {
                 learn_more: "learn more"
             },
             OrderBrief: {
+                from: "from",
+                to: "to",
                 tap_to: "Current market price, tap to ",
                 learn_more: "learn more"
             },
@@ -318,7 +327,7 @@ export default {
             },
             ProductRatings: {
                 reviews: "Reviews",
-                see_all_reviews: "See all %{ratings.length} reviews",
+                see_all_reviews: "See all %{length} reviews",
                 no_reviews_yet: "No reviews yet"
             },
             QRScanner: {
@@ -873,6 +882,11 @@ export default {
             no_discussion: "No order discussions found" ,
             chat:"Chat"
         },
+        checkout: {
+            pay_info: "Pay %{amount}?",
+            cancel: "Cancel",
+            pay_now: "Pay Now"
+        },
         checkoutModerators: {
             select_moderator: "Select a moderator",
             no_available: "No Available Moderators"
@@ -1023,6 +1037,8 @@ export default {
             help_improve: "Help us improve Haven"
         },
         orderDetails: {
+            details: "Details",
+            discussion: "Discussion",
             decline_order: "Decline order?",
             decline_hint: "This order will be canceled and the money will be refunded to the buyer",
             nevermind: "Nevermind",

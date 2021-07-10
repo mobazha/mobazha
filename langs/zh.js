@@ -7,6 +7,7 @@ export default {
         anonymous: '匿名',
         buyer: "买家",
         seller: "卖家",
+        the_seller: "卖家",
         you: "你"
     },
     OnboardingWrapper: {
@@ -71,7 +72,7 @@ export default {
                 block: '屏蔽'
             },
             BuyerReview: {
-                from: "从%{content}",
+                from: "来自 %{name}",
                 no_review: "还没有收到买家的评论"
             },
             BuyWyre: {
@@ -129,6 +130,13 @@ export default {
             ProductPolicy: {
                 no_provided: "不提供%{policy} "
             },
+            ProductRating: {
+                Overall: "综合",
+                Quality: "质量",
+                as_advertised: "广告匹配度",
+                Delivery: "配送",
+                Service: "服务"
+            },
             RadioModalFilter: {
                 reason_reporting: "请输入报告此内容的原因.",
                 other: "其他: 请解释",
@@ -167,7 +175,7 @@ export default {
             CheckoutHeader: {
                 anonymous: "匿名",
                 from_seller: "从 %{seller}",
-                each_price: "各个%{price} "
+                each_price: "单价 %{price} "
             },
             CheckoutSummary: {
                 add_link: "添加",
@@ -176,7 +184,7 @@ export default {
                 remove_coupon_description: "你确定你想要移除优惠券?",
                 cancel: "取消",
                 remove: "移除",
-                quantity:"质量",
+                quantity:"数量",
                 quantity_info: "数量: %{quantity}",
                 coupon_info: "优惠券: %{info}",
                 change: "改变",
@@ -251,6 +259,8 @@ export default {
                 learn_more: "了解更多"
             },
             OrderBrief: {
+                from: "来自",
+                to: "给",
                 tap_to: "当前市场价格, 点击 ",
                 learn_more: "了解更多"
             },
@@ -290,8 +300,8 @@ export default {
             OrderRating: {
                 Overall: "整体",
                 Quality: "质量",
-                as_advertised: "如广告所示",
-                Delivery: "快递",
+                as_advertised: "广告匹配度",
+                Delivery: "配送",
                 Service: "服务",
                 no_feedback: "没有反馈留下来 %{name}"
             },
@@ -319,7 +329,7 @@ export default {
             },
             ProductRatings: {
                 reviews: "评论",
-                see_all_reviews: "查看所有 %{ratings.length} 评论",
+                see_all_reviews: "查看所有 %{length} 条评论",
                 no_reviews_yet: "还没有评论"
             },
             QRScanner: {
@@ -622,12 +632,12 @@ export default {
                 dispute_completed_alert: "您无法对已完成的订单提出争议.",
                 dispute_finalized_alert: "此订单无异议。 卖方已要求为此订单付款。",
                 dispute_processing_alert: "此订单无异议。 请取消您的订单以全额退款。",
-                quantity_info: "数量: {quantity}",
+                quantity_info: "数量: %{quantity}",
                 view: "查看",
                 view_transaction: "查看交易",
                 payment: "支付",
                 no_payment: "尚未找到此订单的付款。 最多可能需要一分钟才能检测到付款。",
-                cannot_dispute: "资金直接发送给 %{user}. 您不能对此订单提出争议。",
+                cannot_dispute: "资金直接发送给%{user}. 您不能对此订单提出争议。",
                 escrow_released: "资金已从托管处释放。 订单不再有争议。",
                 order_in_dispute: "该订单有争议 ",
                 until_accept: "或直到一方接受付款为止。",
@@ -872,6 +882,11 @@ export default {
             no_discussion: "无订单讨论",
             chat: "聊天"
         },
+        checkout: {
+            pay_info: "支付 %{amount}?",
+            cancel: "取消",
+            pay_now: "立即支付"
+        },
         checkoutModerators: {
             select_moderator: "选择一个仲裁者",
             no_available: "没有可用的仲裁者"
@@ -1023,6 +1038,8 @@ export default {
             help_improve: "帮助我们改进haven"
         },
         orderDetails: {
+            details: "详情",
+            discussion: "讨论",
             decline_order: "拒绝下单?",
             decline_hint: "该订单将被取消，这笔钱将退还给买方",
             nevermind: "没关系",

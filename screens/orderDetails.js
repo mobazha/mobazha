@@ -228,10 +228,10 @@ class OrderDetails extends PureComponent {
   }
 
   getOrderTabs = () => [
-    { value: 'details', label: 'Details' },
+    { value: 'details', label: I18n.t('screens.orderDetails.details') },
     {
       value: 'discussion',
-      label: 'Discussion',
+      label: I18n.t('screens.orderDetails.discussion'),
     },
   ]
 

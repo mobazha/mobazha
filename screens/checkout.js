@@ -236,11 +236,11 @@ class Checkout extends PureComponent {
       if (walletType === 'internal') {
         eventTracker.trackEvent('Checkout-ChangeWallet', { walletType });
         Alert.alert(
-          `Pay ${localLabelFromBCH(price, checkoutObject.paymentCoin)}?`, '',
+          I18n.t('screens.checkout.pay_info', {amount:localLabelFromBCH(price, checkoutObject.paymentCoin)}), '',
           [
-            { text: 'Cancel' },
+            { text: I18n.t('screens.checkout.cancel') },
             {
-              text: 'Pay Now',
+              text: I18n.t('screens.checkout.pay_now'),
               onPress: this.handleCheckUnconfirmed,
             },
           ],

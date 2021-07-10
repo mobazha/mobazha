@@ -10,7 +10,7 @@ export function getRandomSearch(query, queryString, page = 0, numPerPage = 40, c
     apiUrl = `${apiUrl}&mobile&type=physical_good&type=service`;
   }
   if (categories) {
-    apiUrl = `${apiUrl}&categories=${escape(categories)}`;
+    apiUrl = `${apiUrl}&categories=${encodeURI(categories)}`;
   }
   return fetch(apiUrl)
     .then(response => (response.json()))
@@ -20,12 +20,12 @@ export function getRandomSearch(query, queryString, page = 0, numPerPage = 40, c
 // Fetch search results from a query
 export function getSearchResult(query, queryString, page = 0, numPerPage = 40, categories) {
   const qVal = query === '' ? '*' : query;
-  let apiUrl = `${searchAPI}/listings?ps=${numPerPage}&q=${escape(qVal)}&${queryString}&page=${page}`;
+  let apiUrl = `${searchAPI}/listings?ps=${numPerPage}&q=${encodeURI(qVal)}&${queryString}&p=${page}`;
   if (Platform.OS === 'ios') {
     apiUrl = `${apiUrl}&mobile&type=physical_good&type=service`;
   }
   if (categories) {
-    apiUrl = `${apiUrl}&categories=${escape(categories)}`;
+    apiUrl = `${apiUrl}&categories=${encodeURI(categories)}`;
   }
   return fetch(apiUrl)
     .then(response => (response.json()))
@@ -34,7 +34,7 @@ export function getSearchResult(query, queryString, page = 0, numPerPage = 40, c
 
 // Fetch search results from a listing
 export function getListingResult(queryString, page = 0, numPerPage = 40) {
-  let apiUrl = `${searchAPI}/listings?ps=${numPerPage}&${queryString}&page=${page}`;
+  let apiUrl = `${searchAPI}/listings?ps=${numPerPage}&${queryString}&p=${page}`;
   if (Platform.OS === 'ios') {
     apiUrl = `${apiUrl}&mobile&type=physical_good&type=service`;
   }

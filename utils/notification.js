@@ -1,4 +1,5 @@
 import { findIndex, hasIn } from 'lodash';
+import {I18n} from '../langs/I18n';
 
 export const orderNotificationTypes = [
   'order',

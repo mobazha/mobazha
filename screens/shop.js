@@ -255,7 +255,7 @@ class ShopScreen extends PureComponent {
           )}
           <MainSlider items={promoData} />
           <CategoryList />
-          <Section title={I18n.t('screens.shop.Trending')}>
+          {/* <Section title={I18n.t('screens.shop.Trending')}>
             <ProductGrid
               compact
               products={trendingListings}
@@ -308,6 +308,14 @@ class ShopScreen extends PureComponent {
               products={devicesListings}
               keyPrefix="devices"
               toListingDetails={this.toListingDetails('Devices')}
+            />
+          </Section> */}
+          <Section title={I18n.t('screens.shop.Best_Sellers')}>
+            <ProductGrid
+              compact
+              products={bestsellersListings}
+              keyPrefix="bestsellers"
+              toListingDetails={this.toListingDetails('Bestsellers')}
             />
           </Section>
 

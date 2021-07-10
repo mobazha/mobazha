@@ -1259,6 +1259,17 @@ export default {
             Jewelry: "Jewelry",
             Tools: "Tools",
             Gift_Cards: "Gift Cards",
+        },
+        notification: {
+            started_disputed: ' started a dispute',
+            proposed_dispute_outcome: ' proposed a dispute outcome',
+            accepted_dispute_payout: ' accepted dispute payout',
+            claimed_their_payment: ' claimed their payment',
+            day: "day",
+            days: "days",
+            has_left: " has ${days} left to propose a dispute outcome",
+            you_placed_order: "You placed an order",
+            placed_order: ' placed an order'
         }
     }
 }

@@ -46,7 +46,7 @@ class EditListingFooter extends PureComponent {
           {localLabelFromLocal(parseFloat(amount) || 0.0)}
         </Text>
         <View style={styles.saveButtonContainer}>
-          <BuyNowButton wrapperStyle={styles.saveButton} title="SAVE" onPress={onSave} />
+          <BuyNowButton wrapperStyle={styles.saveButton} title={I18n.t('components.atoms.EditListingFooter.save')} onPress={onSave} />
         </View>
       </View>
     );

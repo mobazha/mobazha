@@ -33,7 +33,7 @@ class ShippingOptions extends React.PureComponent {
       case 1:
         return <Text style={style}>{shippingOptions[0].name}</Text>;
       default:
-        return <Text style={style}>{I18n.t('components.organism.ShippingOptions.options_count')}</Text>;
+        return <Text style={style}>{I18n.t('components.organism.ShippingOptions.options_count', {count: shippingOptions.length})}</Text>;
     }
   }
 

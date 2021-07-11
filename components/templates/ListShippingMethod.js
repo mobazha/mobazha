@@ -11,7 +11,9 @@ import OBActionSheet from '../organism/ActionSheet';
 
 import {I18n} from '../../langs/I18n';
 
-const actionList = ['Edit', 'Delete', 'Cancel'];
+const actionList = [I18n.t('components.templates.ListShippingMethod.edit'),
+  I18n.t('components.templates.ListShippingMethod.delete'),
+  I18n.t('components.templates.ListShippingMethod.cancel')];
 
 const styles = {
   wrapper: {
@@ -58,9 +60,9 @@ class ListShippingMethod extends PureComponent {
 
   confirmRemove = () => {
     const { selectedOption } = this.state;
-    Alert.alert('Delete shipping option?', "You can't undo this action", [
-      { text: 'Cancel' },
-      { text: 'Delete', onPress: () => this.props.onRemove(selectedOption) },
+    Alert.alert(I18n.t('components.templates.ListShippingMethod.delete_option'), I18n.t('components.templates.ListShippingMethod.cannot_undo'), [
+      { text: I18n.t('components.templates.ListShippingMethod.cancel') },
+      { text: I18n.t('components.templates.ListShippingMethod.delete'), onPress: () => this.props.onRemove(selectedOption) },
     ]);
   };
   keyExtractor = (item, index) => `shippingOption${index}`;
@@ -86,7 +88,7 @@ class ListShippingMethod extends PureComponent {
           ListFooterComponent={
             shippingOptions.length > 0 && (
               <View style={styles.moreButtonWrapper}>
-                <MoreButton title="Add shipping option" onPress={this.props.onAdd} />
+                <MoreButton title={I18n.t('components.templates.ListShippingMethod.add_option')} onPress={this.props.onAdd} />
               </View>
             )
           }

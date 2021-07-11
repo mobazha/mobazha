@@ -134,14 +134,14 @@ class DefaultInventoryItem extends React.Component {
         <View style={styles.editor}>
           <TextInput
             title="SKU"
-            placeholder="SKU, ID, etc"
+            placeholder={I18n.t('components.organism.DefaultInventoryItem.sku_info')}
             value={productId}
             onChangeText={this.onChangeSku}
           />
           {isTracking ? (
             <View style={styles.quantityEditor}>
               <TextInput
-                title="Quantity"
+                title={I18n.t('components.organism.DefaultInventoryItem.quantity')}
                 editable={parseInt(quantity, 10) !== -1}
                 noBorder
                 value={`${quantity}`}
@@ -158,8 +158,8 @@ class DefaultInventoryItem extends React.Component {
         </View>
         <Text style={styles.description}>
           {
-            isTracking ? I18n.t('components.organism.CheckoutSummary.quantity_sold_out')
-            : I18n.t('components.organism.CheckoutSummary.quantity_unlimit')
+            isTracking ? I18n.t('components.organism.DefaultInventoryItem.quantity_sold_out')
+            : I18n.t('components.organism.DefaultInventoryItem.quantity_unlimit')
           }
         </Text>
       </React.Fragment>

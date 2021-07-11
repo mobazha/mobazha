@@ -170,33 +170,33 @@ class CouponModal extends React.Component {
       <OBLightModal visible={visible} animationType="slide">
         <Header
           modal
-          title={mode === 'edit' ? 'Edit Coupon' : 'New Coupon'}
+          title={mode === 'edit' ? I18n.t('components.templates.CouponModal.edit_coupon') : I18n.t('components.templates.CouponModal.new_coupon')}
           left={<NavCloseButton />}
           onLeft={hideModal}
-          right={<LinkText text="Save" color={linkTextColor} fontSize={16} />}
+          right={<LinkText text={I18n.t('components.templates.CouponModal.save')} color={linkTextColor} fontSize={16} />}
           onRight={this.onSave}
         />
         <ScrollView style={styles.wrapper}>
           <InputGroup>
             <TextInput
-              title="Title"
+              title={I18n.t('components.templates.CouponModal.title')}
               required
               value={value.title}
               onChangeText={this.onChangeTitle}
-              placeholder="Enter a title"
+              placeholder={I18n.t('components.templates.CouponModal.title_hint')}
             />
             <TextInput
-              title="Code"
+              title={I18n.t('components.templates.CouponModal.code')}
               required
               value={value.discountCode}
               onChangeText={this.onChangeDiscountCode}
-              placeholder="Enter a coupon code"
+              placeholder={I18n.t('components.templates.CouponModal.code_hint')}
             />
             <View style={styles.discountWrapper}>
               <View style={styles.textInputWrapper}>
                 <TextInput
                   noBorder
-                  title="Discount"
+                  title={I18n.t('components.templates.CouponModal.discount')}
                   required
                   onChangeText={this.onChangeDiscountAmount}
                   value={
@@ -204,7 +204,7 @@ class CouponModal extends React.Component {
                       ? `${get(value, 'percentDiscount', 0)}`
                       : `${get(value, 'priceDiscount', 0)}`
                   }
-                  placeholder={discountMode === 'percentage' ? 'e.g. 10%' : 'e.g. $10'}
+                  placeholder={discountMode === 'percentage' ? I18n.t('components.templates.CouponModal.discount_hint1') : I18n.t('components.templates.CouponModal.discount_hint2')}
                   mask={discountMode === 'percentage' ? '[990]{.}[99]%' : localMask}
                   keyboardType="decimal-pad"
                 />
@@ -212,7 +212,7 @@ class CouponModal extends React.Component {
               <TouchableWithoutFeedback onPress={this.onChangeDiscountMode}>
                 <View>
                   <LinkText
-                    text={discountMode === 'percentage' ? 'Percent' : localCurrency}
+                    text={discountMode === 'percentage' ? I18n.t('components.templates.CouponModal.percent') : localCurrency}
                     color={linkTextColor}
                     fontSize={14}
                   />

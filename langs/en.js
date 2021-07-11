@@ -20,6 +20,12 @@ export default {
             Comment: {
                 posting: 'Posting...'
             },
+            EditListingFooter: {
+                save: "SAVE"
+            },
+            EditProfileBanner: {
+                save: "SAVE"
+            },
             FollowButton: {
                 following: 'Following',
                 follow: 'Follow',
@@ -265,7 +271,9 @@ export default {
                 verified: "verified"
             },
             MultiSelector: {
-                select_info: "%{count} Selected"
+                done: "Done",
+                select_info: "%{count} Selected",
+                reset: "Reset"
             },
             OptionSelector: {
                 current_price: " Current market price, tap to",
@@ -464,7 +472,8 @@ export default {
                 coupon: "Coupon ",
                 not_valid: " is not valid."
 
-            }, CouponModal: {
+            }, 
+            CouponModal: {
                 title_empty_alert: "Discount title cannot be empty",
                 code_empty_alert: "Discount code cannot be empty",
                 percentage_alert: "Sorry, but the value must be between 1 and 99.",
@@ -472,6 +481,7 @@ export default {
                 exceed_alert: "Sorry, but the discount exceeds the value of the item.",
                 edit_coupon: "Edit Coupon",
                 new_coupon: "New Coupon",
+                save: "Save",
                 title: "Title",
                 title_hint: "Enter a title",
                 code: "Code",
@@ -616,11 +626,11 @@ export default {
                 advanced_description: "Add variants, store policies, coupons and manage your inventory"
             },
             ListingCustomOptions:{
-                variant:"variant",
+               variant:"Variant",
                add_variant:"Add variant",
                track_Inventory:"Track Inventory",
                inventory:"Inventory",
-               ListEmptyComponent:  "Add sizes, colours, materials, etc."
+               add_description:  "Add sizes, colours, materials, etc."
             },
             ListingsTab: {
                 loading: "Loading...",
@@ -629,6 +639,14 @@ export default {
                 store_empty: "Your store is empty",
                 put_for_sale: "Put something up for sale!",
                 create_listing: "Create listing"
+            },
+            ListShippingMethod: {
+                delete_option: 'Delete shipping option?',
+                cannot_undo: "You can't undo this action",
+                edit: 'Edit',
+                cancel: 'Cancel',
+                delete: 'Delete',
+                add_option: "Add shipping option"
             },
             NeedCoin: {
                 coinbase: "Coinbase",
@@ -892,6 +910,9 @@ export default {
             selected: "selected",
             clear_all: "Clear all"
         },
+        addListingCoupon: {
+            Coupons: "Coupons"
+        },
         addShippingMethod: {
             fill_required: "Please fill out all the required fields",
             must_be_less: "Shipping option name length must be less than the max of 40",
@@ -990,6 +1011,14 @@ export default {
             select_moderator: "Select a moderator",
             no_available: "No Available Moderators"
         },
+        customOptions: {
+            Variants_Inventory: "Variants & Inventory",
+            Save: "Save"
+        },
+        editInventory: {
+            edit_variant_combo: "Edit Variant Combo",
+            apply: "Apply"
+        },
         editShippingAddress: {
             name_required: "Name is required",
             address_required: "Address is required",
@@ -1063,6 +1092,11 @@ export default {
             add_wishlist: "Added to Wishlist!",
             remove_wishlist: "Removed from Wishlist!",
             reported: "Reported!"
+        },
+
+        listingAdvancedDetails: {
+            store_policies: "Store Policies",
+            apply: "Apply"
         },
 
         listingAdvancedOptions: {

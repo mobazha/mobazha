@@ -47,8 +47,8 @@ class CustomOptions extends PureComponent {
         <Header
           left={<NavBackButton />}
           onLeft={this.goBack}
-          title="Variants & Inventory"
-          right={<LinkText text="Save" />}
+          title={I18n.t('screens.customOptions.Variants_Inventory')}
+          right={<LinkText text={I18n.t('screens.customOptions.Save')} />}
           onRight={this.saveInventory}
         />
         <ListingCustomOptions

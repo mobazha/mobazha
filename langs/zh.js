@@ -21,6 +21,12 @@ export default {
             Comment: {
                 posting: '发送...'
             },
+            EditListingFooter: {
+                save: "保存"
+            },
+            EditProfileBanner: {
+                save: "保存"
+            },
             FollowButton: {
                 following: '关注中',
                 follow: '关注',
@@ -217,7 +223,7 @@ export default {
             DefaultInventoryItem: {
                 no_title: "没有标题",
                 sku: "SKU",
-                sku_info: "SKU, ID, etc",
+                sku_info: "库存单位, ID, 等",
                 quantity: "数量",
                 unlimited: "没有限制的",
                 quantity_sold_out: '如果数量达到0，它将显示为“已售完”.',
@@ -267,7 +273,9 @@ export default {
                 verified: "已经验证"
             },
             MultiSelector: {
-                select_info: "%{count} 筛选"
+                done: "完成",
+                select_info: "%{count} 已选择",
+                reset: "重置"
             },
             OptionSelector: {
                 current_price: "当前市场价格，请点击",
@@ -466,21 +474,23 @@ export default {
                 coupon: "优惠券 ",
                 not_valid: " 无效."
 
-            }, CouponModal: {
+            }, 
+            CouponModal: {
                 title_empty_alert: "折扣标题不能为空",
                 code_empty_alert: "折扣代码不能为空",
                 percentage_alert: "抱歉，该值必须在1到99之间。",
                 value_empty_alert: "折扣数值不能空",
                 exceed_alert: "抱歉，折扣超出了商品的价值。",
                 edit_coupon: "编辑优惠券",
-                new_coupon: "新优惠券",
+                new_coupon: "新建优惠券",
+                save: "保存",
                 title: "标题",
                 title_hint: "输入一个标题", 
-                code: "代码",
-                code_hint: "输入一个优惠券代码",
+                code: "券码",
+                code_hint: "输入一个优惠券码",
                 discount: "折扣",
-                discount_hint1: "例如. 10%",
-                discount_hint2: "例如. $10",
+                discount_hint1: "例如：10%",
+                discount_hint2: "例如：$10",
                 percent: "百分比"
             },
             CovidModal: {
@@ -617,11 +627,11 @@ export default {
                 advanced_description: "添加种类，店铺政策，优惠券和管理库存"
             },
             ListingCustomOptions:{
-               variant:"变体",
-               add_variant:"添加变体",
+               variant:"种类",
+               add_variant:"添加种类",
                track_Inventory:"跟踪存货",
                inventory:"存货",
-               ListEmptyComponent:  "添加大小、颜色、材质等."
+               add_description:  "添加大小、颜色、材质等。"
             },
             ListingsTab: {
                 loading: "加载中.....",
@@ -630,6 +640,14 @@ export default {
                 store_empty: "你的店铺是空的",
                 put_for_sale: "布置一些商品出售！",
                 create_listing: "创建商品",
+            },
+            ListShippingMethod: {
+                delete_option: '删除快递选项？',
+                cannot_undo: "你不能撤销改操作",
+                edit: '编辑',
+                cancel: '取消',
+                delete: '删除',
+                add_option: "添加快递选项"
             },
             NeedCoin: {
                 coinbase: "Coinbase",
@@ -893,6 +911,9 @@ export default {
             selected: "已选择",
             clear_all: "全部清除"
         },
+        addListingCoupon: {
+            Coupons: "优惠券"
+        },
         addShippingMethod: {
             fill_required: "请填写所有必填字段",
             must_be_less: "快递选项名称的长度必须小于40个最大值",
@@ -990,6 +1011,14 @@ export default {
             select_moderator: "选择一个仲裁者",
             no_available: "没有可用的仲裁者"
         },
+        customOptions: {
+            Variants_Inventory: "种类和库存",
+            Save: "保存"
+        },
+        editInventory: {
+            edit_variant_combo: "编辑种类组合",
+            apply: "应用"
+        },
         editShippingAddress: {
             name_required: "名称为必填项",
             address_required: "地址为必填项",
@@ -1065,11 +1094,16 @@ export default {
             reported: "报告!"
         },
 
+        listingAdvancedDetails: {
+            store_policies: "店铺政策",
+            apply: "应用"
+        },
+
         listingAdvancedOptions: {
             add_coupons: "添加优惠券",
             advanced: "高级",
-            Variants_Inventory: "Variants & Inventory",
-            add_hint: "添加variants并管理你店铺inventory",
+            Variants_Inventory: "种类和库存",
+            add_hint: "添加种类并管理你店铺库存",
             store_policies: "店铺规则",
             policies_hint: "添加退货政策或服务条款",
             coupons: "优惠券"

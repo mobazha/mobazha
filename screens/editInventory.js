@@ -47,8 +47,8 @@ class EditInventory extends PureComponent {
           onLeft={() => {
             this.props.navigation.goBack();
           }}
-          title="Edit Variant Combo"
-          right={<LinkText text="Apply" />}
+          title={I18n.t('screens.editInventory.edit_variant_combo')}
+          right={<LinkText text={I18n.t('screens.editInventory.apply')} />}
           onRight={() => {
             const idx = this.props.navigation.getParam('idx');
             this.props.updateInventory({

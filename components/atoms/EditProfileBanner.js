@@ -36,7 +36,7 @@ class EditProfileBanner extends PureComponent {
         <View style={styles.saveButtonContainer}>
           <SaveButton
             wrapperStyle={styles.saveButton}
-            title="SAVE"
+            title={I18n.t('components.atoms.EditProfileBanner.save')}
             onPress={onSave}
           />
         </View>

@@ -92,7 +92,7 @@ class AddListingCoupon extends PureComponent {
     const defaultValue = this.getDefaultValue();
     return (
       <View style={screenWrapper.wrapper}>
-        <Header left={<NavBackButton />} onLeft={this.onLeft} title="Coupons" />
+        <Header left={<NavBackButton />} onLeft={this.onLeft} title={I18n.t('screens.addListingCoupon.Coupons')} />
         <CouponsTemplate
           coupons={coupons}
           localSymbol={localSymbol}

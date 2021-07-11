@@ -51,8 +51,8 @@ class ListingAdvancedDetails extends PureComponent {
         <Header
           left={<NavBackButton />}
           onLeft={this.onLeft}
-          title="Store Policies"
-          right={<LinkText text="Apply" />}
+          title={I18n.t('screens.listingAdvancedDetails.store_policies')}
+          right={<LinkText text={I18n.t('screens.listingAdvancedDetails.apply')} />}
           onRight={this.onRight}
         />
         <InputTemplate

@@ -14,6 +14,7 @@ import InventoryList from './InventoryList';
 import { resetInventory, trackInventory } from '../../reducers/createListing';
 import { eventTracker } from '../../utils/EventTracker';
 
+import {I18n} from '../../langs/I18n';
 class ListingCustomOptions extends PureComponent {
   onChangeInventoryTracking = (val) => {
     eventTracker.trackEvent('CreateListing-ToggledTrackInventory');
@@ -40,22 +41,22 @@ class ListingCustomOptions extends PureComponent {
     } = this.props;
     return (
       <ScrollView>
-        <InputGroup title="Variants" showPencil onPress={onEdit}>
+        <InputGroup title={I18n.t('components.templates.ListingCustomOptions.variant')} showPencil onPress={onEdit}>
           <OptionGroup noBorder noArrow>
             <React.Fragment>
               <FlatList
                 data={options}
                 renderItem={this.renderItem}
-                ListEmptyComponent={<FormLabelText text="Add sizes, colours, materials, etc." />}
+                ListEmptyComponent={<FormLabelText text={I18n.t('components.templates.ListingCustomOptions.add_description')} />}
               />
-              <MoreButton title="Add variant" onPress={onAddNew} />
+              <MoreButton title={I18n.t('components.templates.ListingCustomOptions.add_variant')} onPress={onAddNew} />
             </React.Fragment>
           </OptionGroup>
         </InputGroup>
-        <InputGroup title="Inventory" noBorder>
+        <InputGroup title={I18n.t('components.templates.ListingCustomOptions.inventory')} noBorder>
           <SwitchInput
             secondary
-            title="Track Inventory"
+            title={I18n.t('components.templates.ListingCustomOptions.track_Inventory')}
             value={inventoryTracking}
             onChange={this.onChangeInventoryTracking}
             noBorder

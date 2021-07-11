@@ -252,7 +252,7 @@ export default class MultiSelector extends PureComponent {
             title=""
             left={<NavBackButton />}
             onLeft={this.onClose}
-            right={<LinkText text="Done" />}
+            right={<LinkText text={I18n.t('components.organism.MultiSelector.done')} />}
             onRight={this.onClose}
           />
           <FlatList
@@ -264,10 +264,10 @@ export default class MultiSelector extends PureComponent {
           {selection.length > 0 && (
             <View style={styles.selectionIndicatorWrapper}>
               <Text style={styles.selectedIndicator}>
-                {I18n.t('components.organism.MultiSelector.select_info')} 
+                {I18n.t('components.organism.MultiSelector.select_info', {count: selection.length})} 
               </Text>
               <TouchableOpacity onPress={this.resetSelection}>
-                <LinkText text="Reset" />
+                <LinkText text={I18n.t('components.organism.MultiSelector.reset')} />
               </TouchableOpacity>
             </View>
           )}

@@ -42,6 +42,7 @@ export default {
                 calculating: 'calculating...',
             },
             PaymentMethod: {
+                payment_method: "Payment Method",
                 wallet_empty: 'Your wallet is empty',
                 add_funds: 'Add Funds'
             },
@@ -709,6 +710,10 @@ export default {
                 Write_a_review: "Write a review here",
                 Post_anonymously: "Post anonymously"
             },
+            RecentSearch: {
+                Recent: "Recent",
+                Suggestions: "Suggestions"
+            },
             ReportTemplate: {
                 Ooops: "Ooops!",
                 enter_reason: "Please enter a reason for reporting this content.",
@@ -734,6 +739,7 @@ export default {
                 Send: "Send"
             },
             Settings: {
+                Settings: "Settings",
                 are_you_sure: "Are you sure?",
                 check_backup: "Have you backed up your current store?",
                 cancel: "Cancel",
@@ -820,7 +826,22 @@ export default {
             Automobiles_Motorcycles: "Automobiles & Motorcycles",
             Lights_Lighting: "Lights & Lighting",
             Furniture: "Furniture",
-            Electronic_Components_Supplies: "Electronic Components & Supplies"
+            Electronic_Components_Supplies: "Electronic Components & Supplies",
+            Consumer_Electronics:"Consumer Electronics",
+            Toys_Hobbies: "Toys & Hobbies",
+            Apparel_Women: "Apparel for Women",
+            Weddings_Events: "Weddings & Events",
+            Novelty_Special_Use: "Novelty & Special Use",
+            Office_School_Supplies: "Office & School Supplies",
+            Home_Appliances: "Home Appliances",
+            Home_Improvement: "Home Improvement",
+            Security_Protection: "Security & Protection",
+            Tools: "Tools",
+            Hair_Extensions_Wigs: "Hair Extensions & Wigs",
+            Apparel_Accessories: "Apparel Accessories",
+            Underwear_Sleepwears: "Underwear & Sleepwears",
+            Gift_Cards: "Gift Cards",
+            Other: "Other"
         },
         feePlans: {
             Super_economic_v: 'Super economic (cheapest, slowest)',
@@ -1246,6 +1267,9 @@ export default {
             share_server_log:"Share Server Log",
             share_ifps_Log:"Share IPFS Log"
         },
+        settings: {
+            Settings: "Settings"
+        },
         shippingAddress: {
             are_you_sure: "Are you sure?",
             remove_address: "Remove the address",
@@ -1320,6 +1344,16 @@ export default {
     },
 
     utils: {
+        fee: {
+            Super_Economic: 'Super Economic',
+            Super_economic_v: 'Cheapest, Slowest',
+            Economic: 'Economic',
+            Economic_v: 'Cheap, Slow',
+            Normal: 'Normal',
+            Normal_v: 'Average fee and wait time',
+            Priority: 'Priority',
+            Priority_v: 'Most expensive, Fastest'
+        },
         listings: {
             Electronics: "Electronics",
             Women_Clothing: "Women's Clothing",

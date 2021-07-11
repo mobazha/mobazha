@@ -43,6 +43,7 @@ export default {
                 calculating: '正在计算',
             },
             PaymentMethod: {
+                payment_method: "支付方式",
                 wallet_empty: '你的钱包是空的',
                 add_funds: '添加资金'
             },
@@ -102,10 +103,10 @@ export default {
                 share_to2:"分享至....",
                 delete2:"删除",
                 cancel3:"取消",
-                go_to_profile:"转到个人信息页",
-                report_user:"举报",
-                block_user:"屏蔽",
-                hide_post:"影藏帖子",
+                go_to_profile:"转到用户页面",
+                report_user:"举报用户",
+                block_user:"屏蔽用户",
+                hide_post:"隐藏帖子",
                 cancel4:"取消",
                 reposted: "重发"
             },
@@ -133,6 +134,7 @@ export default {
                 no_provided: "不提供%{policy} "
             },
             ProductRating: {
+                reviews: "评论",
                 Overall: "综合",
                 Quality: "质量",
                 as_advertised: "广告匹配度",
@@ -709,6 +711,10 @@ export default {
                 Write_a_review: "在这里写下评论",
                 Post_anonymously: "匿名发送"
             },
+            RecentSearch: {
+                Recent: "最近",
+                Suggestions: "建议"
+            },
             ReportTemplate: {
                 Ooops: "糟糕！",
                 enter_reason: "请输入报告此内容的原因。",
@@ -734,10 +740,11 @@ export default {
                 Send: "发送"
             },
             Settings: {
-                are_you_sure: "你确定吗?",
+                Settings: "设置",
+                are_you_sure: "您确定吗?",
                 check_backup: "您是否备份了当前商店？",
                 cancel: "取消",
-                OK: "OK",
+                OK: "确定",
                 profile: "个人资料",
                 Country: "国家",
                 currency: "货币",
@@ -772,7 +779,7 @@ export default {
                 }
             },
             StoreModeratorList: {
-                moderators_count: "%{count}仲裁者",
+                moderators_count: "%{count} 个仲裁者",
                 moderators_added: "新的仲裁者会自动添加到您的商店"
             },
             StoreTabs: {
@@ -820,7 +827,22 @@ export default {
             Automobiles_Motorcycles: "汽车和摩托车",
             Lights_Lighting: "灯饰",
             Furniture: "家具",
-            Electronic_Components_Supplies: "电子配件"
+            Electronic_Components_Supplies: "电子配件",
+            Consumer_Electronics:"消费类电子产品",
+            Toys_Hobbies: "玩具爱好",
+            Apparel_Women: "女装",
+            Weddings_Events: "婚礼和活动",
+            Novelty_Special_Use: "新奇和特殊用途",
+            Office_School_Supplies: "办公和学校用品",
+            Home_Appliances: "家用电器",
+            Home_Improvement: "家居装修",
+            Security_Protection: "安全与保护",
+            Tools: "工具",
+            Hair_Extensions_Wigs: "接发和假发",
+            Apparel_Accessories: "服饰与配饰",
+            Underwear_Sleepwears: "内衣和睡衣",
+            Gift_Cards: "礼品卡",
+            Other: "其他"
         },
         feePlans: {
             Super_economic_v: '十分经济（最便宜，最慢）',
@@ -928,7 +950,7 @@ export default {
             cannot_undo: "你不能撤销该操作。",
             Cancel: '取消',
             Delete: '删除',
-            Go_to_profile: '到用户信息',
+            Go_to_profile: '转到用户页面',
             Unblock_user: '取消屏蔽用户',
             Block_user: '屏蔽用户',
             Unfollow: '取消关注',
@@ -1247,6 +1269,9 @@ export default {
             share_server_log:"共享后台日志",
             share_ifps_log:"共享IPFS日志"
         },
+        settings: {
+            Settings: "设置"
+        },
         shippingAddress: {
             are_you_sure: "你确定吗?",
             remove_address: "移除地址",
@@ -1320,6 +1345,16 @@ export default {
     },
 
     utils: {
+        fee: {
+            Super_Economic: '十分经济',
+            Super_economic_v: '最便宜，最慢',
+            Economic: '经济',
+            Economic_v: '便宜，慢',
+            Normal: '普通',
+            Normal_v: '平均费用和等待时间',
+            Priority: '优先',
+            Priority_v: '最贵，最快'
+        },
         listings: {
             Electronics: "电子商品",
             Women_Clothing: "女装",

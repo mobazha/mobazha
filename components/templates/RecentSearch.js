@@ -51,7 +51,7 @@ class RecentSearch extends PureComponent {
         <View style={styles.wrapper}>
           {recent_searches.length > 0 ? (
             <FlatList
-              ListHeaderComponent={renderTextHeader('Recent')}
+              ListHeaderComponent={renderTextHeader(I18n.t('components.templates.RecentSearch.Recent'))}
               data={recent_searches}
               keyExtractor={(item, index) => `recent_item_${index}`}
               renderItem={this.renderItem}
@@ -60,7 +60,7 @@ class RecentSearch extends PureComponent {
             />
           ) : (
             <FlatList
-              ListHeaderComponent={renderTextHeader('Suggestions')}
+              ListHeaderComponent={renderTextHeader(I18n.t('components.templates.RecentSearch.Suggestions'))}
               data={SUGGESTION_OPTIONS}
               keyExtractor={(item, index) => `suggestion_item_${index}`}
               renderItem={this.renderItem}

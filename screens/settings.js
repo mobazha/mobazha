@@ -47,7 +47,7 @@ class Settings extends PureComponent {
         <Header
           left={<NavBackButton />}
           onLeft={() => navigation.goBack(null)}
-          title="Settings"
+          title={I18n.t('screens.settings.Settings')}
         />
         <SettingsTemplate
           toShippingAddress={this.handleNavigation('ShippingAddress')}

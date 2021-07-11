@@ -42,7 +42,7 @@ const categories = [
   },
   {
     name: 'Consumer Electronics',
-    title: 'Consumer Electronics',
+    title: I18n.t('config.categories.Consumer_Electronics'),
     short: I18n.t('config.categories.Electronics'),
     image: require('../assets/images/categories/Consumer_Electronics.jpeg'),
     subs: [
@@ -68,7 +68,7 @@ const categories = [
   },
   {
     name: 'Toys & Hobbies',
-    title: 'Toys & Hobbies',
+    title: I18n.t('config.categories.Toys_Hobbies'),
     short: I18n.t('config.categories.Games'),
     image: require('../assets/images/categories/Toys_Hobbies.jpg'),
     subs: [
@@ -93,7 +93,7 @@ const categories = [
   },
   {
     name: "Women's Clothing",
-    title: 'Apparel for Women',
+    title: I18n.t('config.categories.Apparel_Women'),
     short: I18n.t('config.categories.Clothing'),
     image: require('../assets/images/categories/Womens_Clothing.jpg'),
     subs: [
@@ -326,7 +326,7 @@ const categories = [
   },
   {
     name: 'Weddings & Events',
-    title: 'Weddings & Events',
+    title: I18n.t('config.categories.Weddings_Events'),
     image: require('../assets/images/categories/Wedding_Events.jpg'),
     subs: [
       'Wedding Dresses',
@@ -345,7 +345,7 @@ const categories = [
   },
   {
     name: 'Novelty & Special Use',
-    title: 'Novelty & Special Use',
+    title: I18n.t('config.categories.Novelty_Special_Use'),
     image: require('../assets/images/categories/Novelty_Special_Use.jpg'),
     subs: [
       'Costumes & Accessories',
@@ -432,7 +432,7 @@ const categories = [
   },
   {
     name: 'Office & School Supplies',
-    title: 'Office & School Supplies',
+    title: I18n.t('config.categories.Office_School_Supplies'),
     image: require('../assets/images/categories/Office_School_Supplies.png'),
     subs: [
       'Pens, Pencils & Writing Supplies',
@@ -455,7 +455,7 @@ const categories = [
   },
   {
     name: 'Home Appliances',
-    title: 'Home Appliances',
+    title: I18n.t('config.categories.Home_Appliances'),
     image: require('../assets/images/categories/Home_Appliances.jpeg'),
     subs: [
       'Kitchen Appliances',
@@ -468,7 +468,7 @@ const categories = [
   },
   {
     name: 'Home Improvement',
-    title: 'Home Improvement',
+    title: I18n.t('config.categories.Home_Improvement'),
     image: require('../assets/images/categories/Home_Improvement.jpg'),
     subs: [
       'Lights & Lighting',
@@ -485,7 +485,7 @@ const categories = [
   },
   {
     name: 'Security & Protection',
-    title: 'Security & Protection',
+    title: I18n.t('config.categories.Security_Protection'),
     image: require('../assets/images/categories/Security_Protection.jpg'),
     subs: [
       'Video Surveillance',
@@ -509,7 +509,7 @@ const categories = [
   },
   {
     name: 'Tools',
-    title: 'Tools',
+    title: I18n.t('config.categories.Tools'),
     image: require('../assets/images/categories/Tools.jpg'),
     subs: [
       'Measurement & Analysis Instruments',
@@ -533,7 +533,7 @@ const categories = [
   },
   {
     name: 'Hair Extensions & Wigs',
-    title: 'Hair Extensions & Wigs',
+    title: I18n.t('config.categories.Hair_Extensions_Wigs'),
     image: require('../assets/images/categories/Hair_Extensions_Wigs.jpg'),
     subs: [
       'Human Hair Weaves',
@@ -549,7 +549,7 @@ const categories = [
   },
   {
     name: 'Apparel Accessories',
-    title: 'Apparel Accessories',
+    title: I18n.t('config.categories.Apparel_Accessories'),
     image: require('../assets/images/categories/Apparel_Accessories.jpg'),
     subs: [
       "Women's Glasses",
@@ -573,7 +573,7 @@ const categories = [
   },
   {
     name: 'Underwear & Sleepwears',
-    title: 'Underwear & Sleepwears',
+    title: I18n.t('config.categories.Underwear_Sleepwears'),
     image: require('../assets/images/categories/Underwear_Sleepwear.jpg'),
     subs: [
       "Women's Intimates",
@@ -587,7 +587,7 @@ const categories = [
   },
   {
     name: 'Gift Cards',
-    title: 'Gift Cards',
+    title: I18n.t('config.categories.Gift_Cards'),
     image: require('../assets/images/categories/Gift_Cards.jpg'),
     subs: [
       'General Merchandise',
@@ -605,7 +605,7 @@ const categories = [
   },
   {
     name: 'Other',
-    title: 'Other',
+    title: I18n.t('config.categories.Other'),
     image: require('../assets/images/categories/Other.jpg'),
     subs: [
       'Entertainment',
@@ -626,4 +626,13 @@ categories.forEach((categoryObject) => {
   categoryObject.subs = _.sortBy(categoryObject.subs);
 });
 
-export default _.sortBy(categories, c => c.title);
+export default categories.sort(function(a,b){
+  if (a.name == 'Other') {
+    return 999;
+  }
+
+  if (I18n.locale != 'en') {
+    return a.title.localeCompare(b.title, 'zh-Hans-CN', {sensitivity: 'accent'});
+  }
+  return a.title.localeCompare(b.title);
+});

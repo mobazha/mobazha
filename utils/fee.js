@@ -1,26 +1,28 @@
+import {I18n} from '../langs/I18n';
+
 export const DEFAULT_FEE_LEVELS = [
   {
-    label: 'Super Economic',
+    label: I18n.t('utils.fee.Super_Economic'),
     value: 'superEconomic',
-    description: 'Cheapest, Slowest',
+    description: I18n.t('utils.fee.Super_economic_v'),
     fee: 0,
   },
   {
-    label: 'Economic',
+    label: I18n.t('utils.fee.Economic'),
     value: 'economic',
-    description: 'Cheap, Slow',
+    description: I18n.t('utils.fee.Economic_v'),
     fee: 0,
   },
   {
-    label: 'Normal',
+    label: I18n.t('utils.fee.Normal'),
     value: 'normal',
-    description: 'Average fee and wait time',
+    description: I18n.t('utils.fee.Normal_v'),
     fee: 0,
   },
   {
-    label: 'Priority',
+    label: I18n.t('utils.fee.Priority'),
     value: 'priority',
-    description: 'Most Expensive, Fastest',
+    description: I18n.t('utils.fee.Priority_v'),
     fee: 0,
   },
 ];
@@ -28,13 +30,13 @@ export const DEFAULT_FEE_LEVELS = [
 export const getFeeLevelDescription = (level) => {
   switch (level) {
     case 'superEconomic':
-      return 'Cheapest, Slowest';
+      return I18n.t('utils.fee.Super_economic_v');
     case 'priority':
-      return 'Most Expensive, Fastest';
+      return I18n.t('utils.fee.Priority_v');
     case 'economic':
-      return 'Cheap, Slow';
+      return I18n.t('utils.fee.Economic_v');
     case 'normal':
     default:
-      return 'Average fee and wait time';
+      return I18n.t('utils.fee.Normal_v');
   }
 };

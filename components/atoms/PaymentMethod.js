@@ -79,7 +79,7 @@ export default ({
     balance[paymentMethod].confirmed
   );
   return (
-    <InputGroup title="Payment Method" action={toPaymentMethod} actionTitle={EditIcon}>
+    <InputGroup title={I18n.t('components.atoms.PaymentMethod.payment_method')} action={toPaymentMethod} actionTitle={EditIcon}>
       <TouchableWithoutFeedback onPress={toPaymentMethod}>
         <View style={styles.paymentMethod}>
           <Image source={coin.icon} style={styles.coinImage} />

@@ -72,7 +72,7 @@ class ProductRatings extends PureComponent {
     }
     return (
       <ProductSection
-        title="Reviews"
+        title={I18n.t('components.organism.ProductRatings.reviews')}
         subTitle={
           <Text>
             &nbsp;

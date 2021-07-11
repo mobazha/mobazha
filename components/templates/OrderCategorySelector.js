@@ -3,7 +3,8 @@ import { connect } from 'react-redux';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
-import orderStatus from '../../config/orderStatus.json';
+import orderStatusEn from '../../config/orderStatus.json';
+import orderStatusZh from '../../config/zh/orderStatus.json';
 import { primaryTextColor, secondaryTextColor, borderColor, staticLabelColor, formLabelColor } from '../commonColors';
 import { OBLightModal } from './OBModal';
 import Header from '../molecules/Header';
@@ -11,6 +12,10 @@ import NavCloseButton from '../atoms/NavCloseButton';
 import { isOrderStatusInCategory } from '../../utils/order';
 
 import {I18n} from '../../langs/I18n';
+orderStatus = orderStatusEn
+if (I18n.locale != 'en') {
+  orderStatus = orderStatusZh
+}
 
 const styles = {
   optionTrigger: {
@@ -89,7 +94,7 @@ const categorizeOrder = (orders, type) => {
   return [
     {
       value: 'All',
-      description: `All ${type}`,
+      description: I18n.t('components.templates.OrderCategorySelector.all', {type: I18n.t('components.templates.OrderCategorySelector.'+type)}),
       totalCount: orders.length,
       count: orders.filter(order => !order.read).length,
     },
@@ -127,7 +132,7 @@ class OrderCategorySelector extends PureComponent {
       <View>
         <TouchableOpacity style={styles.optionTrigger} onPress={this.handleShowModal}>
           <Text style={styles.categoryTitleCount}>
-            <Text style={styles.categoryTitle}>{category}</Text>
+            <Text style={styles.categoryTitle}>{category == 'All'?I18n.t('components.templates.OrderCategorySelector.All'):category}</Text>
             {` (${categoryObject.totalCount})`}
           </Text>
           <View style={{ flex: 1 }} />
@@ -156,7 +161,7 @@ class OrderCategorySelector extends PureComponent {
                 onPress={() => this.handleCategorySelected(val.value)}
               >
                 <View style={styles.descriptionWrapper}>
-                  <Text style={styles.title}>{val.value}</Text>
+                  <Text style={styles.title}>{val.value== 'All'?I18n.t('components.templates.OrderCategorySelector.All'):val.value}</Text>
                   <Text style={styles.description}>{val.description}</Text>
                 </View>
                 <Text style={styles.count}>{val.totalCount}</Text>

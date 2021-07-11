@@ -148,7 +148,7 @@ class AcceptedCoins extends PureComponent {
           compare={this.comparer}
         />
         <View style={styles.footer}>
-          <Text style={styles.selectedCount}>{selectedCurrencies.length > 0 ? `${selectedCurrencies.length} selected` : ''}</Text>
+          <Text style={styles.selectedCount}>{selectedCurrencies.length > 0 ? `${selectedCurrencies.length} ${I18n.t('screens.acceptedCoins.selected')}` : ''}</Text>
           <TouchableWithoutFeedback onPress={this.handleClear}>
             <View>
               <Text style={styles.clearAll}> {I18n.t('screens.acceptedCoins.clear_all')}</Text>

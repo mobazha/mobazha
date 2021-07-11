@@ -1,0 +1,155 @@
+{
+  "等待付款": {
+    "items": [{
+      "value": "AWAITING_PAYMENT",
+      "label": "等待付款",
+      "actions": {
+        "sales": []
+      }
+    }],
+    "orderType": ["purchases", "sales"],
+    "description": "等待买家付款"
+  },
+  "等待中": {
+    "items": [{
+      "value": "PENDING",
+      "label": "等待中",
+      "actions": {
+        "sales": ["Decline", "Accept"],
+        "purchases": ["Cancel", "Dispute"]
+      }
+    }],
+    "orderType": ["purchases", "sales"],
+    "description": "等待被接受"
+  },
+  "等待发货": {
+    "items": [{
+      "value": "AWAITING_FULFILLMENT",
+      "label": "等待发货",
+      "actions": {
+        "purchases": ["Dispute"]
+      }
+    }],
+    "orderType": ["purchases"],
+    "description": "等待发货中"
+  },
+  "待处理": {
+    "items": [{
+      "value": "AWAITING_FULFILLMENT",
+      "label": "待处理",
+      "actions": {
+        "sales": ["Refund", "Fulfill"]
+      }
+    }],
+    "orderType": ["sales"],
+    "description": "等待发货中"
+  },
+  "已发货": {
+    "items": [{
+      "value": "FULFILLED",
+      "label": "已发货",
+      "actions": {
+        "sales": ["Dispute"],
+        "purchases": ["Dispute", "Complete"]
+      }
+    }],
+    "orderType": ["purchases", "sales"],
+    "description": "物品已发货、文件已发送、在途中，等"
+  },
+  "争议中": {
+    "items": [
+      {
+        "value": "DISPUTED",
+        "label": "争议中",
+        "actions": {
+          "sales": [],
+          "purchases": []
+        }
+      },
+      {
+        "value": "DECIDED",
+        "label": "赔付争议",
+        "actions": {
+          "sales": ["Accept payout"],
+          "purchases": ["Accept payout"]
+        }
+      },
+      {
+        "value": "DISPUTE_EXPIRED",
+        "label": "争议过期",
+        "actions": {
+          "sales": ["Claim"],
+          "purchases": []
+        }
+      }
+    ],
+    "orderType": ["purchases", "sales"],
+    "description": "订单在有仲裁人参与的争议中"
+  },
+  "关闭": {
+    "items": [
+      {
+        "value": "COMPLETED",
+        "label": "已完成",
+        "actions": {
+          "sales": [],
+          "purchases": []
+        }
+      },
+      {
+        "value": "CANCELED",
+        "label": "已取消",
+        "actions": {
+          "sales": [],
+          "purchases": []
+        }
+      },
+      {
+        "value": "DECLINED",
+        "label": "已取消",
+        "actions": {
+          "sales": [],
+          "purchases": []
+        }
+      },
+      {
+        "value": "REFUNDED",
+        "label": "已退款",
+        "actions": {
+          "sales": [],
+          "purchases": []
+        }
+      },
+      {
+        "value": "RESOLVED",
+        "label": "争议已关闭",
+        "actions": {
+          "sales": [],
+          "purchases": ["Write a review"]
+        }
+      },
+      {
+        "value": "PAYMENT_FINALIZED",
+        "label": "Payment claimed",
+        "actions": {
+          "sales": [],
+          "purchases": ["Write a review"]
+        }
+      }
+    ],
+    "orderType": ["purchases", "sales"],
+    "description": "货物已发送，资金已释放，反馈已留下"
+  },
+  "错误": {
+    "items": [{
+      "value": "PROCESSING_ERROR",
+      "label": "Error",
+      "actions": {
+        "sales": ["Dispute"],
+        "purchases": ["Cancel", "Dispute"]
+      }
+    }],
+    "orderType": ["purchases", "sales"],
+    "description": "哎呀! 出问题了"
+  }
+}

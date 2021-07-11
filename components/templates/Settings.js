@@ -155,7 +155,7 @@ class Settings extends PureComponent {
             <FormLabelText text={I18n.t('components.templates.Settings.Moderators')} />
           </OptionGroup>
           <OptionGroup onPress={this.handleOpenCoinsAccepted} noBorder smallPadding>
-            <FormLabelText text={I18n.t('components.templates.Settings.coins_accepted')} value={acceptedCoins.length > 0 && `${acceptedCoins.length} selected`} />
+            <FormLabelText text={I18n.t('components.templates.Settings.coins_accepted')} value={acceptedCoins.length > 0 && `${acceptedCoins.length} ${I18n.t('components.templates.Settings.selected')}`} />
           </OptionGroup>
         </InputGroup>
         <InputGroup title={I18n.t('components.templates.Settings.Advanced')}>
@@ -163,7 +163,7 @@ class Settings extends PureComponent {
             <View style={styles.optionWrapper}>
               <FormLabelText text={I18n.t('components.templates.Settings.Analytics')} style={styles.formLabel} />
               <Text style={styles.formValue}>
-                {isTrackingEvent ? 'On' : 'Off'}
+                {isTrackingEvent ? I18n.t('components.templates.Settings.On') : I18n.t('components.templates.Settings.On')}
               </Text>
             </View>
           </OptionGroup>

@@ -3,11 +3,17 @@ import { connect } from 'react-redux';
 import { View, Text, TouchableWithoutFeedback } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
-import orderStatus from '../../config/orderStatus.json';
+import orderStatusEn from '../../config/orderStatus.json';
+import orderStatusZh from '../../config/zh/orderStatus.json';
 import { getStatusId } from '../../utils/order';
 import { primaryTextColor, secondaryTextColor, highlightColor, borderColor } from '../commonColors';
 
 import {I18n} from '../../langs/I18n';
+orderStatus = orderStatusEn
+if (I18n.locale != 'en') {
+  orderStatus = orderStatusZh
+}
+
 
 const styles = {
   wrapper: {},

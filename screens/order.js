@@ -7,7 +7,8 @@ import { connect } from 'react-redux';
 import { View } from 'react-native';
 import * as _ from 'lodash';
 
-import orderStatus from '../config/orderStatus.json';
+import orderStatusEn from '../config/orderStatus.json';
+import orderStatusZh from '../config/zh/orderStatus.json';
 
 import Header from '../components/molecules/Header';
 import { fetchPurchases, fetchSales, scanOfflineMessages } from '../reducers/order';
@@ -22,16 +23,21 @@ import { resyncBlockchain } from '../api/wallet';
 
 import {I18n} from '../langs/I18n';
 
+orderStatus = orderStatusEn
+if (I18n.locale != 'en') {
+  orderStatus = orderStatusZh
+}
+
 const AWAITING_PAYMENT_EXPIRE_IN_HOURS = 24;
 
 const orderTabs = [
   {
     value: 'purchases',
-    label: 'Purchases',
+    label: I18n.t('screens.order.purchases'),
   },
   {
     value: 'sales',
-    label: 'Sales',
+    label: I18n.t('screens.order.sales'),
   },
 ];
 
@@ -124,7 +130,7 @@ class OrderManagment extends PureComponent {
           onLeft={() => {
             this.props.navigation.goBack();
           }}
-          title="Orders"
+          title={I18n.t('screens.order.orders')}
         />
         <Tabs
           currentTab={orderType}

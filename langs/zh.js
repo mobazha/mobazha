@@ -600,7 +600,7 @@ export default {
                 refunds_description: "您的退货政策是什么？ 退货接受多长时间？ 谁为退货付款？",
                 terms: "条款和条件",
                 terms2: "T&Cs",
-                terms_description: "上市的条款和条件是什么？ 您作为供应商负责什么？ 有保修吗？"
+                terms_description: "商品购买的条款和条件是什么？ 您作为供应商负责什么？有保修吗？"
             },
             ListingCustomOptions:{
                variant:"变体",
@@ -626,6 +626,12 @@ export default {
                 Orders: "订单",
                 social_empty: "如果有人关注您或者回复您的帖子，您会在这里看到。",
                 order_empty: "敬请关注。您的订单更新将显示在这里。"
+            },
+            OrderCategorySelector: {
+                All: "全部",
+                all: "所有%{type}",
+                purchases: "购买",
+                sales: "出售",
             },
             OrderState: {
                 no_orders: "没有订单",
@@ -735,9 +741,10 @@ export default {
                 store: "店铺",
                 Policies: "政策",
                 Moderators: "仲裁者",
-                coins_accepted: "接收货币",
+                coins_accepted: "接受货币",
+                selected: "已选择",
                 Advanced: "高级",
-                Analytics: "分析",
+                Analytics: "匿名分析",
                 On: "开",
                 Off: "关",
                 Backup_wallet: "备份钱包",
@@ -803,6 +810,16 @@ export default {
             Furniture: "家具",
             Electronic_Components_Supplies: "电子配件"
         },
+        feePlans: {
+            Super_economic_v: '十分经济（最便宜，最慢）',
+            Super_Economic: '十分经济',
+            Economic_v: '经济（便宜，慢）',
+            Economic: '经济',
+            Normal_v: '普通（平均费用和等待时间）',
+            Normal: '普通',
+            Priority_v: '优先（最贵，最快）',
+            Priority: '优先'
+        },
         productTypes: {
             Any: "任意",
             Physical_Good: "物理商品",
@@ -819,6 +836,7 @@ export default {
             OK: "OK",
             coins_accepted: "接受货币",
             save: "保存",
+            selected: "已选择",
             clear_all: "全部清除"
         },
         addShippingMethod: {
@@ -834,15 +852,15 @@ export default {
         },
         analytics: {
             details1: '会话信息，例如您多久使用一次该应用程序以及持续多长时间。',
-            details2: '基本设备信息； 例如，您使用的是哪种电话。',
-            details3: '您从中访问应用程序的国家/地区。',
+            details2: '基本设备信息，例如，您使用的是哪种电话。',
+            details3: '您访问应用程序的国家/地区。',
             details4: '您正在使用哪个版本的应用程序。',
-            details5: '您选择了哪种语言.',
-            details6: '当您输入购买结帐时（不收集有关所购买商品的信息）。',
-            details7: '汇款时以及使用哪种付款方式（不会收集有关付款本身的详细信息，例如地址或值）。',
-            details8: 'When you create a listing (no information about the listing itself is collected).',
-            details9: '在haven内采取的动作，例如点击社交动态或您发新帖的频率。 这些动作本身的内容永远不会被记录，只会记录您执行该动作的事实。',
-            Analytics: "分析工具",
+            details5: '您选择了哪种语言。',
+            details6: '当您购买结帐时（不收集所购买商品的信息）。',
+            details7: '汇款时以及使用哪种付款方式（不会收集有关付款本身的详细信息，例如地址或金额）。',
+            details8: '当您创建一个商品时（不会收集商品自身信息）。',
+            details9: '在Haven内采取的动作，例如点击社交动态或您发新帖的频率。这些动作本身的内容永远不会被记录，只会记录您执行该动作的事实。',
+            Analytics: "匿名分析",
             Share_anonymous: "分享匿名分析",
             description: "如果您选择共享分析，则表示您同意与我们共享以下信息："
         },
@@ -1046,6 +1064,11 @@ export default {
             share_analytics: "分享匿名分析数据",
             help_improve: "帮助我们改进haven"
         },
+        order: {
+            orders: "订单",
+            purchases: "购买",
+            sales: "出售"
+        },
         orderDetails: {
             details: "详情",
             discussion: "讨论",
@@ -1087,7 +1110,7 @@ export default {
             store_policies: "店铺规则",
             save: "保存",
             terms: "条款和条件",
-            terms_hint: "上市的条款和条件是什么？ 您作为供应商负责什么？ 有保修吗？",
+            terms_hint: "商品购买的条款和条件是什么？ 您作为供应商负责什么？ 有保修吗？",
             refunds: "退款",
             refund_hint: "您的退货政策是什么？ 退货接受多长时间？ 谁为退货付款？"
         },

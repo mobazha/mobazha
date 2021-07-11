@@ -627,6 +627,12 @@ export default {
                 social_empty: "If someone follows you or interacts with your posts, you’ll see it here.",
                 order_empty: "Stay tuned. Updates on your orders will show up here."
             },
+            OrderCategorySelector: {
+                All: "All",
+                all: "All %{type}",
+                purchases: "purchases",
+                sales: "sales",
+            },
             OrderState: {
                 no_orders: "No orders found",
             },
@@ -736,6 +742,7 @@ export default {
                 Policies: "Policies",
                 Moderators: "Moderators",
                 coins_accepted: "Coins accepted",
+                selected: "selected",
                 Advanced: "Advanced",
                 Analytics: "Analytics",
                 On: "On",
@@ -803,6 +810,16 @@ export default {
             Furniture: "Furniture",
             Electronic_Components_Supplies: "Electronic Components & Supplies"
         },
+        feePlans: {
+            Super_economic_v: 'Super economic (cheapest, slowest)',
+            Super_Economic: 'Super Economic',
+            Economic_v: 'Economic (cheap, slow)',
+            Economic: 'Economic',
+            Normal_v: 'Normal (average fee and wait time)',
+            Normal: 'Normal',
+            Priority_v: 'Priority (most expensive, fastest)',
+            Priority: 'Priority'
+        },
         productTypes: {
             Any: "Any",
             Physical_Good: "Physical Good",
@@ -819,6 +836,7 @@ export default {
             OK: "OK",
             coins_accepted: "Coins accepted",
             save: "Save",
+            selected: "selected",
             clear_all: "Clear all"
         },
         addShippingMethod: {
@@ -844,7 +862,7 @@ export default {
             details9: 'Actions taken within Haven, such as tapping on the social feed or how often you make new posts. The content of the actions themselves are never recorded, only the fact that you took the action.',
             Analytics: "Analytics",
             Share_anonymous: "Share anonymous analytics",
-            description: "If you opt into sharing analytics, you agree to share the following information with the OB1 Company:"
+            description: "If you opt into sharing analytics, you agree to share the following information with the Mobazha Company:"
         },
         backupProfileInit: {
             back_up_profile: "Back up profile",
@@ -1044,6 +1062,11 @@ export default {
             code:"Code",
             share_analytics: "Share anonymous analytics",
             help_improve: "Help us improve Haven"
+        },
+        order: {
+            orders: "Orders",
+            purchases: "Purchases",
+            sales: "Sales"
         },
         orderDetails: {
             details: "Details",

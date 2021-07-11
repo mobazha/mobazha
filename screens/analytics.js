@@ -36,15 +36,15 @@ const styles = {
 };
 
 const shareDetails = [
-  'Session information, such as how often you use the App and for how long.',
-  'Basic device information; e.g., which type of phone you are using.',
-  'The country you are accessing the App from.',
-  'Which version of the App you are using.',
-  'Which language you have selected.',
-  'When you enter checkout for a purchase (no information is collected about what is being purchased).',
-  'When you send funds, and which type of payment is used (no details are collected about the payment itself such as addresses or values).',
-  'When you create a listing (no information about the listing itself is collected).',
-  'Actions taken within Haven, such as tapping on the social feed or how often you make new posts. The content of the actions themselves are never recorded, only the fact that you took the action.',
+  I18n.t('screens.analytics.details1'),
+  I18n.t('screens.analytics.details2'),
+  I18n.t('screens.analytics.details3'),
+  I18n.t('screens.analytics.details4'),
+  I18n.t('screens.analytics.details5'),
+  I18n.t('screens.analytics.details6'),
+  I18n.t('screens.analytics.details7'),
+  I18n.t('screens.analytics.details8'),
+  I18n.t('screens.analytics.details9'),
 ];
 
 class Analytics extends PureComponent {
@@ -85,13 +85,13 @@ class Analytics extends PureComponent {
             <SwitchInput
               useNative
               noBorder
-              title="Share anonymous analytics"
+              title={I18n.t('screens.analytics.Share_anonymous')}
               value={isTrackingEvent}
               onChange={this.handleToggle}
               style={styles.primaryText}
             />
             <DescriptionText style={styles.textColor}>
-              If you opt into sharing analytics, you agree to share the following information with the OB1 Company:
+            {I18n.t('screens.analytics.description')}
             </DescriptionText>
             {shareDetails.map(this.renderDetails)}
           </InputGroup>

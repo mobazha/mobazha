@@ -1,7 +1,15 @@
 /* eslint-disable prefer-spread */
 import * as _ from 'lodash';
-import orderStatus from '../config/orderStatus.json';
+import orderStatusEn from '../config/orderStatus.json';
+import orderStatusZh from '../config/zh/orderStatus.json';
 import { timeSinceInSeconds, formatSeconds } from './time.js';
+
+import {I18n} from '../langs/I18n';
+
+orderStatus = orderStatusEn
+if (I18n.locale != 'en') {
+  orderStatus = orderStatusZh
+}
 
 export const EXPIRE_IN_HOURS = 45 * 24;
 // export const EXPIRE_IN_HOURS = 1;

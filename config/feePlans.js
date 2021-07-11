@@ -1,23 +1,25 @@
+import {I18n} from '../langs/I18n';
+
 const FEE_PLANS = [
   {
-    label: 'Super economic (cheapest, slowest)',
+    label: I18n.t('config.feePlans.Super_economic_v'),
     value: 'SUPER_ECONOMIC',
-    displayLabel: 'Super Economic',
+    displayLabel: I18n.t('config.feePlans.Super_Economic'),
   },
   {
-    label: 'Economic (cheap, slow)',
+    label: I18n.t('config.feePlans.Economic_v'),
     value: 'ECONOMIC',
-    displayLabel: 'Economic',
+    displayLabel: I18n.t('config.feePlans.Economic'),
   },
   {
-    label: 'Normal (average fee and wait time)',
+    label: I18n.t('config.feePlans.NORMAL_v'),
     value: 'NORMAL',
-    displayLabel: 'Normal',
+    displayLabel: I18n.t('config.feePlans.NORMAL'),
   },
   {
-    label: 'Priority (most expensive, fastest)',
+    label: I18n.t('config.feePlans.Priority_v'),
     value: 'PRIORITY',
-    displayLabel: 'Priority',
+    displayLabel: I18n.t('config.feePlans.Priority'),
   },
 ];
 

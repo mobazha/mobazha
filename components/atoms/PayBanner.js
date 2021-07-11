@@ -90,7 +90,7 @@ class PayBanner extends PureComponent {
           <BuyNowButton
             disabled={disabled}
             wrapperStyle={styles.buyButton}
-            title="PAY"
+            title={I18n.t('components.atoms.PayBanner.PAY')}
             onPress={onPay}
           />
         </View>

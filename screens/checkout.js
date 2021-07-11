@@ -194,7 +194,7 @@ class Checkout extends PureComponent {
   handleSetPaymentMethod = (fees, val) => {
     this.props.setPaymentMethod({
       feeLevel: {
-        label: val === 'superEconomic' ? 'Super Economic' : capitalize(val),
+        label: val === 'superEconomic' ? I18n.t('screens.checkout.Super_Economic') : I18n.t('screens.checkout.'+capitalize(val)),
         value: val,
         fee: fees[val],
       },

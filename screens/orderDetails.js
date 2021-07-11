@@ -649,11 +649,11 @@ class OrderDetails extends PureComponent {
           ref={this.setActionSheet}
           onPress={this.handleChange}
           options={[
-            orderType === 'purchases' ? 'Go to seller\'s profile' : 'Go to buyer\'s profile',
-            'View listing',
-            'Copy order number',
-            'View contract',
-            'Cancel',
+            orderType === 'purchases' ? I18n.t('screens.orderDetails.go_to_seller_profile') : I18n.t('screens.orderDetails.go_to_buyer_profile'),
+            I18n.t('screens.orderDetails.view_listing'),
+            I18n.t('screens.orderDetails.copy_order_number'),
+            I18n.t('screens.orderDetails.view_contract'),
+            I18n.t('screens.orderDetails.cancel'),
           ]}
           cancelButtonIndex={4}
         />

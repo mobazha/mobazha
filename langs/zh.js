@@ -41,6 +41,7 @@ export default {
             },
             PayBanner: {
                 calculating: '正在计算',
+                PAY: "支付"
             },
             PaymentMethod: {
                 payment_method: "支付方式",
@@ -647,6 +648,8 @@ export default {
             },
 
             OrderSummary: {
+                Summary: "概要",
+                Note: "备注",
                 oops: "糟糕!",
                 dispute_pending_alert: "订单仍待处理时，您无法提出争议。",
                 dispute_not_fulfilled_alert: "您必须先完成订单，才能提出争议",
@@ -862,6 +865,14 @@ export default {
         }
     },
 
+    reducers: {
+        createListing: {
+            Free_Worldwide_Shipping: '全球免邮',
+            Standard: '标准',
+            days_30: '30天'
+        }
+    },
+
     screens: {
         acceptedCoins: {
             update_listings: "更新商品页面?",
@@ -960,7 +971,11 @@ export default {
         checkout: {
             pay_info: "支付 %{amount}?",
             cancel: "取消",
-            pay_now: "立即支付"
+            pay_now: "立即支付",
+            Super_Economic: '十分经济'
+        },
+        checkoutOption: {
+            Checkout: "查看"
         },
         checkoutModerators: {
             select_moderator: "选择一个仲裁者",
@@ -1139,7 +1154,13 @@ export default {
             fund_order: "资金订单",
             leave_notes: "留下附注",
             number_copied: "订单编号已经复制",
-            learn_more: "由于汇率的变化，订单的当前市场价格可能与购买时商品的总价格不同."
+            learn_more: "由于汇率的变化，订单的当前市场价格可能与购买时商品的总价格不同.",
+            go_to_seller_profile: '转到卖家页面',
+            go_to_buyer_profile: '转到买家页面',
+            view_listing: '查看商品',
+            copy_order_number: '复制订单号',
+            view_contract: '查看交易合约',
+            cancel: '取消'
         },
         paymentMethod: {
             select_fee_level: "请选择费用等级",
@@ -1147,7 +1168,11 @@ export default {
             coming_soon: "即将上线",
             payment_method: "支付方式",
             done: "确定",
-            transaction_speed: "交易速度"
+            transaction_speed: "交易速度",
+            Super_Economic: '十分经济',
+            Economic: '经济',
+            Normal: '普通',
+            Priority: '优先'
         },
         paymentSuccess: {
             transaction_details: "交易详情",
@@ -1388,6 +1413,9 @@ export default {
             fulfilled_your_order: ' 完成了你的订单',
             fulfilled_order: '已完成了这个订单',
             completed_their_order: ' 结束了订单'
+        },
+        order: {
+            order: "订单 %{id}"
         }
     }
 }

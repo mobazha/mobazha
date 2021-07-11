@@ -809,7 +809,7 @@ class OrderSummary extends PureComponent {
     const price = BigNumber(bigAmount).minus(BigNumber(shippingDetails ? shippingDetails.bigPrice : 0)).div(BigNumber(bigQuantity));
     return (
       <View>
-        <InputGroup title="Summary">
+        <InputGroup title={I18n.t('components.templates.OrderSummary.Summary')}>
           <ListingTitlePrice
             title={decode(title)}
             price={price}
@@ -878,7 +878,7 @@ class OrderSummary extends PureComponent {
             {!isEmpty(shipping) && this.renderShippingAddress(shipping)}
           </InputGroup>
         )}
-        <InputGroup title="Note" noBorder>
+        <InputGroup title={I18n.t('components.templates.OrderSummary.Note')} noBorder>
           {isEmpty(memo) ? (
             <Text style={styles.noMemoStyle}>{I18n.t('components.templates.OrderSummary.no_buyer_note')}</Text>
           ) : (

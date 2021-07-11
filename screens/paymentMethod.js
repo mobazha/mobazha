@@ -141,7 +141,7 @@ class PaymentMethod extends PureComponent {
         method,
         // We use FEE_LEVEL_KEYS instead of Object.keys(mainFees[method]) to stay in the fixed order
         FEE_LEVEL_KEYS.map(level => ({
-          label: level === 'superEconomic' ? 'Super Economic' : capitalize(level),
+          label: level === 'superEconomic' ? I18n.t('screens.paymentMethod.Super_Economic') : I18n.t('screens.paymentMethod.'+capitalize(level)),
           value: level,
           description: getFeeLevelDescription(level),
           fee: mainFees[method][level],

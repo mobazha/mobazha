@@ -108,7 +108,7 @@ export const getOrderActions = (orderType, order, orderDetails) => {
   return actions;
 };
 
-export const getOrderTitleFromOrderId = orderId => `Order #${(orderId || '').substring(0, 5)}...`;
+export const getOrderTitleFromOrderId = orderId => I18n.t('utils.order.order', {id: `${(orderId || '').substring(0, 5)}...`});
 
 export const getOrderBriefFromDetails = (orderId, details, orderType) => {
   if (_.isEmpty(details)) {

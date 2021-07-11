@@ -73,7 +73,7 @@ class CheckoutOption extends PureComponent {
         <Header
           left={<NavBackButton />}
           onLeft={this.goBack}
-          title="Checkout"
+          title={I18n.t('screens.checkoutOption.Checkout')}
           right={<LinkText text="Next" color={linkTextColor} />}
           onRight={this.handleGoToNext}
         />

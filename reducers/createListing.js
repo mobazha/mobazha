@@ -1,5 +1,6 @@
 import { createAction, handleActions } from 'redux-actions';
 import { take, get } from 'lodash';
+import {I18n} from '../langs/I18n';
 
 export const actions = {
   editListing: 'CREATE_LISTING/EDIT_EXISTING_ONE',
@@ -144,14 +145,14 @@ export default handleActions(
       coupons: [],
       shippingOptions: [
         {
-          name: 'Free Worldwide Shipping',
+          name: I18n.t('screens.reducers.Free_Worldwide_Shipping'),
           type: 'FIXED_PRICE',
           regions: ['ALL'],
           services: [
             {
-              name: 'Standard',
+              name: I18n.t('screens.reducers.Standard'),
               price: 0,
-              estimatedDelivery: '30 days',
+              estimatedDelivery: I18n.t('screens.reducers.days_30'),
               additionalItemPrice: 0,
             },
           ],

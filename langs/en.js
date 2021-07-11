@@ -40,6 +40,7 @@ export default {
             },
             PayBanner: {
                 calculating: 'calculating...',
+                PAY: "PAY"
             },
             PaymentMethod: {
                 payment_method: "Payment Method",
@@ -646,6 +647,8 @@ export default {
             },
 
             OrderSummary: {
+                Summary: "Summary",
+                Note: "",
                 oops: "Oops!",
                 dispute_pending_alert: "You can\'t start a dispute while the order is still pending.",
                 dispute_not_fulfilled_alert: "You can\'t start a dispute until you\'ve fulfilled the order",
@@ -861,6 +864,14 @@ export default {
         }
     },
 
+    reducers: {
+        createListing: {
+            Free_Worldwide_Shipping: 'Free Worldwide Shipping',
+            Standard: 'Standard',
+            days_30: '30 days'
+        }
+    },
+
     screens: {
         acceptedCoins: {
             update_listings: "Update Listings?",
@@ -959,7 +970,12 @@ export default {
         checkout: {
             pay_info: "Pay %{amount}?",
             cancel: "Cancel",
-            pay_now: "Pay Now"
+            pay_now: "Pay Now",
+
+            Super_Economic: 'Super Economic'
+        },
+        checkoutOption: {
+            Checkout: "Checkout"
         },
         checkoutModerators: {
             select_moderator: "Select a moderator",
@@ -1137,7 +1153,13 @@ export default {
             fund_order: "Fund Order",
             leave_notes: "Leave Notes",
             number_copied: "Order number copied!",
-            learn_more: "Due to changes in the exchange rate, the current market price for an order may differ from the total price of the item at the time of purchase."
+            learn_more: "Due to changes in the exchange rate, the current market price for an order may differ from the total price of the item at the time of purchase.",
+            go_to_seller_profile: 'Go to seller\'s profile',
+            go_to_buyer_profile: 'Go to buyer\'s profile',
+            view_listing: 'View listing',
+            copy_order_number: 'Copy order number',
+            view_contract: 'View contract',
+            cancel: 'Cancel'
         },
         paymentMethod: {
             select_fee_level: "Please select fee level",
@@ -1145,7 +1167,11 @@ export default {
             coming_soon: "Coming Soon",
             payment_method: "Payment Method",
             done: "Done",
-            transaction_speed: "Transaction speed"
+            transaction_speed: "Transaction speed",
+            Super_Economic: 'Super Economic',
+            Economic: 'Economic',
+            Normal: 'Normal',
+            Priority: 'Priority'
         },
         paymentSuccess: {
             transaction_details: "Transaction details",
@@ -1387,6 +1413,9 @@ export default {
             fulfilled_your_order: ' fulfilled your order',
             fulfilled_order: ' fulfilled this order',
             completed_their_order: ' completed their order'
+        },
+        order: {
+            order: "Order %{id}"
         }
     }
 }

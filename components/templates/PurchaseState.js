@@ -262,7 +262,7 @@ export default class PurchaseState extends React.PureComponent {
         )}
         {paymentState === 'error' && (
           <Text style={styles.errorDescription}>
-            <Text style={styles.errorTitle}>Error:</Text>
+            <Text style={styles.errorTitle}>{I18n.t('components.templates.PurchaseState.error')}</Text>
             {` ${reason}`}
           </Text>
         )}

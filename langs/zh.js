@@ -702,7 +702,7 @@ export default {
                 transaction_failed: "您的交易失败, 请再试一次.",
                 retry: "重试",
                 order_details: "订单详情",
-                error: "错误:"
+                error: "错误："
             },
             RatingModal: {
                 done :"确定",

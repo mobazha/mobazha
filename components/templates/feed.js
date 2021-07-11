@@ -217,7 +217,7 @@ class Feed extends PureComponent {
       <View style={styles.wrapper}>
         <Text style={styles.mainText}>{I18n.t('components.templates.feed.post_hint1')} </Text>
         <Text style={styles.description}>{I18n.t('components.templates.feed.post_hint2')}</Text>
-        <HollowButton title="Create post" onPress={this.createPost} />
+        <HollowButton title={I18n.t('components.templates.feed.Create_post')} onPress={this.createPost} />
       </View>
     );
   }

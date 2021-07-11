@@ -37,7 +37,7 @@ export default ({
   mode, onChange, counts, noBorder,
 }) => (
   <View style={[styles.wrapper, noBorder ? styles.noBorder : {}]}>
-    <Text style={styles.counts}>{counts !== undefined ? `${counts} listings` : ''}</Text>
+    <Text style={styles.counts}>{counts !== undefined ? I18n.t('components.organism.ProductModeSelector.listings', {counts: counts}) : ''}</Text>
     <TouchableWithoutFeedback
       onPress={() => {
         onChange(mode === 'card' ? 'list' : 'card');

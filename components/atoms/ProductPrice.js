@@ -71,7 +71,7 @@ const styles = {
 
 class ProductPrice extends PureComponent {
   onPressUnavailable = () => {
-    Alert.alert('Digital good purchases are unavailable at this time.');
+    Alert.alert(I18n.t('components.atoms.ProductPrice.Digital_unavailable'));
   }
 
   renderShippingPrice = () => {
@@ -132,7 +132,7 @@ class ProductPrice extends PureComponent {
           ) : (
               <BuyNowButton
                 wrapperStyle={styles.buyButton}
-                title="BUY NOW"
+                title={I18n.t('components.atoms.ProductPrice.BUY_NOW')}
                 onPress={onBuy}
               />
             )}

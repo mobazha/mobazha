@@ -762,7 +762,7 @@ class ChatDetail extends PureComponent {
             renderSend={this.renderSend}
             renderInputToolbar={this.renderInputToolbar}
             renderChatFooter={this.renderFooter}
-            placeholder="Say something nice..."
+            placeholder={I18n.t('components.templates.ChatDetail.say_something_nice')}
             minInputToolbarHeight={60}
             maxComposerHeight={120}
             textInputProps={{ autoFocus: true }}

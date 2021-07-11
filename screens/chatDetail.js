@@ -76,17 +76,17 @@ class ChatDetail extends PureComponent {
       case 2:
         if (isFollowing) {
           unfollowPeer(peerID);
-          Toast.show('Unfollowed', TOAST_OPTION);
+          Toast.show(I18n.t('screens.chatDetail.Unfollowed'), TOAST_OPTION);
         } else {
           followPeer(peerID);
-          Toast.show('Followed!', TOAST_OPTION);
+          Toast.show(I18n.t('screens.chatDetail.Followed'), TOAST_OPTION);
         }
         break;
       case 3:
-        Alert.alert('Delete this conversation?', "You can't undo this action.", [
-          { text: 'Cancel' },
+        Alert.alert(I18n.t('screens.chatDetail.Delete_conversation'), I18n.t('screens.chatDetail.cannot_undo'), [
+          { text: I18n.t('screens.chatDetail.Cancel') },
           {
-            text: 'Delete',
+            text: I18n.t('screens.chatDetail.Delete'),
             onPress: this.deleteChatConversation,
           },
         ]);
@@ -131,11 +131,11 @@ class ChatDetail extends PureComponent {
           ref={this.setActionSheet}
           onPress={this.handleActionSheet}
           options={[
-            'Go to profile',
-            isBlocked ? 'Unblock user' : 'Block user',
-            isFollowing ? 'Unfollow' : 'Follow',
-            'Delete conversation',
-            'Cancel',
+            I18n.t('screens.chatDetail.Go_to_profile'),
+            isBlocked ? I18n.t('screens.chatDetail.Unblock_user') : I18n.t('screens.chatDetail.Block_user'),
+            isFollowing ? I18n.t('screens.chatDetail.Unfollow') : I18n.t('screens.chatDetail.Follow'),
+            I18n.t('screens.chatDetail.Delete_conversation'),
+            I18n.t('screens.chatDetail.Cancel'),
           ]}
           destructiveButtonIndex={3}
           cancelButtonIndex={4}

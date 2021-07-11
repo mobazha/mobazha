@@ -77,7 +77,7 @@ class Store extends PureComponent {
         <OBActionSheet
           ref={this.setActionSheet}
           onPress={this.handleChange}
-          options={['Create Listing', 'Create Post', 'Share to...', 'Cancel']}
+          options={[I18n.t('screens.store.Create_Listing'), I18n.t('screens.store.Create_Post'), I18n.t('screens.store.Share_to'), I18n.t('screens.store.Cancel')]}
           cancelButtonIndex={3}
         />
       </View>

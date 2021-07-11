@@ -263,14 +263,14 @@ class ExternalStore extends Component {
           <OBActionSheet
             ref={this.setActionSheet}
             onPress={this.handleLocalStoreAction}
-            options={['Create Listing', 'Create Post', 'Share to...', 'Cancel']}
+            options={[I18n.t('screens.externalStore.Create_Listing'), I18n.t('screens.externalStore.Create_Post'), I18n.t('screens.externalStore.Share_to'), I18n.t('screens.externalStore.Cancel')]}
             cancelButtonIndex={3}
           />
         ) : (
           <OBActionSheet
             ref={this.setActionSheet}
             onPress={this.handleExternalStoreAction}
-            options={['Report user', 'Block user', 'Share to...', 'Cancel']}
+            options={[I18n.t('screens.externalStore.Report_user'), I18n.t('screens.externalStore.Block_user'), I18n.t('screens.externalStore.Share_to'), I18n.t('screens.externalStore.Cancel')]}
             cancelButtonIndex={3}
           />
         )}

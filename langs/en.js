@@ -51,6 +51,8 @@ export default {
             ProductPrice: {
                 free_shipping: 'Free shipping',
                 shipping: 'shipping',
+                Digital_unavailable: 'Digital good purchases are unavailable at this time.',
+                BUY_NOW: "BUY NOW"
             },
             ResetFilter: {
                 reset_filters: 'Reset filters'
@@ -151,6 +153,7 @@ export default {
             },
             ShopInfo: {
                 unknown: "Unknown",
+                reviews: "%{count} reviews",
                 following: "following",
                 followers: "followers",
                 edit_profile: "Edit Profile",
@@ -334,6 +337,9 @@ export default {
                 haven_wallet: "Haven Wallet",
                 not_enough_funds: "Not enough funds"
             },
+            ProductModeSelector: {
+                listings: "%{counts} listings"
+            },
             ProductRatings: {
                 reviews: "Reviews",
                 see_all_reviews: "See all %{length} reviews",
@@ -431,7 +437,7 @@ export default {
                 block_message: "This user has been blocked.",
                 start_with: "Start conversation with",
                 moderator_join: "(moderator) joined this discussion",
-                say_something: "Say something nice..."
+                say_something_nice: "Say something nice..."
             },
             Checkout: {
                 address_required: "*Shipping address required for purchase",
@@ -542,6 +548,7 @@ export default {
                 not_post: "\nhasn\'t posted anything yet.",
                 post_hint1: "You haven’t posted anything yet.",
                 post_hint2: "Share something with the community!",
+                Create_post: "Create post",
                 reported: "Reported"
             },
             FeedDetail: {
@@ -768,6 +775,11 @@ export default {
                 moderators_count: "%{count} moderators",
                 moderators_added: "New moderators are automatically added to your store"
             },
+            StoreTabs: {
+                store: "Store",
+                posts: 'Posts',
+                about: 'About'
+            },
             Toast: {
                 post_created: "Post created",
                 view: "View"
@@ -909,6 +921,20 @@ export default {
             no_discussion: "No order discussions found" ,
             chat:"Chat"
         },
+        chatDetail: {
+            Unfollowed: 'Unfollowed',
+            Followed: 'Followed!',
+            Delete_conversation: 'Delete this conversation?',
+            cannot_undo: "You can't undo this action.",
+            Cancel: 'Cancel',
+            Delete: 'Delete',
+            Go_to_profile: 'Go to profile',
+            Unblock_user: 'Unblock user',
+            Block_user: 'Block user',
+            Unfollow: 'Unfollow',
+            Follow: 'Follow',
+            Delete_conversation: 'Delete conversation'
+        },
         checkout: {
             pay_info: "Pay %{amount}?",
             cancel: "Cancel",
@@ -950,7 +976,12 @@ export default {
             failed_load: "Oops! This profile failed to load.",
             retry:"Retry",
             reported: "Reported",
-
+            Create_Listing: 'Create Listing', 
+            Create_Post: 'Create Post',
+            Share_to: 'Share to...',
+            Cancel: 'Cancel',
+            Report_user: 'Report user',
+            Block_user: 'Block user'
         },
         feed: {
             My_Feed: "My Feed",
@@ -1236,6 +1267,12 @@ export default {
             Gaming: "Gaming",
             Munchies: "Munchies",
             Devices: "Devices"
+        },
+        store: {
+            Create_Listing: 'Create Listing', 
+            Create_Post: 'Create Post',
+            Share_to: 'Share to...',
+            Cancel: 'Cancel'
         },
         StoreRatings: {
             Reviews: "Reviews",

@@ -29,15 +29,15 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const tabs = [
   {
-    label: 'Store',
+    label: I18n.t('components.templates.StoreTabs.store'),
     value: 'store',
   },
   {
-    label: 'Posts',
+    label: I18n.t('components.templates.StoreTabs.posts'),
     value: 'posts',
   },
   {
-    label: 'About',
+    label: I18n.t('components.templates.StoreTabs.about'),
     value: 'about',
   },
 ];

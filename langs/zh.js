@@ -50,8 +50,10 @@ export default {
                 post: '发送'
             },
             ProductPrice: {
-                free_shipping: '免费运送',
-                shipping: '运送',
+                free_shipping: '免费快递',
+                shipping: '快递',
+                Digital_unavailable: '目前无法购买数字商品。',
+                BUY_NOW: "立即购买"
             },
             ResetFilter: {
                 reset_filters: '重置过滤器'
@@ -152,9 +154,10 @@ export default {
             },
             ShopInfo: {
                 unknown: "未知",
+                reviews: "%{count} 评论",
                 following: "关注中",
                 followers: "关注者",
-                edit_profile: "个人信息",
+                edit_profile: "编辑个人信息",
                 message: "消息",
             },
             SocialNotification: {
@@ -336,6 +339,9 @@ export default {
                 haven_wallet: "Haven 钱包",
                 not_enough_funds: "没有足够的资金"
             },
+            ProductModeSelector: {
+                listings: "%{counts} 个商品"
+            },
             ProductRatings: {
                 reviews: "评论",
                 see_all_reviews: "查看所有 %{length} 条评论",
@@ -432,7 +438,7 @@ export default {
                 block_message: "这个用户已经被屏蔽.",
                 start_with: "开始会话：",
                 moderator_join: "(仲裁者) 加入了讨论",
-                say_something: "请说点东西吧..."
+                say_something_nice: "说点什么好的..."
             },
             Checkout: {
                 address_required: "*需要购买的送货地址",
@@ -543,6 +549,7 @@ export default {
                 not_post: "\n还没有发布任何信息",
                 post_hint1: "你还没有发布任何信息.",
                 post_hint2: "在社区分享一些东西!",
+                Create_post: "创建帖子",
                 reported: "报告"
             },
             FeedDetail: {
@@ -768,6 +775,11 @@ export default {
                 moderators_count: "%{count}仲裁者",
                 moderators_added: "新的仲裁者会自动添加到您的商店"
             },
+            StoreTabs: {
+                store: "商店",
+                posts: '信息发布',
+                about: '关于'
+            },
             Toast: {
                 post_created: "帖子已经创建",
                 view: "查看"
@@ -909,6 +921,20 @@ export default {
             no_discussion: "无订单讨论",
             chat: "聊天"
         },
+        chatDetail: {
+            Unfollowed: '已取消关注',
+            Followed: '已关注！',
+            Delete_conversation: '删除这个会话?',
+            cannot_undo: "你不能撤销该操作。",
+            Cancel: '取消',
+            Delete: '删除',
+            Go_to_profile: '到用户信息',
+            Unblock_user: '取消屏蔽用户',
+            Block_user: '屏蔽用户',
+            Unfollow: '取消关注',
+            Follow: '关注',
+            Delete_conversation: '删除会话'
+        },
         checkout: {
             pay_info: "支付 %{amount}?",
             cancel: "取消",
@@ -950,7 +976,12 @@ export default {
             failed_load: "糟糕！ 此用户信息无法加载。",
             retry:"重试",
             reported: "报告",
-
+            Create_Listing: '创建商品', 
+            Create_Post: '创建帖子',
+            Share_to: '分享到...',
+            Cancel: '取消',
+            Report_user: '举报用户',
+            Block_user: '屏蔽用户'
         },
         feed: {
             My_Feed: "我的订阅",
@@ -1237,6 +1268,12 @@ export default {
             Gaming: "游戏",
             Munchies: "餐饮",
             Devices: "设备"
+        },
+        store: {
+            Create_Listing: '创建商品', 
+            Create_Post: '创建帖子',
+            Share_to: '分享到...',
+            Cancel: '取消'
         },
         StoreRatings: {
             Reviews: "评价",

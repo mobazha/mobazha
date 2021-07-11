@@ -302,7 +302,7 @@ class ShopInfo extends Component {
           </View>
           <View style={styles.ratingsWrapper}>
             <View style={styles.chips}>
-              <SocialChip label={`${ratingCount} reviews`} onPress={this.handlePressReviews}>
+              <SocialChip label={I18n.t('components.molecules.ShopInfo.reviews', {count: ratingCount})} onPress={this.handlePressReviews}>
                 <Text style={styles.chipValue}>
                   <Ionicons name="md-star" size={20} color={starRatingColor} />
                   &nbsp;

@@ -5,6 +5,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import InputGroup from '../atoms/InputGroup';
 import TextInput from '../atoms/TextInput';
 
+import {I18n} from '../../langs/I18n';
 class InputTemplate extends PureComponent {
   constructor(props) {
     super(props);
@@ -73,7 +74,7 @@ class InputTemplate extends PureComponent {
     } = this.state;
     return (
       <KeyboardAwareScrollView>
-        <InputGroup title="Return Policy">
+        <InputGroup title={I18n.t('components.templates.ListingAdvancedDetails.Return_Policy')}>
           <Animated.View
             style={{
               overflow: 'hidden',
@@ -90,11 +91,11 @@ class InputTemplate extends PureComponent {
               multiline
               value={refundPolicy}
               onChangeText={this.onChangeRefundPolicy}
-              placeholder="What is your return policy? How long are returns accepted for? Who pays for return shipping?"
+              placeholder={I18n.t('components.templates.ListingAdvancedDetails.return_description')}
             />
           </Animated.View>
         </InputGroup>
-        <InputGroup title="Terms and Conditions">
+        <InputGroup title={I18n.t('components.templates.ListingAdvancedDetails.terms')}>
           <Animated.View
             style={{
               overflow: 'hidden',
@@ -105,13 +106,13 @@ class InputTemplate extends PureComponent {
             }}
           >
             <TextInput
-              title="T&Cs"
+              title={I18n.t('components.templates.ListingAdvancedDetails.T_C')}
               noBorder
               noTitle
               multiline
               value={termsAndConditions}
               onChangeText={this.onChangeTCPolicy}
-              placeholder="What are the terms and conditions of the listing? What are you responsible for as the vendor? Is there a warranty?"
+              placeholder={I18n.t('components.templates.ListingAdvancedDetails.terms_description')}
             />
           </Animated.View>
         </InputGroup>

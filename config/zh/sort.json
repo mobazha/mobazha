@@ -1,0 +1,26 @@
+[
+  {
+    "value": "relevance",
+    "label": "最佳匹配",
+    "selected": false,
+    "default": true
+  },
+  {
+    "value": "rating",
+    "label": "评论",
+    "selected": false,
+    "default": false
+  },
+  {
+    "value": "price-asc",
+    "label": "最低价",
+    "selected": true,
+    "default": false
+  },
+  {
+    "value": "price-desc",
+    "label": "最高价",
+    "selected": false,
+    "default": false
+  }
+]

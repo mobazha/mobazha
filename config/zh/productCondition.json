@@ -1,0 +1,45 @@
+[
+  {
+    "value": "any",
+    "label": "任意",
+    "checked": false,
+    "default": true,
+    "exclusive": true
+  },
+  {
+    "value": "new",
+    "label": "新的",
+    "checked": true,
+    "default": false
+  },
+  {
+    "value": "used",
+    "label": "已使用",
+    "checked": true,
+    "default": false
+  },
+  {
+    "value": "used_excellent",
+    "label": "已使用 - 很好的",
+    "checked": false,
+    "default": false
+  },
+  {
+    "value": "used_good",
+    "label": "已使用 - 好的",
+    "checked": false,
+    "default": false
+  },
+  {
+    "value": "used_poor",
+    "label": "已使用 - 不是很好",
+    "checked": false,
+    "default": false
+  },
+  {
+    "value": "refurbished",
+    "label": "翻新",
+    "checked": false,
+    "default": false
+  }
+]

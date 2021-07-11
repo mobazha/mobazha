@@ -1,0 +1,14 @@
+[
+  {
+      "value": "true",
+      "label": "可见",
+      "checked": false,
+      "default": false
+  },
+  {
+      "value": "false",
+      "label": "隐藏",
+      "checked": true,
+      "default": true
+  }
+]

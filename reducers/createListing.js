@@ -145,14 +145,14 @@ export default handleActions(
       coupons: [],
       shippingOptions: [
         {
-          name: I18n.t('screens.reducers.Free_Worldwide_Shipping'),
+          name: I18n.t('reducers.createListing.Free_Worldwide_Shipping'),
           type: 'FIXED_PRICE',
           regions: ['ALL'],
           services: [
             {
-              name: I18n.t('screens.reducers.Standard'),
+              name: I18n.t('reducers.createListing.Standard'),
               price: 0,
-              estimatedDelivery: I18n.t('screens.reducers.days_30'),
+              estimatedDelivery: I18n.t('reducers.createListing.days_30'),
               additionalItemPrice: 0,
             },
           ],

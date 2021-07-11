@@ -23,7 +23,7 @@ import { resyncBlockchain } from '../api/wallet';
 
 import {I18n} from '../langs/I18n';
 
-orderStatus = orderStatusEn
+let orderStatus = orderStatusEn
 if (I18n.locale != 'en') {
   orderStatus = orderStatusZh
 }

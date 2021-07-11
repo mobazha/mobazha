@@ -21,6 +21,7 @@ import EditListingFooter from '../atoms/EditListingFooter';
 import ListingHeader from '../molecules/ListingHeader';
 import { StatusBarSpacer } from '../../status-bar';
 
+import {I18n} from '../../langs/I18n';
 class ListingBasicInfo extends PureComponent {
   state = { keyboardVisible: false }
 
@@ -105,10 +106,10 @@ class ListingBasicInfo extends PureComponent {
           )}
           <TagEditor count={tags.length} onPress={this.toTagEditor} />
 
-          <InputGroup title="Advanced" noBorder onPress={this.toAdvancedOptions}>
+          <InputGroup title={I18n.t('components.templates.ListingBasicInfo.advanced')} noBorder onPress={this.toAdvancedOptions}>
             <OptionGroup noBorder noArrow>
               <React.Fragment>
-                <FormLabelText text="Add variants, store policies, coupons and manage your inventory" />
+                <FormLabelText text={I18n.t('components.templates.ListingBasicInfo.advanced_description')} />
                 <MoreButton onPress={this.toAdvancedOptions} />
               </React.Fragment>
             </OptionGroup>

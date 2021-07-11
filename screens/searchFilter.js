@@ -18,14 +18,26 @@ import { screenWrapper } from '../utils/styles';
 import { ratingOptions } from '../utils/ratings';
 
 import { ACCEPTED_COINS } from '../utils/coins';
-import prodTypes from '../config/productTypes.json';
+import prodTypesEn from '../config/productTypes.json';
+import prodTypesZh from '../config/zh/productTypes.json';
 import countries from '../config/countries.json';
-import sortOptions from '../config/sort.json';
-import productConditionOptions from '../config/conditionFilter.json';
+import sortOptionsEn from '../config/sort.json';
+import sortOptionsZh from '../config/zh/sort.json';
+import productConditionOptionsEn from '../config/conditionFilter.json';
+import productConditionOptionsZh from '../config/zh/conditionFilter.json';
 
 import { eventTracker } from '../utils/EventTracker';
 
 import {I18n} from '../langs/I18n';
+
+let prodTypes = prodTypesEn
+let sortOptions = sortOptionsEn
+let productConditionOptions = productConditionOptionsEn
+if (I18n.locale != 'en') {
+  prodTypes = prodTypesZh
+  sortOptions = sortOptionsZh
+  productConditionOptions = productConditionOptionsZh
+}
 
 const shippingCountries = [...countries];
 

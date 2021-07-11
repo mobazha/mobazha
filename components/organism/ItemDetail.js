@@ -12,14 +12,30 @@ import InputGroup from '../atoms/InputGroup';
 import TextInput from '../atoms/TextInput';
 import CheckBox from '../atoms/CheckBox';
 import RadioModalFilter from '../molecules/RadioModalFilter';
-import productConditions from '../../config/productCondition.json';
-import prodTypes from '../../config/productTypes.json';
-import iosProdTypes from '../../config/iosProductTypes.json';
+import productConditionsEn from '../../config/productCondition.json';
+import productConditionsZh from '../../config/productCondition.json';
+import prodTypesEn from '../../config/productTypes.json';
+import prodTypesZh from '../../config/zh/productTypes.json';
+import iosProdTypesEn from '../../config/iosProductTypes.json';
+import iosProdTypesZh from '../../config/zh/iosProductTypes.json';
 import { eventTracker } from '../../utils/EventTracker';
 import CategorySelector from './CategorySelector';
 import { getFixedCurrency } from '../../utils/currency';
 
 import {I18n} from '../../langs/I18n';
+
+let prodTypes = prodTypesEn
+let productConditions = productConditionsEn
+if (I18n.locale != 'en') {
+  prodTypes = prodTypesZh
+  productConditions = productConditionsZh
+}
+
+
+let iosProdTypes = iosProdTypesEn
+if (I18n.locale != 'en') {
+  iosProdTypes = iosProdTypesZh
+}
 
 const showingProdTypes = Platform.OS === 'ios' ?
   iosProdTypes.slice(1, iosProdTypes.length) : prodTypes.slice(1, prodTypes.length);

@@ -607,10 +607,14 @@ export default {
             ListingAdvancedDetails: {
                 Return_Policy: "退款政策",
                 Refunds: "退款",
-                refunds_description: "您的退货政策是什么？ 退货接受多长时间？ 谁为退货付款？",
+                return_description: "您的退货政策是什么？接受多长时间退货？谁为退货付款？",
                 terms: "条款和条件",
-                terms2: "T&Cs",
-                terms_description: "商品购买的条款和条件是什么？ 您作为供应商负责什么？有保修吗？"
+                T_C: "条款和条件",
+                terms_description: "商品购买的条款和条件是什么？您作为供应商负责什么？有保修吗？"
+            },
+            ListingBasicInfo: {
+                advanced: "高级",
+                advanced_description: "添加种类，店铺政策，优惠券和管理库存"
             },
             ListingCustomOptions:{
                variant:"变体",

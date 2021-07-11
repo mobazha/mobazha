@@ -2,11 +2,21 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { findIndex } from 'lodash';
 
-import prdType from '../../config/productTypes.json';
-import prdCondition from '../../config/productCondition.json';
+import prdTypeEn from '../../config/productTypes.json';
+import prdTypeZh from '../../config/zh/productTypes.json';
+import prdConditionEn from '../../config/productCondition.json';
+import prdConditionZh from '../../config/productCondition.json';
 import { secondaryTextColor } from '../commonColors';
 
 import {I18n} from '../../langs/I18n';
+
+let prdType = prdTypeEn
+let prdCondition = prdConditionEn
+if (I18n.locale != 'en') {
+  prdType = prdTypeZh
+  prdCondition = prdConditionZh
+}
+
 
 const styles = {
   wrapper: {

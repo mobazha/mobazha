@@ -9,7 +9,7 @@ import { getStatusId } from '../../utils/order';
 import { primaryTextColor, secondaryTextColor, highlightColor, borderColor } from '../commonColors';
 
 import {I18n} from '../../langs/I18n';
-orderStatus = orderStatusEn
+let orderStatus = orderStatusEn
 if (I18n.locale != 'en') {
   orderStatus = orderStatusZh
 }

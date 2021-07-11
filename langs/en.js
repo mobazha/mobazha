@@ -606,10 +606,14 @@ export default {
             ListingAdvancedDetails: {
                 Return_Policy: "Return Policy",
                 Refunds: "Refunds",
-                refunds_description: "What is your return policy? How long are returns accepted for? Who pays for return shipping?",
+                return_description: "What is your return policy? How long are returns accepted for? Who pays for return shipping?",
                 terms: "Terms and Conditions",
-                terms2: "T&Cs",
+                T_C: "T&Cs",
                 terms_description: "What are the terms and conditions of the listing? What are you responsible for as the vendor? Is there a warranty?"
+            },
+            ListingBasicInfo: {
+                advanced: "Advanced",
+                advanced_description: "Add variants, store policies, coupons and manage your inventory"
             },
             ListingCustomOptions:{
                 variant:"variant",

@@ -1,0 +1,27 @@
+[
+  {
+    "value": "any",
+    "label": "任意",
+    "checked": false,
+    "default": true,
+    "exclusive": true
+  },
+  {
+    "value": "new",
+    "label": "新的",
+    "checked": true,
+    "default": false
+  },
+  {
+    "value": ["used", "used_excellent", "used_good", "used_poor"],
+    "label": "已使用",
+    "checked": true,
+    "default": false
+  },
+  {
+    "value": "refurbished",
+    "label": "翻新",
+    "checked": false,
+    "default": false
+  }
+]

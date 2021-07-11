@@ -68,20 +68,20 @@ export const getDisputeText = (
 ) => {
   switch (type) {
     case 'disputeOpen':
-      return { name: disputerName, text: ' started a dispute' };
+      return { name: disputerName, text: I18n.t('utils.notification.started_disputed') };
     case 'disputeClose':
-      return { name: moderatorName, text: ' proposed a dispute outcome' };
+      return { name: moderatorName, text: I18n.t('utils.notification.proposed_dispute_outcome') };
     case 'disputeAccepted':
       if (buyerAccepted) {
-        return ({ name: buyerName, text: ' accepted dispute payout' });
+        return ({ name: buyerName, text: I18n.t('utils.notification.accepted_dispute_payout') });
       }
-      return ({ name: vendorName, text: ' accepted dispute payout' });
+      return ({ name: vendorName, text: I18n.t('utils.notification.accepted_dispute_payout') });
     case 'vendorFinalizePayment':
-      return ({ name: vendorName, text: ' claimed their payment' });
+      return ({ name: vendorName, text: I18n.t('utils.notification.claimed_their_payment') });
     case 'buyerDisputeExpiry': {
       const days = getDays(expiresIn);
-      const daysLeft = (days === 1) ? 'day' : 'days';
-      return ({ name: moderatorName, text: ` has ${days} ${daysLeft} left to propose a dispute outcome` });
+      const daysLeft = (days === 1) ? I18n.t('utils.notification.day') : I18n.t('utils.notification.days');
+      return ({ name: moderatorName, text: I18n.t('utils.notification.has_left', {days: days, daysLeft:daysLeft}) });
     }
     default:
       return { name: disputeeName, text: ` ${type}` };
@@ -91,21 +91,21 @@ export const getDisputeText = (
 export const getOrderText = (type, buyer, vendor, isBuyer) => {
   switch (type) {
     case 'order':
-      return isBuyer ? { name: '', text: 'You placed an order' } : { name: buyer, text: ' placed an order' };
+      return isBuyer ? { name: '', text: I18n.t('utils.notification.you_placed_order') } : { name: buyer, text: I18n.t('utils.notification.placed_order') };
     case 'payment':
-      return isBuyer ? { name: '', text: 'Your payment has been sent' } : { name: buyer, text: ' sent their payment' };
+      return isBuyer ? { name: '', text: I18n.t('utils.notification.your_payment_sent') } : { name: buyer, text: I18n.t('utils.notification.sent_payment') };
     case 'orderDeclined':
-      return isBuyer ? { name: vendor, text: ' cancelled your order' } : { name: 'You', text: ' declined this order' };
+      return isBuyer ? { name: vendor, text: I18n.t('utils.notification.cancelled_your_order') } : { name: I18n.t('utils.notification.you'), text: I18n.t('utils.notification.declined_order') };
     case 'orderConfirmation':
-      return isBuyer ? { name: vendor, text: ' accepted your order' } : { name: 'You', text: ' accepted this order' };
+      return isBuyer ? { name: vendor, text: I18n.t('utils.notification.accepted_your_order') } : { name: I18n.t('utils.notification.you'), text: I18n.t('utils.notification.accepted_order') };
     case 'cancel':
-      return isBuyer ? { name: 'You', text: ' cancelled this order' } : { name: buyer, text: ' cancelled their order' };
+      return isBuyer ? { name: I18n.t('utils.notification.you'), text: I18n.t('utils.notification.cancelled_this_order') } : { name: buyer, text: I18n.t('utils.notification.cancelled_their_order') };
     case 'refund':
-      return isBuyer ? { name: vendor, text: ' refunded your order' } : { name: 'You ', text: ' refunded this order' };
+      return isBuyer ? { name: vendor, text: I18n.t('utils.notification.refunded_your_order') } : { name: I18n.t('utils.notification.you'), text: I18n.t('utils.notification.refunded_this_order') };
     case 'fulfillment':
-      return isBuyer ? { name: vendor, text: ' fulfilled your order' } : { name: 'You ', text: ' fulfilled this order' };
+      return isBuyer ? { name: vendor, text: I18n.t('utils.notification.fulfilled_your_order') } : { name: I18n.t('utils.notification.you'), text: I18n.t('utils.notification.fulfilled_order') };
     case 'orderComplete':
-      return { name: buyer, text: ' completed their order' };
+      return { name: buyer, text: I18n.t('utils.notification.completed_their_order') };
     default:
       return { name: vendor, text: ` ${type}` };
   }

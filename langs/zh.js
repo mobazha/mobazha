@@ -157,6 +157,15 @@ export default {
                 edit_profile: "个人信息",
                 message: "消息",
             },
+            SocialNotification: {
+                unfollowed_you: ' 不再关注你',
+                one_of_moderators: ' 现在是你的仲裁人之一',
+                removed_from_moderator_list: ' 已从你的仲裁人列表里移除',
+                liked_your_post: ' 喜欢了你的帖子',
+                commented_on_your_post: ' 评论了你的帖子',
+                reposted_your_post: ' 转发了你的帖子',
+                followed_you: ' 关注了你'
+            },
             WalletCoinItem: {
                 coming_soon: "即将上线"
             }
@@ -1259,6 +1268,31 @@ export default {
             Jewelry: "珠宝",
             Tools: "工具",
             Gift_Cards: "礼品卡",
+        },
+        notification: {
+            you: "你",
+            started_disputed: '开启了一个争议',
+            proposed_dispute_outcome: '建议了一个争议结果',
+            accepted_dispute_payout: '接受了争议支付',
+            claimed_their_payment: '获取了付款',
+            day: "天",
+            days: "天",
+            has_left: "还剩余%{days}%{daysLeft}天来建议一个争议结果",
+            you_placed_order: "你下了订单",
+            placed_order: ' 下了订单',
+            your_payment_sent: '你的付款已发送',
+            sent_payment: ' 已发送了付款',
+            cancelled_your_order: ' 取消了你的订单',
+            declined_order: '拒绝了这个订单',
+            accepted_your_order: ' 接受了你的订单',
+            accepted_order: '接受了这个订单',
+            cancelled_this_order: '取消了这个订单',
+            cancelled_their_order: ' 取消了订单',
+            refunded_your_order: ' 已对你的订单退款',
+            refunded_this_order: '已对这个订单退款',
+            fulfilled_your_order: ' 完成了你的订单',
+            fulfilled_order: '已完成了这个订单',
+            completed_their_order: ' 结束了订单'
         }
     }
 }

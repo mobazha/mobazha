@@ -119,19 +119,19 @@ class SocialNotification extends React.PureComponent {
     const { verb } = this.props.notification || {};
     switch (verb) {
       case 'unfollow':
-        return ' unfollowed you';
+        return I18n.t('components.molecules.SocialNotification.unfollowed_you');
       case 'moderatorAdd':
-        return ' is now one of your moderators';
+        return I18n.t('components.molecules.SocialNotification.one_of_moderators');
       case 'moderatorRemove':
-        return ' is removed from your moderator list';
+        return I18n.t('components.molecules.SocialNotification.removed_from_moderator_list');
       case 'like':
-        return ' liked your post';
+        return I18n.t('components.molecules.SocialNotification.liked_your_post');
       case 'comment':
-        return ' commented on your post';
+        return I18n.t('components.molecules.SocialNotification.commented_on_your_post');
       case 'repost':
-        return ' reposted your post';
+        return I18n.t('components.molecules.SocialNotification.reposted_your_post');
       case 'follow':
-        return ' followed you';
+        return I18n.t('components.molecules.SocialNotification.followed_you');
       default:
         return '';
     }

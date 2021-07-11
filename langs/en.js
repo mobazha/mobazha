@@ -156,6 +156,15 @@ export default {
                 edit_profile: "Edit Profile",
                 message: "Message",
             },
+            SocialNotification: {
+                unfollowed_you: ' unfollowed you',
+                one_of_moderators: ' is now one of your moderators',
+                removed_from_moderator_list: ' is removed from your moderator list',
+                liked_your_post: ' liked your post',
+                commented_on_your_post: ' commented on your post',
+                reposted_your_post: ' reposted your post',
+                followed_you: ' followed you'
+            },
             WalletCoinItem: {
                 coming_soon: "Coming Soon"
             }
@@ -1261,15 +1270,29 @@ export default {
             Gift_Cards: "Gift Cards",
         },
         notification: {
+            you: "You",
             started_disputed: ' started a dispute',
             proposed_dispute_outcome: ' proposed a dispute outcome',
             accepted_dispute_payout: ' accepted dispute payout',
             claimed_their_payment: ' claimed their payment',
             day: "day",
             days: "days",
-            has_left: " has ${days} left to propose a dispute outcome",
+            has_left: " has ${days} ${daysLeft} left to propose a dispute outcome",
             you_placed_order: "You placed an order",
-            placed_order: ' placed an order'
+            placed_order: ' placed an order',
+            your_payment_sent: 'Your payment has been sent',
+            sent_payment: ' sent their payment',
+            cancelled_your_order: ' cancelled your order',
+            declined_order: ' declined this order',
+            accepted_your_order: ' accepted your order',
+            accepted_order: ' accepted this order',
+            cancelled_this_order: ' cancelled this order',
+            cancelled_their_order: ' cancelled their order',
+            refunded_your_order: ' refunded your order',
+            refunded_this_order: ' refunded this order',
+            fulfilled_your_order: ' fulfilled your order',
+            fulfilled_order: ' fulfilled this order',
+            completed_their_order: ' completed their order'
         }
     }
 }

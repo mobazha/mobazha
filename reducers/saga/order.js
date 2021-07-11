@@ -479,7 +479,7 @@ function* purchaseListingAction(action) {
   } catch (err) {
     eventTracker.trackEvent('Checkout-PaymentFailed', err);
     if (onFailure) {
-      yield call(onFailure, 'Unknown error');
+      yield call(onFailure, I18n.t('reducers.saga.order.Unknown_error'));
     }
   }
 }

@@ -869,6 +869,11 @@ export default {
             Free_Worldwide_Shipping: 'Free Worldwide Shipping',
             Standard: 'Standard',
             days_30: '30 days'
+        },
+        saga: {
+            order: {
+                Unknown_error: 'Unknown error'
+            }
         }
     },
 

@@ -870,6 +870,11 @@ export default {
             Free_Worldwide_Shipping: '全球免邮',
             Standard: '标准',
             days_30: '30天'
+        },
+        saga: {
+            order: {
+                Unknown_error: '暂不支持离线支付'
+            }
         }
     },
 

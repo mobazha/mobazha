@@ -122,7 +122,7 @@ export default class SelectorModal extends PureComponent {
     return idx >= 0 ? (
       getTitleLabel ? getTitleLabel(options[idx]) : getLabel(options[idx])
     ) : (
-      'None'
+      I18n.t('components.organism.SelectorModal.none')
     );
   }
 

@@ -5,6 +5,7 @@ import TextInput from '../atoms/TextInput';
 import InputGroup from '../atoms/InputGroup';
 import { convertorsMap } from '../../selectors/currency';
 
+import {I18n} from '../../langs/I18n';
 class ShippingPriceEditor extends React.Component {
   onChangeName = (name) => {
     const { item, pos, onChange } = this.props;
@@ -31,26 +32,26 @@ class ShippingPriceEditor extends React.Component {
     const { name, price, estimatedDelivery, additionalItemPrice } = item;
     return (
       <InputGroup
-        title={`Shipping service #${pos + 1}`}
+        title={I18n.t('components.organism.ShippingPriceEditor.shipping_service', {pos: pos + 1})}
         action={!hideDelete && removeItem}
-        actionTitle={!hideDelete && 'Delete'}
+        actionTitle={!hideDelete && I18n.t('components.organism.ShippingPriceEditor.delete')}
       >
         <TextInput
-          title="Service"
+          title={I18n.t('components.organism.ShippingPriceEditor.service')}
           value={name}
           required
-          placeholder="Standard, Express, etc."
+          placeholder={I18n.t('components.organism.ShippingPriceEditor.shipping_hint')}
           onChangeText={this.onChangeName}
         />
         <TextInput
-          title="Duration"
+          title={I18n.t('components.organism.ShippingPriceEditor.Duration')}
           defaultValue={estimatedDelivery}
-          placeholder="5-7 days"
+          placeholder={I18n.t('components.organism.ShippingPriceEditor.Duration_hint')}
           required
           onChangeText={this.onChangeEstimate}
         />
         <TextInput
-          title="Price"
+          title={I18n.t('components.organism.ShippingPriceEditor.price')}
           value={price}
           required
           placeholder={`${localSymbol}0.00`}
@@ -59,7 +60,7 @@ class ShippingPriceEditor extends React.Component {
           keyboardType="decimal-pad"
         />
         <TextInput
-          title="Addl. Price"
+          title={I18n.t('components.organism.ShippingPriceEditor.additional_price')}
           noBorder
           value={additionalItemPrice}
           placeholder={`${localSymbol}0.00`}

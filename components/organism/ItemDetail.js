@@ -13,7 +13,7 @@ import TextInput from '../atoms/TextInput';
 import CheckBox from '../atoms/CheckBox';
 import RadioModalFilter from '../molecules/RadioModalFilter';
 import productConditionsEn from '../../config/productCondition.json';
-import productConditionsZh from '../../config/productCondition.json';
+import productConditionsZh from '../../config/zh/productCondition.json';
 import prodTypesEn from '../../config/productTypes.json';
 import prodTypesZh from '../../config/zh/productTypes.json';
 import iosProdTypesEn from '../../config/iosProductTypes.json';

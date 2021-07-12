@@ -206,14 +206,14 @@ export default class MultiSelector extends PureComponent {
   render() {
     const { selection, showModal } = this.state;
     const { options, title, required } = this.props;
-    let text = 'None';
+    let text = I18n.t('components.organism.MultiSelector.none');
     if (selection.length === 1) {
       if (selection[0] === 'ALL') {
         const idx = findIndex(options, option => option.value === 'ALL');
         if (idx >= 0) {
           text = options[idx].label;
         } else {
-          text = 'All';
+          text = I18n.t('components.organism.MultiSelector.all');
         }
       } else if (hasIn(selection, '[0].label')) {
         text = selection[0].label;

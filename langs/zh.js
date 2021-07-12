@@ -240,6 +240,16 @@ export default {
             ErrorModal: {
                 error_message: "错误: %{error}"
             },
+            ImageSelector: {
+                ask_delete: '删除照片吗？',
+                cannot_undo: '你不能撤销该操作。',
+                cancel: '取消',
+                delete: '删除',
+                set_primary: "设置为主照片",
+                take_photo: '拍照',
+                choose_from_gallery: '从图库中选择',
+                delte_photo: '删除照片'
+            },
             InventoryItem: {
                 quantity_info: "QTY: %{quantity}",
                 Unlimited: "没有限制的"
@@ -273,6 +283,8 @@ export default {
                 verified: "已经验证"
             },
             MultiSelector: {
+                none: "无",
+                all: "全部",
                 done: "完成",
                 select_info: "%{count} 已选择",
                 reset: "重置"
@@ -291,7 +303,7 @@ export default {
                 ask_payout: "接受付款?",
                 payout_description: "一旦接受，争议将结束，资金将转移",
                 cancel: "取消",
-                ok: "OK",
+                ok: "好的",
                 dispute_expired: "争议过期",
                 memo_comment1: "仲裁员尚未提出结果。 卖方可以要求付款.",
                 dispute_payout: "争议结果",
@@ -358,6 +370,11 @@ export default {
                 see_all_reviews: "查看所有 %{length} 条评论",
                 no_reviews_yet: "还没有评论"
             },
+            ProfileImages: {
+                take_photo: '拍照',
+                choose_from_gallery: '从图库中选择',
+                cancel: '取消'
+            },
             QRScanner: {
                 scan_qr_payment_address: "扫描付款地址的二维码",
                 scan_qr_store: "扫描商店，商家信息或付款地址的QR码"
@@ -372,7 +389,7 @@ export default {
                 view_details: "查看详情"
             },
             SelectorModal: {
-
+                none: '无'
             },
             SendingAddressSelector: {
                 send: "发送"
@@ -389,23 +406,31 @@ export default {
                 shipping: "快递",
             },
             ShippingPriceEditor: {
-                shipping_service: "快递服务 #${pos}",
+                shipping_service: "快递服务 #%{pos}",
                 delete: "删除",
                 service: "服务",
                 shipping_hint: "标准，特快等",
-                Duration: "长短",
+                Duration: "时长",
                 Duration_hint: "5-7 天",
                 price: "价格",
                 additional_price: "额外的价格"
             },
+            ShippingPrices: {
+                delete_service: '删除快递服务？',
+                cannot_undo: "你不能撤销该操作。",
+                cancel: '取消',
+                delete: '删除',
+                add_service: "添加服务"
+            },
             SingleVariantEditor: {
-                variant_id: "多样的 %{id}",
+                delete: "删除",
+                variant_id: "种类 %{id}",
                 title: "标题",
-                title_hint: "例如大小",
+                title_hint: "例如：大小",
                 description: "描述",
-                description_hint: "例如产品尺寸",
+                description_hint: "例如：产品尺寸",
                 choices: "选项",
-                choices_hint: "例如 大小 ,材料, "
+                choices_hint: "例如：小号、中号、大号"
             },
             SupportHaven: {
                 support_haven: "支持 Haven",
@@ -510,7 +535,7 @@ export default {
                 submit_dispute: "提出争议?",
                 submit_hint: "仲裁者将介入以帮助解决争议。 您无法撤消此操作",
                 cancel: "取消",
-                ok: "确定",
+                ok: "好的",
                 enter_reason: "请输入争议的原因!",
                 content_hint: "您为什么要提出争议？ 提供尽可能多的细节。"
             },
@@ -643,7 +668,7 @@ export default {
             },
             ListShippingMethod: {
                 delete_option: '删除快递选项？',
-                cannot_undo: "你不能撤销改操作",
+                cannot_undo: "你不能撤销改操作。",
                 edit: '编辑',
                 cancel: '取消',
                 delete: '删除',
@@ -652,6 +677,11 @@ export default {
             NeedCoin: {
                 coinbase: "Coinbase",
                 cryptocurrency_exchange: "加密货币交换"
+            },
+            NewsFeedFooter: {
+                take_photo: '拍照',
+                choose_from_gallery: '从图库中选择',
+                cancel: '取消'
             },
             Notification: {
                 Social: "社交",
@@ -769,7 +799,7 @@ export default {
                 are_you_sure: "您确定吗?",
                 check_backup: "您是否备份了当前商店？",
                 cancel: "取消",
-                OK: "确定",
+                OK: "好的",
                 profile: "个人资料",
                 Country: "国家",
                 currency: "货币",
@@ -825,6 +855,13 @@ export default {
             UserSearchResults: {
                 loading_results: "加载搜索结果 ...",
                 no_results: "没有结果."
+            },
+            VariantEditor: {
+                Delete_variant: '删除种类？',
+                cannot_undo: "你不能撤销改操作。",
+                cancel: '取消',
+                delete: '删除',
+                Add_variant: "添加种类"
             },
             wishlist: {
                 wishlist_empty: "你的收藏夹是空的"
@@ -905,7 +942,7 @@ export default {
             update_listings: "更新商品页面?",
             sure_about_update: "您确定所有列表都会更新吗？",
             cancel: "取消",
-            OK: "OK",
+            OK: "好的",
             coins_accepted: "接受货币",
             save: "保存",
             selected: "已选择",
@@ -921,7 +958,7 @@ export default {
             add_shipping_option: "添加一个快递选项",
             shipping_option: "快递选项",
             title: "标题",
-            option_description: "USA Shipping, International, etc",
+            option_description: "顺丰快递，国际快递，等",
             destinations: "目的地",
             save: "保存",
         },
@@ -1011,6 +1048,19 @@ export default {
             select_moderator: "选择一个仲裁者",
             no_available: "没有可用的仲裁者"
         },
+        createListing: {
+            title_required: '商品标题为必填项',
+            price_required: '商品价格为必填项',
+            type_required: '商品类型为必填项',
+            listing_created: '商品已创建！',
+            has_created: '这个商品已经被创建了。',
+            back_to_store: '回到店铺',
+            see_listing: '查看商品',
+            warning: '警告',
+            warning_info: '如果你回退，你将丢失你的进度。',
+            cancel: '取消',
+            ok: '好的'
+        },
         customOptions: {
             Variants_Inventory: "种类和库存",
             Save: "保存"
@@ -1036,6 +1086,16 @@ export default {
             postal_code: "邮政编码",
             country: "国家",
             delivery_notes: "交货单"
+        },
+        editVariants: {
+            Manage_Variants: "管理种类",
+            Save: "保存",
+            fill_required: '请填写所有必填（*）字段。',
+            fill_choices: '请至少填写两个选项。',
+            are_you_sure: '您确定吗？',
+            unsaved_discard: '任何未保存的更改都将被丢弃。',
+            ok: "好的",
+            cancel: '取消'
         },
         externalPay: {
             address_copied: "地址已经复制",
@@ -1076,10 +1136,10 @@ export default {
             no_following2: "你还没有关注任何人"
         },
         listing: {
-            are_you_sure: "你确定吗?",
+            are_you_sure: "您确定吗?",
             ask_block: "屏蔽这个用户?",
             cancel: "取消",
-            OK: "OK",
+            OK: "好的",
             ask_delete: "删除商品页面?",
             delete_hint: "你不能撤销这个操作.",
             cancel: "取消",
@@ -1118,7 +1178,7 @@ export default {
             remove_moderator: "移除仲裁者?",
             remove_hint: "该仲裁将从您的商店中永久删除。您将无法再次添加它们",
             cancel: "取消",
-            OK: "OK",
+            OK: "好的",
             verified: "验证的",
             fee_description: "该费用仅在发生争议时适用。",
             moderator_verified: "该仲裁者已经通过验证",
@@ -1186,7 +1246,7 @@ export default {
             decline_order: "拒绝下单?",
             decline_hint: "该订单将被取消，这笔钱将退还给买方",
             nevermind: "没关系",
-            ok: "确定",
+            ok: "好的",
             refund_order: "退款订单?",
             refund_hint: "该订单将被取消，这笔钱将退还给买方.",
             cancel_order: "取消订单?",
@@ -1341,10 +1401,10 @@ export default {
             Settings: "设置"
         },
         shippingAddress: {
-            are_you_sure: "你确定吗?",
+            are_you_sure: "您确定吗?",
             remove_address: "移除地址",
             cancel: "取消",
-            OK: "确定",
+            OK: "好的",
             free: "免费",
             cannot_ship: "抱歉，该商品无法运送到所选地址",
             Shipping: "快递",
@@ -1372,6 +1432,18 @@ export default {
             Reviews: "评价",
             no_reviews1: "%{user} 没有收到任何评论",
             no_reviews2: "你还没有收到任何评价"
+        },
+        tagEditor: {
+            tags: "标签",
+            done: "完成",
+            recent: "最近",
+            remove_tag: '删除标签？',
+            remove: "删除",
+            cannot_undo: "你不能撤销该操作。",
+            are_you_sure: '您确定吗？',
+            unsaved_discard: '任何未保存的更改都将被丢弃。',
+            ok: "好的",
+            cancel: '取消'
         },
         wallet: {
             Wallet: "钱包",

@@ -149,7 +149,7 @@ class AddShippingMethod extends PureComponent {
             value={name}
             onChangeText={this.onChangeName}
             onChange={this.onChangeName}
-            placeholder="USA Shipping, International, etc"
+            placeholder={I18n.t('screens.addShippingMethod.option_description')}
           />
           <MultiSelector
             title={I18n.t('screens.addShippingMethod.destinations')}

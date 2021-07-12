@@ -20,7 +20,7 @@
   },
   {
     "value": "used_excellent",
-    "label": "已使用 - 很好的",
+    "label": "已使用 - 很好",
     "checked": false,
     "default": false
   },

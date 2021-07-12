@@ -114,10 +114,10 @@ class TagInput extends PureComponent {
   };
 
   onTagPress = (index) => {
-    Alert.alert('Remove tag?', "You can't undo this action", [
-      { text: 'Cancel' },
+    Alert.alert(I18n.t('screens.tagEditor.remove_tag'), I18n.t('screens.tagEditor.cannot_undo'), [
+      { text: I18n.t('screens.tagEditor.cancel') },
       {
-        text: 'Remove',
+        text: I18n.t('screens.tagEditor.remove'),
         onPress: () => {
           this.removeTag(index);
         },
@@ -172,10 +172,10 @@ class TagInput extends PureComponent {
 
   goBack = () => {
     Keyboard.dismiss();
-    Alert.alert('Are you sure?', 'Any unsaved changes will be discarded', [
-      { text: 'Cancel' },
+    Alert.alert(I18n.t('screens.tagEditor.are_you_sure'), I18n.t('screens.tagEditor.unsaved_discard'), [
+      { text: I18n.t('screens.tagEditor.cancel') },
       {
-        text: 'OK',
+        text: I18n.t('screens.tagEditor.ok'),
         onPress: () => {
           this.props.navigation.goBack();
         },
@@ -208,10 +208,10 @@ class TagInput extends PureComponent {
     return (
       <KeyboardAvoidingView style={styles.wrapper} {...keyboardAvoidingViewSharedProps}>
         <Header
-          title="Tags"
+          title={I18n.t('screens.tagEditor.tags')}
           left={<NavBackButton />}
           onLeft={this.goBack}
-          right={<LinkText text="Done" color={greenColor} />}
+          right={<LinkText text={I18n.t('screens.tagEditor.done')} color={greenColor} />}
           onRight={this.save}
         />
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
@@ -238,7 +238,7 @@ class TagInput extends PureComponent {
         </ScrollView>
         {showSuggestion && (
           <TagSuggestion
-            title="Recent"
+            title={I18n.t('screens.tagEditor.recent')}
             suggestions={suggestions}
             onSelect={this.onSelectSuggestion}
           />

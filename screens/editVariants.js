@@ -46,9 +46,9 @@ class EditVariants extends PureComponent {
   };
 
   handleBack = () => {
-    Alert.alert('Are you sure?', 'Any unsaved changes will be discarded.', [
-      { text: 'Cancel' },
-      { text: 'OK', onPress: this.props.navigation.goBack },
+    Alert.alert(I18n.t('screens.editVariants.are_you_sure'), I18n.t('screens.editVariants.unsaved_discard'), [
+      { text: I18n.t('screens.editVariants.cancel') },
+      { text: I18n.t('screens.editVariants.ok'), onPress: this.props.navigation.goBack },
     ]);
   };
 
@@ -102,11 +102,11 @@ class EditVariants extends PureComponent {
     for (const option of options) {
       const { name, variants = [] } = option;
       if (name === '') {
-        return 'Please fill out all required (*) fields.';
+        return I18n.t('screens.editVariants.fill_required');
       }
 
       if (variants.length < 2) {
-        return 'Please fill out at least two choices.';
+        return I18n.t('screens.editVariants.fill_choices');
       }
     }
 
@@ -121,8 +121,8 @@ class EditVariants extends PureComponent {
         <Header
           left={<NavBackButton />}
           onLeft={this.handleBack}
-          title="Manage Variants"
-          right={<LinkText text="Save" />}
+          title={I18n.t('screens.editVariants.Manage_Variants')}
+          right={<LinkText text={I18n.t('screens.editVariants.Save')} />}
           onRight={this.handleSave}
         />
         <VariantEditor

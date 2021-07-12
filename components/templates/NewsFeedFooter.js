@@ -217,7 +217,7 @@ class NewsFeedFooter extends PureComponent {
         <OBActionSheet
           ref={this.setActionSheet}
           onPress={this.handleActionSheet}
-          options={['Take photo', 'Choose from gallery', 'Cancel']}
+          options={[I18n.t('components.templates.NewsFeedFooter.take_photo'), I18n.t('components.templates.NewsFeedFooter.choose_from_gallery'), I18n.t('components.templates.NewsFeedFooter.cancel')]}
           cancelButtonIndex={2}
         />
         <OBDarkModal

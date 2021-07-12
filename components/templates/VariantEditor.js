@@ -58,9 +58,9 @@ export default class VaraintEditor extends React.Component {
     if (isEmptyOption(options[index])) {
       this.doRemove(index);
     } else {
-      Alert.alert('Delete variant?', "You can't undo this action.", [
-        { text: 'Cancel' },
-        { text: 'Delete', onPress: () => this.doRemove(index) },
+      Alert.alert(I18n.t('components.templates.VariantEditor.Delete_variant'), I18n.t('components.templates.VariantEditor.cannot_undo'), [
+        { text: I18n.t('components.templates.VariantEditor.cancel') },
+        { text: I18n.t('components.templates.VariantEditor.delete'), onPress: () => this.doRemove(index) },
       ]);
     }
   };
@@ -88,7 +88,7 @@ export default class VaraintEditor extends React.Component {
 
   renderListFooter = () => (
     <View style={styles.moreButtonWrapper}>
-      <MoreButton title="Add variant" onPress={this.handleAddMore} />
+      <MoreButton title={I18n.t('components.templates.VariantEditor.Add_variant')} onPress={this.handleAddMore} />
     </View>
   );
 

@@ -152,7 +152,7 @@ class ProfileImages extends PureComponent {
         <ActionSheet
           ref={this.setActionSheet}
           onPress={this.handleActionSheet}
-          options={['Take photo', 'Choose from gallery', 'Cancel']}
+          options={[I18n.t('components.organism.ProfileImages.take_photo'), I18n.t('components.organism.ProfileImages.choose_from_gallery'), I18n.t('components.organism.ProfileImages.cancel')]}
           cancelButtonIndex={2}
         />
       </View>

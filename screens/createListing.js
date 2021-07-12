@@ -18,15 +18,15 @@ class CreateListing extends PureComponent {
   handleSave = () => {
     const { productTitle, productType, price } = this.props;
     if (isEmpty(productTitle)) {
-      Alert.alert('Listing title is required');
+      Alert.alert(I18n.t('screens.createListing.title_required'));
       return;
     }
     if (isEmpty(price)) {
-      Alert.alert('Listing price is required');
+      Alert.alert(I18n.t('screens.createListing.price_required'));
       return;
     }
     if (isEmpty(productType)) {
-      Alert.alert('Listing type is required');
+      Alert.alert(I18n.t('screens.createListing.type_required'));
       return;
     }
     Keyboard.dismiss();
@@ -37,15 +37,15 @@ class CreateListing extends PureComponent {
     createListing((slug) => {
       fetchListings();
       resetData();
-      Alert.alert('Listing created!', 'The listing has been created.', [
+      Alert.alert(I18n.t('screens.createListing.listing_created'), I18n.t('screens.createListing.has_created'), [
         {
-          text: 'Back to Store',
+          text: I18n.t('screens.createListing.back_to_store'),
           onPress: () => {
             navigation.pop();
           },
         },
         {
-          text: 'See Listing',
+          text: I18n.t('screens.createListing.see_listing'),
           onPress: () => {
             navigation.navigate({
               routeName: 'Listing',
@@ -58,10 +58,10 @@ class CreateListing extends PureComponent {
   };
 
   handleGoBack = () => {
-    Alert.alert('Warning', 'If you go back, you will lose your progress', [
-      { text: 'Cancel' },
+    Alert.alert(I18n.t('screens.createListing.warning'), I18n.t('screens.createListing.warning_info'), [
+      { text: I18n.t('screens.createListing.cancel') },
       {
-        text: 'OK',
+        text: I18n.t('screens.createListing.ok'),
         onPress: () => {
           this.props.resetData();
           this.props.navigation.goBack(null);

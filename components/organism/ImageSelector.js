@@ -177,11 +177,11 @@ class ImageSelector extends PureComponent {
 
   askRemoveImage = idx => () => {
     Alert.alert(
-      'Delete photo?',
-      'You can\'t undo this action',
+      I18n.t('components.organism.ImageSelector.ask_delete'),
+      I18n.t('components.organism.ImageSelector.cannot_undo'),
       [
-        { text: 'Cancel' },
-        { text: 'Delete', onPress: this.removeImage(idx) },
+        { text: I18n.t('components.organism.ImageSelector.cancel') },
+        { text: I18n.t('components.organism.ImageSelector.delete'), onPress: this.removeImage(idx) },
       ],
     );
   }
@@ -246,7 +246,7 @@ class ImageSelector extends PureComponent {
         <ModalImageIndicator pos={idx} size={images.length} />
         <ModalFavButton selected={idx === 0} onPress={this.setAsFavorite(idx)} />
         <ModalTrashButton onPress={this.askRemoveImage(idx)} />
-        <ModalTooltip ref={this.setModalTooltipRef} text="Set as primary photo" />
+        <ModalTooltip ref={this.setModalTooltipRef} text={I18n.t('components.organism.ImageSelector.set_primary')} />
       </React.Fragment>
     );
   }
@@ -295,17 +295,17 @@ class ImageSelector extends PureComponent {
             renderIndicator={this.renderIndicator}
           />
         </OBDarkModal>
-        <ModalTooltip ref={this.setMainTooltipRef} text="Set as primary photo" />
+        <ModalTooltip ref={this.setMainTooltipRef} text={I18n.t('components.organism.ImageSelector.set_primary')} />
         <OBActionSheet
           ref={this.setMainActionSheet}
           onPress={this.handleMainActionSheet}
-          options={['Take photo', 'Choose from gallery', 'Cancel']}
+          options={[I18n.t('components.organism.ImageSelector.take_photo'), I18n.t('components.organism.ImageSelector.choose_from_gallery'), I18n.t('components.organism.ImageSelector.cancel')]}
           cancelButtonIndex={2}
         />
         <OBActionSheet
           ref={this.setMoreActionSheet}
           onPress={this.handleMoreActionSheet}
-          options={['Set as primary photo', 'Delete photo', 'Cancel']}
+          options={[I18n.t('components.organism.ImageSelector.set_primary'), I18n.t('components.organism.ImageSelector.delte_photo'), I18n.t('components.organism.ImageSelector.cancel')]}
           cancelButtonIndex={2}
           destructiveButtonIndex={1}
         />

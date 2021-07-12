@@ -54,14 +54,14 @@ class UserSearchResults extends PureComponent {
   renderLoadingState = () => (
     <View style={styles.emptyWrapper}>
       <ActivityIndicator style={styles.activityIndicator} size="large" color="#8a8a8f" />
-      <Text style={styles.emptyText}>Loading Search Results ...</Text>
+      <Text style={styles.emptyText}>{I18n.t('components.templates.UserSearchResults.loading_results')}</Text>
     </View>
   );
 
   renderEmptyState = () => (
     <View style={styles.emptyWrapper}>
       <Ionicons style={styles.emptyIcon} name="md-search" size={50} color="#8a8a8f" />
-      <Text style={styles.emptyText}>No results found.</Text>
+      <Text style={styles.emptyText}>{I18n.t('components.templates.UserSearchResults.no_results')}</Text>
     </View>
   );
 

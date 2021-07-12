@@ -43,10 +43,10 @@ export default class ShippingPrices extends PureComponent {
   };
 
   onRemoveItem = pos => () => {
-    Alert.alert('Delete shipping service?', "You can't undo this action.", [
-      { text: 'Cancel' },
+    Alert.alert(I18n.t('components.organism.ShippingPrices.delete_service'), I18n.t('components.organism.ShippingPrices.cannot_undo'), [
+      { text: I18n.t('components.organism.ShippingPrices.cancel') },
       {
-        text: 'Delete',
+        text: I18n.t('components.organism.ShippingPrices.delete'),
         onPress: () => this.removeItem(pos),
       },
     ]);
@@ -96,7 +96,7 @@ export default class ShippingPrices extends PureComponent {
           keyExtractor={this.keyExtractor}
           ListFooterComponent={
             <View style={styles.moreButtonWrapper}>
-              <MoreButton title="Add Service" onPress={this.newItem} />
+              <MoreButton title={I18n.t('components.organism.ShippingPrices.add_service')} onPress={this.newItem} />
             </View>
           }
           extraData={services.length}

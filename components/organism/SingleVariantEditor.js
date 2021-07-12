@@ -6,6 +6,7 @@ import TagInput from '../atoms/TagInput';
 import TextInput from '../atoms/TextInput';
 import TextArea from '../atoms/TextArea';
 
+import {I18n} from '../../langs/I18n';
 export default class SingleVariantEditor extends React.Component {
   static getDerivedStateFromProps(props) {
     if (!deepEqual(this.state, props.option)) {
@@ -52,33 +53,33 @@ export default class SingleVariantEditor extends React.Component {
     const { index } = this.props;
     return (
       <InputGroup
-        title={`Variant ${index + 1}`}
-        actionTitle="Delete"
+        title={I18n.t('components.organism.SingleVariantEditor.variant_id', {id: index + 1})}
+        actionTitle={I18n.t('components.organism.SingleVariantEditor.delete')}
         actionType="secondary"
         action={this.removeOption}
       >
         <React.Fragment>
           <TextInput
-            title="Title"
+            title={I18n.t('components.organism.SingleVariantEditor.title')}
             value={name}
             required
             onChangeText={this.onChangeTitle}
-            placeholder="e.g. Size"
+            placeholder={I18n.t('components.organism.SingleVariantEditor.title_hint')}
             onFocus={this.props.focusInput}
           />
           <TextArea
-            title="Description"
+            title={I18n.t('components.organism.SingleVariantEditor.description')}
             value={description}
             onChangeText={this.onChangeDescription}
-            placeholder="e.g. Size of Product"
+            placeholder={I18n.t('components.organism.SingleVariantEditor.description_hint')}
             onFocus={this.props.focusInput}
           />
           <TagInput
-            title="Choices"
+            title={I18n.t('components.organism.SingleVariantEditor.choices')}
             required
             noBorder
             initialTags={variants}
-            placeholder="e.g. Small, Medium, Large"
+            placeholder={I18n.t('components.organism.SingleVariantEditor.choices_hint')}
             onChangeTags={this.onChangeTags}
             onFocus={this.props.focusInput}
           />

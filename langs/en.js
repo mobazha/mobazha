@@ -238,6 +238,16 @@ export default {
             ErrorModal: {
                 error_message: "Error: %{error}"
             },
+            ImageSelector: {
+                ask_delete: 'Delete photo?',
+                cannot_undo: 'You can\'t undo this action',
+                cancel: 'Cancel',
+                delete: 'Delete',
+                set_primary: "Set as primary photo",
+                take_photo: 'Take photo',
+                choose_from_gallery: 'Choose from gallery',
+                delte_photo: 'Delete photo'
+            },
             InventoryItem: {
                 quantity_info: "QTY: %{quantity}",
                 unlimited: "Unlimited"
@@ -271,6 +281,8 @@ export default {
                 verified: "verified"
             },
             MultiSelector: {
+                none: "None",
+                all: "All",
                 done: "Done",
                 select_info: "%{count} Selected",
                 reset: "Reset"
@@ -355,6 +367,11 @@ export default {
                 see_all_reviews: "See all %{length} reviews",
                 no_reviews_yet: "No reviews yet"
             },
+            ProfileImages: {
+                take_photo: 'Take photo',
+                choose_from_gallery: 'Choose from gallery',
+                cancel: 'Cancel'
+            },
             QRScanner: {
                 scan_qr_payment_address: "Scan the QR code of a payment address",
                 scan_qr_store: "Scan the QR code of a store,\na listing, or a payment address"
@@ -369,7 +386,7 @@ export default {
                 view_details: "View Details"
             },
             SelectorModal: {
-
+                none: 'None'
             },
             SendingAddressSelector: {
                 send: "SEND"
@@ -386,7 +403,7 @@ export default {
                 shipping: "Shipping",
             },
             ShippingPriceEditor: {
-                shipping_service: "Shipping service #${pos}",
+                shipping_service: "Shipping service #%{pos}",
                 delete: "Delete",
                 service: "Service",
                 shipping_hint: "Standard, Express, etc.",
@@ -395,7 +412,15 @@ export default {
                 price: "Price",
                 additional_price: "Addl. Price"
             },
+            ShippingPrices: {
+                delete_service: 'Delete shipping service?',
+                cannot_undo: "You can't undo this action.",
+                cancel: 'Cancel',
+                delete: 'Delete',
+                add_service: "Add Service"
+            },
             SingleVariantEditor: {
+                delete: "Delete",
                 variant_id: "Variant %{id}",
                 title: "Title",
                 title_hint: "e.g. Size",
@@ -652,6 +677,11 @@ export default {
                 coinbase: "Coinbase",
                 cryptocurrency_exchange: "Cryptocurrency Exchange"
             },
+            NewsFeedFooter: {
+                take_photo: 'Take photo',
+                choose_from_gallery: 'Choose from gallery',
+                cancel: 'Cancel'
+            },
             Notification: {
                 Social: "Social",
                 Orders: "Orders",
@@ -824,6 +854,13 @@ export default {
             UserSearchResults: {
                 loading_results: "Loading Search Results ...",
                 no_results: "No results found."
+            },
+            VariantEditor: {
+                Delete_variant: 'Delete variant?',
+                cannot_undo: "You can't undo this action.",
+                cancel: 'Cancel',
+                delete: 'Delete',
+                Add_variant: "Add variant"
             },
             wishlist: {
                 wishlist_empty: "Your Wishlist is empty"
@@ -1011,6 +1048,19 @@ export default {
             select_moderator: "Select a moderator",
             no_available: "No Available Moderators"
         },
+        createListing: {
+            title_required: 'Listing title is required',
+            price_required: 'Listing price is required',
+            type_required: 'Listing type is required',
+            listing_created: 'Listing created!',
+            has_created: 'The listing has been created.',
+            back_to_store: 'Back to Store',
+            see_listing: 'See Listing',
+            warning: 'Warning',
+            warning_info: 'If you go back, you will lose your progress',
+            cancel: 'Cancel',
+            ok: 'OK'
+        },
         customOptions: {
             Variants_Inventory: "Variants & Inventory",
             Save: "Save"
@@ -1036,6 +1086,16 @@ export default {
             postal_code: "Postal Code",
             country: "Country",
             delivery_notes: "Delivery Notes"
+        },
+        editVariants: {
+            Manage_Variants: "Manage Variants",
+            Save: "Save",
+            fill_required: 'Please fill out all required (*) fields.',
+            fill_choices: 'Please fill out at least two choices.',
+            are_you_sure: 'Are you sure?',
+            unsaved_discard: 'Any unsaved changes will be discarded.',
+            ok: "OK",
+            cancel: 'Cancel'
         },
         externalPay: {
             address_copied: "Address copied!",
@@ -1371,6 +1431,18 @@ export default {
             Reviews: "Reviews",
             no_reviews1: "%{user} hasn't received any reviews",
             no_reviews2: "You haven\'t received any reviews"
+        },
+        tagEditor: {
+            tags: "Tags",
+            done: "Done",
+            recent: "Recent",
+            remove_tag: 'Remove tag?',
+            remove: "Remove",
+            cannot_undo: "You can't undo this action",
+            are_you_sure: 'Are you sure?',
+            unsaved_discard: 'Any unsaved changes will be discarded.',
+            ok: "OK",
+            cancel: 'Cancel'
         },
         wallet: {
             Wallet: "Wallet",

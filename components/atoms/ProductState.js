@@ -5,7 +5,7 @@ import { findIndex } from 'lodash';
 import prdTypeEn from '../../config/productTypes.json';
 import prdTypeZh from '../../config/zh/productTypes.json';
 import prdConditionEn from '../../config/productCondition.json';
-import prdConditionZh from '../../config/productCondition.json';
+import prdConditionZh from '../../config/zh/productCondition.json';
 import { secondaryTextColor } from '../commonColors';
 
 import {I18n} from '../../langs/I18n';

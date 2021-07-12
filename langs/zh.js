@@ -353,6 +353,11 @@ export default {
                 },
                 PanelViewBase: {
                     cancel: "取消"
+                },
+                SharePanelView: {
+                    Social: '社交',
+                    External: '外部',
+                    Share_to: "分享到..."
                 }
             },
             PayPanel: {
@@ -602,11 +607,12 @@ export default {
                 first_repost:"首次转发!",
                 },
             FulfillModal: {
-                shipping_carrier: "货运公司",
-                carrier_hint: "USPS, FedEX, etc",
+                shipping_carrier: "快递公司",
+                carrier_hint: "顺丰、中通、韵达，等等",
                 tracking_number: "快递单号",
                 tracking_number_hint: "快递单号码",
                 file_url: "文件链接",
+                file_url_hint: "https://fileurl.com",
                 password: "密码",
                 password_hint: "可选",
                 note: "备注",
@@ -1151,7 +1157,11 @@ export default {
             policy2:"条款和条件",
             add_wishlist: "添加到收藏夹!",
             remove_wishlist: "从收藏夹移除!",
-            reported: "报告!"
+            reported: "已举报!",
+            report_listing: '举报商品',
+            block_user: '屏蔽用户',
+            Edit_Listing: '编辑商品',
+            Delete_Listing: '删除商品'
         },
 
         listingAdvancedDetails: {

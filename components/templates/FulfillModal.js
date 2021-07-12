@@ -111,20 +111,20 @@ class FulfillModal extends React.PureComponent {
       return (
         <View style={styles.contentContainer}>
           <TextInput
-            title="Shipping Carrier"
-            placeholder="USPS, FedEX, etc"
+            title={I18n.t('components.templates.FulfillModal.shipping_carrier')}
+            placeholder={I18n.t('components.templates.FulfillModal.carrier_hint')}
             value={shipper}
             onChangeText={this.updateState('shipper')}
           />
           <TextInput
-            title="Tracking No."
-            placeholder="Tracking number"
+            title={I18n.t('components.templates.FulfillModal.tracking_number')}
+            placeholder={I18n.t('components.templates.FulfillModal.tracking_number_hint')}
             value={trackingNumber}
             onChangeText={this.updateState('trackingNumber')}
           />
           <TextInput
-            title="Note"
-            placeholder="Optional"
+            title={I18n.t('components.templates.FulfillModal.note')}
+            placeholder={I18n.t('components.templates.FulfillModal.note_hint')}
             value={note}
             onChangeText={this.updateState('note')}
             noBorder
@@ -137,20 +137,20 @@ class FulfillModal extends React.PureComponent {
       return (
         <View style={styles.contentContainer}>
           <TextInput
-            title="File URL"
-            placeholder="https://fileurl.com"
+            title={I18n.t('components.templates.FulfillModal.file_url')}
+            placeholder={I18n.t('components.templates.FulfillModal.file_url_hint')}
             value={fileUrl}
             onChangeText={this.updateState('fileUrl')}
           />
           <TextInput
-            title="Password"
-            placeholder="Optional"
+            title={I18n.t('components.templates.FulfillModal.password')}
+            placeholder={I18n.t('components.templates.FulfillModal.password_hint')}
             value={filePassword}
             onChangeText={this.updateState('filePassword')}
           />
           <TextInput
-            title="Note"
-            placeholder="Optional"
+            title={I18n.t('components.templates.FulfillModal.note')}
+            placeholder={I18n.t('components.templates.FulfillModal.note_hint')}
             value={note}
             onChangeText={this.updateState('note')}
             noBorder
@@ -163,7 +163,7 @@ class FulfillModal extends React.PureComponent {
       <View style={styles.contentContainer}>
         <TextInput
           noTitle
-          placeholder="Add a note (optional)"
+          placeholder={I18n.t('components.templates.FulfillModal.add_a_note')}
           value={note}
           onChangeText={this.updateState('note')}
           noBorder

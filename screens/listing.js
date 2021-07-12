@@ -224,12 +224,12 @@ class Listing extends PureComponent {
     const itemPeerID = _.get(listingInfo, 'listing.vendorID.peerID');
     if (myPeerID !== itemPeerID) {
       return {
-        options: ['Report listing', 'Block user', 'Cancel'],
+        options: [I18n.t('screens.listing.report_listing'), I18n.t('screens.listing.block_user'), I18n.t('screens.listing.cancel')],
         cancelButtonIndex: 2,
       };
     }
     return {
-      options: ['Edit Listing', 'Delete Listing', 'Cancel'],
+      options: [I18n.t('screens.listing.Edit_Listing'), I18n.t('screens.listing.Delete_Listing'), I18n.t('screens.listing.cancel')],
       cancelButtonIndex: 2,
     };
   }

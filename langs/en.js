@@ -350,6 +350,11 @@ export default {
                 },
                 PanelViewBase: {
                     cancel: "Cancel"
+                },
+                SharePanelView: {
+                    Social: 'Social',
+                    External: 'External',
+                    Share_to: "Share to..."
                 }
             },
             PayPanel: {
@@ -606,6 +611,7 @@ export default {
                 tracking_number: "Tracking No.",
                 tracking_number_hint: "Tracking number",
                 file_url: "File URL",
+                file_url_hint: "https://fileurl.com",
                 password: "Password",
                 password_hint: "Optional",
                 note: "Note",
@@ -1151,7 +1157,11 @@ export default {
             policy2:"Terms and conditions",
             add_wishlist: "Added to Wishlist!",
             remove_wishlist: "Removed from Wishlist!",
-            reported: "Reported!"
+            reported: "Reported!",
+            report_listing: 'Report listing',
+            block_user: 'Block user',
+            Edit_Listing: 'Edit Listing',
+            Delete_Listing: 'Delete Listing'
         },
 
         listingAdvancedDetails: {

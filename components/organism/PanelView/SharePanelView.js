@@ -43,8 +43,8 @@ const SOCIAL_ICON = <Feather name="users" size={24} style={styles.featherIcons} 
 const EXTERNAL_ICON = <Feather name="share-2" size={24} style={styles.featherIcons} />;
 
 const MENU_ITEMS = [
-  { title: 'Social', icon: SOCIAL_ICON },
-  { title: 'External', icon: EXTERNAL_ICON },
+  { title: I18n.t('components.organism.PanelView.SharePanelView.Social'), icon: SOCIAL_ICON },
+  { title: I18n.t('components.organism.PanelView.SharePanelView.External'), icon: EXTERNAL_ICON },
 ];
 
 class SharePanelView extends React.Component {
@@ -103,7 +103,7 @@ class SharePanelView extends React.Component {
       <React.Fragment>
         <PanelViewBase
           ref={this.panelBaseRef}
-          title="Share to..."
+          title={I18n.t('components.organism.PanelView.SharePanelView.Share_to')}
           isShowingPanel={currentPanel.type === 'share'}
           hidePanel={hidePanel}
         >

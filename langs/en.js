@@ -606,6 +606,7 @@ export default {
 
             },
             FulfillModal: {
+                done: "Done",
                 shipping_carrier: "Shipping Carrier",
                 carrier_hint: "USPS, FedEX, etc",
                 tracking_number: "Tracking No.",

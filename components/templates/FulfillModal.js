@@ -178,7 +178,7 @@ class FulfillModal extends React.PureComponent {
     const headerRightProps = processing ? {
       right: <ActivityIndicator style={styles.indicator} color={brandColor} size="small" />,
     } : {
-      right: <LinkText text="Done" color={linkTextColor} />,
+      right: <LinkText text={I18n.t('components.templates.FulfillModal.done')} color={linkTextColor} />,
       onRight: this.handleFulfill,
     };
     return (

@@ -607,6 +607,7 @@ export default {
                 first_repost:"首次转发!",
                 },
             FulfillModal: {
+                done: "完成",
                 shipping_carrier: "快递公司",
                 carrier_hint: "顺丰、中通、韵达，等等",
                 tracking_number: "快递单号",

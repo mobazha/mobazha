@@ -81,7 +81,7 @@ class Analytics extends PureComponent {
       <View style={screenWrapper.wrapper}>
         <Header left={<NavBackButton />} onLeft={this.handleGoBack} />
         <ScrollView>
-          <InputGroup title="Analytics">
+          <InputGroup title={I18n.t('screens.analytics.Analytics')}>
             <SwitchInput
               useNative
               noBorder

@@ -1057,7 +1057,7 @@ export default {
             back_to_store: '回到店铺',
             see_listing: '查看商品',
             warning: '警告',
-            warning_info: '如果你回退，你将丢失你的进度。',
+            warning_info: '如果你回退，你将丢失你的进度',
             cancel: '取消',
             ok: '好的'
         },
@@ -1233,7 +1233,7 @@ export default {
             currency: "现金",
             code:"邮编",
             share_analytics: "分享匿名分析数据",
-            help_improve: "帮助我们改进haven"
+            help_improve: "帮助我们改进Haven"
         },
         order: {
             orders: "订单",
@@ -1311,22 +1311,22 @@ export default {
         },
         profileSettings: {
             warning: "警告",
-            warning_info: "如果您返回，将会失去进度",
+            warning_info: "如果您返回，将会丢失你的进度",
             Cancel: "取消",
             OK: "好的",
             profile_information: "档案信息",
             name: "姓名",
-            name_hint: "Satoshi Nakamoto",
-            bio: "Bio",
+            name_hint: "张三",
+            bio: "简介",
             bio_hint: "写一条简短的描述",
             location: "位置",
             email:"邮箱",
-            location_hint: "e.g. Seattle",
+            location_hint: "比如，上海",
             contact: "联系方式",
             contact_hint: "satoshin@gmx.com",
-            phone_number: "Phone Number",
+            phone_number: "手机号",
             phone_hint: "+123456789",
-            website: "Website",
+            website: "站点",
             website_hint: "hello.com",
             Aaout: "关于",
             about_hint: "分享更多有关您自己的信息"
@@ -1349,7 +1349,7 @@ export default {
         },
         restoreProfileInit: {
             restore_profile: "恢复用户数据",
-            restore_hint: "选择您的haven用户数据以恢复您的个人资料，包括您的钱包资金。",
+            restore_hint: "选择您的Haven用户数据以恢复您的个人资料，包括您的钱包资金。",
             select_file: "选择文件"
         },
         restoreProfilePassword: {

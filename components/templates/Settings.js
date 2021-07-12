@@ -163,7 +163,7 @@ class Settings extends PureComponent {
             <View style={styles.optionWrapper}>
               <FormLabelText text={I18n.t('components.templates.Settings.Analytics')} style={styles.formLabel} />
               <Text style={styles.formValue}>
-                {isTrackingEvent ? I18n.t('components.templates.Settings.On') : I18n.t('components.templates.Settings.On')}
+                {isTrackingEvent ? I18n.t('components.templates.Settings.On') : I18n.t('components.templates.Settings.Off')}
               </Text>
             </View>
           </OptionGroup>

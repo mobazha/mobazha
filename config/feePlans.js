@@ -12,9 +12,9 @@ const FEE_PLANS = [
     displayLabel: I18n.t('config.feePlans.Economic'),
   },
   {
-    label: I18n.t('config.feePlans.NORMAL_v'),
+    label: I18n.t('config.feePlans.Normal_v'),
     value: 'NORMAL',
-    displayLabel: I18n.t('config.feePlans.NORMAL'),
+    displayLabel: I18n.t('config.feePlans.Normal'),
   },
   {
     label: I18n.t('config.feePlans.Priority_v'),

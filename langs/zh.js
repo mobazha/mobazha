@@ -1064,7 +1064,7 @@ export default {
             back_to_store: '回到店铺',
             see_listing: '查看商品',
             warning: '警告',
-            warning_info: '如果你回退，你将丢失你的进度',
+            warning_info: '如果你回退，你将丢失你的进度。',
             cancel: '取消',
             ok: '好的'
         },
@@ -1322,7 +1322,7 @@ export default {
         },
         profileSettings: {
             warning: "警告",
-            warning_info: "如果您返回，将会丢失你的进度",
+            warning_info: "如果您返回，将会丢失你的进度。",
             Cancel: "取消",
             OK: "好的",
             profile_information: "档案信息",

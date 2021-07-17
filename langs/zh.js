@@ -90,6 +90,7 @@ export default {
                 top_up: "用Wyre充值您的钱包!"
             },
             CheckoutNote: {
+                Note: "备注",
                 add_note: "添加备注到订单上(可选)",
                 add_seller_note: "给买家添加一条附注"
             },
@@ -1241,7 +1242,7 @@ export default {
             name: "姓名",
             optional: "可选的",
             country: "国家",
-            currency: "现金",
+            currency: "币种",
             code:"邮编",
             share_analytics: "分享匿名分析数据",
             help_improve: "帮助我们改进Haven"

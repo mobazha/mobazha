@@ -89,6 +89,7 @@ export default {
                 top_up: "Top-up your wallet with Wyre!"
             },
             CheckoutNote: {
+                note: "Note",
                 add_note: "Add a note to your order (optional)",
                 add_seller_note: "Add a note for the seller"
             },

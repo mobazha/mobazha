@@ -228,7 +228,7 @@ class Onboarding extends PureComponent {
             noBorder
             onChange={this.onChangeCurrency}
             options={currencies}
-            valueKey={I18n.t('screens.onboarding.code')}
+            valueKey="code"
             getLabel={option => `${option.name} (${option.symbol})`}
             titleWidth={titleWidth}
             vertical

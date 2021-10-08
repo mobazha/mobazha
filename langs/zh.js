@@ -757,7 +757,7 @@ export default {
                 thank_you: "谢谢你!",
                 order_placed: "您的订单已下达。 您可以随时跟踪或管理您的订单。",
                 processing: "处理中...",
-                hang_tight: "等一下, 这可能需要一分钟的时间。",
+                hang_tight: "稍等一下, 这可能需要一分钟的时间。",
                 Uh_oh: "Uh_oh",
                 transaction_failed: "您的交易失败, 请再试一次.",
                 retry: "重试",
@@ -1292,7 +1292,7 @@ export default {
         paymentSuccess: {
             transaction_details: "交易详情",
             processing: "处理中…",
-            hang_tight: "等一下 这可能需要一分钟.",
+            hang_tight: "稍等一下 这可能需要一分钟.",
             Uh_oh: "Uh oh!",
             failed_go_through: "您的交易失败。 请再试一次.",
             retry: "重试",

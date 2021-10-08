@@ -27,6 +27,12 @@ export const getCoinAddresses = () => {
   return makeRequest(url);
 };
 
+// Fetch the converted address (for Conflux)
+export const getCoinUpdateAddress = (coin, addr) => {
+  const url = `${gatewayAPI}/wallet/update_address/${coin}?address=${addr}`;
+  return makeRequest(url);
+};
+
 // Fetch the wallet balance
 export const getWalletBalance = () => {
   const url = `${gatewayAPI}/wallet/balance`;

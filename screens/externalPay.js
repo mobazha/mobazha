@@ -10,6 +10,7 @@ import Header from '../components/molecules/Header';
 import { screenWrapper } from '../utils/styles';
 import { COINS } from '../utils/coins';
 import { minUnitAmountToBCH } from '../utils/currency';
+import { getCoinUpdateAddress } from '../api/wallet';
 
 import { primaryTextColor, borderColor, formLabelColor } from '../components/commonColors';
 import NavBackButton from '../components/atoms/NavBackButton';
@@ -97,7 +98,23 @@ class ExternalPay extends PureComponent {
 
     this.state = {
       copied: null,
+      paymentAddress: "",
     };
+
+    this.updatePaymentAddress();
+  }
+
+  updatePaymentAddress() {
+    const { navigation } = this.props;
+    const coin = navigation.getParam('coin');
+    if (coin != 'CFX') {
+      this.setState({ paymentAddress: navigation.getParam('paymentAddress')});
+    } else {
+      getCoinUpdateAddress(coin, navigation.getParam('paymentAddress')).then(response => {
+        console.log("response", response)
+        this.setState({ paymentAddress: response.address});
+      });
+    }
   }
 
   componentDidUpdate(prevProps) {
@@ -122,8 +139,7 @@ class ExternalPay extends PureComponent {
         type: 'payment',
       });
     } else {
-      const paymentAddress = navigation.getParam('paymentAddress');
-      Clipboard.setString(paymentAddress);
+      Clipboard.setString(this.paymentAddress);
 
       this.setState({ copied: I18n.t('screens.externalPay.address_copied')});
       setTimeout(() => this.setState({ copied: null }), 2000);
@@ -148,12 +164,11 @@ class ExternalPay extends PureComponent {
 
   render() {
     const { navigation } = this.props;
-    const paymentAddress = navigation.getParam('paymentAddress');
     const amount = navigation.getParam('amount');
     const coin = navigation.getParam('coin');
     const { icon, qrLabel } = COINS[coin];
 
-    const { copied } = this.state;
+    const { copied, paymentAddress } = this.state;
 
     return (
       <View style={[screenWrapper.wrapper, styles.wrapper]}>

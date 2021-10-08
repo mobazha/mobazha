@@ -97,7 +97,7 @@ class CheckoutNote extends React.PureComponent {
     return (
       <InputGroup
         contentStyle={styles.wrapper}
-        title="Note"
+        title={I18n.t('components.molecules.CheckoutNote.note')}
         action={this.handleOpenModal}
         actionTitle={EditIcon}
         noBorder

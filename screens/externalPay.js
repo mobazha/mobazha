@@ -111,7 +111,6 @@ class ExternalPay extends PureComponent {
       this.setState({ paymentAddress: navigation.getParam('paymentAddress')});
     } else {
       getCoinUpdateAddress(coin, navigation.getParam('paymentAddress')).then(response => {
-        console.log("response", response)
         this.setState({ paymentAddress: response.address});
       });
     }
@@ -139,7 +138,8 @@ class ExternalPay extends PureComponent {
         type: 'payment',
       });
     } else {
-      Clipboard.setString(this.paymentAddress);
+      const { paymentAddress } = this.state;
+      Clipboard.setString(paymentAddress);
 
       this.setState({ copied: I18n.t('screens.externalPay.address_copied')});
       setTimeout(() => this.setState({ copied: null }), 2000);

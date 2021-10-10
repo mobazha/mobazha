@@ -151,7 +151,7 @@ public class ServerBridgeModule extends ReactContextBaseJavaModule {
         protected String doInBackground(String... aurl) {
             final String token = ServerConfig.getServerToken();
             serverNode = Mobile.newNode(
-              MainApplication.getAppContext().getFilesDir() + "/Haven",
+              MainApplication.getAppContext().getFilesDir() + "/Mobazha",
               token,
               false,
               "obmobile",

@@ -2,7 +2,7 @@ import * as _ from 'lodash';
 import { mbzEthGatewayAPI, gatewayAPI, searchAPI } from './const';
 import { serverConfig } from '../utils/server';
 
-// Fetch OB1 verified moderators
+// Fetch Mobazha verified moderators
 export const getModerators = () => {
   const timestamp = Date.now();
   const url = `${searchAPI}/eth_verified_moderators?${timestamp}`;

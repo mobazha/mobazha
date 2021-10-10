@@ -362,7 +362,7 @@ export default {
                 ask_pay: "How would you like to pay?",
                 external_wallet: "External Wallet",
                 not_available_eth: "Not available for ETH",
-                haven_wallet: "Haven Wallet",
+                haven_wallet: "Mobazha Wallet",
                 not_enough_funds: "Not enough funds"
             },
             ProductModeSelector: {
@@ -436,8 +436,8 @@ export default {
                 choices_hint: "e.g. Small, Medium, Large"
             },
             SupportHaven: {
-                support_haven: "Support Haven",
-                description: "Haven is completely free to use and relies on your support to help fund development."
+                support_haven: "Support Mobazha",
+                description: "Mobazha is completely free to use and relies on your support to help fund development."
             },
             TagEditor: {
                 tags: "Tags",
@@ -532,7 +532,7 @@ export default {
                 description23: ", or even a",
                 description24: " distillery",
                 description25: ", please consider creating items and parts that can be donated and/or sold at a fair price.",
-                description31: "Your essential items can be immediately distributed on Haven without fees. No account needed. No questions asked. Please do your part to help.",
+                description31: "Your essential items can be immediately distributed on Mobazha without fees. No account needed. No questions asked. Please do your part to help.",
                 create_listing_title: "Create Listing"
             },
             DisputeModal: {
@@ -546,7 +546,7 @@ export default {
             EULAModal: {
                 eula: "EULA",
                 privacy_description1: "End User License Agreement terms and conditions governing download and use of this mobile application, downloaded by you via Apple, Inc.’s (“Apple”) App Store (the “App Store”) or Google Play. Please read this End User License Agreement terms and conditions carefully.",
-                privacy_description2: "This End User License Agreement sets forth the terms and conditions (“Terms”) under which OB1 (“OB1”) (alternatively referred to as “us,” “we,” or “our”) offers you the right to download and use the Haven mobile application (including any updates thereto, the “Application”) and your use of the Application is governed by these Terms. By accepting these Terms (i) you represent that you are of legal age to enter into a binding contract and (ii) you signify that you have read, understood and agree to these Terms (and that such Terms are enforceable like any other written negotiated agreement signed by you) and certify that you are at least 17 years old or older. If you do not agree to these Terms, or you are not at least 17 years old, you may not use the Application. Violations of these Terms will result in a permanent removal from the Application.",
+                privacy_description2: "This End User License Agreement sets forth the terms and conditions (“Terms”) under which OB1 (“OB1”) (alternatively referred to as “us,” “we,” or “our”) offers you the right to download and use the Mobazha mobile application (including any updates thereto, the “Application”) and your use of the Application is governed by these Terms. By accepting these Terms (i) you represent that you are of legal age to enter into a binding contract and (ii) you signify that you have read, understood and agree to these Terms (and that such Terms are enforceable like any other written negotiated agreement signed by you) and certify that you are at least 17 years old or older. If you do not agree to these Terms, or you are not at least 17 years old, you may not use the Application. Violations of these Terms will result in a permanent removal from the Application.",
                 privacy_description3: "These Terms constitute an agreement strictly between OB1 and you and you acknowledge that OB1 (in accordance with the limitations herein) rather than Apple and Google is responsible for any claim or liability arising from your use of the Application including, but not limited to, any third party claim of infringement of intellectual property rights. Nevertheless, you agree to abide by all terms, conditions or usage rules imposed by Apple and Google applicable to the use of this Application, including, but not limited to, any terms, conditions or usage rules set forth in the App Store Terms of Service.",
                 privacy_description4: "1. License and Restrictions",
                 privacy_description5: "The Application is licensed, not sold, to you. All rights, title and interest (including, without limitation, all copyrights, trademarks and other intellectual property rights) in and to this Application belong to us or our licensors. Subject to your compliance with these Terms, we grant you a non-transferable, non-assignable, revocable, limited license to download and install one copy of this Application on a mobile device that you personally own or control and to use that copy of this Application on that mobile device solely for your own personal use. You may not install or use a copy of the Application on a device you do not own or control. You may not distribute or make the Application available over a network where it could be used by multiple devices at the same time. You may not sell, rent, lend, lease, redistribute, or sublicense the Application or circumvent any technical limitations in the Application or otherwise interfere in any manner with the operation of the Application, or the hardware or network used to operate the Application. You may not copy, reverse engineer, decompile, disassemble, modify, create derivative works or otherwise attempt to derive the source code of this Application. This Application and its content are protected by copyright under both United States and foreign laws. Any use of the Application and its content not explicitly permitted by these Terms is a breach of this agreement and may violate the law. If you violate these Terms, your license to use this Application automatically terminates and you must immediately cease using the Application and destroy all copies, full or partial, of the Application.",
@@ -583,9 +583,9 @@ export default {
                 privacy_description32: "15. Amendment",
                 privacy_description33: "We have the right, at any time and without prior written notice, to add to or modify the Terms, by amending the Terms available within the Home page or by requiring you to accept an updated agreement upon accessing the Application. Your access or use of the Application after the date of such amended Terms constitutes acceptance of such amended Terms. By continuing to access or use the Application after we post such changes, you agree to these Terms, as modified.",
                 privacy_description34: "16. Contact Us",
-                privacy_description35: "For Questions, please email us at haven@ob1.io",
+                privacy_description35: "For Questions, please email us at admin@mobazha.com",
                 privacy_description36: "17. Copyright Infringement – DMCA Notice",
-                privacy_description36: "The Digital Millennium Copyright Act of 1998 (the “DMCA”) provides recourse for copyright owners who believe that material appearing on the Internet infringes their rights under US copyright law. If you believe in good faith that content or material on this Application infringes a copyright owned by you, you (or your agent) may send OB1 a notice requesting that the material be removed, or access to it blocked. This request should be sent to: haven@ob1.io. The notice must include the following information: (a) a physical or electronic signature of a person authorized to act on behalf of the owner of an exclusive right that is allegedly infringed; (b) identification of the copyrighted work claimed to have been infringed; (c) identification of the material that is claimed to be infringing or the subject of infringing activity; (d) the name, address, telephone number, and email address of the complaining party; (e) a statement that the complaining party has a good faith belief that use of the material in the manner complained of is not authorized by the copyright owner, its agent or the law; and (f) a statement that the information in the notification is accurate and, under penalty of perjury, that the complaining party is authorized to act on behalf of the owner of an exclusive right that is allegedly infringed. If you believe in good faith that a notice of copyright infringement has been wrongly filed against you, the DMCA permits you to send us a counter-notice. Notices and counter-notices must meet the then-current statutory requirements imposed by the DMCA. Notices and counternotices with respect to the Application should be sent to the address above.",
+                privacy_description36: "The Digital Millennium Copyright Act of 1998 (the “DMCA”) provides recourse for copyright owners who believe that material appearing on the Internet infringes their rights under US copyright law. If you believe in good faith that content or material on this Application infringes a copyright owned by you, you (or your agent) may send OB1 a notice requesting that the material be removed, or access to it blocked. This request should be sent to: admin@mobazha.com. The notice must include the following information: (a) a physical or electronic signature of a person authorized to act on behalf of the owner of an exclusive right that is allegedly infringed; (b) identification of the copyrighted work claimed to have been infringed; (c) identification of the material that is claimed to be infringing or the subject of infringing activity; (d) the name, address, telephone number, and email address of the complaining party; (e) a statement that the complaining party has a good faith belief that use of the material in the manner complained of is not authorized by the copyright owner, its agent or the law; and (f) a statement that the information in the notification is accurate and, under penalty of perjury, that the complaining party is authorized to act on behalf of the owner of an exclusive right that is allegedly infringed. If you believe in good faith that a notice of copyright infringement has been wrongly filed against you, the DMCA permits you to send us a counter-notice. Notices and counter-notices must meet the then-current statutory requirements imposed by the DMCA. Notices and counternotices with respect to the Application should be sent to the address above.",
                 iaccept: "I Accept"
             }, feed: {
                 not_post: "\nhasn\'t posted anything yet.",
@@ -980,7 +980,7 @@ export default {
             details6: 'When you enter checkout for a purchase (no information is collected about what is being purchased).',
             details7: 'When you send funds, and which type of payment is used (no details are collected about the payment itself such as addresses or values).',
             details8: 'When you create a listing (no information about the listing itself is collected).',
-            details9: 'Actions taken within Haven, such as tapping on the social feed or how often you make new posts. The content of the actions themselves are never recorded, only the fact that you took the action.',
+            details9: 'Actions taken within Mobazha, such as tapping on the social feed or how often you make new posts. The content of the actions themselves are never recorded, only the fact that you took the action.',
             Analytics: "Analytics",
             Share_anonymous: "Share anonymous analytics",
             description: "If you opt into sharing analytics, you agree to share the following information with the Mobazha Company:"
@@ -1219,10 +1219,10 @@ export default {
             Receive_all:"Receive all push notifications", 
             all2:"All",
             featured_content: "Featured content",
-            notify1: "Notify me of deals, discounts, and other cool content on Haven",
+            notify1: "Notify me of deals, discounts, and other cool content on Mobazha",
             promotions: "promotions",
             giveaways1:"Giveaways",
-            Notify2:"Notify me of giveaways and other promotional events on Haven",
+            Notify2:"Notify me of giveaways and other promotional events on Mobazha",
             giveaways2:"giveaways",
             announcements1: "Announcements",
             notify3:'Notify me of new features, updates, and other app-related announcements',
@@ -1246,7 +1246,7 @@ export default {
             currency: "Currency",
             code:"Code",
             share_analytics: "Share anonymous analytics",
-            help_improve: "Help us improve Haven"
+            help_improve: "Help us improve Mobazha"
         },
         order: {
             orders: "Orders",
@@ -1312,9 +1312,9 @@ export default {
             privacy_policy: "Privacy Policy",
             terms: "Terms of Service",
             privacy: "PRIVACY",
-            privacyDescription1: "Haven is built to give you far more privacy in your commerce, messaging, and payments than other apps.It uses several advanced technologies to keep your information from prying eyes, such as peer-to-peer networking and end-to-end encryption.",
-            privacyDescription2: "There are ways to use Haven which improve or diminish your privacy. To learn more about how the underlying technology works, and what steps you can take to improve your privacy, tap the privacy policy link below.",
-            privacyDescription3: "Before you proceed, you must accept the Haven https://gethaven.app/terms and https://gethaven.app/privacy.",
+            privacyDescription1: "Mobazha is built to give you far more privacy in your commerce, messaging, and payments than other apps.It uses several advanced technologies to keep your information from prying eyes, such as peer-to-peer networking and end-to-end encryption.",
+            privacyDescription2: "There are ways to use Mobazha which improve or diminish your privacy. To learn more about how the underlying technology works, and what steps you can take to improve your privacy, tap the privacy policy link below.",
+            privacyDescription3: "Before you proceed, you must accept the Mobazha https://gethaven.app/terms and https://gethaven.app/privacy.",
             cancel: "Cancel",
             I_accept: "I Accept"
         },

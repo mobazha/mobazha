@@ -36,7 +36,7 @@ const styles = {
 
 class ServerLog extends PureComponent {
   handleShareLog = fileName => () => {
-    const path = `${RNFS.DocumentDirectoryPath}/Haven/logs/${fileName}.log`;
+    const path = `${RNFS.DocumentDirectoryPath}/Mobazha/logs/${fileName}.log`;
     const shareOptions = {
       title: 'Email',
       message: 'Here is the log!',

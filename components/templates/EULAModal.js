@@ -87,7 +87,7 @@ const scrollStyleProps = {
 
 export default class EULAModal extends React.Component {
   handleShowModal = (url) => {
-    if (url === 'mailto:haven@ob1.io') {
+    if (url === 'mailto:admin@mobazha.com') {
       Linking.openURL(EMAIL_URL);
     }
   };

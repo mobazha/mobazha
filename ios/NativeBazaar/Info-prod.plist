@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Haven</string>
+	<string>Mobazha</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -46,13 +46,13 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Haven would like to use your camera in order to take images for products, the social feed, or for your avatar.</string>
+	<string>Mobazha would like to use your camera in order to take images for products, the social feed, or for your avatar.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Haven would like to use your microphone (for videos) in order to take videos for the social feed and storefront.</string>
+	<string>Mobazha would like to use your microphone (for videos) in order to take videos for the social feed and storefront.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Haven would like to save photos to your photo gallery in order to save images for products, the social feed, or for your avatar.</string>
+	<string>Mobazha would like to save photos to your photo gallery in order to save images for products, the social feed, or for your avatar.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Haven would like access to your photo gallery in order to use images for products, the social feed, or for your avatar.</string>
+	<string>Mobazha would like access to your photo gallery in order to use images for products, the social feed, or for your avatar.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Entypo.ttf</string>

@@ -76,7 +76,7 @@ RCT_EXPORT_METHOD(stop)
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, true);
     NSString *documentPath = [paths objectAtIndex:0];
 
-    obgo = MobileNewNode([NSString stringWithFormat:@"%@%@", documentPath, @"/Haven"], serverToken, false, @"obmobile", @"", @"", @"", false);
+    obgo = MobileNewNode([NSString stringWithFormat:@"%@%@", documentPath, @"/Mobazha"], serverToken, false, @"obmobile", @"", @"", @"", false);
     [obgo start:&error];
     if(error) {
       NSLog(@"%@", error);

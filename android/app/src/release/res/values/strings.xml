@@ -1,4 +1,5 @@
 <resources>
-    <string name="app_name">Haven</string>
+    <string name="app_name">Mobazha</string>
     <bool name="branch_testmode">false</bool>
+    <string name="BRANCH_KEY">http://mbz.app.link/vZTkywtxEab</string>
 </resources>

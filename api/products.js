@@ -20,14 +20,14 @@ const handleErrorWithEmptyArray = (err) => {
   return [];
 };
 
-// Fetch the latest listings from OB1 search
+// Fetch the latest listings from Mobazha search
 export const fetchTrendingListing = () => {
   const apiURL = `${searchAPI}/listings/fresh/3`;
   return fetch(apiURL)
     .then(response => response.json());
 };
 
-// Fetch the top rated listings from OB1 search
+// Fetch the top rated listings from Mobazha search
 export const fetchFeaturedListing = () => {
   const apiURL = `${searchAPI}/listings/hot/24/6`;
   return fetch(apiURL)

@@ -30,5 +30,5 @@ class ServerConfig {
 
 export const serverConfig = new ServerConfig();
 
-export const SERVER_PATH = `${RnFs.DocumentDirectoryPath}/Haven`;
-export const SERVER_UNZIP_PATH = `${RnFs.DocumentDirectoryPath}/Haven_Unzip`;
+export const SERVER_PATH = `${RnFs.DocumentDirectoryPath}/Mobazha`;
+export const SERVER_UNZIP_PATH = `${RnFs.DocumentDirectoryPath}/Mobazha_Unzip`;

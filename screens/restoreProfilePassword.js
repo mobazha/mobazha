@@ -124,7 +124,7 @@ class RestoreProfilePassword extends PureComponent {
 
   handleServerStopped = async () => {
     console.warn('server stopped');
-    const tempPath = `${RnFs.DocumentDirectoryPath}/Haven_`;
+    const tempPath = `${RnFs.DocumentDirectoryPath}/Mobazha_`;
 
     try {
       await RnFs.moveFile(SERVER_PATH, tempPath);

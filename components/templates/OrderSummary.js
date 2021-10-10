@@ -657,7 +657,7 @@ class OrderSummary extends PureComponent {
         }
       } else if (state === 'RESOLVED') {
         title = I18n.t('components.templates.OrderSummary.dispute_closed');
-        description = I18n.t('components.templates.OrderSummary.dispute_closed_info');
+        description = I18n.t('components.templates.OrderSummary.dispute_closed_info', {user: this.isDisputeClosedBySeller() ?I18n.t('components.templates.OrderSummary.the_seller'):I18n.t('components.templates.OrderSummary.the_buyer')});
         transaction = {
           ...transaction,
           // bigValue: amIBuyer ? buyerValue : sellerValue,

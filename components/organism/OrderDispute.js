@@ -185,7 +185,7 @@ class OrderDispute extends PureComponent {
     const amIBuyer = orderType === 'purchases';
     return (
       <InputGroup
-        title="Dispute payout"
+        title={I18n.t('components.organism.OrderDispute.dispute_payout')}
         actionTitle={timeSince(new Date(disputeResolution.timestamp))}
         actionStyle={styles.timestamp}
       >
@@ -239,7 +239,7 @@ class OrderDispute extends PureComponent {
         {this.renderDisputeExpire()}
         {!isEmpty(disputeResolution) && this.renderDisputePayout()}
         <InputGroup
-          title={`Dispute started by ${name || (sellerStarted ? I18n.t('components.organism.OrderDispute.seller_takes') : I18n.t('components.organism.OrderDispute.buyer_takes'))}`}
+          title={I18n.t('components.organism.OrderDispute.started_by', {name:name}) + " " + (sellerStarted ? I18n.t('components.organism.OrderDispute.seller_takes') : I18n.t('components.organism.OrderDispute.buyer_takes'))}
           actionTitle={timeSince(new Date(dispute.timestamp))}
           actionStyle={styles.timestamp}
         >

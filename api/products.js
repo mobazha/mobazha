@@ -47,30 +47,29 @@ export const fetchDevicesListing = () => fetch(devicesListingAPI)
   .then(response => response.json());
 
 // Fetch an index of listings from a store
-export const getListings = (username, password, peerID = '', countToPull = 10000, page = 0) => {
+export const getListings = (username, password, peerID = '', countToPull = 10000) => {
   let apiURL = '';
   if (isEmpty(peerID)) {
     apiURL = `${gatewayAPI}/ob/listings`;
+    const headers = {
+      method: 'GET',
+      headers: serverConfig.getAuthHeader(username, password),
+    };
+    return fetch(apiURL, headers)
+      .then(response => response.json())
+      .catch(handleErrorWithEmptyArray);
   } else {
-    apiURL = `${gatewayAPI}/ob/listings/`+peerID;
+    apiURL = `${searchAPI}/search/listing_m?q=*&id=${peerID}&nsfw=false&network=mainnet&pageSize=${countToPull}`;
+    if (Platform.OS === 'ios') {
+      apiURL = `${apiURL}&mobile`;
+    }
+    const headers = { method: 'GET' };
+    return fetch(apiURL, headers)
+      .then(response => response.json())
+      .then(filteroutCryptoFromSearch)
+      .then(items => items.results.results.map(item => item.data))
+      .catch(handleErrorWithEmptyArray);
   }
-  const headers = {
-    method: 'GET',
-    headers: serverConfig.getAuthHeader(username, password),
-  };
-  return fetch(apiURL, headers)
-    .then(response => response.json())
-    .catch(handleErrorWithEmptyArray);
-  // } else {
-  //   apiURL = `${searchAPI}/listings?q=*&peerID=${peerID}&page=${page}&pageSize=${countToPull}`;
-  //   if (Platform.OS === 'ios') {
-  //     apiURL = `${apiURL}&mobile`;
-  //   }
-  //   const headers = { method: 'GET' };
-  //   return fetch(apiURL, headers)
-  //     .then(response => response.json())
-  //     .catch(handleErrorWithEmptyArray);
-  // }
 };
 
 // Fetch an individual listing
@@ -84,7 +83,7 @@ export const getListing = (username, password, slug, peerID = '') => {
   }
   const headers = {
     method: 'GET',
-    headers: serverConfig.getAuthHeader(username, password),
+    headers: isEmpty(peerID) ? serverConfig.getAuthHeader(username, password) : {},
   };
   return fetch(apiURL, headers).then(response => response.json());
 };

@@ -1,21 +1,21 @@
 import { isEmpty } from 'lodash';
 
-import { mbzGatewayAPI, gatewayAPI, searchAPI } from './const';
+import { gatewayAPI, searchAPI } from './const';
 import { makeRequest } from './common';
 import { serverConfig } from '../utils/server';
 
 // Fetch the followers of a user/store
 export const getFollowers = (peerID = '') => {
   const timestamp = Date.now();
-  const apiURL = `${gatewayAPI}/ob/followers/${peerID}?usecache=true&${timestamp}`;
-  return makeRequest(apiURL, true);
+  const apiURL = `${searchAPI}/profile/followers?peerId=${peerID}&${timestamp}&pageSize=10000`;
+  return makeRequest(apiURL, isEmpty(peerID));
 };
 
 // Fetch the following list of a user/store
 export const getFollowings = (peerID = '') => {
   const timestamp = Date.now();
-  const apiURL = `${gatewayAPI}/ob/following/${peerID}?usecache=true&${timestamp}`;
-  return makeRequest(apiURL, true);
+  const apiURL = `${searchAPI}/profile/following?peerId=${peerID}&${timestamp}&pageSize=10000`;
+  return makeRequest(apiURL, isEmpty(peerID));
 };
 
 // Check if the user is following the store

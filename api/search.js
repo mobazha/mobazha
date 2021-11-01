@@ -5,9 +5,9 @@ import { filteroutCryptoFromSearch } from '../utils/listings';
 
 export function getRandomSearch(query, queryString, page = 0, numPerPage = 40, categories) {
   const qVal = query === '' ? '*' : query;
-  let apiUrl = `${searchAPI}/listings?ps=${numPerPage}&q=${qVal}&${queryString}&page=${page}`;
+  let apiUrl = `${searchAPI}/search/listing_m?pageSize=${numPerPage}&q=${encodeURI(qVal)}&${queryString}&p=${page}`;
   if (Platform.OS === 'ios') {
-    apiUrl = `${apiUrl}&mobile&type=physical_good&type=service`;
+    apiUrl = `${apiUrl}&mobile&lt=physical_good&lt=service`;
   }
   if (categories) {
     apiUrl = `${apiUrl}&categories=${encodeURI(categories)}`;
@@ -20,9 +20,9 @@ export function getRandomSearch(query, queryString, page = 0, numPerPage = 40, c
 // Fetch search results from a query
 export function getSearchResult(query, queryString, page = 0, numPerPage = 40, categories) {
   const qVal = query === '' ? '*' : query;
-  let apiUrl = `${searchAPI}/listings?ps=${numPerPage}&q=${encodeURI(qVal)}&${queryString}&p=${page}`;
+  let apiUrl = `${searchAPI}/search/listing_m?pageSize=${numPerPage}&q=${encodeURI(qVal)}&${queryString}&p=${page}`;
   if (Platform.OS === 'ios') {
-    apiUrl = `${apiUrl}&mobile&type=physical_good&type=service`;
+    apiUrl = `${apiUrl}&mobile&lt=physical_good&lt=service`;
   }
   if (categories) {
     apiUrl = `${apiUrl}&categories=${encodeURI(categories)}`;
@@ -34,9 +34,9 @@ export function getSearchResult(query, queryString, page = 0, numPerPage = 40, c
 
 // Fetch search results from a listing
 export function getListingResult(queryString, page = 0, numPerPage = 40) {
-  let apiUrl = `${searchAPI}/listings?ps=${numPerPage}&${queryString}&p=${page}`;
+  let apiUrl = `${searchAPI}/search/listing_m?pageSize=${numPerPage}&${queryString}&p=${page}`;
   if (Platform.OS === 'ios') {
-    apiUrl = `${apiUrl}&mobile&type=physical_good&type=service`;
+    apiUrl = `${apiUrl}&mobile&lt=physical_good&lt=service`;
   }
   return fetch(apiUrl)
     .then(response => (response.json()))
@@ -50,7 +50,7 @@ export function getListingResult(queryString, page = 0, numPerPage = 40) {
 // Fetch search results for profile
 export function searchProfile(keyword, page = 0, numPerPage = 40) {
   const qVal = keyword === '' ? '*' : keyword;
-  let apiUrl = `${searchAPI}/vendors?ps=${numPerPage}&page=${page}&q=${qVal}`;
+  let apiUrl = `${searchAPI}/search/profile_m?pageSize=${numPerPage}&p=${page}&q=${qVal}`;
   if (Platform.OS === 'ios') {
     apiUrl = `${apiUrl}&mobile`;
   }

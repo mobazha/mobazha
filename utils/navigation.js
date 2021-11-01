@@ -20,7 +20,7 @@ const ETHER_REGEX = /^0x[a-fA-F0-9]{40}$/;
 
 const CONFLUX_REGEX = /^cfx.*$/;
 
-export const UNIVERSAL_LINK_PREFIX = 'https://market.mobazha.com/';
+export const UNIVERSAL_LINK_PREFIX = 'https://mobazha.com.info/';
 
 export const getNavRouteAndParamsFromURL = (initialUrl) => {
   if (!initialUrl) {

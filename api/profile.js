@@ -1,6 +1,6 @@
 import { isEmpty } from 'lodash';
 
-import { mbzGatewayAPI, gatewayAPI, searchAPI } from './const';
+import { gatewayAPI, searchAPI } from './const';
 import { serverConfig } from '../utils/server';
 import { makeFetch } from './common';
 
@@ -9,14 +9,17 @@ export const getProfile = (peerID = '') => {
 
   let apiURL = '';
   const timestamp = Date.now();
+
+  let fromRemote = false;
   if (isEmpty(peerID)) {
     apiURL = `${gatewayAPI}/ob/profile?async=true`;
   } else {
-    apiURL = `${mbzGatewayAPI}/ob/profile/${peerID}?${timestamp}`;
+    fromRemote = true;
+    apiURL = `${searchAPI}/profile?peerId=${peerID}&${timestamp}`;
   }
   const headers = {
     method: 'GET',
-    headers: serverConfig.getAuthHeader(),
+    headers: isEmpty(peerID) ? serverConfig.getAuthHeader() : {},
   };
   return fetch(
     apiURL,
@@ -26,7 +29,7 @@ export const getProfile = (peerID = '') => {
       if (response.status === 404) {
         return null;
       } else {
-        return response.json();
+        return fromRemote ? response.json().data : response.json();
       }
     });
 };

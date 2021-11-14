@@ -27,7 +27,7 @@ export const postFeed = (status, images) => {
 export const fetchFeedItem = (slug, peerID = '') => {
   let apiURL = `${gatewayAPI}/ob/post/${slug}?`;
   if (peerID !== '') {
-    apiURL = `${searchAPI}/posts/${peerID}/${slug}?type=post&type=repost&includes=likes&includes=reposts&includes=comments`;
+    apiURL = `${searchAPI}/api/posts/${peerID}/${slug}?type=post&type=repost&includes=likes&includes=reposts&includes=comments`;
   }
   const headers = {
     method: 'GET',
@@ -56,7 +56,7 @@ export const deleteFeedItem = (slug) => {
 };
 
 export const likePost = (peer_id, post_peer_id, slug, signature = '*') => {
-  const apiURL = `${searchAPI}/posts/like`;
+  const apiURL = `${searchAPI}/api/posts/like`;
   const headers = {
     method: 'POST',
     body: JSON.stringify({

@@ -20,6 +20,7 @@ import {
   fetchBestsellersListing,
   fetchGamingListing,
   fetchMunchiesListing,
+  fetchArtsListing,
   fetchDevicesListing,
   fetchListingsForCategories,
 } from '../reducers/product';
@@ -101,6 +102,7 @@ class ShopScreen extends PureComponent {
       fetchBestsellersListing,
       fetchGamingListing,
       fetchMunchiesListing,
+      fetchArtsListing,
       fetchDevicesListing,
       fetchFeatured,
       fetchListingsForCategories,
@@ -114,6 +116,7 @@ class ShopScreen extends PureComponent {
     fetchBestsellersListing();
     fetchGamingListing();
     fetchMunchiesListing();
+    fetchArtsListing();
     fetchDevicesListing();
     fetchListingsForCategories();
   };
@@ -126,6 +129,7 @@ class ShopScreen extends PureComponent {
       fetchBestsellersListing,
       fetchGamingListing,
       fetchMunchiesListing,
+      fetchArtsListing,
       fetchDevicesListing,
       fetchFeatured,
       fetchPromo,
@@ -136,6 +140,7 @@ class ShopScreen extends PureComponent {
     fetchBestsellersListing();
     fetchGamingListing();
     fetchMunchiesListing();
+    fetchArtsListing();
     fetchDevicesListing();
     fetchFeatured();
     fetchListingsForCategories();
@@ -362,6 +367,7 @@ const mapDispatchToProps = {
   fetchBestsellersListing,
   fetchGamingListing,
   fetchMunchiesListing,
+  fetchArtsListing,
   fetchDevicesListing,
   fetchFeatured,
   fetchListingsForCategories,

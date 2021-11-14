@@ -1517,6 +1517,7 @@ export default {
             Jewelry: "Jewelry",
             Tools: "Tools",
             Gift_Cards: "Gift Cards",
+            Art: "Art"
         },
         notification: {
             you: "You",

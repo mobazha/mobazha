@@ -5,7 +5,7 @@ import { serverConfig } from '../utils/server';
 // Fetch Mobazha verified moderators
 export const getModerators = () => {
   const timestamp = Date.now();
-  const url = `${searchAPI}/eth_verified_moderators?${timestamp}`;
+  const url = `${searchAPI}/api/moderator/verified?${timestamp}`;
   const headers = {
     method: 'GET',
   };

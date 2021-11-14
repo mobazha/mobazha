@@ -7,14 +7,14 @@ import { serverConfig } from '../utils/server';
 // Fetch the followers of a user/store
 export const getFollowers = (peerID = '') => {
   const timestamp = Date.now();
-  const apiURL = `${searchAPI}/profile/followers?peerId=${peerID}&${timestamp}&pageSize=10000`;
+  const apiURL = `${searchAPI}/api/profile/followers?peerId=${peerID}&${timestamp}&pageSize=10000`;
   return makeRequest(apiURL, isEmpty(peerID));
 };
 
 // Fetch the following list of a user/store
 export const getFollowings = (peerID = '') => {
   const timestamp = Date.now();
-  const apiURL = `${searchAPI}/profile/following?peerId=${peerID}&${timestamp}&pageSize=10000`;
+  const apiURL = `${searchAPI}/api/profile/following?peerId=${peerID}&${timestamp}&pageSize=10000`;
   return makeRequest(apiURL, isEmpty(peerID));
 };
 

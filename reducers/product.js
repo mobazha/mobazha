@@ -21,6 +21,10 @@ export const actions = {
   setMunchies: 'PRODUCT/SET_MUNCHIES',
   setMunchiesLoading: 'PRODUCT/SET_MUNCHIES_LOADING',
 
+  fetchArts: 'PRODUCT/FETCH_ARTS',
+  setArts: 'PRODUCT/SET_ARTS',
+  setArtsLoading: 'PRODUCT/SET_ARTS_LOADING',
+
   fetchDevices: 'PRODUCT/FETCH_DEVICES',
   setDevices: 'PRODUCT/SET_DEVICES',
   setDevicesLoading: 'PRODUCT/SET_DEVICES_LOADING',
@@ -36,6 +40,7 @@ export const fetchTrendingListing = createAction(actions.fetchTrending);
 export const fetchBestsellersListing = createAction(actions.fetchBestsellers);
 export const fetchGamingListing = createAction(actions.fetchGaming);
 export const fetchMunchiesListing = createAction(actions.fetchMunchies);
+export const fetchArtsListing = createAction(actions.fetchArts);
 export const fetchDevicesListing = createAction(actions.fetchDevices);
 export const fetchListingsForCategories = createAction(actions.fetchListingsForCategories);
 

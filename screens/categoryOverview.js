@@ -77,7 +77,7 @@ class CategoryOverview extends PureComponent {
 
   async componentDidMount() {
     const { name } = this.props.navigation.getParam('item');
-    const response = await getRandomSearch('', '', 0, 6, name);
+    const response = await getRandomSearch(name, '', 0, 6, '');
     const results = _.get(response, 'results.results');
     if (results) {
       this.setState({ results });

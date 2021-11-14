@@ -9,6 +9,7 @@ import {
   fetchBestsellersListing,
   fetchGamingListing,
   fetchMunchiesListing,
+  fetchArtsListing,
   fetchDevicesListing,
 } from '../../api/products';
 import { shuffle, PREVIEWING_CATEGORIES } from '../../utils/listings';
@@ -49,7 +50,7 @@ export function* getFeatured() {
 export function* getBestsellers() {
   try {
     const response = yield call(fetchBestsellersListing);
-    const result = response.result.results.map(item => item.data);
+    const result = response.results.results.map(item => item.data);
     yield put({
       type: actions.setBestsellers,
       payload: shuffle(result),
@@ -66,7 +67,7 @@ export function* getBestsellers() {
 export function* getGaming() {
   try {
     const response = yield call(fetchGamingListing);
-    const result = response.result.results.map(item => item.data);
+    const result = response.results.results.map(item => item.data);
     yield put({
       type: actions.setGaming,
       payload: shuffle(result),
@@ -83,7 +84,7 @@ export function* getGaming() {
 export function* getMunchies() {
   try {
     const response = yield call(fetchMunchiesListing);
-    const result = response.result.results.map(item => item.data);
+    const result = response.results.results.map(item => item.data);
     yield put({
       type: actions.setMunchies,
       payload: shuffle(result),
@@ -97,10 +98,27 @@ export function* getMunchies() {
   }
 }
 
+export function* getArts() {
+  try {
+    const response = yield call(fetchArtsListing);
+    const result = response.results.results.map(item => item.data);
+    yield put({
+      type: actions.setArts,
+      payload: shuffle(result),
+    });
+  } catch (err) {
+    console.log('Product Saga Error: ', err);
+    yield put({
+      type: actions.setArtsLoading,
+      payload: false,
+    });
+  }
+}
+
 export function* getDevices() {
   try {
     const response = yield call(fetchDevicesListing);
-    const result = response.result.results.map(item => item.data);
+    const result = response.results.results.map(item => item.data);
     yield put({
       type: actions.setDevices,
       payload: shuffle(result),
@@ -132,7 +150,7 @@ export function* getListingsForCategory(action) {
   });
 
   try {
-    const response = yield call(getRandomSearch, '', '', 0, 8, name);
+    const response = yield call(getRandomSearch, name, '', 0, 8, '');
     yield put({
       type: actions.setListingsForCategory,
       payload: {

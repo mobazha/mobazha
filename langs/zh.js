@@ -1517,6 +1517,7 @@ export default {
             Jewelry: "珠宝",
             Tools: "工具",
             Gift_Cards: "礼品卡",
+            Art: "艺术品"
         },
         notification: {
             you: "你",

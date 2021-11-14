@@ -85,7 +85,7 @@ class ListingsTab extends PureComponent {
     this.setState({ loading: true });
     if (peerID) {
       // pull only one listing just to check if there is listing for that peerID or not (for now)
-      getListings(username, password, peerID, 1).then(this.onFetchListings);
+      getListings(username, password, peerID).then(this.onFetchListings);
     } else {
       this.props.fetchListings();
       this.props.onListingCountChange(this.props.listings.length);

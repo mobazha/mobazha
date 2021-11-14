@@ -108,9 +108,9 @@ class Checkout extends PureComponent {
       this.props.fetchProfile({ peerID: moderator, getLoaded: true });
     });
 
-    const filteredModerators = filterModerators(moderators);
+    // const filteredModerators = filterModerators(moderators);
 
-    this.setState({ moderators: filteredModerators });
+    this.setState({ moderators: moderators });
 
     setModerator('');
     if (!isEmpty(moderators)) {

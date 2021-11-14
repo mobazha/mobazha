@@ -9,6 +9,7 @@ import {
   bestsellersListingAPI,
   gamingListingAPI,
   munchiesListingAPI,
+  artsListingAPI,
   devicesListingAPI,
   trendListingAPI,
 } from './const';
@@ -22,14 +23,14 @@ const handleErrorWithEmptyArray = (err) => {
 
 // Fetch the latest listings from Mobazha search
 export const fetchTrendingListing = () => {
-  const apiURL = `${searchAPI}/listings/fresh/3`;
+  const apiURL = `${searchAPI}/api/listings/fresh/3`;
   return fetch(apiURL)
     .then(response => response.json());
 };
 
 // Fetch the top rated listings from Mobazha search
 export const fetchFeaturedListing = () => {
-  const apiURL = `${searchAPI}/listings/hot/24/6`;
+  const apiURL = `${searchAPI}/api/listings/hot/24/6`;
   return fetch(apiURL)
     .then(response => response.json());
 };
@@ -41,6 +42,9 @@ export const fetchGamingListing = () => fetch(gamingListingAPI)
   .then(response => response.json());
 
 export const fetchMunchiesListing = () => fetch(munchiesListingAPI)
+  .then(response => response.json());
+
+export const fetchArtsListing = () => fetch(artsListingAPI)
   .then(response => response.json());
 
 export const fetchDevicesListing = () => fetch(devicesListingAPI)
@@ -59,7 +63,7 @@ export const getListings = (username, password, peerID = '', countToPull = 10000
       .then(response => response.json())
       .catch(handleErrorWithEmptyArray);
   } else {
-    apiURL = `${searchAPI}/search/listing_m?q=*&id=${peerID}&nsfw=false&network=mainnet&pageSize=${countToPull}`;
+    apiURL = `${searchAPI}/api/search/listing_m?q=*&id=${peerID}&nsfw=false&network=mainnet&pageSize=${countToPull}`;
     if (Platform.OS === 'ios') {
       apiURL = `${apiURL}&mobile`;
     }
@@ -169,7 +173,7 @@ export const deleteListing = (username, password, slug) => {
 };
 
 export const reportListing = (peerID, slug, reason) => {
-  const apiURL = `${searchAPI}/reports`;
+  const apiURL = `${searchAPI}/api/reports`;
   const headers = {
     method: 'POST',
     headers: {

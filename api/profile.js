@@ -10,12 +10,10 @@ export const getProfile = (peerID = '') => {
   let apiURL = '';
   const timestamp = Date.now();
 
-  let fromRemote = false;
   if (isEmpty(peerID)) {
     apiURL = `${gatewayAPI}/ob/profile?async=true`;
   } else {
-    fromRemote = true;
-    apiURL = `${searchAPI}/profile?peerId=${peerID}&${timestamp}`;
+    apiURL = `${searchAPI}/api/profile?peerId=${peerID}&${timestamp}`;
   }
   const headers = {
     method: 'GET',
@@ -29,7 +27,7 @@ export const getProfile = (peerID = '') => {
       if (response.status === 404) {
         return null;
       } else {
-        return fromRemote ? response.json().data : response.json();
+        return response.json();
       }
     });
 };
@@ -53,5 +51,5 @@ export const reportProfile = (peerID, reason, slug = '', report_type = 'node') =
     method: 'POST',
     body: JSON.stringify({ peerID, reason, slug, report_type }),
   };
-  return fetch(`${searchAPI}/reports`, headers);
+  return fetch(`${searchAPI}/api/reports`, headers);
 };

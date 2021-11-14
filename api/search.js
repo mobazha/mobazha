@@ -5,7 +5,8 @@ import { filteroutCryptoFromSearch } from '../utils/listings';
 
 export function getRandomSearch(query, queryString, page = 0, numPerPage = 40, categories) {
   const qVal = query === '' ? '*' : query;
-  let apiUrl = `${searchAPI}/search/listing_m?pageSize=${numPerPage}&q=${encodeURI(qVal)}&${queryString}&p=${page}`;
+  queryString = queryString ? "&${queryString}" : "";
+  let apiUrl = `${searchAPI}/?pageSize=${numPerPage}&q=${encodeURI(qVal)}${queryString}&p=${page}`;
   if (Platform.OS === 'ios') {
     apiUrl = `${apiUrl}&mobile&lt=physical_good&lt=service`;
   }
@@ -20,7 +21,8 @@ export function getRandomSearch(query, queryString, page = 0, numPerPage = 40, c
 // Fetch search results from a query
 export function getSearchResult(query, queryString, page = 0, numPerPage = 40, categories) {
   const qVal = query === '' ? '*' : query;
-  let apiUrl = `${searchAPI}/search/listing_m?pageSize=${numPerPage}&q=${encodeURI(qVal)}&${queryString}&p=${page}`;
+  queryString = queryString ? "&${queryString}" : "";
+  let apiUrl = `${searchAPI}/?pageSize=${numPerPage}&q=${encodeURI(qVal)}${queryString}&p=${page}`;
   if (Platform.OS === 'ios') {
     apiUrl = `${apiUrl}&mobile&lt=physical_good&lt=service`;
   }

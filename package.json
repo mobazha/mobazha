@@ -1,6 +1,6 @@
 {
   "name": "NativeBazaar",
-  "version": "0.0.1",
+  "version": "0.7.5",
   "private": true,
   "scripts": {
     "prestart": "rm -f ./node_modules/react-native/local-cli/core/__fixtures__/files/package.json",
@@ -10,7 +10,8 @@
     "lint:eslint": "eslint --ignore-path .gitignore --ignore-pattern internals/scripts",
     "lint:js": "npm run lint:eslint -- . ",
     "lint:staged": "lint-staged",
-    "postinstall": "npx jetify; ./install_server.sh; cd ./node_modules/react-native; exec ./scripts/ios-install-third-party.sh"
+    "postinstall": "npx jetify; ./install_server.sh; cd ./node_modules/react-native; exec ./scripts/ios-install-third-party.sh",
+    "build:ios": "react-native bundle --entry-file='index.js' --bundle-output='./ios/main.jsbundle' --dev=false --platform='ios'"
   },
   "dependencies": {
     "@react-native-community/async-storage": "^1.12.1",
@@ -19,9 +20,9 @@
     "@react-native-firebase/auth": "8.0.3",
     "@react-native-firebase/firestore": "7.1.2",
     "@react-native-firebase/messaging": "7.1.3",
-    "appcenter": "3.0.0",
-    "appcenter-analytics": "3.0.0",
-    "appcenter-crashes": "3.0.0",
+    "appcenter": "^4.3.0",
+    "appcenter-analytics": "^4.3.0",
+    "appcenter-crashes": "^4.3.0",
     "base-64": "0.1.0",
     "bignumber.js": "9.0.0",
     "countly-sdk-react-native-bridge": "20.4.7",

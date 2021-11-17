@@ -6,9 +6,10 @@
 	<string>development</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:openbazaar.com</string>
-		<string>applinks:ob.app.link</string>
-		<string>applinks:ob-alternate.app.link</string>
+		<string>applinks:mobazha.com</string>
+		<string>applinks:mobazha.info</string>
+		<string>applinks:mbz.app.link</string>
+		<string>applinks:mbz-alternate.app.link</string>
 	</array>
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>

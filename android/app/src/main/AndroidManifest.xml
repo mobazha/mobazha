@@ -13,7 +13,7 @@
 
     <uses-sdk
         android:minSdkVersion="17"
-        android:targetSdkVersion="28" />
+        android:targetSdkVersion="30" />
 
     <application
       android:name=".MainApplication"

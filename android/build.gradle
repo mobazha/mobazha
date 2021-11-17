@@ -17,7 +17,7 @@ buildscript {
 ext {
     compileSdkVersion=28
     buildToolsVersion='28.0.3'
-    minSdkVersion=17
+    minSdkVersion=21
     targetSdkVersion=30
     androidXAnnotation = "1.1.0"
     androidXBrowser = "1.0.0"

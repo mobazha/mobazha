@@ -35,8 +35,6 @@ def common_pods
   pod 'RNInputMask', :path => '../node_modules/react-native-text-input-mask/ios/InputMask'
 
   pod 'SGActionView', :git => 'https://github.com/prscX/SGActionView.git'
-  pod 'RNBottomActionSheet', :path => '../node_modules/react-native-bottom-action-sheet/ios'
-  pod 'RNImageHelper', :path => '../node_modules/react-native-image-helper/ios'
 
   use_native_modules!
 

@@ -8,14 +8,18 @@ import { serverConfig } from '../utils/server';
 export const getFollowers = (peerID = '') => {
   const timestamp = Date.now();
   const apiURL = `${searchAPI}/api/profile/followers?peerId=${peerID}&${timestamp}&pageSize=10000`;
-  return makeRequest(apiURL, isEmpty(peerID));
+  return makeRequest(apiURL, isEmpty(peerID)).then(
+    result => result.followers.map(item => item.peerId)
+  );
 };
 
 // Fetch the following list of a user/store
 export const getFollowings = (peerID = '') => {
   const timestamp = Date.now();
   const apiURL = `${searchAPI}/api/profile/following?peerId=${peerID}&${timestamp}&pageSize=10000`;
-  return makeRequest(apiURL, isEmpty(peerID));
+  return makeRequest(apiURL, isEmpty(peerID)).then(
+    result => result.following.map(item => item.peerId)
+  );
 };
 
 // Check if the user is following the store

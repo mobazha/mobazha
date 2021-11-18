@@ -145,6 +145,10 @@ class Me extends PureComponent {
     Linking.openURL(FAQ_URL);
   }
 
+  handlePressDiscord = () => {
+    Linking.openURL(DISCROD_URL);
+  }
+
   handlePressTelegram = () => {
     Linking.openURL(TELEGRAM_URL);
   }
@@ -211,13 +215,13 @@ class Me extends PureComponent {
               </DescriptionText>
             </InputGroup>
           </ScrollView>
-          {/* <Button
-            title={I18n.t('screens.Me.fAQs')}
+          <Button
+            title={I18n.t('screens.Me.discord')}
             wrapperStyle={styles.buttonWrapper}
             textStyle={styles.buttonText}
-            onPress={this.handlePressFaq}
+            onPress={this.handlePressDiscord}
             style={styles.firstButton}
-          /> */}
+          />
           <Button
             title={I18n.t('screens.Me.telegram')}
             textStyle={styles.buttonText}

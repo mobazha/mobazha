@@ -32,18 +32,18 @@ export const COINS = {
     icon: LtcIcon,
     disabled: false,
   },
-  ZEC: {
-    label: 'Zcash',
-    qrLabel: 'zcash',
-    icon: ZecIcon,
-    disabled: false,
-  },
-  ETH: {
-    label: 'Ethereum',
-    qrLabel: 'ethereum',
-    icon: EthIcon,
-    disabled: false,
-  },
+  // ZEC: {
+  //   label: 'Zcash',
+  //   qrLabel: 'zcash',
+  //   icon: ZecIcon,
+  //   disabled: true,
+  // },
+  // ETH: {
+  //   label: 'Ethereum',
+  //   qrLabel: 'ethereum',
+  //   icon: EthIcon,
+  //   disabled: true,
+  // },
 };
 
 export const ACCEPTED_COINS = [
@@ -62,20 +62,25 @@ export const ACCEPTED_COINS = [
     icon: BchIcon,
   },
   {
+    label: 'Conflux',
+    value: 'CFX',
+    icon: CfxIcon,
+  },
+  {
     label: 'Litecoin',
     value: 'LTC',
     icon: LtcIcon,
   },
-  {
-    label: 'Zcash',
-    value: 'ZEC',
-    icon: ZecIcon,
-  },
-  {
-    label: 'Ethereum',
-    value: 'ETH',
-    icon: EthIcon,
-  },
+  // {
+  //   label: 'Zcash',
+  //   value: 'ZEC',
+  //   icon: ZecIcon,
+  // },
+  // {
+  //   label: 'Ethereum',
+  //   value: 'ETH',
+  //   icon: EthIcon,
+  // },
 ];
 
 export const getRenderingCoins = (acceptedCurrencies) => {

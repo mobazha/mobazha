@@ -130,12 +130,12 @@ export default class EULAModal extends React.Component {
               {I18n.t('components.templates.EULAModal.privacy_description5')}               
             </Text>
 
-            <Text style={styles.privacyDescriptionBold}>
+            {/* <Text style={styles.privacyDescriptionBold}>
               {I18n.t('components.templates.EULAModal.privacy_description6')} 
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
               {I18n.t('components.templates.EULAModal.privacy_description7')} 
-            </Text>
+            </Text> */}
 
             <Text style={styles.privacyDescriptionBold}>
               {I18n.t('components.templates.EULAModal.privacy_description8')}  
@@ -144,14 +144,14 @@ export default class EULAModal extends React.Component {
               {I18n.t('components.templates.EULAModal.privacy_description9')}               
             </Text>
 
-            <Text style={styles.privacyDescriptionBold}>
+            {/* <Text style={styles.privacyDescriptionBold}>
               {I18n.t('components.templates.EULAModal.privacy_description10')}               
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
               {I18n.t('components.templates.EULAModal.privacy_description11')} 
-            </Text>
+            </Text> */}
 
-            <Text style={styles.privacyDescriptionBold}>
+            {/* <Text style={styles.privacyDescriptionBold}>
               {I18n.t('components.templates.EULAModal.privacy_description12')} 
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
@@ -241,7 +241,7 @@ export default class EULAModal extends React.Component {
             </Text>
             <Text style={styles.privacyDescriptionNormal} textBreakStrategy="simple">
             {I18n.t('components.templates.EULAModal.privacy_description37')}               
-            </Text>
+            </Text> */}
 
           </Hyperlink>
         </ScrollView>

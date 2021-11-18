@@ -109,7 +109,7 @@ const initialState = {
   isBackupCopied: false,
   notifications: undefined,
   streamBuildNotificationSeen: false,
-  EULAPopupSeen: false,
+  EULAPopupSeen: true,
   streamBuildMigrated: false,
   ETHBuildMigrated: false,
   toast: {

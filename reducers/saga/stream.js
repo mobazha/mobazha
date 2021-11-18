@@ -400,9 +400,15 @@ function * fetchSocialNotifications(action) {
     notifications = notifications.filter(n => n.verb !== 'unfollow');
     const activityIds = notifications.reduce((prev, notification) => {
       const activity = get(notification, 'activities[0]');
-      const { content = {} } = JSON.parse(activity.object);
-      const { activityId, originalActivityId } = content;
-      return originalActivityId ? [...prev, activityId, originalActivityId] : [...prev, activityId];
+
+      try {
+        const { content = {} } = JSON.parse(activity.object);
+        const { activityId, originalActivityId } = content;
+        return originalActivityId ? [...prev, activityId, originalActivityId] : [...prev, activityId];
+      } catch (error) {
+        return [...prev]
+      }
+
     }, []);
     yield put({ type: streamActions.fetchFeedItems, payload: activityIds });
     if (appending) {

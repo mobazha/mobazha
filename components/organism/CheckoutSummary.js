@@ -306,7 +306,7 @@ class CheckoutSummary extends PureComponent {
   };
 
   handleOpenHelp = () => {
-    const url = 'https://gethaven.app/faq';
+    const url = 'https://mobazha.info/faq';
     Linking.canOpenURL(url)
       .then(supported => supported && Linking.openURL(url))
       .catch(() => {});

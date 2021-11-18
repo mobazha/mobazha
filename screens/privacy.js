@@ -158,9 +158,9 @@ class Privacy extends PureComponent {
   }
 
   handleLinkText = (url) => {
-    if (url === 'https://gethaven.app/privacy') {
+    if (url === 'https://mobazha.com/privacy') {
       return 'Privacy Policy';
-    } else if (url === 'https://gethaven.app/terms') {
+    } else if (url === 'https://mobazha.com/terms') {
       return 'Terms of Service';
     }
     return url;

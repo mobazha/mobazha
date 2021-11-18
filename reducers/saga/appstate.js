@@ -92,18 +92,18 @@ function* setGuest(action) {
 }
 
 function* initializeLogin() {
-  try {
-    const userData = yield call([Auth(), 'signInAnonymously']);
-    const { user, additionalUserInfo } = userData;
-    if (true || additionalUserInfo.isNewUser) {
-      const peerID = yield select(getUserPeerID);
-      const fcmToken = yield call(AsyncStorage.getItem, 'fcmToken');
-      // console.warn('-------addPeerToTokenMap-------', user.uid, peerID, fcmToken);
-      addPeerToTokenMap(user.uid, peerID, fcmToken);
-    }
-  } catch (e) {
-    console.warn('-------failed to update-------', e);
-  }
+  // try {
+  //   const userData = yield call([Auth(), 'signInAnonymously']);
+  //   const { user, additionalUserInfo } = userData;
+  //   if (true || additionalUserInfo.isNewUser) {
+  //     const peerID = yield select(getUserPeerID);
+  //     const fcmToken = yield call(AsyncStorage.getItem, 'fcmToken');
+  //     // console.warn('-------addPeerToTokenMap-------', user.uid, peerID, fcmToken);
+  //     addPeerToTokenMap(user.uid, peerID, fcmToken);
+  //   }
+  // } catch (e) {
+  //   console.warn('-------failed to update-------', e);
+  // }
 
   yield put({ type: profileActions.fetchProfile });
   yield put({ type: notificationActions.getCount });
@@ -116,16 +116,16 @@ function* initializeLogin() {
   yield put({ type: walletActions.getFees });
   yield put({ type: walletActions.fetchCoinAddresses });
 
-  // Notification initialization / migration
-  const notifications = yield select(getNotificationSettings);
-  if (!notifications) {
-    yield put({
-      type: actions.updateNotificationSettings,
-      payload: { topic: 'all', enable: true },
-    });
-  } else if (notifications.chat === undefined) {
-    yield put({ type: actions.migrateFeatureNotificationSettings });
-  }
+  // // Notification initialization / migration
+  // const notifications = yield select(getNotificationSettings);
+  // if (!notifications) {
+  //   yield put({
+  //     type: actions.updateNotificationSettings,
+  //     payload: { topic: 'all', enable: true },
+  //   });
+  // } else if (notifications.chat === undefined) {
+  //   yield put({ type: actions.migrateFeatureNotificationSettings });
+  // }
 
   try {
     const profile = yield getProfile();
@@ -217,7 +217,7 @@ const AppstateSaga = function* Search() {
   yield takeEvery(actions.triggerReviewPrompt, triggerRate);
   yield takeEvery(actions.setGuest, setGuest);
   yield takeEvery(actions.initializeLogin, initializeLogin);
-  yield takeEvery(actions.updateNotificationSettings, updateNotificationSettings);
+  // yield takeEvery(actions.updateNotificationSettings, updateNotificationSettings);
   yield takeEvery(actions.migrateFeatureNotificationSettings, migrateFeatureNotificationSettings);
 };
 

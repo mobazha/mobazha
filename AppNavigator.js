@@ -57,7 +57,7 @@ class AppNavigatorRedux extends React.PureComponent {
 
     this.subscribeBranch();
 
-    this.createNotificationListeners();
+    // this.createNotificationListeners();
   }
 
   componentWillUnmount() {

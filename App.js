@@ -28,7 +28,7 @@ export default class App extends PureComponent {
   }
 
   async componentDidMount() {
-    this.checkPermission();
+    // this.checkPermission();
   }
 
   getToken = async () => {

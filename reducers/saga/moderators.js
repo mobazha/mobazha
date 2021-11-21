@@ -32,7 +32,7 @@ function* fetchModerators() {
       const currencies = yield select(getWalletList);
       if (isFirstETHInit && !currencies.includes('ETH')) { // Needs listings migrated into ETH
         yield call(patchSettingsRequestSaga, { payload: { storeModerators: moderatorIDs } });
-        yield put({ type: profileActions.updateAcceptedCoins, payload: { coins: [...currencies, 'ETH'] } });
+        // yield put({ type: profileActions.updateAcceptedCoins, payload: { coins: [...currencies, 'ETH'] } });
       } else if (!_.isEqual(storeModerators, moderatorIDs)) {
         yield put({ type: settingActions.patchSettingsRequest, payload: { storeModerators: moderatorIDs } });
       }

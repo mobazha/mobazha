@@ -444,7 +444,7 @@ export default {
             },
             TagEditor: {
                 tags: "标签",
-                tags_info: "%{count} %{tag}",
+                tags_info: "%{count} 个标签",
                 add_hint: "在你的商品列表上添加标签"
             },
             TagSuggestion: {

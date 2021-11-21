@@ -20,18 +20,18 @@ function* fetchBalance() {
 
 function* fetchTransactions(action) {
   if (!action.payload) {
-    const [BTC, BCH, LTC, ZEC, ETH, CFX] = yield all([
+    const [BTC, BCH, LTC, CFX] = yield all([
       call(getWalletHistory, 'btc'),
       call(getWalletHistory, 'bch'),
       call(getWalletHistory, 'ltc'),
-      call(getWalletHistory, 'zec'),
-      call(getWalletHistory, 'eth'),
+      // call(getWalletHistory, 'zec'),
+      // call(getWalletHistory, 'eth'),
       call(getWalletHistory, 'cfx'),
     ]);
     yield put({
       type: actions.setGlobalTransactions,
       payload: {
-        BTC, BCH, LTC, ZEC, ETH, CFX,
+        BTC, BCH, LTC, CFX,
       },
     });
   } else {

@@ -441,7 +441,7 @@ export default {
             },
             TagEditor: {
                 tags: "Tags",
-                tags_info: "%{count} %{tag}",
+                tags_info: "%{count} tags",
                 add_hint: "Add #tags to get your listing discovered"
             },
             TagSuggestion: {

@@ -25,7 +25,7 @@ export default class TagEditor extends React.PureComponent {
       <InputGroup title={I18n.t('components.organism.TagEditor.tags')} showPencil onPress={this.props.onPress}>
         <OptionGroup noBorder noArrow>
           { count > 0 ?
-            <Text style={style}>{I18n.t('components.organism.TagEditor.tags_info')}</Text>
+            <Text style={style}>{I18n.t('components.organism.TagEditor.tags_info', {count:count})}</Text>
           :
             <FormLabelText text={I18n.t('components.organism.TagEditor.add_hint')} />
           }

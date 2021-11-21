@@ -20,7 +20,7 @@ import AvatarImage from '../components/atoms/AvatarImage';
 import LocationPin from '../components/atoms/LocationPin';
 import { OBLightModal } from '../components/templates/OBModal';
 import { eventTracker } from '../utils/EventTracker';
-import { FAQ_URL, EMAIL_URL, TELEGRAM_URL } from '../config/supportUrls';
+import { FAQ_URL, DISCORD_URL, EMAIL_URL, TELEGRAM_URL } from '../config/supportUrls';
 
 import {I18n} from '../langs/I18n';
 
@@ -146,7 +146,7 @@ class Me extends PureComponent {
   }
 
   handlePressDiscord = () => {
-    Linking.openURL(DISCROD_URL);
+    Linking.openURL(DISCORD_URL);
   }
 
   handlePressTelegram = () => {

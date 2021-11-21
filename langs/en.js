@@ -1213,7 +1213,7 @@ export default {
         notifications: {
             Notifications: "Notifications"
         },
-        NotificationSettings:{
+        notificationSettings:{
             notification_preferences:"Notification preferences",
             all1:"All",
             Receive_all:"Receive all push notifications", 

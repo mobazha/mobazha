@@ -33,7 +33,7 @@ import {I18n} from '../langs/I18n';
 let prodTypes = prodTypesEn
 let sortOptions = sortOptionsEn
 let productConditionOptions = productConditionOptionsEn
-if (I18n.locale != 'en') {
+if (I18n.locale.startsWith('zh')) {
   prodTypes = prodTypesZh
   sortOptions = sortOptionsZh
   productConditionOptions = productConditionOptionsZh

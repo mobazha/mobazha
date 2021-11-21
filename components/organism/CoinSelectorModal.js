@@ -9,7 +9,7 @@ import NavCloseButton from '../atoms/NavCloseButton';
 
 import {I18n} from '../../langs/I18n';
 
-const WYRE_SUPPORTING_COINS = ['BTC', 'ETH'];
+const WYRE_SUPPORTING_COINS = ['BTC', 'BCH', 'LTC'];
 
 export default class CoinSelectorModal extends PureComponent {
   constructor(props) {

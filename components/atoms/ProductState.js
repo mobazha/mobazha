@@ -12,7 +12,7 @@ import {I18n} from '../../langs/I18n';
 
 let prdType = prdTypeEn
 let prdCondition = prdConditionEn
-if (I18n.locale != 'en') {
+if (I18n.locale.startsWith('zh')) {
   prdType = prdTypeZh
   prdCondition = prdConditionZh
 }

@@ -26,14 +26,14 @@ import {I18n} from '../../langs/I18n';
 
 let prodTypes = prodTypesEn
 let productConditions = productConditionsEn
-if (I18n.locale != 'en') {
+if (I18n.locale.startsWith('zh')) {
   prodTypes = prodTypesZh
   productConditions = productConditionsZh
 }
 
 
 let iosProdTypes = iosProdTypesEn
-if (I18n.locale != 'en') {
+if (I18n.locale.startsWith('zh')) {
   iosProdTypes = iosProdTypesZh
 }
 

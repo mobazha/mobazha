@@ -631,7 +631,7 @@ export default categories.sort(function(a,b){
     return 999;
   }
 
-  if (I18n.locale != 'en') {
+  if (I18n.locale.startsWith('zh')) {
     return a.title.localeCompare(b.title, 'zh-Hans-CN', {sensitivity: 'accent'});
   }
   return a.title.localeCompare(b.title);

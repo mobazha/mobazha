@@ -108,10 +108,10 @@ export const transactionLinkDict = id => ({
 });
 
 export const TIP_ADDRESSES = {
-  LTC: 'MTTEVR5pdAHJNmmFNzVjaQhGB9qLkHLk7m',
-  BTC: '3JuykfZRbCepzkVLLseSaiufDJ5AC8ae8R',
-  ZEC: 't1UEN9mf9hMccwTznqBoJFh2FERgyuMJ2oA',
-  BCH: 'qq9favzja34zywrp222cwrx4fny9fe64pyaxl5dvar',
-  ETH: '0x71A6e8B0580104dacA0633a9BA6F90181C6F40a5',
-  CFX: 'cfx:aap8z8k87yptj485j96amtskgur201btpu4uky500g',
+  LTC: 'MR9My6DoES5312WWG1v8HEXpUVnhBWzJTF',
+  BTC: '39paHMDh791tSkPVHZtwSGV11rkt78RRLu',
+  ZEC: 't1ZHA4i9aquxasN5nhSita11uYyccTQeEYY',
+  BCH: 'qq0m035tygxd5g8c4w2mpps94my9dn2cvcqggunvva',
+  ETH: '0x03bC67c2AEBc572397B19199f540C811F2904718',
+  CFX: 'cfx:aaph2me2h30nfwp6ha24zz00xpp187th76e3xurre9',
 };

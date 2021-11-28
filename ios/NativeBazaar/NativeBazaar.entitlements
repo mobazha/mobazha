@@ -6,7 +6,6 @@
 	<string>development</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:mobazha.com</string>
         <string>applinks:mobazha.info</string>
 		<string>applinks:mbz.app.link</string>
 		<string>applinks:mbz-alternate.app.link</string>

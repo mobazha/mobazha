@@ -54,11 +54,11 @@
           <action android:name="android.intent.action.VIEW" />
           <category android:name="android.intent.category.DEFAULT" />
           <category android:name="android.intent.category.BROWSABLE" />
-          <data android:scheme="https" android:host="openbazaar.com" />
-          <data android:scheme="https" android:host="ob.test-app.link" />
-          <data android:scheme="https" android:host="ob-alternate.test-app.link" />
-          <data android:scheme="https" android:host="ob.app.link" />
-          <data android:scheme="https" android:host="ob-alternate.app.link" />
+          <data android:scheme="https" android:host="mobazha.info" />
+          <data android:scheme="https" android:host="mbz.test-app.link" />
+          <data android:scheme="https" android:host="mbz-alternate.test-app.link" />
+          <data android:scheme="https" android:host="mbz.app.link" />
+          <data android:scheme="https" android:host="mbz-alternate.app.link" />
         </intent-filter>
       </activity>
 

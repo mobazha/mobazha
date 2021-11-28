@@ -99,13 +99,13 @@ class Feed extends PureComponent {
           title={I18n.t('screens.feed.Social')}
           navigation={navigation}
         />
-        { Platform.OS === 'android' && (
+        {/* { Platform.OS === 'android' && ( */}
           <Tabs
             currentTab={filter}
             tabs={filterOptions}
             onChange={this.handleChangeFilter}
           />
-        )}
+        {/* )} */}
         <GlobalFeedTemplate
           filter={filter}
           sort={sort}

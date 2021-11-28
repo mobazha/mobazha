@@ -50,7 +50,7 @@ export default class extends Model {
       language,
       listingsGridViewType: 'grid',
       bitcoinUnit: 'BTC',
-      verifiedModsProvider: 'https://market.mobazha.com/api/moderator/verified',
+      verifiedModsProvider: 'https://mobazha.info/api/moderator/verified',
       verifiedModsProviderTor: 'http://my7nrnmkscxr32zo.onion/verified_moderators',
       dontShowTorExternalLinkWarning: false,
     };

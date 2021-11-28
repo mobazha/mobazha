@@ -31,8 +31,9 @@ export function createSearchURL(options = {}) {
     ...options,
   };
 
-  const query = { ..._.pick(opts, ['q', 'p', 'ps', 'sortBy']), ...opts.filters };
+  const query = { ..._.pick(opts, ['q', 'p', 'sortBy']), ...opts.filters };
   query.q = query.q || '*';
+  query.pageSize = options.ps ? options.ps : opts.ps;
   query.network = !!app.serverConfig.testnet ? 'testnet' : 'mainnet';
 
   return new URL(`${opts.provider[`${options.searchType}Url`]}?${$.param(query, true)}`);

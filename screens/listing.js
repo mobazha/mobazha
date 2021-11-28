@@ -339,7 +339,7 @@ class Listing extends PureComponent {
   };
 
   handleDelete = () => {
-    Alert.alert(I18n.t('screens.listing.ask_delete'), I18n.t('screens.listing.delete_hin'), [
+    Alert.alert(I18n.t('screens.listing.ask_delete'), I18n.t('screens.listing.delete_hint'), [
       { text: I18n.t('screens.listing.cancel')},
       {
         text: I18n.t('screens.listing.remove'),

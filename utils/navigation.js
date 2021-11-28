@@ -1,6 +1,5 @@
 import _ from 'lodash';
 import * as qs from 'query-string';
-import Reactotron from 'reactotron-react-native';
 
 // const BITCOIN_REGEX = /^([13][a-km-zA-HJ-NP-Z1-9]{25,34})|^((bitcoincash:)?(q|p)[a-z0-9]{41})|^((BITCOINCASH:)?(Q|P)[A-Z0-9]{41})$/;
 

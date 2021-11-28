@@ -1,6 +1,5 @@
 import React, { PureComponent } from 'react';
 import { Alert, View, Text, TouchableWithoutFeedback } from 'react-native';
-import Reactotron from 'reactotron-react-native';
 
 import { formLabelColor, foregroundColor, brandColor, borderColor, greenTintColor } from '../commonColors';
 

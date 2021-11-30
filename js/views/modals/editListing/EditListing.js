@@ -269,7 +269,7 @@ export default class extends BaseModal {
   onClickViewListingOnWeb() {
     const slug = this.model.get('slug');
     if (slug) {
-      openExternal(`http://openbazaar.com/store/${app.profile.id}/${slug}`);
+      openExternal(`https://mobazha.info/listing/${app.profile.id}/${slug}`);
     } else {
       throw new Error('There is no slug for this listing in order to navigate!');
     }

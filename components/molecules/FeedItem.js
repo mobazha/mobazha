@@ -206,11 +206,14 @@ class FeedItem extends React.PureComponent {
 
     const { status } = _.get(item, 'object.data.post', {});
     if (status === '') {
-      const reposterProfile = this.getReposterProfile();
-      if (reposterProfile.peerID === currentPeerID) {
+      let posterProfile = this.getReposterProfile();
+      if (!posterProfile.peerID) {
+        posterProfile = this.getUserProfile();
+      }
+      if (posterProfile.peerID === currentPeerID) {
         navigation.navigate('MyStore');
       } else {
-        navigation.push('ExternalStore', { peerID: reposterProfile.peerID });
+        navigation.push('ExternalStore', { peerID: posterProfile.peerID });
       }
     } else {
       this.handlePressAvatar();

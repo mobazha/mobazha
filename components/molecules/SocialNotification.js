@@ -6,6 +6,8 @@ import Feather from 'react-native-vector-icons/Feather';
 import { isEmpty, get } from 'lodash';
 import decode from 'unescape';
 
+import { getUserPeerID } from '../../selectors/profile';
+
 import AvatarImage from '../atoms/AvatarImage';
 import { fetchProfile } from '../../reducers/profile';
 import { timeSince } from '../../utils/time';
@@ -162,7 +164,8 @@ class SocialNotification extends React.PureComponent {
   handlePress = () => {
     const { notification = {}, navigation } = this.props;
     const { activities, verb } = notification;
-    const { actor, object } = get(activities, '[0]', {});
+    const activity = get(activities, '[0]', {});
+    const { actor } = activity;
     let peerID = actor;
     if (typeof actor === 'object') {
       peerID = actor.id;
@@ -172,11 +175,15 @@ class SocialNotification extends React.PureComponent {
       navigation.navigate('ExternalStore', { peerID });
     } else {
       try {
-        const { content } = JSON.parse(object);
-        const activityId = content.activityId;
+        const message = JSON.parse(activity.message);
+        const activityId = message.activityId;
+
         navigation.navigate('FeedDetail', { activityId, tab: verb, showKeyboard: false });
       } catch {
-        navigation.navigate('FeedDetail', { activityId: object.id, tab: verb, showKeyboard: false });
+        // '{activityId=01f73bc2-5365-11ec-acd5-0ac74274a1c1, secondaryText=Happy a new day}'
+        let str = activity.message;
+        const activityId = str.substring(str.indexOf("=") + 1, str.lastIndexOf(","));
+        navigation.navigate('FeedDetail', { activityId, tab: verb, showKeyboard: false });
       }
     }
   };
@@ -237,6 +244,13 @@ class SocialNotification extends React.PureComponent {
     );
   }
   render() {
+    const peerID = this.getPeerId();
+    const { myPeerID } = this.props;
+    if (peerID === myPeerID)
+    {
+      return false;
+    }
+
     const profile = this.getProfile();
     if (isEmpty(profile)) {
       return false;
@@ -245,7 +259,11 @@ class SocialNotification extends React.PureComponent {
   }
 }
 
-const mapStateToProps = ({ profiles }) => ({ profiles });
+const mapStateToProps = state => ({
+  profiles: state.profiles,
+  myPeerID: getUserPeerID(state),
+});
+
 const mapDispatchToProps = { fetchProfile };
 
 export default withNavigation(connect(

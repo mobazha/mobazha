@@ -4,6 +4,7 @@ import androidx.annotation.NonNull;
 import android.os.AsyncTask;
 import android.util.Log;
 import android.net.Uri;
+import android.content.Context;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -25,6 +26,9 @@ import mbz.nativebazaar.ServerConfig;
 import java.util.HashMap;
 import java.util.Map;
 
+import android.net.wifi.WifiManager;
+import android.net.wifi.WifiManager.MulticastLock;
+
 import mobile.Mobile;
 import mobile.Node;
 
@@ -33,6 +37,7 @@ public class ServerBridgeModule extends ReactContextBaseJavaModule {
     private static ReactApplicationContext reactContext = null;
     private static Node serverNode;
     private static ServerTask serverTask;
+    private MulticastLock multicastLock = null;
 
     public ServerBridgeModule(ReactApplicationContext context) {
         // Pass in the context to the constructor and save it so you can emit events
@@ -61,12 +66,24 @@ public class ServerBridgeModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void start () {
+        // Acquire multicast lock
+        WifiManager wifi = (WifiManager) reactContext.getSystemService(Context.WIFI_SERVICE);
+        multicastLock = wifi.createMulticastLock("multicastLock");
+        multicastLock.setReferenceCounted(true);
+        multicastLock.acquire();
+
         ServerBridgeModule.startServerThread();
     }
 
     @ReactMethod
     public void stop () {
         ServerBridgeModule.stopServerThread();
+
+        // Once your finish using it, release multicast lock
+        if (multicastLock != null) {
+            multicastLock.release();
+            multicastLock = null;
+        }
     }
 
     @ReactMethod

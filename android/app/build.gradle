@@ -136,7 +136,7 @@ android {
     defaultConfig {
         applicationId "mbz.nativebazaar"
         minSdkVersion 21
-        targetSdkVersion 30
+        targetSdkVersion 29
         versionCode Integer.parseInt(VERSION_CODE)
         versionName VERSION_NAME
         signingConfig signingConfigs.dev_test_signing

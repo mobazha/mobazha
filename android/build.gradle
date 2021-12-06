@@ -15,10 +15,10 @@ buildscript {
 }
 
 ext {
-    compileSdkVersion=28
+    compileSdkVersion=30
     buildToolsVersion='28.0.3'
     minSdkVersion=21
-    targetSdkVersion=30
+    targetSdkVersion=29
     androidXAnnotation = "1.1.0"
     androidXBrowser = "1.0.0"
 }
@@ -61,7 +61,7 @@ subprojects { project ->
     afterEvaluate {
         if (project.hasProperty("android")) {
             android {
-                compileSdkVersion 28
+                compileSdkVersion 30
                 buildToolsVersion '28.0.3'
                 ndkVersion "21.3.6528147"
             }

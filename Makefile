@@ -4,7 +4,7 @@
 
 .PHONY: ios_framework
 ios_framework: ## Build iOS Framework for mobile
-	gomobile bind -target=ios/arm64,ios/amd64 -iosversion=10 -ldflags="-s -w" -tags notor github.com/OpenBazaar/openbazaar3.0/mobile
+	gomobile bind -target=ios/arm64,ios/amd64 -iosversion=10 -ldflags="-s -w" -tags notor github.com/cpacia/openbazaar3.0/mobile
 
 .PHONY: android_framework
 android_framework: ## Build Android Framework for mobile

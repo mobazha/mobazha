@@ -2,14 +2,26 @@ module github.com/cpacia/openbazaar3.0
 
 go 1.17
 
+replace github.com/ltcsuite/ltcutil => /Users/mingfeng/go/src/github.com/ltcsuite/ltcutil
+
+replace github.com/cpacia/proxyclient => /Users/mingfeng/go/src/github.com/cpacia/proxyclient
+
+replace github.com/cpacia/wallet-interface => /Users/mingfeng/go/src/github.com/cpacia/wallet-interface
+
+replace github.com/cpacia/multiwallet => /Users/mingfeng/go/src/github.com/cpacia/multiwallet
+
+replace github.com/cpacia/go-onion-transport => /Users/mingfeng/go/src/github.com/cpacia/go-onion-transport
+
+replace github.com/cpacia/go-store-and-forward => /Users/mingfeng/go/src/github.com/cpacia/go-store-and-forward
+
 require (
-	github.com/btcsuite/btcd v0.22.0-beta
+	github.com/btcsuite/btcd v0.22.0-beta.0.20210803133449-f5a1fb9965e4
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
-	github.com/cpacia/go-onion-transport v0.1.0
-	github.com/cpacia/go-store-and-forward v0.0.0-20210725230630-1fc92a30c2b6
-	github.com/cpacia/multiwallet v0.0.0-20210120190936-0193f96f22e4
-	github.com/cpacia/proxyclient v0.0.0-20200503052644-89c0e5cb8be7
-	github.com/cpacia/wallet-interface v0.0.0-20200604163334-1be951c8f4bd
+	github.com/cpacia/go-onion-transport v0.0.0-00010101000000-000000000000
+	github.com/cpacia/go-store-and-forward v0.0.0-00010101000000-000000000000
+	github.com/cpacia/multiwallet v0.0.0-00010101000000-000000000000
+	github.com/cpacia/proxyclient v0.0.0-00010101000000-000000000000
+	github.com/cpacia/wallet-interface v0.0.0-00010101000000-000000000000
 	github.com/cretz/bine v0.2.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/fatih/color v1.13.0
@@ -44,7 +56,6 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.16
 	github.com/multiformats/go-multiaddr v0.4.1
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/multiformats/go-multiaddr-net v0.2.0
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
@@ -85,8 +96,8 @@ require (
 	github.com/crackcomm/go-gitignore v0.0.0-20170627025303-887ab5e44cc3 // indirect
 	github.com/cskr/pubsub v1.0.2 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
-	github.com/dchest/blake256 v1.1.0 // indirect
-	github.com/dchest/siphash v1.2.1 // indirect
+	github.com/dchest/blake256 v1.0.0 // indirect
+	github.com/dchest/siphash v1.2.2 // indirect
 	github.com/dgraph-io/badger v1.6.2 // indirect
 	github.com/dgraph-io/ristretto v0.0.2 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
@@ -96,24 +107,25 @@ require (
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.0 // indirect
-	github.com/gcash/bchd v0.15.3-0.20200229013353-8c1fa57b15e7 // indirect
+	github.com/gcash/bchd v0.18.1 // indirect
 	github.com/gcash/bchlog v0.0.0-20180913005452-b4f036f92fa6 // indirect
-	github.com/gcash/bchutil v0.0.0-20200228172631-5e1930e5d630 // indirect
-	github.com/gcash/bchwallet v0.8.2 // indirect
+	github.com/gcash/bchutil v0.0.0-20210113190856-6ea28dff4000 // indirect
+	github.com/gcash/bchwallet v0.9.0 // indirect
 	github.com/go-bindata/go-bindata/v3 v3.1.3 // indirect
 	github.com/go-kit/log v0.1.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.0 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/snappy v0.0.3-0.20201103224600-674baa8c7fc3 // indirect
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.4.0 // indirect
 	github.com/hannahhoward/go-pubsub v0.0.0-20200423002714-8d62886cc36e // indirect
-	github.com/hashicorp/errwrap v1.0.0 // indirect
+	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
-	github.com/hashicorp/golang-lru v0.5.4 // indirect
+	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
 	github.com/huin/goupnp v1.0.2 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitfield v1.0.0 // indirect
@@ -163,8 +175,8 @@ require (
 	github.com/jbenet/goprocess v0.1.4 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.3 // indirect
-	github.com/kisielk/errcheck v1.5.0 // indirect
-	github.com/klauspost/compress v1.11.7 // indirect
+	github.com/kisielk/errcheck v1.6.0 // indirect
+	github.com/klauspost/compress v1.12.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/koron/go-ssdp v0.0.2 // indirect
 	github.com/libp2p/go-addr-util v0.1.0 // indirect
@@ -178,7 +190,6 @@ require (
 	github.com/libp2p/go-libp2p-autonat v0.7.0 // indirect
 	github.com/libp2p/go-libp2p-blankhost v0.3.0 // indirect
 	github.com/libp2p/go-libp2p-connmgr v0.2.4 // indirect
-	github.com/libp2p/go-libp2p-crypto v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-discovery v0.6.0 // indirect
 	github.com/libp2p/go-libp2p-gostream v0.3.0 // indirect
 	github.com/libp2p/go-libp2p-http v0.2.1 // indirect
@@ -188,7 +199,6 @@ require (
 	github.com/libp2p/go-libp2p-nat v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-netutil v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-noise v0.3.0 // indirect
-	github.com/libp2p/go-libp2p-peer v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-peerstore v0.6.0 // indirect
 	github.com/libp2p/go-libp2p-pnet v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-pubsub-router v0.5.0 // indirect
@@ -222,11 +232,11 @@ require (
 	github.com/marten-seemann/qtls-go1-16 v0.1.4 // indirect
 	github.com/marten-seemann/qtls-go1-17 v0.1.0 // indirect
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
-	github.com/martinboehm/btcd v0.0.0-20190104121910-8e7c0427fee5 // indirect
-	github.com/martinboehm/btcutil v0.0.0-20191023112652-a3d2b8457b77 // indirect
+	github.com/martinboehm/btcd v0.0.0-20211010165247-d1f65b0f30fa // indirect
+	github.com/martinboehm/btcutil v0.0.0-20211010173611-6ef1889c1819 // indirect
 	github.com/mattn/go-colorable v0.1.9 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
-	github.com/mattn/go-runewidth v0.0.7 // indirect
+	github.com/mattn/go-runewidth v0.0.12 // indirect
 	github.com/mattn/go-sqlite3 v1.14.9 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
@@ -237,7 +247,7 @@ require (
 	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
-	github.com/multiformats/go-base32 v0.0.3 // indirect
+	github.com/multiformats/go-base32 v0.0.4 // indirect
 	github.com/multiformats/go-base36 v0.1.0 // indirect
 	github.com/multiformats/go-multiaddr-fmt v0.1.0 // indirect
 	github.com/multiformats/go-multibase v0.0.3 // indirect
@@ -253,16 +263,16 @@ require (
 	github.com/prometheus/common v0.30.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/prometheus/statsd_exporter v0.21.0 // indirect
+	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rs/cors v1.7.0 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
-	github.com/syndtr/goleveldb v1.0.1-0.20200815110645-5c35d600f0ca // indirect
+	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc // indirect
 	github.com/whyrusleeping/cbor-gen v0.0.0-20210219115102-f37d292932f2 // indirect
 	github.com/whyrusleeping/chunker v0.0.0-20181014151217-fe64bd25879f // indirect
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
 	github.com/whyrusleeping/go-sysinfo v0.0.0-20190219211824-4a357d4b90b1 // indirect
-	github.com/whyrusleeping/mafmt v1.2.8 // indirect
 	github.com/whyrusleeping/mdns v0.0.0-20190826153040-b9b60ed33aa9 // indirect
 	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7 // indirect
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect
@@ -278,17 +288,18 @@ require (
 	go.uber.org/zap v1.19.1 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/image v0.0.0-20191009234506-e7c1f5e7dbb8 // indirect
-	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
+	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5 // indirect
+	golang.org/x/mobile v0.0.0-20211207041440-4e6c2922fdee // indirect
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	golang.org/x/sys v0.0.0-20211025112917-711f33c9992c // indirect
 	golang.org/x/text v0.3.7 // indirect
-	golang.org/x/tools v0.1.5 // indirect
+	golang.org/x/tools v0.1.8-0.20211022200916-316ba0b74098 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/appengine v1.6.6 // indirect
-	google.golang.org/genproto v0.0.0-20200825200019-8632dd797987 // indirect
-	google.golang.org/grpc v1.40.0 // indirect
+	google.golang.org/genproto v0.0.0-20210521181308-5ccab8a35a9a // indirect
+	google.golang.org/grpc v1.43.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.5.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

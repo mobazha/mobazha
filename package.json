@@ -1,6 +1,6 @@
 {
   "name": "NativeBazaar",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "private": true,
   "scripts": {
     "prestart": "rm -f ./node_modules/react-native/local-cli/core/__fixtures__/files/package.json",

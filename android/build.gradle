@@ -18,7 +18,7 @@ ext {
     compileSdkVersion=30
     buildToolsVersion='28.0.3'
     minSdkVersion=21
-    targetSdkVersion=29
+    targetSdkVersion=30
     androidXAnnotation = "1.1.0"
     androidXBrowser = "1.0.0"
 }

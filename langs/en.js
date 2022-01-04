@@ -830,7 +830,7 @@ export default {
                 Restore_profile: "Restore profile",
                 Resync_transactions: "Resync transactions",
                 Server_Log: "Server Log",
-                Version: "Version 0.7.5"
+                Version: "Version 0.7.6"
             },
             SocialPostTemplate:{
                 RePostTemplate:{

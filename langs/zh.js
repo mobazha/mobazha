@@ -831,7 +831,7 @@ export default {
                 Restore_profile: "恢复用户数据",
                 Resync_transactions: "同步交易",
                 Server_Log: "后台日志",
-                Version: "版本号 0.7.5"
+                Version: "版本号 0.7.6"
             },
             SocialPostTemplate:{
                 RePostTemplate:{

@@ -680,15 +680,15 @@ PODS:
     - React
   - RNI18n (2.0.15):
     - React
-  - RNImageCropPicker (0.28.0):
+  - RNImageCropPicker (0.37.2):
     - React-Core
     - React-RCTImage
-    - RNImageCropPicker/QBImagePickerController (= 0.28.0)
-    - RSKImageCropper
-  - RNImageCropPicker/QBImagePickerController (0.28.0):
+    - RNImageCropPicker/QBImagePickerController (= 0.37.2)
+    - TOCropViewController
+  - RNImageCropPicker/QBImagePickerController (0.37.2):
     - React-Core
     - React-RCTImage
-    - RSKImageCropper
+    - TOCropViewController
   - RNImageHelper (0.0.2):
     - React
   - RNInAppBrowser (3.4.0):
@@ -709,7 +709,6 @@ PODS:
   - RNZipArchive/Core (5.0.1):
     - React
     - SSZipArchive (= 2.2.2)
-  - RSKImageCropper (3.0.2)
   - SDWebImage (5.12.1):
     - SDWebImage/Core (= 5.12.1)
   - SDWebImage/Core (5.12.1)
@@ -718,6 +717,7 @@ PODS:
     - SDWebImage/Core (~> 5.0)
   - SGActionView (0.0.1)
   - SSZipArchive (2.2.2)
+  - TOCropViewController (2.6.0)
   - Yoga (1.14.0)
 
 DEPENDENCIES:
@@ -786,6 +786,7 @@ DEPENDENCIES:
   - RNVectorIcons (from `../node_modules/react-native-vector-icons`)
   - RNZipArchive (from `../node_modules/react-native-zip-archive`)
   - SGActionView (from `https://github.com/prscX/SGActionView.git`)
+  - TOCropViewController
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
@@ -820,10 +821,10 @@ SPEC REPOS:
     - nanopb
     - PromisesObjC
     - Protobuf
-    - RSKImageCropper
     - SDWebImage
     - SDWebImageWebPCoder
     - SSZipArchive
+    - TOCropViewController
 
 EXTERNAL SOURCES:
   appcenter-analytics:
@@ -1041,7 +1042,7 @@ SPEC CHECKSUMS:
   RNFS: 2bd9eb49dc82fa9676382f0585b992c424cd59df
   RNGestureHandler: dde546180bf24af0b5f737c8ad04b6f3fa51609a
   RNI18n: e2f7e76389fcc6e84f2c8733ea89b92502351fd8
-  RNImageCropPicker: cf129d17e042ce3e96fb9ada967c28f21f977c82
+  RNImageCropPicker: 448d3c6e923fde3466b49caf3c2457c2a0ba02dd
   RNImageHelper: 6c6c024af8df428adba367fa5a0c6205526accf8
   RNInAppBrowser: 6097fbc6b09051b40a6a9ec22caf7af40b115ec0
   RNInputMask: 815461ebdf396beb62cf58916c35cf6930adb991
@@ -1050,13 +1051,13 @@ SPEC CHECKSUMS:
   RNSVG: 67f1f12dae2cef6ed59a42cae74a6b8f5a9e7b46
   RNVectorIcons: 0bb4def82230be1333ddaeee9fcba45f0b288ed4
   RNZipArchive: eb4ccf13ab4d8e3e114b8182046b19f10d2ff52e
-  RSKImageCropper: 1ac71e9a82e3f41eea3eedfff8eacb0d3821c9ec
   SDWebImage: 4dc3e42d9ec0c1028b960a33ac6b637bb432207b
   SDWebImageWebPCoder: 947093edd1349d820c40afbd9f42acb6cdecd987
   SGActionView: 7d7f2af343936932cab8302749e5345a1732c0b7
   SSZipArchive: fa16b8cc4cdeceb698e5e5d9f67e9558532fbf23
+  TOCropViewController: 3105367e808b7d3d886a74ff59bf4804e7d3ab38
   Yoga: f2a7cd4280bfe2cca5a7aed98ba0eb3d1310f18b
 
-PODFILE CHECKSUM: c8a018f0dec5603177156917caf60cb1b708179b
+PODFILE CHECKSUM: 898bcb2ca0e9c3337f71b2d21b81c58843374c42
 
 COCOAPODS: 1.10.1

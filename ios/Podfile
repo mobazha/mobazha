@@ -35,6 +35,7 @@ def common_pods
   pod 'RNInputMask', :path => '../node_modules/react-native-text-input-mask/ios/InputMask'
 
   pod 'SGActionView', :git => 'https://github.com/prscX/SGActionView.git'
+  pod 'TOCropViewController'
 
   use_native_modules!
 

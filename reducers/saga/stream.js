@@ -26,7 +26,8 @@ function* fetchStream(action) {
   try {
     const { filter, sort, hashtag, appending, peerID } = action.payload;
     const offset = yield select(getFeedCount(filter, sort));
-    const query = { offset: appending ? offset : 0, ranking: sort ? sort : undefined };
+    // const query = { offset: appending ? offset : 0, ranking: sort ? sort : undefined };
+    const query = { offset: appending ? offset : 0 };
     if (!StreamClient.initDone) {
       yield take(streamActions.streamInitFinished);
     }
@@ -342,8 +343,18 @@ function * notificationUpdate(action) {
   newNotifications = newNotifications.filter(n => n.verb !== 'unfollow');
   if (newNotifications.length > 0) {
     const activityIds = newNotifications.reduce((prev, activity) => {
-      const { content = {} } = JSON.parse(activity.object);
-      const { activityId, originalActivityId } = content;
+      const activityId = activity.id
+
+      let originalActivityId = activityId
+      const message = JSON.parse(activity.message);
+      if (message) {
+        originalActivityId = message.activityId;
+      } else {
+        // '{activityId=01f73bc2-5365-11ec-acd5-0ac74274a1c1, secondaryText=Happy a new day}'
+        let str = activity.message;
+        originalActivityId = str.substring(str.indexOf("=") + 1, str.lastIndexOf(","));
+      }
+
       return originalActivityId ? [...prev, activityId, originalActivityId] : [...prev, activityId];
     }, []);
     yield put({ type: streamActions.fetchFeedItems, payload: activityIds });
@@ -402,8 +413,17 @@ function * fetchSocialNotifications(action) {
       const activity = get(notification, 'activities[0]');
 
       try {
-        const { content = {} } = JSON.parse(activity.object);
-        const { activityId, originalActivityId } = content;
+        const activityId = activity.id
+
+        let originalActivityId = activityId
+        const message = JSON.parse(activity.message);
+        if (message) {
+          originalActivityId = message.activityId;
+        } else {
+          // '{activityId=01f73bc2-5365-11ec-acd5-0ac74274a1c1, secondaryText=Happy a new day}'
+          let str = activity.message;
+          originalActivityId = str.substring(str.indexOf("=") + 1, str.lastIndexOf(","));
+        }
         return originalActivityId ? [...prev, activityId, originalActivityId] : [...prev, activityId];
       } catch (error) {
         return [...prev]

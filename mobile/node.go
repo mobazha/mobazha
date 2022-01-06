@@ -2,9 +2,10 @@ package mobile
 
 import (
 	"context"
+	"path"
+
 	"github.com/cpacia/openbazaar3.0/core"
 	"github.com/cpacia/openbazaar3.0/repo"
-	"path"
 )
 
 var defaultDataDir = repo.AppDataDir("obmobile", false)
@@ -64,11 +65,11 @@ func NewNode(cfg *Config) (*Node, error) {
 	rcfg := &repo.Config{
 		IPNSQuorum:             2,
 		LogLevel:               logLevel,
-		EnabledWallets:         []string{"BTC", "BCH", "LTC", "ZEC", "ETH"},
+		EnabledWallets:         []string{"BTC", "BCH", "LTC"},
 		DisableNATPortMap:      true,
 		DataDir:                dataDir,
 		LogDir:                 logDir,
-		ExchangeRateProviders:  []string{"https://ticker.openbazaar.org/api"},
+		ExchangeRateProviders:  []string{"https://mobazha.info/api/ticker"},
 		DHTClientOnly:          true,
 		BoostrapAddrs:          bootstrapAddrs,
 		StoreAndForwardServers: snfServers,

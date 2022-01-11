@@ -422,7 +422,7 @@ export default class extends BaseModal {
     }
     const photoCol = this.model.toJSON().item.images;
     const photoHash = photoCol[photoIndex].original;
-    const phSrc = app.getServerUrl(`ob/images/${photoHash}`);
+    const phSrc = app.getServerUrl(`ob/image/${photoHash}`);
 
     this.activePhotoIndex = photoIndex;
     this.$photoSelected.trigger('zoom.destroy'); // old zoom must be removed

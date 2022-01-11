@@ -22,7 +22,7 @@ export default class extends BaseModel {
   }
 
   url() {
-    return app.getServerUrl('ob/settings/');
+    return app.getServerUrl('ob/preferences');
   }
 
   nested() {
@@ -41,7 +41,7 @@ export default class extends BaseModel {
   }
 
   get prettyServerVer() {
-    const sVer = this.get('version');
+    const sVer = this.get('userAgent');
     return sVer.substring(sVer.lastIndexOf(':') + 1, sVer.lastIndexOf('/'));
   }
 

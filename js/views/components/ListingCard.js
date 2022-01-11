@@ -123,10 +123,10 @@ export default class extends baseVw {
       const thumbnail = this.model.get('thumbnail');
       const listingImageSrc = this.viewType === 'grid' ?
         app.getServerUrl(
-          `ob/images/${isHiRez() ? thumbnail.medium : thumbnail.small}`
+          `ob/image/${isHiRez() ? thumbnail.medium : thumbnail.small}`
         ) :
         app.getServerUrl(
-          `ob/images/${isHiRez() ? thumbnail.small : thumbnail.tiny}`
+          `ob/image/${isHiRez() ? thumbnail.small : thumbnail.tiny}`
         );
 
       this.listingImage = new Image();
@@ -140,7 +140,7 @@ export default class extends baseVw {
       const vendor = this.model.get('vendor');
       if (vendor && vendor.avatarHashes) {
         const avatarImageSrc = app.getServerUrl(
-          `ob/images/${isHiRez() ? vendor.avatarHashes.small : vendor.avatarHashes.tiny}`
+          `ob/image/${isHiRez() ? vendor.avatarHashes.small : vendor.avatarHashes.tiny}`
         );
 
         this.avatarImage = new Image();

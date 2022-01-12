@@ -74,7 +74,7 @@ export default class extends baseVw {
 
     const save = this.profile.save(formData, {
       attrs: formData,
-      type: 'PATCH',
+      type: 'PUT',
     });
 
     if (save) {

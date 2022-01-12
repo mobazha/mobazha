@@ -83,8 +83,8 @@ function blockUnblock(_block, peerIds) {
   lastSentBlockedNodes = [...blockedNodes];
 
   latestSettingsSave = $.ajax({
-    type: 'PATCH',
-    url: app.getServerUrl('ob/settings/'),
+    type: 'PUT',
+    url: app.getServerUrl('ob/preferences'),
     data: JSON.stringify({ blockedNodes }),
     dataType: 'json',
   }).done(() => {

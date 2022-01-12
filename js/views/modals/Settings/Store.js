@@ -262,12 +262,12 @@ export default class extends baseVw {
 
       const profileSave = this.profile.save(profileFormData, {
         attrs: profileFormData,
-        type: 'PATCH',
+        type: 'PUT',
       });
 
       const settingsSave = this.settings.save(settingsFormData, {
         attrs: settingsFormData,
-        type: 'PATCH',
+        type: 'PUT',
       });
 
       $.when(profileSave, settingsSave)

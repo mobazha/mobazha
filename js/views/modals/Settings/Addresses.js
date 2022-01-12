@@ -51,7 +51,7 @@ export default class extends baseVw {
 
     const save = this.settings.save({ shippingAddresses: shippingAddresses.toJSON() }, {
       attrs: { shippingAddresses: shippingAddresses.toJSON() },
-      type: 'PATCH',
+      type: 'PUT',
     });
 
     if (save) {
@@ -113,7 +113,7 @@ export default class extends baseVw {
 
       const save = this.settings.save({ shippingAddresses: shippingAddresses.toJSON() }, {
         attrs: { shippingAddresses: shippingAddresses.toJSON() },
-        type: 'PATCH',
+        type: 'PUT',
       });
 
       if (save) {

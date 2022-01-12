@@ -83,7 +83,7 @@ export default class extends BaseVw {
     if (!this.settings.validationError) {
       this.settings.save(formData, {
         attrs: formData,
-        type: 'PATCH',
+        type: 'PUT',
       })
           .fail((...args) => {
             const errMsg = args[0] && args[0].responseJSON &&

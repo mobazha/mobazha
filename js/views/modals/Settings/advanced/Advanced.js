@@ -193,7 +193,7 @@ export default class extends baseVw {
       const localSave = this.localSettings.save();
       const serverSave = this.settings.save(serverFormData, {
         attrs: serverFormData,
-        type: 'PATCH',
+        type: 'PUT',
       });
 
       $.when(localSave, serverSave)

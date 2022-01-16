@@ -7,7 +7,7 @@
   "main": "bootstrapper.js",
   "scripts": {
     "start": "cross-env NODE_ENV=development npm-run-all sass:build process-index --parallel sass:watch index:watch browsersync start-app",
-    "start-app": "cross-env NODE_ENV=development electron .",
+    "start-app": "cross-env NODE_ENV=development electron . --remote-debugging-port=9223",
     "test": "cross-env BABEL_ENV=development mocha --compilers js:babel-register --recursive --exit",
     "test:watch": "npm run test -- --watch",
     "lint": "eslint .",

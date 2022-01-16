@@ -9,7 +9,7 @@ import bech32 from 'bech32';
 let _currencies = [
   {
     code: 'BTC',
-    testnetCode: 'TBTC',
+    testnetCode: 'BTC',
     symbol: '₿',
     // Not allowing fee bump on BTC right now given the fees.
     // feeBumpTransactionSize: 154,
@@ -49,7 +49,7 @@ let _currencies = [
   },
   {
     code: 'BCH',
-    testnetCode: 'TBCH',
+    testnetCode: 'BCH',
     feeBumpTransactionSize: 154,
     qrCodeText: address => {
       let prefixedAddress = address;
@@ -78,7 +78,7 @@ let _currencies = [
   },
   {
     code: 'CFX',
-    testnetCode: 'TCFX',
+    testnetCode: 'CFX',
     qrCodeText: address => `conflux:${address}`,
     icon: 'imgs/cryptoIcons/CFX-icon.png',
     url: 'https://confluxnetwork.org',
@@ -100,7 +100,7 @@ let _currencies = [
   },
   {
     code: 'ETH',
-    testnetCode: 'TETH',
+    testnetCode: 'ETH',
     qrCodeText: address => `ethereum:${address}`,
     icon: 'imgs/cryptoIcons/ETH.png',
     url: 'https://ethereum.org/',
@@ -120,7 +120,7 @@ let _currencies = [
   },
   {
     code: 'LTC',
-    testnetCode: 'TLTC',
+    testnetCode: 'LTC',
     feeBumpTransactionSize: 154,
     qrCodeText: address => `litecoin:${address}`,
     icon: 'imgs/cryptoIcons/LTC.png',
@@ -141,7 +141,7 @@ let _currencies = [
   },
   {
     code: 'ZEC',
-    testnetCode: 'TZEC',
+    testnetCode: 'ZEC',
     feeBumpTransactionSize: 154,
     qrCodeText: address => `zcash:${address}`,
     icon: 'imgs/cryptoIcons/ZEC.png',

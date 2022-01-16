@@ -584,17 +584,7 @@ let exchangeRates = {};
  * cached values via getExchangeRate() or more commonly convertCurrency().
  */
 export function fetchExchangeRates(options = {}) {
-  const supportedCurs = supportedWalletCurs();
-  let coin;
-
-  if (supportedCurs.length) {
-    coin = supportedCurs.includes('BTC') ||
-      supportedCurs.includes('TBTC') ?
-        'BTC' :
-        ensureMainnetCode(supportedCurs[0]);
-  }
-
-  const xhr = $.get(app.getServerUrl(`ob/exchangerates/${coin}`), options)
+  const xhr = $.get(app.getServerUrl('ob/exchangerates'), options)
     .done(data => {
       const changed = new Set();
 
@@ -616,7 +606,6 @@ export function fetchExchangeRates(options = {}) {
       const prevExchangeRates = JSON.parse(JSON.stringify(exchangeRates));
       exchangeRates = {
         ...data,
-        [coin]: 1,
       };
 
       if (changed.size) {
@@ -703,12 +692,16 @@ export function convertCurrency(amount, fromCur, toCur) {
   const fromRate = getExchangeRate(fromCurCode);
   const toRate = getExchangeRate(toCurCode);
 
+  const fromDivisibility = getCoinDivisibility(fromCurCode);
+  const toDivisibility = getCoinDivisibility(toCurCode);
+
   const bigNum = amount instanceof bigNumber ?
     amount : bigNumber(amount);
 
   const converted =
     bigNum
-      .times(toRate / fromRate);
+      .times(toRate / fromRate)
+      .multipliedBy(bigNumber(10).pow(fromDivisibility - toDivisibility));
 
   if (amount instanceof bigNumber) {
     return converted;

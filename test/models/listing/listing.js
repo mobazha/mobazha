@@ -59,7 +59,7 @@ describe('the Listing model', () => {
     const parsed = listing.parse({
       listing: {
         item: {
-          bigPrice: '123',
+          price: '123',
           priceCurrency: {
             code: 'USD',
             divisibility: 2,
@@ -69,17 +69,17 @@ describe('the Listing model', () => {
           {
             services: [
               {
-                bigPrice: '123',
+                price: '123',
               },
               {
-                bigPrice: '234',
+                price: '234',
               },
             ],
           },
           {
             services: [
               {
-                bigPrice: '456',
+                price: '456',
               },
             ],
           },
@@ -92,10 +92,10 @@ describe('the Listing model', () => {
       },
     });
 
-    expect(parsed.item.bigPrice.toString()).to.equal('1.23');
-    expect(parsed.shippingOptions[0].services[0].bigPrice.toString()).to.equal('1.23');
-    expect(parsed.shippingOptions[0].services[1].bigPrice.toString()).to.equal('2.34');
-    expect(parsed.shippingOptions[1].services[0].bigPrice.toString()).to.equal('4.56');
+    expect(parsed.item.price.toString()).to.equal('1.23');
+    expect(parsed.shippingOptions[0].services[0].price.toString()).to.equal('1.23');
+    expect(parsed.shippingOptions[0].services[1].price.toString()).to.equal('2.34');
+    expect(parsed.shippingOptions[1].services[0].price.toString()).to.equal('4.56');
     expect(parsed.coupons[0].bigPriceDiscount.toString()).to.equal('13.33');
   });
 
@@ -104,7 +104,7 @@ describe('the Listing model', () => {
     const parsed = listing.parse({
       listing: {
         item: {
-          bigPrice: '271453590',
+          price: '271453590',
           priceCurrency: {
             code: 'BTC',
             divisibility: 8,
@@ -114,17 +114,17 @@ describe('the Listing model', () => {
           {
             services: [
               {
-                bigPrice: '271453590',
+                price: '271453590',
               },
               {
-                bigPrice: '873927651',
+                price: '873927651',
               },
             ],
           },
           {
             services: [
               {
-                bigPrice: '281649276',
+                price: '281649276',
               },
             ],
           },
@@ -140,10 +140,10 @@ describe('the Listing model', () => {
       },
     });
 
-    expect(parsed.item.bigPrice.toString()).to.equal('2.7145359');
-    expect(parsed.shippingOptions[0].services[0].bigPrice.toString()).to.equal('2.7145359');
-    expect(parsed.shippingOptions[0].services[1].bigPrice.toString()).to.equal('8.73927651');
-    expect(parsed.shippingOptions[1].services[0].bigPrice.toString()).to.equal('2.81649276');
+    expect(parsed.item.price.toString()).to.equal('2.7145359');
+    expect(parsed.shippingOptions[0].services[0].price.toString()).to.equal('2.7145359');
+    expect(parsed.shippingOptions[0].services[1].price.toString()).to.equal('8.73927651');
+    expect(parsed.shippingOptions[1].services[0].price.toString()).to.equal('2.81649276');
     expect(parsed.coupons[0].bigPriceDiscount.toString()).to.equal('0.00001333');
     expect(parsed.coupons[1].bigPriceDiscount.toString()).to.equal('2.81649276');
   });
@@ -240,7 +240,7 @@ describe('the Listing model', () => {
 
     listing.set({
       item: {
-        bigPrice: bigNumber('500'),
+        price: bigNumber('500'),
         priceCurrency: {
           code: 'USD',
           divisibility: 2,
@@ -263,7 +263,7 @@ describe('the Listing model', () => {
     }, { validate: true });
   });
 
-  const servicePriceFields = ['bigPrice', 'bigAdditionalItemPrice'];
+  const servicePriceFields = ['price', 'additionalItemPrice'];
 
   it('fails validation if service price fields do not contain a valid currency amount', () => {
     servicePriceFields.forEach(field => {
@@ -300,7 +300,7 @@ describe('the Listing model', () => {
               {
                 [field]: bigNumber('0.009'), // invalid
               },
-              {}, // invalid, bigPrice is required
+              {}, // invalid, price is required
               {
                 [field]: '100', // invalid
               },

@@ -56,7 +56,7 @@ export default class extends BaseModal {
     this.totalPrice = bigNumber();
 
     try {
-      this.totalPrice = this.model.get('item').get('bigPrice');
+      this.totalPrice = this.model.get('item').get('price');
     } catch (e) {
       // pass
     }

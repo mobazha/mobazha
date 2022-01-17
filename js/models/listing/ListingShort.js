@@ -76,12 +76,12 @@ export default class extends BaseModel {
           amount: parsedResponse.amount,
           currency: parsedResponse.currency,
         };
-      } else if (parsedResponse.bigPrice) {
+      } else if (parsedResponse.price) {
         parsedResponse.price = {
-          amount: parsedResponse.bigPrice.amount,
+          amount: parsedResponse.price.amount,
           currency: {
-            code: parsedResponse.bigPrice.currencyCode,
-            divisibility: parsedResponse.bigPrice.divisibility,
+            code: parsedResponse.price.currencyCode,
+            divisibility: parsedResponse.price.divisibility,
           },
         };
       }

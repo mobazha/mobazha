@@ -156,14 +156,14 @@ export default class extends BaseModel {
 
     this.validateCurrencyAmount(
       {
-        amount: attrs.bigPrice,
+        amount: attrs.price,
         currency: {
           code: () => attrs.priceCurrency.code,
           divisibility: () => attrs.priceCurrency.divisibility,
         },
       },
       addError,
-      'bigPrice'
+      'price'
     );
 
     if (!attrs.images.length) {

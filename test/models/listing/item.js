@@ -187,17 +187,17 @@ describe('the Item model', () => {
       .to.equal(true);
   });
 
-  it('fails validation if the bigPrice is not valid', () => {
+  it('fails validation if the price is not valid', () => {
     const item = new Item();
     item.set({
-      bigPrice: bigNumber(100.001),
+      price: bigNumber(100.001),
       priceCurrency: {
         code: 'USD',
         divisibility: 2,
       },
     }, { validate: true });
     const valErr = item.validationError;
-    expect(valErr && !!valErr.bigPrice.length || false)
+    expect(valErr && !!valErr.price.length || false)
       .to.equal(true);
   });
 

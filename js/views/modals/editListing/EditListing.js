@@ -694,11 +694,11 @@ export default class extends BaseModal {
 
       this.images.add(uploadedImages.map(image => ({
         filename: image.filename,
-        original: image.hashes.original,
-        large: image.hashes.large,
-        medium: image.hashes.medium,
-        small: image.hashes.small,
-        tiny: image.hashes.tiny,
+        original: image.original,
+        large: image.large,
+        medium: image.medium,
+        small: image.small,
+        tiny: image.tiny,
       })));
     })
     .fail(jqXhr => {

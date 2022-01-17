@@ -912,7 +912,7 @@ export default class extends BaseModal {
         if (this.trackInventoryBy === 'DO_NOT_TRACK') {
           item.get('skus')
             .forEach(sku => {
-              sku.unset('bigQuantity');
+              sku.unset('quantity');
               sku.set({ infiniteInventory: true });
             });
         }

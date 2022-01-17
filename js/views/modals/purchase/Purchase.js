@@ -90,7 +90,7 @@ export default class extends BaseModal {
     const item = new Item(
       {
         listingHash: this.listing.get('hash'),
-        bigQuantity: !this.listing.isCrypto ? bigNumber('1') : undefined,
+        quantity: !this.listing.isCrypto ? bigNumber('1') : undefined,
         options: opts.variants || [],
       },
       {
@@ -276,7 +276,7 @@ export default class extends BaseModal {
       'click .js-purchaseVerifiedOnly': 'onClickVerifiedOnly',
       'change #cryptoAmountCurrency': 'changeCryptoAmountCurrency',
       'change #cryptoAmount': 'onChangeCryptoAmount',
-      'keyup [name="bigQuantity"]': 'keyupQuantity',
+      'keyup [name="quantity"]': 'keyupQuantity',
       ...super.events(),
     };
   }
@@ -377,14 +377,14 @@ export default class extends BaseModal {
 
     this.order.get('items')
       .at(0)
-      .set({ bigQuantity: quantity });
+      .set({ quantity: quantity });
   }
 
   changeCryptoAmountCurrency(e) {
     this._cryptoAmountCurrency = e.target.value;
     const quantity = this.getFormData(
       this.getCachedEl('#cryptoAmount')
-    ).bigQuantity;
+    ).quantity;
     this.setModelQuantity(quantity);
   }
 
@@ -395,7 +395,7 @@ export default class extends BaseModal {
     }
 
     this.quantityKeyUpTimer = setTimeout(() => {
-      const quantity = this.getFormData($(e.target)).bigQuantity;
+      const quantity = this.getFormData($(e.target)).quantity;
       if (this.listing.isCrypto) this._cryptoQuantity = quantity;
       this.setModelQuantity(quantity);
     }, 150);
@@ -526,8 +526,8 @@ export default class extends BaseModal {
               const item = items.at(i);
               cryptoItems.push({
                 ...item.toJSON(),
-                bigQuantity: decimalToInteger(
-                  item.get('bigQuantity'),
+                quantity: decimalToInteger(
+                  item.get('quantity'),
                   coinDivisibility
                 ),
               });
@@ -666,8 +666,8 @@ export default class extends BaseModal {
         price: bigNumber(this.listing.price.amount),
         sPrice: bigNumber(sOptService ? sOptService.get('bigPrice') : 0),
         aPrice: bigNumber(sOptService ? sOptService.get('bigAdditionalItemPrice') : 0),
-        vPrice: bigNumber(sku ? sku.get('bigSurcharge') : 0),
-        quantity: bigNumber(item.get('bigQuantity')),
+        vPrice: bigNumber(sku ? sku.get('surcharge') : 0),
+        quantity: bigNumber(item.get('quantity')),
       };
     });
   }
@@ -714,7 +714,7 @@ export default class extends BaseModal {
     const state = this.getState();
     const item = this.order.get('items')
       .at(0);
-    const quantity = item.get('bigQuantity');
+    const quantity = item.get('quantity');
     const metadata = this.listing.get('metadata');
 
     let uiQuantity = quantity;

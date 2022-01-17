@@ -460,11 +460,11 @@ export default class extends BaseModel {
       (item.skus || []).forEach(sku => {
         this.validateCurrencyAmount(
           {
-            amount: sku.bigSurcharge,
+            amount: sku.surcharge,
             currency: curDefCurrency,
           },
           addError,
-          `item.skus[${sku.cid}].bigSurcharge`,
+          `item.skus[${sku.cid}].surcharge`,
           {
             validationOptions: {
               rangeType: CUR_VAL_RANGE_TYPES.GREATER_THAN_OR_EQUAL_ZERO,
@@ -582,7 +582,7 @@ export default class extends BaseModel {
       if (method !== 'delete') {
         // it's a create or update
 
-        options.url = options.url || app.getServerUrl('ob/listing/');
+        options.url = options.url || app.getServerUrl('ob/listing');
         options.attrs = options.attrs || this.toJSON();
 
         let coinDiv;
@@ -630,7 +630,7 @@ export default class extends BaseModel {
           });
 
           options.attrs.item.skus.forEach(sku => {
-            sku.bigSurcharge = decimalToInteger(sku.bigSurcharge, coinDiv);
+            sku.surcharge = decimalToInteger(sku.surcharge, coinDiv);
           });
         } else {
           // Don't send over the price on crypto listings.
@@ -660,16 +660,16 @@ export default class extends BaseModel {
           const dummySku = {};
 
           if (options.attrs.metadata.contractType === 'CRYPTOCURRENCY') {
-            dummySku.bigQuantity = decimalToInteger(
+            dummySku.quantity = decimalToInteger(
               options.attrs.item.cryptoQuantity,
               options.attrs.metadata.coinDivisibility
             );
 
             delete options.attrs.item.cryptoQuantity;
           } else if (options.attrs.item.infiniteInventory) {
-            dummySku.bigQuantity = '-1';
+            dummySku.quantity = '-1';
           } else if (options.attrs.item.quantity instanceof bigNumber) {
-            dummySku.bigQuantity = options.attrs.item.quantity;
+            dummySku.quantity = options.attrs.item.quantity;
           }
 
           if (
@@ -694,7 +694,7 @@ export default class extends BaseModel {
         // is expecting a quantity negative quantity in that case.
         options.attrs.item.skus.forEach(sku => {
           if (sku.infiniteInventory) {
-            sku.bigQuantity = bigNumber('-1');
+            sku.quantity = bigNumber('-1');
           }
 
           delete sku.infiniteInventory;
@@ -867,20 +867,6 @@ export default class extends BaseModel {
         }
       }
 
-      if (parsedResponse.metadata !== undefined) {
-        if (parsedResponse.metadata.shippingFromCountryCode === 'NA') {
-          parsedResponse.metadata.shippingFromCountryCode = '';
-        }
-
-        if (parsedResponse.metadata.shippingFromCountryCode !== '') {
-          const countries = getIndexedCountries();
-          const countryCode = parsedResponse.metadata.shippingFromCountryCode;
-          if (countryCode !== undefined) {
-            parsedResponse.metadata.shippingFromCountryName = countries[countryCode].name;
-          }
-        }
-      }
-
       // Re-organize variant structure so a "dummy" SKU (if present) has its quanitity
       // and productID moved to be attributes of the Item model
       if (
@@ -892,12 +878,12 @@ export default class extends BaseModel {
 
         if (isCrypto) {
           parsedResponse.item.cryptoQuantity = integerToDecimal(
-            dummySku.bigQuantity,
+            dummySku.quantity,
             parsedResponse.metadata.coinDivisibility,
-            { fieldName: 'sku.bigQuantity' }
+            { fieldName: 'sku.quantity' }
           );
         } else {
-          parsedResponse.item.quantity = dummySku.bigQuantity;
+          parsedResponse.item.quantity = dummySku.quantity;
         }
 
         parsedResponse.item.productID = dummySku.productID;
@@ -906,20 +892,20 @@ export default class extends BaseModel {
         parsedResponse.item.skus.forEach(sku => {
           // If a sku quantity is set to less than 0, we'll set the
           // infinite inventory flag.
-          if (bigNumber(sku.bigQuantity).lt(0)) {
+          if (bigNumber(sku.quantity).lt(0)) {
             sku.infiniteInventory = true;
           } else {
             sku.infiniteInventory = false;
           }
 
           // convert the surcharge
-          const bigSurcharge = sku.bigSurcharge;
+          const surcharge = sku.surcharge;
 
-          if (bigSurcharge) {
-            sku.bigSurcharge = integerToDecimal(
-              bigSurcharge,
+          if (surcharge) {
+            sku.surcharge = integerToDecimal(
+              surcharge,
               coinDiv,
-              { fieldName: 'sku.bigSurcharge' }
+              { fieldName: 'sku.surcharge' }
             );
           }
         });

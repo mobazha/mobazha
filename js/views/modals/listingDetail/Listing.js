@@ -511,7 +511,7 @@ export default class extends BaseModal {
       .get('skus')
       .find(v =>
         _.isEqual(v.get('variantCombo'), variantCombo));
-    const surcharge = sku ? sku.get('bigSurcharge') : bigNumber('0');
+    const surcharge = sku ? sku.get('surcharge') : bigNumber('0');
 
     try {
       const _totalPrice =

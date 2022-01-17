@@ -15,23 +15,23 @@ import Skus from '../../collections/listing/Skus';
  * API. When a listing does not have variants but tracks inventory, the server handles
  * the quantity and productId values in a "dummy" SKU, e.g:
  *
- * skus: [{ bigQuantity: "123", productId: "54321" }]
+ * skus: [{ quantity: "123", productId: "54321" }]
  *
  * Since that is, arguably, awkward, instead this model offers a few properties to track
  * non-variant inventory:
  *
  * productId - a string that maps to "skus: [{ productId: "54321" }]"
- * quantity - a bigNumber that maps to "skus: [{ bigQuantity: "123" }]" (used
+ * quantity - a bigNumber that maps to "skus: [{ quantity: "123" }]" (used
  *   for non-crypto listings)
- * cryptoQuantity - a bigNumber that maps to "skus: [{ bigQuantity: "123" }]"
+ * cryptoQuantity - a bigNumber that maps to "skus: [{ quantity: "123" }]"
  *   (used for crypto listings)
- * infiniteInventory - a boolean that maps to "skus: [{ bigQuantity: "-1" }]".
+ * infiniteInventory - a boolean that maps to "skus: [{ quantity: "-1" }]".
  *
  * Parse/Sync of the listing model will handle mapping to/from the server version
  * and what's in this model.
  *
  * Please note: If your listing does include variants, you will want to use the
- * bigQuantity and infiniteInventory fields on the SKU model instead of setting
+ * quantity and infiniteInventory fields on the SKU model instead of setting
  * anything on this model related to those fields.
  */
 

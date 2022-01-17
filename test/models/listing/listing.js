@@ -86,7 +86,7 @@ describe('the Listing model', () => {
         ],
         coupons: [
           {
-            bigPriceDiscount: '1333',
+            priceDiscount: '1333',
           },
         ],
       },
@@ -96,7 +96,7 @@ describe('the Listing model', () => {
     expect(parsed.shippingOptions[0].services[0].price.toString()).to.equal('1.23');
     expect(parsed.shippingOptions[0].services[1].price.toString()).to.equal('2.34');
     expect(parsed.shippingOptions[1].services[0].price.toString()).to.equal('4.56');
-    expect(parsed.coupons[0].bigPriceDiscount.toString()).to.equal('13.33');
+    expect(parsed.coupons[0].priceDiscount.toString()).to.equal('13.33');
   });
 
   it('converts BTC prices from Satoshi to BTC format in parse', () => {
@@ -131,10 +131,10 @@ describe('the Listing model', () => {
         ],
         coupons: [
           {
-            bigPriceDiscount: '1333',
+            priceDiscount: '1333',
           },
           {
-            bigPriceDiscount: '281649276',
+            priceDiscount: '281649276',
           },
         ],
       },
@@ -144,8 +144,8 @@ describe('the Listing model', () => {
     expect(parsed.shippingOptions[0].services[0].price.toString()).to.equal('2.7145359');
     expect(parsed.shippingOptions[0].services[1].price.toString()).to.equal('8.73927651');
     expect(parsed.shippingOptions[1].services[0].price.toString()).to.equal('2.81649276');
-    expect(parsed.coupons[0].bigPriceDiscount.toString()).to.equal('0.00001333');
-    expect(parsed.coupons[1].bigPriceDiscount.toString()).to.equal('2.81649276');
+    expect(parsed.coupons[0].priceDiscount.toString()).to.equal('0.00001333');
+    expect(parsed.coupons[1].priceDiscount.toString()).to.equal('2.81649276');
   });
 
   it('fails validation if the refund policy is not provided as a string', () => {
@@ -249,15 +249,15 @@ describe('the Listing model', () => {
       coupons: [
         {
           discountCode: Date.now() + Math.random(),
-          bigPriceDiscount: bigNumber('499.99'), // should not fail validation
+          priceDiscount: bigNumber('499.99'), // should not fail validation
         },
         {
           discountCode: Date.now() + Math.random(),
-          bigPriceDiscount: bigNumber('501'), // should fail validation
+          priceDiscount: bigNumber('501'), // should fail validation
         },
         {
           discountCode: Date.now() + Math.random(),
-          bigPriceDiscount: bigNumber('1500'), // should fail validation
+          priceDiscount: bigNumber('1500'), // should fail validation
         },
       ],
     }, { validate: true });

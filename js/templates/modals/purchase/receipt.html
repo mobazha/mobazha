@@ -50,10 +50,10 @@
         itemTotal = itemTotal.minus(
           itemTotal.times(0.01).times(coupon.percentDiscount)
         );
-      } else if (coupon.bigPriceDiscount && !coupon.bigPriceDiscount.isNaN()) {
+      } else if (coupon.priceDiscount && !coupon.priceDiscount.isNaN()) {
         const convertPriceDiscount =
             ob.currencyMod.convertCurrency(
-              coupon.bigPriceDiscount,
+              coupon.priceDiscount,
               ob.listingCurrency,
               viewingCurrency
             );
@@ -119,8 +119,8 @@
           <b>
             <% if (coupon.percentDiscount) {
                  print(`-${coupon.percentDiscount}%`);
-            } else if (coupon.bigPriceDiscount && !coupon.bigPriceDiscount.isNaN()) {
-              print(`-${ob.currencyMod.convertAndFormatCurrency(coupon.bigPriceDiscount, ob.listingCurrency, viewingCurrency)}`);
+            } else if (coupon.priceDiscount && !coupon.priceDiscount.isNaN()) {
+              print(`-${ob.currencyMod.convertAndFormatCurrency(coupon.priceDiscount, ob.listingCurrency, viewingCurrency)}`);
             } %>
           </b>
         </div>

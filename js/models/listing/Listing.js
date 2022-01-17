@@ -482,7 +482,7 @@ export default class extends BaseModel {
       }
 
       coupons.forEach(coupon => {
-        const priceDiscount = coupon.bigPriceDiscount;
+        const priceDiscount = coupon.priceDiscount;
         const itemPrice = item.price;
 
         this.validateCurrencyAmount(
@@ -491,7 +491,7 @@ export default class extends BaseModel {
             currency: curDefCurrency,
           },
           addError,
-          `coupons[${coupon.cid}].bigPriceDiscount`,
+          `coupons[${coupon.cid}].priceDiscount`,
           {
             translations: {
               required: false,
@@ -508,7 +508,7 @@ export default class extends BaseModel {
           !itemPrice.isNaN()
         ) {
           if (priceDiscount.gte(itemPrice)) {
-            addError(`coupons[${coupon.cid}].bigPriceDiscount`,
+            addError(`coupons[${coupon.cid}].priceDiscount`,
               app.polyglot.t('listingModelErrors.couponsPriceTooLarge'));
           }
         }
@@ -622,9 +622,9 @@ export default class extends BaseModel {
           });
 
           options.attrs.coupons.forEach(coupon => {
-            if (coupon.bigPriceDiscount) {
-              coupon.bigPriceDiscount =
-                decimalToInteger(coupon.bigPriceDiscount, coinDiv);
+            if (coupon.priceDiscount) {
+              coupon.priceDiscount =
+                decimalToInteger(coupon.priceDiscount, coinDiv);
             }
           });
 
@@ -854,12 +854,12 @@ export default class extends BaseModel {
 
         if (parsedResponse.coupons) {
           parsedResponse.coupons.forEach(coupon => {
-            if (coupon.bigPriceDiscount) {
-              coupon.bigPriceDiscount =
+            if (coupon.priceDiscount) {
+              coupon.priceDiscount =
                 integerToDecimal(
-                  coupon.bigPriceDiscount,
+                  coupon.priceDiscount,
                   coinDiv,
-                  { fieldName: 'coupon.bigPriceDiscount' }
+                  { fieldName: 'coupon.priceDiscount' }
                 );
             }
           });

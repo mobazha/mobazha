@@ -79,8 +79,8 @@ export default class extends BaseView {
 
     this.getCoinTypes.done(curs => {
       const modelCur = this.model
-        .get('metadata')
-        .get('coinType');
+        .get('item')
+        .get('cryptoListingCurrencyCode');
       const selected = modelCur || curs[0].code;
 
       const currencies = [...curs];
@@ -149,7 +149,7 @@ export default class extends BaseView {
   }
 
   get defaultFromCur() {
-    return this.model.get('metadata').get('coinType') ||
+    return this.model.get('item').get('cryptoListingCurrencyCode') ||
       this.coinTypes ? this.coinTypes[0].code : '';
   }
 

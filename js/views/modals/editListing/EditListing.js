@@ -896,10 +896,6 @@ export default class extends BaseModal {
     this.variantInventory.setCollectionData();
     this.couponsView.setCollectionData();
 
-    if (formData.metadata.shippingFromCountryCode === '') {
-      formData.metadata.shippingFromCountryCode = 'NA';
-    }
-
     if (!isCrypto) {
       if (item.get('options').length) {
         // If we have options, we shouldn't be providing certain properties on the Item
@@ -977,9 +973,6 @@ export default class extends BaseModal {
     // If the type is not 'PHYSICAL_GOOD', we'll clear out any shipping options.
     if (metadata.get('contractType') !== 'PHYSICAL_GOOD') {
       this.model.get('shippingOptions').reset();
-      const m = this.model.get('metadata');
-      m.set('shippingFromCountryCode', 'NA');
-      m.set('shippingFromPostalCode', '');
     } else {
       // If any shipping options have a type of 'LOCAL_PICKUP', we'll
       // clear out any services that may be there.
@@ -1294,7 +1287,6 @@ export default class extends BaseModal {
             cats: item.max.cats,
             tags: item.max.tags,
             photos: this.MAX_PHOTOS,
-            shippingFromPostalCode: item.max.shippingFromPostalCodeLength,
           },
           shouldShowVariantInventorySection: this.shouldShowVariantInventorySection,
           viewListingsT,

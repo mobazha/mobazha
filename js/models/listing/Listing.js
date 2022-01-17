@@ -154,9 +154,8 @@ export default class extends BaseModel {
     }
 
     let amount = bigNumber();
-
     try {
-      amount = item.get('bigPrice');
+      amount = item.get('price');
     } catch (e) {
       // pass
     }
@@ -429,11 +428,11 @@ export default class extends BaseModel {
         (shipOpt.services || []).forEach(service => {
           this.validateCurrencyAmount(
             {
-              amount: service.bigPrice,
+              amount: service.price,
               currency: curDefCurrency,
             },
             addError,
-            `shippingOptions[${shipOpt.cid}].services[${service.cid}].bigPrice`,
+            `shippingOptions[${shipOpt.cid}].services[${service.cid}].price`,
             {
               validationOptions: {
                 rangeType: CUR_VAL_RANGE_TYPES.GREATER_THAN_OR_EQUAL_ZERO,
@@ -443,11 +442,11 @@ export default class extends BaseModel {
 
           this.validateCurrencyAmount(
             {
-              amount: service.bigAdditionalItemPrice,
+              amount: service.additionalItemPrice,
               currency: curDefCurrency,
             },
             addError,
-            `shippingOptions[${shipOpt.cid}].services[${service.cid}].bigAdditionalItemPrice`,
+            `shippingOptions[${shipOpt.cid}].services[${service.cid}].additionalItemPrice`,
             {
               validationOptions: {
                 rangeType: CUR_VAL_RANGE_TYPES.GREATER_THAN_OR_EQUAL_ZERO,
@@ -484,7 +483,7 @@ export default class extends BaseModel {
 
       coupons.forEach(coupon => {
         const priceDiscount = coupon.bigPriceDiscount;
-        const itemPrice = item.bigPrice;
+        const itemPrice = item.price;
 
         this.validateCurrencyAmount(
           {
@@ -529,7 +528,7 @@ export default class extends BaseModel {
           }
         });
 
-      delete errObj['item.bigPrice'];
+      delete errObj['item.price'];
       delete errObj['item.condition'];
       delete errObj['item.quantity'];
       delete errObj['item.title'];
@@ -598,10 +597,10 @@ export default class extends BaseModel {
           options.attrs.item = {
             ...options.attrs.item,
             ...decimalToCurDef(
-              options.attrs.item.bigPrice,
+              options.attrs.item.price,
               options.attrs.item.priceCurrency.code,
               {
-                amountKey: 'bigPrice',
+                amountKey: 'price',
                 currencyKey: 'priceCurrency',
                 divisibility: coinDiv,
               }
@@ -610,13 +609,13 @@ export default class extends BaseModel {
 
           options.attrs.shippingOptions.forEach(shipOpt => {
             shipOpt.services.forEach(service => {
-              service.bigPrice = decimalToInteger(
-                service.bigPrice,
+              service.price = decimalToInteger(
+                service.price,
                 coinDiv
               );
-              service.bigAdditionalItemPrice =
+              service.additionalItemPrice =
                 decimalToInteger(
-                  service.bigAdditionalItemPrice,
+                  service.additionalItemPrice,
                   coinDiv
                 );
             });
@@ -634,7 +633,7 @@ export default class extends BaseModel {
           });
         } else {
           // Don't send over the price on crypto listings.
-          delete options.attrs.item.bigPrice;
+          delete options.attrs.item.price;
           delete options.attrs.item.priceCurrency;
           delete options.attrs.item.options;
 
@@ -818,11 +817,11 @@ export default class extends BaseModel {
         }
 
         if (parsedResponse.item) {
-          parsedResponse.item.bigPrice =
+          parsedResponse.item.price =
             integerToDecimal(
-              parsedResponse.item.bigPrice,
+              parsedResponse.item.price,
               coinDiv,
-              { fieldName: 'item.bigPrice' }
+              { fieldName: 'item.price' }
             );
         }
 
@@ -830,16 +829,16 @@ export default class extends BaseModel {
           parsedResponse.shippingOptions.forEach((shipOpt, shipOptIndex) => {
             if (shipOpt.services && shipOpt.services.length) {
               shipOpt.services.forEach(service => {
-                service.bigPrice = integerToDecimal(
-                  service.bigPrice,
+                service.price = integerToDecimal(
+                  service.price,
                   coinDiv,
-                  { fieldName: 'service.bigPrice' }
+                  { fieldName: 'service.price' }
                 );
-                service.bigAdditionalItemPrice =
+                service.additionalItemPrice =
                   integerToDecimal(
-                    service.bigAdditionalItemPrice,
+                    service.additionalItemPrice,
                     coinDiv,
-                    { fieldName: 'service.bigAdditionalItemPrice' }
+                    { fieldName: 'service.additionalItemPrice' }
                   );
               });
             }

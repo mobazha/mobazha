@@ -64,28 +64,11 @@ export default class extends BaseModel {
     parsedResponse.categories = Array.isArray(parsedResponse.categories) ?
       parsedResponse.categories : [];
 
-    const modifier = parsedResponse.modifier || 0;
+    const modifier = parsedResponse.cryptoListingPriceModifier || 0;
     let amount = '';
     let currencyCode = '';
 
     try {
-      // Check old style responses
-      if (parsedResponse.price.currencyCode !== '' &&
-        typeof(parsedResponse.price.amount) !== 'string') {
-        parsedResponse.price = {
-          amount: parsedResponse.amount,
-          currency: parsedResponse.currency,
-        };
-      } else if (parsedResponse.price) {
-        parsedResponse.price = {
-          amount: parsedResponse.price.amount,
-          currency: {
-            code: parsedResponse.price.currencyCode,
-            divisibility: parsedResponse.price.divisibility,
-          },
-        };
-      }
-
       amount = parsedResponse.contractType === 'CRYPTOCURRENCY' ?
           1 : curDefToDecimal(parsedResponse.price);
     } catch (e) {
@@ -94,7 +77,7 @@ export default class extends BaseModel {
 
     try {
       currencyCode = parsedResponse.contractType === 'CRYPTOCURRENCY' ?
-        parsedResponse.coinType : parsedResponse.price.currency.code;
+        parsedResponse.cryptoListingCurrencyCode : parsedResponse.price.currency.code;
     } catch (e) {
       // pass
     }
@@ -104,13 +87,6 @@ export default class extends BaseModel {
       currencyCode,
       modifier,
     };
-
-    try {
-      delete parsedResponse.cryptoCurrencyCode;
-      delete parsedResponse.modifier;
-    } catch (e) {
-      // pass
-    }
 
     if (parsedResponse.contractType === 'CRYPTOCURRENCY') {
       // Commenting out inventory related coded since its not functional (on the server

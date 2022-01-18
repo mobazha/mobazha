@@ -1,8 +1,9 @@
 import app from '../../app';
 import BaseModel from '../BaseModel';
 import is from 'is_js';
-import { upToFixed } from '../../utils/number';
 import { isSupportedWalletCur } from '../../data/walletCurrencies';
+import { getCurrencyByCode } from '../../data/currencies';
+import { isValidCoinDivisibility } from '../../utils/currency';
 
 export default class extends BaseModel {
   defaults() {
@@ -53,12 +54,6 @@ export default class extends BaseModel {
       opts = val || {};
     } else {
       (attrs = {})[key] = val;
-    }
-
-    if (attrs.contractType === 'CRYPTOCURRENCY' &&
-      typeof attrs.priceModifier === 'number') {
-      // round to two decimal places
-      attrs.priceModifier = parseFloat(upToFixed(attrs.priceModifier, 2));
     }
 
     return super.set(attrs, opts);
@@ -114,8 +109,24 @@ export default class extends BaseModel {
           'currency is allowed.');
       }
 
-      if (!attrs.coinType || typeof attrs.coinType !== 'string') {
-        addError('coinType', 'Please provide a coinType.');
+      if (!attrs.cryptoListingCurrencyCode || typeof attrs.cryptoListingCurrencyCode !== 'string') {
+        addError('cryptoListingCurrencyCode', 'Please provide a cryptoListingCurrencyCode.');
+      }
+    } else {
+      // The ones in this block should not be user facing unless there's a dev error.
+      if (typeof attrs.pricingCurrency !== 'object') {
+        addError('pricingCurrency', 'The pricingCurrency must be provided as an object.');
+      } else {
+        if (
+          !attrs.pricingCurrency.code ||
+          !getCurrencyByCode(attrs.pricingCurrency.code)
+        ) {
+          addError('pricingCurrency.code', 'The currency is not one of the available ones.');
+        }
+
+        if (!isValidCoinDivisibility(attrs.pricingCurrency.divisibility)[0]) {
+          addError('pricingCurrency.divisibility', 'The divisibility is not valid.');
+        }
       }
     }
 

@@ -138,34 +138,6 @@ export default class extends BaseModel {
       addError('description', app.polyglot.t('itemModelErrors.descriptionTooLong'));
     }
 
-    // The ones in this block should not be user facing unless there's a dev error.
-    if (typeof attrs.priceCurrency !== 'object') {
-      addError('priceCurrency', 'The priceCurrency must be provided as an object.');
-    } else {
-      if (
-        !attrs.priceCurrency.code ||
-        !getCurrencyByCode(attrs.priceCurrency.code)
-      ) {
-        addError('priceCurrency.code', 'The currency is not one of the available ones.');
-      }
-
-      if (!isValidCoinDivisibility(attrs.priceCurrency.divisibility)[0]) {
-        addError('priceCurrency.divisibility', 'The divisibility is not valid.');
-      }
-    }
-
-    this.validateCurrencyAmount(
-      {
-        amount: attrs.price,
-        currency: {
-          code: () => attrs.priceCurrency.code,
-          divisibility: () => attrs.priceCurrency.divisibility,
-        },
-      },
-      addError,
-      'price'
-    );
-
     if (!attrs.images.length) {
       addError('images', app.polyglot.t('itemModelErrors.imageRequired'));
     } else if (attrs.images.length > max.images) {

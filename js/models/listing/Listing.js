@@ -61,17 +61,17 @@ export default class extends BaseModel {
     return this.constructor.getIpnsUrl(this.guid, slug);
   }
 
-  static getIpfsUrl(cid) {
-    if (typeof cid !== 'string' || !cid) {
-      throw new Error('Please provide a cid as a non-empty ' +
+  static getIpfsUrl(hash) {
+    if (typeof hash !== 'string' || !hash) {
+      throw new Error('Please provide a hash as a non-empty ' +
         'string.');
     }
 
-    return app.getServerUrl(`ob/listing/${cid}`);
+    return app.getServerUrl(`ob/listing/${hash}`);
   }
 
-  getIpfsUrl(cid) {
-    return this.constructor.getIpfsUrl(cid);
+  getIpfsUrl(hash) {
+    return this.constructor.getIpfsUrl(hash);
   }
 
   defaults() {
@@ -244,7 +244,7 @@ export default class extends BaseModel {
   cloneListing() {
     const clone = this.clone();
     clone.unset('slug');
-    clone.unset('cid');
+    clone.unset('hash');
     clone.guid = this.guid;
     clone.lastSyncedAttrs = {};
     return clone;
@@ -512,13 +512,13 @@ export default class extends BaseModel {
 
   fetch(options = {}) {
     if (
-      options.cid !== undefined &&
+      options.hash !== undefined &&
       (
-        typeof options.cid !== 'string' ||
-        !options.cid
+        typeof options.hash !== 'string' ||
+        !options.hash
       )
     ) {
-      throw new Error('If providing the options.cid, it must be a ' +
+      throw new Error('If providing the options.hash, it must be a ' +
         'non-empty string.');
     }
 
@@ -541,8 +541,8 @@ export default class extends BaseModel {
 
       options.url = options.url ||
         (
-          typeof options.cid === 'string' && options.cid ?
-            this.getIpfsUrl(options.cid) :
+          typeof options.hash === 'string' && options.hash ?
+            this.getIpfsUrl(options.hash) :
             this.getIpnsUrl(slug)
         );
     } else {
@@ -655,7 +655,7 @@ export default class extends BaseModel {
         });
 
         // remove the hash
-        delete options.attrs.cid;
+        delete options.attrs.hash;
 
         // If all countries are individually provided as shipping regions, we'll send
         // 'ALL' to the server.
@@ -727,7 +727,7 @@ export default class extends BaseModel {
         parsedResponse.metadata.contractType === 'CRYPTOCURRENCY';
 
       // set the cid
-      parsedResponse.cid = response.cid;
+      parsedResponse.hash = response.cid;
 
       let currencyCode;
       try {

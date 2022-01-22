@@ -90,7 +90,7 @@ export default class extends BaseModal {
     */
     const item = new Item(
       {
-        listingHash: this.listing.get('cid'),
+        listingHash: this.listing.get('hash'),
         quantity: !this.listing.isCrypto ? bigNumber('1') : undefined,
         options: opts.variants || [],
       },
@@ -250,7 +250,7 @@ export default class extends BaseModal {
       }
     });
 
-    this._latestHash = this.listing.get('cid');
+    this._latestHash = this.listing.get('hash');
     this._renderedHash = null;
 
     this.listenTo(outdatedListingHashesEvents, 'newHash', e => {
@@ -816,7 +816,7 @@ export default class extends BaseModal {
       }
     });
 
-    this._renderedHash = this.listing.get('cid');
+    this._renderedHash = this.listing.get('hash');
 
     return this;
   }

@@ -62,7 +62,7 @@ export default class extends BaseModal {
     }
 
     this._purchaseModal = null;
-    this._latestHash = this.model.get('cid');
+    this._latestHash = this.model.get('hash');
     this._renderedHash = null;
 
     // Sometimes a profile model is available and the vendor info
@@ -817,7 +817,7 @@ export default class extends BaseModal {
       this.$reviews = this.$('.js-reviews');
       this.$reviews.append(this.reviews.render().$el);
 
-      if (this._latestHash !== this.model.get('cid')) {
+      if (this._latestHash !== this.model.get('hash')) {
         this.outdateHash();
       }
 
@@ -915,7 +915,7 @@ export default class extends BaseModal {
     });
 
     this.rendered = true;
-    this._renderedHash = this.model.get('cid');
+    this._renderedHash = this.model.get('hash');
 
     return this;
   }

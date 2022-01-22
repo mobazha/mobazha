@@ -62,7 +62,7 @@ export default class extends BaseModal {
     }
 
     this._purchaseModal = null;
-    this._latestHash = this.model.get('hash');
+    this._latestHash = this.model.get('cid');
     this._renderedHash = null;
 
     // Sometimes a profile model is available and the vendor info

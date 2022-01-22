@@ -528,8 +528,8 @@ export default class extends BaseModal {
           adjPrice = convertAndFormatCurrency(
             this.totalPrice,
             this.model
-              .get('item')
-              .get('priceCurrency')
+              .get('metadata')
+              .get('pricingCurrency')
               .code,
             app.settings.get('localCurrency')
           );

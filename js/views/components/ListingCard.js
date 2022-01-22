@@ -447,10 +447,10 @@ export default class extends baseVw {
         }
 
         if (ipfsFetch && ipfsFetch.state() === 'resolved') {
-          if (listingHash !== data.hash) {
+          if (listingHash !== data.cid) {
             handleOutdatedHash(data, {
               oldHash: listingHash,
-              newHash: data.hash,
+              newHash: data.cid,
             });
           }
         } else {

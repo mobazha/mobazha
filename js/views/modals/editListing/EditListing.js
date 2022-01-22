@@ -788,7 +788,7 @@ export default class extends BaseModal {
       const segmentation = {
         type: serverData.metadata.contractType,
         currency: serverData.metadata.contractType !== 'CRYPTOCURRENCY' ?
-          serverData.item.priceCurrency.code : serverData.metadata.coinType,
+          serverData.metadata.pricingCurrency.code : serverData.item.cryptoListingCurrencyCode,
         moderated: serverData.moderators && !!serverData.moderators.length,
         isNew: this.model.isNew(),
       };
@@ -995,8 +995,8 @@ export default class extends BaseModal {
         cur = this._origModel
           .unparsedResponse
           .listing
-          .item
-          .priceCurrency
+          .metadata
+          .pricingCurrency
           .code;
       } catch (e) {
         return this;
@@ -1191,8 +1191,8 @@ export default class extends BaseModal {
     try {
       cur =
         this.model
-          .get('item')
-          .get('priceCurrency')
+          .get('metadata')
+          .get('pricingCurrency')
           .code;
     } catch (e) {
       // pass

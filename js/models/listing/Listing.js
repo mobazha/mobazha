@@ -197,13 +197,8 @@ export default class extends BaseModel {
     if (contractType !== 'CRYPTOCURRENCY') {
       let curCode;
 
-      try {
-        curCode =
-          attrs.metadata
-            .pricingCurrency
-            .code;
-      } catch (e) {
-        // pass
+      if (attrs.metadata && attrs.metadata.pricingCurrency) {
+        curCode = attrs.metadata.pricingCurrency.code;
       }
 
       if (
@@ -230,7 +225,7 @@ export default class extends BaseModel {
         }
       }
     } else {
-      if (attrs.meta.contractType === 'CRYPTOCURRENCY' &&
+      if (attrs.metadata.contractType === 'CRYPTOCURRENCY' &&
         typeof attrs.item.cryptoListingPriceModifier === 'number') {
         // round to two decimal places
         attrs.item.cryptoListingPriceModifier = parseFloat(upToFixed(attrs.item.cryptoListingPriceModifier, 2));

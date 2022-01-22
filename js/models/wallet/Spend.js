@@ -19,8 +19,8 @@ import {
 import app from '../../app';
 import BaseModel from '../BaseModel';
 
-const getWalletSpendUrl = () => app.getServerUrl('wallet/spend/');
-const getOrderSpendUrl = () => app.getServerUrl('ob/orderspend/');
+const getWalletSpendUrl = () => app.getServerUrl('wallet/spend');
+const getOrderSpendUrl = () => app.getServerUrl('ob/orderspend');
 
 class Spend extends BaseModel {
   constructor(attrs, options = {}) {

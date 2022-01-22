@@ -17,6 +17,7 @@ import {
   defaultCryptoCoinDivisibility,
   UnrecognizedCurrencyError,
 } from '../../utils/currency';
+import { upToFixed } from '../../utils/number';
 import BaseModel, { flattenAttrs } from '../BaseModel';
 import Item from './Item';
 import Metadata from './Metadata';
@@ -60,17 +61,17 @@ export default class extends BaseModel {
     return this.constructor.getIpnsUrl(this.guid, slug);
   }
 
-  static getIpfsUrl(hash) {
-    if (typeof hash !== 'string' || !hash) {
-      throw new Error('Please provide a hash as a non-empty ' +
+  static getIpfsUrl(cid) {
+    if (typeof cid !== 'string' || !cid) {
+      throw new Error('Please provide a cid as a non-empty ' +
         'string.');
     }
 
-    return app.getServerUrl(`ob/listing/ipfs/${hash}`);
+    return app.getServerUrl(`ob/listing/${cid}`);
   }
 
-  getIpfsUrl(hash) {
-    return this.constructor.getIpfsUrl(hash);
+  getIpfsUrl(cid) {
+    return this.constructor.getIpfsUrl(cid);
   }
 
   defaults() {
@@ -127,28 +128,19 @@ export default class extends BaseModel {
 
   get price() {
     const item = this.get('item');
-    const metadata = this.get('metadata');
-
-    let coinType = '';
-
-    try {
-      coinType = metadata.get('coinType');
-    } catch (e) {
-      // pass
-    }
 
     if (this.isCrypto) {
       let modifier = 0;
 
       try {
-        modifier = item.get('priceModifier') || 0;
+        modifier = item.get('cryptoListingPriceModifier') || 0;
       } catch (e) {
         // pass
       }
 
       return {
         amount: bigNumber(1 + (modifier / 100)),
-        currencyCode: coinType,
+        currencyCode: item.get('cryptoListingCurrencyCode'),
         modifier,
       };
     }
@@ -160,10 +152,10 @@ export default class extends BaseModel {
       // pass
     }
 
+    const metadata = this.get('metadata');
     let currencyCode = '';
-
     try {
-      currencyCode = item.get('priceCurrency').code;
+      currencyCode = metadata.get('pricingCurrency').code;
     } catch (e) {
       // pass
     }
@@ -207,8 +199,8 @@ export default class extends BaseModel {
 
       try {
         curCode =
-          attrs.item
-            .priceCurrency
+          attrs.metadata
+            .pricingCurrency
             .code;
       } catch (e) {
         // pass
@@ -219,68 +211,29 @@ export default class extends BaseModel {
         curCode
       ) {
         try {
-          attrs.item = {
-            ...attrs.item,
-            priceCurrency: {
+          attrs.metadata = {
+            ...attrs.metadata,
+            pricingCurrency: {
               code: curCode,
               divisibility: getCoinDivisibility(curCode),
             },
           };
         } catch (e) {
           if (
-            attrs.item &&
-            typeof attrs.item.priceCurrency === 'object'
+            attrs.metadata &&
+            typeof attrs.metadata.pricingCurrency === 'object'
           ) {
-            delete attrs.item.priceCurrency.divisibility;
+            delete attrs.metadata.pricingCurrency.divisibility;
             // validate will fail validation on the model in this scenario -
             // it's almost certainly a dev error
           }
         }
       }
     } else {
-      let coinType;
-
-      try {
-        coinType =
-          attrs.metadata
-            .coinType;
-      } catch (e) {
-        // pass
-      }
-
-      if (
-        typeof coinType === 'string' &&
-        coinType
-      ) {
-        try {
-          attrs.metadata.coinDivisibility = getCoinDivisibility(coinType);
-        } catch (e) {
-          if (e instanceof UnrecognizedCurrencyError) {
-            // If it's a coin we don't recognize and it has a valid divsibility
-            // set (maybe it came from another client that knows more about the coin
-            // than us), we'll use it. Otherwise, we'll use the default crypto coin
-            // divisibility.
-            let coinDiv = defaultCryptoCoinDivisibility;
-            const curDivis = this.get('metadata') &&
-              this.get('metadata').get('coinDivisibility');
-
-            try {
-              if (isValidCoinDivisibility(curDivis)[0]) {
-                coinDiv = curDivis;
-              }
-            } catch (err) {
-              // pass
-            }
-
-            attrs.metadata.coinDivisibility = coinDiv;
-          } else {
-            if (attrs.metadata) {
-              delete attrs.metadata.coinDivisibility;
-              // validate will fail validation on the model in this scenario -
-              // it's almost certainly a dev error
-            }
-          }
-        }
+      if (attrs.meta.contractType === 'CRYPTOCURRENCY' &&
+        typeof attrs.item.cryptoListingPriceModifier === 'number') {
+        // round to two decimal places
+        attrs.item.cryptoListingPriceModifier = parseFloat(upToFixed(attrs.item.cryptoListingPriceModifier, 2));
       }
     }
 
@@ -296,7 +249,7 @@ export default class extends BaseModel {
   cloneListing() {
     const clone = this.clone();
     clone.unset('slug');
-    clone.unset('hash');
+    clone.unset('cid');
     clone.guid = this.guid;
     clone.lastSyncedAttrs = {};
     return clone;
@@ -319,8 +272,8 @@ export default class extends BaseModel {
     const item = attrs.item;
 
     const curDefCurrency = {
-      code: () => item.priceCurrency.code,
-      divisibility: () => item.priceCurrency.divisibility,
+      code: () => metadata.pricingCurrency.code,
+      divisibility: () => metadata.pricingCurrency.divisibility,
     };
 
     if (!(attributes.item instanceof Item)) {
@@ -363,8 +316,8 @@ export default class extends BaseModel {
     }
 
     if (contractType === 'CRYPTOCURRENCY') {
-      if (!metadata || !metadata.coinType || typeof metadata.coinType !== 'string') {
-        addError('metadata.coinType', app.polyglot.t('metadataModelErrors.provideCoinType'));
+      if (!item || !item.cryptoListingCurrencyCode || typeof item.cryptoListingCurrencyCode !== 'string') {
+        addError('item.cryptoListingCurrencyCode', app.polyglot.t('metadataModelErrors.provideCoinType'));
       }
 
       if (item) {
@@ -384,29 +337,35 @@ export default class extends BaseModel {
         }
 
         if (
-          item.priceModifier === '' ||
-          item.priceModifier === undefined ||
-          item.priceModifier === null
+          item.cryptoListingPriceModifier === '' ||
+          item.cryptoListingPriceModifier === undefined ||
+          item.cryptoListingPriceModifier === null
         ) {
-          addError('item.priceModifier', app.polyglot.t('listingModelErrors.providePriceModifier'));
-        } else if (typeof item.priceModifier !== 'number') {
-          addError('item.priceModifier', app.polyglot.t('listingModelErrors.numericPriceModifier'));
+          addError('item.cryptoListingPriceModifier', app.polyglot.t('listingModelErrors.providePriceModifier'));
+        } else if (typeof item.cryptoListingPriceModifier !== 'number') {
+          addError('item.cryptoListingPriceModifier', app.polyglot.t('listingModelErrors.numericPriceModifier'));
         } else if (
-          item.priceModifier < this.max.minPriceModifier ||
-          item.priceModifier > this.max.maxPriceModifier
+          item.cryptoListingPriceModifier < this.max.minPriceModifier ||
+          item.cryptoListingPriceModifier > this.max.maxPriceModifier
         ) {
-          addError('item.priceModifier', app.polyglot.t('listingModelErrors.priceModifierRange', {
+          addError('item.cryptoListingPriceModifier', app.polyglot.t('listingModelErrors.priceModifierRange', {
             min: this.max.minPriceModifier,
             max: this.max.maxPriceModifier,
           }));
         }
 
+        let coinDiv;
+        try {
+            coinDiv = getCoinDivisibility(item.cryptoListingCurrencyCode);
+        } catch (e) {
+          coinDiv = defaultCryptoCoinDivisibility;
+        }
         this.validateCurrencyAmount(
           {
             amount: item.cryptoQuantity,
             currency: {
-              code: () => metadata.coinType,
-              divisibility: () => metadata.coinDivisibility,
+              code: () => item.cryptoListingCurrencyCode,
+              divisibility: () => coinDiv,
             },
           },
           addError,
@@ -423,6 +382,20 @@ export default class extends BaseModel {
         addError('item.cryptoQuantity', 'The cryptoQuantity should only be set on cryptocurrency ' +
           'listings.');
       }
+
+      if (item && typeof item.cryptoListingCurrencyCode !== 'undefined') {
+        addError('item.cryptoListingCurrencyCode', 'The cryptoListingCurrencyCode should only be set on cryptocurrency ' +
+          'listings.');
+      }
+
+      this.validateCurrencyAmount(
+        {
+          amount: item.price,
+          currency: curDefCurrency,
+        },
+        addError,
+        'price'
+      );
 
       (attrs.shippingOptions || []).forEach(shipOpt => {
         (shipOpt.services || []).forEach(service => {
@@ -523,7 +496,7 @@ export default class extends BaseModel {
       Object
         .keys(errObj)
         .forEach(errKey => {
-          if (errKey.startsWith('item.priceCurrency')) {
+          if (errKey.startsWith('metadata.pricingCurrency')) {
             delete errObj[errKey];
           }
         });
@@ -533,8 +506,8 @@ export default class extends BaseModel {
       delete errObj['item.quantity'];
       delete errObj['item.title'];
     } else {
-      delete errObj['item.cryptoQuantity'];
-      delete errObj['item.priceModifier'];
+      delete errObj['item.cryptoListingCurrencyCode'];
+      delete errObj['item.cryptoListingPriceModifier'];
     }
 
     if (Object.keys(errObj).length) return errObj;
@@ -544,13 +517,13 @@ export default class extends BaseModel {
 
   fetch(options = {}) {
     if (
-      options.hash !== undefined &&
+      options.cid !== undefined &&
       (
-        typeof options.hash !== 'string' ||
-        !options.hash
+        typeof options.cid !== 'string' ||
+        !options.cid
       )
     ) {
-      throw new Error('If providing the options.hash, it must be a ' +
+      throw new Error('If providing the options.cid, it must be a ' +
         'non-empty string.');
     }
 
@@ -573,8 +546,8 @@ export default class extends BaseModel {
 
       options.url = options.url ||
         (
-          typeof options.hash === 'string' && options.hash ?
-            this.getIpfsUrl(options.hash) :
+          typeof options.cid === 'string' && options.cid ?
+            this.getIpfsUrl(options.cid) :
             this.getIpnsUrl(slug)
         );
     } else {
@@ -589,23 +562,10 @@ export default class extends BaseModel {
         if (options.attrs.metadata.contractType !== 'CRYPTOCURRENCY') {
           // Don't send over crypto currency specific fields if it's not a
           // crypto listing.
-          delete options.attrs.item.priceModifier;
-          delete options.attrs.item.cryptoQuantity;
+          delete options.attrs.item.cryptoListingCurrencyCode;
+          delete options.attrs.item.cryptoListingPriceModifier;
 
-          coinDiv = options.attrs.item.priceCurrency.divisibility;
-
-          options.attrs.item = {
-            ...options.attrs.item,
-            ...decimalToCurDef(
-              options.attrs.item.price,
-              options.attrs.item.priceCurrency.code,
-              {
-                amountKey: 'price',
-                currencyKey: 'priceCurrency',
-                divisibility: coinDiv,
-              }
-            ),
-          };
+          coinDiv = options.attrs.metadata.pricingCurrency.divisibility;
 
           options.attrs.shippingOptions.forEach(shipOpt => {
             shipOpt.services.forEach(service => {
@@ -634,12 +594,12 @@ export default class extends BaseModel {
         } else {
           // Don't send over the price on crypto listings.
           delete options.attrs.item.price;
-          delete options.attrs.item.priceCurrency;
+          delete options.attrs.metadata.pricingCurrency;
           delete options.attrs.item.options;
 
           // Update the crypto title based on the accepted currency and
           // coin type.
-          const coinType = options.attrs.metadata.coinType;
+          const coinType = options.attrs.item.cryptoListingCurrencyCode;
           let fromCur = options.attrs.metadata.acceptedCurrencies &&
             options.attrs.metadata.acceptedCurrencies[0];
           if (fromCur) {
@@ -700,7 +660,7 @@ export default class extends BaseModel {
         });
 
         // remove the hash
-        delete options.attrs.hash;
+        delete options.attrs.cid;
 
         // If all countries are individually provided as shipping regions, we'll send
         // 'ALL' to the server.
@@ -771,36 +731,19 @@ export default class extends BaseModel {
       const isCrypto = parsedResponse.metadata &&
         parsedResponse.metadata.contractType === 'CRYPTOCURRENCY';
 
-      // set the hash
-      parsedResponse.hash = response.hash;
+      // set the cid
+      parsedResponse.cid = response.cid;
 
-      // delete some deprecated properties
-      if (parsedResponse.item) {
-        if (parsedResponse.metadata) {
-          delete parsedResponse.metadata.priceModifier;
-        }
-
-        delete parsedResponse.item.price;
-
-        if (Array.isArray(parsedResponse.item.skus)) {
-          parsedResponse.item.skus.forEach(sku => {
-            delete sku.surcharge;
-            delete sku.quantity;
-          });
-        }
+      let currencyCode;
+      try {
+        currencyCode = isCrypto ? parsedResponse.item.cryptoListingCurrencyCode : parsedResponse.metadata.pricingCurrency.code;
+      } catch (e) {
+        // pass
       }
 
       let coinDiv;
-
       try {
-        coinDiv = isCrypto ?
-          parsedResponse
-            .metadata
-            .coinDivisibility :
-          parsedResponse
-            .item
-            .priceCurrency
-            .divisibility;
+        coinDiv = getCoinDivisibility(currencyCode);
       } catch (e) {
         // pass
       }
@@ -812,8 +755,9 @@ export default class extends BaseModel {
       }
 
       if (!isCrypto) {
-        if (parsedResponse.metadata) {
-          delete parsedResponse.metadata.priceModifier;
+        if (parsedResponse.item) {
+          delete parsedResponse.item.cryptoListingCurrencyCode;
+          delete parsedResponse.item.cryptoListingPriceModifier;
         }
 
         if (parsedResponse.item) {
@@ -871,14 +815,14 @@ export default class extends BaseModel {
       if (
         parsedResponse.item && parsedResponse.item.skus &&
         parsedResponse.item.skus.length === 1 &&
-        typeof parsedResponse.item.skus[0].variantCombo === 'undefined'
+        typeof parsedResponse.item.skus[0].selections === 'undefined'
       ) {
         const dummySku = parsedResponse.item.skus[0];
 
         if (isCrypto) {
           parsedResponse.item.cryptoQuantity = integerToDecimal(
             dummySku.quantity,
-            parsedResponse.metadata.coinDivisibility,
+            coinDiv,
             { fieldName: 'sku.quantity' }
           );
         } else {

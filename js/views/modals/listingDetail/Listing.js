@@ -817,7 +817,7 @@ export default class extends BaseModal {
       this.$reviews = this.$('.js-reviews');
       this.$reviews.append(this.reviews.render().$el);
 
-      if (this._latestHash !== this.model.get('hash')) {
+      if (this._latestHash !== this.model.get('cid')) {
         this.outdateHash();
       }
 
@@ -897,7 +897,7 @@ export default class extends BaseModal {
             tradingPairClass: 'cryptoTradingPairXL rowSm',
             exchangeRateClass: 'clrT2 exchangeRateLine',
             fromCur: metadata.get('acceptedCurrencies')[0],
-            toCur: metadata.get('coinType'),
+            toCur: this.model.get('item').get('cryptoListingCurrencyCode'),
           },
         });
         this.getCachedEl('.js-cryptoTitle')
@@ -915,7 +915,7 @@ export default class extends BaseModal {
     });
 
     this.rendered = true;
-    this._renderedHash = this.model.get('hash');
+    this._renderedHash = this.model.get('cid');
 
     return this;
   }

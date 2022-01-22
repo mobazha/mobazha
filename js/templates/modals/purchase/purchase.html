@@ -81,9 +81,9 @@
                   <label for="cryptoAmount" class="clrT txB required"><%= ob.polyT('purchase.cryptoAmount') %></label>
                   <div class="inputSelect">
                     <input type="text" class="clrBr clrP clrSh2" name="quantity" id="cryptoAmount" value="<%= ob.quantity %>" placeholder="0.0000" size="8" data-var-type="bignumber">
-                    <% if (ob.displayCurrency !== ob.listing.metadata.coinType) { %>
+                    <% if (ob.displayCurrency !== ob.listing.item.cryptoListingCurrencyCode) { %>
                       <select id="cryptoAmountCurrency" class="clrBr clrP nestInputRight">
-                        <% [ob.listing.metadata.coinType, ob.displayCurrency].forEach((cur) => {%>
+                        <% [ob.listing.item.cryptoListingCurrencyCode, ob.displayCurrency].forEach((cur) => {%>
                           <option value="<%= cur %>" <% if (cur === ob.cryptoAmountCurrency) print('selected'); %>><%= cur %></option>
                         <% }); %>
                       </select>
@@ -98,14 +98,14 @@
                   priceAmount: totalPrice,
                   priceCurrencyCode: pricingCurrency,
                   displayCurrency: ob.displayCurrency,
-                  priceModifier: ob.listing.item.priceModifier,
+                  priceModifier: ob.listing.item.cryptoListingPriceModifier,
                 })
               %>
             </div>
           </div>
           <hr class="clrBr rowLg" />
           <%
-            const coinType = ob.listing.metadata.coinType;
+            const coinType = ob.listing.item.cryptoListingCurrencyCode;
             const coinTranslationKey = `cryptoCurrencies.${coinType}`;
             const coinName = ob.polyT(coinTranslationKey) === coinTranslationKey ?
               coinType : ob.polyT(coinTranslationKey);

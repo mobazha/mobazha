@@ -118,7 +118,7 @@
 
               if (ob.metadata.contractType === 'CRYPTOCURRENCY') {
                 coinTypeRateAvailable =
-                  !!ob.currencyMod.getExchangeRate(ob.metadata.coinType);
+                  !!ob.currencyMod.getExchangeRate(ob.item.cryptoListingCurrencyCode);
                 cryptoPaymentCoinRateAvailable =
                   !!ob.currencyMod.getExchangeRate(ob.metadata.acceptedCurrencies[0]);
               }
@@ -148,11 +148,11 @@
                 });
               } else if (
                 ob.metadata.contractType === 'CRYPTOCURRENCY' &&
-                ob.metadata.coinType !== ob.metadata.acceptedCurrencies[0] &&
+                ob.item.cryptoListingCurrencyCode !== ob.metadata.acceptedCurrencies[0] &&
                 (!coinTypeRateAvailable || !cryptoPaymentCoinRateAvailable)
               ) {
                 const cursNoRate = [];
-                if (!coinTypeRateAvailable) cursNoRate.push(ob.metadata.coinType);
+                if (!coinTypeRateAvailable) cursNoRate.push(ob.item.cryptoListingCurrencyCode);
                 if (!cryptoPaymentCoinRateAvailable) cursNoRate.push(ob.metadata.acceptedCurrencies[0]);
                 tip = ob.polyT('listingDetail.unableToPurchase.noCryptoExchangeRateInfo', {
                   cur: cursNoRate.join(', '),

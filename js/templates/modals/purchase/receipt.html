@@ -85,7 +85,7 @@
           icons: ob.crypto.tradingPair({
             className: 'cryptoTradingPairSm cryptoTradingPair',
             fromCur: ob.listing.metadata.acceptedCurrencies[0],
-            toCur: ob.listing.metadata.coinType,
+            toCur: ob.listing.item.cryptoListingCurrencyCode,
             truncateCurAfter: 5,
           }),
           cryptoIconsAmount:

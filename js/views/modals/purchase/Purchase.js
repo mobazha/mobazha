@@ -19,6 +19,7 @@ import {
   decimalToInteger,
   isValidCoinDivisibility,
   curDefToDecimal,
+  getCoinDivisibility,
 } from '../../../utils/currency';
 import { capitalize } from '../../../utils/string';
 import { events as outdatedListingHashesEvents } from '../../../utils/outdatedListingHashes';
@@ -89,7 +90,7 @@ export default class extends BaseModal {
     */
     const item = new Item(
       {
-        listingHash: this.listing.get('hash'),
+        listingHash: this.listing.get('cid'),
         quantity: !this.listing.isCrypto ? bigNumber('1') : undefined,
         options: opts.variants || [],
       },
@@ -249,7 +250,7 @@ export default class extends BaseModal {
       }
     });
 
-    this._latestHash = this.listing.get('hash');
+    this._latestHash = this.listing.get('cid');
     this._renderedHash = null;
 
     this.listenTo(outdatedListingHashesEvents, 'newHash', e => {
@@ -683,19 +684,25 @@ export default class extends BaseModal {
 
   get cryptoAmountCurrency() {
     return this._cryptoAmountCurrency ||
-      this.listing.get('metadata')
-        .get('coinType');
+      this.listing.get('item')
+        .get('cryptoListingCurrencyCode');
   }
 
   get coinDivisibility() {
-    return this.listing.isCrypto ?
-      this.listing
-        .get('metadata')
-        .get('coinDivisibility') :
-      this.listing
-        .get('item')
-        .get('priceCurrency')
-        .divisibility;
+    let currencyCode;
+    try {
+      currencyCode = this.listing.isCrypto ? this.listing.get('item').cryptoListingCurrencyCode : this.listing.get('metadata').get('pricingCurrency').code;
+    } catch (e) {
+      // pass
+    }
+
+    let coinDiv;
+    try {
+      coinDiv = getCoinDivisibility(currencyCode);
+    } catch (e) {
+      // pass
+    }
+    return coinDiv;
   }
 
   get isModerated() {
@@ -799,7 +806,7 @@ export default class extends BaseModal {
             tradingPairClass: 'cryptoTradingPairXL',
             exchangeRateClass: 'clrT2 tx6',
             fromCur: metadata.get('acceptedCurrencies')[0],
-            toCur: metadata.get('coinType'),
+            toCur: this.listing.get('item').get('cryptoListingCurrencyCode'),
           },
         });
         this.getCachedEl('.js-cryptoTitle')
@@ -809,7 +816,7 @@ export default class extends BaseModal {
       }
     });
 
-    this._renderedHash = this.listing.get('hash');
+    this._renderedHash = this.listing.get('cid');
 
     return this;
   }

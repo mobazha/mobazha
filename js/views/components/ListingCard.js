@@ -259,7 +259,7 @@ export default class extends baseVw {
     e.stopPropagation();
   }
 
-  loadListingDetail(hash = this.model.get('hash')) {
+  loadListingDetail(cid = this.model.get('cid')) {
     const routeOnOpen = location.hash.slice(1);
     app.router.navigateUser(`${this.options.listingBaseUrl}${this.model.get('slug')}`,
       this.ownerGuid);
@@ -389,7 +389,7 @@ export default class extends baseVw {
     };
 
     const loadListing = () => {
-      const listingHash = getNewerHash(hash || this.model.get('hash'));
+      const listingHash = getNewerHash(cid || this.model.get('cid'));
 
       if (listingHash && this.ownerGuid !== app.profile.id) {
         ipfsFetch = this.fullListing.fetch({
@@ -429,7 +429,7 @@ export default class extends baseVw {
       this.listenTo(this.userLoadingModal, 'clickRetry',
         () => {
           app.router.navigate(routeOnOpen);
-          this.loadListingDetail(hash);
+          this.loadListingDetail(cid);
         });
 
       this.userLoadingModal.render()

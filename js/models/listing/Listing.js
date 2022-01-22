@@ -552,15 +552,16 @@ export default class extends BaseModel {
         options.url = options.url || app.getServerUrl('ob/listing');
         options.attrs = options.attrs || this.toJSON();
 
-        let coinDiv;
-
         if (options.attrs.metadata.contractType !== 'CRYPTOCURRENCY') {
           // Don't send over crypto currency specific fields if it's not a
           // crypto listing.
           delete options.attrs.item.cryptoListingCurrencyCode;
           delete options.attrs.item.cryptoListingPriceModifier;
 
-          coinDiv = options.attrs.metadata.pricingCurrency.divisibility;
+          let coinDiv = options.attrs.metadata.pricingCurrency.divisibility;
+
+          let curDef = decimalToCurDef(options.attrs.item.price, options.attrs.metadata.pricingCurrency.code);
+          options.attrs.item.price = curDef.amount;
 
           options.attrs.shippingOptions.forEach(shipOpt => {
             shipOpt.services.forEach(service => {

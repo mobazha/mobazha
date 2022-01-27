@@ -34,6 +34,9 @@ export default class Profile extends BaseModel {
   }
 
   url() {
+    if (this.id) {
+      return app.getServerUrl(`ob/profile/${this.id}`);
+    }
     return app.getServerUrl('ob/profile');
   }
 

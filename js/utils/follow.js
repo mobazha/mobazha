@@ -31,9 +31,7 @@ export function followUnfollow(guid, type = 'follow') {
 
   return $.ajax({
     type: 'POST',
-    url: app.getServerUrl(`ob/${type}`),
-    data: JSON.stringify({ id: guid }),
-    dataType: 'json',
+    url: app.getServerUrl(`ob/${type}/${guid}`),
   })
     .done(() => {
       // if the call succeeds, add or remove the guid from the collection
@@ -49,7 +47,7 @@ export function followUnfollow(guid, type = 'follow') {
           type: app.polyglot.t(`follow.type${capitalize(type)}`),
           user: guid,
         }),
-        message: data.responseJSON && data.responseJSON.reason || '',
+        message: data.responseJSON && data.responseJSON.error || '',
       })
         .render()
         .open();

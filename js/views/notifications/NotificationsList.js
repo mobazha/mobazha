@@ -51,7 +51,7 @@ export default class extends BaseVw {
           const types = ['follow', 'moderatorAdd', 'moderatorRemove'];
 
           if (types.indexOf(innerNotif.type) > -1) {
-            getCachedProfiles([innerNotif.peerId])[0]
+            getCachedProfiles([innerNotif.peerID])[0]
               .done(profile => {
                 notif.set('notification', {
                   ...innerNotif,
@@ -82,11 +82,11 @@ export default class extends BaseVw {
           if (!filters.length || filters.indexOf(type) > -1) {
             this.totalNotifs += 1;
             this.collection.add({
-              id: e.jsonData.notification.notificationId,
+              id: e.jsonData.notification.notificationID,
               read: false,
               timestamp: (new Date()).toISOString(),
               notification: {
-                ...(_.omit(e.jsonData.notification, 'notificationId')),
+                ...(_.omit(e.jsonData.notification, 'notificationID')),
               },
             });
           }

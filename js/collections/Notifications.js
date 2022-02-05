@@ -14,8 +14,8 @@ export default class extends Collection {
       const innerNotif = notif.notification;
 
       return {
-        id: innerNotif.notificationId,
-        notification: _.omit(innerNotif, 'notificationId'),
+        id: innerNotif.notificationID,
+        notification: _.omit(innerNotif, 'notificationID'),
         ...notif,
       };
     });
@@ -195,12 +195,12 @@ export function getNotifDisplayData(attrs, options = {}) {
     text = app.polyglot.t('notifications.text.disputeAccepted', {
       otherPartyName,
     });
-  } else if (attrs.type === 'follow' || attrs.type === 'moderatorAdd' ||
+  } else if (attrs.type === 'follow' || attrs.type === 'unfollow' || attrs.type === 'moderatorAdd' ||
     attrs.type === 'moderatorRemove') {
     const name = opts.native ?
-      getName(attrs.handle, attrs.peerId) :
-      `<a class="clrTEm" href="#${attrs.peerId}">${getName(attrs.handle, attrs.peerId)}</a>`;
-    route = `#${attrs.peerId}`;
+      getName(attrs.handle, attrs.peerID) :
+      `<a class="clrTEm" href="#${attrs.peerID}">${getName(attrs.handle, attrs.peerID)}</a>`;
+    route = `#${attrs.peerID}`;
     text = app.polyglot.t(`notifications.text.${attrs.type}`, {
       name,
     });

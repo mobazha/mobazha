@@ -185,6 +185,7 @@
       "disputeClose": "The dispute with %{otherPartyName} has been closed.",
       "disputeAccepted": "The dispute with %{otherPartyName} has been finalized.",
       "follow": "%{name} has followed you.",
+      "unfollow": "%{name} has unfollowed you.",
       "moderatorAdd": "%{name} has added you as a moderator.",
       "moderatorRemove": "%{name} has removed you as a moderator.",
       "vendorDisputeTimeout": "%{timeRemaining} left to dispute order %{orderLink}.",

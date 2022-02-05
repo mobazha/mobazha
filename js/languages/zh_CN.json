@@ -181,6 +181,7 @@
       "disputeClose": "与%{otherPartyName}的争议已关闭。",
       "disputeAccepted": "与%{otherPartyName}的争议已解决。",
       "follow": "%{name}关注了你。",
+      "unfollow": "%{name}取消关注了你。",
       "moderatorAdd": "%{name}已添加你作为其仲裁员。",
       "moderatorRemove": "%{name}已移除你作为仲裁员。",
       "vendorDisputeTimeout": "还剩 %{timeRemaining} 来处理争议订单 %{orderLink}。",

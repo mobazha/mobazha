@@ -41,8 +41,8 @@ export default class extends BaseVw {
     }
 
     const chatMessage = new ChatMessage({
-      peerId: this.vendorPeerID,
-      subject: this.orderID,
+      peerID: this.vendorPeerID,
+      orderID: this.orderID,
       message: msg,
     });
 

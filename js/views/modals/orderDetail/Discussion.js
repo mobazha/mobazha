@@ -188,8 +188,8 @@ export default class extends baseVw {
     // second.
     if (!this.lastTypingSentAt || (Date.now() - this.lastTypingSentAt) >= 1000) {
       const typingMessage = new ChatMessage({
-        peerIds: this.sendToIds,
-        subject: this.model.id,
+        peerIDs: this.sendToIds,
+        orderID: this.model.id,
         message: '',
       });
 
@@ -356,8 +356,8 @@ export default class extends baseVw {
     this.lastTypingSentAt = null;
 
     const chatMessage = new ChatMessage({
-      peerIds: this.sendToIds,
-      subject: this.model.id,
+      peerIDs: this.sendToIds,
+      orderID: this.model.id,
       message: msg,
     });
 
@@ -426,7 +426,14 @@ export default class extends baseVw {
   }
 
   markConvoAsRead() {
-    $.post(app.getServerUrl(`ob/markchatasread?subject=${this.model.id}`));
+    $.post({
+      url: app.getServerUrl('ob/markchatasread'),
+      data: JSON.stringify({
+        orderID: this.model.id,
+      }),
+      dataType: 'json',
+      contentType: 'application/json',
+    });
     this.trigger('convoMarkedAsRead');
   }
 

@@ -107,7 +107,7 @@ export function processMessage(message) {
 export default class ChatMessage extends BaseModel {
   defaults() {
     return {
-      subject: '',
+      orderID: '',
       message: '',
       read: false,
       outgoing: true,
@@ -124,13 +124,13 @@ export default class ChatMessage extends BaseModel {
 
   static get max() {
     return {
-      subjectLength: 500,
+      orderIDLength: 500,
       messageLength: 20000,
     };
   }
 
   url() {
-    return app.getServerUrl(`ob/${this.isGroupChatMessage ? 'groupchat' : 'chat'}/`);
+    return app.getServerUrl(`ob/${this.isGroupChatMessage ? 'groupchatmessage' : 'chatmessage'}`);
   }
 
   set(key, val, options = {}) {
@@ -185,19 +185,19 @@ export default class ChatMessage extends BaseModel {
     const max = this.constructor.max;
 
     if (!this.isGroupChatMessage) {
-      if (!attrs.peerId) {
-        addError('peerId', 'The peerId is required');
+      if (!attrs.peerID) {
+        addError('peerID', 'The peerID is required');
       }
-    } else if (!Array.isArray(attrs.peerIds) || !attrs.peerIds.length) {
-      addError('peerIds', 'peerIds must be provided as an array.');
+    } else if (!Array.isArray(attrs.peerIDs) || !attrs.peerIDs.length) {
+      addError('peerIDs', 'peerIDs must be provided as an array.');
     }
 
-    if (attrs.subject !== undefined && typeof attrs.subject !== 'string') {
-      addError('subject', 'If providing a subject, it must be provided as a string.');
-    } else if (attrs.subject.length > max.subjectLength) {
-      addError('subject', `The subject exceeds the max length of ${max.subjectLength}`);
-    } else if (this.isGroupChatMessage && !attrs.subject) {
-      addError('subject', 'A subject is required for a group chat message.');
+    if (attrs.orderID !== undefined && typeof attrs.orderID !== 'string') {
+      addError('orderID', 'If providing a orderID, it must be provided as a string.');
+    } else if (attrs.orderID.length > max.orderIDLength) {
+      addError('orderID', `The orderID exceeds the max length of ${max.orderIDLength}`);
+    } else if (this.isGroupChatMessage && !attrs.orderID) {
+      addError('orderID', 'A orderID is required for a group chat message.');
     }
 
     if (attrs.message.length > max.messageLength) {

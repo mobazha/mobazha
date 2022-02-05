@@ -285,8 +285,8 @@ export default class extends baseVw {
     this.lastTypingSentAt = null;
 
     const chatMessage = new ChatMessage({
-      peerId: this.guid,
-      subject: this.subject,
+      peerID: this.guid,
+      orderID: this.subject,
       message: msg,
     }, { parse: true });
 
@@ -310,8 +310,8 @@ export default class extends baseVw {
     // second.
     if (!this.lastTypingSentAt || (Date.now() - this.lastTypingSentAt) >= 1000) {
       const typingMessage = new ChatMessage({
-        peerId: this.guid,
-        subject: this.subject,
+        peerID: this.guid,
+        orderID: this.subject,
         message: '',
       });
 
@@ -499,8 +499,15 @@ export default class extends baseVw {
   //   otherwise been marked as read, but the call was held off because the app was
   //   not in focus.
   markConvoAsRead() {
-    const queryString = this.subject ? `/?subject=${this.subject}` : '';
-    $.post(app.getServerUrl(`ob/markchatasread/${this.guid}${queryString}`));
+    $.post({
+      url: app.getServerUrl('ob/markchatasread'),
+      data: JSON.stringify({
+        peerID: this.guid,
+        orderID: this.subject,
+      }),
+      dataType: 'json',
+      contentType: 'application/json',
+    });
     this.trigger('convoMarkedAsRead');
     this.markAsReadOnFocus = false;
   }

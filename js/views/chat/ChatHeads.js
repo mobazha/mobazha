@@ -69,7 +69,7 @@ export default class extends baseVw {
       model,
     };
 
-    const profile = this.profiles[model.get('peerId')];
+    const profile = this.profiles[model.get('peerID')];
 
     if (profile) {
       viewData.profile = profile;

@@ -71,8 +71,8 @@ export default class extends baseVw {
 
     this.listenTo(blockEvents, 'blocked',
       data => {
-        this.collection.remove(data.peerIds);
-        if (this.conversation && data.peerIds.includes(this.conversation.guid)) {
+        this.collection.remove(data.peerIDs);
+        if (this.conversation && data.peerIDs.includes(this.conversation.guid)) {
           this.removeConvo();
         }
       });
@@ -160,15 +160,15 @@ export default class extends baseVw {
 
   onNewChatMessage(msg) {
     if (msg && !msg.subject) {
-      const chatHead = this.collection.get(msg.peerId);
+      const chatHead = this.collection.get(msg.peerID);
       const chatHeadData = {
-        peerId: msg.peerId,
+        peerID: msg.peerID,
         lastMessage: msg.message,
         timestamp: msg.timestamp,
         outgoing: msg.outgoing || false,
         unread: msg.outgoing ? 0 : 1,
       };
-      const isConvoOpen = this.conversation && this.conversation.guid === msg.peerId &&
+      const isConvoOpen = this.conversation && this.conversation.guid === msg.peerID &&
         this.conversation.isOpen;
 
       if (chatHead) {
@@ -180,7 +180,7 @@ export default class extends baseVw {
             const notifOptions = {
               onclick() {
                 remote.getCurrentWindow().restore();
-                location.hash = `#${msg.peerId}`;
+                location.hash = `#${msg.peerID}`;
               },
               body: msg.message,
             };
@@ -188,7 +188,7 @@ export default class extends baseVw {
 
             // If the profile is cached, we'll add in some additional data. If it's not,
             // we won't hold up the notification for it to return.
-            const profilePromise = getCachedProfiles([msg.peerId])[0];
+            const profilePromise = getCachedProfiles([msg.peerID])[0];
 
             if (profilePromise.state() === 'resolved') {
               profilePromise.done(profile => {
@@ -203,7 +203,7 @@ export default class extends baseVw {
               });
             }
 
-            launchNativeNotification(handle || msg.peerId, notifOptions);
+            launchNativeNotification(handle || msg.peerID, notifOptions);
           }
 
           // Remove any existing chat head so we could put it back in at the top.
@@ -447,16 +447,16 @@ export default class extends baseVw {
     }
   }
 
-  fetchProfiles(peerIds) {
-    if (!Array.isArray(peerIds)) {
-      throw new Error('Please provide a list of peerIds.');
+  fetchProfiles(peerIDs) {
+    if (!Array.isArray(peerIDs)) {
+      throw new Error('Please provide a list of peerIDs.');
     }
 
-    if (!peerIds.length) {
-      throw new Error('Please provide at least one peerId');
+    if (!peerIDs.length) {
+      throw new Error('Please provide at least one peerID');
     }
 
-    const profilePromises = getCachedProfiles(peerIds);
+    const profilePromises = getCachedProfiles(peerIDs);
 
     profilePromises.forEach(profileFetch => {
       profileFetch.done(profile => this.chatHeads.setProfile(profile));
@@ -472,10 +472,10 @@ export default class extends baseVw {
     // Find which heads are in the viewport and filter out any that have already
     // had or are having their profiles fetched.
     const profilesToFetch = this.chatHeads.views.filter(chatHead => {
-      const peerId = chatHead.model.get('peerId');
-      const alreadyFetched = this.chatHeadProfilesFetched.indexOf(peerId) > -1;
+      const peerID = chatHead.model.get('peerID');
+      const alreadyFetched = this.chatHeadProfilesFetched.indexOf(peerID) > -1;
       return !alreadyFetched && isScrolledIntoView(chatHead.el);
-    }).map(chatHead => (chatHead.model.get('peerId')));
+    }).map(chatHead => (chatHead.model.get('peerID')));
 
     if (profilesToFetch.length) {
       this.chatHeadProfilesFetched.concat(profilesToFetch);

@@ -9,23 +9,23 @@ export default class extends Collection {
     this._blockedHeads = {};
 
     this.listenTo(blockEvents, 'unblocked', data => {
-      data.peerIds.forEach(peerId => {
-        if (this._blockedHeads[peerId]) {
-          this.add(this._blockedHeads[peerId], { parse: true });
-          delete this._blockedHeads[peerId];
+      data.peerIDs.forEach(peerID => {
+        if (this._blockedHeads[peerID]) {
+          this.add(this._blockedHeads[peerID], { parse: true });
+          delete this._blockedHeads[peerID];
         }
       });
     });
 
     this.listenTo(blockEvents, 'blocked', data => {
-      data.peerIds.forEach(peerId => {
-        const md = this.get(peerId);
+      data.peerIDs.forEach(peerID => {
+        const md = this.get(peerID);
 
         if (md) {
-          this._blockedHeads[peerId] = md.toJSON();
+          this._blockedHeads[peerID] = md.toJSON();
         }
       });
-      this.remove(data.peerIds);
+      this.remove(data.peerIDs);
     });
   }
 
@@ -38,7 +38,7 @@ export default class extends Collection {
   }
 
   modelId(attrs) {
-    return attrs.peerId;
+    return attrs.peerID;
   }
 
   comparator(message) {
@@ -57,8 +57,8 @@ export default class extends Collection {
       // Remove any items from blocked nodes, but keep track of them
       // in case the relevant nodes are unblocked.
       const parsedResponse = response.filter(head => {
-        if (isBlocked(head.peerId)) {
-          this._blockedHeads[head.peerId] = head;
+        if (isBlocked(head.peerID)) {
+          this._blockedHeads[head.peerID] = head;
           return false;
         }
 

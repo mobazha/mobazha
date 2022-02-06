@@ -28,7 +28,7 @@ class Order extends BaseOrder {
   }
 
   get idAttribute() {
-    return 'orderId';
+    return 'orderID';
   }
 
   get nested() {

@@ -28,17 +28,17 @@ export default class extends baseVw {
     this.openedOrderModal = null;
 
     const params = deparam(location.hash.split('?')[1] || '');
-    const orderId = params.orderId;
-    const caseId = params.caseId;
+    const orderID = params.orderID;
+    const caseID = params.caseID;
 
-    if (orderId || caseId) {
+    if (orderID || caseID) {
       // cut off the trailing 's' from the tab
       const type = this._tab.slice(0, this._tab.length - 1);
 
       // If we're opening an order model on init, then we'll
       // need to pass it in to the Tab view. It may need to bind event
       // handlers to it.
-      this.openedOrderModal = this.openOrder(orderId || caseId, type);
+      this.openedOrderModal = this.openOrder(orderID || caseID, type);
       this.listenTo(this.openedOrderModal, 'close', () => (this.openedOrderModal = null));
     }
 
@@ -122,9 +122,9 @@ export default class extends baseVw {
     let model;
 
     if (type !== 'case') {
-      model = new Order({ orderId: id }, { type });
+      model = new Order({ orderID: id }, { type });
     } else {
-      model = new Case({ caseId: id });
+      model = new Case({ caseID: id });
     }
 
     const orderDetail = new OrderDetail({
@@ -139,17 +139,17 @@ export default class extends baseVw {
     if (opts.addToRoute) {
       // add the order / case id to the url
       const params = deparam(location.hash.split('?')[1] || '');
-      delete params.orderId;
-      delete params.caseId;
-      params[type === 'case' ? 'caseId' : 'orderId'] = id;
+      delete params.orderID;
+      delete params.caseID;
+      params[type === 'case' ? 'caseID' : 'orderID'] = id;
       app.router.navigate(`${location.hash.split('?')[0]}?${$.param(params)}`);
     }
 
     // remove it from the url on close of the modal
     const onClose = () => {
       const params = deparam(location.hash.split('?')[1] || '');
-      delete params.orderId;
-      delete params.caseId;
+      delete params.orderID;
+      delete params.caseID;
       app.router.navigate(`${location.hash.split('?')[0]}?${$.param(params)}`);
     };
 

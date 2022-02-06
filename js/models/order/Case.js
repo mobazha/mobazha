@@ -8,7 +8,7 @@ class Case extends BaseOrder {
   }
 
   get idAttribute() {
-    return 'caseId';
+    return 'caseID';
   }
 
   get nested() {

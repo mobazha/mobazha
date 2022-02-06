@@ -96,8 +96,8 @@ export default class extends baseVw {
       this.open();
     }
 
-    const profilePromise = this.fetchProfiles([e.view.model.id])[0];
-    this._openConversation(e.view.model.id, profilePromise, e.view.model);
+    const profilePromise = this.fetchProfiles([e.view.model.get('peerID')])[0];
+    this._openConversation(e.view.model.get('peerID'), profilePromise, e.view.model);
   }
 
   onChatHeadsRendered() {

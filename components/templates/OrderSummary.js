@@ -821,7 +821,7 @@ class OrderSummary extends PureComponent {
             <View>
               {isEmpty(shippingDetails) ? (
                 <View style={styles.optionWrapper}>
-                  <Text style={styles.optionPlaceholder}> {I18n.t('components.templates.OrderSummary.shipping')}</Text>
+                  <Text style={styles.optionPlaceholder}> {I18n.t('components.templates.OrderSummary.Shipping')}</Text>
                 </View>
               ) : (
                 <View style={styles.optionWrapper}>
@@ -871,7 +871,7 @@ class OrderSummary extends PureComponent {
         )}
         {contractType === 'PHYSICAL_GOOD' && (
           <InputGroup
-            title={I18n.t('components.templates.OrderSummary.shipping')}
+            title={I18n.t('components.templates.OrderSummary.Shipping')}
             actionTitle={<Ionicons name="md-copy" color={brandColor} size={24} />}
             action={this.handleCopyAddress}
           >

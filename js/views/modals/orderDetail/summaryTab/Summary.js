@@ -45,7 +45,7 @@ export default class extends BaseVw {
     checkValidParticipantObject(options.buyer, 'buyer');
     checkValidParticipantObject(options.vendor, 'vendor');
 
-    if (this.contract.get('buyerOrder').payment.moderator) {
+    if (this.contract.get('orderOpen').payment.moderator) {
       checkValidParticipantObject(options.moderator, 'moderator');
     }
 
@@ -374,11 +374,11 @@ export default class extends BaseVw {
         case 'PAYMENT_FINALIZED':
           state.currentState = 1;
 
-          if (this.contract.get('vendorOrderConfirmation')) {
+          if (this.contract.get('orderConfirmation')) {
             state.currentState = 2;
           }
 
-          if (this.contract.get('vendorOrderFulfillment')) {
+          if (this.contract.get('orderFulfillments')) {
             state.currentState = 3;
           }
 
@@ -392,10 +392,10 @@ export default class extends BaseVw {
   }
 
   get paymentAddress() {
-    const vendorOrderConfirmation = this.contract.get('vendorOrderConfirmation');
+    const vendorOrderConfirmation = this.contract.get('orderConfirmation');
 
     return vendorOrderConfirmation && vendorOrderConfirmation.paymentAddress ||
-      this.contract.get('buyerOrder').payment.address;
+      this.contract.get('orderOpen').payment.address;
   }
 
   setDisputeCountdownTimeout(...args) {
@@ -621,7 +621,7 @@ export default class extends BaseVw {
     let bool = false;
 
     // Show the accepted section if the order has been accepted and its fully funded.
-    if (this.contract.get('vendorOrderConfirmation')
+    if (this.contract.get('orderConfirmation')
       && (this.model.isCase || this.model.getBalanceRemaining() <= 0)) {
       bool = true;
     }
@@ -630,7 +630,7 @@ export default class extends BaseVw {
   }
 
   renderAcceptedView() {
-    const vendorOrderConfirmation = this.contract.get('vendorOrderConfirmation');
+    const vendorOrderConfirmation = this.contract.get('orderConfirmation');
 
     if (!vendorOrderConfirmation) {
       throw new Error('Unable to create the accepted view because the vendorOrderConfirmation ' +
@@ -746,14 +746,14 @@ export default class extends BaseVw {
     if (this.completeOrderForm) this.completeOrderForm.remove();
     this.completeOrderForm = this.createChild(CompleteOrderForm, {
       model,
-      slug: this.contract.get('vendorListings').at(0).get('slug'),
+      slug: this.contract.get('orderOpen').get('listings').at(0).listing.get('slug'),
     });
 
     this.$subSections.prepend(this.completeOrderForm.render().el);
   }
 
   renderFulfilledView() {
-    const data = this.contract.get('vendorOrderFulfillment');
+    const data = this.contract.get('orderFulfillment');
 
     if (!data) {
       throw new Error('Unable to create the fulfilled view because the vendorOrderFulfillment ' +
@@ -768,7 +768,7 @@ export default class extends BaseVw {
 
     if (this.contract.type === 'CRYPTOCURRENCY') {
       fulfilledState.coinType =
-        this.contract.get('vendorListings').at(0)
+        this.contract.get('orderOpen').get('listings').at(0).listing
           .get('metadata')
           .get('coinType');
     }
@@ -802,7 +802,7 @@ export default class extends BaseVw {
   }
 
   renderOrderCompleteView() {
-    const data = this.contract.get('buyerOrderCompletion');
+    const data = this.contract.get('orderCompletion');
 
     if (!data) {
       throw new Error('Unable to create the Order Complete view because the buyerOrderCompletion ' +
@@ -968,19 +968,19 @@ export default class extends BaseVw {
       });
     }
 
-    if (this.contract.get('vendorOrderFulfillment')) {
+    if (this.contract.get('orderFulfillment')) {
       sections.push({
         function: this.renderFulfilledView,
         timestamp:
-          (new Date(this.contract.get('vendorOrderFulfillment')[0].timestamp)),
+          (new Date(this.contract.get('orderFulfillment')[0].timestamp)),
       });
     }
 
-    if (this.contract.get('buyerOrderCompletion')) {
+    if (this.contract.get('orderCompletion')) {
       sections.push({
         function: this.renderOrderCompleteView,
         timestamp:
-          (new Date(this.contract.get('buyerOrderCompletion').timestamp)),
+          (new Date(this.contract.get('orderCompletion').timestamp)),
       });
     }
 
@@ -1047,7 +1047,7 @@ export default class extends BaseVw {
       isDisputable: isBuyer &&
         this.model.isOrderDisputable &&
         this.model.get('state') === 'PROCESSING_ERROR',
-      errors: this.contract.get('errors') || [],
+      errors: this.contract.get('erroredMessages') || [],
     };
 
     if (!this.processingError) {
@@ -1128,7 +1128,7 @@ export default class extends BaseVw {
           isOrderCancelable: () => this.model.isOrderCancelable,
           isCrypto: this.contract.type === 'CRYPTOCURRENCY',
           isOrderConfirmable: () => this.model.get('state') === 'PENDING' &&
-            this.vendor.id === app.profile.id && !this.contract.get('vendorOrderConfirmation'),
+            this.vendor.id === app.profile.id && !this.contract.get('orderConfirmation'),
           // paymentCoin,
         });
         this.$('.js-paymentsWrap').html(this.payments.render().el);

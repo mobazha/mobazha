@@ -261,15 +261,15 @@ export default class extends baseVw {
     const profilesToFetch = [];
 
     models.forEach(md => {
-      const vendorId = md.get('vendorId');
-      const buyerId = md.get('buyerId');
+      const vendorID = md.get('vendorID');
+      const buyerID = md.get('buyerID');
 
-      if (vendorId) {
-        profilesToFetch.push(vendorId);
+      if (vendorID) {
+        profilesToFetch.push(vendorID);
       }
 
-      if (buyerId) {
-        profilesToFetch.push(buyerId);
+      if (buyerID) {
+        profilesToFetch.push(buyerID);
       }
     });
 
@@ -307,19 +307,19 @@ export default class extends baseVw {
     };
 
     this.views.forEach(view => {
-      const vendorId = view.model.get('vendorId');
-      const buyerId = view.model.get('buyerId');
+      const vendorID = view.model.get('vendorID');
+      const buyerID = view.model.get('buyerID');
 
-      if (vendorId) {
-        this.indexedViews.byVendor[vendorId] =
-          this.indexedViews.byVendor[vendorId] || [];
-        this.indexedViews.byVendor[vendorId].push(view);
+      if (vendorID) {
+        this.indexedViews.byVendor[vendorID] =
+          this.indexedViews.byVendor[vendorID] || [];
+        this.indexedViews.byVendor[vendorID].push(view);
       }
 
-      if (buyerId) {
-        this.indexedViews.byBuyer[buyerId] =
-          this.indexedViews.byBuyer[buyerId] || [];
-        this.indexedViews.byBuyer[buyerId].push(view);
+      if (buyerID) {
+        this.indexedViews.byBuyer[buyerID] =
+          this.indexedViews.byBuyer[buyerID] || [];
+        this.indexedViews.byBuyer[buyerID].push(view);
       }
 
       this.indexedViews.byOrder[view.model.id] = view;

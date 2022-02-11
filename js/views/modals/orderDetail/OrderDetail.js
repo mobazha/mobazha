@@ -135,17 +135,17 @@ export default class extends BaseModal {
     if (this.type === 'case') {
       if (this.model.get('buyerOpened')) {
         featuredProfileFetch = this.getBuyerProfile();
-        this.featuredProfilePeerId = featuredProfileState.peerID = this.model.buyerId;
+        this.featuredProfilePeerId = featuredProfileState.peerID = this.model.buyerID;
       } else {
         featuredProfileFetch = this.getVendorProfile();
-        this.featuredProfilePeerId = featuredProfileState.peerID = this.model.vendorId;
+        this.featuredProfilePeerId = featuredProfileState.peerID = this.model.vendorID;
       }
     } else if (this.type === 'sale') {
       featuredProfileFetch = this.getBuyerProfile();
-      this.featuredProfilePeerId = featuredProfileState.peerID = this.model.buyerId;
+      this.featuredProfilePeerId = featuredProfileState.peerID = this.model.buyerID;
     } else {
       featuredProfileFetch = this.getVendorProfile();
-      this.featuredProfilePeerId = featuredProfileState.peerID = this.model.vendorId;
+      this.featuredProfilePeerId = featuredProfileState.peerID = this.model.vendorID;
     }
 
     featuredProfileFetch.done(profile => {
@@ -313,18 +313,18 @@ export default class extends BaseModal {
     const viewData = {
       model: this.model,
       vendor: {
-        id: this.model.vendorId,
+        id: this.model.vendorID,
         getProfile: this.getVendorProfile.bind(this),
       },
       buyer: {
-        id: this.model.buyerId,
+        id: this.model.buyerID,
         getProfile: this.getBuyerProfile.bind(this),
       },
     };
 
-    if (this.model.moderatorId) {
+    if (this.model.moderatorID) {
       viewData.moderator = {
-        id: this.model.moderatorId,
+        id: this.model.moderatorID,
         getProfile: this.getModeratorProfile.bind(this),
       };
     }
@@ -351,20 +351,20 @@ export default class extends BaseModal {
     const viewData = {
       orderId: this.model.id,
       buyer: {
-        id: this.model.buyerId,
+        id: this.model.buyerID,
         getProfile: this.getBuyerProfile.bind(this),
       },
       vendor: {
-        id: this.model.vendorId,
+        id: this.model.vendorID,
         getProfile: this.getVendorProfile.bind(this),
       },
       model: this.model,
       amActiveTab: amActiveTab.bind(this),
     };
 
-    if (this.model.moderatorId) {
+    if (this.model.moderatorID) {
       viewData.moderator = {
-        id: this.model.moderatorId,
+        id: this.model.moderatorID,
         getProfile: this.getModeratorProfile.bind(this),
       };
     }
@@ -415,7 +415,7 @@ export default class extends BaseModal {
 
     const contract = this.model.get('contract');
     const model = new OrderDispute({ orderId: this.model.id });
-    const translationKeySuffix = app.profile.id === this.model.buyerId ?
+    const translationKeySuffix = app.profile.id === this.model.buyerID ?
       'Buyer' : 'Vendor';
     let timeoutMessage = '';
 
@@ -435,7 +435,7 @@ export default class extends BaseModal {
       model,
       contractType: contract.type,
       moderator: {
-        id: this.model.moderatorId,
+        id: this.model.moderatorID,
         getProfile: this.getModeratorProfile.bind(this),
       },
       timeoutMessage,
@@ -469,11 +469,11 @@ export default class extends BaseModal {
       model,
       case: this.model,
       vendor: {
-        id: this.model.vendorId,
+        id: this.model.vendorID,
         getProfile: this.getVendorProfile.bind(this),
       },
       buyer: {
-        id: this.model.buyerId,
+        id: this.model.buyerID,
         getProfile: this.getBuyerProfile.bind(this),
       },
     });

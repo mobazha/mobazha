@@ -46,7 +46,7 @@ class Order extends BaseOrder {
    */
   get vendorProcessingError() {
     const contract = this.get('contract');
-    return contract && Array.isArray(contract.get('errors'));
+    return contract && Array.isArray(contract.get('erroredMessages'));
   }
 
   get orderPrice() {
@@ -55,9 +55,9 @@ class Order extends BaseOrder {
     try {
       orderPrice =
         this.contract
-          .get('buyerOrder')
+          .get('orderOpen')
           .payment
-          .bigAmount;
+          .amount;
     } catch (e) {
       // pass
     }
@@ -70,7 +70,7 @@ class Order extends BaseOrder {
 
   get totalPaid() {
     return this.paymentsIn
-      .reduce((total, transaction) => total.plus(transaction.get('bigValue')), bigNumber(0));
+      .reduce((total, transaction) => total.plus(transaction.get('value')), bigNumber(0));
   }
 
   getBalanceRemaining() {
@@ -127,33 +127,17 @@ class Order extends BaseOrder {
    */
   get paymentsIn() {
     return new Transactions(
-      this.get('paymentAddressTransactions')
-        .filter(payment => (payment.get('bigValue').gt(0)))
+      this.get('contract').transactions
+        .filter(payment => (payment.get('value').gt(0)))
     );
   }
 
   get isOrderCancelable() {
-    return this.buyerId === app.profile.id &&
-      !this.moderatorId &&
-      ['PROCESSING_ERROR', 'PENDING'].includes(this.get('state')) &&
-      this.isFunded;
+    return this.get('isCancelable');
   }
 
   get isOrderDisputable() {
-    const orderState = this.get('state');
-
-    if (this.buyerId === app.profile.id) {
-      return !!this.moderatorId &&
-        (
-          ['AWAITING_FULFILLMENT', 'PENDING', 'FULFILLED'].includes(orderState) ||
-          (orderState === 'PROCESSING_ERROR' && this.isFunded)
-        );
-    } else if (this.vendorId === app.profile.id) {
-      return !!this.moderatorId &&
-        ['PARTIALLY_FULFILLED', 'FULFILLED'].includes(orderState);
-    }
-
-    return false;
+    return this.get('isDisputable');
   }
 
   parse(response = {}) {

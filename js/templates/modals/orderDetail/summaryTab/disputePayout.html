@@ -13,7 +13,7 @@
 
     priceLines[type] = ob.currencyMod.pairedCurrency(
       ob.payout[`${type}Output`] &&
-        ob.payout[`${type}Output`].bigAmount ||
+        ob.payout[`${type}Output`].amount ||
         ob.bigNumber(0),
       ob.paymentCoin,
       ob.userCurrency

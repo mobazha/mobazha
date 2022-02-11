@@ -108,7 +108,7 @@ export default class extends BaseView {
       this.$el.html(t({
         ...this.model.toJSON(),
         listing: this.listing.toJSON(),
-        listingCurrency: this.listing.item.pricingCurrency.code,
+        listingCurrency: this.listing.get('metadata').get('pricingCurrency').code,
         coupons: this.coupons,
         displayCurrency,
         paymentCoin: this.paymentCoin,

@@ -32,12 +32,12 @@
     <% if (!ob.coinType) { %>
       <div class="flexVCent gutterHSm">
         <% const imageHashes = { small: ob.thumbnail, tiny: ob.thumbnail } %>
-        <a href="<%= `#${ob.vendorId}/store/${ob.slug}` %>" class="thumb" style="<%= ob.getListingBgImage(imageHashes) %>"></a>
-        <a href="<%= `#${ob.vendorId}/store/${ob.slug}` %>" class="noOverflow clrT"><%= ob.title %></a>
+        <a href="<%= `#${ob.vendorID}/store/${ob.slug}` %>" class="thumb" style="<%= ob.getListingBgImage(imageHashes) %>"></a>
+        <a href="<%= `#${ob.vendorID}/store/${ob.slug}` %>" class="noOverflow clrT"><%= ob.title %></a>
       </div>
     <% } else { %>
       <div class="flexVCent gutterHSm">
-        <a href="<%= `#${ob.vendorId}/store/${ob.slug}` %>" class="clrT flexNoShrink js-cryptoTradingPairWrap"></a>
+        <a href="<%= `#${ob.vendorID}/store/${ob.slug}` %>" class="clrT flexNoShrink js-cryptoTradingPairWrap"></a>
       </div>
     <% } %>
   </td>
@@ -49,7 +49,7 @@
     userCols.push({
       avatarHashes: ob.vendorAvatarHashes || {},
       userHandle: ob.vendorHandle,
-      userId: ob.vendorId,
+      userId: ob.vendorID,
     });
   }
 
@@ -57,7 +57,7 @@
     userCols.push({
       avatarHashes: ob.buyerAvatarHashes || {},
       userHandle: ob.buyerHandle,
-      userId: ob.buyerId,
+      userId: ob.buyerID,
     });
   }
 %>

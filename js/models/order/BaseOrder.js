@@ -58,47 +58,44 @@ export default class extends BaseModel {
     return contract;
   }
 
-  static getParticipantIds(attrs = {}) {
+  static getParticipantIDs(attrs = {}) {
     return {
-      buyer: this.getContract(attrs).buyerOrder.buyerID.peerID,
-      vendor: this.getContract(attrs).vendorListings[0].vendorID.peerID,
-      moderator: this.getContract(attrs).buyerOrder.payment.moderator,
+      buyer: this.getContract(attrs).orderOpen.buyerID.peerID,
+      vendor: this.getContract(attrs).orderOpen.listings[0].listing.vendorID.peerID,
+      moderator: this.getContract(attrs).orderOpen.payment.moderator,
     };
   }
 
-  get participantIds() {
-    return this.constructor.getParticipantIds(this.toJSON());
+  get participantIDs() {
+    return this.constructor.getParticipantIDs(this.toJSON());
   }
 
-  static getBuyerId(attrs = {}) {
-    return this.getParticipantIds(attrs).buyer;
+  static getBuyerID(attrs = {}) {
+    return this.getParticipantIDs(attrs).buyer;
   }
 
-  get buyerId() {
-    return this.constructor.getBuyerId(this.toJSON());
+  get buyerID() {
+    return this.constructor.getBuyerID(this.toJSON());
   }
 
-  static getVendorId(attrs = {}) {
-    return this.getParticipantIds(attrs).vendor;
+  static getVendorID(attrs = {}) {
+    return this.getParticipantIDs(attrs).vendor;
   }
 
-  get vendorId() {
-    return this.constructor.getVendorId(this.toJSON());
+  get vendorID() {
+    return this.constructor.getVendorID(this.toJSON());
   }
 
-  static getModeratorId(attrs = {}) {
-    return this.getParticipantIds(attrs).moderator;
+  static getModeratorID(attrs = {}) {
+    return this.getParticipantIDs(attrs).moderator;
   }
 
-  get moderatorId() {
-    return this.constructor.getModeratorId(this.toJSON());
+  get moderatorID() {
+    return this.constructor.getModeratorID(this.toJSON());
   }
 
   static canBuyerComplete(attrs = {}) {
-    const orderState = attrs.state;
-
-    return this.getContract(attrs).vendorOrderFulfillment &&
-      ['FULFILLED', 'RESOLVED', 'PAYMENT_FINALIZED'].includes(orderState);
+    return attrs.canComplete;
   }
 
   get canBuyerComplete() {
@@ -111,10 +108,9 @@ export default class extends BaseModel {
     try {
       paymentCoin =
         this.getContract(attrs)
-          .buyerOrder
+          .orderOpen
           .payment
-          .amountCurrency
-          .code;
+          .coin;
     } catch (e) {
       // pass
     }
@@ -148,27 +144,28 @@ export default class extends BaseModel {
       let payment;
 
       try {
-        payment = contract.buyerOrder.payment;
+        payment = contract.orderOpen.payment;
       } catch (e) {
         // pass
       }
 
       if (payment) {
-        payment.bigAmount = curDefToDecimal({
-          amount: payment.bigAmount,
-          currency: payment.amountCurrency,
+        payment.amount = curDefToDecimal({
+          amount: payment.amount,
+          currency: payment.coin,
         });
       }
 
       // convert crypto listing quantities
-      contract.buyerOrder.items.forEach((item, index) => {
+      contract.orderOpen.items.forEach((item, index) => {
         try {
-          const listing = contract.vendorListings[index];
+          const listing = contract.orderOpen.listings[index].listing;
 
           if (listing.metadata.contractType === 'CRYPTOCURRENCY') {
             const divisibility = listing
               .metadata
-              .coinDivisibility;
+              .pricingCurrency
+              .divisibility;
 
             item.quantity = integerToDecimal(item.quantity, divisibility);
           }
@@ -197,34 +194,34 @@ export default class extends BaseModel {
     if (resolution && resolution.payout) {
       if (resolution.payout.buyerOutput) {
         // legacy check
-        if (resolution.payout.buyerOutput.bigAmount === '') {
-          resolution.payout.buyerOutput.bigAmount = integerToDecimal(
+        if (resolution.payout.buyerOutput.amount === '') {
+          resolution.payout.buyerOutput.amount = integerToDecimal(
             resolution.payout.buyerOutput.amount,
             8
           );
         } else {
-          resolution.payout.buyerOutput.bigAmount =
+          resolution.payout.buyerOutput.amount =
             integerToDecimal(
-              resolution.payout.buyerOutput.bigAmount,
+              resolution.payout.buyerOutput.amount,
               divisibility,
-              { fieldName: 'buyerOutput.bigAmount' }
+              { fieldName: 'buyerOutput.amount' }
             );
         }
       }
 
       if (resolution.payout.vendorOutput) {
         // legacy check
-        if (resolution.payout.vendorOutput.bigAmount === '') {
-          resolution.payout.vendorOutput.bigAmount = integerToDecimal(
+        if (resolution.payout.vendorOutput.amount === '') {
+          resolution.payout.vendorOutput.amount = integerToDecimal(
             resolution.payout.vendorOutput.amount,
             8
           );
         } else {
-          resolution.payout.vendorOutput.bigAmount =
+          resolution.payout.vendorOutput.amount =
             integerToDecimal(
-              resolution.payout.vendorOutput.bigAmount,
+              resolution.payout.vendorOutput.amount,
               divisibility,
-              { fieldName: 'vendorOutput.bigAmount' }
+              { fieldName: 'vendorOutput.amount' }
             );
         }
       }
@@ -232,17 +229,17 @@ export default class extends BaseModel {
       if (resolution.payout.moderatorOutput) {
         if (resolution.payout.moderatorOutput) {
           // legacy check
-          if (resolution.payout.moderatorOutput.bigAmount === '') {
-            resolution.payout.moderatorOutput.bigAmount = integerToDecimal(
+          if (resolution.payout.moderatorOutput.amount === '') {
+            resolution.payout.moderatorOutput.amount = integerToDecimal(
               resolution.payout.moderatorOutput.amount,
               8
             );
           } else {
-            resolution.payout.moderatorOutput.bigAmount =
+            resolution.payout.moderatorOutput.amount =
               integerToDecimal(
-                resolution.payout.moderatorOutput.bigAmount,
+                resolution.payout.moderatorOutput.amount,
                 divisibility,
-                { fieldName: 'moderatorOutput.bigAmount' }
+                { fieldName: 'moderatorOutput.amount' }
               );
           }
         }

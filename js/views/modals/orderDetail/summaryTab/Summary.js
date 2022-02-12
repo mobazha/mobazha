@@ -746,7 +746,7 @@ export default class extends BaseVw {
     if (this.completeOrderForm) this.completeOrderForm.remove();
     this.completeOrderForm = this.createChild(CompleteOrderForm, {
       model,
-      slug: this.contract.get('orderOpen').get('listings').at(0).listing.get('slug'),
+      slug: this.contract.get('orderOpen').listings[0].listing.get('slug'),
     });
 
     this.$subSections.prepend(this.completeOrderForm.render().el);
@@ -768,7 +768,7 @@ export default class extends BaseVw {
 
     if (this.contract.type === 'CRYPTOCURRENCY') {
       fulfilledState.coinType =
-        this.contract.get('orderOpen').get('listings').at(0).listing
+        this.contract.get('orderOpen').listings[0].listing
           .get('metadata')
           .get('coinType');
     }

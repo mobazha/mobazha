@@ -24,18 +24,18 @@ export default class extends BaseModel {
   }
 
   get type() {
-    return this.get('vendorListings')
-      .at(0)
+    return this.get('orderOpen')
+      .listings[0].listing
       .get('metadata')
       .get('contractType');
   }
 
   get isLocalPickup() {
-    const buyerOrder = this.get('buyerOrder');
+    const orderOpen = this.get('orderOpen');
 
-    if (buyerOrder && buyerOrder.items && buyerOrder.items[0] &&
-      buyerOrder.items[0].shippingOption) {
-      return buyerOrder.items[0].shippingOption.service === '';
+    if (orderOpen && orderOpen.items && orderOpen.items[0] &&
+      orderOpen.items[0].shippingOption) {
+      return orderOpen.items[0].shippingOption.service === '';
     }
 
     return false;
@@ -69,8 +69,8 @@ export default class extends BaseModel {
    * is not avaialable or invalid.
    */
   get escrowTimeoutHours() {
-    let escrowTimeoutHours = this.get('vendorListings')
-      .at(0)
+    let escrowTimeoutHours = this.get('orderOpen')
+      .listings[0].listing
       .get('metadata')
       .get('escrowTimeoutHours');
 
@@ -102,8 +102,8 @@ export default class extends BaseModel {
       ...response,
       // The parse of the Listing model is expecting the listings to be objects
       // with a key of 'listing' (e.g. listing: { slug: '', ... }, so we'll accomodate.
-      vendorListings: Array.isArray(response.vendorListings) ?
-        response.vendorListings.map(listing => ({ listing })) :
+      vendorListings: Array.isArray(response.orderOpen.listings) ?
+        response.orderOpen.listings.map(listing => ({ listing })) :
         response.vendorListings,
     };
   }

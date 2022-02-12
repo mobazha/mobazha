@@ -721,7 +721,7 @@ export default class extends BaseModel {
 
   parse(response) {
     this.unparsedResponse = JSON.parse(JSON.stringify(response)); // deep clone
-    const parsedResponse = response.listing;
+    const parsedResponse = response.listing.listing;
 
     if (parsedResponse) {
       const isCrypto = parsedResponse.metadata &&

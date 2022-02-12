@@ -30,8 +30,8 @@ export default class extends BaseVw {
     }
 
     this.options = options;
-    this.listing = this.model.get('vendorListings').at(0);
-    this.order = this.model.get('buyerOrder');
+    this.listing = this.model.get('orderOpen').listings[0].listing;
+    this.order = this.model.get('orderOpen');
   }
 
   className() {
@@ -83,7 +83,7 @@ export default class extends BaseVw {
   }
 
   isModerated() {
-    return !!this.model.get('buyerOrder').payment.moderator;
+    return !!this.model.get('orderOpen').payment.moderator;
   }
 
   /**
@@ -94,7 +94,7 @@ export default class extends BaseVw {
     let orderOptions;
     let options;
     let skus;
-    const listing = this.listing.toJSON();
+    const listing = this.listing;
 
     try {
       orderOptions = this.order.items[0].options;
@@ -138,7 +138,7 @@ export default class extends BaseVw {
   render() {
     loadTemplate('modals/orderDetail/summaryTab/orderDetails.html', (t) => {
       this.$el.html(t({
-        listing: this.listing.toJSON(),
+        listing: this.listing,
         order: this.order,
         getCountryByDataName,
         convertAndFormatCurrency,

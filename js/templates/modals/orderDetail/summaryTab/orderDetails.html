@@ -1,6 +1,6 @@
 <%
   const isCrypto = ob.listing.metadata.contractType === 'CRYPTOCURRENCY';
-  const coinType = ob.listing.metadata.coinType;
+  const coinType = ob.listing.metadata.pricingCurrency.code;
 
   if (ob.order.shipping && ob.order.shipping.country !== 'NA') {
     var addressLine3 = `${ob.order.shipping.city ? `${ob.order.shipping.city}${ob.order.shipping.state ? ',' : ''}` : ''}${ob.order.shipping.state ? ` ${ob.order.shipping.state}` : ''}`;
@@ -118,7 +118,7 @@
                   coinType: coinTypeName === cointTypeNameKey ?
                     coinType : coinTypeName,
                   icon: ob.crypto.cryptoIcon({
-                    code: ob.listing.metadata.coinType,
+                    code: ob.listing.metadata.pricingCurrency.code,
                   }),
                 }) %>
               </div>
@@ -168,7 +168,7 @@
 
                     try {
                       bigAmount = ob.order.payment.amount;
-                      bigAmountCur = ob.order.payment.amountCurrency.code;
+                      bigAmountCur = ob.order.payment.coin;
                     } catch (e) {
                       // pass
                     }

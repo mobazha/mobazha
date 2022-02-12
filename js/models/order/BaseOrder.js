@@ -3,6 +3,8 @@ import { getCurrencyByCode as getWalletCurByCode } from '../../data/walletCurren
 import {
   curDefToDecimal,
   integerToDecimal,
+  getCoinDivisibility,
+  defaultCryptoCoinDivisibility,
 } from '../../utils/currency';
 import BaseModel from '../BaseModel';
 
@@ -150,9 +152,19 @@ export default class extends BaseModel {
       }
 
       if (payment) {
+        let coinDiv;
+        try {
+          coinDiv = getCoinDivisibility(payment.coin);
+        } catch (e) {
+          coinDiv = defaultCryptoCoinDivisibility;
+        }
+
         payment.amount = curDefToDecimal({
           amount: payment.amount,
-          currency: payment.coin,
+          currency: {
+            code: payment.coin,
+            divisibility: coinDiv,
+          }
         });
       }
 

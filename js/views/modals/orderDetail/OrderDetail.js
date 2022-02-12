@@ -135,17 +135,17 @@ export default class extends BaseModal {
     if (this.type === 'case') {
       if (this.model.get('buyerOpened')) {
         featuredProfileFetch = this.getBuyerProfile();
-        this.featuredProfilePeerId = featuredProfileState.peerID = this.model.buyerID;
+        this.featuredProfilePeerID = featuredProfileState.peerID = this.model.buyerID;
       } else {
         featuredProfileFetch = this.getVendorProfile();
-        this.featuredProfilePeerId = featuredProfileState.peerID = this.model.vendorID;
+        this.featuredProfilePeerID = featuredProfileState.peerID = this.model.vendorID;
       }
     } else if (this.type === 'sale') {
       featuredProfileFetch = this.getBuyerProfile();
-      this.featuredProfilePeerId = featuredProfileState.peerID = this.model.buyerID;
+      this.featuredProfilePeerID = featuredProfileState.peerID = this.model.buyerID;
     } else {
       featuredProfileFetch = this.getVendorProfile();
-      this.featuredProfilePeerId = featuredProfileState.peerID = this.model.vendorID;
+      this.featuredProfilePeerID = featuredProfileState.peerID = this.model.vendorID;
     }
 
     featuredProfileFetch.done(profile => {
@@ -176,10 +176,12 @@ export default class extends BaseModal {
       // As of now, the buyer only gets these notifications and this is the only way to be
       // aware of partial payments in realtime.
       'payment',
+      'newOrder',
+      'orderPaymentReceived',
       // A notification the vendor will get when an offline order has been canceled
-      'cancel',
+      'orderCancel',
       // A notification the vendor will get when an order has been fully funded
-      'order',
+      'orderFunded',
       // A notification the buyer will get when the vendor has rejected an offline order.
       'orderDeclined',
       // A notification the buyer will get when the vendor has accepted an offline order.
@@ -187,15 +189,17 @@ export default class extends BaseModal {
       // A notification the buyer will get when the vendor has refunded their order.
       'refund',
       // A notification the buyer will get when the vendor has fulfilled their order.
-      'fulfillment',
+      'orderFulfillment',
       // A notification the vendor will get when the buyer has completed an order.
-      'orderComplete',
+      'orderCompletion',
       // When a party opens a dispute the mod and the other party will get this notification
       'disputeOpen',
+
+      'caseOpen',
       // Sent to the moderator when the other party (the one that didn't open the dispute) sends
       // their copy of the contract (which would occur if they were onffline when the dispute was
       // opened and have since come online).
-      'disputeUpdate',
+      'caseUpdate',
       // Notification to the vendor and buyer when a mod has made a decision on an open dispute.
       'disputeClose',
       // Notification the other party will receive when a dispute payout is accepted (e.g. if vendor
@@ -208,7 +212,7 @@ export default class extends BaseModal {
       'vendorFinalizedPayment',
     ];
 
-    if (e.jsonData.notification && e.jsonData.notification.orderId === this.model.id) {
+    if (e.jsonData.notification && e.jsonData.notification.orderID === this.model.id) {
       if (notificationTypes.indexOf(e.jsonData.notification.type) > -1) {
         this.model.fetch();
       }
@@ -227,16 +231,16 @@ export default class extends BaseModal {
   }
 
   _getParticipantProfile(participantType) {
-    const peerId = this.model[`${participantType}Id`];
+    const peerID = this.model[`${participantType}ID`];
     const profileKey = `_${participantType}Profile`;
 
     if (!this[profileKey]) {
-      if (peerId === app.profile.id) {
+      if (peerID === app.profile.id) {
         const deferred = $.Deferred();
         deferred.resolve(app.profile);
         this[profileKey] = deferred.promise();
       } else {
-        this[profileKey] = getCachedProfiles([peerId])[0];
+        this[profileKey] = getCachedProfiles([peerID])[0];
       }
     }
 
@@ -349,7 +353,7 @@ export default class extends BaseModal {
   createDiscussionTabView() {
     const amActiveTab = () => (this.activeTab === 'discussion');
     const viewData = {
-      orderId: this.model.id,
+      orderID: this.model.id,
       buyer: {
         id: this.model.buyerID,
         getProfile: this.getBuyerProfile.bind(this),
@@ -391,7 +395,7 @@ export default class extends BaseModal {
   createFulfillOrderTabView() {
     const contract = this.model.get('contract');
 
-    const model = new OrderFulfillment({ orderId: this.model.id },
+    const model = new OrderFulfillment({ orderID: this.model.id },
       {
         contractType: contract.type,
         isLocalPickup: contract.isLocalPickup,
@@ -414,7 +418,7 @@ export default class extends BaseModal {
     }
 
     const contract = this.model.get('contract');
-    const model = new OrderDispute({ orderId: this.model.id });
+    const model = new OrderDispute({ orderID: this.model.id });
     const translationKeySuffix = app.profile.id === this.model.buyerID ?
       'Buyer' : 'Vendor';
     let timeoutMessage = '';
@@ -447,7 +451,7 @@ export default class extends BaseModal {
   }
 
   createResolveDisputeTabView() {
-    let modelAttrs = { orderId: this.model.id };
+    let modelAttrs = { orderID: this.model.id };
     const isResolvingDispute = resolvingDispute(this.model.id);
 
     // If this order is in the process of the dispute being resolved, we'll
@@ -570,8 +574,8 @@ export default class extends BaseModal {
       this.featuredProfile = this.createChild(ProfileBox, {
         model: this.featuredProfileMd || null,
         initialState: {
-          isFetching: !this.featuredProfilePeerId,
-          peerID: this.featuredProfilePeerId,
+          isFetching: !this.featuredProfilePeerID,
+          peerID: this.featuredProfilePeerID,
         },
       });
       this.$('.js-featuredProfile').html(this.featuredProfile.render().el);
@@ -581,7 +585,7 @@ export default class extends BaseModal {
 
         if (this.actionBar) this.actionBar.remove();
         this.actionBar = this.createChild(ActionBar, {
-          orderId: this.model.id,
+          orderID: this.model.id,
           initialState: this.actionBarButtonState,
         });
         this.$('.js-actionBarContainer').html(this.actionBar.render().el);

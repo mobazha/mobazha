@@ -142,11 +142,11 @@ export default class extends BaseModal {
 
     if (initialActiveCoin && serverSocket) {
       this.listenTo(serverSocket, 'message', e => {
-        if (e.jsonData.wallet) {
+        if (e.jsonData.wallet && e.jsonData.wallet.transaction) {
           let walletCur;
 
           try {
-            walletCur = e.jsonData.wallet.value.currency.code;
+            walletCur = e.jsonData.wallet.transaction.CurrencyCode;
           } catch (err) {
             // pass
             console.error('Unable to process a "wallet" socket because the wallet currency ' +
@@ -158,8 +158,8 @@ export default class extends BaseModal {
             this.transactionsState[walletCur] &&
             this.transactionsState[walletCur].cl || null;
           if (cl) {
-            const data = e.jsonData.wallet;
-            const transaction = cl.get(data.txid);
+            const data = e.jsonData.wallet.transaction;
+            const transaction = cl.get(data.ID);
 
             if (transaction) {
               // existing transaction has been confirmed
@@ -175,10 +175,10 @@ export default class extends BaseModal {
               // of the socket coming in before the AJAX call returns.
               const timeout = setTimeout(() => {
                 if (this.activeCoin === walletCur) {
-                  if (!cl.get(e.jsonData.wallet.txid)) {
+                  if (!cl.get(e.jsonData.wallet.transaction.ID)) {
                     // A new transaction for the active coin - rather than just add it to the
                     // collection causing a page jump, we'll utilize the new transaction pop-up.
-                    this.transactionsVw.newTransactionsTXs.add(e.jsonData.wallet.txid);
+                    this.transactionsVw.newTransactionsTXs.add(e.jsonData.wallet.transaction.ID);
                     this.transactionsVw.showNewTransactionPopup();
                   }
                 } else {
@@ -194,10 +194,10 @@ export default class extends BaseModal {
             }
           }
 
-          if (!e.jsonData.wallet.height) {
+          if (!e.jsonData.wallet.transaction.height) {
             // new transactions
 
-            if (bigNumber(e.jsonData.wallet.value.amount).gt(0)) {
+            if (bigNumber(e.jsonData.wallet.transaction.value).gt(0)) {
               // for incoming new transactions, we'll need a new receiving address
               if (this.activeCoin === walletCur) {
                 this.fetchAddress();

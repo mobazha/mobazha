@@ -402,7 +402,7 @@ export default class extends baseVw {
         // requires the ID of the last transaction in the previous page.
         throw new Error('Cannot fetch page. Do no have the previous pages.');
       } else if (this.collection.length) {
-        fetchParams.offsetId = this.collection.at(this.collection.length - 1).id;
+        fetchParams.offsetID = this.collection.at(this.collection.length - 1).id;
       }
     }
 

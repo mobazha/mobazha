@@ -380,14 +380,14 @@ export default class extends baseVw {
     return messageSent;
   }
 
-  fetchMessages(offsetId, limit = this.messagesPerPage) {
+  fetchMessages(offsetID, limit = this.messagesPerPage) {
     const params = {
       limit,
       subject: this.model.id,
     };
 
-    this.lastFetchMessagesArgs = [offsetId, limit];
-    if (offsetId) params.offsetId = offsetId;
+    this.lastFetchMessagesArgs = [offsetID, limit];
+    if (offsetID) params.offsetID = offsetID;
 
     return this.messages.fetch({
       data: $.param(params),

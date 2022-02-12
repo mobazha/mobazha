@@ -174,7 +174,7 @@ export default class extends BaseVw {
     };
 
     if (this.collection.length) {
-      fetchParams.offsetId = this.collection.at(0).id;
+      fetchParams.offsetID = this.collection.at(0).id;
     }
 
     if (this.options.filter) {
@@ -204,7 +204,7 @@ export default class extends BaseVw {
         fetchError: '',
       };
 
-      if (!fetchParams.offsetId) {
+      if (!fetchParams.offsetID) {
         this.totalNotifs += data.total;
 
         if (!data.notifications.length) {

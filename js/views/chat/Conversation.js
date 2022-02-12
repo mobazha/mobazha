@@ -447,11 +447,11 @@ export default class extends baseVw {
     this.$el.removeClass('isTyping');
   }
 
-  fetchMessages(offsetId, limit = this.messagesPerPage) {
+  fetchMessages(offsetID, limit = this.messagesPerPage) {
     const params = { limit };
 
-    this.lastFetchMessagesArgs = [offsetId, limit];
-    if (offsetId) params.offsetId = offsetId;
+    this.lastFetchMessagesArgs = [offsetID, limit];
+    if (offsetID) params.offsetID = offsetID;
 
     return this.messages.fetch({
       data: $.param(params),

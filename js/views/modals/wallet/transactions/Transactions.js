@@ -143,7 +143,7 @@ export default class extends BaseVw {
     };
 
     if (this.collection.length) {
-      fetchParams.offsetId = this.collection.at(this.collection.length - 1).id;
+      fetchParams.offsetID = this.collection.at(this.collection.length - 1).id;
     }
 
     this.transactionsFetch = this.collection.fetch({

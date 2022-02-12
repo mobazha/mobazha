@@ -127,7 +127,7 @@ class Order extends BaseOrder {
    */
   get paymentsIn() {
     return new Transactions(
-      this.get('contract').transactions
+      this.get('contract').get('transactions')
         .filter(payment => (payment.get('value').gt(0)))
     );
   }

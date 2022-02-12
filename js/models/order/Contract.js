@@ -24,10 +24,7 @@ export default class extends BaseModel {
   }
 
   get type() {
-    return this.get('orderOpen')
-      .listings[0].listing
-      .get('metadata')
-      .get('contractType');
+    return this.get('orderOpen').listings[0].listing.metadata.contractType;
   }
 
   get isLocalPickup() {
@@ -69,10 +66,7 @@ export default class extends BaseModel {
    * is not avaialable or invalid.
    */
   get escrowTimeoutHours() {
-    let escrowTimeoutHours = this.get('orderOpen')
-      .listings[0].listing
-      .get('metadata')
-      .get('escrowTimeoutHours');
+    let escrowTimeoutHours = this.get('orderOpen').listings[0].listing.metadata.escrowTimeoutHours;
 
     escrowTimeoutHours = parseInt(escrowTimeoutHours, 10);
 

@@ -257,7 +257,7 @@ export default class extends baseVw {
       // We'll consider them to be done typing if an actual message came
       // in. If they re-start typing, we'll get another socket message.
       const messageSender = this.getChatters()
-        .find(chatter => chatter.id === e.jsonData.message.peerId);
+        .find(chatter => chatter.id === e.jsonData.message.peerID);
 
       if (messageSender) {
         messageSender.isTyping = false;
@@ -275,7 +275,7 @@ export default class extends baseVw {
       }
     } else if (e.jsonData.messageTyping) {
       // Conversant is typing...
-      this.setTyping(e.jsonData.messageTyping.peerId);
+      this.setTyping(e.jsonData.messageTyping.peerID);
     } else if (e.jsonData.messageRead) {
       // Not using this for now since there are technical / UX complications for marking
       // a message as read when in a group chat (which user read it?).
@@ -330,7 +330,7 @@ export default class extends baseVw {
   }
 
   /**
-   * Returns the peerIds that chat messages should be sent to.
+   * Returns the peerIDs that chat messages should be sent to.
    */
   get sendToIds() {
     return this.getChatters()

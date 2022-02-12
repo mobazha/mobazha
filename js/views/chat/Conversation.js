@@ -94,12 +94,12 @@ export default class extends baseVw {
     this.$el.on('focusin', this.boundOnFocusin);
 
     this.listenTo(blockEvents, 'blocking', data => {
-      if (!data.peerIds.includes(this.guid)) return;
+      if (!data.peerIDs.includes(this.guid)) return;
       this.$el.addClass('isBlocking');
     });
 
     this.listenTo(blockEvents, 'blockFail blocked', data => {
-      if (!data.peerIds.includes(this.guid)) return;
+      if (!data.peerIDs.includes(this.guid)) return;
       this.$el.removeClass('isBlocking');
     });
   }
@@ -359,7 +359,7 @@ export default class extends baseVw {
   onSocketMessage(e) {
     if (e.jsonData.message &&
       e.jsonData.message.subject === this.subject &&
-      e.jsonData.message.peerId === this.guid) {
+      e.jsonData.message.peerID === this.guid) {
       // incoming chat message
       const message = new ChatMessage({
         ...e.jsonData.message,
@@ -381,12 +381,12 @@ export default class extends baseVw {
       this.hideTypingIndicator();
     } else if (e.jsonData.messageTyping &&
       e.jsonData.messageTyping.subject === this.subject &&
-      e.jsonData.messageTyping.peerId === this.guid) {
+      e.jsonData.messageTyping.peerID === this.guid) {
       // Conversant is typing...
       this.showTypingIndicator();
     } else if (e.jsonData.messageRead &&
       e.jsonData.messageRead.subject === this.subject &&
-      e.jsonData.messageRead.peerId === this.guid) {
+      e.jsonData.messageRead.peerID === this.guid) {
       // Conversant read your message
       if (this.convoMessages) {
         const model = this.messages.get(e.jsonData.messageRead.messageId);

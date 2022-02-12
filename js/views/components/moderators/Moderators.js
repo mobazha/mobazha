@@ -221,13 +221,13 @@ export default class extends baseVw {
             const eventData = event.jsonData;
             if (eventData.error) {
               // errors don't have a message id, check to see if the peerID matches
-              if (IDs.includes(eventData.peerId)) {
+              if (IDs.includes(eventData.peerID)) {
                 // provide the expected capitalization of peerID
-                eventData.peerID = eventData.peerId;
-                delete eventData.peerId;
+                eventData.peerID = eventData.peerID;
+                delete eventData.peerID;
                 this.processMod(eventData);
               }
-            } else if (eventData.id === asyncID && !excluded.includes(eventData.peerId)) {
+            } else if (eventData.id === asyncID && !excluded.includes(eventData.peerID)) {
               this.processMod(eventData.profile);
             }
           });
@@ -244,7 +244,7 @@ export default class extends baseVw {
           .done((data) => {
             if (!op.async) {
               data.forEach(mod => {
-                if (!excluded.includes(mod.peerId)) this.processMod(mod.profile);
+                if (!excluded.includes(mod.peerID)) this.processMod(mod.profile);
               });
               this.unfetchedMods = [];
               this.checkNotFetched();

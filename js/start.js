@@ -555,7 +555,7 @@ function start() {
 
     app.ownFollowing = new Followers([], {
       type: 'following',
-      peerId: app.profile.id,
+      peerID: app.profile.id,
     });
 
     app.walletBalances = new WalletBalances();

@@ -11,15 +11,15 @@ export default class extends BaseModal {
       ...options,
     };
 
-    if (typeof options.peerId !== 'string') {
-      throw new Error('Please provide the peerId of the blocked user as a string.');
+    if (typeof options.peerID !== 'string') {
+      throw new Error('Please provide the peerID of the blocked user as a string.');
     }
 
     super(opts);
     this.options = opts;
 
     this.listenTo(blockEvents, 'unblocked unblocking', data => {
-      if (data.peerIds.includes(options.peerId)) this.close();
+      if (data.peerIDs.includes(options.peerID)) this.close();
     });
   }
 
@@ -41,7 +41,7 @@ export default class extends BaseModal {
   }
 
   onUnblockClick() {
-    unblock(this.options.peerId);
+    unblock(this.options.peerID);
     this.close();
   }
 

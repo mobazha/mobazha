@@ -881,7 +881,7 @@ export default class extends BaseModal {
 
         // if (this.cryptoInventory) this.cryptoInventory.remove();
         // this.cryptoInventory = this.createChild(QuantityDisplay, {
-        //   peerId: this.vendor.peerID,
+        //   peerID: this.vendor.peerID,
         //   slug: this.model.get('slug'),
         //   initialState: {
         //     coinType: metadata.get('coinType'),

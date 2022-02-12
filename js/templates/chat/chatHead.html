@@ -2,7 +2,7 @@
   <a class="chatIcon disc clrBr2 clrSh1 flexNoShrink" style="<%= ob.getAvatarBgImage(ob.avatarHashes || {}) %>"></a>
   <div class="contentBox headContent clrBr clrP clrSh2 noOverflow">
     <span class="tx6">
-      <span class="handleGuid noOverflow <% if (ob.unread) print('txB') %>"><%= ob.handle ? `@${ob.handle}` : ob.peerId %>:</span> <%= ob.lastMessage %>
+      <span class="handleGuid noOverflow <% if (ob.unread) print('txB') %>"><%= ob.handle ? `@${ob.handle}` : ob.peerID %>:</span> <%= ob.lastMessage %>
     </span>
   </div>
 </div>

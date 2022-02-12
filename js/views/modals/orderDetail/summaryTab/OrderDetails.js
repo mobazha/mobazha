@@ -154,7 +154,7 @@ export default class extends BaseVw {
 
       if (this.isModerated()) {
         const moderatorState = {
-          peerId: this.options.moderator.id,
+          peerID: this.options.moderator.id,
           ...(this.modProfile && this.modProfile.toJSON() || {}),
         };
 

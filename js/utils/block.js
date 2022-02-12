@@ -30,35 +30,35 @@ let pendingUnblocks = [];
 // and that gets interesting if you kick off a subsequent request while a previous is still
 // pending and, for example, the previous may fail whereas the subsequent (which includes
 // the block/unblock from the previous) may succeed.
-function blockUnblock(_block, peerIds) {
+function blockUnblock(_block, peerIDs) {
   if (typeof _block !== 'boolean') {
     throw new Error('Please provide _block as a boolean.');
   }
 
-  if (!isMultihash(peerIds) && !Array.isArray(peerIds)) {
-    throw new Error('Either provide a single peerId as a multihash or an array of peerId ' +
+  if (!isMultihash(peerIDs) && !Array.isArray(peerIDs)) {
+    throw new Error('Either provide a single peerID as a multihash or an array of peerID ' +
       'multihashes.');
   }
 
-  if (Array.isArray(peerIds)) {
-    peerIds.forEach(peerId => {
-      if (!isMultihash(peerId)) {
-        throw new Error('If providing an array of peerIds, each item must be a multihash.');
+  if (Array.isArray(peerIDs)) {
+    peerIDs.forEach(peerID => {
+      if (!isMultihash(peerID)) {
+        throw new Error('If providing an array of peerIDs, each item must be a multihash.');
       }
     });
   }
 
   checkAppSettings();
 
-  let peerIdList =
-    typeof peerIds === 'string' ? [peerIds] : peerIds;
+  let peerIDList =
+    typeof peerIDs === 'string' ? [peerIDs] : peerIDs;
 
-  if (_block && app.profile && peerIdList.includes(app.profile.id)) {
+  if (_block && app.profile && peerIDList.includes(app.profile.id)) {
     throw new Error('You cannot block your own node.');
   }
 
-  // de-dupe peerId list
-  peerIdList = Array.from(new Set(peerIdList));
+  // de-dupe peerID list
+  peerIDList = Array.from(new Set(peerIDList));
 
   let blockedNodes; // if _block is false, semantically this means unblockedNodes
 
@@ -68,16 +68,16 @@ function blockUnblock(_block, peerIds) {
         latestSettingsSave && latestSettingsSave.state() === 'pending' ?
           lastSentBlockedNodes : app.settings.get('blockedNodes')
       ),
-      ...peerIdList,
+      ...peerIDList,
     ];
-    pendingBlocks = [...pendingBlocks, ...peerIdList];
-    pendingUnblocks = pendingUnblocks.filter(peerId => !peerIdList.includes(peerId));
+    pendingBlocks = [...pendingBlocks, ...peerIDList];
+    pendingUnblocks = pendingUnblocks.filter(peerID => !peerIDList.includes(peerID));
   } else {
     const filterList = latestSettingsSave && latestSettingsSave.state() === 'pending' ?
       lastSentBlockedNodes : app.settings.get('blockedNodes');
-    blockedNodes = filterList.filter(peerId => !peerIdList.includes(peerId));
-    pendingUnblocks = [...pendingUnblocks, ...peerIdList];
-    pendingBlocks = pendingBlocks.filter(peerId => !peerIdList.includes(peerId));
+    blockedNodes = filterList.filter(peerID => !peerIDList.includes(peerID));
+    pendingUnblocks = [...pendingUnblocks, ...peerIDList];
+    pendingBlocks = pendingBlocks.filter(peerID => !peerIDList.includes(peerID));
   }
 
   lastSentBlockedNodes = [...blockedNodes];
@@ -92,18 +92,18 @@ function blockUnblock(_block, peerIds) {
     const blocked = [];
     const unblocked = [];
 
-    pendingBlocks = pendingBlocks.filter(peerId => {
-      if (blockedNodes.includes(peerId)) {
-        blocked.push(peerId);
+    pendingBlocks = pendingBlocks.filter(peerID => {
+      if (blockedNodes.includes(peerID)) {
+        blocked.push(peerID);
         return false;
       }
 
       return true;
     });
 
-    pendingUnblocks = pendingUnblocks.filter(peerId => {
-      if (!blockedNodes.includes(peerId)) {
-        unblocked.push(peerId);
+    pendingUnblocks = pendingUnblocks.filter(peerID => {
+      if (!blockedNodes.includes(peerID)) {
+        unblocked.push(peerID);
         return false;
       }
 
@@ -111,32 +111,32 @@ function blockUnblock(_block, peerIds) {
     });
 
     if (blocked.length) {
-      events.trigger('blocked', { peerIds: blocked });
+      events.trigger('blocked', { peerIDs: blocked });
     }
 
     if (unblocked.length) {
-      events.trigger('unblocked', { peerIds: unblocked });
+      events.trigger('unblocked', { peerIDs: unblocked });
     }
   }).fail(xhr => {
     if (latestSettingsSave && latestSettingsSave.state() === 'pending') return;
 
     const reason = xhr.responseJSON && xhr.responseJSON.reason || '';
     const bn = app.settings.get('blockedNodes');
-    const failedBlocks = pendingBlocks.filter(peerId => !bn.includes(peerId));
-    const failedUnblocks = pendingUnblocks.filter(peerId => bn.includes(peerId));
+    const failedBlocks = pendingBlocks.filter(peerID => !bn.includes(peerID));
+    const failedUnblocks = pendingUnblocks.filter(peerID => bn.includes(peerID));
     pendingBlocks = [];
     pendingUnblocks = [];
 
     if (failedBlocks.length) {
       events.trigger('blockFail', {
-        peerIds: failedBlocks,
+        peerIDs: failedBlocks,
         reason,
       });
     }
 
     if (failedUnblocks.length) {
       events.trigger('unblockFail', {
-        peerIds: failedUnblocks,
+        peerIDs: failedUnblocks,
         reason,
       });
     }
@@ -169,46 +169,46 @@ function blockUnblock(_block, peerIds) {
     }
   });
 
-  events.trigger(_block ? 'blocking' : 'unblocking', { peerIds: peerIdList });
+  events.trigger(_block ? 'blocking' : 'unblocking', { peerIDs: peerIDList });
 }
 
-export function block(peerIds) {
-  blockUnblock(true, peerIds);
+export function block(peerIDs) {
+  blockUnblock(true, peerIDs);
 }
 
-export function unblock(peerIds) {
-  blockUnblock(false, peerIds);
+export function unblock(peerIDs) {
+  blockUnblock(false, peerIDs);
 }
 
-export function isBlocked(peerId) {
-  if (typeof peerId !== 'string') {
-    throw new Error('Please provide a peerId as a string.');
+export function isBlocked(peerID) {
+  if (typeof peerID !== 'string') {
+    throw new Error('Please provide a peerID as a string.');
   }
 
   checkAppSettings();
 
-  return app.settings.get('blockedNodes').includes(peerId);
+  return app.settings.get('blockedNodes').includes(peerID);
 }
 
-export function isBlocking(peerId) {
-  if (typeof peerId !== 'string') {
-    throw new Error('Please provide a peerId as a string.');
-  }
-
-  checkAppSettings();
-
-  return latestSettingsSave && latestSettingsSave.state() === 'pending' &&
-    lastSentBlockedNodes.includes(peerId) || false;
-}
-
-export function isUnblocking(peerId) {
-  if (typeof peerId !== 'string') {
-    throw new Error('Please provide a peerId as a string.');
+export function isBlocking(peerID) {
+  if (typeof peerID !== 'string') {
+    throw new Error('Please provide a peerID as a string.');
   }
 
   checkAppSettings();
 
   return latestSettingsSave && latestSettingsSave.state() === 'pending' &&
-    !lastSentBlockedNodes.includes(peerId) &&
-    app.settings.get('blockedNodes').includes(peerId) || false;
+    lastSentBlockedNodes.includes(peerID) || false;
+}
+
+export function isUnblocking(peerID) {
+  if (typeof peerID !== 'string') {
+    throw new Error('Please provide a peerID as a string.');
+  }
+
+  checkAppSettings();
+
+  return latestSettingsSave && latestSettingsSave.state() === 'pending' &&
+    !lastSentBlockedNodes.includes(peerID) &&
+    app.settings.get('blockedNodes').includes(peerID) || false;
 }

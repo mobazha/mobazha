@@ -71,17 +71,17 @@ export default class extends BaseVw {
 
     let participant = this.buyer;
     initialState.role = 'buyer';
-    let peerId = model.get('peerId');
+    let peerID = model.get('peerID');
 
     if (model.get('outgoing')) {
       initialState.avatarHashes = app.profile.get('avatarHashes').toJSON();
-      peerId = app.profile.id;
+      peerID = app.profile.id;
     }
 
-    if (peerId === this.vendor.id) {
+    if (peerID === this.vendor.id) {
       participant = this.vendor;
       initialState.role = 'vendor';
-    } else if (this.moderator && peerId === this.moderator.id) {
+    } else if (this.moderator && peerID === this.moderator.id) {
       participant = this.moderator;
       initialState.role = 'moderator';
     }

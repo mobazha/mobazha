@@ -9,8 +9,8 @@ import {
 
 export default class extends baseVw {
   constructor(options = {}) {
-    if (typeof options.peerId !== 'string' || !options.peerId) {
-      throw new Error('Please provide a peerId.');
+    if (typeof options.peerID !== 'string' || !options.peerID) {
+      throw new Error('Please provide a peerID.');
     }
 
     if (typeof options.slug !== 'string' || !options.slug) {
@@ -20,7 +20,7 @@ export default class extends baseVw {
     const opts = {
       ...options,
       initialState: {
-        isFetching: isFetching(options.peerId, { slug: options.slug }),
+        isFetching: isFetching(options.peerID, { slug: options.slug }),
         fetchFailed: false,
         fetchError: '',
         coinType: '',
@@ -40,7 +40,7 @@ export default class extends baseVw {
     this.options = options;
 
     this.listenTo(inventoryEvents, 'inventory-fetching', e => {
-      if (e.peerId !== options.peerId || (e.slug && e.slug !== options.slug)) return;
+      if (e.peerID !== options.peerID || (e.slug && e.slug !== options.slug)) return;
       this.setState({
         isFetching: true,
         fetchFailed: false,
@@ -49,7 +49,7 @@ export default class extends baseVw {
     });
 
     this.listenTo(inventoryEvents, 'inventory-fetch-fail', e => {
-      if (e.peerId !== options.peerId || (e.slug && e.slug !== options.slug)) return;
+      if (e.peerID !== options.peerID || (e.slug && e.slug !== options.slug)) return;
       this.setState({
         isFetching: false,
         fetchFailed: true,
@@ -58,12 +58,12 @@ export default class extends baseVw {
     });
 
     this.listenTo(inventoryEvents, 'inventory-fetch-success', e => {
-      if (e.peerId !== options.peerId || (e.slug && e.slug !== options.slug)) return;
+      if (e.peerID !== options.peerID || (e.slug && e.slug !== options.slug)) return;
       this.setState({ isFetching: false });
     });
 
     this.listenTo(inventoryEvents, 'inventory-change', e => {
-      if (e.peerId !== options.peerId || e.slug !== options.slug) return;
+      if (e.peerID !== options.peerID || e.slug !== options.slug) return;
       this.setState({ amount: e.inventory });
     });
   }
@@ -83,7 +83,7 @@ export default class extends baseVw {
   }
 
   onClickRetry() {
-    this.inventoryFetch = getInventory(this.options.peerId, {
+    this.inventoryFetch = getInventory(this.options.peerID, {
       slug: this.options.slug,
       coinDivisibility: this.getState().coinDivisibility,
     });

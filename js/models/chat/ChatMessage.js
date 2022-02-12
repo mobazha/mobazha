@@ -119,7 +119,7 @@ export default class ChatMessage extends BaseModel {
   }
 
   get isGroupChatMessage() {
-    return !!this.get('peerIds');
+    return !!this.get('peerIDs');
   }
 
   static get max() {

@@ -13,8 +13,8 @@ export default class extends Collection {
       throw new Error(`Please provide a type as one of ${types.join(', ')}`);
     }
 
-    if (!options.peerId) {
-      throw new Error('Please provide a peerId');
+    if (!options.peerID) {
+      throw new Error('Please provide a peerID');
     }
 
     this.options = options;
@@ -25,15 +25,15 @@ export default class extends Collection {
   }
 
   modelId(attrs) {
-    return attrs.peerId;
+    return attrs.peerID;
   }
 
   url() {
     return app.getServerUrl(`ob/${this.options.type === 'followers' ? 'followers' : 'following'}` +
-      `${app.profile.id === this.options.peerId ? '' : `/${this.options.peerId}`}`);
+      `${app.profile.id === this.options.peerID ? '' : `/${this.options.peerID}`}`);
   }
 
   parse(response) {
-    return response.map(peerId => ({ peerId }));
+    return response.map(peerID => ({ peerID }));
   }
 }

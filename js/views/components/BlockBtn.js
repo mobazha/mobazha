@@ -31,23 +31,23 @@ export default class extends baseVw {
     this.targetId = options.targetId;
 
     this.listenTo(block.events, 'unblocking blocking', data => {
-      if (!data.peerIds.includes(options.targetId)) return;
+      if (!data.peerIDs.includes(options.targetId)) return;
       this.setState({ isBlocking: true });
     });
 
     this.listenTo(block.events, 'blocked unblocked blockFail unblockFail',
       data => {
-        if (!data.peerIds.includes(options.targetId)) return;
+        if (!data.peerIDs.includes(options.targetId)) return;
         this.setState({ isBlocking: false });
       });
 
     this.listenTo(block.events, 'blocked', data => {
-      if (!data.peerIds.includes(options.targetId)) return;
+      if (!data.peerIDs.includes(options.targetId)) return;
       this.setState({ isBlocked: true });
     });
 
     this.listenTo(block.events, 'unblocked', data => {
-      if (!data.peerIds.includes(options.targetId)) return;
+      if (!data.peerIDs.includes(options.targetId)) return;
       this.setState({ isBlocked: false });
     });
   }

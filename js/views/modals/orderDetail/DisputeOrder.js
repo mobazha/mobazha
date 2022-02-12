@@ -102,7 +102,7 @@ export default class extends BaseVw {
       }));
 
       const moderatorState = {
-        peerId: this.options.moderator.id,
+        peerID: this.options.moderator.id,
         showAvatar: true,
         ...(this.modProfile && this.modProfile.toJSON() || {}),
       };

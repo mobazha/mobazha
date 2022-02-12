@@ -67,7 +67,7 @@ export default class extends baseVw {
     });
 
     this.listenTo(blockEvents, 'blocked unblocked', data => {
-      if (data.peerIds.includes(this.model.id)) {
+      if (data.peerIDs.includes(this.model.id)) {
         this.setBlockedClass();
       }
     });
@@ -187,7 +187,7 @@ export default class extends baseVw {
 
   createFollowersTabView(opts = {}) {
     const collection = new Followers([], {
-      peerId: this.model.id,
+      peerID: this.model.id,
       type: 'followers',
     });
 
@@ -197,7 +197,7 @@ export default class extends baseVw {
     return this.createChild(this.tabViews.Follow, {
       ...opts,
       followType: 'followers',
-      peerId: this.model.id,
+      peerID: this.model.id,
       collection,
     });
   }
@@ -206,7 +206,7 @@ export default class extends baseVw {
     const models = app.profile.id === this.model.id ?
       app.ownFollowing.models : [];
     const collection = new Followers(models, {
-      peerId: this.model.id,
+      peerID: this.model.id,
       type: 'following',
       fetchCollection: app.profile.id !== this.model.id,
     });
@@ -217,7 +217,7 @@ export default class extends baseVw {
     return this.createChild(this.tabViews.Follow, {
       ...opts,
       followType: 'following',
-      peerId: this.model.id,
+      peerID: this.model.id,
       collection,
     });
   }

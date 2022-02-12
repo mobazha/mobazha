@@ -80,7 +80,7 @@ export default class extends BaseModel {
 
       // do not allow own node to be in the blocked list
       response.blockedNodes = response.blockedNodes
-        .filter(peerId => peerId !== app.profile.id);
+        .filter(peerID => peerID !== app.profile.id);
     }
 
     return response;

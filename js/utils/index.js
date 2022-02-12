@@ -18,7 +18,7 @@ export function getGuid(handle, resolver) {
   url = url.charAt(url.length - 1) !== '/' ? `${url}/` : url;
   url += handle;
 
-  $.get(url).done(peerId => deferred.resolve(peerId))
+  $.get(url).done(peerID => deferred.resolve(peerID))
     .fail(xhr => deferred.reject(xhr));
 
   return deferred.promise();
@@ -117,7 +117,7 @@ function s4() {
 
 // https://github.com/jeromegn/Backbone.localStorage
 // Generate a pseudo-GUID by concatenating random hexadecimal.
-// This has nothing to do with an OB guid / peerId. This is is just a
+// This has nothing to do with an OB guid / peerID. This is is just a
 // generic way to generate a unique identifier.
 export function guid(prefix = '') {
   return `${prefix}${s4()}${s4()}-${s4()}-${s4()}-${s4()}-${s4()}${s4()}${s4()}`;

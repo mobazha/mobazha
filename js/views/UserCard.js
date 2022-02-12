@@ -58,7 +58,7 @@ export default class extends BaseVw {
     });
 
     this.listenTo(blockEvents, 'blocked unblocked', data => {
-      if (data.peerIds.includes(this.guid)) {
+      if (data.peerIDs.includes(this.guid)) {
         this.setBlockedClass();
       }
     });

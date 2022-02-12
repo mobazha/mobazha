@@ -389,7 +389,7 @@ export default class ObRouter extends Router {
 
     if (isBlocked(guid) && !isUnblocking(guid)) {
       app.loadingModal.close();
-      const blockedWarningModal = new BlockedWarning({ peerId: guid })
+      const blockedWarningModal = new BlockedWarning({ peerID: guid })
         .render()
         .open();
 
@@ -412,7 +412,7 @@ export default class ObRouter extends Router {
       };
 
       const onUnblock = data => {
-        if (data.peerIds.includes(guid)) {
+        if (data.peerIDs.includes(guid)) {
           app.loadingModal.open();
           this.user(guid, state, ...args);
         }

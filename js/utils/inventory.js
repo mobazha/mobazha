@@ -15,9 +15,9 @@ const cacheExpires = 1000 * 60 * 5;
 
 // todo: put in some periodic cleanup that prevents the cache from growing too large
 
-function checkInventoryArgs(peerId, options = {}) {
-  if (typeof peerId !== 'string') {
-    throw new Error('Please provide a peerId as a string.');
+function checkInventoryArgs(peerID, options = {}) {
+  if (typeof peerID !== 'string') {
+    throw new Error('Please provide a peerID as a string.');
   }
 
   if (options.slug !== undefined && typeof options.slug !== 'string') {
@@ -25,9 +25,9 @@ function checkInventoryArgs(peerId, options = {}) {
   }
 }
 
-function getCache(peerId, options = {}) {
-  checkInventoryArgs(peerId, options);
-  let cacheByStore = inventoryCache.get(peerId);
+function getCache(peerID, options = {}) {
+  checkInventoryArgs(peerID, options);
+  let cacheByStore = inventoryCache.get(peerID);
   let cacheBySlug = options.slug && cacheByStore &&
     cacheByStore[options.slug] && cacheByStore[options.slug].deferred ?
       cacheByStore[options.slug] : null;
@@ -61,14 +61,14 @@ function getCache(peerId, options = {}) {
   };
 }
 
-function setInventory(peerId, data = {}, options = {}) {
-  checkInventoryArgs(peerId, options);
+function setInventory(peerID, data = {}, options = {}) {
+  checkInventoryArgs(peerID, options);
 
   const slugs = options.slug ?
     [options.slug] : Object.keys(data);
 
   slugs.forEach(slug => {
-    const curCache = inventoryCache.get(peerId) || {};
+    const curCache = inventoryCache.get(peerID) || {};
     const prevInventory = curCache[slug] &&
       curCache[slug].inventory;
     const curInventory = options.slug ?
@@ -90,10 +90,10 @@ function setInventory(peerId, data = {}, options = {}) {
           });
       }
 
-      inventoryCache.set(peerId, curCache);
+      inventoryCache.set(peerID, curCache);
 
       events.trigger('inventory-change', {
-        peerId,
+        peerID,
         slug,
         prevInventory,
         inventory: curInventory,
@@ -134,8 +134,8 @@ listingEvents.on('saved', md => {
   }
 });
 
-export function getInventory(peerId, options = {}) {
-  checkInventoryArgs(peerId, options);
+export function getInventory(peerID, options = {}) {
+  checkInventoryArgs(peerID, options);
   const opts = {
     useCache: true,
     // For crypto currency listings be sure to pass in the coinDivisibility so
@@ -146,7 +146,7 @@ export function getInventory(peerId, options = {}) {
     coinDivisibility: undefined,
     ...options,
   };
-  const cacheObj = opts.useCache && getCache(peerId, options);
+  const cacheObj = opts.useCache && getCache(peerID, options);
   let deferred = $.Deferred();
 
   if (!opts.useCache || (!cacheObj.cacheBySlug && !cacheObj.cacheByStore)) {
@@ -155,10 +155,10 @@ export function getInventory(peerId, options = {}) {
     // for local listings do not get cached data from the server - if client
     // side cache is available, it would be used since that is updated if the
     // user updates the listing (at least via this client)
-    const useCache = peerId === app.profile.id ? false : opts.useCache;
+    const useCache = peerID === app.profile.id ? false : opts.useCache;
 
     const url =
-      `ob/inventory/${peerId}${opts.slug ? `/${opts.slug}` : ''}` +
+      `ob/inventory/${peerID}${opts.slug ? `/${opts.slug}` : ''}` +
         `${useCache ? '?usecache=true' : ''}`;
 
     const xhr = $.get(app.getServerUrl(url))
@@ -186,13 +186,13 @@ export function getInventory(peerId, options = {}) {
 
         deferred.resolve(inventoryData);
         events.trigger('inventory-fetch-success', {
-          peerId,
+          peerID,
           slug: opts.slug,
           xhr,
           data: inventoryData,
         });
 
-        setInventory(peerId, inventoryData, options);
+        setInventory(peerID, inventoryData, options);
       }).fail(failedXhr => {
         deferred.reject({
           errCode: failedXhr.statusText === 'abort' ?
@@ -202,13 +202,13 @@ export function getInventory(peerId, options = {}) {
         });
 
         events.trigger('inventory-fetch-fail', {
-          peerId,
+          peerID,
           slug: opts.slug,
           xhr,
         });
 
         // clear failed fetches from the cache
-        const cache = inventoryCache.get(peerId);
+        const cache = inventoryCache.get(peerID);
         if (cache) {
           const cachedItem = cache.deferred === deferred ?
             cache : cache[opts.slug];
@@ -217,7 +217,7 @@ export function getInventory(peerId, options = {}) {
         }
       });
 
-    const curCache = inventoryCache.get(peerId) || {};
+    const curCache = inventoryCache.get(peerID) || {};
     const requestors = [];
 
     // When sending back a promise, call _getPromise() with a unique id. This will include
@@ -258,10 +258,10 @@ export function getInventory(peerId, options = {}) {
       };
     }
 
-    inventoryCache.set(peerId, cacheData);
+    inventoryCache.set(peerID, cacheData);
 
     events.trigger('inventory-fetching', {
-      peerId,
+      peerID,
       slug: opts.slug,
       xhr,
     });
@@ -296,9 +296,9 @@ export function getInventory(peerId, options = {}) {
   return promise;
 }
 
-export function isFetching(peerId, options = {}) {
-  checkInventoryArgs(peerId, options);
-  const cache = inventoryCache.get(peerId);
+export function isFetching(peerID, options = {}) {
+  checkInventoryArgs(peerID, options);
+  const cache = inventoryCache.get(peerID);
   const fetching =
     (cache && cache.deferred && cache.deferred.state() === 'pending') ||
     (options.slug && cache && cache[options.slug] && cache[options.slug].deferred &&

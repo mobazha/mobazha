@@ -8,7 +8,7 @@ export default class extends BaseVw {
     super({
       ...options,
       initialState: {
-        maxPeerIdLength: 8,
+        maxPeerIDLength: 8,
         showAvatar: false,
         ...options.initialState,
       },

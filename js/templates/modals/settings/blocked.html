@@ -6,10 +6,10 @@
 
   <div class="flexColWide tx5 rowMd blockedListWrap <% if (ob.blocked.length) print('padKids borderStackedAll') %>">
   <%  if (ob.blocked.length) {
-        ob.blocked.forEach(peerId => { %>
-          <div class="clrBr" data-peerid="<%= peerId %>">
+        ob.blocked.forEach(peerID => { %>
+          <div class="clrBr" data-peerid="<%= peerID %>">
             <div class="flexVCent">
-              <div class="flexExpand"><a class="clrT" href="<%= peerId %>"><%= peerId %></a></div>
+              <div class="flexExpand"><a class="clrT" href="<%= peerID %>"><%= peerID %></a></div>
               <div>
                 <button class="btn clrP clrBr tx5b js-unblock"><%= ob.polyT('settings.blockedTab.btnUnblock') %></button>
               </div>

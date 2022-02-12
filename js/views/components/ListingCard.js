@@ -98,7 +98,7 @@ export default class extends baseVw {
       $(document).on('click', this.boundDocClick);
 
       this.listenTo(blockEvents, 'blocked unblocked', data => {
-        if (data.peerIds.includes(this.ownerGuid)) {
+        if (data.peerIDs.includes(this.ownerGuid)) {
           this.setBlockedClass();
         }
       });
@@ -479,7 +479,7 @@ export default class extends baseVw {
     };
 
     if (isBlocked(this.ownerGuid) && !isUnblocking(this.ownerGuid)) {
-      const blockedWarningModal = new BlockedWarning({ peerId: this.ownerGuid })
+      const blockedWarningModal = new BlockedWarning({ peerID: this.ownerGuid })
         .render()
         .open();
 

@@ -1,5 +1,5 @@
 <%
-  const isCase = ob.ownPeerId !== ob.buyer && ob.ownPeerId !== ob.vendor;
+  const isCase = ob.ownPeerID !== ob.buyer && ob.ownPeerID !== ob.vendor;
 %>
 
 <div class="headerIconWrap discSm clrP clrBr">
@@ -35,18 +35,18 @@
     messageClass = 'txCtr clrTErr';
     tipClass = 'hide';
   } else if (!isCase) {
-    tip = ob.ownPeerId === ob.buyer ?
+    tip = ob.ownPeerID === ob.buyer ?
       ob.polyT('orderDetail.summaryTab.timeoutInfo.tipClaimAfterTimeoutBuyer') :
       ob.polyT('orderDetail.summaryTab.timeoutInfo.tipClaimAfterTimeoutVendor');
 
     if (ob.isDisputed) {
       if (!ob.hasDisputeEscrowExpired) {
         message = ob.polyT('orderDetail.summaryTab.timeoutInfo.disputedModOnClock', { timeRemaining: `<b>${ob.timeRemaining}</b>` });
-        tip = ob.ownPeerId === ob.buyer ?
+        tip = ob.ownPeerID === ob.buyer ?
           ob.polyT('orderDetail.summaryTab.timeoutInfo.disputedTipBuyer', { totalTime: ob.totalTime }) :
           ob.polyT('orderDetail.summaryTab.timeoutInfo.disputedTipVendor', { totalTime: ob.totalTime });
       } else {
-        message = ob.ownPeerId === ob.buyer ?
+        message = ob.ownPeerID === ob.buyer ?
           ob.polyT('orderDetail.summaryTab.timeoutInfo.disputedTimeUpBuyer') :
           ob.polyT('orderDetail.summaryTab.timeoutInfo.disputedTimeUpVendor');
         tipClass = 'hide';
@@ -55,7 +55,7 @@
       message =
         ob.polyT('orderDetail.summaryTab.timeoutInfo.paymentFinalizedVendor');        
 
-      if (ob.ownPeerId === ob.buyer) {
+      if (ob.ownPeerID === ob.buyer) {
         message = ob.canBuyerComplete ?
           ob.polyT('orderDetail.summaryTab.timeoutInfo.paymentFinalizedBuyerCompletable') :
           ob.polyT('orderDetail.summaryTab.timeoutInfo.paymentFinalizedBuyer');
@@ -68,7 +68,7 @@
         timeRemaining: `<b>${ob.timeRemaining}</b>`,
       });
     } else if (ob.blocksRemaining <= 0) {
-      if (ob.ownPeerId === ob.buyer) {
+      if (ob.ownPeerID === ob.buyer) {
         message = ob.polyT('orderDetail.summaryTab.timeoutInfo.escrowExpired');
         tip = ob.polyT('orderDetail.summaryTab.timeoutInfo.tipEscrowExpiredBuyer', { totalTime: ob.totalTime });
       } else {
@@ -82,7 +82,7 @@
         }
       }
 
-      if (ob.ownPeerId === ob.buyer && ob.canBuyerComplete) {
+      if (ob.ownPeerID === ob.buyer && ob.canBuyerComplete) {
         message = ob.polyT('orderDetail.summaryTab.timeoutInfo.escrowExpiredBuyerComplete');
       }
     } else {
@@ -114,7 +114,7 @@
       <% if (ob.showDisputeBtn) { %>
         <button class="btn tx5b clrErr clrBrDec1 clrTOnEmph js-disputeOrder"><%= ob.polyT('orderDetail.summaryTab.timeoutInfo.btnDisputeOrder') %></button>
       <% } %>
-      <% if (ob.ownPeerId === ob.vendor && ob.isPaymentClaimable) { %>
+      <% if (ob.ownPeerID === ob.vendor && ob.isPaymentClaimable) { %>
         <%= ob.processingButton({
           className: `btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b js-claimPayment ${ob.isClaimingPayment ? 'processing' : ''}`,
           btnText: ob.polyT('orderDetail.summaryTab.timeoutInfo.btnClaimPayment')

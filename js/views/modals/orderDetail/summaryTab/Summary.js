@@ -264,11 +264,11 @@ export default class extends BaseVw {
 
   events() {
     return {
-      'click .js-copyOrderId': 'onClickCopyOrderId',
+      'click .js-copyOrderID': 'onClickCopyOrderID',
     };
   }
 
-  onClickCopyOrderId() {
+  onClickCopyOrderID() {
     clipboard.writeText(this.model.id);
     this.copiedToClipboardAnimatingIn = true;
     this.$copiedToClipboard
@@ -433,7 +433,7 @@ export default class extends BaseVw {
     moment.relativeTimeThreshold('d', 364);
 
     let state = {
-      ownPeerId: app.profile.id,
+      ownPeerID: app.profile.id,
       buyer: this.buyer.id,
       vendor: this.vendor.id,
       moderator: this.moderator && this.moderator.id || undefined,

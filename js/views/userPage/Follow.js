@@ -20,8 +20,8 @@ export default class extends BaseVw {
 
     super(opts);
 
-    if (!opts.peerId) {
-      throw new Error('Please provide a peerId of the user who this list is for.');
+    if (!opts.peerID) {
+      throw new Error('Please provide a peerID of the user who this list is for.');
     }
 
     const types = ['followers', 'following'];
@@ -41,7 +41,7 @@ export default class extends BaseVw {
     this.userCardViews = [];
     this.indexedUserCardViews = {};
     this.renderedCl = new Followers([], {
-      peerId: opts.peerId,
+      peerID: opts.peerID,
       type: opts.followType,
     });
     this.listenTo(this.renderedCl, 'update', this.onCollectionUpdate);
@@ -65,7 +65,7 @@ export default class extends BaseVw {
   }
 
   get ownPage() {
-    return this.options.peerId === app.profile.id;
+    return this.options.peerID === app.profile.id;
   }
 
   onScroll() {
@@ -97,7 +97,7 @@ export default class extends BaseVw {
           !!opts.changes.added.find(addMd => (addMd.id === this.model.id));
 
         if (isUserNewlyFollowed) {
-          this.collection.add({ peerId: app.profile.id }, { at: 0 });
+          this.collection.add({ peerID: app.profile.id }, { at: 0 });
         }
       }
     }
@@ -208,16 +208,16 @@ export default class extends BaseVw {
     return this._origClParse.call(this.collection, users);
   }
 
-  removeUserCard(peerId) {
-    if (!peerId) {
-      throw new Error('Please provide a peerId');
+  removeUserCard(peerID) {
+    if (!peerID) {
+      throw new Error('Please provide a peerID');
     }
 
-    const view = this.indexedUserCardViews[peerId];
+    const view = this.indexedUserCardViews[peerID];
     if (view) {
       view.remove();
       this.userCardViews.splice(this.userCardViews.indexOf(view), 1);
-      delete this.indexedUserCardViews[peerId];
+      delete this.indexedUserCardViews[peerID];
     }
   }
 

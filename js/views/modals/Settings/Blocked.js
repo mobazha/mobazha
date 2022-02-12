@@ -7,7 +7,7 @@ import { unblock, isUnblocking, events as blockEvents } from '../../../utils/blo
 export default class extends baseVw {
   constructor(options = {}) {
     const calcBlockedList = () => app.settings.get('blockedNodes')
-      .filter(peerId => !isUnblocking(peerId));
+      .filter(peerID => !isUnblocking(peerID));
 
     super({
       ...options,
@@ -31,14 +31,14 @@ export default class extends baseVw {
   }
 
   onClickUnblock(e) {
-    const $peerIdEl = $(e.target).closest('[data-peerid]', this.el);
-    const peerId = $peerIdEl.attr('data-peerid');
+    const $peerIDEl = $(e.target).closest('[data-peerid]', this.el);
+    const peerID = $peerIDEl.attr('data-peerid');
 
-    if (!peerId) {
-      throw new Error('Unable to unblock because the peerId data attribute is not set.');
+    if (!peerID) {
+      throw new Error('Unable to unblock because the peerID data attribute is not set.');
     }
 
-    unblock(peerId);
+    unblock(peerID);
   }
 
   render() {

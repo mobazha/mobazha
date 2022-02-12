@@ -4,7 +4,7 @@ import app from '../../../app';
 import { capitalize } from '../../../utils/string';
 import { getSocket } from '../../../utils/serverConnect';
 import loadTemplate from '../../../utils/loadTemplate';
-import ChatMessages from '../../../collections/ChatMessages';
+import GroupMessages from '../../../collections/GroupMessages';
 import ChatMessage from '../../../models/chat/ChatMessage';
 import { checkValidParticipantObject } from './OrderDetail.js';
 import baseVw from '../../baseVw';
@@ -45,7 +45,7 @@ export default class extends baseVw {
     this.vendor.isTyping = false;
     if (this.moderator) this.moderator.isTyping = false;
 
-    this.messages = new ChatMessages([]);
+    this.messages = new GroupMessages([], { guid: this.model.id });
     this.listenTo(this.messages, 'request', this.onMessagesRequest);
     this.listenTo(this.messages, 'sync', this.onMessagesSync);
     this.listenTo(this.messages, 'update', this.onMessagesUpdate);
@@ -83,7 +83,7 @@ export default class extends baseVw {
 
   onMessagesRequest(mdCl, xhr) {
     // Only interested in the collection sync (not any of its models).
-    if (!(mdCl instanceof ChatMessages)) return;
+    if (!(mdCl instanceof GroupMessages)) return;
 
     this.showLoadMessagesError = false;
     this.$loadMessagesError.addClass('hide');
@@ -95,7 +95,7 @@ export default class extends baseVw {
 
   onMessagesSync(mdCl, response) {
     // Only interested in the collection sync (not any of its models).
-    if (!(mdCl instanceof ChatMessages)) return;
+    if (!(mdCl instanceof GroupMessages)) return;
 
     this.showLoadMessagesError = false;
     this.$loadMessagesError.addClass('hide');
@@ -383,7 +383,7 @@ export default class extends baseVw {
   fetchMessages(offsetID, limit = this.messagesPerPage) {
     const params = {
       limit,
-      subject: this.model.id,
+      orderID: this.model.id,
     };
 
     this.lastFetchMessagesArgs = [offsetID, limit];

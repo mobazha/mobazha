@@ -36,8 +36,8 @@ export default class extends BaseVw {
       throw new Error('Please provide the payment address.');
     }
 
-    if (!options.orderId) {
-      throw new Error('Please provide an orderId.');
+    if (!options.orderID) {
+      throw new Error('Please provide an orderID.');
     }
 
     if (typeof options.isModerated !== 'boolean') {
@@ -65,7 +65,7 @@ export default class extends BaseVw {
     this.options = options;
     this._balanceRemaining = options.balanceRemaining;
     this.paymentAddress = options.paymentAddress;
-    this.orderId = options.orderId;
+    this.orderID = options.orderID;
     this.isModerated = options.isModerated;
     this.metricsOrigin = options.metricsOrigin;
     this.paymentCoin = options.paymentCoin;
@@ -76,7 +76,7 @@ export default class extends BaseVw {
       this.listenTo(serverSocket, 'message', e => {
         // listen for a payment socket message, to react to payments from all sources
         if (e.jsonData.notification && e.jsonData.notification.type === 'payment') {
-          if (e.jsonData.notification.orderId === this.orderId) {
+          if (e.jsonData.notification.orderID === this.orderID) {
             let amount;
 
             try {
@@ -174,7 +174,7 @@ export default class extends BaseVw {
 
     try {
       orderSpend({
-        orderId: this.orderId,
+        orderID: this.orderID,
         address: this.paymentAddress,
         amount: this.balanceRemaining,
         currency,

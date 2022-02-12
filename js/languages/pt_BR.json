@@ -1590,7 +1590,7 @@
     "resetFilters": "Resetar filtros",
     "transactionsTable": {
       "headers": {
-        "orderId": "ID do Pedido",
+        "orderID": "ID do Pedido",
         "date": "Data",
         "listing": "Anúncio",
         "buyer": "Comprador",
@@ -1665,7 +1665,7 @@
       "tipVendorContractNotArrived": "O contrato do vendedor ainda não chegou."
     },
     "summaryTab": {
-      "orderNumber": "Pedido #: %{orderId}",
+      "orderNumber": "Pedido #: %{orderID}",
       "copyLink": "Copiar",
       "notApplicable": "n/a",
       "vendorFinalizedPayment": "Você solicitou o pagamento.",

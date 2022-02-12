@@ -1590,7 +1590,7 @@
     "resetFilters": "Réinitialiser les filtres",
     "transactionsTable": {
       "headers": {
-        "orderId": "ID de la commande",
+        "orderID": "ID de la commande",
         "date": "Date",
         "listing": "Annonce",
         "buyer": "Acheteur",
@@ -1665,7 +1665,7 @@
       "tipVendorContractNotArrived": "The vendor's contract has not yet arrived."
     },
     "summaryTab": {
-      "orderNumber": "Commande #: %{orderId}",
+      "orderNumber": "Commande #: %{orderID}",
       "copyLink": "Copier",
       "notApplicable": "n/a",
       "vendorFinalizedPayment": "You have claimed the payment.",

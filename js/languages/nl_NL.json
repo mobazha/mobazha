@@ -1590,7 +1590,7 @@
     "resetFilters": "Herstel filters",
     "transactionsTable": {
       "headers": {
-        "orderId": "Bestellings-ID",
+        "orderID": "Bestellings-ID",
         "date": "Datum",
         "listing": "Aanbieding",
         "buyer": "Koper",
@@ -1665,7 +1665,7 @@
       "tipVendorContractNotArrived": "Het contract van de koper is nog niet aangekomen."
     },
     "summaryTab": {
-      "orderNumber": "Order #: %{orderId}",
+      "orderNumber": "Order #: %{orderID}",
       "copyLink": "Kopieer",
       "notApplicable": "n/a",
       "vendorFinalizedPayment": "You have claimed the payment.",

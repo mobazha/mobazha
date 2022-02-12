@@ -1590,7 +1590,7 @@
     "resetFilters": "Resetovat filtry",
     "transactionsTable": {
       "headers": {
-        "orderId": "ID objednávky",
+        "orderID": "ID objednávky",
         "date": "Datum",
         "listing": "Záznam",
         "buyer": "Nakupující",
@@ -1665,7 +1665,7 @@
       "tipVendorContractNotArrived": "Smlouva prodávajícího dosud nedorazila."
     },
     "summaryTab": {
-      "orderNumber": "Č. objednávy: %{orderId}",
+      "orderNumber": "Č. objednávy: %{orderID}",
       "copyLink": "Kopírovat",
       "notApplicable": "n/a",
       "vendorFinalizedPayment": "Požádal jsi o platbu.",

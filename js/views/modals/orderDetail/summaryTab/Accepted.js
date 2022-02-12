@@ -25,32 +25,32 @@ export default class extends BaseVw {
       },
     });
 
-    if (!options.orderId) {
+    if (!options.orderID) {
       throw new Error('Please provide the order id.');
     }
 
-    this.orderId = options.orderId;
+    this.orderID = options.orderID;
 
     this.listenTo(orderEvents, 'fulfillingOrder', e => {
-      if (e.id === this.orderId) {
+      if (e.id === this.orderID) {
         this.setState({ fulfillInProgress: true });
       }
     });
 
     this.listenTo(orderEvents, 'fulfillOrderComplete fulfillOrderFail', e => {
-      if (e.id === this.orderId) {
+      if (e.id === this.orderID) {
         this.setState({ fulfillInProgress: false });
       }
     });
 
     this.listenTo(orderEvents, 'refundingOrder', e => {
-      if (e.id === this.orderId) {
+      if (e.id === this.orderID) {
         this.setState({ refundOrderInProgress: true });
       }
     });
 
     this.listenTo(orderEvents, 'refundOrderComplete refundOrderFail', e => {
-      if (e.id === this.orderId) {
+      if (e.id === this.orderID) {
         this.setState({ refundOrderInProgress: false });
       }
     });
@@ -97,7 +97,7 @@ export default class extends BaseVw {
   onClickRefundConfirmed() {
     recordEvent('OrderDetails_RefundConfirm');
     this.setState({ refundConfirmOn: false });
-    refundOrder(this.orderId);
+    refundOrder(this.orderID);
   }
 
   onClickFulfillOrder() {
@@ -115,8 +115,8 @@ export default class extends BaseVw {
       this.$el.html(t({
         ...this._state,
         moment,
-        fulfillInProgress: fulfillingOrder(this.orderId),
-        refundOrderInProgress: refundingOrder(this.orderId),
+        fulfillInProgress: fulfillingOrder(this.orderID),
+        refundOrderInProgress: refundingOrder(this.orderID),
       }));
     });
 

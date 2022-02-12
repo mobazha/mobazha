@@ -12,8 +12,8 @@ import ConvoMessages from './ConvoMessages';
 
 export default class extends baseVw {
   constructor(options = {}) {
-    if (!options.orderId) {
-      throw new Error('Please provide an orderId.');
+    if (!options.orderID) {
+      throw new Error('Please provide an orderID.');
     }
 
     if (!options.model) {

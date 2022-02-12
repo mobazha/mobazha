@@ -13,7 +13,7 @@ export default class extends BaseModel {
   }
 
   get idAttribute() {
-    return 'orderId';
+    return 'orderID';
   }
 
   sync(method, model, options) {

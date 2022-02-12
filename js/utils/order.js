@@ -22,41 +22,41 @@ const resolvePosts = {};
 const acceptPayoutPosts = {};
 const releaseEscrowPosts = {};
 
-function confirmOrder(orderId, reject = false) {
-  if (!orderId) {
-    throw new Error('Please provide an orderId');
+function confirmOrder(orderID, reject = false) {
+  if (!orderID) {
+    throw new Error('Please provide an orderID');
   }
 
-  let post = acceptPosts[orderId];
+  let post = acceptPosts[orderID];
 
   if (reject) {
-    post = rejectPosts[orderId];
+    post = rejectPosts[orderID];
   }
 
   if (!post) {
     post = $.post({
       url: app.getServerUrl('ob/orderconfirmation'),
       data: JSON.stringify({
-        orderId,
+        orderID,
         reject,
       }),
       dataType: 'json',
       contentType: 'application/json',
     }).always(() => {
       if (reject) {
-        delete rejectPosts[orderId];
+        delete rejectPosts[orderID];
       } else {
-        delete acceptPosts[orderId];
+        delete acceptPosts[orderID];
       }
     }).done(() => {
       events.trigger(`${reject ? 'reject' : 'accept'}OrderComplete`, {
-        id: orderId,
+        id: orderID,
         xhr: post,
       });
     })
     .fail(xhr => {
       events.trigger(`${reject ? 'reject' : 'accept'}OrderFail`, {
-        id: orderId,
+        id: orderID,
         xhr: post,
       });
 
@@ -68,13 +68,13 @@ function confirmOrder(orderId, reject = false) {
     });
 
     if (reject) {
-      rejectPosts[orderId] = post;
+      rejectPosts[orderID] = post;
     } else {
-      acceptPosts[orderId] = post;
+      acceptPosts[orderID] = post;
     }
 
     events.trigger(`${reject ? 'rejecting' : 'accepting'}Order`, {
-      id: orderId,
+      id: orderID,
       xhr: post,
     });
   }
@@ -84,52 +84,52 @@ function confirmOrder(orderId, reject = false) {
 
 export { events };
 
-export function acceptingOrder(orderId) {
-  return !!acceptPosts[orderId];
+export function acceptingOrder(orderID) {
+  return !!acceptPosts[orderID];
 }
 
-export function acceptOrder(orderId) {
-  return confirmOrder(orderId);
+export function acceptOrder(orderID) {
+  return confirmOrder(orderID);
 }
 
-export function rejectingOrder(orderId) {
-  return !!rejectPosts[orderId];
+export function rejectingOrder(orderID) {
+  return !!rejectPosts[orderID];
 }
 
-export function rejectOrder(orderId) {
-  return confirmOrder(orderId, true);
+export function rejectOrder(orderID) {
+  return confirmOrder(orderID, true);
 }
 
-export function cancelingOrder(orderId) {
-  return !!cancelPosts[orderId];
+export function cancelingOrder(orderID) {
+  return !!cancelPosts[orderID];
 }
 
-export function cancelOrder(orderId) {
-  if (!orderId) {
-    throw new Error('Please provide an orderId');
+export function cancelOrder(orderID) {
+  if (!orderID) {
+    throw new Error('Please provide an orderID');
   }
 
-  let post = cancelPosts[orderId];
+  let post = cancelPosts[orderID];
 
   if (!post) {
     post = $.post({
       url: app.getServerUrl('ob/ordercancel'),
       data: JSON.stringify({
-        orderId,
+        orderID,
       }),
       dataType: 'json',
       contentType: 'application/json',
     }).always(() => {
-      delete cancelPosts[orderId];
+      delete cancelPosts[orderID];
     }).done(() => {
       events.trigger('cancelOrderComplete', {
-        id: orderId,
+        id: orderID,
         xhr: post,
       });
     })
     .fail(xhr => {
       events.trigger('cancelOrderFail', {
-        id: orderId,
+        id: orderID,
         xhr: post,
       });
 
@@ -140,9 +140,9 @@ export function cancelOrder(orderId) {
       );
     });
 
-    cancelPosts[orderId] = post;
+    cancelPosts[orderID] = post;
     events.trigger('cancelingOrder', {
-      id: orderId,
+      id: orderID,
       xhr: post,
     });
   }
@@ -150,18 +150,18 @@ export function cancelOrder(orderId) {
   return post;
 }
 
-export function fulfillingOrder(orderId) {
-  return !!fulfillPosts[orderId];
+export function fulfillingOrder(orderID) {
+  return !!fulfillPosts[orderID];
 }
 
 export function fulfillOrder(contractType = 'PHYSICAL_GOOD', isLocalPickup = false, data = {}) {
-  if (!data || !data.orderId) {
-    throw new Error('An orderId must be provided with the data.');
+  if (!data || !data.orderID) {
+    throw new Error('An orderID must be provided with the data.');
   }
 
-  const orderId = data.orderId;
+  const orderID = data.orderID;
 
-  let post = fulfillPosts[orderId];
+  let post = fulfillPosts[orderID];
 
   if (!post) {
     const model = new OrderFulfillment(data, { contractType, isLocalPickup });
@@ -174,16 +174,16 @@ export function fulfillOrder(contractType = 'PHYSICAL_GOOD', isLocalPickup = fal
         });
     } else {
       post.always(() => {
-        delete fulfillPosts[orderId];
+        delete fulfillPosts[orderID];
       }).done(() => {
         events.trigger('fulfillOrderComplete', {
-          id: orderId,
+          id: orderID,
           xhr: post,
         });
       })
       .fail(xhr => {
         events.trigger('fulfillOrderFail', {
-          id: orderId,
+          id: orderID,
           xhr: post,
         });
 
@@ -194,9 +194,9 @@ export function fulfillOrder(contractType = 'PHYSICAL_GOOD', isLocalPickup = fal
         );
       });
 
-      fulfillPosts[orderId] = post;
+      fulfillPosts[orderID] = post;
       events.trigger('fulfillingOrder', {
-        id: orderId,
+        id: orderID,
         xhr: post,
       });
     }
@@ -205,36 +205,36 @@ export function fulfillOrder(contractType = 'PHYSICAL_GOOD', isLocalPickup = fal
   return post;
 }
 
-export function refundingOrder(orderId) {
-  return !!refundPosts[orderId];
+export function refundingOrder(orderID) {
+  return !!refundPosts[orderID];
 }
 
-export function refundOrder(orderId) {
-  if (!orderId) {
-    throw new Error('Please provide an orderId');
+export function refundOrder(orderID) {
+  if (!orderID) {
+    throw new Error('Please provide an orderID');
   }
 
-  let post = refundPosts[orderId];
+  let post = refundPosts[orderID];
 
   if (!post) {
     post = $.post({
       url: app.getServerUrl('ob/refund'),
       data: JSON.stringify({
-        orderId,
+        orderID,
       }),
       dataType: 'json',
       contentType: 'application/json',
     }).always(() => {
-      delete refundPosts[orderId];
+      delete refundPosts[orderID];
     }).done(() => {
       events.trigger('refundOrderComplete', {
-        id: orderId,
+        id: orderID,
         xhr: post,
       });
     })
     .fail(xhr => {
       events.trigger('refundOrderFail', {
-        id: orderId,
+        id: orderID,
         xhr: post,
       });
 
@@ -245,9 +245,9 @@ export function refundOrder(orderId) {
       );
     });
 
-    refundPosts[orderId] = post;
+    refundPosts[orderID] = post;
     events.trigger('refundingOrder', {
-      id: orderId,
+      id: orderID,
       xhr: post,
     });
   }
@@ -259,16 +259,16 @@ export function refundOrder(orderId) {
  * If the order with the given id is in the process of being completed, this method
  * will return an object containing the post xhr and the data that's being saved.
  */
-export function completingOrder(orderId) {
-  return !!completePosts[orderId];
+export function completingOrder(orderID) {
+  return !!completePosts[orderID];
 }
 
-export function completeOrder(orderId, data = {}) {
-  if (!orderId) {
-    throw new Error('Please provide an orderId');
+export function completeOrder(orderID, data = {}) {
+  if (!orderID) {
+    throw new Error('Please provide an orderID');
   }
 
-  if (!completePosts[orderId]) {
+  if (!completePosts[orderID]) {
     const model = new OrderCompletion(data);
     const save = model.save();
 
@@ -279,16 +279,16 @@ export function completeOrder(orderId, data = {}) {
         });
     } else {
       save.always(() => {
-        delete completePosts[orderId];
+        delete completePosts[orderID];
       }).done(() => {
         events.trigger('completeOrderComplete', {
-          id: orderId,
+          id: orderID,
           xhr: save,
         });
       })
       .fail(xhr => {
         events.trigger('completeOrderFail', {
-          id: orderId,
+          id: orderID,
           xhr: save,
         });
 
@@ -299,19 +299,19 @@ export function completeOrder(orderId, data = {}) {
         );
       });
 
-      completePosts[orderId] = {
+      completePosts[orderID] = {
         xhr: save,
         data: model.toJSON(),
       };
     }
 
     events.trigger('completingOrder', {
-      id: orderId,
+      id: orderID,
       xhr: save,
     });
   }
 
-  return completePosts[orderId].xhr;
+  return completePosts[orderID].xhr;
 }
 
 /**
@@ -319,16 +319,16 @@ export function completeOrder(orderId, data = {}) {
  * this method will return an object containing the post xhr and the data
  * that's being saved.
  */
-export function openingDispute(orderId) {
-  return !!openDisputePosts[orderId];
+export function openingDispute(orderID) {
+  return !!openDisputePosts[orderID];
 }
 
-export function openDispute(orderId, data = {}) {
-  if (!orderId) {
-    throw new Error('Please provide an orderId');
+export function openDispute(orderID, data = {}) {
+  if (!orderID) {
+    throw new Error('Please provide an orderID');
   }
 
-  if (!openDisputePosts[orderId]) {
+  if (!openDisputePosts[orderID]) {
     const model = new OrderDispute(data);
     const save = model.save();
 
@@ -339,16 +339,16 @@ export function openDispute(orderId, data = {}) {
         });
     } else {
       save.always(() => {
-        delete openDisputePosts[orderId];
+        delete openDisputePosts[orderID];
       }).done(() => {
         events.trigger('openDisputeComplete', {
-          id: orderId,
+          id: orderID,
           xhr: save,
         });
       })
       .fail(xhr => {
         events.trigger('openDisputeFail', {
-          id: orderId,
+          id: orderID,
           xhr: save,
         });
 
@@ -359,19 +359,19 @@ export function openDispute(orderId, data = {}) {
         );
       });
 
-      openDisputePosts[orderId] = {
+      openDisputePosts[orderID] = {
         xhr: save,
         data: model.toJSON(),
       };
     }
 
     events.trigger('openingDisputeOrder', {
-      id: orderId,
+      id: orderID,
       xhr: save,
     });
   }
 
-  return openDisputePosts[orderId].xhr;
+  return openDisputePosts[orderID].xhr;
 }
 
 /**
@@ -379,8 +379,8 @@ export function openDispute(orderId, data = {}) {
  * this method will return an object containing the post xhr and the data that's
  * being saved.
  */
-export function resolvingDispute(orderId) {
-  return !!resolvePosts[orderId];
+export function resolvingDispute(orderID) {
+  return !!resolvePosts[orderID];
 }
 
 export function resolveDispute(model) {
@@ -392,9 +392,9 @@ export function resolveDispute(model) {
     throw new Error('The model must have an id set.');
   }
 
-  const orderId = model.id;
+  const orderID = model.id;
 
-  if (!resolvePosts[orderId]) {
+  if (!resolvePosts[orderID]) {
     const save = model.save();
 
     if (!save) {
@@ -404,16 +404,16 @@ export function resolveDispute(model) {
         });
     } else {
       save.always(() => {
-        delete resolvePosts[orderId];
+        delete resolvePosts[orderID];
       }).done(() => {
         events.trigger('resolveDisputeComplete', {
-          id: orderId,
+          id: orderID,
           xhr: save,
         });
       })
       .fail(xhr => {
         events.trigger('resolveDisputeFail', {
-          id: orderId,
+          id: orderID,
           xhr: save,
         });
 
@@ -424,51 +424,51 @@ export function resolveDispute(model) {
         );
       });
 
-      resolvePosts[orderId] = {
+      resolvePosts[orderID] = {
         xhr: save,
         data: model.toJSON(),
       };
     }
 
     events.trigger('resolvingDispute', {
-      id: orderId,
+      id: orderID,
       xhr: save,
     });
   }
 
-  return resolvePosts[orderId].xhr;
+  return resolvePosts[orderID].xhr;
 }
 
-export function acceptingPayout(orderId) {
-  return !!acceptPayoutPosts[orderId];
+export function acceptingPayout(orderID) {
+  return !!acceptPayoutPosts[orderID];
 }
 
-export function acceptPayout(orderId) {
-  if (!orderId) {
-    throw new Error('Please provide an orderId');
+export function acceptPayout(orderID) {
+  if (!orderID) {
+    throw new Error('Please provide an orderID');
   }
 
-  let post = acceptPayoutPosts[orderId];
+  let post = acceptPayoutPosts[orderID];
 
   if (!post) {
     post = $.post({
       url: app.getServerUrl('ob/releasefunds'),
       data: JSON.stringify({
-        orderId,
+        orderID,
       }),
       dataType: 'json',
       contentType: 'application/json',
     }).always(() => {
-      delete acceptPayoutPosts[orderId];
+      delete acceptPayoutPosts[orderID];
     }).done(() => {
       events.trigger('acceptPayoutComplete', {
-        id: orderId,
+        id: orderID,
         xhr: post,
       });
     })
     .fail(xhr => {
       events.trigger('acceptPayoutFail', {
-        id: orderId,
+        id: orderID,
         xhr: post,
       });
 
@@ -479,9 +479,9 @@ export function acceptPayout(orderId) {
       );
     });
 
-    acceptPayoutPosts[orderId] = post;
+    acceptPayoutPosts[orderID] = post;
     events.trigger('acceptingPayout', {
-      id: orderId,
+      id: orderID,
       xhr: post,
     });
   }
@@ -489,36 +489,36 @@ export function acceptPayout(orderId) {
   return post;
 }
 
-export function releasingEscrow(orderId) {
-  return !!releaseEscrowPosts[orderId];
+export function releasingEscrow(orderID) {
+  return !!releaseEscrowPosts[orderID];
 }
 
-export function releaseEscrow(orderId) {
-  if (!orderId) {
-    throw new Error('Please provide an orderId');
+export function releaseEscrow(orderID) {
+  if (!orderID) {
+    throw new Error('Please provide an orderID');
   }
 
-  let post = releaseEscrowPosts[orderId];
+  let post = releaseEscrowPosts[orderID];
 
   if (!post) {
     post = $.post({
       url: app.getServerUrl('ob/releaseescrow'),
       data: JSON.stringify({
-        orderId,
+        orderID,
       }),
       dataType: 'json',
       contentType: 'application/json',
     }).always(() => {
-      delete releaseEscrowPosts[orderId];
+      delete releaseEscrowPosts[orderID];
     }).done(() => {
       events.trigger('releaseEscrowComplete', {
-        id: orderId,
+        id: orderID,
         xhr: post,
       });
     })
     .fail(xhr => {
       events.trigger('releaseEscrowFail', {
-        id: orderId,
+        id: orderID,
         xhr: post,
       });
 
@@ -529,9 +529,9 @@ export function releaseEscrow(orderId) {
       );
     });
 
-    releaseEscrowPosts[orderId] = post;
+    releaseEscrowPosts[orderID] = post;
     events.trigger('releasingEscrow', {
-      id: orderId,
+      id: orderID,
       xhr: post,
     });
   }

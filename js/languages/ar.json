@@ -1590,7 +1590,7 @@
     "resetFilters": "إعادة تعيين الفلاتر",
     "transactionsTable": {
       "headers": {
-        "orderId": "معرف الطلب ID",
+        "orderID": "معرف الطلب ID",
         "date": "تاريخ",
         "listing": "قائمة",
         "buyer": "مشتر",
@@ -1665,7 +1665,7 @@
       "tipVendorContractNotArrived": "إتفاقية البائع لم تصل بعد."
     },
     "summaryTab": {
-      "orderNumber": "رقم الطلب #: %{orderId}",
+      "orderNumber": "رقم الطلب #: %{orderID}",
       "copyLink": "نسخ",
       "notApplicable": "غير متوفر",
       "vendorFinalizedPayment": "You have claimed the payment.",

@@ -23,7 +23,7 @@ export default class extends baseVw {
       ...options,
     };
 
-    if (!options.orderId) {
+    if (!options.orderID) {
       throw new Error('Please provide the order id.');
     }
 
@@ -50,7 +50,7 @@ export default class extends baseVw {
 
     super(opts);
     this.options = opts;
-    this.orderId = this.options.orderId;
+    this.orderID = this.options.orderID;
     this.payments = [];
 
     this.listenTo(this.collection, 'update', () => this.render());
@@ -73,67 +73,67 @@ export default class extends baseVw {
   }
 
   onCancelClick() {
-    cancelOrder(this.orderId);
+    cancelOrder(this.orderID);
   }
 
   onCancelingOrder(e) {
-    if (e.id === this.orderId) {
+    if (e.id === this.orderID) {
       this.payments[this.payments.length - 1].setState({ cancelInProgress: true });
     }
   }
 
   onCancelOrderAlways(e) {
-    if (e.id === this.orderId) {
+    if (e.id === this.orderID) {
       this.payments[this.payments.length - 1].setState({ cancelInProgress: false });
     }
   }
 
   onCancelOrderComplete(e) {
-    if (e.id === this.orderId) {
+    if (e.id === this.orderID) {
       this.payments[this.payments.length - 1].setState({ showCancelButton: false });
     }
   }
 
   onAcceptClick() {
-    acceptOrder(this.orderId);
+    acceptOrder(this.orderID);
   }
 
   onAcceptingOrder(e) {
-    if (e.id === this.orderId) {
+    if (e.id === this.orderID) {
       this.payments[this.payments.length - 1].setState({ acceptInProgress: true });
     }
   }
 
   onAcceptOrderAlways(e) {
-    if (e.id === this.orderId) {
+    if (e.id === this.orderID) {
       this.payments[this.payments.length - 1].setState({ acceptInProgress: false });
     }
   }
 
   onAcceptOrderComplete(e) {
-    if (e.id === this.orderId) {
+    if (e.id === this.orderID) {
       this.payments[this.payments.length - 1].setState({ showAcceptButton: false });
     }
   }
 
   onRejectClick() {
-    rejectOrder(this.orderId);
+    rejectOrder(this.orderID);
   }
 
   onRejectingOrder(e) {
-    if (e.id === this.orderId) {
+    if (e.id === this.orderID) {
       this.payments[this.payments.length - 1].setState({ rejectInProgress: true });
     }
   }
 
   onRejectOrderAlways(e) {
-    if (e.id === this.orderId) {
+    if (e.id === this.orderID) {
       this.payments[this.payments.length - 1].setState({ rejectInProgress: false });
     }
   }
 
   onRejectOrderComplete(e) {
-    if (e.id === this.orderId) {
+    if (e.id === this.orderID) {
       this.payments[this.payments.length - 1].setState({ showRejectButton: false });
     }
   }
@@ -230,9 +230,9 @@ export default class extends baseVw {
           amountShort: this.options.orderPrice.minus(paidSoFar),
           showAcceptRejectButtons: isMostRecentPayment && this.options.isOrderConfirmable(),
           showCancelButton: isMostRecentPayment && this.options.isOrderCancelable(),
-          cancelInProgress: cancelingOrder(this.orderId),
-          acceptInProgress: acceptingOrder(this.orderId),
-          rejectInProgress: rejectingOrder(this.orderId),
+          cancelInProgress: cancelingOrder(this.orderID),
+          acceptInProgress: acceptingOrder(this.orderID),
+          rejectInProgress: rejectingOrder(this.orderID),
           isCrypto: this.options.isCrypto,
           blockChainTxUrl,
           paymentCoin,

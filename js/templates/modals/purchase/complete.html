@@ -8,7 +8,7 @@
         </div>
       </div>
       <h4><%= ob.polyT('purchase.completeSection.paymentSent') %></h4>
-      <% const link = `<a href="#transactions/purchases?orderId=${ob.orderID}">${ob.polyT('purchase.completeSection.purchases')}</a>`; %>
+      <% const link = `<a href="#transactions/purchases?orderID=${ob.orderID}">${ob.polyT('purchase.completeSection.purchases')}</a>`; %>
       <p>
         <%= ob.polyT('purchase.completeSection.progressMessage', { link }) %>
       </p>
@@ -58,7 +58,7 @@
     </div>
   </div>
   <div class="flex gutterH">
-    <% const orderLink = `<a class="txU" href="#transactions/purchases?orderId=${ob.orderID}">${ob.polyT('purchase.completeSection.vendorMessageLink')}</a>`; %>
+    <% const orderLink = `<a class="txU" href="#transactions/purchases?orderID=${ob.orderID}">${ob.polyT('purchase.completeSection.vendorMessageLink')}</a>`; %>
     <div class="flexExpand tx5 clrTEm">
       <span class="hide js-messageSent">
         <%= ob.polyT('purchase.completeSection.vendorMessageSent', { name: ob.vendorName, orderLink }) %>

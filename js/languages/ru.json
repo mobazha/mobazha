@@ -1590,7 +1590,7 @@
     "resetFilters": "Сбросить фильтры",
     "transactionsTable": {
       "headers": {
-        "orderId": "Заказ ID",
+        "orderID": "Заказ ID",
         "date": "Дата",
         "listing": "Объявление",
         "buyer": "Покупатель",
@@ -1665,7 +1665,7 @@
       "tipVendorContractNotArrived": "The vendor's contract has not yet arrived."
     },
     "summaryTab": {
-      "orderNumber": "Сделка #: %{orderId}",
+      "orderNumber": "Сделка #: %{orderID}",
       "copyLink": "Копировать",
       "notApplicable": "n/a",
       "vendorFinalizedPayment": "You have claimed the payment.",

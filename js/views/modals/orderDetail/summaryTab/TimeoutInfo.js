@@ -9,8 +9,8 @@ import BaseVw from '../../../baseVw';
 
 export default class extends BaseVw {
   constructor(options = {}) {
-    if (!options.orderId) {
-      throw new Error('Please provide an orderId');
+    if (!options.orderID) {
+      throw new Error('Please provide an orderID');
     }
 
     super({
@@ -26,23 +26,23 @@ export default class extends BaseVw {
         showDisputeBtn: false,
         showDiscussBtn: false,
         showResolveDisputeBtn: false,
-        isClaimingPayment: releasingEscrow(options.orderId),
+        isClaimingPayment: releasingEscrow(options.orderID),
         invalidContractData: false,
         dataUnavailable: false,
         ...options.initialState,
       },
     });
 
-    this.orderId = options.orderId;
+    this.orderID = options.orderID;
 
     this.listenTo(orderEvents, 'releasingEscrow', e => {
-      if (e.id === this.orderId) {
+      if (e.id === this.orderID) {
         this.setState({ isClaimingPayment: true });
       }
     });
 
     this.listenTo(orderEvents, 'releaseEscrowComplete releaseEscrowFail', e => {
-      if (e.id === this.orderId) {
+      if (e.id === this.orderID) {
         this.setState({ isClaimingPayment: false });
       }
     });
@@ -73,7 +73,7 @@ export default class extends BaseVw {
 
   onClickClaimPayment() {
     recordEvent('OrderDetails_TimeoutClaimPayment');
-    releaseEscrow(this.orderId);
+    releaseEscrow(this.orderID);
   }
 
   onClickDiscussOrder() {

@@ -1590,7 +1590,7 @@
     "resetFilters": "Tilbakestill filtere",
     "transactionsTable": {
       "headers": {
-        "orderId": "Bestillings-ID",
+        "orderID": "Bestillings-ID",
         "date": "Dato",
         "listing": "Oppføring",
         "buyer": "Kjøper",
@@ -1665,7 +1665,7 @@
       "tipVendorContractNotArrived": "Selgers kontrakt har ikke ankommet."
     },
     "summaryTab": {
-      "orderNumber": "Bestilling #: %{orderId}",
+      "orderNumber": "Bestilling #: %{orderID}",
       "copyLink": "Kopiér",
       "notApplicable": "n/a",
       "vendorFinalizedPayment": "You have claimed the payment.",

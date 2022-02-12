@@ -41,7 +41,7 @@ export default class extends BaseModel {
   }
 
   get idAttribute() {
-    return 'orderId';
+    return 'orderID';
   }
 
   get nested() {

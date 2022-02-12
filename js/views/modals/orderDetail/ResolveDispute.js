@@ -95,7 +95,7 @@ export default class extends BaseVw {
     const id = this.model.id;
     this.model.reset();
     // restore the id reset blew away
-    this.model.set({ orderId: id });
+    this.model.set({ orderID: id });
     this.render();
     this.trigger('clickCancel');
     recordEvent('OrderDetails_DisputeResolveCancel');

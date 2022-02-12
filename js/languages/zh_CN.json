@@ -1591,7 +1591,7 @@
     "resetFilters": "重置过滤器",
     "transactionsTable": {
       "headers": {
-        "orderId": "订单号",
+        "orderID": "订单号",
         "date": "日期",
         "listing": "列表",
         "buyer": "买家",
@@ -1666,7 +1666,7 @@
       "tipVendorContractNotArrived": "卖方的合同尚未到达。"
     },
     "summaryTab": {
-      "orderNumber": "订单号: %{orderId}",
+      "orderNumber": "订单号: %{orderID}",
       "copyLink": "复制",
       "notApplicable": "无",
       "vendorFinalizedPayment": "您已手动完成订单。",

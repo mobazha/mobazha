@@ -1590,7 +1590,7 @@
     "resetFilters": "Azzera filtri",
     "transactionsTable": {
       "headers": {
-        "orderId": "ID dell'ordine",
+        "orderID": "ID dell'ordine",
         "date": "Data",
         "listing": "Annunci",
         "buyer": "Acquirente",
@@ -1665,7 +1665,7 @@
       "tipVendorContractNotArrived": "The vendor's contract has not yet arrived."
     },
     "summaryTab": {
-      "orderNumber": "Ordine #: %{orderId}",
+      "orderNumber": "Ordine #: %{orderID}",
       "copyLink": "Copia",
       "notApplicable": "Vuoto",
       "vendorFinalizedPayment": "You have claimed the payment.",

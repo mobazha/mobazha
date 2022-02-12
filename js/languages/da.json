@@ -1590,7 +1590,7 @@
     "resetFilters": "Nulstil filtre",
     "transactionsTable": {
       "headers": {
-        "orderId": "Ordre-ID",
+        "orderID": "Ordre-ID",
         "date": "Dato",
         "listing": "Listning",
         "buyer": "Køber",
@@ -1665,7 +1665,7 @@
       "tipVendorContractNotArrived": "The vendor's contract has not yet arrived."
     },
     "summaryTab": {
-      "orderNumber": "Ordrenr.: %{orderId}",
+      "orderNumber": "Ordrenr.: %{orderID}",
       "copyLink": "Kopiér",
       "notApplicable": "ikke relevant",
       "vendorFinalizedPayment": "You have claimed the payment.",

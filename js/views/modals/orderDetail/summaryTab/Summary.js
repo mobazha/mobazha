@@ -589,7 +589,7 @@ export default class extends BaseVw {
       this.timeoutInfo.setState(state);
     } else {
       this.timeoutInfo = this.createChild(TimeoutInfo, {
-        orderId: this.model.id,
+        orderID: this.model.id,
         initialState: state,
       });
 
@@ -676,7 +676,7 @@ export default class extends BaseVw {
 
     if (this.accepted) this.accepted.remove();
     this.accepted = this.createChild(Accepted, {
-      orderId: this.model.id,
+      orderID: this.model.id,
       initialState,
     });
     this.listenTo(this.accepted, 'clickFulfillOrder',
@@ -742,7 +742,7 @@ export default class extends BaseVw {
   renderCompleteOrderForm() {
     const completingObject = completingOrder(this.model.id);
     const model = new OrderCompletion(
-      completingObject ? completingObject.data : { orderId: this.model.id });
+      completingObject ? completingObject.data : { orderID: this.model.id });
     if (this.completeOrderForm) this.completeOrderForm.remove();
     this.completeOrderForm = this.createChild(CompleteOrderForm, {
       model,
@@ -875,7 +875,7 @@ export default class extends BaseVw {
 
     if (this.disputePayout) this.disputePayout.remove();
     this.disputePayout = this.createChild(DisputePayout, {
-      orderId: this.model.id,
+      orderID: this.model.id,
       initialState: {
         ...data,
         showAcceptButton: !this.model.isCase && this.model.get('state') === 'DECIDED',
@@ -904,7 +904,7 @@ export default class extends BaseVw {
       this.payForOrder = this.createChild(PayForOrder, {
         balanceRemaining: this.model.getBalanceRemaining(),
         paymentAddress: this.paymentAddress,
-        orderId: this.model.id,
+        orderID: this.model.id,
         isModerated: !!this.moderator,
         metricsOrigin: 'Transactions',
         paymentCoin: this.model.paymentCoin,
@@ -1052,7 +1052,7 @@ export default class extends BaseVw {
 
     if (!this.processingError) {
       this.processingError = this.createChild(ProcessingError, {
-        orderId: this.model.id,
+        orderID: this.model.id,
         initialState: state,
       });
       this.getCachedEl('.js-processingErrorContainer')
@@ -1121,7 +1121,7 @@ export default class extends BaseVw {
       if (!this.model.isCase) {
         if (this.payments) this.payments.remove();
         this.payments = this.createChild(Payments, {
-          orderId: this.model.id,
+          orderID: this.model.id,
           collection: this.model.paymentsIn,
           orderPrice: this.model.orderPrice,
           vendor: this.vendor,

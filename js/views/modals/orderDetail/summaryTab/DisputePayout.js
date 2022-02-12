@@ -23,29 +23,29 @@ export default class extends BaseVw {
       },
     });
 
-    if (!options.orderId) {
-      throw new Error('Please provide the orderId');
+    if (!options.orderID) {
+      throw new Error('Please provide the orderID');
     }
 
-    this.orderId = options.orderId;
+    this.orderID = options.orderID;
 
     this.boundOnDocClick = this.onDocumentClick.bind(this);
     $(document).on('click', this.boundOnDocClick);
 
     this.listenTo(orderEvents, 'acceptingPayout', e => {
-      if (e.id === this.orderId) {
+      if (e.id === this.orderID) {
         this.setState({ acceptInProgress: true });
       }
     });
 
     this.listenTo(orderEvents, 'acceptPayoutComplete acceptPayoutFail', e => {
-      if (e.id === this.orderId) {
+      if (e.id === this.orderID) {
         this.setState({ acceptInProgress: false });
       }
     });
 
     this.listenTo(orderEvents, 'acceptPayoutComplete', e => {
-      if (e.id === this.orderId) {
+      if (e.id === this.orderID) {
         this.setState({ showAcceptButton: false });
       }
     });
@@ -88,7 +88,7 @@ export default class extends BaseVw {
   onClickAcceptPayoutConfirmed() {
     recordEvent('OrderDetails_DisputeAcceptConfirm');
     this.setState({ acceptConfirmOn: false });
-    acceptPayout(this.orderId);
+    acceptPayout(this.orderID);
   }
 
   remove() {
@@ -101,7 +101,7 @@ export default class extends BaseVw {
       this.$el.html(t({
         ...this._state,
         moment,
-        acceptInProgress: acceptingPayout(this.orderId),
+        acceptInProgress: acceptingPayout(this.orderID),
       }));
     });
 

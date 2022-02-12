@@ -1590,7 +1590,7 @@
     "resetFilters": "Скинути фільтри",
     "transactionsTable": {
       "headers": {
-        "orderId": "Номер замовлення",
+        "orderID": "Номер замовлення",
         "date": "Дата",
         "listing": "Товар",
         "buyer": "Покупець",
@@ -1665,7 +1665,7 @@
       "tipVendorContractNotArrived": "Договір постачальника ще не прибув."
     },
     "summaryTab": {
-      "orderNumber": "Замовлення №: %{orderId}",
+      "orderNumber": "Замовлення №: %{orderID}",
       "copyLink": "Копіювати",
       "notApplicable": "не доступно",
       "vendorFinalizedPayment": "Ви отримали платіж.",

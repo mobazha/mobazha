@@ -199,11 +199,11 @@ class Spend extends BaseModel {
         if (
           this.url === getOrderSpendUrl() &&
           (
-            typeof attrs.orderId !== 'string' ||
-            !attrs.orderId
+            typeof attrs.orderID !== 'string' ||
+            !attrs.orderID
           )
         ) {
-          addError('orderId', 'Please provide an orderId.');
+          addError('orderID', 'Please provide an orderID.');
         }
       }
     }

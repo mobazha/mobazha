@@ -3,7 +3,7 @@ import BaseVw from '../../../baseVw';
 
 export default class extends BaseVw {
   constructor(options = {}) {
-    if (!options.orderId) {
+    if (!options.orderID) {
       throw new Error('Please provide the order id.');
     }
 
@@ -20,7 +20,7 @@ export default class extends BaseVw {
 
     super(opts);
 
-    this.orderId = options.orderId;
+    this.orderID = options.orderID;
   }
 
   className() {

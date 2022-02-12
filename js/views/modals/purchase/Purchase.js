@@ -567,7 +567,7 @@ export default class extends BaseModal {
             this.payment = this.createChild(Payment, {
               balanceRemaining: curDefToDecimal(data.amount),
               paymentAddress: data.paymentAddress,
-              orderId: data.orderId,
+              orderID: data.orderID,
               isModerated: !!this.order.get('moderator'),
               metricsOrigin: 'Purchase',
               paymentCoin,
@@ -637,7 +637,7 @@ export default class extends BaseModal {
   }
 
   completePurchase(data) {
-    this.complete.orderID = data.orderId;
+    this.complete.orderID = data.orderID;
     this.complete.render();
     this.setState({ phase: 'complete' });
   }

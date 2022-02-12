@@ -27,7 +27,7 @@ export default class extends Collection {
   }
 
   modelId(attrs) {
-    return this.type === 'cases' ? attrs.caseId : attrs.orderId;
+    return this.type === 'cases' ? attrs.caseId : attrs.orderID;
   }
 
   url() {

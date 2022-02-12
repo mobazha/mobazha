@@ -6,11 +6,11 @@ export default class extends BaseVw {
   constructor(options = {}) {
     super(options);
 
-    if (!options.orderId) {
+    if (!options.orderID) {
       throw new Error('Please provide the order id.');
     }
 
-    this.orderId = options.orderId;
+    this.orderID = options.orderID;
     this._state = {
       showDisputeOrderButton: false,
       ...options.initialState || {},

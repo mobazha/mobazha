@@ -1720,7 +1720,7 @@
         "trackingNumberLabel": "Číslo zásilky:",
         "coinTypeVerbose": "%{coinName} (%{coinCode})",
         "cryptoSentLabel": "%{coinTypeVerbose} odesláno",
-        "transactionIdLabel": "ID transakce:",
+        "transactionIDLabel": "ID transakce:",
         "yourNoteLabel": "Tvá poznámka:",
         "noteFromVendorLabel": "Poznámka od dodavatele:",
         "noteFromStoreLabel": "Poznámka od %{store}:",
@@ -1860,8 +1860,8 @@
       "fileUrlPlaceholder": "Odkaz na soubor(y)",
       "passwordLabel": "Heslo",
       "passwordPlaceholder": "Heslo k souboru (volitelné)",
-      "transactionIdLabel": "ID transakce",
-      "transactionIdPlaceholder": "Vložit ID transakce",
+      "transactionIDLabel": "ID transakce",
+      "transactionIDPlaceholder": "Vložit ID transakce",
       "noteLabel": "Poznámka",
       "notePlaceholder": "volitelné",
       "noteHelperTextDigital": "Kupující obdrží oznámení obsahující informace o souboru",
@@ -2113,7 +2113,7 @@
     "provideShipper": "Poskytni přepravce.",
     "provideUrl": "Zadej prosím URL adresu souboru.",
     "invalidUrl": "Zadej prosím platnou adresu URL.",
-    "provideTransactionId": "Zadej prosím číslo transakce.",
+    "provideTransactionID": "Zadej prosím číslo transakce.",
     "transactionIDTooLong": "ID transakce překračuje maximální délku znaků %{maxLength}."
   },
   "errorPage": {

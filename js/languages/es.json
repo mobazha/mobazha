@@ -1720,7 +1720,7 @@
         "trackingNumberLabel": "# Rastreo:",
         "coinTypeVerbose": "%{coinName} (%{coinCode})",
         "cryptoSentLabel": "%{coinTypeVerbose} enviado",
-        "transactionIdLabel": "ID de Transacción:",
+        "transactionIDLabel": "ID de Transacción:",
         "yourNoteLabel": "Tu recado:",
         "noteFromVendorLabel": "Recado del vendedor:",
         "noteFromStoreLabel": "Recado de %{store}:",
@@ -1860,8 +1860,8 @@
       "fileUrlPlaceholder": "Enlace a archivo(s)",
       "passwordLabel": "Contrase&ntilde;a",
       "passwordPlaceholder": "Contraseña al archivo (opcional)",
-      "transactionIdLabel": "ID de Transacción",
-      "transactionIdPlaceholder": "Pega la ID de Transacción",
+      "transactionIDLabel": "ID de Transacción",
+      "transactionIDPlaceholder": "Pega la ID de Transacción",
       "noteLabel": "Nota",
       "notePlaceholder": "opcional",
       "noteHelperTextDigital": "El comprador recibirá un aviso conteniendo la información del archivo",
@@ -2113,7 +2113,7 @@
     "provideShipper": "Please provide a shipping carrier.",
     "provideUrl": "Indique un URL.",
     "invalidUrl": "Introduzca un URL válido.",
-    "provideTransactionId": "Please provide a transaction ID.",
+    "provideTransactionID": "Please provide a transaction ID.",
     "transactionIDTooLong": "Transaction ID exceeds the maximum length of %{maxLength} characters."
   },
   "errorPage": {

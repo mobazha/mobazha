@@ -1720,7 +1720,7 @@
         "trackingNumberLabel": "Відстеження №:",
         "coinTypeVerbose": "%{coinName} (%{coinCode})",
         "cryptoSentLabel": "%{coinTypeVerbose} надіслано",
-        "transactionIdLabel": "ID транзакції:",
+        "transactionIDLabel": "ID транзакції:",
         "yourNoteLabel": "Ваша примітка:",
         "noteFromVendorLabel": "Примітка від продавця:",
         "noteFromStoreLabel": "Нотатка від %{store}:",
@@ -1860,8 +1860,8 @@
       "fileUrlPlaceholder": "Посилання на файл(и)",
       "passwordLabel": "Пароль",
       "passwordPlaceholder": "Пароль на файл(и)",
-      "transactionIdLabel": "ID транзакції",
-      "transactionIdPlaceholder": "Вставте ID транзакції",
+      "transactionIDLabel": "ID транзакції",
+      "transactionIDPlaceholder": "Вставте ID транзакції",
       "noteLabel": "Зауваження",
       "notePlaceholder": "опціонально",
       "noteHelperTextDigital": "Покупець отримає сповіщення, включно інформацію про файли",
@@ -2113,7 +2113,7 @@
     "provideShipper": "Будь ласка, вкажіть перевізника.",
     "provideUrl": "Вкажіть URL-адресу файлу.",
     "invalidUrl": "Будь ласка, вкажіть дійсну URL-адресу.",
-    "provideTransactionId": "Будь ласка, вкажіть ID транзакції.",
+    "provideTransactionID": "Будь ласка, вкажіть ID транзакції.",
     "transactionIDTooLong": "ID транзакції перевищує максимальну довжину в %{maxLength} символів."
   },
   "errorPage": {

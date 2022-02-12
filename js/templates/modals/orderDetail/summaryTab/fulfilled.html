@@ -75,9 +75,9 @@
         }) %></div>
 
         <div class="row">
-          <span><%= ob.polyT('orderDetail.summaryTab.fulfilled.transactionIdLabel') %></span> <span class="clamp3 inline"><%= ob.encodedTxId %></span>
-          <a class="clrTEm js-copyText flexNoShrink" data-content="<%= ob.transactionID %>" data-status-indicator=".js-transactionIdCopiedToClipboard"><%= ob.polyT('orderDetail.summaryTab.fulfilled.copyLink') %></a>
-          <a class="hide js-transactionIdCopiedToClipboard"><%= ob.polyT('copiedToClipboard') %></a>
+          <span><%= ob.polyT('orderDetail.summaryTab.fulfilled.transactionIDLabel') %></span> <span class="clamp3 inline"><%= ob.encodedTxId %></span>
+          <a class="clrTEm js-copyText flexNoShrink" data-content="<%= ob.transactionID %>" data-status-indicator=".js-transactionIDCopiedToClipboard"><%= ob.polyT('orderDetail.summaryTab.fulfilled.copyLink') %></a>
+          <a class="hide js-transactionIDCopiedToClipboard"><%= ob.polyT('copiedToClipboard') %></a>
         </div>
         <div class="rowTn txB"><%= ob.noteFromLabel %></div>
         <div><%= ob.note ? ob.parseEmojis(ob.note) : ob.polyT('orderDetail.summaryTab.notApplicable') %></div>

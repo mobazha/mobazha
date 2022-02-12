@@ -1720,7 +1720,7 @@
         "trackingNumberLabel": "رقم التتبع #:",
         "coinTypeVerbose": "%{coinName} (%{coinCode})",
         "cryptoSentLabel": "%{coinTypeVerbose} تم الإرسال",
-        "transactionIdLabel": "معرف المعاملة:",
+        "transactionIDLabel": "معرف المعاملة:",
         "yourNoteLabel": "ملاحظاتك:",
         "noteFromVendorLabel": "ملاحظة من البائع:",
         "noteFromStoreLabel": "ملاحظة من %{store}:",
@@ -1860,8 +1860,8 @@
       "fileUrlPlaceholder": "رابط لملف أو ملفات",
       "passwordLabel": "كلمة المرور",
       "passwordPlaceholder": "كلمة مرور للملف (اختياري)",
-      "transactionIdLabel": "معرف المعاملة",
-      "transactionIdPlaceholder": "ألصق معرف المعاملة ( التحويلة )",
+      "transactionIDLabel": "معرف المعاملة",
+      "transactionIDPlaceholder": "ألصق معرف المعاملة ( التحويلة )",
       "noteLabel": "ملاحظة",
       "notePlaceholder": "اختياري",
       "noteHelperTextDigital": "سيتلقى المشتري إشعارا يحتوي على معلومات الملف",
@@ -2113,7 +2113,7 @@
     "provideShipper": "يرجى تقديم شركة شحن.",
     "provideUrl": "الرجاء وضع رابط الملف url.",
     "invalidUrl": "يرجى وضع عنوان url صالح.",
-    "provideTransactionId": "يرجى وضع معرف المعاملة ( التحويلة ).",
+    "provideTransactionID": "يرجى وضع معرف المعاملة ( التحويلة ).",
     "transactionIDTooLong": "Transaction ID exceeds the maximum length of %{maxLength} characters."
   },
   "errorPage": {

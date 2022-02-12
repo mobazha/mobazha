@@ -1721,7 +1721,7 @@
         "trackingNumberLabel": "跟踪 #:",
         "coinTypeVerbose": "%{coinName} （%{coinCode}）",
         "cryptoSentLabel": "已发送%{coinTypeVerbose}",
-        "transactionIdLabel": "交易ID: ",
+        "transactionIDLabel": "交易ID: ",
         "yourNoteLabel": "你的备注: ",
         "noteFromVendorLabel": "卖家备注: ",
         "noteFromStoreLabel": "来自%{store}的备注: ",
@@ -1861,8 +1861,8 @@
       "fileUrlPlaceholder": "文件链接",
       "passwordLabel": "密码",
       "passwordPlaceholder": "文件密码（可选）",
-      "transactionIdLabel": "交易ID",
-      "transactionIdPlaceholder": "粘贴交易ID",
+      "transactionIDLabel": "交易ID",
+      "transactionIDPlaceholder": "粘贴交易ID",
       "noteLabel": "备注",
       "notePlaceholder": "可选",
       "noteHelperTextDigital": "买家将收到包含文件信息的通知",
@@ -2114,7 +2114,7 @@
     "provideShipper": "请提供快递公司。",
     "provideUrl": "请提供一个文件的URL",
     "invalidUrl": "请提供有效的URL。",
-    "provideTransactionId": "请提供交易ID。",
+    "provideTransactionID": "请提供交易ID。",
     "transactionIDTooLong": "交易ID超过%{maxLength}个字符的最大长度。"
   },
   "errorPage": {

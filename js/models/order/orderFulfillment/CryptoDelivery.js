@@ -23,7 +23,7 @@ export default class extends BaseModel {
 
     if (!attrs.transactionID ||
       (typeof attrs.transactionID === 'string' && !attrs.transactionID.trim())) {
-      addError('transactionID', app.polyglot.t('orderFulfillmentModelErrors.provideTransactionId'));
+      addError('transactionID', app.polyglot.t('orderFulfillmentModelErrors.provideTransactionID'));
     } else if (attrs.transactionID.length > this.constraints.transactionIDLength) {
       addError('transactionID',
         app.polyglot.t('orderFulfillmentModelErrors.transactionIDTooLong',

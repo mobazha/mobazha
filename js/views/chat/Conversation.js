@@ -31,12 +31,12 @@ export default class extends baseVw {
       throw new Error('Please provide the peer ID of the person you are conversing with.');
     }
 
-    if (options.subject && options.subject.length > ChatMessage.max.subjectLength) {
-      throw new Error(`The subject cannot exceed ${ChatMessage.max.subjectLength} characters`);
+    if (options.orderID && options.orderID.length > ChatMessage.max.orderIDLength) {
+      throw new Error(`The orderID cannot exceed ${ChatMessage.max.orderIDLength} characters`);
     }
 
     const opts = {
-      subject: '',
+      orderID: '',
       ...options,
     };
 
@@ -46,7 +46,7 @@ export default class extends baseVw {
     this._guid = this.options.guid;
     this._isOpen = false;
     this._isEmojiMenuOpen = false;
-    this.subject = '';
+    this.orderID = '';
     this.showLoadMessagesError = false;
     this.fetching = false;
     this.fetchedAllMessages = false;
@@ -286,7 +286,7 @@ export default class extends baseVw {
 
     const chatMessage = new ChatMessage({
       peerID: this.guid,
-      orderID: this.subject,
+      orderID: this.orderID,
       message: msg,
     }, { parse: true });
 
@@ -311,7 +311,7 @@ export default class extends baseVw {
     if (!this.lastTypingSentAt || (Date.now() - this.lastTypingSentAt) >= 1000) {
       const typingMessage = new ChatMessage({
         peerID: this.guid,
-        orderID: this.subject,
+        orderID: this.orderID,
         message: '',
       });
 
@@ -357,8 +357,8 @@ export default class extends baseVw {
   }
 
   onSocketMessage(e) {
-    if (e.jsonData.message &&
-      e.jsonData.message.subject === this.subject &&
+    if (e.jsonData.chatMessage &&
+      e.jsonData.message.orderID === this.orderID &&
       e.jsonData.message.peerID === this.guid) {
       // incoming chat message
       const message = new ChatMessage({
@@ -380,12 +380,12 @@ export default class extends baseVw {
       // in. If they re-start typing, we'll get another socket message.
       this.hideTypingIndicator();
     } else if (e.jsonData.messageTyping &&
-      e.jsonData.messageTyping.subject === this.subject &&
+      e.jsonData.messageTyping.orderID === this.orderID &&
       e.jsonData.messageTyping.peerID === this.guid) {
       // Conversant is typing...
       this.showTypingIndicator();
     } else if (e.jsonData.messageRead &&
-      e.jsonData.messageRead.subject === this.subject &&
+      e.jsonData.messageRead.orderID === this.orderID &&
       e.jsonData.messageRead.peerID === this.guid) {
       // Conversant read your message
       if (this.convoMessages) {
@@ -503,7 +503,7 @@ export default class extends baseVw {
       url: app.getServerUrl('ob/markchatasread'),
       data: JSON.stringify({
         peerID: this.guid,
-        orderID: this.subject,
+        orderID: this.orderID,
       }),
       dataType: 'json',
       contentType: 'application/json',

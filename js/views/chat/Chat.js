@@ -155,11 +155,11 @@ export default class extends baseVw {
   }
 
   onSocketMessage(e) {
-    this.onNewChatMessage(e.jsonData.message);
+    this.onNewChatMessage(e.jsonData.chatMessage);
   }
 
   onNewChatMessage(msg) {
-    if (msg && !msg.subject) {
+    if (msg && !msg.orderID) {
       const chatHead = this.collection.get(msg.peerID);
       const chatHeadData = {
         peerID: msg.peerID,

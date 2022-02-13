@@ -130,6 +130,11 @@ export default class ChatMessage extends BaseModel {
   }
 
   url() {
+    if (this.get('message') === '') {
+      return app.getServerUrl(
+        `ob/${this.isGroupChatMessage ? 'grouptypingmessage' : 'typingmessage'}`
+      );
+    }
     return app.getServerUrl(`ob/${this.isGroupChatMessage ? 'groupchatmessage' : 'chatmessage'}`);
   }
 

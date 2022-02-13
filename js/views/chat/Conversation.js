@@ -358,11 +358,11 @@ export default class extends baseVw {
 
   onSocketMessage(e) {
     if (e.jsonData.chatMessage &&
-      e.jsonData.message.orderID === this.orderID &&
-      e.jsonData.message.peerID === this.guid) {
+      e.jsonData.chatMessage.orderID === this.orderID &&
+      e.jsonData.chatMessage.peerID === this.guid) {
       // incoming chat message
       const message = new ChatMessage({
-        ...e.jsonData.message,
+        ...e.jsonData.chatMessage,
         outgoing: false,
       });
 

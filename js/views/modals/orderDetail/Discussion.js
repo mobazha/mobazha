@@ -240,14 +240,14 @@ export default class extends baseVw {
   }
 
   onSocketMessage(e) {
-    if (e.jsonData.message && e.jsonData.message.subject !== this.model.id) return;
-    if (e.jsonData.messageTyping && e.jsonData.messageTyping.subject !== this.model.id) return;
-    if (e.jsonData.messageRead && e.jsonData.messageRead.subject !== this.model.id) return;
+    if (e.jsonData.chatMessage && e.jsonData.chatMessage.orderID !== this.model.id) return;
+    if (e.jsonData.messageTyping && e.jsonData.messageTyping.orderID !== this.model.id) return;
+    if (e.jsonData.messageRead && e.jsonData.messageRead.orderID !== this.model.id) return;
 
-    if (e.jsonData.message) {
+    if (e.jsonData.chatMessage) {
       // incoming chat message
       const message = new ChatMessage({
-        ...e.jsonData.message,
+        ...e.jsonData.chatMessage,
         outgoing: false,
       });
 

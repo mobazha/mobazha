@@ -389,13 +389,13 @@ export default class extends baseVw {
       e.jsonData.messageRead.peerID === this.guid) {
       // Conversant read your message
       if (this.convoMessages) {
-        const model = this.messages.get(e.jsonData.messageRead.messageId);
+        const model = this.messages.get(e.jsonData.messageRead.messageID);
 
         if (model) {
           model.set('read', true);
         }
 
-        this.convoMessages.markMessageAsRead(e.jsonData.messageRead.messageId);
+        this.convoMessages.markMessageAsRead(e.jsonData.messageRead.messageID);
       }
     }
   }

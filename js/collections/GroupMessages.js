@@ -13,7 +13,7 @@ export default class extends Collection {
   }
 
   modelId(attrs) {
-    return attrs.messageId;
+    return attrs.messageID;
   }
 
   comparator(message) {

@@ -115,7 +115,7 @@ export default class ChatMessage extends BaseModel {
   }
 
   get idAttribute() {
-    return 'messageId';
+    return 'messageID';
   }
 
   get isGroupChatMessage() {

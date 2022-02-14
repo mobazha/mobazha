@@ -133,11 +133,11 @@ class Order extends BaseOrder {
   }
 
   get isOrderCancelable() {
-    return this.get('isCancelable');
+    return this.get('cancelable');
   }
 
   get isOrderDisputable() {
-    return this.get('isDisputable');
+    return this.get('disputable');
   }
 
   parse(response = {}) {

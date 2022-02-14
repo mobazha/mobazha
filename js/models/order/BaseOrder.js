@@ -97,7 +97,7 @@ export default class extends BaseModel {
   }
 
   static canBuyerComplete(attrs = {}) {
-    return attrs.canComplete;
+    return attrs.completable;
   }
 
   get canBuyerComplete() {

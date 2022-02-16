@@ -68,26 +68,12 @@ class Order extends BaseOrder {
     );
   }
 
-  get totalPaid() {
-    return this.paymentsIn
-      .reduce((total, transaction) => total.plus(transaction.get('value')), bigNumber(0));
-  }
-
-  getBalanceRemaining() {
-    return this.orderPrice.minus(this.totalPaid);
-  }
-
-  get isPartiallyFunded() {
-    const balanceRemaining = this.getBalanceRemaining();
-    return balanceRemaining.gt(0) && balanceRemaining.lt(this.orderPrice);
-  }
-
   /**
    * Returns a boolean indicating whether the order has been partially or fully
    * funded.
    */
   get isFunded() {
-    return this.isPartiallyFunded || this.getBalanceRemaining() === 0;
+    return this.get('funded');
   }
 
   /**
@@ -96,27 +82,27 @@ class Order extends BaseOrder {
    * confirmed, it will return 0.
    */
   get fundedBlockHeight() {
-    let height = 0;
+    const height = 0;
 
-    const models = this.paymentsIn
-      .filter(payment => {
-        const paymentHeight = payment.get('height');
-        return typeof paymentHeight === 'number' && paymentHeight > 0;
-      })
-      .sort((a, b) => (a.get('height') - b.get('height')));
+    // const models = this.paymentsIn
+    //   .filter(payment => {
+    //     const paymentHeight = payment.get('height');
+    //     return typeof paymentHeight === 'number' && paymentHeight > 0;
+    //   })
+    //   .sort((a, b) => (a.get('height') - b.get('height')));
 
-    _.every(models, (payment, pIndex) => {
-      const transactions = new Transactions(
-        models.slice(0, pIndex + 1),
-        { paymentCoin: this.paymentCoin }
-      );
-      if (this.getBalanceRemaining(transactions) <= 0) {
-        height = payment.get('height');
-        return false;
-      }
+    // _.every(models, (payment, pIndex) => {
+    //   const transactions = new Transactions(
+    //     models.slice(0, pIndex + 1),
+    //     { paymentCoin: this.paymentCoin }
+    //   );
+    //   if (this.getBalanceRemaining(transactions) <= 0) {
+    //     height = payment.get('height');
+    //     return false;
+    //   }
 
-      return true;
-    });
+    //   return true;
+    // });
 
     return height;
   }
@@ -128,16 +114,31 @@ class Order extends BaseOrder {
   get paymentsIn() {
     return new Transactions(
       this.get('contract').get('transactions')
-        .filter(payment => (payment.get('value').gt(0)))
     );
   }
 
   get isOrderCancelable() {
-    return this.get('cancelable');
+    return this.buyerID === app.profile.id &&
+      !this.moderatorID &&
+      ['PROCESSING_ERROR', 'PENDING'].includes(this.get('state')) &&
+      this.isFunded;
   }
 
   get isOrderDisputable() {
-    return this.get('disputable');
+    const orderState = this.get('state');
+
+    if (this.buyerID === app.profile.id) {
+      return !!this.moderatorID &&
+        (
+          ['AWAITING_FULFILLMENT', 'PENDING', 'FULFILLED'].includes(orderState) ||
+          (orderState === 'PROCESSING_ERROR' && this.isFunded)
+        );
+    } else if (this.vendorID === app.profile.id) {
+      return !!this.moderatorID &&
+        ['PARTIALLY_FULFILLED', 'FULFILLED'].includes(orderState);
+    }
+
+    return false;
   }
 
   parse(response = {}) {

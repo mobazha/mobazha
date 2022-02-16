@@ -184,7 +184,7 @@ export default class extends BaseVw {
           endPrefixedAjaxEvent('SpendFromWallet', this.metricsOrigin, { currency });
         })
         .fail(jqXhr => {
-          const err = jqXhr.responseJSON && jqXhr.responseJSON.reason || '';
+          const err = jqXhr.responseText || '';
           this.showSpendError(err);
           endPrefixedAjaxEvent('SpendFromWallet', this.metricsOrigin, {
             currency,

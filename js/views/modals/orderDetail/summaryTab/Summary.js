@@ -612,7 +612,7 @@ export default class extends BaseVw {
   shouldShowPayForOrderSection() {
     return (
       this.buyer.id === app.profile.id &&
-      this.model.getBalanceRemaining().gt(0) &&
+      !this.model.isFunded &&
       !this.model.vendorProcessingError
     );
   }

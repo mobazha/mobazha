@@ -68,6 +68,20 @@ class Order extends BaseOrder {
     );
   }
 
+  get totalPaid() {
+    return this.paymentsIn
+      .reduce((total, transaction) => total.plus(transaction.value), bigNumber(0));
+  }
+
+  getBalanceRemaining() {
+    return this.orderPrice.minus(this.totalPaid);
+  }
+
+  get isPartiallyFunded() {
+    const balanceRemaining = this.getBalanceRemaining();
+    return balanceRemaining.gt(0) && balanceRemaining.lt(this.orderPrice);
+  }
+
   /**
    * Returns a boolean indicating whether the order has been partially or fully
    * funded.

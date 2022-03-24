@@ -228,9 +228,10 @@ require (
 	github.com/ltcsuite/ltcwallet/wallet/txauthor v1.0.0 // indirect
 	github.com/ltcsuite/ltcwallet/wallet/txrules v1.0.0 // indirect
 	github.com/ltcsuite/ltcwallet/wallet/txsizes v1.0.0 // indirect
-	github.com/lucas-clemente/quic-go v0.24.0 // indirect
-	github.com/marten-seemann/qtls-go1-16 v0.1.4 // indirect
-	github.com/marten-seemann/qtls-go1-17 v0.1.0 // indirect
+	github.com/lucas-clemente/quic-go v0.26.0 // indirect
+	github.com/marten-seemann/qtls-go1-16 v0.1.5 // indirect
+	github.com/marten-seemann/qtls-go1-17 v0.1.1 // indirect
+	github.com/marten-seemann/qtls-go1-18 v0.1.1 // indirect
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
 	github.com/martinboehm/btcd v0.0.0-20211010165247-d1f65b0f30fa // indirect
 	github.com/martinboehm/btcutil v0.0.0-20211010173611-6ef1889c1819 // indirect

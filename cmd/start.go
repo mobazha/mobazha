@@ -3,17 +3,18 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"sort"
+
 	"github.com/cpacia/openbazaar3.0/core"
 	"github.com/cpacia/openbazaar3.0/core/coreiface"
 	"github.com/cpacia/openbazaar3.0/events"
 	"github.com/cpacia/openbazaar3.0/repo"
 	"github.com/cpacia/openbazaar3.0/version"
 	"github.com/fatih/color"
-	ipfscore "github.com/ipfs/go-ipfs/core"
+	ipfscore "github.com/ipfs/kubo/core"
 	"github.com/op/go-logging"
-	"os"
-	"os/signal"
-	"sort"
 )
 
 var log = logging.MustGetLogger("CMD")

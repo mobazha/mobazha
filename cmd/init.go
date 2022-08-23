@@ -2,14 +2,15 @@ package cmd
 
 import (
 	"errors"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/cpacia/multiwallet"
 	"github.com/cpacia/openbazaar3.0/core"
 	"github.com/cpacia/openbazaar3.0/repo"
 	iwallet "github.com/cpacia/wallet-interface"
-	"github.com/ipfs/go-ipfs/repo/fsrepo"
-	"os"
-	"strings"
-	"time"
+	"github.com/ipfs/kubo/repo/fsrepo"
 )
 
 // Init initializes a new OpenBazaar node at the provided path.

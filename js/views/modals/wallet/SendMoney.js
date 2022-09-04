@@ -43,9 +43,10 @@ export default class extends baseVw {
 
     spend({
       ...this.model.toJSON(),
+      coinType: this.coinType,
       feeLevel: app.localSettings.get('defaultTransactionFee'),
     }).fail(jqXhr => {
-      let reason = jqXhr.responseJSON && jqXhr.responseJSON.reason || '';
+      let reason = jqXhr.responseText || '';
 
       if (reason === 'ERROR_INVALID_ADDRESS') {
         reason = app.polyglot.t('wallet.sendMoney.errorInvalidAddress');

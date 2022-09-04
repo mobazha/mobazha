@@ -177,6 +177,7 @@ export default class extends BaseVw {
         orderID: this.orderID,
         address: this.paymentAddress,
         amount: this.balanceRemaining,
+        coinType: currency.code,
         currency,
         wallet: currency,
       })

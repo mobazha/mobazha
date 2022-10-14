@@ -9,6 +9,7 @@ import loadTemplate from '../../../utils/loadTemplate';
 import {
   formatCurrency,
   integerToDecimal,
+  getCoinDivisibility,
 } from '../../../utils/currency';
 import { getCurrencyByCode as getWalletCurByCode } from '../../../data/walletCurrencies';
 import { getSocket } from '../../../utils/serverConnect';
@@ -75,14 +76,16 @@ export default class extends BaseVw {
     if (serverSocket) {
       this.listenTo(serverSocket, 'message', e => {
         // listen for a payment socket message, to react to payments from all sources
-        if (e.jsonData.notification && e.jsonData.notification.type === 'payment') {
+        if (e.jsonData.notification && e.jsonData.notification.type === 'orderPaymentReceived') {
           if (e.jsonData.notification.orderID === this.orderID) {
             let amount;
 
             try {
+              const coinDiv = getCoinDivisibility(this.paymentCoin);
+
               amount = integerToDecimal(
-                e.jsonData.notification.fundingTotal.amount,
-                e.jsonData.notification.fundingTotal.currency.divisibility,
+                e.jsonData.notification.fundingTotal,
+                coinDiv,
                 { returnNaNOnError: false }
               );
             } catch (err) {
@@ -177,7 +180,7 @@ export default class extends BaseVw {
         orderID: this.orderID,
         address: this.paymentAddress,
         amount: this.balanceRemaining,
-        coinType: currency.code,
+        coinType: currency,
         currency,
         wallet: currency,
       })

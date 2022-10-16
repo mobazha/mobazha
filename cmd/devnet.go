@@ -4,6 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"os/signal"
+	"path"
+	"time"
+
 	"github.com/cpacia/openbazaar3.0/core"
 	"github.com/cpacia/openbazaar3.0/core/coreiface"
 	"github.com/cpacia/openbazaar3.0/models"
@@ -12,11 +17,7 @@ import (
 	"github.com/cpacia/openbazaar3.0/repo"
 	"github.com/cpacia/openbazaar3.0/wallet"
 	iwallet "github.com/cpacia/wallet-interface"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"os"
-	"os/signal"
-	"path"
-	"time"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // DevNet spins up a network of three nodes running on localhost.

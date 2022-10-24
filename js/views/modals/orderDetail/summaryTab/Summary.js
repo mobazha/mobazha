@@ -1122,6 +1122,7 @@ export default class extends BaseVw {
           orderID: this.model.id,
           collection: this.model.paymentsIn,
           orderPrice: this.model.orderPrice,
+          paymentCoin,
           vendor: this.vendor,
           isOrderCancelable: () => this.model.isOrderCancelable,
           isCrypto: this.contract.type === 'CRYPTOCURRENCY',

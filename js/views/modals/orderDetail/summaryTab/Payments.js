@@ -165,52 +165,24 @@ export default class extends baseVw {
     this.payments.forEach(payment => (payment.remove()));
     this.payments = [];
 
+    let paymentCoinData;
+    try {
+      paymentCoinData = getWalletCurByCode(this.options.paymentCoin);
+    } catch (e) {
+      // pass
+    }
+
     this.collection.models.forEach((payment, index) => {
       let paidSoFar = this.collection.models
         .slice(0, index + 1)
-        .reduce((total, model) => total.plus(model.get('bigValue')), bigNumber('0'));
-
-      let divisibility;
-
-      try {
-        divisibility = payment.currency.divisibility;
-      } catch (e) {
-        // pass
-      }
+        .reduce((total, model) => total.plus(model.get('value')), bigNumber('0'));
 
       if (isValidCoinDivisibility[0]) {
         // round based on divisibility
-        paidSoFar = paidSoFar.dp(divisibility);
+        paidSoFar = paidSoFar.dp(paymentCoinData.coinDivisibility);
       }
 
       const isMostRecentPayment = index === this.collection.length - 1;
-
-      let paymentCoin = '';
-
-      try {
-        paymentCoin =
-          payment
-            .get('currency')
-            .code;
-      } catch (e) {
-        // pass
-      }
-
-      let paymentCoinData;
-
-      try {
-        paymentCoinData = getWalletCurByCode(paymentCoin);
-      } catch (e) {
-        // pass
-      }
-
-      let paymentCoinDivis = 8;
-
-      try {
-        paymentCoinDivis = paymentCoinData.divisibility;
-      } catch (e) {
-        // pass
-      }
 
       let blockChainTxUrl = '';
 
@@ -235,8 +207,8 @@ export default class extends baseVw {
           rejectInProgress: rejectingOrder(this.orderID),
           isCrypto: this.options.isCrypto,
           blockChainTxUrl,
-          paymentCoin,
-          paymentCoinDivis,
+          paymentCoin: paymentCoinData.code,
+          paymentCoinDivis: paymentCoinData.coinDivisibility,
         },
       });
 

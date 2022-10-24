@@ -4,6 +4,7 @@ import bigNumber from 'bignumber.js';
 import app from '../../../../app';
 import { abbrNum } from '../../../../utils';
 import loadTemplate from '../../../../utils/loadTemplate';
+import { integerToDecimal } from '../../../../utils/currency';
 import BaseVw from '../../../baseVw';
 
 export default class extends BaseVw {
@@ -94,6 +95,7 @@ export default class extends BaseVw {
       this.$el.html(t({
         ...this._state,
         ...this.model.toJSON(),
+        value: integerToDecimal(this.model.get('value'), this._state.paymentCoinDivis),
         abbrNum,
         moment,
       }));

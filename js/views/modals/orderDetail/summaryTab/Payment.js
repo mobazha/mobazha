@@ -91,11 +91,17 @@ export default class extends BaseVw {
   }
 
   render() {
+    const coinInfo = app.walletBalances.get(this._state.paymentCoin);
+    let confirmations = 0;
+    if (this.model.get('height') !== 0) {
+      confirmations = coinInfo.get('height') - this.model.get('height');
+    }
     loadTemplate('modals/orderDetail/summaryTab/payment.html', (t) => {
       this.$el.html(t({
         ...this._state,
         ...this.model.toJSON(),
         value: integerToDecimal(this.model.get('value'), this._state.paymentCoinDivis),
+        confirmations,
         abbrNum,
         moment,
       }));

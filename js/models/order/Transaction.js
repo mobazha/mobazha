@@ -8,14 +8,14 @@ export default class extends BaseModel {
 
   parse(response = {}) {
     console.log('temp pending ob-go/#1803');
-    if (response.bigValue.startsWith('--')) {
-      response.bigValue = response.bigValue.slice(1);
+    if (response.value.startsWith('--')) {
+      response.value = response.value.slice(1);
     }
 
     return {
       ...response,
-      bigValue: curDefToDecimal({
-        amount: response.bigValue,
+      value: curDefToDecimal({
+        amount: response.value,
         currency: response.currency,
       }),
     };

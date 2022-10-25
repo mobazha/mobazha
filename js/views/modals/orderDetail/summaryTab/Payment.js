@@ -93,7 +93,7 @@ export default class extends BaseVw {
   render() {
     const coinInfo = app.walletBalances.get(this._state.paymentCoin);
     let confirmations = 0;
-    if (this.model.get('height') !== 0) {
+    if (coinInfo.get('height') !== 0 && this.model.get('height') !== 0) {
       confirmations = coinInfo.get('height') - this.model.get('height');
     }
     loadTemplate('modals/orderDetail/summaryTab/payment.html', (t) => {

@@ -24,7 +24,7 @@ export default class extends BaseVw {
       throw new Error('Please provide a vendorOrderFulfillment data object.');
     }
 
-    this.dataObject = options.dataObject;
+    this.dataObject = options.dataObject.fulfillments[0];
   }
 
   className() {

@@ -753,7 +753,7 @@ export default class extends BaseVw {
   }
 
   renderFulfilledView() {
-    const data = this.contract.get('orderFulfillment');
+    const data = this.contract.get('orderFulfillments');
 
     if (!data) {
       throw new Error('Unable to create the fulfilled view because the vendorOrderFulfillment ' +
@@ -966,11 +966,11 @@ export default class extends BaseVw {
       });
     }
 
-    if (this.contract.get('orderFulfillment')) {
+    if (this.contract.get('orderFulfillments')) {
       sections.push({
         function: this.renderFulfilledView,
         timestamp:
-          (new Date(this.contract.get('orderFulfillment')[0].timestamp)),
+          (new Date(this.contract.get('orderFulfillments')[0].timestamp)),
       });
     }
 

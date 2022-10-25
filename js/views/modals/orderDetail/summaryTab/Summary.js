@@ -622,7 +622,7 @@ export default class extends BaseVw {
 
     // Show the accepted section if the order has been accepted and its fully funded.
     if (this.contract.get('orderConfirmation')
-      && (this.model.isCase || this.model.getBalanceRemaining() <= 0)) {
+      && (this.model.isCase || this.model.isFunded)) {
       bool = true;
     }
 

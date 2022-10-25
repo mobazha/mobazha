@@ -37,7 +37,7 @@ export default class extends BaseModel {
   }
 
   url() {
-    return app.getServerUrl('ob/orderfulfillment/');
+    return app.getServerUrl('ob/orderfulfillment');
   }
 
   get idAttribute() {
@@ -69,15 +69,15 @@ export default class extends BaseModel {
       // supporting that at this time, we'll convert to an array here. Once we
       // support it, the nested models should be changed to nested collections.
       if (options.attrs.physicalDelivery) {
-        options.attrs.physicalDelivery = [options.attrs.physicalDelivery];
+        options.attrs.physicalDelivery = options.attrs.physicalDelivery;
       }
 
       if (options.attrs.digitalDelivery) {
-        options.attrs.digitalDelivery = [options.attrs.digitalDelivery];
+        options.attrs.digitalDelivery = options.attrs.digitalDelivery;
       }
 
       if (options.attrs.cryptocurrencyDelivery) {
-        options.attrs.cryptocurrencyDelivery = [options.attrs.cryptocurrencyDelivery];
+        options.attrs.cryptocurrencyDelivery = options.attrs.cryptocurrencyDelivery;
       }
     }
 

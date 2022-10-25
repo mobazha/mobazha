@@ -78,8 +78,7 @@ class Order extends BaseOrder {
   }
 
   get isPartiallyFunded() {
-    const balanceRemaining = this.getBalanceRemaining();
-    return balanceRemaining.gt(0) && balanceRemaining.lt(this.orderPrice);
+    return !this.get('funded');
   }
 
   /**

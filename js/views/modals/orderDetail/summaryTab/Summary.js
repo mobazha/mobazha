@@ -800,7 +800,7 @@ export default class extends BaseVw {
   }
 
   renderOrderCompleteView() {
-    const data = this.contract.get('orderCompletion');
+    const data = this.contract.get('orderComplete');
 
     if (!data) {
       throw new Error('Unable to create the Order Complete view because the buyerOrderCompletion ' +
@@ -966,7 +966,7 @@ export default class extends BaseVw {
       });
     }
 
-    if (this.contract.get('orderFulfillments')) {
+    if (this.contract.get('orderFulfillments') && this.contract.get('orderFulfillments').length > 0) {
       sections.push({
         function: this.renderFulfilledView,
         timestamp:
@@ -974,11 +974,11 @@ export default class extends BaseVw {
       });
     }
 
-    if (this.contract.get('orderCompletion')) {
+    if (this.contract.get('orderComplete')) {
       sections.push({
         function: this.renderOrderCompleteView,
         timestamp:
-          (new Date(this.contract.get('orderCompletion').timestamp)),
+          (new Date(this.contract.get('orderComplete').timestamp)),
       });
     }
 

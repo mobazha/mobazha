@@ -21,7 +21,7 @@ export default class extends BaseVw {
   }
 
   render() {
-    const rating = this.dataObject.ratings[0].ratingData;
+    const rating = this.dataObject.ratings[0];
     loadTemplate('modals/orderDetail/summaryTab/orderComplete.html', (t) => {
       this.$el.html(t({
         ...rating,

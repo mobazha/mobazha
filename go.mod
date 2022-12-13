@@ -14,8 +14,8 @@ replace github.com/cpacia/go-store-and-forward => /Users/mingfeng/go/src/github.
 
 require (
 	github.com/btcsuite/btcd v0.23.2
-	github.com/btcsuite/btcd/btcec/v2 v2.2.1
-	github.com/btcsuite/btcd/btcutil v1.1.2
+	github.com/btcsuite/btcd/btcec/v2 v2.3.2
+	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cpacia/go-onion-transport v0.0.0-00010101000000-000000000000
 	github.com/cpacia/go-store-and-forward v0.0.0-00010101000000-000000000000
 	github.com/cpacia/multiwallet v0.0.0-00010101000000-000000000000

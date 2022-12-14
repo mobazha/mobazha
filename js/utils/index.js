@@ -4,7 +4,6 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import app from '../app';
-import multihashes from 'multihashes';
 import twemoji from 'twemoji';
 
 export function getGuid(handle, resolver) {
@@ -121,15 +120,6 @@ function s4() {
 // generic way to generate a unique identifier.
 export function guid(prefix = '') {
   return `${prefix}${s4()}${s4()}-${s4()}-${s4()}-${s4()}-${s4()}${s4()}${s4()}`;
-}
-
-export function isMultihash(_string) {
-  try {
-    multihashes.validate(multihashes.fromB58String(_string));
-    return true;
-  } catch (exc) {
-    return false;
-  }
 }
 
 // applies a template to select2 to turn text emojis into images

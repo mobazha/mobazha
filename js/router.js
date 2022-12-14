@@ -2,7 +2,8 @@ import $ from 'jquery';
 import { ipcRenderer } from 'electron';
 import { Router } from 'backbone';
 import app from './app';
-import { getGuid, isMultihash } from './utils';
+import { getGuid } from './utils';
+import * as isIPFS from 'is-ipfs';
 import { getPageContainer } from './utils/selectors';
 import { isPromise } from './utils/object';
 import { startAjaxEvent, endAjaxEvent, recordEvent } from './utils/metrics';
@@ -161,7 +162,7 @@ export default class ObRouter extends Router {
 
       // If the route starts with a guid and we have a cached handle
       // for that guid, we'll put the handle in.
-      if (isMultihash(split[0])) {
+      if (isIPFS.multihash(split[0])) {
         const handle = this.guidHandleMap.get(split[0]);
 
         if (handle) {

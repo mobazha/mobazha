@@ -1,6 +1,6 @@
 import loadTemplate from '../utils/loadTemplate';
 import baseVw from './baseVw';
-import { isMultihash } from '../utils';
+import * as isIPFS from 'is-ipfs';
 
 export default class extends baseVw {
   constructor(options = {}) {
@@ -27,7 +27,7 @@ export default class extends baseVw {
 
     const urlParts = this.getUrlParts(addressBarText);
 
-    // if (urlParts.length > 1 && isMultihash(urlParts[0])) {
+    if (urlParts.length > 1 && isIPFS.multihash(urlParts[0])) {
       const supportedPages = ['store', 'home', 'followers', 'following'];
       const currentPage = urlParts[1];
 
@@ -50,7 +50,7 @@ export default class extends baseVw {
           viewOnWebState.url = `${obDotCom}/profile/${peerID}`;
         }
       }
-    // }
+    }
 
     viewOnWebState.hide = !viewOnWebState.url;
 

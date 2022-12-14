@@ -1,7 +1,7 @@
 import $ from 'jquery';
 import { Model, Events } from 'backbone';
 import { openSimpleMessage } from '../views/modals/SimpleMessage';
-import { isMultihash } from '../utils';
+import * as isIPFS from 'is-ipfs';
 import app from '../app';
 
 const events = {
@@ -35,14 +35,14 @@ function blockUnblock(_block, peerIDs) {
     throw new Error('Please provide _block as a boolean.');
   }
 
-  if (!isMultihash(peerIDs) && !Array.isArray(peerIDs)) {
+  if (!isIPFS.multihash(peerIDs) && !Array.isArray(peerIDs)) {
     throw new Error('Either provide a single peerID as a multihash or an array of peerID ' +
       'multihashes.');
   }
 
   if (Array.isArray(peerIDs)) {
     peerIDs.forEach(peerID => {
-      if (!isMultihash(peerID)) {
+      if (!isIPFS.multihash(peerID)) {
         throw new Error('If providing an array of peerIDs, each item must be a multihash.');
       }
     });

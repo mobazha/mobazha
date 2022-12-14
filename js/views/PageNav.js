@@ -1,5 +1,5 @@
 import { remote } from 'electron';
-import { isMultihash } from '../utils';
+import * as isIPFS from 'is-ipfs';
 import { events as serverConnectEvents, getCurrentConnection } from '../utils/serverConnect';
 import { setUnreadNotifCount, launchNativeNotification } from '../utils/notification';
 import { recordEvent } from '../utils/metrics';
@@ -404,7 +404,7 @@ export default class extends BaseVw {
         text.split(' ')[0]
           .split('/')[0];
 
-      if (isMultihash(firstTerm)) {
+      if (isIPFS.multihash(firstTerm)) {
         recordEvent('AddressBar_Input', { entry: 'multihash' });
         app.router.navigate(text.split(' ')[0], { trigger: true });
       } else if (firstTerm.charAt(0) === '@' && firstTerm.length > 1) {

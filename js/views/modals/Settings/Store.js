@@ -5,7 +5,7 @@ import '../../../lib/select2';
 import '../../../lib/whenAll.jquery';
 import baseVw from '../../baseVw';
 import loadTemplate from '../../../utils/loadTemplate';
-import { isMultihash } from '../../../utils';
+import * as isIPFS from 'is-ipfs';
 import { bulkCoinUpdate } from '../../../utils/bulkCoinUpdate';
 import { supportedWalletCurs } from '../../../data/walletCurrencies';
 import Moderators from '../../components/moderators/Moderators';
@@ -196,7 +196,7 @@ export default class extends baseVw {
       modID = modID.split('/')[0];
       modID = modID.trim();
 
-      if (isMultihash(modID)) {
+      if (isIPFS.multihash(modID)) {
         if (!this.currentMods.includes(modID)) {
           if (modID !== app.profile.id) {
             this.modsByID.getModeratorsByID({ moderatorIDs: [modID] });

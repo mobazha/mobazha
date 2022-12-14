@@ -149,6 +149,7 @@ export default class Profile extends BaseModel {
     if (
       response.moderatorInfo &&
       response.moderatorInfo.fee &&
+      response.moderatorInfo.fee.feeType !== 'PERCENTAGE' &&
       response.moderatorInfo.fee.fixedFee
     ) {
       try {

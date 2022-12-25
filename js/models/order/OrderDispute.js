@@ -9,7 +9,7 @@ export default class extends BaseModel {
   }
 
   url() {
-    return app.getServerUrl('ob/opendispute/');
+    return app.getServerUrl('ob/opendispute');
   }
 
   get idAttribute() {

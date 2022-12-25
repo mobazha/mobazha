@@ -13,7 +13,7 @@
           ob.polyT('orderDetail.summaryTab.disputeStarted.genericIsDisputed');
       %>
       <div class="rowTn txB"><%= introLine %></div>
-      <div><%= ob.claim || ob.polyT('orderDetail.summaryTab.disputeStarted.noReasonProvided') %></div>
+      <div><%= ob.reason || ob.polyT('orderDetail.summaryTab.disputeStarted.noReasonProvided') %></div>
     </div>
     <% if (ob.showResolveButton) { %>
       <div class="col">

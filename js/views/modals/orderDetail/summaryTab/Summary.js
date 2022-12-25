@@ -300,7 +300,7 @@ export default class extends BaseVw {
     if (orderState === 'DISPUTED' || orderState === 'DECIDED' ||
       orderState === 'RESOLVED' ||
       (['COMPLETED', 'PAYMENT_FINALIZED'].includes(orderState) &&
-        this.contract.get('dispute') !== undefined)) {
+        this.contract.get('disputeOpen') !== undefined)) {
       if (!this.model.isCase) {
         state.states = [
           app.polyglot.t('orderDetail.summaryTab.orderDetails.progressBarStates.disputed'),
@@ -477,7 +477,7 @@ export default class extends BaseVw {
             disputeStartTime = this.model.get('timestamp');
           } else {
             disputeStartTime = this.localDisputeStartTime ||
-              this.contract.get('dispute').timestamp;
+              this.contract.get('disputeOpen').timestamp;
           }
         } catch (e) {
           throw e;
@@ -822,7 +822,7 @@ export default class extends BaseVw {
     const data = this.model.isCase ? {
       timestamp: this.model.get('timestamp'),
       claim: this.model.get('claim'),
-    } : this.contract.get('dispute');
+    } : this.contract.get('disputeOpen');
 
     if (!data) {
       throw new Error('Unable to create the Dispute Started view because the dispute ' +
@@ -982,10 +982,10 @@ export default class extends BaseVw {
       });
     }
 
-    if (this.contract.get('dispute') || isCase) {
+    if (this.contract.get('disputeOpen') || isCase) {
       const timestamp = isCase ?
         this.model.get('timestamp') :
-        this.contract.get('dispute').timestamp;
+        this.contract.get('disputeOpen').timestamp;
 
       sections.push({
         function: this.renderDisputeStartedView,

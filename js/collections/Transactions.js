@@ -22,12 +22,12 @@ export default class extends Collection {
   }
 
   model(attrs) {
-    const Md = attrs.caseId ? Case : Transaction;
+    const Md = attrs.caseID ? Case : Transaction;
     return new Md(attrs, { parse: true });
   }
 
   modelId(attrs) {
-    return this.type === 'cases' ? attrs.caseId : attrs.orderID;
+    return this.type === 'cases' ? attrs.caseID : attrs.orderID;
   }
 
   url() {

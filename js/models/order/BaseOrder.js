@@ -23,7 +23,7 @@ export default class extends BaseModel {
   // where provided, it may lead to inaccurate results (or exceptions).
 
   static isCase(attrs = {}) {
-    return typeof attrs.buyerOpened !== 'undefined';
+    return typeof attrs.disputeOpen !== 'undefined';
   }
 
   get isCase() {
@@ -40,7 +40,7 @@ export default class extends BaseModel {
     let contract = attrs.contract;
 
     if (this.isCase(attrs)) {
-      contract = attrs.buyerOpened ?
+      contract = attrs.disputeOpen.openedBy === 'BUYER' ?
         attrs.buyerContract :
         attrs.vendorContract;
     }

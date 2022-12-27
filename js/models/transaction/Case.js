@@ -3,7 +3,7 @@ import BaseModel from '../BaseModel';
 
 export default class extends BaseModel {
   get idAttribute() {
-    return 'caseId';
+    return 'caseID';
   }
 
   parse(response = {}) {

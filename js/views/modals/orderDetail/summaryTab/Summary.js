@@ -863,8 +863,8 @@ export default class extends BaseVw {
   }
 
   renderDisputePayoutView() {
-    const data = this.model.isCase ? this.model.get('resolution') :
-      this.contract.get('disputeResolution');
+    const data = this.model.isCase ? this.model.get('disputeClose') :
+      this.contract.get('disputeClose');
 
     if (!data) {
       throw new Error('Unable to create the Dispute Payout view because the resolution ' +
@@ -994,11 +994,11 @@ export default class extends BaseVw {
       });
     }
 
-    if (this.contract.get('disputeResolution') ||
-      (isCase && this.model.get('resolution'))) {
+    if (this.contract.get('disputeClose') ||
+      (isCase && this.model.get('disputeClose'))) {
       const timestamp = isCase ?
-        this.model.get('resolution').timestamp :
-        this.contract.get('disputeResolution').timestamp;
+        this.model.get('disputeClose').timestamp :
+        this.contract.get('disputeClose').timestamp;
 
       sections.push({
         function: this.renderDisputePayoutView,

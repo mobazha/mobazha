@@ -109,8 +109,8 @@ class Case extends BaseOrder {
       response.vendorContract = Case.parseContract(response.vendorContract);
     }
 
-    response.resolution =
-      Case.parseDisputePayout(response.resolution);
+    response.disputeClose =
+      Case.parseDisputePayout(response.disputeClose, this.paymentCoin);
 
     return response;
   }

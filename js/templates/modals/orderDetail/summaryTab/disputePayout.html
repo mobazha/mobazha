@@ -7,14 +7,12 @@
       ob.polyT(`orderDetail.summaryTab.disputePayout.${type}HeadingWithName`, { name: ob[`${type}Name`] }) :
         ob.polyT(`orderDetail.summaryTab.disputePayout.${type}Heading`);
 
-    if (!ob.payout) {
+    if (!ob.releaseInfo) {
       return;
     }
 
     priceLines[type] = ob.currencyMod.pairedCurrency(
-      ob.payout[`${type}Output`] &&
-        ob.payout[`${type}Output`].amount ||
-        ob.bigNumber(0),
+      ob.releaseInfo[`${type}Amount`],
       ob.paymentCoin,
       ob.userCurrency
     );
@@ -82,7 +80,7 @@
           ob.polyT('orderDetail.summaryTab.disputePayout.noteFromHeading');
       %>
       <div class="rowTn"><%= noteFromHeading %></div>
-      <div><%= ob.resolution %></div>
+      <div><%= ob.verdict %></div>
     </div>
   </div>
 </div>

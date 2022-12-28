@@ -190,74 +190,67 @@ export default class extends BaseModel {
     return contract;
   }
 
-  static parseDisputePayout(resolution) {
+  static parseDisputePayout(disputeClose, coin) {
     let divisibility;
-
     try {
-      divisibility =
-        resolution
-          .payout
-          .payoutCurrency
-          .divisibility;
+      divisibility = getCoinDivisibility(coin);
     } catch (e) {
-      // pass
+      divisibility = defaultCryptoCoinDivisibility;
     }
 
-    if (resolution && resolution.payout) {
-      if (resolution.payout.buyerOutput) {
+    if (disputeClose && disputeClose.releaseInfo) {
+      if (disputeClose.releaseInfo.buyerAmount) {
         // legacy check
-        if (resolution.payout.buyerOutput.amount === '') {
-          resolution.payout.buyerOutput.amount = integerToDecimal(
-            resolution.payout.buyerOutput.amount,
+        if (disputeClose.releaseInfo.buyerAmount === '') {
+          disputeClose.releaseInfo.buyerAmount = integerToDecimal(
+            disputeClose.releaseInfo.buyerAmount,
             8
           );
         } else {
-          resolution.payout.buyerOutput.amount =
+          disputeClose.releaseInfo.buyerAmount =
             integerToDecimal(
-              resolution.payout.buyerOutput.amount,
+              disputeClose.releaseInfo.buyerAmount,
               divisibility,
-              { fieldName: 'buyerOutput.amount' }
+              { fieldName: 'releaseInfo.buyerAmount' }
             );
         }
       }
 
-      if (resolution.payout.vendorOutput) {
+      if (disputeClose.releaseInfo.vendorAmount) {
         // legacy check
-        if (resolution.payout.vendorOutput.amount === '') {
-          resolution.payout.vendorOutput.amount = integerToDecimal(
-            resolution.payout.vendorOutput.amount,
+        if (disputeClose.releaseInfo.vendorAmount === '') {
+          disputeClose.releaseInfo.vendorAmount = integerToDecimal(
+            disputeClose.releaseInfo.vendorAmount,
             8
           );
         } else {
-          resolution.payout.vendorOutput.amount =
+          disputeClose.releaseInfo.vendorAmount =
             integerToDecimal(
-              resolution.payout.vendorOutput.amount,
+              disputeClose.releaseInfo.vendorAmount,
               divisibility,
-              { fieldName: 'vendorOutput.amount' }
+              { fieldName: 'releaseInfo.vendorAmount' }
             );
         }
       }
 
-      if (resolution.payout.moderatorOutput) {
-        if (resolution.payout.moderatorOutput) {
-          // legacy check
-          if (resolution.payout.moderatorOutput.amount === '') {
-            resolution.payout.moderatorOutput.amount = integerToDecimal(
-              resolution.payout.moderatorOutput.amount,
-              8
+      if (disputeClose.releaseInfo.moderatorAmount) {
+        // legacy check
+        if (disputeClose.releaseInfo.moderatorAmount === '') {
+          disputeClose.releaseInfo.moderatorAmount = integerToDecimal(
+            disputeClose.releaseInfo.moderatorAmount,
+            8
+          );
+        } else {
+          disputeClose.releaseInfo.moderatorAmount =
+            integerToDecimal(
+              disputeClose.releaseInfo.moderatorAmount,
+              divisibility,
+              { fieldName: 'releaseInfo.moderatorAmount' }
             );
-          } else {
-            resolution.payout.moderatorOutput.amount =
-              integerToDecimal(
-                resolution.payout.moderatorOutput.amount,
-                divisibility,
-                { fieldName: 'moderatorOutput.amount' }
-              );
-          }
         }
       }
     }
 
-    return resolution;
+    return disputeClose;
   }
 }

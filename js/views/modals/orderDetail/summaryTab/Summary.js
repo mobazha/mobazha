@@ -913,11 +913,11 @@ export default class extends BaseVw {
   }
 
   renderDisputeAcceptanceView() {
-    const data = this.contract.get('disputeAcceptance');
+    const data = this.contract.get('disputeAccept');
 
     if (!data) {
       throw new Error('Unable to create the Dispute Acceptance view because the ' +
-        'disputeAcceptance data object has not been set.');
+        'disputeAccept data object has not been set.');
     }
 
     const closer = data.closedBy ===
@@ -1007,11 +1007,11 @@ export default class extends BaseVw {
       });
     }
 
-    if (this.contract.get('disputeAcceptance')) {
+    if (this.contract.get('disputeAccept')) {
       sections.push({
         function: this.renderDisputeAcceptanceView,
         timestamp:
-          (new Date(this.contract.get('disputeAcceptance').timestamp)),
+          (new Date(this.contract.get('disputeAccept').timestamp)),
       });
     }
 

@@ -257,7 +257,7 @@ export default class extends baseVw {
       // We'll consider them to be done typing if an actual message came
       // in. If they re-start typing, we'll get another socket message.
       const messageSender = this.getChatters()
-        .find(chatter => chatter.id === e.jsonData.message.peerID);
+        .find(chatter => chatter.id === e.jsonData.chatMessage.peerID);
 
       if (messageSender) {
         messageSender.isTyping = false;

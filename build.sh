@@ -11,9 +11,10 @@
 
 
 ELECTRONVER=6.0.0
-NODEJSVER=14.17.0
+NODEJSVER=14.21.2
 
-OS="${1}"
+BINARY="${1}"
+TRAVIS_OS_NAME="osx"
 # if [ -z "${2}" ]; then
 # SERVERTAG='latest'
 # else
@@ -35,14 +36,14 @@ echo 'Preparing to build installers...'
 
 echo 'Installing npm packages...'
 #npm i -g npm@5.2
-npm install electron-packager -g --silent
-npm install npm-run-all -g --silent
-npm install grunt-cli -g --silent
-npm install grunt --save-dev --silent
-npm install grunt-electron-installer --save-dev --silent
-npm install --silent
+# npm install electron-packager -g --silent
+# npm install npm-run-all -g --silent
+# npm install grunt-cli -g --silent
+# npm install grunt --save-dev --silent
+# npm install grunt-electron-installer --save-dev --silent
+# npm install --silent
 
-rvm reinstall ruby
+# rvm reinstall ruby
 
 echo 'Building Mobazha app...'
 npm run build
@@ -162,14 +163,12 @@ case "$TRAVIS_OS_NAME" in
         node_modules/electron-packager/bin/electron-packager.js . Mobazha --asar --out=dist --protocol-name=Mobazha --ignore="MOBAZHA_TEMP" --win32metadata.ProductName="Mobazha" --win32metadata.CompanyName="Mogaolei" --win32metadata.FileDescription='Decentralized p2p marketplace for Bitcoin' --win32metadata.OriginalFilename=Mobazha.exe --protocol=ob --platform=win32 --arch=x64 --icon=imgs/openbazaar2.ico --electron-version=${ELECTRONVER} --overwrite
 
         echo 'Copying server binary into application folder...'
-        cp -rf MOBAZHA_TEMP/mobazha-amd64.exe dist/Mobazha-win32-x64/resources/
-        cp -rf MOBAZHA_TEMP/libwinpthread-1.win64.dll dist/Mobazha-win32-x64/resources/libwinpthread-1.dll
-        mkdir dist/Mobazha-win32-x64/resources/mobazha
-        mv dist/Mobazha-win32-x64/resources/mobazha-amd64.exe dist/Mobazha-win32-x64/resources/mobazha/mobazhad.exe
-        mv dist/Mobazha-win32-x64/resources/libwinpthread-1.dll dist/Mobazha-win32-x64/resources/mobazha/libwinpthread-1.dll
-
+        mkdir -p dist/Mobazha/resources/mobazha dist/Mobazha/resources/app
+        cp -rf MOBAZHA_TEMP/mobazha-amd64.exe dist/Mobazha/resources/mobazha/mobazhad.exe
+        cp -rf MOBAZHA_TEMP/libwinpthread-1.win64.dll dist/Mobazha/resources/mobazha/libwinpthread-1.dll
+        
         echo 'Building Installer...'
-        grunt -v create-windows-installer --appname=Mobazha --obversion=$PACKAGE_VERSION --appdir=dist/Mobazha-win32-x64 --outdir=dist/win64
+        grunt -v create-windows-installer --appname=Mobazha --obversion=$PACKAGE_VERSION --appdir=dist/Mobazha --outdir=dist/win64
         mv dist/win64/MobazhaSetup.exe dist/win64/Mobazha-$PACKAGE_VERSION-Setup-64.exe
         mv dist/win64/RELEASES dist/win64/RELEASES-x64
 

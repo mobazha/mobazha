@@ -9,3 +9,5 @@ error.log
 .idea
 
 \.vscode/
+
+out/

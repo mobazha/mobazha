@@ -6,12 +6,12 @@ module.exports = function (grunt) {
     pkg: grunt.file.readJSON('package.json'),
     'electron-installer-debian': {
       options: {
-        productName: 'OpenBazaar',
-        name: 'openbazaar2',
+        productName: 'Mobazha',
+        name: 'mobazha',
         arch: 'amd64',
-        version: '2.0.0',
-        bin: 'openbazaar2',
-        maintainer: 'OpenBazaar <project@openbazaar.org>',
+        version: '3.0.0',
+        bin: 'mobazha',
+        maintainer: 'Mobazha <support@mobazha.com>',
         rename(dest) {
           return `${dest}<%= name %>_<%= version %>_<%= arch %>.deb`;
         },
@@ -39,12 +39,12 @@ module.exports = function (grunt) {
         outputDirectory: grunt.option('outdir'),
         name: grunt.option('appname'),
         productName: grunt.option('appname'),
-        authors: 'OpenBazaar',
-        owners: 'OpenBazaar',
+        authors: 'Mobazha',
+        owners: 'Mobazha',
         exe: `${grunt.option('appname')}.exe`,
         description: `${grunt.option('appname')}`,
         version: grunt.option('obversion') || '',
-        title: 'OpenBazaar',
+        title: 'Mobazha',
         iconUrl: 'http://openbazaar.org/assets/windows-icon.ico',
         setupIcon: 'imgs/windows-icon.ico',
         skipUpdateIcon: true,

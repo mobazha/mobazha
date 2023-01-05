@@ -136,8 +136,8 @@ if (isBundledApp || argv.userData) {
 }
 
 crashReporter.start({
-  productName: 'OpenBazaar 2',
-  companyName: 'OpenBazaar',
+  productName: 'Mobazha',
+  companyName: 'Mogaolei',
   submitURL: 'http://104.131.17.128:1127/post',
   uploadToServer: true,
   extra: {

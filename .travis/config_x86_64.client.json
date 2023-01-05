@@ -1,12 +1,12 @@
 {
-  "productName": "OpenBazaar",
-  "name": "openbazaar2client",
+  "productName": "Mobazha",
+  "name": "mobazhaclient",
   "description": "Decentralized Peer to Peer Marketplace for Bitcoin",
-  "version": "2.0.12",
-  "bin": "openbazaar2client",
-  "maintainer": "OpenBazaar <project@openbazaar.org>",
+  "version": "3.0.0",
+  "bin": "mobazhaclient",
+  "maintainer": "Mobazha <support@mobazha.com>",
   "arch": "x86_64",
-  "src": "dist/openbazaar2client-linux-x64/",
+  "src": "dist/mobazhaclient-linux-x64/",
   "dest": "dist/linux64",
   "productDescription": "Decentralized Peer to Peer Marketplace for Bitcoin",
   "lintianOverrides": [

@@ -1,8 +1,8 @@
 {
-  "name": "openbazaar-desktop",
-  "productName": "OpenBazaar Desktop Client",
-  "version": "2.4.12",
-  "serverVersionRequired": "0.14.8",
+  "name": "mobazha-desktop",
+  "productName": "Mobazha Desktop Client",
+  "version": "3.0.0",
+  "serverVersionRequired": "1.0.0",
   "description": "Decentralized p2p marketplace that uses Cryptocurrencies.",
   "main": "bootstrapper.js",
   "scripts": {
@@ -26,14 +26,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OpenBazaar/openbazaar-desktop.git"
+    "url": "git+https://github.com/mobazha/openbazaar-desktop.git"
   },
-  "author": "OB1",
+  "author": "Mogaolei",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/OpenBazaar/openbazaar-desktop/issues"
+    "url": "https://github.com/mobazha/openbazaar-desktop/issues"
   },
-  "homepage": "https://github.com/OpenBazaar/openbazaar-desktop#readme",
+  "homepage": "https://github.com/mobazha/openbazaar-desktop#readme",
   "devDependencies": {
     "babel-cli": "^6.26.0",
     "babel-eslint": "6.0.5",

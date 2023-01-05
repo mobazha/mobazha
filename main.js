@@ -78,12 +78,12 @@ const handleStartupEvent = function () {
 };
 
 if (handleStartupEvent()) {
-  console.log('OpenBazaar started on Windows...');
+  console.log('Mobazha started on Windows...');
 }
 
-const serverPath = `${__dirname}${path.sep}..${path.sep}openbazaar-go${path.sep}`;
+const serverPath = `${__dirname}${path.sep}..${path.sep}mobazha${path.sep}`;
 const serverFilename = process.platform === 'darwin' || process.platform === 'linux' ?
-  'openbazaard' : 'openbazaard.exe';
+  'mobazhad' : 'mobazhad.exe';
 const isBundledApp = fs.existsSync(serverPath + serverFilename);
 global.isBundledApp = isBundledApp;
 let localServer;

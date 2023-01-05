@@ -1,6 +1,6 @@
 #!/bin/bash
 
-## Version 2.0.0
+## Version 3.0.0
 ##
 ## Usage
 ## ./build.sh
@@ -10,31 +10,31 @@
 ##
 
 
-ELECTRONVER=1.8.7
-NODEJSVER=5.1.1
+ELECTRONVER=6.0.0
+NODEJSVER=14.17.0
 
 OS="${1}"
-if [ -z "${2}" ]; then
-SERVERTAG='latest'
-else
-SERVERTAG=tags/${2}
-fi
-echo "Building with openbazaar-go/$SERVERTAG"
+# if [ -z "${2}" ]; then
+# SERVERTAG='latest'
+# else
+# SERVERTAG=tags/${2}
+# fi
+# echo "Building with mobazha/$SERVERTAG"
 
 # Get Version
 PACKAGE_VERSION=$(node -p 'require("./package").version')
-echo "OpenBazaar Version: $PACKAGE_VERSION"
+echo "Mobazha Version: $PACKAGE_VERSION"
 
 # Create temp build dirs
-mkdir dist/
-rm -rf dist/*
-mkdir OPENBAZAAR_TEMP/
-rm -rf OPENBAZAAR_TEMP/*
+# mkdir dist/
+# rm -rf dist/*
+# mkdir MOBAZHA_TEMP/
+# rm -rf MOBAZHA_TEMP/*
 
 echo 'Preparing to build installers...'
 
 echo 'Installing npm packages...'
-npm i -g npm@5.2
+#npm i -g npm@5.2
 npm install electron-packager -g --silent
 npm install npm-run-all -g --silent
 npm install grunt-cli -g --silent
@@ -44,7 +44,7 @@ npm install --silent
 
 rvm reinstall ruby
 
-echo 'Building OpenBazaar app...'
+echo 'Building Mobazha app...'
 npm run build
 
 echo 'Copying transpiled files into js folder...'
@@ -74,27 +74,27 @@ case "$TRAVIS_OS_NAME" in
     # Ensure fakeroot is installed
     sudo apt-get install fakeroot
 
-    # Retrieve Latest Server Binaries
-    sudo apt-get install jq
-    cd OPENBAZAAR_TEMP/
-    curl -u $GITHUB_USER:$GITHUB_TOKEN -s https://api.github.com/repos/OpenBazaar/openbazaar-go/releases/$SERVERTAG > release.txt
-    cat release.txt | jq -r ".assets[].browser_download_url" | xargs -n 1 curl -L -O
-    cd ..
+    # # Retrieve Latest Server Binaries
+    # sudo apt-get install jq
+    # cd MOBAZHA_TEMP/
+    # curl -u $GITHUB_USER:$GITHUB_TOKEN -s https://api.github.com/repos/OpenBazaar/openbazaar-go/releases/$SERVERTAG > release.txt
+    # cat release.txt | jq -r ".assets[].browser_download_url" | xargs -n 1 curl -L -O
+    # cd ..
 
-    APPNAME="openbazaar2"
+    APPNAME="mobazha"
 
     echo 'Building Linux 64-bit Installer....'
 
     echo "Packaging Electron application"
-    electron-packager . ${APPNAME} --platform=linux --arch=x64 --electronVersion=${ELECTRONVER} --overwrite --ignore="OPENBAZAAR_TEMP" --prune --out=dist
+    electron-packager . ${APPNAME} --platform=linux --arch=x64 --electronVersion=${ELECTRONVER} --overwrite --ignore="MOBAZHA_TEMP" --prune --out=dist
 
     echo 'Move go server to electron app'
-    mkdir dist/${APPNAME}-linux-x64/resources/openbazaar-go/
-    cp -rf OPENBAZAAR_TEMP/openbazaar-go-linux-amd64 dist/${APPNAME}-linux-x64/resources/openbazaar-go
-    rm -rf OPENBAZAAR_TEMP/*
-    mv dist/${APPNAME}-linux-x64/resources/openbazaar-go/openbazaar-go-linux-amd64 dist/${APPNAME}-linux-x64/resources/openbazaar-go/openbazaard
+    mkdir dist/${APPNAME}-linux-x64/resources/mobazha/
+    cp -rf MOBAZHA_TEMP/mobazha-linux-amd64 dist/${APPNAME}-linux-x64/resources/mobazha
+    rm -rf MOBAZHA_TEMP/*
+    mv dist/${APPNAME}-linux-x64/resources/mobazha/mobazha-linux-amd64 dist/${APPNAME}-linux-x64/resources/mobazha/mobazhad
     rm -rf dist/${APPNAME}-linux-x64/resources/app/.travis
-    chmod +x dist/${APPNAME}-linux-x64/resources/openbazaar-go/openbazaard
+    chmod +x dist/${APPNAME}-linux-x64/resources/mobazha/mobazhad
 
     echo 'Create debian archive'
     electron-installer-debian --config .travis/config_amd64.json
@@ -102,12 +102,12 @@ case "$TRAVIS_OS_NAME" in
     echo 'Create RPM archive'
     electron-installer-redhat --config .travis/config_x86_64.json
 
-    APPNAME="openbazaar2client"
+    APPNAME="mobazhaclient"
 
     echo 'Building Linux 64-bit Installer....'
 
     echo "Packaging Electron application"
-    electron-packager . ${APPNAME} --platform=linux --arch=x64 --ignore="OPENBAZAAR_TEMP" --electronVersion=${ELECTRONVER} --overwrite --prune --out=dist
+    electron-packager . ${APPNAME} --platform=linux --arch=x64 --ignore="MOBAZHA_TEMP" --electronVersion=${ELECTRONVER} --overwrite --prune --out=dist
 
     echo 'Create debian archive'
     electron-installer-debian --config .travis/config_amd64.client.json
@@ -119,32 +119,32 @@ case "$TRAVIS_OS_NAME" in
 
   "osx")
 
-    brew update
-    brew remove jq
-    brew link oniguruma
-    brew install jq
-    brew link --overwrite fontconfig gd gnutls jasper libgphoto2 libicns libtasn1 libusb libusb-compat little-cms2 nettle openssl sane-backends webp wine git-lfs gnu-tar dpkg xz
-    brew install freetype graphicsmagick
-    brew link xz
-    brew remove openssl
-    brew install openssl
-    brew link freetype graphicsmagick mono
+    # brew update
+    # brew remove jq
+    # brew link oniguruma
+    # brew install jq
+    # brew link --overwrite fontconfig gd gnutls jasper libgphoto2 libicns libtasn1 libusb libusb-compat little-cms2 nettle openssl sane-backends webp wine git-lfs gnu-tar dpkg xz
+    # brew install freetype graphicsmagick
+    # brew link xz
+    # brew remove openssl
+    # brew install openssl
+    # brew link freetype graphicsmagick mono
 
-    # Retrieve Latest Server Binaries
-    cd OPENBAZAAR_TEMP/
-    curl -u $GITHUB_USER:$GITHUB_TOKEN -s https://api.github.com/repos/OpenBazaar/openbazaar-go/releases/$SERVERTAG > release.txt
-    cat release.txt | jq -r ".assets[].browser_download_url" | xargs -n 1 curl -L -O
-    cd ..
+    # # Retrieve Latest Server Binaries
+    # cd MOBAZHA_TEMP/
+    # curl -u $GITHUB_USER:$GITHUB_TOKEN -s https://api.github.com/repos/OpenBazaar/openbazaar-go/releases/$SERVERTAG > release.txt
+    # cat release.txt | jq -r ".assets[].browser_download_url" | xargs -n 1 curl -L -O
+    # cd ..
 
     if [[ $BINARY == 'win' ]]; then
 
-        brew link --overwrite fontconfig gd gnutls jasper libgphoto2 libicns libtasn1 libusb libusb-compat little-cms2 nettle openssl sane-backends webp wine git-lfs gnu-tar dpkg xz
-        brew link libgsf glib pcre
-        brew remove osslsigncode
-        brew install mono osslsigncode
-        brew reinstall openssl@1.1
+        # brew link --overwrite fontconfig gd gnutls jasper libgphoto2 libicns libtasn1 libusb libusb-compat little-cms2 nettle openssl sane-backends webp wine git-lfs gnu-tar dpkg xz
+        # brew link libgsf glib pcre
+        # brew remove osslsigncode
+        # brew install mono osslsigncode
+        # brew reinstall openssl@1.1
 
-        brew install homebrew/cask-versions/wine-devel
+        # brew install homebrew/cask-versions/wine-devel
 
         # WINDOWS 64
         echo 'Building Windows 64-bit Installer...'
@@ -159,31 +159,31 @@ case "$TRAVIS_OS_NAME" in
         cd ../..
 
         echo 'Running Electron Packager...'
-        node_modules/electron-packager/bin/electron-packager.js . OpenBazaar2 --asar --out=dist --protocol-name=OpenBazaar --ignore="OPENBAZAAR_TEMP" --win32metadata.ProductName="OpenBazaar2" --win32metadata.CompanyName="OpenBazaar" --win32metadata.FileDescription='Decentralized p2p marketplace for Bitcoin' --win32metadata.OriginalFilename=OpenBazaar2.exe --protocol=ob --platform=win32 --arch=x64 --icon=imgs/openbazaar2.ico --electron-version=${ELECTRONVER} --overwrite
+        node_modules/electron-packager/bin/electron-packager.js . Mobazha --asar --out=dist --protocol-name=Mobazha --ignore="MOBAZHA_TEMP" --win32metadata.ProductName="Mobazha" --win32metadata.CompanyName="Mogaolei" --win32metadata.FileDescription='Decentralized p2p marketplace for Bitcoin' --win32metadata.OriginalFilename=Mobazha.exe --protocol=ob --platform=win32 --arch=x64 --icon=imgs/openbazaar2.ico --electron-version=${ELECTRONVER} --overwrite
 
         echo 'Copying server binary into application folder...'
-        cp -rf OPENBAZAAR_TEMP/openbazaar-go-windows-4.0-amd64.exe dist/OpenBazaar2-win32-x64/resources/
-        cp -rf OPENBAZAAR_TEMP/libwinpthread-1.win64.dll dist/OpenBazaar2-win32-x64/resources/libwinpthread-1.dll
-        mkdir dist/OpenBazaar2-win32-x64/resources/openbazaar-go
-        mv dist/OpenBazaar2-win32-x64/resources/openbazaar-go-windows-4.0-amd64.exe dist/OpenBazaar2-win32-x64/resources/openbazaar-go/openbazaard.exe
-        mv dist/OpenBazaar2-win32-x64/resources/libwinpthread-1.dll dist/OpenBazaar2-win32-x64/resources/openbazaar-go/libwinpthread-1.dll
+        cp -rf MOBAZHA_TEMP/mobazha-amd64.exe dist/Mobazha-win32-x64/resources/
+        cp -rf MOBAZHA_TEMP/libwinpthread-1.win64.dll dist/Mobazha-win32-x64/resources/libwinpthread-1.dll
+        mkdir dist/Mobazha-win32-x64/resources/mobazha
+        mv dist/Mobazha-win32-x64/resources/mobazha-amd64.exe dist/Mobazha-win32-x64/resources/mobazha/mobazhad.exe
+        mv dist/Mobazha-win32-x64/resources/libwinpthread-1.dll dist/Mobazha-win32-x64/resources/mobazha/libwinpthread-1.dll
 
         echo 'Building Installer...'
-        grunt -v create-windows-installer --appname=OpenBazaar2 --obversion=$PACKAGE_VERSION --appdir=dist/OpenBazaar2-win32-x64 --outdir=dist/win64
-        mv dist/win64/OpenBazaar2Setup.exe dist/win64/OpenBazaar2-$PACKAGE_VERSION-Setup-64.exe
+        grunt -v create-windows-installer --appname=Mobazha --obversion=$PACKAGE_VERSION --appdir=dist/Mobazha-win32-x64 --outdir=dist/win64
+        mv dist/win64/MobazhaSetup.exe dist/win64/Mobazha-$PACKAGE_VERSION-Setup-64.exe
         mv dist/win64/RELEASES dist/win64/RELEASES-x64
 
         #### CLIENT ONLY
         echo 'Running Electron Packager...'
-        electron-packager . OpenBazaar2Client --asar --out=dist --protocol-name=OpenBazaar --ignore="OPENBAZAAR_TEMP" --win32metadata.ProductName="OpenBazaar2Client" --win32metadata.CompanyName="OpenBazaar" --win32metadata.FileDescription='Decentralized p2p marketplace for Bitcoin' --win32metadata.OriginalFilename=OpenBazaar2Client.exe --protocol=ob --platform=win32 --arch=x64 --icon=imgs/openbazaar2.ico --electron-version=${ELECTRONVER} --overwrite
+        electron-packager . MobazhaClient --asar --out=dist --protocol-name=Mobazha --ignore="MOBAZHA_TEMP" --win32metadata.ProductName="MobazhaClient" --win32metadata.CompanyName="Mogaolei" --win32metadata.FileDescription='Decentralized p2p marketplace for Bitcoin' --win32metadata.OriginalFilename=MobazhaClient.exe --protocol=ob --platform=win32 --arch=x64 --icon=imgs/openbazaar2.ico --electron-version=${ELECTRONVER} --overwrite
 
         echo 'Building Installer...'
-        grunt -v create-windows-installer --appname=OpenBazaar2Client --obversion=$PACKAGE_VERSION --appdir=dist/OpenBazaar2Client-win32-x64 --outdir=dist/win64
-        mv dist/win64/OpenBazaar2ClientSetup.exe dist/win64/OpenBazaar2Client-$PACKAGE_VERSION-Setup-64.exe
+        grunt -v create-windows-installer --appname=MobazhaClient --obversion=$PACKAGE_VERSION --appdir=dist/MobazhaClient-win32-x64 --outdir=dist/win64
+        mv dist/win64/MobazhaClientSetup.exe dist/win64/MobazhaClient-$PACKAGE_VERSION-Setup-64.exe
 
         echo 'Sign the installer'
-        osslsigncode sign -t http://timestamp.digicert.com -h sha1 -key .travis/ob1.pvk -pass "$OB1_SECRET" -certs .travis/ob1.spc -in dist/win64/OpenBazaar2-$PACKAGE_VERSION-Setup-64.exe -out dist/win64/OpenBazaar2-$PACKAGE_VERSION-Setup-64.exe
-        osslsigncode sign -t http://timestamp.digicert.com -h sha1 -key .travis/ob1.pvk -pass "$OB1_SECRET" -certs .travis/ob1.spc -in dist/win64/OpenBazaar2Client-$PACKAGE_VERSION-Setup-64.exe -out dist/win64/OpenBazaar2Client-$PACKAGE_VERSION-Setup-64.exe
+        osslsigncode sign -t http://timestamp.sectigo.com -h sha1 -key .travis/mobazha.com.key -certs .travis/mobazha.com.crt -in dist/win64/Mobazha-$PACKAGE_VERSION-Setup-64.exe -out dist/win64/Mobazha-$PACKAGE_VERSION-Setup-64.exe
+        osslsigncode sign -t http://timestamp.sectigo.com -h sha1 -key .travis/mobazha.com.key -certs .travis/mobazha.com.crt -in dist/win64/MobazhaClient-$PACKAGE_VERSION-Setup-64.exe -out dist/win64/MobazhaClient-$PACKAGE_VERSION-Setup-64.exe
 
         mv dist/win64/RELEASES-x64 dist/win64/RELEASES
 
@@ -197,11 +197,11 @@ case "$TRAVIS_OS_NAME" in
         echo 'Installing electron-installer-dmg'
         npm install -g electron-installer-dmg
 
-        # Sign openbazaar-go binary
+        # Sign mobazha binary
         echo 'Signing Go binary'
-        mv OPENBAZAAR_TEMP/openbazaar-go-darwin-10.6-amd64 dist/osx/openbazaard
-        rm -rf OPENBAZAAR_TEMP/*
-        codesign --force --sign "$SIGNING_IDENTITY2" --timestamp --options runtime dist/osx/openbazaard
+        mv MOBAZHA_TEMP/mobazha-darwin-10.6-amd64 dist/osx/mobazhad
+        # rm -rf MOBAZHA_TEMP/*
+        codesign --force --sign "$SIGNING_IDENTITY2" --timestamp --options runtime dist/osx/mobazhad
 
         # Notarize the zip files
         UPLOAD_INFO_PLIST="uploadinfo.plist"
@@ -269,83 +269,83 @@ case "$TRAVIS_OS_NAME" in
         if [[ ${BINARY} == 'osx' ]]; then
 
             echo 'Running Electron Packager...'
-            electron-packager . OpenBazaar2 --out=dist -app-category-type=public.app-category.business --protocol-name=OpenBazaar --ignore="OPENBAZAAR_TEMP" --protocol=ob --platform=darwin --arch=x64 --icon=imgs/openbazaar2.icns --electron-version=${ELECTRONVER} --overwrite --app-version=$PACKAGE_VERSION
+            electron-packager . Mobazha --out=dist -app-category-type=public.app-category.business --protocol-name=Mobazha --ignore="MOBAZHA_TEMP" --protocol=ob --platform=darwin --arch=x64 --icon=imgs/openbazaar2.icns --electron-version=${ELECTRONVER} --overwrite --app-version=$PACKAGE_VERSION
 
-            echo 'Creating openbazaar-go folder in the OS X .app'
-            mkdir dist/OpenBazaar2-darwin-x64/OpenBazaar2.app/Contents/Resources/openbazaar-go
+            echo 'Creating mobazha folder in the OS X .app'
+            mkdir dist/Mobazha-darwin-x64/Mobazha.app/Contents/Resources/mobazha
 
             echo 'Moving binary to correct folder'
-            mv dist/osx/openbazaard dist/OpenBazaar2-darwin-x64/OpenBazaar2.app/Contents/Resources/openbazaar-go/openbazaard
-            chmod +x dist/OpenBazaar2-darwin-x64/OpenBazaar2.app/Contents/Resources/openbazaar-go/openbazaard
+            mv dist/osx/mobazhad dist/Mobazha-darwin-x64/Mobazha.app/Contents/Resources/mobazha/mobazhad
+            chmod +x dist/Mobazha-darwin-x64/Mobazha.app/Contents/Resources/mobazha/mobazhad
 
             echo 'Codesign the .app'
-            codesign -s "$SIGNING_IDENTITY2" dist/OpenBazaar2-darwin-x64/OpenBazaar2.app/Contents/Frameworks/Electron\ Framework.framework/Versions/A/Libraries/libffmpeg.dylib
-            codesign -s "$SIGNING_IDENTITY2" dist/OpenBazaar2-darwin-x64/OpenBazaar2.app/Contents/Frameworks/Electron\ Framework.framework/Versions/A/Libraries/libnode.dylib
-            codesign --force --options runtime --deep --sign "$SIGNING_IDENTITY2" "dist/OpenBazaar2-darwin-x64/OpenBazaar2.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Resources/crashpad_handler"
-            codesign --force --options runtime --deep --sign "$SIGNING_IDENTITY2"  "dist/OpenBazaar2-darwin-x64/OpenBazaar2.app/Contents/Frameworks/Squirrel.framework/Versions/A/Resources/ShipIt"
+            codesign -s "$SIGNING_IDENTITY2" dist/Mobazha-darwin-x64/Mobazha.app/Contents/Frameworks/Electron\ Framework.framework/Versions/A/Libraries/libffmpeg.dylib
+            codesign -s "$SIGNING_IDENTITY2" dist/Mobazha-darwin-x64/Mobazha.app/Contents/Frameworks/Electron\ Framework.framework/Versions/A/Libraries/libnode.dylib
+            codesign --force --options runtime --deep --sign "$SIGNING_IDENTITY2" "dist/Mobazha-darwin-x64/Mobazha.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Resources/crashpad_handler"
+            codesign --force --options runtime --deep --sign "$SIGNING_IDENTITY2"  "dist/Mobazha-darwin-x64/Mobazha.app/Contents/Frameworks/Squirrel.framework/Versions/A/Resources/ShipIt"
 
-            codesign --force --deep --sign "$SIGNING_IDENTITY2" --timestamp --options runtime --entitlements openbazaar.entitlements dist/OpenBazaar2-darwin-x64/OpenBazaar2.app
-            electron-installer-dmg dist/OpenBazaar2-darwin-x64/OpenBazaar2.app OpenBazaar2-$PACKAGE_VERSION --icon ./imgs/openbazaar2.icns --out=dist/OpenBazaar2-darwin-x64 --overwrite --background=./imgs/osx-finder_background.png --debug
+            codesign --force --deep --sign "$SIGNING_IDENTITY2" --timestamp --options runtime --entitlements openbazaar.entitlements dist/Mobazha-darwin-x64/Mobazha.app
+            electron-installer-dmg dist/Mobazha-darwin-x64/Mobazha.app Mobazha-$PACKAGE_VERSION --icon ./imgs/openbazaar2.icns --out=dist/Mobazha-darwin-x64 --overwrite --background=./imgs/osx-finder_background.png --debug
 
             echo 'Codesign the DMG and zip'
-            codesign --force --sign "$SIGNING_IDENTITY2" --timestamp --options runtime --entitlements openbazaar.entitlements dist/OpenBazaar2-darwin-x64/OpenBazaar2-$PACKAGE_VERSION.dmg
-            cd dist/OpenBazaar2-darwin-x64/
-            zip -q -r OpenBazaar2-mac-$PACKAGE_VERSION.zip OpenBazaar2.app
-            cp -r OpenBazaar2.app ../osx/
-            cp OpenBazaar2-mac-$PACKAGE_VERSION.zip ../osx/
-            cp OpenBazaar2-$PACKAGE_VERSION.dmg ../osx/
+            codesign --force --sign "$SIGNING_IDENTITY2" --timestamp --options runtime --entitlements openbazaar.entitlements dist/Mobazha-darwin-x64/Mobazha-$PACKAGE_VERSION.dmg
+            cd dist/Mobazha-darwin-x64/
+            zip -q -r Mobazha-mac-$PACKAGE_VERSION.zip Mobazha.app
+            cp -r Mobazha.app ../osx/
+            cp Mobazha-mac-$PACKAGE_VERSION.zip ../osx/
+            cp Mobazha-$PACKAGE_VERSION.dmg ../osx/
 
             cd ../..
 
-            zip -q -r dist/osx/OpenBazaar2.zip dist/OpenBazaar2-darwin-x64/OpenBazaar2-$PACKAGE_VERSION.dmg
+            zip -q -r dist/osx/Mobazha.zip dist/Mobazha-darwin-x64/Mobazha-$PACKAGE_VERSION.dmg
 
             # Upload to apple and notarize
             echo "Uploading binary to Apple Notarization server for package ${PACKAGE_VERSION}..."
-            xcrun altool --notarize-app --primary-bundle-id "org.openbazaar.desktop-${PACKAGE_VERSION}" --username "$APPLE_ID" --password "$APPLE_PASS" --file dist/osx/OpenBazaar2.zip --output-format xml > ${UPLOAD_INFO_PLIST}
+            xcrun altool --notarize-app --primary-bundle-id "org.openbazaar.desktop-${PACKAGE_VERSION}" --username "$APPLE_ID" --password "$APPLE_PASS" --file dist/osx/Mobazha.zip --output-format xml > ${UPLOAD_INFO_PLIST}
             wait_for_notarization
 
             echo "Stapling ticket to the DMG..."
-            xcrun stapler staple dist/osx/OpenBazaar2-$PACKAGE_VERSION.dmg
+            xcrun stapler staple dist/osx/Mobazha-$PACKAGE_VERSION.dmg
 
-            extract_app "dist/osx/OpenBazaar2-$PACKAGE_VERSION.dmg" "OpenBazaar2"
+            extract_app "dist/osx/Mobazha-$PACKAGE_VERSION.dmg" "Mobazha"
 
-            zip -q -r dist/osx/OpenBazaar2-mac-$PACKAGE_VERSION.zip dist/osx/OpenBazaar2.app
+            zip -q -r dist/osx/Mobazha-mac-$PACKAGE_VERSION.zip dist/osx/Mobazha.app
 
         else
 
             # Client Only
-            electron-packager . OpenBazaar2Client --out=dist -app-category-type=public.app-category.business --protocol-name=OpenBazaar --ignore="OPENBAZAAR_TEMP" --protocol=ob --platform=darwin --arch=x64 --icon=imgs/openbazaar2.icns --electron-version=${ELECTRONVER} --overwrite --app-version=$PACKAGE_VERSION
+            electron-packager . MobazhaClient --out=dist -app-category-type=public.app-category.business --protocol-name=Mobazha --ignore="MOBAZHA_TEMP" --protocol=ob --platform=darwin --arch=x64 --icon=imgs/openbazaar2.icns --electron-version=${ELECTRONVER} --overwrite --app-version=$PACKAGE_VERSION
 
-            codesign -s "$SIGNING_IDENTITY2" dist/OpenBazaar2Client-darwin-x64/OpenBazaar2Client.app/Contents/Frameworks/Electron\ Framework.framework/Versions/A/Libraries/libffmpeg.dylib
-            codesign -s "$SIGNING_IDENTITY2" dist/OpenBazaar2Client-darwin-x64/OpenBazaar2Client.app/Contents/Frameworks/Electron\ Framework.framework/Versions/A/Libraries/libnode.dylib
-            codesign --force --options runtime --deep --sign "$SIGNING_IDENTITY2" "dist/OpenBazaar2Client-darwin-x64/OpenBazaar2Client.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Resources/crashpad_handler"
-            codesign --force --options runtime --deep --sign "$SIGNING_IDENTITY2"  "dist/OpenBazaar2Client-darwin-x64/OpenBazaar2Client.app/Contents/Frameworks/Squirrel.framework/Versions/A/Resources/ShipIt"
+            codesign -s "$SIGNING_IDENTITY2" dist/MobazhaClient-darwin-x64/MobazhaClient.app/Contents/Frameworks/Electron\ Framework.framework/Versions/A/Libraries/libffmpeg.dylib
+            codesign -s "$SIGNING_IDENTITY2" dist/MobazhaClient-darwin-x64/MobazhaClient.app/Contents/Frameworks/Electron\ Framework.framework/Versions/A/Libraries/libnode.dylib
+            codesign --force --options runtime --deep --sign "$SIGNING_IDENTITY2" "dist/MobazhaClient-darwin-x64/MobazhaClient.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Resources/crashpad_handler"
+            codesign --force --options runtime --deep --sign "$SIGNING_IDENTITY2"  "dist/MobazhaClient-darwin-x64/MobazhaClient.app/Contents/Frameworks/Squirrel.framework/Versions/A/Resources/ShipIt"
 
-            codesign --force --deep --sign "$SIGNING_IDENTITY2" --timestamp --options runtime --entitlements openbazaar.entitlements dist/OpenBazaar2Client-darwin-x64/OpenBazaar2Client.app
-            electron-installer-dmg dist/OpenBazaar2Client-darwin-x64/OpenBazaar2Client.app OpenBazaar2Client-$PACKAGE_VERSION --icon ./imgs/openbazaar2.icns --out=dist/OpenBazaar2Client-darwin-x64 --overwrite --background=./imgs/osx-finder_background.png --debug
+            codesign --force --deep --sign "$SIGNING_IDENTITY2" --timestamp --options runtime --entitlements openbazaar.entitlements dist/MobazhaClient-darwin-x64/MobazhaClient.app
+            electron-installer-dmg dist/MobazhaClient-darwin-x64/MobazhaClient.app MobazhaClient-$PACKAGE_VERSION --icon ./imgs/openbazaar2.icns --out=dist/MobazhaClient-darwin-x64 --overwrite --background=./imgs/osx-finder_background.png --debug
 
             # Client Only
-            codesign --force --sign "$SIGNING_IDENTITY2" --timestamp --options runtime --entitlements openbazaar.entitlements dist/OpenBazaar2Client-darwin-x64/OpenBazaar2Client-$PACKAGE_VERSION.dmg
-            cd dist/OpenBazaar2Client-darwin-x64/
-            zip -q -r OpenBazaar2Client-mac-$PACKAGE_VERSION.zip OpenBazaar2Client.app
-            cp -r OpenBazaar2Client.app ../osx/
-            cp OpenBazaar2Client-mac-$PACKAGE_VERSION.zip ../osx/
-            cp OpenBazaar2Client-$PACKAGE_VERSION.dmg ../osx/
+            codesign --force --sign "$SIGNING_IDENTITY2" --timestamp --options runtime --entitlements openbazaar.entitlements dist/MobazhaClient-darwin-x64/MobazhaClient-$PACKAGE_VERSION.dmg
+            cd dist/MobazhaClient-darwin-x64/
+            zip -q -r MobazhaClient-mac-$PACKAGE_VERSION.zip MobazhaClient.app
+            cp -r MobazhaClient.app ../osx/
+            cp MobazhaClient-mac-$PACKAGE_VERSION.zip ../osx/
+            cp MobazhaClient-$PACKAGE_VERSION.dmg ../osx/
 
             cd ../..
 
-            zip -q -r dist/osx/OpenBazaar2Client.zip dist/OpenBazaar2Client-darwin-x64/OpenBazaar2Client-$PACKAGE_VERSION.dmg
+            zip -q -r dist/osx/MobazhaClient.zip dist/MobazhaClient-darwin-x64/MobazhaClient-$PACKAGE_VERSION.dmg
 
             echo "Uploading client only binary to Apple Notarization server..."
-            xcrun altool --notarize-app --primary-bundle-id "org.openbazaar.desktopclient-$PACKAGE_VERSION" --username "$APPLE_ID" --password "$APPLE_PASS" --file dist/osx/OpenBazaar2Client.zip --output-format xml > $UPLOAD_INFO_PLIST
+            xcrun altool --notarize-app --primary-bundle-id "org.openbazaar.desktopclient-$PACKAGE_VERSION" --username "$APPLE_ID" --password "$APPLE_PASS" --file dist/osx/MobazhaClient.zip --output-format xml > $UPLOAD_INFO_PLIST
             wait_for_notarization
 
             echo "Stapling ticket to the DMG..."
-            xcrun stapler staple dist/osx/OpenBazaar2Client-$PACKAGE_VERSION.dmg
+            xcrun stapler staple dist/osx/MobazhaClient-$PACKAGE_VERSION.dmg
 
-            extract_app "dist/osx/OpenBazaar2Client-$PACKAGE_VERSION.dmg" "OpenBazaar2Client"
+            extract_app "dist/osx/MobazhaClient-$PACKAGE_VERSION.dmg" "MobazhaClient"
 
-            zip -q -r dist/osx/OpenBazaar2Client-mac-$PACKAGE_VERSION.zip dist/osx/OpenBazaar2Client.app
+            zip -q -r dist/osx/MobazhaClient-mac-$PACKAGE_VERSION.zip dist/osx/MobazhaClient.app
         fi
 
     fi

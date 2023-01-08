@@ -1,4 +1,3 @@
-import { remote } from 'electron';
 import LocalStorageSync from '../utils/lib/backboneLocalStorage';
 import { Model } from 'backbone';
 import is from 'is_js';
@@ -43,7 +42,7 @@ export default class extends Model {
     const language = langDataObj && langDataObj.code || 'en_US';
 
     return {
-      windowControlStyle: remote.process.platform === 'darwin' ? 'mac' : 'win',
+      windowControlStyle: process.platform === 'darwin' ? 'mac' : 'win',
       showAdvancedVisualEffects: true,
       saveTransactionMetadata: true,
       defaultTransactionFee: 'NORMAL',

@@ -1,12 +1,13 @@
-import { remote, ipcRenderer, clipboard } from 'electron';
+import { ipcRenderer, clipboard } from 'electron';
 import '../../utils/lib/velocity';
 import loadTemplate from '../../utils/loadTemplate';
 import BaseModal from './BaseModal';
+import app from '../../app';
 
 export default class extends BaseModal {
   constructor(options = {}) {
     const opts = {
-      debugLog: remote.getGlobal('serverLog'),
+      debugLog: app.serverLog,
       autoUpdate: true,
       ...options,
     };

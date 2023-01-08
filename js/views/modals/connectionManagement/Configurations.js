@@ -1,4 +1,3 @@
-import { remote } from 'electron';
 import app from '../../../app';
 import
   serverConnect,
@@ -12,8 +11,6 @@ import baseVw from '../../baseVw';
 import Configuration from './Configuration';
 import StatusBar from './StatusBar';
 import { launchDebugLogModal } from '../../../utils/modalManager';
-
-const localServer = remote.getGlobal('localServer');
 
 export default class extends baseVw {
   constructor(options = {}) {
@@ -129,7 +126,7 @@ export default class extends baseVw {
     let links = `<a href="https://github.com/OpenBazaar/openbazaar-desktop/blob/master/docs/connectionIssues.md">${app.polyglot.t('connectionManagement.statusBar.needHelpLink')}</a>`;
     let msg = '';
 
-    if (localServer) {
+    if (app.localServer) {
       links =
         '<a class="js-viewDebugLog">' +
         `${app.polyglot.t('connectionManagement.statusBar.viewLocalServerDebugLogLink')}` +

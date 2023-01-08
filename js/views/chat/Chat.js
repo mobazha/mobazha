@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import _ from 'underscore';
-import { remote } from 'electron';
+import { ipcRenderer } from 'electron';
 import '../../utils/lib/velocity';
 import app from '../../app';
 import { getBody } from '../../utils/selectors';
@@ -179,8 +179,10 @@ export default class extends baseVw {
           if (!document.hasFocus() || !isConvoOpen) {
             const notifOptions = {
               onclick() {
-                remote.getCurrentWindow().restore();
-                location.hash = `#${msg.peerID}`;
+                ipcRenderer.invoke('getMainWindow').then((mainWindow) => {
+                  mainWindow.restore();
+                  location.hash = `#${msg.peerID}`;
+                });
               },
               body: msg.message,
             };

@@ -4,7 +4,6 @@ import app from '../app';
 import { version } from '../../package.json';
 import { cpus, totalmem, freemem } from 'os';
 import { getCurrentConnection } from './serverConnect';
-import { remote } from 'electron';
 
 let metricsRestartNeeded = false;
 
@@ -46,7 +45,7 @@ export function userStats() {
     crypto: p ? p.get('currencies') : pErr,
     displayCurrency: app.settings ? app.settings.get('localCurrency') : 'Settings Not Available',
     displayLanguage: app.localSettings.get('language'),
-    bundled: remote.getGlobal('isBundledApp'),
+    bundled: app.isBundledApp,
     Tor: connectedServer ? !!connectedServer.useTor : torErr,
     DismissedDiscover: connectedServer ? !!connectedServer.dismissedDiscoverCallout : false,
     DismissedStore: connectedServer ? !!connectedServer.dismissedStoreWelcome : false,

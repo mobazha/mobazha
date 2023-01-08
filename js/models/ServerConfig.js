@@ -4,7 +4,6 @@
  * from the server via the ob/config api.
  */
 
-import { remote } from 'electron';
 import LocalStorageSync from '../utils/lib/backboneLocalStorage';
 import is from 'is_js';
 import app from '../app';
@@ -160,7 +159,7 @@ export default class extends BaseModel {
   }
 
   isTorPwRequired() {
-    return ['win', 'darwin'].indexOf(remote.process.platform) > -1 &&
-      this.isLocalServer() && remote.getGlobal('isBundledApp');
+    return ['win', 'darwin'].indexOf(process.platform) > -1 &&
+      this.isLocalServer() && app.isBundledApp;
   }
 }

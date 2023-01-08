@@ -1,4 +1,4 @@
-import { remote } from 'electron';
+import { ipcRenderer } from 'electron';
 import * as isIPFS from 'is-ipfs';
 import { events as serverConnectEvents, getCurrentConnection } from '../utils/serverConnect';
 import { setUnreadNotifCount, launchNativeNotification } from '../utils/notification';
@@ -101,11 +101,13 @@ export default class extends BaseVw {
       const nativeNotifData = {
         silent: true,
         onclick: () => {
-          remote.getCurrentWindow().restore();
+          ipcRenderer.invoke('getMainWindow').then((mainWindow) => {
+            mainWindow.restore();
 
-          if (notifDisplayData.route) {
-            location.hash = notifDisplayData.route;
-          }
+            if (notifDisplayData.route) {
+              location.hash = notifDisplayData.route;
+            }
+          });
         },
       };
 
@@ -219,21 +221,29 @@ export default class extends BaseVw {
 
   navCloseClick() {
     recordEvent('NavClick', { target: 'close' });
-    if (remote.process.platform !== 'darwin') {
-      remote.getCurrentWindow().close();
-    } else {
-      remote.getCurrentWindow().hide();
-    }
+    ipcRenderer.invoke('getMainWindow').then((mainWindow) => {
+      if (process.platform !== 'darwin') {
+        mainWindow.close();
+      } else {
+        mainWindow.hide();
+      }
+    });
   }
 
   navMinClick() {
     recordEvent('NavClick', { target: 'minimize' });
-    remote.getCurrentWindow().minimize();
+
+    ipcRenderer.invoke('getMainWindow').then((mainWindow) => {
+      mainWindow.minimize();
+    });
   }
 
   navMaxClick() {
     recordEvent('NavClick', { target: 'maximize' });
-    remote.getCurrentWindow().setFullScreen(!remote.getCurrentWindow().isFullScreen());
+    ipcRenderer.invoke('getMainWindow').then((mainWindow) => {
+      mainWindow.minimize();
+      mainWindow.setFullScreen(!mainWindow.isFullScreen());
+    });
   }
 
   onRouteSearch() {

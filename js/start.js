@@ -3,7 +3,7 @@ console.log('test non-standard divis in a listing. test failed: #1853');
 console.log('ltc unconfirmed balance shows in confirmed');
 console.log('recheck card error scenario in listing card');
 
-import { remote, ipcRenderer } from 'electron';
+import { ipcRenderer } from 'electron';
 import $ from 'jquery';
 import Backbone from 'backbone';
 import Polyglot from './utils/Polyglot';
@@ -64,6 +64,10 @@ bigNumber.config({ DECIMAL_PLACES: 50 });
 app.localSettings = new LocalSettings({ id: 1 });
 app.localSettings.fetch().fail(() => app.localSettings.save());
 
+const params = new URLSearchParams(global.location.search);
+app.isBundledApp = params.get('isBundledApp');
+app.updatesSupported = params.get('updatesSupported');
+
 // initialize language functionality
 function getValidLanguage(lang) {
   if (getTranslationLangByCode(lang)) {
@@ -115,7 +119,10 @@ app.pageNav = new PageNav({
 });
 $('#pageNavContainer').append(app.pageNav.render().el);
 
-let externalRoute = remote.getGlobal('externalRoute');
+let externalRoute = '';
+ipcRenderer.invoke('externalRoute').then((result) => {
+  externalRoute = result;
+});
 
 app.router = new ObRouter();
 
@@ -588,7 +595,7 @@ function start() {
           localStorage.serverIdAtLastStart = curConn && curConn.server && curConn.server.id;
 
           // Metrics should only be run on bundled apps.
-          if (remote.getGlobal('isBundledApp')) {
+          if (app.isBundledApp) {
             const metricsOn = app.localSettings.get('shareMetrics');
 
             if (metricsOn === undefined || metricsOn && isNewerVersion()) {
@@ -675,17 +682,21 @@ function connectToServer() {
       app.loadingModal.close();
     });
 
-  connectAttempt = serverConnect(app.serverConfigs.activeServer)
-    .done(() => start())
-    .fail(() => {
-      app.connectionManagmentModal.open();
-      app.loadingModal.close();
-      serverConnectEvents.once('connected', () => {
-        startupConnectMessaging.setState({ msg: '' });
-        app.loadingModal.open(startupConnectMessaging);
-        start();
+  ipcRenderer.invoke('get-localServer').then((localServer) => {
+    app.localServer = localServer;
+
+    connectAttempt = serverConnect(app.serverConfigs.activeServer)
+      .done(() => start())
+      .fail(() => {
+        app.connectionManagmentModal.open();
+        app.loadingModal.close();
+        serverConnectEvents.once('connected', () => {
+          startupConnectMessaging.setState({ msg: '' });
+          app.loadingModal.open(startupConnectMessaging);
+          start();
+        });
       });
-    });
+  });
 }
 
 // Handle a server connection event.
@@ -759,7 +770,7 @@ app.connectionManagmentModal = new ConnectionManagement({
 app.serverConfigs.fetch().done(() => {
   app.serverConfigs.migrate();
 
-  const isBundled = remote.getGlobal('isBundledApp');
+  const isBundled = app.isBundledApp;
   if (!app.serverConfigs.length) {
     // no saved server configurations
     if (isBundled) {
@@ -799,7 +810,7 @@ app.serverConfigs.fetch().done(() => {
       activeServer = app.serverConfigs.activeServer = app.serverConfigs.at(0);
     }
 
-    if (activeServer.get('builtIn') && !remote.getGlobal('isBundledApp')) {
+    if (activeServer.get('builtIn') && !app.isBundledApp) {
       // Your active server is the locally bundled server, but you're
       // not running the bundled app. You have bad data!
       activeServer.set('builtIn', false);
@@ -811,7 +822,7 @@ app.serverConfigs.fetch().done(() => {
 
 // Clear localServer events on browser refresh.
 $(window).on('beforeunload', () => {
-  const localServer = remote.getGlobal('localServer');
+  const localServer = app.localServer;
 
   if (localServer) {
     // Since on a refresh any browser variables go away,
@@ -829,7 +840,10 @@ $(window).on('beforeunload', () => {
 });
 
 // Handle 'show debug log' requests from the main process.
-ipcRenderer.on('show-server-log', () => launchDebugLogModal());
+ipcRenderer.on('show-server-log', (event, serverLog) => {
+  app.serverLog = serverLog;
+  launchDebugLogModal();
+});
 
 // Handle update events from main.js
 ipcRenderer.on('updateChecking', () =>
@@ -931,7 +945,7 @@ ipcRenderer.on('close-attempt', (e) => {
   persistOutdatedListingHashes();
 
   // If on the bundled app, do not let the app shutdown until server shuts down.
-  const localServer = remote.getGlobal('localServer');
+  const localServer = app.localServer;
 
   if (localServer && localServer.isRunning) {
     localServer.once('exit', () => e.sender.send('close-confirmed'));
@@ -956,7 +970,7 @@ ipcRenderer.on('close-attempt', (e) => {
 // initialize our listing delete handler
 listingDeleteHandler();
 
-if (remote.getGlobal('isBundledApp')) {
+if (app.isBundledApp) {
   console.log(`%c${app.polyglot.t('consoleWarning.heading')}`,
     'color: red; font-weight: bold; font-size: 50px;');
   console.log(`%c${app.polyglot.t('consoleWarning.line1')}`, 'color: red;');

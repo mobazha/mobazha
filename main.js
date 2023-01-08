@@ -102,6 +102,8 @@ if (isBundledApp) {
   global.authCookie = guid();
 }
 
+ipcMain.handle('get-localServer', () => global.localServer);
+
 const updatesSupported = process.platform === 'win32' || process.platform === 'darwin';
 global.updatesSupported = updatesSupported;
 
@@ -137,11 +139,13 @@ if (isBundledApp || argv.userData) {
 
 crashReporter.start({
   productName: 'Mobazha',
-  companyName: 'Mogaolei',
   submitURL: 'http://104.131.17.128:1127/post',
   uploadToServer: true,
   extra: {
-    bundled: isBundledApp,
+    bundled: isBundledApp ? 'true' : 'false',
+  },
+  globalExtra: {
+    _companyName: 'Mogaolei',
   },
 });
 
@@ -175,7 +179,7 @@ function createWindow() {
     {
       label: 'Website',
       click() {
-        shell.openExternal('https://openbazaar.org');
+        shell.openExternal('https://mobazha.com');
       },
     },
     // until the documentation page is updated, don't show it
@@ -190,7 +194,7 @@ function createWindow() {
     {
       label: 'Support',
       click() {
-        shell.openExternal('https://openbazaar.org/support');
+        shell.openExternal('https://mobazha.com/support');
       },
     },
   ];
@@ -203,7 +207,7 @@ function createWindow() {
           if (updatesSupported) {
             checkForUpdates();
           } else {
-            shell.openExternal('https://www.openbazaar.org/download/');
+            shell.openExternal('https://mobazha.com/download/');
           }
         },
       },
@@ -415,7 +419,7 @@ function createWindow() {
         click() {
           mainWindow.focus();
           mainWindow.restore();
-          mainWindow.webContents.send('show-server-log');
+          mainWindow.webContents.send('show-server-log', global.serverLog);
         },
       },
       {
@@ -466,16 +470,18 @@ function createWindow() {
     minWidth: 1170,
     minHeight: 700,
     center: true,
-    title: 'OpenBazaar',
+    title: 'Mobazha',
     frame: false,
     icon: `${__dirname}/imgs/icon.png`,
     webPreferences: {
       nodeIntegration: true,
+      contextIsolation: false,
     },
   });
 
+  const data = { isBundledApp, updatesSupported };
   // and load the index.html of the app.
-  mainWindow.loadURL(`file://${__dirname}/.tmp/index.html`);
+  mainWindow.loadFile(`${__dirname}/.tmp/index.html`, { query: { data: JSON.stringify(data) } });
 
   ipcMain.on('set-proxy', (e, id, socks5Setting = '') => {
     if (!id) {
@@ -486,7 +492,7 @@ function createWindow() {
     mainWindow.webContents.session.setProxy({
       proxyRules: socks5Setting,
       proxyBypassRules: '<local>',
-    }, () => mainWindow.webContents.send('proxy-set', id));
+    }).then(() => mainWindow.webContents.send('proxy-set', id));
   });
 
   // Open the DevTools.
@@ -525,9 +531,9 @@ function createWindow() {
       mainWindow.send('consoleMsg', `Checking for update at ${autoUpdater.getFeedURL()}`);
     });
 
-    autoUpdater.on('error', (err, msg) => {
-      mainWindow.send('consoleMsg', msg);
-      mainWindow.send('updateError', msg);
+    autoUpdater.on('error', (err) => {
+      mainWindow.send('consoleMsg', err.message);
+      mainWindow.send('updateError', err.message);
     });
 
     autoUpdater.on('update-not-available', () => {
@@ -558,7 +564,7 @@ function createWindow() {
       checkForUpdates();
     });
 
-    autoUpdater.setFeedURL(feedURL);
+    autoUpdater.setFeedURL({ url: feedURL });
   }
 
   mainWindow.webContents.on('dom-ready', () => {
@@ -591,6 +597,8 @@ app.on('activate', () => {
   if (mainWindow) mainWindow.show();
 });
 
+ipcMain.handle('getMainWindow', () => mainWindow);
+
 const handleObLink = (route) => {
   if (!route || typeof route !== 'string') {
     throw new Error('Please provide a route as a string.');
@@ -604,6 +612,7 @@ const handleObLink = (route) => {
     mainWindow.webContents.send('external-route', route);
   }
 };
+ipcMain.handle('externalRoute', () => global.externalRoute);
 
 app.on('open-url', (e, uri) => {
   e.preventDefault();

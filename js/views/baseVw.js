@@ -2,8 +2,8 @@ import _ from 'underscore';
 import $ from 'jquery';
 import bigNumber from 'bignumber.js';
 import sanitizeHtml from 'sanitize-html';
-import { setDeepValue } from '../utils/object';
 import { View } from 'backbone';
+import { setDeepValue } from '../utils/object';
 
 export default class baseVw extends View {
   constructor(options = {}) {
@@ -52,12 +52,11 @@ export default class baseVw extends View {
    * @return {object} An object created from the data in the form fields
    */
   getFormData(selector) {
-    const $formFields = selector instanceof $ ?
-      selector : this.$(selector ||
-        `select[name], input[name],
+    const $formFields = selector instanceof $
+      ? selector : this.$(selector
+        || `select[name], input[name],
         textarea[name]:not([class*="trumbowyg"]),
-        div[contenteditable][name]`
-      );
+        div[contenteditable][name]`);
     const data = {};
 
     $formFields.each((index, field) => {
@@ -81,7 +80,7 @@ export default class baseVw extends View {
           if (val.trim() !== '') {
             const numberFromVal = Number(val);
 
-            if (!isNaN(numberFromVal)) {
+            if (!Number.isNaN(numberFromVal)) {
               val = numberFromVal;
             }
           }
@@ -94,8 +93,8 @@ export default class baseVw extends View {
       }
 
       const name = $field.attr('name');
-      const isCheckboxGroup = field.type === 'checkbox' &&
-        name.endsWith('[]');
+      const isCheckboxGroup = field.type === 'checkbox'
+        && name.endsWith('[]');
       const checkboxGroupName = name.slice(0, name.length - 2);
 
       if (name.indexOf('.') !== -1) {
@@ -112,8 +111,7 @@ export default class baseVw extends View {
         // handle nested model
         setDeepValue(data, deepName, deepVal);
       } else if (isCheckboxGroup) {
-        data[checkboxGroupName] =
-          this._getCheckboxGroupData($formFields.filter(`[name="${name}"]`));
+        data[checkboxGroupName] = this._getCheckboxGroupData($formFields.filter(`[name="${name}"]`));
       } else if (field.type === 'checkbox') {
         data[name] = field.checked;
       } else {
@@ -133,8 +131,8 @@ export default class baseVw extends View {
       throw new Error('Please provide a selector');
     }
 
-    if (!(typeof selector === 'string' ||
-      _.isElement(selector) || selector instanceof $)) {
+    if (!(typeof selector === 'string'
+      || _.isElement(selector) || selector instanceof $)) {
       throw new Error('The selector must be a string, DOM element or jQuery object.');
     }
 
@@ -235,7 +233,7 @@ export default class baseVw extends View {
    * Clears the cached elements map.
    */
   clearCachedElementMap() {
-     // Clear the cache map.
+    // Clear the cache map.
     if (this._cachedElementMap) {
       this._cachedElementMap.clear();
     }

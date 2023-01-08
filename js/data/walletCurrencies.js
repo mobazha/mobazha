@@ -1,7 +1,7 @@
 import _ from 'underscore';
-import app from '../app';
 import bitcoreLib from 'bitcore-lib';
 import bech32 from 'bech32';
+import app from '../app';
 
 // If a currency does not support fee bumping or you want to disable it, do not provide a
 // feeBumpTransactionSize setting.
@@ -13,20 +13,20 @@ let _currencies = [
     symbol: '₿',
     // Not allowing fee bump on BTC right now given the fees.
     // feeBumpTransactionSize: 154,
-    qrCodeText: address => `bitcoin:${address}`,
+    qrCodeText: (address) => `bitcoin:${address}`,
     icon: 'imgs/cryptoIcons/BTC.png',
     url: 'https://bitcoin.org/',
     getBlockChainAddressUrl: (address, isTestnet) => (
-      isTestnet ?
-        `https://chain.so/address/BTCTEST/${address}` :
-        `https://blockchair.com/bitcoin/address/${address}`
+      isTestnet
+        ? `https://chain.so/address/BTCTEST/${address}`
+        : `https://blockchair.com/bitcoin/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
-      isTestnet ?
-        `https://chain.so/tx/BTCTEST/${txid}` :
-        `https://blockchair.com/bitcoin/transaction/${txid}`
+      isTestnet
+        ? `https://chain.so/tx/BTCTEST/${txid}`
+        : `https://blockchair.com/bitcoin/transaction/${txid}`
     ),
-    isValidAddress: address => {
+    isValidAddress: (address) => {
       if (typeof address !== 'string') {
         throw new Error('Please provide a string.');
       }
@@ -51,26 +51,26 @@ let _currencies = [
     code: 'BCH',
     testnetCode: 'BCH',
     feeBumpTransactionSize: 154,
-    qrCodeText: address => {
+    qrCodeText: (address) => {
       let prefixedAddress = address;
 
       const prefix = app.serverConfig.testnet ? 'bchtest' : 'bitcoincash';
-      prefixedAddress = address.startsWith(prefix) ?
-        prefixedAddress : `${prefix}:${address}`;
+      prefixedAddress = address.startsWith(prefix)
+        ? prefixedAddress : `${prefix}:${address}`;
 
       return prefixedAddress;
     },
     icon: 'imgs/cryptoIcons/BCH.png',
     url: 'https://bitcoincash.org/',
     getBlockChainAddressUrl: (address, isTestnet) => (
-      isTestnet ?
-        `https://explorer.bitcoin.com/tbch/address/bchtest:${address}` :
-        `https://blockchair.com/bitcoin-cash/address/${address}`
+      isTestnet
+        ? `https://explorer.bitcoin.com/tbch/address/bchtest:${address}`
+        : `https://blockchair.com/bitcoin-cash/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
-      isTestnet ?
-        `https://explorer.bitcoin.com/tbch/tx/${txid}` :
-        `https://blockchair.com/bitcoin-cash/transaction/${txid}`
+      isTestnet
+        ? `https://explorer.bitcoin.com/tbch/tx/${txid}`
+        : `https://blockchair.com/bitcoin-cash/transaction/${txid}`
     ),
     supportsEscrowTimeout: true,
     blockTime: 1000 * 60 * 10,
@@ -79,19 +79,19 @@ let _currencies = [
   {
     code: 'CFX',
     testnetCode: 'CFX',
-    qrCodeText: address => `conflux:${address}`,
+    qrCodeText: (address) => `conflux:${address}`,
     icon: 'imgs/cryptoIcons/CFX-icon.png',
     url: 'https://confluxnetwork.org',
     getBlockChainAddressUrl: (address, isTestnet) => (
-      isTestnet ?
-        `https://testnet.confluxscan.io/address/${address}` :
-        `https://testnet.confluxscan.io/address/${address}`
+      isTestnet
+        ? `https://testnet.confluxscan.io/address/${address}`
+        : `https://testnet.confluxscan.io/address/${address}`
         // `https://confluxscan.io/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
-      isTestnet ?
-        `https://testnet.confluxscan.io/transaction/${txid}` :
-        `https://testnet.confluxscan.io/transaction/${txid}`
+      isTestnet
+        ? `https://testnet.confluxscan.io/transaction/${txid}`
+        : `https://testnet.confluxscan.io/transaction/${txid}`
         // `https://confluxscan.io/transaction/${txid}`
     ),
     supportsEscrowTimeout: true,
@@ -101,18 +101,18 @@ let _currencies = [
   {
     code: 'ETH',
     testnetCode: 'ETH',
-    qrCodeText: address => `ethereum:${address}`,
+    qrCodeText: (address) => `ethereum:${address}`,
     icon: 'imgs/cryptoIcons/ETH.png',
     url: 'https://ethereum.org/',
     getBlockChainAddressUrl: (address, isTestnet) => (
-      isTestnet ?
-        `https://rinkeby.etherscan.io/address/${address}` :
-        `https://blockchair.com/ethereum/address/${address}`
+      isTestnet
+        ? `https://rinkeby.etherscan.io/address/${address}`
+        : `https://blockchair.com/ethereum/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
-      isTestnet ?
-        `https://rinkeby.etherscan.io/tx/${txid}` :
-        `https://blockchair.com/ethereum/transaction/${txid}`
+      isTestnet
+        ? `https://rinkeby.etherscan.io/tx/${txid}`
+        : `https://blockchair.com/ethereum/transaction/${txid}`
     ),
     supportsEscrowTimeout: true,
     blockTime: 1000 * 10,
@@ -122,18 +122,18 @@ let _currencies = [
     code: 'LTC',
     testnetCode: 'LTC',
     feeBumpTransactionSize: 154,
-    qrCodeText: address => `litecoin:${address}`,
+    qrCodeText: (address) => `litecoin:${address}`,
     icon: 'imgs/cryptoIcons/LTC.png',
     url: 'https://litecoin.org/',
     getBlockChainAddressUrl: (address, isTestnet) => (
-      isTestnet ?
-        `https://chain.so/address/LTCTEST/${address}` :
-        `https://blockchair.com/litecoin/address/${address}`
+      isTestnet
+        ? `https://chain.so/address/LTCTEST/${address}`
+        : `https://blockchair.com/litecoin/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
-      isTestnet ?
-        `https://chain.so/tx/LTCTEST/${txid}` :
-        `https://blockchair.com/litecoin/transaction/${txid}`
+      isTestnet
+        ? `https://chain.so/tx/LTCTEST/${txid}`
+        : `https://blockchair.com/litecoin/transaction/${txid}`
     ),
     supportsEscrowTimeout: true,
     blockTime: 1000 * 60 * 2.5,
@@ -143,18 +143,18 @@ let _currencies = [
     code: 'ZEC',
     testnetCode: 'ZEC',
     feeBumpTransactionSize: 154,
-    qrCodeText: address => `zcash:${address}`,
+    qrCodeText: (address) => `zcash:${address}`,
     icon: 'imgs/cryptoIcons/ZEC.png',
     url: 'https://z.cash',
     getBlockChainAddressUrl: (address, isTestnet) => (
-      isTestnet ?
-        `https://explorer.testnet.z.cash/address/${address}` :
-        `https://explorer.zcha.in/accounts/${address}`
+      isTestnet
+        ? `https://explorer.testnet.z.cash/address/${address}`
+        : `https://explorer.zcha.in/accounts/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
-      isTestnet ?
-        `https://explorer.testnet.z.cash/tx/${txid}` :
-        `https://explorer.zcha.in/transactions/${txid}`
+      isTestnet
+        ? `https://explorer.testnet.z.cash/tx/${txid}`
+        : `https://explorer.zcha.in/transactions/${txid}`
     ),
     supportsEscrowTimeout: false,
     blockTime: 1000 * 60 * 2.5,
@@ -207,12 +207,12 @@ export function init(walletCurs, walletCurDef) {
 
   Object
     .keys(indexedCurs)
-    .forEach(curCode => {
+    .forEach((curCode) => {
       const curDef = walletCurDef[curCode];
 
       if (
-        curDef &&
-        walletCurs.includes(curDef.code)
+        curDef
+        && walletCurs.includes(curDef.code)
       ) {
         const clientCur = indexedCurs[curDef.code];
         const curData = {
@@ -229,15 +229,15 @@ export function init(walletCurs, walletCurDef) {
 }
 
 function getTranslatedCurrencies(
-  lang = app && app.localSettings &&
-    app.localSettings.standardizedTranslatedLang() || 'en-US',
-  sort = true
+  lang = app && app.localSettings
+    && app.localSettings.standardizedTranslatedLang() || 'en-US',
+  sort = true,
 ) {
   enforceInitialized();
 
   if (!lang) {
-    throw new Error('Please provide the language the translated currencies' +
-      ' should be returned in.');
+    throw new Error('Please provide the language the translated currencies'
+      + ' should be returned in.');
   }
 
   let translated = _currencies.map((currency) => ({
@@ -252,8 +252,7 @@ function getTranslatedCurrencies(
   return translated;
 }
 
-const memoizedGetTranslatedCurrencies =
-  _.memoize(getTranslatedCurrencies, (lang, sort) => `${lang}-${!!sort}`);
+const memoizedGetTranslatedCurrencies = _.memoize(getTranslatedCurrencies, (lang, sort) => `${lang}-${!!sort}`);
 
 export { memoizedGetTranslatedCurrencies as getTranslatedCurrencies };
 
@@ -324,8 +323,8 @@ export function supportedWalletCurs(options = {}) {
   enforceInitialized();
 
   return getWalletCurs()
-    .filter(cur => (opts.testnet ? cur.testnetCode : true))
-    .map(cur => (opts.testnet ? cur.testnetCode : cur.code));
+    .filter((cur) => (opts.testnet ? cur.testnetCode : true))
+    .map((cur) => (opts.testnet ? cur.testnetCode : cur.code));
 }
 
 /**
@@ -361,11 +360,11 @@ export function onlySupportedWalletCurs(curs = [], options = {}) {
     throw new Error('Curs must be provided as an Array.');
   }
 
-  if (curs.filter(cur => (typeof cur !== 'string')).length) {
+  if (curs.filter((cur) => (typeof cur !== 'string')).length) {
     throw new Error('Curs items must be provided as strings.');
   }
 
-  return curs.filter(cur => isSupportedWalletCur(cur, options));
+  return curs.filter((cur) => isSupportedWalletCur(cur, options));
 }
 
 /**

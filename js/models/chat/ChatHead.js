@@ -1,5 +1,5 @@
-import { processMessage } from './ChatMessage';
 import sanitizeHtml from 'sanitize-html';
+import { processMessage } from './ChatMessage';
 import app from '../../app';
 import BaseModel from '../BaseModel';
 
@@ -21,4 +21,3 @@ export default class extends BaseModel {
     };
   }
 }
-

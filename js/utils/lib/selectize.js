@@ -6,9 +6,9 @@
 // in the lib to use the following instead of a comma, since some of our tags may have
 // commas in them. If manipulating the data (e.g. Array.split(), String.join()), you'll
 // likely want to pass this variable in.
-export const tagsDelimiter = '<=!=>';
-
 import '../../lib/selectize';
+
+export const tagsDelimiter = '<=!=>';
 
 // hack to work around the circular dependance issue and expose the
 // tags delimiter to the '../lib/selectize' module. Only that module
@@ -18,4 +18,3 @@ import '../../lib/selectize';
 export function _tagsDelimiter() {
   return '<=!=>';
 }
-

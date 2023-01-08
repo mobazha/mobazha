@@ -1,8 +1,8 @@
 import $ from 'jquery';
 import is from 'is_js';
-import { getEmojiByName } from '../../data/emojis';
 import sanitizeHtml from 'sanitize-html';
 import twemoji from 'twemoji';
+import { getEmojiByName } from '../../data/emojis';
 import app from '../../app';
 import BaseModel from '../BaseModel';
 
@@ -38,7 +38,7 @@ export function processMessage(message) {
     });
 
   const wordsToAnchorify = [];
-  const findWords = node => {
+  const findWords = (node) => {
     if (node.nodeType === 3) {
       // It's a text node. Loop through each word and if it's a guid or handle we keep track of it
       // so later we'll wrap it in an anchor element.
@@ -48,20 +48,20 @@ export function processMessage(message) {
 
       if (!words) return;
 
-      words.forEach(word => {
+      words.forEach((word) => {
         const w = word.trim();
         if (wordsToAnchorify.includes(w)) return;
 
-        if ((w.startsWith('@') && w.length > 1) ||
-          (w.startsWith('ob://') && w.length > 5) ||
-          (w.startsWith('http://') && w.length >= 11) ||
-          (w.startsWith('https://') && w.length >= 12) ||
-          (w.startsWith('www.') && w.length >= 8)) {
+        if ((w.startsWith('@') && w.length > 1)
+          || (w.startsWith('ob://') && w.length > 5)
+          || (w.startsWith('http://') && w.length >= 11)
+          || (w.startsWith('https://') && w.length >= 12)
+          || (w.startsWith('www.') && w.length >= 8)) {
           wordsToAnchorify.push(w);
         }
       });
     } else {
-      node.childNodes.forEach(child => findWords(child));
+      node.childNodes.forEach((child) => findWords(child));
     }
   };
 
@@ -69,9 +69,9 @@ export function processMessage(message) {
 
   processedMessage = $message.html();
 
-  wordsToAnchorify.forEach(word => {
-    let href = !is.url(word) && !word.startsWith('ob://') ?
-      `#ob://${word}` : word;
+  wordsToAnchorify.forEach((word) => {
+    let href = !is.url(word) && !word.startsWith('ob://')
+      ? `#ob://${word}` : word;
 
     if (is.url(word)) {
       const link = document.createElement('a');
@@ -98,8 +98,10 @@ export function processMessage(message) {
     .replace(/__ob-compact-amp__/g, '&');
 
   // convert any unicode emoji characters to images via Twemoji
-  processedMessage = twemoji.parse(processedMessage,
-    icon => (`../imgs/emojis/72X72/${icon}.png`));
+  processedMessage = twemoji.parse(
+    processedMessage,
+    (icon) => (`../imgs/emojis/72X72/${icon}.png`),
+  );
 
   return processedMessage;
 }
@@ -132,7 +134,7 @@ export default class ChatMessage extends BaseModel {
   url() {
     if (this.get('message') === '') {
       return app.getServerUrl(
-        `ob/${this.isGroupChatMessage ? 'grouptypingmessage' : 'typingmessage'}`
+        `ob/${this.isGroupChatMessage ? 'grouptypingmessage' : 'typingmessage'}`,
       );
     }
     return app.getServerUrl(`ob/${this.isGroupChatMessage ? 'groupchatmessage' : 'chatmessage'}`);
@@ -157,7 +159,7 @@ export default class ChatMessage extends BaseModel {
       const matches = attrs.message.match(emojiPlaceholderRegEx, 'g');
 
       if (matches) {
-        matches.forEach(match => {
+        matches.forEach((match) => {
           const emoji = getEmojiByName(match);
 
           if (emoji && emoji.char) {
@@ -187,7 +189,7 @@ export default class ChatMessage extends BaseModel {
       errObj[fieldName].push(error);
     };
 
-    const max = this.constructor.max;
+    const { max } = this.constructor;
 
     if (!this.isGroupChatMessage) {
       if (!attrs.peerID) {

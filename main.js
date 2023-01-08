@@ -82,14 +82,14 @@ if (handleStartupEvent()) {
 }
 
 const serverPath = `${__dirname}${path.sep}..${path.sep}mobazha${path.sep}`;
-const serverFilename = process.platform === 'darwin' || process.platform === 'linux' ?
-  'mobazhad' : 'mobazhad.exe';
+const serverFilename = process.platform === 'darwin' || process.platform === 'linux'
+  ? 'mobazhad' : 'mobazhad.exe';
 const isBundledApp = fs.existsSync(serverPath + serverFilename);
 global.isBundledApp = isBundledApp;
 let localServer;
 
 if (isBundledApp) {
-  global.localServer = localServer = new LocalServer({
+  localServer = new LocalServer({
     getMainWindow: () => mainWindow,
     serverPath,
     serverFilename,
@@ -98,6 +98,7 @@ if (isBundledApp) {
     // using the functions in the mainProcLocalServerEvents module. The reasons for that
     // will be explained in the module.
   });
+  global.localServer = localServer;
 
   global.authCookie = guid();
 }
@@ -131,8 +132,10 @@ if (isBundledApp || argv.userData) {
   try {
     app.setPath('userData', userDataPath);
   } catch (e) {
-    dialog.showErrorBox('Error setting the user data path',
-      `There was an error setting the user data path to ${userDataPath}\n\n${e}`);
+    dialog.showErrorBox(
+      'Error setting the user data path',
+      `There was an error setting the user data path to ${userDataPath}\n\n${e}`,
+    );
     app.exit();
   }
 }
@@ -358,7 +361,7 @@ function createWindow() {
             role: 'stopspeaking',
           },
         ],
-      }
+      },
     );
     // Window menu.
     template[3].submenu = [
@@ -460,7 +463,7 @@ function createWindow() {
 
     // we'll enable the debug log when our serverConnect module is ready
     contextMenu.items[2].enabled = false;
-    ipcMain.on('server-connect-ready', () => (contextMenu.items[2].enabled = true));
+    ipcMain.on('server-connect-ready', () => { contextMenu.items[2].enabled = true; });
   }
 
   // Create the browser window.
@@ -485,8 +488,8 @@ function createWindow() {
 
   ipcMain.on('set-proxy', (e, id, socks5Setting = '') => {
     if (!id) {
-      throw new Error('Please provide an id that will be passed back with the "proxy-set" ' +
-        'event.');
+      throw new Error('Please provide an id that will be passed back with the "proxy-set" '
+        + 'event.');
     }
 
     mainWindow.webContents.session.setProxy({
@@ -544,8 +547,13 @@ function createWindow() {
       mainWindow.send('updateAvailable');
     });
 
-    autoUpdater.on('update-downloaded', (e, releaseNotes, releaseName,
-                                         releaseDate, updateUrl) => {
+    autoUpdater.on('update-downloaded', (
+      e,
+      releaseNotes,
+      releaseName,
+      releaseDate,
+      updateUrl,
+    ) => {
       const opts = {};
       opts.Name = releaseName;
       opts.URL = updateUrl;
@@ -641,8 +649,7 @@ ipcMain.on('active-server-set', (e, server) => {
       const un = server.username;
       const pw = server.password;
 
-      details.requestHeaders.Authorization =
-        `Basic ${new Buffer(`${un}:${pw}`).toString('base64')}`;
+      details.requestHeaders.Authorization = `Basic ${new Buffer(`${un}:${pw}`).toString('base64')}`;
     }
 
     if (global.authCookie && server.builtIn) {
@@ -662,7 +669,7 @@ process.on('exit', () => {
 
 // Aggreate and make available the localServer and serverConnect
 // module logs into one cohesive server log.
-const log = msg => {
+const log = (msg) => {
   if (typeof msg !== 'string') {
     throw new Error('Please provide a message as a string.');
   }

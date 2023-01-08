@@ -1,12 +1,13 @@
 import $ from 'jquery';
 import '../../../utils/lib/velocity';
 import '../../../lib/select2';
-import { tagsDelimiter } from '../../../utils/lib/selectize';
+
 import Sortable from 'sortablejs';
 import _ from 'underscore';
 import path from 'path';
-import '../../../utils/lib/velocityUiPack.js';
 import Backbone from 'backbone';
+import { tagsDelimiter } from '../../../utils/lib/selectize';
+import '../../../utils/lib/velocityUiPack';
 import app from '../../../app';
 import { isScrolledIntoView, openExternal } from '../../../utils/dom';
 import { installRichEditor } from '../../../utils/lib/trumbowyg';
@@ -48,10 +49,10 @@ export default class extends BaseModal {
       throw new Error('Please provide a model.');
     }
 
-    if (options.onClickViewListing !== undefined &&
-      typeof options.onClickViewListing !== 'function') {
-      throw new Error('If providing an onClickViewListing option, it must be ' +
-        'provided as a function.');
+    if (options.onClickViewListing !== undefined
+      && typeof options.onClickViewListing !== 'function') {
+      throw new Error('If providing an onClickViewListing option, it must be '
+        + 'provided as a function.');
     }
 
     const opts = {
@@ -78,8 +79,7 @@ export default class extends BaseModal {
 
         // Will parse out some sku attributes that are specific to the variant
         // inventory view.
-        updatedData.item.skus = updatedData.item.skus.map(sku =>
-          _.omit(sku, 'mappingId', 'choices'));
+        updatedData.item.skus = updatedData.item.skus.map((sku) => _.omit(sku, 'mappingId', 'choices'));
 
         if (updatedData.item.quantity === undefined) {
           this._origModel.get('item')
@@ -103,8 +103,8 @@ export default class extends BaseModal {
     });
 
     this.selectedNavTabIndex = 0;
-    this.createMode = !(this.model.lastSyncedAttrs &&
-      this.model.lastSyncedAttrs.slug);
+    this.createMode = !(this.model.lastSyncedAttrs
+      && this.model.lastSyncedAttrs.slug);
     this.photoUploads = [];
     this.images = this.model.get('item').get('images');
     this.shippingOptions = this.model.get('shippingOptions');
@@ -119,30 +119,36 @@ export default class extends BaseModal {
     const getAcceptedCurs = () => this.model.get('metadata')
       .get('acceptedCurrencies');
     const getReceiveCur = () => (
-      this.model.isCrypto ?
-        getAcceptedCurs().length && getAcceptedCurs()[0] || null :
-        null
+      this.model.isCrypto
+        ? getAcceptedCurs().length && getAcceptedCurs()[0] || null
+        : null
     );
     this._receiveCryptoCur = getReceiveCur();
     this._acceptedCurs = getAcceptedCurs();
-    this.listenTo(this.model.get('metadata'),
-      'change:acceptedCurrencies', () => {
+    this.listenTo(
+      this.model.get('metadata'),
+      'change:acceptedCurrencies',
+
+      () => {
         if (this.model.isCrypto) {
           this._receiveCryptoCur = getReceiveCur();
         } else {
           this._acceptedCurs = getAcceptedCurs();
         }
-      });
-
-    getCryptoCursByName().then(
-      curs => this.getCoinTypesDeferred.resolve(curs),
-      () => this.getCoinTypesDeferred.resolve(
-        getCryptoCursByCode().map(cur => ({ code: cur, name: cur }))
-      )
+      },
     );
 
-    loadTemplate('modals/editListing/uploadPhoto.html',
-      uploadT => (this.uploadPhotoT = uploadT));
+    getCryptoCursByName().then(
+      (curs) => this.getCoinTypesDeferred.resolve(curs),
+      () => this.getCoinTypesDeferred.resolve(
+        getCryptoCursByCode().map((cur) => ({ code: cur, name: cur })),
+      ),
+    );
+
+    loadTemplate(
+      'modals/editListing/uploadPhoto.html',
+      (uploadT) => { this.uploadPhotoT = uploadT; },
+    );
 
     this.listenTo(this.images, 'add', this.onAddImage);
     this.listenTo(this.images, 'remove', this.onRemoveImage);
@@ -161,7 +167,7 @@ export default class extends BaseModal {
       const [splicedVw] = this.shippingOptionViews.splice(removeOpts.index, 1);
       splicedVw.remove();
       this.shippingOptionViews.slice(removeOpts.index)
-        .forEach(shipOptVw => (shipOptVw.listPosition = shipOptVw.listPosition - 1));
+        .forEach((shipOptVw) => { shipOptVw.listPosition -= 1; });
     });
 
     this.listenTo(this.shippingOptions, 'update', (cl, updateOpts) => {
@@ -170,8 +176,10 @@ export default class extends BaseModal {
       }
 
       this.$addShipOptSectionHeading
-        .text(app.polyglot.t('editListing.shippingOptions.optionHeading',
-          { listPosition: this.shippingOptions.length + 1 }));
+        .text(app.polyglot.t(
+          'editListing.shippingOptions.optionHeading',
+          { listPosition: this.shippingOptions.length + 1 },
+        ));
     });
 
     this.coupons = this.model.get('coupons');
@@ -299,7 +307,7 @@ export default class extends BaseModal {
   }
 
   onClickCancelPhotoUploads() {
-    this.inProgressPhotoUploads.forEach(photoUpload => photoUpload.abort());
+    this.inProgressPhotoUploads.forEach((photoUpload) => photoUpload.abort());
   }
 
   onChangePrice() {
@@ -309,9 +317,7 @@ export default class extends BaseModal {
   setContractTypeClass(contractType) {
     const removeClasses = this.model.get('metadata')
       .contractTypes
-      .reduce(
-        (classes, type) => (`${classes} TYPE_${type}`), ''
-      );
+      .reduce((classes, type) => (`${classes} TYPE_${type}`), '');
 
     this.$el.removeClass(removeClasses)
       .addClass(`TYPE_${contractType}`);
@@ -349,7 +355,7 @@ export default class extends BaseModal {
     const reader = new FileReader();
 
     reader.onload = (e) => {
-      const dataView = new DataView(e.target.result);  // eslint-disable-line no-undef
+      const dataView = new DataView(e.target.result); // eslint-disable-line no-undef
       let offset = 2;
 
       if (dataView.getUint16(0, false) !== 0xFFD8) return callback(-2);
@@ -397,8 +403,8 @@ export default class extends BaseModal {
 
       // acounting for rare edge case of the extension in and of itself
       // exceeding the max length
-      return parsed.name.slice(0, nameParseLen < 0 ? 0 : nameParseLen) +
-        parsed.ext.slice(0, Image.maxFilenameLength);
+      return parsed.name.slice(0, nameParseLen < 0 ? 0 : nameParseLen)
+        + parsed.ext.slice(0, Image.maxFilenameLength);
     }
 
     return truncated;
@@ -408,7 +414,7 @@ export default class extends BaseModal {
     let photoFiles = Array.prototype.slice.call(this.$inputPhotoUpload[0].files, 0);
 
     // prune out any non-image files
-    photoFiles = photoFiles.filter(file => file.type.startsWith('image'));
+    photoFiles = photoFiles.filter((file) => file.type.startsWith('image'));
 
     this.$inputPhotoUpload.val('');
 
@@ -423,8 +429,8 @@ export default class extends BaseModal {
         title: app.polyglot.t('editListing.errors.tooManyPhotosTitle'),
         message: app.polyglot.t('editListing.errors.tooManyPhotosBody'),
       })
-      .render()
-      .open();
+        .render()
+        .open();
     }
 
     if (!photoFiles.length) return;
@@ -435,7 +441,7 @@ export default class extends BaseModal {
     let loaded = 0;
     let errored = 0;
 
-    photoFiles.forEach(photoFile => {
+    photoFiles.forEach((photoFile) => {
       const newImage = document.createElement('img');
 
       newImage.src = photoFile.path;
@@ -503,11 +509,13 @@ export default class extends BaseModal {
           this.$photoUploadingLabel.addClass('hide');
 
           new SimpleMessage({
-            title: app.polyglot.t('editListing.errors.unableToLoadImages',
-              { smart_count: errored }),
+            title: app.polyglot.t(
+              'editListing.errors.unableToLoadImages',
+              { smart_count: errored },
+            ),
           })
-          .render()
-          .open();
+            .render()
+            .open();
         } else if (loaded + errored === photoFiles.length) {
           this.uploadImages(toUpload);
         }
@@ -598,8 +606,10 @@ export default class extends BaseModal {
       }
     }
 
-    this.$variantInventorySection.toggleClass('hide',
-      !this.shouldShowVariantInventorySection);
+    this.$variantInventorySection.toggleClass(
+      'hide',
+      !this.shouldShowVariantInventorySection,
+    );
   }
 
   onClickScrollToVariantInventory() {
@@ -616,7 +626,7 @@ export default class extends BaseModal {
    */
   get haveVariantOptionsWithChoice() {
     if (this.variantOptionsCl.length) {
-      const atLeastOneHasChoice = this.variantOptionsCl.find(variantOption => {
+      const atLeastOneHasChoice = this.variantOptionsCl.find((variantOption) => {
         const choices = variantOption.get('variants');
         return choices && choices.length;
       });
@@ -689,10 +699,10 @@ export default class extends BaseModal {
     }).always(() => {
       if (this.isRemoved()) return;
       if (!this.inProgressPhotoUploads.length) this.$photoUploadingLabel.addClass('hide');
-    }).done(uploadedImages => {
+    }).done((uploadedImages) => {
       if (this.isRemoved()) return;
 
-      this.images.add(uploadedImages.map(image => ({
+      this.images.add(uploadedImages.map((image) => ({
         filename: image.filename,
         original: image.original,
         large: image.large,
@@ -701,18 +711,22 @@ export default class extends BaseModal {
         tiny: image.tiny,
       })));
     })
-    .fail(jqXhr => {
-      openSimpleMessage(app.polyglot.t('editListing.errors.uploadImageErrorTitle',
-          { smart_count: imagesToUpload.length }),
-        jqXhr.responseJSON && jqXhr.responseJSON.reason || '');
-    });
+      .fail((jqXhr) => {
+        openSimpleMessage(
+          app.polyglot.t(
+            'editListing.errors.uploadImageErrorTitle',
+            { smart_count: imagesToUpload.length },
+          ),
+          jqXhr.responseJSON && jqXhr.responseJSON.reason || '',
+        );
+      });
 
     this.photoUploads.push(upload);
   }
 
   get inProgressPhotoUploads() {
     return this.photoUploads
-      .filter(upload => upload.state() === 'pending');
+      .filter((upload) => upload.state() === 'pending');
   }
 
   onClickAddPhoto() {
@@ -733,7 +747,8 @@ export default class extends BaseModal {
         complete: () => {
           setTimeout(
             () => this.$el.on('scroll', this.throttledOnScroll),
-            100);
+            100,
+          );
         },
       }, 400);
   }
@@ -757,12 +772,10 @@ export default class extends BaseModal {
         this.$scrollLinks.eq(index).addClass('active');
         this.selectedNavTabIndex = index;
         keepLooping = false;
+      } else if (index === this.$scrollToSections.length - 1) {
+        keepLooping = false;
       } else {
-        if (index === this.$scrollToSections.length - 1) {
-          keepLooping = false;
-        } else {
-          index += 1;
-        }
+        index += 1;
       }
     }
   }
@@ -773,7 +786,7 @@ export default class extends BaseModal {
 
     const serverData = this.model.toJSON();
 
-    serverData.item.skus = serverData.item.skus.map(sku => (
+    serverData.item.skus = serverData.item.skus.map((sku) => (
       // The variant inventory view adds some stuff to the skus collection that
       // shouldn't go to the server. We'll ensure the extraneous stuff isn't sent
       // with the save while still allowing it to stay in the collection.
@@ -787,8 +800,8 @@ export default class extends BaseModal {
     if (save) {
       const segmentation = {
         type: serverData.metadata.contractType,
-        currency: serverData.metadata.contractType !== 'CRYPTOCURRENCY' ?
-          serverData.metadata.pricingCurrency.code : serverData.item.cryptoListingCurrencyCode,
+        currency: serverData.metadata.contractType !== 'CRYPTOCURRENCY'
+          ? serverData.metadata.pricingCurrency.code : serverData.item.cryptoListingCurrencyCode,
         moderated: serverData.moderators && !!serverData.moderators.length,
         isNew: this.model.isNew(),
       };
@@ -801,8 +814,8 @@ export default class extends BaseModal {
         duration: 99999999999999,
       }).on('clickViewListing', () => {
         const guidUrl = `#${app.profile.id}/store/${this.model.get('slug')}`;
-        const base = app.profile.get('handle') ?
-          `@${app.profile.get('handle')}` : app.profile.id;
+        const base = app.profile.get('handle')
+          ? `@${app.profile.get('handle')}` : app.profile.id;
         const url = `${base}/store/${this.model.get('slug')}`;
 
         if (location.hash === guidUrl) {
@@ -827,15 +840,15 @@ export default class extends BaseModal {
             title: app.polyglot.t('editListing.errors.saveErrorTitle'),
             message,
           })
-          .render()
-          .open();
+            .render()
+            .open();
           endAjaxEvent('Listing_Save', {
             ...segmentation,
             errors: message || 'unknown',
           });
         }).done(() => {
-          savingStatusMsg.update(`Listing ${this.model.toJSON().item.title}` +
-            ' saved. <a class="js-viewListing">view</a>');
+          savingStatusMsg.update(`Listing ${this.model.toJSON().item.title}`
+            + ' saved. <a class="js-viewListing">view</a>');
           this.attrsAtLastSave = this.model.toJSON();
 
           setTimeout(() => savingStatusMsg.remove(), 6000);
@@ -857,10 +870,11 @@ export default class extends BaseModal {
         // There's a model error that's not represented in the UI - likely
         // developer error.
         const msg = Object.keys(this.model.validationError)
-          .reduce((str, errKey) =>
-            `${str}${errKey}: ${this.model.validationError[errKey].join(', ')}<br>`, '');
-        openSimpleMessage(app.polyglot.t('editListing.errors.saveErrorTitle'),
-          msg);
+          .reduce((str, errKey) => `${str}${errKey}: ${this.model.validationError[errKey].join(', ')}<br>`, '');
+        openSimpleMessage(
+          app.polyglot.t('editListing.errors.saveErrorTitle'),
+          msg,
+        );
       }
     }
   }
@@ -868,8 +882,8 @@ export default class extends BaseModal {
   onChangeManagementType(e) {
     if (e.value === 'TRACK') {
       this.inventoryManagement.setState({
-        trackBy: this.model.get('item').get('options').length ?
-          'TRACK_BY_VARIANT' : 'TRACK_BY_FIXED',
+        trackBy: this.model.get('item').get('options').length
+          ? 'TRACK_BY_VARIANT' : 'TRACK_BY_FIXED',
       });
       this.$el.removeClass('notTrackingInventory');
     } else {
@@ -911,7 +925,7 @@ export default class extends BaseModal {
         // flag for any skus.
         if (this.trackInventoryBy === 'DO_NOT_TRACK') {
           item.get('skus')
-            .forEach(sku => {
+            .forEach((sku) => {
               sku.unset('quantity');
               sku.set({ infiniteInventory: true });
             });
@@ -931,9 +945,9 @@ export default class extends BaseModal {
       formData.metadata = {
         ...formData.metadata,
         format: 'FIXED_PRICE',
-        acceptedCurrencies: this.cryptoCurSelector ?
-          this.cryptoCurSelector.getState().activeCurs :
-          metadata.get('acceptedCurrencies'),
+        acceptedCurrencies: this.cryptoCurSelector
+          ? this.cryptoCurSelector.getState().activeCurs
+          : metadata.get('acceptedCurrencies'),
       };
     } else {
       item.unset('condition');
@@ -951,8 +965,8 @@ export default class extends BaseModal {
         },
         metadata: {
           ...formData.metadata,
-          acceptedCurrencies: typeof formData.metadata.acceptedCurrencies === 'string' ?
-            [formData.metadata.acceptedCurrencies] : [],
+          acceptedCurrencies: typeof formData.metadata.acceptedCurrencies === 'string'
+            ? [formData.metadata.acceptedCurrencies] : [],
           format: 'MARKET_PRICE',
         },
         shippingOptions: [],
@@ -963,10 +977,10 @@ export default class extends BaseModal {
       ...formData,
       item: {
         ...formData.item,
-        tags: formData.item.tags.length ?
-          formData.item.tags.split(tagsDelimiter) : [],
-        categories: formData.item.categories.length ?
-          formData.item.categories.split(tagsDelimiter) : [],
+        tags: formData.item.tags.length
+          ? formData.item.tags.split(tagsDelimiter) : [],
+        categories: formData.item.categories.length
+          ? formData.item.categories.split(tagsDelimiter) : [],
       },
     });
 
@@ -976,7 +990,7 @@ export default class extends BaseModal {
     } else {
       // If any shipping options have a type of 'LOCAL_PICKUP', we'll
       // clear out any services that may be there.
-      this.model.get('shippingOptions').forEach(shipOpt => {
+      this.model.get('shippingOptions').forEach((shipOpt) => {
         if (shipOpt.get('type') === 'LOCAL_PICKUP') {
           shipOpt.set('services', []);
         }
@@ -1033,8 +1047,8 @@ export default class extends BaseModal {
       const item = this.model.get('item');
 
       if (item.isInventoryTracked) {
-        trackBy = item.get('options').length ?
-          'TRACK_BY_VARIANT' : 'TRACK_BY_FIXED';
+        trackBy = item.get('options').length
+          ? 'TRACK_BY_VARIANT' : 'TRACK_BY_FIXED';
       } else {
         trackBy = 'DO_NOT_TRACK';
       }
@@ -1044,36 +1058,36 @@ export default class extends BaseModal {
   }
 
   get $scrollToSections() {
-    return this._$scrollToSections ||
-      (this._$scrollToSections = this.$('.js-scrollToSection'));
+    return this._$scrollToSections
+      || (this._$scrollToSections = this.$('.js-scrollToSection'));
   }
 
   get $scrollLinks() {
-    return this._$scrollLinks ||
-      (this._$scrollLinks = this.$('.js-scrollLink'));
+    return this._$scrollLinks
+      || (this._$scrollLinks = this.$('.js-scrollLink'));
   }
 
   get $formFields() {
     const isCrypto = this.getCachedEl('#editContractType').val() === 'CRYPTOCURRENCY';
     const cryptoExcludes = isCrypto ? ', .js-inventoryManagementSection' : '';
-    const excludes = '.js-sectionShipping, .js-couponsSection, .js-variantsSection, ' +
-      `.js-variantInventorySection${cryptoExcludes}`;
+    const excludes = '.js-sectionShipping, .js-couponsSection, .js-variantsSection, '
+      + `.js-variantInventorySection${cryptoExcludes}`;
 
     let $fields = this.$(
-      `.js-formSectionsContainer > section:not(${excludes}) select[name],` +
-      `.js-formSectionsContainer > section:not(${excludes}) input[name],` +
-      `.js-formSectionsContainer > section:not(${excludes}) div[contenteditable][name],` +
-      `.js-formSectionsContainer > section:not(${excludes}) ` +
-        'textarea[name]:not([class*="trumbowyg"])'
+      `.js-formSectionsContainer > section:not(${excludes}) select[name],`
+      + `.js-formSectionsContainer > section:not(${excludes}) input[name],`
+      + `.js-formSectionsContainer > section:not(${excludes}) div[contenteditable][name],`
+      + `.js-formSectionsContainer > section:not(${excludes}) `
+        + 'textarea[name]:not([class*="trumbowyg"])',
     );
 
     // Filter out hidden fields that are not applicable based on whether this is
     // a crypto currency listing.
     $fields = $fields.filter((index, el) => {
-      const $excludeContainers = isCrypto ?
-        this.getCachedEl('.js-standardTypeWrap')
-          .add(this.getCachedEl('.js-skuMatureContentRow')) :
-        this.getCachedEl('.js-cryptoTypeWrap');
+      const $excludeContainers = isCrypto
+        ? this.getCachedEl('.js-standardTypeWrap')
+          .add(this.getCachedEl('.js-skuMatureContentRow'))
+        : this.getCachedEl('.js-cryptoTypeWrap');
 
       let keep = true;
 
@@ -1090,53 +1104,53 @@ export default class extends BaseModal {
   }
 
   get $currencySelect() {
-    return this._$currencySelect ||
-      (this._$currencySelect = this.$('#editListingCurrency'));
+    return this._$currencySelect
+      || (this._$currencySelect = this.$('#editListingCurrency'));
   }
 
   get $priceInput() {
-    return this._$priceInput ||
-      (this._$priceInput = this.$('#editListingPrice'));
+    return this._$priceInput
+      || (this._$priceInput = this.$('#editListingPrice'));
   }
 
   get $saveButton() {
-    return this._$buttonSave ||
-      (this._$buttonSave = this.$('.js-save'));
+    return this._$buttonSave
+      || (this._$buttonSave = this.$('.js-save'));
   }
 
   get $inputPhotoUpload() {
-    return this._$inputPhotoUpload ||
-      (this._$inputPhotoUpload = this.$('#inputPhotoUpload'));
+    return this._$inputPhotoUpload
+      || (this._$inputPhotoUpload = this.$('#inputPhotoUpload'));
   }
 
   get $photoUploadingLabel() {
-    return this._$photoUploadingLabel ||
-      (this._$photoUploadingLabel = this.$('.js-photoUploadingLabel'));
+    return this._$photoUploadingLabel
+      || (this._$photoUploadingLabel = this.$('.js-photoUploadingLabel'));
   }
 
   get $editListingReturnPolicy() {
-    return this._$editListingReturnPolicy ||
-      (this._$editListingReturnPolicy = this.$('#editListingReturnPolicy'));
+    return this._$editListingReturnPolicy
+      || (this._$editListingReturnPolicy = this.$('#editListingReturnPolicy'));
   }
 
   get $editListingTermsAndConditions() {
-    return this._$editListingTermsAndConditions ||
-      (this._$editListingTermsAndConditions = this.$('#editListingTermsAndConditions'));
+    return this._$editListingTermsAndConditions
+      || (this._$editListingTermsAndConditions = this.$('#editListingTermsAndConditions'));
   }
 
   get $sectionShipping() {
-    return this._$sectionShipping ||
-      (this._$sectionShipping = this.$('.js-sectionShipping'));
+    return this._$sectionShipping
+      || (this._$sectionShipping = this.$('.js-sectionShipping'));
   }
 
   get $maxCatsWarning() {
-    return this._$maxCatsWarning ||
-      (this._$maxCatsWarning = this.$('.js-maxCatsWarning'));
+    return this._$maxCatsWarning
+      || (this._$maxCatsWarning = this.$('.js-maxCatsWarning'));
   }
 
   get $maxTagsWarning() {
-    return this._$maxTagsWarning ||
-      (this._$maxTagsWarning = this.$('.js-maxTagsWarning'));
+    return this._$maxTagsWarning
+      || (this._$maxTagsWarning = this.$('.js-maxTagsWarning'));
   }
 
   get maxTagsWarning() {
@@ -1144,18 +1158,18 @@ export default class extends BaseModal {
   }
 
   get $addShipOptSectionHeading() {
-    return this._$addShipOptSectionHeading ||
-      (this._$addShipOptSectionHeading = this.$('.js-addShipOptSectionHeading'));
+    return this._$addShipOptSectionHeading
+      || (this._$addShipOptSectionHeading = this.$('.js-addShipOptSectionHeading'));
   }
 
   get $variantInventorySection() {
-    return this._$variantInventorySection ||
-      (this._$variantInventorySection = this.$('.js-variantInventorySection'));
+    return this._$variantInventorySection
+      || (this._$variantInventorySection = this.$('.js-variantInventorySection'));
   }
 
   get $itemPrice() {
-    return this._$itemPrice ||
-      (this._$itemPrice = this.$('[name="item.price"]'));
+    return this._$itemPrice
+      || (this._$itemPrice = this.$('[name="item.price"]'));
   }
 
   showMaxTagsWarning() {
@@ -1189,11 +1203,10 @@ export default class extends BaseModal {
     let cur = app.settings.get('localCurrency');
 
     try {
-      cur =
-        this.model
-          .get('metadata')
-          .get('pricingCurrency')
-          .code;
+      cur = this.model
+        .get('metadata')
+        .get('pricingCurrency')
+        .code;
     } catch (e) {
       // pass
     }
@@ -1210,10 +1223,10 @@ export default class extends BaseModal {
     if (this.getCachedEl('#editContractType').length) {
       try {
         coinDiv = getCoinDivisibility(
-          this.getCachedEl('#editContractType').val() === 'CRYPTOCURRENCY' ?
-            this.getCachedEl('#editListingCoinType').val() ||
-              this.model.get('metadata').get('coinType') :
-            this.currency
+          this.getCachedEl('#editContractType').val() === 'CRYPTOCURRENCY'
+            ? this.getCachedEl('#editListingCoinType').val()
+              || this.model.get('metadata').get('coinType')
+            : this.currency,
         );
       } catch (e) {
         // pass
@@ -1228,22 +1241,23 @@ export default class extends BaseModal {
 
   createShippingOptionView(opts) {
     const options = {
-      getCurrency: () => (this.$currencySelect.length ?
-        this.$currencySelect.val() : this.model.get('metadata').pricingCurrency),
+      getCurrency: () => (this.$currencySelect.length
+        ? this.$currencySelect.val() : this.model.get('metadata').pricingCurrency),
       ...opts || {},
     };
     const view = this.createChild(ShippingOption, options);
 
-    this.listenTo(view, 'click-remove', e => {
+    this.listenTo(view, 'click-remove', (e) => {
       this.shippingOptions.remove(
-        this.shippingOptions.at(this.shippingOptionViews.indexOf(e.view)));
+        this.shippingOptions.at(this.shippingOptionViews.indexOf(e.view)),
+      );
     });
 
     return view;
   }
 
   remove() {
-    this.inProgressPhotoUploads.forEach(upload => upload.abort());
+    this.inProgressPhotoUploads.forEach((upload) => upload.abort());
     $(window).off('resize', this.throttledResizeWin);
     super.remove();
   }
@@ -1260,8 +1274,8 @@ export default class extends BaseModal {
     if (this.throttledOnScroll) this.$el.off('scroll', this.throttledOnScroll);
     this.currencies = this.currencies || getCurrenciesSortedByCode();
 
-    loadTemplate('modals/editListing/viewListingLinks.html', viewListingsT => {
-      loadTemplate('modals/editListing/editListing.html', t => {
+    loadTemplate('modals/editListing/viewListingLinks.html', (viewListingsT) => {
+      loadTemplate('modals/editListing/editListing.html', (t) => {
         this.$el.html(t({
           createMode: this.createMode,
           selectedNavTabIndex: this.selectedNavTabIndex,
@@ -1272,14 +1286,16 @@ export default class extends BaseModal {
           contractTypes: metadata.contractTypesVerbose,
           conditionTypes: this.model.get('item')
             .conditionTypes
-            .map((conditionType) => ({ code: conditionType,
-              name: app.polyglot.t(`conditionTypes.${conditionType}`) })),
+            .map((conditionType) => ({
+              code: conditionType,
+              name: app.polyglot.t(`conditionTypes.${conditionType}`),
+            })),
           errors: this.model.validationError || {},
           photoUploadInprogress: !!this.inProgressPhotoUploads.length,
           uploadPhotoT: this.uploadPhotoT,
           expandedReturnPolicy: this.expandedReturnPolicy || !!this.model.get('refundPolicy'),
-          expandedTermsAndConditions: this.expandedTermsAndConditions ||
-            !!this.model.get('termsAndConditions'),
+          expandedTermsAndConditions: this.expandedTermsAndConditions
+            || !!this.model.get('termsAndConditions'),
           maxCatsWarning: this.maxCatsWarning,
           maxTagsWarning: this.maxTagsWarning,
           max: {
@@ -1321,11 +1337,11 @@ export default class extends BaseModal {
         this.$couponsSection = this.$('.js-couponsSection');
         this.$variantsSection = this.$('.js-variantsSection');
 
-        this.$('#editContractType, #editListingVisibility, #editListingCondition, ' +
-          '#editListingCountrySelect').select2({
+        this.$('#editContractType, #editListingVisibility, #editListingCondition, '
+          + '#editListingCountrySelect').select2({
           // disables the search box
-            minimumResultsForSearch: Infinity,
-          });
+          minimumResultsForSearch: Infinity,
+        });
 
         this.$('#editListingCurrency').select2({
           matcher: (params, data) => {
@@ -1342,8 +1358,8 @@ export default class extends BaseModal {
             if (
               data.text
                 .toUpperCase()
-                .includes(term) ||
-              (name && name.toUpperCase().includes(term))
+                .includes(term)
+              || (name && name.toUpperCase().includes(term))
             ) {
               return data;
             }
@@ -1356,7 +1372,7 @@ export default class extends BaseModal {
         this.$editListingTags.selectize({
           persist: false,
           maxItems: item.max.tags,
-          create: input => {
+          create: (input) => {
             // we'll make the tag all lowercase and
             // replace spaces with dashes.
             const term = input.toLowerCase()
@@ -1369,7 +1385,7 @@ export default class extends BaseModal {
               text: term,
             };
           },
-          onChange: value => {
+          onChange: (value) => {
             const tags = value.length ? value.split(',') : [];
             if (tags.length >= item.max.tags) {
               this.showMaxTagsWarning();
@@ -1382,11 +1398,11 @@ export default class extends BaseModal {
         this.$editListingCategories.selectize({
           persist: false,
           maxItems: item.max.cats,
-          create: input => ({
+          create: (input) => ({
             value: input,
             text: input,
           }),
-          onChange: value => {
+          onChange: (value) => {
             const cats = value.length ? value.split(',') : [];
             if (cats.length >= item.max.cats) {
               this.showMaxCatsWarning();
@@ -1431,10 +1447,9 @@ export default class extends BaseModal {
         const variantErrors = {};
 
         Object.keys(item.validationError || {})
-          .forEach(errKey => {
+          .forEach((errKey) => {
             if (errKey.startsWith('options[')) {
-              variantErrors[errKey] =
-                item.validationError[errKey];
+              variantErrors[errKey] = item.validationError[errKey];
             }
           });
 
@@ -1444,19 +1459,22 @@ export default class extends BaseModal {
           errors: variantErrors,
         });
 
-        this.variantsView.listenTo(this.variantsView, 'variantChoiceChange',
-          this.onVariantChoiceChange.bind(this));
+        this.variantsView.listenTo(
+          this.variantsView,
+          'variantChoiceChange',
+          this.onVariantChoiceChange.bind(this),
+        );
 
         this.$variantsSection.find('.js-variantsContainer').append(
-          this.variantsView.render().el
+          this.variantsView.render().el,
         );
 
         // render inventory management section
         if (this.inventoryManagement) this.inventoryManagement.remove();
         const inventoryManagementErrors = {};
 
-        if (this.model.validationError &&
-          this.model.validationError['item.quantity']) {
+        if (this.model.validationError
+          && this.model.validationError['item.quantity']) {
           inventoryManagementErrors.quantity = this.model.validationError['item.quantity'];
         }
 
@@ -1469,8 +1487,11 @@ export default class extends BaseModal {
         });
 
         this.$('.js-inventoryManagementSection').html(this.inventoryManagement.render().el);
-        this.listenTo(this.inventoryManagement, 'changeManagementType',
-          this.onChangeManagementType);
+        this.listenTo(
+          this.inventoryManagement,
+          'changeManagementType',
+          this.onChangeManagementType,
+        );
 
         // render variant inventory
         if (this.variantInventory) this.variantInventory.remove();
@@ -1494,7 +1515,7 @@ export default class extends BaseModal {
         });
 
         this.$couponsSection.find('.js-couponsContainer').append(
-          this.couponsView.render().el
+          this.couponsView.render().el,
         );
 
         installRichEditor(this.$('#editListingDescription'), {
@@ -1573,15 +1594,12 @@ export default class extends BaseModal {
             this.setModelData();
             this.attrsAtCreate = this.model.toJSON();
           }
-        } else {
-          if (!this.attrsAtLastSave) {
-            this.setModelData();
-            this.attrsAtLastSave = this.model.toJSON();
-          }
+        } else if (!this.attrsAtLastSave) {
+          this.setModelData();
+          this.attrsAtLastSave = this.model.toJSON();
         }
       });
     });
     return this;
   }
 }
-

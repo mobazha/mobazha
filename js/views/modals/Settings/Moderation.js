@@ -19,15 +19,17 @@ export default class extends baseVw {
     this.profile = app.profile.clone();
 
     // Sync our clone with any changes made to the global profile.
-    this.listenTo(app.profile, 'someChange',
-      (md, opts) => this.profile.set(opts.setAttrs));
+    this.listenTo(app.profile, 'someChange', (md, opts) => this.profile.set(opts.setAttrs));
 
     // Sync the global profile with any changes we save via our clone.
-    this.listenTo(this.profile, 'sync',
+    this.listenTo(
+      this.profile,
+      'sync',
       // (md, resp, opts) => app.profile.set(this.profile.toJSON(opts.attrs)));
       (md, resp, opts) => {
         app.profile.set(this.profile.toJSON(opts.attrs));
-      });
+      },
+    );
 
     if (this.profile.get('moderatorInfo')) {
       this.moderator = this.profile.get('moderatorInfo');
@@ -64,8 +66,8 @@ export default class extends baseVw {
 
     // The user must check both boxes at the bottom of the page if they want to be a moderator,
     // but the values aren't part of the model, they only exist in the DOM and aren't saved.
-    if (formData.moderator && !(this.getCachedEl('#understandRequirements').prop('checked') &&
-      this.getCachedEl('#acceptGuidelines').prop('checked'))) {
+    if (formData.moderator && !(this.getCachedEl('#understandRequirements').prop('checked')
+      && this.getCachedEl('#acceptGuidelines').prop('checked'))) {
       this.getCachedEl('.js-moderationConfirmError').removeClass('hide');
       return;
     }
@@ -94,20 +96,19 @@ export default class extends baseVw {
           type: 'confirmed',
         });
       })
-      .fail((...args) => {
-        const errMsg =
-          args[0] && args[0].responseJSON && args[0].responseJSON.reason || '';
+        .fail((...args) => {
+          const errMsg = args[0] && args[0].responseJSON && args[0].responseJSON.reason || '';
 
-        openSimpleMessage(app.polyglot.t('settings.moderationTab.errors.save'), errMsg);
+          openSimpleMessage(app.polyglot.t('settings.moderationTab.errors.save'), errMsg);
 
-        statusMessage.update({
-          msg: app.polyglot.t('settings.moderationTab.status.fail'),
-          type: 'warning',
+          statusMessage.update({
+            msg: app.polyglot.t('settings.moderationTab.status.fail'),
+            type: 'warning',
+          });
+        }).always(() => {
+          this.getCachedEl('.js-save').removeClass('processing');
+          setTimeout(() => statusMessage.remove(), 3000);
         });
-      }).always(() => {
-        this.getCachedEl('.js-save').removeClass('processing');
-        setTimeout(() => statusMessage.remove(), 3000);
-      });
     }
 
     // Render so errors are shown / cleared.
@@ -160,8 +161,8 @@ export default class extends baseVw {
         items: moderator.get('languages'),
         options: getTranslatedLangs(),
         render: {
-          option: data => `<div>${data.name}</div>`,
-          item: data => `<div>${data.name}</div>`,
+          option: (data) => `<div>${data.name}</div>`,
+          item: (data) => `<div>${data.name}</div>`,
         },
       });
 

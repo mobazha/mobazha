@@ -34,7 +34,7 @@ export default class extends BaseView {
     const formData = super.getFormData(fields);
 
     // Post process the vairants to seperate the clientID from the actual value.
-    formData.variants = formData.variants.map(v => {
+    formData.variants = formData.variants.map((v) => {
       if (v.includes('<===>')) {
         const split = v.split('<===>');
         return {
@@ -56,9 +56,8 @@ export default class extends BaseView {
   }
 
   get $formFields() {
-    return this._$formFields ||
-      (this._$formFields =
-        this.$('select[name], input[name], textarea[name]'));
+    return this._$formFields
+      || (this._$formFields = this.$('select[name], input[name], textarea[name]'));
   }
 
   render() {
@@ -70,7 +69,7 @@ export default class extends BaseView {
 
     this.$el.toggleClass('hasError', !!Object.keys(errors).length);
 
-    loadTemplate('modals/editListing/variant.html', t => {
+    loadTemplate('modals/editListing/variant.html', (t) => {
       this.$el.html(t({
         ...this.model.toJSON(),
         max: this.model.max,
@@ -83,7 +82,7 @@ export default class extends BaseView {
       const variantOptions = [];
 
       this.model.get('variants').toJSON()
-        .forEach(variant => {
+        .forEach((variant) => {
           const value = `${variant._clientID}<===>${variant.name}`;
           variantOptions.push({ ...variant, value });
           variantItems.push(value);
@@ -94,13 +93,13 @@ export default class extends BaseView {
         valueField: 'value',
         options: variantOptions,
         items: variantItems,
-        create: input => ({
+        create: (input) => ({
           name: input,
           value: input,
         }),
         render: {
-          option: data => `<div>${data.name}</div>`,
-          item: data => `<div>${data.name}</div>`,
+          option: (data) => `<div>${data.name}</div>`,
+          item: (data) => `<div>${data.name}</div>`,
         },
       }).on('change', () => this.trigger('choiceChange', { view: this }));
     });

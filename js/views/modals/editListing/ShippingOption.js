@@ -28,7 +28,7 @@ export default class extends BaseView {
 
     // get regions
     this.selectCountryData = getTranslatedRegions()
-      .map(regionObj => ({
+      .map((regionObj) => ({
         id: regionObj.id,
         text: regionObj.name,
         isRegion: true,
@@ -36,7 +36,7 @@ export default class extends BaseView {
 
     // now, we'll add in the countries
     const selectCountries = getTranslatedCountries()
-      .map(countryObj => ({
+      .map((countryObj) => ({
         id: countryObj.dataName,
         text: countryObj.name,
         isRegion: false,
@@ -118,7 +118,7 @@ export default class extends BaseView {
 
     if (listPosition !== prevPosition) {
       this.$headline.text(
-        app.polyglot.t('editListing.shippingOptions.optionHeading', { listPosition })
+        app.polyglot.t('editListing.shippingOptions.optionHeading', { listPosition }),
       );
     }
   }
@@ -134,7 +134,7 @@ export default class extends BaseView {
     // Strip out any region elements from shipping destinations
     // drop down. The individual countries will remain.
     formData.regions = formData.regions
-      .filter(region => !indexedRegions[region]);
+      .filter((region) => !indexedRegions[region]);
 
     return formData;
   }
@@ -149,35 +149,34 @@ export default class extends BaseView {
   createServiceView(options) {
     const view = this.createChild(Service, options);
 
-    this.listenTo(view, 'click-remove', e => {
+    this.listenTo(view, 'click-remove', (e) => {
       this.services.remove(
-        this.services.at(this.serviceViews.indexOf(e.view)));
+        this.services.at(this.serviceViews.indexOf(e.view)),
+      );
     });
 
     return view;
   }
 
   get $headline() {
-    return this._$headline ||
-      (this._$headline = this.$('h1'));
+    return this._$headline
+      || (this._$headline = this.$('h1'));
   }
 
   get $shipDestinationDropdown() {
-    return this._$shipDestinationDropdown ||
-      (this._$shipDestinationDropdown =
-        this.$(`#shipDestinationsDropdown_${this.model.cid}`));
+    return this._$shipDestinationDropdown
+      || (this._$shipDestinationDropdown = this.$(`#shipDestinationsDropdown_${this.model.cid}`));
   }
 
   get $serviceSection() {
-    return this._$serviceSection ||
-      (this._$serviceSection = this.$('.js-serviceSection'));
+    return this._$serviceSection
+      || (this._$serviceSection = this.$('.js-serviceSection'));
   }
 
   get $formFields() {
-    return this._$formFields ||
-      (this._$formFields =
-        this.$('select[name], input[name], textarea[name]').filter((index, el) => (
-          !$(el).parents('.js-serviceSection').length)));
+    return this._$formFields
+      || (this._$formFields = this.$('select[name], input[name], textarea[name]').filter((index, el) => (
+        !$(el).parents('.js-serviceSection').length)));
   }
 
   /**
@@ -191,8 +190,8 @@ export default class extends BaseView {
 
     const selectedRegions = [];
 
-    regions.forEach(region => {
-      if (region.countries.every(elem => countries.indexOf(elem) > -1)) {
+    regions.forEach((region) => {
+      if (region.countries.every((elem) => countries.indexOf(elem) > -1)) {
         selectedRegions.push(region.id);
       }
     });
@@ -202,7 +201,7 @@ export default class extends BaseView {
 
   render() {
     super.render();
-    loadTemplate('modals/editListing/shippingOption.html', t => {
+    loadTemplate('modals/editListing/shippingOption.html', (t) => {
       this.$el.html(t({
         // Since multiple instances of this view will be rendered, any id's should
         // include the cid, so they're unique.
@@ -228,18 +227,18 @@ export default class extends BaseView {
         items: this.model.get('regions'),
         options: this.selectCountryData,
         render: {
-          option: data => {
+          option: (data) => {
             const className = data.isRegion ? 'region' : '';
             return `<div class="${className}">${data.text}</div>`;
           },
-          item: data => {
+          item: (data) => {
             const className = data.isRegion ? 'region' : '';
             return `<div class="${className}">${data.text}</div>`;
           },
         },
-        onItemAdd: value => {
+        onItemAdd: (value) => {
           const region = getIndexedRegions()[value];
-          const selectize = this.$shipDestinationSelect[0].selectize;
+          const { selectize } = this.$shipDestinationSelect[0];
 
           if (region) {
             // If adding a region, we'll add in all the countries for that region.
@@ -252,16 +251,16 @@ export default class extends BaseView {
             selectize.addItems(this.representedRegions(selectize.items), true);
           }
         },
-        onItemRemove: value => {
+        onItemRemove: (value) => {
           const isRegion = !!getIndexedRegions()[value];
-          const selectize = this.$shipDestinationSelect[0].selectize;
+          const { selectize } = this.$shipDestinationSelect[0];
           const representedRegions = this.representedRegions(selectize.items);
 
           if (!isRegion) {
             // Adding a country may cause a regions or regions to be represented.
             // We'll add in any full regions so they're not selectable as options.
             // CSS will hide the tag.
-            selectize.items.forEach(item => {
+            selectize.items.forEach((item) => {
               const isItemRegion = getIndexedRegions()[item];
               if (isItemRegion && !representedRegions.includes(item)) {
                 selectize.removeItem(item, true);

@@ -6,8 +6,8 @@ import jsonformat from 'json-format';
 import draftLog from 'draftlog';
 
 const iconOutputPath = `${__dirname}${path.sep}..${path.sep}imgs${path.sep}cryptoIcons${path.sep}/`;
-const translationFile = `${__dirname}${path.sep}..${path.sep}js${path.sep}` +
-  `languages${path.sep}/en_US.json`;
+const translationFile = `${__dirname}${path.sep}..${path.sep}js${path.sep}`
+  + `languages${path.sep}/en_US.json`;
 
 draftLog(console);
 
@@ -23,16 +23,16 @@ let whitelist = {};
 function getWhitelist() {
   return new Promise((resolve, reject) => {
     fetch('https://ticker.openbazaar.org/whitelist')
-      .then(res => resolve(res.json()))
-      .catch(err => reject(err));
+      .then((res) => resolve(res.json()))
+      .catch((err) => reject(err));
   });
 }
 
 function getCoinList() {
   return new Promise((resolve, reject) => {
     fetch('https://api.coinmarketcap.com/v2/listings/')
-      .then(res => resolve(res.json()))
-      .catch(err => reject(err));
+      .then((res) => resolve(res.json()))
+      .catch((err) => reject(err));
   });
 }
 
@@ -59,8 +59,7 @@ function setIconsWritten(count) {
 
   if (count !== iconsWritten) {
     iconsWritten = count;
-    draft(`Obtained ${count}/${typeof totalCoins === 'number' ? totalCoins : '?'}` +
-      ' icons.');
+    draft(`Obtained ${count}/${typeof totalCoins === 'number' ? totalCoins : '?'} icons.`);
   }
 }
 
@@ -72,20 +71,17 @@ function getIcon(coin) {
   if (whitelist[coin.symbol] && whitelist[coin.symbol] !== coin.id) return;
 
   fetch(getIconUrl(coin.id))
-    .then(res => {
-      const writeStream =
-        fs.createWriteStream(`${iconOutputPath}${path.sep}${coin.symbol}-icon.png`);
-      writeStream.on('error', err => {
-        logError(`There was an error writing the icon for symbol ${coin.symbol},` +
-          ` with an id of ${coin.id}: ${err}`);
+    .then((res) => {
+      const writeStream = fs.createWriteStream(`${iconOutputPath}${path.sep}${coin.symbol}-icon.png`);
+      writeStream.on('error', (err) => {
+        logError(`There was an error writing the icon for symbol ${coin.symbol}, with an id of ${coin.id}: ${err}`);
       });
       writeStream.on('finish', () => setIconsWritten(iconsWritten + 1));
       res.body.pipe(writeStream);
     })
-    .catch(err => {
+    .catch((err) => {
       if (err.type === 'system') {
-        logError(`There was an error fetching the icon for symbol ${coin.symbol},` +
-          ` with an id of ${coin.id}: ${err.message}`);
+        logError(`There was an error fetching the icon for symbol ${coin.symbol}, with an id of ${coin.id}: ${err.message}`);
       } else {
         logError(err);
       }
@@ -96,20 +92,20 @@ console.log('Obtaining whitelist...');
 
 getWhitelist()
   .then(
-    wl => {
+    (wl) => {
       whitelist = wl;
       console.log('Whitelist obtained...');
       draft('Obtaining crypto icons...');
 
       getCoinList()
-        .then(results => {
+        .then((results) => {
           // remove duplicates from the data set using our whitelist
           const newList = [];
           const indexedNewList = {};
-          results.data.forEach(c => {
+          results.data.forEach((c) => {
             if (
-              !(whitelist[c.symbol] && whitelist[c.symbol] !== c.id) &&
-              !indexedNewList[c.symbol]
+              !(whitelist[c.symbol] && whitelist[c.symbol] !== c.id)
+              && !indexedNewList[c.symbol]
             ) {
               newList.push(c);
               indexedNewList[c.symbol] = c;
@@ -149,7 +145,7 @@ getWhitelist()
 
               const parsed = JSON.parse(data);
 
-              results.data.forEach(c => {
+              results.data.forEach((c) => {
                 if (whitelist[c.symbol] && whitelist[c.symbol] !== c.id) return;
                 parsed.cryptoCurrencies[c.symbol] = c.name;
               });
@@ -157,7 +153,7 @@ getWhitelist()
               const sortedCryptoCurs = {};
               Object.keys(parsed.cryptoCurrencies)
                 .sort()
-                .forEach(key => (sortedCryptoCurs[key] = parsed.cryptoCurrencies[key]));
+                .forEach((key) => { sortedCryptoCurs[key] = parsed.cryptoCurrencies[key]; });
               parsed.cryptoCurrencies = sortedCryptoCurs;
 
               const jsonConfig = {
@@ -165,7 +161,7 @@ getWhitelist()
                 size: 2,
               };
 
-              fs.writeFile(translationFile, jsonformat(parsed, jsonConfig), writeErr => {
+              fs.writeFile(translationFile, jsonformat(parsed, jsonConfig), (writeErr) => {
                 if (err) {
                   logError(`There was an error writing the translation file: ${writeErr}`);
                   return;
@@ -176,7 +172,7 @@ getWhitelist()
             });
           }
         })
-        .catch(err => {
+        .catch((err) => {
           if (err.type === 'system') {
             logError(`There was an error fetching the coin list: ${err}`);
           } else {
@@ -184,6 +180,5 @@ getWhitelist()
           }
         });
     },
-    err => logError(`There was an error fetching the coin list: ${err}`)
+    (err) => logError(`There was an error fetching the coin list: ${err}`),
   );
-

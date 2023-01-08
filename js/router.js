@@ -1,9 +1,9 @@
 import $ from 'jquery';
 import { ipcRenderer } from 'electron';
 import { Router } from 'backbone';
+import * as isIPFS from 'is-ipfs';
 import app from './app';
 import { getGuid } from './utils';
-import * as isIPFS from 'is-ipfs';
 import { getPageContainer } from './utils/selectors';
 import { isPromise } from './utils/object';
 import { startAjaxEvent, endAjaxEvent, recordEvent } from './utils/metrics';
@@ -166,8 +166,7 @@ export default class ObRouter extends Router {
         const handle = this.guidHandleMap.get(split[0]);
 
         if (handle) {
-          displayRoute =
-            `@${handle}${split.length > 1 ? `/${split.slice(1).join('/')}` : ''}`;
+          displayRoute = `@${handle}${split.length > 1 ? `/${split.slice(1).join('/')}` : ''}`;
         }
       }
 
@@ -191,7 +190,7 @@ export default class ObRouter extends Router {
     // the route and roll back the hash.
     if (!options.confirmedClose) {
       const confirmPromises = [];
-      getOpenModals().forEach(modal => {
+      getOpenModals().forEach((modal) => {
         if (typeof modal.confirmClose !== 'function') return;
         const closeConfirmed = modal.confirmClose.call(modal);
 
@@ -378,15 +377,14 @@ export default class ObRouter extends Router {
     }
 
     const pageState = state || 'store';
-    const deepRouteParts = functionArgs.filter(arg => arg !== null);
+    const deepRouteParts = functionArgs.filter((arg) => arg !== null);
 
     if (!this.isValidUserRoute(guid, pageState, ...deepRouteParts)) {
       this.pageNotFound();
       return;
     }
 
-    const standardizedHash = hash =>
-      (hash.endsWith('/') ? hash.slice(0, hash.length - 1) : hash);
+    const standardizedHash = (hash) => (hash.endsWith('/') ? hash.slice(0, hash.length - 1) : hash);
 
     if (isBlocked(guid) && !isUnblocking(guid)) {
       app.loadingModal.close();
@@ -412,7 +410,7 @@ export default class ObRouter extends Router {
         }
       };
 
-      const onUnblock = data => {
+      const onUnblock = (data) => {
         if (data.peerIDs.includes(guid)) {
           app.loadingModal.open();
           this.user(guid, state, ...args);
@@ -539,12 +537,12 @@ export default class ObRouter extends Router {
           model: profile,
           state: pageState,
           listing,
-        }).render()
+        }).render(),
       );
     }).fail((...failArgs) => {
       const jqXhr = failArgs[0];
-      const reason = jqXhr && jqXhr.responseJSON && jqXhr.responseJSON.reason ||
-        jqXhr && jqXhr.responseText || '';
+      const reason = jqXhr && jqXhr.responseJSON && jqXhr.responseJSON.reason
+        || jqXhr && jqXhr.responseText || '';
 
       if (jqXhr === profileFetch && profileFetch.statusText === 'abort') return;
       if (jqXhr === listingFetch && listingFetch.statusText === 'abort') return;
@@ -555,9 +553,9 @@ export default class ObRouter extends Router {
         userPageFetchError = 'Listing Not Found';
       }
 
-      userPageFetchError = userPageFetchError ?
-        `${userPageFetchError} - ${reason || 'unknown'}` :
-        reason || 'unknown';
+      userPageFetchError = userPageFetchError
+        ? `${userPageFetchError} - ${reason || 'unknown'}`
+        : reason || 'unknown';
 
       let contentText = app.polyglot.t('userPage.loading.failTextStore', {
         store: `<b>${handle || `${guid.slice(0, 8)}…`}</b>`,
@@ -565,8 +563,8 @@ export default class ObRouter extends Router {
 
       if (profileFetch.state() === 'resolved' && listingFetch.state() === 'rejected') {
         const linkText = app.polyglot.t('userPage.loading.failTextListingLink');
-        const listingSlug = slug.length > 25 ?
-          `${slug.slice(0, 25)}…` : slug;
+        const listingSlug = slug.length > 25
+          ? `${slug.slice(0, 25)}…` : slug;
         contentText = app.polyglot.t('userPage.loading.failTextListingWithLink', {
           listing: `<b>${listingSlug}</b>`,
           link: `<a href="#${guid}/store">${linkText}</a>`,
@@ -580,8 +578,8 @@ export default class ObRouter extends Router {
     })
       .always(() => {
         this.off(null, onWillRoute);
-        const dismissedCallout = getCurrentConnection() &&
-          getCurrentConnection().server.get('dismissedDiscoverCallout');
+        const dismissedCallout = getCurrentConnection()
+          && getCurrentConnection().server.get('dismissedDiscoverCallout');
         endAjaxEvent('UserPageLoad', {
           ownPage: guid === app.profile.id,
           tab: pageState,
@@ -605,7 +603,7 @@ export default class ObRouter extends Router {
     const initialTab = tab || 'sales';
 
     this.loadPage(
-      new Transactions({ initialTab }).render()
+      new Transactions({ initialTab }).render(),
     );
 
     recordEvent('Transactions_PageLoad', {
@@ -616,10 +614,10 @@ export default class ObRouter extends Router {
   connectedPeers() {
     const peerFetch = $.get(app.getServerUrl('ob/peers')).done((data) => {
       const peersData = data || [];
-      const peers = peersData.map(peer => (peer.slice(peer.lastIndexOf('/') + 1)));
+      const peers = peersData.map((peer) => (peer.slice(peer.lastIndexOf('/') + 1)));
 
       this.loadPage(
-        new ConnectedPeersPage({ peers }).render()
+        new ConnectedPeersPage({ peers }).render(),
       );
     }).fail((xhr) => {
       let content = '<p>There was an error retrieving the connected peers.</p>';
@@ -636,13 +634,13 @@ export default class ObRouter extends Router {
 
   search(tab = 'listings', query) {
     this.loadPage(
-      new Search({ query, initialState: { tab } })
+      new Search({ query, initialState: { tab } }),
     );
   }
 
   userNotFound(user) {
     this.loadPage(
-      new TemplateOnly({ template: 'error-pages/userNotFound.html' }).render({ user })
+      new TemplateOnly({ template: 'error-pages/userNotFound.html' }).render({ user }),
     );
   }
 
@@ -650,13 +648,13 @@ export default class ObRouter extends Router {
     this.loadPage(
       new TemplateOnly({
         template: 'error-pages/pageNotFound.html',
-      }).render()
+      }).render(),
     );
   }
 
   genericError(context = {}) {
     this.loadPage(
-      new TemplateOnly({ template: 'error-pages/genericError.html' }).render(context)
+      new TemplateOnly({ template: 'error-pages/genericError.html' }).render(context),
     );
   }
 }

@@ -4,8 +4,8 @@ import Listings from '../../js/collections/Listings';
 
 describe('the Listings collection', () => {
   describe('has a categories getter', () => {
-    it('that returns a combined and sorted list of categories from all the listings in the' +
-      ' collection', () => {
+    it('that returns a combined and sorted list of categories from all the listings in the'
+      + ' collection', () => {
       // Please Note: As of now, sorting only works on standard ascii characters.
 
       const listing = new Listings([{

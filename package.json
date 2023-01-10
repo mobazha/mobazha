@@ -1,6 +1,6 @@
 {
   "name": "mobazha-desktop",
-  "productName": "Mobazha Desktop Client",
+  "productName": "Mobazha",
   "version": "3.0.0",
   "serverVersionRequired": "1.0.0",
   "description": "Decentralized p2p marketplace that uses Cryptocurrencies.",
@@ -25,7 +25,7 @@
     "binaries": "./build.sh",
     "getCryptoData": "cross-env NODE_ENV=development babel-node ./bin/getCryptoData.js",
     "package": "electron-forge package",
-    "make": "electron-forge make"
+    "make": "electron-forge make --skip-package"
   },
   "repository": {
     "type": "git",
@@ -60,9 +60,9 @@
     "@babel/preset-env": "^7.20.2",
     "@electron-forge/cli": "^6.0.4",
     "@electron-forge/maker-deb": "^6.0.4",
+    "@electron-forge/maker-dmg": "^6.0.4",
     "@electron-forge/maker-rpm": "^6.0.4",
     "@electron-forge/maker-squirrel": "^6.0.4",
-    "@electron-forge/maker-zip": "^6.0.4",
     "@types/babel__register": "^7.17.0",
     "browser-sync": "^2.27.11",
     "chai": "4.3.7",
@@ -77,6 +77,7 @@
     "eslint-plugin-react": "7.31.11",
     "grunt": "^1.5.3",
     "grunt-electron-installer": "^2.1.0",
+    "grunt-electron-installer-debian": "^0.5.0",
     "jsdom": "^21.0.0",
     "mocha": "^10.2.0",
     "nan": "2.17.0",
@@ -99,6 +100,7 @@
     "bluebird": "^3.7.2",
     "cropit": "0.5.1",
     "draftlog": "^1.0.13",
+    "electron-packager": "^17.1.1",
     "electron-squirrel-startup": "^1.0.0",
     "homedir": "0.6.0",
     "ionicons": "^2.0.1",

@@ -19,12 +19,16 @@ let trayMenu;
 let closeConfirmed = false;
 const version = app.getVersion();
 
+const remoteMain = require('@electron/remote/main');
+
 // We no longer support win32, but process.platform returns Windows 64 bit as win32.
 const plat = process.platform === 'win32' ? 'win64' : process.platform;
 
 const feedURL = `https://updates2.openbazaar.org:5001/update/${plat}/${version}`;
 
 global.serverLog = '';
+
+remoteMain.initialize();
 
 const handleStartupEvent = function () {
   if (process.platform !== 'win32') {
@@ -479,12 +483,12 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
+      enableRemoteModule: true,
     },
   });
 
-  const data = { isBundledApp, updatesSupported };
   // and load the index.html of the app.
-  mainWindow.loadFile(`${__dirname}/.tmp/index.html`, { query: { data: JSON.stringify(data) } });
+  mainWindow.loadFile(`${__dirname}/.tmp/index.html`, { query: { isBundledApp, updatesSupported } });
 
   ipcMain.on('set-proxy', (e, id, socks5Setting = '') => {
     if (!id) {
@@ -685,6 +689,8 @@ const log = (msg) => {
   if (mainWindow) {
     mainWindow.webContents.send('server-log', message);
   }
+
+  remoteMain.enable(mainWindow.webContents);
 };
 
 if (localServer) bindLocalServerEvent('log', (localServ, msg) => log(msg));

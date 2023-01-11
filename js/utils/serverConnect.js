@@ -2,8 +2,10 @@ import { EOL } from 'os';
 import { ipcRenderer } from 'electron';
 import $ from 'jquery';
 import { Events } from 'backbone';
-import Socket from '../utils/Socket';
-import { guid } from './';
+import _ from 'underscore';
+import { getGlobal } from '@electron/remote';
+import Socket from './Socket';
+import { guid } from '.';
 import app from '../app';
 import ServerConfig from '../models/ServerConfig';
 
@@ -28,6 +30,8 @@ const events = {
 };
 
 export { events };
+
+const getLocalServer = _.once(() => (getGlobal('localServer')));
 
 let currentConnection = null;
 let debugLog = '';
@@ -228,7 +232,7 @@ export default function connect(server, options = {}) {
   };
 
   const deferred = $.Deferred();
-  const localServer = app.localServer;
+  const localServer = getLocalServer();
   let attempt = 1;
   let socket = null;
   let connectAttempt = null;

@@ -64,7 +64,7 @@
     "@electron-forge/maker-rpm": "^6.0.4",
     "@electron-forge/maker-squirrel": "^6.0.4",
     "@types/babel__register": "^7.17.0",
-    "browser-sync": "^2.27.11",
+    "browser-sync": "^2.26.7",
     "chai": "4.3.7",
     "copyfiles": "2.4.1",
     "cross-env": "^7.0.3",
@@ -92,6 +92,7 @@
   ],
   "dependencies": {
     "@babel/register": "^7.18.9",
+    "@electron/remote": "^2.0.9",
     "backbone": "1.4.1",
     "backbone.localstorage": "^1.1.16",
     "bech32": "2.0.0",

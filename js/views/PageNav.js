@@ -1,13 +1,13 @@
-import { ipcRenderer } from 'electron';
 import * as isIPFS from 'is-ipfs';
+import Backbone from 'backbone';
+import $ from 'jquery';
+import { getCurrentWindow } from '@electron/remote';
 import { events as serverConnectEvents, getCurrentConnection } from '../utils/serverConnect';
 import { setUnreadNotifCount, launchNativeNotification } from '../utils/notification';
 import { recordEvent } from '../utils/metrics';
-import Backbone from 'backbone';
 import BaseVw from './baseVw';
 import loadTemplate from '../utils/loadTemplate';
 import app from '../app';
-import $ from 'jquery';
 import {
   launchEditListingModal, launchAboutModal,
   launchWallet, launchSettingsModal,
@@ -101,13 +101,11 @@ export default class extends BaseVw {
       const nativeNotifData = {
         silent: true,
         onclick: () => {
-          ipcRenderer.invoke('getMainWindow').then((mainWindow) => {
-            mainWindow.restore();
+          getCurrentWindow().restore();
 
-            if (notifDisplayData.route) {
-              location.hash = notifDisplayData.route;
-            }
-          });
+          if (notifDisplayData.route) {
+            location.hash = notifDisplayData.route;
+          }
         },
       };
 
@@ -221,29 +219,22 @@ export default class extends BaseVw {
 
   navCloseClick() {
     recordEvent('NavClick', { target: 'close' });
-    ipcRenderer.invoke('getMainWindow').then((mainWindow) => {
-      if (process.platform !== 'darwin') {
-        mainWindow.close();
-      } else {
-        mainWindow.hide();
-      }
-    });
+    if (process.platform !== 'darwin') {
+      getCurrentWindow().close();
+    } else {
+      getCurrentWindow().hide();
+    }
   }
 
   navMinClick() {
     recordEvent('NavClick', { target: 'minimize' });
 
-    ipcRenderer.invoke('getMainWindow').then((mainWindow) => {
-      mainWindow.minimize();
-    });
+    getCurrentWindow().minimize();
   }
 
   navMaxClick() {
-    recordEvent('NavClick', { target: 'maximize' });
-    ipcRenderer.invoke('getMainWindow').then((mainWindow) => {
-      mainWindow.minimize();
-      mainWindow.setFullScreen(!mainWindow.isFullScreen());
-    });
+    getCurrentWindow().minimize();
+      getCurrentWindow().setFullScreen(!getCurrentWindow().isFullScreen());
   }
 
   onRouteSearch() {

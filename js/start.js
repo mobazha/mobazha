@@ -3,6 +3,7 @@ import $ from 'jquery';
 import Backbone from 'backbone';
 import './lib/whenAll.jquery';
 import moment from 'moment';
+import { getGlobal } from '@electron/remote';
 import bigNumber from 'bignumber.js';
 import Polyglot from './utils/Polyglot';
 import app from './app';
@@ -679,21 +680,17 @@ function connectToServer() {
       app.loadingModal.close();
     });
 
-  ipcRenderer.invoke('get-localServer').then((localServer) => {
-    app.localServer = localServer;
-
-    connectAttempt = serverConnect(app.serverConfigs.activeServer)
-      .done(() => start())
-      .fail(() => {
-        app.connectionManagmentModal.open();
-        app.loadingModal.close();
-        serverConnectEvents.once('connected', () => {
-          startupConnectMessaging.setState({ msg: '' });
-          app.loadingModal.open(startupConnectMessaging);
-          start();
-        });
+  connectAttempt = serverConnect(app.serverConfigs.activeServer)
+    .done(() => start())
+    .fail(() => {
+      app.connectionManagmentModal.open();
+      app.loadingModal.close();
+      serverConnectEvents.once('connected', () => {
+        startupConnectMessaging.setState({ msg: '' });
+        app.loadingModal.open(startupConnectMessaging);
+        start();
       });
-  });
+    });
 }
 
 // Handle a server connection event.
@@ -814,7 +811,7 @@ app.serverConfigs.fetch().done(() => {
 
 // Clear localServer events on browser refresh.
 $(window).on('beforeunload', () => {
-  const { localServer } = app;
+  const localServer = getGlobal('localServer');
 
   if (localServer) {
     // Since on a refresh any browser variables go away,
@@ -933,7 +930,7 @@ ipcRenderer.on('close-attempt', (e) => {
   persistOutdatedListingHashes();
 
   // If on the bundled app, do not let the app shutdown until server shuts down.
-  const { localServer } = app;
+  const localServer = getGlobal('localServer');
 
   if (localServer && localServer.isRunning) {
     localServer.once('exit', () => e.sender.send('close-confirmed'));

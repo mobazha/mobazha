@@ -20,8 +20,8 @@ export default class LocalServer {
     }
 
     if (!options.getMainWindow || typeof options.getMainWindow !== 'function') {
-      throw new Error('Please provide a function that, if available, returns a mainWindow ' +
-        'instance.');
+      throw new Error('Please provide a function that, if available, returns a mainWindow '
+        + 'instance.');
     }
 
     _.extend(this, Events);
@@ -38,8 +38,8 @@ export default class LocalServer {
     ipcMain.on('server-shutdown-fail', (e, data = {}) => {
       if (this.isStopping && this.serverSubProcess) {
         const reasonInsert = data.reason ? ` (${data.reason})` : '';
-        const logMsg = `The server shutdown via api request failed${reasonInsert}. ` +
-          'Will forcibly shutdown.';
+        const logMsg = `The server shutdown via api request failed${reasonInsert}. `
+          + 'Will forcibly shutdown.';
 
         this.log(logMsg);
         this._forceKill();
@@ -68,8 +68,8 @@ export default class LocalServer {
   start(commandLineArgs = []) {
     if (this.isStopping) {
       this.serverSubProcess.once('exit', () => this.startAfterStop(commandLineArgs));
-      const debugInfo = 'Attempt to start server while an existing one' +
-        ' is the process of shutting down. Will start after shut down is complete.';
+      const debugInfo = 'Attempt to start server while an existing one'
+        + ' is the process of shutting down. Will start after shut down is complete.';
       this.log(debugInfo);
       return;
     }
@@ -79,8 +79,8 @@ export default class LocalServer {
         return;
       }
 
-      throw new Error('A server is already running with different command line options. Please ' +
-        'stop that server before starting a new one.');
+      throw new Error('A server is already running with different command line options. Please '
+        + 'stop that server before starting a new one.');
     }
 
     this._isRunning = true;
@@ -88,26 +88,28 @@ export default class LocalServer {
 
     // wire in our auth cookie
     if (global.authCookie) {
-      serverStartArgs = serverStartArgs.concat(['-c', global.authCookie]);
+      serverStartArgs = serverStartArgs.concat(['--apicookie', global.authCookie]);
     }
 
     this.log(`Starting local server via '${serverStartArgs.join(' ')}'.`);
     console.log(`Starting local server via '${serverStartArgs.join(' ')}'.`);
 
     this._lastStartCommandLineArgs = commandLineArgs;
-    this.serverSubProcess =
-      childProcess.spawn(this.serverPath + this.serverFilename,
-        serverStartArgs, {
-          detach: false,
-          cwd: this.serverPath,
-        });
+    this.serverSubProcess = childProcess.spawn(
+      this.serverPath + this.serverFilename,
+      serverStartArgs,
+      {
+        detach: false,
+        cwd: this.serverPath,
+      },
+    );
 
     this.serverSubProcess.stdout.once('data', () => {
       this.trigger('start');
     });
-    this.serverSubProcess.stdout.on('data', buf => this.obServerLog(`${buf}`));
+    this.serverSubProcess.stdout.on('data', (buf) => this.obServerLog(`${buf}`));
 
-    this.serverSubProcess.on('error', err => {
+    this.serverSubProcess.on('error', (err) => {
       const errOutput = `The local server child process has an error: ${err}`;
 
       fs.appendFile(this.errorLogPath, errOutput, (appendFileErr) => {
@@ -119,7 +121,7 @@ export default class LocalServer {
       this.log(errOutput);
     });
 
-    this.serverSubProcess.stderr.on('data', buf => {
+    this.serverSubProcess.stderr.on('data', (buf) => {
       fs.appendFile(this.errorLogPath, String(buf), (err) => {
         if (err) {
           console.log(`Unable to write to the error log: ${err}`);
@@ -146,8 +148,6 @@ export default class LocalServer {
     });
 
     this.serverSubProcess.unref();
-
-    return;
   }
 
   _forceKill() {
@@ -156,8 +156,8 @@ export default class LocalServer {
     }
 
     if (!this.isStopping) {
-      throw new Error('A force kill should only be attempted if you tried stopping via this.stop ' +
-        'and it failed.');
+      throw new Error('A force kill should only be attempted if you tried stopping via this.stop '
+        + 'and it failed.');
     }
 
     if (this.serverSubProcess) {
@@ -197,16 +197,19 @@ export default class LocalServer {
     this.log('Starting local server in status mode.');
     console.log('Starting local server in status mode.');
 
-    const subProcess =
-      childProcess.spawn(this.serverPath + this.serverFilename,
-        ['status', ...commandLineArgs], {
-          detach: false,
-          cwd: this.serverPath,
-        });
+    const subProcess = childProcess.spawn(
+      this.serverPath + this.serverFilename,
+      ['status', ...commandLineArgs],
 
-    subProcess.stdout.on('data', buf => this.obServerStatusLog(`${buf}`));
+      {
+        detach: false,
+        cwd: this.serverPath,
+      },
+    );
 
-    subProcess.on('error', err => {
+    subProcess.stdout.on('data', (buf) => this.obServerStatusLog(`${buf}`));
+
+    subProcess.on('error', (err) => {
       const errOutput = `Starting local server in status mode produced an error: ${err}`;
 
       fs.appendFile(this.errorLogPath, errOutput, (appendFileErr) => {
@@ -218,7 +221,7 @@ export default class LocalServer {
       this.log(errOutput);
     });
 
-    subProcess.stderr.on('data', buf => {
+    subProcess.stderr.on('data', (buf) => {
       fs.appendFile(this.errorLogPath, `[OB-SERVER-STATUS] ${String(buf)}`, (err) => {
         if (err) {
           console.log(`Unable to write to the error log: ${err}`);
@@ -294,8 +297,7 @@ export default class LocalServer {
     console.log(msg);
 
     const msgPreface = type ? `[${type}] ` : '';
-    msg.split(EOL).forEach(splitMsg =>
-      this._log(`${msgPreface}${splitMsg}`, serverType));
+    msg.split(EOL).forEach((splitMsg) => this._log(`${msgPreface}${splitMsg}`, serverType));
   }
 
   obServerStatusLog(msg, type = 'STDOUT') {

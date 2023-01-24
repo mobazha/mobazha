@@ -220,7 +220,7 @@ func setupVendor(n *core.OpenBazaarNode, moderatorID peer.ID) error {
 			return err
 		}
 		physicalListing := factory.NewPhysicalListing("ron-swanson-tshirt")
-		physicalListing.Item.Images = []*pb.Listing_Item_Image{
+		physicalListing.Item.Images = []*pb.Image{
 			{
 				Original: physicalImageHashes.Original,
 				Tiny:     physicalImageHashes.Tiny,
@@ -239,7 +239,7 @@ func setupVendor(n *core.OpenBazaarNode, moderatorID peer.ID) error {
 			return err
 		}
 		digitalListing := factory.NewPhysicalListing("ron-swanson-image")
-		digitalListing.Item.Images = []*pb.Listing_Item_Image{
+		digitalListing.Item.Images = []*pb.Image{
 			{
 				Original: digitalImageHashes.Original,
 				Tiny:     digitalImageHashes.Tiny,

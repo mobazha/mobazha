@@ -31,9 +31,9 @@ require (
 	github.com/gosimple/slug v1.13.1
 	github.com/ipfs/go-cid v0.3.2
 	github.com/ipfs/go-datastore v0.6.0
-	github.com/ipfs/go-ipfs-files v0.1.1
 	github.com/ipfs/go-ipld-format v0.4.0
 	github.com/ipfs/go-ipns v0.3.0
+	github.com/ipfs/go-libipfs v0.4.1-0.20230202010411-6399b73f974c
 	github.com/ipfs/go-log v1.0.5
 	github.com/ipfs/go-merkledag v0.9.0
 	github.com/ipfs/go-namesys v0.7.0
@@ -60,6 +60,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/teserakt-io/golang-ed25519 v0.0.0-20210104091850-3888c087a4c8
 	github.com/tyler-smith/go-bip39 v1.1.0
+	go.uber.org/fx v1.19.1
 	golang.org/x/crypto v0.5.0
 	golang.org/x/net v0.5.0
 	google.golang.org/protobuf v1.28.1
@@ -170,7 +171,6 @@ require (
 	github.com/ipfs/go-ipld-cbor v0.0.6 // indirect
 	github.com/ipfs/go-ipld-git v0.1.1 // indirect
 	github.com/ipfs/go-ipld-legacy v0.1.1 // indirect
-	github.com/ipfs/go-libipfs v0.4.1-0.20230202010411-6399b73f974c // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/ipfs/go-metrics-interface v0.0.1 // indirect
 	github.com/ipfs/go-mfs v0.2.1 // indirect
@@ -287,7 +287,6 @@ require (
 	go.opentelemetry.io/proto/otlp v0.16.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/dig v1.16.1 // indirect
-	go.uber.org/fx v1.19.1 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	go4.org v0.0.0-20201209231011-d4a079459e60 // indirect

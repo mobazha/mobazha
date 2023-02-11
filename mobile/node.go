@@ -96,5 +96,5 @@ func (n *Node) Start() {
 // Stop will stop the MobileNode.
 func (n *Node) Stop() {
 	n.done()
-	n.Stop()
+	n.node.Stop(true)
 }

@@ -47,7 +47,7 @@ export function followUnfollow(guid, type = 'follow') {
           type: app.polyglot.t(`follow.type${capitalize(type)}`),
           user: guid,
         }),
-        message: data.responseJSON && data.responseJSON.error || '',
+        message: data.responseJSON && data.responseJSON.reason || '',
       })
         .render()
         .open();

@@ -1,3 +1,4 @@
+import { getGlobal } from '@electron/remote';
 import _ from 'underscore';
 import MetricsModal from '../views/modals/MetricsModal';
 import app from '../app';
@@ -45,7 +46,7 @@ export function userStats() {
     crypto: p ? p.get('currencies') : pErr,
     displayCurrency: app.settings ? app.settings.get('localCurrency') : 'Settings Not Available',
     displayLanguage: app.localSettings.get('language'),
-    bundled: app.isBundledApp,
+    bundled: getGlobal('isBundledApp'),
     Tor: connectedServer ? !!connectedServer.useTor : torErr,
     DismissedDiscover: connectedServer ? !!connectedServer.dismissedDiscoverCallout : false,
     DismissedStore: connectedServer ? !!connectedServer.dismissedStoreWelcome : false,

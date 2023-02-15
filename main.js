@@ -107,8 +107,6 @@ if (isBundledApp) {
   global.authCookie = guid();
 }
 
-ipcMain.handle('get-localServer', () => global.localServer);
-
 const updatesSupported = process.platform === 'win32' || process.platform === 'darwin';
 global.updatesSupported = updatesSupported;
 
@@ -488,7 +486,7 @@ function createWindow() {
   });
 
   // and load the index.html of the app.
-  mainWindow.loadFile(`${__dirname}/.tmp/index.html`, { query: { isBundledApp, updatesSupported } });
+  mainWindow.loadURL(`file://${__dirname}/.tmp/index.html`);
 
   ipcMain.on('set-proxy', (e, id, socks5Setting = '') => {
     if (!id) {
@@ -609,8 +607,6 @@ app.on('activate', () => {
   if (mainWindow) mainWindow.show();
 });
 
-ipcMain.handle('getMainWindow', () => mainWindow);
-
 const handleObLink = (route) => {
   if (!route || typeof route !== 'string') {
     throw new Error('Please provide a route as a string.');
@@ -624,7 +620,6 @@ const handleObLink = (route) => {
     mainWindow.webContents.send('external-route', route);
   }
 };
-ipcMain.handle('externalRoute', () => global.externalRoute);
 
 app.on('open-url', (e, uri) => {
   e.preventDefault();

@@ -50,11 +50,6 @@ import defaultSearchProviders from './data/defaultSearchProviders';
 import VerifiedMods from './collections/VerifiedMods';
 import VerifiedModsError from './views/modals/VerifiedModsFetchError';
 
-console.log('test order processing error');
-console.log('test non-standard divis in a listing. test failed: #1853');
-console.log('ltc unconfirmed balance shows in confirmed');
-console.log('recheck card error scenario in listing card');
-
 fixLinuxZoomIssue();
 handleServerShutdownRequests();
 
@@ -64,10 +59,6 @@ bigNumber.config({ DECIMAL_PLACES: 50 });
 
 app.localSettings = new LocalSettings({ id: 1 });
 app.localSettings.fetch().fail(() => app.localSettings.save());
-
-const params = new URLSearchParams(global.location.search);
-app.isBundledApp = params.get('isBundledApp');
-app.updatesSupported = params.get('updatesSupported');
 
 // initialize language functionality
 function getValidLanguage(lang) {
@@ -121,10 +112,7 @@ app.pageNav = new PageNav({
 });
 $('#pageNavContainer').append(app.pageNav.render().el);
 
-let externalRoute = '';
-ipcRenderer.invoke('externalRoute').then((result) => {
-  externalRoute = result;
-});
+let externalRoute = getGlobal('externalRoute');
 
 app.router = new ObRouter();
 
@@ -595,7 +583,7 @@ function start() {
           localStorage.serverIdAtLastStart = curConn && curConn.server && curConn.server.id;
 
           // Metrics should only be run on bundled apps.
-          if (app.isBundledApp) {
+          if (getGlobal('isBundledApp')) {
             const metricsOn = app.localSettings.get('shareMetrics');
 
             if (metricsOn === undefined || metricsOn && isNewerVersion()) {
@@ -759,7 +747,7 @@ app.connectionManagmentModal = new ConnectionManagement({
 app.serverConfigs.fetch().done(() => {
   app.serverConfigs.migrate();
 
-  const isBundled = app.isBundledApp;
+  const isBundled = getGlobal('isBundledApp');
   if (!app.serverConfigs.length) {
     // no saved server configurations
     if (isBundled) {
@@ -799,7 +787,7 @@ app.serverConfigs.fetch().done(() => {
       activeServer = app.serverConfigs.activeServer = app.serverConfigs.at(0);
     }
 
-    if (activeServer.get('builtIn') && !app.isBundledApp) {
+    if (activeServer.get('builtIn') && !getGlobal('isBundledApp')) {
       // Your active server is the locally bundled server, but you're
       // not running the bundled app. You have bad data!
       activeServer.set('builtIn', false);
@@ -955,7 +943,7 @@ ipcRenderer.on('close-attempt', (e) => {
 // initialize our listing delete handler
 listingDeleteHandler();
 
-if (app.isBundledApp) {
+if (getGlobal('isBundledApp')) {
   console.log(
     `%c${app.polyglot.t('consoleWarning.heading')}`,
     'color: red; font-weight: bold; font-size: 50px;',

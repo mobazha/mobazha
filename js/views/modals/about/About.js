@@ -1,5 +1,6 @@
 import { version } from '../../../../package.json';
 import { ipcRenderer } from 'electron';
+import { getGlobal } from '@electron/remote';
 import $ from 'jquery';
 import app from '../../../app';
 import loadTemplate from '../../../utils/loadTemplate';
@@ -31,8 +32,8 @@ export default class extends BaseModal {
     };
 
     this.currentTabName = opts.initialTab;
-    this.isBundledApp = app.isBundledApp;
-    this.updatesSupported = app.updatesSupported;
+    this.isBundledApp = getGlobal('isBundledApp');
+    this.updatesSupported = getGlobal('updatesSupported');
   }
 
   className() {

@@ -1,6 +1,7 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import { ipcRenderer } from 'electron';
+import { getCurrentWindow } from '@electron/remote';
 import '../../utils/lib/velocity';
 import app from '../../app';
 import { getBody } from '../../utils/selectors';
@@ -179,10 +180,8 @@ export default class extends baseVw {
           if (!document.hasFocus() || !isConvoOpen) {
             const notifOptions = {
               onclick() {
-                ipcRenderer.invoke('getMainWindow').then((mainWindow) => {
-                  mainWindow.restore();
-                  location.hash = `#${msg.peerID}`;
-                });
+                getCurrentWindow().restore();
+                location.hash = `#${msg.peerId}`;
               },
               body: msg.message,
             };

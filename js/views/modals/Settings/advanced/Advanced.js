@@ -1,4 +1,5 @@
 import { clipboard } from 'electron';
+import { getGlobal } from '@electron/remote';
 import $ from 'jquery';
 import app from '../../../../app';
 import { openSimpleMessage } from '../../SimpleMessage';
@@ -256,7 +257,7 @@ export default class extends baseVw {
 
   render() {
     super.render();
-    const bundled = app.isBundledApp;
+    const bundled = getGlobal('isBundledApp');
     loadTemplate('modals/settings/advanced/advanced.html', (t) => {
       this.$el.html(t({
         errors: {

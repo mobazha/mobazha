@@ -156,15 +156,17 @@ export default class Profile extends BaseModel {
         if (response.moderatorInfo.fee.fixedFee.amount === '') { // legacy fixed fee
           response.moderatorInfo.fee.fixedFee = {
             amount: response.moderatorInfo.fee.fixedFee.amount,
-            currencyKey: response.moderatorInfo.fee.fixedFee.currencyCode,
+            currencyKey: response.moderatorInfo.fee.fixedFee.currency.code,
           };
         } else {
           response.moderatorInfo.fee.fixedFee = {
             amount: curDefToDecimal(response.moderatorInfo.fee.fixedFee, {
               amountKey: 'amount',
-              currencyKey: 'amountCurrency',
+              currencyKey: 'currency',
             }),
-            currencyCode: response.moderatorInfo.fee.fixedFee.amountCurrency.code,
+            currency: {
+              code: response.moderatorInfo.fee.fixedFee.currency.code,
+            }
           };
         }
       } catch (e) {
@@ -229,11 +231,11 @@ export default class Profile extends BaseModel {
             delete options.attrs.moderatorInfo.fee.fixedFee;
           } else {
             const amount = options.attrs.moderatorInfo.fee.fixedFee.amount;
-            const cur = options.attrs.moderatorInfo.fee.fixedFee.currencyCode;
+            const cur = options.attrs.moderatorInfo.fee.fixedFee.currency.code;
             options.attrs.moderatorInfo.fee.fixedFee =
               decimalToCurDef(amount, cur, {
                 amountKey: 'amount',
-                currencyKey: 'amountCurrency',
+                currencyKey: 'currency',
               });
 
             if (options.attrs.moderatorInfo.fee.feeType === feeTypes.FIXED) {

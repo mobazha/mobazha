@@ -6,7 +6,7 @@ import { getCoinDivisibility } from '../../utils/currency';
 export default class extends BaseModel {
   defaults() {
     return {
-      currencyCode: 'USD',
+      currency: {code: 'USD'},
     };
   }
 
@@ -20,14 +20,14 @@ export default class extends BaseModel {
     let coinDiv;
 
     if (
-      typeof attrs.currencyCode !== 'string' ||
-      !attrs.currencyCode ||
-      !getCurrencyByCode(attrs.currencyCode)
+      typeof attrs.currency.code !== 'string' ||
+      !attrs.currency.code ||
+      !getCurrencyByCode(attrs.currency.code)
     ) {
       addError('currencyCode', app.polyglot.t('fixedFeeModelErrors.noCurrency'));
     } else {
       try {
-        coinDiv = getCoinDivisibility(attrs.currencyCode);
+        coinDiv = getCoinDivisibility(attrs.currency.code);
       } catch (e) {
         // pass
       }
@@ -36,7 +36,7 @@ export default class extends BaseModel {
         {
           amount: attrs.amount,
           currency: {
-            code: attrs.currencyCode,
+            code: attrs.currency.code,
             divisibility: coinDiv,
           },
         },

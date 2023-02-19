@@ -52,7 +52,7 @@ export default class extends BaseModel {
     let contract = this.get('contract');
 
     if (this.isCase) {
-      contract = this.get('buyerOpened') ?
+      contract = this.get('disputeOpen').openedBy == "BUYER" ?
         this.get('buyerContract') :
         this.get('vendorContract');
     }

@@ -37,7 +37,7 @@ export default class extends BaseVw {
     this.contract = this.model.get('contract');
 
     if (this.model.isCase) {
-      this.contract = this.model.get('buyerOpened') ?
+      this.contract = this.model.get('disputeOpen').openedBy == "BUYER" ?
         this.model.get('buyerContract') :
         this.model.get('vendorContract');
     }

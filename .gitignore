@@ -11,3 +11,5 @@ error.log
 \.vscode/
 
 out/
+
+.env

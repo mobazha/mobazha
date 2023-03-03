@@ -23,20 +23,21 @@ module.exports = {
       FileDescription: 'Decentralized p2p marketplace for Cryptocurrencies',
       OriginalFilename: 'Mobazha',
     },
-    // osxNotarize: { // https://www.npmjs.com/package/electron-notarize#method-notarizeopts-promisevoid
-    //   tool: 'notarytool',
-    //   appleId: process.env.APPLE_ID,
-    //   appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD,
-    //   teamId: '...',
-    // },
-    // // macOS code-signing configs. See https://www.electronjs.org/docs/latest/tutorial/code-signing#electron-forge
-    // osxSign: { // https://www.npmjs.com/package/electron-osx-sign#opts
-    //   identity: '...',
-    //   'hardened-runtime': true,
-    //   entitlements: './static/entitlements.plist',
-    //   'entitlements-inherit': './static/entitlements.plist',
-    //   keychain: 'build.keychain',
-    // },
+    osxNotarize: { // https://www.npmjs.com/package/electron-notarize#method-notarizeopts-promisevoid
+      tool: 'notarytool',
+      appleId: process.env.APPLE_ID,
+      appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD,
+      teamId: '36RYSCJAD3',
+    },
+    // macOS code-signing configs. See https://www.electronjs.org/docs/latest/tutorial/code-signing#electron-forge
+    osxSign: { // https://www.npmjs.com/package/electron-osx-sign#opts
+      // identity: '...',
+      hardenedRuntime: true,
+      // entitlements: './static/entitlements.plist',
+      // 'entitlements-inherit': './static/entitlements.plist',
+      // keychain: 'build.keychain',
+      ignore: 'Contents/Resources/',
+    },
   },
   rebuildConfig: {},
   makers: [
@@ -50,8 +51,8 @@ module.exports = {
         noMsi: true,
         setupExe: `Mobazha-${version}-${arch}-setup.exe`,
         setupIcon: path.resolve(iconDir, 'openbazaar2.ico'),
-        // certificateFile: path.resolve(__dirname, '.travis', 'mycertificate.pfx'),
-        // certificatePassword: process.env.PFX_PASSWORD,
+        certificateFile: path.resolve(__dirname, '.travis', 'mobazha.org.pfx'),
+        certificatePassword: process.env.PFX_PASSWORD,
       }),
     },
     {

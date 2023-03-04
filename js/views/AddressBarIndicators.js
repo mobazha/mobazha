@@ -1,3 +1,4 @@
+import app from '../app';
 import loadTemplate from '../utils/loadTemplate';
 import baseVw from './baseVw';
 import * as isIPFS from 'is-ipfs';
@@ -32,7 +33,7 @@ export default class extends baseVw {
       const currentPage = urlParts[1];
 
       if (supportedPages.includes(currentPage)) {
-        const obDotCom = 'https://mobazha.info';
+        const obDotCom = `https://${app.serverConfig.testnet ? 'console.' : ''}mobazha.info`;
         const peerID = urlParts[0];
 
         if (currentPage === 'store') {

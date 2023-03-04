@@ -6,17 +6,18 @@ const iconDir = path.resolve(__dirname, 'imgs');
 
 module.exports = {
   packagerConfig: {
-    // asar: true,
-    out: 'dist',
-    appCategoryType: 'public.app-category.business',
-    overwrite: true,
+    asar: true,
     protocols: [
       {
         name: 'Mobazha',
         schemes: ['ob', 'mbz'],
       },
     ],
-    ignore: 'MOBAZHA_TEMP',
+    icon: path.resolve(iconDir, process.platform === 'darwin' ? 'icon.icns' : 'icon.ico'),
+    // ignore: 'mobazha',
+    // extraResource: [
+    //   'mobazha',
+    // ],
     win32metadata: {
       ProductName: 'Mobazha',
       CompanyName: 'Mogaolei',
@@ -36,7 +37,7 @@ module.exports = {
       // entitlements: './static/entitlements.plist',
       // 'entitlements-inherit': './static/entitlements.plist',
       // keychain: 'build.keychain',
-      ignore: 'Contents/Resources/',
+      ignore: 'Contents/Resources/app',
     },
   },
   rebuildConfig: {},
@@ -47,10 +48,10 @@ module.exports = {
         name: 'Mobazha',
         authors: 'Mogaolei',
         exe: 'Mobazha.exe',
-        iconUrl: path.resolve(iconDir, 'openbazaar2.ico'),
+        iconUrl: path.resolve(iconDir, 'icon.ico'),
         noMsi: true,
         setupExe: `Mobazha-${version}-${arch}-setup.exe`,
-        setupIcon: path.resolve(iconDir, 'openbazaar2.ico'),
+        setupIcon: path.resolve(iconDir, 'icon.ico'),
         certificateFile: path.resolve(__dirname, '.travis', 'mobazha.org.pfx'),
         certificatePassword: process.env.PFX_PASSWORD,
       }),
@@ -58,9 +59,9 @@ module.exports = {
     {
       name: '@electron-forge/maker-dmg',
       config: (arch) => ({ // https://js.electronforge.io/maker/dmg/interfaces/makerdmgconfig
-        background: './imgs/osx-finder_background.png',
+        background: path.resolve(iconDir, 'osx-finder_background.png'),
         format: 'ULFO',
-        icon: './imgs/openbazaar2.icns',
+        icon: path.resolve(iconDir, 'icon.icns'),
         name: `Mobazha-${version}-${arch}`,
         overwrite: true,
       }),

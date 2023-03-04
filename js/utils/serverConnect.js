@@ -322,7 +322,7 @@ export default function connect(server, options = {}) {
 
   const newServerDataDir = server.get('dataDir');
 
-  let commandLineArgs = ['-v'];
+  let commandLineArgs = ['-t', '-v'];
 
   if (server.get('useTor')) commandLineArgs.push('--tor');
   const torPw = server.get('torPassword');

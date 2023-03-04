@@ -11,5 +11,6 @@ error.log
 \.vscode/
 
 out/
+mobazha/
 
 .env

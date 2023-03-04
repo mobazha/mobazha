@@ -85,7 +85,7 @@ if (handleStartupEvent()) {
   console.log('Mobazha started on Windows...');
 }
 
-const serverPath = `${__dirname}${path.sep}..${path.sep}mobazha${path.sep}`;
+const serverPath = `${__dirname}${path.sep}mobazha${path.sep}`;
 const serverFilename = process.platform === 'darwin' || process.platform === 'linux'
   ? 'mobazhad' : 'mobazhad.exe';
 const isBundledApp = fs.existsSync(serverPath + serverFilename);
@@ -115,13 +115,13 @@ let defaultUserDataPath;
 
 switch (process.platform) {
   case 'win32':
-    defaultUserDataPath = `${homedir()}\\OpenBazaar2.0-ClientData`;
+    defaultUserDataPath = `${homedir()}\\Mobazha-ClientData`;
     break;
   case 'darwin':
-    defaultUserDataPath = `${homedir()}/Library/Application Support/OpenBazaar2.0-ClientData`;
+    defaultUserDataPath = `${homedir()}/Library/Application Support/Mobazha-ClientData`;
     break;
   default:
-    defaultUserDataPath = `${homedir()}/.openbazaar2.0-clientData`;
+    defaultUserDataPath = `${homedir()}/.mobazha-clientData`;
 }
 
 const userDataPath = argv.userData || defaultUserDataPath;
@@ -399,8 +399,8 @@ function createWindow() {
   });
 
   // put logic here to set tray icon based on OS
-  let osTrayIcon = 'openbazaar-system-tray.png';
-  if (process.platform === 'darwin') osTrayIcon = 'openbazaar-mac-system-tray.png';
+  let osTrayIcon = 'mobazha-system-tray.png';
+  if (process.platform === 'darwin') osTrayIcon = 'mobazha-mac-system-tray.png';
 
   trayMenu = new Tray(`${__dirname}/imgs/${osTrayIcon}`);
 

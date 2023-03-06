@@ -38,3 +38,7 @@ openbazaar-go*
 
 # macOS
 .DS_Store
+
+mobile.aar
+mobile-sources.jar
+Mobile.xcframework

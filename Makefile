@@ -4,7 +4,9 @@
 
 .PHONY: ios_framework
 ios_framework: ## Build iOS Framework for mobile
-	gomobile bind -target=ios -iosversion=10 -ldflags="-s -w" -tags notor github.com/cpacia/openbazaar3.0/mobile
+# https://github.com/libp2p/go-libp2p-connmgr/issues/98
+# https://github.com/libp2p/go-libp2p/pull/1666
+	gomobile bind -target=ios -iosversion=10 -ldflags="-s -w" -tags "nowatchdog notor" github.com/cpacia/openbazaar3.0/mobile
 
 .PHONY: android_framework
 android_framework: ## Build Android Framework for mobile

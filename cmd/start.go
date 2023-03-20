@@ -110,7 +110,7 @@ func printSplashScreen() {
 		`        \/           \/     \/      \/    \/     \/ `,
 	} {
 		if i%2 == 0 {
-			if _, err := white.Printf(l); err != nil {
+			if _, err := white.Println(l); err != nil {
 				log.Debug(err)
 				return
 			}
@@ -125,5 +125,5 @@ func printSplashScreen() {
 	blue.DisableColor()
 	white.DisableColor()
 	fmt.Println("")
-	fmt.Printf("\nopenbazaar-go v%s\n", version.String())
+	fmt.Printf("\nmobazha-go v%s\n", version.String())
 }

@@ -31,7 +31,7 @@ protos:
 ##
 
 sample-config:
-	cd repo && go-bindata -pkg=repo sample-openbazaar.conf
+	cd repo && go-bindata -pkg=repo sample-mobazha.conf
 
 ##
 ## Docker

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sort"
 
 	"github.com/cpacia/openbazaar3.0/core"
@@ -19,6 +20,26 @@ import (
 
 var log = logging.MustGetLogger("CMD")
 
+func migrate() {
+	repoPath := repo.DefaultHomeDir
+
+	defaultConfigFile := filepath.Join(repoPath, "mobazha.conf")
+	if _, err := os.Stat(defaultConfigFile); err != nil {
+		oldConfigFile := filepath.Join(repoPath, "openbazaar.conf")
+		if _, err := os.Stat(oldConfigFile); err == nil {
+			os.Rename(oldConfigFile, defaultConfigFile)
+		}
+	}
+
+	defaultDBFile := filepath.Join(repoPath, "mobazha.db")
+	if _, err := os.Stat(defaultDBFile); err != nil {
+		oldDBFile := filepath.Join(repoPath, "openbazaar.db")
+		if _, err := os.Stat(oldDBFile); err == nil {
+			os.Rename(oldDBFile, defaultDBFile)
+		}
+	}
+}
+
 // Start is the main entry point for openbazaar-go. The options to this
 // command are the same as the OpenBazaar node config options.
 type Start struct {
@@ -27,6 +48,8 @@ type Start struct {
 
 // Execute starts the OpenBazaar node.
 func (x *Start) Execute(args []string) error {
+	migrate()
+
 	cfg, err := repo.LoadConfig()
 	if err != nil {
 		return err

@@ -148,7 +148,7 @@ export default class extends BaseModal {
 
     // get the ratings data, if any
     this.ratingsFetch =
-      $.get(app.getServerUrl(`ob/ratings/${this.vendor.peerID}/${this.model.get('slug')}`))
+      $.get(app.getServerUrl(`ob/ratingindex/${this.vendor.peerID}/${this.model.get('slug')}`))
         .done(data => this.onRatings(data))
         .fail((jqXhr) => {
           if (jqXhr.statusText === 'abort') return;

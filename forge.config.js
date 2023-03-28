@@ -7,6 +7,7 @@ const iconDir = path.resolve(__dirname, 'imgs');
 module.exports = {
   packagerConfig: {
     asar: true,
+    executableName: "mobazha-desktop",
     protocols: [
       {
         name: 'Mobazha',

@@ -20,7 +20,7 @@ module.exports = {
     //   'mobazha',
     // ],
     win32metadata: {
-      ProductName: 'Mobazha',
+      ProductName: 'MobazhaDesktopClient',
       CompanyName: 'Mogaolei',
       FileDescription: 'Decentralized p2p marketplace for Cryptocurrencies',
       OriginalFilename: 'Mobazha',

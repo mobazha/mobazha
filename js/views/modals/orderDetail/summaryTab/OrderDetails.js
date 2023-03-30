@@ -119,7 +119,12 @@ export default class extends BaseVw {
       });
 
       if (Array.isArray(skus)) {
-        const matchingSku = skus.find(sku => _.isEqual(sku.variantCombo, indexes));
+        const selections = indexes.map((val, idx) => ({
+          option: orderOptions[idx].name,
+          variant: orderOptions[idx].variants[val].name,
+        }));
+
+        const matchingSku = skus.find((sku) => _.isEqual(sku.selections, selections));
         return matchingSku && matchingSku.productID || '';
       }
     } else {

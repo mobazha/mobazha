@@ -657,11 +657,16 @@ export default class extends BaseModal {
         const variants = this.listing.get('item').get('options').at(i)
           .get('variants')
           .toJSON();
-        const variantIndex = variants.findIndex(variant => variant.name === option.get('value'));
+        const variantIndex = variants.findIndex((variant) => variant.name === option.get('value'));
         variantCombo.push(variantIndex);
       });
-      const sku = this.listing.get('item').get('skus').find(v =>
-        _.isEqual(v.get('variantCombo'), variantCombo));
+
+      const options = item.get('options');
+      const selections = variantCombo.map((val, idx) => ({
+        option: options[idx].name,
+        variant: options[idx].variants[val].name,
+      }));
+      const sku = this.listing.get('item').get('skus').find((v) => _.isEqual(v.get('selections'), selections));
 
       return {
         price: bigNumber(this.listing.price.amount),

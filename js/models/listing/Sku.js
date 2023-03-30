@@ -31,21 +31,22 @@ export default class extends BaseModel {
       addError('productID', `The productID cannot exceed ${this.max.productIdLength} characters.`);
     }
 
-    if (typeof attrs.infiniteInventory !== 'undefined' &&
-      typeof attrs.infiniteInventory !== 'boolean') {
+    if (typeof attrs.infiniteInventory !== 'undefined'
+      && typeof attrs.infiniteInventory !== 'boolean') {
       addError('infiniteInventory', 'If provided, infiniteInventory should be a boolean.');
     }
 
     if (attrs.infiniteInventory) {
       if (attrs.quantity) {
-        addError('quantity', 'quantity should not be provided if provided if ' +
-          'infiniteInventory is truthy.');
+        addError('quantity', 'quantity should not be provided if provided if '
+          + 'infiniteInventory is truthy.');
       }
     } else {
+      // eslint-disable-next-line no-lonely-if
       if (
-        attrs.quantity === '' ||
-        attrs.quantity === undefined ||
-        attrs.quantity === null
+        attrs.quantity === ''
+        || attrs.quantity === undefined
+        || attrs.quantity === null
       ) {
         addError('quantity', app.polyglot.t('skuModelErrors.provideQuantity'));
       } else if (
@@ -69,13 +70,13 @@ export default class extends BaseModel {
       }
     }
 
-    // The listing API does not require a variantCombo field, since if you have no options and
+    // The listing API does not require a selections field, since if you have no options and
     // want to assign a quantity and / or productId to an Item you would create a "dummy" Sku object
     // and set the values there. That seems like a bit of a klunky way to do it, so the client will
     // not allow such a dummy SKU. Instead, the Item model will allow quantity and productId fields
     // and convert them to / from a dummy SKU in sync / parse.
-    if (!is.array(attrs.variantCombo)) {
-      addError('variantCombo', 'A variantCombo field must be provided and must be an array.');
+    if (!is.array(attrs.selections)) {
+      addError('selections', 'A selections field must be provided and must be an array.');
     }
 
     if (Object.keys(errObj).length) return errObj;

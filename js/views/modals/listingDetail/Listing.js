@@ -24,7 +24,7 @@ import Rating from './Rating';
 import Reviews from '../../reviews/Reviews';
 import SocialBtns from '../../components/SocialBtns';
 // import QuantityDisplay from '../../components/QuantityDisplay';
-import { events as listingEvents } from '../../../models/listing/';
+import { events as listingEvents } from '../../../models/listing';
 import Listings from '../../../collections/Listings';
 import PopInMessage, { buildRefreshAlertMessage } from '../../components/PopInMessage';
 import { openSimpleMessage } from '../SimpleMessage';
@@ -83,21 +83,23 @@ export default class extends BaseModal {
     this.vendor = this.vendor || opts.vendor;
 
     this.countryData = getTranslatedCountries()
-      .map(countryObj => ({ id: countryObj.dataName, text: countryObj.name }));
+      .map((countryObj) => ({ id: countryObj.dataName, text: countryObj.name }));
 
-    this.defaultCountry = app.settings.get('shippingAddresses').length ?
-      app.settings.get('shippingAddresses').at(0).get('country') : app.settings.get('country');
+    this.defaultCountry = app.settings.get('shippingAddresses').length
+      ? app.settings.get('shippingAddresses').at(0).get('country') : app.settings.get('country');
 
-    this.listenTo(app.settings, 'change:country', () =>
-      (this.shipsFreeToMe = this.model.shipsFreeToMe));
+    this.listenTo(app.settings, 'change:country', () => (this.shipsFreeToMe = this.model.shipsFreeToMe));
 
-    this.listenTo(app.settings.get('shippingAddresses'), 'update',
+    this.listenTo(
+      app.settings.get('shippingAddresses'),
+      'update',
       (cl, updateOpts) => {
-        if (updateOpts.changes.added.length ||
-          updateOpts.changes.removed.length) {
+        if (updateOpts.changes.added.length
+          || updateOpts.changes.removed.length) {
           this.shipsFreeToMe = this.model.shipsFreeToMe;
         }
-      });
+      },
+    );
 
     this.listenTo(this.model, 'someChange', () => this.showDataChangedMessage());
 
@@ -108,7 +110,7 @@ export default class extends BaseModal {
           // Factoring out the inventory from the listing data because
           // the inventory will auto-update on a change - no need for a
           // refresh pop-up if that's the only thing that changed.
-          const prev = e.prev;
+          const { prev } = e;
           delete prev.item.cryptoQuantity;
 
           const cur = md.toJSON();
@@ -139,7 +141,7 @@ export default class extends BaseModal {
       }
     });
 
-    this.listenTo(outdatedListingHashesEvents, 'newHash', e => {
+    this.listenTo(outdatedListingHashesEvents, 'newHash', (e) => {
       this._latestHash = e.newHash;
       if (e.oldHash === this._renderedHash) this.outdateHash();
     });
@@ -147,16 +149,16 @@ export default class extends BaseModal {
     this.rating = this.createChild(Rating);
 
     // get the ratings data, if any
-    this.ratingsFetch =
-      $.get(app.getServerUrl(`ob/ratingindex/${this.vendor.peerID}/${this.model.get('slug')}`))
-        .done(data => this.onRatings(data))
-        .fail((jqXhr) => {
-          if (jqXhr.statusText === 'abort') return;
-          const failReason = jqXhr.responseJSON && jqXhr.responseJSON.reason || '';
-          openSimpleMessage(
-            app.polyglot.t('listingDetail.errors.fetchRatings'),
-            failReason);
-        });
+    this.ratingsFetch = $.get(app.getServerUrl(`ob/ratingindex/${this.vendor.peerID}/${this.model.get('slug')}`))
+      .done((data) => this.onRatings(data))
+      .fail((jqXhr) => {
+        if (jqXhr.statusText === 'abort') return;
+        const failReason = jqXhr.responseJSON && jqXhr.responseJSON.reason || '';
+        openSimpleMessage(
+          app.polyglot.t('listingDetail.errors.fetchRatings'),
+          failReason,
+        );
+      });
 
     this.reviews = this.createChild(Reviews, {
       async: true,
@@ -200,9 +202,8 @@ export default class extends BaseModal {
 
     this.moreListingsCol = new Listings([], { guid: this.vendor.peerID });
 
-    const fetchOpts =
-      this.vendor.peerID === app.profile.id ? {} :
-      {
+    const fetchOpts = this.vendor.peerID === app.profile.id ? {}
+      : {
         data: $.param({
           'max-age': 60 * 60, // 1 hour
         }),
@@ -228,7 +229,7 @@ export default class extends BaseModal {
 
     this.purchaseErrorT = null;
     loadTemplate('modals/listingDetail/purchaseError.html',
-      t => (this.purchaseErrorT = t));
+      (t) => (this.purchaseErrorT = t));
   }
 
   className() {
@@ -330,8 +331,8 @@ export default class extends BaseModal {
       this.$deleteListing.addClass('processing');
 
       this.destroyRequest.done(() => {
-        if (this.destroyRequest.statusText === 'abort' ||
-          this.isRemoved()) return;
+        if (this.destroyRequest.statusText === 'abort'
+          || this.isRemoved()) return;
 
         this.close();
       }).always(() => {
@@ -377,8 +378,8 @@ export default class extends BaseModal {
     }
 
     return _.shuffle(cl.models)
-      .filter(md => md.get('slug') !== this.model.get('slug'))
-      .map(md => md.toJSON())
+      .filter((md) => md.get('slug') !== this.model.get('slug'))
+      .map((md) => md.toJSON())
       .slice(0, 8);
   }
 
@@ -430,20 +431,20 @@ export default class extends BaseModal {
   }
 
   activateZoom() {
-    if (this.$photoSelectedInner.width() >= this.$photoSelected.width() ||
-        this.$photoSelectedInner.height() >= this.$photoSelected.height()) {
+    if (this.$photoSelectedInner.width() >= this.$photoSelected.width()
+        || this.$photoSelectedInner.height() >= this.$photoSelected.height()) {
       this.$photoSelected
-          .removeClass('unzoomable')
-          .zoom({
-            url: this.$photoSelectedInner.attr('src'),
-            on: 'click',
-            onZoomIn: () => {
-              this.$photoSelected.addClass('open');
-            },
-            onZoomOut: () => {
-              this.$photoSelected.removeClass('open');
-            },
-          });
+        .removeClass('unzoomable')
+        .zoom({
+          url: this.$photoSelectedInner.attr('src'),
+          on: 'click',
+          onZoomIn: () => {
+            this.$photoSelected.addClass('open');
+          },
+          onZoomOut: () => {
+            this.$photoSelected.removeClass('open');
+          },
+        });
     } else {
       this.$photoSelected.addClass('unzoomable');
     }
@@ -505,20 +506,21 @@ export default class extends BaseModal {
       variantCombo.push($(select).prop('selectedIndex'));
     });
 
+    const { options } = this.model.toJSON().item;
+    const selections = variantCombo.map((val, idx) => ({
+      option: options[idx].name,
+      variant: options[idx].variants[val].name,
+    }));
+
     // each sku has a code that matches the selected variant index combos
     const sku = this.model
       .get('item')
       .get('skus')
-      .find(v =>
-        _.isEqual(v.get('variantCombo'), variantCombo));
+      .find((v) => _.isEqual(v.get('selections'), selections));
     const surcharge = sku ? sku.get('surcharge') : bigNumber('0');
 
     try {
-      const _totalPrice =
-        this.model
-          .price
-          .amount
-          .plus(surcharge);
+      const _totalPrice = this.model.price.amount.plus(surcharge);
 
       if (!_totalPrice.eq(this.totalPrice)) {
         this.totalPrice = _totalPrice;
@@ -567,11 +569,11 @@ export default class extends BaseModal {
 
   outdateHash() {
     const tip = app.polyglot.t('listingDetail.errors.outdatedHash', {
-      reloadLink: '<a class="js-reloadOutdated">' +
-        `${app.polyglot.t('listingDetail.errors.reloadOutdatedHash')}<a>`,
+      reloadLink: '<a class="js-reloadOutdated">'
+        + `${app.polyglot.t('listingDetail.errors.reloadOutdatedHash')}<a>`,
     });
     this.getCachedEl('.js-purchaseErrorWrap').html(
-      this.purchaseErrorT({ tip })
+      this.purchaseErrorT({ tip }),
     );
     this.getCachedEl('.js-purchaseBtn').addClass('disabled');
   }
@@ -603,7 +605,7 @@ export default class extends BaseModal {
       if (destination === 'ALL') return option.regions;
       return option.regions.includes(destination);
     });
-    loadTemplate('modals/listingDetail/shippingOptions.html', t => {
+    loadTemplate('modals/listingDetail/shippingOptions.html', (t) => {
       this.$shippingOptions.html(t({
         templateData,
         displayCurrency: app.settings.get('localCurrency'),
@@ -625,8 +627,7 @@ export default class extends BaseModal {
    * is created. Will also fire a notifications when one is destroyed.
    */
   get purchaseModal() {
-    this._purchaseModalDeferred =
-      this._purchaseModalDeferred || $.Deferred();
+    this._purchaseModalDeferred = this._purchaseModalDeferred || $.Deferred();
 
     if (this._purchaseModal) {
       this._purchaseModalDeferred.notify({
@@ -641,8 +642,10 @@ export default class extends BaseModal {
   startPurchase() {
     if (!this.model.isCrypto) {
       if (this.totalPrice.lte(0)) {
-        openSimpleMessage(app.polyglot.t('listingDetail.errors.noPurchaseTitle'),
-          app.polyglot.t('listingDetail.errors.zeroPriceMsg'));
+        openSimpleMessage(
+          app.polyglot.t('listingDetail.errors.noPurchaseTitle'),
+          app.polyglot.t('listingDetail.errors.zeroPriceMsg'),
+        );
         return;
       }
     // Commenting out inventory related stuff for now since it's broken on the server.
@@ -721,43 +724,43 @@ export default class extends BaseModal {
   }
 
   get $popInMessages() {
-    return this._$popInMessages ||
-      (this._$popInMessages = this.$('.js-popInMessages'));
+    return this._$popInMessages
+      || (this._$popInMessages = this.$('.js-popInMessages'));
   }
 
   get $photoSection() {
-    return this._$photoSection ||
-      (this._$photoSection = this.$('.js-photoSection'));
+    return this._$photoSection
+      || (this._$photoSection = this.$('.js-photoSection'));
   }
 
   get $photoSelected() {
-    return this._$photoSelected ||
-      (this._$photoSelected = this.$('.js-photoSelected'));
+    return this._$photoSelected
+      || (this._$photoSelected = this.$('.js-photoSelected'));
   }
 
   get $shippingSection() {
-    return this._$shippingSection ||
-      (this._$shippingSection = this.$('#shippingSection'));
+    return this._$shippingSection
+      || (this._$shippingSection = this.$('#shippingSection'));
   }
 
   get $shippingOptions() {
-    return this._$shippingOptions ||
-      (this._$shippingOptions = this.$('.js-shippingOptions'));
+    return this._$shippingOptions
+      || (this._$shippingOptions = this.$('.js-shippingOptions'));
   }
 
   get $photoRadioBtns() {
-    return this._$photoRadioBtns ||
-      (this._$photoRadioBtns = this.$('.js-photoSelect'));
+    return this._$photoRadioBtns
+      || (this._$photoRadioBtns = this.$('.js-photoSelect'));
   }
 
   get $storeOwnerAvatar() {
-    return this._$storeOwnerAvatar ||
-      (this._$storeOwnerAvatar = this.$('.js-storeOwnerAvatar'));
+    return this._$storeOwnerAvatar
+      || (this._$storeOwnerAvatar = this.$('.js-storeOwnerAvatar'));
   }
 
   get $deleteConfirmedBox() {
-    return this._$deleteConfirmedBox ||
-      (this._$deleteConfirmedBox = this.$('.js-deleteConfirmedBox'));
+    return this._$deleteConfirmedBox
+      || (this._$deleteConfirmedBox = this.$('.js-deleteConfirmedBox'));
   }
 
   remove() {
@@ -777,17 +780,17 @@ export default class extends BaseModal {
     const defaultBadge = app.verifiedMods.defaultBadge(this.model.get('moderators'));
     let nsfwWarning;
 
-    if (!this.rendered &&
-      this.options.checkNsfw &&
-      this.model.get('item').get('nsfw') &&
-      !this.model.isOwnListing && !app.settings.get('showNsfw')) {
+    if (!this.rendered
+      && this.options.checkNsfw
+      && this.model.get('item').get('nsfw')
+      && !this.model.isOwnListing && !app.settings.get('showNsfw')) {
       nsfwWarning = new NsfwWarning()
         .render()
         .open();
       this.listenTo(nsfwWarning, 'canceled', () => this.close());
     }
 
-    loadTemplate('modals/listingDetail/listing.html', t => {
+    loadTemplate('modals/listingDetail/listing.html', (t) => {
       const flatModel = this.model.toJSON();
 
       this.$el.html(t({

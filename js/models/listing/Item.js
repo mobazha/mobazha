@@ -218,10 +218,9 @@ export default class extends BaseModel {
       addError('skus', 'You have provided more SKUs than variant combinations.');
     }
 
-    // ensure no SKUs with the same variantCombo
+    // ensure no SKUs with the same selections
     // http://stackoverflow.com/a/24968449/632806
-    const uniqueSkus = attrs.skus.map((sku) =>
-      ({ count: 1, name: JSON.stringify(sku.get('variantCombo')) }))
+    const uniqueSkus = attrs.skus.map((sku) => ({ count: 1, name: JSON.stringify(sku.get('selections')) }))
       .reduce((a, b) => {
         a[b.name] = (a[b.name] || 0) + b.count;
         return a;
@@ -233,26 +232,34 @@ export default class extends BaseModel {
       addError('skus', `Variant combos must be unique. ${dupeSku} is duplicated.`);
     });
 
+    const optionsNames = attrs.options.map((option) => option.get('name'));
     attrs.skus.forEach((sku) => {
-      const varCombo = sku.variantCombo;
+      const varSelections = sku.selections;
 
-      // ensure that each SKU has a variantCombo with the correct length
+      // ensure that each SKU has a selections with the correct length
       // (which is the length of the options)
-      if (is.array(varCombo)) {
-        // ensure the variantCombo actually corresponds to a provided option.variant value
-        varCombo.forEach((val, index) => {
-          if (!attrs.options[index]
-            || !attrs.options[index].variants
-            || !attrs.options[index].variants.length
-            || !attrs.options[index].variants[val]) {
-            addError('skus', `Invalid variant combo ${JSON.stringify(varCombo)}.`);
+      if (is.array(varSelections)) {
+        // ensure the selections actually corresponds to a provided option.variant value
+        varSelections.forEach((val) => {
+          const optIndex = optionsNames.indexOf(val.get('option'));
+          if (optIndex === -1) {
+            addError('skus', `Invalid option, variant selections ${JSON.stringify(varSelections)}.`);
+          }
+
+          if (!attrs.options[optIndex].variants
+            || !attrs.options[optIndex].variants.length) {
+            addError('skus', `Empty variant in option, variant selections ${JSON.stringify(varSelections)}.`);
+          }
+
+          const variantNames = attrs.options[optIndex].get('variants').map((variant) => variant.get('name'));
+          if (variantNames.indexOf(val.get('variant')) === -1) {
+            addError('skus', `Invalid variant, variant selections ${JSON.stringify(varSelections)}.`);
           }
         });
       }
     });
 
     // Ensure no duplicate VariantOption names.
-    const optionsNames = attrs.options.map((option) => option.get('name'));
     attrs.options.forEach((option, index) => {
       if (optionsNames.indexOf(option.get('name')) !== index) {
         addError(`options[${option.cid}].name`, app.polyglot.t('itemModelErrors.duplicateOptionName'));

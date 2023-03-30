@@ -31,8 +31,8 @@ export default class extends baseVw {
     // in a more robust way than relying on order which can change.
     if (this.optionsCl.length) {
       this.collection.forEach((sku) => {
-        const variantCombo = sku.get('variantCombo');
-        sku.set('mappingId', this.buildIdFromVariantCombo(variantCombo));
+        const selections = sku.get('selections');
+        sku.set('mappingId', this.buildIdFromSelections(selections));
       });
     }
 
@@ -89,23 +89,18 @@ export default class extends baseVw {
     return returnVal;
   }
 
-  buildIdFromVariantCombo(variantCombo, options = this.optionsCl) {
-    if (!_.isArray(variantCombo)) {
-      throw new Error('Please provide a variantCombo as an array.');
+  buildIdFromSelections(selections, options = this.optionsCl) {
+    if (!_.isArray(selections)) {
+      throw new Error('Please provide a selections as an array.');
     }
 
     let id = '';
 
-    variantCombo.forEach((variantIndex, index) => {
-      const option = options.at(index);
+    selections.forEach((val) => {
+      const option = options.find((opt) => opt.get('name') === val.option);
 
       if (option) {
-        const choice = option.get('variants')
-          .at(variantIndex);
-
-        if (choice) {
-          id += `${id.length ? '/' : ''}${option.id}-${choice.get('name')}`;
-        }
+        id += `${id.length ? '/' : ''}${option.id}-${val.variant}`;
       }
     });
 
@@ -134,14 +129,19 @@ export default class extends baseVw {
           choices.push(options[index].variants[comboIndex].name);
         });
 
+        const selections = combo.map((val, idx) => ({
+          option: options[idx].name,
+          variant: options[idx].variants[val].name,
+        }));
+
         let data = {
           choices,
-          variantCombo: combo,
+          selections,
         };
 
-        const id = this.buildIdFromVariantCombo(combo);
+        const id = this.buildIdFromSelections(selections);
 
-        // If there is an existing sku for this variantCombo, we'll
+        // If there is an existing sku for this selections, we'll
         // merge its data in
         const sku = this.collection.findWhere({ mappingId: id });
 

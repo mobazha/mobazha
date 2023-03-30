@@ -1,10 +1,11 @@
+/* eslint-disable no-lonely-if */
+/* eslint-disable class-methods-use-this */
+/* eslint-disable max-classes-per-file */
 import is from 'is_js';
 import { Collection } from 'backbone';
 import { guid } from '../../utils';
 import { isValidNumber } from '../../utils/number';
 import app from '../../app';
-import { getCurrencyByCode } from '../../data/currencies';
-import { isValidCoinDivisibility } from '../../utils/currency';
 import BaseModel from '../BaseModel';
 import Image from './Image';
 import VariantOptions from '../../collections/listing/VariantOptions';
@@ -102,7 +103,7 @@ export default class extends BaseModel {
       // If we have options and at least one has a non-infinite inventory,
       // we'll consider you to be tracking inventory
       isInventoryTracked = !!this.get('skus')
-        .find(sku => !sku.get('infiniteInventory'));
+        .find((sku) => !sku.get('infiniteInventory'));
     } else {
       // If you don't have any options and have the top level as a non-negative
       // value (i.e. not infiniteInventory), we'll consider you to be tracking inventory
@@ -147,8 +148,7 @@ export default class extends BaseModel {
     if (attrs.tags) {
       if (is.array(attrs.tags)) {
         if (attrs.tags.length > max.tags) {
-          addError('tags',
-            app.polyglot.t('itemModelErrors.tooManyTags', { maxTags: max.tags }));
+          addError('tags', app.polyglot.t('itemModelErrors.tooManyTags', { maxTags: max.tags }));
         }
 
         attrs.tags.forEach((tag, index) => {
@@ -164,8 +164,7 @@ export default class extends BaseModel {
     }
 
     if (attrs.categories && attrs.categories.length > max.cats) {
-      addError('categories',
-        app.polyglot.t('itemModelErrors.tooManyCats', { maxCats: max.cats }));
+      addError('categories', app.polyglot.t('itemModelErrors.tooManyCats', { maxCats: max.cats }));
     }
 
     // Quantity and productId are not allowed on the Item in the listing API. Instead they are
@@ -186,9 +185,9 @@ export default class extends BaseModel {
       }
     } else {
       if (
-        attrs.quantity === 'undefined' ||
-        attrs.quantity === null ||
-        attrs.quantity === ''
+        attrs.quantity === 'undefined'
+        || attrs.quantity === null
+        || attrs.quantity === ''
       ) {
         addError('quantity', app.polyglot.t('itemModelErrors.provideQuantity'));
       } else if (
@@ -221,7 +220,7 @@ export default class extends BaseModel {
 
     // ensure no SKUs with the same variantCombo
     // http://stackoverflow.com/a/24968449/632806
-    const uniqueSkus = attrs.skus.map(sku =>
+    const uniqueSkus = attrs.skus.map((sku) =>
       ({ count: 1, name: JSON.stringify(sku.get('variantCombo')) }))
       .reduce((a, b) => {
         a[b.name] = (a[b.name] || 0) + b.count;
@@ -230,11 +229,11 @@ export default class extends BaseModel {
 
     const duplicateSkus = Object.keys(uniqueSkus).filter((a) => uniqueSkus[a] > 1);
 
-    duplicateSkus.forEach(dupeSku => {
+    duplicateSkus.forEach((dupeSku) => {
       addError('skus', `Variant combos must be unique. ${dupeSku} is duplicated.`);
     });
 
-    attrs.skus.forEach(sku => {
+    attrs.skus.forEach((sku) => {
       const varCombo = sku.variantCombo;
 
       // ensure that each SKU has a variantCombo with the correct length
@@ -242,10 +241,10 @@ export default class extends BaseModel {
       if (is.array(varCombo)) {
         // ensure the variantCombo actually corresponds to a provided option.variant value
         varCombo.forEach((val, index) => {
-          if (!attrs.options[index] ||
-            !attrs.options[index].variants ||
-            !attrs.options[index].variants.length ||
-            !attrs.options[index].variants[val]) {
+          if (!attrs.options[index]
+            || !attrs.options[index].variants
+            || !attrs.options[index].variants.length
+            || !attrs.options[index].variants[val]) {
             addError('skus', `Invalid variant combo ${JSON.stringify(varCombo)}.`);
           }
         });
@@ -253,19 +252,18 @@ export default class extends BaseModel {
     });
 
     // Ensure no duplicate VariantOption names.
-    const optionsNames = attrs.options.map(option => option.get('name'));
+    const optionsNames = attrs.options.map((option) => option.get('name'));
     attrs.options.forEach((option, index) => {
       if (optionsNames.indexOf(option.get('name')) !== index) {
-        addError(`options[${option.cid}].name`,
-          app.polyglot.t('itemModelErrors.duplicateOptionName'));
+        addError(`options[${option.cid}].name`, app.polyglot.t('itemModelErrors.duplicateOptionName'));
       }
 
       // Ensure no duplicate variant names.
-      const variantNames = option.get('variants').map(variant => variant.get('name'));
+      const variantNames = option.get('variants').map((variant) => variant.get('name'));
       option.get('variants').forEach((variant, vIndex) => {
         if (variantNames.indexOf(variant.get('name')) !== vIndex) {
-          const key = `options[${option.cid}].` +
-            `variants[${variant.cid}].name`;
+          const key = `options[${option.cid}].`
+            + `variants[${variant.cid}].name`;
           addError(key, app.polyglot.t('itemModelErrors.duplicateVariantName', {
             name: variant.get('name'),
           }));
@@ -274,8 +272,7 @@ export default class extends BaseModel {
     });
 
     if (attrs.options.length > this.max.optionCount) {
-      addError('options', app.polyglot.t('itemModelErrors.tooManyOptions',
-        { maxOptionCount: this.max.optionCount }));
+      addError('options', app.polyglot.t('itemModelErrors.tooManyOptions', { maxOptionCount: this.max.optionCount }));
     }
 
     errObj = this.mergeInNestedErrors(errObj);

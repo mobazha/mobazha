@@ -30,7 +30,7 @@ export default class extends baseVw {
     // Give each Sku a mappingId which links it to the option it originated from
     // in a more robust way than relying on order which can change.
     if (this.optionsCl.length) {
-      this.collection.forEach(sku => {
+      this.collection.forEach((sku) => {
         const variantCombo = sku.get('variantCombo');
         sku.set('mappingId', this.buildIdFromVariantCombo(variantCombo));
       });
@@ -48,19 +48,20 @@ export default class extends baseVw {
   }
 
   bindOptionVariantsUpdate(options = []) {
-    options.forEach(option => {
+    options.forEach((option) => {
       this.listenTo(option.get('variants'), 'update', () => this.render());
     });
   }
 
   setCollectionData() {
-    this.itemViews.forEach(item => item.setModelData());
+    this.itemViews.forEach((item) => item.setModelData());
   }
 
   get $formFields() {
-    return this._$formFields ||
-      (this._$formFields =
-        this.$('select[name], input[name], textarea[name]'));
+    if (!this._$formFields) {
+      this._$formFields = this.$('select[name], input[name], textarea[name]');
+    }
+    return this._$formFields;
   }
 
   // Inpsired by: http://stackoverflow.com/a/4331218/632806
@@ -76,9 +77,9 @@ export default class extends baseVw {
       returnVal = arr[0].map((val, index) => (index));
     } else {
       const result = [];
-      const allCasesOfRest = this.allPossibleCombos(arr.slice(1));  // recur with the rest of array
-      for (let i = 0; i < allCasesOfRest.length; i++) {
-        for (let j = 0; j < arr[0].length; j++) {
+      const allCasesOfRest = this.allPossibleCombos(arr.slice(1)); // recur with the rest of array
+      for (let i = 0; i < allCasesOfRest.length; i += 1) {
+        for (let j = 0; j < arr[0].length; j += 1) {
           result.push(`${j}, ${allCasesOfRest[i]}`);
         }
       }
@@ -115,18 +116,18 @@ export default class extends baseVw {
   buildInventoryData() {
     const options = this.optionsCl.toJSON()
       // only process options that have at least one variant
-      .filter(option => option.variants && option.variants.length);
+      .filter((option) => option.variants && option.variants.length);
 
-    const columns = options.map(option => option.name);
+    const columns = options.map((option) => option.name);
     const inventoryData = [];
 
     // ensure the Sku collection has the latest data from the UI
     this.setCollectionData();
 
-    this.allPossibleCombos(options.map(option => option.variants))
+    this.allPossibleCombos(options.map((option) => option.variants))
       .sort()
-      .map(strCombo => JSON.parse(`[${strCombo}]`))
-      .forEach(combo => {
+      .map((strCombo) => JSON.parse(`[${strCombo}]`))
+      .forEach((combo) => {
         const choices = [];
 
         combo.forEach((comboIndex, index) => {
@@ -179,11 +180,11 @@ export default class extends baseVw {
         getPrice: this.options.getPrice,
       }));
 
-      this.itemViews.forEach(item => item.remove());
+      this.itemViews.forEach((item) => item.remove());
       this.itemViews = [];
       const itemsFrag = document.createDocumentFragment();
 
-      this.collection.forEach(item => {
+      this.collection.forEach((item) => {
         const view = this.createChild(VariantInventoryItem, {
           model: item,
           getPrice: this.options.getPrice,

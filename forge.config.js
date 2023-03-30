@@ -7,7 +7,8 @@ const iconDir = path.resolve(__dirname, 'imgs');
 module.exports = {
   packagerConfig: {
     asar: true,
-    executableName: "mobazha-desktop",
+    executableName: 'mobazha-desktop',
+    overwrite: true,
     protocols: [
       {
         name: 'Mobazha',
@@ -33,7 +34,7 @@ module.exports = {
     },
     // macOS code-signing configs. See https://www.electronjs.org/docs/latest/tutorial/code-signing#electron-forge
     osxSign: { // https://www.npmjs.com/package/electron-osx-sign#opts
-      // identity: '...',
+      identity: 'Developer ID Application: Hefei Mulgore Network Technology Co.,Ltd. (36RYSCJAD3)',
       hardenedRuntime: true,
       // entitlements: './static/entitlements.plist',
       // 'entitlements-inherit': './static/entitlements.plist',

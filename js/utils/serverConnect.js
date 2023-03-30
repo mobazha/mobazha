@@ -135,7 +135,7 @@ function authenticate(server) {
 
   const deferred = $.Deferred();
 
-  const fetchConfig = $.get(`${server.httpUrl}/ob/config`)
+  const fetchConfig = $.get(`${server.httpUrl}/v1/ob/config`)
     .done(() => deferred.resolve())
     .fail((e) => deferred.reject('failed', e));
 

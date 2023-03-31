@@ -2,7 +2,9 @@ package mobile
 
 import (
 	"context"
+	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/cpacia/openbazaar3.0/core"
 	"github.com/cpacia/openbazaar3.0/repo"
@@ -39,12 +41,27 @@ type Node struct {
 	done context.CancelFunc
 }
 
+func migrate(dataDir string) {
+	repoPath := dataDir
+
+	defaultDBFile := filepath.Join(repoPath, "mobazha.db")
+	if _, err := os.Stat(defaultDBFile); err != nil {
+		oldDBFile := filepath.Join(repoPath, "openbazaar.db")
+		if _, err := os.Stat(oldDBFile); err == nil {
+			os.Rename(oldDBFile, defaultDBFile)
+		}
+	}
+}
+
 // NewNode returns a new MobileNode instance.
 func NewNode(cfg *Config) (*Node, error) {
 	dataDir := defaultDataDir
 	if cfg.DataDir != "" {
 		dataDir = cfg.DataDir
 	}
+
+	migrate(dataDir)
+
 	logDir := path.Join(defaultDataDir, "logs")
 	if cfg.LogDir != "" {
 		logDir = cfg.LogDir

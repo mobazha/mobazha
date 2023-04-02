@@ -16,12 +16,9 @@ module.exports = {
       },
     ],
     icon: path.resolve(iconDir, process.platform === 'darwin' ? 'icon.icns' : 'icon.ico'),
-    // ignore: 'mobazha',
-    // extraResource: [
-    //   'mobazha',
-    // ],
+    ignore: 'mobazhad',
     win32metadata: {
-      ProductName: 'MobazhaDesktopClient',
+      ProductName: 'Mobazha',
       CompanyName: 'Mogaolei',
       FileDescription: 'Decentralized p2p marketplace for Cryptocurrencies',
       OriginalFilename: 'Mobazha',
@@ -47,7 +44,7 @@ module.exports = {
     {
       name: '@electron-forge/maker-squirrel',
       config: (arch) => ({ // https://js.electronforge.io/maker/squirrel/interfaces/makersquirrelconfig
-        name: 'Mobazha',
+        name: 'MobazhaDesktopClient',
         authors: 'Mogaolei',
         exe: 'Mobazha.exe',
         iconUrl: path.resolve(iconDir, 'icon.ico'),

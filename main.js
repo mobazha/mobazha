@@ -85,7 +85,7 @@ if (handleStartupEvent()) {
   console.log('Mobazha started on Windows...');
 }
 
-const serverPath = `${__dirname}${path.sep}mobazha${path.sep}`;
+const serverPath = `${__dirname}${path.sep}..${path.sep}mobazha${path.sep}`;
 const serverFilename = process.platform === 'darwin' || process.platform === 'linux'
   ? 'mobazhad' : 'mobazhad.exe';
 const isBundledApp = fs.existsSync(serverPath + serverFilename);

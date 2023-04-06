@@ -93,7 +93,7 @@
   "formattedCurrency": {
     "unrecognizedCurrencyTip": "Nelze poskytnout informace o cenách, protože jsou ceny v nerozpoznané měně (%{cur})."
   },
-  "addressBarPlaceholder": "Zadej @handle, OpenBazaar ID nebo hledaný výraz",
+  "addressBarPlaceholder": "Zadej @handle, Mobazha ID nebo hledaný výraz",
   "testnet": "Testovací režim",
   "testnetTooltip": "Testovací režim používá testnet mince, které jsou určeny pouze pro účely testování.",
   "tabMenuHeading": "MENU",
@@ -203,7 +203,7 @@
     "notConnectedMenuItem": "Nepřipojeno",
     "torOnTooltip": "Aktivní Tor",
     "discoverCalloutTitle": "Objevit",
-    "discoverCalloutBody": "Procházej a nakupuj ve stovkách obchodů na OpenBazaaru",
+    "discoverCalloutBody": "Procházej a nakupuj ve stovkách obchodů na Mobazhau",
     "myPage": "Moje stránka",
     "customizePage": "Přizpůsobit stránku",
     "createListing": "Vytvořit záznam",
@@ -290,7 +290,7 @@
     "modAddError": "Při přidávání tohoto moderátora došlo k chybě.\n%{errMsg}",
     "modRemoveError": "Při odstraňování tohoto moderátora došlo k chybě.\n%{errMsg}",
     "storeWelcomeCalloutTitle": "Vítej ve svém obchodě!",
-    "storeWelcomeCalloutBody": "Tvůj obchod na OpenBazaar je nyní v síti aktivní. Začni vytvořením záznamu zboží nebo přizpůsobením stránky.",
+    "storeWelcomeCalloutBody": "Tvůj obchod na Mobazha je nyní v síti aktivní. Začni vytvořením záznamu zboží nebo přizpůsobením stránky.",
     "storeWelcomeCalloutBtnClose": "Zavřít",
     "store": {
       "retryStoreFetch": "Zkusit znovu",
@@ -348,7 +348,7 @@
       "failTextListing": "Při načítání %{listing} došlo k problému. Prosím zkus to znovu.",
       "failTextListingLink": "obchod",
       "failTextListingWithLink": "Při načítání %{listing} došlo k problému. Zkus to prosím znovu nebo projdi další nabídky v %{link}.",
-      "socialHeading": "OpenBazaar Zprávy a Diskuse:",
+      "socialHeading": "Mobazha Zprávy a Diskuse:",
       "btnCancel": "Zrušit",
       "btnTryAgain": "Zkusit znovu"
     }
@@ -425,9 +425,9 @@
     "noCoinSupport": "Tento moderátor nepřijímá žádné měny, které tvá peněženka podporuje."
   },
   "about": {
-    "linkText": "O OpenBazaaru",
+    "linkText": "O Mobazhau",
     "blurbs": {
-      "tradeFree": "OpenBazaar funguje díky mezinárodní komunitě vývojářů a dobrovolníků, kteří přispívají svým časem, aby pomohli osvobodit obchod."
+      "tradeFree": "Mobazha funguje díky mezinárodní komunitě vývojářů a dobrovolníků, kteří přispívají svým časem, aby pomohli osvobodit obchod."
     },
     "version": "verze %{version}",
     "bothVersions": "klient %{cVer}, server %{sVer}",
@@ -451,10 +451,10 @@
     },
     "licenseTab": {
       "linkText": "Licence",
-      "sectionHeader": "MIT Licence OpenBazaaru",
-      "licensePreface": "OpenBazaar je software s otevřeným zdrojovým kódem na základě licence MIT. Tato licence je přípustná a je navržena tak, aby lidem umožnila plně znovu použít kód pro jiné open source projekty nebo pro proprietární software. Úplný text licence je uveden níže.",
+      "sectionHeader": "MIT Licence Mobazhau",
+      "licensePreface": "Mobazha je software s otevřeným zdrojovým kódem na základě licence MIT. Tato licence je přípustná a je navržena tak, aby lidem umožnila plně znovu použít kód pro jiné open source projekty nebo pro proprietární software. Úplný text licence je uveden níže.",
       "header": "MIT licence (MIT)",
-      "copyright": "Copyright &copy; 2016 OpenBazaar Vývojáří",
+      "copyright": "Copyright &copy; 2023 Mobazha Vývojáří",
       "paragraphs": {
         "permission": "Jakákoli osoba, která získá kopii tohoto softwaru a související soubory dokumentace (dále jen „Software“), je tímto oprávněna bezplatně jednat se softwarem bez omezení, mimo jiné včetně práv na užívání, kopírování, úpravy, sloučení, publikovat, distribuovat, sublicencovat a/nebo prodávat kopie Softwaru a umožňovat tak osobám, kterým je Software poskytnut, aby tak činily, za následujících podmínek:",
         "inclusion": "Výše uvedené oznámení o autorských právech a toto oznámení o povolení jsou součástí všech kopií nebo podstatných částí Softwaru.",
@@ -463,20 +463,20 @@
     },
     "contributorsTab": {
       "linkText": "Přispěvatelé",
-      "sectionHeader": "Přispěvatelé OpenBazaaru",
+      "sectionHeader": "Přispěvatelé Mobazhau",
       "listPreface": "Toto je neúplný seznam lidí, kteří přispěli projektu, ať už programováním, nebo jinou asistencí."
     },
     "storyTab": {
       "linkText": "Příběh",
-      "sectionHeader": "Příběh OpenBazaaru",
+      "sectionHeader": "Příběh Mobazhau",
       "paragraphs": {
         "taakisDarkMarket": "V dubnu 2014 byl v tajném Torontském hackathonu vytvořen projekt s názvem „Dark Market“. Amir Taaki vedl malý tým vývojářů, aby vytvořil koncept pro decentralizovaný trh. Tento software byl zcela peer to peer bez centrální organizace, která by ho ovládala. \"Dark Market\" vyhrál hackathon, ale Amir a jeho tým se rozhodli nepokračovat v práci na projektu.",
-        "briansOpenBazaar": "Brian Hoffman hovořil s Amirem o \"Dark Marketu\" a zjistil, že nebudou pokračovat ve vývoji. Líbila se mu myšlenka decentralizovaného trhu, ale nelíbilo se mu pouze zaměření na darknet trhy, takže projekt forknul a přejmenoval ho na OpenBazaar",
+        "briansOpenBazaar": "Brian Hoffman hovořil s Amirem o \"Dark Marketu\" a zjistil, že nebudou pokračovat ve vývoji. Líbila se mu myšlenka decentralizovaného trhu, ale nelíbilo se mu pouze zaměření na darknet trhy, takže projekt forknul a přejmenoval ho na Mobazha",
         "alphaTeamalphaRelease": "Myšlenka trhu bez povolení byla silná a lidé z celého světa se připojili k Brianovi, aby pomohli vytvořit tento software s otevřeným zdrojovým kódem. V září tento tým vydal první testovací verzi softwaru.",
         "momentOfTruth": "V příštích několika měsících tým pokračoval ve zlepšování softwaru a dostal povzbudivou odpověď od bitcoinové komunity. Začátkem roku 2015 navštívili FOSSDEM (Free Open Source Software Developers European Meeting) v Bruselu a představili projekt nadšenému publiku. Brian a několik klíčových členů týmu se rozhodli, že je čas obrátit projekt z částečného, dobrovolného úsilí na seriózní, dobře financovanou kampaň, která přinese volný obchod do celého světa.",
         "foundedAndFunded": "Založili společnost OB1 s investicí rizikového kapitálu ve výši 1 milionu dolarů od Union Square Ventures a Andreessen Horowitz a okamžitě začali najímat vývojáře, aby stavěli lepší verzi softwaru už od základů.",
-        "marketOpening": "V dubnu 2016 bylo vydáno první plná verze softwaru a desítky tisíc lidí na celém světě si stáhly OpenBazaar a začaly přímo nakupovat a prodávat pomocí Bitcoinu.",
-        "toInfinityAndBeyond": "Počáteční týmová práce jim na podzim 2016 zajistila investici do druhého kola ve výši 3 miliony dolarů. Na základě průkopnické práce ve verzi 1 byla rozšířená OB1 připravena pracovat na OpenBazaar 2 s cílem osvobodit obchod ještě více lidem okolo světa.",
+        "marketOpening": "V dubnu 2016 bylo vydáno první plná verze softwaru a desítky tisíc lidí na celém světě si stáhly Mobazha a začaly přímo nakupovat a prodávat pomocí Bitcoinu.",
+        "toInfinityAndBeyond": "Počáteční týmová práce jim na podzim 2016 zajistila investici do druhého kola ve výši 3 miliony dolarů. Na základě průkopnické práce ve verzi 1 byla rozšířená OB1 připravena pracovat na Mobazha 2 s cílem osvobodit obchod ještě více lidem okolo světa.",
         "cashCTA": "Přispět nyní",
         "or": "nebo",
         "codeCTA": "Být zahrnutý"
@@ -499,7 +499,7 @@
       "helperLanguage": "Zobraz prvky rozhraní v ",
       "helperCountry": "Země, kde převážně bydlíš",
       "helperCurrency": "Zobraz ceny v",
-      "helperTranslations": "Pomáhej překládat OpenBazaar na %{helperTranslationsLink}",
+      "helperTranslations": "Pomáhej překládat Mobazha na %{helperTranslationsLink}",
       "helperTranslationsLink": "Transifex",
       "sectionName": "Základní",
       "bitcoinUnit": "Bitcoinová jednotka",
@@ -616,7 +616,7 @@
         "purge": "Vymazat sdílené soubory",
         "purgeHelper": "Odstraň nakešované soubory, které sdílíš s ostatními",
         "purgeBtn": "Vymazat soubory",
-        "purgeToolTip": "OpenBazaar sdílí nakešovaný obsah, který jsi prohlížel, s ostatními uživateli. Pokud sis prohlížel text nebo obrázky, které nechceš sdílet, toto tlačítko je odstraní. Neovlivní to žádné soubory, které patří tobě.",
+        "purgeToolTip": "Mobazha sdílí nakešovaný obsah, který jsi prohlížel, s ostatními uživateli. Pokud sis prohlížel text nebo obrázky, které nechceš sdílet, toto tlačítko je odstraní. Neovlivní to žádné soubory, které patří tobě.",
         "purgeError": "Došlo k chybě, vaše nakešované soubory pravděpodobně nebyly odstraněny.",
         "purgeComplete": "Tvoje nakešované soubory byly smazány.",
         "blockData": "Blok Data",
@@ -693,7 +693,7 @@
       "languages": "Jazyky",
       "languagesHelper": "Zadej všechny jazyky, které podporuješ (tj. kterými můžeš jasně komunikovat).",
       "acceptGuidelines": "Přečetl(a) jsem si doporučené %{acceptGuidelinesLink}",
-      "acceptGuidelinesLink": "Pokyny pro řešení sporů OpenBazaar",
+      "acceptGuidelinesLink": "Pokyny pro řešení sporů Mobazha",
       "understandRequirements": "Chápu, že musím nabídnout své služby, abych vyřešil(a) spory komukoli, kdo o ně požádá, pokud neporuší výše uvedené podmínky.",
       "status": {
         "saving": "Ukládání nastavení moderování...",
@@ -986,7 +986,7 @@
     },
     "cryptoTeaser": {
       "coinCount": "%{count}+ mince",
-      "bodyLine": "Obchoduj %{coinCount} na OpenBazaar zdarma",
+      "bodyLine": "Obchoduj %{coinCount} na Mobazha zdarma",
       "btnCreateListing": "Vytvořit záznam",
       "linkViewCryptoListings": "Zobrazení krypto záznamů"
     }
@@ -1378,7 +1378,7 @@
     },
     "tosScreen": {
       "heading": "Podmínky služby",
-      "tos": "OpenBazaar je síť pro přímý obchod zboží a služeb mezi lidmi - využívající kryptoměny - bez jakékoli centrální organizace, která by platformu ovládala. To znamená, že jsi zodpovědný(á) za svou vlastní aktivitu v síti.\n\nUživatelé OpenBazaaru nejsou ve výchozím nastavení anonymní. Většina komunikace mezi stranami je šifrována, ale IP adresy jsou veřejné a mohou být spojeny s činností v síti. Škodlivé strany by mohly tyto informace použít proti tobě; ochrana tvého soukromí je tvou vlastní odpovědností.\n\nUživatelé OpenBazaar musí dodržovat zákony ve své vlastní právní jurisdikci i své svědomí. Vývojáři OpenBazaar neuznávají - a nenesou odpovědnost - jakékoli použití platformy pro nezákonnou činnost.\n\nKomunita vývojářů OpenBazaar usilovně pracovala na poskytování bezplatné platformy pro obchod do světa. Ale stejně jako u jakéhokoli softwaru chyby budou nalezeny. Vývojáři neodpovídají za žádné peněžní ztráty spojené s problémy v softwaru.\n\nPoužíváním OpenBazaar zodpovídáš za své vlastní chování v síti OpenBazaar."
+      "tos": "Mobazha je síť pro přímý obchod zboží a služeb mezi lidmi - využívající kryptoměny - bez jakékoli centrální organizace, která by platformu ovládala. To znamená, že jsi zodpovědný(á) za svou vlastní aktivitu v síti.\n\nUživatelé Mobazhau nejsou ve výchozím nastavení anonymní. Většina komunikace mezi stranami je šifrována, ale IP adresy jsou veřejné a mohou být spojeny s činností v síti. Škodlivé strany by mohly tyto informace použít proti tobě; ochrana tvého soukromí je tvou vlastní odpovědností.\n\nUživatelé Mobazha musí dodržovat zákony ve své vlastní právní jurisdikci i své svědomí. Vývojáři Mobazha neuznávají - a nenesou odpovědnost - jakékoli použití platformy pro nezákonnou činnost.\n\nKomunita vývojářů Mobazha usilovně pracovala na poskytování bezplatné platformy pro obchod do světa. Ale stejně jako u jakéhokoli softwaru chyby budou nalezeny. Vývojáři neodpovídají za žádné peněžní ztráty spojené s problémy v softwaru.\n\nPoužíváním Mobazha zodpovídáš za své vlastní chování v síti Mobazha."
     }
   },
   "pageControls": {
@@ -1452,14 +1452,14 @@
       "to": "Na: %{address}",
       "payFromWallet": "Platit z peněženky",
       "note1": "Pokud potřebuješ pomoci začít s Bitcoinem, přečti si prosím %{link}.",
-      "note1Link": "Potřebuješ Bitcoin? na OpenBazaar.org",
+      "note1Link": "Potřebuješ Bitcoin? na Mobazha.org",
       "note2": "Tvá platba bude bezpečně držena v úschově. Pokud se vyskytne nějaký problémy, budeš mít možnost zahájit spor.",
       "note3": "*Poplatek za moderátorský servis se platí pouze v případě, že je spor zahájen.",
       "note4": "Po zaplacení může aktualizace rozhraní chvíli trvat.",
       "btnConfirmedPay": "Ano, zaplatit",
       "walletNote": "<b>Externí peněženky</b> které nepodporují Segregated Witness, nemusí být schopné platit za transakce.",
       "walletLink": "Místo toho můžeš poslat finanční prostředky do své OB peněženky.",
-      "feeNote": "<b>Nezapomeň pokrýt veškeré poplatky</b>, když odesíláš prostředky do peněženky OpenBazaar."
+      "feeNote": "<b>Nezapomeň pokrýt veškeré poplatky</b>, když odesíláš prostředky do peněženky Mobazha."
     },
     "completeSection": {
       "paymentSent": "Platba odeslána!",
@@ -1474,8 +1474,8 @@
       "send": "Poslat",
       "share": {
         "title": "Sdílet s přáteli",
-        "body": "Právě jsem provedl nákup na OpenBazaar, na svobodném trhu bez poplatků a omezení. Další informaci nalezneš na %{link}.",
-        "shareMsg": "Právě jsem provedl nákup na @OpenBazaar, svobodném trhu bez poplatků a omezení.",
+        "body": "Právě jsem provedl nákup na Mobazha, na svobodném trhu bez poplatků a omezení. Další informaci nalezneš na %{link}.",
+        "shareMsg": "Právě jsem provedl nákup na @Mobazha, svobodném trhu bez poplatků a omezení.",
         "postToTwitter": "Sdílet na Twitter",
         "postToFacebook": "Sdílet na Facebook",
         "postToPinterest": "Sdílet na Pinterest",
@@ -1906,9 +1906,9 @@
   "metrics": {
     "title": "Volitelné anonymní metriky",
     "newVersion": "Přečti si níže uvedenou aktualizaci dohody o analytických datech a klikni na „Aktivovat“.",
-    "msg1": "Pomoz nám vylepšit OpenBazaar tím, že se dohodneš na sdílení analytických údajů o své zkušenosti s vývojovým týmem.",
-    "msg2": "Kliknutím na „Aktivovat“ souhlasíte se sdílením níže uvedených dat se společností OB1 a jejími zpracovateli pro popsané účely a souhlasíte s přenosem těchto dat na servery umístěné ve Spojených státech. Sdílení těchto dat můžete kdykoli zastavit otevřením nastavení a kliknutím na tlačítko Změnit nastavení sdílení v části Upřesnit. Pokud se nacházíte v Evropském hospodářském prostoru, můžete mít určitá práva týkající se těchto údajů, včetně práva na přístup, opravu, výmaz, omezení zpracování, námitky proti zpracování a přenositelnost. Můžete nás o nich kontaktovat, nebo nás jednoduše požádat, abychom přestali používat a smazat shromážděná data, a to kdykoli na adrese data@ob1.io.",
-    "listTitle": "Při používání OpenBazaar bude společnost OB1 shromažďovat následující data:",
+    "msg1": "Pomoz nám vylepšit Mobazha tím, že se dohodneš na sdílení analytických údajů o své zkušenosti s vývojovým týmem.",
+    "msg2": "Kliknutím na „Aktivovat“ souhlasíte se sdílením níže uvedených dat se společností OB1 a jejími zpracovateli pro popsané účely a souhlasíte s přenosem těchto dat na servery umístěné ve Spojených státech. Sdílení těchto dat můžete kdykoli zastavit otevřením nastavení a kliknutím na tlačítko Změnit nastavení sdílení v části Upřesnit. Pokud se nacházíte v Evropském hospodářském prostoru, můžete mít určitá práva týkající se těchto údajů, včetně práva na přístup, opravu, výmaz, omezení zpracování, námitky proti zpracování a přenositelnost. Můžete nás o nich kontaktovat, nebo nás jednoduše požádat, abychom přestali používat a smazat shromážděná data, a to kdykoli na adrese data@mobazha.com.",
+    "listTitle": "Při používání Mobazha bude společnost OB1 shromažďovat následující data:",
     "list": {
       "device": "Tvá IP adresa a informace o zařízení pro účely uvedené níže.",
       "errors": "Údaje o výkonu, jako jsou chyby a jak dlouho trvá načtení obsahu. To nám usnadňuje řešení problémů, se kterými se uživatelé setkávají, aniž bychom čekali na speciální žádosti o opravení.",
@@ -1918,10 +1918,10 @@
       "app": "Podrobnosti o tvé aplikaci, které zahrnují její verzi a zda je nainstalována z balíčku ke stažení ze zdroje. To nám umožňuje pochopit kontext ostatních shromážděných údajů, takže je lze správně použít.",
       "orders": "Základní informace o akcích, které provedeš s příkazy, jako je stav, kdy byl spor zpochybněn nebo zda byla objednávka moderována. To nám pomáhá identifikovat problémy v procesu objednávky.",
       "listings": "Základní informace o akcích provedených při vytváření a úpravách produktů. To zahrnuje typ výpisu, ale žádné další informace o něm. To nám poskytuje data o potenciálních problémech s vytvářením a úpravou produktů.",
-      "path": "Cesta k instalaci OpenBazaar. Tím bude sdílen název všech složek v cestě k instalační složce, která může zahrnovat kořenovou složku nebo složku uživatele. Toto je vedlejší účinek procesu sběru dat a tým OB1 ho nepoužívá."
+      "path": "Cesta k instalaci Mobazha. Tím bude sdílen název všech složek v cestě k instalační složce, která může zahrnovat kořenovou složku nebo složku uživatele. Toto je vedlejší účinek procesu sběru dat a tým OB1 ho nepoužívá."
     },
     "disclaimer1": "S námi nejsou sdíleny žádné informace, které by mohly být použity k identifikaci vašich objednávek nebo jakékoli z vašich transakcí. Tato data jsou vždy uložena na vašem počítači a nejsou přístupná nikomu jinému.",
-    "disclaimer2": "Jak bylo uvedeno výše, vaše sdílení těchto údajů je zcela volitelné. Abyste mohli používat OpenBazaar, nemusíte tato data sdílet.",
+    "disclaimer2": "Jak bylo uvedeno výše, vaše sdílení těchto údajů je zcela volitelné. Abyste mohli používat Mobazha, nemusíte tato data sdílet.",
     "acceptBtn": "Příjmout",
     "declineBtn": "Odmítnout",
     "activateBtn": "Aktivovat",

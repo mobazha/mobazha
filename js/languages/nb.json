@@ -93,7 +93,7 @@
   "formattedCurrency": {
     "unrecognizedCurrencyTip": "Unable to provide price information because it's priced in an unrecognized currency (%{cur})."
   },
-  "addressBarPlaceholder": "Skriv @navn, OpenBazaar ID eller søkeord",
+  "addressBarPlaceholder": "Skriv @navn, Mobazha ID eller søkeord",
   "testnet": "Testmodus",
   "testnetTooltip": "Testmodus bruker testnettmynter, som kun er til testbruk.",
   "tabMenuHeading": "MENY",
@@ -203,7 +203,7 @@
     "notConnectedMenuItem": "Ikke Tilkoblet",
     "torOnTooltip": "Tor aktiv",
     "discoverCalloutTitle": "Oppdag",
-    "discoverCalloutBody": "Se og handle i hundrevis av butikker på OpenBazaar",
+    "discoverCalloutBody": "Se og handle i hundrevis av butikker på Mobazha",
     "myPage": "Min side",
     "customizePage": "Tilpass siden",
     "createListing": "Opprett oppføring",
@@ -290,7 +290,7 @@
     "modAddError": "En feil oppstod ved tilleggelse av denne moderatoren.\n %{errMsg}",
     "modRemoveError": "En feil oppstod ved fjerning av denne moderatoren.\n %{errMsg}",
     "storeWelcomeCalloutTitle": "Velkommen til din butikk!",
-    "storeWelcomeCalloutBody": "Din OpenBazaar butikk er nå live på nettverket. Kom igang med å lage noen oppføringer eller å tilpasse siden din.",
+    "storeWelcomeCalloutBody": "Din Mobazha butikk er nå live på nettverket. Kom igang med å lage noen oppføringer eller å tilpasse siden din.",
     "storeWelcomeCalloutBtnClose": "Lukk",
     "store": {
       "retryStoreFetch": "Forsøk på nytt",
@@ -348,7 +348,7 @@
       "failTextListing": "There was an issue retrieving %{listing}. Please try again.",
       "failTextListingLink": "store",
       "failTextListingWithLink": "There was an issue retrieving %{listing}. Please try again or browse other listings in the %{link}.",
-      "socialHeading": "OpenBazaar News & Discussions:",
+      "socialHeading": "Mobazha News & Discussions:",
       "btnCancel": "Avbryt",
       "btnTryAgain": "Try Again"
     }
@@ -425,9 +425,9 @@
     "noCoinSupport": "This moderator does not accept any of the coins your wallet supports."
   },
   "about": {
-    "linkText": "Om OpenBazaar",
+    "linkText": "Om Mobazha",
     "blurbs": {
-      "tradeFree": "OpenBazaar er gjort mulig gjennom et internasjonalt fellesskap av utviklere og frivillige som bidrar med sin tid for å gjøre handel fri."
+      "tradeFree": "Mobazha er gjort mulig gjennom et internasjonalt fellesskap av utviklere og frivillige som bidrar med sin tid for å gjøre handel fri."
     },
     "version": "versjon %{version}",
     "bothVersions": "klient %{cVer}, server %{sVer}",
@@ -451,10 +451,10 @@
     },
     "licenseTab": {
       "linkText": "Lisens",
-      "sectionHeader": "OpenBazaar MIT Lisens",
-      "licensePreface": "OpenBazaar er open source programvare under MIT lisensen. Denne lisensen er laget for å tillate folk å gjenbruke koden for andre open source prosjekter eller for proprietær programvare. Lisensteksten er gjengitt under i sin helhet.",
+      "sectionHeader": "Mobazha MIT Lisens",
+      "licensePreface": "Mobazha er open source programvare under MIT lisensen. Denne lisensen er laget for å tillate folk å gjenbruke koden for andre open source prosjekter eller for proprietær programvare. Lisensteksten er gjengitt under i sin helhet.",
       "header": "MIT Lisensen (MIT)",
-      "copyright": "Copyright &copy; 2016 OpenBazaar Developers",
+      "copyright": "Copyright &copy; 2016 Mobazha Developers",
       "paragraphs": {
         "permission": "Tillatelse gis herved, uten vederlag, til alle som skaffer en kopi av denne programvaren og tilhørende dokumentasjon (\"Programvaren\"), til å ha befatning med Programvaren uten begrensninger, inkludert ubegrensede rettigheter til å bruke, kopiere, modifisere, slå sammen, publisere, distribuere, viderelisensiere, og/eller selge kopier av Programvaren, og til å tillate personer Programvaren er tilpasset for til å gjøre dette, med følgende betingelser:",
         "inclusion": "Copyright-merknaden over og dette tillatelsesnotatet skal inkluderes i alle kopier eller vesentlige deler av programvaren.",
@@ -463,20 +463,20 @@
     },
     "contributorsTab": {
       "linkText": "Bidragsytere",
-      "sectionHeader": "OpenBazaar Bidragsytere",
+      "sectionHeader": "Mobazha Bidragsytere",
       "listPreface": "Dette er en ufullstendig liste over personer som har bidratt til prosjektet, enten gjennom kode eller med annen hjelp."
     },
     "storyTab": {
       "linkText": "Historien",
-      "sectionHeader": "OpenBazaar's Historie",
+      "sectionHeader": "Mobazha's Historie",
       "paragraphs": {
         "taakisDarkMarket": "I april 2014 på et hemmelig Toronto hackathon ble et prosjekt kalt \"Dark Market\" påbegynt. Amir Taaki ledet et lite team utviklere for å bygge et proof-of-concept for en desentralisert markedsplass. Programvaren var fullstendig peer-to-peer uten noen sentral organisasjon som kontrollerte det. Dark Market vant hackathonet, men Amir og teamet hans bestemte seg for å ikke fortsette arbeidet på prosjektet.",
-        "briansOpenBazaar": "Brian Hoffman snakket med Amir om Dark Market og fant ut at de ikke skulle fortsette utviklingen. Han likte ideen om en desentralisert markedsplass, men han likte ikke fokuset på darknet markeder, så han forket prosjektet og omdøpte det til OpenBazaar.",
+        "briansOpenBazaar": "Brian Hoffman snakket med Amir om Dark Market og fant ut at de ikke skulle fortsette utviklingen. Han likte ideen om en desentralisert markedsplass, men han likte ikke fokuset på darknet markeder, så han forket prosjektet og omdøpte det til Mobazha.",
         "alphaTeamalphaRelease": "Ideen om en markedsplass som ikke krever tillatelser var sterk, og folk rundt om i verden ble med Brian for å hjelpe til med å bygge denne åpne programvaren. I september utga dette teamet den første testversjonen av programvaren.",
         "momentOfTruth": "De påfølgende månedene fortsatte teamet med å forbedre programvaren og fikk oppmuntrende tilbakemeldinger fra Bitcoin-miljøet. De besøkte FOSSDEM (Free Open Source Software Developers European Meeting) i Brüssel tidlig i 2015, og presenterte prosjektet for en entusiastisk folkemengde. Brian og noen få kjernemedlemmer av teamet bestemte at det var på tide å gjøre prosjektet om fra deltid og frivillig innsats til en seriøs og godt finansiert kampanje for å gi verden fri handel.",
         "foundedAndFunded": "De grunnla firmaet OB1 med 1 million dollar i investorkapital fra Union Square Ventures og Andreessen Horowitz. De begynte umiddelbart med å ansette utviklere for å bygge en bedre versjon av programvaren fra grunnen opp.",
-        "marketOpening": "I april 2016 ble den første fulle versjonen av programvaren utgitt, og titusenvis av folk rundt hele verden lastet ned OpenBazaar og begynte å kjøpe og selge direkte med hverandre, med Bitcoin.",
-        "toInfinityAndBeyond": "Det opprinnelige teamets arbeid sikret dem 3 millioner dollar i en andre investor-runde på høsten 2016. Som et videre arbeid basert på deres banebrytende arbeid i versjon 1, begynte et utvidet OB1 å arbeide med OpenBazaar 2, med det mål å gjøre fri handel tilgjengelig for enda flere folk rundt i verden.",
+        "marketOpening": "I april 2016 ble den første fulle versjonen av programvaren utgitt, og titusenvis av folk rundt hele verden lastet ned Mobazha og begynte å kjøpe og selge direkte med hverandre, med Bitcoin.",
+        "toInfinityAndBeyond": "Det opprinnelige teamets arbeid sikret dem 3 millioner dollar i en andre investor-runde på høsten 2016. Som et videre arbeid basert på deres banebrytende arbeid i versjon 1, begynte et utvidet OB1 å arbeide med Mobazha 2, med det mål å gjøre fri handel tilgjengelig for enda flere folk rundt i verden.",
         "cashCTA": "Donér nå",
         "or": "eller",
         "codeCTA": "involver deg."
@@ -499,7 +499,7 @@
       "helperLanguage": "Vis grensesnittelementer i",
       "helperCountry": "Landet du primært holder til i",
       "helperCurrency": "Vis Priser i",
-      "helperTranslations": "Hjelp til med å oversette OpenBazaar på %{helperTranslationsLink}",
+      "helperTranslations": "Hjelp til med å oversette Mobazha på %{helperTranslationsLink}",
       "helperTranslationsLink": "Transifex",
       "sectionName": "Generelt",
       "bitcoinUnit": "Bitcoin Enhet",
@@ -693,7 +693,7 @@
       "languages": "Språk",
       "languagesHelper": "Skriv inn alle språk du kan støtte (som du kan kommunisere klart på).",
       "acceptGuidelines": "Jeg har lest den anbefalte %{acceptGuidelinesLink}",
-      "acceptGuidelinesLink": "OpenBazaar Retningslinjer for Tvisteløsning",
+      "acceptGuidelinesLink": "Mobazha Retningslinjer for Tvisteløsning",
       "understandRequirements": "Jeg forstår at jeg må tilby mine tjenester for å løse tvister til hvem som helst som ber om dem, med mindre de bryter vilkårene beskrevet over.",
       "status": {
         "saving": "Lagrer moderatorinnstillinger...",
@@ -986,7 +986,7 @@
     },
     "cryptoTeaser": {
       "coinCount": "%{count}+ coins",
-      "bodyLine": "Trade %{coinCount} on OpenBazaar for free",
+      "bodyLine": "Trade %{coinCount} on Mobazha for free",
       "btnCreateListing": "Opprett oppføring",
       "linkViewCryptoListings": "View crypto listings"
     }
@@ -1378,7 +1378,7 @@
     },
     "tosScreen": {
       "heading": "Vilkår for Bruk",
-      "tos": "OpenBazaar er et nettverk for å handle varer og tjenester direkte mellom mennesker - ved bruk av kryptovaluta - uten noen sentral organisasjon som styrer plattformen. Dette betyr at du er ansvarlig for din egen aktivitet på nettverket.\n\nOpenBazaar brukere er ikke anonyme i utgangspunktet. Det meste av kommunikasjon mellom brukere er kryptert, men IP-adresser er offentlige og kan kobles til aktivitet på nettverket. Ondsinnede aktører kan bruke denne informasjonen mot deg; å beskytte ditt personvern er ditt eget ansvar.\n\nOpenBazaar brukere må følge loven i deres eget juridiske område samt deres samvittighet. OpenBazaar utviklerne støtter ikke - og er ikke ansvarlig for - bruk av plattformen for ulovlig aktivitet.\n\nFellesskapet av OpenBazaar utviklere har arbeidet hardt for å levere en fri plattform for handel til verden. Men som med all programvare vil det forekomme feil. Utviklerne er ikke ansvarlig for pengemessig tap i forbindelse med feil i programvaren.\n\nVed å bruke OpenBazaar er du ansvarlig for dine egne handlinger på OpenBazaar nettverket."
+      "tos": "Mobazha er et nettverk for å handle varer og tjenester direkte mellom mennesker - ved bruk av kryptovaluta - uten noen sentral organisasjon som styrer plattformen. Dette betyr at du er ansvarlig for din egen aktivitet på nettverket.\n\nOpenBazaar brukere er ikke anonyme i utgangspunktet. Det meste av kommunikasjon mellom brukere er kryptert, men IP-adresser er offentlige og kan kobles til aktivitet på nettverket. Ondsinnede aktører kan bruke denne informasjonen mot deg; å beskytte ditt personvern er ditt eget ansvar.\n\nOpenBazaar brukere må følge loven i deres eget juridiske område samt deres samvittighet. Mobazha utviklerne støtter ikke - og er ikke ansvarlig for - bruk av plattformen for ulovlig aktivitet.\n\nFellesskapet av Mobazha utviklere har arbeidet hardt for å levere en fri plattform for handel til verden. Men som med all programvare vil det forekomme feil. Utviklerne er ikke ansvarlig for pengemessig tap i forbindelse med feil i programvaren.\n\nVed å bruke Mobazha er du ansvarlig for dine egne handlinger på Mobazha nettverket."
     }
   },
   "pageControls": {
@@ -1452,14 +1452,14 @@
       "to": "Til: %{address}",
       "payFromWallet": "Betal fra lommebok",
       "note1": "Hvis du trenger hjelp for å komme igang med Bitcoin, vennligst les %{link}.",
-      "note1Link": "Trenger du Bitcoin? på OpenBazaar.org",
+      "note1Link": "Trenger du Bitcoin? på Mobazha.org",
       "note2": "Din betaling vil holdes sikker i escrow. Hvis et problem oppstår vil du kunne starte en tvistesak.",
       "note3": "*Moderatorgebyr gjelder kun om en tvist oppstår.",
       "note4": "Etter at du har betalt kan det ta litt tid før visningen oppdateres.",
       "btnConfirmedPay": "Ja, Betal",
       "walletNote": "<b>Eksterne lommebøker</b> som ikke støtter Segregated Witness vil kanskje ikke kunne betale for transaksjoner.",
       "walletLink": "Du kan sende penger til din OB lommebok istedenfor.",
-      "feeNote": "<b>Husk å dekke avgifter</b> når du sender penger til din OpenBazaar lommebok."
+      "feeNote": "<b>Husk å dekke avgifter</b> når du sender penger til din Mobazha lommebok."
     },
     "completeSection": {
       "paymentSent": "Betaling Sendt!",
@@ -1474,8 +1474,8 @@
       "send": "Send",
       "share": {
         "title": "Del med venner",
-        "body": "Jeg gjorde akkurat et kjøp på OpenBazaar, den frie markedsplassen uten avgifter eller begrensninger. Lær mer på %{link}.",
-        "shareMsg": "Jeg gjorde akkurat et kjøp på @OpenBazaar, den frie markedsplassen uten avgifter eller begrensninger.",
+        "body": "Jeg gjorde akkurat et kjøp på Mobazha, den frie markedsplassen uten avgifter eller begrensninger. Lær mer på %{link}.",
+        "shareMsg": "Jeg gjorde akkurat et kjøp på @Mobazha, den frie markedsplassen uten avgifter eller begrensninger.",
         "postToTwitter": "Post på Twitter",
         "postToFacebook": "Post på Facebook",
         "postToPinterest": "Post på Pinterest",
@@ -1906,9 +1906,9 @@
   "metrics": {
     "title": "Optional Anonymous Metrics",
     "newVersion": "Please review the update to the analytics data agreement below and click “Activate.”",
-    "msg1": "Please help improve OpenBazaar by agreeing to share analytics data about your experience with the development team.",
-    "msg2": "By clicking “Activate,” you agree to share the data listed below with OB1 Company and its processors for the purposes described, and consent to the transfer of this data to servers located in the United States. You may stop the sharing of this data at any time by opening your settings, and clicking the Change Sharing Settings button in the Advanced section. If you are located in the European Economic Area, you may have certain rights with respect to this data, including the right of access, rectification, erasure, restriction of processing, objection to processing, and portability. You may contact us about these, or simply request us to stop using and delete the data we’ve collected, at any time by contacting data@ob1.io.",
-    "listTitle": "The following data will be collected by OB1 Company as you use OpenBazaar:",
+    "msg1": "Please help improve Mobazha by agreeing to share analytics data about your experience with the development team.",
+    "msg2": "By clicking “Activate,” you agree to share the data listed below with Mulgore Company and its processors for the purposes described, and consent to the transfer of this data to servers located in the United States. You may stop the sharing of this data at any time by opening your settings, and clicking the Change Sharing Settings button in the Advanced section. If you are located in the European Economic Area, you may have certain rights with respect to this data, including the right of access, rectification, erasure, restriction of processing, objection to processing, and portability. You may contact us about these, or simply request us to stop using and delete the data we’ve collected, at any time by contacting data@mobazha.com.",
+    "listTitle": "The following data will be collected by Mulgore Company as you use Mobazha:",
     "list": {
       "device": "Your IP address and device information, for the purposes listed below.",
       "errors": "Performance data like errors and how long content takes to load. This makes it easier for us to fix problems users are experiencing without waiting for a specific request to fix something.",
@@ -1918,10 +1918,10 @@
       "app": "Details about your app, which include its version and whether it is installed from a downloadable package from source. This lets us understand the context of the other data collected, so it can be applied correctly.",
       "orders": "Basic information on actions you take with orders, such as its state when disputed, or if the order was moderated. This helps us identify problems in the order process.",
       "listings": "Basic information about on actions taken when creating and editing listings. This includes the type of listing, but no other information about it. This gives us data on potential problems with creating and editing listings.",
-      "path": "The path to your installation of OpenBazaar. This will share the name of any folders in the path to the installation folder, which may include your root and/or user folder. This is a side effect of the data collection process, and is not used by the OB1 team."
+      "path": "The path to your installation of Mobazha. This will share the name of any folders in the path to the installation folder, which may include your root and/or user folder. This is a side effect of the data collection process, and is not used by the Mobazha team."
     },
     "disclaimer1": "No information that can be used to identify your orders or any of your transactions is shared with us. This data is always stored on your own computer, and cannot be accessed by anyone else.",
-    "disclaimer2": "As stated above, your sharing of this data is completely optional. You are not required to share this data in order to use OpenBazaar.",
+    "disclaimer2": "As stated above, your sharing of this data is completely optional. You are not required to share this data in order to use Mobazha.",
     "acceptBtn": "Godta",
     "declineBtn": "Decline",
     "activateBtn": "Activate",

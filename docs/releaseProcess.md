@@ -11,7 +11,7 @@ Before every release:
 
 TBD
 
-### OpenBazaar maintainer/release engineers, update version in sources
+### Mobazha maintainer/release engineers, update version in sources
 
 Update the following:
 
@@ -51,30 +51,30 @@ cd verify
 
 The list of files should be:
 ```
-OpenBazaar2-${VERSION}-full.nupkg
-OpenBazaar2-${VERSION}-Setup-32.exe
-OpenBazaar2-${VERSION}-Setup-64.exe
-OpenBazaar2-${VERSION}.dmg
-OpenBazaar2-mac-${VERSION}.zip
-openbazaar2_${VERSION}_amd64.deb
-openbazaar2_${VERSION}_i386.deb
+Mobazha-${VERSION}-full.nupkg
+Mobazha-${VERSION}-Setup-32.exe
+Mobazha-${VERSION}-Setup-64.exe
+Mobazha-${VERSION}.dmg
+Mobazha-mac-${VERSION}.zip
+Mobazha_${VERSION}_amd64.deb
+Mobazha_${VERSION}_i386.deb
 ```
 
 - Upload `SHA256SUMS.${VERSION}.asc` from last step, to the openbazaar.org server
   into `../domains/openbazaar.org/html/releases`
 
-- Update OpenBazaar.org version
+- Update Mobazha.org version
 
   - Update website downloads page
 
 - Announce the release:
 
-  - OpenBazaar Slack
+  - Mobazha Slack
 
-  - OpenBazaar Twitter (@openbazaar)
+  - Mobazha Twitter (@openbazaar)
 
   - blog.openbazaar.org blog post
 
-  - /r/Bitcoin, /r/btc, /r/OpenBazaar
+  - /r/Bitcoin, /r/btc, /r/Mobazha
 
   - Facebook

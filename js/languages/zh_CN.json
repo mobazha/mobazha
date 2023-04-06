@@ -93,7 +93,7 @@
   "formattedCurrency": {
     "unrecognizedCurrencyTip": "无法提供价格信息，因为它以无法识别的货币（%{cur}）定价。"
   },
-  "addressBarPlaceholder": "输入@handle，OpenBazaar ID 或关键词",
+  "addressBarPlaceholder": "输入@handle，Mobazha ID 或关键词",
   "testnet": "测试模式",
   "testnetTooltip": "测试模式只能使用测试币，不会发生实质交易",
   "tabMenuHeading": "菜单",
@@ -204,7 +204,7 @@
     "notConnectedMenuItem": "未连接",
     "torOnTooltip": "Tor有效",
     "discoverCalloutTitle": "发现",
-    "discoverCalloutBody": "浏览OpenBazaar上的数百家商店并购物",
+    "discoverCalloutBody": "浏览Mobazha上的数百家商店并购物",
     "myPage": "我的主页",
     "customizePage": "个性化主页",
     "createListing": "创建新条目",
@@ -291,7 +291,7 @@
     "modAddError": "添加此主持人时出错。\n%{errMsg}",
     "modRemoveError": "删除此主持人时出错。\n%{errMsg}",
     "storeWelcomeCalloutTitle": "欢迎来到您的商店！",
-    "storeWelcomeCalloutBody": "您的OpenBazaar商店现在已经上线了。可以从创建新商品条目或自定义您的页面开始。",
+    "storeWelcomeCalloutBody": "您的Mobazha商店现在已经上线了。可以从创建新商品条目或自定义您的页面开始。",
     "storeWelcomeCalloutBtnClose": "关闭",
     "store": {
       "retryStoreFetch": "重试",
@@ -349,7 +349,7 @@
       "failTextListing": "获取商品%{listing}信息出现问题。请重试。",
       "failTextListingLink": "商店",
       "failTextListingWithLink": "获取商品%{listing}信息出现问题。请重试，或者浏览链接中的其他商品%{link}.",
-      "socialHeading": "OpenBazaar新闻&讨论:",
+      "socialHeading": "Mobazha新闻&讨论:",
       "btnCancel": "取消",
       "btnTryAgain": "重试"
     }
@@ -426,9 +426,9 @@
     "noCoinSupport": "此仲裁人不支持%{coin}。"
   },
   "about": {
-    "linkText": "关于OpenBazaar",
+    "linkText": "关于Mobazha",
     "blurbs": {
-      "tradeFree": "OpenBazaar致力于帮助用户构建自由的点到点交易网络。"
+      "tradeFree": "Mobazha致力于帮助用户构建自由的点到点交易网络。"
     },
     "version": "版本 %{version}",
     "bothVersions": "客户端 %{cVer}，服务器 %{sVer}",
@@ -452,10 +452,10 @@
     },
     "licenseTab": {
       "linkText": "许可",
-      "sectionHeader": "OpenBazaar许可证",
-      "licensePreface": "OpenBazaar是MIT许可下的开源软件。该许可证是宽容的，旨在允许人们完全重用其他开源项目或专有软件的代码。完整的许可证文本如下。",
+      "sectionHeader": "Mobazha许可证",
+      "licensePreface": "Mobazha是MIT许可下的开源软件。该许可证是宽容的，旨在允许人们完全重用其他开源项目或专有软件的代码。完整的许可证文本如下。",
       "header": "MIT许可证(MIT)",
-      "copyright": "Copright &copy; 2018 OpenBazaar Developers",
+      "copyright": "Copright &copy; 2023 Mobazha Developers",
       "paragraphs": {
         "permission": "特此授予任何获得本软件和相关文档文件（“软件”）副本的人免费使用本软件，包括但不限于使用、复制、修改的权利 ，合并，发布，分发，再授权和/或出售本软件的副本，并允许提供本软件的人员遵守以下条件：",
         "inclusion": "上述版权声明和本许可声明应包含在本软件的所有副本或主要部分。",
@@ -472,12 +472,12 @@
       "sectionHeader": "OpenBazaar的故事",
       "paragraphs": {
         "taakisDarkMarket": "2014年4月，在多伦多一个秘密的技术比赛中，一个名为“黑市”的项目被创建了。 Amir Taaki领导一个开发人员小团队为去中心化的市场构建了一个概念证明。 该软件是完全点到点的，没有中心组织控制它。 黑暗市场赢得了比赛，但是阿米尔和他的团队决定不继续在这个项目上工作。",
-        "briansOpenBazaar": "布莱恩·霍夫曼（Brian Hoffman）与阿米尔（Amir）谈了黑市，并了解到他们不再继续开发。他喜欢去中心化市场的想法，但不喜欢聚焦在暗网市场，所以他分叉了这个项目，更名为OpenBazaar",
+        "briansOpenBazaar": "布莱恩·霍夫曼（Brian Hoffman）与阿米尔（Amir）谈了黑市，并了解到他们不再继续开发。他喜欢去中心化市场的想法，但不喜欢聚焦在暗网市场，所以他分叉了这个项目，更名为Mobazha",
         "alphaTeamalphaRelease": "无需许可市场的想法是强大的，世界各地的人们加入Brian来帮助构建这个开源软件。9月份，该团队发布了该软件的第一个测试版本。",
         "momentOfTruth": "在接下来的几个月中，团队继续改进软件，并得到了比特币社区的一个令人鼓舞的回应。他们于2015年初访问了位于布鲁塞尔的FOSSDEM（免费开源软件开发商欧洲会议），并向热情的人群介绍了该项目。布莱恩和该团队的几名核心成员决定，现在是将项目从兼职志愿者工作转变为严肃的、资金充足的活动，为世界带来自由贸易的时候了。",
         "foundedAndFunded": "他们创建了一家公司，OB1，获得了Union Square Ventures和Andreessen Horowitz的100万美元风险投资，并立即开始招聘开发人员，从头开始构建更好的软件版本。",
-        "marketOpening": "2016年4月该软件的第一个完整版本发布了，全球数以万计的用户下载了OpenBazaar，并直接使用Bitcoin进行相互买卖。",
-        "toInfinityAndBeyond": "初始团队的工作为他们获得了在2016年秋天的300万美元第二轮投资。在第1版的突破性工作的基础上，扩大的OB1将在OpenBazaar 2上工作，目的是为世界各地更多的人提供自由贸易。",
+        "marketOpening": "2016年4月该软件的第一个完整版本发布了，全球数以万计的用户下载了Mobazha，并直接使用Bitcoin进行相互买卖。",
+        "toInfinityAndBeyond": "初始团队的工作为他们获得了在2016年秋天的300万美元第二轮投资。在第1版的突破性工作的基础上，扩大的OB1将在Mobazha 2上工作，目的是为世界各地更多的人提供自由贸易。",
         "cashCTA": "捐款",
         "or": "或者",
         "codeCTA": "参与其中"
@@ -500,7 +500,7 @@
       "helperLanguage": "显示界面元素",
       "helperCountry": "您居住的国家/地区",
       "helperCurrency": "显示货币",
-      "helperTranslations": "帮助翻译%{helperTranslationsLink}上的OpenBazaar",
+      "helperTranslations": "帮助翻译%{helperTranslationsLink}上的Mobazha",
       "helperTranslationsLink": "Transifex",
       "sectionName": "通用",
       "bitcoinUnit": "比特币单位",
@@ -617,7 +617,7 @@
         "purge": "清除共享文件",
         "purgeHelper": "删除与他人共享的缓存文件",
         "purgeBtn": "清除文件",
-        "purgeToolTip": "OpenBazaar共享你浏览过的其他用户的内容，如果不想共享的这些文本或图片，此按钮将会删除它们，这不会影响属于你的任何文件。",
+        "purgeToolTip": "Mobazha共享你浏览过的其他用户的内容，如果不想共享的这些文本或图片，此按钮将会删除它们，这不会影响属于你的任何文件。",
         "purgeError": "出现错误，你的缓存文件可能未被删除。",
         "purgeComplete": "你的缓存文件已被删除。",
         "blockData": "块数据",
@@ -694,7 +694,7 @@
       "languages": "语言",
       "languagesHelper": "输入你支持的所有语言（即: 你可以清楚地沟通）。",
       "acceptGuidelines": "我已阅读推荐的%{acceptGuidelinesLink}",
-      "acceptGuidelinesLink": "OpenBazaar争议解决指导要则",
+      "acceptGuidelinesLink": "Mobazha争议解决指导要则",
       "understandRequirements": "我理解我必须提供我的服务来解决任何申请人的争端，除非他们违反了上述条款。",
       "status": {
         "saving": "保存审核设置...",
@@ -987,7 +987,7 @@
     },
     "cryptoTeaser": {
       "coinCount": "%{count}+ 个币",
-      "bodyLine": "免费在OpenBazaar上交易 %{coinCount} ",
+      "bodyLine": "免费在Mobazha上交易 %{coinCount} ",
       "btnCreateListing": "创建货币商品",
       "linkViewCryptoListings": "查看加密货币商品"
     }
@@ -1379,7 +1379,7 @@
     },
     "tosScreen": {
       "heading": "服务条款",
-      "tos": "OpenBazaar是一个提供人们之间点到点直接交易货物和服务的网络 - 内建加密货币机制 - 没有任何中央组织控制网络，这意味着您需要对网络上的活动负责。\n \nOpenBazaar用户不是默认匿名的，网络上用户之间大部分的通信都是加密的，但用户IP地址是公开的，可以与网络上的活动相关联，恶意使用者可以使用这些信息攻击你;保护您的隐私是您自己的责任。\n \nOpenBazaar用户必须遵守法律以及道德规范。OpenBazaar开发人员不会宽恕 - 也不负责 - 任何使用该平台进行非法活动。\n \n OpenBazaar致力于构建免费的交易平台，但是和任何软件一样，我们会发现错误，但不承担任何与软件问题带来的资金丢失。\n \n通过使用OpenBazaar，您需要对OpenBazaar网络上自己的行为负责。"
+      "tos": "Mobazha是一个提供人们之间点到点直接交易货物和服务的网络 - 内建加密货币机制 - 没有任何中央组织控制网络，这意味着您需要对网络上的活动负责。\n \nMobazha用户不是默认匿名的，网络上用户之间大部分的通信都是加密的，但用户IP地址是公开的，可以与网络上的活动相关联，恶意使用者可以使用这些信息攻击你;保护您的隐私是您自己的责任。\n \nMobazha用户必须遵守法律以及道德规范。Mobazha开发人员不会宽恕 - 也不负责 - 任何使用该平台进行非法活动。\n \n Mobazha致力于构建免费的交易平台，但是和任何软件一样，我们会发现错误，但不承担任何与软件问题带来的资金丢失。\n \n通过使用Mobazha，您需要对Mobazha网络上自己的行为负责。"
     }
   },
   "pageControls": {
@@ -1453,14 +1453,14 @@
       "to": "到: %{address}",
       "payFromWallet": "从钱包付款",
       "note1": "如果您需要比特币入门帮助，请阅读%{link}。",
-      "note1Link": "需要比特币？在OpenBazaar上？",
+      "note1Link": "需要比特币？在Mobazha上？",
       "note2": "您的付款将被安全地托管，如果出现任何问题，您将有权开启争议。",
       "note3": "*仲裁人服务费仅适用于争议被建立的情况。",
       "note4": "一旦你付款了，接口更新可能会花一点时间。",
       "btnConfirmedPay": "是，支付",
       "walletNote": "不支持“Segregated Witness”的<b>外部钱包</b>可能无法付款。",
-      "walletLink": "您可以将资金转入您的OpenBazaar钱包。",
-      "feeNote": "<b>当您向OpenBazaar钱包发送资金时，请记住要支付任何手续费用</ b>。"
+      "walletLink": "您可以将资金转入您的Mobazha钱包。",
+      "feeNote": "<b>当您向Mobazha钱包发送资金时，请记住要支付任何手续费用</ b>。"
     },
     "completeSection": {
       "paymentSent": "支付指令已发送！",
@@ -1475,8 +1475,8 @@
       "send": "发送",
       "share": {
         "title": "与朋友分享",
-        "body": "我在OpenBazaar上进行了购买，这是一个没有任何其他费用或限制的免费市场，请通过%{link}了解更多信息。",
-        "shareMsg": "我刚在免费市场@OpenBazaar进行了购买，没有任何手续费用或限制。",
+        "body": "我在Mobazha上进行了购买，这是一个没有任何其他费用或限制的免费市场，请通过%{link}了解更多信息。",
+        "shareMsg": "我刚在免费市场@Mobazha进行了购买，没有任何手续费用或限制。",
         "postToTwitter": "发布到Twitter",
         "postToFacebook": "发布到Facebook",
         "postToPinterest": "发布到Pinterest",
@@ -1907,7 +1907,7 @@
   "metrics": {
     "title": "可选的匿名信息",
     "newVersion": "请查看以下的分析数据协议的更新，并点击“激活”",
-    "msg1": "请帮助改进OpenBazaar，同意与开发团队分享有关您使用体验的匿名数据。",
+    "msg1": "请帮助改进Mobazha，同意与开发团队分享有关您使用体验的匿名数据。",
     "msg2": "分享的数据不包含任何可用于识别您，您的订单以及任何交易信息。您的个人数据总是存储在您自己的计算机上，且任何其他人都无法访问。",
     "listTitle": "以下数据将被分享: ",
     "list": {
@@ -1919,10 +1919,10 @@
       "app": "关于您应用程序的详细信息，包括版本号，以及它是从软件安装包还是从源代码进行安装。",
       "orders": "订单处理过程中的基本操作信息，如开立争议时的订单状态，订单是否有仲裁人参与。这将有助于我们识别订单处理中存在的问题。",
       "listings": "在创建和编辑商品信息时的基本操作信息，仅包括商品基本类型和相关操作信息，不包括任何其他关于商品的信息。这将为我们分析创建和编辑商品时存在的潜在问题提供数据。",
-      "path": "安装OpenBazaar应用的路径。它将包含安装文件夹路径的名称，其中可能包括您的根目录和/或用户文件夹路径。"
+      "path": "安装Mobazha应用的路径。它将包含安装文件夹路径的名称，其中可能包括您的根目录和/或用户文件夹路径。"
     },
     "disclaimer1": "我们不收集任何用来识别您的订单以及任何交易信息。这些信息始终存储在您自己的计算机上，且任何其他人都无法访问。",
-    "disclaimer2": "如上所述，您是否愿意分享这些数据完全可选。使用OpenBazaar不要求您一定要分享这些数据。",
+    "disclaimer2": "如上所述，您是否愿意分享这些数据完全可选。使用Mobazha不要求您一定要分享这些数据。",
     "acceptBtn": "接受",
     "declineBtn": "拒绝",
     "activateBtn": "激活",

@@ -636,8 +636,8 @@ function start() {
 
           // Make sure the client is running on a compatible version of the server.
           if (app.settings.prettyServerVer !== serverVersionRequired) {
-            const cLink = `<a href="https://github.com/OpenBazaar/openbazaar-desktop/releases">${app.polyglot.t('serverVersionWarning.clientLink')}</a>`;
-            const sLink = `<a href="https://github.com/OpenBazaar/openbazaar-go/releases">${app.polyglot.t('serverVersionWarning.serverLink')}</a>`;
+            const cLink = `<a href="https://github.com/Mobazha/mobazha/releases">${app.polyglot.t('serverVersionWarning.clientLink')}</a>`;
+            const sLink = `<a href="https://github.com/Mobazha/mobazha/releases">${app.polyglot.t('serverVersionWarning.serverLink')}</a>`;
             const message = app.polyglot.t('serverVersionWarning.message', {
               serverVersion: app.settings.prettyServerVer,
               expectedVersion: serverVersionRequired,

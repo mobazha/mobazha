@@ -130,7 +130,7 @@ export function getNotifDisplayData(attrs, options = {}) {
     text = app.polyglot.t('notifications.text.processingError', {
       vendorName,
     });
-  } else if (attrs.type === 'disputeOpen') {
+  } else if (attrs.type === 'caseOpen') {
     if (attrs.disputeeID === app.profile.id) {
       // notif received by disputee
       const disputerName = opts.native ?
@@ -138,7 +138,7 @@ export function getNotifDisplayData(attrs, options = {}) {
         `<a class="clrTEm" href="#${attrs.disputerID}">` +
           `${getName(attrs.disputerHandle, attrs.disputerID)}</a>`;
       route = `#transactions/${attrs.buyer === attrs.disputerID ? 'purchases' : 'sales'}` +
-        `?orderID=${attrs.orderID}`;
+        `?orderID=${attrs.caseID}`;
       text = app.polyglot.t('notifications.text.disputeOpen', {
         disputerName,
       });
@@ -153,7 +153,7 @@ export function getNotifDisplayData(attrs, options = {}) {
         `<a class="clrTEm" href="#${attrs.disputeeID}">` +
           `${getName(attrs.disputeeHandle, attrs.disputeeID)}</a>`;
 
-      route = `#transactions/cases?caseID=${attrs.orderID}`;
+      route = `#transactions/cases?caseID=${attrs.caseID}`;
       text = app.polyglot.t('notifications.text.disputeOpenMod', {
         disputerName,
         disputeeName,
@@ -168,7 +168,7 @@ export function getNotifDisplayData(attrs, options = {}) {
       getName(attrs.disputeeHandle, attrs.disputeeID) :
       `<a class="clrTEm" href="#${attrs.disputeeID}">` +
         `${getName(attrs.disputeeHandle, attrs.disputeeID)}</a>`;
-    route = `#transactions/cases?orderID=${attrs.orderID}`;
+    route = `#transactions/cases?orderID=${attrs.caseID}`;
     text = app.polyglot.t('notifications.text.disputeUpdate', {
       disputerName,
       disputeeName,

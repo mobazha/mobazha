@@ -121,7 +121,7 @@ export default class extends BaseVw {
       if (Array.isArray(skus)) {
         const selections = indexes.map((val, idx) => ({
           option: orderOptions[idx].name,
-          variant: orderOptions[idx].variants[val].name,
+          variant: orderOptions[idx].value,
         }));
 
         const matchingSku = skus.find((sku) => _.isEqual(sku.selections, selections));

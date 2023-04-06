@@ -136,7 +136,7 @@ export default class extends BaseVw {
       this.model.fetch();
     });
 
-    this.listenTo(this.contract, 'change:vendorOrderConfirmation',
+    this.listenTo(this.contract, 'change:orderConfirmation',
       () => this.renderAcceptedView());
 
     this.listenTo(orderEvents, 'fulfillOrderComplete', e => {
@@ -153,7 +153,7 @@ export default class extends BaseVw {
       }
     });
 
-    this.listenTo(this.contract, 'change:vendorOrderFulfillment', () => {
+    this.listenTo(this.contract, 'change:orderFulfillments', () => {
       // For some reason the order state still reflects the order state at the
       // time this event handler is called even though it is triggered by fetch
       // which brings the updated order state in its payload. Weird... maybe
@@ -164,7 +164,7 @@ export default class extends BaseVw {
       });
     });
 
-    this.listenTo(this.contract, 'change:buyerOrderCompletion',
+    this.listenTo(this.contract, 'change:orderComplete',
       () => this.renderOrderCompleteView());
 
     this.listenTo(orderEvents, 'completeOrderComplete', e => {
@@ -190,14 +190,14 @@ export default class extends BaseVw {
     });
 
     if (!this.model.isCase) {
-      this.listenTo(this.contract, 'change:dispute',
+      this.listenTo(this.contract, 'change:disputeOpen',
         () => this.renderDisputeStartedView());
 
-      this.listenTo(this.contract, 'change:disputeResolution', () => {
+      this.listenTo(this.contract, 'change:disputeClose', () => {
         // Only render the dispute payout the first time we receive it
         // (it changes from undefined to an object with data). It shouldn't
         // be changing after that, but for some reason it is.
-        if (!this.contract.previous('disputeResolution')) {
+        if (!this.contract.previous('disputeClose')) {
           // The timeout is needed in the handler so the updated
           // order state is available.
           setTimeout(() => this.renderDisputePayoutView());
@@ -211,7 +211,7 @@ export default class extends BaseVw {
         }
       });
 
-      this.listenTo(this.contract, 'change:disputeAcceptance', () => {
+      this.listenTo(this.contract, 'change:disputeAccept', () => {
         this.renderDisputeAcceptanceView();
 
         if (this.disputePayout) {
@@ -226,7 +226,7 @@ export default class extends BaseVw {
         }
       });
 
-      this.listenTo(this.model, 'change:resolution',
+      this.listenTo(this.model, 'change:disputeClose',
         () => this.renderDisputePayoutView());
     }
 

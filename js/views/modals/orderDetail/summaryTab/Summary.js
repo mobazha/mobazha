@@ -739,7 +739,8 @@ export default class extends BaseVw {
   renderCompleteOrderForm() {
     const completingObject = completingOrder(this.model.id);
     const model = new OrderCompletion(
-      completingObject ? completingObject.data : { orderID: this.model.id });
+      completingObject ? completingObject.data : { orderID: this.model.id },
+    );
     if (this.completeOrderForm) this.completeOrderForm.remove();
     this.completeOrderForm = this.createChild(CompleteOrderForm, {
       model,
@@ -801,6 +802,11 @@ export default class extends BaseVw {
     if (!data) {
       throw new Error('Unable to create the Order Complete view because the buyerOrderCompletion '
         + 'data object has not been set.');
+    }
+
+    if (this.completeOrderForm) {
+      this.completeOrderForm.remove();
+      this.completeOrderForm = null;
     }
 
     if (this.orderComplete) this.orderComplete.remove();

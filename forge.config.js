@@ -51,6 +51,7 @@ module.exports = {
         noMsi: true,
         setupExe: `Mobazha-${version}-${arch}-setup.exe`,
         setupIcon: path.resolve(iconDir, 'icon.ico'),
+        loadingGif: path.resolve(iconDir, 'windows-loading.gif'),
         certificateFile: path.resolve(__dirname, '.travis', 'mobazha.org.pfx'),
         certificatePassword: process.env.PFX_PASSWORD,
       }),

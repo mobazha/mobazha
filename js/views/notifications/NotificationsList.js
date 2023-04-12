@@ -37,8 +37,8 @@ export default class extends BaseVw {
         // Expecting either a single new notification on the bottom (will
         // be rendered on top) or a page of notifications on top (will be
         // rendered on the bottom).
-        if (updateOpts.changes.added[updateOpts.changes.added.length - 1] ===
-          this.collection.at(0)) {
+        if (updateOpts.changes.added[updateOpts.changes.added.length - 1]
+          === this.collection.at(0)) {
           // It's a page of notifications at the bottom
           this.renderNotifications(updateOpts.changes.added, 'append');
         } else {
@@ -46,18 +46,17 @@ export default class extends BaseVw {
           this.renderNotifications(updateOpts.changes.added, 'prepend');
         }
 
-        updateOpts.changes.added.forEach(notif => {
+        updateOpts.changes.added.forEach((notif) => {
           const innerNotif = notif.get('notification');
           const types = ['follow', 'moderatorAdd', 'moderatorRemove'];
 
           if (types.indexOf(innerNotif.type) > -1) {
             getCachedProfiles([innerNotif.peerID])[0]
-              .done(profile => {
+              .done((profile) => {
                 notif.set('notification', {
                   ...innerNotif,
                   handle: profile.get('handle') || '',
-                  avatarHashes: profile.get('avatarHashes') &&
-                    profile.get('avatarHashes').toJSON() || {},
+                  avatarHashes: (profile.get('avatarHashes') && profile.get('avatarHashes').toJSON()) || {},
                 });
               });
           }
@@ -72,12 +71,12 @@ export default class extends BaseVw {
     const serverSocket = getSocket();
 
     if (serverSocket) {
-      serverSocket.on('message', e => {
+      serverSocket.on('message', (e) => {
         if (e.jsonData.notification && e.jsonData.notification.type !== 'unfollow') {
-          const type = e.jsonData.notification.type;
+          const { type } = e.jsonData.notification;
           const filters = (this.options.filter || '').split(',')
-            .filter(filter => filter.trim().length)
-            .map(filter => filter.trim());
+            .filter((filter) => filter.trim().length)
+            .map((filter) => filter.trim());
 
           if (!filters.length || filters.indexOf(type) > -1) {
             this.totalNotifs += 1;
@@ -129,8 +128,8 @@ export default class extends BaseVw {
 
   set $scrollContainer($el) {
     if (!($el instanceof $)) {
-      throw new Error('Please provide a jQuery element containing the scrollable element ' +
-        ' this view is in.');
+      throw new Error('Please provide a jQuery element containing the scrollable element '
+        + ' this view is in.');
     }
 
     if ($el !== this._$scrollContainer) {
@@ -153,13 +152,13 @@ export default class extends BaseVw {
   }
 
   get isFetching() {
-    return this.notifFetch &&
-      this.notifFetch.state() === 'pending';
+    return this.notifFetch
+      && this.notifFetch.state() === 'pending';
   }
 
   get fetchFailed() {
-    return this.notifFetch &&
-      this.notifFetch.state() === 'rejected';
+    return this.notifFetch
+      && this.notifFetch.state() === 'rejected';
   }
 
   get allLoaded() {
@@ -213,11 +212,11 @@ export default class extends BaseVw {
       }
 
       this.listFetcher.setState(state);
-    }).fail(xhr => {
+    }).fail((xhr) => {
       this.listFetcher.setState({
         isFetching: false,
         fetchFailed: true,
-        fetchError: xhr.responseJSON && xhr.responseJSON.reason || '',
+        fetchError: (xhr.responseJSON && xhr.responseJSON.reason) || '',
       });
     });
   }
@@ -232,13 +231,13 @@ export default class extends BaseVw {
     }
 
     if (insertionType === 'replace') {
-      this.notifViews.forEach(notif => notif.remove());
+      this.notifViews.forEach((notif) => notif.remove());
       this.notifViews = [];
     }
 
     const notifsFrag = document.createDocumentFragment();
 
-    models.forEach(notif => {
+    models.forEach((notif) => {
       const view = this.createNotifView(notif);
       this.notifViews.push(view);
       view.render().$el.appendTo(notifsFrag);
@@ -282,8 +281,7 @@ export default class extends BaseVw {
       initialState: {
         isFetching: this.notifFetch && this.notifFetch.state() === 'pending',
         fetchFailed: this.notifFetch && this.notifFetch.state() === 'rejected',
-        fetchError: this.notifFetch && this.notifFetch.responseJSON &&
-          this.notifFetch.responseJSON.reason || '',
+        fetchError: (this.notifFetch && this.notifFetch.responseJSON && this.notifFetch.responseJSON.reason) || '',
       },
     });
 

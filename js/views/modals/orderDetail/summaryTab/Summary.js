@@ -98,7 +98,7 @@ export default class extends BaseVw {
     });
 
     if (!this.model.isCase) {
-      this.listenTo(this.model.get('paymentAddressTransactions'), 'update', () => {
+      this.listenTo(this.contract, 'update:transactions', () => {
         if (this.payForOrder && !this.shouldShowPayForOrderSection()) {
           this.payForOrder.remove();
           this.payForOrder = null;
@@ -109,7 +109,7 @@ export default class extends BaseVw {
         }
       });
 
-      this.listenTo(this.model, 'change:refundAddressTransaction', () => this.renderRefundView());
+      this.listenTo(this.contract, 'change:refunds', () => this.renderRefundView());
     }
 
     this.listenTo(orderEvents, 'cancelOrderComplete', () => {
@@ -684,31 +684,37 @@ export default class extends BaseVw {
   }
 
   renderRefundView() {
-    const refundMd = this.model.get('refundAddressTransaction');
+    const refundMd = this.contract.get('refunds')[0];
 
-    let paymentCoin = '';
+    if (this.refunded) this.refunded.remove();
 
-    try {
-      paymentCoin = refundMd.get('currency').code;
-    } catch (e) {
-      // pass
+    if (!refundMd) {
+      console.error('Unable to create the refunded view because the refunds '
+        + 'data object has not been set.');
+      return;
     }
+
+    const { paymentCoin } = this.model;
 
     let blockChainTxUrl = false;
 
     try {
       blockChainTxUrl = getWalletCurByCode(paymentCoin)
-        .getBlockChainTxUrl(refundMd.id, app.serverConfig.testnet);
+        .getBlockChainTxUrl(refundMd.transactionID, app.serverConfig.testnet);
     } catch (e) {
       // pass
     }
 
-    if (this.refunded) this.refunded.remove();
+    let height = 0;
+    const transaction = this.contract.get('transactions').find((tx) => tx.txid === refundMd.transactionID);
+    if (transaction) {
+      height = transaction.height;
+    }
 
-    if (!refundMd) {
-      console.error('Unable to create the refunded view because the refundAddressTransaction '
-        + 'data object has not been set.');
-      return;
+    const coinInfo = app.walletBalances.get(paymentCoin);
+    let confirmations = 0;
+    if (coinInfo.get('height') !== 0 && height !== 0) {
+      confirmations = coinInfo.get('height') - height;
     }
 
     this.refunded = this.createChild(Refunded, {
@@ -717,6 +723,7 @@ export default class extends BaseVw {
         isCrypto: this.contract.type === 'CRYPTOCURRENCY',
         blockChainTxUrl,
         paymentCoin,
+        confirmations,
       },
     });
     this.buyer.getProfile()
@@ -943,11 +950,11 @@ export default class extends BaseVw {
     const sections = [];
     const { isCase } = this.model;
 
-    if (this.model.get('refundAddressTransaction')) {
+    if (this.contract.get('refunds')) {
       sections.push({
         function: this.renderRefundView,
         timestamp:
-          (new Date(this.model.get('refundAddressTransaction').timestamp)),
+          (new Date(this.contract.get('refunds')[0].timestamp)),
       });
     }
 

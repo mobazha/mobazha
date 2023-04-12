@@ -30,7 +30,7 @@ export default class extends BaseVw {
     loadTemplate('modals/orderDetail/summaryTab/refunded.html', (t) => {
       this.$el.html(t({
         ...this._state,
-        ...this.model.toJSON(),
+        ...this.model,
         abbrNum,
         moment,
       }));

@@ -651,20 +651,10 @@ export default class extends BaseModal {
       const sOpt = this.listing.get('shippingOptions').findWhere({ name: sName });
       const sOptService = sOpt ? sOpt.get('services').findWhere({ name: sService }) : '';
 
-      // determine which skus match the chosen options
-      const variantCombo = [];
-      item.get('options').forEach((option, i) => {
-        const variants = this.listing.get('item').get('options').at(i)
-          .get('variants')
-          .toJSON();
-        const variantIndex = variants.findIndex((variant) => variant.name === option.get('value'));
-        variantCombo.push(variantIndex);
-      });
-
       const options = item.get('options');
-      const selections = variantCombo.map((val, idx) => ({
-        option: options[idx].name,
-        variant: options[idx].variants[val].name,
+      const selections = options.map((option) => ({
+        option: option.name,
+        variant: option.value,
       }));
       const sku = this.listing.get('item').get('skus').find((v) => _.isEqual(v.get('selections'), selections));
 

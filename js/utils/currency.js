@@ -1,13 +1,15 @@
+/* eslint-disable max-classes-per-file */
 import _ from 'underscore';
-import app from '../app';
+
 import $ from 'jquery';
 import bigNumber from 'bignumber.js';
+import { Events } from 'backbone';
+import app from '../app';
 import {
   preciseRound,
   validateNumberType,
   decimalPlaces,
 } from './number';
-import { Events } from 'backbone';
 import { getCurrencyByCode } from '../data/currencies';
 import {
   getCurrencyByCode as getWalletCurByCode,
@@ -31,13 +33,13 @@ export const btcSymbol = '₿';
 
 export class NoExchangeRateDataError extends Error {
   constructor(message) {
-    return super(message || 'Missing exchange rate data');
+    super(message || 'Missing exchange rate data');
   }
 }
 
 export class UnrecognizedCurrencyError extends Error {
   constructor(message) {
-    return super(message || 'The currency is not recognized.');
+    super(message || 'The currency is not recognized.');
   }
 }
 
@@ -115,7 +117,7 @@ export function getCoinDivisibility(currency, options = {}) {
     throw new Error('Please provide a currrency as a non-empty string.');
   }
 
-  let walletCurDef = options.walletCurDef;
+  let { walletCurDef } = options;
 
   if (!walletCurDef) {
     try {
@@ -126,8 +128,8 @@ export function getCoinDivisibility(currency, options = {}) {
   }
 
   if (!walletCurDef) {
-    throw new Error('The wallet currency definition must be provide as an object either ' +
-      'passed in as an option or available on the app module.');
+    throw new Error('The wallet currency definition must be provide as an object either '
+      + 'passed in as an option or available on the app module.');
   }
 
   if (walletCurDef[currency]) {
@@ -138,9 +140,11 @@ export function getCoinDivisibility(currency, options = {}) {
 
   if (curMeta.isFiat) {
     return 2;
-  } else if (curMeta.isWalletCur) {
+  }
+  if (curMeta.isWalletCur) {
     return curMeta.curData.coinDivisibility;
-  } else if (curMeta.isCryptoListingCur) {
+  }
+  if (curMeta.isCryptoListingCur) {
     return defaultCryptoCoinDivisibility;
   }
 
@@ -165,7 +169,7 @@ export function minValueByCoinDiv(coinDivisibility) {
     throw new Error('The provided coinDivisibility is not valid.');
   }
 
-  return 1 / Math.pow(10, coinDivisibility);
+  return 1 / 10 ** coinDivisibility;
 }
 
 /**
@@ -195,15 +199,15 @@ export function decimalToInteger(value, divisibility, options = {}) {
     return bigNumber(value)
       .multipliedBy(
         bigNumber(10)
-          .pow(divisibility)
+          .pow(divisibility),
       )
       .decimalPlaces(0);
   } catch (e) {
     if (!opts.returnNaNOnError) {
       throw e;
     } else {
-      console.error(`Unable to convert ${value} from a decimal to an ` +
-        `integer: ${e.message}`);
+      console.error(`Unable to convert ${value} from a decimal to an `
+        + `integer: ${e.message}`);
       return bigNumber();
     }
   }
@@ -242,19 +246,15 @@ export function integerToDecimal(value, divisibility, options = {}) {
       throw new Error(divisErr);
     }
 
-    const result = bigNumber(value)
-      .dividedBy(
-        bigNumber(10)
-          .pow(divisibility)
-      );
+    const result = bigNumber(value).dividedBy(bigNumber(10).pow(divisibility));
 
     returnVal = result;
   } catch (e) {
     if (!opts.returnNaNOnError) {
       throw e;
     } else {
-      console.error(`Unable to convert ${opts.fieldName ? `${opts.fieldName}: ` : ''}` +
-        `${value} from an integer to a decimal: ${e.message}`);
+      console.error(`Unable to convert ${opts.fieldName ? `${opts.fieldName}: ` : ''}`
+        + `${value} from an integer to a decimal: ${e.message}`);
       return bigNumber();
     }
   }
@@ -270,8 +270,8 @@ export function isFormattedResultZero(amount, maxDecimals) {
   if (maxDecimals === 0) return true;
 
   return (
-    preciseRound(amount, maxDecimals) <
-      parseFloat(`.${'0'.repeat(maxDecimals - 1)}1`)
+    preciseRound(amount, maxDecimals)
+      < parseFloat(`.${'0'.repeat(maxDecimals - 1)}1`)
   );
 }
 
@@ -313,10 +313,10 @@ function getMaxDisplayDigits(amount, desiredMax) {
   }
 
   while (
-    isFormattedResultZero(amount, max) &&
-    max < MAX_NUMBER_FORMAT_DISPLAY_DECIMALS
+    isFormattedResultZero(amount, max)
+    && max < MAX_NUMBER_FORMAT_DISPLAY_DECIMALS
   ) {
-    max++;
+    max += 1;
   }
 
   return max < desiredMax ? desiredMax : max;
@@ -356,8 +356,8 @@ export function nativeNumberFormatSupported(val, maxDecimals = 20) {
   if (split[0] === '0' && split[1]) {
     if (split[1].length > 20) return false;
   } else {
-    const intLen = split[0] && split[0].length || 0;
-    const fractionLen = split[1] && split[1].length || 0;
+    const intLen = (split[0] && split[0].length) || 0;
+    const fractionLen = (split[1] && split[1].length) || 0;
 
     if (intLen + fractionLen > 16) return false;
   }
@@ -366,15 +366,15 @@ export function nativeNumberFormatSupported(val, maxDecimals = 20) {
   const fraction = bigNumber(split[1]);
 
   if (
-    !int.isNaN() &&
-    int.gt(Number.MAX_SAFE_INTEGER)
+    !int.isNaN()
+    && int.gt(Number.MAX_SAFE_INTEGER)
   ) {
     return false;
   }
 
   if (
-    !fraction.isNaN() &&
-    fraction.gt(Number.MAX_SAFE_INTEGER)
+    !fraction.isNaN()
+    && fraction.gt(Number.MAX_SAFE_INTEGER)
   ) {
     return false;
   }
@@ -392,9 +392,8 @@ export function nativeNumberFormatSupported(val, maxDecimals = 20) {
  */
 export function formatCurrency(amount, currency, options) {
   const opts = {
-    locale: app && app.localSettings && app.localSettings.standardizedTranslatedLang() || 'en-US',
-    btcUnit: app && app.localSettings &&
-      app.localSettings.get('bitcoinUnit') || 'BTC',
+    locale: (app && app.localSettings && app.localSettings.standardizedTranslatedLang()) || 'en-US',
+    btcUnit: (app && app.localSettings && app.localSettings.get('bitcoinUnit')) || 'BTC',
     // For crypto currencies, if a symbol is specified in the cryptoCurrencies data
     // module, it will be displayed in liu of the currency code.
     useCryptoSymbol: true,
@@ -419,7 +418,7 @@ export function formatCurrency(amount, currency, options) {
     if (nativeNumberFormatSupported(value, maxDecimals)) {
       return new Intl.NumberFormat(
         opts.locale,
-        formatAmountOpts
+        formatAmountOpts,
       ).format(value);
     }
 
@@ -474,8 +473,8 @@ export function formatCurrency(amount, currency, options) {
       // formatting - not any vital calculations.
       isCryptoListingCur = true;
     } else {
-      console.error('Unable to format the currency because the currency meta could not ' +
-        `be obtained: ${e.message}`);
+      console.error('Unable to format the currency because the currency meta could not '
+        + `be obtained: ${e.message}`);
       return '';
     }
   }
@@ -483,11 +482,11 @@ export function formatCurrency(amount, currency, options) {
   let formattedCurrency;
 
   if (isFiat) {
-    opts.minDisplayDecimals = typeof opts.minDisplayDecimals === 'number' ?
-      opts.minDisplayDecimals : 2;
+    opts.minDisplayDecimals = typeof opts.minDisplayDecimals === 'number'
+      ? opts.minDisplayDecimals : 2;
   } else {
-    opts.minDisplayDecimals = typeof opts.minDisplayDecimals === 'number' ?
-      opts.minDisplayDecimals : 0;
+    opts.minDisplayDecimals = typeof opts.minDisplayDecimals === 'number'
+      ? opts.minDisplayDecimals : 0;
   }
 
   if (typeof opts.maxDisplayDecimals !== 'number') {
@@ -500,14 +499,14 @@ export function formatCurrency(amount, currency, options) {
   }
 
   if (
-    bigAmount.gt(0) &&
-    opts.extendMaxDecimalsOnZero
+    bigAmount.gt(0)
+    && opts.extendMaxDecimalsOnZero
   ) {
     opts.maxDisplayDecimals = getMaxDisplayDigits(bigAmount, opts.maxDisplayDecimals);
   }
 
   if (isWalletCur) {
-    let curSymbol = opts.useCryptoSymbol && curData.symbol || cur;
+    let curSymbol = (opts.useCryptoSymbol && curData.symbol) || cur;
     let amt = bigAmount;
 
     if (cur === 'BTC' || cur === 'TBTC') {
@@ -537,8 +536,8 @@ export function formatCurrency(amount, currency, options) {
     });
 
     if (opts.includeCryptoCurIdentifier) {
-      const translationSubKey = curSymbol === curData.symbol ?
-        'curSymbolAmount' : 'curCodeAmount';
+      const translationSubKey = curSymbol === curData.symbol
+        ? 'curSymbolAmount' : 'curCodeAmount';
       formattedCurrency = app.polyglot.t(`cryptoCurrencyFormat.${translationSubKey}`, {
         amount: formattedCurrency,
         [curSymbol === curData.symbol ? 'symbol' : 'code']: curSymbol,
@@ -553,8 +552,8 @@ export function formatCurrency(amount, currency, options) {
     if (opts.includeCryptoCurIdentifier) {
       formattedCurrency = app.polyglot.t('cryptoCurrencyFormat.curCodeAmount', {
         amount: formattedCurrency,
-        code: cur.length > 8 ?
-          `${cur.slice(0, 8)}…` : cur,
+        code: cur.length > 8
+          ? `${cur.slice(0, 8)}…` : cur,
       });
     }
   } else {
@@ -569,7 +568,7 @@ export function formatCurrency(amount, currency, options) {
         currency,
         minimumFractionDigits: opts.minDisplayDecimals,
         maximumFractionDigits: opts.maxDisplayDecimals,
-      }
+      },
     );
   }
 
@@ -585,18 +584,18 @@ let exchangeRates = {};
  */
 export function fetchExchangeRates(options = {}) {
   const xhr = $.get(app.getServerUrl('ob/exchangerates'), options)
-    .done(data => {
+    .done((data) => {
       const changed = new Set();
 
       Object.keys(exchangeRates)
-        .forEach(cur => {
+        .forEach((cur) => {
           if (exchangeRates[cur] !== data[cur]) {
             changed.add(cur);
           }
         });
 
       Object.keys(data)
-        .forEach(cur => {
+        .forEach((cur) => {
           if (data[cur] !== exchangeRates[cur]) {
             changed.add(cur);
           }
@@ -610,7 +609,7 @@ export function fetchExchangeRates(options = {}) {
 
       if (changed.size) {
         events.trigger('exchange-rate-change', { changed: changedArray });
-        changedArray.forEach(cur => {
+        changedArray.forEach((cur) => {
           events.trigger(`exchange-rate-change-${cur}`, { previous: prevExchangeRates[cur] });
         });
       }
@@ -680,13 +679,13 @@ export function convertCurrency(amount, fromCur, toCur) {
   }
 
   if (!exchangeRates[fromCurCode]) {
-    throw new NoExchangeRateDataError('We do not have exchange rate data for ' +
-      `${fromCur.toUpperCase()}.`);
+    throw new NoExchangeRateDataError('We do not have exchange rate data for '
+      + `${fromCur.toUpperCase()}.`);
   }
 
   if (!exchangeRates[toCurCode]) {
-    throw new NoExchangeRateDataError('We do not have exchange rate data for ' +
-      `${toCur.toUpperCase()}.`);
+    throw new NoExchangeRateDataError('We do not have exchange rate data for '
+      + `${toCur.toUpperCase()}.`);
   }
 
   const fromRate = getExchangeRate(fromCurCode);
@@ -695,17 +694,17 @@ export function convertCurrency(amount, fromCur, toCur) {
   const fromDivisibility = getCoinDivisibility(fromCurCode);
   const toDivisibility = getCoinDivisibility(toCurCode);
 
-  const bigNum = amount instanceof bigNumber ?
-    amount : bigNumber(amount);
+  const bigNum = amount instanceof bigNumber
+    ? amount : bigNumber(amount);
 
-  const converted =
-    bigNum
-      .times(toRate / fromRate)
-      .multipliedBy(bigNumber(10).pow(fromDivisibility - toDivisibility));
+  const converted = bigNum
+    .times(toRate / fromRate)
+    .multipliedBy(bigNumber(10).pow(fromDivisibility - toDivisibility));
 
   if (amount instanceof bigNumber) {
     return converted;
-  } else if (typeof amount === 'string') {
+  }
+  if (typeof amount === 'string') {
     return converted.toString();
   }
 
@@ -718,8 +717,8 @@ export function convertCurrency(amount, fromCur, toCur) {
  */
 export function convertAndFormatCurrency(amount, fromCur, toCur, options = {}) {
   const opts = {
-    locale: app && app.localSettings && app.localSettings.standardizedTranslatedLang() || 'en-US',
-    btcUnit: app && app.localSettings && app.localSettings.get('bitcoinUnit') || 'BTC',
+    locale: (app && app.localSettings && app.localSettings.standardizedTranslatedLang()) || 'en-US',
+    btcUnit: (app && app.localSettings && app.localSettings.get('bitcoinUnit')) || 'BTC',
     skipConvertOnError: true,
     ...options,
   };
@@ -743,7 +742,7 @@ export function convertAndFormatCurrency(amount, fromCur, toCur, options = {}) {
     formatCurrency(
       convertedAmt,
       outputFormat,
-      _.omit(opts, ['skipConvertOnError'])
+      _.omit(opts, ['skipConvertOnError']),
     )
   );
 }
@@ -761,11 +760,10 @@ export function renderPairedCurrency(price, fromCur, toCur) {
     const fromCurExchangeRate = getExchangeRate(fromCur);
     const toCurExchangeRate = getExchangeRate(toCur);
     const formattedBase = formatCurrency(price, fromCur);
-    const formattedConverted =
-      fromCur === toCur ||
-      typeof fromCurExchangeRate !== 'number' ||
-      typeof toCurExchangeRate !== 'number' ?
-        '' : convertAndFormatCurrency(price, fromCur, toCur);
+    const formattedConverted = (fromCur === toCur
+      || typeof fromCurExchangeRate !== 'number'
+      || typeof toCurExchangeRate !== 'number')
+      ? '' : convertAndFormatCurrency(price, fromCur, toCur);
 
     result = formattedBase;
 
@@ -777,8 +775,8 @@ export function renderPairedCurrency(price, fromCur, toCur) {
     }
   } catch (e) {
     result = '';
-    console.error('Unable to render the paired currency. Returning an empty string. ' +
-      `Error: ${e.message}`);
+    console.error('Unable to render the paired currency. Returning an empty string. '
+      + `Error: ${e.message}`);
   }
 
   return result;
@@ -807,11 +805,11 @@ export function decimalToCurDef(amount, curCode, options = {}) {
     throw new Error('The curCode must be provided as a non-empty string.');
   }
 
-  let divisibility = opts.divisibility;
+  let { divisibility } = opts;
 
   try {
-    divisibility = divisibility === undefined ?
-      getCoinDivisibility(curCode) : divisibility;
+    divisibility = divisibility === undefined
+      ? getCoinDivisibility(curCode) : divisibility;
   } catch (e) {
     // If unable to obtain a divisibility, we'll just default to the crypto listing curs
     // default.
@@ -885,7 +883,7 @@ export function curDefToDecimal(curDef, options = {}) {
 
     converted = integerToDecimal(
       amount,
-      currency.divisibility
+      currency.divisibility,
     );
   } catch (e) {
     console.error(`Unable to convert the given currency definition to a decimal: ${e.message}`);
@@ -904,10 +902,9 @@ let rangeTypeValues;
 
 function isValidRangeType(type) {
   if (!rangeTypeValues) {
-    rangeTypeValues =
-      Object
-        .keys(CUR_VAL_RANGE_TYPES)
-        .map(key => CUR_VAL_RANGE_TYPES[key]);
+    rangeTypeValues = Object
+      .keys(CUR_VAL_RANGE_TYPES)
+      .map((key) => CUR_VAL_RANGE_TYPES[key]);
   }
 
   return rangeTypeValues.includes(type);
@@ -959,9 +956,9 @@ export function validateCurrencyAmount(amount, divisibility, options = {}) {
   };
 
   if (
-    typeof amount === 'undefined' ||
-    amount === '' ||
-    amount === null
+    typeof amount === 'undefined'
+    || amount === ''
+    || amount === null
   ) {
     returnVal.validRequired = false;
     return returnVal;
@@ -974,10 +971,10 @@ export function validateCurrencyAmount(amount, divisibility, options = {}) {
 
   if (
     (
-      opts.requireBigNumAmount &&
-      !(amount instanceof bigNumber)
-    ) ||
-    (bigNum.isNaN())
+      opts.requireBigNumAmount
+      && !(amount instanceof bigNumber)
+    )
+    || (bigNum.isNaN())
   ) {
     returnVal.validType = false;
     return returnVal;
@@ -997,8 +994,7 @@ export function validateCurrencyAmount(amount, divisibility, options = {}) {
   }
 
   if (isValidCoinDiv) {
-    returnVal.validFractionDigitCount =
-      decimalPlaces(amount) <= divisibility;
+    returnVal.validFractionDigitCount = decimalPlaces(amount) <= divisibility;
     returnVal.minValue = minValueByCoinDiv(divisibility);
   }
 

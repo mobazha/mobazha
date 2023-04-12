@@ -16,8 +16,10 @@
     </div>
     <div class="flexExpand tx5">
       <%
+        const divisibility = ob.currencyMod.getCoinDivisibility(ob.paymentCoin);
+        const amount = ob.currencyMod.integerToDecimal(ob.amount, divisibility);
         const priceFrag = ob.currencyMod.pairedCurrency(
-          ob.value,
+          amount,
           ob.paymentCoin,
           ob.userCurrency
         );
@@ -55,10 +57,10 @@
           <div class="noOverflow">
             <% if (ob.blockChainTxUrl) { %>
               <a class="clrT2" href="<%= ob.blockChainTxUrl %>">
-                <%= ob.txid %>
+                <%= ob.transactionID %>
               </a>
             <% } else { %>
-              <div class="clrT2"><%= ob.txid %></div>
+              <div class="clrT2"><%= ob.transactionID %></div>
             <% } %>
           </div>
         </div>

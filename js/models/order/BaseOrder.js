@@ -164,7 +164,7 @@ export default class extends BaseModel {
           currency: {
             code: payment.coin,
             divisibility: coinDiv,
-          }
+          },
         });
       }
 

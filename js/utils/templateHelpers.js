@@ -1,6 +1,8 @@
 import $ from 'jquery';
-import app from '../app';
+import twemoji from 'twemoji';
+import is from 'is_js';
 import bigNumber from 'bignumber.js';
+import app from '../app';
 import {
   formatCurrency,
   convertAndFormatCurrency,
@@ -8,6 +10,9 @@ import {
   getExchangeRate,
   renderPairedCurrency,
   isFiatCur,
+  getCoinDivisibility,
+  minValueByCoinDiv,
+  integerToDecimal,
 } from './currency';
 import {
   getCurrencyByCode as getWalletCurByCode,
@@ -19,7 +24,7 @@ import {
   renderCryptoIcon,
   renderCryptoTradingPair,
   renderCryptoPrice,
-} from '../utils/crypto';
+} from './crypto';
 import {
   isHiRez, isLargeWidth, isSmallHeight, getAvatarBgImage, getListingBgImage,
 } from './responsive';
@@ -29,10 +34,9 @@ import {
   toStandardNotation,
   isValidNumber,
 } from './number';
-import twemoji from 'twemoji';
-import { splitIntoRows, abbrNum } from './';
-import { tagsDelimiter } from '../utils/lib/selectize';
-import is from 'is_js';
+
+import { splitIntoRows, abbrNum } from '.';
+import { tagsDelimiter } from './lib/selectize';
 
 /**
  * This higher-order function will augment the given function so that rather than
@@ -64,8 +68,7 @@ export function polyT(key, options) {
 }
 
 export function parseEmojis(text, className = '', attrs = {}) {
-  const parsed = twemoji.parse(text,
-    icon => (`../imgs/emojis/72X72/${icon}.png`));
+  const parsed = twemoji.parse(text, (icon) => (`../imgs/emojis/72X72/${icon}.png`));
   const $parsed = $(`<div>${parsed}</div>`);
 
   $parsed.find('img')
@@ -74,7 +77,7 @@ export function parseEmojis(text, className = '', attrs = {}) {
       $img.addClass(`emoji ${className}`);
 
       Object.keys(attrs)
-        .forEach(attr => {
+        .forEach((attr) => {
           $img.attr(attr, attrs[attr]);
         });
     });
@@ -94,8 +97,7 @@ export function formatRating(average, count, skipCount) {
   const ratingAverage = avIsNum ? average.toFixed(1) : '?';
   let ratingCount = countIsNum ? ` (${abbrNum(count)})` : ' (?)';
   if (skipCount) ratingCount = '';
-  const error = !avIsNum || (!countIsNum && !skipCount) ?
-    ' <i class="ion-alert-circled clrTErr"></i>' : '';
+  const error = !avIsNum || (!countIsNum && !skipCount) ? ' <i class="ion-alert-circled clrTErr"></i>' : '';
   return `${parseEmojis('⭐')}&nbsp;${ratingAverage}${ratingCount}${error}`;
 }
 
@@ -107,6 +109,9 @@ const currencyExport = {
   convertCurrency,
   getExchangeRate: gracefulException(getExchangeRate, undefined),
   pairedCurrency: gracefulException(renderPairedCurrency),
+  minValueByCoinDiv: gracefulException(minValueByCoinDiv),
+  getCoinDivisibility: gracefulException(getCoinDivisibility),
+  integerToDecimal: gracefulException(integerToDecimal),
   isFiatCur: gracefulException(isFiatCur, false),
 };
 

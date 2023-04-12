@@ -34,8 +34,6 @@ class Order extends BaseOrder {
   get nested() {
     return {
       contract: Contract,
-      paymentAddressTransactions: Transactions,
-      refundAddressTransaction: Transaction,
     };
   }
 

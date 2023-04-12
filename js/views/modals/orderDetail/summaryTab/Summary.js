@@ -950,7 +950,7 @@ export default class extends BaseVw {
     const sections = [];
     const { isCase } = this.model;
 
-    if (this.contract.get('refunds')) {
+    if (this.contract.get('refunds').length > 0) {
       sections.push({
         function: this.renderRefundView,
         timestamp:

@@ -218,7 +218,7 @@ export function refundOrder(orderID) {
 
   if (!post) {
     post = $.post({
-      url: app.getServerUrl('ob/refund'),
+      url: app.getServerUrl('ob/orderrefund'),
       data: JSON.stringify({
         orderID,
       }),

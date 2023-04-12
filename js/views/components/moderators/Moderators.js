@@ -151,15 +151,15 @@ export default class extends baseVw {
     const isAMod = data.moderator && data.moderatorInfo;
     // If the moderator has an invalid currency, remove them from the list.
     // With multi-wallet, this should be a very rare occurrence.
-    const modCurs = data.moderatorInfo && data.moderatorInfo.acceptedCurrencies || [];
+    const modCurs = (data.moderatorInfo && data.moderatorInfo.acceptedCurrencies) || [];
     const supportedCur = anySupportedByWallet(modCurs);
 
-    if (data.moderatorInfo.fee.feeType === 'FIXED_PLUS_PERCENTAGE' &&
-      !(data.moderatorInfo.fee.fixedFee.amount instanceof bigNumber)) {
+    if (data.moderatorInfo && data.moderatorInfo.fee.feeType === 'FIXED_PLUS_PERCENTAGE'
+      && !(data.moderatorInfo.fee.fixedFee.amount instanceof bigNumber)) {
       data.moderatorInfo.fee.fixedFee.amount = bigNumber(data.moderatorInfo.fee.fixedFee.amount);
     }
 
-    if ((!!isAMod && supportedCur || this.options.showInvalid)) {
+    if (((!!isAMod && supportedCur) || this.options.showInvalid)) {
       const newMod = new Moderator(data, { parse: true });
       if (newMod.isValid()) this.moderatorsCol.add(newMod);
       this.removeNotFetched(data.peerID);

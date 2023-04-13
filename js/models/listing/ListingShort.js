@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import app from '../../app';
 import { events as listingEvents, shipsFreeToMe } from './';
 import { curDefToDecimal } from '../../utils/currency';
@@ -64,20 +65,27 @@ export default class extends BaseModel {
     parsedResponse.categories = Array.isArray(parsedResponse.categories) ?
       parsedResponse.categories : [];
 
-    const modifier = parsedResponse.cryptoListingPriceModifier || 0;
+    const modifier = parsedResponse.price.modifier || 0;
     let amount = '';
     let currencyCode = '';
 
     try {
-      amount = parsedResponse.contractType === 'CRYPTOCURRENCY' ?
-          1 : curDefToDecimal(parsedResponse.price);
+      amount = parsedResponse.contractType === 'CRYPTOCURRENCY' ? 1 : curDefToDecimal({
+        amount: parsedResponse.price.amount,
+        currency: {
+          code: parsedResponse.price.currencyCode || parsedResponse.price.currency.code,
+          divisibility: parsedResponse.price.divisibility
+            || parsedResponse.price.currency.divisibility,
+        },
+      });
     } catch (e) {
       console.error(`Unable to convert the listing price from base units: ${e.message}`);
     }
 
     try {
-      currencyCode = parsedResponse.contractType === 'CRYPTOCURRENCY' ?
-        parsedResponse.coinType : parsedResponse.price.currency.code;
+      currencyCode = parsedResponse.contractType === 'CRYPTOCURRENCY'
+        ? parsedResponse.coinType
+        : (parsedResponse.price.currencyCode || parsedResponse.price.currency.code);
     } catch (e) {
       // pass
     }

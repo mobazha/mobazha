@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import _ from 'underscore';
 import BaseVw from '../baseVw';
@@ -26,7 +27,7 @@ export default class extends BaseVw {
     this._reviewIDs = this.options.ratings || [];
     this.showListingData = this.options.showListingData;
     this.collection = new Collection();
-    this.listenTo(this.collection, 'add', model => this.addReview(model));
+    this.listenTo(this.collection, 'add', (model) => this.addReview(model));
   }
 
   className() {
@@ -92,6 +93,8 @@ export default class extends BaseVw {
   }
 
   loadReviews(start = this.startIndex, pageSize = this.pageSize, async = !!this.options.async) {
+    const asyncUpdate = false;
+
     const revLength = this.reviewIDs.length;
     // if on the last page, only fetch the number of reviews that remain
     const ps = start + pageSize <= revLength ? pageSize : revLength - start;
@@ -100,22 +103,22 @@ export default class extends BaseVw {
       this.getCachedEl('.js-loadMoreBtn').addClass('processing');
       this.getCachedEl('.js-errors').html('');
       $.ajax({
-        url: app.getServerUrl(`ob/fetchratings?async=${async}`),
+        url: app.getServerUrl(`ob/fetchratings?async=${asyncUpdate}`),
         data: JSON.stringify(this.reviewIDs.slice(start, start + ps)),
         dataType: 'json',
         contentType: 'application/json',
         type: 'POST',
       })
-        .done(data => {
+        .done((data) => {
           this.startIndex = start + ps;
-          if (!async) {
-            this.collection.add(_.pluck(data, 'ratingData'));
+          if (!asyncUpdate) {
+            this.collection.add(_.pluck(data, 'rating'));
             this.getCachedEl('.js-loadMoreBtn').removeClass('processing');
           }
           this.hideMoreBtn();
         })
         .fail((xhr) => {
-          const failReason = xhr.responseJSON && xhr.responseJSON.reason || '';
+          const failReason = (xhr.responseJSON && xhr.responseJSON.reason) || '';
           this.appendError(failReason);
           this.getCachedEl('.js-errors').append(`<p>${failReason}</p>`);
           this.hideMoreBtn();
@@ -161,7 +164,7 @@ export default class extends BaseVw {
       }));
 
       // render any reviews that have already loaded
-      this.collection.each(review => this.addReview(review));
+      this.collection.each((review) => this.addReview(review));
 
       // load the reviews when data is available and the collection is empty
       if (this.reviewIDs.length && !this.collection.length) {

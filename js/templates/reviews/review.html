@@ -3,13 +3,13 @@
 <% } else { %>
 
   <%
-    let niceSlug = ob.vendorSig.metadata.listingSlug.replace(/-/g, ' ');
+    let niceSlug = ob.vendorSig.slug.replace(/-/g, ' ');
     niceSlug = niceSlug.replace(/\b\w/g, m => m.toUpperCase());
-    let title = ob.vendorSig.metadata.listingTitle ? ob.vendorSig.metadata.listingTitle : niceSlug;
+    let title = ob.vendorSig.title ? ob.vendorSig.title : niceSlug;
     title = title ? title : ob.polyT('reputation.noTitle');
-    const slugLink = ob.vendorID && ob.vendorSig.metadata.listingSlug ? `ob://${ob.vendorID.peerID}/store/${ob.vendorSig.metadata.listingSlug}` : '';
+    const slugLink = ob.vendorID && ob.vendorSig.slug ? `ob://${ob.vendorID.peerID}/store/${ob.vendorSig.slug}` : '';
     let background = '';
-    if (ob.vendorSig.metadata.thumbnail) {
+    if (ob.vendorSig.thumbnail) {
       background = ob.getServerUrl(`ob/image/${ob.isHiRez() ? ob.vendorSig.metadata.thumbnail.small : ob.vendorSig.metadata.thumbnail.tiny}`);
     }
   %>

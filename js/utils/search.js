@@ -1,6 +1,6 @@
+import $ from 'jquery';
 import _ from 'underscore';
 import app from '../app';
-import $ from 'jquery';
 import ProviderMd from '../models/search/SearchProvider';
 
 export const searchTypes = ['listings', 'vendors'];
@@ -34,7 +34,7 @@ export function createSearchURL(options = {}) {
   const query = { ..._.pick(opts, ['q', 'p', 'sortBy']), ...opts.filters };
   query.q = query.q || '*';
   query.pageSize = options.ps ? options.ps : opts.ps;
-  query.network = !!app.serverConfig.testnet ? 'testnet' : 'mainnet';
+  query.network = app.serverConfig.testnet ? 'testnet' : 'mainnet';
 
   return new URL(`${opts.provider[`${options.searchType}Url`]}?${$.param(query, true)}`);
 }

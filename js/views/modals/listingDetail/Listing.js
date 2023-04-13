@@ -520,7 +520,7 @@ export default class extends BaseModal {
     const surcharge = sku ? sku.get('surcharge') : bigNumber('0');
 
     try {
-      const _totalPrice = this.model.price.amount.plus(surcharge);
+      const _totalPrice = this.model.price.amount.plus(surcharge || bigNumber('0'));
 
       if (!_totalPrice.eq(this.totalPrice)) {
         this.totalPrice = _totalPrice;

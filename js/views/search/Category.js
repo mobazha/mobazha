@@ -73,7 +73,7 @@ export default class extends baseVw {
   renderCards(collection = []) {
     const resultsFrag = document.createDocumentFragment();
 
-    collection.forEach(model => {
+    collection.forEach((model) => {
       const cardVw = this.createCardView(model);
 
       if (cardVw) {
@@ -103,7 +103,7 @@ export default class extends baseVw {
       .done(() => {
         this.trigger('fetchComplete');
       })
-      .fail(xhr => {
+      .fail((xhr) => {
         if (xhr.statusText !== 'abort') this.trigger('searchError', xhr);
       })
       .always(() => {
@@ -112,7 +112,7 @@ export default class extends baseVw {
   }
 
   removeCardViews() {
-    this.cardViews.forEach(vw => vw.remove());
+    this.cardViews.forEach((vw) => vw.remove());
     this.cardViews = [];
   }
 

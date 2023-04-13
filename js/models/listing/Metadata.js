@@ -1,6 +1,7 @@
+/* eslint-disable class-methods-use-this */
+import is from 'is_js';
 import app from '../../app';
 import BaseModel from '../BaseModel';
-import is from 'is_js';
 import { isSupportedWalletCur } from '../../data/walletCurrencies';
 import { getCurrencyByCode } from '../../data/currencies';
 import { isValidCoinDivisibility } from '../../utils/currency';
@@ -13,7 +14,7 @@ export default class extends BaseModel {
       // by default, setting to "never" expire (due to a unix bug, the max is before 2038)
       expiry: (new Date(2037, 11, 31, 0, 0, 0, 0)).toISOString(),
       acceptedCurrencies: [
-        ...(app && app.profile && app.profile.get('currencies') || []),
+        ...((app && app.profile && app.profile.get('currencies')) || []),
       ],
     };
   }
@@ -83,30 +84,34 @@ export default class extends BaseModel {
     }
 
     if (!Array.isArray(attrs.acceptedCurrencies) || !attrs.acceptedCurrencies.length) {
-      const translationKey = attrs.contractType === 'CRYPTOCURRENCY' ?
-        'metadataModelErrors.provideAcceptedCurrencyCrypto' :
-        'metadataModelErrors.provideAcceptedCurrency';
-      addError('acceptedCurrencies',
-        app.polyglot.t(translationKey));
-    } else if (attrs.acceptedCurrencies.findIndex(cur => (typeof cur !== 'string' || !cur)) !==
-      -1) {
+      const translationKey = attrs.contractType === 'CRYPTOCURRENCY'
+        ? 'metadataModelErrors.provideAcceptedCurrencyCrypto'
+        : 'metadataModelErrors.provideAcceptedCurrency';
+      addError(
+        'acceptedCurrencies',
+        app.polyglot.t(translationKey),
+      );
+    } else if (attrs.acceptedCurrencies.findIndex((cur) => (typeof cur !== 'string' || !cur))
+      !== -1) {
       // Ensure only non-empty strings are provided as accepted currencies
       addError('acceptedCurrencies', 'Accepted currency values must be non-empty strings.');
     } else {
       // Ensure only supported wallet currencies are provided as accepted currencies
       const unsupportedCurrencies = attrs.acceptedCurrencies
-        .filter(cur => !isSupportedWalletCur(cur));
+        .filter((cur) => !isSupportedWalletCur(cur));
 
       if (unsupportedCurrencies.length) {
-        addError('acceptedCurrencies', app.polyglot.t('metadataModelErrors.unsupportedAcceptedCurs',
-          { curs: unsupportedCurrencies.join(', ') }));
+        addError('acceptedCurrencies', app.polyglot.t(
+          'metadataModelErrors.unsupportedAcceptedCurs',
+          { curs: unsupportedCurrencies.join(', ') },
+        ));
       }
     }
 
     if (attrs.contractType === 'CRYPTOCURRENCY') {
       if (Array.isArray(attrs.acceptedCurrencies) && attrs.acceptedCurrencies.length > 1) {
-        addError('acceptedCurrencies', 'For cryptocurrency listings, only one acccepted ' +
-          'currency is allowed.');
+        addError('acceptedCurrencies', 'For cryptocurrency listings, only one acccepted '
+          + 'currency is allowed.');
       }
 
       if (!attrs.cryptoListingCurrencyCode || typeof attrs.cryptoListingCurrencyCode !== 'string') {
@@ -118,8 +123,8 @@ export default class extends BaseModel {
         addError('pricingCurrency', 'The pricingCurrency must be provided as an object.');
       } else {
         if (
-          !attrs.pricingCurrency.code ||
-          !getCurrencyByCode(attrs.pricingCurrency.code)
+          !attrs.pricingCurrency.code
+          || !getCurrencyByCode(attrs.pricingCurrency.code)
         ) {
           addError('pricingCurrency.code', 'The currency is not one of the available ones.');
         }

@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import app from '../../app';
 import loadTemplate from '../../utils/loadTemplate';
@@ -53,8 +54,8 @@ export default class extends baseVw {
       }
 
       if (typeof this.ownerGuid === 'undefined') {
-        throw new Error('Unable to determine ownership of the listing. Please either provide' +
-          ' a profile model or pass in an ownerGuid option.');
+        throw new Error('Unable to determine ownership of the listing. Please either provide'
+          + ' a profile model or pass in an ownerGuid option.');
       }
 
       if (!opts.listingBaseUrl) {
@@ -97,7 +98,7 @@ export default class extends baseVw {
       this._userClickedShowNsfw = null;
       $(document).on('click', this.boundDocClick);
 
-      this.listenTo(blockEvents, 'blocked unblocked', data => {
+      this.listenTo(blockEvents, 'blocked unblocked', (data) => {
         if (data.peerIDs.includes(this.ownerGuid)) {
           this.setBlockedClass();
         }
@@ -112,8 +113,8 @@ export default class extends baseVw {
 
       this.listenTo(app.verifiedMods, 'update', () => {
         const newVerifiedMods = app.verifiedMods.matched(this.model.get('moderators'));
-        if ((this.verifiedMods.length && !newVerifiedMods.length) ||
-          (!this.verifiedMods.length && newVerifiedMods.length)) {
+        if ((this.verifiedMods.length && !newVerifiedMods.length)
+          || (!this.verifiedMods.length && newVerifiedMods.length)) {
           this.verifiedMods = newVerifiedMods;
           this.render();
         }
@@ -121,11 +122,11 @@ export default class extends baseVw {
 
       // load necessary images in a cancelable way
       const thumbnail = this.model.get('thumbnail');
-      const listingImageSrc = this.viewType === 'grid' ?
-        app.getServerUrl(
+      const listingImageSrc = this.viewType === 'grid'
+        ? app.getServerUrl(
           `ob/image/${isHiRez() ? thumbnail.medium : thumbnail.small}`
-        ) :
-        app.getServerUrl(
+        )
+        : app.getServerUrl(
           `ob/image/${isHiRez() ? thumbnail.small : thumbnail.tiny}`
         );
 
@@ -197,7 +198,7 @@ export default class extends baseVw {
     app.loadingModal.open();
 
     this.fetchFullListing()
-      .done(xhr => {
+      .done((xhr) => {
         if (xhr.statusText === 'abort' || this.isRemoved()) return;
 
         launchEditListingModal({
@@ -224,7 +225,7 @@ export default class extends baseVw {
     app.loadingModal.open();
 
     this.fetchFullListing()
-      .done(xhr => {
+      .done((xhr) => {
         if (xhr.statusText === 'abort' || this.isRemoved()) return;
         launchEditListingModal({
           model: this.fullListing.cloneListing(),
@@ -261,21 +262,20 @@ export default class extends baseVw {
 
   loadListingDetail(hash = this.model.get('cid')) {
     const routeOnOpen = location.hash.slice(1);
-    app.router.navigateUser(`${this.options.listingBaseUrl}${this.model.get('slug')}`,
-      this.ownerGuid);
+    app.router.navigateUser(`${this.options.listingBaseUrl}${this.model.get('slug')}`, this.ownerGuid);
 
     startAjaxEvent('Listing_LoadFromCard');
     const segmentation = {
       ownListing: !!this.ownListing,
       openedFromStore: !!this.options.onStore,
-      searchUrl: this.options.searchUrl && this.options.searchUrl.hostname || 'none',
+      searchUrl: (this.options.searchUrl && this.options.searchUrl.hostname) || 'none',
     };
 
     let storeName = `${this.ownerGuid.slice(0, 8)}…`;
     let avatarHashes;
     let title = this.model.get('title');
-    title = title.length > 25 ?
-      `${title.slice(0, 25)}…` : title;
+    title = title.length > 25
+      ? `${title.slice(0, 25)}…` : title;
 
     if (this.options.profile) {
       storeName = this.options.profile.get('name');
@@ -293,7 +293,7 @@ export default class extends baseVw {
     let ipnsFetch = this.ipnsFetch = null;
     let ipfsFetch = this.ipfsFetch = null;
 
-    const onFailedListingFetch = xhr => {
+    const onFailedListingFetch = (xhr) => {
       if (typeof xhr !== 'object') {
         throw new Error('Please provide the failed xhr.');
       }
@@ -305,8 +305,8 @@ export default class extends baseVw {
         isProcessing: false,
       });
 
-      let err = xhr.responseJSON && xhr.responseJSON.reason || xhr.statusText ||
-          'unknown error';
+      let err = (xhr.responseJSON && xhr.responseJSON.reason) || xhr.statusText
+          || 'unknown error';
       // Consolidate and remove specific data from no link errors.
       if (err.startsWith('no link named')) err = 'no link named under hash';
       endAjaxEvent('Listing_LoadFromCard', {
@@ -338,10 +338,10 @@ export default class extends baseVw {
       };
 
       listingDetail.purchaseModal
-        .progress(getPurchaseE => {
+        .progress((getPurchaseE) => {
           if (getPurchaseE.type === ListingDetail.PURCHASE_MODAL_CREATE) {
             const purchaseModal = getPurchaseE.view;
-            this.listenTo(purchaseModal, 'clickReloadOutdated', e => {
+            this.listenTo(purchaseModal, 'clickReloadOutdated', (e) => {
               e.preventDefault();
               listingDetail.render();
               purchaseModal.remove();
@@ -350,15 +350,21 @@ export default class extends baseVw {
         });
 
       this.listenTo(listingDetail, 'close', onListingDetailClose);
-      this.listenTo(listingDetail, 'modal-will-remove',
-        () => this.stopListening(null, null, onListingDetailClose));
-      this.listenTo(listingDetail, 'clickReloadOutdated',
-        e => {
+      this.listenTo(
+        listingDetail,
+        'modal-will-remove',
+        () => this.stopListening(null, null, onListingDetailClose),
+      );
+      this.listenTo(
+        listingDetail,
+        'clickReloadOutdated',
+        (e) => {
           // Since the model will already have been updated by
           // handleOutdated, we could just re-render here.
           listingDetail.render();
           e.preventDefault();
-        });
+        },
+      );
 
       this.trigger('listingDetailOpened');
       this.userLoadingModal.remove();
@@ -389,7 +395,7 @@ export default class extends baseVw {
     };
 
     const loadListing = () => {
-      const listingHash = getNewerHash(hash || this.model.get('cid'));
+      const listingHash = getNewerHash(hash || this.model.get('hash'));
 
       if (listingHash && this.ownerGuid !== app.profile.id) {
         ipfsFetch = this.fullListing.fetch({
@@ -399,8 +405,8 @@ export default class extends baseVw {
         ipnsFetch = $.ajax(
           Listing.getIpnsUrl(
             this.ownerGuid,
-            this.model.get('slug')
-          )
+            this.model.get('slug'),
+          ),
         );
       } else {
         ipnsFetch = this.fullListing.fetch({ showErrorOnFetchFail: false });
@@ -418,19 +424,25 @@ export default class extends baseVw {
         },
       });
 
-      this.listenTo(this.userLoadingModal, 'clickCancel',
+      this.listenTo(
+        this.userLoadingModal,
+        'clickCancel',
         () => {
           ipnsFetch.abort();
           if (ipfsFetch) ipfsFetch.abort();
           this.userLoadingModal.remove();
           app.router.navigate(routeOnOpen);
-        });
+        },
+      );
 
-      this.listenTo(this.userLoadingModal, 'clickRetry',
+      this.listenTo(
+        this.userLoadingModal,
+        'clickRetry',
         () => {
           app.router.navigate(routeOnOpen);
           this.loadListingDetail(hash);
-        });
+        },
+      );
 
       this.userLoadingModal.render()
         .open();
@@ -439,8 +451,8 @@ export default class extends baseVw {
         if (xhr.statusText === 'abort' || this.isRemoved()) return;
 
         if (
-          ipfsFetch &&
-          ['pending', 'rejected'].includes(ipfsFetch.state())
+          ipfsFetch
+          && ['pending', 'rejected'].includes(ipfsFetch.state())
         ) {
           ipfsFetch.abort();
           this.fullListing.set(this.fullListing.parse(data));
@@ -456,12 +468,12 @@ export default class extends baseVw {
         } else {
           showListingDetail();
         }
-      }).fail(xhr => {
+      }).fail((xhr) => {
         if (xhr.statusText === 'abort') return;
 
         if (
-          ipfsFetch &&
-          ['pending', 'resolved'].includes(ipfsFetch.state())
+          ipfsFetch
+          && ['pending', 'resolved'].includes(ipfsFetch.state())
         ) return;
 
         onFailedListingFetch(xhr);
@@ -471,7 +483,7 @@ export default class extends baseVw {
         ipfsFetch.done((data, textStatus, xhr) => {
           if (xhr.statusText === 'abort' || this.isRemoved()) return;
           showListingDetail();
-        }).fail(xhr => {
+        }).fail((xhr) => {
           if (xhr.statusText === 'abort') return;
           onFailedListingFetch(xhr);
         });
@@ -501,9 +513,9 @@ export default class extends baseVw {
 
   onClick(e) {
     if (this.deleteConfirmOn) return;
-    if (!this.ownListing ||
-        (e.target !== this.$btnEdit[0] && e.target !== this.$btnDelete[0] &&
-         !$.contains(this.$btnEdit[0], e.target) && !$.contains(this.$btnDelete[0], e.target))) {
+    if (!this.ownListing
+        || (e.target !== this.$btnEdit[0] && e.target !== this.$btnDelete[0]
+         && !$.contains(this.$btnEdit[0], e.target) && !$.contains(this.$btnDelete[0], e.target))) {
       this.loadListingDetail();
     }
   }
@@ -527,11 +539,11 @@ export default class extends baseVw {
   setHideNsfwClass() {
     this.$el.toggleClass('hideNsfw',
       // explicitly checking for false, since null means something different
-      this._userClickedShowNsfw === false ||
-      (
-        this.model.get('nsfw') &&
-        !this._userClickedShowNsfw &&
-        !app.settings.get('showNsfw')
+      this._userClickedShowNsfw === false
+      || (
+        this.model.get('nsfw')
+        && !this._userClickedShowNsfw
+        && !app.settings.get('showNsfw')
       )
     );
   }
@@ -547,10 +559,10 @@ export default class extends baseVw {
     }
 
     this.fullListingFetch = this.fullListing.fetch()
-      .fail(xhr => {
-        if (!opts.showErrorOnFetchFail || xhr.statusText === 'abort' ||
-          this.isRemoved()) return;
-        let failReason = xhr.responseJSON && xhr.responseJSON.reason || '';
+      .fail((xhr) => {
+        if (!opts.showErrorOnFetchFail || xhr.statusText === 'abort'
+          || this.isRemoved()) return;
+        let failReason = (xhr.responseJSON && xhr.responseJSON.reason) || '';
 
         if (xhr.status === 404) {
           failReason = app.polyglot.t('listingCard.editFetchErrorDialog.bodyNotFound');
@@ -615,13 +627,13 @@ export default class extends baseVw {
   }
 
   get $btnEdit() {
-    return this._$btnEdit ||
-      (this._$btnEdit = this.$('.js-edit'));
+    return this._$btnEdit
+      || (this._$btnEdit = this.$('.js-edit'));
   }
 
   get $btnDelete() {
-    return this._$btnDelete ||
-      (this._$btnDelete = this.$('.js-delete'));
+    return this._$btnDelete
+      || (this._$btnDelete = this.$('.js-delete'));
   }
 
   remove() {
@@ -647,15 +659,14 @@ export default class extends baseVw {
           this.$el.html(t({
             ...this.model.toJSON(),
             ownListing: this.ownListing,
+            coinType: this.model.get('currency') && this.model.get('currency').code,
             shipsFreeToMe: this.model.shipsFreeToMe,
             viewType: this.viewType,
             displayCurrency: app.settings.get('localCurrency'),
             isBlocked,
             isUnblocking,
-            listingImageSrc: this.listingImage.loaded &&
-              this.listingImage.src || '',
-            vendorAvatarImageSrc: this.avatarImage && this.avatarImage.loaded &&
-              this.avatarImage.src || '',
+            listingImageSrc: (this.listingImage.loaded && this.listingImage.src) || '',
+            vendorAvatarImageSrc: (this.avatarImage && this.avatarImage.loaded && this.avatarImage.src) || '',
             abbrNum,
           }));
         });
@@ -681,7 +692,7 @@ export default class extends baseVw {
               initialState: { useIcon: true },
             })
               .render()
-              .el
+              .el,
           );
         }
 
@@ -691,8 +702,8 @@ export default class extends baseVw {
 
         if (this.verifiedMod) this.verifiedMod.remove();
         this.verifiedMod = this.createChild(VerifiedMod, getListingOptions({
-          model: verifiedID &&
-            app.verifiedMods.get(verifiedID),
+          model: verifiedID
+            && app.verifiedMods.get(verifiedID),
         }));
         this.getCachedEl('.js-verifiedMod').append(this.verifiedMod.render().el);
       } catch (e) {
@@ -708,9 +719,9 @@ export default class extends baseVw {
       let messageHtml = app.polyglot.t('listingCard.cardError');
 
       if (typeof _cardError === 'string') {
-        messageHtml +=
-          `&nbsp;<span class="toolTip" data-tip="${_cardError}">` +
-          '<span class="ion-help-circled clrTErr"></span></span>';
+        messageHtml
+          += `&nbsp;<span class="toolTip" data-tip="${_cardError}">`
+          + '<span class="ion-help-circled clrTErr"></span></span>';
       }
 
       this.$el.html(`<p class="padMd clrTErr tx5">${messageHtml}</p>`);

@@ -82,7 +82,7 @@ export default class extends baseVw {
   renderCards(pageCol = []) {
     const resultsFrag = document.createDocumentFragment();
 
-    pageCol.forEach(model => {
+    pageCol.forEach((model) => {
       const cardVw = this.createCardView(model);
 
       if (cardVw) {
@@ -150,7 +150,7 @@ export default class extends baseVw {
   }
 
   removeCardViews() {
-    this.cardViews.forEach(vw => vw.remove());
+    this.cardViews.forEach((vw) => vw.remove());
     this.cardViews = [];
   }
 

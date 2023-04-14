@@ -1,10 +1,11 @@
+/* eslint-disable class-methods-use-this */
 /*
   This table is re-used for Sales, Purchases and Cases.
 */
 
-import app from '../../../app';
 import $ from 'jquery';
 import _ from 'underscore';
+import app from '../../../app';
 import { getContentFrame } from '../../../utils/selectors';
 import { getSocket } from '../../../utils/serverConnect';
 import {
@@ -69,16 +70,13 @@ export default class extends baseVw {
     }
 
     this.listenTo(orderEvents, 'rejectingOrder', this.onRejectingOrder);
-    this.listenTo(orderEvents, 'rejectOrderComplete, rejectOrderFail',
-      this.onRejectOrderAlways);
+    this.listenTo(orderEvents, 'rejectOrderComplete, rejectOrderFail', this.onRejectOrderAlways);
     this.listenTo(orderEvents, 'rejectOrderComplete', this.onRejectOrderComplete);
     this.listenTo(orderEvents, 'acceptingOrder', this.onAcceptingOrder);
-    this.listenTo(orderEvents, 'acceptOrderComplete, acceptOrderFail',
-      this.onAcceptOrderAlways);
+    this.listenTo(orderEvents, 'acceptOrderComplete, acceptOrderFail', this.onAcceptOrderAlways);
     this.listenTo(orderEvents, 'acceptOrderComplete', this.onAcceptOrderComplete);
     this.listenTo(orderEvents, 'cancelingOrder', this.onCancelingOrder);
-    this.listenTo(orderEvents, 'cancelOrderComplete, cancelOrderFail',
-      this.onCancelOrderAlways);
+    this.listenTo(orderEvents, 'cancelOrderComplete, cancelOrderFail', this.onCancelOrderAlways);
     this.listenTo(orderEvents, 'cancelOrderComplete', this.onCancelOrderComplete);
   }
 
@@ -260,7 +258,7 @@ export default class extends baseVw {
   getAvatars(models = []) {
     const profilesToFetch = [];
 
-    models.forEach(md => {
+    models.forEach((md) => {
       const vendorID = md.get('vendorID');
       const buyerID = md.get('buyerID');
 
@@ -275,18 +273,18 @@ export default class extends baseVw {
 
     if (profilesToFetch.length) {
       getCachedProfiles(profilesToFetch)
-        .forEach(profilePromise => {
-          profilePromise.done(profile => {
+        .forEach((profilePromise) => {
+          profilePromise.done((profile) => {
             const flatProfile = profile.toJSON();
             const vendorViews = this.indexedViews.byVendor[flatProfile.peerID] || [];
             const buyerViews = this.indexedViews.byBuyer[flatProfile.peerID] || [];
 
-            vendorViews.forEach(view => {
+            vendorViews.forEach((view) => {
               view.setState({ vendorAvatarHashes: flatProfile.avatarHashes });
               view.model.set({ vendorHandle: flatProfile.handle });
             });
 
-            buyerViews.forEach(view => {
+            buyerViews.forEach((view) => {
               view.setState({ buyerAvatarHashes: flatProfile.avatarHashes });
               view.model.set({ buyerHandle: flatProfile.handle });
             });
@@ -306,19 +304,17 @@ export default class extends baseVw {
       byOrder: {},
     };
 
-    this.views.forEach(view => {
+    this.views.forEach((view) => {
       const vendorID = view.model.get('vendorID');
       const buyerID = view.model.get('buyerID');
 
       if (vendorID) {
-        this.indexedViews.byVendor[vendorID] =
-          this.indexedViews.byVendor[vendorID] || [];
+        this.indexedViews.byVendor[vendorID] = this.indexedViews.byVendor[vendorID] || [];
         this.indexedViews.byVendor[vendorID].push(view);
       }
 
       if (buyerID) {
-        this.indexedViews.byBuyer[buyerID] =
-          this.indexedViews.byBuyer[buyerID] || [];
+        this.indexedViews.byBuyer[buyerID] = this.indexedViews.byBuyer[buyerID] || [];
         this.indexedViews.byBuyer[buyerID].push(view);
       }
 
@@ -359,8 +355,7 @@ export default class extends baseVw {
     }
 
     let baseRoute = location.hash.split('?')[0];
-    baseRoute = baseRoute.startsWith('#ob://') ?
-      baseRoute.slice(6) : baseRoute.slice(1);
+    baseRoute = baseRoute.startsWith('#ob://') ? baseRoute.slice(6) : baseRoute.slice(1);
 
     app.router.navigate(`${baseRoute}?${$.param(queryFilter)}`, { replace: true });
   }
@@ -385,7 +380,7 @@ export default class extends baseVw {
       ...filterParams,
       sortByAscending: ['UNREAD', 'DATE_ASC'].indexOf(filterParams.sortBy) === -1,
       sortByRead: filterParams.sortBy === 'UNREAD',
-      exclude: this.collection.map(md => md.id),
+      exclude: this.collection.map((md) => md.id),
     };
 
     delete fetchParams.sortBy;
@@ -396,14 +391,12 @@ export default class extends baseVw {
       havePage = true;
       getContentFrame()[0].scrollTop = 0;
       this.render();
-    } else {
-      if (this.collection.length < (page - 1) * this.transactionsPerPage) {
-        // You cannot fetch a page unless you have its previous page. The api
-        // requires the ID of the last transaction in the previous page.
-        throw new Error('Cannot fetch page. Do no have the previous pages.');
-      } else if (this.collection.length) {
-        fetchParams.offsetID = this.collection.at(this.collection.length - 1).id;
-      }
+    } else if (this.collection.length < (page - 1) * this.transactionsPerPage) {
+      // You cannot fetch a page unless you have its previous page. The api
+      // requires the ID of the last transaction in the previous page.
+      throw new Error('Cannot fetch page. Do no have the previous pages.');
+    } else if (this.collection.length) {
+      fetchParams.offsetID = this.collection.at(this.collection.length - 1).id;
     }
 
     if (havePage) return;
@@ -460,7 +453,7 @@ export default class extends baseVw {
     });
 
     const startIndex = (this.curPage - 1) * this.transactionsPerPage;
-    this.views.forEach(view => view.remove());
+    this.views.forEach((view) => view.remove());
     this.views = [];
     this.indexedViews = {};
     const transactionsFrag = document.createDocumentFragment();
@@ -469,7 +462,7 @@ export default class extends baseVw {
     // The collection contains all pages we've fetched, but we'll slice it and
     // only render the current page.
     transToRender
-      .forEach(transaction => {
+      .forEach((transaction) => {
         const view = this.createChild(Row, {
           model: transaction,
           type: this.type,

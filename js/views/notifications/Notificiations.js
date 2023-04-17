@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import app from '../../app';
 import { capitalize } from '../../utils/string';
@@ -57,9 +58,9 @@ export default class extends BaseVw {
     // Going to optimistically mark all as read and switch back if the call fails.
     const notifs = [];
 
-    Object.keys(this.notifListsCache).forEach(listType => {
+    Object.keys(this.notifListsCache).forEach((listType) => {
       this.notifListsCache[listType].collection
-        .forEach(notif => {
+        .forEach((notif) => {
           notif.set('read', true);
           notifs.push(notif);
         });
@@ -68,7 +69,7 @@ export default class extends BaseVw {
     if (!notifs.length) return false;
 
     return $.post(app.getServerUrl('ob/marknotificationsasread'))
-      .fail(() => notifs.forEach(notif => notif.set('read', false)));
+      .fail(() => notifs.forEach((notif) => notif.set('read', false)));
   }
 
   /**
@@ -95,13 +96,12 @@ export default class extends BaseVw {
   createOrdersNotifList() {
     const notifList = this.createChild(NotificationsList, {
       collection: new Notifications(),
-      filter: 'order,orderDeclined,cancel,refund,fulfillment,orderComplete,disputeOpen,' +
-        'disputeUpdate,disputeClose,disputeAccepted,vendorDisputeTimeout,buyerDisputeTimeout' +
-        'buyerDisputeExpiry,moderatorDisputeExpiry',
+      filter: 'order,orderDeclined,cancel,refund,fulfillment,orderComplete,disputeOpen,'
+        + 'disputeUpdate,disputeClose,disputeAccepted,vendorDisputeTimeout,buyerDisputeTimeout'
+        + 'buyerDisputeExpiry,moderatorDisputeExpiry',
     });
 
-    this.listenTo(notifList, 'notifNavigate',
-      () => this.trigger('notifNavigate', { list: 'order' }));
+    this.listenTo(notifList, 'notifNavigate', () => this.trigger('notifNavigate', { list: 'order' }));
 
     return notifList;
   }
@@ -112,8 +112,7 @@ export default class extends BaseVw {
       filter: 'follow',
     });
 
-    this.listenTo(notifList, 'notifNavigate',
-      () => this.trigger('notifNavigate', { list: 'follow' }));
+    this.listenTo(notifList, 'notifNavigate', () => this.trigger('notifNavigate', { list: 'follow' }));
 
     return notifList;
   }
@@ -137,8 +136,8 @@ export default class extends BaseVw {
         notifList.render();
         this.notifListsCache[state.tab] = notifList;
       } else {
-        throw new Error(`Unable to populate the ${state.tab} tab, because I was unable to ` +
-          `find the ${createMethodName} function`);
+        throw new Error(`Unable to populate the ${state.tab} tab, because I was unable to `
+          + `find the ${createMethodName} function`);
       }
     }
 

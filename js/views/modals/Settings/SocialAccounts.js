@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import loadTemplate from '../../../utils/loadTemplate';
 import BaseView from '../../baseVw';
 import SocialAccount from './SocialAccount';
@@ -72,7 +73,7 @@ export default class extends BaseView {
   }
 
   setCollectionData() {
-    this.accountViews.forEach(account => {
+    this.accountViews.forEach((account) => {
       account.setModelData();
       // remove blank accounts
       if (!account.model.get('type') && !account.model.get('username')) {
@@ -100,18 +101,18 @@ export default class extends BaseView {
 
   render() {
     super.render();
-    loadTemplate('modals/settings/socialAccounts.html', t => {
+    loadTemplate('modals/settings/socialAccounts.html', (t) => {
       this.$el.html(t({
         currentCount: this.collection.length,
         max: this.maxAccounts,
       }));
 
-      this.accountViews.forEach(account => account.remove());
+      this.accountViews.forEach((account) => account.remove());
       this.accountViews = [];
 
       const accountFrag = document.createDocumentFragment();
 
-      this.collection.forEach(account => {
+      this.collection.forEach((account) => {
         const view = this.createAccountView(account);
         this.accountViews.push(view);
         view.render().$el.appendTo(accountFrag);

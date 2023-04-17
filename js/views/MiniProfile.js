@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import app from '../app';
 import { followsYou } from '../utils/follow';
 import { isBlocked, events as blockEvents } from '../utils/block';
@@ -31,25 +32,25 @@ export default class extends baseVw {
       this.listenTo(app.profile.get('avatarHashes'), 'change', () => this.render());
     } else {
       if (opts.fetchFollowsYou) {
-        followsYou(this.model.id).done(data => {
+        followsYou(this.model.id).done((data) => {
           this.setState({ followsYou: data.followsMe });
         });
       }
 
-      this.listenTo(app.ownFollowers, 'add', md => {
+      this.listenTo(app.ownFollowers, 'add', (md) => {
         if (md.id === app.profile.id) {
           this.setState({ followsYou: true });
         }
       });
 
-      this.listenTo(app.ownFollowers, 'remove', md => {
+      this.listenTo(app.ownFollowers, 'remove', (md) => {
         if (md.id === app.profile.id) {
           this.setState({ followsYou: false });
         }
       });
     }
 
-    this.listenTo(blockEvents, 'blocked unblocked', data => {
+    this.listenTo(blockEvents, 'blocked unblocked', (data) => {
       if (data.peerIDs.includes(this.model.id)) {
         this.setBlockedClass();
       }

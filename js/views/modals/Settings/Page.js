@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import app from '../../../app';
 import loadTemplate from '../../../utils/loadTemplate';
 import baseVw from '../../baseVw';
@@ -23,12 +24,12 @@ export default class extends baseVw {
     this.profile = app.profile.clone();
 
     // Sync our clone with any changes made to the global profile.
-    this.listenTo(app.profile, 'someChange',
-      (md, opts) => this.profile.set(opts.setAttrs));
+    this.listenTo(app.profile, 'someChange', (md, opts) => this.profile.set(opts.setAttrs));
 
     // Sync the global profile with any changes we save via our clone.
-    this.listenTo(this.profile, 'sync',
-      () => app.profile.set(this.profile.toJSON()));
+    this.listenTo(this.profile, 'sync', () => {
+      app.profile.set(this.profile.toJSON());
+    });
 
     this.socialAccounts = this.createChild(SocialAccounts, {
       collection: this.profile.get('contactInfo').get('social'),
@@ -166,13 +167,13 @@ export default class extends baseVw {
     let saveHeader;
 
     if (save) {
-      if (this.avatarOffsetOnLoad !== this.avatarCropper.cropit('offset') ||
-        this.avatarZoomOnLoad !== this.avatarCropper.cropit('zoom')) {
+      if (this.avatarOffsetOnLoad !== this.avatarCropper.cropit('offset')
+        || this.avatarZoomOnLoad !== this.avatarCropper.cropit('zoom')) {
         this.avatarChanged = true;
       }
 
-      if (this.headerOffsetOnLoad !== this.headerCropper.cropit('offset') ||
-        this.headerZoomOnLoad !== this.headerCropper.cropit('zoom')) {
+      if (this.headerOffsetOnLoad !== this.headerCropper.cropit('offset')
+        || this.headerZoomOnLoad !== this.headerCropper.cropit('zoom')) {
         this.headerChanged = true;
       }
 
@@ -212,9 +213,7 @@ export default class extends baseVw {
           });
         })
         .fail((args) => {
-          const errMsg =
-            args && args[0] && args[0].responseJSON &&
-            args[0].responseJSON.reason || '';
+          const errMsg = (args && args[0] && args[0].responseJSON && args[0].responseJSON.reason) || '';
 
           openSimpleMessage(app.polyglot.t('settings.pageTab.saveErrorAlertTitle'), errMsg);
 
@@ -245,8 +244,10 @@ export default class extends baseVw {
   }
 
   get $btnSave() {
-    return this._$btnSave ||
-      (this._$btnSave = this.$('.js-save'));
+    if (!this._$btnSave) {
+      this._$btnSave = this.$('.js-save');
+    }
+    return this._$btnSave;
   }
 
   render() {
@@ -300,10 +301,8 @@ export default class extends baseVw {
       this.headerCropper = this.$('#headerCropper');
 
       // if the avatar or header exist, don't count the first load as a change
-      this.avatarLoadedOnRender =
-        Boolean(avatarURI || this.profile.get('avatarHashes').get('original'));
-      this.headerLoadedOnRender =
-        Boolean(headerURI || this.profile.get('headerHashes').get('original'));
+      this.avatarLoadedOnRender = Boolean(avatarURI || this.profile.get('avatarHashes').get('original'));
+      this.headerLoadedOnRender = Boolean(headerURI || this.profile.get('headerHashes').get('original'));
 
       setTimeout(() => {
         this.avatarCropper.cropit({
@@ -359,15 +358,19 @@ export default class extends baseVw {
         if (avatarURI) {
           this.avatarCropper.cropit('imageSrc', avatarURI);
         } else if (this.profile.get('avatarHashes').get('original')) {
-          this.avatarCropper.cropit('imageSrc',
-            app.getServerUrl(`ob/image/${this.profile.get('avatarHashes').get('original')}`));
+          this.avatarCropper.cropit(
+            'imageSrc',
+            app.getServerUrl(`ob/image/${this.profile.get('avatarHashes').get('original')}`),
+          );
         }
 
         if (headerURI) {
           this.headerCropper.cropit('imageSrc', headerURI);
         } else if (this.profile.get('headerHashes').get('original')) {
-          this.headerCropper.cropit('imageSrc',
-            app.getServerUrl(`ob/image/${this.profile.get('headerHashes').get('original')}`));
+          this.headerCropper.cropit(
+            'imageSrc',
+            app.getServerUrl(`ob/image/${this.profile.get('headerHashes').get('original')}`),
+          );
         }
       }, 0);
 
@@ -378,4 +381,3 @@ export default class extends baseVw {
     return this;
   }
 }
-

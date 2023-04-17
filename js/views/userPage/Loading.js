@@ -15,8 +15,7 @@ export default class extends BaseModal {
         userName: '',
         contentText: '',
         isProcessing: false,
-        ownAvatarHashes: app.profile && app.profile.get('avatarHashes').toJSON() ||
-          undefined,
+        ownAvatarHashes: (app.profile && app.profile.get('avatarHashes').toJSON()) || undefined,
         ...options.initialState,
       },
     };

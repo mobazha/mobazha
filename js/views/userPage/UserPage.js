@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import baseVw from '../baseVw';
 import loadTemplate from '../../utils/loadTemplate';
@@ -58,7 +59,7 @@ export default class extends baseVw {
     this.listenTo(app.ownFollowing, 'remove', this.onOwnFollowingRemove);
 
     this.followsYou = false;
-    followsYou(this.model.id).done(data => {
+    followsYou(this.model.id).done((data) => {
       if (this.miniProfile) {
         this.miniProfile.setState({ followsYou: data.followsMe });
       }
@@ -66,7 +67,7 @@ export default class extends baseVw {
       if (this.followingCount === 0 && !this.ownPage) this.followingCount = 1;
     });
 
-    this.listenTo(blockEvents, 'blocked unblocked', data => {
+    this.listenTo(blockEvents, 'blocked unblocked', (data) => {
       if (data.peerIDs.includes(this.model.id)) {
         this.setBlockedClass();
       }
@@ -179,9 +180,11 @@ export default class extends baseVw {
     const headerHash = isHiRez() ? headerHashes.large : headerHashes.medium;
 
     if (headerHash) {
-      this.$('.js-header').attr('style',
+      this.$('.js-header').attr(
+        'style',
         `background-image: url(${app.getServerUrl(`ob/image/${headerHash}`)}),
-      url('../imgs/defaultHeader.png')`);
+        url('../imgs/defaultHeader.png')`,
+      );
     }
   }
 
@@ -191,8 +194,9 @@ export default class extends baseVw {
       type: 'followers',
     });
 
-    this.listenTo(collection, 'sync',
-      () => (this.followerCount = collection.length));
+    this.listenTo(collection, 'sync', () => {
+      this.followerCount = collection.length;
+    });
 
     return this.createChild(this.tabViews.Follow, {
       ...opts,
@@ -203,16 +207,17 @@ export default class extends baseVw {
   }
 
   createFollowingTabView(opts = {}) {
-    const models = app.profile.id === this.model.id ?
-      app.ownFollowing.models : [];
+    const models = app.profile.id === this.model.id
+      ? app.ownFollowing.models : [];
     const collection = new Followers(models, {
       peerID: this.model.id,
       type: 'following',
       fetchCollection: app.profile.id !== this.model.id,
     });
 
-    this.listenTo(collection, 'sync',
-      () => (this.followingCount = collection.length));
+    this.listenTo(collection, 'sync', () => {
+      this.followingCount = collection.length;
+    });
 
     return this.createChild(this.tabViews.Follow, {
       ...opts,
@@ -276,8 +281,8 @@ export default class extends baseVw {
       this.$tabTitle.text(tabName);
 
       if (opts.addTabToHistory) {
-        const listingBaseUrl = this.model.get('handle') ?
-          `@${this.model.get('handle')}` : this.model.id;
+        const listingBaseUrl = this.model.get('handle')
+          ? `@${this.model.get('handle')}` : this.model.id;
 
         // add tab to history
         app.router.navigateUser(`${listingBaseUrl}/${targ.toLowerCase()}`, this.model.id);
@@ -305,13 +310,17 @@ export default class extends baseVw {
   }
 
   get $pageContent() {
-    return this._$pageContent ||
-      (this._$pageContent = this.$('.js-pageContent'));
+    if (!this._$pageContent) {
+      this._$pageContent = this.$('.js-pageContent');
+    }
+    return this._$pageContent;
   }
 
   get $listingsCount() {
-    return this._$listingsCount ||
-      (this._$listingsCount = this.$('.js-listingsCount'));
+    if (!this._$listingsCount) {
+      this._$listingsCount = this.$('.js-listingsCount');
+    }
+    return this._$listingsCount;
   }
 
   remove() {

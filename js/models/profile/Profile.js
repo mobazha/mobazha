@@ -1,6 +1,7 @@
+/* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import app from '../../app';
-import { guid } from '../../utils/';
+import { guid } from '../../utils';
 import { getSocket } from '../../utils/serverConnect';
 import {
   decimalToCurDef,
@@ -57,8 +58,8 @@ export default class Profile extends BaseModel {
   }
 
   get isModerator() {
-    return this.get('moderator') &&
-      !!this.get('moderatorInfo');
+    return this.get('moderator')
+      && !!this.get('moderatorInfo');
   }
 
   get isVerified() {
@@ -105,22 +106,25 @@ export default class Profile extends BaseModel {
     if (typeof attrs.shortDescription !== 'string') {
       addError('shortDescription', 'The shortDescription must be provided as a string.');
     } else if (attrs.shortDescription > this.max.shortDescriptionLength) {
-      addError('shortDescription',
-        app.polyglot.t('profileModelErrors.shortDescriptionTooLong',
-          { count: this.max.shortDescriptionLength }));
+      addError(
+        'shortDescription',
+        app.polyglot.t('profileModelErrors.shortDescriptionTooLong', { count: this.max.shortDescriptionLength }),
+      );
     }
 
     // We'll delete the moderatorInfo errors, because we'll revalidate below passing
     // in the appropriate flag on whether required fields should be validated.
-    Object.keys(errObj).forEach(key => {
+    Object.keys(errObj).forEach((key) => {
       if (key.startsWith('moderatorInfo')) delete errObj[key];
     });
 
     if (attrs.moderatorInfo instanceof Moderator) {
       const validateRequiredFields = !!this.get('moderator');
-      const errs = attrs.moderatorInfo.isValid({ validateRequiredFields }) ?
-        {} : attrs.moderatorInfo.validationError;
-      Object.keys(errs).forEach(key => (errObj[`moderatorInfo.${key}`] = errs[key]));
+      const errs = attrs.moderatorInfo.isValid({ validateRequiredFields })
+        ? {} : attrs.moderatorInfo.validationError;
+      Object.keys(errs).forEach((key) => {
+        errObj[`moderatorInfo.${key}`] = errs[key];
+      });
     }
 
     if (Object.keys(errObj).length) return errObj;
@@ -135,8 +139,8 @@ export default class Profile extends BaseModel {
     Object.keys(attrs).forEach((field) => {
       if (typeof attrs[field] !== 'undefined') {
         updatedAttrs[field] = updatedAttrs[field].toString();
-        updatedAttrs[field] = updatedAttrs[field].charAt(0) !== '#' ?
-          `#${updatedAttrs[field]}` : updatedAttrs[field];
+        updatedAttrs[field] = updatedAttrs[field].charAt(0) !== '#'
+          ? `#${updatedAttrs[field]}` : updatedAttrs[field];
       }
     });
 
@@ -147,10 +151,10 @@ export default class Profile extends BaseModel {
     const response = { ...resp };
 
     if (
-      response.moderatorInfo &&
-      response.moderatorInfo.fee &&
-      response.moderatorInfo.fee.feeType !== 'PERCENTAGE' &&
-      response.moderatorInfo.fee.fixedFee
+      response.moderatorInfo
+      && response.moderatorInfo.fee
+      && response.moderatorInfo.fee.feeType !== 'PERCENTAGE'
+      && response.moderatorInfo.fee.fixedFee
     ) {
       try {
         if (response.moderatorInfo.fee.fixedFee.amount === '') { // legacy fixed fee
@@ -207,12 +211,12 @@ export default class Profile extends BaseModel {
       if (options.attrs.stats) delete options.attrs.stats;
 
       const images = [options.attrs.avatarHashes, options.attrs.headerHashes];
-      images.forEach(imageHashes => {
+      images.forEach((imageHashes) => {
         if (typeof imageHashes === 'object') {
           // If the image models are still in their default state (all images hashes as empty
           // strings), we won't send over the image to the server, since it will fail validation.
-          if (Object.keys(imageHashes).filter(key => imageHashes[key] === '').length ===
-            Object.keys(imageHashes).length) {
+          if (Object.keys(imageHashes).filter((key) => imageHashes[key] === '').length
+            === Object.keys(imageHashes).length) {
             if (imageHashes === options.attrs.avatarHashes) {
               delete options.attrs.avatarHashes;
             } else {
@@ -224,19 +228,18 @@ export default class Profile extends BaseModel {
 
       if (method !== 'delete') {
         if (
-          options.attrs.moderatorInfo &&
-          options.attrs.moderatorInfo.fee
+          options.attrs.moderatorInfo
+          && options.attrs.moderatorInfo.fee
         ) {
           if (options.attrs.moderatorInfo.fee.feeType === feeTypes.PERCENTAGE) {
             delete options.attrs.moderatorInfo.fee.fixedFee;
           } else {
-            const amount = options.attrs.moderatorInfo.fee.fixedFee.amount;
+            const { amount } = options.attrs.moderatorInfo.fee.fixedFee;
             const cur = options.attrs.moderatorInfo.fee.fixedFee.currency.code;
-            options.attrs.moderatorInfo.fee.fixedFee =
-              decimalToCurDef(amount, cur, {
-                amountKey: 'amount',
-                currencyKey: 'currency',
-              });
+            options.attrs.moderatorInfo.fee.fixedFee = decimalToCurDef(amount, cur, {
+              amountKey: 'amount',
+              currencyKey: 'currency',
+            });
 
             if (options.attrs.moderatorInfo.fee.feeType === feeTypes.FIXED) {
               options.attrs.moderatorInfo.fee.percentage = 0;
@@ -247,8 +250,8 @@ export default class Profile extends BaseModel {
     }
 
     if (method !== 'create' && !this.get('peerID')) {
-      throw new Error('I am unable to fetch, save or delete because the model does not' +
-        ' have a peerID set.');
+      throw new Error('I am unable to fetch, save or delete because the model does not'
+        + ' have a peerID set.');
     }
 
     return super.sync(method, model, options);
@@ -295,7 +298,7 @@ export function getCachedProfiles(peerIDs = []) {
     throw new Error('Please provide at least one peerID.');
   }
 
-  peerIDs.forEach(id => {
+  peerIDs.forEach((id) => {
     if (typeof id !== 'string') {
       throw new Error('One or more of the provided peerIDs are not strings.');
     }
@@ -317,7 +320,7 @@ export function getCachedProfiles(peerIDs = []) {
     }, 1000 * 60 * 5);
   }
 
-  peerIDs.forEach(id => {
+  peerIDs.forEach((id) => {
     let cached = profileCache.get(id);
 
     // make sure it's not expired
@@ -363,14 +366,14 @@ export function getCachedProfiles(peerIDs = []) {
     socket = getSocket();
 
     if (!socket) {
-      promises.forEach(promise => {
+      promises.forEach((promise) => {
         promise.reject({
           errCode: 'NO_SERVER_CONNECTION',
           error: 'There is no server connection.',
         });
       });
     } else {
-      const onSocketMessage = e => {
+      const onSocketMessage = (e) => {
         if (!(e.jsonData.peerID && (e.jsonData.profile || e.jsonData.error))) return;
         if (e.jsonData.id !== fetchId) return;
 
@@ -405,12 +408,12 @@ export function getCachedProfiles(peerIDs = []) {
         data: JSON.stringify(profilesToFetch),
         dataType: 'json',
         contentType: 'application/json',
-      }).fail(jqXhr => {
+      }).fail((jqXhr) => {
         socket.off('message', onSocketMessage);
-        promises.forEach(promise => {
+        promises.forEach((promise) => {
           promise.reject({
             errCode: 'SERVER_ERROR',
-            error: jqXhr.responseJSON && jqXhr.responseJSON.reason || '',
+            error: (jqXhr.responseJSON && jqXhr.responseJSON.reason) || '',
           });
         });
       });

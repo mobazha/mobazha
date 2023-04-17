@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import { ipcRenderer } from 'electron';
 import { Router } from 'backbone';
@@ -231,7 +232,9 @@ export default class ObRouter extends Router {
               // location hash changes to a new one and you want to cancel that route, we're good.
             }
           })
-          .always(() => (app.pageNav.navigable = true));
+          .always(() => {
+            app.pageNav.navigable = true;
+          });
 
         return false;
       }
@@ -541,8 +544,8 @@ export default class ObRouter extends Router {
       );
     }).fail((...failArgs) => {
       const jqXhr = failArgs[0];
-      const reason = jqXhr && jqXhr.responseJSON && jqXhr.responseJSON.reason
-        || jqXhr && jqXhr.responseText || '';
+      const reason = (jqXhr && jqXhr.responseJSON && jqXhr.responseJSON.reason)
+        || (jqXhr && jqXhr.responseText) || '';
 
       if (jqXhr === profileFetch && profileFetch.statusText === 'abort') return;
       if (jqXhr === listingFetch && listingFetch.statusText === 'abort') return;

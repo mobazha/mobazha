@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import _ from 'underscore';
 import { getSocket } from '../../utils/serverConnect';
@@ -144,7 +145,6 @@ export default class extends BaseVw {
   get $scrollContainer() {
     return this._$scrollContainer;
   }
-
 
   get notifsPerFetch() {
     // return 20;

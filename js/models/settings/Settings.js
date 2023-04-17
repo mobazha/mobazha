@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import _ from 'underscore';
 import app from '../../app';
 import BaseModel from '../BaseModel';
@@ -80,7 +81,7 @@ export default class extends BaseModel {
 
       // do not allow own node to be in the blocked list
       response.blockedNodes = response.blockedNodes
-        .filter(peerID => peerID !== app.profile.id);
+        .filter((peerID) => peerID !== app.profile.id);
     }
 
     return response;

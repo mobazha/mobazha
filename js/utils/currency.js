@@ -967,8 +967,6 @@ export function validateCurrencyAmount(amount, divisibility, options = {}) {
   returnVal.validRequired = true;
 
   const bigNum = bigNumber(amount);
-  console.log(amount);
-
   if (
     (
       opts.requireBigNumAmount

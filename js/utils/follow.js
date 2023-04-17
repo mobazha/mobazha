@@ -1,5 +1,5 @@
 import $ from 'jquery';
-import { capitalize } from '../utils/string';
+import { capitalize } from './string';
 import app from '../app';
 import Dialog from '../views/modals/Dialog';
 
@@ -41,13 +41,13 @@ export function followUnfollow(guid, type = 'follow') {
         app.ownFollowing.remove(guid);
       }
     })
-    .fail(data => {
+    .fail((data) => {
       new Dialog({
         title: app.polyglot.t('follow.followErrorTitle', {
           type: app.polyglot.t(`follow.type${capitalize(type)}`),
           user: guid,
         }),
-        message: data.responseJSON && data.responseJSON.reason || '',
+        message: (data.responseJSON && data.responseJSON.reason) || '',
       })
         .render()
         .open();

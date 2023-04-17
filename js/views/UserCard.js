@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import _ from 'underscore';
 import BaseVw from './baseVw';
@@ -50,14 +51,14 @@ export default class extends BaseVw {
     this.listenTo(app.ownFollowing, 'update', (cl, updateOpts) => {
       const updatedModels = updateOpts.changes.added.concat(updateOpts.changes.removed);
 
-      if (updatedModels.filter(md => md.id === this.guid).length) {
+      if (updatedModels.filter((md) => md.id === this.guid).length) {
         this.followedByYou = followedByYou(this.guid);
         this.$followBtn.toggleClass('active', this.followedByYou);
         this.$followBtn.attr('data-tip', this.getFollowTip());
       }
     });
 
-    this.listenTo(blockEvents, 'blocked unblocked', data => {
+    this.listenTo(blockEvents, 'blocked unblocked', (data) => {
       if (data.peerIDs.includes(this.guid)) {
         this.setBlockedClass();
       }
@@ -69,15 +70,15 @@ export default class extends BaseVw {
   }
 
   getModTip(ownMod = this.ownMod) {
-    return ownMod ?
-      `${app.polyglot.t('userShort.tipModRemove')}` :
-        `${app.polyglot.t('userShort.tipModAdd')}`;
+    return ownMod
+      ? `${app.polyglot.t('userShort.tipModRemove')}`
+      : `${app.polyglot.t('userShort.tipModAdd')}`;
   }
 
   getFollowTip(isFollowedByYou = this.followedByYou) {
-    return isFollowedByYou ?
-      `${app.polyglot.t('userShort.tipUnfollow')}` :
-        `${app.polyglot.t('userShort.tipFollow')}`;
+    return isFollowedByYou
+      ? `${app.polyglot.t('userShort.tipUnfollow')}`
+      : `${app.polyglot.t('userShort.tipFollow')}`;
   }
 
   loadUser(guid = this.guid) {
@@ -90,7 +91,7 @@ export default class extends BaseVw {
       this.profileFetch = getCachedProfiles([guid])[0];
     }
 
-    this.profileFetch.done(profile => {
+    this.profileFetch.done((profile) => {
       if (this.isRemoved()) return;
       this.loading = false;
       this.notFound = false;
@@ -188,8 +189,7 @@ export default class extends BaseVw {
         type: 'PUT',
       })
         .fail((...args) => {
-          const errMsg = args[0] && args[0].responseJSON &&
-              args[0].responseJSON.reason || '';
+          const errMsg = (args[0] && args[0].responseJSON && args[0].responseJSON.reason) || '';
           const phrase = add ? 'userShort.modAddError' : 'userShort.modRemoveError';
           openSimpleMessage(app.polyglot.t(phrase), errMsg);
         })
@@ -204,13 +204,17 @@ export default class extends BaseVw {
   }
 
   get $followBtn() {
-    return this._$followBtn ||
-        (this._$followBtn = this.$('.js-follow'));
+    if (!this._$followBtn) {
+      this._$followBtn = this.$('.js-follow');
+    }
+    return this._$followBtn;
   }
 
   get $modBtn() {
-    return this._$modBtn ||
-        (this._$modBtn = this.$('.js-mod'));
+    if (!this._$modBtn) {
+      this._$modBtn = this.$('.js-mod');
+    }
+    return this._$modBtn;
   }
 
   render() {
@@ -226,7 +230,7 @@ export default class extends BaseVw {
         getModTip: this.getModTip,
         getFollowTip: this.getFollowTip,
         ...this.options,
-        ...(this.model && this.model.toJSON() || {}),
+        ...((this.model && this.model.toJSON()) || {}),
       }));
 
       super.render();
@@ -242,7 +246,7 @@ export default class extends BaseVw {
               initialState: {
                 useIcon: true,
               },
-            }).render().el
+            }).render().el,
           );
       }
 

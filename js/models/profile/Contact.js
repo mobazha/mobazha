@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import BaseModel from '../BaseModel';
 import app from '../../app';
 import is from 'is_js';
@@ -30,7 +31,6 @@ export default class extends BaseModel {
       errObj[fieldName].push(error);
     };
 
-
     if (attrs.email && is.not.email(attrs.email)) {
       addError('email', app.polyglot.t('contactModelErrors.provideValidEmail'));
     }
@@ -40,9 +40,10 @@ export default class extends BaseModel {
     }
 
     if (attrs.social.length > this.maxSocialAccounts) {
-      addError('socialAccounts',
-        app.polyglot.t('contactModelErrors.tooManySocialAccounts',
-          { max: this.maxSocialAccounts }));
+      addError(
+        'socialAccounts',
+        app.polyglot.t('contactModelErrors.tooManySocialAccounts', { max: this.maxSocialAccounts }),
+      );
     }
 
     if (Object.keys(errObj).length) return errObj;

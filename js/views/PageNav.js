@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import * as isIPFS from 'is-ipfs';
 import Backbone from 'backbone';
 import $ from 'jquery';
@@ -65,21 +66,20 @@ export default class extends BaseVw {
     this.boundOnDocClick = this.onDocClick.bind(this);
     $(document).on('click', this.boundOnDocClick);
 
-    this.listenTo(app.localSettings, 'change:windowControlStyle',
-      (_, style) => this.setWinControlsStyle(style));
+    this.listenTo(app.localSettings, 'change:windowControlStyle', (_, style) => this.setWinControlsStyle(style));
     this.setWinControlsStyle(app.localSettings.get('windowControlStyle'));
 
-    this.listenTo(serverConnectEvents, 'connected', e => {
+    this.listenTo(serverConnectEvents, 'connected', (e) => {
       this.$connectedServerName.text(e.server.get('name'))
         .addClass('txB');
       this.listenTo(app.router, 'route:search', this.onRouteSearch);
-      this.fetchUnreadNotifCount().done(data => {
+      this.fetchUnreadNotifCount().done((data) => {
         this.unreadNotifCount = (this.unreadNotifCount || 0) + data.unread;
       });
       this.listenTo(e.socket, 'message', this.onSocketMessage);
     });
 
-    this.listenTo(serverConnectEvents, 'disconnected', e => {
+    this.listenTo(serverConnectEvents, 'disconnected', (e) => {
       this.$connectedServerName.text(app.polyglot.t('pageNav.notConnectedMenuItem'))
         .removeClass('txB');
       this.torIndicatorOn = false;
@@ -234,7 +234,7 @@ export default class extends BaseVw {
 
   navMaxClick() {
     getCurrentWindow().minimize();
-      getCurrentWindow().setFullScreen(!getCurrentWindow().isFullScreen());
+    getCurrentWindow().setFullScreen(!getCurrentWindow().isFullScreen());
   }
 
   onRouteSearch() {
@@ -398,11 +398,11 @@ export default class extends BaseVw {
       const text = this.$addressBar.val().trim();
       this.$addressBar.val(text);
 
-      const firstTerm = text.startsWith('ob://') ?
-        text.slice(5)
+      const firstTerm = text.startsWith('ob://')
+        ? text.slice(5)
           .split(' ')[0]
-          .split('/')[0] :
-        text.split(' ')[0]
+          .split('/')[0]
+        : text.split(' ')[0]
           .split('/')[0];
 
       if (isIPFS.multihash(firstTerm)) {
@@ -499,7 +499,7 @@ export default class extends BaseVw {
           testnet: app.serverConfig.testnet,
           walletIconTmpl,
           showDiscoverCallout,
-          ...(app.profile && app.profile.toJSON() || {}),
+          ...((app.profile && app.profile.toJSON()) || {}),
         }));
       });
     });

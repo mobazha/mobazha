@@ -118,7 +118,7 @@ app.router = new ObRouter();
 
 // Clear the external route flag as soon as it's used so it's not re-used
 // on app refreshes.
-app.router.on('route', () => (externalRoute = null));
+app.router.on('route', () => { externalRoute = null; });
 
 // create our status bar view
 app.statusBar = new StatusBar();
@@ -178,7 +178,7 @@ function fetchStartupData1() {
       if (failed.length) {
         const firstFailedXhr = failed[0];
         let title = '';
-        const message = firstFailedXhr.responseJSON && firstFailedXhr.responseJSON.reason
+        const message = (firstFailedXhr.responseJSON && firstFailedXhr.responseJSON.reason)
           || firstFailedXhr.status || '';
         const btnText = app.polyglot.t('startUp.dialogs.btnManageConnections');
         const btnFrag = 'manageConnections';
@@ -271,7 +271,7 @@ function isOnboardingNeeded() {
       if (profileFailed || settingsFailed) {
         const retryOnboardingModelsDialog = new Dialog({
           title: app.polyglot.t('startUp.dialogs.retryOnboardingFetch.title'),
-          message: jqXhr.responseJSON && jqXhr.responseJSON.reason || '',
+          message: (jqXhr.responseJSON && jqXhr.responseJSON.reason) || '',
           buttons: [
             {
               text: app.polyglot.t('startUp.dialogs.btnRetry'),
@@ -330,7 +330,7 @@ function fetchVerifiedMods() {
     .fail((jqXhr) => {
       const state = {
         fetching: false,
-        reason: jqXhr && jqXhr.responseJSON && jqXhr.responseJSON.reason || jqXhr.status,
+        reason: (jqXhr && jqXhr.responseJSON && jqXhr.responseJSON.reason) || jqXhr.status,
       };
       if (verifiedModsErrorDialog) {
         verifiedModsErrorDialog
@@ -398,7 +398,7 @@ function fetchStartupData2() {
       if (failed.length) {
         const firstFailedXhr = failed[0];
         let title = '';
-        const message = firstFailedXhr.responseJSON && firstFailedXhr.responseJSON.reason
+        const message = (firstFailedXhr.responseJSON && firstFailedXhr.responseJSON.reason)
           || firstFailedXhr.status || '';
         let btnText = app.polyglot.t('startUp.dialogs.btnManageConnections');
         let btnFrag = 'manageConnections';
@@ -501,7 +501,9 @@ function ensureValidSettingsCurrency() {
 
     const bindSetCurSettingsHandler = () => {
       setValidCurDialog.$('.js-setCurSettings')
-        .on('click', () => (settingsModal = launchSettingsModal({ initialTab: 'General' })));
+        .on('click', () => {
+          settingsModal = launchSettingsModal({ initialTab: 'General' });
+        });
     };
 
     bindSetCurSettingsHandler();
@@ -784,7 +786,8 @@ app.serverConfigs.fetch().done(() => {
     if (activeServer) {
       sendMainActiveServer(activeServer);
     } else {
-      activeServer = app.serverConfigs.activeServer = app.serverConfigs.at(0);
+      app.serverConfigs.activeServer = app.serverConfigs.at(0);
+      activeServer = app.serverConfigs.at(0);
     }
 
     if (activeServer.get('builtIn') && !getGlobal('isBundledApp')) {

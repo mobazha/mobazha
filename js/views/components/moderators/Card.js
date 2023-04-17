@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import _ from 'underscore';
 import BaseVw from '../../baseVw';
 import loadTemplate from '../../../utils/loadTemplate';
@@ -42,15 +43,15 @@ export default class extends BaseVw {
     }
 
     const modInfo = this.model.get('moderatorInfo');
-    this.modCurs = modInfo && modInfo.get('acceptedCurrencies') || [];
+    this.modCurs = (modInfo && modInfo.get('acceptedCurrencies')) || [];
 
     this.modLanguages = [];
     if (this.model.isModerator) {
       this.modLanguages = this.model.get('moderatorInfo')
         .get('languages')
-        .map(lang => {
+        .map((lang) => {
           const langData = getLangByCode(lang);
-          return langData && langData.name || lang;
+          return (langData && langData.name) || lang;
         });
     }
 
@@ -118,8 +119,8 @@ export default class extends BaseVw {
   render() {
     super.render();
 
-    const showPreferredWarning = this.getState().preferredCurs.length &&
-      !this.hasPreferredCur;
+    const showPreferredWarning = this.getState().preferredCurs.length
+      && !this.hasPreferredCur;
 
     const verifiedMod = app.verifiedMods.get(this.model.get('peerID'));
 

@@ -1,6 +1,8 @@
+/* eslint-disable class-methods-use-this */
 import _ from 'underscore';
 import $ from 'jquery';
-import { guid } from '../../../utils/';
+import bigNumber from 'bignumber.js';
+import { guid } from '../../../utils';
 import app from '../../../app';
 import { anySupportedByWallet } from '../../../data/walletCurrencies';
 import loadTemplate from '../../../utils/loadTemplate';
@@ -11,7 +13,6 @@ import baseVw from '../../baseVw';
 import { openSimpleMessage } from '../../modals/SimpleMessage';
 import ModCard from './Card';
 import ModeratorsStatus from './Status';
-import bigNumber from 'bignumber.js';
 
 export default class extends baseVw {
   /**
@@ -101,12 +102,12 @@ export default class extends baseVw {
     this.fetchingVerifiedMods = [];
     this.modFetches = [];
     this.moderatorsCol = new Moderators();
-    this.listenTo(this.moderatorsCol, 'add', model => {
+    this.listenTo(this.moderatorsCol, 'add', (model) => {
       this.addMod(model);
       this.batchCardRender(model);
     });
     this.listenTo(this.moderatorsCol, 'remove', (md) => {
-      const removeIndex = this.modCards.findIndex(card => card.model === md);
+      const removeIndex = this.modCards.findIndex((card) => card.model === md);
       this.modCards.splice(removeIndex, 1)[0].remove();
     });
     this.modCards = [];
@@ -141,7 +142,7 @@ export default class extends baseVw {
   }
 
   removeNotFetched(ID) {
-    this.unfetchedMods = this.unfetchedMods.filter(peerID => peerID !== ID);
+    this.unfetchedMods = this.unfetchedMods.filter((peerID) => peerID !== ID);
     this.checkNotFetched();
   }
 
@@ -184,8 +185,7 @@ export default class extends baseVw {
     const IDs = _.without(op.moderatorIDs, excluded);
     const includeString = op.include ? `&include=${op.include}` : '';
 
-    let urlString =
-      `ob/${op.apiPath}?async=${op.async}${includeString}&usecache=${op.useCache}`;
+    let urlString = `ob/${op.apiPath}?async=${op.async}${includeString}&usecache=${op.useCache}`;
     let asyncID;
 
     if (op.async) {
@@ -217,14 +217,11 @@ export default class extends baseVw {
 
       if (op.async) {
         if (this.serverSocket) {
-          this.listenTo(this.serverSocket, 'message', event => {
+          this.listenTo(this.serverSocket, 'message', (event) => {
             const eventData = event.jsonData;
             if (eventData.error) {
               // errors don't have a message id, check to see if the peerID matches
               if (IDs.includes(eventData.peerID)) {
-                // provide the expected capitalization of peerID
-                eventData.peerID = eventData.peerID;
-                delete eventData.peerID;
                 this.processMod(eventData);
               }
             } else if (eventData.id === asyncID && !excluded.includes(eventData.peerID)) {
@@ -241,22 +238,22 @@ export default class extends baseVw {
         data: JSON.stringify(IDs),
         method: op.method,
       })
-          .done((data) => {
-            if (!op.async) {
-              data.forEach(mod => {
-                if (!excluded.includes(mod.peerID)) this.processMod(mod.profile);
-              });
-              this.unfetchedMods = [];
-              this.checkNotFetched();
-              if (!data.length) this.trigger('noModsFound', { guids: IDs });
-            }
-          })
-          .fail((xhr) => {
-            if (xhr.statusText === 'abort') return;
-            const failReason = xhr.responseJSON ? `\n\n${xhr.responseJSON.reason}` : '';
-            const msg = `${op.fetchErrorMsg}${failReason}`;
-            openSimpleMessage(op.fetchErrorTitle, msg);
-          });
+        .done((data) => {
+          if (!op.async) {
+            data.forEach((mod) => {
+              if (!excluded.includes(mod.peerID)) this.processMod(mod.profile);
+            });
+            this.unfetchedMods = [];
+            this.checkNotFetched();
+            if (!data.length) this.trigger('noModsFound', { guids: IDs });
+          }
+        })
+        .fail((xhr) => {
+          if (xhr.statusText === 'abort') return;
+          const failReason = xhr.responseJSON ? `\n\n${xhr.responseJSON.reason}` : '';
+          const msg = `${op.fetchErrorMsg}${failReason}`;
+          openSimpleMessage(op.fetchErrorTitle, msg);
+        });
       this.modFetches.push(fetch);
     }
   }
@@ -267,7 +264,7 @@ export default class extends baseVw {
     }
     // Collect the models so they can be returned to the caller.
     const removed = [];
-    IDs.forEach(id => {
+    IDs.forEach((id) => {
       removed.push(this.moderatorsCol.get(id));
     });
     this.moderatorsCol.remove(IDs);
@@ -321,9 +318,9 @@ export default class extends baseVw {
     });
     // Add verified mods to the beginning.
     if (model.isVerified) {
-      const firstUnverifiedIndex = this.modCards.findIndex(card => !card.model.isVerified);
-      const insertAtIndex = firstUnverifiedIndex < 0 ?
-        0 : firstUnverifiedIndex;
+      const firstUnverifiedIndex = this.modCards.findIndex((card) => !card.model.isVerified);
+      const insertAtIndex = firstUnverifiedIndex < 0
+        ? 0 : firstUnverifiedIndex;
       this.modCards.splice(insertAtIndex, 0, modCard);
     } else {
       this.modCards.push(modCard);
@@ -390,7 +387,7 @@ export default class extends baseVw {
   deselectMod(peerID) {
     if (!peerID) throw new Error('You must provide a peerID.');
 
-    const mod = this.modCards.filter(card => card.model.get('peerID') === peerID);
+    const mod = this.modCards.filter((card) => card.model.get('peerID') === peerID);
     if (mod.length) mod[0].changeSelectState(this.options.notSelected);
   }
 
@@ -407,25 +404,26 @@ export default class extends baseVw {
   }
 
   get noneSelected() {
-    return !this.modCards.filter(mod => mod.getState().selectedState === 'selected').length;
+    return !this.modCards.filter((mod) => mod.getState().selectedState === 'selected').length;
   }
 
   remove() {
-    this.modFetches.forEach(fetch => fetch.abort());
+    this.modFetches.forEach((fetch) => fetch.abort());
     clearTimeout(this.renderTimer);
     super.remove();
   }
 
   render() {
     const state = this.getState();
-    const showMods = this.modCards.filter(mod => this.modShouldRender(mod.model));
-    const unVerCount = this.modCards.filter(mod =>
-      mod.model.hasModCurrency(state.showOnlyCur) && !mod.model.isVerified).length;
+    const showMods = this.modCards.filter((mod) => this.modShouldRender(mod.model));
+    const unVerCount = this.modCards.filter(
+      (mod) => mod.model.hasModCurrency(state.showOnlyCur) && !mod.model.isVerified,
+    ).length;
     const totalIDs = this.allIDs.length;
     clearTimeout(this.renderTimer);
     this.renderTimer = null;
 
-    loadTemplate('components/moderators/moderators.html', t => {
+    loadTemplate('components/moderators/moderators.html', (t) => {
       this.$el.html(t({
         wrapperClasses: this.options.wrapperClasses,
         placeholder: !showMods.length && (this.unfetchedMods.length || !totalIDs),
@@ -459,9 +457,7 @@ export default class extends baseVw {
 
       if (showMods.length) {
         this.getCachedEl('.js-moderatorsWrapper').append(cardsFrag);
-      } else {
-        if (this.modCards.length) this.trigger('noModsShown');
-      }
+      } else if (this.modCards.length) this.trigger('noModsShown');
 
       this.moderatorsStatus.delegateEvents();
       this.getCachedEl('.js-statusWrapper').append(this.moderatorsStatus.render().$el);

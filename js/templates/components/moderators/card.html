@@ -45,7 +45,7 @@
                 <div class="flexNoShrink modFee">
                   <%
                     const amount = ob.currencyMod.convertAndFormatCurrency(
-                      ob.moderatorInfo.fee.fixedFee.amount,
+                      ob.moderatorInfo.fee.fixedFee.amount || 0,
                       ob.moderatorInfo.fee.fixedFee.currency.code,
                       ob.displayCurrency,
                       {

@@ -32,18 +32,18 @@ export default class extends baseVw {
     }
 
     if (!(options.orderPrice instanceof bigNumber)) {
-      throw new Error('Please provide the price of the order as a BigNumber ' +
-        'instance.');
+      throw new Error('Please provide the price of the order as a BigNumber '
+        + 'instance.');
     }
 
     if (typeof options.isOrderCancelable !== 'function') {
-      throw new Error('Please provide a function that returns whether this order can be canceled ' +
-        'by the current user.');
+      throw new Error('Please provide a function that returns whether this order can be canceled '
+        + 'by the current user.');
     }
 
     if (typeof options.isOrderConfirmable !== 'function') {
-      throw new Error('Please provide a function that returns whether this order can be ' +
-        'confirmed by the current user.');
+      throw new Error('Please provide a function that returns whether this order can be '
+        + 'confirmed by the current user.');
     }
 
     checkValidParticipantObject(options.vendor, 'vendor');
@@ -55,16 +55,13 @@ export default class extends baseVw {
 
     this.listenTo(this.collection, 'update', () => this.render());
     this.listenTo(orderEvents, 'cancelingOrder', this.onCancelingOrder);
-    this.listenTo(orderEvents, 'cancelOrderComplete, cancelOrderFail',
-      this.onCancelOrderAlways);
+    this.listenTo(orderEvents, 'cancelOrderComplete, cancelOrderFail', this.onCancelOrderAlways);
     this.listenTo(orderEvents, 'cancelOrderComplete', this.onAcceptOrderComplete);
     this.listenTo(orderEvents, 'acceptingOrder', this.onAcceptingOrder);
-    this.listenTo(orderEvents, 'acceptOrderComplete acceptOrderFail',
-      this.onAcceptOrderAlways);
+    this.listenTo(orderEvents, 'acceptOrderComplete acceptOrderFail', this.onAcceptOrderAlways);
     this.listenTo(orderEvents, 'acceptOrderComplete', this.onAcceptOrderComplete);
     this.listenTo(orderEvents, 'rejectingOrder', this.onRejectingOrder);
-    this.listenTo(orderEvents, 'rejectOrderComplete rejectOrderFail',
-      this.onRejectOrderAlways);
+    this.listenTo(orderEvents, 'rejectOrderComplete rejectOrderFail', this.onRejectOrderAlways);
     this.listenTo(orderEvents, 'rejectOrderComplete', this.onRejectOrderComplete);
   }
 
@@ -162,7 +159,7 @@ export default class extends baseVw {
   render() {
     const paymentsContainer = document.createDocumentFragment();
 
-    this.payments.forEach(payment => (payment.remove()));
+    this.payments.forEach((payment) => (payment.remove()));
     this.payments = [];
 
     let paymentCoinData;
@@ -187,11 +184,10 @@ export default class extends baseVw {
       let blockChainTxUrl = '';
 
       try {
-        blockChainTxUrl =
-          paymentCoinData.getBlockChainTxUrl(
-            payment.id,
-            app.serverConfig.testnet
-          );
+        blockChainTxUrl = paymentCoinData.getBlockChainTxUrl(
+          payment.id,
+          app.serverConfig.testnet,
+        );
       } catch (e) {
         // pass
       }
@@ -217,8 +213,8 @@ export default class extends baseVw {
 
     if (this.payments.length) {
       this.options.vendor.getProfile()
-        .done(profile => {
-          this.payments.forEach(payment => payment.setState({ payee: profile.get('name') || '' }));
+        .done((profile) => {
+          this.payments.forEach((payment) => payment.setState({ payee: profile.get('name') || '' }));
         });
     }
 

@@ -1,7 +1,8 @@
+/* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import app from '../../app';
 import { capitalize } from '../../utils/string';
-import { abbrNum, deparam } from '../../utils/';
+import { abbrNum, deparam } from '../../utils';
 import { getSocket } from '../../utils/serverConnect';
 import loadTemplate from '../../utils/loadTemplate';
 import { recordEvent } from '../../utils/metrics';
@@ -28,8 +29,8 @@ export default class extends baseVw {
     this.openedOrderModal = null;
 
     const params = deparam(location.hash.split('?')[1] || '');
-    const orderID = params.orderID;
-    const caseID = params.caseID;
+    const { orderID } = params;
+    const { caseID } = params;
 
     if (orderID || caseID) {
       // cut off the trailing 's' from the tab
@@ -39,7 +40,7 @@ export default class extends baseVw {
       // need to pass it in to the Tab view. It may need to bind event
       // handlers to it.
       this.openedOrderModal = this.openOrder(orderID || caseID, type);
-      this.listenTo(this.openedOrderModal, 'close', () => (this.openedOrderModal = null));
+      this.listenTo(this.openedOrderModal, 'close', () => { this.openedOrderModal = null; });
     }
 
     this.purchasesCol = new Transactions([], { type: 'purchases' });
@@ -80,14 +81,14 @@ export default class extends baseVw {
 
   syncTabHeadCount(cl, getCountEl) {
     if (typeof getCountEl !== 'function') {
-      throw new Error('Please provide a function that returns a jQuery element ' +
-        'containing the tab head count to update.');
+      throw new Error('Please provide a function that returns a jQuery element '
+        + 'containing the tab head count to update.');
     }
 
     let count;
 
     this.listenTo(cl, 'request', (md, xhr) => {
-      xhr.done(data => {
+      xhr.done((data) => {
         let updateCount = false;
 
         if (typeof count === 'number') {
@@ -199,9 +200,9 @@ export default class extends baseVw {
   }
 
   getSalesPurchasesFilterConfig(isSale) {
-    const defaulFilterStates = isSale ?
-      this.salesDefaultFilter.states :
-      this.purchasesDefaultFilter.states;
+    const defaulFilterStates = isSale
+      ? this.salesDefaultFilter.states
+      : this.purchasesDefaultFilter.states;
 
     return [
       {
@@ -221,8 +222,8 @@ export default class extends baseVw {
       {
         id: 'filterReady',
         text: app.polyglot.t('transactions.filters.ready'),
-        checked: defaulFilterStates.includes(2) || defaulFilterStates.includes(3) ||
-          defaulFilterStates.includes(4),
+        checked: defaulFilterStates.includes(2) || defaulFilterStates.includes(3)
+          || defaulFilterStates.includes(4),
         className: 'filter',
         targetState: [2, 3, 4],
       },
@@ -243,16 +244,16 @@ export default class extends baseVw {
       {
         id: 'filterDisputes',
         text: app.polyglot.t('transactions.filters.disputes'),
-        checked: defaulFilterStates.includes(10) || defaulFilterStates.includes(11) ||
-          defaulFilterStates.includes(12),
+        checked: defaulFilterStates.includes(10) || defaulFilterStates.includes(11)
+          || defaulFilterStates.includes(12),
         className: 'filter',
         targetState: [10, 11, 12],
       },
       {
         id: 'filterCompleted',
         text: app.polyglot.t('transactions.filters.completed'),
-        checked: defaulFilterStates.includes(6) || defaulFilterStates.includes(7) ||
-          defaulFilterStates.includes(8),
+        checked: defaulFilterStates.includes(6) || defaulFilterStates.includes(7)
+          || defaulFilterStates.includes(8),
         className: 'filter',
         targetState: [6, 7, 8],
       },
@@ -338,8 +339,8 @@ export default class extends baseVw {
     if (params.states) {
       params.states = params.states
         .split('-')
-        .map(strIndex => parseInt(strIndex, 10))
-        .filter(state => !isNaN(state));
+        .map((strIndex) => parseInt(strIndex, 10))
+        .filter((state) => !Number.isNaN(state));
     } else {
       delete params.states;
     }
@@ -405,18 +406,24 @@ export default class extends baseVw {
   }
 
   get $purchasesTabCount() {
-    return this._$purchasesTabCount ||
-      (this._$purchasesTabCount = this.$('.js-purchasesTabCount'));
+    if (!this._$purchasesTabCount) {
+      this._$purchasesTabCount = this.$('.js-purchasesTabCount');
+    }
+    return this._$purchasesTabCount;
   }
 
   get $salesTabCount() {
-    return this._$salesTabCount ||
-      (this._$salesTabCount = this.$('.js-salesTabCount'));
+    if (!this._$salesTabCount) {
+      this._$salesTabCount = this.$('.js-salesTabCount');
+    }
+    return this._$salesTabCount;
   }
 
   get $casesTabCount() {
-    return this._$casesTabCount ||
-      (this._$casesTabCount = this.$('.js-casesTabCount'));
+    if (!this._$casesTabCount) {
+      this._$casesTabCount = this.$('.js-casesTabCount');
+    }
+    return this._$casesTabCount;
   }
 
   render() {

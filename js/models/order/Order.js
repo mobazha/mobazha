@@ -1,10 +1,9 @@
-import _ from 'underscore';
+/* eslint-disable class-methods-use-this */
 import bigNumber from 'bignumber.js';
 import app from '../../app';
 import BaseOrder from './BaseOrder';
 import Contract from './Contract';
 import Transactions from '../../collections/order/Transactions';
-import Transaction from '../../models/order/Transaction';
 
 class Order extends BaseOrder {
   constructor(attrs, options) {
@@ -51,18 +50,17 @@ class Order extends BaseOrder {
     let orderPrice;
 
     try {
-      orderPrice =
-        this.contract
-          .get('orderOpen')
-          .payment
-          .amount;
+      orderPrice = this.contract
+        .get('orderOpen')
+        .payment
+        .amount;
     } catch (e) {
       // pass
     }
 
     return (
-      orderPrice instanceof bigNumber ?
-        orderPrice : bigNumber()
+      orderPrice instanceof bigNumber
+        ? orderPrice : bigNumber()
     );
   }
 
@@ -123,30 +121,30 @@ class Order extends BaseOrder {
    * (e.g. money moving from the multisig to the vendor, refunds).
    */
   get paymentsIn() {
-    return new Transactions(
-      this.get('contract').get('transactions')
-    );
+    return new Transactions(this.get('contract').get('transactions'));
   }
 
   get isOrderCancelable() {
-    return this.buyerID === app.profile.id &&
-      !this.moderatorID &&
-      ['PROCESSING_ERROR', 'PENDING'].includes(this.get('state')) &&
-      this.isFunded;
+    return this.buyerID === app.profile.id
+      && !this.moderatorID
+      && ['PROCESSING_ERROR', 'PENDING'].includes(this.get('state'))
+      && this.isFunded;
   }
 
   get isOrderDisputable() {
     const orderState = this.get('state');
 
     if (this.buyerID === app.profile.id) {
-      return !!this.moderatorID &&
-        (
-          ['AWAITING_FULFILLMENT', 'PENDING', 'FULFILLED'].includes(orderState) ||
-          (orderState === 'PROCESSING_ERROR' && this.isFunded)
+      return !!this.moderatorID
+        && (
+          ['AWAITING_FULFILLMENT', 'PENDING', 'FULFILLED'].includes(orderState)
+          || (orderState === 'PROCESSING_ERROR' && this.isFunded)
         );
-    } else if (this.vendorID === app.profile.id) {
-      return !!this.moderatorID &&
-        ['PARTIALLY_FULFILLED', 'FULFILLED'].includes(orderState);
+    }
+
+    if (this.vendorID === app.profile.id) {
+      return !!this.moderatorID
+        && ['PARTIALLY_FULFILLED', 'FULFILLED'].includes(orderState);
     }
 
     return false;
@@ -162,8 +160,10 @@ class Order extends BaseOrder {
 
       response.contract = Order.parseContract(response.contract);
 
-      response.contract.disputeClose =
-        Order.parseDisputePayout(response.contract.disputeClose, this.paymentCoin);
+      response.contract.disputeClose = Order.parseDisputePayout(
+        response.contract.disputeClose,
+        this.paymentCoin,
+      );
     }
 
     return response;

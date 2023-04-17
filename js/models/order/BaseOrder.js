@@ -37,12 +37,10 @@ export default class extends BaseModel {
    * grab it directly via model.get('buyerContract') / model.get('vendorContract').
    */
   static getContract(attrs = {}) {
-    let contract = attrs.contract;
+    let { contract } = attrs;
 
     if (this.isCase(attrs)) {
-      contract = attrs.disputeOpen.openedBy === 'BUYER' ?
-        attrs.buyerContract :
-        attrs.vendorContract;
+      contract = attrs.disputeOpen.openedBy === 'BUYER' ? attrs.buyerContract : attrs.vendorContract;
     }
 
     return contract;
@@ -52,9 +50,7 @@ export default class extends BaseModel {
     let contract = this.get('contract');
 
     if (this.isCase) {
-      contract = this.get('disputeOpen').openedBy == "BUYER" ?
-        this.get('buyerContract') :
-        this.get('vendorContract');
+      contract = this.get('disputeOpen').openedBy === 'BUYER' ? this.get('buyerContract') : this.get('vendorContract');
     }
 
     return contract;
@@ -108,18 +104,16 @@ export default class extends BaseModel {
     let paymentCoin = '';
 
     try {
-      paymentCoin =
-        this.getContract(attrs)
-          .orderOpen
-          .payment
-          .coin;
+      paymentCoin = this.getContract(attrs)
+        .orderOpen
+        .payment
+        .coin;
     } catch (e) {
       // pass
     }
 
     return paymentCoin;
   }
-
 
   get paymentCoin() {
     return this.constructor.getPaymentCoin(this.toJSON());
@@ -171,13 +165,12 @@ export default class extends BaseModel {
       // convert crypto listing quantities
       contract.orderOpen.items.forEach((item, index) => {
         try {
-          const listing = contract.orderOpen.listings[index].listing;
+          const { listing } = contract.orderOpen.listings[index];
 
           if (listing.metadata.contractType === 'CRYPTOCURRENCY') {
-            const divisibility = listing
+            const { divisibility } = listing
               .metadata
-              .pricingCurrency
-              .divisibility;
+              .pricingCurrency;
 
             item.quantity = integerToDecimal(item.quantity, divisibility);
           }
@@ -204,15 +197,14 @@ export default class extends BaseModel {
         if (disputeClose.releaseInfo.buyerAmount === '') {
           disputeClose.releaseInfo.buyerAmount = integerToDecimal(
             disputeClose.releaseInfo.buyerAmount,
-            8
+            8,
           );
         } else {
-          disputeClose.releaseInfo.buyerAmount =
-            integerToDecimal(
-              disputeClose.releaseInfo.buyerAmount,
-              divisibility,
-              { fieldName: 'releaseInfo.buyerAmount' }
-            );
+          disputeClose.releaseInfo.buyerAmount = integerToDecimal(
+            disputeClose.releaseInfo.buyerAmount,
+            divisibility,
+            { fieldName: 'releaseInfo.buyerAmount' },
+          );
         }
       }
 
@@ -221,15 +213,14 @@ export default class extends BaseModel {
         if (disputeClose.releaseInfo.vendorAmount === '') {
           disputeClose.releaseInfo.vendorAmount = integerToDecimal(
             disputeClose.releaseInfo.vendorAmount,
-            8
+            8,
           );
         } else {
-          disputeClose.releaseInfo.vendorAmount =
-            integerToDecimal(
-              disputeClose.releaseInfo.vendorAmount,
-              divisibility,
-              { fieldName: 'releaseInfo.vendorAmount' }
-            );
+          disputeClose.releaseInfo.vendorAmount = integerToDecimal(
+            disputeClose.releaseInfo.vendorAmount,
+            divisibility,
+            { fieldName: 'releaseInfo.vendorAmount' },
+          );
         }
       }
 
@@ -238,15 +229,14 @@ export default class extends BaseModel {
         if (disputeClose.releaseInfo.moderatorAmount === '') {
           disputeClose.releaseInfo.moderatorAmount = integerToDecimal(
             disputeClose.releaseInfo.moderatorAmount,
-            8
+            8,
           );
         } else {
-          disputeClose.releaseInfo.moderatorAmount =
-            integerToDecimal(
-              disputeClose.releaseInfo.moderatorAmount,
-              divisibility,
-              { fieldName: 'releaseInfo.moderatorAmount' }
-            );
+          disputeClose.releaseInfo.moderatorAmount = integerToDecimal(
+            disputeClose.releaseInfo.moderatorAmount,
+            divisibility,
+            { fieldName: 'releaseInfo.moderatorAmount' },
+          );
         }
       }
     }

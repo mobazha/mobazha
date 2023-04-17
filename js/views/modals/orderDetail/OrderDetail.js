@@ -48,8 +48,7 @@ export default class extends BaseModal {
 
     this.listenTo(this.model, 'request', this.onOrderRequest);
     this.listenToOnce(this.model, 'sync', this.onFirstOrderSync);
-    this.listenTo(this.model, 'change:unreadChatMessages',
-      () => this.setUnreadChatMessagesBadge());
+    this.listenTo(this.model, 'change:unreadChatMessages', () => this.setUnreadChatMessagesBadge());
 
     this.listenTo(orderEvents, 'fulfillOrderComplete', () => {
       if (this.activeTab === 'fulfillOrder') this.selectTab('summary');
@@ -135,20 +134,24 @@ export default class extends BaseModal {
     if (this.type === 'case') {
       if (this.model.get('buyerOpened')) {
         featuredProfileFetch = this.getBuyerProfile();
-        this.featuredProfilePeerID = featuredProfileState.peerID = this.model.buyerID;
+        featuredProfileState.peerID = this.model.buyerID;
+        this.featuredProfilePeerID = this.model.buyerID;
       } else {
         featuredProfileFetch = this.getVendorProfile();
-        this.featuredProfilePeerID = featuredProfileState.peerID = this.model.vendorID;
+        featuredProfileState.peerID = this.model.vendorID;
+        this.featuredProfilePeerID = this.model.vendorID;
       }
     } else if (this.type === 'sale') {
       featuredProfileFetch = this.getBuyerProfile();
-      this.featuredProfilePeerID = featuredProfileState.peerID = this.model.buyerID;
+      featuredProfileState.peerID = this.model.buyerID;
+      this.featuredProfilePeerID = this.model.buyerID;
     } else {
       featuredProfileFetch = this.getVendorProfile();
-      this.featuredProfilePeerID = featuredProfileState.peerID = this.model.vendorID;
+      featuredProfileState.peerID = this.model.vendorID;
+      this.featuredProfilePeerID = this.model.vendorID;
     }
 
-    featuredProfileFetch.done(profile => {
+    featuredProfileFetch.done((profile) => {
       this.featuredProfileMd = profile;
       if (this.featuredProfile) this.featuredProfile.setModel(this.featuredProfileMd);
     });
@@ -218,9 +221,9 @@ export default class extends BaseModal {
       }
     }
 
-    if (e.jsonData.message &&
-       e.jsonData.message.subject === this.model.id &&
-       this.activeTab !== 'discussion') {
+    if (e.jsonData.message
+       && e.jsonData.message.subject === this.model.id
+       && this.activeTab !== 'discussion') {
       const count = this.model.get('unreadChatMessages');
       this.model.set('unreadChatMessages', count + 1);
     }
@@ -334,8 +337,7 @@ export default class extends BaseModal {
     }
 
     const view = this.createChild(Summary, viewData);
-    this.listenTo(view, 'clickFulfillOrder',
-      () => this.selectTab('fulfillOrder'));
+    this.listenTo(view, 'clickFulfillOrder', () => this.selectTab('fulfillOrder'));
     this.listenTo(view, 'clickResolveDispute', () => {
       recordEvent('OrderDetails_DisputeResolveStart');
       this.selectTab('resolveDispute');
@@ -344,8 +346,7 @@ export default class extends BaseModal {
       this.recordDisputeStart();
       this.selectTab('disputeOrder');
     });
-    this.listenTo(view, 'clickDiscussOrder',
-      () => this.selectTab('discussion'));
+    this.listenTo(view, 'clickDiscussOrder', () => this.selectTab('discussion'));
 
     return view;
   }
@@ -395,11 +396,13 @@ export default class extends BaseModal {
   createFulfillOrderTabView() {
     const contract = this.model.get('contract');
 
-    const model = new OrderFulfillment({ orderID: this.model.id },
+    const model = new OrderFulfillment(
+      { orderID: this.model.id },
       {
         contractType: contract.type,
         isLocalPickup: contract.isLocalPickup,
-      });
+      },
+    );
 
     const view = this.createChild(FulfillOrder, {
       model,
@@ -419,18 +422,17 @@ export default class extends BaseModal {
 
     const contract = this.model.get('contract');
     const model = new OrderDispute({ orderID: this.model.id });
-    const translationKeySuffix = app.profile.id === this.model.buyerID ?
-      'Buyer' : 'Vendor';
+    const translationKeySuffix = app.profile.id === this.model.buyerID
+      ? 'Buyer' : 'Vendor';
     let timeoutMessage = '';
 
     try {
-      timeoutMessage =
-        getWalletCurByCode(this.model.paymentCoin).supportsEscrowTimeout ?
-          app.polyglot.t(
-            `orderDetail.disputeOrderTab.timeoutMessage${translationKeySuffix}`,
-            { timeoutAmount: contract.disputeExpiryVerbose }
-          ) :
-          '';
+      timeoutMessage = getWalletCurByCode(this.model.paymentCoin).supportsEscrowTimeout
+        ? app.polyglot.t(
+          `orderDetail.disputeOrderTab.timeoutMessage${translationKeySuffix}`,
+          { timeoutAmount: contract.disputeExpiryVerbose },
+        )
+        : '';
     } catch (e) {
       // pass
     }
@@ -507,8 +509,8 @@ export default class extends BaseModal {
 
     return {
       showDisputeOrderButton:
-        (!paymentCurData || !paymentCurData.supportsEscrowTimeout) &&
-        this.model.isOrderDisputable,
+        (!paymentCurData || !paymentCurData.supportsEscrowTimeout)
+        && this.model.isOrderDisputable,
     };
   }
 
@@ -516,19 +518,17 @@ export default class extends BaseModal {
     let tip = '';
 
     if (this.model.isCase && !this.model.bothContractsValid) {
-      const buyerContractAvailableAndInvalid =
-        this.model.get('buyerContract') && !this.model.isBuyerContractValid;
-      const vendorContractAvailableAndInvalid =
-        this.model.get('vendorContract') && !this.model.isVendorContractValid;
+      const buyerContractAvailableAndInvalid = this.model.get('buyerContract') && !this.model.isBuyerContractValid;
+      const vendorContractAvailableAndInvalid = this.model.get('vendorContract') && !this.model.isVendorContractValid;
 
       if (buyerContractAvailableAndInvalid && vendorContractAvailableAndInvalid) {
         tip = app.polyglot.t('orderDetail.contractMenuItem.tipBothContractsHaveError');
       } else {
         // "contract" here means the contract we're guaranteed to have
-        const isContractValid = this.model.get('buyerOpened') ?
-          this.model.isBuyerContractValid : this.model.isVendorContractValid;
-        const otherContract = this.model.get('buyerOpened') ?
-          this.model.get('vendorContract') : this.model.get('buyerContract');
+        const isContractValid = this.model.get('buyerOpened')
+          ? this.model.isBuyerContractValid : this.model.isVendorContractValid;
+        const otherContract = this.model.get('buyerOpened')
+          ? this.model.get('vendorContract') : this.model.get('buyerContract');
         const type = this.model.get('buyerOpened') ? 'Buyer' : 'Vendor';
         const otherType = this.model.get('buyerOpened') ? 'Vendor' : 'Buyer';
 
@@ -537,11 +537,11 @@ export default class extends BaseModal {
         }
 
         if (!otherContract) {
-          tip += `${tip ? ' ' : ''}` +
-            `${app.polyglot.t(`orderDetail.contractMenuItem.tip${otherType}ContractNotArrived`)}`;
+          tip += `${tip ? ' ' : ''}`
+            + `${app.polyglot.t(`orderDetail.contractMenuItem.tip${otherType}ContractNotArrived`)}`;
         } else if (!this.model.isContractValid(!this.model.get('buyerOpened'))) {
-          tip += `${tip ? ' ' : ''}` +
-            `${app.polyglot.t(`orderDetail.contractMenuItem.tip${type}ContractHasError`)}`;
+          tip += `${tip ? ' ' : ''}`
+            + `${app.polyglot.t(`orderDetail.contractMenuItem.tip${type}ContractHasError`)}`;
         }
       }
     }
@@ -550,12 +550,14 @@ export default class extends BaseModal {
   }
 
   get $unreadChatMessagesBadge() {
-    return this._$unreadChatMessagesBadge ||
-      (this._$unreadChatMessagesBadge = this.$('.js-unreadChatMessagesBadge'));
+    if (!this._$unreadChatMessagesBadge) {
+      this._$unreadChatMessagesBadge = this.$('.js-unreadChatMessagesBadge');
+    }
+    return this._$unreadChatMessagesBadge;
   }
 
   render() {
-    loadTemplate('modals/orderDetail/orderDetail.html', t => {
+    loadTemplate('modals/orderDetail/orderDetail.html', (t) => {
       const state = this.getState();
 
       this.$el.html(t({
@@ -619,8 +621,8 @@ export function checkValidParticipantObject(participant, type) {
   }
 
   if (!participant.id || typeof participant.getProfile !== 'function') {
-    throw new Error(`The ${type} object is not valid. It should have an id ` +
-      'as well as a getProfile function that returns a promise that ' +
-      'resolves with a profile model.');
+    throw new Error(`The ${type} object is not valid. It should have an id `
+      + 'as well as a getProfile function that returns a promise that '
+      + 'resolves with a profile model.');
   }
 }

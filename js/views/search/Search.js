@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import _ from 'underscore';
 import $ from 'jquery';
 import is from 'is_js';
@@ -41,8 +42,8 @@ export default class extends baseVw {
     const queryKeys = ['q', 'p', 'ps', 'sortBy'];
 
     // Allow router to pass in a search type for future use with vendor searches.
-    const searchType = searchTypes.includes(opts.initialState.tab) ?
-      opts.initialState.tab : 'listings';
+    const searchType = searchTypes.includes(opts.initialState.tab)
+      ? opts.initialState.tab : 'listings';
 
     this._defaultSearch = {
       q: '*',
@@ -95,7 +96,7 @@ export default class extends baseVw {
     };
 
     this._categorySearches = [this._cryptoSearch];
-    this._categoryTerms.forEach(cat => {
+    this._categoryTerms.forEach((cat) => {
       this._categorySearches.push({ ...this._categorySearch, q: cat });
     });
 
@@ -158,12 +159,10 @@ export default class extends baseVw {
       const filters = { ...this._search.filters, ..._.omit(params, [...queryKeys]) };
 
       this.setSearch({ ..._.pick(params, ...queryKeys), filters }, { force: true });
+    } else if (this._search.provider.id === defaultSearchProviders[0].id) {
+      this.buildCategories();
     } else {
-      if (this._search.provider.id === defaultSearchProviders[0].id) {
-        this.buildCategories();
-      } else {
-        this.setSearch({}, { force: true });
-      }
+      this.setSearch({}, { force: true });
     }
   }
 
@@ -440,11 +439,11 @@ export default class extends baseVw {
 
     let viewType = 'grid';
 
-    if (data.options && data.options.type &&
-      data.options.type.options &&
-      data.options.type.options.length) {
-      if (data.options.type.options.find(op => op.value === 'cryptocurrency' && op.checked) &&
-        data.options.type.options.filter(op => op.checked).length === 1) {
+    if (data.options && data.options.type
+      && data.options.type.options
+      && data.options.type.options.length) {
+      if (data.options.type.options.find((op) => op.value === 'cryptocurrency' && op.checked)
+        && data.options.type.options.filter((op) => op.checked).length === 1) {
         viewType = 'cryptoList';
       }
     }
@@ -468,7 +467,7 @@ export default class extends baseVw {
 
     this.getCachedEl('.js-resultsWrapper').html(this.resultsView.render().el);
 
-    this.listenTo(this.resultsView, 'searchError', xhr => {
+    this.listenTo(this.resultsView, 'searchError', (xhr) => {
       this.setState({
         fetching: false,
         data: {},
@@ -510,19 +509,19 @@ export default class extends baseVw {
   }
 
   removeFetches() {
-    this.searchFetches.forEach(fetch => fetch.abort());
+    this.searchFetches.forEach((fetch) => fetch.abort());
   }
 
   remove() {
     this.removeFetches();
-    this.categoryViews.forEach(cat => cat.remove());
+    this.categoryViews.forEach((cat) => cat.remove());
     super.remove();
   }
 
   renderCategories() {
     const catsFrag = document.createDocumentFragment();
 
-    this.categoryViews.forEach(catVw => {
+    this.categoryViews.forEach((catVw) => {
       catVw.delegateEvents();
       catVw.render().$el.appendTo(catsFrag);
     });
@@ -544,9 +543,9 @@ export default class extends baseVw {
       const provider = this._search.provider.get('name') || this.currentBaseUrl;
       errTitle = app.polyglot.t('search.errors.searchFailTitle', { provider });
       const failReason = state.xhr.responseJSON ? state.xhr.responseJSON.reason : '';
-      errMsg = failReason ?
-        app.polyglot.t('search.errors.searchFailReason', { error: failReason }) :
-        app.polyglot.t('search.errors.searchFailData');
+      errMsg = failReason
+        ? app.polyglot.t('search.errors.searchFailReason', { error: failReason })
+        : app.polyglot.t('search.errors.searchFailData');
     }
 
     loadTemplate('search/search.html', (t) => {
@@ -577,12 +576,12 @@ export default class extends baseVw {
       currentID: this._search.provider.id,
       showSelectDefault: !this.currentDefaultProvider,
     });
-    this.listenTo(this.searchProviders, 'activateProvider', pOpts => this.activateProvider(pOpts));
+    this.listenTo(this.searchProviders, 'activateProvider', (pOpts) => this.activateProvider(pOpts));
     this.$('.js-searchProviders').append(this.searchProviders.render().el);
 
     if (this.suggestions) this.suggestions.remove();
     this.suggestions = this.createChild(Suggestions);
-    this.listenTo(this.suggestions, 'clickSuggestion', opts => this.onClickSuggestion(opts));
+    this.listenTo(this.suggestions, 'clickSuggestion', (opts) => this.onClickSuggestion(opts));
     this.$('.js-suggestions').append(this.suggestions.render().el);
 
     if (this.filters) this.filters.remove();
@@ -593,7 +592,7 @@ export default class extends baseVw {
     } else if (state.tab === 'listings') {
       if (hasFilters) {
         this.filters = this.createChild(Filters, { initialState: { filters: data.options } });
-        this.listenTo(this.filters, 'filterChanged', opts => this.onFilterChanged(opts));
+        this.listenTo(this.filters, 'filterChanged', (opts) => this.onFilterChanged(opts));
         $filterWrapper.append(this.filters.render().el);
 
         $filterWrapper.find('select').select2({
@@ -611,7 +610,7 @@ export default class extends baseVw {
           sortBySelected: this._search.sortBy,
         },
       });
-      this.listenTo(this.sortBy, 'changeSortBy', opts => this.changeSortBy(opts));
+      this.listenTo(this.sortBy, 'changeSortBy', (opts) => this.changeSortBy(opts));
       this.$('.js-sortByWrapper').append(this.sortBy.render().el);
 
       // Use the initial set of results data to create the results view.

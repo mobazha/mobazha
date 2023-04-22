@@ -708,12 +708,12 @@ export default class extends BaseVw {
     let height = 0;
     const transaction = this.contract.get('transactions').find((tx) => tx.txid === refundMd.transactionID);
     if (transaction) {
-      height = transaction.height;
+      height = +transaction.height;
     }
 
     const coinInfo = app.walletBalances.get(paymentCoin);
     let confirmations = 0;
-    if (coinInfo.get('height') !== 0 && height !== 0) {
+    if (coinInfo.get('height') !== 0 && height) {
       confirmations = coinInfo.get('height') - height;
     }
 

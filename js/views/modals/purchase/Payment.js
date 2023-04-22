@@ -1,9 +1,12 @@
+/* eslint-disable class-methods-use-this */
 /*
  This view is also used by the Order Detail overlay. If you make any changes, please
  ensure they are compatible with both the Purchase and Order Detail flows.
  */
 
 import bigNumber from 'bignumber.js';
+import { clipboard } from 'electron';
+import qr from 'qr-encode';
 import app from '../../../app';
 import loadTemplate from '../../../utils/loadTemplate';
 import {
@@ -15,10 +18,8 @@ import { getCurrencyByCode as getWalletCurByCode } from '../../../data/walletCur
 import { getSocket } from '../../../utils/serverConnect';
 import BaseVw from '../../baseVw';
 import SpendConfirmBox from '../wallet/SpendConfirmBox';
-import qr from 'qr-encode';
-import { clipboard } from 'electron';
 import { orderSpend } from '../../../models/wallet/Spend';
-import { openSimpleMessage } from '../../modals/SimpleMessage';
+import { openSimpleMessage } from '../SimpleMessage';
 import { launchWallet } from '../../../utils/modalManager';
 import {
   startPrefixedAjaxEvent,
@@ -28,9 +29,9 @@ import {
 
 export default class extends BaseVw {
   constructor(options = {}) {
-    if (!options.balanceRemaining instanceof bigNumber) {
-      throw new Error('Please provide the balance remaining (in the server\'s' +
-        ' currency) as a bigNumber instance.');
+    if (!(options.balanceRemaining instanceof bigNumber)) {
+      throw new Error('Please provide the balance remaining (in the server\'s'
+        + ' currency) as a bigNumber instance.');
     }
 
     if (!options.paymentAddress) {
@@ -74,7 +75,7 @@ export default class extends BaseVw {
 
     const serverSocket = getSocket();
     if (serverSocket) {
-      this.listenTo(serverSocket, 'message', e => {
+      this.listenTo(serverSocket, 'message', (e) => {
         // listen for a payment socket message, to react to payments from all sources
         if (e.jsonData.notification && e.jsonData.notification.type === 'orderPaymentReceived') {
           if (e.jsonData.notification.orderID === this.orderID) {
@@ -86,11 +87,11 @@ export default class extends BaseVw {
               amount = integerToDecimal(
                 e.jsonData.notification.fundingTotal,
                 coinDiv,
-                { returnNaNOnError: false }
+                { returnNaNOnError: false },
               );
             } catch (err) {
-              console.error('Unable to convert the payment notification amount ' +
-                `from base units: ${err}`);
+              console.error('Unable to convert the payment notification amount '
+                + `from base units: ${err}`);
             }
 
             if (amount && amount.isNaN && !amount.isNaN()) {
@@ -138,9 +139,7 @@ export default class extends BaseVw {
 
   clickPayFromWallet(e) {
     const walletBalance = app.walletBalances.get(this.paymentCoin);
-    const insufficientFunds =
-      this.balanceRemaining
-        .gt(walletBalance ? walletBalance.get('confirmed') : 0);
+    const insufficientFunds = this.balanceRemaining.gt(walletBalance ? walletBalance.get('confirmed') : 0);
 
     if (insufficientFunds) {
       this.spendConfirmBox.setState({
@@ -187,7 +186,7 @@ export default class extends BaseVw {
         .done(() => {
           endPrefixedAjaxEvent('SpendFromWallet', this.metricsOrigin, { currency });
         })
-        .fail(jqXhr => {
+        .fail((jqXhr) => {
           const err = jqXhr.responseText || '';
           this.showSpendError(err);
           endPrefixedAjaxEvent('SpendFromWallet', this.metricsOrigin, {
@@ -212,8 +211,7 @@ export default class extends BaseVw {
     if (this.hideCopyAmountTimer) {
       clearTimeout(this.hideCopyAmountTimer);
     }
-    this.hideCopyAmountTimer = setTimeout(
-      () => this.getCachedEl('.js-copyAmount').removeClass('active'), 3000);
+    this.hideCopyAmountTimer = setTimeout(() => this.getCachedEl('.js-copyAmount').removeClass('active'), 3000);
   }
 
   copyAddress() {
@@ -223,8 +221,7 @@ export default class extends BaseVw {
     if (this.hideCopyAddressTimer) {
       clearTimeout(this.hideCopyAddressTimer);
     }
-    this.hideCopyAddressTimer = setTimeout(
-      () => this.getCachedEl('.js-copyAddress').removeClass('active'), 3000);
+    this.hideCopyAddressTimer = setTimeout(() => this.getCachedEl('.js-copyAddress').removeClass('active'), 3000);
   }
 
   clickFundWallet() {
@@ -240,8 +237,7 @@ export default class extends BaseVw {
       // pass
     }
 
-    return app.polyglot.t('purchase.pendingSection.pay',
-      { amountBTC });
+    return app.polyglot.t('purchase.pendingSection.pay', { amountBTC });
   }
 
   get qrDataUri() {

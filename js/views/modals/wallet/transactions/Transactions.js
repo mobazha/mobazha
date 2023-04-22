@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import _ from 'underscore';
 import app from '../../../../app';
 import { isScrolledIntoView } from '../../../../utils/dom';
@@ -33,8 +34,8 @@ export default class extends BaseVw {
     }
 
     if (!opts.$scrollContainer || !opts.$scrollContainer.length) {
-      throw new Error('Please provide a jQuery object containing the scrollable element ' +
-        'this view is in.');
+      throw new Error('Please provide a jQuery object containing the scrollable element '
+        + 'this view is in.');
     }
 
     this.transactionViews = [];
@@ -49,9 +50,9 @@ export default class extends BaseVw {
       if (clUpdateOpts.changes.added.length) {
         // Expecting either a single new transactions on top or a page
         // of transactions on the bottom.
-        if (clUpdateOpts.changes.added.length === this.collection.length ||
-          clUpdateOpts.changes.added[clUpdateOpts.changes.added.length - 1] ===
-            this.collection.at(this.collection.length - 1)) {
+        if (clUpdateOpts.changes.added.length === this.collection.length
+          || clUpdateOpts.changes.added[clUpdateOpts.changes.added.length - 1]
+            === this.collection.at(this.collection.length - 1)) {
           // It's a page of transactions at the bottom
           this.renderTransactions(clUpdateOpts.changes.added, 'append');
         } else {
@@ -72,16 +73,15 @@ export default class extends BaseVw {
     const serverSocket = getSocket();
 
     if (serverSocket) {
-      this.listenTo(serverSocket, 'message', e => {
+      this.listenTo(serverSocket, 'message', (e) => {
         // The "walletUpdate" socket comes on a regular interval and gives us the current block
         // height which we can use to update the confirmations on a transaction.
         if (e.jsonData.walletUpdate && e.jsonData.walletUpdate[this.coinType]) {
           const walletUpdate = e.jsonData.walletUpdate[this.coinType];
           this.collection.models
-            .filter(transaction => (transaction.get('height') > 0))
-            .forEach(transaction => {
-              const confirmations =
-                walletUpdate.height - transaction.get('height') + 1;
+            .filter((transaction) => (transaction.get('height') > 0))
+            .forEach((transaction) => {
+              const confirmations = walletUpdate.height - transaction.get('height') + 1;
               transaction.set('confirmations', confirmations);
             });
         }
@@ -118,8 +118,8 @@ export default class extends BaseVw {
   }
 
   get isFetching() {
-    return this.transactionsFetch &&
-      this.transactionsFetch.state() === 'pending';
+    return this.transactionsFetch
+      && this.transactionsFetch.state() === 'pending';
   }
 
   get allLoaded() {
@@ -134,8 +134,8 @@ export default class extends BaseVw {
 
   fetchTransactions() {
     if (
-      this.transactionsFetch &&
-      this.transactionsFetch.state() === 'pending'
+      this.transactionsFetch
+      && this.transactionsFetch.state() === 'pending'
     ) return;
 
     const fetchParams = {
@@ -152,7 +152,7 @@ export default class extends BaseVw {
     });
 
     this.transactionsFetch
-      .done(data => {
+      .done((data) => {
         if (this.isRemoved()) return;
 
         this.fetchFailed = false;
@@ -175,9 +175,9 @@ export default class extends BaseVw {
             const warning = openSimpleMessage(
               app.polyglot.t('wallet.transactions.backupWalletWarningTitle'),
               app.polyglot.t('wallet.transactions.backupWalletWarningBody', {
-                link: '<a class="js-recoverWalletSeed">' +
-                  `${app.polyglot.t('wallet.transactions.recoverySeedLink')}</a>`,
-              })
+                link: '<a class="js-recoverWalletSeed">'
+                  + `${app.polyglot.t('wallet.transactions.recoverySeedLink')}</a>`,
+              }),
             );
 
             warning.$el.on('click', '.js-recoverWalletSeed', () => {
@@ -193,11 +193,11 @@ export default class extends BaseVw {
         } else {
           this.render();
         }
-      }).fail(xhr => {
+      }).fail((xhr) => {
         if (this.isRemoved() || xhr.statusText === 'abort') return;
 
         this.fetchFailed = true;
-        this.fetchErrorMessage = xhr.responseJSON && xhr.responseJSON.reason || '';
+        this.fetchErrorMessage = (xhr.responseJSON && xhr.responseJSON.reason) || '';
 
         if (this.collection.length) {
           this.transactionFetchState.setState({
@@ -229,14 +229,18 @@ export default class extends BaseVw {
     if (this.newTransactionPopIn && !this.newTransactionPopIn.isRemoved()) {
       this.newTransactionPopIn.setState({
         messageText:
-          buildRefreshAlertMessage(app.polyglot.t('wallet.transactions.newTransactionsPopin',
-            { smart_count: this.newTransactionsTXs.size })),
+          buildRefreshAlertMessage(app.polyglot.t(
+            'wallet.transactions.newTransactionsPopin',
+            { smart_count: this.newTransactionsTXs.size },
+          )),
       });
     } else {
       this.newTransactionPopIn = this.createChild(PopInMessage, {
         messageText:
-          buildRefreshAlertMessage(app.polyglot.t('wallet.transactions.newTransactionsPopin',
-            { smart_count: this.newTransactionsTXs.size })),
+          buildRefreshAlertMessage(app.polyglot.t(
+            'wallet.transactions.newTransactionsPopin',
+            { smart_count: this.newTransactionsTXs.size },
+          )),
       });
 
       this.listenTo(this.newTransactionPopIn, 'clickRefresh', () => this.refreshTransactions());
@@ -255,30 +259,29 @@ export default class extends BaseVw {
     const view = this.createChild(Transaction, {
       model,
       coinType: this.coinType,
-      bumpFeeXhr: this.options.bumpFeeXhrs &&
-        this.options.bumpFeeXhrs[model.id] || undefined,
+      bumpFeeXhr: (this.options.bumpFeeXhrs && this.options.bumpFeeXhrs[model.id]) || undefined,
       ...options,
     });
 
-    this.listenTo(view, 'bumpFeeSuccess', e =>
-      this.trigger('bumpFeeSuccess', e));
+    this.listenTo(view, 'bumpFeeSuccess', (e) => this.trigger('bumpFeeSuccess', e));
 
-    this.listenTo(view, 'bumpFeeAttempt', e =>
-      this.trigger('bumpFeeAttempt', e));
+    this.listenTo(view, 'bumpFeeAttempt', (e) => this.trigger('bumpFeeAttempt', e));
 
     return view;
   }
 
   remove() {
     if (this.transactionsFetch) this.transactionsFetch.abort();
-    this.popInTimeouts.forEach(timeout => clearTimeout(timeout));
+    this.popInTimeouts.forEach((timeout) => clearTimeout(timeout));
     this.$scrollContainer.off('scroll', this.throttledOnScroll);
     super.remove();
   }
 
   get $popInMessages() {
-    return this._$popInMessages ||
-      (this._$popInMessages = this.$('.js-popInMessages'));
+    if (!this._$popInMessages) {
+      this._$popInMessages = this.$('.js-popInMessages');
+    }
+    return this._$popInMessages;
   }
 
   renderTransactions(models = [], insertionType = 'append') {
@@ -291,13 +294,13 @@ export default class extends BaseVw {
     }
 
     if (insertionType === 'replace') {
-      this.transactionViews.forEach(transaction => transaction.remove());
+      this.transactionViews.forEach((transaction) => transaction.remove());
       this.transactionViews = [];
     }
 
     const transactionsFrag = document.createDocumentFragment();
 
-    models.forEach(transaction => {
+    models.forEach((transaction) => {
       const view = this.createTransactionView(transaction);
       this.transactionViews.push(view);
       view.render().$el.appendTo(transactionsFrag);
@@ -312,7 +315,7 @@ export default class extends BaseVw {
 
   render() {
     this.newTransactionsTXs.clear();
-    this.popInTimeouts.forEach(timeout => clearTimeout(timeout));
+    this.popInTimeouts.forEach((timeout) => clearTimeout(timeout));
     this.popInTimeouts = [];
     if (this.newTransactionPopIn) {
       this.newTransactionPopIn.remove();

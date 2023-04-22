@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import _ from 'underscore';
 import Backbone from 'backbone';
@@ -143,8 +144,7 @@ export default class extends BaseModal {
       coupons: this.listing.get('coupons'),
       listingPrice: bigNumber(this.listing.price.amount),
     });
-    this.listenTo(this.coupons, 'changeCoupons',
-      (hashes, codes) => this.changeCoupons(hashes, codes));
+    this.listenTo(this.coupons, 'changeCoupons', (hashes, codes) => this.changeCoupons(hashes, codes));
 
     const currencies = this.listing.get('metadata').get('acceptedCurrencies') || [];
     const locale = app.localSettings.standardizedTranslatedLang() || 'en-US';
@@ -154,10 +154,8 @@ export default class extends BaseModal {
       return aName.localeCompare(bName, locale, { sensitivity: 'base' });
     });
 
-    const disabledCurs = currencies.filter(c => !isSupportedWalletCur(c));
-    const activeCurs =
-      currencies.length && this.listing.isCrypto ?
-        [currencies[0]] : [];
+    const disabledCurs = currencies.filter((c) => !isSupportedWalletCur(c));
+    const activeCurs = currencies.length && this.listing.isCrypto ? [currencies[0]] : [];
 
     this.cryptoCurSelector = this.createChild(CryptoCurSelector, {
       disabledMsg: app.polyglot.t('purchase.cryptoCurrencyInvalid'),
@@ -170,7 +168,7 @@ export default class extends BaseModal {
       },
     });
 
-    this.listenTo(this.cryptoCurSelector, 'currencyClicked', cOpts => {
+    this.listenTo(this.cryptoCurSelector, 'currencyClicked', (cOpts) => {
       if (cOpts.active) this.moderators.setState({ showOnlyCur: cOpts.currency });
       this.receipt.paymentCoin = cOpts.active ? cOpts.currency : '';
     });
@@ -237,8 +235,7 @@ export default class extends BaseModal {
     this.listenTo(app.settings, 'change:localCurrency', () => this.showDataChangedMessage());
     this.listenTo(app.localSettings, 'change:bitcoinUnit', () => this.showDataChangedMessage());
     this.listenTo(this.order.get('items').at(0), 'someChange ', () => this.refreshPrices());
-    this.listenTo(this.order.get('items').at(0).get('shipping'), 'change', () =>
-      this.refreshPrices());
+    this.listenTo(this.order.get('items').at(0).get('shipping'), 'change', () => this.refreshPrices());
 
     this.hasVerifiedMods = app.verifiedMods.matched(this.moderatorIDs).length > 0;
 
@@ -253,7 +250,7 @@ export default class extends BaseModal {
     this._latestHash = this.listing.get('hash');
     this._renderedHash = null;
 
-    this.listenTo(outdatedListingHashesEvents, 'newHash', e => {
+    this.listenTo(outdatedListingHashesEvents, 'newHash', (e) => {
       this._latestHash = e.oldHash;
       if (e.oldHash === this._renderedHash) this.outdateHash();
     });
@@ -286,8 +283,8 @@ export default class extends BaseModal {
     const superReturn = super.setState(state, options);
 
     if (
-      this.receipt &&
-      this.getState().phase !== 'pay'
+      this.receipt
+      && this.getState().phase !== 'pay'
     ) {
       this.receipt.showTotalTip = false;
     }
@@ -378,14 +375,14 @@ export default class extends BaseModal {
 
     this.order.get('items')
       .at(0)
-      .set({ quantity: quantity });
+      .set({ quantity });
   }
 
   changeCryptoAmountCurrency(e) {
     this._cryptoAmountCurrency = e.target.value;
-    const quantity = this.getFormData(
-      this.getCachedEl('#cryptoAmount')
-    ).quantity;
+    const { quantity } = this.getFormData(
+      this.getCachedEl('#cryptoAmount'),
+    );
     this.setModelQuantity(quantity);
   }
 
@@ -396,7 +393,7 @@ export default class extends BaseModal {
     }
 
     this.quantityKeyUpTimer = setTimeout(() => {
-      const quantity = this.getFormData($(e.target)).quantity;
+      const { quantity } = this.getFormData($(e.target));
       if (this.listing.isCrypto) this._cryptoQuantity = quantity;
       this.setModelQuantity(quantity);
     }, 150);
@@ -409,7 +406,7 @@ export default class extends BaseModal {
   applyCoupon() {
     this.coupons
       .addCode(this.$couponField.val())
-      .then(result => {
+      .then((result) => {
         // if the result is valid, clear the input field
         if (result.type === 'valid') {
           this.$couponField.val('');
@@ -435,9 +432,10 @@ export default class extends BaseModal {
     // combine the codes and hashes so the receipt can check both.
     // if this is the user's own listing they will have codes instead of hashes
     const hashesAndCodes = hashes.concat(codes);
-    const filteredCoupons = this.listing.get('coupons').filter((coupon) =>
-      hashesAndCodes.indexOf(coupon.get('hash') || coupon.get('discountCode')) !== -1);
-    this.couponObj = filteredCoupons.map(coupon => coupon.toJSON());
+    const filteredCoupons = this.listing.get('coupons').filter(
+      (coupon) => hashesAndCodes.indexOf(coupon.get('hash') || coupon.get('discountCode')) !== -1,
+    );
+    this.couponObj = filteredCoupons.map((coupon) => coupon.toJSON());
     this.receipt.coupons = this.couponObj;
     this.order.get('items').at(0).set('coupons', codes);
   }
@@ -508,7 +506,7 @@ export default class extends BaseModal {
           errors: 'own listing',
         });
       } else {
-        const coinDivisibility = this.coinDivisibility;
+        const { coinDivisibility } = this;
         const cryptoItems = [];
 
         if (this.listing.isCrypto) {
@@ -523,13 +521,13 @@ export default class extends BaseModal {
 
           try {
             const items = this.order.get('items');
-            for (let i = 0; i < items.length; i++) {
+            for (let i = 0; i < items.length; i += 2) {
               const item = items.at(i);
               cryptoItems.push({
                 ...item.toJSON(),
                 quantity: decimalToInteger(
                   item.get('quantity'),
-                  coinDivisibility
+                  coinDivisibility,
                 ),
               });
             }
@@ -550,10 +548,10 @@ export default class extends BaseModal {
         const postData = removeProp(
           {
             ...this.order.toJSON(),
-            items: this.listing.isCrypto ?
-              cryptoItems : this.order.get('items').toJSON(),
+            items: this.listing.isCrypto
+              ? cryptoItems : this.order.get('items').toJSON(),
           },
-          'cid'
+          'cid',
         );
 
         $.post({
@@ -572,22 +570,21 @@ export default class extends BaseModal {
               metricsOrigin: 'Purchase',
               paymentCoin,
             });
-            this.listenTo(this.payment, 'walletPaymentComplete',
-              (pmtCompleteData => this.completePurchase(pmtCompleteData)));
+            this.listenTo(this.payment, 'walletPaymentComplete', ((pmtCompleteData) => this.completePurchase(pmtCompleteData)));
             this.$('.js-pending').append(this.payment.render().el);
             endAjaxEvent('Purchase');
           })
-          .fail(jqXHR => {
+          .fail((jqXHR) => {
             this.setState({ phase: 'pay' });
             if (jqXHR.statusText === 'abort') return;
             let errTitle = app.polyglot.t('purchase.errors.orderError');
-            let errMsg = jqXHR.responseJSON && jqXHR.responseJSON.reason || '';
+            let errMsg = (jqXHR.responseJSON && jqXHR.responseJSON.reason) || '';
 
-            if (jqXHR.responseJSON &&
-              jqXHR.responseJSON.code === 'ERR_INSUFFICIENT_INVENTORY' &&
-              typeof jqXHR.responseJSON.remainingInventory === 'number') {
-              this.inventory = jqXHR.responseJSON.remainingInventory /
-                coinDivisibility;
+            if (jqXHR.responseJSON
+              && jqXHR.responseJSON.code === 'ERR_INSUFFICIENT_INVENTORY'
+              && typeof jqXHR.responseJSON.remainingInventory === 'number') {
+              this.inventory = jqXHR.responseJSON.remainingInventory
+                / coinDivisibility;
               errTitle = app.polyglot.t('purchase.errors.insufficientInventoryTitle');
               errMsg = app.polyglot.t('purchase.errors.insufficientInventoryBody', {
                 smart_count: this.inventory,
@@ -611,7 +608,7 @@ export default class extends BaseModal {
     } else {
       this.setState({ phase: 'pay' });
       const purchaseErrs = {};
-      Object.keys(this.order.validationError).forEach(errKey => {
+      Object.keys(this.order.validationError).forEach((errKey) => {
         const domKey = errKey.replace(/\[[^\[\]]*\]/g, '').replace('.', '-');
         let container = this.$(`.js-${domKey}-errors`);
         // if no container exists, use the generic container
@@ -629,7 +626,7 @@ export default class extends BaseModal {
   }
 
   insertErrors(container, errors = []) {
-    loadTemplate('formError.html', t => {
+    loadTemplate('formError.html', (t) => {
       container.html(t({
         errors,
       }));
@@ -644,7 +641,7 @@ export default class extends BaseModal {
 
   get prices() {
     // return an array of price objects that matches the items in the order
-    return this.order.get('items').map(item => {
+    return this.order.get('items').map((item) => {
       const shipping = item.get('shipping');
       const sName = shipping.get('name');
       const sService = shipping.get('service');
@@ -660,9 +657,9 @@ export default class extends BaseModal {
 
       return {
         price: bigNumber(this.listing.price.amount),
-        sPrice: bigNumber(sOptService ? sOptService.get('price') : 0),
-        aPrice: bigNumber(sOptService ? sOptService.get('additionalItemPrice') : 0),
-        vPrice: bigNumber(sku ? sku.get('surcharge') : 0),
+        sPrice: bigNumber(sOptService ? sOptService.get('price') || 0 : 0),
+        aPrice: bigNumber(sOptService ? sOptService.get('additionalItemPrice') || 0 : 0),
+        vPrice: bigNumber(sku ? sku.get('surcharge') || 0 : 0),
         quantity: bigNumber(item.get('quantity')),
       };
     });
@@ -673,13 +670,15 @@ export default class extends BaseModal {
   }
 
   get $couponField() {
-    return this._$couponField ||
-      (this._$couponField = this.$('#couponCode'));
+    if (!this._$couponField) {
+      this._$couponField = this.$('#couponCode');
+    }
+    return this._$couponField;
   }
 
   get cryptoAmountCurrency() {
-    return this._cryptoAmountCurrency ||
-      this.listing.get('item')
+    return this._cryptoAmountCurrency
+      || this.listing.get('item')
         .get('cryptoListingCurrencyCode');
   }
 
@@ -722,11 +721,11 @@ export default class extends BaseModal {
     let uiQuantity = quantity;
 
     if (this.listing.isCrypto && this._cryptoQuantity !== undefined) {
-      uiQuantity = uiQuantity instanceof bigNumber && !uiQuantity.isNaN() ?
-        toStandardNotation(this._cryptoQuantity) : this._cryptoQuantity;
+      uiQuantity = uiQuantity instanceof bigNumber && !uiQuantity.isNaN()
+        ? toStandardNotation(this._cryptoQuantity) : this._cryptoQuantity;
     }
 
-    loadTemplate('modals/purchase/purchase.html', t => {
+    loadTemplate('modals/purchase/purchase.html', (t) => {
       this.$el.html(t({
         ...this.order.toJSON(),
         ...state,
@@ -743,8 +742,8 @@ export default class extends BaseModal {
         cryptoAmountCurrency: this.cryptoAmountCurrency,
         isCrypto: this.listing.isCrypto,
         phaseClass: `phase${capitalize(state.phase)}`,
-        hasCoupons: this.listing.get('coupons').length &&
-          this.listing.get('metadata').get('contractType') !== 'CRYPTOCURRENCY',
+        hasCoupons: this.listing.get('coupons').length
+          && this.listing.get('metadata').get('contractType') !== 'CRYPTOCURRENCY',
       }));
 
       super.render();

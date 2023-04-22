@@ -12,7 +12,7 @@ export function fixLinuxZoomIssue() {
   // fix zoom issue on Linux hiDPI
   if (process.platform === 'linux') {
     try {
-      let scaleFactor = screen.getPrimaryDisplay().scaleFactor;
+      let { scaleFactor } = screen.getPrimaryDisplay();
 
       if (scaleFactor === 0) {
         scaleFactor = 1;
@@ -34,29 +34,34 @@ export function fixLinuxZoomIssue() {
 export function handleServerShutdownRequests() {
   ipcRenderer.on('server-shutdown', () => {
     if (platform() !== 'win32') {
-      ipcRenderer.send('server-shutdown-fail',
-        { reason: 'Not on windows. Use childProcess.kill instead.' });
+      ipcRenderer.send(
+        'server-shutdown-fail',
+        { reason: 'Not on windows. Use childProcess.kill instead.' },
+      );
       return;
     }
 
     const curConn = getCurrentConnection();
 
     if (!curConn || curConn.status !== 'connected') {
-      ipcRenderer.send('server-shutdown-fail',
-        { reason: 'No server connection' });
+      ipcRenderer.send(
+        'server-shutdown-fail',
+        { reason: 'No server connection' },
+      );
       return;
     }
 
     try {
-      $.post(app.getServerUrl('ob/shutdown/'))
-        .fail(xhr => ipcRenderer.send('server-shutdown-fail', {
+      $.post(app.getServerUrl('ob/shutdown'))
+        .fail((xhr) => ipcRenderer.send('server-shutdown-fail', {
           xhr,
-          reason: xhr && xhr.responseJSON && xhr.responseJSON.reason || '',
+          reason: (xhr && xhr.responseJSON && xhr.responseJSON.reason) || '',
         }));
     } catch (e) {
-      ipcRenderer.send('server-shutdown-fail',
-        { reason: e.toString() });
-      return;
+      ipcRenderer.send(
+        'server-shutdown-fail',
+        { reason: e.toString() },
+      );
     }
   });
 }

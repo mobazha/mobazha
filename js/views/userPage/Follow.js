@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import _ from 'underscore';
 import '../../lib/whenAll.jquery';
@@ -71,9 +72,9 @@ export default class extends BaseVw {
   onScroll() {
     const cf = getContentFrame()[0];
     const scrollNearBot = cf.scrollTop >= cf.scrollHeight - cf.offsetHeight - 100;
-    if (this.renderedCl.length < this.collection.length &&
-      this.followLoading && !this.followLoading.getState().isFetching &&
-      scrollNearBot) {
+    if (this.renderedCl.length < this.collection.length
+      && this.followLoading && !this.followLoading.getState().isFetching
+      && scrollNearBot) {
       // Some fake latency so a user doesn't just scroll down and load
       // hundreds of userCards which would kick off hundreds of profile
       // fetches.
@@ -93,8 +94,9 @@ export default class extends BaseVw {
       if (this.ownPage) {
         if (this.followType === 'following') this.collection.add(opts.changes.added);
       } else if (this.followType === 'followers') {
-        const isUserNewlyFollowed =
-          !!opts.changes.added.find(addMd => (addMd.id === this.model.id));
+        const isUserNewlyFollowed = !!opts.changes.added.find(
+          (addMd) => (addMd.id === this.model.id),
+        );
 
         if (isUserNewlyFollowed) {
           this.collection.add({ peerID: app.profile.id }, { at: 0 });
@@ -111,8 +113,9 @@ export default class extends BaseVw {
       if (this.ownPage) return;
 
       if (this.followType === 'followers') {
-        const isUserNewlyUnfollowed =
-          !!opts.changes.removed.find(removedMd => (removedMd.id === this.model.id));
+        const isUserNewlyUnfollowed = !!opts.changes.removed.find(
+          (removedMd) => (removedMd.id === this.model.id),
+        );
         if (isUserNewlyUnfollowed) {
           this.collection.remove(app.profile.id);
         }
@@ -130,8 +133,8 @@ export default class extends BaseVw {
     if (opts.changes.added.length) {
       // Expecting either a single new user on the bottom (own node
       // must have followed in the UI) or a page of users at the bottom.
-      if (opts.changes.added[opts.changes.added.length - 1] ===
-        this.renderedCl.at(this.renderedCl.length - 1)) {
+      if (opts.changes.added[opts.changes.added.length - 1]
+        === this.renderedCl.at(this.renderedCl.length - 1)) {
         // It's a page of users at the bottom
         this.renderUsers(opts.changes.added, 'append');
       } else {
@@ -140,7 +143,7 @@ export default class extends BaseVw {
       }
     }
 
-    opts.changes.removed.forEach(md => this.removeUserCard(md.id));
+    opts.changes.removed.forEach((md) => this.removeUserCard(md.id));
   }
 
   onCollectionFetched() {
@@ -162,11 +165,11 @@ export default class extends BaseVw {
     // is showing our own following list and we follow / unfollow someone; this view
     // is showing anothers followers list and our own node has followed / unfollowed
     // that user), we sync them over to the renderedCl.
-    this.listenTo(this.collection, 'add', md => {
+    this.listenTo(this.collection, 'add', (md) => {
       this.renderedCl.add(md, { at: this.collection.models.indexOf(md) });
     });
 
-    this.listenTo(this.collection, 'remove', md => {
+    this.listenTo(this.collection, 'remove', (md) => {
       this.renderedCl.remove(md.id);
     });
   }
@@ -231,14 +234,14 @@ export default class extends BaseVw {
     }
 
     if (insertionType === 'replace') {
-      this.userCardViews.forEach(user => user.remove());
+      this.userCardViews.forEach((user) => user.remove());
       this.userCardViews = [];
       this.indexedUserCardViews = {};
     }
 
     const usersFrag = document.createDocumentFragment();
 
-    models.forEach(user => {
+    models.forEach((user) => {
       const view = this.createChild(UserCard, { guid: user.id });
       this.userCardViews.push(view);
       this.indexedUserCardViews[user.id] = view;
@@ -263,10 +266,10 @@ export default class extends BaseVw {
 
     const followsYouDeferred = $.Deferred();
 
-    if (!this.ownPage && this.followType === 'following' &&
-      (!this.followsYouFetch || this.followsYouFetchFailed)) {
+    if (!this.ownPage && this.followType === 'following'
+      && (!this.followsYouFetch || this.followsYouFetchFailed)) {
       this.followsYouFetch = followsYou(this.model.id)
-        .done(data => {
+        .done((data) => {
           this.followsMe = data.followsMe;
           followsYouDeferred.resolve();
         });
@@ -278,14 +281,14 @@ export default class extends BaseVw {
       .always(() => {
         this.followFetch = this.collection.fetch()
           .done(() => (this.onCollectionFetched.call(this)))
-          .fail(xhr => {
+          .fail((xhr) => {
             if (xhr.statusText === 'abort') return;
             if (xhr === this.followFetch) {
               if (this.followLoading) {
                 this.followLoading.setState({
                   isFetching: false,
                   fetchFailed: true,
-                  fetchErrorMsg: xhr.responseJSON && xhr.responseJSON.reason || '',
+                  fetchErrorMsg: (xhr.responseJSON && xhr.responseJSON.reason) || '',
                 });
               }
             }
@@ -314,31 +317,30 @@ export default class extends BaseVw {
 
     if (this.followType === 'followers') {
       fetchErrorTitle = app.polyglot.t('userPage.followTab.followersFetchError');
-      noResultsMsg = this.ownPage ?
-        app.polyglot.t('userPage.followTab.noOwnFollowers') :
-        app.polyglot.t('userPage.followTab.noFollowers', {
+      noResultsMsg = this.ownPage
+        ? app.polyglot.t('userPage.followTab.noOwnFollowers')
+        : app.polyglot.t('userPage.followTab.noFollowers', {
           name: this.model.get('handle') || `${this.model.id.slice(0, 8)}…`,
         });
     } else {
       fetchErrorTitle = app.polyglot.t('userPage.followTab.followingFetchError');
-      noResultsMsg = this.ownPage ?
-        app.polyglot.t('userPage.followTab.noOwnFollowing') :
-        app.polyglot.t('userPage.followTab.noFollowing', {
+      noResultsMsg = this.ownPage
+        ? app.polyglot.t('userPage.followTab.noOwnFollowing')
+        : app.polyglot.t('userPage.followTab.noFollowing', {
           name: this.model.get('handle') || `${this.model.id.slice(0, 8)}…`,
         });
     }
 
-    const isFetching =
-      (this.followsYouFetch && this.followsYouFetch.state() === 'pending') ||
-      (this.followFetch && this.followFetch.state() === 'pending');
+    const isFetching = (this.followsYouFetch && this.followsYouFetch.state() === 'pending')
+      || (this.followFetch && this.followFetch.state() === 'pending');
 
     this.followLoading = this.createChild(FollowLoading, {
       initialState: {
         isFetching,
         fetchFailed: this.followFetch && this.followFetch.state() === 'rejected',
         fetchErrorTitle,
-        fetchErrorMsg: this.followFetch && this.followFetch.responseJSON &&
-          this.followFetch.responseJSON.reason || '',
+        fetchErrorMsg: (this.followFetch && this.followFetch.responseJSON
+          && this.followFetch.responseJSON.reason) || '',
         noResultsMsg,
         noResults: !this.collection.length,
       },
@@ -353,4 +355,3 @@ export default class extends BaseVw {
     return this;
   }
 }
-

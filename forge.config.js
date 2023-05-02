@@ -75,6 +75,19 @@ module.exports = {
       config: {},
     },
   ],
+  publishers: [
+    {
+      name: '@electron-forge/publisher-github',
+      config: {
+        repository: {
+          owner: 'mobazha',
+          name: 'mobazha',
+        },
+        prerelease: false,
+        draft: true,
+      },
+    },
+  ],
   hooks: {
     generateAssets: async (platform, arch) => {
       console.info('Packages built at:', platform, arch);

@@ -1,7 +1,7 @@
 import $ from 'jquery';
 import { Model, Events } from 'backbone';
-import { openSimpleMessage } from '../views/modals/SimpleMessage';
 import * as isIPFS from 'is-ipfs';
+import { openSimpleMessage } from '../views/modals/SimpleMessage';
 import app from '../app';
 
 const events = {
@@ -36,12 +36,11 @@ function blockUnblock(_block, peerIDs) {
   }
 
   if (!isIPFS.multihash(peerIDs) && !Array.isArray(peerIDs)) {
-    throw new Error('Either provide a single peerID as a multihash or an array of peerID ' +
-      'multihashes.');
+    throw new Error('Either provide a single peerID as a multihash or an array of peerID multihashes.');
   }
 
   if (Array.isArray(peerIDs)) {
-    peerIDs.forEach(peerID => {
+    peerIDs.forEach((peerID) => {
       if (!isIPFS.multihash(peerID)) {
         throw new Error('If providing an array of peerIDs, each item must be a multihash.');
       }
@@ -50,8 +49,7 @@ function blockUnblock(_block, peerIDs) {
 
   checkAppSettings();
 
-  let peerIDList =
-    typeof peerIDs === 'string' ? [peerIDs] : peerIDs;
+  let peerIDList = typeof peerIDs === 'string' ? [peerIDs] : peerIDs;
 
   if (_block && app.profile && peerIDList.includes(app.profile.id)) {
     throw new Error('You cannot block your own node.');
@@ -65,19 +63,19 @@ function blockUnblock(_block, peerIDs) {
   if (_block) {
     blockedNodes = [
       ...(
-        latestSettingsSave && latestSettingsSave.state() === 'pending' ?
-          lastSentBlockedNodes : app.settings.get('blockedNodes')
+        latestSettingsSave && latestSettingsSave.state() === 'pending'
+          ? lastSentBlockedNodes : app.settings.get('blockedNodes')
       ),
       ...peerIDList,
     ];
     pendingBlocks = [...pendingBlocks, ...peerIDList];
-    pendingUnblocks = pendingUnblocks.filter(peerID => !peerIDList.includes(peerID));
+    pendingUnblocks = pendingUnblocks.filter((peerID) => !peerIDList.includes(peerID));
   } else {
-    const filterList = latestSettingsSave && latestSettingsSave.state() === 'pending' ?
-      lastSentBlockedNodes : app.settings.get('blockedNodes');
-    blockedNodes = filterList.filter(peerID => !peerIDList.includes(peerID));
+    const filterList = latestSettingsSave && latestSettingsSave.state() === 'pending'
+      ? lastSentBlockedNodes : app.settings.get('blockedNodes');
+    blockedNodes = filterList.filter((peerID) => !peerIDList.includes(peerID));
     pendingUnblocks = [...pendingUnblocks, ...peerIDList];
-    pendingBlocks = pendingBlocks.filter(peerID => !peerIDList.includes(peerID));
+    pendingBlocks = pendingBlocks.filter((peerID) => !peerIDList.includes(peerID));
   }
 
   lastSentBlockedNodes = [...blockedNodes];
@@ -92,7 +90,7 @@ function blockUnblock(_block, peerIDs) {
     const blocked = [];
     const unblocked = [];
 
-    pendingBlocks = pendingBlocks.filter(peerID => {
+    pendingBlocks = pendingBlocks.filter((peerID) => {
       if (blockedNodes.includes(peerID)) {
         blocked.push(peerID);
         return false;
@@ -101,7 +99,7 @@ function blockUnblock(_block, peerIDs) {
       return true;
     });
 
-    pendingUnblocks = pendingUnblocks.filter(peerID => {
+    pendingUnblocks = pendingUnblocks.filter((peerID) => {
       if (!blockedNodes.includes(peerID)) {
         unblocked.push(peerID);
         return false;
@@ -117,13 +115,13 @@ function blockUnblock(_block, peerIDs) {
     if (unblocked.length) {
       events.trigger('unblocked', { peerIDs: unblocked });
     }
-  }).fail(xhr => {
+  }).fail((xhr) => {
     if (latestSettingsSave && latestSettingsSave.state() === 'pending') return;
 
-    const reason = xhr.responseJSON && xhr.responseJSON.reason || '';
+    const reason = (xhr.responseJSON && xhr.responseJSON.reason) || '';
     const bn = app.settings.get('blockedNodes');
-    const failedBlocks = pendingBlocks.filter(peerID => !bn.includes(peerID));
-    const failedUnblocks = pendingUnblocks.filter(peerID => bn.includes(peerID));
+    const failedBlocks = pendingBlocks.filter((peerID) => !bn.includes(peerID));
+    const failedUnblocks = pendingUnblocks.filter((peerID) => bn.includes(peerID));
     pendingBlocks = [];
     pendingUnblocks = [];
 
@@ -147,18 +145,18 @@ function blockUnblock(_block, peerIDs) {
 
       if (failedBlocks.length && failedUnblocks.length) {
         title = app.polyglot.t('block.errorModal.titleUnableToBlockUnblock');
-        body = `${app.polyglot.t('block.errorModal.blockFailedListHeading')}<br /><br />` +
-          `<div class="txCtr">${failedBlocks.join('<br />')}</div><br />` +
-          `${app.polyglot.t('block.errorModal.unblockFailedListHeading')}<br /><br />` +
-          `<div class="txCtr">${failedUnblocks.join('<br />')}</div>`;
+        body = `${app.polyglot.t('block.errorModal.blockFailedListHeading')}<br /><br />`
+          + `<div class="txCtr">${failedBlocks.join('<br />')}</div><br />`
+          + `${app.polyglot.t('block.errorModal.unblockFailedListHeading')}<br /><br />`
+          + `<div class="txCtr">${failedUnblocks.join('<br />')}</div>`;
       } else if (failedUnblocks.length) {
         title = app.polyglot.t('block.errorModal.titleUnableToUnblock');
-        body = `${app.polyglot.t('block.errorModal.unblockFailedListHeading')}<br /><br />` +
-          `<div class="txCtr">${failedUnblocks.join('<br />')}</div>`;
+        body = `${app.polyglot.t('block.errorModal.unblockFailedListHeading')}<br /><br />`
+          + `<div class="txCtr">${failedUnblocks.join('<br />')}</div>`;
       } else {
         title = app.polyglot.t('block.errorModal.titleUnableToBlock');
-        body = `${app.polyglot.t('block.errorModal.blockFailedListHeading')}<br /><br />` +
-          `<div class="txCtr">${failedBlocks.join('<br />')}</div>`;
+        body = `${app.polyglot.t('block.errorModal.blockFailedListHeading')}<br /><br />`
+          + `<div class="txCtr">${failedBlocks.join('<br />')}</div>`;
       }
 
       if (reason) {
@@ -197,8 +195,7 @@ export function isBlocking(peerID) {
 
   checkAppSettings();
 
-  return latestSettingsSave && latestSettingsSave.state() === 'pending' &&
-    lastSentBlockedNodes.includes(peerID) || false;
+  return (latestSettingsSave && latestSettingsSave.state() === 'pending' && lastSentBlockedNodes.includes(peerID)) || false;
 }
 
 export function isUnblocking(peerID) {
@@ -208,7 +205,7 @@ export function isUnblocking(peerID) {
 
   checkAppSettings();
 
-  return latestSettingsSave && latestSettingsSave.state() === 'pending' &&
-    !lastSentBlockedNodes.includes(peerID) &&
-    app.settings.get('blockedNodes').includes(peerID) || false;
+  return (latestSettingsSave && latestSettingsSave.state() === 'pending'
+    && !lastSentBlockedNodes.includes(peerID)
+    && app.settings.get('blockedNodes').includes(peerID)) || false;
 }

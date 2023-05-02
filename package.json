@@ -2,7 +2,7 @@
   "name": "mobazha-desktop",
   "productName": "MobazhaDesktopClient",
   "version": "3.0.1",
-  "serverVersionRequired": "1.0.3",
+  "serverVersionRequired": "1.0.2",
   "description": "Decentralized p2p marketplace that uses Cryptocurrencies.",
   "main": "bootstrapper.js",
   "scripts": {
@@ -125,7 +125,6 @@
     "trunk8": "0.0.1",
     "twemoji": "14.0.2",
     "underscore": "^1.13.6",
-    "update-electron-app": "^2.0.1",
     "velocity-animate": "1.5.2",
     "workerize": "0.1.8",
     "yargs": "^17.6.2"

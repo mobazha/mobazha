@@ -12,5 +12,6 @@ error.log
 
 out/
 mobazha/
+MOBAZHA_TEMP/
 
 .env

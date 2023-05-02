@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import _ from 'underscore';
 import { EOL, platform } from 'os';
 import { Events } from 'backbone';
+import path from 'path';
 import fs from 'fs';
 import childProcess from 'child_process';
 
@@ -96,7 +97,7 @@ export default class LocalServer {
 
     this._lastStartCommandLineArgs = commandLineArgs;
     this.serverSubProcess = childProcess.spawn(
-      this.serverPath + this.serverFilename,
+      path.join(this.serverPath, this.serverFilename),
       serverStartArgs,
       {
         detach: false,
@@ -198,7 +199,7 @@ export default class LocalServer {
     console.log('Starting local server in status mode.');
 
     const subProcess = childProcess.spawn(
-      this.serverPath + this.serverFilename,
+      path.join(this.serverPath, this.serverFilename),
       ['status', ...commandLineArgs],
 
       {

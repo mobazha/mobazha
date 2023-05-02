@@ -24,7 +24,7 @@ const remoteMain = require('@electron/remote/main');
 // We no longer support win32, but process.platform returns Windows 64 bit as win32.
 const plat = process.platform === 'win32' ? 'win64' : process.platform;
 
-const feedURL = `https://updates2.openbazaar.org:5001/update/${plat}/${version}`;
+const feedURL = `https://update.electronjs.org/mobazha/mobazha/${plat}-${process.arch}/${version}`;
 
 global.serverLog = '';
 
@@ -85,10 +85,11 @@ if (handleStartupEvent()) {
   console.log('Mobazha started on Windows...');
 }
 
-const serverPath = `${__dirname}${path.sep}..${path.sep}mobazha${path.sep}`;
+// const serverPath = `${__dirname}${path.sep}mobazha${path.sep}`;
+const serverPath = path.join(process.resourcesPath, 'mobazha');//  `${__dirname}${path.sep}..${path.sep}mobazha${path.sep}`;
 const serverFilename = process.platform === 'darwin' || process.platform === 'linux'
   ? 'mobazhad' : 'mobazhad.exe';
-const isBundledApp = fs.existsSync(serverPath + serverFilename);
+const isBundledApp = fs.existsSync(path.join(serverPath, serverFilename));
 global.isBundledApp = isBundledApp;
 let localServer;
 

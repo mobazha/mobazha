@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const packageJson = require('./package.json');
 
 const { version } = packageJson;
@@ -16,7 +17,8 @@ module.exports = {
       },
     ],
     icon: path.resolve(iconDir, process.platform === 'darwin' ? 'icon.icns' : 'icon.ico'),
-    ignore: 'mobazhad',
+    ignore: ['MOBAZHA_TEMP'],
+    // extraResource: ['./mobazha'],
     win32metadata: {
       ProductName: 'Mobazha',
       CompanyName: 'Mogaolei',
@@ -36,7 +38,7 @@ module.exports = {
       // entitlements: './static/entitlements.plist',
       // 'entitlements-inherit': './static/entitlements.plist',
       // keychain: 'build.keychain',
-      ignore: 'Contents/Resources/app',
+      // ignore: 'Contents/Resources/app',
     },
   },
   rebuildConfig: {},
@@ -84,13 +86,18 @@ module.exports = {
           name: 'mobazha',
         },
         prerelease: false,
-        draft: true,
+        draft: false,
       },
     },
   ],
   hooks: {
     generateAssets: async (platform, arch) => {
       console.info('Packages built at:', platform, arch);
+    },
+    packageAfterCopy: async (config, buildPath) => {
+      const src = path.join(__dirname, 'MOBAZHA_TEMP');
+      const dst = path.join(buildPath, '..', 'mobazha');
+      fs.cpSync(src, dst, { recursive: true });
     },
     prePackage: async (platform, arch) => {
       console.info('Packages built at:', platform, arch);

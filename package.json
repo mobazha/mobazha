@@ -73,7 +73,7 @@
     "copyfiles": "2.4.1",
     "cross-env": "^7.0.3",
     "draftlog": "^1.0.13",
-    "electron": "^22.0.0",
+    "electron": "^22.3.7",
     "eslint": "^8.31.0",
     "eslint-config-airbnb": "19.0.4",
     "eslint-config-defaults": "9.0.0",

@@ -22,7 +22,7 @@ const version = app.getVersion();
 const remoteMain = require('@electron/remote/main');
 
 // We no longer support win32, but process.platform returns Windows 64 bit as win32.
-const plat = process.platform === 'win32' ? 'win64' : process.platform;
+const plat = process.platform === 'win64' ? 'win32' : process.platform;
 
 const feedURL = `https://update.electronjs.org/mobazha/mobazha/${plat}-${process.arch}/${version}`;
 
@@ -40,7 +40,7 @@ const handleStartupEvent = function () {
   function exeSquirrelCommand(args, cb) {
     const updateDotExe = path.resolve(path.dirname(process.execPath), '..', 'update.exe');
     const child = childProcess.spawn(updateDotExe, args, { detached: true });
-    child.on('close', cb());
+    child.on('close', cb);
   }
 
   function install(cb) {

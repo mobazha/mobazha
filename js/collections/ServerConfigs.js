@@ -113,7 +113,19 @@ export default class extends Collection {
         }
       }
 
-      if (serverConfig.get('builtIn')) builtInCount++;
+      if (serverConfig.get('builtIn')) {
+        if (serverConfig.get('port') == 4002) {
+          const configSave = serverConfig.save({ port: 5102 });
+
+          if (!configSave) {
+            // developer error or wonky data
+            console.error('There was an error migrating the server config, ' +
+              `${serverConfig.get('name')}, from the port 4002 to the 5102.`);
+          }
+        }
+
+        builtInCount++;
+      }
 
       // Migrate a walletCurrency to a dataDir.
       const walletCurrency = serverConfig.get('walletCurrency');

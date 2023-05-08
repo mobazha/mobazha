@@ -1,11 +1,12 @@
+/* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import _ from 'underscore';
+import * as isIPFS from 'is-ipfs';
 import app from '../../../app';
 import '../../../lib/select2';
 import '../../../lib/whenAll.jquery';
 import baseVw from '../../baseVw';
 import loadTemplate from '../../../utils/loadTemplate';
-import * as isIPFS from 'is-ipfs';
 import { bulkCoinUpdate } from '../../../utils/bulkCoinUpdate';
 import { supportedWalletCurs } from '../../../data/walletCurrencies';
 import Moderators from '../../components/moderators/Moderators';
@@ -25,22 +26,18 @@ export default class extends baseVw {
     this.profile = app.profile.clone();
 
     // Sync our clone with any changes made to the global profile.
-    this.listenTo(app.profile, 'someChange',
-      (md, pOpts) => this.profile.set(pOpts.setAttrs));
+    this.listenTo(app.profile, 'someChange', (md, pOpts) => this.profile.set(pOpts.setAttrs));
 
     // Sync the global profile with any changes we save via our clone.
-    this.listenTo(this.profile, 'sync',
-      () => app.profile.set(this.profile.toJSON()));
+    this.listenTo(this.profile, 'sync', () => app.profile.set(this.profile.toJSON()));
 
     this.settings = app.settings.clone();
 
     // Sync our clone with any changes made to the global settings model.
-    this.listenTo(app.settings, 'someChange',
-      (md, sOpts) => this.settings.set(sOpts.setAttrs));
+    this.listenTo(app.settings, 'someChange', (md, sOpts) => this.settings.set(sOpts.setAttrs));
 
     // Sync the global settings model with any changes we save via our clone.
-    this.listenTo(this.settings, 'sync',
-      (md, resp, sOpts) => app.settings.set(this.settings.toJSON(sOpts.attrs)));
+    this.listenTo(this.settings, 'sync', (md, resp, sOpts) => app.settings.set(this.settings.toJSON(sOpts.attrs)));
 
     const preferredCurs = [...new Set(app.profile.get('currencies'))];
 
@@ -52,7 +49,7 @@ export default class extends baseVw {
       },
     });
 
-    this.listenTo(this.currencySelector, 'currencyClicked', sOpts => {
+    this.listenTo(this.currencySelector, 'currencyClicked', (sOpts) => {
       this.handleCurrencyClicked(sOpts);
     });
 
@@ -112,7 +109,7 @@ export default class extends baseVw {
     ];
 
     this.listenTo(app.verifiedMods, 'update', () => {
-      modsToCheckOnVerifiedUpdate.forEach(obj => {
+      modsToCheckOnVerifiedUpdate.forEach((obj) => {
         const nowSelected = app.verifiedMods.matched(obj.view.allIDs).length > 0;
         if (nowSelected !== obj.hasVerifiedMods) {
           obj.hasVerifiedMods = nowSelected;
@@ -151,8 +148,10 @@ export default class extends baseVw {
   }
 
   noModsByIDFound(guids) {
-    const modsNotFound = app.polyglot.t('settings.storeTab.errors.modsNotFound',
-      { guids, smart_count: guids.length });
+    const modsNotFound = app.polyglot.t(
+      'settings.storeTab.errors.modsNotFound',
+      { guids, smart_count: guids.length },
+    );
     this.showModByIDError(modsNotFound);
     if (this.modsByID.modCount === 0) {
       this.getCachedEl('.js-modListByID').addClass('hide');
@@ -311,8 +310,7 @@ export default class extends baseVw {
         })
         .fail((...args) => {
           // if at least one save fails, the save has failed.
-          const errMsg = args[0] && args[0].responseJSON &&
-            args[0].responseJSON.reason || '';
+          const errMsg = (args[0] && args[0].responseJSON && args[0].responseJSON.reason) || '';
           openSimpleMessage(app.polyglot.t('settings.storeTab.status.error'), errMsg);
 
           statusMessage.update({
@@ -385,4 +383,3 @@ export default class extends baseVw {
     return this;
   }
 }
-

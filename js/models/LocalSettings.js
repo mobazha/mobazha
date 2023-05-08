@@ -39,7 +39,7 @@ export default class extends Model {
       // pass
     }
 
-    const language = langDataObj && langDataObj.code || 'en_US';
+    const language = (langDataObj && langDataObj.code) || 'en_US';
 
     return {
       windowControlStyle: process.platform === 'darwin' ? 'mac' : 'win',
@@ -49,7 +49,7 @@ export default class extends Model {
       language,
       listingsGridViewType: 'grid',
       bitcoinUnit: 'BTC',
-      verifiedModsProvider: `https://mobazha.info/api/moderator/verified`,
+      verifiedModsProvider: 'https://mobazha.info/api/moderator/verified',
       verifiedModsProviderTor: 'http://my7nrnmkscxr32zo.onion/verified_moderators',
       dontShowTorExternalLinkWarning: false,
     };

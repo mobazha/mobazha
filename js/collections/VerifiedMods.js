@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import _ from 'underscore';
 import { Collection } from 'backbone';
 import app from '../app';
@@ -41,7 +42,7 @@ export default class extends Collection {
    * @param IDs {array} - a list of IDs
    */
   matched(IDs = []) {
-    return this.filter(mod => IDs.includes(mod.get('peerID')));
+    return this.filter((mod) => IDs.includes(mod.get('peerID')));
   }
 
   /**
@@ -50,10 +51,10 @@ export default class extends Collection {
    * @param IDs {array} - a list of IDs
    */
   defaultBadge(IDs) {
-    const modelWithBadge = _.find(this.matched(IDs), mod => mod.get('type').badge);
+    const modelWithBadge = _.find(this.matched(IDs), (mod) => mod.get('type').badge);
     return {
       ...this.localBadge,
-      ...(modelWithBadge && modelWithBadge.get('type').badge || {}),
+      ...((modelWithBadge && modelWithBadge.get('type').badge) || {}),
     };
   }
 

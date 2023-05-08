@@ -51,9 +51,9 @@ export default class extends BaseModal {
   render() {
     const modLanguages = this.model.get('moderatorInfo')
       .get('languages')
-      .map(lang => {
+      .map((lang) => {
         const langData = getLangByCode(lang);
-        return langData && langData.name || lang;
+        return (langData && langData.name) || lang;
       });
 
     loadTemplate('modals/moderatorDetails.html', (t) => {
@@ -106,4 +106,3 @@ export default class extends BaseModal {
     return this;
   }
 }
-

@@ -32,7 +32,7 @@ export default class extends BaseVw {
     super.render();
     const state = this.getState();
 
-    loadTemplate('modals/orderDetail/modFragment.html', t => {
+    loadTemplate('modals/orderDetail/modFragment.html', (t) => {
       this.$el.html(t({
         ...state,
       }));
@@ -43,11 +43,10 @@ export default class extends BaseVw {
       });
 
       if (!verifiedMod) {
-        createOptions.initialState.tipBody =
-          app.polyglot.t('verifiedMod.modUnverified.tipBodyOrderDetail', {
-            not: `<b>${app.polyglot.t('verifiedMod.modUnverified.not')}</b>`,
-            name: `<b>${app.verifiedMods.data.name}</b>`,
-          });
+        createOptions.initialState.tipBody = app.polyglot.t('verifiedMod.modUnverified.tipBodyOrderDetail', {
+          not: `<b>${app.polyglot.t('verifiedMod.modUnverified.not')}</b>`,
+          name: `<b>${app.verifiedMods.data.name}</b>`,
+        });
       }
 
       if (this.verifiedMod) this.verifiedMod.remove();

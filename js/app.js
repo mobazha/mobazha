@@ -11,7 +11,6 @@ export default {
         ' been attached to this instance.');
     }
 
-    return this.serverConfigs.activeServer ?
-      `${this.serverConfigs.activeServer.httpUrl}v1/${urlFrag}` : '';
+    return this.serverConfigs.activeServer ? `${this.serverConfigs.activeServer.httpUrl}v1/${urlFrag}` : '';
   },
 };

@@ -1,17 +1,16 @@
 import $ from 'jquery';
-import app from '../app';
 import { shell } from 'electron';
 import Backbone from 'backbone';
+import app from '../app';
 import { getPageContainer } from './selectors';
 import TorExternalLinkWarning from '../views/modals/TorExternalLinkWarning';
-
 
 // todo: check args and write unit test
 // http://stackoverflow.com/a/21627295/632806
 export function isScrolledIntoView(element) {
   let rect = element.getBoundingClientRect();
-  const top = rect.top;
-  const height = rect.height;
+  const { top } = rect;
+  const { height } = rect;
   let el = element.parentNode;
 
   do {
@@ -77,10 +76,9 @@ export function openExternal(href) {
     throw new Error('Please provide a valid href as string.');
   }
 
-  const activeServer = app.serverConfigs.activeServer;
-  const localSettings = app.localSettings;
-  const warningOptedOut = app.localSettings &&
-    localSettings.get('dontShowTorExternalLinkWarning');
+  const { activeServer } = app.serverConfigs;
+  const { localSettings } = app;
+  const warningOptedOut = app.localSettings && localSettings.get('dontShowTorExternalLinkWarning');
 
   if (activeServer && activeServer.get('useTor') && !warningOptedOut) {
     const warningModal = new TorExternalLinkWarning({ url: href })

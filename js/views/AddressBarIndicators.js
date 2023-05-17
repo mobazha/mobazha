@@ -1,7 +1,8 @@
+/* eslint-disable class-methods-use-this */
+import * as isIPFS from 'is-ipfs';
 import app from '../app';
 import loadTemplate from '../utils/loadTemplate';
 import baseVw from './baseVw';
-import * as isIPFS from 'is-ipfs';
 
 export default class extends baseVw {
   constructor(options = {}) {
@@ -63,10 +64,9 @@ export default class extends baseVw {
       throw new Error('Please provide a valid url as a string.');
     }
 
-    const urlParts = url.startsWith('ob://') ?
-      url.slice(5)
-      .split(' ')[0] :
-      url.split(' ')[0];
+    const urlParts = url.startsWith('ob://')
+      ? url.slice(5).split(' ')[0]
+      : url.split(' ')[0];
 
     return urlParts.split('/');
   }

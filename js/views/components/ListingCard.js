@@ -10,16 +10,16 @@ import { startAjaxEvent, endAjaxEvent, recordEvent } from '../../utils/metrics';
 import { getNewerHash, outdateHash } from '../../utils/outdatedListingHashes';
 import Listing from '../../models/listing/Listing';
 import ListingShort from '../../models/listing/ListingShort';
-import { events as listingEvents } from '../../models/listing/';
+import { events as listingEvents } from '../../models/listing';
 import baseVw from '../baseVw';
-import { openSimpleMessage } from '../../views/modals/SimpleMessage';
+import { openSimpleMessage } from '../modals/SimpleMessage';
 import ListingDetail from '../modals/listingDetail/Listing';
 import Report from '../modals/Report';
 import BlockedWarning from '../modals/BlockedWarning';
-import ReportBtn from '../components/ReportBtn';
-import BlockBtn from '../components/BlockBtn';
-import VerifiedMod, { getListingOptions } from '../components/VerifiedMod';
-import UserLoadingModal from '../../views/userPage/Loading';
+import ReportBtn from './ReportBtn';
+import BlockBtn from './BlockBtn';
+import VerifiedMod, { getListingOptions } from './VerifiedMod';
+import UserLoadingModal from '../userPage/Loading';
 
 export default class extends baseVw {
   constructor(options = {}) {
@@ -593,7 +593,7 @@ export default class extends baseVw {
       .render()
       .open();
 
-    this.report.on('modal-will-remove', () => (this.report = null));
+    this.report.on('modal-will-remove', () => { this.report = null; });
     this.listenTo(this.report, 'submitted', this.onReportSubmitted);
   }
 
@@ -627,13 +627,17 @@ export default class extends baseVw {
   }
 
   get $btnEdit() {
-    return this._$btnEdit
-      || (this._$btnEdit = this.$('.js-edit'));
+    if (!this._$btnEdit) {
+      this._$btnEdit = this.$('.js-edit');
+    }
+    return this._$btnEdit;
   }
 
   get $btnDelete() {
-    return this._$btnDelete
-      || (this._$btnDelete = this.$('.js-delete'));
+    if (!this._$btnDelete) {
+      this._$btnDelete = this.$('.js-delete');
+    }
+    return this._$btnDelete;
   }
 
   remove() {

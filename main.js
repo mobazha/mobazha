@@ -19,6 +19,19 @@ let trayMenu;
 let closeConfirmed = false;
 const version = app.getVersion();
 
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    // Someone tried to run a second instance, we should focus our window.
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
 const remoteMain = require('@electron/remote/main');
 
 // We no longer support win32, but process.platform returns Windows 64 bit as win32.
@@ -49,6 +62,8 @@ const handleStartupEvent = function () {
   }
 
   function uninstall(cb) {
+    app.removeAsDefaultProtocolClient('ob');
+
     const target = path.basename(process.execPath);
     exeSquirrelCommand(['--removeShortcut', target], cb);
   }

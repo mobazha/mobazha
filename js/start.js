@@ -829,7 +829,7 @@ ipcRenderer.on('show-server-log', (event, serverLog) => {
 ipcRenderer.on('updateChecking', () => showUpdateStatus(app.polyglot.t('update.checking')));
 ipcRenderer.on('updateAvailable', () => showUpdateStatus(app.polyglot.t('update.available')));
 ipcRenderer.on('updateNotAvailable', () => showUpdateStatus(app.polyglot.t('update.notAvailable')));
-ipcRenderer.on('updateError', (e, msg) => showUpdateStatus(app.polyglot.t('update.error', { error: msg }), 'warning'));
+ipcRenderer.on('updateError', (msg) => showUpdateStatus(app.polyglot.t('update.error', { error: msg }), 'warning'));
 ipcRenderer.on('updateReadyForInstall', (e, opts) => updateReady(opts));
 
 // Allow main.js to send messages to the console

@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import _ from 'underscore';
 import $ from 'jquery';
 import bigNumber from 'bignumber.js';
@@ -28,28 +29,26 @@ export default class extends BaseModal {
   constructor(options = {}) {
     const navCoins = supportedWalletCurs({ clientSupported: false })
       .sort((a, b) => {
-        const aSortVal =
-          app.polyglot.t(`cryptoCurrencies.${a}`, { _: a });
-        const bSortVal =
-          app.polyglot.t(`cryptoCurrencies.${b}`, { _: b });
+        const aSortVal = app.polyglot.t(`cryptoCurrencies.${a}`, { _: a });
+        const bSortVal = app.polyglot.t(`cryptoCurrencies.${b}`, { _: b });
 
         return aSortVal.localeCompare(
           bSortVal,
           app.localSettings.standardizedTranslatedLang(),
-          { sensitivity: 'base' }
+          { sensitivity: 'base' },
         );
       });
 
     let initialActiveCoin;
 
-    if (options.initialActiveCoin &&
-      typeof options.initialActiveCoin === 'string') {
-      initialActiveCoin = isSupportedWalletCur(options.initialActiveCoin) ?
-        options.initialActiveCoin : null;
+    if (options.initialActiveCoin
+      && typeof options.initialActiveCoin === 'string') {
+      initialActiveCoin = isSupportedWalletCur(options.initialActiveCoin)
+        ? options.initialActiveCoin : null;
     }
 
     if (!initialActiveCoin) {
-      initialActiveCoin = navCoins.find(coin => isSupportedWalletCur(coin)) || null;
+      initialActiveCoin = navCoins.find((coin) => isSupportedWalletCur(coin)) || null;
     }
 
     // If at this point the initialActiveCoin and consequently this.activeCoin
@@ -57,8 +56,7 @@ export default class extends BaseModal {
     // this client.
 
     const opts = {
-      initialSendModeOn: app.walletBalances.get(initialActiveCoin) &&
-        app.walletBalances.get(initialActiveCoin).get('confirmed') || false,
+      initialSendModeOn: (app.walletBalances.get(initialActiveCoin) && app.walletBalances.get(initialActiveCoin).get('confirmed')) || false,
       ...options,
       initialActiveCoin,
     };
@@ -81,7 +79,7 @@ export default class extends BaseModal {
     }, {});
     this.popInTimeouts = [];
 
-    this.navCoins = navCoins.map(coin => {
+    this.navCoins = navCoins.map((coin) => {
       const balanceMd = app.walletBalances.get(coin);
       return {
         active: coin === opts.initialNavCoin,
@@ -99,7 +97,7 @@ export default class extends BaseModal {
       },
     }).render();
 
-    this.listenTo(this.coinNav, 'coinSelected', e => {
+    this.listenTo(this.coinNav, 'coinSelected', (e) => {
       this.activeCoin = e.code;
     });
 
@@ -133,15 +131,15 @@ export default class extends BaseModal {
       }).render();
     }
 
-    const ob1ProviderData = defaultSearchProviders.find(provider => provider.id === 'mbz');
-    this.viewCryptoListingsUrl = ob1ProviderData ?
-      `#search?providerQ=${ob1ProviderData.listings}?type=cryptocurrency` :
-      null;
+    const ob1ProviderData = defaultSearchProviders.find((provider) => provider.id === 'mbz');
+    this.viewCryptoListingsUrl = ob1ProviderData
+      ? `#search?providerQ=${ob1ProviderData.listings}?type=cryptocurrency`
+      : null;
 
     const serverSocket = getSocket();
 
     if (initialActiveCoin && serverSocket) {
-      this.listenTo(serverSocket, 'message', e => {
+      this.listenTo(serverSocket, 'message', (e) => {
         if (e.jsonData.wallet && e.jsonData.wallet.transaction) {
           let walletCur;
 
@@ -149,17 +147,16 @@ export default class extends BaseModal {
             walletCur = e.jsonData.wallet.transaction.CurrencyCode;
           } catch (err) {
             // pass
-            console.error('Unable to process a "wallet" socket because the wallet currency ' +
-              'could not be determined');
+            console.error('Unable to process a "wallet" socket because the wallet currency '
+              + 'could not be determined');
             return;
           }
 
-          const cl =
-            this.transactionsState[walletCur] &&
-            this.transactionsState[walletCur].cl || null;
+          const cl = (this.transactionsState[walletCur] && this.transactionsState[walletCur].cl)
+            || null;
           if (cl) {
             const data = e.jsonData.wallet.transaction;
-            const transaction = cl.get(data.ID);
+            const transaction = cl.get(data.transactionID);
 
             if (transaction) {
               // existing transaction has been confirmed
@@ -175,10 +172,11 @@ export default class extends BaseModal {
               // of the socket coming in before the AJAX call returns.
               const timeout = setTimeout(() => {
                 if (this.activeCoin === walletCur) {
-                  if (!cl.get(e.jsonData.wallet.transaction.ID)) {
+                  if (!cl.get(e.jsonData.wallet.transaction.transactionID)) {
                     // A new transaction for the active coin - rather than just add it to the
                     // collection causing a page jump, we'll utilize the new transaction pop-up.
-                    this.transactionsVw.newTransactionsTXs.add(e.jsonData.wallet.transaction.ID);
+                    this.transactionsVw.newTransactionsTXs
+                      .add(e.jsonData.wallet.transaction.transactionID);
                     this.transactionsVw.showNewTransactionPopup();
                   }
                 } else {
@@ -224,9 +222,12 @@ export default class extends BaseModal {
       }
     });
 
-    app.walletBalances.forEach(balanceMd => {
-      this.listenTo(balanceMd, 'change:confirmed change:unconfirmed',
-        _.debounce(this.onBalanceChange, 1));
+    app.walletBalances.forEach((balanceMd) => {
+      this.listenTo(
+        balanceMd,
+        'change:confirmed change:unconfirmed',
+        _.debounce(this.onBalanceChange, 1),
+      );
     });
 
     if (initialActiveCoin) this.fetchAddress();
@@ -252,10 +253,10 @@ export default class extends BaseModal {
       });
     }
 
-    this.navCoins = this.navCoins.map(navCoin => ({
+    this.navCoins = this.navCoins.map((navCoin) => ({
       ...navCoin,
-      balance: md.id === navCoin.code ?
-        md.get('confirmed') : navCoin.balance,
+      balance: md.id === navCoin.code
+        ? md.get('confirmed') : navCoin.balance,
     }));
 
     this.coinNav.setState({ coins: this.navCoins });
@@ -300,10 +301,10 @@ export default class extends BaseModal {
       });
 
       if (
-        this.sendModeOn &&
-        !(
-          app.walletBalances.get(coin) &&
-            app.walletBalances.get(coin).get('confirmed')
+        this.sendModeOn
+        && !(
+          app.walletBalances.get(coin)
+            && app.walletBalances.get(coin).get('confirmed')
         )
       ) {
         this.sendModeOn = false;
@@ -332,18 +333,17 @@ export default class extends BaseModal {
   }
 
   get coinStatsState() {
-    const activeCoin = this.activeCoin;
-    const balance = app && app.walletBalances &&
-      app.walletBalances.get(activeCoin);
+    const { activeCoin } = this;
+    const balance = app && app.walletBalances
+      && app.walletBalances.get(activeCoin);
 
     return {
       cryptoCur: ensureMainnetCode(activeCoin),
-      displayCur: app && app.settings && app.settings.get('localCurrency') ||
-        'USD',
+      displayCur: (app && app.settings && app.settings.get('localCurrency')) || 'USD',
       confirmed: balance && balance.get('confirmed'),
       unconfirmed: balance && balance.get('unconfirmed'),
-      transactionCount: this.transactionsState && this.transactionsState[activeCoin] ?
-        this.transactionsState[activeCoin].countAtFirstFetch : undefined,
+      transactionCount: this.transactionsState && this.transactionsState[activeCoin]
+        ? this.transactionsState[activeCoin].countAtFirstFetch : undefined,
     };
   }
 
@@ -392,7 +392,7 @@ export default class extends BaseModal {
 
     if (this.addressFetches[coinType]) {
       const pendingFetch = this.addressFetches[coinType]
-        .find(xhr => xhr.state() === 'pending');
+        .find((xhr) => xhr.state() === 'pending');
       if (pendingFetch) return pendingFetch;
     }
 
@@ -414,7 +414,7 @@ export default class extends BaseModal {
             address: data.address,
           });
         }
-      }).fail(xhr => {
+      }).fail((xhr) => {
         if (xhr.statusText === 'abort') return;
         this.needAddress[coinType] = true;
         if (receiveMoneyVw && !receiveMoneyVw.isRemoved()) {
@@ -433,8 +433,8 @@ export default class extends BaseModal {
   getCountAtFirstFetch(coinType = this.activeCoin) {
     this.checkCoinType(coinType);
 
-    return this.transactionsState[coinType] &&
-      this.transactionsState[coinType].countAtFirstFetch;
+    return this.transactionsState[coinType]
+      && this.transactionsState[coinType].countAtFirstFetch;
   }
 
   setCountAtFirstFetch(count, coinType = this.activeCoin) {
@@ -444,8 +444,8 @@ export default class extends BaseModal {
 
     this.checkCoinType(coinType);
 
-    if (!this.transactionsState[coinType] ||
-      this.transactionsState[coinType].countAtFirstFetch !== count) {
+    if (!this.transactionsState[coinType]
+      || this.transactionsState[coinType].countAtFirstFetch !== count) {
       this.transactionsState[coinType] = this.transactionsState[coinType] || {};
       this.transactionsState[coinType].countAtFirstFetch = count;
 
@@ -461,7 +461,7 @@ export default class extends BaseModal {
 
     this.setCountAtFirstFetch(
       typeof curCount === 'number' ? curCount + 1 : 1,
-      coinType
+      coinType,
     );
   }
 
@@ -476,20 +476,18 @@ export default class extends BaseModal {
 
   remove() {
     Object.keys(this.addressFetches)
-      .forEach(coinType => {
-        this.addressFetches[coinType].forEach(fetch => fetch.abort());
+      .forEach((coinType) => {
+        this.addressFetches[coinType].forEach((fetch) => fetch.abort());
       });
     Object.keys(this.transactionsState)
-      .forEach(coinType => {
-        if (this.transactionsState[coinType] &&
-          typeof this.transactionsState[coinType].bumpFeeAttempts === 'object') {
+      .forEach((coinType) => {
+        if (this.transactionsState[coinType]
+          && typeof this.transactionsState[coinType].bumpFeeAttempts === 'object') {
           Object.keys(this.transactionsState[coinType].bumpFeeAttempts)
-            .forEach(txId =>
-              this.transactionsState[coinType]
-                .bumpFeeAttempts[txId].abort());
+            .forEach((txId) => this.transactionsState[coinType].bumpFeeAttempts[txId].abort());
         }
       });
-    this.popInTimeouts.forEach(timeout => timeout.remove());
+    this.popInTimeouts.forEach((timeout) => timeout.remove());
     super.remove();
   }
 
@@ -516,19 +514,18 @@ export default class extends BaseModal {
   }
 
   renderTransactionsView() {
-    const activeCoin = this.activeCoin;
+    const { activeCoin } = this;
     const transactionsState = this.transactionsState[activeCoin] || {};
     let cl = transactionsState && transactionsState.cl;
 
     if (!cl) {
-      cl = transactionsState.cl =
-        new Transactions([], { coinType: activeCoin });
+      cl = transactionsState.cl = new Transactions([], { coinType: activeCoin });
 
       this.coinStats.setState({ transactionCount: undefined });
 
       this.listenToOnce(cl, 'sync', (md, response, options) => {
         if (options && options.xhr) {
-          options.xhr.done(data => {
+          options.xhr.done((data) => {
             transactionsState.needsFetch = false;
             this.setCountAtFirstFetch(data.count, activeCoin);
           });
@@ -538,7 +535,7 @@ export default class extends BaseModal {
       this.listenToOnce(cl, 'reset', () => {
         this.listenToOnce(cl, 'sync', (md, response, options) => {
           if (options && options.xhr) {
-            options.xhr.done(data => {
+            options.xhr.done((data) => {
               this.setCountAtFirstFetch(data.count, activeCoin);
             });
           }
@@ -558,13 +555,12 @@ export default class extends BaseModal {
     this.getCachedEl('.js-transactionsContainer')
       .html(this.transactionsVw.render().el);
 
-    this.listenTo(this.transactionsVw, 'bumpFeeAttempt', e => {
-      transactionsState.bumpFeeAttempts =
-        transactionsState.bumpFeeAttempts || {};
+    this.listenTo(this.transactionsVw, 'bumpFeeAttempt', (e) => {
+      transactionsState.bumpFeeAttempts = transactionsState.bumpFeeAttempts || {};
       transactionsState.bumpFeeAttempts[e.md.id] = e.xhr;
     });
 
-    this.listenTo(this.transactionsVw, 'bumpFeeSuccess', e => {
+    this.listenTo(this.transactionsVw, 'bumpFeeSuccess', (e) => {
       app.walletBalances.get(activeCoin).set({
         confirmed: e.data.confirmed,
         unconfirmed: e.data.unconfirmed,
@@ -588,9 +584,9 @@ export default class extends BaseModal {
   }
 
   render() {
-    loadTemplate('modals/wallet/wallet.html', t => {
-      loadTemplate('walletIcon.svg', walletIconTmpl => {
-        loadTemplate('modals/wallet/cryptoListingsTeaser.html', cryptoTeaserT => {
+    loadTemplate('modals/wallet/wallet.html', (t) => {
+      loadTemplate('walletIcon.svg', (walletIconTmpl) => {
+        loadTemplate('modals/wallet/cryptoListingsTeaser.html', (cryptoTeaserT) => {
           this.$el.html(t({
             walletIconTmpl,
             cryptoTeaserHtml: cryptoTeaserT({

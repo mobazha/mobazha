@@ -26,6 +26,9 @@ type Init struct {
 func (x *Init) Execute(args []string) error {
 	if x.DataDir == "" {
 		x.DataDir = repo.DefaultHomeDir
+		if x.Testnet {
+			x.DataDir = repo.DefaultHomeDir + "-testnet"
+		}
 	}
 
 	if fsrepo.IsInitialized(x.DataDir) && !x.Force {

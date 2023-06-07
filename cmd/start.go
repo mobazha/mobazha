@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sort"
+	"syscall"
 
 	"github.com/cpacia/openbazaar3.0/core"
 	"github.com/cpacia/openbazaar3.0/core/coreiface"
@@ -20,36 +20,14 @@ import (
 
 var log = logging.MustGetLogger("CMD")
 
-func migrate() {
-	repoPath := repo.DefaultHomeDir
-
-	defaultConfigFile := filepath.Join(repoPath, "mobazha.conf")
-	if _, err := os.Stat(defaultConfigFile); err != nil {
-		oldConfigFile := filepath.Join(repoPath, "openbazaar.conf")
-		if _, err := os.Stat(oldConfigFile); err == nil {
-			os.Rename(oldConfigFile, defaultConfigFile)
-		}
-	}
-
-	defaultDBFile := filepath.Join(repoPath, "mobazha.db")
-	if _, err := os.Stat(defaultDBFile); err != nil {
-		oldDBFile := filepath.Join(repoPath, "openbazaar.db")
-		if _, err := os.Stat(oldDBFile); err == nil {
-			os.Rename(oldDBFile, defaultDBFile)
-		}
-	}
-}
-
 // Start is the main entry point for openbazaar-go. The options to this
-// command are the same as the OpenBazaar node config options.
+// command are the same as the Mobazha node config options.
 type Start struct {
 	repo.Config
 }
 
-// Execute starts the OpenBazaar node.
+// Execute starts the Mobazha node.
 func (x *Start) Execute(args []string) error {
-	migrate()
-
 	cfg, err := repo.LoadConfig()
 	if err != nil {
 		return err
@@ -64,10 +42,10 @@ func (x *Start) Execute(args []string) error {
 	printSwarmAddrs(n.IPFSNode())
 
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, os.Kill)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	for sig := range c {
-		if sig == os.Kill {
-			log.Info("OpenBazaar killed")
+		if sig == syscall.SIGTERM {
+			log.Info("Mobazha killed")
 			os.Exit(1)
 		}
 		switch n.Stop(false) {
@@ -76,12 +54,12 @@ func (x *Start) Execute(args []string) error {
 			if err != nil {
 				return err
 			}
-			log.Info("OpenBazaar is currently publishing. Press ctl+c again to force shutdown.")
+			log.Info("Mobazha is currently publishing. Press ctl+c again to force shutdown.")
 			select {
 			case <-c:
 			case <-sub.Out():
 			}
-			log.Info("OpenBazaar shutting down...")
+			log.Info("Mobazha shutting down...")
 			n.Stop(true)
 			os.Exit(1)
 		case coreiface.ErrIPFSDelayedShutdown:
@@ -94,10 +72,10 @@ func (x *Start) Execute(args []string) error {
 			case <-c:
 			case <-sub.Out():
 			}
-			log.Info("OpenBazaar shutting down...")
+			log.Info("Mobazha shutting down...")
 			os.Exit(1)
 		case nil:
-			log.Info("OpenBazaar shutting down...")
+			log.Info("Mobazha shutting down...")
 			os.Exit(1)
 		}
 	}

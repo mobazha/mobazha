@@ -1,6 +1,7 @@
-import LocalStorageSync from '../utils/lib/backboneLocalStorage';
+/* eslint-disable class-methods-use-this */
 import { Model } from 'backbone';
 import is from 'is_js';
+import LocalStorageSync from '../utils/lib/backboneLocalStorage';
 import { feeLevels } from '../utils/fees';
 import { getTranslationLangByCode } from '../data/languages';
 import app from '../app';
@@ -49,7 +50,7 @@ export default class extends Model {
       language,
       listingsGridViewType: 'grid',
       bitcoinUnit: 'BTC',
-      verifiedModsProvider: 'https://mobazha.info/api/moderator/verified',
+      verifiedModsProvider: `https://${process.env.TESTNET === 'true' ? 'console.' : ''}mobazha.info/api/moderator/verified`,
       verifiedModsProviderTor: 'http://my7nrnmkscxr32zo.onion/verified_moderators',
       dontShowTorExternalLinkWarning: false,
     };
@@ -66,7 +67,6 @@ export default class extends Model {
   get bitcoinUnits() {
     return ['BTC', 'MBTC', 'UBTC', 'SATOSHI'];
   }
-
 
   standardizedTranslatedLang() {
     return standardizedTranslatedLang(this.get('language'));
@@ -96,13 +96,11 @@ export default class extends Model {
     }
 
     if (is.not.url(attrs.verifiedModsProvider)) {
-      addError('verifiedModsProvider',
-        app.polyglot.t('localSettingsModelErrors.verifiedModsProvider'));
+      addError('verifiedModsProvider', app.polyglot.t('localSettingsModelErrors.verifiedModsProvider'));
     }
 
     if (typeof attrs.dontShowTorExternalLinkWarning !== 'boolean') {
-      addError('dontShowTorExternalLinkWarning',
-        'dontShowTorExternalLinkWarning must be provided as a boolean.');
+      addError('dontShowTorExternalLinkWarning', 'dontShowTorExternalLinkWarning must be provided as a boolean.');
     }
 
     if (Object.keys(errObj).length && errObj) return errObj;

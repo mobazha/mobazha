@@ -22,7 +22,7 @@ export default class extends BaseModel {
   defaults() {
     return {
       serverIp: 'localhost',
-      port: 5102,
+      port: process.env.TESTNET === 'true' ? 4002 : 5102,
       SSL: false,
       builtIn: false,
       useTor: false,

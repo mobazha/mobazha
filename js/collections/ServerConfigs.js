@@ -1,6 +1,7 @@
+/* eslint-disable class-methods-use-this */
 import { platform, homedir } from 'os';
-import app from '../app';
 import { Collection } from 'backbone';
+import app from '../app';
 import LocalStorageSync from '../utils/lib/backboneLocalStorage';
 import ServerConfig from '../models/ServerConfig';
 
@@ -33,18 +34,18 @@ export default class extends Collection {
   }
 
   set activeServer(md) {
-    if (!md instanceof ServerConfig) {
+    if (!(md instanceof ServerConfig)) {
       throw new Error('Please provide a model as a ServerConfig instance.');
     }
 
     if (this.models.indexOf(md) === -1) {
-      throw new Error('The provided model is not in this collection and must be to' +
-        ' set it as the active config.');
+      throw new Error('The provided model is not in this collection and must be to'
+        + ' set it as the active config.');
     }
 
     if (!md.id) {
-      throw new Error('The provided model must have an id in order to be set as the' +
-        ' active config.');
+      throw new Error('The provided model must have an id in order to be set as the'
+        + ' active config.');
     }
 
     if (this._active !== md.id) {
@@ -97,7 +98,7 @@ export default class extends Collection {
   migrate() {
     let builtInCount = 0;
 
-    this.forEach(serverConfig => {
+    this.forEach((serverConfig) => {
       // Migrate any old "built in" configurations containing the 'default' flag to
       // use the new 'builtIn' flag.
       const isDefault = serverConfig.get('default');
@@ -108,23 +109,31 @@ export default class extends Collection {
 
         if (!configSave) {
           // developer error or wonky data
-          console.error('There was an error migrating the server config, ' +
-            `${serverConfig.get('name')}, from the 'default' to the 'built-in' style.`);
+          console.error('There was an error migrating the server config, '
+            + `${serverConfig.get('name')}, from the 'default' to the 'built-in' style.`);
         }
       }
 
       if (serverConfig.get('builtIn')) {
-        if (serverConfig.get('port') == 4002) {
+        if (serverConfig.get('port') === 4002 && process.env.TESTNET !== 'true') {
           const configSave = serverConfig.save({ port: 5102 });
 
           if (!configSave) {
             // developer error or wonky data
-            console.error('There was an error migrating the server config, ' +
-              `${serverConfig.get('name')}, from the port 4002 to the 5102.`);
+            console.error('There was an error migrating the server config, '
+              + `${serverConfig.get('name')}, from the port 4002 to 5102.`);
+          }
+        } else if (serverConfig.get('port') === 5102 && process.env.TESTNET === 'true') {
+          const configSave = serverConfig.save({ port: 4002 });
+
+          if (!configSave) {
+            // developer error or wonky data
+            console.error('There was an error migrating the server config, '
+              + `${serverConfig.get('name')}, from the port 5102 to 4002.`);
           }
         }
 
-        builtInCount++;
+        builtInCount += 1;
       }
 
       // Migrate a walletCurrency to a dataDir.
@@ -143,8 +152,8 @@ export default class extends Collection {
 
               if (!configSave) {
                 // developer error or wonky data
-                console.error('There was an error migrating the dataDir for server ' +
-                  `config ${serverConfig.get('name')}.`);
+                console.error('There was an error migrating the dataDir for server '
+                  + `config ${serverConfig.get('name')}.`);
               }
             }
           }
@@ -164,8 +173,8 @@ export default class extends Collection {
 
       if (!configSave) {
         // developer error or wonky data
-        console.error('There was an error updating the name for built-in server ' +
-          `config ${builtIn.get('name')}.`);
+        console.error('There was an error updating the name for built-in server '
+          + `config ${builtIn.get('name')}.`);
       }
     }
   }

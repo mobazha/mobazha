@@ -215,7 +215,7 @@ function createWindow() {
     {
       label: 'Support',
       click() {
-        shell.openExternal('https://mobazha.com/support');
+        shell.openExternal('https://mobazha.org/support');
       },
     },
   ];
@@ -228,7 +228,7 @@ function createWindow() {
           if (updatesSupported) {
             checkForUpdates();
           } else {
-            shell.openExternal('https://mobazha.com/download/');
+            shell.openExternal('https://mobazha.org/download/');
           }
         },
       },

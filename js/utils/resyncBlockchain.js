@@ -1,8 +1,8 @@
 import $ from 'jquery';
+import { Events } from 'backbone';
 import { getServer } from './serverConnect';
 import { supportedWalletCurs } from '../data/walletCurrencies';
 import { openSimpleMessage } from '../views/modals/SimpleMessage';
-import { Events } from 'backbone';
 import app from '../app';
 
 const events = {
@@ -28,10 +28,10 @@ function __isResyncAvailable(coinType) {
 
   if (server) {
     let lastBlockchainResync = server.get('lastBlockchainResync');
-    lastBlockchainResync = typeof lastBlockchainResync === 'object' ?
-      lastBlockchainResync[coinType] : null;
-    if (lastBlockchainResync && typeof lastBlockchainResync === 'number' &&
-      (Date.now() - (new Date(lastBlockchainResync).getTime())) < resyncInactiveTime) {
+    lastBlockchainResync = typeof lastBlockchainResync === 'object'
+      ? lastBlockchainResync[coinType] : null;
+    if (lastBlockchainResync && typeof lastBlockchainResync === 'number'
+      && (Date.now() - (new Date(lastBlockchainResync).getTime())) < resyncInactiveTime) {
       return false;
     }
   } else {
@@ -67,8 +67,8 @@ function setlastResyncExpiresTimeouts(coinType) {
   if (!server) return;
 
   let lastBlockchainResync = server.get('lastBlockchainResync');
-  lastBlockchainResync = typeof lastBlockchainResync === 'object' ?
-    lastBlockchainResync[coinType] : null;
+  lastBlockchainResync = typeof lastBlockchainResync === 'object'
+    ? lastBlockchainResync[coinType] : null;
 
   if (typeof lastBlockchainResync === 'number') {
     const fromNow = (new Date(lastBlockchainResync)).getTime() + resyncInactiveTime - Date.now();
@@ -87,18 +87,18 @@ export function init() {
   server = getServer();
 
   if (!server) {
-    throw new Error('This module must be initialized when an active server connection ' +
-      'is present');
+    throw new Error('This module must be initialized when an active server connection '
+      + 'is present');
   }
 
   if (typeof app.serverConfig !== 'object') {
-    throw new Error('This module requires the server config to be set on the app object. ' +
-      'Ensure that init is not called before that point.');
+    throw new Error('This module requires the server config to be set on the app object. '
+      + 'Ensure that init is not called before that point.');
   }
 
   const walletCurCodes = supportedWalletCurs();
 
-  walletCurCodes.forEach(cur => {
+  walletCurCodes.forEach((cur) => {
     setResyncAvailable(cur);
     setlastResyncExpiresTimeouts(cur);
   });
@@ -144,47 +144,46 @@ export default function resyncBlockchain(coinType) {
 
   const _server = server;
 
-  const post = resyncPosts[coinType] =
-    $.post(app.getServerUrl(`wallet/resyncblockchain/${coinType}`))
-      .fail((xhr) => {
-        if (xhr.statusText === 'abort') return;
-        const failReason = xhr.responseJSON && xhr.responseJSON.reason || '';
-        openSimpleMessage(
-          app.polyglot.t('resyncFail'),
-          failReason);
-        events.trigger('resyncFail', {
-          xhr: post,
-          coinType,
-        });
-      })
-      .done(() => {
-        events.trigger('resyncComplete', {
-          xhr: post,
-          coinType,
-        });
-
-        if (_server) {
-          let lastBlockchainResync = _server.get('lastBlockchainResync');
-          lastBlockchainResync = typeof lastBlockchainResync === 'object' ?
-            lastBlockchainResync : {};
-          lastBlockchainResync[coinType] = (new Date()).getTime();
-          const serverSave = _server.save({ lastBlockchainResync });
-
-          if (serverSave) {
-            serverSave.done(() => {
-              if (server === _server) {
-                setResyncAvailable(coinType);
-                Object.keys(lastResyncExpiresTimeouts)
-                  .forEach(cur => setlastResyncExpiresTimeouts(cur));
-              }
-            });
-          } else {
-            console.error('There was an error updating the local server config with the ' +
-              'last resync time.');
-            console.dir(_server.validationError);
-          }
-        }
+  const post = $.post(app.getServerUrl(`wallet/resyncblockchain/${coinType}`))
+    .fail((xhr) => {
+      if (xhr.statusText === 'abort') return;
+      const failReason = (xhr.responseJSON && xhr.responseJSON.reason) || '';
+      openSimpleMessage(app.polyglot.t('resyncFail'), failReason);
+      events.trigger('resyncFail', {
+        xhr: post,
+        coinType,
       });
+    })
+    .done(() => {
+      events.trigger('resyncComplete', {
+        xhr: post,
+        coinType,
+      });
+
+      if (_server) {
+        let lastBlockchainResync = _server.get('lastBlockchainResync');
+        lastBlockchainResync = typeof lastBlockchainResync === 'object'
+          ? lastBlockchainResync : {};
+        lastBlockchainResync[coinType] = (new Date()).getTime();
+        const serverSave = _server.save({ lastBlockchainResync });
+
+        if (serverSave) {
+          serverSave.done(() => {
+            if (server === _server) {
+              setResyncAvailable(coinType);
+              Object.keys(lastResyncExpiresTimeouts)
+                .forEach((cur) => setlastResyncExpiresTimeouts(cur));
+            }
+          });
+        } else {
+          console.error('There was an error updating the local server config with the '
+            + 'last resync time.');
+          console.dir(_server.validationError);
+        }
+      }
+    });
+
+  resyncPosts[coinType] = post;
 
   events.trigger('resyncing', {
     xhr: post,
@@ -198,6 +197,5 @@ export function isResyncingBlockchain(coinType) {
   ensureInitialized();
   checkCoinType(coinType);
 
-  return resyncPosts[coinType] &&
-    resyncPosts[coinType].state() === 'pending' || false;
+  return (resyncPosts[coinType] && resyncPosts[coinType].state() === 'pending') || false;
 }

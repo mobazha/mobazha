@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import loadTemplate from '../../../../utils/loadTemplate';
 import BaseVw from '../../../baseVw';
 

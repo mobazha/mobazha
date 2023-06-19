@@ -1,5 +1,6 @@
-import app from '../../app';
+/* eslint-disable class-methods-use-this */
 import { Collection } from 'backbone';
+import app from '../../app';
 import Transaction from '../../models/wallet/Transaction';
 
 export default class extends Collection {

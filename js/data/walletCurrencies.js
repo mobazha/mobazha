@@ -93,13 +93,13 @@ let _currencies = [
     url: 'https://bitcoincash.org/',
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
-        ? `https://explorer.bitcoin.com/tbch/address/bchtest:${address}`
-        : `https://blockchair.com/bitcoin-cash/address/${address}`
+        ? `https://testnet.bscscan.com/address/${address}`
+        : `https://bscscan.com/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
       isTestnet
-        ? `https://explorer.bitcoin.com/tbch/tx/${txid}`
-        : `https://blockchair.com/bitcoin-cash/transaction/${txid}`
+        ? `https://testnet.bscscan.com/tx/${txid}`
+        : `https://bscscan.com/tx/${txid}`
     ),
     supportsEscrowTimeout: true,
     blockTime: 1000 * 3,

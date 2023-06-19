@@ -1,13 +1,14 @@
+/* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import moment from 'moment';
 import { clipboard } from 'electron';
-import { setTimeagoInterval } from '../../../../utils/';
+import { setTimeagoInterval } from '../../../../utils';
 import { getFees } from '../../../../utils/fees';
 import {
   getCurrencyByCode as getWalletCurByCode,
 } from '../../../../data/walletCurrencies';
 import app from '../../../../app';
-import { openSimpleMessage } from '../../../modals/SimpleMessage';
+import { openSimpleMessage } from '../../SimpleMessage';
 import loadTemplate from '../../../../utils/loadTemplate';
 import BaseVw from '../../../baseVw';
 
@@ -111,22 +112,23 @@ export default class extends BaseVw {
       this.setState({
         retryInProgress: false,
       });
-    }).fail(failXhr => {
+    }).fail((failXhr) => {
       if (opts.showErrorOnFail) {
         if (failXhr.statusText === 'abort') return;
-        const failReason = failXhr.responseJSON && failXhr.responseJSON.reason || '';
+        const failReason = (failXhr.responseJSON && failXhr.responseJSON.reason) || '';
         openSimpleMessage(
           app.polyglot.t('wallet.transactions.transaction.retryFailDialogTitle'),
-          failReason);
+          failReason,
+        );
       }
     })
-    .done(data => {
-      this.trigger('bumpFeeSuccess', {
-        md: this.model,
-        data,
+      .done((data) => {
+        this.trigger('bumpFeeSuccess', {
+          md: this.model,
+          data,
+        });
+        this.model.set('feeBumped', true);
       });
-      this.model.set('feeBumped', true);
-    });
 
     if (opts.triggerBumpFeeAttempt) {
       this.trigger('bumpFeeAttempt', {
@@ -177,14 +179,14 @@ export default class extends BaseVw {
       fetchFeeFailed: false,
     });
 
-    getFees(this.options.coinType).done(fees => {
+    getFees(this.options.coinType).done((fees) => {
       if (this.isRemoved()) return;
       this.setState({
         fetchingEstimatedFee: false,
         // server doubles the fee when bumping
         estimatedFee: this.walletCur.feeBumpTransactionSize * fees.priority * 2,
       });
-    }).fail(reason => {
+    }).fail((reason) => {
       if (this.isRemoved()) return;
       this.setState({
         fetchingEstimatedFee: false,
@@ -202,8 +204,11 @@ export default class extends BaseVw {
   }
 
   get $retryPmtConfirmedBox() {
-    return this._$retryPmtConfirmed ||
-      (this._$retryPmtConfirmed = this.$('.js-retryPmtConfirmed'));
+    if (!this._$retryPmtConfirmed) {
+      this._$retryPmtConfirmed = this.$('.js-retryPmtConfirmed');
+    }
+
+    return this._$retryPmtConfirmed;
   }
 
   remove() {
@@ -223,7 +228,7 @@ export default class extends BaseVw {
         userCurrency: app.settings.get('localCurrency'),
         timeAgo: this.renderedTimeAgo,
         isTestnet: !!app.serverConfig.testnet,
-        walletBalance: walletBalance && walletBalance.toJSON() || null,
+        walletBalance: (walletBalance && walletBalance.toJSON()) || null,
         walletCur: this.walletCur,
         ...this._state,
       }));

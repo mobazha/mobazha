@@ -77,6 +77,35 @@ let _currencies = [
     externallyFundableOrders: true,
   },
   {
+    code: 'BNB',
+    testnetCode: 'BNB',
+    feeBumpTransactionSize: 154,
+    qrCodeText: (address) => {
+      let prefixedAddress = address;
+
+      const prefix = app.serverConfig.testnet ? 'bnbtest' : 'bnb';
+      prefixedAddress = address.startsWith(prefix)
+        ? prefixedAddress : `${prefix}:${address}`;
+
+      return prefixedAddress;
+    },
+    icon: 'imgs/cryptoIcons/BNB-icon.png',
+    url: 'https://bitcoincash.org/',
+    getBlockChainAddressUrl: (address, isTestnet) => (
+      isTestnet
+        ? `https://explorer.bitcoin.com/tbch/address/bchtest:${address}`
+        : `https://blockchair.com/bitcoin-cash/address/${address}`
+    ),
+    getBlockChainTxUrl: (txid, isTestnet) => (
+      isTestnet
+        ? `https://explorer.bitcoin.com/tbch/tx/${txid}`
+        : `https://blockchair.com/bitcoin-cash/transaction/${txid}`
+    ),
+    supportsEscrowTimeout: true,
+    blockTime: 1000 * 3,
+    externallyFundableOrders: true,
+  },
+  {
     code: 'CFX',
     testnetCode: 'CFX',
     qrCodeText: (address) => `conflux:${address}`,

@@ -20,6 +20,7 @@ const baseCurrencies = [
   'ARK',
   'BCH',
   'BCN',
+  'BNB',
   'BTCD',
   'BTG',
   'BTS',

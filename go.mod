@@ -11,7 +11,6 @@ replace (
 	github.com/cpacia/wallet-interface => /Users/mingfeng/go/src/github.com/cpacia/wallet-interface
 	github.com/ethereum/go-ethereum => github.com/bnb-chain/bsc v1.2.4
 	github.com/grpc-ecosystem/grpc-gateway/v2 => github.com/prysmaticlabs/grpc-gateway/v2 v2.3.1-0.20210702154020-550e1cd83ec1
-	github.com/hunterlong/tokenbalance => /Users/mingfeng/go/src/github.com/hunterlong/tokenbalance
 
 	github.com/mobazha/go-bscwallet => /Users/mingfeng/dev/openbazaar/bnb_example
 	github.com/tendermint/tendermint => github.com/bnb-chain/tendermint v0.31.15
@@ -156,7 +155,6 @@ require (
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/holiman/uint256 v1.2.2 // indirect
 	github.com/huin/goupnp v1.2.0 // indirect
-	github.com/hunterlong/tokenbalance v0.0.11 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitfield v1.1.0 // indirect
 	github.com/ipfs/go-block-format v0.1.2 // indirect
@@ -241,6 +239,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mobazha/go-bscwallet v0.0.0-20230616024257-82b2f0fcd30d // indirect
 	github.com/mobazha/go-ethereum-hdwallet v0.1.5 // indirect
+	github.com/mobazha/tokenbalance v0.0.0-20230620113229-03b0e9c9836c // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect

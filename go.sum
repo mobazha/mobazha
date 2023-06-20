@@ -2682,6 +2682,8 @@ github.com/mitchellh/reflectwalk v1.0.0/go.mod h1:mSTlrgnPZtwu0c4WaC2kGObEpuNDbx
 github.com/mitchellh/reflectwalk v1.0.1/go.mod h1:mSTlrgnPZtwu0c4WaC2kGObEpuNDbx0jmZXqmk4esnw=
 github.com/mobazha/go-ethereum-hdwallet v0.1.5 h1:tZJs14gZAnE7fP3V3cpNSRoRuf4Ru73fv3oa3SQ3Axk=
 github.com/mobazha/go-ethereum-hdwallet v0.1.5/go.mod h1:Kfx8z54YXsxHWqLEyME581g4BB68aRgFbSm47Mg5+TQ=
+github.com/mobazha/tokenbalance v0.0.0-20230620113229-03b0e9c9836c h1:/2pKvq09SLrh6epEcraMM4+Hs4tCaTKUAfIurHCQ1CQ=
+github.com/mobazha/tokenbalance v0.0.0-20230620113229-03b0e9c9836c/go.mod h1:dsyRsfG5QHb0SOfpzd75qltjWwtIzWs07qWEol928Nc=
 github.com/moby/buildkit v0.8.1/go.mod h1:/kyU1hKy/aYCuP39GZA9MaKioovHku57N6cqlKZIaiQ=
 github.com/moby/buildkit v0.10.3/go.mod h1:jxeOuly98l9gWHai0Ojrbnczrk/rf+o9/JqNhY+UCSo=
 github.com/moby/buildkit v0.10.4/go.mod h1:Yajz9vt1Zw5q9Pp4pdb3TCSUXJBIroIQGQ3TTs/sLug=

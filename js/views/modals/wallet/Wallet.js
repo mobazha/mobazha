@@ -187,9 +187,7 @@ export default class extends BaseModal {
               this.popInTimeouts.push(timeout);
             }
 
-            if (!transaction) {
-              this.incrementCountAtFirstFetch(walletCur);
-            }
+            this.updateTransactionsCount(walletCur);
           }
 
           if (!e.jsonData.wallet.transaction.height) {
@@ -455,14 +453,16 @@ export default class extends BaseModal {
     }
   }
 
-  incrementCountAtFirstFetch(coinType = this.activeCoin) {
+  updateTransactionsCount(coinType = this.activeCoin) {
     this.checkCoinType(coinType);
-    const curCount = this.getCountAtFirstFetch(coinType);
 
-    this.setCountAtFirstFetch(
-      typeof curCount === 'number' ? curCount + 1 : 1,
-      coinType,
-    );
+    const transactionsState = this.transactionsState[coinType] || {};
+    const cl = transactionsState && transactionsState.cl;
+    const newTxs = this.transactionsVw ? this.transactionsVw.newTransactionsTXs : {};
+
+    const count = (cl ? cl.length : 0) + (newTxs ? newTxs.size : 0);
+
+    this.setCountAtFirstFetch(count, coinType);
   }
 
   open(...args) {
@@ -519,7 +519,8 @@ export default class extends BaseModal {
     let cl = transactionsState && transactionsState.cl;
 
     if (!cl) {
-      cl = transactionsState.cl = new Transactions([], { coinType: activeCoin });
+      cl = new Transactions([], { coinType: activeCoin });
+      transactionsState.cl = cl;
 
       this.coinStats.setState({ transactionCount: undefined });
 
@@ -577,7 +578,7 @@ export default class extends BaseModal {
         at: 0,
       });
 
-      this.incrementCountAtFirstFetch(activeCoin);
+      this.updateTransactionsCount(activeCoin);
     });
 
     this.transactionsState[activeCoin] = transactionsState;

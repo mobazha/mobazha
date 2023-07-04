@@ -8,7 +8,7 @@ replace (
 	github.com/cpacia/go-store-and-forward => /Users/mingfeng/go/src/github.com/cpacia/go-store-and-forward
 	github.com/cpacia/multiwallet => /Users/mingfeng/go/src/github.com/cpacia/multiwallet
 	github.com/cpacia/proxyclient => /Users/mingfeng/go/src/github.com/cpacia/proxyclient
-	github.com/cpacia/wallet-interface => /Users/mingfeng/go/src/github.com/cpacia/wallet-interface
+	github.com/mobazha/wallet-interface => /Users/mingfeng/go/src/github.com/cpacia/wallet-interface
 	github.com/ethereum/go-ethereum => github.com/bnb-chain/bsc v1.2.4
 	github.com/grpc-ecosystem/grpc-gateway/v2 => github.com/prysmaticlabs/grpc-gateway/v2 v2.3.1-0.20210702154020-550e1cd83ec1
 
@@ -24,7 +24,7 @@ require (
 	github.com/cpacia/go-store-and-forward v0.0.0-00010101000000-000000000000
 	github.com/cpacia/multiwallet v0.0.0-00010101000000-000000000000
 	github.com/cpacia/proxyclient v0.0.0-20200503052644-89c0e5cb8be7
-	github.com/cpacia/wallet-interface v0.0.0-20200604163334-1be951c8f4bd
+	github.com/mobazha/wallet-interface v0.0.0-20200604163334-1be951c8f4bd
 	github.com/cretz/bine v0.2.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/evanphx/json-patch/v5 v5.6.0

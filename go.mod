@@ -6,13 +6,13 @@ replace (
 	github.com/cometbft/cometbft => github.com/bnb-chain/greenfield-tendermint v0.0.0-20230417032003-4cda1f296fb2
 	github.com/cpacia/go-onion-transport => /Users/mingfeng/go/src/github.com/cpacia/go-onion-transport
 	github.com/cpacia/go-store-and-forward => /Users/mingfeng/go/src/github.com/cpacia/go-store-and-forward
-	github.com/cpacia/multiwallet => /Users/mingfeng/go/src/github.com/cpacia/multiwallet
 	github.com/cpacia/proxyclient => /Users/mingfeng/go/src/github.com/cpacia/proxyclient
-	github.com/mobazha/wallet-interface => /Users/mingfeng/go/src/github.com/cpacia/wallet-interface
 	github.com/ethereum/go-ethereum => github.com/bnb-chain/bsc v1.2.4
 	github.com/grpc-ecosystem/grpc-gateway/v2 => github.com/prysmaticlabs/grpc-gateway/v2 v2.3.1-0.20210702154020-550e1cd83ec1
 
 	github.com/mobazha/go-bscwallet => /Users/mingfeng/dev/openbazaar/bnb_example
+	github.com/mobazha/multiwallet => /Users/mingfeng/go/src/github.com/cpacia/multiwallet
+	github.com/mobazha/wallet-interface => /Users/mingfeng/go/src/github.com/cpacia/wallet-interface
 	github.com/tendermint/tendermint => github.com/bnb-chain/tendermint v0.31.15
 )
 
@@ -22,11 +22,10 @@ require (
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cpacia/go-onion-transport v0.0.0-00010101000000-000000000000
 	github.com/cpacia/go-store-and-forward v0.0.0-00010101000000-000000000000
-	github.com/cpacia/multiwallet v0.0.0-00010101000000-000000000000
 	github.com/cpacia/proxyclient v0.0.0-20200503052644-89c0e5cb8be7
-	github.com/mobazha/wallet-interface v0.0.0-20200604163334-1be951c8f4bd
 	github.com/cretz/bine v0.2.0
 	github.com/disintegration/imaging v1.6.2
+	github.com/ethereum/go-ethereum v1.12.0
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/fatih/color v1.13.0
 	github.com/gogo/protobuf v1.3.2
@@ -48,6 +47,8 @@ require (
 	github.com/libp2p/go-libp2p-testing v0.12.0
 	github.com/libp2p/go-msgio v0.3.0
 	github.com/microcosm-cc/bluemonday v1.0.21
+	github.com/mobazha/multiwallet v0.0.0-00010101000000-000000000000
+	github.com/mobazha/wallet-interface v0.0.0-20200604163334-1be951c8f4bd
 	github.com/multiformats/go-multiaddr v0.9.0
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
@@ -112,7 +113,6 @@ require (
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/elgris/jsondiff v0.0.0-20160530203242-765b5c24c302 // indirect
 	github.com/etcd-io/bbolt v1.3.3 // indirect
-	github.com/ethereum/go-ethereum v1.12.0 // indirect
 	github.com/facebookgo/atomicfile v0.0.0-20151019160806-2de1f203e7d5 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/ferranbt/fastssz v0.0.0-20210905181407-59cf6761a7d5 // indirect
@@ -237,6 +237,7 @@ require (
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
+	github.com/mobazha/ethereum-watcher v0.0.0-20230629131725-e2287c735a52 // indirect
 	github.com/mobazha/go-bscwallet v0.0.0-20230616024257-82b2f0fcd30d // indirect
 	github.com/mobazha/go-ethereum-hdwallet v0.1.5 // indirect
 	github.com/mobazha/tokenbalance v0.0.0-20230620113229-03b0e9c9836c // indirect
@@ -306,6 +307,7 @@ require (
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
 	github.com/whyrusleeping/go-sysinfo v0.0.0-20190219211824-4a357d4b90b1 // indirect
 	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7 // indirect
+	github.com/wk8/go-ordered-map v1.0.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	github.com/zquestz/grab v0.0.0-20190224022517-abcee96e61b1 // indirect

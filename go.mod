@@ -25,31 +25,30 @@ require (
 	github.com/cpacia/proxyclient v0.0.0-20200503052644-89c0e5cb8be7
 	github.com/cretz/bine v0.2.0
 	github.com/disintegration/imaging v1.6.2
-	github.com/ethereum/go-ethereum v1.12.0
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/fatih/color v1.13.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/gosimple/slug v1.13.1
-	github.com/ipfs/boxo v0.10.0
+	github.com/ipfs/boxo v0.10.2
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-ipld-format v0.5.0
 	github.com/ipfs/go-log v1.0.5
-	github.com/ipfs/kubo v0.20.1-0.20230615153534-9298e31bbaa6
+	github.com/ipfs/kubo v0.21.0
 	github.com/ipsn/go-libtor v1.0.380
 	github.com/jarcoal/httpmock v1.2.0
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
 	github.com/jessevdk/go-flags v1.5.0
-	github.com/libp2p/go-libp2p v0.27.6
-	github.com/libp2p/go-libp2p-kad-dht v0.24.1
+	github.com/libp2p/go-libp2p v0.27.7
+	github.com/libp2p/go-libp2p-kad-dht v0.24.2
 	github.com/libp2p/go-libp2p-pubsub v0.9.3
 	github.com/libp2p/go-libp2p-testing v0.12.0
 	github.com/libp2p/go-msgio v0.3.0
 	github.com/microcosm-cc/bluemonday v1.0.21
 	github.com/mobazha/multiwallet v0.0.0-00010101000000-000000000000
 	github.com/mobazha/wallet-interface v0.0.0-20200604163334-1be951c8f4bd
-	github.com/multiformats/go-multiaddr v0.9.0
+	github.com/multiformats/go-multiaddr v0.10.0
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/natefinch/lumberjack v2.0.0+incompatible
@@ -58,9 +57,9 @@ require (
 	github.com/teserakt-io/golang-ed25519 v0.0.0-20210104091850-3888c087a4c8
 	github.com/tyler-smith/go-bip39 v1.1.0
 	go.uber.org/fx v1.19.3
-	golang.org/x/crypto v0.10.0
+	golang.org/x/crypto v0.11.0
 	golang.org/x/net v0.11.0
-	google.golang.org/protobuf v1.30.0
+	google.golang.org/protobuf v1.31.0
 	gorm.io/driver/sqlite v1.4.4
 	gorm.io/gorm v1.24.5
 )
@@ -113,6 +112,7 @@ require (
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/elgris/jsondiff v0.0.0-20160530203242-765b5c24c302 // indirect
 	github.com/etcd-io/bbolt v1.3.3 // indirect
+	github.com/ethereum/go-ethereum v1.12.0 // indirect
 	github.com/facebookgo/atomicfile v0.0.0-20151019160806-2de1f203e7d5 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/ferranbt/fastssz v0.0.0-20210905181407-59cf6761a7d5 // indirect
@@ -330,13 +330,13 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
-	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
+	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df // indirect
 	golang.org/x/image v0.6.0 // indirect
-	golang.org/x/mod v0.10.0 // indirect
+	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sync v0.2.0 // indirect
-	golang.org/x/sys v0.9.0 // indirect
-	golang.org/x/text v0.10.0 // indirect
+	golang.org/x/sys v0.10.0 // indirect
+	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/tools v0.9.1 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	gonum.org/v1/gonum v0.13.0 // indirect

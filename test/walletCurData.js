@@ -1,7 +1,7 @@
 // Multiple test depend on this data. If you modify this file, please ensure
 // you're not breaking other tests.
 
-export const walletCurs = ['BCH', 'BTC', 'ETH', 'LTC', 'ZEC', 'CFX', 'BNB'];
+export const walletCurs = ['BCH', 'BTC', 'ETH', 'LTC', 'ZEC', 'CFX', 'BNB', 'USDT', 'USDC'];
 
 export const walletCurDef = {
   AED: {
@@ -73,5 +73,19 @@ export const walletCurDef = {
     divisibility: 18,
     name: 'Binance Coin',
     testnetCode: 'BNB',
+  },
+  USDT: {
+    code: 'USDT',
+    currencyType: 'crypto',
+    divisibility: 6,
+    name: 'Tether',
+    testnetCode: 'USDT',
+  },
+  USDC: {
+    code: 'USDC',
+    currencyType: 'crypto',
+    divisibility: 6,
+    name: 'USD Coin',
+    testnetCode: 'USDC',
   },
 };

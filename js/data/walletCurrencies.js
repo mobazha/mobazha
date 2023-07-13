@@ -164,6 +164,35 @@ let _currencies = [
     externallyFundableOrders: true,
   },
   {
+    code: 'MBZ',
+    testnetCode: 'MBZ',
+    feeBumpTransactionSize: 154,
+    qrCodeText: (address) => {
+      let prefixedAddress = address;
+
+      const prefix = app.serverConfig.testnet ? 'bnbtest' : 'bnb';
+      prefixedAddress = address.startsWith(prefix)
+        ? prefixedAddress : `${prefix}:${address}`;
+
+      return prefixedAddress;
+    },
+    icon: 'imgs/cryptoIcons/MBZ-icon.png',
+    url: 'https://bitcoincash.org/',
+    getBlockChainAddressUrl: (address, isTestnet) => (
+      isTestnet
+        ? `https://testnet.bscscan.com/address/${address}`
+        : `https://bscscan.com/address/${address}`
+    ),
+    getBlockChainTxUrl: (txid, isTestnet) => (
+      isTestnet
+        ? `https://testnet.bscscan.com/tx/${txid}`
+        : `https://bscscan.com/tx/${txid}`
+    ),
+    supportsEscrowTimeout: true,
+    blockTime: 1000 * 3,
+    externallyFundableOrders: true,
+  },
+  {
     code: 'CFX',
     testnetCode: 'CFX',
     qrCodeText: (address) => `conflux:${address}`,

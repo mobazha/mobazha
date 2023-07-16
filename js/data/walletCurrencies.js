@@ -106,8 +106,8 @@ let _currencies = [
     externallyFundableOrders: true,
   },
   {
-    code: 'USDT',
-    testnetCode: 'USDT',
+    code: 'BNBUSDT',
+    testnetCode: 'BNBUSDT',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
       let prefixedAddress = address;
@@ -135,8 +135,8 @@ let _currencies = [
     externallyFundableOrders: true,
   },
   {
-    code: 'USDC',
-    testnetCode: 'USDC',
+    code: 'BNBUSDC',
+    testnetCode: 'BNBUSDC',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
       let prefixedAddress = address;
@@ -164,8 +164,124 @@ let _currencies = [
     externallyFundableOrders: true,
   },
   {
-    code: 'MBZ',
-    testnetCode: 'MBZ',
+    code: 'BNBMBZ',
+    testnetCode: 'BNBMBZ',
+    feeBumpTransactionSize: 154,
+    qrCodeText: (address) => {
+      let prefixedAddress = address;
+
+      const prefix = app.serverConfig.testnet ? 'bnbtest' : 'bnb';
+      prefixedAddress = address.startsWith(prefix)
+        ? prefixedAddress : `${prefix}:${address}`;
+
+      return prefixedAddress;
+    },
+    icon: 'imgs/cryptoIcons/MBZ-icon.png',
+    url: 'https://bitcoincash.org/',
+    getBlockChainAddressUrl: (address, isTestnet) => (
+      isTestnet
+        ? `https://testnet.bscscan.com/address/${address}`
+        : `https://bscscan.com/address/${address}`
+    ),
+    getBlockChainTxUrl: (txid, isTestnet) => (
+      isTestnet
+        ? `https://testnet.bscscan.com/tx/${txid}`
+        : `https://bscscan.com/tx/${txid}`
+    ),
+    supportsEscrowTimeout: true,
+    blockTime: 1000 * 3,
+    externallyFundableOrders: true,
+  },
+  {
+    code: 'MATIC',
+    testnetCode: 'MATIC',
+    feeBumpTransactionSize: 154,
+    qrCodeText: (address) => {
+      let prefixedAddress = address;
+
+      const prefix = app.serverConfig.testnet ? 'bnbtest' : 'bnb';
+      prefixedAddress = address.startsWith(prefix)
+        ? prefixedAddress : `${prefix}:${address}`;
+
+      return prefixedAddress;
+    },
+    icon: 'imgs/cryptoIcons/MATIC-icon.png',
+    url: 'https://bitcoincash.org/',
+    getBlockChainAddressUrl: (address, isTestnet) => (
+      isTestnet
+        ? `https://testnet.bscscan.com/address/${address}`
+        : `https://bscscan.com/address/${address}`
+    ),
+    getBlockChainTxUrl: (txid, isTestnet) => (
+      isTestnet
+        ? `https://testnet.bscscan.com/tx/${txid}`
+        : `https://bscscan.com/tx/${txid}`
+    ),
+    supportsEscrowTimeout: true,
+    blockTime: 1000 * 3,
+    externallyFundableOrders: true,
+  },
+  {
+    code: 'MATICUSDT',
+    testnetCode: 'MATICUSDT',
+    feeBumpTransactionSize: 154,
+    qrCodeText: (address) => {
+      let prefixedAddress = address;
+
+      const prefix = app.serverConfig.testnet ? 'bnbtest' : 'bnb';
+      prefixedAddress = address.startsWith(prefix)
+        ? prefixedAddress : `${prefix}:${address}`;
+
+      return prefixedAddress;
+    },
+    icon: 'imgs/cryptoIcons/USDT-icon.png',
+    url: 'https://bitcoincash.org/',
+    getBlockChainAddressUrl: (address, isTestnet) => (
+      isTestnet
+        ? `https://testnet.bscscan.com/address/${address}`
+        : `https://bscscan.com/address/${address}`
+    ),
+    getBlockChainTxUrl: (txid, isTestnet) => (
+      isTestnet
+        ? `https://testnet.bscscan.com/tx/${txid}`
+        : `https://bscscan.com/tx/${txid}`
+    ),
+    supportsEscrowTimeout: true,
+    blockTime: 1000 * 3,
+    externallyFundableOrders: true,
+  },
+  {
+    code: 'MATICUSDC',
+    testnetCode: 'MATICUSDC',
+    feeBumpTransactionSize: 154,
+    qrCodeText: (address) => {
+      let prefixedAddress = address;
+
+      const prefix = app.serverConfig.testnet ? 'bnbtest' : 'bnb';
+      prefixedAddress = address.startsWith(prefix)
+        ? prefixedAddress : `${prefix}:${address}`;
+
+      return prefixedAddress;
+    },
+    icon: 'imgs/cryptoIcons/USDC-icon.png',
+    url: 'https://bitcoincash.org/',
+    getBlockChainAddressUrl: (address, isTestnet) => (
+      isTestnet
+        ? `https://testnet.bscscan.com/address/${address}`
+        : `https://bscscan.com/address/${address}`
+    ),
+    getBlockChainTxUrl: (txid, isTestnet) => (
+      isTestnet
+        ? `https://testnet.bscscan.com/tx/${txid}`
+        : `https://bscscan.com/tx/${txid}`
+    ),
+    supportsEscrowTimeout: true,
+    blockTime: 1000 * 3,
+    externallyFundableOrders: true,
+  },
+  {
+    code: 'MATICMBZ',
+    testnetCode: 'MATICMBZ',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
       let prefixedAddress = address;
@@ -293,7 +409,8 @@ function getIndexedCurrencies() {
 
   _indexedCurrencies = _currencies
     .reduce((indexedObj, currency) => {
-      indexedObj[currency.code] = indexedObj[currency.testnetCode] = { ...currency };
+      indexedObj[currency.testnetCode] = { ...currency };
+      indexedObj[currency.code] = { ...currency };
       return indexedObj;
     }, {});
 
@@ -345,8 +462,7 @@ export function init(walletCurs, walletCurDef) {
 }
 
 function getTranslatedCurrencies(
-  lang = app && app.localSettings
-    && app.localSettings.standardizedTranslatedLang() || 'en-US',
+  lang = (app && app.localSettings && app.localSettings.standardizedTranslatedLang()) || 'en-US',
   sort = true,
 ) {
   enforceInitialized();
@@ -432,7 +548,7 @@ export function getWalletCurs() {
  */
 export function supportedWalletCurs(options = {}) {
   const opts = {
-    testnet: app && app.serverConfig && app.serverConfig.testnet || false,
+    testnet: (app && app.serverConfig && app.serverConfig.testnet) || false,
     ...options,
   };
 

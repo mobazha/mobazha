@@ -209,13 +209,13 @@ let _currencies = [
     url: 'https://bitcoincash.org/',
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
-        ? `https://testnet.bscscan.com/address/${address}`
-        : `https://bscscan.com/address/${address}`
+        ? `https://mumbai.polygonscan.com/address/${address}`
+        : `https://polygonscan.com/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
       isTestnet
-        ? `https://testnet.bscscan.com/tx/${txid}`
-        : `https://bscscan.com/tx/${txid}`
+        ? `https://mumbai.polygonscan.com/tx/${txid}`
+        : `https://polygonscan.com/tx/${txid}`
     ),
     supportsEscrowTimeout: true,
     blockTime: 1000 * 3,
@@ -238,13 +238,13 @@ let _currencies = [
     url: 'https://bitcoincash.org/',
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
-        ? `https://testnet.bscscan.com/address/${address}`
-        : `https://bscscan.com/address/${address}`
+        ? `https://mumbai.polygonscan.com/address/${address}`
+        : `https://polygonscan.com/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
       isTestnet
-        ? `https://testnet.bscscan.com/tx/${txid}`
-        : `https://bscscan.com/tx/${txid}`
+        ? `https://mumbai.polygonscan.com/tx/${txid}`
+        : `https://polygonscan.com/tx/${txid}`
     ),
     supportsEscrowTimeout: true,
     blockTime: 1000 * 3,
@@ -267,13 +267,13 @@ let _currencies = [
     url: 'https://bitcoincash.org/',
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
-        ? `https://testnet.bscscan.com/address/${address}`
-        : `https://bscscan.com/address/${address}`
+        ? `https://mumbai.polygonscan.com/address/${address}`
+        : `https://polygonscan.com/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
       isTestnet
-        ? `https://testnet.bscscan.com/tx/${txid}`
-        : `https://bscscan.com/tx/${txid}`
+        ? `https://mumbai.polygonscan.com/tx/${txid}`
+        : `https://polygonscan.com/tx/${txid}`
     ),
     supportsEscrowTimeout: true,
     blockTime: 1000 * 3,
@@ -296,13 +296,13 @@ let _currencies = [
     url: 'https://bitcoincash.org/',
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
-        ? `https://testnet.bscscan.com/address/${address}`
-        : `https://bscscan.com/address/${address}`
+        ? `https://mumbai.polygonscan.com/address/${address}`
+        : `https://polygonscan.com/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
       isTestnet
-        ? `https://testnet.bscscan.com/tx/${txid}`
-        : `https://bscscan.com/tx/${txid}`
+        ? `https://mumbai.polygonscan.com/tx/${txid}`
+        : `https://polygonscan.com/tx/${txid}`
     ),
     supportsEscrowTimeout: true,
     blockTime: 1000 * 3,

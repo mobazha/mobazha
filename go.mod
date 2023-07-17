@@ -7,7 +7,7 @@ replace (
 	github.com/cpacia/go-store-and-forward => /Users/mingfeng/go/src/github.com/cpacia/go-store-and-forward
 	github.com/cpacia/proxyclient => /Users/mingfeng/go/src/github.com/cpacia/proxyclient
 
-	github.com/mobazha/go-bscwallet => /Users/mingfeng/dev/openbazaar/bnb_example
+	github.com/mobazha/go-ethwallet => /Users/mingfeng/dev/openbazaar/bnb_example
 	github.com/mobazha/multiwallet => /Users/mingfeng/go/src/github.com/cpacia/multiwallet
 	github.com/mobazha/wallet-interface => /Users/mingfeng/go/src/github.com/cpacia/wallet-interface
 )
@@ -43,7 +43,7 @@ require (
 	github.com/libp2p/go-msgio v0.3.0
 	github.com/microcosm-cc/bluemonday v1.0.21
 	github.com/mobazha/multiwallet v0.0.0-00010101000000-000000000000
-	github.com/mobazha/wallet-interface v0.0.0-20200604163334-1be951c8f4bd
+	github.com/mobazha/wallet-interface v1.0.0
 	github.com/multiformats/go-multiaddr v0.10.0
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
@@ -88,7 +88,6 @@ require (
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/crackcomm/go-gitignore v0.0.0-20170627025303-887ab5e44cc3 // indirect
 	github.com/cskr/pubsub v1.0.2 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/dchest/blake256 v1.1.0 // indirect
 	github.com/dchest/siphash v1.2.3 // indirect
@@ -137,7 +136,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.2 // indirect
-	github.com/holiman/uint256 v1.2.2 // indirect
+	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/huin/goupnp v1.2.0 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitfield v1.1.0 // indirect
@@ -219,9 +218,8 @@ require (
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mobazha/ethereum-watcher v0.0.0-20230629131725-e2287c735a52 // indirect
-	github.com/mobazha/go-bscwallet v0.0.0-20230616024257-82b2f0fcd30d // indirect
 	github.com/mobazha/go-ethereum-hdwallet v0.1.5 // indirect
-	github.com/mobazha/tokenbalance v0.0.0-20230620113229-03b0e9c9836c // indirect
+	github.com/mobazha/go-ethwallet v0.0.0-20230716015322-58c84d02d1b1 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect

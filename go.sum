@@ -682,8 +682,8 @@ github.com/hashicorp/mdns v1.0.0/go.mod h1:tL+uN++7HEJ6SQLQ2/p+z2pH24WQKWjBPkE0m
 github.com/hashicorp/memberlist v0.1.3/go.mod h1:ajVTdAv/9Im8oMAAj5G31PhhMCZJV2pPBoIllUwCN7I=
 github.com/hashicorp/serf v0.8.2/go.mod h1:6hOLApaqBFA1NXqRQAsxw9QxuDEvNxSQRwA/JwenrHc=
 github.com/holiman/bloomfilter/v2 v2.0.3 h1:73e0e/V0tCydx14a0SCYS/EWCxgwLZ18CZcZKVu0fao=
-github.com/holiman/uint256 v1.2.2 h1:TXKcSGc2WaxPD2+bmzAsVthL4+pEN0YwXcL5qED83vk=
-github.com/holiman/uint256 v1.2.2/go.mod h1:SC8Ryt4n+UBbPbIBKaG9zbbDlp4jOru9xFZmPzLUTxw=
+github.com/holiman/uint256 v1.2.3 h1:K8UWO1HUJpRMXBxbmaY1Y8IAMZC/RsKB+ArEnnK4l5o=
+github.com/holiman/uint256 v1.2.3/go.mod h1:SC8Ryt4n+UBbPbIBKaG9zbbDlp4jOru9xFZmPzLUTxw=
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/huandu/xstrings v1.0.0/go.mod h1:4qWG/gcEcfX4z/mBDHJ++3ReCw9ibxbsNJbcucJdbSo=
 github.com/huandu/xstrings v1.2.0/go.mod h1:DvyZB1rfVYsBIigL8HwpZgxHwXozlTgGqn63UyNX5k4=
@@ -1115,8 +1115,6 @@ github.com/mobazha/ethereum-watcher v0.0.0-20230629131725-e2287c735a52 h1:2JlOBo
 github.com/mobazha/ethereum-watcher v0.0.0-20230629131725-e2287c735a52/go.mod h1:EILpeYj0BhlMqt+/fZsGhvZFDzhOK/1qtkI5zHFeYTs=
 github.com/mobazha/go-ethereum-hdwallet v0.1.5 h1:tZJs14gZAnE7fP3V3cpNSRoRuf4Ru73fv3oa3SQ3Axk=
 github.com/mobazha/go-ethereum-hdwallet v0.1.5/go.mod h1:Kfx8z54YXsxHWqLEyME581g4BB68aRgFbSm47Mg5+TQ=
-github.com/mobazha/tokenbalance v0.0.0-20230620113229-03b0e9c9836c h1:/2pKvq09SLrh6epEcraMM4+Hs4tCaTKUAfIurHCQ1CQ=
-github.com/mobazha/tokenbalance v0.0.0-20230620113229-03b0e9c9836c/go.mod h1:dsyRsfG5QHb0SOfpzd75qltjWwtIzWs07qWEol928Nc=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd h1:TRLaZ9cD/w8PVh93nsPXa1VrQ6jlwL5oN8l14QlcNfg=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=

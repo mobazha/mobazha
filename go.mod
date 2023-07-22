@@ -1,6 +1,6 @@
 module github.com/cpacia/openbazaar3.0
 
-go 1.17
+go 1.18
 
 replace (
 	github.com/cpacia/go-onion-transport => /Users/mingfeng/go/src/github.com/cpacia/go-onion-transport
@@ -13,6 +13,7 @@ replace (
 )
 
 require (
+	github.com/bep/debounce v1.2.1
 	github.com/btcsuite/btcd v0.23.4
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2
 	github.com/btcsuite/btcd/btcutil v1.1.3
@@ -28,6 +29,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/gosimple/slug v1.13.1
 	github.com/ipfs/boxo v0.10.2
+	github.com/ipfs/fs-repo-migrations/tools v0.0.0-20230628085149-3fc3a1aa00e4
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-ipld-format v0.5.0
 	github.com/ipfs/go-log v1.0.5
@@ -42,6 +44,7 @@ require (
 	github.com/libp2p/go-libp2p-testing v0.12.0
 	github.com/libp2p/go-msgio v0.3.0
 	github.com/microcosm-cc/bluemonday v1.0.21
+	github.com/mobazha/go-ethwallet v0.0.0-20230716015322-58c84d02d1b1
 	github.com/mobazha/multiwallet v0.0.0-00010101000000-000000000000
 	github.com/mobazha/wallet-interface v1.0.0
 	github.com/multiformats/go-multiaddr v0.10.0
@@ -72,7 +75,6 @@ require (
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bep/debounce v1.2.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2 // indirect
 	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f // indirect
@@ -220,7 +222,6 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mobazha/ethereum-watcher v0.0.0-20230629131725-e2287c735a52 // indirect
 	github.com/mobazha/go-ethereum-hdwallet v0.1.5 // indirect
-	github.com/mobazha/go-ethwallet v0.0.0-20230716015322-58c84d02d1b1 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect

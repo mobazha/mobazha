@@ -46,7 +46,7 @@ function watchTransactions() {
   socket.on('message', onSocket);
 
   // in case we connect to a new server
-  serverConnectEvents.on('connected', e => {
+  serverConnectEvents.on('connected', (e) => {
     socket.off(null, onSocket);
     e.socket.on('message', onSocket);
   });
@@ -116,8 +116,7 @@ export function estimateFee(coinType, feeLevel, amount, options = {}) {
       createdAt: Date.now(),
     });
 
-    const queryArgs =
-      `feeLevel=${feeLevel}&amount=${amountInBaseUnits}`;
+    const queryArgs = `feeLevel=${feeLevel}&amount=${amountInBaseUnits}`;
     const estimateFeeXhr =
       $.get(app.getServerUrl(`wallet/estimatefee/${coinType}?${queryArgs}`))
         .done((...args) => {
@@ -127,31 +126,28 @@ export function estimateFee(coinType, feeLevel, amount, options = {}) {
             convertedAmount = integerToDecimal(
               args[0].amount,
               args[0].currency.divisibility,
-              { returnNaNOnError: false }
+              { returnNaNOnError: false },
             );
           } catch (e) {
             deferred.reject(
               `Unable to convert the estimated fee amount to base units: ${e.message}`,
-              estimateFeeXhr
+              estimateFeeXhr,
             );
             return;
           }
 
           deferred.resolve(
             convertedAmount,
-            ...args.slice(1)
+            ...args.slice(1),
           );
-        }).fail(xhr => {
-          const reason = xhr && xhr.responseJSON && xhr.responseJSON.reason || '';
+        }).fail((xhr) => {
+          const reason = (xhr && xhr.responseJSON && xhr.responseJSON.reason) || '';
           deferred.reject(reason, xhr);
 
           const knownReasons = [ERROR_INSUFFICIENT_FUNDS, ERROR_DUST_AMOUNT];
 
           // don't cache calls that failed with an unknown reason
-          if (
-            !knownReasons.includes(reason) &&
-            estimateFeeCache[coinType]
-          ) {
+          if (!knownReasons.includes(reason) && estimateFeeCache[coinType]) {
             estimateFeeCache[coinType].delete(cacheKey);
           }
         });
@@ -176,8 +172,8 @@ export function getFees(coinType) {
 
   let deferred;
 
-  if (getFeesCache && getFeesCache[coinType] && getFeesCache[coinType].deferred &&
-    Date.now() - getFeesCache[coinType].createdAt < cacheExpires) {
+  if (getFeesCache && getFeesCache[coinType] && getFeesCache[coinType].deferred
+    && Date.now() - getFeesCache[coinType].createdAt < cacheExpires) {
     deferred = getFeesCache[coinType].deferred;
   }
 
@@ -190,7 +186,7 @@ export function getFees(coinType) {
     };
 
     $.get(app.getServerUrl(`wallet/fees/${coinType}`))
-      .done(data => {
+      .done((data) => {
         let superEconomic;
         let economic;
         let normal;
@@ -199,19 +195,19 @@ export function getFees(coinType) {
         try {
           superEconomic = integerToDecimal(
             data.superEconomic.amount,
-            data.superEconomic.currency.divisibility
+            data.superEconomic.currency.divisibility,
           );
           economic = integerToDecimal(
             data.economic.amount,
-            data.economic.currency.divisibility
+            data.economic.currency.divisibility,
           );
           normal = integerToDecimal(
             data.normal.amount,
-            data.normal.currency.divisibility
+            data.normal.currency.divisibility,
           );
           priority = integerToDecimal(
             data.priority.amount,
-            data.priority.currency.divisibility
+            data.priority.currency.divisibility,
           );
         } catch (e) {
           deferred.reject(`There was an error processing the reponse: ${e.message}`);
@@ -225,9 +221,8 @@ export function getFees(coinType) {
           priority,
         });
       })
-      .fail(xhr => {
-        const reason =
-          xhr && xhr.responseJSON && xhr.responseJSON.reason || '';
+      .fail((xhr) => {
+        const reason = (xhr && xhr.responseJSON && xhr.responseJSON.reason) || '';
         deferred.reject(reason);
         delete getFeesCache[coinType];
       });

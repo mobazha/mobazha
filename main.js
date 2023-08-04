@@ -8,9 +8,9 @@ import { argv } from 'yargs';
 import path from 'path';
 import fs from 'fs';
 import childProcess from 'child_process';
-import { guid } from './js/utils';
-import LocalServer from './js/utils/localServer';
-import { bindLocalServerEvent } from './js/utils/mainProcLocalServerEvents';
+import { guid } from './frontend/backbone/js/utils';
+import LocalServer from './frontend/backbone/js/utils/localServer';
+import { bindLocalServerEvent } from './frontend/backbone/js/utils/mainProcLocalServerEvents';
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.

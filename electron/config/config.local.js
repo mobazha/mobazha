@@ -1,0 +1,22 @@
+'use strict';
+
+/**
+ * 开发环境配置，覆盖 config.default.js
+ */
+module.exports = (appInfo) => {
+  const config = {};
+
+  /**
+   * 开发者工具
+   */
+  config.openDevTools = true;
+
+  /**
+   * 应用程序顶部菜单
+   */
+  config.openAppMenu = true;
+
+  return {
+    ...config
+  };
+};

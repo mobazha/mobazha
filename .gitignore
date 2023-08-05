@@ -1,17 +1,16 @@
 node_modules
-npm-debug.log*
-.DS_Store
-.tmp
-dist
-prod
-mainBuilt.js
-error.log
-.idea
-
-\.vscode/
+out/
+logs/
+run/
+.idea/
+package-lock.json
+# data/
+public/electron/
+pnpm-lock.yaml
 
 out/
 mobazha/
 MOBAZHA_TEMP/
 
 .env
+.tmp/

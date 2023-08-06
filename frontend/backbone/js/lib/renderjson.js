@@ -57,7 +57,7 @@
 //     .object.syntax ("{", "}")
 //     .array.syntax  ("[", "]")
 
-module.exports = (function() {
+const renderjson = (function() {
     var themetext = function(/* [class, text]+ */) {
         var spans = [];
         while (arguments.length)
@@ -193,3 +193,5 @@ module.exports = (function() {
     renderjson.set_max_string_length("none");
     return renderjson;
 })();
+
+export default renderjson;

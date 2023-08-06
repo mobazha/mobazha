@@ -30,7 +30,7 @@ export default class extends baseVw {
 
       // Let's process the content through Twemoji before adding it to the DOM.
       this.$el.html(twemoji.parse(content,
-        icon => (`../imgs/emojis/72X72/${icon}.png`)));
+        icon => (`../../imgs/emojis/72X72/${icon}.png`)));
     });
 
     return this;

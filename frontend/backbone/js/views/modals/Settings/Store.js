@@ -3,7 +3,6 @@ import $ from 'jquery';
 import _ from 'underscore';
 import * as isIPFS from 'is-ipfs';
 import app from '../../../app';
-import '../../../lib/select2';
 import '../../../lib/whenAll.jquery';
 import baseVw from '../../baseVw';
 import loadTemplate from '../../../utils/loadTemplate';

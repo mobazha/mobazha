@@ -35,7 +35,7 @@ import { _tagsDelimiter } from '../utils/lib/selectize';
   } else {
     root.Selectize = factory(root.jQuery, root.Sifter, root.MicroPlugin);
   }
-}(this, function($, Sifter, MicroPlugin) {
+}(window, function($, Sifter, MicroPlugin) {
   'use strict';
 
   var highlight = function($element, pattern) {

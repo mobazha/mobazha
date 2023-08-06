@@ -1,5 +1,4 @@
 import app from '../../../app';
-import '../../../lib/select2';
 import { supportedWalletCurs } from '../../../data/walletCurrencies';
 import { isJQPromise } from '../../../utils/object';
 import loadTemplate from '../../../utils/loadTemplate';

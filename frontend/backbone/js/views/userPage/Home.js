@@ -1,7 +1,7 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import loadTemplate from '../../utils/loadTemplate';
-import { clipboard } from 'electron';
+import { ipc } from '../../../../src/utils/ipcRenderer.js';
 import BaseVw from '../baseVw';
 import app from '../../app';
 import UserCard from '../UserCard';
@@ -99,7 +99,7 @@ export default class extends BaseVw {
 
   guidClick(e) {
     const guid = $(e.target).data('guid');
-    clipboard.writeText(guid);
+    ipc.send('controller.system.writeToClipboard', guid);
     this.$('.js-guidCopied').fadeIn(600);
   }
 
@@ -125,4 +125,3 @@ export default class extends BaseVw {
     return this;
   }
 }
-

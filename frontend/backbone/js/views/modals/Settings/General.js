@@ -1,5 +1,4 @@
 import $ from 'jquery';
-import '../../../lib/select2';
 import app from '../../../app';
 import { translationLangs } from '../../../data/languages';
 import { getTranslatedCountries } from '../../../data/countries';

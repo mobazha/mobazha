@@ -1,7 +1,7 @@
 import _ from 'underscore';
 import $ from 'jquery';
 import bigNumber from 'bignumber.js';
-import sanitizeHtml from 'sanitize-html';
+import DOMPurify from 'dompurify'
 import { View } from 'backbone';
 import { setDeepValue } from '../utils/object';
 
@@ -19,7 +19,7 @@ export default class baseVw extends View {
     const data = [];
 
     $fields.each((index, field) => {
-      const val = typeof field.value === 'string' ? sanitizeHtml(field.value) : field.value;
+      const val = typeof field.value === 'string' ? DOMPurify.sanitize(field.value) : field.value;
       if (field.checked) data.push(val);
     });
 
@@ -115,7 +115,7 @@ export default class baseVw extends View {
       } else if (field.type === 'checkbox') {
         data[name] = field.checked;
       } else {
-        data[name] = typeof val === 'string' && val ? sanitizeHtml(val) : val;
+        data[name] = typeof val === 'string' && val ? DOMPurify.sanitize(val) : val;
       }
     });
 

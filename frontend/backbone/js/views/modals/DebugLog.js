@@ -1,5 +1,5 @@
-import { ipcRenderer, clipboard } from 'electron';
-import '../../utils/lib/velocity';
+import { ipc } from '../../../../src/utils/ipcRenderer.js';
+import 'velocity-animate';
 import loadTemplate from '../../utils/loadTemplate';
 import BaseModal from './BaseModal';
 import app from '../../app';
@@ -16,7 +16,7 @@ export default class extends BaseModal {
     this.options = opts;
     this.debugLog = opts.debugLog;
 
-    ipcRenderer.on('server-log', this.onServerConnectLog.bind(this));
+    ipc.on('server-log', this.onServerConnectLog.bind(this));
   }
 
   get maxDebugLines() {
@@ -35,7 +35,7 @@ export default class extends BaseModal {
   }
 
   onCopyClick() {
-    clipboard.writeText(this.$debugLog.text());
+    ipc.send('controller.system.writeToClipboard', this.$debugLog.text());
     this.$copiedConfirm
       .velocity('stop')
       .velocity('fadeIn')
@@ -90,7 +90,7 @@ export default class extends BaseModal {
   }
 
   remove() {
-    ipcRenderer.removeListener('server-log', this.onServerConnectLog);
+    ipc.removeListener('server-log', this.onServerConnectLog);
     super.remove();
   }
 

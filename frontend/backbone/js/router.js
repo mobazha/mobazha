@@ -1,8 +1,8 @@
 /* eslint-disable class-methods-use-this */
 import $ from 'jquery';
-import { ipcRenderer } from 'electron';
 import { Router } from 'backbone';
 import * as isIPFS from 'is-ipfs';
+import { ipc } from '../../src/utils/ipcRenderer.js';
 import app from './app';
 import { getGuid } from './utils';
 import { getPageContainer } from './utils/selectors';
@@ -63,7 +63,7 @@ export default class ObRouter extends Router {
       }
     });
 
-    ipcRenderer.on('external-route', (e, route) => {
+    ipc.on('external-route', (e, route) => {
       if (app.pageNav.navigable) {
         this.navigate(route, { trigger: true });
       }

@@ -50,7 +50,7 @@ export default class extends BaseVw {
 
     // Convert any unicode emoji characters to images via Twemoji
     message = twemoji.parse($msgHtml.html(),
-      icon => (`../imgs/emojis/72X72/${icon}.png`));
+      icon => (`../../imgs/emojis/72X72/${icon}.png`));
 
     loadTemplate('modals/orderDetail/convoMessage.html', (t) => {
       this.$el.html(t({

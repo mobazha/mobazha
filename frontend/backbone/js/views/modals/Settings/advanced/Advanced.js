@@ -1,9 +1,8 @@
-import { clipboard } from 'electron';
-import { getGlobal } from '@electron/remote';
 import $ from 'jquery';
+import { ipc } from '../../../../../../src/utils/ipcRenderer.js';
 import app from '../../../../app';
 import { openSimpleMessage } from '../../SimpleMessage';
-import Dialog from '../../Dialog';
+import Dialog from '../../../modals/Dialog';
 import { endAjaxEvent, recordEvent, startAjaxEvent } from '../../../../utils/metrics';
 import loadTemplate from '../../../../utils/loadTemplate';
 import baseVw from '../../../baseVw';
@@ -161,7 +160,7 @@ export default class extends baseVw {
           removeOnClose: true,
         }).render().open();
         this.listenTo(blockDataDialog, 'click-copyBlockData', () => {
-          clipboard.writeText(message.map(msg => msg.textString).join('\n\n'));
+          ipc.send('controller.system.writeToClipboard', message.map(msg => msg.textString).join('\n\n'));
         });
       });
   }
@@ -257,7 +256,7 @@ export default class extends baseVw {
 
   render() {
     super.render();
-    const bundled = getGlobal('isBundledApp');
+    const bundled = ipc.sendSync('controller.system.getGlobal', 'isBundledApp');
     loadTemplate('modals/settings/advanced/advanced.html', (t) => {
       this.$el.html(t({
         errors: {

@@ -2,7 +2,7 @@
 import * as isIPFS from 'is-ipfs';
 import Backbone from 'backbone';
 import $ from 'jquery';
-import { getCurrentWindow } from '@electron/remote';
+import { ipc } from '../../../src/utils/ipcRenderer.js';
 import { events as serverConnectEvents, getCurrentConnection } from '../utils/serverConnect';
 import { setUnreadNotifCount, launchNativeNotification } from '../utils/notification';
 import { recordEvent } from '../utils/metrics';
@@ -101,7 +101,7 @@ export default class extends BaseVw {
       const nativeNotifData = {
         silent: true,
         onclick: () => {
-          getCurrentWindow().restore();
+          ipc.send('controller.system.doMainWindowAction', 'restore');
 
           if (notifDisplayData.route) {
             location.hash = notifDisplayData.route;
@@ -220,21 +220,21 @@ export default class extends BaseVw {
   navCloseClick() {
     recordEvent('NavClick', { target: 'close' });
     if (process.platform !== 'darwin') {
-      getCurrentWindow().close();
+      ipc.send('controller.system.doMainWindowAction', 'close');
     } else {
-      getCurrentWindow().hide();
+      ipc.send('controller.system.doMainWindowAction', 'hide');
     }
   }
 
   navMinClick() {
     recordEvent('NavClick', { target: 'minimize' });
 
-    getCurrentWindow().minimize();
+    ipc.send('controller.system.doMainWindowAction', 'minimize');
   }
 
   navMaxClick() {
-    getCurrentWindow().minimize();
-    getCurrentWindow().setFullScreen(!getCurrentWindow().isFullScreen());
+    ipc.send('controller.system.doMainWindowAction', 'minimize');
+    ipc.send('controller.system.doMainWindowAction', 'setFullScreen');
   }
 
   onRouteSearch() {

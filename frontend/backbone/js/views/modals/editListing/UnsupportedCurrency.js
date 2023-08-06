@@ -1,5 +1,4 @@
 import app from '../../../app';
-import '../../../lib/select2';
 import { getCurrenciesSortedByCode } from '../../../data/currencies';
 import loadTemplate from '../../../utils/loadTemplate';
 import BaseModal from '../BaseModal';

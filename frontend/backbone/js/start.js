@@ -1,13 +1,14 @@
-import { ipcRenderer } from 'electron';
 import $ from 'jquery';
 import Backbone from 'backbone';
-import './lib/whenAll.jquery';
+import './lib/select2.js';
+import 'trumbowyg';
 import moment from 'moment';
-import { getGlobal } from '@electron/remote';
 import bigNumber from 'bignumber.js';
+import { ipc } from '../../src/utils/ipcRenderer.js';
+import './lib/whenAll.jquery';
 import Polyglot from './utils/Polyglot';
 import app from './app';
-import { serverVersionRequired } from '../../../package.json';
+import { serverVersionRequired } from '../../package.json';
 import { getCurrencyByCode } from './data/currencies';
 import { init as initWalletCurs } from './data/walletCurrencies';
 import ServerConfigs from './collections/ServerConfigs';
@@ -53,6 +54,12 @@ import VerifiedModsError from './views/modals/VerifiedModsFetchError';
 fixLinuxZoomIssue();
 handleServerShutdownRequests();
 
+$(function() {
+  $.noConflict();
+
+  $.trumbowyg.svgPath = '../node_modules/trumbowyg/dist/ui/icons.svg';
+});
+
 // Will allow us to handle numbers with greater than 20 decimals places. Probably
 // unlikely this will be needed, but just in case.
 bigNumber.config({ DECIMAL_PLACES: 50 });
@@ -73,7 +80,8 @@ const initialLang = getValidLanguage(app.localSettings.get('language'));
 app.localSettings.set('language', initialLang);
 moment.locale(initialLang);
 app.polyglot = new Polyglot();
-app.polyglot.extend(require(`./languages/${initialLang}.json`));
+const langContent = ipc.sendSync('controller.system.getlanguageFileContent', `${initialLang}.json`);
+app.polyglot.extend(langContent);
 
 app.localSettings.on('change:language', (localSettings, lang) => {
   app.polyglot.extend(
@@ -100,7 +108,7 @@ app.localSettings.on('change:language', (localSettings, lang) => {
 
 window.addEventListener('contextmenu', (e) => {
   e.preventDefault();
-  ipcRenderer.send('contextmenu-click');
+  ipc.send('contextmenu-click');
 }, false);
 
 // Instantiating our Server Configs collection now since the page nav
@@ -112,7 +120,7 @@ app.pageNav = new PageNav({
 });
 $('#pageNavContainer').append(app.pageNav.render().el);
 
-let externalRoute = getGlobal('externalRoute');
+let externalRoute = ipc.sendSync('controller.system.getGlobal', 'externalRoute');
 
 app.router = new ObRouter();
 
@@ -585,7 +593,7 @@ function start() {
           localStorage.serverIdAtLastStart = curConn && curConn.server && curConn.server.id;
 
           // Metrics should only be run on bundled apps.
-          if (getGlobal('isBundledApp')) {
+          if (isBundledApp) {
             const metricsOn = app.localSettings.get('shareMetrics');
 
             if (metricsOn === undefined || metricsOn && isNewerVersion()) {
@@ -725,7 +733,7 @@ serverConnectEvents.on('connected', () => app.router.on('will-route', onWillRout
 serverConnectEvents.on('disconnected', () => app.router.off('will-route', onWillRouteCloseConnModal));
 
 const sendMainActiveServer = (activeServer) => {
-  ipcRenderer.send('active-server-set', {
+  ipc.send('active-server-set', {
     ...activeServer.toJSON(),
     httpUrl: activeServer.httpUrl,
     socketUrl: activeServer.socketUrl,
@@ -745,14 +753,14 @@ app.connectionManagmentModal = new ConnectionManagement({
   showCloseButton: false,
 }).render();
 
+const isBundledApp = ipc.sendSync('controller.system.getGlobal', 'isBundledApp');
+
 // get the saved server configurations
 app.serverConfigs.fetch().done(() => {
   app.serverConfigs.migrate();
-
-  const isBundled = getGlobal('isBundledApp');
   if (!app.serverConfigs.length) {
     // no saved server configurations
-    if (isBundled) {
+    if (isBundledApp) {
       // for a bundled app, we'll create a
       // "default" one and try to connect
       const serverConfig = new ServerConfig({
@@ -790,7 +798,7 @@ app.serverConfigs.fetch().done(() => {
       activeServer = app.serverConfigs.at(0);
     }
 
-    if (activeServer.get('builtIn') && !getGlobal('isBundledApp')) {
+    if (activeServer.get('builtIn') && !isBundledApp) {
       // Your active server is the locally bundled server, but you're
       // not running the bundled app. You have bad data!
       activeServer.set('builtIn', false);
@@ -802,7 +810,7 @@ app.serverConfigs.fetch().done(() => {
 
 // Clear localServer events on browser refresh.
 $(window).on('beforeunload', () => {
-  const localServer = getGlobal('localServer');
+  const localServer = ipc.sendSync('controller.system.getGlobal', 'localServer');
 
   if (localServer) {
     // Since on a refresh any browser variables go away,
@@ -815,25 +823,25 @@ $(window).on('beforeunload', () => {
     // Let the main process know we've just blown away all the handlers,
     // since some of them may be main process callbacks that the main
     // process may want to revive.
-    ipcRenderer.send('renderer-cleared-local-server-events');
+    ipc.send('renderer-cleared-local-server-events');
   }
 });
 
 // Handle 'show debug log' requests from the main process.
-ipcRenderer.on('show-server-log', (event, serverLog) => {
+ipc.on('show-server-log', (event, serverLog) => {
   app.serverLog = serverLog;
   launchDebugLogModal();
 });
 
 // Handle update events from main.js
-ipcRenderer.on('updateChecking', () => showUpdateStatus(app.polyglot.t('update.checking')));
-ipcRenderer.on('updateAvailable', () => showUpdateStatus(app.polyglot.t('update.available')));
-ipcRenderer.on('updateNotAvailable', () => showUpdateStatus(app.polyglot.t('update.notAvailable')));
-ipcRenderer.on('updateError', (msg) => showUpdateStatus(app.polyglot.t('update.error', { error: msg }), 'warning'));
-ipcRenderer.on('updateReadyForInstall', (e, opts) => updateReady(opts));
+ipc.on('updateChecking', () => showUpdateStatus(app.polyglot.t('update.checking')));
+ipc.on('updateAvailable', () => showUpdateStatus(app.polyglot.t('update.available')));
+ipc.on('updateNotAvailable', () => showUpdateStatus(app.polyglot.t('update.notAvailable')));
+ipc.on('updateError', (msg) => showUpdateStatus(app.polyglot.t('update.error', { error: msg }), 'warning'));
+ipc.on('updateReadyForInstall', (e, opts) => updateReady(opts));
 
 // Allow main.js to send messages to the console
-ipcRenderer.on('consoleMsg', (e, msg) => console.log(msg));
+ipc.on('consoleMsg', (e, msg) => console.log(msg));
 
 // manage publishing sockets
 let publishingStatusMsg;
@@ -917,11 +925,11 @@ serverConnectEvents.on('connected', (connectedEvent) => {
   });
 });
 
-ipcRenderer.on('close-attempt', (e) => {
+ipc.on('close-attempt', (e) => {
   persistOutdatedListingHashes();
 
   // If on the bundled app, do not let the app shutdown until server shuts down.
-  const localServer = getGlobal('localServer');
+  const localServer = ipc.sendSync('controller.system.getGlobal', 'localServer');
 
   if (localServer && localServer.isRunning) {
     localServer.once('exit', () => e.sender.send('close-confirmed'));
@@ -946,7 +954,7 @@ ipcRenderer.on('close-attempt', (e) => {
 // initialize our listing delete handler
 listingDeleteHandler();
 
-if (getGlobal('isBundledApp')) {
+if (isBundledApp) {
   console.log(
     `%c${app.polyglot.t('consoleWarning.heading')}`,
     'color: red; font-weight: bold; font-size: 50px;',

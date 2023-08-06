@@ -1,4 +1,4 @@
-import { getGlobal } from '@electron/remote';
+import { ipc } from '../../../../../src/utils/ipcRenderer.js';
 import app from '../../../app';
 import
   serverConnect,
@@ -13,7 +13,7 @@ import Configuration from './Configuration';
 import StatusBar from './StatusBar';
 import { launchDebugLogModal } from '../../../utils/modalManager';
 
-const localServer = getGlobal('localServer');
+const localServer = ipc.sendSync('controller.system.getGlobal', 'localServer');
 
 export default class extends baseVw {
   constructor(options = {}) {

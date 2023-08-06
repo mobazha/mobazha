@@ -4,8 +4,8 @@ import app from '../../../../app';
 import moment from 'moment';
 import { getCountryByDataName } from '../../../../data/countries';
 import { convertAndFormatCurrency } from '../../../../utils/currency';
-import { clipboard } from 'electron';
-import '../../../../utils/lib/velocity';
+import { ipc } from '../../../../../../src/utils/ipcRenderer.js';
+import 'velocity-animate';
 import loadTemplate from '../../../../utils/loadTemplate';
 import ModFragment from '../ModFragment';
 import { checkValidParticipantObject } from '../OrderDetail.js';
@@ -47,7 +47,7 @@ export default class extends BaseVw {
   }
 
   onClickCopyAddress(e) {
-    clipboard.writeText($(e.target).data('address') || '');
+    ipc.send('controller.system.writeToClipboard', $(e.target).data('address') || '');
     this.$copiedToClipboard
       .velocity('stop')
       .velocity('fadeIn', {
@@ -59,7 +59,7 @@ export default class extends BaseVw {
   }
 
   onClickCopyCryptoAddress(e) {
-    clipboard.writeText($(e.target).data('address') || '');
+    ipc.send('controller.system.writeToClipboard', $(e.target).data('address') || '');
     this.getCachedEl('.js-cryptoAddressCopiedToClipboard')
       .velocity('stop')
       .velocity('fadeIn', {
@@ -71,7 +71,7 @@ export default class extends BaseVw {
   }
 
   onClickCopyCryptoQuantity(e) {
-    clipboard.writeText($(e.target).data('quantity').toString());
+    ipc.send('controller.system.writeToClipboard', $(e.target).data('quantity').toString());
     this.getCachedEl('.js-cryptoQuantityCopiedToClipboard')
       .velocity('stop')
       .velocity('fadeIn', {

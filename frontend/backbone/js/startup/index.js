@@ -1,18 +1,19 @@
 // Putting start-up related one offs here that are too small for their own module and
 // aren't appropriate to be in any existing module
 
-import { screen, ipcRenderer } from 'electron';
-import { platform } from 'os';
 import $ from 'jquery';
+import { Renderer, ipc } from '../../../src/utils/ipcRenderer.js';
 import { getBody } from '../utils/selectors';
 import { getCurrentConnection } from '../utils/serverConnect';
 import app from '../app';
 
+const platform = ipc.sendSync('controller.system.getPlatform', {});
+
 export function fixLinuxZoomIssue() {
   // fix zoom issue on Linux hiDPI
-  if (process.platform === 'linux') {
+  if (platform === 'linux') {
     try {
-      let { scaleFactor } = screen.getPrimaryDisplay();
+      let { scaleFactor } = Renderer.screen.getPrimaryDisplay();
 
       if (scaleFactor === 0) {
         scaleFactor = 1;
@@ -32,9 +33,9 @@ export function fixLinuxZoomIssue() {
  * module is able to shut down the daemon via OS signals.
  */
 export function handleServerShutdownRequests() {
-  ipcRenderer.on('server-shutdown', () => {
-    if (platform() !== 'win32') {
-      ipcRenderer.send(
+  ipc.on('server-shutdown', () => {
+    if (platform !== 'win32') {
+      ipc.send(
         'server-shutdown-fail',
         { reason: 'Not on windows. Use childProcess.kill instead.' },
       );
@@ -44,7 +45,7 @@ export function handleServerShutdownRequests() {
     const curConn = getCurrentConnection();
 
     if (!curConn || curConn.status !== 'connected') {
-      ipcRenderer.send(
+      ipc.send(
         'server-shutdown-fail',
         { reason: 'No server connection' },
       );
@@ -53,12 +54,12 @@ export function handleServerShutdownRequests() {
 
     try {
       $.post(app.getServerUrl('ob/shutdown'))
-        .fail((xhr) => ipcRenderer.send('server-shutdown-fail', {
+        .fail((xhr) => ipc.send('server-shutdown-fail', {
           xhr,
           reason: (xhr && xhr.responseJSON && xhr.responseJSON.reason) || '',
         }));
     } catch (e) {
-      ipcRenderer.send(
+      ipc.send(
         'server-shutdown-fail',
         { reason: e.toString() },
       );

@@ -1,13 +1,38 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html id="ov1" class="pre-release">
   <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0" />
-    <title></title>
+    <meta charset="UTF-8">
+    <!-- <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0" /> -->
+
+    <title>Mobazha</title>
+    <link rel="stylesheet" href="../node_modules/ionicons/css/ionicons.min.css">
+    <link rel="stylesheet" href="../node_modules/trumbowyg/dist/ui/trumbowyg.min.css">
+    <link rel="stylesheet" href="../node_modules/selectize/dist/css/selectize.css">
+    <link rel="stylesheet" href="/styles/lib/select2.css">
+    <link rel="stylesheet" href="/styles/main.css">
   </head>
-  <body>
-    <div id="app"></div>
+  <body class="clrT clrS">
+    <div id="appFrame">
+      <section id="pageNavContainer"></section>
+      <section id="contentFrame" class="clrBr">
+        <div id="pageContainer"></div>
+      </section>
+      <section id="statusBar"></section>
+      <div id="chatCloseBtn" class="chatCloseBtn js-chatClose ion-ios-close-empty iconBtn clrP clrBr4 clrT2"></div>
+      <div id="chatContainer"></div>
+      <div id="chatConvoContainer" class="clrP clrBr3"></div>
+
+    </div>
+    <!-- <script>
+      // install babel hooks in the renderer process
+      require('/backbone/js/start');
+    </script> -->
+
+    <!-- <script src="/backbone/js/lib/renderjson.js"></script> -->
+
+    <!-- <div id="app"></div> -->
     <script type="module" src="/src/main.js"></script>
+    <script type="module" src="/backbone/js/start.js"></script>
   </body>
 </html>

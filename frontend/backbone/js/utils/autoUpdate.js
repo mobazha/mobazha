@@ -1,5 +1,5 @@
 import $ from 'jquery';
-import { ipcRenderer } from 'electron';
+import { ipc } from '../../../src/utils/ipcRenderer.js';
 import app from '../app';
 import Dialog from '../views/modals/Dialog';
 
@@ -55,7 +55,7 @@ export function updateReady(opts = {}) {
       fragment: 'installUpdate',
       className: 'btnFlx clrP clrBAttGrad clrBrDec1 clrTOnEmph',
     }],
-  }).on('click-installUpdate', () => ipcRenderer.send('installUpdate'))
+  }).on('click-installUpdate', () => ipc.send('installUpdate'))
     .on('click-cancelInstall', () => updateReadyDialog.close())
     .render()
     .open();

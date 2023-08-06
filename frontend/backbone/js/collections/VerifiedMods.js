@@ -30,10 +30,10 @@ export default class extends Collection {
 
   get localBadge() {
     return {
-      large: '../imgs/verifiedModeratorBadge-large.png',
-      medium: '../imgs/verifiedModeratorBadge-medium.png',
-      small: '../imgs/verifiedModeratorBadge-small.png',
-      tiny: '../imgs/verifiedModeratorBadge-tiny.png',
+      large: '../../imgs/verifiedModeratorBadge-large.png',
+      medium: '../../imgs/verifiedModeratorBadge-medium.png',
+      small: '../../imgs/verifiedModeratorBadge-small.png',
+      tiny: '../../imgs/verifiedModeratorBadge-tiny.png',
     };
   }
 

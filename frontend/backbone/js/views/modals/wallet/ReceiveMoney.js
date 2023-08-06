@@ -1,5 +1,5 @@
-import { clipboard } from 'electron';
 import qr from 'qr-encode';
+import { ipc } from '../../../../../src/utils/ipcRenderer.js';
 import { getCurrencyByCode as getWalletCurByCode } from '../../../data/walletCurrencies';
 import app from '../../../app';
 import loadTemplate from '../../../utils/loadTemplate';
@@ -28,7 +28,7 @@ export default class extends baseVw {
   }
 
   copyAddressToClipboard() {
-    clipboard.writeText(this.getState().address);
+    ipc.send('controller.system.writeToClipboard', this.getState().address);
     clearTimeout(this.copyTextTimeout);
     const $copyText = this.getCachedEl('.js-copyAddress')
       .addClass('invisible');

@@ -1,4 +1,3 @@
-import '../../../lib/select2';
 import bigNumber from 'bignumber.js';
 import loadTemplate from '../../../utils/loadTemplate';
 import BaseView from '../../baseVw';

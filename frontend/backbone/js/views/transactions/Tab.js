@@ -1,7 +1,6 @@
 import _ from 'underscore';
 import $ from 'jquery';
 import app from '../../app';
-import '../../lib/select2';
 import baseVw from '../baseVw';
 import loadTemplate from '../../utils/loadTemplate';
 import TransactionsTable from './table/Table';

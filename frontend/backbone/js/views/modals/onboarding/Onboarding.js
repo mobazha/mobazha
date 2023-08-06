@@ -1,6 +1,5 @@
 import $ from 'jquery';
 import 'cropit';
-import '../../../lib/select2';
 import app from '../../../app';
 import { getCurrentConnection } from '../../../utils/serverConnect';
 import { getTranslatedCountries } from '../../../data/countries';

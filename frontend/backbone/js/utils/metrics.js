@@ -1,9 +1,9 @@
-import { getGlobal } from '@electron/remote';
 import _ from 'underscore';
+import { ipc } from '../../../src/utils/ipcRenderer.js';
 import MetricsModal from '../views/modals/MetricsModal';
 import app from '../app';
-import { version } from '../../../../package.json';
-import { cpus, totalmem, freemem } from 'os';
+import { version } from '../../../package.json';
+// import { cpus, totalmem, freemem } from 'os';
 import { getCurrentConnection } from './serverConnect';
 
 let metricsRestartNeeded = false;
@@ -37,25 +37,25 @@ export function userStats() {
   const pErr = 'Profile Not Available';
   const torErr = 'No Current Connection';
   const connectedServer = getCurrentConnection() && getCurrentConnection().server.toJSON();
-
-  return {
-    vendor: p ? p.get('vendor') : pErr,
-    listingCount: p ? p.get('stats').get('listingCount') || 0 : 0,
-    ratingCount: p ? p.get('stats').get('ratingCount') || 0 : 0,
-    moderator: p ? p.get('moderator') : pErr,
-    crypto: p ? p.get('currencies') : pErr,
-    displayCurrency: app.settings ? app.settings.get('localCurrency') : 'Settings Not Available',
-    displayLanguage: app.localSettings.get('language'),
-    bundled: getGlobal('isBundledApp'),
-    Tor: connectedServer ? !!connectedServer.useTor : torErr,
-    DismissedDiscover: connectedServer ? !!connectedServer.dismissedDiscoverCallout : false,
-    DismissedStore: connectedServer ? !!connectedServer.dismissedStoreWelcome : false,
-    systemLanguage: navigator.language,
-    numberOfCPUs: cpus().length, // how many cores?
-    CPU: cpus()[0].model, // how modern/powerful is this computer?
-    RAMtotal: prettyRAM(totalmem()), // does the user have enough RAM?
-    RAMfree: freeRAMPercentage(totalmem(), freemem()), // is user overburdening their system?
-  };
+return {};
+  // return {
+  //   vendor: p ? p.get('vendor') : pErr,
+  //   listingCount: p ? p.get('stats').get('listingCount') || 0 : 0,
+  //   ratingCount: p ? p.get('stats').get('ratingCount') || 0 : 0,
+  //   moderator: p ? p.get('moderator') : pErr,
+  //   crypto: p ? p.get('currencies') : pErr,
+  //   displayCurrency: app.settings ? app.settings.get('localCurrency') : 'Settings Not Available',
+  //   displayLanguage: app.localSettings.get('language'),
+  //   bundled: ipc.sendSync('controller.system.getGlobal', 'isBundledApp'),
+  //   Tor: connectedServer ? !!connectedServer.useTor : torErr,
+  //   DismissedDiscover: connectedServer ? !!connectedServer.dismissedDiscoverCallout : false,
+  //   DismissedStore: connectedServer ? !!connectedServer.dismissedStoreWelcome : false,
+  //   systemLanguage: navigator.language,
+  //   numberOfCPUs: cpus().length, // how many cores?
+  //   CPU: cpus()[0].model, // how modern/powerful is this computer?
+  //   RAMtotal: prettyRAM(totalmem()), // does the user have enough RAM?
+  //   RAMfree: freeRAMPercentage(totalmem(), freemem()), // is user overburdening their system?
+  // };
 }
 
 export function isMetricRestartNeeded() {

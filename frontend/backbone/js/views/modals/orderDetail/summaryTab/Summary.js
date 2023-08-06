@@ -1,8 +1,8 @@
 /* eslint-disable class-methods-use-this */
-import { clipboard } from 'electron';
 import moment from 'moment';
+import { ipc } from '../../../../../../src/utils/ipcRenderer.js';
 import app from '../../../../app';
-import '../../../../utils/lib/velocity';
+import 'velocity-animate';
 import loadTemplate from '../../../../utils/loadTemplate';
 import {
   completingOrder,
@@ -265,7 +265,7 @@ export default class extends BaseVw {
   }
 
   onClickCopyOrderID() {
-    clipboard.writeText(this.model.id);
+    ipc.send('controller.system.writeToClipboard', this.model.id);
     this.copiedToClipboardAnimatingIn = true;
     this.$copiedToClipboard
       .velocity('stop')

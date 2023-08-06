@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import is from 'is_js';
-import sanitizeHtml from 'sanitize-html';
+import DOMPurify from 'dompurify'
 import twemoji from 'twemoji';
 import { getEmojiByName } from '../../data/emojis';
 import app from '../../app';
@@ -100,7 +100,7 @@ export function processMessage(message) {
   // convert any unicode emoji characters to images via Twemoji
   processedMessage = twemoji.parse(
     processedMessage,
-    (icon) => (`../imgs/emojis/72X72/${icon}.png`),
+    (icon) => (`../../imgs/emojis/72X72/${icon}.png`),
   );
 
   return processedMessage;
@@ -169,7 +169,7 @@ export default class ChatMessage extends BaseModel {
       }
 
       // sanitize the message
-      attrs.message = sanitizeHtml(attrs.message);
+      attrs.message = DOMPurify.sanitize(attrs.message);
 
       // Generate a processed message with changes to the message that are specific to our UI.
       attrs.processedMessage = processMessage(attrs.message);

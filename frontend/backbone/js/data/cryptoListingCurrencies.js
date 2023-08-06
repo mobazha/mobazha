@@ -1,6 +1,5 @@
 import $ from 'jquery';
 import _ from 'underscore';
-import fs from 'fs';
 import workerize from 'workerize';
 import app from '../app';
 import fiatCurrencies from './currencies';
@@ -149,21 +148,30 @@ export function getCurrenciesSortedByCode() {
   return currenciesSortedByCode;
 }
 
-const WORKER_PATH = `${__dirname}/../utils/workers/cryptoListingCursWorker.js`;
 let getWorkerDeferred;
 
 function getWorker() {
   if (!getWorkerDeferred) {
     getWorkerDeferred = $.Deferred();
 
-    fs.readFile(WORKER_PATH, 'utf8', (err, data) => {
-      if (err) {
-        getWorkerDeferred.reject(err);
-        return;
+    getWorkerDeferred.resolve(workerize(`
+      export function getCurrenciesSortedByName(
+        currencies = [],
+        translations = {},
+        lang = 'en-US'
+      ) {
+        return currencies.sort((a, b) => {
+          const aTranslation = translations[\`cryptoCurrencies.\${a}\`];
+          const bTranslation = translations[\`cryptoCurrencies.\${b}\`];
+          const aName = aTranslation || a;
+          const bName = bTranslation || b;
+          return aName.localeCompare(bName, lang, { sensitivity: 'base' });
+        }).map(cur => ({
+          code: cur,
+          name: translations[\`cryptoCurrencies.\${cur}\`] || cur,
+        }));
       }
-
-      getWorkerDeferred.resolve(workerize(data));
-    });
+    `));
   }
 
   return getWorkerDeferred.promise();

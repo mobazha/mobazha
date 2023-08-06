@@ -1,6 +1,5 @@
 import $ from 'jquery';
 import _ from 'underscore';
-import '../../../lib/select2';
 import app from '../../../app';
 import loadTemplate from '../../../utils/loadTemplate';
 import baseView from '../../baseVw';

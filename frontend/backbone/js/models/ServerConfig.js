@@ -4,9 +4,9 @@
  * from the server via the ob/config api.
  */
 
-import { getGlobal } from '@electron/remote';
-import LocalStorageSync from '../utils/lib/backboneLocalStorage';
 import is from 'is_js';
+import LocalStorageSync from '../utils/lib/backboneLocalStorage';
+import { ipc } from '../../../src/utils/ipcRenderer.js';
 import app from '../app';
 import BaseModel from './BaseModel';
 
@@ -160,7 +160,8 @@ export default class extends BaseModel {
   }
 
   isTorPwRequired() {
+    const isBundledApp = ipc.sendSync('controller.system.getGlobal', 'isBundledApp');
     return ['win', 'darwin'].indexOf(process.platform) > -1 &&
-      this.isLocalServer() && getGlobal('isBundledApp');
+      this.isLocalServer() && isBundledApp;
   }
 }

@@ -1,9 +1,7 @@
-import { EOL } from 'os';
-import { ipcRenderer } from 'electron';
 import $ from 'jquery';
 import { Events } from 'backbone';
 import _ from 'underscore';
-import { getGlobal } from '@electron/remote';
+import { ipc } from '../../../src/utils/ipcRenderer.js';
 import Socket from './Socket';
 import { guid } from '.';
 import app from '../app';
@@ -31,7 +29,7 @@ const events = {
 
 export { events };
 
-const getLocalServer = _.once(() => (getGlobal('localServer')));
+const getLocalServer = _.once(() => (ipc.sendSync('controller.system.getGlobal', 'localServer')));
 
 let currentConnection = null;
 let debugLog = '';
@@ -43,10 +41,10 @@ function log(msg) {
 
   if (!msg) return;
 
-  const logMsg = `[SERVER-CONNECT] ${msg}${EOL}`;
+  const logMsg = `[SERVER-CONNECT] ${msg}\n`;
   debugLog += logMsg;
   // "if (ipcRenderer)" needed to prevent the `npm test` from bombing.
-  if (ipcRenderer) ipcRenderer.send('server-connect-log', logMsg);
+  if (ipc) ipc.send('server-connect-log', logMsg);
 }
 
 export function getDebugLog() {
@@ -510,15 +508,15 @@ export default function connect(server, options = {}) {
           }
         };
 
-        ipcRenderer.send('set-proxy', setProxyId, `socks5://${server.get('torProxy')}`);
-        _proxySetHandlers.forEach(handler => ipcRenderer.removeListener('proxy-set', handler));
-        ipcRenderer.on('proxy-set', onProxySet);
+        ipc.send('controller.system.setProxy', {id: setProxyId, socks5Setting: `socks5://${server.get('torProxy')}`});
+        _proxySetHandlers.forEach(handler => ipc.removeListener('proxy-set', handler));
+        ipc.on('proxy-set', onProxySet);
         _proxySetHandlers = [onProxySet];
       } else {
         innerConnectNotify('clearing-tor-proxy');
         innerLog('Clearing any proxy that may be set.');
         const setProxyId = guid();
-        ipcRenderer.send('set-proxy', setProxyId, '');
+        ipc.send('controller.system.setProxy', {id: setProxyId, socks5Setting: ''});
 
         const onProxySet = (e, id) => {
           if (id === setProxyId) {
@@ -527,8 +525,8 @@ export default function connect(server, options = {}) {
           }
         };
 
-        _proxySetHandlers.forEach(handler => ipcRenderer.removeListener('proxy-set', handler));
-        ipcRenderer.on('proxy-set', onProxySet);
+        _proxySetHandlers.forEach(handler => ipc.removeListener('proxy-set', handler));
+        ipc.on('proxy-set', onProxySet);
         _proxySetHandlers = [onProxySet];
       }
     }
@@ -628,5 +626,5 @@ export default function connect(server, options = {}) {
 }
 
 // "if (ipcRenderer)" needed to prevent the `npm test` from bombing.
-if (ipcRenderer) ipcRenderer.send('server-connect-ready');
+if (ipc) ipc.send('server-connect-ready');
 log('Browser has been started or refreshed.');

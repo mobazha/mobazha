@@ -1,7 +1,8 @@
 {
-  "name": "ee",
-  "version": "3.6.0",
-  "description": "A fast, desktop software development framework",
+  "name": "mobazha-desktop",
+  "productName": "MobazhaDesktopClient",
+  "version": "3.0.3",
+  "description": "Decentralized p2p marketplace that uses Cryptocurrencies.",
   "main": "main.js",
   "scripts": {
     "start": "electron . ",
@@ -32,14 +33,13 @@
     "rebuild": "electron-rebuild",
     "re-sqlite": "electron-rebuild -f -w better-sqlite3"
   },
-  "repository": "https://github.com/dromara/electron-egg.git",
+  "repository": "https://github.com/mobazha/mobazha.git",
   "keywords": [
-    "Electron",
-    "electron-egg",
-    "ElectronEgg"
+    "Mogaolei",
+    "Mobazha"
   ],
-  "author": "哆啦好梦, Inc <530353222@qq.com>",
-  "license": "Apache",
+  "author": "Mogaolei",
+  "license": "MGL",
   "devDependencies": {
     "@electron/rebuild": "^3.2.13",
     "debug": "^4.3.3",

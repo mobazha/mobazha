@@ -1,6 +1,6 @@
 import $ from 'jquery';
-import { shell } from 'electron';
 import Backbone from 'backbone';
+import { ipc } from '../../../src/utils/ipcRenderer.js';
 import app from '../app';
 import { getPageContainer } from './selectors';
 import TorExternalLinkWarning from '../views/modals/TorExternalLinkWarning';
@@ -87,11 +87,11 @@ export function openExternal(href) {
 
     warningModal.on('cancelClick', () => warningModal.close());
     warningModal.on('confirmClick', () => {
-      shell.openExternal(href);
+      ipc.send('controller.system.openExternal', href);
       warningModal.close();
     });
   } else {
-    shell.openExternal(href);
+    ipc.send('controller.system.openExternal', href);
   }
 }
 

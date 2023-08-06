@@ -1,7 +1,7 @@
-import { clipboard } from 'electron';
 import qr from 'qr-encode';
+import { ipc } from '../../../../../src/utils/ipcRenderer.js';
 import app from '../../../app';
-import { openSimpleMessage } from '../SimpleMessage';
+import { openSimpleMessage } from '../../modals/SimpleMessage';
 import {
   isSupportedWalletCur,
   getCurrencyByCode,
@@ -67,7 +67,7 @@ export default class extends baseVw {
 
   copyDonationAddress() {
     const addr = this.dCoins[this.getState().showCoin].obDonationAddress;
-    clipboard.writeText(addr);
+    ipc.send('controller.system.writeToClipboard', addr);
     const copyNotif = this.getCachedEl('.js-copyNotification');
 
     copyNotif.addClass('active');
@@ -117,4 +117,3 @@ export default class extends baseVw {
     return this;
   }
 }
-

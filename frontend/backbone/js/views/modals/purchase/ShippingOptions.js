@@ -1,6 +1,5 @@
 import $ from 'jquery';
 import app from '../../../app';
-import '../../../lib/select2';
 import loadTemplate from '../../../utils/loadTemplate';
 import baseView from '../../baseVw';
 import Listing from '../../../models/listing/Listing';

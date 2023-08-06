@@ -1,12 +1,12 @@
 /* eslint-disable class-methods-use-this */
 /*
- This view is also used by the Order Detail overlay. If you make any changes, please
- ensure they are compatible with both the Purchase and Order Detail flows.
- */
+This view is also used by the Order Detail overlay. If you make any changes, please
+ensure they are compatible with both the Purchase and Order Detail flows.
+*/
 
 import bigNumber from 'bignumber.js';
-import { clipboard } from 'electron';
 import qr from 'qr-encode';
+import { ipc } from '../../../../../src/utils/ipcRenderer.js';
 import app from '../../../app';
 import loadTemplate from '../../../utils/loadTemplate';
 import {
@@ -205,7 +205,7 @@ export default class extends BaseVw {
   }
 
   copyAmount() {
-    clipboard.writeText(String(this.balanceRemaining));
+    ipc.send('controller.system.writeToClipboard', String(this.balanceRemaining));
 
     this.getCachedEl('.js-copyAmount').addClass('active');
     if (this.hideCopyAmountTimer) {
@@ -215,7 +215,7 @@ export default class extends BaseVw {
   }
 
   copyAddress() {
-    clipboard.writeText(String(this.paymentAddress));
+    ipc.send('controller.system.writeToClipboard', String(this.paymentAddress));
 
     this.getCachedEl('.js-copyAddress').addClass('active');
     if (this.hideCopyAddressTimer) {

@@ -1,5 +1,4 @@
 import $ from 'jquery';
-import '../../../lib/select2';
 import '../../../utils/lib/selectize';
 import loadTemplate from '../../../utils/loadTemplate';
 import { getTranslatedCountries } from '../../../data/countries';

@@ -1,7 +1,7 @@
 /* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import moment from 'moment';
-import { clipboard } from 'electron';
+import { ipc } from '../../../../../../src/utils/ipcRenderer.js';
 import { setTimeagoInterval } from '../../../../utils';
 import { getFees } from '../../../../utils/fees';
 import {
@@ -161,7 +161,7 @@ export default class extends BaseVw {
       copiedIndicatorOn: true,
     });
 
-    clipboard.writeText($(e.target).text());
+    ipc.send('controller.system.writeToClipboard', $(e.target).text());
     clearTimeout(this.copiedIndicatorTimeout);
 
     this.copiedIndicatorTimeout = setTimeout(() => {

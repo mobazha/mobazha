@@ -1,5 +1,5 @@
 import _ from 'underscore';
-import { ipcRenderer } from 'electron';
+import { ipc } from '../../../src/utils/ipcRenderer.js';
 import { stripHtml } from './dom';
 
 let unreadNotifCount = 0;
@@ -18,7 +18,7 @@ export function setAppBarBadgeCount(count) {
 
   if (count !== appBarBadgeCount) {
     appBarBadgeCount = count;
-    ipcRenderer.send('set-badge-count', appBarBadgeCount);
+    ipc.send('set-badge-count', appBarBadgeCount);
   }
 }
 
@@ -59,7 +59,7 @@ function playNotifSound() {
 
   if (!notifAudioEl) {
     notifAudioEl = document.createElement('audio');
-    notifAudioEl.setAttribute('src', '../audio/notification.mp3');
+    notifAudioEl.setAttribute('src', '../../audio/notification.mp3');
   }
 
   notifAudioEl.play();
@@ -95,4 +95,3 @@ export function launchNativeNotification(notifTitle = '', options = {}) {
 
   return notif;
 }
-

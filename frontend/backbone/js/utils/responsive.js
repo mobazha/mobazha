@@ -38,7 +38,7 @@ export function getAvatarBgImage(avatarHashes = {}, options = {}) {
   const opts = {
     standardSize: 'tiny',
     responsiveSize: 'small',
-    defaultUrl: '../imgs/defaultAvatar.png',
+    defaultUrl: '../../imgs/defaultAvatar.png',
     ...options,
   };
 
@@ -50,7 +50,7 @@ export function getListingBgImage(imageHashes = {}, options = {}) {
   const opts = {
     standardSize: 'tiny',
     responsiveSize: 'small',
-    defaultUrl: '../imgs/defaultItem.png',
+    defaultUrl: '../../imgs/defaultItem.png',
     ...options,
   };
 

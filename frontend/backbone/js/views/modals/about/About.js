@@ -1,7 +1,6 @@
-import { version } from '../../../../../../package.json';
-import { ipcRenderer } from 'electron';
-import { getGlobal } from '@electron/remote';
+import { version } from '../../../../../package.json';
 import $ from 'jquery';
+import { ipc } from '../../../../../src/utils/ipcRenderer.js';
 import app from '../../../app';
 import loadTemplate from '../../../utils/loadTemplate';
 import BaseModal from '../BaseModal';
@@ -32,8 +31,8 @@ export default class extends BaseModal {
     };
 
     this.currentTabName = opts.initialTab;
-    this.isBundledApp = getGlobal('isBundledApp');
-    this.updatesSupported = getGlobal('updatesSupported');
+    this.isBundledApp = ipc.sendSync('controller.system.getGlobal', 'isBundledApp');
+    this.updatesSupported = ipc.sendSync('controller.system.getGlobal', 'updatesSupported');
   }
 
   className() {
@@ -82,7 +81,7 @@ export default class extends BaseModal {
   }
 
   checkForUpdateClick() {
-    ipcRenderer.send('checkForUpdate');
+    ipc.send('checkForUpdate');
   }
 
   render() {
@@ -106,4 +105,3 @@ export default class extends BaseModal {
     return this;
   }
 }
-

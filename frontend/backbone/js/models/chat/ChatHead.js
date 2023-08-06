@@ -1,4 +1,4 @@
-import sanitizeHtml from 'sanitize-html';
+import DOMPurify from 'dompurify'
 import { processMessage } from './ChatMessage';
 import app from '../../app';
 import BaseModel from '../BaseModel';
@@ -13,7 +13,7 @@ export default class extends BaseModel {
   }
 
   parse(response) {
-    const processedMessage = processMessage(sanitizeHtml((response.lastMessage)));
+    const processedMessage = processMessage(DOMPurify.sanitize((response.lastMessage)));
 
     return {
       ...response,

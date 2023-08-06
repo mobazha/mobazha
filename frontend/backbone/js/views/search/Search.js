@@ -2,7 +2,6 @@
 import _ from 'underscore';
 import $ from 'jquery';
 import is from 'is_js';
-import '../../lib/select2';
 import app from '../../app';
 import baseVw from '../baseVw';
 import Results from './Results';

@@ -1,7 +1,7 @@
 import $ from 'jquery';
-import { clipboard } from 'electron';
+import { ipc } from '../../../../../../src/utils/ipcRenderer.js';
 import renderjson from '../../../../lib/renderjson';
-import '../../../../utils/lib/velocity';
+import 'velocity-animate';
 import loadTemplate from '../../../../utils/loadTemplate';
 import BaseVw from '../../../baseVw';
 
@@ -37,7 +37,7 @@ export default class extends BaseVw {
   }
 
   onClickCopyContract() {
-    clipboard.writeText(JSON.stringify(this.contract, null, 2));
+    ipc.send('controller.system.writeToClipboard', JSON.stringify(this.contract, null, 2));
     // Fade the link and make it unclickable, but maintain its position in the DOM.
     this.getCachedEl('.js-copyContract')
       .addClass('unclickable')

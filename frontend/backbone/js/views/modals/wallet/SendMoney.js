@@ -1,5 +1,4 @@
 import app from '../../../app';
-import '../../../lib/select2';
 import { getCurrenciesSortedByCode } from '../../../data/currencies';
 import { endAjaxEvent, recordEvent, startAjaxEvent } from '../../../utils/metrics';
 import { convertCurrency, getExchangeRate } from '../../../utils/currency';

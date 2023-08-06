@@ -1,7 +1,7 @@
 import $ from 'jquery';
 import moment from 'moment';
-import { clipboard } from 'electron';
-import '../../../../utils/lib/velocity';
+import { ipc } from '../../../../../../src/utils/ipcRenderer.js';
+import 'velocity-animate';
 import app from '../../../../app';
 import loadTemplate from '../../../../utils/loadTemplate';
 import BaseVw from '../../../baseVw';
@@ -39,7 +39,7 @@ export default class extends BaseVw {
 
   onClickCopyText(e) {
     const $target = $(e.target);
-    clipboard.writeText($target.attr('data-content').replace(/\[!\$quote\$!\]/g, '"'));
+    ipc.send('controller.system.writeToClipboard', $target.attr('data-content').replace(/\[!\$quote\$!\]/g, '"'));
     this.getCachedEl($target.attr('data-status-indicator'))
       .velocity('stop')
       .velocity('fadeIn', {

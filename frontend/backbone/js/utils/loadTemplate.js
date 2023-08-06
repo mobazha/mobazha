@@ -1,9 +1,10 @@
 import _ from 'underscore';
-import fs from 'fs';
-import path from 'path';
+import { ipc } from '../../../src/utils/ipcRenderer.js';
 import * as templateHelpers from './templateHelpers';
 
 const templateCache = {};
+
+let helpers = {};
 
 export default function loadTemplate(templateFile, callback, root = `${__dirname}/../templates/`) {
   if (!templateFile) {
@@ -15,29 +16,29 @@ export default function loadTemplate(templateFile, callback, root = `${__dirname
   let template = templateCache[templateFile];
 
   if (!template) {
-    const file = fs.readFileSync(path.join(root, templateFile), 'utf8');
+    const file = ipc.sendSync('controller.system.readTemplateFileSync', templateFile);
     template = _.template(file);
     templateCache[templateFile] = template;
   }
 
   const sendBackTmpl = () => {
-    const wrappedTmpl = (context) => template({ ...templateHelpers, ...(context || {}) });
+    const wrappedTmpl = (context) => template({ ...templateHelpers, ...helpers, ...(context || {}) });
     callback(wrappedTmpl);
   };
 
-  if (!templateHelpers.formErrorTmpl) {
-    templateHelpers.formErrorTmpl = 'its coming'; // hack to avoid infinite recursion
+  if (!helpers.formErrorTmpl) {
+    helpers.formErrorTmpl = 'its coming'; // hack to avoid infinite recursion
 
     loadTemplate('spinner.svg', (t) => {
-      templateHelpers.spinner = t;
+      helpers.spinner = t;
     });
 
     loadTemplate('processingButton.html', (t) => {
-      templateHelpers.processingButton = t;
+      helpers.processingButton = t;
     });
 
     loadTemplate('formError.html', (t) => {
-      templateHelpers.formErrorTmpl = t;
+      helpers.formErrorTmpl = t;
       sendBackTmpl();
     });
   } else {

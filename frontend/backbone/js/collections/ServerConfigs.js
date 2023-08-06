@@ -1,9 +1,11 @@
 /* eslint-disable class-methods-use-this */
-import { platform, homedir } from 'os';
 import { Collection } from 'backbone';
+import { ipc } from '../../../src/utils/ipcRenderer.js';
 import app from '../app';
 import LocalStorageSync from '../utils/lib/backboneLocalStorage';
 import ServerConfig from '../models/ServerConfig';
+
+const platform = ipc.sendSync('controller.system.getPlatform', {});
 
 export default class extends Collection {
   localStorage() {
@@ -15,7 +17,9 @@ export default class extends Collection {
   }
 
   model(attrs, options) {
-    return new ServerConfig(attrs, options);
+    return function(attrs, options) {
+      return new ServerConfig(attrs, options);
+    }(attrs, options);
   }
 
   constructor(models, options) {
@@ -69,7 +73,7 @@ export default class extends Collection {
 
   get homedir() {
     if (!this._homedir) {
-      this._homedir = homedir();
+      this._homedir = ipc.sendSync('controller.system.getHomedir', {});
     }
 
     return this._homedir;
@@ -146,7 +150,7 @@ export default class extends Collection {
           const walletCurPaths = this.walletCurrencyToDataDir[walletCurrency];
 
           if (walletCurPaths) {
-            const dataDir = walletCurPaths[platform()];
+            const dataDir = walletCurPaths[platform];
             if (dataDir) {
               const configSave = serverConfig.save({ dataDir });
 

@@ -1,5 +1,4 @@
 import $ from 'jquery';
-import '../../lib/select2';
 import baseVw from '../baseVw';
 import { selectEmojis } from '../../utils';
 import loadTemplate from '../../utils/loadTemplate';

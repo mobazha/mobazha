@@ -9,7 +9,7 @@ import { ensureMainnetCode } from '../data/walletCurrencies';
  * attempt to use the server currency.
  */
 export function renderCryptoIcon(options = {}) {
-  const baseIconPath = '../imgs/cryptoIcons/';
+  const baseIconPath = '../../imgs/cryptoIcons/';
 
   if (typeof options.code !== 'string' && options.code !== '') {
     throw new Error('Please provide a crypto currency code.');

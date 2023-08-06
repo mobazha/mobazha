@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import _ from 'underscore';
-import '../../utils/lib/velocity';
+import 'velocity-animate';
 import app from '../../app';
 import { getBody } from '../../utils/selectors';
 import { getSocket } from '../../utils/serverConnect';

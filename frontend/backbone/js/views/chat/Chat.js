@@ -1,8 +1,7 @@
 import $ from 'jquery';
 import _ from 'underscore';
-import { ipcRenderer } from 'electron';
-import { getCurrentWindow } from '@electron/remote';
-import '../../utils/lib/velocity';
+import { ipc } from '../../../../src/utils/ipcRenderer.js';
+import 'velocity-animate';
 import app from '../../app';
 import { getBody } from '../../utils/selectors';
 import { isScrolledIntoView } from '../../utils/dom';
@@ -180,7 +179,7 @@ export default class extends baseVw {
           if (!document.hasFocus() || !isConvoOpen) {
             const notifOptions = {
               onclick() {
-                getCurrentWindow().restore();
+                ipc.send('controller.system.doMainWindowAction', 'restore');
                 location.hash = `#${msg.peerId}`;
               },
               body: msg.message,

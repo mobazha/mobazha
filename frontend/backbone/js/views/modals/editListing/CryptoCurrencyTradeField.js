@@ -1,5 +1,4 @@
 // import app from '../../../app';
-import '../../../lib/select2';
 import loadTemplate from '../../../utils/loadTemplate';
 import BaseView from '../../baseVw';
 

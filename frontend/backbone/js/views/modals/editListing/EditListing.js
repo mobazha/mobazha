@@ -1,13 +1,12 @@
 import $ from 'jquery';
-import '../../../utils/lib/velocity';
-import '../../../lib/select2';
+import 'velocity-animate';
 
 import Sortable from 'sortablejs';
 import _ from 'underscore';
 import path from 'path';
 import Backbone from 'backbone';
 import { tagsDelimiter } from '../../../utils/lib/selectize';
-import '../../../utils/lib/velocityUiPack';
+import 'velocity-animate/velocity.ui';
 import app from '../../../app';
 import { isScrolledIntoView, openExternal } from '../../../utils/dom';
 import { installRichEditor } from '../../../utils/lib/trumbowyg';

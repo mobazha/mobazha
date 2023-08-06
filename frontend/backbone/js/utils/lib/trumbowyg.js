@@ -3,7 +3,7 @@ import 'trumbowyg';
 import app from '../../app';
 import { getTrumboLangFileNameByCode } from '../../data/languages';
 
-$.trumbowyg.svgPath = '../node_modules/trumbowyg/dist/ui/icons.svg';
+// $.trumbowyg.svgPath = '../node_modules/trumbowyg/dist/ui/icons.svg';
 
 export const defaultEditorOptions = {
   btns: [

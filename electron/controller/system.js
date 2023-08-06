@@ -84,12 +84,12 @@ class SystemController extends Controller {
   }
 
   readTemplateFileSync (templateFile, event) {
-    const root = '/Users/mingfeng/dev/openbazaar/openbazaar-desktop/frontend/backbone/js/templates';
+    const root = '../../frontend/backbone/js/templates';
     return fs.readFileSync(path.join(root, templateFile), 'utf8');
   }
 
   getlanguageFileContent (langFile, event) {
-    const root = '/Users/mingfeng/dev/openbazaar/openbazaar-desktop/frontend/backbone/js/languages';
+    const root = '../../frontend/backbone/js/languages';
     return require(path.join(root, langFile));
   }
 

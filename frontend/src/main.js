@@ -1,7 +1,9 @@
 import { createApp } from 'vue';
+import { createStore } from 'vuex'
 import App from './App.vue';
 import './assets/global.less';
 import components from './components/global';
+import products from './store/products.module'
 import Router from './router/index';
 
 import sifter from 'sifter';
@@ -20,4 +22,12 @@ for (const i in components) {
   app.component(i, components[i])
 }
 
-// app.use(Router).mount('#app')
+const store = createStore({
+  modules: {
+    products
+  }
+})
+
+$.vueRouter = Router;
+$.vueStore = store;
+app.use(Router).use(store).mount('#app')

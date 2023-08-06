@@ -38,6 +38,7 @@
     "underscore": "^1.13.6",
     "vue": "^3.2.33",
     "vue-router": "^4.0.14",
+    "vuex": "^4.1.0",
     "workerize": "0.1.8",
     "yargs": "^17.6.2"
   },

@@ -1,11 +1,13 @@
 <template>
-    <router-view/>
+    <!-- <router-view/> -->
+    <shopping-cart></shopping-cart>
 </template>
 
 <script>
+import ShoppingCart from './components/ShoppingCart.vue';
 export default {
   name: 'App',
-  components: {},
+  components: {ShoppingCart},
   data() {
     return {};
   },

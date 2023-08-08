@@ -3,6 +3,8 @@
 const { Controller } = require('ee-core');
 const Log = require('ee-core/log');
 const Services = require('ee-core/services');
+const Ps = require('ee-core/ps');
+
 const { clipboard, shell } = require('electron');
 const { platform, homedir } = require('os');
 
@@ -72,13 +74,13 @@ class SystemController extends Controller {
   }
 
   readTemplateFileSync (templateFile, event) {
-    const root = '/Users/mingfeng/dev/openbazaar/openbazaar-desktop/frontend/backbone/js/templates';
-    return fs.readFileSync(path.join(root, templateFile), 'utf8');
+    const rootDir = Ps.getHomeDir();
+    return fs.readFileSync(path.join(rootDir, 'frontend/backbone/js/templates', templateFile), 'utf8');
   }
 
   getlanguageFileContent (langFile, event) {
-    const root = '/Users/mingfeng/dev/openbazaar/openbazaar-desktop/frontend/backbone/js/languages';
-    return require(path.join(root, langFile));
+    const rootDir = Ps.getHomeDir();
+    return require(path.join(rootDir, 'frontend/backbone/js/languages', langFile));
   }
 }
 

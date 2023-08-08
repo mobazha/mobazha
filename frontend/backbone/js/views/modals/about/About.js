@@ -81,7 +81,7 @@ export default class extends BaseModal {
   }
 
   checkForUpdateClick() {
-    ipc.send('checkForUpdate');
+    ipc.send('controller.mainwindow.checkForUpdate');
   }
 
   render() {

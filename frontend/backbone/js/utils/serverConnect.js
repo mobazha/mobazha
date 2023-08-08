@@ -508,7 +508,7 @@ export default function connect(server, options = {}) {
           }
         };
 
-        ipc.send('controller.system.setProxy', {id: setProxyId, socks5Setting: `socks5://${server.get('torProxy')}`});
+        ipc.send('controller.mainwindow.setProxy', {id: setProxyId, socks5Setting: `socks5://${server.get('torProxy')}`});
         _proxySetHandlers.forEach(handler => ipc.removeListener('proxy-set', handler));
         ipc.on('proxy-set', onProxySet);
         _proxySetHandlers = [onProxySet];
@@ -516,7 +516,7 @@ export default function connect(server, options = {}) {
         innerConnectNotify('clearing-tor-proxy');
         innerLog('Clearing any proxy that may be set.');
         const setProxyId = guid();
-        ipc.send('controller.system.setProxy', {id: setProxyId, socks5Setting: ''});
+        ipc.send('controller.mainwindow.setProxy', {id: setProxyId, socks5Setting: ''});
 
         const onProxySet = (e, id) => {
           if (id === setProxyId) {

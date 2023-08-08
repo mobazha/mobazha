@@ -18,7 +18,7 @@ export function setAppBarBadgeCount(count) {
 
   if (count !== appBarBadgeCount) {
     appBarBadgeCount = count;
-    ipc.send('set-badge-count', appBarBadgeCount);
+    ipc.send('controller.mainwindow.setBadgeCount', appBarBadgeCount);
   }
 }
 

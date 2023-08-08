@@ -71,38 +71,14 @@ class SystemController extends Controller {
     return homedir();
   }
 
-  async doMainWindowAction (action, event) {
-    if (typeof this.app.electron.mainWindow[action] === 'function') {
-      if (action == 'setFullScreen') {
-        const isFullScreen = this.app.electron.mainWindow.isFullScreen();
-        this.app.electron.mainWindow.setFullScreen(!isFullScreen);
-      } else {
-        this.app.electron.mainWindow[action]();
-      }
-    }
-    Log.info('do action: ', action);
-  }
-
   readTemplateFileSync (templateFile, event) {
-    const root = '../../frontend/backbone/js/templates';
+    const root = '/Users/mingfeng/dev/openbazaar/openbazaar-desktop/frontend/backbone/js/templates';
     return fs.readFileSync(path.join(root, templateFile), 'utf8');
   }
 
   getlanguageFileContent (langFile, event) {
-    const root = '../../frontend/backbone/js/languages';
+    const root = '/Users/mingfeng/dev/openbazaar/openbazaar-desktop/frontend/backbone/js/languages';
     return require(path.join(root, langFile));
-  }
-
-  async setProxy(args, event) {
-    if (!args.id) {
-      throw new Error('Please provide an id that will be passed back with the "proxy-set" '
-        + 'event.');
-    }
-
-    this.app.electron.mainWindow.webContents.session.setProxy({
-      proxyRules: args.socks5Setting,
-      proxyBypassRules: '<local>',
-    }).then(() => this.app.electron.mainWindow.webContents.send('proxy-set', args.id));
   }
 }
 

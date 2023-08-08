@@ -44,20 +44,20 @@ module.exports = (appInfo) => {
    * 主窗口
    */
   config.windowsOption = {
-    title: 'EE框架',
-    width: 980,
-    height: 650,
-    minWidth: 800,
-    minHeight: 650,
+    title: 'Mobazha',
+    width: 1200,
+    height: 760,
+    minWidth: 1170,
+    minHeight: 700,
+    center: true,
+    frame: false,
     webPreferences: {
       webSecurity: false, // 跨域问题 -> 打开注释
       contextIsolation: false, // false -> 可在渲染进程中使用electron的api，true->需要bridge.js(contextBridge)
       nodeIntegration: true,
       //preload: path.join(appInfo.baseDir, 'preload', 'bridge.js'),
     },
-    frame: true,
-    show: false,
-    icon: path.join(appInfo.home, 'public', 'images', 'logo-32.png'),
+    icon: path.join(appInfo.home, 'public', 'images', 'logo.png'),
   };
 
   /**
@@ -163,21 +163,22 @@ module.exports = (appInfo) => {
     },
     tray: {
       enable: true,
-      title: 'EE程序',
-      icon: '/public/images/tray.png'
+      title: 'Mobazha',
+      icon: '/public/images/system-tray.png',
+      macIcon: '/public/images/system-tray-mac.png',
     },
     security: {
       enable: true,
     },
     awaken: {
       enable: true,
-      protocol: 'ee',
+      protocol: 'mbz',
       args: []
     },
     autoUpdater: {
       enable: true,
-      windows: false, 
-      macOS: false, 
+      windows: true, 
+      macOS: true, 
       linux: false,
       options: {
         provider: 'generic', 

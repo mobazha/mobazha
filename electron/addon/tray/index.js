@@ -6,6 +6,7 @@ const Electron = require('ee-core/electron');
 const CoreWindow = require('ee-core/electron/window');
 const Conf = require('ee-core/config');
 const EE = require('ee-core/ee');
+const is = require('ee-core/utils/is');
 
 /**
  * 托盘插件
@@ -30,7 +31,7 @@ class TrayAddon {
     const mainWindow = CoreWindow.getMainWindow();
 
     // 托盘图标
-    let iconPath = path.join(Ps.getHomeDir(), cfg.icon);
+    let iconPath = path.join(Ps.getHomeDir(), is.macOS() ? cfg.macIcon : cfg.icon);
   
     // 托盘菜单功能列表
     let trayMenuTemplate = [
@@ -41,7 +42,9 @@ class TrayAddon {
         }
       },
       {
-        label: '退出',
+        label: 'Quit',
+        type: 'normal',
+        accelerator: 'Command+Q',
         click: function () {
           CoreApp.appQuit();
         }

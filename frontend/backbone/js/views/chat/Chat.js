@@ -179,7 +179,7 @@ export default class extends baseVw {
           if (!document.hasFocus() || !isConvoOpen) {
             const notifOptions = {
               onclick() {
-                ipc.send('controller.system.doMainWindowAction', 'restore');
+                ipc.send('controller.mainwindow.doMainWindowAction', 'restore');
                 location.hash = `#${msg.peerId}`;
               },
               body: msg.message,

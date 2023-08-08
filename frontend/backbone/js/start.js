@@ -733,7 +733,7 @@ serverConnectEvents.on('connected', () => app.router.on('will-route', onWillRout
 serverConnectEvents.on('disconnected', () => app.router.off('will-route', onWillRouteCloseConnModal));
 
 const sendMainActiveServer = (activeServer) => {
-  ipc.send('active-server-set', {
+  ipc.send('controller.mainwindow.setActiveServer', {
     ...activeServer.toJSON(),
     httpUrl: activeServer.httpUrl,
     socketUrl: activeServer.socketUrl,
@@ -932,7 +932,7 @@ ipc.on('close-attempt', (e) => {
   const localServer = ipc.sendSync('controller.system.getGlobal', 'localServer');
 
   if (localServer && localServer.isRunning) {
-    localServer.once('exit', () => e.sender.send('close-confirmed'));
+    localServer.once('exit', () => e.sender.send('controller.mainwindow.confirmClose'));
     localServer.stop();
   }
 

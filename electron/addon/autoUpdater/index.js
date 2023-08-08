@@ -114,6 +114,10 @@ class AutoUpdaterAddon {
   checkUpdate () {
     autoUpdater.checkForUpdates();
   }
+
+  installUpdate () {
+    autoUpdater.quitAndInstall();
+  }
   
   /**
    * 下载更新

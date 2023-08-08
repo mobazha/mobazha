@@ -101,7 +101,7 @@ export default class extends BaseVw {
       const nativeNotifData = {
         silent: true,
         onclick: () => {
-          ipc.send('controller.system.doMainWindowAction', 'restore');
+          ipc.send('controller.mainwindow.doMainWindowAction', 'restore');
 
           if (notifDisplayData.route) {
             location.hash = notifDisplayData.route;
@@ -220,21 +220,21 @@ export default class extends BaseVw {
   navCloseClick() {
     recordEvent('NavClick', { target: 'close' });
     if (process.platform !== 'darwin') {
-      ipc.send('controller.system.doMainWindowAction', 'close');
+      ipc.send('controller.mainwindow.doMainWindowAction', 'close');
     } else {
-      ipc.send('controller.system.doMainWindowAction', 'hide');
+      ipc.send('controller.mainwindow.doMainWindowAction', 'hide');
     }
   }
 
   navMinClick() {
     recordEvent('NavClick', { target: 'minimize' });
 
-    ipc.send('controller.system.doMainWindowAction', 'minimize');
+    ipc.send('controller.mainwindow.doMainWindowAction', 'minimize');
   }
 
   navMaxClick() {
-    ipc.send('controller.system.doMainWindowAction', 'minimize');
-    ipc.send('controller.system.doMainWindowAction', 'setFullScreen');
+    ipc.send('controller.mainwindow.doMainWindowAction', 'minimize');
+    ipc.send('controller.mainwindow.doMainWindowAction', 'setFullScreen');
   }
 
   onRouteSearch() {

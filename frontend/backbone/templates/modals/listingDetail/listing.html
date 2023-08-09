@@ -1,0 +1,308 @@
+<div class="popInMessageHolder js-popInMessages"></div>
+
+<div class="topControls withEndBtn flex">
+  <% if (ob.vendor) { %>
+    <div class="contentBox clrP clrSh3 clrBr clrT">
+      <div class="padSm gutterHSm overflowAuto margRSm flexVCent">
+        <a class="clrBr2 clrSh1 disc storeOwnerAvatar flexNoShrink js-storeOwnerAvatar" style="<%= ob.getAvatarBgImage(ob.vendor.avatarHashes) %>"></a>
+        <p class="txUnl tx3 clamp"><%= ob.vendor.name %></p>
+        <a class="link flexNoShrink tx6 js-goToStore"><% print(ob.openedFromStore ? ob.polyT('listingDetail.returnToStore'): ob.polyT('listingDetail.goToStore')) %></a>
+      </div>
+    </div>
+  <% } %>
+  <% if (ob.ownListing) { %>
+    <div class="flexNoShrink" style="margin-left: auto">
+      <div class="btnStrip clrSh3">
+        <button class="btn js-editListing clrP clrBr"><%= ob.polyT('listingDetail.edit') %></button>
+        <button class="btn js-cloneListing clrP clrBr"><%= ob.polyT('listingDetail.clone') %></button>
+        <%= ob.processingButton({
+          className: 'btn js-deleteListing clrP clrBr',
+          btnText: ob.polyT('listingDetail.delete')
+        }) %>
+      </div>
+    </div>
+    <div class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxTop clrBr clrP clrT hide">
+      <div class="tx3 txB rowSm"><%= ob.polyT('listingDetail.confirmDelete.title') %></div>
+      <p><%= ob.polyT('listingDetail.confirmDelete.body') %></p>
+      <hr class="clrBr row" />
+      <div class="flexHRight flexVCent gutterHLg buttonBar">
+        <a class="js-deleteConfirmCancel"><%= ob.polyT('listingDetail.confirmDelete.btnCancel') %></a>
+        <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph js-deleteConfirmed"><%= ob.polyT('listingDetail.confirmDelete.btnConfirm') %></a>
+      </div>
+    </div>
+  <% } else {%>
+    <div class="flexNoShrink" style="margin-left: auto">
+      <div class="js-socialBtns"></div>
+    </div>
+  <% } %>
+</div>
+
+
+<div class="listingContent flexColRow gutterVMd2">
+  <div class="contentBox padLg clrP clrBr clrSh3">
+    <%
+      const titleRowFlexClass =
+        ob.metadata.contractType !== 'CRYPTOCURRENCY' ?
+          'flex' : 'flexVCent';
+    %>
+    <div class="<%= titleRowFlexClass %> gutterHLg">
+      <%
+        if (ob.metadata.contractType !== 'CRYPTOCURRENCY') {
+      %>
+        <h2 class="txUnb flexExpand"><%= ob.item.title %></h2>
+        <h2 class="txUnb flexNoShrink js-price">
+          <%=
+            ob.currencyMod.convertAndFormatCurrency(
+              ob.price.amount,
+              ob.price.currencyCode,
+              ob.displayCurrency
+            )
+          %>
+        </h2>
+      <%
+        } else {
+      %>
+        <h2 class="flexExpand js-cryptoTitle cryptoTitle"></h2>
+        <%=
+          ob.crypto.cryptoPrice({
+            priceAmount: ob.price.amount,
+            priceCurrencyCode: ob.price.currencyCode,
+            displayCurrency: ob.displayCurrency,
+            priceModifier: ob.price.modifier,
+            wrappingTag: 'h2',
+            wrappingClass: 'flexNoShrink txRgt tx3',
+          })
+        %>
+      <% } %>
+    </div>
+    <div class="flex gutterHLg">
+      <div class="mainImageWrapper">
+        <div class="mainImage clrBr js-gotoPhotos"
+        <% if (ob.item.images.length) { %>
+          style="background-image: url(<%= ob.getServerUrl(`ob/image/${ob.isHiRez() ? ob.item.images[0].large : ob.item.images[0].medium}`) %>), url('../imgs/defaultItem.png')"
+        <% } else { %>
+          style="background-image: url('../imgs/defaultItem.png')"
+        <% } %>
+        ></div>
+        <div class="txCtr">
+          <a class="tx5 js-gotoPhotos">
+            <u><%= ob.polyT('listingDetail.viewPhotos', { count: ob.item.images.length, smart_count: ob.item.images.length }) %></u>
+          </a>
+        </div>
+      </div>
+      <div class="flexExpand">
+        <div class="buyBox clrP clrBr">
+          <div class="flexColRows flexHCent gutterV">
+            <% ob.item.options.forEach((item) => { %>
+              <div class="flexVCent gutterHLg">
+                <div class="col4 h5 txUnl"><%= item.name %></div>
+                <div class="col8 txLft">
+                  <select class="js-variantSelect" name="<%= item.name %>">
+                    <% item.variants.forEach((variant) => { %>
+                      <option value="<%= variant.name %>"><%= variant.name %></option>
+                    <% }); %>
+                  </select>
+                </div>
+              </div>
+            <% }); %>
+            <%
+              let tip;
+              let buyNowClass = 'disabled';
+              let buyNowTranslationKey = ob.metadata.contractType !== 'CRYPTOCURRENCY' ?
+                'listingDetail.buyNow' :
+                'listingDetail.buyCryptoNow';
+              let unpurchaseable = true;
+
+              let coinTypeRateAvailable;
+              let cryptoPaymentCoinRateAvailable;
+
+              if (ob.metadata.contractType === 'CRYPTOCURRENCY') {
+                coinTypeRateAvailable =
+                  !!ob.currencyMod.getExchangeRate(ob.item.cryptoListingCurrencyCode);
+                cryptoPaymentCoinRateAvailable =
+                  !!ob.currencyMod.getExchangeRate(ob.metadata.acceptedCurrencies[0]);
+              }
+
+              if (!ob.crypto.anySupportedByWallet(ob.metadata.acceptedCurrencies)) {
+                tip = ob.polyT('listingDetail.unableToPurchase.incompatibleCrypto',
+                  {
+                    acceptedCurs: ob.metadata.acceptedCurrencies.join(', '),
+                    walletCurs: ob.crypto.supportedWalletCurs()
+                      .join(', '),
+                  });
+              } else if (
+                ob.metadata.contractType !== 'CRYPTOCURRENCY' &&
+                !ob.currencyMod.getExchangeRate(ob.price.currencyCode) &&
+                !(
+                  ob.crypto.supportedWalletCurs().includes(ob.price.currencyCode) &&
+                  ob.metadata.acceptedCurrencies.includes(ob.price.currencyCode)
+                )
+              ) {
+                // If it's priced in a wallet cur and that cur is one of the accepted
+                // curs, we won't disable purchase even if there's no exchange rate for the
+                // cur because they could still pay for it using that cur making the
+                // pricing and payment curs the same and therefore the exchange rate
+                // unnecessary.
+                tip = ob.polyT('listingDetail.unableToPurchase.noExchangeRateInfo', {
+                  cur: ob.price.currencyCode
+                });
+              } else if (
+                ob.metadata.contractType === 'CRYPTOCURRENCY' &&
+                ob.item.cryptoListingCurrencyCode !== ob.metadata.acceptedCurrencies[0] &&
+                (!coinTypeRateAvailable || !cryptoPaymentCoinRateAvailable)
+              ) {
+                const cursNoRate = [];
+                if (!coinTypeRateAvailable) cursNoRate.push(ob.item.cryptoListingCurrencyCode);
+                if (!cryptoPaymentCoinRateAvailable) cursNoRate.push(ob.metadata.acceptedCurrencies[0]);
+                tip = ob.polyT('listingDetail.unableToPurchase.noCryptoExchangeRateInfo', {
+                  cur: cursNoRate.join(', '),
+                });
+              } else {
+                buyNowClass = '';
+                unpurchaseable = false;
+              }
+            %>
+            <button class="btnHg clrBAttGrad clrBrDec1 clrTOnEmph js-purchaseBtn <%= buyNowClass %>">
+              <%= ob.polyT(buyNowTranslationKey) %>
+            </button>
+
+            <div class="js-purchaseErrorWrap">
+              <%
+                if (unpurchaseable) {
+                  print(ob.purchaseErrorT({ tip }));
+                }
+              %>
+            </div>
+
+            <div class="flexHCent gutterH">
+              <div class="tx6 js-rating rating"></div>
+              <% if (ob.shipsFreeToMe) { %>
+              <div class="txCtr">
+                <a class="clrE1 clrTOnEmph phraseBox txNoUnd js-freeShippingLabel"><%= ob.polyT('listingDetail.freeShippingBanner') %></a>
+              </div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+        <div class="flexHCent gutterHLg tx5 rowLg">
+          <div>
+            <%= ob.polyT('listingDetail.type', { type: `<b>${ob.polyT(`formats.${ob.metadata.contractType}`)}</b>` }) %>
+          </div>
+          <% // not showing the inventory for now since it's broken on the server %>
+          <% if (ob.isCrypto && false) { %>
+            <div>
+              <%= ob.polyT('listingDetail.inventory', {
+                inventory: '<span class="js-cryptoInventory"></span>'
+              }) %>
+            </div>
+          <% } else if (ob.metadata.contractType === 'PHYSICAL_GOOD') { %>
+            <div>
+              <%= ob.polyT('listingDetail.condition', { condition: `<b>${ob.polyT(`conditionTypes.${ob.item.condition.toUpperCase()}`, { _: ob.item.condition })}</b>` }) %>
+            </div>
+          <% } %>
+        </div>
+        <hr class="rowLg">
+        <h5><%= ob.polyT('listingDetail.tags') %></h5>
+        <div class="tagWrapper rowLg">
+          <% ob.item.tags.forEach(function(tag){
+          print(`<a class="btn tag clrSh2 clrBr" href="#search?q=${tag}">#${ob.parseEmojis(tag)}</a>`);
+          }); %>
+          <% if(!ob.item.tags.length) { print(`<i class="clrT2">${ob.polyT('listingDetail.noTags')}</i>`) } %>
+        </div>
+        <h5><%= ob.polyT('listingDetail.paymentsAccepted') %></h5>
+        <div class="js-supportedCurrenciesList"></div>
+        <% if (ob.hasVerifiedMods) { %>
+          <div class="verifiedModBox clrBrAlert2 clrBAlert2Grad">
+            <div class="flexVCent flexHCent gutterHTn rowSm">
+              <div class="badge" style="background-image: url(<%= ob.defaultBadge.tiny %>), url('../imgs/verifiedModeratorBadgeDefault.png');"></div>
+              <div class="tx5 txB"><%= ob.polyT('verifiedMod.modVerified.titleLong') %></div>
+            </div>
+            <div class="flexColRows gutterVSm tx5b">
+              <%
+              const providerName = `<b>${ob.verifiedModsData.name}</b>`;
+              const verifiedModLink = `<a class="txU noWrap" href="${ob.verifiedModsData.link}" data-open-external>${ob.polyT('verifiedMod.link')}</a>`;
+              %>
+              <div><%= ob.polyT('verifiedMod.genericDescription', { name: providerName, link: verifiedModLink }) %></div>
+            </div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="contentBox descriptionSection padLg clrP clrBr clrSh3">
+    <h2 class="txUnb"><%= ob.polyT('listingDetail.description') %></h2>
+    <%= ob.item.description %>
+    <% if(!ob.item.description) { print(`<i class="clrT2">${ob.polyT('listingDetail.noDescription')}</i>`) } %>
+  </div>
+
+  <% if (ob.item.images.length) { %>
+    <div class="contentBox clrSh3 photoSection js-photoSection">
+      <div class="flexCent photoSelected js-photoSelected">
+        <img class="photoSelectedInner js-photoSelectedInner">
+      </div>
+      <% if (ob.item.images.length > 1) { %>
+        <button class="btn ion-ios-arrow-left photoPrev js-photoPrev"></button>
+        <button class="btn ion-ios-arrow-right photoNext js-photoNext"></button>
+      <% } %>
+      <% if(ob.item.images.length > 1) { %>
+        <div class="photoStrip flex gutterH">
+          <% ob.item.images.forEach(function(image, index){
+          const chk = index === 0 ? "checked" : "";
+          print(`<input type="radio" name="photoStripThumbnails" class="js-photoSelect" id="photoStrip${index}" ${chk}>`);
+          print(`<label style="background-image: url(${ob.getServerUrl(`ob/image/${ob.isHiRez() ? image.small : image.tiny}`)}" for="photoStrip${index}"></label>`);
+          }); %>
+        </div>
+      <% } %>
+    </div>
+  <% } %>
+
+<div class="js-reviews"></div>
+
+<!-- Attachments are not yet available -->
+<!--
+
+  <div class="contentBox padLg clrP clrBr clrSh3">
+    <h2 class="txUnb"><%= ob.polyT('listingDetail.attachments') %></h2>
+    Placeholder for Attachments
+  </div>
+ -->
+
+  <% if (ob.shippingOptions.length) { %>
+    <div class="contentBox padLg clrP clrBr clrSh3" id="shippingSection">
+      <h2 class="txUnb"><%= ob.polyT('listingDetail.shipping') %></h2>
+      <div class="flexVCent gutterHLg tx5">
+        <!-- this data is not yet available -->
+        <!--
+        <div><%= ob.polyT('listingDetail.shipsFrom', { country: `<b>insert translation of the country here</b>` }) %></div>
+        -->
+        <div><%= ob.polyT('listingDetail.shipTo') %></div>
+        <div class="col4">
+          <select id="shippingDestinations">
+            <option value="ALL"><%= ob.polyT('listingDetail.allCountries') %></option>
+            <% ob.countryData.forEach(function(country) {
+            var selected = country.id === ob.defaultCountry ? 'selected' : '';
+            print(`<option value="${country.id}" ${selected}>${country.text}</option>`);
+            }) %>
+          </select>
+        </div>
+      </div>
+      <div class="js-shippingOptions"></div>
+    </div>
+  <% } %>
+
+  <div class="contentBox padLg clrP clrBr clrSh3">
+    <h2 class="txUnb"><%= ob.polyT('listingDetail.refundPolicy') %></h2>
+    <%= ob.refundPolicy %>
+    <% if (!ob.refundPolicy) { print(`<i class="clrT2">${ob.polyT('listingDetail.noRefundPolicy')}</i>`) } %>
+  </div>
+
+  <div class="contentBox padLg clrP clrBr clrSh3">
+    <h2 class="txUnb"><%= ob.polyT('listingDetail.termsAndConditions') %></h2>
+    <%= ob.termsAndConditions %>
+    <% if (!ob.termsAndConditions) { print(`<i class="clrT2">${ob.polyT('listingDetail.noTermsAndConditions')}</i>`) } %>
+  </div>
+
+  <div class="js-moreListings"></div>
+
+</div>

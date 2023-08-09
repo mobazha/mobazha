@@ -1,0 +1,67 @@
+<nav id="pageTabBar" class="barLg clrP clrBr">
+  <div class="flexVCent pageTabs">
+    <div class="js-miniProfileContainer"></div>
+    <div class="flexExpand">
+      <div class="flexHRight flexVCent gutterH clrT2">
+        <a class="btn tab clrBr js-tab" data-tab="home"><%= ob.polyT('userPage.mainNav.home') %></a>
+        <% if (ob.vendor || ob.ownPage) { %> <% // the store tab is only visible to the user if they have vendor set to false %>
+          <a class="btn tab clrBr js-tab" data-tab="store"><%= ob.polyT('userPage.mainNav.store') %><span class="clrTEmph1 margLSm js-listingsCount"><%= ob.stats.listingCount %></span></a>
+        <% } %>
+        <a class="btn tab clrBr js-tab" data-tab="following"><%= ob.polyT('userPage.mainNav.following') %><span class="clrTEmph1 margLSm js-followingCount"><%= ob.followingCount %></span></a>
+        <a class="btn tab clrBr js-tab" data-tab="followers"><%= ob.polyT('userPage.mainNav.followers') %><span class="clrTEmph1 margLSm js-followerCount"><%= ob.followerCount %></span></a>
+      </div>
+    </div>
+  </div>
+</nav>
+<div class="header js-header"
+  <% var headerHash = ob.headerHashes ? ob.isHiRez() ? ob.headerHashes.large : ob.headerHashes.medium : ''; %>
+  <% if (headerHash) { %>
+    style="background-image: url(<%= ob.getServerUrl(`ob/image/${headerHash}`) %>), url('../imgs/defaultHeader.png')"
+  <% } else { %>
+    style="background-image: url('../imgs/defaultHeader.png')"
+  <% } %>>
+  <div class="blockedOverlay clrP">
+    <div class="flexCol flexHCent tx4">
+      <i class="ion-eye-disabled tx1"></i>
+      <div><%= ob.polyT('userPage.blockedUserOverlayText') %></div>
+    </div>
+  </div>
+</div>
+<div class="pageContent js-pageContent">
+  <div class="pageControls flexVBase">
+    <div class="flexExpand">
+      <h1 class="txBg txUnb txUnl txGlow tabTitle js-tabTitle">
+      </h1>
+    </div>
+    <div class="posR">
+      <% if(ob.ownPage) { %>
+        <div class="btnStrip floR clrSh2">
+          <a class="btn clrP clrBr js-customize"><%= ob.polyT('userPage.customize') %></a>
+          <a class="btn clrP clrBr js-createListing"><%= ob.polyT('userPage.createListing') %></a>
+          <!--
+          <a class="btn clrP clrBr hide js-moreableBtn"><%= ob.polyT('userPage.block') %></a>
+          <a class="iconBtn clrP clrBr js-moreBtn"><i class="ion-android-more-vertical"></i> </a>
+        -->
+        </div>
+      <% } else { %>
+      <div class="js-socialBtns"></div>
+      <% } %>
+      <% if (ob.showStoreWelcomeCallout) { %>
+        <div class="storeWelcomeCallout js-storeWelcomeCallout arrowBoxBottom confirmBox clrP clrBr clrSh1 tx5">
+          <div class="tx3 txB rowSm padSm"><%= ob.polyT('userPage.storeWelcomeCalloutTitle') %></div>
+          <hr class="clrBr rowMd" />
+          <p class="rowMd"><%= ob.polyT('userPage.storeWelcomeCalloutBody') %></p>
+          <hr class="clrBr" />
+          <div class="txCtr padSm">
+            <button class="btn clrP clrBr js-closeStoreWelcomeCallout">
+              <%= ob.polyT('userPage.storeWelcomeCalloutBtnClose') %>
+            </button>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+  <div class="tabContent js-tabContent">
+    <!-- insert the tab subview here -->
+  </div>
+</div>

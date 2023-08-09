@@ -6,31 +6,31 @@
 
 @font-face {
   font-family: 'noto_sans';
-  src: url("../../fonts/NotoSans-Regular-webfont.ttf") format("truetype");
+  src: url("/fonts/NotoSans-Regular-webfont.ttf") format("truetype");
   font-weight: normal;
   font-style: normal; }
 
 @font-face {
   font-family: 'noto_sans';
-  src: url("../../fonts/NotoSans-Bold-webfont.ttf") format("truetype");
+  src: url("/fonts/NotoSans-Bold-webfont.ttf") format("truetype");
   font-weight: bold;
   font-style: normal; }
 
 @font-face {
   font-family: 'noto_sans';
-  src: url("../../fonts/NotoSans-Italic-webfont.ttf") format("truetype");
+  src: url("/fonts/NotoSans-Italic-webfont.ttf") format("truetype");
   font-weight: normal;
   font-style: italic; }
 
 @font-face {
   font-family: 'noto_sans';
-  src: url("../../fonts/NotoSans-BoldItalic-webfont.ttf") format("truetype");
+  src: url("/fonts/NotoSans-BoldItalic-webfont.ttf") format("truetype");
   font-weight: bold;
   font-style: italic; }
 
 @font-face {
   font-family: 'bitcoinregular';
-  src: url("../../fonts/Bitcoin-Regular.ttf") format("truetype");
+  src: url("/fonts/Bitcoin-Regular.ttf") format("truetype");
   font-weight: normal;
   font-style: normal; }
 
@@ -1514,7 +1514,7 @@ p.clamp4 {
     padding-bottom: 20px; }
   .searchWrapper:before {
     content: "";
-    background-image: url(../../imgs/emojis/72X72/1f50d.png);
+    background-image: url(/imgs/emojis/72X72/1f50d.png);
     background-repeat: no-repeat;
     background-size: 14px 14px;
     width: 14px;
@@ -2536,7 +2536,7 @@ $crytoListViewInventoryMaxWidth: 21%;
   height: 54px; }
   .onboarding .modalContent .infoScreen #avatarCropper .avatarPreview .cropit-preview-image-container {
     border-radius: 50%;
-    background-image: url(../../imgs/defaultAvatar.png);
+    background-image: url(/imgs/defaultAvatar.png);
     background-position: center;
     background-size: cover; }
     .onboarding .modalContent .infoScreen #avatarCropper .avatarPreview .cropit-preview-image-container img[style] {
@@ -2860,7 +2860,7 @@ $crytoListViewInventoryMaxWidth: 21%;
       height: 100%;
       pointer-events: all; }
       .pageNav .searchWrapper .addressBarIndicators .torIndicatorContainer .torIndicator {
-        background-image: url(../../imgs/icon-tor.png);
+        background-image: url(/imgs/icon-tor.png);
         background-repeat: no-repeat;
         background-size: 13px auto;
         background-position: center 3px;
@@ -3438,7 +3438,7 @@ $crytoListViewInventoryMaxWidth: 21%;
   border-radius: 50%; }
   .settings .avatarPreview .cropit-preview-image-container {
     border-radius: 50%;
-    background-image: url(../../imgs/defaultAvatar.png);
+    background-image: url(/imgs/defaultAvatar.png);
     background-position: center;
     background-size: cover; }
 
@@ -3455,7 +3455,7 @@ $crytoListViewInventoryMaxWidth: 21%;
   width: 474px;
   height: 136px; }
   .settings .headerPreview .cropit-preview-image-container {
-    background-image: url(../../imgs/defaultHeader.png);
+    background-image: url(/imgs/defaultHeader.png);
     background-position: center;
     background-size: cover; }
 
@@ -4033,7 +4033,7 @@ $crytoListViewInventoryMaxWidth: 21%;
 .connectionManagement .configurationForm .torMessage {
   margin-top: 15px;
   padding-left: 33px;
-  background-image: url(../../imgs/icon-tor.png);
+  background-image: url(/imgs/icon-tor.png);
   background-position: 10px 12px;
   background-size: 15px auto;
   background-repeat: no-repeat; }
@@ -5093,7 +5093,7 @@ $crytoListViewInventoryMaxWidth: 21%;
     height: 100%;
     padding: 0 20px; }
     .search .searchProviders .discoverLogo {
-      background-image: url("../../imgs/obVectorIconSmall2.png");
+      background-image: url("/imgs/obVectorIconSmall2.png");
       height: 48px;
       width: 48px;
       margin-top: 5px; }
@@ -5162,7 +5162,7 @@ $crytoListViewInventoryMaxWidth: 21%;
         height: 26px;
         width: 26px; }
       .search .searchBar .searchLogo.loadError {
-        background-image: url(../../imgs/emojis/72X72/1f50d.png);
+        background-image: url(/imgs/emojis/72X72/1f50d.png);
         background-repeat: no-repeat;
         background-size: 16px 16px;
         background-position: center; }

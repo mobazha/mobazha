@@ -9,11 +9,6 @@
         <% } %>
         <a class="btn tab clrBr js-tab" data-tab="following"><%= ob.polyT('userPage.mainNav.following') %><span class="clrTEmph1 margLSm js-followingCount"><%= ob.followingCount %></span></a>
         <a class="btn tab clrBr js-tab" data-tab="followers"><%= ob.polyT('userPage.mainNav.followers') %><span class="clrTEmph1 margLSm js-followerCount"><%= ob.followerCount %></span></a>
-
-        <span class="navbar-text">
-          <button class="btn btn-primary btn-sm btn-cart-2" data-toggle="modal" data-target="#shoppingCart"><i class="fa fa-shopping-cart"></i> Cart<sup><%= ob.inCart ? ob.inCart.length: 0 %></sup></button>
-        </span>
-        <div class="js-shoppingcart"></div>
       </div>
     </div>
   </div>

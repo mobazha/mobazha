@@ -1,5 +1,6 @@
 'use strict';
 
+const { app } = require('electron');
 const { Controller } = require('ee-core');
 const Log = require('ee-core/log');
 const Services = require('ee-core/services');
@@ -74,13 +75,21 @@ class SystemController extends Controller {
   }
 
   readTemplateFileSync (templateFile, event) {
+    let variablePath = 'frontend/backbone/templates'; // 打包前路径
+    if (app.isPackaged) {
+      variablePath = 'public/templates';
+    }
     const rootDir = Ps.getHomeDir();
-    return fs.readFileSync(path.join(rootDir, 'frontend/backbone/templates', templateFile), 'utf8');
+    return fs.readFileSync(path.join(rootDir, variablePath, templateFile), 'utf8');
   }
 
   getlanguageFileContent (langFile, event) {
+    let variablePath = 'frontend/backbone/languages'; // 打包前路径
+    if (app.isPackaged) {
+      variablePath = 'public/languages';
+    }
     const rootDir = Ps.getHomeDir();
-    return require(path.join(rootDir, 'frontend/backbone/languages', langFile));
+    return require(path.join(rootDir, variablePath, langFile));
   }
 }
 

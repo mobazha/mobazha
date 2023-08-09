@@ -1,6 +1,6 @@
 import { version } from '../../../../../package.json';
 import $ from 'jquery';
-import { ipc } from '../../../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../../../src/utils/ipcRenderer.js';
 import app from '../../../app';
 import loadTemplate from '../../../utils/loadTemplate';
 import BaseModal from '../BaseModal';

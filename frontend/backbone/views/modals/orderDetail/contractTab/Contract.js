@@ -1,5 +1,5 @@
 import $ from 'jquery';
-import { ipc } from '../../../../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../../../../src/utils/ipcRenderer.js';
 import renderjson from '../../../../lib/renderjson';
 import 'velocity-animate';
 import loadTemplate from '../../../../utils/loadTemplate';

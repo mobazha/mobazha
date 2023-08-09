@@ -1,6 +1,6 @@
 /* eslint-disable class-methods-use-this */
 import { Collection } from 'backbone';
-import { ipc } from '../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../src/utils/ipcRenderer.js';
 import app from '../app';
 import LocalStorageSync from '../utils/lib/backboneLocalStorage';
 import ServerConfig from '../models/ServerConfig';

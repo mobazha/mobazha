@@ -1,7 +1,7 @@
 import $ from 'jquery';
 import { Events } from 'backbone';
 import _ from 'underscore';
-import { ipc } from '../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../src/utils/ipcRenderer.js';
 import Socket from './Socket';
 import { guid } from '.';
 import app from '../app';

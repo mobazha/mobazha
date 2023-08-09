@@ -6,7 +6,7 @@ ensure they are compatible with both the Purchase and Order Detail flows.
 
 import bigNumber from 'bignumber.js';
 import qr from 'qr-encode';
-import { ipc } from '../../../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../../../src/utils/ipcRenderer.js';
 import app from '../../../app';
 import loadTemplate from '../../../utils/loadTemplate';
 import {

@@ -1,5 +1,5 @@
 import _ from 'underscore';
-import { ipc } from '../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../src/utils/ipcRenderer.js';
 import { stripHtml } from './dom';
 
 let unreadNotifCount = 0;

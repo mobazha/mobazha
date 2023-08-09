@@ -2,7 +2,7 @@
 // aren't appropriate to be in any existing module
 
 import $ from 'jquery';
-import { Renderer, ipc } from '../../../src/utils/ipcRenderer.js';
+import { Renderer, ipc } from '../../src/utils/ipcRenderer.js';
 import { getBody } from '../utils/selectors';
 import { getCurrentConnection } from '../utils/serverConnect';
 import app from '../app';

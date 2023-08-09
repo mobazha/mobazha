@@ -1,7 +1,7 @@
 /* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import moment from 'moment';
-import { ipc } from '../../../../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../../../../src/utils/ipcRenderer.js';
 import { setTimeagoInterval } from '../../../../utils';
 import { getFees } from '../../../../utils/fees';
 import {

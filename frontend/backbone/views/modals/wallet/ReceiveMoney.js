@@ -1,5 +1,5 @@
 import qr from 'qr-encode';
-import { ipc } from '../../../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../../../src/utils/ipcRenderer.js';
 import { getCurrencyByCode as getWalletCurByCode } from '../../../data/walletCurrencies';
 import app from '../../../app';
 import loadTemplate from '../../../utils/loadTemplate';

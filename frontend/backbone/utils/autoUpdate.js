@@ -1,5 +1,5 @@
 import $ from 'jquery';
-import { ipc } from '../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../src/utils/ipcRenderer.js';
 import app from '../app';
 import Dialog from '../views/modals/Dialog';
 

@@ -127,15 +127,3 @@ function sendPhrases() {
     });
   }
 }
-
-export function getCryptoNames() {
-  if (!nameWorker) {
-    nameWorker = new Worker('../js/utils/cryptoNamesWorker.js', { type: 'module' });
-    sendPhrases();
-
-    app.localSettings.on('change:language', () => nameWorker.sendPhrases());
-  }
-
-  cryptoNamesDeferred = cryptoNamesDeferred || $.Deferred();
-  return cryptoNamesDeferred.promise();
-}

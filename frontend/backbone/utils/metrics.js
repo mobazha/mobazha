@@ -1,5 +1,5 @@
 import _ from 'underscore';
-import { ipc } from '../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../src/utils/ipcRenderer.js';
 import MetricsModal from '../views/modals/MetricsModal';
 import app from '../app';
 import { version } from '../../../package.json';

@@ -6,7 +6,7 @@
 
 import is from 'is_js';
 import LocalStorageSync from '../utils/lib/backboneLocalStorage';
-import { ipc } from '../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../src/utils/ipcRenderer.js';
 import app from '../app';
 import BaseModel from './BaseModel';
 

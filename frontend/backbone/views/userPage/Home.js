@@ -1,7 +1,7 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import loadTemplate from '../../utils/loadTemplate';
-import { ipc } from '../../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../../src/utils/ipcRenderer.js';
 import BaseVw from '../baseVw';
 import app from '../../app';
 import UserCard from '../UserCard';

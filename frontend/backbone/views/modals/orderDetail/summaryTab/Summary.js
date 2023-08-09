@@ -1,6 +1,6 @@
 /* eslint-disable class-methods-use-this */
 import moment from 'moment';
-import { ipc } from '../../../../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../../../../src/utils/ipcRenderer.js';
 import app from '../../../../app';
 import 'velocity-animate';
 import loadTemplate from '../../../../utils/loadTemplate';

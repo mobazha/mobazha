@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import moment from 'moment';
-import { ipc } from '../../../../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../../../../src/utils/ipcRenderer.js';
 import 'velocity-animate';
 import app from '../../../../app';
 import loadTemplate from '../../../../utils/loadTemplate';

@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import Backbone from 'backbone';
-import { ipc } from '../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../src/utils/ipcRenderer.js';
 import app from '../app';
 import { getPageContainer } from './selectors';
 import TorExternalLinkWarning from '../views/modals/TorExternalLinkWarning';

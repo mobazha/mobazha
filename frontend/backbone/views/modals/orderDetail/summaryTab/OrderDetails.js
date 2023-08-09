@@ -4,7 +4,7 @@ import app from '../../../../app';
 import moment from 'moment';
 import { getCountryByDataName } from '../../../../data/countries';
 import { convertAndFormatCurrency } from '../../../../utils/currency';
-import { ipc } from '../../../../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../../../../src/utils/ipcRenderer.js';
 import 'velocity-animate';
 import loadTemplate from '../../../../utils/loadTemplate';
 import ModFragment from '../ModFragment';

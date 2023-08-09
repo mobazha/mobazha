@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import _ from 'underscore';
-import { ipc } from '../../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../../src/utils/ipcRenderer.js';
 import 'velocity-animate';
 import app from '../../app';
 import { getBody } from '../../utils/selectors';

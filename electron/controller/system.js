@@ -75,12 +75,12 @@ class SystemController extends Controller {
 
   readTemplateFileSync (templateFile, event) {
     const rootDir = Ps.getHomeDir();
-    return fs.readFileSync(path.join(rootDir, 'frontend/backbone/js/templates', templateFile), 'utf8');
+    return fs.readFileSync(path.join(rootDir, 'frontend/backbone/templates', templateFile), 'utf8');
   }
 
   getlanguageFileContent (langFile, event) {
     const rootDir = Ps.getHomeDir();
-    return require(path.join(rootDir, 'frontend/backbone/js/languages', langFile));
+    return require(path.join(rootDir, 'frontend/backbone/languages', langFile));
   }
 }
 

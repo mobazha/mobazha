@@ -1,5 +1,5 @@
 import app from '../app';
-import { version } from '../../../../package.json';
+import { version } from '../../../package.json';
 import { recordEvent, userStats } from './metrics';
 
 

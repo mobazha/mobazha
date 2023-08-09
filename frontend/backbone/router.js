@@ -2,7 +2,7 @@
 import $ from 'jquery';
 import { Router } from 'backbone';
 import * as isIPFS from 'is-ipfs';
-import { ipc } from '../../src/utils/ipcRenderer.js';
+import { ipc } from '../src/utils/ipcRenderer.js';
 import app from './app';
 import { getGuid } from './utils';
 import { getPageContainer } from './utils/selectors';

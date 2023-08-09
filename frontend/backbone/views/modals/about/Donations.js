@@ -1,5 +1,5 @@
 import qr from 'qr-encode';
-import { ipc } from '../../../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../../../src/utils/ipcRenderer.js';
 import app from '../../../app';
 import { openSimpleMessage } from '../../modals/SimpleMessage';
 import {

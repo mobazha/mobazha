@@ -1,4 +1,4 @@
-import { ipc } from '../../../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../../../src/utils/ipcRenderer.js';
 import app from '../../../app';
 import
   serverConnect,

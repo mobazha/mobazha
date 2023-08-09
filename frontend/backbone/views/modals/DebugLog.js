@@ -1,4 +1,4 @@
-import { ipc } from '../../../../src/utils/ipcRenderer.js';
+import { ipc } from '../../../src/utils/ipcRenderer.js';
 import 'velocity-animate';
 import loadTemplate from '../../utils/loadTemplate';
 import BaseModal from './BaseModal';

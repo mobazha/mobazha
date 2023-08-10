@@ -3,7 +3,7 @@ const fs = require('fs');
 const packageJson = require('./package.json');
 
 const { version } = packageJson;
-const iconDir = path.resolve(__dirname, 'imgs');
+const iconDir = path.resolve(__dirname, 'public', 'imgs');
 
 module.exports = {
   packagerConfig: {
@@ -17,7 +17,27 @@ module.exports = {
       },
     ],
     icon: path.resolve(iconDir, process.platform === 'darwin' ? 'icon.icns' : 'icon.ico'),
-    ignore: ['MOBAZHA_TEMP'],
+    ignore: ['MOBAZHA_TEMP',
+      ".github",
+      ".tmp",
+      ".vscode",
+      "^/bin",
+      "^/data",
+      "^/docs",
+      "^/electron",
+      "^/frontend",
+      "^/logs",
+      "^/test",
+      "^/verify",
+
+      ".editorconfig",
+      ".env",
+      ".travis.yml",
+      "build.sh",
+      "notarize.sh",
+      "README.md",
+      "styleSheet.html"
+    ],
     // extraResource: ['./mobazha'],
     win32metadata: {
       ProductName: 'Mobazha',

@@ -8,6 +8,11 @@
   "asar": true,
   "files": [
     "**/*",
+    "!MOBAZHA_TEMP",
+    "!bin/",
+    "!doc/",
+    "!electron/",
+
     "!frontend/",
     "!run/",
     "!logs/",

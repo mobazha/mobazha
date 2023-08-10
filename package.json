@@ -26,6 +26,11 @@
     "build-l-armv7l": "electron-builder --config=./electron/config/builder.json -l=deb --armv7l",
     "build-lr-64": "electron-builder --config=./electron/config/builder.json -l=rpm --x64",
     "build-lp-64": "electron-builder --config=./electron/config/builder.json -l=pacman --x64",
+
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "publish": "electron-forge publish",
+
     "rd": "ee-bin rd",
     "encrypt": "ee-bin encrypt",
     "clean": "ee-bin clean",
@@ -42,6 +47,12 @@
   "license": "MGL",
   "devDependencies": {
     "@electron/rebuild": "^3.2.13",
+    "@electron-forge/cli": "^6.0.4",
+    "@electron-forge/maker-deb": "^6.0.4",
+    "@electron-forge/maker-dmg": "^6.0.4",
+    "@electron-forge/maker-rpm": "^6.0.4",
+    "@electron-forge/maker-squirrel": "^6.0.4",
+    "@electron-forge/publisher-github": "^6.1.1",
     "debug": "^4.3.3",
     "ee-bin": "^1.1.0",
     "electron": "^21.4.4",

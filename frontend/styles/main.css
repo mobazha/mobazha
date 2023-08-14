@@ -189,11 +189,11 @@ svg {
       height: calc(100% - 463px); }
   #appFrame #chatConvoContainer {
     position: fixed;
-    right: 10px;
-    bottom: -1px;
+    right: 235px;
+    bottom: 10px;
     z-index: 2;
-    width: 225px;
-    height: 360px;
+    width: 720px;
+    height: 650px;
     transform: translateY(105%);
     transition: transform 300ms ease; }
     .chatConvoOpen #appFrame #chatConvoContainer {

@@ -4,12 +4,12 @@
       :class="env?.isH5 ? 'conversation-h5' : 'conversation'"
       v-show="!env?.isH5 || currentModel === 'conversation'"
     >
-      <TUISearch class="search" />
+      <TUISearch class="TUI-search" />
       <TUIConversation @current="handleCurrentConversation" />
     </div>
     <div class="chat" v-show="!env?.isH5 || currentModel === 'message'">
       <TUIChat>
-        <h1>欢迎使用腾讯云即时通信IM</h1>
+        <h1>欢迎使用腾讯云即时通信</h1>
       </TUIChat>
     </div>
     <!-- TUICallKit 组件：通话 UI 组件主体 -->
@@ -86,7 +86,7 @@ export default defineComponent({
   height: 100vh;
   overflow: hidden;
 }
-.search {
+.TUI-search {
   padding: 12px;
 }
 .conversation {
@@ -100,7 +100,7 @@ export default defineComponent({
 }
 .chat {
   flex: 1;
-  height: 100%;
+  height: 85%;
   position: relative;
 }
 .callkit-drag-container {

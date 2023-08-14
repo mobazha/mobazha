@@ -485,7 +485,7 @@ export default class extends baseVw {
 
   get $chatConvoContainer() {
     return this._$chatConvoContainer ||
-      (this._$chatConvoContainer = $('#chatConvoContainer'));
+      (this._$chatConvoContainer = $('#chatConvoContainer0'));
   }
 
   remove() {

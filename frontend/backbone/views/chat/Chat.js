@@ -16,6 +16,8 @@ import baseVw from '../baseVw';
 import ChatHeads from './ChatHeads';
 import Conversation from './Conversation';
 
+import { moutChat } from '../../../src/mount.js'
+
 export default class extends baseVw {
   constructor(options = {}) {
     if (!options.collection) {
@@ -297,6 +299,7 @@ export default class extends baseVw {
         });
       });
 
+    moutChat('#chatConvoContainer');
     this.$chatConvoContainer
       .append(this.conversation.render().el);
 

@@ -1,9 +1,9 @@
 "use strict";
+import mitt from 'mitt'
+import api from "@/api";
+import TIM from './TUICore/tim';
 
 class MyChatSDK {
-  on() {}
-  off() {}
-
   sendMessage() {
     // TODO:
   }
@@ -51,6 +51,7 @@ class MyChatSDK {
   unsubscribeUserStatus() {}
 
   getConversationList() {
+    api.getConversationList()
     // TODO:
   }
   getConversationProfile() {
@@ -138,3 +139,6 @@ this.TUICore.TIM.EVENT.PROFILE_UPDATED
 this.TUICore.TIM.EVENT.MESSAGE_RECEIVED
 this.TUICore.TIM.EVENT.CONVERSATION_LIST_UPDATED
 */
+
+const sdkInstant = mitt(new MyChatSDK());
+export default sdkInstant;

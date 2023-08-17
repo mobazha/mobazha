@@ -40,6 +40,7 @@
     "jquery": "^3.6.3",
     "jquery-zoom": "^1.7.21",
     "microplugin": "^0.0.3",
+    "mitt": "^3.0.1",
     "moment": "^2.29.4",
     "multihashes": "^4.0.3",
     "node-polyglot": "2.4.2",

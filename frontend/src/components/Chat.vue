@@ -27,11 +27,11 @@
 
 <script lang="ts">
 import { defineComponent, reactive, toRefs } from "vue";
-import { TUIEnv } from "./TUIKit/TUIPlugin";
-import { handleErrorPrompts } from "./TUIKit/TUIComponents/container/utils";
+import { TUIEnv } from "../TUIKit/TUIPlugin";
+import { handleErrorPrompts } from "../TUIKit/TUIComponents/container/utils";
 
 export default defineComponent({
-  name: "App",
+  name: "Chat",
   setup() {
     const data = reactive({
       env: TUIEnv(),

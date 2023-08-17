@@ -1,0 +1,119 @@
+@for $i from 1 through 10 {
+    .mt#{$i} {
+        margin-top: 5 * $i * 1px;
+    }
+    .mb#{$i} {
+        margin-bottom: 5 * $i * 1px;
+    }
+    .ml#{$i} {
+        margin-left: 5 * $i * 1px;
+    }
+    .mr#{$i} {
+        margin-right: 5 * $i * 1px;
+    }
+
+    .pt#{$i} {
+        padding-top: 5 * $i * 1px;
+    }
+    .pb#{$i} {
+        padding-bottom: 5 * $i * 1px;
+    }
+    .pl#{$i} {
+        padding-left: 5 * $i * 1px;
+    }
+    .pr#{$i} {
+        padding-right: 5 * $i * 1px;
+    }
+
+    .m#{$i} {
+        margin: 5 * $i * 1px;
+    }
+    .p#{$i} {
+        padding: 5 * $i * 1px;
+    }
+
+    .flex-#{$i} {
+        flex: $i;
+    }
+}
+.text-black {
+    color: $black;
+}
+.text-white {
+    color: $white;
+}
+.text-blue1 {
+    color: $blue1;
+}
+.text-purple {
+    color: $purple;
+}
+.text-red1 {
+    color: $red1;
+}
+.text-red1 {
+    color: $red1;
+}
+.text-red2 {
+    color: $red2;
+}
+.text-pink1 {
+    color: $pink1;
+}
+.text-pink2 {
+    color: $pink2;
+}
+.text-green1 {
+    color: $green2;
+}
+.text-green2 {
+    color: $green2;
+}
+.text-orange {
+    color: $orange;
+}
+.text-yellow1 {
+    color: $yellow1;
+}
+.text-yellow2 {
+    color: $yellow2;
+}
+.text-gray1 {
+    color: $gray1;
+}
+.text-gray2 {
+    color: $gray2;
+}
+.text-gray3 {
+    color: $gray3;
+}
+.text-left {
+    text-align: left;
+}
+.text-center {
+    text-align: center;
+}
+.text-right {
+    text-align: right;
+}
+.underline {
+    text-decoration: underline;
+}
+.nowrap {
+    white-space: nowrap;
+}
+.show {
+    display: $show;
+}
+.hide {
+    display: $hide;
+}
+.font-bold {
+    font-weight: 700;
+}
+.inline {
+    display: inline;
+}
+.relative {
+    position: relative;
+}

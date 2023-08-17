@@ -3,6 +3,7 @@ out/
 logs/
 run/
 .idea/
+dist/
 package-lock.json
 # data/
 public/electron/

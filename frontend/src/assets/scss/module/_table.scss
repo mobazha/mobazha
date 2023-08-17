@@ -1,0 +1,23 @@
+.el-table {
+    .el-table__body td.el-table__cell {
+        border: none;
+    }
+    .el-table__inner-wrapper::before {
+        display: none;
+    }
+    td.el-table__cell,
+    th.el-table__cell.is-leaf {
+        border-color: #e0e0e0;
+    }
+    .el-table__row td.el-table__cell {
+        border-bottom: 1px solid #e0e0e0;
+    }
+    .el-table__row {
+        td.el-table__cell:first-child {
+            border-left: 1px solid #e0e0e0;
+        }
+        td.el-table__cell:last-child {
+            border-right: 1px solid #e0e0e0;
+        }
+    }
+}

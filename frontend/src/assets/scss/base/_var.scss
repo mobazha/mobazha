@@ -1,0 +1,69 @@
+$icon-prev: "cs-icon";
+$icon-family: "iconfont";
+$white: #fff;
+$black: #000;
+$blue1: #6061f6;
+$blue2: #1b4bff;
+$purple: #a322ff;
+$red1: #fe2244;
+$red2: #f14470;
+$pink1: pink;
+$pink2: #ea1877;
+$green1: #46b16d;
+$green2: #23c9da;
+$orange: #ff6000;
+$yellow1: #ebac4c;
+$yellow2: #fee857;
+$gray1: #333333; //文字
+$gray2: #666666;
+$gray3: #999999;
+$border: 1px solid #d5d5d5;
+$shadow: 1px 1px 10rpx #eee;
+$show: block;
+$hide: none;
+//文本溢出
+@mixin _textOver($width: 100%) {
+    width: $width;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+//显示几行文本
+@mixin _showRowText($clamp: 2) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: $clamp;
+    -webkit-box-orient: vertical;
+}
+@mixin _border($left: 30rpx, $right: 30rpx, $num: 0, $color: #d5d5d5, $direction: bottom) {
+    position: absolute;
+    box-sizing: border-box;
+    content: " ";
+    pointer-events: none;
+    right: $right;
+    #{$direction}: $num;
+    left: $left;
+    border-#{$direction}: 1px solid $color;
+    transform: scaleY(0.5);
+}
+
+@mixin _scrollbar() {
+    &::-webkit-scrollbar {
+        /*滚动条整体样式*/
+        width: 10px; /*高宽分别对应横竖滚动条的尺寸*/
+        height: 1px;
+    }
+    &::-webkit-scrollbar-thumb {
+        /*滚动条里面小方块*/
+        border-radius: 10px;
+        box-shadow: inset 0 0 5px #cad5db;
+        background: #fff;
+    }
+    &::-webkit-scrollbar-track {
+        /*滚动条里面轨道*/
+        box-shadow: inset 0 0 5px #fff;
+        border-radius: 10px;
+        background: rgb(255, 255, 255);
+    }
+}

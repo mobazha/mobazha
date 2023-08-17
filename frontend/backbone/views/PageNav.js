@@ -20,6 +20,8 @@ import AddressBarIndicators from './AddressBarIndicators';
 import { getNotifDisplayData } from '../collections/Notifications';
 import Notifications from './notifications/Notificiations';
 
+import { moutShoppingCart } from '../../src/mount.js'
+
 export default class extends BaseVw {
   constructor(options) {
     const opts = {
@@ -47,6 +49,7 @@ export default class extends BaseVw {
         'click .js-navNotifBtn': 'onClickNavNotifBtn',
         'click .js-notifContainer': 'onClickNotifContainer',
         'click .js-notificationListItem a[href]': 'onClickNotificationLink',
+        'click .js-shoppingCart': 'onClickShoppingCartBtn',
       },
       navigable: false,
       ...options,
@@ -382,6 +385,11 @@ export default class extends BaseVw {
 
   onClickNotificationLink() {
     this.closeNotifications();
+  }
+
+  onClickShoppingCartBtn() {
+    app.router.navigate('shopping-cart', { trigger: true });
+    moutShoppingCart();
   }
 
   onDocClick() {

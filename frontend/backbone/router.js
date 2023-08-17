@@ -46,6 +46,7 @@ export default class ObRouter extends Router {
       ['(ob://)transactions/:tab(/)', 'transactions'],
       ['(ob://)connected-peers(/)', 'connectedPeers'],
       ['(ob://)search(/:tab)(?:query)', 'search'],
+      ['(ob://)shopping-cart(/)', 'shoppingCart'],
       ['(ob://)*path', 'pageNotFound'],
     ];
 
@@ -644,6 +645,14 @@ export default class ObRouter extends Router {
   userNotFound(user) {
     this.loadPage(
       new TemplateOnly({ template: 'error-pages/userNotFound.html' }).render({ user }),
+    );
+  }
+
+  shoppingCart() {
+    this.loadPage(
+      new TemplateOnly({
+        template: 'shoppingCart.html',
+      }).render(),
     );
   }
 

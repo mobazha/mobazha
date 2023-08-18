@@ -51,6 +51,12 @@ import defaultSearchProviders from './data/defaultSearchProviders';
 import VerifiedMods from './collections/VerifiedMods';
 import VerifiedModsError from './views/modals/VerifiedModsFetchError';
 
+import '/node_modules/ionicons/css/ionicons.min.css';
+import '/node_modules/trumbowyg/dist/ui/trumbowyg.min.css';
+import '/node_modules/selectize/dist/css/selectize.css';
+import '/styles/lib/select2.css';
+import "/styles/main.scss";
+
 fixLinuxZoomIssue();
 handleServerShutdownRequests();
 

@@ -20,7 +20,7 @@ import AddressBarIndicators from './AddressBarIndicators';
 import { getNotifDisplayData } from '../collections/Notifications';
 import Notifications from './notifications/Notificiations';
 
-import { moutShoppingCart } from '../../src/mount.js'
+import { mountShoppingCart } from '../../src/mount.js'
 
 export default class extends BaseVw {
   constructor(options) {
@@ -389,7 +389,7 @@ export default class extends BaseVw {
 
   onClickShoppingCartBtn() {
     app.router.navigate('shopping-cart', { trigger: true });
-    moutShoppingCart();
+    mountShoppingCart();
   }
 
   onDocClick() {

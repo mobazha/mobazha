@@ -230,7 +230,7 @@ svg {
 
   #chatContainer {
     position: fixed;
-    top: $bar + $barLg -1; //overlap the border
+    top: $bar + $barLg - 1; //overlap the border
     right: $scrollbar; // don't cover scroll bars
     width: $chatClosed;
     height: calc(100% - #{$bar + $barLg});
@@ -260,17 +260,17 @@ svg {
     }
 
     .chatConvoOpen & {
-      height: calc(100% - #{$bar + $barLg + $chatConvoHeight -2});
+      height: calc(100% - #{$bar + $barLg + $chatConvoHeight - 2px});
     }
   }
 
   #chatConvoContainer {
     position: fixed;
-    right: $scrollbar;
-    bottom: -1px; // prevents the emoji tray from displaying at the very bottom
+    right: 235px;
+    bottom: 10px; // prevents the emoji tray from displaying at the very bottom
     z-index: 2; // chat needs to be on top of modals
-    width: 225px;
-    height: $chatConvoHeight;
+    width: 720px;
+    height: 650px;
     transform: translateY(105%);
     transition: transform 300ms ease;
 

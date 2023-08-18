@@ -1,4 +1,6 @@
 import IComponentServer from '../IComponentServer';
+import { getCachedProfiles } from '../../../../../backbone/models/profile/Profile';
+import { Conversation } from './interface';
 
 /**
  * class TUIConversationServer
@@ -92,17 +94,51 @@ export default class TUIConversationServer extends IComponentServer {
    * @returns {Object}
    */
   private handleFilterSystem(list: any) {
+    list = list.map(item => ({
+      conversationID: item.conversationID,
+      type: this.TUICore.TIM.TYPES.CONV_C2C,
+      unreadCount: item.unread,
+      lastMessage: {
+        messageForShow: item.lastMessage,
+      },
+      userProfile: {},
+    } as Conversation));
+
     const options = {
       allConversationList: list,
       conversationList: [],
     };
+
     const currentList = list.filter((item: any) => item?.conversationID === this?.currentStore?.currentConversationID);
     if (currentList.length === 0) {
       this.handleCurrentConversation({});
     }
     options.conversationList = list.filter((item: any) => item.type !== this.TUICore.TIM.TYPES.CONV_SYSTEM);
     this.store.allConversationList = options.allConversationList;
+    this.store.allConversationList.forEach((item) => {
+      const profileFetch = getCachedProfiles([item.conversationID])[0];
+      profileFetch.done((profile) => {
+        item.userProfile = {
+          userID: profile.get('peerID'),
+          nick: profile.get('name'),
+          location: profile.get('location'),
+          avatar: window['app']?.getServerUrl(`ob/image/${profile.get('avatarHashes')?.small}`),
+        };
+      });
+    });
+
     this.store.conversationList = options.conversationList;
+    this.store.conversationList.forEach((item) => {
+      const profileFetch = getCachedProfiles([item.conversationID])[0];
+      profileFetch.done((profile) => {
+        item.userProfile = {
+          userID: profile.get('peerID'),
+          nick: profile.get('name'),
+          location: profile.get('location'),
+          avatar: window['app']?.getServerUrl(`ob/image/${profile.get('avatarHashes')?.small}`),
+        };
+      });
+    });
     return options;
   }
 
@@ -208,7 +244,7 @@ export default class TUIConversationServer extends IComponentServer {
     return this.handlePromiseCallback(async (resolve: any, reject: any) => {
       try {
         const imResponse = await this.TUICore.tim.getConversationList();
-        this.handleFilterSystem(imResponse.data.conversationList);
+        this.handleFilterSystem(imResponse);
         resolve(imResponse);
       } catch (error) {
         reject(error);

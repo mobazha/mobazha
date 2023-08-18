@@ -13,7 +13,7 @@ import $ from "jquery";
 window.jQuery = window.$ = $;
 window.Sifter = sifter;
 window.MicroPlugin = microplugin;
-$.app = app;
+window.app = app;
 
 const store = createStore({
   modules: {

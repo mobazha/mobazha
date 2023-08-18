@@ -3,6 +3,7 @@ import { TUITheme, TUIi18n, TUIEnv, TUIDirective, TUINotification } from '../../
 import TIM from '../tim';
 import TIMUploadPlugin from 'tim-upload-plugin';
 import TIMProfanityFilterPlugin from 'tim-profanity-filter-plugin';
+import MyChatSDK from '../../myChatSDK';
 
 import ITUIServer from '../interfaces/ITUIServer';
 import TUIStore from '../store';
@@ -41,17 +42,19 @@ export default class TUICore extends ITUIServer {
     this.SDKAppID = params.SDKAppID;
     this.TUIServer = {};
     this.store = new TUIStore();
+
     this.TIM = TIM;
     (window as any).TIM = TIM;
     if (!params.tim) {
-      (window as any).TUIKit = TIM.create({ SDKAppID: this.SDKAppID });
+      (window as any).TUIKit = MyChatSDK; // TIM.create({ SDKAppID: this.SDKAppID });
     } else {
       (window as any).TUIKit = params.tim;
     }
     this.tim = (window as any).TUIKit;
+
     // 注册 COS SDK 插件
-    this.tim.registerPlugin({ 'tim-upload-plugin': TIMUploadPlugin });
-    this.tim.registerPlugin({ 'tim-profanity-filter-plugin': TIMProfanityFilterPlugin });
+    // this.tim.registerPlugin({ 'tim-upload-plugin': TIMUploadPlugin });
+    // this.tim.registerPlugin({ 'tim-profanity-filter-plugin': TIMProfanityFilterPlugin });
 
     this.bindTIMEvent();
     this.TUIEnv = TUIEnv();

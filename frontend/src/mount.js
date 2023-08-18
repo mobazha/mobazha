@@ -1,15 +1,15 @@
-import { createApp } from "vue";
-import { createStore } from "vuex";
-import ElementPlus from "element-plus";
-import * as ElementPlusIconsVue from "@element-plus/icons-vue";
-import "element-plus/dist/index.css";
-import "./assets/scss/main.scss";
-import ShoppingCart from "./components/ShoppingCart.vue";
+import { createApp } from 'vue';
+import { createStore } from 'vuex';
+import ElementPlus from 'element-plus';
+import * as ElementPlusIconsVue from '@element-plus/icons-vue';
+import 'element-plus/dist/index.css';
+import './assets/scss/main.scss';
+import ShoppingCart from './components/ShoppingCart.vue';
 
-import "./assets/global.less";
-import components from "./components/global";
-import products from "./store/products.module";
-import Router from "./router/index";
+import './assets/global.less';
+import components from './components/global';
+import products from './store/products.module';
+import Router from './router/index';
 
 export function moutShoppingCart() {
   const shoppingCart = createApp(ShoppingCart);
@@ -29,14 +29,14 @@ export function moutShoppingCart() {
     },
   });
 
-  shoppingCart.use(Router).use(store).mount("#shoppingCart");
+  shoppingCart.use(Router).use(store).mount('#shoppingCart');
 }
 
 export function moutChat(container) {
   const SDKAppID = 1771000181; // Your SDKAppID
   const secretKey =
-    "340f95d79d6810703504d6b9008c901a20070905605f38ff5a49dd23811f85b6"; //Your secretKey
-  const userID = "test123"; // User ID
+    '340f95d79d6810703504d6b9008c901a20070905605f38ff5a49dd23811f85b6'; //Your secretKey
+  const userID = 'test123'; // User ID
 
   const chat = createApp(Chat);
   chat.config.productionTip = false;

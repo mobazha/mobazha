@@ -1,6 +1,6 @@
-import { defineConfig } from "vite";
-import plugins from "./src/plugins";
-import path from "path";
+import { defineConfig } from 'vite';
+import plugins from './src/plugins';
+import path from 'path';
 // https://vitejs.dev/config/
 export default defineConfig(({ command, mode }) => {
   return {
@@ -11,31 +11,31 @@ export default defineConfig(({ command, mode }) => {
       port: 8088,
     },
     // 基础配置
-    base: "./",
-    publicDir: "public",
+    base: './',
+    publicDir: 'public',
     resolve: {
       alias: {
-        "@": path.resolve(__dirname, "src"),
+        '@': path.resolve(__dirname, 'src'),
       },
     },
     css: {
       preprocessorOptions: {
         less: {
           modifyVars: {
-            "@border-color-base": "#dce3e8",
+            '@border-color-base': '#dce3e8',
           },
           javascriptEnabled: true,
         },
       },
     },
     build: {
-      outDir: "dist",
-      assetsDir: "assets",
+      outDir: 'dist',
+      assetsDir: 'assets',
       assetsInlineLimit: 4096,
       cssCodeSplit: true,
       brotliSize: false,
       sourcemap: false,
-      minify: "terser",
+      minify: 'terser',
       terserOptions: {
         compress: {
           // 生产环境去除console及debug

@@ -1,33 +1,32 @@
-'use strict';
+"use strict";
 
-const path = require('path');
+const path = require("path");
 
 /**
  * 默认配置
  */
 module.exports = (appInfo) => {
-
   const config = {};
 
   /**
    * 应用模式配置
    */
   config.developmentMode = {
-    default: 'vue',
+    default: "vue",
     mode: {
       vue: {
-        hostname: 'localhost',
-        port: 8080
+        hostname: "localhost",
+        port: 8088,
       },
       react: {
-        hostname: 'localhost',
-        port: 3000
+        hostname: "localhost",
+        port: 3000,
       },
       html: {
-        hostname: 'localhost',
-        indexPage: 'index.html'
+        hostname: "localhost",
+        indexPage: "index.html",
       },
-    }
+    },
   };
 
   /**
@@ -38,13 +37,13 @@ module.exports = (appInfo) => {
   /**
    * 应用程序顶部菜单
    */
-  config.openAppMenu = 'dev-show';
+  config.openAppMenu = "dev-show";
 
   /**
    * 主窗口
    */
   config.windowsOption = {
-    title: 'Mobazha',
+    title: "Mobazha",
     width: 1200,
     height: 760,
     minWidth: 1170,
@@ -57,35 +56,35 @@ module.exports = (appInfo) => {
       nodeIntegration: true,
       //preload: path.join(appInfo.baseDir, 'preload', 'bridge.js'),
     },
-    icon: path.join(appInfo.home, 'public', 'images', 'logo.png'),
+    icon: path.join(appInfo.home, "public", "images", "logo.png"),
   };
 
   /**
    * ee框架日志
-   */  
+   */
   config.logger = {
-    encoding: 'utf8',
-    level: 'INFO',
+    encoding: "utf8",
+    level: "INFO",
     outputJSON: false,
     buffer: true,
     enablePerformanceTimer: false,
-    rotator: 'day',
-    appLogName: 'ee.log',
-    coreLogName: 'ee-core.log',
-    errorLogName: 'ee-error.log' 
-  }
+    rotator: "day",
+    appLogName: "ee.log",
+    coreLogName: "ee-core.log",
+    errorLogName: "ee-error.log",
+  };
 
   /**
    * 远程模式-web地址
-   */    
+   */
   config.remoteUrl = {
     enable: false,
-    url: 'http://electron-egg.kaka996.com/'
+    url: "http://electron-egg.kaka996.com/",
   };
 
   /**
    * 内置socket服务
-   */   
+   */
   config.socketServer = {
     enable: false,
     port: 7070,
@@ -97,52 +96,50 @@ module.exports = (appInfo) => {
     transports: ["polling", "websocket"],
     cors: {
       origin: true,
-    }
+    },
   };
 
   /**
    * 内置http服务
-   */     
+   */
   config.httpServer = {
     enable: false,
     https: {
-      enable: false, 
-      key: '/public/ssl/localhost+1.key',
-      cert: '/public/ssl/localhost+1.pem'
+      enable: false,
+      key: "/public/ssl/localhost+1.key",
+      cert: "/public/ssl/localhost+1.pem",
     },
     port: 7071,
     cors: {
-      origin: "*"
+      origin: "*",
     },
     body: {
       multipart: true,
       formidable: {
-        keepExtensions: true
-      }
+        keepExtensions: true,
+      },
     },
     filterRequest: {
-      uris:  [
-        'favicon.ico'
-      ],
-      returnData: ''
-    }
+      uris: ["favicon.ico"],
+      returnData: "",
+    },
   };
 
   /**
    * 主进程
-   */     
+   */
   config.mainServer = {
-    protocol: 'file://',
-    indexPath: '/public/dist/index.html',
-    host: 'localhost',
+    protocol: "file://",
+    indexPath: "/public/dist/index.html",
+    host: "localhost",
     port: 7072,
-  }; 
+  };
 
   /**
    * 硬件加速
    */
   config.hardGpu = {
-    enable: false
+    enable: false,
   };
 
   /**
@@ -152,7 +149,7 @@ module.exports = (appInfo) => {
     mainExit: false,
     childExit: true,
     rendererExit: true,
-  };  
+  };
 
   /**
    * 插件功能
@@ -163,39 +160,39 @@ module.exports = (appInfo) => {
     },
     tray: {
       enable: true,
-      title: 'Mobazha',
-      icon: '/public/images/system-tray.png',
-      macIcon: '/public/images/system-tray-mac.png',
+      title: "Mobazha",
+      icon: "/public/images/system-tray.png",
+      macIcon: "/public/images/system-tray-mac.png",
     },
     security: {
       enable: true,
     },
     awaken: {
       enable: true,
-      protocol: 'mbz',
-      args: []
+      protocol: "mbz",
+      args: [],
     },
     autoUpdater: {
       enable: true,
-      windows: true, 
-      macOS: true, 
+      windows: true,
+      macOS: true,
       linux: false,
       options: {
-        provider: 'generic', 
-        url: 'http://kodo.qiniu.com/'
+        provider: "generic",
+        url: "http://kodo.qiniu.com/",
       },
       force: false,
     },
     javaServer: {
       enable: false,
       port: 18080,
-      jreVersion: 'jre1.8.0_201',
+      jreVersion: "jre1.8.0_201",
       opt: '-server -Xms512M -Xmx512M -Xss512k -Dspring.profiles.active=prod -Dserver.port=${port} -Dlogging.file.path="${path}" ',
-      name: 'java-app.jar'
-    }
+      name: "java-app.jar",
+    },
   };
 
   return {
-    ...config
+    ...config,
   };
-}
+};

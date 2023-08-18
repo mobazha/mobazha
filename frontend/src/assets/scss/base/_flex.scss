@@ -1,0 +1,57 @@
+.flex {
+  display: flex;
+}
+.flex-initial {
+  flex: initial;
+}
+.flex-inline {
+  display: inline-flex;
+}
+@for $i from 1 through 3 {
+  .flex-#{$i} {
+    flex: #{$i};
+  }
+}
+.flex-wrap {
+  flex-wrap: wrap;
+}
+.flex-column {
+  flex-direction: column;
+}
+.flex-a-center {
+  display: flex;
+  align-items: center;
+}
+.flex-a-end {
+  display: flex;
+  align-items: flex-end;
+}
+.flex-j-between {
+  display: flex;
+  justify-content: space-between;
+}
+.flex-j-center {
+  display: flex;
+  justify-content: center;
+}
+.flex-j-end {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.flex-center-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.flex-center-end {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

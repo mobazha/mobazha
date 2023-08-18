@@ -1,0 +1,11 @@
+// 全局
+@import "./base/var"; // 全局变量
+@import "./base/reset"; // reset样式
+@import "./base/base"; // 全局公共样式
+@import "./base/function"; // 封装的功能样式
+@import "./base/icon"; // 图标样式
+@import "./base/flex"; // flex
+@import "./base/animate"; // 动画序列
+//模块
+@import "./module/index"; //公共样式
+@import "./page/index";

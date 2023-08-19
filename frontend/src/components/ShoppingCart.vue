@@ -4,165 +4,154 @@
       <div class="page-head">
         <div class="page-head__left">
           <div class="page-head__name">
-            Shopping Cart<span v-if="cartNum > 0">({{ cartNum }})</span>
+            Shopping Cart<span v-if="tableData.length > 0">({{ cartNum }})</span>
           </div>
-          <div class="clean-btn">Clear Cart</div>
+          <div class="clean-btn" v-if="tableData.length > 0">Clear Cart</div>
         </div>
-        <div class="page-head__right">
-          <el-input
-            v-model="params.keyword"
-            placeholder="Search Orders"
-            :prefix-icon="Search"
-          />
+        <div class="page-head__right" v-if="tableData.length > 0">
+          <div class="search">
+            <el-input class="search-input" v-model="params.keyword" placeholder="Search Orders" :prefix-icon="Search" />
+          </div>
         </div>
       </div>
-      <el-table
-        class="table-hc"
-        :header-row-style="headerRowStyle"
-        :data="[]"
-        :height="38"
-      >
-        <el-table-column label="" width="48"></el-table-column>
-        <el-table-column label="Title" width="400"></el-table-column>
-        <el-table-column label="Type" width="160"></el-table-column>
-        <el-table-column label="Price"></el-table-column>
-        <el-table-column label="Quantity"></el-table-column>
-        <el-table-column label="Total"></el-table-column>
-      </el-table>
-      <div class="card">
-        <el-table
-          :data="tableData"
-          :cell-style="cellStyle"
-          @selection-change="handleSelectionChange"
-        >
-          <el-table-column type="selection" width="48" rowspan="2">
-          </el-table-column>
-          <el-table-column label="" width="400">
-            <template #header>
-              <div class="user">
-                <img class="user-avatar" src="@/assets/img/avatar.png" />
-                <span class="user-name">SBA preparedness outlet</span>
-              </div>
-            </template>
-            <template #default="scoped">
-              <div class="goods">
-                <div class="goods-left">
-                  <img class="goods-img" src="@/assets/img/exam.png" />
+      <div class="page-body" v-loading="loading">
+        <template v-if="tableData.length > 0">
+          <div class="table-hc">
+            <el-table :header-row-style="headerRowStyle" :data="[]" :height="38">
+              <el-table-column width="48"></el-table-column>
+              <el-table-column label="Title" width="400"></el-table-column>
+              <el-table-column label="Type" width="160"></el-table-column>
+              <el-table-column label="Price"></el-table-column>
+              <el-table-column label="Quantity"></el-table-column>
+              <el-table-column label="Total"></el-table-column>
+            </el-table>
+          </div>
+          <div class="card">
+            <div class="card-item" v-for="(item, index) in tableData" :key="index">
+              <el-table ref="table" class="table-hearder-one" :data="item.children" @selection-change="handleSelectionChange($event, index)">
+                <el-table-column type="selection" width="48" rowspan="2"> </el-table-column>
+                <el-table-column width="400">
+                  <template #header>
+                    <div class="user">
+                      <img class="user-avatar" :src="item.avatar" />
+                      <span class="user-name">{{ item.name }}</span>
+                    </div>
+                  </template>
+                  <template v-slot="{ row }">
+                    <div class="goods">
+                      <div class="goods-left">
+                        <img class="goods-img" :src="row.url" />
+                      </div>
+                      <div class="goods-right">
+                        <div class="goods-name">{{ row.name }}</div>
+                        <div class="goods-currency">
+                          <img class="currency-icon" src="@/assets/img/currency/icon_1.png" />
+                          <img class="currency-icon" src="@/assets/img/currency/icon_2.png" />
+                          <img class="currency-icon" src="@/assets/img/currency/icon_3.png" />
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column width="160">
+                  <template v-slot="{ row }">
+                    <div class="sku">
+                      <div class="sku-item" v-for="(val, key) in row.sku" :key="key">
+                        <div class="sku-label">{{ val.label }}</div>
+                        <div class="sku-value">{{ val.value }}</div>
+                      </div>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="price"></el-table-column>
+                <el-table-column>
+                  <template v-slot="{ row }">
+                    <el-input class="input-number" v-model="row.num" />
+                  </template>
+                </el-table-column>
+                <el-table-column>
+                  <template v-slot="{ row }">
+                    {{ countRowPrice(row) }}
+                  </template>
+                </el-table-column>
+              </el-table>
+              <div class="footer" v-if="oneStoreTotalPrice(index).num > 0">
+                <div class="total">
+                  <div class="total-price"><span class="total-name">Total:</span>${{ oneStoreTotalPrice(index).total }}</div>
+                  <div class="count-price">Subtotal:$183.97</div>
+                  <div class="freight">Shipping & handling: Free</div>
                 </div>
-                <div class="goods-right">
-                  <div class="goods-name">
-                    Vintage US Navy Pilot Crew Emergency Light FA-11(M) 6230 -
-                    01 - 035 - 6077 (OCS)
-                  </div>
-                  <div class="goods-currency">
-                    <img
-                      class="currency-icon"
-                      src="@/assets/img/currency/icon_1.png"
-                    />
-                    <img
-                      class="currency-icon"
-                      src="@/assets/img/currency/icon_2.png"
-                    />
-                    <img
-                      class="currency-icon"
-                      src="@/assets/img/currency/icon_3.png"
-                    />
-                  </div>
-                </div>
+                <button class="btn-primary pay-btn" @click="pay(index)">Pay</button>
               </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="" width="160">
-            <template #default="scoped">
-              <div class="sku">
-                <div class="sku-item">
-                  <div class="sku-label">Color</div>
-                  <div class="sku-value">Green</div>
-                </div>
-                <div class="sku-item">
-                  <div class="sku-label">Size</div>
-                  <div class="sku-value">Small</div>
-                </div>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="">
-            <template #default="scoped">
-              {{ scoped.row.price }}
-            </template>
-          </el-table-column>
-          <el-table-column label="">
-            <template #default="scoped">
-              <el-input class="input-number" v-model="num" />
-              <!-- <el-input-number v-model="num" :min="1" /> -->
-            </template>
-          </el-table-column>
-          <el-table-column label="">
-            <template #default="scoped">
-              <div class="row-price">
-                {{ scoped.row.price }}
-              </div>
-            </template>
-          </el-table-column>
-        </el-table>
-        <div class="footer">
-          <div class="total">
-            <div class="total-price">
-              <span class="total-name">Total:</span>$318.24
             </div>
-            <div class="count-price">Subtotal:$183.97</div>
-            <div class="freight">Shipping & handling: Free</div>
           </div>
-          <button class="pay-btn">Pay</button>
-        </div>
+        </template>
       </div>
+      <empty v-if="tableData.length === 0 && !loading" :emptyInfo="emptyInfo" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { Search } from "@element-plus/icons-vue";
-import { reactive } from "vue";
-const cartNum = ref(0);
-const params = reactive({
-  keyword: "",
+import empty from '@/components/empty';
+import { Search } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
+import { products } from './products.js';
+
+const params = reactive({ keyword: '' });
+const tableData = ref([]);
+const table = reactive(null);
+const selectors = ref({}); //选中的商品
+const loading = ref(true);
+
+const emptyInfo = ref({
+  type: 'shoppingCart',
+  icon: new URL('@/assets/img/empty/cart.png', import.meta.url).href,
+  name: 'Your cart is empty!',
+  desc: "The possibilities are endless. Go ahead, find something you'll love.",
+  btn: 'Shop Popular Products',
 });
-const tableData = reactive([
-  {
-    price: "$49.70",
-  },
-  {
-    price: "$49.70",
-  },
-  {
-    price: "$49.70",
-  },
-  {
-    price: "$49.70",
-  },
-]);
-const num = ref(0);
-const handleSelectionChange = (val) => {
-  multipleSelection.value = val;
-};
-function headerRowStyle({ rowIndex }) {
-  if (rowIndex === 0)
-    return { background: "transparent", color: "#000", fontSize: "18px" };
+
+setTimeout(() => {
+  tableData.value = products;
+  loading.value = false;
+}, 1000);
+//每个商品总价
+const countRowPrice = computed(() => {
+  return (row) => Number(row.price * row.num).toFixed(2);
+});
+//每个商店商品总价
+const oneStoreTotalPrice = computed(() => (index) => {
+  let list = selectors.value[index];
+  if (!list) return 0;
+  return { num: list.length, total: list.reduce((cur, next) => cur + next.price * next.num, 0) };
+});
+//购物车商品总数量
+const cartNum = computed(() => {
+  return tableData.value.reduce((cur, next) => cur + next.children.length, 0);
+});
+
+function handleSelectionChange(val, index) {
+  selectors.value[index] = val;
 }
-function cellStyle() {
-  return { "font-size": "14px", color: "#000" };
+//提交当前选中的商店商品
+function pay(index) {
+  const selection = table[index].store.states.selection;
+  if (selection.value.length === 0) return ElMessage.warning('请选择商品');
+  console.log(selection.value);
+}
+//修改头部样式
+function headerRowStyle({ rowIndex }) {
+  if (rowIndex === 0) return { background: 'transparent', color: '#000', fontSize: '18px' };
 }
 </script>
 
-<style lang="scss" scoped>
-@import '@/assets/scss/main.scss';
-
+<style lang="scss" rowd>
 .page-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 31px 0 40px 0;
-  margin-bottom: 30px;
+  padding: 31px 0 30px 0;
   &__left {
     display: flex;
     align-items: center;
@@ -184,16 +173,21 @@ function cellStyle() {
   }
 }
 .card {
-  padding: 20px;
-  border: 1px solid #e0e0e0;
-  background: #fff;
+  &-item {
+    padding: 0 20px 20px 20px;
+    border: 1px solid #e0e0e0;
+    background: #fff;
+    &:not(:last-child) {
+      margin-bottom: 20px;
+    }
+  }
 }
 .user {
   display: flex;
   align-items: center;
   &-avatar {
     width: 32px;
-    height: 32rpx;
+    height: 32px;
     border-radius: 50%;
     flex-shrink: 0;
     margin-right: 10px;
@@ -240,7 +234,7 @@ function cellStyle() {
     font-size: 14px;
     min-width: 50px;
     &::after {
-      content: ":";
+      content: ':';
     }
   }
   &-value {
@@ -283,47 +277,6 @@ function cellStyle() {
     color: #000;
     font-size: 14px;
     line-height: 20px;
-  }
-  .pay-btn {
-    position: relative;
-    width: 120px;
-    height: 48px;
-    text-align: center;
-    line-height: 48px;
-    border: 1.5px solid #fff;
-    background: linear-gradient(180deg, #80d769 0%, #5aae41 100%);
-    box-shadow: 2px 2px 4px 0px rgba(0, 0, 0, 0.25);
-    color: #fff;
-    font-size: 24px;
-    &:active {
-      background: linear-gradient(180deg, #8fdc79 0%, #71b95b 100%);
-    }
-    &:hover:before {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 100%;
-      height: 100%;
-      border: inherit;
-      border-radius: inherit;
-      transform: translate(-50%, -50%);
-      opacity: 0.05;
-      content: " ";
-      background-color: #000;
-      border-color: #000;
-    }
-  }
-}
-:deep() {
-  .table-hc {
-    margin: 0 20px;
-    background: transparent;
-    th.el-table__cell {
-      background: transparent;
-    }
-  }
-  .el-table__row {
-    border: 1px solid red;
   }
 }
 </style>

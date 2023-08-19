@@ -18,7 +18,7 @@ $gray1: #333333; //文字
 $gray2: #666666;
 $gray3: #999999;
 $border: 1px solid #d5d5d5;
-$shadow: 1px 1px 10rpx #eee;
+$shadow: 1px 1px 5px #eee;
 $show: block;
 $hide: none;
 //文本溢出
@@ -36,7 +36,7 @@ $hide: none;
     -webkit-line-clamp: $clamp;
     -webkit-box-orient: vertical;
 }
-@mixin _border($left: 30rpx, $right: 30rpx, $num: 0, $color: #d5d5d5, $direction: bottom) {
+@mixin _border($left: 0px, $right: 0px, $num: 0, $color: #d5d5d5, $direction: bottom) {
     position: absolute;
     box-sizing: border-box;
     content: " ";

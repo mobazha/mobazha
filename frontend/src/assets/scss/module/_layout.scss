@@ -8,8 +8,8 @@ body {
     overflow: hidden;
     background: #f0f0f0;
     input {
-        border: none;
-        padding: 0;
-        line-height: var(--el-input-inner-height);
+        border: none !important;
+        padding: 0 !important;
+        line-height: var(--el-input-inner-height) !important;
     }
 }

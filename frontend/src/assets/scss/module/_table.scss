@@ -1,23 +1,46 @@
 .el-table {
-    .el-table__body td.el-table__cell {
+    --el-table-border-color: #e0e0e0;
+    .cell {
+        word-break: normal;
+    }
+    td.el-table__cell {
+        font-size: 14px;
+        color: #000;
         border: none;
+        border-color: #e0e0e0;
+        border-bottom: 1px solid #e0e0e0;
+        &:first-child {
+            border-left: 1px solid #e0e0e0;
+        }
+        &:last-child {
+            border-right: 1px solid #e0e0e0;
+        }
     }
     .el-table__inner-wrapper::before {
         display: none;
     }
-    td.el-table__cell,
-    th.el-table__cell.is-leaf {
-        border-color: #e0e0e0;
+    thead.is-group th.el-table__cell {
+        background: #fff;
+        border-right: none;
     }
-    .el-table__row td.el-table__cell {
-        border-bottom: 1px solid #e0e0e0;
+    &.el-table--border::before,
+    &.el-table--border::after,
+    &.el-table--border .el-table__inner-wrapper::after,
+    .el-table__border-left-patch {
+        display: none;
     }
-    .el-table__row {
-        td.el-table__cell:first-child {
-            border-left: 1px solid #e0e0e0;
-        }
-        td.el-table__cell:last-child {
-            border-right: 1px solid #e0e0e0;
-        }
+}
+.table-hc {
+    margin: 0 20px;
+    .el-table {
+        background: transparent;
+    }
+    th.el-table__cell {
+        background: transparent;
+    }
+}
+.card {
+    th.el-table__cell {
+        padding: 16px 0;
     }
 }

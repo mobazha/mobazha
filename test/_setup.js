@@ -31,7 +31,7 @@ before(function () {
   // depends on localStorage, which is not available to us in the
   // test environement. So... to work around that, we're stubbing
   // getServerUrl.
-  getServerUrl = sinon.stub(app, 'getServerUrl', (urlFrag) => `http://localhost:8080/ob/${urlFrag}`);
+  getServerUrl = sinon.stub(app, 'getServerUrl', (urlFrag) => `http://localhost:8088/ob/${urlFrag}`);
 
   app.serverConfig = {
     ...(app.serverConfig || {}),

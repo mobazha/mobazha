@@ -17,7 +17,7 @@ module.exports = (appInfo) => {
     mode: {
       vue: {
         hostname: 'localhost',
-        port: 8080
+        port: 8088
       },
       react: {
         hostname: 'localhost',

@@ -1,82 +1,32 @@
-// @mixin buttonStyle($name, $color) {
-//     .el-button--#{$name} {
-//         color: #ffffff;
-//         background-color: $color;
-//         border-color: $color;
-//     }
-//     .el-button--#{$name}:active {
-//         background: $color;
-//         border-color: $color;
-//         color: #ffffff;
-//         outline: none;
-//     }
-//     .el-button--#{$name}:hover,
-//     .el-button--#{$name}:focus {
-//         background: rgba($color, 0.8);
-//         border-color: rgba($color, 0.2);
-//         color: #fff;
-//     }
-//     .el-button--#{$name}.is-plain {
-//         color: $color;
-//         // background: rgba($color, 0.1);
-//         background: #fff;
-//         border-color: rgba($color, 0.4);
-//     }
-//     .el-button--#{$name}.is-plain:hover,
-//     .el-button--#{$name}.is-plain:focus {
-//         color: #fff;
-//         background: $color;
-//         border-color: $color;
-//     }
-//     .el-button--#{$name}.el-button--text {
-//         color: $color;
-//         border-color: transparent;
-//         background-color: transparent;
-//     }
-//     .el-button--#{$name}.el-button--text:hover,
-//     .el-button--#{$name}.el-button--text:focus {
-//         color: rgba($color, 0.8);
-//         border-color: transparent;
-//         background-color: transparent;
-//     }
-// }
-// @include buttonStyle("warning", $orange);
-// @include buttonStyle("danger", $red);
-// @include buttonStyle("success", $green);
-// @include buttonStyle("blue", $blue1);
-// @include buttonStyle("red", $red1);
-// @include buttonStyle("yellow", $yellow1);
-// @include buttonStyle("purple", $purple);
-// @include buttonStyle("pink", $pink);
-// @include buttonStyle("pink2", $pink2);
-
-// .el-button--small {
-//     border-radius: 4px;
-// }
-// .el-button--yellow {
-//     color: black;
-// }
-// .el-button--yellow:hover,
-// .el-button--yellow:focus {
-//     color: rgba(#000000, 0.8);
-// }
-// .el-button--primary.is-plain {
-//     background: #fff;
-// }
-// .el-button {
-//     &--small {
-//         padding-left: 12px;
-//         padding-right: 12px;
-//     }
-//     i {
-//         line-height: 11px;
-//         position: relative;
-//         top: 2px;
-//     }
-// }
-// .el-button [class*="bs-icon-"] + span {
-//     margin-left: 5px;
-// }
-// .el-button.border-radius0 {
-//     border-radius: 0;
-// }
+.btn-primary {
+    position: relative;
+    min-width: 120px;
+    height: 48px;
+    text-align: center;
+    line-height: 48px;
+    border: 1.5px solid #fff;
+    background: linear-gradient(180deg, #80d769 0%, #5aae41 100%);
+    box-shadow: 2px 2px 4px 0px rgba(0, 0, 0, 0.25);
+    color: #fff;
+    font-size: 24px;
+    padding: 0 15px;
+    box-sizing: border-box;
+    cursor: pointer;
+    &:active {
+        background: linear-gradient(180deg, #8fdc79 0%, #71b95b 100%);
+    }
+    &:hover:before {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 100%;
+        height: 100%;
+        border: inherit;
+        border-radius: inherit;
+        transform: translate(-50%, -50%);
+        opacity: 0.05;
+        content: " ";
+        background-color: #000;
+        border-color: #000;
+    }
+}

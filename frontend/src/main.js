@@ -1,5 +1,7 @@
 import { createStore } from 'vuex'
 
+import { TUIComponents, TUICore } from './TUIKit';
+
 import app from '../backbone/app';
 
 import './assets/global.less';
@@ -23,3 +25,10 @@ const store = createStore({
 
 $.vueRouter = Router;
 $.vueStore = store;
+
+// init TUIKit
+const TUIKit = TUICore.init({});
+// TUIKit add TUIComponents
+TUIKit.use(TUIComponents);
+
+window.TUIKit = TUIKit;

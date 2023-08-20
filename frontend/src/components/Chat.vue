@@ -8,7 +8,7 @@
       <TUIConversation @current="handleCurrentConversation" />
     </div> -->
     <div class="chat" v-show="!env?.isH5 || currentModel === 'message'">
-      <TUIChat :conversationID="currentConversationID">
+      <TUIChat :conversationID="conversationID">
         <h1>欢迎使用腾讯云即时通信</h1>
       </TUIChat>
     </div>
@@ -32,13 +32,19 @@ import { handleErrorPrompts } from "../TUIKit/TUIComponents/container/utils";
 
 export default defineComponent({
   name: "Chat",
-  setup() {
+  props: {
+    conversationID: {
+      type: String,
+      default: '',
+    },
+  },
+  setup(props) {
     const data = reactive({
       env: TUIEnv(),
       currentModel: "conversation",
       showCall: false,
       showCallMini: false,
-      currentConversationID: '12D3KooWMKA3jLCcMuJ15od9nJmsX7wWuBNaFgtu6xsaxB3LLiRZ',
+      conversationID: props.conversationID,
     });
     const TUIServer = (window as any)?.TUIKitTUICore?.TUIServer;
     const handleCurrentConversation = (value: string) => {

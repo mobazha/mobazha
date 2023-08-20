@@ -51,6 +51,8 @@ import defaultSearchProviders from './data/defaultSearchProviders';
 import VerifiedMods from './collections/VerifiedMods';
 import VerifiedModsError from './views/modals/VerifiedModsFetchError';
 
+import MyChatSDK from '../src/TUIKit/myChatSDK';
+
 import '/node_modules/ionicons/css/ionicons.min.css';
 import '/node_modules/trumbowyg/dist/ui/trumbowyg.min.css';
 import '/node_modules/selectize/dist/css/selectize.css';
@@ -120,6 +122,8 @@ window.addEventListener('contextmenu', (e) => {
 // Instantiating our Server Configs collection now since the page nav
 // utilizes it. We'll fetch it later on.
 app.serverConfigs = new ServerConfigs();
+
+MyChatSDK.emit(window.TUIKit.TIM.EVENT.SDK_READY, {});
 
 app.pageNav = new PageNav({
   serverConfigs: app.serverConfigs,

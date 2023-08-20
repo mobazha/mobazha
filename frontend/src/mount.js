@@ -38,13 +38,13 @@ export function mountShoppingCart() {
   shoppingCart.use(Router).use(store).mount('#shoppingCart');
 }
 
-export function mountChat(container) {
+export function mountChat(container, conversationID) {
   const SDKAppID = 1771000181; // Your SDKAppID
   const secretKey =
     '340f95d79d6810703504d6b9008c901a20070905605f38ff5a49dd23811f85b6'; //Your secretKey
   const userID = 'test123'; // User ID
 
-  const chat = createApp(Chat);
+  const chat = createApp(Chat, { conversationID });
   chat.config.productionTip = false;
 
   // components
@@ -65,7 +65,7 @@ export function mountChat(container) {
   // TUIKit add TUIComponents
   TUIKit.use(TUIComponents);
   // TUIKit add TUICallKit
-  TUIKit.use(TUICallKit);
+  // TUIKit.use(TUICallKit);
 
   // // login TUIKit
   // TUIKit.login({

@@ -43,7 +43,7 @@ export default class TUIChatServer extends IComponentServer {
     }
     if (
       newValue.conversation.conversationID &&
-      newValue.conversation.conversationID !== oldValue.conversation.conversationID
+      newValue.conversation.conversationID !== oldValue.conversation?.conversationID
     ) {
       this.render(newValue.conversation);
     }

@@ -94,15 +94,6 @@ export default class TUIConversationServer extends IComponentServer {
    * @returns {Object}
    */
   private handleFilterSystem(list: any) {
-    list = list.map(item => ({
-      conversationID: item.conversationID,
-      type: this.TUICore.TIM.TYPES.CONV_C2C,
-      unreadCount: item.unread,
-      lastMessage: {
-        messageForShow: item.lastMessage,
-      },
-      userProfile: {},
-    } as Conversation));
 
     const options = {
       allConversationList: list,
@@ -122,7 +113,7 @@ export default class TUIConversationServer extends IComponentServer {
           userID: profile.get('peerID'),
           nick: profile.get('name'),
           location: profile.get('location'),
-          avatar: window['app']?.getServerUrl(`ob/image/${profile.get('avatarHashes')?.small}`),
+          avatar: window['app']?.getServerUrl(`ob/image/${profile.get('avatarHashes')?.get('small')}`),
         };
       });
     });
@@ -135,7 +126,7 @@ export default class TUIConversationServer extends IComponentServer {
           userID: profile.get('peerID'),
           nick: profile.get('name'),
           location: profile.get('location'),
-          avatar: window['app']?.getServerUrl(`ob/image/${profile.get('avatarHashes')?.small}`),
+          avatar: window['app']?.getServerUrl(`ob/image/${profile.get('avatarHashes')?.get('small')}`),
         };
       });
     });
@@ -244,7 +235,7 @@ export default class TUIConversationServer extends IComponentServer {
     return this.handlePromiseCallback(async (resolve: any, reject: any) => {
       try {
         const imResponse = await this.TUICore.tim.getConversationList();
-        this.handleFilterSystem(imResponse);
+        this.handleFilterSystem(imResponse.data.conversationList);
         resolve(imResponse);
       } catch (error) {
         reject(error);

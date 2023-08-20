@@ -197,6 +197,10 @@ const TUIChat: any = defineComponent({
       type: Boolean,
       default: true,
     },
+    conversationID: {
+      type: String,
+      default: '',
+    },
   },
   setup(props) {
     const { TUIServer } = TUIChat;
@@ -456,6 +460,19 @@ const TUIChat: any = defineComponent({
     );
 
     onMounted(() => {
+      if (data.conversation.conversationID != props.conversationID) {
+        console.log("props: ", props)
+        console.log("emit onConversationIDChanged, conversationID: ", props.conversationID)
+
+        TUIServer.TUICore.getStore().TUIChat.conversation = {
+          conversationID: props.conversationID,
+          type: TUIServer.TUICore.TIM.TYPES.CONV_C2C,
+          userProfile: {
+            userID: props.conversationID,
+          },
+        };
+      }
+
       watch(
         () => messageEle?.value,
         () => {

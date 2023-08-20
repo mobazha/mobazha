@@ -500,7 +500,8 @@ export function getImgLoad(container: any, className: string, callback: any) {
 
 // Determine whether it is url
 export function isUrl(url: string) {
-  return /^(https?:\/\/(([a-zA-Z0-9]+-?)+[a-zA-Z0-9]+\.)+[a-zA-Z]+)(:\d+)?(\/.*)?(\?.*)?(#.*)?$/.test(url);
+  return /^(https?:\/\/(([a-zA-Z0-9]+-?)+[a-zA-Z0-9]+\.)+[a-zA-Z]+)(:\d+)?(\/.*)?(\?.*)?(#.*)?$/.test(url)
+  || /^(https?:\/\/localhost)(:\d+)?(\/.*)?(\?.*)?(#.*)?$/.test(url);
 }
 
 // Handling custom message options

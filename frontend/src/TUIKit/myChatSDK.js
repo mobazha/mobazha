@@ -1,5 +1,6 @@
 "use strict";
 import mitt from 'mitt'
+import moment from 'moment';
 import api from "@/api";
 
 class MyChatSDK {
@@ -30,8 +31,23 @@ class MyChatSDK {
   sendMessageReadReceipt() {}
   getMessageReadReceiptList() {}
 
-  getMessageList() {
-    // TODO:
+  getMessageList(params) {
+    return api.getConversationMessage({peerID: params.conversationID, limit: params.count, offsetID: params.nextReqMessageID}).then((list) => {
+      list = list.map(item => (
+        {
+          ID: item.messageID,
+          type: window.TIM.TYPES.MSG_TEXT,
+          conversationID: item.peerID,
+          conversationType: window.TIM.TYPES.CONV_C2C,
+          to: item.outgoing ? item.peerID : '',
+          from: !item.outgoing ? item.peerID : '',
+          time: moment(item.timestamp).unix(),
+          payload: { text: item.message },
+        }
+      ));
+
+      return {data: { messageList: list }};
+    });
   }
   createTextMessage() {
     // TODO:
@@ -48,7 +64,17 @@ class MyChatSDK {
     // TODO:
   }
   getMyProfile() {
-    // TODO:
+    return api.getMyProfile().then((profile) => (
+      {
+        data: {
+          userID: profile.peerID,
+          nick: profile.name,
+          location: profile.location,
+          selfSignature: profile.about,
+          avatar: window['app']?.getServerUrl(`ob/image/${profile?.avatarHashes?.small}`),
+        },
+      }
+    ));
   }
   updateMyProfile() {
     // TODO:
@@ -64,7 +90,18 @@ class MyChatSDK {
   unsubscribeUserStatus() {}
 
   getConversationList() {
-    return api.getConversationList()
+    return api.getConversationList().then((list => {
+      list = list.map(item => ({
+        conversationID: item.conversationID,
+        type: window.TIM.TYPES.CONV_C2C,
+        unreadCount: item.unread,
+        lastMessage: {
+          messageForShow: item.lastMessage,
+        },
+        userProfile: {},
+      }));
+      return { data: {conversationList: list} };
+    }))
   }
   getConversationProfile() {
     // TODO:

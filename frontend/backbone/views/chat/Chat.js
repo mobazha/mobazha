@@ -299,7 +299,7 @@ export default class extends baseVw {
         });
       });
 
-    mountChat('#chatConvoContainer');
+    mountChat('#chatConvoContainer', guid);
     // this.$chatConvoContainer
     //   .append(this.conversation.render().el);
 

@@ -1,19 +1,19 @@
 <template>
   <div class="home-TUIKit-main">
-    <div
+    <!-- <div
       :class="env?.isH5 ? 'conversation-h5' : 'conversation'"
       v-show="!env?.isH5 || currentModel === 'conversation'"
     >
       <TUISearch class="TUI-search" />
       <TUIConversation @current="handleCurrentConversation" />
-    </div>
+    </div> -->
     <div class="chat" v-show="!env?.isH5 || currentModel === 'message'">
-      <TUIChat>
+      <TUIChat :conversationID="currentConversationID">
         <h1>欢迎使用腾讯云即时通信</h1>
       </TUIChat>
     </div>
     <!-- TUICallKit 组件：通话 UI 组件主体 -->
-    <TUICallKit
+    <!-- <TUICallKit
       :class="!showCallMini ? 'callkit-drag-container' : 'callkit-drag-container-mini'"
       :allowedMinimized="true"
       :allowedFullScreen="false"
@@ -21,7 +21,7 @@
       :afterCalling="afterCalling"
       :onMinimized="onMinimized"
       :onMessageSentByMe="onMessageSentByMe"
-    />
+    /> -->
   </div>
 </template>
 
@@ -38,6 +38,7 @@ export default defineComponent({
       currentModel: "conversation",
       showCall: false,
       showCallMini: false,
+      currentConversationID: '12D3KooWMKA3jLCcMuJ15od9nJmsX7wWuBNaFgtu6xsaxB3LLiRZ',
     });
     const TUIServer = (window as any)?.TUIKitTUICore?.TUIServer;
     const handleCurrentConversation = (value: string) => {

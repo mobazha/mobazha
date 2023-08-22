@@ -93,9 +93,9 @@
 </template>
 
 <script setup>
-import empty from '@/components/empty';
 import { Search } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
+import Empty from './Empty.vue';
 import { products } from './products.js';
 
 const params = reactive({ keyword: '' });

@@ -107,11 +107,12 @@
 </template>
 
 <script setup>
-import empty from '@/components/empty';
 import { Search } from '@element-plus/icons-vue';
-import { reactive } from 'vue';
-import { products } from './products.js';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { reactive } from 'vue';
+import Empty from './Empty';
+import { products } from './products.js';
+
 
 const params = reactive({ keyword: '' });
 const tableData = ref([]);

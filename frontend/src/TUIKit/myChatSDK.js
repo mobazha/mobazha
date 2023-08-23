@@ -92,7 +92,7 @@ class MyChatSDK {
   getConversationList() {
     return api.getConversationList().then((list => {
       list = list.map(item => ({
-        conversationID: item.conversationID,
+        conversationID: item.peerID,
         type: window.TIM.TYPES.CONV_C2C,
         unreadCount: item.unread,
         lastMessage: {

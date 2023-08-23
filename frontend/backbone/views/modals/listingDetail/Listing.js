@@ -32,6 +32,8 @@ import MoreListings from './MoreListings';
 import CryptoTradingPair from '../../components/CryptoTradingPair';
 import SupportedCurrenciesList from '../../components/SupportedCurrenciesList';
 
+import api from '../../../../src/api';
+
 export default class extends BaseModal {
   constructor(options = {}) {
     if (!options.model) {
@@ -251,6 +253,7 @@ export default class extends BaseModal {
       'click .js-photoNext': 'onClickPhotoNext',
       'click .js-goToStore': 'onClickGoToStore',
       'click .js-purchaseBtn': 'startPurchase',
+      'click .js-addToCartBtn': 'addToCart',
       'click .js-rating': 'clickRating',
       'change .js-variantSelect': 'onChangeVariantSelect',
       'click .js-reloadOutdated': 'onClickReloadOutdated',
@@ -659,13 +662,7 @@ export default class extends BaseModal {
     //   }
     }
 
-    const selectedVariants = [];
-    this.variantSelects.each((i, select) => {
-      const variant = {};
-      variant.name = $(select).attr('name');
-      variant.value = $(select).val();
-      selectedVariants.push(variant);
-    });
+    const selectedVariants = this.getSelectedVariants();
 
     if (this._purchaseModal) this._purchaseModal.remove();
 
@@ -699,6 +696,28 @@ export default class extends BaseModal {
 
     this.listenTo(this._purchaseModal, 'closeBtnPressed', () => this.close());
     recordEvent('Purchase_Start', { ownListing: this.model.isOwnListing });
+  }
+
+  getSelectedVariants() {
+    const selectedVariants = [];
+    this.variantSelects.each((i, select) => {
+      const variant = {};
+      variant.name = $(select).attr('name');
+      variant.value = $(select).val();
+      selectedVariants.push(variant);
+    });
+
+    return selectedVariants;
+  }
+
+  addToCart() {
+    const selectedVariants = this.getSelectedVariants();
+
+    api.addToShoppingCart(this.vendor.peerID, {
+      listingHash: this.model.get('hash'),
+      quantity: '1',
+      options: selectedVariants || [],
+    })
   }
 
   get shipsFreeToMe() {

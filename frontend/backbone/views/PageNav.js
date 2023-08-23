@@ -79,6 +79,9 @@ export default class extends BaseVw {
       this.fetchUnreadNotifCount().done((data) => {
         this.unreadNotifCount = (this.unreadNotifCount || 0) + data.unread;
       });
+      this.fetchCartItemsCount().done((count) => {
+        this.cartItemsCount = count;
+      });
       this.listenTo(e.socket, 'message', this.onSocketMessage);
     });
 
@@ -88,13 +91,13 @@ export default class extends BaseVw {
       this.torIndicatorOn = false;
       this.stopListening(app.router, null, this.onRouteSearch);
       this.getCachedEl('.js-notifUnreadBadge').addClass('hide');
+      this.getCachedEl('.js-cartItemsCountBadge').addClass('hide');
       this.stopListening(e.socket, 'message', this.onSocketMessage);
     });
   }
 
   onSocketMessage(e) {
     const notif = e.jsonData.notification;
-
     if (notif) {
       if (notif.type === 'unfollow') return;
       this.unreadNotifCount = (this.unreadNotifCount || 0) + 1;
@@ -117,6 +120,11 @@ export default class extends BaseVw {
       }
 
       launchNativeNotification(notifDisplayData.text, nativeNotifData);
+    }
+
+    const shoppingCart = e.jsonData.shoppingCart;
+    if (shoppingCart) {
+      this.cartItemsCount = shoppingCart.itemsCount;
     }
   }
 
@@ -185,6 +193,20 @@ export default class extends BaseVw {
     setUnreadNotifCount(this.unreadNotifCount);
   }
 
+  get cartItemsCount() {
+    return this._cartItemsCount;
+  }
+
+  set cartItemsCount(count) {
+    if (typeof count !== 'number') {
+      throw new Error('Please provide a count as a number.');
+    }
+
+    if (count === this._cartItemsCount) return;
+    this._cartItemsCount = count;
+    this.renderCartItemsCount();
+  }
+
   fetchUnreadNotifCount() {
     if (this.unreadNotifCountFetch) this.unreadNotifCountFetch.abort();
 
@@ -199,6 +221,17 @@ export default class extends BaseVw {
       .toggleClass('hide', !this.unreadNotifCount)
       .toggleClass('ellipsisShown', this.unreadNotifCount > 99)
       .text(this.unreadNotifCount > 99 ? '…' : this.unreadNotifCount);
+  }
+
+  fetchCartItemsCount() {
+    return $.get(app.getServerUrl('ob/carts/itemsCount'));
+  }
+
+  renderCartItemsCount() {
+    this.getCachedEl('.js-cartItemsCountBadge')
+      .toggleClass('hide', !this.cartItemsCount)
+      .toggleClass('ellipsisShown', this.cartItemsCount > 99)
+      .text(this.cartItemsCount > 99 ? '…' : this.cartItemsCount);
   }
 
   setWinControlsStyle(style) {
@@ -536,6 +569,7 @@ export default class extends BaseVw {
     this.$connManagementContainer = this.$('.js-connManagementContainer');
 
     this.renderUnreadNotifCount();
+    this.renderCartItemsCount();
 
     return this;
   }

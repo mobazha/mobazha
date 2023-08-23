@@ -1,6 +1,8 @@
-import chat from "./chat";
 import { ipcApiRoute } from "./main"
+import chat from "./chat";
+import shoppingCart from "./shoppingCart";
 export default {
-  ...chat,
   ipcApiRoute,
+  ...chat,
+  ...shoppingCart,
 };

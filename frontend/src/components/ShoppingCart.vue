@@ -17,58 +17,79 @@
           <div class="table-hc">
             <el-table :header-row-style="headerRowStyle" :data="[]" :height="38">
               <el-table-column width="48"></el-table-column>
-              <el-table-column label="Title" width="400"></el-table-column>
+              <el-table-column label="Title" width="350"></el-table-column>
               <el-table-column label="Type" width="160"></el-table-column>
               <el-table-column label="Price"></el-table-column>
-              <el-table-column label="Quantity"></el-table-column>
+              <el-table-column label="Quantity" width="100"></el-table-column>
               <el-table-column label="Total"></el-table-column>
+              <el-table-column label="Operate" width="100"></el-table-column>
             </el-table>
           </div>
           <div class="card">
             <div class="card-item" v-for="(item, index) in tableData" :key="index">
-              <el-table ref="table" class="table-hearder-one" :data="item.items" @selection-change="handleSelectionChange($event, index)">
-                <el-table-column type="selection" width="48" rowspan="2"> </el-table-column>
-                <el-table-column width="400">
+              <el-table
+                :header-cell-style="headerCellStyle"
+                ref="table"
+                class="table-hearder-one"
+                :data="item.items"
+                @selection-change="handleSelectionChange($event, index)"
+              >
+                <el-table-column>
                   <template #header>
                     <div class="user">
                       <img class="user-avatar" :src="item.avatar" @click="goToStore(item.vendorID)" />
-                      <span class="user-name" @click="goToStore(item.vendorID)" >{{ item.name }}</span>
-                      <span class="user-id">{{ item.vendorID }}</span>
+                      <div class="user-body">
+                        <div class="user-name" @click="goToStore(item.vendorID)">{{ item.name }}</div>
+                        <div class="user-id">{{ item.vendorID }}</div>
+                      </div>
                     </div>
                   </template>
-                  <template v-slot="{ row }">
-                    <div class="goods">
-                      <div class="goods-left">
-                        <img class="goods-img" :src="row.image" @click="goToListing(item.vendorID, row.slug)" />
-                      </div>
-                      <div class="goods-right">
-                        <div class="goods-title" @click="goToListing(item.vendorID, row.slug)">{{ row.title }}</div>
-                        <div class="goods-currency" v-for="(currency, index) in row.acceptedCurrencies" :key="index">
-                          <img class="currency-icon" :src="`../../imgs/cryptoIcons/${currency}-icon.png`" />
+                  <template #default>
+                    <el-table-column type="selection" width="48"> </el-table-column>
+                    <el-table-column width="350">
+                      <template v-slot="{ row }">
+                        <div class="goods">
+                          <div class="goods-left">
+                            <img class="goods-img" :src="row.image" @click="goToListing(item.vendorID, row.slug)" />
+                          </div>
+                          <div class="goods-right">
+                            <div class="goods-title" @click="goToListing(item.vendorID, row.slug)">{{ row.title }}</div>
+                            <div class="goods-currency">
+                              <img
+                                class="currency-icon"
+                                :src="`../../imgs/cryptoIcons/${currency}-icon.png`"
+                                v-for="(currency, index) in row.acceptedCurrencies"
+                                :key="index"
+                              />
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </template>
-                </el-table-column>
-                <el-table-column width="160">
-                  <template v-slot="{ row }">
-                    <div class="sku">
-                      <div class="sku-item" v-for="(val, key) in row.options" :key="key">
-                        <div class="sku-name">{{ val.name }}</div>
-                        <div class="sku-value">{{ val.value }}</div>
-                      </div>
-                    </div>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="price"></el-table-column>
-                <el-table-column>
-                  <template v-slot="{ row }">
-                    <el-input class="input-number" v-model="row.quantity" />
-                  </template>
-                </el-table-column>
-                <el-table-column>
-                  <template v-slot="{ row }">
-                    {{ countRowPrice(row) }}
+                      </template>
+                    </el-table-column>
+                    <el-table-column width="160">
+                      <template v-slot="{ row }">
+                        <div class="sku">
+                          <div class="sku-item" v-for="(val, key) in row.options" :key="key">
+                            <div class="sku-name">{{ val.name }}</div>
+                            <div class="sku-value">{{ val.value }}</div>
+                          </div>
+                        </div>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="price"></el-table-column>
+                    <el-table-column width="100">
+                      <template v-slot="{ row }">
+                        <el-input class="input-number" v-model="row.quantity" />
+                      </template>
+                    </el-table-column>
+                    <el-table-column>
+                      <template v-slot="{ row }">{{ countRowPrice(row) }}</template>
+                    </el-table-column>
+                    <el-table-column width="100">
+                      <template v-slot="{ row }">
+                        <el-button @click="doDelete(row, index)" type="info" :icon="Delete" circle />
+                      </template>
+                    </el-table-column>
                   </template>
                 </el-table-column>
               </el-table>
@@ -90,8 +111,9 @@
 </template>
 
 <script setup>
+import { Delete } from '@element-plus/icons-vue';
 import { Search } from '@element-plus/icons-vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import $ from 'jquery';
 import Empty from './Empty.vue';
 import { products } from './products.js';
@@ -102,7 +124,7 @@ const params = reactive({ keyword: '' });
 const tableData = ref([]);
 const table = reactive({});
 const selectors = ref({}); //选中的商品
-const loading = ref(true);
+const loading = ref(false);
 
 const emptyInfo = ref({
   type: 'shoppingCart',
@@ -112,30 +134,53 @@ const emptyInfo = ref({
   btn: 'Shop Popular Products',
 });
 
-setTimeout(() => {
-  api.getShoppingCarts().then(carts => {
-    tableData.value = carts;
-    tableData.value.forEach(cart => {
-      getCachedProfiles([cart.vendorID])[0].done(profile => {
-        cart.name = profile.get('name');
-        cart.avatar = window['app']?.getServerUrl(`ob/image/${profile.get('avatarHashes')?.get('small')}`)
-      });
+loadData();
 
-      cart.items?.forEach(item => {
-        $.get(window['app']?.getServerUrl(`ob/listing/${item.listingHash}`)).then(listing => {
-          let listingItem = listing.listing.item;
-          item.title = listingItem.title;
-          item.slug = listing.listing.slug;
-          item.image = window['app']?.getServerUrl(`ob/image/${listingItem.images[0]?.small}`);
-          item.price = listingItem.price;
-          item.acceptedCurrencies = listing.listing.metadata.acceptedCurrencies;
-        })
+function loadData() {
+  try {
+    loading.value = true;
+    api.getShoppingCarts().then((carts) => {
+      tableData.value = carts;
+      tableData.value.forEach((cart) => {
+        getCachedProfiles([cart.vendorID])[0].done((profile) => {
+          cart.name = profile.get('name');
+          cart.avatar = window['app']?.getServerUrl(`ob/image/${profile.get('avatarHashes')?.get('small')}`);
+        });
+        cart.items?.forEach((item) => {
+          $.get(window['app']?.getServerUrl(`ob/listing/${item.listingHash}`)).then((listing) => {
+            let listingItem = listing.listing.item;
+            item.title = listingItem.title;
+            item.slug = listing.listing.slug;
+            item.image = window['app']?.getServerUrl(`ob/image/${listingItem.images[0]?.small}`);
+            item.price = listingItem.price;
+            item.acceptedCurrencies = listing.listing.metadata.acceptedCurrencies;
+          });
+        });
       });
-    })
-  })
-  // tableData.value = products;
-  loading.value = false;
-}, 100);
+      loading.value = false;
+    });
+    // tableData.value = products;
+  } catch {
+    loading.value = false;
+  }
+}
+
+//删除单个商品
+function doDelete(row, index) {
+  ElMessageBox.confirm('确定删除该商品吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+    callback: (action) => {
+      if (action === 'confirm') {
+        //tableData.value.splice(index, 1)为展示效果，调用删除接口，再刷新
+        tableData.value.splice(index, 1);
+        ElMessage({ type: 'success', message: '已删除' });
+        loadData();
+      }
+    },
+  });
+}
 
 //每个商品总价
 const countRowPrice = computed(() => {
@@ -171,11 +216,14 @@ function pay(index) {
 }
 //修改头部样式
 function headerRowStyle({ rowIndex }) {
-  if (rowIndex === 0) return { background: 'transparent', color: '#000', fontSize: '18px' };
+  if (rowIndex === 0) return { background: 'transparent', color: '#000', fontSize: '16px' };
+}
+function headerCellStyle({ rowIndex }) {
+  if (rowIndex === 1) return { display: 'none' };
 }
 </script>
 
-<style lang="scss" rowd>
+<style lang="scss" scoped>
 .page-head {
   display: flex;
   align-items: center;
@@ -222,6 +270,9 @@ function headerRowStyle({ rowIndex }) {
     flex-shrink: 0;
     margin-right: 10px;
   }
+  &-body {
+    flex: 1;
+  }
   &-name {
     cursor: pointer;
     text-decoration: underline;
@@ -232,7 +283,8 @@ function headerRowStyle({ rowIndex }) {
     }
   }
   &-id {
-    font-size: 16px;
+    word-break: break-all;
+    font-size: 14px;
     color: #787878;
   }
 }
@@ -266,7 +318,9 @@ function headerRowStyle({ rowIndex }) {
   .currency-icon {
     width: 16px;
     height: 16px;
-    margin-right: 4px;
+    &:not(:last-child) {
+      margin-right: 4px;
+    }
   }
 }
 .sku {

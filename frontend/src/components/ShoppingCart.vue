@@ -31,7 +31,7 @@
                 <el-table-column width="400">
                   <template #header>
                     <div class="user">
-                      <img class="user-avatar" :src="item.avatar" />
+                      <img class="user-avatar" :src="item.avatar" @click="goToStore(item.vendorID)" />
                       <span class="user-name" @click="goToStore(item.vendorID)" >{{ item.name }}</span>
                       <span class="user-id">{{ item.vendorID }}</span>
                     </div>
@@ -39,7 +39,7 @@
                   <template v-slot="{ row }">
                     <div class="goods">
                       <div class="goods-left">
-                        <img class="goods-img" :src="row.image" />
+                        <img class="goods-img" :src="row.image" @click="goToListing(item.vendorID, row.slug)" />
                       </div>
                       <div class="goods-right">
                         <div class="goods-title" @click="goToListing(item.vendorID, row.slug)">{{ row.title }}</div>
@@ -215,6 +215,7 @@ function headerRowStyle({ rowIndex }) {
   display: flex;
   align-items: center;
   &-avatar {
+    cursor: pointer;
     width: 32px;
     height: 32px;
     border-radius: 50%;
@@ -244,6 +245,7 @@ function headerRowStyle({ rowIndex }) {
     margin-right: 12px;
   }
   &-img {
+    cursor: pointer;
     width: 100%;
     height: 100%;
   }

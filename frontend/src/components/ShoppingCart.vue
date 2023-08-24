@@ -32,7 +32,8 @@
                   <template #header>
                     <div class="user">
                       <img class="user-avatar" :src="item.avatar" />
-                      <span class="user-name">{{ item.name }}</span>
+                      <span class="user-name" @click="goToStore(item.vendorID)" >{{ item.name }}</span>
+                      <span class="user-id">{{ item.vendorID }}</span>
                     </div>
                   </template>
                   <template v-slot="{ row }">
@@ -41,11 +42,9 @@
                         <img class="goods-img" :src="row.image" />
                       </div>
                       <div class="goods-right">
-                        <div class="goods-name">{{ row.title }}</div>
-                        <div class="goods-currency">
-                          <img class="currency-icon" src="@/assets/img/currency/icon_1.png" />
-                          <img class="currency-icon" src="@/assets/img/currency/icon_2.png" />
-                          <img class="currency-icon" src="@/assets/img/currency/icon_3.png" />
+                        <div class="goods-title" @click="goToListing(item.vendorID, row.slug)">{{ row.title }}</div>
+                        <div class="goods-currency" v-for="(currency, index) in row.acceptedCurrencies" :key="index">
+                          <img class="currency-icon" :src="`../../imgs/cryptoIcons/${currency}-icon.png`" />
                         </div>
                       </div>
                     </div>
@@ -93,12 +92,15 @@
 <script setup>
 import { Search } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
+import $ from 'jquery';
 import Empty from './Empty.vue';
 import { products } from './products.js';
+import api from '../api';
+import { getCachedProfiles } from '../../backbone/models/profile/Profile';
 
 const params = reactive({ keyword: '' });
 const tableData = ref([]);
-const table = reactive(null);
+const table = reactive({});
 const selectors = ref({}); //选中的商品
 const loading = ref(true);
 
@@ -111,9 +113,30 @@ const emptyInfo = ref({
 });
 
 setTimeout(() => {
-  tableData.value = products;
+  api.getShoppingCarts().then(carts => {
+    tableData.value = carts;
+    tableData.value.forEach(cart => {
+      getCachedProfiles([cart.vendorID])[0].done(profile => {
+        cart.name = profile.get('name');
+        cart.avatar = window['app']?.getServerUrl(`ob/image/${profile.get('avatarHashes')?.get('small')}`)
+      });
+
+      cart.items?.forEach(item => {
+        $.get(window['app']?.getServerUrl(`ob/listing/${item.listingHash}`)).then(listing => {
+          let listingItem = listing.listing.item;
+          item.title = listingItem.title;
+          item.slug = listing.listing.slug;
+          item.image = window['app']?.getServerUrl(`ob/image/${listingItem.images[0]?.small}`);
+          item.price = listingItem.price;
+          item.acceptedCurrencies = listing.listing.metadata.acceptedCurrencies;
+        })
+      });
+    })
+  })
+  // tableData.value = products;
   loading.value = false;
-}, 1000);
+}, 100);
+
 //每个商品总价
 const countRowPrice = computed(() => {
   return (row) => Number(row.price * row.quantity).toFixed(2);
@@ -128,6 +151,14 @@ const oneStoreTotalPrice = computed(() => (index) => {
 const cartNum = computed(() => {
   return tableData.value.reduce((cur, next) => cur + next.items.length, 0);
 });
+
+function goToStore(peerID) {
+  window.location = `#${peerID}/store`;
+}
+
+function goToListing(vendorID, slug) {
+  window.location = `#${vendorID}/store/${slug}`;
+}
 
 function handleSelectionChange(val, index) {
   selectors.value[index] = val;
@@ -191,8 +222,17 @@ function headerRowStyle({ rowIndex }) {
     margin-right: 10px;
   }
   &-name {
+    cursor: pointer;
+    text-decoration: underline;
     font-size: 16px;
     color: #000000;
+    &:hover {
+      opacity: 0.8;
+    }
+  }
+  &-id {
+    font-size: 16px;
+    color: #787878;
   }
 }
 .goods {
@@ -211,10 +251,15 @@ function headerRowStyle({ rowIndex }) {
     flex: 1;
   }
   &-title {
+    cursor: pointer;
+    text-decoration: underline;
     color: #000;
     font-size: 14px;
     line-height: 20px;
     margin-bottom: 8px;
+    &:hover {
+      opacity: 0.8;
+    }
   }
   .currency-icon {
     width: 16px;

@@ -26,7 +26,7 @@
           </div>
           <div class="card">
             <div class="card-item" v-for="(item, index) in tableData" :key="index">
-              <el-table ref="table" class="table-hearder-one" :data="item.children" @selection-change="handleSelectionChange($event, index)">
+              <el-table ref="table" class="table-hearder-one" :data="item.items" @selection-change="handleSelectionChange($event, index)">
                 <el-table-column type="selection" width="48" rowspan="2"> </el-table-column>
                 <el-table-column width="400">
                   <template #header>
@@ -38,10 +38,10 @@
                   <template v-slot="{ row }">
                     <div class="goods">
                       <div class="goods-left">
-                        <img class="goods-img" :src="row.url" />
+                        <img class="goods-img" :src="row.image" />
                       </div>
                       <div class="goods-right">
-                        <div class="goods-name">{{ row.name }}</div>
+                        <div class="goods-name">{{ row.title }}</div>
                         <div class="goods-currency">
                           <img class="currency-icon" src="@/assets/img/currency/icon_1.png" />
                           <img class="currency-icon" src="@/assets/img/currency/icon_2.png" />
@@ -54,8 +54,8 @@
                 <el-table-column width="160">
                   <template v-slot="{ row }">
                     <div class="sku">
-                      <div class="sku-item" v-for="(val, key) in row.sku" :key="key">
-                        <div class="sku-label">{{ val.label }}</div>
+                      <div class="sku-item" v-for="(val, key) in row.options" :key="key">
+                        <div class="sku-name">{{ val.name }}</div>
                         <div class="sku-value">{{ val.value }}</div>
                       </div>
                     </div>
@@ -64,7 +64,7 @@
                 <el-table-column prop="price"></el-table-column>
                 <el-table-column>
                   <template v-slot="{ row }">
-                    <el-input class="input-number" v-model="row.num" />
+                    <el-input class="input-number" v-model="row.quantity" />
                   </template>
                 </el-table-column>
                 <el-table-column>
@@ -73,7 +73,7 @@
                   </template>
                 </el-table-column>
               </el-table>
-              <div class="footer" v-if="oneStoreTotalPrice(index).num > 0">
+              <div class="footer" v-if="oneStoreTotalPrice(index).quantity > 0">
                 <div class="total">
                   <div class="total-price"><span class="total-name">Total:</span>${{ oneStoreTotalPrice(index).total }}</div>
                   <div class="count-price">Subtotal:$183.97</div>
@@ -116,17 +116,17 @@ setTimeout(() => {
 }, 1000);
 //每个商品总价
 const countRowPrice = computed(() => {
-  return (row) => Number(row.price * row.num).toFixed(2);
+  return (row) => Number(row.price * row.quantity).toFixed(2);
 });
 //每个商店商品总价
 const oneStoreTotalPrice = computed(() => (index) => {
   let list = selectors.value[index];
   if (!list) return 0;
-  return { num: list.length, total: list.reduce((cur, next) => cur + next.price * next.num, 0) };
+  return { quantity: list.length, total: list.reduce((cur, next) => cur + next.price * next.quantity, 0) };
 });
 //购物车商品总数量
 const cartNum = computed(() => {
-  return tableData.value.reduce((cur, next) => cur + next.children.length, 0);
+  return tableData.value.reduce((cur, next) => cur + next.items.length, 0);
 });
 
 function handleSelectionChange(val, index) {
@@ -210,7 +210,7 @@ function headerRowStyle({ rowIndex }) {
   &-right {
     flex: 1;
   }
-  &-name {
+  &-title {
     color: #000;
     font-size: 14px;
     line-height: 20px;
@@ -227,7 +227,7 @@ function headerRowStyle({ rowIndex }) {
     display: flex;
     line-height: 16px;
   }
-  &-label {
+  &-name {
     color: #000;
     font-size: 14px;
     min-width: 50px;

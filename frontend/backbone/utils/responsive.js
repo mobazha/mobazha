@@ -14,7 +14,7 @@ export function isSmallHeight() {
   return window.matchMedia('(max-height: 700px)').matches;
 }
 
-function getBackgroundImage(imageHashes = {}, standardSize, responsiveSize, defaultUrl) {
+function getBackgroundImage(imageHashes = {}, standardSize, responsiveSize, defaultUrl, needUrl = false) {
   let imageHash = '';
   let bgImageProperty = '';
 
@@ -25,16 +25,16 @@ function getBackgroundImage(imageHashes = {}, standardSize, responsiveSize, defa
   }
 
   if (imageHash) {
-    bgImageProperty = `background-image: url(${app.getServerUrl(`ob/image/${imageHash}`)})` +
+    bgImageProperty = needUrl ? app.getServerUrl(`ob/image/${imageHash}`) : `background-image: url(${app.getServerUrl(`ob/image/${imageHash}`)})` +
       `, url(${defaultUrl})`;
   } else {
-    bgImageProperty = `background-image: url(${defaultUrl})`;
+    bgImageProperty = needUrl ? defaultUrl : `background-image: url(${defaultUrl})`;
   }
 
   return bgImageProperty;
 }
 
-export function getAvatarBgImage(avatarHashes = {}, options = {}) {
+export function getAvatarBgImage(avatarHashes = {}, options = {}, needUrl = false) {
   const opts = {
     standardSize: 'tiny',
     responsiveSize: 'small',
@@ -43,10 +43,10 @@ export function getAvatarBgImage(avatarHashes = {}, options = {}) {
   };
 
   return getBackgroundImage(avatarHashes, opts.standardSize, opts.responsiveSize,
-    opts.defaultUrl);
+    opts.defaultUrl, needUrl);
 }
 
-export function getListingBgImage(imageHashes = {}, options = {}) {
+export function getListingBgImage(imageHashes = {}, options = {}, needUrl = false) {
   const opts = {
     standardSize: 'tiny',
     responsiveSize: 'small',
@@ -55,6 +55,6 @@ export function getListingBgImage(imageHashes = {}, options = {}) {
   };
 
   return getBackgroundImage(imageHashes, opts.standardSize, opts.responsiveSize,
-    opts.defaultUrl);
+    opts.defaultUrl, needUrl);
 }
 

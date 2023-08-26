@@ -37,9 +37,9 @@
                 <el-table-column>
                   <template #header>
                     <div class="user">
-                      <img class="user-avatar" :src="item.avatar" @click="goToStore(item.vendorID)" />
+                      <img class="user-avatar" :src="getAvatarBgImage(item.profile?.avatarHashes, {}, true)" @click="goToStore(item.vendorID)" />
                       <div class="user-body">
-                        <div class="user-name" @click="goToStore(item.vendorID)">{{ item.name }}</div>
+                        <div class="user-name" @click="goToStore(item.vendorID)">{{ item.profile?.name }}</div>
                         <div class="user-id">{{ item.vendorID }}</div>
                       </div>
                     </div>
@@ -50,15 +50,15 @@
                       <template v-slot="{ row }">
                         <div class="goods">
                           <div class="goods-left">
-                            <img class="goods-img" :src="row.image" @click="goToListing(item.vendorID, row.slug)" />
+                            <img class="goods-img" :src="getListingBgImage(row.listing?.item.images[0], {}, true)" @click="goToListing(item.vendorID, row.listing?.slug)" />
                           </div>
                           <div class="goods-right">
-                            <div class="goods-title" @click="goToListing(item.vendorID, row.slug)">{{ row.title }}</div>
+                            <div class="goods-title" @click="goToListing(item.vendorID, row.listing?.slug)">{{ row.listing?.item.title }}</div>
                             <div class="goods-currency">
                               <img
                                 class="currency-icon"
                                 :src="`../../imgs/cryptoIcons/${currency}-icon.png`"
-                                v-for="(currency, index) in row.acceptedCurrencies"
+                                v-for="(currency, index) in row.listing?.metadata.acceptedCurrencies"
                                 :key="index"
                               />
                             </div>
@@ -115,10 +115,15 @@ import { Delete } from '@element-plus/icons-vue';
 import { Search } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import $ from 'jquery';
+import { toRaw } from 'vue';
 import Empty from './Empty.vue';
 import { products } from './products.js';
 import api from '../api';
 import { getCachedProfiles } from '../../backbone/models/profile/Profile';
+import Listing from '../../backbone/models/listing/Listing';
+import Purchase from '../../backbone/views/modals/purchase/Purchase';
+import { convertAndFormatCurrency, curDefToDecimal } from '../../backbone/utils/currency';
+import { getAvatarBgImage, getListingBgImage } from '../../backbone/utils/responsive';
 
 const params = reactive({ keyword: '' });
 const tableData = ref([]);
@@ -143,17 +148,18 @@ function loadData() {
       tableData.value = carts;
       tableData.value.forEach((cart) => {
         getCachedProfiles([cart.vendorID])[0].done((profile) => {
-          cart.name = profile.get('name');
-          cart.avatar = window['app']?.getServerUrl(`ob/image/${profile.get('avatarHashes')?.get('small')}`);
+          cart.profile = profile.toJSON();
         });
         cart.items?.forEach((item) => {
           $.get(window['app']?.getServerUrl(`ob/listing/${item.listingHash}`)).then((listing) => {
-            let listingItem = listing.listing.item;
-            item.title = listingItem.title;
-            item.slug = listing.listing.slug;
-            item.image = window['app']?.getServerUrl(`ob/image/${listingItem.images[0]?.small}`);
-            item.price = listingItem.price;
-            item.acceptedCurrencies = listing.listing.metadata.acceptedCurrencies;
+            item.listing = listing.listing;
+            item.cid = listing.cid;
+            item.pricingCurrency = listing.listing.metadata.pricingCurrency;
+            item.priceAmount = curDefToDecimal({
+              amount: listing.listing.item.price,
+              currency: item.pricingCurrency,
+            });
+            item.price = convertAndFormatCurrency(item.priceAmount, item.pricingCurrency.code, window['app']?.settings.get('localCurrency'));
           });
         });
       });
@@ -184,13 +190,13 @@ function doDelete(row, index) {
 
 //每个商品总价
 const countRowPrice = computed(() => {
-  return (row) => Number(row.price * row.quantity).toFixed(2);
+  return (row) => row.priceAmount ? convertAndFormatCurrency(row.priceAmount * row.quantity, row.pricingCurrency?.code, window['app']?.settings.get('localCurrency')) : 0;
 });
 //每个商店商品总价
 const oneStoreTotalPrice = computed(() => (index) => {
   let list = selectors.value[index];
   if (!list) return 0;
-  return { quantity: list.length, total: list.reduce((cur, next) => cur + next.price * next.quantity, 0) };
+  return { quantity: list.length, total: list.reduce((cur, next) => cur + next.priceAmount * next.quantity, 0) };
 });
 //购物车商品总数量
 const cartNum = computed(() => {

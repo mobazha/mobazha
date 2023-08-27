@@ -1,0 +1,81 @@
+<template>
+  <div>
+    <div class="flexColRows gutterV">
+      <div class="flexRow pad rowMd txCtr">
+        <div class="col2"></div>
+        <div class="col8">
+          <div class="flexHCent row">
+            <div class="discLg border clrE1 clrBrDec1">
+              <i class="ion-checkmark clrTOnEmph"></i>
+            </div>
+          </div>
+          <h4>{{ ob.polyT('purchase.completeSection.paymentSent') }}</h4>
+          <p>
+            {{
+              ob.polyT('purchase.completeSection.progressMessage', { 
+                link: `<a href="#transactions/purchases?orderID=${ob.orderID}">${ob.polyT('purchase.completeSection.purchases')}</a>`
+              })
+            }}
+          </p>
+          <p class="tx5b clrT2">
+            {{ ob.polyT('purchase.completeSection.estimatedProcessing', { time: ob.processingTime }) }}
+          </p>
+        </div>
+        <div class="col2"></div>
+      </div>
+      <div class="contentBox clrP clrBr padMd socialBtns">
+        <h5>{{ ob.polyT('purchase.completeSection.share.title') }}</h5>
+        <p>{{ ob.polyT('purchase.completeSection.share.body', { link: "<a class='clrTEm' href='https://mobazha.org'>https://mobazha.org</a>" }) }}</p>
+        <div class="flexRow flexKidsExpand gutterH">
+          <a class="btn btnThin clrP clrBr" :href="`https://twitter.com/intent/tweet/?text=${ob.polyT('purchase.completeSection.share.shareMsg')}&url=${shareURL}&hashtags=TradeFree,bitcoin&related=mobazha`">
+            <span class="flexInline gutterHSm">
+              <i class="ion-social-twitter twitterColor"></i><span>{{ ob.polyT('purchase.completeSection.share.postToTwitter') }}</span>
+            </span>
+          </a>
+          <a class="btn btnThin clrP clrBr" :href="`https://www.facebook.com/sharer/sharer.php?u=${shareURL}`">
+            <span class="flexInline gutterHSm">
+              <i class="ion-social-facebook facebookColor"></i><span>{{ ob.polyT('purchase.completeSection.share.postToFacebook') }}</span>
+            </span>
+          </a>
+          <a class="btn btnThin clrP clrBr" :href="`https://pinterest.com/pin/create/button/?url=${shareURL}`">
+            <span class="flexInline gutterHSm">
+              <i class="ion-social-pinterest pinterestColor"></i><span>{{ ob.polyT('purchase.completeSection.share.postToPinterest') }}</span>
+            </span>
+          </a>
+          <a class="btn btnThin clrP clrBr" :href="`https://www.tumblr.com/share/link?url=${shareURL}&name=Mobazha`">
+            <span class="flexInline gutterHSm">
+              <i class="ion-social-tumblr tumblrColor"></i><span>{{ ob.polyT('purchase.completeSection.share.postToTumblr') }}</span>
+            </span>
+          </a>
+        </div>
+      </div>
+      <h5>{{ ob.polyT('purchase.completeSection.vendorMessage') }}</h5>
+      <div class="clrBr clrP flex gutterHSm message js-message">
+        <div class="avatar clrBr2 clrSh1 disc" :style="ob.getAvatarBgImage(ob.ownProfile.avatarHashes)"></div>
+        <div class="flexExpand">
+          <textarea id="messageInput" class="clrP tx5" :placeholder="ob.polyT('purchase.completeSection.vendorMessagePlaceholder')" :maxlength="ob.maxMessageLength" rows="5"></textarea>
+        </div>
+      </div>
+      <div class="flex gutterH">
+        <div class="flexExpand tx5 clrTEm">
+          <span class="hide js-messageSent">
+            {{
+              ob.polyT('purchase.completeSection.vendorMessageSent', {
+                name: ob.vendorName,
+                orderLink: `<a class="txU" href="#transactions/purchases?orderID=${ob.orderID}">${ob.polyT('purchase.completeSection.vendorMessageLink')}</a>`,
+              }) 
+            }}
+          </span>
+        </div>
+        <button class="btn floR clrP clrBr clrSh2 js-send disabled">{{ ob.polyT('purchase.completeSection.send') }}</button>
+      </div>
+    </div>
+
+  </div>
+</template>
+
+<script setup>
+const shareURL = "https://mobazha.org";
+</script>
+<style lang="scss" scoped>
+</style>

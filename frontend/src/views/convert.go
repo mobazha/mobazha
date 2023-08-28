@@ -60,6 +60,11 @@ func updateTemplateContent(content string) string {
 	Str = "${1}<div v-for=\"(${3}, j) in ${2}\" :key=\"j\">\n"
 	content = m.ReplaceAllString(content, Str)
 
+	// update <% ob.coupons.forEach(coupon => { %>
+	m = regexp.MustCompile(`(\s*)<%\s*(\S+)\.forEach\((\w+)\s*=>\s*\{\s*%>\s*\n`)
+	Str = "${1}<div v-for=\"(${3}, j) in ${2}\" :key=\"j\">\n"
+	content = m.ReplaceAllString(content, Str)
+
 	// update forEach close tag: <% }); %>
 	m = regexp.MustCompile(`(\s*)<%\s*}\);\s*%>\s*\n`)
 	Str = "${1}</div>\n"

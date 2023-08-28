@@ -121,7 +121,7 @@ import { products } from './products.js';
 import api from '../api';
 import { getCachedProfiles } from '../../backbone/models/profile/Profile';
 import Listing from '../../backbone/models/listing/Listing';
-import Purchase from '../../backbone/views/modals/purchase/Purchase';
+import Purchase from '../views/modals/purchase/Purchase';
 import { convertAndFormatCurrency, curDefToDecimal } from '../../backbone/utils/currency';
 import { getAvatarBgImage, getListingBgImage } from '../../backbone/utils/responsive';
 
@@ -216,9 +216,30 @@ function handleSelectionChange(val, index) {
 }
 //提交当前选中的商店商品
 function pay(index) {
-  const selection = table[index].store.states.selection;
-  if (selection.value.length === 0) return ElMessage.warning('请选择商品');
-  console.log(selection.value);
+  let cart = toRaw(tableData.value[0]);
+  let input = cart.items[0];
+  let listing = new Listing({slug: input.listing.slug,}, { guid: cart.vendorID});
+  listing.fetch().done(() => {
+    let vendor = {
+      peerID: cart.vendorID,
+      name: cart.profile.name,
+      handle: cart.profile.handle,
+      avatarHashes: cart.profile.avatarHashes,
+    };
+
+    this._purchaseModal = new Purchase({
+        cart: cart,
+        listing: listing,
+        variants: input.options,
+        vendor: vendor,
+        removeOnClose: true,
+        showCloseButton: false,
+        phase: 'pay',
+        // inventory: this._inventory,
+      })
+        .render()
+        .open();
+  });
 }
 //修改头部样式
 function headerRowStyle({ rowIndex }) {

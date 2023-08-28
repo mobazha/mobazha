@@ -12,10 +12,14 @@ import sifter from 'sifter';
 import microplugin from 'microplugin';
 import $ from "jquery";
 
+import * as templateHelpers from '../backbone/utils/templateHelpers';
+
 window.jQuery = window.$ = $;
 window.Sifter = sifter;
 window.MicroPlugin = microplugin;
 window.app = app;
+
+window.templateHelpers = templateHelpers;
 
 const store = createStore({
   modules: {

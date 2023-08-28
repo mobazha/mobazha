@@ -34,7 +34,7 @@
                 </div>
               </div>
 
-              <div class="flexNoShrink" v-if="phase === 'pay' || phase === 'processing'">
+              <div class="flexNoShrink" v-if="ob.phase === 'pay' || ob.phase === 'processing'">
                 <div class="flexVCent gutterH">
                   <div class="flexCol">
                     <label class="flexHRight" for="purchaseQuantity">
@@ -60,9 +60,9 @@
             </div>
             <div v-else>
               <div class="flexVCent gutterHLg row cryptoTitleWrap">
-                <div :class="`js-cryptoTitle ${phase !== 'pay' && phase !== 'processing' ? 'flexExpand' : ''}`"></div>
+                <div :class="`js-cryptoTitle ${ob.phase !== 'pay' && ob.phase !== 'processing' ? 'flexExpand' : ''}`"></div>
 
-                <div class="flexExpand" v-if="phase === 'pay' || phase === 'processing'">
+                <div class="flexExpand" v-if="ob.phase === 'pay' || ob.phase === 'processing'">
                   <div class="flexVCent gutterHLg">
                     <label for="cryptoAmount" class="clrT txB required">{{ ob.polyT('purchase.cryptoAmount') }}</label>
                     <div class="inputSelect">
@@ -105,7 +105,7 @@
                 <label class="h4 flexExpand required" for="purchaseCryptoAddress">{{ ob.polyT('purchase.cryptoAddressHeading', {coinType: coinName}) }}</label>
               </div>
               <div class="js-items-paymentAddress-errors"></div>
-              <div v-if="phase === 'pay' || phase === 'processing'">
+              <div v-if="ob.phase === 'pay' || ob.phase === 'processing'">
                 <input type="text"
                   id="purchaseCryptoAddress"
                   :value="ob.items[0].paymentAddress"
@@ -120,7 +120,7 @@
             </div>
           </section>
 
-          <div v-if="phase === 'pay' || phase === 'processing'">
+          <div v-if="ob.phase === 'pay' || ob.phase === 'processing'">
             <section v-if="ob.listing.shippingOptions && ob.listing.shippingOptions.length" class="contentBox padMd clrP clrBr clrSh3 js-shipping">
               <div class="js-shipping-errors js-items-shipping-errors"></div>
               <div class="js-shippingWrapper"></div>
@@ -224,9 +224,9 @@
             </section>
           </div>
 
-          <section v-if="phase === 'pending'" class="contentBox padMd clrP clrBr clrSh3 js-pending"></section>
+          <section v-if="ob.phase === 'pending'" class="contentBox padMd clrP clrBr clrSh3 js-pending"></section>
 
-          <section v-if="phase === 'complete'" class="contentBox padMd clrP clrBr clrSh3 js-complete"></section>
+          <section v-if="ob.phase === 'complete'" class="contentBox padMd clrP clrBr clrSh3 js-complete"></section>
         </div>
       </div>
       <div class="col3">
@@ -250,9 +250,63 @@
 </template>
 
 <script setup>
-import * as ob from '../../../backbone/utils/templateHelpers';
+import $ from 'jquery';
+import _ from 'underscore';
+import Backbone from 'backbone';
+import bigNumber from 'bignumber.js';
+import 'velocity-animate';
+import { ERROR_DUST_AMOUNT } from '../../../../backbone/constants';
+import { removeProp } from '../../../../backbone/utils/object';
+import app from '../../../../backbone/app';
+import loadTemplate from '../../../../backbone/utils/loadTemplate';
+import { launchSettingsModal } from '../../../../backbone/utils/modalManager';
+// import {
+//   getInventory,
+//   events as inventoryEvents,
+// } from '../../../utils/inventory';
+import { startAjaxEvent, endAjaxEvent } from '../../../../backbone/utils/metrics';
+import { toStandardNotation } from '../../../../backbone/utils/number';
+import {
+  decimalToInteger,
+  isValidCoinDivisibility,
+  curDefToDecimal,
+  getCoinDivisibility,
+} from '../../../../backbone/utils/currency';
+import { capitalize } from '../../../../backbone/utils/string';
+import { events as outdatedListingHashesEvents } from '../../../../backbone/utils/outdatedListingHashes';
+import { isSupportedWalletCur } from '../../../../backbone/data/walletCurrencies';
+import Order from '../../../../backbone/models/purchase/Order';
+import Item from '../../../../backbone/models/purchase/Item';
+import Listing from '../../../../backbone/models/listing/Listing';
+import BaseModal from '../../../../backbone/views/modals/BaseModal';
+import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
+import PopInMessage, { buildRefreshAlertMessage } from '../../../../backbone/views/components/PopInMessage';
+import Moderators from '../../../../backbone/views/components/moderators/Moderators';
+import FeeChange from '../../../../backbone/views/components/FeeChange';
+import CryptoTradingPair from '../../../../backbone/views/components/CryptoTradingPair';
+import CryptoCurSelector from '../../../../backbone/views/components/CryptoCurSelector';
+import Shipping from '../../../../backbone/views/modals/purchase/Shipping';
+import Receipt from '../../../../backbone/views/modals/purchase/Receipt';
+import Coupons from '../../../../backbone/views/modals/purchase/Coupons';
+import ActionBtn from '../../../../backbone/views/modals/purchase/ActionBtn';
+import Payment from '../../../../backbone/views/modals/purchase/Payment';
+import Complete from '../../../../backbone/views/modals/purchase/Complete';
+import DirectPayment from '../../../../backbone/views/modals/purchase/DirectPayment';
 
-let phase = 'pay';
+import { reactive } from 'vue';
+
+const props = defineProps({
+  listings: Object,
+  listing: Object,
+  variants: Object,
+  vendor: Object,
+})
+
+loadData(props);
+
+let ob = {};
+render();
+
 let inventory = 0;
 
 // when multiple listings are supported, the prices array will have one price object for each
@@ -343,9 +397,11 @@ const prices = computed(() => {
     return this.moderators.selectedIDs.length > 0;
   });
 
-loadData({});
+  
 
-  function loadData(opts) {
+  function loadData(options = {}) {
+    this.phase = 'pay';
+
     this.cart = opts.cart;
     this.listings = [];
     this.cart.items.forEach(item => {
@@ -598,7 +654,6 @@ loadData({});
     if (!this.isModerated) return;
 
     this.moderators.deselectOthers();
-    this.setState({ unverifedSelected: false }, { renderOnChange: false });
   }
 
   function togVerifiedModerators(bool) {
@@ -612,8 +667,6 @@ loadData({});
 
   function onCardSelect() {
     const selected = this.moderators.selectedIDs;
-    const unverifedSelected = selected.length && !app.verifiedMods.matched(selected).length;
-    this.setState({ unverifedSelected }, { renderOnChange: false });
   }
 
   function changeCryptoAddress(e) {
@@ -912,7 +965,7 @@ loadData({});
 
   function render() {
     if (this.dataChangePopIn) this.dataChangePopIn.remove();
-    const state = this.getState();
+
     const item = this.order.get('items')
       .at(0);
     const quantity = item.get('quantity');
@@ -925,10 +978,32 @@ loadData({});
         ? toStandardNotation(this._cryptoQuantity) : this._cryptoQuantity;
     }
 
+    let context = {
+      ...this.order.toJSON(),
+      phase: this.phase,
+      listings: this.listings,
+      listing: this.listing.toJSON(),
+      listingPrice: this.listing.price,
+      itemConstraints: this.order.get('items')
+        .at(0)
+        .constraints,
+      vendor: this.vendor,
+      variants: this.variants,
+      prices: this.prices,
+      displayCurrency: app.settings.get('localCurrency'),
+      quantity: uiQuantity,
+      cryptoAmountCurrency: this.cryptoAmountCurrency,
+      isCrypto: this.listing.isCrypto,
+      phaseClass: `phase${capitalize(this.phase)}`,
+      hasCoupons: this.listing.get('coupons').length
+        && this.listing.get('metadata').get('contractType') !== 'CRYPTOCURRENCY',
+    };
+    ob = reactive({ ...window.templateHelpers, ...(context || {}) });
+
     this._$couponField = null;
 
     this.actionBtn.delegateEvents();
-    this.actionBtn.setState({ phase: state.phase }, { renderOnChange: false });
+    this.actionBtn.setState({ phase: this.phase }, { renderOnChange: false });
     this.$('.js-actionBtn').append(this.actionBtn.render().el);
 
     // this.receipt.delegateEvents();

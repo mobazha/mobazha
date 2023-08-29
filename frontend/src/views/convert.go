@@ -12,8 +12,8 @@ import (
 )
 
 var baseDir = "/Users/mingfeng/dev/openbazaar/openbazaar-desktop/frontend"
-var htmlTemplateFolder = "backbone/templates/"
-var jsComponentFolder = "backbone/views/"
+var htmlTemplateFolder = "backbone/templates/components"
+var jsComponentFolder = "backbone/views/components"
 var targetVueFolder = "src/views_draft"
 
 type EventHandler struct {
@@ -24,6 +24,7 @@ type EventHandler struct {
 }
 
 type ComponentInfo struct {
+	TagName      string
 	ClassName    string
 	EventHanders []EventHandler
 }
@@ -41,10 +42,17 @@ func readJsFileContent(templateFilePath string, name string) ([]byte, ComponentI
 
 	// get class name
 	quoteChars := "'\"`"
-	r, _ := regexp.Compile(`\n\s*className\(\s*\)\s*{\s*\n\s*return\s+[` + quoteChars + `](.*?)[` + quoteChars + `][;]?\s*\n`)
+	r, _ := regexp.Compile(`\n\s*(?:get\s*)?className\(\s*\)\s*{\s*\n\s*return\s+[` + quoteChars + `](.*?)[` + quoteChars + `][;]?\s*\n`)
 	matches := r.FindStringSubmatch(string(contentBytes))
 	if len(matches) > 0 {
 		componentInfo.ClassName = matches[1]
+	}
+
+	// get tag name
+	r, _ = regexp.Compile(`\n\s*(?:get\s*)?tagName\(\s*\)\s*{\s*\n\s*return\s+[` + quoteChars + `](.*?)[` + quoteChars + `][;]?\s*\n`)
+	matches = r.FindStringSubmatch(string(contentBytes))
+	if len(matches) > 0 {
+		componentInfo.TagName = matches[1]
 	}
 
 	// get event handlers
@@ -88,15 +96,15 @@ func applyEventHandlerToTemplate(templateFileContent string, jsFileContent strin
 		case "click":
 			eventName = "click"
 		case "keydown":
-			eventName = "on-keydown"
+			eventName = "keydown"
 		case "keyup":
-			eventName = "on-keyup"
+			eventName = "keyup"
 		case "change":
-			eventName = "on-change"
+			eventName = "change"
 		case "focus":
-			eventName = "on-focus"
+			eventName = "focus"
 		case "mouseleave":
-			eventName = "on-mouseleave"
+			eventName = "mouseleave"
 		}
 
 		if len(eventName) > 0 {
@@ -196,12 +204,12 @@ func updateTemplateContent(content string) string {
 	content = m.ReplaceAllString(content, Str)
 
 	// update forEach close tag: <% }); %>
-	m = regexp.MustCompile(`(\s*)<%\s*}\);\s*%>\s*\n`)
+	m = regexp.MustCompile(`(\s*)<%\s*}\);?\s*%>\s*\n`)
 	Str = "${1}</div>\n"
 	content = m.ReplaceAllString(content, Str)
 
 	// update forEach close tag: <% }); %>
-	m = regexp.MustCompile(`(\s*)<%\s*}\);\s*%>\s*$`)
+	m = regexp.MustCompile(`(\s*)<%\s*}\);?\s*%>\s*$`)
 	Str = "${1}</div>\n"
 	content = m.ReplaceAllString(content, Str)
 
@@ -276,13 +284,20 @@ func walk(s string, d fs.DirEntry, err error) error {
 
 			templateFileContent, jsFileContent = applyEventHandlerToTemplate(templateFileContent, jsFileContent, componentInfo)
 
-			rootDivTag := "  <div>\n"
-			if len(componentInfo.ClassName) > 0 {
-				rootDivTag = `  <div class="` + componentInfo.ClassName + "\">\n"
+			rootTagName := "div"
+			if len(componentInfo.TagName) > 0 {
+				rootTagName = componentInfo.TagName
 			}
 
-			text := "<template>\n" + rootDivTag + templateFileContent + `
-  </div>
+			rootTag := fmt.Sprintf("  <%s>\n", rootTagName)
+			if len(componentInfo.ClassName) > 0 {
+				rootTag = fmt.Sprintf("  <%s class=\"%s\">\n", rootTagName, componentInfo.ClassName)
+			}
+			fmt.Printf("rootTag: %s", rootTag)
+
+			endingRootTag := fmt.Sprintf("\n  </%s>\n", rootTagName)
+
+			text := "<template>\n" + rootTag + templateFileContent + endingRootTag + `
 </template>
   
 <script setup>
@@ -300,7 +315,6 @@ render();
 </script>
 <style lang="scss" scoped>
 </style>
-
 `
 			os.WriteFile(path.Join(dir, componentName+".vue"), []byte(text), fs.ModePerm)
 		}

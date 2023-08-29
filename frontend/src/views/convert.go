@@ -175,6 +175,11 @@ func updateTemplateContent(content string) string {
 	Str = "${1}</div>\n"
 	content = m.ReplaceAllString(content, Str)
 
+	// update if/else if/else close tag: <% } %>
+	m = regexp.MustCompile(`(\s*)<%\s*}\s*%>\s*$`)
+	Str = "${1}</div>\n"
+	content = m.ReplaceAllString(content, Str)
+
 	// update <% ob.coupons.forEach((coupon) => { %>
 	m = regexp.MustCompile(`(\s*)<%\s*(\S.*\S)\.forEach\(\((\w+)\)\s*=>\s*\{\s*(%>)?\s*\n`)
 	Str = "${1}<div v-for=\"(${3}, j) in ${2}\" :key=\"j\">\n"
@@ -195,16 +200,36 @@ func updateTemplateContent(content string) string {
 	Str = "${1}</div>\n"
 	content = m.ReplaceAllString(content, Str)
 
+	// update forEach close tag: <% }); %>
+	m = regexp.MustCompile(`(\s*)<%\s*}\);\s*%>\s*$`)
+	Str = "${1}</div>\n"
+	content = m.ReplaceAllString(content, Str)
+
 	return content
 }
 
-func updateJsFileContent(content string) string {
+func updateJsFileContent(content string) (string, string) {
+	header := ""
+
 	// Update function definition
 	m := regexp.MustCompile(`\n(\s+)((\w+)\(.*\) \{)\n`)
 	Str := "\n${1}function $2\n"
 	content = m.ReplaceAllString(content, Str)
 
-	return strings.ReplaceAll(content, " constructor(", " loadData(")
+	result := strings.Split(content, "export default class")
+	if len(result) > 0 {
+		header = result[0]
+		content = strings.ReplaceAll(content, header, "")
+	}
+
+	// Remove line "export default class extends baseVw" { and ending }
+	m = regexp.MustCompile(`export default class.*\n`)
+	content = m.ReplaceAllString(content, "")
+
+	m = regexp.MustCompile(`\n}\n*$`)
+	content = m.ReplaceAllString(content, "\n")
+
+	return header, strings.ReplaceAll(content, " constructor(", " loadData(")
 }
 
 func capitalize(str string) string {
@@ -247,7 +272,7 @@ func walk(s string, d fs.DirEntry, err error) error {
 			if err != nil {
 				fmt.Printf("Error: %v\n", strings.ReplaceAll(err.Error(), path.Join(baseDir, jsComponentFolder), ""))
 			}
-			jsFileContent := updateJsFileContent(string(jsFileBytes))
+			header, jsFileContent := updateJsFileContent(string(jsFileBytes))
 
 			templateFileContent, jsFileContent = applyEventHandlerToTemplate(templateFileContent, jsFileContent, componentInfo)
 
@@ -261,6 +286,7 @@ func walk(s string, d fs.DirEntry, err error) error {
 </template>
   
 <script setup>
+` + header + `
 const props = defineProps({
   phase: String,
   outdatedHash: String,

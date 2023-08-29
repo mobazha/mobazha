@@ -17,6 +17,7 @@ var jsComponentFolder = "backbone/views/"
 var targetVueFolder = "src/views_draft"
 
 type EventHandler struct {
+	Raw         string
 	EventName   string
 	JsClassName string
 	HandlerName string
@@ -57,6 +58,7 @@ func readJsFileContent(templateFilePath string, name string) ([]byte, ComponentI
 		allMatches := r.FindAllStringSubmatch(handlersStr, -1)
 		for _, match := range allMatches {
 			componentInfo.EventHanders = append(componentInfo.EventHanders, EventHandler{
+				Raw:         match[0],
 				EventName:   match[1],
 				JsClassName: strings.TrimPrefix(match[2], "."),
 				HandlerName: match[3],
@@ -69,7 +71,7 @@ func readJsFileContent(templateFilePath string, name string) ([]byte, ComponentI
 
 var eventNames = map[string]bool{}
 
-func applyEventHandlerToTemplate(content string, componentInfo ComponentInfo) string {
+func applyEventHandlerToTemplate(templateFileContent string, jsFileContent string, componentInfo ComponentInfo) (string, string) {
 
 	for _, info := range componentInfo.EventHanders {
 		m := regexp.MustCompile(`( class="(?:.*?\s)?)` + info.JsClassName + `((?:\s.*?)?")`)
@@ -102,13 +104,19 @@ func applyEventHandlerToTemplate(content string, componentInfo ComponentInfo) st
 			if isIDMatch {
 				Str = "$1 @" + eventName + "=\"" + info.HandlerName + "\" "
 			}
-			content = m.ReplaceAllString(content, Str)
+
+			if m.Match([]byte(templateFileContent)) {
+				templateFileContent = m.ReplaceAllString(templateFileContent, Str)
+
+				jsFileContent = strings.ReplaceAll(jsFileContent, info.Raw+",\n", "")
+				jsFileContent = strings.ReplaceAll(jsFileContent, info.Raw+"\n", "")
+			}
 		}
 
 		eventNames[info.EventName] = true
 	}
 
-	return content
+	return templateFileContent, jsFileContent
 }
 
 func updateTemplateContent(content string) string {
@@ -241,7 +249,7 @@ func walk(s string, d fs.DirEntry, err error) error {
 			}
 			jsFileContent := updateJsFileContent(string(jsFileBytes))
 
-			templateFileContent = applyEventHandlerToTemplate(templateFileContent, componentInfo)
+			templateFileContent, jsFileContent = applyEventHandlerToTemplate(templateFileContent, jsFileContent, componentInfo)
 
 			rootDivTag := "  <div>\n"
 			if len(componentInfo.ClassName) > 0 {
@@ -257,6 +265,10 @@ const props = defineProps({
   phase: String,
   outdatedHash: String,
 })
+
+loadData(props);
+
+render();
 
 ` + jsFileContent + `
 </script>

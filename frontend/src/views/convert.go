@@ -12,15 +12,103 @@ import (
 )
 
 var baseDir = "/Users/mingfeng/dev/openbazaar/openbazaar-desktop/frontend"
-var htmlTemplateFolder = "backbone/templates/modals/purchase"
-var jsComponentFolder = "backbone/views/modals/purchase"
+var htmlTemplateFolder = "backbone/templates/"
+var jsComponentFolder = "backbone/views/"
 var targetVueFolder = "src/views_draft"
 
-func readJsFileContent(templateFilePath string, name string) ([]byte, error) {
+type EventHandler struct {
+	EventName   string
+	JsClassName string
+	HandlerName string
+}
+
+type ComponentInfo struct {
+	ClassName    string
+	EventHanders []EventHandler
+}
+
+func readJsFileContent(templateFilePath string, name string) ([]byte, ComponentInfo, error) {
+	componentInfo := ComponentInfo{}
+
 	dir := filepath.Dir(templateFilePath)
 	jsDir := strings.ReplaceAll(dir, path.Join(baseDir, htmlTemplateFolder), path.Join(baseDir, jsComponentFolder))
 
-	return os.ReadFile(path.Join(jsDir, name))
+	contentBytes, err := os.ReadFile(path.Join(jsDir, name))
+	if err != nil {
+		return contentBytes, ComponentInfo{}, err
+	}
+
+	// get class name
+	quoteChars := "'\"`"
+	r, _ := regexp.Compile(`\n\s*className\(\s*\)\s*{\s*\n\s*return\s+[` + quoteChars + `](.*?)[` + quoteChars + `][;]?\s*\n`)
+	matches := r.FindStringSubmatch(string(contentBytes))
+	if len(matches) > 0 {
+		componentInfo.ClassName = matches[1]
+	}
+
+	// get event handlers
+	r, _ = regexp.Compile(`\s*events\(\s*\)\s*{\s*\n\s*return\s+{\n((\s*(\S+)\s+(\S+)': '(\S+)\s*\n)+)\s*};`)
+	matches = r.FindStringSubmatch(string(contentBytes))
+	if len(matches) > 0 {
+		handlersStr := matches[1]
+		fmt.Println(handlersStr)
+
+		r, _ = regexp.Compile(`'(\S+)\s+(\S+)': '(\S+)'`)
+		allMatches := r.FindAllStringSubmatch(handlersStr, -1)
+		for _, match := range allMatches {
+			componentInfo.EventHanders = append(componentInfo.EventHanders, EventHandler{
+				EventName:   match[1],
+				JsClassName: strings.TrimPrefix(match[2], "."),
+				HandlerName: match[3],
+			})
+		}
+	}
+
+	return contentBytes, componentInfo, nil
+}
+
+var eventNames = map[string]bool{}
+
+func applyEventHandlerToTemplate(content string, componentInfo ComponentInfo) string {
+
+	for _, info := range componentInfo.EventHanders {
+		m := regexp.MustCompile(`( class="(?:.*?\s)?)` + info.JsClassName + `((?:\s.*?)?")`)
+
+		isIDMatch := false
+		if strings.HasPrefix(info.JsClassName, "#") {
+			isIDMatch = true
+
+			m = regexp.MustCompile(`( id="` + info.JsClassName[1:] + `")`)
+		}
+
+		eventName := ""
+		switch info.EventName {
+		case "click":
+			eventName = "click"
+		case "keydown":
+			eventName = "on-keydown"
+		case "keyup":
+			eventName = "on-keyup"
+		case "change":
+			eventName = "on-change"
+		case "focus":
+			eventName = "on-focus"
+		case "mouseleave":
+			eventName = "on-mouseleave"
+		}
+
+		if len(eventName) > 0 {
+			Str := "$1$2 @" + eventName + "=\"" + info.HandlerName + "\" "
+			if isIDMatch {
+				Str = "$1 @" + eventName + "=\"" + info.HandlerName + "\" "
+			}
+			content = m.ReplaceAllString(content, Str)
+		}
+
+		eventNames[info.EventName] = true
+	}
+
+	return content
 }
 
 func updateTemplateContent(content string) string {
@@ -147,16 +235,20 @@ func walk(s string, d fs.DirEntry, err error) error {
 			}
 			templateFileContent := updateTemplateContent(string(templateFileBytes))
 
-			jsFileBytes, err := readJsFileContent(s, componentName+".js")
+			jsFileBytes, componentInfo, err := readJsFileContent(s, componentName+".js")
 			if err != nil {
 				fmt.Printf("Error: %v\n", strings.ReplaceAll(err.Error(), path.Join(baseDir, jsComponentFolder), ""))
 			}
 			jsFileContent := updateJsFileContent(string(jsFileBytes))
 
-			text :=
-				`<template>
-  <div>
-` + templateFileContent + `
+			templateFileContent = applyEventHandlerToTemplate(templateFileContent, componentInfo)
+
+			rootDivTag := "  <div>\n"
+			if len(componentInfo.ClassName) > 0 {
+				rootDivTag = `  <div class="` + componentInfo.ClassName + "\">\n"
+			}
+
+			text := "<template>\n" + rootDivTag + templateFileContent + `
   </div>
 </template>
   
@@ -180,4 +272,9 @@ const props = defineProps({
 
 func main() {
 	filepath.WalkDir(path.Join(baseDir, htmlTemplateFolder), walk)
+
+	fmt.Println("events are: ")
+	for key := range eventNames {
+		fmt.Println(key)
+	}
 }

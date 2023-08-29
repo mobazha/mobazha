@@ -1,15 +1,58 @@
 <template>
-  <div>
+  <div class="feeChange">
     {{ ob.polyT('feeChangeWidget.label') }}
-    <span class="txB">{{ ob.polyT(`feeLevels.${feeLevel}`) }}</span>
-    <button :class="`js-changeFee btnAsLink clrT2`">{{ ob.polyT('feeChangeWidget.btnChange') }}</button>
+    <span :class="ob.feeLevelClass">{{ ob.polyT(`feeLevels.${ob.feeLevel}`) }}</span>
+    <button :class="ob.changeLinkClass" @click="onClickChangeFee">{{ ob.polyT('feeChangeWidget.btnChange') }}</button>
   </div>
 </template>
 
 <script setup>
+import app from '../../../backbone/app';
+import { launchSettingsModal } from '../../../backbone/utils/modalManager';
+import loadTemplate from '../../../backbone/utils/loadTemplate';
+
+
 const props = defineProps({
-  feeLevel: String,
+  phase: String,
 })
+
+loadData(props);
+
+render();
+
+function loadData (options = {}) {
+  const opts = {
+    initialState: {
+      feeLevel: app.localSettings.get('defaultTransactionFee'),
+      feeLevelClass: 'txB',
+      changeLinkClass: 'btnAsLink clrT2',
+    },
+    ...options,
+  };
+
+  super(opts);
+
+  this.listenTo(app.localSettings, 'change:defaultTransactionFee',
+    (md, val) => this.setState({ feeLevel: val }));
+}
+
+function onClickChangeFee () {
+  launchSettingsModal({
+    initialTab: 'Advanced',
+    scrollTo: '.js-feeSection',
+  });
+}
+
+function render () {
+  loadTemplate('components/feeChange.html', (t) => {
+    this.$el.html(t({
+      ...this.getState(),
+    }));
+  });
+
+  return this;
+}
+
 </script>
 <style lang="scss" scoped>
 </style>

@@ -222,7 +222,19 @@ func updateJsFileContent(content string) (string, string) {
 	// Update function definition
 	m := regexp.MustCompile(`\n(\s+)((\w+)\(.*\) \{)\n`)
 	Str := "\n${1}function $2\n"
-	content = m.ReplaceAllString(content, Str)
+	contentTemp := m.ReplaceAllString(content, Str)
+
+	methodList := []string{}
+	allMatches := m.FindAllStringSubmatch(content, -1)
+	for _, match := range allMatches {
+		methodList = append(methodList, match[3])
+	}
+
+	content = contentTemp
+	for _, method := range methodList {
+		fmt.Printf("method: %s\n", "this."+method+"(")
+		content = strings.ReplaceAll(content, "this."+method+"(", method+"(")
+	}
 
 	result := strings.Split(content, "export default class")
 	if len(result) > 0 {
@@ -295,11 +307,11 @@ func walk(s string, d fs.DirEntry, err error) error {
 			}
 			fmt.Printf("rootTag: %s", rootTag)
 
-			endingRootTag := fmt.Sprintf("\n  </%s>\n", rootTagName)
+			endingRootTag := fmt.Sprintf("\n  </%s>", rootTagName)
 
 			text := "<template>\n" + rootTag + templateFileContent + endingRootTag + `
 </template>
-  
+
 <script setup>
 ` + header + `
 const props = defineProps({

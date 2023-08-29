@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"unicode"
 )
 
 var baseDir = "/Users/mingfeng/dev/openbazaar/openbazaar-desktop/frontend"
@@ -30,18 +29,43 @@ func updateTemplateContent(content string) string {
 	Str := " :${1}=\"$2\""
 	content = m.ReplaceAllString(content, Str)
 
+	// href="https://www.facebook.com/sharer/sharer.php?u=<%= shareURL %>"
+	m = regexp.MustCompile(` (\S+)="([^"]*)<%=\s*(.+?)\s*%>([^"]*)"`)
+	Str = " :${1}=\"`$2${$3}$4`\""
+	content = m.ReplaceAllString(content, Str)
+
+	// <% if (cur === ob.cryptoAmountCurrency) print('selected'); %>
+	m = regexp.MustCompile(` <% if \((.*?)\) print\('(selected|disabled|checked|required)'\)(;?)\s*%>`)
+	Str = " :$2=\"$1\""
+	content = m.ReplaceAllString(content, Str)
+
+	// <% if (cur === ob.cryptoAmountCurrency) print('hide'); %>
+	m = regexp.MustCompile(` <% if \((.*?)\) print\('(hide)'\)(;?)\s*%>`)
+	Str = " :hidden=\"$1\""
+	content = m.ReplaceAllString(content, Str)
+
+	//  class="abc <% if (cur === ob.cryptoAmountCurrency) print('active')" %>
+	m = regexp.MustCompile(` (\S+)="([^"]*) <% if \((.*?)\) print\('(\S+)'\)(;?)\s+%>(.*?)"`)
+	Str = " :$1=\"`$2 ${$3 ? '$4' : ''}$5`\""
+	content = m.ReplaceAllString(content, Str)
+
+	// maxlength=<%= ob.itemConstraints.maxPaymentAddressLength %>
+	m = regexp.MustCompile(` maxlength=<%=\s*(.*?)\s*%>`)
+	Str = " :maxlength=\"$1\""
+	content = m.ReplaceAllString(content, Str)
+
 	// update variable
 	m = regexp.MustCompile(`<%=\s*(.+?)\s*%>`)
 	Str = "{{ ${1} }}"
 	content = m.ReplaceAllString(content, Str)
 
 	// update: <% if (cur.disabled && ob.disabledMsg) { %>
-	m = regexp.MustCompile(`(\s*)<%\s*if\s*\((.+?)\)\s*\{\s*%>\s*\n`)
+	m = regexp.MustCompile(`(\s*)<%\s*if\s*\((.+?)\)\s*\{\s*(%>)?\s*\n`)
 	Str = "${1}<div v-if=\"${2}\">\n"
 	content = m.ReplaceAllString(content, Str)
 
 	// update: <% } else if (ob.listing.shippingOptions) { %>
-	m = regexp.MustCompile(`(\s*)<%\s*\}\s*else if\s*\((.+?)\)\s*\{\s*%>\s*\n`)
+	m = regexp.MustCompile(`(\s*)<%\s*\}\s*else if\s*\((.+?)\)\s*\{\s*(%>)?\s*\n`)
 	Str = "${1}</div>\n${1}<div v-else-if=\"${2}\">\n"
 	content = m.ReplaceAllString(content, Str)
 
@@ -56,13 +80,18 @@ func updateTemplateContent(content string) string {
 	content = m.ReplaceAllString(content, Str)
 
 	// update <% ob.coupons.forEach((coupon) => { %>
-	m = regexp.MustCompile(`(\s*)<%\s*(\S+)\.forEach\(\((\w+)\)\s*=>\s*\{\s*%>\s*\n`)
+	m = regexp.MustCompile(`(\s*)<%\s*(\S.*\S)\.forEach\(\((\w+)\)\s*=>\s*\{\s*(%>)?\s*\n`)
 	Str = "${1}<div v-for=\"(${3}, j) in ${2}\" :key=\"j\">\n"
 	content = m.ReplaceAllString(content, Str)
 
 	// update <% ob.coupons.forEach(coupon => { %>
-	m = regexp.MustCompile(`(\s*)<%\s*(\S+)\.forEach\((\w+)\s*=>\s*\{\s*%>\s*\n`)
+	m = regexp.MustCompile(`(\s*)<%\s*(\S.*\S)\.forEach\((\w+)\s*=>\s*\{\s*(%>)?\s*\n`)
 	Str = "${1}<div v-for=\"(${3}, j) in ${2}\" :key=\"j\">\n"
+	content = m.ReplaceAllString(content, Str)
+
+	// update <% ob.coupons.forEach((coupon, i) => { %>
+	m = regexp.MustCompile(`(\s*)<%\s*(\S.*\S)\.forEach\(\((\w+, (\w+))\)\s*=>\s*\{\s*(%>)?\s*\n`)
+	Str = "${1}<div v-for=\"(${3}) in ${2}\" :key=\"${4}\">\n"
 	content = m.ReplaceAllString(content, Str)
 
 	// update forEach close tag: <% }); %>
@@ -83,9 +112,15 @@ func updateJsFileContent(content string) string {
 }
 
 func capitalize(str string) string {
-	runes := []rune(str)
-	runes[0] = unicode.ToUpper(runes[0])
-	return string(runes)
+	bs := []byte(str)
+	if len(bs) == 0 {
+		return ""
+	}
+	if bs[0] >= 97 {
+		bs[0] = byte(bs[0] - 32)
+	}
+
+	return string(bs)
 }
 
 func walk(s string, d fs.DirEntry, err error) error {

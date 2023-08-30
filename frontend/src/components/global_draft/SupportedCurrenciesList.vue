@@ -37,8 +37,6 @@ function loadData (options = {}) {
       ...options.initialState,
     },
   };
-
-  super(opts);
 }
 
 function setState (state = {}, options = {}) {
@@ -75,8 +73,6 @@ function setState (state = {}, options = {}) {
         });
     }
   }
-
-  super.setState(processedState, options);
 }
 
 function render () {

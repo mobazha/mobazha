@@ -49,7 +49,7 @@
                       size="3"
                       name="quantity"
                       :value="listing.quantity"
-                      :on-keyup="keyupQuantity"
+                      @keyup="keyupQuantity"
                       placeholder="0"
                       data-var-type="bignumber">
                   </div>
@@ -72,15 +72,15 @@
                         name="quantity"
                         id="cryptoAmount"
                         :value="ob.quantity"
-                        :on-keyup="keyupQuantity"
-                        :on-change="onChangeCryptoAmount"
+                        @keyup="keyupQuantity"
+                        @change="onChangeCryptoAmount"
                         placeholder="0.0000"
                         size="8"
                         data-var-type="bignumber">
 
                       <select id="cryptoAmountCurrency"
                         class="clrBr clrP nestInputRight"
-                        :on-change="changeCryptoAmountCurrency"
+                        @change="changeCryptoAmountCurrency"
                         v-if="ob.displayCurrency !== listing.listing.item.cryptoListingCurrencyCode">
                         <option v-for="(cur, j) in [listing.listing.item.cryptoListingCurrencyCode, ob.displayCurrency]" :key="j" :value="cur" :selected="cur === cryptoAmountCurrency">{{ cur }}</option>
                       </select>
@@ -109,9 +109,9 @@
                 <input type="text"
                   id="purchaseCryptoAddress"
                   :value="ob.items[0].paymentAddress"
-                  :on-change="changeCryptoAddress"
-                  :placeholder="ob.polyT('purchase.cryptoAddressPlaceholder',
-                  { coinType: coinName})" class="clrBr clrP rowSm"
+                  @change="changeCryptoAddress"
+                  :placeholder="ob.polyT('purchase.cryptoAddressPlaceholder', { coinType: coinName})"
+                  class="clrBr clrP rowSm"
                   :maxlength="ob.itemConstraints.maxPaymentAddressLength" />
               </div>
               <p v-else class="cryptoPaymentAddress">{{ ob.items[0].paymentAddress }}</p>
@@ -140,7 +140,7 @@
                 <div class="flexVCentClearMarg">
                   <h2 class="h4 flexExpand required">{{ ob.polyT('purchase.paymentTypeTitle') }}</h2>
                   <div v-if="showModerators">
-                    <input type="checkbox" id="purchaseVerifiedOnly" :on-click="onClickVerifiedOnly" :checked="showVerifiedOnly">
+                    <input type="checkbox" id="purchaseVerifiedOnly" @click="onClickVerifiedOnly" :checked="showVerifiedOnly">
                     <label class="tx5b" for="purchaseVerifiedOnly">{{ ob.polyT('settings.storeTab.verifiedOnly') }}</label>
                   </div>
                 </div>
@@ -173,7 +173,7 @@
                       type="text"
                       id="emailAddress"
                       name="alternateContactInfo"
-                      :on-blur="blurEmailAddress"
+                      @blur="blurEmailAddress"
                       :placeholder="ob.polyT('purchase.emailPlaceholder')"
                       :value="ob.alternateContactInfo">
                   </div>
@@ -194,9 +194,9 @@
                         type="text"
                         id="couponCode"
                         name="couponCode"
-                        :on-keyup="onKeyUpCouponCode"
+                        @keyup="onKeyUpCouponCode"
                         :placeholder="ob.polyT('purchase.couponCodePlaceholder')">
-                      <button class="btn clrP clrBr clrSh2 flexNoShrink" :on-click="applyCoupon">
+                      <button class="btn clrP clrBr clrSh2 flexNoShrink" @click="applyCoupon">
                         {{ ob.polyT('purchase.applyCode') }}
                       </button>
                     </div>
@@ -216,7 +216,7 @@
                 class="clrBr clrP js-purchaseField"
                 id="memo"
                 name="memo"
-                :on-blur="blurMemo"
+                @blur="blurMemo"
                 maxlength="5000"
                 rows="6"
                 v-model="ob.items[0].memo"
@@ -278,7 +278,6 @@ import { isSupportedWalletCur } from '../../../../backbone/data/walletCurrencies
 import Order from '../../../../backbone/models/purchase/Order';
 import Item from '../../../../backbone/models/purchase/Item';
 import Listing from '../../../../backbone/models/listing/Listing';
-import BaseModal from '../../../../backbone/views/modals/BaseModal';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import PopInMessage, { buildRefreshAlertMessage } from '../../../../backbone/views/components/PopInMessage';
 import Moderators from '../../../../backbone/views/components/moderators/Moderators';
@@ -293,7 +292,7 @@ import Payment from '../../../../backbone/views/modals/purchase/Payment';
 import Complete from '../../../../backbone/views/modals/purchase/Complete';
 import DirectPayment from '../../../../backbone/views/modals/purchase/DirectPayment';
 
-import { reactive } from 'vue';
+
 
 const props = defineProps({
   listings: Object,
@@ -339,741 +338,744 @@ let showVerifiedOnly = true;
 
 
 const prices = computed(() => {
-    // return an array of price objects that matches the items in the order
-    return this.order.get('items').map((item) => {
-      const shipping = item.get('shipping');
-      const sName = shipping.get('name');
-      const sService = shipping.get('service');
-      const sOpt = this.listing.get('shippingOptions').findWhere({ name: sName });
-      const sOptService = sOpt ? sOpt.get('services').findWhere({ name: sService }) : '';
+  // return an array of price objects that matches the items in the order
+  return this.order.get('items').map((item) => {
+    const shipping = item.get('shipping');
+    const sName = shipping.get('name');
+    const sService = shipping.get('service');
+    const sOpt = this.listing.get('shippingOptions').findWhere({ name: sName });
+    const sOptService = sOpt ? sOpt.get('services').findWhere({ name: sService }) : '';
 
-      const options = item.get('options');
-      const selections = options.map((option) => ({
-        option: option.name,
-        variant: option.value,
-      }));
-      const sku = this.listing.get('item').get('skus').find((v) => _.isEqual(v.get('selections'), selections));
+    const options = item.get('options');
+    const selections = options.map((option) => ({
+      option: option.name,
+      variant: option.value,
+    }));
+    const sku = this.listing.get('item').get('skus').find((v) => _.isEqual(v.get('selections'), selections));
 
-      return {
-        price: bigNumber(this.listing.price.amount),
-        sPrice: bigNumber(sOptService ? sOptService.get('price') || 0 : 0),
-        aPrice: bigNumber(sOptService ? sOptService.get('additionalItemPrice') || 0 : 0),
-        vPrice: bigNumber(sku ? sku.get('surcharge') || 0 : 0),
-        quantity: bigNumber(item.get('quantity')),
-      };
-    });
+    return {
+      price: bigNumber(this.listing.price.amount),
+      sPrice: bigNumber(sOptService ? sOptService.get('price') || 0 : 0),
+      aPrice: bigNumber(sOptService ? sOptService.get('additionalItemPrice') || 0 : 0),
+      vPrice: bigNumber(sku ? sku.get('surcharge') || 0 : 0),
+      quantity: bigNumber(item.get('quantity')),
+    };
   });
+});
 
-  function refreshPrices() {
-    // this.receipt.updatePrices(this.prices);
+function refreshPrices () {
+  this.receipt.updatePrices(prices);
+}
+
+const couponField = computed(() => {
+  if (!this._couponField) {
+    this._couponField = this.$('#couponCode');
+  }
+  return this._couponField;
+})
+
+const cryptoAmountCurrency = computed(() => {
+  return this._cryptoAmountCurrency
+    || this.listing.get('item')
+      .get('cryptoListingCurrencyCode');
+});
+
+const coinDivisibility = computed(() => {
+  let currencyCode;
+  try {
+    currencyCode = this.listing.isCrypto ? this.listing.get('item').cryptoListingCurrencyCode : this.listing.get('metadata').get('pricingCurrency').code;
+  } catch (e) {
+    // pass
   }
 
-  const couponField = computed(() => {
-    if (!this._couponField) {
-      this._couponField = this.$('#couponCode');
-    }
-    return this._couponField;
+  let coinDiv;
+  try {
+    coinDiv = getCoinDivisibility(currencyCode);
+  } catch (e) {
+    // pass
+  }
+  return coinDiv;
+});
+
+const isModerated = computed(() => {
+  return this.moderators.selectedIDs.length > 0;
+});
+
+
+function loadData (options = {}) {
+  this.phase = 'pay';
+
+  this.cart = opts.cart;
+  this.listings = [];
+  this.cart.items.forEach(item => {
+    console.log("item: ", item)
+    this.listings.push(item)
+  });
+
+  this.listing = opts.listing;
+  this.variants = opts.variants;
+  this.vendor = opts.vendor;
+  const shippingOptions = this.listing.get('shippingOptions');
+  const moderatorIDs = this.listing.get('moderators') || [];
+  const disallowedIDs = [app.profile.id, this.listing.get('vendorID').peerID];
+  this.moderatorIDs = _.without(moderatorIDs, ...disallowedIDs);
+
+  this.couponObj = [];
+
+  this.order = new Order(
+    {},
+    {
+      shippable: !!(shippingOptions && shippingOptions.length),
+      moderated: this.moderatorIDs.length && app.verifiedMods.matched(this.moderatorIDs).length,
+    });
+
+  /*
+     to support multiple items in a purchase in the future, pass in listings in the options,
+     and add them to the order as items here.
+  */
+  this.listings.forEach(listing => {
+    const item = new Item(
+      {
+        listingHash: listing.cid,
+        quantity: listing.listing.metadata.contractType !== 'CRYPTOCURRENCY' ? bigNumber('1') : undefined,
+        options: listing.options || [],
+      },
+      {
+        isCrypto: listing.listing.metadata.contractType === 'CRYPTOCURRENCY',
+        // inventory: () =>
+        //   (
+        //     typeof this.inventory === 'number' ?
+        //       this.inventory : 99999999999999999
+        //   ),
+        getCoinDiv: () => coinDivisibility,
+        getCoinType: () => listing.listing.metadata.pricingCurrency.code,
+      }
+    );
+    // add the item to the order.
+    this.order.get('items').add(item);
   })
 
-  const cryptoAmountCurrency = computed(() => {
-    return this._cryptoAmountCurrency
-      || this.listing.get('item')
-        .get('cryptoListingCurrencyCode');
+
+  this.actionBtn = this.createChild(ActionBtn, {
+    listing: this.listing,
   });
+  this.listenTo(this.actionBtn, 'purchase', () => purchaseListing());
+  this.listenTo(this.actionBtn, 'close', () => this.close());
+  this.listenTo(this.actionBtn, 'reloadOutdated', () => {
+    let defaultPrevented = false;
 
-  const coinDivisibility = computed((listing) => {
-    let currencyCode = listing.isCrypto ? listing.item?.cryptoListingCurrencyCode : listing.metadata?.pricingCurrency?.code;
-
-    let coinDiv;
-    try {
-      coinDiv = getCoinDivisibility(currencyCode);
-    } catch (e) {
-      // pass
-    }
-    return coinDiv;
-  });
-
-  const isModerated = computed(() => {
-    return this.moderators.selectedIDs.length > 0;
-  });
-
-  
-
-  function loadData(options = {}) {
-    this.phase = 'pay';
-
-    this.cart = opts.cart;
-    this.listings = [];
-    this.cart.items.forEach(item => {
-      console.log("item: ", item)
-      this.listings.push(item)
+    this.trigger('clickReloadOutdated', {
+      preventDefault: () => (defaultPrevented = true),
     });
 
-    this.listing = opts.listing;
-    this.variants = opts.variants;
-    this.vendor = opts.vendor;
-    const shippingOptions = this.listing.get('shippingOptions');
-    const moderatorIDs = this.listing.get('moderators') || [];
-    const disallowedIDs = [app.profile.id, this.listing.get('vendorID').peerID];
-    this.moderatorIDs = _.without(moderatorIDs, ...disallowedIDs);
-
-    this.couponObj = [];
-
-    this.order = new Order(
-      {},
-      {
-        shippable: !!(shippingOptions && shippingOptions.length),
-        moderated: this.moderatorIDs.length && app.verifiedMods.matched(this.moderatorIDs).length,
-      });
-
-    /*
-       to support multiple items in a purchase in the future, pass in listings in the options,
-       and add them to the order as items here.
-    */
-    this.listings.forEach(listing => {
-      const item = new Item(
-        {
-          listingHash: listing.cid,
-          quantity: listing.listing.metadata.contractType !== 'CRYPTOCURRENCY' ? bigNumber('1') : undefined,
-          options: listing.options || [],
-        },
-        {
-          isCrypto: listing.listing.metadata.contractType === 'CRYPTOCURRENCY',
-          // inventory: () =>
-          //   (
-          //     typeof this.inventory === 'number' ?
-          //       this.inventory : 99999999999999999
-          //   ),
-          getCoinDiv: () => coinDivisibility(listing.listing),
-          getCoinType: () => listing.listing.metadata.pricingCurrency.code,
-        }
-      );
-      // add the item to the order.
-      this.order.get('items').add(item);
-    })
-    
-
-    this.actionBtn = this.createChild(ActionBtn, {
-      listing: this.listing,
-    });
-    this.listenTo(this.actionBtn, 'purchase', () => purchaseListing());
-    this.listenTo(this.actionBtn, 'close', () => this.close());
-    this.listenTo(this.actionBtn, 'reloadOutdated', () => {
-      let defaultPrevented = false;
-
-      this.trigger('clickReloadOutdated', {
-        preventDefault: () => (defaultPrevented = true),
-      });
-
-      setTimeout(() => {
-        if (!defaultPrevented) {
-          Backbone.history.loadUrl();
-        }
-      });
-    });
-
-    // this.receipt = this.createChild(Receipt, {
-    //   model: this.order,
-    //   listing: this.listing,
-    //   prices: this.prices,
-    //   couponObj: this.couponObj,
-    //   showTotalTip: this.getState().phase === 'pay',
-    // });
-
-    this.coupons = this.createChild(Coupons, {
-      coupons: this.listing.get('coupons'),
-      listingPrice: bigNumber(this.listing.price.amount),
-    });
-    this.listenTo(this.coupons, 'changeCoupons', (hashes, codes) => changeCoupons(hashes, codes));
-
-    const currencies = this.listings[0]?.metadata?.acceptedCurrencies || [];
-    const locale = app.localSettings.standardizedTranslatedLang() || 'en-US';
-    currencies.sort((a, b) => {
-      const aName = app.polyglot.t(`cryptoCurrencies.${a}`, { _: a });
-      const bName = app.polyglot.t(`cryptoCurrencies.${b}`, { _: b });
-      return aName.localeCompare(bName, locale, { sensitivity: 'base' });
-    });
-
-    const disabledCurs = currencies.filter((c) => !isSupportedWalletCur(c));
-    const activeCurs = currencies.length && this.listings[0]?.isCrypto ? [currencies[0]] : [];
-
-    this.cryptoCurSelector = this.createChild(CryptoCurSelector, {
-      disabledMsg: app.polyglot.t('purchase.cryptoCurrencyInvalid'),
-      initialState: {
-        controlType: 'radio',
-        currencies,
-        disabledCurs,
-        sort: false,
-        activeCurs,
-      },
-    });
-
-    this.listenTo(this.cryptoCurSelector, 'currencyClicked', (cOpts) => {
-      if (cOpts.active) this.moderators.setState({ showOnlyCur: cOpts.currency });
-      this.receipt.paymentCoin = cOpts.active ? cOpts.currency : '';
-    });
-
-    this.moderators = this.createChild(Moderators, {
-      moderatorIDs: this.moderatorIDs,
-      useCache: false,
-      fetchErrorTitle: app.polyglot.t('purchase.errors.moderatorsTitle'),
-      fetchErrorMsg: app.polyglot.t('purchase.errors.moderatorsMsg'),
-      purchase: true,
-      cardState: 'unselected',
-      notSelected: 'unselected',
-      singleSelect: true,
-      radioStyle: true,
-      initialState: {
-        showOnlyCur: currencies[0],
-        showVerifiedOnly: true,
-      },
-    });
-    // render the moderators so it can start fetching and adding moderator cards
-    this.moderators.render();
-    this.moderators.getModeratorsByID();
-    this.listenTo(this.moderators, 'noModsShown', () => this.render());
-    this.listenTo(this.moderators, 'clickShowUnverified', () => {
-      showVerifiedOnly = false;
-    });
-    this.listenTo(this.moderators, 'cardSelect', () => onCardSelect());
-
-    if (this.listing[0]?.shippingOptions.length) {
-      this.shipping = this.createChild(Shipping, {
-        model: this.listing,
-      });
-      this.listenTo(this.shipping, 'shippingOptionSelected', () => updateShippingOption());
-      // set the initial shipping option
-      updateShippingOption();
-      this.refreshPrices();
-    }
-
-    this.complete = this.createChild(Complete, {
-      listing: this.listing,
-      vendor: this.vendor,
-    });
-
-    // If the parent has the inventory, pass it in, otherwise we'll fetch it.
-    // -- commenting out for now since inventory is not functioning properly on the server
-    // this.inventory = this.options.inventory;
-    // if (
-    //   this.listing.isCrypto &&
-    //   typeof this.inventory !== 'number'
-    // ) {
-    //   this.inventoryFetch = getInventory(
-    //     this.listing.get('vendorID').peerID,
-    //     {
-    //       slug: this.listing.get('slug'),
-    //       coinDivisibility:
-    //         this.listing.get('metadata')
-    //           .get('coinDivisibility'),
-    //     }
-    //   ).done(e => (this.inventory = e.inventory));
-    //   this.listenTo(inventoryEvents, 'inventory-change',
-    //     e => (this.inventory = e.inventory));
-    // }
-
-    this.listenTo(app.settings, 'change:localCurrency', () => showDataChangedMessage());
-    this.listenTo(app.localSettings, 'change:bitcoinUnit', () => showDataChangedMessage());
-    this.listenTo(this.order.get('items').at(0), 'someChange ', () => this.refreshPrices());
-    this.listenTo(this.order.get('items').at(0).get('shipping'), 'change', () => this.refreshPrices());
-
-    this.hasVerifiedMods = app.verifiedMods.matched(this.moderatorIDs).length > 0;
-
-    this.listenTo(app.verifiedMods, 'update', () => {
-      const newHasVerifiedMods = app.verifiedMods.matched(moderatorIDs).length > 0;
-      if (newHasVerifiedMods !== this.hasVerifiedMods) {
-        this.hasVerifiedMods = newHasVerifiedMods;
-        showDataChangedMessage();
+    setTimeout(() => {
+      if (!defaultPrevented) {
+        Backbone.history.loadUrl();
       }
     });
+  });
 
-    this._latestHash = this.listing.get('hash');
-    this._renderedHash = null;
+  this.receipt = this.createChild(Receipt, {
+    model: this.order,
+    listing: this.listing,
+    prices: prices,
+    couponObj: this.couponObj,
+    showTotalTip: this.phase === 'pay',
+  });
 
-    this.listenTo(outdatedListingHashesEvents, 'newHash', (e) => {
-      this._latestHash = e.oldHash;
-      if (e.oldHash === this._renderedHash) outdateHash();
+  this.coupons = this.createChild(Coupons, {
+    coupons: this.listing.get('coupons'),
+    listingPrice: bigNumber(this.listing.price.amount),
+  });
+  this.listenTo(this.coupons, 'changeCoupons', (hashes, codes) => changeCoupons(hashes, codes));
+
+  const currencies = this.listing.get('metadata').get('acceptedCurrencies') || [];
+  const locale = app.localSettings.standardizedTranslatedLang() || 'en-US';
+  currencies.sort((a, b) => {
+    const aName = app.polyglot.t(`cryptoCurrencies.${a}`, { _: a });
+    const bName = app.polyglot.t(`cryptoCurrencies.${b}`, { _: b });
+    return aName.localeCompare(bName, locale, { sensitivity: 'base' });
+  });
+
+  const disabledCurs = currencies.filter((c) => !isSupportedWalletCur(c));
+  const activeCurs = currencies.length && this.listing.isCrypto ? [currencies[0]] : [];
+
+  this.cryptoCurSelector = this.createChild(CryptoCurSelector, {
+    disabledMsg: app.polyglot.t('purchase.cryptoCurrencyInvalid'),
+    initialState: {
+      controlType: 'radio',
+      currencies,
+      disabledCurs,
+      sort: false,
+      activeCurs,
+    },
+  });
+
+  this.listenTo(this.cryptoCurSelector, 'currencyClicked', (cOpts) => {
+    if (cOpts.active) this.moderators.setState({ showOnlyCur: cOpts.currency });
+    this.receipt.paymentCoin = cOpts.active ? cOpts.currency : '';
+  });
+
+  this.moderators = this.createChild(Moderators, {
+    moderatorIDs: this.moderatorIDs,
+    useCache: false,
+    fetchErrorTitle: app.polyglot.t('purchase.errors.moderatorsTitle'),
+    fetchErrorMsg: app.polyglot.t('purchase.errors.moderatorsMsg'),
+    purchase: true,
+    cardState: 'unselected',
+    notSelected: 'unselected',
+    singleSelect: true,
+    radioStyle: true,
+    initialState: {
+      showOnlyCur: currencies[0],
+      showVerifiedOnly: true,
+    },
+  });
+  // render the moderators so it can start fetching and adding moderator cards
+  this.moderators.render();
+  this.moderators.getModeratorsByID();
+  this.listenTo(this.moderators, 'noModsShown', () => render());
+  this.listenTo(this.moderators, 'clickShowUnverified', () => {
+    showVerifiedOnly = false;
+  });
+  this.listenTo(this.moderators, 'cardSelect', () => onCardSelect());
+
+  if (this.listing.get('shippingOptions').length) {
+    this.shipping = this.createChild(Shipping, {
+      model: this.listing,
     });
+    this.listenTo(this.shipping, 'shippingOptionSelected', () => updateShippingOption());
+    // set the initial shipping option
+    updateShippingOption();
+    refreshPrices();
   }
 
+  this.complete = this.createChild(Complete, {
+    listing: this.listing,
+    vendor: this.vendor,
+  });
 
-  function events() {
-    return {
-      'click .js-close': 'clickClose',
-      'click .js-newAddress': 'clickNewAddress',
-      ...super.events(),
-    };
-  }
+  // If the parent has the inventory, pass it in, otherwise we'll fetch it.
+  // -- commenting out for now since inventory is not functioning properly on the server
+  // this.inventory = this.options.inventory;
+  // if (
+  //   this.listing.isCrypto &&
+  //   typeof this.inventory !== 'number'
+  // ) {
+  //   this.inventoryFetch = getInventory(
+  //     this.listing.get('vendorID').peerID,
+  //     {
+  //       slug: this.listing.get('slug'),
+  //       coinDivisibility:
+  //         this.listing.get('metadata')
+  //           .get('coinDivisibility'),
+  //     }
+  //   ).done(e => (this.inventory = e.inventory));
+  //   this.listenTo(inventoryEvents, 'inventory-change',
+  //     e => (this.inventory = e.inventory));
+  // }
 
-  function showDataChangedMessage() {
-    if (this.dataChangePopIn && !this.dataChangePopIn.isRemoved()) {
-      this.dataChangePopIn.$el.velocity('callout.shake', { duration: 500 });
-    } else {
-      this.dataChangePopIn = this.createChild(PopInMessage, {
-        messageText:
-          buildRefreshAlertMessage(app.polyglot.t('purchase.purchaseDataChangedPopin')),
-      });
+  this.listenTo(app.settings, 'change:localCurrency', () => showDataChangedMessage());
+  this.listenTo(app.localSettings, 'change:bitcoinUnit', () => showDataChangedMessage());
+  this.listenTo(this.order.get('items').at(0), 'someChange ', () => refreshPrices());
+  this.listenTo(this.order.get('items').at(0).get('shipping'), 'change', () => refreshPrices());
 
-      this.listenTo(this.dataChangePopIn, 'clickRefresh', () => {
-        this.moderators.render();
-      });
+  this.hasVerifiedMods = app.verifiedMods.matched(this.moderatorIDs).length > 0;
 
-      this.listenTo(this.dataChangePopIn, 'clickDismiss', () => {
-        this.dataChangePopIn.remove();
-        this.dataChangePopIn = null;
-      });
-
-      this.getCachedEl('.js-popInMessages').append(this.dataChangePopIn.render().el);
+  this.listenTo(app.verifiedMods, 'update', () => {
+    const newHasVerifiedMods = app.verifiedMods.matched(moderatorIDs).length > 0;
+    if (newHasVerifiedMods !== this.hasVerifiedMods) {
+      this.hasVerifiedMods = newHasVerifiedMods;
+      showDataChangedMessage();
     }
+  });
+
+  this._latestHash = this.listing.get('hash');
+  this._renderedHash = null;
+
+  this.listenTo(outdatedListingHashesEvents, 'newHash', (e) => {
+    this._latestHash = e.oldHash;
+    if (e.oldHash === this._renderedHash) outdateHash();
+  });
+}
+
+function events () {
+  return {
+    'click .js-close': 'clickClose',
+    'click .js-newAddress': 'clickNewAddress',
+    ...super.events(),
+  };
+}
+
+function setState (state = {}, options = {}) {
+  const superReturn = super.setState(state, options);
+
+  if (
+    this.receipt
+    && this.phase !== 'pay'
+  ) {
+    this.receipt.showTotalTip = false;
   }
 
-  function goToListing() {
-    app.router.navigate(`${this.vendor.peerID}/store/${this.listing.get('slug')}`,
-      { trigger: true });
-    this.close();
-  }
+  return superReturn;
+}
 
-  function clickGoToListing() {
-    // this.goToListing();
-    const receipt = createApp(Receipt, {
-      model: this.order,
-      listing: this.listing.toJSON(),
-      prices: this.prices,
-      coupons: this.couponObj,
-      showTotalTip: this.phase === 'pay',
+function showDataChangedMessage () {
+  if (this.dataChangePopIn && !this.dataChangePopIn.isRemoved()) {
+    this.dataChangePopIn.$el.velocity('callout.shake', { duration: 500 });
+  } else {
+    this.dataChangePopIn = this.createChild(PopInMessage, {
+      messageText:
+        buildRefreshAlertMessage(app.polyglot.t('purchase.purchaseDataChangedPopin')),
     });
-    receipt.mount('#jsReceipt');
+
+    this.listenTo(this.dataChangePopIn, 'clickRefresh', () => {
+      render();
+      this.moderators.render();
+    });
+
+    this.listenTo(this.dataChangePopIn, 'clickDismiss', () => {
+      this.dataChangePopIn.remove();
+      this.dataChangePopIn = null;
+    });
+
+    this.getCachedEl('.js-popInMessages').append(this.dataChangePopIn.render().el);
+  }
+}
+
+function goToListing () {
+  app.router.navigate(`${this.vendor.peerID}/store/${this.listing.get('slug')}`,
+    { trigger: true });
+  this.close();
+}
+
+function clickGoToListing () {
+  goToListing();
+}
+
+function clickClose () {
+  this.trigger('closeBtnPressed');
+  this.close();
+}
+
+function handleDirectPurchaseClick () {
+  if (!isModerated) return;
+
+  this.moderators.deselectOthers();
+  render(); // always render even if the state didn't change
+}
+
+function togVerifiedModerators (bool) {
+  this.moderators.togVerifiedShown(bool);
+  showVerifiedOnly = bool;
+}
+
+function onClickVerifiedOnly (e) {
+  togVerifiedModerators($(e.target).prop('checked'));
+}
+
+function onCardSelect () {
+  render(); // always render even if the state didn't change
+}
+
+function changeCryptoAddress (e) {
+  this.order.get('items')
+    .at(0)
+    .set('paymentAddress', e.target.value);
+}
+
+function setModelQuantity (quantity) {
+  let cur = cryptoAmountCurrency
+
+  if (this.listing.isCrypto && (typeof cur !== 'string' || !cur)) {
+    throw new Error('Please provide the currency code as a valid, non-empty string.');
   }
 
-  function clickClose() {
-    this.trigger('closeBtnPressed');
-    this.close();
+  this.order.get('items')
+    .at(0)
+    .set({ quantity });
+}
+
+function changeCryptoAmountCurrency (e) {
+  this._cryptoAmountCurrency = e.target.value;
+  const { quantity } = this.getFormData(
+    this.getCachedEl('#cryptoAmount'),
+  );
+  setModelQuantity(quantity);
+}
+
+function keyupQuantity (e) {
+  // wait until they stop typing
+  if (this.quantityKeyUpTimer) {
+    clearTimeout(this.quantityKeyUpTimer);
   }
 
-  function handleDirectPurchaseClick() {
-    if (!this.isModerated) return;
-
-    this.moderators.deselectOthers();
-  }
-
-  function togVerifiedModerators(bool) {
-    this.moderators.togVerifiedShown(bool);
-    showVerifiedOnly = bool;
-  }
-
-  function onClickVerifiedOnly(e) {
-    togVerifiedModerators($(e.target).prop('checked'));
-  }
-
-  function onCardSelect() {
-    const selected = this.moderators.selectedIDs;
-  }
-
-  function changeCryptoAddress(e) {
-    this.order.get('items')
-      .at(0)
-      .set('paymentAddress', e.target.value);
-  }
-
-  function setModelQuantity(quantity, cur = cryptoAmountCurrency) {
-    if (this.listing.isCrypto && (typeof cur !== 'string' || !cur)) {
-      throw new Error('Please provide the currency code as a valid, non-empty string.');
-    }
-
-    this.order.get('items')
-      .at(0)
-      .set({ quantity });
-  }
-
-  function changeCryptoAmountCurrency(e) {
-    this._cryptoAmountCurrency = e.target.value;
-    const { quantity } = this.getFormData(
-      this.getCachedEl('#cryptoAmount'),
-    );
+  this.quantityKeyUpTimer = setTimeout(() => {
+    const { quantity } = this.getFormData($(e.target));
+    if (this.listing.isCrypto) this._cryptoQuantity = quantity;
     setModelQuantity(quantity);
-  }
+  }, 150);
+}
 
-  function keyupQuantity(e) {
-    // wait until they stop typing
-    if (this.quantityKeyUpTimer) {
-      clearTimeout(this.quantityKeyUpTimer);
-    }
+function clickNewAddress () {
+  launchSettingsModal({ initialTab: 'Addresses' });
+}
 
-    this.quantityKeyUpTimer = setTimeout(() => {
-      const { quantity } = this.getFormData($(e.target));
-      if (this.listing.isCrypto) this._cryptoQuantity = quantity;
-      setModelQuantity(quantity);
-    }, 150);
-  }
-
-  function clickNewAddress() {
-    launchSettingsModal({ initialTab: 'Addresses' });
-  }
-
-  function applyCoupon() {
-    this.coupons
-      .addCode(couponField.val())
-      .then((result) => {
-        // if the result is valid, clear the input field
-        if (result.type === 'valid') {
-          couponField.val('');
-        }
-      });
-  }
-
-  function onKeyUpCouponCode(e) {
-    if (e.which === 13) {
-      applyCoupon();
-    }
-  }
-
-  function blurEmailAddress(e) {
-    this.order.set('alternateContactInfo', $(e.target).val());
-  }
-
-  function blurMemo(e) {
-    this.order.get('items').at(0).set('memo', $(e.target).val());
-  }
-
-  function changeCoupons(hashes, codes) {
-    // combine the codes and hashes so the receipt can check both.
-    // if this is the user's own listing they will have codes instead of hashes
-    const hashesAndCodes = hashes.concat(codes);
-    const filteredCoupons = this.listing.get('coupons').filter(
-      (coupon) => hashesAndCodes.indexOf(coupon.get('hash') || coupon.get('discountCode')) !== -1,
-    );
-    this.couponObj = filteredCoupons.map((coupon) => coupon.toJSON());
-    this.receipt.coupons = this.couponObj;
-    this.order.get('items').at(0).set('coupons', codes);
-  }
-
-  function updateShippingOption() {
-    // Set the shipping option.
-    this.order.get('items').at(0).get('shipping')
-      .set(this.shipping.selectedOption);
-  }
-
-  function outdateHash() {
-    this.actionBtn.setState({ outdatedHash: true });
-  }
-
-  function purchaseListing() {
-    // Clear any old errors.
-    const allErrContainers = this.$('div[class $="-errors"]');
-    allErrContainers.each((i, container) => $(container).html(''));
-
-    // Don't allow a zero or negative price purchase.
-    const priceObj = this.prices[0];
-    if (
-      priceObj
-        .price
-        .plus(priceObj.vPrice)
-        .plus(priceObj.sPrice).lte(0)
-    ) {
-      this.insertErrors(this.getCachedEl('.js-errors'),
-        [app.polyglot.t('purchase.errors.zeroPrice')]);
-      this.phase = 'pay';
-      return;
-    }
-
-    // Set the payment coin.
-    const paymentCoin = this.cryptoCurSelector.getState().activeCurs[0];
-    this.order.set({ paymentCoin });
-
-    // Set the shipping address if the listing is shippable.
-    if (this.shipping && this.shipping.selectedAddress) {
-      this.order.addAddress(this.shipping.selectedAddress);
-    }
-
-    // Set the moderator.
-    const moderator = this.moderators.selectedIDs[0] || '';
-    this.order.set({ moderator });
-    this.order.set({}, { validate: true });
-
-    // Cancel any existing order.
-    if (this.orderSubmit) this.orderSubmit.abort();
-
-    this.phase = 'processing';
-
-    startAjaxEvent('Purchase');
-    const segmentation = {
-      paymentCoin,
-      moderated: !!moderator,
-    };
-
-    if (!this.order.validationError) {
-      if (this.listing.isOwnListing) {
-        this.phase = 'pay';
-        // don't allow a seller to buy their own items
-        const errTitle = app.polyglot.t('purchase.errors.ownIDTitle');
-        const errMsg = app.polyglot.t('purchase.errors.ownIDMsg');
-        openSimpleMessage(errTitle, errMsg);
-        endAjaxEvent('Purchase', {
-          ...segmentation,
-          errors: 'own listing',
-        });
-      } else {
-        const { coinDivisibility } = this;
-        const cryptoItems = [];
-
-        if (this.listing.isCrypto) {
-          if (!isValidCoinDivisibility(coinDivisibility)[0]) {
-            this.phase = 'pay';
-            openSimpleMessage(
-              app.polyglot.t('purchase.errors.genericPurchaseErrTitle'),
-              app.polyglot.t('purchase.errors.invalidCoinDiv')
-            );
-            return;
-          }
-
-          try {
-            const items = this.order.get('items');
-            for (let i = 0; i < items.length; i += 2) {
-              const item = items.at(i);
-              cryptoItems.push({
-                ...item.toJSON(),
-                quantity: decimalToInteger(
-                  item.get('quantity'),
-                  coinDivisibility,
-                ),
-              });
-            }
-          } catch (e) {
-            this.phase = 'pay';
-            openSimpleMessage(
-              app.polyglot.t('purchase.errors.genericPurchaseErrTitle'),
-              app.polyglot.t('purchase.errors.unableToConvertCryptoQuantity')
-            );
-            console.error(e);
-            return;
-          }
-        }
-
-        // Strip the 'cid' so it doesn't go to the server. Normally this is
-        // done in the sync of the baseModel, but since we're POSTing outside of
-        // that, we'll replicate that cleanup here.
-        const postData = removeProp(
-          {
-            ...this.order.toJSON(),
-            items: this.listing.isCrypto
-              ? cryptoItems : this.order.get('items').toJSON(),
-          },
-          'cid',
-        );
-
-        $.post({
-          url: app.getServerUrl('ob/purchase'),
-          data: JSON.stringify(postData),
-          dataType: 'json',
-          contentType: 'application/json',
-        })
-          .done((data) => {
-            this.phase = 'pending';
-            
-            this.payment = this.createChild(Payment, {
-              balanceRemaining: curDefToDecimal(data.amount),
-              paymentAddress: data.paymentAddress,
-              orderID: data.orderID,
-              isModerated: !!this.order.get('moderator'),
-              metricsOrigin: 'Purchase',
-              paymentCoin,
-            });
-            this.listenTo(this.payment, 'walletPaymentComplete', ((pmtCompleteData) => completePurchase(pmtCompleteData)));
-            this.$('.js-pending').append(this.payment.render().el);
-            endAjaxEvent('Purchase');
-          })
-          .fail((jqXHR) => {
-            handlePurchaseResponseFailed(jqXHR);
-
-            endAjaxEvent('Purchase', {
-              ...segmentation,
-              errors: errMsg || 'unknown error',
-            });
-          });
+function applyCoupon () {
+  this.coupons
+    .addCode(couponField.val())
+    .then((result) => {
+      // if the result is valid, clear the input field
+      if (result.type === 'valid') {
+        couponField.val('');
       }
-    } else {
-      this.phase = 'pay';
-      const purchaseErrs = formatPurchaseError();
+    });
+}
 
+function onKeyUpCouponCode (e) {
+  if (e.which === 13) {
+    applyCoupon();
+  }
+}
+
+function blurEmailAddress (e) {
+  this.order.set('alternateContactInfo', $(e.target).val());
+}
+
+function blurMemo (e) {
+  this.order.get('items').at(0).set('memo', $(e.target).val());
+}
+
+function changeCoupons (hashes, codes) {
+  // combine the codes and hashes so the receipt can check both.
+  // if this is the user's own listing they will have codes instead of hashes
+  const hashesAndCodes = hashes.concat(codes);
+  const filteredCoupons = this.listing.get('coupons').filter(
+    (coupon) => hashesAndCodes.indexOf(coupon.get('hash') || coupon.get('discountCode')) !== -1,
+  );
+  this.couponObj = filteredCoupons.map((coupon) => coupon.toJSON());
+  this.receipt.coupons = this.couponObj;
+  this.order.get('items').at(0).set('coupons', codes);
+}
+
+function updateShippingOption () {
+  // Set the shipping option.
+  this.order.get('items').at(0).get('shipping')
+    .set(this.shipping.selectedOption);
+}
+
+function outdateHash () {
+  this.actionBtn.setState({ outdatedHash: true });
+}
+
+function purchaseListing () {
+  // Clear any old errors.
+  const allErrContainers = this.$('div[class $="-errors"]');
+  allErrContainers.each((i, container) => $(container).html(''));
+
+  // Don't allow a zero or negative price purchase.
+  const priceObj = prices[0];
+  if (
+    priceObj
+      .price
+      .plus(priceObj.vPrice)
+      .plus(priceObj.sPrice).lte(0)
+  ) {
+    insertErrors(this.getCachedEl('.js-errors'),
+      [app.polyglot.t('purchase.errors.zeroPrice')]);
+    this.phase = 'pay';
+    return;
+  }
+
+  // Set the payment coin.
+  const paymentCoin = this.cryptoCurSelector.getState().activeCurs[0];
+  this.order.set({ paymentCoin });
+
+  // Set the shipping address if the listing is shippable.
+  if (this.shipping && this.shipping.selectedAddress) {
+    this.order.addAddress(this.shipping.selectedAddress);
+  }
+
+  // Set the moderator.
+  const moderator = this.moderators.selectedIDs[0] || '';
+  this.order.set({ moderator });
+  this.order.set({}, { validate: true });
+
+  // Cancel any existing order.
+  if (this.orderSubmit) this.orderSubmit.abort();
+
+  this.phase = 'processing';
+
+  startAjaxEvent('Purchase');
+  const segmentation = {
+    paymentCoin,
+    moderated: !!moderator,
+  };
+
+  if (!this.order.validationError) {
+    if (this.listing.isOwnListing) {
+      this.phase = 'pay';
+      // don't allow a seller to buy their own items
+      const errTitle = app.polyglot.t('purchase.errors.ownIDTitle');
+      const errMsg = app.polyglot.t('purchase.errors.ownIDMsg');
+      openSimpleMessage(errTitle, errMsg);
       endAjaxEvent('Purchase', {
         ...segmentation,
-        errors: 'User Error',
-        ...purchaseErrs,
+        errors: 'own listing',
       });
-    }
-  }
+    } else {
+      const cryptoItems = [];
 
-  function handlePurchaseResponseFailed(jqXHR) {
+      if (this.listing.isCrypto) {
+        if (!isValidCoinDivisibility(coinDivisibility)[0]) {
+          this.phase = 'pay';
+          openSimpleMessage(
+            app.polyglot.t('purchase.errors.genericPurchaseErrTitle'),
+            app.polyglot.t('purchase.errors.invalidCoinDiv')
+          );
+          return;
+        }
+
+        try {
+          const items = this.order.get('items');
+          for (let i = 0; i < items.length; i += 2) {
+            const item = items.at(i);
+            cryptoItems.push({
+              ...item.toJSON(),
+              quantity: decimalToInteger(
+                item.get('quantity'),
+                coinDivisibility,
+              ),
+            });
+          }
+        } catch (e) {
+          this.phase = 'pay';
+          openSimpleMessage(
+            app.polyglot.t('purchase.errors.genericPurchaseErrTitle'),
+            app.polyglot.t('purchase.errors.unableToConvertCryptoQuantity')
+          );
+          console.error(e);
+          return;
+        }
+      }
+
+      // Strip the 'cid' so it doesn't go to the server. Normally this is
+      // done in the sync of the baseModel, but since we're POSTing outside of
+      // that, we'll replicate that cleanup here.
+      const postData = removeProp(
+        {
+          ...this.order.toJSON(),
+          items: this.listing.isCrypto
+            ? cryptoItems : this.order.get('items').toJSON(),
+        },
+        'cid',
+      );
+
+      $.post({
+        url: app.getServerUrl('ob/purchase'),
+        data: JSON.stringify(postData),
+        dataType: 'json',
+        contentType: 'application/json',
+      })
+        .done((data) => {
+          this.phase = 'pending';
+          this.payment = this.createChild(Payment, {
+            balanceRemaining: curDefToDecimal(data.amount),
+            paymentAddress: data.paymentAddress,
+            orderID: data.orderID,
+            isModerated: !!this.order.get('moderator'),
+            metricsOrigin: 'Purchase',
+            paymentCoin,
+          });
+          this.listenTo(this.payment, 'walletPaymentComplete', ((pmtCompleteData) => completePurchase(pmtCompleteData)));
+          this.$('.js-pending').append(this.payment.render().el);
+          endAjaxEvent('Purchase');
+        })
+        .fail((jqXHR) => {
+          handlePurchaseResponseFailed(jqXHR);
+
+          endAjaxEvent('Purchase', {
+            ...segmentation,
+            errors: errMsg || 'unknown error',
+          });
+        });
+    }
+  } else {
     this.phase = 'pay';
-    if (jqXHR.statusText === 'abort') return;
-    let errTitle = app.polyglot.t('purchase.errors.orderError');
-    let errMsg = (jqXHR.responseJSON && jqXHR.responseJSON.reason) || '';
+    const purchaseErrs = formatPurchaseError();
 
-    if (jqXHR.responseJSON
-      && jqXHR.responseJSON.code === 'ERR_INSUFFICIENT_INVENTORY'
-      && typeof jqXHR.responseJSON.remainingInventory === 'number') {
-      this.inventory = jqXHR.responseJSON.remainingInventory / coinDivisibility;
-      errTitle = app.polyglot.t('purchase.errors.insufficientInventoryTitle');
-      errMsg = app.polyglot.t('purchase.errors.insufficientInventoryBody', {
-        smart_count: this.inventory,
-        remainingInventory: new Intl.NumberFormat(app.settings.get('localCurrency'), {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 8,
-        }).format(this.inventory),
-      });
-      // if (this.inventoryFetch) this.inventoryFetch.abort();
-    } else if (errMsg === ERROR_DUST_AMOUNT) {
-      errMsg = app.polyglot.t('purchase.errors.serverErrorBelowDust');
-    }
-
-    openSimpleMessage(errTitle, errMsg);
-  }
-
-  function formatPurchaseError() {
-    const purchaseErrs = {};
-    Object.keys(this.order.validationError).forEach((errKey) => {
-      const domKey = errKey.replace(/\[[^\[\]]*\]/g, '').replace('.', '-');
-      let container = this.$(`.js-${domKey}-errors`);
-      // if no container exists, use the generic container
-      container = container.length ? container : this.getCachedEl('.js-errors');
-      const err = this.order.validationError[errKey];
-      insertErrors(container, err);
-      purchaseErrs[`UserError-${domKey}`] = err.join(', ');
-    });
-    return purchaseErrs;
-  }
-
-  function insertErrors(container, errors = []) {
-    loadTemplate('formError.html', (t) => {
-      container.html(t({
-        errors,
-      }));
+    endAjaxEvent('Purchase', {
+      ...segmentation,
+      errors: 'User Error',
+      ...purchaseErrs,
     });
   }
+}
 
-  function completePurchase(data) {
-    this.complete.orderID = data.orderID;
-    this.phase = 'complete';
-  }
+function handlePurchaseResponseFailed (jqXHR) {
+  this.phase = 'pay';
+  if (jqXHR.statusText === 'abort') return;
+  let errTitle = app.polyglot.t('purchase.errors.orderError');
+  let errMsg = (jqXHR.responseJSON && jqXHR.responseJSON.reason) || '';
 
-  function remove() {
-    if (this.orderSubmit) this.orderSubmit.abort();
+  if (jqXHR.responseJSON
+    && jqXHR.responseJSON.code === 'ERR_INSUFFICIENT_INVENTORY'
+    && typeof jqXHR.responseJSON.remainingInventory === 'number') {
+    this.inventory = jqXHR.responseJSON.remainingInventory / coinDivisibility;
+    errTitle = app.polyglot.t('purchase.errors.insufficientInventoryTitle');
+    errMsg = app.polyglot.t('purchase.errors.insufficientInventoryBody', {
+      smart_count: this.inventory,
+      remainingInventory: new Intl.NumberFormat(app.settings.get('localCurrency'), {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 8,
+      }).format(this.inventory),
+    });
     // if (this.inventoryFetch) this.inventoryFetch.abort();
-    clearTimeout(this.quantityKeyUpTimer);
-    super.remove();
+  } else if (errMsg === ERROR_DUST_AMOUNT) {
+    errMsg = app.polyglot.t('purchase.errors.serverErrorBelowDust');
   }
 
-  function render() {
-    if (this.dataChangePopIn) this.dataChangePopIn.remove();
+  openSimpleMessage(errTitle, errMsg);
+}
 
-    const item = this.order.get('items')
-      .at(0);
-    const quantity = item.get('quantity');
-    const metadata = this.listing.get('metadata');
+function formatPurchaseError () {
+  const purchaseErrs = {};
+  Object.keys(this.order.validationError).forEach((errKey) => {
+    const domKey = errKey.replace(/\[[^\[\]]*\]/g, '').replace('.', '-');
+    let container = this.$(`.js-${domKey}-errors`);
+    // if no container exists, use the generic container
+    container = container.length ? container : this.getCachedEl('.js-errors');
+    const err = this.order.validationError[errKey];
+    insertErrors(container, err);
+    purchaseErrs[`UserError-${domKey}`] = err.join(', ');
+  });
+  return purchaseErrs;
+}
 
-    let uiQuantity = quantity;
+function insertErrors (container, errors = []) {
+  loadTemplate('formError.html', (t) => {
+    container.html(t({
+      errors,
+    }));
+  });
+}
 
-    if (this.listing.isCrypto && this._cryptoQuantity !== undefined) {
-      uiQuantity = uiQuantity instanceof bigNumber && !uiQuantity.isNaN()
-        ? toStandardNotation(this._cryptoQuantity) : this._cryptoQuantity;
-    }
+function completePurchase (data) {
+  this.complete.orderID = data.orderID;
+  this.complete.render();
+  this.phase = 'complete';
+}
 
-    let context = {
-      ...this.order.toJSON(),
-      phase: this.phase,
-      listings: this.listings,
-      listing: this.listing.toJSON(),
-      listingPrice: this.listing.price,
-      itemConstraints: this.order.get('items')
-        .at(0)
-        .constraints,
-      vendor: this.vendor,
-      variants: this.variants,
-      prices: this.prices,
-      displayCurrency: app.settings.get('localCurrency'),
-      quantity: uiQuantity,
-      cryptoAmountCurrency: this.cryptoAmountCurrency,
-      isCrypto: this.listing.isCrypto,
-      phaseClass: `phase${capitalize(this.phase)}`,
-      hasCoupons: this.listing.get('coupons').length
-        && this.listing.get('metadata').get('contractType') !== 'CRYPTOCURRENCY',
-    };
-    ob = reactive({ ...window.templateHelpers, ...(context || {}) });
+function remove () {
+  if (this.orderSubmit) this.orderSubmit.abort();
+  if (this.inventoryFetch) this.inventoryFetch.abort();
+  clearTimeout(this.quantityKeyUpTimer);
+  super.remove();
+}
 
-    this._$couponField = null;
+function render () {
+  if (this.dataChangePopIn) this.dataChangePopIn.remove();
+  const item = this.order.get('items')
+    .at(0);
+  const quantity = item.get('quantity');
+  const metadata = this.listing.get('metadata');
 
-    this.actionBtn.delegateEvents();
-    this.actionBtn.setState({ phase: this.phase }, { renderOnChange: false });
-    this.$('.js-actionBtn').append(this.actionBtn.render().el);
+  let uiQuantity = quantity;
 
-    // this.receipt.delegateEvents();
-    // this.$('.js-receipt').append(this.receipt.render().el);
+  if (this.listing.isCrypto && this._cryptoQuantity !== undefined) {
+    uiQuantity = uiQuantity instanceof bigNumber && !uiQuantity.isNaN()
+      ? toStandardNotation(this._cryptoQuantity) : this._cryptoQuantity;
+  }
 
-    // const receipt = createApp(Receipt, {
-    //   model: this.order,
-    //   listing: this.listing.toJSON(),
-    //   prices: this.prices,
-    //   coupons: this.couponObj,
-    //   showTotalTip: this.getState().phase === 'pay',
-    // });
-    // receipt.mount(this.$('.js-receipt'));
+  let context = {
+    ...this.order.toJSON(),
+    phase: this.phase,
+    listings: this.listings,
+    listing: this.listing.toJSON(),
+    listingPrice: this.listing.price,
+    itemConstraints: this.order.get('items')
+      .at(0)
+      .constraints,
+    vendor: this.vendor,
+    variants: this.variants,
+    prices: prices,
+    displayCurrency: app.settings.get('localCurrency'),
+    quantity: uiQuantity,
+    cryptoAmountCurrency: this.cryptoAmountCurrency,
+    isCrypto: this.listing.isCrypto,
+    phaseClass: `phase${capitalize(this.phase)}`,
+    hasCoupons: this.listing.get('coupons').length
+      && this.listing.get('metadata').get('contractType') !== 'CRYPTOCURRENCY',
+  };
 
-    this.coupons.delegateEvents();
-    this.$('.js-couponsWrapper').html(this.coupons.render().el);
+  ob = { ...window.templateHelpers, ...(context || {}) };
 
-    this.moderators.delegateEvents();
-    this.$('.js-moderatorsWrapper').append(this.moderators.el);
+  this._$couponField = null;
 
-    if (this.directPayment) this.directPayment.remove();
-    this.directPayment = this.createChild(DirectPayment, {
+  this.actionBtn.delegateEvents();
+  this.actionBtn.setState({ phase: state.phase }, { renderOnChange: false });
+  this.$('.js-actionBtn').append(this.actionBtn.render().el);
+
+  this.receipt.delegateEvents();
+  this.$('.js-receipt').append(this.receipt.render().el);
+
+  this.coupons.delegateEvents();
+  this.$('.js-couponsWrapper').html(this.coupons.render().el);
+
+  this.moderators.delegateEvents();
+  this.$('.js-moderatorsWrapper').append(this.moderators.el);
+
+  if (this.directPayment) this.directPayment.remove();
+  this.directPayment = this.createChild(DirectPayment, {
+    initialState: {
+      active: !isModerated,
+    },
+  });
+  this.listenTo(this.directPayment, 'click', () => handleDirectPurchaseClick());
+  this.$('.js-directPaymentWrapper').append(this.directPayment.render().el);
+
+  this.cryptoCurSelector.delegateEvents();
+  this.$('.js-cryptoCurSelectorWrapper').append(this.cryptoCurSelector.render().el);
+
+  if (this.shipping) {
+    this.shipping.delegateEvents();
+    this.$('.js-shippingWrapper').append(this.shipping.render().el);
+  }
+
+  // if this is a re-render, and the payment exists, render it
+  if (this.payment) {
+    this.payment.delegateEvents();
+    this.$('.js-pending').append(this.payment.render().el);
+  }
+
+  this.complete.delegateEvents();
+  this.$('.js-complete').append(this.complete.render().el);
+
+  if (this.feeChange) this.feeChange.remove();
+  this.feeChange = this.createChild(FeeChange);
+  this.$('.js-feeChangeContainer').html(this.feeChange.render().el);
+
+  if (this.listing.isCrypto) {
+    if (this.cryptoTitle) this.cryptoTitle.remove();
+    this.cryptoTitle = this.createChild(CryptoTradingPair, {
       initialState: {
-        active: !this.isModerated,
+        tradingPairClass: 'cryptoTradingPairXL',
+        exchangeRateClass: 'clrT2 tx6',
+        fromCur: metadata.get('acceptedCurrencies')[0],
+        toCur: this.listing.get('item').get('cryptoListingCurrencyCode'),
       },
     });
-    this.listenTo(this.directPayment, 'click', () => this.handleDirectPurchaseClick());
-    this.$('.js-directPaymentWrapper').append(this.directPayment.render().el);
+    this.getCachedEl('.js-cryptoTitle')
+      .html(this.cryptoTitle.render().el);
 
-    this.cryptoCurSelector.delegateEvents();
-    this.$('.js-cryptoCurSelectorWrapper').append(this.cryptoCurSelector.render().el);
-
-    if (this.shipping) {
-      this.shipping.delegateEvents();
-      this.$('.js-shippingWrapper').append(this.shipping.render().el);
-    }
-
-    // if this is a re-render, and the payment exists, render it
-    if (this.payment) {
-      this.payment.delegateEvents();
-      this.$('.js-pending').append(this.payment.render().el);
-    }
-
-    this.complete.delegateEvents();
-    this.$('.js-complete').append(this.complete.render().el);
-
-    if (this.feeChange) this.feeChange.remove();
-    this.feeChange = this.createChild(FeeChange);
-    this.$('.js-feeChangeContainer').html(this.feeChange.render().el);
-
-    if (this.listing.isCrypto) {
-      if (this.cryptoTitle) this.cryptoTitle.remove();
-      this.cryptoTitle = this.createChild(CryptoTradingPair, {
-        initialState: {
-          tradingPairClass: 'cryptoTradingPairXL',
-          exchangeRateClass: 'clrT2 tx6',
-          fromCur: metadata.get('acceptedCurrencies')[0],
-          toCur: this.listing.get('item').get('cryptoListingCurrencyCode'),
-        },
-      });
-      this.getCachedEl('.js-cryptoTitle')
-        .html(this.cryptoTitle.render().el);
-
-      this.$('#cryptoAmountCurrency').select2({ minimumResultsForSearch: Infinity });
-    }
-
-    this._renderedHash = this.listing.get('hash');
-
-    return this;
+    this.$('#cryptoAmountCurrency').select2({ minimumResultsForSearch: Infinity });
   }
+
+  this._renderedHash = this.listing.get('hash');
+
+  return this;
+}
+
 </script>
 <style lang="scss" scoped>
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="complete">
     <div class="flexColRows gutterV">
       <div class="flexRow pad rowMd txCtr">
         <div class="col2"></div>
@@ -10,12 +10,11 @@
             </div>
           </div>
           <h4>{{ ob.polyT('purchase.completeSection.paymentSent') }}</h4>
-          <p>
-            {{
-              ob.polyT('purchase.completeSection.progressMessage', { 
-                link: `<a href="#transactions/purchases?orderID=${ob.orderID}">${ob.polyT('purchase.completeSection.purchases')}</a>`
-              })
-            }}
+          <p>{{
+            ob.polyT('purchase.completeSection.progressMessage', {
+              link: `<a href="#transactions/purchases?orderID=${ob.orderID}">${ob.polyT('purchase.completeSection.purchases')}</a>`
+            })
+          }}
           </p>
           <p class="tx5b clrT2">
             {{ ob.polyT('purchase.completeSection.estimatedProcessing', { time: ob.processingTime }) }}
@@ -53,21 +52,26 @@
       <div class="clrBr clrP flex gutterHSm message js-message">
         <div class="avatar clrBr2 clrSh1 disc" :style="ob.getAvatarBgImage(ob.ownProfile.avatarHashes)"></div>
         <div class="flexExpand">
-          <textarea id="messageInput" class="clrP tx5" :placeholder="ob.polyT('purchase.completeSection.vendorMessagePlaceholder')" :maxlength="ob.maxMessageLength" rows="5"></textarea>
+          <textarea
+          id="messageInput"
+          @keydown="keyDownMessageInput" 
+          class="clrP tx5"
+          :placeholder="ob.polyT('purchase.completeSection.vendorMessagePlaceholder')"
+          :maxlength="ob.maxMessageLength"
+          rows="5"></textarea>
         </div>
       </div>
       <div class="flex gutterH">
         <div class="flexExpand tx5 clrTEm">
-          <span class="hide js-messageSent">
-            {{
-              ob.polyT('purchase.completeSection.vendorMessageSent', {
-                name: ob.vendorName,
-                orderLink: `<a class="txU" href="#transactions/purchases?orderID=${ob.orderID}">${ob.polyT('purchase.completeSection.vendorMessageLink')}</a>`,
-              }) 
+          <span class="hide js-messageSent">{{
+            ob.polyT('purchase.completeSection.vendorMessageSent', {
+              name: ob.vendorName,
+              orderLink: `<a class="txU" href="#transactions/purchases?orderID=${ob.orderID}">${ob.polyT('purchase.completeSection.vendorMessageLink')}</a>`,
+              })
             }}
           </span>
         </div>
-        <button class="btn floR clrP clrBr clrSh2 js-send disabled">{{ ob.polyT('purchase.completeSection.send') }}</button>
+        <button class="btn floR clrP clrBr clrSh2  disabled" @click="sendMessageInput">{{ ob.polyT('purchase.completeSection.send') }}</button>
       </div>
     </div>
 
@@ -75,7 +79,107 @@
 </template>
 
 <script setup>
+import app from '../../../../backbone/app';
+import loadTemplate from '../../../../backbone/utils/loadTemplate';
+import ChatMessage from '../../../../backbone/models/chat/ChatMessage';
+import Listing from '../../../../backbone/models/listing/Listing';
+
+const props = defineProps({
+  phase: String,
+  outdatedHash: String,
+})
+
 const shareURL = "https://mobazha.org";
+
+loadData(props);
+
+render();
+
+function loadData (options = {}) {
+  if (!options.listing || !(options.listing instanceof Listing)) {
+    throw new Error('Please provide a listing model');
+  }
+
+  if (!options.vendor) {
+    throw new Error('Please provide a vendor object');
+  }
+  super(options);
+  this.options = options;
+
+  this.processingTime = this.options.listing.get('item').processingTime ||
+    app.polyglot.t('purchase.completeSection.noData');
+  this.vendorPeerID = this.options.listing.get('vendorID').peerID;
+  this.orderID = '';
+}
+
+function events () {
+  return {
+    'click .js-goToListing': 'close',
+  };
+}
+
+function sendMessage (msg) {
+  if (!msg) {
+    throw new Error('Please provide a message to send.');
+  }
+
+  const chatMessage = new ChatMessage({
+    peerID: this.vendorPeerID,
+    orderID: this.orderID,
+    message: msg,
+  });
+
+  const save = chatMessage.save();
+  let messageSent = true;
+
+  if (save) {
+    this.getCachedEl('.js-send').addClass('disabled');
+    this.getCachedEl('.js-messageSent').removeClass('hide');
+  } else {
+    // Developer error - this shouldn't happen.
+    console.error('There was an error saving the chat message.');
+    console.dir(chatMessage.validationError);
+    messageSent = false;
+  }
+
+  return messageSent;
+}
+
+function sendMessageInput () {
+  const $messageInput = this.getCachedEl('#messageInput');
+  const message = $messageInput.val().trim();
+  if (message) sendMessage(message);
+  $messageInput.val('');
+}
+
+function keyDownMessageInput (e) {
+  this.getCachedEl('.js-send').toggleClass('disabled', !e.target.value);
+  this.getCachedEl('.js-messageSent').addClass('hide');
+
+  // if the key pressed is not enter, do nothing
+  if (e.shiftKey || e.which !== 13) return;
+  e.preventDefault();
+  sendMessageInput();
+  e.preventDefault();
+}
+
+function render () {
+  super.render();
+
+  loadTemplate('modals/purchase/complete.html', t => {
+    this.$el.html(t({
+      displayCurrency: app.settings.get('localCurrency'),
+      processingTime: this.processingTime,
+      maxMessageLength: ChatMessage.max.messageLength,
+      ownProfile: app.profile.toJSON(),
+      orderID: this.orderID,
+      vendorName: this.options.vendor.name,
+    }));
+  });
+
+  return this;
+}
+
 </script>
 <style lang="scss" scoped>
 </style>

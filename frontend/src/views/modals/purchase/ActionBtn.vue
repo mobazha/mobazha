@@ -1,51 +1,67 @@
 <template>
-  <div>
+  <div class="actionBtn">
     <div class="posR">
-      <div v-if="phase === 'pay' || phase === 'processing'">
-        <ProcessingButton :className="'btn width100 clrBAttGrad clrBrDec1 clrTOnEmph js-payBtn ' +
-          `${initPay} ${phase} ${outdatedHash ? 'row' : ''}`" :btnText="ob.polyT('purchase.pay')" />
+      <div v-if="ob.phase === 'pay' || ob.phase === 'processing'">
+        <ProcessingButton
+          :className="'btn width100 clrBAttGrad clrBrDec1 clrTOnEmph' +
+            `${initPay} ${phase} ${outdatedHash ? 'row' : ''}`"
+          @click="clickPayBtn"
+          :btnText="ob.polyT('purchase.pay')" />
 
-        <div class="txCtr rowSm" v-if="showOutdatedHashErr">
-          {{
-        ob.purchaseErrT(
-          ob.polyT('purchase.errors.outdatedHash', {
-            reloadLink: '<a class="js-reloadOutdated">' + `${ob.polyT('purchase.errors.reloadOutdatedHash')}</a>`,
-          })
-        )
-      }}
+        <div class="txCtr rowSm" v-if="showOutdatedHashErr">{{
+          ob.purchaseErrT(
+            ob.polyT('purchase.errors.outdatedHash', {
+              reloadLink: '<a @click="clickReloadOutdated">' + `${ob.polyT('purchase.errors.reloadOutdatedHash')}</a>`,
+            })
+          )
+        }}
         </div>
       </div>
-      <div v-else-if="phase ==='pending'" class="btn width100 clrBAttGrad clrBrDec1 clrTOnEmph pendingBtn">
-        {{ ob.polyT('purchase.pending') }}
-      </div>
-      <button v-else-if="phase ==='complete'" class="btn width100 clrBAttGrad clrBrDec1 clrTOnEmph js-closeBtn">
-        {{ ob.polyT('purchase.close') }}
-      </button>
-
-      <div v-if="ob.confirmOpen" id="confirmPay" class="confirmBox arrowBoxCenteredTop clrBr clrP clrT clrSh1 js-confirmPay">
-        <div class="flexColRows gutterVSm padLg">
-          <h3>
-            {{ ob.polyT('purchase.confirmPayment.title') }}
-          </h3>
-          <p class="tx5">
-            {{ ob.polyT('purchase.confirmPayment.msg') }}
-          </p>
+      <div v-else-if="ob.phase ==='pending'">
+        <div class="btn width100 clrBAttGrad clrBrDec1 clrTOnEmph pendingBtn">
+          {{ ob.polyT('purchase.pending') }}
         </div>
-        <hr class="unleaded clrBr" />
-        <div class="flexHRight flexVCent gutterHLg pad tx5">
-          <a class="js-confirmPayCancel">
-            {{ ob.polyT('purchase.confirmPayment.cancel') }}
-          </a>
-          <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph js-confirmPayConfirm">
-            {{ ob.polyT('purchase.confirmPayment.confirm') }}
-          </a>
+      </div>
+
+      <div v-else-if="ob.phase ==='complete'">
+        <button class="btn width100 clrBAttGrad clrBrDec1 clrTOnEmph " @click="clickCloseBtn">
+          {{ ob.polyT('purchase.close') }}
+        </button>
+      </div>
+      <div v-if="ob.confirmOpen">
+        <div id="confirmPay" class="confirmBox arrowBoxCenteredTop clrBr clrP clrT clrSh1 js-confirmPay">
+          <div class="flexColRows gutterVSm padLg">
+            <h3>
+              {{ ob.polyT('purchase.confirmPayment.title') }}
+            </h3>
+            <p class="tx5">
+              {{ ob.polyT('purchase.confirmPayment.msg') }}
+            </p>
+          </div>
+          <hr class="unleaded clrBr" />
+          <div class="flexHRight flexVCent gutterHLg pad tx5">
+            <a class="" @click="closeConfirmPay">
+              {{ ob.polyT('purchase.confirmPayment.cancel') }}
+            </a>
+            <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph " @click="clickConfirmBtn">
+              {{ ob.polyT('purchase.confirmPayment.confirm') }}
+            </a>
+          </div>
         </div>
       </div>
     </div>
     <div class="padSm flexColRows gutterVSm txSm txCtr clrT2">
-      <span v-if="phase === 'pay'" class="js-payNote">{{ ob.polyT('purchase.payNote') }}</span>
-      <span v-else-if="phase ==='pending'" class="js-pendingNote">{{ ob.polyT('purchase.pendingNote') }}</span>
-      <span v-else-if="phase ==='complete'" class="js-closeNote">{{ ob.polyT('purchase.closeNote') }}</span>
+      <div v-if="ob.phase === 'pay'">
+        <span class="js-payNote">{{ ob.polyT('purchase.payNote') }}</span>
+      </div>
+
+      <div v-else-if="ob.phase ==='pending'">
+        <span class="js-pendingNote">{{ ob.polyT('purchase.pendingNote') }}</span>
+      </div>
+
+      <div v-else-if="ob.phase ==='complete'">
+        <span class="js-closeNote">{{ ob.polyT('purchase.closeNote') }}</span>
+      </div>
       <a class="clrTErr txU" href="https://mobazha.org/scam-prevention">{{ ob.polyT('purchase.scamWarning') }}</a>
     </div>
 
@@ -53,6 +69,10 @@
 </template>
 
 <script setup>
+import $ from 'jquery';
+import loadTemplate from '../../../../backbone/utils/loadTemplate';
+import Listing from '../../../../backbone/models/listing/Listing';
+
 const props = defineProps({
   phase: String,
   outdatedHash: String,
@@ -60,6 +80,89 @@ const props = defineProps({
 
 const showOutdatedHashErr = props.phase === 'pay' && props.outdatedHash;
 const initPay = (ob.listing.shippingOptions && ob.listing.shippingOptions.length) || showOutdatedHashErr ? 'disabled' : '';
+
+loadData(props);
+
+render();
+
+function loadData (options = {}) {
+  if (!options.listing || !(options.listing instanceof Listing)) {
+    throw new Error('Please provide a listing model.');
+  }
+
+  const opts = {
+    ...options,
+    initialState: {
+      phase: 'pay',
+      confirmOpen: false,
+      outdatedHash: false,
+      ...options.initialState || {},
+    },
+  };
+
+  super(opts);
+  this.options = opts;
+
+  this.boundOnDocClick = documentClick.bind(this);
+  $(document).on('click', this.boundOnDocClick);
+}
+
+function documentClick (e) {
+  if (this.getState().confirmOpen &&
+    !($.contains(this.getCachedEl('.js-confirmPay')[0], e.target))) {
+    this.setState({ confirmOpen: false });
+  }
+}
+
+function clickPayBtn (e) {
+  e.stopPropagation();
+  this.setState({ confirmOpen: true });
+}
+
+function clickConfirmBtn () {
+  this.trigger('purchase');
+}
+
+function closeConfirmPay () {
+  this.setState({ confirmOpen: false });
+}
+
+function clickCloseBtn () {
+  this.trigger('close');
+}
+
+function clickReloadOutdated () {
+  this.trigger('reloadOutdated');
+}
+
+function remove () {
+  $(document).off('click', this.boundOnDocClick);
+  super.remove();
+}
+
+function render () {
+  super.render();
+  const state = this.getState();
+
+  const loadPurchasErrTemplIfNeeded = (tPath, func) => {
+    if (state.outdatedHash) return loadTemplate(tPath, func);
+    func(null);
+    return undefined;
+  };
+
+  loadPurchasErrTemplIfNeeded('modals/listingDetail/purchaseError.html', purchaseErrT => {
+    loadTemplate('modals/purchase/actionBtn.html', t => {
+      this.$el.html(t({
+        ...state,
+        listing: this.options.listing,
+        purchaseErrT,
+      }));
+    });
+  });
+
+  return this;
+}
+
 </script>
 <style lang="scss" scoped>
 </style>

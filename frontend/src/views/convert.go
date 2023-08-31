@@ -12,8 +12,8 @@ import (
 )
 
 var baseDir = "/Users/mingfeng/dev/openbazaar/openbazaar-desktop/frontend"
-var htmlTemplateFolder = "backbone/templates/components"
-var jsComponentFolder = "backbone/views/components"
+var htmlTemplateFolder = "backbone/templates/modals/purchase"
+var jsComponentFolder = "backbone/views/modals/purchase"
 var targetVueFolder = "src/views_draft"
 
 type EventHandler struct {
@@ -24,6 +24,8 @@ type EventHandler struct {
 }
 
 type ComponentInfo struct {
+	Name         string
+	IsModal      bool
 	TagName      string
 	ClassName    string
 	EventHanders []EventHandler
@@ -40,24 +42,27 @@ func readJsFileContent(templateFilePath string, name string) ([]byte, ComponentI
 		return contentBytes, ComponentInfo{}, err
 	}
 
+	content := string(contentBytes)
+	componentInfo.IsModal = strings.Contains(content, "export default class extends BaseModal")
+
 	// get class name
 	quoteChars := "'\"`"
 	r, _ := regexp.Compile(`\n\s*(?:get\s*)?className\(\s*\)\s*{\s*\n\s*return\s+[` + quoteChars + `](.*?)[` + quoteChars + `][;]?\s*\n`)
-	matches := r.FindStringSubmatch(string(contentBytes))
+	matches := r.FindStringSubmatch(content)
 	if len(matches) > 0 {
 		componentInfo.ClassName = matches[1]
 	}
 
 	// get tag name
 	r, _ = regexp.Compile(`\n\s*(?:get\s*)?tagName\(\s*\)\s*{\s*\n\s*return\s+[` + quoteChars + `](.*?)[` + quoteChars + `][;]?\s*\n`)
-	matches = r.FindStringSubmatch(string(contentBytes))
+	matches = r.FindStringSubmatch(content)
 	if len(matches) > 0 {
 		componentInfo.TagName = matches[1]
 	}
 
 	// get event handlers
-	r, _ = regexp.Compile(`\s*events\(\s*\)\s*{\s*\n\s*return\s+{\n((\s*(\S+)\s+(\S+)': '(\S+)\s*\n)+)\s*};`)
-	matches = r.FindStringSubmatch(string(contentBytes))
+	r, _ = regexp.Compile(`\s*events\(\s*\)\s*{\s*\n\s*return\s+{\n((.*\n)+)\s*};`)
+	matches = r.FindStringSubmatch(content)
 	if len(matches) > 0 {
 		handlersStr := matches[1]
 		fmt.Println(handlersStr)
@@ -79,7 +84,7 @@ func readJsFileContent(templateFilePath string, name string) ([]byte, ComponentI
 
 var eventNames = map[string]bool{}
 
-func applyEventHandlerToTemplate(templateFileContent string, jsFileContent string, componentInfo ComponentInfo) (string, string) {
+func applyEventHandlerToTemplate(templateFileContent string, jsMethodsListContent string, componentInfo ComponentInfo) (string, string) {
 
 	for _, info := range componentInfo.EventHanders {
 		m := regexp.MustCompile(`( class="(?:.*?\s)?)` + info.JsClassName + `((?:\s.*?)?")`)
@@ -88,7 +93,7 @@ func applyEventHandlerToTemplate(templateFileContent string, jsFileContent strin
 		if strings.HasPrefix(info.JsClassName, "#") {
 			isIDMatch = true
 
-			m = regexp.MustCompile(`( id="` + info.JsClassName[1:] + `")`)
+			m = regexp.MustCompile(`(\s+id="` + info.JsClassName[1:] + `")`)
 		}
 
 		eventName := ""
@@ -116,15 +121,15 @@ func applyEventHandlerToTemplate(templateFileContent string, jsFileContent strin
 			if m.Match([]byte(templateFileContent)) {
 				templateFileContent = m.ReplaceAllString(templateFileContent, Str)
 
-				jsFileContent = strings.ReplaceAll(jsFileContent, info.Raw+",\n", "")
-				jsFileContent = strings.ReplaceAll(jsFileContent, info.Raw+"\n", "")
+				jsMethodsListContent = strings.ReplaceAll(jsMethodsListContent, info.Raw+",\n", "")
+				jsMethodsListContent = strings.ReplaceAll(jsMethodsListContent, info.Raw+"\n", "")
 			}
 		}
 
 		eventNames[info.EventName] = true
 	}
 
-	return templateFileContent, jsFileContent
+	return templateFileContent, jsMethodsListContent
 }
 
 func updateTemplateContent(content string) string {
@@ -219,22 +224,26 @@ func updateTemplateContent(content string) string {
 func updateJsFileContent(content string) (string, string) {
 	header := ""
 
-	// Update function definition
-	m := regexp.MustCompile(`\n(\s+)((\w+)\(.*\) \{)\n`)
-	Str := "\n${1}function $2\n"
-	contentTemp := m.ReplaceAllString(content, Str)
+	// // Update function definition
+	// m := regexp.MustCompile(`\n(\s+)((\w+)\(.*\) \{)\n`)
+	// Str := "\n${1}function $2\n"
+	// contentTemp := m.ReplaceAllString(content, Str)
 
-	methodList := []string{}
-	allMatches := m.FindAllStringSubmatch(content, -1)
-	for _, match := range allMatches {
-		methodList = append(methodList, match[3])
-	}
+	// methodList := []string{}
+	// allMatches := m.FindAllStringSubmatch(content, -1)
+	// for _, match := range allMatches {
+	// 	methodList = append(methodList, match[3])
+	// }
 
-	content = contentTemp
-	for _, method := range methodList {
-		fmt.Printf("method: %s\n", "this."+method+"(")
-		content = strings.ReplaceAll(content, "this."+method+"(", method+"(")
-	}
+	// content = contentTemp
+	// for _, method := range methodList {
+	// 	fmt.Printf("method: %s\n", "this."+method+"(")
+	// 	content = strings.ReplaceAll(content, "this."+method+"(", method+"(")
+	// }
+
+	// Add "," after method
+	m := regexp.MustCompile(`\}(\n*(\s+)((\w+)\(.*\) \{)\n)`)
+	content = m.ReplaceAllString(content, "},$1")
 
 	result := strings.Split(content, "export default class")
 	if len(result) > 0 {
@@ -249,7 +258,56 @@ func updateJsFileContent(content string) (string, string) {
 	m = regexp.MustCompile(`\n}\n*$`)
 	content = m.ReplaceAllString(content, "\n")
 
+	m = regexp.MustCompile(`this.\$\(`)
+	content = m.ReplaceAllString(content, "$(")
+
 	return header, strings.ReplaceAll(content, " constructor(", " loadData(")
+}
+
+type TemplateVariable struct {
+	Raw string
+	Key string
+	Val string
+}
+
+func applyVarsToTemplate(templateFileContent string, jsMethodsListContent string) (string, string) {
+	vars := getTemplateVars(jsMethodsListContent)
+
+	for _, item := range vars {
+		m := regexp.MustCompile(`(\W)ob\.` + item.Key + `(\W)`)
+		if m.Match([]byte(templateFileContent)) {
+			jsMethodsListContent = strings.ReplaceAll(jsMethodsListContent, item.Raw, "")
+
+			templateFileContent = m.ReplaceAllString(templateFileContent, "${1}"+item.Val+"${2}")
+		}
+	}
+
+	return templateFileContent, jsMethodsListContent
+}
+
+func getTemplateVars(jsContent string) []TemplateVariable {
+	vars := []TemplateVariable{}
+
+	r := regexp.MustCompile(`\n\s*this.\$el.html\(t\(\{((.*\n)+)\s*\}\)\)\;`)
+	matches := r.FindStringSubmatch(jsContent)
+	mappingContent := ""
+	if len(matches) > 0 {
+		mappingContent = matches[1]
+	}
+
+	if len(mappingContent) > 0 {
+		r = regexp.MustCompile(`(\s*(\w+):\s*(.*),\s*\n)`)
+		allMatches := r.FindAllStringSubmatch(mappingContent, -1)
+		for _, match := range allMatches {
+			vars = append(vars, TemplateVariable{
+				Raw: match[1],
+				Key: match[2],
+				Val: strings.ReplaceAll(match[3], "this.", ""),
+			})
+		}
+	}
+
+	return vars
 }
 
 func capitalize(str string) string {
@@ -292,9 +350,12 @@ func walk(s string, d fs.DirEntry, err error) error {
 			if err != nil {
 				fmt.Printf("Error: %v\n", strings.ReplaceAll(err.Error(), path.Join(baseDir, jsComponentFolder), ""))
 			}
-			header, jsFileContent := updateJsFileContent(string(jsFileBytes))
+			header, jsMethodsListContent := updateJsFileContent(string(jsFileBytes))
 
-			templateFileContent, jsFileContent = applyEventHandlerToTemplate(templateFileContent, jsFileContent, componentInfo)
+			templateFileContent, jsMethodsListContent = applyEventHandlerToTemplate(templateFileContent, jsMethodsListContent, componentInfo)
+			componentInfo.Name = componentName
+
+			templateFileContent, jsMethodsListContent = applyVarsToTemplate(templateFileContent, jsMethodsListContent)
 
 			rootTagName := "div"
 			if len(componentInfo.TagName) > 0 {
@@ -309,29 +370,52 @@ func walk(s string, d fs.DirEntry, err error) error {
 
 			endingRootTag := fmt.Sprintf("\n  </%s>", rootTagName)
 
+			if componentInfo.IsModal {
+				templateFileContent = buildModalComponent(templateFileContent)
+			}
 			text := "<template>\n" + rootTag + templateFileContent + endingRootTag + `
 </template>
 
-<script setup>
+<script>
 ` + header + `
-const props = defineProps({
-  phase: String,
-  outdatedHash: String,
-})
+export default {
+  mixins: [],
+  props: {
+    cart: Object,
+  },
+  data () {
+    return {
+      ob: {},
+    };
+  },
+  mounted () {
+    loadData(props);
 
-loadData(props);
-
-render();
-
-` + jsFileContent + `
+    render();
+  },
+  computed: {
+  },
+	methods: {
+` + jsMethodsListContent + `
+  }
+}
 </script>
 <style lang="scss" scoped>
 </style>
 `
-			os.WriteFile(path.Join(dir, componentName+".vue"), []byte(text), fs.ModePerm)
+			os.WriteFile(path.Join(dir, componentInfo.Name+".vue"), []byte(text), fs.ModePerm)
 		}
 	}
 	return nil
+}
+
+func buildModalComponent(templateFileContent string) string {
+	return fmt.Sprintf(`<div :class="modelContentClass">
+  <span :class="%s${closeButtonClass} jsModalClose%s" :hidden="!showCloseButton" :data-tip="closeButtonTip || ''">
+    <i :class="innerButtonClass"></i>
+  </span>
+  %s
+</div>`, "`", "`", templateFileContent)
 }
 
 func main() {

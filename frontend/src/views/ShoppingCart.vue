@@ -107,6 +107,10 @@
       </div>
       <empty v-if="tableData.length === 0 && !loading" :emptyInfo="emptyInfo" />
     </div>
+    <div v-if="triggerPurchase">
+      <p>Hello there</p>
+      <Purchase :cart="toRaw(tableData[0])" :phase="pay"/>
+    </div>
   </div>
 </template>
 
@@ -121,12 +125,12 @@ import { products } from '../components/products.js';
 import api from '../api';
 import { getCachedProfiles } from '../../backbone/models/profile/Profile';
 import Listing from '../../backbone/models/listing/Listing';
-import Purchase from '../views/modals/purchase/Purchase';
+import Purchase from './modals/purchase/Purchase.vue';
 import { convertAndFormatCurrency, curDefToDecimal } from '../../backbone/utils/currency';
 import { getAvatarBgImage, getListingBgImage } from '../../backbone/utils/responsive';
 
 const params = reactive({ keyword: '' });
-const tableData = ref([]);
+let tableData = [];
 const table = reactive({});
 const selectors = ref({}); //选中的商品
 const loading = ref(false);
@@ -139,14 +143,16 @@ const emptyInfo = ref({
   btn: 'Shop Popular Products',
 });
 
+let triggerPurchase = false;
+
 loadData();
 
 function loadData() {
   try {
     loading.value = true;
     api.getShoppingCarts().then((carts) => {
-      tableData.value = carts;
-      tableData.value.forEach((cart) => {
+      tableData = carts;
+      tableData.forEach((cart) => {
         getCachedProfiles([cart.vendorID])[0].done((profile) => {
           cart.profile = profile.toJSON();
         });
@@ -165,7 +171,7 @@ function loadData() {
       });
       loading.value = false;
     });
-    // tableData.value = products;
+    // tableData = products;
   } catch {
     loading.value = false;
   }
@@ -179,8 +185,8 @@ function doDelete(row, index) {
     type: 'warning',
     callback: (action) => {
       if (action === 'confirm') {
-        //tableData.value.splice(index, 1)为展示效果，调用删除接口，再刷新
-        tableData.value.splice(index, 1);
+        //tableData.splice(index, 1)为展示效果，调用删除接口，再刷新
+        tableData.splice(index, 1);
         ElMessage({ type: 'success', message: '已删除' });
         loadData();
       }
@@ -200,7 +206,7 @@ const oneStoreTotalPrice = computed(() => (index) => {
 });
 //购物车商品总数量
 const cartNum = computed(() => {
-  return tableData.value.reduce((cur, next) => cur + next.items.length, 0);
+  return tableData.reduce((cur, next) => cur + next.items.length, 0);
 });
 
 function goToStore(peerID) {
@@ -214,33 +220,13 @@ function goToListing(vendorID, slug) {
 function handleSelectionChange(val, index) {
   selectors.value[index] = val;
 }
+
 //提交当前选中的商店商品
 function pay(index) {
-  let cart = toRaw(tableData.value[0]);
-  let input = cart.items[0];
-  let listing = new Listing({slug: input.listing.slug,}, { guid: cart.vendorID});
-  listing.fetch().done(() => {
-    let vendor = {
-      peerID: cart.vendorID,
-      name: cart.profile.name,
-      handle: cart.profile.handle,
-      avatarHashes: cart.profile.avatarHashes,
-    };
-
-    this._purchaseModal = new Purchase({
-        cart: cart,
-        listing: listing,
-        variants: input.options,
-        vendor: vendor,
-        removeOnClose: true,
-        showCloseButton: false,
-        phase: 'pay',
-        // inventory: this._inventory,
-      })
-        .render()
-        .open();
-  });
+  triggerPurchase = true;
+  console.log('In pay, triggerPurchase: ', triggerPurchase)
 }
+
 //修改头部样式
 function headerRowStyle({ rowIndex }) {
   if (rowIndex === 0) return { background: 'transparent', color: '#000', fontSize: '16px' };

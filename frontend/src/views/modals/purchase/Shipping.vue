@@ -1,47 +1,198 @@
 <template>
-  <div>
+  <div class="shipping">
     <div class="flexVCent">
       <h2 class="h4 required flexExpand">{{ ob.polyT('purchase.shippingTitle') }}</h2>
-      <a class="clrTEm txU tx5b js-newAddress" v-if="ob.userAddresses.length">{{ ob.polyT('purchase.newAddress') }}</a>
+      <div v-if="userAddresses.toJSON().length">
+        <a class="clrTEm txU tx5b" @click="createNewAddress">{{ ob.polyT('purchase.newAddress') }}</a>
+      </div>
     </div>
     <div class="row">
-      <select id="shippingAddress" v-if="ob.userAddresses.length">
-        <option v-for="(a, i) in ob.userAddresses" :key="i" :value="i" :selected="ob.selectedAddressIndex === i">
-          {{ getAddress(a) }}
-        </option>
-      </select>
-      <div class="padGi txCtr" v-else>
-        <div class="txB row">
-          {{ ob.polyT('purchase.noAddresses') }}
-        </div>
-        <button class="btn clrP clrBr js-newAddress">
-          {{ ob.polyT('purchase.newAddress') }}
-        </button>
+      <div v-if="userAddresses.toJSON().length">
+        <select id="shippingAddress" @change="changeShippingAddress(val)">
+            <option v-for="(a, i) in userAddresses.toJSON()" :key="i" :value="i" :selected="selectedAddressIndex === i">
+              {{ getAddress(a) }}
+            </option>
+        </select>
       </div>
 
+      <div v-else>
+        <div class="padGi txCtr">
+          <div class="txB row">
+            {{ ob.polyT('purchase.noAddresses') }}
+          </div>
+          <button class="btn clrP clrBr" @click="createNewAddress" >
+            {{ ob.polyT('purchase.newAddress') }}
+          </button>
+        </div>
+      </div>
     </div>
-    <div class="js-shippingOptionsWrapper"></div>
+    <ShippingOptions
+      v-if="userAddresses.toJSON().length"
+      :listing="listing.toJSON()"
+      :validOptions="validOptions"
+      :selectedOption="selectedOption"
+      @shippingOptionSelected="onSelectShippingOption"/>
 
   </div>
 </template>
 
-<script setup>
+<script>
+import $ from 'jquery';
+import _ from 'underscore';
+import app from '../../../../backbone/app';
+import ShippingOptions from './ShippingOptions.vue';
+import ShippingAddress from '../../../../backbone/models/settings/ShippingAddress';
+import { Events } from 'backbone';
 
-function getAddress (a) {
-  const addr = [];
-  addr.push(a.name);
-  if (a.company) addr.push(a.company);
-  if (a.addressLineOne) addr.push(a.addressLineOne);
-  if (a.addressLineTwo) addr.push(a.addressLineTwo);
-  if (a.city) addr.push(a.city);
-  const state = a.state || '';
-  const code = a.postalCode || '';
-  const stateCode = `${state ? `${state} ` : ''}${code}`;
-  if (stateCode) addr.push(stateCode);
+export default {
+  components: {
+    ShippingOptions,
+  },
+  mixins: [],
+  props: {
+    listing: {
+      type: Object,
+      default: {}
+    }
+  },
+  watch: {
+    selectedOption() {
+      this.$emit('shippingOptionSelected', this.selectedOption)
+    },
+    selectedAddress() {
+      this.updateOptions();
+    },
+  },
+  computed: {
+    selectedAddressIndex() {
+      return this.selectedAddress && this.userAddresses.length ? this.userAddresses.indexOf(this.selectedAddress) : '';
+    },
+  },
+  data () {
+    return {
+      userAddresses: app.settings.get('shippingAddresses'),
+      selectedAddress: app.settings.get('shippingAddresses').at(0) || '',
+      selectedOption: {},
+    };
+  },
+  created () {
+    _.extend(this, Events);
 
-  return addr.join(', ');
+    this.loadData();
+  },
+  mounted () {
+    $('#shippingAddress').select2({
+      // disables the search box
+      minimumResultsForSearch: Infinity,
+    });
+  },
+  methods: {
+    loadData () {
+      this.validOptions = [];
+
+      console.log(this.listing)
+
+      const userAddresses = app.settings.get('shippingAddresses');
+      this.listenTo(userAddresses, 'update', col => {
+        // If all the addresses were deleted, set the selection to blank.
+        if (!col.models.length) {
+          this.selectedAddress = '';
+        } else {
+          // If the old selected address doesn't exist any more, select the first address and set the
+          // selection to the first valid value.
+          this.selectedAddress = userAddresses.get(this.selectedAddress) ? this.selectedAddress : userAddresses.at(0);
+        }
+      });
+
+      this.updateOptions();
+    },
+
+    extractValidOptions (address) {
+      // Any time the country is changed, the options valid for that country need to be extracted.
+      if (address !== '' && !(address instanceof ShippingAddress)) {
+        throw new Error('The address must be blank or an instance of the ShippingAddress model.');
+      }
+
+      const validOptions = [];
+      const countryCode = address ? address.get('country') : '';
+
+      const extractedOptions = this.listing.get('shippingOptions').toJSON().filter(option =>
+        option.regions.includes(countryCode) || option.regions.includes('ALL'));
+
+      extractedOptions.forEach(option => {
+        if (option.type === 'LOCAL_PICKUP') {
+          // local pickup options need a service with a name and price
+          option.services[0] = { name: app.polyglot.t('purchase.localPickup'), price: 0 };
+        }
+        option.services = _.sortBy(option.services, 'price');
+        option.services.forEach(optionService => {
+          validOptions.push({
+            ...optionService,
+            name: option.name,
+            service: optionService.name,
+          });
+        });
+      });
+
+      return validOptions;
+    },
+
+    updateOptions() {
+      let address = this.selectedAddress;
+
+      // if the selected address has a new country, extract the valid shipping options.
+      if (address && address.get('country') !== this.country) {
+        this.validOptions = this.extractValidOptions(address);
+      }
+
+      if (this.validOptions.length) {
+        // If the previously selected shipping option is no longer valid, select the first valid
+        // shipping option. this.selectionOption only has a name and service, as that's the expected
+        // data for the server, the validOptions have additional data in them.
+        const isSelectedValid = this.selectedOption && this.selectedOption.name &&
+          !!this.validOptions.filter(option => option.name === this.selectedOption.name &&
+            option.service === this.selectedOption.service).length;
+
+        if (!isSelectedValid) {
+          this.selectedOption = {
+            name: this.validOptions[0].name,
+            service: this.validOptions[0].service,
+          };
+        }
+      } else {
+        this.selectedOption = { name: '', service: '' };
+      }
+    },
+
+    changeShippingAddress (val) {
+      this.selectedAddress = app.settings.get('shippingAddresses').at(val);
+      console.log('changeShippingAddress, selectedAddress:', this.selectedAddress);
+    },
+
+    onSelectShippingOption(option) {
+      console.log('onSelectShippingOption: ', option)
+      this.selectedOption = option
+    },
+
+    getAddress (a) {
+      const addr = [];
+      addr.push(a.name);
+      if (a.company) addr.push(a.company);
+      if (a.addressLineOne) addr.push(a.addressLineOne);
+      if (a.addressLineTwo) addr.push(a.addressLineTwo);
+      if (a.city) addr.push(a.city);
+      const state = a.state || '';
+      const code = a.postalCode || '';
+      const stateCode = `${state ? `${state} ` : ''}${code}`;
+      if (stateCode) addr.push(stateCode);
+
+      return addr.join(', ');
+    },
+
+    createNewAddress () {
+      this.$emit('newAddress')
+    }
+  }
 }
-
 </script>
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>

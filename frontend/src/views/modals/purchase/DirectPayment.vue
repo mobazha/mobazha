@@ -1,13 +1,13 @@
 <template>
-  <div>
+  <div class="moderatorsWrapper fauxModeratorsWrapper">
     <!-- // duplicate the moderator card html to make sure everything aligns -->
 
-    <div class="moderatorCard clrBrInvis clickable " @click="clickDirectPurchase">
+    <div class="moderatorCard clrBrInvis clickable" @click="clickDirectPurchase">
       <div class="moderatorCardInner">
         <div class="flexRow gutterH moderatorCardContent">
           <div class="flexNoShrink">
             <div class="btnRadio">
-              <div tabindex="0" :class="`fauxRadioBtn ${ob.active ? 'active' : ''}`"></div>
+              <div tabindex="0" :class="`fauxRadioBtn ${active ? 'active' : ''}`"></div>
             </div>
           </div>
           <div class="moderatorCardMiddle">
@@ -23,48 +23,19 @@
   </div>
 </template>
 
-<script setup>
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
+<script>
 
-const props = defineProps({
-  phase: String,
-  outdatedHash: String,
-})
 
-loadData(props);
+export default {
+  props: {
+    active: Boolean,
+  },
 
-render();
-
-function loadData (options = {}) {
-  const opts = {
-    className: 'moderatorsWrapper fauxModeratorsWrapper',
-    ...options,
-    initialState: {
-      active: false,
-      ...options.initialState || {},
+  methods: {
+    clickDirectPurchase () {
+      this.$emit('click');
     },
-  };
-
-  super(opts);
+  }
 }
-
-function clickDirectPurchase () {
-  this.setState({ active: true });
-  this.trigger('click', { active: true });
-}
-
-function render () {
-  loadTemplate('modals/purchase/directPayment.html', t => {
-    this.$el.html(t({
-      ...this.getState(),
-    }));
-
-    super.render();
-  });
-
-  return this;
-}
-
 </script>
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>

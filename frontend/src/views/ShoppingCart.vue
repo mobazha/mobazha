@@ -246,6 +246,8 @@ function headerCellStyle ({ rowIndex }) {
 </script>
 
 <style lang="scss" scoped>
+@import '../assets/scss/main.scss';
+
 .page-head {
   display: flex;
   align-items: center;

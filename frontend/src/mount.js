@@ -7,8 +7,7 @@ import 'element-plus/dist/index.css';
 
 import App from './App.vue'
 
-import './assets/scss/main.scss';
-import ShoppingCart from './components/ShoppingCart.vue';
+// import './assets/scss/main.scss';
 
 import Chat from './components/Chat.vue';
 

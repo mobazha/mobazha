@@ -20,8 +20,6 @@ import AddressBarIndicators from './AddressBarIndicators';
 import { getNotifDisplayData } from '../collections/Notifications';
 import Notifications from './notifications/Notificiations';
 
-import { mountShoppingCart } from '../../src/mount.js'
-
 export default class extends BaseVw {
   constructor(options) {
     const opts = {

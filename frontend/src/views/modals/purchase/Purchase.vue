@@ -325,6 +325,7 @@ import { Events } from 'backbone';
 
 import * as templateHelpers from '../../../../backbone/utils/templateHelpers';
 
+import { toRaw } from 'vue';
 
 export default {
   components: {
@@ -333,9 +334,6 @@ export default {
     Shipping,
   },
   mixins: [],
-  props: {
-    cart: Object,
-  },
   data () {
     return {
       // #259 - we've decided not have modals close on an overlay click, so you
@@ -351,11 +349,11 @@ export default {
       removeOnRoute: true,
 
       phase: 'pay',
+      cart: {},
       ob: {},
       vendor: {},
       order: new Order({}, {}),
       items: [],
-
 
       listing: undefined,
       listings: [],
@@ -379,10 +377,7 @@ export default {
     this.ob = { ...templateHelpers};
   },
   mounted () {
-
-    this.loadData(this.$props);
-
-    // this.render();
+    this.loadData(this.$store.state.cart);
   },
   computed: {
     helperMessage () {
@@ -489,9 +484,7 @@ export default {
     },
 
     async loadData (opts = {}) {
-      if (opts.phase) {
-        this.phase = opts.phase;
-      }
+      this.cart = toRaw(opts.cart);
 
       this.listings = [];
       this.cart.items.forEach(item => {
@@ -576,14 +569,6 @@ export default {
           }
         });
       });
-
-      // this.receipt = this.createChild(Receipt, {
-      //   model: this.order,
-      //   listing: this.listing,
-      //   prices: this.prices,
-      //   couponObj: this.couponObj,
-      //   showTotalTip: this.phase === 'pay',
-      // });
 
       this.coupons = this.createChild(Coupons, {
         coupons: this.listing.get('coupons'),
@@ -1059,9 +1044,6 @@ export default {
       this.actionBtn.delegateEvents();
       this.actionBtn.setState({ phase: this.phase }, { renderOnChange: false });
       $('.js-actionBtn').append(this.actionBtn.render().el);
-
-      // this.receipt.delegateEvents();
-      // $('.js-receipt').append(this.receipt.render().el);
 
       this.coupons.delegateEvents();
       $('.js-couponsWrapper').html(this.coupons.render().el);

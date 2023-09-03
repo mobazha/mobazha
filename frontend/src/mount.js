@@ -5,35 +5,43 @@ import ElementPlus from 'element-plus';
 import * as ElementPlusIconsVue from '@element-plus/icons-vue';
 import 'element-plus/dist/index.css';
 
+import App from './App.vue'
+
 import './assets/scss/main.scss';
 import ShoppingCart from './components/ShoppingCart.vue';
 
 import Chat from './components/Chat.vue';
 
+import OrderDetail from './views/modals/orderDetail/OrderDetail.vue'
+
 import './assets/global.less';
 import components from './components/global';
-import products from './store/products.module';
+import cart from './store/cart.module';
 import Router from './router/index';
 
-export function mountShoppingCart() {
-  const shoppingCart = createApp(ShoppingCart);
-  shoppingCart.config.productionTip = false;
+import * as templateHelpers from '../backbone/utils/templateHelpers';
 
-  shoppingCart.use(ElementPlus);
+export function mountVueApp(container) {
+  const vueApp = createApp(App);
+  vueApp.config.productionTip = false;
+
+  vueApp.config.globalProperties.ob = {...templateHelpers};
+
+  vueApp.use(ElementPlus);
   for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-    shoppingCart.component(key, component);
+    vueApp.component(key, component);
   }
   // components
   for (const i in components) {
-    shoppingCart.component(i, components[i]);
+    vueApp.component(i, components[i]);
   }
   const store = createStore({
     modules: {
-      products,
+      cart,
     },
   });
 
-  shoppingCart.use(Router).use(store).mount('#shoppingCart');
+  return vueApp.use(Router).use(store).mount(container);
 }
 
 export function mountChat(container, conversationID) {
@@ -46,4 +54,16 @@ export function mountChat(container, conversationID) {
   }
 
   return chat.use(Router).use(window.TUIKit).mount(container);
+}
+
+export function mountOrderDetail(container, options) {
+  const orderDetail = createApp(OrderDetail, options);
+  orderDetail.config.productionTip = false;
+
+  // components
+  for (const i in components) {
+    orderDetail.component(i, components[i]);
+  }
+
+  return orderDetail.mount(container);
 }

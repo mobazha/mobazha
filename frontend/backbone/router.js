@@ -22,6 +22,8 @@ import TemplateOnly from './views/TemplateOnly';
 import BlockedWarning from './views/modals/BlockedWarning';
 import UserLoadingModal from './views/userPage/Loading';
 
+import { mountVueApp } from '../src/mount.js'
+
 export default class ObRouter extends Router {
   constructor(options = {}) {
     super(options);
@@ -649,11 +651,19 @@ export default class ObRouter extends Router {
   }
 
   shoppingCart() {
-    this.loadPage(
-      new TemplateOnly({
-        template: 'shoppingCart.html',
-      }).render(),
-    );
+    // This block is intentionally duplicated here in case a route
+    // method was called directly on the app.router instance therefore
+    // bypassing execute.
+    if (this.currentPage) {
+      this.currentPage.unmount();
+
+      this.currentPage.remove();
+      this.currentPage = null;
+    }
+
+    mountVueApp("#js-vueRoot")
+
+    app.loadingModal.close();
   }
 
   pageNotFound() {

@@ -388,10 +388,11 @@ export default {
       ob: {},
     };
   },
+  created () {
+	this.loadData(this.$props);
+  },
   mounted () {
-    loadData(props);
-
-    render();
+    this.render();
   },
   computed: {
   },

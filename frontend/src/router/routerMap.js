@@ -14,6 +14,16 @@ const constantRouterMap = [
         name: 'ExampleHelloIndex',
         component: () => import('@/views/example/hello/Index.vue')
       },
+      {
+        path: '/shopping-cart',
+        name: 'ShoppingCart',
+        component: () => import('@/views/ShoppingCart.vue')
+      },
+      {
+        path: '/purchase',
+        name: 'Purchase',
+        component: () => import('@/views/modals/purchase/Purchase.vue')
+      },
     ]
   },
 ]

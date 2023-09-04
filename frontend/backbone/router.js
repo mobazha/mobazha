@@ -44,11 +44,11 @@ export default class ObRouter extends Router {
       [/^(Qm[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'user'],
       [/^(?:ob:\/\/)(12D3Koo[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'user'],
       [/^(12D3Koo[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'user'],
-      ['(ob://)transactions(/)', 'transactions'],
-      ['(ob://)transactions/:tab(/)', 'transactions'],
+      ['(ob://)transactions(/)', 'loadVuePage'],
+      ['(ob://)transactions/:tab(/)', 'loadVuePage'],
       ['(ob://)connected-peers(/)', 'connectedPeers'],
       ['(ob://)search(/:tab)(?:query)', 'search'],
-      ['(ob://)shopping-cart(/)', 'shoppingCart'],
+      ['(ob://)shopping-cart(/)', 'loadVueModal'],
       ['(ob://)*path', 'pageNotFound'],
     ];
 
@@ -264,6 +264,16 @@ export default class ObRouter extends Router {
   }
 
   loadPage(vw) {
+    if (this.vuePageInstance) {
+      this.vuePageInstance.unmount();
+      this.vuePageInstance = null;
+    }
+
+    if (this.vueModalInstance) {
+      this.vueModalInstance.unmount();
+      this.vueModalInstance = null;
+    }
+
     // This block is intentionally duplicated here in case a route
     // method was called directly on the app.router instance therefore
     // bypassing execute.
@@ -274,6 +284,36 @@ export default class ObRouter extends Router {
 
     this.currentPage = vw;
     getPageContainer().append(vw.el);
+    app.loadingModal.close();
+  }
+
+  loadVuePage() {
+    if (this.currentPage) {
+      this.currentPage.remove();
+      this.currentPage = null;
+    }
+
+    if (this.vueModalInstance) {
+      this.vueModalInstance.unmount();
+      this.vueModalInstance = null;
+    }
+
+    if (this.vuePageInstance) {
+      this.vuePageInstance.unmount();
+    }
+
+    this.vuePageInstance = mountVueApp("#pageContainer")
+
+    app.loadingModal.close();
+  }
+
+  loadVueModal() {
+    if (this.vueModalInstance) {
+      this.vueModalInstance.unmount();
+    }
+
+    this.vueModalInstance = mountVueApp("#js-vueRoot")
+
     app.loadingModal.close();
   }
 
@@ -648,22 +688,6 @@ export default class ObRouter extends Router {
     this.loadPage(
       new TemplateOnly({ template: 'error-pages/userNotFound.html' }).render({ user }),
     );
-  }
-
-  shoppingCart() {
-    // This block is intentionally duplicated here in case a route
-    // method was called directly on the app.router instance therefore
-    // bypassing execute.
-    if (this.currentPage) {
-      this.currentPage.unmount();
-
-      this.currentPage.remove();
-      this.currentPage = null;
-    }
-
-    mountVueApp("#js-vueRoot")
-
-    app.loadingModal.close();
   }
 
   pageNotFound() {

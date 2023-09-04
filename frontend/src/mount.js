@@ -40,7 +40,9 @@ export function mountVueApp(container) {
     },
   });
 
-  return vueApp.use(Router).use(store).mount(container);
+  vueApp.use(Router).use(store).mount(container);
+
+  return vueApp;
 }
 
 export function mountChat(container, conversationID) {

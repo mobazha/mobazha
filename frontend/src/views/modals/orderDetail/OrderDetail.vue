@@ -24,14 +24,14 @@
           <div class="contentBox padMd clrP clrBr clrSh3" :disabled="isFetching || fetchFailed">
             <h1 class="h4 txUp clrT">{{ ob.polyT('tabMenuHeading') }}</h1>
             <div class="boxList tx4 clrTx1Br tabHeads">
-              <a class="tab clrT row" @click="onTabClick" data-tab="summary">{{ ob.polyT('orderDetail.navMenu.summary')
+              <a class="tab clrT row" @click="selectTab('summary')">{{ ob.polyT('orderDetail.navMenu.summary')
               }}</a>
-              <a class="tab row" @click="onTabClick" data-tab="discussion">
+              <a class="tab row" @click="selectTab('discussion')">
                 <span>{{ ob.polyT('orderDetail.navMenu.discussion') }}<span
                     class="unreadBadge discSm clrE1 clrBrEmph1 clrTOnEmph">{{
                       unreadChatMessagesText }}</span></span>
               </a>
-              <a class=" tab row" @click="onTabClick" data-tab="contract">{{ ob.polyT('orderDetail.navMenu.contract')
+              <a class=" tab row" @click="selectTab('contract')">{{ ob.polyT('orderDetail.navMenu.contract')
               }}</a>
             </div>
           </div>
@@ -58,6 +58,21 @@
 
             <div v-else>
               <section class="tabContent js-tabContent">
+                <Summary
+                  v-if="_tab === 'summary'"
+                  v-model="tabViewData"
+                  ref="summaryTabView"
+                  @clickFulfillOrder="selectTab('fulfillOrder')"
+                  @clickResolveDispute="() => {
+                    recordEvent('OrderDetails_DisputeResolveStart');
+                    this.selectTab('resolveDispute');
+                  }"
+                  @clickDisputeOrder="() => {
+                    this.recordDisputeStart();
+                    this.selectTab('disputeOrder');
+                  }"
+                  @clickDiscussOrder="selectTab('discussion')"
+                  />
                 <!-- insert the tab subview here -->
               </section>
             </div>
@@ -70,6 +85,7 @@
 
 <script>
 import $ from 'jquery';
+import _ from 'underscore';
 import app from '../../../../backbone/app';
 import { capitalize } from '../../../../backbone/utils/string';
 import { getSocket } from '../../../../backbone/utils/serverConnect';
@@ -85,7 +101,6 @@ import OrderFulfillment from '../../../../backbone/models/order/orderFulfillment
 import OrderDispute from '../../../../backbone/models/order/OrderDispute';
 import ResolveDisputeMd from '../../../../backbone/models/order/ResolveDispute';
 import ProfileBox from '../../../../backbone/views/modals/orderDetail/ProfileBox';
-import Summary from '../../../../backbone/views/modals/orderDetail/summaryTab/Summary';
 import Discussion from '../../../../backbone/views/modals/orderDetail/Discussion';
 import ContractTab from '../../../../backbone/views/modals/orderDetail/contractTab/ContractTab';
 import FulfillOrder from '../../../../backbone/views/modals/orderDetail/FulfillOrder';
@@ -94,28 +109,49 @@ import ResolveDispute from '../../../../backbone/views/modals/orderDetail/Resolv
 import ActionBar from '../../../../backbone/views/modals/orderDetail/ActionBar';
 import ContractMenuItem from '../../../../backbone/views/modals/orderDetail/ContractMenuItem';
 
+import Summary from './summaryTab/Summary.vue';
+
+import { Events } from 'backbone';
+import * as templateHelpers from '../../../../backbone/utils/templateHelpers';
+import { toRaw } from 'vue';
 
 export default {
+  components: {
+    Summary,
+  },
   mixins: [],
   props: {
-    model: {
-      type: Object,
-    },
-    returnText: {
-      type: String,
-      default: '',
-    }
   },
   data () {
     return {
+      // #259 - we've decided not have modals close on an overlay click, so you
+      // probably should never be passing in true for this.
+      dismissOnOverlayClick: false,
+      dismissOnEscPress: true,
+      showCloseButton: false,
+      closeButtonClass: 'cornerTR iconBtn clrP clrBr clrSh3 toolTipNoWrap modalCloseBtn',
+      innerButtonClass: 'ion-ios-close-empty',
+      closeButtonTip: app.polyglot.t('pageNav.toolTip.close'),
+      modelContentClass: 'modalContent',
+      removeOnClose: true,
+      removeOnRoute: true,
+
       isFetching: false,
       fetchFailed: false,
       fetchError: '',
       _tab: 'summary',
+
+      tabViewData: {},
+
+      model: {},
     };
   },
   created () {
-    this.loadData();
+    _.extend(this, Events);
+
+    this.ob = { ...templateHelpers};
+
+    this.loadData(this.$store.state.cart);
   },
   mounted () {
     this.render();
@@ -182,7 +218,23 @@ export default {
     }
   },
   methods: {
-    loadData () {
+    createChild(ChildView, ...args) {
+      if (typeof ChildView !== 'function') {
+        throw new Error('Please provide a ChildView class.');
+      }
+
+      const childView = new ChildView(...args);
+      // this.registerChild(childView);
+
+      return childView;
+    },
+
+    loadData (opts = {}) {
+      let transactions = toRaw(opts.transactions);
+      console.log('transactions: ', transactions);
+      this.model = transactions.model;
+      this.returnText = app.polyglot.t(`transactions.${this.type}s.returnToFromOrder`),
+
       this.tabViewCache = {};
 
       if (!this.model) {
@@ -292,11 +344,6 @@ export default {
       this.close();
     },
 
-    onTabClick (e) {
-      const targ = $(e.target).closest('.js-tab');
-      this.selectTab(targ.attr('data-tab'));
-    },
-
     onSocketMessage (e) {
       const notificationTypes = [
         // A notification for the buyer that a payment has come in for the order. Let's refetch
@@ -393,6 +440,7 @@ export default {
     },
 
     selectTab (targ) {
+      console.log('selectTab: ', targ);
       if (!this[`create${capitalize(targ)}TabView`]) {
         throw new Error(`${targ} is not a valid tab.`);
       }
@@ -434,7 +482,7 @@ export default {
     },
 
     createSummaryTabView () {
-      const viewData = {
+      this.tabViewData = {
         model: this.model,
         vendor: {
           id: this.model.vendorID,
@@ -447,30 +495,18 @@ export default {
       };
 
       if (this.model.moderatorID) {
-        viewData.moderator = {
+        this.tabViewData.moderator = {
           id: this.model.moderatorID,
           getProfile: this.getModeratorProfile.bind(this),
         };
       }
 
-      const view = this.createChild(Summary, viewData);
-      this.listenTo(view, 'clickFulfillOrder', () => this.selectTab('fulfillOrder'));
-      this.listenTo(view, 'clickResolveDispute', () => {
-        recordEvent('OrderDetails_DisputeResolveStart');
-        this.selectTab('resolveDispute');
-      });
-      this.listenTo(view, 'clickDisputeOrder', () => {
-        this.recordDisputeStart();
-        this.selectTab('disputeOrder');
-      });
-      this.listenTo(view, 'clickDiscussOrder', () => this.selectTab('discussion'));
-
-      return view;
+      return this.$refs.summaryTabView;
     },
 
     createDiscussionTabView () {
       const amActiveTab = () => (this.activeTab === 'discussion');
-      const viewData = {
+      this.tabViewData = {
         orderID: this.model.id,
         buyer: {
           id: this.model.buyerID,
@@ -485,13 +521,13 @@ export default {
       };
 
       if (this.model.moderatorID) {
-        viewData.moderator = {
+        this.tabViewData.moderator = {
           id: this.model.moderatorID,
           getProfile: this.getModeratorProfile.bind(this),
         };
       }
 
-      const view = this.createChild(Discussion, viewData);
+      const view = this.createChild(Discussion, this.tabViewData);
       this.listenTo(view, 'convoMarkedAsRead', () => {
         this.model.set('unreadChatMessages', 0);
         this.trigger('convoMarkedAsRead');

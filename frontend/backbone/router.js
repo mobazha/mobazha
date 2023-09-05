@@ -49,6 +49,7 @@ export default class ObRouter extends Router {
       ['(ob://)connected-peers(/)', 'connectedPeers'],
       ['(ob://)search(/:tab)(?:query)', 'search'],
       ['(ob://)shopping-cart(/)', 'loadVueModal'],
+      ['(ob://)orderDetail(/)', 'loadVueModal'],
       ['(ob://)*path', 'pageNotFound'],
     ];
 

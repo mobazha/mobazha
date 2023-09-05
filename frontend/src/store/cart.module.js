@@ -4,19 +4,26 @@ function updateLocalStorage(cart) {
 }
 
 const state = {
-  cart: {}
+  cart: {},
+  transactions: {
+    type: 'purchases',
+    model: {},
+  }
 }
 
 const getters = {
   cartItems: (state) => {
     return state.cart
-  }
+  },
 }
 
 const mutations = {
   updateCart (state, cart) {
     state.cart = cart
   },
+  setTransactionsOrder(state, data) {
+    state.transactions = data;
+  }
 
   // updateCartFromLocalStorage(state) {
   //   const cart = localStorage.getItem('cart')

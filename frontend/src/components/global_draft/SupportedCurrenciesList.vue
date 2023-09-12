@@ -1,13 +1,10 @@
 <template>
   <ul class="unstyled row">
-    <div v-for="(cur, j) in ob.processedCurs" :key="j">
-      <li class="flexVCent gutterHSm clrBr">
-        <span class="ion-ios-checkmark-empty clrTEm tx2"></span>
-        {{ ob.crypto.cryptoIcon({ code: cur.code }) }}
-        <div class="acceptedCurName">{{ cur.displayName }}</div>
-      </li>
-    </div>
-
+    <li class="flexVCent gutterHSm clrBr" v-for="(cur, j) in ob.processedCurs" :key="j">
+      <span class="ion-ios-checkmark-empty clrTEm tx2"></span>
+      {{ ob.crypto.cryptoIcon({ code: cur.code }) }}
+      <div class="acceptedCurName">{{ cur.displayName }}</div>
+    </li>
   </ul>
 </template>
 

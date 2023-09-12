@@ -1,24 +1,21 @@
 <template>
   <ul class="unstyled borderStackedAll curSelector">
-    <div v-for="(cur, j) in ob.processedCurs" :key="j">
-      <li class="clrBr curRow">
-        <span class="curControlWrapper gutterHSm" :disabled="cur.disabled" @click="handleCurClick" :data-code="cur.code">
-          <input :type="ob.controlType"
-            :id="`curSel${cur.code}${ob.cid}`"
-            class="centerLabel"
-            :name="ob.controlType === 'radio' ? 'currencies':''"
-            :checked="cur.active && !cur.disabled">
-          <label :for="`curSel${cur.code}${ob.cid}`">
-            {{ ob.crypto.cryptoIcon({ code: cur.code }) }}
-            <span class="curName noOverflow">{{ cur.displayName }}</span>
-          </label>
-        </span>
-        <div v-if="cur.disabled && ob.disabledMsg">
-          <span class="disabledMsg noOverflow clrTErr tx5b">{{ ob.disabledMsg }}</span>
-        </div>
-      </li>
-    </div>
-
+    <li class="clrBr curRow" v-for="(cur, j) in ob.processedCurs" :key="j">
+      <span class="curControlWrapper gutterHSm" :disabled="cur.disabled" @click="handleCurClick" :data-code="cur.code">
+        <input :type="ob.controlType"
+          :id="`curSel${cur.code}${ob.cid}`"
+          class="centerLabel"
+          :name="ob.controlType === 'radio' ? 'currencies':''"
+          :checked="cur.active && !cur.disabled">
+        <label :for="`curSel${cur.code}${ob.cid}`">
+          {{ ob.crypto.cryptoIcon({ code: cur.code }) }}
+          <span class="curName noOverflow">{{ cur.displayName }}</span>
+        </label>
+      </span>
+      <div v-if="cur.disabled && ob.disabledMsg">
+        <span class="disabledMsg noOverflow clrTErr tx5b">{{ ob.disabledMsg }}</span>
+      </div>
+    </li>
   </ul>
 </template>
 

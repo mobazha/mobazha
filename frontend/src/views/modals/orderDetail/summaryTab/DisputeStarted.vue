@@ -1,0 +1,73 @@
+<template>
+  <div class="disputeStartedEvent rowLg">
+    <h2 class="tx4 margRTn">{{ ob.polyT('orderDetail.summaryTab.disputeStarted.heading') }}</h2>
+    <div v-if="ob.timestamp">
+      <span class="clrT2 tx5b">{{ moment(ob.timestamp).format('lll') }}</span>
+    </div>
+    <div class="border clrBr padMd">
+      <div class="flex gutterH clrT">
+        <div class="statusIconCol"><span class="clrBr ion-alert-circled"></span></div>
+        <div class="flexExpand tx5">
+          <div class="rowTn txB">{{ introLine }}</div>
+          <div>{{ ob.reason || ob.polyT('orderDetail.summaryTab.disputeStarted.noReasonProvided') }}</div>
+        </div>
+        <div v-if="ob.showResolveButton">
+          <div class="col">
+            <ProcessingButton className="btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b"
+              :btnText="ob.polyT('orderDetail.summaryTab.disputeStarted.resolveBtn')" @click="onClickResolveDispute" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</template>
+
+<script>
+import _ from 'underscore';
+import moment from 'moment';
+import {
+  events as orderEvents,
+} from '../../../../../backbone/utils/order';
+
+export default {
+  mixins: [],
+  props: {
+    cart: Object,
+  },
+  data () {
+    return {
+      disputerName: '',
+      claim: '',
+      showResolveButton: false,
+    };
+  },
+  created () {
+    this.loadData(this.$props);
+  },
+  mounted () {
+    this.render();
+  },
+  computed: {
+    introLine () {
+      return ob.disputerName ?
+        ob.polyT('orderDetail.summaryTab.disputeStarted.partyIsDisputing', { name: ob.disputerName }) :
+        ob.polyT('orderDetail.summaryTab.disputeStarted.genericIsDisputed');
+    },
+  },
+  methods: {
+    moment,
+
+    loadData (options = {}) {
+      this.listenTo(orderEvents, 'resolveDisputeComplete', () => {
+        this.showResolveButton = false;
+      });
+    },
+
+    onClickResolveDispute () {
+      this.$emit('clickResolveDispute');
+    },
+  }
+}
+</script>
+<style lang="scss" scoped></style>

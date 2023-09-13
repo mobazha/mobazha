@@ -42,7 +42,6 @@ import _ from 'underscore';
 import app from '../../../../backbone/app';
 import ShippingOptions from './ShippingOptions.vue';
 import ShippingAddress from '../../../../backbone/models/settings/ShippingAddress';
-import { Events } from 'backbone';
 
 export default {
   components: {
@@ -76,7 +75,7 @@ export default {
     };
   },
   created () {
-    _.extend(this, Events);
+    this.initEventChain();
 
     this.loadData();
   },

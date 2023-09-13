@@ -38,11 +38,12 @@
       </div>
     </div>
     <div class="js-payForOrderWrap payForOrderWrap rowLg border clrBr padMd"></div>
-    <div class="js-orderDetailsWrap"></div>
+    <OrderDetails :model="contract" :moderator="moderator"/>
   </div>
 </template>
 
 <script>
+import $ from 'jquery';
 import moment from 'moment';
 import { ipc } from '../../../../utils/ipcRenderer.js';
 import app from '../../../../../backbone/app.js';
@@ -59,7 +60,6 @@ import Payments from '../../../../../backbone/views/modals/orderDetail/summaryTa
 import Accepted from '../../../../../backbone/views/modals/orderDetail/summaryTab/Accepted';
 import Fulfilled from '../../../../../backbone/views/modals/orderDetail/summaryTab/Fulfilled';
 import Refunded from '../../../../../backbone/views/modals/orderDetail/summaryTab/Refunded';
-import OrderDetails from '../../../../../backbone/views/modals/orderDetail/summaryTab/OrderDetails';
 import CompleteOrderForm from '../../../../../backbone/views/modals/orderDetail/summaryTab/CompleteOrderForm';
 import OrderComplete from '../../../../../backbone/views/modals/orderDetail/summaryTab/OrderComplete';
 import DisputeStarted from '../../../../../backbone/views/modals/orderDetail/summaryTab/DisputeStarted';
@@ -69,18 +69,27 @@ import TimeoutInfo from '../../../../../backbone/views/modals/orderDetail/summar
 import PayForOrder from '../../../../../backbone/views/modals/purchase/Payment';
 import ProcessingError from '../../../../../backbone/views/modals/orderDetail/summaryTab/ProcessingError';
 
+import OrderDetails from './OrderDetails.vue'
 
 export default {
+  components: {
+    OrderDetails,
+  },
   mixins: [],
   props: {
-    cart: Object,
+    options: {
+      type: Object,
+      default: {},
+    },
   },
   data () {
     return {
     };
   },
   created () {
-    this.loadData(this.$props);
+    this.initEventChain();
+
+    this.loadData(this.$props.options);
   },
   mounted () {
     this.render();
@@ -217,6 +226,7 @@ export default {
   },
   methods: {
     loadData (options = {}) {
+      this.model = options.model;
       if (!this.model) {
         throw new Error('Please provide a model.');
       }
@@ -236,7 +246,6 @@ export default {
         checkValidParticipantObject(options.moderator, 'moderator');
       }
 
-      this.options = options || {};
       this.vendor = options.vendor;
       this.buyer = options.buyer;
       this.moderator = options.moderator;
@@ -1115,13 +1124,6 @@ export default {
         initialState: this.progressBarState,
       });
       $('.js-statusProgressBarContainer').html(this.stateProgressBar.render().el);
-
-      if (this.orderDetails) this.orderDetails.remove();
-      this.orderDetails = this.createChild(OrderDetails, {
-        model: this.contract,
-        moderator: this.moderator,
-      });
-      $('.js-orderDetailsWrap').html(this.orderDetails.render().el);
 
       if (this.shouldShowPayForOrderSection()) {
         this.renderPayForOrder();

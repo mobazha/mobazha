@@ -317,12 +317,6 @@ import Payment from '../../../../backbone/views/modals/purchase/Payment';
 import Complete from '../../../../backbone/views/modals/purchase/Complete';
 import DirectPayment from './DirectPayment.vue';
 
-import BaseModal from '../../../../backbone/views/modals/BaseModal';
-import baseVw from '../../../../backbone/views/baseVw';
-import { Events } from 'backbone';
-
-import * as templateHelpers from '../../../../backbone/utils/templateHelpers';
-
 import { toRaw } from 'vue';
 
 export default {
@@ -356,11 +350,7 @@ export default {
     };
   },
   created () {
-    // _.extend(this, baseVw.prototype);
-    // _.extend(this, BaseModal.prototype);
-    _.extend(this, Events);
-
-    this.ob = { ...templateHelpers};
+    this.initEventChain();
   },
   mounted () {
     this.loadData(this.$store.state.cart);
@@ -457,17 +447,6 @@ export default {
   },
   methods: {
     capitalize,
-
-    createChild(ChildView, ...args) {
-      if (typeof ChildView !== 'function') {
-        throw new Error('Please provide a ChildView class.');
-      }
-
-      const childView = new ChildView(...args);
-      // this.registerChild(childView);
-
-      return childView;
-    },
 
     async loadData (opts = {}) {
       this.cart = toRaw(opts.cart);

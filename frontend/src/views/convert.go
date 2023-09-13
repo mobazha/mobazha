@@ -379,16 +379,16 @@ func walk(s string, d fs.DirEntry, err error) error {
 <script>
 ` + header + `
 export default {
-  mixins: [],
   props: {
-    cart: Object,
   },
   data () {
     return {
-      ob: {},
+      options: {},
     };
   },
   created () {
+	this.initEventChain();
+
 	this.loadData(this.$props);
   },
   mounted () {

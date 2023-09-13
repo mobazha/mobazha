@@ -7,6 +7,7 @@ import 'element-plus/dist/index.css';
 
 import App from './App.vue'
 import Modal from './Modal.vue'
+import baseVw from './mixins/baseVw';
 
 // import './assets/scss/main.scss';
 
@@ -25,6 +26,7 @@ export function mountVueApp(container) {
   const vueApp = createApp(App);
   vueApp.config.productionTip = false;
 
+  vueApp.mixin(baseVw);
   vueApp.config.globalProperties.ob = {...templateHelpers};
 
   // components
@@ -46,6 +48,7 @@ export function mountVueModal(container, name) {
   const vueModal = createApp(Modal, { name });
   vueModal.config.productionTip = false;
 
+  vueModal.mixin(baseVw);
   vueModal.config.globalProperties.ob = {...templateHelpers};
 
   vueModal.use(ElementPlus);

@@ -110,8 +110,6 @@ import ContractMenuItem from '../../../../backbone/views/modals/orderDetail/Cont
 
 import Summary from './summaryTab/Summary.vue';
 
-import { Events } from 'backbone';
-import * as templateHelpers from '../../../../backbone/utils/templateHelpers';
 import { toRaw } from 'vue';
 
 export default {
@@ -134,9 +132,7 @@ export default {
     };
   },
   created () {
-    _.extend(this, Events);
-
-    this.ob = { ...templateHelpers};
+    this.initEventChain();
 
     this.loadData(this.$store.state.cart);
   },
@@ -205,16 +201,6 @@ export default {
     }
   },
   methods: {
-    createChild(ChildView, ...args) {
-      if (typeof ChildView !== 'function') {
-        throw new Error('Please provide a ChildView class.');
-      }
-
-      const childView = new ChildView(...args);
-      // this.registerChild(childView);
-
-      return childView;
-    },
 
     loadData (opts = {}) {
       let transactions = toRaw(opts.transactions);

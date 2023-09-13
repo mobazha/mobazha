@@ -419,7 +419,7 @@ export default class extends BaseVw {
   }
 
   onClickShoppingCartBtn() {
-    app.router.navigate('shopping-cart', { trigger: true });
+    app.router.loadVueModal('ShoppingCart');
   }
 
   onDocClick() {

@@ -2,14 +2,14 @@
   <div class="orderDetails">
 
     <h2 class="tx4 margRTn">{{ ob.polyT('orderDetail.summaryTab.orderDetails.heading') }}</h2>
-    <span class="clrT2 tx5b">{{ ob.moment(order.timestamp).format('lll') }}</span>
+    <span class="clrT2 tx5b">{{ moment(order.timestamp).format('lll') }}</span>
     <div class="border clrBr padMd">
       <div class="flex gutterH clrT">
         <a :href="`#${`${listing.vendorID.peerID}/store/${listing.slug}`}`" class="listingThumbCol flexNoShrink" :style="ob.getAvatarBgImage(listing.item.images[0])"></a>
         <div class="flexExpand tx5">
           <div class="flex gutterH">
             <div class="flexExpand">
-              <a :href="`#${`${listing.vendorID.peerID}/store/${listing.slug}`}`" :class="`txB clrT inlineBlock ${ob.description || isCrypto ? 'rowTn' : ''}`">{{ title }}</a>
+              <a :href="`#${`${listing.vendorID.peerID}/store/${listing.slug}`}`" :class="`txB clrT inlineBlock ${description || isCrypto ? 'rowTn' : ''}`">{{ title }}</a>
               <div v-if="sku">{{ ob.polyT('orderDetail.summaryTab.orderDetails.skuLabel') }}: {{ sku }}</div>
               <div v-if="item.options && item.options.length">{{ item.options.map(option => `${option.name}:&nbsp;${option.value}`).join(',&nbsp;') }}</div>
               <div v-if="isCrypto">
@@ -83,7 +83,7 @@
                 <div class="flexRow gutterH row">
                   <div class="col6">
                     <div class="txB rowTn">{{ ob.polyT('orderDetail.summaryTab.orderDetails.moderatorHeading') }}</div>
-                    <div v-if="isModerated" class="js-moderatorContainer"></div>
+                    <ModFragment v-if="isModerated" :modInfo="modInfo" />
                     <div v-else> {{ ob.polyT('orderDetail.summaryTab.notApplicable') }}
                     </div>
                   </div>
@@ -140,20 +140,32 @@
 import _ from 'underscore';
 import $ from 'jquery';
 import moment from 'moment';
+import app from '../../../../../backbone/app';
 import { getCountryByDataName } from '../../../../../backbone/data/countries';
 import { ipc } from '../../../../utils/ipcRenderer.js';
 import 'velocity-animate';
-import ModFragment from '../ModFragment';
+import ModFragment from '../ModFragment.vue';
 import { checkValidParticipantObject } from '../../../../utils/utils';
 
 export default {
+  components: {
+    ModFragment,
+  },
   mixins: [],
   props: {
-    cart: Object,
+    model: {
+      type: Object,
+      default: {}
+    },
+    moderator: {
+      type: Object,
+      default: {}
+    },
   },
   data () {
     return {
-      ob: {},
+      app: app,
+      description: '',
     };
   },
   created () {
@@ -180,7 +192,7 @@ export default {
     title () {
       let title = this.listing.item.title;
 
-      if (isCrypto) {
+      if (this.isCrypto) {
         title = ob.crypto.tradingPair({
           className: 'cryptoTradingPairSm',
           fromCur: listing.metadata.acceptedCurrencies[0],
@@ -312,13 +324,18 @@ export default {
       return this._copiedToClipboard ||
         (this._copiedToClipboard = $('.js-orderDetailsCopiedToClipboard'));
     },
+
+    modInfo () {
+      return {
+        peerID: this.options.moderator.id,
+        ...(this.modProfile && this.modProfile.toJSON() || {}),
+      };
+    }
   },
   methods: {
     moment,
 
     loadData (options = {}) {
-      super(options);
-
       if (!this.model) {
         throw new Error('Please provide a Contract model.');
       }
@@ -376,20 +393,6 @@ export default {
 
     render () {
       this._copiedToClipboard = null;
-
-      if (this.isModerated) {
-        const moderatorState = {
-          peerID: this.options.moderator.id,
-          ...(this.modProfile && this.modProfile.toJSON() || {}),
-        };
-
-        if (this.moderatorVw) this.moderatorVw.remove();
-        this.moderatorVw = this.createChild(ModFragment, {
-          initialState: moderatorState,
-        });
-
-        $('.js-moderatorContainer').html(this.moderatorVw.render().el);
-      }
 
       return this;
     }

@@ -43,9 +43,6 @@ import MiniProfile from '../../../backbone/views/MiniProfile';
 import Tab from '../../../backbone/views/transactions/Tab';
 import OrderDetail from '../modals/orderDetail/OrderDetail.vue';
 
-import _ from 'underscore';
-import { Events } from 'backbone';
-import * as templateHelpers from '../../../backbone/utils/templateHelpers';
 
 export default {
   components: {
@@ -58,7 +55,6 @@ export default {
   data () {
     return {
       _tab: 'purchases',
-      ob: {},
 
       tabCount: {
         sales: 0,
@@ -68,9 +64,7 @@ export default {
     };
   },
   created () {
-    _.extend(this, Events);
-
-    this.ob = { ...templateHelpers};
+    this.initEventChain();
 
     this.loadData();
   },
@@ -137,17 +131,6 @@ export default {
     },
   },
   methods: {
-    createChild(ChildView, ...args) {
-      if (typeof ChildView !== 'function') {
-        throw new Error('Please provide a ChildView class.');
-      }
-
-      const childView = new ChildView(...args);
-      // this.registerChild(childView);
-
-      return childView;
-    },
-
     loadData () {
       let tab = this.$route.params.tab;
       if (tab && ['sales', 'cases', 'purchases'].indexOf(tab) === -1) {
@@ -263,11 +246,8 @@ export default {
 
       // orderDetail.render().open();
 
-      const orderDetail = mountOrderDetail($('.js-orderDetail'), {
-        model,
-        removeOnClose: true,
-        returnText: app.polyglot.t(`transactions.${type}s.returnToFromOrder`),
-      });
+      this.$store.commit('cart/setTransactionsOrder', {model, type}, { module: 'cart' });
+      const orderDetail = app.router.loadVueModal('orderDetail');
 
       if (opts.addToRoute) {
         // add the order / case id to the url

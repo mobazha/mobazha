@@ -411,12 +411,11 @@ export default {
 }
 
 func buildModalComponent(templateFileContent string) string {
-	return fmt.Sprintf(`<div :class="modelContentClass">
-  <span :class="%s${closeButtonClass} jsModalClose%s" :hidden="!showCloseButton" :data-tip="closeButtonTip || ''">
-    <i :class="innerButtonClass"></i>
-  </span>
-  %s
-</div>`, "`", "`", templateFileContent)
+	return fmt.Sprintf(`    <BaseModal>
+      <template v-slot:component>
+        %s
+      </template>
+    </BaseModal>`, templateFileContent)
 }
 
 func main() {

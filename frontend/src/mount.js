@@ -6,6 +6,7 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue';
 import 'element-plus/dist/index.css';
 
 import App from './App.vue'
+import Modal from './Modal.vue'
 
 // import './assets/scss/main.scss';
 
@@ -26,10 +27,6 @@ export function mountVueApp(container) {
 
   vueApp.config.globalProperties.ob = {...templateHelpers};
 
-  vueApp.use(ElementPlus);
-  for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-    vueApp.component(key, component);
-  }
   // components
   for (const i in components) {
     vueApp.component(i, components[i]);
@@ -43,6 +40,31 @@ export function mountVueApp(container) {
   vueApp.use(Router).use(store).mount(container);
 
   return vueApp;
+}
+
+export function mountVueModal(container, name) {
+  const vueModal = createApp(Modal, { name });
+  vueModal.config.productionTip = false;
+
+  vueModal.config.globalProperties.ob = {...templateHelpers};
+
+  vueModal.use(ElementPlus);
+  for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+    vueModal.component(key, component);
+  }
+  // components
+  for (const i in components) {
+    vueModal.component(i, components[i]);
+  }
+  const store = createStore({
+    modules: {
+      cart,
+    },
+  });
+
+  vueModal.use(Router).use(store).mount(container);
+
+  return vueModal;
 }
 
 export function mountChat(container, conversationID) {

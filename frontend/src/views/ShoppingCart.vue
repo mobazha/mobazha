@@ -1,113 +1,111 @@
 <template>
-  <div class="modal purchase modalScrollPage">
-    <div :class="modelContentClass">
-      <span :class="`${closeButtonClass} jsModalClose`" :hidden="!showCloseButton" :data-tip="closeButtonTip || ''">
-        <i :class="innerButtonClass"></i>
-      </span>
-
-      <div class="page-main">
-        <div class="page-head">
-          <div class="page-head__left">
-            <div class="page-head__name">
-              Shopping Cart<span v-if="tableData.length > 0">({{ cartNum }})</span>
+  <div class="modal modalScrollPage">
+    <BaseModal>
+      <template v-slot:component>
+        <div class="page-main">
+          <div class="page-head">
+            <div class="page-head__left">
+              <div class="page-head__name">
+                Shopping Cart<span v-if="tableData.length > 0">({{ cartNum }})</span>
+              </div>
+              <div class="clean-btn" v-if="tableData.length > 0">Clear Cart</div>
             </div>
-            <div class="clean-btn" v-if="tableData.length > 0">Clear Cart</div>
-          </div>
-          <div class="page-head__right" v-if="tableData.length > 0">
-            <el-input v-model="params.keyword" placeholder="Search Orders" :prefix-icon="Search" />
-          </div>
-        </div>
-        <div class="page-body" v-loading="loading">
-          <template v-if="tableData.length > 0">
-            <div class="table-hc">
-              <el-table :header-row-style="headerRowStyle" :data="[]" :height="38">
-                <el-table-column width="48"></el-table-column>
-                <el-table-column label="Title" width="350"></el-table-column>
-                <el-table-column label="Type" width="160"></el-table-column>
-                <el-table-column label="Price"></el-table-column>
-                <el-table-column label="Quantity" width="100"></el-table-column>
-                <el-table-column label="Total"></el-table-column>
-                <el-table-column label="Operate" width="100"></el-table-column>
-              </el-table>
+            <div class="page-head__right" v-if="tableData.length > 0">
+              <el-input v-model="params.keyword" placeholder="Search Orders" :prefix-icon="Search" />
             </div>
-            <div class="card">
-              <div class="card-item" v-for="(item, index) in tableData" :key="index">
-                <el-table :header-cell-style="headerCellStyle" ref="table" class="table-hearder-one" :data="item.items"
-                  @selection-change="handleSelectionChange($event, index)">
-                  <el-table-column>
-                    <template #header>
-                      <div class="user">
-                        <img class="user-avatar" :src="getAvatarBgImage(item.profile?.avatarHashes, {}, true)"
-                          @click="goToStore(item.vendorID)" />
-                        <div class="user-body">
-                          <div class="user-name" @click="goToStore(item.vendorID)">{{ item.profile?.name }}</div>
-                          <div class="user-id">{{ item.vendorID }}</div>
+          </div>
+          <div class="page-body" v-loading="loading">
+            <template v-if="tableData.length > 0">
+              <div class="table-hc">
+                <el-table :header-row-style="headerRowStyle" :data="[]" :height="38">
+                  <el-table-column width="48"></el-table-column>
+                  <el-table-column label="Title" width="350"></el-table-column>
+                  <el-table-column label="Type" width="160"></el-table-column>
+                  <el-table-column label="Price"></el-table-column>
+                  <el-table-column label="Quantity" width="100"></el-table-column>
+                  <el-table-column label="Total"></el-table-column>
+                  <el-table-column label="Operate" width="100"></el-table-column>
+                </el-table>
+              </div>
+              <div class="card">
+                <div class="card-item" v-for="(item, index) in tableData" :key="index">
+                  <el-table :header-cell-style="headerCellStyle" ref="table" class="table-hearder-one" :data="item.items"
+                    @selection-change="handleSelectionChange($event, index)">
+                    <el-table-column>
+                      <template #header>
+                        <div class="user">
+                          <img class="user-avatar" :src="getAvatarBgImage(item.profile?.avatarHashes, {}, true)"
+                            @click="goToStore(item.vendorID)" />
+                          <div class="user-body">
+                            <div class="user-name" @click="goToStore(item.vendorID)">{{ item.profile?.name }}</div>
+                            <div class="user-id">{{ item.vendorID }}</div>
+                          </div>
                         </div>
-                      </div>
-                    </template>
-                    <template #default>
-                      <el-table-column type="selection" width="48"> </el-table-column>
-                      <el-table-column width="350">
-                        <template v-slot="{ row }">
-                          <div class="goods">
-                            <div class="goods-left">
-                              <img class="goods-img" :src="getListingBgImage(row.listing?.item.images[0], {}, true)"
-                                @click="goToListing(item.vendorID, row.listing?.slug)" />
-                            </div>
-                            <div class="goods-right">
-                              <div class="goods-title" @click="goToListing(item.vendorID, row.listing?.slug)">{{
-                                row.listing?.item.title }}</div>
-                              <div class="goods-currency">
-                                <img class="currency-icon" :src="`../../imgs/cryptoIcons/${currency}-icon.png`"
-                                  v-for="(currency, index) in row.listing?.metadata.acceptedCurrencies" :key="index" />
+                      </template>
+                      <template #default>
+                        <el-table-column type="selection" width="48"> </el-table-column>
+                        <el-table-column width="350">
+                          <template v-slot="{ row }">
+                            <div class="goods">
+                              <div class="goods-left">
+                                <img class="goods-img" :src="getListingBgImage(row.listing?.item.images[0], {}, true)"
+                                  @click="goToListing(item.vendorID, row.listing?.slug)" />
+                              </div>
+                              <div class="goods-right">
+                                <div class="goods-title" @click="goToListing(item.vendorID, row.listing?.slug)">{{
+                                  row.listing?.item.title }}</div>
+                                <div class="goods-currency">
+                                  <img class="currency-icon" :src="`../../imgs/cryptoIcons/${currency}-icon.png`"
+                                    v-for="(currency, index) in row.listing?.metadata.acceptedCurrencies" :key="index" />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </template>
-                      </el-table-column>
-                      <el-table-column width="160">
-                        <template v-slot="{ row }">
-                          <div class="sku">
-                            <div class="sku-item" v-for="(val, key) in row.options" :key="key">
-                              <div class="sku-name">{{ val.name }}</div>
-                              <div class="sku-value">{{ val.value }}</div>
+                          </template>
+                        </el-table-column>
+                        <el-table-column width="160">
+                          <template v-slot="{ row }">
+                            <div class="sku">
+                              <div class="sku-item" v-for="(val, key) in row.options" :key="key">
+                                <div class="sku-name">{{ val.name }}</div>
+                                <div class="sku-value">{{ val.value }}</div>
+                              </div>
                             </div>
-                          </div>
-                        </template>
-                      </el-table-column>
-                      <el-table-column prop="price"></el-table-column>
-                      <el-table-column width="100">
-                        <template v-slot="{ row }">
-                          <el-input class="input-number" v-model="row.quantity" />
-                        </template>
-                      </el-table-column>
-                      <el-table-column>
-                        <template v-slot="{ row }">{{ countRowPrice(row) }}</template>
-                      </el-table-column>
-                      <el-table-column width="100">
-                        <template v-slot="{ row }">
-                          <el-button @click="doDelete(row, index)" type="info" :icon="Delete" circle />
-                        </template>
-                      </el-table-column>
-                    </template>
-                  </el-table-column>
-                </el-table>
-                <div class="footer" v-if="oneStoreTotalPrice(index).quantity > 0">
-                  <div class="total">
-                    <div class="total-price"><span class="total-name">Total:</span>${{ oneStoreTotalPrice(index).total }}
+                          </template>
+                        </el-table-column>
+                        <el-table-column prop="price"></el-table-column>
+                        <el-table-column width="100">
+                          <template v-slot="{ row }">
+                            <el-input class="input-number" v-model="row.quantity" />
+                          </template>
+                        </el-table-column>
+                        <el-table-column>
+                          <template v-slot="{ row }">{{ countRowPrice(row) }}</template>
+                        </el-table-column>
+                        <el-table-column width="100">
+                          <template v-slot="{ row }">
+                            <el-button @click="doDelete(row, index)" type="info" :icon="Delete" circle />
+                          </template>
+                        </el-table-column>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                  <div class="footer" v-if="oneStoreTotalPrice(index).quantity > 0">
+                    <div class="total">
+                      <div class="total-price"><span class="total-name">Total:</span>${{ oneStoreTotalPrice(index).total }}
+                      </div>
+                      <div class="count-price">Subtotal:$183.97</div>
+                      <div class="freight">Shipping & handling: Free</div>
                     </div>
-                    <div class="count-price">Subtotal:$183.97</div>
-                    <div class="freight">Shipping & handling: Free</div>
+                    <button class="btn-primary pay-btn" @click="pay(index)">Pay</button>
                   </div>
-                  <button class="btn-primary pay-btn" @click="pay(index)">Pay</button>
                 </div>
               </div>
-            </div>
-          </template>
+            </template>
+          </div>
+          <empty v-if="tableData.length === 0 && !loading" :emptyInfo="emptyInfo" />
         </div>
-        <empty v-if="tableData.length === 0 && !loading" :emptyInfo="emptyInfo" />
-      </div>
-    </div>
+      </template>
+    </BaseModal>
   </div>
 </template>
 
@@ -117,6 +115,7 @@ import { Search } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import $ from 'jquery';
 import { toRaw } from 'vue';
+import app from '../../backbone/app';
 import Empty from '../components/Empty.vue';
 import { products } from '../components/products.js';
 import api from '../api';
@@ -131,13 +130,6 @@ import { useRouter } from 'vue-router';
 
 const store = useStore();
 const router = useRouter();
-
-
-const showCloseButton = false;
-const closeButtonClass = 'cornerTR iconBtn clrP clrBr clrSh3 toolTipNoWrap modalCloseBtn';
-const innerButtonClass = 'ion-ios-close-empty';
-// const closeButtonTip = app.polyglot.t('pageNav.toolTip.close');
-const modelContentClass = 'modalContent';
 
 const params = reactive({ keyword: '' });
 let tableData = [];
@@ -233,7 +225,7 @@ function handleSelectionChange (val, index) {
 function pay (index) {
   store.commit('cart/updateCart', toRaw(tableData[0]), { module: 'cart' });
 
-  router.push({name: 'Purchase'})
+  app.router.loadVueModal('Purchase');
 }
 
 //修改头部样式
@@ -430,4 +422,5 @@ function headerCellStyle ({ rowIndex }) {
     font-size: 14px;
     line-height: 20px;
   }
-}</style>
+}
+</style>

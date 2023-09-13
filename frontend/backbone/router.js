@@ -22,7 +22,7 @@ import TemplateOnly from './views/TemplateOnly';
 import BlockedWarning from './views/modals/BlockedWarning';
 import UserLoadingModal from './views/userPage/Loading';
 
-import { mountVueApp } from '../src/mount.js'
+import { mountVueApp, mountVueModal } from '../src/mount.js'
 
 export default class ObRouter extends Router {
   constructor(options = {}) {
@@ -48,8 +48,6 @@ export default class ObRouter extends Router {
       ['(ob://)transactions/:tab(/)', 'loadVuePage'],
       ['(ob://)connected-peers(/)', 'connectedPeers'],
       ['(ob://)search(/:tab)(?:query)', 'search'],
-      ['(ob://)shopping-cart(/)', 'loadVueModal'],
-      ['(ob://)orderDetail(/)', 'loadVueModal'],
       ['(ob://)*path', 'pageNotFound'],
     ];
 
@@ -308,14 +306,18 @@ export default class ObRouter extends Router {
     app.loadingModal.close();
   }
 
-  loadVueModal() {
+  loadVueModal(name) {
     if (this.vueModalInstance) {
       this.vueModalInstance.unmount();
     }
 
-    this.vueModalInstance = mountVueApp("#js-vueRoot")
+    this.vueModalInstance = mountVueModal("#js-vueModal", name)
+  }
 
-    app.loadingModal.close();
+  closeVueModal() {
+    if (this.vueModalInstance) {
+      this.vueModalInstance.unmount();
+    }
   }
 
   /**

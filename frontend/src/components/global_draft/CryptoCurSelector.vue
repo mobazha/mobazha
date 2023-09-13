@@ -1,7 +1,7 @@
 <template>
   <ul class="unstyled borderStackedAll curSelector">
     <li class="clrBr curRow" v-for="(cur, j) in ob.processedCurs" :key="j">
-      <span class="curControlWrapper gutterHSm" :disabled="cur.disabled" @click="handleCurClick" :data-code="cur.code">
+      <span class="curControlWrapper gutterHSm" :disabled="cur.disabled" @click="handleCurClick(cur.code)">
         <input :type="ob.controlType"
           :id="`curSel${cur.code}${ob.cid}`"
           class="centerLabel"
@@ -63,8 +63,7 @@ function loadData (options = {}) {
 }
 
 
-function handleCurClick (e) {
-  const code = $(e.target).attr('data-code');
+function handleCurClick (code) {
   let activeCurs = [...this.getState().activeCurs];
   // Toggle the current active state when clicked.
   const nowActive = !activeCurs.includes(code);

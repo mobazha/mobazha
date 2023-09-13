@@ -1,85 +1,84 @@
 <template>
   <div class="modal modalScrollPage tabbedModal orderDetail">
-    <div :class="modelContentClass">
-      <span :class="`${closeButtonClass} jsModalClose`" :hidden="!showCloseButton" :data-tip="closeButtonTip || ''">
-        <i :class="innerButtonClass"></i>
-      </span>
-      <div class="topControls flex">
-        <!-- // This is something found at the top of multiple modals. Would be nice to make this into a template
-    // and componentize the css. -->
-        <div v-if="returnText">
-          <div class="btnStrip clrSh3">
-            <a class="btn clrP clrBr clrT" @click="onClickReturnBox">
-              <span class="ion-chevron-left margRSm"></span>
-              {{ returnText }}
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <div class="flex gutterH">
-        <div class="tabColumn gutterV">
-          <div class="contentBox clrP clrBr clrSh3 tx4 featuredProfile js-featuredProfile"
-            :disabled="isFetching || fetchFailed"></div>
-          <div class="contentBox padMd clrP clrBr clrSh3" :disabled="isFetching || fetchFailed">
-            <h1 class="h4 txUp clrT">{{ ob.polyT('tabMenuHeading') }}</h1>
-            <div class="boxList tx4 clrTx1Br tabHeads">
-              <a class="tab clrT row" @click="selectTab('summary')">{{ ob.polyT('orderDetail.navMenu.summary')
-              }}</a>
-              <a class="tab row" @click="selectTab('discussion')">
-                <span>{{ ob.polyT('orderDetail.navMenu.discussion') }}<span
-                    class="unreadBadge discSm clrE1 clrBrEmph1 clrTOnEmph">{{
-                      unreadChatMessagesText }}</span></span>
+    <BaseModal :modalInfo="{ removeOnClose: true }">
+      <template v-slot:component>
+        <div class="topControls flex">
+          <!-- // This is something found at the top of multiple modals. Would be nice to make this into a template
+      // and componentize the css. -->
+          <div v-if="returnText">
+            <div class="btnStrip clrSh3">
+              <a class="btn clrP clrBr clrT" @click="onClickReturnBox">
+                <span class="ion-chevron-left margRSm"></span>
+                {{ returnText }}
               </a>
-              <a class=" tab row" @click="selectTab('contract')">{{ ob.polyT('orderDetail.navMenu.contract')
-              }}</a>
             </div>
           </div>
-          <div class="mainCtaWrap hide" :hidden="isFetching || fetchFailed">
-            <ProcessingButton className="btn clrBAttGrad clrBrDec1 clrTOnEmph" btnText="Accept Order"/>
-          </div>
-          <div class="js-actionBarContainer"></div>
         </div>
-        <div class="flexExpand posR">
-          <div class="contentBox clrP clrBr clrSh3 mainContent">
-            <div v-if="isFetching">
-              <div class="center"><SpinnerSVG className="spinnerMd" /></div>
-            </div>
 
-            <div v-else-if="fetchFailed">
-              <div class="center txCtr tx4">
-                <div :class="`txB ${ob.initialFetchErrorMessage ? 'rowTn' : 'row'}`">Unable to fetch order.</div>
-                <div v-if="fetchError">
-                  <div class="row">{{ fetchError }}</div>
-                </div>
-                <a class="btn clrP clrBr clrSh2" @click="onClickRetryFetch">Retry</a>
+        <div class="flex gutterH">
+          <div class="tabColumn gutterV">
+            <div class="contentBox clrP clrBr clrSh3 tx4 featuredProfile js-featuredProfile"
+              :disabled="isFetching || fetchFailed"></div>
+            <div class="contentBox padMd clrP clrBr clrSh3" :disabled="isFetching || fetchFailed">
+              <h1 class="h4 txUp clrT">{{ ob.polyT('tabMenuHeading') }}</h1>
+              <div class="boxList tx4 clrTx1Br tabHeads">
+                <a class="tab clrT row" @click="selectTab('summary')">{{ ob.polyT('orderDetail.navMenu.summary')
+                }}</a>
+                <a class="tab row" @click="selectTab('discussion')">
+                  <span>{{ ob.polyT('orderDetail.navMenu.discussion') }}<span
+                      class="unreadBadge discSm clrE1 clrBrEmph1 clrTOnEmph">{{
+                        unreadChatMessagesText }}</span></span>
+                </a>
+                <a class=" tab row" @click="selectTab('contract')">{{ ob.polyT('orderDetail.navMenu.contract')
+                }}</a>
               </div>
             </div>
+            <div class="mainCtaWrap hide" :hidden="isFetching || fetchFailed">
+              <ProcessingButton className="btn clrBAttGrad clrBrDec1 clrTOnEmph" btnText="Accept Order"/>
+            </div>
+            <div class="js-actionBarContainer"></div>
+          </div>
+          <div class="flexExpand posR">
+            <div class="contentBox clrP clrBr clrSh3 mainContent">
+              <div v-if="isFetching">
+                <div class="center"><SpinnerSVG className="spinnerMd" /></div>
+              </div>
 
-            <div v-else>
-              <section class="tabContent js-tabContent">
-                <Summary
-                  v-if="_tab === 'summary'"
-                  v-model="tabViewData"
-                  ref="summaryTabView"
-                  @clickFulfillOrder="selectTab('fulfillOrder')"
-                  @clickResolveDispute="() => {
-                    recordEvent('OrderDetails_DisputeResolveStart');
-                    this.selectTab('resolveDispute');
-                  }"
-                  @clickDisputeOrder="() => {
-                    this.recordDisputeStart();
-                    this.selectTab('disputeOrder');
-                  }"
-                  @clickDiscussOrder="selectTab('discussion')"
-                  />
-                <!-- insert the tab subview here -->
-              </section>
+              <div v-else-if="fetchFailed">
+                <div class="center txCtr tx4">
+                  <div :class="`txB ${ob.initialFetchErrorMessage ? 'rowTn' : 'row'}`">Unable to fetch order.</div>
+                  <div v-if="fetchError">
+                    <div class="row">{{ fetchError }}</div>
+                  </div>
+                  <a class="btn clrP clrBr clrSh2" @click="onClickRetryFetch">Retry</a>
+                </div>
+              </div>
+
+              <div v-else>
+                <section class="tabContent js-tabContent">
+                  <Summary
+                    v-if="_tab === 'summary'"
+                    v-model="tabViewData"
+                    ref="summaryTabView"
+                    @clickFulfillOrder="selectTab('fulfillOrder')"
+                    @clickResolveDispute="() => {
+                      recordEvent('OrderDetails_DisputeResolveStart');
+                      this.selectTab('resolveDispute');
+                    }"
+                    @clickDisputeOrder="() => {
+                      this.recordDisputeStart();
+                      this.selectTab('disputeOrder');
+                    }"
+                    @clickDiscussOrder="selectTab('discussion')"
+                    />
+                  <!-- insert the tab subview here -->
+                </section>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </template>
+    </BaseModal>
   </div>
 </template>
 
@@ -124,18 +123,6 @@ export default {
   },
   data () {
     return {
-      // #259 - we've decided not have modals close on an overlay click, so you
-      // probably should never be passing in true for this.
-      dismissOnOverlayClick: false,
-      dismissOnEscPress: true,
-      showCloseButton: false,
-      closeButtonClass: 'cornerTR iconBtn clrP clrBr clrSh3 toolTipNoWrap modalCloseBtn',
-      innerButtonClass: 'ion-ios-close-empty',
-      closeButtonTip: app.polyglot.t('pageNav.toolTip.close'),
-      modelContentClass: 'modalContent',
-      removeOnClose: true,
-      removeOnRoute: true,
-
       isFetching: false,
       fetchFailed: false,
       fetchError: '',

@@ -12,17 +12,24 @@
 </template>
 
 <script>
+import $ from 'jquery';
 import app from '../../../../../backbone/app';
-import Contract from './Contract';
+import Contract from '../../../../../backbone/views/modals/orderDetail/contractTab/Contract';
 
 
 export default {
+  props: {
+    model: {
+      type: Object,
+      default: {},
+    },
+  },
   data () {
     return {
     };
   },
   created () {
-    this.loadData(this.$props);
+    this.loadData();
   },
   mounted () {
     this.render();
@@ -30,14 +37,10 @@ export default {
   computed: {
   },
   methods: {
-    loadData (options = {}) {
-      super(options);
-
+    loadData () {
       if (!this.model) {
         throw new Error('Please provide a model.');
       }
-
-      this.options = options || {};
 
       if (this.model.isCase &&
         (!this.model.get('vendorContract') ||
@@ -62,7 +65,7 @@ export default {
     },
 
     onClickBackToSummary () {
-      this.trigger('clickBackToSummary');
+      this.$emit('clickBackToSummary');
     },
 
     onClickRenderjsonLink () {

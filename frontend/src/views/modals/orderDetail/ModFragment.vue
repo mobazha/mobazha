@@ -20,7 +20,6 @@ import app from '../../../../backbone/app';
 
 
 export default {
-  mixins: [],
   props: {
   },
   data () {
@@ -36,6 +35,8 @@ export default {
     };
   },
   created () {
+    this.initEventChain();
+    
     this.loadData(this.$props);
   },
   mounted () {

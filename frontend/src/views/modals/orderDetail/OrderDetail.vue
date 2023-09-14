@@ -22,15 +22,11 @@
             <div class="contentBox padMd clrP clrBr clrSh3" :disabled="isFetching || fetchFailed">
               <h1 class="h4 txUp clrT">{{ ob.polyT('tabMenuHeading') }}</h1>
               <div class="boxList tx4 clrTx1Br tabHeads">
-                <a class="tab clrT row" @click="selectTab('summary')">{{ ob.polyT('orderDetail.navMenu.summary')
-                }}</a>
-                <a class="tab row" @click="selectTab('discussion')">
-                  <span>{{ ob.polyT('orderDetail.navMenu.discussion') }}<span
-                      class="unreadBadge discSm clrE1 clrBrEmph1 clrTOnEmph">{{
-                        unreadChatMessagesText }}</span></span>
+                <a :class="`tab clrT row ${activeTab === 'summary' ? 'clrT active' : ''}`" @click="selectTab('summary')">{{ ob.polyT('orderDetail.navMenu.summary') }}</a>
+                <a :class="`tab row ${activeTab === 'discussion' ? 'clrT active' : ''}`" @click="selectTab('discussion')">
+                  <span>{{ ob.polyT('orderDetail.navMenu.discussion') }}<span class="unreadBadge discSm clrE1 clrBrEmph1 clrTOnEmph">{{ unreadChatMessagesText }}</span></span>
                 </a>
-                <a class=" tab row" @click="selectTab('contract')">{{ ob.polyT('orderDetail.navMenu.contract')
-                }}</a>
+                <a :class="`tab row ${activeTab === 'contract' ? 'clrT active' : ''}`" @click="selectTab('contract')">{{ ob.polyT('orderDetail.navMenu.contract') }}</a>
               </div>
             </div>
             <div class="mainCtaWrap hide" :hidden="isFetching || fetchFailed">
@@ -57,20 +53,63 @@
               <div v-else>
                 <section class="tabContent js-tabContent">
                   <Summary
-                    v-if="_tab === 'summary'"
-                    v-model="tabViewData"
-                    ref="summaryTabView"
+                    v-if="activeTab === 'summary'"
+                    :options="tabViewData"
                     @clickFulfillOrder="selectTab('fulfillOrder')"
                     @clickResolveDispute="() => {
                       recordEvent('OrderDetails_DisputeResolveStart');
-                      this.selectTab('resolveDispute');
+                      selectTab('resolveDispute');
                     }"
                     @clickDisputeOrder="() => {
-                      this.recordDisputeStart();
-                      this.selectTab('disputeOrder');
+                      recordDisputeStart();
+                      selectTab('disputeOrder');
                     }"
                     @clickDiscussOrder="selectTab('discussion')"
-                    />
+                  />
+                  <Discussion
+                    v-if="activeTab === 'discussion'"
+                    :amActiveTab="activeTab === 'discussion'"
+                    :options="tabViewData"
+                    @convoMarkedAsRead="() => {
+                      model.set('unreadChatMessages', 0);
+                      $emit('convoMarkedAsRead');
+                    }"
+                  />
+                  <ContractTab
+                    v-if="activeTab === 'contract'"
+                    :model="model"
+                    @clickBackToSummary="() => {
+                      selectTab('summary');
+                    }"
+                  />
+                  <FulfillOrder
+                    v-if="activeTab === 'fulfillOrder'"
+                    :orderID="model.id"
+                    :contractType="contract.type"
+                    :isLocalPickup="contract.isLocalPickup"
+                    @clickBackToSummary="() => {
+                      selectTab('summary');
+                    }"
+                    @clickCancel="() => {
+                      selectTab('summary');
+                    }"
+                  />
+                  <DisputeOrder
+                    v-if="activeTab === 'disputeOrder'"
+                    :orderID="model.id"
+                    :contractType="contract.type"
+                    :timeoutMessage="disputeTimeoutMessage"
+                    :moderator="{
+                      id: model.moderatorID,
+                      getProfile: getModeratorProfile.bind(this),
+                    }"
+                    @clickBackToSummary="() => {
+                      selectTab('summary');
+                    }"
+                    @clickCancel="() => {
+                      selectTab('summary');
+                    }"
+                  />
                   <!-- insert the tab subview here -->
                 </section>
               </div>
@@ -96,27 +135,32 @@ import {
 import { getCachedProfiles } from '../../../../backbone/models/profile/Profile';
 import { recordEvent } from '../../../../backbone/utils/metrics';
 import Case from '../../../../backbone/models/order/Case';
-import OrderFulfillment from '../../../../backbone/models/order/orderFulfillment/OrderFulfillment';
-import OrderDispute from '../../../../backbone/models/order/OrderDispute';
 import ResolveDisputeMd from '../../../../backbone/models/order/ResolveDispute';
 import ProfileBox from '../../../../backbone/views/modals/orderDetail/ProfileBox';
-import Discussion from '../../../../backbone/views/modals/orderDetail/Discussion';
-import ContractTab from '../../../../backbone/views/modals/orderDetail/contractTab/ContractTab';
-import FulfillOrder from '../../../../backbone/views/modals/orderDetail/FulfillOrder';
-import DisputeOrder from '../../../../backbone/views/modals/orderDetail/DisputeOrder';
+
 import ResolveDispute from '../../../../backbone/views/modals/orderDetail/ResolveDispute';
 import ActionBar from '../../../../backbone/views/modals/orderDetail/ActionBar';
 import ContractMenuItem from '../../../../backbone/views/modals/orderDetail/ContractMenuItem';
 
 import Summary from './summaryTab/Summary.vue';
+import Discussion from './Discussion.vue';
+import ContractTab from './contractTab/ContractTab.vue';
+import FulfillOrder from './FulfillOrder.vue';
+import DisputeOrder from './DisputeOrder.vue'
 
 import { toRaw } from 'vue';
+
+import baseModal from '../../../mixins/baseModal';
 
 export default {
   components: {
     Summary,
+    Discussion,
+    ContractTab,
+    FulfillOrder,
+    DisputeOrder,
   },
-  mixins: [],
+  mixins: [baseModal],
   props: {
   },
   data () {
@@ -124,7 +168,7 @@ export default {
       isFetching: false,
       fetchFailed: false,
       fetchError: '',
-      _tab: 'summary',
+      activeTab: 'summary',
 
       tabViewData: {},
 
@@ -143,8 +187,8 @@ export default {
     type () {
       return this.model instanceof Case ? 'case' : this.model.type;
     },
-    activeTab () {
-      return this._tab;
+    contract () {
+      return this.model.get('contract');
     },
     /**
      * Returns whether different action bar buttons should be displayed or not
@@ -198,17 +242,30 @@ export default {
       count = count > 0 ? count : '';
       count = count > 99 ? '…' : count;
       return count;
+    },
+    disputeTimeoutMessage () {
+      let timeoutMessage = '';
+
+      const translationKeySuffix = app.profile.id === this.model.buyerID ? 'Buyer' : 'Vendor';
+      try {
+        timeoutMessage = getWalletCurByCode(this.model.paymentCoin).supportsEscrowTimeout
+          ? app.polyglot.t(
+            `orderDetail.disputeOrderTab.timeoutMessage${translationKeySuffix}`,
+            { timeoutAmount: this.contract.disputeExpiryVerbose },
+          )
+          : '';
+      } catch (e) {
+        // pass
+      }
+      return timeoutMessage;
     }
   },
   methods: {
-
     loadData (opts = {}) {
       let transactions = toRaw(opts.transactions);
       console.log('transactions: ', transactions);
       this.model = transactions.model;
-      this.returnText = app.polyglot.t(`transactions.${this.type}s.returnToFromOrder`),
-
-      this.tabViewCache = {};
+      this.returnText = app.polyglot.t(`transactions.${this.type}s.returnToFromOrder`);
 
       if (!this.model) {
         throw new Error('Please provide an Order or Case model.');
@@ -247,13 +304,9 @@ export default {
         this.listenTo(socket, 'message', this.onSocketMessage);
       }
 
-      this.model.fetch();
-    },
-
-    events () {
-      return {
-        'click .js-toggleSendReceive': 'onClickToggleSendReceive',
-      };
+      this.model.fetch().done(()=>{
+        this.initTabViewData();
+      });
     },
 
     onOrderRequest (md, xhr) {
@@ -414,37 +467,8 @@ export default {
 
     selectTab (targ) {
       console.log('selectTab: ', targ);
-      if (!this[`create${capitalize(targ)}TabView`]) {
-        throw new Error(`${targ} is not a valid tab.`);
-      }
 
-      this._tab = targ;
-      let tabView = this.tabViewCache[targ];
-
-      if (!this.currentTabView || this.currentTabView !== tabView) {
-        $('.js-tab').removeClass('clrT active');
-        $(`.js-tab[data-tab="${targ}"]`).addClass('clrT active');
-
-        if (this.currentTabView) this.currentTabView.$el.detach();
-
-        if (!tabView) {
-          tabView = this[`create${capitalize(targ)}TabView`]();
-          this.tabViewCache[targ] = tabView;
-          tabView.render();
-        }
-
-        this._tabContent.append(tabView.$el);
-
-        if (typeof tabView.onAttach === 'function') {
-          tabView.onAttach.call(tabView);
-        }
-
-        if (tabView.autoFocusFirstField) {
-          tabView.$el.find('select, input, textarea')[0].focus();
-        }
-
-        this.currentTabView = tabView;
-      }
+      this.activeTab = targ;
     },
 
     recordDisputeStart () {
@@ -454,31 +478,7 @@ export default {
       });
     },
 
-    createSummaryTabView () {
-      this.tabViewData = {
-        model: this.model,
-        vendor: {
-          id: this.model.vendorID,
-          getProfile: this.getVendorProfile.bind(this),
-        },
-        buyer: {
-          id: this.model.buyerID,
-          getProfile: this.getBuyerProfile.bind(this),
-        },
-      };
-
-      if (this.model.moderatorID) {
-        this.tabViewData.moderator = {
-          id: this.model.moderatorID,
-          getProfile: this.getModeratorProfile.bind(this),
-        };
-      }
-
-      return this.$refs.summaryTabView;
-    },
-
-    createDiscussionTabView () {
-      const amActiveTab = () => (this.activeTab === 'discussion');
+    initTabViewData () {
       this.tabViewData = {
         orderID: this.model.id,
         buyer: {
@@ -490,7 +490,6 @@ export default {
           getProfile: this.getVendorProfile.bind(this),
         },
         model: this.model,
-        amActiveTab: amActiveTab.bind(this),
       };
 
       if (this.model.moderatorID) {
@@ -499,83 +498,6 @@ export default {
           getProfile: this.getModeratorProfile.bind(this),
         };
       }
-
-      const view = this.createChild(Discussion, this.tabViewData);
-      this.listenTo(view, 'convoMarkedAsRead', () => {
-        this.model.set('unreadChatMessages', 0);
-        this.trigger('convoMarkedAsRead');
-      });
-
-      return view;
-    },
-
-    createContractTabView () {
-      const view = this.createChild(ContractTab, {
-        model: this.model,
-      });
-
-      this.listenTo(view, 'clickBackToSummary', () => this.selectTab('summary'));
-      return view;
-    },
-
-    // This should not be called on a Case.
-    createFulfillOrderTabView () {
-      const contract = this.model.get('contract');
-
-      const model = new OrderFulfillment(
-        { orderID: this.model.id },
-        {
-          contractType: contract.type,
-          isLocalPickup: contract.isLocalPickup,
-        },
-      );
-
-      const view = this.createChild(FulfillOrder, {
-        model,
-        contractType: contract.type,
-        isLocalPickup: contract.isLocalPickup,
-      });
-
-      this.listenTo(view, 'clickBackToSummary clickCancel', () => this.selectTab('summary'));
-
-      return view;
-    },
-
-    createDisputeOrderTabView () {
-      if (this.model.isCase) {
-        throw new Error('This view should not be created on Cases.');
-      }
-
-      const contract = this.model.get('contract');
-      const model = new OrderDispute({ orderID: this.model.id });
-      const translationKeySuffix = app.profile.id === this.model.buyerID
-        ? 'Buyer' : 'Vendor';
-      let timeoutMessage = '';
-
-      try {
-        timeoutMessage = getWalletCurByCode(this.model.paymentCoin).supportsEscrowTimeout
-          ? app.polyglot.t(
-            `orderDetail.disputeOrderTab.timeoutMessage${translationKeySuffix}`,
-            { timeoutAmount: contract.disputeExpiryVerbose },
-          )
-          : '';
-      } catch (e) {
-        // pass
-      }
-
-      const view = this.createChild(DisputeOrder, {
-        model,
-        contractType: contract.type,
-        moderator: {
-          id: this.model.moderatorID,
-          getProfile: this.getModeratorProfile.bind(this),
-        },
-        timeoutMessage,
-      });
-
-      this.listenTo(view, 'clickBackToSummary clickCancel', () => this.selectTab('summary'));
-
-      return view;
     },
 
     createResolveDisputeTabView () {
@@ -616,8 +538,6 @@ export default {
     },
 
     render () {
-      this._tabContent = $('.js-tabContent');
-
       if (this.featuredProfile) this.featuredProfile.remove();
       this.featuredProfile = this.createChild(ProfileBox, {
         model: this.featuredProfileMd || null,

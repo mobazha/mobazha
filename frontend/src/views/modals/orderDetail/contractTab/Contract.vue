@@ -87,8 +87,7 @@ export default {
         renderjsonEl = $('.js-jsonContractContainer').children()[0];
       }
 
-      $('.js-jsonContractContainer')
-          .html(renderjsonEl || renderjson.set_show_to_level('1')(this.contract));
+      $('.js-jsonContractContainer').html(renderjsonEl || renderjson.set_show_to_level('1')(this.contract));
 
       this.rendered = true;
       return this;

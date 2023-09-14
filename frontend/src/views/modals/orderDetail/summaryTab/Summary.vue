@@ -449,7 +449,6 @@ export default {
       }
     },
 
-
     onClickCopyOrderID () {
       ipc.send('controller.system.writeToClipboard', this.model.id);
       this.copiedToClipboardAnimatingIn = true;
@@ -462,8 +461,6 @@ export default {
           },
         });
     },
-
-
 
     setDisputeCountdownTimeout (...args) {
       clearTimeout(this.disputeCountdownTimeout);

@@ -1,9 +1,9 @@
 <template>
-  <div class="discussionTab clrP noMessages">
+  <div :class="`discussionTab clrP ${messages.length ? 'noMessages' : ''} ${fetching ? 'loadingMessages' : ''} ${isTyping ? 'isTyping' : ''}`">
     <div class="typingIndicator tx5 noOverflow clrBr clrP clrT2 clrSh1">{{ typingIndicatorContent }}</div>
     <div class="convoMessagesWindow tx6 js-convoMessagesWindow">
       <SpinnerSVG />
-      <div class="clrTErr messagesFetchError js-loadMessagesError" :hidden="!showLoadMessagesError">
+      <div class="clrTErr messagesFetchError" v-show="showLoadMessagesError">
         {{ ob.polyT('orderDetail.discussionTab.loadMessagesError', {
           retryLink: `<a class="" @click="onClickRetryLoadMessage">${ob.polyT('orderDetail.discussionTab.retryLink')}</a>`
         }) }}
@@ -12,7 +12,7 @@
     </div>
 
     <div class="clrBr clrP flex gutterHSm convoFooter js-convoFooter">
-      <div class="avatar clrBr2 clrSh1 disc" :style="ob.getAvatarBgImage(app.profile.toJSON().avatarHashes)"></div>
+      <div class="avatar clrBr2 clrSh1 disc" :style="ob.getAvatarBgImage(ownProfile.avatarHashes)"></div>
       <div class="flexExpand">
         <textarea
           ref="inputMessage"
@@ -20,7 +20,7 @@
           @keyup="onKeyUpMessageInput"
           @keydown="onKeyDownMessageInput"
           :placeholder="ob.polyT('chat.conversation.messageInputPlaceholder')"
-          :maxlength="ChatMessage.max.messageLength"
+          :maxlength="maxMessageLength"
           v-model="inputMessage"
           rows="1"></textarea>
         <div class="msgModUnableToChat clrT2">{{ ob.polyT('orderDetail.discussionTab.modCannotChat') }}</div>
@@ -42,12 +42,21 @@ import { capitalize } from '../../../../backbone/utils/string';
 import { getSocket } from '../../../../backbone/utils/serverConnect';
 import GroupMessages from '../../../../backbone/collections/GroupMessages';
 import ChatMessage from '../../../../backbone/models/chat/ChatMessage';
-import { checkValidParticipantObject } from './OrderDetail.js';
-import ConvoMessages from './ConvoMessages';
+import { checkValidParticipantObject } from '../../../utils/utils';
+import ConvoMessages from '../../../../backbone/views/modals/orderDetail/ConvoMessages.js';
 
 
 export default {
-  mixins: [],
+  props: {
+    options: {
+      type: Object,
+      default: {},
+    },
+    amActiveTab: {
+      type: Boolean,
+      default: false,
+    },
+  },
   data () {
     return {
       messagesPerPage: 20,
@@ -55,29 +64,22 @@ export default {
 
       inputMessage: '',
       typingIndicatorContent: '',
+      isTyping: false,
     };
   },
   created () {
-    this.loadData(this.$props);
+    this.initEventChain();
+
+    this.loadData(this.$props.options);
   },
   mounted () {
     this.render();
 
+    this.onAttach();
+
     this.typingIndicatorContent = this.getTypingIndicatorContent();
   },
   computed: {
-    loadMessagesError () {
-      let returnVal;
-
-      if (this._loadMessagesError && this._loadMessagesError.length) {
-        returnVal = this._loadMessagesError;
-      } else {
-        returnVal = (this._loadMessagesError = $('.js-loadMessagesError'));
-      }
-
-      return returnVal;
-    },
-
     convoMessagesWindow () {
       return this._convoMessagesWindow ||
         (this._convoMessagesWindow = $('.js-convoMessagesWindow'));
@@ -111,20 +113,24 @@ export default {
           return include;
         }).map(chatter => chatter.id);
     },
+
+    ownProfile () {
+      return app.profile.toJSON();
+    },
+    maxMessageLength () {
+      return ChatMessage.max.messageLength;
+    },
   },
   methods: {
     loadData (options = {}) {
+      this.model = options.model;
+  
       if (!options.orderID) {
         throw new Error('Please provide an orderID.');
       }
 
       if (!options.model) {
         throw new Error('Please provide an order / case model.');
-      }
-
-      if (typeof options.amActiveTab !== 'function') {
-        throw new Error('Please provide an amActiveTab function that returns a boolean ' +
-          'indicating whether Discussion is the active tab.');
       }
 
       checkValidParticipantObject(options.buyer, 'buyer');
@@ -134,8 +140,6 @@ export default {
         checkValidParticipantObject(options.moderator, 'moderator');
       }
 
-      super(options);
-      this.options = options;
       this.showLoadMessagesError = false;
       this.fetching = false;
       this.fetchedAllMessages = false;
@@ -166,15 +170,12 @@ export default {
       }
     },
 
-
-
     onMessagesRequest (mdCl, xhr) {
       // Only interested in the collection sync (not any of its models).
       if (!(mdCl instanceof GroupMessages)) return;
 
       this.showLoadMessagesError = false;
-      this.loadMessagesError.addClass('hide');
-      this.$el.addClass('loadingMessages');
+
       this.fetching = true;
 
       xhr.always(() => (this.fetching = false));
@@ -185,8 +186,6 @@ export default {
       if (!(mdCl instanceof GroupMessages)) return;
 
       this.showLoadMessagesError = false;
-      this.loadMessagesError.addClass('hide');
-      this.$el.removeClass('loadingMessages');
 
       if (response && !response.length) {
         this.fetchedAllMessages = true;
@@ -196,7 +195,7 @@ export default {
         this.firstSyncComplete = true;
         this.setScrollTop(this.convoMessagesWindow[0].scrollHeight);
 
-        if (this.options.amActiveTab()) this.markConvoAsRead();
+        if (this.amActiveTab) this.markConvoAsRead();
       }
     },
 
@@ -208,15 +207,9 @@ export default {
 
     onMessagesFetchError () {
       this.showLoadMessagesError = true;
-      this.loadMessagesError.removeClass('hide');
-      this.$el.removeClass('loadingMessages');
     },
 
     onMessagesUpdate (cl, opts) {
-      if (this.messages.length) {
-        this.$el.removeClass('noMessages');
-      }
-
       const prevTopModel = this.topRenderedMessageMd;
 
       if (!this.convoMessages) return;
@@ -338,7 +331,7 @@ export default {
         });
 
         this.messages.push(message);
-        if (this.options.amActiveTab()) this.markConvoAsRead();
+        if (this.amActiveTab) this.markConvoAsRead();
 
         // We'll consider them to be done typing if an actual message came
         // in. If they re-start typing, we'll get another socket message.
@@ -400,7 +393,7 @@ export default {
     showTypingIndicator () {
       clearTimeout(this.showTypingTimeout);
       this.setTypingIndicator();
-      this.$el.addClass('isTyping');
+      this.isTyping = true;
       this.showTypingTimeout = setTimeout(
         () => (this.hideTypingIndicator()),
         this.typingExpires);
@@ -408,7 +401,7 @@ export default {
 
     hideTypingIndicator () {
       clearTimeout(this.showTypingTimeout);
-      this.$el.removeClass('isTyping');
+      this.isTyping = false;
     },
 
 
@@ -498,7 +491,7 @@ export default {
         dataType: 'json',
         contentType: 'application/json',
       });
-      this.trigger('convoMarkedAsRead');
+      this.$emit('convoMarkedAsRead');
     },
 
     getChatters (includeSelf = false) {
@@ -576,7 +569,6 @@ export default {
     },
 
     render () {
-      this._loadMessagesError = null;
       this._convoMessagesWindow = null;
       this._btnSend = null;
 

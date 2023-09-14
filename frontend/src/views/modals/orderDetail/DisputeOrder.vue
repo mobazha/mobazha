@@ -23,19 +23,24 @@
         </div>
         <div class="col7">
           <FormError v-if="errors['claim']" :errors="errors['claim']" />
-          <textarea rows="6" name="claim" class="clrBr clrP clrSh2 row" id="fulfillOrderNote"
-            :placeholder="ob.polyT(`orderDetail.disputeOrderTab.reasonPlaceholder`)" v-model="ob.reason" />
+          <textarea
+            rows="6"
+            name="claim"
+            ref="clamTextAread"
+            class="clrBr clrP clrSh2 row"
+            id="fulfillOrderNote"
+            :placeholder="ob.polyT(`orderDetail.disputeOrderTab.reasonPlaceholder`)"
+            v-model="info.reason" />
           <p class="clrT2 txSm">{{ ob.polyT(`orderDetail.disputeOrderTab.reasonHelperText`) }}</p>
-          <p v-if="options.timeoutMessage" class="clrT2 txSm">{{ options.timeoutMessage }}</p>
+          <p v-if="timeoutMessage" class="clrT2 txSm">{{ timeoutMessage }}</p>
         </div>
       </div>
     </form>
     <hr class="clrBr" />
     <div class="buttonBar flexHRight flexVCent gutterHLg">
-      <a class="js-cancel" :disabled="openingDispute" @click="onClickCancel">{{
-        ob.polyT('orderDetail.disputeOrderTab.btnCancel') }}</a>
+      <a :disabled="openingDispute" @click="onClickCancel">{{ ob.polyT('orderDetail.disputeOrderTab.btnCancel') }}</a>
       <ProcessingButton
-        :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph js-submit ${openingDispute ? 'processing' : ''}`"
+        :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph ${openingDispute ? 'processing' : ''}`"
         :btnText="ob.polyT(`orderDetail.fulfillOrderTab.btnSubmit`)" @click="onClickSubmit" />
     </div>
   </div>
@@ -47,6 +52,7 @@ import {
   openDispute,
   events as orderEvents,
 } from '../../../../backbone/utils/order';
+import OrderDispute from '../../../../backbone/models/order/OrderDispute';
 import { recordEvent } from '../../../../backbone/utils/metrics';
 import { checkValidParticipantObject } from '../../../utils/utils';
 import ModFragment from './ModFragment.vue';
@@ -58,51 +64,59 @@ export default {
   },
   mixins: [],
   props: {
+    orderID: String,
+    contractType: String,
+    moderator: Object,
+    timeoutMessage: String,
   },
   data () {
     return {
-      autoFocusFirstField: true,
-
       openingDispute: false,
-      reason: '',
     };
   },
   created () {
-    this.loadData(this.$props);
+    this.model = new OrderDispute({ orderID: this.orderID });
+
+    this.loadData();
   },
   mounted () {
     this.render();
+
+    this.$refs.clamTextAread.focus();
   },
   computed: {
+    info () {
+      if (typeof this.model.toJSON === 'function') {
+        return this.model.toJSON();
+      }
+      return {}
+    },
     errors () {
       return this.model.validationError || {};
     },
     moderatorState() {
       return {
-        peerID: this.options.moderator.id,
+        peerID: this.moderator.id,
         showAvatar: true,
         ...(this.modProfile && this.modProfile.toJSON() || {}),
       };
     },
   },
   methods: {
-    loadData (options = {}) {
+    loadData () {
       if (!this.model) {
         throw new Error('Please provide a DisputeOrder model.');
       }
 
-      checkValidParticipantObject(options.moderator, 'moderator');
+      checkValidParticipantObject(this.moderator, 'moderator');
 
-      options.moderator.getProfile()
+      this.moderator.getProfile()
         .done((modProfile) => {
           this.modProfile = modProfile;
         });
 
-      this.options = options;
-
       this.listenTo(orderEvents, 'openingDispute', this.onOpeningDispute);
-      this.listenTo(orderEvents, 'openDisputeComplete, openDisputeFail',
-        this.onOpenDisputeAlways);
+      this.listenTo(orderEvents, 'openDisputeComplete, openDisputeFail', this.onOpenDisputeAlways);
     },
 
     onClickBackToSummary () {
@@ -136,15 +150,13 @@ export default {
 
     onOpeningDisputeOrder (e) {
       if (e.id === this.model.id) {
-        this.getCachedEl('.js-submit').addClass('processing');
-        this.getCachedEl('.js-cancel').addClass('disabled');
+        this.openingDispute = true;
       }
     },
 
     onOpenDisputeAlways (e) {
       if (e.id === this.model.id) {
-        this.getCachedEl('.js-submit').removeClass('processing');
-        this.getCachedEl('.js-cancel').removeClass('disabled');
+        this.openingDispute = false;
       }
     },
 

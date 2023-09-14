@@ -17,7 +17,7 @@
           <div class="col7">
             <FormError v-if="errors['physicalDelivery.shipper']" :errors="errors['physicalDelivery.shipper']" />
             <input type="text" class="clrBr clrSh2" name="physicalDelivery.shipper" id="fulfillOrderShippingCarrier"
-              :value="ob.physicalDelivery.shipper"
+              :value="info.physicalDelivery.shipper"
               :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.shippingCarrierPlaceholder`)" />
           </div>
         </div>
@@ -29,7 +29,7 @@
             <FormError v-if="errors['physicalDelivery.trackingNumber']"
               :errors="errors['physicalDelivery.trackingNumber']" />
             <input type="text" class="clrBr clrSh2" name="physicalDelivery.trackingNumber" id="fulfillOrderTrackingNumber"
-              :value="ob.physicalDelivery.trackingNumber"
+              :value="info.physicalDelivery.trackingNumber"
               :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.trackingPlaceholder`)" />
           </div>
         </div>
@@ -44,7 +44,7 @@
           <div class="col7">
             <FormError v-if="errors['digitalDelivery.url']" :errors="errors['digitalDelivery.url']" />
             <input type="text" class="clrBr clrSh2" name="digitalDelivery.url" id="fulfillOrderFileUrl"
-              :value="ob.digitalDelivery.url" :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.fileUrlPlaceholder`)" />
+              :value="info.digitalDelivery.url" :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.fileUrlPlaceholder`)" />
           </div>
         </div>
         <div class="flexRow gutterH">
@@ -54,7 +54,7 @@
           <div class="col7">
             <FormError v-if="errors['digitalDelivery.password']" :errors="errors['digitalDelivery.password']" />
             <input type="text" class="clrBr clrSh2" name="digitalDelivery.password" id="fulfillOrderPassword"
-              :value="ob.digitalDelivery.password"
+              :value="info.digitalDelivery.password"
               :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.passwordPlaceholder`)" />
           </div>
         </div>
@@ -67,12 +67,12 @@
               ob.polyT(`orderDetail.fulfillOrderTab.transactionIDLabel`) }}</label>
           </div>
           <div class="col7">
-            <FormError v-if="errors['cryptocurrencyDelivery.transactionID']"
-              :errors="errors['cryptocurrencyDelivery.transactionID']" />
+            <FormError v-if="errors['cryptocurrencyDelivery.transactionID']" :errors="errors['cryptocurrencyDelivery.transactionID']" />
             <input type="text" class="clrBr clrSh2" name="cryptocurrencyDelivery.transactionID"
-              id="fulfillOrderTransactionID" :value="ob.cryptocurrencyDelivery.transactionID"
+              id="fulfillOrderTransactionID"
+              :value="info.cryptocurrencyDelivery.transactionID"
               :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.transactionIDPlaceholder`)"
-              :maxlength="cryptoDelivery && cryptoDelivery.constraints || {}.transactionIDLength" />
+              :maxlength="constraints.transactionIDLength" />
           </div>
         </div>
       </div>
@@ -84,7 +84,7 @@
           <FormError v-if="errors['note']" :errors="errors['note']" />
           <textarea rows="6" name="note" :class="`clrBr clrP clrSh2 ${contractType === 'DIGITAL_GOOD' ? 'rowSm' : ''}`"
             id="fulfillOrderNote" :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.notePlaceholder`)"
-            v-model="ob.note"></textarea>
+            v-model="info.note"></textarea>
           <div v-if="contractType === 'DIGITAL_GOOD'">
             <div class="clrT2 txSm">{{ ob.polyT(`orderDetail.fulfillOrderTab.noteHelperTextDigital`) }}</div>
           </div>
@@ -93,16 +93,17 @@
     </form>
     <hr class="clrBr" />
     <div class="buttonBar flexHRight flexVCent gutterHLg">
-      <a class="js-cancel" :disabled="ob.fulfillingOrder" @click="onClickCancel">{{
+      <a class="js-cancel" :disabled="processing" @click="onClickCancel">{{
         ob.polyT(`orderDetail.fulfillOrderTab.btnCancel`) }}</a>
       <ProcessingButton
-        :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph js-submit ${fulfillingOrder(model.id) ? 'processing' : ''}`"
+        :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph js-submit ${processing ? 'processing' : ''}`"
         :btnText="ob.polyT(`orderDetail.fulfillOrderTab.btnSubmit`)" @click="onClickSubmit" />
     </div>
   </div>
 </template>
 
 <script>
+import OrderFulfillment from '../../../../backbone/models/order/orderFulfillment/OrderFulfillment';
 import {
   fulfillingOrder,
   fulfillOrder,
@@ -112,57 +113,72 @@ import {
 export default {
   mixins: [],
   props: {
+    orderID: {
+      type: String,
+      default: '',
+    },
+    contractType: {
+      type: String,
+      default: '',
+    },
+    isLocalPickup: {
+      type: Boolean,
+      default: '',
+    },
   },
   data () {
     return {
-      autoFocusFirstField: true,
+      model: {},
 
-      fulfillingOrder: false,
+      processing: fulfillingOrder(this.orderID),
     };
   },
   created () {
-    this.loadData(this.$props);
+    this.initEventChain();
+
+    this.loadData();
   },
   mounted () {
     this.render();
+
+    this.$children.filter(c => c.$options._componentTag in ['select', 'input', 'textarea'])[0].focus();
+    // this.$el.find('select, input, textarea')[0].focus();
   },
   computed: {
+    info () {
+      if (typeof this.model.toJSON === 'function') {
+        return this.model.toJSON();
+      }
+      return {
+        physicalDelivery: {},
+        digitalDelivery: {},
+        cryptocurrencyDelivery: {},
+      }
+    },
     errors () {
       return this.model.validationError || {};
     },
-    btnCancel () {
-      return this._btnCancel ||
-        (this._btnCancel = $('.js-cancel'));
-    },
 
-    btnSubmit () {
-      return this._btnSubmit ||
-        (this._btnSubmit = $('.js-submit'));
-    },
     cryptoDelivery () {
       return this.model.get('cryptocurrencyDelivery');
-    }
+    },
+
+    constraints () {
+      return this.cryptoDelivery && this.cryptoDelivery.constraints || {};
+    },
   },
   methods: {
-    loadData (options = {}) {
-      if (!this.model) {
-        throw new Error('Please provide an OrderFulfillment model.');
-      }
+    loadData () {
+      this.model = new OrderFulfillment(
+        { orderID: this.orderID },
+        {
+          contractType: this.contractType,
+          isLocalPickup: this.isLocalPickup,
+        },
+      );
 
-      if (!options.contractType) {
-        throw new Error('Please provide the contract type.');
-      }
-
-      if (typeof options.isLocalPickup !== 'boolean') {
-        throw new Error('Please provide a boolean indicating whether the item is to ' +
-          'be picked up locally.');
-      }
-
-      this.contractType = options.contractType;
-      this.isLocalPickup = options.isLocalPickup;
       this.listenTo(orderEvents, 'fulfillingOrder', this.onFulfillingOrder);
-      this.listenTo(orderEvents, 'fulfillOrderComplete, fulfillOrderFail',
-        this.onFulfillOrderAlways);
+      this.listenTo(orderEvents, 'fulfillOrderComplete, fulfillOrderFail', this.onFulfillOrderAlways);
     },
 
     onClickBackToSummary () {
@@ -194,28 +210,21 @@ export default {
 
     onFulfillingOrder (e) {
       if (e.id === this.model.id) {
-        this.btnSubmit.addClass('processing');
-        this.btnCancel.addClass('disabled');
+        this.processing = true;
       }
     },
 
     onFulfillOrderAlways (e) {
       if (e.id === this.model.id) {
-        this.btnSubmit.removeClass('processing');
-        this.btnCancel.removeClass('disabled');
+        this.processing = false;
       }
     },
 
-
     render () {
-      this.fulfillingOrder = fulfillingOrder(this.model.id);
-
-      this._btnCancel = null;
-      this._btnSubmit = null;
+      this.processing = fulfillingOrder(this.model.id);
 
       return this;
     }
-
   }
 }
 </script>

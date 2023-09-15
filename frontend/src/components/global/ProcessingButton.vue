@@ -1,7 +1,7 @@
 <template>
   <!-- // Add a 'processing' class to the button for the spinner to appear. -->
 
-  <a :class="`btnProcessing ${className}`" :data-tip="dataTip">
+  <a :class="`btnProcessing ${className}`" v-bind="attrs">
     <SpinnerSVG :className="spinnerClassName || ''" />
     <span :class="`js-btnText ${textClassName}`">{{ btnText }}</span>
   </a>
@@ -12,7 +12,7 @@
 const props = defineProps({
   className: String,
   btnText: String,
-  dataTip: String,
+  attrs: {},
   spinnerClassName: String,
   textClassName: String,
 })

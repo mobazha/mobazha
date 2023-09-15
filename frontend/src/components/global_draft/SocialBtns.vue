@@ -12,86 +12,121 @@
   </div>
 </template>
 
-<script setup>
+<script>
 import app from '../../../backbone/app';
 import loadTemplate from '../../../backbone/utils/loadTemplate';
 import { followedByYou, followUnfollow } from '../../../backbone/utils/follow';
 import BlockBtn from './BlockBtn';
 import { recordEvent } from '../../../backbone/utils/metrics';
 
-const props = defineProps({
-  phase: String,
-})
+import BaseVw from '../baseVw';
 
-loadData(props);
 
-render();
-
-function loadData (options = {}) {
-  if (!options.targetID) throw new Error('You must provide a targetID');
-
-  const opts = {
-    ...options,
-    initialState: {
-      following: followedByYou(options.targetID),
-      isFollowing: false,
-      stripClasses: 'btnStrip clrSh3',
-      btnClasses: 'clrP clrBr',
-      ...options.initialState || {},
+export default {
+  props: {
+    options: {
+      type: Object,
+      default: {},
     },
-  };
+  },
+  data () {
+    return {
+    };
+  },
+  created () {
+    this.initEventChain();
 
-  super(opts);
-  this.options = opts;
+    this.loadData(this.$props);
+  },
+  mounted () {
+    this.render();
+  },
+  computed: {
+    params () {
+      return {
+        ...this.options,
+        ...state,
+      };
+    }
+  },
+  methods: {
+    loadData (options = {}) {
+      if (!options.targetID) throw new Error('You must provide a targetID');
 
-  this.listenTo(app.ownFollowing, 'update', () => {
-    this.setState({
-      following: followedByYou(options.targetID),
-    });
-  });
-}
+      const opts = {
+        ...options,
+        initialState: {
+          following: followedByYou(options.targetID),
+          isFollowing: false,
+          stripClasses: 'btnStrip clrSh3',
+          btnClasses: 'clrP clrBr',
+          ...options.initialState || {},
+        },
+      };
 
-function onClickMessage () {
-  // activate the chat message
-  app.chat.openConversation(this.options.targetID);
-  recordEvent('Social_OpenChat');
-}
+      super(opts);
+      this.options = opts;
 
-function onClickFollow () {
-  const type = this.getState().following ? 'unfollow' : 'follow';
-  this.setState({ isFollowing: true });
-  this.folCall = followUnfollow(this.options.targetID, type)
-    .always(() => {
-      if (this.isRemoved()) return;
-      this.setState({ isFollowing: false });
-    });
-  if (type === 'follow') {
-    recordEvent('Social_Follow');
-  } else {
-    recordEvent('Social_Unfollow');
+      this.listenTo(app.ownFollowing, 'update', () => {
+        this.setState({
+          following: followedByYou(options.targetID),
+        });
+      });
+    },
+
+    className () {
+      return 'socialBtns';
+    },
+
+    events () {
+      return {
+        'click .js-followUnfollowBtn': 'onClickFollow',
+        'click .js-messageBtn': 'onClickMessage',
+      };
+    },
+
+    onClickMessage () {
+      // activate the chat message
+      app.chat.openConversation(this.options.targetID);
+      recordEvent('Social_OpenChat');
+    },
+
+    onClickFollow () {
+      const type = this.getState().following ? 'unfollow' : 'follow';
+      this.setState({ isFollowing: true });
+      this.folCall = followUnfollow(this.options.targetID, type)
+        .always(() => {
+          if (this.isRemoved()) return;
+          this.setState({ isFollowing: false });
+        });
+      if (type === 'follow') {
+        recordEvent('Social_Follow');
+      } else {
+        recordEvent('Social_Unfollow');
+      }
+    },
+
+    render () {
+      super.render();
+      const state = this.getState();
+      loadTemplate('components/socialBtns.html', (t) => {
+        this.$el.html(t({
+          ...this.options,
+          ...state,
+        }));
+      });
+
+      this.getCachedEl('.js-blockBtnContainer')
+        .html(
+          new BlockBtn({ targetId: this.options.targetID })
+            .render()
+            .el
+        );
+
+      return this;
+    }
+
   }
 }
-
-function render () {
-  super.render();
-  const state = this.getState();
-  loadTemplate('components/socialBtns.html', (t) => {
-    this.$el.html(t({
-      ...this.options,
-      ...state,
-    }));
-  });
-
-  this.getCachedEl('.js-blockBtnContainer')
-    .html(
-      new BlockBtn({ targetId: this.options.targetID })
-        .render()
-        .el
-    );
-
-  return this;
-}
-
 </script>
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>

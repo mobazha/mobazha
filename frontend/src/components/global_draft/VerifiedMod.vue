@@ -81,15 +81,104 @@
   </div>
 </div>
 
-
 </div>
 </template>
 
-<script setup>
-const props = defineProps({
-  phase: String,
-})
+<script>
+/* eslint-disable class-methods-use-this */
+import app from '../../../backbone/app';
+import VerifiedMod from '../../../backbone/models/VerifiedMod';
+import loadTemplate from '../../../backbone/utils/loadTemplate';
+import { isHiRez } from '../../../backbone/utils/responsive';
+import { handleLinks } from '../../../backbone/utils/dom';
+import BaseVw from '../baseVw';
 
+
+export default {
+  props: {
+    options: {
+      type: Object,
+      default: {},
+    },
+  },
+  data () {
+    return {
+    };
+  },
+  created () {
+    this.initEventChain();
+
+    this.loadData(this.$props);
+  },
+  mounted () {
+    this.render();
+  },
+  computed: {
+    params () {
+      return {
+        ...this.getState(),
+      };
+    }
+  },
+  methods: {
+    loadData (options = {}) {
+      const opts = {
+        ...options,
+        initialState: {
+          verified: false,
+          text: '',
+          textClass: 'txB tx5b',
+          textWrapperClass: 'flexVCent gutterHTn',
+          infoIconClass: 'ion-information-circled clrT2',
+          tipTitle: (options.initialState
+            && typeof options.initialState.tipTitle === 'undefined'
+            && options.initialState.text) || '',
+          tipTitleClass: 'tx4 txB',
+          titleWrapperClass: 'flexCent rowSm gutterHTn',
+          tipBody: '',
+          tipBodyClass: '',
+          arrowClass: 'arrowBoxCenteredTop',
+          badgeUrl: '',
+          wrapInfoIcon: (options.initialState && options.initialState.text) || false,
+          ...options.initialState || {},
+        },
+      };
+
+      if (!opts.initialState.badgeUrl
+        && typeof opts.badge === 'object') {
+        opts.initialState.badgeUrl = isHiRez
+          ? opts.badge.small : opts.badge.tiny;
+      }
+
+      super(opts);
+      handleLinks(this.el);
+    },
+
+    className () {
+      return 'verifiedMod';
+    },
+
+    events () {
+      return {
+        click: 'onClick',
+      };
+    },
+
+    onClick (e) {
+      e.stopPropagation();
+    },
+
+    render () {
+      super.render();
+      loadTemplate('/components/verifiedMod.html', (t) => {
+        this.$el.html(t({
+          ...this.getState(),
+        }));
+      });
+
+      return this;
+    }
+  }
+}
 </script>
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>

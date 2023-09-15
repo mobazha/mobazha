@@ -29,69 +29,110 @@
   </div>
 </template>
 
-<script setup>
+<script>
 import loadTemplate from '../../../backbone/utils/loadTemplate';
 
-const props = defineProps({
-  phase: String,
-})
 
-var countsAvailable = false;
+export default {
+  props: {
+    options: {
+      type: Object,
+      default: {},
+	},
+  },
+  data () {
+    return {
+    };
+  },
+  created () {
+    this.initEventChain();
 
-if (typeof ob.start === 'number' &&
-  typeof ob.end === 'number' &&
-  typeof ob.total === 'number') {
-  countsAvailable = true;
-}
-
-var disabledPrev = true;
-var disabledNext = true;
-
-if (countsAvailable) {
-  if (ob.start > 1) {
-    disabledPrev = false;
-  }
-
-  if (ob.end < ob.total) {
-    disabledNext = false;
-  }
-}
-
-loadData(props);
-
-render();
-
-function loadData (options = {}) {
-  const opts = {
-    ...options,
-    initialState: {
-      start: 1,
-      ...options.initialState,
+    this.loadData(this.$props);
+  },
+  mounted () {
+    this.render();
+  },
+  computed: {
+    params () {
+      return {
+        type: this.type,
+        ...this.getState(),
+      };
     },
-  };
+    countsAvailable () {
+      let countsAvailable = false;
 
-  super(opts);
+      if (typeof ob.start === 'number' &&
+        typeof ob.end === 'number' &&
+        typeof ob.total === 'number') {
+        countsAvailable = true;
+      }
+      return countsAvailable;
+    },
+    disabledPrev () {
+      let disabledPrev = true;
+
+      if (countsAvailable) {
+        if (ob.start > 1) {
+          disabledPrev = false;
+        }
+      }
+      return disabledPrev;
+    },
+    disabledNext () {
+      let disabledNext = true;
+
+      if (countsAvailable) {
+        if (ob.end < ob.total) {
+          disabledNext = false;
+        }
+      }
+      return disabledNext;
+    }
+  },
+	methods: {
+  loadData(options = {}) {
+    const opts = {
+      ...options,
+      initialState: {
+        start: 1,
+        ...options.initialState,
+      },
+    };
+
+    super(opts);
+  },
+
+  className() {
+    return 'pageControlsWrapper overflowAuto';
+  },
+
+  events() {
+    return {
+                };
+  },
+
+  onClickNext() {
+    this.$emit('clickNext');
+  },
+
+  onClickPrev() {
+    this.$emit('clickPrev');
+  },
+
+  render() {
+    loadTemplate('components/pageControls.html', (t) => {
+      this.$el.html(t({
+        type: this.type,
+        ...this.getState(),
+      }));
+    });
+
+    return this;
+  }
+
+  }
 }
-
-function onClickNext () {
-  this.trigger('clickNext');
-}
-
-function onClickPrev () {
-  this.trigger('clickPrev');
-}
-
-function render () {
-  loadTemplate('components/pageControls.html', (t) => {
-    this.$el.html(t({
-      type: this.type,
-      ...this.getState(),
-    }));
-  });
-
-  return this;
-}
-
 </script>
 <style lang="scss" scoped>
 </style>

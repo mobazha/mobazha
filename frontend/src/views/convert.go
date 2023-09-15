@@ -12,8 +12,8 @@ import (
 )
 
 var baseDir = "/Users/mingfeng/dev/openbazaar/openbazaar-desktop/frontend"
-var htmlTemplateFolder = "backbone/templates/modals/purchase"
-var jsComponentFolder = "backbone/views/modals/purchase"
+var htmlTemplateFolder = "backbone/templates/components"
+var jsComponentFolder = "backbone/views/components"
 var targetVueFolder = "src/views_draft"
 
 type EventHandler struct {
@@ -150,7 +150,7 @@ func updateTemplateContent(content string) string {
 
 	// <% if (cur === ob.cryptoAmountCurrency) print('hide'); %>
 	m = regexp.MustCompile(` <% if \((.*?)\) print\('(hide)'\)(;?)\s*%>`)
-	Str = " :hidden=\"$1\""
+	Str = " v-show=\"!$1\""
 	content = m.ReplaceAllString(content, Str)
 
 	//  class="abc <% if (cur === ob.cryptoAmountCurrency) print('active')" %>
@@ -271,21 +271,21 @@ type TemplateVariable struct {
 }
 
 func applyVarsToTemplate(templateFileContent string, jsMethodsListContent string) (string, string) {
-	vars := getTemplateVars(jsMethodsListContent)
+	vars, _ := getTemplateVars(jsMethodsListContent)
 
 	for _, item := range vars {
 		m := regexp.MustCompile(`(\W)ob\.` + item.Key + `(\W)`)
 		if m.Match([]byte(templateFileContent)) {
-			jsMethodsListContent = strings.ReplaceAll(jsMethodsListContent, item.Raw, "")
+			// jsMethodsListContent = strings.ReplaceAll(jsMethodsListContent, item.Raw, "")
 
-			templateFileContent = m.ReplaceAllString(templateFileContent, "${1}"+item.Val+"${2}")
+			templateFileContent = m.ReplaceAllString(templateFileContent, "${1}params."+item.Key+"${2}")
 		}
 	}
 
 	return templateFileContent, jsMethodsListContent
 }
 
-func getTemplateVars(jsContent string) []TemplateVariable {
+func getTemplateVars(jsContent string) ([]TemplateVariable, string) {
 	vars := []TemplateVariable{}
 
 	r := regexp.MustCompile(`\n\s*this.\$el.html\(t\(\{((.*\n)+)\s*\}\)\)\;`)
@@ -307,7 +307,7 @@ func getTemplateVars(jsContent string) []TemplateVariable {
 		}
 	}
 
-	return vars
+	return vars, mappingContent
 }
 
 func capitalize(str string) string {
@@ -357,6 +357,15 @@ func walk(s string, d fs.DirEntry, err error) error {
 
 			templateFileContent, jsMethodsListContent = applyVarsToTemplate(templateFileContent, jsMethodsListContent)
 
+			_, params := getTemplateVars(jsMethodsListContent)
+			if len(params) > 0 {
+				params = `
+    params () {
+      return {` + params +
+					`      };
+    }`
+			}
+
 			rootTagName := "div"
 			if len(componentInfo.TagName) > 0 {
 				rootTagName = componentInfo.TagName
@@ -380,21 +389,25 @@ func walk(s string, d fs.DirEntry, err error) error {
 ` + header + `
 export default {
   props: {
+    options: {
+      type: Object,
+      default: {},
+	},
   },
   data () {
     return {
-      options: {},
     };
   },
   created () {
-	this.initEventChain();
+    this.initEventChain();
 
-	this.loadData(this.$props);
+    this.loadData(this.$props);
   },
   mounted () {
     this.render();
   },
-  computed: {
+  computed: {` + params +
+				`
   },
 	methods: {
 ` + jsMethodsListContent + `

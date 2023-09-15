@@ -3,65 +3,87 @@
 
     <div class="reportBtnShell toolTipNoWrap  toolTipTop" @click="onClickReportBtn" :data-tip="tipText">
       <button :class="`iconBtnTn clrP clrBr tx2 ${ob.reported ? 'reported' : ''}`">
-        <i :class="`ion-ios-flag ${ob.reported ? 'clrTErr' :''}`"></i>
+        <i :class="`ion-ios-flag ${ob.reported ? 'clrTErr' : ''}`"></i>
       </button>
     </div>
 
   </div>
 </template>
 
-<script setup>
+<script>
 import loadTemplate from '../../../backbone/utils/loadTemplate';
+import baseVw from '../baseVw';
 import { recordEvent } from '../../../backbone/utils/metrics';
 
 
-const props = defineProps({
-  phase: String,
-})
+export default {
+  props: {
+    options: {
+      type: Object,
+      default: {},
+    },
+  },
+  data () {
+    return {
+    };
+  },
+  created () {
+    this.initEventChain();
 
-const tipText = ob.reported ? ob.polyT('listingReport.btnTipReported') : ob.polyT('listingReport.btnTip');
+    this.loadData(this.$props);
+  },
+  mounted () {
+    this.render();
+  },
+  computed: {
+    params () {
+      return {
+        ...this.getState(),
+      };
+    },
+    tipText () {
+      return ob.reported ? ob.polyT('listingReport.btnTipReported') : ob.polyT('listingReport.btnTip');
+    },
+  },
+  methods: {
+    loadData (options = {}) {
+      super(options);
 
-loadData(props);
+      this._state = {
+        reported: false,
+        ...options.initialState || {},
+      };
+    },
 
-render();
+    className () {
+      return 'reportBtn';
+    },
 
-function loadData (options = {}) {
-  super(options);
+    attributes () {
+      // make it possible to tab to this element
+      return { tabIndex: 0 };
+    },
 
-  this._state = {
-    reported: false,
-    ...options.initialState || {},
-  };
-}
+    onClickReportBtn (e) {
+      e.stopPropagation();
+      if (!this.getState().reported) {
+        this.trigger('startReport');
+        recordEvent('ReportListing');
+      }
+    },
 
-function className () {
-  return 'reportBtn';
-}
 
-function attributes () {
-  // make it possible to tab to this element
-  return { tabIndex: 0 };
-}
+    render () {
+      loadTemplate('components/reportBtn.html', (t) => {
+        this.$el.html(t({
+          ...this.getState(),
+        }));
+      });
 
-function onClickReportBtn (e) {
-  e.stopPropagation();
-  if (!this.getState().reported) {
-    this.trigger('startReport');
-    recordEvent('ReportListing');
+      return this;
+    }
+
   }
 }
-
-
-function render () {
-  loadTemplate('components/reportBtn.html', (t) => {
-    this.$el.html(t({
-      ...this.getState(),
-    }));
-  });
-
-  return this;
-}
-
 </script>
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>

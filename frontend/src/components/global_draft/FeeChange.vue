@@ -6,53 +6,73 @@
   </div>
 </template>
 
-<script setup>
+<script>
 import app from '../../../backbone/app';
 import { launchSettingsModal } from '../../../backbone/utils/modalManager';
 import loadTemplate from '../../../backbone/utils/loadTemplate';
 
 
-const props = defineProps({
-  phase: String,
-})
+export default {
+  props: {
+    options: {
+      type: Object,
+      default: {},
+	},
+  },
+  data () {
+    return {
+    };
+  },
+  created () {
+    this.initEventChain();
 
-loadData(props);
+    this.loadData(this.$props);
+  },
+  mounted () {
+    this.render();
+  },
+  computed: {
+    params () {
+      return {
+        ...this.getState(),
+      };
+    }
+  },
+	methods: {
+  loadData(options = {}) {
+    const opts = {
+      initialState: {
+        feeLevel: app.localSettings.get('defaultTransactionFee'),
+        feeLevelClass: 'txB',
+        changeLinkClass: 'btnAsLink clrT2',
+      },
+      ...options,
+    };
 
-render();
+    super(opts);
 
-function loadData (options = {}) {
-  const opts = {
-    initialState: {
-      feeLevel: app.localSettings.get('defaultTransactionFee'),
-      feeLevelClass: 'txB',
-      changeLinkClass: 'btnAsLink clrT2',
-    },
-    ...options,
-  };
+    this.listenTo(app.localSettings, 'change:defaultTransactionFee', (md, val) => this.setState({ feeLevel: val }));
+  },
 
-  super(opts);
+  onClickChangeFee() {
+    launchSettingsModal({
+      initialTab: 'Advanced',
+      scrollTo: '.js-feeSection',
+    });
+  },
 
-  this.listenTo(app.localSettings, 'change:defaultTransactionFee',
-    (md, val) => this.setState({ feeLevel: val }));
+  render() {
+    loadTemplate('components/feeChange.html', (t) => {
+      this.$el.html(t({
+        ...this.getState(),
+      }));
+    });
+
+    return this;
+  }
+
+  }
 }
-
-function onClickChangeFee () {
-  launchSettingsModal({
-    initialTab: 'Advanced',
-    scrollTo: '.js-feeSection',
-  });
-}
-
-function render () {
-  loadTemplate('components/feeChange.html', (t) => {
-    this.$el.html(t({
-      ...this.getState(),
-    }));
-  });
-
-  return this;
-}
-
 </script>
 <style lang="scss" scoped>
 </style>

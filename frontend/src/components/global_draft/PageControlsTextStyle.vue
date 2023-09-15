@@ -22,48 +22,74 @@
   </div>
 </template>
 
-<script setup>
+<script>
 import loadTemplate from '../../../backbone/utils/loadTemplate';
 
 
-const props = defineProps({
-  phase: String,
-})
+export default {
+  props: {
+    options: {
+      type: Object,
+      default: {},
+	},
+  },
+  data () {
+    return {
+    };
+  },
+  created () {
+    this.initEventChain();
 
-loadData(props);
+    this.loadData(this.$props);
+  },
+  mounted () {
+    this.render();
+  },
+  computed: {
+    params () {
+      return {
+        ...this.getState(),
+      };
+    }
+  },
+	methods: {
+  loadData(options = {}) {
+    const opts = {
+      ...options,
+      initialState: {
+        start: 1,
+        ...options.initialState,
+      },
+    };
 
-render();
+    super(opts);
+  },
 
-function loadData (options = {}) {
-  const opts = {
-    ...options,
-    initialState: {
-      start: 1,
-      ...options.initialState,
-    },
-  };
+  events() {
+    return {
+                };
+  },
 
-  super(opts);
+  onClickNext() {
+    this.$emit('clickNext');
+  },
+
+  onClickPrev() {
+    this.$emit('clickPrev');
+  },
+
+  render() {
+    loadTemplate('components/pageControlsTextStyle.html', (t) => {
+      this.$el.html(t({
+        ...this.getState(),
+      }));
+    });
+
+    return this;
+  }
+
+  }
 }
-
-function onClickNext () {
-  this.trigger('clickNext');
-}
-
-function onClickPrev () {
-  this.trigger('clickPrev');
-}
-
-function render () {
-  loadTemplate('components/pageControlsTextStyle.html', (t) => {
-    this.$el.html(t({
-      ...this.getState(),
-    }));
-  });
-
-  return this;
-}
-
 </script>
 <style lang="scss" scoped>
 </style>

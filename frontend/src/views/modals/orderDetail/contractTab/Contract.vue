@@ -1,15 +1,15 @@
 <template>
   <section>
-    <div v-if="ob.heading">
-      <h1 class="tx4 txB row">{{ ob.heading }}</h1>
+    <div v-if="info.heading">
+      <h1 class="tx4 txB row">{{ info.heading }}</h1>
     </div>
-    <div v-if="ob.errors && ob.errors.length">
+    <div v-if="info.errors && info.errors.length">
       <p class="txUnl rowSm clrTErr"><span class="ion-alert-circled padSm"></span>{{ ob.polyT('orderDetail.contractTab.contractErrorHeading') }}</p>
       <ul class="row">
-        <li v-for="(err, j) in ob.errors" :key="j" class="clrTErr rowSm">${err}</li>
+        <li v-for="(err, j) in info.errors" :key="j" class="clrTErr rowSm">${err}</li>
       </ul>
     </div>
-    <div class="border clrBr clrP clrT rowLg js-jsonContractContainer"></div>
+    <div class="border clrBr clrP clrT rowLg js-jsonContractContainer" @click.stop></div>
 
     <div class="flexHRight">
       <div class="posR">
@@ -28,12 +28,19 @@ import renderjson from '../../../../../backbone/lib/renderjson.js';
 import 'velocity-animate';
 
 export default {
+  props: {
+    options: {
+      type: Object,
+      default: {},
+    },
+  },
   data () {
     return {
+      info: {},
     };
   },
   created () {
-    this.loadData(this.$props);
+    this.loadData(this.$props.options);
   },
   mounted () {
     this.render();
@@ -56,7 +63,7 @@ export default {
       }
 
       this.contract = options.contract;
-      this.options = opts;
+      this.info = opts;
     },
 
     onClickCopyContract () {

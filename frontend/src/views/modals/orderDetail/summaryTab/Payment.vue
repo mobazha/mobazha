@@ -53,7 +53,7 @@
                   <div v-else>
                     <div class="posR">
                       <a class="txU tx6" :disabled="ob.acceptInProgress" @click="onClickRejectOrder">{{ ob.polyT('orderDetail.summaryTab.payment.rejectBtn') }}</a>
-                      <div class=" confirmBox rejectConfirm tx5 arrowBoxTop clrBr clrP clrT" @click="onClickRejectConfirmBox" :hidden="!ob.rejectConfirmOn">
+                      <div class=" confirmBox rejectConfirm tx5 arrowBoxTop clrBr clrP clrT" @click="onClickRejectConfirmBox" v-show="ob.rejectConfirmOn">
                         <div class="tx3 txB rowSm">{{ ob.polyT('orderDetail.summaryTab.payment.rejectConfirm.title') }}</div>
                         <p>
                           {{

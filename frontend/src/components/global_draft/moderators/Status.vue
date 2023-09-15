@@ -1,6 +1,6 @@
 <template>
   <div class="moderatorStatus">
-    <div class="moderatorsStatus flexCent gutterHTn tx6 clrBr clrP <% if(ob.hidden) print('hide') %>">
+    <div class="moderatorsStatus flexCent gutterHTn tx6 clrBr clrP" v-show="!ob.hidden">
       <SpinnerSVG v-if="ob.showSpinner && ob.loading" className="spinnerTxt js-spinner" />
       <span class="clrT4">{{ statusInfo }}</span>
 

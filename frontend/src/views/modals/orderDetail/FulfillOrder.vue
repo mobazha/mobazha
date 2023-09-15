@@ -17,7 +17,7 @@
           <div class="col7">
             <FormError v-if="errors['physicalDelivery.shipper']" :errors="errors['physicalDelivery.shipper']" />
             <input type="text" class="clrBr clrSh2" name="physicalDelivery.shipper" id="fulfillOrderShippingCarrier"
-              :value="info.physicalDelivery.shipper"
+              v-model="info.physicalDelivery.shipper"
               :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.shippingCarrierPlaceholder`)" />
           </div>
         </div>
@@ -29,7 +29,7 @@
             <FormError v-if="errors['physicalDelivery.trackingNumber']"
               :errors="errors['physicalDelivery.trackingNumber']" />
             <input type="text" class="clrBr clrSh2" name="physicalDelivery.trackingNumber" id="fulfillOrderTrackingNumber"
-              :value="info.physicalDelivery.trackingNumber"
+              v-model="info.physicalDelivery.trackingNumber"
               :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.trackingPlaceholder`)" />
           </div>
         </div>
@@ -44,7 +44,7 @@
           <div class="col7">
             <FormError v-if="errors['digitalDelivery.url']" :errors="errors['digitalDelivery.url']" />
             <input type="text" class="clrBr clrSh2" name="digitalDelivery.url" id="fulfillOrderFileUrl"
-              :value="info.digitalDelivery.url" :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.fileUrlPlaceholder`)" />
+              v-model="info.digitalDelivery.url" :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.fileUrlPlaceholder`)" />
           </div>
         </div>
         <div class="flexRow gutterH">
@@ -54,7 +54,7 @@
           <div class="col7">
             <FormError v-if="errors['digitalDelivery.password']" :errors="errors['digitalDelivery.password']" />
             <input type="text" class="clrBr clrSh2" name="digitalDelivery.password" id="fulfillOrderPassword"
-              :value="info.digitalDelivery.password"
+              v-model="info.digitalDelivery.password"
               :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.passwordPlaceholder`)" />
           </div>
         </div>
@@ -70,7 +70,7 @@
             <FormError v-if="errors['cryptocurrencyDelivery.transactionID']" :errors="errors['cryptocurrencyDelivery.transactionID']" />
             <input type="text" class="clrBr clrSh2" name="cryptocurrencyDelivery.transactionID"
               id="fulfillOrderTransactionID"
-              :value="info.cryptocurrencyDelivery.transactionID"
+              v-model="info.cryptocurrencyDelivery.transactionID"
               :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.transactionIDPlaceholder`)"
               :maxlength="constraints.transactionIDLength" />
           </div>
@@ -129,6 +129,12 @@ export default {
   data () {
     return {
       model: {},
+      info: {
+        physicalDelivery: {},
+        digitalDelivery: {},
+        cryptocurrencyDelivery: {},
+        note: '',
+      },
 
       processing: fulfillingOrder(this.orderID),
     };
@@ -145,26 +151,13 @@ export default {
     // this.$el.find('select, input, textarea')[0].focus();
   },
   computed: {
-    info () {
-      if (typeof this.model.toJSON === 'function') {
-        return this.model.toJSON();
-      }
-      return {
-        physicalDelivery: {},
-        digitalDelivery: {},
-        cryptocurrencyDelivery: {},
-      }
-    },
     errors () {
       return this.model.validationError || {};
     },
 
-    cryptoDelivery () {
-      return this.model.get('cryptocurrencyDelivery');
-    },
-
     constraints () {
-      return this.cryptoDelivery && this.cryptoDelivery.constraints || {};
+      const cryptoDelivery = this.model.get('cryptocurrencyDelivery');
+      return cryptoDelivery && cryptoDelivery.constraints || {};
     },
   },
   methods: {
@@ -195,8 +188,7 @@ export default {
     },
 
     onClickSubmit () {
-      const formData = this.getFormData();
-      this.model.set(formData);
+      this.model.set(this.info);
       this.model.set({}, { validate: true });
 
       if (!this.model.validationError) {

@@ -18,7 +18,9 @@
         <div class="flex gutterH">
           <div class="tabColumn gutterV">
             <div class="contentBox clrP clrBr clrSh3 tx4 featuredProfile js-featuredProfile"
-              :disabled="isFetching || fetchFailed"></div>
+              :disabled="isFetching || fetchFailed">
+              <ProfileBox :options="profileBoxOptions"/>
+            </div>
             <div class="contentBox padMd clrP clrBr clrSh3" :disabled="isFetching || fetchFailed">
               <h1 class="h4 txUp clrT">{{ ob.polyT('tabMenuHeading') }}</h1>
               <div class="boxList tx4 clrTx1Br tabHeads">
@@ -29,7 +31,7 @@
                 <a :class="`tab row ${activeTab === 'contract' ? 'clrT active' : ''}`" @click="selectTab('contract')">{{ ob.polyT('orderDetail.navMenu.contract') }}</a>
               </div>
             </div>
-            <div class="mainCtaWrap hide" :hidden="isFetching || fetchFailed">
+            <div class="mainCtaWrap hide" v-show="!isFetching && !fetchFailed">
               <ProcessingButton className="btn clrBAttGrad clrBrDec1 clrTOnEmph" btnText="Accept Order"/>
             </div>
             <div class="js-actionBarContainer"></div>
@@ -96,13 +98,17 @@
                   />
                   <DisputeOrder
                     v-if="activeTab === 'disputeOrder'"
-                    :orderID="model.id"
-                    :contractType="contract.type"
-                    :timeoutMessage="disputeTimeoutMessage"
-                    :moderator="{
-                      id: model.moderatorID,
-                      getProfile: getModeratorProfile.bind(this),
+                    :options="disputeOrderOptions"
+                    @clickBackToSummary="() => {
+                      selectTab('summary');
                     }"
+                    @clickCancel="() => {
+                      selectTab('summary');
+                    }"
+                  />
+                  <ResolveDispute
+                    v-if="activeTab === 'resolveDispute'"
+                    :options="resolveDisputeOptions"
                     @clickBackToSummary="() => {
                       selectTab('summary');
                     }"
@@ -125,7 +131,6 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import app from '../../../../backbone/app';
-import { capitalize } from '../../../../backbone/utils/string';
 import { getSocket } from '../../../../backbone/utils/serverConnect';
 import { getCurrencyByCode as getWalletCurByCode } from '../../../../backbone/data/walletCurrencies';
 import {
@@ -136,9 +141,7 @@ import { getCachedProfiles } from '../../../../backbone/models/profile/Profile';
 import { recordEvent } from '../../../../backbone/utils/metrics';
 import Case from '../../../../backbone/models/order/Case';
 import ResolveDisputeMd from '../../../../backbone/models/order/ResolveDispute';
-import ProfileBox from '../../../../backbone/views/modals/orderDetail/ProfileBox';
 
-import ResolveDispute from '../../../../backbone/views/modals/orderDetail/ResolveDispute';
 import ActionBar from '../../../../backbone/views/modals/orderDetail/ActionBar';
 import ContractMenuItem from '../../../../backbone/views/modals/orderDetail/ContractMenuItem';
 
@@ -147,6 +150,8 @@ import Discussion from './Discussion.vue';
 import ContractTab from './contractTab/ContractTab.vue';
 import FulfillOrder from './FulfillOrder.vue';
 import DisputeOrder from './DisputeOrder.vue'
+import ResolveDispute from './ResolveDispute.vue'
+import ProfileBox from './ProfileBox.vue'
 
 import { toRaw } from 'vue';
 
@@ -159,6 +164,8 @@ export default {
     ContractTab,
     FulfillOrder,
     DisputeOrder,
+    ResolveDispute,
+    ProfileBox,
   },
   mixins: [baseModal],
   props: {
@@ -169,6 +176,9 @@ export default {
       fetchFailed: false,
       fetchError: '',
       activeTab: 'summary',
+
+      featuredProfileMd: undefined,
+      featuredProfilePeerID: '',
 
       tabViewData: {},
 
@@ -243,10 +253,11 @@ export default {
       count = count > 99 ? '…' : count;
       return count;
     },
-    disputeTimeoutMessage () {
+    disputeOrderOptions () {
+      const model = new OrderDispute({ orderID: this.model.id });
+      const translationKeySuffix = app.profile.id === this.model.buyerID ? 'Buyer' : 'Vendor';
       let timeoutMessage = '';
 
-      const translationKeySuffix = app.profile.id === this.model.buyerID ? 'Buyer' : 'Vendor';
       try {
         timeoutMessage = getWalletCurByCode(this.model.paymentCoin).supportsEscrowTimeout
           ? app.polyglot.t(
@@ -257,8 +268,56 @@ export default {
       } catch (e) {
         // pass
       }
-      return timeoutMessage;
-    }
+
+      return {
+        model,
+        contractType: this.contract.type,
+        moderator: {
+          id: this.model.moderatorID,
+          getProfile: this.getModeratorProfile.bind(this),
+        },
+        timeoutMessage,
+      }
+    },
+    resolveDisputeOptions () {
+      let modelAttrs = { orderID: this.model.id };
+      const isResolvingDispute = resolvingDispute(this.model.id);
+
+      // If this order is in the process of the dispute being resolved, we'll
+      // populate the model with the data that was posted to the server.
+      if (isResolvingDispute) {
+        modelAttrs = {
+          ...modelAttrs,
+          ...isResolvingDispute.data,
+        };
+      }
+
+      const model = new ResolveDisputeMd(modelAttrs, {
+        buyerContractArrived: () => !!this.model.get('buyerContract'),
+        vendorContractArrived: () => !!this.model.get('vendorContract'),
+        vendorProcessingError: () => this.model.vendorProcessingError,
+      });
+
+      return {
+        model,
+        case: this.model,
+        vendor: {
+          id: this.model.vendorID,
+          getProfile: this.getVendorProfile.bind(this),
+        },
+        buyer: {
+          id: this.model.buyerID,
+          getProfile: this.getBuyerProfile.bind(this),
+        },
+      };
+    },
+    profileBoxOptions () {
+      return {
+        model: this.featuredProfileMd || null,
+        isFetching: !this.featuredProfilePeerID,
+        peerID: this.featuredProfilePeerID,
+      };
+    },
   },
   methods: {
     loadData (opts = {}) {
@@ -500,54 +559,7 @@ export default {
       }
     },
 
-    createResolveDisputeTabView () {
-      let modelAttrs = { orderID: this.model.id };
-      const isResolvingDispute = resolvingDispute(this.model.id);
-
-      // If this order is in the process of the dispute being resolved, we'll
-      // populate the model with the data that was posted to the server.
-      if (isResolvingDispute) {
-        modelAttrs = {
-          ...modelAttrs,
-          ...isResolvingDispute.data,
-        };
-      }
-
-      const model = new ResolveDisputeMd(modelAttrs, {
-        buyerContractArrived: () => !!this.model.get('buyerContract'),
-        vendorContractArrived: () => !!this.model.get('vendorContract'),
-        vendorProcessingError: () => this.model.vendorProcessingError,
-      });
-
-      const view = this.createChild(ResolveDispute, {
-        model,
-        case: this.model,
-        vendor: {
-          id: this.model.vendorID,
-          getProfile: this.getVendorProfile.bind(this),
-        },
-        buyer: {
-          id: this.model.buyerID,
-          getProfile: this.getBuyerProfile.bind(this),
-        },
-      });
-
-      this.listenTo(view, 'clickBackToSummary clickCancel', () => this.selectTab('summary'));
-
-      return view;
-    },
-
     render () {
-      if (this.featuredProfile) this.featuredProfile.remove();
-      this.featuredProfile = this.createChild(ProfileBox, {
-        model: this.featuredProfileMd || null,
-        initialState: {
-          isFetching: !this.featuredProfilePeerID,
-          peerID: this.featuredProfilePeerID,
-        },
-      });
-      $('.js-featuredProfile').html(this.featuredProfile.render().el);
-
       if (!this.isFetching && !this.fetchError) {
         this.selectTab(this.activeTab);
 

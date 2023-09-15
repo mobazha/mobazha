@@ -21,23 +21,22 @@ import app from '../../../../backbone/app';
 
 export default {
   props: {
+    options: {
+      type: Object,
+      default: {
+        peerID: '',
+      },
+    },
   },
   data () {
     return {
-      modInfo: {
-        showAvatar: false,
-        avatarHashes: [],
-        name: '',
-        peerID: '',
-        handle: '',
-        maxPeerIDLength: 8,
-      }
+      modInfo: {}
     };
   },
   created () {
     this.initEventChain();
     
-    this.loadData(this.$props);
+    this.loadData(this.$props.options);
   },
   mounted () {
     this.render();
@@ -46,8 +45,7 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-
-      this.options = options;
+      this.modInfo = options;
       this.verifiedModModel = app.verifiedMods.get(this.modInfo.peerID);
 
       this.listenTo(app.verifiedMods, 'update', () => {
@@ -60,7 +58,6 @@ export default {
     },
 
     render () {
-
       const verifiedMod = app.verifiedMods.get(this.modInfo.peerID);
       const createOptions = getModeratorOptions({
         model: verifiedMod,

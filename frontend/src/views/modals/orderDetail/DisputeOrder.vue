@@ -30,9 +30,9 @@
             class="clrBr clrP clrSh2 row"
             id="fulfillOrderNote"
             :placeholder="ob.polyT(`orderDetail.disputeOrderTab.reasonPlaceholder`)"
-            v-model="info.reason" />
+            v-model="claim" />
           <p class="clrT2 txSm">{{ ob.polyT(`orderDetail.disputeOrderTab.reasonHelperText`) }}</p>
-          <p v-if="timeoutMessage" class="clrT2 txSm">{{ timeoutMessage }}</p>
+          <p v-if="options.timeoutMessage" class="clrT2 txSm">{{ options.timeoutMessage }}</p>
         </div>
       </div>
     </form>
@@ -52,7 +52,6 @@ import {
   openDispute,
   events as orderEvents,
 } from '../../../../backbone/utils/order';
-import OrderDispute from '../../../../backbone/models/order/OrderDispute';
 import { recordEvent } from '../../../../backbone/utils/metrics';
 import { checkValidParticipantObject } from '../../../utils/utils';
 import ModFragment from './ModFragment.vue';
@@ -62,22 +61,22 @@ export default {
   components: {
     ModFragment,
   },
-  mixins: [],
   props: {
-    orderID: String,
-    contractType: String,
-    moderator: Object,
-    timeoutMessage: String,
+    options: {
+      type: Object,
+      default: {},
+    },
   },
   data () {
     return {
+      claim: '',
       openingDispute: false,
     };
   },
   created () {
-    this.model = new OrderDispute({ orderID: this.orderID });
+    this.initEventChain();
 
-    this.loadData();
+    this.loadData(this.$props.options);
   },
   mounted () {
     this.render();
@@ -85,12 +84,6 @@ export default {
     this.$refs.clamTextAread.focus();
   },
   computed: {
-    info () {
-      if (typeof this.model.toJSON === 'function') {
-        return this.model.toJSON();
-      }
-      return {}
-    },
     errors () {
       return this.model.validationError || {};
     },
@@ -103,14 +96,15 @@ export default {
     },
   },
   methods: {
-    loadData () {
+    loadData (options = {}) {
+      this.model = options.model;
       if (!this.model) {
         throw new Error('Please provide a DisputeOrder model.');
       }
 
-      checkValidParticipantObject(this.moderator, 'moderator');
+      checkValidParticipantObject(options.moderator, 'moderator');
 
-      this.moderator.getProfile()
+      options.moderator.getProfile()
         .done((modProfile) => {
           this.modProfile = modProfile;
         });
@@ -134,9 +128,7 @@ export default {
     },
 
     onClickSubmit () {
-      const formData = this.getFormData();
-      this.model.set(formData);
-      this.model.set({}, { validate: true });
+      this.model.set({ claim: this.claim }, { validate: true });
 
       if (!this.model.validationError) {
         recordEvent('OrderDetails_DisputeSubmit');

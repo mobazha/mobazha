@@ -8,16 +8,22 @@
     </div>
     <hr class="clrBr rowLg" />
     <div class="js-statusContainer rowLg"></div>
+    <div v-for="(contract, key) in contracts" :key="key">
+      <Contract :options="model.isCase ? contractOptions(contract) : { contract }"/>
+    </div>
   </div>
 </template>
 
 <script>
 import $ from 'jquery';
 import app from '../../../../../backbone/app';
-import Contract from '../../../../../backbone/views/modals/orderDetail/contractTab/Contract';
+import Contract from './Contract.vue';
 
 
 export default {
+  components: {
+    Contract,
+  },
   props: {
     model: {
       type: Object,
@@ -26,13 +32,14 @@ export default {
   },
   data () {
     return {
+      contracts: [],
     };
   },
   created () {
     this.loadData();
   },
   mounted () {
-    this.render();
+    this.loadContracts();
   },
   computed: {
   },
@@ -58,18 +65,8 @@ export default {
       }
     },
 
-    events () {
-      return {
-        'click .renderjson a': 'onClickRenderjsonLink',
-      };
-    },
-
     onClickBackToSummary () {
       this.$emit('clickBackToSummary');
-    },
-
-    onClickRenderjsonLink () {
-      return false;
     },
 
     renderStatus () {
@@ -107,7 +104,7 @@ export default {
       $('.js-statusContainer').html(msg);
     },
 
-    renderContract (contract) {
+    contractOptions (contract) {
       if (!contract) {
         throw new Error('Please provide a contract.');
       }
@@ -120,31 +117,25 @@ export default {
           app.polyglot.t('orderDetail.contractTab.contractHeadingBuyer') :
           app.polyglot.t('orderDetail.contractTab.contractHeadingVendor');
       }
-
-      const view = this[`${isBuyerContract ? 'buyer' : 'vendor'}ContractVw`] =
-        this.createChild(Contract, {
-          contract,
-          initialState: {
-            heading,
-            errors: isBuyerContract ?
-              this.model.get('buyerContractValidationErrors') || [] :
-              this.model.get('vendorContractValidationErrors') || [],
-          },
-        });
-
-      this.$el.append(view.render().el);
+      
+      return {
+        contract,
+        initialState: {
+          heading,
+          errors: isBuyerContract ?
+            this.model.get('buyerContractValidationErrors') || [] :
+            this.model.get('vendorContractValidationErrors') || [],
+        },
+      };
     },
 
-    render () {
+    loadContracts () {
       this.renderStatus();
 
       if (!this.model.isCase) {
-        this.contractVw = this.createChild(Contract, {
-          contract: this.model.get('rawContract'),
-        });
-        this.$el.append(this.contractVw.render().el);
+        this.contracts.push(this.model.get('rawContract'));
       } else {
-        const contracts = [
+        this.contracts = [
           this.model.get('buyerOpened') ?
             this.model.get('rawBuyerContract') :
             this.model.get('rawVendorContract'),
@@ -155,19 +146,14 @@ export default {
           // both have validation errors.
           if (this.model.get('buyerOpened')) {
             if (this.model.get('vendorContract')) {
-              contracts.push(this.model.get('rawVendorContract'));
+              this.contracts.push(this.model.get('rawVendorContract'));
             }
           } else if (this.model.get('buyerContract')) {
-            contracts.push(this.model.get('rawBuyerContract'));
+            this.contracts.push(this.model.get('rawBuyerContract'));
           }
         }
-
-        contracts.forEach(contract => this.renderContract(contract));
       }
-
-      return this;
     }
-
   }
 }
 </script>

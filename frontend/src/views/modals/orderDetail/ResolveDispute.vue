@@ -1,5 +1,7 @@
 <template>
-  <div class="resolveDisputeTab">
+  <div
+    :class="`resolveDisputeTab ${buyerContractUnavailable ? 'buyerContractUnavailable' : ''} ${vendorContractUnavailable ? 'vendorContractUnavailable' : ''} ${ this.case.vendorProcessingError ? 'vendorProcessingError' : ''}`"
+    @click="onDocumentClick">
     <div class="padLg flexVCent">
       <div class="backToSummaryWrap">
         <a class="clrTEm txU" @click="onClickBackToSummary">{{ ob.polyT(`orderDetail.backToSummary`) }}</a>
@@ -12,14 +14,14 @@
         <div class="col3">
           <label for="resolveDisputeBuyerAmount" class="required rowTn">{{
             ob.polyT(`orderDetail.resolveDisputeTab.buyerAmountLabel`) }}</label>
-          <div class="clrT2 tx6">{{ buyerProfile?.get('name') }}</div>
+          <div class="clrT2 tx6">{{ buyerProfile.name }}</div>
         </div>
         <div class="col9">
           <FormError v-if="errors['buyerPercentage']" :errors="errors['buyerPercentage']" />
           <div class="flex gutterH">
             <div class="inputBuyerAmountWrap flexNoShrink">
-              <input type="text" class="clrBr clrSh2" name="buyerPercentage" id="resolveDisputeBuyerAmount" :value="disputeInfo.buyerPercentage" placeholder="" data-var-type="number" />
-              <div class="avatar disc clrBr2 clrSh1" :style="ob.getAvatarBgImage(buyerProfile?.get('avatarHashes').toJSON())"></div>
+              <input type="text" class="clrBr clrSh2" name="buyerPercentage" id="resolveDisputeBuyerAmount" v-model="buyerPercentage" placeholder="" data-var-type="number" />
+              <div class="avatar disc clrBr2 clrSh1" :style="ob.getAvatarBgImage(buyerProfile.avatarHashes)"></div>
             </div>
             <p class="buyerContractUnarrivedMsg"><i class="ion-alert-circled margRSm clrTAlert"></i>{{ ob.polyT(`orderDetail.resolveDisputeTab.buyerContractUnavailable`) }} <span class="toolTip clrT" :data-tip="ob.polyT(`orderDetail.resolveDisputeTab.buyerContractUnavailableTip`)"><i class="ion-help-circled"></i></span></p>
           </div>
@@ -28,14 +30,14 @@
       <div class="flexRow gutterH">
         <div class="col3">
           <label for="resolveDisputeVendorAmount" class="required rowTn">{{ ob.polyT(`orderDetail.resolveDisputeTab.vendorAmountLabel`) }}</label>
-          <div class="clrT2 tx6 js-vendorName">{{ vendorProfile?.get('name') }}</div>
+          <div class="clrT2 tx6 js-vendorName">{{ vendorProfile.name }}</div>
         </div>
         <div class="col9">
           <FormError v-if="errors['vendorPercentage']" :errors="errors['vendorPercentage']" />
           <div class="flex gutterH">
             <div class="inputVendorAmountWrap js-inputVendorWrap flexNoShrink">
-              <input type="text" class="clrBr clrSh2" name="vendorPercentage" id="resolveDisputeVendorAmount" :value="disputeInfo.vendorPercentage" placeholder="" data-var-type="number" />
-              <div class="avatar disc clrBr2 clrSh1" :style="ob.getAvatarBgImage(vendorProfile?.get('avatarHashes').toJSON())">
+              <input type="text" class="clrBr clrSh2" name="vendorPercentage" id="resolveDisputeVendorAmount" v-model="vendorPercentage" placeholder="" data-var-type="number" />
+              <div class="avatar disc clrBr2 clrSh1" :style="ob.getAvatarBgImage(vendorProfile.avatarHashes)">
               </div>
             </div>
             <p class="vendorContractUnarrivedMsg">
@@ -59,19 +61,19 @@
         <div class="col7">
           <FormError v-if="errors['resolution']" :errors="errors['resolution']" />
           <textarea rows="6" name="resolution" class="clrBr clrP clrSh2" id="resolveDisputeComment"
-            :placeholder="ob.polyT(`orderDetail.resolveDisputeTab.commentPlaceholder`)" v-model="disputeInfo.resolution" />
+            :placeholder="ob.polyT(`orderDetail.resolveDisputeTab.commentPlaceholder`)" v-model="resolution" />
         </div>
       </div>
     </form>
     <hr class="clrBr" />
     <div class="buttonBar flexHRight flexVCent gutterHLg">
-      <a class="js-cancel" :disabled="disputeInfo.resolvingDispute" @click="onClickCancel">{{ ob.polyT(`orderDetail.resolveDisputeTab.btnCancel`) }}</a>
+      <a class="js-cancel" :disabled="resolvingDispute" @click="onClickCancel">{{ ob.polyT(`orderDetail.resolveDisputeTab.btnCancel`) }}</a>
       <div class="posR">
         <ProcessingButton
-          :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph js-submit ${disputeInfo.resolvingDispute ? 'processing' : ''}`"
+          :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph js-submit ${resolvingDispute ? 'processing' : ''}`"
           :btnText="ob.polyT(`orderDetail.resolveDisputeTab.btnSubmit`)" @click="onClickSubmit" />
         <div class="js-resolveConfirm confirmBox resolveConfirm tx5 arrowBoxBottom clrBr clrP clrT"
-          :hidden="!disputeInfo.resolveConfirmOn" @click="onClickResolveConfirmBox">
+          v-show="resolveConfirmOn" @click="onClickResolveConfirmBox">
           <div class="tx3 txB rowSm">{{ ob.polyT('orderDetail.resolveDisputeTab.resolveConfirm.title') }}</div>
           <p>{{ ob.polyT('orderDetail.resolveDisputeTab.resolveConfirm.body') }}</p>
           <hr class="clrBr row" />
@@ -99,21 +101,30 @@ import { checkValidParticipantObject } from '../../../utils/utils';
 export default {
   mixins: [],
   props: {
+    options: {
+      type: Object,
+      default: {},
+    },
   },
   data () {
     return {
-      disputeInfo: {
-        buyerPercentage: 0,
-        vendorName: '',
-        vendorPercentage: 0,
-        resolution: '',
-        resolvingDispute: false,
-        resolveConfirmOn: false,
-      }
+      case: {},
+      buyerProfile: {},
+      vendorProfile: {},
+      buyerPercentage: 0,
+      vendorPercentage: 0,
+      resolution: '',
+      resolvingDispute: false,
+      resolveConfirmOn: false,
+
+      buyerContractUnavailable: true,
+      vendorContractUnavailable: true,
     };
   },
   created () {
-    this.loadData(this.$props);
+    this.initEventChain();
+
+    this.loadData(this.$props.options);
   },
   mounted () {
     this.render();
@@ -122,13 +133,10 @@ export default {
     errors() {
       return this.model.validationError || {};
     },
-
-    resolvingDispute() {
-      return resolvingDispute(this.model.id);
-    },
   },
   methods: {
     loadData (options = {}) {
+      this.model = options.model;
       if (!this.model) {
         throw new Error('Please provide an ResolveDispute model.');
       }
@@ -137,29 +145,27 @@ export default {
         throw new Error('Please provide a Case model.');
       }
 
+      this.resolvingDispute = resolvingDispute(this.model.id);
+
       this.case = options.case;
 
       checkValidParticipantObject(options.buyer, 'buyer');
       checkValidParticipantObject(options.vendor, 'vendor');
 
       options.buyer.getProfile().done(profile => {
-        this.buyerProfile = profile;
+        this.buyerProfile = profile?.toJSON() || {};
       });
 
       options.vendor.getProfile().done(profile => {
-        this.vendorProfile = profile;
+        this.vendorProfile = profile?.toJSON() || {};
       });
 
       this.listenTo(orderEvents, 'resolvingDispute', this.onResolvingDispute);
-      this.listenTo(orderEvents, 'resolveDisputeComplete resolveDisputeFail',
-        this.onResolveDisputeAlways);
-      this.listenTo(this.case, 'otherContractArrived', (md, data) => {
-        const type = data.isBuyer ? 'buyer' : 'vendor';
-        this.$el.toggleClass(`${type}ContractUnavailable`, !this.case.get(`${type}Contract`));
+      this.listenTo(orderEvents, 'resolveDisputeComplete resolveDisputeFail', this.onResolveDisputeAlways);
+      this.listenTo(this.case, 'otherContractArrived', () => {
+        this.buyerContractUnavailable = !this.case.get('buyerContract');
+        this.vendorContractUnavailable = !this.case.get('vendorContract');
       });
-
-      this.boundOnDocClick = this.onDocumentClick.bind(this);
-      $(document).on('click', this.boundOnDocClick);
     },
 
     onClickResolveConfirmBox () {
@@ -170,11 +176,11 @@ export default {
 
     onClickCancelConfirm () {
       recordEvent('OrderDetails_DisputeResolveConfirmCancel');
-      $('.js-resolveConfirm').addClass('hide');
+      this.resolveConfirmOn = false;
     },
 
     onDocumentClick () {
-      $('.js-resolveConfirm').addClass('hide');
+      this.resolveConfirmOn = false;
     },
 
     onClickBackToSummary () {
@@ -192,17 +198,16 @@ export default {
     },
 
     onClickSubmit () {
-      $('.js-resolveConfirm').removeClass('hide');
+      this.resolveConfirmOn = true;
       recordEvent('OrderDetails_DisputeResolveSubmit');
       return false;
     },
 
     onClickConfirmedSubmit () {
-      const formData = this.getFormData();
-      this.model.set(formData);
       this.model.set({
-        buyerPercentage: this.case.get('buyerContract') ? formData.buyerPercentage : 0,
-        vendorPercentage: this.case.get('vendorContract') ? formData.vendorPercentage : 0,
+        buyerPercentage: this.case.get('buyerContract') ? this.buyerPercentage : 0,
+        vendorPercentage: this.case.get('vendorContract') ? this.vendorPercentage : 0,
+        resolution: this.resolution,
       }, { validate: true });
 
       if (!this.model.validationError) {
@@ -217,26 +222,19 @@ export default {
 
     onResolvingDispute (e) {
       if (e.id === this.model.id) {
-        $('.js-submit').addClass('processing');
-        $('.js-cancel').addClass('disabled');
+        this.resolvingDispute = true;
       }
     },
 
     onResolveDisputeAlways (e) {
       if (e.id === this.model.id) {
-        $('.js-submit').removeClass('processing');
-        $('.js-cancel').removeClass('disabled');
+        this.resolvingDispute = false;
       }
     },
 
-    remove () {
-      $(document).off('click', this.boundOnDocClick);
-    },
-
     render () {
-      this.$el.toggleClass('vendorContractUnavailable', !this.case.get('vendorContract'));
-      this.$el.toggleClass('buyerContractUnavailable', !this.case.get('buyerContract'));
-      this.$el.toggleClass('vendorProcessingError', this.case.vendorProcessingError);
+      this.buyerContractUnavailable = !this.case.get('buyerContract');
+      this.vendorContractUnavailable = !this.case.get(`vendorContract`);
 
       return this;
     }

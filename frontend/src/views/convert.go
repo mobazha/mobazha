@@ -360,8 +360,9 @@ func walk(s string, d fs.DirEntry, err error) error {
 			_, params := getTemplateVars(jsMethodsListContent)
 			if len(params) > 0 {
 				params = `
-    params () {
-      return {` + params +
+    ob () {
+      return {
+        ...this.templateHelpers,` + params +
 					`      };
     }`
 			}

@@ -27,7 +27,7 @@ export function mountVueApp(container) {
   vueApp.config.productionTip = false;
 
   vueApp.mixin(baseVw);
-  vueApp.config.globalProperties.ob = {...templateHelpers};
+  vueApp.config.globalProperties.templateHelpers = {...templateHelpers};
 
   // components
   for (const i in components) {
@@ -49,7 +49,7 @@ export function mountVueModal(container, name) {
   vueModal.config.productionTip = false;
 
   vueModal.mixin(baseVw);
-  vueModal.config.globalProperties.ob = {...templateHelpers};
+  vueModal.config.globalProperties.templateHelpers = {...templateHelpers};
 
   vueModal.use(ElementPlus);
   for (const [key, component] of Object.entries(ElementPlusIconsVue)) {

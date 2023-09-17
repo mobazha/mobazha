@@ -113,7 +113,7 @@ export default {
       },
     };
 
-    super(opts);
+    this.setState(opts.initialState || {});
     this.options = options;
 
     this.listenTo(inventoryEvents, 'inventory-fetching', e => {

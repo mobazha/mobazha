@@ -1,5 +1,5 @@
 <template>
-  <li :class="`coinNavItem flexVCent gutterHSm lineHeight1 tx4 clrT2 ${ob.active ? 'active' : ''} ${ob.clientSupported ? 'clientUnsupported':''}`" @click="onClick">
+  <li :class="`coinNavItem flexVCent gutterHSm lineHeight1 tx4 clrT2 ${ob.active ? 'active' : ''} ${ob.clientSupported ? 'clientUnsupported':''}`">
     {{ ob.crypto.cryptoIcon({ code: mnCode, className: 'flexNoShrink', }) }}
     <div :class="`flexExpand lineHeight1 ${ob.active ? 'clrT' : ''} coinName`">{{ ob.polyT(`cryptoCurrencies.${mnCode}`, { _: mnCode }) }}</div>
     <div :class="`${ob.balance > 0 ? 'clrTEm' : ''} flexNoShrink balanceText`">
@@ -37,8 +37,6 @@ export default {
   },
   created () {
     this.initEventChain();
-
-    this.loadData(this.$props.options);
   },
   mounted () {
   },
@@ -49,6 +47,9 @@ export default {
         ...this._state,
         NoExchangeRateDataError,
       }
+    },
+    displayCur () {
+      return (app && app.settings && app.settings.get('localCurrency')) || 'USD'
     },
     formattedBalance () {
       let convertedCurrency;
@@ -76,35 +77,6 @@ export default {
     }
   },
   methods: {
-    loadData (options = {}) {
-      const opts = {
-        initialState: {
-          active: false,
-          displayCur: app && app.settings && app.settings.get('localCurrency') || 'USD',
-          ...options.initialState,
-        },
-      };
-
-      if (!opts.initialState || typeof opts.initialState.code !== 'string' ||
-        !opts.initialState.code) {
-        throw new Error('Please provide a code as a non-empty string in the initial state');
-      }
-
-      if (!opts.initialState || typeof opts.initialState.name !== 'string' ||
-        !opts.initialState.name) {
-        throw new Error('Please provide a name as a non-empty string in the initial state');
-      }
-
-      this.setState(opts.initialState || {});
-    },
-
-    onClick () {
-      const state = this.getState();
-
-      if (!state.active && state.clientSupported) {
-        this.$emit('selected', { code: state.code });
-      }
-    },
   }
 }
 </script>

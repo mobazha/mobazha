@@ -62,7 +62,7 @@ export default {
       },
     };
 
-    super(opts);
+    this.setState(opts.initialState || {});
   },
 
   events() {

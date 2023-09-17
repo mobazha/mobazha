@@ -1,14 +1,14 @@
 <template>
   <div class="moderatorsList">
-    <div :class="`moderatorsWrapper clrBr ${params.wrapperClasses} js-moderatorsWrapper`">
+    <div :class="`moderatorsWrapper clrBr ${ob.wrapperClasses} js-moderatorsWrapper`">
       <!-- // placeholder so border collapse doesn't erase the table border when there are no table cells -->
-      <div v-if="params.placeholder">
+      <div v-if="ob.placeholder">
         <div class="moderatorCard clrBr">
           <div class="moderatorCardInner">
           </div>
         </div>
       </div>
-      <div v-if="ob.totalIDs && !params.totalShown">
+      <div v-if="ob.totalIDs && !ob.totalShown">
         <div class="moderatorCard moderatorsMessage clrBr">
           <div class="moderatorCardInner">
             <div class="flexCent">
@@ -20,7 +20,7 @@
                 %>
                   <h4>{{ ob.polyT(`${msgPath}.title`, opts) }}</h4>
                   <!-- // The section below is only relevant if the moderators are loaded in a purchasing context. -->
-                  <div v-if="params.purchase">
+                  <div v-if="ob.purchase">
                     <div class="tx4 clrT2">{{ ob.polyT(`${msgPath}.body`) }}</div>
                     <div v-if="showOnlyVer">
                       <!-- //just a spacer -->
@@ -79,7 +79,7 @@ export default {
     this.render();
   },
   computed: {
-    params () {
+    ob () {
       return {
         wrapperClasses: this.options.wrapperClasses,
         placeholder: !showMods.length && (this.unfetchedMods.length || !totalIDs),
@@ -87,7 +87,7 @@ export default {
         totalShown: showMods.length,
         totalIDs,
         unVerCount,
-        ...state,
+        ...this._state,
       };
     }
   },
@@ -171,7 +171,7 @@ export default {
         opts.method = 'GET';
       }
 
-      super(opts);
+      this.setState(opts.initialState || {});
       this.options = opts;
       this.excludeIDs = opts.excludeIDs;
       this.unfetchedMods = [];

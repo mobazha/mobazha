@@ -150,7 +150,7 @@ export default {
           ? opts.badge.small : opts.badge.tiny;
       }
 
-      super(opts);
+      this.setState(opts.initialState || {});
       handleLinks(this.el);
     },
 

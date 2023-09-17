@@ -11,8 +11,6 @@
 </template>
 
 <script>
-import BaseVw from '../../baseVw';
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
 
 
 export default {
@@ -32,15 +30,16 @@ export default {
     this.loadData(this.$props);
   },
   mounted () {
-    this.render();
   },
   computed: {
-    params () {
+    ob () {
       return {
-        ...this.getState(),
+        ...this._state,
       };
     },
     statusInfo () {
+      const ob = this.ob;
+
       let statusInfo = ob.polyT('moderators.moderatorsLoading');
       if (ob.mode === 'loaded') {
         statusInfo = ob.polyT('moderators.moderatorsLoaded', { total: ob.total, smart_count: ob.total });
@@ -71,13 +70,7 @@ export default {
         },
       };
 
-      super(opts);
-      this.options = opts;
-    },
-
-    events () {
-      return {
-      };
+      this.setState(opts.initialState || {});
     },
 
     setState (state = {}, options = {}) {
@@ -102,16 +95,6 @@ export default {
       clearTimeout(this.spinnerTimeout);
       super.remove();
     },
-
-    render () {
-      loadTemplate('components/moderators/status.html', (t) => {
-        this.$el.html(t({
-          ...this.getState(),
-        }));
-      });
-
-      return this;
-    }
   }
 }
 </script>

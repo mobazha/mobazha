@@ -64,7 +64,7 @@ export default {
         },
       };
 
-      super(opts);
+      this.setState(opts.initialState || {});
       this.options = opts;
 
       this.listenTo(app.ownFollowing, 'update', () => {

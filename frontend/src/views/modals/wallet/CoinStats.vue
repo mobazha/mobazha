@@ -41,10 +41,7 @@
                           includeCryptoCurIdentifier: false,
                         })}
                   </div>`,
-                      icon: ob.crypto.cryptoIcon({
-                        code: ob.displayCur,
-                        className: 'cryptoIcon18',
-                      })
+                      icon: ob.crypto.cryptoIcon({ code: ob.displayCur, className: 'cryptoIcon18', })
                     })
                   }}
                 </div>

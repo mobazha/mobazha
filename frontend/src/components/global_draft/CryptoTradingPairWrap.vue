@@ -84,7 +84,7 @@ export default {
       },
     };
 
-    super(opts);
+    this.setState(opts.initialState || {});
 
     // Since the initial state is not being piped through setState in the
     // base class, this is a hack to run it through setState now and ensure

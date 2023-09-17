@@ -64,7 +64,7 @@ export default {
     moment,
 
     loadData (options = {}) {
-      super(options);
+      this.setState(options.initialState || {});
 
       if (!options.dataObject) {
         throw new Error('Please provide a buyerOrderCompletion data object.');

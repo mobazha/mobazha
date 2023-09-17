@@ -1,9 +1,9 @@
 <template>
   <div class="moderatorCard clrBr" @click="click" @click.stop>
 
-    <div :class="`moderatorCardInner clrP {{ isDisabled }} ${params.verified ? 'verified clrBrAlert2 clrBAlert2Grad' : ''}`">
+    <div :class="`moderatorCardInner clrP {{ isDisabled }} ${ob.verified ? 'verified clrBrAlert2 clrBAlert2Grad' : ''}`">
       <div class="flexRow gutterH moderatorCardContent">
-        <div v-if="params.radioStyle">
+        <div v-if="ob.radioStyle">
           <div class="flexNoShrink">
             <div class="btnRadio">
               <!-- // the card state may be set on render or set on the fly by the view -->
@@ -22,17 +22,17 @@
               <span class="clrT2">{{ ob.handle ? `@${ob.handle}` : '' }}</span>
             </div>
             <div class="row">
-              <div v-if="params.valid">
+              <div v-if="ob.valid">
                 <div class="rowTn clamp2">{{ ob.moderatorInfo.description }}</div>
-                <div v-if="params.modLanguages && params.modLanguages.length">
+                <div v-if="ob.modLanguages && ob.modLanguages.length">
                   <div class="txSm rowTn">
                     {{
-                      params.modLanguages.length > 1 ? ob.polyT('moderatorCard.languages', { lang: params.modLanguages[0], smart_count: params.modLanguages.length - 1 }) : params.modLanguages[0]
+                      ob.modLanguages.length > 1 ? ob.polyT('moderatorCard.languages', { lang: ob.modLanguages[0], smart_count: ob.modLanguages.length - 1 }) : ob.modLanguages[0]
                     }}
                   </div>
                 </div>
                 <div class="flex gutterH tx5 detailsRow">
-                  <div v-if="params.hasValidCurrency">
+                  <div v-if="ob.hasValidCurrency">
                     <div class="flexNoShrink modFee">
                       {{ ob.polyT(`moderatorCard.${ob.moderatorInfo.fee.feeType}`, { amount, percentage: ob.moderatorInfo.fee.percentage }) }}
                     </div>
@@ -65,14 +65,14 @@
           </div>
         </div>
         <div class="flexNoShrink">
-          <div v-if="params.valid || params.controlsOnInvalid">
+          <div v-if="ob.valid || ob.controlsOnInvalid">
             <div class="flexCol gutterV">
-              <div v-if="params.valid">
+              <div v-if="ob.valid">
                 <button class="btn clrP clrBr clrSh2 selectBtn " @click="clickModerator">
                   {{ ob.polyT('moderatorCard.view') }}
                 </button>
               </div>
-              <div v-if="!params.radioStyle">
+              <div v-if="!ob.radioStyle">
                 <button class="btn clrP clrBr clrSh2 selectBtn js-selectBtn" :data-state="ob.selectedState">
                   <i class="ion-checkmark showIfSelected clrTEmph1"></i>
                   <i class="ion-close showIfDeselected clrTErr"></i>
@@ -121,8 +121,9 @@ export default {
     this.render();
   },
   computed: {
-    params () {
+    ob () {
       return {
+        ...this.templateHelpers,
         displayCurrency: app.settings.get('localCurrency'),
         valid: this.model.isModerator,
         hasValidCurrency: this.hasValidCurrency,
@@ -132,25 +133,27 @@ export default {
         verified: !!verifiedMod,
         modLanguages: this.modLanguages,
         ...this.model.toJSON(),
-        ...this.getState(),
+        ...this._state,
       };
     },
     loaded () {
-      return !!ob.name;
+      return !!this.ob.name;
     },
     isDisabled () {
+      const ob = this.ob;
       /* Disable the card if it is invalid and the controls should be shown, and it is not selected. This allow the user to de-select invalid cards.
       The view should prevent the invalid card from being selected again, disabling it is redundant but important visually. */
-      return (!params.valid && !params.controlsOnInvalid) || (!params.valid && params.controlsOnInvalid && ob.selectedState !== 'selected') || !loaded ? 'disabled' : '';
+      return (!ob.valid && !ob.controlsOnInvalid) || (!ob.valid && ob.controlsOnInvalid && ob.selectedState !== 'selected') || !loaded ? 'disabled' : '';
     },
     amount () {
+      const ob = this.ob;
       return ob.currencyMod.convertAndFormatCurrency(
         ob.moderatorInfo.fee.fixedFee.amount || 0,
         ob.moderatorInfo.fee.fixedFee.currency.code,
-        params.displayCurrency,
+        ob.displayCurrency,
         {
           maxDisplayDecimals:
-            !ob.currencyMod.isFiatCur(params.displayCurrency) ? 6 : undefined
+            !ob.currencyMod.isFiatCur(ob.displayCurrency) ? 6 : undefined
         }
       )
     },
@@ -187,7 +190,7 @@ export default {
         },
       };
 
-      super(opts);
+      this.setState(opts.initialState || {});
       this.options = opts;
 
       if (!this.model || !(this.model instanceof Profile)) {

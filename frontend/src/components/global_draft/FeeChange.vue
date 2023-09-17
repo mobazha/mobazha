@@ -49,7 +49,7 @@ export default {
       ...options,
     };
 
-    super(opts);
+    this.setState(opts.initialState || {});
 
     this.listenTo(app.localSettings, 'change:defaultTransactionFee', (md, val) => this.setState({ feeLevel: val }));
   },

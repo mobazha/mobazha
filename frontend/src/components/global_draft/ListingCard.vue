@@ -383,7 +383,7 @@ export default {
       ...options,
     };
 
-    super(opts);
+    this.setState(opts.initialState || {});
     this.options = opts;
     this.cardError = false;
 

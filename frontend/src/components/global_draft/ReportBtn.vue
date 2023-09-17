@@ -47,7 +47,7 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      super(options);
+      this.setState(options.initialState || {});
 
       this._state = {
         reported: false,

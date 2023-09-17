@@ -97,7 +97,7 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      super(options);
+      this.setState(options.initialState || {});
 
       if (!options.model) {
         throw new Error('Please provide an OrderCompletion model.');

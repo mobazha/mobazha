@@ -1,12 +1,16 @@
 <template>
   <div class="popInMessage clrP border clrBrT pad tx5 clrSh1">
     <div v-if="ob.dismissable">
-      <a class="closeIcon tx2 js-dismiss">
+      <a class="closeIcon tx2 js-dismiss" @click="onClickDismiss">
         <span class="ion-ios-close-empty clrBr clrP clrT clrBrT"></span>
       </a>
     </div>
     <div v-if="ob.messageText">
-      <p class="txUnl">{{ ob.messageText }}</p>
+      <p class="txUnl">
+        <span class="ion-alert-circled"></span>
+        <b>{{ob.messageText}}</b>
+        <a class="clrTEm js-refresh" @click="onClickRefresh">{{ob.polyT('refreshAlertPopInMessage.refreshLink')}}</a>
+      </p>
     </div>
 
     <div v-else>
@@ -18,10 +22,6 @@
 
 <script>
 import _ from 'underscore';
-import { capitalize } from '../../../backbone/utils/string';
-import app from '../../../backbone/app';
-import loadTemplate from '../../../backbone/utils/loadTemplate';
-import baseVw from '../baseVw';
 
 
 export default {
@@ -38,16 +38,22 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.$props.options);
   },
   mounted () {
     this.render();
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+      }
+    },
   },
   methods: {
     loadData (options) {
-      super(options);
+      this.setState(options.initialState || {});
 
       const opts = {
         dismissable: false,
@@ -72,30 +78,12 @@ export default {
       };
     },
 
-    className () {
-      return 'popInMessage clrP border clrBrT pad tx5 clrSh1';
+    onClickDismiss () {
+      this.$emit('clickDismiss');
     },
 
-    events () {
-      return {
-        'click [class^="js-"], [class*=" js-"]': 'onClick',
-      };
-    },
-
-    onClick (e) {
-      // If the the el has a '.js-<class>' class, we'll trigger a
-      // 'click<Class>' event from this view.
-      const events = [];
-
-      e.currentTarget.classList.forEach((className) => {
-        if (className.startsWith('js-')) events.push(className.slice(3));
-      });
-
-      if (events.length) {
-        events.forEach(event => {
-          this.trigger(`click${capitalize(event)}`, { view: this, e });
-        });
-      }
+    onClickRefresh () {
+      this.$emit('clickRefresh');
     },
 
     setState (state = {}) {
@@ -106,26 +94,14 @@ export default {
 
       if (!_.isEqual(this._state, newState)) {
         this._state = newState;
-        this.render();
       }
     },
 
     replaceState (state = {}) {
       if (!_.isEqual(this._state, state)) {
         this._state = state;
-        this.render();
       }
     },
-
-    render () {
-      loadTemplate('./components/popInMessage.html', (tmpl) => {
-        this.$el.html(
-          tmpl(this._state)
-        );
-      });
-
-      return this;
-    }
   }
 }
 </script>

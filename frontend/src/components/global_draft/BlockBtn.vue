@@ -65,7 +65,7 @@ export default {
         },
       };
 
-      super(opts);
+      this.setState(opts.initialState || {});
       this.targetId = options.targetId;
 
       this.listenTo(block.events, 'unblocking blocking', data => {

@@ -55,12 +55,12 @@ export default {
     },
 
     onClickSend () {
-      this.$emit('click-send');
+      this.$emit('clickSend');
       recordEvent('Wallet_SendShow');
     },
 
     onClickReceive () {
-      this.$emit('click-receive');
+      this.$emit('clickReceive');
       recordEvent('Wallet_ReceiveShow');
     },
   }

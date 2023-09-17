@@ -54,7 +54,7 @@ export default {
       },
     };
 
-    super(opts);
+    this.setState(opts.initialState || {});
   },
 
   setState(state = {}, options = {}) {

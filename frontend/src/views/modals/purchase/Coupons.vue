@@ -51,7 +51,7 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      super(options);
+      this.setState(opts.initialState || {});
       this.options = options;
 
       if (!isValidNumber(options.listingPrice)) {

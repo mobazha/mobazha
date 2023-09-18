@@ -16,9 +16,9 @@
           {{ ob.polyT('wallet.cryptoTeaser.btnCreateListing') }}
         </a>
       </div>
-      <div v-if="ob.viewCryptoListingsUrl">
+      <div v-if="viewCryptoListingsUrl">
         <div>
-          <a class="tx6 txU js-viewCryptoListings" :href="ob.viewCryptoListingsUrl">
+          <a class="tx6 txU js-viewCryptoListings" :href="viewCryptoListingsUrl">
             {{ ob.polyT('wallet.cryptoTeaser.linkViewCryptoListings') }}
           </a>
         </div>
@@ -31,6 +31,20 @@
 <script>
 
 export default {
+  props: {
+    viewCryptoListingsUrl: {
+      type: String,
+      default: ''
+    }
+  },
+  methods: {
+    onClickCreateListing() {
+      this.$emit('createListing');
+    },
+    onClickViewCryptoListings() {
+      this.$emit('viewCryptoListings');
+    },
+  }
 }
 </script>
 <style lang="scss" scoped></style>

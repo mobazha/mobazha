@@ -16,8 +16,9 @@
           coinType: this.coinType,
           bumpFeeXhr: (this.options.bumpFeeXhrs && this.options.bumpFeeXhrs[model.id]) || undefined,
         }"
-        :bumpFeeSuccess="this.$emit('bumpFeeSuccess', model)"
-        :bumpFeeAttempt="this.$emit('bumpFeeAttempt', model)" />
+        :bumpFeeAttempt="onBumpFeeAttempt"
+        :bumpFeeSuccess="onBumpFeeSuccess"
+         />
       </div>
     </div>
     <TransactionFetchState
@@ -161,6 +162,8 @@ export default {
       this.throttledOnScroll = _.throttle(this.onScroll, 100).bind(this);
 
       if (opts.fetchOnInit) this.refreshTransactions();
+
+      this.$emit('postInit');
     },
 
     onScroll () {
@@ -270,6 +273,14 @@ export default {
       if (this.transactionsFetch) this.transactionsFetch.abort();
       this.popInTimeouts.forEach((timeout) => clearTimeout(timeout));
       this.$scrollContainer.off('scroll', this.throttledOnScroll);
+    },
+
+    onBumpFeeAttempt(e) {
+      this.$emit('bumpFeeAttempt', e);
+    },
+
+    onBumpFeeSuccess(e) {
+      this.$emit('bumpFeeSuccess', e);
     },
 
     clickRetryFetch () {

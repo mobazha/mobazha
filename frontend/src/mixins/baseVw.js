@@ -7,6 +7,13 @@ import { Events } from 'backbone';
 import { setDeepValue } from '../../backbone/utils/object';
 
 export default {
+  computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+      };
+    },
+  },
   data () {
     return {
       _childViews: [],
@@ -255,25 +262,18 @@ export default {
      */
     setState(state = {}, options = {}) {
       const opts = {
-        renderOnChange: true,
         replace: false,
         ...options,
       };
-      let newState;
-  
+ 
       if (typeof state !== 'object') {
         throw new Error('The state must be provided as an object.');
       }
   
       if (opts.replace) {
-        this._state = {};
+        this._state = state;
       } else {
-        newState = _.extend({}, this._state, state);
-      }
-  
-      if (!_.isEqual(this._state, newState)) {
-        this._state = newState;
-        if (opts.renderOnChange) this.render();
+        _.extend(this._state, state);
       }
   
       return this;

@@ -12,8 +12,8 @@ import (
 )
 
 var baseDir = "/Users/mingfeng/dev/openbazaar/openbazaar-desktop/frontend"
-var htmlTemplateFolder = "backbone/templates/components"
-var jsComponentFolder = "backbone/views/components"
+var htmlTemplateFolder = "backbone/templates/modals/wallet"
+var jsComponentFolder = "backbone/views/modals/wallet"
 var targetVueFolder = "src/views_draft"
 
 type EventHandler struct {
@@ -355,7 +355,8 @@ func walk(s string, d fs.DirEntry, err error) error {
 			templateFileContent, jsMethodsListContent = applyEventHandlerToTemplate(templateFileContent, jsMethodsListContent, componentInfo)
 			componentInfo.Name = componentName
 
-			templateFileContent, jsMethodsListContent = applyVarsToTemplate(templateFileContent, jsMethodsListContent)
+			// we continue to use ob, no need to change
+			// templateFileContent, jsMethodsListContent = applyVarsToTemplate(templateFileContent, jsMethodsListContent)
 
 			_, params := getTemplateVars(jsMethodsListContent)
 			if len(params) > 0 {
@@ -402,7 +403,7 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.$props.options);
   },
   mounted () {
     this.render();

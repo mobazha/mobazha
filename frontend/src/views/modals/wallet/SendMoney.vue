@@ -51,7 +51,7 @@
             <div class="posR">
               <ProcessingButton
                 :className="`js-btnSend btn clrBAttGrad clrBrDec1 clrTOnEmph ${ob.saveInProgress ? 'processing' : ''}`"
-                :btnText="ob.polyT('wallet.sendMoney.sendBtn')" @click="onClickSend" @click.stop />
+                :btnText="ob.polyT('wallet.sendMoney.sendBtn')" @click.stop="onClickSend" />
               <div class="js-sendConfirmContainer"></div>
               <SpendConfirmBox ref="spendConfirmBox" :options="{ metricsOrigin: 'Wallet',}" @clickSend="onClickConfirmSend" />
             </div>
@@ -63,11 +63,12 @@
 </template>
 
 <script>
+import $ from 'jquery';
 import app from '../../../../backbone/app';
 import { getCurrenciesSortedByCode } from '../../../../backbone/data/currencies';
 import { endAjaxEvent, recordEvent, startAjaxEvent } from '../../../../backbone/utils/metrics';
 import { convertCurrency, getExchangeRate } from '../../../../backbone/utils/currency';
-import { openSimpleMessage } from '../SimpleMessage';
+import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import Spend, { spend } from '../../../../backbone/models/wallet/Spend';
 import SpendConfirmBox from './SpendConfirmBox.vue';
 
@@ -90,7 +91,7 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.$props.options);
   },
   mounted () {
     $('#walletSendCurrency').select2();

@@ -1,13 +1,11 @@
 <template>
   <div>
     <div class="padLg txCtr">
-      {{
-        ob.crypto.tradingPair({
+      <CryptoTradingPair :options="ob.crypto.tradingPairOptions({
           className: 'cryptoTradingPairXL hideCodes rowMd',
           fromCur: 'BTC',
           toCur: 'ZEC',
-        })
-      }}
+        })" />
       <p class="tx4 rowMd">
         {{ ob.polyT('wallet.cryptoTeaser.bodyLine', { coinCount: ob.polyT('wallet.cryptoTeaser.coinCount', { count: 1500 }) }) }}
       </p>

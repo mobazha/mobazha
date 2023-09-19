@@ -1,12 +1,12 @@
 <template>
-  <li :class="`coinNavItem flexVCent gutterHSm lineHeight1 tx4 clrT2 ${ob.active ? 'active' : ''} ${ob.clientSupported ? 'clientUnsupported':''}`">
-    {{ ob.crypto.cryptoIcon({ code: mnCode, className: 'flexNoShrink', }) }}
+  <li :class="`coinNavItem flexVCent gutterHSm lineHeight1 tx4 clrT2 ${ob.active ? 'active' : ''} ${!ob.clientSupported ? 'clientUnsupported':''}`">
+    <CryptoIcon :code="mnCode" className="flexNoShrink"/>
     <div :class="`flexExpand lineHeight1 ${ob.active ? 'clrT' : ''} coinName`">{{ ob.polyT(`cryptoCurrencies.${mnCode}`, { _: mnCode }) }}</div>
     <div :class="`${ob.balance > 0 ? 'clrTEm' : ''} flexNoShrink balanceText`">
       <div v-if="ob.clientSupported">
         <div class="flexVCent flexHRight">
           <i v-if="ob.active" class="ion-arrow-right-c clrT2 activeBalanceIcon"></i>
-          <span v-else-if="ob.balance > 0" class="clrTEm txB">${formattedBalance}</span>
+          <span v-else-if="ob.balance > 0" class="clrTEm txB">{{ formattedBalance }}</span>
           <div v-else>{{ formattedBalance }}</div>
         </div>
       </div>
@@ -37,6 +37,8 @@ export default {
   },
   created () {
     this.initEventChain();
+
+    this.loadData(this.$props.options);
   },
   mounted () {
   },
@@ -77,6 +79,27 @@ export default {
     }
   },
   methods: {
+    loadData(options = {}) {
+      const opts = {
+        initialState: {
+          active: false,
+          displayCur: app && app.settings && app.settings.get('localCurrency') || 'USD',
+          ...options.initialState,
+        },
+      };
+
+      if (!opts.initialState || typeof opts.initialState.code !== 'string' ||
+        !opts.initialState.code) {
+        throw new Error('Please provide a code as a non-empty string in the initial state');
+      }
+
+      if (!opts.initialState || typeof opts.initialState.name !== 'string' ||
+        !opts.initialState.name) {
+        throw new Error('Please provide a name as a non-empty string in the initial state');
+      }
+
+      this.setState(opts.initialState || {});
+    }
   }
 }
 </script>

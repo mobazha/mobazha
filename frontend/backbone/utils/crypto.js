@@ -36,15 +36,7 @@ export function renderCryptoIcon(options = {}) {
   return `<i class="cryptoIcon ${opts.className}" ${attrs} ${style}></i>`;
 }
 
-/**
- * Will render a a combination of two currenciees indicating that one is being
- * traded for the other (e.g. <btc-icon> BTC > <zec-icon> ZEC). This differs from
- * the CryptoTradingPair view in that the latter allows you to display the exchange
- * rate next to the trading pair. It's also more easily updatable (just setState())
- * in case your currencies need to change dynamically.
- * TODO: document the options.
- */
-export function renderCryptoTradingPair(options = {}) {
+export function getCryptoTradingPairOptions(options = {}) {
   if (typeof options.fromCur !== 'string') {
     throw new Error('Please provide a fromCur as a string.');
   }
@@ -68,6 +60,19 @@ export function renderCryptoTradingPair(options = {}) {
     opts.toCur = opts.toCur.length > opts.truncateCurAfter ?
       `${opts.toCur.slice(0, opts.truncateCurAfter)}…` : opts.toCur;
   }
+  return opts;
+}
+
+/**
+ * Will render a a combination of two currenciees indicating that one is being
+ * traded for the other (e.g. <btc-icon> BTC > <zec-icon> ZEC). This differs from
+ * the CryptoTradingPair view in that the latter allows you to display the exchange
+ * rate next to the trading pair. It's also more easily updatable (just setState())
+ * in case your currencies need to change dynamically.
+ * TODO: document the options.
+ */
+export function renderCryptoTradingPair(options = {}) {
+  const opts = getCryptoTradingPairOptions(options);
 
   let rendered = '';
 

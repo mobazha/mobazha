@@ -53,6 +53,7 @@
               </div>
               <div v-if="isCrypto" class="gutterVTn">
                 <div class="txB cryptoAddress">
+                  <CryptoIcon :code="listing.metadata.pricingCurrency.code" />
                   {{ ob.polyT('orderDetail.summaryTab.orderDetails.paymentAddressHeading', {
                     coinType: coinTypeName === `cryptoCurrencies.${coinType}` ? coinType : ob.polyT(`cryptoCurrencies.${coinType}`),
                     icon: ob.crypto.cryptoIcon({ code: listing.metadata.pricingCurrency.code, }),

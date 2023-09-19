@@ -23,7 +23,7 @@
 
 <script>
 import app from '../../../../backbone/app';
-import { openSimpleMessage } from '../SimpleMessage';
+import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import resyncBlockchain, {
   isResyncAvailable,
   isResyncingBlockchain,
@@ -47,7 +47,7 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.$props.options);
   },
   mounted () {
   },

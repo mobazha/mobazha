@@ -49,7 +49,7 @@ import _ from 'underscore';
 import app from '../../../../../backbone/app';
 import { isScrolledIntoView } from '../../../../../backbone/utils/dom';
 import { getSocket, getCurrentConnection } from '../../../../../backbone/utils/serverConnect';
-import { openSimpleMessage } from '../../SimpleMessage';
+import { openSimpleMessage } from '../../../../../backbone/views/modals/SimpleMessage';
 import { launchSettingsModal } from '../../../../../backbone/utils/modalManager';
 import Transaction from './Transaction.vue';
 import TransactionFetchState from './TransactionFetchState.vue';

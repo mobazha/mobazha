@@ -2,7 +2,7 @@
   <ul class="unstyled row">
     <li class="flexVCent gutterHSm clrBr" v-for="(cur, j) in ob.processedCurs" :key="j">
       <span class="ion-ios-checkmark-empty clrTEm tx2"></span>
-      {{ ob.crypto.cryptoIcon({ code: cur.code }) }}
+      <CryptoIcon :code="cur.code" />
       <div class="acceptedCurName">{{ cur.displayName }}</div>
     </li>
   </ul>

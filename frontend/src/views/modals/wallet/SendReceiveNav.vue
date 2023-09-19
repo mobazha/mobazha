@@ -4,7 +4,7 @@
       <button :class="`btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm ${ob.sendModeOn ? 'active' : ''}`" @click="onClickSend">
         {{ ob.polyT('wallet.sendBtn') }}
       </button>
-      <button :class="`btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm ${!ob.sendModeOn ? 'active' : ''}`" @click="onClickReceive">
+      <button :class="`btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm ${ob.sendModeOn ? '' : 'active'}`" @click="onClickReceive">
         {{ ob.polyT('wallet.receiveBtn') }}
       </button>
     </div>
@@ -17,9 +17,9 @@ import { recordEvent } from '../../../../backbone/utils/metrics';
 
 export default {
   props: {
-    options: {
-      type: Object,
-      default: {},
+    sendModeOn: {
+      type: Boolean,
+      default: false,
     },
   },
   data () {
@@ -27,32 +27,12 @@ export default {
     };
   },
   created () {
-    this.initEventChain();
-
-    this.loadData(this.$props.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
-    ob () {
-      return {
-        ...this.templateHelpers,
-        ...this._state,
-      };
-    }
   },
   methods: {
-    loadData (options = {}) {
-      const opts = {
-        initialState: {
-          sendModeOn: true,
-          ...options.initialState,
-        },
-      };
-
-      this.setState(opts.initialState || {});
-    },
 
     onClickSend () {
       this.$emit('clickSend');

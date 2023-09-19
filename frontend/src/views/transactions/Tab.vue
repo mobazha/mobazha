@@ -211,7 +211,6 @@ export default {
 
     remove () {
       clearTimeout(this.searchKeyUpTimer);
-      super.remove();
     },
 
     render () {
@@ -234,6 +233,7 @@ export default {
 
           if (this.table) this.table.remove();
           this.table = this.createChild(TransactionsTable, {
+            type: this.type,
             collection: this.collection,
             initialFilterParams: this.filter,
             getProfiles: this.options.getProfiles,

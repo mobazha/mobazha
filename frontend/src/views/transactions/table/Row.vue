@@ -2,33 +2,32 @@
   <tr :class="!model.get('read') ? 'unread' : ''" @click="onRowClick">
     <td class="clrBr orderCol noOverflow">
       <div class="unreadBorder clrE1"></div>
-      <span class="ulOnHover">{{ type === 'cases' ? info.caseID : info.orderID }}</span>
+      <span class="ulOnHover">{{ ob.type === 'cases' ? ob.caseID : ob.orderID }}</span>
     </td>
     <td class="clrBr dateCol">
-      <span class="ulOnHover">{{ moment(info.timestamp).format('l LT') }}</span>
+      <span class="ulOnHover">{{ ob.moment(ob.timestamp).format('l LT') }}</span>
     </td>
 
-    <td v-if="type !== 'cases'" class="clrBr listingCol js-listingCol" @click.stop @click="onClickListingColLink">
-      <div v-if="!info.coinType">
+    <td v-if="ob.type !== 'cases'" class="clrBr listingCol js-listingCol" @click.stop="onClickListingColLink">
+      <div v-if="!ob.coinType">
         <div class="flexVCent gutterHSm">
-          <a :href="`#${vendorID}/store/${info.slug}`" class="thumb"
-            :style="ob.getListingBgImage({ small: info.thumbnail, tiny: info.thumbnail })"></a>
-          <a :href="`#${vendorID}/store/${info.slug}`" class="noOverflow clrT">{{ info.title }}</a>
+          <a :href="`#${ob.vendorID}/store/${ob.slug}`" class="thumb" :style="ob.getListingBgImage({ small: ob.thumbnail, tiny: ob.thumbnail })"></a>
+          <a :href="`#${ob.vendorID}/store/${ob.slug}`" class="noOverflow clrT">{{ ob.title }}</a>
         </div>
       </div>
       <div v-else>
         <div class="flexVCent gutterHSm">
-          <a :href="`#${vendorID}/store/${info.slug}`" class="clrT flexNoShrink js-cryptoTradingPairWrap"></a>
+          <a :href="`#${ob.vendorID}/store/${ob.slug}`" class="clrT flexNoShrink js-cryptoTradingPairWrap"></a>
         </div>
       </div>
     </td>
-    <td v-for="(user, index) in userCols" :key="index" class="clrBr userCol js-userCol" @click.stop @click="onClickUserColLink">
+    <td v-for="(user, index) in userCols" :key="index" class="clrBr userCol js-userCol" @click.stop="onClickUserColLink">
       <div class="flexVCent gutterHSm">
         <a class="avatar discSm clrBr2 clrSh1 flexNoShrink" :href="`#${user.userId}`" :style="ob.getAvatarBgImage(user.avatarHashes)"></a>
         <a class="handle noOverflow clrT" :href="`#${user.userId}`">{{ user.userHandle ? `@${user.userHandle}` : user.userId }}</a>
         <div class="flexHRight">
-          <div v-if="info.unreadChatMessages && index === 0">
-            <span class="unreadBadge discSm clrE1 clrBrEmph1 clrTOnEmph">{{ info.unreadChatMessages > 99 ? '…' : info.unreadChatMessages }}</span>
+          <div v-if="ob.unreadChatMessages && index === 0">
+            <span class="unreadBadge discSm clrE1 clrBrEmph1 clrTOnEmph">{{ ob.unreadChatMessages > 99 ? '…' : ob.unreadChatMessages }}</span>
           </div>
         </div>
       </div>
@@ -36,44 +35,44 @@
     <td class="clrBr priceCol txRgt">
       <span class="ulOnHover">
         {{
-          ob.currencyMod.convertAndFormatCurrency( info.total, info.paymentCoin, userCurrency, { maxDisplayDecimals })
+          ob.currencyMod.convertAndFormatCurrency( ob.total, ob.paymentCoin, ob.userCurrency, { maxDisplayDecimals })
         }}
       </span>
     </td>
     <td class="clrBr gutterH statusCol">
-      <div v-if="info.state === 'PENDING'">
-        <div v-if="type === 'sales'">
-          <span v-if="info.rejectOrderInProgress" class="posR inlineBlock">
+      <div v-if="ob.state === 'PENDING'">
+        <div v-if="ob.type === 'sales'">
+          <span v-if="ob.rejectOrderInProgress" class="posR inlineBlock">
             <!-- // including invisible reject link to properly space the spinner -->
             <a class="txU tx6 invisible">{{ ob.polyT('transactions.transactionsTable.btnReject') }}</a>
             <SpinnerSVG className="spinnerSm center" />
           </span>
-          <a v-else class="txU tx6" @click="onClickRejectOrder" :disabled="info.acceptOrderInProgress">{{ ob.polyT('transactions.transactionsTable.btnReject') }}</a>
+          <a v-else class="txU tx6" @click="onClickRejectOrder" :disabled="ob.acceptOrderInProgress">{{ ob.polyT('transactions.transactionsTable.btnReject') }}</a>
 
           <ProcessingButton
-            :className="`js-acceptOrder btnAcceptOrder btn clrBAttGrad clrBrDec1 clrTOnEmph ${info.acceptOrderInProgress ? 'processing' : ''}`"
+            :className="`js-acceptOrder btnAcceptOrder btn clrBAttGrad clrBrDec1 clrTOnEmph ${ob.acceptOrderInProgress ? 'processing' : ''}`"
             :disabled="rejectOrderInProgress"
             @click="onClickAcceptOrder"
             :btnText= "ob.polyT('transactions.transactionsTable.btnAccept')"
           />
         </div>
-        <div v-else-if="!info.moderated">
+        <div v-else-if="!ob.moderated">
           <!-- // Only non-moderated purchase can be canceled. We are not allowing PROCESSING_ERROR orders to be canceled here because
         // they need to be funded and we don't know if they are. If funded, they can be canceled on the Order Detail overlay. -->
-          <span v-if="info.cancelOrderInProgress" class="posR inlineBlock">
+          <span v-if="ob.cancelOrderInProgress" class="posR inlineBlock">
             <!-- // including invisible cancel link to properly space the spinner -->
             <a class="txU tx6 invisible">{{ ob.polyT('transactions.transactionsTable.btnCancel') }}</a>
             <SpinnerSVG className="spinnerSm center" />
           </span>
-          <a v-else class="txU tx6 " @click="onClickCancelOrder">{{ ob.polyT('transactions.transactionsTable.btnCancel')
+          <a v-else class="txU tx6 " @click.stop="onClickCancelOrder">{{ ob.polyT('transactions.transactionsTable.btnCancel')
           }}</a>
         </div>
         <div v-else>
-          <span class="ulOnHover">{{ ob.polyT(`transactions.transactionsTable.status.${info.state}`) }}</span>
+          <span class="ulOnHover">{{ ob.polyT(`transactions.transactionsTable.status.${ob.state}`) }}</span>
         </div>
       </div>
       <div v-else>
-        <span class="ulOnHover">{{ ob.polyT(`transactions.transactionsTable.status.${info.state}`) }}</span>
+        <span class="ulOnHover">{{ ob.polyT(`transactions.transactionsTable.status.${ob.state}`) }}</span>
       </div>
     </td>
   </tr>
@@ -103,32 +102,33 @@ export default {
     };
   },
   created () {
-    this.loadData(this.$props);
+    this.loadData(this.$props.options);
   },
   mounted () {
     this.render();
   },
   computed: {
-    info () {
-      if (this.options.model && typeof this.options.model.toJSON === 'function') {
-        return this.options.model.toJSON();
+    ob () {
+      return {
+        ...this.templateHelpers,
+        type: this.type,
+        ...this._state,
+        ...this.model.toJSON(),
+        userCurrency: app.settings.get('localCurrency'),
+        moment,
+        vendorID: this.type === 'sales' ? app.profile.id : this.model.get('vendorID'),
       }
-      return {}
-    },
-    userCurrency () {
-      return app.settings.get('localCurrency');
-    },
-    vendorID () {
-      return this.type === 'sales' ? app.profile.id : this.model.get('vendorID');
     },
     userCols () {
+      let ob = this.ob;
+
       const userCols = [];
 
       if (this.type !== 'sales') {
         userCols.push({
-          avatarHashes: ob.vendorAvatarHashes || {},
-          userHandle: ob.vendorHandle,
-          userId: this.vendorID,
+          avatarHashes: this.ob.vendorAvatarHashes || {},
+          userHandle: this.ob.vendorHandle,
+          userId: this.ob.vendorID,
         });
       }
 
@@ -145,7 +145,7 @@ export default {
       let maxDisplayDecimals;
 
       try {
-        if (!ob.currencyMod.isFiatCur(this.userCurrency)) {
+        if (!this.ob.currencyMod.isFiatCur(this.ob.userCurrency)) {
           maxDisplayDecimals = 6;
         }
       } catch (e) {
@@ -155,8 +155,6 @@ export default {
     },
   },
   methods: {
-    moment,
-
     loadData (options = {}) {
       const types = ['sales', 'purchases', 'cases'];
       const opts = {
@@ -172,6 +170,8 @@ export default {
       if (types.indexOf(opts.type) === -1) {
         throw new Error('Please provide a valid type.');
       }
+
+      this.setState(options.initialState || {});
 
       if (!this.model) {
         throw new Error('Please provide a model');
@@ -189,19 +189,16 @@ export default {
 
     onClickAcceptOrder (e) {
       this.$emit('clickAcceptOrder', { view: this });
-      e.stopPropagation();
       recordEvent('Transactions_AcceptOrder');
     },
 
     onClickRejectOrder (e) {
       this.$emit('clickRejectOrder', { view: this });
-      e.stopPropagation();
       recordEvent('Transactions_RejectOrder');
     },
 
     onClickCancelOrder (e) {
       this.$emit('clickCancelOrder', { view: this });
-      e.stopPropagation();
       recordEvent('Transactions_CancelOrder');
     },
 

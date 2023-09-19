@@ -21,6 +21,7 @@ import {
   ensureMainnetCode,
 } from '../data/walletCurrencies';
 import {
+  getCryptoTradingPairOptions,
   renderCryptoIcon,
   renderCryptoTradingPair,
   renderCryptoPrice,
@@ -117,6 +118,7 @@ const currencyExport = {
 
 const crypto = {
   cryptoIcon: gracefulException(renderCryptoIcon),
+  tradingPairOptions: gracefulException(getCryptoTradingPairOptions),
   tradingPair: gracefulException(renderCryptoTradingPair),
   cryptoPrice: gracefulException(renderCryptoPrice),
   ensureMainnetCode,

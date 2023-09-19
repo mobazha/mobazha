@@ -2,8 +2,7 @@
   <div>
     <ProcessingButton
       :className="`clrP clrBr ${useIcon && 'iconBtnSm tx3' || 'btn'} ${ob.isBlocking ? 'processing' : ''} ${ob.tooltipClass}`"
-      @click="onClickBlock"
-      @click.stop
+      @click.stop="onClickBlock"
       :attrs="{ 'data-tip': ob.isBlocked ? ob.polyT('blockButton.tipUnblock') : ob.polyT('blockButton.tipBlock') }"
       :textClassName="textClassName"
       :btnText="btnText"

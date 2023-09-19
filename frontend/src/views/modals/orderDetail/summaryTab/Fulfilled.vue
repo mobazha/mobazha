@@ -60,7 +60,8 @@
 
       <div v-else-if="ob.contractType === 'CRYPTOCURRENCY'">
         <div class="flex gutterH clrT">
-          <div class="statusIconCol">{{ ob.crypto.cryptoIcon({ code: ob.coinType, className: 'clrBr', }) }}
+          <div class="statusIconCol">
+            <CryptoIcon :code="ob.coinType" className="clrBr"/>
           </div>
           <div class="flexExpand tx5 posR">
             <div class="rowTn txB">{{ ob.polyT('orderDetail.summaryTab.fulfilled.cryptoSentLabel', {

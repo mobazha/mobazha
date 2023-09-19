@@ -9,7 +9,7 @@
           :name="ob.controlType === 'radio' ? 'currencies' : ''"
           :checked="cur.active && !cur.disabled">
         <label :for="`curSel${cur.code}${ob.cid}`">
-          {{ ob.crypto.cryptoIcon({ code: cur.code }) }}
+          <CryptoIcon :code="ob.code"/>
           <span class="curName noOverflow">{{ cur.displayName }}</span>
         </label>
       </span>

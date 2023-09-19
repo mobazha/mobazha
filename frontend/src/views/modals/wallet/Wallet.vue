@@ -18,9 +18,11 @@
           <div class="flex gutterH">
             <div class="col3">
               <div class="flexColWide gutterV">
-                <div v-for="(coin, key) in navCoins" :key="key" class="js-coinNavContainer coinNav unstyled border padMdKids borderStacked clrP clrBr clrSh3">
-                  <CoinNavItem :options="{...coin, active: coin.code === activeCoin }" @click="coinSelected(coin)"/>
-                </div>
+                <ul class="js-coinNavContainer coinNav unstyled border padMdKids borderStacked clrP clrBr clrSh3">
+                  <CoinNavItem v-for="(coin, key) in navCoins" :key="key"
+                    :options="{initialState: {...coin, active: coin.code === activeCoin} }"
+                    @click="coinSelected(coin)"/>
+                </ul>
                 <div class="js-cryptoListingsTeaser border clrP clrBr clrSh3">
                   <CryptoListingsTeaser
                     :viewCryptoListingsUrl="viewCryptoListingsUrl"
@@ -38,12 +40,18 @@
                     <div class="flexColWide clrP clrSh3">
                       <div class="js-sendReceiveNavContainer rowMd"></div>
                       <SendReceiveNav class="rowMd"
-                        :options="{ initialState: { sendModeOn }, }"
-                        :clickSend="this.sendModeOn = true"
-                        :clickReceive="this.sendModeOn = false" />
+                        :sendModeOn="sendModeOn"
+                        :clickSend="onClickSend"
+                        :clickReceive="onClickReceive" />
                       <div class="js-sendReceiveContainer sendReceiveContainer clrP">
                         <SendMoney v-if="sendModeOn" :options="{ coinType: activeCoin, }" />
-                        <ReceiveMoney v-else :options="{ initialState: { coinType: activeCoin }, }" />
+                        <ReceiveMoney
+                          v-else
+                          ref="receiveMoney"
+                          :coinType="activeCoin"
+                          :fetching="fetchingAddress"
+                          :address="receiveAddress"
+                           />
                       </div>
                     </div>
                   </div>
@@ -92,11 +100,9 @@ import defaultSearchProviders from '../../../../backbone/data/defaultSearchProvi
 import { recordEvent } from '../../../../backbone/utils/metrics';
 import { getSocket } from '../../../../backbone/utils/serverConnect';
 import app from '../../../../backbone/app';
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
 import { launchEditListingModal } from '../../../../backbone/utils/modalManager';
 import Transactions from '../../../../backbone/collections/wallet/Transactions';
 import Listing from '../../../../backbone/models/listing/Listing';
-import BaseModal from '../BaseModal';
 import CoinNavItem from './CoinNavItem.vue';
 import CoinStats from './CoinStats.vue';
 import SendReceiveNav from './SendReceiveNav.vue';
@@ -104,12 +110,11 @@ import SendMoney from './SendMoney.vue';
 import ReceiveMoney from './ReceiveMoney.vue';
 import TransactionsVw from './transactions/Transactions.vue';
 import ReloadTransactions from './ReloadTransactions.vue';
-import CryptoTicker from '../../components/CryptoTicker';
 import CryptoListingsTeaser from './CryptoListingsTeaser.vue'
 
 
 export default {
-  component: {
+  components: {
     CoinNavItem,
     CoinStats,
     SendReceiveNav,
@@ -117,7 +122,6 @@ export default {
     ReceiveMoney,
     ReloadTransactions,
     TransactionsVw,
-    CryptoTicker,
     CryptoListingsTeaser,
   },
   props: {
@@ -130,12 +134,16 @@ export default {
     return {
       activeCoin: '',
       viewCryptoListingsUrl: '',
+      sendModeOn: true,
+
+      fetchingAddress: true,
+      receiveAddress: '',
     };
   },
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.$props.options);
   },
   mounted () {
   },
@@ -364,6 +372,16 @@ export default {
       recordEvent('Wallet_ViewCryptoListings');
     },
 
+    onClickSend() {
+      this.sendModeOn = true;
+      console.log('sendModeOn', this.sendModeOn)
+    },
+
+    onClickReceive() {
+      this.sendModeOn = false;
+      console.log('sendModeOn', this.sendModeOn)
+    },
+
     checkCoinType(coinType) {
       if (typeof coinType !== 'string' || !coinType) {
         throw new Error('Please provide the coinType as a string.');
@@ -378,33 +396,19 @@ export default {
           .find((xhr) => xhr.state() === 'pending');
         if (pendingFetch) return pendingFetch;
       }
-
-      const receiveMoneyVw = this.getReceiveMoneyVw(coinType);
-
-      if (receiveMoneyVw) {
-        receiveMoneyVw.setState({
-          fetching: true,
-        });
-      }
+      this.fetchingAddress = true;
 
       this.needAddress[coinType] = false;
 
       const fetch = $.get(app.getServerUrl(`wallet/address/${coinType}`))
         .done((data) => {
-          if (receiveMoneyVw && !receiveMoneyVw.isRemoved()) {
-            receiveMoneyVw.setState({
-              fetching: false,
-              address: data.address,
-            });
-          }
+          this.fetchingAddress = false;
+          this.receiveAddress = data.address;
         }).fail((xhr) => {
           if (xhr.statusText === 'abort') return;
           this.needAddress[coinType] = true;
-          if (receiveMoneyVw && !receiveMoneyVw.isRemoved()) {
-            receiveMoneyVw.setState({
-              fetching: false,
-            });
-          }
+
+          this.fetchingAddress = false;
         });
 
       this.addressFetches[coinType] = this.addressFetches[coinType] || [];

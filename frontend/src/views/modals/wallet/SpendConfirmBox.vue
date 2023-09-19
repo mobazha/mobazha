@@ -20,7 +20,7 @@
             </div>
             <div v-else>
               <p class="clrT2">{{ ob.polyT('wallet.spendConfirmBox.bodyGenericError', { err: ob.fetchError || '' }) }}</p>
-              <a @click="onClickRetry" @click.stop>{{ ob.polyT('wallet.spendConfirmBox.btnRetry') }}</a>
+              <a @click.stop="onClickRetry">{{ ob.polyT('wallet.spendConfirmBox.btnRetry') }}</a>
             </div>
           </div>
 
@@ -47,12 +47,12 @@
           </div>
 
           <div v-else-if="!ob.fetchFailed">
-            <a @click="onClickCancel" @click.stop>{{ ob.polyT('wallet.spendConfirmBox.btnCancel') }}</a>
-            <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph " @click="onClickSend" @click.stop>{{ ob.btnSendText }}</a>
+            <a @click.stop="onClickCancel">{{ ob.polyT('wallet.spendConfirmBox.btnCancel') }}</a>
+            <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph " @click.stop="onClickSend">{{ ob.btnSendText }}</a>
           </div>
 
           <div v-else>
-            <a @click="onClickCancel" @click.stop>{{ ob.polyT('wallet.spendConfirmBox.btnClose') }}</a>
+            <a @click.stop="onClickCancel">{{ ob.polyT('wallet.spendConfirmBox.btnClose') }}</a>
           </div>
         </div>
       </div>
@@ -91,7 +91,7 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.$props.options);
   },
   mounted () {
     this.render();

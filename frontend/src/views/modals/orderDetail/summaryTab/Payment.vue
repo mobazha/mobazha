@@ -14,7 +14,7 @@
           </div>
 
           <div v-else>
-            {{ ob.crypto.cryptoIcon({ code: ob.paymentCoin, className: 'clrBr', }) }}
+            <CryptoIcon :code="ob.paymentCoin" className="clrBr"/>
           </div>
         </div>
         <div class="flexExpand tx5">

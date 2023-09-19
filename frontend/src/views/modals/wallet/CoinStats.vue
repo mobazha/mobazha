@@ -1,50 +1,35 @@
 <template>
   <div class="coinStats border clrP clrBr clrSh3">
     <!-- // the icon should be added after the text size class determination -->
-    <div v-if="confirmedText" class="flexVCent gutterHTn">
-      {{
-        ob.polyT('cryptoAmountIconPairing', {
-          amount: `<div>${confirmedText}</div>`,
-          icon: ob.crypto.cryptoIcon({
-            code: ob.cryptoCur,
-            className: 'cryptoIcon18',
-          })
-        })
-      }}
-    </div>
     <div class="coinIcon">
-      {{ ob.crypto.cryptoIcon({ code: ob.cryptoCur, className: '' }) }}
+      <CryptoIcon :code="ob.cryptoCur" />
     </div>
     <div class="flex colWrap gutterH">
       <div :class="`${colClass} flexExpand`">
         <div class="flexCol flexHCent gutterVSm padSm">
           <div class="txB tx5">{{ ob.polyT('wallet.coinStats.balanceHeader') }}</div>
-          <div :class="`clrTEm txB ${confirmedTextSizeClass}`">{{ confirmedText }}</div>
+          <div :class="`clrTEm txB ${confirmedTextSizeClass}`">
+            <div v-if="confirmedText" class="flexVCent gutterHTn">
+              <div>{{ confirmedText }}</div>
+              <CryptoIcon :code="ob.cryptoCur" className="cryptoIcon18"/>
+            </div>
+          </div>
           <div class="clrT2 tx5b lineHeight1">{{ unconfirmedText }}</div>
         </div>
       </div>
-      <div v-if="showDisplayCur">
-        <div :class="`${colClass} flexExpand displayCurCol`">
-          <div class="flexCol flexHCent gutterVSm padSm clrBr displayCurColContent">
-            <div class="txB tx5">{{ ob.polyT('wallet.coinStats.valueInDisplayCur', { cur: ob.displayCur }) }}</div>
-            <div :class="`clrTEm txB ${valueInDisplayCurSizeClass}`">
-              <div v-if="ob.currencyMod.isFiatCur(ob.displayCur)">
-                {{ ob.currencyMod.convertAndFormatCurrency(ob.confirmed, ob.cryptoCur, ob.displayCur) }}
-              </div>
+      <div v-if="showDisplayCur" :class="`${colClass} flexExpand displayCurCol`">
+        <div class="flexCol flexHCent gutterVSm padSm clrBr displayCurColContent">
+          <div class="txB tx5">{{ ob.polyT('wallet.coinStats.valueInDisplayCur', { cur: ob.displayCur }) }}</div>
+          <div :class="`clrTEm txB ${valueInDisplayCurSizeClass}`">
+            <div v-if="ob.currencyMod.isFiatCur(ob.displayCur)">
+              {{ ob.currencyMod.convertAndFormatCurrency(ob.confirmed, ob.cryptoCur, ob.displayCur) }}
+            </div>
 
-              <div v-else>
-                <div class="flexVCent gutterHTn">
-                  {{
-                    ob.polyT('cryptoAmountIconPairing', {
-                      amount:
-                        `<div>${ob.currencyMod.convertAndFormatCurrency(ob.confirmed, ob.cryptoCur, ob.displayCur, {
-                          includeCryptoCurIdentifier: false,
-                        })}
-                  </div>`,
-                      icon: ob.crypto.cryptoIcon({ code: ob.displayCur, className: 'cryptoIcon18', })
-                    })
-                  }}
+            <div v-else>
+              <div class="flexVCent gutterHTn">
+                <div>{{ ob.currencyMod.convertAndFormatCurrency(ob.confirmed, ob.cryptoCur, ob.displayCur, { includeCryptoCurIdentifier: false, }) }}
                 </div>
+                <CryptoIcon :code="ob.displayCur" className="cryptoIcon18" />
               </div>
             </div>
           </div>
@@ -80,7 +65,7 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData();
+    this.loadData(this.$props.options);
   },
   computed: {
     ob () {
@@ -96,10 +81,10 @@ export default {
       return typeof this.ob.displayCur === 'string' && this.ob.displayCur;
     },
     cryptoCurHasExchangeRate () {
-      return this.isValidCryptoCur && typeof ob.currencyMod.getExchangeRate(this.ob.cryptoCur) === 'number';
+      return this.isValidCryptoCur && typeof this.ob.currencyMod.getExchangeRate(this.ob.cryptoCur) === 'number';
     },
     displayCurHasExchangeRate () {
-      return this.isValidDisplayCur && typeof ob.currencyMod.getExchangeRate(this.ob.displayCur) === 'number';
+      return this.isValidDisplayCur && typeof this.ob.currencyMod.getExchangeRate(this.ob.displayCur) === 'number';
     },
     showDisplayCur () {
       return this.isValidCryptoCur && this.isValidDisplayCur &&
@@ -107,27 +92,27 @@ export default {
         this.ob.displayCur !== this.ob.cryptoCur;
     },
     colClass () {
-      return showDisplayCur ? 'col4 statCol' : 'col6 statCol';
+      return this.showDisplayCur ? 'col4 statCol' : 'col6 statCol';
     },
     confirmedText () {
-      return this.isValidCryptoCur ? ob.currencyMod.formatCurrency(this.ob.confirmed, this.ob.cryptoCur, { includeCryptoCurIdentifier: false }) : '';
+      return this.isValidCryptoCur ? this.ob.currencyMod.formatCurrency(this.ob.confirmed, this.ob.cryptoCur, { includeCryptoCurIdentifier: false }) : '';
     },
     confirmedTextSizeClass () {
       let confirmedTextSizeClass = 'tx2';
-      confirmedTextSizeClass = confirmedText.length > 14 ? 'tx3' : confirmedTextSizeClass;
-      confirmedTextSizeClass = confirmedText.length > 18 ? 'tx4' : confirmedTextSizeClass;
+      confirmedTextSizeClass = this.confirmedText.length > 14 ? 'tx3' : confirmedTextSizeClass;
+      confirmedTextSizeClass = this.confirmedText.length > 18 ? 'tx4' : confirmedTextSizeClass;
       return confirmedTextSizeClass;
     },
     unconfirmedText () {
-      let unconfirmedText = this.ob.unconfirmed instanceof ob.bigNumber && this.isValidCryptoCur ?
-        ob.currencyMod.formatCurrency(this.ob.unconfirmed, this.ob.cryptoCur, { useCryptoSymbol: false }) : '';
-      unconfirmedText = unconfirmedText ? ob.polyT('wallet.coinStats.unconfirmedBalance', { amount: unconfirmedText }) : '';
+      let unconfirmedText = this.ob.unconfirmed instanceof this.ob.bigNumber && this.isValidCryptoCur ?
+        this.ob.currencyMod.formatCurrency(this.ob.unconfirmed, this.ob.cryptoCur, { useCryptoSymbol: false }) : '';
+      unconfirmedText = unconfirmedText ? this.ob.polyT('wallet.coinStats.unconfirmedBalance', { amount: unconfirmedText }) : '';
 
       return unconfirmedText;
     },
     valueInDisplayCurSizeClass () {
       const valueInDisplayCur =
-        ob.currencyMod.convertAndFormatCurrency(this.ob.confirmed, this.ob.cryptoCur, this.ob.displayCur, {
+        this.ob.currencyMod.convertAndFormatCurrency(this.ob.confirmed, this.ob.cryptoCur, this.ob.displayCur, {
           includeCryptoCurIdentifier: false,
         });
       let valueInDisplayCurSizeClass = valueInDisplayCur.length > 14 ? 'tx3' : 'tx2';

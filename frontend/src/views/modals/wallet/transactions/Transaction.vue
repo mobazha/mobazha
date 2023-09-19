@@ -32,8 +32,7 @@
                 :className="`btn clrP clrBr clrSh2 js-retryPmt ${ob.retryInProgress ? 'processing' : ''}`"
                 :disabled="ob.retryConfirmOn"
                 :btnText="ob.polyT('wallet.transactions.transaction.retryTransactionBtn')"
-                @click="onClickRetryPmt"
-                @click.stop/>
+                @click.stop="onClickRetryPmt" />
             </div>
           </div>
         </div>
@@ -47,7 +46,7 @@
 
       <div v-else-if="ob.fetchFeeFailed">
         <p class="clrT2 bodyText">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.fetchError', { err: ob.fetchFeeError || ''}) }}</p>
-        <a class=" clrTEm" @click="onClickRetryFeeFetch" @click.stop>{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.btnRetry') }}</a>
+        <a class=" clrTEm" @click.stop="onClickRetryFeeFetch">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.btnRetry') }}</a>
       </div>
 
       <div v-else-if="typeof ob.estimatedFee === 'number'">
@@ -92,9 +91,7 @@ import {
   getCurrencyByCode as getWalletCurByCode,
 } from '../../../../../backbone/data/walletCurrencies.js';
 import app from '../../../../../backbone/app.js';
-import { openSimpleMessage } from '../../SimpleMessage';
-import loadTemplate from '../../../../../backbone/utils/loadTemplate.js';
-import BaseVw from '../../../baseVw';
+import { openSimpleMessage } from '../../../../../backbone/views/modals/SimpleMessage';
 
 
 export default {

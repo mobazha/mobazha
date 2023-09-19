@@ -10,8 +10,7 @@
           <div v-if="!ob.isCrypto">
             <span class="clrBr ion-ios-rewind"></span>
           </div>
-
-          <div v-else>{{ ob.crypto.cryptoIcon({ code: ob.paymentCoin, className: 'clrBr', }) }}</div>
+          <CryptoIcon v-else :code="ob.paymentCoin" className="clrBr" />
         </div>
         <div class="flexExpand tx5">
           <div class="rowTn txB">{{ infoLine }}</div>

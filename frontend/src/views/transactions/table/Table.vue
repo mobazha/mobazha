@@ -9,7 +9,7 @@
 
     <div v-else-if="ob.fetchFailed">
       <div class="center txCtr tx4">
-        <div class="txB <% print(ob.initialFetchErrorMessage ? 'rowTn' : 'row') %>">{{ ob.polyT(`transactions.${type}.unableToFetch`) }}</div>
+        <div class="txB <% print(ob.initialFetchErrorMessage ? 'rowTn' : 'row') %>">{{ ob.polyT(`transactions.${ob.type}.unableToFetch`) }}</div>
         <div v-if="ob.fetchError" class="row">{{ ob.fetchError }}</div>
 
         <a class="btn clrP clrBr clrSh2 " @click="onClickRetryFetch">{{ ob.polyT(`transactions.transactionsTable.btnRetryFetch`) }}</a>
@@ -17,18 +17,18 @@
     </div>
 
     <div v-else>
-      <div v-if="transactions.length">
+      <div v-if="ob.transactions.length">
         <table class="js-transactionsTable transactionsTable clrBr clrP row">
           <tr>
             <th class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.orderID') }}</th>
             <th class="clrBr">
               <a class="js-dateHeader dateHeader clrT">{{ ob.polyT('transactions.transactionsTable.headers.date') }}<div class="sortIcon hide"></div></a>
             </th>
-            <th v-if="type !== 'cases'" class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.listing') }}</th>
-            <th v-if="type === 'sales'" class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.buyer') }}</th>
+            <th v-if="ob.type !== 'cases'" class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.listing') }}</th>
+            <th v-if="ob.type === 'sales'" class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.buyer') }}</th>
             <th v-else class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.vendor') }}</th>
 
-            <th v-if="type === 'cases'" class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.buyer') }}</th>
+            <th v-if="ob.type === 'cases'" class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.buyer') }}</th>
 
             <th class="clrBr priceHeader">{{ ob.polyT('transactions.transactionsTable.headers.total') }}</th>
             <th class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.status') }}</th>
@@ -39,7 +39,7 @@
 
       <div v-else>
         <div class="contentBox clrP clrBr noResultsWrap">
-          <div class="center">{{ ob.polyT(`transactions.${type}.noResults`) }}</div>
+          <div class="center">{{ ob.polyT(`transactions.${ob.type}.noResults`) }}</div>
         </div>
       </div>
     </div>
@@ -93,6 +93,14 @@ export default {
     this.render();
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        type: this.type,
+        transactions: this.collection.toJSON(),
+        ...this._state,
+      };
+    },
     transactions() {
       return this.collection.toJSON();
     }
@@ -125,6 +133,8 @@ export default {
       if (typeof opts.openOrder !== 'function') {
         throw new Error('Please provide a function to open the order detail modal.');
       }
+
+      this.setState(opts.initialState || {});
 
       if (!this.collection) {
         throw new Error('Please provide a collection');

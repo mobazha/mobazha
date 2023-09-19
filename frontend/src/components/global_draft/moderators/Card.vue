@@ -1,5 +1,5 @@
 <template>
-  <div class="moderatorCard clrBr" @click="click" @click.stop>
+  <div class="moderatorCard clrBr" @click.stop="click">
 
     <div :class="`moderatorCardInner clrP {{ isDisabled }} ${ob.verified ? 'verified clrBrAlert2 clrBAlert2Grad' : ''}`">
       <div class="flexRow gutterH moderatorCardContent">

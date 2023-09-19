@@ -199,13 +199,8 @@
     <div v-else class="flexVCent gutterH">
       <div class="tradeFromCol">
         <div class="flexVCent gutterHSm">
-          {{ ob.polyT('cryptoCodeIconPairing', {
-              code: `<span class="txB clamp">${ob.acceptedCurrencies && ob.acceptedCurrencies[0] || ''}</span>`,
-              icon: ob.crypto.cryptoIcon({
-                code: `${ob.acceptedCurrencies && ob.acceptedCurrencies[0] || ''}`,
-                className: 'flexNoShrink',
-              }),
-        }) }}
+          <CryptoIcon :code="`${ob.acceptedCurrencies && ob.acceptedCurrencies[0] || ''}`" className="flexNoShrink" />
+          <span class="txB clamp">{{ ob.acceptedCurrencies && ob.acceptedCurrencies[0] || '' }}</span>
         </div>
       </div>
       <div class="tradeArrowCol">
@@ -213,12 +208,8 @@
       </div>
       <div class="tradeToCol">
         <div class="flexVCent gutterHSm">
-          {{ 
-          ob.polyT('cryptoCodeIconPairing', {
-              code: `<span class="txB clamp">${ob.coinType}</span>`,
-              icon: ob.crypto.cryptoIcon({ code: ob.coinType }),
-          })
-        }}
+          <CryptoIcon :code="ob.coinType"/>
+          <span class="txB clamp">{{ ob.coinType }}</span>
         </div>
       </div>
       <div class="vendorCol">

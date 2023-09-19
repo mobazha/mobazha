@@ -1,6 +1,12 @@
 <template>
   <span class="quantityDisplay">
-    <span v-if="typeof ob.amount === 'number'" class="content {{ ob.contentClass }}">{{ formattedAmount }}</span>
+    <span v-if="typeof ob.amount === 'number'" class="content {{ ob.contentClass }}">
+      <div v-if="ob.coinType">
+        <span>{{ formattedAmount }}</span>
+        <CryptoIcon :code="ob.coinType" />
+      </div>
+      <div v-else>{{ formattedAmount }}</div>
+    </span>
     <div v-else-if="ob.isFetching">
       <SpinnerSVG :className="ob.spinnerClass" />
     </div>
@@ -59,13 +65,6 @@ export default {
         minimumFractionDigits: 0,
         maximumFractionDigits: 4,
       }).format(ob.amount);
-
-      formattedAmount = ob.coinType ?
-        ob.polyT('cryptoAmountIconPairing', {
-          amount: `<span>${formattedAmount}</span>`,
-          icon: ob.crypto.cryptoIcon({ code: ob.coinType }),
-        }) :
-        formattedAmount;
 
       return formattedAmount;
     },

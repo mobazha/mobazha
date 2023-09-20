@@ -4,13 +4,22 @@
      the other is also maintained. -->
     <div class="txB rowSm">{{ ob.polyT('userPage.store.categoryFilter.heading') }}</div>
     <div class="btnRadio">
-      <input type="radio" name="filterShippingCategory" value="all" id="filterShippingCategoryAll" data-var-type="boolean" :checked="ob.selected === 'all'" />
+      <input
+        @change="onChangeCategory"
+        type="radio"
+        name="filterShippingCategory"
+        value="all"
+        id="filterShippingCategoryAll"
+        data-var-type="boolean"
+        :checked="ob.selected === 'all'"
+      />
       <label for="filterShippingCategoryAll">{{ ob.polyT('userPage.store.categoryFilter.all') }}</label>
     </div>
 
     <div v-for="(cat, index) in ob.categories.slice(0, ob.maxInitiallyVisibleCats - 1)" :key="index">
       <div class="btnRadio">
         <input
+          @change="onChangeCategory"
           type="radio"
           name="filterShippingCategory"
           :value="formatCategoryString(cat)"
@@ -27,6 +36,7 @@
           <div v-for="(cat, index) in ob.categories.slice(ob.maxInitiallyVisibleCats - 1)" :key="index">
             <div class="btnRadio">
               <input
+                @change="onChangeCategory"
                 type="radio"
                 name="filterShippingCategory"
                 :value="cat"
@@ -101,19 +111,10 @@ export default {
       };
 
       this.setState(opts.initialState || {});
-      this.options = opts;
     },
-
-    events() {
-      return {
-        'change input[type="radio"]': 'onChangeCategory',
-      };
-    },
-
     onClickShowMoreLess() {
       this.setState({ expanded: !this.getState().expanded });
     },
-
     onChangeCategory(e) {
       this._state.selected = e.target.value;
       this.trigger('category-change', { value: $(e.target).val() });

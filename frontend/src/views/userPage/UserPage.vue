@@ -98,7 +98,6 @@ import Store from '../../../backbone/views/userPage/Store';
 import Follow from '../../../backbone/views/userPage/Follow';
 import Reputation from '../../../backbone/views/userPage/Reputation';
 
-
 export default {
   props: {
     options: {
@@ -106,20 +105,19 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props.options);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         ...this.model.toJSON(),
@@ -129,13 +127,13 @@ export default {
         followerCount: abbrNum(this.followerCount),
       };
     },
-    headerHash () {
+    headerHash() {
       const ob = this.ob;
-      return ob.headerHashes ? ob.isHiRez() ? ob.headerHashes.large : ob.headerHashes.medium : '';
+      return ob.headerHashes ? (ob.isHiRez() ? ob.headerHashes.large : ob.headerHashes.medium) : '';
     },
   },
   methods: {
-    loadData (options = {}) {
+    loadData(options = {}) {
       this.setState(options.initialState || {});
 
       if (!options.model) {
@@ -149,15 +147,15 @@ export default {
       this.tabViews = { Home, Store, Follow, Reputation };
 
       const stats = this.model.get('stats');
-      this._followingCount = stats.get('followingCount');
-      this._followerCount = stats.get('followerCount');
+      this.followingCount = stats.get('followingCount');
+      this.followerCount = stats.get('followerCount');
 
       if (!this.ownPage) {
-        if (this._followerCount === 0 && app.ownFollowing.indexOf(this.model.id) > -1) {
-          this._followerCount = 1;
+        if (this.followerCount === 0 && app.ownFollowing.indexOf(this.model.id) > -1) {
+          this.followerCount = 1;
         }
       } else {
-        this._followingCount = app.ownFollowing.length;
+        this.followingCount = app.ownFollowing.length;
       }
 
       this.listenTo(this.model.get('headerHashes'), 'change', () => this.updateHeader());
@@ -177,7 +175,7 @@ export default {
           this.miniProfile.setState({ followsYou: data.followsMe });
         }
 
-        if (this.followingCount === 0 && !this.ownPage) this.followingCount = 1;
+        if (this.followingCount === 0 && !this.ownPage) this.setFollowingCount(1);
       });
 
       this.listenTo(blockEvents, 'blocked unblocked', (data) => {
@@ -187,38 +185,38 @@ export default {
       });
     },
 
-    onOwnFollowingAdd (md) {
+    onOwnFollowingAdd(md) {
       if (this.ownPage) {
-        this.followingCount += 1;
+        this.setFollowingCount(this.followingCount + 1);
       } else if (md.id === this.model.id) {
-        this.followerCount += 1;
+        this.setFollowerCount(this.followerCount + 1);
       }
     },
 
-    onOwnFollowingRemove (md) {
+    onOwnFollowingRemove(md) {
       if (this.ownPage) {
-        this.followingCount -= 1;
+        this.setFollowingCount(this.followingCount - 1);
       } else if (md.id === this.model.id) {
-        this.followerCount -= 1;
+        this.setFollowerCount(this.followerCount - 1);
       }
     },
 
-    clickTab (e) {
+    clickTab(e) {
       const tab = $(e.target).closest('.js-tab').attr('data-tab');
       recordEvent('UserPage_Tab', { tab });
       this.setTabState(tab);
     },
 
-    clickMore () {
+    clickMore() {
       this.$moreableBtns.toggleClass('hide');
     },
 
-    clickCustomize () {
+    clickCustomize() {
       recordEvent('Settings_Open', { origin: 'userPage' });
       launchSettingsModal({ initialTab: 'Page' });
     },
 
-    clickCreateListing () {
+    clickCreateListing() {
       recordEvent('Listing_New', { origin: 'userPage' });
       const listingModel = new Listing({}, { guid: app.profile.id });
 
@@ -227,7 +225,7 @@ export default {
       });
     },
 
-    clickCloseStoreWelcomeCallout () {
+    clickCloseStoreWelcomeCallout() {
       recordEvent('UserPage_CloseStoreWelcome');
       if (this.curConn && this.curConn.server) {
         this.curConn.server.save({ dismissedStoreWelcome: true });
@@ -235,46 +233,37 @@ export default {
       }
     },
 
-    clickRating () {
+    clickRating() {
       recordEvent('UserPage_ClickReputation');
       this.setTabState('reputation');
-    }
+    },
 
-  get followingCount () {
-      return this._followingCount;
-    }
-
-  set followingCount (count) {
+    setFollowingCount(count) {
       if (typeof count !== 'number') {
         throw new Error('Please provide a numeric count.');
       }
 
-      if (count !== this._followingCount) {
-        this._followingCount = count;
+      if (count !== this.followingCount) {
+        this.followingCount = count;
         this.getCachedEl('.js-followingCount').text(abbrNum(count));
       }
-    }
-
-  get followerCount () {
-      return this._followerCount;
-    }
-
-  set followerCount (count) {
+    },
+    setFollowerCount(count) {
       if (typeof count !== 'number') {
         throw new Error('Please provide a numeric count.');
       }
 
-      if (count !== this._followerCount) {
-        this._followerCount = count;
+      if (count !== this.followerCount) {
+        this.followerCount = count;
         this.getCachedEl('.js-followerCount').text(abbrNum(count));
       }
     },
 
-    setBlockedClass () {
+    setBlockedClass() {
       this.$el.toggleClass('isBlocked', isBlocked(this.model.id));
     },
 
-    updateHeader () {
+    updateHeader() {
       const headerHashes = this.model.get('headerHashes').toJSON();
       const headerHash = isHiRez() ? headerHashes.large : headerHashes.medium;
 
@@ -282,19 +271,19 @@ export default {
         $('.js-header').attr(
           'style',
           `background-image: url(${app.getServerUrl(`ob/image/${headerHash}`)}),
-        url('../imgs/defaultHeader.png')`,
+        url('../imgs/defaultHeader.png')`
         );
       }
     },
 
-    createFollowersTabView (opts = {}) {
+    createFollowersTabView(opts = {}) {
       const collection = new Followers([], {
         peerID: this.model.id,
         type: 'followers',
       });
 
       this.listenTo(collection, 'sync', () => {
-        this.followerCount = collection.length;
+        this.setFollowerCount(collection.length);
       });
 
       return this.createChild(this.tabViews.Follow, {
@@ -305,9 +294,8 @@ export default {
       });
     },
 
-    createFollowingTabView (opts = {}) {
-      const models = app.profile.id === this.model.id
-        ? app.ownFollowing.models : [];
+    createFollowingTabView(opts = {}) {
+      const models = app.profile.id === this.model.id ? app.ownFollowing.models : [];
       const collection = new Followers(models, {
         peerID: this.model.id,
         type: 'following',
@@ -315,7 +303,7 @@ export default {
       });
 
       this.listenTo(collection, 'sync', () => {
-        this.followingCount = collection.length;
+        this.setFollowingCount(collection.length);
       });
 
       return this.createChild(this.tabViews.Follow, {
@@ -326,7 +314,7 @@ export default {
       });
     },
 
-    createStoreTabView (opts = {}) {
+    createStoreTabView(opts = {}) {
       this.listings = new Listings([], { guid: this.model.id });
 
       let listingsCount = this.model.get('listingCount');
@@ -334,7 +322,7 @@ export default {
       this.listings.on('update', () => {
         if (this.listings.length !== listingsCount) {
           listingsCount = this.listings.length;
-          this.$listingsCount.html(abbrNum(listingsCount));
+          $('.js-listingsCount').html(abbrNum(listingsCount));
         }
       });
 
@@ -346,7 +334,7 @@ export default {
       });
     },
 
-    setTabState (state, options = {}) {
+    setTabState(state, options = {}) {
       if (!state) {
         throw new Error('Please provide a state.');
       }
@@ -355,7 +343,7 @@ export default {
       this.selectTab(state, options);
     },
 
-    selectTab (targ, options = {}) {
+    selectTab(targ, options = {}) {
       const opts = {
         addTabToHistory: true,
         ...options,
@@ -380,8 +368,7 @@ export default {
         this.$tabTitle.text(tabName);
 
         if (opts.addTabToHistory) {
-          const listingBaseUrl = this.model.get('handle')
-            ? `@${this.model.get('handle')}` : this.model.id;
+          const listingBaseUrl = this.model.get('handle') ? `@${this.model.get('handle')}` : this.model.id;
 
           // add tab to history
           app.router.navigateUser(`${listingBaseUrl}/${targ.toLowerCase()}`, this.model.id);
@@ -406,32 +393,15 @@ export default {
         this.$tabContent.append(tabView.$el);
         this.currentTabView = tabView;
       }
-    }
-
-  get $pageContent () {
-      if (!this._$pageContent) {
-        this._$pageContent = $('.js-pageContent');
-      }
-      return this._$pageContent;
-    }
-
-  get $listingsCount () {
-      if (!this._$listingsCount) {
-        this._$listingsCount = $('.js-listingsCount');
-      }
-      return this._$listingsCount;
     },
-
-    remove () {
+    remove() {
       if (this.followingFetch) this.followingFetch.abort();
     },
 
-    render () {
+    render() {
       this.$tabContent = $('.js-tabContent');
       this.$tabTitle = $('.js-tabTitle');
       this.$moreableBtns = $('.js-moreableBtn');
-      this._$pageContent = null;
-      this._$listingsCount = null;
 
       if (this.miniProfile) this.miniProfile.remove();
       this.miniProfile = this.createChild(MiniProfile, {
@@ -454,9 +424,8 @@ export default {
       this.setBlockedClass();
 
       return this;
-    }
-
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="scss" scoped></style>

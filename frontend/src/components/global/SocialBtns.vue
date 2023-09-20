@@ -7,15 +7,15 @@
         @click="onClickFollow"
         :btnText="ob.following ? ob.polyT('follow.unfollowBtn') : ob.polyT('follow.followBtn')"
       />
-      <div class="js-blockBtnContainer"></div>
-      <BlockBtn :targetId="options.targetID" />
+      <div class="js-blockBtnContainer">
+        <BlockBtn :options="{ targetId: _options.targetID }" />
+      </div>
     </div>
   </div>
 </template>
 
 <script>
 import app from '../../../backbone/app';
-import loadTemplate from '../../../backbone/utils/loadTemplate';
 import { followedByYou, followUnfollow } from '../../../backbone/utils/follow';
 import { recordEvent } from '../../../backbone/utils/metrics';
 
@@ -27,7 +27,9 @@ export default {
     },
   },
   data() {
-    return {};
+    return {
+      _options: {},
+    };
   },
   created() {
     this.initEventChain();
@@ -40,7 +42,7 @@ export default {
   computed: {
     ob () {
       return {
-        ...this.options,
+        ...this._options,
         ...state,
       };
     },
@@ -61,7 +63,7 @@ export default {
       };
 
       this.setState(opts.initialState || {});
-      // this.options = opts;
+      this._options = opts;
 
       this.listenTo(app.ownFollowing, 'update', () => {
         this.setState({
@@ -74,23 +76,16 @@ export default {
       return 'socialBtns';
     },
 
-    events() {
-      return {
-        'click .js-followUnfollowBtn': 'onClickFollow',
-        'click .js-messageBtn': 'onClickMessage',
-      };
-    },
-
     onClickMessage() {
       // activate the chat message
-      app.chat.openConversation(this.options.targetID);
+      app.chat.openConversation(this._options.targetID);
       recordEvent('Social_OpenChat');
     },
 
     onClickFollow() {
       const type = this.getState().following ? 'unfollow' : 'follow';
       this.setState({ isFollowing: true });
-      this.folCall = followUnfollow(this.options.targetID, type).always(() => {
+      this.folCall = followUnfollow(this._options.targetID, type).always(() => {
         if (this.isRemoved()) return;
         this.setState({ isFollowing: false });
       });
@@ -99,21 +94,6 @@ export default {
       } else {
         recordEvent('Social_Unfollow');
       }
-    },
-
-    render() {
-      super.render();
-      const state = this.getState();
-      loadTemplate('components/socialBtns.html', (t) => {
-        this.$el.html(
-          t({
-            ...this.options,
-            ...state,
-          })
-        );
-      });
-
-      return this;
     },
   },
 };

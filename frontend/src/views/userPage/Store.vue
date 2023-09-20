@@ -113,10 +113,7 @@ import ListingsGrid, { LISTINGS_PER_PAGE } from '../../../backbone/views/userPag
 import CategoryFilter from './CategoryFilter';
 import TypeFilter from './TypeFilter';
 import PopInMessage, { buildRefreshAlertMessage } from '../components/PopInMessage';
-import {
-  localizeNumber,
-  isValidNumber,
-} from '../../../backbone/utils/number';
+import { localizeNumber, isValidNumber } from '../../../backbone/utils/number';
 
 export default {
   props: {
@@ -125,36 +122,34 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props.options);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         ...this.model.toJSON(),
         isFetching,
         fetchFailed,
-        fetchFailReason: fetchFailed && this.fetch.responseJSON
-          && this.fetch.responseJSON.reason || '',
+        fetchFailReason: (fetchFailed && this.fetch.responseJSON && this.fetch.responseJSON.reason) || '',
         filter: this.filter,
         countryList: this.countryList,
         shipsToSelected: this.filter.shipsTo || 'any',
         listingCount: this.collection.length,
-      }
-    }
+      };
+    },
   },
   methods: {
-    loadData (options = {}) {
+    loadData(options = {}) {
       this.setState(options.initialState || {});
       this.options = options;
 
@@ -196,22 +191,20 @@ export default {
           }
         });
 
-        this.listenTo(listingEvents, 'destroy', () => (this.showDataChangedMessage()));
+        this.listenTo(listingEvents, 'destroy', () => this.showDataChangedMessage());
         // if the user changes their vendor setting, toggle the warning
-        this.listenTo(app.profile, 'change:vendor', () => (this.toggleInactiveWarning()));
+        this.listenTo(app.profile, 'change:vendor', () => this.toggleInactiveWarning());
       }
 
-      this.listenTo(app.settings, 'change:country', () => (this.showShippingChangedMessage()));
-      this.listenTo(app.settings, 'change:localCurrency', () => (this.showDataChangedMessage()));
-      this.listenTo(app.localSettings, 'change:bitcoinUnit', () => (this.showDataChangedMessage()));
+      this.listenTo(app.settings, 'change:country', () => this.showShippingChangedMessage());
+      this.listenTo(app.settings, 'change:localCurrency', () => this.showDataChangedMessage());
+      this.listenTo(app.localSettings, 'change:bitcoinUnit', () => this.showDataChangedMessage());
 
-      this.listenTo(app.settings.get('shippingAddresses'), 'update',
-        (cl, opts) => {
-          if (opts.changes.added.length ||
-            opts.changes.removed.length) {
-            this.showShippingChangedMessage();
-          }
-        });
+      this.listenTo(app.settings.get('shippingAddresses'), 'update', (cl, opts) => {
+        if (opts.changes.added.length || opts.changes.removed.length) {
+          this.showShippingChangedMessage();
+        }
+      });
 
       // this block should be last
       if (options.initialFetch) {
@@ -220,35 +213,36 @@ export default {
       }
     },
 
-    events () {
+    events() {
       return {
         'click .js-retryFetch': 'onClickRetryFetch',
       };
     },
 
-    onFilterFreeShippingChange (e) {
+    onFilterFreeShippingChange(e) {
       this.filter.freeShipping = $(e.target).is(':checked');
       this.renderListings(this.filteredCollection());
     },
 
-    toggleInactiveWarning () {
-      this.$inactiveWarning.toggleClass('hide', app.settings.get('vendor'));
+    toggleInactiveWarning() {
+      this.$inactiveWarning().toggleClass('hide', app.settings.get('vendor'));
     },
 
-    onShipsToSelectChange (e) {
+    onShipsToSelectChange(e) {
       this.filter.shipsTo = e.target.value;
       this.renderListings(this.filteredCollection());
     },
 
-    onChangeSortBy (e) {
+    onChangeSortBy(e) {
       this.filter.sortBy = $(e.target).val();
       this.renderListings();
     },
 
-    onUpdateCollection (cl, opts) {
+    onUpdateCollection(cl, opts) {
       if (opts.changes.added) {
         opts.changes.added.forEach((md) => {
-          md.searchDescription = $('<div />').html(md.get('description') || '')
+          md.searchDescription = $('<div />')
+            .html(md.get('description') || '')
             .text()
             .toLocaleLowerCase();
           md.searchTitle = (md.get('title') || '').toLocaleLowerCase();
@@ -263,8 +257,7 @@ export default {
             })
           ) {
             try {
-              md.convertedPrice = convertCurrency(price.amount, price.currencyCode,
-                app.settings.get('localCurrency'));
+              md.convertedPrice = convertCurrency(price.amount, price.currencyCode, app.settings.get('localCurrency'));
             } catch (e) {
               if (e instanceof NoExchangeRateDataError) {
                 // If no exchange rate data is available, we'll just use the unconverted price
@@ -278,17 +271,16 @@ export default {
       }
     },
 
-    onKeyupSearchInput (e) {
+    onKeyupSearchInput(e) {
       // make sure they're not still typing
       if (this.searchKeyUpTimer) {
         clearTimeout(this.searchKeyUpTimer);
       }
 
-      this.searchKeyUpTimer = setTimeout(() =>
-        (this.search($(e.target).val())), 150);
+      this.searchKeyUpTimer = setTimeout(() => this.search($(e.target).val()), 150);
     },
 
-    onRequest (cl, xhr) {
+    onRequest(cl, xhr) {
       // Ignore a request on the ListingShort model, which happens
       // if we delete it.
       if (!(cl instanceof Listings)) return;
@@ -321,13 +313,13 @@ export default {
       });
     },
 
-    onClickRetryFetch () {
+    onClickRetryFetch() {
       this.retryPressed = true;
       this.fetchListings();
-      this.$btnRetry.addClass('processing');
+      this.$btnRetry().addClass('processing');
     },
 
-    onClickClearSearch () {
+    onClickClearSearch() {
       // will reset filters / search text, but maintain sort
       this.filter = {
         ...this.defaultFilter,
@@ -337,30 +329,13 @@ export default {
       this.render();
     },
 
-    onClickToggleListGridView () {
-      this.listingsViewType = this.listingsViewType === 'list' ? 'grid' : 'list';
-    },
-
-    onClickActivateStore () {
-      launchSettingsModal({ initialTab: 'Store' });
-    },
-
-    get listingsViewType () {
-      return this._listingsViewType;
-    }
-
-  set listingsViewType (type) {
-      if (['list', 'grid'].indexOf(type) === '-1') {
-        throw new Error('The type provided is not one of the available types.');
-      }
-
-      const prevType = this._listingsViewType;
-      this._listingsViewType = type;
-
+    onClickToggleListGridView() {
+      const prevType = this.listingsViewType;
+      let type = prevType === 'list' ? 'grid' : 'list';
+      this.listingsViewType = type;
       if (prevType) {
-        if (prevType !== this._listingsViewType) {
+        if (prevType !== type) {
           this.$el.toggleClass('listView');
-
           if (this.storeListings) {
             this.renderListings(this.fullRenderedCollection);
           }
@@ -370,53 +345,53 @@ export default {
       }
     },
 
-    showDataChangedMessage () {
+    onClickActivateStore() {
+      launchSettingsModal({ initialTab: 'Store' });
+    },
+    showDataChangedMessage() {
       if (this.dataChangePopIn && !this.dataChangePopIn.isRemoved()) {
         this.dataChangePopIn.$el.velocity('callout.shake', { duration: 500 });
       } else {
         this.dataChangePopIn = this.createChild(PopInMessage, {
-          messageText:
-            buildRefreshAlertMessage(app.polyglot.t('userPage.store.listingDataChangedPopin')),
+          messageText: buildRefreshAlertMessage(app.polyglot.t('userPage.store.listingDataChangedPopin')),
         });
 
-        this.listenTo(this.dataChangePopIn, 'clickRefresh', () => (this.fetchListings()));
+        this.listenTo(this.dataChangePopIn, 'clickRefresh', () => this.fetchListings());
 
         this.listenTo(this.dataChangePopIn, 'clickDismiss', () => {
           this.dataChangePopIn.remove();
           this.dataChangePopIn = null;
         });
 
-        this.$popInMessages.append(this.dataChangePopIn.render().el);
+        this.$popInMessages().append(this.dataChangePopIn.render().el);
       }
     },
 
-    showShippingChangedMessage () {
+    showShippingChangedMessage() {
       if (this.shippingChangePopIn && !this.shippingChangePopIn.isRemoved()) {
         this.shippingChangePopIn.$el.velocity('callout.shake', { duration: 500 });
       } else {
         this.shippingChangePopIn = this.createChild(PopInMessage, {
-          messageText:
-            buildRefreshAlertMessage(app.polyglot.t('userPage.store.shippingDataChangedPopin')),
+          messageText: buildRefreshAlertMessage(app.polyglot.t('userPage.store.shippingDataChangedPopin')),
         });
 
-        this.listenTo(this.shippingChangePopIn, 'clickRefresh', () => (this.fetchListings()));
+        this.listenTo(this.shippingChangePopIn, 'clickRefresh', () => this.fetchListings());
 
         this.listenTo(this.shippingChangePopIn, 'clickDismiss', () => {
           this.shippingChangePopIn.remove();
           this.shippingChangePopIn = null;
         });
 
-        this.$popInMessages.append(this.shippingChangePopIn.render().el);
+        this.$popInMessages().append(this.shippingChangePopIn.render().el);
       }
     },
 
-    fetchListings (options = {}) {
+    fetchListings(options = {}) {
       Store.fetchListings(this.collection, options);
     },
 
-    search (term) {
-      const searchTerm = term.toLocaleLowerCase()
-        .trim();
+    search(term) {
+      const searchTerm = term.toLocaleLowerCase().trim();
 
       if (searchTerm === this.filter.searchTerm) return;
 
@@ -432,7 +407,7 @@ export default {
      * the listing model to be passed in as an arg (currently the router is fetching it).
      * The store will continue to load in the background.
      */
-    showListing (listing) {
+    showListing(listing) {
       if (!listing instanceof Listing) {
         throw new Error('Please provide a listing model.');
       }
@@ -442,54 +417,41 @@ export default {
       this.listingDetail = new ListingDetail({
         profile: this.model,
         model: listing,
-      }).render()
+      })
+        .render()
         .open();
 
       this.listenTo(this.listingDetail, 'close', onListingDetailClose);
-      this.listenTo(this.listingDetail, 'modal-will-remove',
-        () => this.stopListening(null, null, onListingDetailClose));
-    }
-
-  get tabClass () {
-      return 'store';
-    }
-
-  get $btnRetry () {
+      this.listenTo(this.listingDetail, 'modal-will-remove', () => this.stopListening(null, null, onListingDetailClose));
+    },
+    $btnRetry() {
       return this.getCachedEl('.js-retryFetch');
-    }
-
-  get $listingsContainer () {
+    },
+    $listingsContainer() {
       return this.getCachedEl('.js-listingsContainer');
-    }
-  get $shippingFilterContainer () {
+    },
+    $shippingFilterContainer() {
       return this.getCachedEl('.js-shippingFilterContainer');
-    }
-
-  get $catFilterContainer () {
+    },
+    $catFilterContainer() {
       return this.getCachedEl('.js-catFilterContainer');
-    }
-
-  get $typeFilterContainer () {
+    },
+    $typeFilterContainer() {
       return this.getCachedEl('.js-typeFilterContainer');
-    }
-
-  get $listingCount () {
+    },
+    $listingCount() {
       return this.getCachedEl('.js-listingCount');
-    }
-
-  get $noResults () {
+    },
+    $noResults() {
       return this.getCachedEl('.js-noResults') || null;
-    }
-
-  get $popInMessages () {
+    },
+    $popInMessages() {
       return this.getCachedEl('.js-popInMessages');
-    }
-
-  get $inactiveWarning () {
+    },
+    $inactiveWarning() {
       return this.getCachedEl('.js-inactiveWarning');
     },
-
-    filteredCollection (filter = this.filter, collection = this.collection) {
+    filteredCollection(filter = this.filter, collection = this.collection) {
       const models = collection.models.filter((md) => {
         let passesFilter = true;
 
@@ -497,26 +459,21 @@ export default {
           passesFilter = false;
         }
 
-        if (this.filter.category !== 'all' &&
-          md.get('categories').indexOf(this.filter.category) === -1) {
+        if (this.filter.category !== 'all' && md.get('categories').indexOf(this.filter.category) === -1) {
           passesFilter = false;
         }
 
-        if (this.filter.type !== 'all' &&
-          md.get('contractType') !== this.filter.type) {
+        if (this.filter.type !== 'all' && md.get('contractType') !== this.filter.type) {
           passesFilter = false;
         }
 
         const searchTerm = this.filter.searchTerm;
 
-        if (searchTerm &&
-          md.searchTitle.indexOf(searchTerm) === -1 &&
-          md.searchDescription.indexOf(searchTerm) === -1) {
+        if (searchTerm && md.searchTitle.indexOf(searchTerm) === -1 && md.searchDescription.indexOf(searchTerm) === -1) {
           passesFilter = false;
         }
 
-        if (this.filter.shipsTo !== 'any' &&
-          !md.shipsTo(this.filter.shipsTo)) {
+        if (this.filter.shipsTo !== 'any' && !md.shipsTo(this.filter.shipsTo)) {
           passesFilter = false;
         }
 
@@ -530,7 +487,7 @@ export default {
      * Based on the sortBy filter, will appropriatally set the
      * comparator value on the given collection.
      */
-    setSortFunction (col) {
+    setSortFunction(col) {
       if (!col) {
         throw new Error('Please provide a collection.');
       }
@@ -580,20 +537,17 @@ export default {
       }
     },
 
-    storeListingsScroll (paginatedCol, e) {
+    storeListingsScroll(paginatedCol, e) {
       // Make sure we're in the DOM (i.e. the store tab is active).
       if (!this.el.parentElement) return;
 
       // if we've scrolled within a 150px of the bottom
       if (e.target.scrollTop + $(e.target).innerHeight() >= e.target.scrollHeight - 150) {
-        paginatedCol.add(
-          this.fullRenderedCollection.slice(this.storeListings.listingCount,
-            this.storeListings.listingCount + LISTINGS_PER_PAGE)
-        );
+        paginatedCol.add(this.fullRenderedCollection.slice(this.storeListings.listingCount, this.storeListings.listingCount + LISTINGS_PER_PAGE));
       }
     },
 
-    renderListings (col = this.fullRenderedCollection) {
+    renderListings(col = this.fullRenderedCollection) {
       if (!col) {
         throw new Error('Please provide a collection.');
       }
@@ -604,22 +558,18 @@ export default {
       this.setSortFunction(col);
       col.sort();
 
-      this.$listingsContainer.empty();
+      this.$listingsContainer().empty();
 
-      const countPhrase = app.polyglot.t('userPage.store.countListings',
-        { smart_count: col.length, display_count: localizeNumber(col.length) });
+      const countPhrase = app.polyglot.t('userPage.store.countListings', { smart_count: col.length, display_count: localizeNumber(col.length) });
 
-      const fullListingCount =
-        app.polyglot.t('userPage.store.countListingsFound',
-          { countListings: `<span class="txB">${countPhrase}</span>` });
-      this.$listingCount.html(fullListingCount);
+      const fullListingCount = app.polyglot.t('userPage.store.countListingsFound', { countListings: `<span class="txB">${countPhrase}</span>` });
+      this.$listingCount().html(fullListingCount);
 
       if (col.length) {
         // todo: exceptionally tall screens may fit an entire page
         // with room to spare. Which means no scrollbar, which means subsequent
         // pages will not load. Handle that case.
-        const storeListingsCol =
-          new Listings(col.slice(0, LISTINGS_PER_PAGE), { guid: this.model.id });
+        const storeListingsCol = new Listings(col.slice(0, LISTINGS_PER_PAGE), { guid: this.model.id });
 
         if (this.storeListings) this.storeListings.remove();
 
@@ -630,18 +580,18 @@ export default {
         });
 
         getContentFrame().on('scroll', this.storeListingsScrollHandler);
-        const scrollHandler = e => this.storeListingsScroll.call(this, storeListingsCol, e);
+        const scrollHandler = (e) => this.storeListingsScroll.call(this, storeListingsCol, e);
         this.storeListingsScrollHandler = _.debounce(scrollHandler, 100);
         getContentFrame().on('scroll', this.storeListingsScrollHandler);
 
-        this.$noResults.addClass('hide');
-        this.$listingsContainer.append(this.storeListings.render().el);
+        this.$noResults().addClass('hide');
+        this.$listingsContainer().append(this.storeListings.render().el);
       } else {
-        this.$noResults.removeClass('hide');
+        this.$noResults().removeClass('hide');
       }
     },
 
-    renderCategories (cats = this.collection.categories) {
+    renderCategories(cats = this.collection.categories) {
       if (!this.categoryFilter) {
         this.categoryFilter = new CategoryFilter({
           initialState: {
@@ -667,14 +617,13 @@ export default {
         });
       }
 
-      if (!this.$catFilterContainer[0].contains(this.categoryFilter.el)) {
+      if (!this.$catFilterContainer()[0].contains(this.categoryFilter.el)) {
         this.categoryFilter.delegateEvents();
-        this.$catFilterContainer.empty()
-          .append(this.categoryFilter.el);
+        this.$catFilterContainer().empty().append(this.categoryFilter.el);
       }
     },
 
-    renderTypes (types = this.collection.types) {
+    renderTypes(types = this.collection.types) {
       if (!this.typeFilter) {
         this.typeFilter = new TypeFilter({
           initialState: {
@@ -689,9 +638,9 @@ export default {
           this.filter.type = e.value;
 
           if (this.filter.type !== 'PHYSICAL_GOOD' && this.filter.type !== 'all') {
-            this.$shippingFilterContainer.addClass('disabled');
+            this.$shippingFilterContainer().addClass('disabled');
           } else {
-            this.$shippingFilterContainer.removeClass('disabled');
+            this.$shippingFilterContainer().removeClass('disabled');
           }
 
           this.renderListings(this.filteredCollection());
@@ -707,24 +656,22 @@ export default {
         });
       }
 
-      if (!this.$typeFilterContainer[0].contains(this.typeFilter.el)) {
+      if (!this.$typeFilterContainer()[0].contains(this.typeFilter.el)) {
         this.typeFilter.delegateEvents();
-        this.$typeFilterContainer.empty()
-          .append(this.typeFilter.el);
+        this.$typeFilterContainer().empty().append(this.typeFilter.el);
       }
     },
 
-    remove () {
+    remove() {
       getContentFrame().off('scroll', this.storeListingsScrollHandler);
     },
 
-    render () {
+    render() {
       if (this.dataChangePopIn) this.dataChangePopIn.remove();
       if (this.shippingChangePopIn) this.shippingChangePopIn.remove();
 
       const isFetching = this.fetch && this.fetch.state() === 'pending';
-      const fetchFailed = this.fetch && this.fetch.state() === 'rejected'
-        && this.fetch.status !== 404;
+      const fetchFailed = this.fetch && this.fetch.state() === 'rejected' && this.fetch.status !== 404;
 
       this.$sortBy = this.$('.js-sortBySelect');
       this.$shipsToSelect = this.$('.js-shipsToSelect');
@@ -758,9 +705,9 @@ export default {
       }
 
       return this;
-    }
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="scss" scoped></style>
 

@@ -7,15 +7,27 @@
           <div class="flexHRight flexVCent gutterH clrT2">
             <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="home">{{ ob.polyT('userPage.mainNav.home') }}</a>
             <!-- // the store tab is only visible to the user if they have vendor set to false -->
-            <a v-if="ob.vendor || ob.ownPage" class="btn tab clrBr js-tab" @click="clickTab" data-tab="store">{{ ob.polyT('userPage.mainNav.store') }}<span class="clrTEmph1 margLSm js-listingsCount">{{ ob.stats.listingCount }}</span></a>
-            <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="following">{{ ob.polyT('userPage.mainNav.following') }}<span class="clrTEmph1 margLSm js-followingCount">{{ ob.followingCount }}</span></a>
-            <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="followers">{{ ob.polyT('userPage.mainNav.followers') }}<span class="clrTEmph1 margLSm js-followerCount">{{ ob.followerCount }}</span></a>
+            <a v-if="ob.vendor || ob.ownPage" class="btn tab clrBr js-tab" @click="clickTab" data-tab="store"
+              >{{ ob.polyT('userPage.mainNav.store') }}<span class="clrTEmph1 margLSm js-listingsCount">{{ ob.stats.listingCount }}</span></a
+            >
+            <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="following"
+              >{{ ob.polyT('userPage.mainNav.following') }}<span class="clrTEmph1 margLSm js-followingCount">{{ ob.followingCount }}</span></a
+            >
+            <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="followers"
+              >{{ ob.polyT('userPage.mainNav.followers') }}<span class="clrTEmph1 margLSm js-followerCount">{{ ob.followerCount }}</span></a
+            >
           </div>
         </div>
       </div>
     </nav>
-    <div class="header js-header"
-      :style="headerHash ? `background-image: url(${ob.getServerUrl(`ob/image/${headerHash}`)}), url('../imgs/defaultHeader.png')` : `background-image: url('../imgs/defaultHeader.png')`">
+    <div
+      class="header js-header"
+      :style="
+        headerHash
+          ? `background-image: url(${ob.getServerUrl(`ob/image/${headerHash}`)}), url('../imgs/defaultHeader.png')`
+          : `background-image: url('../imgs/defaultHeader.png')`
+      "
+    >
       <div class="blockedOverlay clrP">
         <div class="flexCol flexHCent tx4">
           <i class="ion-eye-disabled tx1"></i>
@@ -26,8 +38,7 @@
     <div class="pageContent js-pageContent">
       <div class="pageControls flexVBase">
         <div class="flexExpand">
-          <h1 class="txBg txUnb txUnl txGlow tabTitle js-tabTitle">
-          </h1>
+          <h1 class="txBg txUnb txUnl txGlow tabTitle js-tabTitle"></h1>
         </div>
         <div class="posR">
           <div v-if="ob.ownPage">
@@ -64,7 +75,6 @@
         <!-- insert the tab subview here -->
       </div>
     </div>
-
   </div>
 </template>
 

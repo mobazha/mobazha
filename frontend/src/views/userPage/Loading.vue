@@ -9,8 +9,7 @@
                 <div>
                   <div class="titleRow flexVCent gutterHSm">
                     <div v-if="ob.userAvatarHashes">
-                      <div class=" discTn clrBr2 clrSh1 flexNoShrink" :style="ob.getAvatarBgImage(ob.userAvatarHashes)">
-                      </div>
+                      <div class="discTn clrBr2 clrSh1 flexNoShrink" :style="ob.getAvatarBgImage(ob.userAvatarHashes)"></div>
                     </div>
                     <div v-if="ob.userName">
                       <h2 class="h4 txUnl lineHeight1 clrT">{{ ob.userName }}</h2>
@@ -23,8 +22,11 @@
               <div class="flexVCent flexInline gutterH row">
                 <div class="discSm clrBr2 clrSh1 flexNoShrink" :style="ob.getAvatarBgImage(ob.ownAvatarHashes)"></div>
                 <i :class="`ion-android-arrow-forward clrT2 lineHeight1 tx3 ${!ob.isProcessing ? 'clrTErr' : ''}`"></i>
-                <div :class="`discSm clrBr2 clrSh1 flexNoShrink  ${disabledToAvatar}`" :disabled="!ob.isProcessing"
-                  :style="ob.getAvatarBgImage(ob.userAvatarHashes)"></div>
+                <div
+                  :class="`discSm clrBr2 clrSh1 flexNoShrink  ${disabledToAvatar}`"
+                  :disabled="!ob.isProcessing"
+                  :style="ob.getAvatarBgImage(ob.userAvatarHashes)"
+                ></div>
               </div>
               <div v-if="ob.isProcessing">
                 <h1 class="h3 clrT">{{ ob.polyT('userPage.loading.connecting') }}</h1>
@@ -34,9 +36,7 @@
                 <h1 class="h3 clrTErr">{{ ob.polyT('userPage.loading.failedToConnect') }}</h1>
               </div>
               <div class="rowHg contentWrap">
-                <div v-if="ob.contentHtml">
-                  print(ob.contentHtml);
-                </div>
+                <div v-if="ob.contentHtml">print(ob.contentHtml);</div>
 
                 <div v-else-if="ob.contentText">
                   <p class="clrT2 tx5">{{ ob.contentText }}</p>
@@ -67,7 +67,8 @@
             <ProcessingButton
               :className="`btnFlx flexExpand clrP js-btnRetry ${ob.isProcessing ? 'processing' : ''}`"
               :btnText="ob.polyT('userPage.loading.btnTryAgain')"
-              @click="onClickBtnRetry" />
+              @click="onClickBtnRetry"
+            />
           </div>
         </section>
       </template>
@@ -85,19 +86,17 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props.options);
   },
-  mounted () {
-  },
+  mounted() {},
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         ...this._state,
@@ -105,7 +104,7 @@ export default {
     },
   },
   methods: {
-    loadData (options = {}) {
+    loadData(options = {}) {
       const opts = {
         ...options,
         dismissOnOverlayClick: false,
@@ -125,14 +124,14 @@ export default {
       this.setState(opts.initialState || {});
     },
 
-    onClickCancel () {
+    onClickCancel() {
       this.$emit('clickCancel');
     },
 
-    onClickBtnRetry () {
+    onClickBtnRetry() {
       this.$emit('clickRetry');
     },
-  }
-}
+  },
+};
 </script>
 <style lang="scss" scoped></style>

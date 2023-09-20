@@ -17,12 +17,10 @@
     <div v-else-if="ob.noResults">
       <p>{{ ob.noResultsMsg }}</p>
     </div>
-
   </div>
 </template>
 
 <script>
-
 export default {
   props: {
     options: {
@@ -30,27 +28,25 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props.options);
   },
-  mounted () {
-  },
+  mounted() {},
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         ...this._state,
       };
-    }
+    },
   },
   methods: {
-    loadData (options = {}) {
+    loadData(options = {}) {
       const opts = {
         initialState: {
           isFetching: false,
@@ -59,7 +55,7 @@ export default {
           fetchFailed: false,
           fetchErrorTitle: '',
           fetchErrorMsg: '',
-          ...options.initialState || {},
+          ...(options.initialState || {}),
         },
         ...options,
       };
@@ -68,10 +64,10 @@ export default {
       this.options = opts;
     },
 
-    onClickRetry () {
+    onClickRetry() {
       this.$emit('retry-click');
     },
-  }
-}
+  },
+};
 </script>
 <style lang="scss" scoped></style>

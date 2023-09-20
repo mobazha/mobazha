@@ -4,8 +4,7 @@
     <div class="userPageSearchBar flex gutterHSm" :disabled="ob.isFetching || ob.fetchFailed || !ob.listingCount">
       <div class="flexExpand">
         <div class="searchWrapper">
-          <input type="text" class="ctrl searchInput clrP clrBr clrSh2" @keyup="onKeyupSearchInput"
-            :placeholder="ob.polyT('userPage.searchStore')">
+          <input type="text" class="ctrl searchInput clrP clrBr clrSh2" @keyup="onKeyupSearchInput" :placeholder="ob.polyT('userPage.searchStore')" />
         </div>
       </div>
       <div>
@@ -27,10 +26,7 @@
       <div class="txCtr padHg contentBox clrBr clrP">
         <h3>{{ ob.polyT('userPage.store.unableToFetchListings') }}</h3>
         <p>{{ ob.fetchFailReason }}</p>
-        <ProcessingButton
-          className="btn clrP clrBr js-retryFetch"
-          :btnText="ob.polyT('userPage.store.retryStoreFetch')"
-          @click="onClickRetryFetch" />
+        <ProcessingButton className="btn clrP clrBr js-retryFetch" :btnText="ob.polyT('userPage.store.retryStoreFetch')" @click="onClickRetryFetch" />
       </div>
     </div>
 
@@ -43,13 +39,16 @@
               <label class="margRSm" for="shipsToSelect">{{ ob.polyT('userPage.store.shippingFilter.shipsTo') }}:</label>
               <select class="tx6 select2Small js-shipsToSelect" @change="onShipsToSelectChange" style="width: 133px" id="shipsToSelect">
                 <option value="any" :selected="ob.shipsToSelected === 'any'">{{ ob.polyT('userPage.store.shipsToFilterAny') }}</option>
-                <option v-for="(country, j) in ob.countryList" :key="j" :value="country.dataName" :selected="country.dataName === ob.shipsToSelected">{{ country.name }}</option>
+                <option v-for="(country, j) in ob.countryList" :key="j" :value="country.dataName" :selected="country.dataName === ob.shipsToSelected">
+                  {{ country.name }}
+                </option>
               </select>
               <div class="select2Small js-shipsToSelectDropdownContainer"></div>
             </div>
             <div class="flexVCent rowSm">
               <input type="checkbox" id="filterFreeShipping" class="margRSm" @change="onFilterFreeShippingChange" :checked="ob.filter.freeShipping" />
-              <label for="filterFreeShipping"></label><!-- label for the replacement checkbox -->
+              <label for="filterFreeShipping"></label
+              ><!-- label for the replacement checkbox -->
               <label class="clrE1 clrTOnEmph phraseBox" for="filterFreeShipping">{{ ob.polyT('userPage.store.freeShippingBanner') }}</label>
             </div>
           </div>
@@ -75,15 +74,15 @@
               </div>
             </div>
             <div class="contentBox row pad clrP clrBr js-inactiveWarning" v-show="!ob.vendor">
-              <span class="tx5">{{ ob.parseEmojis('🔒') }} {{ ob.polyT('userPage.store.inactive') }}
-                <button class="btnTxtOnly txU txUnb clrT2 " @click="onClickActivateStore">${ob.polyT('userPage.store.inactiveLink')}</button>
+              <span class="tx5"
+                >{{ ob.parseEmojis('🔒') }} {{ ob.polyT('userPage.store.inactive') }}
+                <button class="btnTxtOnly txU txUnb clrT2" @click="onClickActivateStore">${ob.polyT('userPage.store.inactiveLink')}</button>
               </span>
             </div>
             <div class="js-listingsContainer"></div>
             <div class="txCtr padGi clrP clrSh2 clrBr tx4 contentBox js-noResults hide">
               <p>{{ ob.polyT('userPage.store.noListingsFound') }}</p>
-              <div class="btn clrP clrBr" @click="onClickClearSearch">{{ ob.polyT('userPage.store.btnClearSearch') }}
-              </div>
+              <div class="btn clrP clrBr" @click="onClickClearSearch">{{ ob.polyT('userPage.store.btnClearSearch') }}</div>
             </div>
           </div>
 
@@ -93,7 +92,6 @@
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -763,7 +761,6 @@ export default {
     }
   }
 }
-
 </script>
 <style lang="scss" scoped></style>
 

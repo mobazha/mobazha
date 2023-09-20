@@ -5,10 +5,10 @@
       <ProcessingButton
         :className="`btn ${ob.btnClasses} ${ob.isFollowing ? 'processing' : ''}`"
         @click="onClickFollow"
-        :btnText="ob.following ? ob.polyT('follow.unfollowBtn') : ob.polyT('follow.followBtn')" />
+        :btnText="ob.following ? ob.polyT('follow.unfollowBtn') : ob.polyT('follow.followBtn')"
+      />
       <div class="js-blockBtnContainer"></div>
     </div>
-
   </div>
 </template>
 
@@ -19,7 +19,6 @@ import { followedByYou, followUnfollow } from '../../../backbone/utils/follow';
 import BlockBtn from './BlockBtn';
 import { recordEvent } from '../../../backbone/utils/metrics';
 
-
 export default {
   props: {
     options: {
@@ -27,28 +26,27 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   computed: {
-    params () {
+    params() {
       return {
         ...this.options,
         ...state,
       };
-    }
+    },
   },
   methods: {
-    loadData (options = {}) {
+    loadData(options = {}) {
       if (!options.targetID) throw new Error('You must provide a targetID');
 
       const opts = {
@@ -58,7 +56,7 @@ export default {
           isFollowing: false,
           stripClasses: 'btnStrip clrSh3',
           btnClasses: 'clrP clrBr',
-          ...options.initialState || {},
+          ...(options.initialState || {}),
         },
       };
 
@@ -72,31 +70,30 @@ export default {
       });
     },
 
-    className () {
+    className() {
       return 'socialBtns';
     },
 
-    events () {
+    events() {
       return {
         'click .js-followUnfollowBtn': 'onClickFollow',
         'click .js-messageBtn': 'onClickMessage',
       };
     },
 
-    onClickMessage () {
+    onClickMessage() {
       // activate the chat message
       app.chat.openConversation(this.options.targetID);
       recordEvent('Social_OpenChat');
     },
 
-    onClickFollow () {
+    onClickFollow() {
       const type = this.getState().following ? 'unfollow' : 'follow';
       this.setState({ isFollowing: true });
-      this.folCall = followUnfollow(this.options.targetID, type)
-        .always(() => {
-          if (this.isRemoved()) return;
-          this.setState({ isFollowing: false });
-        });
+      this.folCall = followUnfollow(this.options.targetID, type).always(() => {
+        if (this.isRemoved()) return;
+        this.setState({ isFollowing: false });
+      });
       if (type === 'follow') {
         recordEvent('Social_Follow');
       } else {
@@ -104,27 +101,23 @@ export default {
       }
     },
 
-    render () {
+    render() {
       super.render();
       const state = this.getState();
       loadTemplate('components/socialBtns.html', (t) => {
-        this.$el.html(t({
-          ...this.options,
-          ...state,
-        }));
+        this.$el.html(
+          t({
+            ...this.options,
+            ...state,
+          })
+        );
       });
 
-      this.getCachedEl('.js-blockBtnContainer')
-        .html(
-          new BlockBtn({ targetId: this.options.targetID })
-            .render()
-            .el
-        );
+      this.getCachedEl('.js-blockBtnContainer').html(new BlockBtn({ targetId: this.options.targetID }).render().el);
 
       return this;
-    }
-
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="scss" scoped></style>

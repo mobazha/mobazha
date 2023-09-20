@@ -4,38 +4,45 @@
      the other is also maintained. -->
     <div class="txB rowSm">{{ ob.polyT('userPage.store.categoryFilter.heading') }}</div>
     <div class="btnRadio">
-      <input type="radio" name="filterShippingCategory" value="all" id="filterShippingCategoryAll" data-var-type="boolean"
-        :checked="ob.selected === 'all'">
+      <input type="radio" name="filterShippingCategory" value="all" id="filterShippingCategoryAll" data-var-type="boolean" :checked="ob.selected === 'all'" />
       <label for="filterShippingCategoryAll">{{ ob.polyT('userPage.store.categoryFilter.all') }}</label>
     </div>
 
     <div v-for="(cat, index) in ob.categories.slice(0, ob.maxInitiallyVisibleCats - 1)" :key="index">
       <div class="btnRadio">
-        <input type="radio" name="filterShippingCategory" :value="formatCategoryString(cat)"
-          :id="`filterShippingCategory${flatCategoryString(cat)}`" :checked="ob.selected === cat">
+        <input
+          type="radio"
+          name="filterShippingCategory"
+          :value="formatCategoryString(cat)"
+          :id="`filterShippingCategory${flatCategoryString(cat)}`"
+          :checked="ob.selected === cat"
+        />
         <label :for="`filterShippingCategory${flatCategoryString(cat)}`">{{ cat }}</label>
       </div>
     </div>
     <!-- // adding 1 to the length to account for the All category we hard-code -->
-    <div v-if="(ob.categories.length + 1) > ob.maxInitiallyVisibleCats">
+    <div v-if="ob.categories.length + 1 > ob.maxInitiallyVisibleCats">
       <div :class="`js-moreCatsWrap moreCatsWrap ${ob.expanded ? 'expanded' : ''}`">
         <div class="moreCats">
           <div v-for="(cat, index) in ob.categories.slice(ob.maxInitiallyVisibleCats - 1)" :key="index">
             <div class="btnRadio">
-              <input type="radio" name="filterShippingCategory" :value="cat"
-                :id="`filterShippingCategory${flatCategoryString(cat)}`" :checked="ob.selected === cat">
+              <input
+                type="radio"
+                name="filterShippingCategory"
+                :value="cat"
+                :id="`filterShippingCategory${flatCategoryString(cat)}`"
+                :checked="ob.selected === cat"
+              />
               <label :for="`filterShippingCategory${flatCategoryString(cat)}`">{{ cat }}</label>
             </div>
           </div>
         </div>
         <a class="clrT tx6 txU showMore" @click="onClickShowMoreLess">{{
-          ob.polyT('userPage.store.categoryFilter.showMore', (ob.categories.length + 1) - ob.maxInitiallyVisibleCats)
+          ob.polyT('userPage.store.categoryFilter.showMore', ob.categories.length + 1 - ob.maxInitiallyVisibleCats)
         }}</a>
-        <a class="clrT tx6 txU showLess" @click="onClickShowMoreLess">{{
-          ob.polyT('userPage.store.categoryFilter.showLess') }}</a>
+        <a class="clrT tx6 txU showLess" @click="onClickShowMoreLess">{{ ob.polyT('userPage.store.categoryFilter.showLess') }}</a>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -53,35 +60,34 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props.options);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         ...this._state,
       };
-    }
+    },
   },
   methods: {
-    formatCategoryString (cat) {
+    formatCategoryString(cat) {
       return cat.replace(/&/g, '&amp;');
     },
-    flatCategoryString (cat) {
+    flatCategoryString(cat) {
       // remove spaces
       return cat.replace(/\s/g, '-');
     },
-    loadData (options = {}) {
+    loadData(options = {}) {
       const opts = {
         ...options,
       };
@@ -98,21 +104,21 @@ export default {
       this.options = opts;
     },
 
-    events () {
+    events() {
       return {
         'change input[type="radio"]': 'onChangeCategory',
       };
     },
 
-    onClickShowMoreLess () {
+    onClickShowMoreLess() {
       this.setState({ expanded: !this.getState().expanded });
     },
 
-    onChangeCategory (e) {
+    onChangeCategory(e) {
       this._state.selected = e.target.value;
       this.trigger('category-change', { value: $(e.target).val() });
     },
-  }
-}
+  },
+};
 </script>
 <style lang="scss" scoped></style>

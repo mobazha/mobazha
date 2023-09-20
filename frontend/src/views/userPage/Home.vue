@@ -2,12 +2,13 @@
   <div class="userPageHome">
     <div class="flexRow gutterH">
       <div class="col4 gutterVMd2">
-        <div class="userCard js-userCard">
-        </div>
+        <div class="userCard js-userCard"></div>
         <div v-if="ob.moderator && ob.moderatorInfo">
           <div class="contentBox padMd2 clrBr clrP clrSh2 js-moderatorInfo">
             <div class="flexVBot gutterH rowLg snipKids">
-              <div class="tx4 flexExpand"><strong>{{ ob.polyT('userPage.moderator') }}</strong></div>
+              <div class="tx4 flexExpand">
+                <strong>{{ ob.polyT('userPage.moderator') }}</strong>
+              </div>
               <div class="clrT2 tx5">
                 <a class="link" @click="termsClick">
                   {{ ob.polyT('userPage.termsOfService') }}
@@ -22,13 +23,15 @@
                 v-show="!ob.currentModerator"
                 className="btn clrP clrBr clrSh2 js-addModerator"
                 :btnText="ob.polyT('userPage.addModerator')"
-                @click="addModeratorClick" />
+                @click="addModeratorClick"
+              />
 
               <ProcessingButton
                 v-show="ob.currentModerator"
                 className="btn clrP clrBr clrSh2 js-removeModerator"
                 :btnText="ob.polyT('userPage.removeModerator')"
-                @click="removeModeratorClick" />
+                @click="removeModeratorClick"
+              />
             </div>
           </div>
         </div>
@@ -50,7 +53,9 @@
               <div class="listItem">
                 <div>{{ ob.polyT('userPage.website') }}</div>
                 <div>
-                  <a class="clrT2" :href="ob.contactInfo.website.startsWith('http') ? ob.contactInfo.website : `http://${ob.contactInfo.website}`">{{ ob.contactInfo.website }}</a>
+                  <a class="clrT2" :href="ob.contactInfo.website.startsWith('http') ? ob.contactInfo.website : `http://${ob.contactInfo.website}`">{{
+                    ob.contactInfo.website
+                  }}</a>
                 </div>
               </div>
             </div>
@@ -85,13 +90,14 @@
             </div>
 
             <div v-else>
-              <span class="clrT2"><i>{{ ob.polyT('userPage.aboutEmpty') }}</i></span>
+              <span class="clrT2"
+                ><i>{{ ob.polyT('userPage.aboutEmpty') }}</i></span
+              >
             </div>
           </div>
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -104,7 +110,6 @@ import UserCard from '../../../backbone/views/UserCard';
 import { launchModeratorDetailsModal } from '../../../backbone/utils/modalManager';
 import { openSimpleMessage } from '../../../backbone/modals/SimpleMessage';
 
-
 export default {
   props: {
     options: {
@@ -112,20 +117,19 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props.options);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         currentModerator: this.ownMod,
@@ -133,16 +137,20 @@ export default {
         ...this.model.toJSON(),
       };
     },
-    feeAmount () {
+    feeAmount() {
       const ob = this.ob;
-      return amount = ob.currencyMod.convertAndFormatCurrency(ob.moderatorInfo.fee.fixedFee.amount, ob.moderatorInfo.fee.fixedFee.currency.code, ob.displayCurrency);
+      return (amount = ob.currencyMod.convertAndFormatCurrency(
+        ob.moderatorInfo.fee.fixedFee.amount,
+        ob.moderatorInfo.fee.fixedFee.currency.code,
+        ob.displayCurrency
+      ));
     },
-    ownMod () {
+    ownMod() {
       return app.settings.ownMod(this.model.id);
     },
   },
   methods: {
-    loadData (options = {}) {
+    loadData(options = {}) {
       this.setState(options.initialState || {});
       this.options = options;
       this.ownPage = options.ownPage;
@@ -159,7 +167,7 @@ export default {
       });
     },
 
-    termsClick () {
+    termsClick() {
       // show the moderator details modal
       const modModal = launchModeratorDetailsModal({ model: this.model });
       this.listenTo(modModal, 'addAsModerator', () => {
@@ -168,7 +176,7 @@ export default {
       });
     },
 
-    addModeratorClick () {
+    addModeratorClick() {
       // show the moderator details modal
       const modModal = launchModeratorDetailsModal({ model: this.model });
       this.listenTo(modModal, 'addAsModerator', () => {
@@ -177,12 +185,12 @@ export default {
       });
     },
 
-    removeModeratorClick () {
+    removeModeratorClick() {
       this.$removeModerator.addClass('processing');
       this.saveModeratorList(false);
     },
 
-    saveModeratorList (add = false) {
+    saveModeratorList(add = false) {
       // clone the array, otherwise it is a reference
       let modList = _.clone(app.settings.get('storeModerators'));
 
@@ -196,13 +204,13 @@ export default {
       this.settings.set(formData);
 
       if (!this.settings.validationError) {
-        this.settings.save(formData, {
-          attrs: formData,
-          type: 'PUT',
-        })
+        this.settings
+          .save(formData, {
+            attrs: formData,
+            type: 'PUT',
+          })
           .fail((...args) => {
-            const errMsg = args[0] && args[0].responseJSON &&
-              args[0].responseJSON.reason || '';
+            const errMsg = (args[0] && args[0].responseJSON && args[0].responseJSON.reason) || '';
             const phrase = add ? 'userPage.modAddError' : 'userPage.modRemoveError';
             openSimpleMessage(app.polyglot.t(phrase), { errMsg });
           })
@@ -212,16 +220,16 @@ export default {
       }
     },
 
-    guidClick (guid) {
+    guidClick(guid) {
       ipc.send('controller.system.writeToClipboard', guid);
       $('.js-guidCopied').fadeIn(600);
     },
 
-    guidLeave () {
+    guidLeave() {
       $('.js-guidCopied').fadeOut(600);
     },
 
-    render () {
+    render() {
       $('.js-userCard').append(this.userCard.render().$el);
 
       this.$modBtn = $('.js-addModerator, .js-removeModerator');
@@ -229,9 +237,8 @@ export default {
       this.$removeModerator = $('.js-removeModerator');
 
       return this;
-    }
-
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="scss" scoped></style>

@@ -18,7 +18,6 @@ import Followers from '../../../backbone/collections/Followers';
 import UserCard from '../../../backbone/views/UserCard';
 import FollowLoading from './FollowLoading.vue';
 
-
 export default {
   components: {
     FollowLoading,
@@ -29,24 +28,24 @@ export default {
       default: {},
     },
   },
-  data () {
+  data() {
     return {
       usersPerPage: 12,
     };
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props.options);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   computed: {
-    ownPage () {
+    ownPage() {
       return this.options.peerID === app.profile.id;
     },
-    followLoadingOptions () {
+    followLoadingOptions() {
       let noResultsMsg;
       let fetchErrorTitle;
 
@@ -55,27 +54,25 @@ export default {
         noResultsMsg = this.ownPage
           ? app.polyglot.t('userPage.followTab.noOwnFollowers')
           : app.polyglot.t('userPage.followTab.noFollowers', {
-            name: this.model.get('handle') || `${this.model.id.slice(0, 8)}…`,
-          });
+              name: this.model.get('handle') || `${this.model.id.slice(0, 8)}…`,
+            });
       } else {
         fetchErrorTitle = app.polyglot.t('userPage.followTab.followingFetchError');
         noResultsMsg = this.ownPage
           ? app.polyglot.t('userPage.followTab.noOwnFollowing')
           : app.polyglot.t('userPage.followTab.noFollowing', {
-            name: this.model.get('handle') || `${this.model.id.slice(0, 8)}…`,
-          });
+              name: this.model.get('handle') || `${this.model.id.slice(0, 8)}…`,
+            });
       }
 
-      const isFetching = (this.followsYouFetch && this.followsYouFetch.state() === 'pending')
-        || (this.followFetch && this.followFetch.state() === 'pending');
+      const isFetching = (this.followsYouFetch && this.followsYouFetch.state() === 'pending') || (this.followFetch && this.followFetch.state() === 'pending');
 
       return {
         initialState: {
           isFetching,
           fetchFailed: this.followFetch && this.followFetch.state() === 'rejected',
           fetchErrorTitle,
-          fetchErrorMsg: (this.followFetch && this.followFetch.responseJSON
-            && this.followFetch.responseJSON.reason) || '',
+          fetchErrorMsg: (this.followFetch && this.followFetch.responseJSON && this.followFetch.responseJSON.reason) || '',
           noResultsMsg,
           noResults: !this.collection.length,
         },
@@ -83,7 +80,7 @@ export default {
     },
   },
   methods: {
-    loadData (options = {}) {
+    loadData(options = {}) {
       const opts = {
         followType: 'followers',
         fetchCollection: true,
@@ -128,12 +125,10 @@ export default {
       this.throttledOnScroll = _.throttle(this.onScroll, 100).bind(this);
     },
 
-    onScroll () {
+    onScroll() {
       const cf = getContentFrame()[0];
       const scrollNearBot = cf.scrollTop >= cf.scrollHeight - cf.offsetHeight - 100;
-      if (this.renderedCl.length < this.collection.length
-        && this.refs.followLoading && !this.refs.followLoading.getState().isFetching
-        && scrollNearBot) {
+      if (this.renderedCl.length < this.collection.length && this.refs.followLoading && !this.refs.followLoading.getState().isFetching && scrollNearBot) {
         // Some fake latency so a user doesn't just scroll down and load
         // hundreds of userCards which would kick off hundreds of profile
         // fetches.
@@ -148,14 +143,12 @@ export default {
       }
     },
 
-    onOwnFollowingUpdate (cl, opts) {
+    onOwnFollowingUpdate(cl, opts) {
       if (opts.changes.added.length) {
         if (this.ownPage) {
           if (this.followType === 'following') this.collection.add(opts.changes.added);
         } else if (this.followType === 'followers') {
-          const isUserNewlyFollowed = !!opts.changes.added.find(
-            (addMd) => (addMd.id === this.model.id),
-          );
+          const isUserNewlyFollowed = !!opts.changes.added.find((addMd) => addMd.id === this.model.id);
 
           if (isUserNewlyFollowed) {
             this.collection.add({ peerID: app.profile.id }, { at: 0 });
@@ -172,9 +165,7 @@ export default {
         if (this.ownPage) return;
 
         if (this.followType === 'followers') {
-          const isUserNewlyUnfollowed = !!opts.changes.removed.find(
-            (removedMd) => (removedMd.id === this.model.id),
-          );
+          const isUserNewlyUnfollowed = !!opts.changes.removed.find((removedMd) => removedMd.id === this.model.id);
           if (isUserNewlyUnfollowed) {
             this.collection.remove(app.profile.id);
           }
@@ -182,7 +173,7 @@ export default {
       }
     },
 
-    onCollectionUpdate (cl, opts) {
+    onCollectionUpdate(cl, opts) {
       this.$el.toggleClass('noResults', !cl.length);
 
       if (this.refs.followLoading) {
@@ -192,8 +183,7 @@ export default {
       if (opts.changes.added.length) {
         // Expecting either a single new user on the bottom (own node
         // must have followed in the UI) or a page of users at the bottom.
-        if (opts.changes.added[opts.changes.added.length - 1]
-          === this.renderedCl.at(this.renderedCl.length - 1)) {
+        if (opts.changes.added[opts.changes.added.length - 1] === this.renderedCl.at(this.renderedCl.length - 1)) {
           // It's a page of users at the bottom
           this.renderUsers(opts.changes.added, 'append');
         } else {
@@ -205,7 +195,7 @@ export default {
       opts.changes.removed.forEach((md) => this.removeUserCard(md.id));
     },
 
-    onCollectionFetched () {
+    onCollectionFetched() {
       const state = {
         isFetching: false,
         fetchFailed: false,
@@ -239,7 +229,7 @@ export default {
      * know some part of the other nodes followers lists are not accurate,
      * we'll adjust them.
      */
-    collectionParse (response) {
+    collectionParse(response) {
       let users = [...response];
 
       if (!this.ownPage) {
@@ -270,7 +260,7 @@ export default {
       return this._origClParse.call(this.collection, users);
     },
 
-    removeUserCard (peerID) {
+    removeUserCard(peerID) {
       if (!peerID) {
         throw new Error('Please provide a peerID');
       }
@@ -283,7 +273,7 @@ export default {
       }
     },
 
-    renderUsers (models = [], insertionType = 'append') {
+    renderUsers(models = [], insertionType = 'append') {
       if (!models) {
         throw new Error('Please provide an array of Follower models.');
       }
@@ -314,7 +304,7 @@ export default {
       }
     },
 
-    fetch () {
+    fetch() {
       if (this.refs.followLoading) {
         this.refs.followLoading.setState({
           isFetching: true,
@@ -325,51 +315,47 @@ export default {
 
       const followsYouDeferred = $.Deferred();
 
-      if (!this.ownPage && this.followType === 'following'
-        && (!this.followsYouFetch || this.followsYouFetchFailed)) {
-        this.followsYouFetch = followsYou(this.model.id)
-          .done((data) => {
-            this.followsMe = data.followsMe;
-            followsYouDeferred.resolve();
-          });
+      if (!this.ownPage && this.followType === 'following' && (!this.followsYouFetch || this.followsYouFetchFailed)) {
+        this.followsYouFetch = followsYou(this.model.id).done((data) => {
+          this.followsMe = data.followsMe;
+          followsYouDeferred.resolve();
+        });
       } else {
         followsYouDeferred.resolve();
       }
 
-      followsYouDeferred
-        .always(() => {
-          this.followFetch = this.collection.fetch()
-            .done(() => (this.onCollectionFetched.call(this)))
-            .fail((xhr) => {
-              if (xhr.statusText === 'abort') return;
-              if (xhr === this.followFetch) {
-                if (this.refs.followLoading) {
-                  this.refs.followLoading.setState({
-                    isFetching: false,
-                    fetchFailed: true,
-                    fetchErrorMsg: (xhr.responseJSON && xhr.responseJSON.reason) || '',
-                  });
-                }
+      followsYouDeferred.always(() => {
+        this.followFetch = this.collection
+          .fetch()
+          .done(() => this.onCollectionFetched.call(this))
+          .fail((xhr) => {
+            if (xhr.statusText === 'abort') return;
+            if (xhr === this.followFetch) {
+              if (this.refs.followLoading) {
+                this.refs.followLoading.setState({
+                  isFetching: false,
+                  fetchFailed: true,
+                  fetchErrorMsg: (xhr.responseJSON && xhr.responseJSON.reason) || '',
+                });
               }
-            });
-        });
+            }
+          });
+      });
     },
 
-    remove () {
+    remove() {
       if (this.followFetch) this.followFetch.abort();
       if (this.followsYouFetch && this.followsYouFetch.abort) {
         this.followsYouFetch.abort();
       }
     },
 
-    render () {
-      getContentFrame().off('scroll', this.throttledOnScroll)
-        .on('scroll', this.throttledOnScroll);
+    render() {
+      getContentFrame().off('scroll', this.throttledOnScroll).on('scroll', this.throttledOnScroll);
 
       return this;
-    }
-
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="scss" scoped></style>

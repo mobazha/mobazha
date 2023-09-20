@@ -3,11 +3,10 @@
     <h2 class="tabHeading txUnb">{{ ob.polyT(`transactions.${type}.heading`) }}</h2>
     <div class="searchWrapper rowMd">
       <input type="text" class="ctrl clrP clrBr clrSh2" @keyup="onKeyUpSearch(filter.search)"
-        :placeholder="ob.polyT(`transactions.placeholderSearch${ob.capitalize(type)}`)" v-model="filter.search">
+        :placeholder="ob.polyT(`transactions.placeholderSearch${capitalize(type)}`)" v-model="filter.search">
     </div>
 
-    <Filters />
-    {{ ob.filtersHtml }}
+    <Filters :filters="setCheckedFilters(filterConfig, filter.states)" />
 
     <div class="flexVCent row gutterH">
       <div class="flexNoShrink gutterHSm js-queryTotalWrapper" v-show="showTotalWrapper">
@@ -25,7 +24,7 @@
       </div>
     </div>
 
-    <div class="js-tableContainer"></div>
+    <TransactionsTable ref="table" :options="tableOptions" />
 
   </div>
 </template>
@@ -34,20 +33,25 @@
 import _ from 'underscore';
 import $ from 'jquery';
 import app from '../../../backbone/app';
-import loadTemplate from '../../../backbone/utils/loadTemplate';
-import TransactionsTable from './table/Table';
 import { capitalize } from '../../../backbone/utils/string';
+import TransactionsTable from './table/Table.vue';
 import Filters from './Filters.vue'
 
 export default {
   components: {
     Filters,
+    TransactionsTable,
   },
   mixins: [],
   props: {
+    options: {
+      type: Object,
+      default: {},
+    },
   },
   data () {
     return {
+      _options: {},
       showTotalWrapper: false,
       queryTotalLine: '',
       filter: {},
@@ -56,23 +60,27 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.$props.options);
   },
   mounted () {
     this.render();
   },
   computed: {
-  },
-  watch: {
-    filter(newVal, oldVal) {
-      if (!_.isEqual(newVal, oldVal)) {
-        if (this.table) {
-          this.table.filterParams = newVal;
-        }
-      }
+    tableOptions () {
+      return {
+        type: this.type,
+        collection: this.collection,
+        filterParams: this.filter,
+        getProfiles: this._options.getProfiles,
+        openOrder: this._options.openOrder,
+        openedOrderModal: this._options.openedOrderModal,
+      };
     }
   },
+  watch: {
+  },
   methods: {
+    capitalize,
     loadData (options = {}) {
       const opts = {
         defaultFilter: {
@@ -84,6 +92,8 @@ export default {
       };
 
       opts.initialFilter = opts.initialFilter || { ...opts.defaultFilter };
+
+      _.extend(this, opts);
 
       if (!this.collection) {
         throw new Error('Please provide a transactions collection.');
@@ -103,25 +113,23 @@ export default {
         throw new Error('Please provide a function to open the order detail modal.');
       }
 
-      this.options = opts || {};
+      this._options = opts || {};
       this.type = opts.type;
       this.filterConfig = opts.filterConfig;
       this._filter = { ...opts.initialFilter };
 
       this.listenTo(this.collection, 'request', (cl, xhr) => {
-        if (this.table) {
-          this.showTotalWrapper = false;
-        }
+        this.showTotalWrapper = false;
 
         setTimeout(() => {
-          if (this.table) {
-            xhr.done(data => {
-              const count = app.polyglot.t(`transactions.${this.type}.countTransactions`, { smart_count: data.queryCount });
-              const countInfo = `<span class="txB">${count}</span>`;
-              this.queryTotalLine = app.polyglot.t(`transactions.${this.type}.countTransactionsFound`, { smart_count: countInfo })
-              this.showTotalWrapper = true;
-            });
-          }
+          xhr.done(data => {
+            const count = app.polyglot.t(`transactions.${this.type}.countTransactions`, { smart_count: data.queryCount });
+            const countInfo = `<span class="txB">${count}</span>`;
+            this.queryTotalLine = app.polyglot.t(`transactions.${this.type}.countTransactionsFound`, { smart_count: countInfo })
+            this.showTotalWrapper = true;
+
+            console.log('countInfo: ', countInfo)
+          });
         });
       });
     },
@@ -134,7 +142,7 @@ export default {
 
     onChangeFilter () {
       let states = [];
-      this.$filterCheckboxes.filter(':checked')
+      $('.filter input').filter(':checked')
         .each((index, checkbox) => {
           states = states.concat($(checkbox).data('state'));
         });
@@ -164,14 +172,8 @@ export default {
       };
     },
 
-    onAttach () {
-      if (typeof this.table.onAttach === 'function') {
-        this.table.onAttach.call(this.table);
-      }
-    },
-
     onClickResetQuery () {
-      this.filter = { ...this.options.defaultFilter };
+      this.filter = { ...this._options.defaultFilter };
       this.render();
     },
 
@@ -201,12 +203,7 @@ export default {
     },
 
     currentFilterIsDefault () {
-      return _.isEqual(this.options.defaultFilter, _.omit(this.filter, 'orderID'));
-    }
-
-  get $filterCheckboxes () {
-      return this._$filterCheckboxes ||
-        (this._$filterCheckboxes = $('.filter input'));
+      return _.isEqual(this._options.defaultFilter, _.omit(this.filter, 'orderID'));
     },
 
     remove () {
@@ -214,34 +211,9 @@ export default {
     },
 
     render () {
-      loadTemplate('transactions/filters.html', (filterT) => {
-        const filtersHtml = filterT({
-          filters: this.setCheckedFilters(this.filterConfig, this.filter.states),
-        });
-
-        loadTemplate('transactions/tab.html', (t) => {
-          this.$el.html(t({
-            filtersHtml, capitalize,
-          }));
-
-          this._$filterCheckboxes = null;
-
-          $('.js-sortBySelect').select2({
-            minimumResultsForSearch: -1,
-            dropdownParent: $('.js-sortBySelectDropdownContainer'),
-          });
-
-          if (this.table) this.table.remove();
-          this.table = this.createChild(TransactionsTable, {
-            type: this.type,
-            collection: this.collection,
-            initialFilterParams: this.filter,
-            getProfiles: this.options.getProfiles,
-            openOrder: this.options.openOrder,
-            openedOrderModal: this.options.openedOrderModal,
-          });
-          $('.js-tableContainer').html(this.table.render().el);
-        });
+      $('.js-sortBySelect').select2({
+        minimumResultsForSearch: -1,
+        dropdownParent: $('.js-sortBySelectDropdownContainer'),
       });
 
       return this;

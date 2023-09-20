@@ -8,6 +8,7 @@
         :btnText="ob.following ? ob.polyT('follow.unfollowBtn') : ob.polyT('follow.followBtn')"
       />
       <div class="js-blockBtnContainer"></div>
+      <BlockBtn :targetId="options.targetID" />
     </div>
   </div>
 </template>
@@ -16,7 +17,6 @@
 import app from '../../../backbone/app';
 import loadTemplate from '../../../backbone/utils/loadTemplate';
 import { followedByYou, followUnfollow } from '../../../backbone/utils/follow';
-import BlockBtn from './BlockBtn';
 import { recordEvent } from '../../../backbone/utils/metrics';
 
 export default {
@@ -38,7 +38,7 @@ export default {
     this.render();
   },
   computed: {
-    params() {
+    ob () {
       return {
         ...this.options,
         ...state,
@@ -61,7 +61,7 @@ export default {
       };
 
       this.setState(opts.initialState || {});
-      this.options = opts;
+      // this.options = opts;
 
       this.listenTo(app.ownFollowing, 'update', () => {
         this.setState({
@@ -112,8 +112,6 @@ export default {
           })
         );
       });
-
-      this.getCachedEl('.js-blockBtnContainer').html(new BlockBtn({ targetId: this.options.targetID }).render().el);
 
       return this;
     },

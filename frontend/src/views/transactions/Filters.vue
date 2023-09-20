@@ -2,13 +2,11 @@
   <div :class="`filters rowHg`">
     <div v-for="(row, i) in rows" :key="i">
       <div class="flex gutterH gutterV">
-        <div v-for="(filter, j) in row" :key="j">
-          <div class="col3">
-            <div :class="`filter clrP clrBr clrSh2 ${filter.className}`">
-              <input type="checkbox" :id="filter.id" :checked="filter.checked"
-                :data-state="JSON.stringify(filter.targetState)" v-bind="filter.attrs">
-              <label class="tx5b" :for="filter.id">{{ filter.text }}</label>
-            </div>
+        <div class="col3" v-for="(filter, j) in row" :key="j">
+          <div :class="`filter clrP clrBr clrSh2 ${filter.className}`">
+            <input type="checkbox" :id="filter.id" :checked="filter.checked"
+              :data-state="JSON.stringify(filter.targetState)" v-bind="filter.attrs">
+            <label class="tx5b" :for="filter.id">{{ filter.text }}</label>
           </div>
         </div>
 
@@ -59,10 +57,10 @@ export default {
   },
   computed: {
     maxPerRowFinal () {
-      return ob.maxPerRow || 4;
+      return this.maxPerRow || 4;
     },
     rows () {
-      return ob.splitIntoRows(this.filters, this.maxPerRowFinal);
+      return this.ob.splitIntoRows(this.filters, this.maxPerRowFinal);
     },
   },
   methods: {

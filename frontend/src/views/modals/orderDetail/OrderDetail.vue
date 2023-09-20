@@ -169,6 +169,10 @@ export default {
   },
   mixins: [baseModal],
   props: {
+    options: {
+      type: Object,
+      default: {},
+    },
   },
   data () {
     return {
@@ -188,7 +192,7 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$store.state.cart);
+    this.loadData(this.$props.options);
   },
   mounted () {
     this.render();
@@ -320,11 +324,21 @@ export default {
     },
   },
   methods: {
-    loadData (opts = {}) {
-      let transactions = toRaw(opts.transactions);
-      console.log('transactions: ', transactions);
-      this.model = transactions.model;
-      this.returnText = app.polyglot.t(`transactions.${this.type}s.returnToFromOrder`);
+    loadData (options = {}) {
+      const opts = {
+      initialState: {
+        isFetching: false,
+        fetchFailed: false,
+        fetchError: '',
+      },
+      initialTab: 'summary',
+      ...options,
+    };
+
+    _.extend(this, opts);
+    this._state = opts.initialState;
+
+    this._tab = opts.initialTab;
 
       if (!this.model) {
         throw new Error('Please provide an Order or Case model.');

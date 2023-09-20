@@ -30,15 +30,13 @@
 </template>
 
 <script>
-import loadTemplate from '../../../backbone/utils/loadTemplate';
-
 
 export default {
   props: {
     options: {
       type: Object,
       default: {},
-	},
+    },
   },
   data () {
     return {
@@ -50,16 +48,17 @@ export default {
     this.loadData(this.$props);
   },
   mounted () {
-    this.render();
   },
   computed: {
-    params () {
+    ob () {
       return {
-        type: this.type,
-        ...this.getState(),
+        ...this.templateHelpers,
+        ...this._state,
       };
     },
     countsAvailable () {
+      const ob = this.ob;
+
       let countsAvailable = false;
 
       if (typeof ob.start === 'number' &&
@@ -72,7 +71,7 @@ export default {
     disabledPrev () {
       let disabledPrev = true;
 
-      if (countsAvailable) {
+      if (this.countsAvailable) {
         if (ob.start > 1) {
           disabledPrev = false;
         }
@@ -82,7 +81,7 @@ export default {
     disabledNext () {
       let disabledNext = true;
 
-      if (countsAvailable) {
+      if (this.countsAvailable) {
         if (ob.end < ob.total) {
           disabledNext = false;
         }
@@ -90,49 +89,28 @@ export default {
       return disabledNext;
     }
   },
-	methods: {
-  loadData(options = {}) {
-    const opts = {
-      ...options,
-      initialState: {
-        start: 1,
-        ...options.initialState,
-      },
-    };
+  methods: {
+    loadData (options = {}) {
+      const opts = {
+        ...options,
+        initialState: {
+          start: 1,
+          ...options.initialState,
+        },
+      };
 
-    this.setState(opts.initialState || {});
-  },
+      this.setState(opts.initialState || {});
+    },
 
-  className() {
-    return 'pageControlsWrapper overflowAuto';
-  },
+    onClickNext () {
+      this.$emit('clickNext');
+    },
 
-  events() {
-    return {
-                };
-  },
-
-  onClickNext() {
-    this.$emit('clickNext');
-  },
-
-  onClickPrev() {
-    this.$emit('clickPrev');
-  },
-
-  render() {
-    loadTemplate('components/pageControls.html', (t) => {
-      this.$el.html(t({
-        type: this.type,
-        ...this.getState(),
-      }));
-    });
-
-    return this;
-  }
+    onClickPrev () {
+      this.$emit('clickPrev');
+    },
 
   }
 }
 </script>
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>

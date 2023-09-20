@@ -44,8 +44,8 @@ export function mountVueApp(container) {
   return vueApp;
 }
 
-export function mountVueModal(container, name) {
-  const vueModal = createApp(Modal, { name });
+export function mountVueModal(container, name, options) {
+  const vueModal = createApp(Modal, { name, options });
   vueModal.config.productionTip = false;
 
   vueModal.mixin(baseVw);
@@ -67,7 +67,7 @@ export function mountVueModal(container, name) {
 
   vueModal.use(Router).use(store).mount(container);
 
-  return vueModal;
+  return typeof vueModal.getActiveRef === 'function' ? vueModal.getActiveRef() : vueModal;
 }
 
 export function mountChat(container, conversationID) {

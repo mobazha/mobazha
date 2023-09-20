@@ -33,8 +33,30 @@
             <th class="clrBr priceHeader">{{ ob.polyT('transactions.transactionsTable.headers.total') }}</th>
             <th class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.status') }}</th>
           </tr>
+
+          <Row
+            v-for="(transaction, key) in transToRender"
+            :key="key"
+            ref="views"
+            :options="{
+              model: transaction,
+              type: this.type,
+              initialState: {
+                acceptOrderInProgress: acceptingOrder(transaction.id),
+                rejectOrderInProgress: rejectingOrder(transaction.id),
+                cancelOrderInProgress: cancelingOrder(transaction.id),
+              },
+            }"
+            @clickAcceptOrder="onClickAcceptOrder(transaction.id)"
+            @clickRejectOrder="onClickRejectOrder(transaction.id)"
+            @clickCancelOrder="onClickCancelOrder(transaction.id)"
+            @clickRow="onClickRow(transaction.id)"/>
         </table>
         <div class="js-pageControlsContainer"></div>
+        <PageControls
+          :options="{ initialState: { start: pageStartIndex + 1, pageEnd, total: queryTotal, },}"
+          @clickNext="onClickNextPage"
+          @clickPrev="onClickPrevPage"/>
       </div>
 
       <div v-else>
@@ -48,7 +70,6 @@
 </template>
 
 <script>
-/* eslint-disable class-methods-use-this */
 /*
   This table is re-used for Sales, Purchases and Cases.
 */
@@ -68,14 +89,18 @@ import {
   events as orderEvents,
 } from '../../../../backbone/utils/order';
 import { getCachedProfiles } from '../../../../backbone/models/profile/Profile';
-import Row from './Row';
-import PageControls from '../../components/PageControls';
-
+import Row from './Row.vue';
 
 export default {
+  components: {
+    Row,
+  },
   mixins: [],
   props: {
-    cart: Object,
+    options: {
+      type: Object,
+      default: {},
+    },
   },
   data () {
     return {
@@ -87,10 +112,10 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.$props.options);
   },
   mounted () {
-    this.render();
+    this.onAttach();
   },
   computed: {
     ob () {
@@ -103,7 +128,29 @@ export default {
     },
     transactions() {
       return this.collection.toJSON();
-    }
+    },
+    pageStartIndex () {
+      return (this.curPage - 1) * this.transactionsPerPage;
+    },
+    pageEnd () {
+      const onLastPage = this.curPage > this.collection.length / this.transactionsPerPage;
+      let end = this.curPage * this.transactionsPerPage;
+
+      if (onLastPage) {
+        end = this.collection.length;
+      }
+      return end;
+    },
+    transToRender () {
+      console.log()
+      if (!this.collection || this.collection.length == 0) {
+        return [];
+      }
+      // The collection contains all pages we've fetched, but we'll slice it and
+      // only render the current page.
+      const startIndex = this.pageStartIndex;
+      return this.collection.slice(startIndex, startIndex + this.transactionsPerPage);
+    },
   },
   watch: {
     filterParams(newVal, oldVal) {
@@ -111,9 +158,15 @@ export default {
         this.collection.reset();
         this.fetchTransactions(1, newVal);
       }
-    }
+    },
+
+    // transToRender () {
+    //   this.indexRowViews();
+    //   this.getAvatars(this.transToRender); // be sure to get avatars *after* indexRowViews()
+    // }
   },
   methods: {
+    acceptingOrder, rejectingOrder, cancelingOrder,
     loadData (options = {}) {
       const types = ['sales', 'purchases', 'cases'];
       const opts = {
@@ -122,7 +175,6 @@ export default {
           fetchError: '',
         },
         type: 'sales',
-        initialFilterParams: {},
         ...options,
       };
 
@@ -133,21 +185,16 @@ export default {
       if (typeof opts.openOrder !== 'function') {
         throw new Error('Please provide a function to open the order detail modal.');
       }
-
+      _.extend(this, opts);
       this.setState(opts.initialState || {});
 
       if (!this.collection) {
         throw new Error('Please provide a collection');
       }
 
-      this.options = opts;
       this.type = opts.type;
-      this.views = [];
       this.curPage = 1;
       this.queryTotal = null;
-
-      // This will kick off our initial fetch.
-      this.filterParams = opts.initialFilterParams;
 
       const socket = getSocket();
 
@@ -158,7 +205,6 @@ export default {
       if (this.options.openedOrderModal) {
         this.bindOrderDetailEvents(this.options.openedOrderModal);
       }
-
       this.listenTo(orderEvents, 'rejectingOrder', this.onRejectingOrder);
       this.listenTo(orderEvents, 'rejectOrderComplete, rejectOrderFail', this.onRejectOrderAlways);
       this.listenTo(orderEvents, 'rejectOrderComplete', this.onRejectOrderComplete);
@@ -190,8 +236,8 @@ export default {
       this.fetchTransactions();
     },
 
-    onClickRejectOrder (e) {
-      rejectOrder(e.view.model.id);
+    onClickRejectOrder (txid) {
+      rejectOrder(txid);
     },
 
     onRejectingOrder (e) {
@@ -223,8 +269,8 @@ export default {
       }
     },
 
-    onClickAcceptOrder (e) {
-      acceptOrder(e.view.model.id);
+    onClickAcceptOrder (txid) {
+      acceptOrder(txid);
     },
 
     onAcceptingOrder (e) {
@@ -256,8 +302,8 @@ export default {
       }
     },
 
-    onClickCancelOrder (e) {
-      cancelOrder(e.view.model.id);
+    onClickCancelOrder (txid) {
+      cancelOrder(txid);
     },
 
     onCancelingOrder (e) {
@@ -289,7 +335,7 @@ export default {
       }
     },
 
-    onClickRow (e) {
+    onClickRow (txid) {
       let type = 'sale';
 
       if (this.type === 'purchases') {
@@ -298,7 +344,7 @@ export default {
         type = 'case';
       }
 
-      const orderDetail = this.options.openOrder(e.view.model.id, type);
+      const orderDetail = this.options.openOrder(txid, type);
       this.bindOrderDetailEvents(orderDetail);
     },
 
@@ -384,7 +430,7 @@ export default {
         byOrder: {},
       };
 
-      this.views.forEach((view) => {
+      this.refs.views.forEach((view) => {
         const vendorID = view.model.get('vendorID');
         const buyerID = view.model.get('buyerID');
 
@@ -454,7 +500,6 @@ export default {
         // we already have the page
         havePage = true;
         getContentFrame()[0].scrollTop = 0;
-        this.render();
       } else if (this.collection.length < (page - 1) * this.transactionsPerPage) {
         // You cannot fetch a page unless you have its previous page. The api
         // requires the ID of the last transaction in the previous page.
@@ -505,64 +550,6 @@ export default {
       if (this.avatarPost) this.avatarPost.abort();
       if (this.transactionsFetch) this.transactionsFetch.abort();
     },
-
-    render () {
-
-      const startIndex = (this.curPage - 1) * this.transactionsPerPage;
-      this.views.forEach((view) => view.remove());
-      this.views = [];
-      this.indexedViews = {};
-      const transactionsFrag = document.createDocumentFragment();
-      const transToRender = this.collection
-        .slice(startIndex, startIndex + this.transactionsPerPage);
-      // The collection contains all pages we've fetched, but we'll slice it and
-      // only render the current page.
-      transToRender
-        .forEach((transaction) => {
-          const view = this.createChild(Row, {
-            model: transaction,
-            type: this.type,
-            initialState: {
-              acceptOrderInProgress: acceptingOrder(transaction.id),
-              rejectOrderInProgress: rejectingOrder(transaction.id),
-              cancelOrderInProgress: cancelingOrder(transaction.id),
-            },
-          });
-
-          this.listenTo(view, 'clickAcceptOrder', this.onClickAcceptOrder);
-          this.listenTo(view, 'clickRejectOrder', this.onClickRejectOrder);
-          this.listenTo(view, 'clickCancelOrder', this.onClickCancelOrder);
-          this.listenTo(view, 'clickRow', this.onClickRow);
-
-          $(transactionsFrag).append(view.render().el);
-          this.views.push(view);
-        });
-
-      this.indexRowViews();
-      this.getAvatars(transToRender); // be sure to get avatars *after* indexRowViews()
-      $('.js-transactionsTable').append(transactionsFrag);
-
-      const onLastPage = this.curPage > this.collection.length / this.transactionsPerPage;
-      let end = this.curPage * this.transactionsPerPage;
-
-      if (onLastPage) {
-        end = this.collection.length;
-      }
-
-      if (this.pageControls) this.pageControls.remove();
-      this.pageControls = this.createChild(PageControls, {
-        initialState: {
-          start: startIndex + 1,
-          end,
-          total: this.queryTotal,
-        },
-      });
-      this.listenTo(this.pageControls, 'clickNext', this.onClickNextPage);
-      this.listenTo(this.pageControls, 'clickPrev', this.onClickPrevPage);
-      $('.js-pageControlsContainer').html(this.pageControls.render().el);
-
-      return this;
-    }
   }
 }
 </script>

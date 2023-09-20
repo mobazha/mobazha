@@ -85,6 +85,7 @@
 
 import app from '../../../../backbone/app';
 import moment from 'moment';
+import _ from 'underscore';
 import { recordEvent } from '../../../../backbone/utils/metrics';
 import CryptoTradingPair from '../../../../backbone/views/components/CryptoTradingPair';
 
@@ -132,7 +133,7 @@ export default {
         });
       }
 
-      if (type !== 'purchases') {
+      if (this.type !== 'purchases') {
         userCols.push({
           avatarHashes: ob.buyerAvatarHashes || {},
           userHandle: ob.buyerHandle,
@@ -171,7 +172,8 @@ export default {
         throw new Error('Please provide a valid type.');
       }
 
-      this.setState(options.initialState || {});
+      _.extend(this, opts);
+      this.setState(opts.initialState || {});
 
       if (!this.model) {
         throw new Error('Please provide a model');

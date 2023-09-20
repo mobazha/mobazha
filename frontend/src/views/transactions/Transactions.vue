@@ -20,19 +20,18 @@
       <div class="pageContent">
         <div class="tabContent js-tabContent">
           <!-- insert the tab subview here -->
+          <Tab v-if="_tab == 'sales'" :options="salesTabOptions" />
+          <Tab v-else-if="_tab == 'purchases'" :options="purchasesTabOptions" />
+          <Tab v-else-if="_tab == 'cases'" :options="casesTabOptions" />
         </div>
       </div>
     </section>
-
-    <!-- <div class="js-orderDetail"></div> -->
   </div>
 </template>
 
 <script>
-/* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import app from '../../../backbone/app';
-import { capitalize } from '../../../backbone/utils/string';
 import { abbrNum, deparam } from '../../../backbone/utils';
 import { getSocket } from '../../../backbone/utils/serverConnect';
 import { recordEvent } from '../../../backbone/utils/metrics';
@@ -40,17 +39,21 @@ import Transactions from '../../../backbone/collections/Transactions';
 import Order from '../../../backbone/models/order/Order';
 import Case from '../../../backbone/models/order/Case';
 import MiniProfile from '../../../backbone/views/MiniProfile';
-import Tab from '../../../backbone/views/transactions/Tab';
 import OrderDetail from '../modals/orderDetail/OrderDetail.vue';
+import Tab from './Tab.vue';
 
 
 export default {
   components: {
     OrderDetail,
+    Tab,
   },
   mixins: [],
   props: {
-    cart: Object,
+    options: {
+      type: Object,
+      default: {},
+    },
   },
   data () {
     return {
@@ -129,6 +132,57 @@ export default {
 
       return params;
     },
+
+    purchasesTabOptions () {
+      return {
+        collection: this.purchasesCol,
+        type: 'purchases',
+        defaultFilter: {
+          ...this.purchasesDefaultFilter,
+        },
+        initialFilter: {
+          ...this.purchasesDefaultFilter,
+          ...this.filterUrlParams,
+        },
+        filterConfig: this.getSalesPurchasesFilterConfig(false),
+        openOrder: this.openOrder.bind(this),
+        openedOrderModal: this.openedOrderModal,
+      };
+    },
+
+    salesTabOptions () {
+      return {
+        collection: this.salesCol,
+        type: 'sales',
+        defaultFilter: {
+          ...this.salesDefaultFilter,
+        },
+        initialFilter: {
+          ...this.salesDefaultFilter,
+          ...this.filterUrlParams,
+        },
+        filterConfig: this.getSalesPurchasesFilterConfig(true),
+        openOrder: this.openOrder.bind(this),
+        openedOrderModal: this.openedOrderModal,
+      };
+    },
+
+    casesTabOptions () {
+      return {
+        collection: this.casesCol,
+        type: 'cases',
+        defaultFilter: {
+          ...this.casesDefaultFilter,
+        },
+        initialFilter: {
+          ...this.casesDefaultFilter,
+          ...this.filterUrlParams,
+        },
+        filterConfig: this.casesFilterConfig,
+        openOrder: this.openOrder.bind(this),
+        openedOrderModal: this.openedOrderModal,
+      }
+    }
   },
   methods: {
     loadData () {
@@ -369,93 +423,13 @@ export default {
         ...options,
       };
 
-      if (!this[`create${capitalize(targ)}TabView`]) {
-        throw new Error(`${targ} is not a valid tab.`);
-      }
-
-      let tabView = this.tabViewCache[targ];
-
-      if (!this.currentTabView || this.currentTabView !== tabView) {
+      if (this._tab !== targ) {
         if (opts.addTabToHistory) {
           // add tab to history
           app.router.navigate(`transactions/${targ}`);
         }
-
         this._tab = targ;
-
-        if (this.currentTabView) this.currentTabView.$el.detach();
-
-        if (!tabView) {
-          tabView = this[`create${capitalize(targ)}TabView`]();
-          this.tabViewCache[targ] = tabView;
-          tabView.render();
-        }
-
-        this._$tabContent.append(tabView.$el);
-
-        if (typeof tabView.onAttach === 'function') {
-          tabView.onAttach.call(tabView);
-        }
-
-        this.currentTabView = tabView;
       }
-    },
-
-    createPurchasesTabView () {
-      const view = this.createChild(Tab, {
-        collection: this.purchasesCol,
-        type: 'purchases',
-        defaultFilter: {
-          ...this.purchasesDefaultFilter,
-        },
-        initialFilter: {
-          ...this.purchasesDefaultFilter,
-          ...this.filterUrlParams,
-        },
-        filterConfig: this.getSalesPurchasesFilterConfig(false),
-        openOrder: this.openOrder.bind(this),
-        openedOrderModal: this.openedOrderModal,
-      });
-
-      return view;
-    },
-
-    createSalesTabView () {
-      const view = this.createChild(Tab, {
-        collection: this.salesCol,
-        type: 'sales',
-        defaultFilter: {
-          ...this.salesDefaultFilter,
-        },
-        initialFilter: {
-          ...this.salesDefaultFilter,
-          ...this.filterUrlParams,
-        },
-        filterConfig: this.getSalesPurchasesFilterConfig(true),
-        openOrder: this.openOrder.bind(this),
-        openedOrderModal: this.openedOrderModal,
-      });
-
-      return view;
-    },
-
-    createCasesTabView () {
-      const view = this.createChild(Tab, {
-        collection: this.casesCol,
-        type: 'cases',
-        defaultFilter: {
-          ...this.casesDefaultFilter,
-        },
-        initialFilter: {
-          ...this.casesDefaultFilter,
-          ...this.filterUrlParams,
-        },
-        filterConfig: this.casesFilterConfig,
-        openOrder: this.openOrder.bind(this),
-        openedOrderModal: this.openedOrderModal,
-      });
-
-      return view;
     },
 
     render () {

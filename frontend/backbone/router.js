@@ -306,12 +306,14 @@ export default class ObRouter extends Router {
     app.loadingModal.close();
   }
 
-  loadVueModal(name) {
+  loadVueModal(name, options) {
     if (this.vueModalInstance) {
       this.vueModalInstance.unmount();
     }
 
-    this.vueModalInstance = mountVueModal("#js-vueModal", name)
+    this.vueModalInstance = mountVueModal("#js-vueModal", name, options)
+
+    return this.vueModalInstance;
   }
 
   closeVueModal() {

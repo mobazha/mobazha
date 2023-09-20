@@ -120,8 +120,6 @@ import Empty from '../components/Empty.vue';
 import { products } from '../components/products.js';
 import api from '../api';
 import { getCachedProfiles } from '../../backbone/models/profile/Profile';
-import Listing from '../../backbone/models/listing/Listing';
-import Purchase from './modals/purchase/Purchase.vue';
 import { convertAndFormatCurrency, curDefToDecimal } from '../../backbone/utils/currency';
 import { getAvatarBgImage, getListingBgImage } from '../../backbone/utils/responsive';
 
@@ -130,6 +128,10 @@ import { useRouter } from 'vue-router';
 
 const store = useStore();
 const router = useRouter();
+
+const props = defineProps({
+  options: Object,
+})
 
 const params = reactive({ keyword: '' });
 let tableData = [];

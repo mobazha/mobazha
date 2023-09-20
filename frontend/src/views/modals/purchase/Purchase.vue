@@ -325,6 +325,12 @@ export default {
     DirectPayment,
     Shipping,
   },
+  props: {
+    options: {
+      type: Object,
+      default: {},
+    },
+  },
   mixins: [],
   data () {
     return {

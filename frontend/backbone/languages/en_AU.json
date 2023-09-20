@@ -303,7 +303,7 @@
       "sortBy": "Sort By",
       "countListings": "%{display_count} listing |||| %{display_count} listings",
       "countListingsFound": "%{countListings} found",
-      "inactive": "Your store is currently inactive and hidden from the public. %{link}",
+      "inactive": "Your store is currently inactive and hidden from the public.",
       "inactiveLink": "Change",
       "listingDataChangedPopin": "Listing data has changed.",
       "shippingDataChangedPopin": "Your country and/or shipping address information has changed. This may affect which listings ship free to you.",

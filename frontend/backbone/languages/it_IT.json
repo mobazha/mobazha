@@ -302,7 +302,7 @@
       "sortBy": "Ordina per",
       "countListings": "%{display_count} listing |||| %{display_count} listings",
       "countListingsFound": "%{countListings} trovati",
-      "inactive": "Il tuo negozio è attualmente inattivo e nascosto al pubblico. %{link}",
+      "inactive": "Il tuo negozio è attualmente inattivo e nascosto al pubblico.",
       "inactiveLink": "Cambia",
       "listingDataChangedPopin": "I listini sono cambiati.",
       "shippingDataChangedPopin": "Il tuo Paese e/o indirizzo di spedizione sono cambiati. Questo potrebbe influire sul costo delle prossime spedizioni.",

@@ -302,7 +302,7 @@
       "sortBy": "Ordenar por",
       "countListings": "%{display_count} anúncio |||| %{display_count} anúncios",
       "countListingsFound": "%{countListings} encontrado(s)",
-      "inactive": "A sua loja está atualmente inativa e escondida do público. %{link}",
+      "inactive": "A sua loja está atualmente inativa e escondida do público.",
       "inactiveLink": "Modificar",
       "listingDataChangedPopin": "Os dados do anúncio foram modificados.",
       "shippingDataChangedPopin": "O seu país e/ou o seu endereço de entrega mudou. Isso pode afetar quais anúncios terão frete grátis para você.",

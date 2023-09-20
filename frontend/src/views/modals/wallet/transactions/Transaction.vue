@@ -40,9 +40,7 @@
     </div>
     <div class="js-retryPmtConfirmed confirmBox retryConfirm arrowBoxTop clrBr clrP clrT clrSh1" v-show="!!ob.retryConfirmOn">
       <div class="tx3 txB rowSm">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.title') }}</div>
-      <div v-if="ob.fetchingEstimatedFee">
-        {{ ob.spinner({ className: 'txCtr spinnerMd' }) }}
-      </div>
+      <SpinnerSVG v-if="ob.fetchingEstimatedFee" className="txCtr spinnerMd" />
 
       <div v-else-if="ob.fetchFeeFailed">
         <p class="clrT2 bodyText">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.fetchError', { err: ob.fetchFeeError || ''}) }}</p>

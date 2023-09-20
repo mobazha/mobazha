@@ -19,8 +19,6 @@ import { followedByYou, followUnfollow } from '../../../backbone/utils/follow';
 import BlockBtn from './BlockBtn';
 import { recordEvent } from '../../../backbone/utils/metrics';
 
-import BaseVw from '../baseVw';
-
 
 export default {
   props: {

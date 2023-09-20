@@ -302,7 +302,7 @@
       "sortBy": "Сортировать по",
       "countListings": "%{display_count} listing |||| %{display_count} listings",
       "countListingsFound": "%{countListings} найдено",
-      "inactive": "Ваш магазин в настоящее время неактивен и скрыт от пользователей. %{link}",
+      "inactive": "Ваш магазин в настоящее время неактивен и скрыт от пользователей.",
       "inactiveLink": "Изменить",
       "listingDataChangedPopin": "Информация была изменена.",
       "shippingDataChangedPopin": "Ваша страна и/или адрес доставки был изменен. Это может отразится на стоимости доставки.",

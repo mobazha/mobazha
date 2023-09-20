@@ -302,7 +302,7 @@
       "sortBy": "Sortér efter",
       "countListings": "%{display_count} listing |||| %{display_count} listings",
       "countListingsFound": "%{countListings} fundet",
-      "inactive": "Din forretning er inaktiv og skjult for offentligheden. %{link}",
+      "inactive": "Din forretning er inaktiv og skjult for offentligheden.",
       "inactiveLink": "Ændr",
       "listingDataChangedPopin": "Listing data has changed.",
       "shippingDataChangedPopin": "Your country and/or shipping address information has changed. This may affect which listings ship free to you.",

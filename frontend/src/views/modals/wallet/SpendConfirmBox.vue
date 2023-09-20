@@ -8,7 +8,9 @@
 
         <div class="posR padSm">
           <div v-if="ob.fetchingFee">
-            <div class="txCtr">{{ ob.spinner({ className: 'spinnerMd' }) }}</div>
+            <div class="txCtr">
+              <SpinnerSVG className="spinnerMd" />
+            </div>
           </div>
 
           <div v-else-if="ob.fetchFailed">

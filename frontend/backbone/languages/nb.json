@@ -302,7 +302,7 @@
       "sortBy": "Sorter Etter",
       "countListings": "%{display_count} listing |||| %{display_count} listings",
       "countListingsFound": "%{countListings} funnet",
-      "inactive": "Butikken din er for tiden inaktiv og skjult. %{link}",
+      "inactive": "Butikken din er for tiden inaktiv og skjult.",
       "inactiveLink": "Endre",
       "listingDataChangedPopin": "Oppføringen er endret.",
       "shippingDataChangedPopin": "Ditt land eller fraktinformasjon er endret. Dette kan påvirke hvilke oppføringer som vil gi deg gratis frakt.",

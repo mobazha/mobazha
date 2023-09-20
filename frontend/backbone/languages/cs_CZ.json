@@ -302,7 +302,7 @@
       "sortBy": "Třídit podle",
       "countListings": "%{display_count} soupis zboží |||| %{display_count} soupisy zboží",
       "countListingsFound": "%{countListings} nalezeno",
-      "inactive": "Tvůj obchod je aktuálně neaktivní a skrytý před veřejností. %{link}",
+      "inactive": "Tvůj obchod je aktuálně neaktivní a skrytý před veřejností.",
       "inactiveLink": "Změnit",
       "listingDataChangedPopin": "Data výpisu zboží se změnila.",
       "shippingDataChangedPopin": "Informace o tvé zemi a/nebo dodací adrese se změnily. To může ovlivnit, které výpisy zboží mají pro tebe dopravu zdarma.",

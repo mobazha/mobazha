@@ -304,7 +304,7 @@
       "sortBy": "排序",
       "countListings": "%{display_count}列表 |||| %{display_count}列表",
       "countListingsFound": "%{countListings}已找到",
-      "inactive": "您的商店目前处于非活动状态并且未公开。%{link}",
+      "inactive":"您的商店目前处于非活动状态并且未公开。",
       "inactiveLink": "更改",
       "listingDataChangedPopin": "列表数据已更改。",
       "shippingDataChangedPopin": "您的国家和/或送货地址信息已更改，这可能会影响哪些商品免费送货给您。",

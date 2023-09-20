@@ -302,7 +302,7 @@
       "sortBy": "ترتيب حسب",
       "countListings": "%{display_count} listing |||| %{display_count} listings",
       "countListingsFound": "تم ايجاد %{countListings}",
-      "inactive": "متجرك غير نشط حاليا ومخفي عن الجمهور. %{link}",
+      "inactive": "متجرك غير نشط حاليا ومخفي عن الجمهور.",
       "inactiveLink": "تغيير",
       "listingDataChangedPopin": "تم تغيير بيانات القائمة.",
       "shippingDataChangedPopin": "تم تغيير معلومات بلدك و/أو عنوان الشحن. هذا قد يؤثر على قوائم الشحن المجانية لك.",

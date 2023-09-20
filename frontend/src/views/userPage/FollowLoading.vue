@@ -1,0 +1,77 @@
+<template>
+  <div class="followLoadingState txCtr tx5">
+    <div v-if="ob.isFetching">
+      <div class="loadingSpinnerWrap">
+        <SpinnerSVG :className="spinnerMd" />
+      </div>
+    </div>
+
+    <div v-else-if="ob.fetchFailed">
+      <p>{{ ob.fetchErrorTitle }}</p>
+      <div v-if="ob.fetchErrorMsg">
+        <p>{{ ob.fetchErrorMsg }}</p>
+      </div>
+      <button class="btn normalBtn clrP clrBr" @click="onClickRetry">{{ ob.polyT('userPage.followTab.btnRetry') }}</button>
+    </div>
+
+    <div v-else-if="ob.noResults">
+      <p>{{ ob.noResultsMsg }}</p>
+    </div>
+
+  </div>
+</template>
+
+<script>
+
+export default {
+  props: {
+    options: {
+      type: Object,
+      default: {},
+    },
+  },
+  data () {
+    return {
+    };
+  },
+  created () {
+    this.initEventChain();
+
+    this.loadData(this.$props.options);
+  },
+  mounted () {
+  },
+  computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+      };
+    }
+  },
+  methods: {
+    loadData (options = {}) {
+      const opts = {
+        initialState: {
+          isFetching: false,
+          noResults: false,
+          noResultsMsg: '',
+          fetchFailed: false,
+          fetchErrorTitle: '',
+          fetchErrorMsg: '',
+          ...options.initialState || {},
+        },
+        ...options,
+      };
+
+      this.setState(opts.initialState || {});
+      this.options = opts;
+    },
+
+    onClickRetry () {
+      this.$emit('retry-click');
+    },
+  }
+}
+</script>
+<style lang="scss" scoped></style>

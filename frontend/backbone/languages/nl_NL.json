@@ -302,7 +302,7 @@
       "sortBy": "Sorteer op",
       "countListings": "%{display_count} listing |||| %{display_count} listings",
       "countListingsFound": "%{countListings} gevonden",
-      "inactive": "Jouw winkel is nu inactief en verborgen voor het publiek. %{link}",
+      "inactive": "Jouw winkel is nu inactief en verborgen voor het publiek.",
       "inactiveLink": "Verander",
       "listingDataChangedPopin": "Artikel informatie is veranderd.",
       "shippingDataChangedPopin": "Uw land en/of verzendadresgegevens zijn veranderd. Dit kan invloed hebben op welke artikelen gratis naar u verzonden kunnen worden.",

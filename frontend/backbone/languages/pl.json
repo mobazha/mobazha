@@ -302,7 +302,7 @@
       "sortBy": "Sortuj według:",
       "countListings": "%{display_count} listing |||| %{display_count} listings",
       "countListingsFound": "Znaleziono %{countListings}",
-      "inactive": "Twój sklep jest w tej chwili nieaktywny i niewidoczny dla innych użytkowników. %{link}",
+      "inactive": "Twój sklep jest w tej chwili nieaktywny i niewidoczny dla innych użytkowników.",
       "inactiveLink": "Zmień",
       "listingDataChangedPopin": "Informacje o przedmiocie zostały zmienione.",
       "shippingDataChangedPopin": "Twój kraj i/lub adres wysyłki został zmieniony. Może to mieć wpływ na dostępność darmowej dostawy.",

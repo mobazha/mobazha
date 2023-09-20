@@ -302,7 +302,7 @@
       "sortBy": "Sortieren nach",
       "countListings": "%{display_count} listing |||| %{display_count} listings",
       "countListingsFound": "%{countListings} gefunden",
-      "inactive": "Ihr Shop ist momentan inaktiv und vor der Öffentlichkeit verborgen. %{link}",
+      "inactive": "Ihr Shop ist momentan inaktiv und vor der Öffentlichkeit verborgen.",
       "inactiveLink": "Ändern",
       "listingDataChangedPopin": "Die Artikeldaten wurden geändert.",
       "shippingDataChangedPopin": "Ihr Land und/oder Ihre Lieferadresse hat sich geändert. Das kann beeinflussen, welche Artikel für Sie versandkostenfrei sind.",

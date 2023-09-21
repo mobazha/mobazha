@@ -11,68 +11,66 @@ import app from '../../../backbone/app';
 import { launchSettingsModal } from '../../../backbone/utils/modalManager';
 import loadTemplate from '../../../backbone/utils/loadTemplate';
 
-
 export default {
   props: {
     options: {
       type: Object,
       default: {},
-	},
+    },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   computed: {
-    params () {
+    params() {
       return {
         ...this.getState(),
       };
-    }
+    },
   },
-	methods: {
-  loadData(options = {}) {
-    const opts = {
-      initialState: {
-        feeLevel: app.localSettings.get('defaultTransactionFee'),
-        feeLevelClass: 'txB',
-        changeLinkClass: 'btnAsLink clrT2',
-      },
-      ...options,
-    };
+  methods: {
+    loadData(options = {}) {
+      const opts = {
+        initialState: {
+          feeLevel: app.localSettings.get('defaultTransactionFee'),
+          feeLevelClass: 'txB',
+          changeLinkClass: 'btnAsLink clrT2',
+        },
+        ...options,
+      };
 
-    this.setState(opts.initialState || {});
+      this.setState(opts.initialState || {});
 
-    this.listenTo(app.localSettings, 'change:defaultTransactionFee', (md, val) => this.setState({ feeLevel: val }));
+      this.listenTo(app.localSettings, 'change:defaultTransactionFee', (md, val) => this.setState({ feeLevel: val }));
+    },
+
+    onClickChangeFee() {
+      launchSettingsModal({
+        initialTab: 'Advanced',
+        scrollTo: '.js-feeSection',
+      });
+    },
+
+    render() {
+      loadTemplate('components/feeChange.html', (t) => {
+        this.$el.html(
+          t({
+            ...this.getState(),
+          })
+        );
+      });
+
+      return this;
+    },
   },
-
-  onClickChangeFee() {
-    launchSettingsModal({
-      initialTab: 'Advanced',
-      scrollTo: '.js-feeSection',
-    });
-  },
-
-  render() {
-    loadTemplate('components/feeChange.html', (t) => {
-      this.$el.html(t({
-        ...this.getState(),
-      }));
-    });
-
-    return this;
-  }
-
-  }
-}
+};
 </script>
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>

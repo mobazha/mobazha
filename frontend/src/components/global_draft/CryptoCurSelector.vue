@@ -7,9 +7,10 @@
           :id="`curSel${cur.code}${ob.cid}`"
           class="centerLabel"
           :name="ob.controlType === 'radio' ? 'currencies' : ''"
-          :checked="cur.active && !cur.disabled">
+          :checked="cur.active && !cur.disabled"
+        />
         <label :for="`curSel${cur.code}${ob.cid}`">
-          <CryptoIcon :code="ob.code"/>
+          <CryptoIcon :code="ob.code" />
           <span class="curName noOverflow">{{ cur.displayName }}</span>
         </label>
       </span>
@@ -33,30 +34,24 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
-  computed: {
-  },
+  computed: {},
   methods: {
-    loadData (options = {}) {
+    loadData(options = {}) {
       let disabledCurs = [];
 
-      if (
-        Array.isArray(options.initialState.disabledCurs) &&
-        Array.isArray(options.initialState.currencies)
-      ) {
-        disabledCurs =
-          options.initialState.currencies.filter(c => !isSupportedWalletCur(c));
+      if (Array.isArray(options.initialState.disabledCurs) && Array.isArray(options.initialState.currencies)) {
+        disabledCurs = options.initialState.currencies.filter((c) => !isSupportedWalletCur(c));
       }
 
       const opts = {
@@ -75,7 +70,7 @@ export default {
       this.options = opts;
     },
 
-    handleCurClick (code) {
+    handleCurClick(code) {
       let activeCurs = [...this.getState().activeCurs];
       // Toggle the current active state when clicked.
       const nowActive = !activeCurs.includes(code);
@@ -84,7 +79,7 @@ export default {
         activeCurs = [code];
       } else {
         if (nowActive) activeCurs.push(code);
-        else activeCurs = activeCurs.filter(c => c !== code);
+        else activeCurs = activeCurs.filter((c) => c !== code);
       }
 
       this.trigger('currencyClicked', {
@@ -96,25 +91,21 @@ export default {
       this.setState({ activeCurs });
     },
 
-
-    setState (state = {}, options = {}) {
+    setState(state = {}, options = {}) {
       const controlTypes = ['checkbox', 'radio'];
       const curState = this.getState();
 
-      if (state.hasOwnProperty('controlType') &&
-        !controlTypes.includes(state.controlType)) {
+      if (state.hasOwnProperty('controlType') && !controlTypes.includes(state.controlType)) {
         throw new Error('If provided the controlType must be a valid value.');
       }
 
-      const checkCurArray = (fieldName => {
-        if (state.hasOwnProperty(fieldName) &&
-          !Array.isArray(state[fieldName])) {
+      const checkCurArray = (fieldName) => {
+        if (state.hasOwnProperty(fieldName) && !Array.isArray(state[fieldName])) {
           throw new Error(`If provided the ${fieldName} must be an array.`);
         }
-      });
+      };
 
-      ['currencies', 'activeCurs', 'disabledCurs']
-        .forEach(field => checkCurArray(field));
+      ['currencies', 'activeCurs', 'disabledCurs'].forEach((field) => checkCurArray(field));
 
       // This is a derived field and should not be directly set
       delete state.processedCurs;
@@ -122,48 +113,38 @@ export default {
       const processedState = {
         ...curState,
         ...state,
-        currencies: Array.isArray(state.currencies) ?
-          [...new Set(state.currencies)] : curState.currencies,
+        currencies: Array.isArray(state.currencies) ? [...new Set(state.currencies)] : curState.currencies,
       };
 
       // Radio controls must have no more than one active currency.
       if (processedState.controlType === 'radio') {
-        processedState.activeCurs = processedState.activeCurs && processedState.activeCurs.length ?
-          [processedState.activeCurs[0]] : [];
+        processedState.activeCurs = processedState.activeCurs && processedState.activeCurs.length ? [processedState.activeCurs[0]] : [];
       }
 
       // Remove any disabled currencies from the active list.
       if (state.activeCurs || state.disabledCurs) {
-        processedState.activeCurs = [...new Set(processedState.activeCurs
-          .filter(c => !processedState.disabledCurs.includes(c)))];
+        processedState.activeCurs = [...new Set(processedState.activeCurs.filter((c) => !processedState.disabledCurs.includes(c)))];
       }
 
       // If necessary, create the processed curs
-      if (
-        !processedState.processedCurs ||
-        state.currencies ||
-        !!processedState.sort !== !!state.sort
-      ) {
-        processedState.processedCurs = processedState.currencies
-          .map(cur => ({
-            code: cur,
-            displayName: app.polyglot.t(`cryptoCurrencies.${cur}`, {
-              _: cur,
-            }),
-            disabled: processedState.disabledCurs.includes(cur),
-            active: processedState.activeCurs.includes(cur),
-          }));
+      if (!processedState.processedCurs || state.currencies || !!processedState.sort !== !!state.sort) {
+        processedState.processedCurs = processedState.currencies.map((cur) => ({
+          code: cur,
+          displayName: app.polyglot.t(`cryptoCurrencies.${cur}`, {
+            _: cur,
+          }),
+          disabled: processedState.disabledCurs.includes(cur),
+          active: processedState.activeCurs.includes(cur),
+        }));
 
         if (processedState.sort) {
           const locale = app.localSettings.standardizedTranslatedLang() || 'en-US';
-          processedState.processedCurs.sort((a, b) =>
-            a.displayName.localeCompare(b.displayName, locale,
-              { sensitivity: 'base' }));
+          processedState.processedCurs.sort((a, b) => a.displayName.localeCompare(b.displayName, locale, { sensitivity: 'base' }));
         }
       } else if (state.activeCurs || state.disabledCurs) {
         // If active or disabled lists are passed in, we'll assume they're
         // different and ensure the processedCurrencies list reflects them.
-        processedState.processedCurs = processedState.processedCurs.map(cur => ({
+        processedState.processedCurs = processedState.processedCurs.map((cur) => ({
           ...cur,
           active: processedState.activeCurs.includes(cur.code),
           disabled: processedState.disabledCurs.includes(cur.code),
@@ -173,17 +154,19 @@ export default {
       super.setState(processedState, options);
     },
 
-    render () {
+    render() {
       loadTemplate('components/cryptoCurSelector.html', (t) => {
-        this.$el.html(t({
-          ...this.options,
-          ...this.getState(),
-        }));
+        this.$el.html(
+          t({
+            ...this.options,
+            ...this.getState(),
+          })
+        );
       });
 
       return this;
-    }
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="scss" scoped></style>

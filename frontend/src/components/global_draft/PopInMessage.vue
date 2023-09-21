@@ -8,21 +8,19 @@
     <div v-if="ob.messageText">
       <p class="txUnl">
         <span class="ion-alert-circled"></span>
-        <b>{{ob.messageText}}</b>
-        <a class="clrTEm js-refresh" @click="onClickRefresh">{{ob.polyT('refreshAlertPopInMessage.refreshLink')}}</a>
+        <b>{{ ob.messageText }}</b>
+        <a class="clrTEm js-refresh" @click="onClickRefresh">{{ ob.polyT('refreshAlertPopInMessage.refreshLink') }}</a>
       </p>
     </div>
 
     <div v-else>
       {{ ob.messageHTML }}
     </div>
-
   </div>
 </template>
 
 <script>
 import _ from 'underscore';
-
 
 export default {
   props: {
@@ -31,28 +29,27 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props.options);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         ...this._state,
-      }
+      };
     },
   },
   methods: {
-    loadData (options) {
+    loadData(options) {
       this.setState(options.initialState || {});
 
       const opts = {
@@ -78,15 +75,15 @@ export default {
       };
     },
 
-    onClickDismiss () {
+    onClickDismiss() {
       this.$emit('clickDismiss');
     },
 
-    onClickRefresh () {
+    onClickRefresh() {
       this.$emit('clickRefresh');
     },
 
-    setState (state = {}) {
+    setState(state = {}) {
       const newState = {
         ...this._state,
         ...state,
@@ -97,12 +94,12 @@ export default {
       }
     },
 
-    replaceState (state = {}) {
+    replaceState(state = {}) {
       if (!_.isEqual(this._state, state)) {
         this._state = state;
       }
     },
-  }
-}
+  },
+};
 </script>
 <style lang="scss" scoped></style>

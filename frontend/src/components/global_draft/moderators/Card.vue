@@ -1,14 +1,16 @@
 <template>
   <div class="moderatorCard clrBr" @click.stop="click">
-
     <div :class="`moderatorCardInner clrP {{ isDisabled }} ${ob.verified ? 'verified clrBrAlert2 clrBAlert2Grad' : ''}`">
       <div class="flexRow gutterH moderatorCardContent">
         <div v-if="ob.radioStyle">
           <div class="flexNoShrink">
             <div class="btnRadio">
               <!-- // the card state may be set on render or set on the fly by the view -->
-              <div tabindex="0" :class="`fauxRadioBtn js-selectBtn ${ob.selectedState === 'selected' ? 'active' : 'inactive'}`" :data-state="ob.selectedState">
-              </div>
+              <div
+                tabindex="0"
+                :class="`fauxRadioBtn js-selectBtn ${ob.selectedState === 'selected' ? 'active' : 'inactive'}`"
+                :data-state="ob.selectedState"
+              ></div>
             </div>
           </div>
         </div>
@@ -27,7 +29,9 @@
                 <div v-if="ob.modLanguages && ob.modLanguages.length">
                   <div class="txSm rowTn">
                     {{
-                      ob.modLanguages.length > 1 ? ob.polyT('moderatorCard.languages', { lang: ob.modLanguages[0], smart_count: ob.modLanguages.length - 1 }) : ob.modLanguages[0]
+                      ob.modLanguages.length > 1
+                        ? ob.polyT('moderatorCard.languages', { lang: ob.modLanguages[0], smart_count: ob.modLanguages.length - 1 })
+                        : ob.modLanguages[0]
                     }}
                   </div>
                 </div>
@@ -36,9 +40,7 @@
                     <div class="flexNoShrink modFee">
                       {{ ob.polyT(`moderatorCard.${ob.moderatorInfo.fee.feeType}`, { amount, percentage: ob.moderatorInfo.fee.percentage }) }}
                     </div>
-                    <div>
-                      {{ ob.parseEmojis('📍') }}{{ ob.location || ob.polyT('userPage.noLocation') }}
-                    </div>
+                    <div>{{ ob.parseEmojis('📍') }}{{ ob.location || ob.polyT('userPage.noLocation') }}</div>
                     <div class="flexExpand flexNoShrink verifiedWrapper js-verifiedMod"></div>
                   </div>
 
@@ -68,7 +70,7 @@
           <div v-if="ob.valid || ob.controlsOnInvalid">
             <div class="flexCol gutterV">
               <div v-if="ob.valid">
-                <button class="btn clrP clrBr clrSh2 selectBtn " @click="clickModerator">
+                <button class="btn clrP clrBr clrSh2 selectBtn" @click="clickModerator">
                   {{ ob.polyT('moderatorCard.view') }}
                 </button>
               </div>
@@ -84,7 +86,6 @@
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -100,7 +101,6 @@ import { launchModeratorDetailsModal } from '../../../../backbone/utils/modalMan
 import { anySupportedByWallet } from '../../../../backbone/data/walletCurrencies';
 import { getLangByCode } from '../../../../backbone/data/languages';
 
-
 export default {
   props: {
     options: {
@@ -108,20 +108,19 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         displayCurrency: app.settings.get('localCurrency'),
@@ -136,37 +135,36 @@ export default {
         ...this._state,
       };
     },
-    loaded () {
+    loaded() {
       return !!this.ob.name;
     },
-    isDisabled () {
+    isDisabled() {
       const ob = this.ob;
       /* Disable the card if it is invalid and the controls should be shown, and it is not selected. This allow the user to de-select invalid cards.
       The view should prevent the invalid card from being selected again, disabling it is redundant but important visually. */
       return (!ob.valid && !ob.controlsOnInvalid) || (!ob.valid && ob.controlsOnInvalid && ob.selectedState !== 'selected') || !loaded ? 'disabled' : '';
     },
-    amount () {
+    amount() {
       const ob = this.ob;
       return ob.currencyMod.convertAndFormatCurrency(
         ob.moderatorInfo.fee.fixedFee.amount || 0,
         ob.moderatorInfo.fee.fixedFee.currency.code,
         ob.displayCurrency,
         {
-          maxDisplayDecimals:
-            !ob.currencyMod.isFiatCur(ob.displayCurrency) ? 6 : undefined
+          maxDisplayDecimals: !ob.currencyMod.isFiatCur(ob.displayCurrency) ? 6 : undefined,
         }
-      )
+      );
     },
-    hasValidCurrency () {
+    hasValidCurrency() {
       return anySupportedByWallet(this.modCurs);
     },
-    hasPreferredCur () {
+    hasPreferredCur() {
       const preCur = _.intersection(this.getState().preferredCurs, this.modCurs);
       return !!preCur.length;
     },
   },
   methods: {
-    loadData (options = {}) {
+    loadData(options = {}) {
       /* There are 3 valid card selected states:
        selected: This mod is pre-selected, or was activated by the user.
        unselected: Neutral. No action has been taken by the user on this mod.
@@ -202,7 +200,8 @@ export default {
 
       this.modLanguages = [];
       if (this.model.isModerator) {
-        this.modLanguages = this.model.get('moderatorInfo')
+        this.modLanguages = this.model
+          .get('moderatorInfo')
           .get('languages')
           .map((lang) => {
             const langData = getLangByCode(lang);
@@ -213,7 +212,7 @@ export default {
       handleLinks(this.el);
     },
 
-    clickModerator (e) {
+    clickModerator(e) {
       e.stopPropagation();
       const modModal = launchModeratorDetailsModal({
         model: this.model,
@@ -225,11 +224,11 @@ export default {
       });
     },
 
-    click (e) {
+    click(e) {
       this.rotateSelectState();
     },
 
-    rotateSelectState () {
+    rotateSelectState() {
       if (this.getState().selectedState === 'selected' && !this.options.radioStyle) {
         this.changeSelectState(this.options.notSelected);
       } else if (this.model.isModerator && this.hasValidCurrency) {
@@ -240,7 +239,7 @@ export default {
       }
     },
 
-    changeSelectState (selectedState) {
+    changeSelectState(selectedState) {
       if (selectedState !== this.getState().selectedState) {
         this.setState({ selectedState });
         this.trigger('modSelectChange', {
@@ -250,40 +249,43 @@ export default {
       }
     },
 
-    render () {
+    render() {
       super.render();
 
-      const showPreferredWarning = this.getState().preferredCurs.length
-        && !this.hasPreferredCur;
+      const showPreferredWarning = this.getState().preferredCurs.length && !this.hasPreferredCur;
 
       const verifiedMod = app.verifiedMods.get(this.model.get('peerID'));
 
       loadTemplate('components/moderators/card.html', (t) => {
-        this.$el.html(t({
-          displayCurrency: app.settings.get('localCurrency'),
-          valid: this.model.isModerator,
-          hasValidCurrency: this.hasValidCurrency,
-          radioStyle: this.options.radioStyle,
-          controlsOnInvalid: this.options.controlsOnInvalid,
-          showPreferredWarning,
-          verified: !!verifiedMod,
-          modLanguages: this.modLanguages,
-          ...this.model.toJSON(),
-          ...this.getState(),
-        }));
+        this.$el.html(
+          t({
+            displayCurrency: app.settings.get('localCurrency'),
+            valid: this.model.isModerator,
+            hasValidCurrency: this.hasValidCurrency,
+            radioStyle: this.options.radioStyle,
+            controlsOnInvalid: this.options.controlsOnInvalid,
+            showPreferredWarning,
+            verified: !!verifiedMod,
+            modLanguages: this.modLanguages,
+            ...this.model.toJSON(),
+            ...this.getState(),
+          })
+        );
 
         if (this.verifiedMod) this.verifiedMod.remove();
 
-        this.verifiedMod = this.createChild(VerifiedMod, getModeratorOptions({
-          model: verifiedMod,
-        }));
+        this.verifiedMod = this.createChild(
+          VerifiedMod,
+          getModeratorOptions({
+            model: verifiedMod,
+          })
+        );
         this.getCachedEl('.js-verifiedMod').append(this.verifiedMod.render().el);
       });
 
       return this;
-    }
-
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="scss" scoped></style>

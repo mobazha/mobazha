@@ -1,6 +1,5 @@
 <template>
   <div class="pageControlsWrapper overflowAuto">
-
     <div class="floR">
       <div class="pageControls flexVCent gutterH tx5">
         <div class="btnStrip">
@@ -18,78 +17,74 @@
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
 <script>
 import loadTemplate from '../../../backbone/utils/loadTemplate';
 
-
 export default {
   props: {
     options: {
       type: Object,
       default: {},
-	},
+    },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   computed: {
-    params () {
+    params() {
       return {
         ...this.getState(),
       };
-    }
+    },
   },
-	methods: {
-  loadData(options = {}) {
-    const opts = {
-      ...options,
-      initialState: {
-        start: 1,
-        ...options.initialState,
-      },
-    };
+  methods: {
+    loadData(options = {}) {
+      const opts = {
+        ...options,
+        initialState: {
+          start: 1,
+          ...options.initialState,
+        },
+      };
 
-    this.setState(opts.initialState || {});
+      this.setState(opts.initialState || {});
+    },
+
+    events() {
+      return {};
+    },
+
+    onClickNext() {
+      this.$emit('clickNext');
+    },
+
+    onClickPrev() {
+      this.$emit('clickPrev');
+    },
+
+    render() {
+      loadTemplate('components/pageControlsTextStyle.html', (t) => {
+        this.$el.html(
+          t({
+            ...this.getState(),
+          })
+        );
+      });
+
+      return this;
+    },
   },
-
-  events() {
-    return {
-                };
-  },
-
-  onClickNext() {
-    this.$emit('clickNext');
-  },
-
-  onClickPrev() {
-    this.$emit('clickPrev');
-  },
-
-  render() {
-    loadTemplate('components/pageControlsTextStyle.html', (t) => {
-      this.$el.html(t({
-        ...this.getState(),
-      }));
-    });
-
-    return this;
-  }
-
-  }
-}
+};
 </script>
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>

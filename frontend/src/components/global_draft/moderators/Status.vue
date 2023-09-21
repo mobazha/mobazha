@@ -3,16 +3,13 @@
     <SpinnerSVG v-if="ob.showSpinner && ob.loading" className="spinnerTxt js-spinner" />
     <span class="clrT4">{{ statusInfo }}</span>
 
-    <button v-if="ob.showLoadBtn" class="btnAsLink tx6 clrT2 browseMore" @click="clickBrowseMore"
-      :disabled="ob.showSpinner">
+    <button v-if="ob.showLoadBtn" class="btnAsLink tx6 clrT2 browseMore" @click="clickBrowseMore" :disabled="ob.showSpinner">
       {{ ob.polyT('moderators.browseMoreModerators') }}
     </button>
   </div>
 </template>
 
 <script>
-
-
 export default {
   props: {
     options: {
@@ -20,24 +17,22 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props);
   },
-  mounted () {
-  },
+  mounted() {},
   computed: {
-    ob () {
+    ob() {
       return {
         ...this._state,
       };
     },
-    statusInfo () {
+    statusInfo() {
       const ob = this.ob;
 
       let statusInfo = ob.polyT('moderators.moderatorsLoading');
@@ -53,7 +48,7 @@ export default {
     },
   },
   methods: {
-    loadData (options = {}) {
+    loadData(options = {}) {
       const opts = {
         className: 'moderatorStatus',
         ...options,
@@ -73,7 +68,7 @@ export default {
       this.setState(opts.initialState || {});
     },
 
-    setState (state = {}, options = {}) {
+    setState(state = {}, options = {}) {
       const combinedState = { ...this.getState(), ...state };
       // Any time the state is set to loading, set the spinner timer if needed.
       if (state.loading && combinedState.showSpinner) {
@@ -87,15 +82,15 @@ export default {
       super.setState(state, options);
     },
 
-    clickBrowseMore () {
+    clickBrowseMore() {
       this.trigger('browseMore');
     },
 
-    remove () {
+    remove() {
       clearTimeout(this.spinnerTimeout);
       super.remove();
     },
-  }
-}
+  },
+};
 </script>
 <style lang="scss" scoped></style>

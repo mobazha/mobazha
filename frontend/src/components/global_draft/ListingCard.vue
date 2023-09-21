@@ -1,6 +1,5 @@
 <template>
   <div>
-
     <div v-if="ob.viewType === 'grid'" class="gridViewContent posR">
       <div class="listingImage js-listingImage" :style="listingImageBgStyle">
         <div class="nsfwOverlay overlayPanel coverFull clrP">
@@ -30,10 +29,16 @@
         <div v-if="ob.ownListing" class="editOverlay overlayPanel">
           <div class="overlayPanelInner"></div>
           <div class="flex gutterHSm">
-            <button class='iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-edit' :data-tip="ob.polyT('listingCard.editListingTooltip')"><span class="ion-edit"></span></button>
-            <button class='iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-clone' :data-tip="ob.polyT('listingCard.cloneListingTooltip')"><span class="ion-ios-copy"></span></button>
+            <button class="iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-edit" :data-tip="ob.polyT('listingCard.editListingTooltip')">
+              <span class="ion-edit"></span>
+            </button>
+            <button class="iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-clone" :data-tip="ob.polyT('listingCard.cloneListingTooltip')">
+              <span class="ion-ios-copy"></span>
+            </button>
             <div class="posR">
-              <a class='iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-delete' :data-tip="ob.polyT('listingCard.deleteListingTooltip')"><span class="ion-trash-b"></span></a>
+              <a class="iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-delete" :data-tip="ob.polyT('listingCard.deleteListingTooltip')"
+                ><span class="ion-trash-b"></span
+              ></a>
               <div class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxBottom clrBr clrP clrT hide">
                 <div class="tx3 txB rowSm">{{ ob.polyT('listingCard.confirmDelete.title') }}</div>
                 <p>{{ ob.polyT('listingCard.confirmDelete.body') }}</p>
@@ -51,17 +56,24 @@
             <div class="hideIfEmpty js-reportBtnWrapper"></div>
             <div class="js-blockBtnWrapper"></div>
 
-            <button v-if="ob.nsfw" class="iconBtnSm clrP clrBr toolTipNoWrap toolTipTop btnHideNsfw js-hideNsfw" :data-tip="ob.polyT('listingCard.tipHideMatureContent')"><i class="ion-locked"></i></button>
+            <button
+              v-if="ob.nsfw"
+              class="iconBtnSm clrP clrBr toolTipNoWrap toolTipTop btnHideNsfw js-hideNsfw"
+              :data-tip="ob.polyT('listingCard.tipHideMatureContent')"
+            >
+              <i class="ion-locked"></i>
+            </button>
           </div>
         </div>
-
       </div>
       <div class="pad clrBr borderTop infoArea">
-
         <div v-if="ob.vendor">
           <a class="userIconWrapper js-userLink" :href="`#${ob.vendor.peerID}/store`">
-            <div class="userIcon disc clrBr2 clrSh1 toolTipNoWrap js-vendorIcon" :style="`background-image: ${vendorAvatarImageSrc}url('../imgs/defaultAvatar.png')`" :data-tip="ob.vendor.name">
-            </div>
+            <div
+              class="userIcon disc clrBr2 clrSh1 toolTipNoWrap js-vendorIcon"
+              :style="`background-image: ${vendorAvatarImageSrc}url('../imgs/defaultAvatar.png')`"
+              :data-tip="ob.vendor.name"
+            ></div>
           </a>
           <div class="userIconWrapper nsfwAvatarOverlay">
             <div class="userIcon disc clrBr2 clrSh1 clrP tx3">
@@ -79,18 +91,23 @@
           <!-- // The accepted currencies check is in case that data is not provided (e.g. a search provider omits),
       // we'll fall back to displaying the title field, since otherwise we're unable to determine one of
       // the trading pairs. -->
-          <div v-if="ob.contractType !== 'CRYPTOCURRENCY' || (!(ob.acceptedCurrencies && ob.acceptedCurrencies.length))"
-            :class="`${ob.title.length > 60 ? 'toolTip' : 'toolTipNoWrap'} toolTipTop inlineBlock ${ob.vendor ? 'trimWidth' : ''}`" :data-tip="ob.title">
+          <div
+            v-if="ob.contractType !== 'CRYPTOCURRENCY' || !(ob.acceptedCurrencies && ob.acceptedCurrencies.length)"
+            :class="`${ob.title.length > 60 ? 'toolTip' : 'toolTipNoWrap'} toolTipTop inlineBlock ${ob.vendor ? 'trimWidth' : ''}`"
+            :data-tip="ob.title"
+          >
             <a class="clrT clamp listingTitle">{{ ob.title }}</a>
           </div>
           <div v-else>
             <a class="listingTitle">
-              {{ ob.crypto.tradingPair({
-            className: 'cryptoTradingPairSm',
-            fromCur: `${ob.acceptedCurrencies && ob.acceptedCurrencies[0]}`,
-            toCur: ob.price.currencyCode,
-            truncateCurAfter: 5,
-          }) }}
+              {{
+                ob.crypto.tradingPair({
+                  className: 'cryptoTradingPairSm',
+                  fromCur: `${ob.acceptedCurrencies && ob.acceptedCurrencies[0]}`,
+                  toCur: ob.price.currencyCode,
+                  truncateCurAfter: 5,
+                })
+              }}
             </a>
           </div>
         </div>
@@ -102,13 +119,10 @@
 
           <div v-if="ob.contractType !== 'CRYPTOCURRENCY'">
             {{
-          ob.currencyMod.convertAndFormatCurrency(
-            ob.price.amount,
-            ob.price.currencyCode,
-            ob.displayCurrency,
-            { maxDisplayDecimals: priceMaxDisplayDecimals }
-          )
-        }}
+              ob.currencyMod.convertAndFormatCurrency(ob.price.amount, ob.price.currencyCode, ob.displayCurrency, {
+                maxDisplayDecimals: priceMaxDisplayDecimals,
+              })
+            }}
           </div>
           <div v-else>
             {{
@@ -120,12 +134,11 @@
                 wrappingClass: '',
                 marketRelativityClass: 'hide',
                 convertAndFormatOpts: {
-                  maxDisplayDecimals: priceMaxDisplayDecimals
-                }
+                  maxDisplayDecimals: priceMaxDisplayDecimals,
+                },
               })
             }}
           </div>
-
         </div>
       </div>
       <div class="listingIcons">
@@ -142,21 +155,20 @@
           <div class="center tx2 nsfwAvatarOverlay">{{ ob.parseEmojis('😲') }}</div>
         </div>
         <div class="flexExpand">
-
-          <div v-if="ob.contractType !== 'CRYPTOCURRENCY' ||
-            !Array.isArray(ob.acceptedCurrencies) ||
-            !ob.acceptedCurrencies.length">
+          <div v-if="ob.contractType !== 'CRYPTOCURRENCY' || !Array.isArray(ob.acceptedCurrencies) || !ob.acceptedCurrencies.length">
             <div :class="`rowTn inlineBlock ${ob.title.length > 60 ? 'toolTip' : 'toolTipNoWrap'} toolTipTop`" :data-tip="ob.title">
               <a class="clrT clamp3 listingTitle">{{ ob.title }}</a>
             </div>
           </div>
           <div v-else>
-            {{ ob.crypto.tradingPair({
-            className: 'cryptoTradingPairSm',
-            fromCur: ob.acceptedCurrencies[0],
-            toCur: ob.price.currencyCode,
-            truncateCurAfter: 5,
-          }) }}
+            {{
+              ob.crypto.tradingPair({
+                className: 'cryptoTradingPairSm',
+                fromCur: ob.acceptedCurrencies[0],
+                toCur: ob.price.currencyCode,
+                truncateCurAfter: 5,
+              })
+            }}
           </div>
           <div class="flexVCent gutterHSm tx5b">
             <div class="flexNoShrink ratingStrip">
@@ -174,22 +186,19 @@
           <span>
             {{
               ob.contractType !== 'CRYPTOCURRENCY'
-                ? ob.currencyMod.convertAndFormatCurrency(
-                  ob.price.amount,
-                  ob.price.currencyCode,
-                  ob.displayCurrency,
-                  { maxDisplayDecimals: priceMaxDisplayDecimals }
-                )
+                ? ob.currencyMod.convertAndFormatCurrency(ob.price.amount, ob.price.currencyCode, ob.displayCurrency, {
+                    maxDisplayDecimals: priceMaxDisplayDecimals,
+                  })
                 : ob.crypto.cryptoPrice({
-                  priceAmount: ob.price.amount,
-                  priceCurrencyCode: ob.price.currencyCode,
-                  displayCurrency: ob.displayCurrency,
-                  priceModifier: ob.price.modifier,
-                  wrappingClass: '',
-                  convertAndFormatOpts: {
-                    maxDisplayDecimals: priceMaxDisplayDecimals
-                  }                
-                })
+                    priceAmount: ob.price.amount,
+                    priceCurrencyCode: ob.price.currencyCode,
+                    displayCurrency: ob.displayCurrency,
+                    priceModifier: ob.price.modifier,
+                    wrappingClass: '',
+                    convertAndFormatOpts: {
+                      maxDisplayDecimals: priceMaxDisplayDecimals,
+                    },
+                  })
             }}
           </span>
         </div>
@@ -199,8 +208,8 @@
     <div v-else class="flexVCent gutterH">
       <div class="tradeFromCol">
         <div class="flexVCent gutterHSm">
-          <CryptoIcon :code="`${ob.acceptedCurrencies && ob.acceptedCurrencies[0] || ''}`" className="flexNoShrink" />
-          <span class="txB clamp">{{ ob.acceptedCurrencies && ob.acceptedCurrencies[0] || '' }}</span>
+          <CryptoIcon :code="`${(ob.acceptedCurrencies && ob.acceptedCurrencies[0]) || ''}`" className="flexNoShrink" />
+          <span class="txB clamp">{{ (ob.acceptedCurrencies && ob.acceptedCurrencies[0]) || '' }}</span>
         </div>
       </div>
       <div class="tradeArrowCol">
@@ -208,7 +217,7 @@
       </div>
       <div class="tradeToCol">
         <div class="flexVCent gutterHSm">
-          <CryptoIcon :code="ob.coinType"/>
+          <CryptoIcon :code="ob.coinType" />
           <span class="txB clamp">{{ ob.coinType }}</span>
         </div>
       </div>
@@ -247,7 +256,6 @@
 
       <!-- // This is being commented out until inventory is functional.
     <div class="inventoryCol flexExpand flexVCent flexHRight gutterHSm {{ inventoryTxClass }}">{{ inventory }}</div> -->
-
     </div>
 
     <div v-if="['list', 'cryptoList'].includes(ob.viewType)">
@@ -265,10 +273,16 @@
       <div v-if="ob.ownListing" class="editOverlay overlayPanel clrP">
         <div class="overlayPanelInner"></div>
         <div class="flexHCent gutterHSm">
-          <button class='iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-edit' :data-tip="ob.polyT('listingCard.editListingTooltip')"><span class="ion-edit"></span></button>
-          <button class='iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-clone' :data-tip="ob.polyT('listingCard.cloneListingTooltip')"><span class="ion-ios-copy"></span></button>
+          <button class="iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-edit" :data-tip="ob.polyT('listingCard.editListingTooltip')">
+            <span class="ion-edit"></span>
+          </button>
+          <button class="iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-clone" :data-tip="ob.polyT('listingCard.cloneListingTooltip')">
+            <span class="ion-ios-copy"></span>
+          </button>
           <div class="posR">
-            <button class='iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-delete' :data-tip="ob.polyT('listingCard.deleteListingTooltip')"><span class="ion-trash-b"></span></button>
+            <button class="iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-delete" :data-tip="ob.polyT('listingCard.deleteListingTooltip')">
+              <span class="ion-trash-b"></span>
+            </button>
             <div class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxBottom clrBr clrP clrT hide">
               <div class="tx3 txB rowSm">{{ ob.polyT('listingCard.confirmDelete.title') }}</div>
               <p>{{ ob.polyT('listingCard.confirmDelete.body') }}</p>
@@ -285,9 +299,22 @@
         <div class="flex gutterHSm">
           <div class="hideIfEmpty js-reportBtnWrapper"></div>
           <div class="js-blockBtnWrapper"></div>
-          <button class="btn clrP clrBr iconBtnSm btnShowNsfw clrSh1 js-showNsfw toolTipNoWrap toolTipTop" tabindex="0" :data-tip="ob.polyT('listingCard.tipShowMatureContent')"><i class="ion-unlocked"></i></button>
+          <button
+            class="btn clrP clrBr iconBtnSm btnShowNsfw clrSh1 js-showNsfw toolTipNoWrap toolTipTop"
+            tabindex="0"
+            :data-tip="ob.polyT('listingCard.tipShowMatureContent')"
+          >
+            <i class="ion-unlocked"></i>
+          </button>
 
-          <button v-if="ob.nsfw" class="btn clrP clrBr iconBtnSm btnHideNsfw clrSh1 js-hideNsfw toolTipNoWrap toolTipTop" tabindex="0" :data-tip="ob.polyT('listingCard.tipHideMatureContent')"><i class="ion-locked"></i></button>
+          <button
+            v-if="ob.nsfw"
+            class="btn clrP clrBr iconBtnSm btnHideNsfw clrSh1 js-hideNsfw toolTipNoWrap toolTipTop"
+            tabindex="0"
+            :data-tip="ob.polyT('listingCard.tipHideMatureContent')"
+          >
+            <i class="ion-locked"></i>
+          </button>
         </div>
       </div>
     </div>
@@ -300,7 +327,6 @@
         {{ ob.polyT('listingCard.deleted') }}
       </div>
     </div>
-
   </div>
 </template>
 
@@ -1074,5 +1100,4 @@ export default {
   }
 }
 </script>
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>

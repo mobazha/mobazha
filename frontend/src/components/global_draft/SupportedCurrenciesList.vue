@@ -15,64 +15,56 @@ import { ensureMainnetCode } from '../../../backbone/data/walletCurrencies';
 import app from '../../../backbone/app';
 import baseVw from '../baseVw';
 
-
 export default {
   props: {
     options: {
       type: Object,
       default: {},
-	},
+    },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   computed: {
-    params () {
+    params() {
       return {
         ...this.getState(),
       };
-    }
+    },
   },
-	methods: {
-  loadData(options = {}) {
-    const opts = {
-      ...options,
-      initialState: {
-        currencies: [],
-        processedCurs: [],
-        sort: true,
-        ...options.initialState,
-      },
-    };
+  methods: {
+    loadData(options = {}) {
+      const opts = {
+        ...options,
+        initialState: {
+          currencies: [],
+          processedCurs: [],
+          sort: true,
+          ...options.initialState,
+        },
+      };
 
-    this.setState(opts.initialState || {});
-  },
+      this.setState(opts.initialState || {});
+    },
 
-  setState(state = {}, options = {}) {
-    const curState = this.getState();
-    const processedState = {
-      ...state,
-      // This is a derived field and should not be directly set
-      processedCurs: Array.isArray(curState.processedCurs) ?
-        curState.processedCurs : [],
-    };
+    setState(state = {}, options = {}) {
+      const curState = this.getState();
+      const processedState = {
+        ...state,
+        // This is a derived field and should not be directly set
+        processedCurs: Array.isArray(curState.processedCurs) ? curState.processedCurs : [],
+      };
 
-    if (Array.isArray(processedState.currencies) &&
-      (
-        curState.sort !== processedState.sort ||
-        !_.isEqual(curState.currencies, state.currencies)
-      )) {
-      processedState.processedCurs = processedState.currencies
-        .map(cur => {
+      if (Array.isArray(processedState.currencies) && (curState.sort !== processedState.sort || !_.isEqual(curState.currencies, state.currencies))) {
+        processedState.processedCurs = processedState.currencies.map((cur) => {
           const code = ensureMainnetCode(cur);
           const displayName = app.polyglot.t(`cryptoCurrencies.${code}`, { _: cur });
 
@@ -83,30 +75,29 @@ export default {
           };
         });
 
-      if (processedState.sort) {
-        processedState.processedCurs = _.sortBy(processedState.processedCurs, 'sortDisplayName')
-          .map(cur => {
+        if (processedState.sort) {
+          processedState.processedCurs = _.sortBy(processedState.processedCurs, 'sortDisplayName').map((cur) => {
             delete cur.sortDisplayName;
             return cur;
           });
+        }
       }
-    }
 
-    super.setState(processedState, options);
+      super.setState(processedState, options);
+    },
+
+    render() {
+      loadTemplate('components/supportedCurrenciesList.html', (t) => {
+        this.$el.html(
+          t({
+            ...this.getState(),
+          })
+        );
+      });
+
+      return this;
+    },
   },
-
-  render() {
-    loadTemplate('components/supportedCurrenciesList.html', (t) => {
-      this.$el.html(t({
-        ...this.getState(),
-      }));
-    });
-
-    return this;
-  }
-
-  }
-}
+};
 </script>
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>

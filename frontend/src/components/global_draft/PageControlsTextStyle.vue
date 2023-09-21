@@ -60,19 +60,12 @@ export default {
 
       this.setState(opts.initialState || {});
     },
-
-    events() {
-      return {};
-    },
-
     onClickNext() {
       this.$emit('clickNext');
     },
-
     onClickPrev() {
       this.$emit('clickPrev');
     },
-
     render() {
       loadTemplate('components/pageControlsTextStyle.html', (t) => {
         this.$el.html(

@@ -1,6 +1,6 @@
 <template>
   <div class="moderatorCard clrBr" @click.stop="click">
-    <div :class="`moderatorCardInner clrP {{ isDisabled }} ${ob.verified ? 'verified clrBrAlert2 clrBAlert2Grad' : ''}`">
+    <div :class="`moderatorCardInner clrP ${isDisabled} ${ob.verified ? 'verified clrBrAlert2 clrBAlert2Grad' : ''}`">
       <div class="flexRow gutterH moderatorCardContent">
         <div v-if="ob.radioStyle">
           <div class="flexNoShrink">
@@ -114,18 +114,21 @@ export default {
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   mounted() {
     this.render();
   },
   computed: {
     ob() {
+      const showPreferredWarning = this._state.preferredCurs.length && !this.hasPreferredCur;
+
+      const verifiedMod = app.verifiedMods.get(this.model.get('peerID'));
       return {
         ...this.templateHelpers,
         displayCurrency: app.settings.get('localCurrency'),
         valid: this.model.isModerator,
-        hasValidCurrency: this.hasValidCurrency,
+        hasValidCurrency: anySupportedByWallet(this.modCurs),
         radioStyle: this.options.radioStyle,
         controlsOnInvalid: this.options.controlsOnInvalid,
         showPreferredWarning,
@@ -142,7 +145,7 @@ export default {
       const ob = this.ob;
       /* Disable the card if it is invalid and the controls should be shown, and it is not selected. This allow the user to de-select invalid cards.
       The view should prevent the invalid card from being selected again, disabling it is redundant but important visually. */
-      return (!ob.valid && !ob.controlsOnInvalid) || (!ob.valid && ob.controlsOnInvalid && ob.selectedState !== 'selected') || !loaded ? 'disabled' : '';
+      return (!ob.valid && !ob.controlsOnInvalid) || (!ob.valid && ob.controlsOnInvalid && ob.selectedState !== 'selected') || !this.loaded ? 'disabled' : '';
     },
     amount() {
       const ob = this.ob;
@@ -155,11 +158,8 @@ export default {
         }
       );
     },
-    hasValidCurrency() {
-      return anySupportedByWallet(this.modCurs);
-    },
     hasPreferredCur() {
-      const preCur = _.intersection(this.getState().preferredCurs, this.modCurs);
+      const preCur = _.intersection(this._state.preferredCurs, this.modCurs);
       return !!preCur.length;
     },
   },
@@ -229,9 +229,9 @@ export default {
     },
 
     rotateSelectState() {
-      if (this.getState().selectedState === 'selected' && !this.options.radioStyle) {
+      if (this._state.selectedState === 'selected' && !this.options.radioStyle) {
         this.changeSelectState(this.options.notSelected);
-      } else if (this.model.isModerator && this.hasValidCurrency) {
+      } else if (this.model.isModerator && anySupportedByWallet(this.modCurs)) {
         /* Only change to selected if this is a valid moderator and the user's currency is supported.
         Moderators that have become invalid may be displayed, and can be de-selected to remove them.
         */
@@ -240,7 +240,7 @@ export default {
     },
 
     changeSelectState(selectedState) {
-      if (selectedState !== this.getState().selectedState) {
+      if (selectedState !== this._state.selectedState) {
         this.setState({ selectedState });
         this.trigger('modSelectChange', {
           selected: selectedState === 'selected',
@@ -252,7 +252,7 @@ export default {
     render() {
       super.render();
 
-      const showPreferredWarning = this.getState().preferredCurs.length && !this.hasPreferredCur;
+      const showPreferredWarning = this._state.preferredCurs.length && !this.hasPreferredCur;
 
       const verifiedMod = app.verifiedMods.get(this.model.get('peerID'));
 
@@ -268,7 +268,7 @@ export default {
             verified: !!verifiedMod,
             modLanguages: this.modLanguages,
             ...this.model.toJSON(),
-            ...this.getState(),
+            ...this._state,
           })
         );
 

@@ -22,7 +22,6 @@
 </template>
 
 <script>
-import $ from 'jquery';
 import app from '../../../backbone/app';
 import loadTemplate from '../../../backbone/utils/loadTemplate';
 import { isSupportedWalletCur } from '../../../backbone/data/walletCurrencies';
@@ -40,12 +39,8 @@ export default {
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
-  mounted() {
-    this.render();
-  },
-  computed: {},
   methods: {
     loadData(options = {}) {
       let disabledCurs = [];
@@ -66,8 +61,7 @@ export default {
           ...options.initialState,
         },
       };
-
-      this.options = opts;
+      this.setState(opts.initialState);
     },
 
     handleCurClick(code) {

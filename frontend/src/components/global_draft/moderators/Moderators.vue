@@ -12,8 +12,6 @@
           <div class="moderatorCardInner">
             <div class="flexCent">
               <div class="flexColRows flexHCent gutterVTn">
-                <% const showOnlyVer = ob.showVerifiedOnly && ob.unVerCount ? 'Verified' : ''; const showOnlyCur = ob.showOnlyCur ? 'Matching' : ''; const opts
-                = ob.showOnlyCur ? { coin: ob.showOnlyCur } : {}; const msgPath = `moderators.noModsMsg.no${showOnlyCur}${showOnlyVer}Moderators`; %>
                 <h4>{{ ob.polyT(`${msgPath}.title`, opts) }}</h4>
                 <!-- // The section below is only relevant if the moderators are loaded in a purchasing context. -->
                 <div v-if="ob.purchase">
@@ -48,11 +46,9 @@ import loadTemplate from '../../../../backbone/utils/loadTemplate';
 import { getSocket } from '../../../../backbone/utils/serverConnect';
 import Moderators from '../../../../backbone/collections/Moderators';
 import Moderator from '../../../../backbone/models/profile/Profile';
-import baseVw from '../../baseVw';
 import { openSimpleMessage } from '../../modals/SimpleMessage';
 import ModCard from './Card';
 import ModeratorsStatus from './Status';
-
 
 export default {
   props: {
@@ -61,20 +57,19 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   computed: {
-    ob () {
+    ob() {
       return {
         wrapperClasses: this.options.wrapperClasses,
         placeholder: !showMods.length && (this.unfetchedMods.length || !totalIDs),
@@ -84,7 +79,22 @@ export default {
         unVerCount,
         ...this._state,
       };
-    }
+    },
+    showOnlyVer() {
+      let ob = this.ob;
+      return ob.showVerifiedOnly && ob.unVerCount ? 'Verified' : '';
+    },
+    showOnlyCur() {
+      let ob = this.ob;
+      return ob.showOnlyCur ? 'Matching' : '';
+    },
+    opts() {
+      let ob = this.ob;
+      return ob.showOnlyCur ? { coin: ob.showOnlyCur } : {};
+    },
+    msgPath() {
+      return `moderators.noModsMsg.no${this.showOnlyCur}${this.showOnlyVer}Moderators`;
+    },
   },
   methods: {
     /**
@@ -111,7 +121,7 @@ export default {
      * @param {boolean} options.showSpinner       - Show the spinner in the status bar
      */
 
-    loadData (options = {}) {
+    loadData(options = {}) {
       if (!options.fetchErrorTitle) {
         throw new Error('Please provide error text for the moderator fetch.');
       }
@@ -198,26 +208,21 @@ export default {
       this.serverSocket = getSocket();
     },
 
-    events () {
-      return {
-      };
-    },
-
-    clickShowUnverified () {
+    clickShowUnverified() {
       this.togVerifiedShown(false);
       this.trigger('clickShowUnverified');
     },
 
-    onBrowseMore () {
+    onBrowseMore() {
       this.getModeratorsByID();
     },
 
-    removeNotFetched (ID) {
+    removeNotFetched(ID) {
       this.unfetchedMods = this.unfetchedMods.filter((peerID) => peerID !== ID);
       this.checkNotFetched();
     },
 
-    processMod (data) {
+    processMod(data) {
       // Don't add profiles that are not moderators unless showInvalid is true. The ID list may have
       // peerIDs that are out of date, and are no longer moderators.
       const isAMod = data.moderator && data.moderatorInfo;
@@ -226,12 +231,11 @@ export default {
       const modCurs = (data.moderatorInfo && data.moderatorInfo.acceptedCurrencies) || [];
       const supportedCur = anySupportedByWallet(modCurs);
 
-      if (data.moderatorInfo && data.moderatorInfo.fee.feeType === 'FIXED_PLUS_PERCENTAGE'
-        && !(data.moderatorInfo.fee.fixedFee.amount instanceof bigNumber)) {
+      if (data.moderatorInfo && data.moderatorInfo.fee.feeType === 'FIXED_PLUS_PERCENTAGE' && !(data.moderatorInfo.fee.fixedFee.amount instanceof bigNumber)) {
         data.moderatorInfo.fee.fixedFee.amount = bigNumber(data.moderatorInfo.fee.fixedFee.amount);
       }
 
-      if (((!!isAMod && supportedCur) || this.options.showInvalid)) {
+      if ((!!isAMod && supportedCur) || this.options.showInvalid) {
         const newMod = new Moderator(data, { parse: true });
         if (newMod.isValid()) this.moderatorsCol.add(newMod);
         this.removeNotFetched(data.peerID);
@@ -241,7 +245,7 @@ export default {
       }
     },
 
-    getModeratorsByID (opts) {
+    getModeratorsByID(opts) {
       const op = {
         ...this.options,
         ...opts,
@@ -282,7 +286,7 @@ export default {
           hidden: false,
           loaded: 0,
           toLoad: IDs.length,
-          total: this.modCount,
+          total: this.modCards.length,
           loading: true,
         });
 
@@ -329,7 +333,7 @@ export default {
       }
     },
 
-    removeModeratorsByID (IDs) {
+    removeModeratorsByID(IDs) {
       if (!IDs) {
         throw new Error('You must provide the ID or IDs to remove.');
       }
@@ -342,7 +346,7 @@ export default {
       return removed;
     },
 
-    checkNotFetched () {
+    checkNotFetched() {
       if (this.unfetchedMods.length === 0 && this.fetchingMods.length) {
         // All ids have been fetched and ids existed to fetch.
         this.moderatorsStatus.setState({
@@ -357,14 +361,13 @@ export default {
         this.moderatorsStatus.setState({
           loaded: this.moderatorsCol.length, // not shown if open fetch
           toLoad: this.fetchingMods.length, // not shown if open fetch
-          total: this.modCount,
+          total: this.modCards.length,
         });
         // re-render to show the unverified moderators button if needed.
         this.render();
       }
     },
-
-    addMod (model) {
+    addMod(model) {
       if (!model || !(model instanceof Moderator)) {
         throw new Error('Please provide a valid profile model.');
       }
@@ -390,8 +393,7 @@ export default {
       // Add verified mods to the beginning.
       if (model.isVerified) {
         const firstUnverifiedIndex = this.modCards.findIndex((card) => !card.model.isVerified);
-        const insertAtIndex = firstUnverifiedIndex < 0
-          ? 0 : firstUnverifiedIndex;
+        const insertAtIndex = firstUnverifiedIndex < 0 ? 0 : firstUnverifiedIndex;
         this.modCards.splice(insertAtIndex, 0, modCard);
       } else {
         this.modCards.push(modCard);
@@ -399,43 +401,29 @@ export default {
       return modCard;
     },
 
-    modShouldRender (model) {
+    modShouldRender(model) {
       const hideOnUnverified = this.getState().showVerifiedOnly && !model.isVerified;
       const showCur = this.getState().showOnlyCur;
       const hideOnCur = showCur && !model.hasModCurrency(showCur);
       return !(hideOnUnverified || hideOnCur);
     },
 
-    batchCardRender (model) {
+    batchCardRender(model) {
       if (!model || !(model instanceof Moderator)) {
         throw new Error('Please provide a valid profile model.');
       }
 
       // Render in batches only if the card being added should be visible.
       if (!this.renderTimer && this.modShouldRender(model)) {
-        this.renderTimer = setTimeout(() => { this.render(); }, 300);
+        this.renderTimer = setTimeout(() => {
+          this.render();
+        }, 300);
       }
-    }
-
-  get excludeIDs () {
-      return this._excludeIDs;
-    }
-
-  set excludeIDs (IDs) {
-      this._excludeIDs = IDs;
-    }
-
-  get modCount () {
-      // Return the number of loaded cards. The collection may have unshown invalid moderators. May
-      // include cards that are not visible due to the state.
-      return this.modCards.length;
-    }
-
-  get allIDs () {
+    },
+    allIDs() {
       return this.moderatorsCol.pluck('peerID');
-    }
-
-  get selectedIDs () {
+    },
+    selectedIDs() {
       const IDs = [];
       this.modCards.forEach((mod) => {
         if (mod.getState().selectedState === 'selected') {
@@ -443,9 +431,8 @@ export default {
         }
       });
       return IDs;
-    }
-
-  get unselectedIDs () {
+    },
+    unselectedIDs() {
       const IDs = [];
       this.modCards.forEach((mod) => {
         if (mod.getState().selectedState !== 'selected') {
@@ -454,56 +441,50 @@ export default {
       });
       return IDs;
     },
-
-    deselectMod (peerID) {
+    deselectMod(peerID) {
       if (!peerID) throw new Error('You must provide a peerID.');
 
       const mod = this.modCards.filter((card) => card.model.get('peerID') === peerID);
       if (mod.length) mod[0].changeSelectState(this.options.notSelected);
     },
-
-    deselectOthers (peerID = '') {
+    deselectOthers(peerID = '') {
       this.modCards.forEach((card) => {
         if (card.model.get('peerID') !== peerID) {
           card.changeSelectState(this.options.notSelected);
         }
       });
     },
-
-    togVerifiedShown (bool) {
+    togVerifiedShown(bool) {
       this.setState({ showVerifiedOnly: bool });
-    }
-
-  get noneSelected () {
+    },
+    noneSelected() {
       return !this.modCards.filter((mod) => mod.getState().selectedState === 'selected').length;
     },
-
-    remove () {
+    remove() {
       this.modFetches.forEach((fetch) => fetch.abort());
       clearTimeout(this.renderTimer);
       super.remove();
     },
-
-    render () {
+    render() {
       const state = this.getState();
       const showMods = this.modCards.filter((mod) => this.modShouldRender(mod.model));
-      const unVerCount = this.modCards.filter(
-        (mod) => mod.model.hasModCurrency(state.showOnlyCur) && !mod.model.isVerified,
-      ).length;
+      const unVerCount = this.modCards.filter((mod) => mod.model.hasModCurrency(state.showOnlyCur) && !mod.model.isVerified).length;
       const totalIDs = this.allIDs.length;
       clearTimeout(this.renderTimer);
       this.renderTimer = null;
 
       loadTemplate('components/moderators/moderators.html', (t) => {
-        this.$el.html(t({
-          wrapperClasses: this.options.wrapperClasses,
-          placeholder: !showMods.length && (this.unfetchedMods.length || !totalIDs),
-          purchase: this.options.purchase,
-          totalShown: showMods.length,
-          totalIDs,
-          unVerCount,
-          ...state,
-        }));
+        this.$el.html(
+          t({
+            wrapperClasses: this.options.wrapperClasses,
+            placeholder: !showMods.length && (this.unfetchedMods.length || !totalIDs),
+            purchase: this.options.purchase,
+            totalShown: showMods.length,
+            totalIDs,
+            unVerCount,
+            ...state,
+          })
+        );
 
         super.render();
 
@@ -515,10 +496,13 @@ export default {
           // Moderators that aren't being rendered should never be selected.
           if (!shouldRender) newState.selectedState = this.options.notSelected;
 
-          mod.setState({
-            preferredCurs: state.preferredCurs,
-            ...newState,
-          }, { renderOnChange: false });
+          mod.setState(
+            {
+              preferredCurs: state.preferredCurs,
+              ...newState,
+            },
+            { renderOnChange: false }
+          );
 
           if (shouldRender) {
             mod.delegateEvents();
@@ -535,9 +519,8 @@ export default {
       });
 
       return this;
-    }
-
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="scss" scoped></style>

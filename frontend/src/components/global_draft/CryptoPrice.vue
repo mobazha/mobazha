@@ -1,44 +1,41 @@
 <template>
-  <div>
-
-<{{ ob.wrappingTag }} :class="`${ob.wrappingClass} ${ob.priceModifier !== 0 ? (ob.priceModifier > 0 ? 'clrTPriceAboveMarket' : 'clrTPriceBelowMarket') : ''}`">
-  <span>
-    {{
-      ob.currencyMod.convertAndFormatCurrency(
-        ob.priceAmount,
-        ob.priceCurrencyCode,
-        ob.displayCurrency,
-        ob.convertAndFormatOpts
-      )
-    }}&nbsp;<span class="priceSymbol">
-      <div v-if="ob.priceModifier !== 0">
-        <span v-if="ob.priceModifier > 0" class="icon ion-arrow-up-c"></span>
-        <span v-else class="icon ion-arrow-down-c"></span>
-      </div>
-      <span v-else class="ion-checkmark clrTEm"></span>
+  <div
+    :is="ob.wrappingTag"
+    :class="`${ob.wrappingClass} ${ob.priceModifier !== 0 ? (ob.priceModifier > 0 ? 'clrTPriceAboveMarket' : 'clrTPriceBelowMarket') : ''}`"
+  >
+    <span
+      >{{ ob.currencyMod.convertAndFormatCurrency(ob.priceAmount, ob.priceCurrencyCode, ob.displayCurrency, ob.convertAndFormatOpts) }}&nbsp;
+      <span class="priceSymbol">{{ priceSymbol }}</span>
     </span>
-  </span>
-  <span :class="`marketRelativity ${ob.marketRelativityClass} ${ob.priceModifier === 0 ? 'clrT2' : ''}`">
-    {{ marketPriceLine }}
-  </span>
-</{{ ob.wrappingTag }}>
-
-
-</div>
+    <span :class="`marketRelativity ${ob.marketRelativityClass} ${ob.priceModifier === 0 ? 'clrT2' : ''}`">
+      {{ marketPriceLine }}
+    </span>
+  </div>
 </template>
-
-<script setup>
-const props = defineProps({
-  phase: String,
-})
-
-let marketPriceLine = ob.polyT('cryptoPriceAtMarket');
-if (ob.priceModifier > 0) {
-  marketPriceLine = ob.polyT('cryptoPriceAboveMarket', { amount: ob.priceModifier });
-} else if (ob.priceModifier < 0) {
-  marketPriceLine = ob.polyT('cryptoPriceBelowMarket', { amount: ob.priceModifier });
-}
-
+<script>
+export default {
+  computed: {
+    colorClass() {
+      let ob = this.ob;
+      if (ob.priceModifier !== 0) return '';
+      return ob.priceModifier > 0 ? 'clrTPriceAboveMarket' : 'clrTPriceBelowMarket';
+    },
+    priceSymbol() {
+      let ob = this.ob;
+      if (ob.priceModifier !== 0) return '(<span class="ion-checkmark clrTEm"></span>)';
+      return ob.priceModifier > 0 ? `(<span class="icon ion-arrow-up-c"></span>)` : `(<span class="icon ion-arrow-down-c"></span>)`;
+    },
+    marketPriceLine() {
+      let ob = this.ob;
+      if (ob.priceModifier > 0) {
+        return ob.polyT('cryptoPriceAboveMarket', { amount: ob.priceModifier });
+      }
+      if (ob.priceModifier < 0) {
+        returnob.polyT('cryptoPriceBelowMarket', { amount: ob.priceModifier });
+      }
+      return ob.polyT('cryptoPriceAtMarket');
+    },
+  },
+};
 </script>
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>

@@ -1,6 +1,6 @@
 <template>
   <span class="quantityDisplay">
-    <span v-if="typeof ob.amount === 'number'" class="content {{ ob.contentClass }}">
+    <span v-if="typeof ob.amount === 'number'" :class="`content ${ob.contentClass}`">
       <div v-if="ob.coinType">
         <span>{{ formattedAmount }}</span>
         <CryptoIcon :code="ob.coinType" />
@@ -10,8 +10,8 @@
     <div v-else-if="ob.isFetching">
       <SpinnerSVG :className="ob.spinnerClass" />
     </div>
-    <div v-else-if="ob.fetchFailed" class="content {{ ob.contentFailedClass }}">
-      <div class="arrowBoxTipWrap {{ ob.tipClass }}">
+    <div v-else-if="ob.fetchFailed" :class="`content ${ob.contentFailedClass}`">
+      <div :class="`arrowBoxTipWrap ${ob.tipClass}`">
         <div class="flexVCent gutterHSm">
           <i class="clrT2">Unknown</i>
           <i class="ion-help-circled"></i>
@@ -25,7 +25,6 @@
 
 <script>
 import app from '../../../backbone/app';
-import baseVw from '../baseVw';
 import loadTemplate from '../../../backbone/utils/loadTemplate';
 import { getInventory, isFetching, events as inventoryEvents } from '../../../backbone/utils/inventory';
 
@@ -136,19 +135,6 @@ export default {
         this.setState({ amount: e.inventory });
       });
     },
-
-    className() {
-      return 'quantityDisplay';
-    },
-
-    tagName() {
-      return 'span';
-    },
-
-    events() {
-      return {};
-    },
-
     onClickRetry() {
       this.inventoryFetch = getInventory(this.options.peerID, {
         slug: this.options.slug,

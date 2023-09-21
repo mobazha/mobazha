@@ -13,7 +13,6 @@ import _ from 'underscore';
 import loadTemplate from '../../../backbone/utils/loadTemplate';
 import { ensureMainnetCode } from '../../../backbone/data/walletCurrencies';
 import app from '../../../backbone/app';
-import baseVw from '../baseVw';
 
 export default {
   props: {
@@ -29,9 +28,6 @@ export default {
     this.initEventChain();
 
     this.loadData(this.$props);
-  },
-  mounted() {
-    this.render();
   },
   computed: {
     params() {

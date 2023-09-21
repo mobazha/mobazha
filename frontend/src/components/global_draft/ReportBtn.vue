@@ -10,7 +10,6 @@
 
 <script>
 import loadTemplate from '../../../backbone/utils/loadTemplate';
-import baseVw from '../baseVw';
 import { recordEvent } from '../../../backbone/utils/metrics';
 
 export default {
@@ -38,6 +37,7 @@ export default {
       };
     },
     tipText() {
+      let ob = this.ob;
       return ob.reported ? ob.polyT('listingReport.btnTipReported') : ob.polyT('listingReport.btnTip');
     },
   },

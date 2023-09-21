@@ -24,10 +24,7 @@ export default {
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props);
-  },
-  mounted() {
-    this.render();
+    this.loadData(this.options);
   },
   computed: {
     params() {

@@ -1,9 +1,9 @@
 <template>
-  <div>
+  <div class="app-container">
     <section id="pageNavContainer"></section>
     <section id="contentFrame" class="clrBr">
       <div id="pageContainer">
-        <router-view v-if="toggleVue"/>
+        <router-view v-if="toggleVue" />
       </div>
     </section>
     <section id="statusBar"></section>
@@ -41,8 +41,8 @@ export default {
   methods: {
     onWalletClose() {
       this.showWallet = false;
-    }
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="less"></style>

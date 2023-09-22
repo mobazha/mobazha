@@ -5,14 +5,14 @@ import ElementPlus from 'element-plus';
 import * as ElementPlusIconsVue from '@element-plus/icons-vue';
 import 'element-plus/dist/index.css';
 
-import Modal from './Modal.vue'
+import Modal from './Modal.vue';
 import baseVw from './mixins/baseVw';
 
 // import './assets/scss/main.scss';
 
 import Chat from './components/Chat.vue';
 
-import OrderDetail from './views/modals/orderDetail/OrderDetail.vue'
+import OrderDetail from './views/modals/orderDetail/OrderDetail.vue';
 
 import './assets/global.less';
 import components from './components/global';
@@ -26,7 +26,7 @@ export function mountVueModal(container, name, options) {
   vueModal.config.productionTip = false;
 
   vueModal.mixin(baseVw);
-  vueModal.config.globalProperties.templateHelpers = {...templateHelpers};
+  vueModal.config.globalProperties.templateHelpers = { ...templateHelpers };
 
   vueModal.use(ElementPlus);
   for (const [key, component] of Object.entries(ElementPlusIconsVue)) {

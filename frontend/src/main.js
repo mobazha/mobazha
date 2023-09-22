@@ -1,12 +1,14 @@
-
 import { createApp } from 'vue';
 import { createStore } from 'vuex';
-
+import ElementPlus from 'element-plus';
+import * as ElementPlusIconsVue from '@element-plus/icons-vue';
+import 'element-plus/dist/index.css';
+import './assets/scss/main.scss';
 import { TUIComponents, TUICore } from './TUIKit';
 
 import app from '../backbone/app';
 
-import App from './App.vue'
+import App from './App.vue';
 import baseVw from './mixins/baseVw';
 import Router from './router/index';
 import components from './components/global';
@@ -14,7 +16,6 @@ import components from './components/global';
 import * as templateHelpers from '../backbone/utils/templateHelpers';
 
 import cart from './store/cart.module';
-
 
 // init TUIKit
 const TUIKit = TUICore.init({});
@@ -25,13 +26,19 @@ window.TUIKit = TUIKit;
 
 window.app = app;
 
-
 function mountVueApp(container) {
   const vueApp = createApp(App);
   vueApp.config.productionTip = false;
-
+  vueApp.use(ElementPlus);
+  for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+    vueApp.component(key, component);
+  }
   vueApp.mixin(baseVw);
-  vueApp.config.globalProperties.templateHelpers = {...templateHelpers};
+  vueApp.config.globalProperties.templateHelpers = { ...templateHelpers };
+
+  Object.keys(templateHelpers).forEach((key) => {
+    vueApp.config.globalProperties[key] = templateHelpers[key];
+  });
 
   // components
   for (const i in components) {
@@ -45,4 +52,4 @@ function mountVueApp(container) {
 
   return vueApp.use(Router).use(store).mount(container);
 }
-window.vueApp = mountVueApp("#appFrame");
+window.vueApp = mountVueApp('#appFrame');

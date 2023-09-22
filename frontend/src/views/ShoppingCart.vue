@@ -1,5 +1,5 @@
 <template>
-  <div class="modal modalScrollPage">
+  <div class="modal modalScrollPage page-container">
     <BaseModal>
       <template v-slot:component>
         <div class="page-main">
@@ -29,13 +29,17 @@
               </div>
               <div class="card">
                 <div class="card-item" v-for="(item, index) in tableData" :key="index">
-                  <el-table :header-cell-style="headerCellStyle" ref="table" class="table-hearder-one" :data="item.items"
-                    @selection-change="handleSelectionChange($event, index)">
+                  <el-table
+                    :header-cell-style="headerCellStyle"
+                    ref="table"
+                    class="table-hearder-one"
+                    :data="item.items"
+                    @selection-change="handleSelectionChange($event, index)"
+                  >
                     <el-table-column>
                       <template #header>
                         <div class="user">
-                          <img class="user-avatar" :src="getAvatarBgImage(item.profile?.avatarHashes, {}, true)"
-                            @click="goToStore(item.vendorID)" />
+                          <img class="user-avatar" :src="getAvatarBgImage(item.profile?.avatarHashes, {}, true)" @click="goToStore(item.vendorID)" />
                           <div class="user-body">
                             <div class="user-name" @click="goToStore(item.vendorID)">{{ item.profile?.name }}</div>
                             <div class="user-id">{{ item.vendorID }}</div>
@@ -45,18 +49,24 @@
                       <template #default>
                         <el-table-column type="selection" width="48"> </el-table-column>
                         <el-table-column width="350">
-                          <template v-slot="row">
+                          <template v-slot="{ row }">
                             <div class="goods">
                               <div class="goods-left">
-                                <img class="goods-img" :src="getListingBgImage(row.listing?.item.images[0], {}, true)"
-                                  @click="goToListing(item.vendorID, row.listing?.slug)" />
+                                <img
+                                  class="goods-img"
+                                  :src="getListingBgImage(row.listing?.item.images[0], {}, true)"
+                                  @click="goToListing(item.vendorID, row.listing?.slug)"
+                                />
                               </div>
                               <div class="goods-right">
-                                <div class="goods-title" @click="goToListing(item.vendorID, row.listing?.slug)">{{
-                                  row.listing?.item.title }}</div>
+                                <div class="goods-title" @click="goToListing(item.vendorID, row.listing?.slug)">{{ row.listing?.item.title }}</div>
                                 <div class="goods-currency">
-                                  <img class="currency-icon" :src="`../../imgs/cryptoIcons/${currency}-icon.png`"
-                                    v-for="(currency, index) in row.listing?.metadata.acceptedCurrencies" :key="index" />
+                                  <img
+                                    class="currency-icon"
+                                    :src="`../../imgs/cryptoIcons/${currency}-icon.png`"
+                                    v-for="(currency, index) in row.listing?.metadata.acceptedCurrencies"
+                                    :key="index"
+                                  />
                                 </div>
                               </div>
                             </div>
@@ -83,7 +93,7 @@
                         </el-table-column>
                         <el-table-column width="100">
                           <template v-slot="{ row }">
-                            <el-button @click="doDelete(row, index)" type="info" :icon="Delete" circle />
+                            <el-button @click="doDelete(row, index)" type="info" :icon="deleteIcon" circle />
                           </template>
                         </el-table-column>
                       </template>
@@ -91,8 +101,7 @@
                   </el-table>
                   <div class="footer" v-if="oneStoreTotalPrice(index).quantity > 0">
                     <div class="total">
-                      <div class="total-price"><span class="total-name">Total:</span>${{ oneStoreTotalPrice(index).total }}
-                      </div>
+                      <div class="total-price"><span class="total-name">Total:</span>${{ oneStoreTotalPrice(index).total }}</div>
                       <div class="count-price">Subtotal:$183.97</div>
                       <div class="freight">Shipping & handling: Free</div>
                     </div>
@@ -110,28 +119,24 @@
 </template>
 
 <script>
-import { Delete } from '@element-plus/icons-vue';
-import { Search } from '@element-plus/icons-vue';
+import { Delete, Search } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import $ from 'jquery';
 import app from '../../backbone/app';
-import Empty from '../components/Empty.vue';
-import { products } from '../components/products.js';
+import Empty from '@/components/Empty.vue';
 import api from '../api';
 import { getCachedProfiles } from '../../backbone/models/profile/Profile';
 import { convertAndFormatCurrency, curDefToDecimal } from '../../backbone/utils/currency';
-import { getAvatarBgImage, getListingBgImage } from '../../backbone/utils/responsive';
-
 
 export default {
   components: {
-    Delete,
-    Search,
     Empty,
   },
   name: 'App',
   data() {
     return {
+      deleteIcon: Delete,
+      Search,
       params: { keyword: '' },
       tableData: [],
       table: {},
@@ -144,7 +149,7 @@ export default {
         name: 'Your cart is empty!',
         desc: "The possibilities are endless. Go ahead, find something you'll love.",
         btn: 'Shop Popular Products',
-      }
+      },
     };
   },
   created() {
@@ -153,14 +158,17 @@ export default {
   computed: {
     //每个商品总价
     countRowPrice() {
-      return (row) => row.priceAmount ? convertAndFormatCurrency(row.priceAmount * row.quantity, row.pricingCurrency?.code, window['app']?.settings.get('localCurrency')) : 0;
+      return (row) =>
+        row.priceAmount ? convertAndFormatCurrency(row.priceAmount * row.quantity, row.pricingCurrency?.code, window['app']?.settings.get('localCurrency')) : 0;
     },
 
     //每个商店商品总价
-    oneStoreTotalPrice(index) {
-      let list = this.selectors[index];
-      if (!list) return 0;
-      return { quantity: list.length, total: list.reduce((cur, next) => cur + next.priceAmount * next.quantity, 0) };
+    oneStoreTotalPrice() {
+      return function (index) {
+        let list = this.selectors[index];
+        if (!list) return 0;
+        return { quantity: list.length, total: list.reduce((cur, next) => cur + next.priceAmount * next.quantity, 0) };
+      };
     },
 
     //购物车商品总数量
@@ -168,9 +176,8 @@ export default {
       return this.tableData.reduce((cur, next) => cur + next.items.length, 0);
     },
   },
-  watch: {},
   methods: {
-    loadData () {
+    loadData() {
       try {
         this.loading = true;
         api.getShoppingCarts().then((carts) => {
@@ -201,7 +208,7 @@ export default {
     },
 
     //删除单个商品
-    doDelete (row, index) {
+    doDelete(row, index) {
       ElMessageBox.confirm('确定删除该商品吗？', '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
@@ -217,35 +224,35 @@ export default {
       });
     },
 
-    goToStore (peerID) {
+    goToStore(peerID) {
       window.location = `#${peerID}/store`;
     },
 
-    goToListing (vendorID, slug) {
+    goToListing(vendorID, slug) {
       window.location = `#${vendorID}/store/${slug}`;
     },
 
-    handleSelectionChange (val, index) {
+    handleSelectionChange(val, index) {
       this.selectors[index] = val;
     },
 
     //提交当前选中的商店商品
-    pay (index) {
+    pay(index) {
       this.$store.commit('cart/updateCart', this.tableData[0], { module: 'cart' });
 
       app.router.loadVueModal('Purchase');
     },
 
     //修改头部样式
-    headerRowStyle ({ rowIndex }) {
+    headerRowStyle({ rowIndex }) {
       if (rowIndex === 0) return { background: 'transparent', color: '#000', fontSize: '16px' };
     },
 
-    headerCellStyle ({ rowIndex }) {
+    headerCellStyle({ rowIndex }) {
       if (rowIndex === 1) return { display: 'none' };
     },
-  }
-}
+  },
+};
 </script>
 
 <style lang="scss" scoped>

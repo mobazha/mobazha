@@ -5,25 +5,25 @@
         <div class="popInMessageHolder js-popInMessages"></div>
 
         <div class="topControls gutterHSm flex">
-          <div v-if="vendor">
+          <div v-if="ob.vendor">
             <div class="contentBox clrP clrSh3 clrBr clrT">
               <div class="padSm gutterHSm overflowAuto margRSm flexVCent">
-                <a class="clrBr2 clrSh1 discTn flexNoShrink" :style="ob.getAvatarBgImage(vendor.avatarHashes)"></a>
-                <p class="txUnl tx3 clamp">{{ vendor.name }}</p>
+                <a class="clrBr2 clrSh1 discTn flexNoShrink" :style="ob.getAvatarBgImage(ob.vendor.avatarHashes)"></a>
+                <p class="txUnl tx3 clamp">{{ ob.vendor.name }}</p>
                 <a class="link flexNoShrink tx6" @click="clickGoToListing">{{ ob.polyT('purchase.returnToListing') }}</a>
               </div>
             </div>
           </div>
         </div>
 
-        <div :class="`flexRow gutterH mainSection ${`phase${capitalize(phase)}`}`">
+        <div :class="`flexRow gutterH mainSection ${`phase${capitalize(ob.phase)}`}`">
           <div class="col9">
             <div class="flexColRow gutterV">
-              <div v-for="(listing, key) in listings" :key="key">
+              <div v-for="(listing, key) in ob.listings" :key="key">
                 <section class="contentBox pad clrP clrBr clrSh3">
                   <div class="js-errors"></div>
                   <div class="js-items-quantity-errors"></div>
-                  <div v-if="!listing.isCrypto">
+                  <div v-if="!ob.isCrypto">
                     <div class="flexVCent gutterH">
                       <div class="thumb" :style="ob.getListingBgImage(listing.listing.item.images[0])"></div>
                       <div class="flexExpand">
@@ -38,7 +38,7 @@
                           </div>
                         </div>
                       </div>
-                      <div v-if="phase === 'pay' || phase === 'processing'">
+                      <div v-if="ob.phase === 'pay' || ob.phase === 'processing'">
                         <div class="flexNoShrink">
                           <div class="flexVCent gutterH">
                             <div class="flexCol">
@@ -67,8 +67,8 @@
 
                   <div v-else>
                     <div class="flexVCent gutterHLg row cryptoTitleWrap">
-                      <div :class="`js-cryptoTitle ${phase !== 'pay' && phase !== 'processing' ? 'flexExpand' : ''}`"></div>
-                      <div v-if="phase === 'pay' || phase === 'processing'">
+                      <div :class="`js-cryptoTitle ${ob.phase !== 'pay' && ob.phase !== 'processing' ? 'flexExpand' : ''}`"></div>
+                      <div v-if="ob.phase === 'pay' || ob.phase === 'processing'">
                         <div class="flexExpand">
                           <div class="flexVCent gutterHLg">
                             <label for="cryptoAmount" class="clrT txB required">{{ ob.polyT('purchase.cryptoAmount') }}</label>
@@ -79,21 +79,21 @@
                                 name="quantity"
                                 id="cryptoAmount"
                                 @change="onChangeCryptoAmount"
-                                :value="uiQuantity"
+                                :value="ob.uiQuantity"
                                 @keyup="keyupQuantity"
                                 placeholder="0.0000"
                                 size="8"
                                 data-var-type="bignumber">
-                              <div v-if="app.settings.get('localCurrency') !== listing.listing.item.cryptoListingCurrencyCode">
+                              <div v-if="ob.displayCurrency !== listing.listing.item.cryptoListingCurrencyCode">
                                 <select
                                   id="cryptoAmountCurrency"
                                   @change="changeCryptoAmountCurrency"
                                   class="clrBr clrP nestInputRight">
                                   <option
-                                    v-for="(cur, j) in [listing.listing.item.cryptoListingCurrencyCode, app.settings.get('localCurrency')]"
+                                    v-for="(cur, j) in [listing.listing.item.cryptoListingCurrencyCode, ob.displayCurrency]"
                                     :key="j"
                                     :value="cur"
-                                    :selected="cur === cryptoAmountCurrency">{{ cur }}</option>
+                                    :selected="cur === ob.cryptoAmountCurrency">{{ cur }}</option>
                                 </select>
                               </div>
                             </div>
@@ -103,9 +103,9 @@
                       <div class="pad flexNoShrink">
                       {{ 
                         ob.crypto.cryptoPrice({
-                          priceAmount: prices[0].price.plus(prices[0].vPrice),
-                          priceCurrencyCode: listing.price.currencyCode,
-                          displayCurrency: displayCurrency,
+                          priceAmount: totalPrice,
+                          priceCurrencyCode: pricingCurrency,
+                          displayCurrency: ob.displayCurrency,
                           priceModifier: listing.listing.item.cryptoListingPriceModifier,
                         })
                       }}
@@ -116,31 +116,31 @@
                       <label class="h4 flexExpand required" for="purchaseCryptoAddress">{{ heading }}</label>
                     </div>
                     <div class="js-items-paymentAddress-errors"></div>
-                    <div v-if="phase === 'pay' || phase === 'processing'">
+                    <div v-if="ob.phase === 'pay' || ob.phase === 'processing'">
                       <input type="text"
                         id="purchaseCryptoAddress"
                         @change="changeCryptoAddress"
-                        :value="items.length > 0 ?items[0].paymentAddress : ''"
+                        :value="ob.items[0].paymentAddress"
                         :placeholder="ob.polyT('purchase.cryptoAddressPlaceholder', { coinType: coinName})"
                         class="clrBr clrP rowSm"
-                        :maxlength="itemConstraints.maxPaymentAddressLength" />
+                        :maxlength="ob.itemConstraints.maxPaymentAddressLength" />
                     </div>
 
                     <div v-else>
-                      <p class="cryptoPaymentAddress">{{ items.length > 0 ?items[0].paymentAddress : '' }}</p>
+                      <p class="cryptoPaymentAddress">{{ ob.items[0].paymentAddress }}</p>
                     </div>
                     <div class="txSm clrT2">{{ helper }}</div>
                   </div>
                 </section>
               </div>
             </div>
-            <div v-if="phase === 'pay' || phase === 'processing'">
-              <div v-if="listing && listing.toJSON && listing.toJSON().shippingOptions && listing.toJSON().shippingOptions.length">
+            <div v-if="ob.phase === 'pay' || ob.phase === 'processing'">
+              <div v-if="ob.listing.shippingOptions && ob.listing.shippingOptions.length">
                 <section class="contentBox padMd clrP clrBr clrSh3 js-shipping">
                   <div class="js-shipping-errors js-items-shipping-errors"></div>
                   <Shipping
-                    v-if="listing.get('shippingOptions').length"
-                    :listing="listing"
+                    v-if="ob.listing.get('shippingOptions').length"
+                    :listing="ob.listing"
                     @shippingOptionSelected="updateShippingOption"
                     @newAddress="clickNewAddress"
                     />
@@ -159,12 +159,12 @@
                 <div class="flexColRows gutterVSm">
                   <div class="flexVCentClearMarg">
                     <h2 class="h4 flexExpand required">{{ ob.polyT('purchase.paymentTypeTitle') }}</h2>
-                    <div v-if="showModerators">
-                      <input type="checkbox" id="purchaseVerifiedOnly" @click="onClickVerifiedOnly" :checked="showVerifiedOnly">
+                    <div v-if="ob.showModerators">
+                      <input type="checkbox" id="purchaseVerifiedOnly" @click="onClickVerifiedOnly" :checked="ob.showVerifiedOnly">
                       <label class="tx5b" for="purchaseVerifiedOnly">{{ ob.polyT('settings.storeTab.verifiedOnly') }}</label>
                     </div>
                   </div>
-                  <div v-if="showModerators && !ob.noValidModerators">
+                  <div v-if="ob.showModerators && !ob.noValidModerators">
                     <div class="js-moderated-errors"></div>
                     <div class="js-moderatorsWrapper"></div>
                     <div v-if="!ob.noValidModerators">
@@ -197,14 +197,14 @@
                         name="alternateContactInfo"
                         @blur="blurEmailAddress"
                         :placeholder="ob.polyT('purchase.emailPlaceholder')"
-                        :value="order.alternateContactInfo">
+                        :value="ob.alternateContactInfo">
                     </div>
                     <div>
                       <span class="txSm clrT2">{{ ob.polyT('purchase.emailNote') }}</span>
                     </div>
                   </div>
                   <div class="col6">
-                    <div v-if="hasCoupons">
+                    <div v-if="ob.hasCoupons">
                       <div class="rowTn">
                         <label for="couponCode" class="tx5">
                           {{ ob.polyT('purchase.couponCode') }}
@@ -241,13 +241,14 @@
                   @blur="blurMemo"
                   maxlength="5000"
                   rows="6"
-                  :placeholder="ob.polyT('purchase.memoPlaceholder')">{{ items.length > 0 ? items[0].memo : '' }}</textarea>
+                  :placeholder="ob.polyT('purchase.memoPlaceholder')"
+                  v-model="ob.items[0].memo"></textarea>
               </section>
             </div>
-            <div v-if="phase === 'pending'">
+            <div v-if="ob.phase === 'pending'">
               <section class="contentBox padMd clrP clrBr clrSh3 js-pending"></section>
             </div>
-            <div v-if="phase === 'complete'">
+            <div v-if="ob.phase === 'complete'">
               <section class="contentBox padMd clrP clrBr clrSh3 js-complete"></section>
             </div>
           </div>
@@ -258,7 +259,7 @@
               <div class="rowLg">
                 <!-- <div class="js-receipt"></div> -->
                 <Receipt :order="order" :listing="listing" :prices="prices" :coupons="couponObj" :paymentCoin="paymentCoin" :showTotalTip="phase === 'pay'"/>
-                <div v-if="showModerators && !ob.noValidModerators">
+                <div v-if="ob.showModerators && !ob.noValidModerators">
                   <hr class="clrBr">
                   <div class="padSm txSm txCtr clrT2">
                     {{ ob.polyT('purchase.moderatorNote') }}
@@ -357,11 +358,42 @@ export default {
   },
   created () {
     this.initEventChain();
-  },
-  mounted () {
+
     this.loadData(this.$store.state.cart);
   },
+  mounted () {
+  },
   computed: {
+    ob () {
+      const item = this.order.get('items').at(0);
+      let uiQuantity = item ? item.get('quantity') : 0;
+
+      if (this.listing?.isCrypto && this._cryptoQuantity !== undefined) {
+        uiQuantity = uiQuantity instanceof bigNumber && !uiQuantity.isNaN()
+          ? toStandardNotation(this._cryptoQuantity) : this._cryptoQuantity;
+      }
+
+      return {
+        ...this.templateHelpers,
+        ...this.order.toJSON(),
+        ...this._state,
+        listing: this.listing.toJSON(),
+        listingPrice: this.listing.price,
+        itemConstraints: this.order.get('items')
+          .at(0)
+          .constraints,
+        vendor: this.vendor,
+        variants: this.variants,
+        prices: this.prices,
+        displayCurrency: app.settings.get('localCurrency'),
+        quantity: uiQuantity,
+        cryptoAmountCurrency: this.cryptoAmountCurrency,
+        isCrypto: this.listing.isCrypto,
+        phaseClass: `phase${capitalize(this._state.phase)}`,
+        hasCoupons: this.listing.get('coupons').length
+          && this.listing.get('metadata').get('contractType') !== 'CRYPTOCURRENCY',
+      }
+    },
     helperMessage () {
       const warning = this.phase === 'pay' || this.phase === 'processing' ?
         `<b>${ob.polyT('purchase.cryptoAddressHelperWarning')}</b>` :
@@ -454,38 +486,41 @@ export default {
   methods: {
     capitalize,
 
-    async loadData (opts = {}) {
-      this.cart = toRaw(opts.cart);
+    loadData (options = {}) {
+      if (!options.listing || !(options.listing instanceof Listing)) {
+        throw new Error('Please provide a listing model');
+      }
 
-      this.listings = [];
-      this.cart.items.forEach(item => {
-        console.log("item: ", item)
-        this.listings.push(item)
-      });
+      if (!options.vendor) {
+        throw new Error('Please provide a vendor object');
+      }
 
-      let input = this.cart.items[0];
-      this.listing = new Listing({ slug: input.listing.slug, }, { guid: this.cart.vendorID });
-      await this.listing.fetch();
-
-      // const coinType = this.listing.listing.item.cryptoListingCurrencyCode;
-      // const coinTranslationKey = `cryptoCurrencies.${coinType}`;
-      // this.coinName = ob.polyT(coinTranslationKey) === coinTranslationKey ? coinType : ob.polyT(coinTranslationKey);
-
-      this.vendor = {
-        peerID: this.cart.vendorID,
-        name: this.cart.profile.name,
-        handle: this.cart.profile.handle,
-        avatarHashes: this.cart.profile.avatarHashes,
+      const opts = {
+        ...options,
+        initialState: {
+          phase: 'pay',
+          ...options.initialState || {},
+        },
       };
 
-      this.variants = this.cart.items[0].options;
-
+      this.baseInit(opts);
+      this.options = opts;
+      this.listing = opts.listing;
+      this.variants = opts.variants;
+      this.vendor = opts.vendor;
       const shippingOptions = this.listing.get('shippingOptions');
       const moderatorIDs = this.listing.get('moderators') || [];
       const disallowedIDs = [app.profile.id, this.listing.get('vendorID').peerID];
       this.moderatorIDs = _.without(moderatorIDs, ...disallowedIDs);
 
+      this.setState({
+      showModerators: this.moderatorIDs.length,
+      showVerifiedOnly: true,
+    }, { renderOnChange: false });
+
       this.couponObj = [];
+
+      this.listings = [this.listing];
 
       this.order = new Order(
         {},
@@ -501,25 +536,24 @@ export default {
       this.listings.forEach(listing => {
         const item = new Item(
           {
-            listingHash: listing.cid,
-            quantity: listing.listing.metadata.contractType !== 'CRYPTOCURRENCY' ? bigNumber('1') : undefined,
+            listingHash: listing.get('hash'),
+            quantity: listing.isCrypto ? bigNumber('1') : undefined,
             options: listing.options || [],
           },
           {
-            isCrypto: listing.listing.metadata.contractType === 'CRYPTOCURRENCY',
+            isCrypto: listing.isCrypto,
             // inventory: () =>
             //   (
             //     typeof this.inventory === 'number' ?
             //       this.inventory : 99999999999999999
             //   ),
             getCoinDiv: () => this.coinDivisibility,
-            getCoinType: () => listing.listing.metadata.pricingCurrency.code,
+            getCoinType: () => listing.get('metadata').get('coinType'),
           }
         );
         // add the item to the order.
         this.order.get('items').add(item);
       })
-      _.extend(this, this.order.toJSON());
 
 
       this.actionBtn = this.createChild(ActionBtn, {
@@ -593,7 +627,7 @@ export default {
       this.moderators.getModeratorsByID();
       this.listenTo(this.moderators, 'noModsShown', () => this.render());
       this.listenTo(this.moderators, 'clickShowUnverified', () => {
-        showVerifiedOnly = false;
+        this.setState({ showVerifiedOnly: false });
       });
       this.listenTo(this.moderators, 'cardSelect', () => this.onCardSelect());
 
@@ -647,8 +681,6 @@ export default {
         this._latestHash = e.oldHash;
         if (e.oldHash === this._renderedHash) this.outdateHash();
       });
-
-      this.render();
     },
 
     showDataChangedMessage () {
@@ -689,20 +721,17 @@ export default {
       this.close();
     },
 
-    close () {
-      app.router.closeVueModal();
-    },
-
     handleDirectPurchaseClick () {
       if (!this.isModerated) return;
 
       this.moderators.deselectOthers();
+      this.setState({ unverifedSelected: false }, { renderOnChange: false });
       this.render(); // always render even if the state didn't change
     },
 
     togVerifiedModerators (bool) {
       this.moderators.togVerifiedShown(bool);
-      this.showVerifiedOnly = bool;
+      this.setState({ showVerifiedOnly: bool });
     },
 
     onClickVerifiedOnly (e) {
@@ -710,6 +739,9 @@ export default {
     },
 
     onCardSelect () {
+      const selected = this.moderators.selectedIDs;
+      const unverifedSelected = selected.length && !app.verifiedMods.matched(selected).length;
+      this.setState({ unverifedSelected }, { renderOnChange: false });
       this.render(); // always render even if the state didn't change
     },
 
@@ -819,7 +851,7 @@ export default {
       ) {
         this.insertErrors(this.getCachedEl('.js-errors'),
           [app.polyglot.t('purchase.errors.zeroPrice')]);
-        this.phase = 'pay';
+        this.setState({ phase: 'pay' });
         return;
       }
 
@@ -840,7 +872,7 @@ export default {
       // Cancel any existing order.
       if (this.orderSubmit) this.orderSubmit.abort();
 
-      this.phase = 'processing';
+      this.setState({ phase: 'processing' });
 
       startAjaxEvent('Purchase');
       const segmentation = {
@@ -850,7 +882,7 @@ export default {
 
       if (!this.order.validationError) {
         if (this.listing.isOwnListing) {
-          this.phase = 'pay';
+          this.setState({ phase: 'pay' });
           // don't allow a seller to buy their own items
           const errTitle = app.polyglot.t('purchase.errors.ownIDTitle');
           const errMsg = app.polyglot.t('purchase.errors.ownIDMsg');
@@ -865,7 +897,7 @@ export default {
 
           if (this.listing.isCrypto) {
             if (!isValidCoinDivisibility(coinDivisibility)[0]) {
-              this.phase = 'pay';
+              this.setState({ phase: 'pay' });
               openSimpleMessage(
                 app.polyglot.t('purchase.errors.genericPurchaseErrTitle'),
                 app.polyglot.t('purchase.errors.invalidCoinDiv')
@@ -886,7 +918,7 @@ export default {
                 });
               }
             } catch (e) {
-              this.phase = 'pay';
+              this.setState({ phase: 'pay' });
               openSimpleMessage(
                 app.polyglot.t('purchase.errors.genericPurchaseErrTitle'),
                 app.polyglot.t('purchase.errors.unableToConvertCryptoQuantity')
@@ -915,7 +947,7 @@ export default {
             contentType: 'application/json',
           })
             .done((data) => {
-              this.phase = 'pending';
+              this.setState({ phase: 'pending' });
               this.payment = this.createChild(Payment, {
                 balanceRemaining: curDefToDecimal(data.amount),
                 paymentAddress: data.paymentAddress,
@@ -929,7 +961,7 @@ export default {
               endAjaxEvent('Purchase');
             })
             .fail((jqXHR) => {
-              this.phase = 'pay';
+              this.setState({ phase: 'pay' });
               if (jqXHR.statusText === 'abort') return;
               let errTitle = app.polyglot.t('purchase.errors.orderError');
               let errMsg = (jqXHR.responseJSON && jqXHR.responseJSON.reason) || '';
@@ -938,7 +970,7 @@ export default {
                 && jqXHR.responseJSON.code === 'ERR_INSUFFICIENT_INVENTORY'
                 && typeof jqXHR.responseJSON.remainingInventory === 'number') {
                 this.inventory = jqXHR.responseJSON.remainingInventory
-                  / this.coinDivisibility;
+                  / coinDivisibility;
                 errTitle = app.polyglot.t('purchase.errors.insufficientInventoryTitle');
                 errMsg = app.polyglot.t('purchase.errors.insufficientInventoryBody', {
                   smart_count: this.inventory,
@@ -960,7 +992,7 @@ export default {
             });
         }
       } else {
-        this.phase = 'pay';
+        this.setState({ phase: 'pay' });
         const purchaseErrs = {};
         Object.keys(this.order.validationError).forEach((errKey) => {
           const domKey = errKey.replace(/\[[^\[\]]*\]/g, '').replace('.', '-');
@@ -990,7 +1022,7 @@ export default {
     completePurchase (data) {
       this.complete.orderID = data.orderID;
       this.complete.render();
-      this.phase = 'complete';
+      this.setState({ phase: 'complete' });
     },
 
     remove () {
@@ -1001,23 +1033,15 @@ export default {
 
     render () {
       if (this.dataChangePopIn) this.dataChangePopIn.remove();
-      const item = this.order.get('items')
-        .at(0);
-      const quantity = item.get('quantity');
+      const state = this.getState();
       const metadata = this.listing.get('metadata');
 
-      let uiQuantity = quantity;
-
-      if (this.listing.isCrypto && this._cryptoQuantity !== undefined) {
-        uiQuantity = uiQuantity instanceof bigNumber && !uiQuantity.isNaN()
-          ? toStandardNotation(this._cryptoQuantity) : this._cryptoQuantity;
-      }
 
 
       this._$couponField = null;
 
       this.actionBtn.delegateEvents();
-      this.actionBtn.setState({ phase: this.phase }, { renderOnChange: false });
+      this.actionBtn.setState({ phase: state.phase }, { renderOnChange: false });
       $('.js-actionBtn').append(this.actionBtn.render().el);
 
       this.coupons.delegateEvents();

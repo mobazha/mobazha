@@ -27,13 +27,16 @@
         </div>
       </div>
     </section>
-  </div>
 
-      <!-- <OrderDetail v-if="showOrderDetail" ref="orderDetail" :options="{
+    <Teleport to="#js-vueModal">
+      <OrderDetail v-if="showOrderDetail" ref="orderDetail" :options="{
           model: modalModel,
           returnText: ob.polyT(`transactions.${modalType}s.returnToFromOrder`),
         }"
-        @close="onOrderDetailClose"/> -->
+        @convoMarkedAsRead="onConvoMarkedAsRead"
+        @close="onOrderDetailClose"/>
+    </Teleport>
+  </div>
 
 </template>
 
@@ -293,6 +296,10 @@ export default {
       app.router.navigate(`${location.hash.split('?')[0]}?${$.param(params)}`);
     },
 
+    onConvoMarkedAsRead() {
+
+    },
+
     /**
      * This function is also passed into the Tab and Table views. They will
      * be affected should you change the signature or return value.
@@ -332,22 +339,6 @@ export default {
         params[type === 'case' ? 'caseID' : 'orderID'] = id;
         app.router.navigate(`${location.hash.split('?')[0]}?${$.param(params)}`);
       }
-
-      // remove it from the url on close of the modal
-      const onClose = () => {
-        const params = deparam(location.hash.split('?')[1] || '');
-        delete params.orderID;
-        delete params.caseID;
-        app.router.navigate(`${location.hash.split('?')[0]}?${$.param(params)}`);
-      };
-
-      this.listenTo(orderDetail, 'close', onClose);
-
-      // Do not alter the url if the user is routing to a new route. The
-      // user has already altered the url.
-      this.listenTo(app.router, 'will-route', () => {
-        this.stopListening(orderDetail, 'close', onClose);
-      });
 
       // On any changes to the order / case detail model state, we'll update the
       // state in the corresponding model in the respective collection driving

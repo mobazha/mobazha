@@ -5,7 +5,7 @@ import * as isIPFS from 'is-ipfs';
 import { ipc } from '../src/utils/ipcRenderer.js';
 import app from './app';
 import { getGuid } from './utils';
-import { getPageContainer, getContentFrame } from './utils/selectors';
+import { getPageContainer } from './utils/selectors';
 import { isPromise } from './utils/object';
 import { startAjaxEvent, endAjaxEvent, recordEvent } from './utils/metrics';
 import { getCurrentConnection } from './utils/serverConnect';

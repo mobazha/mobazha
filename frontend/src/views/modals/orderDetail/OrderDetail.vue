@@ -543,8 +543,6 @@ export default {
     },
 
     selectTab (targ) {
-      console.log('selectTab: ', targ);
-
       this.activeTab = targ;
     },
 

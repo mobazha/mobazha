@@ -1,6 +1,6 @@
 <template>
   <div class="modal modalScrollPage page-container">
-    <BaseModal>
+    <BaseModal @close="onClose">
       <template v-slot:component>
         <div class="page-main">
           <div class="page-head">
@@ -164,7 +164,7 @@ export default {
 
     //每个商店商品总价
     oneStoreTotalPrice() {
-      return function (index) {
+      return (index) => {
         let list = this.selectors[index];
         if (!list) return 0;
         return { quantity: list.length, total: list.reduce((cur, next) => cur + next.priceAmount * next.quantity, 0) };
@@ -177,6 +177,9 @@ export default {
     },
   },
   methods: {
+    onClose() {
+      this.$emit('close');
+    },
     loadData() {
       try {
         this.loading = true;

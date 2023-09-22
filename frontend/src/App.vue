@@ -12,7 +12,7 @@
     <div id="chatConvoContainer" class="clrP clrBr3"></div>
     <div id="js-vueModal"></div>
 
-    <ShoppingCart :ref="name" v-if="modalName === 'ShoppingCart'" />
+    <ShoppingCart :ref="name" v-show="showShoppingCart" @close="onShoppingCartClose"/>
     <Wallet v-if="initialized" v-show="showWallet" @close="onWalletClose" />
   </div>
 </template>
@@ -32,6 +32,7 @@ export default {
       modalName: '',
       initialized: false,
 
+      showShoppingCart: false,
       showWallet: false,
 
       toggleVue: false,
@@ -39,6 +40,9 @@ export default {
   },
   watch: {},
   methods: {
+    onShoppingCartClose() {
+      this.showShoppingCart = false;
+    },
     onWalletClose() {
       this.showWallet = false;
     },

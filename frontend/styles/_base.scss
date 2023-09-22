@@ -52,7 +52,7 @@ body {
 
   &.chatHover {
     .modal,
-    #contentFrame {
+    #contentFrame, #contentFrameVue {
       &::-webkit-scrollbar-track {
         background: transparent;
       }
@@ -152,14 +152,14 @@ svg {
     z-index: 4;
   }
 
-  #contentFrame {
+  #contentFrame, #contentFrameVue {
     position: relative;
     overflow-y: scroll;
     height: calc(100% - #{$bar});
     box-sizing: border-box;
     z-index: 0;
 
-    #pageContainer {
+    #pageContainer, #pageContainerVue {
       padding-top: $barLg;
 
       #pageTabBar {

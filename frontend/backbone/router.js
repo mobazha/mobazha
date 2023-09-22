@@ -5,7 +5,7 @@ import * as isIPFS from 'is-ipfs';
 import { ipc } from '../src/utils/ipcRenderer.js';
 import app from './app';
 import { getGuid } from './utils';
-import { getPageContainer } from './utils/selectors';
+import { getPageContainer, getContentFrame } from './utils/selectors';
 import { isPromise } from './utils/object';
 import { startAjaxEvent, endAjaxEvent, recordEvent } from './utils/metrics';
 import { getCurrentConnection } from './utils/serverConnect';
@@ -44,8 +44,8 @@ export default class ObRouter extends Router {
       [/^(Qm[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'user'],
       [/^(?:ob:\/\/)(12D3Koo[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'user'],
       [/^(12D3Koo[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'user'],
-      ['(ob://)transactions(/)', 'loadVuePage'],
-      ['(ob://)transactions/:tab(/)', 'loadVuePage'],
+      ['(ob://)transactions(/)', 'loadVueApp'],
+      ['(ob://)transactions/:tab(/)', 'loadVueApp'],
       ['(ob://)connected-peers(/)', 'connectedPeers'],
       ['(ob://)search(/:tab)(?:query)', 'search'],
       ['(ob://)*path', 'pageNotFound'],
@@ -273,6 +273,8 @@ export default class ObRouter extends Router {
       this.vueModalInstance = null;
     }
 
+    getContentFrame().removeClass('hide');
+
     // This block is intentionally duplicated here in case a route
     // method was called directly on the app.router instance therefore
     // bypassing execute.
@@ -283,6 +285,21 @@ export default class ObRouter extends Router {
 
     this.currentPage = vw;
     getPageContainer().append(vw.el);
+    app.loadingModal.close();
+  }
+
+  loadVueApp() {
+    if (this.currentPage) {
+      this.currentPage.remove();
+      this.currentPage = null;
+    }
+
+    getContentFrame().addClass('hide');
+
+    if (!this.vuePageInstance) {
+      this.vuePageInstance = mountVueApp("#vueApp")
+    }
+
     app.loadingModal.close();
   }
 
@@ -301,7 +318,7 @@ export default class ObRouter extends Router {
       this.vuePageInstance.unmount();
     }
 
-    this.vuePageInstance = mountVueApp("#pageContainer")
+    this.vuePageInstance = mountVueApp("#vueApp")
 
     app.loadingModal.close();
   }

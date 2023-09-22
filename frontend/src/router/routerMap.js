@@ -25,19 +25,14 @@ const constantRouterMap = [
         component: () => import('@/views/transactions/Transactions.vue')
       },
       {
-        path: 'shopping-cart',
-        name: 'ShoppingCart',
-        component: () => import('@/views/ShoppingCart.vue')
+        path: '/^(?:ob:\/\/)(12D3Koo[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/',
+        name: 'UserPage',
+        component: () => import('@/views/userPage/UserPage.vue')
       },
       {
-        path: 'purchase',
-        name: 'Purchase',
-        component: () => import('@/views/modals/purchase/Purchase.vue')
-      },
-      {
-        path: 'orderDetail',
-        name: 'OrderDetail',
-        component: () => import('@/views/modals/orderDetail/orderDetail.vue')
+        path: '/:guid(12D3Koo[a-zA-Z0-9]+)',
+        name: 'UserPage',
+        component: () => import('@/views/userPage/UserPage.vue')
       },
     ]
   },

@@ -47,9 +47,9 @@ export default {
     clickClose() {
       if (this.removeOnClose) {
         app.router.closeVueModal();
-      } else {
-
       }
+
+      this.$emit('close');
     },
     clickEsc() {
       if (this.dismissOnEscPress) {

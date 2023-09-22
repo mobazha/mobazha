@@ -1,32 +1,43 @@
 <template>
-  <div class="transactions clrS">
-    <nav id="pageTabBar" class="barLg clrP clrBr">
-      <div class="flexVCent pageTabs">
-        <div class="js-miniProfileContainer"></div>
-        <div class="flexExpand">
-          <div class="flexHRight flexVCent gutterH clrT2">
-            <a v-for="(tab, i) in ['sales', 'purchases', 'cases']" :key="i"
-              :class="`btn tab clrBr ${tab == _tab ? 'clrT active' : ''}`"
-              @click="onTabClick(tab)">
-              {{ ob.polyT(`transactions.${tab}.heading`) }}
-              <span class="clrTEmph1 margLSm">{{ tabCount[tab] }}</span>
-            </a>
+  <BaseView>
+    <template v-slot:component>
+      <div class="transactions clrS">
+        <nav id="pageTabBar" class="barLg clrP clrBr">
+          <div class="flexVCent pageTabs">
+            <div class="js-miniProfileContainer"></div>
+            <div class="flexExpand">
+              <div class="flexHRight flexVCent gutterH clrT2">
+                <a v-for="(tab, i) in ['sales', 'purchases', 'cases']" :key="i"
+                  :class="`btn tab clrBr ${tab == _tab ? 'clrT active' : ''}`"
+                  @click="onTabClick(tab)">
+                  {{ ob.polyT(`transactions.${tab}.heading`) }}
+                  <span class="clrTEmph1 margLSm">{{ tabCount[tab] }}</span>
+                </a>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </nav>
+        </nav>
 
-    <section class="flexRow header">
-      <div class="pageContent">
-        <div class="tabContent js-tabContent">
-          <!-- insert the tab subview here -->
-          <Tab v-if="_tab == 'sales'" :options="salesTabOptions" />
-          <Tab v-else-if="_tab == 'purchases'" :options="purchasesTabOptions" />
-          <Tab v-else-if="_tab == 'cases'" :options="casesTabOptions" />
-        </div>
+        <section class="flexRow header">
+          <div class="pageContent">
+            <div class="tabContent js-tabContent">
+              <!-- insert the tab subview here -->
+              <Tab v-if="_tab == 'sales'" :options="salesTabOptions" />
+              <Tab v-else-if="_tab == 'purchases'" :options="purchasesTabOptions" />
+              <Tab v-else-if="_tab == 'cases'" :options="casesTabOptions" />
+            </div>
+          </div>
+        </section>
       </div>
-    </section>
-  </div>
+    </template>
+    <template v-slot:modal>
+      <OrderDetail v-if="showOrderDetail" ref="orderDetail" :options="{
+          model: modalModel,
+          returnText: ob.polyT(`transactions.${modalType}s.returnToFromOrder`),
+        }"
+        @close="onOrderDetailClose"/>
+    </template>
+  </BaseView>
 </template>
 
 <script>
@@ -64,6 +75,10 @@ export default {
         purchases: 0,
         cases: 0,
       },
+
+      showOrderDetail: false,
+      modalModel: {},
+      modalType: 'sale',
     };
   },
   created () {
@@ -271,11 +286,23 @@ export default {
       });
     },
 
+    // remove it from the url on close of the modal
+    onOrderDetailClose () {
+      this.showOrderDetail = false;
+
+      const params = deparam(location.hash.split('?')[1] || '');
+      delete params.orderID;
+      delete params.caseID;
+      app.router.navigate(`${location.hash.split('?')[0]}?${$.param(params)}`);
+    },
+
     /**
      * This function is also passed into the Tab and Table views. They will
      * be affected should you change the signature or return value.
      */
     openOrder (id, type = 'sale', options = {}) {
+      this.showOrderDetail = false;
+
       const opts = {
         modalOptions: {
           ...options.modalOptions || {},
@@ -283,13 +310,13 @@ export default {
         addToRoute: true,
       };
 
-      let model;
-
       if (type !== 'case') {
-        model = new Order({ orderID: id }, { type });
+        this.modalModel = new Order({ orderID: id }, { type });
       } else {
-        model = new Case({ caseID: id });
+        this.modalModel = new Case({ caseID: id });
       }
+      this.modalType = type;
+      this.showOrderDetail = true;
 
       // const orderDetail = new OrderDetail({
       //   model,
@@ -299,9 +326,6 @@ export default {
       // });
 
       // orderDetail.render().open();
-
-      this.$store.commit('cart/setTransactionsOrder', {model, type}, { module: 'cart' });
-      const orderDetail = app.router.loadVueModal('orderDetail');
 
       if (opts.addToRoute) {
         // add the order / case id to the url
@@ -331,7 +355,7 @@ export default {
       // On any changes to the order / case detail model state, we'll update the
       // state in the corresponding model in the respective collection driving
       // the transaction table.
-      this.listenTo(model, 'change:state', (md, state) => {
+      this.listenTo(this.modalModel, 'change:state', (md, state) => {
         let col = this.purchasesCol;
 
         if (type === 'sale') {
@@ -340,13 +364,13 @@ export default {
           col = this.casesCol;
         }
 
-        const collectionMd = col.get(model.id);
+        const collectionMd = col.get(this.modalModel.id);
         if (collectionMd) {
           collectionMd.set('state', state);
         }
       });
 
-      return orderDetail;
+      return this.$refs.orderDetail;
     },
 
     getSalesPurchasesFilterConfig (isSale) {

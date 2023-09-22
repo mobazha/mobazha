@@ -27,6 +27,15 @@ export default {
       _.extend(this, Events);
     },
 
+    baseInit(options = {}) {
+      _.extend(this, options);
+      this._childViews = [];
+      this._unregisterFromParent = true;
+      this._removed = false;
+      this._state = {};
+      this.setState((options.initialState || {}), { renderOnChange: false });
+    },
+
     _getCheckboxGroupData($fields) {
       const data = [];
   

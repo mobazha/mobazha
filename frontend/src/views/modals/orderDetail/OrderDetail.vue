@@ -1,6 +1,6 @@
 <template>
   <div class="modal modalScrollPage tabbedModal orderDetail">
-    <BaseModal :modalInfo="{ removeOnClose: true }">
+    <BaseModal :modalInfo="{ removeOnClose: true }" @close="onClickClose" >
       <template v-slot:component>
         <div class="topControls flex">
           <!-- // This is something found at the top of multiple modals. Would be nice to make this into a template
@@ -440,7 +440,11 @@ export default {
     },
 
     onClickReturnBox () {
-      this.close();
+      this.$emit('close');
+    },
+
+    onClickClose () {
+      this.$emit('close');
     },
 
     onSocketMessage (e) {

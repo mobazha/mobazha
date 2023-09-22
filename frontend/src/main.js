@@ -1,30 +1,20 @@
-import { createStore } from 'vuex'
+
+import { createApp } from 'vue';
+import { createStore } from 'vuex';
 
 import { TUIComponents, TUICore } from './TUIKit';
 
 import app from '../backbone/app';
 
-import './assets/global.less';
-import products from './store/products.module'
+import App from './App.vue'
+import baseVw from './mixins/baseVw';
 import Router from './router/index';
+import components from './components/global';
 
-import sifter from 'sifter';
-import microplugin from 'microplugin';
-import $ from "jquery";
+import * as templateHelpers from '../backbone/utils/templateHelpers';
 
-window.jQuery = window.$ = $;
-window.Sifter = sifter;
-window.MicroPlugin = microplugin;
-window.app = app;
+import cart from './store/cart.module';
 
-const store = createStore({
-  modules: {
-    products
-  }
-})
-
-$.vueRouter = Router;
-$.vueStore = store;
 
 // init TUIKit
 const TUIKit = TUICore.init({});
@@ -32,3 +22,27 @@ const TUIKit = TUICore.init({});
 TUIKit.use(TUIComponents);
 
 window.TUIKit = TUIKit;
+
+window.app = app;
+
+
+function mountVueApp(container) {
+  const vueApp = createApp(App);
+  vueApp.config.productionTip = false;
+
+  vueApp.mixin(baseVw);
+  vueApp.config.globalProperties.templateHelpers = {...templateHelpers};
+
+  // components
+  for (const i in components) {
+    vueApp.component(i, components[i]);
+  }
+  const store = createStore({
+    modules: {
+      cart,
+    },
+  });
+
+  return vueApp.use(Router).use(store).mount(container);
+}
+window.vueApp = mountVueApp("#appFrame");

@@ -22,8 +22,6 @@ import TemplateOnly from './views/TemplateOnly';
 import BlockedWarning from './views/modals/BlockedWarning';
 import UserLoadingModal from './views/userPage/Loading';
 
-import { mountVueApp, mountVueModal } from '../src/mount.js'
-
 export default class ObRouter extends Router {
   constructor(options = {}) {
     super(options);
@@ -263,17 +261,7 @@ export default class ObRouter extends Router {
   }
 
   loadPage(vw) {
-    if (this.vuePageInstance) {
-      this.vuePageInstance.unmount();
-      this.vuePageInstance = null;
-    }
-
-    if (this.vueModalInstance) {
-      this.vueModalInstance.unmount();
-      this.vueModalInstance = null;
-    }
-
-    getContentFrame().removeClass('hide');
+    window.vueApp.toggleVue = false;
 
     // This block is intentionally duplicated here in case a route
     // method was called directly on the app.router instance therefore
@@ -293,44 +281,19 @@ export default class ObRouter extends Router {
       this.currentPage.remove();
       this.currentPage = null;
     }
-
-    getContentFrame().addClass('hide');
-
-    if (!this.vuePageInstance) {
-      this.vuePageInstance = mountVueApp("#vueApp")
-    }
-
-    app.loadingModal.close();
-  }
-
-  loadVuePage() {
-    if (this.currentPage) {
-      this.currentPage.remove();
-      this.currentPage = null;
-    }
-
-    if (this.vueModalInstance) {
-      this.vueModalInstance.unmount();
-      this.vueModalInstance = null;
-    }
-
-    if (this.vuePageInstance) {
-      this.vuePageInstance.unmount();
-    }
-
-    this.vuePageInstance = mountVueApp("#vueApp")
+    window.vueApp.toggleVue = true;
 
     app.loadingModal.close();
   }
 
   loadVueModal(name, options) {
-    if (this.vueModalInstance) {
-      this.vueModalInstance.unmount();
+    if (name == 'Wallet') {
+      window.vueApp.showWallet = true;
     }
 
-    this.vueModalInstance = mountVueModal("#js-vueModal", name, options)
+    // this.vueModalInstance = mountVueModal("#js-vueModal", name, options)
 
-    return this.vueModalInstance;
+    // return this.vueModalInstance;
   }
 
   closeVueModal() {

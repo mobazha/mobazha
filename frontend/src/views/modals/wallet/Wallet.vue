@@ -1,6 +1,6 @@
 <template>
   <div class="modal wallet modalScrollPage">
-    <BaseModal>
+    <BaseModal @close="onClose">
       <template v-slot:component>
         <div class="flexColRows gutterV">
           <div class="topControls flexRow">
@@ -339,6 +339,10 @@ export default {
       });
 
       if (initialActiveCoin) this.fetchAddress();
+    },
+
+    onClose () {
+      this.$emit('close');
     },
 
     coinSelected(coin) {

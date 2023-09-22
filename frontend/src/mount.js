@@ -5,7 +5,6 @@ import ElementPlus from 'element-plus';
 import * as ElementPlusIconsVue from '@element-plus/icons-vue';
 import 'element-plus/dist/index.css';
 
-import App from './App.vue'
 import Modal from './Modal.vue'
 import baseVw from './mixins/baseVw';
 
@@ -21,28 +20,6 @@ import cart from './store/cart.module';
 import Router from './router/index';
 
 import * as templateHelpers from '../backbone/utils/templateHelpers';
-
-export function mountVueApp(container) {
-  const vueApp = createApp(App);
-  vueApp.config.productionTip = false;
-
-  vueApp.mixin(baseVw);
-  vueApp.config.globalProperties.templateHelpers = {...templateHelpers};
-
-  // components
-  for (const i in components) {
-    vueApp.component(i, components[i]);
-  }
-  const store = createStore({
-    modules: {
-      cart,
-    },
-  });
-
-  vueApp.use(Router).use(store).mount(container);
-
-  return vueApp;
-}
 
 export function mountVueModal(container, name, options) {
   const vueModal = createApp(Modal, { name, options });

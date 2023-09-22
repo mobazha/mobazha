@@ -1,43 +1,40 @@
 <template>
-  <BaseView>
-    <template v-slot:component>
-      <div class="transactions clrS">
-        <nav id="pageTabBar" class="barLg clrP clrBr">
-          <div class="flexVCent pageTabs">
-            <div class="js-miniProfileContainer"></div>
-            <div class="flexExpand">
-              <div class="flexHRight flexVCent gutterH clrT2">
-                <a v-for="(tab, i) in ['sales', 'purchases', 'cases']" :key="i"
-                  :class="`btn tab clrBr ${tab == _tab ? 'clrT active' : ''}`"
-                  @click="onTabClick(tab)">
-                  {{ ob.polyT(`transactions.${tab}.heading`) }}
-                  <span class="clrTEmph1 margLSm">{{ tabCount[tab] }}</span>
-                </a>
-              </div>
-            </div>
-          </div>
-        </nav>
 
-        <section class="flexRow header">
-          <div class="pageContent">
-            <div class="tabContent js-tabContent">
-              <!-- insert the tab subview here -->
-              <Tab v-if="_tab == 'sales'" :options="salesTabOptions" />
-              <Tab v-else-if="_tab == 'purchases'" :options="purchasesTabOptions" />
-              <Tab v-else-if="_tab == 'cases'" :options="casesTabOptions" />
-            </div>
+  <div class="transactions clrS">
+    <nav id="pageTabBar" class="barLg clrP clrBr">
+      <div class="flexVCent pageTabs">
+        <div class="js-miniProfileContainer"></div>
+        <div class="flexExpand">
+          <div class="flexHRight flexVCent gutterH clrT2">
+            <a v-for="(tab, i) in ['sales', 'purchases', 'cases']" :key="i"
+              :class="`btn tab clrBr ${tab == _tab ? 'clrT active' : ''}`"
+              @click="onTabClick(tab)">
+              {{ ob.polyT(`transactions.${tab}.heading`) }}
+              <span class="clrTEmph1 margLSm">{{ tabCount[tab] }}</span>
+            </a>
           </div>
-        </section>
+        </div>
       </div>
-    </template>
-    <template v-slot:modal>
-      <OrderDetail v-if="showOrderDetail" ref="orderDetail" :options="{
+    </nav>
+
+    <section class="flexRow header">
+      <div class="pageContent">
+        <div class="tabContent js-tabContent">
+          <!-- insert the tab subview here -->
+          <Tab v-if="_tab == 'sales'" :options="salesTabOptions" />
+          <Tab v-else-if="_tab == 'purchases'" :options="purchasesTabOptions" />
+          <Tab v-else-if="_tab == 'cases'" :options="casesTabOptions" />
+        </div>
+      </div>
+    </section>
+  </div>
+
+      <!-- <OrderDetail v-if="showOrderDetail" ref="orderDetail" :options="{
           model: modalModel,
           returnText: ob.polyT(`transactions.${modalType}s.returnToFromOrder`),
         }"
-        @close="onOrderDetailClose"/>
-    </template>
-  </BaseView>
+        @close="onOrderDetailClose"/> -->
+
 </template>
 
 <script>

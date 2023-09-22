@@ -586,6 +586,8 @@ function start() {
           // add the default search providers
           app.searchProviders.add(defaultSearchProviders, { at: 0 });
 
+          window.vueApp.initialized = true;
+
           if (externalRoute) {
             // handle opening the app from an an external ob link
             location.hash = `#${externalRoute}`;

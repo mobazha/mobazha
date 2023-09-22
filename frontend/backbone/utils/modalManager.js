@@ -95,18 +95,21 @@ export function launchModeratorDetailsModal(modalOptions = {}) {
 }
 
 export function launchWallet(modalOptions = {}) {
-  if (_wallet) {
-    _wallet.open();
-  } else {
-    _wallet = new Wallet({
-      removeOnRoute: false,
-      ...modalOptions,
-    })
-      .render()
-      .open();
+  // if (_wallet) {
+  //   _wallet.open();
+  // } else {
+  //   _wallet = new Wallet({
+  //     removeOnRoute: false,
+  //     ...modalOptions,
+  //   })
+  //     .render()
+  //     .open();
 
-    app.router.on('will-route', () => _wallet.close());
-  }
+  //   app.router.on('will-route', () => _wallet.close());
+  // }
+  // return _wallet;
+
+  _wallet = app.router.loadVueModal('Wallet');
 
   return _wallet;
 }

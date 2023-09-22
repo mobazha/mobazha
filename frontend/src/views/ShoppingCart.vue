@@ -45,7 +45,7 @@
                       <template #default>
                         <el-table-column type="selection" width="48"> </el-table-column>
                         <el-table-column width="350">
-                          <template v-slot="{ row }">
+                          <template v-slot="row">
                             <div class="goods">
                               <div class="goods-left">
                                 <img class="goods-img" :src="getListingBgImage(row.listing?.item.images[0], {}, true)"
@@ -102,19 +102,18 @@
               </div>
             </template>
           </div>
-          <empty v-if="tableData.length === 0 && !loading" :emptyInfo="emptyInfo" />
+          <Empty v-if="tableData.length === 0 && !loading" :emptyInfo="emptyInfo" />
         </div>
       </template>
     </BaseModal>
   </div>
 </template>
 
-<script setup>
+<script>
 import { Delete } from '@element-plus/icons-vue';
 import { Search } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import $ from 'jquery';
-import { toRaw } from 'vue';
 import app from '../../backbone/app';
 import Empty from '../components/Empty.vue';
 import { products } from '../components/products.js';
@@ -123,119 +122,129 @@ import { getCachedProfiles } from '../../backbone/models/profile/Profile';
 import { convertAndFormatCurrency, curDefToDecimal } from '../../backbone/utils/currency';
 import { getAvatarBgImage, getListingBgImage } from '../../backbone/utils/responsive';
 
-import { useStore } from 'vuex';
-import { useRouter } from 'vue-router';
 
-const store = useStore();
-const router = useRouter();
+export default {
+  components: {
+    Delete,
+    Search,
+    Empty,
+  },
+  name: 'App',
+  data() {
+    return {
+      params: { keyword: '' },
+      tableData: [],
+      table: {},
+      selectors: {}, //选中的商品
+      loading: false,
 
-const props = defineProps({
-  options: Object,
-})
+      emptyInfo: {
+        type: 'shoppingCart',
+        icon: new URL('@/assets/img/empty/cart.png', import.meta.url).href,
+        name: 'Your cart is empty!',
+        desc: "The possibilities are endless. Go ahead, find something you'll love.",
+        btn: 'Shop Popular Products',
+      }
+    };
+  },
+  created() {
+    this.loadData();
+  },
+  computed: {
+    //每个商品总价
+    countRowPrice() {
+      return (row) => row.priceAmount ? convertAndFormatCurrency(row.priceAmount * row.quantity, row.pricingCurrency?.code, window['app']?.settings.get('localCurrency')) : 0;
+    },
 
-const params = reactive({ keyword: '' });
-let tableData = [];
-const table = reactive({});
-const selectors = ref({}); //选中的商品
-const loading = ref(false);
+    //每个商店商品总价
+    oneStoreTotalPrice(index) {
+      let list = this.selectors[index];
+      if (!list) return 0;
+      return { quantity: list.length, total: list.reduce((cur, next) => cur + next.priceAmount * next.quantity, 0) };
+    },
 
-const emptyInfo = ref({
-  type: 'shoppingCart',
-  icon: new URL('@/assets/img/empty/cart.png', import.meta.url).href,
-  name: 'Your cart is empty!',
-  desc: "The possibilities are endless. Go ahead, find something you'll love.",
-  btn: 'Shop Popular Products',
-});
-
-loadData();
-
-function loadData () {
-  try {
-    loading.value = true;
-    api.getShoppingCarts().then((carts) => {
-      tableData = carts;
-      tableData.forEach((cart) => {
-        getCachedProfiles([cart.vendorID])[0].done((profile) => {
-          cart.profile = profile.toJSON();
-        });
-        cart.items?.forEach((item) => {
-          $.get(window['app']?.getServerUrl(`ob/listing/${item.listingHash}`)).then((listing) => {
-            item.listing = listing.listing;
-            item.cid = listing.cid;
-            item.pricingCurrency = listing.listing.metadata.pricingCurrency;
-            item.priceAmount = curDefToDecimal({
-              amount: listing.listing.item.price,
-              currency: item.pricingCurrency,
+    //购物车商品总数量
+    cartNum() {
+      return this.tableData.reduce((cur, next) => cur + next.items.length, 0);
+    },
+  },
+  watch: {},
+  methods: {
+    loadData () {
+      try {
+        this.loading = true;
+        api.getShoppingCarts().then((carts) => {
+          this.tableData = carts;
+          this.tableData.forEach((cart) => {
+            getCachedProfiles([cart.vendorID])[0].done((profile) => {
+              cart.profile = profile.toJSON();
             });
-            item.price = convertAndFormatCurrency(item.priceAmount, item.pricingCurrency.code, window['app']?.settings.get('localCurrency'));
+            cart.items?.forEach((item) => {
+              $.get(window['app']?.getServerUrl(`ob/listing/${item.listingHash}`)).then((listing) => {
+                item.listing = listing.listing;
+                item.cid = listing.cid;
+                item.pricingCurrency = listing.listing.metadata.pricingCurrency;
+                item.priceAmount = curDefToDecimal({
+                  amount: listing.listing.item.price,
+                  currency: item.pricingCurrency,
+                });
+                item.price = convertAndFormatCurrency(item.priceAmount, item.pricingCurrency.code, window['app']?.settings.get('localCurrency'));
+              });
+            });
           });
+          this.loading = false;
         });
-      });
-      loading.value = false;
-    });
-    // tableData = products;
-  } catch {
-    loading.value = false;
-  }
-}
-
-//删除单个商品
-function doDelete (row, index) {
-  ElMessageBox.confirm('确定删除该商品吗？', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning',
-    callback: (action) => {
-      if (action === 'confirm') {
-        //tableData.splice(index, 1)为展示效果，调用删除接口，再刷新
-        tableData.splice(index, 1);
-        ElMessage({ type: 'success', message: '已删除' });
-        loadData();
+        // this.tableData = products;
+      } catch {
+        this.loading = false;
       }
     },
-  });
-}
 
-//每个商品总价
-const countRowPrice = computed(() => {
-  return (row) => row.priceAmount ? convertAndFormatCurrency(row.priceAmount * row.quantity, row.pricingCurrency?.code, window['app']?.settings.get('localCurrency')) : 0;
-});
-//每个商店商品总价
-const oneStoreTotalPrice = computed(() => (index) => {
-  let list = selectors.value[index];
-  if (!list) return 0;
-  return { quantity: list.length, total: list.reduce((cur, next) => cur + next.priceAmount * next.quantity, 0) };
-});
-//购物车商品总数量
-const cartNum = computed(() => {
-  return tableData.reduce((cur, next) => cur + next.items.length, 0);
-});
+    //删除单个商品
+    doDelete (row, index) {
+      ElMessageBox.confirm('确定删除该商品吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+        callback: (action) => {
+          if (action === 'confirm') {
+            //this.tableData.splice(index, 1)为展示效果，调用删除接口，再刷新
+            this.tableData.splice(index, 1);
+            ElMessage({ type: 'success', message: '已删除' });
+            loadData();
+          }
+        },
+      });
+    },
 
-function goToStore (peerID) {
-  window.location = `#${peerID}/store`;
-}
+    goToStore (peerID) {
+      window.location = `#${peerID}/store`;
+    },
 
-function goToListing (vendorID, slug) {
-  window.location = `#${vendorID}/store/${slug}`;
-}
+    goToListing (vendorID, slug) {
+      window.location = `#${vendorID}/store/${slug}`;
+    },
 
-function handleSelectionChange (val, index) {
-  selectors.value[index] = val;
-}
+    handleSelectionChange (val, index) {
+      this.selectors[index] = val;
+    },
 
-//提交当前选中的商店商品
-function pay (index) {
-  store.commit('cart/updateCart', toRaw(tableData[0]), { module: 'cart' });
+    //提交当前选中的商店商品
+    pay (index) {
+      this.$store.commit('cart/updateCart', this.tableData[0], { module: 'cart' });
 
-  app.router.loadVueModal('Purchase');
-}
+      app.router.loadVueModal('Purchase');
+    },
 
-//修改头部样式
-function headerRowStyle ({ rowIndex }) {
-  if (rowIndex === 0) return { background: 'transparent', color: '#000', fontSize: '16px' };
-}
-function headerCellStyle ({ rowIndex }) {
-  if (rowIndex === 1) return { display: 'none' };
+    //修改头部样式
+    headerRowStyle ({ rowIndex }) {
+      if (rowIndex === 0) return { background: 'transparent', color: '#000', fontSize: '16px' };
+    },
+
+    headerCellStyle ({ rowIndex }) {
+      if (rowIndex === 1) return { display: 'none' };
+    },
+  }
 }
 </script>
 

@@ -24,16 +24,16 @@ const constantRouterMap = [
         name: 'Transactions',
         component: () => import('@/views/transactions/Transactions.vue')
       },
-      {
-        path: '/^(?:ob:\/\/)(12D3Koo[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/',
-        name: 'UserPage',
-        component: () => import('@/views/userPage/UserPage.vue')
-      },
-      {
-        path: '/:guid(12D3Koo[a-zA-Z0-9]+)',
-        name: 'UserPage',
-        component: () => import('@/views/userPage/UserPage.vue')
-      },
+      // {
+      //   path: '/^(?:ob:\/\/)(12D3Koo[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/',
+      //   name: 'UserPage',
+      //   component: () => import('@/views/userPage/UserPage.vue')
+      // },
+      // {
+      //   path: '/:guid(12D3Koo[a-zA-Z0-9]+)',
+      //   name: 'UserPage',
+      //   component: () => import('@/views/userPage/UserPage.vue')
+      // },
     ]
   },
 ]

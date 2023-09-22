@@ -419,7 +419,7 @@ export default class extends BaseVw {
   }
 
   onClickShoppingCartBtn() {
-    app.router.loadVueModal('ShoppingCart');
+    window.vueApp.modalName = 'ShoppingCart';
   }
 
   onDocClick() {

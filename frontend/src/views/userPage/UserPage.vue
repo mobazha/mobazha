@@ -10,9 +10,9 @@
             <a v-if="ob.vendor || ob.ownPage" class="btn tab clrBr js-tab" @click="clickTab" data-tab="store">
               {{ ob.polyT('userPage.mainNav.store') }}<span class="clrTEmph1 margLSm js-listingsCount">{{ ob.stats.listingCount }}</span></a>
             <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="following">
-              {{ ob.polyT('userPage.mainNav.following') }}<span class="clrTEmph1 margLSm js-followingCount">{{ ob.followingCount }}</span></a>
+              {{ ob.polyT('userPage.mainNav.following') }}<span class="clrTEmph1 margLSm">{{ abbrNum(followingCount) }}</span></a>
             <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="followers">
-              {{ ob.polyT('userPage.mainNav.followers') }}<span class="clrTEmph1 margLSm js-followerCount">{{ ob.followerCount }}</span></a>
+              {{ ob.polyT('userPage.mainNav.followers') }}<span class="clrTEmph1 margLSm">{{ abbrNum(followerCount) }}</span></a>
           </div>
         </div>
       </div>
@@ -50,8 +50,7 @@
           </div>
 
           <div v-else>
-            <div class="js-socialBtns"></div>
-            <SocialBtns :targetID="model.id" />
+            <SocialBtns :params="{ targetID: model.id, }" />
           </div>
           <div v-if="ob.showStoreWelcomeCallout">
             <div class="storeWelcomeCallout js-storeWelcomeCallout arrowBoxBottom confirmBox clrP clrBr clrSh1 tx5">
@@ -123,15 +122,17 @@ export default {
     return {
       handle: '',
       guild: '',
-      state: '',
+      state: 'store',
       slug: '',
 
-      profile: {},
+      tabViewCache: {},
+      tabViews: { Home, Store, Follow, Reputation },
+
+      model: {},
       profileFetch: undefined,
       listing: {},
       listingFetch: undefined,
 
-      model: {},
       isBlockedUser: false,
 
       loadingContextText: '',
@@ -146,7 +147,7 @@ export default {
 
     this.init();
 
-    console.log('In userPage')
+    console.log('In userPage: ', this.$route)
   },
   mounted() {
     this.render();
@@ -158,8 +159,6 @@ export default {
         ...this.model.toJSON(),
         ownPage: this.ownPage,
         showStoreWelcomeCallout: this.showStoreWelcomeCallout,
-        followingCount: abbrNum(this.followingCount),
-        followerCount: abbrNum(this.followerCount),
       };
     },
     headerHash() {
@@ -168,16 +167,23 @@ export default {
     },
   },
   watch: {
-    $route() {
+    $route(to, from) {
+      console.log('in $route, from: ', from);
+      console.log('in $route, to: ', to);
       if (!this.loadingUserFailed) {
         // The app has been routed to a new route, let's
         // clean up by aborting all fetches
         if (this.profileFetch?.abort) this.profileFetch.abort();
         if (this.listingFetch) this.listingFetch.abort();
       }
+
+      if (to.params.guid && to.params.guid !== from.params.guild) {
+        this.init();
+      }
     }
   },
   methods: {
+    abbrNum,
     init() {
       // Hack to pass the handle into this function, which should really only
       // happen when called from userViaHandle(). If a handle is being passed in,
@@ -187,7 +193,7 @@ export default {
 
       let {guid, state, slug} = this.$route.params;
       this.guid = guid;
-      this.state = state;
+      this.state = state || 'store';
       this.slug = slug;
 
       const pageState = state || 'store';
@@ -199,10 +205,10 @@ export default {
       if (guid === app.profile.id) {
         // don't fetch our own profile, since we have it already
         this.profileFetch = $.Deferred().resolve();
-        this.profile = app.profile;
+        this.model = app.profile;
       } else {
-        this.profile = new Profile({ peerID: guid });
-        this.profileFetch = this.profile.fetch();
+        this.model = new Profile({ peerID: guid });
+        this.profileFetch = this.model.fetch();
       }
 
       if (state === 'store') {
@@ -226,7 +232,6 @@ export default {
         // this.cacheGuidHandle(guid, handle);
 
         this.loadData({
-          model: this.profile,
           state: pageState,
           listing: this.listing,
         })
@@ -281,16 +286,10 @@ export default {
     loadData(options = {}) {
       this.baseInit(options);
 
-      if (!options.model) {
-        throw new Error('Please provide a user model.');
-      }
-
       this.setBlockedClass();
 
       this.ownPage = this.model.id === app.profile.id;
       this.state = options.state || 'store';
-      this.tabViewCache = {};
-      this.tabViews = { Home, Store, Follow, Reputation };
 
       const stats = this.model.get('stats');
       this.followingCount = stats.get('followingCount');
@@ -321,7 +320,7 @@ export default {
           this.miniProfile.setState({ followsYou: data.followsMe });
         }
 
-        if (this.followingCount === 0 && !this.ownPage) this.setFollowingCount(1);
+        if (this.followingCount === 0 && !this.ownPage) this.followingCount = 1;
       });
 
       this.listenTo(blockEvents, 'blocked unblocked', (data) => {
@@ -341,17 +340,17 @@ export default {
 
     onOwnFollowingAdd(md) {
       if (this.ownPage) {
-        this.setFollowingCount(this.followingCount + 1);
+        this.followingCount += 1;
       } else if (md.id === this.model.id) {
-        this.setFollowerCount(this.followerCount + 1);
+        this.followerCount += 1;
       }
     },
 
     onOwnFollowingRemove(md) {
       if (this.ownPage) {
-        this.setFollowingCount(this.followingCount - 1);
+        this.followingCount -= 1;
       } else if (md.id === this.model.id) {
-        this.setFollowerCount(this.followerCount - 1);
+        this.followerCount -= 1;
       }
     },
 
@@ -392,27 +391,6 @@ export default {
       this.setTabState('reputation');
     },
 
-    setFollowingCount(count) {
-      if (typeof count !== 'number') {
-        throw new Error('Please provide a numeric count.');
-      }
-
-      if (count !== this.followingCount) {
-        this.followingCount = count;
-        this.getCachedEl('.js-followingCount').text(abbrNum(count));
-      }
-    },
-    setFollowerCount(count) {
-      if (typeof count !== 'number') {
-        throw new Error('Please provide a numeric count.');
-      }
-
-      if (count !== this.followerCount) {
-        this.followerCount = count;
-        this.getCachedEl('.js-followerCount').text(abbrNum(count));
-      }
-    },
-
     setBlockedClass() {
       this.isBlockedUser = isBlocked(this.model.id);
     },
@@ -437,7 +415,7 @@ export default {
       });
 
       this.listenTo(collection, 'sync', () => {
-        this.setFollowerCount(collection.length);
+        this.followerCount = collection.length;
       });
 
       return this.createChild(this.tabViews.Follow, {
@@ -457,7 +435,7 @@ export default {
       });
 
       this.listenTo(collection, 'sync', () => {
-        this.setFollowingCount(collection.length);
+        this.followingCount = collection.length;
       });
 
       return this.createChild(this.tabViews.Follow, {

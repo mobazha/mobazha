@@ -18,16 +18,19 @@ import { recordEvent } from '../../../backbone/utils/metrics';
 
 export default {
   props: {
+    options: {
+      type: Object,
+      default: {},
+    },
   },
   data () {
     return {
-      options: {},
     };
   },
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   mounted () {
   },
@@ -37,17 +40,18 @@ export default {
       return this.useIcon ? textClassName : '';
     },
     btnText () {
+      const ob = this.ob;
       const btnText = ob.isBlocked ? ob.polyT('blockButton.btnTxtUnblock') : ob.polyT('blockButton.btnTxtBlock');
       return ob.useIcon ? '' : btnText;
     }
   },
   methods: {
     loadData (options = {}) {
-      if (typeof options.targetId !== 'string') {
-        throw new Error('Please provide a targetId as a string.');
+      if (typeof options.targetID !== 'string') {
+        throw new Error('Please provide a targetID as a string.');
       }
 
-      if (app.profile.id === options.targetId) {
+      if (app.profile.id === options.targetID) {
         throw new Error('Blocking is not available on your own node.');
       }
 
@@ -57,44 +61,44 @@ export default {
           useIcon: false,
           tooltipClass: options.initialState && options.initialState.useIcon ?
             'toolTipNoWrap toolTipTop' : '',
-          isBlocking: block.isBlocking(options.targetId) ||
-            block.isUnblocking(options.targetId),
-          isBlocked: block.isBlocked(options.targetId),
+          isBlocking: block.isBlocking(options.targetID) ||
+            block.isUnblocking(options.targetID),
+          isBlocked: block.isBlocked(options.targetID),
           ...(options && options.initialState || {}),
         },
       };
 
-      this.setState(opts.initialState || {});
-      this.targetId = options.targetId;
+      this.baseInit(opts);
+      this.targetID = options.targetID;
 
       this.listenTo(block.events, 'unblocking blocking', data => {
-        if (!data.peerIDs.includes(options.targetId)) return;
+        if (!data.peerIDs.includes(options.targetID)) return;
         this.setState({ isBlocking: true });
       });
 
       this.listenTo(block.events, 'blocked unblocked blockFail unblockFail',
         data => {
-          if (!data.peerIDs.includes(options.targetId)) return;
+          if (!data.peerIDs.includes(options.targetID)) return;
           this.setState({ isBlocking: false });
         });
 
       this.listenTo(block.events, 'blocked', data => {
-        if (!data.peerIDs.includes(options.targetId)) return;
+        if (!data.peerIDs.includes(options.targetID)) return;
         this.setState({ isBlocked: true });
       });
 
       this.listenTo(block.events, 'unblocked', data => {
-        if (!data.peerIDs.includes(options.targetId)) return;
+        if (!data.peerIDs.includes(options.targetID)) return;
         this.setState({ isBlocked: false });
       });
     },
 
     onClickBlock () {
       if (this.getState().isBlocked) {
-        block.unblock(this.targetId);
+        block.unblock(this.targetID);
         recordEvent('UnBlockUser');
       } else {
-        block.block(this.targetId);
+        block.block(this.targetID);
         recordEvent('BlockUser');
       }
     },

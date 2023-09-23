@@ -39,7 +39,7 @@
                 <div v-if="ob.contentHtml">print(ob.contentHtml);</div>
 
                 <div v-else-if="ob.contentText">
-                  <p class="clrT2 tx5">{{ ob.contentText }}</p>
+                  <p class="clrT2 tx5" v-html="ob.contentText"></p>
                 </div>
               </div>
               <p class="clrT2 tx6 rowSm">{{ ob.polyT('userPage.loading.socialHeading') }}</p>

@@ -349,7 +349,8 @@ export default class ObRouter extends Router {
       });
     }
 
-    return super.navigate(fragment, options);
+    console.log('fragment: ', fragment)
+    return super.navigate(fragment.replace(/^(ob:\/\/)/, ''), options);
   }
 
   userViaHandle(handle, ...args) {

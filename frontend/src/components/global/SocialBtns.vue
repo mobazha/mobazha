@@ -8,7 +8,7 @@
         :btnText="ob.following ? ob.polyT('follow.unfollowBtn') : ob.polyT('follow.followBtn')"
       />
       <div class="js-blockBtnContainer">
-        <BlockBtn :options="{ targetId: _options.targetID }" />
+        <BlockBtn :options="{ targetID: options.targetID }" />
       </div>
     </div>
   </div>
@@ -21,20 +21,20 @@ import { recordEvent } from '../../../backbone/utils/metrics';
 
 export default {
   props: {
-    options: {
+    params: {
       type: Object,
       default: {},
     },
   },
   data() {
     return {
-      _options: {},
+      options: {},
     };
   },
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.params);
   },
   mounted() {
     this.render();
@@ -42,13 +42,15 @@ export default {
   computed: {
     ob () {
       return {
-        ...this._options,
-        ...state,
+        ...this.templateHelpers,
+        ...this.options,
+        ...this._state,
       };
     },
   },
   methods: {
     loadData(options = {}) {
+      console.log('options: ', options)
       if (!options.targetID) throw new Error('You must provide a targetID');
 
       const opts = {
@@ -63,7 +65,7 @@ export default {
       };
 
       this.setState(opts.initialState || {});
-      this._options = opts;
+      this.options = opts;
 
       this.listenTo(app.ownFollowing, 'update', () => {
         this.setState({
@@ -78,14 +80,14 @@ export default {
 
     onClickMessage() {
       // activate the chat message
-      app.chat.openConversation(this._options.targetID);
+      app.chat.openConversation(this.options.targetID);
       recordEvent('Social_OpenChat');
     },
 
     onClickFollow() {
       const type = this.getState().following ? 'unfollow' : 'follow';
       this.setState({ isFollowing: true });
-      this.folCall = followUnfollow(this._options.targetID, type).always(() => {
+      this.folCall = followUnfollow(this.options.targetID, type).always(() => {
         if (this.isRemoved()) return;
         this.setState({ isFollowing: false });
       });

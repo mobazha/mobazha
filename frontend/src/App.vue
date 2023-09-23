@@ -12,7 +12,7 @@
     <div id="chatConvoContainer" class="clrP clrBr3"></div>
     <div id="js-vueModal"></div>
 
-    <ShoppingCart :ref="name" v-show="showShoppingCart" @close="onShoppingCartClose"/>
+    <ShoppingCart v-if="initialized" v-show="showShoppingCart" @close="onShoppingCartClose"/>
     <Wallet v-if="initialized" v-show="showWallet" @close="onWalletClose" />
   </div>
 </template>

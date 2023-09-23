@@ -39,7 +39,7 @@
                     <el-table-column>
                       <template #header>
                         <div class="user">
-                          <img class="user-avatar" :src="getAvatarBgImage(item.profile?.avatarHashes, {}, true)" @click="goToStore(item.vendorID)" />
+                          <img class="user-avatar" :src="ob.getAvatarBgImage(item.profile?.avatarHashes, {}, true)" @click="goToStore(item.vendorID)" />
                           <div class="user-body">
                             <div class="user-name" @click="goToStore(item.vendorID)">{{ item.profile?.name }}</div>
                             <div class="user-id">{{ item.vendorID }}</div>
@@ -54,7 +54,7 @@
                               <div class="goods-left">
                                 <img
                                   class="goods-img"
-                                  :src="getListingBgImage(row.listing?.item.images[0], {}, true)"
+                                  :src="ob.getListingBgImage(row.listing?.item.images[0], {}, true)"
                                   @click="goToListing(item.vendorID, row.listing?.slug)"
                                 />
                               </div>

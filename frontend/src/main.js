@@ -29,21 +29,20 @@ window.app = app;
 function mountVueApp(container) {
   const vueApp = createApp(App);
   vueApp.config.productionTip = false;
+
   vueApp.use(ElementPlus);
   for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
     vueApp.component(key, component);
   }
-  vueApp.mixin(baseVw);
-  vueApp.config.globalProperties.templateHelpers = { ...templateHelpers };
-
-  Object.keys(templateHelpers).forEach((key) => {
-    vueApp.config.globalProperties[key] = templateHelpers[key];
-  });
 
   // components
   for (const i in components) {
     vueApp.component(i, components[i]);
   }
+
+  vueApp.config.globalProperties.templateHelpers = { ...templateHelpers };
+  vueApp.mixin(baseVw);
+
   const store = createStore({
     modules: {
       cart,

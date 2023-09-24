@@ -3,7 +3,7 @@
 
   <a :class="`btnProcessing ${className}`" v-bind="attrs">
     <SpinnerSVG :className="spinnerClassName || ''" />
-    <span :class="`js-btnText ${textClassName}`">{{ btnText }}</span>
+    <span :class="`js-btnText ${textClassName}`" v-html="btnText"></span>
   </a>
 
 </template>

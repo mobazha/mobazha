@@ -1,0 +1,132 @@
+<template>
+  <div :class="`miniprofile ${isBlocked ? 'isBlocked' : ''}`">
+    <div class="flexVCent">
+      <div class="flexNoShrink">
+        <div class="userIconWrap">
+          <a :href="`#${ob.peerID}`">
+            <div class="userIcon disc clrBr2 clrSh1" :style="ob.getAvatarBgImage(ob.avatarHashes || {})"></div>
+          </a>
+          <div class="blockedAvatarOverlay disc clrBr2 clrSh1 clrP clrT"><i class="ion-eye-disabled center"></i></div>
+        </div>
+      </div>
+      <div class="flexExpand">
+        <h1 :class="`h2 txUnb txUnl clamp ${ob.name.length > 30 ? 'tx3' : ''}`"><a :href="`#${ob.peerID}`" class="clrT">{{ ob.name }}</a></h1>
+        <div class="txt5b gutterHSm">
+          <span class="clrT"
+            v-html="`${ ob.parseEmojis('📍', '', { style: 'width: 10px' }) } ${ ob.location || ob.polyT('userPage.noLocation') }`"></span>
+          <div v-if="ob.followsYou">
+            <span v-html="`${ob.parseEmojis('👥', '', { style: 'width: 10px' })} ${ob.polyT('userPage.followsYou')}`"></span>
+          </div>
+          <a class="ratingStrip" @click="onClickRating"
+            v-html="ob.formatRating(ob.stats.averageRating, ob.stats.ratingCount)"></a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</template>
+
+<script>
+import app from '../../backbone/app';
+import { followsYou } from '../../backbone/utils/follow';
+import { isBlocked, events as blockEvents } from '../../backbone/utils/block';
+
+export default {
+  props: {
+    options: {
+      type: Object,
+      default: {},
+    },
+  },
+  data () {
+    return {
+      isBlockedUser: false,
+    };
+  },
+  created () {
+    this.initEventChain();
+
+    this.loadData(this.options);
+  },
+  mounted () {
+    this.render();
+  },
+  computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+        ...this.model.toJSON(),
+      };
+    }
+  },
+  methods: {
+    loadData (options = {}) {
+      const opts = {
+        fetchFollowsYou: true,
+        onClickRating:
+          () => app.router.navigate(`ob://${options.model.id}/reputation`, { trigger: true }),
+        ...options,
+      };
+
+      this.baseInit(opts);
+      this.options = opts;
+      if (!this.model) {
+        throw new Error('Please provide a profile model.');
+      }
+
+      this._state = {
+        followsYou: false,
+        ...options.initialState || {},
+      };
+
+      this._followsYou = false;
+
+      if (this.model.id === app.profile.id) {
+        this.listenTo(app.profile, 'change:name change:location', () => this.render());
+        this.listenTo(app.profile.get('avatarHashes'), 'change', () => this.render());
+      } else {
+        if (opts.fetchFollowsYou) {
+          followsYou(this.model.id).done((data) => {
+            this.setState({ followsYou: data.followsMe });
+          });
+        }
+
+        this.listenTo(app.ownFollowers, 'add', (md) => {
+          if (md.id === app.profile.id) {
+            this.setState({ followsYou: true });
+          }
+        });
+
+        this.listenTo(app.ownFollowers, 'remove', (md) => {
+          if (md.id === app.profile.id) {
+            this.setState({ followsYou: false });
+          }
+        });
+      }
+
+      this.listenTo(blockEvents, 'blocked unblocked', (data) => {
+        if (data.peerIDs.includes(this.model.id)) {
+          this.setBlockedClass();
+        }
+      });
+    },
+
+    onClickRating () {
+      this.options.onClickRating();
+    },
+
+    setBlockedClass () {
+      this.isBlockedUser = isBlocked(this.model.id);
+    },
+
+    render () {
+      this.setBlockedClass();
+
+      return this;
+    }
+
+  }
+}
+</script>
+<style lang="scss" scoped></style>

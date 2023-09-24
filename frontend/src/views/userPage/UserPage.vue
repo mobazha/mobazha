@@ -2,7 +2,15 @@
   <div :class="`userPage clrS ${isBlockedUser ? 'isBlocked' : ''}`">
     <nav id="pageTabBar" class="barLg clrP clrBr">
       <div class="flexVCent pageTabs">
-        <div class="js-miniProfileContainer"></div>
+        <MiniProfile :options="{
+          model,
+          fetchFollowsYou: false,
+          overwriteClickRating: true,
+          initialState: {
+            followsYou,
+          },
+        }"
+        @clickRating="clickRating" />
         <div class="flexExpand">
           <div class="flexHRight flexVCent gutterH clrT2">
             <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="home">{{ ob.polyT('userPage.mainNav.home') }}</a>
@@ -100,17 +108,18 @@ import Profile from '../../../backbone/models/profile/Profile';
 import Listing from '../../../backbone/models/listing/Listing';
 import Listings from '../../../backbone/collections/Listings';
 import Followers from '../../../backbone/collections/Followers';
-import MiniProfile from '../../../backbone/views/MiniProfile.js';
 import Home from '../../../backbone/views/userPage/Home';
 import Store from '../../../backbone/views/userPage/Store';
 import Follow from '../../../backbone/views/userPage/Follow';
 import Reputation from '../../../backbone/views/userPage/Reputation';
 
 import Loading from './Loading.vue'
+import MiniProfile from '../MiniProfile.vue';
 
 export default {
   components: {
     Loading,
+    MiniProfile,
   },
   props: {
     options: {
@@ -128,7 +137,6 @@ export default {
       tabViewCache: {},
       tabViews: { Home, Store, Follow, Reputation },
 
-      model: {},
       profileFetch: undefined,
       listing: {},
       listingFetch: undefined,
@@ -382,7 +390,8 @@ export default {
       recordEvent('UserPage_CloseStoreWelcome');
       if (this.curConn && this.curConn.server) {
         this.curConn.server.save({ dismissedStoreWelcome: true });
-        this.getCachedEl('.js-storeWelcomeCallout').remove();
+
+        this.showStoreWelcomeCallout = false;
       }
     },
 
@@ -534,18 +543,6 @@ export default {
       this.$tabContent = $('.js-tabContent');
       this.$tabTitle = $('.js-tabTitle');
       this.$moreableBtns = $('.js-moreableBtn');
-
-      if (this.miniProfile) this.miniProfile.remove();
-      this.miniProfile = this.createChild(MiniProfile, {
-        model: this.model,
-        fetchFollowsYou: false,
-        onClickRating: () => this.setTabState('reputation'),
-        initialState: {
-          followsYou: this.followsYou,
-        },
-      });
-      this.listenTo(this.miniProfile, 'clickRating', this.clickRating);
-      $('.js-miniProfileContainer').html(this.miniProfile.render().el);
 
       this.tabViewCache = {}; // clear for re-renders
       this.setTabState(this.state, {

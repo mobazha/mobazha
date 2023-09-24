@@ -1,5 +1,5 @@
 <template>
-  <div :class="`miniprofile ${isBlocked ? 'isBlocked' : ''}`">
+  <div :class="`miniprofile ${isBlockedUser ? 'isBlocked' : ''}`">
     <div class="flexVCent">
       <div class="flexNoShrink">
         <div class="userIconWrap">
@@ -41,6 +41,7 @@ export default {
   data () {
     return {
       isBlockedUser: false,
+      overwriteClickRating: false,
     };
   },
   created () {
@@ -64,13 +65,10 @@ export default {
     loadData (options = {}) {
       const opts = {
         fetchFollowsYou: true,
-        onClickRating:
-          () => app.router.navigate(`ob://${options.model.id}/reputation`, { trigger: true }),
         ...options,
       };
-
       this.baseInit(opts);
-      this.options = opts;
+
       if (!this.model) {
         throw new Error('Please provide a profile model.');
       }
@@ -113,7 +111,11 @@ export default {
     },
 
     onClickRating () {
-      this.options.onClickRating();
+      if (this.overwriteClickRating) {
+        this.$emit('clickRating')
+      } else {
+        app.router.navigate(`ob://${options.model.id}/reputation`, { trigger: true });
+      }
     },
 
     setBlockedClass () {

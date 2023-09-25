@@ -115,6 +115,9 @@
         </div>
       </template>
     </BaseModal>
+    <Teleport to="#js-vueModal">
+      <Purchase v-if="showPurchase" ref="Purchase" />
+    </Teleport>
   </div>
 </template>
 
@@ -127,10 +130,12 @@ import Empty from '@/components/Empty.vue';
 import api from '../api';
 import { getCachedProfiles } from '../../backbone/models/profile/Profile';
 import { convertAndFormatCurrency, curDefToDecimal } from '../../backbone/utils/currency';
+import Purchase from './modals/purchase/Purchase.vue'
 
 export default {
   components: {
     Empty,
+    Purchase,
   },
   name: 'App',
   data() {
@@ -243,7 +248,7 @@ export default {
     pay(index) {
       this.$store.commit('cart/updateCart', this.tableData[0], { module: 'cart' });
 
-      app.router.loadVueModal('Purchase');
+      this.showPurchase = true;
     },
 
     //修改头部样式

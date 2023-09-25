@@ -150,8 +150,7 @@ export default {
   },
   methods: {
     loadData(options = {}) {
-      this.setState(options.initialState || {});
-      this.options = options;
+      this.baseInit(options);
 
       if (!this.collection) {
         throw new Error('Please provide a collection.');
@@ -211,12 +210,6 @@ export default {
         this.fetch = options.initialFetch;
         this.onRequest(this.collection, this.fetch);
       }
-    },
-
-    events() {
-      return {
-        'click .js-retryFetch': 'onClickRetryFetch',
-      };
     },
 
     onFilterFreeShippingChange(e) {

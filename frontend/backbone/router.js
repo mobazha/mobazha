@@ -45,7 +45,7 @@ export default class ObRouter extends Router {
       ['(ob://)transactions(/)', 'loadVueApp'],
       ['(ob://)transactions/:tab(/)', 'loadVueApp'],
       ['(ob://)connected-peers(/)', 'connectedPeers'],
-      ['(ob://)search(/:tab)(?:query)', 'search'],
+      ['(ob://)search(/:tab)(?:query)', 'loadVueApp'],
       ['(ob://)*path', 'pageNotFound'],
     ];
 

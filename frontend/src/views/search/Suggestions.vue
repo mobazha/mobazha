@@ -3,7 +3,7 @@
     <div v-if="ob.suggestions && ob.suggestions.length">
       <span class="clrT2">{{ ob.polyT('search.suggestions') }}</span>
       <div v-for="(suggestion, j) in ob.suggestions" :key="j">
-        <a class="clrT " @click="onClickSuggestion" :data-suggestion="suggestion">{{ suggestion }}</a>
+        <a class="clrT " @click="onClickSuggestion(suggestion)">{{ suggestion }}</a>
       </div>
     </div>
 
@@ -11,7 +11,6 @@
 </template>
 
 <script>
-import $ from 'jquery';
 
 export default {
   props: {
@@ -70,8 +69,7 @@ export default {
       };
     },
 
-    onClickSuggestion (e) {
-      const suggestion = $(e.target).data('suggestion');
+    onClickSuggestion (suggestion) {
       this.$emit('clickSuggestion', { suggestion });
     },
   }

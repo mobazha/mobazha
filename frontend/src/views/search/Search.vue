@@ -66,7 +66,7 @@
             <p>{{ ob.errMsg }}</p>
             <div v-if="!ob.providerLocked">
               <div class="flexHCent">
-                <button class="btn clrP clrBr" @click="clickDeleteProvider" >{{ ob.polyT('search.deleteProviderBtn') }}</button>
+                <button class="btn clrP clrBr" @click="clickDeleteProvider">{{ ob.polyT('search.deleteProviderBtn') }}</button>
               </div>
             </div>
           </div>
@@ -75,7 +75,9 @@
     </div>
 
     <div v-else>
-      <div class="flexCent loadingSearch clrS">{{ ob.spinner({ className: 'spinnerLg' }) }}</div>
+      <div class="flexCent loadingSearch clrS">
+        <SpinnerSVG :className="spinnerLg" />
+      </div>
     </div>
 
   </div>
@@ -87,20 +89,18 @@ import _ from 'underscore';
 import $ from 'jquery';
 import is from 'is_js';
 import app from '../../../backbone/app';
-import baseVw from '../baseVw';
-import Results from './Results';
-import Providers from './SearchProviders';
-import Suggestions from './Suggestions';
-import Category from './Category';
-import SortBy from './SortBy';
-import Filters from './Filters';
-import { openSimpleMessage } from '../modals/SimpleMessage';
+import Results from '../../../backbone/views/search/Results';
+import Providers from '../../../backbone/views/search/SearchProviders';
+import Suggestions from '../../../backbone/views/search/Suggestions';
+import Category from '../../../backbone/views/search/Category';
+import SortBy from '../../../backbone/views/search/SortBy';
+import Filters from '../../../backbone/views/search/Filters';
+import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
 import ResultsCol from '../../../backbone/collections/Results';
 import ProviderMd from '../../../backbone/models/search/SearchProvider';
 import { supportedWalletCurs } from '../../../backbone/data/walletCurrencies';
 import defaultSearchProviders from '../../../backbone/data/defaultSearchProviders';
 import { selectEmojis } from '../../../backbone/utils';
-import loadTemplate from '../../../backbone/utils/loadTemplate';
 import { recordEvent } from '../../../backbone/utils/metrics';
 import { curConnOnTor } from '../../../backbone/utils/serverConnect';
 import { scrollPageIntoView } from '../../../backbone/utils/dom';
@@ -119,6 +119,7 @@ export default {
   },
   data () {
     return {
+      tab: 'listings',
     };
   },
   created () {
@@ -129,8 +130,31 @@ export default {
   mounted () {
     this.render();
   },
+  watch: {
+    $route () {
+      this.removeFetches();
+      this.categoryViews.forEach((cat) => cat.remove());
+    },
+  },
   computed: {
     ob () {
+      const state = this._state;
+      const data = state.data || {};
+      const term = this._search.q === '*' ? '' : this._search.q;
+      const hasFilters = data.options && !$.isEmptyObject(data);
+
+      let errTitle;
+      let errMsg;
+
+      if (state.xhr) {
+        const provider = this._search.provider.get('name') || this.currentBaseUrl;
+        errTitle = app.polyglot.t('search.errors.searchFailTitle', { provider });
+        const failReason = state.xhr.responseJSON ? state.xhr.responseJSON.reason : '';
+        errMsg = failReason
+          ? app.polyglot.t('search.errors.searchFailReason', { error: failReason })
+          : app.polyglot.t('search.errors.searchFailData');
+      }
+
       return {
         ...this.templateHelpers,
         term,
@@ -144,10 +168,18 @@ export default {
         ...state,
         ...data,
       };
-    }
+    },
+    currentDefaultProvider () {
+      return app.searchProviders.defaultProvider;
+    },
+    currentBaseUrl () {
+      return this._search.provider[`${this._search.searchType}Url`];
+    },
   },
   methods: {
     loadData (options = {}) {
+      options.query = this.$route.query;
+
       const opts = {
         initialState: {
           fetching: false,
@@ -158,7 +190,7 @@ export default {
         ...options,
       };
 
-      super(opts);
+      this.baseInit(opts);
       const queryKeys = ['q', 'p', 'ps', 'sortBy'];
 
       // Allow router to pass in a search type for future use with vendor searches.
@@ -183,7 +215,7 @@ export default {
 
       // If there is only one provider and it isn't the default, just set it to be such.
       if (!this.currentDefaultProvider && app.searchProviders.length === 1) {
-        this.currentDefaultProvider = app.searchProviders.at(0);
+        this.setCurrentDefaultProvider(app.searchProviders.at(0));
       }
       this._search.provider = this.currentDefaultProvider || app.searchProviders.at(0);
 
@@ -291,34 +323,30 @@ export default {
         throw new Error('Please provide a search provider model.');
       }
       return !!app.searchProviders.getProviderByURL(md[`${this._search.searchType}Url`]);
-    }
+    },
 
-  get currentDefaultProvider () {
+    getCurrentDefaultProvider () {
       return app.searchProviders.defaultProvider;
-    }
+    },
 
-  set currentDefaultProvider (md) {
+    setCurrentDefaultProvider (md) {
       if (!md || !(md instanceof ProviderMd)) {
         throw new Error('Please provide a search provider model.');
       }
 
       app.searchProviders[`default${curConnOnTor() ? 'Tor' : ''}Provider`] = md;
-    }
-
-  get currentBaseUrl () {
-      return this._search.provider[`${this._search.searchType}Url`];
     },
 
     providerIsADefault (id) {
       return !!_.findWhere(defaultSearchProviders, { id });
     },
 
-  /** Updates the search object. If updated, triggers a search fetch.
-   *
-   * @param {object} search - The new state.
-   * @param {boolean} opts.force - Should search be fired even if nothing changed?
-   */
-  setSearch (search = {}, opts = {}) {
+    /** Updates the search object. If updated, triggers a search fetch.
+     *
+     * @param {object} search - The new state.
+     * @param {boolean} opts.force - Should search be fired even if nothing changed?
+     */
+    setSearch (search = {}, opts = {}) {
       const newSearch = {
         ...this._search,
         ...search,
@@ -331,12 +359,12 @@ export default {
       }
     },
 
-  /**
-   * Creates an object for updating search providers with new data returned from a query.
-   * @param {object} data - Provider object from a search query.
-   * @returns {{data: *, urlTypes: Array}}
-   */
-  buildProviderUpdate (data) {
+    /**
+     * Creates an object for updating search providers with new data returned from a query.
+     * @param {object} data - Provider object from a search query.
+     * @returns {{data: *, urlTypes: Array}}
+     */
+    buildProviderUpdate (data) {
       const update = {};
       const urlTypes = [];
 
@@ -429,12 +457,12 @@ export default {
       this.searchFetches.push(searchFetch);
     },
 
-  /**
-   * This will activate a provider. If no default is set, the activated provider will be set as the
-   * the default. If the user is currently in Tor mode, the default Tor provider will be set.
-   * @param {object} md - the search provider model
-   */
-  activateProvider (md) {
+    /**
+     * This will activate a provider. If no default is set, the activated provider will be set as the
+     * the default. If the user is currently in Tor mode, the default Tor provider will be set.
+     * @param {object} md - the search provider model
+     */
+    activateProvider (md) {
       if (!md || !(md instanceof ProviderMd)) {
         throw new Error('Please provide a search provider model.');
       }
@@ -475,7 +503,7 @@ export default {
         throw new Error('The provider to be made the default must be in the collection.');
       }
 
-      this.currentDefaultProvider = md;
+      this.setCurrentDefaultProvider(md);
     },
 
     clickMakeDefaultProvider () {
@@ -498,11 +526,11 @@ export default {
       this.addQueryProvider();
     },
 
-  /**
-   * This will add the categories one by one in a loop. If the category views already exist, they
-   * will be reused to prevent new calls to the search endpoint.
-   */
-  buildCategories () {
+    /**
+     * This will add the categories one by one in a loop. If the category views already exist, they
+     * will be reused to prevent new calls to the search endpoint.
+     */
+    buildCategories () {
       if (!Array.isArray(this._categorySearches)) {
         throw new Error('this._categorySearches should be a valid array of search objects.');
       }
@@ -531,13 +559,13 @@ export default {
       this.buildCategories();
     },
 
-  /**
-   * This will create a results view from the provided search data.
-   * @param {object} data - JSON results from a search endpoint.
-   * @param {object} search - A valid search object.
-   * @param {boolean} setHistory - Whether the results should save the query to history.
-   */
-  createResults (data = {}, search, setHistory = true) {
+    /**
+     * This will create a results view from the provided search data.
+     * @param {object} data - JSON results from a search endpoint.
+     * @param {object} search - A valid search object.
+     * @param {boolean} setHistory - Whether the results should save the query to history.
+     */
+    createResults (data = {}, search, setHistory = true) {
       if (!search || $.isEmptyObject(search)) throw new Error('Please provide a search object.');
 
       this.resultsCol = new ResultsCol();
@@ -618,12 +646,6 @@ export default {
       this.searchFetches.forEach((fetch) => fetch.abort());
     },
 
-    remove () {
-      this.removeFetches();
-      this.categoryViews.forEach((cat) => cat.remove());
-      super.remove();
-    },
-
     renderCategories () {
       const catsFrag = document.createDocumentFragment();
 
@@ -636,38 +658,10 @@ export default {
     },
 
     render () {
-      super.render();
       const state = this.getState();
       const data = state.data || {};
       const term = this._search.q === '*' ? '' : this._search.q;
       const hasFilters = data.options && !$.isEmptyObject(data);
-
-      let errTitle;
-      let errMsg;
-
-      if (state.xhr) {
-        const provider = this._search.provider.get('name') || this.currentBaseUrl;
-        errTitle = app.polyglot.t('search.errors.searchFailTitle', { provider });
-        const failReason = state.xhr.responseJSON ? state.xhr.responseJSON.reason : '';
-        errMsg = failReason
-          ? app.polyglot.t('search.errors.searchFailReason', { error: failReason })
-          : app.polyglot.t('search.errors.searchFailData');
-      }
-
-      loadTemplate('search/search.html', (t) => {
-        this.$el.html(t({
-          term,
-          errTitle,
-          errMsg,
-          providerLocked: this.providerIsADefault(this._search.provider.id),
-          isExistingProvider: this.isExistingProvider(this._search.provider),
-          showMakeDefault: this._search.provider !== this.currentDefaultProvider,
-          showDataError: $.isEmptyObject(data) && state.tab === 'listings',
-          hasFilters,
-          ...state,
-          ...data,
-        }));
-      });
 
       const $filterWrapper = $('.js-filterWrapper');
       const $searchLogo = $('.js-searchLogo');

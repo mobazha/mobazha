@@ -29,6 +29,11 @@ const constantRouterMap = [
         name: 'UserPage',
         component: () => import('@/views/userPage/UserPage.vue')
       },
+      {
+        path: '/search/:tab?',
+        name: 'Search',
+        component: () => import('@/views/search/Search.vue')
+      },
     ]
   },
 ]

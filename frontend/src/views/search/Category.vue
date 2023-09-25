@@ -33,7 +33,7 @@
 import { capitalize } from '../../../backbone/utils/string';
 import { recordEvent } from '../../../backbone/utils/metrics';
 import { createSearchURL } from '../../../backbone/utils/search';
-import ListingCard from '../components/ListingCard';
+import ListingCard from '../../../backbone/views/components/ListingCard';
 import ResultsCol from '../../../backbone/collections/Results';
 import ProviderMd from '../../../backbone/models/search/SearchProvider';
 

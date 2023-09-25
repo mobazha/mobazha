@@ -25,7 +25,7 @@
         {{ ob.polyT('search.sortBy') }}
       </div>
       <div class="col4">
-        <select id="sortBy" class="select2Small " @change="changeSortBy">
+        <select id="sortBy" class="select2Small " @change="changeSortBy($event)">
           <option v-for="(val, key) in ob.sortBy" :key="key" :value="key" :selected="selected(val, key)">{{ val.label }}
           </option>
         </select>
@@ -83,8 +83,8 @@ export default {
       this.baseInit(opts);
     },
 
-    changeSortBy (e) {
-      this.trigger('changeSortBy', { sortBy: $(e.target).val() });
+    changeSortBy (event) {
+      this.$emit('changeSortBy', { sortBy: event.target.value });
     },
 
     selected (val, key) {

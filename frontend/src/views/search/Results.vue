@@ -40,9 +40,9 @@ import app from '../../../backbone/app';
 import { capitalize } from '../../../backbone/utils/string';
 import { recordEvent } from '../../../backbone/utils/metrics';
 import { createSearchURL } from '../../../backbone/utils/search';
-import UserCard from '../UserCard';
-import ListingCard from '../components/ListingCard';
-import PageControls from '../components/PageControlsTextStyle';
+import UserCard from '../../../backbone/views/UserCard';
+import ListingCard from '../../../backbone/views/components/ListingCard';
+import PageControls from '../../../backbone/views/components/PageControlsTextStyle';
 import ResultsCol from '../../../backbone/collections/Results';
 import ListingCardModel from '../../../backbone/models/listing/ListingShort';
 import ProviderMd from '../../../backbone/models/search/SearchProvider';
@@ -159,7 +159,7 @@ export default {
 
     loadPage (options) {
       this.removeCardViews();
-      this.trigger('loadingPage');
+      this.$emit('loadingPage');
       this.setState({ loading: true });
 
       const opts = {

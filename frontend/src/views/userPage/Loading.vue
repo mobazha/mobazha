@@ -23,8 +23,7 @@
                 <div class="discSm clrBr2 clrSh1 flexNoShrink" :style="ob.getAvatarBgImage(ob.ownAvatarHashes)"></div>
                 <i :class="`ion-android-arrow-forward clrT2 lineHeight1 tx3 ${!ob.isProcessing ? 'clrTErr' : ''}`"></i>
                 <div
-                  :class="`discSm clrBr2 clrSh1 flexNoShrink  ${disabledToAvatar}`"
-                  :disabled="!ob.isProcessing"
+                  :class="`discSm clrBr2 clrSh1 flexNoShrink  ${!ob.isProcessing ? 'disabled' : ''}`"
                   :style="ob.getAvatarBgImage(ob.userAvatarHashes)"
                 ></div>
               </div>

@@ -23,7 +23,7 @@ import app from '../../../backbone/app';
 import { recordEvent } from '../../../backbone/utils/metrics';
 import { curConnOnTor } from '../../../backbone/utils/serverConnect';
 import { searchTypes } from '../../../backbone/utils/search';
-import { openSimpleMessage } from '../modals/SimpleMessage';
+import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
 import ProviderMd from '../../../backbone/models/search/SearchProvider';
 
 

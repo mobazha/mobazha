@@ -1,0 +1,247 @@
+<template>
+  <div class="searchResults flexColRow gutterV">
+    <div v-if="ob.viewType === 'cryptoList'">
+      <div class="flexVCent txB clrBr clrP gutterH cryptoListViewHeader">
+        <div class="tradeFromCol">{{ ob.polyT('search.cryptoListViewHeader.colTradeFrom') }}</div>
+        <div class="tradeArrowCol"></div>
+        <div class="tradeToCol">{{ ob.polyT('search.cryptoListViewHeader.colTradeTo') }}</div>
+        <div class="vendorCol">{{ ob.polyT('search.cryptoListViewHeader.colVendor') }}</div>
+        <div class="priceCol" v-html='ob.polyT("search.cryptoListViewHeader.colPrice",
+          { subText: `<span class="subText clrT2">${ob.polyT("search.cryptoListViewHeader.colPriceSubText")}</span>` })'>
+
+        </div>
+        <!-- /* This is being commented out until inventory is functional.
+        <div class="inventoryCol flexExpand">{{ ob.polyT('search.cryptoListViewHeader.colInventory') }} <span class="toolTip txCtr" :data-tip="ob.polyT('search.cryptoListViewHeader.tipInventory')"><i class="ion-information-circled clrT2"></i></span></div>
+        */ -->
+      </div>
+    </div>
+    <div class="noResultsMessage contentBox clrP clrBr clrSh3">
+      <div class="padHg">
+        <p class="txCtr">{{ ob.polyT('search.noResults') }}</p>
+      </div>
+      <div class="flexRow flexBtnWrapper">
+        <a class="btnFlx flexExpand clrP clrBr " @click="clickResetBtn">Reset Search</a>
+      </div>
+    </div>
+    <div :class="`listingsGrid ${ob.viewTypeClass} flex js-resultsGrid`"></div>
+    <div class="pageControls js-pageControlsContainer"></div>
+    <hr class="clrBr">
+    <div v-if="ob.loading">
+      <div class="flexCent loadingSearch clrS">
+        <SpinnerSVG :className="spinnerLg" />
+      </div>
+    </div>
+
+  </div>
+</template>
+
+<script>
+import app from '../../../backbone/app';
+import { capitalize } from '../../../backbone/utils/string';
+import { recordEvent } from '../../../backbone/utils/metrics';
+import { createSearchURL } from '../../../backbone/utils/search';
+import UserCard from '../UserCard';
+import ListingCard from '../components/ListingCard';
+import PageControls from '../components/PageControlsTextStyle';
+import ResultsCol from '../../../backbone/collections/Results';
+import ListingCardModel from '../../../backbone/models/listing/ListingShort';
+import ProviderMd from '../../../backbone/models/search/SearchProvider';
+
+
+export default {
+  props: {
+    options: {
+      type: Object,
+      default: {},
+    },
+  },
+  data () {
+    return {
+    };
+  },
+  created () {
+    this.initEventChain();
+
+    this.loadData(this.options);
+  },
+  mounted () {
+    this.render();
+  },
+  computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        viewTypeClass: this.viewType === 'grid' ?
+          '' : `listingsGrid${capitalize(this.viewType)}View`,
+        viewType: this.viewType,
+        ...this._state,
+      };
+    }
+  },
+  watch: {
+    $route() {
+      this.removeCardViews();
+      if (this.newPageFetch) this.newPageFetch.abort();
+    },
+  },
+  methods: {
+    loadData (options = {}) {
+      if (!options.search) throw new Error('Please provide a search object.');
+      if (!options.search.provider || !(options.search.provider instanceof ProviderMd)) {
+        throw new Error('Please provide a provider model.');
+      }
+
+      const opts = {
+        viewType: 'grid',
+        setHistory: true,
+        ...options,
+        initialState: {
+          loading: false,
+          ...options.initialState,
+        },
+      };
+
+      this.baseInit(opts);
+      this.options = opts;
+      this._setHistory = opts.setHistory;
+      this._search = {
+        p: 0,
+        ps: 66,
+        ...options.search,
+      };
+
+      this.cardViews = [];
+      this.pageCols = {};
+      // if an initial collection was passed in, add it
+      if (options.initCol) this.pageCols[this._search.p] = (options.initCol);
+      this.loadPage();
+    },
+
+    clickResetBtn () {
+      this.$emit('resetSearch');
+    },
+
+    createCardView (model) {
+      // models can be listings or nodes, even though nodes aren't being used yet
+      if (model instanceof ListingCardModel) {
+        const vendor = model.get('vendor') || {};
+        const base = vendor.handle ? `@${vendor.handle}` : vendor.peerID;
+        const options = {
+          listingBaseUrl: `${base}/store/`,
+          reportsUrl: this._search.provider.reportsUrl || '',
+          searchUrl: this._search.provider[this._search.urlType],
+          model,
+          vendor,
+          onStore: false,
+          viewType: this.viewType,
+        };
+
+        return this.createChild(ListingCard, options);
+      }
+
+      return this.createChild(UserCard, { model });
+    },
+
+    renderCards (pageCol = []) {
+      const resultsFrag = document.createDocumentFragment();
+
+      pageCol.forEach((model) => {
+        const cardVw = this.createCardView(model);
+
+        if (cardVw) {
+          this.cardViews.push(cardVw);
+          cardVw.render().$el.appendTo(resultsFrag);
+        }
+      });
+
+      this.getCachedEl('.js-resultsGrid').html(resultsFrag);
+    },
+
+    loadPage (options) {
+      this.removeCardViews();
+      this.trigger('loadingPage');
+      this.setState({ loading: true });
+
+      const opts = {
+        ...this._search,
+        ...options,
+      };
+
+      const newUrl = createSearchURL(opts);
+
+      // if page exists, reuse it
+      if (this.pageCols[opts.p]) {
+        if (this._setHistory) {
+          app.router.navigate(`search/listings?providerQ=${encodeURIComponent(newUrl)}`);
+        }
+        this.setState({ loading: false });
+      } else {
+        const newPageCol = new ResultsCol();
+        this.pageCols[opts.p] = newPageCol;
+
+        if (this.newPageFetch) this.newPageFetch.abort();
+
+        this.newPageFetch = newPageCol.fetch({
+          url: newUrl,
+        })
+          .done(() => {
+            if (this._setHistory) {
+              app.router.navigate(`search/listings?providerQ=${encodeURIComponent(newUrl)}`);
+            }
+          })
+          .fail((xhr) => {
+            if (xhr.statusText !== 'abort') this.trigger('searchError', xhr);
+          })
+          .always(() => {
+            this.setState({ loading: false });
+          });
+      }
+    },
+
+    clickPagePrev () {
+      recordEvent('Discover_PrevPage', { fromPage: this._search.p });
+      this._search.p--;
+      this._setHistory = true;
+      this.loadPage();
+    },
+
+    clickPageNext () {
+      recordEvent('Discover_NextPage', { fromPage: this._search.p });
+      this._search.p++;
+      this._setHistory = true;
+      this.loadPage();
+    },
+
+    removeCardViews () {
+      this.cardViews.forEach((vw) => vw.remove());
+      this.cardViews = [];
+    },
+
+    render () {
+      super.render();
+      const currentPage = Number(this._search.p) + 1;
+      const pageCol = this.pageCols[this._search.p];
+
+      if (this.pageControls) this.pageControls.remove();
+
+      if (pageCol && pageCol.length) {
+        this.renderCards(pageCol);
+
+        this.pageControls = this.createChild(PageControls, {
+          initialState: {
+            currentPage,
+            morePages: currentPage < Math.ceil(pageCol.total / this._search.ps),
+          },
+        });
+        this.listenTo(this.pageControls, 'clickNext', this.clickPageNext);
+        this.listenTo(this.pageControls, 'clickPrev', this.clickPagePrev);
+        $('.js-pageControlsContainer').html(this.pageControls.render().el);
+      }
+
+      return this;
+    }
+
+  }
+}
+</script>
+<style lang="scss" scoped></style>

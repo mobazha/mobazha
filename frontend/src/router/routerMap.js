@@ -30,9 +30,14 @@ const constantRouterMap = [
         component: () => import('@/views/userPage/UserPage.vue')
       },
       {
-        path: '/search/:tab?',
+        path: 'search/:tab?',
         name: 'Search',
         component: () => import('@/views/search/Search.vue')
+      },
+      {
+        path: 'connected-peers',
+        name: 'connectedPeers',
+        component: () => import('@/views/ConnectedPeersPage.vue')
       },
     ]
   },

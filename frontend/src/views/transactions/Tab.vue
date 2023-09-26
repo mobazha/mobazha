@@ -2,8 +2,13 @@
   <div :class="`${type} tx5`">
     <h2 class="tabHeading txUnb">{{ ob.polyT(`transactions.${type}.heading`) }}</h2>
     <div class="searchWrapper rowMd">
-      <input type="text" class="ctrl clrP clrBr clrSh2" @keyup="onKeyUpSearch(filter.search)"
-        :placeholder="ob.polyT(`transactions.placeholderSearch${capitalize(type)}`)" v-model="filter.search">
+      <input
+        type="text"
+        class="ctrl clrP clrBr clrSh2"
+        @keyup="onKeyUpSearch(filter.search)"
+        :placeholder="ob.polyT(`transactions.placeholderSearch${capitalize(type)}`)"
+        v-model="filter.search"
+      />
     </div>
 
     <Filters :filters="setCheckedFilters(filterConfig, filter.states)" />
@@ -25,7 +30,6 @@
     </div>
 
     <TransactionsTable ref="table" :options="tableOptions" />
-
   </div>
 </template>
 
@@ -35,7 +39,7 @@ import $ from 'jquery';
 import app from '../../../backbone/app';
 import { capitalize } from '../../../backbone/utils/string';
 import TransactionsTable from './table/Table.vue';
-import Filters from './Filters.vue'
+import Filters from './Filters.vue';
 
 export default {
   components: {
@@ -49,7 +53,7 @@ export default {
       default: {},
     },
   },
-  data () {
+  data() {
     return {
       _options: {},
       showTotalWrapper: false,
@@ -57,16 +61,16 @@ export default {
       filter: {},
     };
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props.options);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   computed: {
-    tableOptions () {
+    tableOptions() {
       return {
         type: this.type,
         collection: this.collection,
@@ -75,13 +79,12 @@ export default {
         openOrder: this._options.openOrder,
         openedOrderModal: this._options.openedOrderModal,
       };
-    }
+    },
   },
-  watch: {
-  },
+  watch: {},
   methods: {
     capitalize,
-    loadData (options = {}) {
+    loadData(options = {}) {
       const opts = {
         defaultFilter: {
           search: '',
@@ -122,27 +125,28 @@ export default {
         this.showTotalWrapper = false;
 
         setTimeout(() => {
-          xhr.done(data => {
+          xhr.done((data) => {
             const count = app.polyglot.t(`transactions.${this.type}.countTransactions`, { smart_count: data.queryCount });
             const countInfo = `<span class="txB">${count}</span>`;
-            this.queryTotalLine = app.polyglot.t(`transactions.${this.type}.countTransactionsFound`, { smart_count: countInfo })
+            this.queryTotalLine = app.polyglot.t(`transactions.${this.type}.countTransactionsFound`, { smart_count: countInfo });
             this.showTotalWrapper = true;
 
-            console.log('countInfo: ', countInfo)
+            console.log('countInfo: ', countInfo);
           });
         });
       });
     },
 
-    events () {
+    events() {
       return {
         'change .filter input': 'onChangeFilter',
       };
     },
 
-    onChangeFilter () {
+    onChangeFilter() {
       let states = [];
-      $('.filter input').filter(':checked')
+      $('.filter input')
+        .filter(':checked')
         .each((index, checkbox) => {
           states = states.concat($(checkbox).data('state'));
         });
@@ -153,7 +157,7 @@ export default {
       };
     },
 
-    onKeyUpSearch (val) {
+    onKeyUpSearch(val) {
       // wait until they stop typing
       clearTimeout(this.searchKeyUpTimer);
 
@@ -165,14 +169,14 @@ export default {
       }, 200);
     },
 
-    onChangeSortBy (val) {
+    onChangeSortBy(val) {
       this.filter = {
         ...this.filter,
         sortBy: val,
       };
     },
 
-    onClickResetQuery () {
+    onClickResetQuery() {
       this.filter = { ...this._options.defaultFilter };
       this.render();
     },
@@ -182,16 +186,15 @@ export default {
      * will return a filterConfig list with the checked value set for each
      * filter.
      */
-    setCheckedFilters (filterConfig = [], checkedStates = []) {
+    setCheckedFilters(filterConfig = [], checkedStates = []) {
       const checkedConfig = [];
 
       filterConfig.forEach((filter, index) => {
         if (!filter.targetState || !filter.targetState.length) {
-          throw new Error(`Filter at index ${index} needs a tragetState ` +
-            'provided as an array.');
+          throw new Error(`Filter at index ${index} needs a tragetState ` + 'provided as an array.');
         }
 
-        filter.targetState.forEach(targetState => {
+        filter.targetState.forEach((targetState) => {
           checkedConfig[index] = {
             ...filterConfig[index],
             checked: checkedStates.indexOf(targetState) > -1,
@@ -202,24 +205,23 @@ export default {
       return checkedConfig;
     },
 
-    currentFilterIsDefault () {
+    currentFilterIsDefault() {
       return _.isEqual(this._options.defaultFilter, _.omit(this.filter, 'orderID'));
     },
 
-    remove () {
+    remove() {
       clearTimeout(this.searchKeyUpTimer);
     },
 
-    render () {
+    render() {
       $('.js-sortBySelect').select2({
         minimumResultsForSearch: -1,
         dropdownParent: $('.js-sortBySelectDropdownContainer'),
       });
 
       return this;
-    }
-
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="scss" scoped></style>

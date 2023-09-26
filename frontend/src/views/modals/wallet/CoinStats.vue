@@ -11,7 +11,7 @@
           <div :class="`clrTEm txB ${confirmedTextSizeClass}`">
             <div v-if="confirmedText" class="flexVCent gutterHTn">
               <div>{{ confirmedText }}</div>
-              <CryptoIcon :code="ob.cryptoCur" className="cryptoIcon18"/>
+              <CryptoIcon :code="ob.cryptoCur" className="cryptoIcon18" />
             </div>
           </div>
           <div class="clrT2 tx5b lineHeight1">{{ unconfirmedText }}</div>
@@ -27,8 +27,7 @@
 
             <div v-else>
               <div class="flexVCent gutterHTn">
-                <div>{{ ob.currencyMod.convertAndFormatCurrency(ob.confirmed, ob.cryptoCur, ob.displayCur, { includeCryptoCurIdentifier: false, }) }}
-                </div>
+                <div>{{ ob.currencyMod.convertAndFormatCurrency(ob.confirmed, ob.cryptoCur, ob.displayCur, { includeCryptoCurIdentifier: false }) }}</div>
                 <CryptoIcon :code="ob.displayCur" className="cryptoIcon18" />
               </div>
             </div>
@@ -44,7 +43,6 @@
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -58,63 +56,71 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  watch: {
+    options: {
+      handler(val) {
+        this.loadData(val);
+      },
+      deep: true,
+      immediate: true,
+    },
   },
-  created () {
+  created() {
     this.initEventChain();
-
-    this.loadData(this.$props.options);
   },
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         ...this._state,
       };
     },
-    isValidCryptoCur () {
+    isValidCryptoCur() {
       return typeof this.ob.cryptoCur === 'string' && this.ob.cryptoCur;
     },
-    isValidDisplayCur () {
+    isValidDisplayCur() {
       return typeof this.ob.displayCur === 'string' && this.ob.displayCur;
     },
-    cryptoCurHasExchangeRate () {
+    cryptoCurHasExchangeRate() {
       return this.isValidCryptoCur && typeof this.ob.currencyMod.getExchangeRate(this.ob.cryptoCur) === 'number';
     },
-    displayCurHasExchangeRate () {
+    displayCurHasExchangeRate() {
       return this.isValidDisplayCur && typeof this.ob.currencyMod.getExchangeRate(this.ob.displayCur) === 'number';
     },
-    showDisplayCur () {
-      return this.isValidCryptoCur && this.isValidDisplayCur &&
-        this.cryptoCurHasExchangeRate && this.displayCurHasExchangeRate &&
-        this.ob.displayCur !== this.ob.cryptoCur;
+    showDisplayCur() {
+      return (
+        this.isValidCryptoCur &&
+        this.isValidDisplayCur &&
+        this.cryptoCurHasExchangeRate &&
+        this.displayCurHasExchangeRate &&
+        this.ob.displayCur !== this.ob.cryptoCur
+      );
     },
-    colClass () {
+    colClass() {
       return this.showDisplayCur ? 'col4 statCol' : 'col6 statCol';
     },
-    confirmedText () {
+    confirmedText() {
       return this.isValidCryptoCur ? this.ob.currencyMod.formatCurrency(this.ob.confirmed, this.ob.cryptoCur, { includeCryptoCurIdentifier: false }) : '';
     },
-    confirmedTextSizeClass () {
+    confirmedTextSizeClass() {
       let confirmedTextSizeClass = 'tx2';
       confirmedTextSizeClass = this.confirmedText.length > 14 ? 'tx3' : confirmedTextSizeClass;
       confirmedTextSizeClass = this.confirmedText.length > 18 ? 'tx4' : confirmedTextSizeClass;
       return confirmedTextSizeClass;
     },
-    unconfirmedText () {
-      let unconfirmedText = this.ob.unconfirmed instanceof this.ob.bigNumber && this.isValidCryptoCur ?
-        this.ob.currencyMod.formatCurrency(this.ob.unconfirmed, this.ob.cryptoCur, { useCryptoSymbol: false }) : '';
+    unconfirmedText() {
+      let unconfirmedText =
+        this.ob.unconfirmed instanceof this.ob.bigNumber && this.isValidCryptoCur
+          ? this.ob.currencyMod.formatCurrency(this.ob.unconfirmed, this.ob.cryptoCur, { useCryptoSymbol: false })
+          : '';
       unconfirmedText = unconfirmedText ? this.ob.polyT('wallet.coinStats.unconfirmedBalance', { amount: unconfirmedText }) : '';
 
       return unconfirmedText;
     },
-    valueInDisplayCurSizeClass () {
-      const valueInDisplayCur =
-        this.ob.currencyMod.convertAndFormatCurrency(this.ob.confirmed, this.ob.cryptoCur, this.ob.displayCur, {
-          includeCryptoCurIdentifier: false,
-        });
+    valueInDisplayCurSizeClass() {
+      const valueInDisplayCur = this.ob.currencyMod.convertAndFormatCurrency(this.ob.confirmed, this.ob.cryptoCur, this.ob.displayCur, {
+        includeCryptoCurIdentifier: false,
+      });
       let valueInDisplayCurSizeClass = valueInDisplayCur.length > 14 ? 'tx3' : 'tx2';
       return valueInDisplayCur.length > 18 ? 'tx4' : valueInDisplayCurSizeClass;
     },
@@ -124,7 +130,7 @@ export default {
       const opts = {
         initialState: {
           cryptoCur: '',
-          displayCur: app && app.settings && app.settings.get('localCurrency') || 'USD',
+          displayCur: (app && app.settings && app.settings.get('localCurrency')) || 'USD',
           confirmed: undefined,
           unconfirmed: undefined,
           transactionCount: undefined,
@@ -133,8 +139,8 @@ export default {
       };
 
       this.setState(opts.initialState || {});
-    }
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="scss" scoped></style>

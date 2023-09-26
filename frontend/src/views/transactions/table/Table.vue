@@ -1,6 +1,5 @@
 <template>
   <div class="transactionsTableWrap">
-
     <div v-if="ob.isFetching">
       <div class="center">
         <SpinnerSVG className="spinnerMd" />
@@ -12,7 +11,7 @@
         <div class="txB <% print(ob.initialFetchErrorMessage ? 'rowTn' : 'row') %>">{{ ob.polyT(`transactions.${ob.type}.unableToFetch`) }}</div>
         <div v-if="ob.fetchError" class="row">{{ ob.fetchError }}</div>
 
-        <a class="btn clrP clrBr clrSh2 " @click="onClickRetryFetch">{{ ob.polyT(`transactions.transactionsTable.btnRetryFetch`) }}</a>
+        <a class="btn clrP clrBr clrSh2" @click="onClickRetryFetch">{{ ob.polyT(`transactions.transactionsTable.btnRetryFetch`) }}</a>
       </div>
     </div>
 
@@ -22,7 +21,10 @@
           <tr>
             <th class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.orderID') }}</th>
             <th class="clrBr">
-              <a class="js-dateHeader dateHeader clrT">{{ ob.polyT('transactions.transactionsTable.headers.date') }}<div class="sortIcon hide"></div></a>
+              <a class="js-dateHeader dateHeader clrT"
+                >{{ ob.polyT('transactions.transactionsTable.headers.date') }}
+                <div class="sortIcon hide"></div
+              ></a>
             </th>
             <th v-if="ob.type !== 'cases'" class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.listing') }}</th>
             <th v-if="ob.type === 'sales'" class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.buyer') }}</th>
@@ -50,13 +52,15 @@
             @clickAcceptOrder="onClickAcceptOrder(transaction.id)"
             @clickRejectOrder="onClickRejectOrder(transaction.id)"
             @clickCancelOrder="onClickCancelOrder(transaction.id)"
-            @clickRow="onClickRow(transaction.id)"/>
+            @clickRow="onClickRow(transaction.id)"
+          />
         </table>
         <div class="js-pageControlsContainer"></div>
         <PageControls
-          :options="{ initialState: { start: pageStartIndex + 1, pageEnd, total: queryTotal, },}"
+          :options="{ initialState: { start: pageStartIndex + 1, pageEnd, total: queryTotal } }"
           @clickNext="onClickNextPage"
-          @clickPrev="onClickPrevPage"/>
+          @clickPrev="onClickPrevPage"
+        />
       </div>
 
       <div v-else>
@@ -65,7 +69,6 @@
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -79,15 +82,7 @@ import _ from 'underscore';
 import app from '../../../../backbone/app';
 import { getContentFrame } from '../../../../backbone/utils/selectors';
 import { getSocket } from '../../../../backbone/utils/serverConnect';
-import {
-  acceptingOrder,
-  acceptOrder,
-  rejectingOrder,
-  rejectOrder,
-  cancelingOrder,
-  cancelOrder,
-  events as orderEvents,
-} from '../../../../backbone/utils/order';
+import { acceptingOrder, acceptOrder, rejectingOrder, rejectOrder, cancelingOrder, cancelOrder, events as orderEvents } from '../../../../backbone/utils/order';
 import { getCachedProfiles } from '../../../../backbone/models/profile/Profile';
 import Row from './Row.vue';
 
@@ -102,23 +97,23 @@ export default {
       default: {},
     },
   },
-  data () {
+  data() {
     return {
       transactionsPerPage: 20,
 
       filterParams: {},
     };
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props.options);
   },
-  mounted () {
+  mounted() {
     this.onAttach();
   },
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         type: this.type,
@@ -129,10 +124,10 @@ export default {
     transactions() {
       return this.collection.toJSON();
     },
-    pageStartIndex () {
+    pageStartIndex() {
       return (this.curPage - 1) * this.transactionsPerPage;
     },
-    pageEnd () {
+    pageEnd() {
       const onLastPage = this.curPage > this.collection.length / this.transactionsPerPage;
       let end = this.curPage * this.transactionsPerPage;
 
@@ -141,8 +136,8 @@ export default {
       }
       return end;
     },
-    transToRender () {
-      console.log()
+    transToRender() {
+      console.log();
       if (!this.collection || this.collection.length == 0) {
         return [];
       }
@@ -166,8 +161,10 @@ export default {
     // }
   },
   methods: {
-    acceptingOrder, rejectingOrder, cancelingOrder,
-    loadData (options = {}) {
+    acceptingOrder,
+    rejectingOrder,
+    cancelingOrder,
+    loadData(options = {}) {
       const types = ['sales', 'purchases', 'cases'];
       const opts = {
         initialState: {
@@ -216,7 +213,7 @@ export default {
       this.listenTo(orderEvents, 'cancelOrderComplete', this.onCancelOrderComplete);
     },
 
-    onSocketMessage (e) {
+    onSocketMessage(e) {
       if (e.jsonData.message) {
         // If a chat message comes in for a transaction in our list,
         // we'll update the unread count.
@@ -232,15 +229,15 @@ export default {
       }
     },
 
-    onClickRetryFetch () {
+    onClickRetryFetch() {
       this.fetchTransactions();
     },
 
-    onClickRejectOrder (txid) {
+    onClickRejectOrder(txid) {
       rejectOrder(txid);
     },
 
-    onRejectingOrder (e) {
+    onRejectingOrder(e) {
       const view = this.indexedViews.byOrder[e.id];
 
       if (view) {
@@ -250,7 +247,7 @@ export default {
       }
     },
 
-    onRejectOrderAlways (e) {
+    onRejectOrderAlways(e) {
       const view = this.indexedViews.byOrder[e.id];
 
       if (view) {
@@ -260,20 +257,19 @@ export default {
       }
     },
 
-    onRejectOrderComplete (e) {
+    onRejectOrderComplete(e) {
       const view = this.indexedViews.byOrder[e.id];
 
       if (view) {
-        view.model
-          .set('state', 'DECLINED');
+        view.model.set('state', 'DECLINED');
       }
     },
 
-    onClickAcceptOrder (txid) {
+    onClickAcceptOrder(txid) {
       acceptOrder(txid);
     },
 
-    onAcceptingOrder (e) {
+    onAcceptingOrder(e) {
       const view = this.indexedViews.byOrder[e.id];
 
       if (view) {
@@ -283,7 +279,7 @@ export default {
       }
     },
 
-    onAcceptOrderAlways (e) {
+    onAcceptOrderAlways(e) {
       const view = this.indexedViews.byOrder[e.id];
 
       if (view) {
@@ -293,20 +289,19 @@ export default {
       }
     },
 
-    onAcceptOrderComplete (e) {
+    onAcceptOrderComplete(e) {
       const view = this.indexedViews.byOrder[e.id];
 
       if (view) {
-        view.model
-          .set('state', 'AWAITING_FULFILLMENT');
+        view.model.set('state', 'AWAITING_FULFILLMENT');
       }
     },
 
-    onClickCancelOrder (txid) {
+    onClickCancelOrder(txid) {
       cancelOrder(txid);
     },
 
-    onCancelingOrder (e) {
+    onCancelingOrder(e) {
       const view = this.indexedViews.byOrder[e.id];
 
       if (view) {
@@ -316,7 +311,7 @@ export default {
       }
     },
 
-    onCancelOrderAlways (e) {
+    onCancelOrderAlways(e) {
       const view = this.indexedViews.byOrder[e.id];
 
       if (view) {
@@ -326,16 +321,15 @@ export default {
       }
     },
 
-    onCancelOrderComplete (e) {
+    onCancelOrderComplete(e) {
       const view = this.indexedViews.byOrder[e.id];
 
       if (view) {
-        view.model
-          .set('state', 'CANCELED');
+        view.model.set('state', 'CANCELED');
       }
     },
 
-    onClickRow (txid) {
+    onClickRow(txid) {
       let type = 'sale';
 
       if (this.type === 'purchases') {
@@ -348,7 +342,7 @@ export default {
       this.bindOrderDetailEvents(orderDetail);
     },
 
-    bindOrderDetailEvents (orderDetail) {
+    bindOrderDetailEvents(orderDetail) {
       this.listenTo(orderDetail.model, 'sync', () => {
         const transaction = this.collection.get(orderDetail.model.id);
 
@@ -369,19 +363,19 @@ export default {
       });
     },
 
-    onClickNextPage () {
-      this.fetchTransactions(this.curPage += 1);
+    onClickNextPage() {
+      this.fetchTransactions((this.curPage += 1));
     },
 
-    onClickPrevPage () {
-      this.fetchTransactions(this.curPage -= 1);
+    onClickPrevPage() {
+      this.fetchTransactions((this.curPage -= 1));
     },
 
-    onAttach () {
+    onAttach() {
       this.setFilterOnRoute();
     },
 
-    getAvatars (models = []) {
+    getAvatars(models = []) {
       const profilesToFetch = [];
 
       models.forEach((md) => {
@@ -398,32 +392,31 @@ export default {
       });
 
       if (profilesToFetch.length) {
-        getCachedProfiles(profilesToFetch)
-          .forEach((profilePromise) => {
-            profilePromise.done((profile) => {
-              const flatProfile = profile.toJSON();
-              const vendorViews = this.indexedViews.byVendor[flatProfile.peerID] || [];
-              const buyerViews = this.indexedViews.byBuyer[flatProfile.peerID] || [];
+        getCachedProfiles(profilesToFetch).forEach((profilePromise) => {
+          profilePromise.done((profile) => {
+            const flatProfile = profile.toJSON();
+            const vendorViews = this.indexedViews.byVendor[flatProfile.peerID] || [];
+            const buyerViews = this.indexedViews.byBuyer[flatProfile.peerID] || [];
 
-              vendorViews.forEach((view) => {
-                view.setState({ vendorAvatarHashes: flatProfile.avatarHashes });
-                view.model.set({ vendorHandle: flatProfile.handle });
-              });
+            vendorViews.forEach((view) => {
+              view.setState({ vendorAvatarHashes: flatProfile.avatarHashes });
+              view.model.set({ vendorHandle: flatProfile.handle });
+            });
 
-              buyerViews.forEach((view) => {
-                view.setState({ buyerAvatarHashes: flatProfile.avatarHashes });
-                view.model.set({ buyerHandle: flatProfile.handle });
-              });
+            buyerViews.forEach((view) => {
+              view.setState({ buyerAvatarHashes: flatProfile.avatarHashes });
+              view.model.set({ buyerHandle: flatProfile.handle });
             });
           });
+        });
       }
     },
 
     /*
-    * Index the Row Views by Vendor and/or Buyer ID as well as orderID
-    * so they could be easily retreived by the respective identifier.
-    */
-    indexRowViews () {
+     * Index the Row Views by Vendor and/or Buyer ID as well as orderID
+     * so they could be easily retreived by the respective identifier.
+     */
+    indexRowViews() {
       this.indexedViews = {
         byVendor: {},
         byBuyer: {},
@@ -448,7 +441,7 @@ export default {
       });
     },
 
-    setFilterOnRoute (filter = this.filterParams) {
+    setFilterOnRoute(filter = this.filterParams) {
       const queryFilter = {
         ...filter,
         // Joining with dashes instead of commas because commas
@@ -470,7 +463,7 @@ export default {
       app.router.navigate(`${baseRoute}?${$.param(queryFilter)}`, { replace: true });
     },
 
-    fetchTransactions (page = this.curPage, filterParams = this.filterParams) {
+    fetchTransactions(page = this.curPage, filterParams = this.filterParams) {
       if (typeof page !== 'number') {
         throw new Error('Please provide a page number to fetch.');
       }
@@ -515,29 +508,31 @@ export default {
         remove: false,
       });
 
-      this.transactionsFetch.fail((jqXhr) => {
-        if (jqXhr.statusText === 'abort') return;
+      this.transactionsFetch
+        .fail((jqXhr) => {
+          if (jqXhr.statusText === 'abort') return;
 
-        let fetchError = '';
+          let fetchError = '';
 
-        if (jqXhr.responseJSON && jqXhr.responseJSON.reason) {
-          fetchError = jqXhr.responseJSON.reason;
-        }
+          if (jqXhr.responseJSON && jqXhr.responseJSON.reason) {
+            fetchError = jqXhr.responseJSON.reason;
+          }
 
-        this.setState({
-          isFetching: false,
-          fetchFailed: true,
-          fetchError,
+          this.setState({
+            isFetching: false,
+            fetchFailed: true,
+            fetchError,
+          });
+        })
+        .done((data, textStatus, jqXhr) => {
+          if (jqXhr.statusText === 'abort') return;
+
+          this.queryTotal = data.queryCount;
+
+          this.setState({
+            isFetching: false,
+          });
         });
-      }).done((data, textStatus, jqXhr) => {
-        if (jqXhr.statusText === 'abort') return;
-
-        this.queryTotal = data.queryCount;
-
-        this.setState({
-          isFetching: false,
-        });
-      });
 
       this.setState({
         isFetching: true,
@@ -546,11 +541,11 @@ export default {
       });
     },
 
-    remove () {
+    remove() {
       if (this.avatarPost) this.avatarPost.abort();
       if (this.transactionsFetch) this.transactionsFetch.abort();
     },
-  }
-}
+  },
+};
 </script>
 <style lang="scss" scoped></style>

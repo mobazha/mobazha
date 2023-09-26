@@ -12,22 +12,28 @@
               <a class="jsModalClose tx6 txU">{{ ob.polyT('wallet.closeLink') }}</a>
             </div>
             <div class="js-tickerContainer tickerContainer flexHRight">
-              <CryptoTicker v-if="activeCoin" :coinType="activeCoin"/>
+              <CryptoTicker v-if="activeCoin" :coinType="activeCoin" />
             </div>
           </div>
           <div class="flex gutterH">
             <div class="col3">
               <div class="flexColWide gutterV">
-                <ul class="js-coinNavContainer coinNav unstyled border padMdKids borderStacked clrP clrBr clrSh3">
-                  <CoinNavItem v-for="(coin, key) in navCoins" :key="key"
-                    :options="{initialState: {...coin, active: coin.code === activeCoin} }"
-                    @click="coinSelected(coin)"/>
-                </ul>
+                <div class="js-coinNavContainer">
+                  <ul class="coinNav unstyled border padMdKids borderStacked clrP clrBr clrSh3">
+                    <CoinNavItem
+                      v-for="(coin, key) in navCoins"
+                      :key="key"
+                      :options="{ initialState: { ...coin, active: coin.code === activeCoin } }"
+                      @click="coinSelected(coin)"
+                    />
+                  </ul>
+                </div>
                 <div class="js-cryptoListingsTeaser border clrP clrBr clrSh3">
                   <CryptoListingsTeaser
                     :viewCryptoListingsUrl="viewCryptoListingsUrl"
                     @createListing="onClickCreateListing"
-                    @viewCryptoListings="onClickViewCryptoListings"/>
+                    @viewCryptoListings="onClickViewCryptoListings"
+                  />
                 </div>
               </div>
             </div>
@@ -35,23 +41,14 @@
               <div class="flexColWide gutterV">
                 <div v-if="activeCoin">
                   <div class="js-coinStatsContainer"></div>
-                  <CoinStats :options="{ initialState: this.coinStatsState, }" />
+                  <CoinStats :options="{ initialState: coinStatsState }" />
                   <div>
                     <div class="flexColWide clrP clrSh3">
                       <div class="js-sendReceiveNavContainer rowMd"></div>
-                      <SendReceiveNav class="rowMd"
-                        :sendModeOn="sendModeOn"
-                        :clickSend="onClickSend"
-                        :clickReceive="onClickReceive" />
+                      <SendReceiveNav class="rowMd" :sendModeOn="sendModeOn" @clickSend="onClickSend" @clickReceive="onClickReceive" />
                       <div class="js-sendReceiveContainer sendReceiveContainer clrP">
-                        <SendMoney v-if="sendModeOn" :options="{ coinType: activeCoin, }" />
-                        <ReceiveMoney
-                          v-else
-                          ref="receiveMoney"
-                          :coinType="activeCoin"
-                          :fetching="fetchingAddress"
-                          :address="receiveAddress"
-                           />
+                        <SendMoney v-if="sendModeOn" :options="{ coinType: activeCoin }" />
+                        <ReceiveMoney v-else ref="receiveMoney" :coinType="activeCoin" :fetching="fetchingAddress" :address="receiveAddress" />
                       </div>
                     </div>
                   </div>
@@ -63,10 +60,11 @@
                         @options="transactionViewOptions(coin)"
                         @bumpFeeAttempt="onBumpFeeAttempt"
                         @bumpFeeSuccess="onBumpFeeSuccess"
-                        @postInit="this.transactionsState[coin].needsFetch = false" />
+                        @postInit="transactionsState[coin].needsFetch = false"
+                      />
                     </div>
                     <div class="js-reloadTransactionsContainer reloadTransactions">
-                      <ReloadTransactions :options="{ initialState: { coinType: this.activeCoin, }, }" />
+                      <ReloadTransactions :options="{ initialState: { coinType: activeCoin } }" />
                     </div>
                   </div>
                 </div>
@@ -80,7 +78,6 @@
             </div>
           </div>
         </div>
-
       </template>
     </BaseModal>
   </div>
@@ -91,11 +88,7 @@
 import _ from 'underscore';
 import $ from 'jquery';
 import bigNumber from 'bignumber.js';
-import {
-  isSupportedWalletCur,
-  ensureMainnetCode,
-  supportedWalletCurs,
-} from '../../../../backbone/data/walletCurrencies';
+import { isSupportedWalletCur, ensureMainnetCode, supportedWalletCurs } from '../../../../backbone/data/walletCurrencies';
 import defaultSearchProviders from '../../../../backbone/data/defaultSearchProviders';
 import { recordEvent } from '../../../../backbone/utils/metrics';
 import { getSocket } from '../../../../backbone/utils/serverConnect';
@@ -110,8 +103,7 @@ import SendMoney from './SendMoney.vue';
 import ReceiveMoney from './ReceiveMoney.vue';
 import TransactionsVw from './transactions/Transactions.vue';
 import ReloadTransactions from './ReloadTransactions.vue';
-import CryptoListingsTeaser from './CryptoListingsTeaser.vue'
-
+import CryptoListingsTeaser from './CryptoListingsTeaser.vue';
 
 export default {
   components: {
@@ -130,7 +122,7 @@ export default {
       default: {},
     },
   },
-  data () {
+  data() {
     return {
       activeCoin: '',
       viewCryptoListingsUrl: '',
@@ -140,40 +132,34 @@ export default {
       receiveAddress: '',
     };
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props.options);
   },
-  mounted () {
-  },
+  mounted() {},
   watch: {
     activeCoin(coin, oldVal) {
       if (this.needAddress[coin]) {
         this.fetchAddress(coin);
       }
 
-      if (this.sendModeOn
-        && !(
-          app.walletBalances.get(coin)
-          && app.walletBalances.get(coin).get('confirmed')
-        )
-      ) {
+      if (this.sendModeOn && !(app.walletBalances.get(coin) && app.walletBalances.get(coin).get('confirmed'))) {
         this.sendModeOn = false;
       }
     },
   },
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         activeCoin: this.activeCoin,
       };
     },
-    displayCur () {
+    displayCur() {
       return (app && app.settings && app.settings.get('localCurrency')) || 'USD';
     },
-    coinStatsState () {
+    coinStatsState() {
       const { activeCoin } = this;
       const balance = app && app.walletBalances && app.walletBalances.get(activeCoin);
 
@@ -184,36 +170,27 @@ export default {
         transactionCount: this.transactionsCountActive,
       };
     },
-    transactionsCountActive () {
+    transactionsCountActive() {
       let coinType = this.activeCoin;
-      
       const transactionsState = this.transactionsState[coinType] || {};
       const cl = transactionsState && transactionsState.cl;
       const newTxs = this.$refs.transactionsVw ? this.$refs.transactionsVw.newTransactionsTXs : {};
-
-      return (cl ? cl.length : 0) + (newTxs ? newTxs.size : 0);
+      return (cl ? cl.length : 0) + (newTxs ? newTxs?.size ?? 0 : 0);
     },
   },
   methods: {
-    loadData (options = {}) {
-      const navCoins = supportedWalletCurs({ clientSupported: false })
-        .sort((a, b) => {
-          const aSortVal = app.polyglot.t(`cryptoCurrencies.${a}`, { _: a });
-          const bSortVal = app.polyglot.t(`cryptoCurrencies.${b}`, { _: b });
+    loadData(options = {}) {
+      const navCoins = supportedWalletCurs({ clientSupported: false }).sort((a, b) => {
+        const aSortVal = app.polyglot.t(`cryptoCurrencies.${a}`, { _: a });
+        const bSortVal = app.polyglot.t(`cryptoCurrencies.${b}`, { _: b });
 
-          return aSortVal.localeCompare(
-            bSortVal,
-            app.localSettings.standardizedTranslatedLang(),
-            { sensitivity: 'base' },
-          );
-        });
+        return aSortVal.localeCompare(bSortVal, app.localSettings.standardizedTranslatedLang(), { sensitivity: 'base' });
+      });
 
       let initialActiveCoin;
 
-      if (options.initialActiveCoin
-        && typeof options.initialActiveCoin === 'string') {
-        initialActiveCoin = isSupportedWalletCur(options.initialActiveCoin)
-          ? options.initialActiveCoin : null;
+      if (options.initialActiveCoin && typeof options.initialActiveCoin === 'string') {
+        initialActiveCoin = isSupportedWalletCur(options.initialActiveCoin) ? options.initialActiveCoin : null;
       }
 
       if (!initialActiveCoin) {
@@ -271,13 +248,11 @@ export default {
               walletCur = e.jsonData.wallet.transaction.CurrencyCode;
             } catch (err) {
               // pass
-              console.error('Unable to process a "wallet" socket because the wallet currency '
-                + 'could not be determined');
+              console.error('Unable to process a "wallet" socket because the wallet currency ' + 'could not be determined');
               return;
             }
 
-            const cl = (this.transactionsState[walletCur] && this.transactionsState[walletCur].cl)
-              || null;
+            const cl = (this.transactionsState[walletCur] && this.transactionsState[walletCur].cl) || null;
             if (cl) {
               const data = e.jsonData.wallet.transaction;
               const transaction = cl.get(data.transactionID);
@@ -299,8 +274,7 @@ export default {
                     if (!cl.get(e.jsonData.wallet.transaction.transactionID)) {
                       // A new transaction for the active coin - rather than just add it to the
                       // collection causing a page jump, we'll utilize the new transaction pop-up.
-                      this.$refs.transactionsVw.newTransactionsTXs
-                        .add(e.jsonData.wallet.transaction.transactionID);
+                      this.$refs.transactionsVw.newTransactionsTXs.add(e.jsonData.wallet.transaction.transactionID);
                       this.$refs.transactionsVw.showNewTransactionPopup();
                     }
                   } else {
@@ -331,17 +305,13 @@ export default {
       }
 
       app.walletBalances.forEach((balanceMd) => {
-        this.listenTo(
-          balanceMd,
-          'change:confirmed change:unconfirmed',
-          _.debounce(this.onBalanceChange, 1),
-        );
+        this.listenTo(balanceMd, 'change:confirmed change:unconfirmed', _.debounce(this.onBalanceChange, 1));
       });
 
       if (initialActiveCoin) this.fetchAddress();
     },
 
-    onClose () {
+    onClose() {
       this.$emit('close');
     },
 
@@ -351,7 +321,7 @@ export default {
       }
     },
 
-    onBalanceChange (md) {
+    onBalanceChange(md) {
       this.navCoins = this.navCoins.map((navCoin) => ({
         ...navCoin,
         balance: md.id === navCoin.code ? md.get('confirmed') : navCoin.balance,
@@ -360,7 +330,7 @@ export default {
       this.coinNav.setState({ coins: this.navCoins });
     },
 
-    onClickCreateListing () {
+    onClickCreateListing() {
       const model = new Listing({
         metadata: {
           contractType: 'CRYPTOCURRENCY',
@@ -372,18 +342,18 @@ export default {
       launchEditListingModal({ model });
     },
 
-    onClickViewCryptoListings () {
+    onClickViewCryptoListings() {
       recordEvent('Wallet_ViewCryptoListings');
     },
 
     onClickSend() {
       this.sendModeOn = true;
-      console.log('sendModeOn', this.sendModeOn)
+      console.log('sendModeOn', this.sendModeOn);
     },
 
     onClickReceive() {
       this.sendModeOn = false;
-      console.log('sendModeOn', this.sendModeOn)
+      console.log('sendModeOn', this.sendModeOn);
     },
 
     checkCoinType(coinType) {
@@ -392,12 +362,11 @@ export default {
       }
     },
 
-    fetchAddress (coinType = this.activeCoin) {
+    fetchAddress(coinType = this.activeCoin) {
       this.checkCoinType(coinType);
 
       if (this.addressFetches[coinType]) {
-        const pendingFetch = this.addressFetches[coinType]
-          .find((xhr) => xhr.state() === 'pending');
+        const pendingFetch = this.addressFetches[coinType].find((xhr) => xhr.state() === 'pending');
         if (pendingFetch) return pendingFetch;
       }
       this.fetchingAddress = true;
@@ -408,7 +377,8 @@ export default {
         .done((data) => {
           this.fetchingAddress = false;
           this.receiveAddress = data.address;
-        }).fail((xhr) => {
+        })
+        .fail((xhr) => {
           if (xhr.statusText === 'abort') return;
           this.needAddress[coinType] = true;
 
@@ -421,7 +391,7 @@ export default {
       return fetch;
     },
 
-    open (...args) {
+    open(...args) {
       const returnVal = super.open(...args);
       if (this.sendModeOn) {
         const sendVw = this.getSendMoneyVw();
@@ -430,47 +400,46 @@ export default {
       return returnVal;
     },
 
-    remove () {
-      Object.keys(this.addressFetches)
-        .forEach((coinType) => {
-          this.addressFetches[coinType].forEach((fetch) => fetch.abort());
-        });
-      Object.keys(this.transactionsState)
-        .forEach((coinType) => {
-          if (this.transactionsState[coinType]
-            && typeof this.transactionsState[coinType].bumpFeeAttempts === 'object') {
-            Object.keys(this.transactionsState[coinType].bumpFeeAttempts)
-              .forEach((txId) => this.transactionsState[coinType].bumpFeeAttempts[txId].abort());
-          }
-        });
+    remove() {
+      Object.keys(this.addressFetches).forEach((coinType) => {
+        this.addressFetches[coinType].forEach((fetch) => fetch.abort());
+      });
+      Object.keys(this.transactionsState).forEach((coinType) => {
+        if (this.transactionsState[coinType] && typeof this.transactionsState[coinType].bumpFeeAttempts === 'object') {
+          Object.keys(this.transactionsState[coinType].bumpFeeAttempts).forEach((txId) => this.transactionsState[coinType].bumpFeeAttempts[txId].abort());
+        }
+      });
       this.popInTimeouts.forEach((timeout) => timeout.remove());
       super.remove();
     },
 
-    onBumpFeeAttempt (e) {
+    onBumpFeeAttempt(e) {
       const transactionsState = this.transactionsState[this.activeCoin];
 
       transactionsState.bumpFeeAttempts = transactionsState.bumpFeeAttempts || {};
       transactionsState.bumpFeeAttempts[e.md.id] = e.xhr;
     },
 
-    onBumpFeeSuccess (e) {
+    onBumpFeeSuccess(e) {
       app.walletBalances.get(this.activeCoin).set({
         confirmed: e.data.confirmed,
         unconfirmed: e.data.unconfirmed,
       });
 
       const transactionsState = this.transactionsState[this.activeCoin];
-      transactionsState.cl.add({
-        value: e.data.amount * -1,
-        txid: e.data.txid,
-        timestamp: e.data.timestamp,
-        address: e.data.address,
-        memo: e.data.memo,
-      }, {
-        parse: true,
-        at: 0,
-      });
+      transactionsState.cl.add(
+        {
+          value: e.data.amount * -1,
+          txid: e.data.txid,
+          timestamp: e.data.timestamp,
+          address: e.data.address,
+          memo: e.data.memo,
+        },
+        {
+          parse: true,
+          at: 0,
+        }
+      );
 
       this.updateTransactionsCount(this.activeCoin);
     },
@@ -485,7 +454,7 @@ export default {
       if (coinType == this.activeCoin) {
         const newTxs = this.$refs.transactionsVw ? this.$refs.transactionsVw.newTransactionsTXs : {};
 
-        count += (newTxs ? newTxs.size : 0);
+        count += newTxs ? newTxs.size : 0;
       }
 
       this.setCountAtFirstFetch(count, coinType);
@@ -498,15 +467,14 @@ export default {
 
       this.checkCoinType(coinType);
 
-      if (!this.transactionsState[coinType]
-        || this.transactionsState[coinType].countAtFirstFetch !== count) {
+      if (!this.transactionsState[coinType] || this.transactionsState[coinType].countAtFirstFetch !== count) {
         this.transactionsState[coinType] = this.transactionsState[coinType] || {};
         this.transactionsState[coinType].countAtFirstFetch = count;
       }
     },
 
-    transactionViewOptions (coin) {
-      const transactionsState = this.transactionsState[coin] || { needsFetch : true};
+    transactionViewOptions(coin) {
+      const transactionsState = this.transactionsState[coin] || { needsFetch: true };
       let cl = transactionsState && transactionsState.cl;
 
       if (!cl) {
@@ -539,9 +507,9 @@ export default {
         fetchOnInit: transactionsState.needsFetch,
         countAtFirstFetch: transactionsState.countAtFirstFetch,
         bumpFeeXhrs: transactionsState.bumpFeeAttempts || undefined,
-      }
+      };
     },
-  }
-}
+  },
+};
 </script>
 <style lang="scss" scoped></style>

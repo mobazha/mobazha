@@ -1,10 +1,10 @@
 <template>
   <div class="sendReceiveNav clrP">
     <div class="flexBtnWrapper flexBtnTop flexRow">
-      <button :class="`btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm ${ob.sendModeOn ? 'active' : ''}`" @click="onClickSend">
+      <button :class="`btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm ${sendModeOn ? 'active' : ''}`" @click="onClickSend">
         {{ ob.polyT('wallet.sendBtn') }}
       </button>
-      <button :class="`btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm ${ob.sendModeOn ? '' : 'active'}`" @click="onClickReceive">
+      <button :class="`btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm ${sendModeOn ? '' : 'active'}`" @click="onClickReceive">
         {{ ob.polyT('wallet.receiveBtn') }}
       </button>
     </div>
@@ -14,7 +14,6 @@
 <script>
 import { recordEvent } from '../../../../backbone/utils/metrics';
 
-
 export default {
   props: {
     sendModeOn: {
@@ -22,28 +21,23 @@ export default {
       default: false,
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
-  },
-  mounted () {
-  },
-  computed: {
-  },
+  created() {},
+  mounted() {},
+  computed: {},
   methods: {
-
-    onClickSend () {
+    onClickSend() {
       this.$emit('clickSend');
       recordEvent('Wallet_SendShow');
     },
 
-    onClickReceive () {
+    onClickReceive() {
       this.$emit('clickReceive');
       recordEvent('Wallet_ReceiveShow');
     },
-  }
-}
+  },
+};
 </script>
 <style lang="scss" scoped></style>

@@ -1,14 +1,16 @@
 <template>
-
   <div class="transactions clrS">
     <nav id="pageTabBar" class="barLg clrP clrBr">
       <div class="flexVCent pageTabs">
         <div class="js-miniProfileContainer"></div>
         <div class="flexExpand">
           <div class="flexHRight flexVCent gutterH clrT2">
-            <a v-for="(tab, i) in ['sales', 'purchases', 'cases']" :key="i"
+            <a
+              v-for="(tab, i) in ['sales', 'purchases', 'cases']"
+              :key="i"
               :class="`btn tab clrBr ${tab == _tab ? 'clrT active' : ''}`"
-              @click="onTabClick(tab)">
+              @click="onTabClick(tab)"
+            >
               {{ ob.polyT(`transactions.${tab}.heading`) }}
               <span class="clrTEmph1 margLSm">{{ tabCount[tab] }}</span>
             </a>
@@ -21,23 +23,24 @@
       <div class="pageContent">
         <div class="tabContent js-tabContent">
           <!-- insert the tab subview here -->
-          <Tab v-if="_tab == 'sales'" :options="salesTabOptions" />
-          <Tab v-else-if="_tab == 'purchases'" :options="purchasesTabOptions" />
-          <Tab v-else-if="_tab == 'cases'" :options="casesTabOptions" />
+          <Tab :options="tabOptions" />
         </div>
       </div>
     </section>
 
     <Teleport to="#js-vueModal">
-      <OrderDetail v-if="showOrderDetail" ref="orderDetail" :options="{
+      <OrderDetail
+        v-if="showOrderDetail"
+        ref="orderDetail"
+        :options="{
           model: modalModel,
           returnText: ob.polyT(`transactions.${modalType}s.returnToFromOrder`),
         }"
         @convoMarkedAsRead="onConvoMarkedAsRead"
-        @close="onOrderDetailClose"/>
+        @close="onOrderDetailClose"
+      />
     </Teleport>
   </div>
-
 </template>
 
 <script>
@@ -53,7 +56,6 @@ import MiniProfile from '../../../backbone/views/MiniProfile';
 import OrderDetail from '../modals/orderDetail/OrderDetail.vue';
 import Tab from './Tab.vue';
 
-
 export default {
   components: {
     OrderDetail,
@@ -66,7 +68,7 @@ export default {
       default: {},
     },
   },
-  data () {
+  data() {
     return {
       _tab: 'purchases',
 
@@ -81,16 +83,16 @@ export default {
       modalType: 'sale',
     };
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData();
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   computed: {
-    salesDefaultFilter () {
+    salesDefaultFilter() {
       return {
         search: '',
         sortBy: 'UNREAD',
@@ -98,7 +100,7 @@ export default {
       };
     },
 
-    purchasesDefaultFilter () {
+    purchasesDefaultFilter() {
       return {
         search: '',
         sortBy: 'UNREAD',
@@ -106,7 +108,7 @@ export default {
       };
     },
 
-    casesDefaultFilter () {
+    casesDefaultFilter() {
       return {
         search: '',
         sortBy: 'UNREAD',
@@ -114,7 +116,7 @@ export default {
       };
     },
 
-    casesFilterConfig () {
+    casesFilterConfig() {
       return [
         {
           id: 'filterDisputeOpen',
@@ -133,7 +135,7 @@ export default {
       ];
     },
 
-    filterUrlParams () {
+    filterUrlParams() {
       const params = deparam(location.hash.split('?')[1] || '');
 
       if (params.states) {
@@ -147,8 +149,11 @@ export default {
 
       return params;
     },
-
-    purchasesTabOptions () {
+    tabOptions() {
+      let _tab = this._tab || 'purchases';
+      return this[`${_tab}TabOptions`];
+    },
+    purchasesTabOptions() {
       return {
         collection: this.purchasesCol,
         type: 'purchases',
@@ -165,7 +170,7 @@ export default {
       };
     },
 
-    salesTabOptions () {
+    salesTabOptions() {
       return {
         collection: this.salesCol,
         type: 'sales',
@@ -182,7 +187,7 @@ export default {
       };
     },
 
-    casesTabOptions () {
+    casesTabOptions() {
       return {
         collection: this.casesCol,
         type: 'cases',
@@ -196,11 +201,11 @@ export default {
         filterConfig: this.casesFilterConfig,
         openOrder: this.openOrder.bind(this),
         openedOrderModal: this.openedOrderModal,
-      }
-    }
+      };
+    },
   },
   methods: {
-    loadData () {
+    loadData() {
       let tab = this.$route.params.tab;
       if (tab && ['sales', 'cases', 'purchases'].indexOf(tab) === -1) {
         // this.pageNotFound();
@@ -230,38 +235,39 @@ export default {
         // need to pass it in to the Tab view. It may need to bind event
         // handlers to it.
         this.openedOrderModal = this.openOrder(orderID || caseID, type);
-        this.listenTo(this.openedOrderModal, 'close', () => { this.openedOrderModal = null; });
+        this.listenTo(this.openedOrderModal, 'close', () => {
+          this.openedOrderModal = null;
+        });
       }
 
       this.purchasesCol = new Transactions([], { type: 'purchases' });
-      this.syncTabHeadCount(this.purchasesCol, (count) => this.tabCount.purchases = count);
+      this.syncTabHeadCount(this.purchasesCol, (count) => (this.tabCount.purchases = count));
       // fetch so we get the count for the tabhead
       this.purchasesCol.fetch();
 
       this.salesCol = new Transactions([], { type: 'sales' });
-      this.syncTabHeadCount(this.salesCol, (count) => this.tabCount.sales = count);
+      this.syncTabHeadCount(this.salesCol, (count) => (this.tabCount.sales = count));
       // fetch so we get the count for the tabhead
       this.salesCol.fetch();
 
       this.casesCol = new Transactions([], { type: 'cases' });
-      this.syncTabHeadCount(this.casesCol, (count) => this.tabCount.cases = count);
+      this.syncTabHeadCount(this.casesCol, (count) => (this.tabCount.cases = count));
       // fetch so we get the count for the tabhead
       this.casesCol.fetch();
 
       this.socket = getSocket();
     },
 
-    onTabClick (tab) {
+    onTabClick(tab) {
       this.selectTab(tab);
       recordEvent('Transactions_TabChange', {
         tab,
       });
     },
 
-    syncTabHeadCount (cl, setCount) {
+    syncTabHeadCount(cl, setCount) {
       if (typeof setCount !== 'function') {
-        throw new Error('Please provide a function that returns a jQuery element '
-          + 'containing the tab head count to update.');
+        throw new Error('Please provide a function that returns a jQuery element ' + 'containing the tab head count to update.');
       }
 
       let count;
@@ -287,7 +293,7 @@ export default {
     },
 
     // remove it from the url on close of the modal
-    onOrderDetailClose () {
+    onOrderDetailClose() {
       this.showOrderDetail = false;
 
       const params = deparam(location.hash.split('?')[1] || '');
@@ -296,20 +302,18 @@ export default {
       app.router.navigate(`${location.hash.split('?')[0]}?${$.param(params)}`);
     },
 
-    onConvoMarkedAsRead() {
-
-    },
+    onConvoMarkedAsRead() {},
 
     /**
      * This function is also passed into the Tab and Table views. They will
      * be affected should you change the signature or return value.
      */
-    openOrder (id, type = 'sale', options = {}) {
+    openOrder(id, type = 'sale', options = {}) {
       this.showOrderDetail = false;
 
       const opts = {
         modalOptions: {
-          ...options.modalOptions || {},
+          ...(options.modalOptions || {}),
         },
         addToRoute: true,
       };
@@ -361,10 +365,8 @@ export default {
       return this.$refs.orderDetail;
     },
 
-    getSalesPurchasesFilterConfig (isSale) {
-      const defaulFilterStates = isSale
-        ? this.salesDefaultFilter.states
-        : this.purchasesDefaultFilter.states;
+    getSalesPurchasesFilterConfig(isSale) {
+      const defaulFilterStates = isSale ? this.salesDefaultFilter.states : this.purchasesDefaultFilter.states;
 
       return [
         {
@@ -384,8 +386,7 @@ export default {
         {
           id: 'filterReady',
           text: app.polyglot.t('transactions.filters.ready'),
-          checked: defaulFilterStates.includes(2) || defaulFilterStates.includes(3)
-            || defaulFilterStates.includes(4),
+          checked: defaulFilterStates.includes(2) || defaulFilterStates.includes(3) || defaulFilterStates.includes(4),
           className: 'filter',
           targetState: [2, 3, 4],
         },
@@ -406,16 +407,14 @@ export default {
         {
           id: 'filterDisputes',
           text: app.polyglot.t('transactions.filters.disputes'),
-          checked: defaulFilterStates.includes(10) || defaulFilterStates.includes(11)
-            || defaulFilterStates.includes(12),
+          checked: defaulFilterStates.includes(10) || defaulFilterStates.includes(11) || defaulFilterStates.includes(12),
           className: 'filter',
           targetState: [10, 11, 12],
         },
         {
           id: 'filterCompleted',
           text: app.polyglot.t('transactions.filters.completed'),
-          checked: defaulFilterStates.includes(6) || defaulFilterStates.includes(7)
-            || defaulFilterStates.includes(8),
+          checked: defaulFilterStates.includes(6) || defaulFilterStates.includes(7) || defaulFilterStates.includes(8),
           className: 'filter',
           targetState: [6, 7, 8],
         },
@@ -429,7 +428,7 @@ export default {
       ];
     },
 
-    selectTab (targ, options = {}) {
+    selectTab(targ, options = {}) {
       const opts = {
         addTabToHistory: true,
         ...options,
@@ -444,7 +443,7 @@ export default {
       }
     },
 
-    render () {
+    render() {
       this._$tabContent = $('.js-tabContent');
 
       if (this.miniProfile) this.miniProfile.remove();
@@ -458,9 +457,8 @@ export default {
       });
 
       return this;
-    }
-
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="scss" scoped></style>

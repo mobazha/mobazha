@@ -25,11 +25,11 @@
                   <div class="js-items-quantity-errors"></div>
                   <div v-if="!ob.isCrypto">
                     <div class="flexVCent gutterH">
-                      <div class="thumb" :style="ob.getListingBgImage(listing.listing.item.images[0])"></div>
+                      <div class="thumb" :style="ob.getListingBgImage(listing.item.images[0])"></div>
                       <div class="flexExpand">
                         <div class="flexCol gutterVTn">
                           <div class="width100 noOverflow">
-                            <b>{{ listing.listing.item.title }}</b>
+                            <b>{{ listing.item.title }}</b>
                           </div>
                           <div v-for="(variant, j) in listing.options" :key="j">
                             <div class="width100 noOverflow">
@@ -53,7 +53,7 @@
                                 id="purchaseQuantity"
                                 size="3"
                                 name="quantity"
-                                :value="listing.quantity"
+                                v-model="listing.quantity"
                                 @keyup="keyupQuantity"
                                 placeholder="0"
                                 data-var-type="bignumber">
@@ -84,13 +84,13 @@
                                 placeholder="0.0000"
                                 size="8"
                                 data-var-type="bignumber">
-                              <div v-if="ob.displayCurrency !== listing.listing.item.cryptoListingCurrencyCode">
+                              <div v-if="ob.displayCurrency !== listing.item.cryptoListingCurrencyCode">
                                 <select
                                   id="cryptoAmountCurrency"
                                   @change="changeCryptoAmountCurrency"
                                   class="clrBr clrP nestInputRight">
                                   <option
-                                    v-for="(cur, j) in [listing.listing.item.cryptoListingCurrencyCode, ob.displayCurrency]"
+                                    v-for="(cur, j) in [listing.item.cryptoListingCurrencyCode, ob.displayCurrency]"
                                     :key="j"
                                     :value="cur"
                                     :selected="cur === ob.cryptoAmountCurrency">{{ cur }}</option>
@@ -106,7 +106,7 @@
                           priceAmount: totalPrice,
                           priceCurrencyCode: pricingCurrency,
                           displayCurrency: ob.displayCurrency,
-                          priceModifier: listing.listing.item.cryptoListingPriceModifier,
+                          priceModifier: listing.item.cryptoListingPriceModifier,
                         })
                       }}
                       </div>
@@ -318,6 +318,7 @@ import Payment from '../../../../backbone/views/modals/purchase/Payment';
 import Complete from '../../../../backbone/views/modals/purchase/Complete';
 import DirectPayment from './DirectPayment.vue';
 
+import { toRaw } from 'vue';
 
 export default {
   components: {
@@ -341,7 +342,7 @@ export default {
       items: [],
 
       listing: undefined,
-      listings: [],
+      listings: undefined,
       moderators: undefined,
       couponObj: [],
       cryptoCurSelector: undefined,
@@ -376,6 +377,7 @@ export default {
         ...this.order.toJSON(),
         ...this._state,
         listing: this.listing.toJSON(),
+        listings: this.listings.map((listing) => listing.toJSON()),
         listingPrice: this.listing.price,
         itemConstraints: this.order.get('items')
           .at(0)
@@ -495,7 +497,7 @@ export default {
         avatarHashes: cart.profile.avatarHashes,
       };
       
-      options.listings = cart.listings;
+      options.listings = toRaw(cart.listings);
       options.listing = cart.listings[0];
 
       options.variants = cart.items[0].options;
@@ -736,6 +738,10 @@ export default {
     clickClose () {
       this.trigger('closeBtnPressed');
       this.close();
+    },
+
+    close () {
+      this.$emit('close');
     },
 
     handleDirectPurchaseClick () {

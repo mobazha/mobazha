@@ -14,7 +14,7 @@
 
     <ShoppingCart v-if="initialized && showShoppingCart" @close="onShoppingCartClose" @openPurchaseModal="onOpenPurchaseModal"/>
     <Wallet v-if="initialized" v-show="showWallet" @close="onWalletClose" />
-    <Purchase v-if="showPurchase" />
+    <Purchase v-if="showPurchase" @close="onPurchaseClose" />
   </div>
 </template>
 
@@ -55,6 +55,9 @@ export default {
       this.showShoppingCart = false;
       this.showPurchase = true;
     },
+    onPurchaseClose() {
+      this.showPurchase = false;
+    }
   },
 };
 </script>

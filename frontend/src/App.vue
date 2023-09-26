@@ -12,21 +12,25 @@
     <div id="chatConvoContainer" class="clrP clrBr3"></div>
     <div id="js-vueModal"></div>
 
-    <ShoppingCart v-if="initialized" v-show="showShoppingCart" @close="onShoppingCartClose"/>
+    <ShoppingCart v-if="initialized && showShoppingCart" @close="onShoppingCartClose" @openPurchaseModal="onOpenPurchaseModal"/>
     <Wallet v-if="initialized" v-show="showWallet" @close="onWalletClose" />
+    <Purchase v-if="showPurchase" />
   </div>
 </template>
 
 <script>
 import ShoppingCart from '@/views/ShoppingCart.vue';
 import Wallet from '@/views/modals/wallet/Wallet.vue';
+import Purchase from './views/modals/purchase/Purchase.vue';
 
 export default {
   components: {
     ShoppingCart,
     Wallet,
+    Purchase,
   },
-  name: 'App',
+  name: 
+    'App',
   data() {
     return {
       modalName: '',
@@ -34,6 +38,7 @@ export default {
 
       showShoppingCart: false,
       showWallet: false,
+      showPurchase: false,
 
       toggleVue: false,
     };
@@ -45,6 +50,10 @@ export default {
     },
     onWalletClose() {
       this.showWallet = false;
+    },
+    onOpenPurchaseModal() {
+      this.showShoppingCart = false;
+      this.showPurchase = true;
     },
   },
 };

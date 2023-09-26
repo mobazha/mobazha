@@ -183,7 +183,6 @@ export default {
     };
   },
   created () {
-    this.ob = { ...templateHelpers };
     this.loadData(this.props);
   },
   mounted () {

@@ -714,7 +714,7 @@ export default class extends BaseModal {
     const selectedVariants = this.getSelectedVariants();
 
     api.addToShoppingCart(this.vendor.peerID, {
-      listingHash: this.model.get('hash'),
+      slug: this.model.get('slug'),
       quantity: '1',
       options: selectedVariants || [],
     })

@@ -139,8 +139,8 @@
                 <section class="contentBox padMd clrP clrBr clrSh3 js-shipping">
                   <div class="js-shipping-errors js-items-shipping-errors"></div>
                   <Shipping
-                    v-if="ob.listing.get('shippingOptions').length"
-                    :listing="ob.listing"
+                    v-if="listing.get('shippingOptions').length"
+                    :listing="listing"
                     @shippingOptionSelected="updateShippingOption"
                     @newAddress="clickNewAddress"
                     />
@@ -318,7 +318,6 @@ import Payment from '../../../../backbone/views/modals/purchase/Payment';
 import Complete from '../../../../backbone/views/modals/purchase/Complete';
 import DirectPayment from './DirectPayment.vue';
 
-import { toRaw } from 'vue';
 
 export default {
   components: {
@@ -337,7 +336,6 @@ export default {
     return {
       phase: 'pay',
       cart: {},
-      ob: {},
       vendor: {},
       order: new Order({}, {}),
       items: [],
@@ -359,7 +357,7 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$store.state.cart);
+    this.init();
   },
   mounted () {
   },
@@ -486,6 +484,28 @@ export default {
   methods: {
     capitalize,
 
+    init() {
+      let options = {};
+      let cart = this.$store.state.cart.cart;
+
+      options.vendor = {
+        peerID: cart.vendorID,
+        name: cart.profile.name,
+        handle: cart.profile.handle,
+        avatarHashes: cart.profile.avatarHashes,
+      };
+      
+      options.listings = cart.listings;
+      options.listing = cart.listings[0];
+
+      options.variants = cart.items[0].options;
+
+      this.loadData(options);
+
+      // const coinType = this.listing.listing.item.cryptoListingCurrencyCode;
+      // const coinTranslationKey = `cryptoCurrencies.${coinType}`;
+      // this.coinName = ob.polyT(coinTranslationKey) === coinTranslationKey ? coinType : ob.polyT(coinTranslationKey);
+    },
     loadData (options = {}) {
       if (!options.listing || !(options.listing instanceof Listing)) {
         throw new Error('Please provide a listing model');
@@ -504,7 +524,7 @@ export default {
       };
 
       this.baseInit(opts);
-      this.options = opts;
+
       this.listing = opts.listing;
       this.variants = opts.variants;
       this.vendor = opts.vendor;
@@ -514,13 +534,11 @@ export default {
       this.moderatorIDs = _.without(moderatorIDs, ...disallowedIDs);
 
       this.setState({
-      showModerators: this.moderatorIDs.length,
-      showVerifiedOnly: true,
-    }, { renderOnChange: false });
+        showModerators: this.moderatorIDs.length,
+        showVerifiedOnly: true,
+      }, { renderOnChange: false });
 
       this.couponObj = [];
-
-      this.listings = [this.listing];
 
       this.order = new Order(
         {},
@@ -555,7 +573,6 @@ export default {
         this.order.get('items').add(item);
       })
 
-
       this.actionBtn = this.createChild(ActionBtn, {
         listing: this.listing,
       });
@@ -564,7 +581,7 @@ export default {
       this.listenTo(this.actionBtn, 'reloadOutdated', () => {
         let defaultPrevented = false;
 
-        this.trigger('clickReloadOutdated', {
+        this.$emit('clickReloadOutdated', {
           preventDefault: () => (defaultPrevented = true),
         });
 

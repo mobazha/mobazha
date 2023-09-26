@@ -8,7 +8,7 @@
               <div class="page-head__name">
                 Shopping Cart<span v-if="tableData.length > 0">({{ cartNum }})</span>
               </div>
-              <div class="clean-btn" v-if="tableData.length > 0">Clear Cart</div>
+              <div class="clean-btn" v-if="tableData.length > 0" @click="clearCart">Clear Cart</div>
             </div>
             <div class="page-head__right" v-if="tableData.length > 0">
               <el-input v-model="params.keyword" placeholder="Search Orders" :prefix-icon="Search" />
@@ -115,9 +115,6 @@
         </div>
       </template>
     </BaseModal>
-    <Teleport to="#js-vueModal">
-      <Purchase v-if="showPurchase" ref="Purchase" />
-    </Teleport>
   </div>
 </template>
 
@@ -131,6 +128,7 @@ import api from '../api';
 import { getCachedProfiles } from '../../backbone/models/profile/Profile';
 import { convertAndFormatCurrency, curDefToDecimal } from '../../backbone/utils/currency';
 import Purchase from './modals/purchase/Purchase.vue'
+import Listing from '../../backbone/models/listing/Listing';
 
 export default {
   components: {
@@ -190,24 +188,40 @@ export default {
         this.loading = true;
         api.getShoppingCarts().then((carts) => {
           this.tableData = carts;
+
+          let fetches = [];
           this.tableData.forEach((cart) => {
             getCachedProfiles([cart.vendorID])[0].done((profile) => {
               cart.profile = profile.toJSON();
             });
+
+            cart.listings = [];
             cart.items?.forEach((item) => {
-              $.get(window['app']?.getServerUrl(`ob/listing/${item.listingHash}`)).then((listing) => {
-                item.listing = listing.listing;
-                item.cid = listing.cid;
-                item.pricingCurrency = listing.listing.metadata.pricingCurrency;
-                item.priceAmount = curDefToDecimal({
-                  amount: listing.listing.item.price,
-                  currency: item.pricingCurrency,
-                });
-                item.price = convertAndFormatCurrency(item.priceAmount, item.pricingCurrency.code, window['app']?.settings.get('localCurrency'));
-              });
+              item.listingExt = new Listing({ slug: item.slug, }, { guid: cart.vendorID, hash: item.listingHash });
+              cart.listings.push(item.listingExt);
+
+              const listingFetch = item.listingExt.fetch();
+              fetches.push(listingFetch);
             });
           });
-          this.loading = false;
+
+          $.whenAll(fetches.slice()).always(() => {
+            this.tableData.forEach((cart) => {
+                cart.items?.forEach((item) => {
+                  let listing = item.listingExt.toJSON();
+                  item.listing = listing;
+                  item.pricingCurrency = listing.metadata.pricingCurrency;
+                  item.priceAmount = curDefToDecimal({
+                    amount: listing.item.price,
+                    currency: item.pricingCurrency,
+                  });
+                  item.price = convertAndFormatCurrency(item.priceAmount, item.pricingCurrency.code, app.settings.get('localCurrency'));
+                });
+              });
+
+            this.loading = false;
+          });
+          
         });
         // this.tableData = products;
       } catch {
@@ -244,11 +258,18 @@ export default {
       this.selectors[index] = val;
     },
 
+    clearCart() {
+      api.clearShoppingCarts({}, () => {
+        this.$store.commit('cart/updateCart', {}, { module: 'cart' });
+        this.loadData();
+      });
+    },
+
     //提交当前选中的商店商品
     pay(index) {
       this.$store.commit('cart/updateCart', this.tableData[0], { module: 'cart' });
 
-      this.showPurchase = true;
+      this.$emit('openPurchaseModal');
     },
 
     //修改头部样式

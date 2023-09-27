@@ -53,14 +53,13 @@
                     </div>
                   </div>
                   <div class="clrP clrSh3 posR">
-                    <div v-for="(coin, key) in navCoins" :key="key" class="js-transactionsContainer">
+                    <div class="js-transactionsContainer">
                       <TransactionsVw
-                        v-if="coin === activeCoin"
                         ref="transactionsVw"
-                        @options="transactionViewOptions(coin)"
+                        :options="transactionViewOptions"
                         @bumpFeeAttempt="onBumpFeeAttempt"
                         @bumpFeeSuccess="onBumpFeeSuccess"
-                        @postInit="transactionsState[coin].needsFetch = false"
+                        @postInit="onTransactionsVwPostInit"
                       />
                     </div>
                     <div class="js-reloadTransactionsContainer reloadTransactions">
@@ -135,7 +134,7 @@ export default {
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted() {},
   watch: {
@@ -176,6 +175,43 @@ export default {
       const cl = transactionsState && transactionsState.cl;
       const newTxs = this.$refs.transactionsVw ? this.$refs.transactionsVw.newTransactionsTXs : {};
       return (cl ? cl.length : 0) + (newTxs ? newTxs?.size ?? 0 : 0);
+    },
+    transactionViewOptions() {
+      let coin = this.activeCoin;
+      const transactionsState = this.transactionsState[coin] || { needsFetch: true };
+      let cl = transactionsState && transactionsState.cl;
+
+      if (!cl) {
+        cl = new Transactions([], { coinType: coin });
+        transactionsState.cl = cl;
+
+        this.listenToOnce(cl, 'sync', (md, response, options) => {
+          if (options && options.xhr) {
+            options.xhr.done((data) => {
+              transactionsState.needsFetch = false;
+              this.setCountAtFirstFetch(data.count, coin);
+            });
+          }
+        });
+
+        this.listenToOnce(cl, 'reset', () => {
+          this.listenToOnce(cl, 'sync', (md, response, options) => {
+            if (options && options.xhr) {
+              options.xhr.done((data) => {
+                this.setCountAtFirstFetch(data.count, coin);
+              });
+            }
+          });
+        });
+      }
+
+      return {
+        collection: transactionsState.cl,
+        // $scrollContainer: this.$el,
+        fetchOnInit: transactionsState.needsFetch,
+        countAtFirstFetch: transactionsState.countAtFirstFetch,
+        bumpFeeXhrs: transactionsState.bumpFeeAttempts || undefined,
+      };
     },
   },
   methods: {
@@ -444,6 +480,10 @@ export default {
       this.updateTransactionsCount(this.activeCoin);
     },
 
+    onTransactionsVwPostInit() {
+      this.transactionsState[this.activeCoin].needsFetch = false;
+    },
+
     updateTransactionsCount(coinType = this.activeCoin) {
       this.checkCoinType(coinType);
 
@@ -471,43 +511,6 @@ export default {
         this.transactionsState[coinType] = this.transactionsState[coinType] || {};
         this.transactionsState[coinType].countAtFirstFetch = count;
       }
-    },
-
-    transactionViewOptions(coin) {
-      const transactionsState = this.transactionsState[coin] || { needsFetch: true };
-      let cl = transactionsState && transactionsState.cl;
-
-      if (!cl) {
-        cl = new Transactions([], { coinType: coin });
-        transactionsState.cl = cl;
-
-        this.listenToOnce(cl, 'sync', (md, response, options) => {
-          if (options && options.xhr) {
-            options.xhr.done((data) => {
-              transactionsState.needsFetch = false;
-              this.setCountAtFirstFetch(data.count, coin);
-            });
-          }
-        });
-
-        this.listenToOnce(cl, 'reset', () => {
-          this.listenToOnce(cl, 'sync', (md, response, options) => {
-            if (options && options.xhr) {
-              options.xhr.done((data) => {
-                this.setCountAtFirstFetch(data.count, coin);
-              });
-            }
-          });
-        });
-      }
-
-      return {
-        collection: transactionsState.cl,
-        $scrollContainer: this.$el,
-        fetchOnInit: transactionsState.needsFetch,
-        countAtFirstFetch: transactionsState.countAtFirstFetch,
-        bumpFeeXhrs: transactionsState.bumpFeeAttempts || undefined,
-      };
     },
   },
 };

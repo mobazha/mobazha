@@ -14,7 +14,7 @@
         :options="{
           model,
           coinType: this.coinType,
-          bumpFeeXhr: (this.options.bumpFeeXhrs && this.options.bumpFeeXhrs[model.id]) || undefined,
+          bumpFeeXhr: (this.bumpFeeXhrs && this.bumpFeeXhrs[model.id]) || undefined,
         }"
         :bumpFeeAttempt="onBumpFeeAttempt"
         :bumpFeeSuccess="onBumpFeeSuccess"
@@ -84,11 +84,20 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.options);
+
+    window.addEventListener('scroll', this.throttledOnScroll);
   },
   mounted () {
-    this.$scrollContainer.off('scroll', this.throttledOnScroll)
-        .on('scroll', this.throttledOnScroll);
+    if (this.fetchOnInit) this.refreshTransactions();
+
+    this.$emit('postInit');
+  },
+  unmounted () {
+    if (this.transactionsFetch) this.transactionsFetch.abort();
+    this.popInTimeouts.forEach((timeout) => clearTimeout(timeout));
+
+    window.removeEventListener('scroll', this.throttledOnScroll);
   },
   computed: {
     ob () {
@@ -107,7 +116,7 @@ export default {
       return this.collection.length >= this.countAtFirstFetch;
     },
     notFixedMessages () {
-      return this.$scrollContainer[0].scrollTop < 515;
+      return this.scrollTop < 515;
     },
   },
   methods: {
@@ -125,17 +134,16 @@ export default {
         ...options,
       };
 
-      this.setState(opts.initialState || {});
-      this.options = opts;
+      this.baseInit(opts);
 
       if (!this.collection) {
         throw new Error('Please provide a Transactions collection.');
       }
 
-      if (!opts.$scrollContainer || !opts.$scrollContainer.length) {
-        throw new Error('Please provide a jQuery object containing the scrollable element '
-          + 'this view is in.');
-      }
+      // if (!opts.$scrollContainer || !opts.$scrollContainer.length) {
+      //   throw new Error('Please provide a jQuery object containing the scrollable element '
+      //     + 'this view is in.');
+      // }
 
       this.coinType = this.collection.options.coinType;
       this.countAtFirstFetch = opts.countAtFirstFetch;
@@ -158,15 +166,13 @@ export default {
         });
       }
 
-      this.$scrollContainer = opts.$scrollContainer;
+      // this.$scrollContainer = opts.$scrollContainer;
       this.throttledOnScroll = _.throttle(this.onScroll, 100).bind(this);
-
-      if (opts.fetchOnInit) this.refreshTransactions();
-
-      this.$emit('postInit');
     },
 
-    onScroll () {
+    onScroll (event) {
+      this.scrollTop = event.currentTarget.scrollTop;
+
       if (this.collection.length && !this.allLoaded) {
         // fetch next batch of transactions
         const lastTransaction = this.transactionViews[this.transactionViews.length - 1];
@@ -267,12 +273,6 @@ export default {
 
     showNewTransactionPopup () {
       this.showNewTxPopup = true;
-    },
-
-    remove () {
-      if (this.transactionsFetch) this.transactionsFetch.abort();
-      this.popInTimeouts.forEach((timeout) => clearTimeout(timeout));
-      this.$scrollContainer.off('scroll', this.throttledOnScroll);
     },
 
     onBumpFeeAttempt(e) {

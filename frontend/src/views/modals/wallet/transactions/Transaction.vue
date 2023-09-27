@@ -106,12 +106,13 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   mounted () {
   },
   computed: {
     ob () {
+      const walletBalance = app.walletBalances && app.walletBalances[this.options.coinType];
       return {
         ...this.templateHelpers,
         ...this.model.toJSON(),
@@ -206,8 +207,7 @@ export default {
         },
       };
 
-      this.setState(opts.initialState || {});
-      this.options = opts;
+      this.baseInit(opts);
 
       if (!this.model) {
         throw new Error('Please provide a Transaction model.');

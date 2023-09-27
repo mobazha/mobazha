@@ -3,7 +3,7 @@
     <div :class="`flex gutterHSm clrT ${ob.status === 'CONFIRMED' ? 'confirmedTransaction' : ''}`">
       <div :class="`statusIconCol ${statusInfo.statusIconClasses}`"><span :class="statusInfo.statusIcon"></span></div>
       <div class="flexExpand tx5">
-        <div class="rowTn flex">{{ infoLine }}</div>
+        <div class="rowTn flex" v-html="infoLine"></div>
         <div>
           <div class="flexInline gutterH margR clrT2 tx6 floL">
             <div class="flexNoShrink">
@@ -16,23 +16,27 @@
               }}
             </div>
             <div class="flexNoShrink" style="max-width: 80px">
-              <div class="noOverflow"><a class="clrT2 txU " @click="onClickTxidLink(ob.txid)">{{ ob.txid }}</a></div>
+              <div class="noOverflow">
+                <a class="clrT2 txU" @click="onClickTxidLink(ob.txid)">{{ ob.txid }}</a>
+              </div>
             </div>
           </div>
-          <div class="clrT2 tx6" style="vertical-align: text-top;">{{ memoInfo }}</div>
+          <div class="clrT2 tx6" style="vertical-align: text-top">{{ memoInfo }}</div>
         </div>
       </div>
       <div class="col">
         <div class="flexHRight">
           <div class="btnStrip">
             <a class="btn clrP clrBr clrSh2" :href="ob.walletCur.getBlockChainTxUrl(ob.txid, ob.isTestnet)">{{
-              ob.polyT('wallet.transactions.transaction.viewDetailsBtn') }}</a>
+              ob.polyT('wallet.transactions.transaction.viewDetailsBtn')
+            }}</a>
             <div v-if="ob.allowFeeBump">
               <ProcessingButton
                 :className="`btn clrP clrBr clrSh2 js-retryPmt ${ob.retryInProgress ? 'processing' : ''}`"
                 :disabled="ob.retryConfirmOn"
                 :btnText="ob.polyT('wallet.transactions.transaction.retryTransactionBtn')"
-                @click.stop="onClickRetryPmt" />
+                @click.stop="onClickRetryPmt"
+              />
             </div>
           </div>
         </div>
@@ -43,38 +47,35 @@
       <SpinnerSVG v-if="ob.fetchingEstimatedFee" className="txCtr spinnerMd" />
 
       <div v-else-if="ob.fetchFeeFailed">
-        <p class="clrT2 bodyText">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.fetchError', { err: ob.fetchFeeError || ''}) }}</p>
-        <a class=" clrTEm" @click.stop="onClickRetryFeeFetch">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.btnRetry') }}</a>
+        <p class="clrT2 bodyText">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.fetchError', { err: ob.fetchFeeError || '' }) }}</p>
+        <a class="clrTEm" @click.stop="onClickRetryFeeFetch">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.btnRetry') }}</a>
       </div>
 
       <div v-else-if="typeof ob.estimatedFee === 'number'">
         <div v-if="!insufficientFunds">
-          <p class="clrT2 bodyText">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.body', {
-            currencyPairing: estimatedFeeCombo,
-            asterisk: '<span>*</span>',
-          }) }}</p>
+          <p class="clrT2 bodyText">
+            {{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.body', { currencyPairing: estimatedFeeCombo, asterisk: '<span>*</span>', }) }}
+          </p>
         </div>
         <div v-else>
-          <p class="clrT2 bodyText">{{
-            ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.insufficientFundsBody', {
-              currencyPairing: estimatedFeeCombo,
-              asterisk: '<span>*</span>',
-            }) }}</p>
+          <p class="clrT2 bodyText">
+            {{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.insufficientFundsBody', { currencyPairing: estimatedFeeCombo, asterisk:
+            '<span>*</span>', }) }}
+          </p>
         </div>
-        <p class="clrT2 tx6">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.subText', {
-          asterisk: '<span>*</span>',
-        }) }}</p>
+        <p class="clrT2 tx6">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.subText', { asterisk: '<span>*</span>', }) }}</p>
       </div>
       <hr class="clrBr row" />
       <div class="flexHRight flexVCent gutterHLg buttonBar">
         <a class="" @click="onClickRetryConfirmCancel">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.btnCancel') }}</a>
-        <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph" @click="onClickRetryConfirmed" :disabled="ob.fetchingEstimatedFee || insufficientFunds">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.btnConfirmSend') }}</a>
+        <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph" @click="onClickRetryConfirmed" :disabled="ob.fetchingEstimatedFee || insufficientFunds">{{
+          ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.btnConfirmSend')
+        }}</a>
       </div>
     </div>
     <div v-if="ob.copiedIndicatorOn">
       <div class="copiedIndicator clrT tx6">Copied to clipboard</div>
     </div>
-
   </div>
 </template>
 
@@ -85,12 +86,9 @@ import moment from 'moment';
 import { ipc } from '../../../../utils/ipcRenderer.js';
 import { setTimeagoInterval } from '../../../../../backbone/utils/index.js';
 import { getFees } from '../../../../../backbone/utils/fees.js';
-import {
-  getCurrencyByCode as getWalletCurByCode,
-} from '../../../../../backbone/data/walletCurrencies.js';
+import { getCurrencyByCode as getWalletCurByCode } from '../../../../../backbone/data/walletCurrencies.js';
 import app from '../../../../../backbone/app.js';
 import { openSimpleMessage } from '../../../../../backbone/views/modals/SimpleMessage';
-
 
 export default {
   props: {
@@ -99,19 +97,16 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
-
     this.loadData(this.options);
   },
-  mounted () {
-  },
+  mounted() {},
   computed: {
-    ob () {
+    ob() {
       const walletBalance = app.walletBalances && app.walletBalances[this.options.coinType];
       return {
         ...this.templateHelpers,
@@ -124,10 +119,10 @@ export default {
         ...this._state,
       };
     },
-    renderedTimeAgo () {
+    renderedTimeAgo() {
       return moment(this.model.get('timestamp')).fromNow();
     },
-    statusInfo () {
+    statusInfo() {
       let statusIcon = 'ion-ios-checkmark-empty';
       let statusIconClasses = 'clrTEmph1';
       let ob = this.ob;
@@ -144,14 +139,10 @@ export default {
       }
       return { statusIcon, statusIconClasses };
     },
-    infoLine () {
+    infoLine() {
       let ob = this.ob;
 
-      let priceFrag = ob.currencyMod.pairedCurrency(
-        Math.abs(ob.value),
-        ob.walletCur.code,
-        ob.userCurrency
-      );
+      let priceFrag = ob.currencyMod.pairedCurrency(Math.abs(ob.value), ob.walletCur.code, ob.userCurrency);
 
       priceFrag = ob.value < 0 ? `-${priceFrag}` : `+${priceFrag}`;
 
@@ -172,28 +163,27 @@ export default {
         } else {
           infoLine = currencyPairing;
         }
-
-        return infoLine;
       }
+      return infoLine;
     },
-    memoInfo () {
+    memoInfo() {
       let ob = this.ob;
 
       return ob.translatedMemo || ob.memo.length > 300 ? `${ob.memo.slice(0, 300)}…` : ob.memo;
     },
-    insufficientFunds () {
+    insufficientFunds() {
       let ob = this.ob;
 
       return ob.walletBalance && ob.walletBalance.confirmed < ob.estimatedFee;
     },
-    estimatedFeeCombo () {
+    estimatedFeeCombo() {
       let ob = this.ob;
 
       return ob.currencyMod.pairedCurrency(ob.estimatedFee, ob.walletCur.code, ob.userCurrency);
-    }
+    },
   },
   methods: {
-    loadData (options = {}) {
+    loadData(options = {}) {
       const opts = {
         ...options,
         initialState: {
@@ -229,34 +219,27 @@ export default {
       }
     },
 
-    onDocumentClick (e) {
+    onDocumentClick(e) {
       let retryPmtConfirmedBox = $('.js-retryPmtConfirmed');
-      if (this.getState().retryConfirmOn &&
-        !($.contains(retryPmtConfirmedBox[0], e.target) ||
-          e.target === retryPmtConfirmedBox[0])) {
+      if (this.getState().retryConfirmOn && !($.contains(retryPmtConfirmedBox[0], e.target) || e.target === retryPmtConfirmedBox[0])) {
         this.setState({
           retryConfirmOn: false,
         });
       }
     },
 
-    onClickRetryFeeFetch (e) {
+    onClickRetryFeeFetch(e) {
       this.fetchFees();
     },
 
-    onPostBumpFee (xhr, options = {}) {
+    onPostBumpFee(xhr, options = {}) {
       const opts = {
         triggerBumpFeeAttempt: true,
         showErrorOnFail: true,
         ...options,
       };
 
-      if (
-        !xhr ||
-        typeof xhr.done !== 'function' &&
-        typeof xhr.fail !== 'function' &&
-        typeof xhr.always !== 'function'
-      ) {
+      if (!xhr || (typeof xhr.done !== 'function' && typeof xhr.fail !== 'function' && typeof xhr.always !== 'function')) {
         throw new Error('Please provide a jQuery xhr');
       }
 
@@ -265,20 +248,19 @@ export default {
         retryConfirmOn: false,
       });
 
-      xhr.always(() => {
-        this.setState({
-          retryInProgress: false,
-        });
-      }).fail((failXhr) => {
-        if (opts.showErrorOnFail) {
-          if (failXhr.statusText === 'abort') return;
-          const failReason = (failXhr.responseJSON && failXhr.responseJSON.reason) || '';
-          openSimpleMessage(
-            app.polyglot.t('wallet.transactions.transaction.retryFailDialogTitle'),
-            failReason,
-          );
-        }
-      })
+      xhr
+        .always(() => {
+          this.setState({
+            retryInProgress: false,
+          });
+        })
+        .fail((failXhr) => {
+          if (opts.showErrorOnFail) {
+            if (failXhr.statusText === 'abort') return;
+            const failReason = (failXhr.responseJSON && failXhr.responseJSON.reason) || '';
+            openSimpleMessage(app.polyglot.t('wallet.transactions.transaction.retryFailDialogTitle'), failReason);
+          }
+        })
         .done((data) => {
           this.$emit('bumpFeeSuccess', {
             md: this.model,
@@ -295,12 +277,12 @@ export default {
       }
     },
 
-    onClickRetryConfirmed () {
+    onClickRetryConfirmed() {
       const post = $.post(app.getServerUrl(`wallet/bumpfee/${this.model.id}`));
       this.onPostBumpFee(post);
     },
 
-    onClickRetryPmt (e) {
+    onClickRetryPmt(e) {
       this.setState({
         retryConfirmOn: true,
       });
@@ -308,11 +290,11 @@ export default {
       this.fetchFees();
     },
 
-    onClickRetryConfirmCancel () {
+    onClickRetryConfirmCancel() {
       this.closeRetryConfirmBox();
     },
 
-    onClickTxidLink (txid) {
+    onClickTxidLink(txid) {
       this.setState({
         copiedIndicatorOn: true,
       });
@@ -327,7 +309,7 @@ export default {
       }, 1000);
     },
 
-    fetchFees () {
+    fetchFees() {
       this.setState({
         retryConfirmOn: true,
         fetchingEstimatedFee: true,
@@ -335,34 +317,36 @@ export default {
         fetchFeeFailed: false,
       });
 
-      getFees(this.options.coinType).done((fees) => {
-        if (this.isRemoved()) return;
-        this.setState({
-          fetchingEstimatedFee: false,
-          // server doubles the fee when bumping
-          estimatedFee: this.walletCur.feeBumpTransactionSize * fees.priority * 2,
+      getFees(this.options.coinType)
+        .done((fees) => {
+          if (this.isRemoved()) return;
+          this.setState({
+            fetchingEstimatedFee: false,
+            // server doubles the fee when bumping
+            estimatedFee: this.walletCur.feeBumpTransactionSize * fees.priority * 2,
+          });
+        })
+        .fail((reason) => {
+          if (this.isRemoved()) return;
+          this.setState({
+            fetchingEstimatedFee: false,
+            fetchFeeFailed: true,
+            fetchFeeError: reason || '',
+          });
         });
-      }).fail((reason) => {
-        if (this.isRemoved()) return;
-        this.setState({
-          fetchingEstimatedFee: false,
-          fetchFeeFailed: true,
-          fetchFeeError: reason || '',
-        });
-      });
     },
 
-    closeRetryConfirmBox () {
+    closeRetryConfirmBox() {
       this.setState({
         retryConfirmOn: false,
         fetchingEstimatedFee: false,
       });
     },
 
-    remove () {
+    remove() {
       clearTimeout(this.copiedIndicatorTimeout);
     },
-  }
-}
+  },
+};
 </script>
 <style lang="scss" scoped></style>

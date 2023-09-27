@@ -10,15 +10,13 @@
       <div :class="`${ob.transactionsPresent ? '' : 'center'} txCtr tx5`">
         <div :class="`txB ${ob.initialFetchErrorMessage ? 'rowTn' : 'row'}`">{{ ob.polyT('wallet.transactions.fetchFailedMsg') }}</div>
         <div v-if="ob.fetchErrorMessage" class="row">{{ ob.fetchErrorMessage }}</div>
-        <a class="btn clrP clrBr clrSh2 " @click="onClickRetryFetch">Retry</a>
+        <a class="btn clrP clrBr clrSh2" @click="onClickRetryFetch">Retry</a>
       </div>
     </div>
-
   </div>
 </template>
 
 <script>
-
 export default {
   props: {
     options: {
@@ -26,34 +24,32 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.$props.options);
   },
-  mounted () {
-  },
+  mounted() {},
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         ...this._state,
       };
-    }
+    },
   },
   methods: {
-    loadData (options = {}) {
+    loadData(options = {}) {
       this.setState(options.initialState || {});
     },
 
-    onClickRetryFetch () {
+    onClickRetryFetch() {
       this.$emit('clickRetryFetch');
     },
-  }
-}
+  },
+};
 </script>
 <style lang="scss" scoped></style>

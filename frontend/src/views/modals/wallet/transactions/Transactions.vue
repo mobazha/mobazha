@@ -5,20 +5,21 @@
       <PopInMessage
         v-if="showNewTxPopup"
         :class="`popInMessageHolder js-popInMessages ${notFixedMessages ? 'notFixed' : ''}`"
-        :options="{ messageText: ob.polyT('wallet.transactions.newTransactionsPopin', { smart_count: newTransactionsTXs.size },), }"
+        :options="{ messageText: ob.polyT('wallet.transactions.newTransactionsPopin', { smart_count: newTransactionsTXs.size }) }"
         @clickRefresh="refreshTransactions()"
         @clickDismiss="this.showNewTxPopup = false"
       />
-      <div v-for="(model, key) in collection.models" :key="key" class="js-transactionListContainer borderStacked clrBr padMdKids">
+      <div v-for="(model, key) in options.collection.models" :key="key" class="js-transactionListContainer borderStacked clrBr padMdKids">
         <Transaction
-        :options="{
-          model,
-          coinType: this.coinType,
-          bumpFeeXhr: (this.bumpFeeXhrs && this.bumpFeeXhrs[model.id]) || undefined,
-        }"
-        :bumpFeeAttempt="onBumpFeeAttempt"
-        :bumpFeeSuccess="onBumpFeeSuccess"
-         />
+          ref="transaction"
+          :options="{
+            model,
+            coinType: this.coinType,
+            bumpFeeXhr: (this.bumpFeeXhrs && this.bumpFeeXhrs[model.id]) || undefined,
+          }"
+          @bumpFeeAttempt="onBumpFeeAttempt"
+          @bumpFeeSuccess="onBumpFeeSuccess"
+        />
       </div>
     </div>
     <TransactionFetchState
@@ -28,16 +29,15 @@
           isFetching,
           fetchFailed,
           fetchErrorMessage,
-          transactionsPresent: !!this.collection.length,
+          transactionsPresent: !!options.collection.length,
         },
       }"
-      :clickRetryFetch="clickRetryFetch"
-      />
+      @clickRetryFetch="clickRetryFetch"
+    />
     <div class="js-transactionEmptyState"></div>
     <div v-if="!ob.transactions.length && !isFetching && !ob.fetchFailed">
       <div class="center txCtr tx5 clrT2">
-        {{ ob.polyT('wallet.transactions.noTransactionsPlaceholder',
-          { coinType: ob.polyT(`cryptoCurrencies.${ob.coinType}`, { _: ob.coinType }) }) }}
+        {{ ob.polyT('wallet.transactions.noTransactionsPlaceholder', { coinType: ob.polyT(`cryptoCurrencies.${ob.coinType}`, { _: ob.coinType }) }) }}
       </div>
     </div>
   </div>
@@ -54,7 +54,6 @@ import { launchSettingsModal } from '../../../../../backbone/utils/modalManager'
 import Transaction from './Transaction.vue';
 import TransactionFetchState from './TransactionFetchState.vue';
 
-
 export default {
   components: {
     Transaction,
@@ -66,7 +65,7 @@ export default {
       default: {},
     },
   },
-  data () {
+  data() {
     return {
       transactionsPerFetch: 25,
 
@@ -81,46 +80,45 @@ export default {
       showNewTxPopup: false,
     };
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.options);
 
     window.addEventListener('scroll', this.throttledOnScroll);
   },
-  mounted () {
+  mounted() {
     if (this.fetchOnInit) this.refreshTransactions();
 
     this.$emit('postInit');
   },
-  unmounted () {
+  unmounted() {
     if (this.transactionsFetch) this.transactionsFetch.abort();
     this.popInTimeouts.forEach((timeout) => clearTimeout(timeout));
 
     window.removeEventListener('scroll', this.throttledOnScroll);
   },
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
-        transactions: this.collection.toJSON(),
+        transactions: this.options.collection.toJSON(),
         fetchFailed: this.fetchFailed,
         coinType: this.coinType,
       };
     },
-    isFetching () {
-      return this.transactionsFetch
-        && this.transactionsFetch.state() === 'pending';
+    isFetching() {
+      return this.transactionsFetch && this.transactionsFetch.state() === 'pending';
     },
-    allLoaded () {
-      return this.collection.length >= this.countAtFirstFetch;
+    allLoaded() {
+      return this.options.collection.length >= this.countAtFirstFetch;
     },
-    notFixedMessages () {
+    notFixedMessages() {
       return this.scrollTop < 515;
     },
   },
   methods: {
-    loadData (options = {}) {
+    loadData(options = {}) {
       const opts = {
         fetchOnInit: true,
         // If not fetching on init, you may want to pass in the count of transactions
@@ -136,7 +134,7 @@ export default {
 
       this.baseInit(opts);
 
-      if (!this.collection) {
+      if (!this.options.collection) {
         throw new Error('Please provide a Transactions collection.');
       }
 
@@ -144,8 +142,7 @@ export default {
       //   throw new Error('Please provide a jQuery object containing the scrollable element '
       //     + 'this view is in.');
       // }
-
-      this.coinType = this.collection.options.coinType;
+      this.coinType = this.options.collection.options.coinType;
       this.countAtFirstFetch = opts.countAtFirstFetch;
 
       const serverSocket = getSocket();
@@ -156,8 +153,8 @@ export default {
           // height which we can use to update the confirmations on a transaction.
           if (e.jsonData.walletUpdate && e.jsonData.walletUpdate[this.coinType]) {
             const walletUpdate = e.jsonData.walletUpdate[this.coinType];
-            this.collection.models
-              .filter((transaction) => (transaction.get('height') > 0))
+            this.options.collection.models
+              .filter((transaction) => transaction.get('height') > 0)
               .forEach((transaction) => {
                 const confirmations = walletUpdate.height - transaction.get('height') + 1;
                 transaction.set('confirmations', confirmations);
@@ -170,10 +167,10 @@ export default {
       this.throttledOnScroll = _.throttle(this.onScroll, 100).bind(this);
     },
 
-    onScroll (event) {
+    onScroll(event) {
       this.scrollTop = event.currentTarget.scrollTop;
 
-      if (this.collection.length && !this.allLoaded) {
+      if (this.options.collection.length && !this.allLoaded) {
         // fetch next batch of transactions
         const lastTransaction = this.transactionViews[this.transactionViews.length - 1];
 
@@ -183,26 +180,23 @@ export default {
       }
     },
 
-    refreshTransactions () {
-      this.collection.reset();
+    refreshTransactions() {
+      this.options.collection.reset();
       this.fetchTransactions();
     },
 
-    fetchTransactions () {
-      if (
-        this.transactionsFetch
-        && this.transactionsFetch.state() === 'pending'
-      ) return;
+    fetchTransactions() {
+      if (this.transactionsFetch && this.transactionsFetch.state() === 'pending') return;
 
       const fetchParams = {
         limit: this.transactionsPerFetch,
       };
 
-      if (this.collection.length) {
-        fetchParams.offsetID = this.collection.at(this.collection.length - 1).id;
+      if (this.options.collection.length) {
+        fetchParams.offsetID = this.options.collection.at(this.options.collection.length - 1).id;
       }
 
-      this.transactionsFetch = this.collection.fetch({
+      this.transactionsFetch = this.options.collection.fetch({
         data: fetchParams,
         remove: false,
       });
@@ -218,7 +212,7 @@ export default {
             this.countAtFirstFetch = data.count;
           }
 
-          if (this.collection.length) {
+          if (this.options.collection.length) {
             this.$refs.transactionFetchState.setState({
               isFetching: false,
               fetchFailed: this.fetchFailed,
@@ -231,9 +225,8 @@ export default {
               const warning = openSimpleMessage(
                 app.polyglot.t('wallet.transactions.backupWalletWarningTitle'),
                 app.polyglot.t('wallet.transactions.backupWalletWarningBody', {
-                  link: '<a class="js-recoverWalletSeed">'
-                    + `${app.polyglot.t('wallet.transactions.recoverySeedLink')}</a>`,
-                }),
+                  link: '<a class="js-recoverWalletSeed">' + `${app.polyglot.t('wallet.transactions.recoverySeedLink')}</a>`,
+                })
               );
 
               warning.$el.on('click', '.js-recoverWalletSeed', () => {
@@ -247,13 +240,14 @@ export default {
               curConn.server.save({ backupWalletWarned: true });
             }
           }
-        }).fail((xhr) => {
+        })
+        .fail((xhr) => {
           if (this.isRemoved() || xhr.statusText === 'abort') return;
 
           this.fetchFailed = true;
           this.fetchErrorMessage = (xhr.responseJSON && xhr.responseJSON.reason) || '';
 
-          if (this.collection.length) {
+          if (this.options.collection.length) {
             this.$refs.transactionFetchState.setState({
               isFetching: false,
               fetchFailed: this.fetchFailed,
@@ -264,14 +258,14 @@ export default {
 
       this.$refs.transactionFetchState.setState({
         isFetching: true,
-        transactionsPresent: !!this.collection.length,
+        transactionsPresent: !!this.options.collection.length,
       });
 
       this.fetchFailed = false;
       this.fetchErrorMessage = '';
     },
 
-    showNewTransactionPopup () {
+    showNewTransactionPopup() {
       this.showNewTxPopup = true;
     },
 
@@ -283,12 +277,12 @@ export default {
       this.$emit('bumpFeeSuccess', e);
     },
 
-    clickRetryFetch () {
+    clickRetryFetch() {
       // simulate some latency so if it fails again, it looks like it tried.
       this.$refs.transactionFetchState.setState({ isFetching: true });
       setTimeout(() => this.fetchTransactions(), 250);
     },
-  }
-}
+  },
+};
 </script>
 <style lang="scss" scoped></style>

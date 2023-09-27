@@ -129,6 +129,7 @@ export default {
 
       fetchingAddress: true,
       receiveAddress: '',
+      transactionsState: {},
     };
   },
   created() {
@@ -161,7 +162,6 @@ export default {
     coinStatsState() {
       const { activeCoin } = this;
       const balance = app && app.walletBalances && app.walletBalances.get(activeCoin);
-
       return {
         cryptoCur: ensureMainnetCode(activeCoin),
         confirmed: balance && balance.get('confirmed'),
@@ -320,7 +320,6 @@ export default {
 
                 this.popInTimeouts.push(timeout);
               }
-
               this.updateTransactionsCount(walletCur);
             }
 
@@ -476,7 +475,6 @@ export default {
           at: 0,
         }
       );
-
       this.updateTransactionsCount(this.activeCoin);
     },
 
@@ -506,7 +504,7 @@ export default {
       }
 
       this.checkCoinType(coinType);
-
+      console.log('this.transactionsState[coinType]', this.transactionsState[coinType]);
       if (!this.transactionsState[coinType] || this.transactionsState[coinType].countAtFirstFetch !== count) {
         this.transactionsState[coinType] = this.transactionsState[coinType] || {};
         this.transactionsState[coinType].countAtFirstFetch = count;

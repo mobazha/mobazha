@@ -56,6 +56,7 @@
                     <div class="js-transactionsContainer">
                       <TransactionsVw
                         ref="transactionsVw"
+                        v-if="showTransactionsVw"
                         :options="transactionViewOptions"
                         @bumpFeeAttempt="onBumpFeeAttempt"
                         @bumpFeeSuccess="onBumpFeeSuccess"
@@ -130,6 +131,8 @@ export default {
       fetchingAddress: true,
       receiveAddress: '',
       transactionsState: {},
+
+      showTransactionsVw: true,
     };
   },
   created() {
@@ -147,6 +150,8 @@ export default {
       if (this.sendModeOn && !(app.walletBalances.get(coin) && app.walletBalances.get(coin).get('confirmed'))) {
         this.sendModeOn = false;
       }
+
+      this.reRenderTransactionsVw();
     },
   },
   computed: {
@@ -180,6 +185,9 @@ export default {
       let coin = this.activeCoin;
       const transactionsState = this.transactionsState[coin] || { needsFetch: true };
       let cl = transactionsState && transactionsState.cl;
+
+      console.log('coin: ', coin)
+      console.log('cl: ', cl)
 
       if (!cl) {
         cl = new Transactions([], { coinType: coin });
@@ -480,6 +488,15 @@ export default {
 
     onTransactionsVwPostInit() {
       this.transactionsState[this.activeCoin].needsFetch = false;
+    },
+
+    reRenderTransactionsVw() {
+      console.log('reRenderTransactionsVw triggered')
+      this.showTransactionsVw = false;
+
+      this.$nextTick(() => {
+        this.showTransactionsVw = true;
+      });
     },
 
     updateTransactionsCount(coinType = this.activeCoin) {

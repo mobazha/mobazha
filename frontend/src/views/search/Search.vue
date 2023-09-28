@@ -4,82 +4,64 @@
       <div class="pageTabs js-searchProviders"></div>
     </nav>
 
-    <div v-if="!ob.fetching">
-      <div class="pageContent">
-        <div v-if="!ob.showDataError">
-          <div class="flexColRows row">
-            <div class="flexVBase gutterH">
-              <h3 class="txUnl rowSm">{{ ob.name }}</h3>
-              <div v-if="ob.isExistingProvider">
-                <div v-if="!ob.providerLocked">
-                  <button class="btnTxtOnly txb txU txUnb" @click="clickDeleteProvider">{{ ob.polyT('search.deleteProviderBtn') }}</button>
-                </div>
-                <div v-if="ob.showMakeDefault">
-                  <div>
-                    <button class="btnTxtOnly txb txU txUnb" @click="clickMakeDefaultProvider"> {{ ob.polyT('search.makeDefaultBtn') }}
-                      <span class="toolTip" :data-tip="ob.polyT('search.makeDefaultBtnHelper')">
-                        <i class="ion-help-circled"></i>
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div v-else>
-                <button class="btnTxtOnly txb txU txUnb" @click="clickAddQueryProvider">{{ ob.polyT('search.addQueryProviderBtn') }}</button>
-              </div>
-            </div>
-            <div class="searchBar row clrP clrBr clrSh2">
-              <div v-if="ob.logo">
-                <div class="searchLogo js-searchLogo">
-                  <img :src="ob.logo" />
-                </div>
-              </div>
-              <input :class="`clrP clrBr searchInput js-searchInput ${ob.logo ? 'withLogo' : ''}`" type="text"
-                :placeholder="ob.polyT('search.searchPlaceholder')"
-                :value="ob.term"
-                @keyup="onKeyupSearchInput">
-              <button class="btn clrP clrBr searchBtn" @click="clickSearchBtn">{{ ob.polyT('search.searchBtn') }}</button>
-            </div>
-            <div class="js-suggestions"></div>
-            <hr class="clrBr">
+    <div v-if="!ob.fetching" class="pageContent">
+      <template v-if="!ob.showDataError">
+        <div class="flexColRows row">
+          <div class="flexVBase gutterH">
+            <h3 class="txUnl rowSm">{{ ob.name }}</h3>
+            <template v-if="ob.isExistingProvider">
+              <button v-if="!ob.providerLocked" class="btnTxtOnly txb txU txUnb" @click="clickDeleteProvider">
+                {{ ob.polyT('search.deleteProviderBtn') }}
+              </button>
+              <button v-if="ob.showMakeDefault" class="btnTxtOnly txb txU txUnb" @click="clickMakeDefaultProvider">
+                {{ ob.polyT('search.makeDefaultBtn') }}
+                <span class="toolTip" :data-tip="ob.polyT('search.makeDefaultBtnHelper')">
+                  <i class="ion-help-circled"></i>
+                </span>
+              </button>
+            </template>
+            <button v-else class="btnTxtOnly txb txU txUnb" @click="clickAddQueryProvider">{{ ob.polyT('search.addQueryProviderBtn') }}</button>
           </div>
-          <div class="js-categoryWrapper"></div>
-          <div class="flexRow gutterHLg">
-            <div v-if="ob.hasFilters">
-              <div class="col3 filterWrapper js-filterWrapper"></div>
-              <div class="col9" />
+          <div class="searchBar row clrP clrBr clrSh2">
+            <div v-if="ob.logo" class="searchLogo js-searchLogo">
+              <img :src="ob.logo" />
             </div>
-            <div v-else>
-              <div class="col12" />
-            </div>
-            <div class="flexCol">
-              <div class="width100 js-sortByWrapper"></div>
-              <div class="width100 js-resultsWrapper"></div>
-            </div>
+            <input
+              :class="`clrP clrBr searchInput js-searchInput ${ob.logo ? 'withLogo' : ''}`"
+              type="text"
+              :placeholder="ob.polyT('search.searchPlaceholder')"
+              :value="ob.term"
+              @keyup="onKeyupSearchInput"
+            />
+            <button class="btn clrP clrBr searchBtn" @click="clickSearchBtn">{{ ob.polyT('search.searchBtn') }}</button>
+          </div>
+          <div class="js-suggestions"></div>
+          <hr class="clrBr" />
+        </div>
+        <div class="js-categoryWrapper"></div>
+        <div class="flexRow gutterHLg">
+          <template v-if="ob.hasFilters">
+            <div class="col3 filterWrapper js-filterWrapper"></div>
+            <div class="col9" />
+          </template>
+          <div v-else class="col12" />
+          <div class="flexCol">
+            <div class="width100 js-sortByWrapper"></div>
+            <div class="width100 js-resultsWrapper"></div>
           </div>
         </div>
-
-        <div v-else>
-          <div class="contentBox padLg flexColRows flexHCent clrP clrBr">
-            <h2 class="rowLg">{{ ob.errTitle }}</h2>
-            <p>{{ ob.errMsg }}</p>
-            <div v-if="!ob.providerLocked">
-              <div class="flexHCent">
-                <button class="btn clrP clrBr" @click="clickDeleteProvider">{{ ob.polyT('search.deleteProviderBtn') }}</button>
-              </div>
-            </div>
-          </div>
+      </template>
+      <div v-else class="contentBox padLg flexColRows flexHCent clrP clrBr">
+        <h2 class="rowLg">{{ ob.errTitle }}</h2>
+        <p>{{ ob.errMsg }}</p>
+        <div v-if="!ob.providerLocked" class="flexHCent">
+          <button class="btn clrP clrBr" @click="clickDeleteProvider">{{ ob.polyT('search.deleteProviderBtn') }}</button>
         </div>
       </div>
     </div>
-
-    <div v-else>
-      <div class="flexCent loadingSearch clrS">
-        <SpinnerSVG :className="spinnerLg" />
-      </div>
+    <div v-else class="flexCent loadingSearch clrS">
+      <SpinnerSVG className="spinnerLg" style="width: 80px; height: 80px" />
     </div>
-
   </div>
 </template>
 

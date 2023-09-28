@@ -2,7 +2,7 @@
   <div class="followLoadingState txCtr tx5">
     <div v-if="ob.isFetching">
       <div class="loadingSpinnerWrap">
-        <SpinnerSVG :className="spinnerMd" />
+        <SpinnerSVG className="spinnerMd" />
       </div>
     </div>
 

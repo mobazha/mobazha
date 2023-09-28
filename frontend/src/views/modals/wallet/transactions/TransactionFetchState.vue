@@ -2,7 +2,7 @@
   <div class="transactionFetchState">
     <div v-if="ob.isFetching">
       <div :class="`${ob.transactionsPresent ? 'txCtr' : 'center'}  padLg`">
-        <SpinnerSVG :className="spinnerMd" />
+        <SpinnerSVG className="spinnerMd" />
       </div>
     </div>
 

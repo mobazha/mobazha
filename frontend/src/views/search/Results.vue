@@ -28,7 +28,7 @@
     <hr class="clrBr">
     <div v-if="ob.loading">
       <div class="flexCent loadingSearch clrS">
-        <SpinnerSVG :className="spinnerLg" />
+        <SpinnerSVG className="spinnerLg" />
       </div>
     </div>
 

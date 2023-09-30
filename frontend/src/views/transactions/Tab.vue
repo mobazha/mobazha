@@ -34,7 +34,8 @@
         return {
           collection: collection,
         };
-    }" />
+      }"
+      @clickRow="onClickRow" />
   </div>
 </template>
 
@@ -80,8 +81,6 @@ export default {
         type: this.type,
         filterParams: this.filter,
         getProfiles: this._options.getProfiles,
-        openOrder: this._options.openOrder,
-        openedOrderModal: this._options.openedOrderModal,
       };
     },
   },
@@ -116,10 +115,6 @@ export default {
         throw new Error('Please provide a filter config object.');
       }
 
-      if (typeof opts.openOrder !== 'function') {
-        throw new Error('Please provide a function to open the order detail modal.');
-      }
-
       this._options = opts || {};
       this.type = opts.type;
       this.filterConfig = opts.filterConfig;
@@ -145,6 +140,10 @@ export default {
       return {
         'change .filter input': 'onChangeFilter',
       };
+    },
+
+    onClickRow(orderID, type) {
+      this.$emit('clickRow', orderID, type);
     },
 
     onChangeFilter() {

@@ -216,7 +216,7 @@ export default {
     },
 
     onRowClick () {
-      this.$emit('clickRow', { view: this });
+      this.$emit('clickRow');
       recordEvent('Transactions_ClickOrder', {
         type: this.type,
       });

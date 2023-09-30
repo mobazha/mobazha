@@ -23,7 +23,7 @@
       <div class="pageContent">
         <div class="tabContent js-tabContent">
           <!-- insert the tab subview here -->
-          <Tab :options="tabOptions" />
+          <Tab :options="tabOptions" @clickRow="openOrder" />
         </div>
       </div>
     </section>
@@ -31,7 +31,6 @@
     <Teleport to="#js-vueModal">
       <OrderDetail
         v-if="showOrderDetail"
-        ref="orderDetail"
         :options="{
           model: modalModel,
           returnText: ob.polyT(`transactions.${modalType}s.returnToFromOrder`),
@@ -165,8 +164,6 @@ export default {
           ...this.filterUrlParams,
         },
         filterConfig: this.getSalesPurchasesFilterConfig(false),
-        openOrder: this.openOrder.bind(this),
-        openedOrderModal: this.openedOrderModal,
       };
     },
 
@@ -182,8 +179,6 @@ export default {
           ...this.filterUrlParams,
         },
         filterConfig: this.getSalesPurchasesFilterConfig(true),
-        openOrder: this.openOrder.bind(this),
-        openedOrderModal: this.openedOrderModal,
       };
     },
 
@@ -199,8 +194,6 @@ export default {
           ...this.filterUrlParams,
         },
         filterConfig: this.casesFilterConfig,
-        openOrder: this.openOrder.bind(this),
-        openedOrderModal: this.openedOrderModal,
       };
     },
   },
@@ -221,7 +214,6 @@ export default {
       this.tabViewCache = {};
       this.profileDeferreds = {};
       this.profilePosts = [];
-      this.openedOrderModal = null;
 
       const params = deparam(location.hash.split('?')[1] || '');
       const { orderID } = params;
@@ -231,13 +223,7 @@ export default {
         // cut off the trailing 's' from the tab
         const type = this._tab.slice(0, this._tab.length - 1);
 
-        // If we're opening an order model on init, then we'll
-        // need to pass it in to the Tab view. It may need to bind event
-        // handlers to it.
-        this.openedOrderModal = this.openOrder(orderID || caseID, type);
-        this.listenTo(this.openedOrderModal, 'close', () => {
-          this.openedOrderModal = null;
-        });
+        this.openOrder(orderID || caseID, type);
       }
 
       this.purchasesCol = new Transactions([], { type: 'purchases' });
@@ -302,21 +288,29 @@ export default {
       app.router.navigate(`${location.hash.split('?')[0]}?${$.param(params)}`);
     },
 
-    onConvoMarkedAsRead() {},
+    onConvoMarkedAsRead(orderID) {
+      let collection = this.tabOptions.collection;
 
-    /**
-     * This function is also passed into the Tab and Table views. They will
-     * be affected should you change the signature or return value.
-     */
-    openOrder(id, type = 'sale', options = {}) {
+      const transaction = collection.get(orderID);
+      if (transaction) {
+        transaction.set({
+          unreadChatMessages: 0,
+          read: true,
+        });
+      }
+    },
+
+    markOrderAsRead(orderID) {
+      let collection = this.tabOptions.collection;
+
+      const transaction = collection.get(orderID);
+      if (transaction) {
+          transaction.set('read', true);
+        }
+    },
+
+    openOrder(id, type = 'sale') {
       this.showOrderDetail = false;
-
-      const opts = {
-        modalOptions: {
-          ...(options.modalOptions || {}),
-        },
-        addToRoute: true,
-      };
 
       if (type !== 'case') {
         this.modalModel = new Order({ orderID: id }, { type });
@@ -326,16 +320,10 @@ export default {
       this.modalType = type;
       this.showOrderDetail = true;
 
-      // const orderDetail = new OrderDetail({
-      //   model,
-      //   removeOnClose: true,
-      //   returnText: app.polyglot.t(`transactions.${type}s.returnToFromOrder`),
-      //   ...opts.modalOptions,
-      // });
+      this.markOrderAsRead(id);
 
-      // orderDetail.render().open();
-
-      if (opts.addToRoute) {
+      let addToRoute = true;
+      if (addToRoute) {
         // add the order / case id to the url
         const params = deparam(location.hash.split('?')[1] || '');
         delete params.orderID;
@@ -361,8 +349,6 @@ export default {
           collectionMd.set('state', state);
         }
       });
-
-      return this.$refs.orderDetail;
     },
 
     getSalesPurchasesFilterConfig(isSale) {

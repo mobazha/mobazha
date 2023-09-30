@@ -74,7 +74,7 @@
                     :options="tabViewData"
                     @convoMarkedAsRead="() => {
                       model.set('unreadChatMessages', 0);
-                      $emit('convoMarkedAsRead');
+                      $emit('convoMarkedAsRead', model.id);
                     }"
                   />
                   <ContractTab
@@ -129,7 +129,6 @@
 
 <script>
 import $ from 'jquery';
-import _ from 'underscore';
 import app from '../../../../backbone/app';
 import { getSocket } from '../../../../backbone/utils/serverConnect';
 import { getCurrencyByCode as getWalletCurByCode } from '../../../../backbone/data/walletCurrencies';
@@ -152,8 +151,6 @@ import FulfillOrder from './FulfillOrder.vue';
 import DisputeOrder from './DisputeOrder.vue'
 import ResolveDispute from './ResolveDispute.vue'
 import ProfileBox from './ProfileBox.vue'
-
-import { toRaw } from 'vue';
 
 import baseModal from '../../../mixins/baseModal';
 
@@ -326,17 +323,16 @@ export default {
   methods: {
     loadData (options = {}) {
       const opts = {
-      initialState: {
-        isFetching: false,
-        fetchFailed: false,
-        fetchError: '',
-      },
-      initialTab: 'summary',
-      ...options,
-    };
+        initialState: {
+          isFetching: false,
+          fetchFailed: false,
+          fetchError: '',
+        },
+        initialTab: 'summary',
+        ...options,
+      };
 
-    _.extend(this, opts);
-    this._state = opts.initialState;
+    this.baseInit(opts);
 
     this._tab = opts.initialTab;
 
@@ -346,6 +342,7 @@ export default {
 
       this.listenTo(this.model, 'request', this.onOrderRequest);
       this.listenToOnce(this.model, 'sync', this.onFirstOrderSync);
+      this.listenTo(this.model, 'change:unreadChatMessages', () => this.setUnreadChatMessagesBadge());
 
       this.listenTo(orderEvents, 'fulfillOrderComplete', () => {
         if (this.activeTab === 'fulfillOrder') this.selectTab('summary');

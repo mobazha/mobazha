@@ -96,6 +96,7 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data() {
     return {
@@ -117,12 +118,9 @@ export default {
       return {
         ...this.templateHelpers,
         type: this.type,
-        transactions: this.collection.toJSON(),
+        transactions: this.collection,
         ...this._state,
       };
-    },
-    transactions() {
-      return this.collection.toJSON();
     },
     pageStartIndex() {
       return (this.curPage - 1) * this.transactionsPerPage;
@@ -179,11 +177,7 @@ export default {
         throw new Error('Please provide a valid type.');
       }
 
-      if (typeof opts.openOrder !== 'function') {
-        throw new Error('Please provide a function to open the order detail modal.');
-      }
-      _.extend(this, opts);
-      this.setState(opts.initialState || {});
+      this.baseInit(opts);
 
       if (!this.collection) {
         throw new Error('Please provide a collection');
@@ -199,9 +193,6 @@ export default {
         this.listenTo(socket, 'message', this.onSocketMessage);
       }
 
-      if (this.options.openedOrderModal) {
-        this.bindOrderDetailEvents(this.options.openedOrderModal);
-      }
       this.listenTo(orderEvents, 'rejectingOrder', this.onRejectingOrder);
       this.listenTo(orderEvents, 'rejectOrderComplete, rejectOrderFail', this.onRejectOrderAlways);
       this.listenTo(orderEvents, 'rejectOrderComplete', this.onRejectOrderComplete);
@@ -329,7 +320,7 @@ export default {
       }
     },
 
-    onClickRow(txid) {
+    onClickRow(orderID) {
       let type = 'sale';
 
       if (this.type === 'purchases') {
@@ -337,30 +328,7 @@ export default {
       } else if (this.type === 'cases') {
         type = 'case';
       }
-
-      const orderDetail = this.options.openOrder(txid, type);
-      this.bindOrderDetailEvents(orderDetail);
-    },
-
-    bindOrderDetailEvents(orderDetail) {
-      this.listenTo(orderDetail.model, 'sync', () => {
-        const transaction = this.collection.get(orderDetail.model.id);
-
-        if (transaction) {
-          transaction.set('read', true);
-        }
-      });
-
-      this.listenTo(orderDetail, 'convoMarkedAsRead', () => {
-        const transaction = this.collection.get(orderDetail.model.id);
-
-        if (transaction) {
-          transaction.set({
-            unreadChatMessages: 0,
-            read: true,
-          });
-        }
-      });
+      this.$emit('clickRow', orderID, type);
     },
 
     onClickNextPage() {

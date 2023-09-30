@@ -1,10 +1,13 @@
 import { createApp } from 'vue';
 import { createStore } from 'vuex';
+
 import ElementPlus from 'element-plus';
 import * as ElementPlusIconsVue from '@element-plus/icons-vue';
 import 'element-plus/dist/index.css';
 import './assets/scss/main.scss';
 import { TUIComponents, TUICore } from './TUIKit';
+
+import VueBackbone from './plugins/vue-backbone/vue-backbone';
 
 import app from '../backbone/app';
 
@@ -49,6 +52,6 @@ function mountVueApp(container) {
     },
   });
 
-  return vueApp.use(Router).use(store).mount(container);
+  return vueApp.use(Router).use(store).use(VueBackbone).mount(container);
 }
 window.vueApp = mountVueApp('#appFrame');

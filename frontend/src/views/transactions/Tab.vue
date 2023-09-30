@@ -29,7 +29,12 @@
       </div>
     </div>
 
-    <TransactionsTable ref="table" :options="tableOptions" />
+    <TransactionsTable ref="table" :options="tableOptions"
+      :bb="function() {
+        return {
+          collection: collection,
+        };
+    }" />
   </div>
 </template>
 
@@ -73,7 +78,6 @@ export default {
     tableOptions() {
       return {
         type: this.type,
-        collection: this.collection,
         filterParams: this.filter,
         getProfiles: this._options.getProfiles,
         openOrder: this._options.openOrder,

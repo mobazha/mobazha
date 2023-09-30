@@ -1,5 +1,5 @@
 <template>
-  <tr :class="!model.get('read') ? 'unread' : ''" @click="onRowClick">
+  <tr :class="!model.read ? 'unread' : ''" @click="onRowClick">
     <td class="clrBr orderCol noOverflow">
       <div class="unreadBorder clrE1"></div>
       <span class="ulOnHover">{{ ob.type === 'cases' ? ob.caseID : ob.orderID }}</span>
@@ -114,10 +114,10 @@ export default {
         ...this.templateHelpers,
         type: this.type,
         ...this._state,
-        ...this.model.toJSON(),
+        ...this.model,
         userCurrency: app.settings.get('localCurrency'),
         moment,
-        vendorID: this.type === 'sales' ? app.profile.id : this.model.get('vendorID'),
+        vendorID: this.type === 'sales' ? app.profile.id : this.model.vendorID,
       }
     },
     userCols () {
@@ -172,8 +172,7 @@ export default {
         throw new Error('Please provide a valid type.');
       }
 
-      _.extend(this, opts);
-      this.setState(opts.initialState || {});
+      this.baseInit(opts);
 
       if (!this.model) {
         throw new Error('Please provide a model');
@@ -224,10 +223,10 @@ export default {
     },
 
     render () {
-      const coinType = this.model.get('coinType');
+      const coinType = this.model.coinType;
 
       if (coinType) {
-        const paymentCoin = this.model.get('paymentCoin');
+        const paymentCoin = this.model.paymentCoin;
         let tradingPairClass = 'cryptoTradingPairSm';
 
         if (paymentCoin.length > 5 && coinType.length > 5) {

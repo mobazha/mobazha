@@ -10,7 +10,7 @@
           :checked="cur.active && !cur.disabled"
         />
         <label :for="`curSel${cur.code}${ob.cid}`">
-          <CryptoIcon :code="ob.code" />
+          <CryptoIcon :code="cur.code" />
           <span class="curName noOverflow">{{ cur.displayName }}</span>
         </label>
       </span>
@@ -22,8 +22,8 @@
 </template>
 
 <script>
+import _ from 'underscore';
 import app from '../../../backbone/app';
-import loadTemplate from '../../../backbone/utils/loadTemplate';
 import { isSupportedWalletCur } from '../../../backbone/data/walletCurrencies';
 
 export default {
@@ -34,19 +34,37 @@ export default {
     },
   },
   data() {
-    return {};
+    return {
+      _options: {},
+    };
   },
   created() {
     this.initEventChain();
 
     this.loadData(this.options);
   },
+  mounted () {
+  },
+  computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        cid: this.cid,
+        ...this._options,
+        ...this._state,
+      };
+    }
+  },
   methods: {
     loadData(options = {}) {
       let disabledCurs = [];
 
-      if (Array.isArray(options.initialState.disabledCurs) && Array.isArray(options.initialState.currencies)) {
-        disabledCurs = options.initialState.currencies.filter((c) => !isSupportedWalletCur(c));
+      if (
+        Array.isArray(options.initialState.disabledCurs) &&
+        Array.isArray(options.initialState.currencies)
+      ) {
+        disabledCurs =
+          options.initialState.currencies.filter(c => !isSupportedWalletCur(c));
       }
 
       const opts = {
@@ -61,7 +79,8 @@ export default {
           ...options.initialState,
         },
       };
-      this.setState(opts.initialState);
+      this.baseInit(opts);
+      this._options = opts;
     },
 
     handleCurClick(code) {
@@ -76,7 +95,7 @@ export default {
         else activeCurs = activeCurs.filter((c) => c !== code);
       }
 
-      this.trigger('currencyClicked', {
+      this.$emit('currencyClicked', {
         currency: code,
         active: nowActive,
         activeCurs,
@@ -145,20 +164,7 @@ export default {
         }));
       }
 
-      super.setState(processedState, options);
-    },
-
-    render() {
-      loadTemplate('components/cryptoCurSelector.html', (t) => {
-        this.$el.html(
-          t({
-            ...this.options,
-            ...this.getState(),
-          })
-        );
-      });
-
-      return this;
+      _.extend(this._state, processedState);
     },
   },
 };

@@ -152,6 +152,21 @@
                     <div class="js-paymentCoin-errors"></div>
                     <h2 class="h4 flexExpand required">{{ ob.polyT('purchase.cryptoCurrencyTitle') }}</h2>
                     <div class="js-cryptoCurSelectorWrapper"></div>
+                    <CryptoCurSelector
+                      ref="cryptoCurSelector"
+                      :options="{
+                        disabledMsg: ob.polyT('purchase.cryptoCurrencyInvalid'),
+                        initialState: {
+                          controlType: 'radio',
+                          currencies,
+                          disabledCurs: currencies.filter((c) => !isSupportedWalletCur(c)),
+                          sort: false,
+                          activeCurs: currencies.length && listing.isCrypto ? [currencies[0]] : [],
+                        },
+                      }"
+                      @currencyClicked="(cOpts) => {
+                        if (cOpts.active) this.moderators.setState({ showOnlyCur: cOpts.currency });
+                      }"/>
                   </div>
                 </div>
               </section>
@@ -345,7 +360,6 @@ export default {
       listings: undefined,
       moderators: undefined,
       couponObj: [],
-      cryptoCurSelector: undefined,
 
       coinName: '',
       moderatorIDs: [],
@@ -412,7 +426,7 @@ export default {
       return app.settings.get('localCurrency');
     },
     paymentCoin () {
-      return this.cryptoCurSelector ? this.cryptoCurSelector.getState().activeCurs[0] : '';
+      return this.$refs.cryptoCurSelector ? this.$refs.cryptoCurSelector.getState().activeCurs[0] : '';
     },
     prices () {
       // return an array of price objects that matches the items in the order
@@ -481,10 +495,23 @@ export default {
     hasCoupons () {
       return this.listing && this.listing.get('coupons').length
             && this.listing.get('metadata').get('contractType') !== 'CRYPTOCURRENCY';
-    }
+    },
+
+    currencies () {
+      let currencies = this.listing.get('metadata').get('acceptedCurrencies') || [];
+      const locale = app.localSettings.standardizedTranslatedLang() || 'en-US';
+      currencies.sort((a, b) => {
+        const aName = app.polyglot.t(`cryptoCurrencies.${a}`, { _: a });
+        const bName = app.polyglot.t(`cryptoCurrencies.${b}`, { _: b });
+        return aName.localeCompare(bName, locale, { sensitivity: 'base' });
+      });
+
+      return currencies;
+    },
   },
   methods: {
     capitalize,
+    isSupportedWalletCur,
 
     init() {
       let options = {};
@@ -600,32 +627,6 @@ export default {
       });
       this.listenTo(this.coupons, 'changeCoupons', (hashes, codes) => this.changeCoupons(hashes, codes));
 
-      const currencies = this.listing.get('metadata').get('acceptedCurrencies') || [];
-      const locale = app.localSettings.standardizedTranslatedLang() || 'en-US';
-      currencies.sort((a, b) => {
-        const aName = app.polyglot.t(`cryptoCurrencies.${a}`, { _: a });
-        const bName = app.polyglot.t(`cryptoCurrencies.${b}`, { _: b });
-        return aName.localeCompare(bName, locale, { sensitivity: 'base' });
-      });
-
-      const disabledCurs = currencies.filter((c) => !isSupportedWalletCur(c));
-      const activeCurs = currencies.length && this.listing.isCrypto ? [currencies[0]] : [];
-
-      this.cryptoCurSelector = this.createChild(CryptoCurSelector, {
-        disabledMsg: app.polyglot.t('purchase.cryptoCurrencyInvalid'),
-        initialState: {
-          controlType: 'radio',
-          currencies,
-          disabledCurs,
-          sort: false,
-          activeCurs,
-        },
-      });
-
-      this.listenTo(this.cryptoCurSelector, 'currencyClicked', (cOpts) => {
-        if (cOpts.active) this.moderators.setState({ showOnlyCur: cOpts.currency });
-      });
-
       this.moderators = this.createChild(Moderators, {
         moderatorIDs: this.moderatorIDs,
         useCache: false,
@@ -637,7 +638,7 @@ export default {
         singleSelect: true,
         radioStyle: true,
         initialState: {
-          showOnlyCur: currencies[0],
+          showOnlyCur: this.currencies[0],
           showVerifiedOnly: true,
         },
       });
@@ -1072,9 +1073,6 @@ export default {
 
       this.moderators.delegateEvents();
       $('.js-moderatorsWrapper').append(this.moderators.el);
-
-      this.cryptoCurSelector.delegateEvents();
-      $('.js-cryptoCurSelectorWrapper').append(this.cryptoCurSelector.render().el);
 
       // if this is a re-render, and the payment exists, render it
       if (this.payment) {

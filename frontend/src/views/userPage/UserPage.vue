@@ -491,7 +491,7 @@ export default {
       let tabView = this.tabViewCache[targ];
       const tabOptions = {
         ownPage: this.ownPage,
-        model: this.model,
+        model: original(this.model),
         ...opts,
       };
 

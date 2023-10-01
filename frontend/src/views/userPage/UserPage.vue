@@ -141,6 +141,9 @@ export default {
       state: 'store',
       slug: '',
 
+      followingCount: 0,
+      followerCount: 0,
+
       tabViewCache: {},
       tabViews: { Home, Store, Follow, Reputation },
 
@@ -157,12 +160,22 @@ export default {
       loadingUserFailed: false,
     };
   },
+  beforeRouteUpdate(to, from) {
+  },
+  beforeRouteLeave(to, from) {
+    if (!this.loadingUserFailed) {
+      // The app has been routed to a new route, let's
+      // clean up by aborting all fetches
+      if (this.profileFetch?.abort) this.profileFetch.abort();
+      if (this.listingFetch) this.listingFetch.abort();
+    }
+  },
+  watch: {
+  },
   created() {
     this.initEventChain();
 
     this.init();
-
-    console.log('In userPage: ', this.$route)
   },
   mounted() {
     this.render();
@@ -171,31 +184,20 @@ export default {
     ob() {
       return {
         ...this.templateHelpers,
-        ...this.model.toJSON(),
+        ...this._model,
         ownPage: this.ownPage,
         showStoreWelcomeCallout: this.showStoreWelcomeCallout,
       };
     },
     headerHash() {
-      const ob = this.ob;
-      return ob.headerHashes ? (ob.isHiRez() ? ob.headerHashes.large : ob.headerHashes.medium) : '';
+      const headerHashes = this._model.headerHashes;
+      return headerHashes ? (isHiRez() ? headerHashes.large : headerHashes.medium) : '';
     },
+    ownPage() {
+      return this.model.id === app.profile.id;
+    }
   },
   watch: {
-    $route(to, from) {
-      console.log('in $route, from: ', from);
-      console.log('in $route, to: ', to);
-      if (!this.loadingUserFailed) {
-        // The app has been routed to a new route, let's
-        // clean up by aborting all fetches
-        if (this.profileFetch?.abort) this.profileFetch.abort();
-        if (this.listingFetch) this.listingFetch.abort();
-      }
-
-      if (to.params.guid && to.params.guid !== from.params.guild) {
-        this.init();
-      }
-    }
   },
   methods: {
     abbrNum,
@@ -237,6 +239,7 @@ export default {
       app.loadingModal.close();
 
       this.loadingUserFailed = false;
+      this.showUserLoading = true;
 
       this.loadingContextText = app.polyglot.t('userPage.loading.loadingText', { name: `<b>${handle || `${guid.slice(0, 8)}…`}</b>`, });
       this.isLoadingUser = true;
@@ -303,7 +306,6 @@ export default {
 
       this.setBlockedClass();
 
-      this.ownPage = this.model.id === app.profile.id;
       this.state = options.state || 'store';
 
       const stats = this.model.get('stats');
@@ -317,8 +319,6 @@ export default {
       } else {
         this.followingCount = app.ownFollowing.length;
       }
-
-      this.listenTo(this.model.get('headerHashes'), 'change', () => this.updateHeader());
 
       this.curConn = getCurrentConnection();
 
@@ -411,19 +411,6 @@ export default {
       this.isBlockedUser = isBlocked(this.model.id);
     },
 
-    updateHeader() {
-      const headerHashes = this.model.get('headerHashes').toJSON();
-      const headerHash = isHiRez() ? headerHashes.large : headerHashes.medium;
-
-      if (headerHash) {
-        $('.js-header').attr(
-          'style',
-          `background-image: url(${app.getServerUrl(`ob/image/${headerHash}`)}),
-        url('../imgs/defaultHeader.png')`
-        );
-      }
-    },
-
     createFollowersTabView(opts = {}) {
       const collection = new Followers([], {
         peerID: this.model.id,
@@ -478,7 +465,7 @@ export default {
         ...opts,
         initialFetch: Store.fetchListings(this.listings),
         collection: this.listings,
-        model: this.model,
+        model: original(this.model),
       });
     },
 

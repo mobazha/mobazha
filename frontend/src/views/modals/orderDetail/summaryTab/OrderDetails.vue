@@ -85,8 +85,7 @@
                   <div class="col6">
                     <div class="txB rowTn">{{ ob.polyT('orderDetail.summaryTab.orderDetails.moderatorHeading') }}</div>
                     <ModFragment v-if="isModerated" :modInfo="modInfo" />
-                    <template v-else> {{ ob.polyT('orderDetail.summaryTab.notApplicable') }}
-                    </template>
+                    <template v-else> {{ ob.polyT('orderDetail.summaryTab.notApplicable') }}</template>
                   </div>
                   <div class="col6">
                     <div class="txB rowTn">{{ ob.polyT('orderDetail.summaryTab.orderDetails.totalHeading') }}</div>

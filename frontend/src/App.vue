@@ -38,6 +38,7 @@ export default {
     return {
       modalName: '',
       initialized: false,
+      showLoadingModal: false,
 
       showShoppingCart: false,
       showWallet: false,

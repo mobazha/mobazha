@@ -91,7 +91,7 @@ function bindCollectionToVue(vm, key, ctx, bb) {
  * As VueBackbone can't support reactivity on new attributes added to a Backbone
  * Model, there's a safety with warning for it.
  */
-function bindModelToVue(ctx, bb) {
+function bindModelToVue(vm, key, ctx, bb) {
 	ctx.onchange = () => {
 		// Test for new attribute
 		if (bb.keys().length > Object.keys(bb._previousAttributes).length) {
@@ -100,6 +100,8 @@ function bindModelToVue(ctx, bb) {
 				"VueBackbone: Adding new Model attributes after binding is not supported, provide defaults for all properties"
 			);
 		}
+
+		vm.$data[getDataKey(key)] = rawSrc(bb);
 	};
 
 	bb.on("change", ctx.onchange);
@@ -109,7 +111,7 @@ function bindBBToVue(vm, key) {
 	var ctx = vm._vuebackbone[key],
 		bb = ctx.bb;
 
-	bb.models ? bindCollectionToVue(vm, key, ctx, bb) : bindModelToVue(ctx, bb);
+	bb.models ? bindCollectionToVue(vm, key, ctx, bb) : bindModelToVue(vm, key, ctx, bb);
 }
 
 /**

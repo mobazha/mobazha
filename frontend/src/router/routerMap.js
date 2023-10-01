@@ -3,6 +3,9 @@
  * @type { *[] }
  */
 
+import Profile from '../../backbone/models/profile/Profile';
+import app from '../../backbone/app';
+
 const constantRouterMap = [
   {
     path: '/',
@@ -31,7 +34,19 @@ const constantRouterMap = [
         meta: {
           watchParam: 'guid',
         },
-        props: true,
+        props: route => ({bb: function() {
+          let { guid } = route.params;
+
+          let model;
+          if (guid === app.profile.id) {
+            model = app.profile;
+          } else {
+            model = new Profile({ peerID: guid });
+          }
+          return {
+            model,
+          };
+        }}),
       },
       {
         path: 'search/:tab?',

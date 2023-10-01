@@ -1,25 +1,27 @@
 <template>
   <span class="quantityDisplay">
     <span v-if="typeof ob.amount === 'number'" :class="`content ${ob.contentClass}`">
-      <div v-if="ob.coinType">
+      <template v-if="ob.coinType">
         <span>{{ formattedAmount }}</span>
         <CryptoIcon :code="ob.coinType" />
-      </div>
-      <div v-else>{{ formattedAmount }}</div>
+      </template>
+      <template v-else>{{ formattedAmount }}</template>
     </span>
-    <div v-else-if="ob.isFetching">
+    <template v-else-if="ob.isFetching">
       <SpinnerSVG :className="ob.spinnerClass" />
-    </div>
-    <div v-else-if="ob.fetchFailed" :class="`content ${ob.contentFailedClass}`">
-      <div :class="`arrowBoxTipWrap ${ob.tipClass}`">
-        <div class="flexVCent gutterHSm">
-          <i class="clrT2">Unknown</i>
-          <i class="ion-help-circled"></i>
-        </div>
+    </template>
+    <template v-else-if="ob.fetchFailed">
+      <div :class="`content ${ob.contentFailedClass}`">
+        <div :class="`arrowBoxTipWrap ${ob.tipClass}`">
+          <div class="flexVCent gutterHSm">
+            <i class="clrT2">Unknown</i>
+            <i class="ion-help-circled"></i>
+          </div>
 
-        <div v-if="ob.fetchError" class="arrowBoxCenteredTop clrBr clrP">{{ message }}</div>
+          <div class="arrowBoxCenteredTop clrBr clrP">{{ message }}</div>
+        </div>
       </div>
-    </div>
+    </template>
   </span>
 </template>
 

@@ -1,11 +1,11 @@
 <template>
   <div class="suggestions flex gutterH row tx5 noOverflow">
-    <div v-if="ob.suggestions && ob.suggestions.length">
+    <template v-if="ob.suggestions && ob.suggestions.length">
       <span class="clrT2">{{ ob.polyT('search.suggestions') }}</span>
-      <div v-for="(suggestion, j) in ob.suggestions" :key="j">
+      <template v-for="(suggestion, j) in ob.suggestions" :key="j">
         <a class="clrT " @click="onClickSuggestion(suggestion)">{{ suggestion }}</a>
-      </div>
-    </div>
+      </template>
+    </template>
 
   </div>
 </template>

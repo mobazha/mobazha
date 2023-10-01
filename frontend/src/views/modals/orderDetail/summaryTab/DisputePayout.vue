@@ -1,9 +1,9 @@
 <template>
   <div class="disputePayoutEvent rowLg">
     <h2 class="tx4 margRTn">{{ ob.polyT('orderDetail.summaryTab.disputePayout.heading') }}</h2>
-    <div v-if="ob.timestamp">
+    <template v-if="ob.timestamp">
       <span class="clrT2 tx5b">{{ moment(ob.timestamp).format('lll') }}</span>
-    </div>
+    </template>
     <div class="border clrBr padMd">
       <div class="flexRow row">
         <div class="col8 gutterV">
@@ -34,13 +34,13 @@
         </div>
         <div class="col4 flexHRight">
           <div class="posR">
-            <div v-if="ob.showAcceptButton">
+            <template v-if="ob.showAcceptButton">
               <ProcessingButton
                 :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b js-acceptPayout ${acceptInProgress ? 'processing' : ''}`"
                 :disabled="acceptConfirmOn" :btnText="ob.polyT('orderDetail.summaryTab.disputePayout.btnAcceptPayout')"
                 @click="onClickAcceptPayout" />
-            </div>
-            <div v-if="ob.acceptConfirmOn">
+            </template>
+            <template v-if="ob.acceptConfirmOn">
               <div class="confirmBox acceptPayoutConfirm tx5 arrowBoxTop clrBr clrP clrT" @click="onClickAcceptPayoutConfirmedBox">
                 <div class="tx3 txB rowSm">{{ ob.polyT('orderDetail.summaryTab.disputePayout.acceptPayoutConfirm.title') }}</div>
                 <p>{{ ob.polyT('orderDetail.summaryTab.disputePayout.acceptPayoutConfirm.body') }}</p>
@@ -50,7 +50,7 @@
                   <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph" @click="onClickAcceptPayoutConfirmed">{{ ob.polyT('orderDetail.summaryTab.disputePayout.acceptPayoutConfirm.btnConfirm') }}</a>
                 </div>
               </div>
-            </div>
+            </template>
           </div>
         </div>
       </div>

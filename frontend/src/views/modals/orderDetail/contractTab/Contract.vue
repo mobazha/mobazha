@@ -1,14 +1,14 @@
 <template>
   <section>
-    <div v-if="info.heading">
+    <template v-if="info.heading">
       <h1 class="tx4 txB row">{{ info.heading }}</h1>
-    </div>
-    <div v-if="info.errors && info.errors.length">
+    </template>
+    <template v-if="info.errors && info.errors.length">
       <p class="txUnl rowSm clrTErr"><span class="ion-alert-circled padSm"></span>{{ ob.polyT('orderDetail.contractTab.contractErrorHeading') }}</p>
       <ul class="row">
         <li v-for="(err, j) in info.errors" :key="j" class="clrTErr rowSm">${err}</li>
       </ul>
-    </div>
+    </template>
     <div class="border clrBr clrP clrT rowLg js-jsonContractContainer" @click.stop></div>
 
     <div class="flexHRight">

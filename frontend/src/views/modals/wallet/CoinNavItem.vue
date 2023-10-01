@@ -4,18 +4,18 @@
     <CryptoIcon :code="mnCode" className="flexNoShrink" />
     <div :class="`flexExpand lineHeight1 ${ob.active ? 'clrT' : ''} coinName`">{{ ob.polyT(`cryptoCurrencies.${mnCode}`, { _: mnCode }) }}</div>
     <div :class="`${ob.balance > 0 ? 'clrTEm' : ''} flexNoShrink balanceText`">
-      <div v-if="ob.clientSupported">
+      <template v-if="ob.clientSupported">
         <div class="flexVCent flexHRight">
           <i v-if="ob.active" class="ion-arrow-right-c clrT2 activeBalanceIcon"></i>
           <span v-else-if="ob.balance > 0" class="clrTEm txB">{{ formattedBalance }}</span>
           <template v-else>{{ formattedBalance }}</template>
         </div>
-      </div>
-      <div v-else>
+      </template>
+      <template v-else>
         <span class="toolTip" :data-tip="ob.polyT('wallet.coinNav.unsupportedCurTip')">
           <i class="ion-help-circled"></i>
         </span>
-      </div>
+      </template>
     </div>
   </li>
 </template>

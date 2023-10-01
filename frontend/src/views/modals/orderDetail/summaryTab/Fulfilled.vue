@@ -1,32 +1,32 @@
 <template>
   <div class="fulfilledEvent rowLg">
     <h2 class="tx4 margRTn">{{ ob.polyT('orderDetail.summaryTab.fulfilled.heading') }}</h2>
-    <div v-if="ob.timestamp">
+    <template v-if="ob.timestamp">
       <span class="clrT2 tx5b">{{ ob.moment(ob.timestamp).format('lll') }}</span>
-    </div>
+    </template>
     <div class="border clrBr padMd">
-      <div v-if="ob.contractType === 'PHYSICAL_GOOD'">
+      <template v-if="ob.contractType === 'PHYSICAL_GOOD'">
         <div class="flex gutterH clrT">
           <div class="statusIconCol"><span class="clrBr ion-cube"></span></div>
           <div class="flexExpand tx5">
-            <div v-if="!ob.isLocalPickup">
+            <template v-if="!ob.isLocalPickup">
               <div class="rowTn txB">{{ ob.polyT('orderDetail.summaryTab.fulfilled.shippedByLabel') }} <span>{{ physicalDelivery.shipper }}</span></div>
               <div class="row">
                 <span>{{ ob.polyT('orderDetail.summaryTab.fulfilled.trackingNumberLabel') }}</span> {{ physicalDelivery.trackingNumber || ob.polyT('orderDetail.summaryTab.notApplicable') }}
-                <div v-if="physicalDelivery.trackingNumber">
+                <template v-if="physicalDelivery.trackingNumber">
                   <a class="clrTEm" @click="onClickCopyText(physicalDelivery.trackingNumber, $event)" data-status-indicator=".js-trackingCopiedToClipboard">{{
                       ob.polyT('orderDetail.summaryTab.fulfilled.copyLink') }}</a>
                   <a class="hide js-trackingCopiedToClipboard">{{ ob.polyT('copiedToClipboard') }}</a>
-                </div>
+                </template>
               </div>
-            </div>
+            </template>
             <div class="rowTn txB">{{ ob.noteFromLabel }}</div>
             <div>{{ ob.note ? ob.parseEmojis(ob.note) : ob.polyT('orderDetail.summaryTab.notApplicable') }}</div>
           </div>
         </div>
-      </div>
+      </template>
 
-      <div v-else-if="ob.contractType === 'DIGITAL_GOOD'">
+      <template v-else-if="ob.contractType === 'DIGITAL_GOOD'">
         <div class="flex gutterH clrT">
           <div class="statusIconCol clrT"><span class="clrBr ion-ios-folder"></span></div>
           <div class="flexExpand tx5">
@@ -38,17 +38,17 @@
             <div class="<% if (ob.showPassword) print('row') %>">
               <a class="clrTEm" :href="digitalDelivery.url" data-open-external>{{ digitalDelivery.url }}</a>
             </div>
-            <div v-if="ob.showPassword">
+            <template v-if="ob.showPassword">
               <div class="rowTn txB">{{ ob.polyT('orderDetail.summaryTab.fulfilled.passwordLabel') }}</div>
               <div class="row">{{ digitalDelivery.password || ob.polyT('orderDetail.summaryTab.notApplicable') }}</div>
-            </div>
+            </template>
             <div class="rowTn txB">{{ ob.noteFromLabel }}</div>
             <div>{{ ob.note ? ob.parseEmojis(ob.note) : ob.polyT('orderDetail.summaryTab.notApplicable') }}</div>
           </div>
         </div>
-      </div>
+      </template>
 
-      <div v-else-if="ob.contractType === 'SERVICE'">
+      <template v-else-if="ob.contractType === 'SERVICE'">
         <div class="flex gutterH clrT">
           <div class="statusIconCol clrT"><span class="clrBr ion-ios-body"></span></div>
           <div class="flexExpand tx5">
@@ -56,9 +56,9 @@
             <div>{{ ob.note ? ob.parseEmojis(ob.note) : ob.polyT('orderDetail.summaryTab.notApplicable') }}</div>
           </div>
         </div>
-      </div>
+      </template>
 
-      <div v-else-if="ob.contractType === 'CRYPTOCURRENCY'">
+      <template v-else-if="ob.contractType === 'CRYPTOCURRENCY'">
         <div class="flex gutterH clrT">
           <div class="statusIconCol">
             <CryptoIcon :code="ob.coinType" className="clrBr"/>
@@ -80,7 +80,7 @@
             <div>{{ ob.note ? ob.parseEmojis(ob.note) : ob.polyT('orderDetail.summaryTab.notApplicable') }}</div>
           </div>
         </div>
-      </div>
+      </template>
     </div>
 
   </div>

@@ -1,17 +1,17 @@
 <template>
   <div class="listBox clrBr clrP clrSh1">
     <div class="listGroup clrP clrBr serverList">
-      <div v-for="(server, j) in ob.servers" :key="j">
+      <template v-for="(server, j) in ob.servers" :key="j">
         <component :is="ob.connectedServer === server.id ? 'span' : 'a'" class="listItem js-navListItem"
           @click="onServerClick" :data-server-id="server.id">
           <span>
-            <div v-if="ob.connectedServer === server.id">
+            <template v-if="ob.connectedServer === server.id">
               <span class="connectedIcon ion-ios-checkmark-empty clrTEmph1 tx1"></span>
-            </div>
+            </template>
             {{ server.name }}
           </span>
         </component>
-      </div>
+      </template>
     </div>
     <div class="listGroup clrP clrBr">
       <a class="listItem js-navListItem" @click="onNewServerClick">

@@ -1,26 +1,26 @@
 <template>
   <div class="actionBtn">
     <div class="posR">
-      <div v-if="ob.phase === 'pay' || ob.phase === 'processing'">
+      <template v-if="ob.phase === 'pay' || ob.phase === 'processing'">
         <ProcessingButton
           :className="`btn width100 clrBAttGrad clrBrDec1 clrTOnEmph ${ob.phase} ${outdatedHash ? 'row' : ''}`"
           :disabled="initPay"
           @click="clickPayBtn"
           :btnText="ob.polyT('purchase.pay')" />
         <div v-if="showOutdatedHashErr" class="txCtr rowSm">${ob.purchaseErrT({ tip: errTip })}</div>
-      </div>
-      <div v-else-if="ob.phase === 'pending'">
+      </template>
+      <template v-else-if="ob.phase === 'pending'">
         <div class="btn width100 clrBAttGrad clrBrDec1 clrTOnEmph pendingBtn">
           {{ ob.polyT('purchase.pending') }}
         </div>
-      </div>
+      </template>
 
-      <div v-else-if="ob.phase === 'complete'">
+      <template v-else-if="ob.phase === 'complete'">
         <button class="btn width100 clrBAttGrad clrBrDec1 clrTOnEmph " @click="clickCloseBtn">
           {{ ob.polyT('purchase.close') }}
         </button>
-      </div>
-      <div v-if="confirmOpen">
+      </template>
+      <template v-if="confirmOpen">
         <div id="confirmPay" class="confirmBox arrowBoxCenteredTop clrBr clrP clrT clrSh1 js-confirmPay">
           <div class="flexColRows gutterVSm padLg">
             <h3>
@@ -40,20 +40,20 @@
             </a>
           </div>
         </div>
-      </div>
+      </template>
     </div>
     <div class="padSm flexColRows gutterVSm txSm txCtr clrT2">
-      <div v-if="ob.phase === 'pay'">
+      <template v-if="ob.phase === 'pay'">
         <span class="js-payNote">{{ ob.polyT('purchase.payNote') }}</span>
-      </div>
+      </template>
 
-      <div v-else-if="ob.phase === 'pending'">
+      <template v-else-if="ob.phase === 'pending'">
         <span class="js-pendingNote">{{ ob.polyT('purchase.pendingNote') }}</span>
-      </div>
+      </template>
 
-      <div v-else-if="ob.phase === 'complete'">
+      <template v-else-if="ob.phase === 'complete'">
         <span class="js-closeNote">{{ ob.polyT('purchase.closeNote') }}</span>
-      </div>
+      </template>
       <a class="clrTErr txU" href="https://mobazha.org/scam-prevention">{{ ob.polyT('purchase.scamWarning') }}</a>
     </div>
 

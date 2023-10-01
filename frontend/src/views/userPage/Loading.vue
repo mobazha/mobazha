@@ -5,18 +5,18 @@
         <section class="contentBox clrP clrBr clrSh3">
           <div class="padMd">
             <header>
-              <div v-if="ob.userAvatarHashes || ob.userName">
+              <template v-if="ob.userAvatarHashes || ob.userName">
                 <div>
                   <div class="titleRow flexVCent gutterHSm">
-                    <div v-if="ob.userAvatarHashes">
+                    <template v-if="ob.userAvatarHashes">
                       <div class="discTn clrBr2 clrSh1 flexNoShrink" :style="ob.getAvatarBgImage(ob.userAvatarHashes)"></div>
-                    </div>
-                    <div v-if="ob.userName">
+                    </template>
+                    <template v-if="ob.userName">
                       <h2 class="h4 txUnl lineHeight1 clrT">{{ ob.userName }}</h2>
-                    </div>
+                    </template>
                   </div>
                 </div>
-              </div>
+              </template>
             </header>
             <div class="txCtr">
               <div class="flexVCent flexInline gutterH row">
@@ -27,19 +27,19 @@
                   :style="ob.getAvatarBgImage(ob.userAvatarHashes)"
                 ></div>
               </div>
-              <div v-if="ob.isProcessing">
+              <template v-if="ob.isProcessing">
                 <h1 class="h3 clrT">{{ ob.polyT('userPage.loading.connecting') }}</h1>
-              </div>
+              </template>
 
-              <div v-else>
+              <template v-else>
                 <h1 class="h3 clrTErr">{{ ob.polyT('userPage.loading.failedToConnect') }}</h1>
-              </div>
+              </template>
               <div class="rowHg contentWrap">
-                <div v-if="ob.contentHtml">print(ob.contentHtml);</div>
+                <template v-if="ob.contentHtml">print(ob.contentHtml);</template>
 
-                <div v-else-if="ob.contentText">
+                <template v-else-if="ob.contentText">
                   <p class="clrT2 tx5" v-html="ob.contentText"></p>
-                </div>
+                </template>
               </div>
               <p class="clrT2 tx6 rowSm">{{ ob.polyT('userPage.loading.socialHeading') }}</p>
               <div class="flexVCent flexInline gutterHSm socialIcons">

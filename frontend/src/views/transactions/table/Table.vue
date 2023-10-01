@@ -1,22 +1,22 @@
 <template>
   <div class="transactionsTableWrap">
-    <div v-if="ob.isFetching">
+    <template v-if="ob.isFetching">
       <div class="center">
         <SpinnerSVG className="spinnerMd" />
       </div>
-    </div>
+    </template>
 
-    <div v-else-if="ob.fetchFailed">
+    <template v-else-if="ob.fetchFailed">
       <div class="center txCtr tx4">
         <div class="txB <% print(ob.initialFetchErrorMessage ? 'rowTn' : 'row') %>">{{ ob.polyT(`transactions.${ob.type}.unableToFetch`) }}</div>
         <div v-if="ob.fetchError" class="row">{{ ob.fetchError }}</div>
 
         <a class="btn clrP clrBr clrSh2" @click="onClickRetryFetch">{{ ob.polyT(`transactions.transactionsTable.btnRetryFetch`) }}</a>
       </div>
-    </div>
+    </template>
 
-    <div v-else>
-      <div v-if="ob.transactions.length">
+    <template v-else>
+      <template v-if="ob.transactions.length">
         <table class="js-transactionsTable transactionsTable clrBr clrP row">
           <tr>
             <th class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.orderID') }}</th>
@@ -65,14 +65,14 @@
           @clickNext="onClickNextPage"
           @clickPrev="onClickPrevPage"
         />
-      </div>
+      </template>
 
-      <div v-else>
+      <template v-else>
         <div class="contentBox clrP clrBr noResultsWrap">
           <div class="center">{{ ob.polyT(`transactions.${ob.type}.noResults`) }}</div>
         </div>
-      </div>
-    </div>
+      </template>
+    </template>
   </div>
 </template>
 

@@ -12,29 +12,29 @@
           </a>
           <div class="blockedAvatarOverlay disc clrBr2 clrSh1 clrP clrT"><i class="ion-eye-disabled center"></i></div>
         </div>
-        <div v-if="!ob.hideControls">
+        <template v-if="!ob.hideControls">
           <div class="userControls flexHRight gutterHSm">
-            <div v-if="!ob.ownGuid">
-              <div v-if="ob.moderator && ob.crypto.anySupportedByWallet(ob.moderatorInfo.acceptedCurrencies)">
+            <template v-if="!ob.ownGuid">
+              <template v-if="ob.moderator && ob.crypto.anySupportedByWallet(ob.moderatorInfo.acceptedCurrencies)">
                 <ProcessingButton
                   :className="`iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-mod ${ob.ownMod ? 'active' : ''}`"
                   @click.stop="modClick"
                   btnText='<i class="ion-briefcase"></i>'
                   :attrs="{ 'data-tip': ob.getModTip(ob.ownMod) }" />
-              </div>
+              </template>
               <ProcessingButton
                 :className="`iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-follow ${ob.followedByYou ? 'active' : ''}`"
                 @click.stop="followClick"
                 btnText='<i class="ion-person-stalker"></i>'
                 :attrs="{ 'data-tip': ob.getFollowTip(ob.followedByYou) }" />
               <div class="js-blockBtnContainer"></div>
-            </div>
+            </template>
           </div>
-        </div>
+        </template>
         <div class="js-verifiedMod"></div>
       </div>
       <div class="content">
-        <div v-if="!ob.loading && !ob.notFound">
+        <template v-if="!ob.loading && !ob.notFound">
           <div class="contentTop">
             <div>
               <a class="flex snipKids gutterH rowTn userName " @click="nameClick">
@@ -56,15 +56,15 @@
               v-html="ob.formatRating(ob.stats.averageRating, ob.stats.ratingCount)">
             </a>
           </div>
-        </div>
+        </template>
 
-        <div v-else-if="ob.loading">
+        <template v-else-if="ob.loading">
           <div class="h3 clrT">{{ ob.polyT('userShort.userLoading') }}</div>
-        </div>
+        </template>
 
-        <div v-else-if="ob.notFound">
+        <template v-else-if="ob.notFound">
           <div class="h5 txUnb clrT" v-html="ob.polyT('userShort.userNotFound', { guid: ob.guid })"></div>
-        </div>
+        </template>
       </div>
     </div>
 

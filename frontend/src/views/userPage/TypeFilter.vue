@@ -8,29 +8,29 @@
       <label for="filterListingTypeAll">{{ ob.polyT('userPage.store.typeFilter.all') }}</label>
     </div>
 
-    <div v-for="(type, index) in ob.types.slice(0, ob.maxInitiallyVisibleTypes - 1)" :key="index">
+    <template v-for="(type, index) in ob.types.slice(0, ob.maxInitiallyVisibleTypes - 1)" :key="index">
       <div class="btnRadio">
         <input type="radio" name="filterListingType" :value="type" :id="`filterListingType${flatType(type)}`" :checked="ob.selected === type" />
         <label :for="`filterListingType${flatType(type)}`">{{ ob.polyT(`formats.${type}`) }}</label>
       </div>
-    </div>
+    </template>
     <!-- // adding 1 to the length to account for the All type we hard-code %> -->
-    <div v-if="ob.types.length + 1 > ob.maxInitiallyVisibleTypes">
+    <template v-if="ob.types.length + 1 > ob.maxInitiallyVisibleTypes">
       <div :class="`js-moreTypesWrap moreTypesWrap ${ob.expanded ? 'expanded' : ''}`">
         <div class="moreTypes">
-          <div v-for="(type, index) in ob.types.slice(ob.maxInitiallyVisibleTypes - 1)" :key="index">
+          <template v-for="(type, index) in ob.types.slice(ob.maxInitiallyVisibleTypes - 1)" :key="index">
             <div class="btnRadio">
               <input type="radio" name="filterListingType" :value="type" :id="`filterListingType${flatType(type)}`" :checked="ob.selected === type" />
               <label :for="`filterListingType${flatType(type)}`">${ob.polyT(`formats.${type}`)}</label>
             </div>
-          </div>
+          </template>
         </div>
         <a class="clrT tx6 txU showMore" @click="onClickShowMoreLess">{{
           ob.polyT('userPage.store.typeFilter.showMore', ob.types.length + 1 - ob.maxInitiallyVisibleTypes)
         }}</a>
         <a class="clrT tx6 txU showLess" @click="onClickShowMoreLess">{{ ob.polyT('userPage.store.typeFilter.showLess') }}</a>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 

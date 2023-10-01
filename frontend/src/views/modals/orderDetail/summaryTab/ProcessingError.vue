@@ -1,24 +1,24 @@
 <template>
   <div class="rowLg clrTErr">
-    <div v-if="ob.isBuyer || ob.isModerator">
-      <div v-if="!ob.isModerated">
+    <template v-if="ob.isBuyer || ob.isModerator">
+      <template v-if="!ob.isModerated">
         <p v-if="!ob.errors.length"><span class="ion-alert-circled padSm"></span>{{
           !ob.isOrderCancelable ?
           ob.polyT('orderDetail.summaryTab.processingError.procErrBuyerNoMsg') :
           ob.polyT('orderDetail.summaryTab.processingError.procErrBuyerNoMsgCancelable')
         }}</p>
 
-        <div v-else>
+        <template v-else>
           <p><span class="ion-alert-circled padSm"></span>{{ ob.polyT('orderDetail.summaryTab.processingError.procErrBuyer') }}</p>
           <ul class="row">
             <li v-for="(err, j) in ob.errors" :key="j">{{ err }}</li>
           </ul>
-          <div v-if="ob.isOrderCancelable">
+          <template v-if="ob.isOrderCancelable">
             <p>{{ ob.polyT('orderDetail.summaryTab.processingError.youMayCancel') }}</p>
-          </div>
-        </div>
-      </div>
-      <div v-else>
+          </template>
+        </template>
+      </template>
+      <template v-else>
 
         <p v-if="!ob.errors.length"><span class="ion-alert-circled padSm"></span>{{
           !ob.isDisputable ?
@@ -26,29 +26,29 @@
           ob.polyT('orderDetail.summaryTab.processingError.procErrBuyerNoMsgDisputable')
         }}</p>
 
-        <div v-else>
+        <template v-else>
           <p><span class="ion-alert-circled padSm"></span>{{ ob.polyT('orderDetail.summaryTab.processingError.procErrBuyer') }}</p>
           <ul class="row"> <li v-for="(err, j) in ob.errors" :key="j">{{ err }}</li></ul>
-          <div v-if="ob.isDisputable && !ob.isModerator">
+          <template v-if="ob.isDisputable && !ob.isModerator">
             <p>{{ ob.polyT('orderDetail.summaryTab.processingError.youMayDispute') }}</p>
-          </div>
-        </div>
+          </template>
+        </template>
 
-      </div>
-    </div>
-    <div v-else>
+      </template>
+    </template>
+    <template v-else>
       <!-- it's the vendor -->
-      <div v-if="!ob.errors.length">
+      <template v-if="!ob.errors.length">
         <p><span class="ion-alert-circled padSm"></span>{{ ob.polyT('orderDetail.summaryTab.processingError.procErrVendorNoMsg') }}</p>
-      </div>
+      </template>
 
-      <div v-else>
+      <template v-else>
         <p><span class="ion-alert-circled padSm"></span>{{ ob.polyT('orderDetail.summaryTab.processingError.procErrVendor') }}</p>
         <ul>
           <li v-for="(err, j) in ob.errors" :key="j">{{ err }}</li>
         </ul>
-      </div>
-    </div>
+      </template>
+    </template>
   </div>
 </template>
 

@@ -9,7 +9,7 @@
         @clickRefresh="refreshTransactions()"
         @clickDismiss="this.showNewTxPopup = false"
       />
-      <div v-for="(model, key) in options.collection.models" :key="key" class="js-transactionListContainer borderStacked clrBr padMdKids">
+      <template v-for="(model, key) in options.collection.models" :key="key" class="js-transactionListContainer borderStacked clrBr padMdKids">
         <Transaction
           ref="transaction"
           :options="{
@@ -20,7 +20,7 @@
           @bumpFeeAttempt="onBumpFeeAttempt"
           @bumpFeeSuccess="onBumpFeeSuccess"
         />
-      </div>
+      </template>
     </div>
     <TransactionFetchState
       ref="transactionFetchState"
@@ -35,11 +35,11 @@
       @clickRetryFetch="clickRetryFetch"
     />
     <div class="js-transactionEmptyState"></div>
-    <div v-if="!ob.transactions.length && !isFetching && !ob.fetchFailed">
+    <template v-if="!ob.transactions.length && !isFetching && !ob.fetchFailed">
       <div class="center txCtr tx5 clrT2">
         {{ ob.polyT('wallet.transactions.noTransactionsPlaceholder', { coinType: ob.polyT(`cryptoCurrencies.${ob.coinType}`, { _: ob.coinType }) }) }}
       </div>
-    </div>
+    </template>
   </div>
 </template>
 

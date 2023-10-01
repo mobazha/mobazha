@@ -1,21 +1,21 @@
 <template>
   <div class="popInMessage clrP border clrBrT pad tx5 clrSh1">
-    <div v-if="ob.dismissable">
+    <template v-if="ob.dismissable">
       <a class="closeIcon tx2 js-dismiss" @click="onClickDismiss">
         <span class="ion-ios-close-empty clrBr clrP clrT clrBrT"></span>
       </a>
-    </div>
-    <div v-if="ob.messageText">
+    </template>
+    <template v-if="ob.messageText">
       <p class="txUnl">
         <span class="ion-alert-circled"></span>
         <b>{{ ob.messageText }}</b>
         <a class="clrTEm js-refresh" @click="onClickRefresh">{{ ob.polyT('refreshAlertPopInMessage.refreshLink') }}</a>
       </p>
-    </div>
+    </template>
 
-    <div v-else>
+    <template v-else>
       {{ ob.messageHTML }}
-    </div>
+    </template>
   </div>
 </template>
 

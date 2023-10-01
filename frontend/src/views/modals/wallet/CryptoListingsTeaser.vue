@@ -14,13 +14,13 @@
           {{ ob.polyT('wallet.cryptoTeaser.btnCreateListing') }}
         </a>
       </div>
-      <div v-if="viewCryptoListingsUrl">
+      <template v-if="viewCryptoListingsUrl">
         <div>
           <a class="tx6 txU js-viewCryptoListings" :href="viewCryptoListingsUrl">
             {{ ob.polyT('wallet.cryptoTeaser.linkViewCryptoListings') }}
           </a>
         </div>
-      </div>
+      </template>
     </div>
 
   </div>

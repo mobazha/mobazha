@@ -11,12 +11,12 @@
     </div>
     <div class="providersBar flexExpand">
       <div class="providerWrapper gutterH <% if(!ob.showSelectDefault) print('margR') %> js-providerWrapper">
-        <div v-if="ob.showSelectDefault">
+        <template v-if="ob.showSelectDefault">
           <div class="selectingBox confirmBox arrowBoxTop clrP clrBr clrSh1">
             <h2>{{ ob.polyT('search.chooseDefaultTitle') }}</h2>
             <p class="tx5">{{ ob.polyT('search.chooseDefaultMsg') }}</p>
           </div>
-        </div>
+        </template>
       </div>
       <div class="posR flexVCent addWrapper js-addWrapper <% if(!ob.showAdd) print('hide') %>">
         <button class="thumb clrP clrBr clrSh2 addBtn js-openAddBtn"><i class="ion-ios-plus-empty"></i></button>

@@ -3,7 +3,7 @@
 
     <div class="floR">
       <div class="pageControls flexVCent gutterH tx5">
-        <div v-if="countsAvailable">
+        <template v-if="countsAvailable">
           <div> {{
             ob.polyT('pageControls.displaying', {
               displayingCounts: ob.polyT('pageControls.displayingCounts', {
@@ -14,7 +14,7 @@
             })
           }}
           </div>
-        </div>
+        </template>
         <div class="btnStrip">
           <button class="btn clrP clrBr pagePrev" @click="onClickPrev" :disabled="disabledPrev">
             <i class="ion-arrow-left-b"></i>

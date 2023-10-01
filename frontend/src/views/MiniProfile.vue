@@ -14,9 +14,9 @@
         <div class="txt5b gutterHSm">
           <span class="clrT"
             v-html="`${ ob.parseEmojis('📍', '', { style: 'width: 10px' }) } ${ ob.location || ob.polyT('userPage.noLocation') }`"></span>
-          <div v-if="ob.followsYou">
+          <template v-if="ob.followsYou">
             <span v-html="`${ob.parseEmojis('👥', '', { style: 'width: 10px' })} ${ob.polyT('userPage.followsYou')}`"></span>
-          </div>
+          </template>
           <a class="ratingStrip" @click="onClickRating"
             v-html="ob.formatRating(ob.stats.averageRating, ob.stats.ratingCount)"></a>
         </div>

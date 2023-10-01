@@ -1,18 +1,18 @@
 <template>
   <div class="transactionFetchState">
-    <div v-if="ob.isFetching">
+    <template v-if="ob.isFetching">
       <div :class="`${ob.transactionsPresent ? 'txCtr' : 'center'}  padLg`">
         <SpinnerSVG className="spinnerMd" />
       </div>
-    </div>
+    </template>
 
-    <div v-else-if="ob.fetchFailed">
+    <template v-else-if="ob.fetchFailed">
       <div :class="`${ob.transactionsPresent ? '' : 'center'} txCtr tx5`">
         <div :class="`txB ${ob.initialFetchErrorMessage ? 'rowTn' : 'row'}`">{{ ob.polyT('wallet.transactions.fetchFailedMsg') }}</div>
         <div v-if="ob.fetchErrorMessage" class="row">{{ ob.fetchErrorMessage }}</div>
         <a class="btn clrP clrBr clrSh2" @click="onClickRetryFetch">Retry</a>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 

@@ -3,16 +3,16 @@
     <CryptoTradingPair :options="tradingPairOptions" />
 
     <div :class="ob.exchangeRateClass">
-      <div v-if="!ob.fromRateUnavailable && !ob.toRateUnavailable">
+      <template v-if="!ob.fromRateUnavailable && !ob.toRateUnavailable">
         {{ `${fromPairing} = ${toPairing} (${fromCurAmount})` }}
-      </div>
-      <div v-else>
+      </template>
+      <template v-else>
         {{ fromPairing }} =
         <span v-if="noExchangeRateTip" class="toolTip" :data-tip="noExchangeRateTip">
           <span :class="ob.iconClass"></span>
         </span>
         <span v-else :class="ob.iconClass"></span>
-      </div>
+      </template>
     </div>
   </div>
 </template>

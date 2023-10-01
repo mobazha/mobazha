@@ -14,9 +14,9 @@
           <span class="curName noOverflow">{{ cur.displayName }}</span>
         </label>
       </span>
-      <div v-if="cur.disabled && ob.disabledMsg">
+      <template v-if="cur.disabled && ob.disabledMsg">
         <span class="disabledMsg noOverflow clrTErr tx5b">{{ ob.disabledMsg }}</span>
-      </div>
+      </template>
     </li>
   </ul>
 </template>

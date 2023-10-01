@@ -1,9 +1,9 @@
 <template>
   <div class="acceptedEvent rowLg">
     <h2 class="tx4 margRTn">{{ ob.polyT('orderDetail.summaryTab.accepted.heading') }}</h2>
-    <div v-if="ob.timestamp">
+    <template v-if="ob.timestamp">
       <span class="clrT2 tx5b">{{ moment(ob.timestamp).format('lll') }}</span>
-    </div>
+    </template>
     <div class="border clrBr padMd">
       <div class="flexVCent gutterH clrT">
         <div class="avatarCol disc clrBr2 clrSh1 flexNoShrink" :style="ob.getAvatarBgImage(ob.avatarHashes)"></div>
@@ -13,20 +13,20 @@
         </div>
         <div class="col">
           <div class="flexVCent gutterHLg">
-            <div v-if="ob.showRefundButton">
-              <div v-if="refundOrderInProgress">
+            <template v-if="ob.showRefundButton">
+              <template v-if="refundOrderInProgress">
                 <span class="posR">
                   <!-- // including invisible refund link to properly space the spinner -->
                   <a class="txU tx6 invisible">{{ ob.polyT('orderDetail.summaryTab.accepted.refundBtn') }}</a>
                   <SpinnerSVG className="spinnerSm center" />
                 </span>
-              </div>
+              </template>
 
-              <div v-else>
+              <template v-else>
                 <div class="posR">
                   <a class="txU tx6" :disabled="refundConfirmOn || fulfillInProgress" @click="onClickRefundOrder">{{
                     ob.polyT('orderDetail.summaryTab.accepted.refundBtn') }}</a>
-                  <div v-if="refundConfirmOn">
+                  <template v-if="refundConfirmOn">
                     <div class="confirmBox refundConfirm tx5 arrowBoxTop clrBr clrP clrT"
                       @click="onClickRefundConfirmBox">
                       <div class="tx3 txB rowSm">{{ ob.polyT('orderDetail.summaryTab.accepted.refundConfirm.title') }}
@@ -46,16 +46,16 @@
                         <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph" @click="onClickRefundConfirmed">{{ ob.polyT('orderDetail.summaryTab.accepted.refundConfirm.btnConfirm') }}</a>
                       </div>
                     </div>
-                  </div>
+                  </template>
                 </div>
-              </div>
-            </div>
-            <div v-if="showFulfillButton">
+              </template>
+            </template>
+            <template v-if="showFulfillButton">
               <ProcessingButton
                 :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b js-fulfillOrder ${fulfillInProgress ? 'processing' : ''}`"
                 :disabled="refundOrderInProgress" :btnText="ob.polyT('orderDetail.summaryTab.accepted.fulfillBtn')"
                 @click="onClickFulfillOrder" />
-            </div>
+            </template>
           </div>
         </div>
       </div>

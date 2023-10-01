@@ -5,7 +5,7 @@
         <div class="popInMessageHolder js-popInMessages"></div>
 
         <div class="topControls gutterHSm flex">
-          <div v-if="ob.vendor">
+          <template v-if="ob.vendor">
             <div class="contentBox clrP clrSh3 clrBr clrT">
               <div class="padSm gutterHSm overflowAuto margRSm flexVCent">
                 <a class="clrBr2 clrSh1 discTn flexNoShrink" :style="ob.getAvatarBgImage(ob.vendor.avatarHashes)"></a>
@@ -13,17 +13,17 @@
                 <a class="link flexNoShrink tx6" @click="clickGoToListing">{{ ob.polyT('purchase.returnToListing') }}</a>
               </div>
             </div>
-          </div>
+          </template>
         </div>
 
         <div :class="`flexRow gutterH mainSection ${`phase${capitalize(ob.phase)}`}`">
           <div class="col9">
             <div class="flexColRow gutterV">
-              <div v-for="(listing, key) in ob.listings" :key="key">
+              <template v-for="(listing, key) in ob.listings" :key="key">
                 <section class="contentBox pad clrP clrBr clrSh3">
                   <div class="js-errors"></div>
                   <div class="js-items-quantity-errors"></div>
-                  <div v-if="!ob.isCrypto">
+                  <template v-if="!ob.isCrypto">
                     <div class="flexVCent gutterH">
                       <div class="thumb" :style="ob.getListingBgImage(listing.item.images[0])"></div>
                       <div class="flexExpand">
@@ -31,14 +31,14 @@
                           <div class="width100 noOverflow">
                             <b>{{ listing.item.title }}</b>
                           </div>
-                          <div v-for="(variant, j) in listing.options" :key="j">
+                          <template v-for="(variant, j) in listing.options" :key="j">
                             <div class="width100 noOverflow">
                               <span class="clrT2">{{ variant.name }}: {{ variant.value }}</span>
                             </div>
-                          </div>
+                          </template>
                         </div>
                       </div>
-                      <div v-if="ob.phase === 'pay' || ob.phase === 'processing'">
+                      <template v-if="ob.phase === 'pay' || ob.phase === 'processing'">
                         <div class="flexNoShrink">
                           <div class="flexVCent gutterH">
                             <div class="flexCol">
@@ -60,15 +60,15 @@
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </template>
                       <div class="pad flexNoShrink"><b>{{ listing.price }}</b></div>
                     </div>
-                  </div>
+                  </template>
 
-                  <div v-else>
+                  <template v-else>
                     <div class="flexVCent gutterHLg row cryptoTitleWrap">
                       <div :class="`js-cryptoTitle ${ob.phase !== 'pay' && ob.phase !== 'processing' ? 'flexExpand' : ''}`"></div>
-                      <div v-if="ob.phase === 'pay' || ob.phase === 'processing'">
+                      <template v-if="ob.phase === 'pay' || ob.phase === 'processing'">
                         <div class="flexExpand">
                           <div class="flexVCent gutterHLg">
                             <label for="cryptoAmount" class="clrT txB required">{{ ob.polyT('purchase.cryptoAmount') }}</label>
@@ -84,7 +84,7 @@
                                 placeholder="0.0000"
                                 size="8"
                                 data-var-type="bignumber">
-                              <div v-if="ob.displayCurrency !== listing.item.cryptoListingCurrencyCode">
+                              <template v-if="ob.displayCurrency !== listing.item.cryptoListingCurrencyCode">
                                 <select
                                   id="cryptoAmountCurrency"
                                   @change="changeCryptoAmountCurrency"
@@ -95,11 +95,11 @@
                                     :value="cur"
                                     :selected="cur === ob.cryptoAmountCurrency">{{ cur }}</option>
                                 </select>
-                              </div>
+                              </template>
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </template>
                       <div class="pad flexNoShrink">
                       {{ 
                         ob.crypto.cryptoPrice({
@@ -116,7 +116,7 @@
                       <label class="h4 flexExpand required" for="purchaseCryptoAddress">{{ heading }}</label>
                     </div>
                     <div class="js-items-paymentAddress-errors"></div>
-                    <div v-if="ob.phase === 'pay' || ob.phase === 'processing'">
+                    <template v-if="ob.phase === 'pay' || ob.phase === 'processing'">
                       <input type="text"
                         id="purchaseCryptoAddress"
                         @change="changeCryptoAddress"
@@ -124,18 +124,18 @@
                         :placeholder="ob.polyT('purchase.cryptoAddressPlaceholder', { coinType: coinName})"
                         class="clrBr clrP rowSm"
                         :maxlength="ob.itemConstraints.maxPaymentAddressLength" />
-                    </div>
+                    </template>
 
-                    <div v-else>
+                    <template v-else>
                       <p class="cryptoPaymentAddress">{{ ob.items[0].paymentAddress }}</p>
-                    </div>
+                    </template>
                     <div class="txSm clrT2">{{ helper }}</div>
-                  </div>
+                  </template>
                 </section>
-              </div>
+              </template>
             </div>
-            <div v-if="ob.phase === 'pay' || ob.phase === 'processing'">
-              <div v-if="ob.listing.shippingOptions && ob.listing.shippingOptions.length">
+            <template v-if="ob.phase === 'pay' || ob.phase === 'processing'">
+              <template v-if="ob.listing.shippingOptions && ob.listing.shippingOptions.length">
                 <section class="contentBox padMd clrP clrBr clrSh3 js-shipping">
                   <div class="js-shipping-errors js-items-shipping-errors"></div>
                   <Shipping
@@ -145,7 +145,7 @@
                     @newAddress="clickNewAddress"
                     />
                 </section>
-              </div>
+              </template>
               <section class="contentBox padMd clrP clrBr clrSh3">
                 <div class="flexColRows gutterVSm">
                   <div>
@@ -159,21 +159,21 @@
                 <div class="flexColRows gutterVSm">
                   <div class="flexVCentClearMarg">
                     <h2 class="h4 flexExpand required">{{ ob.polyT('purchase.paymentTypeTitle') }}</h2>
-                    <div v-if="ob.showModerators">
+                    <template v-if="ob.showModerators">
                       <input type="checkbox" id="purchaseVerifiedOnly" @click="onClickVerifiedOnly" :checked="ob.showVerifiedOnly">
                       <label class="tx5b" for="purchaseVerifiedOnly">{{ ob.polyT('settings.storeTab.verifiedOnly') }}</label>
-                    </div>
+                    </template>
                   </div>
-                  <div v-if="ob.showModerators && !ob.noValidModerators">
+                  <template v-if="ob.showModerators && !ob.noValidModerators">
                     <div class="js-moderated-errors"></div>
                     <div class="js-moderatorsWrapper"></div>
-                    <div v-if="!ob.noValidModerators">
+                    <template v-if="!ob.noValidModerators">
                       <div>
                         <div class="clrT2 tx6 rowMd">{{ ob.polyT('purchase.moderatorsDisclaimer') }}</div>
                       </div>
-                    </div>
+                    </template>
                     <hr class="clrBr row">
-                  </div>
+                  </template>
                   <DirectPayment class="moderatorsList" :active="!isModerated" @click="handleDirectPurchaseClick" />
                 </div>
               </section>
@@ -204,7 +204,7 @@
                     </div>
                   </div>
                   <div class="col6">
-                    <div v-if="ob.hasCoupons">
+                    <template v-if="ob.hasCoupons">
                       <div class="rowTn">
                         <label for="couponCode" class="tx5">
                           {{ ob.polyT('purchase.couponCode') }}
@@ -225,7 +225,7 @@
                       <div class="js-couponsWrapper">
                         <!-- // coupons are inserted here after they are added by the user. -->
                       </div>
-                    </div>
+                    </template>
                   </div>
                 </div>
                 <hr class="clrBr row">
@@ -244,13 +244,13 @@
                   :placeholder="ob.polyT('purchase.memoPlaceholder')"
                   v-model="ob.items[0].memo"></textarea>
               </section>
-            </div>
-            <div v-if="ob.phase === 'pending'">
+            </template>
+            <template v-if="ob.phase === 'pending'">
               <section class="contentBox padMd clrP clrBr clrSh3 js-pending"></section>
-            </div>
-            <div v-if="ob.phase === 'complete'">
+            </template>
+            <template v-if="ob.phase === 'complete'">
               <section class="contentBox padMd clrP clrBr clrSh3 js-complete"></section>
-            </div>
+            </template>
           </div>
           <div class="col3">
             <section class="contentBox pad clrP clrBr clrSh3 sidebar">
@@ -259,12 +259,12 @@
               <div class="rowLg">
                 <!-- <div class="js-receipt"></div> -->
                 <Receipt :order="order" :listing="listing" :prices="prices" :coupons="couponObj" :paymentCoin="paymentCoin" :showTotalTip="phase === 'pay'"/>
-                <div v-if="ob.showModerators && !ob.noValidModerators">
+                <template v-if="ob.showModerators && !ob.noValidModerators">
                   <hr class="clrBr">
                   <div class="padSm txSm txCtr clrT2">
                     {{ ob.polyT('purchase.moderatorNote') }}
                   </div>
-                </div>
+                </template>
               </div>
               <div class="tx6 js-feeChangeContainer"></div>
             </section>

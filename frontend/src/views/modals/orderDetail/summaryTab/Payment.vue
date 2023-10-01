@@ -2,20 +2,20 @@
   <div class="payment rowLg">
 
     <h2 class="tx4 margRTn">{{ heading }}</h2>
-    <div v-if="ob.timestamp">
+    <template v-if="ob.timestamp">
       <span class="clrT2 tx5b">{{ ob.moment(ob.timestamp).format('lll') }}</span>
-    </div>
+    </template>
     <div class="border clrBr padMd">
       <div class="flexVCent gutterH clrT">
         <!-- // if ob.amountShort.gt(0), it is partial payment, otherwise full payment -->
         <div :class="`statusIconCol ${amountShort.gt(0) ? 'clrTErr' : 'clrTEm'}`">
-          <div v-if="!ob.isCrypto">
+          <template v-if="!ob.isCrypto">
             <span :class="`clrBr ${amountShort.gt(0) ? 'ion-ios-close-empty' : 'ion-ios-checkmark-empty'}`"></span>
-          </div>
+          </template>
 
-          <div v-else>
+          <template v-else>
             <CryptoIcon :code="ob.paymentCoin" className="clrBr"/>
-          </div>
+          </template>
         </div>
         <div class="flexExpand tx5">
           <div class="rowTn txB">{{ infoLine }}</div>
@@ -23,13 +23,13 @@
             <div style="flex-shrink: 0">{{ confirmationsText }}</div>
             <div style="flex-shrink: 0;max-width: 80px">
               <div class="noOverflow">
-                <div v-if="ob.blockChainTxUrl">
+                <template v-if="ob.blockChainTxUrl">
                   <a class="clrT2 js-txidLink" :href="ob.blockChainTxUrl">{{ ob.txid }}</a>
-                </div>
+                </template>
 
-                <div v-else>
+                <template v-else>
                   <span class="clrT2">{{ ob.txid }}</span>
-                </div>
+                </template>
               </div>
             </div>
             <div>
@@ -37,20 +37,20 @@
             </div>
           </div>
         </div>
-        <div v-if="ob.showAcceptRejectButtons || ob.showCancelButton">
+        <template v-if="ob.showAcceptRejectButtons || ob.showCancelButton">
           <div class="col">
             <div class="flexVCent gutterHLg">
-              <div v-if="ob.showAcceptRejectButtons">
+              <template v-if="ob.showAcceptRejectButtons">
                 <div class="flexVCent gutterHLg">
-                  <div v-if="ob.rejectInProgress">
+                  <template v-if="ob.rejectInProgress">
                     <span class="posR">
                       <!-- // including invisible cancel link to properly space the spinner -->
                       <a class="txU tx6 invisible">{{ ob.polyT('orderDetail.summaryTab.payment.rejectBtn') }}</a>
                       <SpinnerSVG className="spinnerSm center" />
                     </span>
-                  </div>
+                  </template>
 
-                  <div v-else>
+                  <template v-else>
                     <div class="posR">
                       <a class="txU tx6" :disabled="ob.acceptInProgress" @click="onClickRejectOrder">{{ ob.polyT('orderDetail.summaryTab.payment.rejectBtn') }}</a>
                       <div class=" confirmBox rejectConfirm tx5 arrowBoxTop clrBr clrP clrT" @click="onClickRejectConfirmBox" v-show="ob.rejectConfirmOn">
@@ -69,31 +69,31 @@
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </template>
                   <ProcessingButton
                     :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b js-acceptOrder ${ob.acceptInProgress ? 'processing' : ''}`"
                     :disabled="ob.rejectInProgress" :btnText="ob.polyT('orderDetail.summaryTab.payment.acceptBtn')"
                     @click="onClickAcceptOrder" />
                 </div>
-              </div>
+              </template>
 
-              <div v-else-if="ob.showCancelButton">
-                <div v-if="ob.cancelInProgress">
+              <template v-else-if="ob.showCancelButton">
+                <template v-if="ob.cancelInProgress">
                   <span class="posR">
                     <!-- // including invisible cancel link to properly space the spinner -->
                     <a class="txU tx6 invisible">{{ ob.polyT('orderDetail.summaryTab.payment.cancelBtn') }}</a>
                     <SpinnerSVG className="spinnerSm center" />
                   </span>
-                </div>
+                </template>
 
-                <div v-else>
+                <template v-else>
                   <a class="txU tx6 " @click="onClickCancelOrder">{{ ob.polyT('orderDetail.summaryTab.payment.cancelBtn')
                   }}</a>
-                </div>
-              </div>
+                </template>
+              </template>
             </div>
           </div>
-        </div>
+        </template>
       </div>
     </div>
 

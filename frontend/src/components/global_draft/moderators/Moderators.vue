@@ -2,33 +2,33 @@
   <div class="moderatorsList">
     <div :class="`moderatorsWrapper clrBr ${ob.wrapperClasses} js-moderatorsWrapper`">
       <!-- // placeholder so border collapse doesn't erase the table border when there are no table cells -->
-      <div v-if="ob.placeholder">
+      <template v-if="ob.placeholder">
         <div class="moderatorCard clrBr">
           <div class="moderatorCardInner"></div>
         </div>
-      </div>
-      <div v-if="ob.totalIDs && !ob.totalShown">
+      </template>
+      <template v-if="ob.totalIDs && !ob.totalShown">
         <div class="moderatorCard moderatorsMessage clrBr">
           <div class="moderatorCardInner">
             <div class="flexCent">
               <div class="flexColRows flexHCent gutterVTn">
                 <h4>{{ ob.polyT(`${msgPath}.title`, opts) }}</h4>
                 <!-- // The section below is only relevant if the moderators are loaded in a purchasing context. -->
-                <div v-if="ob.purchase">
+                <template v-if="ob.purchase">
                   <div class="tx4 clrT2">{{ ob.polyT(`${msgPath}.body`) }}</div>
-                  <div v-if="showOnlyVer">
+                  <template v-if="showOnlyVer">
                     <!-- //just a spacer -->
                     <div class="padTn"></div>
                     <div>
                       <button class="btn clrP clrBr" @click="clickShowUnverified">{{ ob.polyT('moderators.showUnverified') }}</button>
                     </div>
-                  </div>
-                </div>
+                  </template>
+                </template>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </template>
     </div>
     <div class="js-statusWrapper"></div>
   </div>

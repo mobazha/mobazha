@@ -1,6 +1,6 @@
 <template>
   <div class="profileBox">
-    <div v-if="!options.isFetching">
+    <template v-if="!options.isFetching">
       <a :href="`#${options.peerID}`" :style="ob.getAvatarBgImage(info.avatarHashes,
         {
           standardSize: 'small',
@@ -8,7 +8,7 @@
         })" class="avatar clrBr2 clrSh1 disc"></a>
       <a :href="`#${options.peerID}`" class="txB clamp clrT">{{ info.name }}</a>
       <div class="clrT2 tx5 clamp">{{ info.location }}</div>
-    </div>
+    </template>
 
   </div>
 </template>

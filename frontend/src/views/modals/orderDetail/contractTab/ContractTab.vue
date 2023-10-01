@@ -8,9 +8,9 @@
     </div>
     <hr class="clrBr rowLg" />
     <div class="js-statusContainer rowLg"></div>
-    <div v-for="(contract, key) in contracts" :key="key">
+    <template v-for="(contract, key) in contracts" :key="key">
       <Contract :options="model.isCase ? contractOptions(contract) : { contract }"/>
-    </div>
+    </template>
   </div>
 </template>
 

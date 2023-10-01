@@ -1,6 +1,6 @@
 <template>
   <div class="convoMessage">
-    <div v-if="!ob.outgoing">
+    <template v-if="!ob.outgoing">
       <div class="gutterH flex rowLg">
         <a :href="`#${ob.peerID}`" :class="`avatar disc clrBr2 clrSh1 flexNoShrink ${!ob.showAvatar ? 'invisible' : ''}`"
           :style="ob.showAvatar ? ob.getAvatarBgImage(ob.avatarHashes) : ''"></a>
@@ -8,33 +8,33 @@
           <div :class="`contentBox msgContentBox clrBr clrP clrSh2 ${ob.showTimestampLine ? 'rowSm' : ''}`">
             <span class="tx5">{{ ob.processedMessage }}</span>
           </div>
-          <div v-if="ob.showTimestampLine">
+          <template v-if="ob.showTimestampLine">
             <div>
               <span class="clrT2 tx6">{{ timeLine }}</span>
             </div>
-          </div>
+          </template>
         </div>
       </div>
-    </div>
+    </template>
 
-    <div v-else>
+    <template v-else>
       <div class="flexHRight gutterH rowLg">
         <div class="posR flexExpand">
           <div
             :class="`contentBox msgContentBox clrBr clrP clrSh2 <% if (ob.showAsRead) print('read') %> ${ob.showTimestampLine ? 'rowSm' : ''}`">
             <span class="tx5">{{ ob.processedMessage }}</span>
           </div>
-          <div v-if="ob.showTimestampLine">
+          <template v-if="ob.showTimestampLine">
             <div>
               <span class="clrT2 tx6">{{ timeLine }}</span>
             </div>
-          </div>
+          </template>
         </div>
         <a :href="`#${app.profile.id}`"
           :class="`avatar disc clrBr2 clrSh1 flexNoShrink ${!ob.showAvatar ? 'invisible' : ''}`"
           :style="ob.showAvatar ? ob.getAvatarBgImage(ob.avatarHashes) : ''"></a>
       </div>
-    </div>
+    </template>
 
   </div>
 </template>

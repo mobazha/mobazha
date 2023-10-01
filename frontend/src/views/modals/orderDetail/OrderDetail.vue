@@ -5,14 +5,14 @@
         <div class="topControls flex">
           <!-- // This is something found at the top of multiple modals. Would be nice to make this into a template
       // and componentize the css. -->
-          <div v-if="returnText">
+          <template v-if="returnText">
             <div class="btnStrip clrSh3">
               <a class="btn clrP clrBr clrT" @click="onClickReturnBox">
                 <span class="ion-chevron-left margRSm"></span>
                 {{ returnText }}
               </a>
             </div>
-          </div>
+          </template>
         </div>
 
         <div class="flex gutterH">
@@ -38,21 +38,21 @@
           </div>
           <div class="flexExpand posR">
             <div class="contentBox clrP clrBr clrSh3 mainContent">
-              <div v-if="isFetching">
+              <template v-if="isFetching">
                 <div class="center"><SpinnerSVG className="spinnerMd" /></div>
-              </div>
+              </template>
 
-              <div v-else-if="fetchFailed">
+              <template v-else-if="fetchFailed">
                 <div class="center txCtr tx4">
                   <div :class="`txB ${ob.initialFetchErrorMessage ? 'rowTn' : 'row'}`">Unable to fetch order.</div>
-                  <div v-if="fetchError">
+                  <template v-if="fetchError">
                     <div class="row">{{ fetchError }}</div>
-                  </div>
+                  </template>
                   <a class="btn clrP clrBr clrSh2" @click="onClickRetryFetch">Retry</a>
                 </div>
-              </div>
+              </template>
 
-              <div v-else>
+              <template v-else>
                 <section class="tabContent js-tabContent">
                   <Summary
                     v-if="activeTab === 'summary'"
@@ -118,7 +118,7 @@
                   />
                   <!-- insert the tab subview here -->
                 </section>
-              </div>
+              </template>
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@
   <div class="moderatorCard clrBr" @click.stop="click">
     <div :class="`moderatorCardInner clrP ${isDisabled} ${ob.verified ? 'verified clrBrAlert2 clrBAlert2Grad' : ''}`">
       <div class="flexRow gutterH moderatorCardContent">
-        <div v-if="ob.radioStyle">
+        <template v-if="ob.radioStyle">
           <div class="flexNoShrink">
             <div class="btnRadio">
               <!-- // the card state may be set on render or set on the fly by the view -->
@@ -13,20 +13,20 @@
               ></div>
             </div>
           </div>
-        </div>
+        </template>
         <div class="flexNoShrink">
           <a class="userIcon disc clrBr2 clrSh1" :style="ob.getAvatarBgImage(ob.avatarHashes)"></a>
         </div>
         <div class="moderatorCardMiddle">
-          <div v-if="loaded">
+          <template v-if="loaded">
             <div class="flex snipKids gutterHSm rowSm">
               <strong class="txt5">{{ ob.name }}</strong>
               <span class="clrT2">{{ ob.handle ? `@${ob.handle}` : '' }}</span>
             </div>
             <div class="row">
-              <div v-if="ob.valid">
+              <template v-if="ob.valid">
                 <div class="rowTn clamp2">{{ ob.moderatorInfo.description }}</div>
-                <div v-if="ob.modLanguages && ob.modLanguages.length">
+                <template v-if="ob.modLanguages && ob.modLanguages.length">
                   <div class="txSm rowTn">
                     {{
                       ob.modLanguages.length > 1
@@ -34,55 +34,55 @@
                         : ob.modLanguages[0]
                     }}
                   </div>
-                </div>
+                </template>
                 <div class="flex gutterH tx5 detailsRow">
-                  <div v-if="ob.hasValidCurrency">
+                  <template v-if="ob.hasValidCurrency">
                     <div class="flexNoShrink modFee">
                       {{ ob.polyT(`moderatorCard.${ob.moderatorInfo.fee.feeType}`, { amount, percentage: ob.moderatorInfo.fee.percentage }) }}
                     </div>
                     <div>{{ ob.parseEmojis('📍') }}{{ ob.location || ob.polyT('userPage.noLocation') }}</div>
                     <div class="flexExpand flexNoShrink verifiedWrapper js-verifiedMod"></div>
-                  </div>
+                  </template>
 
-                  <div v-else>
+                  <template v-else>
                     <span class="clrTErr clamp2">{{ ob.polyT('moderatorCard.noCoinSupport') }}</span>
-                  </div>
+                  </template>
                 </div>
-                <div v-if="ob.showPreferredWarning">
+                <template v-if="ob.showPreferredWarning">
                   <div class="clrTErr note">{{ ob.polyT('moderatorCard.noPreferredSupport', { coins: ob.moderatorInfo.acceptedCurrencies.join(', ') }) }}</div>
-                </div>
-              </div>
+                </template>
+              </template>
 
-              <div v-else>
+              <template v-else>
                 <span class="clrTErr">{{ ob.polyT('moderatorCard.invalid') }}</span>
-              </div>
+              </template>
             </div>
-          </div>
+          </template>
 
-          <div v-else>
+          <template v-else>
             <div class="flexCol gutterVSm clrTErr">
               <strong class="txt5 noOverflow">{{ ob.peerID }}</strong>
               <span>{{ ob.polyT('moderatorCard.failed') }}</span>
             </div>
-          </div>
+          </template>
         </div>
         <div class="flexNoShrink">
-          <div v-if="ob.valid || ob.controlsOnInvalid">
+          <template v-if="ob.valid || ob.controlsOnInvalid">
             <div class="flexCol gutterV">
-              <div v-if="ob.valid">
+              <template v-if="ob.valid">
                 <button class="btn clrP clrBr clrSh2 selectBtn" @click="clickModerator">
                   {{ ob.polyT('moderatorCard.view') }}
                 </button>
-              </div>
-              <div v-if="!ob.radioStyle">
+              </template>
+              <template v-if="!ob.radioStyle">
                 <button class="btn clrP clrBr clrSh2 selectBtn js-selectBtn" :data-state="ob.selectedState">
                   <i class="ion-checkmark showIfSelected clrTEmph1"></i>
                   <i class="ion-close showIfDeselected clrTErr"></i>
                   <i class="ion-checkmark showIfUnselected clrTEmph1Disabled"></i>
                 </button>
-              </div>
+              </template>
             </div>
-          </div>
+          </template>
         </div>
       </div>
     </div>

@@ -1,9 +1,9 @@
 <template>
   <div class="actionBar gutterV">
-    <div v-if="ob.showDisputeOrderButton">
+    <template v-if="ob.showDisputeOrderButton">
       <ProcessingButton className="flex btn clrErr clrBrDec1 clrTOnEmph"
         :btnText="ob.polyT('orderDetail.actionBar.disputeOrderBtn')" @click="onClickOpenDispute" />
-    </div>
+    </template>
   </div>
 </template>
 

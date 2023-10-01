@@ -1,6 +1,6 @@
 <template>
   <div class="searchResults flexColRow gutterV">
-    <div v-if="ob.viewType === 'cryptoList'">
+    <template v-if="ob.viewType === 'cryptoList'">
       <div class="flexVCent txB clrBr clrP gutterH cryptoListViewHeader">
         <div class="tradeFromCol">{{ ob.polyT('search.cryptoListViewHeader.colTradeFrom') }}</div>
         <div class="tradeArrowCol"></div>
@@ -14,7 +14,7 @@
         <div class="inventoryCol flexExpand">{{ ob.polyT('search.cryptoListViewHeader.colInventory') }} <span class="toolTip txCtr" :data-tip="ob.polyT('search.cryptoListViewHeader.tipInventory')"><i class="ion-information-circled clrT2"></i></span></div>
         */ -->
       </div>
-    </div>
+    </template>
     <div class="noResultsMessage contentBox clrP clrBr clrSh3">
       <div class="padHg">
         <p class="txCtr">{{ ob.polyT('search.noResults') }}</p>
@@ -26,11 +26,11 @@
     <div :class="`listingsGrid ${ob.viewTypeClass} flex js-resultsGrid`"></div>
     <div class="pageControls js-pageControlsContainer"></div>
     <hr class="clrBr">
-    <div v-if="ob.loading">
+    <template v-if="ob.loading">
       <div class="flexCent loadingSearch clrS">
         <SpinnerSVG className="spinnerLg" />
       </div>
-    </div>
+    </template>
 
   </div>
 </template>

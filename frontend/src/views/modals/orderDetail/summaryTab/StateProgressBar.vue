@@ -1,6 +1,6 @@
 <template>
   <div class="stateProgressBar">
-    <div v-for="(state, index) in ob.states" :key="index">
+    <template v-for="(state, index) in ob.states" :key="index">
       <div :class="`stateSection ${index < ob.currentState ? 'active' : ''}`" :style="`width: ${statesWidth(index)}%`">
         <div class="stateTrack"></div>
         <div class="stateCircle">
@@ -8,13 +8,13 @@
         </div>
         <div class="stateCircleBorderFillIn"></div>
         <div class="stateLabel">{{ state }}</div>
-        <div v-if="ob.disputeState === index + 1">
+        <template v-if="ob.disputeState === index + 1">
           <div class="disputeOpenedBadge clrBr clrP">
             <span class="ion-alert-circled"></span>
           </div>
-        </div>
+        </template>
       </div>
-    </div>
+    </template>
 
   </div>
 </template>

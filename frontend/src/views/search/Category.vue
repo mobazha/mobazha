@@ -3,7 +3,7 @@
     <a class="clrT " @click="clickSeeAll">
       <h2>{{ ob.title }}</h2>
     </a>
-    <div v-if="ob.viewType === 'cryptoList'">
+    <template v-if="ob.viewType === 'cryptoList'">
       <div class="flexVCent txB clrBr clrP gutterH cryptoListViewHeader">
         <div class="tradeFromCol">{{ ob.polyT('search.cryptoListViewHeader.colTradeFrom') }}</div>
         <div class="tradeArrowCol"></div>
@@ -16,15 +16,15 @@
           {{ ob.polyT('search.cryptoListViewHeader.colInventory') }} <span class="toolTip txCtr" :data-tip="ob.polyT('search.cryptoListViewHeader.tipInventory')"><i class="ion-information-circled clrT2"></i></span>
         </div> -->
       </div>
-    </div>
+    </template>
     <div :class="`listingsGrid ${ob.viewTypeClass} flex js-resultsGrid`"></div>
     <div class="flexCent rowLg">
       <button class="btn clrP clrT clrBr clrSh1 " @click="clickSeeAll">{{ ob.polyT('search.categories.seeAllBtn') }}</button>
     </div>
     <hr class="clrBr row categoryRow">
-    <div v-if="ob.loading">
+    <template v-if="ob.loading">
       <div class="flexCent loadingSearch clrS">{{ ob.spinner({ className: 'spinnerLg' }) }}</div>
-    </div>
+    </template>
 
   </div>
 </template>

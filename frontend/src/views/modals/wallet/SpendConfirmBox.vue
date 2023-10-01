@@ -1,32 +1,32 @@
 <template>
   <div class="spendConfirmBox centeredBelow" @click="onDocumentClick">
-    <div v-if="ob.show">
+    <template v-if="ob.show">
       <div class="confirmBox sendConfirm arrowBoxTop clrBr clrP clrT clrSh1">
         <!-- // invisible heading for spacing purposes -->
         <div v-if="ob.fetchingFee" class="tx3 txB rowSm invisible">{{ ob.polyT('wallet.spendConfirmBox.heading') }}</div>
         <div v-else class="tx3 txB rowSm">{{ ob.polyT(ob.fetchError ? 'wallet.spendConfirmBox.errorHeading' : 'wallet.spendConfirmBox.heading') }}</div>
 
         <div class="posR padSm">
-          <div v-if="ob.fetchingFee">
+          <template v-if="ob.fetchingFee">
             <div class="txCtr">
               <SpinnerSVG className="spinnerMd" />
             </div>
-          </div>
+          </template>
 
-          <div v-else-if="ob.fetchFailed">
-            <div v-if="ob.fetchError === ob.ERROR_INSUFFICIENT_FUNDS">
+          <template v-else-if="ob.fetchFailed">
+            <template v-if="ob.fetchError === ob.ERROR_INSUFFICIENT_FUNDS">
               <p class="clrT2"> {{ ob.polyT('wallet.spendConfirmBox.bodyInsufficientFunds') }} </p>
-            </div>
-            <div v-else-if="ob.fetchError === ob.ERROR_DUST_AMOUNT">
+            </template>
+            <template v-else-if="ob.fetchError === ob.ERROR_DUST_AMOUNT">
               <p class="clrT2"> {{ ob.polyT('wallet.spendConfirmBox.bodyDustAmount') }} </p>
-            </div>
-            <div v-else>
+            </template>
+            <template v-else>
               <p class="clrT2">{{ ob.polyT('wallet.spendConfirmBox.bodyGenericError', { err: ob.fetchError || '' }) }}</p>
               <a @click.stop="onClickRetry">{{ ob.polyT('wallet.spendConfirmBox.btnRetry') }}</a>
-            </div>
-          </div>
+            </template>
+          </template>
 
-          <div v-else-if="ob.fee instanceof ob.bigNumber">
+          <template v-else-if="ob.fee instanceof ob.bigNumber">
             <p class="clrT2">
               {{
                 ob.polyT('wallet.spendConfirmBox.body', {
@@ -38,27 +38,27 @@
                 })
               }}
             </p>
-          </div>
+          </template>
         </div>
         <hr class="clrBr row" />
 
         <div class="flexHRight flexVCent gutterHLg">
-          <div v-if="ob.fetchingFee">
+          <template v-if="ob.fetchingFee">
             <!-- // invisible button for spacing purposes -->
             <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph invisible">{{ ob.btnSendText }}</a>
-          </div>
+          </template>
 
-          <div v-else-if="!ob.fetchFailed">
+          <template v-else-if="!ob.fetchFailed">
             <a @click.stop="onClickCancel">{{ ob.polyT('wallet.spendConfirmBox.btnCancel') }}</a>
             <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph " @click.stop="onClickSend">{{ ob.btnSendText }}</a>
-          </div>
+          </template>
 
-          <div v-else>
+          <template v-else>
             <a @click.stop="onClickCancel">{{ ob.polyT('wallet.spendConfirmBox.btnClose') }}</a>
-          </div>
+          </template>
         </div>
       </div>
-    </div>
+    </template>
 
   </div>
 </template>

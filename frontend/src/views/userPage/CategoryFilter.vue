@@ -16,7 +16,7 @@
       <label for="filterShippingCategoryAll">{{ ob.polyT('userPage.store.categoryFilter.all') }}</label>
     </div>
 
-    <div v-for="(cat, index) in ob.categories.slice(0, ob.maxInitiallyVisibleCats - 1)" :key="index">
+    <template v-for="(cat, index) in ob.categories.slice(0, ob.maxInitiallyVisibleCats - 1)" :key="index">
       <div class="btnRadio">
         <input
           @change="onChangeCategory"
@@ -28,12 +28,12 @@
         />
         <label :for="`filterShippingCategory${flatCategoryString(cat)}`">{{ cat }}</label>
       </div>
-    </div>
+    </template>
     <!-- // adding 1 to the length to account for the All category we hard-code -->
-    <div v-if="ob.categories.length + 1 > ob.maxInitiallyVisibleCats">
+    <template v-if="ob.categories.length + 1 > ob.maxInitiallyVisibleCats">
       <div :class="`js-moreCatsWrap moreCatsWrap ${ob.expanded ? 'expanded' : ''}`">
         <div class="moreCats">
-          <div v-for="(cat, index) in ob.categories.slice(ob.maxInitiallyVisibleCats - 1)" :key="index">
+          <template v-for="(cat, index) in ob.categories.slice(ob.maxInitiallyVisibleCats - 1)" :key="index">
             <div class="btnRadio">
               <input
                 @change="onChangeCategory"
@@ -45,14 +45,14 @@
               />
               <label :for="`filterShippingCategory${flatCategoryString(cat)}`">{{ cat }}</label>
             </div>
-          </div>
+          </template>
         </div>
         <a class="clrT tx6 txU showMore" @click="onClickShowMoreLess">{{
           ob.polyT('userPage.store.categoryFilter.showMore', ob.categories.length + 1 - ob.maxInitiallyVisibleCats)
         }}</a>
         <a class="clrT tx6 txU showLess" @click="onClickShowMoreLess">{{ ob.polyT('userPage.store.categoryFilter.showLess') }}</a>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 

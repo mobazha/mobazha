@@ -15,28 +15,28 @@
 
     <div class="js-timeoutInfoContainer"></div>
     <div class="js-subSections"></div>
-    <div v-if="!model.isCase">
+    <template v-if="!model.isCase">
       <div class="js-paymentsWrap"></div>
-    </div>
+    </template>
 
-    <div v-else>
+    <template v-else>
       <div class="rowLg">
         <h2 class="tx4 margRTn">{{ ob.polyT('orderDetail.summaryTab.payment.firstPaymentHeading') }}</h2>
         <div class="border clrBr padMd">
-          <div v-if="blockChainAddressUrl">
+          <template v-if="blockChainAddressUrl">
             <a :href="blockChainAddressUrl" class="clrTEm">
               {{ ob.polyT('orderDetail.summaryTab.payment.viewPaymentDetails', {
                 icon: '<span class="ion-android-open clrT2"></span>',
               }) }}
             </a>
-          </div>
+          </template>
 
-          <div v-else>
+          <template v-else>
             <span class="clrTErr">{{ ob.polyT('orderDetail.summaryTab.unableToShowPayments') }}</span>
-          </div>
+          </template>
         </div>
       </div>
-    </div>
+    </template>
     <div class="js-payForOrderWrap payForOrderWrap rowLg border clrBr padMd"></div>
     <OrderDetails :model="contract" :moderator="moderator"/>
   </div>

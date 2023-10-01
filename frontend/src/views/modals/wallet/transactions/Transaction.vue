@@ -30,14 +30,14 @@
             <a class="btn clrP clrBr clrSh2" :href="ob.walletCur.getBlockChainTxUrl(ob.txid, ob.isTestnet)">{{
               ob.polyT('wallet.transactions.transaction.viewDetailsBtn')
             }}</a>
-            <div v-if="ob.allowFeeBump">
+            <template v-if="ob.allowFeeBump">
               <ProcessingButton
                 :className="`btn clrP clrBr clrSh2 js-retryPmt ${ob.retryInProgress ? 'processing' : ''}`"
                 :disabled="ob.retryConfirmOn"
                 :btnText="ob.polyT('wallet.transactions.transaction.retryTransactionBtn')"
                 @click.stop="onClickRetryPmt"
               />
-            </div>
+            </template>
           </div>
         </div>
       </div>
@@ -46,25 +46,25 @@
       <div class="tx3 txB rowSm">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.title') }}</div>
       <SpinnerSVG v-if="ob.fetchingEstimatedFee" className="txCtr spinnerMd" />
 
-      <div v-else-if="ob.fetchFeeFailed">
+      <template v-else-if="ob.fetchFeeFailed">
         <p class="clrT2 bodyText">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.fetchError', { err: ob.fetchFeeError || '' }) }}</p>
         <a class="clrTEm" @click.stop="onClickRetryFeeFetch">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.btnRetry') }}</a>
-      </div>
+      </template>
 
-      <div v-else-if="typeof ob.estimatedFee === 'number'">
-        <div v-if="!insufficientFunds">
+      <template v-else-if="typeof ob.estimatedFee === 'number'">
+        <template v-if="!insufficientFunds">
           <p class="clrT2 bodyText">
             {{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.body', { currencyPairing: estimatedFeeCombo, asterisk: '<span>*</span>', }) }}
           </p>
-        </div>
-        <div v-else>
+        </template>
+        <template v-else>
           <p class="clrT2 bodyText">
             {{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.insufficientFundsBody', { currencyPairing: estimatedFeeCombo, asterisk:
             '<span>*</span>', }) }}
           </p>
-        </div>
+        </template>
         <p class="clrT2 tx6">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.subText', { asterisk: '<span>*</span>', }) }}</p>
-      </div>
+      </template>
       <hr class="clrBr row" />
       <div class="flexHRight flexVCent gutterHLg buttonBar">
         <a class="" @click="onClickRetryConfirmCancel">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.btnCancel') }}</a>
@@ -73,9 +73,9 @@
         }}</a>
       </div>
     </div>
-    <div v-if="ob.copiedIndicatorOn">
+    <template v-if="ob.copiedIndicatorOn">
       <div class="copiedIndicator clrT tx6">Copied to clipboard</div>
-    </div>
+    </template>
   </div>
 </template>
 

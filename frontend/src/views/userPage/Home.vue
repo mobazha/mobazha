@@ -3,7 +3,7 @@
     <div class="flexRow gutterH">
       <div class="col4 gutterVMd2">
         <div class="userCard js-userCard"></div>
-        <div v-if="ob.moderator && ob.moderatorInfo">
+        <template v-if="ob.moderator && ob.moderatorInfo">
           <div class="contentBox padMd2 clrBr clrP clrSh2 js-moderatorInfo">
             <div class="flexVBot gutterH rowLg snipKids">
               <div class="tx4 flexExpand">
@@ -34,7 +34,7 @@
               />
             </div>
           </div>
-        </div>
+        </template>
         <div class="informationList listBox padMd2 clrBr clrP clrSh2">
           <div class="informationHeader">
             <strong>{{ ob.polyT('userPage.information') }}</strong>
@@ -48,8 +48,8 @@
               <a class="clrT2" @click="guidClick(ob.peerID)" @mouseleave="guidLeave">{{ ob.peerID }}</a>
             </div>
           </div>
-          <div v-if="ob.contactInfo">
-            <div v-if="ob.contactInfo.website">
+          <template v-if="ob.contactInfo">
+            <template v-if="ob.contactInfo.website">
               <div class="listItem">
                 <div>{{ ob.polyT('userPage.website') }}</div>
                 <div>
@@ -58,25 +58,25 @@
                   }}</a>
                 </div>
               </div>
-            </div>
-            <div v-if="ob.contactInfo.email">
+            </template>
+            <template v-if="ob.contactInfo.email">
               <div class="listItem">
                 <div>{{ ob.polyT('userPage.email') }}</div>
                 <div class="clrT2">{{ ob.contactInfo.email }}</div>
               </div>
-            </div>
-            <div v-for="(account, key) in ob.contactInfo.social" :key="key">
+            </template>
+            <template v-for="(account, key) in ob.contactInfo.social" :key="key">
               <div class="listItem">
                 <div>{{ account.type }}</div>
                 <div class="clrT2">
-                  <div v-if="ob.is.url(account.username)">
+                  <template v-if="ob.is.url(account.username)">
                     <a data-open-external class="clrT2" :href="account.username">{{ account.username }}</a>
-                  </div>
-                  <div v-else>{{ account.username }}</div>
+                  </template>
+                  <template v-else>{{ account.username }}</template>
                 </div>
               </div>
-            </div>
-          </div>
+            </template>
+          </template>
         </div>
       </div>
       <div class="col8">
@@ -85,15 +85,15 @@
             <div class="informationHeader row">
               <strong>{{ ob.polyT('userPage.about') }}</strong>
             </div>
-            <div v-if="ob.about">
+            <template v-if="ob.about">
               {{ ob.about }}
-            </div>
+            </template>
 
-            <div v-else>
+            <template v-else>
               <span class="clrT2"
                 ><i>{{ ob.polyT('userPage.aboutEmpty') }}</i></span
               >
-            </div>
+            </template>
           </div>
         </div>
       </div>

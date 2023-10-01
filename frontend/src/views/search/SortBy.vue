@@ -1,26 +1,26 @@
 <template>
   <div class="row flexVBase gutterH">
     <div class="tx5 flexExpand">
-      <div v-if="ob.results">
+      <template v-if="ob.results">
         <div v-if="ob.term" v-html="ob.polyT('search.resultsFound', {
           term: ob.parseEmojis(ob.term),
           smart_count: ob.number.localizeNumber(ob.results.total),
         })">
         </div>
 
-        <div v-else>
+        <template v-else>
           <b>
             {{ ob.polyT('search.resultsTotal', {
               smart_count: ob.number.localizeNumber(ob.results.total),
             }) }}
           </b>
-        </div>
+        </template>
         <span class="toolTip" :data-tip="ob.polyT('search.resultsHelper')">
           <i class="ion-information-circled clrT2"></i>
         </span>
-      </div>
+      </template>
     </div>
-    <div v-if="ob.sortBy">
+    <template v-if="ob.sortBy">
       <div class="tx5b">
         {{ ob.polyT('search.sortBy') }}
       </div>
@@ -30,7 +30,7 @@
           </option>
         </select>
       </div>
-    </div>
+    </template>
 
   </div>
 </template>

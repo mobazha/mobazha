@@ -6,11 +6,11 @@
           <button class="btn clrP clrBr pagePrev" @click="onClickPrev" :disabled="ob.currentPage === 1">
             <span class="txUnb">{{ '< ' + ob.polyT('pageControlsTextStyle.previous') }}</span>
           </button>
-          <div v-if="typeof ob.currentPage === 'number'">
+          <template v-if="typeof ob.currentPage === 'number'">
             <div class="btn clrP clrBr unclickable">
               <span class="txUnb">{{ ob.number.localizeNumber(ob.currentPage) }}</span>
             </div>
-          </div>
+          </template>
           <button class="btn clrP clrBr pageNext" @click="onClickNext" :disabled="!ob.morePages">
             <span class="txUnb">{{ ob.polyT('pageControlsTextStyle.next') }} ></span>
           </button>

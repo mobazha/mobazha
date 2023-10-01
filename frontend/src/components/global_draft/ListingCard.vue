@@ -79,7 +79,7 @@
         </div>
       </div>
       <div class="pad clrBr borderTop infoArea">
-        <div v-if="ob.vendor">
+        <template v-if="ob.vendor">
           <a class="userIconWrapper js-userLink" :href="`#${ob.vendor.peerID}/store`">
             <div
               class="userIcon disc clrBr2 clrSh1 toolTipNoWrap js-vendorIcon"
@@ -97,7 +97,7 @@
               <i class="ion-eye-disabled"></i>
             </div>
           </div>
-        </div>
+        </template>
 
         <div class="rowSm">
           <!-- // The accepted currencies check is in case that data is not provided (e.g. a search provider omits),
@@ -110,7 +110,7 @@
           >
             <a class="clrT clamp listingTitle">{{ ob.title }}</a>
           </div>
-          <div v-else>
+          <template v-else>
             <a class="listingTitle">
               {{
                 ob.crypto.tradingPair({
@@ -121,7 +121,7 @@
                 })
               }}
             </a>
-          </div>
+          </template>
         </div>
 
         <div :class="`flexVCent ${priceRowTextClass}`">
@@ -129,14 +129,14 @@
             {{ formattedRating }}
           </div>
 
-          <div v-if="ob.contractType !== 'CRYPTOCURRENCY'">
+          <template v-if="ob.contractType !== 'CRYPTOCURRENCY'">
             {{
               ob.currencyMod.convertAndFormatCurrency(ob.price.amount, ob.price.currencyCode, ob.displayCurrency, {
                 maxDisplayDecimals: priceMaxDisplayDecimals,
               })
             }}
-          </div>
-          <div v-else>
+          </template>
+          <template v-else>
             {{
               ob.crypto.cryptoPrice({
                 priceAmount: ob.price.amount,
@@ -150,7 +150,7 @@
                 },
               })
             }}
-          </div>
+          </template>
         </div>
       </div>
       <div class="listingIcons">
@@ -167,12 +167,12 @@
           <div class="center tx2 nsfwAvatarOverlay">{{ ob.parseEmojis('😲') }}</div>
         </div>
         <div class="flexExpand">
-          <div v-if="ob.contractType !== 'CRYPTOCURRENCY' || !Array.isArray(ob.acceptedCurrencies) || !ob.acceptedCurrencies.length">
+          <template v-if="ob.contractType !== 'CRYPTOCURRENCY' || !Array.isArray(ob.acceptedCurrencies) || !ob.acceptedCurrencies.length">
             <div :class="`rowTn inlineBlock ${ob.title.length > 60 ? 'toolTip' : 'toolTipNoWrap'} toolTipTop`" :data-tip="ob.title">
               <a class="clrT clamp3 listingTitle">{{ ob.title }}</a>
             </div>
-          </div>
-          <div v-else>
+          </template>
+          <template v-else>
             {{
               ob.crypto.tradingPair({
                 className: 'cryptoTradingPairSm',
@@ -181,7 +181,7 @@
                 truncateCurAfter: 5,
               })
             }}
-          </div>
+          </template>
           <div class="flexVCent gutterHSm tx5b">
             <div class="flexNoShrink ratingStrip">
               {{ ob.formatRating(ob.averageRating, ob.ratingCount) }}
@@ -270,7 +270,7 @@
     <div class="inventoryCol flexExpand flexVCent flexHRight gutterHSm {{ inventoryTxClass }}">{{ inventory }}</div> -->
     </div>
 
-    <div v-if="['list', 'cryptoList'].includes(ob.viewType)">
+    <template v-if="['list', 'cryptoList'].includes(ob.viewType)">
       <div class="blockedOverlay overlayPanel coverFull clrP">
         <div class="flexCent">
           <div>
@@ -343,7 +343,7 @@
           </button>
         </div>
       </div>
-    </div>
+    </template>
 
     <div class="deleteOverlay coverFull overlayPanel">
       <div class="overlayPanelInner clrS"></div>

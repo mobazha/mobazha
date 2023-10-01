@@ -170,52 +170,52 @@ func updateTemplateContent(content string) string {
 
 	// update: <% if (cur.disabled && ob.disabledMsg) { %>
 	m = regexp.MustCompile(`(\s*)<%\s*if\s*\((.+?)\)\s*\{\s*(%>)?\s*\n`)
-	Str = "${1}<div v-if=\"${2}\">\n"
+	Str = "${1}<template v-if=\"${2}\">\n"
 	content = m.ReplaceAllString(content, Str)
 
 	// update: <% } else if (ob.listing.shippingOptions) { %>
 	m = regexp.MustCompile(`(\s*)<%\s*\}\s*else if\s*\((.+?)\)\s*\{\s*(%>)?\s*\n`)
-	Str = "${1}</div>\n${1}<div v-else-if=\"${2}\">\n"
+	Str = "${1}</template>\n${1}<template v-else-if=\"${2}\">\n"
 	content = m.ReplaceAllString(content, Str)
 
 	// update: <% } else { %>
 	m = regexp.MustCompile(`(\s*)<%\s*}\s*else\s*\{\s*%>\s*\n`)
-	Str = "${1}</div>\n${1}<div v-else>\n"
+	Str = "${1}</template>\n${1}<template v-else>\n"
 	content = m.ReplaceAllString(content, Str)
 
 	// update if/else if/else close tag: <% } %>
 	m = regexp.MustCompile(`(\s*)<%\s*}\s*%>\s*\n`)
-	Str = "${1}</div>\n"
+	Str = "${1}</template>\n"
 	content = m.ReplaceAllString(content, Str)
 
 	// update if/else if/else close tag: <% } %>
 	m = regexp.MustCompile(`(\s*)<%\s*}\s*%>\s*$`)
-	Str = "${1}</div>\n"
+	Str = "${1}</template>\n"
 	content = m.ReplaceAllString(content, Str)
 
 	// update <% ob.coupons.forEach((coupon) => { %>
 	m = regexp.MustCompile(`(\s*)<%\s*(\S.*\S)\.forEach\(\((\w+)\)\s*=>\s*\{\s*(%>)?\s*\n`)
-	Str = "${1}<div v-for=\"(${3}, j) in ${2}\" :key=\"j\">\n"
+	Str = "${1}<template v-for=\"(${3}, j) in ${2}\" :key=\"j\">\n"
 	content = m.ReplaceAllString(content, Str)
 
 	// update <% ob.coupons.forEach(coupon => { %>
 	m = regexp.MustCompile(`(\s*)<%\s*(\S.*\S)\.forEach\((\w+)\s*=>\s*\{\s*(%>)?\s*\n`)
-	Str = "${1}<div v-for=\"(${3}, j) in ${2}\" :key=\"j\">\n"
+	Str = "${1}<template v-for=\"(${3}, j) in ${2}\" :key=\"j\">\n"
 	content = m.ReplaceAllString(content, Str)
 
 	// update <% ob.coupons.forEach((coupon, i) => { %>
 	m = regexp.MustCompile(`(\s*)<%\s*(\S.*\S)\.forEach\(\((\w+, (\w+))\)\s*=>\s*\{\s*(%>)?\s*\n`)
-	Str = "${1}<div v-for=\"(${3}) in ${2}\" :key=\"${4}\">\n"
+	Str = "${1}<template v-for=\"(${3}) in ${2}\" :key=\"${4}\">\n"
 	content = m.ReplaceAllString(content, Str)
 
 	// update forEach close tag: <% }); %>
 	m = regexp.MustCompile(`(\s*)<%\s*}\);?\s*%>\s*\n`)
-	Str = "${1}</div>\n"
+	Str = "${1}</template>\n"
 	content = m.ReplaceAllString(content, Str)
 
 	// update forEach close tag: <% }); %>
 	m = regexp.MustCompile(`(\s*)<%\s*}\);?\s*%>\s*$`)
-	Str = "${1}</div>\n"
+	Str = "${1}</template>\n"
 	content = m.ReplaceAllString(content, Str)
 
 	return content

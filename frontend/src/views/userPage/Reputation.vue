@@ -2,7 +2,7 @@
   <div class="userPageReputation">
     <div class="flexColRows gutterVLg">
       <div class="contentBox flexRow flexVCent gutterH pad clrP clrBr statsBox">
-        <div v-if="!ob.isFetching">
+        <template v-if="!ob.isFetching">
           <div class="col6 txCtr">
             <div class="repBg">{{ ob.formatRating(ob.average, '', true) }}</div>
             <div class="tx2b">{{ ob.polyT('reputation.averageRating') }}</div>
@@ -12,17 +12,17 @@
             <div class="repBg">{{ ob.count }}</div>
             <div class="tx2b">{{ ob.polyT('reputation.totalReviews', { smart_count: ob.count }) }}</div>
           </div>
-        </div>
+        </template>
 
-        <div v-else>
+        <template v-else>
           <div class="flexHCent">
             <SpinnerSVG className="spinnerMd" />
           </div>
-        </div>
+        </template>
       </div>
-      <div v-if="!ob.isFetching">
+      <template v-if="!ob.isFetching">
         <div class="js-reviews"></div>
-      </div>
+      </template>
     </div>
   </div>
 </template>

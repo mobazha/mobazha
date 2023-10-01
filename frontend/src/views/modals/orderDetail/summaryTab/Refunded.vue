@@ -1,15 +1,15 @@
 <template>
   <div class="refunded rowLg">
     <h2 class="tx4 margRTn">{{ ob.polyT('orderDetail.summaryTab.refund.heading') }}</h2>
-    <div v-if="ob.timestamp">
+    <template v-if="ob.timestamp">
       <span class="clrT2 tx5b">{{ ob.moment(ob.timestamp).format('lll') }}</span>
-    </div>
+    </template>
     <div class="border clrBr padMd">
       <div class="flexVCent gutterH clrT">
         <div class="statusIconCol clrT">
-          <div v-if="!ob.isCrypto">
+          <template v-if="!ob.isCrypto">
             <span class="clrBr ion-ios-rewind"></span>
-          </div>
+          </template>
           <CryptoIcon v-else :code="ob.paymentCoin" className="clrBr" />
         </div>
         <div class="flexExpand tx5">
@@ -18,12 +18,12 @@
             <div class="" style="flex-shrink: 0">{{ confirmationsText }}</div>
             <div class="" style="flex-shrink: 0;max-width: 80px">
               <div class="noOverflow">
-                <div v-if="ob.blockChainTxUrl">
+                <template v-if="ob.blockChainTxUrl">
                   <a class="clrT2" :href="ob.blockChainTxUrl">{{ ob.transactionID }}</a>
-                </div>
-                <div v-else>
+                </template>
+                <template v-else>
                   <div class="clrT2">{{ ob.transactionID }}</div>
-                </div>
+                </template>
               </div>
             </div>
           </div>

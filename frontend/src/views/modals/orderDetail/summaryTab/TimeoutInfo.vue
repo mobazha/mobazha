@@ -8,24 +8,24 @@
       <div class="flexCol flexCent gutterVSm">
         <p :class="messageClass">{{ message }} <span :class="`toolTip clrT ${tipClass}`" :data-tip="tip"><i class="ion-help-circled"></i></span></p>
         <div class="flexCent gutterH">
-          <div v-if="ob.showDisputeBtn">
+          <template v-if="ob.showDisputeBtn">
             <button class="btn tx5b clrErr clrBrDec1 clrTOnEmph " @click="onClickDisputeOrder">{{ ob.polyT('orderDetail.summaryTab.timeoutInfo.btnDisputeOrder') }}</button>
-          </div>
-          <div v-if="ob.ownPeerID === ob.vendor && ob.isPaymentClaimable">
+          </template>
+          <template v-if="ob.ownPeerID === ob.vendor && ob.isPaymentClaimable">
             <ProcessingButton
               :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b js-claimPayment ${ob.isClaimingPayment ? 'processing' : ''}`"
               :btnText="ob.polyT('orderDetail.summaryTab.timeoutInfo.btnClaimPayment')"
               @click="onClickClaimPayment"/>
-          </div>
-          <div v-if="ob.showDiscussBtn">
+          </template>
+          <template v-if="ob.showDiscussBtn">
             <button class="btn tx5b clrP clrBr " @click="onClickDiscussOrder">{{ ob.polyT('orderDetail.summaryTab.timeoutInfo.btnDiscussOrder') }}</button>
-          </div>
-          <div v-if="ob.showResolveDisputeBtn">
+          </template>
+          <template v-if="ob.showResolveDisputeBtn">
             <ProcessingButton
               :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b js-resolveDispute ${ob.isResolvingDispute ? 'processing' : ''}`"
               :btnText="ob.polyT('orderDetail.summaryTab.timeoutInfo.btnResolveDispute')"
               @click="onClickResolveDispute"/>
-          </div>
+          </template>
         </div>
       </div>
     </div>

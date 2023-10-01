@@ -1,15 +1,15 @@
 <template>
   <div class="verifiedMod" @click.stop>
     <div :class="`innerWrap ${ob.verified ? 'verified' : 'unverified'}`">
-      <div v-if="!ob.wrapInfoIcon">
+      <template v-if="!ob.wrapInfoIcon">
         <div class="arrowBoxTipWrap">
           {{ textWrapper }}
           {{ arrowBox }}
         </div>
-      </div>
-      <div v-else>
+      </template>
+      <template v-else>
         {{ textWrapper }}
-      </div>
+      </template>
     </div>
   </div>
 </template>

@@ -1,9 +1,9 @@
 <template>
   <div>
     <div class="flexVCent gutterHSm rowTn">
-      <div v-if="modInfo.showAvatar">
+      <template v-if="modInfo.showAvatar">
         <div class="avatar clrBr2 clrSh1 disc" :style="ob.getAvatarBgImage(modInfo.avatarHashes || {})"></div>
-      </div>
+      </template>
       <div>{{ modInfo.name }}
         <a class="clrTEm" :href="`#${modInfo.peerID}`">{{ modInfo.handle && `@${modInfo.handle}` || `${modInfo.peerID.slice(0,
           modInfo.maxPeerIDLength)}…` }}</a>

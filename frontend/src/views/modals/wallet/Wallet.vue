@@ -39,7 +39,7 @@
             </div>
             <div class="col9">
               <div class="flexColWide gutterV">
-                <div v-if="activeCoin">
+                <template v-if="activeCoin">
                   <div class="js-coinStatsContainer"></div>
                   <CoinStats :options="{ initialState: coinStatsState }" />
                   <div>
@@ -67,13 +67,13 @@
                       <ReloadTransactions :options="{ initialState: { coinType: activeCoin } }" />
                     </div>
                   </div>
-                </div>
+                </template>
 
-                <div v-else>
+                <template v-else>
                   <div class="clrP clrSh3 clrBr border zeroSupportedCurs">
                     <div class="center">{{ ob.polyT('wallet.zeroSupportedCurs') }}</div>
                   </div>
-                </div>
+                </template>
               </div>
             </div>
           </div>

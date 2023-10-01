@@ -39,11 +39,11 @@
                   :placeholder="ob.polyT('addressBarPlaceholder')" :value="ob.addressBarText" />
                 <div class="js-addressBarIndicatorsContainer"></div>
               </div>
-              <div v-if="ob.testnet">
+              <template v-if="ob.testnet">
                 <div id="testnetFlag" class="btn barBtn normalBtn clrP clrBr">
                   <span class="toolTip" :data-tip="ob.polyT('testnetTooltip')">{{ ob.polyT('testnet') }}</span>
                 </div>
-              </div>
+              </template>
             </div>
           </div>
           <div class="rowDivV clrBrBk"></div>
@@ -52,12 +52,12 @@
               <a href="#search" class="toolTipNoWrap js-discover" :data-tip="ob.polyT('pageNav.toolTip.discover')" id="Nav_Discover">
                 <div class="discoverBtn navBtn" style="background-image: url('../imgs/obVectorIconSmall2.png')"></div>
               </a>
-              <div v-if="ob.showDiscoverCallout">
+              <template v-if="ob.showDiscoverCallout">
                 <div class="discoverCallout js-discoverCallout arrowBoxTop confirmBox clrP clrSh1 clrBr">
                   <div class="tx3 txB rowSm">{{ ob.polyT('pageNav.discoverCalloutTitle') }}</div>
                   <p>{{ ob.polyT('pageNav.discoverCalloutBody') }}</p>
                 </div>
-              </div>
+              </template>
               <a class="navBtn toolTipNoWrap" @click="navWalletClick" :data-tip="ob.polyT('pageNav.toolTip.wallet')"
                 id="Nav_Wallet">
                 <div class="iconBtn navWalletBtn">{{ ob.walletIconTmpl() }}</div>

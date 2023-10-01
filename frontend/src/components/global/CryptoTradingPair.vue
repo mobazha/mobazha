@@ -6,10 +6,10 @@
 
       <span :class="`pairingSeparator ion-android-arrow-forward ${ob.arrowIconClass || ''}`"></span>
       
-      <div v-if="ob.toCur">
+      <template v-if="ob.toCur">
         <CryptoIcon :code="ob.toCur"/>
         <span :class="`fromCur ${ob.toCurClass}`">{{ ob.toCur }}</span>
-      </div>
+      </template>
     </span>
   </div>
 </template>

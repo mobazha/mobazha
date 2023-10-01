@@ -3,12 +3,16 @@
     <nav id="pageTabBar" class="barLg clrP clrBr">
       <div class="flexVCent pageTabs">
         <MiniProfile :options="{
-          model,
           fetchFollowsYou: false,
           overwriteClickRating: true,
           initialState: {
             followsYou,
           },
+        }"
+        :bb="function() {
+          return {
+            model: model,
+          };
         }"
         @clickRating="clickRating" />
         <div class="flexExpand">
@@ -46,7 +50,7 @@
           <h1 class="txBg txUnb txUnl txGlow tabTitle js-tabTitle"></h1>
         </div>
         <div class="posR">
-          <div v-if="ob.ownPage">
+          <template v-if="ob.ownPage">
             <div class="btnStrip floR clrSh2">
               <a class="btn clrP clrBr" @click="clickCustomize">{{ ob.polyT('userPage.customize') }}</a>
               <a class="btn clrP clrBr" @click="clickCreateListing">{{ ob.polyT('userPage.createListing') }}</a>
@@ -55,12 +59,12 @@
           <a class="iconBtn clrP clrBr " @click="clickMore" ><i class="ion-android-more-vertical"></i> </a>
         -->
             </div>
-          </div>
+          </template>
 
-          <div v-else>
+          <template v-else>
             <SocialBtns :params="{ targetID: model.id, }" />
-          </div>
-          <div v-if="ob.showStoreWelcomeCallout">
+          </template>
+          <template v-if="ob.showStoreWelcomeCallout">
             <div class="storeWelcomeCallout js-storeWelcomeCallout arrowBoxBottom confirmBox clrP clrBr clrSh1 tx5">
               <div class="tx3 txB rowSm padSm">{{ ob.polyT('userPage.storeWelcomeCalloutTitle') }}</div>
               <hr class="clrBr rowMd" />
@@ -72,7 +76,7 @@
                 </button>
               </div>
             </div>
-          </div>
+          </template>
         </div>
       </div>
       <div class="tabContent js-tabContent">
@@ -116,6 +120,8 @@ import Reputation from '../../../backbone/views/userPage/Reputation';
 import Loading from './Loading.vue'
 import MiniProfile from '../MiniProfile.vue';
 
+import { original } from '@/plugins/vue-backbone/vue-backbone.js';
+
 export default {
   components: {
     Loading,
@@ -126,6 +132,7 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data() {
     return {

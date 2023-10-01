@@ -8,7 +8,7 @@
           <label for="cryptoAmount" class="clrT txB required">{{ ob.polyT('purchase.cryptoAmount') }}</label>
           <div class="inputSelect">
             <input type="text" class="clrBr clrP clrSh2" name="quantity" id="cryptoAmount" :value="ob.quantity" placeholder="0.0000" size="8">
-            <div v-if="ob.displayCurrency !== ob.listing.metadata.coinType">
+            <template v-if="ob.displayCurrency !== ob.listing.metadata.coinType">
               <select id="cryptoAmountCurrency" class="clrBr clrP nestInputRight">
                 <option
                   v-for="(cur, j) in [ob.listing.metadata.coinType, ob.displayCurrency]"
@@ -16,7 +16,7 @@
                   :value="cur"
                   :selected="cur === ob.cryptoAmountCurrency">{{ cur }}</option>
               </select>
-            </div>
+            </template>
           </div>
         </div>
       </div>

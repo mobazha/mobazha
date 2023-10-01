@@ -1,22 +1,22 @@
 <template>
   <div class="flexVCent gutterH">
     <div class="posR tx5b txU">
-      <div v-if="!ob.isResyncAvailable">
+      <template v-if="!ob.isResyncAvailable">
         <span class="toolTip" :data-tip="ob.polyT('wallet.reloadTransactionsWidget.syncUnavailable')"
           style="text-align: left">
           <a class=" disabled margRSm" @click="onClickResync">{{ ob.polyT('wallet.reloadTransactionsWidget.resyncBtn')
           }}</a><span class="ion-android-warning clrTErr"></span>
         </span>
-      </div>
+      </template>
 
-      <div v-else-if="ob.isSyncing">
+      <template v-else-if="ob.isSyncing">
         <a class="invisible">{{ ob.polyT('wallet.reloadTransactionsWidget.resyncBtn') }}</a>
         <SpinnerSVG className="center spinnerSm" />
-      </div>
+      </template>
 
-      <div v-else>
+      <template v-else>
         <a class="" @click="onClickResync">{{ ob.polyT('wallet.reloadTransactionsWidget.resyncBtn') }}</a>
-      </div>
+      </template>
     </div>
   </div>
 </template>

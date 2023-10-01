@@ -9,26 +9,26 @@
     </td>
 
     <td v-if="ob.type !== 'cases'" class="clrBr listingCol js-listingCol" @click.stop="onClickListingColLink">
-      <div v-if="!ob.coinType">
+      <template v-if="!ob.coinType">
         <div class="flexVCent gutterHSm">
           <a :href="`#${ob.vendorID}/store/${ob.slug}`" class="thumb" :style="ob.getListingBgImage({ small: ob.thumbnail, tiny: ob.thumbnail })"></a>
           <a :href="`#${ob.vendorID}/store/${ob.slug}`" class="noOverflow clrT">{{ ob.title }}</a>
         </div>
-      </div>
-      <div v-else>
+      </template>
+      <template v-else>
         <div class="flexVCent gutterHSm">
           <a :href="`#${ob.vendorID}/store/${ob.slug}`" class="clrT flexNoShrink js-cryptoTradingPairWrap"></a>
         </div>
-      </div>
+      </template>
     </td>
     <td v-for="(user, index) in userCols" :key="index" class="clrBr userCol js-userCol" @click.stop="onClickUserColLink">
       <div class="flexVCent gutterHSm">
         <a class="avatar discSm clrBr2 clrSh1 flexNoShrink" :href="`#${user.userId}`" :style="ob.getAvatarBgImage(user.avatarHashes)"></a>
         <a class="handle noOverflow clrT" :href="`#${user.userId}`">{{ user.userHandle ? `@${user.userHandle}` : user.userId }}</a>
         <div class="flexHRight">
-          <div v-if="ob.unreadChatMessages && index === 0">
+          <template v-if="ob.unreadChatMessages && index === 0">
             <span class="unreadBadge discSm clrE1 clrBrEmph1 clrTOnEmph">{{ ob.unreadChatMessages > 99 ? '…' : ob.unreadChatMessages }}</span>
-          </div>
+          </template>
         </div>
       </div>
     </td>
@@ -40,8 +40,8 @@
       </span>
     </td>
     <td class="clrBr gutterH statusCol">
-      <div v-if="ob.state === 'PENDING'">
-        <div v-if="ob.type === 'sales'">
+      <template v-if="ob.state === 'PENDING'">
+        <template v-if="ob.type === 'sales'">
           <span v-if="ob.rejectOrderInProgress" class="posR inlineBlock">
             <!-- // including invisible reject link to properly space the spinner -->
             <a class="txU tx6 invisible">{{ ob.polyT('transactions.transactionsTable.btnReject') }}</a>
@@ -55,8 +55,8 @@
             @click="onClickAcceptOrder"
             :btnText= "ob.polyT('transactions.transactionsTable.btnAccept')"
           />
-        </div>
-        <div v-else-if="!ob.moderated">
+        </template>
+        <template v-else-if="!ob.moderated">
           <!-- // Only non-moderated purchase can be canceled. We are not allowing PROCESSING_ERROR orders to be canceled here because
         // they need to be funded and we don't know if they are. If funded, they can be canceled on the Order Detail overlay. -->
           <span v-if="ob.cancelOrderInProgress" class="posR inlineBlock">
@@ -66,14 +66,14 @@
           </span>
           <a v-else class="txU tx6 " @click.stop="onClickCancelOrder">{{ ob.polyT('transactions.transactionsTable.btnCancel')
           }}</a>
-        </div>
-        <div v-else>
+        </template>
+        <template v-else>
           <span class="ulOnHover">{{ ob.polyT(`transactions.transactionsTable.status.${ob.state}`) }}</span>
-        </div>
-      </div>
-      <div v-else>
+        </template>
+      </template>
+      <template v-else>
         <span class="ulOnHover">{{ ob.polyT(`transactions.transactionsTable.status.${ob.state}`) }}</span>
-      </div>
+      </template>
     </td>
   </tr>
 </template>

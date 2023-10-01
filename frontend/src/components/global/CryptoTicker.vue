@@ -2,10 +2,12 @@
   <div class="cryptoTicker">
     <!-- We won't show anything if there is no displayRate is set. It's likely the required exchange
     rates weren't available to make the calculation. -->
-    <div v-if="displayRate" class="flexVCent clrP clrBr clrSh3 contentBox padSm toolTipNoWrap" :data-tip="tip">
-      <CryptoIcon :code="coinType" className="margRSm"/>
-      <strong class="tx5">{{ displayRate }}</strong>
-    </div>
+    <template v-if="displayRate">
+      <div class="flexVCent clrP clrBr clrSh3 contentBox padSm toolTipNoWrap" :data-tip="tip">
+        <CryptoIcon :code="coinType" className="margRSm"/>
+        <strong class="tx5">{{ displayRate }}</strong>
+      </div>
+    </template>
 
   </div>
 </template>

@@ -1,9 +1,9 @@
 <template>
   <div class="disputeStartedEvent rowLg">
     <h2 class="tx4 margRTn">{{ ob.polyT('orderDetail.summaryTab.disputeStarted.heading') }}</h2>
-    <div v-if="ob.timestamp">
+    <template v-if="ob.timestamp">
       <span class="clrT2 tx5b">{{ moment(ob.timestamp).format('lll') }}</span>
-    </div>
+    </template>
     <div class="border clrBr padMd">
       <div class="flex gutterH clrT">
         <div class="statusIconCol"><span class="clrBr ion-alert-circled"></span></div>
@@ -11,12 +11,12 @@
           <div class="rowTn txB">{{ introLine }}</div>
           <div>{{ ob.reason || ob.polyT('orderDetail.summaryTab.disputeStarted.noReasonProvided') }}</div>
         </div>
-        <div v-if="ob.showResolveButton">
+        <template v-if="ob.showResolveButton">
           <div class="col">
             <ProcessingButton className="btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b"
               :btnText="ob.polyT('orderDetail.summaryTab.disputeStarted.resolveBtn')" @click="onClickResolveDispute" />
           </div>
-        </div>
+        </template>
       </div>
     </div>
 

@@ -1,13 +1,13 @@
 <template>
   <div class="statusMessageWrap">
     <div :class="`statusMessage statusMessage-${ob.type}`">
-      <div v-if="ob.type === 'warning'">
+      <template v-if="ob.type === 'warning'">
         <span class="icon ion-alert-circled"></span>
-      </div>
+      </template>
 
-      <div v-else-if="ob.type === 'confirmed'">
+      <template v-else-if="ob.type === 'confirmed'">
         <span class="icon ion-ios-checkmark-empty"></span>
-      </div>
+      </template>
       <div v-html="ob.msg" />
     </div>
 

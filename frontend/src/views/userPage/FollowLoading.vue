@@ -1,22 +1,22 @@
 <template>
   <div class="followLoadingState txCtr tx5">
-    <div v-if="ob.isFetching">
+    <template v-if="ob.isFetching">
       <div class="loadingSpinnerWrap">
         <SpinnerSVG className="spinnerMd" />
       </div>
-    </div>
+    </template>
 
-    <div v-else-if="ob.fetchFailed">
+    <template v-else-if="ob.fetchFailed">
       <p>{{ ob.fetchErrorTitle }}</p>
-      <div v-if="ob.fetchErrorMsg">
+      <template v-if="ob.fetchErrorMsg">
         <p>{{ ob.fetchErrorMsg }}</p>
-      </div>
+      </template>
       <button class="btn normalBtn clrP clrBr" @click="onClickRetry">{{ ob.polyT('userPage.followTab.btnRetry') }}</button>
-    </div>
+    </template>
 
-    <div v-else-if="ob.noResults">
+    <template v-else-if="ob.noResults">
       <p>{{ ob.noResultsMsg }}</p>
-    </div>
+    </template>
   </div>
 </template>
 

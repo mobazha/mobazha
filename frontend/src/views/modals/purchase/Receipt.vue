@@ -3,7 +3,7 @@
     <hr class="clrBr">
     <b>{{ ob.polyT('purchase.receipt.summary') }}</b>
 
-    <div v-for="(priceObj, i) in prices" :key="i">
+    <template v-for="(priceObj, i) in prices" :key="i">
       <div class="flexRow gutterHSm">
         <span class="flexExpand">
           {{
@@ -33,7 +33,7 @@
           </div>
         </div>
       </div>
-      <div v-for="(coupon, j) in coupons" :key="j">
+      <template v-for="(coupon, j) in coupons" :key="j">
         <div class="flexRow gutterHSm">
           <span class="flexExpand">
             {{ ob.polyT('purchase.receipt.coupon') }}
@@ -48,7 +48,7 @@
             </div>
           </div>
         </div>
-      </div>
+      </template>
       <div
         v-if="listing.toJSON().shippingOptions && listing.toJSON().shippingOptions.length && priceObj.shippingPrice !== priceObj.additionalShippingPrice && priceObj.quantity > 1">
         <div class="flexRow gutterHSm">
@@ -82,7 +82,7 @@
         </div>
       </div>
 
-      <div v-else-if="listing.toJSON().shippingOptions && listing.toJSON().shippingOptions.length">
+      <template v-else-if="listing.toJSON().shippingOptions && listing.toJSON().shippingOptions.length">
         <div class="flexRow gutterHSm">
           <span class="flexExpand">
             {{ ob.polyT('purchase.receipt.shipping') }}
@@ -95,10 +95,10 @@
             </div>
           </div>
         </div>
-      </div>
+      </template>
       <hr class="clrBr">
-      <div v-if="priceObj.quantity && priceObj.quantity.gt(0)">
-        <div v-if="!listing.isCrypto">
+      <template v-if="priceObj.quantity && priceObj.quantity.gt(0)">
+        <template v-if="!listing.isCrypto">
           <div class="flexRow gutterHSm">
             <span class="flexExpand">
               {{ ob.polyT('purchase.receipt.subtotal', { quantity: ob.number.toStandardNotation(priceObj.quantity) }) }}
@@ -111,8 +111,8 @@
               </div>
             </div>
           </div>
-        </div>
-        <div v-if="listing.toJSON().shippingOptions && listing.toJSON().shippingOptions.length && priceObj.shippingTotal">
+        </template>
+        <template v-if="listing.toJSON().shippingOptions && listing.toJSON().shippingOptions.length && priceObj.shippingTotal">
           <div class="flexRow gutterHSm">
             <span class="flexExpand">
               {{ ob.polyT('purchase.receipt.shippingTotal') }}
@@ -125,8 +125,8 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </template>
+      </template>
       <div class="flexRow">
         <span class="flexExpand">
           {{ ob.polyT('purchase.receipt.total') }}
@@ -142,7 +142,7 @@
           </div>
         </div>
       </div>
-    </div>
+    </template>
 
   </div>
 </template>

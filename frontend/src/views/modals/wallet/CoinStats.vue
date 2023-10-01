@@ -21,16 +21,16 @@
         <div class="flexCol flexHCent gutterVSm padSm clrBr displayCurColContent">
           <div class="txB tx5">{{ ob.polyT('wallet.coinStats.valueInDisplayCur', { cur: ob.displayCur }) }}</div>
           <div :class="`clrTEm txB ${valueInDisplayCurSizeClass}`">
-            <div v-if="ob.currencyMod.isFiatCur(ob.displayCur)">
+            <template v-if="ob.currencyMod.isFiatCur(ob.displayCur)">
               {{ ob.currencyMod.convertAndFormatCurrency(ob.confirmed, ob.cryptoCur, ob.displayCur) }}
-            </div>
+            </template>
 
-            <div v-else>
+            <template v-else>
               <div class="flexVCent gutterHTn">
                 <div>{{ ob.currencyMod.convertAndFormatCurrency(ob.confirmed, ob.cryptoCur, ob.displayCur, { includeCryptoCurIdentifier: false }) }}</div>
                 <CryptoIcon :code="ob.displayCur" className="cryptoIcon18" />
               </div>
-            </div>
+            </template>
           </div>
         </div>
       </div>

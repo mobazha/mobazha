@@ -5,24 +5,24 @@
 -->
 
     <div :class="`flexRow gutterHLg ${ob.externallyFundable ? `pad rowMd` : ''}`">
-      <div v-if="ob.externallyFundable">
+      <template v-if="ob.externallyFundable">
         <div class="flexNoShrink">
           <a class="QR js-purchaseQRCode"><img :src="qrDataUri"></a>
         </div>
-      </div>
+      </template>
       <div class="flexExpand">
         <div class="flexVCent">
           <div class="flexExpand">
             <div class="rowSm clickable " @click="copyAmount">
               <span class="h1">{{ amountDueLine }}</span>
-              <div v-if="ob.externallyFundable">
+              <template v-if="ob.externallyFundable">
                 <button class="btnTxtOnly txUnb flipBtn js-copyAmount">
                   <span class="clrTEm unFlipped">{{ ob.polyT('purchase.pendingSection.copy') }}</span>
                   <span class="flipped">{{ ob.polyT('purchase.pendingSection.copied') }}</span>
                 </button>
-              </div>
+              </template>
             </div>
-            <div v-if="ob.externallyFundable">
+            <template v-if="ob.externallyFundable">
               <div class="tx5 rowMd clickable " @click="copyAddress">
                 <span :class="ob.paymentAddress.length > 34 ? 'toolTipNoWrap toolTipTop' : ''"
                   :data-tip="ob.paymentAddress.length > 34 ? ob.paymentAddress : ''">
@@ -33,7 +33,7 @@
                   <span class="flipped">{{ ob.polyT('purchase.pendingSection.copied') }}</span>
                 </button>
               </div>
-            </div>
+            </template>
             <div :class="`flexRow gutterH ${ob.externallyFundable ? 'rowLg' : 'rowMd'}`">
               <div class="col6">
                 <ProcessingButton
@@ -44,34 +44,34 @@
                 <div class="js-confirmWalletContainer"></div>
               </div>
             </div>
-            <div v-if="ob.externallyFundable">
+            <template v-if="ob.externallyFundable">
               <div class="txBase clrT2">
-                <div v-if="['BTC', 'TBTC'].includes(ob.paymentCoin)">
+                <template v-if="['BTC', 'TBTC'].includes(ob.paymentCoin)">
                   <p>
                     {{ ob.polyT('purchase.pendingSection.walletNote') }} <button class="btnAsLink "
                       @click="clickFundWallet">{{ ob.polyT('purchase.pendingSection.walletLink') }}</button>
                   </p>
-                </div>
+                </template>
                 <p> {{ ob.polyT('purchase.pendingSection.feeNote') }} </p>
               </div>
-            </div>
+            </template>
           </div>
         </div>
       </div>
     </div>
     <div class="tx6 clrT2">
-      <div v-if="['BTC', 'TBTC'].includes(ob.paymentCoin)">
+      <template v-if="['BTC', 'TBTC'].includes(ob.paymentCoin)">
         <p>{{ ob.polyT('purchase.pendingSection.note1', {
           link: `<a class="clrTEm" href="https://www.openbazaar.org/bitcoin">${ob.polyT('purchase.pendingSection.note1Link')}</a>`,
         }) }}</p>
-      </div>
-      <div v-if="ob.isModerated">
+      </template>
+      <template v-if="ob.isModerated">
         <p>
           {{ ob.polyT('purchase.pendingSection.note2') }}
           <br>
           {{ ob.polyT('purchase.pendingSection.note3') }}
         </p>
-      </div>
+      </template>
       <p>{{ ob.polyT('purchase.pendingSection.note4') }}</p>
     </div>
 

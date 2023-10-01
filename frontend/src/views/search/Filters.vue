@@ -1,49 +1,49 @@
 <template>
   <div class="filters">
     <form class="flexColWide gutterV">
-      <div v-for="(filter, key) in ob.filters" :key="key">
-        <div v-if="['dropdown', 'checkbox', 'radio'].includes(filter.type)">
+      <template v-for="(filter, key) in ob.filters" :key="key">
+        <template v-if="['dropdown', 'checkbox', 'radio'].includes(filter.type)">
           <div class="contentBox pad clrP clrBr clrSh2">
             <div class="rowSm txB tx5b">{{ filter.label }}</div>
-            <div v-if="filter.type === 'dropdown'">
+            <template v-if="filter.type === 'dropdown'">
               <select :name="key" class="select2Small">
                 <!-- // if any option has a selected value use the first one. Otherwise use the first default.
           // parsing the label for emojis isn't needed here because the select list is replaced by select2.js -->
                 <option v-for="(option, ind) in filter.options" :key="ind" :selected="selectedIndex(filter) === ind"
                   :value="option.value">{{ option.label }}</option>
               </select>
-            </div>
+            </template>
 
-            <div v-else-if="filter.type === 'radio'">
+            <template v-else-if="filter.type === 'radio'">
               <div class="flexCol">
                 <!-- // if any options has a checked value, check the first one. Otherwise use the first default. -->
-                <div v-for="(option, ind) in filter.options" :key="ind">
+                <template v-for="(option, ind) in filter.options" :key="ind">
                   <div class="btnRadio clrBr">
                     <input type="radio" :name="key" :id="key + ind" :checked="selectedIndex(filter) === ind"
                       :value="option.value">
                     <label :for="key + ind"><span v-html="ob.parseEmojis(option.label)"></span></label>
                   </div>
-                </div>
+                </template>
               </div>
-            </div>
+            </template>
 
-            <div v-else-if="filter.type === 'checkbox'">
+            <template v-else-if="filter.type === 'checkbox'">
               <div class="flexCol checkboxCol row">
-                <div v-for="(option, index) in filter.options" :key="index">
+                <template v-for="(option, index) in filter.options" :key="index">
                   <input type="checkbox" :checked="isChecked(filter)" :id="key + index"
                     :name="`${key}${filter.options.length > 1 ? '[]' : ''}`" :value="option.value">
                   <label :for="key + index"><span v-html="ob.parseEmojis(option.label)"></span></label>
-                </div>
+                </template>
               </div>
               <div class="flex tx5b">
                 <a class="flexExpand " @click="clickFilterAll" :name="key">Select All</a>
                 <a class="flexExpand txRgt " @click="clickFilterNone" :name="key">Select None</a>
               </div>
               <!-- else { console.log(`Unrecognized filter type: ${filter.type}`); } -->
-            </div>
+            </template>
           </div>
-        </div>
-      </div>
+        </template>
+      </template>
     </form>
 
   </div>

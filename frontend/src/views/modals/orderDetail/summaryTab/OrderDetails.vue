@@ -12,14 +12,14 @@
               <a :href="`#${`${listing.vendorID.peerID}/store/${listing.slug}`}`" :class="`txB clrT inlineBlock ${description || isCrypto ? 'rowTn' : ''}`">{{ title }}</a>
               <div v-if="sku">{{ ob.polyT('orderDetail.summaryTab.orderDetails.skuLabel') }}: {{ sku }}</div>
               <div v-if="item.options && item.options.length">{{ item.options.map(option => `${option.name}:&nbsp;${option.value}`).join(',&nbsp;') }}</div>
-              <div v-if="isCrypto">
+              <template v-if="isCrypto">
                 <div class="rowTn">
                   <span class="txB">{{ ob.polyT('orderDetail.summaryTab.orderDetails.quantityHeading') }}:</span>
                   {{ ob.currencyMod.convertAndFormatCurrency(item.quantity, coinType) }}
                   <a class=" clrTEm" v-if="item.quantity" @click="onClickCopyCryptoQuantity(item.quantity)"> {{ ob.polyT('orderDetail.summaryTab.orderDetails.copyLink') }}</a>
                 </div>
                 <div class="clrT2 hide orderDetailsCopiedToClipboard js-cryptoQuantityCopiedToClipboard">{{ ob.polyT('copiedToClipboard') }}</div>
-              </div>
+              </template>
             </div>
           </div>
           <hr class="clrBr" />
@@ -27,7 +27,7 @@
             <div class="col4">
               <div :class="`gutterVTn ${isCrypto ? 'row' : ''}`">
                 <div class="txB">{{ ob.polyT('orderDetail.summaryTab.orderDetails.shipToHeading') }}</div>
-                <div v-if="order.shipping && order.shipping.country !== 'NA'">
+                <template v-if="order.shipping && order.shipping.country !== 'NA'">
                   <div>{{ order.shipping.shipTo }}</div>
                   <div v-if="order.shipping.address">{{ order.shipping.address }}</div>
                   <div v-if="addressLine3">{{ addressLine3 }}</div>
@@ -44,11 +44,11 @@
                       {{ order.shipping.addressNotes }}
                     </div>
                   </div>
-                </div>
+                </template>
 
-                <div v-else>
+                <template v-else>
                   {{ ob.polyT('orderDetail.summaryTab.notApplicable') }}
-                </div>
+                </template>
                 <span class="clrT2 hide orderDetailsCopiedToClipboard js-orderDetailsCopiedToClipboard">{{ ob.polyT('copiedToClipboard') }}</span>
               </div>
               <div v-if="isCrypto" class="gutterVTn">
@@ -85,8 +85,8 @@
                   <div class="col6">
                     <div class="txB rowTn">{{ ob.polyT('orderDetail.summaryTab.orderDetails.moderatorHeading') }}</div>
                     <ModFragment v-if="isModerated" :modInfo="modInfo" />
-                    <div v-else> {{ ob.polyT('orderDetail.summaryTab.notApplicable') }}
-                    </div>
+                    <template v-else> {{ ob.polyT('orderDetail.summaryTab.notApplicable') }}
+                    </template>
                   </div>
                   <div class="col6">
                     <div class="txB rowTn">{{ ob.polyT('orderDetail.summaryTab.orderDetails.totalHeading') }}</div>

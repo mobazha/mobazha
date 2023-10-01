@@ -16,21 +16,21 @@
         </div>
       </div>
     </div>
-    <div v-if="ob.isFetching">
+    <template v-if="ob.isFetching">
       <div class="txCtr padHg contentBox clrBr clrP">
         <SpinnerSVG className="spinnerLg" />
       </div>
-    </div>
+    </template>
 
-    <div v-else-if="ob.fetchFailed">
+    <template v-else-if="ob.fetchFailed">
       <div class="txCtr padHg contentBox clrBr clrP">
         <h3>{{ ob.polyT('userPage.store.unableToFetchListings') }}</h3>
         <p>{{ ob.fetchFailReason }}</p>
         <ProcessingButton className="btn clrP clrBr js-retryFetch" :btnText="ob.polyT('userPage.store.retryStoreFetch')" @click="onClickRetryFetch" />
       </div>
-    </div>
+    </template>
 
-    <div v-else-if="!ob.isFetching">
+    <template v-else-if="!ob.isFetching">
       <div class="flex">
         <div class="col storeFilters" :disabled="!ob.listingCount">
           <div class="js-shippingFilterContainer clrP clrBr padMd clrT clrSh2 contentBox">
@@ -56,7 +56,7 @@
           <div class="js-typeFilterContainer"></div>
         </div>
         <div class="col storeListings">
-          <div v-if="ob.listingCount">
+          <template v-if="ob.listingCount">
             <div class="row clrT tx5 flexVBot listingsHeaderRow">
               <span class="listingsCount js-listingCount"></span>
               <div>
@@ -84,14 +84,14 @@
               <p>{{ ob.polyT('userPage.store.noListingsFound') }}</p>
               <div class="btn clrP clrBr" @click="onClickClearSearch">{{ ob.polyT('userPage.store.btnClearSearch') }}</div>
             </div>
-          </div>
+          </template>
 
-          <div v-else>
+          <template v-else>
             <div class="txCtr padGi tx4">{{ ob.polyT('userPage.store.noListings') }}</div>
-          </div>
+          </template>
         </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 

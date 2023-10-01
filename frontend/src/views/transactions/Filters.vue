@@ -1,6 +1,6 @@
 <template>
   <div :class="`filters rowHg`">
-    <div v-for="(row, i) in rows" :key="i">
+    <template v-for="(row, i) in rows" :key="i">
       <div class="flex gutterH gutterV">
         <div class="col3" v-for="(filter, j) in row" :key="j">
           <div :class="`filter clrP clrBr clrSh2 ${filter.className}`">
@@ -11,11 +11,11 @@
         </div>
 
         <!-- // If necessary, add in spacers. -->
-        <div v-for="k in (maxPerRowFinal - row.length)" :key="k">
+        <template v-for="k in (maxPerRowFinal - row.length)" :key="k">
           <div class="col3"></div>
-        </div>
+        </template>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 

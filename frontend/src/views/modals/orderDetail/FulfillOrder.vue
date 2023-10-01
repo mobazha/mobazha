@@ -8,7 +8,7 @@
     </div>
     <hr class="clrBr rowMd" />
     <form class="padKids padStack pad clrP clrBr js-fulfillForm">
-      <div v-if="contractType === 'PHYSICAL_GOOD' && !isLocalPickup">
+      <template v-if="contractType === 'PHYSICAL_GOOD' && !isLocalPickup">
         <div class="flexRow gutterH">
           <div class="col3">
             <label for="fulfillOrderShippingCarrier" class="required">{{
@@ -33,9 +33,9 @@
               :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.trackingPlaceholder`)" />
           </div>
         </div>
-      </div>
+      </template>
 
-      <div v-else-if="contractType === 'DIGITAL_GOOD'">
+      <template v-else-if="contractType === 'DIGITAL_GOOD'">
         <div class="flexRow gutterH">
           <div class="col3">
             <label for="fulfillOrderFileUrl" class="required">{{ ob.polyT(`orderDetail.fulfillOrderTab.fileUrlLabel`)
@@ -58,9 +58,9 @@
               :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.passwordPlaceholder`)" />
           </div>
         </div>
-      </div>
+      </template>
 
-      <div v-else-if="contractType === 'CRYPTOCURRENCY'">
+      <template v-else-if="contractType === 'CRYPTOCURRENCY'">
         <div class="flexRow gutterH">
           <div class="col3">
             <label for="fulfillOrderTransactionID" class="required">{{
@@ -75,7 +75,7 @@
               :maxlength="constraints.transactionIDLength" />
           </div>
         </div>
-      </div>
+      </template>
       <div class="flexRow gutterH rowHg">
         <div class="col3">
           <label for="fulfillOrderNote">{{ ob.polyT(`orderDetail.fulfillOrderTab.noteLabel`) }}</label>
@@ -85,9 +85,9 @@
           <textarea rows="6" name="note" :class="`clrBr clrP clrSh2 ${contractType === 'DIGITAL_GOOD' ? 'rowSm' : ''}`"
             id="fulfillOrderNote" :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.notePlaceholder`)"
             v-model="info.note"></textarea>
-          <div v-if="contractType === 'DIGITAL_GOOD'">
+          <template v-if="contractType === 'DIGITAL_GOOD'">
             <div class="clrT2 txSm">{{ ob.polyT(`orderDetail.fulfillOrderTab.noteHelperTextDigital`) }}</div>
-          </div>
+          </template>
         </div>
       </div>
     </form>

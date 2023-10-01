@@ -5,12 +5,12 @@
       // CSS and hover all the previos icons on hover, the icons are
       // displayed in reverse order via flex-direction. This requires index
       // calculations to be computed from the end. -->
-      <div v-for="(i, key) in ob.maxRating" :key="key">
+      <template v-for="(i, key) in ob.maxRating" :key="key">
         <a :class="`ratingIcon ${ob.clickable ? 'clickable' : ''}`" :selected="ob.curRating > ob.maxRating - i"
           @click="onClickRatingIcon"
           v-html="ob.parseEmojis('⭐', ob.iconClrClass)">
         </a>
-      </div>
+      </template>
     </div>
     <span :class="`ratingNumbers ${ob.numberClrClass}`">({{ ob.curRating }}/{{ ob.maxRating }})</span>
   </div>

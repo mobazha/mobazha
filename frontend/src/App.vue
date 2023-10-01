@@ -3,7 +3,7 @@
     <section id="pageNavContainer"></section>
     <section id="contentFrame" class="clrBr">
       <div id="pageContainer">
-        <router-view v-if="toggleVue" />
+        <router-view v-if="toggleVue && initialized" :key="$route.params[$route.meta.watchParam]" />
       </div>
     </section>
     <section id="statusBar"></section>
@@ -15,6 +15,7 @@
     <ShoppingCart v-if="initialized && showShoppingCart" @close="onShoppingCartClose" @openPurchaseModal="onOpenPurchaseModal"/>
     <Wallet v-if="initialized" v-show="showWallet" @close="onWalletClose" />
     <Purchase v-if="showPurchase" @close="onPurchaseClose" />
+    <LoadingModal v-if="initialized" v-show="showLoadingModal" />
   </div>
 </template>
 
@@ -22,12 +23,14 @@
 import ShoppingCart from '@/views/ShoppingCart.vue';
 import Wallet from '@/views/modals/wallet/Wallet.vue';
 import Purchase from './views/modals/purchase/Purchase.vue';
+import LoadingModal from './views/modals/Loading.vue';
 
 export default {
   components: {
     ShoppingCart,
     Wallet,
     Purchase,
+    LoadingModal,
   },
   name: 
     'App',

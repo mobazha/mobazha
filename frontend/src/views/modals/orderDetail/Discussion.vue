@@ -1,5 +1,5 @@
 <template>
-  <div :class="`discussionTab clrP ${messages.length ? 'noMessages' : ''} ${fetching ? 'loadingMessages' : ''} ${isTyping ? 'isTyping' : ''}`">
+  <div :class="`discussionTab clrP ${messages.length ? 'noMessages' : ''} ${loadingMessages ? 'loadingMessages' : ''} ${isTyping ? 'isTyping' : ''}`">
     <div class="typingIndicator tx5 noOverflow clrBr clrP clrT2 clrSh1">{{ typingIndicatorContent }}</div>
     <div class="convoMessagesWindow tx6 js-convoMessagesWindow">
       <SpinnerSVG />
@@ -65,6 +65,8 @@ export default {
       inputMessage: '',
       typingIndicatorContent: '',
       isTyping: false,
+
+      loadingMessages: false,
     };
   },
   created () {
@@ -123,8 +125,6 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      this.model = options.model;
-  
       if (!options.orderID) {
         throw new Error('Please provide an orderID.');
       }
@@ -139,6 +139,8 @@ export default {
       if (options.moderator) {
         checkValidParticipantObject(options.moderator, 'moderator');
       }
+
+      this.baseInit(options);
 
       this.showLoadMessagesError = false;
       this.fetching = false;
@@ -175,6 +177,7 @@ export default {
       if (!(mdCl instanceof GroupMessages)) return;
 
       this.showLoadMessagesError = false;
+      this.loadingMessages = true;
 
       this.fetching = true;
 
@@ -186,6 +189,7 @@ export default {
       if (!(mdCl instanceof GroupMessages)) return;
 
       this.showLoadMessagesError = false;
+      this.loadingMessages = false;
 
       if (response && !response.length) {
         this.fetchedAllMessages = true;
@@ -207,6 +211,7 @@ export default {
 
     onMessagesFetchError () {
       this.showLoadMessagesError = true;
+      this.loadingMessages = false;
     },
 
     onMessagesUpdate (cl, opts) {

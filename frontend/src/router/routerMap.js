@@ -27,7 +27,11 @@ const constantRouterMap = [
       {
         path: '/:guid(12D3Koo[a-zA-Z0-9]+)/:state?/:slug?',
         name: 'UserPage',
-        component: () => import('@/views/userPage/UserPage.vue')
+        component: () => import('@/views/userPage/UserPage.vue'),
+        meta: {
+          watchParam: 'guid',
+        },
+        props: true,
       },
       {
         path: 'search/:tab?',

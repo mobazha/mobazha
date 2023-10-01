@@ -1,6 +1,9 @@
 import { createApp } from 'vue';
 import { createStore } from 'vuex';
 
+import Backbone from 'backbone';
+import _ from 'underscore';
+
 import ElementPlus from 'element-plus';
 import * as ElementPlusIconsVue from '@element-plus/icons-vue';
 import 'element-plus/dist/index.css';
@@ -52,6 +55,29 @@ function mountVueApp(container) {
     },
   });
 
-  return vueApp.use(Router).use(store).use(VueBackbone).mount(container);
+
+  let app = vueApp.use(Router).use(store).use(VueBackbone).mount(container);
+  Router.beforeEach((to, from) => {
+    app.showLoadingModal = true;
+  });
+
+  Router.afterEach(() => {
+    app.showLoadingModal = false;
+  })
+  return app;
 }
 window.vueApp = mountVueApp('#appFrame');
+
+// https://github.com/jashkenas/backbone/issues/483#issuecomment-71374622
+Backbone.Model.prototype.toJSON2 = function() {
+  if (this._isSerializing) {
+      return this.id || this.cid;
+  }
+  this._isSerializing = true;
+  var json = _.clone(this.attributes);
+  _.each(json, function(value, name) {
+      _.isFunction((value || "").toJSON2) && (json[name] = value.toJSON2());
+  });
+  this._isSerializing = false;
+  return json;
+}

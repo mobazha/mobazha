@@ -1,7 +1,7 @@
 <template>
   <div>
     <ProcessingButton
-      :className="`clrP clrBr ${useIcon && 'iconBtnSm tx3' || 'btn'} ${ob.isBlocking ? 'processing' : ''} ${ob.tooltipClass}`"
+      :className="`clrP clrBr ${ob.useIcon && 'iconBtnSm tx3' || 'btn'} ${ob.isBlocking ? 'processing' : ''} ${ob.tooltipClass}`"
       @click.stop="onClickBlock"
       :attrs="{ 'data-tip': ob.isBlocked ? ob.polyT('blockButton.tipUnblock') : ob.polyT('blockButton.tipBlock') }"
       :textClassName="textClassName"
@@ -35,9 +35,16 @@ export default {
   mounted () {
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+      }
+    },
     textClassName () {
-      const textClassName = this.isBlocked ? 'ion-eye' : 'ion-eye-disabled';
-      return this.useIcon ? textClassName : '';
+      const ob = this.ob;
+      const textClassName = ob.isBlocked ? 'ion-eye' : 'ion-eye-disabled';
+      return ob.useIcon ? textClassName : '';
     },
     btnText () {
       const ob = this.ob;

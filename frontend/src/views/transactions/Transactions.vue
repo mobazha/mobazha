@@ -23,7 +23,7 @@
       <div class="pageContent">
         <div class="tabContent js-tabContent">
           <!-- insert the tab subview here -->
-          <Tab :options="tabOptions" @clickRow="openOrder" />
+          <Tab v-if="showTab" :options="tabOptions" @clickRow="openOrder" />
         </div>
       </div>
     </section>
@@ -70,6 +70,7 @@ export default {
   data() {
     return {
       _tab: 'purchases',
+      showTab: true,
 
       tabCount: {
         sales: 0,
@@ -421,6 +422,11 @@ export default {
       };
 
       if (this._tab !== targ) {
+        this.showTab = false;
+        this.$nextTick(() => {
+          this.showTab = true;
+        });
+
         if (opts.addTabToHistory) {
           // add tab to history
           app.router.navigate(`transactions/${targ}`);
@@ -430,8 +436,6 @@ export default {
     },
 
     render() {
-      this._$tabContent = $('.js-tabContent');
-
       if (this.miniProfile) this.miniProfile.remove();
       this.miniProfile = this.createChild(MiniProfile, {
         model: app.profile,

@@ -37,6 +37,7 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
@@ -57,9 +58,11 @@ export default {
       return {
         ...this.templateHelpers,
         ...this._state,
-        ...this.model.toJSON(),
+        ...this._model,
       };
     }
+  },
+  watch: {
   },
   methods: {
     loadData (options = {}) {

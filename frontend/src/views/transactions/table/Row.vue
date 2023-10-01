@@ -1,5 +1,5 @@
 <template>
-  <tr :class="!model.read ? 'unread' : ''" @click="onRowClick">
+  <tr :class="!ob.read ? 'unread' : ''" @click="onRowClick">
     <td class="clrBr orderCol noOverflow">
       <div class="unreadBorder clrE1"></div>
       <span class="ulOnHover">{{ ob.type === 'cases' ? ob.caseID : ob.orderID }}</span>
@@ -51,7 +51,7 @@
 
           <ProcessingButton
             :className="`js-acceptOrder btnAcceptOrder btn clrBAttGrad clrBrDec1 clrTOnEmph ${ob.acceptOrderInProgress ? 'processing' : ''}`"
-            :disabled="rejectOrderInProgress"
+            :disabled="ob.rejectOrderInProgress"
             @click="onClickAcceptOrder"
             :btnText= "ob.polyT('transactions.transactionsTable.btnAccept')"
           />
@@ -97,6 +97,7 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
@@ -114,10 +115,10 @@ export default {
         ...this.templateHelpers,
         type: this.type,
         ...this._state,
-        ...this.model,
+        ...this._model,
         userCurrency: app.settings.get('localCurrency'),
         moment,
-        vendorID: this.type === 'sales' ? app.profile.id : this.model.vendorID,
+        vendorID: this.type === 'sales' ? app.profile.id : this._model.vendorID,
       }
     },
     userCols () {
@@ -223,10 +224,10 @@ export default {
     },
 
     render () {
-      const coinType = this.model.coinType;
+      const coinType = this.model.get('coinType');
 
       if (coinType) {
-        const paymentCoin = this.model.paymentCoin;
+        const paymentCoin = this.model.get('paymentCoin');
         let tradingPairClass = 'cryptoTradingPairSm';
 
         if (paymentCoin.length > 5 && coinType.length > 5) {

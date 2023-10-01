@@ -36,7 +36,7 @@ function vueBackboneProxy(bb) {
  */
 
 function rawSrcModel(model) {
-	return model.attributes;
+	return model.toJSON2();
 }
 
 function rawSrcCollection(collection) {
@@ -146,13 +146,12 @@ function extendData(vm, key) {
 		let data = {},
 			origData = origDataFn ? origDataFn.apply(this, arguments) : {};
 
-			console.log('origData: ', origData)
 		if (origData.hasOwnProperty(key)) {
 			throw `VueBackbone: Property '${key}' mustn't exist within the Vue data already`;
 		}
-		if (origData.hasOwnProperty(dataKey)) {
-			throw `VueBackbone: Property '${dataKey}' mustn't exist within the Vue data already`;
-		}
+		// if (origData.hasOwnProperty(dataKey)) {
+		// 	throw `VueBackbone: Property '${dataKey}' mustn't exist within the Vue data already`;
+		// }
 		// shallow copy (just in case)
 		Object.keys(origData).forEach(attr => (data[attr] = origData[attr]));
 		data[dataKey] = value;
@@ -209,7 +208,7 @@ function extendComputed(vm, key) {
 	o.computed = o.computed || {};
 
 	// In the case of conflict, don't add it
-	if (!o.computed[key]) {
+	// if (!o.computed[key]) {
 		o.computed[key] = {
 			get() {
 				let access = vm.$data[dataKey]; // eslint-disable-line no-unused-vars
@@ -223,11 +222,11 @@ function extendComputed(vm, key) {
 				bindBBToVue(vm, key);
 			}
 		};
-	} else {
-		console.warn(
-			`VueBackbone: Generated computed function '${key}' already exists within the Vue computed functions`
-		);
-	}
+	// } else {
+	// 	console.warn(
+	// 		`VueBackbone: Generated computed function '${key}' already exists within the Vue computed functions`
+	// 	);
+	// }
 }
 
 /**

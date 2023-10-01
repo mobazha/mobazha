@@ -41,13 +41,17 @@
             :key="key"
             ref="views"
             :options="{
-              model: transaction,
               type: this.type,
               initialState: {
                 acceptOrderInProgress: acceptingOrder(transaction.id),
                 rejectOrderInProgress: rejectingOrder(transaction.id),
                 cancelOrderInProgress: cancelingOrder(transaction.id),
               },
+            }"
+            :bb="function() {
+              return {
+                model: original(transaction),
+              };
             }"
             @clickAcceptOrder="onClickAcceptOrder(transaction.id)"
             @clickRejectOrder="onClickRejectOrder(transaction.id)"
@@ -85,6 +89,7 @@ import { getSocket } from '../../../../backbone/utils/serverConnect';
 import { acceptingOrder, acceptOrder, rejectingOrder, rejectOrder, cancelingOrder, cancelOrder, events as orderEvents } from '../../../../backbone/utils/order';
 import { getCachedProfiles } from '../../../../backbone/models/profile/Profile';
 import Row from './Row.vue';
+import { original } from '@/plugins/vue-backbone/vue-backbone.js';
 
 export default {
   components: {
@@ -135,7 +140,6 @@ export default {
       return end;
     },
     transToRender() {
-      console.log();
       if (!this.collection || this.collection.length == 0) {
         return [];
       }
@@ -162,6 +166,7 @@ export default {
     acceptingOrder,
     rejectingOrder,
     cancelingOrder,
+    original,
     loadData(options = {}) {
       const types = ['sales', 'purchases', 'cases'];
       const opts = {

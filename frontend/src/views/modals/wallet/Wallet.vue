@@ -48,8 +48,8 @@
                       <div class="js-sendReceiveNavContainer rowMd"></div>
                       <SendReceiveNav class="rowMd" :sendModeOn="sendModeOn" @clickSend="onClickSend" @clickReceive="onClickReceive" />
                       <div class="js-sendReceiveContainer sendReceiveContainer clrP">
-                        <SendMoney v-if="sendModeOn" :options="{ coinType: activeCoin }" />
-                        <ReceiveMoney v-else ref="receiveMoney" :coinType="activeCoin" :fetching="fetchingAddress" :address="receiveAddress" />
+                        <SendMoney v-if="sendModeOn" ref="sendeMoneyVw" :options="{ coinType: activeCoin }" />
+                        <ReceiveMoney v-else ref="receiveMoneyVw" :coinType="activeCoin" :fetching="fetchingAddress" :address="receiveAddress" />
                       </div>
                     </div>
                   </div>
@@ -59,6 +59,7 @@
                         ref="transactionsVw"
                         v-if="showTransactionsVw && activeCoin"
                         :options="transactionViewOptions"
+                        @transactionsUpdate="onTransactionsUpdate"
                         @bumpFeeAttempt="onBumpFeeAttempt"
                         @bumpFeeSuccess="onBumpFeeSuccess"
                         @postInit="onTransactionsVwPostInit"
@@ -130,6 +131,8 @@ export default {
       viewCryptoListingsUrl: '',
       sendModeOn: true,
 
+      transactionsCount: 0,
+
       fetchingAddress: true,
       receiveAddress: '',
       transactionsState: {},
@@ -142,7 +145,22 @@ export default {
 
     this.loadData(this.options);
   },
-  mounted() {},
+  mounted() {
+    if (this.sendModeOn) {
+      if (this.$refs.sendeMoneyVw) this.$refs.sendeMoneyVw.focusAddress();
+    }
+  },
+  unmounted() {
+    Object.keys(this.addressFetches).forEach((coinType) => {
+      this.addressFetches[coinType].forEach((fetch) => fetch.abort());
+    });
+    Object.keys(this.transactionsState).forEach((coinType) => {
+      if (this.transactionsState[coinType] && typeof this.transactionsState[coinType].bumpFeeAttempts === 'object') {
+        Object.keys(this.transactionsState[coinType].bumpFeeAttempts).forEach((txId) => this.transactionsState[coinType].bumpFeeAttempts[txId].abort());
+      }
+    });
+    this.popInTimeouts.forEach((timeout) => timeout.remove());
+  },
   watch: {
     activeCoin(coin, oldVal) {
       if (this.needAddress[coin]) {
@@ -173,16 +191,10 @@ export default {
         cryptoCur: ensureMainnetCode(activeCoin),
         confirmed: balance && balance.confirmed,
         unconfirmed: balance && balance.unconfirmed,
-        transactionCount: this.transactionsCountActive,
+        transactionCount: this.transactionsCount,
       };
     },
-    transactionsCountActive() {
-      let coinType = this.activeCoin;
-      const transactionsState = this.transactionsState[coinType] || {};
-      const cl = transactionsState && transactionsState.cl;
-      const newTxs = this.$refs.transactionsVw ? this.$refs.transactionsVw.newTransactionsTXs : {};
-      return (cl ? cl.length : 0) + (newTxs ? newTxs?.size ?? 0 : 0);
-    },
+
     transactionViewOptions() {
       let coin = this.activeCoin;
       const transactionsState = this.transactionsState[coin] || { needsFetch: true };
@@ -393,28 +405,6 @@ export default {
       return fetch;
     },
 
-    open(...args) {
-      const returnVal = super.open(...args);
-      if (this.sendModeOn) {
-        const sendVw = this.getSendMoneyVw();
-        if (sendVw) sendVw.focusAddress();
-      }
-      return returnVal;
-    },
-
-    remove() {
-      Object.keys(this.addressFetches).forEach((coinType) => {
-        this.addressFetches[coinType].forEach((fetch) => fetch.abort());
-      });
-      Object.keys(this.transactionsState).forEach((coinType) => {
-        if (this.transactionsState[coinType] && typeof this.transactionsState[coinType].bumpFeeAttempts === 'object') {
-          Object.keys(this.transactionsState[coinType].bumpFeeAttempts).forEach((txId) => this.transactionsState[coinType].bumpFeeAttempts[txId].abort());
-        }
-      });
-      this.popInTimeouts.forEach((timeout) => timeout.remove());
-      super.remove();
-    },
-
     onBumpFeeAttempt(e) {
       const transactionsState = this.transactionsState[this.activeCoin];
 
@@ -449,9 +439,18 @@ export default {
       this.transactionsState[this.activeCoin].needsFetch = false;
     },
 
+    onTransactionsUpdate() {
+      let coinType = this.activeCoin;
+      const transactionsState = this.transactionsState[coinType] || {};
+      const cl = transactionsState && transactionsState.cl;
+      const newTxs = this.$refs.transactionsVw ? this.$refs.transactionsVw.newTransactionsTXs : {};
+
+      this.transactionsCount = (cl ? cl.length : 0) + (newTxs ? newTxs?.size ?? 0 : 0);
+    },
+
     reRenderTransactionsVw() {
-      console.log('reRenderTransactionsVw triggered')
       this.showTransactionsVw = false;
+      this.transactionsCount = 0;
 
       this.$nextTick(() => {
         this.showTransactionsVw = true;
@@ -471,19 +470,8 @@ export default {
         count += newTxs ? newTxs.size : 0;
       }
 
-      this.setCountAtFirstFetch(count, coinType);
-    },
-
-    setCountAtFirstFetch(count, coinType = this.activeCoin) {
-      if (typeof count !== 'number') {
-        throw new Error('Please provide a count as a number.');
-      }
-
-      this.checkCoinType(coinType);
-      console.log('this.transactionsState[coinType]', this.transactionsState[coinType]);
-      if (!this.transactionsState[coinType] || this.transactionsState[coinType].countAtFirstFetch !== count) {
-        this.transactionsState[coinType] = this.transactionsState[coinType] || {};
-        this.transactionsState[coinType].countAtFirstFetch = count;
+      if (coinType === this.activeCoin) {
+        this.transactionsCount = count;
       }
     },
   },

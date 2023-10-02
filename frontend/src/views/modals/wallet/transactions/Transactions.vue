@@ -215,6 +215,8 @@ export default {
           this.fetchFailed = false;
           this.fetchErrorMessage = '';
 
+          this.$emit('transactionsUpdate');
+
           if (typeof this.countAtFirstFetch === 'undefined') {
             this.countAtFirstFetch = data.count;
           }
@@ -244,6 +246,8 @@ export default {
         })
         .fail((xhr) => {
           if (this.isRemoved() || xhr.statusText === 'abort') return;
+
+          this.$emit('transactionsUpdate');
 
           this.isFetching = false;
           this.fetchFailed = true;

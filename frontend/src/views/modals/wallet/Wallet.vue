@@ -40,8 +40,9 @@
             <div class="col9">
               <div class="flexColWide gutterV">
                 <template v-if="activeCoin">
-                  <div class="js-coinStatsContainer"></div>
-                  <CoinStats :options="{ initialState: coinStatsState }" />
+                  <div class="js-coinStatsContainer">
+                    <CoinStats :options="{ initialState: coinStatsState }" />
+                  </div>
                   <div>
                     <div class="flexColWide clrP clrSh3">
                       <div class="js-sendReceiveNavContainer rowMd"></div>
@@ -56,7 +57,7 @@
                     <div class="js-transactionsContainer">
                       <TransactionsVw
                         ref="transactionsVw"
-                        v-if="showTransactionsVw"
+                        v-if="showTransactionsVw && activeCoin"
                         :options="transactionViewOptions"
                         @bumpFeeAttempt="onBumpFeeAttempt"
                         @bumpFeeSuccess="onBumpFeeSuccess"
@@ -121,6 +122,7 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data() {
     return {
@@ -147,7 +149,7 @@ export default {
         this.fetchAddress(coin);
       }
 
-      if (this.sendModeOn && !(app.walletBalances.get(coin) && app.walletBalances.get(coin).get('confirmed'))) {
+      if (this.sendModeOn && !(this.walletBalances.get(coin) && this.walletBalances.get(coin).get('confirmed'))) {
         this.sendModeOn = false;
       }
 
@@ -166,11 +168,11 @@ export default {
     },
     coinStatsState() {
       const { activeCoin } = this;
-      const balance = app && app.walletBalances && app.walletBalances.get(activeCoin);
+      const balance = this._walletBalances.find((item) => item.code === activeCoin);
       return {
         cryptoCur: ensureMainnetCode(activeCoin),
-        confirmed: balance && balance.get('confirmed'),
-        unconfirmed: balance && balance.get('unconfirmed'),
+        confirmed: balance && balance.confirmed,
+        unconfirmed: balance && balance.unconfirmed,
         transactionCount: this.transactionsCountActive,
       };
     },
@@ -184,99 +186,71 @@ export default {
     transactionViewOptions() {
       let coin = this.activeCoin;
       const transactionsState = this.transactionsState[coin] || { needsFetch: true };
-      let cl = transactionsState && transactionsState.cl;
 
-      console.log('coin: ', coin)
-      console.log('cl: ', cl)
-
+      let cl = transactionsState.cl;
       if (!cl) {
         cl = new Transactions([], { coinType: coin });
         transactionsState.cl = cl;
-
-        this.listenToOnce(cl, 'sync', (md, response, options) => {
-          if (options && options.xhr) {
-            options.xhr.done((data) => {
-              transactionsState.needsFetch = false;
-              this.setCountAtFirstFetch(data.count, coin);
-            });
-          }
-        });
-
-        this.listenToOnce(cl, 'reset', () => {
-          this.listenToOnce(cl, 'sync', (md, response, options) => {
-            if (options && options.xhr) {
-              options.xhr.done((data) => {
-                this.setCountAtFirstFetch(data.count, coin);
-              });
-            }
-          });
-        });
       }
 
       return {
-        collection: transactionsState.cl,
+        collection: cl,
         // $scrollContainer: this.$el,
         fetchOnInit: transactionsState.needsFetch,
         countAtFirstFetch: transactionsState.countAtFirstFetch,
         bumpFeeXhrs: transactionsState.bumpFeeAttempts || undefined,
       };
     },
+    
+    navCoins() {
+      let supportedCoins = this.supportedCoins();
+
+      return supportedCoins.map((coin) => {
+        const balanceMd = this._walletBalances.find((item) => item.code === coin);
+        return {
+          active: coin === this.activeCoin,
+          code: coin,
+          name: app.polyglot.t(`cryptoCurrencies.${coin}`, { _: coin }),
+          balance: balanceMd.confirmed,
+          clientSupported: true,
+        };
+      });
+    }
   },
   methods: {
-    loadData(options = {}) {
-      const navCoins = supportedWalletCurs({ clientSupported: false }).sort((a, b) => {
+    supportedCoins () {
+      return supportedWalletCurs({ clientSupported: false }).sort((a, b) => {
         const aSortVal = app.polyglot.t(`cryptoCurrencies.${a}`, { _: a });
         const bSortVal = app.polyglot.t(`cryptoCurrencies.${b}`, { _: b });
 
         return aSortVal.localeCompare(bSortVal, app.localSettings.standardizedTranslatedLang(), { sensitivity: 'base' });
       });
+    },
 
-      let initialActiveCoin;
-
-      if (options.initialActiveCoin && typeof options.initialActiveCoin === 'string') {
-        initialActiveCoin = isSupportedWalletCur(options.initialActiveCoin) ? options.initialActiveCoin : null;
-      }
-
-      if (!initialActiveCoin) {
-        initialActiveCoin = navCoins.find((coin) => isSupportedWalletCur(coin)) || null;
-      }
+    loadData() {
+      let supportedCoins = this.supportedCoins();
+      let initialActiveCoin = supportedCoins.find((coin) => isSupportedWalletCur(coin)) || null;
 
       // If at this point the initialActiveCoin and consequently this.activeCoin
       // are null, it indicates that none of the wallet currencies are supported by
       // this client.
 
-      const opts = {
-        initialSendModeOn: (app.walletBalances.get(initialActiveCoin) && app.walletBalances.get(initialActiveCoin).get('confirmed')) || false,
-        ...options,
-        initialActiveCoin,
-      };
+      this.sendModeOn = (this.walletBalances.get(initialActiveCoin) && this.walletBalances.get(initialActiveCoin).get('confirmed')) || false,
 
-      this.setState(opts.initialState || {});
-      this.activeCoin = opts.initialActiveCoin;
+      this.activeCoin = initialActiveCoin;
 
       this.addressFetches = {};
-      this.needAddress = navCoins.reduce((acc, coin) => {
+      this.needAddress = supportedCoins.reduce((acc, coin) => {
         acc[coin] = true;
         return acc;
       }, {});
       // The majority of the TransactionsVw state is managed within the component, but
       // some of it we'll manage so as you nav from coin to coin, certain state is maintained.
-      this.transactionsState = navCoins.reduce((acc, coin) => {
+      this.transactionsState = supportedCoins.reduce((acc, coin) => {
         acc[coin] = { needsFetch: true };
         return acc;
       }, {});
       this.popInTimeouts = [];
-
-      this.navCoins = navCoins.map((coin) => {
-        const balanceMd = app.walletBalances.get(coin);
-        return {
-          active: coin === opts.initialNavCoin,
-          code: coin,
-          name: app.polyglot.t(`cryptoCurrencies.${coin}`, { _: coin }),
-          balance: balanceMd && balanceMd.get('confirmed'),
-          clientSupported: isSupportedWalletCur(coin),
-        };
-      });
 
       const ob1ProviderData = defaultSearchProviders.find((provider) => provider.id === 'mbz');
       this.viewCryptoListingsUrl = ob1ProviderData ? `#search?providerQ=${ob1ProviderData.listings}?type=cryptocurrency` : null;
@@ -347,10 +321,6 @@ export default {
         });
       }
 
-      app.walletBalances.forEach((balanceMd) => {
-        this.listenTo(balanceMd, 'change:confirmed change:unconfirmed', _.debounce(this.onBalanceChange, 1));
-      });
-
       if (initialActiveCoin) this.fetchAddress();
     },
 
@@ -362,15 +332,6 @@ export default {
       if (!coin.active && coin.clientSupported) {
         this.activeCoin = coin.code;
       }
-    },
-
-    onBalanceChange(md) {
-      this.navCoins = this.navCoins.map((navCoin) => ({
-        ...navCoin,
-        balance: md.id === navCoin.code ? md.get('confirmed') : navCoin.balance,
-      }));
-
-      this.coinNav.setState({ coins: this.navCoins });
     },
 
     onClickCreateListing() {
@@ -391,12 +352,10 @@ export default {
 
     onClickSend() {
       this.sendModeOn = true;
-      console.log('sendModeOn', this.sendModeOn);
     },
 
     onClickReceive() {
       this.sendModeOn = false;
-      console.log('sendModeOn', this.sendModeOn);
     },
 
     checkCoinType(coinType) {
@@ -464,7 +423,7 @@ export default {
     },
 
     onBumpFeeSuccess(e) {
-      app.walletBalances.get(this.activeCoin).set({
+      this.walletBalances.get(this.activeCoin).set({
         confirmed: e.data.confirmed,
         unconfirmed: e.data.unconfirmed,
       });

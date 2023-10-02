@@ -96,6 +96,7 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data() {
     return {};
@@ -110,7 +111,7 @@ export default {
       const walletBalance = app.walletBalances && app.walletBalances[this.options.coinType];
       return {
         ...this.templateHelpers,
-        ...this.model.toJSON(),
+        ...this._model,
         userCurrency: app.settings.get('localCurrency'),
         timeAgo: this.renderedTimeAgo,
         isTestnet: !!app.serverConfig.testnet,

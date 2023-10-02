@@ -151,7 +151,6 @@
                   <div>
                     <div class="js-paymentCoin-errors"></div>
                     <h2 class="h4 flexExpand required">{{ ob.polyT('purchase.cryptoCurrencyTitle') }}</h2>
-                    <div class="js-cryptoCurSelectorWrapper"></div>
                     <CryptoCurSelector
                       ref="cryptoCurSelector"
                       :options="{

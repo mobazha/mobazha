@@ -29,8 +29,15 @@ export default {
   },
   created() {
     this.initEventChain();
-
-    this.loadData(this.$props.options);
+  },
+  watch: {
+    options: {
+      handler(val) {
+        this.loadData(val);
+      },
+      deep: true,
+      immediate: true,
+    },
   },
   mounted() {},
   computed: {

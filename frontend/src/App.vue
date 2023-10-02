@@ -13,7 +13,15 @@
     <div id="js-vueModal"></div>
 
     <ShoppingCart v-if="initialized && showShoppingCart" @close="onShoppingCartClose" @openPurchaseModal="onOpenPurchaseModal"/>
-    <Wallet v-if="initialized" v-show="showWallet" @close="onWalletClose" />
+    <Wallet
+      v-if="initialized"
+      v-show="showWallet"
+      :bb="function() {
+        return {
+          walletBalances: app.walletBalances,
+        };
+      }"
+      @close="onWalletClose" />
     <Purchase v-if="showPurchase" @close="onPurchaseClose" />
     <LoadingModal v-if="initialized" v-show="showLoadingModal" />
   </div>
@@ -24,6 +32,7 @@ import ShoppingCart from '@/views/ShoppingCart.vue';
 import Wallet from '@/views/modals/wallet/Wallet.vue';
 import Purchase from './views/modals/purchase/Purchase.vue';
 import LoadingModal from './views/modals/Loading.vue';
+import app from '../backbone/app';
 
 export default {
   components: {
@@ -45,6 +54,8 @@ export default {
       showPurchase: false,
 
       toggleVue: false,
+
+      app: app,
     };
   },
   watch: {},

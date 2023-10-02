@@ -138,7 +138,7 @@ export default {
         },
       };
 
-      this.setState(opts.initialState || {});
+      this.baseInit(opts);
     },
   },
 };

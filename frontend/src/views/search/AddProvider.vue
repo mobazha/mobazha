@@ -5,7 +5,7 @@
         <h3>{{ ob.polyT('search.addTitle') }}</h3>
         <FormError v-if="ob.errors[ob.urlType]" :errors="ob.errors[ob.urlType]" />
         <FormError v-if="ob.showExistsError" :errors="[ob.polyT('search.errors.existsError')]" />
-        <input type="url" class="clrP clrBr clrSh2 js-addProviderInput" @keyup="onKeyUpAddProviderInput"
+        <input type="url" class="clrP clrBr clrSh2 js-addProviderInput" @keyup.enter="onKeyUpAddProviderInput"
           :placeholder="ob.polyT(`${ob.usingTor ? 'search.addTorPlaceholder' : 'search.addPlaceholder'}`)">
         <div class="flexHRight flexVCent gutterH">
           <button class="btnTxtOnly barBtn clrT2 txUnb js-cancelBtn" @click="onClickCancel">{{ ob.polyT('search.cancel') }}</button>
@@ -29,24 +29,26 @@ import ProviderMd from '../../../backbone/models/search/SearchProvider';
 
 export default {
   props: {
-    options: {
-      type: Object,
-      default: {},
+    searchType: {
+      type: String,
+      default: '',
     },
   },
   data () {
     return {
-      params: {},
+      showExistsError: false,
       showProvider: true,
     };
   },
   created () {
     this.initEventChain();
 
-    this.loadData(this.options);
+    this.loadData();
   },
   mounted () {
-    this.render();
+    setTimeout(() => {
+      $('.js-addProviderInput').focus();
+    });
   },
   computed: {
     ob () {
@@ -55,35 +57,21 @@ export default {
         errors: {
           ...(this.model.validationError || {}),
         },
-        ...this.params,
-        ...this._state,
       };
     }
   },
   methods: {
-    loadData (options = {}) {
-      if (!searchTypes.includes(options.searchType)) {
+    loadData () {
+      if (!searchTypes.includes(this.searchType)) {
         throw new Error('Please provide a valid search type.');
       }
-
-      const opts = {
-        searchType: '',
-        initialState: {
-          showExistsError: false,
-          ...options.initialState,
-        },
-        ...options,
-      };
-
-      this.baseInit(opts);
-      this.params = opts;
 
       this.model = new ProviderMd();
     },
 
     onDocumentClick (e) {
       if (!($.contains(this.el, e.target) || e.target === this.el)) {
-        this.remove();
+        this.close();
       }
     },
 
@@ -104,12 +92,12 @@ export default {
          returned listing endpoint, which is the same as the default OB1 search.
        */
       if (app.searchProviders.getProviderByURL(URL)) {
-        this.setState({ showExistsError: true });
+        this.showExistsError = true;
         return;
       }
 
       const opts = {};
-      const urlType = `${curConnOnTor() ? 'tor' : ''}${this.params.searchType}`;
+      const urlType = `${curConnOnTor() ? 'tor' : ''}${this.searchType}`;
       opts[urlType] = URL;
 
       // pass the type of url to validate to the model
@@ -122,7 +110,7 @@ export default {
           save.done(() => {
             recordEvent('Discover_AddProviderSaved', { errors: 'none', url: URL });
             app.searchProviders.add(this.model);
-            this.trigger('newProviderSaved', this.model);
+            this.$emit('newProviderSaved', this.model);
           })
             .fail(() => {
               // this is saved to local storage, errors shouldn't normally happen
@@ -136,9 +124,7 @@ export default {
     },
 
     onKeyUpAddProviderInput (e) {
-      if (e.which === 13) {
-        this.save();
-      }
+      this.save();
     },
 
     onClickAdd (e) {
@@ -146,23 +132,13 @@ export default {
     },
 
     onClickCancel () {
-      this.remove();
+      this.close();
       recordEvent('Discover_AddProviderCancel');
     },
 
-    remove () {
-      this.showProvider = false;
+    close () {
+      this.$emit('close');
     },
-
-    render () {
-
-      setTimeout(() => {
-        this.getCachedEl('.js-addProviderInput').focus();
-      });
-
-      return this;
-    }
-
   }
 }
 </script>

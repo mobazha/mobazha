@@ -21,7 +21,7 @@
       <div class="flexHRight gutterH rowLg">
         <div class="posR flexExpand">
           <div
-            :class="`contentBox msgContentBox clrBr clrP clrSh2 <% if (ob.showAsRead) print('read') %> ${ob.showTimestampLine ? 'rowSm' : ''}`">
+            :class="`contentBox msgContentBox clrBr clrP clrSh2 ${ob.showAsRead ? 'read' : ''} ${ob.showTimestampLine ? 'rowSm' : ''}`">
             <span class="tx5">{{ ob.processedMessage }}</span>
           </div>
           <template v-if="ob.showTimestampLine">

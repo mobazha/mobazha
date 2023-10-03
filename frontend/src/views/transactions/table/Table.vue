@@ -8,7 +8,7 @@
 
     <template v-else-if="ob.fetchFailed">
       <div class="center txCtr tx4">
-        <div class="txB <% print(ob.initialFetchErrorMessage ? 'rowTn' : 'row') %>">{{ ob.polyT(`transactions.${ob.type}.unableToFetch`) }}</div>
+        <div :class="`txB ${ob.initialFetchErrorMessage ? 'rowTn' : 'row'}`">{{ ob.polyT(`transactions.${ob.type}.unableToFetch`) }}</div>
         <div v-if="ob.fetchError" class="row">{{ ob.fetchError }}</div>
 
         <a class="btn clrP clrBr clrSh2" @click="onClickRetryFetch">{{ ob.polyT(`transactions.transactionsTable.btnRetryFetch`) }}</a>

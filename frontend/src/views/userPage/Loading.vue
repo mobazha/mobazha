@@ -35,7 +35,7 @@
                 <h1 class="h3 clrTErr">{{ ob.polyT('userPage.loading.failedToConnect') }}</h1>
               </template>
               <div class="rowHg contentWrap">
-                <template v-if="ob.contentHtml">print(ob.contentHtml);</template>
+                <div v-if="ob.contentHtml" v-html="ob.contentHtml"></div>
 
                 <template v-else-if="ob.contentText">
                   <p class="clrT2 tx5" v-html="ob.contentText"></p>

@@ -247,7 +247,7 @@ export default {
       // are null, it indicates that none of the wallet currencies are supported by
       // this client.
 
-      this.sendModeOn = (this.walletBalances.get(initialActiveCoin) && this.walletBalances.get(initialActiveCoin).get('confirmed')) || false,
+      this.sendModeOn = !!(this.walletBalances.get(initialActiveCoin) && this.walletBalances.get(initialActiveCoin).get('confirmed')) || false,
 
       this.activeCoin = initialActiveCoin;
 

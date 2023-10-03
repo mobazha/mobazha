@@ -35,7 +35,7 @@
               {{ ob.polyT('orderDetail.summaryTab.fulfilled.digitalReadyForDlText') }}
             </div>
             <div class="rowTn txB">{{ ob.polyT('orderDetail.summaryTab.fulfilled.urlLabel') }}</div>
-            <div class="<% if (ob.showPassword) print('row') %>">
+            <div :class="`${ob.showPassword ? 'row' : ''}`">
               <a class="clrTEm" :href="digitalDelivery.url" data-open-external>{{ digitalDelivery.url }}</a>
             </div>
             <template v-if="ob.showPassword">

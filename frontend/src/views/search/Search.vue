@@ -1,7 +1,15 @@
 <template>
   <div class="search">
-    <nav id="pageTabBar" class="noTabs barLg clrP clrBr <% if(ob.fetching) print('noTips') %>">
-      <div class="pageTabs js-searchProviders"></div>
+    <nav id="pageTabBar" :class="`noTabs barLg clrP clrBr ${ob.fetching ? 'noTips' : ''}`">
+      <div class="pageTabs js-searchProviders">
+        <Providers
+          :options="{
+            searchType: _search.searchType,
+            currentID: _search.provider.id,
+            showSelectDefault: !currentDefaultProvider,
+          }"
+          @activateProvider="activateProvider" />
+      </div>
     </nav>
 
     <div v-if="!ob.fetching" class="pageContent">
@@ -35,7 +43,9 @@
             />
             <button class="btn clrP clrBr searchBtn" @click="clickSearchBtn">{{ ob.polyT('search.searchBtn') }}</button>
           </div>
-          <div class="js-suggestions"></div>
+          <div class="js-suggestions">
+            <Suggestions @clickSuggestion="onClickSuggestion" />
+          </div>
           <hr class="clrBr" />
         </div>
         <div class="js-categoryWrapper"></div>
@@ -72,8 +82,6 @@ import $ from 'jquery';
 import is from 'is_js';
 import app from '../../../backbone/app';
 import Results from '../../../backbone/views/search/Results';
-import Providers from '../../../backbone/views/search/SearchProviders';
-import Suggestions from '../../../backbone/views/search/Suggestions';
 import Category from '../../../backbone/views/search/Category';
 import SortBy from '../../../backbone/views/search/SortBy';
 import Filters from '../../../backbone/views/search/Filters';
@@ -91,8 +99,15 @@ import {
   createSearchURL,
 } from '../../../backbone/utils/search';
 
+import Suggestions from './Suggestions.vue'
+import Providers from './Providers.vue'
+
 
 export default {
+  components: {
+    Suggestions,
+    Providers,
+  },
   props: {
     options: {
       type: Object,
@@ -102,6 +117,7 @@ export default {
   data () {
     return {
       tab: 'listings',
+      _search: {},
     };
   },
   created () {
@@ -651,20 +667,6 @@ export default {
       $searchLogo.find('img').on('error', () => {
         $searchLogo.addClass('loadError');
       });
-
-      if (this.searchProviders) this.searchProviders.remove();
-      this.searchProviders = this.createChild(Providers, {
-        searchType: this._search.searchType,
-        currentID: this._search.provider.id,
-        showSelectDefault: !this.currentDefaultProvider,
-      });
-      this.listenTo(this.searchProviders, 'activateProvider', (pOpts) => this.activateProvider(pOpts));
-      $('.js-searchProviders').append(this.searchProviders.render().el);
-
-      if (this.suggestions) this.suggestions.remove();
-      this.suggestions = this.createChild(Suggestions);
-      this.listenTo(this.suggestions, 'clickSuggestion', (opts) => this.onClickSuggestion(opts));
-      $('.js-suggestions').append(this.suggestions.render().el);
 
       if (this.filters) this.filters.remove();
       if (this.sortBy) this.sortBy.remove();

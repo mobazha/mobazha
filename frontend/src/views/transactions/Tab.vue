@@ -14,13 +14,13 @@
     <Filters :filters="setCheckedFilters(filterConfig, filter.states)" />
 
     <div class="flexVCent row gutterH">
-      <div class="flexNoShrink gutterHSm js-queryTotalWrapper" v-show="showTotalWrapper">
-        <span class="flexNoShrink js-queryTotalLine">{{ queryTotalLine }}</span>
+      <div class="flexNoShrink gutterHSm js-queryTotalWrapper" v-show="collection.length">
+        <span class="flexNoShrink js-queryTotalLine" v-html="queryTotalLine"></span>
         <a v-show="currentFilterIsDefault" @click="onClickResetQuery">{{ ob.polyT(`transactions.resetFilters`) }}</a>
       </div>
       <div class="tx6 flexVCent">
         <label class="clrT2 marginLAuto margRSm">{{ ob.polyT('transactions.sort.label') }}</label>
-        <select class="tx6 select2Small" @change="onChangeSortBy(filter.sortBy)" style="width: 150px">
+        <select class="tx6 select2Small js-sortBySelect" @change="onChangeSortBy(filter.sortBy)" style="width: 150px">
           <option value="UNREAD" :selected="filter.sortBy === 'UNREAD'">{{ ob.polyT('transactions.sort.unread') }}</option>
           <option value="DATE_ASC" :selected="filter.sortBy === 'DATE_ASC'">{{ ob.polyT('transactions.sort.dateAsc') }}</option>
           <option value="DATE_DESC" :selected="filter.sortBy === 'DATE_DESC'">{{ ob.polyT('transactions.sort.dateDesc') }}</option>
@@ -32,7 +32,7 @@
     <TransactionsTable ref="table" :options="tableOptions"
       :bb="function() {
         return {
-          collection: collection,
+          collection: original(collection),
         };
       }"
       @clickRow="onClickRow" />
@@ -46,6 +46,7 @@ import app from '../../../backbone/app';
 import { capitalize } from '../../../backbone/utils/string';
 import TransactionsTable from './table/Table.vue';
 import Filters from './Filters.vue';
+import { original } from '@/plugins/vue-backbone/vue-backbone.js';
 
 export default {
   components: {
@@ -58,22 +59,28 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data() {
     return {
       _options: {},
       showTotalWrapper: false,
-      queryTotalLine: '',
       filter: {},
     };
   },
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted() {
-    this.render();
+    $('.js-sortBySelect').select2({
+      minimumResultsForSearch: -1,
+      dropdownParent: $('.js-sortBySelectDropdownContainer'),
+    });
+  },
+  unmounted() {
+    clearTimeout(this.searchKeyUpTimer);
   },
   computed: {
     tableOptions() {
@@ -83,10 +90,18 @@ export default {
         getProfiles: this._options.getProfiles,
       };
     },
+    queryTotalLine() {
+      console.log('this.collection: ', this.collection)
+      const count = app.polyglot.t(`transactions.${this.type}.countTransactions`, { smart_count: this.collection.length });
+      const countInfo = `<span class="txB">${count}</span>`;
+      return app.polyglot.t(`transactions.${this.type}.countTransactionsFound`, { smart_count: countInfo });
+    }
   },
-  watch: {},
+  watch: {
+  },
   methods: {
     capitalize,
+    original,
     loadData(options = {}) {
       const opts = {
         defaultFilter: {
@@ -99,7 +114,7 @@ export default {
 
       opts.initialFilter = opts.initialFilter || { ...opts.defaultFilter };
 
-      _.extend(this, opts);
+      this.baseInit(opts);
 
       if (!this.collection) {
         throw new Error('Please provide a transactions collection.');
@@ -119,21 +134,6 @@ export default {
       this.type = opts.type;
       this.filterConfig = opts.filterConfig;
       this._filter = { ...opts.initialFilter };
-
-      this.listenTo(this.collection, 'request', (cl, xhr) => {
-        this.showTotalWrapper = false;
-
-        setTimeout(() => {
-          xhr.done((data) => {
-            const count = app.polyglot.t(`transactions.${this.type}.countTransactions`, { smart_count: data.queryCount });
-            const countInfo = `<span class="txB">${count}</span>`;
-            this.queryTotalLine = app.polyglot.t(`transactions.${this.type}.countTransactionsFound`, { smart_count: countInfo });
-            this.showTotalWrapper = true;
-
-            console.log('countInfo: ', countInfo);
-          });
-        });
-      });
     },
 
     events() {
@@ -181,7 +181,6 @@ export default {
 
     onClickResetQuery() {
       this.filter = { ...this._options.defaultFilter };
-      this.render();
     },
 
     /*
@@ -214,15 +213,6 @@ export default {
 
     remove() {
       clearTimeout(this.searchKeyUpTimer);
-    },
-
-    render() {
-      $('.js-sortBySelect').select2({
-        minimumResultsForSearch: -1,
-        dropdownParent: $('.js-sortBySelectDropdownContainer'),
-      });
-
-      return this;
     },
   },
 };

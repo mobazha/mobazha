@@ -21,13 +21,15 @@
 </template>
 
 <script>
-import loadTemplate from '../../../backbone/utils/loadTemplate';
 
 export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        currentPage: 1,
+        morePages: false,
+      },
     },
   },
   data() {
@@ -35,47 +37,24 @@ export default {
   },
   created() {
     this.initEventChain();
-
-    this.loadData(this.$props);
   },
   mounted() {
     this.render();
   },
   computed: {
-    params() {
+    ob() {
       return {
-        ...this.getState(),
+        ...this.templateHelpers,
+        ...this.options,
       };
     },
   },
   methods: {
-    loadData(options = {}) {
-      const opts = {
-        ...options,
-        initialState: {
-          start: 1,
-          ...options.initialState,
-        },
-      };
-
-      this.setState(opts.initialState || {});
-    },
     onClickNext() {
       this.$emit('clickNext');
     },
     onClickPrev() {
       this.$emit('clickPrev');
-    },
-    render() {
-      loadTemplate('components/pageControlsTextStyle.html', (t) => {
-        this.$el.html(
-          t({
-            ...this.getState(),
-          })
-        );
-      });
-
-      return this;
     },
   },
 };

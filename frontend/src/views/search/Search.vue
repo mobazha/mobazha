@@ -31,7 +31,7 @@
             <button v-else class="btnTxtOnly txb txU txUnb" @click="clickAddQueryProvider">{{ ob.polyT('search.addQueryProviderBtn') }}</button>
           </div>
           <div class="searchBar row clrP clrBr clrSh2">
-            <div v-if="ob.logo" class="searchLogo js-searchLogo">
+            <div v-if="ob.logo" :class="`searchLogo js-searchLogo ${!ob.logo ? 'loadError' : ''}`">
               <img :src="ob.logo" />
             </div>
             <input
@@ -48,16 +48,36 @@
           </div>
           <hr class="clrBr" />
         </div>
-        <div class="js-categoryWrapper"></div>
-        <div class="flexRow gutterHLg">
-          <template v-if="ob.hasFilters">
-            <div class="col3 filterWrapper js-filterWrapper"></div>
-            <div class="col9" />
+        <div class="js-categoryWrapper" v-if="tab === 'home'">
+          <template v-for="search in _categorySearches">
+            <Category
+              :search="search"
+              :viewType="search.filters.type === 'cryptocurrency' ? 'cryptoList' : 'grid'"
+              @seeAllCategory="setSearch"
+              />
           </template>
-          <div v-else class="col12" />
-          <div class="flexCol">
-            <div class="width100 js-sortByWrapper"></div>
-            <div class="width100 js-resultsWrapper"></div>
+        </div>
+        <div class="flexRow gutterHLg" v-if="tab === 'listings'" >
+          <div v-if="ob.hasFilters" class="col3 filterWrapper js-filterWrapper">
+            <Filters
+              :filters="ob.data.options"
+              @filterChanged="onFilterChanged"/>
+          </div>
+          <div :class="`${ob.hasFilters ? 'col9' : 'col12'}`">
+            <div class="flexCol">
+              <div class="width100 js-sortByWrapper">
+                <SortBy :options="{
+                  term: ob.term,
+                  results: ob.data.results,
+                  sortBy: ob.data.sortBy,
+                  sortBySelected: _search.sortBy,
+                }"
+                @changeSortBy="changeSortBy"/>
+              </div>
+              <div class="width100 js-resultsWrapper">
+                <Results :options="resultOptions"/>
+              </div>
+            </div>
           </div>
         </div>
       </template>
@@ -81,16 +101,11 @@ import _ from 'underscore';
 import $ from 'jquery';
 import is from 'is_js';
 import app from '../../../backbone/app';
-import Results from '../../../backbone/views/search/Results';
-import Category from '../../../backbone/views/search/Category';
-import SortBy from '../../../backbone/views/search/SortBy';
-import Filters from '../../../backbone/views/search/Filters';
 import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
 import ResultsCol from '../../../backbone/collections/Results';
 import ProviderMd from '../../../backbone/models/search/SearchProvider';
 import { supportedWalletCurs } from '../../../backbone/data/walletCurrencies';
 import defaultSearchProviders from '../../../backbone/data/defaultSearchProviders';
-import { selectEmojis } from '../../../backbone/utils';
 import { recordEvent } from '../../../backbone/utils/metrics';
 import { curConnOnTor } from '../../../backbone/utils/serverConnect';
 import { scrollPageIntoView } from '../../../backbone/utils/dom';
@@ -101,12 +116,20 @@ import {
 
 import Suggestions from './Suggestions.vue'
 import Providers from './Providers.vue'
+import Category from './Category.vue'
+import Filters from './Filters.vue'
+import SortBy from './SortBy.vue'
+import Results from './Results.vue'
 
 
 export default {
   components: {
     Suggestions,
     Providers,
+    Category,
+    Filters,
+    SortBy,
+    Results,
   },
   props: {
     options: {
@@ -126,13 +149,10 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
-  watch: {
-    $route () {
-      this.removeFetches();
-      this.categoryViews.forEach((cat) => cat.remove());
-    },
+  unmounted() {
+    this.removeFetches();
+    this.categoryViews.forEach((cat) => cat.remove());
   },
   computed: {
     ob () {
@@ -173,6 +193,33 @@ export default {
     currentBaseUrl () {
       return this._search.provider[`${this._search.searchType}Url`];
     },
+    resultOptions () {
+      const data = this._state.data || {};
+
+      // Use the initial set of results data to create the results view.
+      this.resultsCol = new ResultsCol();
+      this.resultsCol.add(this.resultsCol.parse(data));
+
+      let viewType = 'grid';
+
+      if (data.options && data.options.type
+        && data.options.type.options
+        && data.options.type.options.length) {
+        if (data.options.type.options.find((op) => op.value === 'cryptocurrency' && op.checked)
+          && data.options.type.options.filter((op) => op.checked).length === 1) {
+          viewType = 'cryptoList';
+        }
+      }
+
+      return {
+        search: this._search,
+        total: data.results ? data.results.total : 0,
+        morePages: data.results ? data.results.morePages : false,
+        initCol: this.resultsCol,
+        viewType,
+        setHistory: this._setHistory,
+      }
+    }
   },
   methods: {
     loadData (options = {}) {
@@ -510,13 +557,11 @@ export default {
         url: this.currentBaseUrl,
       });
       this.makeDefaultProvider(this._search.provider);
-      this.render();
     },
 
     addQueryProvider () {
       if (!this.isExistingProvider(this._search.provider)) {
         app.searchProviders.add(this._search.provider);
-        this.render();
       }
     },
 
@@ -529,10 +574,6 @@ export default {
      * will be reused to prevent new calls to the search endpoint.
      */
     buildCategories () {
-      if (!Array.isArray(this._categorySearches)) {
-        throw new Error('this._categorySearches should be a valid array of search objects.');
-      }
-
       if (this.categoryViews.length === this._categorySearches.length) {
         app.router.navigate('search');
         // After either the first search or the first category load completes, set the history.
@@ -545,16 +586,6 @@ export default {
         this.render();
         return;
       }
-
-      const search = this._categorySearches[this.categoryViews.length];
-      const categoryVw = this.createChild(Category, {
-        search,
-        viewType: search.filters.type === 'cryptocurrency' ? 'cryptoList' : 'grid',
-      });
-      this.categoryViews.push(categoryVw);
-
-      this.listenTo(categoryVw, 'seeAllCategory', (opts) => this.setSearch(opts));
-      this.buildCategories();
     },
 
     /**
@@ -644,65 +675,7 @@ export default {
       this.searchFetches.forEach((fetch) => fetch.abort());
     },
 
-    renderCategories () {
-      const catsFrag = document.createDocumentFragment();
-
-      this.categoryViews.forEach((catVw) => {
-        catVw.delegateEvents();
-        catVw.render().$el.appendTo(catsFrag);
-      });
-
-      this.getCachedEl('.js-categoryWrapper').html(catsFrag);
-    },
-
     render () {
-      const state = this.getState();
-      const data = state.data || {};
-      const term = this._search.q === '*' ? '' : this._search.q;
-      const hasFilters = data.options && !$.isEmptyObject(data);
-
-      const $filterWrapper = $('.js-filterWrapper');
-      const $searchLogo = $('.js-searchLogo');
-
-      $searchLogo.find('img').on('error', () => {
-        $searchLogo.addClass('loadError');
-      });
-
-      if (this.filters) this.filters.remove();
-      if (this.sortBy) this.sortBy.remove();
-
-      if (state.tab === 'home') {
-        this.renderCategories();
-      } else if (state.tab === 'listings') {
-        if (hasFilters) {
-          this.filters = this.createChild(Filters, { initialState: { filters: data.options } });
-          this.listenTo(this.filters, 'filterChanged', (opts) => this.onFilterChanged(opts));
-          $filterWrapper.append(this.filters.render().el);
-
-          $filterWrapper.find('select').select2({
-            minimumResultsForSearch: 10,
-            templateResult: selectEmojis,
-            templateSelection: selectEmojis,
-          });
-        }
-
-        this.sortBy = this.createChild(SortBy, {
-          initialState: {
-            term,
-            results: data.results,
-            sortBy: data.sortBy,
-            sortBySelected: this._search.sortBy,
-          },
-        });
-        this.listenTo(this.sortBy, 'changeSortBy', (opts) => this.changeSortBy(opts));
-        $('.js-sortByWrapper').append(this.sortBy.render().el);
-
-        // Use the initial set of results data to create the results view.
-        this.createResults(data, this._search, this._setHistory);
-      }
-
-      this.$filters = $filterWrapper.find('select, input');
-
       return this;
     }
 

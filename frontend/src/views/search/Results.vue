@@ -24,9 +24,16 @@
       </div>
     </div>
     <div :class="`listingsGrid ${ob.viewTypeClass} flex js-resultsGrid`"></div>
-    <div class="pageControls js-pageControlsContainer"></div>
+    <div class="pageControls js-pageControlsContainer">
+      <PageControlsTextStyle :options="{
+        currentPage,
+        morePages,
+      }"
+      @clickNext="clickPageNext"
+      @clickPrev="clickPagePrev"/>
+    </div>
     <hr class="clrBr">
-    <template v-if="ob.loading">
+    <template v-if="loading">
       <div class="flexCent loadingSearch clrS">
         <SpinnerSVG className="spinnerLg" />
       </div>
@@ -42,7 +49,6 @@ import { recordEvent } from '../../../backbone/utils/metrics';
 import { createSearchURL } from '../../../backbone/utils/search';
 import UserCard from '../../../backbone/views/UserCard';
 import ListingCard from '../../../backbone/views/components/ListingCard';
-import PageControls from '../../../backbone/views/components/PageControlsTextStyle';
 import ResultsCol from '../../../backbone/collections/Results';
 import ListingCardModel from '../../../backbone/models/listing/ListingShort';
 import ProviderMd from '../../../backbone/models/search/SearchProvider';
@@ -52,11 +58,20 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        search: {},
+        total: 0,
+        morePages: false,
+        initCol: {},
+        viewType: '',
+        setHistory: false,
+      },
     },
   },
   data () {
     return {
+      loading: false,
+      pageCols: [],
     };
   },
   created () {
@@ -71,18 +86,24 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        viewTypeClass: this.viewType === 'grid' ?
-          '' : `listingsGrid${capitalize(this.viewType)}View`,
+        viewTypeClass: this.viewType === 'grid' ? '' : `listingsGrid${capitalize(this.viewType)}View`,
         viewType: this.viewType,
-        ...this._state,
       };
+    },
+
+    currentPage(){
+      return Number(this._search.p) + 1;
+    },
+    pageCol() {
+      return this.pageCols[this._search.p];
+    },
+    morePages() {
+      return this.currentPage < Math.ceil(this.pageCol.total / this._search.ps);
     }
   },
-  watch: {
-    $route() {
-      this.removeCardViews();
-      if (this.newPageFetch) this.newPageFetch.abort();
-    },
+  unmounted() {
+    this.removeCardViews();
+    if (this.newPageFetch) this.newPageFetch.abort();
   },
   methods: {
     loadData (options = {}) {
@@ -91,19 +112,8 @@ export default {
         throw new Error('Please provide a provider model.');
       }
 
-      const opts = {
-        viewType: 'grid',
-        setHistory: true,
-        ...options,
-        initialState: {
-          loading: false,
-          ...options.initialState,
-        },
-      };
-
-      this.baseInit(opts);
-      this.options = opts;
-      this._setHistory = opts.setHistory;
+      this.baseInit(options);
+      this._setHistory = options.setHistory;
       this._search = {
         p: 0,
         ps: 66,
@@ -160,7 +170,7 @@ export default {
     loadPage (options) {
       this.removeCardViews();
       this.$emit('loadingPage');
-      this.setState({ loading: true });
+      this.loading = true;
 
       const opts = {
         ...this._search,
@@ -174,7 +184,7 @@ export default {
         if (this._setHistory) {
           app.router.navigate(`search/listings?providerQ=${encodeURIComponent(newUrl)}`);
         }
-        this.setState({ loading: false });
+        this.loading = false;
       } else {
         const newPageCol = new ResultsCol();
         this.pageCols[opts.p] = newPageCol;
@@ -193,7 +203,7 @@ export default {
             if (xhr.statusText !== 'abort') this.trigger('searchError', xhr);
           })
           .always(() => {
-            this.setState({ loading: false });
+            this.loading = false;
           });
       }
     },
@@ -218,24 +228,10 @@ export default {
     },
 
     render () {
-      super.render();
-      const currentPage = Number(this._search.p) + 1;
       const pageCol = this.pageCols[this._search.p];
-
-      if (this.pageControls) this.pageControls.remove();
 
       if (pageCol && pageCol.length) {
         this.renderCards(pageCol);
-
-        this.pageControls = this.createChild(PageControls, {
-          initialState: {
-            currentPage,
-            morePages: currentPage < Math.ceil(pageCol.total / this._search.ps),
-          },
-        });
-        this.listenTo(this.pageControls, 'clickNext', this.clickPageNext);
-        this.listenTo(this.pageControls, 'clickPrev', this.clickPagePrev);
-        $('.js-pageControlsContainer').html(this.pageControls.render().el);
       }
 
       return this;

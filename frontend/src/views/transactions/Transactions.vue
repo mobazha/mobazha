@@ -23,7 +23,14 @@
       <div class="pageContent">
         <div class="tabContent js-tabContent">
           <!-- insert the tab subview here -->
-          <Tab v-if="showTab" :options="tabOptions" @clickRow="openOrder" />
+          <Tab v-if="showTab"
+            :options="tabOptions.options"
+            :bb="function() {
+              return {
+                collection: tabOptions.collection,
+              };
+            }"
+            @clickRow="openOrder" />
         </div>
       </div>
     </section>
@@ -156,45 +163,51 @@ export default {
     purchasesTabOptions() {
       return {
         collection: this.purchasesCol,
-        type: 'purchases',
-        defaultFilter: {
-          ...this.purchasesDefaultFilter,
-        },
-        initialFilter: {
-          ...this.purchasesDefaultFilter,
-          ...this.filterUrlParams,
-        },
-        filterConfig: this.getSalesPurchasesFilterConfig(false),
+        options: {
+          type: 'purchases',
+          defaultFilter: {
+            ...this.purchasesDefaultFilter,
+          },
+          initialFilter: {
+            ...this.purchasesDefaultFilter,
+            ...this.filterUrlParams,
+          },
+          filterConfig: this.getSalesPurchasesFilterConfig(false),
+        }
       };
     },
 
     salesTabOptions() {
       return {
         collection: this.salesCol,
-        type: 'sales',
-        defaultFilter: {
-          ...this.salesDefaultFilter,
-        },
-        initialFilter: {
-          ...this.salesDefaultFilter,
-          ...this.filterUrlParams,
-        },
-        filterConfig: this.getSalesPurchasesFilterConfig(true),
+        options: {
+          type: 'sales',
+          defaultFilter: {
+            ...this.salesDefaultFilter,
+          },
+          initialFilter: {
+            ...this.salesDefaultFilter,
+            ...this.filterUrlParams,
+          },
+          filterConfig: this.getSalesPurchasesFilterConfig(true),
+        }
       };
     },
 
     casesTabOptions() {
       return {
         collection: this.casesCol,
-        type: 'cases',
-        defaultFilter: {
-          ...this.casesDefaultFilter,
-        },
-        initialFilter: {
-          ...this.casesDefaultFilter,
-          ...this.filterUrlParams,
-        },
-        filterConfig: this.casesFilterConfig,
+        options: {
+          type: 'cases',
+          defaultFilter: {
+            ...this.casesDefaultFilter,
+          },
+          initialFilter: {
+            ...this.casesDefaultFilter,
+            ...this.filterUrlParams,
+          },
+          filterConfig: this.casesFilterConfig,
+        }
       };
     },
   },

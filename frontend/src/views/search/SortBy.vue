@@ -1,17 +1,17 @@
 <template>
   <div class="row flexVBase gutterH">
     <div class="tx5 flexExpand">
-      <template v-if="ob.results">
-        <div v-if="ob.term" v-html="ob.polyT('search.resultsFound', {
-          term: ob.parseEmojis(ob.term),
-          smart_count: ob.number.localizeNumber(ob.results.total),
+      <template v-if="options.results">
+        <div v-if="options.term" v-html="ob.polyT('search.resultsFound', {
+          term: ob.parseEmojis(options.term),
+          smart_count: ob.number.localizeNumber(options.results.total),
         })">
         </div>
 
         <template v-else>
           <b>
             {{ ob.polyT('search.resultsTotal', {
-              smart_count: ob.number.localizeNumber(ob.results.total),
+              smart_count: ob.number.localizeNumber(options.results.total),
             }) }}
           </b>
         </template>
@@ -20,13 +20,13 @@
         </span>
       </template>
     </div>
-    <template v-if="ob.sortBy">
+    <template v-if="options.sortBy">
       <div class="tx5b">
         {{ ob.polyT('search.sortBy') }}
       </div>
       <div class="col4">
         <select id="sortBy" class="select2Small " @change="changeSortBy($event)">
-          <option v-for="(val, key) in ob.sortBy" :key="key" :value="key" :selected="selected(val, key)">{{ val.label }}
+          <option v-for="(val, key) in options.sortBy" :key="key" :value="key" :selected="selected(val, key)">{{ val.label }}
           </option>
         </select>
       </div>
@@ -44,7 +44,12 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default:  {
+        term: '',
+        results: [],
+        sortBy: '',
+        sortBySelected: '',
+      },
     },
   },
   data () {
@@ -53,8 +58,6 @@ export default {
   },
   created () {
     this.initEventChain();
-
-    this.loadData(this.options);
   },
   mounted () {
     $('#sortBy').select2({
@@ -67,38 +70,23 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this._state,
       };
     },
   },
   methods: {
-    loadData (options = {}) {
-      const opts = {
-        ...options,
-        initialState: {
-          ...options.initialState,
-        },
-      };
-
-      this.baseInit(opts);
-    },
-
     changeSortBy (event) {
       this.$emit('changeSortBy', { sortBy: event.target.value });
     },
 
     selected (val, key) {
-      const ob = this.ob;
-
       let selected = false;
-      if (ob.sortBySelected) {
-        selected = key === ob.sortBySelected;
+      if (this.options.sortBySelected) {
+        selected = key === this.options.sortBySelected;
       } else {
         selected = val.default;
       }
       return selected;
     }
-
   }
 }
 </script>

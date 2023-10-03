@@ -1,7 +1,7 @@
 <template>
   <div class="filters">
     <form class="flexColWide gutterV">
-      <template v-for="(filter, key) in ob.filters" :key="key">
+      <template v-for="(filter, key) in filters" :key="key">
         <template v-if="['dropdown', 'checkbox', 'radio'].includes(filter.type)">
           <div class="contentBox pad clrP clrBr clrSh2">
             <div class="rowSm txB tx5b">{{ filter.label }}</div>
@@ -56,7 +56,7 @@ import { selectEmojis } from '../../../backbone/utils';
 
 export default {
   props: {
-    options: {
+    filters: {
       type: Object,
       default: {},
     },
@@ -67,8 +67,6 @@ export default {
   },
   created () {
     this.initEventChain();
-
-    this.loadData(this.options);
   },
   mounted () {
     this.render();
@@ -82,18 +80,6 @@ export default {
     },
   },
   methods: {
-    loadData (options = {}) {
-      const opts = {
-        initialState: {
-          filters: {},
-          ...options.initialState,
-        },
-        ...options,
-      };
-
-      this.baseInit(opts);
-    },
-
     selectedIndex (filter) {
       let selectedIndex = filter.options.findIndex(opt => opt.checked);
       selectedIndex = selectedIndex === -1 ? filter.options.findIndex(opt => opt.default) : selectedIndex;
@@ -129,13 +115,12 @@ export default {
     },
 
     makeFilterAllOrNone (name, all = true) {
-      const filters = this.getState().filters;
-      const processedData = filters[name];
+      const processedData = this.filters[name];
       processedData.options.forEach((opt, i) => {
         processedData.options[i].checked = all;
       });
-      filters[name] = processedData;
-      this.setState({ filters });
+      this.filters[name] = processedData;
+
       this.render(); // The shallow compare in setState won't recognize the filters changed;
       this.changeFilter();
     },

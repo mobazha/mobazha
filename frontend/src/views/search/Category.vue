@@ -23,7 +23,9 @@
     </div>
     <hr class="clrBr row categoryRow">
     <template v-if="ob.loading">
-      <div class="flexCent loadingSearch clrS">{{ ob.spinner({ className: 'spinnerLg' }) }}</div>
+      <div class="flexCent loadingSearch clrS">
+        <SpinnerSVG className="spinnerLg" />
+      </div>
     </template>
 
   </div>
@@ -42,11 +44,15 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        search: {},
+        viewType: '',
+      },
     },
   },
   data () {
     return {
+      cryptoTitle: '',
     };
   },
   created () {
@@ -69,11 +75,9 @@ export default {
       };
     }
   },
-  watch: {
-    $route() {
-      this.removeCardViews();
-      if (this.categoryFetch) this.categoryFetch.abort();
-    },
+  unmounted() {
+    this.removeCardViews();
+    if (this.categoryFetch) this.categoryFetch.abort();
   },
   methods: {
     loadData (options = {}) {
@@ -158,10 +162,10 @@ export default {
         url: createSearchURL(opts),
       })
         .done(() => {
-          this.trigger('fetchComplete');
+          this.$emit('fetchComplete');
         })
         .fail((xhr) => {
-          if (xhr.statusText !== 'abort') this.trigger('searchError', xhr);
+          if (xhr.statusText !== 'abort') this.$emit('searchError', xhr);
         })
         .always(() => {
           this.setState({ loading: false });

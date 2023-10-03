@@ -51,8 +51,10 @@
         <div class="js-categoryWrapper" v-if="tab === 'home'">
           <template v-for="search in _categorySearches">
             <Category
-              :search="search"
-              :viewType="search.filters.type === 'cryptocurrency' ? 'cryptoList' : 'grid'"
+              :options="{
+                search,
+                viewType: search.filters.type === 'cryptocurrency' ? 'cryptoList' : 'grid',
+              }"
               @seeAllCategory="setSearch"
               />
           </template>
@@ -75,7 +77,18 @@
                 @changeSortBy="changeSortBy"/>
               </div>
               <div class="width100 js-resultsWrapper">
-                <Results :options="resultOptions"/>
+                <Results
+                  :options="resultOptions"
+                  @searchError="(xhr) => {
+                    setState({
+                      fetching: false,
+                      data: {},
+                      xhr,
+                    });
+                  }"
+                  @loadingPage="scrollPageIntoView"
+                  @resetSearch="() => this.setSearch(this._defaultSearch)"
+                  />
               </div>
             </div>
           </div>
@@ -629,16 +642,6 @@ export default {
       });
 
       this.getCachedEl('.js-resultsWrapper').html(this.resultsView.render().el);
-
-      this.listenTo(this.resultsView, 'searchError', (xhr) => {
-        this.setState({
-          fetching: false,
-          data: {},
-          xhr,
-        });
-      });
-      this.listenTo(this.resultsView, 'loadingPage', () => scrollPageIntoView());
-      this.listenTo(this.resultsView, 'resetSearch', () => this.setSearch(this._defaultSearch));
     },
 
     clickSearchBtn () {

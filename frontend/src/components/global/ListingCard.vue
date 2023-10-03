@@ -1,5 +1,5 @@
 <template>
-  <div @click.stop="onClick" class="listingCard col clrBr clrHover clrT clrP clrSh2 contentBox">
+  <div @click.stop="onClick" :class="`listingCard col clrBr clrHover clrT clrP clrSh2 contentBox ${ownListing ? 'ownListing' : ''}`">
     <div v-if="ob.viewType === 'grid'" class="gridViewContent posR">
       <div class="listingImage js-listingImage" :style="listingImageBgStyle">
         <div class="nsfwOverlay overlayPanel coverFull clrP">
@@ -50,13 +50,13 @@
                 :data-tip="ob.polyT('listingCard.deleteListingTooltip')"
                 ><span class="ion-trash-b"></span
               ></a>
-              <div class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxBottom clrBr clrP clrT hide">
+              <div v-show="deleteConfirmOn" class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxBottom clrBr clrP clrT hide" @click.stop="onClickDeleteConfirmBox">
                 <div class="tx3 txB rowSm">{{ ob.polyT('listingCard.confirmDelete.title') }}</div>
                 <p>{{ ob.polyT('listingCard.confirmDelete.body') }}</p>
                 <hr class="clrBr row" />
                 <div class="flexHRight flexVCent gutterHLg buttonBar">
-                  <a class="js-deleteConfirmCancel">{{ ob.polyT('listingCard.confirmDelete.btnCancel') }}</a>
-                  <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph js-deleteConfirmed">{{ ob.polyT('listingCard.confirmDelete.btnConfirm') }}</a>
+                  <a class="js-deleteConfirmCancel" @click="onClickConfirmCancel">{{ ob.polyT('listingCard.confirmDelete.btnCancel') }}</a>
+                  <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph js-deleteConfirmed" @click.stop="onClickConfirmedDelete">{{ ob.polyT('listingCard.confirmDelete.btnConfirm') }}</a>
                 </div>
               </div>
             </div>
@@ -80,7 +80,7 @@
       </div>
       <div class="pad clrBr borderTop infoArea">
         <template v-if="ob.vendor">
-          <a class="userIconWrapper js-userLink" :href="`#${ob.vendor.peerID}/store`">
+          <a class="userIconWrapper js-userLink" :href="`#${ob.vendor.peerID}/store`" @click.stop="onClickUserLink">
             <div
               class="userIcon disc clrBr2 clrSh1 toolTipNoWrap js-vendorIcon"
               :style="`background-image: ${vendorAvatarImageSrc}url('../imgs/defaultAvatar.png')`"
@@ -110,7 +110,7 @@
           >
             <a class="clrT clamp listingTitle">{{ ob.title }}</a>
           </div>
-          <template v-else>
+          <div v-else>
             <a class="listingTitle">
               {{
                 ob.crypto.tradingPair({
@@ -121,7 +121,7 @@
                 })
               }}
             </a>
-          </template>
+          </div>
         </div>
 
         <div :class="`flexVCent ${priceRowTextClass}`">
@@ -129,13 +129,13 @@
             {{ formattedRating }}
           </div>
 
-          <template v-if="ob.contractType !== 'CRYPTOCURRENCY'">
+          <div v-if="ob.contractType !== 'CRYPTOCURRENCY'">
             {{
               ob.currencyMod.convertAndFormatCurrency(ob.price.amount, ob.price.currencyCode, ob.displayCurrency, {
                 maxDisplayDecimals: priceMaxDisplayDecimals,
               })
             }}
-          </template>
+          </div>
           <template v-else>
             {{
               ob.crypto.cryptoPrice({
@@ -236,11 +236,11 @@
       <div class="vendorCol">
         <div class="flex gutterH">
           <div>
-            <a class="userIcon disc clrBr2 clrSh1 js-userLink" :style="ob.getAvatarBgImage(ob.vendor.avatarHashes)" :href="`#${ob.vendor.peerID}/store`"></a>
+            <a class="userIcon disc clrBr2 clrSh1 js-userLink" :style="ob.getAvatarBgImage(ob.vendor.avatarHashes)" :href="`#${ob.vendor.peerID}/store`" @click.stop="onClickUserLink"></a>
           </div>
           <div class="flexCol gutterVTn">
             <div>
-              <a class="clrT clamp js-userLink" :href="`#${ob.vendor.peerID}/store`">{{ ob.vendor.name }}</a>
+              <a class="clrT clamp js-userLink" :href="`#${ob.vendor.peerID}/store`" @click.top="onClickUserLink">{{ ob.vendor.name }}</a>
             </div>
 
             <div class="cl2amp clrT2 tx6 flexVCent gutterHSm">
@@ -307,13 +307,13 @@
             >
               <span class="ion-trash-b"></span>
             </button>
-            <div class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxBottom clrBr clrP clrT hide">
+            <div v-show="deleteConfirmOn" class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxBottom clrBr clrP clrT hide" @click.stop="onClickDeleteConfirmBox">
               <div class="tx3 txB rowSm">{{ ob.polyT('listingCard.confirmDelete.title') }}</div>
               <p>{{ ob.polyT('listingCard.confirmDelete.body') }}</p>
               <hr class="clrBr row" />
               <div class="flexHRight flexVCent gutterHLg buttonBar">
-                <a class="js-deleteConfirmCancel">{{ ob.polyT('listingCard.confirmDelete.btnCancel') }}</a>
-                <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph js-deleteConfirmed">{{ ob.polyT('listingCard.confirmDelete.btnConfirm') }}</a>
+                <a class="js-deleteConfirmCancel" @click="onClickConfirmCancel">{{ ob.polyT('listingCard.confirmDelete.btnCancel') }}</a>
+                <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph js-deleteConfirmed" @click.stop="onClickConfirmedDelete">{{ ob.polyT('listingCard.confirmDelete.btnConfirm') }}</a>
               </div>
             </div>
           </div>
@@ -370,14 +370,14 @@ import { getNewerHash, outdateHash } from '../../../backbone/utils/outdatedListi
 import Listing from '../../../backbone/models/listing/Listing';
 import ListingShort from '../../../backbone/models/listing/ListingShort';
 import { events as listingEvents } from '../../../backbone/models/listing';
-import { openSimpleMessage } from '../modals/SimpleMessage';
-import ListingDetail from '../modals/listingDetail/Listing';
-import Report from '../modals/Report';
-import BlockedWarning from '../modals/BlockedWarning';
-import ReportBtn from './ReportBtn';
-import BlockBtn from './BlockBtn';
-import VerifiedMod, { getListingOptions } from './VerifiedMod';
-import UserLoadingModal from '../userPage/Loading';
+import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
+import ListingDetail from '../../../backbone/views/modals/listingDetail/Listing';
+import Report from '../../../backbone/views/modals/Report';
+import BlockedWarning from '../../../backbone/views/modals/BlockedWarning';
+import ReportBtn from '../../../backbone/views/components/ReportBtn';
+import BlockBtn from '../../../backbone/views/components/BlockBtn';
+import VerifiedMod, { getListingOptions } from '../../../backbone/views/components/VerifiedMod';
+import UserLoadingModal from '../../../backbone/views/userPage/Loading';
 
 export default {
   props: {
@@ -387,7 +387,9 @@ export default {
     },
   },
   data() {
-    return {};
+    return {
+      showErrorCardOnError: true,
+    };
   },
   created() {
     this.initEventChain();
@@ -398,10 +400,11 @@ export default {
     this.render();
   },
   computed: {
-    params() {
+    ob() {
       return {
+        ...this.templateHelpers,
         ...this.model.toJSON(),
-        ownListing: this.ownListing(),
+        ownListing: this.ownListing,
         coinType: this.model.get('currency') && this.model.get('currency').code,
         shipsFreeToMe: this.model.shipsFreeToMe,
         viewType: this.viewType,
@@ -422,6 +425,9 @@ export default {
       let ob = this.ob;
       if (!ob.currencyMod.isFiatCur(ob.displayCurrency)) return 6;
     },
+    ownListing() {
+      return app.profile.id === this.ownerGuid;
+    },
   },
   methods: {
     loadData(options = {}) {
@@ -429,12 +435,11 @@ export default {
         viewType: 'grid',
         reportsUrl: '',
         searchUrl: '',
-        showErrorCardOnError: true,
         ...options,
       };
 
-      this.setState(opts.initialState || {});
-      this.options = opts;
+      this.baseInit(opts);
+
       this.cardError = false;
 
       try {
@@ -466,11 +471,7 @@ export default {
           throw new Error('Please provide a listingBaseUrl.');
         }
 
-        if (this.ownListing()) {
-          this.$el.addClass('ownListing');
-        }
-
-        if (this.ownListing()) {
+        if (this.ownListing) {
           this.listenTo(listingEvents, 'destroying', (md, destroyingOpts) => {
             if (this.isRemoved()) return;
 
@@ -548,7 +549,7 @@ export default {
       } catch (e) {
         this.cardError = e.message || true;
 
-        if (opts.showErrorCardOnError) {
+        if (this.showErrorCardOnError) {
           this.render();
           return;
         }
@@ -557,19 +558,14 @@ export default {
       }
     },
 
-    className() {
-      return 'listingCard col clrBr clrHover clrT clrP clrSh2 contentBox';
-    },
-
     attributes() {
       // make it possible to tab to this element
       return { tabIndex: 0 };
     },
     onDocumentClick() {
-      this.getCachedEl('.js-deleteConfirmedBox').addClass('hide');
       this.deleteConfirmOn = false;
     },
-    onClickEdit(e) {
+    onClickEdit() {
       recordEvent('Lisitng_EditFromCard');
       app.loadingModal.open();
 
@@ -585,18 +581,14 @@ export default {
           if (this.isRemoved()) return;
           app.loadingModal.close();
         });
-
-      e.stopPropagation();
     },
 
-    onClickDelete(e) {
+    onClickDelete() {
       recordEvent('Lisitng_DeleteFromCard');
-      this.getCachedEl('.js-deleteConfirmedBox').removeClass('hide');
       this.deleteConfirmOn = true;
-      e.stopPropagation();
     },
 
-    onClickClone(e) {
+    onClickClone() {
       recordEvent('Lisitng_CloneFromCard');
       app.loadingModal.open();
 
@@ -611,29 +603,23 @@ export default {
           if (this.isRemoved()) return;
           app.loadingModal.close();
         });
-
-      e.stopPropagation();
     },
 
-    onClickConfirmedDelete(e) {
+    onClickConfirmedDelete() {
       recordEvent('Lisitng_DeleteFromCardConfirm');
-      e.stopPropagation();
       if (this.destroyRequest && this.destroyRequest.state === 'pending') return;
       this.destroyRequest = this.model.destroy({ wait: true });
     },
 
     onClickConfirmCancel() {
       recordEvent('Lisitng_DeleteFromCardCancel');
-      this.getCachedEl('.js-deleteConfirmedBox').addClass('hide');
       this.deleteConfirmOn = false;
     },
 
-    onClickDeleteConfirmBox(e) {
-      e.stopPropagation();
+    onClickDeleteConfirmBox() {
     },
 
-    onClickUserLink(e) {
-      e.stopPropagation();
+    onClickUserLink() {
     },
 
     loadListingDetail(hash = this.model.get('cid')) {
@@ -642,7 +628,7 @@ export default {
 
       startAjaxEvent('Listing_LoadFromCard');
       const segmentation = {
-        ownListing: !!this.ownListing(),
+        ownListing: !!this.ownListing,
         openedFromStore: !!this.options.onStore,
         searchUrl: (this.options.searchUrl && this.options.searchUrl.hostname) || 'none',
       };
@@ -731,7 +717,7 @@ export default {
           e.preventDefault();
         });
 
-        this.trigger('listingDetailOpened');
+        this.$emit('listingDetailOpened');
         this.userLoadingModal.remove();
         app.loadingModal.close();
       };
@@ -861,24 +847,22 @@ export default {
     onClick(e) {
       if (this.deleteConfirmOn) return;
       if (
-        !this.ownListing() ||
-        (e.target !== this.$btnEdit()[0] &&
-          e.target !== this.$btnDelete()[0] &&
-          !$.contains(this.$btnEdit()[0], e.target) &&
-          !$.contains(this.$btnDelete()[0], e.target))
+        !this.ownListing ||
+        (e.target !== $('.js-edit')[0] &&
+          e.target !== $('.js-delete')[0] &&
+          !$.contains($('.js-edit')[0], e.target) &&
+          !$.contains($('.js-delete')[0], e.target))
       ) {
         this.loadListingDetail();
       }
     },
 
-    onClickShowNsfw(e) {
-      e.stopPropagation();
+    onClickShowNsfw() {
       this._userClickedShowNsfw = true;
       this.setHideNsfwClass();
     },
 
     onClickHideNsfw(e) {
-      e.stopPropagation();
       this._userClickedShowNsfw = false;
       this.setHideNsfwClass();
     },
@@ -943,9 +927,6 @@ export default {
       this.listenTo(this.report, 'submitted', this.onReportSubmitted);
     },
 
-    ownListing() {
-      return app.profile.id === this.ownerGuid;
-    },
     getFullListing() {
       if (!this.fullListing) {
         this.fullListing = new Listing(
@@ -959,18 +940,7 @@ export default {
       }
       return this.fullListing;
     },
-    $btnEdit() {
-      if (!this._$btnEdit) {
-        this._$btnEdit = $('.js-edit');
-      }
-      return this._$btnEdit;
-    },
-    $btnDelete() {
-      if (!this._$btnDelete) {
-        this._$btnDelete = $('.js-delete');
-      }
-      return this._$btnDelete;
-    },
+
     remove() {
       if (this.listingImage) this.listingImage.src = '';
       if (this.avatarImage) this.avatarImage.src = '';
@@ -993,7 +963,7 @@ export default {
             this.$el.html(
               t({
                 ...this.model.toJSON(),
-                ownListing: this.ownListing(),
+                ownListing: this.ownListing,
                 coinType: this.model.get('currency') && this.model.get('currency').code,
                 shipsFreeToMe: this.model.shipsFreeToMe,
                 viewType: this.viewType,
@@ -1007,9 +977,6 @@ export default {
             );
           });
 
-          this._$btnEdit = null;
-          this._$btnDelete = null;
-
           this.setBlockedClass();
           this.setHideNsfwClass();
           this.$el.toggleClass('isNsfw', this.model.get('nsfw'));
@@ -1021,7 +988,7 @@ export default {
             this.getCachedEl('.js-reportBtnWrapper').append(this.reportBtn.render().el);
           }
 
-          if (!this.ownListing()) {
+          if (!this.ownListing) {
             this.getCachedEl('.js-blockBtnWrapper').html(
               new BlockBtn({
                 targetId: this.ownerGuid,
@@ -1043,7 +1010,7 @@ export default {
           );
           this.getCachedEl('.js-verifiedMod').append(this.verifiedMod.render().el);
         } catch (e) {
-          if (!this.options.showErrorCardOnError) throw e;
+          if (!this.showErrorCardOnError) throw e;
           _cardError = e.message || true;
         }
       }

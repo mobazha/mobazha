@@ -8,21 +8,44 @@
 <script>
 
 export default {
-  mixins: [],
+  props: {
+    options: {
+      type: Object,
+      default: {},
+	  },
+  },
 
   data () {
     return {
-      tip: '',
-      tipClass: 'toolTip clrTAlert',
-      tipIconClass: 'ion-alert-circled padSm',
     };
+  },
+  created () {
+    this.loadData(this.options);
   },
   mounted () {
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+      };
+    }
   },
   methods: {
+    loadData(options = {}) {
+      const opts = {
+        ...options,
+        initialState: {
+          tip: '',
+          tipClass: 'toolTip clrTAlert',
+          tipIconClass: 'ion-alert-circled padSm',
+          ...options.initialState || {},
+        },
+      };
 
+      this.baseInit(opts);
+    },
     attributes () {
       return { 'data-tab': 'contract' };
     },

@@ -22,7 +22,6 @@
 <script>
 
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,
@@ -31,18 +30,27 @@ export default {
   },
   data () {
     return {
-      states: ['Point 1', 'Point 2'],
-      currentState: 0,
-      disputeState: 0,
+      _state: {
+        states: ['Point 1', 'Point 2'],
+        currentState: 0,
+        disputeState: 0,
+      }
     };
   },
   created () {
+    this.initEventChain();
+
     this.loadData(this.options);
   },
   mounted () {
   },
   computed: {
-
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+      };
+    }
   },
   methods: {
     statesWidth (index) {
@@ -51,6 +59,15 @@ export default {
       return width * 100;
     },
     loadData (options = {}) {
+      this.baseInit({
+        ...options,
+        initialState: {
+          states: ['Point 1', 'Point 2'],
+          currentState: 0,
+          disputeState: 0,
+          ...options.initialState,
+        },
+      });
       const state = this.getState();
 
       if (!Array.isArray(state.states)) {

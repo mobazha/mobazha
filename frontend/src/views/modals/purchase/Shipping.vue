@@ -2,20 +2,20 @@
   <div class="shipping">
     <div class="flexVCent">
       <h2 class="h4 required flexExpand">{{ ob.polyT('purchase.shippingTitle') }}</h2>
-      <div v-if="userAddresses.toJSON().length">
+      <template v-if="userAddresses.toJSON().length">
         <a class="clrTEm txU tx5b" @click="createNewAddress">{{ ob.polyT('purchase.newAddress') }}</a>
-      </div>
+      </template>
     </div>
     <div class="row">
-      <div v-if="userAddresses.toJSON().length">
+      <template v-if="userAddresses.toJSON().length">
         <select id="shippingAddress" @change="changeShippingAddress(val)">
             <option v-for="(a, i) in userAddresses.toJSON()" :key="i" :value="i" :selected="selectedAddressIndex === i">
               {{ getAddress(a) }}
             </option>
         </select>
-      </div>
+      </template>
 
-      <div v-else>
+      <template v-else>
         <div class="padGi txCtr">
           <div class="txB row">
             {{ ob.polyT('purchase.noAddresses') }}
@@ -24,7 +24,7 @@
             {{ ob.polyT('purchase.newAddress') }}
           </button>
         </div>
-      </div>
+      </template>
     </div>
     <ShippingOptions
       v-if="userAddresses.toJSON().length"

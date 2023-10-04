@@ -3,7 +3,7 @@
     <div class="flexHCent padLg">
       <div class="posR">
         <div class="clrT2 hide copiedToClipboard js-copiedToClipboard">{{ ob.polyT('copiedToClipboard') }}</div>
-        <h1 class="inline tx4">{{ ob.polyT('orderDetail.summaryTab.orderNumber', { orderID: model.id }) }}</h1>
+        <h1 class="inline tx4">{{ ob.polyT('orderDetail.summaryTab.orderNumber', { orderID: ob.id }) }}</h1>
         <a class="clrTEm tx5" @click="onClickCopyOrderID">{{ ob.polyT('orderDetail.summaryTab.copyLink') }}</a>
       </div>
     </div>
@@ -15,7 +15,7 @@
 
     <div class="js-timeoutInfoContainer"></div>
     <div class="js-subSections"></div>
-    <template v-if="!model.isCase">
+    <template v-if="!ob.isCase">
       <div class="js-paymentsWrap"></div>
     </template>
 
@@ -23,11 +23,10 @@
       <div class="rowLg">
         <h2 class="tx4 margRTn">{{ ob.polyT('orderDetail.summaryTab.payment.firstPaymentHeading') }}</h2>
         <div class="border clrBr padMd">
-          <template v-if="blockChainAddressUrl">
-            <a :href="blockChainAddressUrl" class="clrTEm">
-              {{ ob.polyT('orderDetail.summaryTab.payment.viewPaymentDetails', {
-                icon: '<span class="ion-android-open clrT2"></span>',
-              }) }}
+          <template v-if="ob.blockChainAddressUrl">
+            <a :href="ob.blockChainAddressUrl" class="clrTEm" v-html='ob.polyT("orderDetail.summaryTab.payment.viewPaymentDetails", {
+                icon: `<span class="ion-android-open clrT2"></span>`,
+              })'>
             </a>
           </template>
 
@@ -75,12 +74,12 @@ export default {
   components: {
     OrderDetails,
   },
-  mixins: [],
   props: {
     options: {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
@@ -226,7 +225,8 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      this.model = options.model;
+      this.baseInit(options);
+
       if (!this.model) {
         throw new Error('Please provide a model.');
       }
@@ -1109,7 +1109,6 @@ export default {
 
     remove () {
       clearTimeout(this.disputeCountdownTimeout);
-      super.remove();
     },
 
     render () {

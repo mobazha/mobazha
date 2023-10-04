@@ -25,10 +25,11 @@ export default {
     Contract,
   },
   props: {
-    model: {
+    options: {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
@@ -36,7 +37,7 @@ export default {
     };
   },
   created () {
-    this.loadData();
+    this.loadData(this.options);
   },
   mounted () {
     this.loadContracts();
@@ -44,7 +45,9 @@ export default {
   computed: {
   },
   methods: {
-    loadData () {
+    loadData (options = {}) {
+      this.baseInit(options);
+
       if (!this.model) {
         throw new Error('Please provide a model.');
       }

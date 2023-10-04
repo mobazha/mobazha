@@ -2,15 +2,15 @@
   <div class="orderDetails">
 
     <h2 class="tx4 margRTn">{{ ob.polyT('orderDetail.summaryTab.orderDetails.heading') }}</h2>
-    <span class="clrT2 tx5b">{{ moment(order.timestamp).format('lll') }}</span>
+    <span class="clrT2 tx5b">{{ moment(ob.order.timestamp).format('lll') }}</span>
     <div class="border clrBr padMd">
       <div class="flex gutterH clrT">
-        <a :href="`#${`${listing.vendorID.peerID}/store/${listing.slug}`}`" class="listingThumbCol flexNoShrink" :style="ob.getAvatarBgImage(listing.item.images[0])"></a>
+        <a :href="`#${`${ob.listing.vendorID.peerID}/store/${ob.listing.slug}`}`" class="listingThumbCol flexNoShrink" :style="ob.getAvatarBgImage(ob.listing.item.images[0])"></a>
         <div class="flexExpand tx5">
           <div class="flex gutterH">
             <div class="flexExpand">
-              <a :href="`#${`${listing.vendorID.peerID}/store/${listing.slug}`}`" :class="`txB clrT inlineBlock ${description || isCrypto ? 'rowTn' : ''}`">{{ title }}</a>
-              <div v-if="sku">{{ ob.polyT('orderDetail.summaryTab.orderDetails.skuLabel') }}: {{ sku }}</div>
+              <a :href="`#${`${ob.listing.vendorID.peerID}/store/${ob.listing.slug}`}`" :class="`txB clrT inlineBlock ${ob.description || isCrypto ? 'rowTn' : ''}`">{{ title }}</a>
+              <div v-if="ob.sku">{{ ob.polyT('orderDetail.summaryTab.orderDetails.skuLabel') }}: {{ ob.sku }}</div>
               <div v-if="item.options && item.options.length">{{ item.options.map(option => `${option.name}:&nbsp;${option.value}`).join(',&nbsp;') }}</div>
               <template v-if="isCrypto">
                 <div class="rowTn">
@@ -27,21 +27,21 @@
             <div class="col4">
               <div :class="`gutterVTn ${isCrypto ? 'row' : ''}`">
                 <div class="txB">{{ ob.polyT('orderDetail.summaryTab.orderDetails.shipToHeading') }}</div>
-                <template v-if="order.shipping && order.shipping.country !== 'NA'">
-                  <div>{{ order.shipping.shipTo }}</div>
-                  <div v-if="order.shipping.address">{{ order.shipping.address }}</div>
+                <template v-if="ob.order.shipping && ob.order.shipping.country !== 'NA'">
+                  <div>{{ ob.order.shipping.shipTo }}</div>
+                  <div v-if="ob.order.shipping.address">{{ ob.order.shipping.address }}</div>
                   <div v-if="addressLine3">{{ addressLine3 }}</div>
                   <div>{{ addressLine4 }}</div>
                   <div class="gutterH">
                     <a class=" clrTEm" @click="onClickCopyAddress(clipboardAddress)">{{ ob.polyT('orderDetail.summaryTab.orderDetails.copyLink') }}</a>
                     <a class="clrTEm" :href="mapUrl">{{ ob.polyT('orderDetail.summaryTab.orderDetails.viewOnMap') }}</a>
                   </div>
-                  <div class="addressNotes gutterVTn" v-if="order.shipping.addressNotes">
+                  <div class="addressNotes gutterVTn" v-if="ob.order.shipping.addressNotes">
                     <div>
                       <b>{{ ob.polyT('orderDetail.summaryTab.orderDetails.addressNotes') }}</b>
                     </div>
                     <div>
-                      {{ order.shipping.addressNotes }}
+                      {{ ob.order.shipping.addressNotes }}
                     </div>
                   </div>
                 </template>
@@ -53,10 +53,10 @@
               </div>
               <div v-if="isCrypto" class="gutterVTn">
                 <div class="txB cryptoAddress">
-                  <CryptoIcon :code="listing.metadata.pricingCurrency.code" />
+                  <CryptoIcon :code="ob.listing.metadata.pricingCurrency.code" />
                   {{ ob.polyT('orderDetail.summaryTab.orderDetails.paymentAddressHeading', {
                     coinType: coinTypeName === `cryptoCurrencies.${coinType}` ? coinType : ob.polyT(`cryptoCurrencies.${coinType}`),
-                    icon: ob.crypto.cryptoIcon({ code: listing.metadata.pricingCurrency.code, }),
+                    icon: ob.crypto.cryptoIcon({ code: ob.listing.metadata.pricingCurrency.code, }),
                   }) }}
                 </div>
                 <div class="flex gutterHSm">
@@ -89,8 +89,7 @@
                   </div>
                   <div class="col6">
                     <div class="txB rowTn">{{ ob.polyT('orderDetail.summaryTab.orderDetails.totalHeading') }}</div>
-                    <div>
-                      {{ ob.currencyMod.pairedCurrency( order.payment.amount, order.payment.coin, app.settings.get('localCurrency') ) }}
+                    <div v-html="ob.currencyMod.pairedCurrency( order.payment.amount, order.payment.coin, app.settings.get('localCurrency') )">
                     </div>
                   </div>
                 </div>
@@ -124,7 +123,7 @@
               <div>
                 <div class="gutterVTn">
                   <div class="txB">{{ ob.polyT('orderDetail.summaryTab.orderDetails.alternateContact') }}</div>
-                  <div>{{ order.alternateContactInfo ? order.alternateContactInfo : ob.polyT('orderDetail.summaryTab.notApplicable') }}</div>
+                  <div>{{ ob.order.alternateContactInfo ? ob.order.alternateContactInfo : ob.polyT('orderDetail.summaryTab.notApplicable') }}</div>
                 </div>
               </div>
             </div>
@@ -151,16 +150,11 @@ export default {
   components: {
     ModFragment,
   },
-  mixins: [],
   props: {
-    model: {
+    options: {
       type: Object,
-      default: {}
-    },
-    moderator: {
-      type: Object,
-      default: {}
-    },
+      default: {},
+	  },
   },
   data () {
     return {
@@ -169,12 +163,29 @@ export default {
     };
   },
   created () {
+    this.initEventChain();
+
     this.loadData(this.options);
   },
   mounted () {
     this.render();
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        listing: this.listing,
+        order: this.order,
+        getCountryByDataName,
+        convertAndFormatCurrency,
+        userCurrency: app.settings.get('localCurrency'),
+        moment,
+        isModerated: this.isModerated(),
+        sku: this.sku,
+        locale: app && app.localSettings && app.localSettings.standardizedTranslatedLang()
+          || 'en-US',
+      };
+    },
     isCrypto () {
       return this.listing.metadata.contractType === 'CRYPTOCURRENCY';
     },
@@ -337,6 +348,7 @@ export default {
 
     loadData (options = {}) {
       this.baseInit(options);
+
       if (!this.model) {
         throw new Error('Please provide a Contract model.');
       }

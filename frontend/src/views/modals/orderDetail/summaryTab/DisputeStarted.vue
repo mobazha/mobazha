@@ -31,7 +31,6 @@ import {
 } from '../../../../../backbone/utils/order';
 
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,
@@ -40,12 +39,16 @@ export default {
   },
   data () {
     return {
-      disputerName: '',
-      claim: '',
-      showResolveButton: false,
+      _state: {
+        disputerName: '',
+        claim: '',
+        showResolveButton: false,
+      }
     };
   },
   created () {
+    this.initEventChain();
+
     this.loadData(this.options);
   },
   mounted () {
@@ -78,7 +81,7 @@ export default {
       };
 
       this.listenTo(orderEvents, 'resolveDisputeComplete', () => {
-        this.showResolveButton = false;
+        this.setState({ showResolveButton: false, });
       });
     },
 

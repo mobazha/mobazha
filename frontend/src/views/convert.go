@@ -261,6 +261,10 @@ func updateJsFileContent(content string) (string, string) {
 	m = regexp.MustCompile(`this.\$\(`)
 	content = m.ReplaceAllString(content, "$(")
 
+	// super(opts);
+	m = regexp.MustCompile(`super\((.*)\);`)
+	content = m.ReplaceAllString(content, "this.baseInit($1);")
+
 	return header, strings.ReplaceAll(content, " constructor(", " loadData(")
 }
 

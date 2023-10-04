@@ -13,8 +13,9 @@
           <div for="fulfillOrderNote">{{ ob.polyT(`orderDetail.disputeOrderTab.moderatorLabel`) }}</div>
         </div>
         <div class="col7">
-          <div class="js-modContainer"></div>
-          <ModFragment :modInfo="moderatorState" />
+          <div class="js-modContainer">
+            <ModFragment :modInfo="moderatorState" />
+          </div>
         </div>
       </div>
       <div class="flexRow gutterH rowHg">
@@ -22,7 +23,7 @@
           <label for="fulfillOrderNote">{{ ob.polyT(`orderDetail.disputeOrderTab.reasonLabel`) }}</label>
         </div>
         <div class="col7">
-          <FormError v-if="errors['claim']" :errors="errors['claim']" />
+          <FormError v-if="ob.errors['claim']" :errors="ob.errors['claim']" />
           <textarea
             rows="6"
             name="claim"
@@ -32,15 +33,15 @@
             :placeholder="ob.polyT(`orderDetail.disputeOrderTab.reasonPlaceholder`)"
             v-model="claim" />
           <p class="clrT2 txSm">{{ ob.polyT(`orderDetail.disputeOrderTab.reasonHelperText`) }}</p>
-          <p v-if="options.timeoutMessage" class="clrT2 txSm">{{ options.timeoutMessage }}</p>
+          <p v-if="ob.timeoutMessage" class="clrT2 txSm">{{ ob.timeoutMessage }}</p>
         </div>
       </div>
     </form>
     <hr class="clrBr" />
     <div class="buttonBar flexHRight flexVCent gutterHLg">
-      <a :disabled="openingDispute" @click="onClickCancel">{{ ob.polyT('orderDetail.disputeOrderTab.btnCancel') }}</a>
+      <a :disabled="ob.openingDispute" @click="onClickCancel">{{ ob.polyT('orderDetail.disputeOrderTab.btnCancel') }}</a>
       <ProcessingButton
-        :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph ${openingDispute ? 'processing' : ''}`"
+        :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph ${ob.openingDispute ? 'processing' : ''}`"
         :btnText="ob.polyT(`orderDetail.fulfillOrderTab.btnSubmit`)" @click="onClickSubmit" />
     </div>
   </div>
@@ -66,11 +67,11 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
       claim: '',
-      openingDispute: false,
     };
   },
   created () {
@@ -84,8 +85,14 @@ export default {
     this.$refs.clamTextAread.focus();
   },
   computed: {
-    errors () {
-      return this.model.validationError || {};
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._model,
+        errors: this._model.validationError || {},
+        openingDispute: !!openingDispute(this.model.id),
+        timeoutMessage: this.options.timeoutMessage,
+      };
     },
     moderatorState() {
       return {

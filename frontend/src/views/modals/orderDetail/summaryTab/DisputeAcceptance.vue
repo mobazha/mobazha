@@ -22,7 +22,6 @@ import _ from 'underscore';
 import moment from 'moment';
 
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,
@@ -36,6 +35,8 @@ export default {
     };
   },
   created () {
+    this.initEventChain();
+
     this.loadData(this.options);
   },
   mounted () {
@@ -45,6 +46,7 @@ export default {
       return {
         ...this.templateHelpers,
         ...this._state,
+        moment,
       };
     },
 

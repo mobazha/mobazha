@@ -1,8 +1,8 @@
 <template>
   <div class="shippingOptions">
-    <div v-if="validOptions.length">
+    <template v-if="validOptions.length">
       <div class="flexColRows boxList border borderStacked clrP clrBr">
-        <div v-for="(service, i) in validOptions" :key="i">
+        <template v-for="(service, i) in validOptions" :key="i">
           <div class="btnRadio width100">
             <input type="radio"
               @click="onSelectShippingOption(service)"
@@ -22,14 +22,14 @@
               </div>
             </label>
           </div>
-        </div>
+        </template>
       </div>
-    </div>
-    <div v-else>
+    </template>
+    <template v-else>
       <div class="padGi flexCent">
         <h5>{{ ob.polyT('purchase.noShippableAddresses') }}</h5>
       </div>
-    </div>
+    </template>
 
   </div>
 </template>

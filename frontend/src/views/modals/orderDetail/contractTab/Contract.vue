@@ -6,7 +6,7 @@
     <template v-if="ob.errors && ob.errors.length">
       <p class="txUnl rowSm clrTErr"><span class="ion-alert-circled padSm"></span>{{ ob.polyT('orderDetail.contractTab.contractErrorHeading') }}</p>
       <ul class="row">
-        <li v-for="(err, j) in ob.errors" :key="j" class="clrTErr rowSm">${err}</li>
+        <li v-for="(err, j) in ob.errors" :key="j" class="clrTErr rowSm">{{ err }}</li>
       </ul>
     </template>
     <div class="border clrBr clrP clrT rowLg js-jsonContractContainer" @click.stop></div>
@@ -67,8 +67,6 @@ export default {
       if (!options.contract) {
         throw new Error('Please provide a contract.');
       }
-
-      this.contract = options.contract;
     },
 
     onClickCopyContract () {

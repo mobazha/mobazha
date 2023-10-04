@@ -1,12 +1,12 @@
 <template>
   <div>
     <div class="flexVCent gutterHSm rowTn">
-      <template v-if="modInfo.showAvatar">
-        <div class="avatar clrBr2 clrSh1 disc" :style="ob.getAvatarBgImage(modInfo.avatarHashes || {})"></div>
+      <template v-if="ob.showAvatar">
+        <div class="avatar clrBr2 clrSh1 disc" :style="ob.getAvatarBgImage(ob.avatarHashes || {})"></div>
       </template>
-      <div>{{ modInfo.name }}
-        <a class="clrTEm" :href="`#${modInfo.peerID}`">{{ modInfo.handle && `@${modInfo.handle}` || `${modInfo.peerID.slice(0,
-          modInfo.maxPeerIDLength)}…` }}</a>
+      <div>{{ ob.name }}
+        <a class="clrTEm" :href="`#${ob.peerID}`">{{ ob.handle && `@${ob.handle}` || `${ob.peerID.slice(0,
+          ob.maxPeerIDLength)}…` }}</a>
       </div>
     </div>
     <div class="js-verifiedMod"></div>
@@ -30,26 +30,40 @@ export default {
   },
   data () {
     return {
-      modInfo: {}
     };
   },
   created () {
     this.initEventChain();
-    
+
     this.loadData(this.options);
   },
   mounted () {
     this.render();
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+      };
+    }
   },
   methods: {
     loadData (options = {}) {
-      this.modInfo = options;
-      this.verifiedModModel = app.verifiedMods.get(this.modInfo.peerID);
+      this.baseInit({
+        ...options,
+        initialState: {
+          maxPeerIDLength: 8,
+          showAvatar: false,
+          ...options.initialState,
+        },
+      });
+
+      const state = this.getState();
+      this.verifiedModModel = app.verifiedMods.get(state.peerID);
 
       this.listenTo(app.verifiedMods, 'update', () => {
-        const newVerifiedModModel = app.verifiedMods.get(this.modInfo.peerID);
+        const newVerifiedModModel = app.verifiedMods.get(state.peerID);
         if (newVerifiedModModel !== this.verifiedModModel) {
           this.verifiedModModel = newVerifiedModModel;
           this.render();
@@ -58,7 +72,8 @@ export default {
     },
 
     render () {
-      const verifiedMod = app.verifiedMods.get(this.modInfo.peerID);
+      const state = this.getState();
+      const verifiedMod = app.verifiedMods.get(state.peerID);
       const createOptions = getModeratorOptions({
         model: verifiedMod,
       });

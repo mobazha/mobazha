@@ -1,13 +1,13 @@
 <template>
   <div class="profileBox">
-    <template v-if="!options.isFetching">
-      <a :href="`#${options.peerID}`" :style="ob.getAvatarBgImage(info.avatarHashes,
+    <template v-if="!ob.isFetching">
+      <a :href="`#${ob.peerID}`" :style="ob.getAvatarBgImage(ob.avatarHashes,
         {
           standardSize: 'small',
           responsiveSize: 'medium',
         })" class="avatar clrBr2 clrSh1 disc"></a>
-      <a :href="`#${options.peerID}`" class="txB clamp clrT">{{ info.name }}</a>
-      <div class="clrT2 tx5 clamp">{{ info.location }}</div>
+      <a :href="`#${ob.peerID}`" class="txB clamp clrT">{{ ob.name }}</a>
+      <div class="clrT2 tx5 clamp">{{ ob.location }}</div>
     </template>
 
   </div>
@@ -15,31 +15,45 @@
 
 <script>
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
-      fetchFailed: false,
     };
   },
   created () {
+    this.initEventChain();
+
+    this.loadData(this.options);
   },
   mounted () {
   },
   computed: {
-    info () {
-      if (this.options.model && typeof this.options.model.toJSON === 'function') {
-        return this.options.model.toJSON();
-      }
-      return {}
-    },
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+        ...this._model || {},
+      };
+    }
   },
   methods: {
+    loadData(options = {}) {
+      const opts = {
+        initialState: {
+          isFetching: false,
+          fetchFailed: false,
+        },
+        ...options,
+      };
+
+      this.baseInit(opts);
+    },
   }
 }
 </script>

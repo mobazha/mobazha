@@ -7,19 +7,19 @@
           <div class="flexVBase rowSm">
             <label class="txB tx5 required flexNoShrink" for="completeOrderReview">{{ ob.polyT('orderDetail.summaryTab.completeOrderForm.reviewLabel') }}</label>
             <div class="flexHRight">
-              <span class="clrT2 tx6">{{ ob.polyT('orderDetail.summaryTab.completeOrderForm.maxReviewChars', { max: constraints.maxReviewCharacters}) }}</span>
+              <span class="clrT2 tx6">{{ ob.polyT('orderDetail.summaryTab.completeOrderForm.maxReviewChars', { max: ob.constraints.maxReviewCharacters}) }}</span>
             </div>
           </div>
-          <FormError v-if="errors.review" :errors="errors.review" />
+          <FormError v-if="ob.errors.review" :errors="ob.errors.review" />
           <textarea rows="8" name="review" class="clrBr clrP clrSh2 rowMd" id="completeOrderReview"
-            placeholder="Write your review here…" :maxlength="constraints.maxReviewCharacters" v-model="rating.review" />
+            placeholder="Write your review here…" :maxlength="ob.constraints.maxReviewCharacters" v-model="rating.review" />
           <div class="flexVCent gutterH">
             <ProcessingButton
-              :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph js-completeOrder ${isCompleting ? 'processing' : ''}`"
+              :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph js-completeOrder ${ob.isCompleting ? 'processing' : ''}`"
               :btnText="ob.polyT('orderDetail.summaryTab.completeOrderForm.btnCompleteOrder')"
               @click="onClickCompleteOrder" />
             <div class="gutterHSm">
-              <FormError v-if="errors.anonymous" :errors="errors.anonymous" />
+              <FormError v-if="ob.errors.anonymous" :errors="ob.errors.anonymous" />
               <input type="checkbox" name="anonymous" id="completeOrderAnon" class="centerLabel" data-var-type="boolean"
                 :checked="!rating.anonymous">
               <label for="completeOrderAnon" class="clrT2 tx5b">{{ ob.polyT('orderDetail.summaryTab.completeOrderForm.anonCheckLabel') }}</label>
@@ -29,27 +29,27 @@
         <div class="col3 ratingsCol">
           <div class="row">
             <div class="txB tx5">{{ ob.polyT('ratingLabels.overall') }}</div>
-            <FormError v-if="errors.overall" :errors="errors.overall" />
+            <FormError v-if="ob.errors.overall" :errors="ob.errors.overall" />
             <div class="ratingsContainer" data-rating-type="overall"></div>
           </div>
           <div class="row">
             <div class="txB tx5">{{ ob.polyT('ratingLabels.quality') }}</div>
-            <FormError v-if="errors.quality" :errors="errors.quality" />
+            <FormError v-if="ob.errors.quality" :errors="ob.errors.quality" />
             <div class="ratingsContainer" data-rating-type="quality"></div>
           </div>
           <div class="row">
             <div class="txB tx5">{{ ob.polyT('ratingLabels.asAdvertised') }}</div>
-            <FormError v-if="errors.description" :errors="errors.description" />
+            <FormError v-if="ob.errors.description" :errors="ob.errors.description" />
             <div class="ratingsContainer" data-rating-type="description"></div>
           </div>
           <div class="row">
             <div class="txB tx5">{{ ob.polyT('ratingLabels.delivery') }}</div>
-            <FormError v-if="errors.deliverySpeed" :errors="errors.deliverySpeed" />
+            <FormError v-if="ob.errors.deliverySpeed" :errors="ob.errors.deliverySpeed" />
             <div class="ratingsContainer" data-rating-type="deliverySpeed"></div>
           </div>
           <div class="row">
             <div class="txB tx5">{{ ob.polyT('ratingLabels.service') }}</div>
-            <FormError v-if="errors.customerService" :errors="errors.customerService" />
+            <FormError v-if="ob.errors.customerService" :errors="ob.errors.customerService" />
             <div class="ratingsContainer" data-rating-type="customerService"></div>
           </div>
         </div>
@@ -72,7 +72,6 @@ import RatingsStrip from '../../../../../backbone/views/RatingsStrip';
 
 
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,
@@ -81,21 +80,25 @@ export default {
   },
   data () {
     return {
-      ob: {},
     };
   },
   created () {
+    this.initEventChain();
+
     this.loadData(this.options);
   },
   mounted () {
     this.render();
   },
   computed: {
-    errors () {
-      return this.rating.validationError || {};
-    },
-    constraints () {
-      return this.rating.constraints || {};
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this.rating.toJSON(),
+        errors: this.rating.validationError || {},
+        isCompleting: !!completingOrder(this.model.id),
+        constraints: this.rating.constraints || {},
+      };
     }
   },
   methods: {

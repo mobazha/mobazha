@@ -1,5 +1,5 @@
 <template>
-  <div class="disputePayoutEvent rowLg">
+  <div class="disputePayoutEvent rowLg" @click="onDocumentClick">
     <h2 class="tx4 margRTn">{{ ob.polyT('orderDetail.summaryTab.disputePayout.heading') }}</h2>
     <template v-if="ob.timestamp">
       <span class="clrT2 tx5b">{{ moment(ob.timestamp).format('lll') }}</span>
@@ -36,7 +36,7 @@
           <div class="posR">
             <template v-if="ob.showAcceptButton">
               <ProcessingButton
-                :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b js-acceptPayout ${acceptInProgress ? 'processing' : ''}`"
+                :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b js-acceptPayout ${ob.acceptInProgress ? 'processing' : ''}`"
                 :disabled="acceptConfirmOn" :btnText="ob.polyT('orderDetail.summaryTab.disputePayout.btnAcceptPayout')"
                 @click="onClickAcceptPayout" />
             </template>
@@ -79,7 +79,6 @@ import {
 import { recordEvent } from '../../../../../backbone/utils/metrics';
 
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,
@@ -88,10 +87,13 @@ export default {
   },
   data () {
     return {
-      userCurrency: app.settings.get('localCurrency') || 'USD',
-      showAcceptButton: false,
-      acceptConfirmOn: false,
-      paymentCoin: undefined,
+      _state: {
+        userCurrency: app.settings.get('localCurrency') || 'USD',
+        showAcceptButton: false,
+        acceptConfirmOn: false,
+        paymentCoin: undefined,
+        acceptInProgress: false,
+      },
 
       priceLines: {},
       partyHeadings: {},
@@ -104,12 +106,29 @@ export default {
   mounted () {
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+        moment,
+        acceptInProgress: acceptingPayout(this.orderID),
+      };
+    }
   },
   methods: {
     moment,
 
     loadData (options = {}) {
-      this.baseInit(options);
+      this.baseInit({
+        ...options,
+        initialState: {
+          userCurrency: app.settings.get('localCurrency') || 'USD',
+          showAcceptButton: false,
+          acceptConfirmOn: false,
+          paymentCoin: undefined,
+          ...options.initialState,
+        },
+      });
 
       if (!options.orderID) {
         throw new Error('Please provide the orderID');
@@ -117,28 +136,23 @@ export default {
 
       this.orderID = options.orderID;
 
-      this.boundOnDocClick = this.onDocumentClick.bind(this);
-      $(document).on('click', this.boundOnDocClick);
-
       this.listenTo(orderEvents, 'acceptingPayout', e => {
         if (e.id === this.orderID) {
-          this.acceptInProgress = true;
+          this.setState({ acceptInProgress: true });
         }
       });
 
       this.listenTo(orderEvents, 'acceptPayoutComplete acceptPayoutFail', e => {
         if (e.id === this.orderID) {
-          this.acceptInProgress = false;
+          this.setState({ acceptInProgress: false });
         }
       });
 
       this.listenTo(orderEvents, 'acceptPayoutComplete', e => {
         if (e.id === this.orderID) {
-          this.showAcceptButton = false;
+          this.setState({ showAcceptButton: false });
         }
       });
-
-      this.acceptInProgress = acceptingPayout(this.orderID);
 
       ['buyer', 'vendor', 'moderator'].forEach((type, index) => {
         this.partyHeadings[type] = ob[`${type}Name`] ?
@@ -167,7 +181,7 @@ export default {
 
     onClickAcceptPayout () {
       recordEvent('OrderDetails_DisputeAcceptClick');
-      this.acceptConfirmOn = true;
+      this.setState({ acceptConfirmOn: true });
       return false;
     },
 
@@ -179,18 +193,15 @@ export default {
 
     onClickAcceptPayoutConfirmCancel () {
       recordEvent('OrderDetails_DisputeAcceptCancel');
-      this.acceptConfirmOn = false;
+      this.setState({ acceptConfirmOn: false });
     },
 
     onClickAcceptPayoutConfirmed () {
       recordEvent('OrderDetails_DisputeAcceptConfirm');
-      this.acceptConfirmOn = false;
+      this.setState({ acceptConfirmOn: false });
       acceptPayout(this.orderID);
     },
 
-    remove () {
-      $(document).off('click', this.boundOnDocClick);
-    },
   }
 }
 </script>

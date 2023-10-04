@@ -30,7 +30,7 @@
             </div>
           </template>
         </div>
-        <a :href="`#${app.profile.id}`"
+        <a :href="`#${ob.ownGuid}`"
           :class="`avatar disc clrBr2 clrSh1 flexNoShrink ${!ob.showAvatar ? 'invisible' : ''}`"
           :style="ob.showAvatar ? ob.getAvatarBgImage(ob.avatarHashes) : ''"></a>
       </div>
@@ -45,30 +45,43 @@ import moment from 'moment';
 import twemoji from 'twemoji';
 import { capitalize } from '../../../../backbone/utils/string';
 import { setTimeagoInterval } from '../../../../backbone/utils';
+import app from '../../../../backbone/app';
 
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
-      showAvatar: true,
-      showTimestampLine: true,
-      showAsRead: false,
     };
   },
   created () {
+    this.initEventChain();
+
     this.loadData(this.options);
   },
   mounted () {
     this.render();
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._model,
+        ...this._state,
+        moment,
+        message,
+        capitalize,
+        ownGuid: app.profile.id,
+      };
+    },
+
     timeLine () {
+      const ob = this.ob;
       return ob.polyT('orderDetail.discussionTab.timeLineAndRole', {
         timeFromNow: moment(ob.timestamp).fromNow(),
         role: ob.polyT(`orderDetail.discussionTab.role${capitalize(ob.role)}`)
@@ -81,7 +94,15 @@ export default {
         throw new Error('Please provide a model.');
       }
 
-      this.baseInit(options);
+      this.baseInit({
+        ...options,
+        initialState: {
+          showAvatar: true,
+          showTimestampLine: true,
+          showAsRead: false,
+          ...options.initialState,
+        },
+      });
 
       this.listenTo(this.model, 'change', () => this.render());
       this.timeAgoInterval = setTimeagoInterval(this.model.get('timestamp'), () => {

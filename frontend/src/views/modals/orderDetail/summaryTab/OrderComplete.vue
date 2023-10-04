@@ -1,7 +1,7 @@
 <template>
   <div class="orderCompleteEvent rowLg">
     <h2 class="tx4 margRTn">{{ ob.polyT('orderDetail.summaryTab.orderComplete.heading') }}</h2>
-    <span class="clrT2 tx5b">{{ ob.moment(dataObject.timestamp).format('lll') }}</span>
+    <span class="clrT2 tx5b">{{ ob.moment(ob.timestamp).format('lll') }}</span>
     <div class="border clrBr padMd">
       <div class="flex gutterHLg">
         <div class="col9">
@@ -43,7 +43,6 @@ import RatingsStrip from '../../../../../backbone/views/RatingsStrip';
 
 
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,
@@ -52,16 +51,26 @@ export default {
   },
   data () {
     return {
-      ob: {},
     };
   },
   created () {
+    this.initEventChain();
+
     this.loadData(this.options);
   },
   mounted () {
     this.render();
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...rating,
+        ...this._state,
+        timestamp: this.dataObject.timestamp,
+        moment,
+      };
+    }
   },
   methods: {
     moment,

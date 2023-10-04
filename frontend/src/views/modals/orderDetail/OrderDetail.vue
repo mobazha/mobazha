@@ -5,11 +5,11 @@
         <div class="topControls flex">
           <!-- // This is something found at the top of multiple modals. Would be nice to make this into a template
       // and componentize the css. -->
-          <template v-if="returnText">
+          <template v-if="ob.returnText">
             <div class="btnStrip clrSh3">
               <a class="btn clrP clrBr clrT" @click="onClickReturnBox">
                 <span class="ion-chevron-left margRSm"></span>
-                {{ returnText }}
+                {{ ob.returnText }}
               </a>
             </div>
           </template>
@@ -31,22 +31,22 @@
                 <a :class="`tab row ${activeTab === 'contract' ? 'clrT active' : ''}`" @click="selectTab('contract')">{{ ob.polyT('orderDetail.navMenu.contract') }}</a>
               </div>
             </div>
-            <div class="mainCtaWrap hide" v-show="!isFetching && !fetchFailed">
+            <div class="mainCtaWrap hide" v-show="!ob.isFetching && !ob.fetchFailed">
               <ProcessingButton className="btn clrBAttGrad clrBrDec1 clrTOnEmph" btnText="Accept Order"/>
             </div>
             <div class="js-actionBarContainer"></div>
           </div>
           <div class="flexExpand posR">
             <div class="contentBox clrP clrBr clrSh3 mainContent">
-              <template v-if="isFetching">
+              <template v-if="ob.isFetching">
                 <div class="center"><SpinnerSVG className="spinnerMd" /></div>
               </template>
 
-              <template v-else-if="fetchFailed">
+              <template v-else-if="ob.fetchFailed">
                 <div class="center txCtr tx4">
                   <div :class="`txB ${ob.initialFetchErrorMessage ? 'rowTn' : 'row'}`">Unable to fetch order.</div>
-                  <template v-if="fetchError">
-                    <div class="row">{{ fetchError }}</div>
+                  <template v-if="ob.fetchError">
+                    <div class="row">{{ ob.fetchError }}</div>
                   </template>
                   <a class="btn clrP clrBr clrSh2" @click="onClickRetryFetch">Retry</a>
                 </div>
@@ -57,6 +57,11 @@
                   <Summary
                     v-if="activeTab === 'summary'"
                     :options="tabViewData"
+                    :bb="function() {
+                      return {
+                        model,
+                      };
+                    }"
                     @clickFulfillOrder="selectTab('fulfillOrder')"
                     @clickResolveDispute="() => {
                       recordEvent('OrderDetails_DisputeResolveStart');
@@ -70,8 +75,12 @@
                   />
                   <Discussion
                     v-if="activeTab === 'discussion'"
-                    :amActiveTab="activeTab === 'discussion'"
                     :options="tabViewData"
+                    :bb="function() {
+                      return {
+                        model,
+                      };
+                    }"
                     @convoMarkedAsRead="() => {
                       model.set('unreadChatMessages', 0);
                       $emit('convoMarkedAsRead', model.id);
@@ -79,16 +88,23 @@
                   />
                   <ContractTab
                     v-if="activeTab === 'contract'"
-                    :model="model"
+                    :bb="function() {
+                      return {
+                        model,
+                      };
+                    }"
                     @clickBackToSummary="() => {
                       selectTab('summary');
                     }"
                   />
                   <FulfillOrder
                     v-if="activeTab === 'fulfillOrder'"
-                    :orderID="model.id"
-                    :contractType="contract.type"
-                    :isLocalPickup="contract.isLocalPickup"
+                    :options="fulfillOrderOptions.options"
+                    :bb="function() {
+                      return {
+                        model,
+                      };
+                    }"
                     @clickBackToSummary="() => {
                       selectTab('summary');
                     }"
@@ -98,7 +114,12 @@
                   />
                   <DisputeOrder
                     v-if="activeTab === 'disputeOrder'"
-                    :options="disputeOrderOptions"
+                    :options="disputeOrderOptions.options"
+                    :bb="function() {
+                      return {
+                        model: disputeOrderOptions.model,
+                      };
+                    }"
                     @clickBackToSummary="() => {
                       selectTab('summary');
                     }"
@@ -108,7 +129,12 @@
                   />
                   <ResolveDispute
                     v-if="activeTab === 'resolveDispute'"
-                    :options="resolveDisputeOptions"
+                    :options="resolveDisputeOptions.options"
+                    :bb="function() {
+                      return {
+                        model: resolveDisputeOptions.model,
+                      };
+                    }"
                     @clickBackToSummary="() => {
                       selectTab('summary');
                     }"
@@ -195,6 +221,16 @@ export default {
     this.render();
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+        ...this._model,
+        returnText: this.options.returnText,
+        type: this.type,
+        getUnreadChatMessagesText: this.getUnreadChatMessagesText.bind(this),
+      };
+    },
     type () {
       return this.model instanceof Case ? 'case' : this.model.type;
     },
@@ -254,6 +290,25 @@ export default {
       count = count > 99 ? '…' : count;
       return count;
     },
+    fulfillOrderOptions() {
+      const contract = this.model.get('contract');
+
+      const model = new OrderFulfillment(
+        { orderID: this.model.id },
+        {
+          contractType: contract.type,
+          isLocalPickup: contract.isLocalPickup,
+        },
+      );
+
+      return {
+        model,
+        options: {
+          contractType: contract.type,
+          isLocalPickup: contract.isLocalPickup,
+        }
+      };
+    },
     disputeOrderOptions () {
       const model = new OrderDispute({ orderID: this.model.id });
       const translationKeySuffix = app.profile.id === this.model.buyerID ? 'Buyer' : 'Vendor';
@@ -272,12 +327,14 @@ export default {
 
       return {
         model,
-        contractType: this.contract.type,
-        moderator: {
-          id: this.model.moderatorID,
-          getProfile: this.getModeratorProfile.bind(this),
-        },
-        timeoutMessage,
+        options: {
+          contractType: this.contract.type,
+          moderator: {
+            id: this.model.moderatorID,
+            getProfile: this.getModeratorProfile.bind(this),
+          },
+          timeoutMessage,
+        }
       }
     },
     resolveDisputeOptions () {
@@ -301,15 +358,17 @@ export default {
 
       return {
         model,
-        case: this.model,
-        vendor: {
-          id: this.model.vendorID,
-          getProfile: this.getVendorProfile.bind(this),
-        },
-        buyer: {
-          id: this.model.buyerID,
-          getProfile: this.getBuyerProfile.bind(this),
-        },
+        options: {
+          case: this.model,
+          vendor: {
+            id: this.model.vendorID,
+            getProfile: this.getVendorProfile.bind(this),
+          },
+          buyer: {
+            id: this.model.buyerID,
+            getProfile: this.getBuyerProfile.bind(this),
+          },
+        }
       };
     },
     profileBoxOptions () {
@@ -561,7 +620,6 @@ export default {
           id: this.model.vendorID,
           getProfile: this.getVendorProfile.bind(this),
         },
-        model: this.model,
       };
 
       if (this.model.moderatorID) {

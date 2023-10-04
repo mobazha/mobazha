@@ -1,18 +1,19 @@
 <template>
   <div :class="`discussionTab clrP ${messages.length ? 'noMessages' : ''} ${loadingMessages ? 'loadingMessages' : ''} ${isTyping ? 'isTyping' : ''}`">
-    <div class="typingIndicator tx5 noOverflow clrBr clrP clrT2 clrSh1">{{ typingIndicatorContent }}</div>
+    <div class="typingIndicator tx5 noOverflow clrBr clrP clrT2 clrSh1">{{ ob.typingIndicator }}</div>
     <div class="convoMessagesWindow tx6 js-convoMessagesWindow">
       <SpinnerSVG />
-      <div class="clrTErr messagesFetchError" v-show="showLoadMessagesError">
-        {{ ob.polyT('orderDetail.discussionTab.loadMessagesError', {
-          retryLink: `<a class="" @click="onClickRetryLoadMessage">${ob.polyT('orderDetail.discussionTab.retryLink')}</a>`
-        }) }}
+      <div class="clrTErr messagesFetchError"
+        v-show="ob.showLoadMessagesError"
+        v-html='ob.polyT("orderDetail.discussionTab.loadMessagesError", {
+          retryLink: `<a @click="onClickRetryLoadMessage">${ob.polyT("orderDetail.discussionTab.retryLink")}</a>`
+        })'>
       </div>
       <div class="js-convoMessagesContainer"></div>
     </div>
 
     <div class="clrBr clrP flex gutterHSm convoFooter js-convoFooter">
-      <div class="avatar clrBr2 clrSh1 disc" :style="ob.getAvatarBgImage(ownProfile.avatarHashes)"></div>
+      <div class="avatar clrBr2 clrSh1 disc" :style="ob.getAvatarBgImage(ob.ownProfile.avatarHashes)"></div>
       <div class="flexExpand">
         <textarea
           ref="inputMessage"
@@ -20,7 +21,7 @@
           @keyup="onKeyUpMessageInput"
           @keydown="onKeyDownMessageInput"
           :placeholder="ob.polyT('chat.conversation.messageInputPlaceholder')"
-          :maxlength="maxMessageLength"
+          :maxlength="ob.maxMessageLength"
           v-model="inputMessage"
           rows="1"></textarea>
         <div class="msgModUnableToChat clrT2">{{ ob.polyT('orderDetail.discussionTab.modCannotChat') }}</div>
@@ -52,21 +53,12 @@ export default {
       type: Object,
       default: {},
     },
-    amActiveTab: {
-      type: Boolean,
-      default: false,
-    },
+    bb: Function,
   },
   data () {
     return {
       messagesPerPage: 20,
       typingExpires: 3000,
-
-      inputMessage: '',
-      typingIndicatorContent: '',
-      isTyping: false,
-
-      loadingMessages: false,
     };
   },
   created () {
@@ -78,10 +70,18 @@ export default {
     this.render();
 
     this.onAttach();
-
-    this.typingIndicatorContent = this.getTypingIndicatorContent();
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        showLoadMessagesError: this.showLoadMessagesError,
+        typingIndicator: this.getTypingIndicatorContent(),
+        maxMessageLength: ChatMessage.max.messageLength,
+        ownProfile: app.profile.toJSON(),
+        canModChat: this.footerClass,
+      };
+    },
     convoMessagesWindow () {
       return this._convoMessagesWindow ||
         (this._convoMessagesWindow = $('.js-convoMessagesWindow'));
@@ -108,7 +108,7 @@ export default {
           let include = true;
 
           if (chatter.role === 'moderator' &&
-            this.model.get('state') !== 'DISPUTED') {
+            this._model.state !== 'DISPUTED') {
             include = false;
           }
 
@@ -199,7 +199,7 @@ export default {
         this.firstSyncComplete = true;
         this.setScrollTop(this.convoMessagesWindow[0].scrollHeight);
 
-        if (this.amActiveTab) this.markConvoAsRead();
+        this.markConvoAsRead();
       }
     },
 
@@ -336,7 +336,7 @@ export default {
         });
 
         this.messages.push(message);
-        if (this.amActiveTab) this.markConvoAsRead();
+        this.markConvoAsRead();
 
         // We'll consider them to be done typing if an actual message came
         // in. If they re-start typing, we'll get another socket message.

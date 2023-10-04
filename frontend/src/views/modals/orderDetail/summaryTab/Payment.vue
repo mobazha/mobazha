@@ -1,5 +1,5 @@
 <template>
-  <div class="payment rowLg">
+  <div class="payment rowLg" @click="onDocumentClick">
 
     <h2 class="tx4 margRTn">{{ heading }}</h2>
     <template v-if="ob.timestamp">
@@ -110,16 +110,16 @@ import { integerToDecimal } from '../../../../../backbone/utils/currency';
 
 
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
-      info: {
+      _state: {
         paymentNumber: 1,
         amountShort: bigNumber(0),
         balanceRemaining: bigNumber(0),
@@ -130,11 +130,11 @@ export default {
         acceptInProgress: false,
         rejectInProgress: false,
         cancelInProgress: false,
+        rejectConfirmOn: false,
         blockChainTxUrl: '',
         paymentCoin: '',
         paymentCoinDivis: 8,
       },
-      rejectConfirmOn: false,
     };
   },
   created () {
@@ -143,6 +143,23 @@ export default {
   mounted () {
   },
   computed: {
+    ob () {
+      const coinInfo = app.walletBalances.get(this._state.paymentCoin);
+      let confirmations = 0;
+      if (coinInfo && coinInfo.get('height') !== 0 && (+this.model.get('height'))) {
+        confirmations = coinInfo.get('height') - this.model.get('height');
+      }
+
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+        ...this._model,
+        value: integerToDecimal(this._model.value, this._state.paymentCoinDivis),
+        confirmations,
+        abbrNum,
+        moment,
+      };
+    },
     heading () {
       if (ob.paymentNumber > 1) {
         return ob.polyT('orderDetail.summaryTab.payment.paymentHeading', {
@@ -220,12 +237,30 @@ export default {
     moment,
 
     loadData (options = {}) {
+      this.baseInit({
+        ...options,
+        initialState: {
+          paymentNumber: 1,
+          amountShort: bigNumber(0),
+          balanceRemaining: bigNumber(0),
+          payee: '',
+          userCurrency: app.settings.get('localCurrency') || 'BTC',
+          showAcceptRejectButtons: false,
+          showCancelButton: false,
+          acceptInProgress: false,
+          rejectInProgress: false,
+          cancelInProgress: false,
+          rejectConfirmOn: false,
+          blockChainTxUrl: '',
+          paymentCoin: '',
+          paymentCoinDivis: 8,
+          ...options.initialState || {},
+        },
+      });
+
       if (!this.model) {
         throw new Error('Please provide a model.');
       }
-
-      this.boundOnDocClick = this.onDocumentClick.bind(this);
-      $(document).on('click', this.boundOnDocClick);
     },
 
     onClickCancelOrder () {
@@ -238,11 +273,11 @@ export default {
 
     onClickRejectConfirmed () {
       this.$emit('confirmedRejectClick', { view: this });
-      this.rejectConfirmOn = false;
+      this.setState({ rejectConfirmOn: false });
     },
 
     onClickRejectOrder () {
-      this.rejectConfirmOn = true;
+      this.setState({ rejectConfirmOn: true });
       return false;
     },
 
@@ -253,16 +288,13 @@ export default {
     },
 
     onClickRejectConfirmCancel () {
-      this.rejectConfirmOn = false;
+      this.setState({ rejectConfirmOn: false });
     },
 
     onDocumentClick () {
-      this.rejectConfirmOn = false;
+      this.setState({ rejectConfirmOn: false });
     },
 
-    remove () {
-      $(document).off('click', this.boundOnDocClick);
-    },
   }
 }
 </script>

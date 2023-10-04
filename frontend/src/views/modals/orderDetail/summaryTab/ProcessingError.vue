@@ -55,7 +55,6 @@
 <script>
 
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,
@@ -64,19 +63,29 @@ export default {
   },
   data () {
     return {
-      isBuyer: false,
-      isModerated: false,
-      isOrderCancelable: false,
-      isDisputable: false,
-      errors: [],
+      _state: {
+        isBuyer: false,
+        isModerated: false,
+        isOrderCancelable: false,
+        isDisputable: false,
+        errors: [],
+      }
     };
   },
   created () {
+    this.initEventChain();
+
     this.loadData(this.options);
   },
   mounted () {
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+      };
+    }
   },
   methods: {
     loadData (options = {}) {
@@ -84,7 +93,18 @@ export default {
         throw new Error('Please provide the order id.');
       }
 
-      this.orderID = options.orderID;
+      const opts = {
+        initialState: {
+          isBuyer: false,
+          isModerated: false,
+          isOrderCancelable: false,
+          isDisputable: false,
+          errors: [],
+          ...options.initialState || {},
+        },
+      };
+
+      this.baseInit(opts);
     },
   }
 }

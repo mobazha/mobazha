@@ -41,7 +41,6 @@ import { abbrNum } from '../../../../../backbone/utils';
 
 
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,
@@ -50,18 +49,31 @@ export default {
   },
   data () {
     return {
-      buyerName: '',
-      userCurrency: app.settings.get('localCurrency') || 'BTC',
-      isCrypto: false,
-      blockChainTxUrl: '',
+      _state: {
+        buyerName: '',
+        userCurrency: app.settings.get('localCurrency') || 'BTC',
+        isCrypto: false,
+        blockChainTxUrl: '',
+      }
     };
   },
   created () {
+    this.initEventChain();
+
     this.loadData(this.options);
   },
   mounted () {
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+        ...this.model,
+        abbrNum,
+        moment,
+      };
+    },
     infoLine () {
       const divisibility = ob.currencyMod.getCoinDivisibility(ob.paymentCoin);
       const amount = ob.currencyMod.integerToDecimal(ob.amount, divisibility);
@@ -98,6 +110,16 @@ export default {
   methods: {
     abbrNum, moment,
     loadData (options = {}) {
+      this.baseInit({
+        ...options,
+        initialState: {
+          buyerName: '',
+          userCurrency: app.settings.get('localCurrency') || 'BTC',
+          isCrypto: false,
+          blockChainTxUrl: '',
+          ...options.initialState,
+        },
+      });
       if (!this.model) {
         throw new Error('Please provide a model.');
       }

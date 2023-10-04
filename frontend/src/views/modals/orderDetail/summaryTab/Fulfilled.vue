@@ -71,7 +71,7 @@
 
             <div class="row">
               <span>{{ ob.polyT('orderDetail.summaryTab.fulfilled.transactionIDLabel') }}</span>
-              <span class="clamp3 inline">{{ revealEscapeChars(transactionID) }}</span>
+              <span class="clamp3 inline">{{ ob.encodedTxId }}</span>
               <a class="clrTEm  flexNoShrink" @click="onClickCopyText(ob.transactionID, $event)" data-status-indicator=".js-transactionIDCopiedToClipboard">{{
                   ob.polyT('orderDetail.summaryTab.fulfilled.copyLink') }}</a>
               <a class="hide js-transactionIDCopiedToClipboard">{{ ob.polyT('copiedToClipboard') }}</a>
@@ -95,7 +95,6 @@ import app from '../../../../../backbone/app.js';
 
 
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,
@@ -104,26 +103,44 @@ export default {
   },
   data () {
     return {
-      contractType: 'PHYSICAL_GOOD',
-      isLocalPickup: false,
-      showPassword: false,
-      noteFromLabel: app.polyglot.t('orderDetail.summaryTab.fulfilled.noteFromVendorLabel'),
-      coinType: '',
+      _state: {
+        contractType: 'PHYSICAL_GOOD',
+        isLocalPickup: false,
+        showPassword: false,
+        noteFromLabel:
+          app.polyglot.t('orderDetail.summaryTab.fulfilled.noteFromVendorLabel'),
+        coinType: '',
+      }
     };
   },
   created () {
+    this.initEventChain();
+
     this.loadData(this.options);
   },
   mounted () {
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+        ...this.dataObject,
+        transactionID: transactionID.replace(/["]/g, '[!$quote$!]'),
+        encodedTxId: this.revealEscapeChars(transactionID),
+        moment,
+      };
+    },
     physicalDelivery () {
+      const ob = this.ob;
       return ob.physicalDelivery && ob.physicalDelivery[0] || {};
     },
     digitalDelivery () {
+      const ob = this.ob;
       return ob.digitalDelivery && ob.digitalDelivery[0] || {};
     },
     coinTypeVerbose () {
+      const ob = this.ob;
       let coinTypeTranslationKey = `cryptoCurrencies.${ob.coinType}`;
       return ob.polyT(coinTypeTranslationKey) === coinTypeTranslationKey ?
         ob.coinType :
@@ -141,6 +158,17 @@ export default {
     moment,
 
     loadData (options = {}) {
+      this.baseInit({
+        initialState: {
+          contractType: 'PHYSICAL_GOOD',
+          isLocalPickup: false,
+          showPassword: false,
+          noteFromLabel:
+            app.polyglot.t('orderDetail.summaryTab.fulfilled.noteFromVendorLabel'),
+          coinType: '',
+          ...options.initialState,
+        },
+      });
       if (!options.dataObject) {
         throw new Error('Please provide a vendorOrderFulfillment data object.');
       }

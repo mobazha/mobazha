@@ -21,7 +21,6 @@ export default {
   mixins: [],
   data () {
     return {
-      showDisputeOrderButton: false,
     };
   },
   created () {
@@ -30,15 +29,24 @@ export default {
   mounted () {
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+      };
+    }
   },
   methods: {
     loadData (options = {}) {
+      this.baseInit(options);
+
       if (!options.orderID) {
         throw new Error('Please provide the order id.');
       }
 
       this.orderID = options.orderID;
       this._state = {
+        showDisputeOrderButton: false,
         ...options.initialState || {},
       };
     },

@@ -9,7 +9,6 @@
 </template>
 
 <script>
-import loadTemplate from '../../../backbone/utils/loadTemplate';
 import { recordEvent } from '../../../backbone/utils/metrics';
 
 export default {
@@ -28,7 +27,6 @@ export default {
     this.loadData(this.options);
   },
   mounted() {
-    this.render();
   },
   computed: {
     ob() {
@@ -67,18 +65,6 @@ export default {
         this.trigger('startReport');
         recordEvent('ReportListing');
       }
-    },
-
-    render() {
-      loadTemplate('components/reportBtn.html', (t) => {
-        this.$el.html(
-          t({
-            ...this.getState(),
-          })
-        );
-      });
-
-      return this;
     },
   },
 };

@@ -1,5 +1,6 @@
 <template>
-  <div @click.stop="onClick" :class="`listingCard col clrBr clrHover clrT clrP clrSh2 contentBox ${ownListing ? 'ownListing' : ''}`">
+  <div v-if="!cardError" @click.stop="onClick"
+    :class="`listingCard col clrBr clrHover clrT clrP clrSh2 contentBox ${ownListing ? 'ownListing' : ''} ${destroyClass} ${blocked ? 'blocked' : ''} ${hideNsfw ? 'hideNsfw' : ''} ${_model.nsfw ? 'nsfw' : ''}`">
     <div v-if="ob.viewType === 'grid'" class="gridViewContent posR">
       <div class="listingImage js-listingImage" :style="listingImageBgStyle">
         <div class="nsfwOverlay overlayPanel coverFull clrP">
@@ -7,8 +8,8 @@
             <div>
               <div class="flexCol flexHCent gutterV">
                 <div class="flexHCent gutterHSm tx3">
-                  {{ ob.parseEmojis('😲') }}
-                  {{ ob.parseEmojis('😱') }}
+                  <div v-html="ob.parseEmojis('😲')" />
+                  <div v-html="ob.parseEmojis('😱')" />
                 </div>
                 <button class="btn clrP clrBr tx6 clrSh1" @click.stop="onClickShowNsfw">{{ ob.polyT('listingCard.btnShowMatureContent') }}</button>
               </div>
@@ -64,7 +65,9 @@
         </div>
         <div v-else class="additionalOverlay overlayPanel">
           <div class="flex gutterHSm">
-            <div class="hideIfEmpty js-reportBtnWrapper"></div>
+            <div class="hideIfEmpty js-reportBtnWrapper">
+              <ReportBtn v-if="reportsUrl" @startReport="startReport"/>
+            </div>
             <div class="js-blockBtnWrapper"></div>
 
             <button
@@ -83,13 +86,13 @@
           <a class="userIconWrapper js-userLink" :href="`#${ob.vendor.peerID}/store`" @click.stop="onClickUserLink">
             <div
               class="userIcon disc clrBr2 clrSh1 toolTipNoWrap js-vendorIcon"
-              :style="`background-image: ${vendorAvatarImageSrc}url('../imgs/defaultAvatar.png')`"
+              :style="`background-image: ` + (ob.vendorAvatarImageSrc ? `url(${ob.vendorAvatarImageSrc}), ` : '') +`url('../imgs/defaultAvatar.png')`"
               :data-tip="ob.vendor.name"
             ></div>
           </a>
           <div class="userIconWrapper nsfwAvatarOverlay">
             <div class="userIcon disc clrBr2 clrSh1 clrP tx3">
-              {{ ob.parseEmojis('😲') }}
+              <div v-html="ob.parseEmojis('😲')" />
             </div>
           </div>
           <div class="userIconWrapper blockedAvatarOverlay">
@@ -111,52 +114,48 @@
             <a class="clrT clamp listingTitle">{{ ob.title }}</a>
           </div>
           <div v-else>
-            <a class="listingTitle">
-              {{
-                ob.crypto.tradingPair({
-                  className: 'cryptoTradingPairSm',
-                  fromCur: `${ob.acceptedCurrencies && ob.acceptedCurrencies[0]}`,
-                  toCur: ob.price.currencyCode,
-                  truncateCurAfter: 5,
-                })
-              }}
+            <a class="listingTitle"
+              v-html="ob.crypto.tradingPair({
+                className: 'cryptoTradingPairSm',
+                fromCur: `${ob.acceptedCurrencies && ob.acceptedCurrencies[0]}`,
+                toCur: ob.price.currencyCode,
+                truncateCurAfter: 5,
+              })">
             </a>
           </div>
         </div>
 
         <div :class="`flexVCent ${priceRowTextClass}`">
-          <div class="flexExpand ratingStrip">
-            {{ formattedRating }}
-          </div>
+          <div class="flexExpand ratingStrip" v-html="ob.formatRating(ob.averageRating, ob.ratingCount)"></div>
 
-          <div v-if="ob.contractType !== 'CRYPTOCURRENCY'">
-            {{
-              ob.currencyMod.convertAndFormatCurrency(ob.price.amount, ob.price.currencyCode, ob.displayCurrency, {
+          <div v-if="ob.contractType !== 'CRYPTOCURRENCY'"
+            v-html="ob.currencyMod.convertAndFormatCurrency(ob.price.amount, ob.price.currencyCode, ob.displayCurrency, {
                 maxDisplayDecimals: priceMaxDisplayDecimals,
-              })
-            }}
+              })">
           </div>
-          <template v-else>
-            {{
-              ob.crypto.cryptoPrice({
-                priceAmount: ob.price.amount,
-                priceCurrencyCode: ob.price.currencyCode,
-                displayCurrency: ob.displayCurrency,
-                priceModifier: ob.price.modifier,
-                wrappingClass: '',
-                marketRelativityClass: 'hide',
-                convertAndFormatOpts: {
-                  maxDisplayDecimals: priceMaxDisplayDecimals,
-                },
-              })
-            }}
-          </template>
+          <div v-else
+            v-html="ob.crypto.cryptoPrice({
+              priceAmount: ob.price.amount,
+              priceCurrencyCode: ob.price.currencyCode,
+              displayCurrency: ob.displayCurrency,
+              priceModifier: ob.price.modifier,
+              wrappingClass: '',
+              marketRelativityClass: 'hide',
+              convertAndFormatOpts: {
+                maxDisplayDecimals: priceMaxDisplayDecimals,
+              },
+            })">
+          </div>
         </div>
       </div>
       <div class="listingIcons">
         <span v-if="ob.shipsFreeToMe" class="clrE1 clrTOnEmph phraseBox">{{ ob.polyT('listingCard.freeShippingBanner') }}</span>
       </div>
-      <div class="verifiedModWrapper js-verifiedMod"></div>
+      <div class="verifiedModWrapper js-verifiedMod">
+        <VerifiedMod :options="getListingOptions({
+            model: verifiedModID && app.verifiedMods.get(verifiedModID),
+          })"/>
+      </div>
     </div>
 
     <div v-else-if="ob.viewType === 'list'" class="listViewContent">
@@ -164,7 +163,7 @@
         <!-- // Since we have inconsistent padding/gutters, we'll inline some padding settings. -->
         <div class="flexNoShrink posR">
           <div class="listingImage js-listingImage posR" :style="listingImageBgStyle"></div>
-          <div class="center tx2 nsfwAvatarOverlay">{{ ob.parseEmojis('😲') }}</div>
+          <div class="center tx2 nsfwAvatarOverlay"><div v-html="ob.parseEmojis('😲')" /></div>
         </div>
         <div class="flexExpand">
           <template v-if="ob.contractType !== 'CRYPTOCURRENCY' || !Array.isArray(ob.acceptedCurrencies) || !ob.acceptedCurrencies.length">
@@ -172,21 +171,21 @@
               <a class="clrT clamp3 listingTitle">{{ ob.title }}</a>
             </div>
           </template>
-          <template v-else>
-            {{
-              ob.crypto.tradingPair({
-                className: 'cryptoTradingPairSm',
-                fromCur: ob.acceptedCurrencies[0],
-                toCur: ob.price.currencyCode,
-                truncateCurAfter: 5,
-              })
-            }}
-          </template>
+          <div v-else v-html="ob.crypto.tradingPair({
+            className: 'cryptoTradingPairSm',
+            fromCur: ob.acceptedCurrencies[0],
+            toCur: ob.price.currencyCode,
+            truncateCurAfter: 5,
+          })">
+          </div>
           <div class="flexVCent gutterHSm tx5b">
-            <div class="flexNoShrink ratingStrip">
-              {{ ob.formatRating(ob.averageRating, ob.ratingCount) }}
+            <div class="flexNoShrink ratingStrip" v-html="ob.formatRating(ob.averageRating, ob.ratingCount)">
             </div>
-            <div class="verifiedModWrapper js-verifiedMod"></div>
+            <div class="verifiedModWrapper js-verifiedMod">
+              <VerifiedMod :options="getListingOptions({
+                model: verifiedModID && app.verifiedMods.get(verifiedModID),
+              })"/>
+            </div>
           </div>
         </div>
 
@@ -195,23 +194,22 @@
         </div>
 
         <div class="priceCol flexNoShrink clamp4">
-          <span>
-            {{
-              ob.contractType !== 'CRYPTOCURRENCY'
-                ? ob.currencyMod.convertAndFormatCurrency(ob.price.amount, ob.price.currencyCode, ob.displayCurrency, {
+          <span
+            v-html="ob.contractType !== 'CRYPTOCURRENCY'
+              ? ob.currencyMod.convertAndFormatCurrency(ob.price.amount, ob.price.currencyCode, ob.displayCurrency, {
+                  maxDisplayDecimals: priceMaxDisplayDecimals,
+                })
+              : ob.crypto.cryptoPrice({
+                  priceAmount: ob.price.amount,
+                  priceCurrencyCode: ob.price.currencyCode,
+                  displayCurrency: ob.displayCurrency,
+                  priceModifier: ob.price.modifier,
+                  wrappingClass: '',
+                  convertAndFormatOpts: {
                     maxDisplayDecimals: priceMaxDisplayDecimals,
-                  })
-                : ob.crypto.cryptoPrice({
-                    priceAmount: ob.price.amount,
-                    priceCurrencyCode: ob.price.currencyCode,
-                    displayCurrency: ob.displayCurrency,
-                    priceModifier: ob.price.modifier,
-                    wrappingClass: '',
-                    convertAndFormatOpts: {
-                      maxDisplayDecimals: priceMaxDisplayDecimals,
-                    },
-                  })
-            }}
+                  },
+                })"
+          >
           </span>
         </div>
       </div>
@@ -244,26 +242,29 @@
             </div>
 
             <div class="cl2amp clrT2 tx6 flexVCent gutterHSm">
-              <div class="ratingStrip">
-                {{ ob.vendor && ob.vendor.stats ? ob.formatRating(averageStoreRating, totalStoreRatings) : ob.formatRating(0, 0) }}
+              <div class="ratingStrip"
+                v-html="ob.vendor && ob.vendor.stats ? ob.formatRating(averageStoreRating, totalStoreRatings) : ob.formatRating(0, 0)">
               </div>
               <div class="verifiedModWrapper">
-                <div class="js-verifiedMod"></div>
+                <div class="js-verifiedMod">
+                  <VerifiedMod :options="getListingOptions({
+                    model: verifiedModID && app.verifiedMods.get(verifiedModID),
+                  })"/>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-      <div class="priceCol">
-        {{
-          ob.crypto.cryptoPrice({
-            priceAmount: ob.price.amount,
-            priceCurrencyCode: ob.price.currencyCode,
-            displayCurrency: ob.displayCurrency,
-            priceModifier: ob.price.modifier,
-            wrappingClass: 'txB',
-          })
-        }}
+      <div
+        class="priceCol"
+        v-html="ob.crypto.cryptoPrice({
+          priceAmount: ob.price.amount,
+          priceCurrencyCode: ob.price.currencyCode,
+          displayCurrency: ob.displayCurrency,
+          priceModifier: ob.price.modifier,
+          wrappingClass: 'txB',
+        })">
       </div>
 
       <!-- // This is being commented out until inventory is functional.
@@ -321,7 +322,9 @@
       </div>
       <div v-else class="additionalOverlay overlayPanel clrP">
         <div class="flex gutterHSm">
-          <div class="hideIfEmpty js-reportBtnWrapper"></div>
+          <div class="hideIfEmpty js-reportBtnWrapper">
+            <ReportBtn v-if="reportsUrl" @startReport="startReport"/>
+          </div>
           <div class="js-blockBtnWrapper"></div>
           <button
             class="btn clrP clrBr iconBtnSm btnShowNsfw clrSh1 toolTipNoWrap toolTipTop"
@@ -354,13 +357,14 @@
       </div>
     </div>
   </div>
+  <div v-else class="listingCard col clrBr clrT clrP clrSh2 contentBox ListingCard-errorCard" v-html="cardErrorInfo">
+  </div>
 </template>
 
 <script>
 /* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import app from '../../../backbone/app';
-import loadTemplate from '../../../backbone/utils/loadTemplate';
 import { abbrNum } from '../../../backbone/utils';
 import { launchEditListingModal } from '../../../backbone/utils/modalManager';
 import { isBlocked, isUnblocking, events as blockEvents } from '../../../backbone/utils/block';
@@ -376,8 +380,10 @@ import Report from '../../../backbone/views/modals/Report';
 import BlockedWarning from '../../../backbone/views/modals/BlockedWarning';
 import ReportBtn from '../../../backbone/views/components/ReportBtn';
 import BlockBtn from '../../../backbone/views/components/BlockBtn';
-import VerifiedMod, { getListingOptions } from '../../../backbone/views/components/VerifiedMod';
 import UserLoadingModal from '../../../backbone/views/userPage/Loading';
+
+import { getListingOptions } from '@/utils/verifiedMod'
+import { original } from '@/plugins/vue-backbone/vue-backbone.js';
 
 export default {
   props: {
@@ -385,16 +391,24 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data() {
     return {
+      cardError: false,
       showErrorCardOnError: true,
+
+      destroyClass: '',
+      blocked: false,
+      hideNsfw: false,
+
+      app: app,
     };
   },
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   mounted() {
     this.render();
@@ -403,7 +417,7 @@ export default {
     ob() {
       return {
         ...this.templateHelpers,
-        ...this.model.toJSON(),
+        ...this._model,
         ownListing: this.ownListing,
         coinType: this.model.get('currency') && this.model.get('currency').code,
         shipsFreeToMe: this.model.shipsFreeToMe,
@@ -428,8 +442,40 @@ export default {
     ownListing() {
       return app.profile.id === this.ownerGuid;
     },
+    cardErrorInfo() {
+      let messageHtml = app.polyglot.t('listingCard.cardError');
+
+      if (typeof this.cardError === 'string') {
+        messageHtml += `&nbsp;<span class="toolTip" data-tip="${this.cardError}">` + '<span class="ion-help-circled clrTErr"></span></span>';
+      }
+
+      return `<p class="padMd clrTErr tx5">${messageHtml}</p>`;
+    },
+    priceRowTextClass() {
+      let priceRowTextClass = '';
+
+      try {
+        const formattedRating = this.ob.formatRating(ob.averageRating, ob.ratingCount);
+        const priceLength = this.ob.price.amount.toFormat().length;
+        const ratingLength = ($(`<div>${formattedRating}</div>`).text()).length;
+
+        if (priceLength + ratingLength > 17) {
+          priceRowTextClass = 'txBase'
+        }
+      } catch (e) {
+        // pass
+      }
+
+      return priceRowTextClass;
+    },
+    verifiedModID() {
+      const moderators = this.model.get('moderators') || [];
+      const verifiedIDs = app.verifiedMods.matched(moderators);
+      return verifiedIDs[0];
+    }
   },
   methods: {
+    getListingOptions,
     loadData(options = {}) {
       const opts = {
         viewType: 'grid',
@@ -443,7 +489,7 @@ export default {
       this.cardError = false;
 
       try {
-        if (!this.model || !(this.model instanceof ListingShort)) {
+        if (!this.model || !(original(this.model) instanceof ListingShort)) {
           throw new Error('Please provide a ListingShort model.');
         }
 
@@ -476,17 +522,17 @@ export default {
             if (this.isRemoved()) return;
 
             if (destroyingOpts.slug === this.model.get('slug')) {
-              this.$el.addClass('listingDeleting');
+              this.destroyClass = 'listingDeleting';
             }
 
-            destroyingOpts.xhr.fail(() => this.$el.removeClass('listingDeleting'));
+            destroyingOpts.xhr.fail(() => this.destroyClass = '');
           });
 
           this.listenTo(listingEvents, 'destroy', (md, destroyOpts) => {
             if (this.isRemoved()) return;
 
             if (destroyOpts.slug === this.model.get('slug')) {
-              this.$el.addClass('listingDeleted');
+              this.destroyClass = 'listingDeleted';
             }
           });
         }
@@ -868,15 +914,12 @@ export default {
     },
 
     setBlockedClass() {
-      this.$el.toggleClass('blocked', isBlocked(this.ownerGuid));
+      this.blocked = isBlocked(this.ownerGuid);
     },
 
     setHideNsfwClass() {
-      this.$el.toggleClass(
-        'hideNsfw',
-        // explicitly checking for false, since null means something different
-        this._userClickedShowNsfw === false || (this.model.get('nsfw') && !this._userClickedShowNsfw && !app.settings.get('showNsfw'))
-      );
+      // explicitly checking for false, since null means something different
+      this.hideNsfw = this._userClickedShowNsfw === false || (this.model.get('nsfw') && !this._userClickedShowNsfw && !app.settings.get('showNsfw'));
     },
 
     fetchFullListing(options = {}) {
@@ -950,82 +993,22 @@ export default {
       if (this.userLoadingModal) this.userLoadingModal.remove();
       if (this.ipnsFetch) this.ipnsFetch.abort();
       if (this.ipfsFetch) this.ipfsFetch.abort();
-      super.remove();
     },
     render(cardError = this.cardError) {
       let _cardError = cardError;
 
       if (!_cardError) {
-        try {
-          super.render();
+        this.setBlockedClass();
+        this.setHideNsfwClass();
 
-          loadTemplate('components/listingCard.html', (t) => {
-            this.$el.html(
-              t({
-                ...this.model.toJSON(),
-                ownListing: this.ownListing,
-                coinType: this.model.get('currency') && this.model.get('currency').code,
-                shipsFreeToMe: this.model.shipsFreeToMe,
-                viewType: this.viewType,
-                displayCurrency: app.settings.get('localCurrency'),
-                isBlocked,
-                isUnblocking,
-                listingImageSrc: (this.listingImage.loaded && this.listingImage.src) || '',
-                vendorAvatarImageSrc: (this.avatarImage && this.avatarImage.loaded && this.avatarImage.src) || '',
-                abbrNum,
-              })
-            );
-          });
-
-          this.setBlockedClass();
-          this.setHideNsfwClass();
-          this.$el.toggleClass('isNsfw', this.model.get('nsfw'));
-
-          if (this.reportBtn) this.reportBtn.remove();
-          if (this.reportsUrl) {
-            this.reportBtn = this.createChild(ReportBtn);
-            this.listenTo(this.reportBtn, 'startReport', this.startReport);
-            this.getCachedEl('.js-reportBtnWrapper').append(this.reportBtn.render().el);
-          }
-
-          if (!this.ownListing) {
-            this.getCachedEl('.js-blockBtnWrapper').html(
-              new BlockBtn({
-                targetId: this.ownerGuid,
-                initialState: { useIcon: true },
-              }).render().el
-            );
-          }
-
-          const moderators = this.model.get('moderators') || [];
-          const verifiedIDs = app.verifiedMods.matched(moderators);
-          const verifiedID = verifiedIDs[0];
-
-          if (this.verifiedMod) this.verifiedMod.remove();
-          this.verifiedMod = this.createChild(
-            VerifiedMod,
-            getListingOptions({
-              model: verifiedID && app.verifiedMods.get(verifiedID),
-            })
+        if (!this.ownListing) {
+          this.getCachedEl('.js-blockBtnWrapper').html(
+            new BlockBtn({
+              targetId: this.ownerGuid,
+              initialState: { useIcon: true },
+            }).render().el
           );
-          this.getCachedEl('.js-verifiedMod').append(this.verifiedMod.render().el);
-        } catch (e) {
-          if (!this.showErrorCardOnError) throw e;
-          _cardError = e.message || true;
         }
-      }
-
-      if (_cardError) {
-        this.$el.addClass('ListingCard-errorCard');
-        this.$el.removeClass('clrHover');
-
-        let messageHtml = app.polyglot.t('listingCard.cardError');
-
-        if (typeof _cardError === 'string') {
-          messageHtml += `&nbsp;<span class="toolTip" data-tip="${_cardError}">` + '<span class="ion-help-circled clrTErr"></span></span>';
-        }
-
-        this.$el.html(`<p class="padMd clrTErr tx5">${messageHtml}</p>`);
       }
 
       return this;

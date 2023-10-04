@@ -5,7 +5,7 @@
   >
     <span
       >{{ ob.currencyMod.convertAndFormatCurrency(ob.priceAmount, ob.priceCurrencyCode, ob.displayCurrency, ob.convertAndFormatOpts) }}&nbsp;
-      <span class="priceSymbol">{{ priceSymbol }}</span>
+      <span class="priceSymbol" v-html="priceSymbol"></span>
     </span>
     <span :class="`marketRelativity ${ob.marketRelativityClass} ${ob.priceModifier === 0 ? 'clrT2' : ''}`">
       {{ marketPriceLine }}
@@ -31,7 +31,7 @@ export default {
         return ob.polyT('cryptoPriceAboveMarket', { amount: ob.priceModifier });
       }
       if (ob.priceModifier < 0) {
-        returnob.polyT('cryptoPriceBelowMarket', { amount: ob.priceModifier });
+        return ob.polyT('cryptoPriceBelowMarket', { amount: ob.priceModifier });
       }
       return ob.polyT('cryptoPriceAtMarket');
     },

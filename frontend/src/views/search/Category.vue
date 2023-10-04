@@ -17,7 +17,18 @@
         </div> -->
       </div>
     </template>
-    <div :class="`listingsGrid ${ob.viewTypeClass} flex js-resultsGrid`"></div>
+    <div :class="`listingsGrid ${ob.viewTypeClass} flex js-resultsGrid`">
+      <template v-for="model in catCol">
+        <ListingCard
+          :options="cardViewOptions(model)"
+          :bb="function() {
+            return {
+              model,
+            };
+          }"
+        />
+      </template>
+    </div>
     <div class="flexCent rowLg">
       <button class="btn clrP clrT clrBr clrSh1 " @click="clickSeeAll">{{ ob.polyT('search.categories.seeAllBtn') }}</button>
     </div>
@@ -129,6 +140,19 @@ export default {
       };
 
       return this.createChild(ListingCard, options);
+    },
+
+    cardViewOptions (model) {
+      const vendor = model.get('vendor') || {};
+      const base = vendor.handle ? `@${vendor.handle}` : vendor.peerID;
+      return {
+        listingBaseUrl: `${base}/store/`,
+        reportsUrl: this._search.provider.reportsUrl || '',
+        searchUrl: this._search.provider.listingsUrl,
+        vendor,
+        onStore: false,
+        viewType: this.viewType,
+      };
     },
 
     renderCards (collection = []) {

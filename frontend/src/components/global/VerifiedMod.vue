@@ -3,19 +3,18 @@
     <div :class="`innerWrap ${ob.verified ? 'verified' : 'unverified'}`">
       <template v-if="!ob.wrapInfoIcon">
         <div class="arrowBoxTipWrap">
-          {{ textWrapper }}
-          {{ arrowBox }}
+          <div v-html="textWrapper" />
+          <div v-html="arrowBox" />
         </div>
       </template>
       <template v-else>
-        {{ textWrapper }}
+        <div v-html="textWrapper" />
       </template>
     </div>
   </div>
 </template>
 
 <script>
-import loadTemplate from '../../../backbone/utils/loadTemplate';
 import { isHiRez } from '../../../backbone/utils/responsive';
 import { handleLinks } from '../../../backbone/utils/dom';
 
@@ -32,19 +31,19 @@ export default {
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   mounted() {
-    this.render();
   },
   computed: {
-    params() {
+    ob () {
       return {
-        ...this.getState(),
+        ...this.templateHelpers,
+        ...this._state,
       };
     },
     badgeFrag() {
-      let ob = this.ob;
+      const ob = this.ob;
       return `<div class="badge" style="background-image: ${
         ob.badgeUrl ? `url(${ob.badgeUrl}),` : ''
       }url('../imgs/verifiedModeratorBadgeDefault-tiny.png');" tabindex="0"></div>`;
@@ -53,10 +52,11 @@ export default {
       return `<div class="warning"><i class="ion-alert-circled clrTAlert"></i></div>`;
     },
     arrowBoxClass() {
-      let ob = this.ob;
+      const ob = this.ob;
       return `${ob.arrowClass} ${ob.verified ? 'clrBrAlert2 clrBAlert2Grad' : 'clrP clrBr'}`;
     },
     arrowBox() {
+      const ob = this.ob;
       return `
       <div class="arrowBox ${this.arrowBoxClass}">
         <div class="titleWrapper ${ob.titleWrapperClass}">
@@ -68,13 +68,13 @@ export default {
     `;
     },
     icon() {
-      let ob = this.ob;
+      const ob = this.ob;
       let icon = `<i class="${ob.infoIconClass}"></i>`;
       if (ob.wrapInfoIcon) return ` <div class="arrowBoxTipWrap">${icon} ${this.arrowBox}</div>`;
       return icon;
     },
     textWrapper() {
-      let ob = this.ob;
+      const ob = this.ob;
       return `
       <div class="textWrapper ${ob.textWrapperClass}">
         ${ob.verified ? this.badgeFrag : this.warnFrag}
@@ -109,20 +109,8 @@ export default {
         opts.initialState.badgeUrl = isHiRez ? opts.badge.small : opts.badge.tiny;
       }
 
-      this.setState(opts.initialState || {});
+      this.baseInit(opts);
       handleLinks(this.el);
-    },
-    render() {
-      super.render();
-      loadTemplate('/components/verifiedMod.html', (t) => {
-        this.$el.html(
-          t({
-            ...this.getState(),
-          })
-        );
-      });
-
-      return this;
     },
   },
 };

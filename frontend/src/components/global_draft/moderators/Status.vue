@@ -29,6 +29,7 @@ export default {
   computed: {
     ob() {
       return {
+        ...this.templateHelpers,
         ...this._state,
       };
     },
@@ -65,7 +66,7 @@ export default {
         },
       };
 
-      this.setState(opts.initialState || {});
+      this.baseInit(opts);
     },
 
     setState(state = {}, options = {}) {

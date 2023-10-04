@@ -151,8 +151,8 @@ export default {
   },
   methods: {
     loadData(options = {}) {
-      this.setState(options.initialState || {});
-      this.options = options;
+      this.baseInit(options);
+
       this.ownPage = options.ownPage;
       this.userCard = this.createChild(UserCard, { model: this.model });
       this.settings = app.settings.clone();

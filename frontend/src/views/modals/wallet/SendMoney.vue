@@ -91,7 +91,7 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted () {
     $('#walletSendCurrency').select2();
@@ -119,7 +119,7 @@ export default {
         throw new Error('Please provide the coinType as a string.');
       }
 
-      this.setState(options.initialState || {});
+      this.baseInit(options);
       this.coinType = options.coinType;
       this.model = new Spend({ wallet: options.coinType });
     },

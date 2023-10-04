@@ -43,15 +43,16 @@ export default {
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   mounted() {
     this.render();
   },
   computed: {
-    params() {
+    ob() {
       return {
-        ...this.getState(),
+        ...this.templateHelpers,
+        ...this._state,
       };
     },
     formattedAmount() {
@@ -106,8 +107,7 @@ export default {
         },
       };
 
-      this.setState(opts.initialState || {});
-      this.options = options;
+      this.baseInit(opts);
 
       this.listenTo(inventoryEvents, 'inventory-fetching', (e) => {
         if (e.peerID !== options.peerID || (e.slug && e.slug !== options.slug)) return;

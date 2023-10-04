@@ -74,7 +74,10 @@ import RatingsStrip from '../../../../../backbone/views/RatingsStrip';
 export default {
   mixins: [],
   props: {
-    cart: Object,
+    options: {
+      type: Object,
+      default: {},
+    },
   },
   data () {
     return {
@@ -82,7 +85,7 @@ export default {
     };
   },
   created () {
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   mounted () {
     this.render();
@@ -97,7 +100,7 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      this.setState(options.initialState || {});
+      this.baseInit(options);
 
       if (!options.model) {
         throw new Error('Please provide an OrderCompletion model.');

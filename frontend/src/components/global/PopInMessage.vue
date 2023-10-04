@@ -50,15 +50,12 @@ export default {
   },
   methods: {
     loadData(options) {
-      this.setState(options.initialState || {});
+      this.baseInit(options);
 
       const opts = {
         dismissable: false,
         ...options,
       };
-
-      this.options = opts;
-
       // Use messageText if you're providing inline content which the template
       // will wrap in a <p>. Otherwise, use messageHTML and provide the full markup.
       if (!options.messageText && !options.messageHTML) {

@@ -47,7 +47,7 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted () {
   },
@@ -76,7 +76,7 @@ export default {
         },
       };
 
-      this.setState(opts.initialState || {});
+      this.baseInit(opts);
 
       this.listenTo(resyncEvents, 'resyncing', e => {
         if (e.coinType === this.getState().coinType) {

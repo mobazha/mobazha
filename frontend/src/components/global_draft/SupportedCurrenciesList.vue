@@ -27,12 +27,13 @@ export default {
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   computed: {
-    params() {
+    ob() {
       return {
-        ...this.getState(),
+        ...this.templateHelpers,
+        ...this._state,
       };
     },
   },
@@ -48,7 +49,7 @@ export default {
         },
       };
 
-      this.setState(opts.initialState || {});
+      this.baseInit(opts);
     },
 
     setState(state = {}, options = {}) {

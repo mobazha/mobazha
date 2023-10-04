@@ -76,7 +76,7 @@ export default {
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted() {
     this.render();
@@ -110,7 +110,7 @@ export default {
         ...(options.initialState || {}),
       };
 
-      this.setState(opts.initialState || {});
+      this.baseInit(opts);
     },
     onClickShowMoreLess() {
       this.setState({ expanded: !this.getState().expanded });

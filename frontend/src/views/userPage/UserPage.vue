@@ -62,7 +62,7 @@
           </template>
 
           <template v-else>
-            <SocialBtns :params="{ targetID: model.id, }" />
+            <SocialBtns :options="{ targetID: model.id, }" />
           </template>
           <template v-if="ob.showStoreWelcomeCallout">
             <div class="storeWelcomeCallout js-storeWelcomeCallout arrowBoxBottom confirmBox clrP clrBr clrSh1 tx5">

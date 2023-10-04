@@ -104,7 +104,7 @@ export default {
     };
   },
   created () {
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted () {
     this.render();

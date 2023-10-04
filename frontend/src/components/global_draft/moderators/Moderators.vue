@@ -71,6 +71,7 @@ export default {
   computed: {
     ob() {
       return {
+        ...this.templateHelpers,
         wrapperClasses: this.options.wrapperClasses,
         placeholder: !showMods.length && (this.unfetchedMods.length || !totalIDs),
         purchase: this.options.purchase,
@@ -176,8 +177,7 @@ export default {
         opts.method = 'GET';
       }
 
-      this.setState(opts.initialState || {});
-      this.options = opts;
+      this.baseInit(opts);
       this.excludeIDs = opts.excludeIDs;
       this.unfetchedMods = [];
       this.fetchingMods = [];

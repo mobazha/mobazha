@@ -188,9 +188,7 @@ export default {
         },
       };
 
-      this.setState(opts.initialState || {});
-      this.options = opts;
-
+      this.baseInit(opts);
       if (!this.model || !(this.model instanceof Profile)) {
         throw new Error('Please provide a Profile model.');
       }

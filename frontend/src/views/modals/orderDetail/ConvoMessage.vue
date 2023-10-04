@@ -49,7 +49,10 @@ import { setTimeagoInterval } from '../../../../backbone/utils';
 export default {
   mixins: [],
   props: {
-    cart: Object,
+    options: {
+      type: Object,
+      default: {},
+    },
   },
   data () {
     return {
@@ -59,7 +62,7 @@ export default {
     };
   },
   created () {
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   mounted () {
     this.render();
@@ -77,6 +80,8 @@ export default {
       if (!options.model) {
         throw new Error('Please provide a model.');
       }
+
+      this.baseInit(options);
 
       this.listenTo(this.model, 'change', () => this.render());
       this.timeAgoInterval = setTimeagoInterval(this.model.get('timestamp'), () => {

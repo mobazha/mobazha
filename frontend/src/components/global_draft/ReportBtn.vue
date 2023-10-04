@@ -25,15 +25,16 @@ export default {
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   mounted() {
     this.render();
   },
   computed: {
-    params() {
+    ob() {
       return {
-        ...this.getState(),
+        ...this.templateHelpers,
+        ...this._state,
       };
     },
     tipText() {
@@ -43,7 +44,7 @@ export default {
   },
   methods: {
     loadData(options = {}) {
-      this.setState(options.initialState || {});
+      this.baseInit(options);
 
       this._state = {
         reported: false,

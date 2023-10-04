@@ -33,7 +33,10 @@ import {
 export default {
   mixins: [],
   props: {
-    cart: Object,
+    options: {
+      type: Object,
+      default: {},
+    },
   },
   data () {
     return {
@@ -43,7 +46,7 @@ export default {
     };
   },
   created () {
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   mounted () {
     this.render();
@@ -54,11 +57,26 @@ export default {
         ob.polyT('orderDetail.summaryTab.disputeStarted.partyIsDisputing', { name: ob.disputerName }) :
         ob.polyT('orderDetail.summaryTab.disputeStarted.genericIsDisputed');
     },
+    ob() {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+      };
+    },
   },
   methods: {
     moment,
 
     loadData (options = {}) {
+      this.baseInit(options);
+
+      this._state = {
+        disputerName: '',
+        claim: '',
+        showResolveButton: false,
+        ...options.initialState || {},
+      };
+
       this.listenTo(orderEvents, 'resolveDisputeComplete', () => {
         this.showResolveButton = false;
       });

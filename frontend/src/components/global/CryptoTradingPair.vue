@@ -28,7 +28,7 @@ export default {
     };
   },
   created () {
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted () {
   },
@@ -42,7 +42,7 @@ export default {
   },
   methods: {
     loadData(options = {}) {
-      this.setState(options || {});
+      this.baseInit(options);
     }
   }
 }

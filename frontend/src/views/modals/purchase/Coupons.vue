@@ -2,27 +2,27 @@
   <div class="coupons">
     <BaseModal>
       <template v-slot:component>
-        <div v-if="codeResult && codeResult.type && codeResult.type !== 'valid'">
+        <template v-if="codeResult && codeResult.type && codeResult.type !== 'valid'">
           <div class="txSm rowTn flex">
             <span class="clrTErr">
-              <div v-if="codeResult.code">
+              <template v-if="codeResult.code">
                 {{ ob.polyT(`purchase.codeErrors.${codeResult.type}`, { code: codeResult.code }) }}
-              </div>
+              </template>
 
-              <div v-else>
+              <template v-else>
                 {{ ob.polyT('purchase.codeErrors.blank') }}
-              </div>
+              </template>
             </span>
           </div>
-        </div>
-        <div v-for="(code, j) in couponCodes" :key="j">
+        </template>
+        <template v-for="(code, j) in couponCodes" :key="j">
           <div class="txSm rowTn flexVCent gutterH">
             <span class="clrTEm">{{ ob.polyT('purchase.code', { code }) }}</span>
             <button class="btnTxtOnly " @click="removeCode(code)">
               {{ ob.polyT('purchase.removeCode') }}
             </button>
           </div>
-        </div>
+        </template>
       </template>
     </BaseModal>
   </div>
@@ -37,7 +37,10 @@ import { isValidNumber } from '../../../../backbone/utils/number';
 export default {
   mixins: [],
   props: {
-    cart: Object,
+    options: {
+      type: Object,
+      default: {},
+    },
   },
   data () {
     return {
@@ -51,8 +54,7 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      this.setState(opts.initialState || {});
-      this.options = options;
+      this.baseInit(opts);
 
       if (!isValidNumber(options.listingPrice)) {
         throw new Error('Please provide a string based number as the price of the listing.');

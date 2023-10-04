@@ -12,6 +12,12 @@ import _ from 'underscore';
 
 
 export default {
+  props: {
+    options: {
+      type: Object,
+      default: {},
+    },
+  },
   mixins: [],
   data () {
     return {
@@ -19,7 +25,7 @@ export default {
     };
   },
   created () {
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   mounted () {
   },

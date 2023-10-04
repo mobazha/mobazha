@@ -1,12 +1,12 @@
 <template>
   <section>
-    <template v-if="info.heading">
-      <h1 class="tx4 txB row">{{ info.heading }}</h1>
+    <template v-if="ob.heading">
+      <h1 class="tx4 txB row">{{ ob.heading }}</h1>
     </template>
-    <template v-if="info.errors && info.errors.length">
+    <template v-if="ob.errors && ob.errors.length">
       <p class="txUnl rowSm clrTErr"><span class="ion-alert-circled padSm"></span>{{ ob.polyT('orderDetail.contractTab.contractErrorHeading') }}</p>
       <ul class="row">
-        <li v-for="(err, j) in info.errors" :key="j" class="clrTErr rowSm">${err}</li>
+        <li v-for="(err, j) in ob.errors" :key="j" class="clrTErr rowSm">${err}</li>
       </ul>
     </template>
     <div class="border clrBr clrP clrT rowLg js-jsonContractContainer" @click.stop></div>
@@ -36,16 +36,21 @@ export default {
   },
   data () {
     return {
-      info: {},
     };
   },
   created () {
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted () {
     this.render();
   },
   computed: {
+    ob() {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+      }
+    }
   },
   methods: {
     loadData (options = {}) {
@@ -57,13 +62,13 @@ export default {
           ...options.initialState || {},
         },
       };
+      this.baseInit(opts);
 
       if (!options.contract) {
         throw new Error('Please provide a contract.');
       }
 
       this.contract = options.contract;
-      this.info = opts;
     },
 
     onClickCopyContract () {

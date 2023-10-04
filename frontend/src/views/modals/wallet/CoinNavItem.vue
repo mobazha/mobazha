@@ -100,7 +100,7 @@ export default {
         throw new Error('Please provide a name as a non-empty string in the initial state');
       }
 
-      this.setState(opts.initialState || {});
+      this.baseInit(opts);
     },
   },
 };

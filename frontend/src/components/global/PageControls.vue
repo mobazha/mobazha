@@ -45,7 +45,7 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   mounted () {
   },
@@ -99,7 +99,7 @@ export default {
         },
       };
 
-      this.setState(opts.initialState || {});
+      this.baseInit(opts);
     },
 
     onClickNext () {

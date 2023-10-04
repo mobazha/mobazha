@@ -50,7 +50,7 @@ export default {
   },
   methods: {
     loadData(options = {}) {
-      this.setState(options.initialState || {});
+      this.baseInit(options);
     },
 
     onClickRetryFetch() {

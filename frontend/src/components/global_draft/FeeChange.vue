@@ -27,9 +27,10 @@ export default {
     this.loadData(this.options);
   },
   computed: {
-    params() {
+    ob() {
       return {
-        ...this.getState(),
+        ...this.templateHelpers,
+        ...this._state,
       };
     },
   },
@@ -44,7 +45,7 @@ export default {
         ...options,
       };
 
-      this.setState(opts.initialState || {});
+      this.baseInit(opts);
 
       this.listenTo(app.localSettings, 'change:defaultTransactionFee', (md, val) => this.setState({ feeLevel: val }));
     },

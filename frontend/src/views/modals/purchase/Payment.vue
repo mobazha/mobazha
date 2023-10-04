@@ -111,6 +111,10 @@ import {
 export default {
   mixins: [],
   props: {
+    options: {
+      type: Object,
+      default: {},
+    },
   },
   data () {
     return {
@@ -179,7 +183,8 @@ export default {
         throw new Error(`Unable to obtain wallet currency data for "${options.paymentCoin}"`);
       }
 
-      this.options = options;
+      this.baseInit(options);
+
       this.balanceRemaining = options.balanceRemaining;
       this.paymentAddress = options.paymentAddress;
       this.orderID = options.orderID;

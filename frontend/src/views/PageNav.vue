@@ -176,7 +176,7 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted () {
     this.render();
@@ -215,7 +215,6 @@ export default {
       if (!opts.navigable) opts.className += ' notNavigable';
       if (opts.torIndicatorOn) opts.className += ' torIndicatorOn';
       this.baseInit(opts);
-      this.options = opts;
       this.addressBarText = '';
 
       this.boundOnDocClick = this.onDocClick.bind(this);

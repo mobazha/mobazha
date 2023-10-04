@@ -169,7 +169,7 @@ export default {
     };
   },
   created () {
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   mounted () {
     this.render();
@@ -336,6 +336,7 @@ export default {
     moment,
 
     loadData (options = {}) {
+      this.baseInit(options);
       if (!this.model) {
         throw new Error('Please provide a Contract model.');
       }
@@ -350,7 +351,6 @@ export default {
           });
       }
 
-      this.options = options;
       this.listing = this.model.get('orderOpen').listings[0].listing;
       this.order = this.model.get('orderOpen');
     },

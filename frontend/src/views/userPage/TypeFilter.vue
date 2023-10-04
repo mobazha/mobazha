@@ -54,7 +54,7 @@ export default {
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted() {},
   computed: {
@@ -79,8 +79,7 @@ export default {
         ...(options.initialState || {}),
       };
 
-      this.setState(opts.initialState || {});
-      this.options = opts;
+      this.baseInit(opts);
     },
     flatType(type) {
       return type.replace(/\s/g, '-');

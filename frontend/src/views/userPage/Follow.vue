@@ -36,7 +36,7 @@ export default {
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted() {
     this.render();
@@ -87,7 +87,7 @@ export default {
         ...options,
       };
 
-      this.setState(opts);
+      this.baseInit(opts);
 
       if (!opts.peerID) {
         throw new Error('Please provide a peerID of the user who this list is for.');
@@ -104,8 +104,6 @@ export default {
 
       this._origClParse = this.collection.parse;
       this.collection.parse = this.collectionParse.bind(this);
-
-      this.options = opts;
       this.followType = opts.followType;
       this.userCardViews = [];
       this.indexedUserCardViews = {};

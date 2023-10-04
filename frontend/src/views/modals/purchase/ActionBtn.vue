@@ -100,8 +100,7 @@ export default {
       if (!options.listing || !(options.listing instanceof Listing)) {
         throw new Error('Please provide a listing model.');
       }
-
-      this.options = opts;
+      this.baseInit(options);
 
       this.boundOnDocClick = this.documentClick.bind(this);
       $(document).on('click', this.boundOnDocClick);

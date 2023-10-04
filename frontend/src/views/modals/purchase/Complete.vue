@@ -96,7 +96,7 @@ export default {
   created () {
     this.initEventChain();
 
-    loadData(this.$props);
+    loadData(this.options);
   },
   mounted () {
   },
@@ -118,7 +118,7 @@ export default {
         throw new Error('Please provide a vendor object');
       }
 
-      this.options = options;
+      this.baseInit(options);
 
       this.processingTime = this.options.listing.get('item').processingTime ||
         app.polyglot.t('purchase.completeSection.noData');

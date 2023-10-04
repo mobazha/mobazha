@@ -47,7 +47,7 @@ export default {
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted() {
     this.render();
@@ -72,9 +72,7 @@ export default {
           ...(options.initialState || {}),
         },
       };
-      this.setState(opts.initialState || {});
-      this.options = opts;
-
+      this.baseInit(opts);
       // create the reviews here, so they're available for the fetch
       this.reviews = this.createChild(Reviews, {
         async: true,

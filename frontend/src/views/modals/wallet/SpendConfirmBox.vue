@@ -93,7 +93,7 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted () {
     this.render();

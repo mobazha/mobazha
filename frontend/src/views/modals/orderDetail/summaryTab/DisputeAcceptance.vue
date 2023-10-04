@@ -24,25 +24,30 @@ import moment from 'moment';
 export default {
   mixins: [],
   props: {
-    cart: Object,
+    options: {
+      type: Object,
+      default: {},
+    },
   },
   data () {
     return {
-      closerName: '',
-      closerAvatarHashes: {},
-      buyerViewing: false,
-      vendorProcessingError: false,
-
       introLine: '',
       subText: '',
     };
   },
   created () {
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   mounted () {
   },
   computed: {
+    ob() {
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+      };
+    },
+
     introLine () {
       if (this.closerName) {
         return ob.polyT('orderDetail.summaryTab.disputeAcceptance.userAcceptedPayout', { name: this.closerName, });
@@ -68,7 +73,15 @@ export default {
   methods: {
     moment,
     loadData (options = {}) {
+      this.baseInit(options);
 
+      this._state = {
+        closerName: '',
+        closerAvatarHashes: {},
+        buyerViewing: false,
+        vendorProcessingError: false,
+        ...options.initialState || {},
+      };
     },
 
   }

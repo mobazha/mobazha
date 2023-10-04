@@ -76,7 +76,7 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted () {
     this.render();
@@ -97,7 +97,8 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      this.model = options.model;
+      this.baseInit(options);
+
       if (!this.model) {
         throw new Error('Please provide a DisputeOrder model.');
       }

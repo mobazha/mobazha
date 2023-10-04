@@ -81,7 +81,10 @@ import { recordEvent } from '../../../../../backbone/utils/metrics';
 export default {
   mixins: [],
   props: {
-    cart: Object,
+    options: {
+      type: Object,
+      default: {},
+    },
   },
   data () {
     return {
@@ -96,7 +99,7 @@ export default {
     };
   },
   created () {
-    this.loadData(this.$props);
+    this.loadData(this.options);
   },
   mounted () {
   },
@@ -106,6 +109,8 @@ export default {
     moment,
 
     loadData (options = {}) {
+      this.baseInit(options);
+
       if (!options.orderID) {
         throw new Error('Please provide the orderID');
       }

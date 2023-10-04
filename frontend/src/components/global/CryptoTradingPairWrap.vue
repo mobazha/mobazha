@@ -56,23 +56,24 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted () {
   },
   computed: {
     ob () {
       return {
+        ...this.templateHelpers,
         ...state,
       };
     },
     tradingPairOptions () {
       const ob = this.ob;
-      return Object.assign({
+      return {
         className: ob.tradingPairClass,
         fromCur: ob.fromCur,
         toCur: ob.toCur,
-      }, ob);
+      };
     },
     fromPairing () {
       const ob = this.ob;
@@ -134,7 +135,7 @@ export default {
         },
       };
 
-      this._state = opts.initialState || {};
+      this.baseInit(opts);
 
       // Since the initial state is not being piped through setState in the
       // base class, this is a hack to run it through setState now and ensure

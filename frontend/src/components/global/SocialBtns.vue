@@ -21,20 +21,19 @@ import { recordEvent } from '../../../backbone/utils/metrics';
 
 export default {
   props: {
-    params: {
+    options: {
       type: Object,
       default: {},
     },
   },
   data() {
     return {
-      options: {},
     };
   },
   created() {
     this.initEventChain();
 
-    this.loadData(this.params);
+    this.loadData(this.options);
   },
   mounted() {
     this.render();
@@ -64,9 +63,7 @@ export default {
         },
       };
 
-      this.setState(opts.initialState || {});
-      this.options = opts;
-
+      this.baseInit(opts);
       this.listenTo(app.ownFollowing, 'update', () => {
         this.setState({
           following: followedByYou(options.targetID),

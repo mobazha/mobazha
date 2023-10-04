@@ -91,7 +91,7 @@ export default {
   created() {
     this.initEventChain();
 
-    this.loadData(this.$props.options);
+    this.loadData(this.options);
   },
   mounted() {},
   computed: {
@@ -120,7 +120,7 @@ export default {
         },
       };
 
-      this.setState(opts.initialState || {});
+      this.baseInit(opts);
     },
 
     onClickCancel() {

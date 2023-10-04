@@ -234,7 +234,7 @@
     "unreadMessages": "Ulæste beskeder %{arrow}",
     "conversation": {
       "messageInputPlaceholder": "Indtast besked…",
-      "loadMessagesError": "En fejl opstod under indlæsning af beskederne. %{retryLink}",
+      "loadMessagesError": "En fejl opstod under indlæsning af beskederne. ",
       "retryLink": "Prøv igen",
       "subMenu": {
         "viewPage": "Vis side",
@@ -1638,7 +1638,7 @@
       "enterMessagePlaceholder": "Indtast besked…",
       "enterMessageNoMoreModPlaceholder": "Indtast besked… (moderatoren har bekendtgjort sin beslutning og vil ikke længere se nye chatbeskeder)",
       "modCannotChat": "Du har bekendtgjort en beslutning og kan ikke længere sende beskeder.",
-      "loadMessagesError": "En fejl opstod under indlæsning af beskederne. %{retryLink}",
+      "loadMessagesError": "En fejl opstod under indlæsning af beskederne. ",
       "retryLink": "Prøv igen",
       "btnSend": "Send"
     },

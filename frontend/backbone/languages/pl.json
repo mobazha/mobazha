@@ -234,7 +234,7 @@
     "unreadMessages": "Nieprzeczytane wiadomości %{arrow}",
     "conversation": {
       "messageInputPlaceholder": "Wprowadź wiadomość",
-      "loadMessagesError": "Wystąpił błąd wczytywania wiadomości. %{retryLink}",
+      "loadMessagesError": "Wystąpił błąd wczytywania wiadomości. ",
       "retryLink": "ponów",
       "subMenu": {
         "viewPage": "Zobacz stronę",
@@ -1638,7 +1638,7 @@
       "enterMessagePlaceholder": "Wprowadź wiadomość...",
       "enterMessageNoMoreModPlaceholder": "Enter message... (the moderator has issued a decision and will no longer see any new chat messages)",
       "modCannotChat": "You have issued a decision and cannot send further messages.",
-      "loadMessagesError": "Wystąpił błąd wczytywania wiadomości. %{retryLink}",
+      "loadMessagesError": "Wystąpił błąd wczytywania wiadomości. ",
       "retryLink": "ponów",
       "btnSend": "Wyślij"
     },

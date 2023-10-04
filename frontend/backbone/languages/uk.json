@@ -234,7 +234,7 @@
     "unreadMessages": "Непрочитані повідомлення %{arrow}",
     "conversation": {
       "messageInputPlaceholder": "Введіть повідомлення ...",
-      "loadMessagesError": "Під час завантаження повідомлень сталася помилка. %{retryLink}",
+      "loadMessagesError": "Під час завантаження повідомлень сталася помилка. ",
       "retryLink": "повторити спробу",
       "subMenu": {
         "viewPage": "Дивитись сторінку",
@@ -1638,7 +1638,7 @@
       "enterMessagePlaceholder": "Введіть повідомлення...",
       "enterMessageNoMoreModPlaceholder": "Введіть повідомлення ... (модератор виніс рішення і більше не бачить нових повідомлень в чаті)",
       "modCannotChat": "Ви вже прийняли рішення і не можете надсилати інші повідомлення.",
-      "loadMessagesError": "Під час завантаження повідомлень сталася помилка. %{retryLink}",
+      "loadMessagesError": "Під час завантаження повідомлень сталася помилка. ",
       "retryLink": "повторити спробу",
       "btnSend": "Відправити"
     },

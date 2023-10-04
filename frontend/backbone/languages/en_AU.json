@@ -235,7 +235,7 @@
     "unreadMessages": "Unread messages %{arrow}",
     "conversation": {
       "messageInputPlaceholder": "Enter message…",
-      "loadMessagesError": "There was an error loading the messages. %{retryLink}",
+      "loadMessagesError": "There was an error loading the messages. ",
       "retryLink": "retry",
       "subMenu": {
         "viewPage": "View page",
@@ -1640,7 +1640,7 @@
       "enterMessagePlaceholder": "Enter message...",
       "enterMessageNoMoreModPlaceholder": "Enter message... (the moderator has issued a decision and will no longer see any new chat messages)",
       "modCannotChat": "You have issued a decision and cannot send further messages.",
-      "loadMessagesError": "There was an error loading the messages. %{retryLink}",
+      "loadMessagesError": "There was an error loading the messages. ",
       "retryLink": "retry",
       "btnSend": "Send"
     },

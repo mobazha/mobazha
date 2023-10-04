@@ -234,7 +234,7 @@
     "unreadMessages": "Nuovi messaggi %{arrow}",
     "conversation": {
       "messageInputPlaceholder": "Scrivi qualcosa...",
-      "loadMessagesError": "C'è stato un errore nel caricamento del messaggio. %{retryLink}",
+      "loadMessagesError": "C'è stato un errore nel caricamento del messaggio. ",
       "retryLink": "indietro",
       "subMenu": {
         "viewPage": "Visita pagina",
@@ -1638,7 +1638,7 @@
       "enterMessagePlaceholder": "Inserisci messaggio...",
       "enterMessageNoMoreModPlaceholder": "Inserisci messaggio... (il moderatore ha rilasciato la decisione e non vedrà più i messaggi di questa conversazione)",
       "modCannotChat": "Hai rilasciato una decisione e non puoi più inviare messaggi.",
-      "loadMessagesError": "C'è stato un errore nel caricamento del messaggio. %{retryLink}",
+      "loadMessagesError": "C'è stato un errore nel caricamento del messaggio. ",
       "retryLink": "indietro",
       "btnSend": "Manda"
     },

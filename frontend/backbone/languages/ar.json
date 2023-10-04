@@ -234,7 +234,7 @@
     "unreadMessages": "رسائل غير مقروءة %{arrow}",
     "conversation": {
       "messageInputPlaceholder": "أدخل رسالة ...",
-      "loadMessagesError": "حدث خطأ أثناء تحميل الرسائل %{retryLink}",
+      "loadMessagesError": "حدث خطأ أثناء تحميل الرسائل ",
       "retryLink": "إعادة المحاولة",
       "subMenu": {
         "viewPage": "عرض الصفحة",
@@ -1638,7 +1638,7 @@
       "enterMessagePlaceholder": "أدخل رسالة ...",
       "enterMessageNoMoreModPlaceholder": "أدخل الرسالة... (أصدر المشرف قرارًا ولن يرى أي رسائل دردشة جديدة)",
       "modCannotChat": "لقد أصدرت قرارًا ولا يمكنك إرسال رسائل مرة أخرى.",
-      "loadMessagesError": "حدث خطأ أثناء تحميل الرسائل %{retryLink}",
+      "loadMessagesError": "حدث خطأ أثناء تحميل الرسائل ",
       "retryLink": "أعد المحاوله",
       "btnSend": "ارسل"
     },

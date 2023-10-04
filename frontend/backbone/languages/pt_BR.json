@@ -234,7 +234,7 @@
     "unreadMessages": "Mensagens não lidas %{arrow}",
     "conversation": {
       "messageInputPlaceholder": "Inserir mensagem...",
-      "loadMessagesError": "Houve um erro ao carregar as mensagens. %{retryLink}",
+      "loadMessagesError": "Houve um erro ao carregar as mensagens. ",
       "retryLink": "tentar novamente",
       "subMenu": {
         "viewPage": "Ver página",
@@ -1638,7 +1638,7 @@
       "enterMessagePlaceholder": "Inserir mensagem...",
       "enterMessageNoMoreModPlaceholder": "Insira uma mensagem... (o moderador já emitiu uma decisão e não irá mais ver novas mensagens de chat)",
       "modCannotChat": "Você já emitiu uma decisão e não pode mais enviar mensagens.",
-      "loadMessagesError": "Houve um erro ao carregar as mensagens. %{retryLink}",
+      "loadMessagesError": "Houve um erro ao carregar as mensagens. ",
       "retryLink": "tentar novamente",
       "btnSend": "Enviar"
     },

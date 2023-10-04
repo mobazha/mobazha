@@ -3,12 +3,10 @@
     <div class="typingIndicator tx5 noOverflow clrBr clrP clrT2 clrSh1">{{ ob.typingIndicator }}</div>
     <div class="convoMessagesWindow tx6 js-convoMessagesWindow">
       <SpinnerSVG />
-      <div class="clrTErr messagesFetchError"
-        v-show="ob.showLoadMessagesError"
-        v-html='ob.polyT("orderDetail.discussionTab.loadMessagesError", {
-          retryLink: `<a @click="onClickRetryLoadMessage">${ob.polyT("orderDetail.discussionTab.retryLink")}</a>`
-        })'>
-      </div>
+      <div class="clrTErr messagesFetchError" v-show="ob.showLoadMessagesError">
+        {{ ob.polyT('orderDetail.discussionTab.loadMessagesError') }}
+        <a @click="onClickRetryLoadMessage">${ob.polyT("orderDetail.discussionTab.retryLink")}</a>
+        </div>
       <div class="js-convoMessagesContainer"></div>
     </div>
 

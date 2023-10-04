@@ -234,7 +234,7 @@
     "unreadMessages": "Ungelesene Nachrichten %{arrow}",
     "conversation": {
       "messageInputPlaceholder": "Geben Sie eine Nachricht ein …",
-      "loadMessagesError": "Beim Laden der Nachrichten ist ein Fehler aufgetreten. %{retryLink}",
+      "loadMessagesError": "Beim Laden der Nachrichten ist ein Fehler aufgetreten. ",
       "retryLink": "erneut versuchen",
       "subMenu": {
         "viewPage": "Seite ansehen",
@@ -1638,7 +1638,7 @@
       "enterMessagePlaceholder": "Geben Sie eine Nachricht ein…",
       "enterMessageNoMoreModPlaceholder": "Geben Sie eine Nachricht ein… (Der Moderator eine Entscheidung getroffen und wird keine neuen Chat-Nachrichten mehr empfangen)",
       "modCannotChat": "Sie haben eine Entscheidung getroffen und können keine weiteren Nachrichten senden.",
-      "loadMessagesError": "Beim Laden der Nachricht ist ein Fehler aufgetreten. %{retryLink}",
+      "loadMessagesError": "Beim Laden der Nachricht ist ein Fehler aufgetreten. ",
       "retryLink": "erneut versuchen",
       "btnSend": "Senden"
     },

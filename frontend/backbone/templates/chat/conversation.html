@@ -17,9 +17,9 @@
     <%= ob.spinner() %>
     <%
       const retryLink = `<a class="js-retryLoadMessage">${ob.polyT('chat.conversation.retryLink')}</a>`;
-      const loadMessagesError = ob.polyT('chat.conversation.loadMessagesError', { retryLink: retryLink });
+      const loadMessagesError = ob.polyT('chat.conversation.loadMessagesError');
     %>
-    <div class="clrTErr messagesFetchError js-loadMessagesError <% if (!ob.showLoadMessagesError) print('hide') %>"><%= loadMessagesError %></div>
+    <div class="clrTErr messagesFetchError js-loadMessagesError <% if (!ob.showLoadMessagesError) print('hide') %>"><%= loadMessagesError %><%= retryLink %></div>
     <div class="js-convoMessagesContainer"></div>
   </div>
   <div class="emojiMenuContainer clrP clrBr js-emojiMenuContainer"></div>

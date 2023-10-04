@@ -234,7 +234,7 @@
     "unreadMessages": "Nepřečtené zprávy %{arrow}",
     "conversation": {
       "messageInputPlaceholder": "Vlož zprávu...",
-      "loadMessagesError": "Při načítání tvých zpráv nastala chyba. %{retryLink}",
+      "loadMessagesError": "Při načítání tvých zpráv nastala chyba. ",
       "retryLink": "zkusit znovu",
       "subMenu": {
         "viewPage": "Zobrazit stránku",
@@ -1638,7 +1638,7 @@
       "enterMessagePlaceholder": "Vlož zprávu...",
       "enterMessageNoMoreModPlaceholder": "Zadej zprávu... (moderátor vydal rozhodnutí a již neuvidí žádné nové chatové zprávy)",
       "modCannotChat": "Vydal jsi rozhodnutí a nemůžeš posílat další zprávy.",
-      "loadMessagesError": "Při načítání tvých zpráv nastala chyba. %{retryLink}",
+      "loadMessagesError": "Při načítání tvých zpráv nastala chyba. ",
       "retryLink": "zkusit znovu",
       "btnSend": "Poslat"
     },

@@ -18,7 +18,7 @@
           }"
           :bb="function() {
             return {
-              model: original(model),
+              model: model,
             };
           }"
           @bumpFeeAttempt="onBumpFeeAttempt"
@@ -56,7 +56,6 @@ import { openSimpleMessage } from '../../../../../backbone/views/modals/SimpleMe
 import { launchSettingsModal } from '../../../../../backbone/utils/modalManager';
 import Transaction from './Transaction.vue';
 import TransactionFetchState from './TransactionFetchState.vue';
-import { original } from '@/plugins/vue-backbone/vue-backbone.js';
 
 export default {
   components: {
@@ -120,8 +119,6 @@ export default {
     },
   },
   methods: {
-    original,
-
     loadData(options = {}) {
       const opts = {
         fetchOnInit: true,

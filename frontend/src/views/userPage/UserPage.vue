@@ -120,8 +120,6 @@ import Reputation from '../../../backbone/views/userPage/Reputation';
 import Loading from './Loading.vue'
 import MiniProfile from '../MiniProfile.vue';
 
-import { original } from '@/plugins/vue-backbone/vue-backbone.js';
-
 export default {
   components: {
     Loading,
@@ -465,7 +463,7 @@ export default {
         ...opts,
         initialFetch: Store.fetchListings(this.listings),
         collection: this.listings,
-        model: original(this.model),
+        model: this.model,
       });
     },
 
@@ -491,7 +489,7 @@ export default {
       let tabView = this.tabViewCache[targ];
       const tabOptions = {
         ownPage: this.ownPage,
-        model: original(this.model),
+        model: this.model,
         ...opts,
       };
 

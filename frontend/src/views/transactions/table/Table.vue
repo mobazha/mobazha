@@ -50,7 +50,7 @@
             }"
             :bb="function() {
               return {
-                model: original(transaction),
+                model: transaction,
               };
             }"
             @clickAcceptOrder="onClickAcceptOrder(transaction.id)"
@@ -89,7 +89,6 @@ import { getSocket } from '../../../../backbone/utils/serverConnect';
 import { acceptingOrder, acceptOrder, rejectingOrder, rejectOrder, cancelingOrder, cancelOrder, events as orderEvents } from '../../../../backbone/utils/order';
 import { getCachedProfiles } from '../../../../backbone/models/profile/Profile';
 import Row from './Row.vue';
-import { original } from '@/plugins/vue-backbone/vue-backbone.js';
 
 export default {
   components: {
@@ -165,7 +164,6 @@ export default {
     acceptingOrder,
     rejectingOrder,
     cancelingOrder,
-    original,
     loadData(options = {}) {
       const types = ['sales', 'purchases', 'cases'];
       const opts = {

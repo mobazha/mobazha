@@ -32,7 +32,7 @@
     <TransactionsTable ref="table" :options="tableOptions"
       :bb="function() {
         return {
-          collection: original(collection),
+          collection,
         };
       }"
       @clickRow="onClickRow" />
@@ -46,7 +46,6 @@ import app from '../../../backbone/app';
 import { capitalize } from '../../../backbone/utils/string';
 import TransactionsTable from './table/Table.vue';
 import Filters from './Filters.vue';
-import { original } from '@/plugins/vue-backbone/vue-backbone.js';
 
 export default {
   components: {
@@ -100,7 +99,6 @@ export default {
   },
   methods: {
     capitalize,
-    original,
     loadData(options = {}) {
       const opts = {
         defaultFilter: {

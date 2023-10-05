@@ -383,7 +383,6 @@ import BlockBtn from '../../../backbone/views/components/BlockBtn';
 import UserLoadingModal from '../../../backbone/views/userPage/Loading';
 
 import { getListingOptions } from '@/utils/verifiedMod'
-import { original } from '@/plugins/vue-backbone/vue-backbone.js';
 
 export default {
   props: {
@@ -489,7 +488,7 @@ export default {
       this.cardError = false;
 
       try {
-        if (!this.model || !(original(this.model) instanceof ListingShort)) {
+        if (!this.model || !(this.model instanceof ListingShort)) {
           throw new Error('Please provide a ListingShort model.');
         }
 

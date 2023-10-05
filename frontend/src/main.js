@@ -1,7 +1,6 @@
 import { createApp } from 'vue';
 import { createStore } from 'vuex';
 
-import Backbone from 'backbone';
 import _ from 'underscore';
 
 import ElementPlus from 'element-plus';
@@ -67,17 +66,3 @@ function mountVueApp(container) {
   return app;
 }
 window.vueApp = mountVueApp('#appFrame');
-
-// https://github.com/jashkenas/backbone/issues/483#issuecomment-71374622
-Backbone.Model.prototype.toJSON2 = function() {
-  if (this._isSerializing) {
-      return this.id || this.cid;
-  }
-  this._isSerializing = true;
-  var json = _.clone(this.attributes);
-  _.each(json, function(value, name) {
-      _.isFunction((value || "").toJSON2) && (json[name] = value.toJSON2());
-  });
-  this._isSerializing = false;
-  return json;
-}

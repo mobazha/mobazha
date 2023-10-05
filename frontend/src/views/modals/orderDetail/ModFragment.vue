@@ -23,13 +23,16 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {
-        peerID: '',
-      },
+      default: {},
     },
+    bb: Function,
   },
   data () {
     return {
+      _state: {
+        maxPeerIDLength: 8,
+        showAvatar: false,
+      }
     };
   },
   created () {
@@ -44,6 +47,7 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
+        ...this._model,
         ...this._state,
       };
     }
@@ -59,11 +63,10 @@ export default {
         },
       });
 
-      const state = this.getState();
-      this.verifiedModModel = app.verifiedMods.get(state.peerID);
+      this.verifiedModModel = app.verifiedMods.get(this.peerID);
 
       this.listenTo(app.verifiedMods, 'update', () => {
-        const newVerifiedModModel = app.verifiedMods.get(state.peerID);
+        const newVerifiedModModel = app.verifiedMods.get(this.peerID);
         if (newVerifiedModModel !== this.verifiedModModel) {
           this.verifiedModModel = newVerifiedModModel;
           this.render();
@@ -72,8 +75,7 @@ export default {
     },
 
     render () {
-      const state = this.getState();
-      const verifiedMod = app.verifiedMods.get(state.peerID);
+      const verifiedMod = app.verifiedMods.get(this.peerID);
       const createOptions = getModeratorOptions({
         model: verifiedMod,
       });

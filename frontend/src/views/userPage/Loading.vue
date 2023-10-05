@@ -1,6 +1,13 @@
 <template>
   <div class="userLoadingModal modal modalMedium modalScrollPage">
-    <BaseModal>
+    <BaseModal :modalInfo="
+      {
+        dismissOnOverlayClick: false,
+        dismissOnEscPress: false,
+        showCloseButton: false,
+        removeOnClose: false,
+        removeOnRoute: true,
+      }">
       <template v-slot:component>
         <section class="contentBox clrP clrBr clrSh3">
           <div class="padMd">
@@ -106,11 +113,6 @@ export default {
     loadData(options = {}) {
       const opts = {
         ...options,
-        dismissOnOverlayClick: false,
-        dismissOnEscPress: false,
-        showCloseButton: false,
-        removeOnClose: false,
-        removeOnRoute: true,
         initialState: {
           userName: '',
           contentText: '',

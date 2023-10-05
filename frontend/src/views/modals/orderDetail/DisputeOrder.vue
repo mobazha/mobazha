@@ -14,7 +14,14 @@
         </div>
         <div class="col7">
           <div class="js-modContainer">
-            <ModFragment :modInfo="moderatorState" />
+            <ModFragment v-if="modProfile"
+              :options="moderatorState"
+              :bb="function() {
+                return {
+                  model: modProfile,
+                };
+              }"
+            />
           </div>
         </div>
       </div>
@@ -96,9 +103,8 @@ export default {
     },
     moderatorState() {
       return {
-        peerID: this.moderator.id,
+        peerID: this.options.moderator.id,
         showAvatar: true,
-        ...(this.modProfile && this.modProfile.toJSON() || {}),
       };
     },
   },

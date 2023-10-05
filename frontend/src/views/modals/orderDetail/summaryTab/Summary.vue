@@ -37,7 +37,15 @@
       </div>
     </template>
     <div class="js-payForOrderWrap payForOrderWrap rowLg border clrBr padMd"></div>
-    <OrderDetails :model="contract" :moderator="moderator"/>
+    <OrderDetails
+      :options="{
+        moderator,
+      }"
+      :bb="function() {
+        return {
+          model: contract,
+        };
+      }"/>
   </div>
 </template>
 

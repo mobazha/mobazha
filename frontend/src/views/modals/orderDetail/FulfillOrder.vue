@@ -119,9 +119,15 @@ export default {
   data () {
     return {
       info: {
-        physicalDelivery: {},
-        digitalDelivery: {},
-        cryptocurrencyDelivery: {},
+        physicalDelivery: {
+          trackingNumber: '',
+        },
+        digitalDelivery: {
+          password: '',
+        },
+        cryptocurrencyDelivery: {
+          transactionID: '',
+        },
         note: '',
       },
       processing: fulfillingOrder(this.orderID),

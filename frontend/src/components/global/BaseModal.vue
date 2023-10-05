@@ -19,7 +19,7 @@ export default {
     }
   },
   created() {
-    _.extend(this.$data, this.$props.modalInfo);
+    _.extend(this.$data, this.modalInfo);
   },
   data () {
     return {

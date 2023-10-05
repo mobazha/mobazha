@@ -155,6 +155,7 @@ export default {
       type: Object,
       default: {},
 	  },
+    bb: Function,
   },
   data () {
     return {
@@ -177,10 +178,9 @@ export default {
         listing: this.listing,
         order: this.order,
         getCountryByDataName,
-        convertAndFormatCurrency,
         userCurrency: app.settings.get('localCurrency'),
         moment,
-        isModerated: this.isModerated(),
+        isModerated: this.isModerated,
         sku: this.sku,
         locale: app && app.localSettings && app.localSettings.standardizedTranslatedLang()
           || 'en-US',

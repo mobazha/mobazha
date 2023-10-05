@@ -1,6 +1,6 @@
 <template>
   <div class="modal modalScrollPage tabbedModal orderDetail">
-    <BaseModal :modalInfo="{ removeOnClose: true }" @close="onClickClose" >
+    <BaseModal @close="onClickClose" >
       <template v-slot:component>
         <div class="topControls flex">
           <!-- // This is something found at the top of multiple modals. Would be nice to make this into a template
@@ -18,23 +18,45 @@
         <div class="flex gutterH">
           <div class="tabColumn gutterV">
             <div class="contentBox clrP clrBr clrSh3 tx4 featuredProfile js-featuredProfile"
-              :disabled="isFetching || fetchFailed">
-              <ProfileBox :options="profileBoxOptions"/>
+              :disabled="ob.isFetching || ob.fetchFailed">
+              <ProfileBox v-if="featuredProfileMd"
+                :options="profileBoxOptions"
+                :bb="function() {
+                  return {
+                    model: featuredProfileMd,
+                  };
+                }"
+              />
             </div>
-            <div class="contentBox padMd clrP clrBr clrSh3" :disabled="isFetching || fetchFailed">
+            <div class="contentBox padMd clrP clrBr clrSh3" :disabled="ob.isFetching || ob.fetchFailed">
               <h1 class="h4 txUp clrT">{{ ob.polyT('tabMenuHeading') }}</h1>
               <div class="boxList tx4 clrTx1Br tabHeads">
                 <a :class="`tab clrT row ${activeTab === 'summary' ? 'clrT active' : ''}`" @click="selectTab('summary')">{{ ob.polyT('orderDetail.navMenu.summary') }}</a>
                 <a :class="`tab row ${activeTab === 'discussion' ? 'clrT active' : ''}`" @click="selectTab('discussion')">
                   <span>{{ ob.polyT('orderDetail.navMenu.discussion') }}<span class="unreadBadge discSm clrE1 clrBrEmph1 clrTOnEmph">{{ unreadChatMessagesText }}</span></span>
                 </a>
-                <a :class="`tab row ${activeTab === 'contract' ? 'clrT active' : ''}`" @click="selectTab('contract')">{{ ob.polyT('orderDetail.navMenu.contract') }}</a>
+                <ContractMenuItem ref="contractMenuItem"
+                  :options="{
+                    initialState: {
+                      ...contractMenuItemState,
+                    },
+                  }"
+                  :active="activeTab === 'contract'"
+                  @click="selectTab('contract')"
+                  />
               </div>
             </div>
             <div class="mainCtaWrap hide" v-show="!ob.isFetching && !ob.fetchFailed">
               <ProcessingButton className="btn clrBAttGrad clrBrDec1 clrTOnEmph" btnText="Accept Order"/>
             </div>
-            <div class="js-actionBarContainer"></div>
+            <div class="js-actionBarContainer">
+              <ActionBar ref="actionBar"
+                :options="{
+                  orderID: model.id,
+                  initialState: actionBarButtonState,
+                }"
+                @clickOpenDispute="onClickOpenDispute" />
+            </div>
           </div>
           <div class="flexExpand posR">
             <div class="contentBox clrP clrBr clrSh3 mainContent">
@@ -67,10 +89,7 @@
                       recordEvent('OrderDetails_DisputeResolveStart');
                       selectTab('resolveDispute');
                     }"
-                    @clickDisputeOrder="() => {
-                      recordDisputeStart();
-                      selectTab('disputeOrder');
-                    }"
+                    @clickDisputeOrder="onClickOpenDispute"
                     @clickDiscussOrder="selectTab('discussion')"
                   />
                   <Discussion
@@ -102,7 +121,7 @@
                     :options="fulfillOrderOptions.options"
                     :bb="function() {
                       return {
-                        model,
+                        model: fulfillOrderOptions.model,
                       };
                     }"
                     @clickBackToSummary="() => {
@@ -133,6 +152,7 @@
                     :bb="function() {
                       return {
                         model: resolveDisputeOptions.model,
+                        case: resolveDisputeOptions.case,
                       };
                     }"
                     @clickBackToSummary="() => {
@@ -167,9 +187,8 @@ import { recordEvent } from '../../../../backbone/utils/metrics';
 import Case from '../../../../backbone/models/order/Case';
 import ResolveDisputeMd from '../../../../backbone/models/order/ResolveDispute';
 
-import ActionBar from '../../../../backbone/views/modals/orderDetail/ActionBar';
-import ContractMenuItem from '../../../../backbone/views/modals/orderDetail/ContractMenuItem';
-
+import ActionBar from './ActionBar.vue'
+import ContractMenuItem from './ContractMenuItem.vue'
 import Summary from './summaryTab/Summary.vue';
 import Discussion from './Discussion.vue';
 import ContractTab from './contractTab/ContractTab.vue';
@@ -178,10 +197,10 @@ import DisputeOrder from './DisputeOrder.vue'
 import ResolveDispute from './ResolveDispute.vue'
 import ProfileBox from './ProfileBox.vue'
 
-import baseModal from '../../../mixins/baseModal';
-
 export default {
   components: {
+    ActionBar,
+    ContractMenuItem,
     Summary,
     Discussion,
     ContractTab,
@@ -190,26 +209,26 @@ export default {
     ResolveDispute,
     ProfileBox,
   },
-  mixins: [baseModal],
   props: {
     options: {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
-      isFetching: false,
-      fetchFailed: false,
-      fetchError: '',
+      _state: {
+        isFetching: false,
+        fetchFailed: false,
+        fetchError: '',
+      },
       activeTab: 'summary',
 
       featuredProfileMd: undefined,
       featuredProfilePeerID: '',
 
       tabViewData: {},
-
-      model: {},
     };
   },
   created () {
@@ -228,14 +247,13 @@ export default {
         ...this._model,
         returnText: this.options.returnText,
         type: this.type,
-        getUnreadChatMessagesText: this.getUnreadChatMessagesText.bind(this),
       };
     },
     type () {
       return this.model instanceof Case ? 'case' : this.model.type;
     },
     contract () {
-      return this.model.get('contract');
+      return this._model.contract;
     },
     /**
      * Returns whether different action bar buttons should be displayed or not
@@ -285,7 +303,7 @@ export default {
       return { tip };
     },
     unreadChatMessagesText () {
-      let count = this.model.get('unreadChatMessages');
+      let count = this._model.unreadChatMessages;
       count = count > 0 ? count : '';
       count = count > 99 ? '…' : count;
       return count;
@@ -358,8 +376,8 @@ export default {
 
       return {
         model,
+        case: this.model,
         options: {
-          case: this.model,
           vendor: {
             id: this.model.vendorID,
             getProfile: this.getVendorProfile.bind(this),
@@ -373,7 +391,6 @@ export default {
     },
     profileBoxOptions () {
       return {
-        model: this.featuredProfileMd || null,
         isFetching: !this.featuredProfilePeerID,
         peerID: this.featuredProfilePeerID,
       };
@@ -393,15 +410,13 @@ export default {
 
     this.baseInit(opts);
 
-    this._tab = opts.initialTab;
-
       if (!this.model) {
         throw new Error('Please provide an Order or Case model.');
       }
 
       this.listenTo(this.model, 'request', this.onOrderRequest);
       this.listenToOnce(this.model, 'sync', this.onFirstOrderSync);
-      this.listenTo(this.model, 'change:unreadChatMessages', () => this.setUnreadChatMessagesBadge());
+      // this.listenTo(this.model, 'change:unreadChatMessages', () => this.setUnreadChatMessagesBadge());
 
       this.listenTo(orderEvents, 'fulfillOrderComplete', () => {
         if (this.activeTab === 'fulfillOrder') this.selectTab('summary');
@@ -416,14 +431,14 @@ export default {
       });
 
       this.listenTo(this.model, 'change:state', () => {
-        if (this.actionBar) {
-          this.actionBar.setState(this.actionBarButtonState);
+        if (this.$refs.actionBar) {
+          this.$refs.actionBar.setState(this.actionBarButtonState);
         }
       });
 
       this.listenTo(this.model, 'otherContractArrived', () => {
-        if (this.contractMenuItem) {
-          this.contractMenuItem.setState(this.contractMenuItemState);
+        if (this.$refs.contractMenuItem) {
+          this.$refs.contractMenuItem.setState(this.contractMenuItemState);
         }
       });
 
@@ -439,22 +454,31 @@ export default {
     },
 
     onOrderRequest (md, xhr) {
-      this.isFetching = true;
-      this.fetchError = '';
-      this.fetchFailed = false;
+      this.setState({
+        isFetching: true,
+        fetchError: '',
+        fetchFailed: false,
+      });
 
       xhr.done(() => {
-        this.isFetching = false;
-        this.fetchFailed = false;
+        this.setState({
+          isFetching: false,
+          fetchFailed: false,
+        });
       }).fail((jqXhr) => {
         if (jqXhr.statusText === 'abort') return;
 
+        let fetchError = '';
+
         if (jqXhr.responseJSON && jqXhr.responseJSON.reason) {
-          this.fetchError = jqXhr.responseJSON.reason;
+          fetchError = jqXhr.responseJSON.reason;
         }
 
-        this.isFetching = false;
-        this.fetchFailed = true;
+        this.setState({
+          isFetching: false,
+          fetchFailed: true,
+          fetchError,
+        });
       });
     },
 
@@ -485,7 +509,6 @@ export default {
 
       featuredProfileFetch.done((profile) => {
         this.featuredProfileMd = profile;
-        if (this.featuredProfile) this.featuredProfile.setModel(this.featuredProfileMd);
       });
 
       if (this.featuredProfile) this.featuredProfile.setState(featuredProfileState);
@@ -602,10 +625,15 @@ export default {
       this.activeTab = targ;
     },
 
+    onClickOpenDispute() {
+      this.recordDisputeStart();
+      this.selectTab('disputeOrder');
+    },
+
     recordDisputeStart () {
       recordEvent('OrderDetails_DisputeStart', {
         type: this.type,
-        state: { isFetching: this.isFetching, fetchError: this.fetchError, fetchFailed: this.fetchFailed },
+        state: this.model.get('state'),
       });
     },
 
@@ -629,34 +657,6 @@ export default {
         };
       }
     },
-
-    render () {
-      if (!this.isFetching && !this.fetchError) {
-        this.selectTab(this.activeTab);
-
-        if (this.actionBar) this.actionBar.remove();
-        this.actionBar = this.createChild(ActionBar, {
-          orderID: this.model.id,
-          initialState: this.actionBarButtonState,
-        });
-        $('.js-actionBarContainer').html(this.actionBar.render().el);
-        this.listenTo(this.actionBar, 'clickOpenDispute', () => {
-          this.recordDisputeStart();
-          this.selectTab('disputeOrder');
-        });
-
-        if (this.contractMenuItem) this.contractMenuItem.remove();
-        this.contractMenuItem = this.createChild(ContractMenuItem, {
-          initialState: {
-            ...this.contractMenuItemState,
-          },
-        });
-        this.getCachedEl('[data-tab="contract"]')
-          .replaceWith(this.contractMenuItem.render().el);
-      }
-
-      return this;
-    }
   }
 }
 </script>

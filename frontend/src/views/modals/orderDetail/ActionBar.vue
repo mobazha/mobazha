@@ -20,6 +20,9 @@ export default {
   },
   data () {
     return {
+      _state: {
+        showDisputeOrderButton: false,
+      }
     };
   },
   created () {

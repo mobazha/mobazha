@@ -1,12 +1,12 @@
 <template>
   <div :class="`discussionTab clrP ${messages.length ? 'noMessages' : ''} ${loadingMessages ? 'loadingMessages' : ''} ${isTyping ? 'isTyping' : ''}`">
-    <div class="typingIndicator tx5 noOverflow clrBr clrP clrT2 clrSh1">{{ ob.typingIndicator }}</div>
+    <div class="typingIndicator tx5 noOverflow clrBr clrP clrT2 clrSh1">{{ typingIndicatorContent }}</div>
     <div class="convoMessagesWindow tx6 js-convoMessagesWindow">
       <SpinnerSVG />
       <div class="clrTErr messagesFetchError" v-show="ob.showLoadMessagesError">
         {{ ob.polyT('orderDetail.discussionTab.loadMessagesError') }}
         <a @click="onClickRetryLoadMessage">${ob.polyT("orderDetail.discussionTab.retryLink")}</a>
-        </div>
+      </div>
       <div class="js-convoMessagesContainer"></div>
     </div>
 
@@ -57,6 +57,24 @@ export default {
     return {
       messagesPerPage: 20,
       typingExpires: 3000,
+
+      messages: [],
+      inputMessage: '',
+      typingIndicatorContent: '',
+
+      showLoadMessagesError: false,
+      fetching: false,
+      fetchedAllMessages: false,
+      ignoreScroll: false,
+      buyer: {
+        isTyping: false,
+      },
+      vendor: {
+        isTyping: false,
+      },
+      moderator: {
+        isTyping: false,
+      }
     };
   },
   created () {
@@ -112,13 +130,6 @@ export default {
 
           return include;
         }).map(chatter => chatter.id);
-    },
-
-    ownProfile () {
-      return app.profile.toJSON();
-    },
-    maxMessageLength () {
-      return ChatMessage.max.messageLength;
     },
   },
   methods: {

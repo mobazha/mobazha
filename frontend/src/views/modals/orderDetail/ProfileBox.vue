@@ -24,6 +24,10 @@ export default {
   },
   data () {
     return {
+      _state: {
+        isFetching: false,
+        fetchFailed: false,
+      }
     };
   },
   created () {
@@ -38,7 +42,7 @@ export default {
       return {
         ...this.templateHelpers,
         ...this._state,
-        ...this._model || {},
+        ...this._model,
       };
     }
   },

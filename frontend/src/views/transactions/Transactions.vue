@@ -39,8 +39,12 @@
       <OrderDetail
         v-if="showOrderDetail"
         :options="{
-          model: modalModel,
           returnText: ob.polyT(`transactions.${modalType}s.returnToFromOrder`),
+        }"
+        :bb="function() {
+          return {
+            model: modalModel,
+          };
         }"
         @convoMarkedAsRead="onConvoMarkedAsRead"
         @close="onOrderDetailClose"

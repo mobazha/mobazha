@@ -8,6 +8,7 @@
 // import collectionProxy from "./collection-proxy.js";
 
 import Backbone from 'backbone';
+import _ from 'underscore';
 
 /**
  * Default values for the possible options passed in Vue.use

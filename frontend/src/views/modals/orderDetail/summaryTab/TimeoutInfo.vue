@@ -42,7 +42,6 @@ import { recordEvent } from '../../../../../backbone/utils/metrics';
 
 
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,

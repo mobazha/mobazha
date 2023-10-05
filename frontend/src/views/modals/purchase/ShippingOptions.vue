@@ -37,7 +37,6 @@
 <script>
 
 export default {
-  mixins: [],
   props: {
     listing: {
       type: Object,

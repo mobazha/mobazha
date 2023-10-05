@@ -109,7 +109,6 @@ import {
 
 
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,

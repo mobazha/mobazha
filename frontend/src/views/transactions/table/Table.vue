@@ -95,7 +95,6 @@ export default {
   components: {
     Row,
   },
-  mixins: [],
   props: {
     options: {
       type: Object,

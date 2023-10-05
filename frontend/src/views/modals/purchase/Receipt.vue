@@ -163,7 +163,6 @@ import * as templateHelpers from '../../../../backbone/utils/templateHelpers';
 
 
 export default {
-  mixins: [],
   props: {
     order: Object,
     listing: Object,

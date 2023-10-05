@@ -47,7 +47,6 @@ export default {
   components: {
     ShippingOptions,
   },
-  mixins: [],
   props: {
     listing: {
       type: Object,

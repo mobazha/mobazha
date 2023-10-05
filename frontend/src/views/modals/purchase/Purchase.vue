@@ -346,7 +346,6 @@ export default {
       default: {},
     },
   },
-  mixins: [],
   data () {
     return {
       phase: 'pay',

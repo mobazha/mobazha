@@ -35,7 +35,6 @@ import { isValidNumber } from '../../../../backbone/utils/number';
 
 
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,

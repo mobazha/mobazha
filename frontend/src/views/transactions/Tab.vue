@@ -53,7 +53,6 @@ export default {
     Filters,
     TransactionsTable,
   },
-  mixins: [],
   props: {
     options: {
       type: Object,

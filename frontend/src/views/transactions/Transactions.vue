@@ -67,7 +67,6 @@ export default {
     OrderDetail,
     Tab,
   },
-  mixins: [],
   props: {
     options: {
       type: Object,

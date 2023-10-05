@@ -91,7 +91,6 @@ import CryptoTradingPair from '../../../../backbone/views/components/CryptoTradi
 
 
 export default {
-  mixins: [],
   props: {
     options: {
       type: Object,

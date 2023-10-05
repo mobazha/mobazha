@@ -18,7 +18,6 @@ export default {
       default: {},
     },
   },
-  mixins: [],
   data () {
     return {
     };

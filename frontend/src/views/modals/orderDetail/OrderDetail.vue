@@ -20,10 +20,10 @@
             <div class="contentBox clrP clrBr clrSh3 tx4 featuredProfile js-featuredProfile"
               :disabled="ob.isFetching || ob.fetchFailed">
               <ProfileBox v-if="featuredProfileMd"
-                :options="profileBoxOptions"
+                :options="profileBoxOptions.options"
                 :bb="function() {
                   return {
-                    model: featuredProfileMd,
+                    model: profileBoxOptions.model,
                   };
                 }"
               />
@@ -50,7 +50,8 @@
               <ProcessingButton className="btn clrBAttGrad clrBrDec1 clrTOnEmph" btnText="Accept Order"/>
             </div>
             <div class="js-actionBarContainer">
-              <ActionBar ref="actionBar"
+              <ActionBar v-if="!ob.isFetching && !ob.fetchError"
+                ref="actionBar"
                 :options="{
                   orderID: model.id,
                   initialState: actionBarButtonState,
@@ -391,8 +392,11 @@ export default {
     },
     profileBoxOptions () {
       return {
-        isFetching: !this.featuredProfilePeerID,
-        peerID: this.featuredProfilePeerID,
+        model: this.featuredProfileMd,
+        options: {
+          isFetching: !this.featuredProfilePeerID,
+          peerID: this.featuredProfilePeerID,
+        }        
       };
     },
   },
@@ -484,34 +488,28 @@ export default {
 
     onFirstOrderSync () {
       this.stopListening(this.model, null, this.onOrderRequest);
-      const featuredProfileState = { isFetching: false };
+
       let featuredProfileFetch;
 
       if (this.type === 'case') {
         if (this.model.get('buyerOpened')) {
           featuredProfileFetch = this.getBuyerProfile();
-          featuredProfileState.peerID = this.model.buyerID;
           this.featuredProfilePeerID = this.model.buyerID;
         } else {
           featuredProfileFetch = this.getVendorProfile();
-          featuredProfileState.peerID = this.model.vendorID;
           this.featuredProfilePeerID = this.model.vendorID;
         }
       } else if (this.type === 'sale') {
         featuredProfileFetch = this.getBuyerProfile();
-        featuredProfileState.peerID = this.model.buyerID;
         this.featuredProfilePeerID = this.model.buyerID;
       } else {
         featuredProfileFetch = this.getVendorProfile();
-        featuredProfileState.peerID = this.model.vendorID;
         this.featuredProfilePeerID = this.model.vendorID;
       }
 
       featuredProfileFetch.done((profile) => {
         this.featuredProfileMd = profile;
       });
-
-      if (this.featuredProfile) this.featuredProfile.setState(featuredProfileState);
     },
 
     onClickRetryFetch () {

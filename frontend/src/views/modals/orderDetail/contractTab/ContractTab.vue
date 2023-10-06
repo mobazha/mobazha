@@ -9,7 +9,7 @@
     <hr class="clrBr rowLg" />
     <div class="js-statusContainer rowLg"></div>
     <template v-for="(contract, key) in contracts" :key="key">
-      <Contract :options="model.isCase ? contractOptions(contract) : { contract }"/>
+      <Contract refs="contractVws" :options="contractOptions(contract)"/>
     </template>
   </div>
 </template>
@@ -58,11 +58,11 @@ export default {
         this.listenTo(this.model, 'otherContractArrived', (md, data) => {
           const rawContract = this.model.get(`raw${data.isBuyer ? 'Buyer' : 'Vendor'}Contract`);
 
-          if (!this.model.bothContractsValid) this.renderContract(rawContract);
+          if (!this.model.bothContractsValid) this.contracts.push(rawContract);
           this.renderStatus();
 
-          if (this.model.bothContractsValid) {
-            this[`${data.isBuyer ? 'vendor' : 'buyer'}ContractVw`].setState({ heading: '' });
+          if (this.model.bothContractsValid && this.$refs.contractVws) {
+            this.$refs.contractVws.forEach((vw) => { vw.setState({ heading: '' }); });
           }
         });
       }
@@ -108,6 +108,10 @@ export default {
     },
 
     contractOptions (contract) {
+      if (!this.model.isCase) {
+        return { contract };
+      }
+
       if (!contract) {
         throw new Error('Please provide a contract.');
       }
@@ -133,6 +137,8 @@ export default {
     },
 
     loadContracts () {
+      this.contracts = [];
+
       this.renderStatus();
 
       if (!this.model.isCase) {

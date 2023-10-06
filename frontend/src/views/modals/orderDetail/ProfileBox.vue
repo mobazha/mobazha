@@ -26,6 +26,7 @@ export default {
     return {
       _state: {
         isFetching: false,
+        peerID: '',
         fetchFailed: false,
       }
     };

@@ -61,7 +61,7 @@
         </table>
         <div class="js-pageControlsContainer"></div>
         <PageControls
-          :options="{ initialState: { start: pageStartIndex + 1, pageEnd, total: queryTotal } }"
+          :options="pageControlsOptions"
           @clickNext="onClickNextPage"
           @clickPrev="onClickPrevPage"
         />
@@ -137,6 +137,13 @@ export default {
       }
       return end;
     },
+    pageControlsOptions() {
+      return { initialState: {
+        start: this.pageStartIndex + 1,
+        end: this.pageEnd,
+        total: this.queryTotal,
+      }};
+    },
     transToRender() {
       if (!this.collection || this.collection.length == 0) {
         return [];
@@ -187,7 +194,7 @@ export default {
 
       this.type = opts.type;
       this.curPage = 1;
-      this.queryTotal = null;
+      this.queryTotal = 0;
 
       const socket = getSocket();
 

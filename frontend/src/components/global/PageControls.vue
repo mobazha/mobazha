@@ -4,15 +4,13 @@
     <div class="floR">
       <div class="pageControls flexVCent gutterH tx5">
         <template v-if="countsAvailable">
-          <div> {{
-            ob.polyT('pageControls.displaying', {
-              displayingCounts: ob.polyT('pageControls.displayingCounts', {
-                start: ob.number.localizeNumber(ob.start),
-                end: ob.number.localizeNumber(ob.end),
-                total: ob.number.localizeNumber(ob.total),
-              }),
-            })
-          }}
+          <div v-html="ob.polyT('pageControls.displaying', {
+            displayingCounts: ob.polyT('pageControls.displayingCounts', {
+              start: ob.number.localizeNumber(ob.start),
+              end: ob.number.localizeNumber(ob.end),
+              total: ob.number.localizeNumber(ob.total),
+            }),
+          })">
           </div>
         </template>
         <div class="btnStrip">
@@ -40,6 +38,11 @@ export default {
   },
   data () {
     return {
+      _state: {
+        start: 0,
+        end: 0,
+        total: 0,
+      }
     };
   },
   created () {
@@ -69,6 +72,7 @@ export default {
       return countsAvailable;
     },
     disabledPrev () {
+      const ob = this.ob; 
       let disabledPrev = true;
 
       if (this.countsAvailable) {
@@ -79,6 +83,7 @@ export default {
       return disabledPrev;
     },
     disabledNext () {
+      const ob = this.ob;
       let disabledNext = true;
 
       if (this.countsAvailable) {

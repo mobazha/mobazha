@@ -36,6 +36,10 @@ export default {
   },
   data () {
     return {
+      _state: {
+        heading: '',
+        errors: [],
+      }
     };
   },
   created () {

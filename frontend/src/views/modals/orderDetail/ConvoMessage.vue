@@ -107,7 +107,7 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      if (!options.model) {
+      if (!this.model) {
         throw new Error('Please provide a model.');
       }
 

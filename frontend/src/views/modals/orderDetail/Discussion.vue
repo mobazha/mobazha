@@ -7,10 +7,18 @@
         {{ ob.polyT('orderDetail.discussionTab.loadMessagesError') }}
         <a @click="onClickRetryLoadMessage">${ob.polyT("orderDetail.discussionTab.retryLink")}</a>
       </div>
-      <div class="js-convoMessagesContainer"></div>
+      <div class="js-convoMessagesContainer">
+        <!-- <ConvoMessages :options="{
+          collection: this.messages,
+          $scrollContainer: this.convoMessagesWindow,
+          buyer: this.buyer,
+          vendor: this.vendor,
+          moderator: this.moderator,
+        }" /> -->
+      </div>
     </div>
 
-    <div class="clrBr clrP flex gutterHSm convoFooter js-convoFooter">
+    <div :class="`clrBr clrP flex gutterHSm convoFooter js-convoFooter ${footerClass}`">
       <div class="avatar clrBr2 clrSh1 disc" :style="ob.getAvatarBgImage(ob.ownProfile.avatarHashes)"></div>
       <div class="flexExpand">
         <textarea
@@ -18,7 +26,7 @@
           class="clrP tx5"
           @keyup="onKeyUpMessageInput"
           @keydown="onKeyDownMessageInput"
-          :placeholder="ob.polyT('chat.conversation.messageInputPlaceholder')"
+          :placeholder="messageInputPlaceholder"
           :maxlength="ob.maxMessageLength"
           v-model="inputMessage"
           rows="1"></textarea>
@@ -61,6 +69,8 @@ export default {
       messages: [],
       inputMessage: '',
       typingIndicatorContent: '',
+      isTyping: false,
+      _chatters: undefined,
 
       showLoadMessagesError: false,
       fetching: false,
@@ -95,7 +105,6 @@ export default {
         typingIndicator: this.getTypingIndicatorContent(),
         maxMessageLength: ChatMessage.max.messageLength,
         ownProfile: app.profile.toJSON(),
-        canModChat: this.footerClass,
       };
     },
     convoMessagesWindow () {
@@ -106,11 +115,6 @@ export default {
     btnSend () {
       return this._btnSend ||
         (this._btnSend = $('.js-btnSend'));
-    },
-
-    convoFooter () {
-      return this._convoFooter ||
-        (this._convoFooter = $('.js-convoFooter'));
     },
 
     /**
@@ -131,6 +135,28 @@ export default {
           return include;
         }).map(chatter => chatter.id);
     },
+
+    footerClass () {
+      if (this.moderator && this.moderator.id === app.profile.id &&
+        this._model.state === 'RESOLVED') {
+        // If this is the moderator looking at the order and the mod has
+        // already made a decision, the mod cannot send any more chat messages.
+        return 'preventModChat';
+      }
+      return '';
+    },
+
+    messageInputPlaceholder () {
+      if (this.moderator && this.moderator.id === app.profile.id) return;
+
+      if (this._model.state === 'DECIDED' ||
+        this._model.state === 'RESOLVED') {
+        // If the mod has made a decision, indicator to the vendor / buyer
+        // that they will no longer recieve new chat message.
+        return app.polyglot.t('orderDetail.discussionTab.enterMessageNoMoreModPlaceholder');
+      }
+      return app.polyglot.t('chat.conversation.messageInputPlaceholder');
+    },
   },
   methods: {
     loadData (options = {}) {
@@ -138,7 +164,7 @@ export default {
         throw new Error('Please provide an orderID.');
       }
 
-      if (!options.model) {
+      if (!this.model) {
         throw new Error('Please provide an order / case model.');
       }
 
@@ -168,11 +194,6 @@ export default {
       this.listenTo(this.messages, 'update', this.onMessagesUpdate);
       this.listenTo(this.messages, 'error', this.onMessagesFetchError);
       this.fetchMessages();
-
-      this.listenTo(this.model, 'change:state', () => {
-        this.checkIfModCanChat();
-        this.setMessageInputPlaceholder();
-      });
 
       const socket = getSocket();
 
@@ -560,33 +581,9 @@ export default {
       this.typingIndicatorContent = this.getTypingIndicatorContent();
     },
 
-
-    checkIfModCanChat () {
-      if (this.moderator && this.moderator.id === app.profile.id &&
-        this.model.get('state') === 'RESOLVED') {
-        // If this is the moderator looking at the order and the mod has
-        // already made a decision, the mod cannot send any more chat messages.
-        this.convoFooter.addClass('preventModChat');
-      }
-    },
-
-    setMessageInputPlaceholder () {
-      if (this.moderator && this.moderator.id === app.profile.id) return;
-
-      if (this.model.get('state') === 'DECIDED' ||
-        this.model.get('state') === 'RESOLVED') {
-        // If the mod has made a decision, indicator to the vendor / buyer
-        // that they will no longer recieve new chat message.
-        this.$refs.inputMessage.placeholder =
-          app.polyglot.t('orderDetail.discussionTab.enterMessageNoMoreModPlaceholder');
-      }
-    },
-
     render () {
       this._convoMessagesWindow = null;
       this._btnSend = null;
-
-      this._convoFooter = null;
 
       if (this.convoMessages) this.ConvoMessages.remove();
       this.convoMessages = new ConvoMessages({
@@ -599,8 +596,6 @@ export default {
       $('.js-convoMessagesContainer').html(this.convoMessages.render().el);
 
       this.throttleScrollHandler();
-      this.checkIfModCanChat();
-      this.setMessageInputPlaceholder();
 
       return this;
     }

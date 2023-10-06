@@ -105,7 +105,7 @@ export default {
     loadData (options = {}) {
       this.baseInit(options);
 
-      if (!options.model) {
+      if (!this.model) {
         throw new Error('Please provide an OrderCompletion model.');
       }
 

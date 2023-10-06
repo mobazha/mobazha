@@ -102,6 +102,31 @@ export default {
     this.render();
   },
   computed: {
+    ob() {
+      const { paymentCoin } = this.model;
+      let templateData = {
+        ...this.templateHelpers,
+        id: this.model.id,
+        isCase: this.model.isCase,
+        paymentCoin,
+        ...this._model,
+      };
+
+      if (this.model.isCase) {
+        const { paymentCoinData } = this.model;
+        const { paymentAddress } = this;
+
+        templateData = {
+          ...templateData,
+          blockChainAddressUrl: paymentCoinData
+            ? paymentCoinData.getBlockChainAddressUrl(paymentAddress, app.serverConfig.testnet)
+            : false,
+          paymentAddress,
+        };
+      }
+
+      return templateData;
+    },
     progressBarState () {
       const orderState = this.model.get('state');
       const state = {

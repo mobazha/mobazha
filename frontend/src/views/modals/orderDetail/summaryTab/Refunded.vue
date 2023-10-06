@@ -75,6 +75,8 @@ export default {
       };
     },
     infoLine () {
+      const ob = this.ob;
+
       const divisibility = ob.currencyMod.getCoinDivisibility(ob.paymentCoin);
       const amount = ob.currencyMod.integerToDecimal(ob.amount, divisibility);
       const priceFrag = ob.currencyMod.pairedCurrency(
@@ -96,6 +98,8 @@ export default {
     },
 
     confirmationsText () {
+      const ob = this.ob;
+
       if (ob.confirmations < 10000) {
         return ob.polyT('orderDetail.summaryTab.payment.confirmationsCount', {
           smart_count: ob.confirmations,

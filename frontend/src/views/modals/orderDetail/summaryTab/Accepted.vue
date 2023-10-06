@@ -95,8 +95,6 @@ export default {
 
         fulfillInProgress: false,
         refundOrderInProgress: false,
-
-        refundConfirmOn: false,
       }
     };
   },

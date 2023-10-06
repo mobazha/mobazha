@@ -54,6 +54,7 @@ export default {
   },
   methods: {
     statesWidth (index) {
+      const ob = this.ob;
       let width = index === 0 || index === ob.states.length - 1 ?
         0.5 / (ob.states.length - 1) : 1 / (ob.states.length - 1);
       return width * 100;

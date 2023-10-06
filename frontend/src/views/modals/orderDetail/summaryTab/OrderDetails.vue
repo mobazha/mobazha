@@ -2,7 +2,7 @@
   <div class="orderDetails">
 
     <h2 class="tx4 margRTn">{{ ob.polyT('orderDetail.summaryTab.orderDetails.heading') }}</h2>
-    <span class="clrT2 tx5b">{{ moment(ob.order.timestamp).format('lll') }}</span>
+    <span class="clrT2 tx5b">{{ ob.moment(ob.order.timestamp).format('lll') }}</span>
     <div class="border clrBr padMd">
       <div class="flex gutterH clrT">
         <a :href="`#${`${ob.listing.vendorID.peerID}/store/${ob.listing.slug}`}`" class="listingThumbCol flexNoShrink" :style="ob.getAvatarBgImage(ob.listing.item.images[0])"></a>
@@ -84,7 +84,13 @@
                 <div class="flexRow gutterH row">
                   <div class="col6">
                     <div class="txB rowTn">{{ ob.polyT('orderDetail.summaryTab.orderDetails.moderatorHeading') }}</div>
-                    <ModFragment v-if="isModerated" :modInfo="modInfo" />
+                    <ModFragment v-if="ob.isModerated && modProfile"
+                      :modInfo="modInfo.options"
+                      :bb="function() {
+                        return {
+                          model: modInfo.model,
+                        };
+                      }" />
                     <template v-else> {{ ob.polyT('orderDetail.summaryTab.notApplicable') }}</template>
                   </div>
                   <div class="col6">
@@ -116,7 +122,7 @@
             <div class="col6">
               <div class="gutterVTn">
                 <div class="txB">{{ ob.polyT('orderDetail.summaryTab.orderDetails.memo') }}</div>
-                <div class="memo">{{ item.memo ? ob.parseEmojis(item.memo) : ob.polyT('orderDetail.summaryTab.notApplicable') }}</div>
+                <div class="memo" v-html="item.memo ? ob.parseEmojis(item.memo) : ob.polyT('orderDetail.summaryTab.notApplicable')"></div>
               </div>
             </div>
             <div class="col6">
@@ -201,6 +207,8 @@ export default {
     },
 
     title () {
+      const ob = this.ob;
+
       let title = this.listing.item.title;
 
       if (this.isCrypto) {
@@ -338,8 +346,10 @@ export default {
 
     modInfo () {
       return {
-        peerID: this.options.moderator.id,
-        ...(this.modProfile && this.modProfile.toJSON() || {}),
+        options: {
+          peerID: this.options.moderator.id,
+        },
+        model: this.modProfile,
       };
     }
   },
@@ -359,7 +369,6 @@ export default {
         options.moderator.getProfile()
           .done((modProfile) => {
             this.modProfile = modProfile;
-            if (this.moderatorVw) this.moderatorVw.setState({ ...modProfile.toJSON() });
           });
       }
 

@@ -91,6 +91,7 @@ export default {
   },
   data () {
     return {
+      moderator: undefined,
     };
   },
   created () {
@@ -128,7 +129,7 @@ export default {
       return templateData;
     },
     progressBarState () {
-      const orderState = this.model.get('state');
+      const orderState = this._model.state;
       const state = {
         states: [
           app.polyglot.t('orderDetail.summaryTab.orderDetails.progressBarStates.paid'),
@@ -278,10 +279,6 @@ export default {
       if (this.contract.get('orderOpen').payment.moderator) {
         checkValidParticipantObject(options.moderator, 'moderator');
       }
-
-      this.vendor = options.vendor;
-      this.buyer = options.buyer;
-      this.moderator = options.moderator;
 
       this.listenTo(this.model, 'change:state', (md, state) => {
         this.stateProgressBar.setState(this.progressBarState);

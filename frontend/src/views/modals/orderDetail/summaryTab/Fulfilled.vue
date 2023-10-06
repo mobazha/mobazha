@@ -21,7 +21,7 @@
               </div>
             </template>
             <div class="rowTn txB">{{ ob.noteFromLabel }}</div>
-            <div>{{ ob.note ? ob.parseEmojis(ob.note) : ob.polyT('orderDetail.summaryTab.notApplicable') }}</div>
+            <div v-html="`${ ob.note ? ob.parseEmojis(ob.note) : ob.polyT('orderDetail.summaryTab.notApplicable') }`"></div>
           </div>
         </div>
       </template>
@@ -43,7 +43,7 @@
               <div class="row">{{ digitalDelivery.password || ob.polyT('orderDetail.summaryTab.notApplicable') }}</div>
             </template>
             <div class="rowTn txB">{{ ob.noteFromLabel }}</div>
-            <div>{{ ob.note ? ob.parseEmojis(ob.note) : ob.polyT('orderDetail.summaryTab.notApplicable') }}</div>
+            <div v-html="`${ ob.note ? ob.parseEmojis(ob.note) : ob.polyT('orderDetail.summaryTab.notApplicable') }`"></div>
           </div>
         </div>
       </template>
@@ -53,7 +53,7 @@
           <div class="statusIconCol clrT"><span class="clrBr ion-ios-body"></span></div>
           <div class="flexExpand tx5">
             <div class="rowTn txB">{{ ob.noteFromLabel }}</div>
-            <div>{{ ob.note ? ob.parseEmojis(ob.note) : ob.polyT('orderDetail.summaryTab.notApplicable') }}</div>
+            <div v-html="`${ ob.note ? ob.parseEmojis(ob.note) : ob.polyT('orderDetail.summaryTab.notApplicable') }`"></div>
           </div>
         </div>
       </template>
@@ -77,7 +77,7 @@
               <a class="hide js-transactionIDCopiedToClipboard">{{ ob.polyT('copiedToClipboard') }}</a>
             </div>
             <div class="rowTn txB">{{ ob.noteFromLabel }}</div>
-            <div>{{ ob.note ? ob.parseEmojis(ob.note) : ob.polyT('orderDetail.summaryTab.notApplicable') }}</div>
+            <div v-html="`${ ob.note ? ob.parseEmojis(ob.note) : ob.polyT('orderDetail.summaryTab.notApplicable') }`"></div>
           </div>
         </div>
       </template>
@@ -103,6 +103,9 @@ export default {
   },
   data () {
     return {
+      dataObject: {
+        cryptocurrencyDelivery: undefined,
+      },
       _state: {
         contractType: 'PHYSICAL_GOOD',
         isLocalPickup: false,
@@ -122,6 +125,9 @@ export default {
   },
   computed: {
     ob () {
+      const cd = this.dataObject.cryptocurrencyDelivery;
+      const transactionID = cd && cd[0] && cd[0].transactionID || '';
+
       return {
         ...this.templateHelpers,
         ...this._state,

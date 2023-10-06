@@ -8,9 +8,9 @@
     <div class="border clrBr padMd">
       <div class="flexVCent gutterH clrT">
         <!-- // if ob.amountShort.gt(0), it is partial payment, otherwise full payment -->
-        <div :class="`statusIconCol ${amountShort.gt(0) ? 'clrTErr' : 'clrTEm'}`">
+        <div :class="`statusIconCol ${ob.amountShort.gt(0) ? 'clrTErr' : 'clrTEm'}`">
           <template v-if="!ob.isCrypto">
-            <span :class="`clrBr ${amountShort.gt(0) ? 'ion-ios-close-empty' : 'ion-ios-checkmark-empty'}`"></span>
+            <span :class="`clrBr ${ob.amountShort.gt(0) ? 'ion-ios-close-empty' : 'ion-ios-checkmark-empty'}`"></span>
           </template>
 
           <template v-else>
@@ -161,6 +161,8 @@ export default {
       };
     },
     heading () {
+      const ob = this.ob;
+
       if (ob.paymentNumber > 1) {
         return ob.polyT('orderDetail.summaryTab.payment.paymentHeading', {
           paymentNumber: ob.paymentNumber,
@@ -170,6 +172,8 @@ export default {
       }
     },
     infoLine () {
+      const ob = this.ob;
+
       const priceFrag = ob.currencyMod.pairedCurrency(
         integerToDecimal(model.get('value'), _state.paymentCoinDivis),
         ob.paymentCoin,
@@ -191,6 +195,8 @@ export default {
       return infoLine;
     },
     confirmationsText () {
+      const ob = this.ob;
+
       let confirmationsText;
 
       if (this.confirmations < 10000) {
@@ -205,6 +211,8 @@ export default {
       return confirmationsText;
     },
     subText () {
+      const ob = this.ob;
+
       let subText = ob.polyT('orderDetail.summaryTab.payment.paidInFull');
       let roundedAmountShort = ob.amountShort;
 
@@ -234,7 +242,6 @@ export default {
   },
   methods: {
     abbrNum,
-    moment,
 
     loadData (options = {}) {
       this.baseInit({

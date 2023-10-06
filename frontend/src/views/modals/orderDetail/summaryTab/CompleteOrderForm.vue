@@ -12,7 +12,7 @@
           </div>
           <FormError v-if="ob.errors.review" :errors="ob.errors.review" />
           <textarea rows="8" name="review" class="clrBr clrP clrSh2 rowMd" id="completeOrderReview"
-            placeholder="Write your review here…" :maxlength="ob.constraints.maxReviewCharacters" v-model="rating.review" />
+            placeholder="Write your review here…" :maxlength="ob.constraints.maxReviewCharacters" v-model="formData.review" />
           <div class="flexVCent gutterH">
             <ProcessingButton
               :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph js-completeOrder ${ob.isCompleting ? 'processing' : ''}`"
@@ -77,9 +77,13 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
+      formData: {
+        review: '',
+      }
     };
   },
   created () {
@@ -126,19 +130,17 @@ export default {
       }
 
       this.listenTo(orderEvents, 'completingOrder', () => {
-        this.getCachedEl('.js-completeOrder').addClass('processing');
+        $('.js-completeOrder').addClass('processing');
       });
 
       this.listenTo(orderEvents, 'completeOrderComplete completeOrderFail', () => {
-        this.getCachedEl('.js-completeOrder').removeClass('processing');
+        $('.js-completeOrder').removeClass('processing');
       });
     },
 
     onClickCompleteOrder () {
-      const formData = this.getFormData();
-
       const data = {
-        ...formData,
+        ...this.formData,
         anonymous: !formData.anonymous,
         // If a rating is not set, the RatingStrip view will return 0. We'll
         // send undefined in that case since it gives us the error message we

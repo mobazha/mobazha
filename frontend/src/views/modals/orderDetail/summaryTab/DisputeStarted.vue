@@ -2,7 +2,7 @@
   <div class="disputeStartedEvent rowLg">
     <h2 class="tx4 margRTn">{{ ob.polyT('orderDetail.summaryTab.disputeStarted.heading') }}</h2>
     <template v-if="ob.timestamp">
-      <span class="clrT2 tx5b">{{ moment(ob.timestamp).format('lll') }}</span>
+      <span class="clrT2 tx5b">{{ ob.moment(ob.timestamp).format('lll') }}</span>
     </template>
     <div class="border clrBr padMd">
       <div class="flex gutterH clrT">
@@ -56,6 +56,8 @@ export default {
   },
   computed: {
     introLine () {
+      const ob = this.ob;
+
       return ob.disputerName ?
         ob.polyT('orderDetail.summaryTab.disputeStarted.partyIsDisputing', { name: ob.disputerName }) :
         ob.polyT('orderDetail.summaryTab.disputeStarted.genericIsDisputed');
@@ -64,12 +66,11 @@ export default {
       return {
         ...this.templateHelpers,
         ...this._state,
+        moment,
       };
     },
   },
   methods: {
-    moment,
-
     loadData (options = {}) {
       this.baseInit(options);
 

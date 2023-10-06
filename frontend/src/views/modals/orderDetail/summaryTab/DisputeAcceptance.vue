@@ -30,8 +30,12 @@ export default {
   },
   data () {
     return {
-      introLine: '',
-      subText: '',
+      _state: {
+        closerName: '',
+        closerAvatarHashes: {},
+        buyerViewing: false,
+        vendorProcessingError: false,
+      }
     };
   },
   created () {
@@ -51,6 +55,8 @@ export default {
     },
 
     introLine () {
+      const ob = this.ob;
+
       if (this.closerName) {
         return ob.polyT('orderDetail.summaryTab.disputeAcceptance.userAcceptedPayout', { name: this.closerName, });
       } else {

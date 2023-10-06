@@ -75,7 +75,7 @@
             </div>
             <div class="contentBox row pad clrP clrBr js-inactiveWarning" v-show="!ob.vendor">
               <span class="tx5"
-                >{{ ob.parseEmojis('🔒') }} {{ ob.polyT('userPage.store.inactive') }}
+                ><template v-html="ob.parseEmojis('🔒')"/> {{ ob.polyT('userPage.store.inactive') }}
                 <button class="btnTxtOnly txU txUnb clrT2" @click="onClickActivateStore">${ob.polyT('userPage.store.inactiveLink')}</button>
               </span>
             </div>

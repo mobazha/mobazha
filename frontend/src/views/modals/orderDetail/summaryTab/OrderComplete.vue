@@ -6,7 +6,7 @@
       <div class="flex gutterHLg">
         <div class="col9">
           <div class="txB tx5 flexNoShrink rowTn">{{ ob.polyT('orderDetail.summaryTab.orderComplete.reviewLabel', { name: ob.buyerName }) }}</div>
-          <div class="tx5">{{ ob.parseEmojis(ob.review) }}</div>
+          <div class="tx5" v-html="ob.parseEmojis(ob.review)"></div>
         </div>
         <div class="col3 ratingsCol">
           <div class="row">
@@ -51,6 +51,9 @@ export default {
   },
   data () {
     return {
+      dataObject: {
+        timestamp: undefined,
+      }
     };
   },
   created () {
@@ -82,7 +85,6 @@ export default {
         throw new Error('Please provide a buyerOrderCompletion data object.');
       }
 
-      this.dataObject = options.dataObject;
       this.ratingStrips = {};
     },
 

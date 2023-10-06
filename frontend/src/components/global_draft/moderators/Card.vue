@@ -40,7 +40,7 @@
                     <div class="flexNoShrink modFee">
                       {{ ob.polyT(`moderatorCard.${ob.moderatorInfo.fee.feeType}`, { amount, percentage: ob.moderatorInfo.fee.percentage }) }}
                     </div>
-                    <div>{{ ob.parseEmojis('📍') }}{{ ob.location || ob.polyT('userPage.noLocation') }}</div>
+                    <div v-html="`${ ob.parseEmojis('📍') }${ ob.location || ob.polyT('userPage.noLocation') }`"></div>
                     <div class="flexExpand flexNoShrink verifiedWrapper js-verifiedMod"></div>
                   </template>
 

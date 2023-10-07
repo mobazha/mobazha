@@ -88,6 +88,16 @@ export default {
   },
   data () {
     return {
+      _state: {
+        show: false,
+        fetchingFee: false,
+        fetchFailed: false,
+        fetchError: '',
+        fee: false,
+        coinType: '',
+        displayCurrency: app.settings.get('localCurrency') || 'USD',
+        btnSendText: app.polyglot.t('wallet.spendConfirmBox.btnConfirmSend'),
+      }
     };
   },
   created () {

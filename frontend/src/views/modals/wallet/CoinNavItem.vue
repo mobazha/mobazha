@@ -40,6 +40,14 @@ export default {
       immediate: true,
     },
   },
+  data() {
+    return {
+      _state: {
+        active: false,
+        displayCur: (app && app.settings && app.settings.get('localCurrency')) || 'USD',
+      }
+    };
+  },
   created() {
     this.initEventChain();
   },

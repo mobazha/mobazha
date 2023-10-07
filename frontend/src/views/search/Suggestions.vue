@@ -21,6 +21,9 @@ export default {
   },
   data () {
     return {
+      _state: {
+        suggestions: [],
+      }
     };
   },
   created () {

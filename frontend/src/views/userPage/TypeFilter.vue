@@ -49,7 +49,14 @@ export default {
     },
   },
   data() {
-    return {};
+    return {
+      _state: {
+        types: [],
+        selected: 'all',
+        expanded: false,
+        maxInitiallyVisibleTypes: 6,
+      }
+    };
   },
   created() {
     this.initEventChain();

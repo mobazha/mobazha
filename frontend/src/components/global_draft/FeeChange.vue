@@ -19,7 +19,13 @@ export default {
     },
   },
   data() {
-    return {};
+    return {
+      _state: {
+        feeLevel: app.localSettings.get('defaultTransactionFee'),
+        feeLevelClass: 'txB',
+        changeLinkClass: 'btnAsLink clrT2',
+      }
+    };
   },
   created() {
     this.initEventChain();

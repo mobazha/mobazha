@@ -71,7 +71,14 @@ export default {
     },
   },
   data() {
-    return {};
+    return {
+      _state: {
+        categories: [],
+        selected: 'all',
+        expanded: false,
+        maxInitiallyVisibleCats: 6,
+      }
+    };
   },
   created() {
     this.initEventChain();

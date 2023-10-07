@@ -28,6 +28,12 @@ export default {
   },
   data() {
     return {
+      _state: {
+        following: followedByYou(options.targetID),
+        isFollowing: false,
+        stripClasses: 'btnStrip clrSh3',
+        btnClasses: 'clrP clrBr',
+      }
     };
   },
   created() {

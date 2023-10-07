@@ -54,11 +54,35 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        className: 'moderatorsList',
+        apiPath: 'fetchprofiles',
+        async: true,
+        useCache: true,
+        moderatorIDs: [],
+        excludeIDs: [],
+        method: 'POST',
+        include: '',
+        purchase: false,
+        singleSelect: false,
+        radioStyle: false,
+        controlsOnInvalid: false,
+        cardState: 'unselected',
+        notSelected: 'unselected',
+        showLoadBtn: false,
+        showSpinner: true,
+      },
     },
   },
   data() {
-    return {};
+    return {
+      _state: {
+        preferredCurs: [],
+        showOnlyCur: '',
+        showVerifiedOnly: false,
+        loading: false,
+      }
+    };
   },
   created() {
     this.initEventChain();

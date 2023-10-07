@@ -65,6 +65,15 @@ export default {
       immediate: true,
     },
   },
+  data() {
+    return {
+      cryptoCur: '',
+      displayCur: (app && app.settings && app.settings.get('localCurrency')) || 'USD',
+      confirmed: undefined,
+      unconfirmed: undefined,
+      transactionCount: undefined,
+    }
+  },
   created() {
     this.initEventChain();
   },

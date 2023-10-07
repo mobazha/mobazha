@@ -38,7 +38,20 @@ export default {
     },
   },
   data() {
-    return {};
+    return {
+      _state: {
+        isFetching: false,
+        fetchFailed: false,
+        fetchError: '',
+        coinType: '',
+        coinDivisibility: 100000000,
+        contentClass: 'txB flexVCent gutterHSm',
+        contentFailedClass: '',
+        spinnerClass: 'spinnerSm',
+        tipClass: 'clrT tx5 txCtr',
+        localCur: app.settings.get('localCurrency'),
+      }
+    };
   },
   created() {
     this.initEventChain();

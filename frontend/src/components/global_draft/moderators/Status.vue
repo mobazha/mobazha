@@ -18,7 +18,18 @@ export default {
     },
   },
   data() {
-    return {};
+    return {
+      _state: {
+        hidden: true,
+        showSpinner: true,
+        showLoadBtn: false,
+        loaded: 0,
+        toLoad: 0,
+        total: 0,
+        mode: 'loaded',
+        loading: false,
+      }
+    };
   },
   created() {
     this.initEventChain();

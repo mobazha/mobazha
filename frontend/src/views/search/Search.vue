@@ -152,7 +152,12 @@ export default {
   },
   data () {
     return {
-      tab: 'home',
+      _state: {
+        fetching: false,
+        tab: 'home',
+        xhr: null,
+      },
+
       _search: {},
     };
   },

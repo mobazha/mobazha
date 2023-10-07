@@ -35,7 +35,16 @@ export default {
   },
   data() {
     return {
-      _options: {},
+      _options: {
+        disabledMsg: '',
+      },
+      _state: {
+        controlType: 'checkbox',
+        currencies: [],
+        activeCurs: [],
+        disabledCurs,
+        sort: false,
+      }
     };
   },
   created() {

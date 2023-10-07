@@ -64,6 +64,10 @@ export default {
   data () {
     return {
       cryptoTitle: '',
+
+      _state: {
+        loading: false,
+      }
     };
   },
   created () {

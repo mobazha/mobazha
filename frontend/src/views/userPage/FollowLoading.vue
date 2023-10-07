@@ -29,7 +29,16 @@ export default {
     },
   },
   data() {
-    return {};
+    return {
+      _state: {
+        isFetching: false,
+        noResults: false,
+        noResultsMsg: '',
+        fetchFailed: false,
+        fetchErrorTitle: '',
+        fetchErrorMsg: '',
+      }
+    };
   },
   created() {
     this.initEventChain();

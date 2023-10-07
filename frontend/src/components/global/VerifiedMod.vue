@@ -26,7 +26,23 @@ export default {
     },
   },
   data() {
-    return {};
+    return {
+      _state: {
+        verified: false,
+        text: '',
+        textClass: 'txB tx5b',
+        textWrapperClass: 'flexVCent gutterHTn',
+        infoIconClass: 'ion-information-circled clrT2',
+        tipTitle: '',
+        tipTitleClass: 'tx4 txB',
+        titleWrapperClass: 'flexCent rowSm gutterHTn',
+        tipBody: '',
+        tipBodyClass: '',
+        arrowClass: 'arrowBoxCenteredTop',
+        badgeUrl: '',
+        wrapInfoIcon: false,
+      }
+    };
   },
   created() {
     this.initEventChain();

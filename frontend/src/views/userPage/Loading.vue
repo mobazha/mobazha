@@ -93,7 +93,14 @@ export default {
     },
   },
   data() {
-    return {};
+    return {
+      _state: {
+        userName: '',
+        contentText: '',
+        isProcessing: false,
+        ownAvatarHashes: (app.profile && app.profile.get('avatarHashes').toJSON()) || undefined,
+      }
+    };
   },
   created() {
     this.initEventChain();

@@ -97,12 +97,18 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        type: '',
+      },
     },
     bb: Function,
   },
   data() {
     return {
+      _state: {
+        isFetching: false,
+        fetchError: '',
+      },
       transactionsPerPage: 20,
 
       filterParams: {},

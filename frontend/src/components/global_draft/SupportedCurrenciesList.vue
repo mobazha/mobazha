@@ -22,7 +22,13 @@ export default {
     },
   },
   data() {
-    return {};
+    return {
+      _state: {
+        currencies: [],
+        processedCurs: [],
+        sort: true,
+      }
+    };
   },
   created() {
     this.initEventChain();

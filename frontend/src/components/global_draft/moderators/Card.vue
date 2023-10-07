@@ -109,7 +109,12 @@ export default {
     },
   },
   data() {
-    return {};
+    return {
+      _state: {
+        selectedState: 'unselected',
+        preferredCurs: [],
+      }
+    };
   },
   created() {
     this.initEventChain();

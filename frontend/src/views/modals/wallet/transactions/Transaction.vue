@@ -99,7 +99,16 @@ export default {
     bb: Function,
   },
   data() {
-    return {};
+    return {
+      _state: {
+        retryConfirmOn: false,
+        retryInProgress: false,
+        copiedIndicatorOn: false,
+        fetchingEstimatedFee: false,
+        fetchFeeError: '',
+        fetchFeeFailed: false,
+      },
+    };
   },
   created() {
     this.initEventChain();

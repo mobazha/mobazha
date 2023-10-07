@@ -31,6 +31,11 @@ export default {
   data() {
     return {
       usersPerPage: 12,
+
+      _state: {
+        followType: 'followers',
+        fetchCollection: true,
+      }
     };
   },
   created() {

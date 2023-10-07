@@ -42,7 +42,11 @@ export default {
     },
   },
   data() {
-    return {};
+    return {
+      _state: {
+        isFetching: true,
+      }
+    };
   },
   created() {
     this.initEventChain();

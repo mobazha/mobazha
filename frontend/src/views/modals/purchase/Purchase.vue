@@ -401,7 +401,10 @@ export default {
   },
   data () {
     return {
-      phase: 'pay',
+      _state: {
+        phase: 'pay',
+      },
+
       cart: {},
       vendor: {},
       order: new Order({}, {}),

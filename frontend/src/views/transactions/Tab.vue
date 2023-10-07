@@ -1,17 +1,18 @@
 <template>
-  <div :class="`${type} tx5`">
-    <h2 class="tabHeading txUnb">{{ ob.polyT(`transactions.${type}.heading`) }}</h2>
+  <div :class="`${ob.type} tx5`">
+    <h2 class="tabHeading txUnb">{{ ob.polyT(`transactions.${ob.type}.heading`) }}</h2>
     <div class="searchWrapper rowMd">
       <input
         type="text"
         class="ctrl clrP clrBr clrSh2"
-        @keyup="onKeyUpSearch(filter.search)"
-        :placeholder="ob.polyT(`transactions.placeholderSearch${capitalize(type)}`)"
-        v-model="filter.search"
+        @keyup="onKeyUpSearch(ob.filter.search)"
+        :placeholder="ob.polyT(`transactions.placeholderSearch${ob.capitalize(ob.type)}`)"
       />
     </div>
 
-    <Filters :filters="setCheckedFilters(filterConfig, filter.states)" />
+    <Filters
+      :filters="setCheckedFilters(filterConfig, filter.states)"
+      @changeFilter="onChangeFilter"/>
 
     <div class="flexVCent row gutterH">
       <div class="flexNoShrink gutterHSm js-queryTotalWrapper" v-show="collection.length">
@@ -20,10 +21,10 @@
       </div>
       <div class="tx6 flexVCent">
         <label class="clrT2 marginLAuto margRSm">{{ ob.polyT('transactions.sort.label') }}</label>
-        <select class="tx6 select2Small js-sortBySelect" @change="onChangeSortBy(filter.sortBy)" style="width: 150px">
-          <option value="UNREAD" :selected="filter.sortBy === 'UNREAD'">{{ ob.polyT('transactions.sort.unread') }}</option>
-          <option value="DATE_ASC" :selected="filter.sortBy === 'DATE_ASC'">{{ ob.polyT('transactions.sort.dateAsc') }}</option>
-          <option value="DATE_DESC" :selected="filter.sortBy === 'DATE_DESC'">{{ ob.polyT('transactions.sort.dateDesc') }}</option>
+        <select class="tx6 select2Small js-sortBySelect" @change="onChangeSortBy(ob.filter.sortBy)" style="width: 150px">
+          <option value="UNREAD" :selected="ob.filter.sortBy === 'UNREAD'">{{ ob.polyT('transactions.sort.unread') }}</option>
+          <option value="DATE_ASC" :selected="ob.filter.sortBy === 'DATE_ASC'">{{ ob.polyT('transactions.sort.dateAsc') }}</option>
+          <option value="DATE_DESC" :selected="ob.filter.sortBy === 'DATE_DESC'">{{ ob.polyT('transactions.sort.dateDesc') }}</option>
         </select>
         <div class="select2Small js-sortBySelectDropdownContainer"></div>
       </div>
@@ -61,9 +62,14 @@ export default {
   },
   data() {
     return {
-      _options: {},
-      showTotalWrapper: false,
+      defaultFilter: {
+        search: '',
+        sortBy: 'UNREAD',
+        states: [],
+      },
+
       filter: {},
+      showTotalWrapper: false,
     };
   },
   created() {
@@ -81,11 +87,20 @@ export default {
     clearTimeout(this.searchKeyUpTimer);
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+          type: this.type,
+          filter: this.filter,
+          currentFilterIsDefault: this.currentFilterIsDefault(),
+          capitalize,
+      };
+    },
     tableOptions() {
       return {
         type: this.type,
         filterParams: this.filter,
-        getProfiles: this._options.getProfiles,
+        getProfiles: this.options.getProfiles,
       };
     },
     queryTotalLine() {
@@ -98,7 +113,6 @@ export default {
   watch: {
   },
   methods: {
-    capitalize,
     loadData(options = {}) {
       const opts = {
         defaultFilter: {
@@ -127,10 +141,9 @@ export default {
         throw new Error('Please provide a filter config object.');
       }
 
-      this._options = opts || {};
       this.type = opts.type;
       this.filterConfig = opts.filterConfig;
-      this._filter = { ...opts.initialFilter };
+      this.filter = { ...opts.initialFilter };
     },
 
     events() {
@@ -143,18 +156,16 @@ export default {
       this.$emit('clickRow', orderID, type);
     },
 
-    onChangeFilter() {
-      let states = [];
-      $('.filter input')
-        .filter(':checked')
-        .each((index, checkbox) => {
-          states = states.concat($(checkbox).data('state'));
+    onChangeFilter(filter, checked) {
+      if (checked) {
+        filter.targetState.forEach((targetState) => {
+          if (this.filter.states.indexOf(targetState) == -1) {
+            this.filter.states.push(targetState);
+          }
         });
-
-      this.filter = {
-        ...this.filter,
-        states,
-      };
+      } else {
+        this.filter.states = this.filter.states.filter((item) => { return filter.targetState.indexOf(item) == -1; });
+      }
     },
 
     onKeyUpSearch(val) {
@@ -177,7 +188,7 @@ export default {
     },
 
     onClickResetQuery() {
-      this.filter = { ...this._options.defaultFilter };
+      this.filter = { ...this.defaultFilter };
     },
 
     /*
@@ -205,7 +216,7 @@ export default {
     },
 
     currentFilterIsDefault() {
-      return _.isEqual(this._options.defaultFilter, _.omit(this.filter, 'orderID'));
+      return _.isEqual(this.defaultFilter, _.omit(this.filter, 'orderID'));
     },
 
     remove() {

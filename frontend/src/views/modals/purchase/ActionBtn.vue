@@ -1,13 +1,15 @@
 <template>
-  <div class="actionBtn">
+  <div class="actionBtn" @click="documentClick">
     <div class="posR">
       <template v-if="ob.phase === 'pay' || ob.phase === 'processing'">
         <ProcessingButton
           :className="`btn width100 clrBAttGrad clrBrDec1 clrTOnEmph ${ob.phase} ${outdatedHash ? 'row' : ''}`"
           :disabled="initPay"
-          @click="clickPayBtn"
+          @click.stop="clickPayBtn"
           :btnText="ob.polyT('purchase.pay')" />
-        <div v-if="showOutdatedHashErr" class="txCtr rowSm">${ob.purchaseErrT({ tip: errTip })}</div>
+        <div v-if="showOutdatedHashErr" class="txCtr rowSm">
+          <PurchaseError :tip="errTip" />
+        </div>
       </template>
       <template v-else-if="ob.phase === 'pending'">
         <div class="btn width100 clrBAttGrad clrBrDec1 clrTOnEmph pendingBtn">
@@ -20,7 +22,7 @@
           {{ ob.polyT('purchase.close') }}
         </button>
       </template>
-      <template v-if="confirmOpen">
+      <template v-if="ob.confirmOpen">
         <div id="confirmPay" class="confirmBox arrowBoxCenteredTop clrBr clrP clrT clrSh1 js-confirmPay">
           <div class="flexColRows gutterVSm padLg">
             <h3>
@@ -62,36 +64,58 @@
 
 <script>
 import $ from 'jquery';
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
 import Listing from '../../../../backbone/models/listing/Listing';
 
+import PurchaseError from '@/views/modals/listingDetail/PurchaseError.vue'
+
 export default {
+  components: {
+    PurchaseError,
+  },
   props: {
+    options: {
+      type: Object,
+      default: {},
+	  },
+    bb: Function,
   },
   data () {
     return {
-      phase: 'pay',
-      confirmOpen: false,
-      outdatedHash: false,
+      _state: {
+        phase: 'pay',
+        confirmOpen: false,
+        outdatedHash: false,
+      }
     };
   },
+  created () {
+    this.loadData(this.options);
+  },
   mounted () {
-    loadData(props);
-
-    render();
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+          ...this._state,
+          listing: this.options.listing,
+          purchaseErrT,
+      };
+    },
     showOutdatedHashErr () {
-      return ob.phase === 'pay' && this.outdatedHash;
+      const ob = this.ob;
+      return ob.phase === 'pay' && ob.outdatedHash;
     },
 
     initPay () {
-      return (options.listing.shippingOptions && options.listing.shippingOptions.length) || showOutdatedHashErr;
+      const ob = this.ob;
+      return (ob.listing.shippingOptions && ob.listing.shippingOptions.length) || this.showOutdatedHashErr;
     },
 
     errTip () {
+      const ob = this.ob;
       return ob.polyT('purchase.errors.outdatedHash', {
-        eloadLink: '<a class="" @click="clickReloadOutdated" >' + `${ob.polyT('purchase.errors.reloadOutdatedHash')}</a>`,
+        reloadLink: '<a class="" @click="clickReloadOutdated" >' + `${ob.polyT('purchase.errors.reloadOutdatedHash')}</a>`,
       });
     }
   },
@@ -100,22 +124,28 @@ export default {
       if (!options.listing || !(options.listing instanceof Listing)) {
         throw new Error('Please provide a listing model.');
       }
-      this.baseInit(options);
+      const opts = {
+        ...options,
+        initialState: {
+          phase: 'pay',
+          confirmOpen: false,
+          outdatedHash: false,
+          ...options.initialState || {},
+        },
+      };
 
-      this.boundOnDocClick = this.documentClick.bind(this);
-      $(document).on('click', this.boundOnDocClick);
+      this.baseInit(opts);
     },
 
     documentClick (e) {
-      if (this.confirmOpen &&
-        !($.contains(this.getCachedEl('.js-confirmPay')[0], e.target))) {
-        this.confirmOpen = false;
+      if (this.getState().confirmOpen &&
+        !($.contains($('.js-confirmPay')[0], e.target))) {
+          this.setState({ confirmOpen: false });
       }
     },
 
     clickPayBtn (e) {
-      e.stopPropagation();
-      this.confirmOpen = true;
+      this.setState({ confirmOpen: true });
     },
 
     clickConfirmBtn () {
@@ -123,7 +153,7 @@ export default {
     },
 
     closeConfirmPay () {
-      this.confirmOpen = false;
+      this.setState({ confirmOpen: false });
     },
 
     clickCloseBtn () {
@@ -133,29 +163,6 @@ export default {
     clickReloadOutdated () {
       this.$emit('reloadOutdated');
     },
-
-    remove () {
-      $(document).off('click', this.boundOnDocClick);
-    },
-
-    render () {
-      const loadPurchasErrTemplIfNeeded = (tPath, func) => {
-        if (this.outdatedHash) return loadTemplate(tPath, func);
-        func(null);
-        return undefined;
-      };
-
-      loadPurchasErrTemplIfNeeded('modals/listingDetail/purchaseError.html', purchaseErrT => {
-        loadTemplate('modals/purchase/actionBtn.html', t => {
-          this.$el.html(t({
-            purchaseErrT,
-          }));
-        });
-      });
-
-      return this;
-    }
-
   }
 }
 </script>

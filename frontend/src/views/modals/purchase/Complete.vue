@@ -10,14 +10,11 @@
             </div>
           </div>
           <h4>{{ ob.polyT('purchase.completeSection.paymentSent') }}</h4>
-          <p>{{
-            ob.polyT('purchase.completeSection.progressMessage', {
-              link: `<a href="#transactions/purchases?orderID=${orderID}">${ob.polyT('purchase.completeSection.purchases')}</a>`
-            })
-          }}
-          </p>
+          <p v-html='ob.polyT("purchase.completeSection.progressMessage", {
+              link: `<a href="#transactions/purchases?orderID=${orderID}">${ob.polyT("purchase.completeSection.purchases")}</a>`
+            })'></p>
           <p class="tx5b clrT2">
-            {{ ob.polyT('purchase.completeSection.estimatedProcessing', { time: processingTime }) }}
+            {{ ob.polyT('purchase.completeSection.estimatedProcessing', { time: ob.processingTime }) }}
           </p>
         </div>
         <div class="col2"></div>
@@ -50,28 +47,27 @@
       </div>
       <h5>{{ ob.polyT('purchase.completeSection.vendorMessage') }}</h5>
       <div class="clrBr clrP flex gutterHSm message js-message">
-        <div class="avatar clrBr2 clrSh1 disc" :style="ob.getAvatarBgImage(ownProfile.avatarHashes)"></div>
+        <div class="avatar clrBr2 clrSh1 disc" :style="ob.getAvatarBgImage(ob.ownProfile.avatarHashes)"></div>
         <div class="flexExpand">
           <textarea
-            id="messageInput"
-            @keydown="keyDownMessageInput"
+            @keydown.enter.exact.prevent="keyDownMessageInput"
             class="clrP tx5"
             :placeholder="ob.polyT('purchase.completeSection.vendorMessagePlaceholder')"
-            :maxlength="messageLength"
-            rows="5"></textarea>
+            :maxlength="ob.maxMessageLength"
+            rows="5"
+            v-model="messageInput"
+            ></textarea>
         </div>
       </div>
       <div class="flex gutterH">
         <div class="flexExpand tx5 clrTEm">
-          <span class="hide js-messageSent">{{
-            ob.polyT('purchase.completeSection.vendorMessageSent', {
-              name: options.vendor?.name,
-              orderLink: `<a class="txU" href="#transactions/purchases?orderID=${orderID}">${ob.polyT('purchase.completeSection.vendorMessageLink')}</a>`,
-            })
-          }}
+          <span class="js-messageSent" v-show="messageSentShow" v-html='ob.polyT("purchase.completeSection.vendorMessageSent", {
+              name: ob.vendorName,
+              orderLink: `<a class="txU" href="#transactions/purchases?orderID=${orderID}">${ob.polyT("purchase.completeSection.vendorMessageLink")}</a>`,
+            })'>
           </span>
         </div>
-        <button class="btn floR clrP clrBr clrSh2  disabled" @click="sendMessageInput">{{ ob.polyT('purchase.completeSection.send') }}</button>
+        <button :class="`btn floR clrP clrBr clrSh2 js-send ${disabledSend? 'disabled' : ''}`" @click="sendMessageInput">{{ ob.polyT('purchase.completeSection.send') }}</button>
       </div>
     </div>
 
@@ -85,27 +81,38 @@ import Listing from '../../../../backbone/models/listing/Listing';
 
 export default {
   props: {
+    options: {
+      type: Object,
+      default: {},
+	  },
   },
   data () {
     return {
-      options: '',
-      orderID: '',
       shareURL: 'https://mobazha.org',
+      messageInput: '',
+
+      disabledSend: false,
+      messageSentShow: false,
     };
   },
   created () {
     this.initEventChain();
 
-    loadData(this.options);
+    this.loadData(this.options);
   },
   mounted () {
   },
   computed: {
-    ownProfile () {
-      return app.profile.toJSON();
-    },
-    maxMessageLength () {
-      return ChatMessage.max.messageLength;
+    ob () {
+      return {
+        ...this.templateHelpers,
+        displayCurrency: app.settings.get('localCurrency'),
+        processingTime: this.processingTime,
+        maxMessageLength: ChatMessage.max.messageLength,
+        ownProfile: app.profile.toJSON(),
+        orderID: this.orderID,
+        vendorName: this.options.vendor.name,
+      };
     },
   },
   methods: {
@@ -125,12 +132,6 @@ export default {
       this.vendorPeerID = this.options.listing.get('vendorID').peerID;
     },
 
-    events () {
-      return {
-        'click .js-goToListing': 'close',
-      };
-    },
-
     sendMessage (msg) {
       if (!msg) {
         throw new Error('Please provide a message to send.');
@@ -146,8 +147,8 @@ export default {
       let messageSent = true;
 
       if (save) {
-        this.getCachedEl('.js-send').addClass('disabled');
-        this.getCachedEl('.js-messageSent').removeClass('hide');
+        this.disabledSend = true;
+        this.messageSentShow = true;
       } else {
         // Developer error - this shouldn't happen.
         console.error('There was an error saving the chat message.');
@@ -159,21 +160,18 @@ export default {
     },
 
     sendMessageInput () {
-      const $messageInput = this.getCachedEl('#messageInput');
-      const message = $messageInput.val().trim();
+      const message = this.messageInput.trim();
       if (message) this.sendMessage(message);
-      $messageInput.val('');
+      this.messageInput = ''
     },
 
-    keyDownMessageInput (e) {
-      this.getCachedEl('.js-send').toggleClass('disabled', !e.target.value);
-      this.getCachedEl('.js-messageSent').addClass('hide');
-
+    keyDownMessageInput () {
       // if the key pressed is not enter, do nothing
-      if (e.shiftKey || e.which !== 13) return;
-      e.preventDefault();
+
+      this.disabledSend = !this.messageInput;
+      this.messageSentShow = false;
+
       this.sendMessageInput();
-      e.preventDefault();
     },
 
   }

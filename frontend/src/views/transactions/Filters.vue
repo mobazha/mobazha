@@ -1,11 +1,16 @@
 <template>
-  <div :class="`filters rowHg`">
+  <div :class="`filters rowHg ${ob.className}`">
     <template v-for="(row, i) in rows" :key="i">
       <div class="flex gutterH gutterV">
         <div class="col3" v-for="(filter, j) in row" :key="j">
           <div :class="`filter clrP clrBr clrSh2 ${filter.className}`">
-            <input type="checkbox" :id="filter.id" :checked="filter.checked"
-              :data-state="JSON.stringify(filter.targetState)" v-bind="filter.attrs">
+            <input type="checkbox"
+              :id="filter.id"
+              :checked="filter.checked"
+              v-bind="filter.attrs"
+              v-model="checkResult[`${i}_${j}`]"
+              @change="onChangeFilter(filter, checkResult[`${i}_${j}`])"
+              >
             <label class="tx5b" :for="filter.id">{{ filter.text }}</label>
           </div>
         </div>
@@ -48,12 +53,17 @@
 
 export default {
   props: {
-    maxPerRow: Number,
-    filters: Object,
+    filters: {
+      type: Object,
+      default: {},
+	  },
   },
   data () {
     return {
+      checkResult: {},
     };
+  },
+  created () {
   },
   computed: {
     maxPerRowFinal () {
@@ -64,7 +74,9 @@ export default {
     },
   },
   methods: {
-
+    onChangeFilter(filter, checked) {
+      this.$emit('changeFilter', filter, checked);
+    }
   }
 }
 </script>

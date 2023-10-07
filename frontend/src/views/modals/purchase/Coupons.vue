@@ -2,11 +2,11 @@
   <div class="coupons">
     <BaseModal>
       <template v-slot:component>
-        <template v-if="codeResult && codeResult.type && codeResult.type !== 'valid'">
+        <template v-if="ob.codeResult && ob.codeResult.type && ob.codeResult.type !== 'valid'">
           <div class="txSm rowTn flex">
             <span class="clrTErr">
-              <template v-if="codeResult.code">
-                {{ ob.polyT(`purchase.codeErrors.${codeResult.type}`, { code: codeResult.code }) }}
+              <template v-if="ob.codeResult.code">
+                {{ ob.polyT(`purchase.codeErrors.${ob.codeResult.type}`, { code: ob.codeResult.code }) }}
               </template>
 
               <template v-else>
@@ -15,7 +15,7 @@
             </span>
           </div>
         </template>
-        <template v-for="(code, j) in couponCodes" :key="j">
+        <template v-for="(code, j) in ob.couponCodes" :key="j">
           <div class="txSm rowTn flexVCent gutterH">
             <span class="clrTEm">{{ ob.polyT('purchase.code', { code }) }}</span>
             <button class="btnTxtOnly " @click="removeCode(code)">
@@ -43,13 +43,22 @@ export default {
   },
   data () {
     return {
-      ob: {},
     };
   },
+  created () {
+    this.loadData(this.options);
+  },
   mounted () {
-    loadData(props);
+    this.render();
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        couponCodes: this.couponCodes,
+        codeResult: this.codeResult,
+      };
+    }
   },
   methods: {
     loadData (options = {}) {

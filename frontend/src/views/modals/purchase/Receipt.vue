@@ -7,12 +7,12 @@
       <div class="flexRow gutterHSm">
         <span class="flexExpand">
           {{
-            !listing.isCrypto ? ob.polyT('purchase.receipt.listing')
+            !ob.isCrypto ? ob.polyT('purchase.receipt.listing')
             : ob.polyT('purchase.receipt.cryptoIconsAmountCombo', {
-              icons: ob.crypto?.tradingPair({
+              icons: ob.crypto.tradingPair({
                 className: 'cryptoTradingPairSm cryptoTradingPair',
-                fromCur: listing?.toJSON().metadata.acceptedCurrencies[0],
-                toCur: listing?.toJSON().item.cryptoListingCurrencyCode,
+                fromCur: ob.listing.metadata.acceptedCurrencies[0],
+                toCur: ob.listing.item.cryptoListingCurrencyCode,
                 truncateCurAfter: 5,
               }),
               cryptoIconsAmount:
@@ -25,7 +25,7 @@
           <div class="flexHRight">
             <b>
               {{
-                !listing.isCrypto
+                !ob.isCrypto
                 ? (priceObj.preCouponPrice ? ob.currencyMod.formatCurrency(priceObj.preCouponPrice, viewingCurrency) : 0)
                 : (priceObj.subTotal ? ob.currencyMod.formatCurrency(priceObj.subTotal.plus(priceObj.shippingTotal), viewingCurrency) : 0)
               }}
@@ -33,7 +33,7 @@
           </div>
         </div>
       </div>
-      <template v-for="(coupon, j) in coupons" :key="j">
+      <template v-for="(coupon, j) in ob.coupons" :key="j">
         <div class="flexRow gutterHSm">
           <span class="flexExpand">
             {{ ob.polyT('purchase.receipt.coupon') }}
@@ -43,14 +43,14 @@
               <b>
                 {{ coupon.percentDiscount ? `-${coupon.percentDiscount}%`
                   : (coupon.priceDiscount && !coupon.priceDiscount.isNaN() ?
-                    `-${convertAndFormatCurrency(coupon.priceDiscount, listingCurrency, viewingCurrency)}` : "") }}
+                    `-${convertAndFormatCurrency(coupon.priceDiscount, ob.listingCurrency, viewingCurrency)}` : "") }}
               </b>
             </div>
           </div>
         </div>
       </template>
       <div
-        v-if="listing.toJSON().shippingOptions && listing.toJSON().shippingOptions.length && priceObj.shippingPrice !== priceObj.additionalShippingPrice && priceObj.quantity > 1">
+        v-if="ob.listing.shippingOptions && ob.listing.shippingOptions.length && priceObj.shippingPrice !== priceObj.additionalShippingPrice && priceObj.quantity > 1">
         <div class="flexRow gutterHSm">
           <span class="flexExpand">
             {{ ob.polyT('purchase.receipt.shipping') }}
@@ -82,7 +82,7 @@
         </div>
       </div>
 
-      <template v-else-if="listing.toJSON().shippingOptions && listing.toJSON().shippingOptions.length">
+      <template v-else-if="ob.listing.shippingOptions && ob.listing.shippingOptions.length">
         <div class="flexRow gutterHSm">
           <span class="flexExpand">
             {{ ob.polyT('purchase.receipt.shipping') }}
@@ -98,7 +98,7 @@
       </template>
       <hr class="clrBr">
       <template v-if="priceObj.quantity && priceObj.quantity.gt(0)">
-        <template v-if="!listing.isCrypto">
+        <template v-if="!ob.isCrypto">
           <div class="flexRow gutterHSm">
             <span class="flexExpand">
               {{ ob.polyT('purchase.receipt.subtotal', { quantity: ob.number.toStandardNotation(priceObj.quantity) }) }}
@@ -112,7 +112,7 @@
             </div>
           </div>
         </template>
-        <template v-if="listing.toJSON().shippingOptions && listing.toJSON().shippingOptions.length && priceObj.shippingTotal">
+        <template v-if="ob.listing.shippingOptions && ob.listing.shippingOptions.length && priceObj.shippingTotal">
           <div class="flexRow gutterHSm">
             <span class="flexExpand">
               {{ ob.polyT('purchase.receipt.shippingTotal') }}
@@ -130,7 +130,7 @@
       <div class="flexRow">
         <span class="flexExpand">
           {{ ob.polyT('purchase.receipt.total') }}
-          <span class="toolTip clrTAlert" :data-tip="totalTip()" v-show="showTotalTip"><span
+          <span class="toolTip clrTAlert" :data-tip="totalTip" v-show="showTotalTip"><span
               class="ion-alert-circled padSm"></span></span>
         </span>
         <div class="constrainedWidth">
@@ -159,46 +159,89 @@ import bigNumber from 'bignumber.js';
 import Order from '../../../../backbone/models/purchase/Order';
 import Listing from '../../../../backbone/models/listing/Listing';
 
-import * as templateHelpers from '../../../../backbone/utils/templateHelpers';
-
-
 export default {
   props: {
-    order: Object,
-    listing: Object,
-    prices: Array,
-    paymentCoin: {
-      type: String,
-      default: '',
-    },
-    coupons: Array,
-    showTotalTip: {
-      type: Boolean,
-      default: true,
-    }
+    options: {
+      type: Object,
+      default: {},
+	  },
   },
   data () {
     return {
     };
   },
   created () {
-    this.loadData(this.props);
+    this.loadData(this.options);
   },
   mounted () {
+    this.render();
   },
   computed: {
+    ob () {
+      const displayCurrency = app.settings.get('localCurrency');
+
+      return {
+        ...this.templateHelpers,
+        ...this._model,
+        listing: this._listing,
+        listingCurrency: this._listing.metadata.pricingCurrency.code,
+        coupons: this.coupons,
+        displayCurrency,
+        paymentCoin: this.paymentCoin,
+        showTotalTip: this.showTotalTip,
+        prices: this.prices.map(priceObj => {
+          let quantity =
+            priceObj.quantity &&
+            !priceObj.quantity.isNaN() &&
+            priceObj.quantity.gt(0) ?
+              priceObj.quantity : bigNumber(1);
+
+          if (this.listing.isCrypto) {
+            quantity =
+              priceObj.quantity &&
+              !priceObj.quantity.isNaN() &&
+              priceObj.quantity.gt(0) ?
+                priceObj.quantity : bigNumber(0);
+          }
+
+          // let coinDiv;
+          // let formattedQuantity;
+
+          // try {
+          //   coinDiv = getCoinDivisibility(displayCurrency);
+          // } catch (e) {
+          //   // pass
+          // }
+
+          // if (coinDiv === undefined) coinDiv = defaultCryptoCoinDivisibility;
+
+          // if (nativeNumberFormatSupported(quantity, coinDiv)) {
+          //   formattedQuantity = new Intl.NumberFormat(displayCurrency, {
+          //     minimumFractionDigits: 0,
+          //     maximumFractionDigits: coinDiv,
+          //   }).format(quantity.toNumber());
+          // } else {
+          //   formattedQuantity = quantity.toFormat();
+          // }
+
+          return {
+            ...priceObj,
+            // formattedQuantity,
+            quantity,
+          };
+        }),
+        isCrypto: this.listing.isCrypto,
+      };
+    },
+    displayCurrency() {
+      return app.settings.get('localCurrency');
+    },
     listingCurrency () {
-      return this.listing.get('metadata').get('pricingCurrency').code
+      return this.listing._metadata.pricingCurrency.code;
     },
     viewingCurrency () {
-      let displayCurrency = app.settings.get('localCurrency');
-      let listingCurrency = this.listing.get('metadata').get('pricingCurrency').code
-
-      return getExchangeRate(displayCurrency) !== undefined ? displayCurrency : listingCurrency;
+      return getExchangeRate(this.displayCurrency) !== undefined ? this.displayCurrency : this.listingCurrency;
     },
-
-  },
-  methods: {
     totalTip () {
       let totalTip = "";
       if (this.viewingCurrency !== this.listingCurrency) {
@@ -214,7 +257,22 @@ export default {
       return totalTip;
     },
 
-    loadData (opts = {}) {
+  },
+  methods: {
+    loadData (options = {}) {
+      this.baseInit(options);
+
+      if (!this.model || !(this.model instanceof Order)) {
+        throw new Error('Please provide an order model');
+      }
+
+      if (!opts.listing || !(opts.listing instanceof Listing)) {
+        throw new Error('Please provide a listing model');
+      }
+
+      if (!opts.prices) {
+        throw new Error('Please provide the prices array');
+      }
 
       this.prices.forEach((priceObj, i) => {
         // convert the prices here, to prevent rounding errors in the display

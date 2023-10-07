@@ -2,14 +2,14 @@
   <div class="shipping">
     <div class="flexVCent">
       <h2 class="h4 required flexExpand">{{ ob.polyT('purchase.shippingTitle') }}</h2>
-      <template v-if="userAddresses.toJSON().length">
+      <template v-if="ob.userAddresses.length">
         <a class="clrTEm txU tx5b" @click="createNewAddress">{{ ob.polyT('purchase.newAddress') }}</a>
       </template>
     </div>
     <div class="row">
-      <template v-if="userAddresses.toJSON().length">
+      <template v-if="ob.userAddresses.length">
         <select id="shippingAddress" @change="changeShippingAddress(val)">
-            <option v-for="(a, i) in userAddresses.toJSON()" :key="i" :value="i" :selected="selectedAddressIndex === i">
+            <option v-for="(a, i) in ob.userAddresses" :key="i" :value="i" :selected="ob.selectedAddressIndex === i">
               {{ getAddress(a) }}
             </option>
         </select>
@@ -27,11 +27,18 @@
       </template>
     </div>
     <ShippingOptions
-      v-if="userAddresses.toJSON().length"
-      :listing="listing.toJSON()"
-      :validOptions="validOptions"
-      :selectedOption="selectedOption"
-      @shippingOptionSelected="onSelectShippingOption"/>
+      v-if="ob.userAddresses.length"
+      :options="{
+        validOptions,
+        selectedOption,
+      }"
+      :bb="function() {
+        return {
+          model,
+        };
+      }"
+      @shippingOptionSelected="onSelectShippingOption"
+    />
 
   </div>
 </template>
@@ -40,6 +47,7 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import app from '../../../../backbone/app';
+import Listing from '../../../../backbone/models/listing/Listing';
 import ShippingOptions from './ShippingOptions.vue';
 import ShippingAddress from '../../../../backbone/models/settings/ShippingAddress';
 
@@ -48,10 +56,11 @@ export default {
     ShippingOptions,
   },
   props: {
-    listing: {
+    options: {
       type: Object,
-      default: {}
-    }
+      default: {},
+	  },
+    bb: Function,
   },
   watch: {
     selectedOption() {
@@ -59,11 +68,6 @@ export default {
     },
     selectedAddress() {
       this.updateOptions();
-    },
-  },
-  computed: {
-    selectedAddressIndex() {
-      return this.selectedAddress && this.userAddresses.length ? this.userAddresses.indexOf(this.selectedAddress) : '';
     },
   },
   data () {
@@ -76,7 +80,7 @@ export default {
   created () {
     this.initEventChain();
 
-    this.loadData();
+    this.loadData(this.options);
   },
   mounted () {
     $('#shippingAddress').select2({
@@ -84,13 +88,33 @@ export default {
       minimumResultsForSearch: Infinity,
     });
   },
+  computed: {
+    ob () {
+      const userAddresses = app.settings.get('shippingAddresses');
+
+      const selectedAddressIndex = this.selectedAddress && userAddresses.length ?
+      userAddresses.indexOf(this.selectedAddress) : '';
+
+      return {
+        ...this.templateHelpers,
+        userAddresses: userAddresses.toJSON(),
+        selectedAddressIndex,
+      };
+    }
+  },
   methods: {
-    loadData () {
+    loadData (options = {}) {
+      this.baseInit(options);
+
+      if (!this.model || !(this.model instanceof Listing)) {
+        throw new Error('Please provide a listing model');
+      }
+
       this.validOptions = [];
 
-      console.log(this.listing)
-
       const userAddresses = app.settings.get('shippingAddresses');
+      this.selectedAddress = userAddresses.at(0) || '';
+
       this.listenTo(userAddresses, 'update', col => {
         // If all the addresses were deleted, set the selection to blank.
         if (!col.models.length) {
@@ -114,7 +138,7 @@ export default {
       const validOptions = [];
       const countryCode = address ? address.get('country') : '';
 
-      const extractedOptions = this.listing.get('shippingOptions').toJSON().filter(option =>
+      const extractedOptions = this.model.get('shippingOptions').toJSON().filter(option =>
         option.regions.includes(countryCode) || option.regions.includes('ALL'));
 
       extractedOptions.forEach(option => {
@@ -168,7 +192,6 @@ export default {
     },
 
     onSelectShippingOption(option) {
-      console.log('onSelectShippingOption: ', option)
       this.selectedOption = option
     },
 

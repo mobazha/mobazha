@@ -17,7 +17,9 @@
       </template>
       <template v-else>
         <div class="flexVCent gutterHSm">
-          <a :href="`#${ob.vendorID}/store/${ob.slug}`" class="clrT flexNoShrink js-cryptoTradingPairWrap"></a>
+          <a :href="`#${ob.vendorID}/store/${ob.slug}`" class="clrT flexNoShrink js-cryptoTradingPairWrap">
+            <CryptoTradingPair v-if="ob.coinType" :options="cryptoTradingPairOptions" />
+          </a>
         </div>
       </template>
     </td>
@@ -94,19 +96,25 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        type: 'sales'
+      },
     },
     bb: Function,
   },
   data () {
     return {
+      _state: {
+        acceptOrderInProgress: false,
+        rejectOrderInProgress: false,
+        cancelOrderInProgress: false,
+      }
     };
   },
   created () {
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob () {
@@ -154,6 +162,25 @@ export default {
       }
       return maxDisplayDecimals;
     },
+    cryptoTradingPairOptions() {
+      const coinType = this.model.get('coinType');
+      const paymentCoin = this.model.get('paymentCoin');
+      let tradingPairClass = 'cryptoTradingPairSm';
+
+      if (paymentCoin.length > 5 && coinType.length > 5) {
+        tradingPairClass += ' longCurCodes';
+      }
+
+      return {
+        initialState: {
+          tradingPairClass,
+          exchangeRateClass: 'hide',
+          fromCur: paymentCoin,
+          toCur: coinType,
+          truncateCurAfter: 5,
+        },
+      };
+    }
   },
   methods: {
     loadData (options = {}) {
@@ -221,34 +248,6 @@ export default {
         type: this.type,
       });
     },
-
-    render () {
-      const coinType = this.model.get('coinType');
-
-      if (coinType) {
-        const paymentCoin = this.model.get('paymentCoin');
-        let tradingPairClass = 'cryptoTradingPairSm';
-
-        if (paymentCoin.length > 5 && coinType.length > 5) {
-          tradingPairClass += ' longCurCodes';
-        }
-
-        if (this.cryptoTradingPair) this.cryptoTradingPair.remove();
-        this.cryptoTradingPair = this.createChild(CryptoTradingPair, {
-          initialState: {
-            tradingPairClass,
-            exchangeRateClass: 'hide',
-            fromCur: paymentCoin,
-            toCur: coinType,
-            truncateCurAfter: 5,
-          },
-        });
-        this.getCachedEl('.js-cryptoTradingPairWrap')
-          .html(this.cryptoTradingPair.render().el);
-      }
-
-      return this;
-    }
   }
 }
 </script>

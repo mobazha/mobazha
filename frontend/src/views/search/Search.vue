@@ -152,7 +152,7 @@ export default {
   },
   data () {
     return {
-      tab: 'listings',
+      tab: 'home',
       _search: {},
     };
   },

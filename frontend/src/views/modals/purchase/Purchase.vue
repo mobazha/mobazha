@@ -1,6 +1,6 @@
 <template>
   <div class="modal purchase modalScrollPage">
-    <BaseModal :modalInfo="{ removeOnClose: true, showCloseButton: false }">
+    <BaseModal :modalInfo="{ showCloseButton: false }">
       <template v-slot:component>
         <div class="popInMessageHolder js-popInMessages"></div>
 
@@ -16,7 +16,7 @@
           </template>
         </div>
 
-        <div :class="`flexRow gutterH mainSection ${`phase${capitalize(ob.phase)}`}`">
+        <div :class="`flexRow gutterH mainSection ${ob.phaseClass}`">
           <div class="col9">
             <div class="flexColRow gutterV">
               <template v-for="(listing, key) in ob.listings" :key="key">
@@ -101,14 +101,12 @@
                         </div>
                       </template>
                       <div class="pad flexNoShrink">
-                      {{ 
-                        ob.crypto.cryptoPrice({
+                        <CryptoPrice :options="{
                           priceAmount: totalPrice,
                           priceCurrencyCode: pricingCurrency,
                           displayCurrency: ob.displayCurrency,
                           priceModifier: listing.item.cryptoListingPriceModifier,
-                        })
-                      }}
+                        }" />
                       </div>
                     </div>
                     <hr class="clrBr rowLg" />
@@ -140,7 +138,11 @@
                   <div class="js-shipping-errors js-items-shipping-errors"></div>
                   <Shipping
                     v-if="listing.get('shippingOptions').length"
-                    :listing="listing"
+                    :bb="function() {
+                      return {
+                        model: listing,
+                      };
+                    }"
                     @shippingOptionSelected="updateShippingOption"
                     @newAddress="clickNewAddress"
                     />
@@ -237,6 +239,11 @@
                         </button>
                       </div>
                       <div class="js-couponsWrapper">
+                        <Coupons :options="{
+                            coupons: _listing.coupons,
+                            listingPrice: ob.bigNumber(listing.price.amount),
+                          }"
+                          @changeCoupons="changeCoupons"/>
                         <!-- // coupons are inserted here after they are added by the user. -->
                       </div>
                     </template>
@@ -263,16 +270,57 @@
               <section class="contentBox padMd clrP clrBr clrSh3 js-pending"></section>
             </template>
             <template v-if="ob.phase === 'complete'">
-              <section class="contentBox padMd clrP clrBr clrSh3 js-complete"></section>
+              <section class="contentBox padMd clrP clrBr clrSh3 js-complete">
+                <Complete :options="{
+                    vendor,
+                    orderID,
+                  }"
+                  :bb="function() {
+                    return {
+                      listing,
+                    };
+                  }"
+                />
+              </section>
             </template>
           </div>
           <div class="col3">
             <section class="contentBox pad clrP clrBr clrSh3 sidebar">
               <i class="cornerTR ion-ios-close-empty iconBtn clrP clrBr clrSh3 closeBtn" @click="clickClose"></i>
-              <div class="js-actionBtn"></div>
+              <div class="js-actionBtn">
+                <ActionBtn
+                  ref="actionBtn"
+                  :options="{
+                    initialState: {
+                      phase: ob.phase,
+                      outdatedHash,
+                    },
+                  }"
+                  :bb="function() {
+                    return {
+                      listing,
+                    };
+                  }"
+                  @purchase="purchaseListing"
+                  @close="close"
+                  @reloadOutdated="onReloadOutdated"
+                />
+              </div>
               <div class="rowLg">
                 <!-- <div class="js-receipt"></div> -->
-                <Receipt :order="order" :listing="listing" :prices="prices" :coupons="couponObj" :paymentCoin="paymentCoin" :showTotalTip="phase === 'pay'"/>
+                <Receipt
+                  :options="{
+                    prices: prices,
+                    coupons: couponObj,
+                    showTotalTip: _state.phase === 'pay',
+                  }"
+                  :bb="function() {
+                    return {
+                      order,
+                      listing,
+                    };
+                  }"
+                />
                 <template v-if="ob.showModerators && !ob.noValidModerators">
                   <hr class="clrBr">
                   <div class="padSm txSm txCtr clrT2">
@@ -324,18 +372,23 @@ import Moderators from '../../../../backbone/views/components/moderators/Moderat
 import FeeChange from '../../../../backbone/views/components/FeeChange';
 import CryptoTradingPair from '../../../../backbone/views/components/CryptoTradingPair';
 import CryptoCurSelector from '../../../../backbone/views/components/CryptoCurSelector';
-import Shipping from './Shipping.vue';
-import Receipt from './Receipt.vue';
-import Coupons from '../../../../backbone/views/modals/purchase/Coupons';
-import ActionBtn from '../../../../backbone/views/modals/purchase/ActionBtn';
+
 import Payment from '../../../../backbone/views/modals/purchase/Payment';
-import Complete from '../../../../backbone/views/modals/purchase/Complete';
+
+import ActionBtn from './ActionBtn.vue';
+import Complete from './Complete.vue';
+import Coupons from './Coupons.vue';
 import DirectPayment from './DirectPayment.vue';
+import Receipt from './Receipt.vue';
+import Shipping from './Shipping.vue';
 
 import { toRaw } from 'vue';
 
 export default {
   components: {
+    ActionBtn,
+    Complete,
+    Coupons,
     Receipt,
     DirectPayment,
     Shipping,
@@ -364,7 +417,11 @@ export default {
       showVerifiedOnly: true,
       shipping: {
         selectedAddress: '',
-      }
+      },
+
+      outdatedHash: false,
+
+      orderID: '',
     };
   },
   created () {
@@ -508,7 +565,6 @@ export default {
     },
   },
   methods: {
-    capitalize,
     isSupportedWalletCur,
 
     init() {
@@ -600,31 +656,6 @@ export default {
         this.order.get('items').add(item);
       })
 
-      this.actionBtn = this.createChild(ActionBtn, {
-        listing: this.listing,
-      });
-      this.listenTo(this.actionBtn, 'purchase', () => this.purchaseListing());
-      this.listenTo(this.actionBtn, 'close', () => this.close());
-      this.listenTo(this.actionBtn, 'reloadOutdated', () => {
-        let defaultPrevented = false;
-
-        this.$emit('clickReloadOutdated', {
-          preventDefault: () => (defaultPrevented = true),
-        });
-
-        setTimeout(() => {
-          if (!defaultPrevented) {
-            Backbone.history.loadUrl();
-          }
-        });
-      });
-
-      this.coupons = this.createChild(Coupons, {
-        coupons: this.listing.get('coupons'),
-        listingPrice: bigNumber(this.listing.price.amount),
-      });
-      this.listenTo(this.coupons, 'changeCoupons', (hashes, codes) => this.changeCoupons(hashes, codes));
-
       this.moderators = this.createChild(Moderators, {
         moderatorIDs: this.moderatorIDs,
         useCache: false,
@@ -649,15 +680,6 @@ export default {
       });
       this.listenTo(this.moderators, 'cardSelect', () => this.onCardSelect());
 
-      if (this.listing.get('shippingOptions').length) {
-        // set the initial shipping option
-        this.updateShippingOption();
-      }
-
-      this.complete = this.createChild(Complete, {
-        listing: this.listing,
-        vendor: this.vendor,
-      });
 
       // If the parent has the inventory, pass it in, otherwise we'll fetch it.
       // -- commenting out for now since inventory is not functioning properly on the server
@@ -698,6 +720,20 @@ export default {
       this.listenTo(outdatedListingHashesEvents, 'newHash', (e) => {
         this._latestHash = e.oldHash;
         if (e.oldHash === this._renderedHash) this.outdateHash();
+      });
+    },
+
+    onReloadOutdated() {
+      let defaultPrevented = false;
+
+      this.$emit('clickReloadOutdated', {
+        preventDefault: () => (defaultPrevented = true),
+      });
+
+      setTimeout(() => {
+        if (!defaultPrevented) {
+          Backbone.history.loadUrl();
+        }
       });
     },
 
@@ -743,7 +779,8 @@ export default {
       this.$emit('close');
     },
 
-    handleDirectPurchaseClick () {
+    handleDirectPurchaseClick (options) {
+      // { active: true }
       if (!this.isModerated) return;
 
       this.moderators.deselectOthers();
@@ -855,7 +892,7 @@ export default {
     },
 
     outdateHash () {
-      this.actionBtn.setState({ outdatedHash: true });
+      this.outdatedHash = true;
     },
 
     purchaseListing () {
@@ -1042,8 +1079,8 @@ export default {
     },
 
     completePurchase (data) {
-      this.complete.orderID = data.orderID;
-      this.complete.render();
+      this.orderID = data.orderID;
+
       this.setState({ phase: 'complete' });
     },
 
@@ -1058,16 +1095,7 @@ export default {
       const state = this.getState();
       const metadata = this.listing.get('metadata');
 
-
-
       this._$couponField = null;
-
-      this.actionBtn.delegateEvents();
-      this.actionBtn.setState({ phase: state.phase }, { renderOnChange: false });
-      $('.js-actionBtn').append(this.actionBtn.render().el);
-
-      this.coupons.delegateEvents();
-      $('.js-couponsWrapper').html(this.coupons.render().el);
 
       this.moderators.delegateEvents();
       $('.js-moderatorsWrapper').append(this.moderators.el);
@@ -1077,9 +1105,6 @@ export default {
         this.payment.delegateEvents();
         $('.js-pending').append(this.payment.render().el);
       }
-
-      this.complete.delegateEvents();
-      $('.js-complete').append(this.complete.render().el);
 
       if (this.feeChange) this.feeChange.remove();
       this.feeChange = this.createChild(FeeChange);

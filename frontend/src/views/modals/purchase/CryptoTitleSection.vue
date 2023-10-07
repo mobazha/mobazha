@@ -45,10 +45,17 @@
 
 export default {
   props: {
+    options: {
+      type: Object,
+      default: {},
+	  },
   },
   data () {
     return {
     };
+  },
+  created () {
+    this.loadData(this.options);
   },
   mounted () {
   },

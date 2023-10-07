@@ -7,14 +7,14 @@
     <div :class="`flexRow gutterHLg ${ob.externallyFundable ? `pad rowMd` : ''}`">
       <template v-if="ob.externallyFundable">
         <div class="flexNoShrink">
-          <a class="QR js-purchaseQRCode"><img :src="qrDataUri"></a>
+          <a class="QR js-purchaseQRCode"><img class="js-qrCodeImg" :src="ob.qrDataUri"></a>
         </div>
       </template>
       <div class="flexExpand">
         <div class="flexVCent">
           <div class="flexExpand">
             <div class="rowSm clickable " @click="copyAmount">
-              <span class="h1">{{ amountDueLine }}</span>
+              <span class="h1">{{ ob.amountDueLine }}</span>
               <template v-if="ob.externallyFundable">
                 <button class="btnTxtOnly txUnb flipBtn js-copyAmount">
                   <span class="clrTEm unFlipped">{{ ob.polyT('purchase.pendingSection.copy') }}</span>
@@ -23,7 +23,7 @@
               </template>
             </div>
             <template v-if="ob.externallyFundable">
-              <div class="tx5 rowMd clickable " @click="copyAddress">
+              <div class="tx5 rowMd clickable " @click="copyAddress(ob.paymentAddress)">
                 <span :class="ob.paymentAddress.length > 34 ? 'toolTipNoWrap toolTipTop' : ''"
                   :data-tip="ob.paymentAddress.length > 34 ? ob.paymentAddress : ''">
                   {{ ob.polyT('purchase.pendingSection.to', { address: pAddress }) }}
@@ -61,9 +61,9 @@
     </div>
     <div class="tx6 clrT2">
       <template v-if="['BTC', 'TBTC'].includes(ob.paymentCoin)">
-        <p>{{ ob.polyT('purchase.pendingSection.note1', {
-          link: `<a class="clrTEm" href="https://www.openbazaar.org/bitcoin">${ob.polyT('purchase.pendingSection.note1Link')}</a>`,
-        }) }}</p>
+        <p v-html='ob.polyT("purchase.pendingSection.note1", {
+          link: `<a class="clrTEm" href="https://www.openbazaar.org/bitcoin">${ob.polyT("purchase.pendingSection.note1Link")}</a>`,
+        })'></p>
       </template>
       <template v-if="ob.isModerated">
         <p>
@@ -119,12 +119,28 @@ export default {
     return {
     };
   },
-  mounted () {
-    loadData(props);
+  created () {
+    this.initEventChain();
 
-    render();
+    this.loadData(this.options);
+  },
+  mounted () {
+    this.render();
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+          displayCurrency: this.displayCurrency,
+          amountDueLine: this.amountDueLine,
+          paymentAddress: this.paymentAddress,
+          qrDataUri: this.qrDataUri,
+          walletIconTmpl,
+          isModerated: this.isModerated,
+          paymentCoin: this.paymentCoin,
+          externallyFundable: this.paymentCoinData.externallyFundableOrders,
+      };
+    },
     walletIconTag() {
       return `<i class=\"icon\">${this.ob.walletIconTmpl()}</i>`;
     },
@@ -184,12 +200,6 @@ export default {
 
       this.baseInit(options);
 
-      this.balanceRemaining = options.balanceRemaining;
-      this.paymentAddress = options.paymentAddress;
-      this.orderID = options.orderID;
-      this.isModerated = options.isModerated;
-      this.metricsOrigin = options.metricsOrigin;
-      this.paymentCoin = options.paymentCoin;
       this.paymentCoinData = paymentCoinData;
 
       const serverSocket = getSocket();

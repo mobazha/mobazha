@@ -85,6 +85,7 @@ export default {
       type: Object,
       default: {},
 	  },
+    bb: Function,
   },
   data () {
     return {
@@ -107,17 +108,20 @@ export default {
       return {
         ...this.templateHelpers,
         displayCurrency: app.settings.get('localCurrency'),
-        processingTime: this.processingTime,
+        processingTime: this._listing.item.processingTime || app.polyglot.t('purchase.completeSection.noData'),
         maxMessageLength: ChatMessage.max.messageLength,
         ownProfile: app.profile.toJSON(),
         orderID: this.orderID,
         vendorName: this.options.vendor.name,
       };
     },
+    vendorPeerID() {
+      return this._listing.vendorID.peerID;
+    }
   },
   methods: {
     loadData (options = {}) {
-      if (!options.listing || !(options.listing instanceof Listing)) {
+      if (!this.listing || !(this.listing instanceof Listing)) {
         throw new Error('Please provide a listing model');
       }
 
@@ -126,10 +130,6 @@ export default {
       }
 
       this.baseInit(options);
-
-      this.processingTime = this.options.listing.get('item').processingTime ||
-        app.polyglot.t('purchase.completeSection.noData');
-      this.vendorPeerID = this.options.listing.get('vendorID').peerID;
     },
 
     sendMessage (msg) {

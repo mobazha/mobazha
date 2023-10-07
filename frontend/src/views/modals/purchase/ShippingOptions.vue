@@ -1,8 +1,8 @@
 <template>
   <div class="shippingOptions">
-    <template v-if="validOptions.length">
+    <template v-if="ob.validOptions.length">
       <div class="flexColRows boxList border borderStacked clrP clrBr">
-        <template v-for="(service, i) in validOptions" :key="i">
+        <template v-for="(service, i) in ob.validOptions" :key="i">
           <div class="btnRadio width100">
             <input type="radio"
               @click="onSelectShippingOption(service)"
@@ -35,25 +35,45 @@
 </template>
 
 <script>
+import $ from 'jquery';
+import app from '../../../../backbone/app';
+import Listing from '../../../../backbone/models/listing/Listing';
 
 export default {
   props: {
-    listing: {
+    options: {
       type: Object,
       default: {},
     },
-    validOptions: {
-      type: Object,
-      default: [],
-    },
-    selectedOption: {
-      type: Object,
-      default: {}
+  },
+  data () {
+    return {
+    };
+  },
+  created () {
+    this.loadData(this.options);
+  },
+  mounted () {
+  },
+  computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this._model,
+        validOptions: this.validOptions,
+        selectedOption: this.selectedOption,
+        displayCurrency: app.settings.get('localCurrency'),
+      };
     }
   },
-  mounted() {
-  },
   methods: {
+    loadData(options = {}) {
+      this.baseInit(options);
+
+      if (!this.model || !(this.model instanceof Listing)) {
+        throw new Error('Please provide a listing model');
+      }
+    },
     isServiceSelected (service) {
       return this.selectedOption && this.selectedOption.name === service.name && this.selectedOption.service === service.service;
     },

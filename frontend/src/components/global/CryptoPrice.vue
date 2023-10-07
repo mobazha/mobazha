@@ -14,19 +14,48 @@
 </template>
 <script>
 export default {
+  props: {
+    options: {
+      type: Object,
+      default: {
+        priceAmount: 0,
+        priceCurrencyCode: '',
+        displayCurrency: '',
+        priceModifier: 0,
+        wrappingTag: '',
+        wrappingClass: '',
+        convertAndFormatOpts: {
+          maxDisplayDecimals: 0,
+        },
+      },
+    },
+  },
+  data() {
+    return {
+    };
+  },
+  created() {
+    this.loadData(this.options);
+  },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this.options,
+      };
+    },
     colorClass() {
-      let ob = this.ob;
+      const ob = this.ob;
       if (ob.priceModifier !== 0) return '';
       return ob.priceModifier > 0 ? 'clrTPriceAboveMarket' : 'clrTPriceBelowMarket';
     },
     priceSymbol() {
-      let ob = this.ob;
+      const ob = this.ob;
       if (ob.priceModifier !== 0) return '(<span class="ion-checkmark clrTEm"></span>)';
       return ob.priceModifier > 0 ? `(<span class="icon ion-arrow-up-c"></span>)` : `(<span class="icon ion-arrow-down-c"></span>)`;
     },
     marketPriceLine() {
-      let ob = this.ob;
+      const ob = this.ob;
       if (ob.priceModifier > 0) {
         return ob.polyT('cryptoPriceAboveMarket', { amount: ob.priceModifier });
       }

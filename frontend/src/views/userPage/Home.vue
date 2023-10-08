@@ -116,6 +116,7 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data() {
     return {};
@@ -134,7 +135,7 @@ export default {
         ...this.templateHelpers,
         currentModerator: this.ownMod,
         displayCurrency: app.settings.get('localCurrency'),
-        ...this.model.toJSON(),
+        ...this._model,
       };
     },
     feeAmount() {

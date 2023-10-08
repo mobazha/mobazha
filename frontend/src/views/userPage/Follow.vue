@@ -25,7 +25,10 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        followType: 'followers',
+        fetchCollection: true,
+      },
     },
   },
   data() {

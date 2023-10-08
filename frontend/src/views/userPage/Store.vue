@@ -121,9 +121,22 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data() {
-    return {};
+    return {
+      countryList: getTranslatedCountries(),
+      defaultFilter: {
+        category: 'all',
+        type: 'all',
+        shipsTo: 'any',
+        searchTerm: '',
+        sortBy: 'PRICE_ASC',
+        freeShipping: false,
+      },
+      filter: { ...this.defaultFilter },
+      listingsViewType: app.localSettings.get('listingsGridViewType'),
+    };
   },
   created() {
     this.initEventChain();
@@ -137,7 +150,7 @@ export default {
     ob() {
       return {
         ...this.templateHelpers,
-        ...this.model.toJSON(),
+        ...this._model,
         isFetching,
         fetchFailed,
         fetchFailReason: (fetchFailed && this.fetch.responseJSON && this.fetch.responseJSON.reason) || '',
@@ -159,21 +172,6 @@ export default {
       if (!this.model) {
         throw new Error('Please provide a model.');
       }
-
-      this.countryList = getTranslatedCountries();
-
-      this.defaultFilter = {
-        category: 'all',
-        type: 'all',
-        shipsTo: 'any',
-        searchTerm: '',
-        sortBy: 'PRICE_ASC',
-        freeShipping: false,
-      };
-
-      this.filter = { ...this.defaultFilter };
-
-      this.listingsViewType = app.localSettings.get('listingsGridViewType');
 
       this.listenTo(this.collection, 'request', this.onRequest);
       this.listenTo(this.collection, 'update', this.onUpdateCollection);

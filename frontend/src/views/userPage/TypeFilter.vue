@@ -4,13 +4,13 @@
      the other is also maintained. -->
     <div class="txB rowSm">{{ ob.polyT('userPage.store.typeFilter.heading') }}</div>
     <div class="btnRadio">
-      <input type="radio" name="filterListingType" value="all" id="filterListingTypeAll" data-var-type="boolean" :checked="ob.selected === 'all'" />
+      <input type="radio" name="filterListingType" @change="onChangeType('all')" id="filterListingTypeAll" data-var-type="boolean" :checked="ob.selected === 'all'" />
       <label for="filterListingTypeAll">{{ ob.polyT('userPage.store.typeFilter.all') }}</label>
     </div>
 
     <template v-for="(type, index) in ob.types.slice(0, ob.maxInitiallyVisibleTypes - 1)" :key="index">
       <div class="btnRadio">
-        <input type="radio" name="filterListingType" :value="type" :id="`filterListingType${flatType(type)}`" :checked="ob.selected === type" />
+        <input type="radio" name="filterListingType" @change="onChangeType(type)" :id="`filterListingType${flatType(type)}`" :checked="ob.selected === type" />
         <label :for="`filterListingType${flatType(type)}`">{{ ob.polyT(`formats.${type}`) }}</label>
       </div>
     </template>
@@ -20,7 +20,7 @@
         <div class="moreTypes">
           <template v-for="(type, index) in ob.types.slice(ob.maxInitiallyVisibleTypes - 1)" :key="index">
             <div class="btnRadio">
-              <input type="radio" name="filterListingType" :value="type" :id="`filterListingType${flatType(type)}`" :checked="ob.selected === type" />
+              <input type="radio" name="filterListingType" @change="onChangeType(type)" :id="`filterListingType${flatType(type)}`" :checked="ob.selected === type" />
               <label :for="`filterListingType${flatType(type)}`">${ob.polyT(`formats.${type}`)}</label>
             </div>
           </template>
@@ -92,19 +92,13 @@ export default {
       return type.replace(/\s/g, '-');
     },
 
-    events() {
-      return {
-        'change input[type="radio"]': 'onChangeType',
-      };
-    },
-
     onClickShowMoreLess() {
       this.setState({ expanded: !this.getState().expanded });
     },
 
-    onChangeType(e) {
-      this._state.selected = e.target.value;
-      this.$emit('type-change', { value: $(e.target).val() });
+    onChangeType(val) {
+      this._state.selected = val;
+      this.$emit('type-change', { value: val });
     },
   },
 };

@@ -48,7 +48,7 @@
           </div>
           <hr class="clrBr" />
         </div>
-        <div class="js-categoryWrapper" v-if="tab === 'home'">
+        <div class="js-categoryWrapper" v-if="ob.tab === 'home'">
           <template v-for="search in _categorySearches">
             <Category
               :options="{
@@ -59,7 +59,7 @@
               />
           </template>
         </div>
-        <div class="flexRow gutterHLg" v-if="tab === 'listings'" >
+        <div class="flexRow gutterHLg" v-if="ob.tab === 'listings'" >
           <div v-if="ob.hasFilters" class="col3 filterWrapper js-filterWrapper">
             <Filters
               :filters="ob.data.options"
@@ -154,7 +154,7 @@ export default {
     return {
       _state: {
         fetching: false,
-        tab: 'home',
+        tab: 'listings',
         xhr: null,
       },
 

@@ -29,7 +29,7 @@ export default {
   data() {
     return {
       _state: {
-        following: followedByYou(options.targetID),
+        following: false,
         isFollowing: false,
         stripClasses: 'btnStrip clrSh3',
         btnClasses: 'clrP clrBr',

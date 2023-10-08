@@ -42,6 +42,11 @@ export default {
   },
   data () {
     return {
+      _state: {
+        coinType: '',
+        isSyncing: false,
+        isResyncAvailable: false,
+      }
     };
   },
   created () {

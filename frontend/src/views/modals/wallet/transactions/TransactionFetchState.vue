@@ -25,19 +25,19 @@ export default {
     },
   },
   data() {
-    return {};
+    return {
+      _state: {
+        isFetching: false,
+        fetchFailed: false,
+        fetchErrorMessage: '',
+        transactionsPresent: false,
+      }
+    };
   },
   created() {
-    this.initEventChain();
+    this.loadData(this.options);
   },
   watch: {
-    options: {
-      handler(val) {
-        this.loadData(val);
-      },
-      deep: true,
-      immediate: true,
-    },
   },
   mounted() {},
   computed: {

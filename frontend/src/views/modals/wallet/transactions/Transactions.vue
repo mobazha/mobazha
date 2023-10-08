@@ -80,9 +80,19 @@ export default {
       newTransactionsTXs: new Set(),
       popInTimeouts: [],
       coinType: '',
-      countAtFirstFetch: false,
 
       showNewTxPopup: false,
+
+      _state: {
+        // If not fetching on init, you may want to pass in the count of transactions
+        // that were returned by the first fetch which is used to determine if all the
+        // pages have been fetched.
+        countAtFirstFetch: undefined,
+        // If there are any existing bump fee attempts that you want shuttled into the
+        // individual transaction views, please provide an indexed object (indexed by txid)
+        // of them here.
+        bumpFeeXhrs: undefined,
+      }
     };
   },
   created() {

@@ -120,6 +120,8 @@ export default {
   },
   methods: {
     loadData (options = {}) {
+      this.baseInit(options);
+
       this._state = {
         show: false,
         fetchingFee: false,

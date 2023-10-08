@@ -56,26 +56,19 @@ export default {
       default: {},
     },
   },
-  watch: {
-    options: {
-      handler(val) {
-        this.loadData(val);
-      },
-      deep: true,
-      immediate: true,
-    },
-  },
   data() {
     return {
-      cryptoCur: '',
-      displayCur: (app && app.settings && app.settings.get('localCurrency')) || 'USD',
-      confirmed: undefined,
-      unconfirmed: undefined,
-      transactionCount: undefined,
+      _state: {
+        cryptoCur: '',
+        displayCur: (app && app.settings && app.settings.get('localCurrency')) || 'USD',
+        confirmed: undefined,
+        unconfirmed: undefined,
+        transactionCount: undefined,
+      }
     }
   },
   created() {
-    this.initEventChain();
+    this.loadData(this.options);
   },
   computed: {
     ob() {

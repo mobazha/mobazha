@@ -28,28 +28,25 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
-    },
-  },
-  watch: {
-    options: {
-      handler(val) {
-        this.loadData(val);
+      default: {
       },
-      deep: true,
-      immediate: true,
     },
   },
   data() {
     return {
       _state: {
         active: false,
+        code: '',
+        name: '',
+        balance: undefined,
+        clientSupported: false,
+
         displayCur: (app && app.settings && app.settings.get('localCurrency')) || 'USD',
       }
     };
   },
   created() {
-    this.initEventChain();
+    this.loadData(this.options);
   },
   mounted() {},
   computed: {

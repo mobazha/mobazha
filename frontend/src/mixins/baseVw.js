@@ -315,6 +315,10 @@ export default {
   
     isRemoved() {
       return this._removed;
+    },
+
+    close() {
+      this.$emit('close');
     }
   },
 };

@@ -119,6 +119,7 @@ import Reputation from '../../../backbone/views/userPage/Reputation';
 
 import Loading from './Loading.vue'
 import MiniProfile from '../MiniProfile.vue';
+// import Home from './Home.vue'
 
 export default {
   components: {

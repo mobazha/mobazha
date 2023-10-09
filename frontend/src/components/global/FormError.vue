@@ -1,5 +1,5 @@
 <template>
-  <ul class="unstyled errorList js-errorList <%= ob.class || ''%>" :id="id">
+  <ul :class="`unstyled errorList js-errorList ${ob.class}`" :id="id">
     <li v-for="(err, k) in errors" :key="k">
       <i class="ion-alert-circled"></i>{{ err }}
     </li>
@@ -10,6 +10,7 @@
 const props = defineProps({
   errors: [],
   id: String,
+  class: String,
 })
 </script>
 <style lang="scss" scoped></style>

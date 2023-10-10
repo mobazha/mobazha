@@ -3,22 +3,20 @@ import Backbone from 'backbone';
 import './lib/select2.js';
 import 'trumbowyg';
 import moment from 'moment';
-import bigNumber from 'bignumber.js';
+
 import { ipc } from '../src/utils/ipcRenderer.js';
 import './lib/whenAll.jquery';
-import Polyglot from './utils/Polyglot';
 import app from './app';
 import { serverVersionRequired } from '../package.json';
 import { getCurrencyByCode } from './data/currencies';
 import { init as initWalletCurs } from './data/walletCurrencies';
-import ServerConfigs from './collections/ServerConfigs';
 import ServerConfig from './models/ServerConfig';
 import serverConnect, {
   events as serverConnectEvents,
   getSocket,
   getCurrentConnection,
 } from './utils/serverConnect';
-import LocalSettings from './models/LocalSettings';
+
 import ObRouter from './router';
 import { getChatContainer, getBody } from './utils/selectors';
 import { addFeedback } from './utils/feedback';
@@ -28,13 +26,12 @@ import { handleLinks } from './utils/dom';
 import { persist as persistOutdatedListingHashes } from './utils/outdatedListingHashes';
 import Chat from './views/chat/Chat';
 import ChatHeads from './collections/ChatHeads';
-import PageNav from './views/PageNav';
 import LoadingModal from './views/modals/Loading';
 import StartupConnectMessaging from './views/StartupConnectMessaging';
 import { openSimpleMessage } from './views/modals/SimpleMessage';
 import Dialog from './views/modals/Dialog';
 import StatusBar from './views/StatusBar';
-import { getTranslationLangByCode } from './data/languages';
+
 import Profile from './models/profile/Profile';
 import Settings from './models/settings/Settings';
 import WalletBalances from './collections/wallet/Balances';
@@ -68,29 +65,6 @@ $(function() {
   $.trumbowyg.svgPath = '../node_modules/trumbowyg/dist/ui/icons.svg';
 });
 
-// Will allow us to handle numbers with greater than 20 decimals places. Probably
-// unlikely this will be needed, but just in case.
-bigNumber.config({ DECIMAL_PLACES: 50 });
-
-app.localSettings = new LocalSettings({ id: 1 });
-app.localSettings.fetch().fail(() => app.localSettings.save());
-
-// initialize language functionality
-function getValidLanguage(lang) {
-  if (getTranslationLangByCode(lang)) {
-    return lang;
-  }
-
-  return 'en_US';
-}
-
-const initialLang = getValidLanguage(app.localSettings.get('language'));
-app.localSettings.set('language', initialLang);
-moment.locale(initialLang);
-app.polyglot = new Polyglot();
-const langContent = ipc.sendSync('controller.system.getlanguageFileContent', `${initialLang}.json`);
-app.polyglot.extend(langContent);
-
 app.localSettings.on('change:language', (localSettings, lang) => {
   app.polyglot.extend(
     require(`./languages/${lang}.json`),
@@ -119,16 +93,10 @@ window.addEventListener('contextmenu', (e) => {
   ipc.send('contextmenu-click');
 }, false);
 
-// Instantiating our Server Configs collection now since the page nav
-// utilizes it. We'll fetch it later on.
-app.serverConfigs = new ServerConfigs();
 
 MyChatSDK.emit(window.TUIKit.TIM.EVENT.SDK_READY, {});
 
-app.pageNav = new PageNav({
-  serverConfigs: app.serverConfigs,
-});
-$('#pageNavContainer').append(app.pageNav.render().el);
+app.pageNav = window.vueApp.$refs.pageNav;
 
 let externalRoute = ipc.sendSync('controller.system.getGlobal', 'externalRoute');
 
@@ -562,12 +530,6 @@ function start() {
     initWalletCurs(app.serverConfig.wallets, data.walletCurDef);
     app.walletCurDef = data.walletCurDef;
 
-    const curConn = getCurrentConnection();
-
-    if (curConn && curConn.status !== 'disconnected') {
-      app.pageNav.torIndicatorOn = app.serverConfig.tor && curConn.server.get('useTor');
-    }
-
     app.ownFollowing = new Followers([], {
       type: 'following',
       peerID: app.profile.id,
@@ -579,14 +541,19 @@ function start() {
     onboardIfNeeded().done(() => {
       fetchStartupData2().done(() => {
         ensureValidSettingsCurrency().done(() => {
+          window.vueApp.initialized = true;
+
+          const curConn = getCurrentConnection();
+          if (curConn && curConn.status !== 'disconnected') {
+            app.pageNav.torIndicatorOn = app.serverConfig.tor && curConn.server.get('useTor');
+          }
+
           app.pageNav.navigable = true;
           app.pageNav.setAppProfile();
           app.loadingModal.close();
 
           // add the default search providers
           app.searchProviders.add(defaultSearchProviders, { at: 0 });
-
-          window.vueApp.initialized = true;
 
           if (externalRoute) {
             // handle opening the app from an an external ob link

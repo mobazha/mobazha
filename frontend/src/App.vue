@@ -1,6 +1,10 @@
 <template>
   <div class="app-container">
-    <section id="pageNavContainer"></section>
+    <section id="pageNavContainer">
+      <PageNav ref="pageNav" :options="{
+        serverConfigs: app.serverConfigs,
+      }" />
+    </section>
     <section id="contentFrame" class="clrBr">
       <div id="pageContainer">
         <router-view v-if="toggleVue && initialized" :key="$route.params[$route.meta.watchParam]" />
@@ -28,11 +32,12 @@
 </template>
 
 <script>
+import app from '../backbone/app';
 import ShoppingCart from '@/views/ShoppingCart.vue';
 import Wallet from '@/views/modals/wallet/Wallet.vue';
-import Purchase from './views/modals/purchase/Purchase.vue';
-import LoadingModal from './views/modals/Loading.vue';
-import app from '../backbone/app';
+import Purchase from '@/views/modals/purchase/Purchase.vue';
+import LoadingModal from '@/views/modals/Loading.vue';
+import PageNav from '@/views/PageNav.vue'
 
 export default {
   components: {
@@ -40,6 +45,7 @@ export default {
     Wallet,
     Purchase,
     LoadingModal,
+    PageNav,
   },
   name: 
     'App',
@@ -57,6 +63,8 @@ export default {
 
       app: app,
     };
+  },
+  mounted() {
   },
   watch: {},
   methods: {

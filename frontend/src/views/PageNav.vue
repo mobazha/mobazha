@@ -39,7 +39,9 @@
                   @keyup="onKeyupAddressBar"
                   @focusin="onFocusInAddressBar"
                   :placeholder="ob.polyT('addressBarPlaceholder')" :value="ob.addressBarText" />
-                <div class="js-addressBarIndicatorsContainer"></div>
+                <div class="js-addressBarIndicatorsContainer">
+                  <AddressBarIndicators ref="addressBarIndicators" />
+                </div>
               </div>
               <template v-if="ob.testnet">
                 <div id="testnetFlag" class="btn barBtn normalBtn clrP clrBr">
@@ -133,7 +135,14 @@
               </nav>
               <nav class="connManagementContainer foldDown clrSh1 js-connManagementContainer"
                 @mouseenter="onMouseEnterConnManagementContainer"
-                @mouseleave="onMouseLeaveConnManagementContainer"></nav>
+                @mouseleave="onMouseLeaveConnManagementContainer">
+                <PageNavServersMenu
+                :bb="function() {
+                    return {
+                      collection: app.serverConfigs,
+                    };
+                  }" />
+              </nav>
             </div>
           </div>
         </div>
@@ -159,24 +168,36 @@ import {
 } from '../../backbone/utils/modalManager.js';
 import Listing from '../../backbone/models/listing/Listing.js';
 import { getAvatarBgImage } from '../../backbone/utils/responsive.js';
-import PageNavServersMenu from './PageNavServersMenu';
-import AddressBarIndicators from './AddressBarIndicators';
 import { getNotifDisplayData } from '../../backbone/collections/Notifications.js';
-import Notifications from './notifications/Notificiations';
+import Notifications from '../../backbone/views/notifications/Notificiations';
 
+import PageNavServersMenu from './PageNavServersMenu.vue';
+import AddressBarIndicators from './AddressBarIndicators.vue';
 
 export default {
+  components: {
+    PageNavServersMenu,
+    AddressBarIndicators,
+  },
   props: {
     options: {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
       navigable: false,
+      torIndicatorOn: false,
 
       windowStyle: 'win',
+      app: app,
+
+      toggleUpdate: false,
+
+      _unreadNotifCount: 0,
+      _cartItemsCount: 0,
     };
   },
   created () {
@@ -192,6 +213,8 @@ export default {
   },
   computed: {
     ob () {
+      let access = this.toggleUpdate;
+
       let connectedServer = getCurrentConnection();
 
       if (connectedServer && connectedServer.status !== 'disconnected') {
@@ -588,10 +611,14 @@ export default {
         this.$addressBar.val(text);
       }
 
-      if (this.addressBarIndicators) this.addressBarIndicators.updateVisibility(text);
+      if (this.$refs.addressBarIndicators) this.$refs.addressBarIndicators.updateVisibility(text);
     },
 
     navSettingsClick () {
+      setTimeout(() => {
+        this.closeNavMenu();
+      });
+      
       // This is recorded as two events that belong to different metrics we're comparing.
       recordEvent('NavMenu_Click', { target: 'settings' });
       recordEvent('Settings_Open', { origin: 'navMenu' });
@@ -616,6 +643,10 @@ export default {
     },
 
     navCreateListingClick () {
+      setTimeout(() => {
+        this.closeNavMenu();
+      });
+
       // This is recorded as two events that belong to different metrics we're comparing.
       recordEvent('NavMenu_Click', { target: 'newListing' });
       recordEvent('Listing_New', { origin: 'navMenu' });
@@ -627,23 +658,6 @@ export default {
     },
 
     render () {
-      if (this.pageNavServersMenu) this.pageNavServersMenu.remove();
-      this.pageNavServersMenu = new PageNavServersMenu({
-        collection: app.serverConfigs,
-      });
-      $('.js-connManagementContainer').append(this.pageNavServersMenu.render().el);
-
-      let initialAddressBarState = {};
-      if (this.addressBarIndicators) {
-        initialAddressBarState = this.addressBarIndicators.getState();
-        this.addressBarIndicators.remove();
-      }
-
-      this.addressBarIndicators = this.createChild(AddressBarIndicators, {
-        initialState: initialAddressBarState,
-      });
-      $('.js-addressBarIndicatorsContainer').html(this.addressBarIndicators.render().el);
-
       this.$addressBar = $('.js-addressBar');
       this.$navList = $('.js-navList');
       this.$navOverlay = $('.js-navOverlay');
@@ -652,6 +666,8 @@ export default {
 
       this.renderUnreadNotifCount();
       this.renderCartItemsCount();
+
+      this.toggleUpdate = !this.toggleUpdate;
 
       return this;
     }

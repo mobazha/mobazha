@@ -221,14 +221,7 @@ export default {
 
       startAjaxEvent('UserPageLoad');
 
-      if (guid === app.profile.id) {
-        // don't fetch our own profile, since we have it already
-        this.profileFetch = $.Deferred().resolve();
-        this.model = app.profile;
-      } else {
-        this.model = new Profile({ peerID: guid });
-        this.profileFetch = this.model.fetch();
-      }
+      this.profileFetch = this.model.fetch();
 
       if (state === 'store') {
         if (slug) {
@@ -540,7 +533,7 @@ export default {
       this.tabViewCache = {}; // clear for re-renders
       this.setTabState(this.state, {
         addTabToHistory: false,
-        listing: this.listing,
+        listing: this.options.listing,
       });
 
       return this;

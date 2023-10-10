@@ -38,6 +38,7 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
@@ -61,7 +62,7 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      if (!options.collection) {
+      if (!this.collection) {
         throw new Error('Please provide a server configurations collection.');
       }
 

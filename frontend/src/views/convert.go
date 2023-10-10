@@ -398,7 +398,8 @@ export default {
     options: {
       type: Object,
       default: {},
-	},
+    },
+    bb: Function,
   },
   data () {
     return {

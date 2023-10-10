@@ -152,13 +152,13 @@ export default {
         this.trigger('variantChoiceChange', e));
 
       return view;
-    }
+    },
 
-  get views () {
+    get views () {
       return this._variantViews;
-    }
+    },
 
-  get $btnAddVariant () {
+    get $btnAddVariant () {
       return this._$btnAddVariant ||
         (this._$btnAddVariant =
           $('.js-btnAddVariant'));

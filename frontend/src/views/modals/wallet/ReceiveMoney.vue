@@ -18,6 +18,7 @@
 </template>
 
 <script>
+import $ from 'jquery';
 import qr from 'qr-encode';
 import { ipc } from '../../../utils/ipcRenderer.js';
 import { getCurrencyByCode as getWalletCurByCode } from '../../../../backbone/data/walletCurrencies.js';
@@ -82,9 +83,9 @@ export default {
     copyAddressToClipboard () {
       ipc.send('controller.system.writeToClipboard', this.address);
       clearTimeout(this.copyTextTimeout);
-      const $copyText = this.getCachedEl('.js-copyAddress')
+      const $copyText = $('.js-copyAddress')
         .addClass('invisible');
-      const $copiedText = this.getCachedEl('.js-copiedText')
+      const $copiedText = $('.js-copiedText')
         .stop()
         .show();
 

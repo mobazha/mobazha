@@ -646,18 +646,18 @@ export default {
         page: this._search.p + 1,
       });
 
-      this.getCachedEl('.js-resultsWrapper').html(this.resultsView.render().el);
+      $('.js-resultsWrapper').html(this.resultsView.render().el);
     },
 
     clickSearchBtn () {
-      this.setSearch({ q: this.getCachedEl('.js-searchInput').val(), p: 0 }, { force: true });
+      this.setSearch({ q: $('.js-searchInput').val(), p: 0 }, { force: true });
       recordEvent('Discover_ClickSearch');
       recordEvent('Discover_Search', { type: 'click' });
     },
 
     onKeyupSearchInput (e) {
       if (e.which === 13) {
-        this.setSearch({ q: this.getCachedEl('.js-searchInput').val(), p: 0 }, { force: true });
+        this.setSearch({ q: $('.js-searchInput').val(), p: 0 }, { force: true });
         recordEvent('Discover_EnterKeySearch');
         recordEvent('Discover_Search', { type: 'enterKey' });
       }

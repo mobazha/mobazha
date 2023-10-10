@@ -759,7 +759,7 @@ export default {
           this.dataChangePopIn = null;
         });
 
-        this.getCachedEl('.js-popInMessages').append(this.dataChangePopIn.render().el);
+        $('.js-popInMessages').append(this.dataChangePopIn.render().el);
       }
     },
 
@@ -828,7 +828,7 @@ export default {
     changeCryptoAmountCurrency (e) {
       this._cryptoAmountCurrency = e.target.value;
       const { quantity } = this.getFormData(
-        this.getCachedEl('#cryptoAmount'),
+        $('#cryptoAmount'),
       );
       this.setModelQuantity(quantity);
     },
@@ -911,7 +911,7 @@ export default {
           .plus(priceObj.vPrice)
           .plus(priceObj.sPrice).lte(0)
       ) {
-        this.insertErrors(this.getCachedEl('.js-errors'),
+        this.insertErrors($('.js-errors'),
           [app.polyglot.t('purchase.errors.zeroPrice')]);
         this.setState({ phase: 'pay' });
         return;
@@ -1060,7 +1060,7 @@ export default {
           const domKey = errKey.replace(/\[[^\[\]]*\]/g, '').replace('.', '-');
           let container = $(`.js-${domKey}-errors`);
           // if no container exists, use the generic container
-          container = container.length ? container : this.getCachedEl('.js-errors');
+          container = container.length ? container : $('.js-errors');
           const err = this.order.validationError[errKey];
           this.insertErrors(container, err);
           purchaseErrs[`UserError-${domKey}`] = err.join(', ');
@@ -1123,7 +1123,7 @@ export default {
             toCur: this.listing.get('item').get('cryptoListingCurrencyCode'),
           },
         });
-        this.getCachedEl('.js-cryptoTitle')
+        $('.js-cryptoTitle')
           .html(this.cryptoTitle.render().el);
 
         $('#cryptoAmountCurrency').select2({ minimumResultsForSearch: Infinity });

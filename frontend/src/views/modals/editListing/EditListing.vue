@@ -345,6 +345,10 @@ export default {
   mounted () {
     this.render();
   },
+  unmounted() {
+    this.inProgressPhotoUploads.forEach((upload) => upload.abort());
+    $(window).off('resize', this.throttledResizeWin);
+  },
   computed: {
     ob () {
       const item = this.model.get('item');
@@ -610,7 +614,6 @@ export default {
         'click .js-scrollToVariantInventory': 'onClickScrollToVariantInventory',
         'click .js-viewListing': 'onClickViewListing',
         'click .js-viewListingOnWeb': 'onClickViewListingOnWeb',
-        ...super.events(),
       };
     },
 
@@ -706,9 +709,9 @@ export default {
         if (e.target.value === 'CRYPTOCURRENCY') {
           this.model.get('metadata')
             .set('acceptedCurrencies', [this._receiveCryptoCur]);
-          this.getCachedEl('#editListingCryptoContractType')
+          $('#editListingCryptoContractType')
             .val('CRYPTOCURRENCY');
-          this.getCachedEl('#editListingCryptoContractType')
+          $('#editListingCryptoContractType')
             .trigger('change')
             .focus();
         }
@@ -720,9 +723,9 @@ export default {
 
       this.model.get('metadata')
         .set('acceptedCurrencies', this._acceptedCurs);
-      this.getCachedEl('#editContractType')
+      $('#editContractType')
         .val(e.target.value);
-      this.getCachedEl('#editContractType')
+      $('#editContractType')
         .trigger('change', { fromCryptoTypeChange: true })
         .focus();
     },
@@ -1278,7 +1281,7 @@ export default {
       let formData = this.getFormData(this.$formFields);
       const item = this.model.get('item');
       const metadata = this.model.get('metadata');
-      const isCrypto = this.getCachedEl('#editContractType').val() === 'CRYPTOCURRENCY';
+      const isCrypto = $('#editContractType').val() === 'CRYPTOCURRENCY';
 
       // set model / collection data for various child views
       this.shippingOptionViews.forEach((shipOptVw) => shipOptVw.setModelData());
@@ -1375,8 +1378,6 @@ export default {
     },
 
     open () {
-      super.open();
-
       if (!this.openedBefore) {
         this.openedBefore = true;
         let cur;
@@ -1444,7 +1445,7 @@ export default {
     },
 
     get $formFields () {
-      const isCrypto = this.getCachedEl('#editContractType').val() === 'CRYPTOCURRENCY';
+      const isCrypto = $('#editContractType').val() === 'CRYPTOCURRENCY';
       const cryptoExcludes = isCrypto ? ', .js-inventoryManagementSection' : '';
       const excludes = '.js-sectionShipping, .js-couponsSection, .js-variantsSection, '
         + `.js-variantInventorySection${cryptoExcludes}`;
@@ -1461,9 +1462,9 @@ export default {
       // a crypto currency listing.
       $fields = $fields.filter((index, el) => {
         const $excludeContainers = isCrypto
-          ? this.getCachedEl('.js-standardTypeWrap')
-            .add(this.getCachedEl('.js-skuMatureContentRow'))
-          : this.getCachedEl('.js-cryptoTypeWrap');
+          ? $('.js-standardTypeWrap')
+            .add($('.js-skuMatureContentRow'))
+          : $('.js-cryptoTypeWrap');
 
         let keep = true;
 
@@ -1596,11 +1597,11 @@ export default {
     get coinDivisibility () {
       let coinDiv;
 
-      if (this.getCachedEl('#editContractType').length) {
+      if ($('#editContractType').length) {
         try {
           coinDiv = getCoinDivisibility(
-            this.getCachedEl('#editContractType').val() === 'CRYPTOCURRENCY'
-              ? this.getCachedEl('#editListingCoinType').val()
+            $('#editContractType').val() === 'CRYPTOCURRENCY'
+              ? $('#editListingCoinType').val()
               || this.model.get('metadata').get('coinType')
               : this.currency,
           );
@@ -1630,12 +1631,6 @@ export default {
       });
 
       return view;
-    },
-
-    remove () {
-      this.inProgressPhotoUploads.forEach((upload) => upload.abort());
-      $(window).off('resize', this.throttledResizeWin);
-      super.remove();
     },
 
     render (restoreScrollPos = true) {
@@ -1686,7 +1681,6 @@ export default {
           }));
 
           this.setContractTypeClass(metadata.get('contractType'));
-          super.render();
 
           this._$scrollLinks = null;
           this._$scrollToSections = null;
@@ -1921,7 +1915,7 @@ export default {
             getReceiveCur: () => this._receiveCryptoCur,
           });
 
-          this.getCachedEl('.js-cryptoTypeWrap')
+          $('.js-cryptoTypeWrap')
             .html(this.cryptoCurrencyType.render().el);
 
           const activeCurs = this.model.get('metadata')
@@ -1944,7 +1938,7 @@ export default {
           this.cryptoCurSelector = this.createChild(CryptoCurSelector, {
             initialState: curSelectorInitialState,
           });
-          this.getCachedEl('.js-cryptoCurSelectContainer')
+          $('.js-cryptoCurSelectContainer')
             .html(this.cryptoCurSelector.render().el);
 
           setTimeout(() => {

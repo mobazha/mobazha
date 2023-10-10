@@ -114,9 +114,9 @@ export default {
         this.collection.remove(e.view.model));
 
       return view;
-    }
+    },
 
-  get $addCoupon () {
+    get $addCoupon () {
       return this._$addCoupon ||
         (this._$addCoupon =
           $('.js-addCoupon'));

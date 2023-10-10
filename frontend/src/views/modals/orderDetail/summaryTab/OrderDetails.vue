@@ -390,11 +390,11 @@ export default {
 
     onClickCopyCryptoAddress (address) {
       ipc.send('controller.system.writeToClipboard', address);
-      this.getCachedEl('.js-cryptoAddressCopiedToClipboard')
+      $('.js-cryptoAddressCopiedToClipboard')
         .velocity('stop')
         .velocity('fadeIn', {
           complete: () => {
-            this.getCachedEl('.js-cryptoAddressCopiedToClipboard')
+            $('.js-cryptoAddressCopiedToClipboard')
               .velocity('fadeOut', { delay: 1000 });
           },
         });
@@ -402,11 +402,11 @@ export default {
 
     onClickCopyCryptoQuantity (quantity) {
       ipc.send('controller.system.writeToClipboard', quantity);
-      this.getCachedEl('.js-cryptoQuantityCopiedToClipboard')
+      $('.js-cryptoQuantityCopiedToClipboard')
         .velocity('stop')
         .velocity('fadeIn', {
           complete: () => {
-            this.getCachedEl('.js-cryptoQuantityCopiedToClipboard')
+            $('.js-cryptoQuantityCopiedToClipboard')
               .velocity('fadeOut', { delay: 1000 });
           },
         });

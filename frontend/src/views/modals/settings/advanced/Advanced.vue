@@ -578,7 +578,6 @@ export default {
     },
 
     render () {
-      super.render();
       const bundled = ipc.sendSync('controller.system.getGlobal', 'isBundledApp');
       loadTemplate('modals/settings/advanced/advanced.html', (t) => {
         this.$el.html(t({

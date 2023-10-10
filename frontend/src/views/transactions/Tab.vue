@@ -218,10 +218,6 @@ export default {
     currentFilterIsDefault() {
       return _.isEqual(this.defaultFilter, _.omit(this.filter, 'orderID'));
     },
-
-    remove() {
-      clearTimeout(this.searchKeyUpTimer);
-    },
   },
 };
 </script>

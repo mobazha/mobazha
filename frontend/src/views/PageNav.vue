@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div @click="onDocClick">
     <header>
       <nav class="bar clrBr clrP navBar">
         <div class="flexVCent">
@@ -181,6 +181,9 @@ export default {
   mounted () {
     this.render();
   },
+  unmounted() {
+    if (this.unreadNotifCountFetch) this.unreadNotifCountFetch.abort();
+  },
   computed: {
     ob () {
       return {
@@ -217,9 +220,6 @@ export default {
       this.baseInit(opts);
       this.addressBarText = '';
 
-      this.boundOnDocClick = this.onDocClick.bind(this);
-      $(document).on('click', this.boundOnDocClick);
-
       this.listenTo(app.localSettings, 'change:windowControlStyle', (_, style) => this.setWinControlsStyle(style));
       this.setWinControlsStyle(app.localSettings.get('windowControlStyle'));
 
@@ -241,8 +241,8 @@ export default {
           .removeClass('txB');
         this.torIndicatorOn = false;
         this.stopListening(app.router, null, this.onRouteSearch);
-        this.getCachedEl('.js-notifUnreadBadge').addClass('hide');
-        this.getCachedEl('.js-cartItemsCountBadge').addClass('hide');
+        $('.js-notifUnreadBadge').addClass('hide');
+        $('.js-cartItemsCountBadge').addClass('hide');
         this.stopListening(e.socket, 'message', this.onSocketMessage);
       });
     },
@@ -277,13 +277,13 @@ export default {
       if (shoppingCart) {
         this.cartItemsCount = shoppingCart.itemsCount;
       }
-    }
+    },
 
-  get navigable () {
+    get navigable () {
       return this.options.navigable;
-    }
+    },
 
-  set navigable (navigable) {
+    set navigable (navigable) {
       const prevNavigable = this.options.navigable;
 
       this.options.navigable = !!navigable;
@@ -295,13 +295,13 @@ export default {
           this.$el.addClass('notNavigable');
         }
       }
-    }
+    },
 
-  get torIndicatorOn () {
+    get torIndicatorOn () {
       return this.options.torIndicatorOn;
-    }
+    },
 
-  set torIndicatorOn (bool) {
+    set torIndicatorOn (bool) {
       if (this.options.torIndicatorOn !== bool) {
         this.options.torIndicatorOn = bool;
         this.$el.toggleClass('torIndicatorOn', bool);
@@ -327,13 +327,13 @@ export default {
       setTimeout(() => {
         Backbone.history.loadUrl();
       }, 200);
-    }
+    },
 
-  get unreadNotifCount () {
+    get unreadNotifCount () {
       return this._unreadNotifCount;
-    }
+    },
 
-  set unreadNotifCount (count) {
+    set unreadNotifCount (count) {
       if (typeof count !== 'number') {
         throw new Error('Please provide a count as a number.');
       }
@@ -342,13 +342,13 @@ export default {
       this._unreadNotifCount = count;
       this.renderUnreadNotifCount();
       setUnreadNotifCount(this.unreadNotifCount);
-    }
+    },
 
-  get cartItemsCount () {
+    get cartItemsCount () {
       return this._cartItemsCount;
-    }
+    },
 
-  set cartItemsCount (count) {
+    set cartItemsCount (count) {
       if (typeof count !== 'number') {
         throw new Error('Please provide a count as a number.');
       }
@@ -368,7 +368,7 @@ export default {
     },
 
     renderUnreadNotifCount () {
-      this.getCachedEl('.js-notifUnreadBadge')
+      $('.js-notifUnreadBadge')
         .toggleClass('hide', !this.unreadNotifCount)
         .toggleClass('ellipsisShown', this.unreadNotifCount > 99)
         .text(this.unreadNotifCount > 99 ? '…' : this.unreadNotifCount);
@@ -379,7 +379,7 @@ export default {
     },
 
     renderCartItemsCount () {
-      this.getCachedEl('.js-cartItemsCountBadge')
+      $('.js-cartItemsCountBadge')
         .toggleClass('hide', !this.cartItemsCount)
         .toggleClass('ellipsisShown', this.cartItemsCount > 99)
         .text(this.cartItemsCount > 99 ? '…' : this.cartItemsCount);
@@ -431,7 +431,7 @@ export default {
         connectedServer.server.save({ dismissedDiscoverCallout: true });
       }
 
-      this.getCachedEl('.js-discoverCallout').remove();
+      $('.js-discoverCallout').remove();
     },
 
     onMouseEnterConnectedServerListItem () {
@@ -512,7 +512,7 @@ export default {
     },
 
     isNotificationsOpen () {
-      return this.getCachedEl('.js-notifContainer').hasClass('open');
+      return $('.js-notifContainer').hasClass('open');
     },
 
     toggleNotifications () {
@@ -526,11 +526,11 @@ export default {
         // open notifications menu
         if (!this.notifications) {
           this.notifications = new Notifications();
-          this.getCachedEl('.js-notifContainer').html(this.notifications.render().el);
+          $('.js-notifContainer').html(this.notifications.render().el);
           this.listenTo(this.notifications, 'notifNavigate', () => this.closeNotifications());
         }
 
-        this.getCachedEl('.js-notifContainer').addClass('open');
+        $('.js-notifContainer').addClass('open');
       }
     },
 
@@ -548,7 +548,7 @@ export default {
 
       if (!this.isNotificationsOpen()) return;
       if (opts.closeNavList) this.$navList.removeClass('open');
-      this.getCachedEl('.js-notifContainer').removeClass('open');
+      $('.js-notifContainer').removeClass('open');
       if (opts.closeOverlay) this.$navOverlay.removeClass('open');
 
       if (this.notifications) {
@@ -659,15 +659,7 @@ export default {
       });
     },
 
-    remove () {
-      if (this.unreadNotifCountFetch) this.unreadNotifCountFetch.abort();
-      $(document).off('click', this.boundOnDocClick);
-      super.remove();
-    },
-
     render () {
-      super.render();
-
       let connectedServer = getCurrentConnection();
 
       if (connectedServer && connectedServer.status !== 'disconnected') {

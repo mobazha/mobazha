@@ -116,7 +116,7 @@
 </template>
 
 <script>
-import loadTemplate from '../../../backbone/utils/loadTemplate';
+import $ from 'jquery';
 import app from '../../../backbone/app';
 import Profile from '../../../backbone/models/profile/Profile';
 import SocialBtns from '../components/SocialBtns';
@@ -207,7 +207,7 @@ export default {
             .get('acceptedCurrencies'),
         },
       });
-      this.getCachedEl('.js-supportedCurrenciesList')
+      $('.js-supportedCurrenciesList')
         .append(this.supportedCurrenciesList.render().el);
 
       return this;

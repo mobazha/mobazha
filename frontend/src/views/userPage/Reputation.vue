@@ -56,6 +56,9 @@ export default {
   mounted() {
     this.render();
   },
+  unmounted() {
+    if (this.ratingsFetch) this.ratingsFetch.abort();
+  },
   computed: {
     ob() {
       return {
@@ -108,13 +111,9 @@ export default {
       this.reviews.setState({ isFetchingRatings: false });
     },
 
-    remove() {
-      if (this.ratingsFetch) this.ratingsFetch.abort();
-    },
-
     render() {
       this.delegateEvents(this.reviews);
-      this.getCachedEl('.js-reviews').append(this.reviews.render().$el);
+      $('.js-reviews').append(this.reviews.render().$el);
 
       return this;
     },

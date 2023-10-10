@@ -129,7 +129,7 @@ export default {
     onDocumentClick (e) {
       if (this.getState().showConfirmTooltip &&
         !$(e.target).hasClass('js-confirmBox') &&
-        !($.contains(this.getCachedEl('.js-confirmBox')[0], e.target))) {
+        !($.contains($('.js-confirmBox')[0], e.target))) {
         this.setState({ showConfirmTooltip: false });
       }
     },

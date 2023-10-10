@@ -334,6 +334,14 @@ export default {
   mounted () {
     this.render();
   },
+  unmounted() {
+    if (this.editModal) this.editModal.remove();
+    if (this._purchaseModal) this._purchaseModal.remove();
+    if (this.destroyRequest) this.destroyRequest.abort();
+    if (this.ratingsFetch) this.ratingsFetch.abort();
+    // if (this.inventoryFetch) this.inventoryFetch.abort();
+    if (this.moreListingsFetch) this.moreListingsFetch.abort();
+  },
   computed: {
     ob () {
       const defaultBadge = app.verifiedMods.defaultBadge(this.model.get('moderators'));
@@ -903,7 +911,7 @@ export default {
             console.error(e);
           }
 
-          this.getCachedEl('.js-price').html(adjPrice);
+          $('.js-price').html(adjPrice);
         }
       } catch (e) {
         // pass
@@ -935,10 +943,10 @@ export default {
         reloadLink: '<a class="js-reloadOutdated">'
           + `${app.polyglot.t('listingDetail.errors.reloadOutdatedHash')}<a>`,
       });
-      this.getCachedEl('.js-purchaseErrorWrap').html(
+      $('.js-purchaseErrorWrap').html(
         this.purchaseErrorT({ tip }),
       );
-      this.getCachedEl('.js-purchaseBtn').addClass('disabled');
+      $('.js-purchaseBtn').addClass('disabled');
     },
 
     onClickReloadOutdated () {
@@ -976,11 +984,11 @@ export default {
         }));
       });
     },
-  /**
-   * Returns a promise that will fire progress notifications when a purchase modal
-   * is created. Will also fire a notifications when one is destroyed.
-   */
-  get purchaseModal () {
+    /**
+     * Returns a promise that will fire progress notifications when a purchase modal
+     * is created. Will also fire a notifications when one is destroyed.
+     */
+    get purchaseModal () {
       this._purchaseModalDeferred = this._purchaseModalDeferred || $.Deferred();
 
       if (this._purchaseModal) {
@@ -1133,17 +1141,6 @@ export default {
         || (this._$deleteConfirmedBox = $('.js-deleteConfirmedBox'));
     },
 
-    remove () {
-      if (this.editModal) this.editModal.remove();
-      if (this._purchaseModal) this._purchaseModal.remove();
-      if (this.destroyRequest) this.destroyRequest.abort();
-      if (this.ratingsFetch) this.ratingsFetch.abort();
-      // if (this.inventoryFetch) this.inventoryFetch.abort();
-      if (this.moreListingsFetch) this.moreListingsFetch.abort();
-      $(document).off('click', this.boundDocClick);
-      super.remove();
-    },
-
     render () {
       if (this.dataChangePopIn) this.dataChangePopIn.remove();
 
@@ -1176,7 +1173,7 @@ export default {
             .get('acceptedCurrencies'),
         },
       });
-      this.getCachedEl('.js-supportedCurrenciesList')
+      $('.js-supportedCurrenciesList')
         .append(this.supportedCurrenciesList.render().el);
 
       if (!this.model.isOwnListing) {
@@ -1195,7 +1192,7 @@ export default {
         },
       });
       this.listenTo(this.moreListings, 'listingDetailOpened', () => this.remove());
-      this.getCachedEl('.js-moreListings')
+      $('.js-moreListings')
         .append(this.moreListings.render().$el);
 
       this.$photoSelectedInner = $('.js-photoSelectedInner');
@@ -1236,7 +1233,7 @@ export default {
         //     amount: this._inventory,
         //   },
         // });
-        // this.getCachedEl('.js-cryptoInventory')
+        // $('.js-cryptoInventory')
         //   .html(this.cryptoInventory.render().el);
 
         if (this.cryptoTitle) this.cryptoTitle.remove();
@@ -1248,7 +1245,7 @@ export default {
             toCur: this.model.get('item').get('cryptoListingCurrencyCode'),
           },
         });
-        this.getCachedEl('.js-cryptoTitle')
+        $('.js-cryptoTitle')
           .html(this.cryptoTitle.render().el);
       } else {
         this.adjustPriceBySku();

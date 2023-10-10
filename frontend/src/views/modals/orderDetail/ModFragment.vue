@@ -15,6 +15,7 @@
 </template>
 
 <script>
+import $ from 'jquery';
 import VerifiedMod, { getModeratorOptions } from '../../../../backbone/views/components/VerifiedMod';
 import app from '../../../../backbone/app';
 
@@ -89,7 +90,7 @@ export default {
 
       if (this.verifiedMod) this.verifiedMod.remove();
       this.verifiedMod = this.createChild(VerifiedMod, createOptions);
-      this.getCachedEl('.js-verifiedMod').append(this.verifiedMod.render().el);
+      $('.js-verifiedMod').append(this.verifiedMod.render().el);
 
       return this;
     }

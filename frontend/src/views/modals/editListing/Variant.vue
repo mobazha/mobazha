@@ -86,8 +86,8 @@ export default {
       this.$emit('removeClick', { view: this });
     },
 
-    getFormData (fields = this.$formFields) {
-      const formData = super.getFormData(fields);
+    getFormDataEx (fields = this.$formFields) {
+      const formData = this.getFormData(fields);
 
       // Post process the vairants to seperate the clientID from the actual value.
       formData.variants = formData.variants.map((v) => {
@@ -107,7 +107,7 @@ export default {
 
     // Sets the model based on the current data in the UI.
     setModelData () {
-      const formData = this.getFormData();
+      const formData = this.getFormDataEx();
       this.model.set(formData);
     },
 
@@ -117,7 +117,6 @@ export default {
     },
 
     render () {
-      super.render();
       const errors = {
         ...(this.model.validationError || {}),
         ...(this.options.errors || {}),
@@ -144,7 +143,7 @@ export default {
             variantItems.push(value);
           });
 
-        this.getCachedEl('select[name=variants]').selectize({
+        $('select[name=variants]').selectize({
           persist: false,
           valueField: 'value',
           options: variantOptions,

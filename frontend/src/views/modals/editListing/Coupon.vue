@@ -101,8 +101,8 @@ export default {
       this.$emit('remove-click', { view: this });
     },
 
-    getFormData (fields = this.$formFields) {
-      const formData = super.getFormData(fields);
+    getFormDataEx (fields = this.$formFields) {
+      const formData = this.getFormData(fields);
 
       if (formData.discountType === 'FIXED') {
         const bigNumDiscount = bigNumber(formData.discountAmount);
@@ -120,11 +120,11 @@ export default {
       delete formData.discountAmount;
 
       return formData;
-    }
+    },
 
-  // Sets the model based on the current data in the UI.
-  setModelData () {
-      const formData = this.getFormData();
+    // Sets the model based on the current data in the UI.
+    setModelData () {
+      const formData = this.getFormDataEx();
 
       if (formData.priceDiscount !== undefined) {
         this.model.unset('percentDiscount');
@@ -133,15 +133,15 @@ export default {
       }
 
       this.model.set(formData);
-    }
+    },
 
-  get $inputDiscountAmount () {
+    get $inputDiscountAmount () {
       return this._$inputDiscountAmount ||
         (this._$inputDiscountAmount =
           $('input[name=discountAmount]'));
-    }
+    },
 
-  get $formFields () {
+    get $formFields () {
       return this._$formFields ||
         (this._$formFields =
           $('select[name], input[name], textarea[name]'));

@@ -4,14 +4,14 @@
       <form class="padSmKids padStack">
         <div class="flexVCent">
           <h2 class="h4 clrT flexExpand" :required="ob.listPosition === 1">{{ ob.polyT('editListing.shippingOptions.optionHeading', { listPosition: ob.listPosition }) }}</h2>
-          <a class="clrBr clrP clrSh2 margRSm btn js-removeShippingOption">{{ ob.polyT('editListing.shippingOptions.btnDeleteShippingOption') }}</a>
+          <a class="clrBr clrP clrSh2 margRSm btn js-removeShippingOption" @click="onClickRemoveShippingOption">{{ ob.polyT('editListing.shippingOptions.btnDeleteShippingOption') }}</a>
         </div>
         <hr class="clrBr rowMd" />
         <div class="flexRow">
           <label :for="`shipDestinationsSelect_${ob.cid}`" class="required">{{ ob.polyT('editListing.shippingOptions.shippingDestinations') }}</label>
           <div class="flexExpand">
             <div class="flexHRight flexVCent">
-              <a class="js-clearAllShipDest tx6">{{ ob.polyT('editListing.shippingOptions.clearAll') }}</a>
+              <a class="js-clearAllShipDest tx6" @click="onClickClearShipDest">{{ ob.polyT('editListing.shippingOptions.clearAll') }}</a>
             </div>
           </div>
         </div>
@@ -26,7 +26,7 @@
           <div class="col6 simpleFlexCol">
             <label :for="`shipOptionType_${ob.cid}`" class="required">{{ ob.polyT('editListing.shippingOptions.typeLabel') }}</label>
             <FormError v-if="ob.errors['type']" :errors="ob.errors['type']" />
-            <select :id="`shipOptionType_${ob.cid}`" name="type" class="clrBr clrP clrSh2 marginTopAuto">
+            <select :id="`shipOptionType_${ob.cid}`" @change="onChangeShippingType(val)" name="type" class="clrBr clrP clrSh2 marginTopAuto">
               <template v-for="(shippingType, j) in ob.shippingTypes" :key="j">
                 <option :value="shippingType" :selected="ob.type === shippingType">{{ ob.polyT(`editListing.shippingOptions.shippingTypes.${shippingType}`) }}</option>
               </template>
@@ -49,7 +49,7 @@
         </div>
         <div class="js-servicesWrap js-serviceSection servicesWrap padKids padStack padTop0" v-show="!ob.type === 'LOCAL_PICKUP'"></div>
         <div class="flexRow pad js-serviceSection" v-show="!ob.type === 'LOCAL_PICKUP'">
-          <a class="clrBr clrP clrTEm js-btnAddService">{{ ob.polyT('editListing.shippingOptions.services.addService') }}</a>
+          <a class="clrBr clrP clrTEm js-btnAddService" @click="onClickAddService">{{ ob.polyT('editListing.shippingOptions.services.addService') }}</a>
         </div>
       </form>
     </div>
@@ -151,22 +151,6 @@ export default {
       });
     },
 
-    events () {
-      const events = {
-        'click .js-removeShippingOption': 'onClickRemoveShippingOption',
-        'click .js-btnAddService': 'onClickAddService',
-        'click .js-clearAllShipDest': 'onClickClearShipDest',
-      };
-
-      events[`change #shipOptionType_${this.model.cid}`] = 'onChangeShippingType';
-
-      return events;
-    },
-
-    tagName () {
-      return 'section';
-    },
-
     onClickRemoveShippingOption () {
       this.trigger('click-remove', { view: this });
     },
@@ -182,10 +166,10 @@ export default {
         .clear();
     },
 
-    onChangeShippingType (e) {
+    onChangeShippingType (val) {
       let method;
 
-      if ($(e.target).val() === 'LOCAL_PICKUP') {
+      if (val === 'LOCAL_PICKUP') {
         method = 'addClass';
       } else {
         method = 'removeClass';
@@ -196,9 +180,9 @@ export default {
       }
 
       this.$serviceSection[method]('hide');
-    }
+    },
 
-  set listPosition (position) {
+    set listPosition (position) {
       if (typeof position !== 'number') {
         throw new Error('Please provide a position as a number');
       }
@@ -211,14 +195,14 @@ export default {
           app.polyglot.t('editListing.shippingOptions.optionHeading', { listPosition }),
         );
       }
-    }
+    },
 
-  get listPosition () {
+    get listPosition () {
       return this.options.listPosition;
     },
 
-    getFormData (fields = this.$formFields) {
-      const formData = super.getFormData(fields);
+    getFormDataEx (fields = this.$formFields) {
+      const formData = this.getFormData(fields);
       const indexedRegions = getIndexedRegions();
 
       // Strip out any region elements from shipping destinations
@@ -227,13 +211,13 @@ export default {
         .filter((region) => !indexedRegions[region]);
 
       return formData;
-    }
+    },
 
-  // Sets the model based on the current data in the UI.
-  setModelData () {
+    // Sets the model based on the current data in the UI.
+    setModelData () {
       // set the data for our nested Services views
       this.serviceViews.forEach((serviceVw) => serviceVw.setModelData());
-      this.model.set(this.getFormData());
+      this.model.set(this.getFormDataEx());
     },
 
     createServiceView (options) {
@@ -246,34 +230,34 @@ export default {
       });
 
       return view;
-    }
+    },
 
-  get $headline () {
+    get $headline () {
       return this._$headline
         || (this._$headline = $('h1'));
-    }
+    },
 
-  get $shipDestinationDropdown () {
+    get $shipDestinationDropdown () {
       return this._$shipDestinationDropdown
         || (this._$shipDestinationDropdown = $(`#shipDestinationsDropdown_${this.model.cid}`));
-    }
+    },
 
-  get $serviceSection () {
+    get $serviceSection () {
       return this._$serviceSection
         || (this._$serviceSection = $('.js-serviceSection'));
-    }
+    },
 
-  get $formFields () {
+    get $formFields () {
       return this._$formFields
         || (this._$formFields = $('select[name], input[name], textarea[name]').filter((index, el) => (
           !$(el).parents('.js-serviceSection').length)));
-    }
+    },
 
-  /**
-   * Returns a list of any regions that are fully represented in the provided
-   * countries list.
-   */
-  representedRegions (countries = []) {
+    /**
+     * Returns a list of any regions that are fully represented in the provided
+     * countries list.
+     */
+    representedRegions (countries = []) {
       if (!Array.isArray(countries)) {
         throw new Error('Please provide an array of country codes.');
       }
@@ -290,7 +274,6 @@ export default {
     },
 
     render () {
-      super.render();
       loadTemplate('modals/editListing/shippingOption.html', (t) => {
         this.$el.html(t({
           // Since multiple instances of this view will be rendered, any id's should
@@ -307,7 +290,7 @@ export default {
           minimumResultsForSearch: Infinity,
         });
 
-        this.$shipDestinationSelect = this.getCachedEl(`#shipDestinationsSelect_${this.model.cid}`);
+        this.$shipDestinationSelect = $(`#shipDestinationsSelect_${this.model.cid}`);
         this.$servicesWrap = $('.js-servicesWrap');
 
         this.$shipDestinationSelect.selectize({
@@ -382,7 +365,6 @@ export default {
 
       return this;
     }
-
   }
 }
 </script>

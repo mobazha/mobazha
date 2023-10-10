@@ -88,7 +88,7 @@ export default {
       this.baseInit(options);
     },
 
-  get infiniteQuantityChar () {
+    get infiniteQuantityChar () {
       return '—';
     },
 
@@ -118,14 +118,14 @@ export default {
       }
     },
 
-    getFormData (fields = this.$formFields) {
-      const formData = super.getFormData(fields);
+    getFormDataEx (fields = this.$formFields) {
+      const formData = this.getFormData(fields);
       return formData;
     },
 
   // Sets the model based on the current data in the UI.
   setModelData () {
-      const formData = this.getFormData();
+      const formData = this.getFormDataEx();
 
       if (formData.infiniteInventory) {
         delete formData.quantity;
@@ -151,25 +151,25 @@ export default {
       return formatted;
     },
 
-  get $formFields () {
+    get $formFields () {
       return this._$formFields ||
         (this._$formFields =
           $('select[name], input[name], textarea[name]'));
     },
 
-  get $totalPrice () {
+    get $totalPrice () {
       return this._$totalPrice ||
         (this._$totalPrice =
           $('.js-totalPrice'));
     },
 
-  get $infiniteInventoryCheckbox () {
+    get $infiniteInventoryCheckbox () {
       return this._$infiniteInventoryCheckbox ||
         (this._$infiniteInventoryCheckbox =
           $('.js-infiniteInventoryCheckbox'));
     },
 
-  get $quantity () {
+    get $quantity () {
       return this._$quantity ||
         (this._$quantity =
           $('.js-quantity'));

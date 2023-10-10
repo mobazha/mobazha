@@ -112,18 +112,18 @@ export default {
 
     setCollectionData () {
       this.itemViews.forEach((item) => item.setModelData());
-    }
+    },
 
-  get $formFields () {
+    get $formFields () {
       if (!this._$formFields) {
         this._$formFields = $('select[name], input[name], textarea[name]');
       }
       return this._$formFields;
-    }
+    },
 
-  // Inpsired by: http://stackoverflow.com/a/4331218/632806
-  // TODO: would be nice to unit test this guy
-  allPossibleCombos (arr) {
+    // Inpsired by: http://stackoverflow.com/a/4331218/632806
+    // TODO: would be nice to unit test this guy
+    allPossibleCombos (arr) {
       let returnVal;
 
       if (!arr.length) {
@@ -162,10 +162,10 @@ export default {
       });
 
       return id;
-    }
+    },
 
-  // todo: good unit test candidate
-  buildInventoryData () {
+    // todo: good unit test candidate
+    buildInventoryData () {
       const options = this.optionsCl.toJSON()
         // only process options that have at least one variant
         .filter((option) => option.variants && option.variants.length);

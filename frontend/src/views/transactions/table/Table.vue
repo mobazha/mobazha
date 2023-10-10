@@ -122,6 +122,10 @@ export default {
   mounted() {
     this.onAttach();
   },
+  unmounted() {
+    if (this.avatarPost) this.avatarPost.abort();
+    if (this.transactionsFetch) this.transactionsFetch.abort();
+  },
   computed: {
     ob() {
       return {
@@ -522,11 +526,6 @@ export default {
         fetchFailed: false,
         fetchError: '',
       });
-    },
-
-    remove() {
-      if (this.avatarPost) this.avatarPost.abort();
-      if (this.transactionsFetch) this.transactionsFetch.abort();
     },
   },
 };

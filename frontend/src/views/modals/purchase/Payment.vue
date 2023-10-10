@@ -79,12 +79,11 @@
 </template>
 
 <script>
-/* eslint-disable class-methods-use-this */
 /*
 This view is also used by the Order Detail overlay. If you make any changes, please
 ensure they are compatible with both the Purchase and Order Detail flows.
 */
-
+import $ from 'jquery';
 import bigNumber from 'bignumber.js';
 import qr from 'qr-encode';
 import { ipc } from '../../../utils/ipcRenderer.js';
@@ -225,7 +224,7 @@ export default {
 
               if (amount && amount.isNaN && !amount.isNaN()) {
                 if (amount.gte(this.balanceRemaining)) {
-                  this.getCachedEl('.js-payFromWallet').removeClass('processing');
+                  $('.js-payFromWallet').removeClass('processing');
                   this.trigger('walletPaymentComplete', e.jsonData.notification);
                 } else {
                   this.balanceRemaining = this.balanceRemaining.minus(amount);
@@ -268,7 +267,7 @@ export default {
     },
 
     walletConfirm () {
-      this.getCachedEl('.js-payFromWallet').addClass('processing');
+      $('.js-payFromWallet').addClass('processing');
       this.spendConfirmBox.setState({ show: false });
       const currency = this.paymentCoin;
 
@@ -294,34 +293,34 @@ export default {
               errors: err || 'unknown error',
             });
             if (this.isRemoved()) return;
-            this.getCachedEl('.js-payFromWallet').removeClass('processing');
+            $('.js-payFromWallet').removeClass('processing');
           });
       } catch (e) {
         // This is almost certainly a dev error if this happens, but it prevents the purchase and
         // is confusing and at least to make debugging easier, we'll display an error modal.
         this.showSpendError(e.message || '');
-        this.getCachedEl('.js-payFromWallet').removeClass('processing');
+        $('.js-payFromWallet').removeClass('processing');
       }
     },
 
     copyAmount () {
       ipc.send('controller.system.writeToClipboard', String(this.balanceRemaining));
 
-      this.getCachedEl('.js-copyAmount').addClass('active');
+      $('.js-copyAmount').addClass('active');
       if (this.hideCopyAmountTimer) {
         clearTimeout(this.hideCopyAmountTimer);
       }
-      this.hideCopyAmountTimer = setTimeout(() => this.getCachedEl('.js-copyAmount').removeClass('active'), 3000);
+      this.hideCopyAmountTimer = setTimeout(() => $('.js-copyAmount').removeClass('active'), 3000);
     },
 
     copyAddress () {
       ipc.send('controller.system.writeToClipboard', String(this.paymentAddress));
 
-      this.getCachedEl('.js-copyAddress').addClass('active');
+      $('.js-copyAddress').addClass('active');
       if (this.hideCopyAddressTimer) {
         clearTimeout(this.hideCopyAddressTimer);
       }
-      this.hideCopyAddressTimer = setTimeout(() => this.getCachedEl('.js-copyAddress').removeClass('active'), 3000);
+      this.hideCopyAddressTimer = setTimeout(() => $('.js-copyAddress').removeClass('active'), 3000);
     },
 
     clickFundWallet () {
@@ -350,7 +349,7 @@ export default {
           },
         });
         this.listenTo(this.spendConfirmBox, 'clickSend', this.walletConfirm);
-        this.getCachedEl('.js-confirmWalletContainer').html(this.spendConfirmBox.render().el);
+        $('.js-confirmWalletContainer').html(this.spendConfirmBox.render().el);
       });
 
       return this;

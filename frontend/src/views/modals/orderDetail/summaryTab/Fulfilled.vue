@@ -185,11 +185,11 @@ export default {
     onClickCopyText (content, event) {
       const target = event.target;
       ipc.send('controller.system.writeToClipboard', content.replace(/\[!\$quote\$!\]/g, '"'));
-      this.getCachedEl(target.attr('data-status-indicator'))
+      $(target.attr('data-status-indicator'))
         .velocity('stop')
         .velocity('fadeIn', {
           complete: () => {
-            this.getCachedEl(target.attr('data-status-indicator'))
+            $(target.attr('data-status-indicator'))
               .velocity('fadeOut', { delay: 1000 });
           },
         });

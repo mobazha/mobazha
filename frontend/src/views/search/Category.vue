@@ -43,6 +43,7 @@
 </template>
 
 <script>
+import $ from 'jquery';
 import { capitalize } from '../../../backbone/utils/string';
 import { recordEvent } from '../../../backbone/utils/metrics';
 import { createSearchURL } from '../../../backbone/utils/search';
@@ -171,7 +172,7 @@ export default {
         }
       });
 
-      this.getCachedEl('.js-resultsGrid').html(resultsFrag);
+      $('.js-resultsGrid').html(resultsFrag);
     },
 
     loadCategory (options) {

@@ -164,7 +164,7 @@ export default {
         }
       });
 
-      this.getCachedEl('.js-resultsGrid').html(resultsFrag);
+      $('.js-resultsGrid').html(resultsFrag);
     },
 
     loadPage (options) {

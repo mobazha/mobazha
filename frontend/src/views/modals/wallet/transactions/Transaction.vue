@@ -115,6 +115,9 @@ export default {
     this.loadData(this.options);
   },
   mounted() {},
+  unmounted() {
+    clearTimeout(this.copiedIndicatorTimeout);
+  },
   computed: {
     ob() {
       const walletBalance = app.walletBalances && app.walletBalances[this.options.coinType];
@@ -351,10 +354,6 @@ export default {
         retryConfirmOn: false,
         fetchingEstimatedFee: false,
       });
-    },
-
-    remove() {
-      clearTimeout(this.copiedIndicatorTimeout);
     },
   },
 };

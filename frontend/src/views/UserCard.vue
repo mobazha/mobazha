@@ -104,6 +104,9 @@ export default {
   mounted () {
     this.render();
   },
+  unmounted() {
+    if (this.profileFetch && this.profileFetch.abort) this.profileFetch.abort();
+  },
   computed: {
     ob () {
       return {
@@ -305,16 +308,16 @@ export default {
 
     setBlockedClass () {
       this.$el.toggleClass('isBlocked', isBlocked(this.guid));
-    }
+    },
 
-  get $followBtn () {
+    get $followBtn () {
       if (!this._$followBtn) {
         this._$followBtn = $('.js-follow');
       }
       return this._$followBtn;
-    }
+    },
 
-  get $modBtn () {
+    get $modBtn () {
       if (!this._$modBtn) {
         this._$modBtn = $('.js-mod');
       }
@@ -322,7 +325,6 @@ export default {
     },
 
     render () {
-      super.render();
       loadTemplate('userCard.html', (t) => {
         this.$el.html(t({
           loading: this.loading,
@@ -337,13 +339,11 @@ export default {
           ...((this.model && this.model.toJSON()) || {}),
         }));
 
-        super.render();
-
         this._$followBtn = null;
         this._$modBtn = null;
 
         if (this.guid !== app.profile.id) {
-          this.getCachedEl('.js-blockBtnContainer')
+          $('.js-blockBtnContainer')
             .html(
               new BlockedBtn({
                 targetId: this.guid,
@@ -374,18 +374,12 @@ export default {
               text: '',
             },
           });
-          this.getCachedEl('.js-verifiedMod').append(this.verifiedMod.render().el);
+          $('.js-verifiedMod').append(this.verifiedMod.render().el);
         }
       });
 
       return this;
     },
-
-    remove () {
-      if (this.profileFetch && this.profileFetch.abort) this.profileFetch.abort();
-      super.remove();
-    }
-
   }
 }
 </script>

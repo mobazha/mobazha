@@ -262,14 +262,14 @@ export default {
       this.cryptoTradingPair.setState({
         fromCur: e.target.value,
       });
-    }
+    },
 
-  get defaultFromCur () {
+    get defaultFromCur () {
       return this.model.get('item').get('cryptoListingCurrencyCode') ||
         this.coinTypes ? this.coinTypes[0].code : '';
-    }
+    },
 
-  get tradeSelect2Opts () {
+    get tradeSelect2Opts () {
       return {
         minimumResultsForSearch: 5,
         matcher: (params, data) => {
@@ -300,8 +300,6 @@ export default {
     },
 
     render () {
-      super.render();
-
       loadTemplate('modals/editListing/viewListingLinks.html', viewListingsT => {
         loadTemplate('modals/editListing/cryptoCurrencyType.html', t => {
           this.$el.html(t({

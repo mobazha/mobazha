@@ -76,7 +76,7 @@ export default {
     },
 
     save () {
-      let URL = this.getCachedEl('.js-addProviderInput').val();
+      let URL = $('.js-addProviderInput').val();
       // if the user doesn't type http:// or https://, add http:// for them
       if (!/^https?:\/\//i.test(URL)) {
         URL = `http://${URL}`;

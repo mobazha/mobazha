@@ -126,7 +126,7 @@ export default {
     },
 
     onOtherClick () {
-      this.getCachedEl('.js-otherInput').focus();
+      $('.js-otherInput').focus();
     },
 
     onClickSubmit () {

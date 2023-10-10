@@ -49,6 +49,12 @@ export default {
   mounted() {
     this.render();
   },
+  unmounted() {
+    if (this.followFetch) this.followFetch.abort();
+    if (this.followsYouFetch && this.followsYouFetch.abort) {
+      this.followsYouFetch.abort();
+    }
+  },
   computed: {
     ownPage() {
       return this.options.peerID === app.profile.id;
@@ -304,9 +310,9 @@ export default {
       });
 
       if (insertionType === 'prepend') {
-        this.getCachedEl('.js-userCardsContainer').prepend(usersFrag);
+        $('.js-userCardsContainer').prepend(usersFrag);
       } else {
-        this.getCachedEl('.js-userCardsContainer').append(usersFrag);
+        $('.js-userCardsContainer').append(usersFrag);
       }
     },
 
@@ -347,13 +353,6 @@ export default {
             }
           });
       });
-    },
-
-    remove() {
-      if (this.followFetch) this.followFetch.abort();
-      if (this.followsYouFetch && this.followsYouFetch.abort) {
-        this.followsYouFetch.abort();
-      }
     },
 
     render() {

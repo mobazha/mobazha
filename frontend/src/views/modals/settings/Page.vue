@@ -404,7 +404,7 @@ export default {
     /** Handles when a hex color code is entered by updating color picker. */
     handleColorCodeEntered (event) {
       const colorPickerId = $(event.target).data('color-picker-id');
-      const $colorPicker = this.getCachedEl(colorPickerId);
+      const $colorPicker = $(colorPickerId);
       const newHexColorCode = event.target.value;
 
       // If the text passes a basic RegExp for a valid 6 digit hex value,
@@ -417,7 +417,7 @@ export default {
     /** Handles when a color is chosen from the color picker by updating hex color code text. */
     handleColorChosen (event) {
       const hexInputId = $(event.target).data('hex-input-id');
-      const $hexInput = this.getCachedEl(hexInputId);
+      const $hexInput = $(hexInputId);
       const newColor = event.target.value;
 
       $hexInput.val(newColor);

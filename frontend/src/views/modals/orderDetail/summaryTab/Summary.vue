@@ -986,7 +986,7 @@ export default {
           paymentCoin: this.model.paymentCoin,
         });
 
-        this.getCachedEl('.js-payForOrderWrap').html(this.payForOrder.render().el);
+        $('.js-payForOrderWrap').html(this.payForOrder.render().el);
       }
     },
 
@@ -1130,7 +1130,7 @@ export default {
           orderID: this.model.id,
           initialState: state,
         });
-        this.getCachedEl('.js-processingErrorContainer')
+        $('.js-processingErrorContainer')
           .html(this.processingError.render().el);
       } else {
         this.processingError.setState(state);

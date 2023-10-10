@@ -146,6 +146,9 @@ export default {
   mounted() {
     this.render();
   },
+  unmounted() {
+    getContentFrame().off('scroll', this.storeListingsScrollHandler);
+  },
   computed: {
     ob() {
       return {
@@ -416,31 +419,31 @@ export default {
       this.listenTo(this.listingDetail, 'modal-will-remove', () => this.stopListening(null, null, onListingDetailClose));
     },
     $btnRetry() {
-      return this.getCachedEl('.js-retryFetch');
+      return $('.js-retryFetch');
     },
     $listingsContainer() {
-      return this.getCachedEl('.js-listingsContainer');
+      return $('.js-listingsContainer');
     },
     $shippingFilterContainer() {
-      return this.getCachedEl('.js-shippingFilterContainer');
+      return $('.js-shippingFilterContainer');
     },
     $catFilterContainer() {
-      return this.getCachedEl('.js-catFilterContainer');
+      return $('.js-catFilterContainer');
     },
     $typeFilterContainer() {
-      return this.getCachedEl('.js-typeFilterContainer');
+      return $('.js-typeFilterContainer');
     },
     $listingCount() {
-      return this.getCachedEl('.js-listingCount');
+      return $('.js-listingCount');
     },
     $noResults() {
-      return this.getCachedEl('.js-noResults') || null;
+      return $('.js-noResults') || null;
     },
     $popInMessages() {
-      return this.getCachedEl('.js-popInMessages');
+      return $('.js-popInMessages');
     },
     $inactiveWarning() {
-      return this.getCachedEl('.js-inactiveWarning');
+      return $('.js-inactiveWarning');
     },
     filteredCollection(filter = this.filter, collection = this.collection) {
       const models = collection.models.filter((md) => {
@@ -651,10 +654,6 @@ export default {
         this.typeFilter.delegateEvents();
         this.$typeFilterContainer().empty().append(this.typeFilter.el);
       }
-    },
-
-    remove() {
-      getContentFrame().off('scroll', this.storeListingsScrollHandler);
     },
 
     render() {

@@ -78,8 +78,8 @@ export default {
       this.trigger('click-remove', { view: this });
     },
 
-  // Sets the model based on the current data in the UI.
-  setModelData () {
+    // Sets the model based on the current data in the UI.
+    setModelData () {
       this.model.set(this.getFormData(this.$formFields));
     },
 

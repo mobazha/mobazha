@@ -303,7 +303,6 @@ import app from '../../../../../backbone/app.js';
 import { openSimpleMessage } from '../../SimpleMessage';
 import Dialog from '../../../modals/Dialog';
 import { endAjaxEvent, recordEvent, startAjaxEvent } from '../../../../../backbone/utils/metrics.js';
-import loadTemplate from '../../../../../backbone/utils/loadTemplate.js';
 import WalletSeed from './WalletSeed';
 import SmtpSettings from './SmtpSettings';
 import MetricsStatus from './MetricsStatus';
@@ -331,6 +330,8 @@ export default {
   },
   computed: {
     ob () {
+      const bundled = ipc.sendSync('controller.system.getGlobal', 'isBundledApp');
+
       return {
         ...this.templateHelpers,
         errors: {
@@ -579,50 +580,36 @@ export default {
 
     render () {
       const bundled = ipc.sendSync('controller.system.getGlobal', 'isBundledApp');
-      loadTemplate('modals/settings/advanced/advanced.html', (t) => {
-        this.$el.html(t({
-          errors: {
-            ...(this.settings.validationError || {}),
-            ...(this.localSettings.validationError || {}),
-          },
-          isPurging: this.purge && this.purge.state() === 'pending',
-          isGettingBlockData: this.blockData && this.blockData.state() === 'pending',
-          bundled,
-          ...this.settings.toJSON(),
-          ...this.localSettings.toJSON(),
-        }));
-
-        const formFieldsSelector = `
+      const formFieldsSelector = `
         .contentBox:not(.js-contentBoxEmailIntegration) select[name],
         .contentBox:not(.js-contentBoxEmailIntegration) input[name],
         .contentBox:not(.js-contentBoxEmailIntegration) textarea[name]
       `;
-        this.$formFields = $(formFieldsSelector)
-          .not('[data-persistence-location="local"]');
-        this.$localFields = $('[data-persistence-location="local"]');
+      this.$formFields = $(formFieldsSelector)
+        .not('[data-persistence-location="local"]');
+      this.$localFields = $('[data-persistence-location="local"]');
 
-        if (this.walletSeed) this.walletSeed.remove();
-        this.walletSeed = this.createChild(WalletSeed, {
-          initialState: {
-            seed: this.mnemonic || '',
-            isFetching: this.walletSeedFetch && this.walletSeedFetch.state() === 'pending',
-          },
-        });
-        this.listenTo(this.walletSeed, 'clickShowSeed', this.onClickShowSeed);
-        $('.js-walletSeedContainer').append(this.walletSeed.render().el);
-
-        if (this.smtpSettings) this.smtpSettings.remove();
-        this.smtpSettings = this.createChild(SmtpSettings, {
-          model: this.settings.get('smtpSettings'),
-        });
-        $('.js-smtpSettingsContainer').html(this.smtpSettings.render().el);
-
-        if (this.metricsStatus) this.metricsStatus.remove();
-        if (bundled) {
-          this.metricsStatus = this.createChild(MetricsStatus);
-          $('.js-metricsStatusWrapper').append(this.metricsStatus.render().el);
-        }
+      if (this.walletSeed) this.walletSeed.remove();
+      this.walletSeed = this.createChild(WalletSeed, {
+        initialState: {
+          seed: this.mnemonic || '',
+          isFetching: this.walletSeedFetch && this.walletSeedFetch.state() === 'pending',
+        },
       });
+      this.listenTo(this.walletSeed, 'clickShowSeed', this.onClickShowSeed);
+      $('.js-walletSeedContainer').append(this.walletSeed.render().el);
+
+      if (this.smtpSettings) this.smtpSettings.remove();
+      this.smtpSettings = this.createChild(SmtpSettings, {
+        model: this.settings.get('smtpSettings'),
+      });
+      $('.js-smtpSettingsContainer').html(this.smtpSettings.render().el);
+
+      if (this.metricsStatus) this.metricsStatus.remove();
+      if (bundled) {
+        this.metricsStatus = this.createChild(MetricsStatus);
+        $('.js-metricsStatusWrapper').append(this.metricsStatus.render().el);
+      }
 
       return this;
     }

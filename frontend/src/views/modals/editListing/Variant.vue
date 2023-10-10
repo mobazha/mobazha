@@ -21,8 +21,6 @@
 </template>
 
 <script>
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
-
 export default {
   props: {
     options: {
@@ -43,6 +41,11 @@ export default {
   },
   computed: {
     ob () {
+      const errors = {
+        ...(this.model.validationError || {}),
+        ...(this.options.errors || {}),
+      };
+
       return {
         ...this.templateHelpers,
         ...this._model,
@@ -117,47 +120,34 @@ export default {
     },
 
     render () {
-      const errors = {
-        ...(this.model.validationError || {}),
-        ...(this.options.errors || {}),
-      };
-
       this.$el.toggleClass('hasError', !!Object.keys(errors).length);
 
-      loadTemplate('modals/editListing/variant.html', (t) => {
-        this.$el.html(t({
-          ...this.model.toJSON(),
-          max: this.model.max,
-          errors,
-        }));
+      this._$formFields = null;
 
-        this._$formFields = null;
+      const variantItems = [];
+      const variantOptions = [];
 
-        const variantItems = [];
-        const variantOptions = [];
+      this.model.get('variants').toJSON()
+        .forEach((variant) => {
+          const value = `${variant._clientID}<===>${variant.name}`;
+          variantOptions.push({ ...variant, value });
+          variantItems.push(value);
+        });
 
-        this.model.get('variants').toJSON()
-          .forEach((variant) => {
-            const value = `${variant._clientID}<===>${variant.name}`;
-            variantOptions.push({ ...variant, value });
-            variantItems.push(value);
-          });
-
-        $('select[name=variants]').selectize({
-          persist: false,
-          valueField: 'value',
-          options: variantOptions,
-          items: variantItems,
-          create: (input) => ({
-            name: input,
-            value: input,
-          }),
-          render: {
-            option: (data) => `<div>${data.name}</div>`,
-            item: (data) => `<div>${data.name}</div>`,
-          },
-        }).on('change', () => this.trigger('choiceChange', { view: this }));
-      });
+      $('select[name=variants]').selectize({
+        persist: false,
+        valueField: 'value',
+        options: variantOptions,
+        items: variantItems,
+        create: (input) => ({
+          name: input,
+          value: input,
+        }),
+        render: {
+          option: (data) => `<div>${data.name}</div>`,
+          item: (data) => `<div>${data.name}</div>`,
+        },
+      }).on('change', () => this.trigger('choiceChange', { view: this }));
 
       return this;
     }

@@ -32,7 +32,6 @@
 <script>
 import $ from 'jquery';
 import { formatCurrency } from '../../../../backbone/utils/currency';
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
 
 export default {
   props: {

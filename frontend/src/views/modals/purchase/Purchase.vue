@@ -21,8 +21,12 @@
             <div class="flexColRow gutterV">
               <template v-for="(listing, key) in ob.listings" :key="key">
                 <section class="contentBox pad clrP clrBr clrSh3">
-                  <div class="js-errors"></div>
-                  <div class="js-items-quantity-errors"></div>
+                  <div class="js-errors">
+                    <FormError v-if="errors['js-errors']" :errors="errors['js-errors']" />
+                  </div>
+                  <div class="js-items-quantity-errors">
+                    <FormError v-if="errors['items-quantity']" :errors="errors['items-quantity']" />
+                  </div>
                   <template v-if="!ob.isCrypto">
                     <div class="flexVCent gutterH">
                       <div class="thumb" :style="ob.getListingBgImage(listing.item.images[0])"></div>
@@ -113,7 +117,9 @@
                     <div class="rowSm">
                       <label class="h4 flexExpand required" for="purchaseCryptoAddress">{{ heading }}</label>
                     </div>
-                    <div class="js-items-paymentAddress-errors"></div>
+                    <div class="js-items-paymentAddress-errors">
+                      <FormError v-if="errors['items-paymentAddress']" :errors="errors['items-paymentAddress']" />
+                    </div>
                     <template v-if="ob.phase === 'pay' || ob.phase === 'processing'">
                       <input type="text"
                         id="purchaseCryptoAddress"
@@ -135,7 +141,10 @@
             <template v-if="ob.phase === 'pay' || ob.phase === 'processing'">
               <template v-if="ob.listing.shippingOptions && ob.listing.shippingOptions.length">
                 <section class="contentBox padMd clrP clrBr clrSh3 js-shipping">
-                  <div class="js-shipping-errors js-items-shipping-errors"></div>
+                  <div class="js-shipping-errors js-items-shipping-errors">
+                    <FormError v-if="errors['shipping']" :errors="errors['shipping']" />
+                    <FormError v-if="errors['items-shipping']" :errors="errors['items-shipping']" />
+                  </div>
                   <Shipping
                     v-if="listing.get('shippingOptions').length"
                     :bb="function() {
@@ -151,7 +160,9 @@
               <section class="contentBox padMd clrP clrBr clrSh3">
                 <div class="flexColRows gutterVSm">
                   <div>
-                    <div class="js-paymentCoin-errors"></div>
+                    <div class="js-paymentCoin-errors">
+                      <FormError v-if="errors['paymentCoin']" :errors="errors['paymentCoin']" />
+                    </div>
                     <h2 class="h4 flexExpand required">{{ ob.polyT('purchase.cryptoCurrencyTitle') }}</h2>
                     <CryptoCurSelector
                       ref="cryptoCurSelector"
@@ -181,7 +192,9 @@
                     </template>
                   </div>
                   <template v-if="ob.showModerators && !ob.noValidModerators">
-                    <div class="js-moderated-errors"></div>
+                    <div class="js-moderated-errors">
+                      <FormError v-if="errors['moderated']" :errors="errors['moderated']" />
+                    </div>
                     <div class="js-moderatorsWrapper"></div>
                     <template v-if="!ob.noValidModerators">
                       <div>
@@ -346,7 +359,6 @@ import 'velocity-animate';
 import { ERROR_DUST_AMOUNT } from '../../../../backbone/constants';
 import { removeProp } from '../../../../backbone/utils/object';
 import app from '../../../../backbone/app';
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
 import { launchSettingsModal } from '../../../../backbone/utils/modalManager';
 // import {
 //   getInventory,
@@ -425,6 +437,8 @@ export default {
       outdatedHash: false,
 
       orderID: '',
+
+      errors: {},
     };
   },
   created () {
@@ -900,8 +914,7 @@ export default {
 
     purchaseListing () {
       // Clear any old errors.
-      const allErrContainers = $('div[class $="-errors"]');
-      allErrContainers.each((i, container) => $(container).html(''));
+      this.errors = {};
 
       // Don't allow a zero or negative price purchase.
       const priceObj = this.prices[0];
@@ -911,8 +924,7 @@ export default {
           .plus(priceObj.vPrice)
           .plus(priceObj.sPrice).lte(0)
       ) {
-        this.insertErrors($('.js-errors'),
-          [app.polyglot.t('purchase.errors.zeroPrice')]);
+        this.insertErrors('js-errors', [app.polyglot.t('purchase.errors.zeroPrice')]);
         this.setState({ phase: 'pay' });
         return;
       }
@@ -1058,9 +1070,9 @@ export default {
         const purchaseErrs = {};
         Object.keys(this.order.validationError).forEach((errKey) => {
           const domKey = errKey.replace(/\[[^\[\]]*\]/g, '').replace('.', '-');
-          let container = $(`.js-${domKey}-errors`);
+          let container = domKey;
           // if no container exists, use the generic container
-          container = container.length ? container : $('.js-errors');
+          container = container.length ? container : 'js-errors';
           const err = this.order.validationError[errKey];
           this.insertErrors(container, err);
           purchaseErrs[`UserError-${domKey}`] = err.join(', ');
@@ -1074,11 +1086,7 @@ export default {
     },
 
     insertErrors (container, errors = []) {
-      loadTemplate('formError.html', (t) => {
-        container.html(t({
-          errors,
-        }));
-      });
+      this.errors[container] = errors;
     },
 
     completePurchase (data) {

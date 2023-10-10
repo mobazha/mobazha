@@ -33,8 +33,6 @@
 </template>
 
 <script>
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
-
 export default {
   props: {
     options: {

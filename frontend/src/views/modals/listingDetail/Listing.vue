@@ -103,7 +103,7 @@
                     </template>
 
                     <button
-                      :class="`btnHg clrBAttGrad clrBrDec1 clrTOnEmph js-purchaseBtn ${templateOptions.buyNowClass}`"
+                      :class="`btnHg clrBAttGrad clrBrDec1 clrTOnEmph js-purchaseBtn ${templateOptions.buyNowClass} ${outdateHash ? 'disabled' : ''}`"
                       @click="startPurchase">
                       {{ ob.polyT(templateOptions.buyNowTranslationKey) }}
                     </button>
@@ -114,7 +114,12 @@
                     </button>
 
                     <div class="js-purchaseErrorWrap">
-                      <template v-if="unpurchaseable">
+                      <template v-if="outdateHash">
+                        <PurchaseError :tip='ob.polyT("listingDetail.errors.outdatedHash", {
+                          reloadLink: `<a class="js-reloadOutdated">` + `${ob.polyT("listingDetail.errors.reloadOutdatedHash")}<a>`,
+                        })'></PurchaseError>
+                      </template>
+                      <template v-else-if="unpurchaseable">
                         <PurchaseError :tip="templateOptions.tip"></PurchaseError>
                       </template>
                     </div>
@@ -245,7 +250,9 @@
                   </select>
                 </div>
               </div>
-              <div class="js-shippingOptions"></div>
+              <div class="js-shippingOptions">
+                <ShippingOptions :options="shippingOptionsInfo" />
+              </div>
             </div>
           </template>
           <div class="contentBox padLg clrP clrBr clrSh3">
@@ -284,7 +291,6 @@ import app from '../../../../backbone/app';
 import 'velocity-animate';
 import { getAvatarBgImage } from '../../../../backbone/utils/responsive';
 import { convertAndFormatCurrency } from '../../../../backbone/utils/currency';
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
 import { launchEditListingModal } from '../../../../backbone/utils/modalManager';
 // import {
 //   getInventory,
@@ -310,8 +316,12 @@ import SupportedCurrenciesList from '../../components/SupportedCurrenciesList';
 
 import api from '../../../api';
 
+import ShippingOptions from './ShippingOptions.vue'
 
 export default {
+  components: {
+    ShippingOptions
+  },
   props: {
     options: {
       type: Object,
@@ -324,6 +334,10 @@ export default {
 
       PURCHASE_MODAL_CREATE: 'PURCHASE_MODAL_CREATE',
       PURCHASE_MODAL_DESTROY: 'PURCHASE_MODAL_DESTROY',
+
+      outdateHash: false,
+
+      shippingDestination: '',
     };
   },
   created () {
@@ -426,7 +440,21 @@ export default {
       }
 
       return { tip, buyNowClass, buyNowTranslationKey, unpurchaseable }
-    }
+    },
+
+    shippingOptionsInfo() {
+      const shippingOptions = this._model.shippingOptions;
+      const templateData = shippingOptions.filter((option) => {
+        if (this.shippingDestination === 'ALL') return option.regions;
+        return option.regions.includes(this.shippingDestination);
+      });
+
+      return {
+        templateData,
+        displayCurrency: app.settings.get('localCurrency'),
+        pricingCurrency: this.model.price.currencyCode,
+      };
+    },
   },
   methods: {
     loadData (options = {}) {
@@ -537,7 +565,7 @@ export default {
 
       this.listenTo(outdatedListingHashesEvents, 'newHash', (e) => {
         this._latestHash = e.newHash;
-        if (e.oldHash === this._renderedHash) this.outdateHash();
+        if (e.oldHash === this._renderedHash) this.outdateHash = true;
       });
 
       this.rating = this.createChild(Rating);
@@ -617,10 +645,6 @@ export default {
 
       this.rendered = false;
       this._outdatedHashState = null;
-
-      this.purchaseErrorT = null;
-      loadTemplate('modals/listingDetail/purchaseError.html',
-        (t) => (this.purchaseErrorT = t));
     },
 
     events () {
@@ -938,17 +962,6 @@ export default {
       }
     },
 
-    outdateHash () {
-      const tip = app.polyglot.t('listingDetail.errors.outdatedHash', {
-        reloadLink: '<a class="js-reloadOutdated">'
-          + `${app.polyglot.t('listingDetail.errors.reloadOutdatedHash')}<a>`,
-      });
-      $('.js-purchaseErrorWrap').html(
-        this.purchaseErrorT({ tip }),
-      );
-      $('.js-purchaseBtn').addClass('disabled');
-    },
-
     onClickReloadOutdated () {
       let defaultPrevented = false;
 
@@ -963,27 +976,10 @@ export default {
       });
     },
 
-    onSetShippingDestination (e) {
-      this.renderShippingDestinations($(e.target).val());
+    onSetShippingDestination (val) {
+      this.shippingDestination = val;
     },
 
-    renderShippingDestinations (destination) {
-      if (!destination) {
-        throw new Error('Please provide a destination.');
-      }
-      const shippingOptions = this.model.get('shippingOptions').toJSON();
-      const templateData = shippingOptions.filter((option) => {
-        if (destination === 'ALL') return option.regions;
-        return option.regions.includes(destination);
-      });
-      loadTemplate('modals/listingDetail/shippingOptions.html', (t) => {
-        this.$shippingOptions.html(t({
-          templateData,
-          displayCurrency: app.settings.get('localCurrency'),
-          pricingCurrency: this.model.price.currencyCode,
-        }));
-      });
-    },
     /**
      * Returns a promise that will fire progress notifications when a purchase modal
      * is created. Will also fire a notifications when one is destroyed.
@@ -1121,11 +1117,6 @@ export default {
         || (this._$shippingSection = $('#shippingSection'));
     },
 
-    get $shippingOptions () {
-      return this._$shippingOptions
-        || (this._$shippingOptions = $('.js-shippingOptions'));
-    },
-
     get $photoRadioBtns () {
       return this._$photoRadioBtns
         || (this._$photoRadioBtns = $('.js-photoSelect'));
@@ -1163,7 +1154,7 @@ export default {
       this.$reviews.append(this.reviews.render().$el);
 
       if (this._latestHash !== this.model.get('hash')) {
-        this.outdateHash();
+        this.outdateHash = true;
       }
 
       if (this.supportedCurrenciesList) this.supportedCurrenciesList.remove();
@@ -1201,7 +1192,6 @@ export default {
       this._$popInMessages = null;
       this._$photoSection = null;
       this._$photoSelected = null;
-      this._$shippingOptions = null;
       this._$photoRadioBtns = null;
       this._$shippingSection = null;
       this._$storeOwnerAvatar = null;
@@ -1217,7 +1207,8 @@ export default {
       });
 
       $('#shippingDestinations').select2();
-      this.renderShippingDestinations(this.defaultCountry);
+      this.shippingDestination = this.defaultCountry;
+
       this.setSelectedPhoto(this.activePhotoIndex);
       this.setActivePhotoThumbnail(this.activePhotoIndex);
 
@@ -1263,7 +1254,6 @@ export default {
 
       return this;
     }
-
   }
 }
 </script>

@@ -7,7 +7,7 @@
             <label for="editListingTitle">{{ ob.polyT('editListing.title') }}</label>
             <div class="js-cryptoTradingPairContainer"></div>
           </div>
-          {{ ob.viewListingsT({ createMode: ob.createMode }) }}
+          <ViewListingLinks :createMode="ob.createMode" />
         </div>
       </div>
     </div>
@@ -89,7 +89,6 @@
 import app from '../../../../backbone/app';
 import { supportedWalletCurs } from '../../../../backbone/data/walletCurrencies';
 import { isJQPromise } from '../../../../backbone/utils/object';
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
 import CryptoTradingPair from '../../components/CryptoTradingPair';
 import CryptoCurrencyTradeField from './CryptoCurrencyTradeField';
 
@@ -122,7 +121,6 @@ export default {
         coinTypes: this.coinTypes,
         receiveCurs: this.receiveCurs,
         errors: this.model.validationError || {},
-        viewListingsT,
         ...this._model,
         receiveCur: this.options.getReceiveCur(),
       };
@@ -300,31 +298,17 @@ export default {
     },
 
     render () {
-      loadTemplate('modals/editListing/viewListingLinks.html', viewListingsT => {
-        loadTemplate('modals/editListing/cryptoCurrencyType.html', t => {
-          this.$el.html(t({
-            contractTypes: this.model.get('metadata').contractTypesVerbose,
-            coinTypes: this.coinTypes,
-            receiveCurs: this.receiveCurs,
-            errors: this.model.validationError || {},
-            viewListingsT,
-            ...this.model.toJSON(),
-            receiveCur: this.options.getReceiveCur(),
-          }));
-
-          $('#editListingCryptoContractType').select2({
-            minimumResultsForSearch: Infinity,
-          });
-
-          $('#editListingCryptoReceive').select2(this.tradeSelect2Opts);
-
-          this.tradeField.delegateEvents();
-          $('.js-cryptoCurrencyTradeContainer').html(this.tradeField.el);
-
-          this.cryptoTradingPair.delegateEvents();
-          $('.js-cryptoTradingPairContainer').html(this.cryptoTradingPair.el);
-        });
+      $('#editListingCryptoContractType').select2({
+        minimumResultsForSearch: Infinity,
       });
+
+      $('#editListingCryptoReceive').select2(this.tradeSelect2Opts);
+
+      this.tradeField.delegateEvents();
+      $('.js-cryptoCurrencyTradeContainer').html(this.tradeField.el);
+
+      this.cryptoTradingPair.delegateEvents();
+      $('.js-cryptoTradingPairContainer').html(this.cryptoTradingPair.el);
 
       return this;
     }

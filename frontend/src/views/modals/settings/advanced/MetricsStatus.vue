@@ -21,7 +21,6 @@
 
 <script>
 import app from '../../../../../backbone/app';
-import loadTemplate from '../../../../../backbone/utils/loadTemplate';
 import { showMetricsModal, isMetricRestartNeeded, recordEvent } from '../../../../../backbone/utils/metrics';
 
 export default {

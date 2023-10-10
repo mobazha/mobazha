@@ -59,7 +59,6 @@
 <script>
 import $ from 'jquery';
 import '../../../../backbone/utils/lib/selectize';
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 import regions, {
   getTranslatedRegions,
@@ -274,94 +273,82 @@ export default {
     },
 
     render () {
-      loadTemplate('modals/editListing/shippingOption.html', (t) => {
-        this.$el.html(t({
-          // Since multiple instances of this view will be rendered, any id's should
-          // include the cid, so they're unique.
-          cid: this.model.cid,
-          listPosition: this.options.listPosition,
-          shippingTypes: this.model.shippingTypes,
-          errors: this.model.validationError || {},
-          ...this.model.toJSON(),
-        }));
-
-        $(`#shipOptionType_${this.model.cid}`).select2({
-          // disables the search box
-          minimumResultsForSearch: Infinity,
-        });
-
-        this.$shipDestinationSelect = $(`#shipDestinationsSelect_${this.model.cid}`);
-        this.$servicesWrap = $('.js-servicesWrap');
-
-        this.$shipDestinationSelect.selectize({
-          maxItems: null,
-          valueField: 'id',
-          searchField: ['text', 'id'],
-          items: this.model.get('regions'),
-          options: this.selectCountryData,
-          render: {
-            option: (data) => {
-              const className = data.isRegion ? 'region' : '';
-              return `<div class="${className}">${data.text}</div>`;
-            },
-            item: (data) => {
-              const className = data.isRegion ? 'region' : '';
-              return `<div class="${className}">${data.text}</div>`;
-            },
-          },
-          onItemAdd: (value) => {
-            const region = getIndexedRegions()[value];
-            const { selectize } = this.$shipDestinationSelect[0];
-
-            if (region) {
-              // If adding a region, we'll add in all the countries for that region.
-              // selectize.removeItem(value);
-              selectize.addItems(region.countries, true);
-            } else {
-              // Adding a country may cause a region or regions to be represented.
-              // We'll add in any full regions so they're not selectable as options.
-              // CSS will hide the tag.
-              selectize.addItems(this.representedRegions(selectize.items), true);
-            }
-          },
-          onItemRemove: (value) => {
-            const isRegion = !!getIndexedRegions()[value];
-            const { selectize } = this.$shipDestinationSelect[0];
-            const representedRegions = this.representedRegions(selectize.items);
-
-            if (!isRegion) {
-              // Adding a country may cause a regions or regions to be represented.
-              // We'll add in any full regions so they're not selectable as options.
-              // CSS will hide the tag.
-              selectize.items.forEach((item) => {
-                const isItemRegion = getIndexedRegions()[item];
-                if (isItemRegion && !representedRegions.includes(item)) {
-                  selectize.removeItem(item, true);
-                }
-              });
-            }
-          },
-        });
-
-        this.serviceViews.forEach((serviceVw) => serviceVw.remove());
-        this.serviceViews = [];
-        const servicesFrag = document.createDocumentFragment();
-
-        this.model.get('services').forEach((serviceMd) => {
-          const serviceVw = this.createServiceView({ model: serviceMd });
-
-          this.serviceViews.push(serviceVw);
-          serviceVw.render().$el.appendTo(servicesFrag);
-        });
-
-        this.$servicesWrap.append(servicesFrag);
-
-        this._$headline = null;
-        this._$shipDestinationDropdown = null;
-        this._$formFields = null;
-        this._$serviceSection = null;
-        this._$shipDestinationsSelect = null;
+      $(`#shipOptionType_${this.model.cid}`).select2({
+        // disables the search box
+        minimumResultsForSearch: Infinity,
       });
+
+      this.$shipDestinationSelect = $(`#shipDestinationsSelect_${this.model.cid}`);
+      this.$servicesWrap = $('.js-servicesWrap');
+
+      this.$shipDestinationSelect.selectize({
+        maxItems: null,
+        valueField: 'id',
+        searchField: ['text', 'id'],
+        items: this.model.get('regions'),
+        options: this.selectCountryData,
+        render: {
+          option: (data) => {
+            const className = data.isRegion ? 'region' : '';
+            return `<div class="${className}">${data.text}</div>`;
+          },
+          item: (data) => {
+            const className = data.isRegion ? 'region' : '';
+            return `<div class="${className}">${data.text}</div>`;
+          },
+        },
+        onItemAdd: (value) => {
+          const region = getIndexedRegions()[value];
+          const { selectize } = this.$shipDestinationSelect[0];
+
+          if (region) {
+            // If adding a region, we'll add in all the countries for that region.
+            // selectize.removeItem(value);
+            selectize.addItems(region.countries, true);
+          } else {
+            // Adding a country may cause a region or regions to be represented.
+            // We'll add in any full regions so they're not selectable as options.
+            // CSS will hide the tag.
+            selectize.addItems(this.representedRegions(selectize.items), true);
+          }
+        },
+        onItemRemove: (value) => {
+          const isRegion = !!getIndexedRegions()[value];
+          const { selectize } = this.$shipDestinationSelect[0];
+          const representedRegions = this.representedRegions(selectize.items);
+
+          if (!isRegion) {
+            // Adding a country may cause a regions or regions to be represented.
+            // We'll add in any full regions so they're not selectable as options.
+            // CSS will hide the tag.
+            selectize.items.forEach((item) => {
+              const isItemRegion = getIndexedRegions()[item];
+              if (isItemRegion && !representedRegions.includes(item)) {
+                selectize.removeItem(item, true);
+              }
+            });
+          }
+        },
+      });
+
+      this.serviceViews.forEach((serviceVw) => serviceVw.remove());
+      this.serviceViews = [];
+      const servicesFrag = document.createDocumentFragment();
+
+      this.model.get('services').forEach((serviceMd) => {
+        const serviceVw = this.createServiceView({ model: serviceMd });
+
+        this.serviceViews.push(serviceVw);
+        serviceVw.render().$el.appendTo(servicesFrag);
+      });
+
+      this.$servicesWrap.append(servicesFrag);
+
+      this._$headline = null;
+      this._$shipDestinationDropdown = null;
+      this._$formFields = null;
+      this._$serviceSection = null;
+      this._$shipDestinationsSelect = null;
 
       return this;
     }

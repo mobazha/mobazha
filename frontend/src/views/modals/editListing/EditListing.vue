@@ -41,7 +41,7 @@
                           <div class="flexRow">
                             <label for="editListingTitle" class="required flexExpand">{{ ob.polyT('editListing.title')
                             }}</label>
-                            {{ ob.viewListingsT({ createMode: ob.createMode }) }}
+                            <ViewListingLinks :createMode="ob.createMode" />
                           </div>
                           <FormError v-if="ob.errors['item.title']" :errors="ob.errors['item.title']" />
                           <input type="text" class="clrBr clrP clrSh2" name="item.title" id="editListingTitle"
@@ -166,16 +166,15 @@
                 <FormError v-if="ob.errors['item.images']" :errors="ob.errors['item.images']" />
                 <input type="file" id="inputPhotoUpload" @change="onChangePhotoUploadInput" accept="image/*" class="hide"
                   multiple>
-                <ul class="unstyled uploadItems clrBr rowSm js-photoUploadItems">
+                <ul ref="photoUploadItems" class="unstyled uploadItems clrBr rowSm js-photoUploadItems">
                   <li class="addElement tile js-addPhotoWrap">
                     <span class="imagesIcon ion-images clrT4"></span>
                     <button class="btn clrP clrBr clrT tx6 " @click="onClickAddPhoto">{{
                       ob.polyT('editListing.btnAddPhoto') }}</button>
                   </li>
-                  <template v-for="(image, j) in ob.item.images" :key="j">
-                    print(ob.uploadPhotoT(Object.assign(image, { closeIconClass: 'js-removeImage' })))
-                    });
-                    %>
+                  <template v-for="(image, j) in ob.item.images">
+                    <UploadPhoto :image="image" @closeIcon="onClickRemoveImage(j)" />
+                  </template>
                 </ul>
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperPhotos', { maxPhotos: ob.max.photos }) }}
                 </div>
@@ -267,7 +266,7 @@
 
               <div class="contentBox padMd clrP clrBr clrSh3">
                 <div class="flexHRight flexVCent gutterH">
-                  {{ ob.viewListingsT({ createMode: ob.createMode }) }}
+                  <ViewListingLinks :createMode="ob.createMode" />
                   <a class="btn clrP clrBAttGrad clrBrDec1 clrTOnEmph " @click="onSaveClick">{{ ob.polyT('settings.btnSave') }}</a>
                 </div>
               </div>
@@ -307,7 +306,6 @@ import { getCoinDivisibility } from '../../../../backbone/utils/currency';
 import { setDeepValue } from '../../../../backbone/utils/object';
 import SimpleMessage, { openSimpleMessage } from '../SimpleMessage';
 import Dialog from '../Dialog';
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
 import ShippingOptionMd from '../../../../backbone/models/listing/ShippingOption';
 import Service from '../../../../backbone/models/listing/Service';
 import Image from '../../../../backbone/models/listing/Image';
@@ -325,16 +323,24 @@ import CryptoCurrencyType from './CryptoCurrencyType';
 import CryptoCurSelector from '../../components/CryptoCurSelector';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 
+import ViewListingLinks from './ViewListingLinks.vue'
+import UploadPhoto from './UploadPhoto.vue'
 
 export default {
+  component: {
+    ViewListingLinks,
+    uploadPhoto,
+  },
   props: {
     options: {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
+      images: undefined,
     };
   },
   created () {
@@ -373,7 +379,6 @@ export default {
           })),
         errors: this.model.validationError || {},
         photoUploadInprogress: !!this.inProgressPhotoUploads.length,
-        uploadPhotoT: this.uploadPhotoT,
         expandedReturnPolicy: this.expandedReturnPolicy || !!this.model.get('refundPolicy'),
         expandedTermsAndConditions: this.expandedTermsAndConditions
           || !!this.model.get('termsAndConditions'),
@@ -386,8 +391,7 @@ export default {
           photos: this.MAX_PHOTOS,
         },
         shouldShowVariantInventorySection: this.shouldShowVariantInventorySection,
-        viewListingsT,
-        ...this.model.toJSON(),
+        ...this._model,
       };
     },
     tabs () {
@@ -542,14 +546,6 @@ export default {
         ),
       );
 
-      loadTemplate(
-        'modals/editListing/uploadPhoto.html',
-        (uploadT) => { this.uploadPhotoT = uploadT; },
-      );
-
-      this.listenTo(this.images, 'add', this.onAddImage);
-      this.listenTo(this.images, 'remove', this.onRemoveImage);
-
       this.listenTo(this.shippingOptions, 'add', (shipOptMd) => {
         const shipOptVw = this.createShippingOptionView({
           listPosition: this.shippingOptions.length,
@@ -662,27 +658,8 @@ export default {
       }
     },
 
-    onAddImage (image) {
-      const imageHtml = this.uploadPhotoT({
-        closeIconClass: 'js-removeImage',
-        ...image.toJSON(),
-      });
-
-      this.$photoUploadItems.append(imageHtml);
-    },
-
-    onRemoveImage (image, images, options) {
-      // 1 is added to the index to account for the .addElement
-      this.$photoUploadItems.find('li')
-        .eq(options.index + 1)
-        .remove();
-    },
-
-    onClickRemoveImage (e) {
-      // since the first li is the .addElement, we need to subtract 1 from the index
-      const removeIndex = $(e.target).parents('li').index() - 1;
-
-      this.images.remove(this.images.at(removeIndex));
+    onClickRemoveImage (j) {
+      this.images.remove(this.images.at(j));
     },
 
     onClickCancelPhotoUploads () {
@@ -1645,331 +1622,293 @@ export default {
       if (this.throttledOnScroll) this.$el.off('scroll', this.throttledOnScroll);
       this.currencies = this.currencies || getCurrenciesSortedByCode();
 
-      loadTemplate('modals/editListing/viewListingLinks.html', (viewListingsT) => {
-        loadTemplate('modals/editListing/editListing.html', (t) => {
-          this.$el.html(t({
-            createMode: this.createMode,
-            selectedNavTabIndex: this.selectedNavTabIndex,
-            returnText: this.options.returnText,
-            listingCurrency: this.currency,
-            countryList: this.countryList,
-            currencies: this.currencies,
-            contractTypes: metadata.contractTypesVerbose,
-            conditionTypes: this.model.get('item')
-              .conditionTypes
-              .map((conditionType) => ({
-                code: conditionType,
-                name: app.polyglot.t(`conditionTypes.${conditionType}`),
-              })),
-            errors: this.model.validationError || {},
-            photoUploadInprogress: !!this.inProgressPhotoUploads.length,
-            uploadPhotoT: this.uploadPhotoT,
-            expandedReturnPolicy: this.expandedReturnPolicy || !!this.model.get('refundPolicy'),
-            expandedTermsAndConditions: this.expandedTermsAndConditions
-              || !!this.model.get('termsAndConditions'),
-            maxCatsWarning: this.maxCatsWarning,
-            maxTagsWarning: this.maxTagsWarning,
-            max: {
-              title: item.max.titleLength,
-              cats: item.max.cats,
-              tags: item.max.tags,
-              photos: this.MAX_PHOTOS,
-            },
-            shouldShowVariantInventorySection: this.shouldShowVariantInventorySection,
-            viewListingsT,
-            ...this.model.toJSON(),
-          }));
+      this.setContractTypeClass(metadata.get('contractType'));
 
-          this.setContractTypeClass(metadata.get('contractType'));
+      this._$scrollLinks = null;
+      this._$scrollToSections = null;
+      this._$currencySelect = null;
+      this._$priceInput = null;
+      this._$buttonSave = null;
+      this._$inputPhotoUpload = null;
+      this._$photoUploadingLabel = null;
+      this._$editListingReturnPolicy = null;
+      this._$editListingTermsAndConditions = null;
+      this._$sectionShipping = null;
+      this._$maxCatsWarning = null;
+      this._$maxTagsWarning = null;
+      this._$addShipOptSectionHeading = null;
+      this._$variantInventorySection = null;
+      this._$itemPrice = null;
+      this.$modalContent = $('.modalContent');
+      this.$tabControls = $('.tabControls');
+      this.$titleInput = $('#editListingTitle');
+      this.$editListingTags = $('#editListingTags');
+      this.$editListingCategories = $('#editListingCategories');
+      this.$shippingOptionsWrap = $('.js-shippingOptionsWrap');
+      this.$couponsSection = $('.js-couponsSection');
+      this.$variantsSection = $('.js-variantsSection');
 
-          this._$scrollLinks = null;
-          this._$scrollToSections = null;
-          this._$currencySelect = null;
-          this._$priceInput = null;
-          this._$buttonSave = null;
-          this._$inputPhotoUpload = null;
-          this._$photoUploadingLabel = null;
-          this._$editListingReturnPolicy = null;
-          this._$editListingTermsAndConditions = null;
-          this._$sectionShipping = null;
-          this._$maxCatsWarning = null;
-          this._$maxTagsWarning = null;
-          this._$addShipOptSectionHeading = null;
-          this._$variantInventorySection = null;
-          this._$itemPrice = null;
-          this.$photoUploadItems = $('.js-photoUploadItems');
-          this.$modalContent = $('.modalContent');
-          this.$tabControls = $('.tabControls');
-          this.$titleInput = $('#editListingTitle');
-          this.$editListingTags = $('#editListingTags');
-          this.$editListingCategories = $('#editListingCategories');
-          this.$shippingOptionsWrap = $('.js-shippingOptionsWrap');
-          this.$couponsSection = $('.js-couponsSection');
-          this.$variantsSection = $('.js-variantsSection');
+      $('#editContractType, #editListingVisibility, #editListingCondition, '
+        + '#editListingCountrySelect').select2({
+          // disables the search box
+          minimumResultsForSearch: Infinity,
+        });
 
-          $('#editContractType, #editListingVisibility, #editListingCondition, '
-            + '#editListingCountrySelect').select2({
-              // disables the search box
-              minimumResultsForSearch: Infinity,
-            });
-
-          $('#editListingCurrency').select2({
-            matcher: (params, data) => {
-              if (!params.term || params.term.trim() === '') {
-                return data;
-              }
-
-              const term = params.term
-                .toUpperCase()
-                .trim();
-
-              const name = data.element.getAttribute('data-name');
-
-              if (
-                data.text
-                  .toUpperCase()
-                  .includes(term)
-                || (name && name.toUpperCase().includes(term))
-              ) {
-                return data;
-              }
-
-              return null;
-            },
-          })
-            .on('change', () => this.variantInventory.render());
-
-          this.$editListingTags.selectize({
-            persist: false,
-            maxItems: item.max.tags,
-            create: (input) => {
-              // we'll make the tag all lowercase and
-              // replace spaces with dashes.
-              const term = input.toLowerCase()
-                .replace(/\s/g, '-')
-                .replace('#', '')
-                // replace consecutive dashes with one
-                .replace(/-{2,}/g, '-');
-              return {
-                value: term,
-                text: term,
-              };
-            },
-            onChange: (value) => {
-              const tags = value.length ? value.split(',') : [];
-              if (tags.length >= item.max.tags) {
-                this.showMaxTagsWarning();
-              } else {
-                this.hideMaxTagsWarning();
-              }
-            },
-          });
-
-          this.$editListingCategories.selectize({
-            persist: false,
-            maxItems: item.max.cats,
-            create: (input) => ({
-              value: input,
-              text: input,
-            }),
-            onChange: (value) => {
-              const cats = value.length ? value.split(',') : [];
-              if (cats.length >= item.max.cats) {
-                this.showMaxCatsWarning();
-              } else {
-                this.hideMaxCatsWarning();
-              }
-            },
-          });
-
-          // render shipping options
-          this.shippingOptionViews.forEach((shipOptVw) => shipOptVw.remove());
-          this.shippingOptionViews = [];
-          const shipOptsFrag = document.createDocumentFragment();
-
-          this.model.get('shippingOptions').forEach((shipOpt, shipOptIndex) => {
-            const shipOptVw = this.createShippingOptionView({
-              model: shipOpt,
-              listPosition: shipOptIndex + 1,
-            });
-
-            this.shippingOptionViews.push(shipOptVw);
-            shipOptVw.render().$el.appendTo(shipOptsFrag);
-          });
-
-          this.$shippingOptionsWrap.append(shipOptsFrag);
-
-          // render sku field
-          if (this.skuField) this.skuField.remove();
-
-          this.skuField = this.createChild(SkuField, {
-            model: item,
-            initialState: {
-              variantsPresent: !!item.get('options').length,
-            },
-          });
-
-          $('.js-skuFieldContainer').html(this.skuField.render().el);
-
-          // render variants
-          if (this.variantsView) this.variantsView.remove();
-
-          const variantErrors = {};
-
-          Object.keys(item.validationError || {})
-            .forEach((errKey) => {
-              if (errKey.startsWith('options[')) {
-                variantErrors[errKey] = item.validationError[errKey];
-              }
-            });
-
-          this.variantsView = this.createChild(Variants, {
-            collection: this.variantOptionsCl,
-            maxVariantCount: item.max.optionCount,
-            errors: variantErrors,
-          });
-
-          this.variantsView.listenTo(
-            this.variantsView,
-            'variantChoiceChange',
-            this.onVariantChoiceChange.bind(this),
-          );
-
-          this.$variantsSection.find('.js-variantsContainer').append(
-            this.variantsView.render().el,
-          );
-
-          // render inventory management section
-          if (this.inventoryManagement) this.inventoryManagement.remove();
-          const inventoryManagementErrors = {};
-
-          if (this.model.validationError
-            && this.model.validationError['item.quantity']) {
-            inventoryManagementErrors.quantity = this.model.validationError['item.quantity'];
+      $('#editListingCurrency').select2({
+        matcher: (params, data) => {
+          if (!params.term || params.term.trim() === '') {
+            return data;
           }
 
-          this.inventoryManagement = this.createChild(InventoryManagement, {
-            initialState: {
-              trackBy: this.trackInventoryBy,
-              quantity: item.get('quantity'),
-              errors: inventoryManagementErrors,
-            },
-          });
+          const term = params.term
+            .toUpperCase()
+            .trim();
 
-          $('.js-inventoryManagementSection').html(this.inventoryManagement.render().el);
-          this.listenTo(
-            this.inventoryManagement,
-            'changeManagementType',
-            this.onChangeManagementType,
-          );
+          const name = data.element.getAttribute('data-name');
 
-          // render variant inventory
-          if (this.variantInventory) this.variantInventory.remove();
+          if (
+            data.text
+              .toUpperCase()
+              .includes(term)
+            || (name && name.toUpperCase().includes(term))
+          ) {
+            return data;
+          }
 
-          this.variantInventory = this.createChild(VariantInventory, {
-            collection: item.get('skus'),
-            optionsCl: item.get('options'),
-            getPrice: () => this.getFormData(this.$itemPrice).item.price,
-            getCurrency: () => this.currency,
-          });
+          return null;
+        },
+      })
+        .on('change', () => this.variantInventory.render());
 
-          $('.js-variantInventoryTableContainer')
-            .html(this.variantInventory.render().el);
-
-          // render coupons
-          if (this.couponsView) this.couponsView.remove();
-
-          this.couponsView = this.createChild(Coupons, {
-            collection: this.coupons,
-            maxCouponCount: this.model.max.couponCount,
-          });
-
-          this.$couponsSection.find('.js-couponsContainer').append(
-            this.couponsView.render().el,
-          );
-
-          installRichEditor($('#editListingDescription'), {
-            topLevelClass: 'clrBr',
-          });
-
-          if (this.sortablePhotos) this.sortablePhotos.destroy();
-          this.sortablePhotos = Sortable.create(this.$photoUploadItems[0], {
-            filter: '.js-addPhotoWrap',
-            onUpdate: (e) => {
-              const imageModels = this.model
-                .get('item')
-                .get('images')
-                .models;
-
-              const movingModel = imageModels[e.oldIndex - 1];
-              imageModels.splice(e.oldIndex - 1, 1);
-              imageModels.splice(e.newIndex - 1, 0, movingModel);
-            },
-            onMove: (e) => ($(e.related).hasClass('js-addPhotoWrap') ? false : undefined),
-          });
-
-          if (this.cryptoCurrencyType) this.cryptoCurrencyType.remove();
-          this.cryptoCurrencyType = this.createChild(CryptoCurrencyType, {
-            model: this.model,
-            getCoinTypes: this.getCoinTypesDeferred.promise(),
-            getReceiveCur: () => this._receiveCryptoCur,
-          });
-
-          $('.js-cryptoTypeWrap')
-            .html(this.cryptoCurrencyType.render().el);
-
-          const activeCurs = this.model.get('metadata')
-            .get('acceptedCurrencies');
-          let curSelectorInitialState = {
-            currencies: [
-              ...activeCurs,
-              ...supportedWalletCurs(),
-            ],
-            activeCurs,
-            sort: true,
+      this.$editListingTags.selectize({
+        persist: false,
+        maxItems: item.max.tags,
+        create: (input) => {
+          // we'll make the tag all lowercase and
+          // replace spaces with dashes.
+          const term = input.toLowerCase()
+            .replace(/\s/g, '-')
+            .replace('#', '')
+            // replace consecutive dashes with one
+            .replace(/-{2,}/g, '-');
+          return {
+            value: term,
+            text: term,
           };
-          if (this.cryptoCurSelector) {
-            curSelectorInitialState = {
-              ...curSelectorInitialState,
-              ...this.cryptoCurSelector.getState(),
-            };
-            this.cryptoCurSelector.remove();
+        },
+        onChange: (value) => {
+          const tags = value.length ? value.split(',') : [];
+          if (tags.length >= item.max.tags) {
+            this.showMaxTagsWarning();
+          } else {
+            this.hideMaxTagsWarning();
           }
-          this.cryptoCurSelector = this.createChild(CryptoCurSelector, {
-            initialState: curSelectorInitialState,
-          });
-          $('.js-cryptoCurSelectContainer')
-            .html(this.cryptoCurSelector.render().el);
+        },
+      });
 
-          setTimeout(() => {
-            if (!this.rendered) {
-              this.rendered = true;
-              this.$titleInput.focus();
-            }
-          });
+      this.$editListingCategories.selectize({
+        persist: false,
+        maxItems: item.max.cats,
+        create: (input) => ({
+          value: input,
+          text: input,
+        }),
+        onChange: (value) => {
+          const cats = value.length ? value.split(',') : [];
+          if (cats.length >= item.max.cats) {
+            this.showMaxCatsWarning();
+          } else {
+            this.hideMaxCatsWarning();
+          }
+        },
+      });
 
-          setTimeout(() => {
-            // restore the scroll position
-            if (restoreScrollPos) {
-              this.el.scrollTop = prevScrollPos;
-            }
+      // render shipping options
+      this.shippingOptionViews.forEach((shipOptVw) => shipOptVw.remove());
+      this.shippingOptionViews = [];
+      const shipOptsFrag = document.createDocumentFragment();
 
-            this.throttledOnScroll = _.bind(_.throttle(this.onScroll, 100), this);
-            setTimeout(() => this.$el.on('scroll', this.throttledOnScroll), 100);
-          });
+      this.model.get('shippingOptions').forEach((shipOpt, shipOptIndex) => {
+        const shipOptVw = this.createShippingOptionView({
+          model: shipOpt,
+          listPosition: shipOptIndex + 1,
+        });
 
-          // This block should be after any dom manipulation in render.
-          if (this.createMode) {
-            if (!this.attrsAtCreate) {
-              this.setModelData();
-              this.attrsAtCreate = this.model.toJSON();
-            }
-          } else if (!this.attrsAtLastSave) {
-            this.setModelData();
-            this.attrsAtLastSave = this.model.toJSON();
+        this.shippingOptionViews.push(shipOptVw);
+        shipOptVw.render().$el.appendTo(shipOptsFrag);
+      });
+
+      this.$shippingOptionsWrap.append(shipOptsFrag);
+
+      // render sku field
+      if (this.skuField) this.skuField.remove();
+
+      this.skuField = this.createChild(SkuField, {
+        model: item,
+        initialState: {
+          variantsPresent: !!item.get('options').length,
+        },
+      });
+
+      $('.js-skuFieldContainer').html(this.skuField.render().el);
+
+      // render variants
+      if (this.variantsView) this.variantsView.remove();
+
+      const variantErrors = {};
+
+      Object.keys(item.validationError || {})
+        .forEach((errKey) => {
+          if (errKey.startsWith('options[')) {
+            variantErrors[errKey] = item.validationError[errKey];
           }
         });
+
+      this.variantsView = this.createChild(Variants, {
+        collection: this.variantOptionsCl,
+        maxVariantCount: item.max.optionCount,
+        errors: variantErrors,
       });
+
+      this.variantsView.listenTo(
+        this.variantsView,
+        'variantChoiceChange',
+        this.onVariantChoiceChange.bind(this),
+      );
+
+      this.$variantsSection.find('.js-variantsContainer').append(
+        this.variantsView.render().el,
+      );
+
+      // render inventory management section
+      if (this.inventoryManagement) this.inventoryManagement.remove();
+      const inventoryManagementErrors = {};
+
+      if (this.model.validationError
+        && this.model.validationError['item.quantity']) {
+        inventoryManagementErrors.quantity = this.model.validationError['item.quantity'];
+      }
+
+      this.inventoryManagement = this.createChild(InventoryManagement, {
+        initialState: {
+          trackBy: this.trackInventoryBy,
+          quantity: item.get('quantity'),
+          errors: inventoryManagementErrors,
+        },
+      });
+
+      $('.js-inventoryManagementSection').html(this.inventoryManagement.render().el);
+      this.listenTo(
+        this.inventoryManagement,
+        'changeManagementType',
+        this.onChangeManagementType,
+      );
+
+      // render variant inventory
+      if (this.variantInventory) this.variantInventory.remove();
+
+      this.variantInventory = this.createChild(VariantInventory, {
+        collection: item.get('skus'),
+        optionsCl: item.get('options'),
+        getPrice: () => this.getFormData(this.$itemPrice).item.price,
+        getCurrency: () => this.currency,
+      });
+
+      $('.js-variantInventoryTableContainer')
+        .html(this.variantInventory.render().el);
+
+      // render coupons
+      if (this.couponsView) this.couponsView.remove();
+
+      this.couponsView = this.createChild(Coupons, {
+        collection: this.coupons,
+        maxCouponCount: this.model.max.couponCount,
+      });
+
+      this.$couponsSection.find('.js-couponsContainer').append(
+        this.couponsView.render().el,
+      );
+
+      installRichEditor($('#editListingDescription'), {
+        topLevelClass: 'clrBr',
+      });
+
+      if (this.sortablePhotos) this.sortablePhotos.destroy();
+      this.sortablePhotos = Sortable.create(this.$refs.photoUploadItems, {
+        filter: '.js-addPhotoWrap',
+        onUpdate: (e) => {
+          const imageModels = this.model
+            .get('item')
+            .get('images')
+            .models;
+
+          const movingModel = imageModels[e.oldIndex - 1];
+          imageModels.splice(e.oldIndex - 1, 1);
+          imageModels.splice(e.newIndex - 1, 0, movingModel);
+        },
+        onMove: (e) => ($(e.related).hasClass('js-addPhotoWrap') ? false : undefined),
+      });
+
+      if (this.cryptoCurrencyType) this.cryptoCurrencyType.remove();
+      this.cryptoCurrencyType = this.createChild(CryptoCurrencyType, {
+        model: this.model,
+        getCoinTypes: this.getCoinTypesDeferred.promise(),
+        getReceiveCur: () => this._receiveCryptoCur,
+      });
+
+      $('.js-cryptoTypeWrap')
+        .html(this.cryptoCurrencyType.render().el);
+
+      const activeCurs = this.model.get('metadata')
+        .get('acceptedCurrencies');
+      let curSelectorInitialState = {
+        currencies: [
+          ...activeCurs,
+          ...supportedWalletCurs(),
+        ],
+        activeCurs,
+        sort: true,
+      };
+      if (this.cryptoCurSelector) {
+        curSelectorInitialState = {
+          ...curSelectorInitialState,
+          ...this.cryptoCurSelector.getState(),
+        };
+        this.cryptoCurSelector.remove();
+      }
+      this.cryptoCurSelector = this.createChild(CryptoCurSelector, {
+        initialState: curSelectorInitialState,
+      });
+      $('.js-cryptoCurSelectContainer')
+        .html(this.cryptoCurSelector.render().el);
+
+      setTimeout(() => {
+        if (!this.rendered) {
+          this.rendered = true;
+          this.$titleInput.focus();
+        }
+      });
+
+      setTimeout(() => {
+        // restore the scroll position
+        if (restoreScrollPos) {
+          this.el.scrollTop = prevScrollPos;
+        }
+
+        this.throttledOnScroll = _.bind(_.throttle(this.onScroll, 100), this);
+        setTimeout(() => this.$el.on('scroll', this.throttledOnScroll), 100);
+      });
+
+      // This block should be after any dom manipulation in render.
+      if (this.createMode) {
+        if (!this.attrsAtCreate) {
+          this.setModelData();
+          this.attrsAtCreate = this.model.toJSON();
+        }
+      } else if (!this.attrsAtLastSave) {
+        this.setModelData();
+        this.attrsAtLastSave = this.model.toJSON();
+      }
       return this;
     }
 

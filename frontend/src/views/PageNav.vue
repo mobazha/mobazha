@@ -1,5 +1,5 @@
 <template>
-  <div @click="onDocClick">
+  <div :class="`pageNav ${!navigable ? 'notNavigable' : ''} ${torIndicatorOn ? 'torIndicatorOn' : ''}`" @click="onDocClick">
     <header>
       <nav class="bar clrBr clrP navBar">
         <div class="flexVCent">
@@ -60,7 +60,9 @@
               </template>
               <a class="navBtn toolTipNoWrap" @click="navWalletClick" :data-tip="ob.polyT('pageNav.toolTip.wallet')"
                 id="Nav_Wallet">
-                <div class="iconBtn navWalletBtn">{{ ob.walletIconTmpl() }}</div>
+                <div class="iconBtn navWalletBtn">
+                  <WalletIcon />
+                </div>
               </a>
               <a class="navBtn toolTipNoWrap" @click="onClickNavNotifBtn"
                 :data-tip="ob.polyT('pageNav.toolTip.notifications')" id="Nav_Notifications">
@@ -148,7 +150,6 @@ import { ipc } from '../utils/ipcRenderer.js';
 import { events as serverConnectEvents, getCurrentConnection } from '../../backbone/utils/serverConnect.js';
 import { setUnreadNotifCount, launchNativeNotification } from '../../backbone/utils/notification.js';
 import { recordEvent } from '../../backbone/utils/metrics.js';
-import loadTemplate from '../../backbone/utils/loadTemplate.js';
 import app from '../../backbone/app.js';
 import {
   launchEditListingModal, launchAboutModal,
@@ -171,6 +172,7 @@ export default {
   },
   data () {
     return {
+      navigable: false,
     };
   },
   created () {
@@ -186,12 +188,25 @@ export default {
   },
   computed: {
     ob () {
+      let connectedServer = getCurrentConnection();
+
+      if (connectedServer && connectedServer.status !== 'disconnected') {
+        connectedServer = connectedServer.server.toJSON();
+      } else {
+        connectedServer = null;
+      }
+
+      let showDiscoverCallout = false;
+
+      if (connectedServer && !connectedServer.dismissedDiscoverCallout) {
+        showDiscoverCallout = true;
+      }
+
       return {
         ...this.templateHelpers,
         addressBarText: this.addressBarText,
         connectedServer,
         testnet: app.serverConfig.testnet,
-        walletIconTmpl,
         showDiscoverCallout,
         ...((app.profile && app.profile.toJSON()) || {}),
       };
@@ -201,9 +216,6 @@ export default {
     loadData (options) {
       const opts = {
         events: {
-          'click .js-navListItem': 'onNavListItemClick',
-          'click .js-navList': 'onNavListClick',
-          'click .js-notifContainer': 'onClickNotifContainer',
           'click .js-notificationListItem a[href]': 'onClickNotificationLink',
         },
         navigable: false,
@@ -214,9 +226,6 @@ export default {
         throw new Error('Please provide a Server Configs collection');
       }
 
-      opts.className = 'pageNav';
-      if (!opts.navigable) opts.className += ' notNavigable';
-      if (opts.torIndicatorOn) opts.className += ' torIndicatorOn';
       this.baseInit(opts);
       this.addressBarText = '';
 
@@ -660,33 +669,6 @@ export default {
     },
 
     render () {
-      let connectedServer = getCurrentConnection();
-
-      if (connectedServer && connectedServer.status !== 'disconnected') {
-        connectedServer = connectedServer.server.toJSON();
-      } else {
-        connectedServer = null;
-      }
-
-      let showDiscoverCallout = false;
-
-      if (connectedServer && !connectedServer.dismissedDiscoverCallout) {
-        showDiscoverCallout = true;
-      }
-
-      loadTemplate('pageNav.html', (t) => {
-        loadTemplate('walletIcon.svg', (walletIconTmpl) => {
-          this.$el.html(t({
-            addressBarText: this.addressBarText,
-            connectedServer,
-            testnet: app.serverConfig.testnet,
-            walletIconTmpl,
-            showDiscoverCallout,
-            ...((app.profile && app.profile.toJSON()) || {}),
-          }));
-        });
-      });
-
       if (this.pageNavServersMenu) this.pageNavServersMenu.remove();
       this.pageNavServersMenu = new PageNavServersMenu({
         collection: app.serverConfigs,

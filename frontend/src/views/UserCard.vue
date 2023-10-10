@@ -74,7 +74,6 @@
 <script>
 import $ from 'jquery';
 import _ from 'underscore';
-import loadTemplate from '../../backbone/utils/loadTemplate';
 import app from '../../backbone/app';
 import { followedByYou, followUnfollow } from '../../backbone/utils/follow';
 import Profile, { getCachedProfiles } from '../../backbone/models/profile/Profile';
@@ -91,14 +90,13 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
     };
   },
   created () {
-    this.initEventChain();
-
     this.loadData(this.options);
   },
   mounted () {
@@ -120,7 +118,7 @@ export default {
         getModTip: this.getModTip,
         getFollowTip: this.getFollowTip,
         ...this.options,
-        ...((this.model && this.model.toJSON()) || {}),
+        ...this._model,
       };
     },
     headerHash () {
@@ -325,58 +323,43 @@ export default {
     },
 
     render () {
-      loadTemplate('userCard.html', (t) => {
-        this.$el.html(t({
-          loading: this.loading,
-          notFound: this.notFound,
-          guid: this.guid,
-          ownGuid: this.ownGuid,
-          followedByYou: this.followedByYou,
-          ownMod: this.ownMod,
-          getModTip: this.getModTip,
-          getFollowTip: this.getFollowTip,
-          ...this.options,
-          ...((this.model && this.model.toJSON()) || {}),
-        }));
+      this._$followBtn = null;
+      this._$modBtn = null;
 
-        this._$followBtn = null;
-        this._$modBtn = null;
+      if (this.guid !== app.profile.id) {
+        $('.js-blockBtnContainer')
+          .html(
+            new BlockedBtn({
+              targetId: this.guid,
+              initialState: {
+                useIcon: true,
+              },
+            }).render().el,
+          );
+      }
 
-        if (this.guid !== app.profile.id) {
-          $('.js-blockBtnContainer')
-            .html(
-              new BlockedBtn({
-                targetId: this.guid,
-                initialState: {
-                  useIcon: true,
-                },
-              }).render().el,
-            );
-        }
+      this.setBlockedClass();
 
-        this.setBlockedClass();
+      if (!this.fetched) this.loadUser();
+      /* the view should be rendered when it is created and before it has data, so it can occupy
+        space in the DOM while the data is being fetched. */
 
-        if (!this.fetched) this.loadUser();
-        /* the view should be rendered when it is created and before it has data, so it can occupy
-         space in the DOM while the data is being fetched. */
+      if (this.verifiedMod) this.verifiedMod.remove();
 
-        if (this.verifiedMod) this.verifiedMod.remove();
-
-        const verifiedMod = app.verifiedMods.get(this.guid);
-        const createOptions = getModeratorOptions({
-          model: verifiedMod,
-        });
-        if (verifiedMod && this.model && this.model.isModerator) {
-          this.verifiedMod = this.createChild(VerifiedMod, {
-            ...createOptions,
-            initialState: {
-              ...createOptions.initialState,
-              text: '',
-            },
-          });
-          $('.js-verifiedMod').append(this.verifiedMod.render().el);
-        }
+      const verifiedMod = app.verifiedMods.get(this.guid);
+      const createOptions = getModeratorOptions({
+        model: verifiedMod,
       });
+      if (verifiedMod && this.model && this.model.isModerator) {
+        this.verifiedMod = this.createChild(VerifiedMod, {
+          ...createOptions,
+          initialState: {
+            ...createOptions.initialState,
+            text: '',
+          },
+        });
+        $('.js-verifiedMod').append(this.verifiedMod.render().el);
+      }
 
       return this;
     },

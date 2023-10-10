@@ -39,8 +39,8 @@
                 <ProcessingButton
                   className="btn btnThin width100 clrP clrBr clrSh2 js-payFromWallet"
                   textClassName="flexCent"
-                  :btnText="`${walletIconTag}${ob.polyT('purchase.pendingSection.payFromWallet')}`"
-                  @click="clickPayFromWallet" />
+                  :btnText='`<i class="icon"><WalletIcon /></i>${ob.polyT("purchase.pendingSection.payFromWallet")}`'
+                  @click.stop="clickPayFromWallet" />
                 <div class="js-confirmWalletContainer"></div>
               </div>
             </div>
@@ -88,7 +88,6 @@ import bigNumber from 'bignumber.js';
 import qr from 'qr-encode';
 import { ipc } from '../../../utils/ipcRenderer.js';
 import app from '../../../../backbone/app.js';
-import loadTemplate from '../../../../backbone/utils/loadTemplate.js';
 import {
   formatCurrency,
   integerToDecimal,
@@ -134,14 +133,10 @@ export default {
           amountDueLine: this.amountDueLine,
           paymentAddress: this.paymentAddress,
           qrDataUri: this.qrDataUri,
-          walletIconTmpl,
           isModerated: this.isModerated,
           paymentCoin: this.paymentCoin,
           externallyFundable: this.paymentCoinData.externallyFundableOrders,
       };
-    },
-    walletIconTag() {
-      return `<i class=\"icon\">${this.ob.walletIconTmpl()}</i>`;
     },
 
     amountDueLine () {
@@ -258,8 +253,6 @@ export default {
         this.spendConfirmBox.setState({ show: true });
         this.spendConfirmBox.fetchFeeEstimate(this.balanceRemaining);
       }
-
-      e.stopPropagation();
     },
 
     showSpendError (error = '') {
@@ -334,23 +327,15 @@ export default {
     },
 
     render () {
-      loadTemplate('modals/purchase/payment.html', (t) => {
-        loadTemplate('walletIcon.svg', (walletIconTmpl) => {
-          this.$el.html(t({
-            walletIconTmpl,
-          }));
-        });
-
-        this.spendConfirmBox = this.createChild(SpendConfirmBox, {
-          metricsOrigin: this.metricsOrigin,
-          initialState: {
-            btnSendText: app.polyglot.t('purchase.pendingSection.btnConfirmedPay'),
-            coinType: this.paymentCoin,
-          },
-        });
-        this.listenTo(this.spendConfirmBox, 'clickSend', this.walletConfirm);
-        $('.js-confirmWalletContainer').html(this.spendConfirmBox.render().el);
+      this.spendConfirmBox = this.createChild(SpendConfirmBox, {
+        metricsOrigin: this.metricsOrigin,
+        initialState: {
+          btnSendText: app.polyglot.t('purchase.pendingSection.btnConfirmedPay'),
+          coinType: this.paymentCoin,
+        },
       });
+      this.listenTo(this.spendConfirmBox, 'clickSend', this.walletConfirm);
+      $('.js-confirmWalletContainer').html(this.spendConfirmBox.render().el);
 
       return this;
     }

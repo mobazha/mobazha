@@ -26,7 +26,6 @@
 
 <script>
 import _ from 'underscore';
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
 import Sku from '../../../../backbone/models/listing/Sku';
 import VariantInventoryItem from './VariantInventoryItem';
 
@@ -53,6 +52,9 @@ export default {
   },
   computed: {
     ob () {
+      const inventoryData = this.buildInventoryData();
+      this.collection.set(inventoryData.inventory);
+
       return {
         ...this.templateHelpers,
         columns: inventoryData.columns,
@@ -227,33 +229,22 @@ export default {
     },
 
     render () {
-      const inventoryData = this.buildInventoryData();
-      this.collection.set(inventoryData.inventory);
+      this.itemViews.forEach((item) => item.remove());
+      this.itemViews = [];
+      const itemsFrag = document.createDocumentFragment();
 
-      loadTemplate('modals/editListing/variantInventory.html', (t) => {
-        this.$el.html(t({
-          columns: inventoryData.columns,
-          inventory: this.collection.toJSON(),
+      this.collection.forEach((item) => {
+        const view = this.createChild(VariantInventoryItem, {
+          model: item,
           getPrice: this.options.getPrice,
-        }));
-
-        this.itemViews.forEach((item) => item.remove());
-        this.itemViews = [];
-        const itemsFrag = document.createDocumentFragment();
-
-        this.collection.forEach((item) => {
-          const view = this.createChild(VariantInventoryItem, {
-            model: item,
-            getPrice: this.options.getPrice,
-            getCurrency: this.options.getCurrency,
-          });
-
-          this.itemViews.push(view);
-          view.render().$el.appendTo(itemsFrag);
+          getCurrency: this.options.getCurrency,
         });
 
-        $('table').append(itemsFrag);
+        this.itemViews.push(view);
+        view.render().$el.appendTo(itemsFrag);
       });
+
+      $('table').append(itemsFrag);
 
       return this;
     }

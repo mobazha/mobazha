@@ -15,7 +15,6 @@
 </template>
 
 <script>
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
 import VariantOption from '../../../../backbone/models/listing/VariantOption';
 import Variant from './Variant';
 
@@ -28,6 +27,7 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
@@ -165,27 +165,20 @@ export default {
     },
 
     render () {
-      loadTemplate('modals/editListing/variants.html', t => {
-        this.$el.html(t({
-          variants: this.collection.toJSON(),
-          maxVariantCount: this.options.maxCouponCount,
-        }));
+      this.$variantsWrap = $('.js-variantsWrap');
+      this._$btnAddVariant = null;
 
-        this.$variantsWrap = $('.js-variantsWrap');
-        this._$btnAddVariant = null;
+      this._variantViews.forEach(variant => variant.remove());
+      this._variantViews = [];
+      const variantsFrag = document.createDocumentFragment();
 
-        this._variantViews.forEach(variant => variant.remove());
-        this._variantViews = [];
-        const variantsFrag = document.createDocumentFragment();
-
-        this.collection.forEach(variant => {
-          const view = this.createVariantView(variant);
-          this._variantViews.push(view);
-          view.render().$el.appendTo(variantsFrag);
-        });
-
-        this.$variantsWrap.append(variantsFrag);
+      this.collection.forEach(variant => {
+        const view = this.createVariantView(variant);
+        this._variantViews.push(view);
+        view.render().$el.appendTo(variantsFrag);
       });
+
+      this.$variantsWrap.append(variantsFrag);
 
       return this;
     }

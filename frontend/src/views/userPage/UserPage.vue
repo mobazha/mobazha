@@ -179,6 +179,9 @@ export default {
   mounted() {
     this.render();
   },
+  unmounted() {
+    if (this.followingFetch) this.followingFetch.abort();
+  },
   computed: {
     ob() {
       return {
@@ -527,9 +530,6 @@ export default {
         this.$tabContent.append(tabView.$el);
         this.currentTabView = tabView;
       }
-    },
-    remove() {
-      if (this.followingFetch) this.followingFetch.abort();
     },
 
     render() {

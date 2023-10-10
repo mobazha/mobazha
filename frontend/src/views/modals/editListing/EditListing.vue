@@ -1,5 +1,5 @@
 <template>
-  <div class="modal editListing tabbedModal modalScrollPage">
+  <div :class="`modal editListing tabbedModal modalScrollPage ${contractTypeClass} ${!createMode ? 'editMode' : ''} ${fixedNav ? 'fixedNav' : ''} ${notTrackingInventory ? 'notTrackingInventory' : ''}`">
     <BaseModal>
       <template v-slot:component>
         <div class="topControls flex">
@@ -55,7 +55,7 @@
                           <label for="editContractType" class="required">{{ ob.polyT('editListing.type') }}</label>
                           <FormError v-if="ob.errors['metadata.contractType']"
                             :errors="ob.errors['metadata.contractType']" />
-                          <select id="editContractType" @change="onChangeContractType" name="metadata.contractType"
+                          <select id="editContractType" @change="onChangeContractType(val)" name="metadata.contractType"
                             class="clrBr clrP clrSh2 marginTopAuto" style="width: 100%">
                             <template v-for="(contractType, j) in ob.contractTypes" :key="j">
                               <option :value="contractType.code"
@@ -340,7 +340,11 @@ export default {
   },
   data () {
     return {
+      contractTypeClass: '',
       images: undefined,
+
+      fixedNav: false,
+      notTrackingInventory: true,
     };
   },
   created () {
@@ -590,15 +594,15 @@ export default {
       this.listenTo(this.variantOptionsCl, 'update', this.onUpdateVariantOptions);
 
       this.$el.on('scroll', () => {
-        if (this.el.scrollTop > 57 && !this.$el.hasClass('fixedNav')) {
-          this.$el.addClass('fixedNav');
-        } else if (this.el.scrollTop <= 57 && this.$el.hasClass('fixedNav')) {
-          this.$el.removeClass('fixedNav');
+        if (this.el.scrollTop > 57) {
+          this.fixedNav = true;
+        } else if (this.el.scrollTop <= 57) {
+          this.fixedNav = false;
         }
       });
 
       if (this.trackInventoryBy === 'DO_NOT_TRACK') {
-        this.$el.addClass('notTrackingInventory');
+        this.notTrackingInventory = true;
       }
     },
 
@@ -615,21 +619,6 @@ export default {
 
     get MAX_PHOTOS () {
       return this.model.get('item').max.images;
-    },
-
-    get createMode () {
-      return this._createMode;
-    },
-
-    set createMode (bool) {
-      if (typeof bool !== 'boolean') {
-        throw new Error('Please provide bool as a boolean.');
-      }
-
-      if (bool !== this._createMode) {
-        this._createMode = bool;
-        this.$el.toggleClass('editMode', !this._createMode);
-      }
     },
 
     onClickReturn () {
@@ -671,19 +660,14 @@ export default {
     },
 
     setContractTypeClass (contractType) {
-      const removeClasses = this.model.get('metadata')
-        .contractTypes
-        .reduce((classes, type) => (`${classes} TYPE_${type}`), '');
-
-      this.$el.removeClass(removeClasses)
-        .addClass(`TYPE_${contractType}`);
+      this.contractTypeClass = `TYPE_${contractType}`;
     },
 
-    onChangeContractType (e, data = {}) {
-      this.setContractTypeClass(e.target.value);
+    onChangeContractType (val, data = {}) {
+      this.setContractTypeClass(val);
 
       if (!data.fromCryptoTypeChange) {
-        if (e.target.value === 'CRYPTOCURRENCY') {
+        if (val === 'CRYPTOCURRENCY') {
           this.model.get('metadata')
             .set('acceptedCurrencies', [this._receiveCryptoCur]);
           $('#editListingCryptoContractType')
@@ -1241,12 +1225,12 @@ export default {
           trackBy: this.model.get('item').get('options').length
             ? 'TRACK_BY_VARIANT' : 'TRACK_BY_FIXED',
         });
-        this.$el.removeClass('notTrackingInventory');
+        this.notTrackingInventory = false;
       } else {
         this.inventoryManagement.setState({
           trackBy: 'DO_NOT_TRACK',
         });
-        this.$el.addClass('notTrackingInventory');
+        this.notTrackingInventory = true;
       }
     },
 

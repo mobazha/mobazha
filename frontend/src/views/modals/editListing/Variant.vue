@@ -1,5 +1,5 @@
 <template>
-  <div class="variant flexRow gutterH">
+  <div :class="`variant flexRow gutterH ${hasError ? 'hasError' : ''}`">
     <div class="col6 simpleFlexCol">
       <FormError v-if="ob.errors['name']" :errors="ob.errors['name']" />
       <input type="text" class="clrBr clrP clrSh2 variantNameInput js-variantNameInput" name="name" :value="ob.name"
@@ -69,6 +69,14 @@ export default {
       }
 
       return variantsErrs;
+    },
+    hasError() {
+      const errors = {
+        ...(this.model.validationError || {}),
+        ...(this.options.errors || {}),
+      };
+
+      return !!Object.keys(errors).length;
     }
   },
   methods: {
@@ -120,8 +128,6 @@ export default {
     },
 
     render () {
-      this.$el.toggleClass('hasError', !!Object.keys(errors).length);
-
       this._$formFields = null;
 
       const variantItems = [];

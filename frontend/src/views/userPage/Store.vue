@@ -1,5 +1,5 @@
 <template>
-  <div class="userPageStore">
+  <div :class="`userPageStore ${isListView ? 'listView' : ''}`">
     <div class="popInMessageHolder js-popInMessages"></div>
     <div class="userPageSearchBar flex gutterHSm" :disabled="ob.isFetching || ob.fetchFailed || !ob.listingCount">
       <div class="flexExpand">
@@ -136,6 +136,8 @@ export default {
       },
       filter: { ...this.defaultFilter },
       listingsViewType: app.localSettings.get('listingsGridViewType'),
+
+      isListView: this.listingsViewType == 'list',
     };
   },
   created() {
@@ -329,13 +331,14 @@ export default {
       this.listingsViewType = type;
       if (prevType) {
         if (prevType !== type) {
-          this.$el.toggleClass('listView');
+          this.isListView = !this.isListView;
+
           if (this.storeListings) {
             this.renderListings(this.fullRenderedCollection);
           }
         }
       } else if (type === 'list') {
-        this.$el.addClass('listView');
+        this.isListView = true;
       }
     },
 

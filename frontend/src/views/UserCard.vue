@@ -1,5 +1,5 @@
 <template>
-  <div class="userCard">
+  <div :class="`userCard ${isBlocked ? 'isBlocked' : ''}`">
     <div class="contentBox clrBr clrP clrSh2 <% if (ob.notFound) { %>disabled<% } %>">
       <div class="shortHeader pointer " @click="nameClick"
         :style="headerHash ? `background-image: url(${ob.getServerUrl(`ob/image/${headerHash}`)}), url('../imgs/defaultHeader.png')` : `background-image: url('../imgs/defaultHeader.png')`">
@@ -94,6 +94,7 @@ export default {
   },
   data () {
     return {
+      isBlocked: false,
     };
   },
   created () {
@@ -305,7 +306,7 @@ export default {
     },
 
     setBlockedClass () {
-      this.$el.toggleClass('isBlocked', isBlocked(this.guid));
+      this.isBlocked = isBlocked(this.guid);
     },
 
     get $followBtn () {

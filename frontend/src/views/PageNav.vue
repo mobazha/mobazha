@@ -1,5 +1,7 @@
 <template>
-  <div :class="`pageNav ${!navigable ? 'notNavigable' : ''} ${torIndicatorOn ? 'torIndicatorOn' : ''}`" @click="onDocClick">
+  <div
+    :class="`pageNav ${!navigable ? 'notNavigable' : ''} ${torIndicatorOn ? 'torIndicatorOn' : ''} ${windowStyle === 'mac' ? 'macStyleWindowControls' : 'winStyleWindowControls'}`"
+    @click="onDocClick">
     <header>
       <nav class="bar clrBr clrP navBar">
         <div class="flexVCent">
@@ -64,7 +66,7 @@
                   <WalletIcon />
                 </div>
               </a>
-              <a class="navBtn toolTipNoWrap" @click="onClickNavNotifBtn"
+              <a class="navBtn toolTipNoWrap" @click.stop="onClickNavNotifBtn"
                 :data-tip="ob.polyT('pageNav.toolTip.notifications')" id="Nav_Notifications">
                 <i class="iconBtn ion-android-notifications"></i>
                 <div class="discTn notifUnreadBadge js-notifUnreadBadge clrE1 clrTOnEmph clrBr2 clrSh2 hide"></div>
@@ -74,10 +76,10 @@
                 <i class="iconBtn ion-android-cart"></i>
                 <div class="discTn notifUnreadBadge js-cartItemsCountBadge clrE1 clrTOnEmph clrBr2 clrSh2 hide"></div>
               </a>
-              <div class="js-notifContainer notifContainer foldDown" @click="onClickNotifContainer"></div>
-              <a id="AvatarBtn" class="discSm clrBr2 clrSh1 navListBtn toolTipNoWrap" @click="navListBtnClick"
+              <div class="js-notifContainer notifContainer foldDown" @click.stop="onClickNotifContainer"></div>
+              <a id="AvatarBtn" class="discSm clrBr2 clrSh1 navListBtn toolTipNoWrap" @click.stop="navListBtnClick"
                 :style="ob.getAvatarBgImage(ob.avatarHashes)" :data-tip="ob.polyT('pageNav.toolTip.nav')"></a>
-              <nav class="navListWrapper foldDown js-navList" @click="onNavListClick">
+              <nav class="navListWrapper foldDown js-navList" @click.stop="onNavListClick">
                 <div class="navList clrBr listBox clrP clrSh1">
                   <div class="listGroup clrP clrBr">
                     <a class="listItem js-navListItem" @click="onNavListItemClick" :href="`#${ob.peerID}/home`">
@@ -173,6 +175,8 @@ export default {
   data () {
     return {
       navigable: false,
+
+      windowStyle: 'win',
     };
   },
   created () {
@@ -229,8 +233,8 @@ export default {
       this.baseInit(opts);
       this.addressBarText = '';
 
-      this.listenTo(app.localSettings, 'change:windowControlStyle', (_, style) => this.setWinControlsStyle(style));
-      this.setWinControlsStyle(app.localSettings.get('windowControlStyle'));
+      this.listenTo(app.localSettings, 'change:windowControlStyle', (_, style) => this.windowStyle = style);
+      this.windowStyle = app.localSettings.get('windowControlStyle');
 
       this.listenTo(serverConnectEvents, 'connected', (e) => {
         this.$connectedServerName.text(e.server.get('name'))
@@ -285,35 +289,6 @@ export default {
       const shoppingCart = e.jsonData.shoppingCart;
       if (shoppingCart) {
         this.cartItemsCount = shoppingCart.itemsCount;
-      }
-    },
-
-    get navigable () {
-      return this.options.navigable;
-    },
-
-    set navigable (navigable) {
-      const prevNavigable = this.options.navigable;
-
-      this.options.navigable = !!navigable;
-
-      if (this.options.navigable !== prevNavigable) {
-        if (this.options.navigable) {
-          this.$el.removeClass('notNavigable');
-        } else {
-          this.$el.addClass('notNavigable');
-        }
-      }
-    },
-
-    get torIndicatorOn () {
-      return this.options.torIndicatorOn;
-    },
-
-    set torIndicatorOn (bool) {
-      if (this.options.torIndicatorOn !== bool) {
-        this.options.torIndicatorOn = bool;
-        this.$el.toggleClass('torIndicatorOn', bool);
       }
     },
 
@@ -392,15 +367,6 @@ export default {
         .toggleClass('hide', !this.cartItemsCount)
         .toggleClass('ellipsisShown', this.cartItemsCount > 99)
         .text(this.cartItemsCount > 99 ? '…' : this.cartItemsCount);
-    },
-
-    setWinControlsStyle (style) {
-      if (style !== 'mac' && style !== 'win') {
-        throw new Error('Style must be \'mac\' or \'win\'.');
-      }
-
-      this.$el.removeClass('winStyleWindowControls macStyleWindowControls');
-      this.$el.addClass(style === 'mac' ? 'macStyleWindowControls' : 'winStyleWindowControls');
     },
 
     setAppProfile () {
@@ -486,8 +452,6 @@ export default {
         closeNavList: false,
       });
       this.toggleNavMenu();
-      // do not bubble to onDocClick
-      e.stopPropagation();
     },
 
     toggleNavMenu () {
@@ -508,16 +472,12 @@ export default {
     },
 
     onNavListClick (e) {
-      // do not bubble to onDocClick
-      e.stopPropagation();
     },
 
     onClickNavNotifBtn (e) {
       this.$navList.removeClass('open');
       this.$connManagementContainer.removeClass('open');
       this.toggleNotifications();
-      // do not bubble to onDocClick
-      e.stopPropagation();
     },
 
     isNotificationsOpen () {
@@ -543,9 +503,7 @@ export default {
       }
     },
 
-    onClickNotifContainer (e) {
-      // do not bubble to onDocClick
-      e.stopPropagation();
+    onClickNotifContainer () {
     },
 
     closeNotifications (options) {

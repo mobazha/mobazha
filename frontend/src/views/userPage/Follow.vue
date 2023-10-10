@@ -1,5 +1,5 @@
 <template>
-  <div class="userPageFollow noResults">
+  <div :class="`userPageFollow ${noResults ? 'noResults': ''}`">
     <div class="js-userCardsContainer userCardsContainer flexRow"></div>
     <div class="js-followLoadingContainer followLoadingContainer">
       <FollowLoading ref="followLoading" :options="followLoadingOptions" @retry-click="fetch()" />
@@ -34,6 +34,7 @@ export default {
   data() {
     return {
       usersPerPage: 12,
+      noResults: false,
 
       _state: {
         followType: 'followers',
@@ -186,7 +187,7 @@ export default {
     },
 
     onCollectionUpdate(cl, opts) {
-      this.$el.toggleClass('noResults', !cl.length);
+      this.noResults = !cl.length;
 
       if (this.refs.followLoading) {
         this.refs.followLoading.setState({ noResults: !cl.length });

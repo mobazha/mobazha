@@ -540,7 +540,7 @@ export default {
       this.tabViewCache = {}; // clear for re-renders
       this.setTabState(this.state, {
         addTabToHistory: false,
-        listing: this.options.listing,
+        listing: this.listing,
       });
 
       return this;

@@ -112,7 +112,7 @@ export default {
         maxMessageLength: ChatMessage.max.messageLength,
         ownProfile: app.profile.toJSON(),
         orderID: this.orderID,
-        vendorName: this.options.vendor.name,
+        vendorName: this.vendor.name,
       };
     },
     vendorPeerID() {

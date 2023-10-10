@@ -87,6 +87,13 @@ export default {
   mounted () {
     this.render();
   },
+  watch: {
+    listPosition() {
+      this.$headline.text(
+        app.polyglot.t('editListing.shippingOptions.optionHeading', { listPosition }),
+      );
+    },
+  },
   computed: {
     ob () {
       return {
@@ -94,7 +101,7 @@ export default {
         // Since multiple instances of this view will be rendered, any id's should
         // include the cid, so they're unique.
         cid: this.model.cid,
-        listPosition: this.options.listPosition,
+        listPosition: this.listPosition,
         shippingTypes: this.model.shippingTypes,
         errors: this.model.validationError || {},
         ...this.model.toJSON(),
@@ -113,7 +120,6 @@ export default {
       };
 
       this.baseInit(opts);
-      this.options = opts;
 
       // get regions
       this.selectCountryData = getTranslatedRegions()
@@ -179,25 +185,6 @@ export default {
       }
 
       this.$serviceSection[method]('hide');
-    },
-
-    set listPosition (position) {
-      if (typeof position !== 'number') {
-        throw new Error('Please provide a position as a number');
-      }
-
-      const prevPosition = this.options.listPosition;
-      const listPosition = this.options.listPosition = position;
-
-      if (listPosition !== prevPosition) {
-        this.$headline.text(
-          app.polyglot.t('editListing.shippingOptions.optionHeading', { listPosition }),
-        );
-      }
-    },
-
-    get listPosition () {
-      return this.options.listPosition;
     },
 
     getFormDataEx (fields = this.$formFields) {

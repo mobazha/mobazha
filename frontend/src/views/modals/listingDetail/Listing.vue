@@ -1138,7 +1138,7 @@ export default {
       let nsfwWarning;
 
       if (!this.rendered
-        && this.options.checkNsfw
+        && this.checkNsfw
         && this.model.get('item').get('nsfw')
         && !this.model.isOwnListing && !app.settings.get('showNsfw')) {
         nsfwWarning = new NsfwWarning()

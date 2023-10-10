@@ -122,7 +122,7 @@ export default {
         receiveCurs: this.receiveCurs,
         errors: this.model.validationError || {},
         ...this._model,
-        receiveCur: this.options.getReceiveCur(),
+        receiveCur: this.getReceiveCur(),
       };
     }
   },
@@ -136,21 +136,19 @@ export default {
         throw new Error('Please provide getCoinTypes as a jQuery promise.');
       }
 
-      this.baseInit(options);
-
-      this.options = {
+      this.baseInit({
         getReceiveCur: () => this.model.get('metadata')
           .get('acceptedCurrencies')[0],
         ...options,
-      };
+      });
 
-      if (typeof this.options.getReceiveCur !== 'function') {
+      if (typeof this.getReceiveCur !== 'function') {
         throw new Error('If providing a getReceiveCur options, it must be a function.');
       }
 
       this.getCoinTypes = options.getCoinTypes;
       this.receiveCurs = supportedWalletCurs();
-      const receiveCur = this.options.getReceiveCur();
+      const receiveCur = this.getReceiveCur();
 
       if (receiveCur && !this.receiveCurs.includes(receiveCur)) {
         // if the model has the receiving currency set to an unsupported cur,
@@ -190,7 +188,7 @@ export default {
           // TODO
           // TODO
           // TODO - don't assume BTC, hard-code to the exchange rate reference coin
-          fromCur: this.options.getReceiveCur() ||
+          fromCur: this.getReceiveCur() ||
             (this.receiveCurs[0] && this.receiveCurs[0].code) || 'BTC',
           toCur: 'BTC',
         },

@@ -54,8 +54,6 @@ export default {
   methods: {
     loadData (options = {}) {
       const opts = {
-        removeOnClose: true,
-        removeOnRoute: true,
         title: '',
         message: '',
         ...options,

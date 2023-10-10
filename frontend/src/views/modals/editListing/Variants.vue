@@ -70,7 +70,6 @@ export default {
       // }
 
       this.baseInit(options);
-      this.options = options;
       this._variantViews = [];
 
       this.listenTo(this.collection, 'add', (md, cl) => {

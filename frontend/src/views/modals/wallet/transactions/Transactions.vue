@@ -206,7 +206,7 @@ export default {
       };
 
       if (this.collection.length) {
-        fetchParams.offsetID = this.collection.at(this.options.collection.length - 1).id;
+        fetchParams.offsetID = this.collection.at(this.collection.length - 1).id;
       }
 
       this.transactionsFetch = this.collection.fetch({

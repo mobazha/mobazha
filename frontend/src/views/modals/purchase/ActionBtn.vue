@@ -98,7 +98,7 @@ export default {
       return {
         ...this.templateHelpers,
           ...this._state,
-          listing: this.options.listing,
+          listing: this.listing,
           purchaseErrT,
       };
     },

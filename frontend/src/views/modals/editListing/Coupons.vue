@@ -79,7 +79,7 @@ export default {
 
         this.couponViews.splice(index, 0, view);
 
-        if (this.collection.length >= this.options.maxCouponCount) {
+        if (this.collection.length >= this.maxCouponCount) {
           this.$addCoupon.addClass('hide');
         }
       });
@@ -87,7 +87,7 @@ export default {
       this.listenTo(this.collection, 'remove', (md, cl, removeOpts) => {
         (this.couponViews.splice(removeOpts.index, 1)[0]).remove();
 
-        if (this.collection.length < this.options.maxCouponCount) {
+        if (this.collection.length < this.maxCouponCount) {
           this.$addCoupon.removeClass('hide');
         }
       });

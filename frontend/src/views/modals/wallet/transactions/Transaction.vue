@@ -120,7 +120,7 @@ export default {
   },
   computed: {
     ob() {
-      const walletBalance = app.walletBalances && app.walletBalances[this.options.coinType];
+      const walletBalance = app.walletBalances && app.walletBalances[this.coinType];
       return {
         ...this.templateHelpers,
         ...this._model,
@@ -330,7 +330,7 @@ export default {
         fetchFeeFailed: false,
       });
 
-      getFees(this.options.coinType)
+      getFees(this.coinType)
         .done((fees) => {
           if (this.isRemoved()) return;
           this.setState({

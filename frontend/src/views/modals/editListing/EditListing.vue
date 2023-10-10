@@ -460,13 +460,7 @@ export default {
           + 'provided as a function.');
       }
 
-      const opts = {
-        removeOnClose: true,
-        ...options,
-      };
-
-      this.baseInit(opts);
-      this.options = opts;
+      this.baseInit(options);
 
       // So the passed in model does not get any un-saved data,
       // we'll clone and update it on sync

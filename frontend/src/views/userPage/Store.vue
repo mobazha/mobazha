@@ -679,10 +679,10 @@ export default {
       });
 
       if (!this.rendered) {
-        if (this.options.listing) {
+        if (this.listing) {
           // if first render, show a listing if it was
           // passed in as a view option
-          this.showListing(this.options.listing);
+          this.showListing(this.listing);
         }
 
         this.rendered = true;

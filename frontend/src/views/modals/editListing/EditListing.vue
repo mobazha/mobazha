@@ -19,15 +19,15 @@
         <div class="flex gutterH">
           <div class="tabColumn contentBox padMd clrP clrBr clrSh3">
             <div class="boxList tx4 clrTx1Br">
-              <template v-for="(tab, index) in tabs">
-                <a :class="`tab row tab-${tab.key} ${ob.selectedNavTabIndex === index ? 'active' : ''}`"
-                  @click="onScrollLinkClick">{{ tab.name }}</a>
+              <template v-for="tab in tabs">
+                <a :class="`tab row tab-${tab.key} ${activeTab === tab.key ? 'active' : ''}`"
+                  @click="scrollTo(tab.key)">{{ tab.name }}</a>
               </template>
             </div>
           </div>
           <div class="flexExpand posR tabContent">
             <div class="gutterVMd2 js-formSectionsContainer">
-              <section class="js-scrollToSection contentBox padMd clrP clrBr clrSh3">
+              <section ref="sectionGeneral" class="contentBox padMd clrP clrBr clrSh3">
                 <div class="flexHCent">
                   <h2 class="h3 clrT js-listingHeading">{{ ob.createMode ? ob.polyT('editListing.createListingLabel') :
                     ob.polyT('editListing.editListingLabel') }}</h2>
@@ -148,7 +148,7 @@
                 </div>
               </section>
 
-              <section class="js-scrollToSection photoUploadSection contentBox padMd clrP clrBr clrSh3 tx3">
+              <section ref="sectionPhotos" class="photoUploadSection contentBox padMd clrP clrBr clrSh3 tx3">
                 <div class="overflowAuto">
                   <h2 class="h4 clrT required">{{ ob.polyT('editListing.sectionNames.photos') }}</h2>
                   <div class="js-photoUploadingLabel floR" v-show="!!ob.photoUploadInprogress">{{ ob.polyT('editListing.uploading') }} <a class="" @click="onClickCancelPhotoUploads">{{ ob.polyT('editListing.btnCancelUpload') }}</a></div>
@@ -171,7 +171,7 @@
                 </div>
               </section>
 
-              <section class="js-scrollToSection js-sectionShipping shippingSection">
+              <section ref="sectionShipping" class="js-sectionShipping shippingSection">
                 <div class="gutterVMd">
                   <div class="js-shippingOptionsWrap shippingOptionsWrap gutterVMd"></div>
                   <div class="contentBox padMd clrP clrBr clrSh3 tx3 shipOptPlaceholder">
@@ -184,7 +184,7 @@
                 </div>
               </section>
 
-              <section class="js-scrollToSection tagsSection contentBox padMd clrP clrBr clrSh3 tx3">
+              <section ref="sectionTags" class="tagsSection contentBox padMd clrP clrBr clrSh3 tx3">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.tagsDetailed') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['item.tags']" :errors="ob.errors['item.tags']" />
@@ -193,7 +193,7 @@
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperTags') }}</div>
               </section>
 
-              <section class="js-scrollToSection categorySection contentBox padMd clrP clrBr clrSh3 tx3">
+              <section ref="sectionCategory" class="categorySection contentBox padMd clrP clrBr clrSh3 tx3">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.categoryDetailed') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['item.categories']" :errors="ob.errors['item.categories']" />
@@ -201,7 +201,7 @@
                 <input type="text" id="editListingCategories" name="item.categories" class="clrBr clrP hideDropDown" :value="ob.item.categories.join(ob.tagsDelimiter)" :placeholder="ob.polyT('editListing.categoryPlaceholder')" />
               </section>
 
-              <section class="js-scrollToSection js-variantsSection variantsSection contentBox padMd clrP clrBr clrSh3 tx3 <% ob.item.options.length && print('expandedVariantsView') %>">
+              <section ref="sectionVariants" class="js-variantsSection variantsSection contentBox padMd clrP clrBr clrSh3 tx3 <% ob.item.options.length && print('expandedVariantsView') %>">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.variantsDetailed') }}</h2>
                 <hr class="clrBr rowMd" />
                 <div class="js-variantsContainer variantsContainer"></div>
@@ -212,7 +212,7 @@
                 class="contentBox padMd clrP clrBr clrSh3 tx3 js-inventoryManagementSection inventoryManagementSection">
               </section>
 
-              <section
+              <section ref="sectionVariantInventory"
                 class="contentBox variantInventorySection js-variantInventorySection padMd clrP clrBr clrSh3 tx3" v-show="!!ob.shouldShowVariantInventorySection">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.variantInventory') }}</h2>
                 <hr class="clrBr rowMd">
@@ -220,7 +220,7 @@
                 <div class="js-variantInventoryTableContainer"></div>
               </section>
 
-              <section class="js-scrollToSection contentBox padMd clrP clrBr clrSh3 tx3">
+              <section ref="sectionReturnPolicy" class="contentBox padMd clrP clrBr clrSh3 tx3">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.returnPolicy') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['refundPolicy']" :errors="ob.errors['refundPolicy']" />
@@ -229,7 +229,7 @@
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperReturnPolicy') }}</div>
               </section>
 
-              <section class="js-scrollToSection contentBox padMd clrP clrBr clrSh3 tx3">
+              <section ref="sectionTermsAndConditions" class="contentBox padMd clrP clrBr clrSh3 tx3">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.termsAndConditions') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['termsAndConditions']" :errors="ob.errors['termsAndConditions']" />
@@ -238,8 +238,8 @@
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperTerms') }}</div>
               </section>
 
-              <section
-                class="js-scrollToSection contentBox padMd clrP clrBr clrSh3 tx3 couponsSection js-couponsSection <% ob.coupons.length && print('expandedCouponView') %>">
+              <section ref="sectionCoupons"
+                class="contentBox padMd clrP clrBr clrSh3 tx3 couponsSection js-couponsSection <% ob.coupons.length && print('expandedCouponView') %>">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.coupons') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['coupons']" :errors="ob.errors['coupons']" />
@@ -247,7 +247,7 @@
                 <a class="btn clrP clrBr clrSh2 btnAddCoupon " @click="onClickAddCoupon">{{ ob.polyT('editListing.btnAddCoupon') }}</a>
               </section>
 
-              <section class="js-scrollToSection contentBox padMd clrP clrBr clrSh3 tx3 acceptedCurrenciesSection">
+              <section ref="sectionAcceptedCurs" class="contentBox padMd clrP clrBr clrSh3 tx3 acceptedCurrenciesSection">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.acceptedCurrencies') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['metadata.acceptedCurrencies'] && ob.metadata.contractType !== 'CRYPTOCURRENCY'" :errors="ob.errors['metadata.acceptedCurrencies']" />
@@ -322,6 +322,7 @@ import SkuField from '../../../../backbone/views/modals/editListing/SkuField';
 import UnsupportedCurrency from '../../../../backbone/views/modals/editListing/UnsupportedCurrency';
 import CryptoCurrencyType from '../../../../backbone/views/modals/editListing/CryptoCurrencyType';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
+import { capitalize } from '../../../../backbone/utils/string';
 
 import ViewListingLinks from './ViewListingLinks.vue'
 import UploadPhoto from './UploadPhoto.vue'
@@ -340,6 +341,8 @@ export default {
   },
   data () {
     return {
+      activeTab: 'general',
+
       contractTypeClass: '',
       images: undefined,
 
@@ -371,7 +374,6 @@ export default {
       return {
         ...this.templateHelpers,
         createMode: this.createMode,
-        selectedNavTabIndex: this.selectedNavTabIndex,
         returnText: this.options.returnText,
         listingCurrency: this.currency,
         countryList: this.countryList,
@@ -419,10 +421,10 @@ export default {
           key: 'tags',
           name: ob.polyT('editListing.sectionNames.tags'),
         },
-        {
-          key: 'shippingOrigin',
-          name: ob.polyT('editListing.sectionNames.sendLocation'),
-        },
+        // {
+        //   key: 'shippingOrigin',
+        //   name: ob.polyT('editListing.sectionNames.sendLocation'),
+        // },
         {
           key: 'category',
           name: ob.polyT('editListing.sectionNames.category'),
@@ -538,16 +540,6 @@ export default {
       }
 
       return coinDiv;
-    },
-
-    $scrollToSections () {
-      return this._$scrollToSections
-        || (this._$scrollToSections = $('.js-scrollToSection'));
-    },
-
-    $scrollLinks () {
-      return this._$scrollLinks
-        || (this._$scrollLinks = $('.js-scrollLink'));
     },
 
     $formFields () {
@@ -711,7 +703,6 @@ export default {
         // event emitter in models/listing/index.js.
       });
 
-      this.selectedNavTabIndex = 0;
       this.createMode = !(this.model.lastSyncedAttrs
         && this.model.lastSyncedAttrs.slug);
       this.photoUploads = [];
@@ -1145,7 +1136,7 @@ export default {
     },
 
     onClickScrollToVariantInventory () {
-      this.scrollTo(this.$variantInventorySection);
+      this.scrollTo('variantInventory');
     },
 
     confirmClose () {
@@ -1240,44 +1231,32 @@ export default {
       this.$inputPhotoUpload.trigger('click');
     },
 
-    scrollTo ($el) {
+    scrollTo (key) {
+      console.log('scroll to: ', key)
+      let $el = this.$refs[`section${capitalize(key)}`];
       if (!$el) {
         throw new Error('Please provide a jQuery element to scroll to.');
       }
+
+      console.log('$el.getBoundingClientRect().top: ', $el.getBoundingClientRect().top)
 
       // Had this initially in Velocity, but after markup re-factor, it
       // doesn't work consistently, so we'll go old-school for now.
       this.$el
         .animate({
-          scrollTop: $el.position().top,
+          scrollTop: `${$el.getBoundingClientRect().top}px`,
         }, {
           complete: () => {
+            this.activeTab = key;
           },
         }, 400);
     },
 
-    onScrollLinkClick (e) {
-      const index = $(e.target).index();
-      this.selectedNavTabIndex = index;
-      this.$scrollLinks.removeClass('active');
-      $(e.target).addClass('active');
-      this.scrollTo(this.$scrollToSections.eq(index));
-    },
-
-    onScroll () {
-      let index = 0;
-      let keepLooping = true;
-
-      while (keepLooping) {
-        if (isScrolledIntoView(this.$scrollToSections[index])) {
-          this.$scrollLinks.removeClass('active');
-          this.$scrollLinks.eq(index).addClass('active');
-          this.selectedNavTabIndex = index;
-          keepLooping = false;
-        } else if (index === this.$scrollToSections.length - 1) {
-          keepLooping = false;
-        } else {
-          index += 1;
+    _onScroll() {
+      for (const tab of this.tabs) {
+        if (isScrolledIntoView(this.$refs[`section${capitalize(tab.key)}`])) {
+          this.activeTab = tab.key;
+          break;
         }
       }
 
@@ -1286,6 +1265,10 @@ export default {
       } else if (this.$el.scrollTop <= 57) {
         this.fixedNav = false;
       }
+    },
+
+    onScroll () {
+      _.throttle(this._onScroll, 100)();
     },
 
     onSaveClick () {
@@ -1588,8 +1571,6 @@ export default {
 
       this.setContractTypeClass(metadata.get('contractType'));
 
-      this._$scrollLinks = null;
-      this._$scrollToSections = null;
       this._$currencySelect = null;
       this._$priceInput = null;
       this._$buttonSave = null;

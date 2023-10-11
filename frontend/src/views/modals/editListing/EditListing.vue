@@ -283,7 +283,7 @@
 
 <script>
 import $ from 'jquery';
-import 'velocity-animate';
+import Velocity from 'velocity-animate';
 
 import Sortable from 'sortablejs';
 import _ from 'underscore';
@@ -1240,16 +1240,27 @@ export default {
 
       console.log('$el.getBoundingClientRect().top: ', $el.getBoundingClientRect().top)
 
-      // Had this initially in Velocity, but after markup re-factor, it
-      // doesn't work consistently, so we'll go old-school for now.
-      this.$el
-        .animate({
-          scrollTop: `${$el.getBoundingClientRect().top}px`,
-        }, {
+      Velocity(
+        this.$el,
+        { scrollTop: $el.getBoundingClientRect().top},
+        {
+          duration: 400,
           complete: () => {
             this.activeTab = key;
           },
-        }, 400);
+        }
+      );
+
+      // // Had this initially in Velocity, but after markup re-factor, it
+      // // doesn't work consistently, so we'll go old-school for now.
+      // this.$el
+      //   .animate({
+      //     scrollTop: $el.position().top,
+      //   }, {
+      //     complete: () => {
+      //       this.activeTab = key;
+      //     },
+      //   }, 400);
     },
 
     _onScroll() {

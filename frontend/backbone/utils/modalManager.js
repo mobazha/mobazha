@@ -58,20 +58,7 @@ export function launchAboutModal(modalOptions = {}) {
 }
 
 export function launchSettingsModal(modalOptions = {}) {
-  if (settingsModal) {
-    settingsModal.bringToTop();
-  } else {
-    settingsModal = new Settings({
-      removeOnClose: true,
-      ...modalOptions,
-    })
-      .render()
-      .open();
-
-    settingsModal.on('modal-will-remove', () => (settingsModal = null));
-  }
-
-  return settingsModal;
+  return window.vueApp.launchModal('Settings', modalOptions);
 }
 
 export function launchDebugLogModal(modalOptions = {}) {

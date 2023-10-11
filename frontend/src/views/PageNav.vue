@@ -618,7 +618,7 @@ export default {
       setTimeout(() => {
         this.closeNavMenu();
       });
-      
+
       // This is recorded as two events that belong to different metrics we're comparing.
       recordEvent('NavMenu_Click', { target: 'settings' });
       recordEvent('Settings_Open', { origin: 'navMenu' });
@@ -626,6 +626,10 @@ export default {
     },
 
     navHelpClick () {
+      setTimeout(() => {
+        this.closeNavMenu();
+      });
+
       recordEvent('NavMenu_Click', { target: 'help' });
       launchAboutModal({ initialTab: 'Help' });
       this.closeNavMenu();

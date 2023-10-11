@@ -26,6 +26,11 @@
         };
       }"
       @close="onWalletClose" />
+
+    <KeepAlive v-if="initialized" :exclude="['Settings', 'About', 'ShoppingCart']">
+      <component :is="modalName" ref="modalInstance" :options="modalOptions" @close="onModalClose"></component>
+    </KeepAlive>
+
     <Purchase v-if="showPurchase" @close="onPurchaseClose" />
     <LoadingModal v-if="initialized" v-show="showLoadingModal" />
   </div>
@@ -33,16 +38,19 @@
 
 <script>
 import app from '../backbone/app';
-import ShoppingCart from '@/views/ShoppingCart.vue';
+import Settings from '@/views/modals/settings/Settings.vue';
+
 import Wallet from '@/views/modals/wallet/Wallet.vue';
+import ShoppingCart from '@/views/ShoppingCart.vue';
 import Purchase from '@/views/modals/purchase/Purchase.vue';
 import LoadingModal from '@/views/modals/Loading.vue';
 import PageNav from '@/views/PageNav.vue'
 
 export default {
   components: {
-    ShoppingCart,
+    Settings,
     Wallet,
+    ShoppingCart,
     Purchase,
     LoadingModal,
     PageNav,
@@ -51,7 +59,6 @@ export default {
     'App',
   data() {
     return {
-      modalName: '',
       initialized: false,
       showLoadingModal: false,
 
@@ -62,6 +69,9 @@ export default {
       toggleVue: false,
 
       app: app,
+
+      modalName: '',
+      modalOptions: {},
     };
   },
   mounted() {
@@ -80,6 +90,16 @@ export default {
     },
     onPurchaseClose() {
       this.showPurchase = false;
+    },
+    launchModal(modalName, options) {
+      this.modalName = modalName;
+      this.modalOptions = options;
+
+      return this.$refs.modalInstance;
+    },
+    onModalClose() {
+      console.log('onModalClose');
+      this.modalName = '';
     }
   },
 };

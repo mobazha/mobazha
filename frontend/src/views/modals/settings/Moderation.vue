@@ -142,7 +142,7 @@
                 <ul class="unstyled errorList hide js-moderationConfirmError">
                   <li><i class="ion-alert-circled"></i> {{ ob.polyT('settings.moderationTab.errors.confirm') }}</li>
                 </ul>
-                <input type="checkbox" id="acceptGuidelines" <% if (ob.isModerator) { print('checked') } %>>
+                <input type="checkbox" id="acceptGuidelines" :checked="ob.isModerator">
                 <label class="tx5b" for="acceptGuidelines">
                   <span v-html='ob.polyT("settings.moderationTab.acceptGuidelines", {
                       acceptGuidelinesLink: `<a
@@ -181,7 +181,7 @@
 import $ from 'jquery';
 import '../../../../backbone/utils/lib/selectize';
 import app from '../../../../backbone/app';
-import { openSimpleMessage } from '../SimpleMessage';
+import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import Moderator from '../../../../backbone/models/profile/Moderator';
 import { feeTypes } from '../../../../backbone/models/profile/Fee';
 import { getTranslatedLangs } from '../../../../backbone/data/languages';

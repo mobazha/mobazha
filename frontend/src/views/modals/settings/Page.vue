@@ -3,7 +3,7 @@
     <div class="gutterVMd2">
       <div class="contentBox padMd clrP clrBr clrSh3">
         <div class="flexHCent">
-          <h2 class="h3 clrT">{{ ob.polyT('settings.pageTab.sectionPage') }}</h2>
+          <h2 class="h3 clrT">{{ ob.polyT('settings.pageTab.sectionName') }}</h2>
           <ProcessingButton
             className="btn clrP clrBAttGrad clrBrDec1 clrTOnEmph modalContentCornerBtn js-save"
             @click="save" :btnText="ob.polyT('settings.btnSave')" />

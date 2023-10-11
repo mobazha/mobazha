@@ -35,6 +35,7 @@ export default {
   },
   data() {
     return {
+      cid: '',
       _options: {
         disabledMsg: '',
       },
@@ -42,7 +43,7 @@ export default {
         controlType: 'checkbox',
         currencies: [],
         activeCurs: [],
-        disabledCurs,
+        disabledCurs: [],
         sort: false,
       }
     };

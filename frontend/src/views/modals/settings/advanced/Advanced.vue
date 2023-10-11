@@ -300,8 +300,8 @@
 import $ from 'jquery';
 import { ipc } from '../../../../utils/ipcRenderer.js';
 import app from '../../../../../backbone/app.js';
-import { openSimpleMessage } from '../../SimpleMessage';
-import Dialog from '../../../modals/Dialog';
+import { openSimpleMessage } from '../../../../../backbone/views/modals/SimpleMessage';
+import Dialog from '../../../../backbone/views/modals/Dialog';
 import { endAjaxEvent, recordEvent, startAjaxEvent } from '../../../../../backbone/utils/metrics.js';
 import WalletSeed from './WalletSeed';
 import SmtpSettings from './SmtpSettings';

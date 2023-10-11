@@ -139,6 +139,7 @@ export default {
       guild: '',
       state: 'store',
       slug: '',
+      showStoreWelcomeCallout: true,
 
       followingCount: 0,
       followerCount: 0,

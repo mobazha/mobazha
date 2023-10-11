@@ -54,9 +54,20 @@
               </div>
               <div class="col9">
                 <FormError v-if="ob.errors['currencies']" :errors="ob.errors['currencies']" />
-                <div class="row js-currencySelector"></div>
+                <div class="row js-currencySelector">
+                  <CryptoCurSelector ref="currencySelector" :options="{
+                      initialState: {
+                        currencies: supportedWalletCurs(),
+                        activeCurs: [...new Set(app.profile.get('currencies'))],
+                        sort: true,
+                      },
+                    }"
+                    @currencyClicked="handleCurrencyClicked"/>
+                </div>
                 <div class="flexHRight">
-                  <div class="js-bulkCoinUpdateBtn"></div>
+                  <div class="js-bulkCoinUpdateBtn">
+                    <BulkCoinUpdateBtn ref="bulkCoinUpdateBtn" @bulkCoinUpdateConfirm="onBulkCoinUpdateConfirm" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -145,13 +156,15 @@ import app from '../../../../backbone/app';
 import '../../../../backbone/lib/whenAll.jquery';
 import { bulkCoinUpdate } from '../../../../backbone/utils/bulkCoinUpdate';
 import { supportedWalletCurs } from '../../../../backbone/data/walletCurrencies';
-import Moderators from '../../components/moderators/Moderators';
-import BulkCoinUpdateBtn from './BulkCoinUpdateBtn';
-import CurrencySelector from '../../components/CryptoCurSelector';
-import { openSimpleMessage } from '../SimpleMessage';
+import Moderators from '../../../../backbone/views/components/moderators/Moderators';
+import BulkCoinUpdateBtn from './BulkCoinUpdateBtn.vue';
+import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 
 
 export default {
+  components: {
+    BulkCoinUpdateBtn,
+  },
   props: {
     options: {
       type: Object,
@@ -161,6 +174,7 @@ export default {
   },
   data () {
     return {
+      app: app,
     };
   },
   created () {
@@ -171,22 +185,30 @@ export default {
   mounted () {
     this.render();
   },
+  watch: {
+    showVerifiedOnly(val) {
+      if (this.modsAvailable) {
+        this.modsAvailable.setState({ showVerifiedOnly: val });
+      }
+    }
+  },
   computed: {
     ob () {
       return {
         ...this.templateHelpers,
         modsAvailable: this.modsAvailable.allIDs,
-        showVerifiedOnly: this._showVerifiedOnly,
+        showVerifiedOnly: this.showVerifiedOnly,
         errors: {
           ...(this.profile.validationError || {}),
           ...(this.settings.validationError || {}),
         },
-        ...this._profile,
-        ...this._settings,
+        ...this.profile.toJSON(),
+        ...this.settings.toJSON(),
       };
     }
   },
   methods: {
+    supportedWalletCurs,
     loadData (options = {}) {
       this.baseInit(options);
 
@@ -208,20 +230,8 @@ export default {
 
       const preferredCurs = [...new Set(app.profile.get('currencies'))];
 
-      this.currencySelector = this.createChild(CurrencySelector, {
-        initialState: {
-          currencies: supportedWalletCurs(),
-          activeCurs: preferredCurs,
-          sort: true,
-        },
-      });
-
-      this.listenTo(this.currencySelector, 'currencyClicked', (sOpts) => {
-        this.handleCurrencyClicked(sOpts);
-      });
-
       this.currentMods = this.settings.get('storeModerators');
-      this._showVerifiedOnly = true;
+      this.showVerifiedOnly = true;
 
       this.modsSelected = new Moderators({
         cardState: 'selected',
@@ -284,25 +294,24 @@ export default {
           }
         });
       });
+    },
 
-      this.bulkCoinUpdateBtn = new BulkCoinUpdateBtn();
-      this.listenTo(this.bulkCoinUpdateBtn, 'bulkCoinUpdateConfirm', () => {
-        const newCoins = this.currencySelector.getState().activeCurs;
-        if (newCoins.length) {
-          bulkCoinUpdate(this.currencySelector.getState().activeCurs);
-          this.bulkCoinUpdateBtn.setState({
-            isBulkCoinUpdating: true,
-            showConfirmTooltip: false,
-            error: '',
-          });
-        } else {
-          this.bulkCoinUpdateBtn.setState({
-            isBulkCoinUpdating: false,
-            showConfirmTooltip: false,
-            error: 'NoCoinsError',
-          });
-        }
-      });
+    onBulkCoinUpdateConfirm() {
+      const newCoins = this.$refs.currencySelector.getState().activeCurs;
+      if (newCoins.length) {
+        bulkCoinUpdate(this.$refs.currencySelector.getState().activeCurs);
+        this.$refs.bulkCoinUpdateBtn.setState({
+          isBulkCoinUpdating: true,
+          showConfirmTooltip: false,
+          error: '',
+        });
+      } else {
+        this.$refs.bulkCoinUpdateBtn.setState({
+          isBulkCoinUpdating: false,
+          showConfirmTooltip: false,
+          error: 'NoCoinsError',
+        });
+      }
     },
 
     noModsByIDFound (guids) {
@@ -396,7 +405,7 @@ export default {
     save () {
       // this view saves to two different models
       const profileFormData = this.getProfileFormData();
-      profileFormData.currencies = this.currencySelector.getState().activeCurs;
+      profileFormData.currencies = this.$refs.currencySelector.getState().activeCurs;
       const settingsFormData = this.getSettingsData();
 
       this.profile.set(profileFormData);
@@ -463,7 +472,7 @@ export default {
             // If any of the mods moved to the available collect are unverified, show them
             if (app.verifiedMods.matched(unSel).length !== unSel.length) {
               // Don't render, the render is in the always handler
-              this._showVerifiedOnly = false;
+              this.showVerifiedOnly = false;
             }
           })
           .fail((...args) => {
@@ -495,15 +504,7 @@ export default {
       }
     },
 
-    set showVerifiedOnly (bool) {
-      this._showVerifiedOnly = bool;
-      this.modsAvailable.setState({ showVerifiedOnly: bool });
-    },
-
     render () {
-      this.currencySelector.delegateEvents();
-      $('.js-currencySelector').append(this.currencySelector.render().el);
-
       this.modsSelected.delegateEvents();
       $('.js-modListSelected').append(this.modsSelected.render().el);
       if (!this.modsSelected.modFetches.length) {
@@ -519,9 +520,6 @@ export default {
       $('.js-modListAvailable')
         .append(this.modsAvailable.render().el)
         .toggleClass('hide', !this.modsAvailable.allIDs.length);
-
-      this.bulkCoinUpdateBtn.delegateEvents();
-      $('.js-bulkCoinUpdateBtn').append(this.bulkCoinUpdateBtn.render().el);
 
       return this;
     }

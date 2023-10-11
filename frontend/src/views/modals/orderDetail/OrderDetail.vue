@@ -1,13 +1,13 @@
 <template>
   <div class="modal modalScrollPage tabbedModal orderDetail">
-    <BaseModal @close="onClickClose" >
+    <BaseModal @close="close" >
       <template v-slot:component>
         <div class="topControls flex">
           <!-- // This is something found at the top of multiple modals. Would be nice to make this into a template
       // and componentize the css. -->
           <template v-if="ob.returnText">
             <div class="btnStrip clrSh3">
-              <a class="btn clrP clrBr clrT" @click="onClickReturnBox">
+              <a class="btn clrP clrBr clrT" @click="close">
                 <span class="ion-chevron-left margRSm"></span>
                 {{ ob.returnText }}
               </a>
@@ -514,14 +514,6 @@ export default {
 
     onClickRetryFetch () {
       this.model.fetch();
-    },
-
-    onClickReturnBox () {
-      this.$emit('close');
-    },
-
-    onClickClose () {
-      this.$emit('close');
     },
 
     onSocketMessage (e) {

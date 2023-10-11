@@ -12,7 +12,6 @@ import baseVw from './mixins/baseVw';
 
 import Chat from './components/Chat.vue';
 
-import OrderDetail from './views/modals/orderDetail/OrderDetail.vue';
 
 import './assets/global.less';
 import components from './components/global';
@@ -57,16 +56,4 @@ export function mountChat(container, conversationID) {
   }
 
   return chat.use(Router).use(window.TUIKit).mount(container);
-}
-
-export function mountOrderDetail(container, options) {
-  const orderDetail = createApp(OrderDetail, options);
-  orderDetail.config.productionTip = false;
-
-  // components
-  for (const i in components) {
-    orderDetail.component(i, components[i]);
-  }
-
-  return orderDetail.mount(container);
 }

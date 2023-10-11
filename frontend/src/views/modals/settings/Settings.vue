@@ -1,6 +1,6 @@
 <template>
   <div class="modal settings tabbedModal modalScrollPage">
-    <BaseModal :modalInfo="{ removeOnClose: true, removeOnRoute: false, }" @close="onClose">
+    <BaseModal :modalInfo="{ removeOnClose: true, removeOnRoute: false, }" @close="close">
       <template v-slot:component>
         <div class="topControls flex"></div>
         <div class="flex gutterH">
@@ -147,10 +147,6 @@ export default {
         }); 
       }
     },
-
-    onClose() {
-      this.$emit('close');
-    }
   }
 }
 </script>

@@ -3,7 +3,7 @@
     :class="`modal editListing tabbedModal modalScrollPage ${contractTypeClass} ${!createMode ? 'editMode' : ''} ${fixedNav ? 'fixedNav' : ''} ${notTrackingInventory ? 'notTrackingInventory' : ''}`"
     @scroll="onScroll"
     >
-    <BaseModal>
+    <BaseModal @close="close">
       <template v-slot:component>
         <div class="topControls flex">
           <div class="btnStrip clrSh3">

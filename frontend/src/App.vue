@@ -27,7 +27,7 @@
       }"
       @close="onWalletClose" />
 
-    <KeepAlive v-if="initialized" :exclude="['Settings', 'About', 'ShoppingCart']">
+    <KeepAlive v-if="initialized" :exclude="['EditListing', 'Settings', 'About', 'ShoppingCart']">
       <component :is="modalName" ref="modalInstance"
         :options="modalOptions"
         :bb="modalBBFunc"

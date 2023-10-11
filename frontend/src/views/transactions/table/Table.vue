@@ -172,10 +172,14 @@ export default {
       }
     },
 
-    // transToRender () {
-    //   this.indexRowViews();
-    //   this.getAvatars(this.transToRender); // be sure to get avatars *after* indexRowViews()
-    // }
+    transToRender (val) {
+      if (val && val.length > 0) {
+        this.$nextTick(() => {
+          this.indexRowViews();
+          this.getAvatars(this.transToRender); // be sure to get avatars *after* indexRowViews()
+        });
+      }
+    }
   },
   methods: {
     acceptingOrder,
@@ -410,7 +414,7 @@ export default {
         byOrder: {},
       };
 
-      this.refs.views.forEach((view) => {
+      this.$refs.views.forEach((view) => {
         const vendorID = view.model.get('vendorID');
         const buyerID = view.model.get('buyerID');
 

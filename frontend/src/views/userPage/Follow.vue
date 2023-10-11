@@ -141,16 +141,16 @@ export default {
     onScroll() {
       const cf = getContentFrame()[0];
       const scrollNearBot = cf.scrollTop >= cf.scrollHeight - cf.offsetHeight - 100;
-      if (this.renderedCl.length < this.collection.length && this.refs.followLoading && !this.refs.followLoading.getState().isFetching && scrollNearBot) {
+      if (this.renderedCl.length < this.collection.length && this.$refs.followLoading && !this.$refs.followLoading.getState().isFetching && scrollNearBot) {
         // Some fake latency so a user doesn't just scroll down and load
         // hundreds of userCards which would kick off hundreds of profile
         // fetches.
-        this.refs.followLoading.setState({ isFetching: true });
+        this.$refs.followLoading.setState({ isFetching: true });
 
         setTimeout(() => {
           const start = this.renderedCl.length;
           const end = start + this.usersPerPage;
-          this.refs.followLoading.setState({ isFetching: false });
+          this.$refs.followLoading.setState({ isFetching: false });
           this.renderedCl.add(this.collection.models.slice(start, end));
         }, 500);
       }
@@ -189,8 +189,8 @@ export default {
     onCollectionUpdate(cl, opts) {
       this.noResults = !cl.length;
 
-      if (this.refs.followLoading) {
-        this.refs.followLoading.setState({ noResults: !cl.length });
+      if (this.$refs.followLoading) {
+        this.$refs.followLoading.setState({ noResults: !cl.length });
       }
 
       if (opts.changes.added.length) {
@@ -220,7 +220,7 @@ export default {
         state.noResults = true;
       }
 
-      if (this.refs.followLoading) this.refs.followLoading.setState(state);
+      if (this.$refs.followLoading) this.$refs.followLoading.setState(state);
       this.renderedCl.add(this.collection.models.slice(0, this.usersPerPage));
 
       // If any additions / removal occur on the main collection (e.g. this view
@@ -318,8 +318,8 @@ export default {
     },
 
     fetch() {
-      if (this.refs.followLoading) {
-        this.refs.followLoading.setState({
+      if (this.$refs.followLoading) {
+        this.$refs.followLoading.setState({
           isFetching: true,
           fetchFailed: false,
           fetchErrorMsg: '',
@@ -344,8 +344,8 @@ export default {
           .fail((xhr) => {
             if (xhr.statusText === 'abort') return;
             if (xhr === this.followFetch) {
-              if (this.refs.followLoading) {
-                this.refs.followLoading.setState({
+              if (this.$refs.followLoading) {
+                this.$refs.followLoading.setState({
                   isFetching: false,
                   fetchFailed: true,
                   fetchErrorMsg: (xhr.responseJSON && xhr.responseJSON.reason) || '',

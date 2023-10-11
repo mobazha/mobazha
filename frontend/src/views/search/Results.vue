@@ -43,6 +43,7 @@
 </template>
 
 <script>
+import $ from 'jquery';
 import app from '../../../backbone/app';
 import { capitalize } from '../../../backbone/utils/string';
 import { recordEvent } from '../../../backbone/utils/metrics';

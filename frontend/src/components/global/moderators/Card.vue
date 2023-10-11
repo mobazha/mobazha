@@ -212,7 +212,7 @@ export default {
           });
       }
 
-      handleLinks(this.el);
+      handleLinks(this.$el);
     },
 
     clickModerator(e) {

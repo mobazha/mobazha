@@ -1,5 +1,8 @@
 <template>
-  <div :class="`modal editListing tabbedModal modalScrollPage ${contractTypeClass} ${!createMode ? 'editMode' : ''} ${fixedNav ? 'fixedNav' : ''} ${notTrackingInventory ? 'notTrackingInventory' : ''}`">
+  <div
+    :class="`modal editListing tabbedModal modalScrollPage ${contractTypeClass} ${!createMode ? 'editMode' : ''} ${fixedNav ? 'fixedNav' : ''} ${notTrackingInventory ? 'notTrackingInventory' : ''}`"
+    @scroll="onScroll"
+    >
     <BaseModal>
       <template v-slot:component>
         <div class="topControls flex">
@@ -95,19 +98,7 @@
                               </template>
                             </select>
                           </div>
-                          <%
-                    const supportedWalletCurs = ob.crypto.supportedWalletCurs()
-                      .map(cur => ob.crypto.ensureMainnetCode(cur));
-                    const helperCryptoCurCode = supportedWalletCurs.includes('BTC') ?
-                      'BTC' : supportedWalletCurs.sort()[0] || 'EUR';
-                    const helperCryptoCurName =
-                      ob.polyT(`cryptoCurrencies.${helperCryptoCurCode}`,
-                        ob.polyT(`currencies.${helperCryptoCurCode}`, { _: helperCryptoCurCode }));
-                  %>
-                            <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperPrice', {
-                              cur:
-                                helperCryptoCurName
-                            }) }}</div>
+                          <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperPrice', { cur: helperCryptoCurName }) }}</div>
                         </div>
                         <div class="col6 simpleFlexCol conditionWrap">
                           <label for="editListingCondition" class="required">{{ ob.polyT('editListing.condition')
@@ -260,7 +251,18 @@
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.acceptedCurrencies') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['metadata.acceptedCurrencies'] && ob.metadata.contractType !== 'CRYPTOCURRENCY'" :errors="ob.errors['metadata.acceptedCurrencies']" />
-                <div class="js-cryptoCurSelectContainer rowSm"></div>
+                <div class="js-cryptoCurSelectContainer rowSm">
+                  <CryptoCurSelector ref="cryptoCurSelector" :options="{
+                    initialState: {
+                      currencies: [
+                        ...ob.metadata.acceptedCurrencies,
+                        ...supportedWalletCurs(),
+                      ],
+                      activeCurs: ob.metadata.acceptedCurrencies,
+                      sort: true,
+                    },
+                  }" />
+                </div>
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperAcceptedCurrencies') }}</div>
               </section>
 
@@ -304,23 +306,21 @@ import {
 import { supportedWalletCurs } from '../../../../backbone/data/walletCurrencies';
 import { getCoinDivisibility } from '../../../../backbone/utils/currency';
 import { setDeepValue } from '../../../../backbone/utils/object';
-import SimpleMessage, { openSimpleMessage } from '../SimpleMessage';
-import Dialog from '../Dialog';
+import SimpleMessage, { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
+import Dialog from '../../../../backbone/views/modals/Dialog';
 import ShippingOptionMd from '../../../../backbone/models/listing/ShippingOption';
 import Service from '../../../../backbone/models/listing/Service';
 import Image from '../../../../backbone/models/listing/Image';
 import Coupon from '../../../../backbone/models/listing/Coupon';
 import VariantOption from '../../../../backbone/models/listing/VariantOption';
-import BaseModal from '../BaseModal';
-import ShippingOption from './ShippingOption';
-import Coupons from './Coupons';
-import Variants from './Variants';
-import VariantInventory from './VariantInventory';
-import InventoryManagement from './InventoryManagement';
-import SkuField from './SkuField';
-import UnsupportedCurrency from './UnsupportedCurrency';
-import CryptoCurrencyType from './CryptoCurrencyType';
-import CryptoCurSelector from '../../components/CryptoCurSelector';
+import ShippingOption from '../../../../backbone/views/modals/editListing/ShippingOption';
+import Coupons from '../../../../backbone/views/modals/editListing/Coupons';
+import Variants from '../../../../backbone/views/modals/editListing/Variants';
+import VariantInventory from '../../../../backbone/views/modals/editListing/VariantInventory';
+import InventoryManagement from '../../../../backbone/views/modals/editListing/InventoryManagement';
+import SkuField from '../../../../backbone/views/modals/editListing/SkuField';
+import UnsupportedCurrency from '../../../../backbone/views/modals/editListing/UnsupportedCurrency';
+import CryptoCurrencyType from '../../../../backbone/views/modals/editListing/CryptoCurrencyType';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 
 import ViewListingLinks from './ViewListingLinks.vue'
@@ -329,7 +329,7 @@ import UploadPhoto from './UploadPhoto.vue'
 export default {
   component: {
     ViewListingLinks,
-    uploadPhoto,
+    UploadPhoto,
   },
   props: {
     options: {
@@ -345,6 +345,8 @@ export default {
 
       fixedNav: false,
       notTrackingInventory: true,
+
+      togglePhotoUploads: false,
     };
   },
   created () {
@@ -446,13 +448,221 @@ export default {
           name: ob.polyT('editListing.sectionNames.acceptedCurrencies'),
         }
       ];
-    }
+    },
+
+    helperCryptoCurName() {
+      const ob = this.ob;
+
+      const supportedWalletCurs = ob.crypto.supportedWalletCurs().map(cur => ob.crypto.ensureMainnetCode(cur));
+      const helperCryptoCurCode = supportedWalletCurs.includes('BTC') ? 'BTC' : supportedWalletCurs.sort()[0] || 'EUR';
+      return ob.polyT(`cryptoCurrencies.${helperCryptoCurCode}`, ob.polyT(`currencies.${helperCryptoCurCode}`, { _: helperCryptoCurCode }));
+    },
+
+    MAX_PHOTOS () {
+      return this.model.get('item').max.images;
+    },
+
+    shouldShowVariantInventorySection () {
+      return !!this.variantOptionsCl.length;
+    },
+
+    inProgressPhotoUploads () {
+      let access = this.togglePhotoUploads;
+
+      return this.photoUploads
+        .filter((upload) => upload.state() === 'pending');
+    },
+
+    trackInventoryBy () {
+      let trackBy;
+
+      // If the inventoryManagement has been rendered, we'll let it's drop-down
+      // determine whether we are tracking inventory. Otherwise, we'll get the info
+      // from the model.
+      if (this.inventoryManagement) {
+        trackBy = this.inventoryManagement.getState().trackBy;
+      } else {
+        const item = this.model.get('item');
+
+        if (item.isInventoryTracked) {
+          trackBy = item.get('options').length
+            ? 'TRACK_BY_VARIANT' : 'TRACK_BY_FIXED';
+        } else {
+          trackBy = 'DO_NOT_TRACK';
+        }
+      }
+
+      return trackBy;
+    },
+
+    // return the currency associated with this listing
+    currency () {
+      if (this.$currencySelect.length) {
+        return this.$currencySelect.val();
+      }
+
+      let cur = app.settings.get('localCurrency');
+
+      try {
+        cur = this.model
+          .get('metadata')
+          .get('pricingCurrency')
+          .code;
+      } catch (e) {
+        // pass
+      }
+
+      return cur;
+    },
+
+    // Keep in mind this could return undefined if certain dependant form fields are not set yet
+    // (e.g. rendering not complete, dependant async data not loaded) and the divisibility was
+    // never set in the model.
+    coinDivisibility () {
+      let coinDiv;
+
+      if ($('#editContractType').length) {
+        try {
+          coinDiv = getCoinDivisibility(
+            $('#editContractType').val() === 'CRYPTOCURRENCY'
+              ? $('#editListingCoinType').val()
+              || this.model.get('metadata').get('coinType')
+              : this.currency,
+          );
+        } catch (e) {
+          // pass
+        }
+      } else {
+        coinDiv = this.model.get('metadata')
+          .get('coinDivisibility');
+      }
+
+      return coinDiv;
+    },
+
+    $scrollToSections () {
+      return this._$scrollToSections
+        || (this._$scrollToSections = $('.js-scrollToSection'));
+    },
+
+    $scrollLinks () {
+      return this._$scrollLinks
+        || (this._$scrollLinks = $('.js-scrollLink'));
+    },
+
+    $formFields () {
+      const isCrypto = $('#editContractType').val() === 'CRYPTOCURRENCY';
+      const cryptoExcludes = isCrypto ? ', .js-inventoryManagementSection' : '';
+      const excludes = '.js-sectionShipping, .js-couponsSection, .js-variantsSection, '
+        + `.js-variantInventorySection${cryptoExcludes}`;
+
+      let $fields = $(
+        `.js-formSectionsContainer > section:not(${excludes}) select[name],`
+        + `.js-formSectionsContainer > section:not(${excludes}) input[name],`
+        + `.js-formSectionsContainer > section:not(${excludes}) div[contenteditable][name],`
+        + `.js-formSectionsContainer > section:not(${excludes}) `
+        + 'textarea[name]:not([class*="trumbowyg"])',
+      );
+
+      // Filter out hidden fields that are not applicable based on whether this is
+      // a crypto currency listing.
+      $fields = $fields.filter((index, el) => {
+        const $excludeContainers = isCrypto
+          ? $('.js-standardTypeWrap')
+            .add($('.js-skuMatureContentRow'))
+          : $('.js-cryptoTypeWrap');
+
+        let keep = true;
+
+        $excludeContainers.each((i, container) => {
+          if ($.contains(container, el)) {
+            keep = false;
+          }
+        });
+
+        return keep;
+      });
+
+      return $fields;
+    },
+
+    $currencySelect () {
+      return this._$currencySelect
+        || (this._$currencySelect = $('#editListingCurrency'));
+    },
+
+    $priceInput () {
+      return this._$priceInput
+        || (this._$priceInput = $('#editListingPrice'));
+    },
+
+    $saveButton () {
+      return this._$buttonSave
+        || (this._$buttonSave = $('.js-save'));
+    },
+
+    $inputPhotoUpload () {
+      return this._$inputPhotoUpload
+        || (this._$inputPhotoUpload = $('#inputPhotoUpload'));
+    },
+
+    $photoUploadingLabel () {
+      return this._$photoUploadingLabel
+        || (this._$photoUploadingLabel = $('.js-photoUploadingLabel'));
+    },
+
+    $editListingReturnPolicy () {
+      return this._$editListingReturnPolicy
+        || (this._$editListingReturnPolicy = $('#editListingReturnPolicy'));
+    },
+
+    $editListingTermsAndConditions () {
+      return this._$editListingTermsAndConditions
+        || (this._$editListingTermsAndConditions = $('#editListingTermsAndConditions'));
+    },
+
+    $sectionShipping () {
+      return this._$sectionShipping
+        || (this._$sectionShipping = $('.js-sectionShipping'));
+    },
+
+    $maxCatsWarning () {
+      return this._$maxCatsWarning
+        || (this._$maxCatsWarning = $('.js-maxCatsWarning'));
+    },
+
+    $maxTagsWarning () {
+      return this._$maxTagsWarning
+        || (this._$maxTagsWarning = $('.js-maxTagsWarning'));
+    },
+
+    maxTagsWarning () {
+      return `<div class="clrT2 tx5 row">${app.polyglot.t('editListing.maxTagsWarning')}</div>`;
+    },
+
+    $addShipOptSectionHeading () {
+      return this._$addShipOptSectionHeading
+        || (this._$addShipOptSectionHeading = $('.js-addShipOptSectionHeading'));
+    },
+
+    $variantInventorySection () {
+      return this._$variantInventorySection
+        || (this._$variantInventorySection = $('.js-variantInventorySection'));
+    },
+
+    $itemPrice () {
+      return this._$itemPrice
+        || (this._$itemPrice = $('[name="item.price"]'));
+    },
   },
   methods: {
+    supportedWalletCurs,
     loadData (options = {}) {
-      if (!options.model) {
+      if (!this.model) {
         throw new Error('Please provide a model.');
       }
+
+      console.log('EditingListing, model: ', this.model);
 
       if (options.onClickViewListing !== undefined
         && typeof options.onClickViewListing !== 'function') {
@@ -587,14 +797,6 @@ export default {
 
       this.listenTo(this.variantOptionsCl, 'update', this.onUpdateVariantOptions);
 
-      this.$el.on('scroll', () => {
-        if (this.el.scrollTop > 57) {
-          this.fixedNav = true;
-        } else if (this.el.scrollTop <= 57) {
-          this.fixedNav = false;
-        }
-      });
-
       if (this.trackInventoryBy === 'DO_NOT_TRACK') {
         this.notTrackingInventory = true;
       }
@@ -609,10 +811,6 @@ export default {
         'click .js-viewListing': 'onClickViewListing',
         'click .js-viewListingOnWeb': 'onClickViewListingOnWeb',
       };
-    },
-
-    get MAX_PHOTOS () {
-      return this.model.get('item').max.images;
     },
 
     onClickReturn () {
@@ -950,29 +1148,6 @@ export default {
       this.scrollTo(this.$variantInventorySection);
     },
 
-    get shouldShowVariantInventorySection () {
-      return !!this.variantOptionsCl.length;
-    },
-
-    /**
-     * Will return true if we have at least one variant option with at least
-     * one choice.
-     */
-    get haveVariantOptionsWithChoice () {
-      if (this.variantOptionsCl.length) {
-        const atLeastOneHasChoice = this.variantOptionsCl.find((variantOption) => {
-          const choices = variantOption.get('variants');
-          return choices && choices.length;
-        });
-
-        if (atLeastOneHasChoice) {
-          return true;
-        }
-      }
-
-      return false;
-    },
-
     confirmClose () {
       const deferred = $.Deferred();
 
@@ -1053,14 +1228,12 @@ export default {
             ),
             jqXhr.responseJSON && jqXhr.responseJSON.reason || '',
           );
+        })
+        .always(() => {
+          this.togglePhotoUploads = !this.togglePhotoUploads;
         });
 
       this.photoUploads.push(upload);
-    },
-
-    get inProgressPhotoUploads () {
-      return this.photoUploads
-        .filter((upload) => upload.state() === 'pending');
     },
 
     onClickAddPhoto () {
@@ -1079,10 +1252,6 @@ export default {
           scrollTop: $el.position().top,
         }, {
           complete: () => {
-            setTimeout(
-              () => this.$el.on('scroll', this.throttledOnScroll),
-              100,
-            );
           },
         }, 400);
     },
@@ -1092,7 +1261,6 @@ export default {
       this.selectedNavTabIndex = index;
       this.$scrollLinks.removeClass('active');
       $(e.target).addClass('active');
-      this.$el.off('scroll', this.throttledOnScroll);
       this.scrollTo(this.$scrollToSections.eq(index));
     },
 
@@ -1111,6 +1279,12 @@ export default {
         } else {
           index += 1;
         }
+      }
+
+      if (this.$el.scrollTop > 57) {
+        this.fixedNav = true;
+      } else if (this.$el.scrollTop <= 57) {
+        this.fixedNav = false;
       }
     },
 
@@ -1194,7 +1368,7 @@ export default {
       }
 
       // render so errrors are shown / cleared
-      this.render(!!save);
+      this.render();
 
       if (!save) {
         const $firstErr = $('.errorList:visible').eq(0);
@@ -1279,8 +1453,8 @@ export default {
         formData.metadata = {
           ...formData.metadata,
           format: 'FIXED_PRICE',
-          acceptedCurrencies: this.cryptoCurSelector
-            ? this.cryptoCurSelector.getState().activeCurs
+          acceptedCurrencies: this.$refs.cryptoCurSelector
+            ? this.$refs.cryptoCurSelector.getState().activeCurs
             : metadata.get('acceptedCurrencies'),
         };
       } else {
@@ -1367,143 +1541,6 @@ export default {
       return this;
     },
 
-    get trackInventoryBy () {
-      let trackBy;
-
-      // If the inventoryManagement has been rendered, we'll let it's drop-down
-      // determine whether we are tracking inventory. Otherwise, we'll get the info
-      // from the model.
-      if (this.inventoryManagement) {
-        trackBy = this.inventoryManagement.getState().trackBy;
-      } else {
-        const item = this.model.get('item');
-
-        if (item.isInventoryTracked) {
-          trackBy = item.get('options').length
-            ? 'TRACK_BY_VARIANT' : 'TRACK_BY_FIXED';
-        } else {
-          trackBy = 'DO_NOT_TRACK';
-        }
-      }
-
-      return trackBy;
-    },
-
-    get $scrollToSections () {
-      return this._$scrollToSections
-        || (this._$scrollToSections = $('.js-scrollToSection'));
-    },
-
-    get $scrollLinks () {
-      return this._$scrollLinks
-        || (this._$scrollLinks = $('.js-scrollLink'));
-    },
-
-    get $formFields () {
-      const isCrypto = $('#editContractType').val() === 'CRYPTOCURRENCY';
-      const cryptoExcludes = isCrypto ? ', .js-inventoryManagementSection' : '';
-      const excludes = '.js-sectionShipping, .js-couponsSection, .js-variantsSection, '
-        + `.js-variantInventorySection${cryptoExcludes}`;
-
-      let $fields = $(
-        `.js-formSectionsContainer > section:not(${excludes}) select[name],`
-        + `.js-formSectionsContainer > section:not(${excludes}) input[name],`
-        + `.js-formSectionsContainer > section:not(${excludes}) div[contenteditable][name],`
-        + `.js-formSectionsContainer > section:not(${excludes}) `
-        + 'textarea[name]:not([class*="trumbowyg"])',
-      );
-
-      // Filter out hidden fields that are not applicable based on whether this is
-      // a crypto currency listing.
-      $fields = $fields.filter((index, el) => {
-        const $excludeContainers = isCrypto
-          ? $('.js-standardTypeWrap')
-            .add($('.js-skuMatureContentRow'))
-          : $('.js-cryptoTypeWrap');
-
-        let keep = true;
-
-        $excludeContainers.each((i, container) => {
-          if ($.contains(container, el)) {
-            keep = false;
-          }
-        });
-
-        return keep;
-      });
-
-      return $fields;
-    },
-
-    get $currencySelect () {
-      return this._$currencySelect
-        || (this._$currencySelect = $('#editListingCurrency'));
-    },
-
-    get $priceInput () {
-      return this._$priceInput
-        || (this._$priceInput = $('#editListingPrice'));
-    },
-
-    get $saveButton () {
-      return this._$buttonSave
-        || (this._$buttonSave = $('.js-save'));
-    },
-
-    get $inputPhotoUpload () {
-      return this._$inputPhotoUpload
-        || (this._$inputPhotoUpload = $('#inputPhotoUpload'));
-    },
-
-    get $photoUploadingLabel () {
-      return this._$photoUploadingLabel
-        || (this._$photoUploadingLabel = $('.js-photoUploadingLabel'));
-    },
-
-    get $editListingReturnPolicy () {
-      return this._$editListingReturnPolicy
-        || (this._$editListingReturnPolicy = $('#editListingReturnPolicy'));
-    },
-
-    get $editListingTermsAndConditions () {
-      return this._$editListingTermsAndConditions
-        || (this._$editListingTermsAndConditions = $('#editListingTermsAndConditions'));
-    },
-
-    get $sectionShipping () {
-      return this._$sectionShipping
-        || (this._$sectionShipping = $('.js-sectionShipping'));
-    },
-
-    get $maxCatsWarning () {
-      return this._$maxCatsWarning
-        || (this._$maxCatsWarning = $('.js-maxCatsWarning'));
-    },
-
-    get $maxTagsWarning () {
-      return this._$maxTagsWarning
-        || (this._$maxTagsWarning = $('.js-maxTagsWarning'));
-    },
-
-    get maxTagsWarning () {
-      return `<div class="clrT2 tx5 row">${app.polyglot.t('editListing.maxTagsWarning')}</div>`;
-    },
-
-    get $addShipOptSectionHeading () {
-      return this._$addShipOptSectionHeading
-        || (this._$addShipOptSectionHeading = $('.js-addShipOptSectionHeading'));
-    },
-
-    get $variantInventorySection () {
-      return this._$variantInventorySection
-        || (this._$variantInventorySection = $('.js-variantInventorySection'));
-    },
-
-    get $itemPrice () {
-      return this._$itemPrice
-        || (this._$itemPrice = $('[name="item.price"]'));
-    },
-
     showMaxTagsWarning () {
       this.$maxTagsWarning.empty()
         .append(this.maxTagsWarning);
@@ -1526,51 +1563,6 @@ export default {
       this.$maxCatsWarning.empty();
     },
 
-    // return the currency associated with this listing
-    get currency () {
-      if (this.$currencySelect.length) {
-        return this.$currencySelect.val();
-      }
-
-      let cur = app.settings.get('localCurrency');
-
-      try {
-        cur = this.model
-          .get('metadata')
-          .get('pricingCurrency')
-          .code;
-      } catch (e) {
-        // pass
-      }
-
-      return cur;
-    },
-
-    // Keep in mind this could return undefined if certain dependant form fields are not set yet
-    // (e.g. rendering not complete, dependant async data not loaded) and the divisibility was
-    // never set in the model.
-    get coinDivisibility () {
-      let coinDiv;
-
-      if ($('#editContractType').length) {
-        try {
-          coinDiv = getCoinDivisibility(
-            $('#editContractType').val() === 'CRYPTOCURRENCY'
-              ? $('#editListingCoinType').val()
-              || this.model.get('metadata').get('coinType')
-              : this.currency,
-          );
-        } catch (e) {
-          // pass
-        }
-      } else {
-        coinDiv = this.model.get('metadata')
-          .get('coinDivisibility');
-      }
-
-      return coinDiv;
-    },
-
     createShippingOptionView (opts) {
       const options = {
         getCurrency: () => (this.$currencySelect.length
@@ -1588,16 +1580,10 @@ export default {
       return view;
     },
 
-    render (restoreScrollPos = true) {
-      let prevScrollPos = 0;
+    render () {
       const item = this.model.get('item');
       const metadata = this.model.get('metadata');
 
-      if (restoreScrollPos) {
-        prevScrollPos = this.el.scrollTop;
-      }
-
-      if (this.throttledOnScroll) this.$el.off('scroll', this.throttledOnScroll);
       this.currencies = this.currencies || getCurrenciesSortedByCode();
 
       this.setContractTypeClass(metadata.get('contractType'));
@@ -1837,44 +1823,11 @@ export default {
       $('.js-cryptoTypeWrap')
         .html(this.cryptoCurrencyType.render().el);
 
-      const activeCurs = this.model.get('metadata')
-        .get('acceptedCurrencies');
-      let curSelectorInitialState = {
-        currencies: [
-          ...activeCurs,
-          ...supportedWalletCurs(),
-        ],
-        activeCurs,
-        sort: true,
-      };
-      if (this.cryptoCurSelector) {
-        curSelectorInitialState = {
-          ...curSelectorInitialState,
-          ...this.cryptoCurSelector.getState(),
-        };
-        this.cryptoCurSelector.remove();
-      }
-      this.cryptoCurSelector = this.createChild(CryptoCurSelector, {
-        initialState: curSelectorInitialState,
-      });
-      $('.js-cryptoCurSelectContainer')
-        .html(this.cryptoCurSelector.render().el);
-
       setTimeout(() => {
         if (!this.rendered) {
           this.rendered = true;
           this.$titleInput.focus();
         }
-      });
-
-      setTimeout(() => {
-        // restore the scroll position
-        if (restoreScrollPos) {
-          this.el.scrollTop = prevScrollPos;
-        }
-
-        this.throttledOnScroll = _.bind(_.throttle(this.onScroll, 100), this);
-        setTimeout(() => this.$el.on('scroll', this.throttledOnScroll), 100);
       });
 
       // This block should be after any dom manipulation in render.

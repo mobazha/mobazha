@@ -70,7 +70,7 @@ export default {
     },
 
     onDocumentClick (e) {
-      if (!($.contains(this.el, e.target) || e.target === this.el)) {
+      if (!($.contains(this.$el, e.target) || e.target === this.$el)) {
         this.close();
       }
     },

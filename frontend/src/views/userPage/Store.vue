@@ -536,7 +536,7 @@ export default {
 
     storeListingsScroll(paginatedCol, e) {
       // Make sure we're in the DOM (i.e. the store tab is active).
-      if (!this.el.parentElement) return;
+      if (!this.$el.parentElement) return;
 
       // if we've scrolled within a 150px of the bottom
       if (e.target.scrollTop + $(e.target).innerHeight() >= e.target.scrollHeight - 150) {

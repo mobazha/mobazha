@@ -126,7 +126,7 @@ export default {
       }
 
       this.baseInit(opts);
-      handleLinks(this.el);
+      handleLinks(this.$el);
     },
   },
 };

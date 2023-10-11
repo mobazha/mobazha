@@ -139,7 +139,7 @@ export default {
     },
 
     onDocumentClick (e) {
-      if (this.getState().show && !($.contains(this.el, e.target) || e.target === this.el)) {
+      if (this.getState().show && !($.contains(this.$el, e.target) || e.target === this.$el)) {
         this.setState({ show: false });
       }
     },

@@ -541,7 +541,7 @@
       "placeholderTextColor": "#252525",
       "placeholderHighlightColor": "#2BAD23",
       "placeholderHighlightTextColor": "#FFFFFF",
-      "sectionPage": "Page",
+      "sectionName": "Page",
       "sectionLinks": "Liens",
       "sectionAbout": "À propos",
       "sectionTheme": "Thème",

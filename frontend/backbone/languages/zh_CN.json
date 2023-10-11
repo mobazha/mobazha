@@ -543,7 +543,7 @@
       "placeholderTextColor": "#252525",
       "placeholderHighlightColor": "#2BAD23",
       "placeholderHighlightTextColor": "#FFFFFF",
-      "sectionPage": "页面",
+      "sectionName": "页面",
       "sectionLinks": "链接",
       "sectionAbout": "关于",
       "sectionTheme": "主题",

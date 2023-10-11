@@ -541,7 +541,7 @@
       "placeholderTextColor": "#252525",
       "placeholderHighlightColor": "#2BAD23",
       "placeholderHighlightTextColor": "#FFFFFF ",
-      "sectionPage": "Страница",
+      "sectionName": "Страница",
       "sectionLinks": "Ссылки",
       "sectionAbout": "О нас",
       "sectionTheme": "Тема",

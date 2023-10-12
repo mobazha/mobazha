@@ -3,8 +3,12 @@
     <div class="contentBox pad clrP clrBr clrSh3 tx3">
       <form class="padSmKids padStack">
         <div class="flexVCent">
-          <h2 class="h4 clrT flexExpand" :required="ob.listPosition === 1">{{ ob.polyT('editListing.shippingOptions.optionHeading', { listPosition: ob.listPosition }) }}</h2>
-          <a class="clrBr clrP clrSh2 margRSm btn js-removeShippingOption" @click="onClickRemoveShippingOption">{{ ob.polyT('editListing.shippingOptions.btnDeleteShippingOption') }}</a>
+          <h2 class="h4 clrT flexExpand" :required="ob.listPosition === 1">
+            {{ ob.polyT('editListing.shippingOptions.optionHeading', { listPosition: ob.listPosition }) }}
+          </h2>
+          <a class="clrBr clrP clrSh2 margRSm btn js-removeShippingOption" @click="onClickRemoveShippingOption">{{
+            ob.polyT('editListing.shippingOptions.btnDeleteShippingOption')
+          }}</a>
         </div>
         <hr class="clrBr rowMd" />
         <div class="flexRow">
@@ -16,19 +20,34 @@
           </div>
         </div>
         <FormError v-if="ob.errors['regions']" :errors="ob.errors['regions']" />
-        <select :id="`shipDestinationsSelect_${ob.cid}`" multiple name="regions" class="clrBr clrP clrSh2" :placeholder="ob.polyT('editListing.shippingOptions.regionsPlaceholder')"></select>
+        <select
+          :id="`shipDestinationsSelect_${ob.cid}`"
+          multiple
+          name="regions"
+          class="clrBr clrP clrSh2"
+          :placeholder="ob.polyT('editListing.shippingOptions.regionsPlaceholder')"
+        ></select>
         <div class="flexRow gutterH">
           <div class="col6 simpleFlexCol">
             <label :for="`shipOptionTitle_${ob.cid}`" class="required">{{ ob.polyT('editListing.shippingOptions.nameLabel') }}</label>
             <FormError v-if="ob.errors['name']" :errors="ob.errors['name']" />
-            <input type="text" class="clrBr clrP clrSh2 marginTopAuto" name="name" :id="`shipOptionTitle_${ob.cid}`" :value="ob.name" :placeholder="ob.polyT('editListing.shippingOptions.namePlaceholder')">
+            <input
+              type="text"
+              class="clrBr clrP clrSh2 marginTopAuto"
+              name="name"
+              :id="`shipOptionTitle_${ob.cid}`"
+              :value="ob.name"
+              :placeholder="ob.polyT('editListing.shippingOptions.namePlaceholder')"
+            />
           </div>
           <div class="col6 simpleFlexCol">
             <label :for="`shipOptionType_${ob.cid}`" class="required">{{ ob.polyT('editListing.shippingOptions.typeLabel') }}</label>
             <FormError v-if="ob.errors['type']" :errors="ob.errors['type']" />
             <select :id="`shipOptionType_${ob.cid}`" @change="onChangeShippingType(val)" name="type" class="clrBr clrP clrSh2 marginTopAuto">
               <template v-for="(shippingType, j) in ob.shippingTypes" :key="j">
-                <option :value="shippingType" :selected="ob.type === shippingType">{{ ob.polyT(`editListing.shippingOptions.shippingTypes.${shippingType}`) }}</option>
+                <option :value="shippingType" :selected="ob.type === shippingType">
+                  {{ ob.polyT(`editListing.shippingOptions.shippingTypes.${shippingType}`) }}
+                </option>
               </template>
             </select>
           </div>
@@ -60,10 +79,7 @@
 import $ from 'jquery';
 import '../../../../backbone/utils/lib/selectize';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
-import regions, {
-  getTranslatedRegions,
-  getIndexedRegions,
-} from '../../../../backbone/data/regions';
+import regions, { getTranslatedRegions, getIndexedRegions } from '../../../../backbone/data/regions';
 import ServiceMd from '../../../../backbone/models/listing/Service';
 import app from '../../../../backbone/app';
 import Service from './Service';
@@ -75,27 +91,24 @@ export default {
       default: {},
     },
   },
-  data () {
-    return {
-    };
+  data() {
+    return {};
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.options);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   watch: {
     listPosition() {
-      this.$headline.text(
-        app.polyglot.t('editListing.shippingOptions.optionHeading', { listPosition }),
-      );
+      this.$headline.text(app.polyglot.t('editListing.shippingOptions.optionHeading', { listPosition }));
     },
   },
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         // Since multiple instances of this view will be rendered, any id's should
@@ -106,10 +119,27 @@ export default {
         errors: this.model.validationError || {},
         ...this.model.toJSON(),
       };
-    }
+    },
+    $headline() {
+      return this._$headline || (this._$headline = $('h1'));
+    },
+    $shipDestinationDropdown() {
+      return this._$shipDestinationDropdown || (this._$shipDestinationDropdown = $(`#shipDestinationsDropdown_${this.model.cid}`));
+    },
+
+    $serviceSection() {
+      return this._$serviceSection || (this._$serviceSection = $('.js-serviceSection'));
+    },
+
+    $formFields() {
+      return (
+        this._$formFields ||
+        (this._$formFields = $('select[name], input[name], textarea[name]').filter((index, el) => !$(el).parents('.js-serviceSection').length))
+      );
+    },
   },
   methods: {
-    loadData (options = {}) {
+    loadData(options = {}) {
       if (!options.model) {
         throw new Error('Please provide a model.');
       }
@@ -122,20 +152,18 @@ export default {
       this.baseInit(opts);
 
       // get regions
-      this.selectCountryData = getTranslatedRegions()
-        .map((regionObj) => ({
-          id: regionObj.id,
-          text: regionObj.name,
-          isRegion: true,
-        }));
+      this.selectCountryData = getTranslatedRegions().map((regionObj) => ({
+        id: regionObj.id,
+        text: regionObj.name,
+        isRegion: true,
+      }));
 
       // now, we'll add in the countries
-      const selectCountries = getTranslatedCountries()
-        .map((countryObj) => ({
-          id: countryObj.dataName,
-          text: countryObj.name,
-          isRegion: false,
-        }));
+      const selectCountries = getTranslatedCountries().map((countryObj) => ({
+        id: countryObj.dataName,
+        text: countryObj.name,
+        isRegion: false,
+      }));
       this.selectCountryData = this.selectCountryData.concat(selectCountries);
 
       this.services = this.model.get('services');
@@ -156,22 +184,19 @@ export default {
       });
     },
 
-    onClickRemoveShippingOption () {
+    onClickRemoveShippingOption() {
       this.trigger('click-remove', { view: this });
     },
 
-    onClickAddService () {
-      this.services
-        .push(new ServiceMd());
+    onClickAddService() {
+      this.services.push(new ServiceMd());
     },
 
-    onClickClearShipDest () {
-      this.$shipDestinationSelect[0]
-        .selectize
-        .clear();
+    onClickClearShipDest() {
+      this.$shipDestinationSelect[0].selectize.clear();
     },
 
-    onChangeShippingType (val) {
+    onChangeShippingType(val) {
       let method;
 
       if (val === 'LOCAL_PICKUP') {
@@ -187,63 +212,39 @@ export default {
       this.$serviceSection[method]('hide');
     },
 
-    getFormDataEx (fields = this.$formFields) {
+    getFormDataEx(fields = this.$formFields) {
       const formData = this.getFormData(fields);
       const indexedRegions = getIndexedRegions();
 
       // Strip out any region elements from shipping destinations
       // drop down. The individual countries will remain.
-      formData.regions = formData.regions
-        .filter((region) => !indexedRegions[region]);
+      formData.regions = formData.regions.filter((region) => !indexedRegions[region]);
 
       return formData;
     },
 
     // Sets the model based on the current data in the UI.
-    setModelData () {
+    setModelData() {
       // set the data for our nested Services views
       this.serviceViews.forEach((serviceVw) => serviceVw.setModelData());
       this.model.set(this.getFormDataEx());
     },
 
-    createServiceView (options) {
+    createServiceView(options) {
       const view = this.createChild(Service, options);
 
       this.listenTo(view, 'click-remove', (e) => {
-        this.services.remove(
-          this.services.at(this.serviceViews.indexOf(e.view)),
-        );
+        this.services.remove(this.services.at(this.serviceViews.indexOf(e.view)));
       });
 
       return view;
-    },
-
-    get $headline () {
-      return this._$headline
-        || (this._$headline = $('h1'));
-    },
-
-    get $shipDestinationDropdown () {
-      return this._$shipDestinationDropdown
-        || (this._$shipDestinationDropdown = $(`#shipDestinationsDropdown_${this.model.cid}`));
-    },
-
-    get $serviceSection () {
-      return this._$serviceSection
-        || (this._$serviceSection = $('.js-serviceSection'));
-    },
-
-    get $formFields () {
-      return this._$formFields
-        || (this._$formFields = $('select[name], input[name], textarea[name]').filter((index, el) => (
-          !$(el).parents('.js-serviceSection').length)));
     },
 
     /**
      * Returns a list of any regions that are fully represented in the provided
      * countries list.
      */
-    representedRegions (countries = []) {
+    representedRegions(countries = []) {
       if (!Array.isArray(countries)) {
         throw new Error('Please provide an array of country codes.');
       }
@@ -259,7 +260,7 @@ export default {
       return selectedRegions;
     },
 
-    render () {
+    render() {
       $(`#shipOptionType_${this.model.cid}`).select2({
         // disables the search box
         minimumResultsForSearch: Infinity,
@@ -338,8 +339,8 @@ export default {
       this._$shipDestinationsSelect = null;
 
       return this;
-    }
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="scss" scoped></style>

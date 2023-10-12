@@ -1234,12 +1234,13 @@ export default {
     },
 
     scrollTo({ key }) {
-      this.$scrollTo(`.${key}Section`, 400, {
+      this.$scrollTo(`.${key}Section`, 300, {
         container: '.tabbedModal', //设置滚动容器
         easing: 'ease-in', //动画效果
-        offset: -50, //偏移量
         onDone: () => {
-          this.activeTab = key;
+          setTimeout(() => {
+            this.activeTab = key;
+          }, 20);
         },
         x: false, //是否在x轴滚动
         y: true, //是否在y轴滚动
@@ -1248,7 +1249,7 @@ export default {
 
     _onScroll() {
       for (const tab of this.tabs) {
-        if (isScrolledIntoView(this.$refs[`section${capitalize(tab.key)}`])) {
+      if (isScrolledIntoView(this.$refs[`section${capitalize(tab.key)}`])) {
           this.activeTab = tab.key;
           break;
         }

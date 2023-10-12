@@ -7,7 +7,8 @@
           <ProcessingButton
             className="btn clrP clrBAttGrad clrBrDec1 clrTOnEmph modalContentCornerBtn js-save"
             @click="save"
-            :btnText="ob.polyT('settings.btnSave')" />
+            :btnText="ob.polyT('settings.btnSave')"
+          />
         </div>
         <hr class="clrBr" />
 
@@ -21,13 +22,15 @@
                 <FormError v-if="ob.errors['vendor']" :errors="ob.errors['vendor']" />
                 <div class="btnStrip">
                   <div class="btnRadio clrBr">
-                    <input type="radio"
+                    <input
+                      type="radio"
                       name="vendor"
                       value="true"
                       class="js-profileField"
                       id="settingsModerationStatusTrue"
                       data-var-type="boolean"
-                      :checked="ob.vendor">
+                      :checked="ob.vendor"
+                    />
                     <label for="settingsModerationStatusTrue">{{ ob.polyT('settings.on') }}</label>
                   </div>
                   <div class="btnRadio clrBr">
@@ -38,7 +41,8 @@
                       class="js-profileField"
                       id="settingsModerationStatusFalse"
                       :checked="!ob.vendor"
-                      data-var-type="boolean">
+                      data-var-type="boolean"
+                    />
                     <label for="settingsModerationStatusFalse">{{ ob.polyT('settings.off') }}</label>
                   </div>
                 </div>
@@ -55,14 +59,17 @@
               <div class="col9">
                 <FormError v-if="ob.errors['currencies']" :errors="ob.errors['currencies']" />
                 <div class="row js-currencySelector">
-                  <CryptoCurSelector ref="currencySelector" :options="{
+                  <CryptoCurSelector
+                    ref="currencySelector"
+                    :options="{
                       initialState: {
                         currencies: supportedWalletCurs(),
                         activeCurs: [...new Set(app.profile.get('currencies'))],
                         sort: true,
                       },
                     }"
-                    @currencyClicked="handleCurrencyClicked"/>
+                    @currencyClicked="handleCurrencyClicked"
+                  />
                 </div>
                 <div class="flexHRight">
                   <div class="js-bulkCoinUpdateBtn">
@@ -85,17 +92,19 @@
                     <div class="js-modListSelected"></div>
                   </div>
                   <ul class="unstyled errorList hide js-submitModByIDInputError">
-                    <li><i class="ion-alert-circled"></i><span class="js-submitModByIDInputErrorText"></span> </li>
+                    <li><i class="ion-alert-circled"></i><span class="js-submitModByIDInputErrorText"></span></li>
                   </ul>
                   <div class="flex gutterH">
                     <input
                       type="text"
                       class="btnHeight clrBr clrP clrSh2 js-submitModByIDInput"
-                      :placeholder="ob.polyT('settings.storeTab.moderatorByIDPlaceholder')">
+                      :placeholder="ob.polyT('settings.storeTab.moderatorByIDPlaceholder')"
+                    />
                     <ProcessingButton
                       className="btn clrP clrBr clrSh2 flexNoShrink js-submitModByID"
                       @click="clickSubmitModByID"
-                      :btnText="ob.polyT('settings.storeTab.moderatoryByIDSubmit')" />
+                      :btnText="ob.polyT('settings.storeTab.moderatoryByIDSubmit')"
+                    />
                   </div>
                   <div class="js-modListByID"></div>
                   <div>
@@ -107,16 +116,16 @@
                     <div class="tx5 rowTn">
                       <div class="flexVCentClearMarg">
                         <h5 class="flexExpand">{{ ob.polyT('settings.storeTab.availableModerators') }}</h5>
-                        <input type="checkbox" id="storeVerifiedOnly" :checked="ob.showVerifiedOnly" @click="onClickVerifiedOnly" >
+                        <input type="checkbox" id="storeVerifiedOnly" :checked="ob.showVerifiedOnly" @click="onClickVerifiedOnly" />
                         <label class="tx5b" for="storeVerifiedOnly">{{ ob.polyT('settings.storeTab.verifiedOnly') }}</label>
                       </div>
                     </div>
                     <ul class="unstyled errorList hide js-modListAvailableError">
-                      <li><i class="ion-alert-circled"></i><span class="js-modListAvailableErrorText"></span> </li>
+                      <li><i class="ion-alert-circled"></i><span class="js-modListAvailableErrorText"></span></li>
                     </ul>
                     <div class="js-modListAvailable"></div>
                     <div class="noModsAdded flex clrBr js-noModsAdded" v-show="!ob.modsAvailable.length">
-                      <button class="btn clrP clrBr browseMods " @click="fetchAvailableModerators">
+                      <button class="btn clrP clrBr browseMods" @click="fetchAvailableModerators">
                         {{ ob.polyT('settings.storeTab.browseModerators') }}
                       </button>
                     </div>
@@ -137,14 +146,10 @@
 
       <div class="contentBox padMd clrP clrBr clrSh3">
         <div class="flexHRight">
-          <ProcessingButton
-            className="btn clrP clrBAttGrad clrBrDec1 clrTOnEmph js-save"
-            @click="save"
-            :btnText="ob.polyT('settings.btnSave')" />
+          <ProcessingButton className="btn clrP clrBAttGrad clrBrDec1 clrTOnEmph js-save" @click="save" :btnText="ob.polyT('settings.btnSave')" />
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -160,7 +165,6 @@ import Moderators from '../../../../backbone/views/components/moderators/Moderat
 import BulkCoinUpdateBtn from './BulkCoinUpdateBtn.vue';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 
-
 export default {
   components: {
     BulkCoinUpdateBtn,
@@ -172,17 +176,17 @@ export default {
     },
     bb: Function,
   },
-  data () {
+  data() {
     return {
       app: app,
     };
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.options);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   watch: {
@@ -190,10 +194,10 @@ export default {
       if (this.modsAvailable) {
         this.modsAvailable.setState({ showVerifiedOnly: val });
       }
-    }
+    },
   },
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         modsAvailable: this.modsAvailable.allIDs,
@@ -205,11 +209,11 @@ export default {
         ...this.profile.toJSON(),
         ...this.settings.toJSON(),
       };
-    }
+    },
   },
   methods: {
     supportedWalletCurs,
-    loadData (options = {}) {
+    loadData(options = {}) {
       this.baseInit(options);
 
       this.profile = app.profile.clone();
@@ -314,18 +318,15 @@ export default {
       }
     },
 
-    noModsByIDFound (guids) {
-      const modsNotFound = app.polyglot.t(
-        'settings.storeTab.errors.modsNotFound',
-        { guids, smart_count: guids.length },
-      );
+    noModsByIDFound(guids) {
+      const modsNotFound = app.polyglot.t('settings.storeTab.errors.modsNotFound', { guids, smart_count: guids.length });
       this.showModByIDError(modsNotFound);
       if (this.modsByID.modCount === 0) {
         $('.js-modListByID').addClass('hide');
       }
     },
 
-    fetchAvailableModerators () {
+    fetchAvailableModerators() {
       // get the verified mods via POST
       this.modsAvailable.getModeratorsByID({
         moderatorIDs: app.verifiedMods.pluck('peerID'),
@@ -339,19 +340,19 @@ export default {
       $('.js-noModsAdded').addClass('hide');
     },
 
-    showModByIDError (msg) {
+    showModByIDError(msg) {
       $('.js-submitModByIDInputError').removeClass('hide');
       $('.js-submitModByIDInputErrorText').text(msg);
     },
 
-    handleCurrencyClicked (opts) {
+    handleCurrencyClicked(opts) {
       const preferredCurs = opts.activeCurs;
       this.modsSelected.setState({ preferredCurs });
       this.modsByID.setState({ preferredCurs });
       this.modsAvailable.setState({ preferredCurs });
     },
 
-    clickSubmitModByID () {
+    clickSubmitModByID() {
       let modID = $('.js-submitModByIDInput').val();
 
       $('.js-submitModByIDInputError').addClass('hide');
@@ -385,15 +386,15 @@ export default {
       }
     },
 
-    onClickVerifiedOnly (e) {
+    onClickVerifiedOnly(e) {
       this.showVerifiedOnly = $(e.target).prop('checked');
     },
 
-    getProfileFormData (subset = this.$profileFormFields) {
+    getProfileFormData(subset = this.$profileFormFields) {
       return this.getFormData(subset);
     },
 
-    getSettingsData () {
+    getSettingsData() {
       let selected = app.settings.get('storeModerators');
       // The mods may not have loaded in the interface yet. Subtract only explicitly de-selected ones.
       selected = _.without(selected, ...this.modsSelected.unselectedIDs);
@@ -402,7 +403,7 @@ export default {
       return { storeModerators: [...new Set([...selected, ...byID, ...available])] };
     },
 
-    save () {
+    save() {
       // this view saves to two different models
       const profileFormData = this.getProfileFormData();
       profileFormData.currencies = this.$refs.currencySelector.getState().activeCurs;
@@ -504,7 +505,7 @@ export default {
       }
     },
 
-    render () {
+    render() {
       this.modsSelected.delegateEvents();
       $('.js-modListSelected').append(this.modsSelected.render().el);
       if (!this.modsSelected.modFetches.length) {
@@ -512,19 +513,14 @@ export default {
       }
 
       this.modsByID.delegateEvents();
-      $('.js-modListByID')
-        .append(this.modsByID.render().el)
-        .toggleClass('hide', !this.modsByID.allIDs.length);
+      $('.js-modListByID').append(this.modsByID.render().el).toggleClass('hide', !this.modsByID.allIDs.length);
 
       this.modsAvailable.delegateEvents();
-      $('.js-modListAvailable')
-        .append(this.modsAvailable.render().el)
-        .toggleClass('hide', !this.modsAvailable.allIDs.length);
+      $('.js-modListAvailable').append(this.modsAvailable.render().el).toggleClass('hide', !this.modsAvailable.allIDs.length);
 
       return this;
-    }
-
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="scss" scoped></style>

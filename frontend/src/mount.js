@@ -12,21 +12,20 @@ import baseVw from './mixins/baseVw';
 
 import Chat from './components/Chat.vue';
 
-
 import './assets/global.less';
 import components from './components/global';
 import cart from './store/cart.module';
 import Router from './router/index';
 
 import * as templateHelpers from '../backbone/utils/templateHelpers';
-
+import VueScrollTo from 'vue-scrollto';
 export function mountVueModal(container, name, options) {
   const vueModal = createApp(Modal, { name, options });
   vueModal.config.productionTip = false;
 
   vueModal.mixin(baseVw);
   vueModal.config.globalProperties.templateHelpers = { ...templateHelpers };
-
+  vueModal.use(VueScrollTo);
   vueModal.use(ElementPlus);
   for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
     vueModal.component(key, component);

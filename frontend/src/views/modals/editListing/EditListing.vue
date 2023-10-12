@@ -21,14 +21,14 @@
         <div class="flex gutterH">
           <div class="tabColumn contentBox padMd clrP clrBr clrSh3">
             <div class="boxList tx4 clrTx1Br">
-              <template v-for="tab in tabs">
-                <a :class="`tab row tab-${tab.key} ${activeTab === tab.key ? 'active' : ''}`" @click="scrollTo(tab.key)">{{ tab.name }}</a>
-              </template>
+              <a v-for="(tab, index) in tabs" :key="index" @click="scrollTo(tab)" :class="`tab row tab-${tab.key} ${activeTab === tab.key ? 'active' : ''}`">{{
+                tab.name
+              }}</a>
             </div>
           </div>
           <div class="flexExpand posR tabContent">
             <div class="gutterVMd2 js-formSectionsContainer">
-              <section ref="sectionGeneral" class="contentBox padMd clrP clrBr clrSh3">
+              <section ref="sectionGeneral" class="generalSection contentBox padMd clrP clrBr clrSh3">
                 <div class="flexHCent">
                   <h2 class="h3 clrT js-listingHeading">
                     {{ ob.createMode ? ob.polyT('editListing.createListingLabel') : ob.polyT('editListing.editListingLabel') }}
@@ -169,7 +169,7 @@
                 </div>
               </section>
 
-              <section ref="sectionPhotos" class="photoUploadSection contentBox padMd clrP clrBr clrSh3 tx3">
+              <section ref="sectionPhotos" class="photosSection photoUploadSection contentBox padMd clrP clrBr clrSh3 tx3">
                 <div class="overflowAuto">
                   <h2 class="h4 clrT required">{{ ob.polyT('editListing.sectionNames.photos') }}</h2>
                   <div class="js-photoUploadingLabel floR" v-show="!!ob.photoUploadInprogress">
@@ -191,7 +191,7 @@
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperPhotos', { maxPhotos: ob.max.photos }) }}</div>
               </section>
 
-              <section ref="sectionShipping" class="js-sectionShipping shippingSection">
+              <section ref="sectionShipping" class="shippingSection js-sectionShipping">
                 <div class="gutterVMd">
                   <div class="js-shippingOptionsWrap shippingOptionsWrap gutterVMd"></div>
                   <div class="contentBox padMd clrP clrBr clrSh3 tx3 shipOptPlaceholder">
@@ -241,7 +241,7 @@
 
               <section
                 ref="sectionVariants"
-                class="js-variantsSection variantsSection contentBox padMd clrP clrBr clrSh3 tx3 <% ob.item.options.length && print('expandedVariantsView') %>"
+                class="variantsSection js-variantsSection contentBox padMd clrP clrBr clrSh3 tx3 <% ob.item.options.length && print('expandedVariantsView') %>"
               >
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.variantsDetailed') }}</h2>
                 <hr class="clrBr rowMd" />
@@ -262,7 +262,7 @@
                 <div class="js-variantInventoryTableContainer"></div>
               </section>
 
-              <section ref="sectionReturnPolicy" class="contentBox padMd clrP clrBr clrSh3 tx3">
+              <section ref="sectionReturnPolicy" class="returnPolicySection contentBox padMd clrP clrBr clrSh3 tx3">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.returnPolicy') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['refundPolicy']" :errors="ob.errors['refundPolicy']" />
@@ -280,7 +280,7 @@
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperReturnPolicy') }}</div>
               </section>
 
-              <section ref="sectionTermsAndConditions" class="contentBox padMd clrP clrBr clrSh3 tx3">
+              <section ref="sectionTermsAndConditions" class="termsAndConditionsSection contentBox padMd clrP clrBr clrSh3 tx3">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.termsAndConditions') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['termsAndConditions']" :errors="ob.errors['termsAndConditions']" />
@@ -300,7 +300,7 @@
 
               <section
                 ref="sectionCoupons"
-                class="contentBox padMd clrP clrBr clrSh3 tx3 couponsSection js-couponsSection <% ob.coupons.length && print('expandedCouponView') %>"
+                class="couponsSection contentBox padMd clrP clrBr clrSh3 tx3 js-couponsSection <% ob.coupons.length && print('expandedCouponView') %>"
               >
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.coupons') }}</h2>
                 <hr class="clrBr rowMd" />
@@ -309,7 +309,7 @@
                 <a class="btn clrP clrBr clrSh2 btnAddCoupon" @click="onClickAddCoupon">{{ ob.polyT('editListing.btnAddCoupon') }}</a>
               </section>
 
-              <section ref="sectionAcceptedCurs" class="contentBox padMd clrP clrBr clrSh3 tx3 acceptedCurrenciesSection">
+              <section ref="sectionAcceptedCurs" class="acceptedCursSection contentBox padMd clrP clrBr clrSh3 tx3 acceptedCurrenciesSection">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.acceptedCurrencies') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError
@@ -1233,36 +1233,17 @@ export default {
       this.$inputPhotoUpload.trigger('click');
     },
 
-    scrollTo(key) {
-      console.log('scroll to: ', key);
-      let $el = this.$refs[`section${capitalize(key)}`];
-      if (!$el) {
-        throw new Error('Please provide a jQuery element to scroll to.');
-      }
-
-      console.log('$el.getBoundingClientRect().top: ', $el.getBoundingClientRect().top);
-
-      Velocity(
-        this.$el,
-        { scrollTop: $el.getBoundingClientRect().top },
-        {
-          duration: 400,
-          complete: () => {
-            this.activeTab = key;
-          },
-        }
-      );
-
-      // // Had this initially in Velocity, but after markup re-factor, it
-      // // doesn't work consistently, so we'll go old-school for now.
-      // this.$el
-      //   .animate({
-      //     scrollTop: $el.position().top,
-      //   }, {
-      //     complete: () => {
-      //       this.activeTab = key;
-      //     },
-      //   }, 400);
+    scrollTo({ key }) {
+      this.$scrollTo(`.${key}Section`, 400, {
+        container: '.tabbedModal', //设置滚动容器
+        easing: 'ease-in', //动画效果
+        offset: -50, //偏移量
+        onDone: () => {
+          this.activeTab = key;
+        },
+        x: false, //是否在x轴滚动
+        y: true, //是否在y轴滚动
+      });
     },
 
     _onScroll() {

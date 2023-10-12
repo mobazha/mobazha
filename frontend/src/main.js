@@ -19,7 +19,7 @@ import components from './components/global';
 import * as templateHelpers from '../backbone/utils/templateHelpers';
 
 import cart from './store/cart.module';
-
+import VueScrollTo from 'vue-scrollto';
 // init TUIKit
 const TUIKit = TUICore.init({});
 // TUIKit add TUIComponents
@@ -32,7 +32,7 @@ window.app = app;
 function mountVueApp(container) {
   const vueApp = createApp(App);
   vueApp.config.productionTip = false;
-
+  vueApp.use(VueScrollTo);
   vueApp.use(ElementPlus);
   for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
     vueApp.component(key, component);
@@ -52,7 +52,6 @@ function mountVueApp(container) {
     },
   });
 
-
   let app = vueApp.use(Router).use(store).use(VueBackbone).mount(container);
   Router.beforeEach((to, from) => {
     app.showLoadingModal = true;
@@ -60,7 +59,7 @@ function mountVueApp(container) {
 
   Router.afterEach(() => {
     app.showLoadingModal = false;
-  })
+  });
   return app;
 }
 window.vueApp = mountVueApp('#appFrame');

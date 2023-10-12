@@ -68,6 +68,7 @@
     "microplugin": "^0.0.3",
     "selectize": "^0.12.6",
     "sifter": "^0.5.4",
-    "velocity-animate": "1.5.2"
+    "velocity-animate": "1.5.2",
+    "vue-scrollto": "^2.20.0"
   }
 }

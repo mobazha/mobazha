@@ -1,90 +1,96 @@
 <template>
   <div :class="`userPage clrS ${isBlockedUser ? 'isBlocked' : ''}`">
-    <nav id="pageTabBar" class="barLg clrP clrBr">
-      <div class="flexVCent pageTabs">
-        <MiniProfile :options="{
-          fetchFollowsYou: false,
-          overwriteClickRating: true,
-          initialState: {
-            followsYou,
-          },
-        }"
-        :bb="function() {
-          return {
-            model: model,
-          };
-        }"
-        @clickRating="clickRating" />
-        <div class="flexExpand">
-          <div class="flexHRight flexVCent gutterH clrT2">
-            <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="home">{{ ob.polyT('userPage.mainNav.home') }}</a>
-            <!-- // the store tab is only visible to the user if they have vendor set to false -->
-            <a v-if="ob.vendor || ob.ownPage" class="btn tab clrBr js-tab" @click="clickTab" data-tab="store">
-              {{ ob.polyT('userPage.mainNav.store') }}<span class="clrTEmph1 margLSm js-listingsCount">{{ ob.stats.listingCount }}</span></a>
-            <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="following">
-              {{ ob.polyT('userPage.mainNav.following') }}<span class="clrTEmph1 margLSm">{{ abbrNum(followingCount) }}</span></a>
-            <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="followers">
-              {{ ob.polyT('userPage.mainNav.followers') }}<span class="clrTEmph1 margLSm">{{ abbrNum(followerCount) }}</span></a>
+    <template v-if="!options.showBlockedModal">
+      <nav id="pageTabBar" class="barLg clrP clrBr">
+        <div class="flexVCent pageTabs">
+          <MiniProfile :options="{
+            fetchFollowsYou: false,
+            overwriteClickRating: true,
+            initialState: {
+              followsYou,
+            },
+          }"
+          :bb="function() {
+            return {
+              model: model,
+            };
+          }"
+          @clickRating="clickRating" />
+          <div class="flexExpand">
+            <div class="flexHRight flexVCent gutterH clrT2">
+              <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="home">{{ ob.polyT('userPage.mainNav.home') }}</a>
+              <!-- // the store tab is only visible to the user if they have vendor set to false -->
+              <a v-if="ob.vendor || ob.ownPage" class="btn tab clrBr js-tab" @click="clickTab" data-tab="store">
+                {{ ob.polyT('userPage.mainNav.store') }}<span class="clrTEmph1 margLSm js-listingsCount">{{ ob.stats.listingCount }}</span></a>
+              <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="following">
+                {{ ob.polyT('userPage.mainNav.following') }}<span class="clrTEmph1 margLSm">{{ abbrNum(followingCount) }}</span></a>
+              <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="followers">
+                {{ ob.polyT('userPage.mainNav.followers') }}<span class="clrTEmph1 margLSm">{{ abbrNum(followerCount) }}</span></a>
+            </div>
+          </div>
+        </div>
+      </nav>
+      <div
+        class="header js-header"
+        :style="
+          headerHash
+            ? `background-image: url(${ob.getServerUrl(`ob/image/${headerHash}`)}), url('../imgs/defaultHeader.png')`
+            : `background-image: url('../imgs/defaultHeader.png')`
+        "
+      >
+        <div class="blockedOverlay clrP">
+          <div class="flexCol flexHCent tx4">
+            <i class="ion-eye-disabled tx1"></i>
+            <div>{{ ob.polyT('userPage.blockedUserOverlayText') }}</div>
           </div>
         </div>
       </div>
-    </nav>
-    <div
-      class="header js-header"
-      :style="
-        headerHash
-          ? `background-image: url(${ob.getServerUrl(`ob/image/${headerHash}`)}), url('../imgs/defaultHeader.png')`
-          : `background-image: url('../imgs/defaultHeader.png')`
-      "
-    >
-      <div class="blockedOverlay clrP">
-        <div class="flexCol flexHCent tx4">
-          <i class="ion-eye-disabled tx1"></i>
-          <div>{{ ob.polyT('userPage.blockedUserOverlayText') }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="pageContent js-pageContent">
-      <div class="pageControls flexVBase">
-        <div class="flexExpand">
-          <h1 class="txBg txUnb txUnl txGlow tabTitle js-tabTitle"></h1>
-        </div>
-        <div class="posR">
-          <template v-if="ob.ownPage">
-            <div class="btnStrip floR clrSh2">
-              <a class="btn clrP clrBr" @click="clickCustomize">{{ ob.polyT('userPage.customize') }}</a>
-              <a class="btn clrP clrBr" @click="clickCreateListing">{{ ob.polyT('userPage.createListing') }}</a>
-              <!--
-          <a class="btn clrP clrBr hide js-moreableBtn">{{ ob.polyT('userPage.block') }}</a>
-          <a class="iconBtn clrP clrBr " @click="clickMore" ><i class="ion-android-more-vertical"></i> </a>
-        -->
-            </div>
-          </template>
-
-          <template v-else>
-            <SocialBtns :options="{ targetID: model.id, }" />
-          </template>
-          <template v-if="ob.showStoreWelcomeCallout">
-            <div class="storeWelcomeCallout js-storeWelcomeCallout arrowBoxBottom confirmBox clrP clrBr clrSh1 tx5">
-              <div class="tx3 txB rowSm padSm">{{ ob.polyT('userPage.storeWelcomeCalloutTitle') }}</div>
-              <hr class="clrBr rowMd" />
-              <p class="rowMd">{{ ob.polyT('userPage.storeWelcomeCalloutBody') }}</p>
-              <hr class="clrBr" />
-              <div class="txCtr padSm">
-                <button class="btn clrP clrBr" @click="clickCloseStoreWelcomeCallout">
-                  {{ ob.polyT('userPage.storeWelcomeCalloutBtnClose') }}
-                </button>
+      <div class="pageContent js-pageContent">
+        <div class="pageControls flexVBase">
+          <div class="flexExpand">
+            <h1 class="txBg txUnb txUnl txGlow tabTitle js-tabTitle"></h1>
+          </div>
+          <div class="posR">
+            <template v-if="ob.ownPage">
+              <div class="btnStrip floR clrSh2">
+                <a class="btn clrP clrBr" @click="clickCustomize">{{ ob.polyT('userPage.customize') }}</a>
+                <a class="btn clrP clrBr" @click="clickCreateListing">{{ ob.polyT('userPage.createListing') }}</a>
+                <!--
+            <a class="btn clrP clrBr hide js-moreableBtn">{{ ob.polyT('userPage.block') }}</a>
+            <a class="iconBtn clrP clrBr " @click="clickMore" ><i class="ion-android-more-vertical"></i> </a>
+          -->
               </div>
-            </div>
-          </template>
+            </template>
+
+            <template v-else>
+              <SocialBtns :options="{ targetID: model.id, }" />
+            </template>
+            <template v-if="ob.showStoreWelcomeCallout">
+              <div class="storeWelcomeCallout js-storeWelcomeCallout arrowBoxBottom confirmBox clrP clrBr clrSh1 tx5">
+                <div class="tx3 txB rowSm padSm">{{ ob.polyT('userPage.storeWelcomeCalloutTitle') }}</div>
+                <hr class="clrBr rowMd" />
+                <p class="rowMd">{{ ob.polyT('userPage.storeWelcomeCalloutBody') }}</p>
+                <hr class="clrBr" />
+                <div class="txCtr padSm">
+                  <button class="btn clrP clrBr" @click="clickCloseStoreWelcomeCallout">
+                    {{ ob.polyT('userPage.storeWelcomeCalloutBtnClose') }}
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+        <div class="tabContent js-tabContent">
+          <!-- insert the tab subview here -->
         </div>
       </div>
-      <div class="tabContent js-tabContent">
-        <!-- insert the tab subview here -->
-      </div>
-    </div>
+    </template>
 
     <Teleport to="#js-vueModal">
+      <BlockedWarning v-if="options.showBlockedModal" :options="options"
+       @canceled="onBlockWarningCanceled"
+       @close="cleanUpBlockedModal"
+      />
       <Loading v-if="showUserLoading" ref="userLoadingModal" :options="{
           initialState: {
             contentText: loadingContextText,
@@ -94,6 +100,7 @@
         @clickCancel="onClickLoadingCancel"
         @clickRetry="onClickLoadingRetry"/>
     </Teleport>
+    
   </div>
 </template>
 
@@ -106,7 +113,8 @@ import { capitalize } from '../../../backbone/utils/string';
 import { isHiRez } from '../../../backbone/utils/responsive';
 import { startAjaxEvent, endAjaxEvent, recordEvent } from '../../../backbone/utils/metrics';
 import { launchEditListingModal, launchSettingsModal } from '../../../backbone/utils/modalManager';
-import { isBlocked, events as blockEvents } from '../../../backbone/utils/block';
+import { isBlocked, isUnblocking, events as blockEvents } from '../../../backbone/utils/block';
+import { isValidUserRoute }from '../../../backbone/utils/routeCheck'
 import { getCurrentConnection } from '../../../backbone/utils/serverConnect';
 import Profile from '../../../backbone/models/profile/Profile';
 import Listing from '../../../backbone/models/listing/Listing';
@@ -117,12 +125,16 @@ import Store from '../../../backbone/views/userPage/Store';
 import Follow from '../../../backbone/views/userPage/Follow';
 import Reputation from '../../../backbone/views/userPage/Reputation';
 
+import UserLoadingModal from '../../../backbone/views/userPage/Loading';
+
+import BlockedWarning from '../modals/BlockedWarning.vue'
 import Loading from './Loading.vue'
 import MiniProfile from '../MiniProfile.vue';
 // import Home from './Home.vue'
 
 export default {
   components: {
+    BlockedWarning,
     Loading,
     MiniProfile,
   },
@@ -148,34 +160,33 @@ export default {
       tabViews: { Home, Store, Follow, Reputation },
 
       profileFetch: undefined,
-      listing: {},
       listingFetch: undefined,
+      showUserLoading: true,
+      showBlockedModal: false,
 
       isBlockedUser: false,
 
       loadingContextText: '',
       isLoadingUser: true,
-      showUserLoading: true,
-
-      loadingUserFailed: false,
     };
   },
-  beforeRouteUpdate(to, from) {
-  },
-  beforeRouteLeave(to, from) {
-    if (!this.loadingUserFailed) {
+  watch: {
+    $route() {
       // The app has been routed to a new route, let's
       // clean up by aborting all fetches
-      if (this.profileFetch?.abort) this.profileFetch.abort();
+      if (this.profileFetch.abort) this.profileFetch.abort();
       if (this.listingFetch) this.listingFetch.abort();
     }
-  },
-  watch: {
   },
   created() {
     this.initEventChain();
 
-    this.init();
+    const options = this.preLoad();
+    if (options.showBlockedModal) {
+      return;
+    }
+
+    this.loadData(options);
   },
   mounted() {
     this.render();
@@ -204,62 +215,130 @@ export default {
   },
   methods: {
     abbrNum,
-    init() {
+    onBlockWarningCanceled(){
+      if (window.history.state.back === null) {
+        // there is no previous page, let's navigate to our home page
+        this.$router.push({ path: `/${app.profile.id}`});
+      } else {
+        // go back to previous page
+        this.$router.back();
+      }
+    },
+    onUnblock(data) {
+      if (data.peerIDs.includes(guid)) {
+        app.loadingModal.open();
+        this.user(guid, state, ...args);
+      }
+    },
+    preLoad() {
+      let { guid, state, slug } = this.$route.params;
+
+      const pageState = state || 'store';
+
+      if (!isValidUserRoute(guid, pageState, slug)) {
+        app.router.pageNotFound();
+        return;
+      }
+
+      if (isBlocked(guid) && !isUnblocking(guid)) {
+        return { showBlockedModal: true, peerID: guid };
+      }
+
+      let profileFetch;
+      let listing;
+      let listingFetch;
+
+      startAjaxEvent('UserPageLoad');
+
+      if (guid === app.profile.id) {
+        // don't fetch our own profile, since we have it already
+        profileFetch = $.Deferred().resolve();
+      } else {
+        profileFetch = this.model.fetch();
+      }
+
+      if (state === 'store') {
+        if (slug) {
+          listing = new Listing({
+            slug,
+          }, { guid });
+
+          listingFetch = listing.fetch();
+        }
+      }
+
+      return {
+        state: pageState,
+        profileFetch,
+        listing,
+        listingFetch,
+        showUserLoading: true,
+        showBlockedModal: false,
+      };
+    },
+    loadData(options) {
+      this.baseInit(options);
+
+      let { guid, state, slug } = this.$route.params;
+
       // Hack to pass the handle into this function, which should really only
       // happen when called from userViaHandle(). If a handle is being passed in,
       // it will be passed in as { handle: 'charlie' } as the first element of the
       // ...args argument.
       let handle;
-
-      let {guid, state, slug} = this.$route.params;
-      this.guid = guid;
-      this.state = state || 'store';
-      this.slug = slug;
-
-      const pageState = state || 'store';
+      // if (args.length && args[0] && args[0].hasOwnProperty('handle')) {
+      //   functionArgs = functionArgs.slice(1);
+      //   handle = args[0].handle;
+      // }
 
       let userPageFetchError = '';
-
-      startAjaxEvent('UserPageLoad');
-
-      this.profileFetch = this.model.fetch();
-
-      if (state === 'store') {
-        if (slug) {
-          this.listing = new Listing({ slug, }, { guid });
-
-          this.listingFetch = this.listing.fetch();
+      const profileFetch = this.profileFetch;
+      const listingFetch = this.listingFetch;
+      $.whenAll(profileFetch, listingFetch).done(() => {
+        handle = this.model.get('handle');
+        if (handle) {
+          app.router.cacheGuidHandle(guid, handle);
         }
-      }
 
-      app.loadingModal.close();
-
-      this.loadingUserFailed = false;
-      this.showUserLoading = true;
-
-      this.loadingContextText = app.polyglot.t('userPage.loading.loadingText', { name: `<b>${handle || `${guid.slice(0, 8)}…`}</b>`, });
-      this.isLoadingUser = true;
-
-      $.whenAll(this.profileFetch, this.listingFetch).done(() => {
         this.showUserLoading = false;
-        // handle = profile.get('handle');
-        // this.cacheGuidHandle(guid, handle);
 
-        this.loadData({
-          state: pageState,
-          listing: this.listing,
-        })
+        // Setting the address bar which will ensure the most up to date handle (or none) is
+        // shown in the address bar.
+        app.router.setAddressBarText();
+
+        if (this.state === 'store' && !this.model.get('vendor') && guid !== app.profile.id) {
+          // the user does not have an active store and this is not our own node
+          if (state) {
+            // You've explicitly tried to navigate to the store tab. Since it's not
+            // available, we'll re-route to page-not-found
+            app.router.pageNotFound();
+            return;
+          }
+
+          // You've attempted to find a user with no particular tab. Since store is not available
+          // we'll take you to the home tab.
+          this.$router.replace(`${guid}/home/${slug ? slug : ''}`);
+          return;
+        }
+
+        if (!state) {
+          this.$router.replace(`${guid}/store/${slug ? slug : ''}`);
+          return;
+        }
+        this.showUserLoading = false;
+
+        this.initUserPage();
       }).fail((...failArgs) => {
         const jqXhr = failArgs[0];
         const reason = (jqXhr && jqXhr.responseJSON && jqXhr.responseJSON.reason)
           || (jqXhr && jqXhr.responseText) || '';
 
-        if (jqXhr === this.profileFetch && this.profileFetch.statusText === 'abort') return;
-        if (jqXhr === this.listingFetch && this.listingFetch.statusText === 'abort') return;
+        if (jqXhr === profileFetch && profileFetch.statusText === 'abort') return;
+        if (jqXhr === listingFetch && listingFetch.statusText === 'abort') return;
 
-        if (this.profileFetch.state() === 'rejected') {
+        if (profileFetch.state() === 'rejected') {
           userPageFetchError = 'User Not Found';
-        } else if (this.listingFetch.state() === 'rejected') {
+        } else if (listingFetch.state() === 'rejected') {
           userPageFetchError = 'Listing Not Found';
         }
 
@@ -271,7 +350,7 @@ export default {
           store: `<b>${handle || `${guid.slice(0, 8)}…`}</b>`,
         });
 
-        if (this.profileFetch.state() === 'resolved' && this.listingFetch.state() === 'rejected') {
+        if (profileFetch.state() === 'resolved' && listingFetch.state() === 'rejected') {
           const linkText = app.polyglot.t('userPage.loading.failTextListingLink');
           const listingSlug = slug.length > 25
             ? `${slug.slice(0, 25)}…` : slug;
@@ -283,26 +362,21 @@ export default {
 
         this.loadingContextText = contentText;
         this.isLoadingUser = false;
-      }).always(() => {
-        this.loadingUserFailed = true;
-
-        const dismissedCallout = getCurrentConnection()
-          && getCurrentConnection().server.get('dismissedDiscoverCallout');
-        endAjaxEvent('UserPageLoad', {
-          ownPage: guid === app.profile.id,
-          tab: pageState,
-          dismissedCallout,
-          listing: !!this.listingFetch,
-          errors: userPageFetchError || 'none',
+      })
+        .always(() => {
+          const dismissedCallout = getCurrentConnection()
+            && getCurrentConnection().server.get('dismissedDiscoverCallout');
+          endAjaxEvent('UserPageLoad', {
+            ownPage: guid === app.profile.id,
+            tab: this.state,
+            dismissedCallout,
+            listing: !!listingFetch,
+            errors: userPageFetchError || 'none',
+          });
         });
-      });
     },
-    loadData(options = {}) {
-      this.baseInit(options);
-
+    initUserPage() {
       this.setBlockedClass();
-
-      this.state = options.state || 'store';
 
       const stats = this.model.get('stats');
       this.followingCount = stats.get('followingCount');
@@ -342,11 +416,17 @@ export default {
     },
 
     onClickLoadingCancel() {
-
+      if (window.history.state.back === null) {
+        // there is no previous page, let's navigate to our home page
+        this.$router.push({ path: `/${app.profile.id}`});
+      } else {
+        // go back to previous page
+        this.$router.back();
+      }
     },
 
     onClickLoadingRetry() {
-      this.init();
+      this.user(guid, state, ...args);
     },
 
     onOwnFollowingAdd(md) {

@@ -12,6 +12,12 @@ const constantRouterMap = [
     name: 'Example',
     redirect: { name: 'ExampleHelloIndex' },
     children: [
+      // will match everything and put it under `$route.params.pathMatch`
+      {
+        path: '/:pathMatch(.*)*',
+        name: 'NotFound',
+        component: () => import('@/views/error-pages/PageNotFound.vue')
+      },
       {
         path: '/example',
         name: 'ExampleHelloIndex',
@@ -27,6 +33,7 @@ const constantRouterMap = [
         name: 'Transactions',
         component: () => import('@/views/transactions/Transactions.vue')
       },
+      // https://router.vuejs-korea.org/guide/essentials/route-matching-syntax.html#optional-parameters
       {
         path: '/:guid(12D3Koo[a-zA-Z0-9]+)/:state?/:slug?',
         name: 'UserPage',
@@ -58,6 +65,11 @@ const constantRouterMap = [
         name: 'connectedPeers',
         component: () => import('@/views/ConnectedPeersPage.vue')
       },
+      // {
+      //   path: 'connected-peers',
+      //   name: 'pageNotFound',
+      //   component: () => import('@/views/pageNotFound.vue')
+      // }
     ]
   },
 ]

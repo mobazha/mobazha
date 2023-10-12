@@ -1,14 +1,16 @@
 <template>
   <div
-    :class="`modal editListing tabbedModal modalScrollPage ${contractTypeClass} ${!createMode ? 'editMode' : ''} ${fixedNav ? 'fixedNav' : ''} ${notTrackingInventory ? 'notTrackingInventory' : ''}`"
+    :class="`modal editListing tabbedModal modalScrollPage ${contractTypeClass} ${!createMode ? 'editMode' : ''} ${fixedNav ? 'fixedNav' : ''} ${
+      notTrackingInventory ? 'notTrackingInventory' : ''
+    }`"
     @scroll="onScroll"
-    >
+  >
     <BaseModal @close="close">
       <template v-slot:component>
         <div class="topControls flex">
           <div class="btnStrip clrSh3">
             <template v-if="ob.returnText">
-              <a class="btn clrP clrBr clrT " @click="onClickReturn">
+              <a class="btn clrP clrBr clrT" @click="onClickReturn">
                 <span class="ion-chevron-left margRSm"></span>
                 {{ ob.returnText }}
               </a>
@@ -20,8 +22,7 @@
           <div class="tabColumn contentBox padMd clrP clrBr clrSh3">
             <div class="boxList tx4 clrTx1Br">
               <template v-for="tab in tabs">
-                <a :class="`tab row tab-${tab.key} ${activeTab === tab.key ? 'active' : ''}`"
-                  @click="scrollTo(tab.key)">{{ tab.name }}</a>
+                <a :class="`tab row tab-${tab.key} ${activeTab === tab.key ? 'active' : ''}`" @click="scrollTo(tab.key)">{{ tab.name }}</a>
               </template>
             </div>
           </div>
@@ -29,10 +30,10 @@
             <div class="gutterVMd2 js-formSectionsContainer">
               <section ref="sectionGeneral" class="contentBox padMd clrP clrBr clrSh3">
                 <div class="flexHCent">
-                  <h2 class="h3 clrT js-listingHeading">{{ ob.createMode ? ob.polyT('editListing.createListingLabel') :
-                    ob.polyT('editListing.editListingLabel') }}</h2>
-                  <a class="btn clrP clrBAttGrad clrBrDec1 clrTOnEmph modalContentCornerBtn" @click="onSaveClick">{{
-                    ob.polyT('settings.btnSave') }}</a>
+                  <h2 class="h3 clrT js-listingHeading">
+                    {{ ob.createMode ? ob.polyT('editListing.createListingLabel') : ob.polyT('editListing.editListingLabel') }}
+                  </h2>
+                  <a class="btn clrP clrBAttGrad clrBrDec1 clrTOnEmph modalContentCornerBtn" @click="onSaveClick">{{ ob.polyT('settings.btnSave') }}</a>
                 </div>
                 <hr class="clrBr" />
 
@@ -42,38 +43,43 @@
                       <div class="flexRow">
                         <div class="col12">
                           <div class="flexRow">
-                            <label for="editListingTitle" class="required flexExpand">{{ ob.polyT('editListing.title')
-                            }}</label>
+                            <label for="editListingTitle" class="required flexExpand">{{ ob.polyT('editListing.title') }}</label>
                             <ViewListingLinks :createMode="ob.createMode" />
                           </div>
                           <FormError v-if="ob.errors['item.title']" :errors="ob.errors['item.title']" />
-                          <input type="text" class="clrBr clrP clrSh2" name="item.title" id="editListingTitle"
-                            :value="ob.item.title" :maxLength="ob.max.title"
-                            :placeholder="ob.polyT('editListing.placeholderTitle')">
+                          <input
+                            type="text"
+                            class="clrBr clrP clrSh2"
+                            name="item.title"
+                            id="editListingTitle"
+                            :value="ob.item.title"
+                            :maxLength="ob.max.title"
+                            :placeholder="ob.polyT('editListing.placeholderTitle')"
+                          />
                           <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperTitle') }}</div>
                         </div>
                       </div>
                       <div class="flexRow gutterH">
                         <div class="col6 simpleFlexCol">
                           <label for="editContractType" class="required">{{ ob.polyT('editListing.type') }}</label>
-                          <FormError v-if="ob.errors['metadata.contractType']"
-                            :errors="ob.errors['metadata.contractType']" />
-                          <select id="editContractType" @change="onChangeContractType(val)" name="metadata.contractType"
-                            class="clrBr clrP clrSh2 marginTopAuto" style="width: 100%">
+                          <FormError v-if="ob.errors['metadata.contractType']" :errors="ob.errors['metadata.contractType']" />
+                          <select
+                            id="editContractType"
+                            @change="onChangeContractType(val)"
+                            name="metadata.contractType"
+                            class="clrBr clrP clrSh2 marginTopAuto"
+                            style="width: 100%"
+                          >
                             <template v-for="(contractType, j) in ob.contractTypes" :key="j">
-                              <option :value="contractType.code"
-                                :selected="contractType.code === ob.metadata.contractType">{{ contractType.name }}
-                              </option>
+                              <option :value="contractType.code" :selected="contractType.code === ob.metadata.contractType">{{ contractType.name }}</option>
                             </template>
                           </select>
-                          <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperType', { smart_count: 4 }) }}
-                          </div>
+                          <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperType', { smart_count: 4 }) }}</div>
                         </div>
                         <div class="col6 simpleFlexCol">
                           <!-- // hiding until this is ready on the back end -->
                           <div class="hide">
-                            <label for="editListingVisibility" class="required">{{ ob.polyT('editListing.visibility')
-                            }}</label>
+                            <label for="editListingVisibility" class="required">{{ ob.polyT('editListing.visibility') }}</label>
                             <select id="editListingVisibility" class="clrBr clrP clrSh2 marginTopAuto">
                               <option value="hidden">Hidden (doesn't display in store)</option>
                             </select>
@@ -84,31 +90,34 @@
                         <div class="col6 simpleFlexCol">
                           <label for="editListingPrice" class="required">{{ ob.polyT('editListing.price') }}</label>
                           <FormError v-if="ob.errors['item.price']" :errors="ob.errors['item.price']" />
-                          <FormError v-if="ob.errors['metadata.pricingCurrency.code']"
-                            :errors="ob.errors['metadata.pricingCurrency.code']" />
+                          <FormError v-if="ob.errors['metadata.pricingCurrency.code']" :errors="ob.errors['metadata.pricingCurrency.code']" />
                           <div class="inputSelect marginTopAuto">
-                            <input type="text" class="clrBr clrP clrSh2" @change="onChangePrice" name="item.price"
-                              id="editListingPrice" :value="ob.number.toStandardNotation(ob.item.price)"
-                              placeholder="0.00" data-var-type="bignumber">
-                            <select id="editListingCurrency" name="metadata.pricingCurrency.code"
-                              class="clrBr clrP nestInputRight">
+                            <input
+                              type="text"
+                              class="clrBr clrP clrSh2"
+                              @change="onChangePrice"
+                              name="item.price"
+                              id="editListingPrice"
+                              :value="ob.number.toStandardNotation(ob.item.price)"
+                              placeholder="0.00"
+                              data-var-type="bignumber"
+                            />
+                            <select id="editListingCurrency" name="metadata.pricingCurrency.code" class="clrBr clrP nestInputRight">
                               <template v-for="(currency, j) in ob.currencies" :key="j">
-                                <option :value="currency.code" :data-name="currency.name"
-                                  :selected="currency.code === ob.listingCurrency">{{ currency.code }}</option>
+                                <option :value="currency.code" :data-name="currency.name" :selected="currency.code === ob.listingCurrency">
+                                  {{ currency.code }}
+                                </option>
                               </template>
                             </select>
                           </div>
                           <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperPrice', { cur: helperCryptoCurName }) }}</div>
                         </div>
                         <div class="col6 simpleFlexCol conditionWrap">
-                          <label for="editListingCondition" class="required">{{ ob.polyT('editListing.condition')
-                          }}</label>
+                          <label for="editListingCondition" class="required">{{ ob.polyT('editListing.condition') }}</label>
                           <FormError v-if="ob.errors['item.condition']" :errors="ob.errors['item.condition']" />
-                          <select id="editListingCondition" name="item.condition" class="clrBr clrP clrSh2 marginTopAuto"
-                            style="width: 100%">
+                          <select id="editListingCondition" name="item.condition" class="clrBr clrP clrSh2 marginTopAuto" style="width: 100%">
                             <template v-for="(conditionType, j) in ob.conditionTypes" :key="j">
-                              <option :value="conditionType.code" :selected="conditionType.code === ob.item.condition">{{
-                                conditionType.name }}</option>
+                              <option :value="conditionType.code" :selected="conditionType.code === ob.item.condition">{{ conditionType.name }}</option>
                             </template>
                           </select>
                           <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperCondition') }}</div>
@@ -123,13 +132,18 @@
                         <FormError v-if="ob.errors['item.nsfw']" :errors="ob.errors['item.nsfw']" />
                         <div class="btnStrip">
                           <div class="btnRadio clrBr">
-                            <input type="radio" name="item.nsfw" value="true" id="editListingNSFWInputTrue"
-                              data-var-type="boolean" :checked="ob.item.nsfw">
+                            <input type="radio" name="item.nsfw" value="true" id="editListingNSFWInputTrue" data-var-type="boolean" :checked="ob.item.nsfw" />
                             <label for="editListingNSFWInputTrue">{{ ob.polyT('editListing.nsfwYes') }}</label>
                           </div>
                           <div class="btnRadio clrBr">
-                            <input type="radio" name="item.nsfw" value="false" id="editListingNSFWInputFalse"
-                              data-var-type="boolean" :checked="!ob.item.nsfw">
+                            <input
+                              type="radio"
+                              name="item.nsfw"
+                              value="false"
+                              id="editListingNSFWInputFalse"
+                              data-var-type="boolean"
+                              :checked="!ob.item.nsfw"
+                            />
                             <label for="editListingNSFWInputFalse">{{ ob.polyT('editListing.nsfwNo') }}</label>
                           </div>
                         </div>
@@ -140,8 +154,15 @@
                       <div class="col12">
                         <label for="editListingDescription">{{ ob.polyT('editListing.description') }}</label>
                         <FormError v-if="ob.errors['item.description']" :errors="ob.errors['item.description']" />
-                        <div contenteditable class="clrBr clrSh2" name="item.description" id="editListingDescription"
-                          :placeholder="ob.polyT('editListing.placeholderDescription')">{{ ob.item.description }}</div>
+                        <div
+                          contenteditable
+                          class="clrBr clrSh2"
+                          name="item.description"
+                          id="editListingDescription"
+                          :placeholder="ob.polyT('editListing.placeholderDescription')"
+                        >
+                          {{ ob.item.description }}
+                        </div>
                       </div>
                     </div>
                   </form>
@@ -151,24 +172,23 @@
               <section ref="sectionPhotos" class="photoUploadSection contentBox padMd clrP clrBr clrSh3 tx3">
                 <div class="overflowAuto">
                   <h2 class="h4 clrT required">{{ ob.polyT('editListing.sectionNames.photos') }}</h2>
-                  <div class="js-photoUploadingLabel floR" v-show="!!ob.photoUploadInprogress">{{ ob.polyT('editListing.uploading') }} <a class="" @click="onClickCancelPhotoUploads">{{ ob.polyT('editListing.btnCancelUpload') }}</a></div>
+                  <div class="js-photoUploadingLabel floR" v-show="!!ob.photoUploadInprogress">
+                    {{ ob.polyT('editListing.uploading') }} <a class="" @click="onClickCancelPhotoUploads">{{ ob.polyT('editListing.btnCancelUpload') }}</a>
+                  </div>
                   <hr class="clrBr rowMd" />
                 </div>
                 <FormError v-if="ob.errors['item.images']" :errors="ob.errors['item.images']" />
-                <input type="file" id="inputPhotoUpload" @change="onChangePhotoUploadInput" accept="image/*" class="hide"
-                  multiple>
+                <input type="file" id="inputPhotoUpload" @change="onChangePhotoUploadInput" accept="image/*" class="hide" multiple />
                 <ul ref="photoUploadItems" class="unstyled uploadItems clrBr rowSm js-photoUploadItems">
                   <li class="addElement tile js-addPhotoWrap">
                     <span class="imagesIcon ion-images clrT4"></span>
-                    <button class="btn clrP clrBr clrT tx6 " @click="onClickAddPhoto">{{
-                      ob.polyT('editListing.btnAddPhoto') }}</button>
+                    <button class="btn clrP clrBr clrT tx6" @click="onClickAddPhoto">{{ ob.polyT('editListing.btnAddPhoto') }}</button>
                   </li>
                   <template v-for="(image, j) in ob.item.images">
                     <UploadPhoto :image="image" @closeIcon="onClickRemoveImage(j)" />
                   </template>
                 </ul>
-                <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperPhotos', { maxPhotos: ob.max.photos }) }}
-                </div>
+                <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperPhotos', { maxPhotos: ob.max.photos }) }}</div>
               </section>
 
               <section ref="sectionShipping" class="js-sectionShipping shippingSection">
@@ -176,9 +196,13 @@
                   <div class="js-shippingOptionsWrap shippingOptionsWrap gutterVMd"></div>
                   <div class="contentBox padMd clrP clrBr clrSh3 tx3 shipOptPlaceholder">
                     <FormError v-if="ob.errors['shippingOptions']" :errors="ob.errors['shippingOptions']" :class="topLevelShipOptErrs" />
-                    <h2 class="h4 clrT js-addShipOptSectionHeading">{{ ob.polyT('editListing.shippingOptions.optionHeading', { listPosition: ob.shippingOptions.length + 1 }) }}</h2>
+                    <h2 class="h4 clrT js-addShipOptSectionHeading">
+                      {{ ob.polyT('editListing.shippingOptions.optionHeading', { listPosition: ob.shippingOptions.length + 1 }) }}
+                    </h2>
                     <hr class="clrBr rowMd" />
-                    <a class="btn clrBr clrP clrSh2 rowSm" @click="onClickAddShippingOption">{{ ob.polyT('editListing.shippingOptions.btnAddShippingOption') }}</a>
+                    <a class="btn clrBr clrP clrSh2 rowSm" @click="onClickAddShippingOption">{{
+                      ob.polyT('editListing.shippingOptions.btnAddShippingOption')
+                    }}</a>
                     <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperShipping') }}</div>
                   </div>
                 </div>
@@ -189,7 +213,14 @@
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['item.tags']" :errors="ob.errors['item.tags']" />
                 <div class="js-maxTagsWarning"><template v-if="ob.item.tags.length >= ob.max.tags" v-html="ob.maxTagsWarning"></template></div>
-                <input type="text" id="editListingTags" name="item.tags" class="clrBr clrP hashPrefacedTags hideDropDown" :value="ob.item.tags.join(ob.tagsDelimiter)" :placeholder="ob.polyT('editListing.tagsPlaceholder')" />
+                <input
+                  type="text"
+                  id="editListingTags"
+                  name="item.tags"
+                  class="clrBr clrP hashPrefacedTags hideDropDown"
+                  :value="ob.item.tags.join(ob.tagsDelimiter)"
+                  :placeholder="ob.polyT('editListing.tagsPlaceholder')"
+                />
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperTags') }}</div>
               </section>
 
@@ -198,24 +229,35 @@
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['item.categories']" :errors="ob.errors['item.categories']" />
                 <div class="js-maxCatsWarning"><template v-if="ob.item.categories.length >= ob.max.cats" v-html="ob.maxCatsWarning"></template></div>
-                <input type="text" id="editListingCategories" name="item.categories" class="clrBr clrP hideDropDown" :value="ob.item.categories.join(ob.tagsDelimiter)" :placeholder="ob.polyT('editListing.categoryPlaceholder')" />
-              </section>
-
-              <section ref="sectionVariants" class="js-variantsSection variantsSection contentBox padMd clrP clrBr clrSh3 tx3 <% ob.item.options.length && print('expandedVariantsView') %>">
-                <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.variantsDetailed') }}</h2>
-                <hr class="clrBr rowMd" />
-                <div class="js-variantsContainer variantsContainer"></div>
-                <a class="btn clrP clrBr clrSh2 addFirstVariant " @click="onClickAddFirstVariant">{{ ob.polyT('editListing.variants.btnAddVariant') }}</a>
+                <input
+                  type="text"
+                  id="editListingCategories"
+                  name="item.categories"
+                  class="clrBr clrP hideDropDown"
+                  :value="ob.item.categories.join(ob.tagsDelimiter)"
+                  :placeholder="ob.polyT('editListing.categoryPlaceholder')"
+                />
               </section>
 
               <section
-                class="contentBox padMd clrP clrBr clrSh3 tx3 js-inventoryManagementSection inventoryManagementSection">
+                ref="sectionVariants"
+                class="js-variantsSection variantsSection contentBox padMd clrP clrBr clrSh3 tx3 <% ob.item.options.length && print('expandedVariantsView') %>"
+              >
+                <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.variantsDetailed') }}</h2>
+                <hr class="clrBr rowMd" />
+                <div class="js-variantsContainer variantsContainer"></div>
+                <a class="btn clrP clrBr clrSh2 addFirstVariant" @click="onClickAddFirstVariant">{{ ob.polyT('editListing.variants.btnAddVariant') }}</a>
               </section>
 
-              <section ref="sectionVariantInventory"
-                class="contentBox variantInventorySection js-variantInventorySection padMd clrP clrBr clrSh3 tx3" v-show="!!ob.shouldShowVariantInventorySection">
+              <section class="contentBox padMd clrP clrBr clrSh3 tx3 js-inventoryManagementSection inventoryManagementSection"></section>
+
+              <section
+                ref="sectionVariantInventory"
+                class="contentBox variantInventorySection js-variantInventorySection padMd clrP clrBr clrSh3 tx3"
+                v-show="!!ob.shouldShowVariantInventorySection"
+              >
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.variantInventory') }}</h2>
-                <hr class="clrBr rowMd">
+                <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['item.skus']" :errors="ob.errors['item.skus']" />
                 <div class="js-variantInventoryTableContainer"></div>
               </section>
@@ -224,8 +266,17 @@
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.returnPolicy') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['refundPolicy']" :errors="ob.errors['refundPolicy']" />
-                <a class="btn clrP clrBr clrSh2 rowSm %>" v-show="!ob.expandedReturnPolicy" @click="onClickAddReturnPolicy">{{ ob.polyT('editListing.btnAddReturnPolicy') }}</a>
-                <textarea rows="8" name="refundPolicy" class="clrBr clrP clrSh2 <% !ob.expandedReturnPolicy && print('hide') %>" id="editListingReturnPolicy" :placeholder="ob.polyT('editListing.placeholderReturnPolicy')">{{ ob.refundPolicy }}</textarea>
+                <a class="btn clrP clrBr clrSh2 rowSm %>" v-show="!ob.expandedReturnPolicy" @click="onClickAddReturnPolicy">{{
+                  ob.polyT('editListing.btnAddReturnPolicy')
+                }}</a>
+                <textarea
+                  rows="8"
+                  name="refundPolicy"
+                  class="clrBr clrP clrSh2 <% !ob.expandedReturnPolicy && print('hide') %>"
+                  id="editListingReturnPolicy"
+                  :placeholder="ob.polyT('editListing.placeholderReturnPolicy')"
+                  >{{ ob.refundPolicy }}</textarea
+                >
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperReturnPolicy') }}</div>
               </section>
 
@@ -233,35 +284,49 @@
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.termsAndConditions') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['termsAndConditions']" :errors="ob.errors['termsAndConditions']" />
-                <a class="btn clrP clrBr clrSh2  rowSm <% ob.expandedTermsAndConditions && print('hide') %>" @click="onClickAddTermsAndConditions">{{ ob.polyT('editListing.btnTermsAndConditions') }}</a>
-                <textarea rows="8" name="termsAndConditions" class="clrBr clrP clrSh2 <% !ob.expandedTermsAndConditions && print('hide') %>" id="editListingTermsAndConditions" :placeholder="ob.polyT('editListing.placeholderTerms')">{{ ob.termsAndConditions }}</textarea>
+                <a class="btn clrP clrBr clrSh2 rowSm <% ob.expandedTermsAndConditions && print('hide') %>" @click="onClickAddTermsAndConditions">{{
+                  ob.polyT('editListing.btnTermsAndConditions')
+                }}</a>
+                <textarea
+                  rows="8"
+                  name="termsAndConditions"
+                  class="clrBr clrP clrSh2 <% !ob.expandedTermsAndConditions && print('hide') %>"
+                  id="editListingTermsAndConditions"
+                  :placeholder="ob.polyT('editListing.placeholderTerms')"
+                  >{{ ob.termsAndConditions }}</textarea
+                >
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperTerms') }}</div>
               </section>
 
-              <section ref="sectionCoupons"
-                class="contentBox padMd clrP clrBr clrSh3 tx3 couponsSection js-couponsSection <% ob.coupons.length && print('expandedCouponView') %>">
+              <section
+                ref="sectionCoupons"
+                class="contentBox padMd clrP clrBr clrSh3 tx3 couponsSection js-couponsSection <% ob.coupons.length && print('expandedCouponView') %>"
+              >
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.coupons') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['coupons']" :errors="ob.errors['coupons']" />
                 <div class="js-couponsContainer couponsContainer"></div>
-                <a class="btn clrP clrBr clrSh2 btnAddCoupon " @click="onClickAddCoupon">{{ ob.polyT('editListing.btnAddCoupon') }}</a>
+                <a class="btn clrP clrBr clrSh2 btnAddCoupon" @click="onClickAddCoupon">{{ ob.polyT('editListing.btnAddCoupon') }}</a>
               </section>
 
               <section ref="sectionAcceptedCurs" class="contentBox padMd clrP clrBr clrSh3 tx3 acceptedCurrenciesSection">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.acceptedCurrencies') }}</h2>
                 <hr class="clrBr rowMd" />
-                <FormError v-if="ob.errors['metadata.acceptedCurrencies'] && ob.metadata.contractType !== 'CRYPTOCURRENCY'" :errors="ob.errors['metadata.acceptedCurrencies']" />
+                <FormError
+                  v-if="ob.errors['metadata.acceptedCurrencies'] && ob.metadata.contractType !== 'CRYPTOCURRENCY'"
+                  :errors="ob.errors['metadata.acceptedCurrencies']"
+                />
                 <div class="js-cryptoCurSelectContainer rowSm">
-                  <CryptoCurSelector ref="cryptoCurSelector" :options="{
-                    initialState: {
-                      currencies: [
-                        ...ob.metadata.acceptedCurrencies,
-                        ...supportedWalletCurs(),
-                      ],
-                      activeCurs: ob.metadata.acceptedCurrencies,
-                      sort: true,
-                    },
-                  }" />
+                  <CryptoCurSelector
+                    ref="cryptoCurSelector"
+                    :options="{
+                      initialState: {
+                        currencies: [...ob.metadata.acceptedCurrencies, ...supportedWalletCurs()],
+                        activeCurs: ob.metadata.acceptedCurrencies,
+                        sort: true,
+                      },
+                    }"
+                  />
                 </div>
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperAcceptedCurrencies') }}</div>
               </section>
@@ -269,13 +334,12 @@
               <div class="contentBox padMd clrP clrBr clrSh3">
                 <div class="flexHRight flexVCent gutterH">
                   <ViewListingLinks :createMode="ob.createMode" />
-                  <a class="btn clrP clrBAttGrad clrBrDec1 clrTOnEmph " @click="onSaveClick">{{ ob.polyT('settings.btnSave') }}</a>
+                  <a class="btn clrP clrBAttGrad clrBrDec1 clrTOnEmph" @click="onSaveClick">{{ ob.polyT('settings.btnSave') }}</a>
                 </div>
               </div>
             </div>
           </div>
         </div>
-
       </template>
     </BaseModal>
   </div>
@@ -295,10 +359,7 @@ import app from '../../../../backbone/app';
 import { isScrolledIntoView, openExternal } from '../../../../backbone/utils/dom';
 import { installRichEditor } from '../../../../backbone/utils/lib/trumbowyg';
 import { startAjaxEvent, endAjaxEvent } from '../../../../backbone/utils/metrics';
-import {
-  getCurrenciesSortedByCode,
-  getCurrencyByCode,
-} from '../../../../backbone/data/currencies';
+import { getCurrenciesSortedByCode, getCurrencyByCode } from '../../../../backbone/data/currencies';
 import {
   getCurrenciesSortedByName as getCryptoCursByName,
   getCurrenciesSortedByCode as getCryptoCursByCode,
@@ -324,8 +385,8 @@ import CryptoCurrencyType from '../../../../backbone/views/modals/editListing/Cr
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 import { capitalize } from '../../../../backbone/utils/string';
 
-import ViewListingLinks from './ViewListingLinks.vue'
-import UploadPhoto from './UploadPhoto.vue'
+import ViewListingLinks from './ViewListingLinks.vue';
+import UploadPhoto from './UploadPhoto.vue';
 
 export default {
   component: {
@@ -339,7 +400,7 @@ export default {
     },
     bb: Function,
   },
-  data () {
+  data() {
     return {
       activeTab: 'general',
 
@@ -352,12 +413,12 @@ export default {
       togglePhotoUploads: false,
     };
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.options);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   unmounted() {
@@ -365,7 +426,7 @@ export default {
     $(window).off('resize', this.throttledResizeWin);
   },
   computed: {
-    ob () {
+    ob() {
       const item = this.model.get('item');
       const metadata = this.model.get('metadata');
 
@@ -379,17 +440,14 @@ export default {
         countryList: this.countryList,
         currencies: this.currencies,
         contractTypes: metadata.contractTypesVerbose,
-        conditionTypes: this.model.get('item')
-          .conditionTypes
-          .map((conditionType) => ({
-            code: conditionType,
-            name: app.polyglot.t(`conditionTypes.${conditionType}`),
-          })),
+        conditionTypes: this.model.get('item').conditionTypes.map((conditionType) => ({
+          code: conditionType,
+          name: app.polyglot.t(`conditionTypes.${conditionType}`),
+        })),
         errors: this.model.validationError || {},
         photoUploadInprogress: !!this.inProgressPhotoUploads.length,
         expandedReturnPolicy: this.expandedReturnPolicy || !!this.model.get('refundPolicy'),
-        expandedTermsAndConditions: this.expandedTermsAndConditions
-          || !!this.model.get('termsAndConditions'),
+        expandedTermsAndConditions: this.expandedTermsAndConditions || !!this.model.get('termsAndConditions'),
         maxCatsWarning: this.maxCatsWarning,
         maxTagsWarning: this.maxTagsWarning,
         max: {
@@ -402,7 +460,7 @@ export default {
         ...this._model,
       };
     },
-    tabs () {
+    tabs() {
       const ob = this.ob;
       return [
         {
@@ -448,34 +506,33 @@ export default {
         {
           key: 'acceptedCurs',
           name: ob.polyT('editListing.sectionNames.acceptedCurrencies'),
-        }
+        },
       ];
     },
 
     helperCryptoCurName() {
       const ob = this.ob;
 
-      const supportedWalletCurs = ob.crypto.supportedWalletCurs().map(cur => ob.crypto.ensureMainnetCode(cur));
+      const supportedWalletCurs = ob.crypto.supportedWalletCurs().map((cur) => ob.crypto.ensureMainnetCode(cur));
       const helperCryptoCurCode = supportedWalletCurs.includes('BTC') ? 'BTC' : supportedWalletCurs.sort()[0] || 'EUR';
       return ob.polyT(`cryptoCurrencies.${helperCryptoCurCode}`, ob.polyT(`currencies.${helperCryptoCurCode}`, { _: helperCryptoCurCode }));
     },
 
-    MAX_PHOTOS () {
+    MAX_PHOTOS() {
       return this.model.get('item').max.images;
     },
 
-    shouldShowVariantInventorySection () {
+    shouldShowVariantInventorySection() {
       return !!this.variantOptionsCl.length;
     },
 
-    inProgressPhotoUploads () {
+    inProgressPhotoUploads() {
       let access = this.togglePhotoUploads;
 
-      return this.photoUploads
-        .filter((upload) => upload.state() === 'pending');
+      return this.photoUploads.filter((upload) => upload.state() === 'pending');
     },
 
-    trackInventoryBy () {
+    trackInventoryBy() {
       let trackBy;
 
       // If the inventoryManagement has been rendered, we'll let it's drop-down
@@ -487,8 +544,7 @@ export default {
         const item = this.model.get('item');
 
         if (item.isInventoryTracked) {
-          trackBy = item.get('options').length
-            ? 'TRACK_BY_VARIANT' : 'TRACK_BY_FIXED';
+          trackBy = item.get('options').length ? 'TRACK_BY_VARIANT' : 'TRACK_BY_FIXED';
         } else {
           trackBy = 'DO_NOT_TRACK';
         }
@@ -498,7 +554,7 @@ export default {
     },
 
     // return the currency associated with this listing
-    currency () {
+    currency() {
       if (this.$currencySelect.length) {
         return this.$currencySelect.val();
       }
@@ -506,10 +562,7 @@ export default {
       let cur = app.settings.get('localCurrency');
 
       try {
-        cur = this.model
-          .get('metadata')
-          .get('pricingCurrency')
-          .code;
+        cur = this.model.get('metadata').get('pricingCurrency').code;
       } catch (e) {
         // pass
       }
@@ -520,49 +573,41 @@ export default {
     // Keep in mind this could return undefined if certain dependant form fields are not set yet
     // (e.g. rendering not complete, dependant async data not loaded) and the divisibility was
     // never set in the model.
-    coinDivisibility () {
+    coinDivisibility() {
       let coinDiv;
 
       if ($('#editContractType').length) {
         try {
           coinDiv = getCoinDivisibility(
-            $('#editContractType').val() === 'CRYPTOCURRENCY'
-              ? $('#editListingCoinType').val()
-              || this.model.get('metadata').get('coinType')
-              : this.currency,
+            $('#editContractType').val() === 'CRYPTOCURRENCY' ? $('#editListingCoinType').val() || this.model.get('metadata').get('coinType') : this.currency
           );
         } catch (e) {
           // pass
         }
       } else {
-        coinDiv = this.model.get('metadata')
-          .get('coinDivisibility');
+        coinDiv = this.model.get('metadata').get('coinDivisibility');
       }
 
       return coinDiv;
     },
 
-    $formFields () {
+    $formFields() {
       const isCrypto = $('#editContractType').val() === 'CRYPTOCURRENCY';
       const cryptoExcludes = isCrypto ? ', .js-inventoryManagementSection' : '';
-      const excludes = '.js-sectionShipping, .js-couponsSection, .js-variantsSection, '
-        + `.js-variantInventorySection${cryptoExcludes}`;
+      const excludes = '.js-sectionShipping, .js-couponsSection, .js-variantsSection, ' + `.js-variantInventorySection${cryptoExcludes}`;
 
       let $fields = $(
-        `.js-formSectionsContainer > section:not(${excludes}) select[name],`
-        + `.js-formSectionsContainer > section:not(${excludes}) input[name],`
-        + `.js-formSectionsContainer > section:not(${excludes}) div[contenteditable][name],`
-        + `.js-formSectionsContainer > section:not(${excludes}) `
-        + 'textarea[name]:not([class*="trumbowyg"])',
+        `.js-formSectionsContainer > section:not(${excludes}) select[name],` +
+          `.js-formSectionsContainer > section:not(${excludes}) input[name],` +
+          `.js-formSectionsContainer > section:not(${excludes}) div[contenteditable][name],` +
+          `.js-formSectionsContainer > section:not(${excludes}) ` +
+          'textarea[name]:not([class*="trumbowyg"])'
       );
 
       // Filter out hidden fields that are not applicable based on whether this is
       // a crypto currency listing.
       $fields = $fields.filter((index, el) => {
-        const $excludeContainers = isCrypto
-          ? $('.js-standardTypeWrap')
-            .add($('.js-skuMatureContentRow'))
-          : $('.js-cryptoTypeWrap');
+        const $excludeContainers = isCrypto ? $('.js-standardTypeWrap').add($('.js-skuMatureContentRow')) : $('.js-cryptoTypeWrap');
 
         let keep = true;
 
@@ -578,88 +623,73 @@ export default {
       return $fields;
     },
 
-    $currencySelect () {
-      return this._$currencySelect
-        || (this._$currencySelect = $('#editListingCurrency'));
+    $currencySelect() {
+      return this._$currencySelect || (this._$currencySelect = $('#editListingCurrency'));
     },
 
-    $priceInput () {
-      return this._$priceInput
-        || (this._$priceInput = $('#editListingPrice'));
+    $priceInput() {
+      return this._$priceInput || (this._$priceInput = $('#editListingPrice'));
     },
 
-    $saveButton () {
-      return this._$buttonSave
-        || (this._$buttonSave = $('.js-save'));
+    $saveButton() {
+      return this._$buttonSave || (this._$buttonSave = $('.js-save'));
     },
 
-    $inputPhotoUpload () {
-      return this._$inputPhotoUpload
-        || (this._$inputPhotoUpload = $('#inputPhotoUpload'));
+    $inputPhotoUpload() {
+      return this._$inputPhotoUpload || (this._$inputPhotoUpload = $('#inputPhotoUpload'));
     },
 
-    $photoUploadingLabel () {
-      return this._$photoUploadingLabel
-        || (this._$photoUploadingLabel = $('.js-photoUploadingLabel'));
+    $photoUploadingLabel() {
+      return this._$photoUploadingLabel || (this._$photoUploadingLabel = $('.js-photoUploadingLabel'));
     },
 
-    $editListingReturnPolicy () {
-      return this._$editListingReturnPolicy
-        || (this._$editListingReturnPolicy = $('#editListingReturnPolicy'));
+    $editListingReturnPolicy() {
+      return this._$editListingReturnPolicy || (this._$editListingReturnPolicy = $('#editListingReturnPolicy'));
     },
 
-    $editListingTermsAndConditions () {
-      return this._$editListingTermsAndConditions
-        || (this._$editListingTermsAndConditions = $('#editListingTermsAndConditions'));
+    $editListingTermsAndConditions() {
+      return this._$editListingTermsAndConditions || (this._$editListingTermsAndConditions = $('#editListingTermsAndConditions'));
     },
 
-    $sectionShipping () {
-      return this._$sectionShipping
-        || (this._$sectionShipping = $('.js-sectionShipping'));
+    $sectionShipping() {
+      return this._$sectionShipping || (this._$sectionShipping = $('.js-sectionShipping'));
     },
 
-    $maxCatsWarning () {
-      return this._$maxCatsWarning
-        || (this._$maxCatsWarning = $('.js-maxCatsWarning'));
+    $maxCatsWarning() {
+      return this._$maxCatsWarning || (this._$maxCatsWarning = $('.js-maxCatsWarning'));
     },
 
-    $maxTagsWarning () {
-      return this._$maxTagsWarning
-        || (this._$maxTagsWarning = $('.js-maxTagsWarning'));
+    $maxTagsWarning() {
+      return this._$maxTagsWarning || (this._$maxTagsWarning = $('.js-maxTagsWarning'));
     },
 
-    maxTagsWarning () {
+    maxTagsWarning() {
       return `<div class="clrT2 tx5 row">${app.polyglot.t('editListing.maxTagsWarning')}</div>`;
     },
 
-    $addShipOptSectionHeading () {
-      return this._$addShipOptSectionHeading
-        || (this._$addShipOptSectionHeading = $('.js-addShipOptSectionHeading'));
+    $addShipOptSectionHeading() {
+      return this._$addShipOptSectionHeading || (this._$addShipOptSectionHeading = $('.js-addShipOptSectionHeading'));
     },
 
-    $variantInventorySection () {
-      return this._$variantInventorySection
-        || (this._$variantInventorySection = $('.js-variantInventorySection'));
+    $variantInventorySection() {
+      return this._$variantInventorySection || (this._$variantInventorySection = $('.js-variantInventorySection'));
     },
 
-    $itemPrice () {
-      return this._$itemPrice
-        || (this._$itemPrice = $('[name="item.price"]'));
+    $itemPrice() {
+      return this._$itemPrice || (this._$itemPrice = $('[name="item.price"]'));
     },
   },
   methods: {
     supportedWalletCurs,
-    loadData (options = {}) {
+    loadData(options = {}) {
       if (!this.model) {
         throw new Error('Please provide a model.');
       }
 
       console.log('EditingListing, model: ', this.model);
 
-      if (options.onClickViewListing !== undefined
-        && typeof options.onClickViewListing !== 'function') {
-        throw new Error('If providing an onClickViewListing option, it must be '
-          + 'provided as a function.');
+      if (options.onClickViewListing !== undefined && typeof options.onClickViewListing !== 'function') {
+        throw new Error('If providing an onClickViewListing option, it must be ' + 'provided as a function.');
       }
 
       this.baseInit(options);
@@ -683,13 +713,11 @@ export default {
           updatedData.item.skus = updatedData.item.skus.map((sku) => _.omit(sku, 'mappingId', 'choices'));
 
           if (updatedData.item.quantity === undefined) {
-            this._origModel.get('item')
-              .unset('quantity');
+            this._origModel.get('item').unset('quantity');
           }
 
           if (updatedData.item.productID === undefined) {
-            this._origModel.get('item')
-              .unset('productID');
+            this._origModel.get('item').unset('productID');
           }
 
           this._origModel.set(updatedData);
@@ -703,8 +731,7 @@ export default {
         // event emitter in models/listing/index.js.
       });
 
-      this.createMode = !(this.model.lastSyncedAttrs
-        && this.model.lastSyncedAttrs.slug);
+      this.createMode = !(this.model.lastSyncedAttrs && this.model.lastSyncedAttrs.slug);
       this.photoUploads = [];
       this.images = this.model.get('item').get('images');
       this.shippingOptions = this.model.get('shippingOptions');
@@ -716,13 +743,8 @@ export default {
       // and the Accepted Currencies select list are both driven by the same
       // model field (acceptdCurrencies), we'll keep track of their values
       // seperately, so they don't interfere with each other.
-      const getAcceptedCurs = () => this.model.get('metadata')
-        .get('acceptedCurrencies');
-      const getReceiveCur = () => (
-        this.model.isCrypto
-          ? getAcceptedCurs().length && getAcceptedCurs()[0] || null
-          : null
-      );
+      const getAcceptedCurs = () => this.model.get('metadata').get('acceptedCurrencies');
+      const getReceiveCur = () => (this.model.isCrypto ? (getAcceptedCurs().length && getAcceptedCurs()[0]) || null : null);
       this._receiveCryptoCur = getReceiveCur();
       this._acceptedCurs = getAcceptedCurs();
       this.listenTo(
@@ -735,14 +757,12 @@ export default {
           } else {
             this._acceptedCurs = getAcceptedCurs();
           }
-        },
+        }
       );
 
       getCryptoCursByName().then(
         (curs) => this.getCoinTypesDeferred.resolve(curs),
-        () => this.getCoinTypesDeferred.resolve(
-          getCryptoCursByCode().map((cur) => ({ code: cur, name: cur })),
-        ),
+        () => this.getCoinTypesDeferred.resolve(getCryptoCursByCode().map((cur) => ({ code: cur, name: cur })))
       );
 
       this.listenTo(this.shippingOptions, 'add', (shipOptMd) => {
@@ -758,8 +778,9 @@ export default {
       this.listenTo(this.shippingOptions, 'remove', (shipOptMd, shipOptCl, removeOpts) => {
         const [splicedVw] = this.shippingOptionViews.splice(removeOpts.index, 1);
         splicedVw.remove();
-        this.shippingOptionViews.slice(removeOpts.index)
-          .forEach((shipOptVw) => { shipOptVw.listPosition -= 1; });
+        this.shippingOptionViews.slice(removeOpts.index).forEach((shipOptVw) => {
+          shipOptVw.listPosition -= 1;
+        });
       });
 
       this.listenTo(this.shippingOptions, 'update', (cl, updateOpts) => {
@@ -767,11 +788,7 @@ export default {
           return;
         }
 
-        this.$addShipOptSectionHeading
-          .text(app.polyglot.t(
-            'editListing.shippingOptions.optionHeading',
-            { listPosition: this.shippingOptions.length + 1 },
-          ));
+        this.$addShipOptSectionHeading.text(app.polyglot.t('editListing.shippingOptions.optionHeading', { listPosition: this.shippingOptions.length + 1 }));
       });
 
       this.coupons = this.model.get('coupons');
@@ -783,8 +800,7 @@ export default {
         }
       });
 
-      this.variantOptionsCl = this.model.get('item')
-        .get('options');
+      this.variantOptionsCl = this.model.get('item').get('options');
 
       this.listenTo(this.variantOptionsCl, 'update', this.onUpdateVariantOptions);
 
@@ -793,7 +809,7 @@ export default {
       }
     },
 
-    events () {
+    events() {
       return {
         'change #editListingCryptoContractType': 'onChangeCryptoContractType',
         'click .js-removeImage': 'onClickRemoveImage',
@@ -804,11 +820,11 @@ export default {
       };
     },
 
-    onClickReturn () {
+    onClickReturn() {
       this.trigger('click-return', { view: this });
     },
 
-    onClickViewListing () {
+    onClickViewListing() {
       if (this.options.onClickViewListing) {
         this.options.onClickViewListing.call(this);
       } else {
@@ -821,7 +837,7 @@ export default {
       }
     },
 
-    onClickViewListingOnWeb () {
+    onClickViewListingOnWeb() {
       const slug = this.model.get('slug');
       if (slug) {
         openExternal(`https://${app.serverConfig.testnet ? 'console.' : ''}mobazha.info/listing/${app.profile.id}/${slug}`);
@@ -830,77 +846,69 @@ export default {
       }
     },
 
-    onClickRemoveImage (j) {
+    onClickRemoveImage(j) {
       this.images.remove(this.images.at(j));
     },
 
-    onClickCancelPhotoUploads () {
+    onClickCancelPhotoUploads() {
       this.inProgressPhotoUploads.forEach((photoUpload) => photoUpload.abort());
     },
 
-    onChangePrice () {
+    onChangePrice() {
       this.variantInventory.render();
     },
 
-    setContractTypeClass (contractType) {
+    setContractTypeClass(contractType) {
       this.contractTypeClass = `TYPE_${contractType}`;
     },
 
-    onChangeContractType (val, data = {}) {
+    onChangeContractType(val, data = {}) {
       this.setContractTypeClass(val);
 
       if (!data.fromCryptoTypeChange) {
         if (val === 'CRYPTOCURRENCY') {
-          this.model.get('metadata')
-            .set('acceptedCurrencies', [this._receiveCryptoCur]);
-          $('#editListingCryptoContractType')
-            .val('CRYPTOCURRENCY');
-          $('#editListingCryptoContractType')
-            .trigger('change')
-            .focus();
+          this.model.get('metadata').set('acceptedCurrencies', [this._receiveCryptoCur]);
+          $('#editListingCryptoContractType').val('CRYPTOCURRENCY');
+          $('#editListingCryptoContractType').trigger('change').focus();
         }
       }
     },
 
-    onChangeCryptoContractType (e) {
+    onChangeCryptoContractType(e) {
       if (e.target.value === 'CRYPTOCURRENCY') return;
 
-      this.model.get('metadata')
-        .set('acceptedCurrencies', this._acceptedCurs);
-      $('#editContractType')
-        .val(e.target.value);
-      $('#editContractType')
-        .trigger('change', { fromCryptoTypeChange: true })
-        .focus();
+      this.model.get('metadata').set('acceptedCurrencies', this._acceptedCurs);
+      $('#editContractType').val(e.target.value);
+      $('#editContractType').trigger('change', { fromCryptoTypeChange: true }).focus();
     },
 
-    getOrientation (file, callback) {
+    getOrientation(file, callback) {
       const reader = new FileReader();
 
       reader.onload = (e) => {
         const dataView = new DataView(e.target.result); // eslint-disable-line no-undef
         let offset = 2;
 
-        if (dataView.getUint16(0, false) !== 0xFFD8) return callback(-2);
+        if (dataView.getUint16(0, false) !== 0xffd8) return callback(-2);
 
         while (offset < dataView.byteLength) {
           const marker = dataView.getUint16(offset, false);
           offset += 2;
-          if (marker === 0xFFE1) {
+          if (marker === 0xffe1) {
             offset += 2;
             if (dataView.getUint32(offset, false) !== 0x45786966) {
               return callback(-1);
             }
-            const little = dataView.getUint16(offset += 6, false) === 0x4949;
+            const little = dataView.getUint16((offset += 6), false) === 0x4949;
             offset += dataView.getUint32(offset + 4, little);
             const tags = dataView.getUint16(offset, little);
             offset += 2;
             for (let i = 0; i < tags; i++) {
-              if (dataView.getUint16(offset + (i * 12), little) === 0x0112) {
-                return callback(dataView.getUint16(offset + (i * 12) + 8, little));
+              if (dataView.getUint16(offset + i * 12, little) === 0x0112) {
+                return callback(dataView.getUint16(offset + i * 12 + 8, little));
               }
             }
-          } else if ((marker & 0xFF00) !== 0xFF00) {
+          } else if ((marker & 0xff00) !== 0xff00) {
             break;
           } else {
             offset += dataView.getUint16(offset, false);
@@ -913,7 +921,7 @@ export default {
       reader.readAsArrayBuffer(file.slice(0, 64 * 1024));
     },
 
-    truncateImageFilename (filename) {
+    truncateImageFilename(filename) {
       if (!filename || typeof filename !== 'string') {
         throw new Error('Please provide a filename as a string.');
       }
@@ -926,14 +934,13 @@ export default {
 
         // acounting for rare edge case of the extension in and of itself
         // exceeding the max length
-        return parsed.name.slice(0, nameParseLen < 0 ? 0 : nameParseLen)
-          + parsed.ext.slice(0, Image.maxFilenameLength);
+        return parsed.name.slice(0, nameParseLen < 0 ? 0 : nameParseLen) + parsed.ext.slice(0, Image.maxFilenameLength);
       }
 
       return truncated;
     },
 
-    onChangePhotoUploadInput () {
+    onChangePhotoUploadInput() {
       let photoFiles = Array.prototype.slice.call(this.$inputPhotoUpload[0].files, 0);
 
       // prune out any non-image files
@@ -941,9 +948,7 @@ export default {
 
       this.$inputPhotoUpload.val('');
 
-      const currPhotoLength = this.model.get('item')
-        .get('images')
-        .length;
+      const currPhotoLength = this.model.get('item').get('images').length;
 
       if (currPhotoLength + photoFiles.length > this.MAX_PHOTOS) {
         photoFiles = photoFiles.slice(0, this.MAX_PHOTOS - currPhotoLength);
@@ -987,34 +992,40 @@ export default {
             switch (orientation) {
               case 2:
                 ctx.translate(imgW, 0);
-                ctx.scale(-1, 1); break;
+                ctx.scale(-1, 1);
+                break;
               case 3:
                 ctx.translate(imgW, imgH);
-                ctx.rotate(Math.PI); break;
+                ctx.rotate(Math.PI);
+                break;
               case 4:
                 ctx.translate(0, imgH);
-                ctx.scale(1, -1); break;
+                ctx.scale(1, -1);
+                break;
               case 5:
                 ctx.rotate(0.5 * Math.PI);
-                ctx.scale(1, -1); break;
+                ctx.scale(1, -1);
+                break;
               case 6:
                 ctx.rotate(0.5 * Math.PI);
-                ctx.translate(0, -imgH); break;
+                ctx.translate(0, -imgH);
+                break;
               case 7:
                 ctx.rotate(0.5 * Math.PI);
                 ctx.translate(imgW, -imgH);
-                ctx.scale(-1, 1); break;
+                ctx.scale(-1, 1);
+                break;
               case 8:
                 ctx.rotate(-0.5 * Math.PI);
-                ctx.translate(-imgW, 0); break;
+                ctx.translate(-imgW, 0);
+                break;
               default: // do nothing
             }
 
             ctx.drawImage(newImage, 0, 0, imgW, imgH);
             toUpload.push({
               filename: this.truncateImageFilename(photoFile.name),
-              image: canvas.toDataURL('image/jpeg', 0.9)
-                .replace(/^data:image\/(png|jpeg|webp);base64,/, ''),
+              image: canvas.toDataURL('image/jpeg', 0.9).replace(/^data:image\/(png|jpeg|webp);base64,/, ''),
             });
 
             loaded += 1;
@@ -1032,10 +1043,7 @@ export default {
             this.$photoUploadingLabel.addClass('hide');
 
             new SimpleMessage({
-              title: app.polyglot.t(
-                'editListing.errors.unableToLoadImages',
-                { smart_count: errored },
-              ),
+              title: app.polyglot.t('editListing.errors.unableToLoadImages', { smart_count: errored }),
             })
               .render()
               .open();
@@ -1046,69 +1054,62 @@ export default {
       });
     },
 
-    onClickAddReturnPolicy (e) {
+    onClickAddReturnPolicy(e) {
       $(e.target).addClass('hide');
-      this.$editListingReturnPolicy.removeClass('hide')
-        .focus();
+      this.$editListingReturnPolicy.removeClass('hide').focus();
       this.expandedReturnPolicy = true;
     },
 
-    onClickAddTermsAndConditions (e) {
+    onClickAddTermsAndConditions(e) {
       $(e.target).addClass('hide');
-      this.$editListingTermsAndConditions.removeClass('hide')
-        .focus();
+      this.$editListingTermsAndConditions.removeClass('hide').focus();
       this.expandedTermsAndConditions = true;
     },
 
-    onClickAddShippingOption () {
-      this.shippingOptions
-        .push(new ShippingOptionMd({
-          services: [
-            new Service(),
-          ],
-        }));
+    onClickAddShippingOption() {
+      this.shippingOptions.push(
+        new ShippingOptionMd({
+          services: [new Service()],
+        })
+      );
     },
 
-    onClickAddCoupon () {
+    onClickAddCoupon() {
       this.coupons.add(new Coupon());
 
       if (this.coupons.length === 1) {
-        this.$couponsSection.find('.coupon input[name=title]')
-          .focus();
+        this.$couponsSection.find('.coupon input[name=title]').focus();
       }
     },
 
-    onClickAddFirstVariant () {
+    onClickAddFirstVariant() {
       this.variantOptionsCl.add(new VariantOption());
 
       if (this.variantOptionsCl.length === 1) {
-        this.$variantsSection.find('.variant input[name=name]')
-          .focus();
+        this.$variantsSection.find('.variant input[name=name]').focus();
       }
     },
 
-    onKeyUpVariantName (e) {
+    onKeyUpVariantName(e) {
       // wait until they stop typing
       if (this.variantNameKeyUpTimer) {
         clearTimeout(this.variantNameKeyUpTimer);
       }
 
       this.variantNameKeyUpTimer = setTimeout(() => {
-        const index = $(e.target).closest('.variant')
-          .index();
+        const index = $(e.target).closest('.variant').index();
 
         this.variantsView.setModelData(index);
       }, 150);
     },
 
-    onVariantChoiceChange (e) {
-      const index = this.variantsView.views
-        .indexOf(e.view);
+    onVariantChoiceChange(e) {
+      const index = this.variantsView.views.indexOf(e.view);
 
       this.variantsView.setModelData(index);
     },
 
-    onUpdateVariantOptions () {
+    onUpdateVariantOptions() {
       if (this.variantOptionsCl.length) {
         this.$variantsSection.addClass('expandedVariantsView');
         this.skuField.setState({ variantsPresent: true });
@@ -1129,17 +1130,14 @@ export default {
         }
       }
 
-      this.$variantInventorySection.toggleClass(
-        'hide',
-        !this.shouldShowVariantInventorySection,
-      );
+      this.$variantInventorySection.toggleClass('hide', !this.shouldShowVariantInventorySection);
     },
 
-    onClickScrollToVariantInventory () {
+    onClickScrollToVariantInventory() {
       this.scrollTo('variantInventory');
     },
 
-    confirmClose () {
+    confirmClose() {
       const deferred = $.Deferred();
 
       this.setModelData();
@@ -1153,13 +1151,16 @@ export default {
           removeOnClose: false,
           title: app.polyglot.t('editListing.confirmCloseDialog.title'),
           message: app.polyglot.t(`editListing.confirmCloseDialog.${messageKey}`),
-          buttons: [{
-            text: app.polyglot.t('editListing.confirmCloseDialog.btnNo'),
-            fragment: 'no',
-          }, {
-            text: app.polyglot.t('editListing.confirmCloseDialog.btnYes'),
-            fragment: 'yes',
-          }],
+          buttons: [
+            {
+              text: app.polyglot.t('editListing.confirmCloseDialog.btnNo'),
+              fragment: 'no',
+            },
+            {
+              text: app.polyglot.t('editListing.confirmCloseDialog.btnYes'),
+              fragment: 'yes',
+            },
+          ],
         })
           .on('click-yes', () => {
             deferred.resolve();
@@ -1179,7 +1180,7 @@ export default {
       return deferred.promise();
     },
 
-    uploadImages (images) {
+    uploadImages(images) {
       let imagesToUpload = images;
 
       if (!images) {
@@ -1196,28 +1197,29 @@ export default {
         data: JSON.stringify(imagesToUpload),
         dataType: 'json',
         contentType: 'application/json',
-      }).always(() => {
-        if (this.isRemoved()) return;
-        if (!this.inProgressPhotoUploads.length) this.$photoUploadingLabel.addClass('hide');
-      }).done((uploadedImages) => {
-        if (this.isRemoved()) return;
-
-        this.images.add(uploadedImages.map((image) => ({
-          filename: image.filename,
-          original: image.original,
-          large: image.large,
-          medium: image.medium,
-          small: image.small,
-          tiny: image.tiny,
-        })));
       })
+        .always(() => {
+          if (this.isRemoved()) return;
+          if (!this.inProgressPhotoUploads.length) this.$photoUploadingLabel.addClass('hide');
+        })
+        .done((uploadedImages) => {
+          if (this.isRemoved()) return;
+
+          this.images.add(
+            uploadedImages.map((image) => ({
+              filename: image.filename,
+              original: image.original,
+              large: image.large,
+              medium: image.medium,
+              small: image.small,
+              tiny: image.tiny,
+            }))
+          );
+        })
         .fail((jqXhr) => {
           openSimpleMessage(
-            app.polyglot.t(
-              'editListing.errors.uploadImageErrorTitle',
-              { smart_count: imagesToUpload.length },
-            ),
-            jqXhr.responseJSON && jqXhr.responseJSON.reason || '',
+            app.polyglot.t('editListing.errors.uploadImageErrorTitle', { smart_count: imagesToUpload.length }),
+            (jqXhr.responseJSON && jqXhr.responseJSON.reason) || ''
           );
         })
         .always(() => {
@@ -1227,22 +1229,22 @@ export default {
       this.photoUploads.push(upload);
     },
 
-    onClickAddPhoto () {
+    onClickAddPhoto() {
       this.$inputPhotoUpload.trigger('click');
     },
 
-    scrollTo (key) {
-      console.log('scroll to: ', key)
+    scrollTo(key) {
+      console.log('scroll to: ', key);
       let $el = this.$refs[`section${capitalize(key)}`];
       if (!$el) {
         throw new Error('Please provide a jQuery element to scroll to.');
       }
 
-      console.log('$el.getBoundingClientRect().top: ', $el.getBoundingClientRect().top)
+      console.log('$el.getBoundingClientRect().top: ', $el.getBoundingClientRect().top);
 
       Velocity(
         this.$el,
-        { scrollTop: $el.getBoundingClientRect().top},
+        { scrollTop: $el.getBoundingClientRect().top },
         {
           duration: 400,
           complete: () => {
@@ -1278,22 +1280,22 @@ export default {
       }
     },
 
-    onScroll () {
+    onScroll() {
       _.throttle(this._onScroll, 100)();
     },
 
-    onSaveClick () {
+    onSaveClick() {
       this.$saveButton.addClass('disabled');
       this.setModelData();
 
       const serverData = this.model.toJSON();
 
-      serverData.item.skus = serverData.item.skus.map((sku) => (
+      serverData.item.skus = serverData.item.skus.map((sku) =>
         // The variant inventory view adds some stuff to the skus collection that
         // shouldn't go to the server. We'll ensure the extraneous stuff isn't sent
         // with the save while still allowing it to stay in the collection.
         _.omit(sku, 'mappingId', 'choices')
-      ));
+      );
 
       const save = this.model.save(null, {
         attrs: serverData,
@@ -1302,32 +1304,34 @@ export default {
       if (save) {
         const segmentation = {
           type: serverData.metadata.contractType,
-          currency: serverData.metadata.contractType !== 'CRYPTOCURRENCY'
-            ? serverData.metadata.pricingCurrency.code : serverData.item.cryptoListingCurrencyCode,
+          currency:
+            serverData.metadata.contractType !== 'CRYPTOCURRENCY' ? serverData.metadata.pricingCurrency.code : serverData.item.cryptoListingCurrencyCode,
           moderated: serverData.moderators && !!serverData.moderators.length,
           isNew: this.model.isNew(),
         };
 
         startAjaxEvent('Listing_Save');
 
-        const savingStatusMsg = app.statusBar.pushMessage({
-          msg: 'Saving listing...',
-          type: 'message',
-          duration: 99999999999999,
-        }).on('clickViewListing', () => {
-          const guidUrl = `#${app.profile.id}/store/${this.model.get('slug')}`;
-          const base = app.profile.get('handle')
-            ? `@${app.profile.get('handle')}` : app.profile.id;
-          const url = `${base}/store/${this.model.get('slug')}`;
+        const savingStatusMsg = app.statusBar
+          .pushMessage({
+            msg: 'Saving listing...',
+            type: 'message',
+            duration: 99999999999999,
+          })
+          .on('clickViewListing', () => {
+            const guidUrl = `#${app.profile.id}/store/${this.model.get('slug')}`;
+            const base = app.profile.get('handle') ? `@${app.profile.get('handle')}` : app.profile.id;
+            const url = `${base}/store/${this.model.get('slug')}`;
 
-          if (location.hash === guidUrl) {
-            Backbone.history.loadUrl();
-          } else {
-            app.router.navigateUser(url, app.profile.id, { trigger: true });
-          }
-        });
+            if (location.hash === guidUrl) {
+              Backbone.history.loadUrl();
+            } else {
+              app.router.navigateUser(url, app.profile.id, { trigger: true });
+            }
+          });
 
-        save.always(() => this.$saveButton.removeClass('disabled'))
+        save
+          .always(() => this.$saveButton.removeClass('disabled'))
           .fail((...args) => {
             savingStatusMsg.update({
               msg: `Listing <em>${this.model.toJSON().item.title}</em> failed to save.`,
@@ -1336,7 +1340,7 @@ export default {
 
             setTimeout(() => savingStatusMsg.remove(), 3000);
 
-            const message = args[0] && args[0].responseJSON && args[0].responseJSON.reason || '';
+            const message = (args[0] && args[0].responseJSON && args[0].responseJSON.reason) || '';
 
             new SimpleMessage({
               title: app.polyglot.t('editListing.errors.saveErrorTitle'),
@@ -1348,9 +1352,9 @@ export default {
               ...segmentation,
               errors: message || 'unknown',
             });
-          }).done(() => {
-            savingStatusMsg.update(`Listing ${this.model.toJSON().item.title}`
-              + ' saved. <a class="js-viewListing">view</a>');
+          })
+          .done(() => {
+            savingStatusMsg.update(`Listing ${this.model.toJSON().item.title}` + ' saved. <a class="js-viewListing">view</a>');
             this.attrsAtLastSave = this.model.toJSON();
 
             setTimeout(() => savingStatusMsg.remove(), 6000);
@@ -1371,21 +1375,19 @@ export default {
         } else {
           // There's a model error that's not represented in the UI - likely
           // developer error.
-          const msg = Object.keys(this.model.validationError)
-            .reduce((str, errKey) => `${str}${errKey}: ${this.model.validationError[errKey].join(', ')}<br>`, '');
-          openSimpleMessage(
-            app.polyglot.t('editListing.errors.saveErrorTitle'),
-            msg,
+          const msg = Object.keys(this.model.validationError).reduce(
+            (str, errKey) => `${str}${errKey}: ${this.model.validationError[errKey].join(', ')}<br>`,
+            ''
           );
+          openSimpleMessage(app.polyglot.t('editListing.errors.saveErrorTitle'), msg);
         }
       }
     },
 
-    onChangeManagementType (e) {
+    onChangeManagementType(e) {
       if (e.value === 'TRACK') {
         this.inventoryManagement.setState({
-          trackBy: this.model.get('item').get('options').length
-            ? 'TRACK_BY_VARIANT' : 'TRACK_BY_FIXED',
+          trackBy: this.model.get('item').get('options').length ? 'TRACK_BY_VARIANT' : 'TRACK_BY_FIXED',
         });
         this.notTrackingInventory = false;
       } else {
@@ -1400,7 +1402,7 @@ export default {
      * Will set the model with data from the form, including setting nested models
      * and collections which are managed by nested views.
      */
-    setModelData () {
+    setModelData() {
       let formData = this.getFormData(this.$formFields);
       const item = this.model.get('item');
       const metadata = this.model.get('metadata');
@@ -1426,11 +1428,10 @@ export default {
           // If we have options and are not tracking inventory, we'll set the infiniteInventory
           // flag for any skus.
           if (this.trackInventoryBy === 'DO_NOT_TRACK') {
-            item.get('skus')
-              .forEach((sku) => {
-                sku.unset('quantity');
-                sku.set({ infiniteInventory: true });
-              });
+            item.get('skus').forEach((sku) => {
+              sku.unset('quantity');
+              sku.set({ infiniteInventory: true });
+            });
           }
         } else {
           formData.item.infiniteInventory = this.trackInventoryBy === 'DO_NOT_TRACK';
@@ -1447,9 +1448,7 @@ export default {
         formData.metadata = {
           ...formData.metadata,
           format: 'FIXED_PRICE',
-          acceptedCurrencies: this.$refs.cryptoCurSelector
-            ? this.$refs.cryptoCurSelector.getState().activeCurs
-            : metadata.get('acceptedCurrencies'),
+          acceptedCurrencies: this.$refs.cryptoCurSelector ? this.$refs.cryptoCurSelector.getState().activeCurs : metadata.get('acceptedCurrencies'),
         };
       } else {
         item.unset('condition');
@@ -1467,8 +1466,7 @@ export default {
           },
           metadata: {
             ...formData.metadata,
-            acceptedCurrencies: typeof formData.metadata.acceptedCurrencies === 'string'
-              ? [formData.metadata.acceptedCurrencies] : [],
+            acceptedCurrencies: typeof formData.metadata.acceptedCurrencies === 'string' ? [formData.metadata.acceptedCurrencies] : [],
             format: 'MARKET_PRICE',
           },
           shippingOptions: [],
@@ -1479,10 +1477,8 @@ export default {
         ...formData,
         item: {
           ...formData.item,
-          tags: formData.item.tags.length
-            ? formData.item.tags.split(tagsDelimiter) : [],
-          categories: formData.item.categories.length
-            ? formData.item.categories.split(tagsDelimiter) : [],
+          tags: formData.item.tags.length ? formData.item.tags.split(tagsDelimiter) : [],
+          categories: formData.item.categories.length ? formData.item.categories.split(tagsDelimiter) : [],
         },
       });
 
@@ -1500,18 +1496,13 @@ export default {
       }
     },
 
-    open () {
+    open() {
       if (!this.openedBefore) {
         this.openedBefore = true;
         let cur;
 
         try {
-          cur = this._origModel
-            .unparsedResponse
-            .listing
-            .metadata
-            .pricingCurrency
-            .code;
+          cur = this._origModel.unparsedResponse.listing.metadata.pricingCurrency.code;
         } catch (e) {
           return this;
         }
@@ -1519,7 +1510,9 @@ export default {
         if (!this.model.isCrypto && !getCurrencyByCode(cur)) {
           const unsupportedCurrencyDialog = new UnsupportedCurrency({
             unsupportedCurrency: cur,
-          }).render().open();
+          })
+            .render()
+            .open();
 
           this.listenTo(unsupportedCurrencyDialog, 'close', () => {
             const response = JSON.parse(JSON.stringify(this._origModel.unparsedResponse));
@@ -1535,46 +1528,41 @@ export default {
       return this;
     },
 
-    showMaxTagsWarning () {
-      this.$maxTagsWarning.empty()
-        .append(this.maxTagsWarning);
+    showMaxTagsWarning() {
+      this.$maxTagsWarning.empty().append(this.maxTagsWarning);
     },
 
-    hideMaxTagsWarning () {
+    hideMaxTagsWarning() {
       this.$maxTagsWarning.empty();
     },
 
-    get maxCatsWarning () {
+    get maxCatsWarning() {
       return `<div class="clrT2 tx5 row">${app.polyglot.t('editListing.maxCatsWarning')}</div>`;
     },
 
-    showMaxCatsWarning () {
-      this.$maxCatsWarning.empty()
-        .append(this.maxCatsWarning);
+    showMaxCatsWarning() {
+      this.$maxCatsWarning.empty().append(this.maxCatsWarning);
     },
 
-    hideMaxCatsWarning () {
+    hideMaxCatsWarning() {
       this.$maxCatsWarning.empty();
     },
 
-    createShippingOptionView (opts) {
+    createShippingOptionView(opts) {
       const options = {
-        getCurrency: () => (this.$currencySelect.length
-          ? this.$currencySelect.val() : this.model.get('metadata').pricingCurrency),
-        ...opts || {},
+        getCurrency: () => (this.$currencySelect.length ? this.$currencySelect.val() : this.model.get('metadata').pricingCurrency),
+        ...(opts || {}),
       };
       const view = this.createChild(ShippingOption, options);
 
       this.listenTo(view, 'click-remove', (e) => {
-        this.shippingOptions.remove(
-          this.shippingOptions.at(this.shippingOptionViews.indexOf(e.view)),
-        );
+        this.shippingOptions.remove(this.shippingOptions.at(this.shippingOptionViews.indexOf(e.view)));
       });
 
       return view;
     },
 
-    render () {
+    render() {
       const item = this.model.get('item');
       const metadata = this.model.get('metadata');
 
@@ -1604,36 +1592,29 @@ export default {
       this.$couponsSection = $('.js-couponsSection');
       this.$variantsSection = $('.js-variantsSection');
 
-      $('#editContractType, #editListingVisibility, #editListingCondition, '
-        + '#editListingCountrySelect').select2({
-          // disables the search box
-          minimumResultsForSearch: Infinity,
-        });
+      $('#editContractType, #editListingVisibility, #editListingCondition, ' + '#editListingCountrySelect').select2({
+        // disables the search box
+        minimumResultsForSearch: Infinity,
+      });
 
-      $('#editListingCurrency').select2({
-        matcher: (params, data) => {
-          if (!params.term || params.term.trim() === '') {
-            return data;
-          }
+      $('#editListingCurrency')
+        .select2({
+          matcher: (params, data) => {
+            if (!params.term || params.term.trim() === '') {
+              return data;
+            }
 
-          const term = params.term
-            .toUpperCase()
-            .trim();
+            const term = params.term.toUpperCase().trim();
 
-          const name = data.element.getAttribute('data-name');
+            const name = data.element.getAttribute('data-name');
 
-          if (
-            data.text
-              .toUpperCase()
-              .includes(term)
-            || (name && name.toUpperCase().includes(term))
-          ) {
-            return data;
-          }
+            if (data.text.toUpperCase().includes(term) || (name && name.toUpperCase().includes(term))) {
+              return data;
+            }
 
-          return null;
-        },
-      })
+            return null;
+          },
+        })
         .on('change', () => this.variantInventory.render());
 
       this.$editListingTags.selectize({
@@ -1642,7 +1623,8 @@ export default {
         create: (input) => {
           // we'll make the tag all lowercase and
           // replace spaces with dashes.
-          const term = input.toLowerCase()
+          const term = input
+            .toLowerCase()
             .replace(/\s/g, '-')
             .replace('#', '')
             // replace consecutive dashes with one
@@ -1713,12 +1695,11 @@ export default {
 
       const variantErrors = {};
 
-      Object.keys(item.validationError || {})
-        .forEach((errKey) => {
-          if (errKey.startsWith('options[')) {
-            variantErrors[errKey] = item.validationError[errKey];
-          }
-        });
+      Object.keys(item.validationError || {}).forEach((errKey) => {
+        if (errKey.startsWith('options[')) {
+          variantErrors[errKey] = item.validationError[errKey];
+        }
+      });
 
       this.variantsView = this.createChild(Variants, {
         collection: this.variantOptionsCl,
@@ -1726,22 +1707,15 @@ export default {
         errors: variantErrors,
       });
 
-      this.variantsView.listenTo(
-        this.variantsView,
-        'variantChoiceChange',
-        this.onVariantChoiceChange.bind(this),
-      );
+      this.variantsView.listenTo(this.variantsView, 'variantChoiceChange', this.onVariantChoiceChange.bind(this));
 
-      this.$variantsSection.find('.js-variantsContainer').append(
-        this.variantsView.render().el,
-      );
+      this.$variantsSection.find('.js-variantsContainer').append(this.variantsView.render().el);
 
       // render inventory management section
       if (this.inventoryManagement) this.inventoryManagement.remove();
       const inventoryManagementErrors = {};
 
-      if (this.model.validationError
-        && this.model.validationError['item.quantity']) {
+      if (this.model.validationError && this.model.validationError['item.quantity']) {
         inventoryManagementErrors.quantity = this.model.validationError['item.quantity'];
       }
 
@@ -1754,11 +1728,7 @@ export default {
       });
 
       $('.js-inventoryManagementSection').html(this.inventoryManagement.render().el);
-      this.listenTo(
-        this.inventoryManagement,
-        'changeManagementType',
-        this.onChangeManagementType,
-      );
+      this.listenTo(this.inventoryManagement, 'changeManagementType', this.onChangeManagementType);
 
       // render variant inventory
       if (this.variantInventory) this.variantInventory.remove();
@@ -1770,8 +1740,7 @@ export default {
         getCurrency: () => this.currency,
       });
 
-      $('.js-variantInventoryTableContainer')
-        .html(this.variantInventory.render().el);
+      $('.js-variantInventoryTableContainer').html(this.variantInventory.render().el);
 
       // render coupons
       if (this.couponsView) this.couponsView.remove();
@@ -1781,9 +1750,7 @@ export default {
         maxCouponCount: this.model.max.couponCount,
       });
 
-      this.$couponsSection.find('.js-couponsContainer').append(
-        this.couponsView.render().el,
-      );
+      this.$couponsSection.find('.js-couponsContainer').append(this.couponsView.render().el);
 
       installRichEditor($('#editListingDescription'), {
         topLevelClass: 'clrBr',
@@ -1793,10 +1760,7 @@ export default {
       this.sortablePhotos = Sortable.create(this.$refs.photoUploadItems, {
         filter: '.js-addPhotoWrap',
         onUpdate: (e) => {
-          const imageModels = this.model
-            .get('item')
-            .get('images')
-            .models;
+          const imageModels = this.model.get('item').get('images').models;
 
           const movingModel = imageModels[e.oldIndex - 1];
           imageModels.splice(e.oldIndex - 1, 1);
@@ -1812,8 +1776,7 @@ export default {
         getReceiveCur: () => this._receiveCryptoCur,
       });
 
-      $('.js-cryptoTypeWrap')
-        .html(this.cryptoCurrencyType.render().el);
+      $('.js-cryptoTypeWrap').html(this.cryptoCurrencyType.render().el);
 
       setTimeout(() => {
         if (!this.rendered) {
@@ -1833,9 +1796,8 @@ export default {
         this.attrsAtLastSave = this.model.toJSON();
       }
       return this;
-    }
-
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="scss" scoped></style>

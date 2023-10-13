@@ -52,13 +52,14 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        scrollTo: '',
+      },
     },
   },
   data () {
     return {
       activeTab: 'General',
-      scrollTo: '',
     };
   },
   created () {

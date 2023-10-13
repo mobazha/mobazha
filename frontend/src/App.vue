@@ -27,13 +27,13 @@
       }"
       @close="onWalletClose" />
 
-    <KeepAlive v-if="initialized" :exclude="['EditListing', 'Settings', 'About', 'ShoppingCart']">
-      <component :is="modalName" ref="modalInstance"
+    <!-- <KeepAlive v-if="initialized" :exclude="['EditListing', 'Settings', 'About', 'ShoppingCart']"> -->
+      <component v-if="modalName" :is="modalName" :name="modalName" ref="modalInstance"
         :options="modalOptions"
         :bb="modalBBFunc"
         @close="onModalClose">
       </component>
-    </KeepAlive>
+    <!-- </KeepAlive> -->
 
     <Purchase v-if="showPurchase" @close="onPurchaseClose" />
     <LoadingModal v-if="initialized" v-show="showLoadingModal" />
@@ -107,7 +107,7 @@ export default {
       return this.$refs.modalInstance;
     },
     onModalClose() {
-      console.log('onModalClose');
+      console.log('onModalClose: ', this.modalName);
       this.modalName = '';
     }
   },

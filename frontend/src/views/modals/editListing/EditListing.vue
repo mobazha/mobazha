@@ -389,7 +389,7 @@ import ViewListingLinks from './ViewListingLinks.vue';
 import UploadPhoto from './UploadPhoto.vue';
 
 export default {
-  component: {
+  components: {
     ViewListingLinks,
     UploadPhoto,
   },

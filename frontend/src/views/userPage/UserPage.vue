@@ -80,7 +80,7 @@
             </template>
           </div>
         </div>
-        <div class="tabContent js-tabContent">
+        <div class="tabContent js-userPage-tabContent">
           <!-- insert the tab subview here -->
         </div>
       </div>
@@ -601,7 +601,7 @@ export default {
     },
 
     render() {
-      this.$tabContent = $('.js-tabContent');
+      this.$tabContent = $('.js-userPage-tabContent');
       this.$tabTitle = $('.js-tabTitle');
       this.$moreableBtns = $('.js-moreableBtn');
 

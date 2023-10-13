@@ -1,6 +1,6 @@
 <template>
   <div :class="`userPageStore ${isListView ? 'listView' : ''}`">
-    <div class="popInMessageHolder js-popInMessages"></div>
+    <div class="popInMessageHolder js-storePopInMessages"></div>
     <div class="userPageSearchBar flex gutterHSm" :disabled="ob.isFetching || ob.fetchFailed || !ob.listingCount">
       <div class="flexExpand">
         <div class="searchWrapper">
@@ -443,7 +443,7 @@ export default {
       return $('.js-noResults') || null;
     },
     $popInMessages() {
-      return $('.js-popInMessages');
+      return $('.js-storePopInMessages');
     },
     $inactiveWarning() {
       return $('.js-inactiveWarning');

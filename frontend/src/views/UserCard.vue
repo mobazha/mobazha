@@ -31,7 +31,7 @@
             </template>
           </div>
         </template>
-        <div class="js-verifiedMod"></div>
+        <div class="js-cardVerifiedMod"></div>
       </div>
       <div class="content">
         <template v-if="!ob.loading && !ob.notFound">
@@ -359,7 +359,7 @@ export default {
             text: '',
           },
         });
-        $('.js-verifiedMod').append(this.verifiedMod.render().el);
+        $('.js-cardVerifiedMod').append(this.verifiedMod.render().el);
       }
 
       return this;

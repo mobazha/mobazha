@@ -21,7 +21,7 @@
         </template>
       </div>
       <template v-if="!ob.isFetching">
-        <div class="js-reviews"></div>
+        <div class="js-reviewsList"></div>
       </template>
     </div>
   </div>
@@ -114,7 +114,7 @@ export default {
 
     render() {
       this.delegateEvents(this.reviews);
-      $('.js-reviews').append(this.reviews.render().$el);
+      $('.js-reviewsList').append(this.reviews.render().$el);
 
       return this;
     },

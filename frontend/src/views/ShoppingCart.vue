@@ -269,7 +269,7 @@ export default {
     pay(index) {
       this.$store.commit('cart/updateCart', this.tableData[0], { module: 'cart' });
 
-      this.$emit('openPurchaseModal');
+      window.vueApp.launchModal('Purchase');
     },
 
     //修改头部样式

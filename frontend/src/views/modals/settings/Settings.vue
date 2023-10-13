@@ -59,7 +59,8 @@ export default {
   },
   data () {
     return {
-      activeTab: 'General',
+      initialTab: 'General',
+      activeTab: '',
     };
   },
   created () {
@@ -70,7 +71,7 @@ export default {
   mounted () {
     this.$tabContent = $('.js-tabContent');
 
-    this.selectTab(this.activeTab, {
+    this.selectTab(this.initialTab, {
       scrollTo: this.options.scrollTo,
     });
   },

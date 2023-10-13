@@ -165,6 +165,7 @@ export default {
       type: Object,
       default: {},
 	  },
+    bb: Function,
   },
   data () {
     return {
@@ -237,7 +238,7 @@ export default {
       return app.settings.get('localCurrency');
     },
     listingCurrency () {
-      return this.listing._metadata.pricingCurrency.code;
+      return this._listing.metadata.pricingCurrency.code;
     },
     viewingCurrency () {
       return getExchangeRate(this.displayCurrency) !== undefined ? this.displayCurrency : this.listingCurrency;
@@ -266,11 +267,11 @@ export default {
         throw new Error('Please provide an order model');
       }
 
-      if (!opts.listing || !(opts.listing instanceof Listing)) {
+      if (!this.listing || !(this.listing instanceof Listing)) {
         throw new Error('Please provide a listing model');
       }
 
-      if (!opts.prices) {
+      if (!this.prices) {
         throw new Error('Please provide the prices array');
       }
 

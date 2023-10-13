@@ -41,7 +41,6 @@ export default {
     };
   },
   created () {
-    this.loadData(this.options);
   },
   mounted () {
   },

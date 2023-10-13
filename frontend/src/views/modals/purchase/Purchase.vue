@@ -329,7 +329,7 @@
                   }"
                   :bb="function() {
                     return {
-                      order,
+                      model: order,
                       listing,
                     };
                   }"

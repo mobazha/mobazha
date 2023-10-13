@@ -99,7 +99,6 @@ export default {
         ...this.templateHelpers,
           ...this._state,
           listing: this.listing,
-          purchaseErrT,
       };
     },
     showOutdatedHashErr () {
@@ -121,7 +120,7 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      if (!options.listing || !(options.listing instanceof Listing)) {
+      if (!this.listing || !(this.listing instanceof Listing)) {
         throw new Error('Please provide a listing model.');
       }
       const opts = {

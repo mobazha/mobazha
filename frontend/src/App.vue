@@ -16,7 +16,6 @@
     <div id="chatConvoContainer" class="clrP clrBr3"></div>
     <div id="js-vueModal"></div>
 
-    <ShoppingCart v-if="initialized && showShoppingCart" @close="onShoppingCartClose" @openPurchaseModal="onOpenPurchaseModal"/>
     <Wallet
       v-if="initialized"
       v-show="showWallet"
@@ -27,7 +26,7 @@
       }"
       @close="onWalletClose" />
 
-    <!-- <KeepAlive v-if="initialized" :exclude="['EditListing', 'Settings', 'About', 'ShoppingCart']"> -->
+    <!-- <KeepAlive v-if="initialized" :exclude="['EditListing', 'Settings', 'About', 'ShoppingCart', 'Purchase']"> -->
       <component v-if="modalName" :is="modalName" :name="modalName" ref="modalInstance"
         :options="modalOptions"
         :bb="modalBBFunc"
@@ -35,7 +34,6 @@
       </component>
     <!-- </KeepAlive> -->
 
-    <Purchase v-if="showPurchase" @close="onPurchaseClose" />
     <LoadingModal v-if="initialized" v-show="showLoadingModal" />
   </div>
 </template>
@@ -69,9 +67,7 @@ export default {
       initialized: false,
       showLoadingModal: false,
 
-      showShoppingCart: false,
       showWallet: false,
-      showPurchase: false,
 
       toggleVue: false,
 
@@ -86,19 +82,10 @@ export default {
   },
   watch: {},
   methods: {
-    onShoppingCartClose() {
-      this.showShoppingCart = false;
-    },
     onWalletClose() {
       this.showWallet = false;
     },
-    onOpenPurchaseModal() {
-      this.showShoppingCart = false;
-      this.showPurchase = true;
-    },
-    onPurchaseClose() {
-      this.showPurchase = false;
-    },
+
     launchModal(modalName, options, bbFunc = undefined) {
       this.modalName = modalName;
       this.modalOptions = options;

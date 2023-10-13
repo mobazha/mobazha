@@ -562,7 +562,7 @@ export default {
     },
 
     onClickShoppingCartBtn () {
-      window.vueApp.showShoppingCart = true;
+      window.vueApp.launchModal('ShoppingCart');
     },
 
     onDocClick () {

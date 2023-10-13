@@ -419,7 +419,7 @@ export default class extends BaseVw {
   }
 
   onClickShoppingCartBtn() {
-    window.vueApp.showShoppingCart = true;
+    window.vueApp.launchModal('ShoppingCart');
   }
 
   onDocClick() {

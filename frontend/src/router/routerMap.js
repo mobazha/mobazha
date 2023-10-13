@@ -15,7 +15,7 @@ const constantRouterMap = [
       // will match everything and put it under `$route.params.pathMatch`
       {
         path: '/:pathMatch(.*)*',
-        name: 'NotFound',
+        name: 'PageNotFound',
         component: () => import('@/views/error-pages/PageNotFound.vue')
       },
       {

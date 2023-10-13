@@ -12,14 +12,14 @@
         <section class="contentBox clrP clrBr clrSh3">
           <div class="padMd">
             <header>
-              <template v-if="ob.userAvatarHashes || ob.userName">
+              <template v-if="ob.userAvatarHashes || userName">
                 <div>
                   <div class="titleRow flexVCent gutterHSm">
                     <template v-if="ob.userAvatarHashes">
                       <div class="discTn clrBr2 clrSh1 flexNoShrink" :style="ob.getAvatarBgImage(ob.userAvatarHashes)"></div>
                     </template>
-                    <template v-if="ob.userName">
-                      <h2 class="h4 txUnl lineHeight1 clrT">{{ ob.userName }}</h2>
+                    <template v-if="userName">
+                      <h2 class="h4 txUnl lineHeight1 clrT">{{ userName }}</h2>
                     </template>
                   </div>
                 </div>
@@ -28,13 +28,13 @@
             <div class="txCtr">
               <div class="flexVCent flexInline gutterH row">
                 <div class="discSm clrBr2 clrSh1 flexNoShrink" :style="ob.getAvatarBgImage(ob.ownAvatarHashes)"></div>
-                <i :class="`ion-android-arrow-forward clrT2 lineHeight1 tx3 ${!ob.isProcessing ? 'clrTErr' : ''}`"></i>
+                <i :class="`ion-android-arrow-forward clrT2 lineHeight1 tx3 ${!isProcessing ? 'clrTErr' : ''}`"></i>
                 <div
-                  :class="`discSm clrBr2 clrSh1 flexNoShrink  ${!ob.isProcessing ? 'disabled' : ''}`"
+                  :class="`discSm clrBr2 clrSh1 flexNoShrink  ${!isProcessing ? 'disabled' : ''}`"
                   :style="ob.getAvatarBgImage(ob.userAvatarHashes)"
                 ></div>
               </div>
-              <template v-if="ob.isProcessing">
+              <template v-if="isProcessing">
                 <h1 class="h3 clrT">{{ ob.polyT('userPage.loading.connecting') }}</h1>
               </template>
 
@@ -44,8 +44,8 @@
               <div class="rowHg contentWrap">
                 <div v-if="ob.contentHtml" v-html="ob.contentHtml"></div>
 
-                <template v-else-if="ob.contentText">
-                  <p class="clrT2 tx5" v-html="ob.contentText"></p>
+                <template v-else-if="contentText">
+                  <p class="clrT2 tx5" v-html="contentText"></p>
                 </template>
               </div>
               <p class="clrT2 tx6 rowSm">{{ ob.polyT('userPage.loading.socialHeading') }}</p>
@@ -71,7 +71,7 @@
           <div class="flexRow flexBtnWrapper">
             <a class="txCtr btnFlx flexExpand" @click="onClickCancel">{{ ob.polyT('userPage.loading.btnCancel') }}</a>
             <ProcessingButton
-              :className="`btnFlx flexExpand clrP js-btnRetry ${ob.isProcessing ? 'processing' : ''}`"
+              :className="`btnFlx flexExpand clrP js-btnRetry ${isProcessing ? 'processing' : ''}`"
               :btnText="ob.polyT('userPage.loading.btnTryAgain')"
               @click="onClickBtnRetry"
             />
@@ -87,24 +87,27 @@ import app from '../../../backbone/app';
 
 export default {
   props: {
-    options: {
-      type: Object,
-      default: {},
+    userName: {
+      type: String,
+      default: '',
+    },
+    contentText: {
+      type: String,
+      default: '',
+    },
+    isProcessing: {
+      type: Boolean,
+      default: false,
     },
   },
   data() {
     return {
       _state: {
-        userName: '',
-        contentText: '',
-        isProcessing: false,
         ownAvatarHashes: (app.profile && app.profile.get('avatarHashes').toJSON()) || undefined,
       }
     };
   },
   created() {
-    this.initEventChain();
-
     this.loadData(this.options);
   },
   mounted() {},
@@ -121,9 +124,6 @@ export default {
       const opts = {
         ...options,
         initialState: {
-          userName: '',
-          contentText: '',
-          isProcessing: false,
           ownAvatarHashes: (app.profile && app.profile.get('avatarHashes').toJSON()) || undefined,
           ...options.initialState,
         },

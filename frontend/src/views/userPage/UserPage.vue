@@ -1,6 +1,6 @@
 <template>
   <div :class="`userPage clrS ${isBlockedUser ? 'isBlocked' : ''}`">
-    <template v-if="!options.showBlockedModal">
+    <template v-if="!showPageNotFound && !showBlockedModal">
       <nav id="pageTabBar" class="barLg clrP clrBr">
         <div class="flexVCent pageTabs">
           <MiniProfile :options="{
@@ -85,20 +85,15 @@
         </div>
       </div>
     </template>
+    <PageNotFound v-else-if="showPageNotFound" />
 
     <Teleport to="#js-vueModal">
-      <BlockedWarning v-if="options.showBlockedModal" :options="options"
+      <BlockedWarning v-if="showBlockedModal" :options="{ peerID }"
        @canceled="onBlockWarningCanceled"
        @close="cleanUpBlockedModal"
       />
-      <Loading v-if="showUserLoading" ref="userLoadingModal" :options="{
-          initialState: {
-            contentText: loadingContextText,
-            isProcessing: isLoadingUser,
-          },
-        }"
-        @clickCancel="onClickLoadingCancel"
-        @clickRetry="onClickLoadingRetry"/>
+      <Loading v-else-if="showUserLoading" :contentText="loadingContextText" :isProcessing="isLoadingUser"
+        @clickCancel="onClickLoadingCancel" @clickRetry="onClickLoadingRetry"/>
     </Teleport>
     
   </div>
@@ -116,7 +111,6 @@ import { launchEditListingModal, launchSettingsModal } from '../../../backbone/u
 import { isBlocked, isUnblocking, events as blockEvents } from '../../../backbone/utils/block';
 import { isValidUserRoute }from '../../../backbone/utils/routeCheck'
 import { getCurrentConnection } from '../../../backbone/utils/serverConnect';
-import Profile from '../../../backbone/models/profile/Profile';
 import Listing from '../../../backbone/models/listing/Listing';
 import Listings from '../../../backbone/collections/Listings';
 import Followers from '../../../backbone/collections/Followers';
@@ -125,15 +119,15 @@ import Store from '../../../backbone/views/userPage/Store';
 import Follow from '../../../backbone/views/userPage/Follow';
 import Reputation from '../../../backbone/views/userPage/Reputation';
 
-import UserLoadingModal from '../../../backbone/views/userPage/Loading';
-
 import BlockedWarning from '../modals/BlockedWarning.vue'
 import Loading from './Loading.vue'
 import MiniProfile from '../MiniProfile.vue';
 // import Home from './Home.vue'
+import PageNotFound from '../error-pages/PageNotFound.vue'
 
 export default {
   components: {
+    PageNotFound,
     BlockedWarning,
     Loading,
     MiniProfile,
@@ -161,7 +155,8 @@ export default {
 
       profileFetch: undefined,
       listingFetch: undefined,
-      showUserLoading: true,
+      showUserLoading: false,
+      showPageNotFound: false,
       showBlockedModal: false,
 
       isBlockedUser: false,
@@ -182,11 +177,13 @@ export default {
     this.initEventChain();
 
     const options = this.preLoad();
-    if (options.showBlockedModal) {
+    this.baseInit(options);
+
+    if (options.showPageNotFound || options.showBlockedModal) {
       return;
     }
 
-    this.loadData(options);
+    this.loadData();
   },
   mounted() {
     this.render();
@@ -236,8 +233,7 @@ export default {
       const pageState = state || 'store';
 
       if (!isValidUserRoute(guid, pageState, slug)) {
-        app.router.pageNotFound();
-        return;
+        return { showPageNotFound: true };
       }
 
       if (isBlocked(guid) && !isUnblocking(guid)) {
@@ -276,9 +272,7 @@ export default {
         showBlockedModal: false,
       };
     },
-    loadData(options) {
-      this.baseInit(options);
-
+    loadData() {
       let { guid, state, slug } = this.$route.params;
 
       // Hack to pass the handle into this function, which should really only
@@ -311,7 +305,7 @@ export default {
           if (state) {
             // You've explicitly tried to navigate to the store tab. Since it's not
             // available, we'll re-route to page-not-found
-            app.router.pageNotFound();
+            this.showPageNotFound = true;
             return;
           }
 

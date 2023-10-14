@@ -4,13 +4,10 @@ import Listing from '../models/listing/Listing';
 import About from '../views/modals/about/About';
 import DebugLog from '../views/modals/DebugLog';
 import ModeratorDetails from '../views/modals/moderatorDetails';
-import Wallet from '../views/modals/wallet/Wallet';
 
 let aboutModal;
-let settingsModal;
 let debugLogModal;
 let moderatorDetailsModal;
-let _wallet;
 
 export function launchEditListingModal(modalOptions = {}) {
   const model = modalOptions.model;
@@ -69,25 +66,9 @@ export function launchModeratorDetailsModal(modalOptions = {}) {
 }
 
 export function launchWallet(modalOptions = {}) {
-  // if (_wallet) {
-  //   _wallet.open();
-  // } else {
-  //   _wallet = new Wallet({
-  //     removeOnRoute: false,
-  //     ...modalOptions,
-  //   })
-  //     .render()
-  //     .open();
-
-  //   app.router.on('will-route', () => _wallet.close());
-  // }
-  // return _wallet;
-
-  _wallet = app.router.loadVueModal('Wallet');
-
-  return _wallet;
-}
-
-export function getWallet() {
-  return _wallet;
+  return window.vueApp.launchModal('Wallet', modalOptions, function() {
+    return {
+      walletBalances: app.walletBalances,
+    };
+  });
 }

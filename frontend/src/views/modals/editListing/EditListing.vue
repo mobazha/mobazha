@@ -411,6 +411,10 @@ export default {
       notTrackingInventory: true,
 
       togglePhotoUploads: false,
+
+      currencies: [],
+      expandedReturnPolicy: false,
+      expandedTermsAndConditions: false,
     };
   },
   created() {
@@ -440,14 +444,14 @@ export default {
         countryList: this.countryList,
         currencies: this.currencies,
         contractTypes: metadata.contractTypesVerbose,
-        conditionTypes: this.model.get('item').conditionTypes.map((conditionType) => ({
+        conditionTypes: this._model.item.conditionTypes ? this._model.item.conditionTypes.map((conditionType) => ({
           code: conditionType,
           name: app.polyglot.t(`conditionTypes.${conditionType}`),
-        })),
+        })) : [],
         errors: this.model.validationError || {},
         photoUploadInprogress: !!this.inProgressPhotoUploads.length,
-        expandedReturnPolicy: this.expandedReturnPolicy || !!this.model.get('refundPolicy'),
-        expandedTermsAndConditions: this.expandedTermsAndConditions || !!this.model.get('termsAndConditions'),
+        expandedReturnPolicy: this.expandedReturnPolicy || !!this._model.refundPolicy,
+        expandedTermsAndConditions: this.expandedTermsAndConditions || !!this._model.termsAndConditions,
         maxCatsWarning: this.maxCatsWarning,
         maxTagsWarning: this.maxTagsWarning,
         max: {
@@ -591,6 +595,10 @@ export default {
       return coinDiv;
     },
 
+    maxCatsWarning() {
+      return `<div class="clrT2 tx5 row">${app.polyglot.t('editListing.maxCatsWarning')}</div>`;
+    },
+
     $formFields() {
       const isCrypto = $('#editContractType').val() === 'CRYPTOCURRENCY';
       const cryptoExcludes = isCrypto ? ', .js-inventoryManagementSection' : '';
@@ -685,8 +693,6 @@ export default {
       if (!this.model) {
         throw new Error('Please provide a model.');
       }
-
-      console.log('EditingListing, model: ', this.model);
 
       if (options.onClickViewListing !== undefined && typeof options.onClickViewListing !== 'function') {
         throw new Error('If providing an onClickViewListing option, it must be ' + 'provided as a function.');
@@ -1146,7 +1152,6 @@ export default {
 
       if (!_.isEqual(prevData, curData)) {
         const messageKey = `body${this.createMode ? 'Create' : 'Edit'}`;
-        this.bringToTop();
         this.closeConfirmDialog = this.createChild(Dialog, {
           removeOnClose: false,
           title: app.polyglot.t('editListing.confirmCloseDialog.title'),
@@ -1516,10 +1521,6 @@ export default {
 
     hideMaxTagsWarning() {
       this.$maxTagsWarning.empty();
-    },
-
-    get maxCatsWarning() {
-      return `<div class="clrT2 tx5 row">${app.polyglot.t('editListing.maxCatsWarning')}</div>`;
     },
 
     showMaxCatsWarning() {

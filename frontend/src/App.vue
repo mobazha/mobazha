@@ -16,16 +16,6 @@
     <div id="chatConvoContainer" class="clrP clrBr3"></div>
     <div id="js-vueModal"></div>
 
-    <Wallet
-      v-if="initialized"
-      v-show="showWallet"
-      :bb="function() {
-        return {
-          walletBalances: app.walletBalances,
-        };
-      }"
-      @close="onWalletClose" />
-
     <Purchase v-if="showPurchase" @close="onPurchaseClose" />
 
     <!-- <KeepAlive v-if="initialized" :exclude="['EditListing', 'Settings', 'About', 'ShoppingCart', 'Purchase']"> -->
@@ -69,7 +59,6 @@ export default {
       initialized: false,
       showLoadingModal: false,
 
-      showWallet: false,
       showPurchase: false,
 
       toggleVue: false,
@@ -85,9 +74,6 @@ export default {
   },
   watch: {},
   methods: {
-    onWalletClose() {
-      this.showWallet = false;
-    },
     onPurchaseClose() {
       this.showPurchase = false;
     },
@@ -97,7 +83,7 @@ export default {
     },
 
     launchModal(modalName, options, bbFunc = undefined) {
-      if (modalName == 'ShoppingCart') {
+      if (modalName === 'ShoppingCart') {
         this.showPurchase = false;
       }
 

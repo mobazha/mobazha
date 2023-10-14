@@ -20,7 +20,13 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        className: 'cryptoTradingPairLg',
+        arrowIconClass: '',
+        truncateCurAfter: 8,
+        fromCur: '',
+        toCur: '',
+      },
     },
   },
   data () {
@@ -28,7 +34,6 @@ export default {
     };
   },
   created () {
-    this.loadData(this.options);
   },
   mounted () {
   },
@@ -36,14 +41,11 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this._state,
+        ...this.options,
       };
     },
   },
   methods: {
-    loadData(options = {}) {
-      this.baseInit(options);
-    }
   }
 }
 </script>

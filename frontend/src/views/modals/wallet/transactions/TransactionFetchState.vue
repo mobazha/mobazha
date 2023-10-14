@@ -21,21 +21,23 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
-    },
-  },
-  data() {
-    return {
-      _state: {
+      default: {
         isFetching: false,
         fetchFailed: false,
         fetchErrorMessage: '',
         transactionsPresent: false,
-      }
+      },
+    },
+  },
+  data() {
+    return {
+      isFetching: false,
+      fetchFailed: false,
+      fetchErrorMessage: '',
+      transactionsPresent: false,
     };
   },
   created() {
-    this.loadData(this.options);
   },
   watch: {
   },
@@ -44,15 +46,11 @@ export default {
     ob() {
       return {
         ...this.templateHelpers,
-        ...this._state,
+        ...this.options,
       };
     },
   },
   methods: {
-    loadData(options = {}) {
-      this.baseInit(options);
-    },
-
     onClickRetryFetch() {
       this.$emit('clickRetryFetch');
     },

@@ -28,12 +28,10 @@
     </div>
     <TransactionFetchState
       :options="{
-        initialState: {
-          isFetching,
-          fetchFailed,
-          fetchErrorMessage,
-          transactionsPresent: !!options.collection.length,
-        },
+        isFetching,
+        fetchFailed,
+        fetchErrorMessage,
+        transactionsPresent: !!options.collection.length,
       }"
       @clickRetryFetch="clickRetryFetch"
     />
@@ -47,7 +45,6 @@
 </template>
 
 <script>
-/* eslint-disable class-methods-use-this */
 import _ from 'underscore';
 import app from '../../../../../backbone/app';
 import { isScrolledIntoView } from '../../../../../backbone/utils/dom';

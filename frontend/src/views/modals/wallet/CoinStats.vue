@@ -53,28 +53,26 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
-    },
-  },
-  data() {
-    return {
-      _state: {
+      default: {
         cryptoCur: '',
         displayCur: (app && app.settings && app.settings.get('localCurrency')) || 'USD',
         confirmed: undefined,
         unconfirmed: undefined,
         transactionCount: undefined,
-      }
+      },
+    },
+  },
+  data() {
+    return {
     }
   },
   created() {
-    this.loadData(this.options);
   },
   computed: {
     ob() {
       return {
         ...this.templateHelpers,
-        ...this._state,
+        ...this.options,
       };
     },
     isValidCryptoCur() {
@@ -128,20 +126,6 @@ export default {
     },
   },
   methods: {
-    loadData(options = {}) {
-      const opts = {
-        initialState: {
-          cryptoCur: '',
-          displayCur: (app && app.settings && app.settings.get('localCurrency')) || 'USD',
-          confirmed: undefined,
-          unconfirmed: undefined,
-          transactionCount: undefined,
-          ...options.initialState,
-        },
-      };
-
-      this.baseInit(opts);
-    },
   },
 };
 </script>

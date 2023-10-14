@@ -6,7 +6,7 @@ import {
   isSupportedWalletCur,
   getCurrencyByCode,
 } from '../../../data/walletCurrencies';
-import { getWallet, launchWallet } from '../../../utils/modalManager';
+import { launchWallet } from '../../../utils/modalManager';
 import loadTemplate from '../../../utils/loadTemplate';
 import baseVw from '../../baseVw';
 
@@ -78,14 +78,10 @@ export default class extends baseVw {
   }
 
   openInWalletClick() {
-    let wallet = getWallet();
-
-    if (!wallet) {
-      wallet = launchWallet({
-        initialActiveCoin: this.getState().showCoin,
-        initialSendModeOn: true,
-      });
-    }
+    let wallet = launchWallet({
+      initialActiveCoin: this.getState().showCoin,
+      initialSendModeOn: true,
+    });
 
     const sendView = wallet.getSendMoneyVw();
 

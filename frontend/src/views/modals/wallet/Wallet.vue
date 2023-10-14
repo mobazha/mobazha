@@ -23,7 +23,7 @@
                     <CoinNavItem
                       v-for="(coin, key) in navCoins"
                       :key="key"
-                      :options="{ initialState: { ...coin, active: coin.code === activeCoin } }"
+                      :options="{ ...coin, active: coin.code === activeCoin }"
                       @click="coinSelected(coin)"
                     />
                   </ul>
@@ -41,7 +41,7 @@
               <div class="flexColWide gutterV">
                 <template v-if="activeCoin">
                   <div class="js-coinStatsContainer">
-                    <CoinStats :options="{ initialState: coinStatsState }" />
+                    <CoinStats :options="coinStatsState" />
                   </div>
                   <div>
                     <div class="flexColWide clrP clrSh3">
@@ -188,7 +188,7 @@ export default {
       const { activeCoin } = this;
       const balance = this._walletBalances.find((item) => item.code === activeCoin);
       return {
-        cryptoCur: ensureMainnetCode(activeCoin),
+        cryptoCur: activeCoin && ensureMainnetCode(activeCoin),
         confirmed: balance && balance.confirmed,
         unconfirmed: balance && balance.unconfirmed,
         transactionCount: this.transactionsCount,

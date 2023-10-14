@@ -1,6 +1,6 @@
 <template>
   <div :class="modelContentClass" @keydown.esc="clickEsc">
-    <span :class="`${closeButtonClass} jsModalClose`" @click="clickClose" v-show="showCloseButton" :data-tip="closeButtonTip || ''">
+    <span :class="`${closeButtonClass} jsModalClose`" @click="close" v-show="showCloseButton" :data-tip="closeButtonTip || ''">
       <i :class="innerButtonClass"></i>
     </span>
     <slot name="component"></slot>
@@ -39,21 +39,17 @@ export default {
   watch: {
     $route (to, from) {
       if (this.removeOnRoute) {
-        app.router.closeVueModal();
+        close();
       }
     }
   },
   methods: {
-    clickClose() {
-      if (this.removeOnClose) {
-        app.router.closeVueModal();
-      }
-
+    close() {
       this.$emit('close');
     },
     clickEsc() {
       if (this.dismissOnEscPress) {
-        this.clickClose();
+        this.close();
       }
     },
   }

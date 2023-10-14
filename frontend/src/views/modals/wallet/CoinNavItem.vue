@@ -29,12 +29,6 @@ export default {
     options: {
       type: Object,
       default: {
-      },
-    },
-  },
-  data() {
-    return {
-      _state: {
         active: false,
         code: '',
         name: '',
@@ -42,18 +36,21 @@ export default {
         clientSupported: false,
 
         displayCur: (app && app.settings && app.settings.get('localCurrency')) || 'USD',
-      }
+      },
+    },
+  },
+  data() {
+    return {
     };
   },
   created() {
-    this.loadData(this.options);
   },
   mounted() {},
   computed: {
     ob() {
       return {
         ...this.templateHelpers,
-        ...this._state,
+        ...this.options,
         NoExchangeRateDataError,
       };
     },
@@ -84,29 +81,10 @@ export default {
       return formattedBalance;
     },
     mnCode() {
-      return this.ob.crypto.ensureMainnetCode(this.ob.code);
+      return this.ob.code && this.ob.crypto.ensureMainnetCode(this.ob.code);
     },
   },
   methods: {
-    loadData(options = {}) {
-      const opts = {
-        initialState: {
-          active: false,
-          displayCur: (app && app.settings && app.settings.get('localCurrency')) || 'USD',
-          ...options.initialState,
-        },
-      };
-
-      if (!opts.initialState || typeof opts.initialState.code !== 'string' || !opts.initialState.code) {
-        throw new Error('Please provide a code as a non-empty string in the initial state');
-      }
-
-      if (!opts.initialState || typeof opts.initialState.name !== 'string' || !opts.initialState.name) {
-        throw new Error('Please provide a name as a non-empty string in the initial state');
-      }
-
-      this.baseInit(opts);
-    },
   },
 };
 </script>

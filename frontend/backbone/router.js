@@ -286,22 +286,6 @@ export default class ObRouter extends Router {
     app.loadingModal.close();
   }
 
-  loadVueModal(name, options) {
-    if (name == 'Wallet') {
-      window.vueApp.showWallet = true;
-    }
-
-    // this.vueModalInstance = mountVueModal("#js-vueModal", name, options)
-
-    // return this.vueModalInstance;
-  }
-
-  closeVueModal() {
-    if (this.vueModalInstance) {
-      this.vueModalInstance.unmount();
-    }
-  }
-
   /**
    * If you need to navigate to a user page via a handle and you have the user's guid, use
    * this method which is mostly a wrapper around the standard Router.navigate. The addition

@@ -26,11 +26,13 @@
       }"
       @close="onWalletClose" />
 
+    <Purchase v-if="showPurchase" @close="onPurchaseClose" />
+
     <!-- <KeepAlive v-if="initialized" :exclude="['EditListing', 'Settings', 'About', 'ShoppingCart', 'Purchase']"> -->
       <component v-if="modalName" :is="modalName" :name="modalName" ref="modalInstance"
         :options="modalOptions"
         :bb="modalBBFunc"
-        @close="onModalClose">
+        @close="closeModal">
       </component>
     <!-- </KeepAlive> -->
 
@@ -68,6 +70,7 @@ export default {
       showLoadingModal: false,
 
       showWallet: false,
+      showPurchase: false,
 
       toggleVue: false,
 
@@ -85,16 +88,26 @@ export default {
     onWalletClose() {
       this.showWallet = false;
     },
+    onPurchaseClose() {
+      this.showPurchase = false;
+    },
+    launchPurchaseModal() {
+      this.closeModal();
+      this.showPurchase = true;
+    },
 
     launchModal(modalName, options, bbFunc = undefined) {
+      if (modalName == 'ShoppingCart') {
+        this.showPurchase = false;
+      }
+
       this.modalName = modalName;
       this.modalOptions = options;
       this.modalBBFunc = bbFunc;
 
       return this.$refs.modalInstance;
     },
-    onModalClose() {
-      console.log('onModalClose: ', this.modalName);
+    closeModal() {
       this.modalName = '';
     }
   },

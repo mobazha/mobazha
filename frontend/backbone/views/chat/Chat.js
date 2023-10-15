@@ -16,7 +16,7 @@ import baseVw from '../baseVw';
 import ChatHeads from './ChatHeads';
 import Conversation from './Conversation';
 
-import { mountChat } from '../../../src/mount.js'
+// import { mountChat } from '../../../src/mount.js'
 
 export default class extends baseVw {
   constructor(options = {}) {
@@ -299,9 +299,9 @@ export default class extends baseVw {
         });
       });
 
-    mountChat('#chatConvoContainer', guid);
-    // this.$chatConvoContainer
-    //   .append(this.conversation.render().el);
+    // mountChat('#chatConvoContainer', guid);
+    this.$chatConvoContainer
+      .append(this.conversation.render().el);
 
     this.conversation.open();
 
@@ -488,7 +488,7 @@ export default class extends baseVw {
 
   get $chatConvoContainer() {
     return this._$chatConvoContainer ||
-      (this._$chatConvoContainer = $('#chatConvoContainer0'));
+      (this._$chatConvoContainer = $('#chatConvoContainer'));
   }
 
   remove() {

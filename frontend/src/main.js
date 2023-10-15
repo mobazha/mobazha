@@ -5,7 +5,7 @@ import ElementPlus from 'element-plus';
 import * as ElementPlusIconsVue from '@element-plus/icons-vue';
 import 'element-plus/dist/index.css';
 import './assets/scss/main.scss';
-import { TUIComponents, TUICore } from './TUIKit';
+// import { TUIComponents, TUICore } from './TUIKit';
 
 import VueBackbone from './plugins/vue-backbone/vue-backbone';
 
@@ -20,12 +20,13 @@ import * as templateHelpers from '../backbone/utils/templateHelpers';
 
 import cart from './store/cart.module';
 import VueScrollTo from 'vue-scrollto';
-// init TUIKit
-const TUIKit = TUICore.init({});
-// TUIKit add TUIComponents
-TUIKit.use(TUIComponents);
 
-window.TUIKit = TUIKit;
+// // init TUIKit
+// const TUIKit = TUICore.init({});
+// // TUIKit add TUIComponents
+// TUIKit.use(TUIComponents);
+
+// window.TUIKit = TUIKit;
 
 window.app = app;
 

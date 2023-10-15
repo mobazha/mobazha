@@ -94,7 +94,7 @@ window.addEventListener('contextmenu', (e) => {
 }, false);
 
 
-MyChatSDK.emit(window.TUIKit.TIM.EVENT.SDK_READY, {});
+// MyChatSDK.emit(window.TUIKit.TIM.EVENT.SDK_READY, {});
 
 app.pageNav = window.vueApp.$refs.pageNav;
 

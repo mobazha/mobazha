@@ -196,14 +196,23 @@ export default {
 
       toggleUpdate: false,
 
-      _unreadNotifCount: 0,
-      _cartItemsCount: 0,
+      unreadNotifCount: 0,
+      cartItemsCount: 0,
     };
   },
   created () {
     this.initEventChain();
 
     this.loadData(this.options);
+  },
+  watch: {
+    unreadNotifCount() {
+      this.renderUnreadNotifCount();
+      setUnreadNotifCount(this.unreadNotifCount);
+    },
+    cartItemsCount() {
+      this.renderCartItemsCount();
+    }
   },
   mounted () {
     this.render();
@@ -334,35 +343,6 @@ export default {
       setTimeout(() => {
         Backbone.history.loadUrl();
       }, 200);
-    },
-
-    get unreadNotifCount () {
-      return this._unreadNotifCount;
-    },
-
-    set unreadNotifCount (count) {
-      if (typeof count !== 'number') {
-        throw new Error('Please provide a count as a number.');
-      }
-
-      if (count === this._unreadNotifCount) return;
-      this._unreadNotifCount = count;
-      this.renderUnreadNotifCount();
-      setUnreadNotifCount(this.unreadNotifCount);
-    },
-
-    get cartItemsCount () {
-      return this._cartItemsCount;
-    },
-
-    set cartItemsCount (count) {
-      if (typeof count !== 'number') {
-        throw new Error('Please provide a count as a number.');
-      }
-
-      if (count === this._cartItemsCount) return;
-      this._cartItemsCount = count;
-      this.renderCartItemsCount();
     },
 
     fetchUnreadNotifCount () {

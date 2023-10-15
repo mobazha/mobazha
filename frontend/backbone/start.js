@@ -558,7 +558,7 @@ function start() {
           if (externalRoute) {
             // handle opening the app from an an external ob link
             location.hash = `#${externalRoute}`;
-          } else if (!location.hash) {
+          } else if (location.pathname === '/' || !location.hash) {
             // If for some reason the route to start on is empty, we'll change it to be
             // the user's profile.
             const href = location.href.replace(/(javascript:|#).*$/, '');

@@ -9,8 +9,8 @@ import app from '../../backbone/app';
 const constantRouterMap = [
   {
     path: '/',
-    name: 'Example',
-    redirect: { name: 'ExampleHelloIndex' },
+    name: 'Home',
+    // redirect: { name: 'ExampleHelloIndex' },
     children: [
       // will match everything and put it under `$route.params.pathMatch`
       {

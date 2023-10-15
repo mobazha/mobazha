@@ -4,11 +4,7 @@
       <nav id="pageTabBar" class="barLg clrP clrBr">
         <div class="flexVCent pageTabs">
           <MiniProfile :options="{
-            fetchFollowsYou: false,
             overwriteClickRating: true,
-            initialState: {
-              followsYou,
-            },
           }"
           :bb="function() {
             return {

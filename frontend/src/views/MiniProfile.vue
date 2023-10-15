@@ -43,12 +43,16 @@ export default {
     return {
       isBlockedUser: false,
       overwriteClickRating: false,
+
+      _state: {
+        followsYou: false,
+      }
     };
   },
   created () {
     this.initEventChain();
 
-    this.loadData(this.options);
+    this.loadData();
   },
   mounted () {
     this.render();
@@ -65,33 +69,18 @@ export default {
   watch: {
   },
   methods: {
-    loadData (options = {}) {
-      const opts = {
-        fetchFollowsYou: true,
-        ...options,
-      };
-      this.baseInit(opts);
-
+    loadData () {
       if (!this.model) {
         throw new Error('Please provide a profile model.');
       }
-
-      this._state = {
-        followsYou: false,
-        ...options.initialState || {},
-      };
-
-      this._followsYou = false;
 
       if (this.model.id === app.profile.id) {
         this.listenTo(app.profile, 'change:name change:location', () => this.render());
         this.listenTo(app.profile.get('avatarHashes'), 'change', () => this.render());
       } else {
-        if (opts.fetchFollowsYou) {
-          followsYou(this.model.id).done((data) => {
-            this.setState({ followsYou: data.followsMe });
-          });
-        }
+        followsYou(this.model.id).done((data) => {
+          this.setState({ followsYou: data.followsMe });
+        });
 
         this.listenTo(app.ownFollowers, 'add', (md) => {
           if (md.id === app.profile.id) {

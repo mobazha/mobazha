@@ -1,23 +1,25 @@
 <template>
-  <div :class="`${ob.type} tx5`">
+  <div :class="className">
     <h2 class="tabHeading txUnb">{{ ob.polyT(`transactions.${ob.type}.heading`) }}</h2>
     <div class="searchWrapper rowMd">
       <input
         type="text"
         class="ctrl clrP clrBr clrSh2"
-        @keyup="onKeyUpSearch(ob.filter.search)"
+        @keyup="onKeyUpSearch(filter.search)"
         :placeholder="ob.polyT(`transactions.placeholderSearch${ob.capitalize(ob.type)}`)"
+        v-model="filter.search"
       />
     </div>
 
     <Filters
+      :className="className"
       :filters="setCheckedFilters(filterConfig, filter.states)"
       @changeFilter="onChangeFilter"/>
 
     <div class="flexVCent row gutterH">
       <div class="flexNoShrink gutterHSm js-queryTotalWrapper" v-show="collection.length">
         <span class="flexNoShrink js-queryTotalLine" v-html="queryTotalLine"></span>
-        <a v-show="currentFilterIsDefault" @click="onClickResetQuery">{{ ob.polyT(`transactions.resetFilters`) }}</a>
+        <a v-show="!currentFilterIsDefault" @click="onClickResetQuery">{{ ob.polyT(`transactions.resetFilters`) }}</a>
       </div>
       <div class="tx6 flexVCent">
         <label class="clrT2 marginLAuto margRSm">{{ ob.polyT('transactions.sort.label') }}</label>
@@ -30,7 +32,7 @@
       </div>
     </div>
 
-    <TransactionsTable ref="table" :options="tableOptions"
+    <TransactionsTable ref="table" :key="filterKey" :options="tableOptions"
       :bb="function() {
         return {
           collection,
@@ -62,13 +64,17 @@ export default {
   },
   data() {
     return {
+      filterKey: 0,
+
       defaultFilter: {
         search: '',
         sortBy: 'UNREAD',
         states: [],
       },
 
-      filter: {},
+      filter: {
+        search: '',
+      },
       showTotalWrapper: false,
     };
   },
@@ -92,9 +98,14 @@ export default {
         ...this.templateHelpers,
           type: this.type,
           filter: this.filter,
-          currentFilterIsDefault: this.currentFilterIsDefault(),
           capitalize,
       };
+    },
+    className () {
+      return `${this.type} tx5`;
+    },
+    currentFilterIsDefault() {
+      return _.isEqual(this.defaultFilter, _.omit(this.filter, 'orderID'));
     },
     tableOptions() {
       return {
@@ -104,13 +115,18 @@ export default {
       };
     },
     queryTotalLine() {
-      console.log('this.collection: ', this.collection)
       const count = app.polyglot.t(`transactions.${this.type}.countTransactions`, { smart_count: this.collection.length });
       const countInfo = `<span class="txB">${count}</span>`;
       return app.polyglot.t(`transactions.${this.type}.countTransactionsFound`, { smart_count: countInfo });
     }
   },
   watch: {
+    filter: {
+      handler() {
+        this.filterKey += 1;
+      },
+      deep: true,
+    }
   },
   methods: {
     loadData(options = {}) {
@@ -146,12 +162,6 @@ export default {
       this.filter = { ...opts.initialFilter };
     },
 
-    events() {
-      return {
-        'change .filter input': 'onChangeFilter',
-      };
-    },
-
     onClickRow(orderID, type) {
       this.$emit('clickRow', orderID, type);
     },
@@ -163,6 +173,7 @@ export default {
             this.filter.states.push(targetState);
           }
         });
+        this.filter.states.sort((a, b) => a - b);
       } else {
         this.filter.states = this.filter.states.filter((item) => { return filter.targetState.indexOf(item) == -1; });
       }
@@ -213,10 +224,6 @@ export default {
       });
 
       return checkedConfig;
-    },
-
-    currentFilterIsDefault() {
-      return _.isEqual(this.defaultFilter, _.omit(this.filter, 'orderID'));
     },
   },
 };

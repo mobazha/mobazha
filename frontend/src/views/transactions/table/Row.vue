@@ -18,7 +18,7 @@
       <template v-else>
         <div class="flexVCent gutterHSm">
           <a :href="`#${ob.vendorID}/store/${ob.slug}`" class="clrT flexNoShrink js-cryptoTradingPairWrap">
-            <CryptoTradingPair v-if="ob.coinType" :options="cryptoTradingPairOptions" />
+            <CryptoTradingPair :key="key" v-if="ob.coinType" :options="cryptoTradingPairOptions" />
           </a>
         </div>
       </template>
@@ -104,6 +104,8 @@ export default {
   },
   data () {
     return {
+      key: 0,
+
       _state: {
         acceptOrderInProgress: false,
         rejectOrderInProgress: false,
@@ -112,6 +114,8 @@ export default {
     };
   },
   created () {
+    this.initEventChain();
+
     this.loadData(this.options);
   },
   mounted () {
@@ -206,6 +210,17 @@ export default {
       }
 
       this.type = opts.type;
+
+      this.listenTo(this.model, 'change', md => {
+        if (md.hasChanged('read') &&
+          Object.keys(md.changedAttributes).length === 1) {
+          // if the only thing that has changed is the read flag,
+          // we'll do nothing since that has it's own handler
+          return;
+        }
+
+        this.key += 1;
+      });
     },
 
     events () {

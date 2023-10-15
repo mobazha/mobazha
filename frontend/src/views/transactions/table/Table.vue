@@ -37,8 +37,8 @@
           </tr>
 
           <Row
-            v-for="(transaction, key) in transToRender"
-            :key="key"
+            v-for="transaction in transToRender"
+            :key="transaction.id"
             ref="views"
             :options="{
               type: this.type,
@@ -61,7 +61,11 @@
         </table>
         <div class="js-pageControlsContainer"></div>
         <PageControls
-          :options="pageControlsOptions"
+          :options="{
+            start: pageStartIndex + 1,
+            end: pageEnd,
+            total: queryTotal
+          }"
           @clickNext="onClickNextPage"
           @clickPrev="onClickPrevPage"
         />
@@ -105,13 +109,18 @@ export default {
   },
   data() {
     return {
+      type: 'sales',
+      curPage: 1,
+      queryTotal: 0,
+
+      transactionsPerPage: 20,
+
+      filterParams: {},
+
       _state: {
         isFetching: false,
         fetchError: '',
       },
-      transactionsPerPage: 20,
-
-      filterParams: {},
     };
   },
   created() {
@@ -120,7 +129,6 @@ export default {
     this.loadData(this.options);
   },
   mounted() {
-    this.onAttach();
   },
   unmounted() {
     if (this.avatarPost) this.avatarPost.abort();
@@ -147,13 +155,6 @@ export default {
       }
       return end;
     },
-    pageControlsOptions() {
-      return { initialState: {
-        start: this.pageStartIndex + 1,
-        end: this.pageEnd,
-        total: this.queryTotal,
-      }};
-    },
     transToRender() {
       if (!this.collection || this.collection.length == 0) {
         return [];
@@ -167,8 +168,10 @@ export default {
   watch: {
     filterParams(newVal, oldVal) {
       if (!_.isEqual(newVal, oldVal)) {
+        this.setFilterOnRoute();
+
         this.collection.reset();
-        this.fetchTransactions(1, newVal);
+        this.fetchTransactions(1);
       }
     },
 
@@ -362,10 +365,6 @@ export default {
       this.fetchTransactions((this.curPage -= 1));
     },
 
-    onAttach() {
-      this.setFilterOnRoute();
-    },
-
     getAvatars(models = []) {
       const profilesToFetch = [];
 
@@ -413,6 +412,9 @@ export default {
         byBuyer: {},
         byOrder: {},
       };
+      if (!this.$refs.views) {
+        return;
+      }
 
       this.$refs.views.forEach((view) => {
         const vendorID = view.model.get('vendorID');
@@ -454,7 +456,9 @@ export default {
       app.router.navigate(`${baseRoute}?${$.param(queryFilter)}`, { replace: true });
     },
 
-    fetchTransactions(page = this.curPage, filterParams = this.filterParams) {
+    fetchTransactions(page = this.curPage) {
+      const filterParams = this.filterParams;
+
       if (typeof page !== 'number') {
         throw new Error('Please provide a page number to fetch.');
       }
@@ -464,8 +468,6 @@ export default {
       }
 
       this.curPage = page;
-      this.filterParams = filterParams;
-      this.setFilterOnRoute();
 
       if (this.transactionsFetch) this.transactionsFetch.abort();
 

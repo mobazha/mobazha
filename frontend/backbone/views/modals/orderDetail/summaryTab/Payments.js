@@ -162,7 +162,7 @@ export default class extends baseVw {
     this.payments.forEach((payment) => (payment.remove()));
     this.payments = [];
 
-    let paymentCoinData;
+    let paymentCoinData = {};
     try {
       paymentCoinData = getWalletCurByCode(this.options.paymentCoin);
     } catch (e) {

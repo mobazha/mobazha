@@ -16,7 +16,7 @@
         </div>
 
         <!-- // If necessary, add in spacers. -->
-        <template v-for="k in (maxPerRowFinal - row.length)" :key="k">
+        <template v-for="k in (maxPerRow - row.length)" :key="k">
           <div class="col3"></div>
         </template>
       </div>
@@ -57,6 +57,14 @@ export default {
       type: Object,
       default: {},
 	  },
+    className: {
+      type: String,
+      default: {},
+	  },
+    maxPerRow: {
+      type: Number,
+      default: 4,
+    }
   },
   data () {
     return {
@@ -66,11 +74,8 @@ export default {
   created () {
   },
   computed: {
-    maxPerRowFinal () {
-      return this.maxPerRow || 4;
-    },
     rows () {
-      return this.ob.splitIntoRows(this.filters, this.maxPerRowFinal);
+      return this.ob.splitIntoRows(this.filters, this.maxPerRow);
     },
   },
   methods: {

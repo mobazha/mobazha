@@ -57,16 +57,17 @@
                     <div class="js-transactionsContainer">
                       <TransactionsVw
                         ref="transactionsVw"
-                        v-if="showTransactionsVw && activeCoin"
+                        v-if="activeCoin"
                         :options="transactionViewOptions"
                         @transactionsUpdate="onTransactionsUpdate"
                         @bumpFeeAttempt="onBumpFeeAttempt"
                         @bumpFeeSuccess="onBumpFeeSuccess"
                         @postInit="onTransactionsVwPostInit"
+                        :key="transactionsVwKey"
                       />
                     </div>
                     <div class="js-reloadTransactionsContainer reloadTransactions">
-                      <ReloadTransactions :options="{ initialState: { coinType: activeCoin } }" />
+                      <ReloadTransactions :options="{ initialState: { coinType: activeCoin } }" :key="transactionsVwKey" />
                     </div>
                   </div>
                 </template>
@@ -127,6 +128,8 @@ export default {
   },
   data() {
     return {
+      transactionsVwKey: 0,
+
       activeCoin: '',
       viewCryptoListingsUrl: '',
       sendModeOn: true,
@@ -136,8 +139,6 @@ export default {
       fetchingAddress: true,
       receiveAddress: '',
       transactionsState: {},
-
-      showTransactionsVw: true,
     };
   },
   created() {
@@ -171,7 +172,7 @@ export default {
         this.sendModeOn = false;
       }
 
-      this.reRenderTransactionsVw();
+      this.transactionsVwKey += 1;
     },
   },
   computed: {
@@ -446,15 +447,6 @@ export default {
       const newTxs = this.$refs.transactionsVw ? this.$refs.transactionsVw.newTransactionsTXs : {};
 
       this.transactionsCount = (cl ? cl.length : 0) + (newTxs ? newTxs?.size ?? 0 : 0);
-    },
-
-    reRenderTransactionsVw() {
-      this.showTransactionsVw = false;
-      this.transactionsCount = 0;
-
-      this.$nextTick(() => {
-        this.showTransactionsVw = true;
-      });
     },
 
     updateTransactionsCount(coinType = this.activeCoin) {

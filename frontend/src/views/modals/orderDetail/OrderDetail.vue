@@ -76,7 +76,7 @@
               </template>
 
               <template v-else>
-                <section class="tabContent js-tabContent">
+                <section class="tabContent">
                   <Summary
                     v-if="activeTab === 'summary'"
                     :options="tabViewData"

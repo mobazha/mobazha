@@ -21,9 +21,9 @@
 
     <section class="flexRow header">
       <div class="pageContent">
-        <div class="tabContent js-tabContent">
+        <div class="tabContent">
           <!-- insert the tab subview here -->
-          <Tab v-if="showTab"
+          <Tab :key="tabKey"
             :options="tabOptions.options"
             :bb="function() {
               return {
@@ -80,7 +80,7 @@ export default {
   data() {
     return {
       _tab: 'purchases',
-      showTab: true,
+      tabKey: 0,
 
       tabCount: {
         sales: 0,
@@ -236,13 +236,6 @@ export default {
       const { orderID } = params;
       const { caseID } = params;
 
-      if (orderID || caseID) {
-        // cut off the trailing 's' from the tab
-        const type = this._tab.slice(0, this._tab.length - 1);
-
-        this.openOrder(orderID || caseID, type);
-      }
-
       this.purchasesCol = new Transactions([], { type: 'purchases' });
       this.syncTabHeadCount(this.purchasesCol, (count) => (this.tabCount.purchases = count));
       // fetch so we get the count for the tabhead
@@ -259,6 +252,13 @@ export default {
       this.casesCol.fetch();
 
       this.socket = getSocket();
+
+      if (orderID || caseID) {
+        // cut off the trailing 's' from the tab
+        const type = this._tab.slice(0, this._tab.length - 1);
+
+        this.openOrder(orderID || caseID, type);
+      }
     },
 
     onTabClick(tab) {
@@ -438,10 +438,7 @@ export default {
       };
 
       if (this._tab !== targ) {
-        this.showTab = false;
-        this.$nextTick(() => {
-          this.showTab = true;
-        });
+        this.tabKey += 1;
 
         if (opts.addTabToHistory) {
           // add tab to history

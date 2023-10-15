@@ -58,8 +58,10 @@
                 </div>
               </div>
               <div class="rowDivV clrBrBk"></div>
-              <div :class="`box mDetail verifiedWrapper ${ob.verifiedMod ? 'clrBrAlert2 clrBAlert2Grad' : 'clrBrInvis'} js-verifiedMod`">
-                <VerifiedMod :options="getModeratorOptions({
+              <div :class="`box mDetail verifiedWrapper ${verifiedModModel ? 'clrBrAlert2 clrBAlert2Grad' : 'clrBrInvis'} js-verifiedMod`">
+                <VerifiedMod
+                  :key="verfiedModsKey"
+                  :options="getModeratorOptions({
                     model: verifiedModModel,
                     shortText: false,
                   })"
@@ -140,7 +142,7 @@ export default {
       purchase: false,
       cardState: {},
 
-      _verfiedModsMonitor: 0,
+      verfiedModsKey: 0,
     };
   },
   created () {
@@ -167,13 +169,12 @@ export default {
         purchase: this.purchase,
         cardState: this.cardState,
         modLanguages,
-        verifiedMod: this.verifiedModModel,
         ...this._model,
       };
     },
 
     verifiedModModel() {
-      let verfiedModsMonitor = this._verfiedModsMonitor; // for refresh
+      let access = this.verfiedModsKey;
       return app.verifiedMods.get(this._model.peerID);
     }
   },
@@ -186,7 +187,7 @@ export default {
       }
 
       this.listenTo(app.verifiedMods, 'update', () => {
-        this._verfiedModsMonitor += 1;
+        this.verfiedModsKey += 1;
       });
     },
 

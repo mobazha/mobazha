@@ -33,22 +33,18 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        start: 1,
+        end: 0,
+        total: 0,
+      },
     },
   },
   data () {
     return {
-      _state: {
-        start: 0,
-        end: 0,
-        total: 0,
-      }
     };
   },
   created () {
-    this.initEventChain();
-
-    this.loadData(this.options);
   },
   mounted () {
   },
@@ -56,7 +52,7 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this._state,
+        ...this.options,
       };
     },
     countsAvailable () {
@@ -95,18 +91,6 @@ export default {
     }
   },
   methods: {
-    loadData (options = {}) {
-      const opts = {
-        ...options,
-        initialState: {
-          start: 1,
-          ...options.initialState,
-        },
-      };
-
-      this.baseInit(opts);
-    },
-
     onClickNext () {
       this.$emit('clickNext');
     },

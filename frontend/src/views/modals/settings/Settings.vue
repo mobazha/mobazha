@@ -13,7 +13,7 @@
             </div>
           </div>
           <div class="flexExpand posR">
-            <div class="js-tabContent tabContent">
+            <div class="js-settings-tabContent tabContent">
               <Store ref="Store" v-if="activeTab == 'Store'" @unrecognizedModelError="onUnrecognizedModelError" />
             </div>
           </div>
@@ -69,7 +69,7 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    this.$tabContent = $('.js-tabContent');
+    this.$tabContent = $('.js-settings-tabContent');
 
     this.selectTab(this.initialTab, {
       scrollTo: this.options.scrollTo,

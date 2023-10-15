@@ -29,14 +29,20 @@ export default {
   },
   data () {
     return {
-      displayRate: null,
       tip: '',
+
+      rateToggle: false,
     };
   },
   created () {
     this.initEventChain();
 
-    this.loadData();
+    this.listenTo(currencyEvents, 'exchange-rate-change', e => {
+      if (e.changed.includes(this.displayCur) ||
+        e.changed.includes(this.coinType)) {
+        this.rateToggle = !this.rateToggle;
+      }
+    });
   },
   mounted () {
   },
@@ -44,22 +50,11 @@ export default {
     displayCur () {
       return app.settings.get('localCurrency') || 'USD';
     },
-  },
-  methods: {
-    loadData () {
-      this.listenTo(currencyEvents, 'exchange-rate-change', e => {
-        if (e.changed.includes(this.displayCur) ||
-          e.changed.includes(this.coinType)) {
-          this.calcDisplayRate();
-        }
-      });
+    displayRate () {
+      let access = this.rateToggle;
 
-      this.calcDisplayRate ();
-    },
-
-    calcDisplayRate () {
       if (this.coinType === this.displayCur) {
-        this.displayRate = null;
+        return null;
       }
 
       let rate = null;
@@ -70,8 +65,10 @@ export default {
         // pass
       }
 
-      this.displayRate = rate;
+      return rate;
     },
+  },
+  methods: {
   }
 }
 </script>

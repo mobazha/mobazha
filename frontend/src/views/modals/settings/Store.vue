@@ -52,31 +52,6 @@
           <div class="box padMdKids padStack">
             <div class="flexRow gutterH">
               <div class="col3">
-                <label class="required">{{ ob.polyT('editListing.sectionNames.shipping') }}</label>
-              </div>
-              <div class="col9">
-                <section ref="sectionShipping" class="shippingSection js-sectionShipping">
-                  <div class="gutterVMd">
-                    <div class="js-shippingOptionsWrap shippingOptionsWrap gutterVMd"></div>
-                    <div class="contentBox padMd clrP clrBr clrSh3 tx3 shipOptPlaceholder">
-                      <FormError v-if="ob.errors['shippingOptions']" :errors="ob.errors['shippingOptions']" :class="topLevelShipOptErrs" />
-                      <h2 class="h4 clrT js-addShipOptSectionHeading">
-                        {{ ob.polyT('editListing.shippingOptions.optionHeading', { listPosition: ob.shippingOptions.length + 1 }) }}
-                      </h2>
-                      <hr class="clrBr rowMd" />
-                      <a class="btn clrBr clrP clrSh2 rowSm" @click="onClickAddShippingOption">{{
-                        ob.polyT('editListing.shippingOptions.btnAddShippingOption')
-                      }}</a>
-                      <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperShipping') }}</div>
-                    </div>
-                  </div>
-                </section>
-              </div>
-            </div>
-          </div>
-          <div class="box padMdKids padStack">
-            <div class="flexRow gutterH">
-              <div class="col3">
                 <label class="required">{{ ob.polyT('settings.storeTab.currencies') }}</label>
                 <div class="clrT2 txSm rowSm">{{ ob.polyT('settings.storeTab.currenciesHelper') }}</div>
                 <div class="clrT2 txSm">{{ ob.polyT('settings.storeTab.currenciesNote') }}</div>
@@ -165,6 +140,29 @@
                 </template>
               </div>
             </div>
+          </div>
+          <div class="box padMdKids padStack">
+            <div class="flexRow gutterH">
+              <div class="col3">
+                <label class="required">{{ ob.polyT('editListing.sectionNames.shipping') }}</label>
+              </div>
+            </div>
+            <section ref="sectionShipping" class="shippingSection js-sectionShipping">
+              <div class="gutterVMd">
+                <div class="js-shippingOptionsWrap shippingOptionsWrap gutterVMd"></div>
+                <div class="contentBox padMd clrP clrBr clrSh3 tx3 shipOptPlaceholder">
+                  <FormError v-if="ob.errors['shippingOptions']" :errors="ob.errors['shippingOptions']" :class="topLevelShipOptErrs" />
+                  <h2 class="h4 clrT js-addShipOptSectionHeading">
+                    {{ ob.polyT('editListing.shippingOptions.optionHeading', { listPosition: ob.shippingOptions.length + 1 }) }}
+                  </h2>
+                  <hr class="clrBr rowMd" />
+                  <a class="btn clrBr clrP clrSh2 rowSm" @click="onClickAddShippingOption">{{
+                    ob.polyT('editListing.shippingOptions.btnAddShippingOption')
+                  }}</a >
+                  <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperShipping') }}</div>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </div>

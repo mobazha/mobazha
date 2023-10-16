@@ -562,7 +562,7 @@ export default class extends baseVw {
     this.$emojiMenuContainer
       .velocity('stop')
       .velocity({
-        top: [146, 266],
+        top: [306, 416],
       });
   }
 
@@ -573,7 +573,7 @@ export default class extends baseVw {
     this.$emojiMenuContainer
       .velocity('stop')
       .velocity({
-        top: 266,
+        top: 416,
       }, {
         complete: () => {
           this.$emojiMenuContainer[0].scrollTop = 0;

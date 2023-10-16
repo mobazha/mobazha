@@ -276,7 +276,7 @@ svg {
     bottom: 10px; // prevents the emoji tray from displaying at the very bottom
     z-index: 2; // chat needs to be on top of modals
     width: 720px;
-    height: 650px;
+    height: 550px;
     transform: translateY(105%);
     transition: transform 300ms ease;
 

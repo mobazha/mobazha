@@ -1,9 +1,10 @@
 #doorbell-button {
   right: $scrollbar + $pad;
-  @include chatOpeningTransition(right);
+  // @include chatOpeningTransition(right);
 
   .chatOpen & {
-    right: $scrollbar + $pad + $chatOpen;
+    // right: $scrollbar + $pad + $chatOpen;
+    right: $scrollbar + $pad;
   }
 }
 

@@ -39,7 +39,7 @@ export default {
   watch: {
     $route (to, from) {
       if (this.removeOnRoute) {
-        close();
+        this.close();
       }
     }
   },

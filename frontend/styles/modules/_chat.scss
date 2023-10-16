@@ -63,7 +63,8 @@
       }
     }
 
-    .topUnreadBanner, .bottomUnreadBanner {
+    .topUnreadBanner,
+    .bottomUnreadBanner {
       display: none;
       padding: $pad;
       font-size: $tx6;
@@ -74,7 +75,7 @@
       @include chatOpeningTransition(all);
 
       .fullText {
-        display: none
+        display: none;
       }
 
       .chatOpen & {
@@ -127,6 +128,7 @@
   border-style: solid;
   border-color: inherit;
   height: 100%;
+  overflow: hidden;
 
   .convoHeader {
     background-color: #ecf0f1;
@@ -256,7 +258,8 @@
     }
   }
 
-  .deletingOverlay, .blockingOverlay {
+  .deletingOverlay,
+  .blockingOverlay {
     display: none;
     font-size: $tx4;
 
@@ -267,7 +270,8 @@
     }
   }
 
-  &.isDeleting, &.isBlocking {
+  &.isDeleting,
+  &.isBlocking {
     .subMenuTrigger {
       @include disabled;
     }
@@ -408,9 +412,9 @@
   }
 }
 
-.chatConversation .emoji, #chatContainer .chatConvoMessages .emoji {
+.chatConversation .emoji,
+#chatContainer .chatConvoMessages .emoji {
   width: 1.3em;
   height: 1.3em;
   vertical-align: bottom;
 }
-

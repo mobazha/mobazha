@@ -10,14 +10,13 @@ const constantRouterMap = [
   {
     path: '/',
     name: 'Home',
-    // redirect: { name: 'ExampleHelloIndex' },
+    component: () => import('@/views/userPage/UserPage.vue'),
+    props: {bb: function() {
+      return {
+        model: app.profile,
+      };
+    }},
     children: [
-      // will match everything and put it under `$route.params.pathMatch`
-      {
-        path: '/:pathMatch(.*)*',
-        name: 'PageNotFound',
-        component: () => import('@/views/error-pages/PageNotFound.vue')
-      },
       {
         path: '/example',
         name: 'ExampleHelloIndex',
@@ -70,6 +69,12 @@ const constantRouterMap = [
       //   name: 'pageNotFound',
       //   component: () => import('@/views/pageNotFound.vue')
       // }
+      // will match everything and put it under `$route.params.pathMatch`
+      {
+        path: '/:pathMatch(.*)*',
+        name: 'PageNotFound',
+        component: () => import('@/views/error-pages/PageNotFound.vue')
+      },
     ]
   },
 ]

@@ -172,14 +172,16 @@ export default {
   created() {
     this.initEventChain();
 
-    const options = this.preLoad();
-    this.baseInit(options);
-
-    if (options.showPageNotFound || options.showBlockedModal) {
-      return;
+    let { guid, state, slug } = this.$route.params;
+    if (this.$route.path === '/') {
+      guid = app.profile.id;
     }
 
-    this.loadData();
+    this.init(guid, state, slug);
+  },
+  beforeRouteUpdate(to) {
+    let { guid, state, slug } = to.params;
+    this.init(guid, state, slug);
   },
   mounted() {
     this.render();
@@ -223,9 +225,17 @@ export default {
         this.user(guid, state, ...args);
       }
     },
-    preLoad() {
-      let { guid, state, slug } = this.$route.params;
+    init(guid, state, slug) {
+      const options = this.preLoad(guid, state, slug);
+      this.baseInit(options);
 
+      if (options.showPageNotFound || options.showBlockedModal) {
+        return;
+      }
+
+      this.loadData(guid, state, slug);
+    },
+    preLoad(guid, state, slug) {
       const pageState = state || 'store';
 
       if (!isValidUserRoute(guid, pageState, slug)) {
@@ -233,7 +243,7 @@ export default {
       }
 
       if (isBlocked(guid) && !isUnblocking(guid)) {
-        return { showBlockedModal: true, peerID: guid };
+        return { showPageNotFound: false, showBlockedModal: true, peerID: guid };
       }
 
       let profileFetch;
@@ -266,11 +276,10 @@ export default {
         listingFetch,
         showUserLoading: true,
         showBlockedModal: false,
+        showPageNotFound: false,
       };
     },
-    loadData() {
-      let { guid, state, slug } = this.$route.params;
-
+    loadData(guid, state, slug) {
       // Hack to pass the handle into this function, which should really only
       // happen when called from userViaHandle(). If a handle is being passed in,
       // it will be passed in as { handle: 'charlie' } as the first element of the
@@ -307,12 +316,13 @@ export default {
 
           // You've attempted to find a user with no particular tab. Since store is not available
           // we'll take you to the home tab.
-          this.$router.replace(`${guid}/home/${slug ? slug : ''}`);
+          app.router.navigate(`${guid}/home/${slug ? slug : ''}`, {trigger: true, replace: true});
           return;
         }
 
         if (!state) {
-          this.$router.replace(`${guid}/store/${slug ? slug : ''}`);
+          app.router.navigate(`${guid}/store/${slug ? slug : ''}`, {trigger: true, replace: true});
+          // this.$router.replace(`${guid}/store/${slug ? slug : ''}`);
           return;
         }
         this.showUserLoading = false;

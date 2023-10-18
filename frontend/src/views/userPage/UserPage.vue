@@ -14,14 +14,15 @@
           @clickRating="clickRating" />
           <div class="flexExpand">
             <div class="flexHRight flexVCent gutterH clrT2">
-              <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="home">{{ ob.polyT('userPage.mainNav.home') }}</a>
+              <DefineTabHeader v-slot="{tab, count}">
+                <a :class="`btn tab clrBr ${activeTab === tab ? 'clrT active' : ''}`" @click="clickTab(tab)"
+                >{{ ob.polyT(`userPage.mainNav.${tab}`) }}<span v-if="count == null" class="clrTEmph1 margLSm">{{ abbrNum(count) }}</span></a>
+              </DefineTabHeader>
+              <ReuseTabHeader tab="home" />
               <!-- // the store tab is only visible to the user if they have vendor set to false -->
-              <a v-if="ob.vendor || ob.ownPage" class="btn tab clrBr js-tab" @click="clickTab" data-tab="store">
-                {{ ob.polyT('userPage.mainNav.store') }}<span class="clrTEmph1 margLSm js-listingsCount">{{ ob.stats.listingCount }}</span></a>
-              <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="following">
-                {{ ob.polyT('userPage.mainNav.following') }}<span class="clrTEmph1 margLSm">{{ abbrNum(followingCount) }}</span></a>
-              <a class="btn tab clrBr js-tab" @click="clickTab" data-tab="followers">
-                {{ ob.polyT('userPage.mainNav.followers') }}<span class="clrTEmph1 margLSm">{{ abbrNum(followerCount) }}</span></a>
+              <ReuseTabHeader v-if="ob.vendor || ob.ownPage" tab="store" :count="listingCount"></ReuseTabHeader>
+              <ReuseTabHeader tab="following" :count="followingCount"></ReuseTabHeader>
+              <ReuseTabHeader tab="followers" :count="followerCount"></ReuseTabHeader>
             </div>
           </div>
         </div>
@@ -97,8 +98,9 @@
 
 <script>
 import $ from 'jquery';
+import { createReusableTemplate } from '@vueuse/core';
+
 import app from '../../../backbone/app';
-import { followsYou } from '../../../backbone/utils/follow';
 import { abbrNum } from '../../../backbone/utils';
 import { capitalize } from '../../../backbone/utils/string';
 import { isHiRez } from '../../../backbone/utils/responsive';
@@ -120,9 +122,13 @@ import Loading from './Loading.vue'
 import MiniProfile from '../MiniProfile.vue';
 // import Home from './Home.vue'
 import PageNotFound from '../error-pages/PageNotFound.vue'
+const [DefineTabHeader, ReuseTabHeader] = createReusableTemplate();
 
 export default {
   components: {
+    DefineTabHeader,
+    ReuseTabHeader,
+
     PageNotFound,
     BlockedWarning,
     Loading,

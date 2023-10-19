@@ -79,6 +79,24 @@
         </div>
         <div class="tabContent js-userPage-tabContent">
           <!-- insert the tab subview here -->
+          <Home v-if="activeTab === 'home'" :bb="function() {
+              return {
+                model,
+              }
+            }" />
+          <Store v-if="activeTab === 'store'" :options="{listing: options.listing}" :bb="storeBB()" @listingsUpdate="onListingsUpdate"/>
+          <Follow v-if="activeTab === 'followers' || activeTab === 'following'" :key="activeTab"
+            :options="{
+              followType: activeTab,
+              peerID: model.id,
+            }"
+            :bb="followBB(activeTab)"
+            />
+          <Reputation v-if="activeTab === 'reputation'" :bb="function() {
+              return {
+                model,
+              }
+            }" />
         </div>
       </div>
     </template>
@@ -112,16 +130,17 @@ import { getCurrentConnection } from '../../../backbone/utils/serverConnect';
 import Listing from '../../../backbone/models/listing/Listing';
 import Listings from '../../../backbone/collections/Listings';
 import Followers from '../../../backbone/collections/Followers';
-import Home from '../../../backbone/views/userPage/Home';
-import Store from '../../../backbone/views/userPage/Store';
-import Follow from '../../../backbone/views/userPage/Follow';
-import Reputation from '../../../backbone/views/userPage/Reputation';
 
 import BlockedWarning from '../modals/BlockedWarning.vue'
 import Loading from './Loading.vue'
 import MiniProfile from '../MiniProfile.vue';
-// import Home from './Home.vue'
 import PageNotFound from '../error-pages/PageNotFound.vue'
+
+import Home from './Home.vue';
+import Store from './Store.vue';
+import Follow from './Follow.vue';
+import Reputation from './Reputation.vue';
+
 const [DefineTabHeader, ReuseTabHeader] = createReusableTemplate();
 
 export default {
@@ -133,6 +152,10 @@ export default {
     BlockedWarning,
     Loading,
     MiniProfile,
+    Home,
+    Store,
+    Follow,
+    Reputation,
   },
   props: {
     options: {
@@ -145,15 +168,13 @@ export default {
     return {
       handle: '',
       guild: '',
-      state: 'store',
+      activeTab: 'store',
       slug: '',
       showStoreWelcomeCallout: true,
 
       followingCount: 0,
       followerCount: 0,
-
-      tabViewCache: {},
-      tabViews: { Home, Store, Follow, Reputation },
+      listingCount: 0,
 
       profileFetch: undefined,
       listingFetch: undefined,
@@ -190,7 +211,27 @@ export default {
     this.init(guid, state, slug);
   },
   mounted() {
-    this.render();
+    this.setBlockedClass();
+
+    const stats = this.model.get('stats');
+    this.followingCount = stats.get('followingCount');
+    this.followerCount = stats.get('followerCount');
+    this.listingCount = stats.get('listingCount');
+
+    this.curConn = getCurrentConnection();
+
+    if (this.curConn && this.curConn.server) {
+      this.showStoreWelcomeCallout = !this.curConn.server.get('dismissedStoreWelcome');
+    }
+
+    this.listenTo(app.ownFollowing, 'add', this.onOwnFollowingAdd);
+    this.listenTo(app.ownFollowing, 'remove', this.onOwnFollowingRemove);
+
+    this.listenTo(blockEvents, 'blocked unblocked', (data) => {
+      if (data.peerIDs.includes(this.model.id)) {
+        this.setBlockedClass();
+      }
+    });
   },
   unmounted() {
     if (this.followingFetch) this.followingFetch.abort();
@@ -227,8 +268,9 @@ export default {
     },
     onUnblock(data) {
       if (data.peerIDs.includes(guid)) {
-        app.loadingModal.open();
-        this.user(guid, state, ...args);
+        let { guid, state, slug } = this.$route.params;
+
+        this.init(guid, state, slug);
       }
     },
     init(guid, state, slug) {
@@ -276,7 +318,7 @@ export default {
       }
 
       return {
-        state: pageState,
+        activeTab: pageState,
         profileFetch,
         listing,
         listingFetch,
@@ -311,7 +353,7 @@ export default {
         // shown in the address bar.
         app.router.setAddressBarText();
 
-        if (this.state === 'store' && !this.model.get('vendor') && guid !== app.profile.id) {
+        if (this.activeTab === 'store' && !this.model.get('vendor') && guid !== app.profile.id) {
           // the user does not have an active store and this is not our own node
           if (state) {
             // You've explicitly tried to navigate to the store tab. Since it's not
@@ -331,9 +373,6 @@ export default {
           // this.$router.replace(`${guid}/store/${slug ? slug : ''}`);
           return;
         }
-        this.showUserLoading = false;
-
-        this.initUserPage();
       }).fail((...failArgs) => {
         const jqXhr = failArgs[0];
         const reason = (jqXhr && jqXhr.responseJSON && jqXhr.responseJSON.reason)
@@ -374,51 +413,12 @@ export default {
             && getCurrentConnection().server.get('dismissedDiscoverCallout');
           endAjaxEvent('UserPageLoad', {
             ownPage: guid === app.profile.id,
-            tab: this.state,
+            tab: this.activeTab,
             dismissedCallout,
             listing: !!listingFetch,
             errors: userPageFetchError || 'none',
           });
         });
-    },
-    initUserPage() {
-      this.setBlockedClass();
-
-      const stats = this.model.get('stats');
-      this.followingCount = stats.get('followingCount');
-      this.followerCount = stats.get('followerCount');
-
-      if (!this.ownPage) {
-        if (this.followerCount === 0 && app.ownFollowing.indexOf(this.model.id) > -1) {
-          this.followerCount = 1;
-        }
-      } else {
-        this.followingCount = app.ownFollowing.length;
-      }
-
-      this.curConn = getCurrentConnection();
-
-      if (this.curConn && this.curConn.server) {
-        this.showStoreWelcomeCallout = !this.curConn.server.get('dismissedStoreWelcome');
-      }
-
-      this.listenTo(app.ownFollowing, 'add', this.onOwnFollowingAdd);
-      this.listenTo(app.ownFollowing, 'remove', this.onOwnFollowingRemove);
-
-      this.followsYou = false;
-      followsYou(this.model.id).done((data) => {
-        if (this.miniProfile) {
-          this.miniProfile.setState({ followsYou: data.followsMe });
-        }
-
-        if (this.followingCount === 0 && !this.ownPage) this.followingCount = 1;
-      });
-
-      this.listenTo(blockEvents, 'blocked unblocked', (data) => {
-        if (data.peerIDs.includes(this.model.id)) {
-          this.setBlockedClass();
-        }
-      });
     },
 
     onClickLoadingCancel() {
@@ -432,7 +432,9 @@ export default {
     },
 
     onClickLoadingRetry() {
-      this.user(guid, state, ...args);
+      let { guid, state, slug } = this.$route.params;
+
+      this.init(guid, state, slug);
     },
 
     onOwnFollowingAdd(md) {
@@ -451,14 +453,13 @@ export default {
       }
     },
 
-    clickTab(e) {
-      const tab = $(e.target).closest('.js-tab').attr('data-tab');
+    clickTab(tab) {
       recordEvent('UserPage_Tab', { tab });
       this.setTabState(tab);
     },
 
     clickMore() {
-      this.$moreableBtns.toggleClass('hide');
+      $('.js-moreableBtn').toggleClass('hide');
     },
 
     clickCustomize() {
@@ -493,137 +494,37 @@ export default {
       this.isBlockedUser = isBlocked(this.model.id);
     },
 
-    createFollowersTabView(opts = {}) {
-      const collection = new Followers([], {
-        peerID: this.model.id,
-        type: 'followers',
-      });
+    followBB(type) {
+      const collection = new Followers([], { peerID: this.model.id, type, });
 
-      this.listenTo(collection, 'sync', () => {
-        this.followerCount = collection.length;
-      });
-
-      return this.createChild(this.tabViews.Follow, {
-        ...opts,
-        followType: 'followers',
-        peerID: this.model.id,
-        collection,
-      });
-    },
-
-    createFollowingTabView(opts = {}) {
-      const models = app.profile.id === this.model.id ? app.ownFollowing.models : [];
-      const collection = new Followers(models, {
-        peerID: this.model.id,
-        type: 'following',
-        fetchCollection: app.profile.id !== this.model.id,
-      });
-
-      this.listenTo(collection, 'sync', () => {
-        this.followingCount = collection.length;
-      });
-
-      return this.createChild(this.tabViews.Follow, {
-        ...opts,
-        followType: 'following',
-        peerID: this.model.id,
-        collection,
-      });
-    },
-
-    createStoreTabView(opts = {}) {
-      this.listings = new Listings([], { guid: this.model.id });
-
-      let listingsCount = this.model.get('listingCount');
-
-      this.listings.on('update', () => {
-        if (this.listings.length !== listingsCount) {
-          listingsCount = this.listings.length;
-          $('.js-listingsCount').html(abbrNum(listingsCount));
+      return function() {
+        return {
+          collection,
         }
-      });
-
-      return this.createChild(this.tabViews.Store, {
-        ...opts,
-        initialFetch: Store.fetchListings(this.listings),
-        collection: this.listings,
-        model: this.model,
-      });
+      };
     },
 
-    setTabState(state, options = {}) {
+    storeBB() {
+      let collection = new Listings([], { guid: this.model.id });
+      let model = this.model;
+      return function() {
+        return {
+          collection,
+          model,
+        }
+      };
+    },
+
+    onListingsUpdate(listings) {
+      this.listingCount = listings.length;
+    },
+
+    setTabState(state) {
       if (!state) {
         throw new Error('Please provide a state.');
       }
 
-      this.state = state;
-      this.selectTab(state, options);
-    },
-
-    selectTab(targ, options = {}) {
-      const opts = {
-        addTabToHistory: true,
-        ...options,
-      };
-
-      if (!this.tabViews[capitalize(targ)] && targ !== 'following' && targ !== 'followers') {
-        throw new Error(`${targ} is not a valid tab.`);
-      }
-
-      let tabView = this.tabViewCache[targ];
-      const tabOptions = {
-        ownPage: this.ownPage,
-        model: this.model,
-        ...opts,
-      };
-
-      // delete any opts that the tab view(s) wouldn't need
-      delete tabOptions.addTabToHistory;
-
-      if (!this.currentTabView || this.currentTabView !== tabView) {
-        const tabName = app.polyglot.t(`userPage.tabTitles.${targ}`);
-        this.$tabTitle.text(tabName);
-
-        if (opts.addTabToHistory) {
-          const listingBaseUrl = this.model.get('handle') ? `@${this.model.get('handle')}` : this.model.id;
-
-          // add tab to history
-          app.router.navigateUser(`${listingBaseUrl}/${targ.toLowerCase()}`, this.model.id);
-        }
-
-        $('.js-tab').removeClass('clrT active');
-        $(`.js-tab[data-tab="${targ}"]`).addClass('clrT active');
-
-        if (this.currentTabView) this.currentTabView.$el.detach();
-
-        if (!tabView) {
-          if (this[`create${capitalize(targ)}TabView`]) {
-            tabView = this[`create${capitalize(targ)}TabView`](tabOptions);
-          } else {
-            tabView = this.createChild(this.tabViews[capitalize(targ)], tabOptions);
-          }
-
-          this.tabViewCache[targ] = tabView;
-          tabView.render();
-        }
-
-        this.$tabContent.append(tabView.$el);
-        this.currentTabView = tabView;
-      }
-    },
-
-    render() {
-      this.$tabContent = $('.js-userPage-tabContent');
-      this.$tabTitle = $('.js-tabTitle');
-      this.$moreableBtns = $('.js-moreableBtn');
-
-      this.tabViewCache = {}; // clear for re-renders
-      this.setTabState(this.state, {
-        addTabToHistory: false,
-        listing: this.options.listing,
-      });
-
-      return this;
+      this.activeTab = state;
     },
   },
 };

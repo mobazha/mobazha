@@ -30,6 +30,7 @@ export default {
         fetchCollection: true,
       },
     },
+    bb: Function,
   },
   data() {
     return {
@@ -113,7 +114,7 @@ export default {
         throw new Error(`followType must be one of ${types.join(', ')}`);
       }
 
-      if (!opts.collection) {
+      if (!this.collection) {
         throw new Error('Please provide a followers collection.');
       }
 

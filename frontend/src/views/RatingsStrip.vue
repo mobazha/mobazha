@@ -5,9 +5,9 @@
       // CSS and hover all the previos icons on hover, the icons are
       // displayed in reverse order via flex-direction. This requires index
       // calculations to be computed from the end. -->
-      <template v-for="(i, key) in ob.maxRating" :key="key">
-        <a :class="`ratingIcon ${ob.clickable ? 'clickable' : ''}`" :selected="ob.curRating > ob.maxRating - i"
-          @click="onClickRatingIcon"
+      <template v-for="(val, key) in ob.maxRating" :key="key">
+        <a :class="`ratingIcon js-ratingIcon ${ob.clickable ? 'clickable' : ''}`" :selected="ob.curRating > ob.maxRating - val"
+          @click="onClickRatingIcon(val)"
           v-html="ob.parseEmojis('⭐', ob.iconClrClass)">
         </a>
       </template>
@@ -17,14 +17,17 @@
 </template>
 
 <script>
-import $ from 'jquery';
 import _ from 'underscore';
 
 export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        curRating: 0,
+        clickable: false,
+        maxRating: 5,
+      },
     },
   },
   data () {
@@ -32,8 +35,6 @@ export default {
     };
   },
   created () {
-    this.initEventChain();
-
     this.loadData(this.options);
   },
   mounted () {
@@ -43,10 +44,8 @@ export default {
       return {
         ...this.templateHelpers,
         ...this._state,
+        ...this.options,
       };
-    },
-    rating () {
-      return this._state.curRating;
     },
   },
   methods: {
@@ -54,23 +53,19 @@ export default {
       this.baseInit(options);
 
       this._state = {
-        curRating: 0,
-        maxRating: 5,
         hoverIndex: 0,
         iconClrClass: '',
         numberClrClass: 'clrT2',
-        clickable: false,
         ...options.initialState || {},
       };
     },
 
-    onClickRatingIcon (e) {
+    onClickRatingIcon (val) {
       // Important!!! In order to simulate a previous sibling selector in
       // CSS and hover all the previos icons on hover, the icons are
       // displayed in reverse order via flex-direction. This requires index
       // calculations to be computed from the end.
-      const totalIcons = this.getState().maxRating;
-      this.setState({ curRating: totalIcons - $(e.target).closest('.js-ratingIcon').index() });
+      this.setState({ curRating: this.maxRating - val });
     },
   }
 }

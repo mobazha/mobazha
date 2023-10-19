@@ -401,6 +401,8 @@ export default {
       blocked: false,
       hideNsfw: false,
 
+      avatarImage: undefined,
+
       app: app,
     };
   },

@@ -53,23 +53,33 @@
           <table class="ratings">
             <tr>
               <td><b>{{ ob.polyT('ratingLabels.overall') }}</b></td>
-              <td class="ratingsContainer" data-rating-type="overall"></td>
+              <td class="ratingsContainer">
+                <RatingsStrip :options="{ curRating: _model.get('overall') || 0, }" />
+              </td>
             </tr>
             <tr>
               <td>{{ ob.polyT('ratingLabels.quality') }}</td>
-              <td class="ratingsContainer" data-rating-type="quality"></td>
+              <td class="ratingsContainer">
+                <RatingsStrip :options="{ curRating: _model.get('quality') || 0, }" />
+              </td>
             </tr>
             <tr>
               <td>{{ ob.polyT('ratingLabels.asAdvertised') }}</td>
-              <td class="ratingsContainer" data-rating-type="description"></td>
+              <td class="ratingsContainer">
+                <RatingsStrip :options="{ curRating: _model.get('description') || 0, }" />
+              </td>
             </tr>
             <tr>
               <td>{{ ob.polyT('ratingLabels.delivery') }}</td>
-              <td class="ratingsContainer" data-rating-type="deliverySpeed"></td>
+              <td class="ratingsContainer">
+                <RatingsStrip :options="{ curRating: _model.get('deliverySpeed') || 0, }" />
+              </td>
             </tr>
             <tr>
               <td>{{ ob.polyT('ratingLabels.service') }}</td>
-              <td class="ratingsContainer" data-rating-type="customerService"></td>
+              <td class="ratingsContainer">
+                <RatingsStrip :options="{ curRating: _model.get('customerService') || 0, }" />
+              </td>
             </tr>
           </table>
         </div>
@@ -82,13 +92,16 @@
 <script>
 import $ from 'jquery';
 import app from '../../../backbone/app';
-import loadTemplate from '../../../backbone/utils/loadTemplate';
-import RatingsStrip from '../RatingsStrip';
 import moment from 'moment';
 import 'trunk8';
 
+import RatingsStrip from '../RatingsStrip.vue';
+
 
 export default {
+  components: {
+    RatingsStrip,
+  },
   props: {
     options: {
       type: Object,
@@ -114,7 +127,7 @@ export default {
         ...this.templateHelpers,
         moment,
         showListingData: this.options.showListingData,
-        ...this.model.toJSON(),
+        ...this._model,
       };
     },
     title () {
@@ -140,9 +153,6 @@ export default {
   methods: {
     loadData (options = {}) {
       this.baseInit(options);
-      this.options = options;
-
-      this.ratingStrips = {};
     },
 
     events () {
@@ -162,38 +172,6 @@ export default {
     clickShowLess (e) {
       $(e.target).parent().trunk8();
     },
-
-    render () {
-      loadTemplate('reviews/review.html', (t) => {
-        this.$el.html(t({
-          moment,
-          showListingData: this.options.showListingData,
-          ...this.model.toJSON(),
-        }));
-
-        $('.ratingsContainer').each((index, element) => {
-          const $el = $(element);
-          const type = $el.data('ratingType');
-
-          if (!type) {
-            throw new Error('Unable to render the ratings strips because it\'s container does not ' +
-              'specify a type.');
-          }
-
-          if (this.ratingStrips[type]) this.ratingStrips[type].remove();
-          this.ratingStrips[type] = this.createChild(RatingsStrip, {
-            initialState: {
-              curRating: this.model.get(type) || 0,
-            },
-          });
-
-          $el.append(this.ratingStrips[type].render().el);
-        });
-      });
-
-      return this;
-    }
-
   }
 }
 </script>

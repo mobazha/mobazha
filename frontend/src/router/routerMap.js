@@ -10,13 +10,18 @@ const constantRouterMap = [
   {
     path: '/',
     name: 'Home',
-    component: () => import('@/views/userPage/UserPage.vue'),
-    props: {bb: function() {
-      return {
-        model: app.profile,
-      };
-    }},
+    redirect: { name: 'OwnPage' },
     children: [
+      {
+        path: '/home',
+        name: 'OwnPage',
+        component: () => import('@/views/userPage/UserPage.vue'),
+        props: {bb: function() {
+          return {
+            model: app.profile,
+          };
+        }},
+      },
       {
         path: '/example',
         name: 'ExampleHelloIndex',

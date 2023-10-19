@@ -108,7 +108,7 @@ import { ipc } from '../../utils/ipcRenderer.js';
 import app from '../../../backbone/app';
 import UserCard from '../../../backbone/views/UserCard';
 import { launchModeratorDetailsModal } from '../../../backbone/utils/modalManager';
-import { openSimpleMessage } from '../../../backbone/modals/SimpleMessage';
+import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
 
 export default {
   props: {

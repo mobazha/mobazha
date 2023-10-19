@@ -4,7 +4,7 @@
       <div class="contentBox flexRow flexVCent gutterH pad clrP clrBr statsBox">
         <template v-if="!ob.isFetching">
           <div class="col6 txCtr">
-            <div class="repBg">{{ ob.formatRating(ob.average, '', true) }}</div>
+            <div class="repBg" v-html="ob.formatRating(ob.average, '', true)"></div>
             <div class="tx2b">{{ ob.polyT('reputation.averageRating') }}</div>
           </div>
           <div class="rowDivV clrBrBk"></div>
@@ -31,7 +31,7 @@
 import $ from 'jquery';
 import app from '../../../backbone/app';
 import Reviews from '../../../backbone/views/reviews/Reviews';
-import { openSimpleMessage } from '../../../backbone/modals/SimpleMessage';
+import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
 import Profile from '../../../backbone/models/profile/Profile';
 
 export default {
@@ -70,7 +70,7 @@ export default {
   },
   methods: {
     loadData(options = {}) {
-      if (!options.model || !(options.model instanceof Profile)) {
+      if (!this.model || !(this.model instanceof Profile)) {
         throw new Error('Please provide a valid profile model.');
       }
       const opts = {
@@ -113,7 +113,6 @@ export default {
     },
 
     render() {
-      this.delegateEvents(this.reviews);
       $('.js-reviewsList').append(this.reviews.render().$el);
 
       return this;

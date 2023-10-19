@@ -1,10 +1,10 @@
 <template>
-  <div :class="`userPageStore ${isListView ? 'listView' : ''}`">
+  <div :class="`userPageStore ${listingsViewType == 'list' ? 'listView' : ''}`" @scroll="onStoreListingsScroll">
     <div class="popInMessageHolder js-storePopInMessages"></div>
     <div class="userPageSearchBar flex gutterHSm" :disabled="ob.isFetching || ob.fetchFailed || !ob.listingCount">
       <div class="flexExpand">
         <div class="searchWrapper">
-          <input type="text" class="ctrl searchInput clrP clrBr clrSh2" @keyup="onKeyupSearchInput" :placeholder="ob.polyT('userPage.searchStore')" />
+          <input type="text" class="ctrl searchInput clrP clrBr clrSh2" @keyup="onKeyupSearchInput(inputTerm)" :placeholder="ob.polyT('userPage.searchStore')" v-model="inputTerm" />
         </div>
       </div>
       <div>
@@ -33,11 +33,11 @@
     <template v-else-if="!ob.isFetching">
       <div class="flex">
         <div class="col storeFilters" :disabled="!ob.listingCount">
-          <div class="js-shippingFilterContainer clrP clrBr padMd clrT clrSh2 contentBox">
+          <div :class="`js-shippingFilterContainer clrP clrBr padMd clrT clrSh2 contentBox ${!enableShipping ? 'disabled' : ''}`">
             <div class="txB rowSm">{{ ob.polyT('userPage.store.shippingFilter.heading') }}</div>
             <div class="flexVCent rowSm">
               <label class="margRSm" for="shipsToSelect">{{ ob.polyT('userPage.store.shippingFilter.shipsTo') }}:</label>
-              <select class="tx6 select2Small js-shipsToSelect" @change="onShipsToSelectChange" style="width: 133px" id="shipsToSelect">
+              <select class="tx6 select2Small js-shipsToSelect" @change="onShipsToSelectChange($event)" style="width: 133px" id="shipsToSelect">
                 <option value="any" :selected="ob.shipsToSelected === 'any'">{{ ob.polyT('userPage.store.shipsToFilterAny') }}</option>
                 <option v-for="(country, j) in ob.countryList" :key="j" :value="country.dataName" :selected="country.dataName === ob.shipsToSelected">
                   {{ country.name }}
@@ -52,17 +52,21 @@
               <label class="clrE1 clrTOnEmph phraseBox" for="filterFreeShipping">{{ ob.polyT('userPage.store.freeShippingBanner') }}</label>
             </div>
           </div>
-          <div class="js-catFilterContainer"></div>
-          <div class="js-typeFilterContainer"></div>
+          <div class="js-catFilterContainer">
+            <CategoryFilter :categories="collection.categories" :selected="filter.category" @category-change="onCategoryChange" />
+          </div>
+          <div class="js-typeFilterContainer">
+            <TypeFilter :types="collection.types" :selected="filter.type" @type-change="onTypeChange" />
+          </div>
         </div>
         <div class="col storeListings">
           <template v-if="ob.listingCount">
             <div class="row clrT tx5 flexVBot listingsHeaderRow">
-              <span class="listingsCount js-listingCount"></span>
+              <span class="listingsCount js-listingCount" v-html="fullListingCount"></span>
               <div>
                 <div class="tx6 flexVCent">
                   <label class="clrT2 marginLAuto margRSm">{{ ob.polyT('userPage.store.sortBy') }}</label>
-                  <select class="tx6 select2Small js-sortBySelect" @change="onChangeSortBy" style="width: 150px">
+                  <select class="tx6 select2Small js-sortBySelect" @change="onChangeSortBy($event)" style="width: 150px">
                     <option value="PRICE_ASC" :selected="ob.filter.sortBy === 'PRICE_ASC'">{{ ob.polyT('userPage.store.sortOpts.priceAsc') }}</option>
                     <option value="PRICE_DESC" :selected="ob.filter.sortBy === 'PRICE_DESC'">{{ ob.polyT('userPage.store.sortOpts.priceDesc') }}</option>
                     <option value="NAME_ASC" :selected="ob.filter.sortBy === 'NAME_ASC'">{{ ob.polyT('userPage.store.sortOpts.nameAsc') }}</option>
@@ -79,8 +83,18 @@
                 <button class="btnTxtOnly txU txUnb clrT2" @click="onClickActivateStore">${ob.polyT('userPage.store.inactiveLink')}</button>
               </span>
             </div>
-            <div class="js-listingsContainer"></div>
-            <div class="txCtr padGi clrP clrSh2 clrBr tx4 contentBox js-noResults hide">
+            <div class="js-listingsContainer">
+              <ListingsGrid
+                :key="listingsGridKey"
+                :viewType="listingsViewType"
+                :bb="function() {
+                  return {
+                    collection: storeListingsCol,
+                    storeOwnerProfile: model,
+                  }
+                }"/>
+            </div>
+            <div class="txCtr padGi clrP clrSh2 clrBr tx4 contentBox js-noResults" v-show="!filteredCollection.length">
               <p>{{ ob.polyT('userPage.store.noListingsFound') }}</p>
               <div class="btn clrP clrBr" @click="onClickClearSearch">{{ ob.polyT('userPage.store.btnClearSearch') }}</div>
             </div>
@@ -102,20 +116,34 @@ import 'velocity-animate';
 import 'velocity-animate/velocity.ui';
 import { getTranslatedCountries } from '../../../backbone/data/countries';
 import app from '../../../backbone/app';
-import { getContentFrame } from '../../../backbone/utils/selectors';
 import { convertCurrency, NoExchangeRateDataError } from '../../../backbone/utils/currency';
 import { launchSettingsModal } from '../../../backbone/utils/modalManager';
 import Listing from '../../../backbone/models/listing/Listing';
 import Listings from '../../../backbone/collections/Listings';
 import { events as listingEvents } from '../../../backbone/models/listing';
 import ListingDetail from '../../../backbone/views/modals/listingDetail/Listing';
-import ListingsGrid, { LISTINGS_PER_PAGE } from '../../../backbone/views/userPage/ListingsGrid';
-import CategoryFilter from './CategoryFilter';
-import TypeFilter from './TypeFilter';
-import PopInMessage, { buildRefreshAlertMessage } from '../components/PopInMessage';
+
+import CategoryFilter from './CategoryFilter.vue';
+import TypeFilter from './TypeFilter.vue';
+import ListingsGrid from './ListingsGrid.vue'
+import PopInMessage, { buildRefreshAlertMessage } from '../../../backbone/views/components/PopInMessage';
 import { localizeNumber, isValidNumber } from '../../../backbone/utils/number';
 
+const defaultFilter = {
+  category: 'all',
+  type: 'all',
+  shipsTo: 'any',
+  searchTerm: '',
+  sortBy: 'PRICE_ASC',
+  freeShipping: false,
+};
+
 export default {
+  components: {
+    CategoryFilter,
+    TypeFilter,
+    ListingsGrid,
+  },
   props: {
     options: {
       type: Object,
@@ -126,18 +154,16 @@ export default {
   data() {
     return {
       countryList: getTranslatedCountries(),
-      defaultFilter: {
-        category: 'all',
-        type: 'all',
-        shipsTo: 'any',
-        searchTerm: '',
-        sortBy: 'PRICE_ASC',
-        freeShipping: false,
-      },
-      filter: { ...this.defaultFilter },
+      filter: { ...defaultFilter },
       listingsViewType: app.localSettings.get('listingsGridViewType'),
 
-      isListView: this.listingsViewType == 'list',
+      inputTerm: '',
+      storeListingsCol: {},
+      listingsGridKey: 0,
+
+      // Standard width grid has 3 columns, so best to leave this
+      // as a multiple of 3.
+      LISTINGS_PER_PAGE: 24,
     };
   },
   created() {
@@ -147,12 +173,23 @@ export default {
   },
   mounted() {
     this.render();
+
+    $('.js-sortBySelect').select2({
+      minimumResultsForSearch: -1,
+      dropdownParent: $('.js-sortBySelectDropdownContainer'),
+    });
+
+    $('.js-shipsToSelect').select2({
+      dropdownParent: $('.js-shipsToSelectDropdownContainer'),
+    });
   },
   unmounted() {
-    getContentFrame().off('scroll', this.storeListingsScrollHandler);
   },
   computed: {
     ob() {
+      const isFetching = this.fetch && this.fetch.state() === 'pending';
+      const fetchFailed = this.fetch && this.fetch.state() === 'rejected' && this.fetch.status !== 404;
+
       return {
         ...this.templateHelpers,
         ...this._model,
@@ -165,6 +202,67 @@ export default {
         listingCount: this.collection.length,
       };
     },
+    filteredCollection() {
+      const filter = this.filter;
+      const collection = this.collection;
+
+      const models = collection.models.filter((md) => {
+        let passesFilter = true;
+
+        if (filter.freeShipping && !md.shipsFreeToMe) {
+          passesFilter = false;
+        }
+
+        if (filter.category !== 'all' && md.get('categories').indexOf(filter.category) === -1) {
+          passesFilter = false;
+        }
+
+        if (filter.type !== 'all' && md.get('contractType') !== filter.type) {
+          passesFilter = false;
+        }
+
+        const searchTerm = filter.searchTerm;
+
+        if (searchTerm && md.searchTitle.indexOf(searchTerm) === -1 && md.searchDescription.indexOf(searchTerm) === -1) {
+          passesFilter = false;
+        }
+
+        if (filter.shipsTo !== 'any' && !md.shipsTo(filter.shipsTo)) {
+          passesFilter = false;
+        }
+
+        return passesFilter;
+      });
+
+      let col = new Listings(models, { guid: this.model.id });
+      this.setSortFunction(col);
+      col.sort();
+
+      // todo: exceptionally tall screens may fit an entire page
+      // with room to spare. Which means no scrollbar, which means subsequent
+      // pages will not load. Handle that case.
+      this.storeListingsCol = new Listings(col.slice(0, this.LISTINGS_PER_PAGE), { guid: this.model.id });
+      this.listingsGridKey += 1;
+
+      return col;
+    },
+    
+
+    fullListingCount() {
+      const col = this.filteredCollection;
+
+      const countPhrase = app.polyglot.t('userPage.store.countListings', { smart_count: col.length, display_count: localizeNumber(col.length) });
+
+      return app.polyglot.t('userPage.store.countListingsFound', { countListings: `<span class="txB">${countPhrase}</span>` });
+    },
+    enableShipping() {
+      return this.filter.type === 'PHYSICAL_GOOD' || this.filter.type === 'all';
+    },
+  },
+  watch: {
+    _collection() {
+      this.$emit('listingsUpdate', this._collection);
+    }
   },
   methods: {
     loadData(options = {}) {
@@ -194,8 +292,6 @@ export default {
         });
 
         this.listenTo(listingEvents, 'destroy', () => this.showDataChangedMessage());
-        // if the user changes their vendor setting, toggle the warning
-        this.listenTo(app.profile, 'change:vendor', () => this.toggleInactiveWarning());
       }
 
       this.listenTo(app.settings, 'change:country', () => this.showShippingChangedMessage());
@@ -209,29 +305,20 @@ export default {
       });
 
       // this block should be last
-      if (options.initialFetch) {
-        this.fetch = options.initialFetch;
-        this.onRequest(this.collection, this.fetch);
-      }
+      this.fetch = this.fetchListings();
+      this.onRequest(this.collection, this.fetch);
     },
 
     onFilterFreeShippingChange(e) {
       this.filter.freeShipping = $(e.target).is(':checked');
-      this.renderListings(this.filteredCollection());
     },
 
-    toggleInactiveWarning() {
-      this.$inactiveWarning().toggleClass('hide', app.settings.get('vendor'));
+    onShipsToSelectChange(event) {
+      this.filter.shipsTo = event.target.value;
     },
 
-    onShipsToSelectChange(e) {
-      this.filter.shipsTo = e.target.value;
-      this.renderListings(this.filteredCollection());
-    },
-
-    onChangeSortBy(e) {
-      this.filter.sortBy = $(e.target).val();
-      this.renderListings();
+    onChangeSortBy(event) {
+      this.filter.sortBy = event.target.value;
     },
 
     onUpdateCollection(cl, opts) {
@@ -267,13 +354,13 @@ export default {
       }
     },
 
-    onKeyupSearchInput(e) {
+    onKeyupSearchInput(term) {
       // make sure they're not still typing
       if (this.searchKeyUpTimer) {
         clearTimeout(this.searchKeyUpTimer);
       }
 
-      this.searchKeyUpTimer = setTimeout(() => this.search($(e.target).val()), 150);
+      this.searchKeyUpTimer = setTimeout(() => this.search(term), 150);
     },
 
     onRequest(cl, xhr) {
@@ -318,7 +405,7 @@ export default {
     onClickClearSearch() {
       // will reset filters / search text, but maintain sort
       this.filter = {
-        ...this.defaultFilter,
+        ...defaultFilter,
         sortBy: this.filter.sortBy,
       };
 
@@ -327,19 +414,7 @@ export default {
 
     onClickToggleListGridView() {
       const prevType = this.listingsViewType;
-      let type = prevType === 'list' ? 'grid' : 'list';
-      this.listingsViewType = type;
-      if (prevType) {
-        if (prevType !== type) {
-          this.isListView = !this.isListView;
-
-          if (this.storeListings) {
-            this.renderListings(this.fullRenderedCollection);
-          }
-        }
-      } else if (type === 'list') {
-        this.isListView = true;
-      }
+      this.listingsViewType = prevType === 'list' ? 'grid' : 'list';
     },
 
     onClickActivateStore() {
@@ -383,8 +458,8 @@ export default {
       }
     },
 
-    fetchListings(options = {}) {
-      Store.fetchListings(this.collection, options);
+    fetchListings() {
+      return this.collection.fetch({ cache: false });
     },
 
     search(term) {
@@ -393,7 +468,6 @@ export default {
       if (searchTerm === this.filter.searchTerm) return;
 
       this.filter.searchTerm = searchTerm;
-      this.renderListings(this.filteredCollection());
     },
 
     /**
@@ -424,60 +498,8 @@ export default {
     $btnRetry() {
       return $('.js-retryFetch');
     },
-    $listingsContainer() {
-      return $('.js-listingsContainer');
-    },
-    $shippingFilterContainer() {
-      return $('.js-shippingFilterContainer');
-    },
-    $catFilterContainer() {
-      return $('.js-catFilterContainer');
-    },
-    $typeFilterContainer() {
-      return $('.js-typeFilterContainer');
-    },
-    $listingCount() {
-      return $('.js-listingCount');
-    },
-    $noResults() {
-      return $('.js-noResults') || null;
-    },
     $popInMessages() {
       return $('.js-storePopInMessages');
-    },
-    $inactiveWarning() {
-      return $('.js-inactiveWarning');
-    },
-    filteredCollection(filter = this.filter, collection = this.collection) {
-      const models = collection.models.filter((md) => {
-        let passesFilter = true;
-
-        if (this.filter.freeShipping && !md.shipsFreeToMe) {
-          passesFilter = false;
-        }
-
-        if (this.filter.category !== 'all' && md.get('categories').indexOf(this.filter.category) === -1) {
-          passesFilter = false;
-        }
-
-        if (this.filter.type !== 'all' && md.get('contractType') !== this.filter.type) {
-          passesFilter = false;
-        }
-
-        const searchTerm = this.filter.searchTerm;
-
-        if (searchTerm && md.searchTitle.indexOf(searchTerm) === -1 && md.searchDescription.indexOf(searchTerm) === -1) {
-          passesFilter = false;
-        }
-
-        if (this.filter.shipsTo !== 'any' && !md.shipsTo(this.filter.shipsTo)) {
-          passesFilter = false;
-        }
-
-        return passesFilter;
-      });
-
-      return new Listings(models, { guid: this.model.id });
     },
 
     /**
@@ -534,149 +556,31 @@ export default {
       }
     },
 
-    storeListingsScroll(paginatedCol, e) {
-      // Make sure we're in the DOM (i.e. the store tab is active).
-      if (!this.$el.parentElement) return;
-
+    _onStoreListingsScroll(e) {
+      let currentLength = this.storeListingsCol.length;
       // if we've scrolled within a 150px of the bottom
       if (e.target.scrollTop + $(e.target).innerHeight() >= e.target.scrollHeight - 150) {
-        paginatedCol.add(this.fullRenderedCollection.slice(this.storeListings.listingCount, this.storeListings.listingCount + LISTINGS_PER_PAGE));
+        this.storeListingsCol.add(this.filteredCollection.slice(currentLength, currentLength + this.LISTINGS_PER_PAGE));
       }
     },
 
-    renderListings(col = this.fullRenderedCollection) {
-      if (!col) {
-        throw new Error('Please provide a collection.');
-      }
-
-      // This collection will be loaded in batches as the
-      // user scrolls.
-      this.fullRenderedCollection = col;
-      this.setSortFunction(col);
-      col.sort();
-
-      this.$listingsContainer().empty();
-
-      const countPhrase = app.polyglot.t('userPage.store.countListings', { smart_count: col.length, display_count: localizeNumber(col.length) });
-
-      const fullListingCount = app.polyglot.t('userPage.store.countListingsFound', { countListings: `<span class="txB">${countPhrase}</span>` });
-      this.$listingCount().html(fullListingCount);
-
-      if (col.length) {
-        // todo: exceptionally tall screens may fit an entire page
-        // with room to spare. Which means no scrollbar, which means subsequent
-        // pages will not load. Handle that case.
-        const storeListingsCol = new Listings(col.slice(0, LISTINGS_PER_PAGE), { guid: this.model.id });
-
-        if (this.storeListings) this.storeListings.remove();
-
-        this.storeListings = new ListingsGrid({
-          collection: storeListingsCol,
-          storeOwnerProfile: this.model,
-          viewType: this.listingsViewType,
-        });
-
-        getContentFrame().on('scroll', this.storeListingsScrollHandler);
-        const scrollHandler = (e) => this.storeListingsScroll.call(this, storeListingsCol, e);
-        this.storeListingsScrollHandler = _.debounce(scrollHandler, 100);
-        getContentFrame().on('scroll', this.storeListingsScrollHandler);
-
-        this.$noResults().addClass('hide');
-        this.$listingsContainer().append(this.storeListings.render().el);
-      } else {
-        this.$noResults().removeClass('hide');
-      }
+    onStoreListingsScroll(e) {
+      _.debounce(() => {
+        this._onStoreListingsScroll(e);
+      }, 100);
     },
 
-    renderCategories(cats = this.collection.categories) {
-      if (!this.categoryFilter) {
-        this.categoryFilter = new CategoryFilter({
-          initialState: {
-            categories: cats,
-            selected: this.filter.category,
-          },
-        });
-
-        this.categoryFilter.render();
-
-        this.listenTo(this.categoryFilter, 'category-change', (e) => {
-          this.filter.category = e.value;
-          this.renderListings(this.filteredCollection());
-        });
-      } else {
-        if (cats.indexOf(this.filter.category) === -1) {
-          this.filter.category = 'all';
-        }
-
-        this.categoryFilter.setState({
-          categories: cats,
-          selected: this.filter.category,
-        });
-      }
-
-      if (!this.$catFilterContainer()[0].contains(this.categoryFilter.el)) {
-        this.categoryFilter.delegateEvents();
-        this.$catFilterContainer().empty().append(this.categoryFilter.el);
-      }
+    onCategoryChange(cat) {
+      this.filter.category = cat;
     },
 
-    renderTypes(types = this.collection.types) {
-      if (!this.typeFilter) {
-        this.typeFilter = new TypeFilter({
-          initialState: {
-            types,
-            selected: this.filter.type,
-          },
-        });
-
-        this.typeFilter.render();
-
-        this.listenTo(this.typeFilter, 'type-change', (e) => {
-          this.filter.type = e.value;
-
-          if (this.filter.type !== 'PHYSICAL_GOOD' && this.filter.type !== 'all') {
-            this.$shippingFilterContainer().addClass('disabled');
-          } else {
-            this.$shippingFilterContainer().removeClass('disabled');
-          }
-
-          this.renderListings(this.filteredCollection());
-        });
-      } else {
-        if (types.indexOf(this.filter.type) === -1) {
-          this.filter.type = 'all';
-        }
-
-        this.typeFilter.setState({
-          types,
-          selected: this.filter.type,
-        });
-      }
-
-      if (!this.$typeFilterContainer()[0].contains(this.typeFilter.el)) {
-        this.typeFilter.delegateEvents();
-        this.$typeFilterContainer().empty().append(this.typeFilter.el);
-      }
+    onTypeChange(type) {
+      this.filter.type = type;
     },
 
     render() {
       if (this.dataChangePopIn) this.dataChangePopIn.remove();
       if (this.shippingChangePopIn) this.shippingChangePopIn.remove();
-
-      const isFetching = this.fetch && this.fetch.state() === 'pending';
-      const fetchFailed = this.fetch && this.fetch.state() === 'rejected' && this.fetch.status !== 404;
-
-      this.$sortBy = this.$('.js-sortBySelect');
-      this.$shipsToSelect = this.$('.js-shipsToSelect');
-
-      this.$sortBy.select2({
-        minimumResultsForSearch: -1,
-        dropdownParent: this.$('.js-sortBySelectDropdownContainer'),
-      });
-
-      this.$shipsToSelect.select2({
-        dropdownParent: this.$('.js-shipsToSelectDropdownContainer'),
-      });
 
       if (!this.rendered) {
         if (this.listing) {
@@ -688,22 +592,9 @@ export default {
         this.rendered = true;
       }
 
-      if (!isFetching && !fetchFailed) {
-        this.renderCategories(this.collection.categories);
-        this.renderTypes(this.collection.types);
-
-        if (this.collection.length) {
-          this.renderListings(this.filteredCollection());
-        }
-      }
-
       return this;
     },
   },
 };
 </script>
 <style lang="scss" scoped></style>
-
-<!-- 
-Store.fetchListings = (cl, options = {}) =>
-  cl.fetch({ cache: false, ...options }); -->

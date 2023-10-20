@@ -23,12 +23,11 @@
       </div>
       <div class="tx6 flexVCent">
         <label class="clrT2 marginLAuto margRSm">{{ ob.polyT('transactions.sort.label') }}</label>
-        <select class="tx6 select2Small js-sortBySelect" @change="onChangeSortBy(ob.filter.sortBy)" style="width: 150px">
+        <Select2 class="tx6 select2Small js-sortBySelect" :options="{ minimumResultsForSearch: -1, }" v-model="filter.sortBy" style="width: 150px">
           <option value="UNREAD" :selected="ob.filter.sortBy === 'UNREAD'">{{ ob.polyT('transactions.sort.unread') }}</option>
           <option value="DATE_ASC" :selected="ob.filter.sortBy === 'DATE_ASC'">{{ ob.polyT('transactions.sort.dateAsc') }}</option>
           <option value="DATE_DESC" :selected="ob.filter.sortBy === 'DATE_DESC'">{{ ob.polyT('transactions.sort.dateDesc') }}</option>
-        </select>
-        <div class="select2Small js-sortBySelectDropdownContainer"></div>
+        </Select2>
       </div>
     </div>
 
@@ -74,6 +73,8 @@ export default {
 
       filter: {
         search: '',
+        sortBy: 'UNREAD',
+        states: [],
       },
       showTotalWrapper: false,
     };
@@ -84,10 +85,6 @@ export default {
     this.loadData(this.options);
   },
   mounted() {
-    $('.js-sortBySelect').select2({
-      minimumResultsForSearch: -1,
-      dropdownParent: $('.js-sortBySelectDropdownContainer'),
-    });
   },
   unmounted() {
     clearTimeout(this.searchKeyUpTimer);
@@ -189,13 +186,6 @@ export default {
           search: val,
         };
       }, 200);
-    },
-
-    onChangeSortBy(val) {
-      this.filter = {
-        ...this.filter,
-        sortBy: val,
-      };
     },
 
     onClickResetQuery() {

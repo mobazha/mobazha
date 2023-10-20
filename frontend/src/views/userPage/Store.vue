@@ -37,16 +37,15 @@
             <div class="txB rowSm">{{ ob.polyT('userPage.store.shippingFilter.heading') }}</div>
             <div class="flexVCent rowSm">
               <label class="margRSm" for="shipsToSelect">{{ ob.polyT('userPage.store.shippingFilter.shipsTo') }}:</label>
-              <select class="tx6 select2Small js-shipsToSelect" @change="onShipsToSelectChange($event)" style="width: 133px" id="shipsToSelect">
+              <Select2 class="tx6 select2Small js-shipsToSelect" v-model="filter.shipsTo" style="width: 133px" id="shipsToSelect">
                 <option value="any" :selected="ob.shipsToSelected === 'any'">{{ ob.polyT('userPage.store.shipsToFilterAny') }}</option>
                 <option v-for="(country, j) in ob.countryList" :key="j" :value="country.dataName" :selected="country.dataName === ob.shipsToSelected">
                   {{ country.name }}
                 </option>
-              </select>
-              <div class="select2Small js-shipsToSelectDropdownContainer"></div>
+              </Select2>
             </div>
             <div class="flexVCent rowSm">
-              <input type="checkbox" id="filterFreeShipping" class="margRSm" @change="onFilterFreeShippingChange" :checked="ob.filter.freeShipping" />
+              <input type="checkbox" id="filterFreeShipping" class="margRSm" v-model="filter.freeShipping" />
               <label for="filterFreeShipping"></label
               ><!-- label for the replacement checkbox -->
               <label class="clrE1 clrTOnEmph phraseBox" for="filterFreeShipping">{{ ob.polyT('userPage.store.freeShippingBanner') }}</label>
@@ -66,14 +65,13 @@
               <div>
                 <div class="tx6 flexVCent">
                   <label class="clrT2 marginLAuto margRSm">{{ ob.polyT('userPage.store.sortBy') }}</label>
-                  <select class="tx6 select2Small js-sortBySelect" @change="onChangeSortBy($event)" style="width: 150px">
+                  <Select2 class="tx6 select2Small js-sortBySelect" :options="{ minimumResultsForSearch: -1, }" v-model="filter.sortBy" style="width: 150px">
                     <option value="PRICE_ASC" :selected="ob.filter.sortBy === 'PRICE_ASC'">{{ ob.polyT('userPage.store.sortOpts.priceAsc') }}</option>
                     <option value="PRICE_DESC" :selected="ob.filter.sortBy === 'PRICE_DESC'">{{ ob.polyT('userPage.store.sortOpts.priceDesc') }}</option>
                     <option value="NAME_ASC" :selected="ob.filter.sortBy === 'NAME_ASC'">{{ ob.polyT('userPage.store.sortOpts.nameAsc') }}</option>
                     <option value="NAME_DESC" :selected="ob.filter.sortBy === 'NAME_DESC'">{{ ob.polyT('userPage.store.sortOpts.nameDesc') }}</option>
                     <!-- <option value="RATING">Rating</option> -->
-                  </select>
-                  <div class="select2Small js-sortBySelectDropdownContainer"></div>
+                  </Select2>
                 </div>
               </div>
             </div>
@@ -173,15 +171,6 @@ export default {
   },
   mounted() {
     this.render();
-
-    $('.js-sortBySelect').select2({
-      minimumResultsForSearch: -1,
-      dropdownParent: $('.js-sortBySelectDropdownContainer'),
-    });
-
-    $('.js-shipsToSelect').select2({
-      dropdownParent: $('.js-shipsToSelectDropdownContainer'),
-    });
   },
   unmounted() {
   },
@@ -307,18 +296,6 @@ export default {
       // this block should be last
       this.fetch = this.fetchListings();
       this.onRequest(this.collection, this.fetch);
-    },
-
-    onFilterFreeShippingChange(e) {
-      this.filter.freeShipping = $(e.target).is(':checked');
-    },
-
-    onShipsToSelectChange(event) {
-      this.filter.shipsTo = event.target.value;
-    },
-
-    onChangeSortBy(event) {
-      this.filter.sortBy = event.target.value;
     },
 
     onUpdateCollection(cl, opts) {

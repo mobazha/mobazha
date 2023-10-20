@@ -26,7 +26,7 @@ export default class extends BaseModel {
       throw new Error('Please provide a country.');
     }
 
-    return this.get('shipsTo').indexOf(country) !== -1;
+    return this.get('shipsTo') === null || this.get('shipsTo').indexOf(country) !== -1;
   }
 
   get isCrypto() {

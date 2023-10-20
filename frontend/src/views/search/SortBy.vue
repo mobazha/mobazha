@@ -25,10 +25,15 @@
         {{ ob.polyT('search.sortBy') }}
       </div>
       <div class="col4">
-        <select id="sortBy" class="select2Small " @change="changeSortBy($event)">
-          <option v-for="(val, key) in options.sortBy" :key="key" :value="key" :selected="selected(val, key)">{{ val.label }}
+        <Select2 id="sortBy" class="select2Small" v-model="sortBySelected" @change="changeSortBy($event)"
+          :options="{
+            minimumResultsForSearch: Infinity, // disables the search box
+            templateResult: selectEmojis,
+            templateSelection: selectEmojis,
+          }">
+          <option v-for="(val, key) in options.sortBy" :value="key" :selected="selected(val, key)">{{ val.label }}
           </option>
-        </select>
+        </Select2>
       </div>
     </template>
 
@@ -36,7 +41,6 @@
 </template>
 
 <script>
-import $ from 'jquery';
 import { selectEmojis } from '../../../backbone/utils';
 
 
@@ -47,24 +51,22 @@ export default {
       default:  {
         term: '',
         results: [],
-        sortBy: '',
+        sortBy: [],
         sortBySelected: '',
       },
     },
   },
   data () {
     return {
+      sortBySelected: '',
     };
   },
   created () {
     this.initEventChain();
+
+    this.sortBySelected = this.options.sortBySelected;
   },
   mounted () {
-    $('#sortBy').select2({
-      minimumResultsForSearch: Infinity, // disables the search box
-      templateResult: selectEmojis,
-      templateSelection: selectEmojis,
-    });
   },
   computed: {
     ob () {
@@ -74,14 +76,16 @@ export default {
     },
   },
   methods: {
+    selectEmojis,
+
     changeSortBy (event) {
       this.$emit('changeSortBy', { sortBy: event.target.value });
     },
 
     selected (val, key) {
       let selected = false;
-      if (this.options.sortBySelected) {
-        selected = key === this.options.sortBySelected;
+      if (this.sortBySelected) {
+        selected = key === this.sortBySelected;
       } else {
         selected = val.default;
       }

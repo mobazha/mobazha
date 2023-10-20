@@ -16,7 +16,7 @@
             <div class="flexHRight flexVCent gutterH clrT2">
               <DefineTabHeader v-slot="{tab, count}">
                 <a :class="`btn tab clrBr ${activeTab === tab ? 'clrT active' : ''}`" @click="clickTab(tab)"
-                >{{ ob.polyT(`userPage.mainNav.${tab}`) }}<span v-if="count == null" class="clrTEmph1 margLSm">{{ abbrNum(count) }}</span></a>
+                >{{ ob.polyT(`userPage.mainNav.${tab}`) }}<span v-if="count !== null" class="clrTEmph1 margLSm">{{ abbrNum(count) }}</span></a>
               </DefineTabHeader>
               <ReuseTabHeader tab="home" />
               <!-- // the store tab is only visible to the user if they have vendor set to false -->
@@ -120,7 +120,6 @@ import { createReusableTemplate } from '@vueuse/core';
 
 import app from '../../../backbone/app';
 import { abbrNum } from '../../../backbone/utils';
-import { capitalize } from '../../../backbone/utils/string';
 import { isHiRez } from '../../../backbone/utils/responsive';
 import { startAjaxEvent, endAjaxEvent, recordEvent } from '../../../backbone/utils/metrics';
 import { launchEditListingModal, launchSettingsModal } from '../../../backbone/utils/modalManager';
@@ -528,6 +527,11 @@ export default {
       }
 
       this.activeTab = state;
+
+      // // add tab to history
+      const listingBaseUrl = this.model.get('handle') ? `@${this.model.get('handle')}` : this.model.id;
+      app.router.navigate(`${listingBaseUrl}/${state}`, {replace: true});
+      // app.router.navigateUser(`${listingBaseUrl}/${state}`, this.model.id);
     },
   },
 };

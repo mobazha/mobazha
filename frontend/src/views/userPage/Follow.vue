@@ -37,6 +37,8 @@ export default {
       usersPerPage: 12,
       noResults: false,
 
+      followsYouFetch: undefined,
+
       _state: {
         followType: 'followers',
         fetchCollection: true,

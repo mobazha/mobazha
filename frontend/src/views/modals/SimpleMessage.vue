@@ -10,7 +10,7 @@
             <h1>{{ ob.title }}</h1>
           </div>
           <div class="msgWrap">
-            <template v-if="ob.messageHtml" v-html="ob.messageHtml"></template>
+            <div v-if="ob.messageHtml" v-html="ob.messageHtml" />
             <template v-else>
               <p v-html="ob.message"></p>
             </template>

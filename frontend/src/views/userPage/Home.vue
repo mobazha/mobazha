@@ -86,13 +86,10 @@
               <strong>{{ ob.polyT('userPage.about') }}</strong>
             </div>
             <template v-if="ob.about">
-              {{ ob.about }}
+              <div v-html="ob.about" />
             </template>
-
             <template v-else>
-              <span class="clrT2"
-                ><i>{{ ob.polyT('userPage.aboutEmpty') }}</i></span
-              >
+              <span class="clrT2"><i>{{ ob.polyT('userPage.aboutEmpty') }}</i></span>
             </template>
           </div>
         </div>
@@ -140,11 +137,11 @@ export default {
     },
     feeAmount() {
       const ob = this.ob;
-      return (amount = ob.currencyMod.convertAndFormatCurrency(
+      return ob.currencyMod.convertAndFormatCurrency(
         ob.moderatorInfo.fee.fixedFee.amount,
         ob.moderatorInfo.fee.fixedFee.currency.code,
         ob.displayCurrency
-      ));
+      );
     },
     ownMod() {
       return app.settings.ownMod(this.model.id);

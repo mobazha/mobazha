@@ -43,7 +43,7 @@
               <div class="rowDivV clrBrBk TODO"></div>
               <div class="mDetail TODO">
                 <div class="flexCol flexCent">
-                  <template v-html="b.parseEmojis('👍')"></template> XX <!-- // placeholder for reputation -->
+                  <div v-html="b.parseEmojis('👍')" /> XX <!-- // placeholder for reputation -->
                   <div class="txCtr tx5b clrT2">{{ ob.polyT('moderatorDetails.recommendations') }}</div>
                 </div>
               </div>

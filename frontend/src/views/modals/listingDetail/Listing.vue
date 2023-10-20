@@ -192,7 +192,7 @@
 
           <div class="contentBox descriptionSection padLg clrP clrBr clrSh3">
             <h2 class="txUnb">{{ ob.polyT('listingDetail.description') }}</h2>
-            <template v-html="ob.item.description"></template>
+            <div v-html="ob.item.description" />
             <template v-if="!ob.item.description">
               <i class="clrT2">{{ ob.polyT('listingDetail.noDescription') }}</i>
             </template>
@@ -257,7 +257,7 @@
           </template>
           <div class="contentBox padLg clrP clrBr clrSh3">
             <h2 class="txUnb">{{ ob.polyT('listingDetail.refundPolicy') }}</h2>
-            <template v-html="ob.refundPolicy"></template>
+            <div v-html="ob.refundPolicy" />
             <template v-if="!ob.refundPolicy">
               <i class="clrT2">{{ ob.polyT('listingDetail.noRefundPolicy') }}</i>
             </template>
@@ -265,7 +265,7 @@
 
           <div class="contentBox padLg clrP clrBr clrSh3">
             <h2 class="txUnb">{{ ob.polyT('listingDetail.termsAndConditions') }}</h2>
-            <template v-html="ob.termsAndConditions"></template>
+            <div v-html="ob.termsAndConditions" />
             <template v-if="!ob.termsAndConditions">
               <i class="clrT2">{{ ob.polyT('listingDetail.noTermsAndConditions') }}</i>
             </template>

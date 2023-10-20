@@ -212,7 +212,7 @@
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.tagsDetailed') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['item.tags']" :errors="ob.errors['item.tags']" />
-                <div class="js-maxTagsWarning"><template v-if="ob.item.tags.length >= ob.max.tags" v-html="ob.maxTagsWarning"></template></div>
+                <div class="js-maxTagsWarning"><div v-if="ob.item.tags.length >= ob.max.tags" v-html="ob.maxTagsWarning" /></div>
                 <input
                   type="text"
                   id="editListingTags"
@@ -228,7 +228,7 @@
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.categoryDetailed') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['item.categories']" :errors="ob.errors['item.categories']" />
-                <div class="js-maxCatsWarning"><template v-if="ob.item.categories.length >= ob.max.cats" v-html="ob.maxCatsWarning"></template></div>
+                <div class="js-maxCatsWarning"><div v-if="ob.item.categories.length >= ob.max.cats" v-html="ob.maxCatsWarning" /></div>
                 <input
                   type="text"
                   id="editListingCategories"

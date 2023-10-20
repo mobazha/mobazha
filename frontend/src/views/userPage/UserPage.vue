@@ -232,6 +232,7 @@ export default {
         this.setBlockedClass();
       }
     });
+    this.listenTo(blockEvents, 'unblocking unblocked', this.onUnblock);
   },
   unmounted() {
     if (this.followingFetch) this.followingFetch.abort();
@@ -267,7 +268,7 @@ export default {
       }
     },
     onUnblock(data) {
-      if (data.peerIDs.includes(guid)) {
+      if (data.peerIDs.includes(this.model.id)) {
         let { guid, state, slug } = this.$route.params;
 
         this.init(guid, state, slug);
@@ -496,10 +497,12 @@ export default {
 
     followBB(type) {
       const collection = new Followers([], { peerID: this.model.id, type, });
+      const model = this.model;
 
       return function() {
         return {
           collection,
+          model,
         }
       };
     },

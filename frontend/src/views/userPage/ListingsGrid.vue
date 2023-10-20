@@ -1,6 +1,6 @@
 <template>
-  <div :class="`listingsGrid flex ${viewType === 'list' ? 'listingsGridListView' : ''}`">
-    <template v-for="model in collection">
+  <div :class="`listingsGrid flex ${viewType === 'list' ? 'listingsGridListView' : ''}`" :key="viewType">
+    <template v-for="model in collection" :key="model.id">
       <ListingCard :options="cardOptions(model)" :bb="function() {
         return {
           model,

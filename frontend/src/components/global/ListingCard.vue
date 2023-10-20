@@ -2,7 +2,7 @@
   <div v-if="!cardError" @click.stop="onClick"
     :class="`listingCard col clrBr clrHover clrT clrP clrSh2 contentBox ${ownListing ? 'ownListing' : ''} ${destroyClass} ${blocked ? 'blocked' : ''} ${hideNsfw ? 'hideNsfw' : ''} ${_model.nsfw ? 'nsfw' : ''}`">
     <div v-if="ob.viewType === 'grid'" class="gridViewContent posR">
-      <div class="listingImage js-listingImage" :style="listingImageBgStyle">
+      <div class="listingImage" :style="listingImageStyle">
         <div class="nsfwOverlay overlayPanel coverFull clrP">
           <div class="flexCent">
             <div>
@@ -86,7 +86,7 @@
           <a class="userIconWrapper js-userLink" :href="`#${ob.vendor.peerID}/store`" @click.stop="onClickUserLink">
             <div
               class="userIcon disc clrBr2 clrSh1 toolTipNoWrap js-vendorIcon"
-              :style="`background-image: ` + (ob.vendorAvatarImageSrc ? `url(${ob.vendorAvatarImageSrc}), ` : '') +`url('../imgs/defaultAvatar.png')`"
+              :style="vendorAvatarStyle"
               :data-tip="ob.vendor.name"
             ></div>
           </a>
@@ -162,7 +162,7 @@
       <div class="flexVCent gutterHSm">
         <!-- // Since we have inconsistent padding/gutters, we'll inline some padding settings. -->
         <div class="flexNoShrink posR">
-          <div class="listingImage js-listingImage posR" :style="listingImageBgStyle"></div>
+          <div class="listingImage posR" :style="listingImageStyle"></div>
           <div class="center tx2 nsfwAvatarOverlay"><div v-html="ob.parseEmojis('😲')" /></div>
         </div>
         <div class="flexExpand">
@@ -401,8 +401,6 @@ export default {
       blocked: false,
       hideNsfw: false,
 
-      avatarImage: undefined,
-
       app: app,
     };
   },
@@ -426,15 +424,29 @@ export default {
         displayCurrency: app.settings.get('localCurrency'),
         isBlocked,
         isUnblocking,
-        listingImageSrc: (this.listingImage.loaded && this.listingImage.src) || '',
-        vendorAvatarImageSrc: (this.avatarImage && this.avatarImage.loaded && this.avatarImage.src) || '',
         abbrNum,
       };
     },
-    listingImageBgStyle() {
-      let ob = this.ob;
-      const listingImageSrc = ob.listingImageSrc ? `url(${ob.listingImageSrc}), ` : '';
-      return `background-image: ${listingImageSrc}url('../imgs/defaultItem.png')`;
+    listingImageStyle() {
+      const thumbnail = this.model.get('thumbnail');
+      if (thumbnail) {
+        let listingImageSrc = this.viewType === 'grid'
+          ? app.getServerUrl(`ob/image/${isHiRez() ? thumbnail.medium : thumbnail.small}`)
+          : app.getServerUrl(`ob/image/${isHiRez() ? thumbnail.small : thumbnail.tiny}`);
+
+        return `background-image: url(${listingImageSrc}), url('../imgs/defaultItem.png')`;
+      }
+
+      return `background-image: url('../imgs/defaultItem.png')`;
+    },
+    vendorAvatarStyle() {
+      const vendor = this.model.get('vendor');
+      if (vendor && vendor.avatarHashes) {
+        const avatarImageSrc = app.getServerUrl(`ob/image/${isHiRez() ? vendor.avatarHashes.small : vendor.avatarHashes.tiny}`);
+
+        return `background-image: url(${avatarImageSrc}), url('../imgs/defaultAvatar.png')`;
+      }
+      return `background-image: url('../imgs/defaultAvatar.png')`;
     },
     priceMaxDisplayDecimals() {
       let ob = this.ob;
@@ -473,7 +485,7 @@ export default {
       const moderators = this.model.get('moderators') || [];
       const verifiedIDs = app.verifiedMods.matched(moderators);
       return verifiedIDs[0];
-    }
+    },
   },
   methods: {
     getListingOptions,
@@ -567,32 +579,6 @@ export default {
             this.render();
           }
         });
-
-        // load necessary images in a cancelable way
-        const thumbnail = this.model.get('thumbnail');
-        const listingImageSrc =
-          this.viewType === 'grid'
-            ? app.getServerUrl(`ob/image/${isHiRez() ? thumbnail.medium : thumbnail.small}`)
-            : app.getServerUrl(`ob/image/${isHiRez() ? thumbnail.small : thumbnail.tiny}`);
-
-        this.listingImage = new Image();
-        this.listingImage.addEventListener('load', () => {
-          this.listingImage.loaded = true;
-          $('.js-listingImage').css('backgroundImage', `url(${listingImageSrc})`);
-        });
-        this.listingImage.src = listingImageSrc;
-
-        const vendor = this.model.get('vendor');
-        if (vendor && vendor.avatarHashes) {
-          const avatarImageSrc = app.getServerUrl(`ob/image/${isHiRez() ? vendor.avatarHashes.small : vendor.avatarHashes.tiny}`);
-
-          this.avatarImage = new Image();
-          this.avatarImage.addEventListener('load', () => {
-            this.avatarImage.loaded = true;
-            $('.js-vendorIcon').css('backgroundImage', `url(${avatarImageSrc})`);
-          });
-          this.avatarImage.src = avatarImageSrc;
-        }
       } catch (e) {
         this.cardError = e.message || true;
 
@@ -986,8 +972,6 @@ export default {
     },
 
     remove() {
-      if (this.listingImage) this.listingImage.src = '';
-      if (this.avatarImage) this.avatarImage.src = '';
       if (this.fullListingFetch) this.fullListingFetch.abort();
       if (this.destroyRequest) this.destroyRequest.abort();
       $(document).off('click', this.boundDocClick);

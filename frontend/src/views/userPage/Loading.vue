@@ -12,11 +12,11 @@
         <section class="contentBox clrP clrBr clrSh3">
           <div class="padMd">
             <header>
-              <template v-if="ob.userAvatarHashes || userName">
+              <template v-if="userAvatarHashes || userName">
                 <div>
                   <div class="titleRow flexVCent gutterHSm">
-                    <template v-if="ob.userAvatarHashes">
-                      <div class="discTn clrBr2 clrSh1 flexNoShrink" :style="ob.getAvatarBgImage(ob.userAvatarHashes)"></div>
+                    <template v-if="userAvatarHashes">
+                      <div class="discTn clrBr2 clrSh1 flexNoShrink" :style="ob.getAvatarBgImage(userAvatarHashes)"></div>
                     </template>
                     <template v-if="userName">
                       <h2 class="h4 txUnl lineHeight1 clrT">{{ userName }}</h2>
@@ -31,7 +31,7 @@
                 <i :class="`ion-android-arrow-forward clrT2 lineHeight1 tx3 ${!isProcessing ? 'clrTErr' : ''}`"></i>
                 <div
                   :class="`discSm clrBr2 clrSh1 flexNoShrink  ${!isProcessing ? 'disabled' : ''}`"
-                  :style="ob.getAvatarBgImage(ob.userAvatarHashes)"
+                  :style="ob.getAvatarBgImage(userAvatarHashes)"
                 ></div>
               </div>
               <template v-if="isProcessing">
@@ -90,6 +90,11 @@ export default {
     userName: {
       type: String,
       default: '',
+    },
+    userAvatarHashes: 
+    {
+      type: Object,
+      default: undefined,
     },
     contentText: {
       type: String,

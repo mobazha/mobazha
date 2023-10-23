@@ -96,7 +96,7 @@ export default {
       return {
         ...this.templateHelpers,
         ...this._model,
-        errors: this._model.validationError || {},
+        errors: this.model.validationError || {},
         openingDispute: !!openingDispute(this.model.id),
         timeoutMessage: this.options.timeoutMessage,
       };

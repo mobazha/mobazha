@@ -70,7 +70,7 @@
           <template v-if="ob.valid || ob.controlsOnInvalid">
             <div class="flexCol gutterV">
               <template v-if="ob.valid">
-                <button class="btn clrP clrBr clrSh2 selectBtn" @click="clickModerator">
+                <button class="btn clrP clrBr clrSh2 selectBtn" @click.stop="clickModerator">
                   {{ ob.polyT('moderatorCard.view') }}
                 </button>
               </template>
@@ -216,7 +216,6 @@ export default {
     },
 
     clickModerator(e) {
-      e.stopPropagation();
       const modModal = launchModeratorDetailsModal({
         model: this.model,
         purchase: this.options.purchase,

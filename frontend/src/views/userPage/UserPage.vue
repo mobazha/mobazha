@@ -530,7 +530,7 @@ export default {
 
       // // add tab to history
       const listingBaseUrl = this.model.get('handle') ? `@${this.model.get('handle')}` : this.model.id;
-      app.router.navigate(`${listingBaseUrl}/${state}`, {replace: true});
+      app.router.navigate(`${listingBaseUrl}/${state}`);
       // app.router.navigateUser(`${listingBaseUrl}/${state}`, this.model.id);
     },
   },

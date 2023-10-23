@@ -2,7 +2,7 @@
   <div>
     <template v-if="ob.templateData.length">
       <table class="shippingTable clrBr">
-        <template v-for="(option, tdi) in ob.templateData" :key="tdi">
+        <template v-for="(option, tdi) in ob.templateData" :key="option">
           <tr class="tx5 clrBr borderBottom">
             <th>{{ option.name }}</th>
             <template v-if="option.type === 'LOCAL_PICKUP'">
@@ -16,7 +16,7 @@
             </template>
           </tr>
 
-          <template v-for="(service, si) in sortedService(option)" :key="si">
+          <template v-for="(service, si) in sortedService(option)" :key="service">
             <tr :class="`${fShp(service) ? 'txB' : ''} ${si === option.services.length - 1 ? 'lastRow' : ''}`">
               <td>{{ service.name }}</td>
               <td>{{ service.estimatedDelivery }}</td>
@@ -80,12 +80,19 @@ export default {
     };
   },
   created () {
-    this.loadData(this.options);
   },
   mounted () {
     this.render();
   },
   computed: {
+    ob () {
+      return {
+        ...this.templateHelpers,
+        ...this.options,
+      }
+    },
+  },
+  methods: {
     sortedService (option) {
       return option.services
         .sort((a, b) => {
@@ -103,9 +110,6 @@ export default {
     fShp (service) {
       return service.price && service.price.eq(0) ? true : false;
     }
-  },
-  methods: {
-
   }
 }
 </script>

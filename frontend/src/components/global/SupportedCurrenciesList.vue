@@ -10,7 +10,6 @@
 
 <script>
 import _ from 'underscore';
-import loadTemplate from '../../../backbone/utils/loadTemplate';
 import { ensureMainnetCode } from '../../../backbone/data/walletCurrencies';
 import app from '../../../backbone/app';
 
@@ -31,8 +30,6 @@ export default {
     };
   },
   created() {
-    this.initEventChain();
-
     this.loadData(this.options);
   },
   computed: {
@@ -58,7 +55,7 @@ export default {
       this.baseInit(opts);
     },
 
-    setState(state = {}, options = {}) {
+    setState(state = {}) {
       const curState = this.getState();
       const processedState = {
         ...state,
@@ -86,19 +83,7 @@ export default {
         }
       }
 
-      super.setState(processedState, options);
-    },
-
-    render() {
-      loadTemplate('components/supportedCurrenciesList.html', (t) => {
-        this.$el.html(
-          t({
-            ...this.getState(),
-          })
-        );
-      });
-
-      return this;
+      _.extend(this._state, processedState);
     },
   },
 };

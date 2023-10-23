@@ -128,7 +128,7 @@ export default {
           let include = true;
 
           if (chatter.role === 'moderator' &&
-            this._model.state !== 'DISPUTED') {
+            this.model.get('state') !== 'DISPUTED') {
             include = false;
           }
 
@@ -138,7 +138,7 @@ export default {
 
     footerClass () {
       if (this.moderator && this.moderator.id === app.profile.id &&
-        this._model.state === 'RESOLVED') {
+        this.model.get('state') === 'RESOLVED') {
         // If this is the moderator looking at the order and the mod has
         // already made a decision, the mod cannot send any more chat messages.
         return 'preventModChat';
@@ -149,8 +149,8 @@ export default {
     messageInputPlaceholder () {
       if (this.moderator && this.moderator.id === app.profile.id) return;
 
-      if (this._model.state === 'DECIDED' ||
-        this._model.state === 'RESOLVED') {
+      if (this.model.get('state') === 'DECIDED' ||
+        this.model.get('state') === 'RESOLVED') {
         // If the mod has made a decision, indicator to the vendor / buyer
         // that they will no longer recieve new chat message.
         return app.polyglot.t('orderDetail.discussionTab.enterMessageNoMoreModPlaceholder');

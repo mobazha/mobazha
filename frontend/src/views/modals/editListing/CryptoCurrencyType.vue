@@ -117,7 +117,7 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        contractTypes: this._model.metadata.contractTypesVerbose,
+        contractTypes: this.model.get('metadata').contractTypesVerbose,
         coinTypes: this.coinTypes,
         receiveCurs: this.receiveCurs,
         errors: this.model.validationError || {},

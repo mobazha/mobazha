@@ -129,7 +129,7 @@ export default {
         ...this._model,
         userCurrency: app.settings.get('localCurrency'),
         moment,
-        vendorID: this.type === 'sales' ? app.profile.id : this._model.vendorID,
+        vendorID: this.type === 'sales' ? app.profile.id : this.model.get('vendorID'),
       }
     },
     userCols () {

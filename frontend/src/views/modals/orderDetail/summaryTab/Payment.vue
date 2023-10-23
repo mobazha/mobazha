@@ -154,7 +154,7 @@ export default {
         ...this.templateHelpers,
         ...this._state,
         ...this._model,
-        value: integerToDecimal(this._model.value, this._state.paymentCoinDivis),
+        value: integerToDecimal(this.model.get('value'), this._state.paymentCoinDivis),
         confirmations,
         abbrNum,
         moment,

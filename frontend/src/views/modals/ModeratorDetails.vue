@@ -155,7 +155,8 @@ export default {
   },
   computed: {
     ob () {
-      const modLanguages = this._model.moderatorInfo.languages
+      const modLanguages = this.model.get('moderatorInfo')
+        .get('languages')
         .map((lang) => {
           const langData = getLangByCode(lang);
           return (langData && langData.name) || lang;
@@ -175,7 +176,7 @@ export default {
 
     verifiedModModel() {
       let access = this.verfiedModsKey;
-      return app.verifiedMods.get(this._model.peerID);
+      return app.verifiedMods.get(this.model.get('peerID'));
     }
   },
   methods: {

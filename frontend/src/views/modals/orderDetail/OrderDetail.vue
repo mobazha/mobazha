@@ -254,7 +254,7 @@ export default {
       return this.model instanceof Case ? 'case' : this.model.type;
     },
     contract () {
-      return this._model.contract;
+      return this.model.get('contract');
     },
     /**
      * Returns whether different action bar buttons should be displayed or not
@@ -304,7 +304,7 @@ export default {
       return { tip };
     },
     unreadChatMessagesText () {
-      let count = this._model.unreadChatMessages;
+      let count = this.model.get('unreadChatMessages');
       count = count > 0 ? count : '';
       count = count > 99 ? '…' : count;
       return count;

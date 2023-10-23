@@ -146,14 +146,14 @@ export default {
   },
   computed: {
     ob () {
-      const cryptoDelivery = this._model.cryptocurrencyDelivery;
+      const cryptoDelivery = this.model.get('cryptocurrencyDelivery');
 
       return {
         ...this.templateHelpers,
         contractType: this.contractType,
         isLocalPickup: this.isLocalPickup,
         ...this._model,
-        errors: this._model.validationError || {},
+        errors: this.model.validationError || {},
         fulfillingOrder: fulfillingOrder(this.model.id),
         constraints: cryptoDelivery && cryptoDelivery.constraints || {},
       };

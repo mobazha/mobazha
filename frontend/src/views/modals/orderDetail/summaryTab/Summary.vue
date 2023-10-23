@@ -129,7 +129,7 @@ export default {
       return templateData;
     },
     progressBarState () {
-      const orderState = this._model.state;
+      const orderState = this.model.get('state');
       const state = {
         states: [
           app.polyglot.t('orderDetail.summaryTab.orderDetails.progressBarStates.paid'),

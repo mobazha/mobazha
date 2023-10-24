@@ -153,7 +153,7 @@ export default {
       return {
         ...this.templateHelpers,
         ...this._state,
-        ...this._model,
+        ...this.model.toJSON(),
         value: integerToDecimal(this.model.get('value'), this._state.paymentCoinDivis),
         confirmations,
         abbrNum,

@@ -128,7 +128,7 @@ export default {
         ...this.templateHelpers,
         countryList: this.countryList,
         errors: this.model.validationError || {},
-        ...this._model,
+        ...this.model.toJSON(),
       };
     }
   },

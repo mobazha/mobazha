@@ -132,7 +132,7 @@ export default {
         ...this.templateHelpers,
         currentModerator: this.ownMod,
         displayCurrency: app.settings.get('localCurrency'),
-        ...this._model,
+        ...this.model.toJSON(),
       };
     },
     feeAmount() {

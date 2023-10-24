@@ -127,7 +127,7 @@ export default {
         ...this.templateHelpers,
         moment,
         showListingData: this.options.showListingData,
-        ...this._model,
+        ...this.model.toJSON(),
       };
     },
     title () {

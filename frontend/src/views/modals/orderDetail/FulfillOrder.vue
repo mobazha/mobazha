@@ -152,7 +152,7 @@ export default {
         ...this.templateHelpers,
         contractType: this.contractType,
         isLocalPickup: this.isLocalPickup,
-        ...this._model,
+        ...this.model.toJSON(),
         errors: this.model.validationError || {},
         fulfillingOrder: fulfillingOrder(this.model.id),
         constraints: cryptoDelivery && cryptoDelivery.constraints || {},

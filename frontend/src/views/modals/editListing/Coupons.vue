@@ -46,7 +46,7 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        coupons: this._collection,
+        coupons: this.collection.toJSON(),
         maxCouponCount: this.maxCouponCount,
       };
     }

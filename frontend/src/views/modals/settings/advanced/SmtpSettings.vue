@@ -187,7 +187,7 @@ export default {
         ...this.templateHelpers,
         errors: this.model.validationError || {},
         testingSmtp: this.testSmtpPost && this.testSmtpPost.state() === 'pending',
-        ...this._model,
+        ...this.model.toJSON(),
       };
     }
   },

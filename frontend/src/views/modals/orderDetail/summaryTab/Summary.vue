@@ -110,7 +110,7 @@ export default {
         id: this.model.id,
         isCase: this.model.isCase,
         paymentCoin,
-        ...this._model,
+        ...this.model.toJSON(),
       };
 
       if (this.model.isCase) {

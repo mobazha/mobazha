@@ -170,7 +170,7 @@ export default {
         purchase: this.purchase,
         cardState: this.cardState,
         modLanguages,
-        ...this._model,
+        ...this.model.toJSON(),
       };
     },
 

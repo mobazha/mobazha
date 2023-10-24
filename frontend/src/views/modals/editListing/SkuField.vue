@@ -21,6 +21,7 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
@@ -35,7 +36,7 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this._model,
+        ...this.model.toJSON(),
         ...this._state,
         errors: this.model.validationError || {},
         max: {

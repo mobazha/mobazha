@@ -245,7 +245,7 @@ export default {
       return {
         ...this.templateHelpers,
         ...this._state,
-        ...this._model,
+        ...this.model.toJSON(),
         returnText: this.options.returnText,
         type: this.type,
       };

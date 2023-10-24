@@ -119,7 +119,7 @@ export default {
         getModTip: this.getModTip,
         getFollowTip: this.getFollowTip,
         ...this.options,
-        ...this._model,
+        ...this.model.toJSON(),
       };
     },
     headerHash () {

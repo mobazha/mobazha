@@ -126,7 +126,7 @@ export default {
         ...this.templateHelpers,
         type: this.type,
         ...this._state,
-        ...this._model,
+        ...this.model.toJSON(),
         userCurrency: app.settings.get('localCurrency'),
         moment,
         vendorID: this.type === 'sales' ? app.profile.id : this.model.get('vendorID'),

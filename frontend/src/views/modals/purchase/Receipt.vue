@@ -183,7 +183,7 @@ export default {
 
       return {
         ...this.templateHelpers,
-        ...this._model,
+        ...this.model.toJSON(),
         listing: this._listing,
         listingCurrency: this._listing.metadata.pricingCurrency.code,
         coupons: this.coupons,

@@ -123,7 +123,7 @@ export default {
       const walletBalance = app.walletBalances && app.walletBalances[this.coinType];
       return {
         ...this.templateHelpers,
-        ...this._model,
+        ...this.model.toJSON(),
         userCurrency: app.settings.get('localCurrency'),
         timeAgo: this.renderedTimeAgo,
         isTestnet: !!app.serverConfig.testnet,

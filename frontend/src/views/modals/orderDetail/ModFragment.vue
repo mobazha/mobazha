@@ -48,7 +48,7 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this._model,
+        ...this.model.toJSON(),
         ...this._state,
       };
     }

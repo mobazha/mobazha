@@ -59,7 +59,7 @@ export default {
         // include the cid, so they're unique.
         cid: this.model.cid,
         errors: this.model.validationError || {},
-        ...this._model,
+        ...this.model.toJSON(),
       };
     }
   },

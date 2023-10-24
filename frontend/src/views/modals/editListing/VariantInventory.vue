@@ -58,7 +58,7 @@ export default {
       return {
         ...this.templateHelpers,
         columns: inventoryData.columns,
-        inventory: this._collection,
+        inventory: this.collection.toJSON(),
         getPrice: this.options.getPrice,
       };
     }

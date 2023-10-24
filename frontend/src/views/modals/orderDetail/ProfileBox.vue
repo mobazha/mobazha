@@ -43,7 +43,7 @@ export default {
       return {
         ...this.templateHelpers,
         ...this._state,
-        ...this._model,
+        ...this.model.toJSON(),
       };
     }
   },

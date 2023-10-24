@@ -59,7 +59,7 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this._model,
+        ...this.model.toJSON(),
         validOptions: this.validOptions,
         selectedOption: this.selectedOption,
         displayCurrency: app.settings.get('localCurrency'),

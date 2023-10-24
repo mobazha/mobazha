@@ -95,7 +95,7 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this._model,
+        ...this.model.toJSON(),
         errors: this.model.validationError || {},
         openingDispute: !!openingDispute(this.model.id),
         timeoutMessage: this.options.timeoutMessage,

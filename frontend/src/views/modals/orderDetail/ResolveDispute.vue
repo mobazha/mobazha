@@ -132,7 +132,7 @@ export default {
   computed: {
     ob () {
       return {
-        ...this._model,
+        ...this.model.toJSON(),
         errors: this.model.validationError || {},
         resolvingDispute: resolvingDispute(this.model.id),
       };

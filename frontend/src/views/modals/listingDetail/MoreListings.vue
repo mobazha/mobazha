@@ -5,15 +5,10 @@
         <h2 class="txUnb">{{ ob.polyT('listingDetail.moreBy', { name: ob.vendor.name }) }}</h2>
       </template>
       <div class="listingsGrid flex js-cardWrapper">
-        <template v-for="listing in ob.listings">
+        <template v-for="listing in ob.listings" :key="listing.id">
           <ListingCard
-            :options="cardViewOptions(listing).options"
-            :bb="function() {
-              return {
-                model:cardViewOptions(listing).model,
-              };
-            }"
-            @listingDetailOpened="onListingDetailOpened"
+            :options="cardOptions"
+            :bb="cardBB(listing)"
           />
         </template>
       </div>
@@ -24,66 +19,50 @@
 
 <script>
 import ListingShort from '../../../../backbone/models/listing/ListingShort';
-import ListingCard from '../../components/ListingCard';
-
 
 export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        listings: [],
+        vendor: {},
+      },
     },
   },
   data () {
     return {
-      _state: {
-        listings: [],
-        vendor: {},
-      },
     };
   },
   created () {
-    this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob() {
       return {
         ...this.templateHelpers,
-        ...this._state,
+        ...this.options,
+      };
+    },
+
+    cardOptions () {
+      return {
+          vendor: this.options.vendor,
+          onStore: true,
       };
     },
   },
   methods: {
-    loadData (options = {}) {
-      this.baseInit({
-        ...options,
-        initialState: {
-          listings: [],
-          vendor: {},
-          ...options.initialState,
-        },
-      });
-    },
-
-    cardViewOptions (listing) {
-      const vendor = this.getState().vendor;
+    cardBB(listing) {
       const model = new ListingShort(listing);
-      model.set('vendor', vendor);
-      return {
-        model,
-        options: {
-          listingBaseUrl: `${vendor.peerID}/store/`,
-          vendor,
-          onStore: true,
-        }
-      };
-    },
+      model.set('vendor', this.options.vendor);
 
-    onListingDetailOpened() {
-      this.$emit('listingDetailOpened');
+      return function() {
+        return {
+          model,
+        }
+      }
     },
   }
 }

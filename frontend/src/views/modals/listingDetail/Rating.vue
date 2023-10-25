@@ -12,18 +12,18 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        averageRating: 0,
+        ratingCount: 0,
+        fetched: false,
+      },
     },
   },
   data () {
     return {
-      averageRating: 0,
-      ratingCount: 0,
-      fetched: false,
     };
   },
   created () {
-    this.loadData(this.options);
   },
   mounted () {
   },
@@ -31,18 +31,11 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        averageRating: this.averageRating,
-        ratingCount: this.ratingCount,
-        fetched: this.fetched,
+        ...this.options,
       };
     }
   },
   methods: {
-    loadData (options = {}) {
-      this.averageRating = options.averageRating || 0;
-      this.ratingCount = options.ratingCount || 0;
-      this.fetched = options.fetched || false;
-    },
   }
 }
 </script>

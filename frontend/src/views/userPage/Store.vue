@@ -116,10 +116,8 @@ import { getTranslatedCountries } from '../../../backbone/data/countries';
 import app from '../../../backbone/app';
 import { convertCurrency, NoExchangeRateDataError } from '../../../backbone/utils/currency';
 import { launchSettingsModal } from '../../../backbone/utils/modalManager';
-import Listing from '../../../backbone/models/listing/Listing';
 import Listings from '../../../backbone/collections/Listings';
 import { events as listingEvents } from '../../../backbone/models/listing';
-import ListingDetail from '../../../backbone/views/modals/listingDetail/Listing';
 
 import CategoryFilter from './CategoryFilter.vue';
 import TypeFilter from './TypeFilter.vue';
@@ -143,10 +141,6 @@ export default {
     ListingsGrid,
   },
   props: {
-    options: {
-      type: Object,
-      default: {},
-    },
     bb: Function,
   },
   data() {
@@ -167,7 +161,7 @@ export default {
   created() {
     this.initEventChain();
 
-    this.loadData(this.options);
+    this.loadData();
   },
   mounted() {
     this.render();
@@ -181,7 +175,7 @@ export default {
 
       return {
         ...this.templateHelpers,
-        ...this._model,
+        ...this.model.toJSON(),
         isFetching,
         fetchFailed,
         fetchFailReason: (fetchFailed && this.fetch.responseJSON && this.fetch.responseJSON.reason) || '',
@@ -254,9 +248,7 @@ export default {
     }
   },
   methods: {
-    loadData(options = {}) {
-      this.baseInit(options);
-
+    loadData() {
       if (!this.collection) {
         throw new Error('Please provide a collection.');
       }
@@ -447,31 +439,6 @@ export default {
       this.filter.searchTerm = searchTerm;
     },
 
-    /**
-     * When a listing card is clicked, the listingShort view will manage showing the
-     * listing detail modal. This method is used when this view initially loads and a
-     * listing was part of the url. Since we don't want to wait until the entire
-     * (unpaginated) store is fetched before showing the listing, we are expecting the
-     * the listing model to be passed in as an arg (currently the router is fetching it).
-     * The store will continue to load in the background.
-     */
-    showListing(listing) {
-      if (!listing instanceof Listing) {
-        throw new Error('Please provide a listing model.');
-      }
-
-      const onListingDetailClose = () => app.router.navigate(`${this.model.id}/store`);
-
-      this.listingDetail = new ListingDetail({
-        profile: this.model,
-        model: listing,
-      })
-        .render()
-        .open();
-
-      this.listenTo(this.listingDetail, 'close', onListingDetailClose);
-      this.listenTo(this.listingDetail, 'modal-will-remove', () => this.stopListening(null, null, onListingDetailClose));
-    },
     $btnRetry() {
       return $('.js-retryFetch');
     },
@@ -558,16 +525,6 @@ export default {
     render() {
       if (this.dataChangePopIn) this.dataChangePopIn.remove();
       if (this.shippingChangePopIn) this.shippingChangePopIn.remove();
-
-      if (!this.rendered) {
-        if (this.listing) {
-          // if first render, show a listing if it was
-          // passed in as a view option
-          this.showListing(this.listing);
-        }
-
-        this.rendered = true;
-      }
 
       return this;
     },

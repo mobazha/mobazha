@@ -71,7 +71,7 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this._model,
+        ...this.model.toJSON(),
         max: this.model.max,
         errors: this.model.validationError || {},
       };

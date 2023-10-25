@@ -1,6 +1,6 @@
 <template>
-  <div class="modal listingDetail modalScrollPage" v-show="showModal" @click="onDocumentClick">
-    <BaseModal>
+  <div v-if="!showNsfwWarning" v-show="showModal" class="modal listingDetail modalScrollPage" @click="onDocumentClick">
+    <BaseModal @close="close">
       <template v-slot:component>
         <div class="popInMessageHolder js-popInMessages"></div>
 
@@ -38,7 +38,9 @@
 
           <template v-else>
             <div class="flexNoShrink" style="margin-left: auto">
-              <div class="js-socialBtns"></div>
+              <div class="js-socialBtns">
+                <SocialBtns :options="{ targetID: vendor.peerID, }" />
+              </div>
             </div>
           </template>
         </div>
@@ -119,13 +121,15 @@
                           reloadLink: `<a class="js-reloadOutdated">` + `${ob.polyT("listingDetail.errors.reloadOutdatedHash")}<a>`,
                         })'></PurchaseError>
                       </template>
-                      <template v-else-if="unpurchaseable">
+                      <template v-else-if="templateOptions.unpurchaseable">
                         <PurchaseError :tip="templateOptions.tip"></PurchaseError>
                       </template>
                     </div>
 
                     <div class="flexHCent gutterH">
-                      <div class="tx6  rating" @click="clickRating"></div>
+                      <div class="tx6 js-rating rating" @click="clickRating">
+                        <Rating :options="ratingData"/>
+                      </div>
                       <template v-if="ob.shipsFreeToMe">
                         <div class="txCtr">
                           <a class="clrE1 clrTOnEmph phraseBox txNoUnd " @click="onClickFreeShippingLabel">{{
@@ -136,10 +140,9 @@
                   </div>
                 </div>
                 <div class="flexHCent gutterHLg tx5 rowLg">
-                  <div>
-                    {{ ob.polyT('listingDetail.type', {
+                  <div v-html="ob.polyT('listingDetail.type', {
                       type: `<b>${ob.polyT(`formats.${ob.metadata.contractType}`)}</b>`
-                    }) }}
+                    })">
                   </div>
                   <!-- // not showing the inventory for now since it's broken on the server -->
                   <template v-if="ob.isCrypto && false">
@@ -150,11 +153,10 @@
                   </template>
 
                   <template v-else-if="ob.metadata.contractType === 'PHYSICAL_GOOD'">
-                    <div>
-                      {{ ob.polyT('listingDetail.condition', {
-                        condition:
-                          `<b>${ob.polyT(`conditionTypes.${ob.item.condition.toUpperCase()}`, { _: ob.item.condition })}</b>`
-                      }) }}
+                    <div v-html="ob.polyT('listingDetail.condition', {
+                      condition:
+                        `<b>${ob.polyT(`conditionTypes.${ob.item.condition.toUpperCase()}`, { _: ob.item.condition })}</b>`
+                    })">
                     </div>
                   </template>
                 </div>
@@ -169,7 +171,13 @@
                   </template>
                 </div>
                 <h5>{{ ob.polyT('listingDetail.paymentsAccepted') }}</h5>
-                <div class="js-supportedCurrenciesList"></div>
+                <div class="js-supportedCurrenciesList">
+                  <SupportedCurrenciesList :options="{
+                    initialState: {
+                      currencies: model.get('metadata').get('acceptedCurrencies'),
+                    },
+                  }"/>
+                </div>
                 <template v-if="ob.hasVerifiedMods">
                   <div class="verifiedModBox clrBrAlert2 clrBAlert2Grad">
                     <div class="flexVCent flexHCent gutterHTn rowSm">
@@ -271,13 +279,19 @@
             </template>
           </div>
 
-          <div class="js-moreListings"></div>
+          <div class="js-moreListings">
+            <MoreListings :options="{
+              vendor,
+              listings: moreListingsData,
+            }" />
+          </div>
 
         </div>
 
       </template>
     </BaseModal>
   </div>
+  <NsfwWarning v-else="showNsfwWarning" @canceled="close" @close="onNsfwWarningClose" />
 </template>
 
 <script>
@@ -299,45 +313,58 @@ import { launchEditListingModal } from '../../../../backbone/utils/modalManager'
 import { recordEvent } from '../../../../backbone/utils/metrics';
 import { events as outdatedListingHashesEvents } from '../../../../backbone/utils/outdatedListingHashes';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
-import BaseModal from '../BaseModal';
-import Purchase from '../purchase/Purchase';
-import Rating from './Rating';
-import Reviews from '../../reviews/Reviews';
-import SocialBtns from '../../components/SocialBtns';
 // import QuantityDisplay from '../../components/QuantityDisplay';
 import { events as listingEvents } from '../../../../backbone/models/listing';
 import Listings from '../../../../backbone/collections/Listings';
-import PopInMessage, { buildRefreshAlertMessage } from '../../components/PopInMessage';
-import { openSimpleMessage } from '../SimpleMessage';
-import NsfwWarning from '../NsfwWarning';
-import MoreListings from './MoreListings';
-import CryptoTradingPair from '../../components/CryptoTradingPair';
-import SupportedCurrenciesList from '../../components/SupportedCurrenciesList';
+
+import Purchase from '../../../../backbone/views/modals/purchase/Purchase';
+import Reviews from '../../../../backbone/views/reviews/Reviews';
+
+import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
+
+import PopInMessage, { buildRefreshAlertMessage } from '../../../../backbone/views/components/PopInMessage';
 
 import api from '../../../api';
 
+import Rating from './Rating.vue';
+import NsfwWarning from '../NsfwWarning.vue';
+import MoreListings from './MoreListings.vue';
 import ShippingOptions from './ShippingOptions.vue'
+import PurchaseError from '@/views/modals/listingDetail/PurchaseError.vue'
 
 export default {
   components: {
-    ShippingOptions
+    Rating,
+    NsfwWarning,
+    MoreListings,
+    ShippingOptions,
+    PurchaseError,
   },
   props: {
     options: {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
       showModal: true,
 
       PURCHASE_MODAL_CREATE: 'PURCHASE_MODAL_CREATE',
-      PURCHASE_MODAL_DESTROY: 'PURCHASE_MODAL_DESTROY',
 
       outdateHash: false,
 
       shippingDestination: '',
+
+      ratingData: {
+        averageRating: 0,
+        ratingCount: 0,
+        fetched: false,
+      },
+      _showNsfwWarning: true,
+
+      moreListingsData: undefined,
     };
   },
   created () {
@@ -359,10 +386,11 @@ export default {
   computed: {
     ob () {
       const defaultBadge = app.verifiedMods.defaultBadge(this.model.get('moderators'));
+      const flatModel = this.model.toJSON();
 
       return {
         ...this.templateHelpers,
-        ...this._model,
+        ...flatModel,
         shipsFreeToMe: this.shipsFreeToMe,
         ownListing: this.model.isOwnListing,
         price: this.model.price,
@@ -443,7 +471,7 @@ export default {
     },
 
     shippingOptionsInfo() {
-      const shippingOptions = this._model.shippingOptions;
+      const shippingOptions = this.model.get('shippingOptions').toJSON();
       const templateData = shippingOptions.filter((option) => {
         if (this.shippingDestination === 'ALL') return option.regions;
         return option.regions.includes(this.shippingDestination);
@@ -455,10 +483,16 @@ export default {
         pricingCurrency: this.model.price.currencyCode,
       };
     },
+    showNsfwWarning() {
+      return this._showNsfwWarning
+        && this.checkNsfw
+        && this.model.get('item').get('nsfw')
+        && !this.model.isOwnListing && !app.settings.get('showNsfw');
+    }
   },
   methods: {
     loadData (options = {}) {
-      if (!options.model) {
+      if (!this.model) {
         throw new Error('Please provide a model.');
       }
 
@@ -470,7 +504,7 @@ export default {
 
       this.baseInit(opts);
 
-      this._shipsFreeToMe = this.model.shipsFreeToMe;
+      this.shipsFreeToMe = this.model.shipsFreeToMe;
       this.activePhotoIndex = 0;
 
       // Set to an empty bigNumber instance so if we can't fill it with a legitmate
@@ -489,12 +523,12 @@ export default {
 
       // Sometimes a profile model is available and the vendor info
       // can be obtained from that.
-      if (opts.profile) {
+      if (this.profile) {
         this.vendor = {
-          peerID: opts.profile.id,
-          name: opts.profile.get('name'),
-          handle: opts.profile.get('handle'),
-          avatarHashes: opts.profile.get('avatarHashes').toJSON(),
+          peerID: this.profile.id,
+          name: this.profile.get('name'),
+          handle: this.profile.get('handle'),
+          avatarHashes: this.profile.get('avatarHashes').toJSON(),
         };
       }
 
@@ -545,7 +579,7 @@ export default {
         });
 
         this.listenTo(app.profile.get('avatarHashes'), 'change', () => {
-          this.$storeOwnerAvatar
+          this.getStoreOwnerAvatarEl()
             .attr('style', getAvatarBgImage(app.profile.get('avatarHashes').toJSON()));
         });
 
@@ -567,8 +601,6 @@ export default {
         this._latestHash = e.newHash;
         if (e.oldHash === this._renderedHash) this.outdateHash = true;
       });
-
-      this.rating = this.createChild(Rating);
 
       // get the ratings data, if any
       this.ratingsFetch = $.get(app.getServerUrl(`ob/ratingindex/${this.vendor.peerID}/${this.model.get('slug')}`))
@@ -634,13 +666,6 @@ export default {
       this.moreListingsFetch = this.moreListingsCol.fetch(fetchOpts)
         .done(() => {
           this.moreListingsData = this.randomizeMoreListings(this.moreListingsCol);
-          setTimeout(() => {
-            if (this.moreListings) {
-              this.moreListings.setState({
-                listings: this.moreListingsData,
-              });
-            }
-          });
         });
 
       this.rendered = false;
@@ -654,15 +679,18 @@ export default {
     },
 
     onDocumentClick () {
-      this.$deleteConfirmedBox.addClass('hide');
+      this.getDeleteConfirmedBoxEl().addClass('hide');
     },
 
     onRatings (data) {
       const pData = data || {};
-      this.rating.averageRating = pData.average;
-      this.rating.ratingCount = pData.count;
-      this.rating.fetched = true;
-      this.rating.render();
+
+      this.ratingData = {
+        averageRating: pData.average,
+        ratingCount: pData.count,
+        fetched: true,
+      }
+
       this.reviews.reviewIDs = pData.ratings || [];
       this.reviews.setState({ isFetchingRatings: false });
     },
@@ -707,7 +735,7 @@ export default {
 
     onClickDeleteListing () {
       recordEvent('Listing_DeleteFromListing');
-      this.$deleteConfirmedBox.removeClass('hide');
+      this.getDeleteConfirmedBoxEl().removeClass('hide');
       // don't bubble to the document click handler
       return false;
     },
@@ -723,7 +751,7 @@ export default {
       this.destroyRequest = this.model.destroy({ wait: true });
 
       if (this.destroyRequest) {
-        this.$deleteListing.addClass('processing');
+        this.getDeleteListingEl().addClass('processing');
 
         this.destroyRequest.done(() => {
           if (this.destroyRequest.statusText === 'abort'
@@ -732,7 +760,7 @@ export default {
           this.close();
         }).always(() => {
           if (!this.isRemoved()) {
-            this.$deleteListing.removeClass('processing');
+            this.getDeleteListingEl().removeClass('processing');
           }
         });
       }
@@ -740,7 +768,7 @@ export default {
 
     onClickConfirmCancel () {
       recordEvent('Listing_DeleteFromListingCancel');
-      this.$deleteConfirmedBox.addClass('hide');
+      this.getDeleteConfirmedBoxEl().addClass('hide');
     },
 
     onClickGotoPhotos () {
@@ -780,7 +808,7 @@ export default {
 
     gotoPhotos () {
       recordEvent('Listing_GoToPhotos', { ownListing: this.model.isOwnListing });
-      this.$photoSection.velocity(
+      this.getPhotoSectionEl().velocity(
         'scroll',
         {
           duration: 500,
@@ -821,27 +849,27 @@ export default {
       const phSrc = app.getServerUrl(`ob/image/${photoHash}`);
 
       this.activePhotoIndex = photoIndex;
-      this.$photoSelected.trigger('zoom.destroy'); // old zoom must be removed
-      this.$photoSelectedInner.attr('src', phSrc);
+      this.getPhotoSelectedEl().trigger('zoom.destroy'); // old zoom must be removed
+      this.photoSelectedInner.attr('src', phSrc);
     },
 
     activateZoom () {
-      if (this.$photoSelectedInner.width() >= this.$photoSelected.width()
-        || this.$photoSelectedInner.height() >= this.$photoSelected.height()) {
-        this.$photoSelected
+      if (this.photoSelectedInner.width() >= this.getPhotoSelectedEl().width()
+        || this.photoSelectedInner.height() >= this.getPhotoSelectedEl().height()) {
+        this.getPhotoSelectedEl()
           .removeClass('unzoomable')
           .zoom({
-            url: this.$photoSelectedInner.attr('src'),
+            url: this.photoSelectedInner.attr('src'),
             on: 'click',
             onZoomIn: () => {
-              this.$photoSelected.addClass('open');
+              this.getPhotoSelectedEl().addClass('open');
             },
             onZoomOut: () => {
-              this.$photoSelected.removeClass('open');
+              this.getPhotoSelectedEl().removeClass('open');
             },
           });
       } else {
-        this.$photoSelected.addClass('unzoomable');
+        this.getPhotoSelectedEl().addClass('unzoomable');
       }
     },
 
@@ -852,7 +880,7 @@ export default {
       if (thumbIndex < 0) {
         throw new Error('Please provide a valid index for the selected photo thumbnail.');
       }
-      this.$photoRadioBtns.prop('checked', false).eq(thumbIndex).prop('checked', true);
+      this.getPhotoRadioBtnsEl().prop('checked', false).eq(thumbIndex).prop('checked', true);
     },
 
     onClickPhotoPrev () {
@@ -881,7 +909,7 @@ export default {
     },
 
     gotoShippingOptions () {
-      this.$shippingSection.velocity(
+      this.getShippingSectionEl().velocity(
         'scroll',
         {
           duration: 500,
@@ -958,7 +986,7 @@ export default {
           this.dataChangePopIn = null;
         });
 
-        this.$popInMessages.append(this.dataChangePopIn.render().el);
+        this.getPopInMessagesEl().append(this.dataChangePopIn.render().el);
       }
     },
 
@@ -978,23 +1006,6 @@ export default {
 
     onSetShippingDestination (val) {
       this.shippingDestination = val;
-    },
-
-    /**
-     * Returns a promise that will fire progress notifications when a purchase modal
-     * is created. Will also fire a notifications when one is destroyed.
-     */
-    get purchaseModal () {
-      this._purchaseModalDeferred = this._purchaseModalDeferred || $.Deferred();
-
-      if (this._purchaseModal) {
-        this._purchaseModalDeferred.notify({
-          type: this.PURCHASE_MODAL_CREATE,
-          view: this._purchaseModal,
-        });
-      }
-
-      return this._purchaseModalDeferred.promise();
     },
 
     startPurchase () {
@@ -1020,6 +1031,13 @@ export default {
 
       const selectedVariants = this.getSelectedVariants();
 
+      window.vueApp.launchPurchaseModal({ variants: selectedVariants, vendor: this.vendor, phase: 'pay',},
+        function() {
+          return {
+            listing: this.model,
+          };
+        });
+
       if (this._purchaseModal) this._purchaseModal.remove();
 
       this._purchaseModal = new Purchase({
@@ -1040,15 +1058,6 @@ export default {
           view: this._purchaseModal,
         });
       }
-
-      this._purchaseModal.on('modal-will-remove', () => {
-        this._purchaseModal = null;
-        if (this._purchaseModalDeferred) {
-          this._purchaseModalDeferred.notify({
-            type: this.PURCHASE_MODAL_DESTROY,
-          });
-        }
-      });
 
       this.listenTo(this._purchaseModal, 'closeBtnPressed', () => this.close());
       recordEvent('Purchase_Start', { ownListing: this.model.isOwnListing });
@@ -1076,142 +1085,39 @@ export default {
       })
     },
 
-    get shipsFreeToMe () {
-      return this._shipsFreeToMe;
+    getDeleteListingEl() {
+      return $('.js-deleteListing');
     },
 
-    set shipsFreeToMe (shipsFree) {
-      const prevVal = this._shipsFreeToMe;
-      this._shipsFreeToMe = !!shipsFree;
-
-      if (prevVal !== this._shipsFreeToMe) {
-        this.$shipsFreeBanner[this._shipsFreeToMe ? 'removeClass' : 'addClass']('hide');
-      }
+    getPopInMessagesEl () {
+      return $('.js-popInMessages');
     },
 
-    get $deleteListing () {
-      return this._$deleteListing || $('.js-deleteListing');
+    getPhotoSectionEl() {
+      return $('.js-photoSection');
     },
 
-    get $shipsFreeBanner () {
-      return this._$shipsFreeBanner || $('.js-shipsFreeBanner');
+    getPhotoSelectedEl() {
+      return $('.js-photoSelected');
     },
 
-    get $popInMessages () {
-      return this._$popInMessages
-        || (this._$popInMessages = $('.js-popInMessages'));
+    getShippingSectionEl () {
+      return $('#shippingSection');
     },
 
-    get $photoSection () {
-      return this._$photoSection
-        || (this._$photoSection = $('.js-photoSection'));
+    getPhotoRadioBtnsEl () {
+      return $('.js-photoSelect');
     },
 
-    get $photoSelected () {
-      return this._$photoSelected
-        || (this._$photoSelected = $('.js-photoSelected'));
+    getStoreOwnerAvatarEl () {
+      return $('.js-storeOwnerAvatar');
     },
 
-    get $shippingSection () {
-      return this._$shippingSection
-        || (this._$shippingSection = $('#shippingSection'));
+    getDeleteConfirmedBoxEl () {
+      return $('.js-deleteConfirmedBox');
     },
 
-    get $photoRadioBtns () {
-      return this._$photoRadioBtns
-        || (this._$photoRadioBtns = $('.js-photoSelect'));
-    },
-
-    get $storeOwnerAvatar () {
-      return this._$storeOwnerAvatar
-        || (this._$storeOwnerAvatar = $('.js-storeOwnerAvatar'));
-    },
-
-    get $deleteConfirmedBox () {
-      return this._$deleteConfirmedBox
-        || (this._$deleteConfirmedBox = $('.js-deleteConfirmedBox'));
-    },
-
-    render () {
-      if (this.dataChangePopIn) this.dataChangePopIn.remove();
-
-      let nsfwWarning;
-
-      if (!this.rendered
-        && this.checkNsfw
-        && this.model.get('item').get('nsfw')
-        && !this.model.isOwnListing && !app.settings.get('showNsfw')) {
-        nsfwWarning = new NsfwWarning()
-          .render()
-          .open();
-        this.listenTo(nsfwWarning, 'canceled', () => this.close());
-      }
-
-      if (nsfwWarning) this.showModal = false;
-
-      $('.js-rating').append(this.rating.render().$el);
-      this.$reviews = $('.js-reviews');
-      this.$reviews.append(this.reviews.render().$el);
-
-      if (this._latestHash !== this.model.get('hash')) {
-        this.outdateHash = true;
-      }
-
-      if (this.supportedCurrenciesList) this.supportedCurrenciesList.remove();
-      this.supportedCurrenciesList = this.createChild(SupportedCurrenciesList, {
-        initialState: {
-          currencies: this.model.get('metadata')
-            .get('acceptedCurrencies'),
-        },
-      });
-      $('.js-supportedCurrenciesList')
-        .append(this.supportedCurrenciesList.render().el);
-
-      if (!this.model.isOwnListing) {
-        if (this.socialBtns) this.socialBtns.remove();
-        this.socialBtns = this.createChild(SocialBtns, {
-          targetID: this.vendor.peerID,
-        });
-        $('.js-socialBtns').append(this.socialBtns.render().$el);
-      }
-
-      if (this.moreListings) this.moreListings.remove();
-      this.moreListings = this.createChild(MoreListings, {
-        initialState: {
-          vendor: this.vendor,
-          listings: this.moreListingsData,
-        },
-      });
-      this.listenTo(this.moreListings, 'listingDetailOpened', () => this.remove());
-      $('.js-moreListings')
-        .append(this.moreListings.render().$el);
-
-      this.$photoSelectedInner = $('.js-photoSelectedInner');
-      this._$deleteListing = null;
-      this._$shipsFreeBanner = null;
-      this._$popInMessages = null;
-      this._$photoSection = null;
-      this._$photoSelected = null;
-      this._$photoRadioBtns = null;
-      this._$shippingSection = null;
-      this._$storeOwnerAvatar = null;
-      this._$deleteConfirmedBox = null;
-
-      this.$photoSelectedInner.on('load', () => this.activateZoom());
-
-      this.variantSelects = $('.js-variantSelect');
-
-      this.variantSelects.select2({
-        // disables the search box
-        minimumResultsForSearch: Infinity,
-      });
-
-      $('#shippingDestinations').select2();
-      this.shippingDestination = this.defaultCountry;
-
-      this.setSelectedPhoto(this.activePhotoIndex);
-      this.setActivePhotoThumbnail(this.activePhotoIndex);
-
+    cryptoTradingPairOptions() {
       if (this.model.isCrypto) {
         const metadata = this.model.get('metadata');
 
@@ -1227,26 +1133,45 @@ export default {
         // $('.js-cryptoInventory')
         //   .html(this.cryptoInventory.render().el);
 
-        if (this.cryptoTitle) this.cryptoTitle.remove();
-        this.cryptoTitle = this.createChild(CryptoTradingPair, {
+        return {
           initialState: {
             tradingPairClass: 'cryptoTradingPairXL rowSm',
             exchangeRateClass: 'clrT2 exchangeRateLine',
             fromCur: metadata.get('acceptedCurrencies')[0],
             toCur: this.model.get('item').get('cryptoListingCurrencyCode'),
           },
-        });
-        $('.js-cryptoTitle')
-          .html(this.cryptoTitle.render().el);
-      } else {
-        this.adjustPriceBySku();
+        };
+      }
+      return {};
+    },
+
+    onNsfwWarningClose() {
+      this._showNsfwWarning = false;
+    },
+
+    render () {
+      if (this.dataChangePopIn) this.dataChangePopIn.remove();
+
+      this.$reviews = $('.js-reviews');
+      this.$reviews.append(this.reviews.render().$el);
+
+      if (this._latestHash !== this.model.get('hash')) {
+        this.outdateHash = true;
       }
 
-      if (nsfwWarning) {
-        setTimeout(() => {
-          nsfwWarning.bringToTop();
-          this.showModal = true;
-        });
+      this.photoSelectedInner = $('.js-photoSelectedInner');
+
+      this.photoSelectedInner.on('load', () => this.activateZoom());
+
+      this.variantSelects = $('.js-variantSelect');
+
+      this.shippingDestination = this.defaultCountry;
+
+      this.setSelectedPhoto(this.activePhotoIndex);
+      this.setActivePhotoThumbnail(this.activePhotoIndex);
+
+      if (!this.model.isCrypto) {
+        this.adjustPriceBySku();
       }
 
       this.rendered = true;

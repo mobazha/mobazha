@@ -1,6 +1,6 @@
 <template>
   <div :class="`userPage clrS ${isBlockedUser ? 'isBlocked' : ''}`">
-    <template v-if="!showPageNotFound && !showBlockedModal">
+    <template v-if="!showPageNotFound && !showBlockedModal && !showUserLoading">
       <nav id="pageTabBar" class="barLg clrP clrBr">
         <div class="flexVCent pageTabs">
           <MiniProfile :options="{
@@ -84,7 +84,10 @@
                 model,
               }
             }" />
-          <Store v-if="activeTab === 'store'" :options="{listing: options.listing}" :bb="storeBB()" @listingsUpdate="onListingsUpdate"/>
+          <Store v-if="activeTab === 'store'"
+            :bb="storeBB()"
+            @listingsUpdate="onListingsUpdate"
+            />
           <Follow v-if="activeTab === 'followers' || activeTab === 'following'" :key="activeTab"
             :options="{
               followType: activeTab,
@@ -107,8 +110,25 @@
        @canceled="onBlockWarningCanceled"
        @close="cleanUpBlockedModal"
       />
-      <Loading v-else-if="showUserLoading" :contentText="loadingContextText" :isProcessing="isLoadingUser"
+      <Loading v-else-if="showUserLoading"
+        :userName="_model.name"
+        :userAvatarHashes="_model.avatarHashes"
+        :contentText="loadingContextText"
+        :isProcessing="isLoadingUser"
         @clickCancel="onClickLoadingCancel" @clickRetry="onClickLoadingRetry"/>
+      <ListingDetail v-else-if="activeTab === 'store' && listing"
+        :key="listing.cid"
+        :options="{
+          openedFromStore: true,
+        }"
+        :bb="function() {
+          return {
+            profile: model,
+            model: listing,
+          }
+        }"
+        @close="onListingDetailClose"
+      />
     </Teleport>
     
   </div>
@@ -139,6 +159,7 @@ import Home from './Home.vue';
 import Store from './Store.vue';
 import Follow from './Follow.vue';
 import Reputation from './Reputation.vue';
+import ListingDetail from '../modals/listingDetail/Listing.vue';
 
 const [DefineTabHeader, ReuseTabHeader] = createReusableTemplate();
 
@@ -155,6 +176,8 @@ export default {
     Store,
     Follow,
     Reputation,
+
+    ListingDetail,
   },
   props: {
     options: {
@@ -177,6 +200,7 @@ export default {
 
       profileFetch: undefined,
       listingFetch: undefined,
+      listing: undefined,
       showUserLoading: false,
       showPageNotFound: false,
       showBlockedModal: false,
@@ -184,7 +208,7 @@ export default {
       isBlockedUser: false,
 
       loadingContextText: '',
-      isLoadingUser: true,
+      isLoadingUser: false,
     };
   },
   watch: {
@@ -240,13 +264,13 @@ export default {
     ob() {
       return {
         ...this.templateHelpers,
-        ...this._model,
+        ...this.model.toJSON(),
         ownPage: this.ownPage,
         showStoreWelcomeCallout: this.showStoreWelcomeCallout,
       };
     },
     headerHash() {
-      const headerHashes = this._model.headerHashes;
+      const headerHashes = this.model.get('headerHashes').toJSON();
       return headerHashes ? (isHiRez() ? headerHashes.large : headerHashes.medium) : '';
     },
     ownPage() {
@@ -294,40 +318,15 @@ export default {
         return { showPageNotFound: false, showBlockedModal: true, peerID: guid };
       }
 
-      let profileFetch;
-      let listing;
-      let listingFetch;
-
-      startAjaxEvent('UserPageLoad');
-
-      if (guid === app.profile.id) {
-        // don't fetch our own profile, since we have it already
-        profileFetch = $.Deferred().resolve();
-      } else {
-        profileFetch = this.model.fetch();
-      }
-
-      if (state === 'store') {
-        if (slug) {
-          listing = new Listing({
-            slug,
-          }, { guid });
-
-          listingFetch = listing.fetch();
-        }
-      }
-
       return {
         activeTab: pageState,
-        profileFetch,
-        listing,
-        listingFetch,
-        showUserLoading: true,
         showBlockedModal: false,
         showPageNotFound: false,
       };
     },
     loadData(guid, state, slug) {
+      this.showUserLoading = true;
+
       // Hack to pass the handle into this function, which should really only
       // happen when called from userViaHandle(). If a handle is being passed in,
       // it will be passed in as { handle: 'charlie' } as the first element of the
@@ -338,9 +337,34 @@ export default {
       //   handle = args[0].handle;
       // }
 
+      startAjaxEvent('UserPageLoad');
+
+      if (guid === app.profile.id) {
+        // don't fetch our own profile, since we have it already
+        this.profileFetch = $.Deferred().resolve();
+      } else {
+        this.profileFetch = this.model.fetch();
+      }
+
+      if (state === 'store') {
+        if (slug) {
+          this.listing = new Listing({
+            slug,
+          }, { guid });
+
+          this.listingFetch = this.listing.fetch();
+        }
+      }
+
       let userPageFetchError = '';
       const profileFetch = this.profileFetch;
       const listingFetch = this.listingFetch;
+
+      this.loadingContextText = app.polyglot.t('userPage.loading.loadingText', {
+          name: `<b>${handle || `${guid.slice(0, 8)}…`}</b>`,
+        }),
+      this.isLoadingUser = true;
+
       $.whenAll(profileFetch, listingFetch).done(() => {
         handle = this.model.get('handle');
         if (handle) {
@@ -519,6 +543,13 @@ export default {
 
     onListingsUpdate(listings) {
       this.listingCount = listings.length;
+    },
+
+    onListingDetailClose() {
+      this.listing = null;
+
+      const guid = this.model.id;
+      app.router.navigate(`${guid}/store`, {trigger: false});
     },
 
     setTabState(state) {

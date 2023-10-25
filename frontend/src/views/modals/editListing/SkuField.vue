@@ -71,7 +71,6 @@ export default {
 
       if (!_.isEqual(this._state, newState)) {
         this._state = newState;
-        this.render();
       }
 
       return this;

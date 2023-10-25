@@ -6,7 +6,7 @@
       </div>
       <hr class="clrBr rowLg" />
 
-      <div class="flexColWide tx5 rowMd blockedListWrap <% if (ob.blocked.length) print('padKids borderStackedAll') %>">
+      <div :class="`flexColWide tx5 rowMd blockedListWrap ${ob.blocked.length ? 'padKids borderStackedAll' : ''}`">
         <template v-if="ob.blocked.length">
           <template v-for="peerID in ob.blocked">
             <div class="clrBr">

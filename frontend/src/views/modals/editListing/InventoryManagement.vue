@@ -98,7 +98,7 @@ export default {
     },
 
     onChangeManagementType (e) {
-      this.trigger('changeManagementType', { value: e.target.value });
+      this.$emit('changeManagementType', { value: e.target.value });
     },
 
   }

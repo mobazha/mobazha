@@ -121,7 +121,7 @@ export default {
         coinTypes: this.coinTypes,
         receiveCurs: this.receiveCurs,
         errors: this.model.validationError || {},
-        ...this._model,
+        ...this.model.toJSON(),
         receiveCur: this.getReceiveCur(),
       };
     }

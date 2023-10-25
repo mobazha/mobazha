@@ -56,7 +56,7 @@
                 <p>{{ ob.polyT('listingCard.confirmDelete.body') }}</p>
                 <hr class="clrBr row" />
                 <div class="flexHRight flexVCent gutterHLg buttonBar">
-                  <a class="js-deleteConfirmCancel" @click="onClickConfirmCancel">{{ ob.polyT('listingCard.confirmDelete.btnCancel') }}</a>
+                  <a class="js-deleteConfirmCancel" @click.stop="onClickConfirmCancel">{{ ob.polyT('listingCard.confirmDelete.btnCancel') }}</a>
                   <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph js-deleteConfirmed" @click.stop="onClickConfirmedDelete">{{ ob.polyT('listingCard.confirmDelete.btnConfirm') }}</a>
                 </div>
               </div>
@@ -68,7 +68,9 @@
             <div class="hideIfEmpty js-reportBtnWrapper">
               <ReportBtn v-if="reportsUrl" @startReport="startReport"/>
             </div>
-            <div class="js-blockBtnWrapper"></div>
+            <div class="js-blockBtnWrapper">
+              <BlockBtn :options="{ targetID: ownerGuid, initialState: { useIcon: true }, }" />
+            </div>
 
             <button
               v-if="ob.nsfw"
@@ -325,7 +327,9 @@
           <div class="hideIfEmpty js-reportBtnWrapper">
             <ReportBtn v-if="reportsUrl" @startReport="startReport"/>
           </div>
-          <div class="js-blockBtnWrapper"></div>
+          <div class="js-blockBtnWrapper">
+            <BlockBtn :options="{ targetID: ownerGuid, initialState: { useIcon: true }, }" />
+          </div>
           <button
             class="btn clrP clrBr iconBtnSm btnShowNsfw clrSh1 toolTipNoWrap toolTipTop"
             @click.stop="onClickShowNsfw"
@@ -375,12 +379,7 @@ import Listing from '../../../backbone/models/listing/Listing';
 import ListingShort from '../../../backbone/models/listing/ListingShort';
 import { events as listingEvents } from '../../../backbone/models/listing';
 import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
-import ListingDetail from '../../../backbone/views/modals/listingDetail/Listing';
 import Report from '../../../backbone/views/modals/Report';
-import BlockedWarning from '../../../backbone/views/modals/BlockedWarning';
-import ReportBtn from '../../../backbone/views/components/ReportBtn';
-import BlockBtn from '../../../backbone/views/components/BlockBtn';
-import UserLoadingModal from '../../../backbone/views/userPage/Loading';
 
 import { getListingOptions } from '@/utils/verifiedMod'
 
@@ -412,11 +411,15 @@ export default {
   mounted() {
     this.render();
   },
+  unmounted() {
+    if (this.fullListingFetch) this.fullListingFetch.abort();
+    if (this.destroyRequest) this.destroyRequest.abort();
+  },
   computed: {
     ob() {
       return {
         ...this.templateHelpers,
-        ...this._model,
+        ...this.model.toJSON(),
         ownListing: this.ownListing,
         coinType: this.model.get('currency') && this.model.get('currency').code,
         shipsFreeToMe: this.model.shipsFreeToMe,
@@ -481,6 +484,18 @@ export default {
 
       return priceRowTextClass;
     },
+    ownerGuid() {
+      if (this.profile) {
+        // If a profile model of the listing owner is available, please pass it in.
+        return this.profile.id;
+      } else if (this.model.get('vendor')) {
+        // If a vendor object is available (part of proposed search API), please pass it in.
+        return this.model.get('vendor').peerID;
+      } else {
+        // Otherwise please provide the store owner's guid.
+        this.ownerGuid = this.options.ownerGuid;
+      }
+    },
     verifiedModID() {
       const moderators = this.model.get('moderators') || [];
       const verifiedIDs = app.verifiedMods.matched(moderators);
@@ -506,30 +521,6 @@ export default {
           throw new Error('Please provide a ListingShort model.');
         }
 
-        // Any provided profile model or vendor info object will also be passed into the
-        // listing detail modal.
-        if (opts.profile) {
-          // If a profile model of the listing owner is available, please pass it in.
-          this.ownerGuid = opts.profile.id;
-        } else if (this.model.get('vendor')) {
-          // If a vendor object is available (part of proposed search API), please pass it in.
-          this.ownerGuid = this.model.get('vendor').peerID;
-        } else {
-          // Otherwise please provide the store owner's guid.
-          this.ownerGuid = opts.ownerGuid;
-        }
-
-        if (typeof this.ownerGuid === 'undefined') {
-          throw new Error('Unable to determine ownership of the listing. Please either provide' + ' a profile model or pass in an ownerGuid option.');
-        }
-
-        if (!opts.listingBaseUrl) {
-          // When the listing card is clicked and the listing detail modal is
-          // opened, the slug of the listing is concatenated with the listingBaseUrl
-          // and the route is updated (both history & address bar).
-          throw new Error('Please provide a listingBaseUrl.');
-        }
-
         if (this.ownListing) {
           this.listenTo(listingEvents, 'destroying', (md, destroyingOpts) => {
             if (this.isRemoved()) return;
@@ -553,11 +544,9 @@ export default {
         this.viewType = opts.viewType;
         this.reportsUrl = opts.reportsUrl;
         this.deleteConfirmOn = false;
-        this.boundDocClick = this.onDocumentClick.bind(this);
         // This should be initialized as null, so we could determine whether the user
         // never set this (null), or explicitly clicked to show / hide nsfw (true / false)
         this._userClickedShowNsfw = null;
-        $(document).on('click', this.boundDocClick);
 
         this.listenTo(blockEvents, 'blocked unblocked', (data) => {
           if (data.peerIDs.includes(this.ownerGuid)) {
@@ -576,14 +565,12 @@ export default {
           const newVerifiedMods = app.verifiedMods.matched(this.model.get('moderators'));
           if ((this.verifiedMods.length && !newVerifiedMods.length) || (!this.verifiedMods.length && newVerifiedMods.length)) {
             this.verifiedMods = newVerifiedMods;
-            this.render();
           }
         });
       } catch (e) {
         this.cardError = e.message || true;
 
         if (this.showErrorCardOnError) {
-          this.render();
           return;
         }
 
@@ -594,9 +581,6 @@ export default {
     attributes() {
       // make it possible to tab to this element
       return { tabIndex: 0 };
-    },
-    onDocumentClick() {
-      this.deleteConfirmOn = false;
     },
     onClickEdit() {
       recordEvent('Lisitng_EditFromCard');
@@ -655,227 +639,6 @@ export default {
     onClickUserLink() {
     },
 
-    loadListingDetail(hash = this.model.get('cid')) {
-      const routeOnOpen = location.hash.slice(1);
-      app.router.navigateUser(`${this.options.listingBaseUrl}${this.model.get('slug')}`, this.ownerGuid);
-
-      startAjaxEvent('Listing_LoadFromCard');
-      const segmentation = {
-        ownListing: !!this.ownListing,
-        openedFromStore: !!this.options.onStore,
-        searchUrl: (this.options.searchUrl && this.options.searchUrl.hostname) || 'none',
-      };
-
-      let storeName = `${this.ownerGuid.slice(0, 8)}…`;
-      let avatarHashes;
-      let title = this.model.get('title');
-      title = title.length > 25 ? `${title.slice(0, 25)}…` : title;
-
-      if (this.options.profile) {
-        storeName = this.options.profile.get('name');
-        avatarHashes = this.options.profile.get('avatarHashes').toJSON();
-      } else if (this.options.vendor) {
-        storeName = this.options.vendor.name;
-        avatarHashes = this.options.vendor.avatarHashes;
-      }
-
-      if (storeName.length > 40) {
-        storeName = `${storeName.slice(0, 40)}…`;
-      }
-
-      let ipnsFetch = (this.ipnsFetch = null);
-      let ipfsFetch = (this.ipfsFetch = null);
-
-      const onFailedListingFetch = (xhr) => {
-        if (typeof xhr !== 'object') {
-          throw new Error('Please provide the failed xhr.');
-        }
-
-        this.userLoadingModal.setState({
-          contentText: app.polyglot.t('userPage.loading.failTextListing', {
-            listing: `<b>${title}</b>`,
-          }),
-          isProcessing: false,
-        });
-
-        let err = (xhr.responseJSON && xhr.responseJSON.reason) || xhr.statusText || 'unknown error';
-        // Consolidate and remove specific data from no link errors.
-        if (err.startsWith('no link named')) err = 'no link named under hash';
-        endAjaxEvent('Listing_LoadFromCard', {
-          ...segmentation,
-          errors: err,
-        });
-      };
-
-      const showListingDetail = () => {
-        endAjaxEvent('Listing_LoadFromCard', {
-          ...segmentation,
-        });
-
-        const listingDetail = new ListingDetail({
-          model: this.getFullListing(),
-          profile: this.options.profile,
-          vendor: this.options.vendor,
-          closeButtonClass: 'cornerTR iconBtn clrP clrBr clrSh3 toolTipNoWrap',
-          modelContentClass: 'modalContent',
-          openedFromStore: !!this.options.onStore,
-          checkNsfw: !this._userClickedShowNsfw,
-        })
-          .render()
-          .open();
-
-        const onListingDetailClose = () => {
-          app.router.navigate(routeOnOpen);
-          if (ipfsFetch) ipfsFetch.abort();
-          ipnsFetch.abort();
-        };
-
-        listingDetail.purchaseModal.progress((getPurchaseE) => {
-          if (getPurchaseE.type === ListingDetail.PURCHASE_MODAL_CREATE) {
-            const purchaseModal = getPurchaseE.view;
-            this.listenTo(purchaseModal, 'clickReloadOutdated', (e) => {
-              e.preventDefault();
-              listingDetail.render();
-              purchaseModal.remove();
-            });
-          }
-        });
-
-        this.listenTo(listingDetail, 'close', onListingDetailClose);
-        this.listenTo(listingDetail, 'modal-will-remove', () => this.stopListening(null, null, onListingDetailClose));
-        this.listenTo(listingDetail, 'clickReloadOutdated', (e) => {
-          // Since the model will already have been updated by
-          // handleOutdated, we could just re-render here.
-          listingDetail.render();
-          e.preventDefault();
-        });
-
-        this.$emit('listingDetailOpened');
-        this.userLoadingModal.remove();
-        app.loadingModal.close();
-      };
-
-      const handleOutdatedHash = (listingData = {}, hashData) => {
-        const { oldHash, newHash } = hashData;
-
-        if (typeof listingData !== 'object') {
-          throw new Error('Please provide the listing data as an object.');
-        }
-
-        if (typeof oldHash !== 'string' || !oldHash) {
-          throw new Error('Please provide an oldHash as a non-empty string.');
-        }
-
-        if (typeof newHash !== 'string' || !newHash) {
-          throw new Error('Please provide an newHash as a non-empty string.');
-        }
-
-        recordEvent('Lisitng_OutdatedHashFromCard', segmentation);
-
-        this.getFullListing().set(this.getFullListing().parse(listingData));
-
-        // push mapping to outdatedHashes collection
-        outdateHash(oldHash, newHash);
-      };
-
-      const loadListing = () => {
-        const listingHash = getNewerHash(hash || this.model.get('hash'));
-
-        if (listingHash && this.ownerGuid !== app.profile.id) {
-          ipfsFetch = this.getFullListing().fetch({
-            hash: listingHash,
-            showErrorOnFetchFail: false,
-          });
-          ipnsFetch = $.ajax(Listing.getIpnsUrl(this.ownerGuid, this.model.get('slug')));
-        } else {
-          ipnsFetch = this.getFullListing().fetch({ showErrorOnFetchFail: false });
-        }
-
-        if (this.userLoadingModal) this.userLoadingModal.remove();
-        this.userLoadingModal = new UserLoadingModal({
-          initialState: {
-            userName: avatarHashes ? storeName : undefined,
-            userAvatarHashes: avatarHashes,
-            contentText: app.polyglot.t('userPage.loading.loadingText', {
-              name: `<b>${title}</b>`,
-            }),
-            isProcessing: true,
-          },
-        });
-
-        this.listenTo(this.userLoadingModal, 'clickCancel', () => {
-          ipnsFetch.abort();
-          if (ipfsFetch) ipfsFetch.abort();
-          this.userLoadingModal.remove();
-          app.router.navigate(routeOnOpen);
-        });
-
-        this.listenTo(this.userLoadingModal, 'clickRetry', () => {
-          app.router.navigate(routeOnOpen);
-          this.loadListingDetail(hash);
-        });
-
-        this.userLoadingModal.render().open();
-
-        ipnsFetch
-          .done((data, textStatus, xhr) => {
-            if (xhr.statusText === 'abort' || this.isRemoved()) return;
-
-            if (ipfsFetch && ['pending', 'rejected'].includes(ipfsFetch.state())) {
-              ipfsFetch.abort();
-              this.getFullListing().set(this.getFullListing().parse(data));
-            }
-
-            if (ipfsFetch && ipfsFetch.state() === 'resolved') {
-              if (listingHash !== data.cid) {
-                handleOutdatedHash(data, {
-                  oldHash: listingHash,
-                  newHash: data.cid,
-                });
-              }
-            } else {
-              showListingDetail();
-            }
-          })
-          .fail((xhr) => {
-            if (xhr.statusText === 'abort') return;
-
-            if (ipfsFetch && ['pending', 'resolved'].includes(ipfsFetch.state())) return;
-
-            onFailedListingFetch(xhr);
-          });
-
-        if (ipfsFetch) {
-          ipfsFetch
-            .done((data, textStatus, xhr) => {
-              if (xhr.statusText === 'abort' || this.isRemoved()) return;
-              showListingDetail();
-            })
-            .fail((xhr) => {
-              if (xhr.statusText === 'abort') return;
-              onFailedListingFetch(xhr);
-            });
-        }
-      };
-
-      if (isBlocked(this.ownerGuid) && !isUnblocking(this.ownerGuid)) {
-        const blockedWarningModal = new BlockedWarning({ peerID: this.ownerGuid }).render().open();
-
-        this.listenTo(blockedWarningModal, 'canceled', () => {
-          app.router.navigate(routeOnOpen);
-        });
-
-        const onUnblock = () => loadListing();
-
-        this.listenTo(blockEvents, 'unblocking unblocked', onUnblock);
-
-        this.listenTo(blockedWarningModal, 'close', () => {
-          this.stopListening(null, null, onUnblock);
-        });
-      } else {
-        loadListing();
-      }
-    },
 
     onClick(e) {
       if (this.deleteConfirmOn) return;
@@ -886,7 +649,13 @@ export default {
           !$.contains($('.js-edit')[0], e.target) &&
           !$.contains($('.js-delete')[0], e.target))
       ) {
-        this.loadListingDetail();
+        const slug = this.model.get('slug');
+
+        if (this.$route.params.guid === this.ownerGuid) {
+          app.router.navigate(`${this.ownerGuid}/store/${slug}`);
+        } else {
+          app.router.navigate(`${this.ownerGuid}/store/${slug}`, { trigger: true });
+        }
       }
     },
 
@@ -936,7 +705,7 @@ export default {
     },
 
     onReportSubmitted() {
-      this.reportBtn.setState({ reported: true });
+      this.$refs.reportBtn.setState({ reported: true });
     },
 
     startReport() {
@@ -951,9 +720,6 @@ export default {
         .render()
         .open();
 
-      this.report.on('modal-will-remove', () => {
-        this.report = null;
-      });
       this.listenTo(this.report, 'submitted', this.onReportSubmitted);
     },
 
@@ -971,29 +737,12 @@ export default {
       return this.fullListing;
     },
 
-    remove() {
-      if (this.fullListingFetch) this.fullListingFetch.abort();
-      if (this.destroyRequest) this.destroyRequest.abort();
-      $(document).off('click', this.boundDocClick);
-      if (this.userLoadingModal) this.userLoadingModal.remove();
-      if (this.ipnsFetch) this.ipnsFetch.abort();
-      if (this.ipfsFetch) this.ipfsFetch.abort();
-    },
     render(cardError = this.cardError) {
       let _cardError = cardError;
 
       if (!_cardError) {
         this.setBlockedClass();
         this.setHideNsfwClass();
-
-        if (!this.ownListing) {
-          this.getCachedEl('.js-blockBtnWrapper').html(
-            new BlockBtn({
-              targetId: this.ownerGuid,
-              initialState: { useIcon: true },
-            }).render().el
-          );
-        }
       }
 
       return this;

@@ -9,7 +9,7 @@
         <div class="flexExpand tx5">
           <div class="flex gutterH">
             <div class="flexExpand">
-              <a :href="`#${`${ob.listing.vendorID.peerID}/store/${ob.listing.slug}`}`" :class="`txB clrT inlineBlock ${ob.description || isCrypto ? 'rowTn' : ''}`">{{ title }}</a>
+              <a :href="`#${`${ob.listing.vendorID.peerID}/store/${ob.listing.slug}`}`" :class="`txB clrT inlineBlock ${ob.description || isCrypto ? 'rowTn' : ''}`" v-html="title"></a>
               <div v-if="ob.sku">{{ ob.polyT('orderDetail.summaryTab.orderDetails.skuLabel') }}: {{ ob.sku }}</div>
               <div v-if="item.options && item.options.length">{{ item.options.map(option => `${option.name}:&nbsp;${option.value}`).join(',&nbsp;') }}</div>
               <template v-if="isCrypto">

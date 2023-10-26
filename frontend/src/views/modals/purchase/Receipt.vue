@@ -6,20 +6,18 @@
     <template v-for="(priceObj, i) in prices" :key="i">
       <div class="flexRow gutterHSm">
         <span class="flexExpand">
-          {{
-            !ob.isCrypto ? ob.polyT('purchase.receipt.listing')
-            : ob.polyT('purchase.receipt.cryptoIconsAmountCombo', {
-              icons: ob.crypto.tradingPair({
-                className: 'cryptoTradingPairSm cryptoTradingPair',
-                fromCur: ob.listing.metadata.acceptedCurrencies[0],
-                toCur: ob.listing.item.cryptoListingCurrencyCode,
-                truncateCurAfter: 5,
-              }),
-              cryptoIconsAmount:
-                `<span class="cryptoQuantity">${ob.polyT('purchase.receipt.cryptoIconsAmount',
-                  { amount: ob.number.toStandardNotation(priceObj.quantity) })}</span>`,
-            })
-          }}
+          <div v-if="!ob.isCrypto" v-html="ob.polyT('purchase.receipt.listing')" />
+          <template v-else>
+            <CryptoTradingPair :options="ob.crypto.tradingPairOptions({
+              className: 'cryptoTradingPairSm cryptoTradingPair',
+              fromCur: ob.listing.metadata.acceptedCurrencies[0],
+              toCur: ob.listing.item.cryptoListingCurrencyCode,
+              truncateCurAfter: 5,
+            })" />
+            <span class="cryptoQuantity">
+              {{ ob.polyT('purchase.receipt.cryptoIconsAmount', { amount: ob.number.toStandardNotation(priceObj.quantity) }) }}
+            </span>
+          </template>
         </span>
         <div class="constrainedWidth">
           <div class="flexHRight">

@@ -63,7 +63,9 @@
               </template>
 
               <template v-else>
-                <h2 class="flexExpand js-cryptoTitle cryptoTitle"></h2>
+                <h2 class="flexExpand js-cryptoTitle cryptoTitle">
+                  <CryptoTradingPairWrap :options="cryptoTradingPairOptions()" />
+                </h2>
                 <CryptoPrice :options="{
                       priceAmount: ob.price.amount,
                       priceCurrencyCode: ob.price.currencyCode,
@@ -1134,12 +1136,10 @@ export default {
         //   .html(this.cryptoInventory.render().el);
 
         return {
-          initialState: {
-            tradingPairClass: 'cryptoTradingPairXL rowSm',
-            exchangeRateClass: 'clrT2 exchangeRateLine',
-            fromCur: metadata.get('acceptedCurrencies')[0],
-            toCur: this.model.get('item').get('cryptoListingCurrencyCode'),
-          },
+          tradingPairClass: 'cryptoTradingPairXL rowSm',
+          exchangeRateClass: 'clrT2 exchangeRateLine',
+          fromCur: metadata.get('acceptedCurrencies')[0],
+          toCur: this.model.get('item').get('cryptoListingCurrencyCode'),
         };
       }
       return {};

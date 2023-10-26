@@ -22,10 +22,10 @@
             <div class="tx5b clrT2">
               <template v-if="ob.buyerID">
                 <b>
-                  <template v-html='ob.polyT("listingDetail.review.title", {
+                  <div v-html='ob.polyT("listingDetail.review.title", {
                     time: ob.moment(ob.timestamp).format("MMM Do YYYY h:mm a"),
                     name: `<a href="${ob.buyerID.peerID}"><span class="clrT2">${ob.buyerName}</span></a>`
-                    })'></template>
+                    })'></div>
                 </b>
               </template>
 

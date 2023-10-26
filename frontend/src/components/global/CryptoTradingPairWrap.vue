@@ -51,7 +51,7 @@ export default {
   },
   data () {
     return {
-      _state: {
+      defaultOptions: {
         tradingPairClass: 'cryptoTradingPairLg',
         exchangeRateClass: '',
         fromCur: '',
@@ -69,7 +69,9 @@ export default {
         exchangeRateUnavailable: false,
         iconClass: 'ion-alert-circled clrTAlert',
         truncateCurAfter: 8,
-      }
+      },
+      newOptions: {},
+      triggerUpdate: 0,
     };
   },
   created () {
@@ -81,9 +83,39 @@ export default {
   },
   computed: {
     ob () {
+      let access = this.triggerUpdate;
+
+      let newOptions = {
+        ...this.defaultOptions,
+        ...this.options,
+      }
+
+      if (typeof newOptions.fromCur === 'string') {
+        newOptions.fromCur = ensureMainnetCode(newOptions.fromCur);
+
+        if (newOptions.fromCur > newOptions.truncateCurAfter) {
+          newOptions.fromCur = `${newOptions.fromCur.slice(0, newOptions.truncateCurAfter)}…`;
+        }
+      }
+
+      if (typeof newOptions.toCur === 'string') {
+        newOptions.toCur = ensureMainnetCode(newOptions.toCur);
+
+        if (newOptions.toCur > newOptions.truncateCurAfter) {
+          newOptions.toCur = `${newOptions.toCur.slice(0, newOptions.truncateCurAfter)}…`;
+        }
+      }
+
+      newOptions = {
+        ...newOptions,
+        ...this.getConversionState(newOptions.fromCur, newOptions.toCur, newOptions.fromCurAmount),
+      };
+
+      this.newOptions = newOptions;
+
       return {
         ...this.templateHelpers,
-        ...state,
+        ...this.newOptions,
       };
     },
     tradingPairOptions () {
@@ -110,7 +142,7 @@ export default {
       }).format(ob.fromCurConvertedAmount);
     },
     noExchangeRateTip () {
-      const state = this.getState();
+      const state = this.newOptions;
       const coinsMissingRates = [];
 
       if (state.toRateUnavailable) coinsMissingRates.push(state.toCur);
@@ -129,94 +161,13 @@ export default {
     },
   },
   methods: {
-    loadData (options = {}) {
-      const opts = {
-        ...options,
-        initialState: {
-          tradingPairClass: 'cryptoTradingPairLg',
-          exchangeRateClass: '',
-          fromCur: '',
-          fromCurAmount: 1,
-          toCur: '',
-          localCurrency: app.settings.get('localCurrency'),
-          // If passing this in, it should be a string or a function. If it's a function
-          // it will be passed the state and coin(s) with missing exchange rates and it
-          // should return a string.
-          noExchangeRateTip: coinsMissingRates => (
-            app.polyglot.t('cryptoTradingPair.tipMissingExchangeRate', {
-              coins: coinsMissingRates.join(', '),
-            })
-          ),
-          exchangeRateUnavailable: false,
-          iconClass: 'ion-alert-circled clrTAlert',
-          truncateCurAfter: 8,
-          ...options.initialState || {},
-        },
-      };
-
-      this.baseInit(opts);
-
-      // Since the initial state is not being piped through setState in the
-      // base class, this is a hack to run it through setState now and ensure
-      // setState updates the exchange rate which is based on the toCur changing.
-      if (typeof this._state.toCur === 'string' && this._state.toCur) {
-        const toCur = this._state.toCur;
-        this._state.toCur = '';
-        this.setState({
-          ...this._state,
-          toCur,
-        });
-      }
+    loadData () {
 
       this.listenTo(currencyEvents, 'exchange-rate-change', e => {
-        if (
-          e.changed.includes(this.getState().toCur) ||
-          e.changed.includes(this.getState().fromCur)
-        ) {
-          const curState = this.getState();
-          this.setState({
-            ...curState,
-            ...this.getConversionState(curState.fromCur, curState.toCur, curState.fromCurAmount),
-          });
+        if (e.changed.includes(this.options.toCur) || e.changed.includes(this.options.fromCur)) {
+          this.triggerUpdate += 1;
         }
       });
-    },
-
-    setState (state = {}, options = {}) {
-      const prevState = this.getState();
-      let newState = {
-        ...prevState,
-        ...state,
-      };
-
-      if (typeof state === 'object') {
-        if (typeof state.fromCur === 'string') {
-          newState.fromCur = ensureMainnetCode(state.fromCur);
-
-          if (newState.fromCur > state.truncateCurAfter) {
-            newState.fromCur = `${newState.fromCur.slice(0, state.truncateCurAfter)}…`;
-          }
-        }
-
-        if (typeof state.toCur === 'string') {
-          newState.toCur = ensureMainnetCode(state.toCur);
-
-          if (newState.toCur > state.truncateCurAfter) {
-            newState.toCur = `${newState.toCur.slice(0, state.truncateCurAfter)}…`;
-          }
-        }
-
-        if (newState.fromCur !== prevState.fromCur ||
-          newState.toCur !== prevState.toCur ||
-          newState.fromCurAmount !== prevState.fromCurAmount) {
-          newState = {
-            ...newState,
-            ...this.getConversionState(newState.fromCur, newState.toCur, newState.fromCurAmount),
-          };
-        }
-      }
-
-      return this._state = newState;
     },
 
     getConversionState (fromCur, toCur, fromCurAmount) {

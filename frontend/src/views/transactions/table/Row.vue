@@ -18,7 +18,7 @@
       <template v-else>
         <div class="flexVCent gutterHSm">
           <a :href="`#${ob.vendorID}/store/${ob.slug}`" class="clrT flexNoShrink js-cryptoTradingPairWrap">
-            <CryptoTradingPair :key="key" v-if="ob.coinType" :options="cryptoTradingPairOptions" />
+            <CryptoTradingPairWrap :key="key" v-if="ob.coinType" :options="cryptoTradingPairOptions" />
           </a>
         </div>
       </template>
@@ -176,13 +176,11 @@ export default {
       }
 
       return {
-        initialState: {
-          tradingPairClass,
-          exchangeRateClass: 'hide',
-          fromCur: paymentCoin,
-          toCur: coinType,
-          truncateCurAfter: 5,
-        },
+        tradingPairClass,
+        exchangeRateClass: 'hide',
+        fromCur: paymentCoin,
+        toCur: coinType,
+        truncateCurAfter: 5,
       };
     }
   },

@@ -1209,7 +1209,7 @@
     "cryptoCurrencyType": {
       "helperTypeCount": "1500+ cryptocurrencies",
       "helperType": "Trade %{count} for free",
-      "helperCoinType": "The currency you’re offering for trade",
+      "helperCoinType": "The currency you're offering for trade",
       "helperReceive": "The currency you'll receive for the trade",
       "helperQuantity": "Buyer(s) can purchase a fraction or full amount",
       "helperMarketValue": "Buyer(s) pay market value. The listing price will automatically reflect the market value.",

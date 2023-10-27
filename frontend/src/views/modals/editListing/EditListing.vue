@@ -1,6 +1,6 @@
 <template>
   <div
-    :class="`modal editListing tabbedModal modalScrollPage ${contractTypeClass} ${!createMode ? 'editMode' : ''} ${fixedNav ? 'fixedNav' : ''} ${
+    :class="`modal editListing tabbedModal modalScrollPage TYPE_${formData.metadata.contractType} ${!createMode ? 'editMode' : ''} ${fixedNav ? 'fixedNav' : ''} ${
       notTrackingInventory ? 'notTrackingInventory' : ''
     }`"
     @scroll="onScroll"
@@ -39,12 +39,12 @@
 
                 <div class="tabFormWrapper">
                   <form class="box padSmKids padStack">
-                    <div class="standardTypeWrap js-standardTypeWrap pad0 padSmKids padStackAll">
+                    <div class="standardTypeWrap js-standardTypeWrap pad0 padSmKids padStackAll" v-if="formData.metadata.contractType !== 'CRYPTOCURRENCY'">
                       <div class="flexRow">
                         <div class="col12">
                           <div class="flexRow">
                             <label for="editListingTitle" class="required flexExpand">{{ ob.polyT('editListing.title') }}</label>
-                            <ViewListingLinks :createMode="ob.createMode" />
+                            <ViewListingLinks :createMode="ob.createMode" @viewListing="onClickViewListing" @viewListingOnWeb="onClickViewListingOnWeb" />
                           </div>
                           <FormError v-if="ob.errors['item.title']" :errors="ob.errors['item.title']" />
                           <input
@@ -124,7 +124,19 @@
                         </div>
                       </div>
                     </div>
-                    <div class="cryptoTypeWrap js-cryptoTypeWrap pad0"></div>
+                    <div class="cryptoTypeWrap js-cryptoTypeWrap pad0" v-if="formData.metadata.contractType === 'CRYPTOCURRENCY'">
+                      <CryptoCurrencyType v-model="formData" :options="{
+                          getCoinTypes: getCoinTypesDeferred.promise(),
+                          receiveCur,
+                        }"
+                        :bb="function() {
+                          return {
+                            model,
+                          }
+                        }"
+                        @clickViewListing="onClickViewListing"
+                        @clickViewListingOnWeb="onClickViewListingOnWeb" />
+                    </div>
                     <div class="flexRow gutterH skuMatureContentRow js-skuMatureContentRow">
                       <div class="col6 simpleFlexCol js-skuFieldContainer"></div>
                       <div class="col6 simpleFlexCol">
@@ -444,10 +456,12 @@ export default {
         countryList: this.countryList,
         currencies: this.currencies,
         contractTypes: metadata.contractTypesVerbose,
-        conditionTypes: this._model.item.conditionTypes ? this._model.item.conditionTypes.map((conditionType) => ({
-          code: conditionType,
-          name: app.polyglot.t(`conditionTypes.${conditionType}`),
-        })) : [],
+        conditionTypes: this.model.get('item')
+          .conditionTypes
+          .map((conditionType) => ({
+            code: conditionType,
+            name: app.polyglot.t(`conditionTypes.${conditionType}`),
+          })),
         errors: this.model.validationError || {},
         photoUploadInprogress: !!this.inProgressPhotoUploads.length,
         expandedReturnPolicy: this.expandedReturnPolicy || !!this._model.refundPolicy,
@@ -461,7 +475,7 @@ export default {
           photos: this.MAX_PHOTOS,
         },
         shouldShowVariantInventorySection: this.shouldShowVariantInventorySection,
-        ...this._model,
+        ...this.model.toJSON(),
       };
     },
     tabs() {
@@ -1751,15 +1765,6 @@ export default {
         },
         onMove: (e) => ($(e.related).hasClass('js-addPhotoWrap') ? false : undefined),
       });
-
-      if (this.cryptoCurrencyType) this.cryptoCurrencyType.remove();
-      this.cryptoCurrencyType = this.createChild(CryptoCurrencyType, {
-        model: this.model,
-        getCoinTypes: this.getCoinTypesDeferred.promise(),
-        getReceiveCur: () => this._receiveCryptoCur,
-      });
-
-      $('.js-cryptoTypeWrap').html(this.cryptoCurrencyType.render().el);
 
       setTimeout(() => {
         if (!this.rendered) {

@@ -4,7 +4,7 @@
 
     <div :class="ob.exchangeRateClass">
       <template v-if="!ob.fromRateUnavailable && !ob.toRateUnavailable">
-        {{ `${fromPairing} = ${toPairing} (${fromCurAmount})` }}
+        {{ `${fromPairing} = ${toPairing} (${ob.fromCurAmount})` }}
       </template>
       <template v-else>
         {{ fromPairing }} =

@@ -63,17 +63,20 @@
                         <div class="col6 simpleFlexCol">
                           <label for="editContractType" class="required">{{ ob.polyT('editListing.type') }}</label>
                           <FormError v-if="ob.errors['metadata.contractType']" :errors="ob.errors['metadata.contractType']" />
-                          <select
+                          <Select2
                             id="editContractType"
-                            @change="onChangeContractType(val)"
-                            name="metadata.contractType"
+                            v-model="formData.metadata.contractType"
+                            :options="{
+                              // disables the search box
+                              minimumResultsForSearch: Infinity,
+                            }"
                             class="clrBr clrP clrSh2 marginTopAuto"
                             style="width: 100%"
                           >
                             <template v-for="(contractType, j) in ob.contractTypes" :key="j">
-                              <option :value="contractType.code" :selected="contractType.code === ob.metadata.contractType">{{ contractType.name }}</option>
+                              <option :value="contractType.code" :selected="contractType.code === formData.metadata.contractType">{{ contractType.name }}</option>
                             </template>
-                          </select>
+                          </Select2>
                           <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperType', { smart_count: 4 }) }}</div>
                         </div>
                         <div class="col6 simpleFlexCol">
@@ -359,7 +362,6 @@
 
 <script>
 import $ from 'jquery';
-import Velocity from 'velocity-animate';
 
 import Sortable from 'sortablejs';
 import _ from 'underscore';
@@ -377,7 +379,6 @@ import {
   getCurrenciesSortedByCode as getCryptoCursByCode,
 } from '../../../../backbone/data/cryptoListingCurrencies';
 import { supportedWalletCurs } from '../../../../backbone/data/walletCurrencies';
-import { getCoinDivisibility } from '../../../../backbone/utils/currency';
 import { setDeepValue } from '../../../../backbone/utils/object';
 import SimpleMessage, { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import Dialog from '../../../../backbone/views/modals/Dialog';
@@ -588,33 +589,8 @@ export default {
       return cur;
     },
 
-    // Keep in mind this could return undefined if certain dependant form fields are not set yet
-    // (e.g. rendering not complete, dependant async data not loaded) and the divisibility was
-    // never set in the model.
-    coinDivisibility() {
-      let coinDiv;
-
-      if ($('#editContractType').length) {
-        try {
-          coinDiv = getCoinDivisibility(
-            $('#editContractType').val() === 'CRYPTOCURRENCY' ? $('#editListingCoinType').val() || this.model.get('metadata').get('coinType') : this.currency
-          );
-        } catch (e) {
-          // pass
-        }
-      } else {
-        coinDiv = this.model.get('metadata').get('coinDivisibility');
-      }
-
-      return coinDiv;
-    },
-
-    maxCatsWarning() {
-      return `<div class="clrT2 tx5 row">${app.polyglot.t('editListing.maxCatsWarning')}</div>`;
-    },
-
     $formFields() {
-      const isCrypto = $('#editContractType').val() === 'CRYPTOCURRENCY';
+      const isCrypto = this.formData.metadata.contractType === 'CRYPTOCURRENCY';
       const cryptoExcludes = isCrypto ? ', .js-inventoryManagementSection' : '';
       const excludes = '.js-sectionShipping, .js-couponsSection, .js-variantsSection, ' + `.js-variantInventorySection${cryptoExcludes}`;
 
@@ -756,29 +732,7 @@ export default {
       this.images = this.model.get('item').get('images');
       this.shippingOptions = this.model.get('shippingOptions');
       this.shippingOptionViews = [];
-      this.getCoinTypesDeferred = $.Deferred();
       this.countryList = getTranslatedCountries();
-
-      // Since the UI is driven from the model and since the Receive field
-      // and the Accepted Currencies select list are both driven by the same
-      // model field (acceptdCurrencies), we'll keep track of their values
-      // seperately, so they don't interfere with each other.
-      const getAcceptedCurs = () => this.model.get('metadata').get('acceptedCurrencies');
-      const getReceiveCur = () => (this.model.isCrypto ? (getAcceptedCurs().length && getAcceptedCurs()[0]) || null : null);
-      this._receiveCryptoCur = getReceiveCur();
-      this._acceptedCurs = getAcceptedCurs();
-      this.listenTo(
-        this.model.get('metadata'),
-        'change:acceptedCurrencies',
-
-        () => {
-          if (this.model.isCrypto) {
-            this._receiveCryptoCur = getReceiveCur();
-          } else {
-            this._acceptedCurs = getAcceptedCurs();
-          }
-        }
-      );
 
       getCryptoCursByName().then(
         (curs) => this.getCoinTypesDeferred.resolve(curs),
@@ -835,8 +789,6 @@ export default {
         'click .js-removeImage': 'onClickRemoveImage',
         'keyup .js-variantNameInput': 'onKeyUpVariantName',
         'click .js-scrollToVariantInventory': 'onClickScrollToVariantInventory',
-        'click .js-viewListing': 'onClickViewListing',
-        'click .js-viewListingOnWeb': 'onClickViewListingOnWeb',
       };
     },
 
@@ -876,30 +828,6 @@ export default {
 
     onChangePrice() {
       this.variantInventory.render();
-    },
-
-    setContractTypeClass(contractType) {
-      this.contractTypeClass = `TYPE_${contractType}`;
-    },
-
-    onChangeContractType(val, data = {}) {
-      this.setContractTypeClass(val);
-
-      if (!data.fromCryptoTypeChange) {
-        if (val === 'CRYPTOCURRENCY') {
-          this.model.get('metadata').set('acceptedCurrencies', [this._receiveCryptoCur]);
-          $('#editListingCryptoContractType').val('CRYPTOCURRENCY');
-          $('#editListingCryptoContractType').trigger('change').focus();
-        }
-      }
-    },
-
-    onChangeCryptoContractType(e) {
-      if (e.target.value === 'CRYPTOCURRENCY') return;
-
-      this.model.get('metadata').set('acceptedCurrencies', this._acceptedCurs);
-      $('#editContractType').val(e.target.value);
-      $('#editContractType').trigger('change', { fromCryptoTypeChange: true }).focus();
     },
 
     getOrientation(file, callback) {
@@ -1407,7 +1335,7 @@ export default {
       let formData = this.getFormData(this.$formFields);
       const item = this.model.get('item');
       const metadata = this.model.get('metadata');
-      const isCrypto = $('#editContractType').val() === 'CRYPTOCURRENCY';
+      const isCrypto = this.formData.metadata.contractType === 'CRYPTOCURRENCY';
 
       // set model / collection data for various child views
       this.shippingOptionViews.forEach((shipOptVw) => shipOptVw.setModelData());
@@ -1589,7 +1517,7 @@ export default {
       this.$couponsSection = $('.js-couponsSection');
       this.$variantsSection = $('.js-variantsSection');
 
-      $('#editContractType, #editListingVisibility, #editListingCondition, ' + '#editListingCountrySelect').select2({
+      $('#editListingCondition, ' + '#editListingCountrySelect').select2({
         // disables the search box
         minimumResultsForSearch: Infinity,
       });

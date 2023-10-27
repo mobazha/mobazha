@@ -137,6 +137,10 @@ export default {
     },
     formData: {
       handler(val) {
+        if (val.metadata.contractType !== 'CRYPTOCURRENCY') {
+          // Restore acceptedCurrencies if not CRYPTOCURRENCY to switch back
+          this.formData.metadata.acceptedCurrencies = this.model.get('metadata').get('acceptedCurrencies');
+        }
         this.$emit('update:modelValue', val);
       },
       deep: true,

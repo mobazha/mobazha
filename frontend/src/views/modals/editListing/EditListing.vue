@@ -50,9 +50,8 @@
                           <input
                             type="text"
                             class="clrBr clrP clrSh2"
-                            name="item.title"
+                            v-model="formData.item.title"
                             id="editListingTitle"
-                            :value="ob.item.title"
                             :maxLength="ob.max.title"
                             :placeholder="ob.polyT('editListing.placeholderTitle')"
                           />
@@ -83,9 +82,13 @@
                           <!-- // hiding until this is ready on the back end -->
                           <div class="hide">
                             <label for="editListingVisibility" class="required">{{ ob.polyT('editListing.visibility') }}</label>
-                            <select id="editListingVisibility" class="clrBr clrP clrSh2 marginTopAuto">
+                            <Select2 id="editListingVisibility" class="clrBr clrP clrSh2 marginTopAuto"
+                              :options="{
+                                // disables the search box
+                                minimumResultsForSearch: Infinity,
+                              }" >
                               <option value="hidden">Hidden (doesn't display in store)</option>
-                            </select>
+                            </Select2>
                           </div>
                         </div>
                       </div>
@@ -98,31 +101,30 @@
                             <input
                               type="text"
                               class="clrBr clrP clrSh2"
-                              @change="onChangePrice"
-                              name="item.price"
+                              @change="onChangePrice($event)"
                               id="editListingPrice"
-                              :value="ob.number.toStandardNotation(ob.item.price)"
+                              :value="ob.number.toStandardNotation(formData.item.price)"
                               placeholder="0.00"
                               data-var-type="bignumber"
                             />
-                            <select id="editListingCurrency" name="metadata.pricingCurrency.code" class="clrBr clrP nestInputRight">
+                            <Select2 id="editListingCurrency" v-model="formData.metadata.pricingCurrency.code" class="clrBr clrP nestInputRight">
                               <template v-for="(currency, j) in ob.currencies" :key="j">
-                                <option :value="currency.code" :data-name="currency.name" :selected="currency.code === ob.listingCurrency">
+                                <option :value="currency.code" :selected="currency.code.toUpperCase() === ob.listingCurrency.toUpperCase()">
                                   {{ currency.code }}
                                 </option>
                               </template>
-                            </select>
+                            </Select2>
                           </div>
                           <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperPrice', { cur: helperCryptoCurName }) }}</div>
                         </div>
                         <div class="col6 simpleFlexCol conditionWrap">
                           <label for="editListingCondition" class="required">{{ ob.polyT('editListing.condition') }}</label>
                           <FormError v-if="ob.errors['item.condition']" :errors="ob.errors['item.condition']" />
-                          <select id="editListingCondition" name="item.condition" class="clrBr clrP clrSh2 marginTopAuto" style="width: 100%">
+                          <Select2 id="editListingCondition" v-model="formData.item.condition" class="clrBr clrP clrSh2 marginTopAuto" style="width: 100%" :options="{ minimumResultsForSearch: Infinity, }">
                             <template v-for="(conditionType, j) in ob.conditionTypes" :key="j">
-                              <option :value="conditionType.code" :selected="conditionType.code === ob.item.condition">{{ conditionType.name }}</option>
+                              <option :value="conditionType.code" :selected="conditionType.code === formData.item.condition">{{ conditionType.name }}</option>
                             </template>
-                          </select>
+                          </Select2>
                           <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperCondition') }}</div>
                         </div>
                       </div>
@@ -141,24 +143,28 @@
                         @clickViewListingOnWeb="onClickViewListingOnWeb" />
                     </div>
                     <div class="flexRow gutterH skuMatureContentRow js-skuMatureContentRow">
-                      <div class="col6 simpleFlexCol js-skuFieldContainer"></div>
+                      <div class="col6 simpleFlexCol js-skuFieldContainer">
+                        <div>
+                          <label for="editListingSku">{{ ob.polyT('editListing.sku') }}</label>
+                          <FormError v-if="ob.errors['item.productId']" :errors="ob.errors['item.productId']" />
+                          <input type="text" class="clrBr clrP clrSh2 marginTopAuto" :disabled="showVariantInventorySection" v-model="formData.item.productID"
+                            id="editListingSku" :placeholder="ob.polyT('editListing.placeholderSKU')" :maxlength="ob.max.productIdLength">
+                          <div class="clrT2 txSm helper" v-html='showVariantInventorySection ?
+                            ob.polyT("editListing.helperSKUWithVariants",
+                              { variantInventoryLink: `<a class="js-scrollToVariantInventory">${ob.polyT("editListing.variantInventoryLink")}</a>` }) :
+                            ob.polyT("editListing.helperSKU")'></div>
+                        </div>
+                      </div>
                       <div class="col6 simpleFlexCol">
                         <label>{{ ob.polyT('editListing.nsfwLabel') }}</label>
                         <FormError v-if="ob.errors['item.nsfw']" :errors="ob.errors['item.nsfw']" />
                         <div class="btnStrip">
                           <div class="btnRadio clrBr">
-                            <input type="radio" name="item.nsfw" value="true" id="editListingNSFWInputTrue" data-var-type="boolean" :checked="ob.item.nsfw" />
+                            <input type="radio" v-model="formData.item.nsfw" value="true" id="editListingNSFWInputTrue" />
                             <label for="editListingNSFWInputTrue">{{ ob.polyT('editListing.nsfwYes') }}</label>
                           </div>
                           <div class="btnRadio clrBr">
-                            <input
-                              type="radio"
-                              name="item.nsfw"
-                              value="false"
-                              id="editListingNSFWInputFalse"
-                              data-var-type="boolean"
-                              :checked="!ob.item.nsfw"
-                            />
+                            <input type="radio" v-model="formData.item.nsfw" value="false" id="editListingNSFWInputFalse" />
                             <label for="editListingNSFWInputFalse">{{ ob.polyT('editListing.nsfwNo') }}</label>
                           </div>
                         </div>
@@ -227,13 +233,15 @@
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.tagsDetailed') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['item.tags']" :errors="ob.errors['item.tags']" />
-                <div class="js-maxTagsWarning"><div v-if="ob.item.tags.length >= ob.max.tags" v-html="ob.maxTagsWarning" /></div>
+                <div class="js-maxTagsWarning">
+                  <div v-if="ob.item.tags.length >= ob.max.tags" class="clrT2 tx5 row">{{ ob.polyT('editListing.maxTagsWarning') }}</div>
+                </div>
                 <input
                   type="text"
                   id="editListingTags"
-                  name="item.tags"
+                  @input="event => formData.item.tags = event.target.value.length ? event.target.value.split(ob.tagsDelimiter) : [] "
                   class="clrBr clrP hashPrefacedTags hideDropDown"
-                  :value="ob.item.tags.join(ob.tagsDelimiter)"
+                  :value="formData.item.tags.join(ob.tagsDelimiter)"
                   :placeholder="ob.polyT('editListing.tagsPlaceholder')"
                 />
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperTags') }}</div>
@@ -243,13 +251,15 @@
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.categoryDetailed') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['item.categories']" :errors="ob.errors['item.categories']" />
-                <div class="js-maxCatsWarning"><div v-if="ob.item.categories.length >= ob.max.cats" v-html="ob.maxCatsWarning" /></div>
+                <div class="js-maxCatsWarning">
+                  <div v-if="ob.item.categories.length >= ob.max.cats" class="clrT2 tx5 row">{{ ob.polyT('editListing.maxCatsWarning') }}</div>
+                </div>
                 <input
                   type="text"
                   id="editListingCategories"
-                  name="item.categories"
+                  @input="event => formData.item.categories = event.target.value.length ? event.target.value.split(ob.tagsDelimiter) : [] "
                   class="clrBr clrP hideDropDown"
-                  :value="ob.item.categories.join(ob.tagsDelimiter)"
+                  :value="formData.item.categories.join(ob.tagsDelimiter)"
                   :placeholder="ob.polyT('editListing.categoryPlaceholder')"
                 />
               </section>
@@ -285,12 +295,13 @@
                   ob.polyT('editListing.btnAddReturnPolicy')
                 }}</a>
                 <textarea
+                  ref="returnPolicy"
                   rows="8"
-                  name="refundPolicy"
-                  class="clrBr clrP clrSh2 <% !ob.expandedReturnPolicy && print('hide') %>"
-                  id="editListingReturnPolicy"
+                  v-model="formData.refundPolicy"
+                  class="clrBr clrP clrSh2"
+                  v-show="ob.expandedReturnPolicy"
                   :placeholder="ob.polyT('editListing.placeholderReturnPolicy')"
-                  >{{ ob.refundPolicy }}</textarea
+                  ></textarea
                 >
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperReturnPolicy') }}</div>
               </section>
@@ -299,17 +310,17 @@
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.termsAndConditions') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['termsAndConditions']" :errors="ob.errors['termsAndConditions']" />
-                <a class="btn clrP clrBr clrSh2 rowSm <% ob.expandedTermsAndConditions && print('hide') %>" @click="onClickAddTermsAndConditions">{{
+                <a class="btn clrP clrBr clrSh2 rowSm" v-show="!ob.expandedTermsAndConditions" @click="onClickAddTermsAndConditions">{{
                   ob.polyT('editListing.btnTermsAndConditions')
                 }}</a>
                 <textarea
+                  ref="termsAndConditions"
                   rows="8"
-                  name="termsAndConditions"
-                  class="clrBr clrP clrSh2 <% !ob.expandedTermsAndConditions && print('hide') %>"
-                  id="editListingTermsAndConditions"
+                  v-model="formData.termsAndConditions"
+                  class="clrBr clrP clrSh2"
+                  v-show="ob.expandedTermsAndConditions"
                   :placeholder="ob.polyT('editListing.placeholderTerms')"
-                  >{{ ob.termsAndConditions }}</textarea
-                >
+                  ></textarea>
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperTerms') }}</div>
               </section>
 
@@ -328,7 +339,7 @@
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.acceptedCurrencies') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError
-                  v-if="ob.errors['metadata.acceptedCurrencies'] && ob.metadata.contractType !== 'CRYPTOCURRENCY'"
+                  v-if="ob.errors['metadata.acceptedCurrencies'] && formData.metadata.contractType !== 'CRYPTOCURRENCY'"
                   :errors="ob.errors['metadata.acceptedCurrencies']"
                 />
                 <div class="js-cryptoCurSelectContainer rowSm">
@@ -348,7 +359,7 @@
 
               <div class="contentBox padMd clrP clrBr clrSh3">
                 <div class="flexHRight flexVCent gutterH">
-                  <ViewListingLinks :createMode="ob.createMode" />
+                  <ViewListingLinks :createMode="ob.createMode" @viewListing="onClickViewListing" @viewListingOnWeb="onClickViewListingOnWeb" />
                   <a class="btn clrP clrBAttGrad clrBrDec1 clrTOnEmph" @click="onSaveClick">{{ ob.polyT('settings.btnSave') }}</a>
                 </div>
               </div>
@@ -392,18 +403,19 @@ import Coupons from '../../../../backbone/views/modals/editListing/Coupons';
 import Variants from '../../../../backbone/views/modals/editListing/Variants';
 import VariantInventory from '../../../../backbone/views/modals/editListing/VariantInventory';
 import InventoryManagement from '../../../../backbone/views/modals/editListing/InventoryManagement';
-import SkuField from '../../../../backbone/views/modals/editListing/SkuField';
 import UnsupportedCurrency from '../../../../backbone/views/modals/editListing/UnsupportedCurrency';
-import CryptoCurrencyType from '../../../../backbone/views/modals/editListing/CryptoCurrencyType';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 import { capitalize } from '../../../../backbone/utils/string';
+import { toStandardNotation } from '../../../../backbone/utils/number';
 
 import ViewListingLinks from './ViewListingLinks.vue';
 import UploadPhoto from './UploadPhoto.vue';
+import CryptoCurrencyType from './CryptoCurrencyType.vue'
 
 export default {
   components: {
     ViewListingLinks,
+    CryptoCurrencyType,
     UploadPhoto,
   },
   props: {
@@ -428,6 +440,27 @@ export default {
       currencies: [],
       expandedReturnPolicy: false,
       expandedTermsAndConditions: false,
+
+      getCoinTypesDeferred: $.Deferred(),
+
+      formData: {
+        item: {
+          title: '',
+          price: 0,
+          condition: '',
+          productID: '',
+          nsfw: true,
+          description: '',
+        },
+        metadata: {
+          contractType: '',
+          pricingCurrency: {
+            code: '',
+          },
+        },
+        refundPolicy: '',
+        termsAndConditions: '',
+      },
     };
   },
   created() {
@@ -465,17 +498,15 @@ export default {
           })),
         errors: this.model.validationError || {},
         photoUploadInprogress: !!this.inProgressPhotoUploads.length,
-        expandedReturnPolicy: this.expandedReturnPolicy || !!this._model.refundPolicy,
-        expandedTermsAndConditions: this.expandedTermsAndConditions || !!this._model.termsAndConditions,
-        maxCatsWarning: this.maxCatsWarning,
-        maxTagsWarning: this.maxTagsWarning,
+        expandedReturnPolicy: this.expandedReturnPolicy || !!this.formData.refundPolicy,
+        expandedTermsAndConditions: this.expandedTermsAndConditions || !!this.formData.termsAndConditions,
         max: {
           title: item.max.titleLength,
           cats: item.max.cats,
           tags: item.max.tags,
+          productIdLength: item.max.productIdLength,
           photos: this.MAX_PHOTOS,
         },
-        shouldShowVariantInventorySection: this.shouldShowVariantInventorySection,
         ...this.model.toJSON(),
       };
     },
@@ -541,7 +572,7 @@ export default {
       return this.model.get('item').max.images;
     },
 
-    shouldShowVariantInventorySection() {
+    showVariantInventorySection() {
       return !!this.variantOptionsCl.length;
     },
 
@@ -574,8 +605,8 @@ export default {
 
     // return the currency associated with this listing
     currency() {
-      if (this.$currencySelect.length) {
-        return this.$currencySelect.val();
+      if (this.formData.metadata.pricingCurrency.code) {
+        return this.formData.metadata.pricingCurrency.code;
       }
 
       let cur = app.settings.get('localCurrency');
@@ -694,6 +725,28 @@ export default {
       // we'll clone and update it on sync
       this._origModel = this.model;
       this.model = this._origModel.clone();
+
+      const model = this.model.toJSON();
+      this.formData = {
+        item: {
+          title: model.item.title,
+          price: toStandardNotation(model.item.price),
+          condition: model.item.condition,
+          productID: model.item.productID,
+          nsfw: model.item.nsfw,
+          tags: model.item.tags,
+          categories: model.item.categories,
+          description: model.item.description,
+        },
+        metadata: {
+          contractType: model.metadata.contractType,
+          pricingCurrency: {
+            code: this.currency,
+          },
+        },
+        refundPolicy: model.refundPolicy,
+        termsAndConditions: model.termsAndConditions,
+      };
 
       this.listenTo(this.model, 'sync', () => {
         setTimeout(() => {
@@ -1002,16 +1055,18 @@ export default {
       });
     },
 
-    onClickAddReturnPolicy(e) {
-      $(e.target).addClass('hide');
-      this.$editListingReturnPolicy.removeClass('hide').focus();
+    onClickAddReturnPolicy() {
       this.expandedReturnPolicy = true;
+      this.$nextTick(() => {
+        this.$refs.returnPolicy.focus();
+      });
     },
 
-    onClickAddTermsAndConditions(e) {
-      $(e.target).addClass('hide');
-      this.$editListingTermsAndConditions.removeClass('hide').focus();
+    onClickAddTermsAndConditions() {
       this.expandedTermsAndConditions = true;
+      this.$nextTick(() => {
+        this.$refs.termsAndConditions.focus();
+      });
     },
 
     onClickAddShippingOption() {
@@ -1406,8 +1461,6 @@ export default {
         ...formData,
         item: {
           ...formData.item,
-          tags: formData.item.tags.length ? formData.item.tags.split(tagsDelimiter) : [],
-          categories: formData.item.categories.length ? formData.item.categories.split(tagsDelimiter) : [],
         },
       });
 
@@ -1523,26 +1576,9 @@ export default {
       });
 
       $('#editListingCurrency')
-        .select2({
-          matcher: (params, data) => {
-            if (!params.term || params.term.trim() === '') {
-              return data;
-            }
-
-            const term = params.term.toUpperCase().trim();
-
-            const name = data.element.getAttribute('data-name');
-
-            if (data.text.toUpperCase().includes(term) || (name && name.toUpperCase().includes(term))) {
-              return data;
-            }
-
-            return null;
-          },
-        })
         .on('change', () => this.variantInventory.render());
 
-      this.$editListingTags.selectize({
+      $('#editListingTags').selectize({
         persist: false,
         maxItems: item.max.tags,
         create: (input) => {
@@ -1559,31 +1595,15 @@ export default {
             text: term,
           };
         },
-        onChange: (value) => {
-          const tags = value.length ? value.split(',') : [];
-          if (tags.length >= item.max.tags) {
-            this.showMaxTagsWarning();
-          } else {
-            this.hideMaxTagsWarning();
-          }
-        },
       });
 
-      this.$editListingCategories.selectize({
+      $('#editListingCategories').selectize({
         persist: false,
         maxItems: item.max.cats,
         create: (input) => ({
           value: input,
           text: input,
         }),
-        onChange: (value) => {
-          const cats = value.length ? value.split(',') : [];
-          if (cats.length >= item.max.cats) {
-            this.showMaxCatsWarning();
-          } else {
-            this.hideMaxCatsWarning();
-          }
-        },
       });
 
       // render shipping options
@@ -1602,18 +1622,6 @@ export default {
       });
 
       this.$shippingOptionsWrap.append(shipOptsFrag);
-
-      // render sku field
-      if (this.skuField) this.skuField.remove();
-
-      this.skuField = this.createChild(SkuField, {
-        model: item,
-        initialState: {
-          variantsPresent: !!item.get('options').length,
-        },
-      });
-
-      $('.js-skuFieldContainer').html(this.skuField.render().el);
 
       // render variants
       if (this.variantsView) this.variantsView.remove();

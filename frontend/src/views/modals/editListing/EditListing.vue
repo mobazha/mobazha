@@ -266,7 +266,7 @@
 
               <section
                 ref="sectionVariants"
-                class="variantsSection js-variantsSection contentBox padMd clrP clrBr clrSh3 tx3 <% ob.item.options.length && print('expandedVariantsView') %>"
+                :class="`variantsSection js-variantsSection contentBox padMd clrP clrBr clrSh3 tx3 ${showVariantInventorySection ? 'expandedVariantsView' : ''}`"
               >
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.variantsDetailed') }}</h2>
                 <hr class="clrBr rowMd" />
@@ -279,7 +279,7 @@
               <section
                 ref="sectionVariantInventory"
                 class="contentBox variantInventorySection js-variantInventorySection padMd clrP clrBr clrSh3 tx3"
-                v-show="!!ob.shouldShowVariantInventorySection"
+                v-show="showVariantInventorySection"
               >
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.variantInventory') }}</h2>
                 <hr class="clrBr rowMd" />
@@ -378,7 +378,6 @@ import Sortable from 'sortablejs';
 import _ from 'underscore';
 import path from 'path';
 import Backbone from 'backbone';
-import { tagsDelimiter } from '../../../../backbone/utils/lib/selectize';
 import 'velocity-animate/velocity.ui';
 import app from '../../../../backbone/app';
 import { isScrolledIntoView, openExternal } from '../../../../backbone/utils/dom';
@@ -451,6 +450,8 @@ export default {
           productID: '',
           nsfw: true,
           description: '',
+          tags: [],
+          categories: [],
         },
         metadata: {
           contractType: '',
@@ -846,7 +847,7 @@ export default {
     },
 
     onClickReturn() {
-      this.trigger('click-return', { view: this });
+      this.$emit('click-return', { view: this });
     },
 
     onClickViewListing() {
@@ -1114,26 +1115,18 @@ export default {
 
     onUpdateVariantOptions() {
       if (this.variantOptionsCl.length) {
-        this.$variantsSection.addClass('expandedVariantsView');
-        this.skuField.setState({ variantsPresent: true });
-
         if (this.inventoryManagement.getState().trackBy !== 'DO_NOT_TRACK') {
           this.inventoryManagement.setState({
             trackBy: 'TRACK_BY_VARIANT',
           });
         }
       } else {
-        this.$variantsSection.removeClass('expandedVariantsView');
-        this.skuField.setState({ variantsPresent: false });
-
         if (this.inventoryManagement.getState().trackBy !== 'DO_NOT_TRACK') {
           this.inventoryManagement.setState({
             trackBy: 'TRACK_BY_FIXED',
           });
         }
       }
-
-      this.$variantInventorySection.toggleClass('hide', !this.shouldShowVariantInventorySection);
     },
 
     onClickScrollToVariantInventory() {
@@ -1510,22 +1503,6 @@ export default {
       return this;
     },
 
-    showMaxTagsWarning() {
-      this.$maxTagsWarning.empty().append(this.maxTagsWarning);
-    },
-
-    hideMaxTagsWarning() {
-      this.$maxTagsWarning.empty();
-    },
-
-    showMaxCatsWarning() {
-      this.$maxCatsWarning.empty().append(this.maxCatsWarning);
-    },
-
-    hideMaxCatsWarning() {
-      this.$maxCatsWarning.empty();
-    },
-
     createShippingOptionView(opts) {
       const options = {
         getCurrency: () => (this.$currencySelect.length ? this.$currencySelect.val() : this.model.get('metadata').pricingCurrency),
@@ -1542,35 +1519,19 @@ export default {
 
     render() {
       const item = this.model.get('item');
-      const metadata = this.model.get('metadata');
 
       this.currencies = this.currencies || getCurrenciesSortedByCode();
 
-      this.setContractTypeClass(metadata.get('contractType'));
-
-      this._$currencySelect = null;
-      this._$priceInput = null;
-      this._$buttonSave = null;
-      this._$inputPhotoUpload = null;
-      this._$photoUploadingLabel = null;
-      this._$editListingReturnPolicy = null;
-      this._$editListingTermsAndConditions = null;
       this._$sectionShipping = null;
-      this._$maxCatsWarning = null;
-      this._$maxTagsWarning = null;
       this._$addShipOptSectionHeading = null;
       this._$variantInventorySection = null;
       this._$itemPrice = null;
-      this.$modalContent = $('.modalContent');
-      this.$tabControls = $('.tabControls');
       this.$titleInput = $('#editListingTitle');
-      this.$editListingTags = $('#editListingTags');
-      this.$editListingCategories = $('#editListingCategories');
       this.$shippingOptionsWrap = $('.js-shippingOptionsWrap');
       this.$couponsSection = $('.js-couponsSection');
       this.$variantsSection = $('.js-variantsSection');
 
-      $('#editListingCondition, ' + '#editListingCountrySelect').select2({
+      $('#editListingCountrySelect').select2({
         // disables the search box
         minimumResultsForSearch: Infinity,
       });

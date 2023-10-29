@@ -1,8 +1,7 @@
 <template>
   <div
     :class="`modal editListing tabbedModal modalScrollPage TYPE_${formData.metadata.contractType} ${!createMode ? 'editMode' : ''} ${fixedNav ? 'fixedNav' : ''} ${
-      notTrackingInventory ? 'notTrackingInventory' : ''
-    }`"
+      trackInventoryBy === 'DO_NOT_TRACK' ? 'notTrackingInventory' : ''}`"
     @scroll="onScroll"
   >
     <BaseModal @close="close">
@@ -274,7 +273,16 @@
                 <a class="btn clrP clrBr clrSh2 addFirstVariant" @click="onClickAddFirstVariant">{{ ob.polyT('editListing.variants.btnAddVariant') }}</a>
               </section>
 
-              <section class="contentBox padMd clrP clrBr clrSh3 tx3 js-inventoryManagementSection inventoryManagementSection"></section>
+              <section class="contentBox padMd clrP clrBr clrSh3 tx3 js-inventoryManagementSection inventoryManagementSection">
+                <InventoryManagement :options="{
+                    trackBy: trackInventoryBy,
+                    quantity: formData.item.quantity,
+                    errors: ob.errors['item'] || {},
+                  }"
+                  @changeManagementType="onChangeManagementType"
+                  @changeInventoryQuantity="onChangeInventoryQuantity"
+                />
+              </section>
 
               <section
                 ref="sectionVariantInventory"
@@ -326,7 +334,7 @@
 
               <section
                 ref="sectionCoupons"
-                class="couponsSection contentBox padMd clrP clrBr clrSh3 tx3 js-couponsSection <% ob.coupons.length && print('expandedCouponView') %>"
+                :class="`couponsSection contentBox padMd clrP clrBr clrSh3 tx3 js-couponsSection ${ob.coupons.length ? 'expandedCouponView' : ''}`"
               >
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.coupons') }}</h2>
                 <hr class="clrBr rowMd" />
@@ -401,7 +409,6 @@ import ShippingOption from '../../../../backbone/views/modals/editListing/Shippi
 import Coupons from '../../../../backbone/views/modals/editListing/Coupons';
 import Variants from '../../../../backbone/views/modals/editListing/Variants';
 import VariantInventory from '../../../../backbone/views/modals/editListing/VariantInventory';
-import InventoryManagement from '../../../../backbone/views/modals/editListing/InventoryManagement';
 import UnsupportedCurrency from '../../../../backbone/views/modals/editListing/UnsupportedCurrency';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 import { capitalize } from '../../../../backbone/utils/string';
@@ -409,13 +416,15 @@ import { toStandardNotation } from '../../../../backbone/utils/number';
 
 import ViewListingLinks from './ViewListingLinks.vue';
 import UploadPhoto from './UploadPhoto.vue';
-import CryptoCurrencyType from './CryptoCurrencyType.vue'
+import CryptoCurrencyType from './CryptoCurrencyType.vue';
+import InventoryManagement from './InventoryManagement.vue';
 
 export default {
   components: {
     ViewListingLinks,
     CryptoCurrencyType,
     UploadPhoto,
+    InventoryManagement,
   },
   props: {
     options: {
@@ -432,7 +441,6 @@ export default {
       images: undefined,
 
       fixedNav: false,
-      notTrackingInventory: true,
 
       togglePhotoUploads: false,
 
@@ -462,6 +470,7 @@ export default {
         refundPolicy: '',
         termsAndConditions: '',
       },
+      trackInventoryBy: '',
     };
   },
   created() {
@@ -583,27 +592,6 @@ export default {
       return this.photoUploads.filter((upload) => upload.state() === 'pending');
     },
 
-    trackInventoryBy() {
-      let trackBy;
-
-      // If the inventoryManagement has been rendered, we'll let it's drop-down
-      // determine whether we are tracking inventory. Otherwise, we'll get the info
-      // from the model.
-      if (this.inventoryManagement) {
-        trackBy = this.inventoryManagement.getState().trackBy;
-      } else {
-        const item = this.model.get('item');
-
-        if (item.isInventoryTracked) {
-          trackBy = item.get('options').length ? 'TRACK_BY_VARIANT' : 'TRACK_BY_FIXED';
-        } else {
-          trackBy = 'DO_NOT_TRACK';
-        }
-      }
-
-      return trackBy;
-    },
-
     // return the currency associated with this listing
     currency() {
       if (this.formData.metadata.pricingCurrency.code) {
@@ -653,64 +641,43 @@ export default {
       return $fields;
     },
 
-    $currencySelect() {
-      return this._$currencySelect || (this._$currencySelect = $('#editListingCurrency'));
-    },
-
-    $priceInput() {
-      return this._$priceInput || (this._$priceInput = $('#editListingPrice'));
-    },
-
-    $saveButton() {
-      return this._$buttonSave || (this._$buttonSave = $('.js-save'));
-    },
-
-    $inputPhotoUpload() {
-      return this._$inputPhotoUpload || (this._$inputPhotoUpload = $('#inputPhotoUpload'));
-    },
-
-    $photoUploadingLabel() {
-      return this._$photoUploadingLabel || (this._$photoUploadingLabel = $('.js-photoUploadingLabel'));
-    },
-
-    $editListingReturnPolicy() {
-      return this._$editListingReturnPolicy || (this._$editListingReturnPolicy = $('#editListingReturnPolicy'));
-    },
-
-    $editListingTermsAndConditions() {
-      return this._$editListingTermsAndConditions || (this._$editListingTermsAndConditions = $('#editListingTermsAndConditions'));
-    },
-
-    $sectionShipping() {
-      return this._$sectionShipping || (this._$sectionShipping = $('.js-sectionShipping'));
-    },
-
-    $maxCatsWarning() {
-      return this._$maxCatsWarning || (this._$maxCatsWarning = $('.js-maxCatsWarning'));
-    },
-
-    $maxTagsWarning() {
-      return this._$maxTagsWarning || (this._$maxTagsWarning = $('.js-maxTagsWarning'));
-    },
-
-    maxTagsWarning() {
-      return `<div class="clrT2 tx5 row">${app.polyglot.t('editListing.maxTagsWarning')}</div>`;
-    },
-
-    $addShipOptSectionHeading() {
-      return this._$addShipOptSectionHeading || (this._$addShipOptSectionHeading = $('.js-addShipOptSectionHeading'));
-    },
-
-    $variantInventorySection() {
-      return this._$variantInventorySection || (this._$variantInventorySection = $('.js-variantInventorySection'));
-    },
-
-    $itemPrice() {
-      return this._$itemPrice || (this._$itemPrice = $('[name="item.price"]'));
-    },
+    receiveCur() {
+      const acceptedCurs = this.model.get('metadata').get('acceptedCurrencies');
+      return this.model.isCrypto ? (acceptedCurs.length && acceptedCurs()[0]) || null : null;
+    }
   },
   methods: {
     supportedWalletCurs,
+    initFormData(model) {
+      this.formData = {
+        item: {
+          title: model.item.title,
+          price: toStandardNotation(model.item.price),
+          condition: model.item.condition,
+          productID: model.item.productID,
+          nsfw: model.item.nsfw,
+          tags: model.item.tags,
+          categories: model.item.categories,
+          description: model.item.description,
+          quantity: model.item.quantity,
+        },
+        metadata: {
+          contractType: model.metadata.contractType,
+          pricingCurrency: {
+            code: this.currency,
+          },
+        },
+        refundPolicy: model.refundPolicy,
+        termsAndConditions: model.termsAndConditions,
+      };
+
+      const item = this.model.get('item');
+      if (item.isInventoryTracked) {
+        this.trackInventoryBy = item.get('options').length ? 'TRACK_BY_VARIANT' : 'TRACK_BY_FIXED';
+      } else {
+        this.trackInventoryBy = 'DO_NOT_TRACK';
+      }
+    },
     loadData(options = {}) {
       if (!this.model) {
         throw new Error('Please provide a model.');
@@ -727,27 +694,7 @@ export default {
       this._origModel = this.model;
       this.model = this._origModel.clone();
 
-      const model = this.model.toJSON();
-      this.formData = {
-        item: {
-          title: model.item.title,
-          price: toStandardNotation(model.item.price),
-          condition: model.item.condition,
-          productID: model.item.productID,
-          nsfw: model.item.nsfw,
-          tags: model.item.tags,
-          categories: model.item.categories,
-          description: model.item.description,
-        },
-        metadata: {
-          contractType: model.metadata.contractType,
-          pricingCurrency: {
-            code: this.currency,
-          },
-        },
-        refundPolicy: model.refundPolicy,
-        termsAndConditions: model.termsAndConditions,
-      };
+      this.initFormData(this.model.toJSON());
 
       this.listenTo(this.model, 'sync', () => {
         setTimeout(() => {
@@ -831,16 +778,26 @@ export default {
       this.variantOptionsCl = this.model.get('item').get('options');
 
       this.listenTo(this.variantOptionsCl, 'update', this.onUpdateVariantOptions);
+    },
 
-      if (this.trackInventoryBy === 'DO_NOT_TRACK') {
-        this.notTrackingInventory = true;
-      }
+    $currencySelect() {
+      return $('#editListingCurrency');
+    },
+
+    $saveButton() {
+      return $('.js-save');
+    },
+
+    $sectionShipping() {
+      return $('.js-sectionShipping');
+    },
+
+    $addShipOptSectionHeading() {
+      return $('.js-addShipOptSectionHeading');
     },
 
     events() {
       return {
-        'change #editListingCryptoContractType': 'onChangeCryptoContractType',
-        'click .js-removeImage': 'onClickRemoveImage',
         'keyup .js-variantNameInput': 'onKeyUpVariantName',
         'click .js-scrollToVariantInventory': 'onClickScrollToVariantInventory',
       };
@@ -1114,17 +1071,13 @@ export default {
     },
 
     onUpdateVariantOptions() {
-      if (this.variantOptionsCl.length) {
-        if (this.inventoryManagement.getState().trackBy !== 'DO_NOT_TRACK') {
-          this.inventoryManagement.setState({
-            trackBy: 'TRACK_BY_VARIANT',
-          });
+      if (this.showVariantInventorySection) {
+        if (this.trackInventoryBy !== 'DO_NOT_TRACK') {
+          this.trackInventoryBy = 'TRACK_BY_VARIANT';
         }
       } else {
-        if (this.inventoryManagement.getState().trackBy !== 'DO_NOT_TRACK') {
-          this.inventoryManagement.setState({
-            trackBy: 'TRACK_BY_FIXED',
-          });
+        if (this.trackInventoryBy !== 'DO_NOT_TRACK') {
+          this.trackInventoryBy = 'TRACK_BY_FIXED';
         }
       }
     },
@@ -1361,18 +1314,16 @@ export default {
       }
     },
 
-    onChangeManagementType(e) {
-      if (e.value === 'TRACK') {
-        this.inventoryManagement.setState({
-          trackBy: this.model.get('item').get('options').length ? 'TRACK_BY_VARIANT' : 'TRACK_BY_FIXED',
-        });
-        this.notTrackingInventory = false;
+    onChangeManagementType(type) {
+      if (type === 'TRACK') {
+        this.trackInventoryBy = this.showVariantInventorySection ? 'TRACK_BY_VARIANT' : 'TRACK_BY_FIXED';
       } else {
-        this.inventoryManagement.setState({
-          trackBy: 'DO_NOT_TRACK',
-        });
-        this.notTrackingInventory = true;
+        this.trackInventoryBy = 'DO_NOT_TRACK';
       }
+    },
+
+    onChangeInventoryQuantity(quantity) {
+      this.formData.item.quantity = quantity;
     },
 
     /**
@@ -1525,7 +1476,6 @@ export default {
       this._$sectionShipping = null;
       this._$addShipOptSectionHeading = null;
       this._$variantInventorySection = null;
-      this._$itemPrice = null;
       this.$titleInput = $('#editListingTitle');
       this.$shippingOptionsWrap = $('.js-shippingOptionsWrap');
       this.$couponsSection = $('.js-couponsSection');
@@ -1604,25 +1554,6 @@ export default {
       this.variantsView.listenTo(this.variantsView, 'variantChoiceChange', this.onVariantChoiceChange.bind(this));
 
       this.$variantsSection.find('.js-variantsContainer').append(this.variantsView.render().el);
-
-      // render inventory management section
-      if (this.inventoryManagement) this.inventoryManagement.remove();
-      const inventoryManagementErrors = {};
-
-      if (this.model.validationError && this.model.validationError['item.quantity']) {
-        inventoryManagementErrors.quantity = this.model.validationError['item.quantity'];
-      }
-
-      this.inventoryManagement = this.createChild(InventoryManagement, {
-        initialState: {
-          trackBy: this.trackInventoryBy,
-          quantity: item.get('quantity'),
-          errors: inventoryManagementErrors,
-        },
-      });
-
-      $('.js-inventoryManagementSection').html(this.inventoryManagement.render().el);
-      this.listenTo(this.inventoryManagement, 'changeManagementType', this.onChangeManagementType);
 
       // render variant inventory
       if (this.variantInventory) this.variantInventory.remove();

@@ -4,16 +4,16 @@
     <hr class="clrBr rowMd">
     <div class="flexRow gutterH rowSm">
       <div class="col6 simpleFlexCol">
-        <select id="editInventoryManagementType" @change="onChangeManagementType" class="clrBr clrP clrSh2 marginTopAuto">
-          <option value="DO_NOT_TRACK" :selected="ob.trackBy === 'DO_NOT_TRACK'">
+        <Select2 id="editInventoryManagementType" v-model="trackBy" @change="onChangeManagementType" class="clrBr clrP clrSh2 marginTopAuto" :options="{ minimumResultsForSearch: Infinity, }">
+          <option value="DO_NOT_TRACK" :selected="this.trackBy === 'DO_NOT_TRACK'">
             {{ ob.polyT('editListing.inventoryManagement.doNotTrackSelectOption') }}
           </option>
-          <option value="TRACK" :selected="ob.trackBy !== 'DO_NOT_TRACK'">
+          <option value="TRACK" :selected="this.trackBy !== 'DO_NOT_TRACK'">
             {{ ob.polyT('editListing.inventoryManagement.trackSelectOption') }}
           </option>
-        </select>
+        </Select2>
       </div>
-      <template v-if="ob.trackBy === 'TRACK_BY_FIXED'">
+      <template v-if="this.trackBy === 'TRACK_BY_FIXED'">
         <div class="col6 simpleFlexCol">
           <div>
             <FormError v-if="ob.errors['quantity']" :errors="ob.errors['quantity']" :class="margL" />
@@ -38,31 +38,33 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        trackBy: 'DO_NOT_TRACK', // DO_NOT_TRACK, TRACK_BY_FIXED, TRACK_BY_VARIANT
+        quantity: 0,
+        errors: {},
+      },
     },
   },
   data () {
     return {
-      _state: {
-        trackBy: 'DO_NOT_TRACK', // DO_NOT_TRACK, TRACK_BY_FIXED, TRACK_BY_VARIANT
-        errors: {},
-      }
+      trackBy: 'DO_NOT_TRACK',
     };
   },
+  watch: {
+    'options.trackBy'() {
+      this.trackBy = this.options.trackBy;
+    }
+  },
   created () {
-    this.loadData(this.options);
+    this.trackBy = this.options.trackBy;
   },
   mounted () {
-    $('#editInventoryManagementType').select2({
-      // disables the search box
-      minimumResultsForSearch: Infinity,
-    });
   },
   computed: {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this._state,
+        ...this.options,
       };
     },
     helperText () {
@@ -70,9 +72,9 @@ export default {
 
       let helperText = ob.polyT('editListing.inventoryManagement.doNotTrackHelperText');
 
-      if (ob.trackBy === 'TRACK_BY_FIXED') {
+      if (this.trackBy === 'TRACK_BY_FIXED') {
         helperText = ob.polyT('editListing.inventoryManagement.trackByFixedHelperText');
-      } else if (ob.trackBy === 'TRACK_BY_VARIANT') {
+      } else if (this.trackBy === 'TRACK_BY_VARIANT') {
         helperText = ob.polyT('editListing.inventoryManagement.trackByVariantsHelperText');
       }
 
@@ -80,27 +82,13 @@ export default {
     },
   },
   methods: {
-    loadData (options = {}) {
-      this.baseInit(options);
-
-      this._state = {
-        trackBy: 'DO_NOT_TRACK', // DO_NOT_TRACK, TRACK_BY_FIXED, TRACK_BY_VARIANT
-        errors: {},
-        ...options.initialState || {},
-      };
-    },
-
     onChangeQuantityInput (e) {
-      this._state = {
-        ...this._state,
-        quantity: e.target.value,
-      };
+      this.$emit('changeInventoryQuantity', e.target.value);
     },
 
     onChangeManagementType (e) {
-      this.$emit('changeManagementType', { value: e.target.value });
+      this.$emit('changeManagementType', e.target.value);
     },
-
   }
 }
 </script>

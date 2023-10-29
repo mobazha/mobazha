@@ -17,7 +17,8 @@
           <div class="col7">
             <FormError v-if="ob.errors['physicalDelivery.shipper']" :errors="ob.errors['physicalDelivery.shipper']" />
             <input type="text" class="clrBr clrSh2" name="physicalDelivery.shipper" id="fulfillOrderShippingCarrier"
-              v-model="info.physicalDelivery.shipper"
+              v-focus
+              v-model="formData.physicalDelivery.shipper"
               :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.shippingCarrierPlaceholder`)" />
           </div>
         </div>
@@ -29,7 +30,7 @@
             <FormError v-if="ob.errors['physicalDelivery.trackingNumber']"
               :errors="ob.errors['physicalDelivery.trackingNumber']" />
             <input type="text" class="clrBr clrSh2" name="physicalDelivery.trackingNumber" id="fulfillOrderTrackingNumber"
-              v-model="info.physicalDelivery.trackingNumber"
+              v-model="formData.physicalDelivery.trackingNumber"
               :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.trackingPlaceholder`)" />
           </div>
         </div>
@@ -44,7 +45,8 @@
           <div class="col7">
             <FormError v-if="ob.errors['digitalDelivery.url']" :errors="ob.errors['digitalDelivery.url']" />
             <input type="text" class="clrBr clrSh2" name="digitalDelivery.url" id="fulfillOrderFileUrl"
-              v-model="info.digitalDelivery.url" :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.fileUrlPlaceholder`)" />
+              v-focus
+              v-model="formData.digitalDelivery.url" :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.fileUrlPlaceholder`)" />
           </div>
         </div>
         <div class="flexRow gutterH">
@@ -54,7 +56,7 @@
           <div class="col7">
             <FormError v-if="ob.errors['digitalDelivery.password']" :errors="ob.errors['digitalDelivery.password']" />
             <input type="text" class="clrBr clrSh2" name="digitalDelivery.password" id="fulfillOrderPassword"
-              v-model="info.digitalDelivery.password"
+              v-model="formData.digitalDelivery.password"
               :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.passwordPlaceholder`)" />
           </div>
         </div>
@@ -69,8 +71,9 @@
           <div class="col7">
             <FormError v-if="ob.errors['cryptocurrencyDelivery.transactionID']" :errors="ob.errors['cryptocurrencyDelivery.transactionID']" />
             <input type="text" class="clrBr clrSh2" name="cryptocurrencyDelivery.transactionID"
+              v-focus
               id="fulfillOrderTransactionID"
-              v-model="info.cryptocurrencyDelivery.transactionID"
+              v-model="formData.cryptocurrencyDelivery.transactionID"
               :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.transactionIDPlaceholder`)"
               :maxlength="ob.constraints.transactionIDLength" />
           </div>
@@ -84,7 +87,7 @@
           <FormError v-if="ob.errors['note']" :errors="ob.errors['note']" />
           <textarea rows="6" name="note" :class="`clrBr clrP clrSh2 ${ob.contractType === 'DIGITAL_GOOD' ? 'rowSm' : ''}`"
             id="fulfillOrderNote" :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.notePlaceholder`)"
-            v-model="info.note"></textarea>
+            v-model="formData.note"></textarea>
           <template v-if="ob.contractType === 'DIGITAL_GOOD'">
             <div class="clrT2 txSm">{{ ob.polyT(`orderDetail.fulfillOrderTab.noteHelperTextDigital`) }}</div>
           </template>
@@ -118,7 +121,7 @@ export default {
   },
   data () {
     return {
-      info: {
+      formData: {
         physicalDelivery: {
           trackingNumber: '',
         },
@@ -140,9 +143,6 @@ export default {
   },
   mounted () {
     this.render();
-
-    this.$children.filter(c => c.$options._componentTag in ['select', 'input', 'textarea'])[0].focus();
-    // this.$el.find('select, input, textarea')[0].focus();
   },
   computed: {
     ob () {
@@ -193,7 +193,7 @@ export default {
     },
 
     onClickSubmit () {
-      this.model.set(this.info);
+      this.model.set(this.formData);
       this.model.set({}, { validate: true });
 
       if (!this.model.validationError) {

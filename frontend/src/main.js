@@ -47,6 +47,11 @@ function mountVueApp(container) {
   vueApp.config.globalProperties.templateHelpers = { ...templateHelpers };
   vueApp.mixin(baseVw);
 
+  vueApp.directive('focus', {
+      mounted: (el) => el.focus()
+    }
+  );
+
   const store = createStore({
     modules: {
       cart,

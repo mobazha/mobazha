@@ -10,6 +10,7 @@
         <div class="col9">
           <FormError v-if="ob.errors.address" :errors="ob.errors.address" />
           <input type="text" class="clrBr clrSh2" :disabled="ob.saveInProgress" name="address" id="walletSendTo"
+            ref="walletSendTo"
             v-model="ob.address"
             :placeholder="ob.polyT('wallet.sendMoney.toPlaceholder', { cur: ob.polyT(`cryptoCurrencies.${ob.coinType}`, { _: ob.coinType }) })">
         </div>
@@ -176,7 +177,7 @@ export default {
     },
 
     focusAddress () {
-      if (!this.saveInProgress) $('#walletSendTo').focus();
+      if (!this.saveInProgress) this.$refs.walletSendTo.focus();
     },
 
     setFormData (data = {}, options = {}) {

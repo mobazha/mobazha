@@ -32,9 +32,9 @@
         <div class="col7">
           <FormError v-if="ob.errors['claim']" :errors="ob.errors['claim']" />
           <textarea
+            v-focus
             rows="6"
             name="claim"
-            ref="clamTextAread"
             class="clrBr clrP clrSh2 row"
             id="fulfillOrderNote"
             :placeholder="ob.polyT(`orderDetail.disputeOrderTab.reasonPlaceholder`)"
@@ -88,8 +88,6 @@ export default {
   },
   mounted () {
     this.render();
-
-    this.$refs.clamTextAread.focus();
   },
   computed: {
     ob () {

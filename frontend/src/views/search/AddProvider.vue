@@ -6,6 +6,8 @@
         <FormError v-if="ob.errors[ob.urlType]" :errors="ob.errors[ob.urlType]" />
         <FormError v-if="ob.showExistsError" :errors="[ob.polyT('search.errors.existsError')]" />
         <input type="url" class="clrP clrBr clrSh2 js-addProviderInput" @keyup.enter="onKeyUpAddProviderInput"
+          v-focus
+          v-model="providerUrl"
           :placeholder="ob.polyT(`${ob.usingTor ? 'search.addTorPlaceholder' : 'search.addPlaceholder'}`)">
         <div class="flexHRight flexVCent gutterH">
           <button class="btnTxtOnly barBtn clrT2 txUnb js-cancelBtn" @click="onClickCancel">{{ ob.polyT('search.cancel') }}</button>
@@ -38,6 +40,8 @@ export default {
     return {
       showExistsError: false,
       showProvider: true,
+
+      providerUrl: '',
     };
   },
   created () {
@@ -46,9 +50,6 @@ export default {
     this.loadData();
   },
   mounted () {
-    setTimeout(() => {
-      $('.js-addProviderInput').focus();
-    });
   },
   computed: {
     ob () {
@@ -76,7 +77,7 @@ export default {
     },
 
     save () {
-      let URL = $('.js-addProviderInput').val();
+      let URL = this.providerUrl;
       // if the user doesn't type http:// or https://, add http:// for them
       if (!/^https?:\/\//i.test(URL)) {
         URL = `http://${URL}`;

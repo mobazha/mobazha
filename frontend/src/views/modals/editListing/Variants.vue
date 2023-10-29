@@ -8,20 +8,32 @@
         <label class="required">{{ ob.polyT('editListing.variants.choicesLabel') }}</label>
       </div>
     </div>
-    <div class="js-variantsWrap padKids padStack padTop0"></div>
-    <a class="clrBr clrP clrTEm btnAddVariant" v-show="ob.variants.length < ob.maxVariantCount"
+    <div class="js-variantsWrap padKids padStack padTop0">
+      <template v-for="model in collection" :key="model.id">
+        <Variant ref="_variantViews" :options="variantViewOptions(model)" :bb="function() {
+          return {
+            model,
+          }
+        }"
+        @removeClick="onRemoveClick" />
+      </template>
+    </div>
+    <a class="clrBr clrP clrTEm btnAddVariant js-btnAddVariant" v-show="ob.variants.length < ob.maxVariantCount"
       @click="onClickAddVariant">{{ ob.polyT('editListing.variants.addVariant') }}</a>
   </div>
 </template>
 
 <script>
 import VariantOption from '../../../../backbone/models/listing/VariantOption';
-import Variant from './Variant';
+import Variant from './Variant.vue';
 
 // There are some terminology mismatches between the UI and server. When the UI uses the
 // term 'variant', it maps to an 'options' list in the listing API.
 
 export default {
+  components: {
+    Variant,
+  },
   props: {
     options: {
       type: Object,
@@ -34,25 +46,22 @@ export default {
     };
   },
   created () {
-    this.initEventChain();
-
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob () {
       return {
         ...this.templateHelpers,
         variants: this.collection.toJSON(),
-        maxVariantCount: this.options.maxCouponCount,
+        maxVariantCount: this.options.maxVariantCount,
       };
     }
   },
   methods: {
     loadData (options = {}) {
-      if (!options.collection) {
+      if (!this.collection) {
         throw new Error('Please provide an VariantOptions collection.');
       }
 
@@ -68,52 +77,18 @@ export default {
       //   options[<model.cid>].<fieldName2> = ['error1', 'error2', ...],
       //   options[<model2.cid>].<fieldName> = ['error1', 'error2', ...]
       // }
-
-      this.baseInit(options);
-      this._variantViews = [];
-
-      this.listenTo(this.collection, 'add', (md, cl) => {
-        const index = cl.indexOf(md);
-        const view = this.createVariantView(md);
-
-        if (index) {
-          this.$variantsWrap.find('> *')
-            .eq(index - 1)
-            .after(view.render().el);
-        } else {
-          this.$variantsWrap.prepend(view.render().el);
-        }
-
-        this._variantViews.splice(index, 0, view);
-
-        if (this.collection.length >= this.options.maxVariantCount) {
-          this.$btnAddVariant.addClass('hide');
-        }
-      });
-
-      this.listenTo(this.collection, 'remove', (md, cl, removeOpts) => {
-        (this._variantViews.splice(removeOpts.index, 1)[0]).remove();
-
-        if (this.collection.length < this.options.maxVariantCount) {
-          this.$btnAddVariant.removeClass('hide');
-        }
-      });
-    },
-
-    events () {
-      return {
-      };
     },
 
     onClickAddVariant () {
       this.collection.add(new VariantOption());
-      this._variantViews[this._variantViews.length - 1]
-        .$('input[name=name]')
-        .focus();
+
+      this.$nextTick(() => {
+        if (this.collection.length) (this.$refs._variantViews[this.collection.length - 1]).setFocus();
+      });
     },
 
     setCollectionData () {
-      this._variantViews.forEach(variant => variant.setModelData());
+      this.$refs._variantViews.forEach(variant => variant.setModelData());
     },
 
     setModelData (index) {
@@ -121,67 +96,28 @@ export default {
         throw new Error('Please provide a numeric index.');
       }
 
-      const view = this._variantViews[index];
+      const view = this.$refs._variantViews[index];
       if (view) view.setModelData();
     },
 
-    createVariantView (model, options = {}) {
+    variantViewOptions(model) {
       const errors = {};
 
       if (this.options.errors) {
         Object.keys(this.options.errors)
           .forEach(errKey => {
             if (errKey.startsWith(`options[${model.cid}]`)) {
-              errors[errKey.slice(errKey.indexOf('.') + 1)] =
-                this.options.errors[errKey];
+              errors[errKey.slice(errKey.indexOf('.') + 1)] = this.options.errors[errKey];
             }
           });
       }
 
-      const view = this.createChild(Variant, {
-        model,
-        errors,
-        ...options,
-      });
-
-      this.listenTo(view, 'removeClick', e =>
-        this.collection.remove(e.view.model));
-
-      this.listenTo(view, 'choiceChange', e =>
-        this.trigger('variantChoiceChange', e));
-
-      return view;
+      return { errors };
     },
 
-    get views () {
-      return this._variantViews;
+    onRemoveClick(model) {
+      this.collection.remove(model);
     },
-
-    get $btnAddVariant () {
-      return this._$btnAddVariant ||
-        (this._$btnAddVariant =
-          $('.js-btnAddVariant'));
-    },
-
-    render () {
-      this.$variantsWrap = $('.js-variantsWrap');
-      this._$btnAddVariant = null;
-
-      this._variantViews.forEach(variant => variant.remove());
-      this._variantViews = [];
-      const variantsFrag = document.createDocumentFragment();
-
-      this.collection.forEach(variant => {
-        const view = this.createVariantView(variant);
-        this._variantViews.push(view);
-        view.render().$el.appendTo(variantsFrag);
-      });
-
-      this.$variantsWrap.append(variantsFrag);
-
-      return this;
-    }
-
   }
 }
 </script>

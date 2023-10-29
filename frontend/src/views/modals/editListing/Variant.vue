@@ -3,12 +3,13 @@
     <div class="col6 simpleFlexCol">
       <FormError v-if="ob.errors['name']" :errors="ob.errors['name']" />
       <input type="text" class="clrBr clrP clrSh2 variantNameInput js-variantNameInput" name="name" :value="ob.name"
+        ref="name"
         :placeholder="ob.polyT('editListing.variants.titlePlaceholder')" :maxlength="ob.max.nameLength">
     </div>
     <div class="col6 simpleFlexCol">
       <FormError v-if="variantsErrs.length" :errors="variantsErrs" />
       <div class="flexRow marginTopAuto">
-        <select multiple name="variants" class="clrBr clrP clrSh2 hideDropDown flexExpand"
+        <select ref="variants" multiple name="variants" class="clrBr clrP clrSh2 hideDropDown flexExpand"
           :placeholder="ob.polyT('editListing.variants.choicesPlaceholder')"></select>
         <a class="iconBtn clrBr clrP clrSh2 margLSm toolTipNoWrap  btnRemoveVariant" @click="onClickRemove"
           :data-tip="ob.polyT('editListing.variants.toolTip.delete')">
@@ -21,6 +22,8 @@
 </template>
 
 <script>
+import $ from 'jquery';
+
 export default {
   props: {
     options: {
@@ -80,7 +83,7 @@ export default {
     }
   },
   methods: {
-    loadData (options = {}) {
+    loadData () {
       if (!this.model) {
         throw new Error('Please provide a VariantOption model.');
       }
@@ -89,15 +92,18 @@ export default {
       // options.errors = {
       //   <field-name>: ['err1', 'err2', 'err3']
       // }
+    },
 
-      this.baseInit(options);
+    setFocus() {
+      this.$refs.name.focus();
     },
 
     onClickRemove () {
-      this.$emit('removeClick', { view: this });
+      this.$emit('removeClick', this.model);
     },
 
-    getFormDataEx (fields = this.$formFields) {
+    getFormDataEx () {
+      const fields = this.$el.querySelectorAll('select[name], input[name], textarea[name]');
       const formData = this.getFormData(fields);
 
       // Post process the vairants to seperate the clientID from the actual value.
@@ -122,14 +128,7 @@ export default {
       this.model.set(formData);
     },
 
-    get $formFields () {
-      return this._$formFields
-        || (this._$formFields = $('select[name], input[name], textarea[name]'));
-    },
-
     render () {
-      this._$formFields = null;
-
       const variantItems = [];
       const variantOptions = [];
 
@@ -140,7 +139,7 @@ export default {
           variantItems.push(value);
         });
 
-      $('select[name=variants]').selectize({
+      $(this.$refs.variants).selectize({
         persist: false,
         valueField: 'value',
         options: variantOptions,
@@ -153,11 +152,10 @@ export default {
           option: (data) => `<div>${data.name}</div>`,
           item: (data) => `<div>${data.name}</div>`,
         },
-      }).on('change', () => this.trigger('choiceChange', { view: this }));
+      }).on('change', () => this.setModelData());
 
       return this;
     }
-
   }
 }
 </script>

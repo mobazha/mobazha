@@ -20,7 +20,7 @@
         <div class="flex gutterH">
           <div class="tabColumn contentBox padMd clrP clrBr clrSh3">
             <div class="boxList tx4 clrTx1Br">
-              <a v-for="(tab, index) in tabs" :key="index" @click="scrollTo(tab)" :class="`tab row tab-${tab.key} ${activeTab === tab.key ? 'active' : ''}`">{{
+              <a v-for="(tab, index) in tabs" :key="index" @click="scrollTo(tab.key)" :class="`tab row tab-${tab.key} ${activeTab === tab.key ? 'active' : ''}`">{{
                 tab.name
               }}</a>
             </div>
@@ -48,6 +48,7 @@
                           <FormError v-if="ob.errors['item.title']" :errors="ob.errors['item.title']" />
                           <input
                             type="text"
+                            v-focus
                             class="clrBr clrP clrSh2"
                             v-model="formData.item.title"
                             id="editListingTitle"
@@ -148,9 +149,9 @@
                           <FormError v-if="ob.errors['item.productId']" :errors="ob.errors['item.productId']" />
                           <input type="text" class="clrBr clrP clrSh2 marginTopAuto" :disabled="showVariantInventorySection" v-model="formData.item.productID"
                             id="editListingSku" :placeholder="ob.polyT('editListing.placeholderSKU')" :maxlength="ob.max.productIdLength">
-                          <div class="clrT2 txSm helper" v-html='showVariantInventorySection ?
+                          <div class="clrT2 txSm helper" @click="onClickScrollToVariantInventory" v-html='showVariantInventorySection ?
                             ob.polyT("editListing.helperSKUWithVariants",
-                              { variantInventoryLink: `<a class="js-scrollToVariantInventory">${ob.polyT("editListing.variantInventoryLink")}</a>` }) :
+                              { variantInventoryLink: `<a id="scrollToVariantInventory">${ob.polyT("editListing.variantInventoryLink")}</a>` }) :
                             ob.polyT("editListing.helperSKU")'></div>
                         </div>
                       </div>
@@ -269,7 +270,19 @@
               >
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.variantsDetailed') }}</h2>
                 <hr class="clrBr rowMd" />
-                <div class="js-variantsContainer variantsContainer"></div>
+                <div class="js-variantsContainer variantsContainer">
+                  <Variants ref="variantsView"
+                    :options="{
+                      maxVariantCount: ob.max.optionCount,
+                      errors: variantErrors,
+                    }"
+                    :bb="function() {
+                      return {
+                        collection: variantOptionsCl,
+                      };
+                    }"
+                    />
+                </div>
                 <a class="btn clrP clrBr clrSh2 addFirstVariant" @click="onClickAddFirstVariant">{{ ob.polyT('editListing.variants.btnAddVariant') }}</a>
               </section>
 
@@ -398,26 +411,27 @@ import {
 } from '../../../../backbone/data/cryptoListingCurrencies';
 import { supportedWalletCurs } from '../../../../backbone/data/walletCurrencies';
 import { setDeepValue } from '../../../../backbone/utils/object';
-import SimpleMessage, { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
-import Dialog from '../../../../backbone/views/modals/Dialog';
 import ShippingOptionMd from '../../../../backbone/models/listing/ShippingOption';
 import Service from '../../../../backbone/models/listing/Service';
 import Image from '../../../../backbone/models/listing/Image';
 import Coupon from '../../../../backbone/models/listing/Coupon';
 import VariantOption from '../../../../backbone/models/listing/VariantOption';
-import ShippingOption from '../../../../backbone/views/modals/editListing/ShippingOption';
-import Coupons from '../../../../backbone/views/modals/editListing/Coupons';
-import Variants from '../../../../backbone/views/modals/editListing/Variants';
-import VariantInventory from '../../../../backbone/views/modals/editListing/VariantInventory';
-import UnsupportedCurrency from '../../../../backbone/views/modals/editListing/UnsupportedCurrency';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 import { capitalize } from '../../../../backbone/utils/string';
 import { toStandardNotation } from '../../../../backbone/utils/number';
+
+import SimpleMessage, { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
+import Dialog from '../../../../backbone/views/modals/Dialog';
+import ShippingOption from '../../../../backbone/views/modals/editListing/ShippingOption';
+import Coupons from '../../../../backbone/views/modals/editListing/Coupons';
+import VariantInventory from '../../../../backbone/views/modals/editListing/VariantInventory';
+import UnsupportedCurrency from '../../../../backbone/views/modals/editListing/UnsupportedCurrency';
 
 import ViewListingLinks from './ViewListingLinks.vue';
 import UploadPhoto from './UploadPhoto.vue';
 import CryptoCurrencyType from './CryptoCurrencyType.vue';
 import InventoryManagement from './InventoryManagement.vue';
+import Variants from './Variants.vue';
 
 export default {
   components: {
@@ -425,6 +439,7 @@ export default {
     CryptoCurrencyType,
     UploadPhoto,
     InventoryManagement,
+    Variants,
   },
   props: {
     options: {
@@ -437,7 +452,6 @@ export default {
     return {
       activeTab: 'general',
 
-      contractTypeClass: '',
       images: undefined,
 
       fixedNav: false,
@@ -449,6 +463,9 @@ export default {
       expandedTermsAndConditions: false,
 
       getCoinTypesDeferred: $.Deferred(),
+      variantOptionsCl: {
+        length: 0,
+      },
 
       formData: {
         item: {
@@ -483,7 +500,6 @@ export default {
   },
   unmounted() {
     this.inProgressPhotoUploads.forEach((upload) => upload.abort());
-    $(window).off('resize', this.throttledResizeWin);
   },
   computed: {
     ob() {
@@ -516,6 +532,7 @@ export default {
           tags: item.max.tags,
           productIdLength: item.max.productIdLength,
           photos: this.MAX_PHOTOS,
+          optionCount: item.max.optionCount,
         },
         ...this.model.toJSON(),
       };
@@ -609,42 +626,21 @@ export default {
       return cur;
     },
 
-    $formFields() {
-      const isCrypto = this.formData.metadata.contractType === 'CRYPTOCURRENCY';
-      const cryptoExcludes = isCrypto ? ', .js-inventoryManagementSection' : '';
-      const excludes = '.js-sectionShipping, .js-couponsSection, .js-variantsSection, ' + `.js-variantInventorySection${cryptoExcludes}`;
-
-      let $fields = $(
-        `.js-formSectionsContainer > section:not(${excludes}) select[name],` +
-          `.js-formSectionsContainer > section:not(${excludes}) input[name],` +
-          `.js-formSectionsContainer > section:not(${excludes}) div[contenteditable][name],` +
-          `.js-formSectionsContainer > section:not(${excludes}) ` +
-          'textarea[name]:not([class*="trumbowyg"])'
-      );
-
-      // Filter out hidden fields that are not applicable based on whether this is
-      // a crypto currency listing.
-      $fields = $fields.filter((index, el) => {
-        const $excludeContainers = isCrypto ? $('.js-standardTypeWrap').add($('.js-skuMatureContentRow')) : $('.js-cryptoTypeWrap');
-
-        let keep = true;
-
-        $excludeContainers.each((i, container) => {
-          if ($.contains(container, el)) {
-            keep = false;
-          }
-        });
-
-        return keep;
-      });
-
-      return $fields;
-    },
-
     receiveCur() {
       const acceptedCurs = this.model.get('metadata').get('acceptedCurrencies');
       return this.model.isCrypto ? (acceptedCurs.length && acceptedCurs()[0]) || null : null;
-    }
+    },
+
+    variantErrors() {
+      const variantErrors = {};
+
+      const item = this.model.get('item');
+      Object.keys(item.validationError || {}).forEach((errKey) => {
+        if (errKey.startsWith('options[')) {
+          variantErrors[errKey] = item.validationError[errKey];
+        }
+      });
+    },
   },
   methods: {
     supportedWalletCurs,
@@ -794,13 +790,6 @@ export default {
 
     $addShipOptSectionHeading() {
       return $('.js-addShipOptSectionHeading');
-    },
-
-    events() {
-      return {
-        'keyup .js-variantNameInput': 'onKeyUpVariantName',
-        'click .js-scrollToVariantInventory': 'onClickScrollToVariantInventory',
-      };
     },
 
     onClickReturn() {
@@ -1045,29 +1034,6 @@ export default {
 
     onClickAddFirstVariant() {
       this.variantOptionsCl.add(new VariantOption());
-
-      if (this.variantOptionsCl.length === 1) {
-        this.$variantsSection.find('.variant input[name=name]').focus();
-      }
-    },
-
-    onKeyUpVariantName(e) {
-      // wait until they stop typing
-      if (this.variantNameKeyUpTimer) {
-        clearTimeout(this.variantNameKeyUpTimer);
-      }
-
-      this.variantNameKeyUpTimer = setTimeout(() => {
-        const index = $(e.target).closest('.variant').index();
-
-        this.variantsView.setModelData(index);
-      }, 150);
-    },
-
-    onVariantChoiceChange(e) {
-      const index = this.variantsView.views.indexOf(e.view);
-
-      this.variantsView.setModelData(index);
     },
 
     onUpdateVariantOptions() {
@@ -1082,8 +1048,10 @@ export default {
       }
     },
 
-    onClickScrollToVariantInventory() {
-      this.scrollTo('variantInventory');
+    onClickScrollToVariantInventory(e) {
+      if (e.target.id === 'scrollToVariantInventory') {
+        this.scrollTo('variantInventory');
+      }
     },
 
     confirmClose() {
@@ -1181,13 +1149,13 @@ export default {
       this.$inputPhotoUpload.trigger('click');
     },
 
-    scrollTo({ key }) {
-      this.$scrollTo(`.${key}Section`, 300, {
+    scrollTo(tab) {
+      this.$scrollTo(`.${tab}Section`, 300, {
         container: '.tabbedModal', //设置滚动容器
         easing: 'ease-in', //动画效果
         onDone: () => {
           setTimeout(() => {
-            this.activeTab = key;
+            this.activeTab = tab;
           }, 20);
         },
         x: false, //是否在x轴滚动
@@ -1331,14 +1299,15 @@ export default {
      * and collections which are managed by nested views.
      */
     setModelData() {
-      let formData = this.getFormData(this.$formFields);
+      let formData = this.formData;
+
       const item = this.model.get('item');
       const metadata = this.model.get('metadata');
       const isCrypto = this.formData.metadata.contractType === 'CRYPTOCURRENCY';
 
       // set model / collection data for various child views
       this.shippingOptionViews.forEach((shipOptVw) => shipOptVw.setModelData());
-      this.variantsView.setCollectionData();
+      this.$refs.variantsView.setCollectionData();
       this.variantInventory.setCollectionData();
       this.couponsView.setCollectionData();
 
@@ -1362,8 +1331,6 @@ export default {
             });
           }
         } else {
-          formData.item.infiniteInventory = this.trackInventoryBy === 'DO_NOT_TRACK';
-
           if (this.trackInventoryBy === 'DO_NOT_TRACK') {
             formData.item.infiniteInventory = true;
             delete formData.item.quantity;
@@ -1394,13 +1361,14 @@ export default {
           },
           metadata: {
             ...formData.metadata,
-            acceptedCurrencies: typeof formData.metadata.acceptedCurrencies === 'string' ? [formData.metadata.acceptedCurrencies] : [],
+            acceptedCurrencies: formData.metadata.acceptedCurrencies,
             format: 'MARKET_PRICE',
           },
           shippingOptions: [],
         };
       }
 
+      this.formData = formData;
       this.model.set({
         ...formData,
         item: {
@@ -1476,10 +1444,9 @@ export default {
       this._$sectionShipping = null;
       this._$addShipOptSectionHeading = null;
       this._$variantInventorySection = null;
-      this.$titleInput = $('#editListingTitle');
+
       this.$shippingOptionsWrap = $('.js-shippingOptionsWrap');
       this.$couponsSection = $('.js-couponsSection');
-      this.$variantsSection = $('.js-variantsSection');
 
       $('#editListingCountrySelect').select2({
         // disables the search box
@@ -1534,27 +1501,6 @@ export default {
 
       this.$shippingOptionsWrap.append(shipOptsFrag);
 
-      // render variants
-      if (this.variantsView) this.variantsView.remove();
-
-      const variantErrors = {};
-
-      Object.keys(item.validationError || {}).forEach((errKey) => {
-        if (errKey.startsWith('options[')) {
-          variantErrors[errKey] = item.validationError[errKey];
-        }
-      });
-
-      this.variantsView = this.createChild(Variants, {
-        collection: this.variantOptionsCl,
-        maxVariantCount: item.max.optionCount,
-        errors: variantErrors,
-      });
-
-      this.variantsView.listenTo(this.variantsView, 'variantChoiceChange', this.onVariantChoiceChange.bind(this));
-
-      this.$variantsSection.find('.js-variantsContainer').append(this.variantsView.render().el);
-
       // render variant inventory
       if (this.variantInventory) this.variantInventory.remove();
 
@@ -1592,13 +1538,6 @@ export default {
           imageModels.splice(e.newIndex - 1, 0, movingModel);
         },
         onMove: (e) => ($(e.related).hasClass('js-addPhotoWrap') ? false : undefined),
-      });
-
-      setTimeout(() => {
-        if (!this.rendered) {
-          this.rendered = true;
-          this.$titleInput.focus();
-        }
       });
 
       // This block should be after any dom manipulation in render.

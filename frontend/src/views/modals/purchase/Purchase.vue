@@ -235,16 +235,15 @@
                   <div class="col6">
                     <template v-if="ob.hasCoupons">
                       <div class="rowTn">
-                        <label for="couponCode" class="tx5">
-                          {{ ob.polyT('purchase.couponCode') }}
-                        </label>
+                        <label for="couponCode" class="tx5">{{ ob.polyT('purchase.couponCode') }}</label>
                       </div>
                       <div class="flex gutterH row">
                         <input
                           class="btnHeight clrBr clrP"
                           type="text"
                           id="couponCode"
-                          @keyup="onKeyUpCouponCode"
+                          @keyup.enter="applyCoupon"
+                          v-model="couponCode"
                           name="couponCode"
                           :placeholder="ob.polyT('purchase.couponCodePlaceholder')">
                         <button class="btn clrP clrBr clrSh2 flexNoShrink" @click="applyCoupon">
@@ -437,6 +436,7 @@ export default {
       outdatedHash: false,
 
       orderID: '',
+      couponCode: '',
 
       errors: {},
     };
@@ -524,12 +524,6 @@ export default {
           quantity: bigNumber(item.get('quantity')),
         };
       });
-    },
-    couponField () {
-      if (!this._couponField) {
-        this._couponField = this.$('#couponCode');
-      }
-      return this._couponField;
     },
     cryptoAmountCurrency () {
       return this._cryptoAmountCurrency
@@ -866,19 +860,13 @@ export default {
 
     applyCoupon () {
       this.coupons
-        .addCode(this.couponField.val())
+        .addCode(this.couponCode)
         .then((result) => {
           // if the result is valid, clear the input field
           if (result.type === 'valid') {
-            this.couponField.val('');
+            this.couponCode = '';
           }
         });
-    },
-
-    onKeyUpCouponCode (e) {
-      if (e.which === 13) {
-        this.applyCoupon();
-      }
     },
 
     blurEmailAddress (e) {
@@ -1105,8 +1093,6 @@ export default {
       if (this.dataChangePopIn) this.dataChangePopIn.remove();
       const state = this.getState();
       const metadata = this.listing.get('metadata');
-
-      this._$couponField = null;
 
       this.moderators.delegateEvents();
       $('.js-moderatorsWrapper').append(this.moderators.el);

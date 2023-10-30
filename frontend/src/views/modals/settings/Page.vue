@@ -488,7 +488,8 @@ export default {
     },
 
     getFormDataEx () {
-      const formData = this.getFormData(this.$formFields);
+      const fields = this.$el.querySelectorAll('select[name], input[name], textarea[name], div[contenteditable][name]');
+      const formData = this.getFormData(fields);
 
       while (formData.handle.startsWith('@')) {
         formData.handle = formData.handle.slice(1);
@@ -623,8 +624,6 @@ export default {
         });
       }
 
-      const formFields = 'select[name], input[name], textarea[name], div[contenteditable][name]';
-      this.$formFields = $(formFields);
       this._$btnSave = null;
 
       installRichEditor($('#settingsAbout'), {

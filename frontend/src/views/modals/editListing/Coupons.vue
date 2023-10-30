@@ -11,7 +11,15 @@
         <label class="required">{{ ob.polyT('editListing.coupons.discountLabel') }}</label>
       </div>
     </div>
-    <div class="js-couponsWrap padKids padStack padTop0"></div>
+    <div class="js-couponsWrap padKids padStack padTop0">
+      <template v-for="coupon in collection" :key="coupon.id">
+        <Coupon :bb="function() {
+          return {
+            model: coupon,
+          }
+        }" />
+      </template>
+    </div>
     <a class="clrBr clrP clrTEm" v-show="ob.coupons.length < ob.maxCouponCount" @click="onClickAddCoupon">{{
       ob.polyT('editListing.coupons.btnAddCoupon') }}</a>
   </div>
@@ -110,16 +118,13 @@ export default {
         ...options,
       });
 
-      this.listenTo(view, 'remove-click', e =>
-        this.collection.remove(e.view.model));
+      this.listenTo(view, 'remove-click', e => this.collection.remove(e.view.model));
 
       return view;
     },
 
     get $addCoupon () {
-      return this._$addCoupon ||
-        (this._$addCoupon =
-          $('.js-addCoupon'));
+      return this._$addCoupon || (this._$addCoupon = $('.js-addCoupon'));
     },
 
     render () {

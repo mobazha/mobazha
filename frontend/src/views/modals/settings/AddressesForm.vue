@@ -120,7 +120,6 @@ export default {
   },
   mounted () {
     $('#settingsAddressCountry').select2();
-    this.$formFields = $('select[name], input[name], textarea[name]');
   },
   computed: {
     ob () {
@@ -146,7 +145,8 @@ export default {
     },
 
     getFormDataEx () {
-      return this.getFormData(this.$formFields);
+      const fields = this.$el.querySelectorAll('select[name], input[name], textarea[name]');
+      return this.getFormData(fields);
     },
   }
 }

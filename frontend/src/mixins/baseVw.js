@@ -76,9 +76,9 @@ export default {
     getFormData(selector) {
       const $formFields = selector instanceof $
         ? selector : $(selector
-          || `select[name], input[name],
+          || this.$el.querySelectorAll(`select[name], input[name],
           textarea[name]:not([class*="trumbowyg"]),
-          div[contenteditable][name]`);
+          div[contenteditable][name]`));
       const data = {};
   
       $formFields.each((index, field) => {

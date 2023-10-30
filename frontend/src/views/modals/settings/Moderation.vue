@@ -49,7 +49,7 @@
                 <FormError v-if="feeErrors.length" :errors="feeErrors" />
                 <div class="flexRow gutterH rowTn">
                   <div class="col4">
-                    <select id="moderationFeeType" @change="changeFeeType(val)" name="moderatorInfo.fee.feeType"
+                    <Select2 id="moderationFeeType" @change="changeFeeType(val)" name="moderatorInfo.fee.feeType" :options="{ minimumResultsForSearch: Infinity }"
                       class="clrBr clrP clrSh2">
                       <option :value="ob.feeTypes.PERCENTAGE"
                         :selected="!ob.fee || (ob.fee && ob.fee.feeType === ob.feeTypes.PERCENTAGE)">
@@ -62,10 +62,10 @@
                         :selected="ob.fee && ob.fee.feeType === ob.feeTypes.FIXED_PLUS_PERCENTAGE">
                         {{ ob.polyT('settings.moderationTab.fixedPlusPercentage') }}
                       </option>
-                    </select>
+                    </Select2>
                   </div>
                   <div
-                    class="col2 js-feeFixedInput <% if (!ob.fee || (ob.fee && ob.fee.feeType === ob.feeTypes.PERCENTAGE)) { print('visuallyHidden') } %>">
+                    :class="`col2 js-feeFixedInput ${!ob.fee || (ob.fee && ob.fee.feeType === ob.feeTypes.PERCENTAGE) ? 'visuallyHidden' : ''}`">
                     <input
                       type="text"
                       class="noSpin clrBr clrSh2"
@@ -75,17 +75,17 @@
                       :value="ob.fee && ob.fee.fixedFee ? ob.number.toStandardNotation(ob.fee.fixedFee.amount) : ''">
                   </div>
                   <div
-                    class="col4 js-feeFixedInput <% if (!ob.fee || (ob.fee && ob.fee.feeType === ob.feeTypes.PERCENTAGE)) { print('visuallyHidden') } %>">
-                    <select id="moderationCurrency" name="moderatorInfo.fee.fixedFee.currency.code"
+                    :class="`col4 js-feeFixedInput ${!ob.fee || (ob.fee && ob.fee.feeType === ob.feeTypes.PERCENTAGE) ? 'visuallyHidden' : ''}`">
+                    <Select2 id="moderationCurrency" name="moderatorInfo.fee.fixedFee.currency.code"
                       class="clrBr clrP clrSh2" style="width: 100%">
                       <template v-for="(currency, j) in ob.currencyList" :key="j">
                         <option :value="currency.code" :selected="currency.code === ccode">{{ currency.nameWithCode }}
                         </option>
                       </template>
-                    </select>
+                    </Select2>
                   </div>
                   <div
-                    class="col2 js-feePercentageInput <% if (ob.fee && ob.fee.feeType === 'FIXED') { print('visuallyHidden') } %>">
+                    :class="`col2 js-feePercentageInput ${ob.fee && ob.fee.feeType === 'FIXED' ? 'visuallyHidden' : ''}`">
                     <div class="inputPercentWrapper clrBr clrSh2">
                       <input type="text" maxlength="5" name="moderatorInfo.fee.percentage" :value="ob.fee.percentage"
                         placeholder="0" data-var-type="number">
@@ -217,14 +217,6 @@ export default {
         item: (data) => `<div>${data.name}</div>`,
       },
     });
-
-    $('#moderationFeeType').select2({
-      minimumResultsForSearch: Infinity,
-    });
-
-    $('#moderationCurrency').select2();
-
-    this.$formFields = $('select[name], input[name], textarea[name]');
   },
   computed: {
     ob () {
@@ -298,7 +290,8 @@ export default {
     },
 
     getFormDataEx () {
-      return this.getFormData(this.$formFields);
+      const fields = this.$el.querySelectorAll('select[name], input[name], textarea[name]');
+      return this.getFormData(fields);
     },
 
     save () {

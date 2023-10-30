@@ -168,7 +168,7 @@ export default {
         this.fetchFeeEstimate();
       }
 
-      const $firstErr = $('.errorList:first');
+      const $firstErr = this.$el.querySelectorAll('.errorList:first');
       if ($firstErr.length) $firstErr[0].scrollIntoViewIfNeeded();
     },
 
@@ -219,7 +219,7 @@ export default {
     },
 
     getFormFields () {
-      return $(`select[name], input[name], 
+      return this.$el.querySelectorAll(`select[name], input[name], 
         textarea[name]:not([class*="trumbowyg"]), 
         div[contenteditable][name]`);
     },

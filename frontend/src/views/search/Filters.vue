@@ -139,7 +139,7 @@ export default {
         templateResult: selectEmojis,
         templateSelection: selectEmojis,
       });
-      this.$filters = this.$el.find('select, input');
+      this.$filters = this.$el.querySelectorAll('select, input');
 
       return this;
     }

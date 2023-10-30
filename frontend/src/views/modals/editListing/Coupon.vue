@@ -2,12 +2,12 @@
   <div class="coupon flexRow gutterH">
     <div class="col4 simpleFlexCol">
       <FormError v-if="ob.errors['title']" :errors="ob.errors['title']" />
-      <input type="text" class="clrBr clrP clrSh2 marginTopAuto" name="title" :value="ob.title"
+      <input type="text" class="clrBr clrP clrSh2 marginTopAuto" v-model="formData.title"
         :placeholder="ob.polyT('editListing.coupons.titlePlaceholder')" :maxlength="ob.max.titleLength">
     </div>
     <div class="col4 simpleFlexCol">
       <FormError v-if="ob.errors['discountCode']" :errors="ob.errors['discountCode']" />
-      <input type="text" class="clrBr clrP clrSh2 marginTopAuto" name="discountCode" :value="ob.discountCode"
+      <input type="text" class="clrBr clrP clrSh2 marginTopAuto" v-model="formData.discountCode"
         :placeholder="ob.polyT('editListing.coupons.discountCodePlaceholder')">
     </div>
     <div class="col4 simpleFlexCol">
@@ -15,14 +15,14 @@
       <FormError v-if="ob.errors['priceDiscount']" :errors="ob.errors['priceDiscount']" />
       <div class="flexRow marginTopAuto">
         <div class="inputSelect marginTopAuto">
-          <input type="text" class="clrBr clrP clrSh2" name="discountAmount" placeholder="0.00"
-            v-model="inputDiscountAmount">
-          <select name="discountType" class="clrBr clrP nestInputRight">
+          <input type="text" class="clrBr clrP clrSh2" v-model="formData.discountAmount" placeholder="0.00" >
+            <!-- // disables the search box -->
+          <Select2 class="clrBr clrP nestInputRight" v-model="discountType" :options="{ minimumResultsForSearch: Infinity }">
             <option value="PERCENTAGE" :selected="!ob.priceDiscount">{{
               ob.polyT('editListing.coupons.discountTypePercent') }}</option>
             <option value="FIXED" :selected="!!ob.priceDiscount">{{ ob.polyT('editListing.coupons.discountTypeFixed') }}
             </option>
-          </select>
+          </Select2>
         </div>
 
         <a class="iconBtn clrBr clrP clrSh2 margLSm toolTipNoWrap  btnRemoveCoupon" @click="onClickRemove"
@@ -36,7 +36,6 @@
 </template>
 
 <script>
-import $ from 'jquery';
 import bigNumber from 'bignumber.js';
 
 
@@ -50,7 +49,9 @@ export default {
   },
   data () {
     return {
-      inputDiscountAmount: this.discountAmount,
+      discountType: '',
+
+      formData: {},
     };
   },
   created () {
@@ -59,13 +60,6 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
-
-    $('select[name=discountType]')
-      .select2({
-        // disables the search box
-        minimumResultsForSearch: Infinity,
-      });
   },
   computed: {
     ob () {
@@ -89,6 +83,13 @@ export default {
     }
   },
   methods: {
+    createFormData(model) {
+      return {
+        title: model.title,
+        discountCode: model.discountCode,
+        discountAmount: model.discountAmount,
+      }
+    },
     loadData (options = {}) {
       if (!this.model) {
         throw new Error('Please provide a model.');
@@ -101,10 +102,11 @@ export default {
       this.$emit('remove-click', { view: this });
     },
 
-    getFormDataEx (fields = this.$formFields) {
+    getFormDataEx () {
+      const fields = this.$el.querySelectorAll('select[name], input[name], textarea[name]');
       const formData = this.getFormData(fields);
 
-      if (formData.discountType === 'FIXED') {
+      if (this.discountType === 'FIXED') {
         const bigNumDiscount = bigNumber(formData.discountAmount);
         formData.priceDiscount = bigNumDiscount.isNaN() ?
           formData.discountAmount : bigNumDiscount;
@@ -116,7 +118,6 @@ export default {
           percentDiscount : formData.discountAmount;
       }
 
-      delete formData.discountType;
       delete formData.discountAmount;
 
       return formData;
@@ -134,26 +135,6 @@ export default {
 
       this.model.set(formData);
     },
-
-    get $inputDiscountAmount () {
-      return this._$inputDiscountAmount ||
-        (this._$inputDiscountAmount =
-          $('input[name=discountAmount]'));
-    },
-
-    get $formFields () {
-      return this._$formFields ||
-        (this._$formFields =
-          $('select[name], input[name], textarea[name]'));
-    },
-
-    render () {
-      this._$formFields = null;
-      this._$inputDiscountAmount = null;
-
-      return this;
-    }
-
   }
 }
 </script>

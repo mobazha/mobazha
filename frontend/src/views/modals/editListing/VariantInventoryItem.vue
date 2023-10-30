@@ -117,8 +117,10 @@ export default {
       }
     },
 
-    getFormDataEx (fields = this.$formFields) {
+    getFormDataEx () {
+      const fields = this.$el.querySelectorAll('select[name], input[name], textarea[name]');
       const formData = this.getFormData(fields);
+
       return formData;
     },
 
@@ -150,12 +152,6 @@ export default {
       return formatted;
     },
 
-    get $formFields () {
-      return this._$formFields ||
-        (this._$formFields =
-          $('select[name], input[name], textarea[name]'));
-    },
-
     get $totalPrice () {
       return this._$totalPrice ||
         (this._$totalPrice =
@@ -175,7 +171,6 @@ export default {
     },
 
     render () {
-      this._$formFields = null;
       this._$totalPrice = null;
       this._$infiniteInventoryCheckbox = null;
       this._$quantity = null;

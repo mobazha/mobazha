@@ -28,12 +28,12 @@ const constantRouterMap = [
         component: () => import('@/views/example/hello/Index.vue')
       },
       {
-        path: 'transactions',
+        path: '/transactions',
         name: 'Transactions',
         component: () => import('@/views/transactions/Transactions.vue')
       },
       {
-        path: 'transactions/:tab',
+        path: '/transactions/:tab',
         name: 'Transactions',
         component: () => import('@/views/transactions/Transactions.vue')
       },
@@ -60,7 +60,7 @@ const constantRouterMap = [
         }}),
       },
       {
-        path: 'search/:tab?',
+        path: '/search/:tab?',
         name: 'Search',
         component: () => import('@/views/search/Search.vue')
       },

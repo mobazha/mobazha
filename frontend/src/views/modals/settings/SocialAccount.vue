@@ -67,7 +67,8 @@ export default {
       this.$emit('remove-click', { view: this });
     },
 
-    getFormDataEx (fields = $('input[name]')) {
+    getFormDataEx () {
+      const fields = this.$el.querySelectorAll('input[name]');
       return this.getFormData(fields);
     },
 

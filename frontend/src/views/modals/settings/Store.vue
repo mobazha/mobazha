@@ -244,17 +244,17 @@ export default {
     $addShipOptSectionHeading() {
       return this._$addShipOptSectionHeading || (this._$addShipOptSectionHeading = $('.js-addShipOptSectionHeading'));
     },
-    $formFields() {
+    formFields() {
       const excludes = '.js-sectionShipping';
 
-      let $fields = $(
+      let fields = this.$el.querySelectorAll(
         `.js-formSectionsContainer > section:not(${excludes}) select[name],` +
           `.js-formSectionsContainer > section:not(${excludes}) input[name],` +
           `.js-formSectionsContainer > section:not(${excludes}) div[contenteditable][name],` +
           `.js-formSectionsContainer > section:not(${excludes}) ` +
           'textarea[name]:not([class*="trumbowyg"])'
       );
-      return $fields;
+      return fields;
     },
   },
   methods: {
@@ -601,7 +601,7 @@ export default {
       }
     },
     setModelData() {
-      let formData = this.getFormData(this.$formFields);
+      let formData = this.getFormData(this.formFields);
       this.shippingOptionViews.forEach((shipOptVw) => shipOptVw.setModelData());
       this.model.set({
         ...formData,

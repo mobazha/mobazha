@@ -49,7 +49,6 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob () {
@@ -78,21 +77,9 @@ export default {
 
     // Sets the model based on the current data in the UI.
     setModelData () {
-      this.model.set(this.getFormData(this.$formFields));
+      const fields = this.$el.querySelectorAll('select[name], input[name], textarea[name]');
+      this.model.set(this.getFormData(fields));
     },
-
-  get $formFields () {
-      return this._$formFields ||
-        (this._$formFields =
-          $('select[name], input[name], textarea[name]'));
-    },
-
-    render () {
-      this._$formFields = null;
-
-      return this;
-    }
-
   }
 }
 </script>

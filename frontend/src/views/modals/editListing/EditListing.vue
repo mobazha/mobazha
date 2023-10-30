@@ -919,7 +919,7 @@ export default {
       photoFiles.forEach((photoFile) => {
         const newImage = document.createElement('img');
 
-        newImage.src = photoFile.path;
+        newImage.src = URL.createObjectURL(photoFile);
 
         newImage.onload = () => {
           const imgW = newImage.width;

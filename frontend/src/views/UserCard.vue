@@ -17,17 +17,19 @@
             <template v-if="!ob.ownGuid">
               <template v-if="ob.moderator && ob.crypto.anySupportedByWallet(ob.moderatorInfo.acceptedCurrencies)">
                 <ProcessingButton
-                  :className="`iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-mod ${ob.ownMod ? 'active' : ''}`"
+                  :className="`iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-mod ${ob.ownMod ? 'active' : ''} ${processingMod ? 'processing' : ''}`"
                   @click.stop="modClick"
                   btnText='<i class="ion-briefcase"></i>'
-                  :attrs="{ 'data-tip': ob.getModTip(ob.ownMod) }" />
+                  :data-tip="ob.getModTip(ob.ownMod)" />
               </template>
               <ProcessingButton
-                :className="`iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-follow ${ob.followedByYou ? 'active' : ''}`"
+                :className="`iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-follow ${ob.followedByYou ? 'active' : ''} ${processingFollow ? 'processing' : ''}`"
                 @click.stop="followClick"
                 btnText='<i class="ion-person-stalker"></i>'
-                :attrs="{ 'data-tip': ob.getFollowTip(ob.followedByYou) }" />
-              <div class="js-blockBtnContainer"></div>
+                :data-tip="ob.getFollowTip(ob.followedByYou)" />
+              <div class="js-blockBtnContainer">
+                <BlockBtn :options="{ targetID: guid, initialState: { useIcon: true }, }" />
+              </div>
             </template>
           </div>
         </template>
@@ -95,6 +97,10 @@ export default {
   data () {
     return {
       isBlocked: false,
+
+      updateKey: 0,
+      processingMod: false,
+      processingFollow: false,
     };
   },
   created () {
@@ -108,6 +114,8 @@ export default {
   },
   computed: {
     ob () {
+      let access = this.updateKey;
+
       return {
         ...this.templateHelpers,
         loading: this.loading,
@@ -165,8 +173,7 @@ export default {
       });
 
       this.listenTo(app.settings, 'change:storeModerators', () => {
-        this.$modBtn.toggleClass('active', this.ownMod);
-        this.$modBtn.attr('data-tip', this.getModTip());
+        this.updateKey += 1;
       });
 
       this.listenTo(app.ownFollowing, 'update', (cl, updateOpts) => {
@@ -174,8 +181,7 @@ export default {
 
         if (updatedModels.filter((md) => md.id === this.guid).length) {
           this.followedByYou = followedByYou(this.guid);
-          this.$followBtn.toggleClass('active', this.followedByYou);
-          this.$followBtn.attr('data-tip', this.getFollowTip());
+          this.updateKey += 1;
         }
       });
 
@@ -209,16 +215,15 @@ export default {
       }
 
       this.profileFetch.done((profile) => {
-        if (this.isRemoved()) return;
         this.loading = false;
         this.notFound = false;
         this.model = profile;
-        this.render();
+        this.updateKey += 1;
       }).fail(() => {
-        if (this.isRemoved()) return;
         this.loading = false;
         this.notFound = true;
-        this.render();
+
+        this.updateKey += 1;
       });
     },
 
@@ -227,35 +232,28 @@ export default {
       return { tabIndex: 0 };
     },
 
-    events () {
-      return {
-        'click .js-follow': 'followClick',
-        'click .js-mod': 'modClick',
-      };
-    },
-
     nameClick () {
       this.navToUser();
     },
 
-    followClick (e) {
+    followClick () {
       const type = this.followedByYou ? 'unfollow' : 'follow';
 
-      this.$followBtn.addClass('processing');
+      this.processingFollow = true;
       followUnfollow(this.guid, type)
-        .always(() => (this.$followBtn.removeClass('processing')));
+        .always(() => (this.processingFollow = false));
     },
 
-    modClick (e) {
+    modClick () {
       if (this.ownMod) {
         // remove this user from the moderator list
-        this.$modBtn.addClass('processing');
+        this.processingMod = true;
         this.saveModeratorList(false);
       } else {
         // show the moderator details modal
         const modModal = launchModeratorDetailsModal({ model: this.model });
         this.listenTo(modModal, 'addAsModerator', () => {
-          this.$modBtn.addClass('processing');
+          this.processingMod = true;
           this.saveModeratorList(true);
         });
       }
@@ -300,7 +298,7 @@ export default {
             openSimpleMessage(app.polyglot.t(phrase), errMsg);
           })
           .always(() => {
-            this.$modBtn.removeClass('processing');
+            this.processingMod = false;
           });
       }
     },
@@ -309,36 +307,7 @@ export default {
       this.isBlocked = isBlocked(this.guid);
     },
 
-    get $followBtn () {
-      if (!this._$followBtn) {
-        this._$followBtn = $('.js-follow');
-      }
-      return this._$followBtn;
-    },
-
-    get $modBtn () {
-      if (!this._$modBtn) {
-        this._$modBtn = $('.js-mod');
-      }
-      return this._$modBtn;
-    },
-
     render () {
-      this._$followBtn = null;
-      this._$modBtn = null;
-
-      if (this.guid !== app.profile.id) {
-        $('.js-blockBtnContainer')
-          .html(
-            new BlockedBtn({
-              targetId: this.guid,
-              initialState: {
-                useIcon: true,
-              },
-            }).render().el,
-          );
-      }
-
       this.setBlockedClass();
 
       if (!this.fetched) this.loadUser();

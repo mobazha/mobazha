@@ -88,7 +88,9 @@ export default {
     },
 
     setCollectionData () {
-      this.$refs._variantViews.forEach(variant => variant.setModelData());
+      this.$nextTick(() => {
+        (this.$refs._variantViews ?? []).forEach((variant) => variant.setModelData());
+      });
     },
 
     setModelData (index) {

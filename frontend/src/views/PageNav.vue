@@ -36,9 +36,11 @@
             <div class="flexVCent gutterHSm">
               <div class="searchWrapper">
                 <input type="text" class="js-addressBar flexExpand addressBar clrSh2 clrBr4"
+                  ref="addressBar"
                   @keyup.enter="onKeyupAddressBar"
+                  v-model="addressBarText"
                   @focusin="onFocusInAddressBar"
-                  :placeholder="ob.polyT('addressBarPlaceholder')" :value="ob.addressBarText" />
+                  :placeholder="ob.polyT('addressBarPlaceholder')" />
                 <div class="js-addressBarIndicatorsContainer">
                   <AddressBarIndicators ref="addressBarIndicators" />
                 </div>
@@ -86,10 +88,10 @@
                   {{ cartItemsCount > 99 ? '…' : cartItemsCount }}
                 </div>
               </a>
-              <div class="js-notifContainer notifContainer foldDown" @click.stop="onClickNotifContainer"></div>
+              <div :class="`js-notifContainer notifContainer foldDown ${notifContainerOpened ? 'open' : ''}`" @click.stop="onClickNotifContainer"></div>
               <a id="AvatarBtn" class="discSm clrBr2 clrSh1 navListBtn toolTipNoWrap" @click.stop="navListBtnClick"
                 :style="ob.getAvatarBgImage(avatarHashes || ob.avatarHashes)" :data-tip="ob.polyT('pageNav.toolTip.nav')"></a>
-              <nav class="navListWrapper foldDown js-navList" @click.stop="onNavListClick">
+              <nav :class="`navListWrapper foldDown js-navList ${navListOpened ? 'open' : ''}`" @click.stop="onNavListClick">
                 <div class="navList clrBr listBox clrP clrSh1">
                   <div class="listGroup clrP clrBr">
                     <a class="listItem js-navListItem" @click="onNavListItemClick" :href="`#${ob.peerID}/home`">
@@ -100,7 +102,7 @@
                     <a class="listItem connectedServerListItem"
                       @mouseenter="onMouseEnterConnectedServerListItem"
                       @mouseleave="onMouseLeaveConnectedServerListItem">
-                      <span :class="`noOverflow js-connectedServerName ${ob.connectedServer ? 'txB' : ''}`">{{ ob.connectedServer ? ob.connectedServer.name : ob.polyT('pageNav.notConnectedMenuItem') }}</span>
+                      <span :class="`noOverflow js-connectedServerName ${serverConnected ? 'txB' : ''}`">{{ serverConnected ? ob.connectedServer.name : ob.polyT('pageNav.notConnectedMenuItem') }}</span>
                       <span><i class="ion-arrow-right-b floR"></i></span>
                     </a>
                   </div>
@@ -141,7 +143,7 @@
               </div> -->
                 </div>
               </nav>
-              <nav class="connManagementContainer foldDown clrSh1 js-connManagementContainer"
+              <nav :class="`connManagementContainer foldDown clrSh1 js-connManagementContainer ${connManagementContainerOpened ? 'open' : ''}`"
                 @mouseenter="onMouseEnterConnManagementContainer"
                 @mouseleave="onMouseLeaveConnManagementContainer">
                 <PageNavServersMenu
@@ -156,7 +158,7 @@
         </div>
       </nav>
     </header>
-    <div class="navOverlay modal js-navOverlay"></div>
+    <div :class="`navOverlay modal js-navOverlay ${navOverlayOpened ? 'open' :'' }`"></div>
 
   </div>
 </template>
@@ -175,7 +177,6 @@ import {
   launchWallet, launchSettingsModal,
 } from '../../backbone/utils/modalManager.js';
 import Listing from '../../backbone/models/listing/Listing.js';
-import { getAvatarBgImage } from '../../backbone/utils/responsive.js';
 import { getNotifDisplayData } from '../../backbone/collections/Notifications.js';
 import Notifications from '../../backbone/views/notifications/Notificiations';
 
@@ -202,7 +203,7 @@ export default {
       windowStyle: 'win',
       app: app,
 
-      toggleUpdate: false,
+      toggleKey: 0,
 
       unreadNotifCount: 0,
       cartItemsCount: 0,
@@ -210,6 +211,10 @@ export default {
       serverConnected: false,
 
       avatarHashes: '',
+      navListOpened: false,
+      navOverlayOpened: false,
+      connManagementContainerOpened: false,
+      notifContainerOpened: false,
     };
   },
   created () {
@@ -223,14 +228,13 @@ export default {
     },
   },
   mounted () {
-    this.render();
   },
   unmounted() {
     if (this.unreadNotifCountFetch) this.unreadNotifCountFetch.abort();
   },
   computed: {
     ob () {
-      let access = this.toggleUpdate;
+      let access = this.toggleKey;
 
       let connectedServer = getCurrentConnection();
 
@@ -248,7 +252,6 @@ export default {
 
       return {
         ...this.templateHelpers,
-        addressBarText: this.addressBarText,
         connectedServer,
         testnet: app.serverConfig.testnet,
         showDiscoverCallout,
@@ -278,9 +281,8 @@ export default {
 
       this.listenTo(serverConnectEvents, 'connected', (e) => {
         this.serverConnected = true;
+        this.toggleKey += 1;
 
-        this.$connectedServerName.text(e.server.get('name'))
-          .addClass('txB');
         this.listenTo(app.router, 'route:search', this.onRouteSearch);
         this.fetchUnreadNotifCount().done((data) => {
           this.unreadNotifCount = (this.unreadNotifCount || 0) + data.unread;
@@ -293,9 +295,8 @@ export default {
 
       this.listenTo(serverConnectEvents, 'disconnected', (e) => {
         this.serverConnected = false;
+        this.toggleKey += 1;
 
-        this.$connectedServerName.text(app.polyglot.t('pageNav.notConnectedMenuItem'))
-          .removeClass('txB');
         this.torIndicatorOn = false;
         this.stopListening(app.router, null, this.onRouteSearch);
         this.stopListening(e.socket, 'message', this.onSocketMessage);
@@ -372,7 +373,7 @@ export default {
       // when this view is created, the app.profile doesn't exist
       this.listenTo(app.profile.get('avatarHashes'), 'change', this.updateAvatar);
       
-      this.toggleUpdate = !this.toggleUpdate;
+      this.toggleKey += 1;
     },
 
     updateAvatar () {
@@ -411,7 +412,7 @@ export default {
 
     onMouseEnterConnectedServerListItem () {
       this.overConnectedServerListItem = true;
-      this.$connManagementContainer.addClass('open');
+      this.connManagementContainerOpened = true;
     },
 
     onMouseLeaveConnectedServerListItem () {
@@ -419,7 +420,7 @@ export default {
 
       setTimeout(() => {
         if (!this.overConnManagementContainer) {
-          this.$connManagementContainer.removeClass('open');
+          this.connManagementContainerOpened = false;
         }
       }, 100);
     },
@@ -433,7 +434,7 @@ export default {
 
       setTimeout(() => {
         if (!this.overConnectedServerListItem) {
-          this.$connManagementContainer.removeClass('open');
+          this.connManagementContainerOpened = false;
         }
       }, 100);
     },
@@ -455,41 +456,38 @@ export default {
     },
 
     toggleNavMenu () {
-      const isOpen = this.$navList.hasClass('open');
-      this.$navList.toggleClass('open', !isOpen);
-      this.$navOverlay.toggleClass('open', !isOpen);
+      const isOpen = this.navListOpened;
+      this.navListOpened = !isOpen;
+      this.navOverlayOpened = !isOpen;
 
       if (!isOpen) {
-        this.$connManagementContainer.removeClass('open');
+        this.connManagementContainerOpened = false;
         recordEvent('NavClick', { target: 'navMenuOpen' });
       }
     },
 
     closeNavMenu () {
-      this.$navList.removeClass('open');
-      this.$navOverlay.removeClass('open');
-      this.$connManagementContainer.removeClass('open');
+      this.navListOpened = false;
+      this.navOverlayOpened = false;
+
+      this.connManagementContainerOpened = false;
     },
 
     onNavListClick (e) {
     },
 
-    onClickNavNotifBtn (e) {
-      this.$navList.removeClass('open');
-      this.$connManagementContainer.removeClass('open');
+    onClickNavNotifBtn () {
+      this.navListOpened = false;
+      this.connManagementContainerOpened = false;
       this.toggleNotifications();
     },
 
-    isNotificationsOpen () {
-      return $('.js-notifContainer').hasClass('open');
-    },
-
     toggleNotifications () {
-      if (this.isNotificationsOpen()) {
+      if (this.notifContainerOpened) {
         this.closeNotifications();
-        this.$navOverlay.removeClass('open');
+        this.navOverlayOpened = false;
       } else {
-        this.$navOverlay.addClass('open');
+        this.navOverlayOpened = true;
         recordEvent('NavClick', { target: 'notificationsOpen' });
 
         // open notifications menu
@@ -499,7 +497,7 @@ export default {
           this.listenTo(this.notifications, 'notifNavigate', () => this.closeNotifications());
         }
 
-        $('.js-notifContainer').addClass('open');
+        this.notifContainerOpened = true;
       }
     },
 
@@ -513,10 +511,10 @@ export default {
         ...options,
       };
 
-      if (!this.isNotificationsOpen()) return;
-      if (opts.closeNavList) this.$navList.removeClass('open');
-      $('.js-notifContainer').removeClass('open');
-      if (opts.closeOverlay) this.$navOverlay.removeClass('open');
+      if (!this.notifContainerOpened) return;
+      if (opts.closeNavList) this.navListOpened = false;
+      this.notifContainerOpened = false;
+      if (opts.closeOverlay) this.navOverlayOpened = false;
 
       if (this.notifications) {
         const count = this.unreadNotifCount;
@@ -548,13 +546,13 @@ export default {
     },
 
     onFocusInAddressBar () {
-      this.$addressBar.select();
+      this.$refs.addressBar.select();
     },
 
     onKeyupAddressBar () {
-      const text = this.$addressBar.val().trim();
-      this.$addressBar.val(text);
-
+      const text = this.addressBarText.trim();
+      this.addressBarText = text;
+      
       const firstTerm = text.startsWith('ob://')
         ? text.slice(5)
           .split(' ')[0]
@@ -581,10 +579,7 @@ export default {
     },
 
     setAddressBar (text = '') {
-      if (this.$addressBar) {
-        this.addressBarText = text;
-        this.$addressBar.val(text);
-      }
+      this.addressBarText = text;
 
       if (this.$refs.addressBarIndicators) this.$refs.addressBarIndicators.updateVisibility(text);
     },
@@ -635,17 +630,6 @@ export default {
         model: listingModel,
       });
     },
-
-    render () {
-      this.$addressBar = $('.js-addressBar');
-      this.$navList = $('.js-navList');
-      this.$navOverlay = $('.js-navOverlay');
-      this.$connectedServerName = $('.js-connectedServerName');
-      this.$connManagementContainer = $('.js-connManagementContainer');
-
-      return this;
-    }
-
   }
 }
 </script>

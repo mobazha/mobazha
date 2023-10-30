@@ -199,13 +199,13 @@
                   <hr class="clrBr rowMd" />
                 </div>
                 <FormError v-if="ob.errors['item.images']" :errors="ob.errors['item.images']" />
-                <input type="file" id="inputPhotoUpload" @change="onChangePhotoUploadInput" accept="image/*" class="hide" multiple />
+                <input type="file" id="inputPhotoUpload" ref="inputPhotoUpload" @change="onChangePhotoUploadInput" accept="image/*" class="hide" multiple />
                 <ul ref="photoUploadItems" class="unstyled uploadItems clrBr rowSm js-photoUploadItems">
                   <li class="addElement tile js-addPhotoWrap">
                     <span class="imagesIcon ion-images clrT4"></span>
-                    <button class="btn clrP clrBr clrT tx6" @click="onClickAddPhoto">{{ ob.polyT('editListing.btnAddPhoto') }}</button>
+                    <button class="btn clrP clrBr clrT tx6" @click="$refs.inputPhotoUpload.click()">{{ ob.polyT('editListing.btnAddPhoto') }}</button>
                   </li>
-                  <template v-for="(image, j) in ob.item.images">
+                  <template v-for="(image, j) in images.toJSON()" :key="image.id">
                     <UploadPhoto :image="image" @closeIcon="onClickRemoveImage(j)" />
                   </template>
                 </ul>
@@ -456,7 +456,7 @@ export default {
 
       fixedNav: false,
 
-      togglePhotoUploads: false,
+      photoUploadsKey: 0,
 
       currencies: [],
       expandedReturnPolicy: false,
@@ -604,7 +604,7 @@ export default {
     },
 
     inProgressPhotoUploads() {
-      let access = this.togglePhotoUploads;
+      let access = this.photoUploadsKey;
 
       return this.photoUploads.filter((upload) => upload.state() === 'pending');
     },
@@ -824,6 +824,7 @@ export default {
 
     onClickCancelPhotoUploads() {
       this.inProgressPhotoUploads.forEach((photoUpload) => photoUpload.abort());
+      this.photoUploadsKey += 1;
     },
 
     onChangePrice() {
@@ -889,12 +890,12 @@ export default {
     },
 
     onChangePhotoUploadInput() {
-      let photoFiles = Array.prototype.slice.call(this.$inputPhotoUpload[0].files, 0);
+      let photoFiles = Array.prototype.slice.call(this.$refs.inputPhotoUpload.files, 0);
 
       // prune out any non-image files
       photoFiles = photoFiles.filter((file) => file.type.startsWith('image'));
 
-      this.$inputPhotoUpload.val('');
+      this.$refs.inputPhotoUpload.value = '';
 
       const currPhotoLength = this.model.get('item').get('images').length;
 
@@ -910,8 +911,6 @@ export default {
       }
 
       if (!photoFiles.length) return;
-
-      this.$photoUploadingLabel.removeClass('hide');
 
       const toUpload = [];
       let loaded = 0;
@@ -988,8 +987,6 @@ export default {
           errored += 1;
 
           if (errored === photoFiles.length) {
-            this.$photoUploadingLabel.addClass('hide');
-
             new SimpleMessage({
               title: app.polyglot.t('editListing.errors.unableToLoadImages', { smart_count: errored }),
             })
@@ -1114,10 +1111,6 @@ export default {
         dataType: 'json',
         contentType: 'application/json',
       })
-        .always(() => {
-          if (this.isRemoved()) return;
-          if (!this.inProgressPhotoUploads.length) this.$photoUploadingLabel.addClass('hide');
-        })
         .done((uploadedImages) => {
           if (this.isRemoved()) return;
 
@@ -1139,14 +1132,11 @@ export default {
           );
         })
         .always(() => {
-          this.togglePhotoUploads = !this.togglePhotoUploads;
+          this.photoUploadsKey += 1;
         });
 
       this.photoUploads.push(upload);
-    },
-
-    onClickAddPhoto() {
-      this.$inputPhotoUpload.trigger('click');
+      this.photoUploadsKey += 1;
     },
 
     scrollTo(tab) {

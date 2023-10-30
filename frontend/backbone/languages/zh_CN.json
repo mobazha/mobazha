@@ -292,7 +292,7 @@
     "modAddError": "添加此主持人时出错。\n%{errMsg}",
     "modRemoveError": "删除此主持人时出错。\n%{errMsg}",
     "storeWelcomeCalloutTitle": "欢迎来到您的商店！",
-    "storeWelcomeCalloutBody": "您的Mobazha商店现在已经上线了。可以从创建新商品条目或自定义您的页面开始。",
+    "storeWelcomeCalloutBody": "您的Mobazha商店现在已经上线了。可以从创建新商品或自定义您的页面开始。",
     "storeWelcomeCalloutBtnClose": "关闭",
     "store": {
       "retryStoreFetch": "重试",

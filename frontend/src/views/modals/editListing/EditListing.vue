@@ -176,14 +176,16 @@
                         <label for="editListingDescription">{{ ob.polyT('editListing.description') }}</label>
                         <FormError v-if="ob.errors['item.description']" :errors="ob.errors['item.description']" />
                         <div
+                          ref="editListingDescription"
                           contenteditable
                           class="clrBr clrSh2"
-                          name="item.description"
+                          @input="onChangeDescription"
                           id="editListingDescription"
                           :placeholder="ob.polyT('editListing.placeholderDescription')"
+                          v-html="formData.item.description"
                         >
-                          {{ ob.item.description }}
                         </div>
+                        <!-- <Tinymce ref="tinymce" @input="inputTinymce" :height="300" /> -->
                       </div>
                     </div>
                   </form>
@@ -1425,6 +1427,14 @@ export default {
 
       return view;
     },
+
+    onChangeDescription() {
+      this.formData.item.description = this.$refs.editListingDescription.innerHTML;
+    },
+
+    // inputTinymce(value) {
+    //   this.formData.item.description = value;
+    // },
 
     render() {
       const item = this.model.get('item');

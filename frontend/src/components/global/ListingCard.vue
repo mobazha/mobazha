@@ -49,8 +49,8 @@
                 @click.stop="onClickDelete"
                 class="iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-delete"
                 :data-tip="ob.polyT('listingCard.deleteListingTooltip')"
-                ><span class="ion-trash-b"></span
-              ></a>
+                ><span class="ion-trash-b"></span>
+              </a>
               <div v-show="deleteConfirmOn" class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxBottom clrBr clrP clrT hide" @click.stop="onClickDeleteConfirmBox">
                 <div class="tx3 txB rowSm">{{ ob.polyT('listingCard.confirmDelete.title') }}</div>
                 <p>{{ ob.polyT('listingCard.confirmDelete.body') }}</p>
@@ -642,20 +642,13 @@ export default {
 
     onClick(e) {
       if (this.deleteConfirmOn) return;
-      if (
-        !this.ownListing ||
-        (e.target !== $('.js-edit')[0] &&
-          e.target !== $('.js-delete')[0] &&
-          !$.contains($('.js-edit')[0], e.target) &&
-          !$.contains($('.js-delete')[0], e.target))
-      ) {
-        const slug = this.model.get('slug');
 
-        if (this.$route.params.guid === this.ownerGuid) {
-          app.router.navigate(`${this.ownerGuid}/store/${slug}`);
-        } else {
-          app.router.navigate(`${this.ownerGuid}/store/${slug}`, { trigger: true });
-        }
+      const slug = this.model.get('slug');
+
+      if (this.$route.params.guid === this.ownerGuid) {
+        app.router.navigate(`${this.ownerGuid}/store/${slug}`);
+      } else {
+        app.router.navigate(`${this.ownerGuid}/store/${slug}`, { trigger: true });
       }
     },
 

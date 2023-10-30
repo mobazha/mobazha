@@ -240,7 +240,7 @@ export default {
             //this.tableData.splice(index, 1)为展示效果，调用删除接口，再刷新
             this.tableData.splice(index, 1);
             ElMessage({ type: 'success', message: '已删除' });
-            loadData();
+            this.loadData();
           }
         },
       });

@@ -71,16 +71,24 @@
               <a class="navBtn toolTipNoWrap" @click.stop="onClickNavNotifBtn"
                 :data-tip="ob.polyT('pageNav.toolTip.notifications')" id="Nav_Notifications">
                 <i class="iconBtn ion-android-notifications"></i>
-                <div class="discTn notifUnreadBadge js-notifUnreadBadge clrE1 clrTOnEmph clrBr2 clrSh2 hide"></div>
+                <div
+                  :class="`discTn notifUnreadBadge js-notifUnreadBadge clrE1 clrTOnEmph clrBr2 clrSh2 ${unreadNotifCount > 99 ? 'ellipsisShown' : ''}`"
+                  v-show="serverConnected && unreadNotifCount">
+                  {{ unreadNotifCount > 99 ? '…' : unreadNotifCount }}
+                </div>
               </a>
               <a class="navBtn toolTipNoWrap " @click="onClickShoppingCartBtn"
                 :data-tip="ob.polyT('pageNav.toolTip.shoppingCart')" id="Nav_ShoppingCart">
                 <i class="iconBtn ion-android-cart"></i>
-                <div class="discTn notifUnreadBadge js-cartItemsCountBadge clrE1 clrTOnEmph clrBr2 clrSh2 hide"></div>
+                <div
+                  :class="`discTn notifUnreadBadge js-cartItemsCountBadge clrE1 clrTOnEmph clrBr2 clrSh2 ${cartItemsCount > 99 ? 'ellipsisShown' : ''}`"
+                  v-show="serverConnected && cartItemsCount">
+                  {{ cartItemsCount > 99 ? '…' : cartItemsCount }}
+                </div>
               </a>
               <div class="js-notifContainer notifContainer foldDown" @click.stop="onClickNotifContainer"></div>
               <a id="AvatarBtn" class="discSm clrBr2 clrSh1 navListBtn toolTipNoWrap" @click.stop="navListBtnClick"
-                :style="ob.getAvatarBgImage(ob.avatarHashes)" :data-tip="ob.polyT('pageNav.toolTip.nav')"></a>
+                :style="ob.getAvatarBgImage(avatarHashes || ob.avatarHashes)" :data-tip="ob.polyT('pageNav.toolTip.nav')"></a>
               <nav class="navListWrapper foldDown js-navList" @click.stop="onNavListClick">
                 <div class="navList clrBr listBox clrP clrSh1">
                   <div class="listGroup clrP clrBr">
@@ -198,6 +206,10 @@ export default {
 
       unreadNotifCount: 0,
       cartItemsCount: 0,
+
+      serverConnected: false,
+
+      avatarHashes: '',
     };
   },
   created () {
@@ -207,12 +219,8 @@ export default {
   },
   watch: {
     unreadNotifCount() {
-      this.renderUnreadNotifCount();
       setUnreadNotifCount(this.unreadNotifCount);
     },
-    cartItemsCount() {
-      this.renderCartItemsCount();
-    }
   },
   mounted () {
     this.render();
@@ -269,6 +277,8 @@ export default {
       this.windowStyle = app.localSettings.get('windowControlStyle');
 
       this.listenTo(serverConnectEvents, 'connected', (e) => {
+        this.serverConnected = true;
+
         this.$connectedServerName.text(e.server.get('name'))
           .addClass('txB');
         this.listenTo(app.router, 'route:search', this.onRouteSearch);
@@ -282,12 +292,12 @@ export default {
       });
 
       this.listenTo(serverConnectEvents, 'disconnected', (e) => {
+        this.serverConnected = false;
+
         this.$connectedServerName.text(app.polyglot.t('pageNav.notConnectedMenuItem'))
           .removeClass('txB');
         this.torIndicatorOn = false;
         this.stopListening(app.router, null, this.onRouteSearch);
-        $('.js-notifUnreadBadge').addClass('hide');
-        $('.js-cartItemsCountBadge').addClass('hide');
         this.stopListening(e.socket, 'message', this.onSocketMessage);
       });
     },
@@ -354,32 +364,19 @@ export default {
       return $.get(app.getServerUrl('ob/notifications?filter=blah-blah'));
     },
 
-    renderUnreadNotifCount () {
-      $('.js-notifUnreadBadge')
-        .toggleClass('hide', !this.unreadNotifCount)
-        .toggleClass('ellipsisShown', this.unreadNotifCount > 99)
-        .text(this.unreadNotifCount > 99 ? '…' : this.unreadNotifCount);
-    },
-
     fetchCartItemsCount () {
       return $.get(app.getServerUrl('ob/carts/itemsCount'));
-    },
-
-    renderCartItemsCount () {
-      $('.js-cartItemsCountBadge')
-        .toggleClass('hide', !this.cartItemsCount)
-        .toggleClass('ellipsisShown', this.cartItemsCount > 99)
-        .text(this.cartItemsCount > 99 ? '…' : this.cartItemsCount);
     },
 
     setAppProfile () {
       // when this view is created, the app.profile doesn't exist
       this.listenTo(app.profile.get('avatarHashes'), 'change', this.updateAvatar);
-      this.render();
+      
+      this.toggleUpdate = !this.toggleUpdate;
     },
 
     updateAvatar () {
-      $('#AvatarBtn').attr('style', getAvatarBgImage(app.profile.get('avatarHashes').toJSON()));
+      this.avatarHashes = app.profile.get('avatarHashes').toJSON();
     },
 
     navCloseClick () {
@@ -647,11 +644,6 @@ export default {
       this.$navOverlay = $('.js-navOverlay');
       this.$connectedServerName = $('.js-connectedServerName');
       this.$connManagementContainer = $('.js-connManagementContainer');
-
-      this.renderUnreadNotifCount();
-      this.renderCartItemsCount();
-
-      this.toggleUpdate = !this.toggleUpdate;
 
       return this;
     }

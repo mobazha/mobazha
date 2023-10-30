@@ -75,7 +75,7 @@ export default {
             });
             docFrag.append(user.render().$el);
           });
-        $('.js-peerWrapper').append(docFrag);
+        this.$el.querySelector('.js-peerWrapper').append(docFrag);
         this.loadPeersUpTo += this.peersIterator;
       }
     },

@@ -7,6 +7,12 @@ import 'element-plus/dist/index.css';
 import './assets/scss/main.scss';
 // import { TUIComponents, TUICore } from './TUIKit';
 
+import '/node_modules/ionicons/css/ionicons.min.css';
+import '/node_modules/trumbowyg/dist/ui/trumbowyg.min.css';
+import '/node_modules/selectize/dist/css/selectize.css';
+import '/styles/lib/select2.css';
+import "/styles/main.scss";
+
 import VueBackbone from './plugins/vue-backbone/vue-backbone';
 
 import app from '../backbone/app';

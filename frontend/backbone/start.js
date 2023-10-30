@@ -50,11 +50,6 @@ import VerifiedModsError from './views/modals/VerifiedModsFetchError';
 
 import MyChatSDK from '../src/TUIKit/myChatSDK';
 
-import '/node_modules/ionicons/css/ionicons.min.css';
-import '/node_modules/trumbowyg/dist/ui/trumbowyg.min.css';
-import '/node_modules/selectize/dist/css/selectize.css';
-import '/styles/lib/select2.css';
-import "/styles/main.scss";
 
 fixLinuxZoomIssue();
 handleServerShutdownRequests();

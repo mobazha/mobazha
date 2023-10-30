@@ -39,7 +39,7 @@
               type="text"
               :placeholder="ob.polyT('search.searchPlaceholder')"
               :value="ob.term"
-              @keyup="onKeyupSearchInput"
+              @keyup.enter="onKeyupSearchInput"
             />
             <button class="btn clrP clrBr searchBtn" @click="clickSearchBtn">{{ ob.polyT('search.searchBtn') }}</button>
           </div>
@@ -655,12 +655,10 @@ export default {
       recordEvent('Discover_Search', { type: 'click' });
     },
 
-    onKeyupSearchInput (e) {
-      if (e.which === 13) {
-        this.setSearch({ q: $('.js-searchInput').val(), p: 0 }, { force: true });
-        recordEvent('Discover_EnterKeySearch');
-        recordEvent('Discover_Search', { type: 'enterKey' });
-      }
+    onKeyupSearchInput () {
+      this.setSearch({ q: $('.js-searchInput').val(), p: 0 }, { force: true });
+      recordEvent('Discover_EnterKeySearch');
+      recordEvent('Discover_Search', { type: 'enterKey' });
     },
 
     changeSortBy (opts) {

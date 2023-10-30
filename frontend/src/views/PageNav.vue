@@ -36,7 +36,7 @@
             <div class="flexVCent gutterHSm">
               <div class="searchWrapper">
                 <input type="text" class="js-addressBar flexExpand addressBar clrSh2 clrBr4"
-                  @keyup="onKeyupAddressBar"
+                  @keyup.enter="onKeyupAddressBar"
                   @focusin="onFocusInAddressBar"
                   :placeholder="ob.polyT('addressBarPlaceholder')" :value="ob.addressBarText" />
                 <div class="js-addressBarIndicatorsContainer">
@@ -551,34 +551,32 @@ export default {
       this.$addressBar.select();
     },
 
-    onKeyupAddressBar (e) {
-      if (e.which === 13) {
-        const text = this.$addressBar.val().trim();
-        this.$addressBar.val(text);
+    onKeyupAddressBar () {
+      const text = this.$addressBar.val().trim();
+      this.$addressBar.val(text);
 
-        const firstTerm = text.startsWith('ob://')
-          ? text.slice(5)
-            .split(' ')[0]
-            .split('/')[0]
-          : text.split(' ')[0]
-            .split('/')[0];
+      const firstTerm = text.startsWith('ob://')
+        ? text.slice(5)
+          .split(' ')[0]
+          .split('/')[0]
+        : text.split(' ')[0]
+          .split('/')[0];
 
-        if (isIPFS.multihash(firstTerm)) {
-          recordEvent('AddressBar_Input', { entry: 'multihash' });
-          app.router.navigate(text.split(' ')[0], { trigger: true });
-        } else if (firstTerm.charAt(0) === '@' && firstTerm.length > 1) {
-          // a handle
-          recordEvent('AddressBar_Input', { entry: 'handle' });
-          app.router.navigate(text.split(' ')[0], { trigger: true });
-        } else if (text.startsWith('ob://')) {
-          // trying to show a specific page
-          recordEvent('AddressBar_Input', { entry: 'ob://' });
-          app.router.navigate(text.split(' ')[0], { trigger: true });
-        } else {
-          // searching term
-          recordEvent('AddressBar_Input', { entry: 'searchTerm' });
-          app.router.navigate(`search?q=${encodeURIComponent(text)}`, { trigger: true });
-        }
+      if (isIPFS.multihash(firstTerm)) {
+        recordEvent('AddressBar_Input', { entry: 'multihash' });
+        app.router.navigate(text.split(' ')[0], { trigger: true });
+      } else if (firstTerm.charAt(0) === '@' && firstTerm.length > 1) {
+        // a handle
+        recordEvent('AddressBar_Input', { entry: 'handle' });
+        app.router.navigate(text.split(' ')[0], { trigger: true });
+      } else if (text.startsWith('ob://')) {
+        // trying to show a specific page
+        recordEvent('AddressBar_Input', { entry: 'ob://' });
+        app.router.navigate(text.split(' ')[0], { trigger: true });
+      } else {
+        // searching term
+        recordEvent('AddressBar_Input', { entry: 'searchTerm' });
+        app.router.navigate(`search?q=${encodeURIComponent(text)}`, { trigger: true });
       }
     },
 

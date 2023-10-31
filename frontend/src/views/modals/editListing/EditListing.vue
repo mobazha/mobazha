@@ -217,7 +217,7 @@
               <section ref="sectionShipping" class="shippingSection js-sectionShipping">
                 <div class="gutterVMd">
                   <div class="js-shippingOptionsWrap shippingOptionsWrap gutterVMd">
-                    <template v-for="(shipOpt, shipOptIndex) in shippingOptions">
+                    <template v-for="(shipOpt, shipOptIndex) in shippingOptions" :key="shipOpt.cid">
                       <ShippingOption
                         :options="{
                           getCurrency: () => formData.metadata.pricingCurrency.code,

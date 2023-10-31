@@ -9,7 +9,7 @@
       </div>
     </div>
     <div class="js-variantsWrap padKids padStack padTop0">
-      <template v-for="model in collection" :key="model.id">
+      <template v-for="model in collection" :key="model.cid">
         <Variant ref="_variantViews" :options="variantViewOptions(model)" :bb="function() {
           return {
             model,

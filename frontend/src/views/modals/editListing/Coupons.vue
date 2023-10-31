@@ -12,7 +12,7 @@
       </div>
     </div>
     <div class="js-couponsWrap padKids padStack padTop0">
-      <template v-for="coupon in collection" :key="coupon.id">
+      <template v-for="coupon in collection" :key="coupon.cid">
         <Coupon :bb="function() {
           return {
             model: coupon,

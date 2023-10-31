@@ -18,7 +18,7 @@
       </div>
     </template>
     <div :class="`listingsGrid ${ob.viewTypeClass} flex js-resultsGrid`">
-      <template v-for="model in catCol">
+      <template v-for="model in catCol" :key="model.cid">
         <ListingCard
           :options="cardViewOptions(model)"
           :bb="function() {

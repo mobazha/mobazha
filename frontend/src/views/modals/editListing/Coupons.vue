@@ -56,7 +56,7 @@ export default {
       return {
         ...this.templateHelpers,
         coupons: this.collection.toJSON(),
-        maxCouponCount: this.maxCouponCount,
+        maxCouponCount: this.options.maxCouponCount,
       };
     }
   },

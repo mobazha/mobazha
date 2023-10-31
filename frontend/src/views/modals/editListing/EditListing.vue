@@ -320,7 +320,20 @@
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.variantInventory') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['item.skus']" :errors="ob.errors['item.skus']" />
-                <div class="js-variantInventoryTableContainer"></div>
+                <div class="js-variantInventoryTableContainer">
+                  <VariantInventory ref="variantInventory" :key="`${formData.item.price}_${currency}`"
+                    :options="{
+                      basePrice: formData.item.price,
+                      listingCurrency: currency,
+                    }"
+                    :bb="function() {
+                      return {
+                        collection: model.get('item').get('skus'),
+                        optionsCl: model.get('item').get('options'),
+                      }
+                    }"
+                  />
+                </div>
               </section>
 
               <section ref="sectionReturnPolicy" class="returnPolicySection contentBox padMd clrP clrBr clrSh3 tx3">
@@ -441,17 +454,16 @@ import VariantOption from '../../../../backbone/models/listing/VariantOption';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 import { capitalize } from '../../../../backbone/utils/string';
 import { toStandardNotation } from '../../../../backbone/utils/number';
-
 import SimpleMessage, { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import Dialog from '../../../../backbone/views/modals/Dialog';
-import VariantInventory from '../../../../backbone/views/modals/editListing/VariantInventory';
 import UnsupportedCurrency from '../../../../backbone/views/modals/editListing/UnsupportedCurrency';
 
 import ViewListingLinks from './ViewListingLinks.vue';
 import UploadPhoto from './UploadPhoto.vue';
 import CryptoCurrencyType from './CryptoCurrencyType.vue';
-import InventoryManagement from './InventoryManagement.vue';
 import Variants from './Variants.vue';
+import InventoryManagement from './InventoryManagement.vue';
+import VariantInventory from './VariantInventory.vue';
 import Coupons from './Coupons.vue';
 import ShippingOption from './ShippingOption.vue'
 
@@ -462,8 +474,9 @@ export default {
     ViewListingLinks,
     CryptoCurrencyType,
     UploadPhoto,
-    InventoryManagement,
     Variants,
+    InventoryManagement,
+    VariantInventory,
     Coupons,
     ShippingOption,
   },
@@ -803,8 +816,8 @@ export default {
       this.photoUploadsKey += 1;
     },
 
-    onChangePrice() {
-      this.variantInventory.render();
+    onChangePrice(event) {
+      this.formData.item.price = event.target.value;
     },
 
     getOrientation(file, callback) {
@@ -1233,9 +1246,6 @@ export default {
         this.saving = false;
       }
 
-      // render so errrors are shown / cleared
-      this.render();
-
       if (!save) {
         const firstErr = $('.errorList:visible').eq(0);
         if (firstErr.length) {
@@ -1278,7 +1288,7 @@ export default {
       // set model / collection data for various child views
       (this.$refs.shippingOptionViews ?? []).forEach((shipOptVw) => shipOptVw.setModelData());
       this.$refs.variantsView.setCollectionData();
-      this.variantInventory.setCollectionData();
+      this.$refs.variantInventory.setCollectionData();
       this.$refs.couponsView.setCollectionData();
 
       if (!isCrypto) {
@@ -1385,7 +1395,6 @@ export default {
             this.model.set(this.model.parse(response));
 
             this.formData.metadata.pricingCurrency.code = newCur;
-            this.render();
           });
         }
       }
@@ -1409,12 +1418,6 @@ export default {
       const item = this.model.get('item');
 
       this.currencies = this.currencies || getCurrenciesSortedByCode();
-
-      this._$variantInventorySection = null;
-
-      this.$couponsSection = $('.js-couponsSection');
-
-      $('#editListingCurrency').on('change', () => this.variantInventory.render());
 
       $('#editListingTags').selectize({
         persist: false,
@@ -1443,18 +1446,6 @@ export default {
           text: input,
         }),
       });
-
-      // render variant inventory
-      if (this.variantInventory) this.variantInventory.remove();
-
-      this.variantInventory = this.createChild(VariantInventory, {
-        collection: item.get('skus'),
-        optionsCl: item.get('options'),
-        getPrice: () => this.getFormData(this.$itemPrice).item.price,
-        getCurrency: () => this.currency,
-      });
-
-      $('.js-variantInventoryTableContainer').html(this.variantInventory.render().el);
 
       installRichEditor($('#editListingDescription'), {
         topLevelClass: 'clrBr',

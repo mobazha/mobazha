@@ -145,7 +145,7 @@ export default {
     initFormData() {
       const model = this.model.toJSON();
       this.formData = {
-        regions: [],
+        regions: model.regions,
         name: model.name,
         type: model.type,
       }
@@ -154,6 +154,8 @@ export default {
       if (!this.model) {
         throw new Error('Please provide a model.');
       }
+
+      this.initFormData();
 
       // get regions
       this.selectCountryData = getTranslatedRegions().map((regionObj) => ({

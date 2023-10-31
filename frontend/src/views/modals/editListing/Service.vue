@@ -72,7 +72,7 @@ export default {
     },
 
     onClickRemoveService () {
-      this.$emit('click-remove', { view: this });
+      this.$emit('click-remove', this.model);
     },
 
     // Sets the model based on the current data in the UI.

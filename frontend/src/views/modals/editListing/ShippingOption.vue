@@ -22,8 +22,9 @@
         <FormError v-if="ob.errors['regions']" :errors="ob.errors['regions']" />
         <select
           :id="`shipDestinationsSelect_${ob.cid}`"
+          ref="shipDestinationSelect"
           multiple
-          name="regions"
+          v-model="formData.regions"
           class="clrBr clrP clrSh2"
           :placeholder="ob.polyT('editListing.shippingOptions.regionsPlaceholder')"
         ></select>
@@ -34,25 +35,29 @@
             <input
               type="text"
               class="clrBr clrP clrSh2 marginTopAuto"
-              name="name"
+              v-model="formData.name"
               :id="`shipOptionTitle_${ob.cid}`"
-              :value="ob.name"
               :placeholder="ob.polyT('editListing.shippingOptions.namePlaceholder')"
             />
           </div>
           <div class="col6 simpleFlexCol">
             <label :for="`shipOptionType_${ob.cid}`" class="required">{{ ob.polyT('editListing.shippingOptions.typeLabel') }}</label>
             <FormError v-if="ob.errors['type']" :errors="ob.errors['type']" />
-            <select :id="`shipOptionType_${ob.cid}`" @change="onChangeShippingType(val)" name="type" class="clrBr clrP clrSh2 marginTopAuto">
+            <Select2
+              :id="`shipOptionType_${ob.cid}`"
+              :options="{ minimumResultsForSearch: Infinity, }"
+              @change="onChangeShippingType(val)"
+              v-model="formData.type"
+              class="clrBr clrP clrSh2 marginTopAuto">
               <template v-for="(shippingType, j) in ob.shippingTypes" :key="j">
-                <option :value="shippingType" :selected="ob.type === shippingType">
+                <option :value="shippingType" :selected="formData.type === shippingType">
                   {{ ob.polyT(`editListing.shippingOptions.shippingTypes.${shippingType}`) }}
                 </option>
               </template>
-            </select>
+            </Select2>
           </div>
         </div>
-        <div class="flexRow gutterH js-serviceSection" v-show="!ob.type === 'LOCAL_PICKUP'">
+        <div class="flexRow gutterH js-serviceSection" v-show="formData.type !== 'LOCAL_PICKUP'">
           <div class="col3">
             <label class="required">{{ ob.polyT('editListing.shippingOptions.services.nameLabel') }}</label>
           </div>
@@ -66,8 +71,17 @@
             <label class="required">{{ ob.polyT('editListing.shippingOptions.services.additionalItemPriceLabel') }}</label>
           </div>
         </div>
-        <div class="js-servicesWrap js-serviceSection servicesWrap padKids padStack padTop0" v-show="!ob.type === 'LOCAL_PICKUP'"></div>
-        <div class="flexRow pad js-serviceSection" v-show="!ob.type === 'LOCAL_PICKUP'">
+        <div class="js-servicesWrap js-serviceSection servicesWrap padKids padStack padTop0" v-show="formData.type !== 'LOCAL_PICKUP'">
+          <template v-for="serviceMd in model.get('services')">
+            <Service ref="serviceViews" :bb="function() {
+                return {
+                  model: serviceMd,
+                }
+              }"
+              @click-remove="onRemoveService" />
+          </template>
+        </div>
+        <div class="flexRow pad js-serviceSection" v-show="formData.type !== 'LOCAL_PICKUP'">
           <a class="clrBr clrP clrTEm js-btnAddService" @click="onClickAddService">{{ ob.polyT('editListing.shippingOptions.services.addService') }}</a>
         </div>
       </form>
@@ -81,18 +95,27 @@ import '../../../../backbone/utils/lib/selectize';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 import regions, { getTranslatedRegions, getIndexedRegions } from '../../../../backbone/data/regions';
 import ServiceMd from '../../../../backbone/models/listing/Service';
-import app from '../../../../backbone/app';
-import Service from './Service';
+import Service from './Service.vue';
 
 export default {
+  components: {
+    Service,
+  },
   props: {
     options: {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data() {
-    return {};
+    return {
+      formData: {
+        regions: [],
+        name: '',
+        type: '',
+      }
+    };
   },
   created() {
     this.initEventChain();
@@ -103,9 +126,6 @@ export default {
     this.render();
   },
   watch: {
-    listPosition() {
-      this.$headline.text(app.polyglot.t('editListing.shippingOptions.optionHeading', { listPosition }));
-    },
   },
   computed: {
     ob() {
@@ -114,42 +134,26 @@ export default {
         // Since multiple instances of this view will be rendered, any id's should
         // include the cid, so they're unique.
         cid: this.model.cid,
-        listPosition: this.listPosition,
+        listPosition: this.options.listPosition,
         shippingTypes: this.model.shippingTypes,
         errors: this.model.validationError || {},
         ...this.model.toJSON(),
       };
     },
-    $headline() {
-      return this._$headline || (this._$headline = $('h1'));
-    },
-    $shipDestinationDropdown() {
-      return this._$shipDestinationDropdown || (this._$shipDestinationDropdown = $(`#shipDestinationsDropdown_${this.model.cid}`));
-    },
-
-    $serviceSection() {
-      return this._$serviceSection || (this._$serviceSection = $('.js-serviceSection'));
-    },
-
-    $formFields() {
-      return (
-        this._$formFields ||
-        (this._$formFields = $('select[name], input[name], textarea[name]').filter((index, el) => !$(el).parents('.js-serviceSection').length))
-      );
-    },
   },
   methods: {
-    loadData(options = {}) {
-      if (!options.model) {
+    initFormData() {
+      const model = this.model.toJSON();
+      this.formData = {
+        regions: [],
+        name: model.name,
+        type: model.type,
+      }
+    },
+    loadData() {
+      if (!this.model) {
         throw new Error('Please provide a model.');
       }
-
-      const opts = {
-        listPosition: 1,
-        ...options,
-      };
-
-      this.baseInit(opts);
 
       // get regions
       this.selectCountryData = getTranslatedRegions().map((regionObj) => ({
@@ -167,25 +171,10 @@ export default {
       this.selectCountryData = this.selectCountryData.concat(selectCountries);
 
       this.services = this.model.get('services');
-      this.serviceViews = [];
-
-      this.listenTo(this.services, 'add', (serviceMd) => {
-        const serviceVw = this.createServiceView({
-          model: serviceMd,
-        });
-
-        this.serviceViews.push(serviceVw);
-        this.$servicesWrap.append(serviceVw.render().el);
-      });
-
-      this.listenTo(this.services, 'remove', (serviceMd, servicesCl, removeOpts) => {
-        const [splicedVw] = this.serviceViews.splice(removeOpts.index, 1);
-        splicedVw.remove();
-      });
     },
 
     onClickRemoveShippingOption() {
-      this.trigger('click-remove', { view: this });
+      this.$emit('click-remove', this.model);
     },
 
     onClickAddService() {
@@ -193,27 +182,19 @@ export default {
     },
 
     onClickClearShipDest() {
-      this.$shipDestinationSelect[0].selectize.clear();
+      this.shipDestinationSelect[0].selectize.clear();
     },
 
     onChangeShippingType(val) {
-      let method;
-
-      if (val === 'LOCAL_PICKUP') {
-        method = 'addClass';
-      } else {
-        method = 'removeClass';
-
+      if (val !== 'LOCAL_PICKUP') {
         const services = this.model.get('services');
 
         if (!services.length) services.push(new ServiceMd());
       }
-
-      this.$serviceSection[method]('hide');
     },
 
-    getFormDataEx(fields = this.$formFields) {
-      const formData = this.getFormData(fields);
+    getFormDataEx() {
+      const formData = this.formData;
       const indexedRegions = getIndexedRegions();
 
       // Strip out any region elements from shipping destinations
@@ -226,18 +207,14 @@ export default {
     // Sets the model based on the current data in the UI.
     setModelData() {
       // set the data for our nested Services views
-      this.serviceViews.forEach((serviceVw) => serviceVw.setModelData());
+      this.$nextTick(() => {
+        (this.$refs.serviceViews ?? []).forEach((serviceVw) => serviceVw.setModelData());
+      });
       this.model.set(this.getFormDataEx());
     },
 
-    createServiceView(options) {
-      const view = this.createChild(Service, options);
-
-      this.listenTo(view, 'click-remove', (e) => {
-        this.services.remove(this.services.at(this.serviceViews.indexOf(e.view)));
-      });
-
-      return view;
+    onRemoveService(md) {
+      this.services.remove(md);
     },
 
     /**
@@ -261,15 +238,9 @@ export default {
     },
 
     render() {
-      $(`#shipOptionType_${this.model.cid}`).select2({
-        // disables the search box
-        minimumResultsForSearch: Infinity,
-      });
+      this.shipDestinationSelect = $(`#shipDestinationsSelect_${this.model.cid}`); //$(this.$refs.shipDestinationSelect);
 
-      this.$shipDestinationSelect = $(`#shipDestinationsSelect_${this.model.cid}`);
-      this.$servicesWrap = $('.js-servicesWrap');
-
-      this.$shipDestinationSelect.selectize({
+      this.shipDestinationSelect.selectize({
         maxItems: null,
         valueField: 'id',
         searchField: ['text', 'id'],
@@ -287,7 +258,7 @@ export default {
         },
         onItemAdd: (value) => {
           const region = getIndexedRegions()[value];
-          const { selectize } = this.$shipDestinationSelect[0];
+          const { selectize } = this.shipDestinationSelect[0];
 
           if (region) {
             // If adding a region, we'll add in all the countries for that region.
@@ -302,7 +273,7 @@ export default {
         },
         onItemRemove: (value) => {
           const isRegion = !!getIndexedRegions()[value];
-          const { selectize } = this.$shipDestinationSelect[0];
+          const { selectize } = this.shipDestinationSelect[0];
           const representedRegions = this.representedRegions(selectize.items);
 
           if (!isRegion) {
@@ -318,25 +289,6 @@ export default {
           }
         },
       });
-
-      this.serviceViews.forEach((serviceVw) => serviceVw.remove());
-      this.serviceViews = [];
-      const servicesFrag = document.createDocumentFragment();
-
-      this.model.get('services').forEach((serviceMd) => {
-        const serviceVw = this.createServiceView({ model: serviceMd });
-
-        this.serviceViews.push(serviceVw);
-        serviceVw.render().$el.appendTo(servicesFrag);
-      });
-
-      this.$servicesWrap.append(servicesFrag);
-
-      this._$headline = null;
-      this._$shipDestinationDropdown = null;
-      this._$formFields = null;
-      this._$serviceSection = null;
-      this._$shipDestinationsSelect = null;
 
       return this;
     },

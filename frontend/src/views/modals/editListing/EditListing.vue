@@ -32,7 +32,7 @@
                   <h2 class="h3 clrT js-listingHeading">
                     {{ ob.createMode ? ob.polyT('editListing.createListingLabel') : ob.polyT('editListing.editListingLabel') }}
                   </h2>
-                  <a class="btn clrP clrBAttGrad clrBrDec1 clrTOnEmph modalContentCornerBtn" @click="onSaveClick">{{ ob.polyT('settings.btnSave') }}</a>
+                  <a :class="`btn clrP clrBAttGrad clrBrDec1 clrTOnEmph modalContentCornerBtn ${saving ? 'disable' : ''}`" @click="onSaveClick">{{ ob.polyT('settings.btnSave') }}</a>
                 </div>
                 <hr class="clrBr" />
 
@@ -361,7 +361,7 @@
 
               <section
                 ref="sectionCoupons"
-                :class="`couponsSection contentBox padMd clrP clrBr clrSh3 tx3 js-couponsSection ${ob.coupons.length ? 'expandedCouponView' : ''}`"
+                :class="`couponsSection contentBox padMd clrP clrBr clrSh3 tx3 js-couponsSection ${coupons.length ? 'expandedCouponView' : ''}`"
               >
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.coupons') }}</h2>
                 <hr class="clrBr rowMd" />
@@ -480,12 +480,9 @@ export default {
       expandedTermsAndConditions: false,
 
       getCoinTypesDeferred: $.Deferred(),
-      variantOptionsCl: {
-        length: 0,
-      },
-      shippingOptions: {
-        length: 0,
-      },
+      variantOptionsCl: [],
+      coupons: [],
+      shippingOptions: [],
 
       formData: {
         item: {
@@ -508,6 +505,7 @@ export default {
         termsAndConditions: '',
       },
       trackInventoryBy: '',
+      saving: false,
     };
   },
   created() {
@@ -716,7 +714,6 @@ export default {
         setTimeout(() => {
           if (this.createMode && !this.model.isNew()) {
             this.createMode = false;
-            $('.js-listingHeading').text(app.polyglot.t('editListing.editListingLabel'));
           }
 
           const updatedData = this.model.toJSON();
@@ -768,10 +765,6 @@ export default {
       this.variantOptionsCl = this.model.get('item').get('options');
 
       this.listenTo(this.variantOptionsCl, 'update', this.onUpdateVariantOptions);
-    },
-
-    $saveButton() {
-      return $('.js-save');
     },
 
     onClickReturn() {
@@ -1155,7 +1148,7 @@ export default {
     },
 
     onSaveClick() {
-      this.$saveButton.addClass('disabled');
+      this.saving = true;
       this.setModelData();
 
       const serverData = this.model.toJSON();
@@ -1201,7 +1194,7 @@ export default {
           });
 
         save
-          .always(() => this.$saveButton.removeClass('disabled'))
+          .always(() => this.saving = false)
           .fail((...args) => {
             savingStatusMsg.update({
               msg: `Listing <em>${this.model.toJSON().item.title}</em> failed to save.`,
@@ -1232,16 +1225,16 @@ export default {
           });
       } else {
         // client side validation failed
-        this.$saveButton.removeClass('disabled');
+        this.saving = false;
       }
 
       // render so errrors are shown / cleared
       this.render();
 
       if (!save) {
-        const $firstErr = $('.errorList:visible').eq(0);
-        if ($firstErr.length) {
-          $firstErr[0].scrollIntoViewIfNeeded();
+        const firstErr = $('.errorList:visible').eq(0);
+        if (firstErr.length) {
+          firstErr[0].scrollIntoViewIfNeeded();
         } else {
           // There's a model error that's not represented in the UI - likely
           // developer error.
@@ -1416,8 +1409,7 @@ export default {
 
       this.$couponsSection = $('.js-couponsSection');
 
-      $('#editListingCurrency')
-        .on('change', () => this.variantInventory.render());
+      $('#editListingCurrency').on('change', () => this.variantInventory.render());
 
       $('#editListingTags').selectize({
         persist: false,

@@ -13,24 +13,28 @@
     </div>
     <div class="js-couponsWrap padKids padStack padTop0">
       <template v-for="coupon in collection" :key="coupon.cid">
-        <Coupon :bb="function() {
-          return {
-            model: coupon,
-          }
-        }" />
+        <Coupon ref="couponViews" :bb="function() {
+            return {
+              model: coupon,
+            }
+          }"
+          @remove-click="onRemoveCouponView" />
       </template>
     </div>
-    <a class="clrBr clrP clrTEm" v-show="ob.coupons.length < ob.maxCouponCount" @click="onClickAddCoupon">{{
+    <a class="clrBr clrP clrTEm" v-show="collection.length < ob.maxCouponCount" @click="onClickAddCoupon">{{
       ob.polyT('editListing.coupons.btnAddCoupon') }}</a>
   </div>
 </template>
 
 <script>
 import CouponMd from '../../../../backbone/models/listing/Coupon';
-import Coupon from './Coupon';
+import Coupon from './Coupon.vue';
 
 
 export default {
+  components: {
+    Coupon,
+  },
   props: {
     options: {
       type: Object,
@@ -43,12 +47,9 @@ export default {
     };
   },
   created () {
-    this.initEventChain();
-
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob () {
@@ -69,83 +70,24 @@ export default {
         throw new Error('Please provide the maximum coupon count.');
       }
 
-      this.baseInit(options);
-
       this.couponViews = [];
-
-      this.listenTo(this.collection, 'add', (md, cl) => {
-        const index = cl.indexOf(md);
-        const view = this.createCouponView(md);
-
-        if (index) {
-          this.$couponsWrap.find('> *')
-            .eq(index - 1)
-            .after(view.render().el);
-        } else {
-          this.$couponsWrap.prepend(view.render().el);
-        }
-
-        this.couponViews.splice(index, 0, view);
-
-        if (this.collection.length >= this.maxCouponCount) {
-          this.$addCoupon.addClass('hide');
-        }
-      });
-
-      this.listenTo(this.collection, 'remove', (md, cl, removeOpts) => {
-        (this.couponViews.splice(removeOpts.index, 1)[0]).remove();
-
-        if (this.collection.length < this.maxCouponCount) {
-          this.$addCoupon.removeClass('hide');
-        }
-      });
     },
 
     onClickAddCoupon () {
       this.collection.add(new CouponMd());
-      this.couponViews[this.couponViews.length - 1]
-        .$('input[name=title]')
-        .focus();
+
+      this.$nextTick(() => {
+        if (this.collection.length) (this.$refs.couponViews[this.collection.length - 1]).setFocus();
+      });
     },
 
     setCollectionData () {
       this.couponViews.forEach(coupon => coupon.setModelData());
     },
 
-    createCouponView (model, options = {}) {
-      const view = this.createChild(Coupon, {
-        model,
-        ...options,
-      });
-
-      this.listenTo(view, 'remove-click', e => this.collection.remove(e.view.model));
-
-      return view;
+    onRemoveCouponView(md) {
+      this.collection.remove(md)
     },
-
-    get $addCoupon () {
-      return this._$addCoupon || (this._$addCoupon = $('.js-addCoupon'));
-    },
-
-    render () {
-      this.$couponsWrap = $('.js-couponsWrap');
-      this._$addCoupon = null;
-
-      this.couponViews.forEach(coupon => coupon.remove());
-      this.couponViews = [];
-      const couponsFrag = document.createDocumentFragment();
-
-      this.collection.forEach(coupon => {
-        const view = this.createCouponView(coupon);
-        this.couponViews.push(view);
-        view.render().$el.appendTo(couponsFrag);
-      });
-
-      this.$couponsWrap.append(couponsFrag);
-
-      return this;
-    }
-
   }
 }
 </script>

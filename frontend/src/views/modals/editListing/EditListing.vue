@@ -219,6 +219,7 @@
                   <div class="js-shippingOptionsWrap shippingOptionsWrap gutterVMd">
                     <template v-for="(shipOpt, shipOptIndex) in shippingOptions" :key="shipOpt.cid">
                       <ShippingOption
+                        ref="shippingOptionViews"
                         :options="{
                           getCurrency: () => formData.metadata.pricingCurrency.code,
                           listPosition: shipOptIndex + 1,
@@ -366,7 +367,14 @@
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.coupons') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['coupons']" :errors="ob.errors['coupons']" />
-                <div class="js-couponsContainer couponsContainer"></div>
+                <div class="js-couponsContainer couponsContainer">
+                  <Coupons ref="couponsView" :options="{ maxCouponCount: model.max.couponCount, }"
+                    :bb="function() {
+                      return {
+                        collection: coupons,
+                      }
+                    }"/>
+                </div>
                 <a class="btn clrP clrBr clrSh2 btnAddCoupon" @click="onClickAddCoupon">{{ ob.polyT('editListing.btnAddCoupon') }}</a>
               </section>
 
@@ -436,7 +444,6 @@ import { toStandardNotation } from '../../../../backbone/utils/number';
 
 import SimpleMessage, { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import Dialog from '../../../../backbone/views/modals/Dialog';
-import Coupons from '../../../../backbone/views/modals/editListing/Coupons';
 import VariantInventory from '../../../../backbone/views/modals/editListing/VariantInventory';
 import UnsupportedCurrency from '../../../../backbone/views/modals/editListing/UnsupportedCurrency';
 
@@ -445,6 +452,7 @@ import UploadPhoto from './UploadPhoto.vue';
 import CryptoCurrencyType from './CryptoCurrencyType.vue';
 import InventoryManagement from './InventoryManagement.vue';
 import Variants from './Variants.vue';
+import Coupons from './Coupons.vue';
 import ShippingOption from './ShippingOption.vue'
 
 // import Tinymce from './../../../components/Tinymce/index.vue';
@@ -456,6 +464,7 @@ export default {
     UploadPhoto,
     InventoryManagement,
     Variants,
+    Coupons,
     ShippingOption,
   },
   props: {
@@ -745,7 +754,6 @@ export default {
       this.photoUploads = [];
       this.images = this.model.get('item').get('images');
       this.shippingOptions = this.model.get('shippingOptions');
-      this.shippingOptionViews = [];
       this.countryList = getTranslatedCountries();
 
       getCryptoCursByName().then(
@@ -754,13 +762,6 @@ export default {
       );
 
       this.coupons = this.model.get('coupons');
-      this.listenTo(this.coupons, 'update', () => {
-        if (this.coupons.length) {
-          this.$couponsSection.addClass('expandedCouponView');
-        } else {
-          this.$couponsSection.removeClass('expandedCouponView');
-        }
-      });
 
       this.variantOptionsCl = this.model.get('item').get('options');
 
@@ -1000,12 +1001,16 @@ export default {
       this.coupons.add(new Coupon());
 
       if (this.coupons.length === 1) {
-        this.$couponsSection.find('.coupon input[name=title]').focus();
+        $('.js-couponsSection').find('.coupon input[name=title]').focus();
       }
     },
 
     onClickAddFirstVariant() {
       this.variantOptionsCl.add(new VariantOption());
+
+      if (this.variantOptionsCl.length === 1) {
+        $('.js-variantsSection').find('.variant input[name=name]').focus();
+      }
     },
 
     onUpdateVariantOptions() {
@@ -1271,10 +1276,10 @@ export default {
       const isCrypto = this.formData.metadata.contractType === 'CRYPTOCURRENCY';
 
       // set model / collection data for various child views
-      this.shippingOptionViews.forEach((shipOptVw) => shipOptVw.setModelData());
+      (this.$refs.shippingOptionViews ?? []).forEach((shipOptVw) => shipOptVw.setModelData());
       this.$refs.variantsView.setCollectionData();
       this.variantInventory.setCollectionData();
-      this.couponsView.setCollectionData();
+      this.$refs.couponsView.setCollectionData();
 
       if (!isCrypto) {
         if (item.get('options').length) {
@@ -1450,16 +1455,6 @@ export default {
       });
 
       $('.js-variantInventoryTableContainer').html(this.variantInventory.render().el);
-
-      // render coupons
-      if (this.couponsView) this.couponsView.remove();
-
-      this.couponsView = this.createChild(Coupons, {
-        collection: this.coupons,
-        maxCouponCount: this.model.max.couponCount,
-      });
-
-      this.$couponsSection.find('.js-couponsContainer').append(this.couponsView.render().el);
 
       installRichEditor($('#editListingDescription'), {
         topLevelClass: 'clrBr',

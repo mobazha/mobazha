@@ -60,6 +60,14 @@ class AwakenAddon {
       urlParams: search && search.slice(1)
     }
     Log.info('[addon:awaken] awakeUrlInfo:', awakeUrlInfo);
+
+    global.externalRoute = awakeUrlInfo.urlStr;
+
+    if (app.mainWindow) {
+      // if our app router is fully loaded it will process the event sent below, otherwise
+      // the global.externalRoute will be used
+      app.mainWindow.webContents.send('external-route', awakeUrlInfo.urlStr);
+    }
   }
 }
 

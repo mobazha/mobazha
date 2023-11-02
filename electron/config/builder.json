@@ -1,7 +1,7 @@
 {
-  "productName": "ee",
-  "appId": "com.electron.ee",
-  "copyright": "© 2023 哆啦好梦 Technology Co., Ltd.",
+  "productName": "Mobazha",
+  "appId": "com.mogaolei.mobazha",
+  "copyright": "© 2023 Mogaolei Technology Co., Ltd.",
   "directories": {
     "output": "out"
   },

@@ -172,7 +172,7 @@ module.exports = (appInfo) => {
     },
     awaken: {
       enable: true,
-      protocol: 'mbz',
+      protocol: 'ob',
       args: []
     },
     autoUpdater: {

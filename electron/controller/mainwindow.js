@@ -82,6 +82,30 @@ class MainWindowController extends Controller {
     }
   }
 
+  async serverConnectLog(inputMsg) {
+    // Aggreate and make available the localServer and serverConnect
+    // module logs into one cohesive server log.
+    const log = (msg) => {
+      if (typeof msg !== 'string') {
+        throw new Error('Please provide a message as a string.');
+      }
+
+      if (!msg) return;
+
+      // Prevent the logs / msg from getting so large it eats up all the ram
+      // and crashes the client.
+      const message = msg.slice(msg.length - 500000);
+      global.serverLog += message;
+      global.serverLog = global.serverLog.slice(global.serverLog.length - 2000000);
+
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('server-log', message);
+      }
+    };
+
+    log(inputMsg);
+  }
+
   async installUpdate(args, event) {
     Addon.get('autoUpdater').installUpdate();
   }

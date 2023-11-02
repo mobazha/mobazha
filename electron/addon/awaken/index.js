@@ -63,10 +63,10 @@ class AwakenAddon {
 
     global.externalRoute = awakeUrlInfo.urlStr;
 
-    if (app.mainWindow) {
+    if (electronApp.mainWindow) {
       // if our app router is fully loaded it will process the event sent below, otherwise
       // the global.externalRoute will be used
-      app.mainWindow.webContents.send('external-route', awakeUrlInfo.urlStr);
+      electronApp.mainWindow.webContents.send('external-route', awakeUrlInfo.urlStr);
     }
   }
 }

@@ -20,12 +20,12 @@
                 <button class="btn clrP clrBr" @click="onClickEditListing">{{ ob.polyT('listingDetail.edit') }}</button>
                 <button class="btn clrP clrBr" @click="onClickCloneListing">{{ ob.polyT('listingDetail.clone') }}</button>
                 <ProcessingButton
-                  className="btn js-deleteListing clrP clrBr"
+                  :className="`btn js-deleteListing clrP clrBr ${isDeleting ? 'processing' : ''}`"
                   @click="onClickDeleteListing"
                   :btnText="ob.polyT('listingDetail.delete')" />
               </div>
             </div>
-            <div class=" confirmBox deleteConfirm tx5 arrowBoxTop clrBr clrP clrT hide" @click="onClickDeleteConfirmBox">
+            <div class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxTop clrBr clrP clrT" v-show="showDeleteConfirmedBox" @click.stop="onClickDeleteConfirmBox">
               <div class="tx3 txB rowSm">{{ ob.polyT('listingDetail.confirmDelete.title') }}</div>
               <p>{{ ob.polyT('listingDetail.confirmDelete.body') }}</p>
               <hr class="clrBr row" />
@@ -209,7 +209,7 @@
           </div>
 
           <template v-if="ob.item.images.length">
-            <div class="contentBox clrSh3 photoSection js-photoSection">
+            <div ref="photoSection" class="contentBox clrSh3 photoSection js-photoSection">
               <div class="flexCent photoSelected js-photoSelected">
                 <img class="photoSelectedInner js-photoSelectedInner">
               </div>
@@ -242,7 +242,7 @@
  -->
 
           <template v-if="ob.shippingOptions.length">
-            <div class="contentBox padLg clrP clrBr clrSh3" id="shippingSection">
+            <div ref="shippingSection" class="contentBox padLg clrP clrBr clrSh3">
               <h2 class="txUnb">{{ ob.polyT('listingDetail.shipping') }}</h2>
               <div class="flexVCent gutterHLg tx5">
                 <!-- this data is not yet available -->
@@ -251,17 +251,16 @@
         -->
                 <div>{{ ob.polyT('listingDetail.shipTo') }}</div>
                 <div class="col4">
-                  <select id="shippingDestinations" @change="onSetShippingDestination">
+                  <Select2 v-model="shippingDestination">
                     <option value="ALL">{{ ob.polyT('listingDetail.allCountries') }}</option>
-                    <template v-for="country in ob.countryData">
-                      <option value="${country.id}" :selected="country.id === ob.defaultCountry">{{ country.text }}
-                      </option>
+                    <template v-for="country in countryData">
+                      <option :value="country.id" :selected="country.id === shippingDestination">{{ country.text }}</option>
                     </template>
-                  </select>
+                  </Select2>
                 </div>
               </div>
               <div class="js-shippingOptions">
-                <ShippingOptions :options="shippingOptionsInfo" />
+                <ShippingOptions :options="shippingOptionsInfo" :key="shippingDestination" />
               </div>
             </div>
           </template>
@@ -358,6 +357,7 @@ export default {
       outdateHash: false,
 
       shippingDestination: '',
+      countryData: getTranslatedCountries().map((countryObj) => ({ id: countryObj.dataName, text: countryObj.name })),
 
       ratingData: {
         averageRating: 0,
@@ -367,6 +367,9 @@ export default {
       _showNsfwWarning: true,
 
       moreListingsData: undefined,
+
+      isDeleting: false,
+      showDeleteConfirmedBox: false,
     };
   },
   created () {
@@ -399,8 +402,6 @@ export default {
         displayCurrency: app.settings.get('localCurrency'),
         // the ships from data doesn't exist yet
         // shipsFromCountry: this.model.get('shipsFrom');
-        countryData: this.countryData,
-        defaultCountry: this.defaultCountry,
         vendor: this.vendor,
         openedFromStore: this.options.openedFromStore,
         hasVerifiedMods: this.hasVerifiedMods,
@@ -472,6 +473,10 @@ export default {
       return { tip, buyNowClass, buyNowTranslationKey, unpurchaseable }
     },
 
+    defaultCountry() {
+      return app.settings.get('shippingAddresses').length
+        ? app.settings.get('shippingAddresses').at(0).get('country') : app.settings.get('country');
+    },
     shippingOptionsInfo() {
       const shippingOptions = this.model.get('shippingOptions').toJSON();
       const templateData = shippingOptions.filter((option) => {
@@ -540,20 +545,13 @@ export default {
       // bridge when we get to it.
       this.vendor = this.vendor || opts.vendor;
 
-      this.countryData = getTranslatedCountries()
-        .map((countryObj) => ({ id: countryObj.dataName, text: countryObj.name }));
-
-      this.defaultCountry = app.settings.get('shippingAddresses').length
-        ? app.settings.get('shippingAddresses').at(0).get('country') : app.settings.get('country');
-
       this.listenTo(app.settings, 'change:country', () => (this.shipsFreeToMe = this.model.shipsFreeToMe));
 
       this.listenTo(
         app.settings.get('shippingAddresses'),
         'update',
         (cl, updateOpts) => {
-          if (updateOpts.changes.added.length
-            || updateOpts.changes.removed.length) {
+          if (updateOpts.changes.added.length || updateOpts.changes.removed.length) {
             this.shipsFreeToMe = this.model.shipsFreeToMe;
           }
         },
@@ -681,7 +679,7 @@ export default {
     },
 
     onDocumentClick () {
-      this.getDeleteConfirmedBoxEl().addClass('hide');
+      this.showDeleteConfirmedBox = false;
     },
 
     onRatings (data) {
@@ -737,7 +735,7 @@ export default {
 
     onClickDeleteListing () {
       recordEvent('Listing_DeleteFromListing');
-      this.getDeleteConfirmedBoxEl().removeClass('hide');
+      this.showDeleteConfirmedBox = true;
       // don't bubble to the document click handler
       return false;
     },
@@ -753,7 +751,7 @@ export default {
       this.destroyRequest = this.model.destroy({ wait: true });
 
       if (this.destroyRequest) {
-        this.getDeleteListingEl().addClass('processing');
+        this.isDeleting = true;
 
         this.destroyRequest.done(() => {
           if (this.destroyRequest.statusText === 'abort'
@@ -761,16 +759,14 @@ export default {
 
           this.close();
         }).always(() => {
-          if (!this.isRemoved()) {
-            this.getDeleteListingEl().removeClass('processing');
-          }
+          this.isDeleting = false;
         });
       }
     },
 
     onClickConfirmCancel () {
       recordEvent('Listing_DeleteFromListingCancel');
-      this.getDeleteConfirmedBoxEl().addClass('hide');
+      this.showDeleteConfirmedBox = false;
     },
 
     onClickGotoPhotos () {
@@ -810,7 +806,7 @@ export default {
 
     gotoPhotos () {
       recordEvent('Listing_GoToPhotos', { ownListing: this.model.isOwnListing });
-      this.getPhotoSectionEl().velocity(
+      $(this.$refs.photoSection).velocity(
         'scroll',
         {
           duration: 500,
@@ -911,7 +907,7 @@ export default {
     },
 
     gotoShippingOptions () {
-      this.getShippingSectionEl().velocity(
+      $(this.$refs.shippingSection).velocity(
         'scroll',
         {
           duration: 500,
@@ -1006,10 +1002,6 @@ export default {
       });
     },
 
-    onSetShippingDestination (val) {
-      this.shippingDestination = val;
-    },
-
     startPurchase () {
       if (!this.model.isCrypto) {
         if (this.totalPrice.lte(0)) {
@@ -1087,24 +1079,12 @@ export default {
       })
     },
 
-    getDeleteListingEl() {
-      return $('.js-deleteListing');
-    },
-
     getPopInMessagesEl () {
       return $('.js-popInMessages');
     },
 
-    getPhotoSectionEl() {
-      return $('.js-photoSection');
-    },
-
     getPhotoSelectedEl() {
       return $('.js-photoSelected');
-    },
-
-    getShippingSectionEl () {
-      return $('#shippingSection');
     },
 
     getPhotoRadioBtnsEl () {
@@ -1113,10 +1093,6 @@ export default {
 
     getStoreOwnerAvatarEl () {
       return $('.js-storeOwnerAvatar');
-    },
-
-    getDeleteConfirmedBoxEl () {
-      return $('.js-deleteConfirmedBox');
     },
 
     cryptoTradingPairOptions() {

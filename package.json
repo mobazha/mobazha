@@ -57,6 +57,7 @@
     "electron-builder": "^23.6.0",
     "eslint": "^5.13.0",
     "eslint-plugin-prettier": "^3.0.1",
+    "icon-gen": "^4.0.0",
     "nodemon": "^2.0.16"
   },
   "dependencies": {

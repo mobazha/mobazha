@@ -46,9 +46,9 @@
     </form>
     <hr class="clrBr" />
     <div class="buttonBar flexHRight flexVCent gutterHLg">
-      <a :disabled="ob.openingDispute" @click="onClickCancel">{{ ob.polyT('orderDetail.disputeOrderTab.btnCancel') }}</a>
+      <a :disabled="processing" @click="onClickCancel">{{ ob.polyT('orderDetail.disputeOrderTab.btnCancel') }}</a>
       <ProcessingButton
-        :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph ${ob.openingDispute ? 'processing' : ''}`"
+        :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph ${processing ? 'processing' : ''}`"
         :btnText="ob.polyT(`orderDetail.fulfillOrderTab.btnSubmit`)" @click="onClickSubmit" />
     </div>
   </div>
@@ -79,6 +79,8 @@ export default {
   data () {
     return {
       claim: '',
+
+      processing: false,
     };
   },
   created () {
@@ -87,7 +89,6 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob () {
@@ -95,7 +96,6 @@ export default {
         ...this.templateHelpers,
         ...this.model.toJSON(),
         errors: this.model.validationError || {},
-        openingDispute: !!openingDispute(this.model.id),
         timeoutMessage: this.options.timeoutMessage,
       };
     },
@@ -121,6 +121,7 @@ export default {
           this.modProfile = modProfile;
         });
 
+      this.processing = !!openingDispute(this.model.id);
       this.listenTo(orderEvents, 'openingDispute', this.onOpeningDispute);
       this.listenTo(orderEvents, 'openDisputeComplete, openDisputeFail', this.onOpenDisputeAlways);
     },
@@ -154,21 +155,15 @@ export default {
 
     onOpeningDisputeOrder (e) {
       if (e.id === this.model.id) {
-        this.openingDispute = true;
+        this.processing = true;
       }
     },
 
     onOpenDisputeAlways (e) {
       if (e.id === this.model.id) {
-        this.openingDispute = false;
+        this.processing = false;
       }
     },
-
-    render () {
-      this.openingDispute = !!openingDispute(this.model.id);
-
-      return this;
-    }
   }
 }
 </script>

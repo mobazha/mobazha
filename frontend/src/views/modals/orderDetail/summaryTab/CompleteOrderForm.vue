@@ -15,7 +15,7 @@
             placeholder="Write your review here…" :maxlength="ob.constraints.maxReviewCharacters" v-model="formData.review" />
           <div class="flexVCent gutterH">
             <ProcessingButton
-              :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph js-completeOrder ${ob.isCompleting ? 'processing' : ''}`"
+              :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph js-completeOrder ${isCompleting ? 'processing' : ''}`"
               :btnText="ob.polyT('orderDetail.summaryTab.completeOrderForm.btnCompleteOrder')"
               @click="onClickCompleteOrder" />
             <div class="gutterHSm">
@@ -83,7 +83,8 @@ export default {
     return {
       formData: {
         review: '',
-      }
+      },
+      isCompleting: false,
     };
   },
   created () {
@@ -100,7 +101,6 @@ export default {
         ...this.templateHelpers,
         ...this.rating.toJSON(),
         errors: this.rating.validationError || {},
-        isCompleting: !!completingOrder(this.model.id),
         constraints: this.rating.constraints || {},
       };
     }
@@ -129,12 +129,13 @@ export default {
         ratings.push(this.rating);
       }
 
+      this.isCompleting = !!completingOrder(this.model.id);
       this.listenTo(orderEvents, 'completingOrder', () => {
-        $('.js-completeOrder').addClass('processing');
+        this.isCompleting = true;
       });
 
       this.listenTo(orderEvents, 'completeOrderComplete completeOrderFail', () => {
-        $('.js-completeOrder').removeClass('processing');
+        this.isCompleting = false;
       });
     },
 
@@ -167,8 +168,6 @@ export default {
     },
 
     render () {
-      this.isCompleting = !!completingOrder(this.model.id);
-
       $('.ratingsContainer').each((index, element) => {
         const $el = $(element);
         const type = $el.data('ratingType');

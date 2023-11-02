@@ -67,13 +67,13 @@
     </form>
     <hr class="clrBr" />
     <div class="buttonBar flexHRight flexVCent gutterHLg">
-      <a class="js-cancel" :disabled="ob.resolvingDispute" @click="onClickCancel">{{ ob.polyT(`orderDetail.resolveDisputeTab.btnCancel`) }}</a>
+      <a class="js-cancel" :disabled="processing" @click="onClickCancel">{{ ob.polyT(`orderDetail.resolveDisputeTab.btnCancel`) }}</a>
       <div class="posR">
         <ProcessingButton
-          :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph js-submit ${ob.resolvingDispute ? 'processing' : ''}`"
-          :btnText="ob.polyT(`orderDetail.resolveDisputeTab.btnSubmit`)" @click="onClickSubmit" />
+          :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph js-submit ${processing ? 'processing' : ''}`"
+          :btnText="ob.polyT(`orderDetail.resolveDisputeTab.btnSubmit`)" @click.stop="onClickSubmit" />
         <div class="js-resolveConfirm confirmBox resolveConfirm tx5 arrowBoxBottom clrBr clrP clrT"
-          v-show="ob.resolveConfirmOn" @click="onClickResolveConfirmBox">
+          v-show="resolveConfirmOn" @click="onClickResolveConfirmBox">
           <div class="tx3 txB rowSm">{{ ob.polyT('orderDetail.resolveDisputeTab.resolveConfirm.title') }}</div>
           <p>{{ ob.polyT('orderDetail.resolveDisputeTab.resolveConfirm.body') }}</p>
           <hr class="clrBr row" />
@@ -112,7 +112,7 @@ export default {
       vendorPercentage: 0,
       resolution: '',
 
-      resolvingDispute: false,
+      processing: false,
       resolveConfirmOn: false,
 
       buyerAvatarHashes: {},
@@ -173,7 +173,7 @@ export default {
         this.vendorAvatarHashes = profile.get('avatarHashes').toJSON();
       });
 
-      this.resolvingDispute = resolvingDispute(this.model.id);
+      this.processing = resolvingDispute(this.model.id);
       this.listenTo(orderEvents, 'resolvingDispute', this.onResolvingDispute);
       this.listenTo(orderEvents, 'resolveDisputeComplete resolveDisputeFail', this.onResolveDisputeAlways);
     },
@@ -231,13 +231,13 @@ export default {
 
     onResolvingDispute (e) {
       if (e.id === this.model.id) {
-        this.resolvingDispute = true;
+        this.processing = true;
       }
     },
 
     onResolveDisputeAlways (e) {
       if (e.id === this.model.id) {
-        this.resolvingDispute = false;
+        this.processing = false;
       }
     },
   }

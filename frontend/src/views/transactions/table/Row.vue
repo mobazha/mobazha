@@ -89,7 +89,6 @@ import app from '../../../../backbone/app';
 import moment from 'moment';
 import _ from 'underscore';
 import { recordEvent } from '../../../../backbone/utils/metrics';
-import CryptoTradingPair from '../../../../backbone/views/components/CryptoTradingPair';
 
 
 export default {

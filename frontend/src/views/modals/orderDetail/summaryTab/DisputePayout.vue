@@ -36,9 +36,9 @@
           <div class="posR">
             <template v-if="ob.showAcceptButton">
               <ProcessingButton
-                :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b js-acceptPayout ${ob.acceptInProgress ? 'processing' : ''}`"
+                :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b js-acceptPayout ${acceptInProgress ? 'processing' : ''}`"
                 :disabled="ob.acceptConfirmOn" :btnText="ob.polyT('orderDetail.summaryTab.disputePayout.btnAcceptPayout')"
-                @click="onClickAcceptPayout" />
+                @click.stop="onClickAcceptPayout" />
             </template>
             <template v-if="ob.acceptConfirmOn">
               <div class="confirmBox acceptPayoutConfirm tx5 arrowBoxTop clrBr clrP clrT" @click="onClickAcceptPayoutConfirmedBox">
@@ -68,7 +68,6 @@
 </template>
 
 <script>
-import $ from 'jquery';
 import app from '../../../../../backbone/app';
 import moment from 'moment';
 import {
@@ -92,8 +91,9 @@ export default {
         showAcceptButton: false,
         acceptConfirmOn: false,
         paymentCoin: undefined,
-        acceptInProgress: false,
       },
+
+      acceptInProgress: false,
 
       priceLines: {},
       partyHeadings: {},
@@ -111,7 +111,6 @@ export default {
         ...this.templateHelpers,
         ...this._state,
         moment,
-        acceptInProgress: acceptingPayout(this.orderID),
       };
     }
   },
@@ -134,15 +133,16 @@ export default {
 
       this.orderID = options.orderID;
 
+      this.acceptInProgress = acceptingPayout(this.orderID);
       this.listenTo(orderEvents, 'acceptingPayout', e => {
         if (e.id === this.orderID) {
-          this.setState({ acceptInProgress: true });
+          this.acceptInProgress = true;
         }
       });
 
       this.listenTo(orderEvents, 'acceptPayoutComplete acceptPayoutFail', e => {
         if (e.id === this.orderID) {
-          this.setState({ acceptInProgress: false });
+          this.acceptInProgress = false;
         }
       });
 

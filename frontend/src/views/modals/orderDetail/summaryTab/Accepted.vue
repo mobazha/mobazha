@@ -14,7 +14,7 @@
         <div class="col">
           <div class="flexVCent gutterHLg">
             <template v-if="ob.showRefundButton">
-              <template v-if="ob.refundOrderInProgress">
+              <template v-if="refundOrderInProgress">
                 <span class="posR">
                   <!-- // including invisible refund link to properly space the spinner -->
                   <a class="txU tx6 invisible">{{ ob.polyT('orderDetail.summaryTab.accepted.refundBtn') }}</a>
@@ -24,9 +24,9 @@
 
               <template v-else>
                 <div class="posR">
-                  <a class="txU tx6" :disabled="ob.refundConfirmOn || ob.fulfillInProgress" @click="onClickRefundOrder">{{
+                  <a class="txU tx6" :disabled="refundConfirmOn || fulfillInProgress" @click.stop="onClickRefundOrder">{{
                     ob.polyT('orderDetail.summaryTab.accepted.refundBtn') }}</a>
-                  <template v-if="ob.refundConfirmOn">
+                  <template v-if="refundConfirmOn">
                     <div class="confirmBox refundConfirm tx5 arrowBoxTop clrBr clrP clrT"
                       @click="onClickRefundConfirmBox">
                       <div class="tx3 txB rowSm">{{ ob.polyT('orderDetail.summaryTab.accepted.refundConfirm.title') }}
@@ -52,8 +52,8 @@
             </template>
             <template v-if="ob.showFulfillButton">
               <ProcessingButton
-                :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b js-fulfillOrder ${ob.fulfillInProgress ? 'processing' : ''}`"
-                :disabled="ob.refundOrderInProgress" :btnText="ob.polyT('orderDetail.summaryTab.accepted.fulfillBtn')"
+                :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b js-fulfillOrder ${fulfillInProgress ? 'processing' : ''}`"
+                :disabled="refundOrderInProgress" :btnText="ob.polyT('orderDetail.summaryTab.accepted.fulfillBtn')"
                 @click="onClickFulfillOrder" />
             </template>
           </div>
@@ -65,7 +65,6 @@
 </template>
 
 <script>
-import $ from 'jquery';
 import moment from 'moment';
 import {
   fulfillingOrder,
@@ -90,12 +89,12 @@ export default {
         showRefundButton: false,
         showFulfillButton: false,
         avatarHashes: {},
-        refundConfirmOn: false,
+        
         paymentCoin: undefined,
-
-        fulfillInProgress: false,
-        refundOrderInProgress: false,
-      }
+      },
+      refundConfirmOn: false,
+      fulfillInProgress: false,
+      refundOrderInProgress: false,
     };
   },
   created () {
@@ -111,8 +110,6 @@ export default {
         ...this.templateHelpers,
         ...this._state,
         moment,
-        fulfillInProgress: fulfillingOrder(this.orderID),
-        refundOrderInProgress: refundingOrder(this.orderID),
       };
     }
   },
@@ -127,7 +124,6 @@ export default {
           showRefundButton: false,
           showFulfillButton: false,
           avatarHashes: {},
-          refundConfirmOn: false,
           paymentCoin: undefined,
           ...options.initialState,
         },
@@ -139,34 +135,34 @@ export default {
 
       this.orderID = options.orderID;
 
+      this.fulfillInProgress = fulfillingOrder(this.orderID),
       this.listenTo(orderEvents, 'fulfillingOrder', e => {
         if (e.id === this.orderID) {
-          this.setState({ fulfillInProgress: true });
+          this.fulfillInProgress = true;
         }
       });
-
       this.listenTo(orderEvents, 'fulfillOrderComplete fulfillOrderFail', e => {
         if (e.id === this.orderID) {
-          this.setState({ fulfillInProgress: false });
+          this.fulfillInProgress = false;
         }
       });
 
+      this.refundOrderInProgress = refundingOrder(this.orderID),
       this.listenTo(orderEvents, 'refundingOrder', e => {
         if (e.id === this.orderID) {
-          this.setState({ refundOrderInProgress: true });
+          this.refundOrderInProgress = true;
         }
       });
-
       this.listenTo(orderEvents, 'refundOrderComplete refundOrderFail', e => {
         if (e.id === this.orderID) {
-          this.setState({ refundOrderInProgress: false });
+          this.refundOrderInProgress = false;
         }
       });
     },
 
     onClickRefundOrder () {
       recordEvent('OrderDetails_Refund');
-      this.setState({ refundConfirmOn: true });
+      this.refundConfirmOn = true;
       return false;
     },
 
@@ -178,16 +174,16 @@ export default {
 
     onClickRefundConfirmCancel () {
       recordEvent('OrderDetails_RefundCancel');
-      this.setState({ refundConfirmOn: false });
+      this.refundConfirmOn = false;
     },
 
     onDocumentClick () {
-      this.setState({ refundConfirmOn: false });
+      this.refundConfirmOn = false;
     },
 
     onClickRefundConfirmed () {
       recordEvent('OrderDetails_RefundConfirm');
-      this.setState({ refundConfirmOn: false });
+      this.refundConfirmOn = false;
       refundOrder(this.orderID);
     },
 

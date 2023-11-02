@@ -133,7 +133,7 @@ export default {
         },
         note: '',
       },
-      processing: fulfillingOrder(this.orderID),
+      processing: false,
     };
   },
   created () {
@@ -142,7 +142,6 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob () {
@@ -154,7 +153,6 @@ export default {
         isLocalPickup: this.isLocalPickup,
         ...this.model.toJSON(),
         errors: this.model.validationError || {},
-        fulfillingOrder: fulfillingOrder(this.model.id),
         constraints: cryptoDelivery && cryptoDelivery.constraints || {},
       };
     }
@@ -176,6 +174,7 @@ export default {
           'be picked up locally.');
       }
 
+      this.processing = fulfillingOrder(this.model.id);
       this.listenTo(orderEvents, 'fulfillingOrder', this.onFulfillingOrder);
       this.listenTo(orderEvents, 'fulfillOrderComplete, fulfillOrderFail', this.onFulfillOrderAlways);
     },
@@ -216,12 +215,6 @@ export default {
         this.processing = false;
       }
     },
-
-    render () {
-      this.processing = fulfillingOrder(this.model.id);
-
-      return this;
-    }
   }
 }
 </script>

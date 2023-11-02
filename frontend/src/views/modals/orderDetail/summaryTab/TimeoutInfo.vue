@@ -13,7 +13,7 @@
           </template>
           <template v-if="ob.ownPeerID === ob.vendor && ob.isPaymentClaimable">
             <ProcessingButton
-              :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b js-claimPayment ${ob.isClaimingPayment ? 'processing' : ''}`"
+              :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b js-claimPayment ${isClaimingPayment ? 'processing' : ''}`"
               :btnText="ob.polyT('orderDetail.summaryTab.timeoutInfo.btnClaimPayment')"
               @click="onClickClaimPayment"/>
           </template>
@@ -61,10 +61,11 @@ export default {
         showDisputeBtn: false,
         showDiscussBtn: false,
         showResolveDisputeBtn: false,
-        isClaimingPayment: releasingEscrow(options.orderID),
         invalidContractData: false,
         dataUnavailable: false,
       },
+
+      isClaimingPayment: false,
 
       message: '',
       messageClass: 'txCtr',
@@ -90,15 +91,16 @@ export default {
 
       this.orderID = options.orderID;
 
+      this.isClaimingPayment = releasingEscrow(options.orderID);
       this.listenTo(orderEvents, 'releasingEscrow', e => {
         if (e.id === this.orderID) {
-          this.setState({ isClaimingPayment: true });
+          this.isClaimingPayment = true;
         }
       });
 
       this.listenTo(orderEvents, 'releaseEscrowComplete releaseEscrowFail', e => {
         if (e.id === this.orderID) {
-          this.setState({ isClaimingPayment: false });
+          this.isClaimingPayment = false;
         }
       });
 

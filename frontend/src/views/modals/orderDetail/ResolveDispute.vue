@@ -134,7 +134,6 @@ export default {
       return {
         ...this.model.toJSON(),
         errors: this.model.validationError || {},
-        resolvingDispute: resolvingDispute(this.model.id),
       };
     },
     buyerContractUnavailable() {
@@ -174,6 +173,7 @@ export default {
         this.vendorAvatarHashes = profile.get('avatarHashes').toJSON();
       });
 
+      this.resolvingDispute = resolvingDispute(this.model.id);
       this.listenTo(orderEvents, 'resolvingDispute', this.onResolvingDispute);
       this.listenTo(orderEvents, 'resolveDisputeComplete resolveDisputeFail', this.onResolveDisputeAlways);
     },

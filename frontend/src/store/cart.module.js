@@ -5,10 +5,6 @@ function updateLocalStorage(cart) {
 
 const state = {
   cart: {},
-  transactions: {
-    type: 'purchases',
-    model: {},
-  }
 }
 
 const getters = {
@@ -21,9 +17,6 @@ const mutations = {
   updateCart (state, cart) {
     state.cart = cart
   },
-  setTransactionsOrder(state, data) {
-    state.transactions = data;
-  }
 
   // updateCartFromLocalStorage(state) {
   //   const cart = localStorage.getItem('cart')

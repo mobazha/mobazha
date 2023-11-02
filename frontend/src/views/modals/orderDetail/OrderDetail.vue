@@ -20,10 +20,13 @@
             <div class="contentBox clrP clrBr clrSh3 tx4 featuredProfile js-featuredProfile"
               :disabled="ob.isFetching || ob.fetchFailed">
               <ProfileBox v-if="featuredProfileMd"
-                :options="profileBoxOptions.options"
+                :options="{
+                  isFetching: !featuredProfilePeerID,
+                  peerID: featuredProfilePeerID,
+                }"
                 :bb="function() {
                   return {
-                    model: profileBoxOptions.model,
+                    model: featuredProfileMd,
                   };
                 }"
               />
@@ -119,10 +122,13 @@
                   />
                   <FulfillOrder
                     v-if="activeTab === 'fulfillOrder'"
-                    :options="fulfillOrderOptions.options"
+                    :options="{
+                      contractType: model.get('contract').type,
+                      isLocalPickup: model.get('contract').isLocalPickup,
+                    }"
                     :bb="function() {
                       return {
-                        model: fulfillOrderOptions.model,
+                        model: fulfillOrderModel(),
                       };
                     }"
                     @clickBackToSummary="() => {
@@ -134,10 +140,10 @@
                   />
                   <DisputeOrder
                     v-if="activeTab === 'disputeOrder'"
-                    :options="disputeOrderOptions.options"
+                    :options="disputeOrderOptions()"
                     :bb="function() {
                       return {
-                        model: disputeOrderOptions.model,
+                        model: disputeOrderModel(),
                       };
                     }"
                     @clickBackToSummary="() => {
@@ -149,11 +155,11 @@
                   />
                   <ResolveDispute
                     v-if="activeTab === 'resolveDispute'"
-                    :options="resolveDisputeOptions.options"
+                    :options="resolveDisputeOptions()"
                     :bb="function() {
                       return {
-                        model: resolveDisputeOptions.model,
-                        case: resolveDisputeOptions.case,
+                        model: resolveDisputeModel(),
+                        case: model,
                       };
                     }"
                     @clickBackToSummary="() => {
@@ -264,9 +270,7 @@ export default {
       const paymentCurData = this.model.paymentCoinData;
 
       return {
-        showDisputeOrderButton:
-          (!paymentCurData || !paymentCurData.supportsEscrowTimeout)
-          && this.model.isOrderDisputable,
+        showDisputeOrderButton: (!paymentCurData || !paymentCurData.supportsEscrowTimeout) && this.model.isOrderDisputable,
       };
     },
     contractMenuItemState () {
@@ -309,96 +313,6 @@ export default {
       count = count > 99 ? '…' : count;
       return count;
     },
-    fulfillOrderOptions() {
-      const contract = this.model.get('contract');
-
-      const model = new OrderFulfillment(
-        { orderID: this.model.id },
-        {
-          contractType: contract.type,
-          isLocalPickup: contract.isLocalPickup,
-        },
-      );
-
-      return {
-        model,
-        options: {
-          contractType: contract.type,
-          isLocalPickup: contract.isLocalPickup,
-        }
-      };
-    },
-    disputeOrderOptions () {
-      const model = new OrderDispute({ orderID: this.model.id });
-      const translationKeySuffix = app.profile.id === this.model.buyerID ? 'Buyer' : 'Vendor';
-      let timeoutMessage = '';
-
-      try {
-        timeoutMessage = getWalletCurByCode(this.model.paymentCoin).supportsEscrowTimeout
-          ? app.polyglot.t(
-            `orderDetail.disputeOrderTab.timeoutMessage${translationKeySuffix}`,
-            { timeoutAmount: this.contract.disputeExpiryVerbose },
-          )
-          : '';
-      } catch (e) {
-        // pass
-      }
-
-      return {
-        model,
-        options: {
-          contractType: this.contract.type,
-          moderator: {
-            id: this.model.moderatorID,
-            getProfile: this.getModeratorProfile.bind(this),
-          },
-          timeoutMessage,
-        }
-      }
-    },
-    resolveDisputeOptions () {
-      let modelAttrs = { orderID: this.model.id };
-      const isResolvingDispute = resolvingDispute(this.model.id);
-
-      // If this order is in the process of the dispute being resolved, we'll
-      // populate the model with the data that was posted to the server.
-      if (isResolvingDispute) {
-        modelAttrs = {
-          ...modelAttrs,
-          ...isResolvingDispute.data,
-        };
-      }
-
-      const model = new ResolveDisputeMd(modelAttrs, {
-        buyerContractArrived: () => !!this.model.get('buyerContract'),
-        vendorContractArrived: () => !!this.model.get('vendorContract'),
-        vendorProcessingError: () => this.model.vendorProcessingError,
-      });
-
-      return {
-        model,
-        case: this.model,
-        options: {
-          vendor: {
-            id: this.model.vendorID,
-            getProfile: this.getVendorProfile.bind(this),
-          },
-          buyer: {
-            id: this.model.buyerID,
-            getProfile: this.getBuyerProfile.bind(this),
-          },
-        }
-      };
-    },
-    profileBoxOptions () {
-      return {
-        model: this.featuredProfileMd,
-        options: {
-          isFetching: !this.featuredProfilePeerID,
-          peerID: this.featuredProfilePeerID,
-        }        
-      };
-    },
   },
   methods: {
     loadData (options = {}) {
@@ -412,7 +326,7 @@ export default {
         ...options,
       };
 
-    this.baseInit(opts);
+      this.baseInit(opts);
 
       if (!this.model) {
         throw new Error('Please provide an Order or Case model.');
@@ -646,6 +560,78 @@ export default {
           getProfile: this.getModeratorProfile.bind(this),
         };
       }
+    },
+
+    fulfillOrderModel() {
+      const contract = this.model.get('contract');
+
+      return new OrderFulfillment(
+        { orderID: this.model.id },
+        {
+          contractType: contract.type,
+          isLocalPickup: contract.isLocalPickup,
+        },
+      );
+    },
+
+    disputeOrderModel() {
+      return new OrderDispute({ orderID: this.model.id });
+    },
+
+    disputeOrderOptions () {
+      const translationKeySuffix = app.profile.id === this.model.buyerID ? 'Buyer' : 'Vendor';
+      let timeoutMessage = '';
+
+      try {
+        timeoutMessage = getWalletCurByCode(this.model.paymentCoin).supportsEscrowTimeout
+          ? app.polyglot.t(
+            `orderDetail.disputeOrderTab.timeoutMessage${translationKeySuffix}`,
+            { timeoutAmount: this.contract.disputeExpiryVerbose },
+          )
+          : '';
+      } catch (e) {
+        // pass
+      }
+
+      return {
+        contractType: this.contract.type,
+        moderator: {
+          id: this.model.moderatorID,
+          getProfile: this.getModeratorProfile.bind(this),
+        },
+        timeoutMessage,
+      }
+    },
+    resolveDisputeModel() {
+      let modelAttrs = { orderID: this.model.id };
+      const isResolvingDispute = resolvingDispute(this.model.id);
+
+      // If this order is in the process of the dispute being resolved, we'll
+      // populate the model with the data that was posted to the server.
+      if (isResolvingDispute) {
+        modelAttrs = {
+          ...modelAttrs,
+          ...isResolvingDispute.data,
+        };
+      }
+
+      return new ResolveDisputeMd(modelAttrs, {
+        buyerContractArrived: () => !!this.model.get('buyerContract'),
+        vendorContractArrived: () => !!this.model.get('vendorContract'),
+        vendorProcessingError: () => this.model.vendorProcessingError,
+      });
+    },
+    resolveDisputeOptions () {
+      return {
+        vendor: {
+          id: this.model.vendorID,
+          getProfile: this.getVendorProfile.bind(this),
+        },
+        buyer: {
+          id: this.model.buyerID,
+          getProfile: this.getBuyerProfile.bind(this),
+        },
+      };
     },
   }
 }

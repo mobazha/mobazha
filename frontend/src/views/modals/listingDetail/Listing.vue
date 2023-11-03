@@ -2,7 +2,7 @@
   <div v-if="!showNsfwWarning" v-show="showModal" class="modal listingDetail modalScrollPage" @click="onDocumentClick">
     <BaseModal @close="close">
       <template v-slot:component>
-        <div class="popInMessageHolder js-popInMessages"></div>
+        <div ref="popInMessages" class="popInMessageHolder js-popInMessages"></div>
 
         <div class="topControls withEndBtn flex">
           <template v-if="ob.vendor">
@@ -97,8 +97,8 @@
                       <div class="flexVCent gutterHLg">
                         <div class="col4 h5 txUnl">{{ item.name }}</div>
                         <div class="col8 txLft">
-                          <select class="" @change="onChangeVariantSelect" :name="item.name">
-                            <template v-for="(variant, j) in item.variants" :key="j">
+                          <select class="js-variantSelect" ref="variantSelect" @change="onChangeVariantSelect" :name="item.name">
+                            <template v-for="variant in item.variants" :key="variant.name">
                               <option :value="variant.name">{{ variant.name }}</option>
                             </template>
                           </select>
@@ -211,7 +211,7 @@
           <template v-if="ob.item.images.length">
             <div ref="photoSection" class="contentBox clrSh3 photoSection js-photoSection">
               <div class="flexCent photoSelected js-photoSelected">
-                <img class="photoSelectedInner js-photoSelectedInner">
+                <img ref="photoSelectedInner" class="photoSelectedInner js-photoSelectedInner">
               </div>
               <template v-if="ob.item.images.length > 1">
                 <button class="btn ion-ios-arrow-left photoPrev " @click="onClickPhotoPrev"></button>
@@ -219,18 +219,18 @@
               </template>
               <template v-if="ob.item.images.length > 1">
                 <div class="photoStrip flex gutterH">
-                  <template v-for="(image, index) in ob.item.images">
-                    <input type="radio" name="photoStripThumbnails" class="" @click="onClickPhotoSelect"
-                      id="photoStrip${index}" :checked="index === 0">
+                  <template v-for="(image, photoIndex) in ob.item.images">
+                    <input type="radio" name="photoStripThumbnails" class="" @click="onClickPhotoSelect(photoIndex)"
+                      :id="`photoStrip${photoIndex}`" :checked="photoIndex === 0">
                     <label
                       :style="`background-image: url(` + ob.getServerUrl(`ob/image/${ob.isHiRez() ? image.small : image.tiny}`) + `)`"
-                      :for="`photoStrip${index}`"></label>
+                      :for="`photoStrip${photoIndex}`"></label>
                   </template>
                 </div>
               </template>
             </div>
           </template>
-          <div class="js-reviews"></div>
+          <div ref="reviews" class="js-reviews"></div>
 
           <!-- Attachments are not yet available -->
           <!--
@@ -242,7 +242,7 @@
  -->
 
           <template v-if="ob.shippingOptions.length">
-            <div ref="shippingSection" class="contentBox padLg clrP clrBr clrSh3">
+            <div ref="shippingSection" class="contentBox padLg clrP clrBr clrSh3" id="shippingSection">
               <h2 class="txUnb">{{ ob.polyT('listingDetail.shipping') }}</h2>
               <div class="flexVCent gutterHLg tx5">
                 <!-- this data is not yet available -->
@@ -356,7 +356,7 @@ export default {
 
       outdateHash: false,
 
-      shippingDestination: '',
+      shippingDestination: this.defaultCountry(),
       countryData: getTranslatedCountries().map((countryObj) => ({ id: countryObj.dataName, text: countryObj.name })),
 
       ratingData: {
@@ -473,10 +473,6 @@ export default {
       return { tip, buyNowClass, buyNowTranslationKey, unpurchaseable }
     },
 
-    defaultCountry() {
-      return app.settings.get('shippingAddresses').length
-        ? app.settings.get('shippingAddresses').at(0).get('country') : app.settings.get('country');
-    },
     shippingOptionsInfo() {
       const shippingOptions = this.model.get('shippingOptions').toJSON();
       const templateData = shippingOptions.filter((option) => {
@@ -556,8 +552,6 @@ export default {
           }
         },
       );
-
-      this.listenTo(this.model, 'someChange', () => this.showDataChangedMessage());
 
       if (this.model.isOwnListing) {
         this.listenTo(listingEvents, 'saved', (md, e) => {
@@ -668,7 +662,6 @@ export default {
           this.moreListingsData = this.randomizeMoreListings(this.moreListingsCol);
         });
 
-      this.rendered = false;
       this._outdatedHashState = null;
     },
 
@@ -680,6 +673,11 @@ export default {
 
     onDocumentClick () {
       this.showDeleteConfirmedBox = false;
+    },
+
+    defaultCountry() {
+      return app.settings.get('shippingAddresses').length
+        ? app.settings.get('shippingAddresses').at(0).get('country') : app.settings.get('country');
     },
 
     onRatings (data) {
@@ -830,9 +828,9 @@ export default {
         });
     },
 
-    onClickPhotoSelect (e) {
+    onClickPhotoSelect (photoIndex) {
       recordEvent('Listing_ClickOnPhoto', { ownListing: this.model.isOwnListing });
-      this.setSelectedPhoto($(e.target).index('.js-photoSelect'));
+      this.setSelectedPhoto(photoIndex);
     },
 
     setSelectedPhoto (photoIndex) {
@@ -977,14 +975,14 @@ export default {
             buildRefreshAlertMessage(app.polyglot.t('listingDetail.listingDataChangedPopin')),
         });
 
-        this.listenTo(this.dataChangePopIn, 'clickRefresh', () => (this.render()));
+        this.listenTo(this.dataChangePopIn, 'clickRefresh', () => (this.$emit('refresh')));
 
         this.listenTo(this.dataChangePopIn, 'clickDismiss', () => {
           this.dataChangePopIn.remove();
           this.dataChangePopIn = null;
         });
 
-        this.getPopInMessagesEl().append(this.dataChangePopIn.render().el);
+        $(this.$refs.popInMessages).append(this.dataChangePopIn.render().el);
       }
     },
 
@@ -1079,10 +1077,6 @@ export default {
       })
     },
 
-    getPopInMessagesEl () {
-      return $('.js-popInMessages');
-    },
-
     getPhotoSelectedEl() {
       return $('.js-photoSelected');
     },
@@ -1128,20 +1122,22 @@ export default {
     render () {
       if (this.dataChangePopIn) this.dataChangePopIn.remove();
 
-      this.$reviews = $('.js-reviews');
+      this.$reviews = $(this.$refs.reviews);
       this.$reviews.append(this.reviews.render().$el);
 
       if (this._latestHash !== this.model.get('hash')) {
         this.outdateHash = true;
       }
 
-      this.photoSelectedInner = $('.js-photoSelectedInner');
+      this.photoSelectedInner = $(this.$refs.photoSelectedInner);
 
       this.photoSelectedInner.on('load', () => this.activateZoom());
 
-      this.variantSelects = $('.js-variantSelect');
-
-      this.shippingDestination = this.defaultCountry;
+      this.variantSelects = $(this.$refs.variantSelect);
+      this.variantSelects.select2({
+        // disables the search box
+        minimumResultsForSearch: Infinity,
+      });
 
       this.setSelectedPhoto(this.activePhotoIndex);
       this.setActivePhotoThumbnail(this.activePhotoIndex);
@@ -1150,7 +1146,6 @@ export default {
         this.adjustPriceBySku();
       }
 
-      this.rendered = true;
       this._renderedHash = this.model.get('hash');
 
       return this;

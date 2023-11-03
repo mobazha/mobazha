@@ -117,7 +117,7 @@
         :isProcessing="isLoadingUser"
         @clickCancel="onClickLoadingCancel" @clickRetry="onClickLoadingRetry"/>
       <ListingDetail v-else-if="activeTab === 'store' && listing"
-        :key="listing.cid"
+        :key="`${listing.cid}_${listingKey}`"
         :options="{
           openedFromStore: true,
         }"
@@ -127,6 +127,7 @@
             model: listing,
           }
         }"
+        @refresh="listingKey += 1"
         @close="onListingDetailClose"
       />
     </Teleport>
@@ -206,6 +207,8 @@ export default {
       showBlockedModal: false,
 
       isBlockedUser: false,
+
+      listingKey: 0,
 
       loadingContextText: '',
       isLoadingUser: false,

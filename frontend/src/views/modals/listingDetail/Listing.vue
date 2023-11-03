@@ -51,15 +51,7 @@
             <div :class="`${ob.metadata.contractType !== 'CRYPTOCURRENCY' ? 'flex' : 'flexVCent'} gutterHLg`">
               <template v-if="ob.metadata.contractType !== 'CRYPTOCURRENCY'">
                 <h2 class="txUnb flexExpand">{{ ob.item.title }}</h2>
-                <h2 class="txUnb flexNoShrink js-price">
-                  {{
-                    ob.currencyMod.convertAndFormatCurrency(
-                      ob.price.amount,
-                      ob.price.currencyCode,
-                      ob.displayCurrency
-                    )
-                  }}
-                </h2>
+                <h2 class="txUnb flexNoShrink js-price" v-html="totalPriceInfo"></h2>
               </template>
 
               <template v-else>
@@ -93,15 +85,15 @@
               <div class="flexExpand">
                 <div class="buyBox clrP clrBr">
                   <div class="flexColRows flexHCent gutterV">
-                    <template v-for="(item, j) in ob.item.options" :key="j">
+                    <template v-for="(item, optionIndex) in ob.item.options" :key="item.name">
                       <div class="flexVCent gutterHLg">
                         <div class="col4 h5 txUnl">{{ item.name }}</div>
                         <div class="col8 txLft">
-                          <select class="js-variantSelect" ref="variantSelect" @change="onChangeVariantSelect" :name="item.name">
+                          <Select2 class="js-variantSelect" v-model="variantOptions[optionIndex]" @change="onChangeVariantSelect" :name="item.name">
                             <template v-for="variant in item.variants" :key="variant.name">
                               <option :value="variant.name">{{ variant.name }}</option>
                             </template>
-                          </select>
+                          </Select2>
                         </div>
                       </div>
                     </template>
@@ -356,6 +348,8 @@ export default {
 
       outdateHash: false,
 
+      variantOptions: [],
+
       shippingDestination: this.defaultCountry(),
       countryData: getTranslatedCountries().map((countryObj) => ({ id: countryObj.dataName, text: countryObj.name })),
 
@@ -379,6 +373,18 @@ export default {
   },
   mounted () {
     this.render();
+  },
+  watch: {
+    '_model.item.options'(options) {
+      this.variantOptions = [];
+      for (let option of options) {
+        if (option.variants && option.variants.length > 0) {
+          this.variantOptions.push(option.variants[0]);
+        } else {
+          this.variantOptions.push('');
+        }
+      }
+    },
   },
   unmounted() {
     if (this.editModal) this.editModal.remove();
@@ -491,6 +497,20 @@ export default {
         && this.checkNsfw
         && this.model.get('item').get('nsfw')
         && !this.model.isOwnListing && !app.settings.get('showNsfw');
+    },
+    totalPriceInfo() {
+      let priceInfo;
+      try {
+        priceInfo = convertAndFormatCurrency(
+          this.totalPrice,
+          this.model.get('metadata').get('pricingCurrency').code,
+          app.settings.get('localCurrency')
+        );
+      } catch (e) {
+        // pass
+        console.error(e);
+      }
+      return priceInfo;
     }
   },
   methods: {
@@ -533,6 +553,16 @@ export default {
           handle: this.profile.get('handle'),
           avatarHashes: this.profile.get('avatarHashes').toJSON(),
         };
+      }
+
+      this.variantOptions = [];
+      const itemOptions = this.model.get('item').get('options').toJSON();
+      for (let option of itemOptions) {
+        if (option.variants && option.variants.length > 0) {
+          this.variantOptions.push(option.variants[0].name);
+        } else {
+          this.variantOptions.push('');
+        }
       }
 
       // In most cases the page opening this modal will already have and be able
@@ -919,16 +949,10 @@ export default {
     },
 
     adjustPriceBySku () {
-      const variantCombo = [];
-      // assemble a combo of the indexes of the selected variants
-      this.variantSelects.each((i, select) => {
-        variantCombo.push($(select).prop('selectedIndex'));
-      });
-
       const { options } = this.model.toJSON().item;
-      const selections = variantCombo.map((val, idx) => ({
+      const selections = this.variantOptions.map((val, idx) => ({
         option: options[idx].name,
-        variant: options[idx].variants[val].name,
+        variant: val,
       }));
 
       // each sku has a code that matches the selected variant index combos
@@ -940,26 +964,8 @@ export default {
 
       try {
         const _totalPrice = this.model.price.amount.plus(surcharge || bigNumber('0'));
-
         if (!_totalPrice.eq(this.totalPrice)) {
           this.totalPrice = _totalPrice;
-          let adjPrice = '';
-
-          try {
-            adjPrice = convertAndFormatCurrency(
-              this.totalPrice,
-              this.model
-                .get('metadata')
-                .get('pricingCurrency')
-                .code,
-              app.settings.get('localCurrency')
-            );
-          } catch (e) {
-            // pass
-            console.error(e);
-          }
-
-          $('.js-price').html(adjPrice);
         }
       } catch (e) {
         // pass
@@ -1056,15 +1062,12 @@ export default {
     },
 
     getSelectedVariants () {
-      const selectedVariants = [];
-      this.variantSelects.each((i, select) => {
-        const variant = {};
-        variant.name = $(select).attr('name');
-        variant.value = $(select).val();
-        selectedVariants.push(variant);
-      });
+      const { options } = this.model.toJSON().item;
 
-      return selectedVariants;
+      return this.variantOptions.map((val, idx) => ({
+        name: options[idx].name,
+        value: val,
+      }));
     },
 
     addToCart () {
@@ -1132,12 +1135,6 @@ export default {
       this.photoSelectedInner = $(this.$refs.photoSelectedInner);
 
       this.photoSelectedInner.on('load', () => this.activateZoom());
-
-      this.variantSelects = $(this.$refs.variantSelect);
-      this.variantSelects.select2({
-        // disables the search box
-        minimumResultsForSearch: Infinity,
-      });
 
       this.setSelectedPhoto(this.activePhotoIndex);
       this.setActivePhotoThumbnail(this.activePhotoIndex);

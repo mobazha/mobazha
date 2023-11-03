@@ -1144,7 +1144,6 @@ export default {
     render () {
       const { paymentCoin } = this.model;
 
-
       if (this.stateProgressBar) this.stateProgressBar.remove();
       this.stateProgressBar = this.createChild(StateProgressBar, {
         initialState: this.progressBarState,

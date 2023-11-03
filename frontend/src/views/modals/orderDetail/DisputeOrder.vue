@@ -135,7 +135,7 @@ export default {
       this.model.reset();
       // restore the id reset blew away
       this.model.set({ orderID: id });
-      this.render();
+
       this.$emit('clickCancel');
       recordEvent('OrderDetails_DisputeSubmitCancel');
     },
@@ -148,7 +148,6 @@ export default {
         openDispute(this.model.id, this.model.toJSON());
       }
 
-      this.render();
       const $firstErr = $('.errorList:first');
       if ($firstErr.length) $firstErr[0].scrollIntoViewIfNeeded();
     },

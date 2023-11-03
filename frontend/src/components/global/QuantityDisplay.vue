@@ -59,7 +59,6 @@ export default {
     this.loadData(this.options);
   },
   mounted() {
-    this.render();
   },
   computed: {
     ob() {
@@ -160,18 +159,6 @@ export default {
     remove() {
       if (this.inventoryFetch) this.inventoryFetch.abort();
       return super.remove();
-    },
-
-    render() {
-      loadTemplate('components/quantityDisplay.html', (t) => {
-        this.$el.html(
-          t({
-            ...this.getState(),
-          })
-        );
-      });
-
-      return this;
     },
   },
 };

@@ -39,7 +39,6 @@ export default {
     this.initEventChain();
   },
   mounted() {
-    this.render();
   },
   computed: {
     ob() {

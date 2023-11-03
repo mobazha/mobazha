@@ -49,7 +49,7 @@
                 <template v-else>
                   {{ ob.polyT('orderDetail.summaryTab.notApplicable') }}
                 </template>
-                <span class="clrT2 hide orderDetailsCopiedToClipboard js-orderDetailsCopiedToClipboard">{{ ob.polyT('copiedToClipboard') }}</span>
+                <span ref="orderDetailsCopiedToClipboard" class="clrT2 hide orderDetailsCopiedToClipboard js-orderDetailsCopiedToClipboard">{{ ob.polyT('copiedToClipboard') }}</span>
               </div>
               <div v-if="isCrypto" class="gutterVTn">
                 <div class="txB cryptoAddress">
@@ -175,7 +175,6 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob () {
@@ -339,11 +338,6 @@ export default {
       return '';
     },
 
-    copiedToClipboard () {
-      return this._copiedToClipboard ||
-        (this._copiedToClipboard = $('.js-orderDetailsCopiedToClipboard'));
-    },
-
     modInfo () {
       return {
         options: {
@@ -376,13 +370,17 @@ export default {
       this.order = this.model.get('orderOpen');
     },
 
+    getCopiedToClipboardEl () {
+      return $(this.$refs.orderDetailsCopiedToClipboard);
+    },
+
     onClickCopyAddress (address) {
       ipc.send('controller.system.writeToClipboard', address);
-      this.copiedToClipboard
+      this.getCopiedToClipboardEl()
         .velocity('stop')
         .velocity('fadeIn', {
           complete: () => {
-            this.copiedToClipboard
+            this.getCopiedToClipboardEl()
               .velocity('fadeOut', { delay: 1000 });
           },
         });
@@ -411,13 +409,6 @@ export default {
           },
         });
     },
-
-    render () {
-      this._copiedToClipboard = null;
-
-      return this;
-    }
-
   }
 }
 </script>

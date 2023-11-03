@@ -70,7 +70,6 @@ export default {
       if (title !== this.title || message !== this.message) {
         this.title = title;
         this.message = message;
-        this.render();
       }
     },
   }

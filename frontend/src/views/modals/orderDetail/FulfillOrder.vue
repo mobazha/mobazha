@@ -199,7 +199,6 @@ export default {
         fulfillOrder(this.contractType, this.isLocalPickup, this.model.toJSON());
       }
 
-      this.render();
       const $firstErr = $('.errorList:first');
       if ($firstErr.length) $firstErr[0].scrollIntoViewIfNeeded();
     },

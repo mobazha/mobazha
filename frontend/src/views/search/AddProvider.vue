@@ -120,7 +120,6 @@ export default {
         }
       } else {
         recordEvent('Discover_AddProviderSaved', { errors: 'Invalid' });
-        this.render();
       }
     },
 

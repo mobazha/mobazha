@@ -79,7 +79,6 @@ export default {
   created () {
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob () {

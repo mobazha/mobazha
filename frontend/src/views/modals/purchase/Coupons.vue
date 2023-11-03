@@ -49,7 +49,6 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob () {
@@ -122,7 +121,6 @@ export default {
         } else {
           this.codeResult = { type: 'invalid', code };
         }
-        this.render();
         return this.codeResult;
       });
     },
@@ -146,9 +144,8 @@ export default {
         this.totalDiscount.minus(
           this.couponDiscount(this.findCoupon('', code))
         );
-      this.trigger('changeCoupons', this.couponHashes, this.couponCodes);
+      this.$emit('changeCoupons', this.couponHashes, this.couponCodes);
       this.codeResult = { type: 'valid', code };
-      this.render();
     },
   }
 }

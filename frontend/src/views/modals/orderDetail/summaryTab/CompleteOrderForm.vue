@@ -162,7 +162,6 @@ export default {
         recordEvent('OrderDetails_CompleteOrder');
       }
 
-      this.render();
       const $firstErr = $('.errorList:first');
       if ($firstErr.length) $firstErr[0].scrollIntoViewIfNeeded();
     },

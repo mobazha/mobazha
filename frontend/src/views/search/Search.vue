@@ -601,7 +601,6 @@ export default {
         const data = { name: defaultSearchProviders[0].name, logo: defaultSearchProviders[0].logo };
         // The state may not be changed here, so always fire a render.
         this.setState({ tab: 'home', data }, { renderOnChange: false });
-        this.render();
         return;
       }
     },
@@ -680,11 +679,6 @@ export default {
     removeFetches () {
       this.searchFetches.forEach((fetch) => fetch.abort());
     },
-
-    render () {
-      return this;
-    }
-
   }
 }
 </script>

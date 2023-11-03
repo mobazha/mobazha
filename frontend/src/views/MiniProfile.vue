@@ -55,7 +55,6 @@ export default {
     this.loadData();
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob () {
@@ -74,10 +73,7 @@ export default {
         throw new Error('Please provide a profile model.');
       }
 
-      if (this.model.id === app.profile.id) {
-        this.listenTo(app.profile, 'change:name change:location', () => this.render());
-        this.listenTo(app.profile.get('avatarHashes'), 'change', () => this.render());
-      } else {
+      if (this.model.id !== app.profile.id) {
         followsYou(this.model.id).done((data) => {
           this.setState({ followsYou: data.followsMe });
         });
@@ -95,6 +91,7 @@ export default {
         });
       }
 
+      this.setBlockedClass();
       this.listenTo(blockEvents, 'blocked unblocked', (data) => {
         if (data.peerIDs.includes(this.model.id)) {
           this.setBlockedClass();
@@ -113,13 +110,6 @@ export default {
     setBlockedClass () {
       this.isBlockedUser = isBlocked(this.model.id);
     },
-
-    render () {
-      this.setBlockedClass();
-
-      return this;
-    }
-
   }
 }
 </script>

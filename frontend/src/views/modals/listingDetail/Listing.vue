@@ -5,11 +5,11 @@
         <div ref="popInMessages" class="popInMessageHolder js-popInMessages"></div>
 
         <div class="topControls withEndBtn flex">
-          <template v-if="ob.vendor">
+          <template v-if="vendor">
             <div class="contentBox clrP clrSh3 clrBr clrT">
               <div class="padSm gutterHSm overflowAuto margRSm flexVCent">
-                <a class="clrBr2 clrSh1 disc storeOwnerAvatar flexNoShrink js-storeOwnerAvatar" :style="ob.getAvatarBgImage(ob.vendor.avatarHashes)"></a>
-                <p class="txUnl tx3 clamp">{{ ob.vendor.name }}</p>
+                <a class="clrBr2 clrSh1 disc storeOwnerAvatar flexNoShrink js-storeOwnerAvatar" :style="ob.getAvatarBgImage(vendor.avatarHashes)"></a>
+                <p class="txUnl tx3 clamp">{{ vendor.name }}</p>
                 <a class="link flexNoShrink tx6 " @click="onClickGoToStore">{{ ob.openedFromStore ? ob.polyT('listingDetail.returnToStore') : ob.polyT('listingDetail.goToStore') }}</a>
               </div>
             </div>
@@ -111,8 +111,8 @@
 
                     <div class="js-purchaseErrorWrap">
                       <template v-if="outdateHash">
-                        <PurchaseError :tip='ob.polyT("listingDetail.errors.outdatedHash", {
-                          reloadLink: `<a class="js-reloadOutdated">` + `${ob.polyT("listingDetail.errors.reloadOutdatedHash")}<a>`,
+                        <PurchaseError @click.stop="onClickReloadOutdated" :tip='ob.polyT("listingDetail.errors.outdatedHash", {
+                          reloadLink: `<a class="js-reloadOutdated" id="reloadOutdated">${ob.polyT("listingDetail.errors.reloadOutdatedHash")}<a>`,
                         })'></PurchaseError>
                       </template>
                       <template v-else-if="templateOptions.unpurchaseable">
@@ -202,7 +202,7 @@
 
           <template v-if="ob.item.images.length">
             <div ref="photoSection" class="contentBox clrSh3 photoSection js-photoSection">
-              <div class="flexCent photoSelected js-photoSelected">
+              <div ref="photoSelected" class="flexCent photoSelected js-photoSelected">
                 <img ref="photoSelectedInner" class="photoSelectedInner js-photoSelectedInner">
               </div>
               <template v-if="ob.item.images.length > 1">
@@ -212,8 +212,11 @@
               <template v-if="ob.item.images.length > 1">
                 <div class="photoStrip flex gutterH">
                   <template v-for="(image, photoIndex) in ob.item.images">
-                    <input type="radio" name="photoStripThumbnails" class="" @click="onClickPhotoSelect(photoIndex)"
-                      :id="`photoStrip${photoIndex}`" :checked="photoIndex === 0">
+                    <input type="radio" name="photoStripThumbnails" class="js-photoSelect"
+                      :id="`photoStrip${photoIndex}`"
+                      :value="photoIndex"
+                      v-model="activePhotoIndex"
+                      @click="onClickPhotoSelect(photoIndex)">
                     <label
                       :style="`background-image: url(` + ob.getServerUrl(`ob/image/${ob.isHiRez() ? image.small : image.tiny}`) + `)`"
                       :for="`photoStrip${photoIndex}`"></label>
@@ -296,7 +299,6 @@ import 'jquery-zoom';
 import is from 'is_js';
 import app from '../../../../backbone/app';
 import 'velocity-animate';
-import { getAvatarBgImage } from '../../../../backbone/utils/responsive';
 import { convertAndFormatCurrency } from '../../../../backbone/utils/currency';
 import { launchEditListingModal } from '../../../../backbone/utils/modalManager';
 // import {
@@ -349,6 +351,8 @@ export default {
       outdateHash: false,
 
       variantOptions: [],
+
+      activePhotoIndex: 0,
 
       shippingDestination: this.defaultCountry(),
       countryData: getTranslatedCountries().map((countryObj) => ({ id: countryObj.dataName, text: countryObj.name })),
@@ -408,7 +412,6 @@ export default {
         displayCurrency: app.settings.get('localCurrency'),
         // the ships from data doesn't exist yet
         // shipsFromCountry: this.model.get('shipsFrom');
-        vendor: this.vendor,
         openedFromStore: this.options.openedFromStore,
         hasVerifiedMods: this.hasVerifiedMods,
         verifiedModsData: app.verifiedMods.data,
@@ -416,6 +419,25 @@ export default {
         isCrypto: this.model.isCrypto,
         _: { sortBy: _.sortBy },
       };
+    },
+    vendor() {
+      // In most cases the page opening this modal will already have and be able
+      // to provide the vendor information. If it cannot, then I suppose we
+      // could fetch the profile and lazy load it in, but we can cross that
+      // bridge when we get to it.
+
+      // Sometimes a profile model is available and the vendor info
+      // can be obtained from that.
+      if (this.profile) {
+        return {
+          peerID: this.profile.id,
+          name: this.profile.get('name'),
+          handle: this.profile.get('handle'),
+          avatarHashes: this.profile.get('avatarHashes').toJSON(),
+        };
+      }
+
+      return this.options.vendor;
     },
     templateOptions () {
       const ob = this.ob;
@@ -431,10 +453,8 @@ export default {
       let cryptoPaymentCoinRateAvailable;
 
       if (ob.metadata.contractType === 'CRYPTOCURRENCY') {
-        coinTypeRateAvailable =
-          !!ob.currencyMod.getExchangeRate(ob.item.cryptoListingCurrencyCode);
-        cryptoPaymentCoinRateAvailable =
-          !!ob.currencyMod.getExchangeRate(ob.metadata.acceptedCurrencies[0]);
+        coinTypeRateAvailable = !!ob.currencyMod.getExchangeRate(ob.item.cryptoListingCurrencyCode);
+        cryptoPaymentCoinRateAvailable = !!ob.currencyMod.getExchangeRate(ob.metadata.acceptedCurrencies[0]);
       }
 
       if (!ob.crypto.anySupportedByWallet(ob.metadata.acceptedCurrencies)) {
@@ -544,17 +564,6 @@ export default {
       this._latestHash = this.model.get('hash');
       this._renderedHash = null;
 
-      // Sometimes a profile model is available and the vendor info
-      // can be obtained from that.
-      if (this.profile) {
-        this.vendor = {
-          peerID: this.profile.id,
-          name: this.profile.get('name'),
-          handle: this.profile.get('handle'),
-          avatarHashes: this.profile.get('avatarHashes').toJSON(),
-        };
-      }
-
       this.variantOptions = [];
       const itemOptions = this.model.get('item').get('options').toJSON();
       for (let option of itemOptions) {
@@ -565,17 +574,9 @@ export default {
         }
       }
 
-      // In most cases the page opening this modal will already have and be able
-      // to provide the vendor information. If it cannot, then I suppose we
-      // could fetch the profile and lazy load it in, but we can cross that
-      // bridge when we get to it.
-      this.vendor = this.vendor || opts.vendor;
-
       this.listenTo(app.settings, 'change:country', () => (this.shipsFreeToMe = this.model.shipsFreeToMe));
 
-      this.listenTo(
-        app.settings.get('shippingAddresses'),
-        'update',
+      this.listenTo(app.settings.get('shippingAddresses'), 'update',
         (cl, updateOpts) => {
           if (updateOpts.changes.added.length || updateOpts.changes.removed.length) {
             this.shipsFreeToMe = this.model.shipsFreeToMe;
@@ -600,11 +601,6 @@ export default {
               this.showDataChangedMessage();
             }
           }
-        });
-
-        this.listenTo(app.profile.get('avatarHashes'), 'change', () => {
-          this.getStoreOwnerAvatarEl()
-            .attr('style', getAvatarBgImage(app.profile.get('avatarHashes').toJSON()));
         });
 
         this.listenTo(app.settings, 'change:localCurrency', () => this.showDataChangedMessage());
@@ -693,12 +689,6 @@ export default {
         });
 
       this._outdatedHashState = null;
-    },
-
-    events () {
-      return {
-        'click .js-reloadOutdated': 'onClickReloadOutdated',
-      };
     },
 
     onDocumentClick () {
@@ -899,16 +889,6 @@ export default {
       }
     },
 
-    setActivePhotoThumbnail (thumbIndex) {
-      if (is.not.number(thumbIndex)) {
-        throw new Error('Please provide an index for the selected photo thumbnail.');
-      }
-      if (thumbIndex < 0) {
-        throw new Error('Please provide a valid index for the selected photo thumbnail.');
-      }
-      this.getPhotoRadioBtnsEl().prop('checked', false).eq(thumbIndex).prop('checked', true);
-    },
-
     onClickPhotoPrev () {
       recordEvent('Listing_ClickOnPhotoPrev', { ownListing: this.model.isOwnListing });
       let targetIndex = this.activePhotoIndex - 1;
@@ -916,7 +896,6 @@ export default {
 
       targetIndex = targetIndex < 0 ? imagesLength - 1 : targetIndex;
       this.setSelectedPhoto(targetIndex);
-      this.setActivePhotoThumbnail(targetIndex);
     },
 
     onClickPhotoNext () {
@@ -926,7 +905,6 @@ export default {
 
       targetIndex = targetIndex >= imagesLength ? 0 : targetIndex;
       this.setSelectedPhoto(targetIndex);
-      this.setActivePhotoThumbnail(targetIndex);
     },
 
     onClickFreeShippingLabel () {
@@ -992,18 +970,10 @@ export default {
       }
     },
 
-    onClickReloadOutdated () {
-      let defaultPrevented = false;
+    onClickReloadOutdated (e) {
+      if (e.target.id !== 'reloadOutdated') return;
 
-      this.trigger('clickReloadOutdated', {
-        preventDefault: () => (defaultPrevented = true),
-      });
-
-      setTimeout(() => {
-        if (!defaultPrevented) {
-          Backbone.history.loadUrl();
-        }
-      });
+      this.$emit('refresh');
     },
 
     startPurchase () {
@@ -1081,15 +1051,7 @@ export default {
     },
 
     getPhotoSelectedEl() {
-      return $('.js-photoSelected');
-    },
-
-    getPhotoRadioBtnsEl () {
-      return $('.js-photoSelect');
-    },
-
-    getStoreOwnerAvatarEl () {
-      return $('.js-storeOwnerAvatar');
+      return $(this.$refs.photoSelected);
     },
 
     cryptoTradingPairOptions() {
@@ -1137,7 +1099,6 @@ export default {
       this.photoSelectedInner.on('load', () => this.activateZoom());
 
       this.setSelectedPhoto(this.activePhotoIndex);
-      this.setActivePhotoThumbnail(this.activePhotoIndex);
 
       if (!this.model.isCrypto) {
         this.adjustPriceBySku();

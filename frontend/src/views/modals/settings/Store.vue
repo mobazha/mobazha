@@ -149,16 +149,29 @@
             </div>
             <section ref="sectionShipping" class="shippingSection js-sectionShipping">
               <div class="gutterVMd">
-                <div class="js-shippingOptionsWrap shippingOptionsWrap gutterVMd"></div>
+                <div class="js-shippingOptionsWrap shippingOptionsWrap gutterVMd">
+                  <template v-for="(shipOpt, shipOptIndex) in shippingOptions" :key="shipOpt.cid">
+                    <ShippingOption
+                      ref="shippingOptionViews"
+                      :options="{
+                        getCurrency: () => formData.metadata.pricingCurrency.code,
+                        listPosition: shipOptIndex + 1,
+                      }"
+                      :bb="function() {
+                        return {
+                          model: shipOpt,
+                        }
+                      }"
+                      @click-remove="onRemoveShippingOption" />
+                  </template>
+                </div>
                 <div class="contentBox padMd clrP clrBr clrSh3 tx3 shipOptPlaceholder">
                   <FormError v-if="ob.errors['shippingOptions']" :errors="ob.errors['shippingOptions']" :class="topLevelShipOptErrs" />
                   <h2 class="h4 clrT js-addShipOptSectionHeading">
-                    {{ ob.polyT('editListing.shippingOptions.optionHeading', { listPosition: ob.shippingOptions.length + 1 }) }}
+                    {{ ob.polyT('editListing.shippingOptions.optionHeading', { listPosition: shippingOptions.length + 1 }) }}
                   </h2>
                   <hr class="clrBr rowMd" />
-                  <a class="btn clrBr clrP clrSh2 rowSm" @click="onClickAddShippingOption">{{
-                    ob.polyT('editListing.shippingOptions.btnAddShippingOption')
-                  }}</a >
+                  <a class="btn clrBr clrP clrSh2 rowSm" @click="onClickAddShippingOption">{{ ob.polyT('editListing.shippingOptions.btnAddShippingOption') }}</a>
                   <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperShipping') }}</div>
                 </div>
               </div>
@@ -189,11 +202,14 @@ import BulkCoinUpdateBtn from './BulkCoinUpdateBtn.vue';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import ShippingOptionMd from '../../../../backbone/models/listing/ShippingOption';
 import Service from '../../../../backbone/models/listing/Service';
-import ShippingOption from '../../../../backbone/views/modals/editListing/ShippingOption';
 import Listing from '../../../../backbone/models/listing/Listing';
+
+import ShippingOption from '../editListing/ShippingOption.vue';
+
 export default {
   components: {
     BulkCoinUpdateBtn,
+    ShippingOption,
   },
   props: {
     options: {
@@ -206,6 +222,8 @@ export default {
     return {
       app: app,
       model: {},
+
+      shippingOptions: [],
     };
   },
   created() {
@@ -235,26 +253,7 @@ export default {
         },
         ...this.profile.toJSON(),
         ...this.settings.toJSON(),
-        shippingOptions: [],
       };
-    },
-    $sectionShipping() {
-      return this._$sectionShipping || (this._$sectionShipping = $('.js-sectionShipping'));
-    },
-    $addShipOptSectionHeading() {
-      return this._$addShipOptSectionHeading || (this._$addShipOptSectionHeading = $('.js-addShipOptSectionHeading'));
-    },
-    formFields() {
-      const excludes = '.js-sectionShipping';
-
-      let fields = this.$el.querySelectorAll(
-        `.js-formSectionsContainer > section:not(${excludes}) select[name],` +
-          `.js-formSectionsContainer > section:not(${excludes}) input[name],` +
-          `.js-formSectionsContainer > section:not(${excludes}) div[contenteditable][name],` +
-          `.js-formSectionsContainer > section:not(${excludes}) ` +
-          'textarea[name]:not([class*="trumbowyg"])'
-      );
-      return fields;
     },
   },
   methods: {
@@ -284,34 +283,6 @@ export default {
       this.showVerifiedOnly = true;
       this.model = new Listing({
         shippingOptions: [],
-      });
-      this.shippingOptions = this.model.get('shippingOptions');
-      this.shippingOptionViews = [];
-
-      this.listenTo(this.shippingOptions, 'add', (shipOptMd) => {
-        const shipOptVw = this.createShippingOptionView({
-          listPosition: this.shippingOptions.length,
-          model: shipOptMd,
-        });
-
-        this.shippingOptionViews.push(shipOptVw);
-        this.$shippingOptionsWrap.append(shipOptVw.render().el);
-      });
-
-      this.listenTo(this.shippingOptions, 'remove', (shipOptMd, shipOptCl, removeOpts) => {
-        const [splicedVw] = this.shippingOptionViews.splice(removeOpts.index, 1);
-        splicedVw.remove();
-        this.shippingOptionViews.slice(removeOpts.index).forEach((shipOptVw) => {
-          shipOptVw.listPosition -= 1;
-        });
-      });
-
-      this.listenTo(this.shippingOptions, 'update', (cl, updateOpts) => {
-        if (!(updateOpts.changes.added.length || updateOpts.changes.removed.length)) {
-          return;
-        }
-
-        this.$addShipOptSectionHeading.text(app.polyglot.t('editListing.shippingOptions.optionHeading', { listPosition: this.shippingOptions.length + 1 }));
       });
 
       this.modsSelected = new Moderators({
@@ -383,18 +354,8 @@ export default {
         })
       );
     },
-    createShippingOptionView(opts) {
-      const options = {
-        getCurrency: () => (this.$currencySelect.length ? this.$currencySelect.val() : this.model.get('metadata').pricingCurrency),
-        ...(opts || {}),
-      };
-      const view = this.createChild(ShippingOption, options);
-
-      this.listenTo(view, 'click-remove', (e) => {
-        this.shippingOptions.remove(this.shippingOptions.at(this.shippingOptionViews.indexOf(e.view)));
-      });
-
-      return view;
+    onRemoveShippingOption(md) {
+      this.shippingOptions.remove(md);
     },
     onBulkCoinUpdateConfirm() {
       const newCoins = this.$refs.currencySelector.getState().activeCurs;
@@ -600,40 +561,7 @@ export default {
         }
       }
     },
-    setModelData() {
-      let formData = this.getFormData(this.formFields);
-      this.shippingOptionViews.forEach((shipOptVw) => shipOptVw.setModelData());
-      this.model.set({
-        ...formData,
-      });
-
-      this.model.get('shippingOptions').forEach((shipOpt) => {
-        if (shipOpt.get('type') === 'LOCAL_PICKUP') {
-          shipOpt.set('services', []);
-        }
-      });
-    },
     render() {
-      this._$addShipOptSectionHeading = null;
-      this._$sectionShipping = null;
-      this.$shippingOptionsWrap = $('.js-shippingOptionsWrap');
-      // render shipping options
-      this.shippingOptionViews.forEach((shipOptVw) => shipOptVw.remove());
-      this.shippingOptionViews = [];
-      const shipOptsFrag = document.createDocumentFragment();
-
-      this.model.get('shippingOptions').forEach((shipOpt, shipOptIndex) => {
-        const shipOptVw = this.createShippingOptionView({
-          model: shipOpt,
-          listPosition: shipOptIndex + 1,
-        });
-
-        this.shippingOptionViews.push(shipOptVw);
-        shipOptVw.render().$el.appendTo(shipOptsFrag);
-      });
-
-      this.$shippingOptionsWrap.append(shipOptsFrag);
-
       this.modsSelected.delegateEvents();
       $('.js-modListSelected').append(this.modsSelected.render().el);
       if (!this.modsSelected.modFetches.length) {
@@ -645,7 +573,7 @@ export default {
 
       this.modsAvailable.delegateEvents();
       $('.js-modListAvailable').append(this.modsAvailable.render().el).toggleClass('hide', !this.modsAvailable.allIDs.length);
-      this.setModelData();
+
       return this;
     },
   },

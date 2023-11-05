@@ -21,7 +21,7 @@
         </template>
       </div>
       <template v-if="!ob.isFetching">
-        <div class="js-reviewsList"></div>
+        <div ref="reviewsList" class="js-reviewsList"></div>
       </template>
     </div>
   </div>
@@ -113,7 +113,7 @@ export default {
     },
 
     render() {
-      $('.js-reviewsList').append(this.reviews.render().$el);
+      $(this.$refs.reviewsList).append(this.reviews.render().$el);
 
       return this;
     },

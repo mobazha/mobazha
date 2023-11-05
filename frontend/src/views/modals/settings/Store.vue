@@ -200,6 +200,7 @@ import { supportedWalletCurs } from '../../../../backbone/data/walletCurrencies'
 import Moderators from '../../../../backbone/views/components/moderators/Moderators';
 import BulkCoinUpdateBtn from './BulkCoinUpdateBtn.vue';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
+import ShippingOptions from '../../../../backbone/collections/listing/ShippingOptions.js';
 import ShippingOptionMd from '../../../../backbone/models/listing/ShippingOption';
 import Service from '../../../../backbone/models/listing/Service';
 import Listing from '../../../../backbone/models/listing/Listing';
@@ -223,7 +224,7 @@ export default {
       app: app,
       model: {},
 
-      shippingOptions: [],
+      shippingOptions: new ShippingOptions(),
     };
   },
   created() {

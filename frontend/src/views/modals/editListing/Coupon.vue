@@ -2,7 +2,7 @@
   <div class="coupon flexRow gutterH">
     <div class="col4 simpleFlexCol">
       <FormError v-if="ob.errors['title']" :errors="ob.errors['title']" />
-      <input type="text" ref="title" class="clrBr clrP clrSh2 marginTopAuto" v-model="formData.title"
+      <input type="text" ref="title" class="clrBr clrP clrSh2 marginTopAuto" name="title" v-model="formData.title"
         :placeholder="ob.polyT('editListing.coupons.titlePlaceholder')" :maxlength="ob.max.titleLength">
     </div>
     <div class="col4 simpleFlexCol">

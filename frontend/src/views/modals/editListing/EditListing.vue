@@ -1009,7 +1009,9 @@ export default {
       this.coupons.add(new Coupon());
 
       if (this.coupons.length === 1) {
-        $('.js-couponsSection').find('.coupon input[name=title]').focus();
+        this.$nextTick(() => {
+          $(this.$refs.sectionCoupons).find('.coupon input[name=title]').focus();
+        });
       }
     },
 
@@ -1017,7 +1019,9 @@ export default {
       this.variantOptionsCl.add(new VariantOption());
 
       if (this.variantOptionsCl.length === 1) {
-        $('.js-variantsSection').find('.variant input[name=name]').focus();
+        this.$nextTick(() => {
+          $(this.$refs.sectionVariants).find('.variant input[name=name]').focus();
+        });
       }
     },
 

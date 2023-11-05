@@ -61,9 +61,7 @@
         </div>
         <div class="flexRow gutterHLg" v-if="ob.tab === 'listings'" >
           <div v-if="ob.hasFilters" class="col3 filterWrapper js-filterWrapper">
-            <Filters
-              :filters="ob.data.options"
-              @filterChanged="onFilterChanged"/>
+            <Filters ref="filters" v-model:filters="ob.data.options" @filterChanged="onFilterChanged"/>
           </div>
           <div :class="`${ob.hasFilters ? 'col9' : 'col12'}`">
             <div class="flexCol">
@@ -666,7 +664,7 @@ export default {
     },
 
     onFilterChanged () {
-      this.setSearch({ filters: this.filters.retrieveFormData(), p: 0 });
+      this.setSearch({ filters: this.$refs.filters.retrieveFormData(), p: 0 });
       recordEvent('Discover_ChangeFilter');
     },
 

@@ -5,7 +5,7 @@
     </template>
     <td class="clrBr">
       <FormError v-if="ob.errors['surcharge']" :errors="ob.errors['surcharge']" />
-      <input type="text" class="clrBr clrP clrSh2" @change="onChangeSurchange($event)" name="surcharge"
+      <input type="number" class="clrBr clrP clrSh2" @change="onChangeSurchange($event)" name="surcharge"
         :value="ob.number.toStandardNotation(formData.surcharge)" placeholder="0.00" data-var-type="bignumber" />
     </td>
     <td class="clrBr js-totalPrice">{{ ob.calculateTotalPrice(formData.surcharge || ob.bigNumber('0')) }}</td>
@@ -16,7 +16,7 @@
     <td class="clrBr unconstrainedWidth quantityCol">
       <FormError v-if="ob.errors['quantity']" :errors="ob.errors['quantity']" />
       <div class="flexVCent gutterH">
-        <input type="text" class="clrBr clrP clrSh2 " @focus="onFocusQuantity" @keyup="onKeyupQuantity" name="quantity"
+        <input type="number" class="clrBr clrP clrSh2 " @focus="onFocusQuantity" @keyup="onKeyupQuantity" name="quantity"
           :value="formData.infiniteInventory ? infiniteQuantityChar : formData.quantity" data-var-type="bignumber" placeholder="0" />
         <input type="checkbox" :id="`${ob.cid}_inventoryItemUnlimtedCheckbox`" class="centerLabel" v-model="formData.infiniteInventory" name="infiniteInventory">
         <label class="tx5b flexNoShrink" :for="`${ob.cid}_inventoryItemUnlimtedCheckbox`">{{ ob.polyT('editListing.variantInventory.unlimitedQuantityLabel') }}</label>

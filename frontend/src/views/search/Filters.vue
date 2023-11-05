@@ -6,7 +6,7 @@
           <div class="contentBox pad clrP clrBr clrSh2">
             <div class="rowSm txB tx5b">{{ filter.label }}</div>
             <template v-if="filter.type === 'dropdown'">
-              <select :name="key" class="select2Small">
+              <select ref="select" :name="key" class="select2Small" @change="changeFilter">
                 <!-- // if any option has a selected value use the first one. Otherwise use the first default.
           // parsing the label for emojis isn't needed here because the select list is replaced by select2.js -->
                 <option v-for="(option, ind) in filter.options" :key="ind" :selected="selectedIndex(filter) === ind"
@@ -20,7 +20,7 @@
                 <template v-for="(option, ind) in filter.options" :key="ind">
                   <div class="btnRadio clrBr">
                     <input type="radio" :name="key" :id="key + ind" :checked="selectedIndex(filter) === ind"
-                      :value="option.value">
+                      :value="option.value" @input="changeFilter">
                     <label :for="key + ind"><span v-html="ob.parseEmojis(option.label)"></span></label>
                   </div>
                 </template>
@@ -30,14 +30,14 @@
             <template v-else-if="filter.type === 'checkbox'">
               <div class="flexCol checkboxCol row">
                 <template v-for="(option, index) in filter.options" :key="index">
-                  <input type="checkbox" :checked="isChecked(filter)" :id="key + index"
+                  <input type="checkbox" :checked="isChecked(filter)" :id="key + index" @input="changeFilter"
                     :name="`${key}${filter.options.length > 1 ? '[]' : ''}`" :value="option.value">
                   <label :for="key + index"><span v-html="ob.parseEmojis(option.label)"></span></label>
                 </template>
               </div>
               <div class="flex tx5b">
-                <a class="flexExpand " @click="clickFilterAll" :name="key">Select All</a>
-                <a class="flexExpand txRgt " @click="clickFilterNone" :name="key">Select None</a>
+                <a class="flexExpand " @click="clickFilterAll(key)" :name="key">Select All</a>
+                <a class="flexExpand txRgt " @click="clickFilterNone(key)" :name="key">Select None</a>
               </div>
               <!-- else { console.log(`Unrecognized filter type: ${filter.type}`); } -->
             </template>
@@ -61,6 +61,7 @@ export default {
       default: {},
     },
   },
+  emits: ['update:filters', 'filterChanged'],
   data () {
     return {
     };
@@ -99,19 +100,12 @@ export default {
       return checked;
     },
 
-    events () {
-      return {
-        'change select': 'changeFilter',
-        'change input': 'changeFilter',
-      };
-    },
-
     retrieveFormData () {
       return this.getFormData(this.$filters);
     },
 
     changeFilter () {
-      this.trigger('filterChanged', this.retrieveFormData());
+      this.$emit('filterChanged', this.retrieveFormData());
     },
 
     makeFilterAllOrNone (name, all = true) {
@@ -121,20 +115,21 @@ export default {
       });
       this.filters[name] = processedData;
 
-      this.render(); // The shallow compare in setState won't recognize the filters changed;
+      this.$emit('update:filters', this.filters);
+
       this.changeFilter();
     },
 
-    clickFilterAll (e) {
-      this.makeFilterAllOrNone($(e.target).prop('name'), true);
+    clickFilterAll (key) {
+      this.makeFilterAllOrNone(key, true);
     },
 
     clickFilterNone (e) {
-      this.makeFilterAllOrNone($(e.target).prop('name'), false);
+      this.makeFilterAllOrNone(key, false);
     },
 
     render () {
-      $('select').select2({
+      $(this.$refs.select).select2({
         minimumResultsForSearch: 10,
         templateResult: selectEmojis,
         templateSelection: selectEmojis,

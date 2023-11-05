@@ -67,7 +67,7 @@
                   <div
                     :class="`col2 js-feeFixedInput ${!ob.fee || (ob.fee && ob.fee.feeType === ob.feeTypes.PERCENTAGE) ? 'visuallyHidden' : ''}`">
                     <input
-                      type="text"
+                      type="number"
                       class="noSpin clrBr clrSh2"
                       name="moderatorInfo.fee.fixedFee.amount"
                       data-var-type="bignumber"

@@ -8,11 +8,11 @@
           <p>{{ ob.polyT('editListing.unsupportedCurrencyDialog.body', { cur: ob.unsupportedCurrency }) }}</p>
           <div class="flexCent row">
             <div class="col6">
-              <select class="clrBr clrP js-currencyList">
+              <Select2 class="clrBr clrP js-currencyList" v-model="newCur">
                 <template v-for="(currency, j) in ob.curList" :key="j">
-                  <option :value="currency.code" :selected="currency.code === ob.userCurrency">{{ `${currency.code} - ${ob.polyT(`currencies.${currency.code}`)}` }}</option>
+                  <option :value="currency.code" :selected="currency.code === newCur">{{ `${currency.code} - ${ob.polyT(`currencies.${currency.code}`)}` }}</option>
                 </template>
-              </select>
+              </Select2>
             </div>
           </div>
           <div class="flexCent">
@@ -38,13 +38,13 @@ export default {
   },
   data () {
     return {
+      newCur: app.settings.get('localCurrency'),
     };
   },
   created () {
     this.loadData(this.options);
   },
   mounted () {
-    $('.js-currencyList').select2();
   },
   computed: {
     ob () {
@@ -54,7 +54,6 @@ export default {
         ...this.templateHelpers,
         unsupportedCurrency: this.unsupportedCurrency,
         curList: this.curList,
-        userCurrency: app.settings.get('localCurrency'),
       };
     }
   },
@@ -80,7 +79,7 @@ export default {
     },
 
     getCurrency () {
-      return $('.js-currencyList')[0].value;
+      return this.newCur;
     },
   }
 }

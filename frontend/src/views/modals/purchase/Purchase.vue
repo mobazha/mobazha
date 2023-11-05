@@ -53,7 +53,7 @@
                             <div class="flexNoShrink">
                               <input
                                 class="clrBr clrP"
-                                type="text"
+                                type="number"
                                 id="purchaseQuantity"
                                 size="3"
                                 name="quantity"

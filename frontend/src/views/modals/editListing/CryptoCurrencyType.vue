@@ -61,8 +61,8 @@
         <label for="editListingCryptoQuantity" class="required">{{ ob.polyT('editListing.cryptoCurrencyType.quantity') }}</label>
         <FormError v-if="ob.errors['item.cryptoQuantity']" :errors="ob.errors['item.cryptoQuantity']" />
         <div class="posR">
-          <input type="text" class="clrBr clrP clrSh2" @input="event => formData.item.cryptoQuantity = event.target.value" id="editListingCryptoQuantity"
-            :value="ob.number.toStandardNotation(formData.item.cryptoQuantity)" placeholder="0.00" data-var-type="bignumber">
+          <input type="number" class="clrBr clrP clrSh2" v-model="formData.item.cryptoQuantity" id="editListingCryptoQuantity"
+            placeholder="0.00" data-var-type="bignumber">
           <div class="cryptoQuantityCoinType clrT2 tx5 js-quantityCoinType">{{ curToSell }}</div>
         </div>
         <div class="clrT2 txSm helper">{{ ob.polyT('editListing.cryptoCurrencyType.helperQuantity') }}</div>

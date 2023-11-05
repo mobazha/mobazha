@@ -99,11 +99,10 @@
                           <FormError v-if="ob.errors['metadata.pricingCurrency.code']" :errors="ob.errors['metadata.pricingCurrency.code']" />
                           <div class="inputSelect marginTopAuto">
                             <input
-                              type="text"
+                              type="number"
                               class="clrBr clrP clrSh2"
-                              @change="onChangePrice($event)"
+                              v-model="formData.item.price"
                               id="editListingPrice"
-                              :value="ob.number.toStandardNotation(formData.item.price)"
                               placeholder="0.00"
                               data-var-type="bignumber"
                             />
@@ -814,10 +813,6 @@ export default {
     onClickCancelPhotoUploads() {
       this.inProgressPhotoUploads.forEach((photoUpload) => photoUpload.abort());
       this.photoUploadsKey += 1;
-    },
-
-    onChangePrice(event) {
-      this.formData.item.price = event.target.value;
     },
 
     getOrientation(file, callback) {

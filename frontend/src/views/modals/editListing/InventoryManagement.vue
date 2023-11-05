@@ -19,7 +19,7 @@
             <FormError v-if="ob.errors['quantity']" :errors="ob.errors['quantity']" :class="margL" />
             <div class="flexVCent">
               <span class="margL margR">{{ ob.polyT('editListing.inventoryManagement.quantity') }}</span>
-              <input type="text" class="clrBr clrP clrSh2 quantityInput" @change="onChangeQuantityInput"
+              <input type="number" class="clrBr clrP clrSh2 quantityInput" @change="onChangeQuantityInput"
                 name="item.quantity" :value="ob.quantity < 0 ? '' : ob.quantity" placeholder="0"
                 data-var-type="bignumber">
             </div>

@@ -130,22 +130,6 @@ export default {
       this.$emit('seeAllCategory', { q: this._search.q, filters: this._search.filters });
     },
 
-    createCardView (model) {
-      const vendor = model.get('vendor') || {};
-      const base = vendor.handle ? `@${vendor.handle}` : vendor.peerID;
-      const options = {
-        listingBaseUrl: `${base}/store/`,
-        reportsUrl: this._search.provider.reportsUrl || '',
-        searchUrl: this._search.provider.listingsUrl,
-        model,
-        vendor,
-        onStore: false,
-        viewType: this.viewType,
-      };
-
-      return this.createChild(ListingCard, options);
-    },
-
     cardViewOptions (model) {
       const vendor = model.get('vendor') || {};
       const base = vendor.handle ? `@${vendor.handle}` : vendor.peerID;
@@ -157,21 +141,6 @@ export default {
         onStore: false,
         viewType: this.viewType,
       };
-    },
-
-    renderCards (collection = []) {
-      const resultsFrag = document.createDocumentFragment();
-
-      collection.forEach((model) => {
-        const cardVw = this.createCardView(model);
-
-        if (cardVw) {
-          this.cardViews.push(cardVw);
-          cardVw.render().$el.appendTo(resultsFrag);
-        }
-      });
-
-      $('.js-resultsGrid').html(resultsFrag);
     },
 
     loadCategory (options) {
@@ -204,13 +173,6 @@ export default {
       this.cardViews.forEach((vw) => vw.remove());
       this.cardViews = [];
     },
-
-    render () {
-      if (this.catCol && this.catCol.length) this.renderCards(this.catCol);
-
-      return this;
-    }
-
   }
 }
 </script>

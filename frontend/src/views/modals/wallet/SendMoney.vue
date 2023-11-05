@@ -9,9 +9,8 @@
         </div>
         <div class="col9">
           <FormError v-if="ob.errors.address" :errors="ob.errors.address" />
-          <input type="text" class="clrBr clrSh2" :disabled="ob.saveInProgress" name="address" id="walletSendTo"
+          <input type="text" class="clrBr clrSh2" :disabled="ob.saveInProgress" v-model="formData.address" id="walletSendTo"
             ref="walletSendTo"
-            v-model="ob.address"
             :placeholder="ob.polyT('wallet.sendMoney.toPlaceholder', { cur: ob.polyT(`cryptoCurrencies.${ob.coinType}`, { _: ob.coinType }) })">
         </div>
       </div>
@@ -25,11 +24,10 @@
           <FormError v-if="ob.errors.amount" :errors="ob.errors.amount" />
           <FormError v-if="ob.errors.currency" :errors="ob.errors.currency" />
           <div class="inputSelect" :disabled="ob.saveInProgress">
-            <input type="text" class="clrBr clrP clrSh2" name="amount" id="walletSendAmount"
-              :value="ob.number.toStandardNotation(ob.amount)" placeholder="0.00" data-var-type="bignumber">
-            <select id="walletSendCurrency" name="currency" class="clrBr clrP nestInputRight">
-              <option v-for="(currency, j) in ob.currencies" :key="j" :value="currency.code" :selected="currency.code === ob.currencyCode">{{ currency.code }}</option>
-            </select>
+            <input type="number" class="clrBr clrP clrSh2" v-model="formData.amount" id="walletSendAmount"  placeholder="0.00" data-var-type="bignumber">
+            <Select2 id="walletSendCurrency" v-model="formData.currency" class="clrBr clrP nestInputRight">
+              <option v-for="(currency, j) in ob.currencies" :key="j" :value="currency.code" :selected="currency.code === formData.currencyCode">{{ currency.code }}</option>
+            </Select2>
           </div>
         </div>
       </div>
@@ -41,8 +39,8 @@
         </div>
         <div class="col9">
           <FormError v-if="ob.errors.memo" :errors="ob.errors.memo" />
-          <input type="text" class="clrBr clrSh2" :disabled="ob.saveInProgress" name="memo" id="walletSendNote"
-            v-model="ob.memo" :placeholder="ob.polyT('wallet.sendMoney.notePlaceholder')">
+          <input type="text" class="clrBr clrSh2" :disabled="ob.saveInProgress" v-model="formData.memo" id="walletSendNote"
+            :placeholder="ob.polyT('wallet.sendMoney.notePlaceholder')">
         </div>
       </div>
       <div class="flexVCent">
@@ -64,6 +62,7 @@
 </template>
 
 <script>
+import _ from 'underscore';
 import $ from 'jquery';
 import app from '../../../../backbone/app';
 import { getCurrenciesSortedByCode } from '../../../../backbone/data/currencies';
@@ -87,6 +86,13 @@ export default {
   data () {
     return {
       saveInProgress: false,
+
+      formData: {
+        address: '',
+        amount: 0,
+        currency: '',
+        memo: '',
+      }
     };
   },
   created () {
@@ -95,7 +101,6 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    $('#walletSendCurrency').select2();
   },
   computed: {
     defaultCur () {
@@ -107,8 +112,7 @@ export default {
         ...this.templateHelpers,
         ...this.model.toJSON(),
         errors: this.model.validationError || {},
-        currencyCode: this.model.get('currency') || this.defaultCur,
-        currencies: this.currencies || getCurrenciesSortedByCode(),
+        currencies: getCurrenciesSortedByCode(),
         saveInProgress: this.saveInProgress,
         coinType: this.coinType,
       };
@@ -121,8 +125,10 @@ export default {
       }
 
       this.baseInit(options);
-      this.coinType = options.coinType;
+
       this.model = new Spend({ wallet: options.coinType });
+      this.formData = _.pick(this.model.toJSON(), _.keys(this.formData));
+      this.formData.currency = this.defaultCur;
     },
 
     onClickConfirmSend () {
@@ -158,8 +164,7 @@ export default {
     },
 
     onClickSend () {
-      const formData = this.getFormData(this.getFormFields());
-      this.model.set(formData);
+      this.model.set(this.formData);
       this.model.set({}, { validate: true });
 
       if (!this.model.validationError) {
@@ -180,21 +185,6 @@ export default {
       if (!this.saveInProgress) this.$refs.walletSendTo.focus();
     },
 
-    setFormData (data = {}, options = {}) {
-      const opts = {
-        focusAddressInput: true,
-        render: true,
-        ...options,
-      };
-
-      this.clearForm();
-      this.model.set(data);
-
-      setTimeout(() => {
-        if (opts.focusAddressInput) this.focusAddress();
-      });
-    },
-
     clearModel () {
       // this.model.clear();
 
@@ -206,6 +196,8 @@ export default {
       this.model.unset('currency');
       this.model.set(this.model.defaults || {});
       this.model.validationError = null;
+
+      this.formData = _.pick(this.model.toJSON(), _.keys(this.formData));
     },
 
     clearForm () {
@@ -216,12 +208,6 @@ export default {
       const amount = convertCurrency(this.model.get('amount'), this.model.get('currency'),
         this.coinType);
       this.$refs.spendConfirmBox.fetchFeeEstimate(amount, this.coinType);
-    },
-
-    getFormFields () {
-      return this.$el.querySelectorAll(`select[name], input[name], 
-        textarea[name]:not([class*="trumbowyg"]), 
-        div[contenteditable][name]`);
     },
   }
 }

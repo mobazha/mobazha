@@ -8,10 +8,10 @@
     </div>
     <div class="row">
       <template v-if="ob.userAddresses.length">
-        <select id="shippingAddress" @change="changeShippingAddress(val)">
-            <option v-for="(a, i) in ob.userAddresses" :key="i" :value="i" :selected="ob.selectedAddressIndex === i">
-              {{ getAddress(a) }}
-            </option>
+        <select ref="shippingAddress" @change="changeShippingAddress(val)">
+          <option v-for="(a, i) in ob.userAddresses" :key="i" :value="i" :selected="ob.selectedAddressIndex === i">
+            {{ getAddress(a) }}
+          </option>
         </select>
       </template>
 
@@ -83,7 +83,7 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    $('#shippingAddress').select2({
+    $(this.$refs.shippingAddress).select2({
       // disables the search box
       minimumResultsForSearch: Infinity,
     });
@@ -92,8 +92,7 @@ export default {
     ob () {
       const userAddresses = app.settings.get('shippingAddresses');
 
-      const selectedAddressIndex = this.selectedAddress && userAddresses.length ?
-      userAddresses.indexOf(this.selectedAddress) : '';
+      const selectedAddressIndex = this.selectedAddress && userAddresses.length ? userAddresses.indexOf(this.selectedAddress) : '';
 
       return {
         ...this.templateHelpers,
@@ -188,7 +187,6 @@ export default {
 
     changeShippingAddress (val) {
       this.selectedAddress = app.settings.get('shippingAddresses').at(val);
-      console.log('changeShippingAddress, selectedAddress:', this.selectedAddress);
     },
 
     onSelectShippingOption(option) {

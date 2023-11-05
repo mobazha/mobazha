@@ -8,7 +8,7 @@
         </div>
         <div class="col6">
           <FormError v-if="ob.errors.name" :errors="ob.errors.name" />
-          <input type="text" class="clrBr clrSh2" name="name" id="settingsAddressName" :value="ob.name"
+          <input type="text" class="clrBr clrSh2" v-model="formData.name" id="settingsAddressName"
             :placeholder="ob.polyT('settings.addressesTab.placeholderName')" />
         </div>
       </div>
@@ -18,7 +18,7 @@
         </div>
         <div class="col6">
           <FormError v-if="ob.errors.company" :errors="ob.errors.company" />
-          <input type="text" class="clrBr clrSh2" name="company" id="settingsAddressCompany" :value="ob.company"
+          <input type="text" class="clrBr clrSh2" v-model="formData.company" id="settingsAddressCompany"
             :placeholder="ob.polyT('settings.optional')" />
         </div>
       </div>
@@ -28,8 +28,8 @@
         </div>
         <div class="col6">
           <FormError v-if="ob.errors.addressLineOne" :errors="ob.errors.addressLineOne" />
-          <input type="text" class="clrBr clrSh2" name="addressLineOne" id="settingsAddressLineOne"
-            :value="ob.addressLineOne" :placeholder="ob.polyT('settings.addressesTab.placeholderAddress')" />
+          <input type="text" class="clrBr clrSh2" v-model="formData.addressLineOne" id="settingsAddressLineOne"
+            :placeholder="ob.polyT('settings.addressesTab.placeholderAddress')" />
         </div>
       </div>
       <div class="flexRow gutterH">
@@ -38,8 +38,8 @@
         </div>
         <div class="col3">
           <FormError v-if="ob.errors.addressLineTwo" :errors="ob.errors.addressLineTwo" />
-          <input type="text" class="clrBr clrSh2" name="addressLineTwo" id="settingsAddressLineTwo"
-            :value="ob.addressLineTwo" :placeholder="ob.polyT('settings.optional')" />
+          <input type="text" class="clrBr clrSh2" v-model="formData.addressLineTwo" id="settingsAddressLineTwo"
+            :placeholder="ob.polyT('settings.optional')" />
         </div>
       </div>
       <div class="flexRow gutterH">
@@ -48,7 +48,7 @@
         </div>
         <div class="col6">
           <FormError v-if="ob.errors.city" :errors="ob.errors.city" />
-          <input type="text" class="clrBr clrSh2" name="city" id="settingsAddressCity" :value="ob.city"
+          <input type="text" class="clrBr clrSh2" v-model="formData.city" id="settingsAddressCity"
             :placeholder="ob.polyT('settings.addressesTab.placeholderCity')" />
         </div>
       </div>
@@ -58,7 +58,7 @@
         </div>
         <div class="col6">
           <FormError v-if="ob.errors.state" :errors="ob.errors.state" />
-          <input type="text" class="clrBr clrSh2" name="state" id="settingsAddressState" :value="ob.state"
+          <input type="text" class="clrBr clrSh2" v-model="formData.state" id="settingsAddressState"
             :placeholder="ob.polyT('settings.addressesTab.placeholderState')" />
         </div>
       </div>
@@ -68,7 +68,7 @@
         </div>
         <div class="col3">
           <FormError v-if="ob.errors.postalCode" :errors="ob.errors.postalCode" />
-          <input type="text" class="clrBr clrSh2" name="postalCode" id="settingsAddressPostalCode" :value="ob.postalCode"
+          <input type="text" class="clrBr clrSh2" v-model="formData.postalCode" id="settingsAddressPostalCode"
             :placeholder="ob.polyT('settings.addressesTab.placeholderPostalCode')" />
         </div>
       </div>
@@ -78,11 +78,11 @@
         </div>
         <div class="col6 clrSh2">
           <FormError v-if="ob.errors.country" :errors="ob.errors.country" />
-          <select id="settingsAddressCountry" name="country">
+          <Select2 id="settingsAddressCountry" v-model="formData.country">
             <template v-for="(country, j) in ob.countryList" :key="j">
-              <option :value="country.dataName" :selected="country.dataName == ob.country">{{ country.name }}</option>
+              <option :value="country.dataName" :selected="country.dataName == formData.country">{{ country.name }}</option>
             </template>
-          </select>
+          </Select2>
         </div>
       </div>
       <div class="flexRow gutterH">
@@ -91,8 +91,8 @@
         </div>
         <div class="col9">
           <FormError v-if="ob.errors.addressNotes" :errors="ob.errors.addressNotes" />
-          <textarea rows="6" name="addressNotes" class="clrBr clrSh2" id="settingsAddressNotes"
-            :placeholder="ob.polyT('settings.addressesTab.placeholderNotes')">{{ ob.addressNotes }}</textarea>
+          <textarea rows="6" v-model="formData.addressNotes" class="clrBr clrSh2" id="settingsAddressNotes"
+            :placeholder="ob.polyT('settings.addressesTab.placeholderNotes')"></textarea>
         </div>
       </div>
     </form>
@@ -101,6 +101,7 @@
 </template>
 
 <script>
+import _ from 'underscore';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 
 export default {
@@ -113,13 +114,23 @@ export default {
   },
   data () {
     return {
+      formData: {
+        name: '',
+        company: '',
+        addressLineOne: '',
+        addressLineTwo: '',
+        city: '',
+        state: '',
+        postalCode: '',
+        country: '',
+        addressNotes: '',
+      }
     };
   },
   created () {
-    this.loadData(this.options);
+    this.loadData();
   },
   mounted () {
-    $('#settingsAddressCountry').select2();
   },
   computed: {
     ob () {
@@ -127,26 +138,22 @@ export default {
         ...this.templateHelpers,
         countryList: this.countryList,
         errors: this.model.validationError || {},
-        ...this.model.toJSON(),
       };
     }
   },
   methods: {
-    loadData (options = {}) {
-      this.baseInit({
-        ...options,
-      });
-
+    loadData () {
       if (!this.model) {
         throw new Error('Please provide a model.');
       }
 
       this.countryList = getTranslatedCountries();
+
+      this.formData = _.pick(this.model.toJSON(), _.keys(this.formData));
     },
 
-    getFormDataEx () {
-      const fields = this.$el.querySelectorAll('select[name], input[name], textarea[name]');
-      return this.getFormData(fields);
+    getFormData () {
+      return this.formData;
     },
   }
 }

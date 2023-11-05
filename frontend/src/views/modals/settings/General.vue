@@ -17,7 +17,7 @@
             </div>
             <div class="col6">
               <FormError v-if="ob.errors['language']" :errors="ob.errors['language']" />
-              <select id="settingsLanguageSelect" name="language" class="clrSh2" data-persistence-location="local">
+              <select ref="settingsLanguageSelect" id="settingsLanguageSelect" name="language" class="clrSh2" data-persistence-location="local">
                 <template v-for="(lang, j) in ob.languageList" :key="j">
                   <option :value="lang.code" :selected="lang.code == ob.language">{{ lang.name }}</option>
                 </template>
@@ -35,7 +35,7 @@
             </div>
             <div class="col6">
               <FormError v-if="ob.errors['country']" :errors="ob.errors['country']" />
-              <select id="settingsCountrySelect" name="country" class="clrSh2">
+              <select ref="settingsCountrySelect" id="settingsCountrySelect" name="country" class="clrSh2">
                 <template v-for="(country, j) in ob.countryList" :key="j">
                   <option :value="country.dataName" :selected="country.dataName == ob.country">{{ country.name }}</option>
                 </template>
@@ -49,7 +49,7 @@
             </div>
             <div class="col6">
               <FormError v-if="ob.errors['localCurrency']" :errors="ob.errors['localCurrency']" />
-              <select id="settingsCurrencySelect" @change="onChangeCurrencySelect(val)" name="localCurrency"
+              <select ref="settingsCurrencySelect" id="settingsCurrencySelect" @change="onChangeCurrencySelect(val)" name="localCurrency"
                 class="clrSh2">
                 <template v-for="(currency, j) in ob.currencyList" :key="j">
                   <option :value="currency.code" :selected="currency.code == ob.localCurrency">{{ currency.nameWithCode }}
@@ -165,9 +165,9 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    $('#settingsLanguageSelect').select2();
-    $('#settingsCountrySelect').select2();
-    $('#settingsCurrencySelect').select2();
+    $(this.$refs.settingsLanguageSelect).select2();
+    $(this.$refs.settingsCountrySelect).select2();
+    $(this.$refs.settingsCurrencySelect).select2();
 
     this._$settingsFields = null;
     this._$localSettingsFields = null;

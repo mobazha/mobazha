@@ -12,14 +12,14 @@
     </div>
     <div class="col3 simpleFlexCol">
       <FormError v-if="ob.errors['price']" :errors="ob.errors['price']" />
-      <input type="text" class="clrBr clrP clrSh2 marginTopAuto js-price" name="price"
+      <input type="number" class="clrBr clrP clrSh2 marginTopAuto js-price" name="price"
         :value="ob.number.toStandardNotation(ob.price)"
         :placeholder="ob.polyT('editListing.shippingOptions.services.pricePlaceholder')" data-var-type="bignumber">
     </div>
     <div class="col3 simpleFlexCol">
       <FormError v-if="ob.errors['additionalItemPrice']" :errors="ob.errors['additionalItemPrice']" />
       <div class="flexRow marginTopAuto">
-        <input type="text" class="clrBr clrP clrSh2 marginTopAuto js-price" name="additionalItemPrice"
+        <input type="number" class="clrBr clrP clrSh2 marginTopAuto js-price" name="additionalItemPrice"
           :value="ob.number.toStandardNotation(ob.additionalItemPrice)"
           :placeholder="ob.polyT('editListing.shippingOptions.services.pricePlaceholder')" data-var-type="bignumber">
         <a class="iconBtn clrBr clrP margLSm toolTipNoWrap  btnRemoveService" @click="onClickRemoveService"

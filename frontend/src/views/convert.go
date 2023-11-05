@@ -336,6 +336,11 @@ func walk(s string, d fs.DirEntry, err error) error {
 		if libRegEx.MatchString(d.Name()) {
 			dir := filepath.Dir(s)
 			dir = strings.ReplaceAll(dir, path.Join(baseDir, htmlTemplateFolder), path.Join(baseDir, htmlTemplateFolder))
+
+			// if !strings.HasSuffix(dir, "summaryTab") {
+			// 	return nil
+			// }
+
 			err := os.MkdirAll(dir, os.ModePerm)
 			if err != nil {
 				log.Println(err)

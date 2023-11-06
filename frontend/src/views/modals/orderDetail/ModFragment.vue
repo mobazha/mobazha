@@ -9,7 +9,7 @@
           ob.maxPeerIDLength)}…` }}</a>
       </div>
     </div>
-    <div class="js-verifiedMod"></div>
+    <div ref="verifiedMod" class="js-verifiedMod"></div>
 
   </div>
 </template>
@@ -90,7 +90,7 @@ export default {
 
       if (this.verifiedMod) this.verifiedMod.remove();
       this.verifiedMod = this.createChild(VerifiedMod, createOptions);
-      $('.js-verifiedMod').append(this.verifiedMod.render().el);
+      $(this.$refs.verifiedMod).append(this.verifiedMod.render().el);
 
       return this;
     }

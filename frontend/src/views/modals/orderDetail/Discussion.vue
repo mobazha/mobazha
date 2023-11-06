@@ -1,16 +1,16 @@
 <template>
   <div :class="`discussionTab clrP ${messages.length ? 'noMessages' : ''} ${loadingMessages ? 'loadingMessages' : ''} ${isTyping ? 'isTyping' : ''}`">
     <div class="typingIndicator tx5 noOverflow clrBr clrP clrT2 clrSh1">{{ typingIndicatorContent }}</div>
-    <div class="convoMessagesWindow tx6 js-convoMessagesWindow">
+    <div ref="convoMessagesWindow" class="convoMessagesWindow tx6 js-convoMessagesWindow">
       <SpinnerSVG />
       <div class="clrTErr messagesFetchError" v-show="ob.showLoadMessagesError">
         {{ ob.polyT('orderDetail.discussionTab.loadMessagesError') }}
         <a @click="onClickRetryLoadMessage">${ob.polyT("orderDetail.discussionTab.retryLink")}</a>
       </div>
-      <div class="js-convoMessagesContainer">
+      <div ref="convoMessagesContainer" class="js-convoMessagesContainer">
         <!-- <ConvoMessages :options="{
           collection: this.messages,
-          $scrollContainer: this.convoMessagesWindow,
+          $scrollContainer: this.getConvoMessagesWindow(),
           buyer: this.buyer,
           vendor: this.vendor,
           moderator: this.moderator,
@@ -33,7 +33,7 @@
         <div class="msgModUnableToChat clrT2">{{ ob.polyT('orderDetail.discussionTab.modCannotChat') }}</div>
       </div>
       <div>
-        <button class="btn clrBAttGrad clrBrDec1 clrTOnEmph btnSend disabled" @click="onClickSend">{{
+        <button :class="`btn clrBAttGrad clrBrDec1 clrTOnEmph btnSend js-btnSend ${sendDisabled ? 'disabled' : ''}`" @click="onClickSend">{{
           ob.polyT('orderDetail.discussionTab.btnSend') }}</button>
       </div>
     </div>
@@ -84,7 +84,9 @@ export default {
       },
       moderator: {
         isTyping: false,
-      }
+      },
+
+      sendDisabled: false,
     };
   },
   created () {
@@ -106,15 +108,6 @@ export default {
         maxMessageLength: ChatMessage.max.messageLength,
         ownProfile: app.profile.toJSON(),
       };
-    },
-    convoMessagesWindow () {
-      return this._convoMessagesWindow ||
-        (this._convoMessagesWindow = $('.js-convoMessagesWindow'));
-    },
-
-    btnSend () {
-      return this._btnSend ||
-        (this._btnSend = $('.js-btnSend'));
     },
 
     /**
@@ -202,6 +195,10 @@ export default {
       }
     },
 
+    getConvoMessagesWindow () {
+      return $(this.$refs.convoMessagesWindow);
+    },
+
     onMessagesRequest (mdCl, xhr) {
       // Only interested in the collection sync (not any of its models).
       if (!(mdCl instanceof GroupMessages)) return;
@@ -227,7 +224,7 @@ export default {
 
       if (!this.firstSyncComplete) {
         this.firstSyncComplete = true;
-        this.setScrollTop(this.convoMessagesWindow[0].scrollHeight);
+        this.setScrollTop(this.getConvoMessagesWindow()[0].scrollHeight);
 
         this.markConvoAsRead();
       }
@@ -252,8 +249,8 @@ export default {
       // As appropriate, update the scroll position.
       const prevScroll = {};
 
-      prevScroll.height = this.convoMessagesWindow[0].scrollHeight;
-      prevScroll.top = this.convoMessagesWindow[0].scrollTop;
+      prevScroll.height = this.getConvoMessagesWindow()[0].scrollHeight;
+      prevScroll.top = this.getConvoMessagesWindow()[0].scrollTop;
 
       this.convoMessages.render();
       this.topRenderedMessageMd = this.messages.at(0);
@@ -272,12 +269,12 @@ export default {
 
           if (newMessage.get('outgoing')) {
             // It's our own message, so we'll auto scroll to the bottom.
-            this.setScrollTop(this.convoMessagesWindow[0].scrollHeight);
+            this.setScrollTop(this.getConvoMessagesWindow()[0].scrollHeight);
           } else if (prevScroll.top >=
-            prevScroll.height - this.convoMessagesWindow[0].clientHeight - 10) {
+            prevScroll.height - this.getConvoMessagesWindow()[0].clientHeight - 10) {
             // For an incoming message, if we were scrolled within 10px of the bottom at the
             // time the message came, we'll auto-scroll. Otherwise, we'll leave you where you were.
-            this.setScrollTop(this.convoMessagesWindow[0].scrollHeight);
+            this.setScrollTop(this.getConvoMessagesWindow()[0].scrollHeight);
           }
         }
       } else if (opts.changes.added.length &&
@@ -286,7 +283,7 @@ export default {
         // New page of messages added up top. We'll adjust the scroll position so there is no
         // jump as they are added in.
         this.setScrollTop(prevScroll.top +
-          (this.convoMessagesWindow[0].scrollHeight - prevScroll.height - 60));
+          (this.getConvoMessagesWindow()[0].scrollHeight - prevScroll.height - 60));
 
         // the hardcode 60 is to account for the loading spinner that is going away
       }
@@ -297,7 +294,7 @@ export default {
     },
 
     onKeyUpMessageInput (e) {
-      this.btnSend.toggleClass('disabled', !e.target.value);
+      this.sendDisabled = !e.target.value;
 
       // Send an empty message to indicate "typing...", but no more than 1 every
       // second.
@@ -492,7 +489,7 @@ export default {
         throw new Error('Please provide a value as a number.');
       }
 
-      if (this.convoMessagesWindow[0].scrollTop === value) return;
+      if (this.getConvoMessagesWindow()[0].scrollTop === value) return;
 
       if (silent) {
         // Unthrottling the scroll handler so that our ignoreScoll flag won't
@@ -502,19 +499,19 @@ export default {
         this.ignoreScroll = true;
       }
 
-      this.convoMessagesWindow[0].scrollTop = value;
+      this.getConvoMessagesWindow()[0].scrollTop = value;
     },
 
     unthrottleScrollHandler () {
-      this.convoMessagesWindow.off('scroll', this.boundScrollHandler);
+      this.getConvoMessagesWindow().off('scroll', this.boundScrollHandler);
       this.boundScrollHandler = this.onScroll.bind(this);
-      this.convoMessagesWindow.on('scroll', this.boundScrollHandler);
+      this.getConvoMessagesWindow().on('scroll', this.boundScrollHandler);
     },
 
     throttleScrollHandler () {
-      this.convoMessagesWindow.off('scroll', this.boundScrollHandler);
+      this.getConvoMessagesWindow().off('scroll', this.boundScrollHandler);
       this.boundScrollHandler = _.throttle(this.onScroll, 100).bind(this);
-      this.convoMessagesWindow.on('scroll', this.boundScrollHandler);
+      this.getConvoMessagesWindow().on('scroll', this.boundScrollHandler);
     },
 
     markConvoAsRead () {
@@ -588,12 +585,12 @@ export default {
       if (this.convoMessages) this.ConvoMessages.remove();
       this.convoMessages = new ConvoMessages({
         collection: this.messages,
-        $scrollContainer: this.convoMessagesWindow,
+        $scrollContainer: this.getConvoMessagesWindow(),
         buyer: this.buyer,
         vendor: this.vendor,
         moderator: this.moderator,
       });
-      $('.js-convoMessagesContainer').html(this.convoMessages.render().el);
+      $(this.$refs.convoMessagesContainer).html(this.convoMessages.render().el);
 
       this.throttleScrollHandler();
 

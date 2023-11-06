@@ -23,7 +23,7 @@
         </button>
       </template>
       <template v-if="ob.confirmOpen">
-        <div id="confirmPay" class="confirmBox arrowBoxCenteredTop clrBr clrP clrT clrSh1 js-confirmPay">
+        <div id="confirmPay" class="confirmBox arrowBoxCenteredTop clrBr clrP clrT clrSh1 js-confirmPay" @click.stop.prevent>
           <div class="flexColRows gutterVSm padLg">
             <h3>
               {{ ob.polyT('purchase.confirmPayment.title') }}
@@ -34,10 +34,10 @@
           </div>
           <hr class="unleaded clrBr" />
           <div class="flexHRight flexVCent gutterHLg pad tx5">
-            <a class="" @click="closeConfirmPay">
+            <a class="" @click.stop="closeConfirmPay">
               {{ ob.polyT('purchase.confirmPayment.cancel') }}
             </a>
-            <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph" @click="clickConfirmBtn">
+            <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph" @click.stop="clickConfirmBtn">
               {{ ob.polyT('purchase.confirmPayment.confirm') }}
             </a>
           </div>
@@ -137,9 +137,8 @@ export default {
     },
 
     documentClick (e) {
-      if (this.getState().confirmOpen &&
-        !($.contains($('.js-confirmPay')[0], e.target))) {
-          this.setState({ confirmOpen: false });
+      if (this.getState().confirmOpen) {
+        this.setState({ confirmOpen: false });
       }
     },
 

@@ -2,7 +2,14 @@
   <div class="transactions clrS">
     <nav id="pageTabBar" class="barLg clrP clrBr">
       <div class="flexVCent pageTabs">
-        <div class="js-miniProfileContainer"></div>
+        <div class="js-miniProfileContainer">
+          <MiniProfile
+            :bb="function() {
+              return {
+                model: ownProfile,
+              };
+            }" />
+        </div>
         <div class="flexExpand">
           <div class="flexHRight flexVCent gutterH clrT2">
             <a
@@ -62,14 +69,15 @@ import { recordEvent } from '../../../backbone/utils/metrics';
 import Transactions from '../../../backbone/collections/Transactions';
 import Order from '../../../backbone/models/order/Order';
 import Case from '../../../backbone/models/order/Case';
-import MiniProfile from '../../../backbone/views/MiniProfile';
 import OrderDetail from '../modals/orderDetail/OrderDetail.vue';
 import Tab from './Tab.vue';
+import MiniProfile from '../MiniProfile.vue';
 
 export default {
   components: {
     OrderDetail,
     Tab,
+    MiniProfile,
   },
   props: {
     options: {
@@ -102,6 +110,9 @@ export default {
     this.render();
   },
   computed: {
+    ownProfile() {
+      return app.profile;
+    },
     salesDefaultFilter() {
       return {
         search: '',
@@ -449,12 +460,6 @@ export default {
     },
 
     render() {
-      if (this.miniProfile) this.miniProfile.remove();
-      this.miniProfile = this.createChild(MiniProfile, {
-        model: app.profile,
-      });
-      $('.js-miniProfileContainer').html(this.miniProfile.render().el);
-
       this.selectTab(this._tab, {
         addTabToHistory: false,
       });

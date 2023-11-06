@@ -7,7 +7,7 @@
       <div class="txCtr txB tx3 flexExpand">{{ ob.polyT(`orderDetail.contractTab.heading`) }}</div>
     </div>
     <hr class="clrBr rowLg" />
-    <div class="js-statusContainer rowLg"></div>
+    <div class="js-statusContainer rowLg" v-html="statusMsg"></div>
     <template v-for="(contract, key) in contracts" :key="key">
       <Contract refs="contractVws" :options="contractOptions(contract)"/>
     </template>
@@ -34,6 +34,8 @@ export default {
   data () {
     return {
       contracts: [],
+
+      statusMsg: '',
     };
   },
   created () {
@@ -104,7 +106,7 @@ export default {
         }
       }
 
-      $('.js-statusContainer').html(msg);
+      this.statusMsg = msg;
     },
 
     contractOptions (contract) {

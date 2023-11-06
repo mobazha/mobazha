@@ -2,7 +2,7 @@
   <div class="userPageHome">
     <div class="flexRow gutterH">
       <div class="col4 gutterVMd2">
-        <div class="userCard js-userCard"></div>
+        <div ref="userCard" class="userCard js-userCard"></div>
         <template v-if="ob.moderator && ob.moderatorInfo">
           <div class="contentBox padMd2 clrBr clrP clrSh2 js-moderatorInfo">
             <div class="flexVBot gutterH rowLg snipKids">
@@ -20,15 +20,15 @@
             </div>
             <div class="flexHCent">
               <ProcessingButton
-                v-show="!ob.currentModerator"
-                className="btn clrP clrBr clrSh2 js-addModerator"
+                v-show="!ownMod"
+                :className="`btn clrP clrBr clrSh2 js-addModerator ${addingModerator ? 'processing' : ''}`"
                 :btnText="ob.polyT('userPage.addModerator')"
                 @click="addModeratorClick"
               />
 
               <ProcessingButton
-                v-show="ob.currentModerator"
-                className="btn clrP clrBr clrSh2 js-removeModerator"
+                v-show="ownMod"
+                :className="`btn clrP clrBr clrSh2 js-removeModerator ${removingModerator ? 'processing' : ''}`"
                 :btnText="ob.polyT('userPage.removeModerator')"
                 @click="removeModeratorClick"
               />
@@ -42,7 +42,7 @@
           <div class="listItem">
             <div class="flex">
               <span class="flexExpand">{{ ob.polyT('userPage.peerID') }}</span>
-              <span class="clrT hide js-guidCopied">{{ ob.polyT('copiedToClipboard') }}</span>
+              <span ref="guidCopied" class="clrT hide js-guidCopied">{{ ob.polyT('copiedToClipboard') }}</span>
             </div>
             <div class="clrT2">
               <a class="clrT2" @click="guidClick(ob.peerID)" @mouseleave="guidLeave">{{ ob.peerID }}</a>
@@ -65,7 +65,7 @@
                 <div class="clrT2">{{ ob.contactInfo.email }}</div>
               </div>
             </template>
-            <template v-for="(account, key) in ob.contactInfo.social" :key="key">
+            <template v-for="account in ob.contactInfo.social" :key="account.type">
               <div class="listItem">
                 <div>{{ account.type }}</div>
                 <div class="clrT2">
@@ -116,7 +116,12 @@ export default {
     bb: Function,
   },
   data() {
-    return {};
+    return {
+      modsKey: 0,
+
+      addingModerator: false,
+      removingModerator: false,
+    };
   },
   created() {
     this.initEventChain();
@@ -130,7 +135,6 @@ export default {
     ob() {
       return {
         ...this.templateHelpers,
-        currentModerator: this.ownMod,
         displayCurrency: app.settings.get('localCurrency'),
         ...this.model.toJSON(),
       };
@@ -144,6 +148,7 @@ export default {
       );
     },
     ownMod() {
+      let access = this.modsKey;
       return app.settings.ownMod(this.model.id);
     },
   },
@@ -160,8 +165,7 @@ export default {
       });
 
       this.listenTo(app.settings, 'change:storeModerators', () => {
-        this.$addModerator.toggleClass('hide', this.ownMod);
-        this.$removeModerator.toggleClass('hide', !this.ownMod);
+        this.modsKey += 1;
       });
     },
 
@@ -169,7 +173,7 @@ export default {
       // show the moderator details modal
       const modModal = launchModeratorDetailsModal({ model: this.model });
       this.listenTo(modModal, 'addAsModerator', () => {
-        this.$addModerator.addClass('processing');
+        this.addingModerator = true;
         this.saveModeratorList(true);
       });
     },
@@ -178,13 +182,13 @@ export default {
       // show the moderator details modal
       const modModal = launchModeratorDetailsModal({ model: this.model });
       this.listenTo(modModal, 'addAsModerator', () => {
-        this.$addModerator.addClass('processing');
+        this.addingModerator = true;
         this.saveModeratorList(true);
       });
     },
 
     removeModeratorClick() {
-      this.$removeModerator.addClass('processing');
+      this.removingModerator = true;
       this.saveModeratorList(false);
     },
 
@@ -213,26 +217,23 @@ export default {
             openSimpleMessage(app.polyglot.t(phrase), { errMsg });
           })
           .always(() => {
-            this.$modBtn.removeClass('processing');
+            this.addingModerator = false;
+            this.removingModerator = false;
           });
       }
     },
 
     guidClick(guid) {
       ipc.send('controller.system.writeToClipboard', guid);
-      $('.js-guidCopied').fadeIn(600);
+      $(this.$refs.guidCopied).fadeIn(600);
     },
 
     guidLeave() {
-      $('.js-guidCopied').fadeOut(600);
+      $(this.$refs.guidCopied).fadeOut(600);
     },
 
     render() {
-      $('.js-userCard').append(this.userCard.render().$el);
-
-      this.$modBtn = $('.js-addModerator, .js-removeModerator');
-      this.$addModerator = $('.js-addModerator');
-      this.$removeModerator = $('.js-removeModerator');
+      $(this.$refs.userCard).append(this.userCard.render().$el);
 
       return this;
     },

@@ -1,6 +1,6 @@
 <template>
   <div :class="`userPageFollow ${noResults ? 'noResults': ''}`">
-    <div class="js-userCardsContainer userCardsContainer flexRow"></div>
+    <div ref="userCardsContainer" class="js-userCardsContainer userCardsContainer flexRow"></div>
     <div class="js-followLoadingContainer followLoadingContainer">
       <FollowLoading ref="followLoading" :options="followLoadingOptions" @retry-click="fetch()" />
     </div>
@@ -314,9 +314,9 @@ export default {
       });
 
       if (insertionType === 'prepend') {
-        $('.js-userCardsContainer').prepend(usersFrag);
+        $(this.$refs.userCardsContainer).prepend(usersFrag);
       } else {
-        $('.js-userCardsContainer').append(usersFrag);
+        $(this.$refs.userCardsContainer).append(usersFrag);
       }
     },
 

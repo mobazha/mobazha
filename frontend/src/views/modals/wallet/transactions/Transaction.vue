@@ -42,7 +42,7 @@
         </div>
       </div>
     </div>
-    <div class="js-retryPmtConfirmed confirmBox retryConfirm arrowBoxTop clrBr clrP clrT clrSh1" v-show="!!ob.retryConfirmOn">
+    <div class="js-retryPmtConfirmed confirmBox retryConfirm arrowBoxTop clrBr clrP clrT clrSh1" v-show="!!ob.retryConfirmOn" @click.stop.prevent>
       <div class="tx3 txB rowSm">{{ ob.polyT('wallet.transactions.transaction.retryPaymentConfirmBox.title') }}</div>
       <SpinnerSVG v-if="ob.fetchingEstimatedFee" className="txCtr spinnerMd" />
 
@@ -233,8 +233,7 @@ export default {
     },
 
     onDocumentClick(e) {
-      let retryPmtConfirmedBox = $('.js-retryPmtConfirmed');
-      if (this.getState().retryConfirmOn && !($.contains(retryPmtConfirmedBox[0], e.target) || e.target === retryPmtConfirmedBox[0])) {
+      if (this.getState().retryConfirmOn) {
         this.setState({
           retryConfirmOn: false,
         });

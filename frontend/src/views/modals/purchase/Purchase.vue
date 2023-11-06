@@ -2,7 +2,7 @@
   <div class="modal purchase modalScrollPage">
     <BaseModal :modalInfo="{ showCloseButton: false }">
       <template v-slot:component>
-        <div class="popInMessageHolder js-popInMessages"></div>
+        <div ref="popInMessages" class="popInMessageHolder js-popInMessages"></div>
 
         <div class="topControls gutterHSm flex">
           <template v-if="ob.vendor">
@@ -71,7 +71,7 @@
 
                   <template v-else>
                     <div class="flexVCent gutterHLg row cryptoTitleWrap">
-                      <div :class="`js-cryptoTitle ${ob.phase !== 'pay' && ob.phase !== 'processing' ? 'flexExpand' : ''}`"></div>
+                      <div ref="cryptoTitle" :class="`js-cryptoTitle ${ob.phase !== 'pay' && ob.phase !== 'processing' ? 'flexExpand' : ''}`"></div>
                       <template v-if="ob.phase === 'pay' || ob.phase === 'processing'">
                         <div class="flexExpand">
                           <div class="flexVCent gutterHLg">
@@ -195,7 +195,7 @@
                     <div class="js-moderated-errors">
                       <FormError v-if="errors['moderated']" :errors="errors['moderated']" />
                     </div>
-                    <div class="js-moderatorsWrapper"></div>
+                    <div ref="moderatorsWrapper" class="js-moderatorsWrapper"></div>
                     <template v-if="!ob.noValidModerators">
                       <div>
                         <div class="clrT2 tx6 rowMd">{{ ob.polyT('purchase.moderatorsDisclaimer') }}</div>
@@ -279,7 +279,7 @@
               </section>
             </template>
             <template v-if="ob.phase === 'pending'">
-              <section class="contentBox padMd clrP clrBr clrSh3 js-pending"></section>
+              <section ref="pendingPayment" class="contentBox padMd clrP clrBr clrSh3 js-pending"></section>
             </template>
             <template v-if="ob.phase === 'complete'">
               <section class="contentBox padMd clrP clrBr clrSh3 js-complete">
@@ -340,7 +340,7 @@
                   </div>
                 </template>
               </div>
-              <div class="tx6 js-feeChangeContainer"></div>
+              <div ref="feeChangeContainer" class="tx6 js-feeChangeContainer"></div>
             </section>
           </div>
         </div>
@@ -767,7 +767,7 @@ export default {
           this.dataChangePopIn = null;
         });
 
-        $('.js-popInMessages').append(this.dataChangePopIn.render().el);
+        $(this.$refs.popInMessages).append(this.dataChangePopIn.render().el);
       }
     },
 
@@ -1019,7 +1019,7 @@ export default {
                 paymentCoin,
               });
               this.listenTo(this.payment, 'walletPaymentComplete', ((pmtCompleteData) => this.completePurchase(pmtCompleteData)));
-              $('.js-pending').append(this.payment.render().el);
+              $(this.$refs.pendingPayment).append(this.payment.render().el);
               endAjaxEvent('Purchase');
             })
             .fail((jqXHR) => {
@@ -1095,17 +1095,17 @@ export default {
       const metadata = this.listing.get('metadata');
 
       this.moderators.delegateEvents();
-      $('.js-moderatorsWrapper').append(this.moderators.el);
+      $(this.$refs.moderatorsWrapper).append(this.moderators.el);
 
       // if this is a re-render, and the payment exists, render it
       if (this.payment) {
         this.payment.delegateEvents();
-        $('.js-pending').append(this.payment.render().el);
+        $(this.$refs.pendingPayment).append(this.payment.render().el);
       }
 
       if (this.feeChange) this.feeChange.remove();
       this.feeChange = this.createChild(FeeChange);
-      $('.js-feeChangeContainer').html(this.feeChange.render().el);
+      $(this.$refs.feeChangeContainer).html(this.feeChange.render().el);
 
       if (this.listing.isCrypto) {
         if (this.cryptoTitle) this.cryptoTitle.remove();
@@ -1117,8 +1117,7 @@ export default {
             toCur: this.listing.get('item').get('cryptoListingCurrencyCode'),
           },
         });
-        $('.js-cryptoTitle')
-          .html(this.cryptoTitle.render().el);
+        $(this.$refs.cryptoTitle).html(this.cryptoTitle.render().el);
 
         $('#cryptoAmountCurrency').select2({ minimumResultsForSearch: Infinity });
       }

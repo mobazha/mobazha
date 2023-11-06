@@ -23,7 +23,7 @@
         <a class="btnFlx flexExpand clrP clrBr " @click="clickResetBtn">Reset Search</a>
       </div>
     </div>
-    <div :class="`listingsGrid ${ob.viewTypeClass} flex js-resultsGrid`"></div>
+    <div ref="resultsGrid" :class="`listingsGrid ${ob.viewTypeClass} flex js-resultsGrid`"></div>
     <div class="pageControls js-pageControlsContainer">
       <PageControlsTextStyle :options="{
         currentPage,
@@ -165,7 +165,7 @@ export default {
         }
       });
 
-      $('.js-resultsGrid').html(resultsFrag);
+      $(this.$refs.resultsGrid).html(resultsFrag);
     },
 
     loadPage (options) {

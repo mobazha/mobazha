@@ -16,7 +16,7 @@
             <div class="rowSm clickable " @click="copyAmount">
               <span class="h1">{{ ob.amountDueLine }}</span>
               <template v-if="ob.externallyFundable">
-                <button class="btnTxtOnly txUnb flipBtn js-copyAmount">
+                <button :class="`btnTxtOnly txUnb flipBtn js-copyAmount ${copyAmountActive ? 'active' : ''}`">
                   <span class="clrTEm unFlipped">{{ ob.polyT('purchase.pendingSection.copy') }}</span>
                   <span class="flipped">{{ ob.polyT('purchase.pendingSection.copied') }}</span>
                 </button>
@@ -28,7 +28,7 @@
                   :data-tip="ob.paymentAddress.length > 34 ? ob.paymentAddress : ''">
                   {{ ob.polyT('purchase.pendingSection.to', { address: pAddress }) }}
                 </span>
-                <button class="btnTxtOnly txUnb flipBtn js-copyAddress">
+                <button :class="`btnTxtOnly txUnb flipBtn js-copyAddress ${copyAddressActive ? 'active' : ''}`">
                   <span class="clrTEm unFlipped">{{ ob.polyT('purchase.pendingSection.copy') }}</span>
                   <span class="flipped">{{ ob.polyT('purchase.pendingSection.copied') }}</span>
                 </button>
@@ -37,11 +37,11 @@
             <div :class="`flexRow gutterH ${ob.externallyFundable ? 'rowLg' : 'rowMd'}`">
               <div class="col6">
                 <ProcessingButton
-                  className="btn btnThin width100 clrP clrBr clrSh2 js-payFromWallet"
+                  :className="`btn btnThin width100 clrP clrBr clrSh2 js-payFromWallet ${isPaying ? 'processing' : ''}`"
                   textClassName="flexCent"
                   :btnText='`<i class="icon"><WalletIcon /></i>${ob.polyT("purchase.pendingSection.payFromWallet")}`'
                   @click.stop="clickPayFromWallet" />
-                <div class="js-confirmWalletContainer"></div>
+                <div ref="confirmWalletContainer" class="js-confirmWalletContainer"></div>
               </div>
             </div>
             <template v-if="ob.externallyFundable">
@@ -115,6 +115,9 @@ export default {
   },
   data () {
     return {
+      copyAmountActive: false,
+      copyAddressActive: false,
+      isPaying: false,
     };
   },
   created () {
@@ -219,8 +222,8 @@ export default {
 
               if (amount && amount.isNaN && !amount.isNaN()) {
                 if (amount.gte(this.balanceRemaining)) {
-                  $('.js-payFromWallet').removeClass('processing');
-                  this.trigger('walletPaymentComplete', e.jsonData.notification);
+                  this.isPaying = false;
+                  this.$emit('walletPaymentComplete', e.jsonData.notification);
                 } else {
                   this.balanceRemaining = this.balanceRemaining.minus(amount);
                 }
@@ -260,7 +263,7 @@ export default {
     },
 
     walletConfirm () {
-      $('.js-payFromWallet').addClass('processing');
+      this.isPaying = true;
       this.spendConfirmBox.setState({ show: false });
       const currency = this.paymentCoin;
 
@@ -286,34 +289,34 @@ export default {
               errors: err || 'unknown error',
             });
             if (this.isRemoved()) return;
-            $('.js-payFromWallet').removeClass('processing');
+            this.isPaying = false;
           });
       } catch (e) {
         // This is almost certainly a dev error if this happens, but it prevents the purchase and
         // is confusing and at least to make debugging easier, we'll display an error modal.
         this.showSpendError(e.message || '');
-        $('.js-payFromWallet').removeClass('processing');
+        this.isPaying = false;
       }
     },
 
     copyAmount () {
       ipc.send('controller.system.writeToClipboard', String(this.balanceRemaining));
 
-      $('.js-copyAmount').addClass('active');
+      this.copyAmountActive = true;
       if (this.hideCopyAmountTimer) {
         clearTimeout(this.hideCopyAmountTimer);
       }
-      this.hideCopyAmountTimer = setTimeout(() => $('.js-copyAmount').removeClass('active'), 3000);
+      this.hideCopyAmountTimer = setTimeout(() => this.copyAmountActive = false, 3000);
     },
 
     copyAddress () {
       ipc.send('controller.system.writeToClipboard', String(this.paymentAddress));
 
-      $('.js-copyAddress').addClass('active');
+      this.copyAddressActive = true;
       if (this.hideCopyAddressTimer) {
         clearTimeout(this.hideCopyAddressTimer);
       }
-      this.hideCopyAddressTimer = setTimeout(() => $('.js-copyAddress').removeClass('active'), 3000);
+      this.hideCopyAddressTimer = setTimeout(() => this.copyAddressActive = false, 3000);
     },
 
     clickFundWallet () {
@@ -335,7 +338,7 @@ export default {
         },
       });
       this.listenTo(this.spendConfirmBox, 'clickSend', this.walletConfirm);
-      $('.js-confirmWalletContainer').html(this.spendConfirmBox.render().el);
+      $(this.$refs.confirmWalletContainer).html(this.spendConfirmBox.render().el);
 
       return this;
     }

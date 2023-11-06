@@ -71,7 +71,7 @@
             <div class="contentBox mDetailWrapper padMd2 clrP clrBr clrSh3 tx5">
               <div class="rowMd">
                 <h4>{{ ob.polyT('moderatorDetails.currenciesSupported') }}</h4>
-                <div class="js-supportedCurrenciesList"></div>
+                <div ref="supportedCurrenciesList" class="js-supportedCurrenciesList"></div>
               </div>
               <div class="rowLg">
                 <h4>{{ ob.polyT('moderatorDetails.languages') }}</h4>
@@ -209,8 +209,7 @@ export default {
             .get('acceptedCurrencies'),
         },
       });
-      $('.js-supportedCurrenciesList')
-        .append(this.supportedCurrenciesList.render().el);
+      $(this.$refs.supportedCurrenciesList).append(this.supportedCurrenciesList.render().el);
 
       return this;
     }

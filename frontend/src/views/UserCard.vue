@@ -33,7 +33,7 @@
             </template>
           </div>
         </template>
-        <div class="js-cardVerifiedMod"></div>
+        <div ref="cardVerifiedMod" class="js-cardVerifiedMod"></div>
       </div>
       <div class="content">
         <template v-if="!ob.loading && !ob.notFound">
@@ -328,7 +328,7 @@ export default {
             text: '',
           },
         });
-        $('.js-cardVerifiedMod').append(this.verifiedMod.render().el);
+        $(this.$refs.cardVerifiedMod).append(this.verifiedMod.render().el);
       }
 
       return this;

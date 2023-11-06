@@ -9,12 +9,12 @@
         <li v-for="(err, j) in ob.errors" :key="j" class="clrTErr rowSm">{{ err }}</li>
       </ul>
     </template>
-    <div class="border clrBr clrP clrT rowLg js-jsonContractContainer" @click.stop></div>
+    <div ref="jsonContractContainer" class="border clrBr clrP clrT rowLg js-jsonContractContainer" @click.stop.prevent></div>
 
     <div class="flexHRight">
       <div class="posR">
-        <a class="js-copyContract clrTEm" @click="onClickCopyContract">{{ ob.polyT(`orderDetail.contractTab.copyContract`) }}</a>
-        <a class="copied js-copyContractDone clrT2">{{ ob.polyT(`orderDetail.contractTab.copyContractDone`) }}</a>
+        <a ref="copyContract" class="js-copyContract clrTEm" @click="onClickCopyContract">{{ ob.polyT(`orderDetail.contractTab.copyContract`) }}</a>
+        <a ref="copyContractDone" class="copied js-copyContractDone clrT2">{{ ob.polyT(`orderDetail.contractTab.copyContractDone`) }}</a>
       </div>
     </div>
 
@@ -76,7 +76,7 @@ export default {
     onClickCopyContract () {
       ipc.send('controller.system.writeToClipboard', JSON.stringify(this.contract, null, 2));
       // Fade the link and make it unclickable, but maintain its position in the DOM.
-      $('.js-copyContract')
+      $(this.$refs.copyContract)
         .addClass('unclickable')
         .velocity('stop')
         .velocity({ opacity: 0 })
@@ -86,7 +86,7 @@ export default {
             $(els[0]).removeClass('unclickable');
           },
         });
-      $('.js-copyContractDone')
+      $(this.$refs.copyContractDone)
         .velocity('stop')
         .velocity({ opacity: 1 })
         .velocity({ opacity: 0 }, { delay: 5000 });
@@ -98,10 +98,10 @@ export default {
       if (this.rendered) {
         // On re-renders, reuse the renderjson el so it's state (e.g.
         // what is expanded/collapsed) is maintained.
-        renderjsonEl = $('.js-jsonContractContainer').children()[0];
+        renderjsonEl = $(this.$refs.jsonContractContainer).children()[0];
       }
 
-      $('.js-jsonContractContainer').html(renderjsonEl || renderjson.set_show_to_level('1')(this.contract));
+      $(this.$refs.jsonContractContainer).html(renderjsonEl || renderjson.set_show_to_level('1')(this.contract));
 
       this.rendered = true;
       return this;

@@ -16,7 +16,7 @@
     <div class="js-timeoutInfoContainer"></div>
     <div class="js-subSections"></div>
     <template v-if="!ob.isCase">
-      <div class="js-paymentsWrap"></div>
+      <div ref="paymentsWrap" class="js-paymentsWrap"></div>
     </template>
 
     <template v-else>
@@ -1170,7 +1170,7 @@ export default {
             && this.vendor.id === app.profile.id && !this.contract.get('orderConfirmation'),
           // paymentCoin,
         });
-        $('.js-paymentsWrap').html(this.payments.render().el);
+        $(this.$refs.paymentsWrap).html(this.payments.render().el);
       }
 
       if (this.shouldShowAcceptedSection()) this.renderAcceptedView();

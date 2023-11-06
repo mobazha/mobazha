@@ -7,8 +7,8 @@
     <div :class="`rowMd ${fetching ? 'invisible' : ''}`">
       <a class=" clrT clrBr tx5 addressText clamp" @click="copyAddressToClipboard">{{ address }}</a>
       <span class="posR copyTextWrap">
-        <a class="tx5b txU copyAddress " @click="copyAddressToClipboard">Copy</a>
-        <span class="hide tx5b copiedText js-copiedText">Copied</span>
+        <a ref="copyAddress" class="tx5b txU copyAddress " @click="copyAddressToClipboard">Copy</a>
+        <span ref="copiedText" class="hide tx5b copiedText js-copiedText">Copied</span>
       </span>
     </div>
     <div class="spinnerWrap" v-show="!!fetching">
@@ -83,11 +83,8 @@ export default {
     copyAddressToClipboard () {
       ipc.send('controller.system.writeToClipboard', this.address);
       clearTimeout(this.copyTextTimeout);
-      const $copyText = $('.js-copyAddress')
-        .addClass('invisible');
-      const $copiedText = $('.js-copiedText')
-        .stop()
-        .show();
+      const $copyText = $(this.$refs.copyAddress).addClass('invisible');
+      const $copiedText = $(this.$refs.copiedText).stop().show();
 
       this.copyTextTimeout = setTimeout(() => {
         $copiedText.hide();

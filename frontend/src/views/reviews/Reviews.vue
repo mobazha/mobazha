@@ -4,13 +4,13 @@
       <h2 class="txUnb title">{{ ob.polyT('listingDetail.reviews') }}</h2>
       <template v-if="!ob.isFetchingRatings">
         <template v-if="ob.reviewsLength">
-          <div class="js-reviewWrapper" v-show="!!ob.collectionLength"></div>
-          <div class="clrTErr js-errors"></div>
+          <div ref="reviewWrapper" class="js-reviewWrapper" v-show="!!ob.collectionLength"></div>
+          <div class="clrTErr js-errors" v-html="errorMsg"></div>
           <div class="flexHCent loadMore clrBr" v-show="!!ob.collectionLength && startIndex < reviewIDs.length">
-            <ProcessingButton className="btn clrP clrBr js-loadMoreBtn" @click="clickLoadMore"
+            <ProcessingButton :className="`btn clrP clrBr js-loadMoreBtn ${loadingMore ? 'processing' : ''}`" @click="clickLoadMore"
               :btnText="ob.polyT('listingDetail.review.loadMore')" />
           </div>
-          <div class="flexHCent js-reviewsSpinner">
+          <div class="flexHCent js-reviewsSpinner" v-show="!ob.collectionLength">
             <SpinnerSVG className="spinnerMd" />
           </div>
         </template>
@@ -55,6 +55,10 @@ export default {
   data () {
     return {
       reviewIDs: [],
+      collection: [],
+
+      loadingMore: false,
+      errorMsg: '',
     };
   },
   created () {
@@ -109,7 +113,7 @@ export default {
           this.collection.add(eventData);
         }
         if (this.collection.length >= this.startIndex) {
-          $('.js-loadMoreBtn').removeClass('processing');
+          this.loadingMore = false;
         }
       }
     },
@@ -127,7 +131,7 @@ export default {
 
     appendError (error) {
       const msg = app.polyglot.t('listingDetail.errors.fetchReviews', { error });
-      $('.js-errors').append(`<p><i class="ion-alert-circled"> ${msg}</p>`);
+      this.errorMsg += `<p><i class="ion-alert-circled"> ${msg}</p>`;
     },
 
     loadReviews (start = this.startIndex, pageSize = this.pageSize, async = !!this.options.async) {
@@ -138,8 +142,8 @@ export default {
       const ps = start + pageSize <= revLength ? pageSize : revLength - start;
 
       if (start < revLength) {
-        $('.js-loadMoreBtn').addClass('processing');
-        $('.js-errors').html('');
+        this.loadingMore = true;
+        this.errorMsg = '';
         $.ajax({
           url: app.getServerUrl(`ob/fetchratings?async=${asyncUpdate}`),
           data: JSON.stringify(this.reviewIDs.slice(start, start + ps)),
@@ -151,14 +155,14 @@ export default {
             this.startIndex = start + ps;
             if (!asyncUpdate) {
               this.collection.add(_.pluck(data, 'rating'));
-              $('.js-loadMoreBtn').removeClass('processing');
+              this.loadingMore = false;
             }
           })
           .fail((xhr) => {
             const failReason = (xhr.responseJSON && xhr.responseJSON.reason) || '';
             this.appendError(failReason);
-            $('.js-errors').append(`<p>${failReason}</p>`);
-            $('.js-loadMoreBtn').removeClass('processing');
+            this.errorMsg += `<p>${failReason}</p>`;
+            this.loadingMore = false;
           });
       }
     },
@@ -172,9 +176,7 @@ export default {
       const btnTxt = app.polyglot.t('listingDetail.review.showMore');
       const truncLines = model.get('buyerID') !== undefined ? 5 : 6;
 
-      $('.js-reviewWrapper').append(newRevieEl);
-      $('.js-reviewWrapper').removeClass('hide');
-      $('.js-reviewsSpinner').addClass('hide');
+      $(this.$refs.reviewWrapper).append(newRevieEl);
 
       // truncate any review text that is too long
       newRevieEl.find('.js-reviewText').trunk8({

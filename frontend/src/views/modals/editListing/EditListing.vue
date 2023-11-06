@@ -252,6 +252,7 @@
                 </div>
                 <input
                   type="text"
+                  ref="editListingTags"
                   id="editListingTags"
                   @input="event => formData.item.tags = event.target.value.length ? event.target.value.split(ob.tagsDelimiter) : [] "
                   class="clrBr clrP hashPrefacedTags hideDropDown"
@@ -270,6 +271,7 @@
                 </div>
                 <input
                   type="text"
+                  ref="editListingCategories"
                   id="editListingCategories"
                   @input="event => formData.item.categories = event.target.value.length ? event.target.value.split(ob.tagsDelimiter) : [] "
                   class="clrBr clrP hideDropDown"
@@ -1418,7 +1420,7 @@ export default {
 
       this.currencies = this.currencies || getCurrenciesSortedByCode();
 
-      $('#editListingTags').selectize({
+      $(this.$refs.editListingTags).selectize({
         persist: false,
         maxItems: item.max.tags,
         create: (input) => {
@@ -1437,7 +1439,7 @@ export default {
         },
       });
 
-      $('#editListingCategories').selectize({
+      $(this.$refs.editListingCategories).selectize({
         persist: false,
         maxItems: item.max.cats,
         create: (input) => ({

@@ -3,6 +3,7 @@ import _ from 'underscore';
 import app from '../../app';
 import BaseModel from '../BaseModel';
 import ShippingAddresses from '../../collections/ShippingAddresses';
+import ShippingOptions from '../../collections/listing/ShippingOptions'
 import SMTPSettings from './SMTPSettings';
 
 export default class extends BaseModel {
@@ -18,6 +19,7 @@ export default class extends BaseModel {
       blockedNodes: [],
       storeModerators: [],
       shippingAddresses: new ShippingAddresses(),
+      shippingOptions: new ShippingOptions(),
       smtpSettings: new SMTPSettings(),
     };
   }
@@ -29,6 +31,7 @@ export default class extends BaseModel {
   nested() {
     return {
       shippingAddresses: ShippingAddresses,
+      shippingOptions: ShippingOptions,
       smtpSettings: SMTPSettings,
     };
   }

@@ -200,10 +200,8 @@ import { supportedWalletCurs } from '../../../../backbone/data/walletCurrencies'
 import Moderators from '../../../../backbone/views/components/moderators/Moderators';
 import BulkCoinUpdateBtn from './BulkCoinUpdateBtn.vue';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
-import ShippingOptions from '../../../../backbone/collections/listing/ShippingOptions.js';
 import ShippingOptionMd from '../../../../backbone/models/listing/ShippingOption';
 import Service from '../../../../backbone/models/listing/Service';
-import Listing from '../../../../backbone/models/listing/Listing';
 
 import ShippingOption from '../editListing/ShippingOption.vue';
 
@@ -224,7 +222,7 @@ export default {
       app: app,
       model: {},
 
-      shippingOptions: new ShippingOptions(),
+      shippingOptions: [],
     };
   },
   created() {
@@ -282,9 +280,6 @@ export default {
 
       this.currentMods = this.settings.get('storeModerators');
       this.showVerifiedOnly = true;
-      this.model = new Listing({
-        shippingOptions: [],
-      });
 
       this.modsSelected = new Moderators({
         cardState: 'selected',
@@ -347,6 +342,8 @@ export default {
           }
         });
       });
+
+      this.shippingOptions = this.settings.get('shippingOptions');
     },
     onClickAddShippingOption() {
       this.shippingOptions.push(
@@ -458,10 +455,15 @@ export default {
       selected = _.without(selected, ...this.modsSelected.unselectedIDs);
       const byID = this.modsByID.selectedIDs;
       const available = this.modsAvailable.selectedIDs;
-      return { storeModerators: [...new Set([...selected, ...byID, ...available])] };
+      return {
+        storeModerators: [...new Set([...selected, ...byID, ...available])],
+        shippingOptions: this.shippingOptions.toJSON(),
+      };
     },
 
     save() {
+      (this.$refs.shippingOptionViews ?? []).forEach((shippingOptionVw) => shippingOptionVw.setModelData());
+
       // this view saves to two different models
       const profileFormData = this.getProfileFormData();
       profileFormData.currencies = this.$refs.currencySelector.getState().activeCurs;

@@ -24,7 +24,6 @@
           :id="`shipDestinationsSelect_${ob.cid}`"
           ref="shipDestinationSelect"
           multiple
-          v-model="formData.regions"
           class="clrBr clrP clrSh2"
           :placeholder="ob.polyT('editListing.shippingOptions.regionsPlaceholder')"
         ></select>
@@ -196,6 +195,8 @@ export default {
     },
 
     getFormDataEx() {
+      this.formData.regions = this.shipDestinationSelect[0].selectize.items;
+
       const formData = this.formData;
       const indexedRegions = getIndexedRegions();
 
@@ -209,9 +210,7 @@ export default {
     // Sets the model based on the current data in the UI.
     setModelData() {
       // set the data for our nested Services views
-      this.$nextTick(() => {
-        (this.$refs.serviceViews ?? []).forEach((serviceVw) => serviceVw.setModelData());
-      });
+      (this.$refs.serviceViews ?? []).forEach((serviceVw) => serviceVw.setModelData());
       this.model.set(this.getFormDataEx());
     },
 

@@ -1229,8 +1229,8 @@
         "namePlaceholder": "مثلا عادي، سريع، صباح اليوم التالي",
         "estimatedDeliveryLabel": "موعد التسليم ,المقدر",
         "estimatedDeliveryPlaceholder": "مثال. 5-7 أيام",
-        "priceLabel": "السعر (البند الأول)",
-        "additionalItemPriceLabel": "السعر (البند الإضافي)",
+        "priceLabel": "السعر (الوزن الأول)",
+        "additionalWeightPriceLabel": "السعر (الوزن الإضافي)",
         "pricePlaceholder": "0.00",
         "addService": "+ اضف خدمة"
       },

@@ -7,7 +7,7 @@ export default class extends BaseModel {
     return {
       name: '',
       price: '',
-      additionalItemPrice: '',
+      additionalWeightPrice: '',
       estimatedDelivery: '',
     };
   }

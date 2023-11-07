@@ -1229,8 +1229,8 @@
         "namePlaceholder": "ej. Estándar, Express, 24 horas",
         "estimatedDeliveryLabel": "Tiempo de entrega estimado",
         "estimatedDeliveryPlaceholder": "ej. 5-7 días",
-        "priceLabel": "Precio (primer ítem)",
-        "additionalItemPriceLabel": "Precio (ítem adicional)",
+        "priceLabel": "Precio (primer peso)",
+        "additionalWeightPriceLabel": "Precio (peso adicional)",
         "pricePlaceholder": "0.00",
         "addService": "+ Agregar Servicio"
       },

@@ -1229,8 +1229,8 @@
         "namePlaceholder": "fx “Standard”, “Ekspres”, “B-post”, “Quickbrev”",
         "estimatedDeliveryLabel": "Estimeret leveringstid",
         "estimatedDeliveryPlaceholder": "fx 5–7 dage",
-        "priceLabel": "Price (first item)",
-        "additionalItemPriceLabel": "Price (additional item)",
+        "priceLabel": "Pris (førstevekt)",
+        "additionalWeightPriceLabel": "Pris (ekstra vægt)",
         "pricePlaceholder": "0.00",
         "addService": "+ Tilføj service"
       },

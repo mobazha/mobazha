@@ -1229,8 +1229,8 @@
         "namePlaceholder": "e.g. Standard, Express, Overnight",
         "estimatedDeliveryLabel": "Est. Delivery Time",
         "estimatedDeliveryPlaceholder": "e.g. 5-7 days",
-        "priceLabel": "Price (first item)",
-        "additionalItemPriceLabel": "Price (additional item)",
+        "priceLabel": "Cena (pierwsza waga)",
+        "additionalWeightPriceLabel": "Cena (dodatkowa waga)",
         "pricePlaceholder": "0.00",
         "addService": "+ Add Service"
       },

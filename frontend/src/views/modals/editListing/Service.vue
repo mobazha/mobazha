@@ -17,10 +17,10 @@
         :placeholder="ob.polyT('editListing.shippingOptions.services.pricePlaceholder')" data-var-type="bignumber">
     </div>
     <div class="col3 simpleFlexCol">
-      <FormError v-if="ob.errors['additionalItemPrice']" :errors="ob.errors['additionalItemPrice']" />
+      <FormError v-if="ob.errors['additionalWeightPrice']" :errors="ob.errors['additionalWeightPrice']" />
       <div class="flexRow marginTopAuto">
-        <input type="number" class="clrBr clrP clrSh2 marginTopAuto js-price" name="additionalItemPrice"
-          :value="ob.number.toStandardNotation(ob.additionalItemPrice)"
+        <input type="number" class="clrBr clrP clrSh2 marginTopAuto js-price" name="additionalWeightPrice"
+          :value="ob.number.toStandardNotation(ob.additionalWeightPrice)"
           :placeholder="ob.polyT('editListing.shippingOptions.services.pricePlaceholder')" data-var-type="bignumber">
         <a class="iconBtn clrBr clrP margLSm toolTipNoWrap  btnRemoveService" @click="onClickRemoveService"
           :data-tip="ob.polyT('editListing.shippingOptions.toolTip.delete')">

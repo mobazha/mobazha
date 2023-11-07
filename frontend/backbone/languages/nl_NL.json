@@ -1229,8 +1229,8 @@
         "namePlaceholder": "b.v. Standaard, Express, Overnight",
         "estimatedDeliveryLabel": "Verwachte leveringsdatum",
         "estimatedDeliveryPlaceholder": "b.v. 5-7 dagen",
-        "priceLabel": "Prijs (eerste item)",
-        "additionalItemPriceLabel": "Prijs (elk volgend item)",
+        "priceLabel": "Prijs (eerste gewicht)",
+        "additionalWeightPriceLabel": "Prijs (extra gewicht)",
         "pricePlaceholder": "0.00",
         "addService": "+ Voeg service toe"
       },

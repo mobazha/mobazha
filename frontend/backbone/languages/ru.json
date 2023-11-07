@@ -1229,8 +1229,8 @@
         "namePlaceholder": "e.g. Standard, Express, Overnight",
         "estimatedDeliveryLabel": "Est. Delivery Time",
         "estimatedDeliveryPlaceholder": "например, 5-7 дней",
-        "priceLabel": "Price (first item)",
-        "additionalItemPriceLabel": "Price (additional item)",
+        "priceLabel": "Цена (первый вес)",
+        "additionalWeightPriceLabel": "Цена (дополнительный вес)",
         "pricePlaceholder": "0.00",
         "addService": "+ Добавить услугу"
       },

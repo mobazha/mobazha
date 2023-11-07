@@ -1232,8 +1232,8 @@
         "namePlaceholder": "例如标准，中通快递，隔日到",
         "estimatedDeliveryLabel": "预计递送时间",
         "estimatedDeliveryPlaceholder": "例如5-7天",
-        "priceLabel": "价格（首项）",
-        "additionalItemPriceLabel": "价格（附加项目）",
+        "priceLabel": "价格（首重）",
+        "additionalWeightPriceLabel": "价格（续重）",
         "pricePlaceholder": "0.00",
         "addService": "+添加服务"
       },

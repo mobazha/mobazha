@@ -1229,8 +1229,8 @@
         "namePlaceholder": "ex: PAC, SEDEX, etc.",
         "estimatedDeliveryLabel": "Tempo de Entrega",
         "estimatedDeliveryPlaceholder": "ex: 5-7 dias",
-        "priceLabel": "Custo (1º item)",
-        "additionalItemPriceLabel": "Custo (item adicional)",
+        "priceLabel": "Preço (primeiro peso)",
+        "additionalWeightPriceLabel": "Preço (peso adicional)",
         "pricePlaceholder": "0.00",
         "addService": "+ Inserir Serviço"
       },

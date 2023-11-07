@@ -519,7 +519,7 @@ export default {
         return {
           price: bigNumber(this.listing.price.amount),
           sPrice: bigNumber(sOptService ? sOptService.get('price') || 0 : 0),
-          aPrice: bigNumber(sOptService ? sOptService.get('additionalItemPrice') || 0 : 0),
+          aPrice: bigNumber(sOptService ? sOptService.get('additionalWeightPrice') || 0 : 0),
           vPrice: bigNumber(sku ? sku.get('surcharge') || 0 : 0),
           quantity: bigNumber(item.get('quantity')),
         };

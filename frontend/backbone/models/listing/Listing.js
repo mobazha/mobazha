@@ -410,11 +410,11 @@ export default class extends BaseModel {
 
           this.validateCurrencyAmount(
             {
-              amount: service.additionalItemPrice,
+              amount: service.additionalWeightPrice,
               currency: curDefCurrency,
             },
             addError,
-            `shippingOptions[${shipOpt.cid}].services[${service.cid}].additionalItemPrice`,
+            `shippingOptions[${shipOpt.cid}].services[${service.cid}].additionalWeightPrice`,
             {
               validationOptions: {
                 rangeType: CUR_VAL_RANGE_TYPES.GREATER_THAN_OR_EQUAL_ZERO,
@@ -569,9 +569,9 @@ export default class extends BaseModel {
                 service.price,
                 coinDiv
               );
-              service.additionalItemPrice =
+              service.additionalWeightPrice =
                 decimalToInteger(
-                  service.additionalItemPrice,
+                  service.additionalWeightPrice,
                   coinDiv
                 );
             });
@@ -774,11 +774,11 @@ export default class extends BaseModel {
                   coinDiv,
                   { fieldName: 'service.price' }
                 );
-                service.additionalItemPrice =
+                service.additionalWeightPrice =
                   integerToDecimal(
-                    service.additionalItemPrice,
+                    service.additionalWeightPrice,
                     coinDiv,
-                    { fieldName: 'service.additionalItemPrice' }
+                    { fieldName: 'service.additionalWeightPrice' }
                   );
               });
             }

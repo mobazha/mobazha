@@ -1229,8 +1229,8 @@
         "namePlaceholder": "f.eks. Standard, Ekspress, Over natten",
         "estimatedDeliveryLabel": "Antatt Leveringstid",
         "estimatedDeliveryPlaceholder": "f.eks. 5-7 dager",
-        "priceLabel": "Pris (primærgjenstand)",
-        "additionalItemPriceLabel": "Pris (tilleggsgjenstand)",
+        "priceLabel": "Pris (førstevekt)",
+        "additionalWeightPriceLabel": "Pris (ekstra vekt)",
         "pricePlaceholder": "0.00",
         "addService": "+ Legg til Tjeneste"
       },

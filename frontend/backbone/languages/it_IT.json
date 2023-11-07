@@ -1229,8 +1229,8 @@
         "namePlaceholder": "es. Ordinaria, Veloce",
         "estimatedDeliveryLabel": "Tempo di consegna stimato",
         "estimatedDeliveryPlaceholder": "es. 5-7 giorni",
-        "priceLabel": "Prezzo (primo pezzo)",
-        "additionalItemPriceLabel": "Prezzo (pezzi successivi)",
+        "priceLabel": "Prezzo (primo peso)",
+        "additionalWeightPriceLabel": "Prezzo (peso aggiuntivo)",
         "pricePlaceholder": "0.00",
         "addService": "+ Aggiungi Servizio"
       },

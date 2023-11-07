@@ -1229,8 +1229,8 @@
         "namePlaceholder": "Par exemple: Standard, Express, ...",
         "estimatedDeliveryLabel": "Durée de livraison estimée",
         "estimatedDeliveryPlaceholder": "Par exemple 5 à 7 jours",
-        "priceLabel": "Prix (premier article)",
-        "additionalItemPriceLabel": "Prix (article supplémentaire)",
+        "priceLabel": "Prix ​​(premier poids)",
+        "additionalWeightPriceLabel": "Prix ​​(poids supplémentaire)",
         "pricePlaceholder": "0.00",
         "addService": "+ Ajouter un service"
       },

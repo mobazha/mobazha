@@ -68,7 +68,7 @@
             <label class="required">{{ ob.polyT('editListing.shippingOptions.services.priceLabel') }}</label>
           </div>
           <div class="col3">
-            <label class="required">{{ ob.polyT('editListing.shippingOptions.services.additionalItemPriceLabel') }}</label>
+            <label class="required">{{ ob.polyT('editListing.shippingOptions.services.additionalWeightPriceLabel') }}</label>
           </div>
         </div>
         <div class="js-servicesWrap js-serviceSection servicesWrap padKids padStack padTop0" v-show="formData.type !== 'LOCAL_PICKUP'">

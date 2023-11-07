@@ -1229,8 +1229,8 @@
         "namePlaceholder": "z.B. Standard, Express, Overnight",
         "estimatedDeliveryLabel": "Vsl. Lieferdatum",
         "estimatedDeliveryPlaceholder": "z.B. 5-7 Tage",
-        "priceLabel": "Preis (erster Artikel)",
-        "additionalItemPriceLabel": "Preis (weiterer Artikel)",
+        "priceLabel": "Preis (Erstgewicht)",
+        "additionalWeightPriceLabel": "Preis (Mehrgewicht)",
         "pricePlaceholder": "0,00",
         "addService": "+ Dienstleistung hinzufügen"
       },

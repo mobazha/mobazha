@@ -1229,8 +1229,8 @@
         "namePlaceholder": "např. Standardní, Expresní, Přes noc",
         "estimatedDeliveryLabel": "Odhadovaná Dodací lhůta",
         "estimatedDeliveryPlaceholder": "např. 5-7 dní",
-        "priceLabel": "Cena (první položka)",
-        "additionalItemPriceLabel": "Cena (další položka)",
+        "priceLabel": "Cena (první váha)",
+        "additionalWeightPriceLabel": "Cena (přídavná hmotnost)",
         "pricePlaceholder": "0.00",
         "addService": "+ Přidat službu"
       },

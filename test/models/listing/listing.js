@@ -263,7 +263,7 @@ describe('the Listing model', () => {
     }, { validate: true });
   });
 
-  const servicePriceFields = ['price', 'additionalItemPrice'];
+  const servicePriceFields = ['price', 'additionalWeightPrice'];
 
   it('fails validation if service price fields do not contain a valid currency amount', () => {
     servicePriceFields.forEach(field => {

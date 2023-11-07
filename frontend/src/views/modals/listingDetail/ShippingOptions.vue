@@ -35,14 +35,14 @@
               </template>
             </td>
             <td>
-              <template v-if="service.additionalItemPrice && service.additionalItemPrice.eq(0)">
+              <template v-if="service.additionalWeightPrice && service.additionalWeightPrice.eq(0)">
                 <div class="clrE1 clrTOnEmph phraseBox floL">{{ ob.polyT('listingDetail.freeShippingBanner') }}</div>
               </template>
 
               <template v-else>
                 {{
                   ob.currencyMod.convertAndFormatCurrency(
-                    service.additionalItemPrice,
+                    service.additionalWeightPrice,
                     ob.pricingCurrency,
                     ob.displayCurrency
                   )

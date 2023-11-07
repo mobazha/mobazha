@@ -1229,8 +1229,8 @@
         "namePlaceholder": "наприклад, Стандарт, Експрес, Нічне перевезення, тощо",
         "estimatedDeliveryLabel": "Орієнтовний термін доставки",
         "estimatedDeliveryPlaceholder": "наприклад, 5-7 днів",
-        "priceLabel": "Ціна (за один товар)",
-        "additionalItemPriceLabel": "Ціна (додатковий товар)",
+        "priceLabel": "Ціна (перша вага)",
+        "additionalWeightPriceLabel": "Ціна (додаткова вага)",
         "pricePlaceholder": "\n0.00",
         "addService": "+ Додати сервіс"
       },

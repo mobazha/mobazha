@@ -24,23 +24,21 @@
                   <div class="btnRadio clrBr">
                     <input
                       type="radio"
-                      name="vendor"
-                      value="true"
+                      v-model="formData.vendor"
+                      :value="true"
                       class="js-profileField"
                       id="settingsModerationStatusTrue"
                       data-var-type="boolean"
-                      :checked="ob.vendor"
                     />
                     <label for="settingsModerationStatusTrue">{{ ob.polyT('settings.on') }}</label>
                   </div>
                   <div class="btnRadio clrBr">
                     <input
                       type="radio"
-                      name="vendor"
-                      value="false"
+                      v-model="formData.vendor"
+                      :value="false"
                       class="js-profileField"
                       id="settingsModerationStatusFalse"
-                      :checked="!ob.vendor"
                       data-var-type="boolean"
                     />
                     <label for="settingsModerationStatusFalse">{{ ob.polyT('settings.off') }}</label>
@@ -116,7 +114,7 @@
                     <div class="tx5 rowTn">
                       <div class="flexVCentClearMarg">
                         <h5 class="flexExpand">{{ ob.polyT('settings.storeTab.availableModerators') }}</h5>
-                        <input type="checkbox" id="storeVerifiedOnly" :checked="ob.showVerifiedOnly" @click="onClickVerifiedOnly" />
+                        <input type="checkbox" id="storeVerifiedOnly" v-model="showVerifiedOnly" />
                         <label class="tx5b" for="storeVerifiedOnly">{{ ob.polyT('settings.storeTab.verifiedOnly') }}</label>
                       </div>
                     </div>
@@ -220,7 +218,10 @@ export default {
   data() {
     return {
       app: app,
-      model: {},
+
+      formData: {
+        vendor: false,
+      },
 
       shippingOptions: [],
     };
@@ -245,7 +246,6 @@ export default {
       return {
         ...this.templateHelpers,
         modsAvailable: this.modsAvailable.allIDs,
-        showVerifiedOnly: this.showVerifiedOnly,
         errors: {
           ...(this.profile.validationError || {}),
           ...(this.settings.validationError || {}),
@@ -275,6 +275,8 @@ export default {
 
       // Sync the global settings model with any changes we save via our clone.
       this.listenTo(this.settings, 'sync', (md, resp, sOpts) => app.settings.set(this.settings.toJSON(sOpts.attrs)));
+
+      this.formData.vendor = this.profile.get('vendor');
 
       const preferredCurs = [...new Set(app.profile.get('currencies'))];
 
@@ -441,14 +443,6 @@ export default {
       }
     },
 
-    onClickVerifiedOnly(e) {
-      this.showVerifiedOnly = $(e.target).prop('checked');
-    },
-
-    getProfileFormData(subset = this.$profileFormFields) {
-      return this.getFormData(subset);
-    },
-
     getSettingsData() {
       let selected = app.settings.get('storeModerators');
       // The mods may not have loaded in the interface yet. Subtract only explicitly de-selected ones.
@@ -465,7 +459,7 @@ export default {
       (this.$refs.shippingOptionViews ?? []).forEach((shippingOptionVw) => shippingOptionVw.setModelData());
 
       // this view saves to two different models
-      const profileFormData = this.getProfileFormData();
+      const profileFormData = this.formData;
       profileFormData.currencies = this.$refs.currencySelector.getState().activeCurs;
       const settingsFormData = this.getSettingsData();
 

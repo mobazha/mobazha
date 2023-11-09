@@ -210,7 +210,12 @@ export default {
     // Sets the model based on the current data in the UI.
     setModelData() {
       // set the data for our nested Services views
-      (this.$refs.serviceViews ?? []).forEach((serviceVw) => serviceVw.setModelData());
+      if (this.formData.type === 'LOCAL_PICKUP') {
+        this.model.set('services', []);
+      } else {
+        (this.$refs.serviceViews ?? []).forEach((serviceVw) => serviceVw.setModelData());
+      }
+
       this.model.set(this.getFormDataEx());
     },
 

@@ -50,7 +50,7 @@
                             type="text"
                             v-focus
                             class="clrBr clrP clrSh2"
-                            v-model="formData.item.title"
+                            v-model.trim="formData.item.title"
                             id="editListingTitle"
                             :maxLength="ob.max.title"
                             :placeholder="ob.polyT('editListing.placeholderTitle')"
@@ -108,7 +108,7 @@
                             />
                             <Select2 id="editListingCurrency" v-model="formData.metadata.pricingCurrency.code" class="clrBr clrP nestInputRight">
                               <template v-for="(currency, j) in ob.currencies" :key="j">
-                                <option :value="currency.code" :selected="currency.code.toUpperCase() === ob.listingCurrency.toUpperCase()">
+                                <option :value="currency.code" :selected="currency.code.toUpperCase() === formData.metadata.pricingCurrency.code.toUpperCase()">
                                   {{ currency.code }}
                                 </option>
                               </template>
@@ -213,36 +213,6 @@
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperPhotos', { maxPhotos: ob.max.photos }) }}</div>
               </section>
 
-              <section ref="sectionShipping" class="shippingSection js-sectionShipping">
-                <div class="gutterVMd">
-                  <div class="js-shippingOptionsWrap shippingOptionsWrap gutterVMd">
-                    <template v-for="(shipOpt, shipOptIndex) in shippingOptions" :key="shipOpt.cid">
-                      <ShippingOption
-                        ref="shippingOptionViews"
-                        :options="{
-                          getCurrency: () => formData.metadata.pricingCurrency.code,
-                          listPosition: shipOptIndex + 1,
-                        }"
-                        :bb="function() {
-                          return {
-                            model: shipOpt,
-                          }
-                        }"
-                        @click-remove="onRemoveShippingOption" />
-                    </template>
-                  </div>
-                  <div class="contentBox padMd clrP clrBr clrSh3 tx3 shipOptPlaceholder">
-                    <FormError v-if="ob.errors['shippingOptions']" :errors="ob.errors['shippingOptions']" :class="topLevelShipOptErrs" />
-                    <h2 class="h4 clrT js-addShipOptSectionHeading">
-                      {{ ob.polyT('editListing.shippingOptions.optionHeading', { listPosition: shippingOptions.length + 1 }) }}
-                    </h2>
-                    <hr class="clrBr rowMd" />
-                    <a class="btn clrBr clrP clrSh2 rowSm" @click="onClickAddShippingOption">{{ ob.polyT('editListing.shippingOptions.btnAddShippingOption') }}</a>
-                    <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperShipping') }}</div>
-                  </div>
-                </div>
-              </section>
-
               <section ref="sectionTags" class="tagsSection contentBox padMd clrP clrBr clrSh3 tx3">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.tagsDetailed') }}</h2>
                 <hr class="clrBr rowMd" />
@@ -322,10 +292,10 @@
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['item.skus']" :errors="ob.errors['item.skus']" />
                 <div class="js-variantInventoryTableContainer">
-                  <VariantInventory ref="variantInventory" :key="`${formData.item.price}_${currency}`"
+                  <VariantInventory ref="variantInventory" :key="`${formData.item.price}_${formData.metadata.pricingCurrency.code}`"
                     :options="{
                       basePrice: formData.item.price,
-                      listingCurrency: currency,
+                      listingCurrency: formData.metadata.pricingCurrency.code,
                     }"
                     :bb="function() {
                       return {
@@ -447,8 +417,6 @@ import {
 } from '../../../../backbone/data/cryptoListingCurrencies';
 import { supportedWalletCurs } from '../../../../backbone/data/walletCurrencies';
 import { setDeepValue } from '../../../../backbone/utils/object';
-import ShippingOptionMd from '../../../../backbone/models/listing/ShippingOption';
-import Service from '../../../../backbone/models/listing/Service';
 import Image from '../../../../backbone/models/listing/Image';
 import Coupon from '../../../../backbone/models/listing/Coupon';
 import VariantOption from '../../../../backbone/models/listing/VariantOption';
@@ -466,7 +434,6 @@ import Variants from './Variants.vue';
 import InventoryManagement from './InventoryManagement.vue';
 import VariantInventory from './VariantInventory.vue';
 import Coupons from './Coupons.vue';
-import ShippingOption from './ShippingOption.vue'
 
 // import Tinymce from './../../../components/Tinymce/index.vue';
 
@@ -479,7 +446,6 @@ export default {
     InventoryManagement,
     VariantInventory,
     Coupons,
-    ShippingOption,
   },
   props: {
     options: {
@@ -505,7 +471,6 @@ export default {
       getCoinTypesDeferred: $.Deferred(),
       variantOptionsCl: [],
       coupons: [],
-      shippingOptions: [],
 
       formData: {
         item: {
@@ -553,7 +518,6 @@ export default {
         ...this.templateHelpers,
         createMode: this.createMode,
         returnText: this.options.returnText,
-        listingCurrency: this.currency,
         countryList: this.countryList,
         currencies: this.currencies,
         contractTypes: metadata.contractTypesVerbose,
@@ -588,10 +552,6 @@ export default {
         {
           key: 'photos',
           name: ob.polyT('editListing.sectionNames.photos'),
-        },
-        {
-          key: 'shipping',
-          name: ob.polyT('editListing.sectionNames.shipping'),
         },
         {
           key: 'tags',
@@ -650,23 +610,6 @@ export default {
       return this.photoUploads.filter((upload) => upload.state() === 'pending');
     },
 
-    // return the currency associated with this listing
-    currency() {
-      if (this.formData.metadata.pricingCurrency.code) {
-        return this.formData.metadata.pricingCurrency.code;
-      }
-
-      let cur = app.settings.get('localCurrency');
-
-      try {
-        cur = this.model.get('metadata').get('pricingCurrency').code;
-      } catch (e) {
-        // pass
-      }
-
-      return cur;
-    },
-
     receiveCur() {
       const acceptedCurs = this.model.get('metadata').get('acceptedCurrencies');
       return this.model.isCrypto ? (acceptedCurs.length && acceptedCurs()[0]) || null : null;
@@ -685,7 +628,16 @@ export default {
   },
   methods: {
     supportedWalletCurs,
-    initFormData(model) {
+    initFormData() {
+      const model = this.model.toJSON();
+
+      let cur = app.settings.get('localCurrency');
+      try {
+        cur = model.metadata.pricingCurrency.code;
+      } catch (e) {
+        // pass
+      }
+
       this.formData = {
         item: {
           title: model.item.title,
@@ -701,7 +653,7 @@ export default {
         metadata: {
           contractType: model.metadata.contractType,
           pricingCurrency: {
-            code: this.currency,
+            code: cur,
           },
         },
         refundPolicy: model.refundPolicy,
@@ -731,7 +683,7 @@ export default {
       this._origModel = this.model;
       this.model = this._origModel.clone();
 
-      this.initFormData(this.model.toJSON());
+      this.initFormData();
 
       this.listenTo(this.model, 'sync', () => {
         setTimeout(() => {
@@ -767,7 +719,6 @@ export default {
       this.createMode = !(this.model.lastSyncedAttrs && this.model.lastSyncedAttrs.slug);
       this.photoUploads = [];
       this.images = this.model.get('item').get('images');
-      this.shippingOptions = this.model.get('shippingOptions');
       this.countryList = getTranslatedCountries();
 
       getCryptoCursByName().then(
@@ -997,14 +948,6 @@ export default {
       this.$nextTick(() => {
         this.$refs.termsAndConditions.focus();
       });
-    },
-
-    onClickAddShippingOption() {
-      this.shippingOptions.push(
-        new ShippingOptionMd({
-          services: [new Service()],
-        })
-      );
     },
 
     onClickAddCoupon() {
@@ -1287,7 +1230,6 @@ export default {
       const isCrypto = this.formData.metadata.contractType === 'CRYPTOCURRENCY';
 
       // set model / collection data for various child views
-      (this.$refs.shippingOptionViews ?? []).forEach((shipOptVw) => shipOptVw.setModelData());
       this.$refs.variantsView.setCollectionData();
       this.$refs.variantInventory.setCollectionData();
       this.$refs.couponsView.setCollectionData();
@@ -1345,7 +1287,6 @@ export default {
             acceptedCurrencies: formData.metadata.acceptedCurrencies,
             format: 'MARKET_PRICE',
           },
-          shippingOptions: [],
         };
       }
 
@@ -1356,19 +1297,6 @@ export default {
           ...formData.item,
         },
       });
-
-      // If the type is not 'PHYSICAL_GOOD', we'll clear out any shipping options.
-      if (metadata.get('contractType') !== 'PHYSICAL_GOOD') {
-        this.model.get('shippingOptions').reset();
-      } else {
-        // If any shipping options have a type of 'LOCAL_PICKUP', we'll
-        // clear out any services that may be there.
-        this.model.get('shippingOptions').forEach((shipOpt) => {
-          if (shipOpt.get('type') === 'LOCAL_PICKUP') {
-            shipOpt.set('services', []);
-          }
-        });
-      }
     },
 
     open() {
@@ -1401,10 +1329,6 @@ export default {
       }
 
       return this;
-    },
-
-    onRemoveShippingOption(md) {
-      this.shippingOptions.remove(md);
     },
 
     onChangeDescription() {

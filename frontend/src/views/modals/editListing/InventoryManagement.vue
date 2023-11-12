@@ -5,15 +5,15 @@
     <div class="flexRow gutterH rowSm">
       <div class="col6 simpleFlexCol">
         <Select2 id="editInventoryManagementType" v-model="trackBy" @change="onChangeManagementType" class="clrBr clrP clrSh2 marginTopAuto" :options="{ minimumResultsForSearch: Infinity, }">
-          <option value="DO_NOT_TRACK" :selected="this.trackBy === 'DO_NOT_TRACK'">
+          <option value="DO_NOT_TRACK" :selected="trackBy === 'DO_NOT_TRACK'">
             {{ ob.polyT('editListing.inventoryManagement.doNotTrackSelectOption') }}
           </option>
-          <option value="TRACK" :selected="this.trackBy !== 'DO_NOT_TRACK'">
+          <option value="TRACK" :selected="trackBy !== 'DO_NOT_TRACK'">
             {{ ob.polyT('editListing.inventoryManagement.trackSelectOption') }}
           </option>
         </Select2>
       </div>
-      <template v-if="this.trackBy === 'TRACK_BY_FIXED'">
+      <template v-if="options.trackBy === 'TRACK_BY_FIXED'">
         <div class="col6 simpleFlexCol">
           <div>
             <FormError v-if="ob.errors['quantity']" :errors="ob.errors['quantity']" :class="margL" />
@@ -50,13 +50,8 @@ export default {
       trackBy: 'DO_NOT_TRACK',
     };
   },
-  watch: {
-    'options.trackBy'() {
-      this.trackBy = this.options.trackBy;
-    }
-  },
   created () {
-    this.trackBy = this.options.trackBy;
+    this.trackBy = (this.options.trackBy === 'DO_NOT_TRACK') ? 'DO_NOT_TRACK' : 'TRACK';
   },
   mounted () {
   },
@@ -72,9 +67,9 @@ export default {
 
       let helperText = ob.polyT('editListing.inventoryManagement.doNotTrackHelperText');
 
-      if (this.trackBy === 'TRACK_BY_FIXED') {
+      if (this.options.trackBy === 'TRACK_BY_FIXED') {
         helperText = ob.polyT('editListing.inventoryManagement.trackByFixedHelperText');
-      } else if (this.trackBy === 'TRACK_BY_VARIANT') {
+      } else if (this.options.trackBy === 'TRACK_BY_VARIANT') {
         helperText = ob.polyT('editListing.inventoryManagement.trackByVariantsHelperText');
       }
 

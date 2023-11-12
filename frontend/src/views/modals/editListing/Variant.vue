@@ -152,7 +152,10 @@ export default {
           option: (data) => `<div>${data.name}</div>`,
           item: (data) => `<div>${data.name}</div>`,
         },
-      }).on('change', () => this.setModelData());
+      }).on('change', () => {
+        this.setModelData();
+        this.$emit('update');
+      });
 
       return this;
     }

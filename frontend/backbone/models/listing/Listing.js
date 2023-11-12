@@ -304,12 +304,6 @@ export default class extends BaseModel {
       }
     }
 
-    if (contractType === 'PHYSICAL_GOOD') {
-      if (!attrs.shippingOptions.length) {
-        addError('shippingOptions', app.polyglot.t('listingModelErrors.provideShippingOption'));
-      }
-    }
-
     if (contractType === 'CRYPTOCURRENCY') {
       if (!item || !item.cryptoListingCurrencyCode || typeof item.cryptoListingCurrencyCode !== 'string') {
         addError('item.cryptoListingCurrencyCode', app.polyglot.t('metadataModelErrors.provideCoinType'));
@@ -391,38 +385,6 @@ export default class extends BaseModel {
         addError,
         'price'
       );
-
-      (attrs.shippingOptions || []).forEach(shipOpt => {
-        (shipOpt.services || []).forEach(service => {
-          this.validateCurrencyAmount(
-            {
-              amount: service.price,
-              currency: curDefCurrency,
-            },
-            addError,
-            `shippingOptions[${shipOpt.cid}].services[${service.cid}].price`,
-            {
-              validationOptions: {
-                rangeType: CUR_VAL_RANGE_TYPES.GREATER_THAN_OR_EQUAL_ZERO,
-              },
-            }
-          );
-
-          this.validateCurrencyAmount(
-            {
-              amount: service.additionalWeightPrice,
-              currency: curDefCurrency,
-            },
-            addError,
-            `shippingOptions[${shipOpt.cid}].services[${service.cid}].additionalWeightPrice`,
-            {
-              validationOptions: {
-                rangeType: CUR_VAL_RANGE_TYPES.GREATER_THAN_OR_EQUAL_ZERO,
-              },
-            }
-          );
-        });
-      });
 
       (item.skus || []).forEach(sku => {
         this.validateCurrencyAmount(

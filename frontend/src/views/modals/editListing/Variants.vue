@@ -15,7 +15,8 @@
             model,
           }
         }"
-        @removeClick="onRemoveClick" />
+        @removeClick="onRemoveClick"
+        @update="this.$emit('update')" />
       </template>
     </div>
     <a class="clrBr clrP clrTEm btnAddVariant js-btnAddVariant" v-show="ob.variants.length < ob.maxVariantCount"

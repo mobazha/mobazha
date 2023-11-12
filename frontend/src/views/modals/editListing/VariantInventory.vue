@@ -157,9 +157,7 @@ export default {
     },
 
     setCollectionData () {
-      this.$nextTick(() => {
-        (this.$refs.itemViews ?? []).forEach((item) => item.setModelData());
-      });
+      (this.$refs.itemViews ?? []).forEach((item) => item.setModelData());
     },
 
     // Inpsired by: http://stackoverflow.com/a/4331218/632806

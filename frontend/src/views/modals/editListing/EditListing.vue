@@ -257,13 +257,14 @@
                         collection: variantOptionsCl,
                       };
                     }"
+                    @update="onUpdateVariantOptions"
                     />
                 </div>
                 <a class="btn clrP clrBr clrSh2 addFirstVariant" @click="onClickAddFirstVariant">{{ ob.polyT('editListing.variants.btnAddVariant') }}</a>
               </section>
 
               <section class="contentBox padMd clrP clrBr clrSh3 tx3 js-inventoryManagementSection inventoryManagementSection">
-                <InventoryManagement :options="{
+                <InventoryManagement :key="trackInventoryBy" :options="{
                     trackBy: trackInventoryBy,
                     quantity: formData.item.quantity,
                     errors: ob.errors['item'] || {},
@@ -282,7 +283,7 @@
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['item.skus']" :errors="ob.errors['item.skus']" />
                 <div class="js-variantInventoryTableContainer">
-                  <VariantInventory ref="variantInventory" :key="`${formData.item.price}_${formData.metadata.pricingCurrency.code}`"
+                  <VariantInventory ref="variantInventory" :key="`${formData.item.price}_${formData.metadata.pricingCurrency.code}_${variantOptionsKey}`"
                     :options="{
                       basePrice: formData.item.price,
                       listingCurrency: formData.metadata.pricingCurrency.code,
@@ -290,7 +291,7 @@
                     :bb="function() {
                       return {
                         collection: model.get('item').get('skus'),
-                        optionsCl: model.get('item').get('options'),
+                        optionsCl: variantOptionsCl,
                       }
                     }"
                   />
@@ -395,6 +396,7 @@ import Sortable from 'sortablejs';
 import _ from 'underscore';
 import path from 'path';
 import Backbone from 'backbone';
+import bigNumber from 'bignumber.js';
 import 'velocity-animate/velocity.ui';
 import app from '../../../../backbone/app';
 import { isScrolledIntoView, openExternal } from '../../../../backbone/utils/dom';
@@ -460,6 +462,7 @@ export default {
 
       getCoinTypesDeferred: $.Deferred(),
       variantOptionsCl: [],
+      variantOptionsKey: 0,
       coupons: [],
 
       formData: {
@@ -960,6 +963,8 @@ export default {
     },
 
     onUpdateVariantOptions() {
+      this.variantOptionsKey += 1;
+
       if (this.showVariantInventorySection) {
         if (this.trackInventoryBy !== 'DO_NOT_TRACK') {
           this.trackInventoryBy = 'TRACK_BY_VARIANT';
@@ -1213,6 +1218,7 @@ export default {
      */
     setModelData() {
       let formData = this.formData;
+      formData.item.price = bigNumber(formData.item.price);
 
       const item = this.model.get('item');
       const metadata = this.model.get('metadata');
@@ -1323,7 +1329,7 @@ export default {
     render() {
       const item = this.model.get('item');
 
-      $(this.$refs.editListingTags).selectize({
+      this.editListingTags = $(this.$refs.editListingTags).selectize({
         persist: false,
         maxItems: item.max.tags,
         create: (input) => {
@@ -1340,15 +1346,21 @@ export default {
             text: term,
           };
         },
+        onChange: () => {
+          this.formData.item.tags = this.editListingTags[0].selectize.items;
+        }
       });
 
-      $(this.$refs.editListingCategories).selectize({
+      this.editListingCategories = $(this.$refs.editListingCategories).selectize({
         persist: false,
         maxItems: item.max.cats,
         create: (input) => ({
           value: input,
           text: input,
         }),
+        onChange: () => {
+          this.formData.item.categories = this.editListingCategories[0].selectize.items;
+        }
       });
 
       if (this.sortablePhotos) this.sortablePhotos.destroy();

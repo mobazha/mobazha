@@ -5,8 +5,7 @@
     </template>
     <td class="clrBr">
       <FormError v-if="ob.errors['surcharge']" :errors="ob.errors['surcharge']" />
-      <input type="number" class="clrBr clrP clrSh2" @change="onChangeSurchange($event)" name="surcharge"
-        :value="ob.number.toStandardNotation(formData.surcharge)" placeholder="0.00" data-var-type="bignumber" />
+      <input type="number" class="clrBr clrP clrSh2" v-model="formData.surcharge" placeholder="0.00" data-var-type="bignumber" />
     </td>
     <td class="clrBr js-totalPrice">{{ ob.calculateTotalPrice(formData.surcharge || ob.bigNumber('0')) }}</td>
     <td class="clrBr">
@@ -16,9 +15,8 @@
     <td class="clrBr unconstrainedWidth quantityCol">
       <FormError v-if="ob.errors['quantity']" :errors="ob.errors['quantity']" />
       <div class="flexVCent gutterH">
-        <input type="number" class="clrBr clrP clrSh2 " @focus="onFocusQuantity" @keyup="onKeyupQuantity" name="quantity"
-          :value="formData.infiniteInventory ? infiniteQuantityChar : formData.quantity" data-var-type="bignumber" placeholder="0" />
-        <input type="checkbox" :id="`${ob.cid}_inventoryItemUnlimtedCheckbox`" class="centerLabel" v-model="formData.infiniteInventory" name="infiniteInventory">
+        <input type="number" class="clrBr clrP clrSh2 " v-model="formData.quantity" :placeholder="quantityPlaceholder" data-var-type="bignumber"/>
+        <input type="checkbox" :id="`${ob.cid}_inventoryItemUnlimtedCheckbox`" class="centerLabel" v-model="formData.infiniteInventory" @change="changeInfinite">
         <label class="tx5b flexNoShrink" :for="`${ob.cid}_inventoryItemUnlimtedCheckbox`">{{ ob.polyT('editListing.variantInventory.unlimitedQuantityLabel') }}</label>
       </div>
     </td>
@@ -67,6 +65,13 @@ export default {
         max: this.model.max,
       };
     },
+    quantityPlaceholder() {
+      if (this.formData.infiniteInventory) {
+        return this.infiniteQuantityChar;
+      } else {
+        return 0;
+      }
+    }
   },
   methods: {
     initFormData() {
@@ -77,6 +82,10 @@ export default {
         quantity: model.quantity,
         infiniteInventory: model.infiniteInventory,
       }
+
+      if (this.formData.infiniteInventory) {
+        this.formData.quantity = this.infiniteQuantityChar;
+      }
     },
     loadData () {
       if (!this.model) {
@@ -86,23 +95,11 @@ export default {
       this.initFormData();
     },
 
-    onChangeSurchange(event) {
-      this.formData.surcharge = event.target.value;
-    },
-
-    onFocusQuantity (e) {
-      if (e.target.value === this.infiniteQuantityChar) {
-        e.target.setSelectionRange(0, e.target.value.length);
-      }
-    },
-
-    onKeyupQuantity (e) {
-      if (e.target.value !== this.infiniteQuantityChar) {
-        this.formData.infiniteInventory = false;
-        this.formData.quantity = e.target.value;
-      } else {
-        this.formData.infiniteInventory = true;
+    changeInfinite() {
+      if (this.formData.infiniteInventory) {
         this.formData.quantity = '';
+      } else {
+        this.formData.quantity = 0;
       }
     },
 
@@ -110,12 +107,16 @@ export default {
     setModelData () {
       const formData = this.formData;
 
+      formData.surcharge = bigNumber(formData.surcharge);
+
       if (formData.infiniteInventory) {
         delete formData.quantity;
         this.model.unset('quantity');
+      } else {
+        formData.quantity = bigNumber(formData.quantity);
       }
 
-      this.model.set(formData);
+      this.model.set(formData, { validate: true });
     },
 
     calculateTotalPrice (surcharge) {

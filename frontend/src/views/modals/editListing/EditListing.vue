@@ -107,7 +107,7 @@
                               data-var-type="bignumber"
                             />
                             <Select2 id="editListingCurrency" v-model="formData.metadata.pricingCurrency.code" class="clrBr clrP nestInputRight">
-                              <template v-for="(currency, j) in ob.currencies" :key="j">
+                              <template v-for="(currency, j) in currencies" :key="j">
                                 <option :value="currency.code" :selected="currency.code.toUpperCase() === formData.metadata.pricingCurrency.code.toUpperCase()">
                                   {{ currency.code }}
                                 </option>
@@ -174,17 +174,7 @@
                       <div class="col12">
                         <label for="editListingDescription">{{ ob.polyT('editListing.description') }}</label>
                         <FormError v-if="ob.errors['item.description']" :errors="ob.errors['item.description']" />
-                        <div
-                          ref="editListingDescription"
-                          contenteditable
-                          class="clrBr clrSh2"
-                          @input="onChangeDescription"
-                          id="editListingDescription"
-                          :placeholder="ob.polyT('editListing.placeholderDescription')"
-                          v-html="formData.item.description"
-                        >
-                        </div>
-                        <!-- <Tinymce ref="tinymce" @input="inputTinymce" :height="300" /> -->
+                        <Tinymce class="clrBr clrSh2" id="editListingDescription" v-model="formData.item.description" :height="500" :placeholder="ob.polyT('editListing.placeholderDescription')" ></Tinymce>
                       </div>
                     </div>
                   </form>
@@ -408,7 +398,6 @@ import Backbone from 'backbone';
 import 'velocity-animate/velocity.ui';
 import app from '../../../../backbone/app';
 import { isScrolledIntoView, openExternal } from '../../../../backbone/utils/dom';
-import { installRichEditor } from '../../../../backbone/utils/lib/trumbowyg';
 import { startAjaxEvent, endAjaxEvent } from '../../../../backbone/utils/metrics';
 import { getCurrenciesSortedByCode, getCurrencyByCode } from '../../../../backbone/data/currencies';
 import {
@@ -435,7 +424,7 @@ import InventoryManagement from './InventoryManagement.vue';
 import VariantInventory from './VariantInventory.vue';
 import Coupons from './Coupons.vue';
 
-// import Tinymce from './../../../components/Tinymce/index.vue';
+import Tinymce from './../../../components/Tinymce/index.vue';
 
 export default {
   components: {
@@ -446,6 +435,7 @@ export default {
     InventoryManagement,
     VariantInventory,
     Coupons,
+    Tinymce,
   },
   props: {
     options: {
@@ -512,14 +502,11 @@ export default {
       const item = this.model.get('item');
       const metadata = this.model.get('metadata');
 
-      this.currencies = this.currencies || getCurrenciesSortedByCode();
-
       return {
         ...this.templateHelpers,
         createMode: this.createMode,
         returnText: this.options.returnText,
         countryList: this.countryList,
-        currencies: this.currencies,
         contractTypes: metadata.contractTypesVerbose,
         conditionTypes: this.model.get('item')
           .conditionTypes
@@ -682,6 +669,8 @@ export default {
       // we'll clone and update it on sync
       this._origModel = this.model;
       this.model = this._origModel.clone();
+
+      this.currencies = getCurrenciesSortedByCode();
 
       this.initFormData();
 
@@ -1331,18 +1320,8 @@ export default {
       return this;
     },
 
-    onChangeDescription() {
-      this.formData.item.description = this.$refs.editListingDescription.innerHTML;
-    },
-
-    // inputTinymce(value) {
-    //   this.formData.item.description = value;
-    // },
-
     render() {
       const item = this.model.get('item');
-
-      this.currencies = this.currencies || getCurrenciesSortedByCode();
 
       $(this.$refs.editListingTags).selectize({
         persist: false,
@@ -1370,10 +1349,6 @@ export default {
           value: input,
           text: input,
         }),
-      });
-
-      installRichEditor($('#editListingDescription'), {
-        topLevelClass: 'clrBr',
       });
 
       if (this.sortablePhotos) this.sortablePhotos.destroy();

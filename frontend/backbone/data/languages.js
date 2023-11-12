@@ -1069,15 +1069,18 @@ export const translationLangs = [
     name: 'Arabic',
     code: 'ar',
     trumbowyg: 'ar',
+    tinymce: 'ar',
   },
   {
     name: '中文 (Chinese, S)',
     code: 'zh_CN',
+    tinymce: 'zh_CN',
   },
   {
     name: 'Czech (Czech Republic)',
     code: 'cs_CZ',
     trumbowyg: 'cz',
+    tinymce: 'cs_CZ',
   },
   // {
   //   name: 'Croatian (Croatian, Croatia)',
@@ -1087,16 +1090,19 @@ export const translationLangs = [
     name: 'Dansk (Danish)',
     code: 'da',
     trumbowyg: 'da',
+    tinymce: 'da',
   },
   {
     name: 'Deutsch (German, Germany)',
     code: 'de_DE',
     trumbowyg: 'de',
+    tinymce: 'de',
   },
   {
     name: 'Dutch (Dutch, Netherlands)',
     code: 'nl_NL',
     trumbowyg: 'nl',
+    tinymce: 'nl',
   },
   {
     name: 'English (English, Australia)',
@@ -1106,6 +1112,7 @@ export const translationLangs = [
     name: 'Espa&ntilde;ol (Spanish)',
     code: 'es',
     trumbowyg: 'es',
+    tinymce: 'es_419',
   },
   // {
   //   name: 'Esperanto',
@@ -1115,11 +1122,13 @@ export const translationLangs = [
     name: 'Français (French, Canada)',
     code: 'fr_CA',
     trumbowyg: 'fr',
+    tinymce: 'fr',
   },
   {
     name: 'Français (French)',
     code: 'fr',
     trumbowyg: 'fr',
+    tinymce: 'fr',
   },
   // {
   //   name: 'Greek (Greek)',
@@ -1129,6 +1138,7 @@ export const translationLangs = [
     name: 'Italiano (Italian, Italy)',
     code: 'it_IT',
     trumbowyg: 'it',
+    tinymce: 'it',
   },
   // {
   //   name: '日本語 (Japanese, Japan)',
@@ -1138,6 +1148,7 @@ export const translationLangs = [
     name: 'Norwegian (Bokmål)',
     code: 'nb',
     trumbowyg: 'no_nb',
+    tinymce: 'nb_NO',
   },
   // {
   //   name: '한국어 (Korean)',
@@ -1147,11 +1158,13 @@ export const translationLangs = [
     name: 'Polski (Polish)',
     code: 'pl',
     trumbowyg: 'pl',
+    tinymce: 'pl',
   },
   {
     name: 'Português (Portuguese, Brazil)',
     code: 'pt_BR',
     trumbowyg: 'pt_br',
+    tinymce: 'pt_BR',
   },
   // {
   //   name: 'Română (Romanian)',
@@ -1161,6 +1174,7 @@ export const translationLangs = [
     name: 'Russian (Russian)',
     code: 'ru',
     trumbowyg: 'ru',
+    tinymce: 'ru',
   },
   // {
   //   name: 'Slovenský jazyk (Slovak)',
@@ -1174,6 +1188,7 @@ export const translationLangs = [
     name: 'Українська (Ukrainian)',
     code: 'uk',
     trumbowyg: 'ua',
+    tinymce: 'uk',
   },
   // {
   //   name: 'Uzbek (Uzbek)',
@@ -1209,4 +1224,13 @@ export function getTrumboLangFileNameByCode(code) {
 
   const lang = getIndexedTranslationLang()[code];
   return lang ? lang.trumbowyg : null;
+}
+
+export function getTinymceLangFileNameByCode(code) {
+  if (!code) {
+    throw new Error('Please provide a language code.');
+  }
+
+  const lang = getIndexedTranslationLang()[code];
+  return lang ? lang.tinymce : null;
 }

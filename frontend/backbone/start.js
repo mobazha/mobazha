@@ -61,10 +61,6 @@ $(function() {
 });
 
 app.localSettings.on('change:language', (localSettings, lang) => {
-  app.polyglot.extend(
-    require(`./languages/${lang}.json`),
-  ); // eslint-disable-line global-require
-
   moment.locale(lang);
 
   const restartLangChangeDialog = new Dialog({

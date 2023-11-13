@@ -62,6 +62,10 @@ export default class extends BaseModel {
       addError('storeModerators', 'The storeModerators is invalid because it is not an array');
     }
 
+    if (!(attrs.shippingOptions instanceof ShippingOptions)) {
+      addError('shippingOptions', 'A nested ShippingOptions collection is required.');
+    }
+
     if (Object.keys(errObj).length) return errObj;
 
     return undefined;

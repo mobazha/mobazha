@@ -743,6 +743,10 @@
         "fail": "Non è stato possibile salvare le impostazioni del negozio. ",
         "error": "C'è stato un errore nel salvataggio delle impostazioni del negozio. "
       },
+      "shippingOption": {
+        "error": "Impossibile eliminare l'unica opzione di spedizione.",
+        "noShippingOption": "There are physical listings in the Store. At least one shipping option should be provided."
+      },
       "errors": {
         "modNotFoundTitle": "Moderatore non trovato",
         "modsNotFound": "%{guids} could not be found on the network. It may not be a valid peer ID. |||| %{guids} could not be found on the network. They may not be valid peer IDs.",
@@ -1996,7 +2000,7 @@
   "listingModelErrors": {
     "returnPolicyTooLong": "La descrizione della politica di reso supera il numero di caratteri consentito.",
     "termsAndConditionsTooLong": "I termini e le condizioni superano il limite di caratteri consentito.",
-    "provideShippingOption": "Per i beni fisici, almeno una modalità di spedizione è richiesta.",
+    "provideShippingOption": "Per i beni fisici, almeno una modalità di spedizione è richiesta. Configuralo nelle Impostazioni del negozio.",
     "tooManyCoupons": "Non puoi avere più di %{maxCouponCount} codici promozionali.",
     "couponsPriceTooLarge": "Lo sconto non può essere uguale o maggiore del prezzo dell'annuncio."
   },

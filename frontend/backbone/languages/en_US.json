@@ -750,6 +750,10 @@
         "fail": "Saving the store settings failed.",
         "error": "There was an error saving your store settings."
       },
+      "shippingOption": {
+        "error": "Cannot delete the only shipping option.",
+        "noShippingOption": "There are physical listings in the Store. At least one shipping option should be provided."
+      },
       "errors": {
         "modNotFoundTitle": "Moderator Not Found",
         "modsNotFound": "%{guids} could not be found on the network. It may not be a valid peer ID. |||| %{guids} could not be found on the network. They may not be valid peer IDs.",
@@ -2024,7 +2028,7 @@
   "listingModelErrors": {
     "returnPolicyTooLong": "The return policy exceeds the maximum allowable length.",
     "termsAndConditionsTooLong": "The terms and conditions exceed the maximum allowable length.",
-    "provideShippingOption": "For a physical good, at least one shipping option is required.",
+    "provideShippingOption": "For a physical good, at least one shipping option is required. Please configure it in your Store Settings.",
     "tooManyCoupons": "You cannot have more than %{maxCouponCount} coupons.",
     "couponsPriceTooLarge": "The discount amount cannot be equal to or greater than the listing price.",
     "skuPriceTooLow": "A surcharge can be zero. But if providing a value larger than zero, the minimum value for a surcharge in %{cur} is %{min}.",

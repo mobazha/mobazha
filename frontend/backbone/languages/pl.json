@@ -743,6 +743,10 @@
         "fail": "Saving the store settings failed.",
         "error": "There was an error saving your store settings."
       },
+      "shippingOption": {
+        "error": "Nie można usunąć jedynej opcji wysyłki.",
+        "noShippingOption": "There are physical listings in the Store. At least one shipping option should be provided."
+      },
       "errors": {
         "modNotFoundTitle": "Nie znaleziono moderatora",
         "modsNotFound": "%{guids} could not be found on the network. It may not be a valid peer ID. |||| %{guids} could not be found on the network. They may not be valid peer IDs.",
@@ -1996,7 +2000,7 @@
   "listingModelErrors": {
     "returnPolicyTooLong": "The return policy exceeds the maximum allowable length.",
     "termsAndConditionsTooLong": "Przekroczono limit znaków dla warunków umowy.",
-    "provideShippingOption": "For a physical good, at least one shipping option is required.",
+    "provideShippingOption": "W przypadku towaru fizycznego wymagana jest co najmniej jedna opcja wysyłki. Skonfiguruj to w Ustawieniach Sklepu.",
     "tooManyCoupons": "Przekroczono limit kuponów (maksymalnie %{maxCouponCount}).",
     "couponsPriceTooLarge": "Wartość zniżki nie może być równa/większa niż cena przedmiotu."
   },

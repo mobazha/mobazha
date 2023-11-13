@@ -743,6 +743,10 @@
         "fail": "Shop-Einstellungen konnten nicht gespeichert werden.",
         "error": "Beim Speichern Ihrer Shop-Einstellungen ist ein Fehler aufgetreten."
       },
+      "shippingOption": {
+        "error": "Die einzige Versandoption kann nicht gelöscht werden.",
+        "noShippingOption": "There are physical listings in the Store. At least one shipping option should be provided."
+      },
       "errors": {
         "modNotFoundTitle": "Der Moderator konnte nicht gefunden werden",
         "modsNotFound": "%{guids} could not be found on the network. It may not be a valid peer ID. |||| %{guids} could not be found on the network. They may not be valid peer IDs.",
@@ -1996,7 +2000,7 @@
   "listingModelErrors": {
     "returnPolicyTooLong": "Die Rücknahmegarantie überschreitet die maximal zulässige Länge.",
     "termsAndConditionsTooLong": "Die Geschäftsbedingungen überschreiten die maximal zulässige Länge.",
-    "provideShippingOption": "Für materielle Ware wird mindestens eine Versandoption benötigt.",
+    "provideShippingOption": "Für materielle Ware wird mindestens eine Versandoption benötigt. Bitte konfigurieren Sie es in Ihren Store-Einstellungen.",
     "tooManyCoupons": "Sie können nicht mehr als %{maxCouponCount} Gutscheine haben.",
     "couponsPriceTooLarge": "Der Ermäßigungsbetrag darf nicht gleich oder größer als der Preis des Artikels sein."
   },

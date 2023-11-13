@@ -743,6 +743,10 @@
         "fail": "El guardado de las configuraciones de la tienda ha fallado.",
         "error": "Hubo un error guardando las configuraciones de tu tienda."
       },
+      "shippingOption": {
+        "error": "No se puede eliminar la única opción de envío.",
+        "noShippingOption": "There are physical listings in the Store. At least one shipping option should be provided."
+      },
       "errors": {
         "modNotFoundTitle": "Moderador No Encontrado",
         "modsNotFound": "%{guids} could not be found on the network. It may not be a valid peer ID. |||| %{guids} could not be found on the network. They may not be valid peer IDs.",
@@ -1996,7 +2000,7 @@
   "listingModelErrors": {
     "returnPolicyTooLong": "La política de devolución excede la longitud máxima permitida.",
     "termsAndConditionsTooLong": "Los términos y condiciones exceden la longitud máxima permitida.",
-    "provideShippingOption": "Para un bien físico, se requiere al menos una opción de envío.",
+    "provideShippingOption": "Para un bien físico, se requiere al menos una opción de envío. Configúrelo en la configuración de su tienda.",
     "tooManyCoupons": "No puedes tener mas de %{maxCouponCount} cupones.",
     "couponsPriceTooLarge": "El monto del descuento no puede ser igual o mayor que el precio de publicación"
   },

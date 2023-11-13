@@ -743,6 +743,10 @@
         "fail": "La sauvegarde des paramètres de la boutique a échoué.",
         "error": "Une erreur s'est produite lors de la sauvegarde des réglages de la boutique."
       },
+      "shippingOption": {
+        "error": "Impossible de supprimer la seule option d'expédition.",
+        "noShippingOption": "There are physical listings in the Store. At least one shipping option should be provided."
+      },
       "errors": {
         "modNotFoundTitle": "Modérateur non trouvé",
         "modsNotFound": "%{guids} n'a pas pu être trouvé sur le réseau. Le peer ID n'est peut-être pas valide. |||| %{guids} n'ont pas pu être trouvés sur le réseau. Les peer ID ne sont peut-être pas valides.",
@@ -1996,7 +2000,7 @@
   "listingModelErrors": {
     "returnPolicyTooLong": "Les conditions de retour dépassent la longueur maximale autorisée.",
     "termsAndConditionsTooLong": "Les conditions générales dépassent la longueur maximale autorisée.",
-    "provideShippingOption": "Pour un produit physique, vous devez fournir au moins une option d'expédition.",
+    "provideShippingOption": "Pour un produit physique, vous devez fournir au moins une option d'expédition. Veuillez le configurer dans les paramètres de votre boutique.",
     "tooManyCoupons": "Vous ne pouvez pas avoir plus de %{maxCouponCount} codes promotionnels",
     "couponsPriceTooLarge": "La réduction ne peut pas être égale ou supérieure au prix original."
   },

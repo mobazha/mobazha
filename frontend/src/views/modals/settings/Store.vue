@@ -354,8 +354,17 @@ export default {
         })
       );
     },
+    hasPhysicalListing() {
+      const stats = app.profile.get('stats');
+      return stats.get('physicalListingCount') > 0;
+    },
     onRemoveShippingOption(md) {
-      this.shippingOptions.remove(md);
+      if (this.hasPhysicalListing() && this.shippingOptions.length == 1 && this.shippingOptions.at(0).cid === md.cid) {
+        openSimpleMessage(app.polyglot.t('settings.storeTab.shippingOption.error'),
+          app.polyglot.t('settings.storeTab.shippingOption.noShippingOption'));
+      } else {
+        this.shippingOptions.remove(md);
+      }
     },
     onBulkCoinUpdateConfirm() {
       const newCoins = this.$refs.currencySelector.getState().activeCurs;

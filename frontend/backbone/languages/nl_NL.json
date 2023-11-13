@@ -743,6 +743,10 @@
         "fail": "Opslaan van winkel instellingen mislukt",
         "error": "Fout bij opslaan van winkel instellingen"
       },
+      "shippingOption": {
+        "error": "Kan de enige verzendoptie niet verwijderen.",
+        "noShippingOption": "There are physical listings in the Store. At least one shipping option should be provided."
+      },
       "errors": {
         "modNotFoundTitle": "Moderator niet gevonden",
         "modsNotFound": "%{guids} kon niet gevonden worden op het netwerk. Het is mogelijk niet een valide peer ID. |||| %{guids} konden niet gevonden worden op het netwerk. Het zijn mogelijk niet valide peer IDs.",
@@ -1996,7 +2000,7 @@
   "listingModelErrors": {
     "returnPolicyTooLong": "Het terugstuurbeleid overschrijd het maximaal aantal karakters.",
     "termsAndConditionsTooLong": "De verkoopvoorwaarden overschrijden de maximaal toegestande lengte. ",
-    "provideShippingOption": "Voor een fysiek artikel is in ieder geval 1 verzend optie verplicht.",
+    "provideShippingOption": "Voor een fysiek artikel is in ieder geval 1 verzend optie verplicht. Configureer het in uw winkelinstellingen.",
     "tooManyCoupons": "Je mag niet meer dan %{maxCouponCount} coupons hebben.",
     "couponsPriceTooLarge": "Het kortingsbedrag kan niet gelijk of groter zijn dan de artikelprijs."
   },

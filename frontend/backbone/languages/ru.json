@@ -743,6 +743,10 @@
         "fail": "Сбой сохранения настроек магазина.",
         "error": "Произошла ошибка при сохранении настроек магазина."
       },
+      "shippingOption": {
+        "error": "Невозможно удалить единственный вариант доставки.",
+        "noShippingOption": "There are physical listings in the Store. At least one shipping option should be provided."
+      },
       "errors": {
         "modNotFoundTitle": "Модератор не найден",
         "modsNotFound": "%{guids} could not be found on the network. It may not be a valid peer ID. |||| %{guids} could not be found on the network. They may not be valid peer IDs.",
@@ -1996,7 +2000,7 @@
   "listingModelErrors": {
     "returnPolicyTooLong": "The return policy exceeds the maximum allowable length.",
     "termsAndConditionsTooLong": "The terms and conditions exceed the maximum allowable length.",
-    "provideShippingOption": "For a physical good, at least one shipping option is required.",
+    "provideShippingOption": "Для физического товара требуется хотя бы один вариант доставки. Пожалуйста, настройте его в настройках вашего магазина.",
     "tooManyCoupons": "You cannot have more than %{maxCouponCount} coupons.",
     "couponsPriceTooLarge": "Сумма скидки не может быть равна или больше, чем цена в объявлении."
   },

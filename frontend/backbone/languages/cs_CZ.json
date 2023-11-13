@@ -743,6 +743,10 @@
         "fail": "Ukládání nastavení obchodu se nezdařilo.",
         "error": "Při ukládání nastavení obchodu došlo k chybě."
       },
+      "shippingOption": {
+        "error": "Nelze smazat jedinou možnost dopravy.",
+        "noShippingOption": "V obchodě jsou fyzické záznamy. Měla by být poskytnuta alespoň jedna možnost dopravy."
+      },
       "errors": {
         "modNotFoundTitle": "Moderátor nalezen",
         "modsNotFound": "%{guids} nelze najít v síti. Nemusí to být platný peer ID. |||| %{guids} nelze najít v síti. Nemusí to být platné peer ID.",
@@ -1996,7 +2000,7 @@
   "listingModelErrors": {
     "returnPolicyTooLong": "Zásady vrácení překračují maximální povolenou délku.",
     "termsAndConditionsTooLong": "Podmínky překračují maximální povolenou délku.",
-    "provideShippingOption": "Pro fyzické zboží je vyžadována alespoň jedna možnost dopravy.",
+    "provideShippingOption": "Pro fyzické zboží je vyžadována alespoň jedna možnost dopravy. Nakonfigurujte jej prosím v nastavení vašeho obchodu.",
     "tooManyCoupons": "Nemůžeš mít více než %{maxCouponCount} kupónů.",
     "couponsPriceTooLarge": "Částka slevy nemůže být stejná nebo vyšší než cena uvedená na produktu."
   },

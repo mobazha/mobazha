@@ -745,6 +745,10 @@
         "fail": "保存商店设置失败。",
         "error": "保存商店设置时发生错误。"
       },
+      "shippingOption": {
+        "error": "无法删除唯一的快递选项。",
+        "noShippingOption": "商店中有物理商品，应至少提供一种快递选项。"
+      },
       "errors": {
         "modNotFoundTitle": "未找到仲裁人",
         "modsNotFound": "在网络上找不到%{guids}，它可能不是有效的节点ID。 ||||| 在网络上找不到 {guids}，它们可能不是有效的节点ID。",
@@ -1999,7 +2003,7 @@
   "listingModelErrors": {
     "returnPolicyTooLong": "退货条款超出允许的最大长度。",
     "termsAndConditionsTooLong": "其他条款和条件超过最大允许长度。",
-    "provideShippingOption": "对于物理货物，至少需要提供一个快递选项。",
+    "provideShippingOption": "对于物理货物，至少需要提供一个快递选项。请在您的商店设置中进行配置。",
     "tooManyCoupons": "您不能拥有超过%{maxCouponCount}张优惠券。",
     "couponsPriceTooLarge": "折扣金额不能等于或大于商品价格。"
   },

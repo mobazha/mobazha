@@ -743,6 +743,10 @@
         "fail": "Saving the store settings failed.",
         "error": "There was an error saving your store settings."
       },
+      "shippingOption": {
+        "error": "Kan ikke slette den eneste forsendelsesmulighed.",
+        "noShippingOption": "There are physical listings in the Store. At least one shipping option should be provided."
+      },
       "errors": {
         "modNotFoundTitle": "Moderator Not Found",
         "modsNotFound": "%{guids} could not be found on the network. It may not be a valid peer ID. |||| %{guids} could not be found on the network. They may not be valid peer IDs.",
@@ -1996,7 +2000,7 @@
   "listingModelErrors": {
     "returnPolicyTooLong": "Politik om returret overskrider den maksimalt tilladte længde.",
     "termsAndConditionsTooLong": "The terms and conditions exceed the maximum allowable length.",
-    "provideShippingOption": "For a physical good, at least one shipping option is required.",
+    "provideShippingOption": "For en fysisk vare kræves der mindst én forsendelsesmulighed. Konfigurer det i dine butiksindstillinger.",
     "tooManyCoupons": "Du kan ikke have mere end %{maxCouponCount} rabatkuponer.",
     "couponsPriceTooLarge": "The discount amount cannot be equal to or greater than the listing price."
   },

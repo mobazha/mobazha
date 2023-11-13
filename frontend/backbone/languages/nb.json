@@ -743,6 +743,10 @@
         "fail": "Butikkinnstillinger kunne ikke lagres.",
         "error": "Det oppstod en feil ved lagring av dine butikkinnstillinger."
       },
+      "shippingOption": {
+        "error": "Kan ikke slette det eneste fraktalternativet.",
+        "noShippingOption": "There are physical listings in the Store. At least one shipping option should be provided."
+      },
       "errors": {
         "modNotFoundTitle": "Moderator Ikke Funnet",
         "modsNotFound": "%{guids} ble ikke funnet på nettverket. Det er kanskje ikke en gyldig node ID. |||| %{guids} ble ikke funnet på nettverket. De er kanskje ikke gyldige node IDer.",
@@ -1996,7 +2000,7 @@
   "listingModelErrors": {
     "returnPolicyTooLong": "Regler for retur overskrider maks tillatte lengde.",
     "termsAndConditionsTooLong": "Vilkår og betingelser overskrider maks tillatt lengde.",
-    "provideShippingOption": "For en fysisk vare er minst ett fraktalternativ nødvendig.",
+    "provideShippingOption": "For en fysisk vare er minst ett fraktalternativ nødvendig. Vennligst konfigurer den i butikkinnstillingene.",
     "tooManyCoupons": "Du kan ikke ha flere enn %{maxCouponCount} kuponger.",
     "couponsPriceTooLarge": "Rabattsummen kan ikke være lik eller større enn prisen."
   },

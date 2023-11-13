@@ -1,6 +1,10 @@
 import app from '../../app';
 import is from 'is_js';
 import BaseModel from '../BaseModel';
+import {
+  getCoinDivisibility,
+  CUR_VAL_RANGE_TYPES,
+} from '../../utils/currency';
 
 export default class extends BaseModel {
   defaults() {
@@ -34,6 +38,40 @@ export default class extends BaseModel {
     } else if (!attrs.estimatedDelivery) {
       addError('estimatedDelivery', app.polyglot.t('serviceModelErrors.provideEstDeliveryTime'));
     }
+
+    const cur = app.settings.get('localCurrency');
+    const curDefCurrency = {
+      code: () => cur,
+      divisibility: () => getCoinDivisibility(cur),
+    };
+    
+    this.validateCurrencyAmount(
+      {
+        amount: attrs.price,
+        currency: curDefCurrency,
+      },
+      addError,
+      `price`,
+      {
+        validationOptions: {
+          rangeType: CUR_VAL_RANGE_TYPES.GREATER_THAN_OR_EQUAL_ZERO,
+        },
+      }
+    );
+
+    this.validateCurrencyAmount(
+      {
+        amount: attrs.additionalWeightPrice,
+        currency: curDefCurrency,
+      },
+      addError,
+      `additionalWeightPrice`,
+      {
+        validationOptions: {
+          rangeType: CUR_VAL_RANGE_TYPES.GREATER_THAN_OR_EQUAL_ZERO,
+        },
+      }
+    );
 
     if (Object.keys(errObj).length) return errObj;
 

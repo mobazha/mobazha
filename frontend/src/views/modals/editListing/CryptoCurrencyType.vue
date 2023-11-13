@@ -99,6 +99,8 @@
 </template>
 
 <script>
+import _ from 'underscore';
+import bigNumber from 'bignumber.js';
 import app from '../../../../backbone/app';
 import { supportedWalletCurs } from '../../../../backbone/data/walletCurrencies';
 import { isJQPromise } from '../../../../backbone/utils/object';
@@ -139,7 +141,10 @@ export default {
       handler(val) {
         if (val.metadata.contractType !== 'CRYPTOCURRENCY') {
           // Restore acceptedCurrencies if not CRYPTOCURRENCY to switch back
-          this.formData.metadata.acceptedCurrencies = this.model.get('metadata').get('acceptedCurrencies');
+          val.metadata.acceptedCurrencies = this.model.get('metadata').get('acceptedCurrencies');
+        }
+        if (!_.isEmpty(val.item.cryptoQuantity)) {
+          val.item.cryptoQuantity = bigNumber(val.item.cryptoQuantity);
         }
         this.$emit('update:modelValue', val);
       },

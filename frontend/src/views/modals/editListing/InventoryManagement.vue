@@ -33,6 +33,8 @@
 </template>
 
 <script>
+import _ from 'underscore';
+import bigNumber from 'bignumber.js';
 
 export default {
   props: {
@@ -78,7 +80,9 @@ export default {
   },
   methods: {
     onChangeQuantityInput (e) {
-      this.$emit('changeInventoryQuantity', e.target.value);
+      if (!_.isEmpty(e.target.value)) {
+        this.$emit('changeInventoryQuantity', bigNumber(e.target.value));
+      }
     },
 
     onChangeManagementType (e) {

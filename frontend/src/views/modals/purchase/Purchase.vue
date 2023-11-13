@@ -848,7 +848,10 @@ export default {
       }
 
       this.quantityKeyUpTimer = setTimeout(() => {
-        const { quantity } = this.getFormData($(e.target));
+        let { quantity } = this.getFormData($(e.target));
+        if (!_.isEmpty(quantity)) {
+          quantity = bigNumber(quantity);
+        }
         if (this.listing.isCrypto) this._cryptoQuantity = quantity;
         this.setModelQuantity(quantity);
       }, 150);

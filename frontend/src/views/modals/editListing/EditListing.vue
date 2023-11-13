@@ -1086,7 +1086,7 @@ export default {
 
     _onScroll() {
       for (const tab of this.tabs) {
-      if (isScrolledIntoView(this.$refs[`section${capitalize(tab.key)}`])) {
+        if (isScrolledIntoView(this.$refs[`section${capitalize(tab.key)}`])) {
           this.activeTab = tab.key;
           break;
         }
@@ -1218,7 +1218,9 @@ export default {
      */
     setModelData() {
       let formData = this.formData;
-      formData.item.price = bigNumber(formData.item.price);
+      if (!_.isEmpty(formData.item.price)) {
+        formData.item.price = bigNumber(formData.item.price);
+      }
 
       const item = this.model.get('item');
       const metadata = this.model.get('metadata');

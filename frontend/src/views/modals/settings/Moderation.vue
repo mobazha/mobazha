@@ -179,6 +179,8 @@
 
 <script>
 import $ from 'jquery';
+import _ from 'underscore';
+import bigNumber from 'bignumber.js';
 import '../../../../backbone/utils/lib/selectize';
 import app from '../../../../backbone/app';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
@@ -291,7 +293,11 @@ export default {
 
     getFormDataEx () {
       const fields = this.$el.querySelectorAll('select[name], input[name], textarea[name]');
-      return this.getFormData(fields);
+      const formData = this.getFormData(fields);
+      if (!_.isEmpty(formData.fee.fixedFee.amount)) {
+        formData.fee.fixedFee.amount = bigNumber(formData.fee.fixedFee.amount);
+      }
+      return formData;
     },
 
     save () {

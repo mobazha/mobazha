@@ -24,8 +24,9 @@
 </template>
 
 <script>
-import { formatCurrency } from '../../../../backbone/utils/currency';
+import _ from 'underscore';
 import bigNumber from 'bignumber.js';
+import { formatCurrency } from '../../../../backbone/utils/currency';
 
 export default {
   props: {
@@ -107,12 +108,14 @@ export default {
     setModelData () {
       const formData = this.formData;
 
-      formData.surcharge = bigNumber(formData.surcharge);
+      if (!_.isEmpty(formData.surcharge)) {
+        formData.surcharge = bigNumber(formData.surcharge);
+      }
 
       if (formData.infiniteInventory) {
         delete formData.quantity;
         this.model.unset('quantity');
-      } else {
+      } else if (!_.isEmpty(formData.quantity)) {
         formData.quantity = bigNumber(formData.quantity);
       }
 

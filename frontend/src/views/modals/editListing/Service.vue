@@ -33,6 +33,9 @@
 </template>
 
 <script>
+import _ from 'underscore';
+import bigNumber from 'bignumber.js';
+
 export default {
   props: {
     options: {
@@ -78,7 +81,15 @@ export default {
     // Sets the model based on the current data in the UI.
     setModelData () {
       const fields = this.$el.querySelectorAll('select[name], input[name], textarea[name]');
-      this.model.set(this.getFormData(fields));
+      const formData = this.getFormData(fields);
+      if (!_.isEmpty(formData.price)) {
+        formData.price = bigNumber(formData.price);
+      }
+      if (!_.isEmpty(formData.additionalWeightPrice)) {
+        formData.additionalWeightPrice = bigNumber(formData.additionalWeightPrice);
+      }
+
+      this.model.set(formData);
     },
   }
 }

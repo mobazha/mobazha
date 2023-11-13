@@ -63,7 +63,7 @@
 
 <script>
 import _ from 'underscore';
-import $ from 'jquery';
+import bigNumber from 'bignumber.js';
 import app from '../../../../backbone/app';
 import { getCurrenciesSortedByCode } from '../../../../backbone/data/currencies';
 import { endAjaxEvent, recordEvent, startAjaxEvent } from '../../../../backbone/utils/metrics';
@@ -164,7 +164,12 @@ export default {
     },
 
     onClickSend () {
-      this.model.set(this.formData);
+      const formData = this.formData;
+      if (!_.isEmpty(formData.amount)) {
+        formData.amount = bigNumber(formData.amount);
+      }
+
+      this.model.set(formData);
       this.model.set({}, { validate: true });
 
       if (!this.model.validationError) {

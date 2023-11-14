@@ -279,10 +279,6 @@ export default class extends BaseModel {
       addError('metadata', 'A nested Metadata model is required.');
     }
 
-    if (!(attributes.shippingOptions instanceof ShippingOptions)) {
-      addError('shippingOptions', 'A nested ShippingOptions collection is required.');
-    }
-
     if (!(attributes.coupons instanceof Coupons)) {
       addError('coupons', 'A nested Coupons collection is required.');
     }
@@ -301,6 +297,13 @@ export default class extends BaseModel {
       } else if (attrs.termsAndConditions.length > this.max.termsAndConditionsLength) {
         addError('termsAndConditions',
           app.polyglot.t('listingModelErrors.termsAndConditionsTooLong'));
+      }
+    }
+
+    if (contractType === 'PHYSICAL_GOOD') {
+      const shippingOptions = app.settings.get('shippingOptions');
+      if (!shippingOptions.length) {
+        addError('shippingOptions', app.polyglot.t('listingModelErrors.provideShippingOption'));
       }
     }
 
@@ -525,20 +528,6 @@ export default class extends BaseModel {
           let curDef = decimalToCurDef(options.attrs.item.price, options.attrs.metadata.pricingCurrency.code);
           options.attrs.item.price = curDef.amount;
 
-          options.attrs.shippingOptions.forEach(shipOpt => {
-            shipOpt.services.forEach(service => {
-              service.price = decimalToInteger(
-                service.price,
-                coinDiv
-              );
-              service.additionalWeightPrice =
-                decimalToInteger(
-                  service.additionalWeightPrice,
-                  coinDiv
-                );
-            });
-          });
-
           options.attrs.coupons.forEach(coupon => {
             if (coupon.priceDiscount) {
               coupon.priceDiscount =
@@ -619,14 +608,6 @@ export default class extends BaseModel {
 
         // remove the hash
         delete options.attrs.hash;
-
-        // If all countries are individually provided as shipping regions, we'll send
-        // 'ALL' to the server.
-        options.attrs.shippingOptions.forEach(shipOpt => {
-          if (_.isEqual(Object.keys(getIndexedCountries()), shipOpt.regions)) {
-            shipOpt.regions = ['ALL'];
-          }
-        });
 
         if (app.serverConfig.testnet) {
           options.attrs.metadata.escrowTimeoutHours =

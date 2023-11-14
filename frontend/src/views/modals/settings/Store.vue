@@ -459,6 +459,7 @@ export default {
       const byID = this.modsByID.selectedIDs;
       const available = this.modsAvailable.selectedIDs;
       return {
+        localCurrency: app.settings.get('localCurrency'),
         storeModerators: [...new Set([...selected, ...byID, ...available])],
         shippingOptions: this.shippingOptions.toJSON(),
       };

@@ -6,6 +6,13 @@ import ShippingAddresses from '../../collections/ShippingAddresses';
 import ShippingOptions from '../../collections/listing/ShippingOptions'
 import SMTPSettings from './SMTPSettings';
 
+import {
+  decimalToInteger,
+  integerToDecimal,
+  isValidCoinDivisibility,
+  getCoinDivisibility,
+} from '../../utils/currency';
+
 export default class extends BaseModel {
   defaults() {
     return {
@@ -78,6 +85,24 @@ export default class extends BaseModel {
       options.type = 'PUT';
     }
 
+    if (method !== 'read' && method !== 'delete') {
+      const currency = options.attrs.localCurrency ? options.attrs.localCurrency : this.get('localCurrency');
+      const coinDiv = getCoinDivisibility(currency);
+      options.attrs.shippingOptions.forEach(shipOpt => {
+        shipOpt.services.forEach(service => {
+          service.price = decimalToInteger(
+            service.price,
+            coinDiv
+          );
+          service.additionalWeightPrice =
+            decimalToInteger(
+              service.additionalWeightPrice,
+              coinDiv
+            );
+        });
+      });
+    }
+
     return super.sync(method, model, options);
   }
 
@@ -89,6 +114,40 @@ export default class extends BaseModel {
       // do not allow own node to be in the blocked list
       response.blockedNodes = response.blockedNodes
         .filter((peerID) => peerID !== app.profile.id);
+    }
+
+    if (response.shippingOptions && response.shippingOptions.length) {
+      const currencyCode = response.localCurrency;
+      let coinDiv;
+      try {
+        coinDiv = getCoinDivisibility(currencyCode);
+      } catch (e) {
+        // pass
+      }
+
+      const [isValidCoinDiv] = isValidCoinDivisibility(coinDiv);
+
+      if (!isValidCoinDiv) {
+        console.error('Unable to convert price fields. The coin divisibility is not valid. Currency: ', currencyCode);
+      }
+
+      response.shippingOptions.forEach((shipOpt, shipOptIndex) => {
+        if (shipOpt.services && shipOpt.services.length) {
+          shipOpt.services.forEach(service => {
+            service.price = integerToDecimal(
+              service.price,
+              coinDiv,
+              { fieldName: 'service.price' }
+            );
+            service.additionalWeightPrice =
+              integerToDecimal(
+                service.additionalWeightPrice,
+                coinDiv,
+                { fieldName: 'service.additionalWeightPrice' }
+              );
+          });
+        }
+      });
     }
 
     return response;

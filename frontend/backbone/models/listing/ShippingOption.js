@@ -63,4 +63,26 @@ export default class extends BaseModel {
 
     return undefined;
   }
+
+  sync(method, model, options) {
+    if (method !== 'read' && method !== 'delete') {
+      // If all countries are individually provided as shipping regions, we'll send
+      // 'ALL' to the server.
+      if (_.isEqual(Object.keys(getIndexedCountries()), options.attrs.regions)) {
+        options.attrs.regions = ['ALL'];
+      }
+    }
+
+    return super.sync(method, model, options);
+  }
+
+  parse(response = {}) {
+    // If the shipping regions are set to 'ALL', we'll replace with a list of individual
+    // countries, which is what our UI is designed to work with.
+    if (response.regions && response.regions.length && response.regions[0] === 'ALL') {
+      response.regions = Object.keys(getIndexedCountries());
+    }
+
+    return response;
+  }
 }

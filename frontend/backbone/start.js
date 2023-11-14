@@ -873,6 +873,10 @@ serverConnectEvents.on('connected', (connectedEvent) => {
           msg: app.polyglot.t('publish.statusPublishing'),
           type: 'message',
         });
+
+        // If a physical listing is added or removed, the profile stats(for example stats.physicalListingCount)
+        // would be changed. It would affect whether shippingOption in Setting can be deleted or not if the last.
+        app.profile.fetch();
       } else if (e.jsonData.status === 'error publishing') {
         setPublishingStatus({
           msg: app.polyglot.t('publish.statusPublishFailed', {

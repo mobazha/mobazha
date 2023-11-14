@@ -6,9 +6,10 @@ import is from 'is_js';
 export default class extends BaseModel {
   defaults() {
     return {
-      type: 'FIXED_PRICE',
-      regions: [],
       name: '',
+      type: 'FIXED_PRICE',
+      currency: '',
+      regions: [],
       services: new Services(),
     };
   }
@@ -81,6 +82,12 @@ export default class extends BaseModel {
     // countries, which is what our UI is designed to work with.
     if (response.regions && response.regions.length && response.regions[0] === 'ALL') {
       response.regions = Object.keys(getIndexedCountries());
+    }
+
+    if (response.services && response.services.length) {
+      response.services.forEach((service) => {
+        service.currency = response.currency;
+      });
     }
 
     return response;

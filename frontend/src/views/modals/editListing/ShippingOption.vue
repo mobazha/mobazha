@@ -39,7 +39,7 @@
               :placeholder="ob.polyT('editListing.shippingOptions.namePlaceholder')"
             />
           </div>
-          <div class="col6 simpleFlexCol">
+          <div class="col4 simpleFlexCol">
             <label :for="`shipOptionType_${ob.cid}`" class="required">{{ ob.polyT('editListing.shippingOptions.typeLabel') }}</label>
             <FormError v-if="ob.errors['type']" :errors="ob.errors['type']" />
             <Select2
@@ -51,6 +51,17 @@
               <template v-for="(shippingType, j) in ob.shippingTypes" :key="j">
                 <option :value="shippingType" :selected="formData.type === shippingType">
                   {{ ob.polyT(`editListing.shippingOptions.shippingTypes.${shippingType}`) }}
+                </option>
+              </template>
+            </Select2>
+          </div>
+          <div class="col2 simpleFlexCol">
+            <label :for="`currency_${ob.cid}`" class="required">{{ ob.polyT('settings.currency') }}</label>
+            <FormError v-if="ob.errors['currency']" :errors="ob.errors['currency']" />
+            <Select2 :id="`currency_${ob.cid}`" v-model="formData.currency" class="clrBr clrP clrSh2 marginTopAuto">
+              <template v-for="(currency, j) in currencies" :key="j">
+                <option :value="currency.code" :selected="currency.code.toUpperCase() === formData.currency.toUpperCase()">
+                  {{ currency.code }}
                 </option>
               </template>
             </Select2>
@@ -93,6 +104,7 @@ import $ from 'jquery';
 import '../../../../backbone/utils/lib/selectize';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 import regions, { getTranslatedRegions, getIndexedRegions } from '../../../../backbone/data/regions';
+import { getCurrenciesSortedByCode } from '../../../../backbone/data/currencies';
 import ServiceMd from '../../../../backbone/models/listing/Service';
 import Service from './Service.vue';
 
@@ -113,7 +125,8 @@ export default {
         regions: [],
         name: '',
         type: '',
-      }
+      },
+      currencies: getCurrenciesSortedByCode(),
     };
   },
   created() {
@@ -147,6 +160,7 @@ export default {
         regions: model.regions,
         name: model.name,
         type: model.type,
+        currency: model.currency,
       }
     },
     loadData() {

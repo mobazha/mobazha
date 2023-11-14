@@ -28,7 +28,7 @@
                 {{
                   ob.currencyMod.convertAndFormatCurrency(
                     service.price,
-                    ob.pricingCurrency,
+                    option.currency,
                     ob.displayCurrency
                   )
                 }}
@@ -43,7 +43,7 @@
                 {{
                   ob.currencyMod.convertAndFormatCurrency(
                     service.additionalWeightPrice,
-                    ob.pricingCurrency,
+                    option.currency,
                     ob.displayCurrency
                   )
                 }}

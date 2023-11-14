@@ -86,9 +86,10 @@ export default class extends BaseModel {
     }
 
     if (method !== 'read' && method !== 'delete') {
-      const currency = options.attrs.localCurrency ? options.attrs.localCurrency : this.get('localCurrency');
-      const coinDiv = getCoinDivisibility(currency);
+      
       options.attrs.shippingOptions.forEach(shipOpt => {
+        const coinDiv = getCoinDivisibility(shipOpt.currency);
+
         shipOpt.services.forEach(service => {
           service.price = decimalToInteger(
             service.price,
@@ -117,21 +118,21 @@ export default class extends BaseModel {
     }
 
     if (response.shippingOptions && response.shippingOptions.length) {
-      const currencyCode = response.localCurrency;
-      let coinDiv;
-      try {
-        coinDiv = getCoinDivisibility(currencyCode);
-      } catch (e) {
-        // pass
-      }
-
-      const [isValidCoinDiv] = isValidCoinDivisibility(coinDiv);
-
-      if (!isValidCoinDiv) {
-        console.error('Unable to convert price fields. The coin divisibility is not valid. Currency: ', currencyCode);
-      }
-
       response.shippingOptions.forEach((shipOpt, shipOptIndex) => {
+        const currencyCode = shipOpt.currency;
+        let coinDiv;
+        try {
+          coinDiv = getCoinDivisibility(currencyCode);
+        } catch (e) {
+          // pass
+        }
+
+        const [isValidCoinDiv] = isValidCoinDivisibility(coinDiv);
+
+        if (!isValidCoinDiv) {
+          console.error('Unable to convert price fields. The coin divisibility is not valid. Currency: ', currencyCode);
+        }
+
         if (shipOpt.services && shipOpt.services.length) {
           shipOpt.services.forEach(service => {
             service.price = integerToDecimal(

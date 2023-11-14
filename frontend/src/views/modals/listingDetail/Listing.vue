@@ -509,7 +509,6 @@ export default {
       return {
         templateData,
         displayCurrency: app.settings.get('localCurrency'),
-        pricingCurrency: this.model.price.currencyCode,
       };
     },
     showNsfwWarning() {

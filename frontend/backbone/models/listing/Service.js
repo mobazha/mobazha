@@ -13,6 +13,7 @@ export default class extends BaseModel {
       price: '',
       additionalWeightPrice: '',
       estimatedDelivery: '',
+      currency: '',
     };
   }
 
@@ -39,10 +40,9 @@ export default class extends BaseModel {
       addError('estimatedDelivery', app.polyglot.t('serviceModelErrors.provideEstDeliveryTime'));
     }
 
-    const cur = app.settings.get('localCurrency');
     const curDefCurrency = {
-      code: () => cur,
-      divisibility: () => getCoinDivisibility(cur),
+      code: () => attrs.currency,
+      divisibility: () => getCoinDivisibility(attrs.currency),
     };
     
     this.validateCurrencyAmount(

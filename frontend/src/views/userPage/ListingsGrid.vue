@@ -1,15 +1,10 @@
 <template>
   <div :class="`listingsGrid flex ${viewType === 'list' ? 'listingsGridListView' : ''}`" :key="viewType">
     <template v-for="model in collection" :key="model.cid">
-      <ListingCard :options="{
-          viewType,
-          profile: storeOwnerProfile,
-          // Flag so the listing card knows it's on a store. This is useful to
-          // the listing detail modal and will be passed into there.
-          onStore: true,
-        }" :bb="function() {
+      <ListingCard :options="getCardOptions(model)" :bb="function() {
           return {
             model,
+            profile: storeOwnerProfile,
           }
         }"
       />
@@ -55,6 +50,31 @@ export default {
     },
   },
   methods: {
+    getCardOptions(model) {
+      let listingBaseUrl;
+
+      // The listingBaseUrl can be directly provided as an option or we
+      // will attempt to derive it from a passed in Profile model or
+      // Vendor information in the listing short models.
+      if (this.options.listingBaseUrl) {
+        listingBaseUrl = this.options.listingBaseUrl;
+      } else if (model.get('vendor')) {
+        const base = model.get('vendor').handle ? `@${model.get('vendor').handle}` : model.get('vendor').peerID;
+        listingBaseUrl = `${base}/store/`;
+      } else if (this.storeOwnerProfile) {
+        const base = this.storeOwnerProfile.get('handle') ? `@${this.storeOwnerProfile.get('handle')}` : this.storeOwnerProfile.id;
+        listingBaseUrl = `${base}/store/`;
+      }
+
+      return {
+        listingBaseUrl,
+        viewType: this.viewType,
+
+        // Flag so the listing card knows it's on a store. This is useful to
+        // the listing detail modal and will be passed into there.
+        onStore: true,
+      };
+    }
   },
 };
 </script>

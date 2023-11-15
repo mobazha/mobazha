@@ -236,7 +236,7 @@
       <div class="vendorCol">
         <div class="flex gutterH">
           <div>
-            <a class="userIcon disc clrBr2 clrSh1 js-userLink" :style="ob.getAvatarBgImage(ob.vendor.avatarHashes)" :href="`#${ob.vendor.peerID}/store`" @click.stop="onClickUserLink"></a>
+            <a class="userIcon disc clrBr2 clrSh1 js-userLink" :style="ob.getAvatarBgImage(avatarHashes)" :href="`#${ob.vendor.peerID}/store`" @click.stop="onClickUserLink"></a>
           </div>
           <div class="flexCol gutterVTn">
             <div>
@@ -360,9 +360,37 @@
         {{ ob.polyT('listingCard.deleted') }}
       </div>
     </div>
+
+    <Teleport to="#js-vueModal">
+			<BlockedWarning v-if="showBlockedModal" :options="{ ownerGuid }"
+				@canceled="onBlockWarningCanceled"
+				@unblock="onUnBlockedModal"
+			/>
+			<LoadingUser v-else-if="showListingLoading"
+				:userName="storeName"
+				:userAvatarHashes="avatarHashes"
+				:contentText="loadingContextText"
+				:isProcessing="isLoadingUser"
+				@clickCancel="onClickLoadingCancel" @clickRetry="onClickLoadingRetry"/>
+			<ListingDetail ref="listingDetail" v-else-if="showListingDetailModal"
+				:key="listingDetailKey"
+				:options="{
+          vendor: options.vendor,
+          openedFromStore: !!options.onStore,
+          checkNsfw: !_userClickedShowNsfw,
+				}"
+				:bb="function() {
+					return {
+						profile: profile,
+						model: fullListing,
+					}
+				}"
+				@refresh="listingDetailKey += 1"
+				@close="onListingDetailClose"
+			/>
+		</Teleport>
   </div>
-  <div v-else class="listingCard col clrBr clrT clrP clrSh2 contentBox ListingCard-errorCard" v-html="cardErrorInfo">
-  </div>
+  <div v-else class="listingCard col clrBr clrT clrP clrSh2 contentBox ListingCard-errorCard" v-html="cardErrorInfo"></div>
 </template>
 
 <script>
@@ -383,7 +411,16 @@ import Report from '../../../backbone/views/modals/Report';
 
 import { getListingOptions } from '@/utils/verifiedMod'
 
+import BlockedWarning from '../../views/modals/BlockedWarning.vue';
+import LoadingUser from '../../views/modals/LoadingUser.vue';
+import ListingDetail from '../../views/modals/listingDetail/Listing.vue';
+
 export default {
+  components: {
+		BlockedWarning,
+		LoadingUser,
+		ListingDetail,
+	},
   props: {
     options: {
       type: Object,
@@ -399,6 +436,17 @@ export default {
       destroyClass: '',
       blocked: false,
       hideNsfw: false,
+
+      showBlockedModal: false,
+
+      showListingLoading: false,
+      loadingContextText: '',
+      isLoadingUser: false,
+
+      showListingDetailModal: false,
+      listingDetailKey: 0,
+
+      routeOnOpen: '',
 
       app: app,
     };
@@ -443,13 +491,47 @@ export default {
       return `background-image: url('../imgs/defaultItem.png')`;
     },
     vendorAvatarStyle() {
-      const vendor = this.model.get('vendor');
-      if (vendor && vendor.avatarHashes) {
-        const avatarImageSrc = app.getServerUrl(`ob/image/${isHiRez() ? vendor.avatarHashes.small : vendor.avatarHashes.tiny}`);
+      if (this.avatarHashes) {
+        const avatarImageSrc = app.getServerUrl(`ob/image/${isHiRez() ? this.avatarHashes.small : this.avatarHashes.tiny}`);
 
         return `background-image: url(${avatarImageSrc}), url('../imgs/defaultAvatar.png')`;
       }
       return `background-image: url('../imgs/defaultAvatar.png')`;
+    },
+    avatarHashes() {
+      let avatarHashes;
+
+      if (this.profile) {
+        avatarHashes = this.profile.get('avatarHashes').toJSON();
+      } else if (this.options.vendor) {
+        avatarHashes = this.options.vendor.avatarHashes;
+      }
+      return avatarHashes;
+    },
+    storeName() {
+      let storeName = `${this.ownerGuid.slice(0, 8)}…`;
+
+      if (this.profile) {
+        storeName = this.profile.get('name');
+      } else if (this.options.vendor) {
+        storeName = this.options.vendor.name;
+      }
+
+      if (storeName.length > 40) {
+        storeName = `${storeName.slice(0, 40)}…`;
+      }
+      return storeName;
+    },
+    titleInLoadingDialog() {
+      const title = this.model.get('title');
+      return title.length > 25 ? `${title.slice(0, 25)}…` : title;
+    },
+    segmentation() {
+      return {
+        ownListing: !!this.ownListing,
+        openedFromStore: !!this.options.onStore,
+        searchUrl: (this.options.searchUrl && this.options.searchUrl.hostname) || 'none',
+      };
     },
     priceMaxDisplayDecimals() {
       let ob = this.ob;
@@ -639,17 +721,196 @@ export default {
     onClickUserLink() {
     },
 
+    onFailedListingFetch(xhr) {
+      if (typeof xhr !== 'object') {
+        throw new Error('Please provide the failed xhr.');
+      }
+
+      this.loadingContextText = app.polyglot.t('userPage.loading.failTextListing', {
+        listing: `<b>${this.titleInLoadingDialog}</b>`,
+      });
+      this.isLoadingUser = false;
+
+      let err = (xhr.responseJSON && xhr.responseJSON.reason) || xhr.statusText
+          || 'unknown error';
+      // Consolidate and remove specific data from no link errors.
+      if (err.startsWith('no link named')) err = 'no link named under hash';
+      endAjaxEvent('Listing_LoadFromCard', {
+        ...this.segmentation,
+        errors: err,
+      });
+    },
+
+    handleOutdatedHash(listingData = {}, hashData) {
+      const { oldHash, newHash } = hashData;
+
+      if (typeof listingData !== 'object') {
+        throw new Error('Please provide the listing data as an object.');
+      }
+
+      if (typeof oldHash !== 'string' || !oldHash) {
+        throw new Error('Please provide an oldHash as a non-empty string.');
+      }
+
+      if (typeof newHash !== 'string' || !newHash) {
+        throw new Error('Please provide an newHash as a non-empty string.');
+      }
+
+      recordEvent('Lisitng_OutdatedHashFromCard', this.segmentation);
+
+      this.getFullListing().set(this.getFullListing().parse(listingData));
+
+      // push mapping to outdatedHashes collection
+      outdateHash(oldHash, newHash);
+    },
+
+    showListingDetail() {
+      endAjaxEvent('Listing_LoadFromCard', {
+        ...this.segmentation,
+      });
+
+      this.showListingLoading = false;
+
+      this.showListingDetailModal = true;
+      this.$nextTick(() => {
+        this.$refs.listingDetail.purchaseModal
+          .progress((getPurchaseE) => {
+            if (getPurchaseE.type === ListingDetail.PURCHASE_MODAL_CREATE) {
+              const purchaseModal = getPurchaseE.view;
+              this.listenTo(purchaseModal, 'clickReloadOutdated', (e) => {
+                e.preventDefault();
+
+                this.showListingDetailModal = true;
+                this.listingDetailKey += 1;
+                purchaseModal.remove();
+              });
+            }
+          });
+      });
+
+      this.$emit('listingDetailOpened');
+
+      app.loadingModal.close();
+    },
+
+    onListingDetailClose() {
+      app.router.navigate(this.routeOnOpen);
+      if (this.ipfsFetch) this.ipfsFetch.abort();
+      this.ipnsFetch.abort();
+    },
+
+    loadListing() {
+      const hash = this.model.get('cid');
+      const listingHash = getNewerHash(hash || this.model.get('hash'));
+
+      if (listingHash && this.ownerGuid !== app.profile.id) {
+        this.ipfsFetch = this.getFullListing().fetch({
+          hash: listingHash,
+          showErrorOnFetchFail: false,
+        });
+        this.ipnsFetch = $.ajax(
+          Listing.getIpnsUrl(
+            this.ownerGuid,
+            this.model.get('slug'),
+          ),
+        );
+      } else {
+        this.ipnsFetch = this.getFullListing().fetch({ showErrorOnFetchFail: false });
+      }
+
+      this.showListingLoading = true;
+      this.loadingContextText = app.polyglot.t('userPage.loading.loadingText', {
+        name: `<b>${this.titleInLoadingDialog}</b>`,
+      });
+      this.isLoadingUser = true;
+
+      this.ipnsFetch.done((data, textStatus, xhr) => {
+        if (xhr.statusText === 'abort' || this.isRemoved()) return;
+
+        if (
+          this.ipfsFetch
+          && ['pending', 'rejected'].includes(this.ipfsFetch.state())
+        ) {
+          this.ipfsFetch.abort();
+          this.getFullListing().set(this.getFullListing().parse(data));
+        }
+
+        if (this.ipfsFetch && this.ipfsFetch.state() === 'resolved') {
+          if (listingHash !== data.cid) {
+            this.handleOutdatedHash(data, {
+              oldHash: listingHash,
+              newHash: data.cid,
+            });
+          }
+        } else {
+          this.showListingDetail();
+        }
+      }).fail((xhr) => {
+        if (xhr.statusText === 'abort') return;
+
+        if (
+          this.ipfsFetch
+          && ['pending', 'resolved'].includes(this.ipfsFetch.state())
+        ) return;
+
+        this.onFailedListingFetch(xhr);
+      });
+
+      if (this.ipfsFetch) {
+        this.ipfsFetch.done((data, textStatus, xhr) => {
+          if (xhr.statusText === 'abort' || this.isRemoved()) return;
+          this.showListingDetail();
+        }).fail((xhr) => {
+          if (xhr.statusText === 'abort') return;
+          this.onFailedListingFetch(xhr);
+        });
+      }
+    },
+
+    loadListingDetail() {
+      this.routeOnOpen = location.hash.slice(1);
+      app.router.navigateUser(`${this.options.listingBaseUrl}${this.model.get('slug')}`, this.ownerGuid);
+
+      startAjaxEvent('Listing_LoadFromCard');
+
+      this.ipnsFetch = null;
+      this.ipfsFetch = null;
+
+      if (isBlocked(this.ownerGuid) && !isUnblocking(this.ownerGuid)) {
+        this.showBlockedModal = true;
+      } else {
+        this.loadListing();
+      }
+    },
+
+    onBlockWarningCanceled() {
+      app.router.navigate(this.routeOnOpen);
+    },
+
+    onUnBlockedModal() {
+      this.showBlockedModal = false;
+
+      this.loadListing();
+    },
+
+    onClickLoadingCancel() {
+      this.ipnsFetch.abort();
+      if (this.ipfsFetch) this.ipfsFetch.abort();
+
+      this.showListingLoading = false;
+      app.router.navigate(this.routeOnOpen);
+    },
+
+    onClickLoadingRetry() {
+      app.router.navigate(this.routeOnOpen);
+
+      this.loadListingDetail();
+    },
 
     onClick(e) {
       if (this.deleteConfirmOn) return;
 
-      const slug = this.model.get('slug');
-
-      if (this.$route.params.guid === this.ownerGuid) {
-        app.router.navigate(`${this.ownerGuid}/store/${slug}`);
-      } else {
-        app.router.navigate(`${this.ownerGuid}/store/${slug}`, { trigger: true });
-      }
+      this.loadListingDetail();
     },
 
     onClickShowNsfw() {

@@ -352,6 +352,8 @@ export default {
 
       outdateHash: false,
 
+      vendor: undefined,
+
       variantOptions: [],
 
       activePhotoIndex: 0,
@@ -421,25 +423,6 @@ export default {
         isCrypto: this.model.isCrypto,
         _: { sortBy: _.sortBy },
       };
-    },
-    vendor() {
-      // In most cases the page opening this modal will already have and be able
-      // to provide the vendor information. If it cannot, then I suppose we
-      // could fetch the profile and lazy load it in, but we can cross that
-      // bridge when we get to it.
-
-      // Sometimes a profile model is available and the vendor info
-      // can be obtained from that.
-      if (this.profile) {
-        return {
-          peerID: this.profile.id,
-          name: this.profile.get('name'),
-          handle: this.profile.get('handle'),
-          avatarHashes: this.profile.get('avatarHashes').toJSON(),
-        };
-      }
-
-      return this.options.vendor;
     },
     templateOptions () {
       const ob = this.ob;
@@ -564,6 +547,24 @@ export default {
       this._purchaseModal = null;
       this._latestHash = this.model.get('hash');
       this._renderedHash = null;
+
+      // Sometimes a profile model is available and the vendor info
+      // can be obtained from that.
+      const profile = this.profile;
+      if (profile) {
+        this.vendor = {
+          peerID: profile.id,
+          name: profile.get('name'),
+          handle: profile.get('handle'),
+          avatarHashes: profile.get('avatarHashes').toJSON(),
+        };
+      }
+
+      // In most cases the page opening this modal will already have and be able
+      // to provide the vendor information. If it cannot, then I suppose we
+      // could fetch the profile and lazy load it in, but we can cross that
+      // bridge when we get to it.
+      this.vendor = this.vendor || opts.vendor;
 
       this.variantOptions = [];
       const itemOptions = this.model.get('item').get('options').toJSON();

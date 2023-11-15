@@ -108,7 +108,7 @@
     <Teleport to="#js-vueModal">
       <BlockedWarning v-if="showBlockedModal" :options="{ peerID }"
        @canceled="onBlockWarningCanceled"
-       @close="cleanUpBlockedModal"
+       @unblock="onUnblock"
       />
       <Loading v-else-if="showUserLoading"
         :userName="_model.name"
@@ -152,7 +152,7 @@ import Listings from '../../../backbone/collections/Listings';
 import Followers from '../../../backbone/collections/Followers';
 
 import BlockedWarning from '../modals/BlockedWarning.vue'
-import Loading from './Loading.vue'
+import Loading from '../modals/LoadingUser.vue'
 import MiniProfile from '../MiniProfile.vue';
 import PageNotFound from '../error-pages/PageNotFound.vue'
 
@@ -258,7 +258,6 @@ export default {
         this.setBlockedClass();
       }
     });
-    this.listenTo(blockEvents, 'unblocking unblocked', this.onUnblock);
   },
   unmounted() {
     if (this.followingFetch) this.followingFetch.abort();
@@ -285,6 +284,8 @@ export default {
   methods: {
     abbrNum,
     onBlockWarningCanceled(){
+      this.showBlockedModal = false;
+
       if (window.history.state.back === null) {
         // there is no previous page, let's navigate to our home page
         this.$router.push({ path: `/${app.profile.id}`});
@@ -293,12 +294,12 @@ export default {
         this.$router.back();
       }
     },
-    onUnblock(data) {
-      if (data.peerIDs.includes(this.model.id)) {
-        let { guid, state, slug } = this.$route.params;
+    onUnblock() {
+      this.showBlockedModal = false;
 
-        this.init(guid, state, slug);
-      }
+      let { guid, state, slug } = this.$route.params;
+
+      this.init(guid, state, slug);
     },
     init(guid, state, slug) {
       const options = this.preLoad(guid, state, slug);
@@ -436,8 +437,7 @@ export default {
         this.isLoadingUser = false;
       })
         .always(() => {
-          const dismissedCallout = getCurrentConnection()
-            && getCurrentConnection().server.get('dismissedDiscoverCallout');
+          const dismissedCallout = getCurrentConnection() && getCurrentConnection().server.get('dismissedDiscoverCallout');
           endAjaxEvent('UserPageLoad', {
             ownPage: guid === app.profile.id,
             tab: this.activeTab,
@@ -518,7 +518,7 @@ export default {
     },
 
     setBlockedClass() {
-      this.isBlockedUser = isBlocked(this.model.id);
+      this.isBlockedUser = isBlocked(this.model.id) && !isUnblocking(this.model.id);
     },
 
     followBB(type) {

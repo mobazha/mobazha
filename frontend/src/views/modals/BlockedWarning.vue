@@ -69,16 +69,11 @@ export default {
 
     onCancelClick () {
       this.$emit('canceled');
-      this.close();
     },
 
     onUnblockClick () {
       unblock(this.options.peerID);
-      this.close();
-    },
-
-    close() {
-      this.$emit('close');
+      this.$emit('unblock');
     },
   }
 }

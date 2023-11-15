@@ -1,6 +1,6 @@
 <template>
   <div :class="`userPageStore ${listingsViewType == 'list' ? 'listView' : ''}`" @scroll="onStoreListingsScroll">
-    <div class="popInMessageHolder js-storePopInMessages"></div>
+    <div ref="popInMessages" class="popInMessageHolder js-storePopInMessages"></div>
     <div class="userPageSearchBar flex gutterHSm" :disabled="ob.isFetching || ob.fetchFailed || !ob.listingCount">
       <div class="flexExpand">
         <div class="searchWrapper">
@@ -403,7 +403,7 @@ export default {
           this.dataChangePopIn = null;
         });
 
-        this.$popInMessages().append(this.dataChangePopIn.render().el);
+        $(this.$refs.popInMessages).append(this.dataChangePopIn.render().el);
       }
     },
 
@@ -422,7 +422,7 @@ export default {
           this.shippingChangePopIn = null;
         });
 
-        this.$popInMessages().append(this.shippingChangePopIn.render().el);
+        $(this.$refs.popInMessages).append(this.shippingChangePopIn.render().el);
       }
     },
 
@@ -440,9 +440,6 @@ export default {
 
     $btnRetry() {
       return $('.js-retryFetch');
-    },
-    $popInMessages() {
-      return $('.js-storePopInMessages');
     },
 
     /**

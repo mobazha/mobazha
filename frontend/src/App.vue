@@ -16,7 +16,7 @@
     <div id="chatConvoContainer" class="clrP clrBr3"></div>
     <div id="js-vueModal"></div>
 
-    <Purchase v-if="showPurchase" :options="purchaseOptions" :bb="purchaseBBFunc" @close="onPurchaseClose" />
+    <Purchase ref="purchaseModal" v-if="showPurchase" :options="purchaseOptions" :bb="purchaseBBFunc" @close="onPurchaseClose" />
 
     <!-- <KeepAlive v-if="initialized" :exclude="['EditListing', 'Settings', 'About', 'ShoppingCart', 'Purchase']"> -->
       <component v-if="modalName" :is="modalName" :name="modalName" ref="modalInstance"
@@ -86,6 +86,8 @@ export default {
       this.purchaseOptions = options;
       this.purchaseBBFunc = bbFunc;
       this.showPurchase = true;
+
+      return this.$refs.purchaseModal;
     },
 
     launchModal(modalName, options, bbFunc = undefined) {

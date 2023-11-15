@@ -152,6 +152,8 @@
                         `<b>${ob.polyT(`conditionTypes.${ob.item.condition.toUpperCase()}`, { _: ob.item.condition })}</b>`
                     })">
                     </div>
+                    <div v-html="ob.polyT('listingDetail.weight', { weight: `<b>${ob.item.grams ? ob.item.grams : 0}</b>` })">
+                    </div>
                   </template>
                 </div>
                 <hr class="rowLg">

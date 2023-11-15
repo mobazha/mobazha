@@ -528,6 +528,9 @@ export default class extends BaseModel {
           let curDef = decimalToCurDef(options.attrs.item.price, options.attrs.metadata.pricingCurrency.code);
           options.attrs.item.price = curDef.amount;
 
+          // Don't need pass shippingOptions. Would get from Store settings
+          delete options.attrs.shippingOptions;
+
           options.attrs.coupons.forEach(coupon => {
             if (coupon.priceDiscount) {
               coupon.priceDiscount =

@@ -1,8 +1,6 @@
 <template>
   <div class="ratingStrip">
-    <template v-if="ob.fetched" >
-      <div v-html="ob.formatRating(ob.averageRating, ob.ratingCount)" />
-    </template>
+    <div v-if="ob.fetched" v-html="ob.formatRating(ob.averageRating, ob.ratingCount)" />
   </div>
 </template>
 

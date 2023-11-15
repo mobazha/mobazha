@@ -93,7 +93,7 @@
                         </div>
                       </div>
                       <div class="flexRow gutterH">
-                        <div class="col6 simpleFlexCol">
+                        <div class="col4 simpleFlexCol">
                           <label for="editListingPrice" class="required">{{ ob.polyT('editListing.price') }}</label>
                           <FormError v-if="ob.errors['item.price']" :errors="ob.errors['item.price']" />
                           <FormError v-if="ob.errors['metadata.pricingCurrency.code']" :errors="ob.errors['metadata.pricingCurrency.code']" />
@@ -116,7 +116,7 @@
                           </div>
                           <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperPrice', { cur: helperCryptoCurName }) }}</div>
                         </div>
-                        <div class="col6 simpleFlexCol conditionWrap">
+                        <div class="col4 simpleFlexCol conditionWrap">
                           <label for="editListingCondition" class="required">{{ ob.polyT('editListing.condition') }}</label>
                           <FormError v-if="ob.errors['item.condition']" :errors="ob.errors['item.condition']" />
                           <Select2 id="editListingCondition" v-model="formData.item.condition" class="clrBr clrP clrSh2 marginTopAuto" style="width: 100%" :options="{ minimumResultsForSearch: Infinity, }">
@@ -125,6 +125,13 @@
                             </template>
                           </Select2>
                           <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperCondition') }}</div>
+                        </div>
+                        <div class="col3 simpleFlexCol weightWrap">
+                          <label for="editListingWeight" class="required">{{ ob.polyT('editListing.weight') }} (g)</label>
+                          <FormError v-if="ob.errors['item.grams']" :errors="ob.errors['item.grams']" />
+                          <input type="number" class="clrBr clrP clrSh2 marginTopAuto" v-model="formData.item.grams"
+                            id="editListingWeight" :placeholder="0" />
+                          <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperWeight') }}</div>
                         </div>
                       </div>
                     </div>
@@ -633,6 +640,7 @@ export default {
           title: model.item.title,
           price: toStandardNotation(model.item.price),
           condition: model.item.condition,
+          grams: model.item.grams,
           productID: model.item.productID,
           nsfw: model.item.nsfw,
           tags: model.item.tags,

@@ -58,6 +58,7 @@ export default class extends BaseModel {
       categories: [],
       nsfw: false,
       condition: 'NEW',
+      grams: Number,
       images: new ListingImages(),
       options: new VariantOptions(),
       skus: new Skus(),

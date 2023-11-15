@@ -138,7 +138,7 @@
         "title": "无法获取您的个人资料和设置数据。"
       },
       "retryOnboardingSave": {
-        "title": "无法保存% {type} 数据。"
+        "title": "无法保存%{type} 数据。"
       },
       "unableToGetFollowData": {
         "title": "无法获取您关注的人的数据"
@@ -562,7 +562,7 @@
       "placeholderNotes": "例如将包裹放在小区收件箱内",
       "sectionName": "收货地址",
       "statusDeletingAddress": "删除地址%{name} ...",
-      "statusDeleteAddressComplete": "地址%{名称}已删除。",
+      "statusDeleteAddressComplete": "地址%{name}已删除。",
       "statusDeleteAddressFailed": "无法删除地址%{name}。",
       "deleteAddressErrorAlertTitle": "无法删除地址%{name}",
       "statusAddingAddress": "添加地址%{name} ...",
@@ -1025,8 +1025,9 @@
     "listingDataChangedPopin": "商品列表数据已更改。",
     "viewPhotos": "查看%{count}张照片 |||| 查看%{count}张照片",
     "type": "类型: %{type}",
-    "condition": "条件: %{条件}",
-    "inventory": "库存: %{库存}",
+    "condition": "条件: %{condition}",
+    "weight": "重量: %{weight} g",
+    "inventory": "库存: %{inventory}",
     "tags": "标签",
     "paymentsAccepted": "付款已接受",
     "noTags": "未添加标签",
@@ -1080,7 +1081,7 @@
       "zeroPriceMsg": "您无法以0或更少的价格进行购买。",
       "outOfStock": "您无法进行购买，因为商品目前缺货。",
       "reloadOutdatedHash": "试着重新加载列表",
-      "outdatedHash": "您正在查看该商家信息的过期版本。 要购买此商家信息，请％{reloadLink}。"
+      "outdatedHash": "您正在查看该商家信息的过期版本。 要购买此商家信息，请%{reloadLink}。"
     }
   },
   "listingCard": {
@@ -1167,6 +1168,7 @@
     "helperSKUWithVariants": "当商品变体存在时，Skus可以在%{variantInventoryLink}部分中声明",
     "variantInventoryLink": "变体库存",
     "helperCondition": "您的商品信息的整体状况",
+    "helperWeight": "产品重量",
     "helperNSFW": "如果是成人内容，则标记是",
     "helperTags": "添加多个标签。输入标签名称，按回车键，重复。",
     "helperCategories": "不支持类别嵌套 例如鞋类->靴子目前不支持）。输入类别名称，按回车键，重复。",
@@ -1181,6 +1183,7 @@
     "visibility": "可见度",
     "price": "价格",
     "condition": "新旧程度",
+    "weight": "重量",
     "sku": "SKU",
     "description": "描述",
     "uploading": "正在上传...",
@@ -1514,14 +1517,14 @@
       "insufficientInventoryTitle": "库存不足",
       "insufficientInventoryBody": "卖家没有足够的库存，只剩下%{remainingInventory}个商品。 |||| 卖家没有足够的库存，只剩下%{remainingInventory}个商品。",
       "reloadOutdatedHash": "加载最新版本",
-      "outdatedHash": "您正在查看该商家信息的过期版本。 要购买商家信息，请％{reloadLink}并重新开始购买流程。"
+      "outdatedHash": "您正在查看该商家信息的过期版本。 要购买商家信息，请%{reloadLink}并重新开始购买流程。"
     }
   },
   "moderators": {
     "moderatorsLoading": "加载仲裁人...",
     "moderatorsXofY": "正在加载仲裁人 %{current}/%{total}",
-    "loadingXofYTimedOut": "已加载％{加载}％{total}版主。 ％{remainder}版主未加载。|||| 已加载％{加载}％{total}版主。 ％{remainder}版主未加载。",
-    "moderatorsLoaded": "％{total}版主加载了|||| 已加载％{total}版主。",
+    "loadingXofYTimedOut": "已加载%{加载}%{total}版主。 %{remainder}版主未加载。|||| 已加载%{加载}%{total}版主。 %{remainder}版主未加载。",
+    "moderatorsLoaded": "%{total}版主加载了|||| 已加载%{total}版主。",
     "noModsMsg": {
       "noModerators": {
         "title": "没有有效的仲裁人可用。",
@@ -1536,7 +1539,7 @@
         "body": "仲裁人可以使用此商品接受的一种或多种其他货币。"
       },
       "noMatchingVerifiedModerators": {
-        "title": "尚未加载已接受％{coin}验证的版主。",
+        "title": "尚未加载已接受%{coin}验证的版主。",
         "body": "尝试查看未经验证的仲裁人。"
       }
     },

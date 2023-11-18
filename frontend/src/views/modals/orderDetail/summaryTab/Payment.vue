@@ -52,8 +52,8 @@
 
                   <template v-else>
                     <div class="posR">
-                      <a class="txU tx6" :disabled="ob.acceptInProgress" @click="onClickRejectOrder">{{ ob.polyT('orderDetail.summaryTab.payment.rejectBtn') }}</a>
-                      <div class=" confirmBox rejectConfirm tx5 arrowBoxTop clrBr clrP clrT" @click="onClickRejectConfirmBox" v-show="ob.rejectConfirmOn">
+                      <a class="txU tx6" :disabled="ob.acceptInProgress" @click.stop="onClickRejectOrder">{{ ob.polyT('orderDetail.summaryTab.payment.rejectBtn') }}</a>
+                      <div class=" confirmBox rejectConfirm tx5 arrowBoxTop clrBr clrP clrT" @click.stop.prevent v-show="rejectConfirmOn">
                         <div class="tx3 txB rowSm">{{ ob.polyT('orderDetail.summaryTab.payment.rejectConfirm.title') }}</div>
                         <p>
                           {{
@@ -130,11 +130,12 @@ export default {
         acceptInProgress: false,
         rejectInProgress: false,
         cancelInProgress: false,
-        rejectConfirmOn: false,
         blockChainTxUrl: '',
         paymentCoin: '',
         paymentCoinDivis: 8,
       },
+
+      rejectConfirmOn: false,
     };
   },
   created () {
@@ -257,7 +258,6 @@ export default {
           acceptInProgress: false,
           rejectInProgress: false,
           cancelInProgress: false,
-          rejectConfirmOn: false,
           blockChainTxUrl: '',
           paymentCoin: '',
           paymentCoinDivis: 8,
@@ -280,26 +280,19 @@ export default {
 
     onClickRejectConfirmed () {
       this.$emit('confirmedRejectClick', { view: this });
-      this.setState({ rejectConfirmOn: false });
+      this.rejectConfirmOn = false;
     },
 
     onClickRejectOrder () {
-      this.setState({ rejectConfirmOn: true });
-      return false;
-    },
-
-    onClickRejectConfirmBox () {
-      // ensure event doesn't bubble so onDocumentClick doesn't
-      // close the confirmBox.
-      return false;
+      this.rejectConfirmOn = true;
     },
 
     onClickRejectConfirmCancel () {
-      this.setState({ rejectConfirmOn: false });
+      this.rejectConfirmOn = false;
     },
 
     onDocumentClick () {
-      this.setState({ rejectConfirmOn: false });
+      this.rejectConfirmOn = false;
     },
 
   }

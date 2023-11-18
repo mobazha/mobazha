@@ -28,7 +28,7 @@
                     ob.polyT('orderDetail.summaryTab.accepted.refundBtn') }}</a>
                   <template v-if="refundConfirmOn">
                     <div class="confirmBox refundConfirm tx5 arrowBoxTop clrBr clrP clrT"
-                      @click="onClickRefundConfirmBox">
+                      @click.stop.prevent>
                       <div class="tx3 txB rowSm">{{ ob.polyT('orderDetail.summaryTab.accepted.refundConfirm.title') }}
                       </div>
                       <p>
@@ -163,13 +163,6 @@ export default {
     onClickRefundOrder () {
       recordEvent('OrderDetails_Refund');
       this.refundConfirmOn = true;
-      return false;
-    },
-
-    onClickRefundConfirmBox () {
-      // ensure event doesn't bubble so onDocumentClick doesn't
-      // close the confirmBox.
-      return false;
     },
 
     onClickRefundConfirmCancel () {

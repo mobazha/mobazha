@@ -22,17 +22,17 @@
                   <button class="btn clrP clrBr" @click="onClickCloneListing">{{ ob.polyT('listingDetail.clone') }}</button>
                   <ProcessingButton
                     :className="`btn js-deleteListing clrP clrBr ${isDeleting ? 'processing' : ''}`"
-                    @click="onClickDeleteListing"
+                    @click.stop="onClickDeleteListing"
                     :btnText="ob.polyT('listingDetail.delete')" />
                 </div>
               </div>
-              <div class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxTop clrBr clrP clrT" v-show="showDeleteConfirmedBox" @click.stop="onClickDeleteConfirmBox">
+              <div class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxTop clrBr clrP clrT" v-show="showDeleteConfirmedBox" @click.stop.prevent>
                 <div class="tx3 txB rowSm">{{ ob.polyT('listingDetail.confirmDelete.title') }}</div>
                 <p>{{ ob.polyT('listingDetail.confirmDelete.body') }}</p>
                 <hr class="clrBr row" />
                 <div class="flexHRight flexVCent gutterHLg buttonBar">
-                  <a class="" @click="onClickConfirmCancel">{{ ob.polyT('listingDetail.confirmDelete.btnCancel') }}</a>
-                  <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph " @click="onClickConfirmedDelete">{{ ob.polyT('listingDetail.confirmDelete.btnConfirm') }}</a>
+                  <a class="" @click.stop="onClickConfirmCancel">{{ ob.polyT('listingDetail.confirmDelete.btnCancel') }}</a>
+                  <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph " @click.stop="onClickConfirmedDelete">{{ ob.polyT('listingDetail.confirmDelete.btnConfirm') }}</a>
                 </div>
               </div>
             </template>
@@ -797,13 +797,6 @@ export default {
     onClickDeleteListing () {
       recordEvent('Listing_DeleteFromListing');
       this.showDeleteConfirmedBox = true;
-      // don't bubble to the document click handler
-      return false;
-    },
-
-    onClickDeleteConfirmBox () {
-      // don't bubble to the document click handler
-      return false;
     },
 
     onClickConfirmedDelete () {

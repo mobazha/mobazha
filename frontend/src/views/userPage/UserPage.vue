@@ -118,9 +118,6 @@
         @clickCancel="onClickLoadingCancel" @clickRetry="onClickLoadingRetry"/>
       <ListingDetail v-else-if="activeTab === 'store' && listing"
         :key="`${listing.cid}_${listingKey}`"
-        :options="{
-          openedFromStore: true,
-        }"
         :bb="function() {
           return {
             profile: model,

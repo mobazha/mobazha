@@ -9,7 +9,6 @@
 <script>
 import app from '../../../backbone/app';
 import { launchSettingsModal } from '../../../backbone/utils/modalManager';
-import loadTemplate from '../../../backbone/utils/loadTemplate';
 
 export default {
   props: {
@@ -57,22 +56,7 @@ export default {
     },
 
     onClickChangeFee() {
-      launchSettingsModal({
-        initialTab: 'Advanced',
-        scrollTo: '.js-feeSection',
-      });
-    },
-
-    render() {
-      loadTemplate('components/feeChange.html', (t) => {
-        this.$el.html(
-          t({
-            ...this.getState(),
-          })
-        );
-      });
-
-      return this;
+      launchSettingsModal({ initialTab: 'Advanced', scrollTo: '.js-feeSection', });
     },
   },
 };

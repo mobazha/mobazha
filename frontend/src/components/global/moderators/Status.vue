@@ -10,6 +10,8 @@
 </template>
 
 <script>
+import _ from 'underscore';
+
 export default {
   props: {
     options: {
@@ -37,6 +39,9 @@ export default {
     this.loadData(this.options);
   },
   mounted() {},
+  unmounted() {
+    clearTimeout(this.spinnerTimeout);
+  },
   computed: {
     ob() {
       return {
@@ -62,7 +67,6 @@ export default {
   methods: {
     loadData(options = {}) {
       const opts = {
-        className: 'moderatorStatus',
         ...options,
         initialState: {
           hidden: true,
@@ -80,7 +84,7 @@ export default {
       this.baseInit(opts);
     },
 
-    setState(state = {}, options = {}) {
+    setState(state = {}) {
       const combinedState = { ...this.getState(), ...state };
       // Any time the state is set to loading, set the spinner timer if needed.
       if (state.loading && combinedState.showSpinner) {
@@ -91,16 +95,11 @@ export default {
           this.setState({ showSpinner: false, mode });
         }, 10000);
       }
-      super.setState(state, options);
+      _.extend(this._state, state);
     },
 
     clickBrowseMore() {
-      this.trigger('browseMore');
-    },
-
-    remove() {
-      clearTimeout(this.spinnerTimeout);
-      super.remove();
+      this.$emit('browseMore');
     },
   },
 };

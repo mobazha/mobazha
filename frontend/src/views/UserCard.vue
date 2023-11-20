@@ -82,7 +82,8 @@ import Profile, { getCachedProfiles } from '../../backbone/models/profile/Profil
 import { isBlocked, events as blockEvents } from '../../backbone/utils/block';
 import { launchModeratorDetailsModal } from '../../backbone/utils/modalManager';
 import { openSimpleMessage } from './modals/SimpleMessage';
-import VerifiedMod, { getModeratorOptions } from './components/VerifiedMod';
+import VerifiedMod from './components/VerifiedMod';
+import { getModeratorOptions } from '@/utils/verifiedMod';
 import BlockedBtn from './components/BlockBtn';
 
 

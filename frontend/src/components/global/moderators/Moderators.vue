@@ -29,8 +29,43 @@
           </div>
         </div>
       </template>
+      <template v-for="card in modCards" :key="model.id">
+        <ModCard
+          ref="modCards"
+          v-show="modShouldRender(card.model)"
+          :options="{
+            purchase: _options.purchase,
+            notSelected: _options.notSelected,
+            radioStyle: _options.radioStyle,
+            controlsOnInvalid: _options.controlsOnInvalid,
+            initialState: {
+              // Moderators that aren't being rendered should never be selected.
+              selectedState: modShouldRender(card.model) ? _options.cardState : _options.notSelected,
+              preferredCurs: getState().preferredCurs,
+            },
+          }"
+          :bb="() => {
+            return {
+              model: card.model,
+            }
+          }"
+          @modSelectChange="onModSelectChange" />
+      </template>
     </div>
-    <div class="js-statusWrapper"></div>
+    <div class="js-statusWrapper">
+      <!-- // create a moderators status view. It should retain it's state between renders of this view. -->
+      <ModeratorsStatus
+        ref="moderatorsStatus"
+        :options="{
+          initialState: {
+            mode: method === 'GET' ? 'loaded' : 'loadingXofY',
+            showLoadBtn,
+            showSpinner,
+          }
+        }"
+        @browseMore="onBrowseMore"
+      />
+    </div>
   </div>
 </template>
 
@@ -42,20 +77,36 @@ import bigNumber from 'bignumber.js';
 import { guid } from '../../../../backbone/utils';
 import app from '../../../../backbone/app';
 import { anySupportedByWallet } from '../../../../backbone/data/walletCurrencies';
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
 import { getSocket } from '../../../../backbone/utils/serverConnect';
 import Moderators from '../../../../backbone/collections/Moderators';
 import Moderator from '../../../../backbone/models/profile/Profile';
-import { openSimpleMessage } from '../../modals/SimpleMessage';
-import ModCard from './Card';
-import ModeratorsStatus from './Status';
+import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
+import ModCard from './Card.vue';
+import ModeratorsStatus from './Status.vue';
 
 export default {
+  components: {
+    ModCard,
+    ModeratorsStatus
+  },
   props: {
     options: {
       type: Object,
-      default: {
-        className: 'moderatorsList',
+      default: {},
+    },
+  },
+  data() {
+    return {
+      _state: {
+        preferredCurs: [],
+        showOnlyCur: '',
+        showVerifiedOnly: false,
+        loading: false,
+      },
+
+      modCards: [],
+
+      _options: {
         apiPath: 'fetchprofiles',
         async: true,
         useCache: true,
@@ -72,16 +123,6 @@ export default {
         showLoadBtn: false,
         showSpinner: true,
       },
-    },
-  },
-  data() {
-    return {
-      _state: {
-        preferredCurs: [],
-        showOnlyCur: '',
-        showVerifiedOnly: false,
-        loading: false,
-      }
     };
   },
   created() {
@@ -90,15 +131,21 @@ export default {
     this.loadData(this.options);
   },
   mounted() {
-    this.render();
+  },
+  unmounted() {
+    this.modFetches.forEach((fetch) => fetch.abort());
   },
   computed: {
     ob() {
+      const state = this.getState();
+      const showMods = this.modCards.filter((card) => this.modShouldRender(card.model));
+      const unVerCount = this.modCards.filter((card) => card.model.hasModCurrency(state.showOnlyCur) && !card.model.isVerified).length;
+      const totalIDs = this.allIDs.length;
       return {
         ...this.templateHelpers,
-        wrapperClasses: this.options.wrapperClasses,
+        wrapperClasses: this._options.wrapperClasses,
         placeholder: !showMods.length && (this.unfetchedMods.length || !totalIDs),
-        purchase: this.options.purchase,
+        purchase: this._options.purchase,
         totalShown: showMods.length,
         totalIDs,
         unVerCount,
@@ -119,6 +166,27 @@ export default {
     },
     msgPath() {
       return `moderators.noModsMsg.no${this.showOnlyCur}${this.showOnlyVer}Moderators`;
+    },
+    allIDs() {
+      return this.moderatorsCol.pluck('peerID');
+    },
+    selectedIDs() {
+      const IDs = [];
+      this.$refs.modCards.forEach((mod) => {
+        if (mod.getState().selectedState === 'selected') {
+          IDs.push(mod.model.id);
+        }
+      });
+      return IDs;
+    },
+    unselectedIDs() {
+      const IDs = [];
+      this.$refs.modCards.forEach((mod) => {
+        if (mod.getState().selectedState !== 'selected') {
+          IDs.push(mod.model.id);
+        }
+      });
+      return IDs;
     },
   },
   methods: {
@@ -177,6 +245,7 @@ export default {
           ...options.initialState,
         },
       };
+      this._options = opts;
 
       if (!opts.apiPath || ['fetchprofiles', 'moderators'].indexOf(opts.apiPath) === -1) {
         throw new Error('The apiPath must be either fetchprofiles or moderators');
@@ -210,7 +279,6 @@ export default {
       this.moderatorsCol = new Moderators();
       this.listenTo(this.moderatorsCol, 'add', (model) => {
         this.addMod(model);
-        this.batchCardRender(model);
       });
       this.listenTo(this.moderatorsCol, 'remove', (md) => {
         const removeIndex = this.modCards.findIndex((card) => card.model === md);
@@ -218,23 +286,13 @@ export default {
       });
       this.modCards = [];
 
-      // create a moderators status view. It should retain it's state between renders of this view.
-      this.moderatorsStatus = this.createChild(ModeratorsStatus, {
-        initialState: {
-          mode: opts.method === 'GET' ? 'loaded' : 'loadingXofY',
-          showLoadBtn: opts.showLoadBtn,
-          showSpinner: opts.showSpinner,
-        },
-      });
-      this.listenTo(this.moderatorsStatus, 'browseMore', () => this.onBrowseMore());
-
       // listen to the websocket for moderator data
       this.serverSocket = getSocket();
     },
 
     clickShowUnverified() {
       this.togVerifiedShown(false);
-      this.trigger('clickShowUnverified');
+      this.$emit('clickShowUnverified');
     },
 
     onBrowseMore() {
@@ -259,7 +317,7 @@ export default {
         data.moderatorInfo.fee.fixedFee.amount = bigNumber(data.moderatorInfo.fee.fixedFee.amount);
       }
 
-      if ((!!isAMod && supportedCur) || this.options.showInvalid) {
+      if ((!!isAMod && supportedCur) || this._options.showInvalid) {
         const newMod = new Moderator(data, { parse: true });
         if (newMod.isValid()) this.moderatorsCol.add(newMod);
         this.removeNotFetched(data.peerID);
@@ -271,7 +329,7 @@ export default {
 
     getModeratorsByID(opts) {
       const op = {
-        ...this.options,
+        ...this._options,
         ...opts,
       };
 
@@ -306,7 +364,7 @@ export default {
 
       // Either a list of IDs can be posted, or any available moderators can be retrieved with GET
       if (IDs.length || op.method === 'GET') {
-        this.moderatorsStatus.setState({
+        this.$refs.moderatorsStatus.setState({
           hidden: false,
           loaded: 0,
           toLoad: IDs.length,
@@ -344,7 +402,7 @@ export default {
               });
               this.unfetchedMods = [];
               this.checkNotFetched();
-              if (!data.length) this.trigger('noModsFound', { guids: IDs });
+              if (!data.length) this.$emit('noModsFound', { guids: IDs });
             }
           })
           .fail((xhr) => {
@@ -373,7 +431,7 @@ export default {
     checkNotFetched() {
       if (this.unfetchedMods.length === 0 && this.fetchingMods.length) {
         // All ids have been fetched and ids existed to fetch.
-        this.moderatorsStatus.setState({
+        this.$refs.moderatorsStatus.setState({
           loading: false,
           hidden: true,
         });
@@ -382,13 +440,11 @@ export default {
         });
       } else {
         // Either ids are still fetching, or this is an open fetch with no set ids.
-        this.moderatorsStatus.setState({
+        this.$refs.moderatorsStatus.setState({
           loaded: this.moderatorsCol.length, // not shown if open fetch
           toLoad: this.fetchingMods.length, // not shown if open fetch
           total: this.modCards.length,
         });
-        // re-render to show the unverified moderators button if needed.
-        this.render();
       }
     },
     addMod(model) {
@@ -396,24 +452,10 @@ export default {
         throw new Error('Please provide a valid profile model.');
       }
 
-      const modCard = this.createChild(ModCard, {
+      const modCard = {
         model,
-        purchase: this.options.purchase,
-        notSelected: this.options.notSelected,
-        radioStyle: this.options.radioStyle,
-        controlsOnInvalid: this.options.controlsOnInvalid,
-        initialState: {
-          selectedState: this.options.cardState,
-          preferredCurs: this.getState().preferredCurs,
-        },
-      });
-      this.listenTo(modCard, 'modSelectChange', (data) => {
-        if (data.selected) {
-          // If only one moderator should be selected, deselect the other moderators.
-          if (this.options.singleSelect) this.deselectOthers(data.guid);
-          this.trigger('cardSelect');
-        }
-      });
+      }
+
       // Add verified mods to the beginning.
       if (model.isVerified) {
         const firstUnverifiedIndex = this.modCards.findIndex((card) => !card.model.isVerified);
@@ -422,7 +464,14 @@ export default {
       } else {
         this.modCards.push(modCard);
       }
-      return modCard;
+    },
+
+    onModSelectChange(data) {
+      if (data.selected) {
+        // If only one moderator should be selected, deselect the other moderators.
+        if (this._options.singleSelect) this.deselectOthers(data.guid);
+        this.$emit('cardSelect');
+      }
     },
 
     modShouldRender(model) {
@@ -432,117 +481,21 @@ export default {
       return !(hideOnUnverified || hideOnCur);
     },
 
-    batchCardRender(model) {
-      if (!model || !(model instanceof Moderator)) {
-        throw new Error('Please provide a valid profile model.');
-      }
-
-      // Render in batches only if the card being added should be visible.
-      if (!this.renderTimer && this.modShouldRender(model)) {
-        this.renderTimer = setTimeout(() => {
-          this.render();
-        }, 300);
-      }
-    },
-    allIDs() {
-      return this.moderatorsCol.pluck('peerID');
-    },
-    selectedIDs() {
-      const IDs = [];
-      this.modCards.forEach((mod) => {
-        if (mod.getState().selectedState === 'selected') {
-          IDs.push(mod.model.id);
-        }
-      });
-      return IDs;
-    },
-    unselectedIDs() {
-      const IDs = [];
-      this.modCards.forEach((mod) => {
-        if (mod.getState().selectedState !== 'selected') {
-          IDs.push(mod.model.id);
-        }
-      });
-      return IDs;
-    },
     deselectMod(peerID) {
       if (!peerID) throw new Error('You must provide a peerID.');
 
-      const mod = this.modCards.filter((card) => card.model.get('peerID') === peerID);
-      if (mod.length) mod[0].changeSelectState(this.options.notSelected);
+      const mod = this.$refs.modCards.filter((card) => card.model.get('peerID') === peerID);
+      if (mod.length) mod[0].changeSelectState(this._options.notSelected);
     },
     deselectOthers(peerID = '') {
-      this.modCards.forEach((card) => {
+      this.$refs.modCards.forEach((card) => {
         if (card.model.get('peerID') !== peerID) {
-          card.changeSelectState(this.options.notSelected);
+          card.changeSelectState(this._options.notSelected);
         }
       });
     },
     togVerifiedShown(bool) {
       this.setState({ showVerifiedOnly: bool });
-    },
-    noneSelected() {
-      return !this.modCards.filter((mod) => mod.getState().selectedState === 'selected').length;
-    },
-    remove() {
-      this.modFetches.forEach((fetch) => fetch.abort());
-      clearTimeout(this.renderTimer);
-      super.remove();
-    },
-    render() {
-      const state = this.getState();
-      const showMods = this.modCards.filter((mod) => this.modShouldRender(mod.model));
-      const unVerCount = this.modCards.filter((mod) => mod.model.hasModCurrency(state.showOnlyCur) && !mod.model.isVerified).length;
-      const totalIDs = this.allIDs.length;
-      clearTimeout(this.renderTimer);
-      this.renderTimer = null;
-
-      loadTemplate('components/moderators/moderators.html', (t) => {
-        this.$el.html(
-          t({
-            wrapperClasses: this.options.wrapperClasses,
-            placeholder: !showMods.length && (this.unfetchedMods.length || !totalIDs),
-            purchase: this.options.purchase,
-            totalShown: showMods.length,
-            totalIDs,
-            unVerCount,
-            ...state,
-          })
-        );
-
-        super.render();
-
-        const cardsFrag = document.createDocumentFragment();
-
-        this.modCards.forEach((mod) => {
-          const newState = {};
-          const shouldRender = showMods.includes(mod);
-          // Moderators that aren't being rendered should never be selected.
-          if (!shouldRender) newState.selectedState = this.options.notSelected;
-
-          mod.setState(
-            {
-              preferredCurs: state.preferredCurs,
-              ...newState,
-            },
-            { renderOnChange: false }
-          );
-
-          if (shouldRender) {
-            mod.delegateEvents();
-            $(cardsFrag).append(mod.render().$el);
-          }
-        });
-
-        if (showMods.length) {
-          this.getCachedEl('.js-moderatorsWrapper').append(cardsFrag);
-        } else if (this.modCards.length) this.trigger('noModsShown');
-
-        this.moderatorsStatus.delegateEvents();
-        this.getCachedEl('.js-statusWrapper').append(this.moderatorsStatus.render().$el);
-      });
-
-      return this;
     },
   },
 };

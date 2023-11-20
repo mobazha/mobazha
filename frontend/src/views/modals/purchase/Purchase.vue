@@ -1,5 +1,5 @@
 <template>
-  <div class="modal purchase modalScrollPage">
+  <div class="modal purchase modalScrollPage" :key="viewKey">
     <BaseModal :modalInfo="{ showCloseButton: false }">
       <template v-slot:component>
         <div ref="popInMessages" class="popInMessageHolder js-popInMessages"></div>
@@ -71,7 +71,14 @@
 
                   <template v-else>
                     <div class="flexVCent gutterHLg row cryptoTitleWrap">
-                      <div ref="cryptoTitle" :class="`js-cryptoTitle ${ob.phase !== 'pay' && ob.phase !== 'processing' ? 'flexExpand' : ''}`"></div>
+                      <div ref="cryptoTitle" :class="`js-cryptoTitle ${ob.phase !== 'pay' && ob.phase !== 'processing' ? 'flexExpand' : ''}`">
+                        <CryptoTradingPairWrap :options="{
+                          tradingPairClass: 'cryptoTradingPairXL',
+                          exchangeRateClass: 'clrT2 tx6',
+                          fromCur: listing.get('metadata').get('acceptedCurrencies')[0],
+                          toCur: listing.get('item').get('cryptoListingCurrencyCode'),
+                        }"/>
+                      </div>
                       <template v-if="ob.phase === 'pay' || ob.phase === 'processing'">
                         <div class="flexExpand">
                           <div class="flexVCent gutterHLg">
@@ -176,9 +183,7 @@
                           activeCurs: currencies.length && listing.isCrypto ? [currencies[0]] : [],
                         },
                       }"
-                      @currencyClicked="(cOpts) => {
-                        if (cOpts.active) this.moderators.setState({ showOnlyCur: cOpts.currency });
-                      }"/>
+                      @currencyClicked="onCurrencyClicked"/>
                   </div>
                 </div>
               </section>
@@ -195,7 +200,28 @@
                     <div class="js-moderated-errors">
                       <FormError v-if="errors['moderated']" :errors="errors['moderated']" />
                     </div>
-                    <div ref="moderatorsWrapper" class="js-moderatorsWrapper"></div>
+                    <div ref="moderatorsWrapper" class="js-moderatorsWrapper">
+                      <Moderators
+                        ref="moderators"
+                        :options="{
+                          moderatorIDs: moderatorIDs,
+                          useCache: false,
+                          fetchErrorTitle: ob.polyT('purchase.errors.moderatorsTitle'),
+                          fetchErrorMsg: ob.polyT('purchase.errors.moderatorsMsg'),
+                          purchase: true,
+                          cardState: 'unselected',
+                          notSelected: 'unselected',
+                          singleSelect: true,
+                          radioStyle: true,
+                          initialState: {
+                            showOnlyCur: currencies[0],
+                            showVerifiedOnly: true,
+                          },
+                        }"
+                        @clickShowUnverified="setState({ showVerifiedOnly: false })"
+                        @cardSelect="onCardSelect"
+                      />
+                    </div>
                     <template v-if="!ob.noValidModerators">
                       <div>
                         <div class="clrT2 tx6 rowMd">{{ ob.polyT('purchase.moderatorsDisclaimer') }}</div>
@@ -279,7 +305,20 @@
               </section>
             </template>
             <template v-if="ob.phase === 'pending'">
-              <section ref="pendingPayment" class="contentBox padMd clrP clrBr clrSh3 js-pending"></section>
+              <section ref="pendingPayment" class="contentBox padMd clrP clrBr clrSh3 js-pending">
+                <Payment
+                  v-if="paymentData"
+                  :options="{
+                    balanceRemaining: curDefToDecimal(paymentData.amount),
+                    paymentAddress: paymentData.paymentAddress,
+                    orderID: paymentData.orderID,
+                    isModerated: !!this.order.get('moderator'),
+                    metricsOrigin: 'Purchase',
+                    paymentCoin,
+                  }"
+                  @walletPaymentComplete="completePurchase"
+                />
+              </section>
             </template>
             <template v-if="ob.phase === 'complete'">
               <section class="contentBox padMd clrP clrBr clrSh3 js-complete">
@@ -341,7 +380,9 @@
                   </div>
                 </template>
               </div>
-              <div ref="feeChangeContainer" class="tx6 js-feeChangeContainer"></div>
+              <div ref="feeChangeContainer" class="tx6 js-feeChangeContainer">
+                <FeeChange />
+              </div>
             </section>
           </div>
         </div>
@@ -380,19 +421,15 @@ import Item from '../../../../backbone/models/purchase/Item';
 import Listing from '../../../../backbone/models/listing/Listing';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import PopInMessage, { buildRefreshAlertMessage } from '../../../../backbone/views/components/PopInMessage';
-import Moderators from '../../../../backbone/views/components/moderators/Moderators';
-import FeeChange from '../../../../backbone/views/components/FeeChange';
-import CryptoTradingPair from '../../../../backbone/views/components/CryptoTradingPair';
-import CryptoCurSelector from '../../../../backbone/views/components/CryptoCurSelector';
-
-import Payment from '../../../../backbone/views/modals/purchase/Payment';
 
 import ActionBtn from './ActionBtn.vue';
 import Complete from './Complete.vue';
 import Coupons from './Coupons.vue';
 import DirectPayment from './DirectPayment.vue';
+import Payment from './Payment.vue'
 import Receipt from './Receipt.vue';
 import Shipping from './Shipping.vue';
+
 
 import { toRaw } from 'vue';
 
@@ -403,6 +440,7 @@ export default {
     Coupons,
     Receipt,
     DirectPayment,
+    Payment,
     Shipping,
   },
   props: {
@@ -414,6 +452,8 @@ export default {
   },
   data () {
     return {
+      viewKey: 0,
+
       _state: {
         phase: 'pay',
       },
@@ -439,6 +479,8 @@ export default {
       orderID: '',
       couponCode: '',
 
+      paymentData: undefined,
+
       errors: {},
     };
   },
@@ -450,6 +492,13 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
+    // render the moderators so it can start fetching and adding moderator cards
+    this.$refs.moderators.getModeratorsByID();
+  },
+  unmounted() {
+    if (this.orderSubmit) this.orderSubmit.abort();
+    if (this.inventoryFetch) this.inventoryFetch.abort();
+    clearTimeout(this.quantityKeyUpTimer);
   },
   computed: {
     ob () {
@@ -552,7 +601,7 @@ export default {
     },
 
     isModerated () {
-      return this.moderators ? this.moderators.selectedIDs.length > 0 : false;
+      return this.$refs.moderators ? this.$refs.moderators.selectedIDs.length > 0 : false;
     },
 
     itemConstraints () {
@@ -580,6 +629,24 @@ export default {
   },
   methods: {
     isSupportedWalletCur,
+    curDefToDecimal,
+
+    getListingCoinDivisibility(listing) {
+      let currencyCode;
+      try {
+        currencyCode = listing.isCrypto ? listing.get('item').cryptoListingCurrencyCode : listing.get('metadata').get('pricingCurrency').code;
+      } catch (e) {
+        // pass
+      }
+
+      let coinDiv;
+      try {
+        coinDiv = getCoinDivisibility(currencyCode);
+      } catch (e) {
+        // pass
+      }
+      return coinDiv;
+    },
 
     init() {
       let options = {};
@@ -654,7 +721,7 @@ export default {
           {
             listingHash: listing.get('hash'),
             quantity: listing.isCrypto ? bigNumber('1') : undefined,
-            options: listing.options || [],
+            options: opts.variants || [], // Need update to the selected listing variants for each listing
           },
           {
             isCrypto: listing.isCrypto,
@@ -663,7 +730,7 @@ export default {
             //     typeof this.inventory === 'number' ?
             //       this.inventory : 99999999999999999
             //   ),
-            getCoinDiv: () => this.coinDivisibility,
+            getCoinDiv: () => this.getListingCoinDivisibility(listing),
             getCoinType: () => listing.get('metadata').get('coinType'),
           }
         );
@@ -671,30 +738,7 @@ export default {
         this.order.get('items').add(item);
       })
 
-      this.moderators = this.createChild(Moderators, {
-        moderatorIDs: this.moderatorIDs,
-        useCache: false,
-        fetchErrorTitle: app.polyglot.t('purchase.errors.moderatorsTitle'),
-        fetchErrorMsg: app.polyglot.t('purchase.errors.moderatorsMsg'),
-        purchase: true,
-        cardState: 'unselected',
-        notSelected: 'unselected',
-        singleSelect: true,
-        radioStyle: true,
-        initialState: {
-          showOnlyCur: this.currencies[0],
-          showVerifiedOnly: true,
-        },
-      });
-      // render the moderators so it can start fetching and adding moderator cards
-      this.moderators.render();
-      this.moderators.getModeratorsByID();
-      this.listenTo(this.moderators, 'noModsShown', () => this.render());
-      this.listenTo(this.moderators, 'clickShowUnverified', () => {
-        this.setState({ showVerifiedOnly: false });
-      });
-      this.listenTo(this.moderators, 'cardSelect', () => this.onCardSelect());
-
+      this.cryptoAmountCurrency = this.listing.get('item').get('cryptoListingCurrencyCode');
 
       // If the parent has the inventory, pass it in, otherwise we'll fetch it.
       // -- commenting out for now since inventory is not functioning properly on the server
@@ -738,6 +782,10 @@ export default {
       });
     },
 
+    onCurrencyClicked(cOpts) {
+      if (cOpts.active) this.$refs.moderators.setState({ showOnlyCur: cOpts.currency });
+    },
+
     onReloadOutdated() {
       let defaultPrevented = false;
 
@@ -762,8 +810,7 @@ export default {
         });
 
         this.listenTo(this.dataChangePopIn, 'clickRefresh', () => {
-          this.render();
-          this.moderators.render();
+          this.viewKey += 1;
         });
 
         this.listenTo(this.dataChangePopIn, 'clickDismiss', () => {
@@ -775,48 +822,40 @@ export default {
       }
     },
 
-    goToListing () {
-      app.router.navigate(`${this.vendor.peerID}/store/${this.listing.get('slug')}`,
-        { trigger: true });
+    goToListing() {
+      app.router.navigate(`${this.vendor.peerID}/store/${this.listing.get('slug')}`, { trigger: true });
       this.close();
     },
 
-    clickGoToListing () {
+    clickGoToListing() {
       this.goToListing();
     },
 
-    clickClose () {
+    clickClose() {
       this.$emit('closeBtnPressed');
       this.close();
     },
 
-    close () {
-      this.$emit('close');
-    },
-
-    handleDirectPurchaseClick (options) {
-      // { active: true }
+    handleDirectPurchaseClick() {
       if (!this.isModerated) return;
 
-      this.moderators.deselectOthers();
+      this.$refs.moderators.deselectOthers();
       this.setState({ unverifedSelected: false }, { renderOnChange: false });
-      this.render(); // always render even if the state didn't change
     },
 
-    togVerifiedModerators (bool) {
-      this.moderators.togVerifiedShown(bool);
+    togVerifiedModerators(bool) {
+      this.$refs.moderators.togVerifiedShown(bool);
       this.setState({ showVerifiedOnly: bool });
     },
 
-    onClickVerifiedOnly (e) {
+    onClickVerifiedOnly(e) {
       this.togVerifiedModerators($(e.target).prop('checked'));
     },
 
-    onCardSelect () {
-      const selected = this.moderators.selectedIDs;
+    onCardSelect() {
+      const selected = this.$refs.moderators.selectedIDs;
       const unverifedSelected = selected.length && !app.verifiedMods.matched(selected).length;
       this.setState({ unverifedSelected }, { renderOnChange: false });
-      this.render(); // always render even if the state didn't change
     },
 
     changeCryptoAddress (e) {
@@ -832,9 +871,7 @@ export default {
         throw new Error('Please provide the currency code as a valid, non-empty string.');
       }
 
-      this.order.get('items')
-        .at(0)
-        .set({ quantity });
+      this.order.get('items').at(0).set({ quantity });
     },
 
     changeCryptoAmountCurrency (e) {
@@ -934,7 +971,7 @@ export default {
       }
 
       // Set the moderator.
-      const moderator = this.moderators.selectedIDs[0] || '';
+      const moderator = this.$refs.moderators.selectedIDs[0] || '';
       this.order.set({ moderator });
       this.order.set({}, { validate: true });
 
@@ -961,7 +998,7 @@ export default {
             errors: 'own listing',
           });
         } else {
-          const { coinDivisibility } = this;
+          const coinDivisibility = this.getListingCoinDivisibility(this.listing);
           const cryptoItems = [];
 
           if (this.listing.isCrypto) {
@@ -1017,16 +1054,9 @@ export default {
           })
             .done((data) => {
               this.setState({ phase: 'pending' });
-              this.payment = this.createChild(Payment, {
-                balanceRemaining: curDefToDecimal(data.amount),
-                paymentAddress: data.paymentAddress,
-                orderID: data.orderID,
-                isModerated: !!this.order.get('moderator'),
-                metricsOrigin: 'Purchase',
-                paymentCoin,
-              });
-              this.listenTo(this.payment, 'walletPaymentComplete', ((pmtCompleteData) => this.completePurchase(pmtCompleteData)));
-              $(this.$refs.pendingPayment).append(this.payment.render().el);
+              
+              this.paymentData = data;
+
               endAjaxEvent('Purchase');
             })
             .fail((jqXHR) => {
@@ -1090,45 +1120,7 @@ export default {
       this.setState({ phase: 'complete' });
     },
 
-    remove () {
-      if (this.orderSubmit) this.orderSubmit.abort();
-      if (this.inventoryFetch) this.inventoryFetch.abort();
-      clearTimeout(this.quantityKeyUpTimer);
-    },
-
     render () {
-      if (this.dataChangePopIn) this.dataChangePopIn.remove();
-      const state = this.getState();
-      const metadata = this.listing.get('metadata');
-
-      this.moderators.delegateEvents();
-      $(this.$refs.moderatorsWrapper).append(this.moderators.el);
-
-      // if this is a re-render, and the payment exists, render it
-      if (this.payment) {
-        this.payment.delegateEvents();
-        $(this.$refs.pendingPayment).append(this.payment.render().el);
-      }
-
-      if (this.feeChange) this.feeChange.remove();
-      this.feeChange = this.createChild(FeeChange);
-      $(this.$refs.feeChangeContainer).html(this.feeChange.render().el);
-
-      if (this.listing.isCrypto) {
-        if (this.cryptoTitle) this.cryptoTitle.remove();
-        this.cryptoTitle = this.createChild(CryptoTradingPair, {
-          initialState: {
-            tradingPairClass: 'cryptoTradingPairXL',
-            exchangeRateClass: 'clrT2 tx6',
-            fromCur: metadata.get('acceptedCurrencies')[0],
-            toCur: this.listing.get('item').get('cryptoListingCurrencyCode'),
-          },
-        });
-        $(this.$refs.cryptoTitle).html(this.cryptoTitle.render().el);
-
-        $('#cryptoAmountCurrency').select2({ minimumResultsForSearch: Infinity });
-      }
-
       this._renderedHash = this.listing.get('hash');
 
       return this;

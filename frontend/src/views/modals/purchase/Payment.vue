@@ -41,12 +41,23 @@
                   textClassName="flexCent"
                   :btnText='`<i class="icon"><WalletIcon /></i>${ob.polyT("purchase.pendingSection.payFromWallet")}`'
                   @click.stop="clickPayFromWallet" />
-                <div ref="confirmWalletContainer" class="js-confirmWalletContainer"></div>
+                <div ref="confirmWalletContainer" class="js-confirmWalletContainer">
+                  <SpendConfirmBox
+                    ref="spendConfirmBox"
+                    :options="{
+                      metricsOrigin,
+                      initialState: {
+                        btnSendText: ob.polyT('purchase.pendingSection.btnConfirmedPay'),
+                        coinType: paymentCoin,
+                      },
+                    }"
+                    @clickSend="walletConfirm" />
+                </div>
               </div>
             </div>
             <template v-if="ob.externallyFundable">
               <div class="txBase clrT2">
-                <template v-if="['BTC', 'TBTC'].includes(ob.paymentCoin)">
+                <template v-if="['BTC', 'TBTC'].includes(paymentCoin)">
                   <p>
                     {{ ob.polyT('purchase.pendingSection.walletNote') }} <button class="btnAsLink "
                       @click="clickFundWallet">{{ ob.polyT('purchase.pendingSection.walletLink') }}</button>
@@ -60,7 +71,7 @@
       </div>
     </div>
     <div class="tx6 clrT2">
-      <template v-if="['BTC', 'TBTC'].includes(ob.paymentCoin)">
+      <template v-if="['BTC', 'TBTC'].includes(paymentCoin)">
         <p v-html='ob.polyT("purchase.pendingSection.note1", {
           link: `<a class="clrTEm" href="https://www.openbazaar.org/bitcoin">${ob.polyT("purchase.pendingSection.note1Link")}</a>`,
         })'></p>
@@ -83,30 +94,33 @@
 This view is also used by the Order Detail overlay. If you make any changes, please
 ensure they are compatible with both the Purchase and Order Detail flows.
 */
-import $ from 'jquery';
+
 import bigNumber from 'bignumber.js';
 import qr from 'qr-encode';
-import { ipc } from '../../../utils/ipcRenderer.js';
-import app from '../../../../backbone/app.js';
+import { ipc } from '../../../utils/ipcRenderer';
+import app from '../../../../backbone/app';
 import {
   formatCurrency,
   integerToDecimal,
   getCoinDivisibility,
-} from '../../../../backbone/utils/currency.js';
-import { getCurrencyByCode as getWalletCurByCode } from '../../../../backbone/data/walletCurrencies.js';
-import { getSocket } from '../../../../backbone/utils/serverConnect.js';
-import SpendConfirmBox from '../wallet/SpendConfirmBox';
-import { orderSpend } from '../../../../backbone/models/wallet/Spend.js';
-import { openSimpleMessage } from '../SimpleMessage';
-import { launchWallet } from '../../../../backbone/utils/modalManager.js';
+} from '../../../../backbone/utils/currency';
+import { getCurrencyByCode as getWalletCurByCode } from '../../../../backbone/data/walletCurrencies';
+import { getSocket } from '../../../../backbone/utils/serverConnect';
+import { orderSpend } from '../../../../backbone/models/wallet/Spend';
+import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
+import { launchWallet } from '../../../../backbone/utils/modalManager';
 import {
   startPrefixedAjaxEvent,
   endPrefixedAjaxEvent,
   recordPrefixedEvent,
-} from '../../../../backbone/utils/metrics.js';
+} from '../../../../backbone/utils/metrics';
 
+import SpendConfirmBox from '../wallet/SpendConfirmBox.vue';
 
 export default {
+  components: {
+    SpendConfirmBox,
+  },
   props: {
     options: {
       type: Object,
@@ -126,7 +140,11 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
+  },
+  unmounted() {
+    if (this.hideCopyAmountTimer) {
+      clearTimeout(this.hideCopyAmountTimer);
+    }
   },
   computed: {
     ob () {
@@ -137,7 +155,6 @@ export default {
           paymentAddress: this.paymentAddress,
           qrDataUri: this.qrDataUri,
           isModerated: this.isModerated,
-          paymentCoin: this.paymentCoin,
           externallyFundable: this.paymentCoinData.externallyFundableOrders,
       };
     },
@@ -234,12 +251,12 @@ export default {
       }
     },
 
-    clickPayFromWallet (e) {
+    clickPayFromWallet () {
       const walletBalance = app.walletBalances.get(this.paymentCoin);
       const insufficientFunds = this.balanceRemaining.gt(walletBalance ? walletBalance.get('confirmed') : 0);
 
       if (insufficientFunds) {
-        this.spendConfirmBox.setState({
+        this.$refs.spendConfirmBox.setState({
           show: true,
           fetchFailed: true,
           fetchError: 'ERROR_INSUFFICIENT_FUNDS',
@@ -253,8 +270,8 @@ export default {
           currency: this.paymentCoin,
           sufficientFunds: true,
         });
-        this.spendConfirmBox.setState({ show: true });
-        this.spendConfirmBox.fetchFeeEstimate(this.balanceRemaining);
+        this.$refs.spendConfirmBox.setState({ show: true });
+        this.$refs.spendConfirmBox.fetchFeeEstimate(this.balanceRemaining);
       }
     },
 
@@ -264,7 +281,7 @@ export default {
 
     walletConfirm () {
       this.isPaying = true;
-      this.spendConfirmBox.setState({ show: false });
+      this.$refs.spendConfirmBox.setState({ show: false });
       const currency = this.paymentCoin;
 
       startPrefixedAjaxEvent('SpendFromWallet', this.metricsOrigin);
@@ -322,27 +339,6 @@ export default {
     clickFundWallet () {
       launchWallet().sendModeOn = false;
     },
-
-    remove () {
-      if (this.hideCopyAmountTimer) {
-        clearTimeout(this.hideCopyAmountTimer);
-      }
-    },
-
-    render () {
-      this.spendConfirmBox = this.createChild(SpendConfirmBox, {
-        metricsOrigin: this.metricsOrigin,
-        initialState: {
-          btnSendText: app.polyglot.t('purchase.pendingSection.btnConfirmedPay'),
-          coinType: this.paymentCoin,
-        },
-      });
-      this.listenTo(this.spendConfirmBox, 'clickSend', this.walletConfirm);
-      $(this.$refs.confirmWalletContainer).html(this.spendConfirmBox.render().el);
-
-      return this;
-    }
-
   }
 }
 </script>

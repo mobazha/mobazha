@@ -41,7 +41,13 @@
                       {{ ob.polyT(`moderatorCard.${ob.moderatorInfo.fee.feeType}`, { amount, percentage: ob.moderatorInfo.fee.percentage }) }}
                     </div>
                     <div v-html="`${ ob.parseEmojis('📍') }${ ob.location || ob.polyT('userPage.noLocation') }`"></div>
-                    <div class="flexExpand flexNoShrink verifiedWrapper js-verifiedMod"></div>
+                    <div class="flexExpand flexNoShrink verifiedWrapper js-verifiedMod">
+                      <VerifiedMod
+                        :options="getModeratorOptions({
+                          model: verifiedMod,
+                        })"
+                      />
+                    </div>
                   </template>
 
                   <template v-else>
@@ -92,10 +98,9 @@
 <script>
 /* eslint-disable class-methods-use-this */
 import _ from 'underscore';
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
 import app from '../../../../backbone/app';
 import Profile from '../../../../backbone/models/profile/Profile';
-import VerifiedMod, { getModeratorOptions } from '../VerifiedMod';
+import { getModeratorOptions } from '@/utils/verifiedMod'
 import { handleLinks } from '../../../../backbone/utils/dom';
 import { launchModeratorDetailsModal } from '../../../../backbone/utils/modalManager';
 import { anySupportedByWallet } from '../../../../backbone/data/walletCurrencies';
@@ -107,6 +112,7 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data() {
     return {
@@ -122,7 +128,6 @@ export default {
     this.loadData(this.options);
   },
   mounted() {
-    this.render();
   },
   computed: {
     ob() {
@@ -133,10 +138,11 @@ export default {
         ...this.templateHelpers,
         displayCurrency: app.settings.get('localCurrency'),
         valid: this.model.isModerator,
-        hasValidCurrency: anySupportedByWallet(this.modCurs),
+        hasValidCurrency: this.hasValidCurrency(),
         radioStyle: this.options.radioStyle,
         controlsOnInvalid: this.options.controlsOnInvalid,
         showPreferredWarning,
+        verifiedMod,
         verified: !!verifiedMod,
         modLanguages: this.modLanguages,
         ...this.model.toJSON(),
@@ -169,6 +175,8 @@ export default {
     },
   },
   methods: {
+    getModeratorOptions,
+
     loadData(options = {}) {
       /* There are 3 valid card selected states:
        selected: This mod is pre-selected, or was activated by the user.
@@ -203,8 +211,7 @@ export default {
 
       this.modLanguages = [];
       if (this.model.isModerator) {
-        this.modLanguages = this.model
-          .get('moderatorInfo')
+        this.modLanguages = this.model.get('moderatorInfo')
           .get('languages')
           .map((lang) => {
             const langData = getLangByCode(lang);
@@ -226,14 +233,17 @@ export default {
       });
     },
 
-    click(e) {
+    click() {
       this.rotateSelectState();
+    },
+    hasValidCurrency() {
+      return anySupportedByWallet(this.modCurs);
     },
 
     rotateSelectState() {
-      if (this._state.selectedState === 'selected' && !this.options.radioStyle) {
+      if (this.getState().selectedState === 'selected' && !this.options.radioStyle) {
         this.changeSelectState(this.options.notSelected);
-      } else if (this.model.isModerator && anySupportedByWallet(this.modCurs)) {
+      } else if (this.model.isModerator && this.hasValidCurrency()) {
         /* Only change to selected if this is a valid moderator and the user's currency is supported.
         Moderators that have become invalid may be displayed, and can be de-selected to remove them.
         */
@@ -242,50 +252,13 @@ export default {
     },
 
     changeSelectState(selectedState) {
-      if (selectedState !== this._state.selectedState) {
+      if (selectedState !== this.getState().selectedState) {
         this.setState({ selectedState });
-        this.trigger('modSelectChange', {
+        this.$emit('modSelectChange', {
           selected: selectedState === 'selected',
           guid: this.model.id,
         });
       }
-    },
-
-    render() {
-      super.render();
-
-      const showPreferredWarning = this._state.preferredCurs.length && !this.hasPreferredCur;
-
-      const verifiedMod = app.verifiedMods.get(this.model.get('peerID'));
-
-      loadTemplate('components/moderators/card.html', (t) => {
-        this.$el.html(
-          t({
-            displayCurrency: app.settings.get('localCurrency'),
-            valid: this.model.isModerator,
-            hasValidCurrency: this.hasValidCurrency,
-            radioStyle: this.options.radioStyle,
-            controlsOnInvalid: this.options.controlsOnInvalid,
-            showPreferredWarning,
-            verified: !!verifiedMod,
-            modLanguages: this.modLanguages,
-            ...this.model.toJSON(),
-            ...this._state,
-          })
-        );
-
-        if (this.verifiedMod) this.verifiedMod.remove();
-
-        this.verifiedMod = this.createChild(
-          VerifiedMod,
-          getModeratorOptions({
-            model: verifiedMod,
-          })
-        );
-        this.getCachedEl('.js-verifiedMod').append(this.verifiedMod.render().el);
-      });
-
-      return this;
     },
   },
 };

@@ -126,7 +126,7 @@ import { getLangByCode } from '../../../backbone/data/languages';
 import VerifiedMod from '../components/VerifiedMod';
 import SupportedCurrenciesList from '../components/SupportedCurrenciesList';
 
-import { getModeratorOptions } from '@/utils/verifiedMod'
+import { getModeratorOptions } from '@/utils/verifiedMod';
 
 
 export default {
@@ -180,6 +180,8 @@ export default {
     }
   },
   methods: {
+    getModeratorOptions,
+
     loadData (options = {}) {
       this.baseInit(options);
 

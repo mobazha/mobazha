@@ -1519,7 +1519,7 @@
       "totalWarning2NoCoin": "Actual total may vary slightly on the next screen after conversion to the payment currency."
     },
     "errors": {
-      "moderatorsTitle": "Moderator Data Failted to Load",
+      "moderatorsTitle": "Moderator Data Failed to Load",
       "moderatorsMsg": "This listing has available moderators, but they could not be loaded.",
       "orderError": "Your order can not be processed due to the following errors.",
       "ownIDTitle": "You Can't Purchase Your Own Listings",

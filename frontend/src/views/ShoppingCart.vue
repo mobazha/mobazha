@@ -127,7 +127,7 @@ import Empty from '@/components/Empty.vue';
 import api from '../api';
 import { getCachedProfiles } from '../../backbone/models/profile/Profile';
 import { convertAndFormatCurrency, curDefToDecimal } from '../../backbone/utils/currency';
-import Purchase from './modals/purchase/Purchase.vue'
+import Purchase from './modals/purchase/Purchase.vue';
 import Listing from '../../backbone/models/listing/Listing';
 
 export default {
@@ -185,7 +185,7 @@ export default {
     },
     loadData() {
       try {
-        this.loading = true;
+        // this.loading = true;
         api.getShoppingCarts().then((carts) => {
           this.tableData = carts;
 
@@ -197,7 +197,7 @@ export default {
 
             cart.listings = [];
             cart.items?.forEach((item) => {
-              item.listingExt = new Listing({ slug: item.slug, }, { guid: cart.vendorID, hash: item.listingHash });
+              item.listingExt = new Listing({ slug: item.slug }, { guid: cart.vendorID, hash: item.listingHash });
               cart.listings.push(item.listingExt);
 
               const listingFetch = item.listingExt.fetch();
@@ -207,21 +207,20 @@ export default {
 
           $.whenAll(fetches.slice()).always(() => {
             this.tableData.forEach((cart) => {
-                cart.items?.forEach((item) => {
-                  let listing = item.listingExt.toJSON();
-                  item.listing = listing;
-                  item.pricingCurrency = listing.metadata.pricingCurrency;
-                  item.priceAmount = curDefToDecimal({
-                    amount: listing.item.price,
-                    currency: item.pricingCurrency,
-                  });
-                  item.price = convertAndFormatCurrency(item.priceAmount, item.pricingCurrency.code, app.settings.get('localCurrency'));
+              cart.items?.forEach((item) => {
+                let listing = item.listingExt.toJSON();
+                item.listing = listing;
+                item.pricingCurrency = listing.metadata.pricingCurrency;
+                item.priceAmount = curDefToDecimal({
+                  amount: listing.item.price,
+                  currency: item.pricingCurrency,
                 });
+                item.price = convertAndFormatCurrency(item.priceAmount, item.pricingCurrency.code, app.settings.get('localCurrency'));
               });
+            });
 
             this.loading = false;
           });
-          
         });
         // this.tableData = products;
       } catch {
@@ -285,8 +284,6 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import '../assets/scss/main.scss';
-
 .page-head {
   display: flex;
   align-items: center;
@@ -469,5 +466,9 @@ export default {
     font-size: 14px;
     line-height: 20px;
   }
+}
+::v-deep() {
+  @import '../assets/scss/module/table.scss';
+  @import '../assets/scss/module/input.scss';
 }
 </style>

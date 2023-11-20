@@ -337,4 +337,8 @@ function cellStyle({ columnIndex, rowIndex }) {
     height: 20px;
   }
 }
+::v-deep() {
+  @import '../assets/scss/module/table.scss';
+  @import '../assets/scss/module/table.scss';
+}
 </style>

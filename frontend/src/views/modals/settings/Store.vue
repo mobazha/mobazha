@@ -139,6 +139,19 @@
               </div>
             </div>
           </div>
+          <Express :ob="ob" :shippingOptions="shippingOptions" @onClickAddShippingOption="onClickAddShippingOption">
+            <template v-slot="{ item: { $index, ...item } }">
+              <ShippingOption
+                ref="shippingOptionViews"
+                :options="{
+                  getCurrency: () => formData.metadata.pricingCurrency.code,
+                  listPosition: $index + 1,
+                }"
+                :bb="() => ({ model: item })"
+                @click-remove="onRemoveShippingOption"
+              />
+            </template>
+          </Express>
           <div class="box padMdKids padStack">
             <div class="flexRow gutterH">
               <div class="col3">
@@ -155,21 +168,27 @@
                         getCurrency: () => formData.metadata.pricingCurrency.code,
                         listPosition: shipOptIndex + 1,
                       }"
-                      :bb="function() {
-                        return {
-                          model: shipOpt,
+                      :bb="
+                        function () {
+                          return {
+                            model: shipOpt,
+                          };
                         }
-                      }"
-                      @click-remove="onRemoveShippingOption" />
+                      "
+                      @click-remove="onRemoveShippingOption"
+                    />
                   </template>
                 </div>
+
                 <div class="contentBox padMd clrP clrBr clrSh3 tx3 shipOptPlaceholder">
                   <FormError v-if="ob.errors['shippingOptions']" :errors="ob.errors['shippingOptions']" :class="topLevelShipOptErrs" />
                   <h2 class="h4 clrT js-addShipOptSectionHeading">
                     {{ ob.polyT('editListing.shippingOptions.optionHeading', { listPosition: shippingOptions.length + 1 }) }}
                   </h2>
                   <hr class="clrBr rowMd" />
-                  <a class="btn clrBr clrP clrSh2 rowSm" @click="onClickAddShippingOption">{{ ob.polyT('editListing.shippingOptions.btnAddShippingOption') }}</a>
+                  <a class="btn clrBr clrP clrSh2 rowSm" @click="onClickAddShippingOption">{{
+                    ob.polyT('editListing.shippingOptions.btnAddShippingOption')
+                  }}</a>
                   <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperShipping') }}</div>
                 </div>
               </div>
@@ -200,13 +219,14 @@ import BulkCoinUpdateBtn from './BulkCoinUpdateBtn.vue';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import ShippingOptionMd from '../../../../backbone/models/listing/ShippingOption';
 import Service from '../../../../backbone/models/listing/Service';
-
+import Express from './Express.vue';
 import ShippingOption from '../editListing/ShippingOption.vue';
 
 export default {
   components: {
     BulkCoinUpdateBtn,
     ShippingOption,
+    Express,
   },
   props: {
     options: {
@@ -344,14 +364,20 @@ export default {
           }
         });
       });
-
       this.shippingOptions = this.settings.get('shippingOptions');
     },
     onClickAddShippingOption() {
       this.shippingOptions.push(
-        new ShippingOptionMd({
-          services: [new Service()],
-        })
+        Object.assign(
+          {},
+          new ShippingOptionMd({
+            services: [new Service()],
+          }),
+          {
+            templateId: '',
+            options: [],
+          }
+        )
       );
     },
     hasPhysicalListing() {
@@ -360,8 +386,7 @@ export default {
     },
     onRemoveShippingOption(md) {
       if (this.hasPhysicalListing() && this.shippingOptions.length == 1 && this.shippingOptions.at(0).cid === md.cid) {
-        openSimpleMessage(app.polyglot.t('settings.storeTab.shippingOption.error'),
-          app.polyglot.t('settings.storeTab.shippingOption.noShippingOption'));
+        openSimpleMessage(app.polyglot.t('settings.storeTab.shippingOption.error'), app.polyglot.t('settings.storeTab.shippingOption.noShippingOption'));
       } else {
         this.shippingOptions.remove(md);
       }

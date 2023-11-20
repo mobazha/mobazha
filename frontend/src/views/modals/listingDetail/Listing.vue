@@ -1,295 +1,330 @@
 <template>
-  <div v-if="!showNsfwWarning" v-show="showModal" class="modal listingDetail modalScrollPage" @click="onDocumentClick">
-    <BaseModal @close="close">
-      <template v-slot:component>
-        <div ref="popInMessages" class="popInMessageHolder js-popInMessages"></div>
+  <div>
+    <div v-if="!showNsfwWarning && showModal" class="modal listingDetail modalScrollPage" @click="onDocumentClick">
+      <BaseModal @close="close">
+        <template v-slot:component>
+          <div ref="popInMessages" class="popInMessageHolder js-popInMessages"></div>
 
-        <div class="topControls withEndBtn flex">
-          <template v-if="vendor">
-            <div class="contentBox clrP clrSh3 clrBr clrT">
-              <div class="padSm gutterHSm overflowAuto margRSm flexVCent">
-                <a class="clrBr2 clrSh1 disc storeOwnerAvatar flexNoShrink js-storeOwnerAvatar" :style="ob.getAvatarBgImage(vendor.avatarHashes)"></a>
-                <p class="txUnl tx3 clamp">{{ vendor.name }}</p>
-                <a class="link flexNoShrink tx6 " @click="onClickGoToStore">{{ ob.openedFromStore ? ob.polyT('listingDetail.returnToStore') : ob.polyT('listingDetail.goToStore') }}</a>
-              </div>
-            </div>
-          </template>
-          <template v-if="ob.ownListing">
-            <div class="flexNoShrink" style="margin-left: auto">
-              <div class="btnStrip clrSh3">
-                <button class="btn clrP clrBr" @click="onClickEditListing">{{ ob.polyT('listingDetail.edit') }}</button>
-                <button class="btn clrP clrBr" @click="onClickCloneListing">{{ ob.polyT('listingDetail.clone') }}</button>
-                <ProcessingButton
-                  :className="`btn js-deleteListing clrP clrBr ${isDeleting ? 'processing' : ''}`"
-                  @click="onClickDeleteListing"
-                  :btnText="ob.polyT('listingDetail.delete')" />
-              </div>
-            </div>
-            <div class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxTop clrBr clrP clrT" v-show="showDeleteConfirmedBox" @click.stop="onClickDeleteConfirmBox">
-              <div class="tx3 txB rowSm">{{ ob.polyT('listingDetail.confirmDelete.title') }}</div>
-              <p>{{ ob.polyT('listingDetail.confirmDelete.body') }}</p>
-              <hr class="clrBr row" />
-              <div class="flexHRight flexVCent gutterHLg buttonBar">
-                <a class="" @click="onClickConfirmCancel">{{ ob.polyT('listingDetail.confirmDelete.btnCancel') }}</a>
-                <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph " @click="onClickConfirmedDelete">{{ ob.polyT('listingDetail.confirmDelete.btnConfirm') }}</a>
-              </div>
-            </div>
-          </template>
-
-          <template v-else>
-            <div class="flexNoShrink" style="margin-left: auto">
-              <div class="js-socialBtns">
-                <SocialBtns :options="{ targetID: vendor.peerID, }" />
-              </div>
-            </div>
-          </template>
-        </div>
-
-
-        <div class="listingContent flexColRow gutterVMd2">
-          <div class="contentBox padLg clrP clrBr clrSh3">
-            <div :class="`${ob.metadata.contractType !== 'CRYPTOCURRENCY' ? 'flex' : 'flexVCent'} gutterHLg`">
-              <template v-if="ob.metadata.contractType !== 'CRYPTOCURRENCY'">
-                <h2 class="txUnb flexExpand">{{ ob.item.title }}</h2>
-                <h2 class="txUnb flexNoShrink js-price" v-html="totalPriceInfo"></h2>
-              </template>
-
-              <template v-else>
-                <h2 class="flexExpand js-cryptoTitle cryptoTitle">
-                  <CryptoTradingPairWrap :options="cryptoTradingPairOptions()" />
-                </h2>
-                <CryptoPrice :options="{
-                      priceAmount: ob.price.amount,
-                      priceCurrencyCode: ob.price.currencyCode,
-                      displayCurrency: ob.displayCurrency,
-                      priceModifier: ob.price.modifier,
-                      wrappingTag: 'h2',
-                      wrappingClass: 'flexNoShrink txRgt tx3',
-                    }" />
-              </template>
-            </div>
-            <div class="flex gutterHLg">
-              <div class="mainImageWrapper">
-                <div class="mainImage clrBr " @click="onClickGotoPhotos" :style="ob.item.images.length
-                  ? `background-image: url(${ob.getServerUrl(`ob/image/${ob.isHiRez() ? ob.item.images[0].large : ob.item.images[0].medium}`)}), url('../imgs/defaultItem.png')`
-                  : `background-image: url('../imgs/defaultItem.png')`"></div>
-                <div class="txCtr">
-                  <a class="tx5 " @click="onClickGotoPhotos">
-                    <u>{{ ob.polyT('listingDetail.viewPhotos', {
-                      count: ob.item.images.length, smart_count:
-                        ob.item.images.length
-                    }) }}</u>
-                  </a>
+          <div class="topControls withEndBtn flex">
+            <template v-if="vendor">
+              <div class="contentBox clrP clrSh3 clrBr clrT">
+                <div class="padSm gutterHSm overflowAuto margRSm flexVCent">
+                  <a class="clrBr2 clrSh1 disc storeOwnerAvatar flexNoShrink js-storeOwnerAvatar" :style="ob.getAvatarBgImage(vendor.avatarHashes)"></a>
+                  <p class="txUnl tx3 clamp">{{ vendor.name }}</p>
+                  <a class="link flexNoShrink tx6 " @click="onClickGoToStore">{{ ob.openedFromStore ? ob.polyT('listingDetail.returnToStore') : ob.polyT('listingDetail.goToStore') }}</a>
                 </div>
               </div>
-              <div class="flexExpand">
-                <div class="buyBox clrP clrBr">
-                  <div class="flexColRows flexHCent gutterV">
-                    <template v-for="(item, optionIndex) in ob.item.options" :key="item.name">
-                      <div class="flexVCent gutterHLg">
-                        <div class="col4 h5 txUnl">{{ item.name }}</div>
-                        <div class="col8 txLft">
-                          <Select2 class="js-variantSelect" v-model="variantOptions[optionIndex]" @change="onChangeVariantSelect" :name="item.name">
-                            <template v-for="variant in item.variants" :key="variant.name">
-                              <option :value="variant.name">{{ variant.name }}</option>
-                            </template>
-                          </Select2>
+            </template>
+            <template v-if="ob.ownListing">
+              <div class="flexNoShrink" style="margin-left: auto">
+                <div class="btnStrip clrSh3">
+                  <button class="btn clrP clrBr" @click="onClickEditListing">{{ ob.polyT('listingDetail.edit') }}</button>
+                  <button class="btn clrP clrBr" @click="onClickCloneListing">{{ ob.polyT('listingDetail.clone') }}</button>
+                  <ProcessingButton
+                    :className="`btn js-deleteListing clrP clrBr ${isDeleting ? 'processing' : ''}`"
+                    @click.stop="onClickDeleteListing"
+                    :btnText="ob.polyT('listingDetail.delete')" />
+                </div>
+              </div>
+              <div class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxTop clrBr clrP clrT" v-show="showDeleteConfirmedBox" @click.stop.prevent>
+                <div class="tx3 txB rowSm">{{ ob.polyT('listingDetail.confirmDelete.title') }}</div>
+                <p>{{ ob.polyT('listingDetail.confirmDelete.body') }}</p>
+                <hr class="clrBr row" />
+                <div class="flexHRight flexVCent gutterHLg buttonBar">
+                  <a class="" @click.stop="onClickConfirmCancel">{{ ob.polyT('listingDetail.confirmDelete.btnCancel') }}</a>
+                  <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph " @click.stop="onClickConfirmedDelete">{{ ob.polyT('listingDetail.confirmDelete.btnConfirm') }}</a>
+                </div>
+              </div>
+            </template>
+
+            <template v-else>
+              <div class="flexNoShrink" style="margin-left: auto">
+                <div class="js-socialBtns">
+                  <SocialBtns :options="{ targetID: vendor.peerID, }" />
+                </div>
+              </div>
+            </template>
+          </div>
+
+
+          <div class="listingContent flexColRow gutterVMd2">
+            <div class="contentBox padLg clrP clrBr clrSh3">
+              <div :class="`${ob.metadata.contractType !== 'CRYPTOCURRENCY' ? 'flex' : 'flexVCent'} gutterHLg`">
+                <template v-if="ob.metadata.contractType !== 'CRYPTOCURRENCY'">
+                  <h2 class="txUnb flexExpand">{{ ob.item.title }}</h2>
+                  <h2 class="txUnb flexNoShrink js-price" v-html="totalPriceInfo"></h2>
+                </template>
+
+                <template v-else>
+                  <h2 class="flexExpand js-cryptoTitle cryptoTitle">
+                    <CryptoTradingPairWrap :options="cryptoTradingPairOptions()" />
+                  </h2>
+                  <CryptoPrice :options="{
+                        priceAmount: ob.price.amount,
+                        priceCurrencyCode: ob.price.currencyCode,
+                        displayCurrency: ob.displayCurrency,
+                        priceModifier: ob.price.modifier,
+                        wrappingTag: 'h2',
+                        wrappingClass: 'flexNoShrink txRgt tx3',
+                      }" />
+                </template>
+              </div>
+              <div class="flex gutterHLg">
+                <div class="mainImageWrapper">
+                  <div class="mainImage clrBr " @click="onClickGotoPhotos" :style="ob.item.images.length
+                    ? `background-image: url(${ob.getServerUrl(`ob/image/${ob.isHiRez() ? ob.item.images[0].large : ob.item.images[0].medium}`)}), url('../imgs/defaultItem.png')`
+                    : `background-image: url('../imgs/defaultItem.png')`"></div>
+                  <div class="txCtr">
+                    <a class="tx5 " @click="onClickGotoPhotos">
+                      <u>{{ ob.polyT('listingDetail.viewPhotos', {
+                        count: ob.item.images.length, smart_count:
+                          ob.item.images.length
+                      }) }}</u>
+                    </a>
+                  </div>
+                </div>
+                <div class="flexExpand">
+                  <div class="buyBox clrP clrBr">
+                    <div class="flexColRows flexHCent gutterV">
+                      <template v-for="(item, optionIndex) in ob.item.options" :key="item.name">
+                        <div class="flexVCent gutterHLg">
+                          <div class="col4 h5 txUnl">{{ item.name }}</div>
+                          <div class="col8 txLft">
+                            <Select2 class="js-variantSelect" v-model="variantOptions[optionIndex]" @change="onChangeVariantSelect" :name="item.name">
+                              <template v-for="variant in item.variants" :key="variant.name">
+                                <option :value="variant.name">{{ variant.name }}</option>
+                              </template>
+                            </Select2>
+                          </div>
                         </div>
+                      </template>
+
+                      <button
+                        :class="`btnHg clrBAttGrad clrBrDec1 clrTOnEmph js-purchaseBtn ${templateOptions.buyNowClass} ${outdateHash ? 'disabled' : ''}`"
+                        @click="startPurchase">
+                        {{ ob.polyT(templateOptions.buyNowTranslationKey) }}
+                      </button>
+                      <button
+                        :class="`btnHg clrBAttGrad clrBrDec1 clrTOnEmph js-addToCartBtn ${templateOptions.buyNowClass}`"
+                        @click="addToCart">
+                        {{ ob.polyT('listingDetail.addToCart') }}
+                      </button>
+
+                      <div class="js-purchaseErrorWrap">
+                        <template v-if="outdateHash">
+                          <PurchaseError @click.stop="onClickReloadOutdated" :tip='ob.polyT("listingDetail.errors.outdatedHash", {
+                            reloadLink: `<a class="js-reloadOutdated" id="reloadOutdated">${ob.polyT("listingDetail.errors.reloadOutdatedHash")}<a>`,
+                          })'></PurchaseError>
+                        </template>
+                        <template v-else-if="templateOptions.unpurchaseable">
+                          <PurchaseError :tip="templateOptions.tip"></PurchaseError>
+                        </template>
+                      </div>
+
+                      <div class="flexHCent gutterH">
+                        <div class="tx6 js-rating rating" @click="clickRating">
+                          <Rating :options="ratingData"/>
+                        </div>
+                        <template v-if="ob.shipsFreeToMe">
+                          <div class="txCtr">
+                            <a class="clrE1 clrTOnEmph phraseBox txNoUnd " @click="onClickFreeShippingLabel">{{
+                              ob.polyT('listingDetail.freeShippingBanner') }}</a>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flexHCent gutterHLg tx5 rowLg">
+                    <div v-html="ob.polyT('listingDetail.type', {
+                        type: `<b>${ob.polyT(`formats.${ob.metadata.contractType}`)}</b>`
+                      })">
+                    </div>
+                    <!-- // not showing the inventory for now since it's broken on the server -->
+                    <template v-if="ob.isCrypto && false">
+                      <div v-html='ob.polyT("listingDetail.inventory", {
+                        inventory: `<span class="js-cryptoInventory"></span>`
+                      })'>
                       </div>
                     </template>
 
-                    <button
-                      :class="`btnHg clrBAttGrad clrBrDec1 clrTOnEmph js-purchaseBtn ${templateOptions.buyNowClass} ${outdateHash ? 'disabled' : ''}`"
-                      @click="startPurchase">
-                      {{ ob.polyT(templateOptions.buyNowTranslationKey) }}
-                    </button>
-                    <button
-                      :class="`btnHg clrBAttGrad clrBrDec1 clrTOnEmph js-addToCartBtn ${templateOptions.buyNowClass}`"
-                      @click="addToCart">
-                      {{ ob.polyT('listingDetail.addToCart') }}
-                    </button>
-
-                    <div class="js-purchaseErrorWrap">
-                      <template v-if="outdateHash">
-                        <PurchaseError @click.stop="onClickReloadOutdated" :tip='ob.polyT("listingDetail.errors.outdatedHash", {
-                          reloadLink: `<a class="js-reloadOutdated" id="reloadOutdated">${ob.polyT("listingDetail.errors.reloadOutdatedHash")}<a>`,
-                        })'></PurchaseError>
-                      </template>
-                      <template v-else-if="templateOptions.unpurchaseable">
-                        <PurchaseError :tip="templateOptions.tip"></PurchaseError>
-                      </template>
-                    </div>
-
-                    <div class="flexHCent gutterH">
-                      <div class="tx6 js-rating rating" @click="clickRating">
-                        <Rating :options="ratingData"/>
+                    <template v-else-if="ob.metadata.contractType === 'PHYSICAL_GOOD'">
+                      <div v-html="ob.polyT('listingDetail.condition', {
+                        condition:
+                          `<b>${ob.polyT(`conditionTypes.${ob.item.condition.toUpperCase()}`, { _: ob.item.condition })}</b>`
+                      })">
                       </div>
-                      <template v-if="ob.shipsFreeToMe">
-                        <div class="txCtr">
-                          <a class="clrE1 clrTOnEmph phraseBox txNoUnd " @click="onClickFreeShippingLabel">{{
-                            ob.polyT('listingDetail.freeShippingBanner') }}</a>
+                      <div v-html="ob.polyT('listingDetail.weight', { weight: `<b>${ob.item.grams ? ob.item.grams : 0}</b>` })">
+                      </div>
+                    </template>
+                  </div>
+                  <hr class="rowLg">
+                  <h5>{{ ob.polyT('listingDetail.tags') }}</h5>
+                  <div class="tagWrapper rowLg">
+                    <template v-for="tag in ob.item.tags">
+                      <a class="btn tag clrSh2 clrBr" :href="`#search?q=${tag}`" v-html="`#${ob.parseEmojis(tag)}`"></a>
+                    </template>
+                    <template v-if="!ob.item.tags.length">
+                      <i class="clrT2">{{ ob.polyT('listingDetail.noTags') }}</i>
+                    </template>
+                  </div>
+                  <h5>{{ ob.polyT('listingDetail.paymentsAccepted') }}</h5>
+                  <div class="js-supportedCurrenciesList">
+                    <SupportedCurrenciesList :options="{
+                      initialState: {
+                        currencies: model.get('metadata').get('acceptedCurrencies'),
+                      },
+                    }"/>
+                  </div>
+                  <template v-if="ob.hasVerifiedMods">
+                    <div class="verifiedModBox clrBrAlert2 clrBAlert2Grad">
+                      <div class="flexVCent flexHCent gutterHTn rowSm">
+                        <div class="badge"
+                          :style="`background-image: url(${ob.defaultBadge.tiny}), url('../imgs/verifiedModeratorBadgeDefault.png');`">
                         </div>
-                      </template>
-                    </div>
-                  </div>
-                </div>
-                <div class="flexHCent gutterHLg tx5 rowLg">
-                  <div v-html="ob.polyT('listingDetail.type', {
-                      type: `<b>${ob.polyT(`formats.${ob.metadata.contractType}`)}</b>`
-                    })">
-                  </div>
-                  <!-- // not showing the inventory for now since it's broken on the server -->
-                  <template v-if="ob.isCrypto && false">
-                    <div v-html='ob.polyT("listingDetail.inventory", {
-                      inventory: `<span class="js-cryptoInventory"></span>`
-                    })'>
-                    </div>
-                  </template>
-
-                  <template v-else-if="ob.metadata.contractType === 'PHYSICAL_GOOD'">
-                    <div v-html="ob.polyT('listingDetail.condition', {
-                      condition:
-                        `<b>${ob.polyT(`conditionTypes.${ob.item.condition.toUpperCase()}`, { _: ob.item.condition })}</b>`
-                    })">
-                    </div>
-                    <div v-html="ob.polyT('listingDetail.weight', { weight: `<b>${ob.item.grams ? ob.item.grams : 0}</b>` })">
-                    </div>
-                  </template>
-                </div>
-                <hr class="rowLg">
-                <h5>{{ ob.polyT('listingDetail.tags') }}</h5>
-                <div class="tagWrapper rowLg">
-                  <template v-for="tag in ob.item.tags">
-                    <a class="btn tag clrSh2 clrBr" :href="`#search?q=${tag}`" v-html="`#${ob.parseEmojis(tag)}`"></a>
-                  </template>
-                  <template v-if="!ob.item.tags.length">
-                    <i class="clrT2">{{ ob.polyT('listingDetail.noTags') }}</i>
-                  </template>
-                </div>
-                <h5>{{ ob.polyT('listingDetail.paymentsAccepted') }}</h5>
-                <div class="js-supportedCurrenciesList">
-                  <SupportedCurrenciesList :options="{
-                    initialState: {
-                      currencies: model.get('metadata').get('acceptedCurrencies'),
-                    },
-                  }"/>
-                </div>
-                <template v-if="ob.hasVerifiedMods">
-                  <div class="verifiedModBox clrBrAlert2 clrBAlert2Grad">
-                    <div class="flexVCent flexHCent gutterHTn rowSm">
-                      <div class="badge"
-                        :style="`background-image: url(${ob.defaultBadge.tiny}), url('../imgs/verifiedModeratorBadgeDefault.png');`">
+                        <div class="tx5 txB">{{ ob.polyT('verifiedMod.modVerified.titleLong') }}</div>
                       </div>
-                      <div class="tx5 txB">{{ ob.polyT('verifiedMod.modVerified.titleLong') }}</div>
+                      <div class="flexColRows gutterVSm tx5b">
+                        <div v-html='ob.polyT("verifiedMod.genericDescription", {
+                          name: `<b>${ob.verifiedModsData.name}</b>`,
+                          link: `<a class="txU noWrap" href="${ob.verifiedModsData.link}" data-open-external>${ob.polyT("verifiedMod.link")}</a>`
+                        })'></div>
+                      </div>
                     </div>
-                    <div class="flexColRows gutterVSm tx5b">
-                      <div v-html='ob.polyT("verifiedMod.genericDescription", {
-                        name: `<b>${ob.verifiedModsData.name}</b>`,
-                        link: `<a class="txU noWrap" href="${ob.verifiedModsData.link}" data-open-external>${ob.polyT("verifiedMod.link")}</a>`
-                      })'></div>
-                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <div class="contentBox descriptionSection padLg clrP clrBr clrSh3">
+              <h2 class="txUnb">{{ ob.polyT('listingDetail.description') }}</h2>
+              <div v-html="ob.item.description" />
+              <template v-if="!ob.item.description">
+                <i class="clrT2">{{ ob.polyT('listingDetail.noDescription') }}</i>
+              </template>
+            </div>
+
+            <template v-if="ob.item.images.length">
+              <div ref="photoSection" class="contentBox clrSh3 photoSection js-photoSection">
+                <div ref="photoSelected" class="flexCent photoSelected js-photoSelected">
+                  <img ref="photoSelectedInner" class="photoSelectedInner js-photoSelectedInner">
+                </div>
+                <template v-if="ob.item.images.length > 1">
+                  <button class="btn ion-ios-arrow-left photoPrev " @click="onClickPhotoPrev"></button>
+                  <button class="btn ion-ios-arrow-right photoNext " @click="onClickPhotoNext"></button>
+                </template>
+                <template v-if="ob.item.images.length > 1">
+                  <div class="photoStrip flex gutterH">
+                    <template v-for="(image, photoIndex) in ob.item.images">
+                      <input type="radio" name="photoStripThumbnails" class="js-photoSelect"
+                        :id="`photoStrip${photoIndex}`"
+                        :value="photoIndex"
+                        v-model="activePhotoIndex"
+                        @click="onClickPhotoSelect(photoIndex)">
+                      <label
+                        :style="`background-image: url(` + ob.getServerUrl(`ob/image/${ob.isHiRez() ? image.small : image.tiny}`) + `)`"
+                        :for="`photoStrip${photoIndex}`"></label>
+                    </template>
                   </div>
                 </template>
               </div>
-            </div>
-          </div>
-
-          <div class="contentBox descriptionSection padLg clrP clrBr clrSh3">
-            <h2 class="txUnb">{{ ob.polyT('listingDetail.description') }}</h2>
-            <div v-html="ob.item.description" />
-            <template v-if="!ob.item.description">
-              <i class="clrT2">{{ ob.polyT('listingDetail.noDescription') }}</i>
             </template>
-          </div>
+            <div ref="reviews" class="js-reviews"></div>
 
-          <template v-if="ob.item.images.length">
-            <div ref="photoSection" class="contentBox clrSh3 photoSection js-photoSection">
-              <div ref="photoSelected" class="flexCent photoSelected js-photoSelected">
-                <img ref="photoSelectedInner" class="photoSelectedInner js-photoSelectedInner">
-              </div>
-              <template v-if="ob.item.images.length > 1">
-                <button class="btn ion-ios-arrow-left photoPrev " @click="onClickPhotoPrev"></button>
-                <button class="btn ion-ios-arrow-right photoNext " @click="onClickPhotoNext"></button>
-              </template>
-              <template v-if="ob.item.images.length > 1">
-                <div class="photoStrip flex gutterH">
-                  <template v-for="(image, photoIndex) in ob.item.images">
-                    <input type="radio" name="photoStripThumbnails" class="js-photoSelect"
-                      :id="`photoStrip${photoIndex}`"
-                      :value="photoIndex"
-                      v-model="activePhotoIndex"
-                      @click="onClickPhotoSelect(photoIndex)">
-                    <label
-                      :style="`background-image: url(` + ob.getServerUrl(`ob/image/${ob.isHiRez() ? image.small : image.tiny}`) + `)`"
-                      :for="`photoStrip${photoIndex}`"></label>
-                  </template>
+            <!-- Attachments are not yet available -->
+            <!--
+
+    <div class="contentBox padLg clrP clrBr clrSh3">
+      <h2 class="txUnb">{{ ob.polyT('listingDetail.attachments') }}</h2>
+      Placeholder for Attachments
+    </div>
+  -->
+
+            <template v-if="ob.shippingOptions.length">
+              <div ref="shippingSection" class="contentBox padLg clrP clrBr clrSh3" id="shippingSection">
+                <h2 class="txUnb">{{ ob.polyT('listingDetail.shipping') }}</h2>
+                <div class="flexVCent gutterHLg tx5">
+                  <!-- this data is not yet available -->
+                  <!--
+          <div>{{ ob.polyT('listingDetail.shipsFrom', { country: `<b>insert translation of the country here</b>` }) }}</div>
+          -->
+                  <div>{{ ob.polyT('listingDetail.shipTo') }}</div>
+                  <div class="col4">
+                    <Select2 v-model="shippingDestination">
+                      <option value="ALL">{{ ob.polyT('listingDetail.allCountries') }}</option>
+                      <template v-for="country in countryData">
+                        <option :value="country.id" :selected="country.id === shippingDestination">{{ country.text }}</option>
+                      </template>
+                    </Select2>
+                  </div>
                 </div>
-              </template>
-            </div>
-          </template>
-          <div ref="reviews" class="js-reviews"></div>
-
-          <!-- Attachments are not yet available -->
-          <!--
-
-  <div class="contentBox padLg clrP clrBr clrSh3">
-    <h2 class="txUnb">{{ ob.polyT('listingDetail.attachments') }}</h2>
-    Placeholder for Attachments
-  </div>
- -->
-
-          <template v-if="ob.shippingOptions.length">
-            <div ref="shippingSection" class="contentBox padLg clrP clrBr clrSh3" id="shippingSection">
-              <h2 class="txUnb">{{ ob.polyT('listingDetail.shipping') }}</h2>
-              <div class="flexVCent gutterHLg tx5">
-                <!-- this data is not yet available -->
-                <!--
-        <div>{{ ob.polyT('listingDetail.shipsFrom', { country: `<b>insert translation of the country here</b>` }) }}</div>
-        -->
-                <div>{{ ob.polyT('listingDetail.shipTo') }}</div>
-                <div class="col4">
-                  <Select2 v-model="shippingDestination">
-                    <option value="ALL">{{ ob.polyT('listingDetail.allCountries') }}</option>
-                    <template v-for="country in countryData">
-                      <option :value="country.id" :selected="country.id === shippingDestination">{{ country.text }}</option>
-                    </template>
-                  </Select2>
+                <div class="js-shippingOptions">
+                  <ShippingOptions :options="shippingOptionsInfo" :key="shippingDestination" />
                 </div>
               </div>
-              <div class="js-shippingOptions">
-                <ShippingOptions :options="shippingOptionsInfo" :key="shippingDestination" />
-              </div>
+            </template>
+            <div class="contentBox padLg clrP clrBr clrSh3">
+              <h2 class="txUnb">{{ ob.polyT('listingDetail.refundPolicy') }}</h2>
+              <div v-html="ob.refundPolicy" />
+              <template v-if="!ob.refundPolicy">
+                <i class="clrT2">{{ ob.polyT('listingDetail.noRefundPolicy') }}</i>
+              </template>
             </div>
-          </template>
-          <div class="contentBox padLg clrP clrBr clrSh3">
-            <h2 class="txUnb">{{ ob.polyT('listingDetail.refundPolicy') }}</h2>
-            <div v-html="ob.refundPolicy" />
-            <template v-if="!ob.refundPolicy">
-              <i class="clrT2">{{ ob.polyT('listingDetail.noRefundPolicy') }}</i>
-            </template>
+
+            <div class="contentBox padLg clrP clrBr clrSh3">
+              <h2 class="txUnb">{{ ob.polyT('listingDetail.termsAndConditions') }}</h2>
+              <div v-html="ob.termsAndConditions" />
+              <template v-if="!ob.termsAndConditions">
+                <i class="clrT2">{{ ob.polyT('listingDetail.noTermsAndConditions') }}</i>
+              </template>
+            </div>
+
+            <div class="js-moreListings">
+              <MoreListings :options="{
+                vendor,
+                listings: moreListingsData,
+              }" />
+            </div>
+
           </div>
 
-          <div class="contentBox padLg clrP clrBr clrSh3">
-            <h2 class="txUnb">{{ ob.polyT('listingDetail.termsAndConditions') }}</h2>
-            <div v-html="ob.termsAndConditions" />
-            <template v-if="!ob.termsAndConditions">
-              <i class="clrT2">{{ ob.polyT('listingDetail.noTermsAndConditions') }}</i>
-            </template>
-          </div>
-
-          <div class="js-moreListings">
-            <MoreListings :options="{
-              vendor,
-              listings: moreListingsData,
-            }" />
-          </div>
-
-        </div>
-
-      </template>
-    </BaseModal>
+        </template>
+      </BaseModal>
+      
+    </div>
+    <Teleport to="#js-vueModal">
+      <NsfwWarning v-if="showNsfwWarning" @canceled="close" @close="onNsfwWarningClose" />
+      <Purchase ref="purchaseModal" v-else-if="showPurchase"
+        :options="{ variants: selectedVariants, vendor, phase: 'pay',}"
+        :bb="function() {
+          return {
+            listing: model,
+          };
+        }"
+        @clickReloadOutdated="onPurchaseReloadOutdated"
+        @close="onPurchaseClose" />
+      <EditListing ref="editModal" v-else-if="showEditListing"
+        :options="{
+          returnText: ob.polyT('listingDetail.editListingReturnText'),
+          onClickViewListing: onEditModalClickReturn,
+        }"
+        :bb="function() {
+          return {
+            model,
+          };
+        }"
+        @click-return="onEditModalClickReturn"
+        @close="onCloseEditModal"
+      />
+      <EditListing ref="cloneModal" v-else-if="showCloneListing"
+        :bb="function() {
+          return {
+            model: model.cloneListing(),
+          };
+        }"
+        @close="onCloseCloneModal"
+      />
+    </Teleport>
   </div>
-  <NsfwWarning v-else="showNsfwWarning" @canceled="close" @close="onNsfwWarningClose" />
 </template>
 
 <script>
@@ -302,7 +337,6 @@ import is from 'is_js';
 import app from '../../../../backbone/app';
 import 'velocity-animate';
 import { convertAndFormatCurrency } from '../../../../backbone/utils/currency';
-import { launchEditListingModal } from '../../../../backbone/utils/modalManager';
 // import {
 //   getInventory,
 //   events as inventoryEvents,
@@ -314,7 +348,6 @@ import { getTranslatedCountries } from '../../../../backbone/data/countries';
 import { events as listingEvents } from '../../../../backbone/models/listing';
 import Listings from '../../../../backbone/collections/Listings';
 
-import Purchase from '../../../../backbone/views/modals/purchase/Purchase';
 import Reviews from '../../../../backbone/views/reviews/Reviews';
 
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
@@ -328,6 +361,8 @@ import NsfwWarning from '../NsfwWarning.vue';
 import MoreListings from './MoreListings.vue';
 import ShippingOptions from './ShippingOptions.vue'
 import PurchaseError from '@/views/modals/listingDetail/PurchaseError.vue'
+import Purchase from '../purchase/Purchase.vue'
+import EditListing from '../editListing/EditListing.vue'
 
 export default {
   components: {
@@ -335,7 +370,9 @@ export default {
     NsfwWarning,
     MoreListings,
     ShippingOptions,
+    Purchase,
     PurchaseError,
+    EditListing,
   },
   props: {
     options: {
@@ -372,6 +409,10 @@ export default {
 
       isDeleting: false,
       showDeleteConfirmedBox: false,
+
+      showPurchase: false,
+      showEditListing: false,
+      showCloneListing: false,
     };
   },
   created () {
@@ -395,8 +436,6 @@ export default {
     },
   },
   unmounted() {
-    if (this.editModal) this.editModal.remove();
-    if (this._purchaseModal) this._purchaseModal.remove();
     if (this.destroyRequest) this.destroyRequest.abort();
     if (this.ratingsFetch) this.ratingsFetch.abort();
     // if (this.inventoryFetch) this.inventoryFetch.abort();
@@ -515,7 +554,15 @@ export default {
         console.error(e);
       }
       return priceInfo;
-    }
+    },
+    selectedVariants () {
+      const { options } = this.model.toJSON().item;
+
+      return this.variantOptions.map((val, idx) => ({
+        name: options[idx].name,
+        value: val,
+      }));
+    },
   },
   methods: {
     loadData (options = {}) {
@@ -544,7 +591,6 @@ export default {
         // pass
       }
 
-      this._purchaseModal = null;
       this._latestHash = this.model.get('hash');
       this._renderedHash = null;
 
@@ -717,52 +763,40 @@ export default {
 
     onClickEditListing () {
       recordEvent('Listing_EditFromListing');
-      const onCloseEditModal = () => {
-        this.showModal = false;
 
-        if (!this.isRemoved()) {
-          this.showModal = true;
-        }
-      };
-
-      const onEditModalClickReturn = () => {
-        this.editModal.confirmClose()
-          .done(() => {
-            this.stopListening(null, null, onCloseEditModal);
-            this.editModal.remove();
-
-            this.showModal = true;
-          });
-      };
-
-      this.editModal = launchEditListingModal({
-        model: this.model,
-        returnText: app.polyglot.t('listingDetail.editListingReturnText'),
-        onClickViewListing: onEditModalClickReturn,
-      });
-
+      this.showEditListing = true;
       this.showModal = false;
-      this.listenTo(this.editModal, 'close', onCloseEditModal);
-      this.listenTo(this.editModal, 'click-return', onEditModalClickReturn);
+    },
+
+    onEditModalClickReturn() {
+      this.$refs.editModal.confirmClose()
+        .done(() => {
+          this.showEditListing = false;
+
+          this.showModal = true;
+        });
+    },
+
+    onCloseEditModal() {
+      this.showEditListing = false;
+      this.showModal = true;
     },
 
     onClickCloneListing () {
       recordEvent('Listing_CloneFromListing');
-      launchEditListingModal({
-        model: this.model.cloneListing(),
-      });
+
+      this.showCloneListing = true;
+      this.showModal = false;
+    },
+
+    onCloseCloneModal() {
+      this.showCloneListing = false;
+      this.showModal = true;
     },
 
     onClickDeleteListing () {
       recordEvent('Listing_DeleteFromListing');
       this.showDeleteConfirmedBox = true;
-      // don't bubble to the document click handler
-      return false;
-    },
-
-    onClickDeleteConfirmBox () {
-      // don't bubble to the document click handler
-      return false;
     },
 
     onClickConfirmedDelete () {
@@ -999,56 +1033,25 @@ export default {
         //   }
       }
 
-      const selectedVariants = this.getSelectedVariants();
+      this.showPurchase = true;
 
-      window.vueApp.launchPurchaseModal({ variants: selectedVariants, vendor: this.vendor, phase: 'pay',},
-        function() {
-          return {
-            listing: this.model,
-          };
-        });
-
-      if (this._purchaseModal) this._purchaseModal.remove();
-
-      this._purchaseModal = new Purchase({
-        listing: this.model,
-        variants: selectedVariants,
-        vendor: this.vendor,
-        removeOnClose: true,
-        showCloseButton: false,
-        phase: 'pay',
-        // inventory: this._inventory,
-      })
-        .render()
-        .open();
-
-      if (this._purchaseModalDeferred) {
-        this._purchaseModalDeferred.notify({
-          type: this.PURCHASE_MODAL_CREATE,
-          view: this._purchaseModal,
-        });
-      }
-
-      this.listenTo(this._purchaseModal, 'closeBtnPressed', () => this.close());
       recordEvent('Purchase_Start', { ownListing: this.model.isOwnListing });
     },
 
-    getSelectedVariants () {
-      const { options } = this.model.toJSON().item;
-
-      return this.variantOptions.map((val, idx) => ({
-        name: options[idx].name,
-        value: val,
-      }));
+    onPurchaseReloadOutdated() {
+      this.showPurchase = false;
+      this.showModal = true; 
+    },
+    onPurchaseClose() {
+      this.showPurchase = false;
+      this.close();
     },
 
     addToCart () {
-      const selectedVariants = this.getSelectedVariants();
-
       api.addToShoppingCart(this.vendor.peerID, {
         slug: this.model.get('slug'),
         quantity: '1',
-        options: selectedVariants || [],
+        options: this.selectedVariants || [],
       })
     },
 

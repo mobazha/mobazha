@@ -37,11 +37,11 @@
             <template v-if="ob.showAcceptButton">
               <ProcessingButton
                 :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph tx5b js-acceptPayout ${acceptInProgress ? 'processing' : ''}`"
-                :disabled="ob.acceptConfirmOn" :btnText="ob.polyT('orderDetail.summaryTab.disputePayout.btnAcceptPayout')"
+                :disabled="acceptConfirmOn" :btnText="ob.polyT('orderDetail.summaryTab.disputePayout.btnAcceptPayout')"
                 @click.stop="onClickAcceptPayout" />
             </template>
-            <template v-if="ob.acceptConfirmOn">
-              <div class="confirmBox acceptPayoutConfirm tx5 arrowBoxTop clrBr clrP clrT" @click="onClickAcceptPayoutConfirmedBox">
+            <template v-if="acceptConfirmOn">
+              <div class="confirmBox acceptPayoutConfirm tx5 arrowBoxTop clrBr clrP clrT" @click.stop.prevent>
                 <div class="tx3 txB rowSm">{{ ob.polyT('orderDetail.summaryTab.disputePayout.acceptPayoutConfirm.title') }}</div>
                 <p>{{ ob.polyT('orderDetail.summaryTab.disputePayout.acceptPayoutConfirm.body') }}</p>
                 <hr class="clrBr row" />
@@ -89,10 +89,10 @@ export default {
       _state: {
         userCurrency: app.settings.get('localCurrency') || 'USD',
         showAcceptButton: false,
-        acceptConfirmOn: false,
         paymentCoin: undefined,
       },
 
+      acceptConfirmOn: false,
       acceptInProgress: false,
 
       priceLines: {},
@@ -121,7 +121,6 @@ export default {
         initialState: {
           userCurrency: app.settings.get('localCurrency') || 'USD',
           showAcceptButton: false,
-          acceptConfirmOn: false,
           paymentCoin: undefined,
           ...options.initialState,
         },
@@ -179,24 +178,17 @@ export default {
 
     onClickAcceptPayout () {
       recordEvent('OrderDetails_DisputeAcceptClick');
-      this.setState({ acceptConfirmOn: true });
-      return false;
-    },
-
-    onClickAcceptPayoutConfirmedBox () {
-      // ensure event doesn't bubble so onDocumentClick doesn't
-      // close the confirmBox.
-      return false;
+      this.acceptConfirmOn = true;
     },
 
     onClickAcceptPayoutConfirmCancel () {
       recordEvent('OrderDetails_DisputeAcceptCancel');
-      this.setState({ acceptConfirmOn: false });
+      this.acceptConfirmOn = false;
     },
 
     onClickAcceptPayoutConfirmed () {
       recordEvent('OrderDetails_DisputeAcceptConfirm');
-      this.setState({ acceptConfirmOn: false });
+      this.acceptConfirmOn = false;
       acceptPayout(this.orderID);
     },
 

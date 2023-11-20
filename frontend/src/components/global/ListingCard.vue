@@ -772,21 +772,6 @@ export default {
       this.showListingLoading = false;
 
       this.showListingDetailModal = true;
-      this.$nextTick(() => {
-        this.$refs.listingDetail.purchaseModal
-          .progress((getPurchaseE) => {
-            if (getPurchaseE.type === ListingDetail.PURCHASE_MODAL_CREATE) {
-              const purchaseModal = getPurchaseE.view;
-              this.listenTo(purchaseModal, 'clickReloadOutdated', (e) => {
-                e.preventDefault();
-
-                this.showListingDetailModal = true;
-                this.listingDetailKey += 1;
-                purchaseModal.remove();
-              });
-            }
-          });
-      });
 
       this.$emit('listingDetailOpened');
 

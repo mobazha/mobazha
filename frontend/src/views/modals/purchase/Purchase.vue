@@ -321,6 +321,7 @@
               <div class="rowLg">
                 <!-- <div class="js-receipt"></div> -->
                 <Receipt
+                  v-if="order"
                   :options="{
                     prices: prices,
                     coupons: couponObj,
@@ -409,6 +410,7 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data () {
     return {
@@ -418,10 +420,9 @@ export default {
 
       cart: {},
       vendor: {},
-      order: new Order({}, {}),
+      order: undefined,
       items: [],
 
-      listing: undefined,
       listings: undefined,
       moderators: undefined,
       couponObj: [],
@@ -444,7 +445,9 @@ export default {
   created () {
     this.initEventChain();
 
-    this.init();
+    // for shopping cart
+    // this.init();
+    this.loadData(this.options);
   },
   mounted () {
   },
@@ -601,7 +604,7 @@ export default {
       // this.coinName = ob.polyT(coinTranslationKey) === coinTranslationKey ? coinType : ob.polyT(coinTranslationKey);
     },
     loadData (options = {}) {
-      if (!options.listing || !(options.listing instanceof Listing)) {
+      if (!this.listing || !(this.listing instanceof Listing)) {
         throw new Error('Please provide a listing model');
       }
 
@@ -619,9 +622,9 @@ export default {
 
       this.baseInit(opts);
 
-      this.listing = opts.listing;
-      this.variants = opts.variants;
-      this.vendor = opts.vendor;
+      // this.listing = opts.listing;
+      // this.variants = opts.variants;
+      // this.vendor = opts.vendor;
       const shippingOptions = this.listing.get('shippingOptions');
       const moderatorIDs = this.listing.get('moderators') || [];
       const disallowedIDs = [app.profile.id, this.listing.get('vendorID').peerID];
@@ -645,6 +648,7 @@ export default {
          to support multiple items in a purchase in the future, pass in listings in the options,
          and add them to the order as items here.
       */
+      this.listings = [ this.listing ];
       this.listings.forEach(listing => {
         const item = new Item(
           {
@@ -782,7 +786,7 @@ export default {
     },
 
     clickClose () {
-      this.trigger('closeBtnPressed');
+      this.$emit('closeBtnPressed');
       this.close();
     },
 

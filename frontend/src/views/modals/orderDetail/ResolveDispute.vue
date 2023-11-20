@@ -73,13 +73,13 @@
           :className="`btn clrBAttGrad clrBrDec1 clrTOnEmph js-submit ${processing ? 'processing' : ''}`"
           :btnText="ob.polyT(`orderDetail.resolveDisputeTab.btnSubmit`)" @click.stop="onClickSubmit" />
         <div class="js-resolveConfirm confirmBox resolveConfirm tx5 arrowBoxBottom clrBr clrP clrT"
-          v-show="resolveConfirmOn" @click="onClickResolveConfirmBox">
+          v-show="resolveConfirmOn" @click.stop.prevent>
           <div class="tx3 txB rowSm">{{ ob.polyT('orderDetail.resolveDisputeTab.resolveConfirm.title') }}</div>
           <p>{{ ob.polyT('orderDetail.resolveDisputeTab.resolveConfirm.body') }}</p>
           <hr class="clrBr row" />
           <div class="flexHRight flexVCent gutterHLg buttonBar">
-            <a @click="onClickCancelConfirm">{{ ob.polyT('orderDetail.resolveDisputeTab.resolveConfirm.btnCancel') }}</a>
-            <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph" @click="onClickConfirmedSubmit">{{ ob.polyT('orderDetail.resolveDisputeTab.resolveConfirm.btnSubmit') }}</a>
+            <a @click.stop="onClickCancelConfirm">{{ ob.polyT('orderDetail.resolveDisputeTab.resolveConfirm.btnCancel') }}</a>
+            <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph" @click.stop="onClickConfirmedSubmit">{{ ob.polyT('orderDetail.resolveDisputeTab.resolveConfirm.btnSubmit') }}</a>
           </div>
         </div>
       </div>
@@ -178,12 +178,6 @@ export default {
       this.listenTo(orderEvents, 'resolveDisputeComplete resolveDisputeFail', this.onResolveDisputeAlways);
     },
 
-    onClickResolveConfirmBox () {
-      // ensure event doesn't bubble so onDocumentClick doesn't
-      // close the confirmBox.
-      return false;
-    },
-
     onClickCancelConfirm () {
       recordEvent('OrderDetails_DisputeResolveConfirmCancel');
       this.resolveConfirmOn = false;
@@ -210,7 +204,6 @@ export default {
     onClickSubmit () {
       this.resolveConfirmOn = true;
       recordEvent('OrderDetails_DisputeResolveSubmit');
-      return false;
     },
 
     onClickConfirmedSubmit () {

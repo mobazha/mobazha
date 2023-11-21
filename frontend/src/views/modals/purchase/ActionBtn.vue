@@ -3,7 +3,7 @@
     <div class="posR">
       <template v-if="ob.phase === 'pay' || ob.phase === 'processing'">
         <ProcessingButton
-          :className="`btn width100 clrBAttGrad clrBrDec1 clrTOnEmph ${ob.phase} ${outdatedHash ? 'row' : ''}`"
+          :className="`btn width100 clrBAttGrad clrBrDec1 clrTOnEmph ${ob.phase} ${ob.outdatedHash ? 'row' : ''}`"
           :disabled="initPay"
           @click.stop="clickPayBtn"
           :btnText="ob.polyT('purchase.pay')" />

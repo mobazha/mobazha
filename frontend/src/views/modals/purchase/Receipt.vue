@@ -167,6 +167,9 @@ export default {
   },
   data () {
     return {
+      paymentCoin: '',
+      prices: [],
+      showTotalTip: true,
     };
   },
   created () {

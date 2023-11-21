@@ -1,30 +1,26 @@
 <template>
   <div class="coupons">
-    <BaseModal>
-      <template v-slot:component>
-        <template v-if="ob.codeResult && ob.codeResult.type && ob.codeResult.type !== 'valid'">
-          <div class="txSm rowTn flex">
-            <span class="clrTErr">
-              <template v-if="ob.codeResult.code">
-                {{ ob.polyT(`purchase.codeErrors.${ob.codeResult.type}`, { code: ob.codeResult.code }) }}
-              </template>
+    <template v-if="codeResult && codeResult.type && codeResult.type !== 'valid'">
+      <div class="txSm rowTn flex">
+        <span class="clrTErr">
+          <template v-if="codeResult.code">
+            {{ ob.polyT(`purchase.codeErrors.${codeResult.type}`, { code: codeResult.code }) }}
+          </template>
 
-              <template v-else>
-                {{ ob.polyT('purchase.codeErrors.blank') }}
-              </template>
-            </span>
-          </div>
-        </template>
-        <template v-for="(code, j) in ob.couponCodes" :key="j">
-          <div class="txSm rowTn flexVCent gutterH">
-            <span class="clrTEm">{{ ob.polyT('purchase.code', { code }) }}</span>
-            <button class="btnTxtOnly " @click="removeCode(code)">
-              {{ ob.polyT('purchase.removeCode') }}
-            </button>
-          </div>
-        </template>
-      </template>
-    </BaseModal>
+          <template v-else>
+            {{ ob.polyT('purchase.codeErrors.blank') }}
+          </template>
+        </span>
+      </div>
+    </template>
+    <template v-for="code in couponCodes" :key="code">
+      <div class="txSm rowTn flexVCent gutterH">
+        <span class="clrTEm">{{ ob.polyT('purchase.code', { code }) }}</span>
+        <button class="btnTxtOnly " @click="removeCode(code)">
+          {{ ob.polyT('purchase.removeCode') }}
+        </button>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -43,6 +39,11 @@ export default {
   },
   data () {
     return {
+      couponCodes: [],
+      codeResult: {
+        type: '',
+        code: ''
+      }
     };
   },
   created () {
@@ -51,17 +52,10 @@ export default {
   mounted () {
   },
   computed: {
-    ob () {
-      return {
-        ...this.templateHelpers,
-        couponCodes: this.couponCodes,
-        codeResult: this.codeResult,
-      };
-    }
   },
   methods: {
     loadData (options = {}) {
-      this.baseInit(opts);
+      this.baseInit(options);
 
       if (!isValidNumber(options.listingPrice)) {
         throw new Error('Please provide a string based number as the price of the listing.');
@@ -114,7 +108,7 @@ export default {
             this.totalDiscount = this.totalDiscount.plus(discount);
             this.couponCodes.push(code);
             this.couponHashes.push(hashedCode);
-            this.trigger('changeCoupons', this.couponHashes, this.couponCodes);
+            this.$emit('changeCoupons', this.couponHashes, this.couponCodes);
           } else {
             this.codeResult = { type: 'excessive', code };
           }

@@ -34,13 +34,13 @@
           ref="modCards"
           v-show="modShouldRender(card.model)"
           :options="{
-            purchase: _options.purchase,
-            notSelected: _options.notSelected,
-            radioStyle: _options.radioStyle,
-            controlsOnInvalid: _options.controlsOnInvalid,
+            purchase: innerOptions.purchase,
+            notSelected: innerOptions.notSelected,
+            radioStyle: innerOptions.radioStyle,
+            controlsOnInvalid: innerOptions.controlsOnInvalid,
             initialState: {
               // Moderators that aren't being rendered should never be selected.
-              selectedState: modShouldRender(card.model) ? _options.cardState : _options.notSelected,
+              selectedState: modShouldRender(card.model) ? innerOptions.cardState : innerOptions.notSelected,
               preferredCurs: getState().preferredCurs,
             },
           }"
@@ -106,7 +106,7 @@ export default {
 
       modCards: [],
 
-      _options: {
+      innerOptions: {
         apiPath: 'fetchprofiles',
         async: true,
         useCache: true,
@@ -143,9 +143,9 @@ export default {
       const totalIDs = this.allIDs.length;
       return {
         ...this.templateHelpers,
-        wrapperClasses: this._options.wrapperClasses,
+        wrapperClasses: this.innerOptions.wrapperClasses,
         placeholder: !showMods.length && (this.unfetchedMods.length || !totalIDs),
-        purchase: this._options.purchase,
+        purchase: this.innerOptions.purchase,
         totalShown: showMods.length,
         totalIDs,
         unVerCount,
@@ -220,22 +220,7 @@ export default {
       }
 
       const opts = {
-        className: 'moderatorsList',
-        apiPath: 'fetchprofiles',
-        async: true,
-        useCache: true,
-        moderatorIDs: [],
-        excludeIDs: [],
-        method: 'POST',
-        include: '',
-        purchase: false,
-        singleSelect: false,
-        radioStyle: false,
-        controlsOnInvalid: false,
-        cardState: 'unselected',
-        notSelected: 'unselected',
-        showLoadBtn: false,
-        showSpinner: true,
+        ...this.innerOptions,
         ...options,
         initialState: {
           preferredCurs: [],
@@ -245,7 +230,7 @@ export default {
           ...options.initialState,
         },
       };
-      this._options = opts;
+      this.innerOptions = opts;
 
       if (!opts.apiPath || ['fetchprofiles', 'moderators'].indexOf(opts.apiPath) === -1) {
         throw new Error('The apiPath must be either fetchprofiles or moderators');
@@ -317,7 +302,7 @@ export default {
         data.moderatorInfo.fee.fixedFee.amount = bigNumber(data.moderatorInfo.fee.fixedFee.amount);
       }
 
-      if ((!!isAMod && supportedCur) || this._options.showInvalid) {
+      if ((!!isAMod && supportedCur) || this.innerOptions.showInvalid) {
         const newMod = new Moderator(data, { parse: true });
         if (newMod.isValid()) this.moderatorsCol.add(newMod);
         this.removeNotFetched(data.peerID);
@@ -329,7 +314,7 @@ export default {
 
     getModeratorsByID(opts) {
       const op = {
-        ...this._options,
+        ...this.innerOptions,
         ...opts,
       };
 
@@ -469,7 +454,7 @@ export default {
     onModSelectChange(data) {
       if (data.selected) {
         // If only one moderator should be selected, deselect the other moderators.
-        if (this._options.singleSelect) this.deselectOthers(data.guid);
+        if (this.innerOptions.singleSelect) this.deselectOthers(data.guid);
         this.$emit('cardSelect');
       }
     },
@@ -485,12 +470,12 @@ export default {
       if (!peerID) throw new Error('You must provide a peerID.');
 
       const mod = this.$refs.modCards.filter((card) => card.model.get('peerID') === peerID);
-      if (mod.length) mod[0].changeSelectState(this._options.notSelected);
+      if (mod.length) mod[0].changeSelectState(this.innerOptions.notSelected);
     },
     deselectOthers(peerID = '') {
       this.$refs.modCards.forEach((card) => {
         if (card.model.get('peerID') !== peerID) {
-          card.changeSelectState(this._options.notSelected);
+          card.changeSelectState(this.innerOptions.notSelected);
         }
       });
     },

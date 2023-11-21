@@ -15,7 +15,7 @@
       <FormError v-if="ob.errors['priceDiscount']" :errors="ob.errors['priceDiscount']" />
       <div class="flexRow marginTopAuto">
         <div class="inputSelect marginTopAuto">
-          <input type="text" class="clrBr clrP clrSh2" v-model="formData.discountAmount" placeholder="0.00" >
+          <input type="number" class="clrBr clrP clrSh2" @input="onInputDiscountAmount" :value="discountAmount" placeholder="0.00" >
             <!-- // disables the search box -->
           <Select2 class="clrBr clrP nestInputRight" v-model="discountType" :options="{ minimumResultsForSearch: Infinity }">
             <option value="PERCENTAGE" :selected="!ob.priceDiscount">{{
@@ -37,7 +37,7 @@
 
 <script>
 import bigNumber from 'bignumber.js';
-
+import { toStandardNotation } from '../../../../backbone/utils/number';
 
 export default {
   props: {
@@ -49,9 +49,14 @@ export default {
   },
   data () {
     return {
-      discountType: '',
+      formData: {
+        title: '',
+        discountCode: '',
+        percentDiscount: undefined,
+        priceDiscount: undefined,
+      },
 
-      formData: {},
+      discountType: '',
     };
   },
   created () {
@@ -69,31 +74,30 @@ export default {
       };
     },
     discountAmount () {
-      const ob = this.ob;
-      let discountAmount;
-
-      if (ob.priceDiscount) {
-        discountAmount = ob.number.toStandardNotation(ob.priceDiscount);
-      } else if (typeof ob.percentDiscount !== 'undefined') {
-        discountAmount = ob.number.toStandardNotation(ob.percentDiscount);
+      if (this.formData.priceDiscount) {
+        return toStandardNotation(this.formData.priceDiscount);
+      } else if (typeof this.formData.percentDiscount !== 'undefined') {
+        return toStandardNotation(this.formData.percentDiscount);
       }
-      return discountAmount;
     }
   },
   methods: {
-    createFormData(model) {
-      return {
-        title: model.title,
-        discountCode: model.discountCode,
-        discountAmount: model.discountAmount,
-      }
-    },
+
     loadData (options = {}) {
       if (!this.model) {
         throw new Error('Please provide a model.');
       }
 
       this.baseInit(options);
+
+      const model = this.model.toJSON();
+      this.formData = {
+        title: model.title,
+        discountCode: model.discountCode,
+        percentDiscount: model.percentDiscount,
+        priceDiscount: model.priceDiscount,
+      }
+      this.discountType = !this.formData.priceDiscount ? 'PERCENTAGE' : 'FIXED';
     },
 
     setFocus() {
@@ -104,38 +108,32 @@ export default {
       this.$emit('remove-click', this.model);
     },
 
-    getFormDataEx () {
-      const fields = this.$el.querySelectorAll('select[name], input[name], textarea[name]');
-      const formData = this.getFormData(fields);
+    onInputDiscountAmount(event) {
+      const discountAmount = event.target.value;
 
       if (this.discountType === 'FIXED') {
-        const bigNumDiscount = bigNumber(formData.discountAmount);
-        formData.priceDiscount = bigNumDiscount.isNaN() ?
-          formData.discountAmount : bigNumDiscount;
+        const bigNumDiscount = bigNumber(discountAmount);
+        this.formData.priceDiscount = bigNumDiscount.isNaN() ? discountAmount : bigNumDiscount;
+
+        this.formData.percentDiscount = undefined;
       } else {
         // discountAmount
-        const percentDiscount = Number(formData.discountAmount);
+        const percentDiscount = Number(discountAmount);
+        this.formData.percentDiscount = discountAmount && !isNaN(percentDiscount) ? percentDiscount : discountAmount;
 
-        formData.percentDiscount = formData.discountAmount && !isNaN(percentDiscount) ?
-          percentDiscount : formData.discountAmount;
+        this.formData.priceDiscount = undefined;
       }
-
-      delete formData.discountAmount;
-
-      return formData;
     },
 
     // Sets the model based on the current data in the UI.
     setModelData () {
-      const formData = this.getFormDataEx();
-
-      if (formData.priceDiscount !== undefined) {
+      if (this.formData.priceDiscount !== undefined) {
         this.model.unset('percentDiscount');
       } else {
         this.model.unset('priceDiscount');
       }
 
-      this.model.set(formData);
+      this.model.set(this.formData);
     },
   }
 }

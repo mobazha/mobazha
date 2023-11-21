@@ -19,7 +19,7 @@
         <div :class="`flexRow gutterH mainSection ${ob.phaseClass}`">
           <div class="col9">
             <div class="flexColRow gutterV">
-              <template v-for="(listing, key) in ob.listings" :key="key">
+              <template v-for="(listing, idx) in ob.listings" :key="listing.slug">
                 <section class="contentBox pad clrP clrBr clrSh3">
                   <div class="js-errors">
                     <FormError v-if="errors['js-errors']" :errors="errors['js-errors']" />
@@ -35,7 +35,7 @@
                           <div class="width100 noOverflow">
                             <b>{{ listing.item.title }}</b>
                           </div>
-                          <template v-for="(variant, j) in listing.options" :key="j">
+                          <template v-for="variant in variants" :key="variant.name">
                             <div class="width100 noOverflow">
                               <span class="clrT2">{{ variant.name }}: {{ variant.value }}</span>
                             </div>
@@ -57,7 +57,7 @@
                                 id="purchaseQuantity"
                                 size="3"
                                 name="quantity"
-                                v-model="listing.quantity"
+                                v-model="formData.itemsData[idx].quantity"
                                 @keyup="keyupQuantity"
                                 placeholder="0"
                                 data-var-type="bignumber">
@@ -250,9 +250,9 @@
                         type="text"
                         id="emailAddress"
                         name="alternateContactInfo"
+                        v-model="formData.emailAddress"
                         @blur="blurEmailAddress"
-                        :placeholder="ob.polyT('purchase.emailPlaceholder')"
-                        :value="ob.alternateContactInfo">
+                        :placeholder="ob.polyT('purchase.emailPlaceholder')">
                     </div>
                     <div>
                       <span class="txSm clrT2">{{ ob.polyT('purchase.emailNote') }}</span>
@@ -269,15 +269,16 @@
                           type="text"
                           id="couponCode"
                           @keyup.enter="applyCoupon"
-                          v-model="couponCode"
-                          name="couponCode"
+                          v-model="formData.couponCode"
                           :placeholder="ob.polyT('purchase.couponCodePlaceholder')">
                         <button class="btn clrP clrBr clrSh2 flexNoShrink" @click="applyCoupon">
                           {{ ob.polyT('purchase.applyCode') }}
                         </button>
                       </div>
                       <div class="js-couponsWrapper">
-                        <Coupons :options="{
+                        <Coupons
+                          ref="coupons"
+                          :options="{
                             coupons: _listing.coupons,
                             listingPrice: ob.bigNumber(listing.price.amount),
                           }"
@@ -296,12 +297,11 @@
                 <textarea
                   class="clrBr clrP js-purchaseField"
                   id="memo"
-                  name="memo"
                   @blur="blurMemo"
                   maxlength="5000"
                   rows="6"
                   :placeholder="ob.polyT('purchase.memoPlaceholder')"
-                  v-model="ob.items[0].memo"></textarea>
+                  v-model="formData.itemsData[0].memo"></textarea>
               </section>
             </template>
             <template v-if="ob.phase === 'pending'">
@@ -454,6 +454,18 @@ export default {
     return {
       viewKey: 0,
 
+      formData: {
+        itemsData: [
+          {
+            quantity: 0,
+            memo: '',
+            coupons: [],
+          }
+        ],
+        emailAddress: '',
+        couponCode: '',
+      },
+
       _state: {
         phase: 'pay',
       },
@@ -477,7 +489,6 @@ export default {
       outdatedHash: false,
 
       orderID: '',
-      couponCode: '',
 
       paymentData: undefined,
 
@@ -716,6 +727,7 @@ export default {
          and add them to the order as items here.
       */
       this.listings = [ this.listing ];
+      this.formData.itemsData = [];
       this.listings.forEach(listing => {
         const item = new Item(
           {
@@ -736,6 +748,10 @@ export default {
         );
         // add the item to the order.
         this.order.get('items').add(item);
+
+        this.formData.itemsData.push({
+          quantity: listing.quantity,
+        });
       })
 
       this.cryptoAmountCurrency = this.listing.get('item').get('cryptoListingCurrencyCode');
@@ -903,22 +919,22 @@ export default {
     },
 
     applyCoupon () {
-      this.coupons
-        .addCode(this.couponCode)
+      this.$refs.coupons
+        .addCode(this.formData.couponCode)
         .then((result) => {
           // if the result is valid, clear the input field
           if (result.type === 'valid') {
-            this.couponCode = '';
+            this.formData.couponCode = '';
           }
         });
     },
 
-    blurEmailAddress (e) {
-      this.order.set('alternateContactInfo', $(e.target).val());
+    blurEmailAddress () {
+      this.order.set('alternateContactInfo', this.formData.emailAddress);
     },
 
-    blurMemo (e) {
-      this.order.get('items').at(0).set('memo', $(e.target).val());
+    blurMemo () {
+      this.order.get('items').at(0).set('memo', this.formData.itemsData[0].memo);
     },
 
     changeCoupons (hashes, codes) {

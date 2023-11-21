@@ -44,7 +44,7 @@
                       </div>
                       <template v-if="ob.phase === 'pay' || ob.phase === 'processing'">
                         <div class="flexNoShrink">
-                          <div class="flexVCent gutterH">
+                          <div class="flexVCent gutterH purchaseQuantity">
                             <div class="flexCol">
                               <label class="flexHRight" for="purchaseQuantity">
                                 <span class="required txB margR">{{ ob.polyT('purchase.quantity') }}</span>
@@ -65,7 +65,7 @@
                           </div>
                         </div>
                       </template>
-                      <div class="pad flexNoShrink"><b>{{ listing.price }}</b></div>
+                      <div class="pad flexNoShrink"><b>{{ ob.currencyMod.convertAndFormatCurrency(totalPrice, pricingCurrency, displayCurrency) }}</b></div>
                     </div>
                   </template>
 
@@ -115,7 +115,7 @@
                         <CryptoPrice :options="{
                           priceAmount: totalPrice,
                           priceCurrencyCode: pricingCurrency,
-                          displayCurrency: ob.displayCurrency,
+                          displayCurrency: displayCurrency,
                           priceModifier: listing.item.cryptoListingPriceModifier,
                         }" />
                       </div>
@@ -534,7 +534,6 @@ export default {
         vendor: this.vendor,
         variants: this.variants,
         prices: this.prices,
-        displayCurrency: app.settings.get('localCurrency'),
         quantity: uiQuantity,
         cryptoAmountCurrency: this.cryptoAmountCurrency,
         isCrypto: this.listing.isCrypto,
@@ -556,9 +555,6 @@ export default {
     },
     showModerators () {
       return this.moderatorIDs.length;
-    },
-    displayCurrency() {
-      return app.settings.get('localCurrency');
     },
     paymentCoin () {
       return this.$refs.cryptoCurSelector ? this.$refs.cryptoCurSelector.getState().activeCurs[0] : '';
@@ -588,6 +584,10 @@ export default {
         };
       });
     },
+    totalPrice() {
+      return this.prices[0].price.plus(this.prices[0].vPrice);
+    },
+
     cryptoAmountCurrency () {
       return this._cryptoAmountCurrency
         || this.listing.get('item')
@@ -636,6 +636,12 @@ export default {
       });
 
       return currencies;
+    },
+    displayCurrency() {
+      return app.settings.get('localCurrency');
+    },
+    pricingCurrency() {
+      return this.listing.price.currencyCode;
     },
   },
   methods: {
@@ -732,7 +738,7 @@ export default {
         const item = new Item(
           {
             listingHash: listing.get('hash'),
-            quantity: listing.isCrypto ? bigNumber('1') : undefined,
+            quantity: listing.isCrypto ? bigNumber('1') : 1,
             options: opts.variants || [], // Need update to the selected listing variants for each listing
           },
           {
@@ -750,7 +756,7 @@ export default {
         this.order.get('items').add(item);
 
         this.formData.itemsData.push({
-          quantity: listing.quantity,
+          quantity: item.get('quantity'),
         });
       })
 
@@ -1145,4 +1151,9 @@ export default {
 }
 </script>
 <style lang="scss" scoped>
+.purchaseQuantity {
+  input[type=number] {
+    width: 100px;
+  }
+}
 </style>

@@ -3,7 +3,7 @@
     <hr class="clrBr">
     <b>{{ ob.polyT('purchase.receipt.summary') }}</b>
 
-    <template v-for="(priceObj, i) in prices" :key="i">
+    <template v-for="(priceObj, i) in updatedPrice" :key="i">
       <div class="flexRow gutterHSm">
         <span class="flexExpand">
           <div v-if="!ob.isCrypto" v-html="ob.polyT('purchase.receipt.listing')" />
@@ -31,7 +31,7 @@
           </div>
         </div>
       </div>
-      <template v-for="(coupon, j) in ob.coupons" :key="j">
+      <template v-for="(coupon, j) in options.coupons" :key="j">
         <div class="flexRow gutterHSm">
           <span class="flexExpand">
             {{ ob.polyT('purchase.receipt.coupon') }}
@@ -161,14 +161,17 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        prices: [],
+        coupons: [],
+        showTotalTip: true,
+      },
 	  },
     bb: Function,
   },
   data () {
     return {
       paymentCoin: '',
-      prices: [],
       showTotalTip: true,
     };
   },
@@ -186,51 +189,9 @@ export default {
         ...this.model.toJSON(),
         listing: this._listing,
         listingCurrency: this._listing.metadata.pricingCurrency.code,
-        coupons: this.coupons,
         displayCurrency,
         paymentCoin: this.paymentCoin,
         showTotalTip: this.showTotalTip,
-        prices: this.prices.map(priceObj => {
-          let quantity =
-            priceObj.quantity &&
-            !priceObj.quantity.isNaN() &&
-            priceObj.quantity.gt(0) ?
-              priceObj.quantity : bigNumber(1);
-
-          if (this.listing.isCrypto) {
-            quantity =
-              priceObj.quantity &&
-              !priceObj.quantity.isNaN() &&
-              priceObj.quantity.gt(0) ?
-                priceObj.quantity : bigNumber(0);
-          }
-
-          // let coinDiv;
-          // let formattedQuantity;
-
-          // try {
-          //   coinDiv = getCoinDivisibility(displayCurrency);
-          // } catch (e) {
-          //   // pass
-          // }
-
-          // if (coinDiv === undefined) coinDiv = defaultCryptoCoinDivisibility;
-
-          // if (nativeNumberFormatSupported(quantity, coinDiv)) {
-          //   formattedQuantity = new Intl.NumberFormat(displayCurrency, {
-          //     minimumFractionDigits: 0,
-          //     maximumFractionDigits: coinDiv,
-          //   }).format(quantity.toNumber());
-          // } else {
-          //   formattedQuantity = quantity.toFormat();
-          // }
-
-          return {
-            ...priceObj,
-            // formattedQuantity,
-            quantity,
-          };
-        }),
         isCrypto: this.listing.isCrypto,
       };
     },
@@ -257,25 +218,9 @@ export default {
 
       return totalTip;
     },
-
-  },
-  methods: {
-    loadData (options = {}) {
-      this.baseInit(options);
-
-      if (!this.model || !(this.model instanceof Order)) {
-        throw new Error('Please provide an order model');
-      }
-
-      if (!this.listing || !(this.listing instanceof Listing)) {
-        throw new Error('Please provide a listing model');
-      }
-
-      if (!this.prices) {
-        throw new Error('Please provide the prices array');
-      }
-
-      this.prices.forEach((priceObj, i) => {
+    updatedPrice() {
+      const updatedPrice = this.prices;
+      updatedPrice.forEach((priceObj, i) => {
         // convert the prices here, to prevent rounding errors in the display
         const basePrice = convertCurrency(priceObj.price, this.listingCurrency, this.viewingCurrency);
 
@@ -294,7 +239,7 @@ export default {
 
         let itemTotal = basePrice.plus(surcharge);
         priceObj.preCouponPrice = itemTotal;
-        this.coupons.forEach((coupon) => {
+        this.options.coupons.forEach((coupon) => {
           if (coupon.percentDiscount) {
             itemTotal = itemTotal.minus(
               itemTotal.times(0.01).times(coupon.percentDiscount)
@@ -327,6 +272,30 @@ export default {
         }
         priceObj.quantity = quantity;
       });
+      return updatedPrice;
+    },
+  },
+  methods: {
+    loadData (options = {}) {
+      const opts = {
+        paymentCoin: '',
+        showTotalTip: true,
+        ...options,
+      };
+
+      this.baseInit(opts);
+
+      if (!this.model || !(this.model instanceof Order)) {
+        throw new Error('Please provide an order model');
+      }
+
+      if (!this.listing || !(this.listing instanceof Listing)) {
+        throw new Error('Please provide a listing model');
+      }
+
+      if (!this.prices) {
+        throw new Error('Please provide the prices array');
+      }
     },
 
     updatePrices (prices) {

@@ -1,8 +1,6 @@
 <template>
   <div class="feeChange">
-    {{ ob.polyT('feeChangeWidget.label') }}
-    <span :class="ob.feeLevelClass">{{ ob.polyT(`feeLevels.${ob.feeLevel}`) }}</span>
-    <button :class="ob.changeLinkClass" @click="onClickChangeFee">{{ ob.polyT('feeChangeWidget.btnChange') }}</button>
+    {{ ob.polyT('feeChangeWidget.label') }} <span :class="ob.feeLevelClass">{{ ob.polyT(`feeLevels.${ob.feeLevel}`) }}</span> <button :class="ob.changeLinkClass" @click="onClickChangeFee">{{ ob.polyT('feeChangeWidget.btnChange') }}</button>
   </div>
 </template>
 

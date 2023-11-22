@@ -58,14 +58,11 @@
                 <FormError v-if="ob.errors['currencies']" :errors="ob.errors['currencies']" />
                 <div class="row js-currencySelector">
                   <CryptoCurSelector
-                    ref="currencySelector"
                     :options="{
-                      initialState: {
-                        currencies: supportedWalletCurs(),
-                        activeCurs: [...new Set(app.profile.get('currencies'))],
-                        sort: true,
-                      },
+                      currencies: supportedWalletCurs(),
+                      sort: true,
                     }"
+                    v-model:activeCurs="formData.currencies"
                     @currencyClicked="handleCurrencyClicked"
                   />
                 </div>
@@ -241,6 +238,7 @@ export default {
 
       formData: {
         vendor: false,
+        currencies: [...new Set(app.profile.get('currencies'))],
       },
 
       shippingOptions: [],
@@ -392,9 +390,9 @@ export default {
       }
     },
     onBulkCoinUpdateConfirm() {
-      const newCoins = this.$refs.currencySelector.getState().activeCurs;
+      const newCoins = this.formData.currencies;
       if (newCoins.length) {
-        bulkCoinUpdate(this.$refs.currencySelector.getState().activeCurs);
+        bulkCoinUpdate(this.formData.currencies);
         this.$refs.bulkCoinUpdateBtn.setState({
           isBulkCoinUpdating: true,
           showConfirmTooltip: false,
@@ -494,7 +492,6 @@ export default {
 
       // this view saves to two different models
       const profileFormData = this.formData;
-      profileFormData.currencies = this.$refs.currencySelector.getState().activeCurs;
       const settingsFormData = this.getSettingsData();
 
       this.profile.set(profileFormData);

@@ -172,7 +172,7 @@ export default {
     },
     selectedIDs() {
       const IDs = [];
-      this.$refs.modCards.forEach((mod) => {
+      (this.$refs.modCards ?? []).forEach((mod) => {
         if (mod.getState().selectedState === 'selected') {
           IDs.push(mod.model.id);
         }
@@ -181,7 +181,7 @@ export default {
     },
     unselectedIDs() {
       const IDs = [];
-      this.$refs.modCards.forEach((mod) => {
+      (this.$refs.modCards ?? []).forEach((mod) => {
         if (mod.getState().selectedState !== 'selected') {
           IDs.push(mod.model.id);
         }

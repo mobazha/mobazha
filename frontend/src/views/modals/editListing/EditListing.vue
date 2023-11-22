@@ -369,14 +369,11 @@
                 />
                 <div class="js-cryptoCurSelectContainer rowSm">
                   <CryptoCurSelector
-                    ref="cryptoCurSelector"
                     :options="{
-                      initialState: {
-                        currencies: [...ob.metadata.acceptedCurrencies, ...supportedWalletCurs()],
-                        activeCurs: ob.metadata.acceptedCurrencies,
-                        sort: true,
-                      },
+                      currencies: [...supportedWalletCurs()],
+                      sort: true,
                     }"
+                    v-model:activeCurs="formData.metadata.acceptedCurrencies"
                   />
                 </div>
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperAcceptedCurrencies') }}</div>
@@ -653,6 +650,7 @@ export default {
           pricingCurrency: {
             code: cur,
           },
+          acceptedCurrencies: model.metadata.acceptedCurrencies
         },
         refundPolicy: model.refundPolicy,
         termsAndConditions: model.termsAndConditions,
@@ -1271,7 +1269,6 @@ export default {
         formData.metadata = {
           ...formData.metadata,
           format: 'FIXED_PRICE',
-          acceptedCurrencies: this.$refs.cryptoCurSelector ? this.$refs.cryptoCurSelector.getState().activeCurs : metadata.get('acceptedCurrencies'),
         };
       } else {
         item.unset('condition');
@@ -1289,7 +1286,6 @@ export default {
           },
           metadata: {
             ...formData.metadata,
-            acceptedCurrencies: formData.metadata.acceptedCurrencies,
             format: 'MARKET_PRICE',
           },
         };

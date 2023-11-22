@@ -56,7 +56,6 @@
                                 type="number"
                                 id="purchaseQuantity"
                                 size="3"
-                                name="quantity"
                                 v-model="formData.itemsData[idx].quantity"
                                 @keyup="keyupQuantity"
                                 placeholder="0"
@@ -153,6 +152,7 @@
                     <FormError v-if="errors['items-shipping']" :errors="errors['items-shipping']" />
                   </div>
                   <Shipping
+                    ref="shipping"
                     v-if="listing.get('shippingOptions').length"
                     :bb="function() {
                       return {
@@ -175,14 +175,12 @@
                       ref="cryptoCurSelector"
                       :options="{
                         disabledMsg: ob.polyT('purchase.cryptoCurrencyInvalid'),
-                        initialState: {
-                          controlType: 'radio',
-                          currencies,
-                          disabledCurs: currencies.filter((c) => !isSupportedWalletCur(c)),
-                          sort: false,
-                          activeCurs: currencies.length && listing.isCrypto ? [currencies[0]] : [],
-                        },
+                        controlType: 'radio',
+                        currencies,
+                        disabledCurs: currencies.filter((c) => !isSupportedWalletCur(c)),
+                        sort: false,
                       }"
+                      v-model:activeCurs="formData.activeCurs"
                       @currencyClicked="onCurrencyClicked"/>
                   </div>
                 </div>
@@ -279,7 +277,7 @@
                         <Coupons
                           ref="coupons"
                           :options="{
-                            coupons: _listing.coupons,
+                            coupons: listing.get('coupons'),
                             listingPrice: ob.bigNumber(listing.price.amount),
                           }"
                           @changeCoupons="changeCoupons"/>
@@ -462,6 +460,7 @@ export default {
             coupons: [],
           }
         ],
+        activeCurs: [],
         emailAddress: '',
         couponCode: '',
       },
@@ -557,7 +556,7 @@ export default {
       return this.moderatorIDs.length;
     },
     paymentCoin () {
-      return this.$refs.cryptoCurSelector ? this.$refs.cryptoCurSelector.getState().activeCurs[0] : '';
+      return this.formData.activeCurs[0];
     },
     prices () {
       // return an array of price objects that matches the items in the order
@@ -738,7 +737,7 @@ export default {
         const item = new Item(
           {
             listingHash: listing.get('hash'),
-            quantity: listing.isCrypto ? bigNumber('1') : 1,
+            quantity: bigNumber('1'),
             options: opts.variants || [], // Need update to the selected listing variants for each listing
           },
           {
@@ -759,6 +758,9 @@ export default {
           quantity: item.get('quantity'),
         });
       })
+
+      let currencies = this.listing.get('metadata').get('acceptedCurrencies') || [];
+      this.formData.activeCurs = currencies.length && this.listing.isCrypto ? [currencies[0]] : [];
 
       this.cryptoAmountCurrency = this.listing.get('item').get('cryptoListingCurrencyCode');
 
@@ -904,14 +906,14 @@ export default {
       this.setModelQuantity(quantity);
     },
 
-    keyupQuantity (e) {
+    keyupQuantity () {
       // wait until they stop typing
       if (this.quantityKeyUpTimer) {
         clearTimeout(this.quantityKeyUpTimer);
       }
 
       this.quantityKeyUpTimer = setTimeout(() => {
-        let { quantity } = this.getFormData($(e.target));
+        let { quantity } = this.formData.itemsData[0];
         if (!_.isEmpty(quantity)) {
           quantity = bigNumber(quantity);
         }
@@ -957,9 +959,7 @@ export default {
 
     updateShippingOption (selectedOption) {
       // Set the shipping option.
-      this.shipping.selectedAddress = selectedOption;
-
-      // this.order.get('items').at(0).get('shipping').set(selectedOption);
+      this.order.get('items').at(0).get('shipping').set(selectedOption);
     },
 
     outdateHash () {
@@ -988,12 +988,12 @@ export default {
       this.order.set({ paymentCoin });
 
       // Set the shipping address if the listing is shippable.
-      if (this.shipping && this.shipping.selectedAddress) {
-        this.order.addAddress(this.shipping.selectedAddress);
+      if (this.$refs.shipping && this.$refs.shipping.selectedAddress) {
+        this.order.addAddress(this.$refs.shipping.selectedAddress);
       }
 
       // Set the moderator.
-      const moderator = this.$refs.moderators.selectedIDs[0] || '';
+      const moderator = this.$refs.moderators.selectedIDs.length > 0 && this.$refs.moderators.selectedIDs[0] || '';
       this.order.set({ moderator });
       this.order.set({}, { validate: true });
 

@@ -1,9 +1,9 @@
 <template>
   <div class="actionBtn" @click="documentClick">
     <div class="posR">
-      <template v-if="ob.phase === 'pay' || ob.phase === 'processing'">
+      <template v-if="phase === 'pay' || phase === 'processing'">
         <ProcessingButton
-          :className="`btn width100 clrBAttGrad clrBrDec1 clrTOnEmph ${ob.phase} ${ob.outdatedHash ? 'row' : ''}`"
+          :className="`btn width100 clrBAttGrad clrBrDec1 clrTOnEmph ${phase} ${outdatedHash ? 'row' : ''}`"
           :disabled="initPay"
           @click.stop="clickPayBtn"
           :btnText="ob.polyT('purchase.pay')" />
@@ -11,19 +11,19 @@
           <PurchaseError :tip="errTip" />
         </div>
       </template>
-      <template v-else-if="ob.phase === 'pending'">
+      <template v-else-if="phase === 'pending'">
         <div class="btn width100 clrBAttGrad clrBrDec1 clrTOnEmph pendingBtn">
           {{ ob.polyT('purchase.pending') }}
         </div>
       </template>
 
-      <template v-else-if="ob.phase === 'complete'">
+      <template v-else-if="phase === 'complete'">
         <button class="btn width100 clrBAttGrad clrBrDec1 clrTOnEmph " @click="clickCloseBtn">
           {{ ob.polyT('purchase.close') }}
         </button>
       </template>
-      <template v-if="ob.confirmOpen">
-        <div id="confirmPay" class="confirmBox arrowBoxCenteredTop clrBr clrP clrT clrSh1 js-confirmPay" @click.stop.prevent>
+      <template v-if="confirmOpen">
+        <div id="confirmPay" class="confirmBox arrowBoxCenteredTop clrBr clrP clrT clrSh1 js-confirmPay">
           <div class="flexColRows gutterVSm padLg">
             <h3>
               {{ ob.polyT('purchase.confirmPayment.title') }}
@@ -37,7 +37,7 @@
             <a class="" @click.stop="closeConfirmPay">
               {{ ob.polyT('purchase.confirmPayment.cancel') }}
             </a>
-            <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph" @click.stop="clickConfirmBtn">
+            <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph" @click="clickConfirmBtn">
               {{ ob.polyT('purchase.confirmPayment.confirm') }}
             </a>
           </div>
@@ -45,15 +45,15 @@
       </template>
     </div>
     <div class="padSm flexColRows gutterVSm txSm txCtr clrT2">
-      <template v-if="ob.phase === 'pay'">
+      <template v-if="phase === 'pay'">
         <span class="js-payNote">{{ ob.polyT('purchase.payNote') }}</span>
       </template>
 
-      <template v-else-if="ob.phase === 'pending'">
+      <template v-else-if="phase === 'pending'">
         <span class="js-pendingNote">{{ ob.polyT('purchase.pendingNote') }}</span>
       </template>
 
-      <template v-else-if="ob.phase === 'complete'">
+      <template v-else-if="phase === 'complete'">
         <span class="js-closeNote">{{ ob.polyT('purchase.closeNote') }}</span>
       </template>
       <a class="clrTErr txU" href="https://mobazha.org/scam-prevention">{{ ob.polyT('purchase.scamWarning') }}</a>
@@ -63,7 +63,6 @@
 </template>
 
 <script>
-import $ from 'jquery';
 import Listing from '../../../../backbone/models/listing/Listing';
 
 import PurchaseError from '@/views/modals/listingDetail/PurchaseError.vue'
@@ -73,23 +72,24 @@ export default {
     PurchaseError,
   },
   props: {
-    options: {
-      type: Object,
-      default: {},
+    phase: {
+      type: String,
+      default: 'pay',
 	  },
+    outdatedHash: {
+      type: Boolean,
+      default: false,
+	  },
+    
     bb: Function,
   },
   data () {
     return {
-      _state: {
-        phase: 'pay',
-        confirmOpen: false,
-        outdatedHash: false,
-      }
+      confirmOpen: false,
     };
   },
   created () {
-    this.loadData(this.options);
+    this.loadData();
   },
   mounted () {
   },
@@ -97,18 +97,14 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-          ...this._state,
-          listing: this.listing,
       };
     },
     showOutdatedHashErr () {
-      const ob = this.ob;
-      return ob.phase === 'pay' && ob.outdatedHash;
+      return this.phase === 'pay' && this.outdatedHash;
     },
 
     initPay () {
-      const ob = this.ob;
-      return (ob.listing.shippingOptions && ob.listing.shippingOptions.length) || this.showOutdatedHashErr;
+      return (this.listing.shippingOptions && this.listing.shippingOptions.length) || this.showOutdatedHashErr;
     },
 
     errTip () {
@@ -119,31 +115,20 @@ export default {
     }
   },
   methods: {
-    loadData (options = {}) {
+    loadData () {
       if (!this.listing || !(this.listing instanceof Listing)) {
         throw new Error('Please provide a listing model.');
       }
-      const opts = {
-        ...options,
-        initialState: {
-          phase: 'pay',
-          confirmOpen: false,
-          outdatedHash: false,
-          ...options.initialState || {},
-        },
-      };
-
-      this.baseInit(opts);
     },
 
     documentClick (e) {
-      if (this.getState().confirmOpen) {
-        this.setState({ confirmOpen: false });
+      if (this.confirmOpen) {
+        this.confirmOpen = false;;
       }
     },
 
-    clickPayBtn (e) {
-      this.setState({ confirmOpen: true });
+    clickPayBtn () {
+      this.confirmOpen = true;;
     },
 
     clickConfirmBtn () {
@@ -151,7 +136,7 @@ export default {
     },
 
     closeConfirmPay () {
-      this.setState({ confirmOpen: false });
+      this.confirmOpen = false;;
     },
 
     clickCloseBtn () {

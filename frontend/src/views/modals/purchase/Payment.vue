@@ -63,7 +63,7 @@
                       @click="clickFundWallet">{{ ob.polyT('purchase.pendingSection.walletLink') }}</button>
                   </p>
                 </template>
-                <p> {{ ob.polyT('purchase.pendingSection.feeNote') }} </p>
+                <p v-html="ob.polyT('purchase.pendingSection.feeNote')"></p>
               </div>
             </template>
           </div>
@@ -150,13 +150,18 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-          displayCurrency: this.displayCurrency,
           amountDueLine: this.amountDueLine,
           paymentAddress: this.paymentAddress,
           qrDataUri: this.qrDataUri,
           isModerated: this.isModerated,
           externallyFundable: this.paymentCoinData.externallyFundableOrders,
       };
+    },
+
+    pAddress() {
+      const ob = this.ob;
+
+      return ob.paymentAddress.length > 34 ? `${ob.paymentAddress.slice(0, 34)}…` : ob.paymentAddress;
     },
 
     amountDueLine () {

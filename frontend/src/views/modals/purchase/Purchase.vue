@@ -339,12 +339,8 @@
               <div class="js-actionBtn">
                 <ActionBtn
                   ref="actionBtn"
-                  :options="{
-                    initialState: {
-                      phase: ob.phase,
-                      outdatedHash,
-                    },
-                  }"
+                  :phase="ob.phase"
+                  :outdatedHash="outdatedHash"
                   :bb="function() {
                     return {
                       listing,

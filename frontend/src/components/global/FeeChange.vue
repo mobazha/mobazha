@@ -1,15 +1,12 @@
 <template>
   <div class="feeChange">
-    {{ ob.polyT('feeChangeWidget.label') }}
-    <span :class="ob.feeLevelClass">{{ ob.polyT(`feeLevels.${ob.feeLevel}`) }}</span>
-    <button :class="ob.changeLinkClass" @click="onClickChangeFee">{{ ob.polyT('feeChangeWidget.btnChange') }}</button>
+    {{ ob.polyT('feeChangeWidget.label') }} <span :class="ob.feeLevelClass">{{ ob.polyT(`feeLevels.${ob.feeLevel}`) }}</span> <button :class="ob.changeLinkClass" @click="onClickChangeFee">{{ ob.polyT('feeChangeWidget.btnChange') }}</button>
   </div>
 </template>
 
 <script>
 import app from '../../../backbone/app';
 import { launchSettingsModal } from '../../../backbone/utils/modalManager';
-import loadTemplate from '../../../backbone/utils/loadTemplate';
 
 export default {
   props: {
@@ -57,22 +54,7 @@ export default {
     },
 
     onClickChangeFee() {
-      launchSettingsModal({
-        initialTab: 'Advanced',
-        scrollTo: '.js-feeSection',
-      });
-    },
-
-    render() {
-      loadTemplate('components/feeChange.html', (t) => {
-        this.$el.html(
-          t({
-            ...this.getState(),
-          })
-        );
-      });
-
-      return this;
+      launchSettingsModal({ initialTab: 'Advanced', scrollTo: '.js-feeSection', });
     },
   },
 };

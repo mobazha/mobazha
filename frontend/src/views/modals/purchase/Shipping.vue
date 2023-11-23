@@ -128,7 +128,7 @@ export default {
       this.updateOptions();
     },
 
-    extractValidOptions (address) {
+    extractValidOptions(address) {
       // Any time the country is changed, the options valid for that country need to be extracted.
       if (address !== '' && !(address instanceof ShippingAddress)) {
         throw new Error('The address must be blank or an instance of the ShippingAddress model.');

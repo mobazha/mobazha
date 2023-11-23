@@ -16,7 +16,8 @@
 
 <script>
 import $ from 'jquery';
-import VerifiedMod, { getModeratorOptions } from '../../../../backbone/views/components/VerifiedMod';
+import VerifiedMod from '../../../../backbone/views/components/VerifiedMod';
+import { getModeratorOptions } from '@/utils/verifiedMod';
 import app from '../../../../backbone/app';
 
 

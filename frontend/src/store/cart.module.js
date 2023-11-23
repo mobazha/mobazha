@@ -1,3 +1,4 @@
+// For each item in a cart, it could be a ListingShort and the selected listing variants
 
 function updateLocalStorage(cart) {
   localStorage.setItem('cart', JSON.stringify(cart))

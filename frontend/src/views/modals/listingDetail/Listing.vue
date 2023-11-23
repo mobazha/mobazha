@@ -57,7 +57,7 @@
 
                 <template v-else>
                   <h2 class="flexExpand js-cryptoTitle cryptoTitle">
-                    <CryptoTradingPairWrap :options="cryptoTradingPairOptions()" />
+                    <CryptoTradingPairWrap :options="cryptoTradingPairOptions" />
                   </h2>
                   <CryptoPrice :options="{
                         priceAmount: ob.price.amount,
@@ -563,6 +563,31 @@ export default {
         value: val,
       }));
     },
+    cryptoTradingPairOptions() {
+      if (this.model.isCrypto) {
+        const metadata = this.model.get('metadata');
+
+        // if (this.cryptoInventory) this.cryptoInventory.remove();
+        // this.cryptoInventory = this.createChild(QuantityDisplay, {
+        //   peerID: this.vendor.peerID,
+        //   slug: this.model.get('slug'),
+        //   initialState: {
+        //     coinType: metadata.get('coinType'),
+        //     amount: this._inventory,
+        //   },
+        // });
+        // $('.js-cryptoInventory')
+        //   .html(this.cryptoInventory.render().el);
+
+        return {
+          tradingPairClass: 'cryptoTradingPairXL rowSm',
+          exchangeRateClass: 'clrT2 exchangeRateLine',
+          fromCur: metadata.get('acceptedCurrencies')[0],
+          toCur: this.model.get('item').get('cryptoListingCurrencyCode'),
+        };
+      }
+      return {};
+    },
   },
   methods: {
     loadData (options = {}) {
@@ -1057,32 +1082,6 @@ export default {
 
     getPhotoSelectedEl() {
       return $(this.$refs.photoSelected);
-    },
-
-    cryptoTradingPairOptions() {
-      if (this.model.isCrypto) {
-        const metadata = this.model.get('metadata');
-
-        // if (this.cryptoInventory) this.cryptoInventory.remove();
-        // this.cryptoInventory = this.createChild(QuantityDisplay, {
-        //   peerID: this.vendor.peerID,
-        //   slug: this.model.get('slug'),
-        //   initialState: {
-        //     coinType: metadata.get('coinType'),
-        //     amount: this._inventory,
-        //   },
-        // });
-        // $('.js-cryptoInventory')
-        //   .html(this.cryptoInventory.render().el);
-
-        return {
-          tradingPairClass: 'cryptoTradingPairXL rowSm',
-          exchangeRateClass: 'clrT2 exchangeRateLine',
-          fromCur: metadata.get('acceptedCurrencies')[0],
-          toCur: this.model.get('item').get('cryptoListingCurrencyCode'),
-        };
-      }
-      return {};
     },
 
     onNsfwWarningClose() {

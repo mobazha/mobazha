@@ -1472,7 +1472,7 @@
       "payFromWallet": "Pay from wallet",
       "note1": "If you need help getting started with Bitcoin, please read %{link}.",
       "note1Link": "Need Bitcoin? on Mobazha.org",
-      "note2": "Your payment will be held securely in escrow. If any issues arise, you’ll have the ability to open a dispute.",
+      "note2": "Your payment will be held securely in escrow. If any issues arise, you'll have the ability to open a dispute.",
       "note3": "*The moderator service fee only applies if a dispute is opened.",
       "note4": "Once you have paid, it may take a bit for the interface to update.",
       "btnConfirmedPay": "Yes, Pay",
@@ -1519,7 +1519,7 @@
       "totalWarning2NoCoin": "Actual total may vary slightly on the next screen after conversion to the payment currency."
     },
     "errors": {
-      "moderatorsTitle": "Moderator Data Failted to Load",
+      "moderatorsTitle": "Moderator Data Failed to Load",
       "moderatorsMsg": "This listing has available moderators, but they could not be loaded.",
       "orderError": "Your order can not be processed due to the following errors.",
       "ownIDTitle": "You Can't Purchase Your Own Listings",

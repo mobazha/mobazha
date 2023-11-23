@@ -69,8 +69,6 @@ export default {
       if (typeof options.maxCouponCount === 'undefined') {
         throw new Error('Please provide the maximum coupon count.');
       }
-
-      this.couponViews = [];
     },
 
     onClickAddCoupon () {
@@ -82,7 +80,7 @@ export default {
     },
 
     setCollectionData () {
-      this.couponViews.forEach(coupon => coupon.setModelData());
+      (this.$refs.couponViews ?? []).forEach(coupon => coupon.setModelData());
     },
 
     onRemoveCouponView(md) {

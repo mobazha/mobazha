@@ -56,7 +56,6 @@ export default {
   },
   methods: {
     loadData(options = {}) {
-      console.log('options: ', options)
       if (!options.targetID) throw new Error('You must provide a targetID');
 
       const opts = {

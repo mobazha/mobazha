@@ -38,6 +38,7 @@ export default {
       noResults: false,
 
       followsYouFetch: undefined,
+      followFetch: undefined,
 
       _state: {
         followType: 'followers',

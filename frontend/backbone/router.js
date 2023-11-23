@@ -153,8 +153,8 @@ export default class ObRouter extends Router {
     return standardized;
   }
 
-  setAddressBarText(route = this.standardizedRoute()) {
-    let displayRoute = route;
+  setAddressBarText(route = location.hash) {
+    let displayRoute = this.standardizedRoute(route);
 
     if (!route) {
       displayRoute = '';

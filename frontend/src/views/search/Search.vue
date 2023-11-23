@@ -209,6 +209,12 @@ export default {
     currentBaseUrl () {
       return this._search.provider[`${this._search.searchType}Url`];
     },
+    /**
+     * This will create a results view from the provided search data.
+     * @param {object} data - JSON results from a search endpoint.
+     * @param {object} search - A valid search object.
+     * @param {boolean} setHistory - Whether the results should save the query to history.
+     */
     resultOptions () {
       const data = this._state.data || {};
 
@@ -229,8 +235,6 @@ export default {
 
       return {
         search: this._search,
-        total: data.results ? data.results.total : 0,
-        morePages: data.results ? data.results.morePages : false,
         initCol: this.resultsCol,
         viewType,
         setHistory: this._setHistory,
@@ -238,6 +242,8 @@ export default {
     }
   },
   methods: {
+    scrollPageIntoView,
+
     loadData (options = {}) {
       options.query = this.$route.query;
 
@@ -601,49 +607,6 @@ export default {
         this.setState({ tab: 'home', data }, { renderOnChange: false });
         return;
       }
-    },
-
-    /**
-     * This will create a results view from the provided search data.
-     * @param {object} data - JSON results from a search endpoint.
-     * @param {object} search - A valid search object.
-     * @param {boolean} setHistory - Whether the results should save the query to history.
-     */
-    createResults (data = {}, search, setHistory = true) {
-      if (!search || $.isEmptyObject(search)) throw new Error('Please provide a search object.');
-
-      this.resultsCol = new ResultsCol();
-      this.resultsCol.add(this.resultsCol.parse(data));
-
-      let viewType = 'grid';
-
-      if (data.options && data.options.type
-        && data.options.type.options
-        && data.options.type.options.length) {
-        if (data.options.type.options.find((op) => op.value === 'cryptocurrency' && op.checked)
-          && data.options.type.options.filter((op) => op.checked).length === 1) {
-          viewType = 'cryptoList';
-        }
-      }
-
-      if (this.resultsView) this.resultsView.remove();
-      this.resultsView = this.createChild(Results, {
-        search,
-        total: data.results ? data.results.total : 0,
-        morePages: data.results ? data.results.morePages : false,
-        initCol: this.resultsCol,
-        viewType,
-        setHistory,
-      });
-
-      recordEvent('Discover_Results', {
-        total: data.results ? data.results.total : 0,
-        provider: this._search.provider.get('name') || 'unknown',
-        url: this.currentBaseUrl,
-        page: this._search.p + 1,
-      });
-
-      $('.js-resultsWrapper').html(this.resultsView.render().el);
     },
 
     clickSearchBtn () {

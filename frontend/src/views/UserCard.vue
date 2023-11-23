@@ -270,9 +270,7 @@ export default {
 
     navToUser (tab) {
       const route = `${this.guid}${tab ? `/${tab}` : ''}`;
-      app.router.navigate(route, {
-        trigger: true,
-      });
+      app.router.navigate(route, { trigger: true, });
     },
 
     saveModeratorList (add = false) {

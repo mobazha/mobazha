@@ -38,7 +38,7 @@
                 <input type="text" class="js-addressBar flexExpand addressBar clrSh2 clrBr4"
                   ref="addressBar"
                   @keyup.enter="onKeyupAddressBar"
-                  v-model="addressBarText"
+                  v-model.trim="addressBarText"
                   @focusin="onFocusInAddressBar"
                   :placeholder="ob.polyT('addressBarPlaceholder')" />
                 <div class="js-addressBarIndicatorsContainer">
@@ -215,6 +215,8 @@ export default {
       navOverlayOpened: false,
       connManagementContainerOpened: false,
       notifContainerOpened: false,
+
+      addressBarText: '',
     };
   },
   created () {
@@ -274,7 +276,6 @@ export default {
       }
 
       this.baseInit(opts);
-      this.addressBarText = '';
 
       this.listenTo(app.localSettings, 'change:windowControlStyle', (_, style) => this.windowStyle = style);
       this.windowStyle = app.localSettings.get('windowControlStyle');
@@ -550,9 +551,8 @@ export default {
     },
 
     onKeyupAddressBar () {
-      const text = this.addressBarText.trim();
-      this.addressBarText = text;
-      
+      const text = this.addressBarText;
+
       const firstTerm = text.startsWith('ob://')
         ? text.slice(5)
           .split(' ')[0]

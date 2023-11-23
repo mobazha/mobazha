@@ -231,10 +231,6 @@ export default {
 
     this.init(guid, state, slug);
   },
-  beforeRouteUpdate(to) {
-    let { guid, state, slug } = to.params;
-    this.init(guid, state, slug);
-  },
   mounted() {
     this.setBlockedClass();
 
@@ -303,6 +299,9 @@ export default {
       this.init(guid, state, slug);
     },
     init(guid, state, slug) {
+      this.listing = undefined;
+      this.listingFetch = undefined;
+
       const options = this.preLoad(guid, state, slug);
       this.baseInit(options);
 

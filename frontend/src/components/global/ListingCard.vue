@@ -395,6 +395,7 @@
 
 <script>
 /* eslint-disable class-methods-use-this */
+import _ from 'underscore';
 import $ from 'jquery';
 import app from '../../../backbone/app';
 import { abbrNum } from '../../../backbone/utils';
@@ -501,7 +502,7 @@ export default {
     avatarHashes() {
       let avatarHashes;
 
-      if (this.profile) {
+      if (_.has(this, 'profile') && this.profile) {
         avatarHashes = this.profile.get('avatarHashes').toJSON();
       } else if (this.options.vendor) {
         avatarHashes = this.options.vendor.avatarHashes;
@@ -511,7 +512,7 @@ export default {
     storeName() {
       let storeName = `${this.ownerGuid.slice(0, 8)}…`;
 
-      if (this.profile) {
+      if (_.has(this, 'profile') && this.profile) {
         storeName = this.profile.get('name');
       } else if (this.options.vendor) {
         storeName = this.options.vendor.name;
@@ -567,7 +568,7 @@ export default {
       return priceRowTextClass;
     },
     ownerGuid() {
-      if (this.profile) {
+      if (_.has(this, 'profile') && this.profile) {
         // If a profile model of the listing owner is available, please pass it in.
         return this.profile.id;
       } else if (this.model.get('vendor')) {
@@ -779,7 +780,13 @@ export default {
     },
 
     onListingDetailClose() {
-      app.router.navigate(this.routeOnOpen);
+      this.showListingDetailModal = false;
+
+      if (this.options.onStore) {
+        app.router.navigate(this.routeOnOpen);
+      } else {
+        app.router.setAddressBarText(this.routeOnOpen);
+      }
       if (this.ipfsFetch) this.ipfsFetch.abort();
       this.ipnsFetch.abort();
     },
@@ -854,7 +861,12 @@ export default {
 
     loadListingDetail() {
       this.routeOnOpen = location.hash.slice(1);
-      app.router.navigateUser(`${this.options.listingBaseUrl}${this.model.get('slug')}`, this.ownerGuid);
+      if (this.options.onStore) {
+        app.router.navigateUser(`${this.options.listingBaseUrl}${this.model.get('slug')}`, this.ownerGuid);
+      } else {
+        // avoid routing triggered in Vue router
+        app.router.setAddressBarText(`${this.options.listingBaseUrl}${this.model.get('slug')}`);
+      }
 
       startAjaxEvent('Listing_LoadFromCard');
 
@@ -869,7 +881,13 @@ export default {
     },
 
     onBlockWarningCanceled() {
-      app.router.navigate(this.routeOnOpen);
+      this.showBlockedModal = false;
+
+      if (this.options.onStore) {
+        app.router.navigate(this.routeOnOpen);
+      } else {
+        app.router.setAddressBarText(this.routeOnOpen);
+      }
     },
 
     onUnBlockedModal() {
@@ -883,11 +901,20 @@ export default {
       if (this.ipfsFetch) this.ipfsFetch.abort();
 
       this.showListingLoading = false;
-      app.router.navigate(this.routeOnOpen);
+
+      if (this.options.onStore) {
+        app.router.navigate(this.routeOnOpen);
+      } else {
+        app.router.setAddressBarText(this.routeOnOpen);
+      }
     },
 
     onClickLoadingRetry() {
-      app.router.navigate(this.routeOnOpen);
+      if (this.options.onStore) {
+        app.router.navigate(this.routeOnOpen);
+      } else {
+        app.router.setAddressBarText(this.routeOnOpen);
+      }
 
       this.loadListingDetail();
     },

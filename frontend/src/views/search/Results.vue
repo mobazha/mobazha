@@ -62,7 +62,6 @@ export default {
       default: {
         search: {},
         total: 0,
-        morePages: false,
         initCol: {},
         viewType: '',
         setHistory: false,

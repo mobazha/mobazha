@@ -9,6 +9,11 @@
         </el-form-item>
         <el-button class="add-btn" link type="success" @click="doAdd">+添加</el-button>
       </div>
+      <div class="tips" v-if="formData.templateId">
+        <span class="tips-btn">说明!</span>
+        <template v-if="formData.templateId === '0'">运费=首重费用+ (包裹重量-首重)/续重单位重量单价+挂号费</template>
+        <template v-if="formData.templateId === '1'">运费=费用+挂号费</template>
+      </div>
       <el-table :data="formData.options" :border="true" row-class-name="form-table" cell-class-name="cell-form-table">
         <el-table-column label="服务" width="130">
           <template v-slot="{ row, $index }">
@@ -246,7 +251,18 @@ export default {
     font-size: 16px;
   }
 }
-
+.tips {
+  display: flex;
+  align-items: center;
+  color: #999;
+  margin-bottom: 10px;
+  &-btn {
+    padding: 2px 14px;
+    background: green;
+    color: #fff;
+    margin-right: 10px;
+  }
+}
 ::v-deep() {
   .form-table.el-form-item__content {
     margin-left: 0 !important;

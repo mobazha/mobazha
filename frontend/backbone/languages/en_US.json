@@ -1251,7 +1251,20 @@
         "priceLabel": "Price (first weight)",
         "additionalWeightPriceLabel": "Price (additional weight)",
         "pricePlaceholder": "0.00",
-        "addService": "+ Add Service"
+        "addService": "+ Add Service",
+
+        "firstRenewalTemplate": "Billed based on the first and renewal weight",
+        "firstRenewalExplanation": "Freight = first weight fee + (package weight - first weight) / unit weight of additional weight * unit price + registration fee",
+        "startWeight": "Start Weight",
+        "endWeight": "End Weight",
+        "firstWeight": "First Weight",
+        "firstFreight": "First Freight",
+        "renewwalWeight": "Unit Weight (additional weight)",
+        "unitPrice": "Unit Price",
+        "registrationFee": "Registration Fee",
+        "sameWeightTemplate": "Same price for the same weight class",
+        "sameWeightExplanation": "Freight = fee + registration fee",
+        "fee": "Fee"
       },
       "toolTip": {
         "delete": "Delete"

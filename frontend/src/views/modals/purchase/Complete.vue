@@ -21,7 +21,7 @@
       </div>
       <div class="contentBox clrP clrBr padMd socialBtns">
         <h5>{{ ob.polyT('purchase.completeSection.share.title') }}</h5>
-        <p>{{ ob.polyT('purchase.completeSection.share.body', { link: "<a class='clrTEm' href='https://mobazha.org'>https://mobazha.org</a>" }) }}</p>
+        <p v-html="shareBody"></p>
         <div class="flexRow flexKidsExpand gutterH">
           <a class="btn btnThin clrP clrBr" :href="`https://twitter.com/intent/tweet/?text=${ob.polyT('purchase.completeSection.share.shareMsg')}&url=${shareURL}&hashtags=TradeFree,bitcoin&related=mobazha`">
             <span class="flexInline gutterHSm">
@@ -117,6 +117,10 @@ export default {
     },
     vendorPeerID() {
       return this._listing.vendorID.peerID;
+    },
+    shareBody() {
+      const ob = this.ob;
+      return ob.polyT('purchase.completeSection.share.body', { link: "<a class='clrTEm' href='https://mobazha.org'>https://mobazha.org</a>" });
     }
   },
   methods: {

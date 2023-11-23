@@ -161,6 +161,8 @@ import ListingDetail from '../modals/listingDetail/Listing.vue';
 
 const [DefineTabHeader, ReuseTabHeader] = createReusableTemplate();
 
+const standardizedHash = (hash) => (hash.endsWith('/') ? hash.slice(0, hash.length - 1) : hash);
+
 export default {
   components: {
     DefineTabHeader,
@@ -283,12 +285,14 @@ export default {
     onBlockWarningCanceled(){
       this.showBlockedModal = false;
 
-      if (window.history.state.back === null) {
-        // there is no previous page, let's navigate to our home page
-        this.$router.push({ path: `/${app.profile.id}`});
+      const prevHash = standardizedHash(app.router.prevHash);
+      const locationHash = standardizedHash(location.hash);
+
+      if (prevHash === locationHash) {
+        // means there is no previous page - will go to our own node page
+        app.router.navigate(`${app.profile.id}`, { replace: true, trigger: true, });
       } else {
-        // go back to previous page
-        this.$router.back();
+        app.router.navigate(`${prevHash.slice(1)}`, { replace: true, trigger: true, });
       }
     },
     onUnblock() {
@@ -446,12 +450,15 @@ export default {
     },
 
     onClickLoadingCancel() {
-      if (window.history.state.back === null) {
+      const prevHash = standardizedHash(app.router.prevHash);
+      const locationHash = standardizedHash(location.hash);
+
+      if (prevHash === locationHash) {
         // there is no previous page, let's navigate to our home page
-        this.$router.push({ path: `/${app.profile.id}`});
+        this.navigate(`${app.profile.id}`, { trigger: true, });
       } else {
         // go back to previous page
-        this.$router.back();
+        window.history.back();
       }
     },
 
@@ -561,8 +568,7 @@ export default {
 
       // // add tab to history
       const listingBaseUrl = this.model.get('handle') ? `@${this.model.get('handle')}` : this.model.id;
-      app.router.navigate(`${listingBaseUrl}/${state}`);
-      // app.router.navigateUser(`${listingBaseUrl}/${state}`, this.model.id);
+      app.router.navigateUser(`${listingBaseUrl}/${state}`, this.model.id);
     },
   },
 };

@@ -86,8 +86,7 @@ export default class extends BaseModel {
     }
 
     if (method !== 'read' && method !== 'delete') {
-      
-      options.attrs.shippingOptions.forEach(shipOpt => {
+      (options.attrs.shippingOptions ?? []).forEach(shipOpt => {
         const coinDiv = getCoinDivisibility(shipOpt.currency);
 
         shipOpt.services.forEach(service => {

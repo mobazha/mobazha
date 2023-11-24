@@ -95,6 +95,16 @@
         </div>
       </div>
     </div>
+    <Teleport to="#js-vueModal">
+      <ModeratorDetails v-if="showModeratorDetails"
+        :bb="() => {
+          return {
+            model,
+          }}"
+       @addAsModerator="onAddAsModerator"
+       @close="showModeratorDetails = false"
+      />
+    </Teleport>
   </div>
 </template>
 
@@ -104,10 +114,14 @@ import _ from 'underscore';
 import { ipc } from '../../utils/ipcRenderer.js';
 import app from '../../../backbone/app';
 import UserCard from '../../../backbone/views/UserCard';
-import { launchModeratorDetailsModal } from '../../../backbone/utils/modalManager';
 import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
 
+import ModeratorDetails from '@/views/modals/ModeratorDetails.vue';
+
 export default {
+  components: {
+    ModeratorDetails,
+  },
   props: {
     options: {
       type: Object,
@@ -121,6 +135,8 @@ export default {
 
       addingModerator: false,
       removingModerator: false,
+
+      showModeratorDetails: false,
     };
   },
   created() {
@@ -171,20 +187,17 @@ export default {
 
     termsClick() {
       // show the moderator details modal
-      const modModal = launchModeratorDetailsModal({ model: this.model });
-      this.listenTo(modModal, 'addAsModerator', () => {
-        this.addingModerator = true;
-        this.saveModeratorList(true);
-      });
+      this.showModeratorDetails = true;
     },
 
     addModeratorClick() {
       // show the moderator details modal
-      const modModal = launchModeratorDetailsModal({ model: this.model });
-      this.listenTo(modModal, 'addAsModerator', () => {
-        this.addingModerator = true;
-        this.saveModeratorList(true);
-      });
+      this.showModeratorDetails = true;
+    },
+
+    onAddAsModerator() {
+      this.addingModerator = true;
+      this.saveModeratorList(true);
     },
 
     removeModeratorClick() {

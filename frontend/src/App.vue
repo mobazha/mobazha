@@ -18,7 +18,7 @@
 
     <Purchase ref="purchaseModal" v-if="showPurchase" :options="purchaseOptions" :bb="purchaseBBFunc" @close="onPurchaseClose" />
 
-    <!-- <KeepAlive v-if="initialized" :exclude="['EditListing', 'Settings', 'About', 'ShoppingCart', 'Purchase']"> -->
+    <!-- <KeepAlive v-if="initialized" :exclude="['EditListing', 'Settings', 'About', 'ShoppingCart', 'Purchase', 'ModeratorDetails']"> -->
       <component v-if="modalName" :is="modalName" :name="modalName" ref="modalInstance"
         :options="modalOptions"
         :bb="modalBBFunc"
@@ -34,6 +34,7 @@
 import app from '../backbone/app';
 import Settings from '@/views/modals/settings/Settings.vue';
 import EditListing from '@/views/modals/editListing/EditListing.vue';
+import ModeratorDetails from '@/views/modals/ModeratorDetails.vue'
 
 import Wallet from '@/views/modals/wallet/Wallet.vue';
 import ShoppingCart from '@/views/ShoppingCart.vue';
@@ -45,6 +46,7 @@ export default {
   components: {
     Settings,
     EditListing,
+    ModeratorDetails,
 
     Wallet,
     ShoppingCart,

@@ -3,12 +3,45 @@
     <div :class="`innerWrap ${ob.verified ? 'verified' : 'unverified'}`">
       <template v-if="!ob.wrapInfoIcon">
         <div class="arrowBoxTipWrap">
-          <div v-html="textWrapper" />
-          <div v-html="arrowBox" />
+          <div :class="`textWrapper ${ob.textWrapperClass}`">
+            <div v-if="ob.verified" class="badge" :style="`background-image: ${badgeUrlInfo}`" tabindex="0"></div>
+            <div v-else class="warning"><i class="ion-alert-circled clrTAlert"></i></div>
+
+            <span v-if="ob.text" class="${ob.textClass}">{{ob.text}}<i :class="ob.infoIconClass"></i></span>
+          </div>
+
+          <div :class="`arrowBox ${arrowBoxClass}`">
+            <div :class="`titleWrapper ${ob.titleWrapperClass}`">
+              <div v-if="ob.verified" class="badge" :style="`background-image: ${badgeUrlInfo}`" tabindex="0"></div>
+              <div v-else class="warning"><i class="ion-alert-circled clrTAlert"></i></div>
+
+              <div :class="ob.tipTitleClass" v-html="ob.tipTitle"></div>
+            </div>
+            <div :class="ob.tipBodyClass" v-html="ob.tipBody"></div>
+          </div>
         </div>
       </template>
       <template v-else>
-        <div v-html="textWrapper" />
+        <div :class="`textWrapper ${ob.textWrapperClass}`">
+          <div v-if="ob.verified" class="badge" :style="`background-image: ${badgeUrlInfo}`" tabindex="0"></div>
+          <div v-else class="warning"><i class="ion-alert-circled clrTAlert"></i></div>
+
+          <span v-if="ob.text" class="${ob.textClass}">
+            {{ob.text}}
+            <div class="arrowBoxTipWrap">
+              <i :class="ob.infoIconClass"></i>
+
+              <div :class="`arrowBox ${arrowBoxClass}`">
+                <div :class="`titleWrapper ${ob.titleWrapperClass}`">
+                  <div v-if="ob.verified" class="badge" :style="`background-image: ${badgeUrlInfo}`" tabindex="0"></div>
+                  <div v-else class="warning"><i class="ion-alert-circled clrTAlert"></i></div>
+                  <div :class="ob.tipTitleClass" v-html="ob.tipTitle"></div>
+                </div>
+                <div :class="ob.tipBodyClass" v-html="ob.tipBody"></div>
+              </div> 
+            </div>
+          </span>
+        </div>
       </template>
     </div>
   </div>
@@ -58,46 +91,16 @@ export default {
         ...this._state,
       };
     },
-    badgeFrag() {
-      const ob = this.ob;
-      return `<div class="badge" style="background-image: ${
-        ob.badgeUrl ? `url(${ob.badgeUrl}),` : ''
-      }url('../imgs/verifiedModeratorBadgeDefault-tiny.png');" tabindex="0"></div>`;
-    },
-    warnFrag() {
-      return `<div class="warning"><i class="ion-alert-circled clrTAlert"></i></div>`;
-    },
+
     arrowBoxClass() {
       const ob = this.ob;
       return `${ob.arrowClass} ${ob.verified ? 'clrBrAlert2 clrBAlert2Grad' : 'clrP clrBr'}`;
     },
-    arrowBox() {
-      const ob = this.ob;
-      return `
-      <div class="arrowBox ${this.arrowBoxClass}">
-        <div class="titleWrapper ${ob.titleWrapperClass}">
-          ${ob.verified ? this.badgeFrag : this.warnFrag}
-          <div class="${ob.tipTitleClass}">${ob.tipTitle}</div>
-        </div>
-        <div class="${ob.tipBodyClass}">${ob.tipBody}</div>
-      </div>     
-    `;
-    },
-    icon() {
-      const ob = this.ob;
-      let icon = `<i class="${ob.infoIconClass}"></i>`;
-      if (ob.wrapInfoIcon) return ` <div class="arrowBoxTipWrap">${icon} ${this.arrowBox}</div>`;
-      return icon;
-    },
-    textWrapper() {
-      const ob = this.ob;
-      return `
-      <div class="textWrapper ${ob.textWrapperClass}">
-        ${ob.verified ? this.badgeFrag : this.warnFrag}
-        ${ob.text ? `<span class="${ob.textClass}">${ob.text}<i class="${ob.infoIconClass}"></i></span>` : ''}
-      </div>
-    `;
-    },
+    
+    badgeUrlInfo() {
+      const state = this._state;
+      return `${state.badgeUrl ? `url(${state.badgeUrl}),` : ''}url('../imgs/verifiedModeratorBadgeDefault-tiny.png')`;
+    }
   },
   methods: {
     loadData(options = {}) {

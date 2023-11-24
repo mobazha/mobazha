@@ -1,6 +1,10 @@
 <template>
   <div :class="`userPageFollow ${noResults ? 'noResults': ''}`">
-    <div ref="userCardsContainer" class="js-userCardsContainer userCardsContainer flexRow"></div>
+    <div ref="userCardsContainer" class="js-userCardsContainer userCardsContainer flexRow">
+      <template v-for="user in renderedCl" :key="user.id">
+        <UserCard :options="{ guid: user.id }"/>
+      </template>
+    </div>
     <div class="js-followLoadingContainer followLoadingContainer">
       <FollowLoading ref="followLoading" :options="followLoadingOptions" @retry-click="fetch()" />
     </div>
@@ -15,7 +19,6 @@ import app from '../../../backbone/app';
 import { getContentFrame } from '../../../backbone/utils/selectors';
 import { followsYou, followedByYou } from '../../../backbone/utils/follow';
 import Followers from '../../../backbone/collections/Followers';
-import UserCard from '../../../backbone/views/UserCard';
 import FollowLoading from './FollowLoading.vue';
 
 export default {
@@ -43,7 +46,9 @@ export default {
       _state: {
         followType: 'followers',
         fetchCollection: true,
-      }
+      },
+
+      renderedClKey: 0,
     };
   },
   created() {
@@ -124,8 +129,7 @@ export default {
       this._origClParse = this.collection.parse;
       this.collection.parse = this.collectionParse.bind(this);
       this.followType = opts.followType;
-      this.userCardViews = [];
-      this.indexedUserCardViews = {};
+
       this.renderedCl = new Followers([], {
         peerID: opts.peerID,
         type: opts.followType,
@@ -191,25 +195,13 @@ export default {
     },
 
     onCollectionUpdate(cl, opts) {
+      this.renderedClKey += 1;
+
       this.noResults = !cl.length;
 
       if (this.$refs.followLoading) {
         this.$refs.followLoading.setState({ noResults: !cl.length });
       }
-
-      if (opts.changes.added.length) {
-        // Expecting either a single new user on the bottom (own node
-        // must have followed in the UI) or a page of users at the bottom.
-        if (opts.changes.added[opts.changes.added.length - 1] === this.renderedCl.at(this.renderedCl.length - 1)) {
-          // It's a page of users at the bottom
-          this.renderUsers(opts.changes.added, 'append');
-        } else {
-          // New user at top
-          this.renderUsers(opts.changes.added, 'prepend');
-        }
-      }
-
-      opts.changes.removed.forEach((md) => this.removeUserCard(md.id));
     },
 
     onCollectionFetched() {
@@ -275,50 +267,6 @@ export default {
       }
 
       return this._origClParse.call(this.collection, users);
-    },
-
-    removeUserCard(peerID) {
-      if (!peerID) {
-        throw new Error('Please provide a peerID');
-      }
-
-      const view = this.indexedUserCardViews[peerID];
-      if (view) {
-        view.remove();
-        this.userCardViews.splice(this.userCardViews.indexOf(view), 1);
-        delete this.indexedUserCardViews[peerID];
-      }
-    },
-
-    renderUsers(models = [], insertionType = 'append') {
-      if (!models) {
-        throw new Error('Please provide an array of Follower models.');
-      }
-
-      if (['append', 'prepend', 'replace'].indexOf(insertionType) === -1) {
-        throw new Error('Please provide a valid insertion type.');
-      }
-
-      if (insertionType === 'replace') {
-        this.userCardViews.forEach((user) => user.remove());
-        this.userCardViews = [];
-        this.indexedUserCardViews = {};
-      }
-
-      const usersFrag = document.createDocumentFragment();
-
-      models.forEach((user) => {
-        const view = this.createChild(UserCard, { guid: user.id });
-        this.userCardViews.push(view);
-        this.indexedUserCardViews[user.id] = view;
-        view.render().$el.appendTo(usersFrag);
-      });
-
-      if (insertionType === 'prepend') {
-        $(this.$refs.userCardsContainer).prepend(usersFrag);
-      } else {
-        $(this.$refs.userCardsContainer).append(usersFrag);
-      }
     },
 
     fetch() {

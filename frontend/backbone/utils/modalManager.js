@@ -1,13 +1,12 @@
 import _ from 'underscore';
 import app from '../app';
+import Profile from '../models/Profile/Profile';
 import Listing from '../models/listing/Listing';
 import About from '../views/modals/about/About';
 import DebugLog from '../views/modals/DebugLog';
-import ModeratorDetails from '../views/modals/moderatorDetails';
 
 let aboutModal;
 let debugLogModal;
-let moderatorDetailsModal;
 
 export function launchEditListingModal(modalOptions = {}) {
   const model = modalOptions.model;
@@ -56,13 +55,17 @@ export function launchDebugLogModal(modalOptions = {}) {
 }
 
 export function launchModeratorDetailsModal(modalOptions = {}) {
-  if (moderatorDetailsModal) moderatorDetailsModal.remove();
+  const model = modalOptions.model;
+  if (!(model instanceof Profile)) {
+    throw new Error('In the modalOptions, please provide an instance of ' +
+      'a Profile model.');
+  }
 
-  moderatorDetailsModal = new ModeratorDetails(modalOptions)
-      .render()
-      .open();
-
-  return moderatorDetailsModal;
+  return window.vueApp.launchModal('ModeratorDetails', _.omit(modalOptions, 'model'), function() {
+      return {
+        model,
+      };
+    });
 }
 
 export function launchWallet(modalOptions = {}) {

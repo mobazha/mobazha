@@ -71,7 +71,16 @@
         </template>
       </div>
     </div>
-
+    <Teleport to="#js-vueModal">
+      <ModeratorDetails v-if="showModeratorDetails"
+        :bb="() => {
+          return {
+            model,
+          }}"
+       @addAsModerator="onAddAsModerator"
+       @close="showModeratorDetails = false"
+      />
+    </Teleport>
   </div>
 </template>
 
@@ -82,12 +91,15 @@ import app from '../../../backbone/app';
 import { followedByYou, followUnfollow } from '../../../backbone/utils/follow';
 import Profile, { getCachedProfiles } from '../../../backbone/models/profile/Profile';
 import { isBlocked, events as blockEvents } from '../../../backbone/utils/block';
-import { launchModeratorDetailsModal } from '../../../backbone/utils/modalManager';
 import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
 import { getModeratorOptions } from '@/utils/verifiedMod';
 
+import ModeratorDetails from '@/views/modals/ModeratorDetails.vue';
 
 export default {
+  components: {
+    ModeratorDetails,
+  },
   props: {
     options: {
       type: Object,
@@ -99,12 +111,19 @@ export default {
     return {
       isBlocked: false,
 
+      loading: false,
+      notFound: false,
+
       updateKey: 0,
       processingMod: false,
       processingFollow: false,
+
+      showModeratorDetails: false,
     };
   },
   created () {
+    this.initEventChain();
+
     this.loadData(this.options);
   },
   mounted () {
@@ -129,7 +148,7 @@ export default {
         getModTip: this.getModTip,
         getFollowTip: this.getFollowTip,
         ...this.options,
-        ...this.model.toJSON(),
+        ...((_.has(this, 'model') && this.model.toJSON()) || {}),
       };
     },
     headerHash () {
@@ -148,7 +167,7 @@ export default {
     loadData (options = {}) {
       this.baseInit(options);
 
-      if (this.model instanceof Profile) {
+      if (_.has(this, 'model') && this.model instanceof Profile) {
         this.guid = this.model.id;
         this.fetched = true;
       } else {
@@ -157,7 +176,7 @@ export default {
       }
 
       if (!this.guid) {
-        if (this.model) {
+        if (_.has(this, 'model')) {
           throw new Error('The guid must be provided in the model.');
         } else {
           throw new Error('The guid must be provided in the options.');
@@ -253,12 +272,12 @@ export default {
         this.saveModeratorList(false);
       } else {
         // show the moderator details modal
-        const modModal = launchModeratorDetailsModal({ model: this.model });
-        this.listenTo(modModal, 'addAsModerator', () => {
-          this.processingMod = true;
-          this.saveModeratorList(true);
-        });
+        this.showModeratorDetails = true;
       }
+    },
+    onAddAsModerator() {
+      this.processingMod = true;
+      this.saveModeratorList(true);
     },
 
     onClickImageHeader () {

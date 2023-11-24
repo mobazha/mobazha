@@ -92,6 +92,20 @@
         </div>
       </div>
     </div>
+    <Teleport to="#js-vueModal">
+      <ModeratorDetails v-if="showModeratorDetails"
+        :options="{
+          purchase: options.purchase,
+          cardState: _state.selectedState,
+        }"
+        :bb="() => {
+          return {
+            model,
+          }}"
+       @addAsModerator="changeSelectState('selected')"
+       @close="showModeratorDetails = false"
+      />
+    </Teleport>
   </div>
 </template>
 
@@ -102,11 +116,15 @@ import app from '../../../../backbone/app';
 import Profile from '../../../../backbone/models/profile/Profile';
 import { getModeratorOptions } from '@/utils/verifiedMod'
 import { handleLinks } from '../../../../backbone/utils/dom';
-import { launchModeratorDetailsModal } from '../../../../backbone/utils/modalManager';
 import { anySupportedByWallet } from '../../../../backbone/data/walletCurrencies';
 import { getLangByCode } from '../../../../backbone/data/languages';
 
+import ModeratorDetails from '@/views/modals/ModeratorDetails.vue';
+
 export default {
+  components: {
+    ModeratorDetails,
+  },
   props: {
     options: {
       type: Object,
@@ -119,7 +137,9 @@ export default {
       _state: {
         selectedState: 'unselected',
         preferredCurs: [],
-      }
+      },
+
+      showModeratorDetails: false,
     };
   },
   created() {
@@ -222,15 +242,8 @@ export default {
       handleLinks(this.$el);
     },
 
-    clickModerator(e) {
-      const modModal = launchModeratorDetailsModal({
-        model: this.model,
-        purchase: this.options.purchase,
-        cardState: this.getState('selectedState'),
-      });
-      this.listenTo(modModal, 'addAsModerator', () => {
-        this.changeSelectState('selected');
-      });
+    clickModerator() {
+      this.showModeratorDetails = true;
     },
 
     click() {

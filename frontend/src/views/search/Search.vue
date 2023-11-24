@@ -414,12 +414,10 @@ export default {
      * @param {boolean} opts.force - Should search be fired even if nothing changed?
      */
     setSearch (search = {}, opts = {}) {
-      const newSearch = {
-        ...this._search,
-        ...search,
-      };
+      const previousSearch = { ...this._search };
+      const newSearch = { ...this._search, ...search, };
 
-      if (!_.isEqual(this._search, newSearch) || opts.force) {
+      if (!_.isEqual(previousSearch, newSearch) || opts.force) {
         this._search = newSearch;
         scrollPageIntoView();
         this.fetchSearch(this._search);

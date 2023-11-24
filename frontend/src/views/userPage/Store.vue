@@ -155,6 +155,8 @@ export default {
       // Standard width grid has 3 columns, so best to leave this
       // as a multiple of 3.
       LISTINGS_PER_PAGE: 24,
+
+      fetchKey: 0,
     };
   },
   created() {
@@ -169,6 +171,8 @@ export default {
   },
   computed: {
     ob() {
+      let access = this.fetchKey;
+
       const isFetching = this.fetch && this.fetch.state() === 'pending';
       const fetchFailed = this.fetch && this.fetch.state() === 'rejected' && this.fetch.status !== 404;
 
@@ -285,8 +289,7 @@ export default {
       });
 
       // this block should be last
-      this.fetch = this.fetchListings();
-      this.onRequest(this.collection, this.fetch);
+      this.fetchListings();
     },
 
     onUpdateCollection(cl, opts) {
@@ -342,6 +345,8 @@ export default {
       const startTime = Date.now();
 
       xhr.always(() => {
+        this.fetchKey += 1;
+
         if (xhr.state() === 'rejected' && xhr.status !== 404) {
           // if fetch is triggered by retry button and
           // it immediately fails, it looks like nothing happend,

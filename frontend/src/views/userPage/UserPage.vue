@@ -397,7 +397,7 @@ export default {
         }
 
         if (!state) {
-          app.router.navigate(`${guid}/store/${slug ? slug : ''}`, {trigger: true, replace: true});
+          app.router.navigate(`${guid}/store${slug ? '/'+slug : ''}`, {trigger: true, replace: true});
           // this.$router.replace(`${guid}/store/${slug ? slug : ''}`);
           return;
         }

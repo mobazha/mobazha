@@ -33,7 +33,9 @@
             </template>
           </div>
         </template>
-        <div ref="cardVerifiedMod" class="js-cardVerifiedMod"></div>
+        <div ref="cardVerifiedMod" class="js-cardVerifiedMod">
+          <VerifiedMod v-if="ob.verifiedMod" :options="verifiedModOptions()" />
+        </div>
       </div>
       <div class="content">
         <template v-if="!ob.loading && !ob.notFound">
@@ -76,15 +78,13 @@
 <script>
 import $ from 'jquery';
 import _ from 'underscore';
-import app from '../../backbone/app';
-import { followedByYou, followUnfollow } from '../../backbone/utils/follow';
-import Profile, { getCachedProfiles } from '../../backbone/models/profile/Profile';
-import { isBlocked, events as blockEvents } from '../../backbone/utils/block';
-import { launchModeratorDetailsModal } from '../../backbone/utils/modalManager';
-import { openSimpleMessage } from './modals/SimpleMessage';
-import VerifiedMod from './components/VerifiedMod';
+import app from '../../../backbone/app';
+import { followedByYou, followUnfollow } from '../../../backbone/utils/follow';
+import Profile, { getCachedProfiles } from '../../../backbone/models/profile/Profile';
+import { isBlocked, events as blockEvents } from '../../../backbone/utils/block';
+import { launchModeratorDetailsModal } from '../../../backbone/utils/modalManager';
+import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
 import { getModeratorOptions } from '@/utils/verifiedMod';
-import BlockedBtn from './components/BlockBtn';
 
 
 export default {
@@ -125,6 +125,7 @@ export default {
         ownGuid: this.ownGuid,
         followedByYou: this.followedByYou,
         ownMod: this.ownMod,
+        verifiedMod: app.verifiedMods.get(this.guid),
         getModTip: this.getModTip,
         getFollowTip: this.getFollowTip,
         ...this.options,
@@ -306,29 +307,26 @@ export default {
       this.isBlocked = isBlocked(this.guid);
     },
 
+    verifiedModOptions() {
+      const verifiedMod = app.verifiedMods.get(this.guid);
+
+      const createOptions = getModeratorOptions({
+        model: verifiedMod,
+      });
+
+      return {
+        ...createOptions,
+        initialState: {
+          ...createOptions.initialState,
+          text: '',
+        },
+      };
+    },
+
     render () {
       this.setBlockedClass();
 
       if (!this.fetched) this.loadUser();
-      /* the view should be rendered when it is created and before it has data, so it can occupy
-        space in the DOM while the data is being fetched. */
-
-      if (this.verifiedMod) this.verifiedMod.remove();
-
-      const verifiedMod = app.verifiedMods.get(this.guid);
-      const createOptions = getModeratorOptions({
-        model: verifiedMod,
-      });
-      if (verifiedMod && this.model && this.model.isModerator) {
-        this.verifiedMod = this.createChild(VerifiedMod, {
-          ...createOptions,
-          initialState: {
-            ...createOptions.initialState,
-            text: '',
-          },
-        });
-        $(this.$refs.cardVerifiedMod).append(this.verifiedMod.render().el);
-      }
 
       return this;
     },

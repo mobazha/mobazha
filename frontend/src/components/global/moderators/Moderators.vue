@@ -29,7 +29,7 @@
           </div>
         </div>
       </template>
-      <template v-for="card in modCards" :key="model.id">
+      <template v-for="card in modCards" :key="card.model.id">
         <ModCard
           ref="modCards"
           v-show="modShouldRender(card.model)"

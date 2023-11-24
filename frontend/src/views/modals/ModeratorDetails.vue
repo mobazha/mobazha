@@ -1,6 +1,6 @@
 <template>
   <div class="modal moderatorDetails modalTop modalScrollPage modalNarrow">
-    <BaseModal>
+    <BaseModal @close="$emit('close')">
       <template v-slot:component>
 
         <div class="topControls flex js-closeClickTarget"></div>

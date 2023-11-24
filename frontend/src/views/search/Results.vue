@@ -23,7 +23,25 @@
         <a class="btnFlx flexExpand clrP clrBr " @click="clickResetBtn">Reset Search</a>
       </div>
     </div>
-    <div ref="resultsGrid" :class="`listingsGrid ${ob.viewTypeClass} flex js-resultsGrid`"></div>
+    <div ref="resultsGrid" :class="`listingsGrid ${ob.viewTypeClass} flex js-resultsGrid`">
+      <template v-for="model in pageCols[_search.p]">
+        <ListingCard v-if="isListingCardModel(model)"
+          :options="cardViewOptions(model)"
+          :bb="function() {
+            return {
+              model,
+            };
+          }"
+        />
+        <UserCard v-else
+          :bb="function() {
+            return {
+              model,
+            };
+          }"
+        />
+      </template>
+    </div>
     <div class="pageControls js-pageControlsContainer">
       <PageControlsTextStyle :options="{
         currentPage,
@@ -43,13 +61,10 @@
 </template>
 
 <script>
-import $ from 'jquery';
 import app from '../../../backbone/app';
 import { capitalize } from '../../../backbone/utils/string';
 import { recordEvent } from '../../../backbone/utils/metrics';
 import { createSearchURL } from '../../../backbone/utils/search';
-import UserCard from '../../../backbone/views/UserCard';
-import ListingCard from '../../../backbone/views/components/ListingCard';
 import ResultsCol from '../../../backbone/collections/Results';
 import ListingCardModel from '../../../backbone/models/listing/ListingShort';
 import ProviderMd from '../../../backbone/models/search/SearchProvider';
@@ -61,7 +76,6 @@ export default {
       type: Object,
       default: {
         search: {},
-        total: 0,
         initCol: {},
         viewType: '',
         setHistory: false,
@@ -80,7 +94,6 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob () {
@@ -131,40 +144,22 @@ export default {
       this.$emit('resetSearch');
     },
 
-    createCardView (model) {
+    cardViewOptions(model) {
       // models can be listings or nodes, even though nodes aren't being used yet
-      if (model instanceof ListingCardModel) {
-        const vendor = model.get('vendor') || {};
-        const base = vendor.handle ? `@${vendor.handle}` : vendor.peerID;
-        const options = {
-          listingBaseUrl: `${base}/store/`,
-          reportsUrl: this._search.provider.reportsUrl || '',
-          searchUrl: this._search.provider[this._search.urlType],
-          model,
-          vendor,
-          onStore: false,
-          viewType: this.viewType,
-        };
-
-        return this.createChild(ListingCard, options);
-      }
-
-      return this.createChild(UserCard, { model });
+      const vendor = model.get('vendor') || {};
+      const base = vendor.handle ? `@${vendor.handle}` : vendor.peerID;
+      return {
+        listingBaseUrl: `${base}/store/`,
+        reportsUrl: this._search.provider.reportsUrl || '',
+        searchUrl: this._search.provider[this._search.urlType],
+        vendor,
+        onStore: false,
+        viewType: this.viewType,
+      };
     },
 
-    renderCards (pageCol = []) {
-      const resultsFrag = document.createDocumentFragment();
-
-      pageCol.forEach((model) => {
-        const cardVw = this.createCardView(model);
-
-        if (cardVw) {
-          this.cardViews.push(cardVw);
-          cardVw.render().$el.appendTo(resultsFrag);
-        }
-      });
-
-      $(this.$refs.resultsGrid).html(resultsFrag);
+    isListingCardModel(model) {
+      return model instanceof ListingCardModel;
     },
 
     loadPage (options) {
@@ -226,17 +221,6 @@ export default {
       this.cardViews.forEach((vw) => vw.remove());
       this.cardViews = [];
     },
-
-    render () {
-      const pageCol = this.pageCols[this._search.p];
-
-      if (pageCol && pageCol.length) {
-        this.renderCards(pageCol);
-      }
-
-      return this;
-    }
-
   }
 }
 </script>

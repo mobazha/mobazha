@@ -2,7 +2,15 @@
   <div class="userPageHome">
     <div class="flexRow gutterH">
       <div class="col4 gutterVMd2">
-        <div ref="userCard" class="userCard js-userCard"></div>
+        <div ref="userCard" class="userCard js-userCard">
+          <UserCard
+            :bb="function() {
+              return {
+                model,
+              };
+            }"
+          />
+        </div>
         <template v-if="ob.moderator && ob.moderatorInfo">
           <div class="contentBox padMd2 clrBr clrP clrSh2 js-moderatorInfo">
             <div class="flexVBot gutterH rowLg snipKids">
@@ -113,7 +121,6 @@ import $ from 'jquery';
 import _ from 'underscore';
 import { ipc } from '../../utils/ipcRenderer.js';
 import app from '../../../backbone/app';
-import UserCard from '../../../backbone/views/UserCard';
 import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
 
 import ModeratorDetails from '@/views/modals/ModeratorDetails.vue';
@@ -145,7 +152,6 @@ export default {
     this.loadData(this.options);
   },
   mounted() {
-    this.render();
   },
   computed: {
     ob() {
@@ -173,7 +179,6 @@ export default {
       this.baseInit(options);
 
       this.ownPage = options.ownPage;
-      this.userCard = this.createChild(UserCard, { model: this.model });
       this.settings = app.settings.clone();
 
       this.listenTo(this.settings, 'sync', () => {
@@ -243,12 +248,6 @@ export default {
 
     guidLeave() {
       $(this.$refs.guidCopied).fadeOut(600);
-    },
-
-    render() {
-      $(this.$refs.userCard).append(this.userCard.render().$el);
-
-      return this;
     },
   },
 };

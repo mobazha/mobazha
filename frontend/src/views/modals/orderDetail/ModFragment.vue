@@ -9,14 +9,14 @@
           ob.maxPeerIDLength)}…` }}</a>
       </div>
     </div>
-    <div ref="verifiedMod" class="js-verifiedMod"></div>
+    <div ref="verifiedMod" class="js-verifiedMod">
+      <VerifiedMod :key="modKey" :options="modOptions" />
+    </div>
 
   </div>
 </template>
 
 <script>
-import $ from 'jquery';
-import VerifiedMod from '../../../../backbone/views/components/VerifiedMod';
 import { getModeratorOptions } from '@/utils/verifiedMod';
 import app from '../../../../backbone/app';
 
@@ -34,7 +34,8 @@ export default {
       _state: {
         maxPeerIDLength: 8,
         showAvatar: false,
-      }
+      },
+      modKey: 0,
     };
   },
   created () {
@@ -43,7 +44,6 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob () {
@@ -52,6 +52,21 @@ export default {
         ...this.model.toJSON(),
         ...this._state,
       };
+    },
+
+    modOptions() {
+      const verifiedMod = app.verifiedMods.get(this.peerID);
+      const createOptions = getModeratorOptions({
+        model: verifiedMod,
+      });
+
+      if (!verifiedMod) {
+        createOptions.initialState.tipBody = app.polyglot.t('verifiedMod.modUnverified.tipBodyOrderDetail', {
+          not: `<b>${app.polyglot.t('verifiedMod.modUnverified.not')}</b>`,
+          name: `<b>${app.verifiedMods.data.name}</b>`,
+        });
+      }
+      return createOptions;
     }
   },
   methods: {
@@ -71,31 +86,10 @@ export default {
         const newVerifiedModModel = app.verifiedMods.get(this.peerID);
         if (newVerifiedModModel !== this.verifiedModModel) {
           this.verifiedModModel = newVerifiedModModel;
-          this.render();
+          this.modKey += 1;
         }
       });
     },
-
-    render () {
-      const verifiedMod = app.verifiedMods.get(this.peerID);
-      const createOptions = getModeratorOptions({
-        model: verifiedMod,
-      });
-
-      if (!verifiedMod) {
-        createOptions.initialState.tipBody = app.polyglot.t('verifiedMod.modUnverified.tipBodyOrderDetail', {
-          not: `<b>${app.polyglot.t('verifiedMod.modUnverified.not')}</b>`,
-          name: `<b>${app.verifiedMods.data.name}</b>`,
-        });
-      }
-
-      if (this.verifiedMod) this.verifiedMod.remove();
-      this.verifiedMod = this.createChild(VerifiedMod, createOptions);
-      $(this.$refs.verifiedMod).append(this.verifiedMod.render().el);
-
-      return this;
-    }
-
   }
 }
 </script>

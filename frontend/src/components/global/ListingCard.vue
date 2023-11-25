@@ -2,7 +2,16 @@
   <div v-if="!cardError" @click.stop="onClick"
     :class="`listingCard col clrBr clrHover clrT clrP clrSh2 contentBox ${ownListing ? 'ownListing' : ''} ${destroyClass} ${blocked ? 'blocked' : ''} ${hideNsfw ? 'hideNsfw' : ''} ${_model.nsfw ? 'nsfw' : ''}`">
     <div v-if="ob.viewType === 'grid'" class="gridViewContent posR">
-      <div class="listingImage" :style="listingImageStyle">
+      <div class="listingImage" >
+        <el-image ref="listingImage" lazy class="main-img" :src="listingImageUrl">
+          <template #placeholder>
+            <img src="../../../imgs/defaultItem.png" class="placeholder-img" />
+          </template>
+          <template #error>
+            <img src="../../../imgs/defaultItem.png" class="placeholder-img" />
+          </template>
+        </el-image>
+
         <div class="nsfwOverlay overlayPanel coverFull clrP">
           <div class="flexCent">
             <div>
@@ -86,11 +95,14 @@
       <div class="pad clrBr borderTop infoArea">
         <template v-if="ob.vendor">
           <a class="userIconWrapper js-userLink" :href="`#${ob.vendor.peerID}/store`" @click.stop="onClickUserLink">
-            <div
-              class="userIcon disc clrBr2 clrSh1 toolTipNoWrap js-vendorIcon"
-              :style="vendorAvatarStyle"
-              :data-tip="ob.vendor.name"
-            ></div>
+            <el-image ref="avatarImage" lazy class="userIcon disc clrBr2 clrSh1 toolTipNoWrap js-vendorIcon" :src="vendorAvatarUrl" :data-tip="ob.vendor.name">
+                <template #placeholder>
+                  <img src="../../../imgs/defaultAvatar.png" class="placeholder-img" />
+                </template>
+                <template #error>
+                  <img src="../../../imgs/defaultAvatar.png" class="placeholder-img" />
+                </template>
+              </el-image>
           </a>
           <div class="userIconWrapper nsfwAvatarOverlay">
             <div class="userIcon disc clrBr2 clrSh1 clrP tx3">
@@ -164,7 +176,16 @@
       <div class="flexVCent gutterHSm">
         <!-- // Since we have inconsistent padding/gutters, we'll inline some padding settings. -->
         <div class="flexNoShrink posR">
-          <div class="listingImage posR" :style="listingImageStyle"></div>
+          <div class="listingImage posR">
+            <el-image ref="listingImage" lazy class="main-img" :src="listingImageUrl">
+              <template #placeholder>
+                <img src="../../../imgs/defaultItem.png" class="placeholder-img" />
+              </template>
+              <template #error>
+                <img src="../../../imgs/defaultItem.png" class="placeholder-img" />
+              </template>
+            </el-image>
+          </div>
           <div class="center tx2 nsfwAvatarOverlay"><div v-html="ob.parseEmojis('😲')" /></div>
         </div>
         <div class="flexExpand">
@@ -460,6 +481,22 @@ export default {
   mounted() {
     this.render();
   },
+  beforeUnmount() {
+    // 取消 el-image 组件的图片请求
+    let imageElements = [];
+    if (this.$refs.listingImage) {
+      imageElements.push(this.$refs.listingImage.$el);
+    }
+    if (this.$refs.avatarImage) {
+      imageElements.push(this.$refs.avatarImage.$el);
+    }
+    imageElements.forEach((imageElement) => {
+      if (imageElement) {
+        imageElement.onload = null; // 取消 onload 事件
+        imageElement.src = ''; // 设置图片源为空，取消请求
+      }
+    })
+  },
   unmounted() {
     if (this.fullListingFetch) this.fullListingFetch.abort();
     if (this.destroyRequest) this.destroyRequest.abort();
@@ -479,25 +516,16 @@ export default {
         abbrNum,
       };
     },
-    listingImageStyle() {
+    listingImageUrl() {
       const thumbnail = this.model.get('thumbnail');
-      if (thumbnail) {
-        let listingImageSrc = this.viewType === 'grid'
-          ? app.getServerUrl(`ob/image/${isHiRez() ? thumbnail.medium : thumbnail.small}`)
-          : app.getServerUrl(`ob/image/${isHiRez() ? thumbnail.small : thumbnail.tiny}`);
+      if (!thumbnail) return '';
 
-        return `background-image: url(${listingImageSrc}), url('../imgs/defaultItem.png')`;
-      }
-
-      return `background-image: url('../imgs/defaultItem.png')`;
+      return this.viewType === 'grid'
+        ? app.getServerUrl(`ob/image/${isHiRez() ? thumbnail.medium : thumbnail.small}`)
+        : app.getServerUrl(`ob/image/${isHiRez() ? thumbnail.small : thumbnail.tiny}`);
     },
-    vendorAvatarStyle() {
-      if (this.avatarHashes) {
-        const avatarImageSrc = app.getServerUrl(`ob/image/${isHiRez() ? this.avatarHashes.small : this.avatarHashes.tiny}`);
-
-        return `background-image: url(${avatarImageSrc}), url('../imgs/defaultAvatar.png')`;
-      }
-      return `background-image: url('../imgs/defaultAvatar.png')`;
+    vendorAvatarUrl() {
+      return this.avatarHashes ? app.getServerUrl(`ob/image/${isHiRez() ? this.avatarHashes.small : this.avatarHashes.tiny}`) : '';
     },
     avatarHashes() {
       let avatarHashes;
@@ -1016,4 +1044,10 @@ export default {
   },
 };
 </script>
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.main-img,
+.placeholder-img {
+  width: 100%;
+  height: 100%;
+}
+</style>

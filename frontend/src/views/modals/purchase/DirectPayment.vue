@@ -7,7 +7,7 @@
         <div class="flexRow gutterH moderatorCardContent">
           <div class="flexNoShrink">
             <div class="btnRadio">
-              <div tabindex="0" :class="`fauxRadioBtn ${ob.active ? 'active' : ''}`"></div>
+              <div tabindex="0" :class="`fauxRadioBtn ${active ? 'active' : ''}`"></div>
             </div>
           </div>
           <div class="moderatorCardMiddle">
@@ -28,16 +28,13 @@
 
 export default {
   props: {
-    options: {
-      type: Object,
-      default: {},
+    active: {
+      type: Boolean,
+      default: false,
 	  },
   },
   data () {
     return {
-      _state: {
-        active: false,
-      }
     };
   },
   created () {
@@ -45,18 +42,11 @@ export default {
   mounted () {
   },
   computed: {
-    ob () {
-      return {
-        ...this.templateHelpers,
-        ...this._state,
-      };
-    }
   },
 
   methods: {
     clickDirectPurchase () {
-      this.setState({ active: true });
-      this.$emit('click', { active: true });
+      this.$emit('click');
     },
   }
 }

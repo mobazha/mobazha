@@ -1,5 +1,5 @@
 <template>
-  <div class="moderatorsStatus flexCent gutterHTn tx6 clrBr clrP" v-show="!ob.hidden">
+  <div class="moderatorsStatus flexCent gutterHTn tx6 clrBr clrP">
     <SpinnerSVG v-if="ob.showSpinner && ob.loading" className="spinnerTxt js-spinner" />
     <span class="clrT4">{{ statusInfo }}</span>
 
@@ -22,7 +22,6 @@ export default {
   data() {
     return {
       _state: {
-        hidden: true,
         showSpinner: true,
         showLoadBtn: false,
         loaded: 0,
@@ -69,7 +68,6 @@ export default {
       const opts = {
         ...options,
         initialState: {
-          hidden: true,
           showSpinner: true,
           showLoadBtn: false,
           loaded: 0,

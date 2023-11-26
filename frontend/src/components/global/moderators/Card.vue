@@ -44,7 +44,7 @@
                     <div class="flexExpand flexNoShrink verifiedWrapper js-verifiedMod">
                       <VerifiedMod
                         :options="getModeratorOptions({
-                          model: verifiedMod,
+                          model: ob.verifiedMod,
                         })"
                       />
                     </div>

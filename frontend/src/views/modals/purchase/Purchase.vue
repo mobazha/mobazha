@@ -189,12 +189,12 @@
                 <div class="flexColRows gutterVSm">
                   <div class="flexVCentClearMarg">
                     <h2 class="h4 flexExpand required">{{ ob.polyT('purchase.paymentTypeTitle') }}</h2>
-                    <template v-if="ob.showModerators">
-                      <input type="checkbox" id="purchaseVerifiedOnly" @click="onClickVerifiedOnly" :checked="ob.showVerifiedOnly">
+                    <template v-if="showModerators">
+                      <input type="checkbox" id="purchaseVerifiedOnly" v-model="showVerifiedOnly">
                       <label class="tx5b" for="purchaseVerifiedOnly">{{ ob.polyT('settings.storeTab.verifiedOnly') }}</label>
                     </template>
                   </div>
-                  <template v-if="ob.showModerators && !ob.noValidModerators">
+                  <template v-if="showModerators">
                     <div class="js-moderated-errors">
                       <FormError v-if="errors['moderated']" :errors="errors['moderated']" />
                     </div>
@@ -213,18 +213,17 @@
                           radioStyle: true,
                           initialState: {
                             showOnlyCur: currencies[0],
-                            showVerifiedOnly: true,
                           },
                         }"
-                        @clickShowUnverified="setState({ showVerifiedOnly: false })"
+                        :showVerifiedOnly="showVerifiedOnly"
+                        :modCurrency="paymentCoin"
+                        @clickShowUnverified="showVerifiedOnly = false"
                         @cardSelect="onCardSelect"
                       />
                     </div>
-                    <template v-if="!ob.noValidModerators">
-                      <div>
-                        <div class="clrT2 tx6 rowMd">{{ ob.polyT('purchase.moderatorsDisclaimer') }}</div>
-                      </div>
-                    </template>
+                    <div>
+                      <div class="clrT2 tx6 rowMd">{{ ob.polyT('purchase.moderatorsDisclaimer') }}</div>
+                    </div>
                     <hr class="clrBr row">
                   </template>
                   <DirectPayment class="moderatorsList" :active="!isModerated" @click="handleDirectPurchaseClick" />
@@ -367,7 +366,7 @@
                     };
                   }"
                 />
-                <template v-if="ob.showModerators && !ob.noValidModerators">
+                <template v-if="showModerators">
                   <hr class="clrBr">
                   <div class="padSm txSm txCtr clrT2">
                     {{ ob.polyT('purchase.moderatorNote') }}
@@ -484,6 +483,8 @@ export default {
       outdatedHash: false,
 
       orderID: '',
+      showModerators: false,
+      isModerated: false,
 
       paymentData: undefined,
 
@@ -498,8 +499,6 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    // render the moderators so it can start fetching and adding moderator cards
-    this.$refs.moderators.getModeratorsByID();
   },
   unmounted() {
     if (this.orderSubmit) this.orderSubmit.abort();
@@ -709,10 +708,7 @@ export default {
       const disallowedIDs = [app.profile.id, this.listing.get('vendorID').peerID];
       this.moderatorIDs = _.without(moderatorIDs, ...disallowedIDs);
 
-      this.setState({
-        showModerators: this.moderatorIDs.length,
-        showVerifiedOnly: true,
-      }, { renderOnChange: false });
+      this.showModerators = this.moderatorIDs.length > 0;
 
       this.couponObj = [];
 
@@ -859,23 +855,15 @@ export default {
     handleDirectPurchaseClick() {
       if (!this.isModerated) return;
 
-      this.$refs.moderators.deselectOthers();
-      this.setState({ unverifedSelected: false }, { renderOnChange: false });
-    },
+      if (this.$refs.moderators) {
+        this.$refs.moderators.deselectOthers();
+        this.isModerated = this.$refs.moderators.selectedIDs.length > 0;
 
-    togVerifiedModerators(bool) {
-      this.$refs.moderators.togVerifiedShown(bool);
-      this.setState({ showVerifiedOnly: bool });
-    },
-
-    onClickVerifiedOnly(e) {
-      this.togVerifiedModerators($(e.target).prop('checked'));
+      }
     },
 
     onCardSelect() {
-      const selected = this.$refs.moderators.selectedIDs;
-      const unverifedSelected = selected.length && !app.verifiedMods.matched(selected).length;
-      this.setState({ unverifedSelected }, { renderOnChange: false });
+      this.isModerated = this.$refs.moderators.selectedIDs.length > 0;
     },
 
     changeCryptoAddress (e) {
@@ -989,7 +977,7 @@ export default {
       }
 
       // Set the moderator.
-      const moderator = this.$refs.moderators.selectedIDs.length > 0 && this.$refs.moderators.selectedIDs[0] || '';
+      const moderator = this.$refs.moderators && this.$refs.moderators.selectedIDs.length > 0 && this.$refs.moderators.selectedIDs[0] || '';
       this.order.set({ moderator });
       this.order.set({}, { validate: true });
 

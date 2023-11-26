@@ -12,11 +12,11 @@
           <div class="moderatorCardInner">
             <div class="flexCent">
               <div class="flexColRows flexHCent gutterVTn">
-                <h4>{{ ob.polyT(`${msgPath}.title`, opts) }}</h4>
+                <h4>{{ ob.polyT(`${msgPath}.title`, { coin: modCurrency }) }}</h4>
                 <!-- // The section below is only relevant if the moderators are loaded in a purchasing context. -->
                 <template v-if="ob.purchase">
                   <div class="tx4 clrT2">{{ ob.polyT(`${msgPath}.body`) }}</div>
-                  <template v-if="showOnlyVer">
+                  <template v-if="hasHiddenUnverfied">
                     <!-- //just a spacer -->
                     <div class="padTn"></div>
                     <div>
@@ -29,7 +29,7 @@
           </div>
         </div>
       </template>
-      <template v-for="card in modCards" :key="card.model.id">
+      <template v-for="card in modCards" :key="`${card.model.id}_${showVerifiedOnly}_${modCurrency}`">
         <ModCard
           ref="modCards"
           v-show="modShouldRender(card.model)"
@@ -56,6 +56,7 @@
       <!-- // create a moderators status view. It should retain it's state between renders of this view. -->
       <ModeratorsStatus
         ref="moderatorsStatus"
+        v-show="showStatus"
         :options="{
           initialState: {
             mode: method === 'GET' ? 'loaded' : 'loadingXofY',
@@ -79,7 +80,7 @@ import app from '../../../../backbone/app';
 import { anySupportedByWallet } from '../../../../backbone/data/walletCurrencies';
 import { getSocket } from '../../../../backbone/utils/serverConnect';
 import Moderators from '../../../../backbone/collections/Moderators';
-import Moderator from '../../../../backbone/models/profile/Profile';
+import Profile from '../../../../backbone/models/profile/Profile';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import ModCard from './Card.vue';
 import ModeratorsStatus from './Status.vue';
@@ -94,13 +95,19 @@ export default {
       type: Object,
       default: {},
     },
+    showVerifiedOnly: {
+      type: Boolean,
+      default: false,
+    },
+    modCurrency: {
+      type: String,
+      default: '',
+    }
   },
   data() {
     return {
       _state: {
         preferredCurs: [],
-        showOnlyCur: '',
-        showVerifiedOnly: false,
         loading: false,
       },
 
@@ -123,6 +130,13 @@ export default {
         showLoadBtn: false,
         showSpinner: true,
       },
+
+      unVerifiedCount: 0,
+      showStatus: false,
+
+      fetchingMods: [],
+      moderatorsCol: undefined,
+      moderatorsColKey: 0,
     };
   },
   created() {
@@ -131,16 +145,22 @@ export default {
     this.loadData(this.options);
   },
   mounted() {
+    // render the moderators so it can start fetching and adding moderator cards
+    if (this.moderatorIDs.length > 0) {
+      this.getModeratorsByID();
+    }
   },
   unmounted() {
     this.modFetches.forEach((fetch) => fetch.abort());
   },
   computed: {
     ob() {
-      const state = this.getState();
+      let access = this.showVerifiedOnly;
+
       const showMods = this.modCards.filter((card) => this.modShouldRender(card.model));
-      const unVerCount = this.modCards.filter((card) => card.model.hasModCurrency(state.showOnlyCur) && !card.model.isVerified).length;
+      this.unVerifiedCount = this.modCards.filter((card) => card.model.hasModCurrency(this.modCurrency) && !card.model.isVerified).length;
       const totalIDs = this.allIDs.length;
+
       return {
         ...this.templateHelpers,
         wrapperClasses: this.innerOptions.wrapperClasses,
@@ -148,26 +168,18 @@ export default {
         purchase: this.innerOptions.purchase,
         totalShown: showMods.length,
         totalIDs,
-        unVerCount,
         ...this._state,
       };
     },
-    showOnlyVer() {
-      let ob = this.ob;
-      return ob.showVerifiedOnly && ob.unVerCount ? 'Verified' : '';
-    },
-    showOnlyCur() {
-      let ob = this.ob;
-      return ob.showOnlyCur ? 'Matching' : '';
-    },
-    opts() {
-      let ob = this.ob;
-      return ob.showOnlyCur ? { coin: ob.showOnlyCur } : {};
+    hasHiddenUnverfied() {
+      return this.showVerifiedOnly && this.unVerifiedCount;
     },
     msgPath() {
-      return `moderators.noModsMsg.no${this.showOnlyCur}${this.showOnlyVer}Moderators`;
+      return `moderators.noModsMsg.no${this.modCurrency ? 'Matching' : ''}${this.hasHiddenUnverfied ? 'Verified' : ''}Moderators`;
     },
     allIDs() {
+      let access = this.moderatorsColKey;
+
       return this.moderatorsCol.pluck('peerID');
     },
     selectedIDs() {
@@ -224,8 +236,6 @@ export default {
         ...options,
         initialState: {
           preferredCurs: [],
-          showOnlyCur: '',
-          showVerifiedOnly: false,
           loading: false,
           ...options.initialState,
         },
@@ -256,16 +266,19 @@ export default {
       }
 
       this.baseInit(opts);
-      this.excludeIDs = opts.excludeIDs;
       this.unfetchedMods = [];
       this.fetchingMods = [];
       this.fetchingVerifiedMods = [];
       this.modFetches = [];
       this.moderatorsCol = new Moderators();
       this.listenTo(this.moderatorsCol, 'add', (model) => {
+        this.moderatorsColKey += 1;
+
         this.addMod(model);
       });
       this.listenTo(this.moderatorsCol, 'remove', (md) => {
+        this.moderatorsColKey += 1;
+
         const removeIndex = this.modCards.findIndex((card) => card.model === md);
         this.modCards.splice(removeIndex, 1)[0].remove();
       });
@@ -276,7 +289,6 @@ export default {
     },
 
     clickShowUnverified() {
-      this.togVerifiedShown(false);
       this.$emit('clickShowUnverified');
     },
 
@@ -303,7 +315,7 @@ export default {
       }
 
       if ((!!isAMod && supportedCur) || this.innerOptions.showInvalid) {
-        const newMod = new Moderator(data, { parse: true });
+        const newMod = new Profile(data, { parse: true });
         if (newMod.isValid()) this.moderatorsCol.add(newMod);
         this.removeNotFetched(data.peerID);
       } else {
@@ -349,13 +361,15 @@ export default {
 
       // Either a list of IDs can be posted, or any available moderators can be retrieved with GET
       if (IDs.length || op.method === 'GET') {
-        this.$refs.moderatorsStatus.setState({
-          hidden: false,
-          loaded: 0,
-          toLoad: IDs.length,
-          total: this.modCards.length,
-          loading: true,
-        });
+        this.showStatus = true;
+        this.$nextTick(() => {
+          this.$refs.moderatorsStatus.setState({
+            loaded: 0,
+            toLoad: IDs.length,
+            total: this.modCards.length,
+            loading: true,
+          });
+        })
 
         if (op.async) {
           if (this.serverSocket) {
@@ -416,14 +430,12 @@ export default {
     checkNotFetched() {
       if (this.unfetchedMods.length === 0 && this.fetchingMods.length) {
         // All ids have been fetched and ids existed to fetch.
-        this.$refs.moderatorsStatus.setState({
-          loading: false,
-          hidden: true,
-        });
+        this.showStatus = false;
+
         this.setState({
           loading: false,
         });
-      } else {
+      } else if (this.showStatus) {
         // Either ids are still fetching, or this is an open fetch with no set ids.
         this.$refs.moderatorsStatus.setState({
           loaded: this.moderatorsCol.length, // not shown if open fetch
@@ -433,7 +445,7 @@ export default {
       }
     },
     addMod(model) {
-      if (!model || !(model instanceof Moderator)) {
+      if (!model || !(model instanceof Profile)) {
         throw new Error('Please provide a valid profile model.');
       }
 
@@ -460,9 +472,8 @@ export default {
     },
 
     modShouldRender(model) {
-      const hideOnUnverified = this.getState().showVerifiedOnly && !model.isVerified;
-      const showCur = this.getState().showOnlyCur;
-      const hideOnCur = showCur && !model.hasModCurrency(showCur);
+      const hideOnUnverified = this.showVerifiedOnly && !model.isVerified;
+      const hideOnCur = this.modCurrency && !model.hasModCurrency(this.modCurrency);
       return !(hideOnUnverified || hideOnCur);
     },
 
@@ -478,9 +489,6 @@ export default {
           card.changeSelectState(this.innerOptions.notSelected);
         }
       });
-    },
-    togVerifiedShown(bool) {
-      this.setState({ showVerifiedOnly: bool });
     },
   },
 };

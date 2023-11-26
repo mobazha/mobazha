@@ -157,6 +157,7 @@ export default {
       LISTINGS_PER_PAGE: 24,
 
       fetchKey: 0,
+      retryPressed: false,
     };
   },
   created() {

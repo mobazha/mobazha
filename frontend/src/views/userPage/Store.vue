@@ -26,7 +26,7 @@
       <div class="txCtr padHg contentBox clrBr clrP">
         <h3>{{ ob.polyT('userPage.store.unableToFetchListings') }}</h3>
         <p>{{ ob.fetchFailReason }}</p>
-        <ProcessingButton className="btn clrP clrBr js-retryFetch" :btnText="ob.polyT('userPage.store.retryStoreFetch')" @click="onClickRetryFetch" />
+        <ProcessingButton :className="`btn clrP clrBr js-retryFetch ${retryPressed ? 'processing' : ''}`" :btnText="ob.polyT('userPage.store.retryStoreFetch')" @click="onClickRetryFetch" />
       </div>
     </template>
 
@@ -340,12 +340,13 @@ export default {
       if (!(cl instanceof Listings)) return;
 
       this.fetch = xhr;
-      if (!this.retryPressed) this.render();
 
       const startTime = Date.now();
 
       xhr.always(() => {
         this.fetchKey += 1;
+
+        if (!this.retryPressed) this.render();
 
         if (xhr.state() === 'rejected' && xhr.status !== 404) {
           // if fetch is triggered by retry button and
@@ -372,7 +373,6 @@ export default {
     onClickRetryFetch() {
       this.retryPressed = true;
       this.fetchListings();
-      this.$btnRetry().addClass('processing');
     },
 
     onClickClearSearch() {

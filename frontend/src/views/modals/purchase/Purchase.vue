@@ -547,9 +547,6 @@ export default {
         warning,
       });
     },
-    showModerators () {
-      return this.moderatorIDs.length;
-    },
     paymentCoin () {
       return this.formData.activeCurs[0];
     },

@@ -16,7 +16,11 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        loaded: 0,
+        toLoad: 0,
+        total: 0,
+      },
     },
   },
   data() {
@@ -24,9 +28,7 @@ export default {
       _state: {
         showSpinner: true,
         showLoadBtn: false,
-        loaded: 0,
-        toLoad: 0,
-        total: 0,
+
         mode: 'loaded',
         loading: false,
       }
@@ -45,6 +47,9 @@ export default {
     ob() {
       return {
         ...this.templateHelpers,
+        total: this.options.total || 0,
+        loaded: this.options.loaded || 0,
+        toLoad: this.options.toLoad || 0,
         ...this._state,
       };
     },
@@ -70,9 +75,7 @@ export default {
         initialState: {
           showSpinner: true,
           showLoadBtn: false,
-          loaded: 0,
-          toLoad: 0,
-          total: 0,
+          
           mode: 'loaded',
           loading: false,
           ...(options.initialState || {}),
@@ -91,7 +94,7 @@ export default {
           let mode = this.getState().mode;
           if (mode === 'loadingXofY') mode = 'loadingXofYTimedOut';
           this.setState({ showSpinner: false, mode });
-        }, 10000);
+        }, 20000);
       }
       _.extend(this._state, state);
     },

@@ -1523,8 +1523,8 @@
   "moderators": {
     "moderatorsLoading": "加载仲裁人...",
     "moderatorsXofY": "正在加载仲裁人 %{current}/%{total}",
-    "loadingXofYTimedOut": "已加载%{加载}%{total}版主。 %{remainder}版主未加载。|||| 已加载%{加载}%{total}版主。 %{remainder}版主未加载。",
-    "moderatorsLoaded": "%{total}版主加载了|||| 已加载%{total}版主。",
+    "loadingXofYTimedOut": "已加载%{loaded}%{total}仲裁人。 %{remainder}仲裁人未加载。|||| 已加载%{loaded}%{total}仲裁人。 %{remainder}仲裁人未加载。",
+    "moderatorsLoaded": "%{total}仲裁人加载了|||| 已加载%{total}仲裁人。",
     "noModsMsg": {
       "noModerators": {
         "title": "没有有效的仲裁人可用。",
@@ -1539,7 +1539,7 @@
         "body": "仲裁人可以使用此商品接受的一种或多种其他货币。"
       },
       "noMatchingVerifiedModerators": {
-        "title": "尚未加载已接受%{coin}验证的版主。",
+        "title": "尚未加载已接受%{coin}验证的仲裁人。",
         "body": "尝试查看未经验证的仲裁人。"
       }
     },

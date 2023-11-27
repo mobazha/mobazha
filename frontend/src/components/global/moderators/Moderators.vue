@@ -58,6 +58,10 @@
         ref="moderatorsStatus"
         v-show="showStatus"
         :options="{
+          loaded: allIDs.length, // not shown if open fetch
+          toLoad: fetchingMods.length, // not shown if open fetch
+          total: modCards.length,
+
           initialState: {
             mode: method === 'GET' ? 'loaded' : 'loadingXofY',
             showLoadBtn,
@@ -364,9 +368,6 @@ export default {
         this.showStatus = true;
         this.$nextTick(() => {
           this.$refs.moderatorsStatus.setState({
-            loaded: 0,
-            toLoad: IDs.length,
-            total: this.modCards.length,
             loading: true,
           });
         })
@@ -430,18 +431,15 @@ export default {
     checkNotFetched() {
       if (this.unfetchedMods.length === 0 && this.fetchingMods.length) {
         // All ids have been fetched and ids existed to fetch.
-        this.showStatus = false;
-
-        this.setState({
+        // this.showStatus = false;
+        this.$refs.moderatorsStatus.setState({
           loading: false,
         });
-      } else if (this.showStatus) {
+
+        this.setState({ loading: false, });
+      } else if (this.$refs.moderatorsStatus) {
         // Either ids are still fetching, or this is an open fetch with no set ids.
-        this.$refs.moderatorsStatus.setState({
-          loaded: this.moderatorsCol.length, // not shown if open fetch
-          toLoad: this.fetchingMods.length, // not shown if open fetch
-          total: this.modCards.length,
-        });
+        this.$refs.moderatorsStatus.setState({});
       }
     },
     addMod(model) {

@@ -1,6 +1,6 @@
 import $ from 'jquery';
-import app from '../app';
 import { Events } from 'backbone';
+import app from '../app';
 import OrderFulfillment from '../models/order/orderFulfillment/OrderFulfillment';
 import { openSimpleMessage } from '../views/modals/SimpleMessage';
 import OrderCompletion from '../models/order/orderCompletion/OrderCompletion';
@@ -42,30 +42,32 @@ function confirmOrder(orderID, reject = false) {
       }),
       dataType: 'json',
       contentType: 'application/json',
-    }).always(() => {
-      if (reject) {
-        delete rejectPosts[orderID];
-      } else {
-        delete acceptPosts[orderID];
-      }
-    }).done(() => {
-      events.trigger(`${reject ? 'reject' : 'accept'}OrderComplete`, {
-        id: orderID,
-        xhr: post,
-      });
     })
-    .fail(xhr => {
-      events.trigger(`${reject ? 'reject' : 'accept'}OrderFail`, {
-        id: orderID,
-        xhr: post,
-      });
+      .always(() => {
+        if (reject) {
+          delete rejectPosts[orderID];
+        } else {
+          delete acceptPosts[orderID];
+        }
+      })
+      .done(() => {
+        events.trigger(`${reject ? 'reject' : 'accept'}OrderComplete`, {
+          id: orderID,
+          xhr: post,
+        });
+      })
+      .fail((xhr) => {
+        events.trigger(`${reject ? 'reject' : 'accept'}OrderFail`, {
+          id: orderID,
+          xhr: post,
+        });
 
-      const failReason = xhr.responseJSON && xhr.responseJSON.reason || '';
-      openSimpleMessage(
-        app.polyglot.t(`orderUtil.failed${reject ? 'Reject' : 'Accept'}Heading`),
-        failReason
-      );
-    });
+        const failReason = (xhr.responseJSON && xhr.responseJSON.reason) || '';
+        openSimpleMessage(
+          app.polyglot.t(`orderUtil.failed${reject ? 'Reject' : 'Accept'}Heading`,),
+          failReason,
+        );
+      });
 
     if (reject) {
       rejectPosts[orderID] = post;
@@ -127,18 +129,18 @@ export function cancelOrder(orderID) {
         xhr: post,
       });
     })
-    .fail(xhr => {
-      events.trigger('cancelOrderFail', {
-        id: orderID,
-        xhr: post,
-      });
+      .fail((xhr) => {
+        events.trigger('cancelOrderFail', {
+          id: orderID,
+          xhr: post,
+        });
 
-      const failReason = xhr.responseJSON && xhr.responseJSON.reason || '';
-      openSimpleMessage(
-        app.polyglot.t('orderUtil.failedCancelHeading'),
-        failReason
-      );
-    });
+        const failReason = (xhr.responseJSON && xhr.responseJSON.reason) || '';
+        openSimpleMessage(
+          app.polyglot.t('orderUtil.failedCancelHeading'),
+          failReason,
+        );
+      });
 
     cancelPosts[orderID] = post;
     events.trigger('cancelingOrder', {
@@ -159,7 +161,7 @@ export function fulfillOrder(contractType = 'PHYSICAL_GOOD', isLocalPickup = fal
     throw new Error('An orderID must be provided with the data.');
   }
 
-  const orderID = data.orderID;
+  const { orderID } = data;
 
   let post = fulfillPosts[orderID];
 
@@ -169,7 +171,7 @@ export function fulfillOrder(contractType = 'PHYSICAL_GOOD', isLocalPickup = fal
 
     if (!post) {
       Object.keys(model.validationError)
-        .forEach(errorKey => {
+        .forEach((errorKey) => {
           throw new Error(`${errorKey}: ${model.validationError[errorKey][0]}`);
         });
     } else {
@@ -181,18 +183,18 @@ export function fulfillOrder(contractType = 'PHYSICAL_GOOD', isLocalPickup = fal
           xhr: post,
         });
       })
-      .fail(xhr => {
-        events.trigger('fulfillOrderFail', {
-          id: orderID,
-          xhr: post,
-        });
+        .fail((xhr) => {
+          events.trigger('fulfillOrderFail', {
+            id: orderID,
+            xhr: post,
+          });
 
-        const failReason = xhr.responseJSON && xhr.responseJSON.reason || '';
-        openSimpleMessage(
-          app.polyglot.t('orderUtil.failedFulfillHeading'),
-          failReason
-        );
-      });
+          const failReason = (xhr.responseJSON && xhr.responseJSON.reason) || '';
+          openSimpleMessage(
+            app.polyglot.t('orderUtil.failedFulfillHeading'),
+            failReason,
+          );
+        });
 
       fulfillPosts[orderID] = post;
       events.trigger('fulfillingOrder', {
@@ -232,18 +234,18 @@ export function refundOrder(orderID) {
         xhr: post,
       });
     })
-    .fail(xhr => {
-      events.trigger('refundOrderFail', {
-        id: orderID,
-        xhr: post,
-      });
+      .fail((xhr) => {
+        events.trigger('refundOrderFail', {
+          id: orderID,
+          xhr: post,
+        });
 
-      const failReason = xhr.responseJSON && xhr.responseJSON.reason || '';
-      openSimpleMessage(
-        app.polyglot.t('orderUtil.failedRefundHeading'),
-        failReason
-      );
-    });
+        const failReason = (xhr.responseJSON && xhr.responseJSON.reason) || '';
+        openSimpleMessage(
+          app.polyglot.t('orderUtil.failedRefundHeading'),
+          failReason,
+        );
+      });
 
     refundPosts[orderID] = post;
     events.trigger('refundingOrder', {
@@ -274,7 +276,7 @@ export function completeOrder(orderID, data = {}) {
 
     if (!save) {
       Object.keys(model.validationError)
-        .forEach(errorKey => {
+        .forEach((errorKey) => {
           throw new Error(`${errorKey}: ${model.validationError[errorKey][0]}`);
         });
     } else {
@@ -286,18 +288,18 @@ export function completeOrder(orderID, data = {}) {
           xhr: save,
         });
       })
-      .fail(xhr => {
-        events.trigger('completeOrderFail', {
-          id: orderID,
-          xhr: save,
-        });
+        .fail((xhr) => {
+          events.trigger('completeOrderFail', {
+            id: orderID,
+            xhr: save,
+          });
 
-        const failReason = xhr.responseJSON && xhr.responseJSON.reason || '';
-        openSimpleMessage(
-          app.polyglot.t('orderUtil.failedCompleteHeading'),
-          failReason
-        );
-      });
+          const failReason = (xhr.responseJSON && xhr.responseJSON.reason) || '';
+          openSimpleMessage(
+            app.polyglot.t('orderUtil.failedCompleteHeading'),
+            failReason,
+          );
+        });
 
       completePosts[orderID] = {
         xhr: save,
@@ -334,7 +336,7 @@ export function openDispute(orderID, data = {}) {
 
     if (!save) {
       Object.keys(model.validationError)
-        .forEach(errorKey => {
+        .forEach((errorKey) => {
           throw new Error(`${errorKey}: ${model.validationError[errorKey][0]}`);
         });
     } else {
@@ -346,18 +348,18 @@ export function openDispute(orderID, data = {}) {
           xhr: save,
         });
       })
-      .fail(xhr => {
-        events.trigger('openDisputeFail', {
-          id: orderID,
-          xhr: save,
-        });
+        .fail((xhr) => {
+          events.trigger('openDisputeFail', {
+            id: orderID,
+            xhr: save,
+          });
 
-        const failReason = xhr.responseJSON && xhr.responseJSON.reason || '';
-        openSimpleMessage(
-          app.polyglot.t('orderUtil.failedOpenDisputeHeading'),
-          failReason
-        );
-      });
+          const failReason = (xhr.responseJSON && xhr.responseJSON.reason) || '';
+          openSimpleMessage(
+            app.polyglot.t('orderUtil.failedOpenDisputeHeading'),
+            failReason,
+          );
+        });
 
       openDisputePosts[orderID] = {
         xhr: save,
@@ -399,7 +401,7 @@ export function resolveDispute(model) {
 
     if (!save) {
       Object.keys(model.validationError)
-        .forEach(errorKey => {
+        .forEach((errorKey) => {
           throw new Error(`${errorKey}: ${model.validationError[errorKey][0]}`);
         });
     } else {
@@ -411,18 +413,18 @@ export function resolveDispute(model) {
           xhr: save,
         });
       })
-      .fail(xhr => {
-        events.trigger('resolveDisputeFail', {
-          id: orderID,
-          xhr: save,
-        });
+        .fail((xhr) => {
+          events.trigger('resolveDisputeFail', {
+            id: orderID,
+            xhr: save,
+          });
 
-        const failReason = xhr.responseJSON && xhr.responseJSON.reason || '';
-        openSimpleMessage(
-          app.polyglot.t('orderUtil.failedResolveHeading'),
-          failReason
-        );
-      });
+          const failReason = (xhr.responseJSON && xhr.responseJSON.reason) || '';
+          openSimpleMessage(
+            app.polyglot.t('orderUtil.failedResolveHeading'),
+            failReason,
+          );
+        });
 
       resolvePosts[orderID] = {
         xhr: save,
@@ -466,18 +468,18 @@ export function acceptPayout(orderID) {
         xhr: post,
       });
     })
-    .fail(xhr => {
-      events.trigger('acceptPayoutFail', {
-        id: orderID,
-        xhr: post,
-      });
+      .fail((xhr) => {
+        events.trigger('acceptPayoutFail', {
+          id: orderID,
+          xhr: post,
+        });
 
-      const failReason = xhr.responseJSON && xhr.responseJSON.reason || '';
-      openSimpleMessage(
-        app.polyglot.t('orderUtil.failedAcceptPayoutHeading'),
-        failReason
-      );
-    });
+        const failReason = (xhr.responseJSON && xhr.responseJSON.reason) || '';
+        openSimpleMessage(
+          app.polyglot.t('orderUtil.failedAcceptPayoutHeading'),
+          failReason,
+        );
+      });
 
     acceptPayoutPosts[orderID] = post;
     events.trigger('acceptingPayout', {
@@ -516,18 +518,18 @@ export function releaseEscrow(orderID) {
         xhr: post,
       });
     })
-    .fail(xhr => {
-      events.trigger('releaseEscrowFail', {
-        id: orderID,
-        xhr: post,
-      });
+      .fail((xhr) => {
+        events.trigger('releaseEscrowFail', {
+          id: orderID,
+          xhr: post,
+        });
 
-      const failReason = xhr.responseJSON && xhr.responseJSON.reason || '';
-      openSimpleMessage(
-        app.polyglot.t('orderUtil.failedReleaseEscrowHeading'),
-        failReason
-      );
-    });
+        const failReason = (xhr.responseJSON && xhr.responseJSON.reason) || '';
+        openSimpleMessage(
+          app.polyglot.t('orderUtil.failedReleaseEscrowHeading'),
+          failReason,
+        );
+      });
 
     releaseEscrowPosts[orderID] = post;
     events.trigger('releasingEscrow', {

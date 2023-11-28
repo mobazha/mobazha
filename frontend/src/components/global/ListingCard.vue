@@ -3,7 +3,7 @@
     :class="`listingCard col clrBr clrHover clrT clrP clrSh2 contentBox ${ownListing ? 'ownListing' : ''} ${destroyClass} ${blocked ? 'blocked' : ''} ${hideNsfw ? 'hideNsfw' : ''} ${_model.nsfw ? 'nsfw' : ''}`">
     <div v-if="ob.viewType === 'grid'" class="gridViewContent posR">
       <div class="listingImage" >
-        <el-image ref="listingImage" lazy class="main-img" :src="listingImageUrl">
+        <el-image ref="listingImage" fit="cover" lazy class="main-img" :src="listingImageUrl">
           <template #placeholder>
             <img src="../../../imgs/defaultItem.png" class="placeholder-img" />
           </template>
@@ -177,7 +177,7 @@
         <!-- // Since we have inconsistent padding/gutters, we'll inline some padding settings. -->
         <div class="flexNoShrink posR">
           <div class="listingImage posR">
-            <el-image ref="listingImage" lazy class="main-img" :src="listingImageUrl">
+            <el-image ref="listingImage" fit="cover" lazy class="main-img" :src="listingImageUrl">
               <template #placeholder>
                 <img src="../../../imgs/defaultItem.png" class="placeholder-img" />
               </template>

@@ -55,6 +55,7 @@
 </template>
 
 <script>
+import OrderDispute from '../../../../backbone/models/order/OrderDispute';
 import {
   openingDispute,
   openDispute,
@@ -74,10 +75,12 @@ export default {
       type: Object,
       default: {},
     },
-    bb: Function,
   },
   data () {
     return {
+      _model: undefined,
+      _modelKey: 0,
+
       claim: '',
 
       processing: false,
@@ -99,6 +102,11 @@ export default {
         timeoutMessage: this.options.timeoutMessage,
       };
     },
+    model() {
+      let access = this._modelKey;
+
+      return this._model;
+    },
     moderatorState() {
       return {
         peerID: this.options.moderator.id,
@@ -108,20 +116,23 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      this.baseInit(options);
-
-      if (!this.model) {
-        throw new Error('Please provide a DisputeOrder model.');
+      if (!options.orderID) {
+        throw new Error('Please provide the orderID.');
       }
 
       checkValidParticipantObject(options.moderator, 'moderator');
+
+      this.baseInit(options);
+
+      this._model = new OrderDispute({ orderID: options.orderID });
+      this._model.on('change', () => this._modelKey += 1);
 
       options.moderator.getProfile()
         .done((modProfile) => {
           this.modProfile = modProfile;
         });
 
-      this.processing = !!openingDispute(this.model.id);
+      this.processing = !!openingDispute(this._model.id);
       this.listenTo(orderEvents, 'openingDispute', this.onOpeningDispute);
       this.listenTo(orderEvents, 'openDisputeComplete, openDisputeFail', this.onOpenDisputeAlways);
     },

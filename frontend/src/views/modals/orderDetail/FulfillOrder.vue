@@ -8,7 +8,7 @@
     </div>
     <hr class="clrBr rowMd" />
     <form class="padKids padStack pad clrP clrBr js-fulfillForm">
-      <template v-if="ob.contractType === 'PHYSICAL_GOOD' && !ob.isLocalPickup">
+      <template v-if="contractType === 'PHYSICAL_GOOD' && !isLocalPickup">
         <div class="flexRow gutterH">
           <div class="col3">
             <label for="fulfillOrderShippingCarrier" class="required">{{
@@ -36,7 +36,7 @@
         </div>
       </template>
 
-      <template v-else-if="ob.contractType === 'DIGITAL_GOOD'">
+      <template v-else-if="contractType === 'DIGITAL_GOOD'">
         <div class="flexRow gutterH">
           <div class="col3">
             <label for="fulfillOrderFileUrl" class="required">{{ ob.polyT(`orderDetail.fulfillOrderTab.fileUrlLabel`)
@@ -62,7 +62,7 @@
         </div>
       </template>
 
-      <template v-else-if="ob.contractType === 'CRYPTOCURRENCY'">
+      <template v-else-if="contractType === 'CRYPTOCURRENCY'">
         <div class="flexRow gutterH">
           <div class="col3">
             <label for="fulfillOrderTransactionID" class="required">{{
@@ -85,10 +85,10 @@
         </div>
         <div class="col7">
           <FormError v-if="ob.errors['note']" :errors="ob.errors['note']" />
-          <textarea rows="6" name="note" :class="`clrBr clrP clrSh2 ${ob.contractType === 'DIGITAL_GOOD' ? 'rowSm' : ''}`"
+          <textarea rows="6" name="note" :class="`clrBr clrP clrSh2 ${contractType === 'DIGITAL_GOOD' ? 'rowSm' : ''}`"
             id="fulfillOrderNote" :placeholder="ob.polyT(`orderDetail.fulfillOrderTab.notePlaceholder`)"
             v-model="formData.note"></textarea>
-          <template v-if="ob.contractType === 'DIGITAL_GOOD'">
+          <template v-if="contractType === 'DIGITAL_GOOD'">
             <div class="clrT2 txSm">{{ ob.polyT(`orderDetail.fulfillOrderTab.noteHelperTextDigital`) }}</div>
           </template>
         </div>
@@ -106,6 +106,8 @@
 </template>
 
 <script>
+import $ from 'jquery';
+import OrderFulfillment from '../../../../backbone/models/order/orderFulfillment/OrderFulfillment';
 import {
   fulfillingOrder,
   fulfillOrder,
@@ -116,16 +118,25 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        orderID: '',
+        contractType: '',
+        isLocalPickup: '',
+      },
 	  },
   },
   data () {
     return {
+      _model: undefined,
+      _modelKey: 0,
+
       formData: {
         physicalDelivery: {
+          shipper: '',
           trackingNumber: '',
         },
         digitalDelivery: {
+          url: '',
           password: '',
         },
         cryptocurrencyDelivery: {
@@ -149,20 +160,22 @@ export default {
 
       return {
         ...this.templateHelpers,
-        contractType: this.contractType,
-        isLocalPickup: this.isLocalPickup,
         ...this.model.toJSON(),
         errors: this.model.validationError || {},
         constraints: cryptoDelivery && cryptoDelivery.constraints || {},
       };
+    },
+
+    model() {
+      let access = this._modelKey;
+
+      return this._model;
     }
   },
   methods: {
     loadData (options = {}) {
-      this.baseInit(options);
-
-      if (!this.model) {
-        throw new Error('Please provide an OrderFulfillment model.');
+      if (!options.orderID) {
+        throw new Error('Please provide an orderID.');
       }
 
       if (!options.contractType) {
@@ -174,7 +187,18 @@ export default {
           'be picked up locally.');
       }
 
-      this.processing = fulfillingOrder(this.model.id);
+      this.baseInit(options);
+
+      this._model = new OrderFulfillment(
+        { orderID: this.orderID },
+        {
+          contractType: this.contractType,
+          isLocalPickup: this.isLocalPickup,
+        },
+      );
+      this._model.on('change', () => this._modelKey += 1);
+
+      this.processing = fulfillingOrder(this._model.id);
       this.listenTo(orderEvents, 'fulfillingOrder', this.onFulfillingOrder);
       this.listenTo(orderEvents, 'fulfillOrderComplete, fulfillOrderFail', this.onFulfillOrderAlways);
     },
@@ -192,7 +216,16 @@ export default {
     },
 
     onClickSubmit () {
-      this.model.set(this.formData);
+      const formData = {};
+      if (this.contractType === 'DIGITAL_GOOD') {
+        formData.digitalDelivery = this.formData.digitalDelivery;
+      } else if (this.contractType === 'CRYPTOCURRENCY') {
+        formData.cryptocurrencyDelivery = this.formData.cryptocurrencyDelivery;
+      } else if (this.contractType === 'PHYSICAL_GOOD' && !context.isLocalPickup) {
+        formData.physicalDelivery = this.formData.physicalDelivery;
+      }
+
+      this.model.set(formData);
       this.model.set({}, { validate: true });
 
       if (!this.model.validationError) {

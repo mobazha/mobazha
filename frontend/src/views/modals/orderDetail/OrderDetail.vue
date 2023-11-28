@@ -123,13 +123,9 @@
                   <FulfillOrder
                     v-if="activeTab === 'fulfillOrder'"
                     :options="{
+                      orderID: model.id,
                       contractType: model.get('contract').type,
                       isLocalPickup: model.get('contract').isLocalPickup,
-                    }"
-                    :bb="function() {
-                      return {
-                        model: fulfillOrderModel(),
-                      };
                     }"
                     @clickBackToSummary="() => {
                       selectTab('summary');
@@ -141,11 +137,6 @@
                   <DisputeOrder
                     v-if="activeTab === 'disputeOrder'"
                     :options="disputeOrderOptions()"
-                    :bb="function() {
-                      return {
-                        model: disputeOrderModel(),
-                      };
-                    }"
                     @clickBackToSummary="() => {
                       selectTab('summary');
                     }"
@@ -158,7 +149,6 @@
                     :options="resolveDisputeOptions()"
                     :bb="function() {
                       return {
-                        model: resolveDisputeModel(),
                         case: model,
                       };
                     }"
@@ -192,8 +182,6 @@ import {
 import { getCachedProfiles } from '../../../../backbone/models/profile/Profile';
 import { recordEvent } from '../../../../backbone/utils/metrics';
 import Case from '../../../../backbone/models/order/Case';
-import ResolveDisputeMd from '../../../../backbone/models/order/ResolveDispute';
-
 import ActionBar from './ActionBar.vue'
 import ContractMenuItem from './ContractMenuItem.vue'
 import Summary from './summaryTab/Summary.vue';
@@ -561,22 +549,6 @@ export default {
       }
     },
 
-    fulfillOrderModel() {
-      const contract = this.model.get('contract');
-
-      return new OrderFulfillment(
-        { orderID: this.model.id },
-        {
-          contractType: contract.type,
-          isLocalPickup: contract.isLocalPickup,
-        },
-      );
-    },
-
-    disputeOrderModel() {
-      return new OrderDispute({ orderID: this.model.id });
-    },
-
     disputeOrderOptions () {
       const translationKeySuffix = app.profile.id === this.model.buyerID ? 'Buyer' : 'Vendor';
       let timeoutMessage = '';
@@ -593,6 +565,7 @@ export default {
       }
 
       return {
+        orderID: this.model.id,
         contractType: this.contract.type,
         moderator: {
           id: this.model.moderatorID,
@@ -600,25 +573,6 @@ export default {
         },
         timeoutMessage,
       }
-    },
-    resolveDisputeModel() {
-      let modelAttrs = { orderID: this.model.id };
-      const isResolvingDispute = resolvingDispute(this.model.id);
-
-      // If this order is in the process of the dispute being resolved, we'll
-      // populate the model with the data that was posted to the server.
-      if (isResolvingDispute) {
-        modelAttrs = {
-          ...modelAttrs,
-          ...isResolvingDispute.data,
-        };
-      }
-
-      return new ResolveDisputeMd(modelAttrs, {
-        buyerContractArrived: () => !!this.model.get('buyerContract'),
-        vendorContractArrived: () => !!this.model.get('vendorContract'),
-        vendorProcessingError: () => this.model.vendorProcessingError,
-      });
     },
     resolveDisputeOptions () {
       return {

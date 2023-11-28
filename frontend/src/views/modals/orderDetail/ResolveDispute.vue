@@ -89,6 +89,7 @@
 
 <script>
 import $ from 'jquery';
+import ResolveDisputeMd from '../../../../backbone/models/order/ResolveDispute';
 import {
   resolvingDispute,
   resolveDispute,
@@ -108,6 +109,9 @@ export default {
   },
   data () {
     return {
+      _model: undefined,
+      _modelKey: 0,
+
       buyerPercentage: 0,
       vendorPercentage: 0,
       resolution: '',
@@ -136,6 +140,11 @@ export default {
         errors: this.model.validationError || {},
       };
     },
+    model() {
+      let access = this._modelKey;
+
+      return this._model;
+    },
     buyerContractUnavailable() {
       return !this._case.buyerContract;
     },
@@ -149,18 +158,33 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      this.baseInit(options);
-
-      if (!this.model) {
-        throw new Error('Please provide an ResolveDispute model.');
-      }
-
       if (!this.case) {
         throw new Error('Please provide a Case model.');
       }
 
       checkValidParticipantObject(options.buyer, 'buyer');
       checkValidParticipantObject(options.vendor, 'vendor');
+
+      this.baseInit(options);
+
+      let modelAttrs = { orderID: this.case.id };
+      const isResolvingDispute = resolvingDispute(this.case.id);
+
+      // If this order is in the process of the dispute being resolved, we'll
+      // populate the model with the data that was posted to the server.
+      if (isResolvingDispute) {
+        modelAttrs = {
+          ...modelAttrs,
+          ...isResolvingDispute.data,
+        };
+      }
+
+      this._model = new ResolveDisputeMd(modelAttrs, {
+        buyerContractArrived: () => !!this.case.get('buyerContract'),
+        vendorContractArrived: () => !!this.case.get('vendorContract'),
+        vendorProcessingError: () => this.case.vendorProcessingError,
+      });
+      this._model.on('change', () => this._modelKey += 1);
 
       options.buyer.getProfile().done(profile => {
         this.buyerName = profile.get('name');
@@ -173,7 +197,7 @@ export default {
         this.vendorAvatarHashes = profile.get('avatarHashes').toJSON();
       });
 
-      this.processing = resolvingDispute(this.model.id);
+      this.processing = resolvingDispute(this._model.id);
       this.listenTo(orderEvents, 'resolvingDispute', this.onResolvingDispute);
       this.listenTo(orderEvents, 'resolveDisputeComplete resolveDisputeFail', this.onResolveDisputeAlways);
     },

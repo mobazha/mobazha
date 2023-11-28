@@ -1,82 +1,74 @@
 <template>
   <div class="transactionsTableWrap">
-    <template v-if="ob.isFetching">
-      <div class="center">
-        <SpinnerSVG className="spinnerMd" />
-      </div>
-    </template>
+    <div v-if="ob.isFetching" class="center">
+      <SpinnerSVG className="spinnerMd" />
+    </div>
 
-    <template v-else-if="ob.fetchFailed">
-      <div class="center txCtr tx4">
-        <div :class="`txB ${ob.initialFetchErrorMessage ? 'rowTn' : 'row'}`">{{ ob.polyT(`transactions.${ob.type}.unableToFetch`) }}</div>
-        <div v-if="ob.fetchError" class="row">{{ ob.fetchError }}</div>
+    <div v-else-if="ob.fetchFailed" class="center txCtr tx4">
+      <div :class="`txB ${ob.initialFetchErrorMessage ? 'rowTn' : 'row'}`">{{ ob.polyT(`transactions.${ob.type}.unableToFetch`) }}</div>
+      <div v-if="ob.fetchError" class="row">{{ ob.fetchError }}</div>
 
-        <a class="btn clrP clrBr clrSh2" @click="onClickRetryFetch">{{ ob.polyT(`transactions.transactionsTable.btnRetryFetch`) }}</a>
-      </div>
-    </template>
+      <a class="btn clrP clrBr clrSh2" @click="onClickRetryFetch">{{ ob.polyT(`transactions.transactionsTable.btnRetryFetch`) }}</a>
+    </div>
 
-    <template v-else>
-      <template v-if="ob.transactions.length">
-        <table class="js-transactionsTable transactionsTable clrBr clrP row">
-          <tr>
-            <th class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.orderID') }}</th>
-            <th class="clrBr">
-              <a class="js-dateHeader dateHeader clrT"
-                >{{ ob.polyT('transactions.transactionsTable.headers.date') }}
-                <div class="sortIcon hide"></div
-              ></a>
-            </th>
-            <th v-if="ob.type !== 'cases'" class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.listing') }}</th>
-            <th v-if="ob.type === 'sales'" class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.buyer') }}</th>
-            <th v-else class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.vendor') }}</th>
+    <template v-else-if="ob.transactions.length">
+      <table class="js-transactionsTable transactionsTable clrBr clrP row">
+        <tr>
+          <th class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.orderID') }}</th>
+          <th class="clrBr">
+            <a class="js-dateHeader dateHeader clrT"
+              >{{ ob.polyT('transactions.transactionsTable.headers.date') }}
+              <div class="sortIcon hide"></div
+            ></a>
+          </th>
+          <th v-if="ob.type !== 'cases'" class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.listing') }}</th>
+          <th v-if="ob.type === 'sales'" class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.buyer') }}</th>
+          <th v-else class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.vendor') }}</th>
 
-            <th v-if="ob.type === 'cases'" class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.buyer') }}</th>
+          <th v-if="ob.type === 'cases'" class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.buyer') }}</th>
 
-            <th class="clrBr priceHeader">{{ ob.polyT('transactions.transactionsTable.headers.total') }}</th>
-            <th class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.status') }}</th>
-          </tr>
+          <th class="clrBr priceHeader">{{ ob.polyT('transactions.transactionsTable.headers.total') }}</th>
+          <th class="clrBr">{{ ob.polyT('transactions.transactionsTable.headers.status') }}</th>
+        </tr>
 
-          <Row
-            v-for="transaction in transToRender"
-            :key="transaction.id"
-            ref="views"
-            :options="{
-              type: this.type,
-              initialState: {
-                acceptOrderInProgress: acceptingOrder(transaction.id),
-                rejectOrderInProgress: rejectingOrder(transaction.id),
-                cancelOrderInProgress: cancelingOrder(transaction.id),
-              },
-            }"
-            :bb="function() {
-              return {
-                model: transaction,
-              };
-            }"
-            @clickAcceptOrder="onClickAcceptOrder(transaction.id)"
-            @clickRejectOrder="onClickRejectOrder(transaction.id)"
-            @clickCancelOrder="onClickCancelOrder(transaction.id)"
-            @clickRow="onClickRow(transaction.id)"
-          />
-        </table>
-        <div class="js-pageControlsContainer"></div>
-        <PageControls
+        <Row
+          v-for="transaction in transToRender"
+          :key="transaction.id"
+          :ref="(el) => views[transaction.id] = el"
           :options="{
-            start: pageStartIndex + 1,
-            end: pageEnd,
-            total: queryTotal
+            type: this.type,
+            initialState: {
+              acceptOrderInProgress: acceptingOrder(transaction.id),
+              rejectOrderInProgress: rejectingOrder(transaction.id),
+              cancelOrderInProgress: cancelingOrder(transaction.id),
+            },
           }"
-          @clickNext="onClickNextPage"
-          @clickPrev="onClickPrevPage"
+          :bb="function() {
+            return {
+              model: transaction,
+            };
+          }"
+          @clickAcceptOrder="onClickAcceptOrder(transaction.id)"
+          @clickRejectOrder="onClickRejectOrder(transaction.id)"
+          @clickCancelOrder="onClickCancelOrder(transaction.id)"
+          @clickRow="onClickRow(transaction.id)"
         />
-      </template>
-
-      <template v-else>
-        <div class="contentBox clrP clrBr noResultsWrap">
-          <div class="center">{{ ob.polyT(`transactions.${ob.type}.noResults`) }}</div>
-        </div>
-      </template>
+      </table>
+      <div class="js-pageControlsContainer"></div>
+      <PageControls
+        :options="{
+          start: pageStartIndex + 1,
+          end: pageEnd,
+          total: queryTotal
+        }"
+        @clickNext="onClickNextPage"
+        @clickPrev="onClickPrevPage"
+      />
     </template>
+
+    <div v-else class="contentBox clrP clrBr noResultsWrap">
+      <div class="center">{{ ob.polyT(`transactions.${ob.type}.noResults`) }}</div>
+    </div>
   </div>
 </template>
 
@@ -121,6 +113,8 @@ export default {
         isFetching: false,
         fetchError: '',
       },
+
+      views: {},
     };
   },
   created() {
@@ -164,6 +158,41 @@ export default {
       const startIndex = this.pageStartIndex;
       return this.collection.slice(startIndex, startIndex + this.transactionsPerPage);
     },
+    /*
+     * Index the Row Views by Vendor and/or Buyer ID
+     * so they could be easily retreived by the respective identifier.
+     */
+     indexedViews() {
+      let indexedViews = {
+        byVendor: {},
+        byBuyer: {},
+      };
+      if (!this.views.length) {
+        return indexedViews;
+      }
+
+      this.views.forEach((view) => {
+        if (view == null) return;
+
+        const vendorID = view.model.get('vendorID');
+        const buyerID = view.model.get('buyerID');
+
+        if (vendorID) {
+          if (!indexedViews.byVendor[vendorID]) {
+            indexedViews.byVendor[vendorID] = [];
+          };
+          indexedViews.byVendor[vendorID].push(view);
+        }
+
+        if (buyerID) {
+          if (!indexedViews.byBuyer[buyerID]) {
+            indexedViews.byBuyer[buyerID] = [];
+          }
+          indexedViews.byBuyer[buyerID].push(view);
+        }
+      });
+      return indexedViews;
+    },
   },
   watch: {
     filterParams(newVal, oldVal) {
@@ -175,12 +204,9 @@ export default {
       }
     },
 
-    transToRender (val) {
-      if (val && val.length > 0) {
-        this.$nextTick(() => {
-          this.indexRowViews();
-          this.getAvatars(this.transToRender); // be sure to get avatars *after* indexRowViews()
-        });
+    transToRender (models) {
+      if (models && models.length > 0) {
+        this.getAvatars(models);
       }
     }
   },
@@ -255,7 +281,7 @@ export default {
     },
 
     onRejectingOrder(e) {
-      const view = this.indexedViews.byOrder[e.id];
+      const view = this.views[e.id];
 
       if (view) {
         view.setState({
@@ -265,7 +291,7 @@ export default {
     },
 
     onRejectOrderAlways(e) {
-      const view = this.indexedViews.byOrder[e.id];
+      const view = this.views[e.id];
 
       if (view) {
         view.setState({
@@ -275,7 +301,7 @@ export default {
     },
 
     onRejectOrderComplete(e) {
-      const view = this.indexedViews.byOrder[e.id];
+      const view = this.views[e.id];
 
       if (view) {
         view.model.set('state', 'DECLINED');
@@ -287,7 +313,7 @@ export default {
     },
 
     onAcceptingOrder(e) {
-      const view = this.indexedViews.byOrder[e.id];
+      const view = this.views[e.id];
 
       if (view) {
         view.setState({
@@ -297,7 +323,7 @@ export default {
     },
 
     onAcceptOrderAlways(e) {
-      const view = this.indexedViews.byOrder[e.id];
+      const view = this.views[e.id];
 
       if (view) {
         view.setState({
@@ -307,7 +333,7 @@ export default {
     },
 
     onAcceptOrderComplete(e) {
-      const view = this.indexedViews.byOrder[e.id];
+      const view = this.views[e.id];
 
       if (view) {
         view.model.set('state', 'AWAITING_FULFILLMENT');
@@ -319,7 +345,7 @@ export default {
     },
 
     onCancelingOrder(e) {
-      const view = this.indexedViews.byOrder[e.id];
+      const view = this.views[e.id];
 
       if (view) {
         view.setState({
@@ -329,7 +355,7 @@ export default {
     },
 
     onCancelOrderAlways(e) {
-      const view = this.indexedViews.byOrder[e.id];
+      const view = this.views[e.id];
 
       if (view) {
         view.setState({
@@ -339,7 +365,7 @@ export default {
     },
 
     onCancelOrderComplete(e) {
-      const view = this.indexedViews.byOrder[e.id];
+      const view = this.views[e.id];
 
       if (view) {
         view.model.set('state', 'CANCELED');
@@ -400,38 +426,6 @@ export default {
           });
         });
       }
-    },
-
-    /*
-     * Index the Row Views by Vendor and/or Buyer ID as well as orderID
-     * so they could be easily retreived by the respective identifier.
-     */
-    indexRowViews() {
-      this.indexedViews = {
-        byVendor: {},
-        byBuyer: {},
-        byOrder: {},
-      };
-      if (!this.$refs.views) {
-        return;
-      }
-
-      this.$refs.views.forEach((view) => {
-        const vendorID = view.model.get('vendorID');
-        const buyerID = view.model.get('buyerID');
-
-        if (vendorID) {
-          this.indexedViews.byVendor[vendorID] = this.indexedViews.byVendor[vendorID] || [];
-          this.indexedViews.byVendor[vendorID].push(view);
-        }
-
-        if (buyerID) {
-          this.indexedViews.byBuyer[buyerID] = this.indexedViews.byBuyer[buyerID] || [];
-          this.indexedViews.byBuyer[buyerID].push(view);
-        }
-
-        this.indexedViews.byOrder[view.model.id] = view;
-      });
     },
 
     setFilterOnRoute(filter = this.filterParams) {

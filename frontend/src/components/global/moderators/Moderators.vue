@@ -431,15 +431,19 @@ export default {
     checkNotFetched() {
       if (this.unfetchedMods.length === 0 && this.fetchingMods.length) {
         // All ids have been fetched and ids existed to fetch.
-        // this.showStatus = false;
-        this.$refs.moderatorsStatus.setState({
-          loading: false,
-        });
+        if (this.$refs.moderatorsStatus) {
+          // this.showStatus = false;
+          this.$refs.moderatorsStatus.setState({
+            loading: false,
+          });
+        }
 
         this.setState({ loading: false, });
-      } else if (this.$refs.moderatorsStatus) {
+      } else {
         // Either ids are still fetching, or this is an open fetch with no set ids.
-        this.$refs.moderatorsStatus.setState({});
+        if (this.$refs.moderatorsStatus) {
+          this.$refs.moderatorsStatus.setState({});
+        }
       }
     },
     addMod(model) {

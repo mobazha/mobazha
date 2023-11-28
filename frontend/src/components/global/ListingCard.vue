@@ -469,6 +469,7 @@ export default {
       listingDetailKey: 0,
 
       routeOnOpen: '',
+      routeNameOnOpen: '',
 
       app: app,
     };
@@ -810,13 +811,17 @@ export default {
     onListingDetailClose() {
       this.showListingDetailModal = false;
 
-      if (this.options.onStore) {
-        app.router.navigate(this.routeOnOpen);
-      } else {
-        app.router.setAddressBarText(this.routeOnOpen);
-      }
       if (this.ipfsFetch) this.ipfsFetch.abort();
       this.ipnsFetch.abort();
+
+      // in page close instead of route change close
+      if (this.$route.name === this.routeNameOnOpen) {
+        if (this.options.onStore) {
+          app.router.navigate(this.routeOnOpen);
+        } else {
+          app.router.setAddressBarText(this.routeOnOpen);
+        }
+      }
     },
 
     loadListing() {
@@ -889,6 +894,8 @@ export default {
 
     loadListingDetail() {
       this.routeOnOpen = location.hash.slice(1);
+      this.routeNameOnOpen = this.$route.name;
+
       if (this.options.onStore) {
         app.router.navigateUser(`${this.options.listingBaseUrl}${this.model.get('slug')}`, this.ownerGuid);
       } else {

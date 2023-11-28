@@ -6,7 +6,7 @@
       </template>
     </div>
     <div class="js-followLoadingContainer followLoadingContainer">
-      <FollowLoading ref="followLoading" :options="followLoadingOptions" @retry-click="fetch()" />
+      <FollowLoading ref="followLoading" :options="followLoadingOptions()" @retry-click="fetch()" />
     </div>
   </div>
 </template>
@@ -69,39 +69,6 @@ export default {
   computed: {
     ownPage() {
       return this.options.peerID === app.profile.id;
-    },
-    followLoadingOptions() {
-      let noResultsMsg;
-      let fetchErrorTitle;
-
-      if (this.followType === 'followers') {
-        fetchErrorTitle = app.polyglot.t('userPage.followTab.followersFetchError');
-        noResultsMsg = this.ownPage
-          ? app.polyglot.t('userPage.followTab.noOwnFollowers')
-          : app.polyglot.t('userPage.followTab.noFollowers', {
-              name: this.model.get('handle') || `${this.model.id.slice(0, 8)}…`,
-            });
-      } else {
-        fetchErrorTitle = app.polyglot.t('userPage.followTab.followingFetchError');
-        noResultsMsg = this.ownPage
-          ? app.polyglot.t('userPage.followTab.noOwnFollowing')
-          : app.polyglot.t('userPage.followTab.noFollowing', {
-              name: this.model.get('handle') || `${this.model.id.slice(0, 8)}…`,
-            });
-      }
-
-      const isFetching = (this.followsYouFetch && this.followsYouFetch.state() === 'pending') || (this.followFetch && this.followFetch.state() === 'pending');
-
-      return {
-        initialState: {
-          isFetching,
-          fetchFailed: this.followFetch && this.followFetch.state() === 'rejected',
-          fetchErrorTitle,
-          fetchErrorMsg: (this.followFetch && this.followFetch.responseJSON && this.followFetch.responseJSON.reason) || '',
-          noResultsMsg,
-          noResults: !this.collection.length,
-        },
-      };
     },
   },
   methods: {
@@ -268,6 +235,40 @@ export default {
       }
 
       return this._origClParse.call(this.collection, users);
+    },
+
+    followLoadingOptions() {
+      let noResultsMsg;
+      let fetchErrorTitle;
+
+      if (this.followType === 'followers') {
+        fetchErrorTitle = app.polyglot.t('userPage.followTab.followersFetchError');
+        noResultsMsg = this.ownPage
+          ? app.polyglot.t('userPage.followTab.noOwnFollowers')
+          : app.polyglot.t('userPage.followTab.noFollowers', {
+              name: this.model.get('handle') || `${this.model.id.slice(0, 8)}…`,
+            });
+      } else {
+        fetchErrorTitle = app.polyglot.t('userPage.followTab.followingFetchError');
+        noResultsMsg = this.ownPage
+          ? app.polyglot.t('userPage.followTab.noOwnFollowing')
+          : app.polyglot.t('userPage.followTab.noFollowing', {
+              name: this.model.get('handle') || `${this.model.id.slice(0, 8)}…`,
+            });
+      }
+
+      const isFetching = (this.followsYouFetch && this.followsYouFetch.state() === 'pending') || (this.followFetch && this.followFetch.state() === 'pending');
+
+      return {
+        initialState: {
+          isFetching,
+          fetchFailed: this.followFetch && this.followFetch.state() === 'rejected',
+          fetchErrorTitle,
+          fetchErrorMsg: (this.followFetch && this.followFetch.responseJSON && this.followFetch.responseJSON.reason) || '',
+          noResultsMsg,
+          noResults: !this.collection.length,
+        },
+      };
     },
 
     fetch() {

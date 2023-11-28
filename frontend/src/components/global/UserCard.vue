@@ -18,9 +18,9 @@
               <template v-if="ob.moderator && ob.crypto.anySupportedByWallet(ob.moderatorInfo.acceptedCurrencies)">
                 <ProcessingButton
                   :className="`iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-mod ${ob.ownMod ? 'active' : ''} ${processingMod ? 'processing' : ''}`"
-                  @click.stop="modClick"
+                  @click.stop="modClick()"
                   btnText='<i class="ion-briefcase"></i>'
-                  :data-tip="ob.getModTip(ob.ownMod)" />
+                  :data-tip="getModTip()" />
               </template>
               <ProcessingButton
                 :className="`iconBtnSm clrP clrBr toolTipNoWrap toolTipTop js-follow ${ob.followedByYou ? 'active' : ''} ${processingFollow ? 'processing' : ''}`"
@@ -111,12 +111,20 @@ export default {
     return {
       isBlocked: false,
 
+      guid: '',
+      fetched: false,
+      fetchedModel: undefined,
+
       loading: false,
       notFound: false,
 
       updateKey: 0,
       processingMod: false,
       processingFollow: false,
+
+      followedByYou: false,
+
+      settings: undefined,
 
       showModeratorDetails: false,
     };
@@ -141,14 +149,14 @@ export default {
         loading: this.loading,
         notFound: this.notFound,
         guid: this.guid,
-        ownGuid: this.ownGuid,
+        ownGuid: this.guid === app.profile.id,
         followedByYou: this.followedByYou,
-        ownMod: this.ownMod,
+        ownMod: this.isOwnMod(),
         verifiedMod: app.verifiedMods.get(this.guid),
-        getModTip: this.getModTip,
         getFollowTip: this.getFollowTip,
         ...this.options,
-        ...((_.has(this, 'model') && this.model.toJSON()) || {}),
+        ...((this.bb && this.model && this.model.toJSON()) || {}),
+        ...((this.fetchedModel && this.fetchedModel.toJSON()) || {}),
       };
     },
     headerHash () {
@@ -159,15 +167,12 @@ export default {
       const ob = this.ob;
       return ob.avatarHashes ? ob.isHiRez() ? ob.avatarHashes.small : ob.avatarHashes.tiny : '';
     },
-    ownMod () {
-      return app.settings.ownMod(this.guid);
-    },
   },
   methods: {
     loadData (options = {}) {
       this.baseInit(options);
 
-      if (_.has(this, 'model') && this.model instanceof Profile) {
+      if (this.bb && this.model && this.model instanceof Profile) {
         this.guid = this.model.id;
         this.fetched = true;
       } else {
@@ -183,7 +188,6 @@ export default {
         }
       }
 
-      this.ownGuid = this.guid === app.profile.id;
       this.followedByYou = followedByYou(this.guid);
 
       this.loading = !this.fetched;
@@ -213,8 +217,12 @@ export default {
       });
     },
 
-    getModTip (ownMod = this.ownMod) {
-      return ownMod
+    isOwnMod() {
+      return app.settings.ownMod(this.guid);
+    },
+
+    getModTip () {
+      return this.isOwnMod()
         ? `${app.polyglot.t('userShort.tipModRemove')}`
         : `${app.polyglot.t('userShort.tipModAdd')}`;
     },
@@ -225,20 +233,20 @@ export default {
         : `${app.polyglot.t('userShort.tipFollow')}`;
     },
 
-    loadUser (guid = this.guid) {
+    loadUser () {
       this.fetched = true;
 
-      if (guid === app.profile.id) {
+      if (this.guid === app.profile.id) {
         // don't fetch this user's own profile, since we have it already
         this.profileFetch = $.Deferred().resolve(app.profile);
       } else {
-        this.profileFetch = getCachedProfiles([guid])[0];
+        this.profileFetch = getCachedProfiles([this.guid])[0];
       }
 
       this.profileFetch.done((profile) => {
         this.loading = false;
         this.notFound = false;
-        this.model = profile;
+        this.fetchedModel = profile;
         this.updateKey += 1;
       }).fail(() => {
         this.loading = false;
@@ -266,7 +274,7 @@ export default {
     },
 
     modClick () {
-      if (this.ownMod) {
+      if (this.isOwnMod()) {
         // remove this user from the moderator list
         this.processingMod = true;
         this.saveModeratorList(false);
@@ -297,7 +305,7 @@ export default {
       // clone the array, otherwise it is a reference
       let modList = _.clone(app.settings.get('storeModerators'));
 
-      if (add && !this.ownMod) {
+      if (add && !this.isOwnMod()) {
         modList.push(this.guid);
       } else {
         modList = _.without(modList, this.guid);

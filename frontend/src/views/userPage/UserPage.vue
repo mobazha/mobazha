@@ -93,7 +93,12 @@
               followType: activeTab,
               peerID: model.id,
             }"
-            :bb="followBB(activeTab)"
+            :bb="() => {
+              return {
+                model,
+                collection: activeTab === 'followers' ? followersCol : followingCol,
+              }
+            }"
             />
           <Reputation v-if="activeTab === 'reputation'" :bb="function() {
               return {
@@ -198,6 +203,9 @@ export default {
       followerCount: 0,
       listingCount: 0,
 
+      followersCol: undefined,
+      followingCol: undefined,
+
       profileFetch: undefined,
       listingFetch: undefined,
       listing: undefined,
@@ -222,6 +230,9 @@ export default {
     }
 
     this.init(guid, state, slug);
+
+    this.followersCol = new Followers([], { peerID: this.model.id, type: 'followers', });
+    this.followingCol = new Followers([], { peerID: this.model.id, type: 'following', });
   },
   mounted() {
     this.setBlockedClass();
@@ -234,6 +245,9 @@ export default {
 
     this.listenTo(app.ownFollowing, 'add', this.onOwnFollowingAdd);
     this.listenTo(app.ownFollowing, 'remove', this.onOwnFollowingRemove);
+
+    this.followersCol.on('update', () => this.followerCount = this.followersCol.length);
+    this.followingCol.on('update', () => this.followingCount = this.followingCol.length);
 
     this.listenTo(blockEvents, 'blocked unblocked', (data) => {
       if (data.peerIDs.includes(this.model.id)) {

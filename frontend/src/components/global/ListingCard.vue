@@ -1,6 +1,6 @@
 <template>
   <div v-if="!cardError" @click.stop="onClick"
-    :class="`listingCard col clrBr clrHover clrT clrP clrSh2 contentBox ${ownListing ? 'ownListing' : ''} ${destroyClass} ${blocked ? 'blocked' : ''} ${hideNsfw ? 'hideNsfw' : ''} ${_model.nsfw ? 'nsfw' : ''}`">
+    :class="`listingCard col clrBr clrHover clrT clrP clrSh2 contentBox ${ownListing ? 'ownListing' : ''} ${destroyClass} ${blocked ? 'blocked' : ''} ${hideNsfw ? 'hideNsfw' : ''} ${model.get('nsfw') ? 'nsfw' : ''}`">
     <div v-if="ob.viewType === 'grid'" class="gridViewContent posR">
       <div class="listingImage" >
         <el-image ref="listingImage" fit="cover" lazy class="main-img" :src="listingImageUrl">

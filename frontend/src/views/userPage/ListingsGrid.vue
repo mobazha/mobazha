@@ -35,9 +35,6 @@ export default {
   },
   mounted () { },
   computed: {
-    listingCount() {
-      return this.collection.length;
-    },
   },
   watch: {
     viewType(type) {

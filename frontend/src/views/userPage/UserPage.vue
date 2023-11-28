@@ -111,8 +111,8 @@
        @unblock="onUnblock"
       />
       <Loading v-else-if="showUserLoading"
-        :userName="_model.name"
-        :userAvatarHashes="_model.avatarHashes"
+        :userName="model.get('name')"
+        :userAvatarHashes="model.get('avatarHashes')"
         :contentText="loadingContextText"
         :isProcessing="isLoadingUser"
         @clickCancel="onClickLoadingCancel" @clickRetry="onClickLoadingRetry"/>
@@ -213,14 +213,6 @@ export default {
       isLoadingUser: false,
     };
   },
-  watch: {
-    $route() {
-      // The app has been routed to a new route, let's
-      // clean up by aborting all fetches
-      if (this.profileFetch.abort) this.profileFetch.abort();
-      if (this.listingFetch) this.listingFetch.abort();
-    }
-  },
   created() {
     this.initEventChain();
 
@@ -233,11 +225,6 @@ export default {
   },
   mounted() {
     this.setBlockedClass();
-
-    const stats = this.model.get('stats');
-    this.followingCount = stats.get('followingCount');
-    this.followerCount = stats.get('followerCount');
-    this.listingCount = stats.get('listingCount');
 
     this.curConn = getCurrentConnection();
 
@@ -255,6 +242,11 @@ export default {
     });
   },
   unmounted() {
+    // The app has been routed to a new route, let's
+    // clean up by aborting all fetches
+    if (this.profileFetch && this.profileFetch.abort) this.profileFetch.abort();
+    if (this.listingFetch) this.listingFetch.abort();
+
     if (this.followingFetch) this.followingFetch.abort();
   },
   computed: {
@@ -273,8 +265,6 @@ export default {
     ownPage() {
       return this.model.id === app.profile.id;
     }
-  },
-  watch: {
   },
   methods: {
     abbrNum,
@@ -380,6 +370,11 @@ export default {
         // Setting the address bar which will ensure the most up to date handle (or none) is
         // shown in the address bar.
         app.router.setAddressBarText();
+
+        const stats = this.model.get('stats');
+        this.followingCount = stats.get('followingCount');
+        this.followerCount = stats.get('followerCount');
+        this.listingCount = stats.get('listingCount');
 
         if (this.activeTab === 'store' && !this.model.get('vendor') && guid !== app.profile.id) {
           // the user does not have an active store and this is not our own node

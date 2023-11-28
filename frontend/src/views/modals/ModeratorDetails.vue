@@ -26,7 +26,7 @@
                 <SocialBtns
                   v-if="!ob.isOwnProfile"
                   :options="{
-                  targetID: _model.id,
+                  targetID: model.id,
                   initialState: {
                     stripClasses: 'flexHCent gutterH',
                     btnClasses: 'clrP clrBr clrSh2',

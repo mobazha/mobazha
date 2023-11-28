@@ -1,6 +1,6 @@
 <template>
   <div :class="`userPageFollow ${noResults ? 'noResults': ''}`">
-    <div ref="userCardsContainer" class="js-userCardsContainer userCardsContainer flexRow">
+    <div ref="userCardsContainer" :key="renderedClKey" class="js-userCardsContainer userCardsContainer flexRow">
       <template v-for="user in renderedCl" :key="user.id">
         <UserCard :options="{ guid: user.id }"/>
       </template>
@@ -48,6 +48,7 @@ export default {
         fetchCollection: true,
       },
 
+      renderedCl: undefined,
       renderedClKey: 0,
     };
   },

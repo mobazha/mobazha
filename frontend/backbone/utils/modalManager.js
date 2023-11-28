@@ -1,6 +1,6 @@
 import _ from 'underscore';
 import app from '../app';
-import Profile from '../models/Profile/Profile';
+import Profile from '../models/profile/Profile';
 import Listing from '../models/listing/Listing';
 import About from '../views/modals/about/About';
 import DebugLog from '../views/modals/DebugLog';

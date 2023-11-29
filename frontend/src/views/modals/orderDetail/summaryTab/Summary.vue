@@ -4,7 +4,7 @@
       <div class="posR">
         <div class="clrT2 hide copiedToClipboard js-copiedToClipboard">{{ ob.polyT('copiedToClipboard') }}</div>
         <h1 class="inline tx4">{{ ob.polyT('orderDetail.summaryTab.orderNumber', { orderID: ob.id }) }}</h1>
-        <a class="clrTEm tx5" @click="onClickCopyOrderID">{{ ob.polyT('orderDetail.summaryTab.copyLink') }}</a>
+        <a class="clrTEm tx5" @click="onClickCopyOrderID">{{ ' ' + ob.polyT('orderDetail.summaryTab.copyLink') }}</a>
       </div>
     </div>
 
@@ -14,7 +14,27 @@
     <hr class="clrBr rowLg" />
 
     <div class="js-timeoutInfoContainer"></div>
-    <div class="js-subSections"></div>
+    <div class="js-subSections">
+      <CompleteOrderForm ref="completeOrderForm" v-if="showCompleteOrderForm"
+        :options="{
+          orderID: model.id,
+          slug: contract.get('orderOpen').listings[0].listing.slug,
+        }"/>
+      <OrderComplete ref="orderComplete" v-if="showOrderComplete" :dataObject="contract.get('orderComplete')" />
+      <DisputePayout ref="disputePayout" v-if="showDisputePayout" :options="{
+        orderID: model.id,
+        initialState: {
+          ...(model.isCase ? model.get('disputeClose') : contract.get('disputeClose')),
+          showAcceptButton: !model.isCase && model.get('state') === 'DECIDED',
+          paymentCoin: model.paymentCoin,
+        },
+      }" />
+      <DisputeAcceptance ref="disputeAcceptance" v-if="showDisputeAcceptance" :options="disputeAcceptanceOptions" />
+      <DisputeStarted ref="disputeStarted" v-if="showDisputeStarted" :options="disputeStartedOptions" @clickResolveDispute="$emit('clickResolveDispute')" />
+      <Fulfilled ref="fulfilled" v-if="showFulfilled" :options="fulfilledOptions" />
+      <Accepted ref="accepted" v-if="showAccepted" :options="acceptedOptions" @clickFulfillOrder="$emit('clickFulfillOrder')" />
+      <Refunded ref="refunded" v-if="showRefunded" :options="refundedOptions"/>
+    </div>
     <template v-if="!ob.isCase">
       <div ref="paymentsWrap" class="js-paymentsWrap"></div>
     </template>
@@ -56,30 +76,36 @@ import { ipc } from '../../../../utils/ipcRenderer.js';
 import app from '../../../../../backbone/app.js';
 import 'velocity-animate';
 import {
-  completingOrder,
   events as orderEvents,
 } from '../../../../../backbone/utils/order.js';
 import { getCurrencyByCode as getWalletCurByCode } from '../../../../../backbone/data/walletCurrencies.js';
-import OrderCompletion from '../../../../../backbone/models/order/orderCompletion/OrderCompletion.js';
 import { checkValidParticipantObject } from '../../../../utils/utils';
 import StateProgressBar from '../../../../../backbone/views/modals/orderDetail/summaryTab/StateProgressBar';
 import Payments from '../../../../../backbone/views/modals/orderDetail/summaryTab/Payments';
-import Accepted from '../../../../../backbone/views/modals/orderDetail/summaryTab/Accepted';
-import Fulfilled from '../../../../../backbone/views/modals/orderDetail/summaryTab/Fulfilled';
-import Refunded from '../../../../../backbone/views/modals/orderDetail/summaryTab/Refunded';
-import CompleteOrderForm from '../../../../../backbone/views/modals/orderDetail/summaryTab/CompleteOrderForm';
-import OrderComplete from '../../../../../backbone/views/modals/orderDetail/summaryTab/OrderComplete';
-import DisputeStarted from '../../../../../backbone/views/modals/orderDetail/summaryTab/DisputeStarted';
-import DisputePayout from '../../../../../backbone/views/modals/orderDetail/summaryTab/DisputePayout';
-import DisputeAcceptance from '../../../../../backbone/views/modals/orderDetail/summaryTab/DisputeAcceptance';
 import TimeoutInfo from '../../../../../backbone/views/modals/orderDetail/summaryTab/TimeoutInfo';
 import PayForOrder from '../../../../../backbone/views/modals/purchase/Payment';
 import ProcessingError from '../../../../../backbone/views/modals/orderDetail/summaryTab/ProcessingError';
 
-import OrderDetails from './OrderDetails.vue'
+import Accepted from './Accepted.vue';
+import Refunded from './Refunded.vue';
+import CompleteOrderForm from './CompleteOrderForm.vue';
+import Fulfilled from './Fulfilled.vue';
+import OrderComplete from './OrderComplete.vue';
+import DisputeStarted from './DisputeStarted.vue';
+import DisputePayout from './DisputePayout.vue';
+import DisputeAcceptance from './DisputeAcceptance.vue';
+import OrderDetails from './OrderDetails.vue';
 
 export default {
   components: {
+    Accepted,
+    Refunded,
+    CompleteOrderForm,
+    Fulfilled,
+    OrderComplete,
+    DisputeStarted,
+    DisputePayout,
+    DisputeAcceptance,
     OrderDetails,
   },
   props: {
@@ -92,6 +118,28 @@ export default {
   data () {
     return {
       moderator: undefined,
+
+      showAccepted: false,
+      acceptedOptions: {},
+
+      showRefunded: false,
+      refundedOptions: {},
+
+      showCompleteOrderForm: false,
+
+      showFulfilled: false,
+      fulfilledOptions: {},
+
+      showOrderComplete: false,
+      orderCompleteOptions: {},
+
+      showDisputeStarted: false,
+      disputeStartedOptions: {},
+
+      showDisputePayout: false,
+
+      showDisputeAcceptance: false,
+      disputeAcceptanceOptions: {},
     };
   },
   created () {
@@ -284,27 +332,27 @@ export default {
         this.stateProgressBar.setState(this.progressBarState);
         if (this.payments) this.payments.render();
         if (this.shouldShowAcceptedSection()) {
-          if (!this.accepted) this.renderAcceptedView();
-        } else if (this.accepted) {
-          this.accepted.remove();
+          if (!this.showAccepted) this.renderAcceptedView();
+        } else if (this.showAccepted) {
+          this.showAccepted = false;
         }
 
         if (
           ['REFUNDED', 'FULFILLED', 'DISPUTED', 'DECIDED', 'RESOLVED', 'COMPLETED']
-            .indexOf(state) > -1 && this.accepted) {
-          const acceptedState = {
-            showFulfillButton: false,
-            infoText: app.polyglot.t('orderDetail.summaryTab.accepted.vendorReceived'),
-            showRefundButton: false,
-          };
+            .indexOf(state) > -1 && this.showAccepted) {
+          this.$nextTick(() => {
+            const acceptedState = {
+              showFulfillButton: false,
+              infoText: app.polyglot.t('orderDetail.summaryTab.accepted.vendorReceived'),
+              showRefundButton: false,
+            };
 
-          this.accepted.setState(acceptedState);
+            this.$refs.accepted && this.$refs.accepted.setState(acceptedState);
+          })
         }
 
-        if (this.completeOrderForm
-          && ['FULFILLED', 'RESOLVED'].indexOf(state) === -1) {
-          this.completeOrderForm.remove();
-          this.completeOrderForm = null;
+        if (['FULFILLED', 'RESOLVED'].indexOf(state) === -1) {
+            this.showCompleteOrderForm = false;
         }
 
         if (state === 'PROCESSING_ERROR') {
@@ -314,8 +362,8 @@ export default {
           }
         }
 
-        if (this.shouldShowCompleteOrderForm() && !this.completeOrderForm) {
-          this.renderCompleteOrderForm();
+        if (this.shouldShowCompleteOrderForm()) {
+          this.showCompleteOrderForm = true;
         }
 
         this.renderProcessingError();
@@ -391,7 +439,7 @@ export default {
       this.listenTo(this.contract, 'change:orderComplete', () => this.renderOrderCompleteView());
 
       this.listenTo(orderEvents, 'completeOrderComplete', (e) => {
-        if (e.id === this.model.id && this.accepted) {
+        if (e.id === this.model.id && this.showAccepted) {
           this.model.set('state', 'COMPLETED');
           this.model.fetch();
         }
@@ -437,8 +485,8 @@ export default {
         this.listenTo(this.contract, 'change:disputeAccept', () => {
           this.renderDisputeAcceptanceView();
 
-          if (this.disputePayout) {
-            this.disputePayout.setState({ showAcceptButton: false });
+          if (this.$refs.disputePayout) {
+            this.$refs.disputePayout.setState({ showAcceptButton: false });
           }
         });
       } else {
@@ -680,7 +728,7 @@ export default {
 
         this.listenTo(this.timeoutInfo, 'clickDiscussOrder', () => this.$emit('clickDiscussOrder'));
 
-        this.listenTo(this.timeoutInfo, 'clickResolveDispute', () => this.trigger('clickResolveDispute'));
+        this.listenTo(this.timeoutInfo, 'clickResolveDispute', () => this.$emit('clickResolveDispute'));
       }
     },
 
@@ -745,21 +793,20 @@ export default {
         initialState.infoText = app.polyglot.t('orderDetail.summaryTab.accepted.modOrderAccepted');
       }
 
-      if (this.accepted) this.accepted.remove();
-      this.accepted = this.createChild(Accepted, {
+      this.acceptedOptions = {
         orderID: this.model.id,
         initialState,
-      });
-      this.listenTo(this.accepted, 'clickFulfillOrder', () => this.$emit('clickFulfillOrder'));
+      }
+      this.showAccepted = true;
 
-      this.vendor.getProfile()
-        .done((profile) => {
-          this.accepted.setState({
-            avatarHashes: profile.get('avatarHashes').toJSON(),
+      this.$nextTick(() => {
+        this.vendor.getProfile()
+          .done((profile) => {
+            this.$refs.accepted && this.$refs.accepted.setState({
+              avatarHashes: profile.get('avatarHashes').toJSON(),
+            });
           });
-        });
-
-      $('.js-subSections').prepend(this.accepted.render().el);
+      })
     },
 
     renderRefundView () {
@@ -796,7 +843,7 @@ export default {
         confirmations = coinInfo.get('height') - height;
       }
 
-      this.refunded = this.createChild(Refunded, {
+      this.refundedOptions = {
         model: refundMd,
         initialState: {
           isCrypto: this.contract.type === 'CRYPTOCURRENCY',
@@ -804,29 +851,18 @@ export default {
           paymentCoin,
           confirmations,
         },
-      });
-      this.buyer.getProfile()
-        .done((profile) => this.refunded.setState({ buyerName: profile.get('name') }));
-      $('.js-subSections').prepend(this.refunded.render().el);
+      };
+      this.showRefunded = true;
+
+      this.$nextTick(() => {
+        this.buyer.getProfile()
+          .done((profile) => this.$refs.refunded && this.$refs.refunded.setState({ buyerName: profile.get('name') }));
+      })
     },
 
     shouldShowCompleteOrderForm () {
       return this.buyer.id === app.profile.id
         && this.model.canBuyerComplete;
-    },
-
-    renderCompleteOrderForm () {
-      const completingObject = completingOrder(this.model.id);
-      const model = new OrderCompletion(
-        completingObject ? completingObject.data : { orderID: this.model.id },
-      );
-      if (this.completeOrderForm) this.completeOrderForm.remove();
-      this.completeOrderForm = this.createChild(CompleteOrderForm, {
-        model,
-        slug: this.contract.get('orderOpen').listings[0].listing.slug,
-      });
-
-      $('.js-subSections').prepend(this.completeOrderForm.render().el);
     },
 
     renderFulfilledView () {
@@ -847,55 +883,45 @@ export default {
         fulfilledState.coinType = this.contract.get('orderOpen').listings[0].listing.metadata.coinType;
       }
 
-      if (this.fulfilled) this.fulfilled.remove();
-      this.fulfilled = this.createChild(Fulfilled, {
+      this.fulfilledOptions = {
         dataObject: data[0],
         initialState: fulfilledState,
-      });
+      };
+      this.showFulfilled = true;
 
-      if (app.profile.id === this.vendor.id) {
-        this.fulfilled.setState({
-          noteFromLabel: app.polyglot.t('orderDetail.summaryTab.fulfilled.yourNoteLabel'),
-        });
-      } else {
-        this.vendor.getProfile()
-          .done((profile) => {
-            this.fulfilled.setState({
-              noteFromLabel: app.polyglot.t('orderDetail.summaryTab.fulfilled.noteFromStoreLabel', { store: profile.get('name') }),
-            });
+      this.$nextTick(() => {
+        if (app.profile.id === this.vendor.id) {
+          this.$refs.fulfilled && this.$refs.fulfilled.setState({
+            noteFromLabel: app.polyglot.t('orderDetail.summaryTab.fulfilled.yourNoteLabel'),
           });
-      }
+        } else {
+          this.vendor.getProfile()
+            .done((profile) => {
+              this.$refs.fulfilled && this.$refs.fulfilled.setState({
+                noteFromLabel: app.polyglot.t('orderDetail.summaryTab.fulfilled.noteFromStoreLabel', { store: profile.get('name') }),
+              });
+            });
+        }
+      })
 
-      if (this.completeOrderForm) {
-        this.completeOrderForm.$el.after(this.fulfilled.render().el);
-      } else {
-        $('.js-subSections').prepend(this.fulfilled.render().el);
-
-        if (this.shouldShowCompleteOrderForm()) this.renderCompleteOrderForm();
-      }
+      if (this.shouldShowCompleteOrderForm()) this.showCompleteOrderForm = true;
     },
 
     renderOrderCompleteView () {
       const data = this.contract.get('orderComplete');
-
       if (!data) {
         throw new Error('Unable to create the Order Complete view because the buyerOrderCompletion '
           + 'data object has not been set.');
       }
 
-      if (this.completeOrderForm) {
-        this.completeOrderForm.remove();
-        this.completeOrderForm = null;
-      }
+      this.showCompleteOrderForm = false;
 
-      if (this.orderComplete) this.orderComplete.remove();
-      this.orderComplete = this.createChild(OrderComplete, {
-        dataObject: data,
-      });
+      this.showOrderComplete = true;
 
-      this.buyer.getProfile()
-        .done((profile) => this.orderComplete.setState({ buyerName: profile.get('name') }));
-      $('.js-subSections').prepend(this.orderComplete.render().el);
+      this.$nextTick(() => {
+        this.buyer.getProfile()
+          .done((profile) => this.$refs.orderComplete && this.$refs.orderComplete.setState({ buyerName: profile.get('name') }));
+      })
     },
 
     renderDisputeStartedView () {
@@ -917,58 +943,50 @@ export default {
         // pass
       }
 
-      if (this.disputeStarted) this.disputeStarted.remove();
-      this.disputeStarted = this.createChild(DisputeStarted, {
+      this.disputeStartedOptions = {
         initialState: {
           ...data,
           showResolveButton: this.model.get('state') === 'DISPUTED'
             && this.model.isCase
             && (!paymentCoinData || !paymentCoinData.supportsEscrowTimeout),
         },
-      });
+      };
+      this.showDisputeStarted = true;
 
-      // this is only set on the Case.
-      const buyerOpened = this.model.get('buyerOpened');
-      if (typeof buyerOpened !== 'undefined') {
-        const disputeOpener = buyerOpened ? this.buyer : this.vendor;
-        disputeOpener.getProfile()
-          .done((profile) => this.disputeStarted.setState({ disputerName: profile.get('name') }));
-      }
-
-      this.listenTo(this.disputeStarted, 'clickResolveDispute', () => this.$emit('clickResolveDispute'));
-
-      $('.js-subSections').prepend(this.disputeStarted.render().el);
+      this.$nextTick(() => {
+        // this is only set on the Case.
+        const buyerOpened = this.model.get('buyerOpened');
+        if (typeof buyerOpened !== 'undefined') {
+          const disputeOpener = buyerOpened ? this.buyer : this.vendor;
+          disputeOpener.getProfile()
+            .done((profile) => this.$refs.disputeStarted && this.$refs.disputeStarted.setState({ disputerName: profile.get('name') }));
+        }
+      })
     },
 
     renderDisputePayoutView () {
       const data = this.model.isCase ? this.model.get('disputeClose')
         : this.contract.get('disputeClose');
-
       if (!data) {
         throw new Error('Unable to create the Dispute Payout view because the resolution '
           + 'data object has not been set.');
       }
 
-      if (this.disputePayout) this.disputePayout.remove();
-      this.disputePayout = this.createChild(DisputePayout, {
-        orderID: this.model.id,
-        initialState: {
-          ...data,
-          showAcceptButton: !this.model.isCase && this.model.get('state') === 'DECIDED',
-          paymentCoin: this.model.paymentCoin,
-        },
-      });
+      this.showDisputePayout = true;
 
-      ['buyer', 'vendor', 'moderator'].forEach((type) => {
-        this[type].getProfile().done((profile) => {
-          const state = {};
-          state[`${type}Name`] = profile.get('name');
-          state[`${type}AvatarHashes`] = profile.get('avatarHashes').toJSON();
-          this.disputePayout.setState(state);
+      this.$nextTick(() => {
+        ['buyer', 'vendor', 'moderator'].forEach((type) => {
+          this[type].getProfile().done((profile) => {
+            const state = {};
+            state[`${type}Name`] = profile.get('name');
+            state[`${type}AvatarHashes`] = profile.get('avatarHashes').toJSON();
+
+            if (this.$refs.disputePayout) {
+              this.$refs.disputePayout.setState(state);
+            }
+          });
         });
       });
-
-      $('.js-subSections').prepend(this.disputePayout.render().el);
     },
 
     renderPayForOrder () {
@@ -1001,29 +1019,25 @@ export default {
       const closer = data.closedBy
         === this.buyer.id ? this.buyer : this.vendor;
 
-      if (this.disputeAcceptance) this.disputeAcceptance.remove();
-      this.disputeAcceptance = this.createChild(DisputeAcceptance, {
+      this.disputeAcceptanceOptions = {
         initialState: {
           timestamp: data.timestamp,
           acceptedByBuyer: closer.id === this.buyer.id,
           buyerViewing: app.profile.id === this.buyer.id,
           vendorProcessingError: this.model.vendorProcessingError,
         },
+      };
+      this.showDisputeAcceptance = true;
+
+      this.$nextTick(() => {
+        closer.getProfile()
+          .done((profile) => this.$refs.disputeAcceptance && this.$refs.disputeAcceptance.setState({
+            closerName: profile.get('name'),
+            closerAvatarHashes: profile.get('avatarHashes').toJSON(),
+          }));
       });
 
-      closer.getProfile()
-        .done((profile) => this.disputeAcceptance.setState({
-          closerName: profile.get('name'),
-          closerAvatarHashes: profile.get('avatarHashes').toJSON(),
-        }));
-
-      if (this.completeOrderForm) {
-        this.completeOrderForm.$el.after(this.disputeAcceptance.render().el);
-      } else {
-        $('.js-subSections').prepend(this.disputeAcceptance.render().el);
-
-        if (this.shouldShowCompleteOrderForm()) this.renderCompleteOrderForm();
-      }
+      if (this.shouldShowCompleteOrderForm()) this.showCompleteOrderForm = true;
     },
 
     /**

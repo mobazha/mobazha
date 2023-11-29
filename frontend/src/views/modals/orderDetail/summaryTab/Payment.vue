@@ -139,6 +139,8 @@ export default {
     };
   },
   created () {
+    this.initEventChain();
+
     this.loadData(this.options);
   },
   mounted () {

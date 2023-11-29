@@ -61,6 +61,7 @@
 
 <script>
 import $ from 'jquery';
+import OrderCompletion from '../../../../../backbone/models/order/orderCompletion/OrderCompletion';
 import {
   completeOrder,
   completingOrder,
@@ -81,6 +82,9 @@ export default {
   },
   data () {
     return {
+      _model: undefined,
+      _modelKey: 0,
+
       formData: {
         review: '',
       },
@@ -103,24 +107,35 @@ export default {
         errors: this.rating.validationError || {},
         constraints: this.rating.constraints || {},
       };
+    },
+
+    model() {
+      let access = this._modelKey;
+
+      return this._model;
     }
   },
   methods: {
     loadData (options = {}) {
-      this.baseInit(options);
-
-      if (!this.model) {
-        throw new Error('Please provide an OrderCompletion model.');
+      if (!options.orderID) {
+        throw new Error('Please provide the orderID.');
       }
 
       if (!options.slug) {
         throw new Error('Please provide the listing slug.');
       }
 
-      this.ratingStrips = {};
-      this.slug = options.slug;
+      this.baseInit(options);
 
-      const ratings = this.model.get('ratings');
+      const completingObject = completingOrder(this.orderID);
+      this._model = new OrderCompletion(
+        completingObject ? completingObject.data : { orderID: this.orderID },
+      );
+      this._model.on('change', () => this._modelKey += 1);
+
+      this.ratingStrips = {};
+
+      const ratings = this._model.get('ratings');
 
       if (ratings.length) {
         this.rating = ratings.at(0);
@@ -129,7 +144,7 @@ export default {
         ratings.push(this.rating);
       }
 
-      this.isCompleting = !!completingOrder(this.model.id);
+      this.isCompleting = !!completingOrder(this._model.id);
       this.listenTo(orderEvents, 'completingOrder', () => {
         this.isCompleting = true;
       });

@@ -6,7 +6,7 @@
       // displayed in reverse order via flex-direction. This requires index
       // calculations to be computed from the end. -->
       <template v-for="(val, key) in ob.maxRating" :key="key">
-        <a :class="`ratingIcon js-ratingIcon ${ob.clickable ? 'clickable' : ''}`" :selected="ob.curRating > ob.maxRating - val"
+        <a :class="`ratingIcon js-ratingIcon ${ob.clickable ? 'clickable' : ''} ${ob.curRating > ob.maxRating - val ? 'selected' : ''}`"
           @click="onClickRatingIcon(val)"
           v-html="ob.parseEmojis('⭐', ob.iconClrClass)">
         </a>
@@ -44,14 +44,16 @@ export default {
       return {
         ...this.templateHelpers,
         ...this._state,
+
+        curRating: 0,
+        clickable: false,
+        maxRating: 5,
         ...this.options,
       };
     },
   },
   methods: {
     loadData (options = {}) {
-      this.baseInit(options);
-
       this._state = {
         hoverIndex: 0,
         iconClrClass: '',

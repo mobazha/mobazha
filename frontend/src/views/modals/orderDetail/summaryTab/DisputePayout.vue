@@ -11,24 +11,24 @@
             <div class="avatarCol disc clrBr2 clrSh1 flexNoShrink" :style="ob.getAvatarBgImage(ob.buyerAvatarHashes)">
             </div>
             <div class="flexExpand tx5">
-              <div class="rowTn txB">{{ partyHeadings.buyer }}</div>
-              <div>{{ priceLines.buyer }}</div>
+              <div class="rowTn txB">{{ partyInfo.partyHeadings.buyer }}</div>
+              <div>{{ partyInfo.priceLines.buyer }}</div>
             </div>
           </div>
           <div class="flex gutterH clrT">
             <div class="avatarCol disc clrBr2 clrSh1 flexNoShrink" :style="ob.getAvatarBgImage(ob.vendorAvatarHashes)">
             </div>
             <div class="flexExpand tx5">
-              <div class="rowTn txB">{{ partyHeadings.vendor }}</div>
-              <div>{{ priceLines.vendor }}</div>
+              <div class="rowTn txB">{{ partyInfo.partyHeadings.vendor }}</div>
+              <div>{{ partyInfo.priceLines.vendor }}</div>
             </div>
           </div>
           <div class="flex gutterH clrT">
             <div class="avatarCol disc clrBr2 clrSh1 flexNoShrink" :style="ob.getAvatarBgImage(ob.moderatorAvatarHashes)">
             </div>
             <div class="flexExpand tx5">
-              <div class="rowTn txB">{{ partyHeadings.moderator }}</div>
-              <div>{{ priceLines.moderator }}</div>
+              <div class="rowTn txB">{{ partyInfo.partyHeadings.moderator }}</div>
+              <div>{{ partyInfo.priceLines.moderator }}</div>
             </div>
           </div>
         </div>
@@ -94,13 +94,11 @@ export default {
 
       acceptConfirmOn: false,
       acceptInProgress: false,
-
-      priceLines: {},
-      partyHeadings: {},
-      noteFromHeading: '',
     };
   },
   created () {
+    this.initEventChain();
+
     this.loadData(this.options);
   },
   mounted () {
@@ -112,6 +110,41 @@ export default {
         ...this._state,
         moment,
       };
+    },
+
+    partyInfo() {
+      let partyInfo = {
+        partyHeadings: {},
+        priceLines: {},
+      };
+
+      const ob = this.ob;
+
+      ['buyer', 'vendor', 'moderator'].forEach((type, index) => {
+        partyInfo.partyHeadings[type] = ob[`${type}Name`] ?
+          ob.polyT(`orderDetail.summaryTab.disputePayout.${type}HeadingWithName`, { name: ob[`${type}Name`] }) :
+          ob.polyT(`orderDetail.summaryTab.disputePayout.${type}Heading`);
+
+        if (!ob.releaseInfo) {
+          return;
+        }
+
+        partyInfo.priceLines[type] = ob.currencyMod.pairedCurrency(
+          ob.releaseInfo[`${type}Amount`],
+          ob.paymentCoin,
+          ob.userCurrency
+        );
+      });
+
+      return partyInfo;
+    },
+    
+    noteFromHeading() {
+      const ob = this.ob;
+
+      return ob.moderatorName ?
+        ob.polyT('orderDetail.summaryTab.disputePayout.noteFromHeadingWithName', { name: ob.moderatorName }) :
+        ob.polyT('orderDetail.summaryTab.disputePayout.noteFromHeading');
     }
   },
   methods: {
@@ -129,8 +162,6 @@ export default {
       if (!options.orderID) {
         throw new Error('Please provide the orderID');
       }
-
-      this.orderID = options.orderID;
 
       this.acceptInProgress = acceptingPayout(this.orderID);
       this.listenTo(orderEvents, 'acceptingPayout', e => {
@@ -151,25 +182,7 @@ export default {
         }
       });
 
-      ['buyer', 'vendor', 'moderator'].forEach((type, index) => {
-        this.partyHeadings[type] = ob[`${type}Name`] ?
-          ob.polyT(`orderDetail.summaryTab.disputePayout.${type}HeadingWithName`, { name: ob[`${type}Name`] }) :
-          ob.polyT(`orderDetail.summaryTab.disputePayout.${type}Heading`);
-
-        if (!ob.releaseInfo) {
-          return;
-        }
-
-        this.priceLines[type] = ob.currencyMod.pairedCurrency(
-          ob.releaseInfo[`${type}Amount`],
-          ob.paymentCoin,
-          ob.userCurrency
-        );
-      });
-
-      this.noteFromHeading = ob.moderatorName ?
-        ob.polyT('orderDetail.summaryTab.disputePayout.noteFromHeadingWithName', { name: ob.moderatorName }) :
-        ob.polyT('orderDetail.summaryTab.disputePayout.noteFromHeading');
+      
     },
 
     onDocumentClick () {

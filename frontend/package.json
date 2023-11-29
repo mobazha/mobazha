@@ -64,6 +64,7 @@
     "vue-clipboard3": "2.0.0",
     "vue-i18n": "9.2.0-beta.32",
     "vue-router": "^4.0.14",
+    "vue3-text-clamp": "0.1.2",
     "vuex": "^4.1.0",
     "workerize": "0.1.8",
     "yargs": "^17.6.2"

@@ -14,14 +14,19 @@
           </div>
         </template>
 
-        <template v-else>
-          <div class="flexHCent">
-            <SpinnerSVG className="spinnerMd" />
-          </div>
-        </template>
+        <div v-else class="flexHCent">
+          <SpinnerSVG className="spinnerMd" />
+        </div>
       </div>
       <template v-if="!ob.isFetching">
-        <div ref="reviewsList" class="js-reviewsList"></div>
+        <div ref="reviewsList" class="js-reviewsList">
+          <Reviews ref="reviews" :key="reviewIDs" :reviewIDs="reviewIDs" :options="{
+            async: true,
+            initialPageSize: 5,
+            pageSize: 5,
+            isFetchingRatings: ob.isFetching,
+          }"/>
+        </div>
       </template>
     </div>
   </div>
@@ -30,11 +35,15 @@
 <script>
 import $ from 'jquery';
 import app from '../../../backbone/app';
-import Reviews from '../../../backbone/views/reviews/Reviews';
 import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
 import Profile from '../../../backbone/models/profile/Profile';
 
+import Reviews from '../reviews/Reviews.vue';
+
 export default {
+  components: {
+    Reviews,
+  },
   props: {
     options: {
       type: Object,
@@ -44,6 +53,8 @@ export default {
   },
   data() {
     return {
+      reviewIDs: [],
+
       _state: {
         isFetching: true,
       }
@@ -55,7 +66,6 @@ export default {
     this.loadData(this.options);
   },
   mounted() {
-    this.render();
   },
   unmounted() {
     if (this.ratingsFetch) this.ratingsFetch.abort();
@@ -81,15 +91,6 @@ export default {
         },
       };
       this.baseInit(opts);
-      // create the reviews here, so they're available for the fetch
-      this.reviews = this.createChild(Reviews, {
-        async: true,
-        initialPageSize: 5,
-        pageSize: 5,
-        initialState: {
-          isFetchingRatings: true,
-        },
-      });
 
       // fetch the ratings immediately. They are asyncronous, and should not be refetched
       // if the view re-renders.
@@ -108,14 +109,8 @@ export default {
         isFetching: false,
         ...pData,
       });
-      this.reviews.reviewIDs = pData.ratings || [];
-      this.reviews.setState({ isFetchingRatings: false });
-    },
 
-    render() {
-      $(this.$refs.reviewsList).append(this.reviews.render().$el);
-
-      return this;
+      this.reviewIDs = pData.ratings || [];
     },
   },
 };

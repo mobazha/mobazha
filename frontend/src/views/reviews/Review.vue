@@ -45,7 +45,12 @@
               </h4>
             </template>
             <div class="reviewTextWrapper js-reviewTextWrapper">
-              <p class="reviewText js-reviewText">{{ ob.review }}</p>
+              <TextClamp :text="ob.review ?? ''" class="reviewText" autoresize :max-lines="model.get('buyerID') !== undefined ? 5 : 6" ellipsis="..." location="end" >
+                <template #after="{ toggle, expanded, clamped }">
+                  <button v-if="expanded || clamped" class="btnTxtOnly trunkLink" @click="toggle">
+                  {{ clamped ? ob.polyT('listingDetail.review.showMore') : ob.polyT('listingDetail.review.showLess')}}</button>
+                </template>
+              </TextClamp>
             </div>
           </div>
         </div>
@@ -90,17 +95,15 @@
 </template>
 
 <script>
-import $ from 'jquery';
-import app from '../../../backbone/app';
+import TextClamp from 'vue3-text-clamp';
 import moment from 'moment';
-import 'trunk8';
 
 import RatingsStrip from '../RatingsStrip.vue';
-
 
 export default {
   components: {
     RatingsStrip,
+    TextClamp,
   },
   props: {
     options: {
@@ -111,6 +114,7 @@ export default {
   },
   data () {
     return {
+
     };
   },
   created () {
@@ -119,6 +123,7 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
+    
   },
   computed: {
     ob () {
@@ -143,33 +148,17 @@ export default {
     },
     background () {
       let background = '';
+
+      const ob = this.ob;
       if (ob.vendorSig.thumbnail) {
         background = ob.getServerUrl(`ob/image/${ob.isHiRez() ? ob.vendorSig.metadata.thumbnail.small : ob.vendorSig.metadata.thumbnail.tiny}`);
       }
       return background;
-    }
+    },
   },
   methods: {
     loadData (options = {}) {
       this.baseInit(options);
-    },
-
-    events () {
-      return {
-        'click .js-showMore': 'clickShowMore',
-        'click .js-showLess': 'clickShowLess',
-      };
-    },
-
-    clickShowMore (e) {
-      // the show more button is added by the parent view when it applies trunk8 to the text
-      const btnTxt = app.polyglot.t('listingDetail.review.showLess');
-      $(e.target).parent().trunk8('revert')
-        .append(`&nbsp; <button class="btnTxtOnly trunkLink js-showLess">${btnTxt}</button>`);
-    },
-
-    clickShowLess (e) {
-      $(e.target).parent().trunk8();
     },
   }
 }

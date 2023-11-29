@@ -80,15 +80,15 @@
         <div class="tabContent js-userPage-tabContent">
           <!-- insert the tab subview here -->
           <Home v-if="activeTab === 'home'" :bb="function() {
-              return {
-                model,
-              }
-            }" />
-          <Store v-if="activeTab === 'store'"
+            return {
+              model,
+            }
+          }" />
+          <Store v-else-if="activeTab === 'store'"
             :bb="storeBB()"
             @listingsUpdate="onListingsUpdate"
             />
-          <Follow v-if="activeTab === 'followers' || activeTab === 'following'" :key="activeTab"
+          <Follow v-else-if="activeTab === 'followers' || activeTab === 'following'" :key="activeTab"
             :options="{
               followType: activeTab,
               peerID: model.id,
@@ -100,7 +100,7 @@
               }
             }"
             />
-          <Reputation v-if="activeTab === 'reputation'" :bb="function() {
+          <Reputation v-else-if="activeTab === 'reputation'" :bb="function() {
               return {
                 model,
               }
@@ -220,6 +220,11 @@ export default {
       loadingContextText: '',
       isLoadingUser: false,
     };
+  },
+  beforeRouteUpdate(to) {
+    if (this.activeTab && this.activeTab !== to.params.state) {
+      this.activeTab = to.params.state ?? 'store';
+    }
   },
   created() {
     this.initEventChain();

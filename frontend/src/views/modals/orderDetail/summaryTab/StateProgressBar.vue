@@ -27,14 +27,17 @@ export default {
       type: Object,
       default: {},
     },
-  },
-  data () {
-    return {
-      _state: {
+    barState: {
+      type: Object,
+      default: {
         states: ['Point 1', 'Point 2'],
         currentState: 0,
         disputeState: 0,
-      }
+      },
+    }
+  },
+  data () {
+    return {
     };
   },
   created () {
@@ -48,7 +51,10 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this._state,
+        states: ['Point 1', 'Point 2'],
+        currentState: 0,
+        disputeState: 0,
+        ...this.barState,
       };
     }
   },
@@ -59,17 +65,13 @@ export default {
         0.5 / (ob.states.length - 1) : 1 / (ob.states.length - 1);
       return width * 100;
     },
-    loadData (options = {}) {
-      this.baseInit({
-        ...options,
-        initialState: {
-          states: ['Point 1', 'Point 2'],
-          currentState: 0,
-          disputeState: 0,
-          ...options.initialState,
-        },
-      });
-      const state = this.getState();
+    loadData () {
+      const state = {
+        states: ['Point 1', 'Point 2'],
+        currentState: 0,
+        disputeState: 0,
+        ...this.barState
+      };
 
       if (!Array.isArray(state.states)) {
         throw new Error('Please provide an array of states.');

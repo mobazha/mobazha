@@ -9,8 +9,12 @@
     </div>
 
     <hr class="clrBr rowLg" />
-    <div class="js-statusProgressBarContainer statusProgressBarContainer"></div>
-    <div class="js-processingErrorContainer"></div>
+    <div class="js-statusProgressBarContainer statusProgressBarContainer">
+      <StateProgressBar :barState="progressBarState" />
+    </div>
+    <div class="js-processingErrorContainer">
+      <ProcessingError ref="processingError" v-if="showProcessingError" :options="processingErrorOptions" />
+    </div>
     <hr class="clrBr rowLg" />
 
     <div class="js-timeoutInfoContainer"></div>
@@ -56,7 +60,19 @@
         </div>
       </div>
     </template>
-    <div class="js-payForOrderWrap payForOrderWrap rowLg border clrBr padMd"></div>
+    <div class="js-payForOrderWrap payForOrderWrap rowLg border clrBr padMd">
+      <PayForOrder
+        v-if="showPayForOrder"
+        :options="{
+          balanceRemaining: model.getBalanceRemaining(),
+          paymentAddress: paymentAddress,
+          orderID: model.id,
+          isModerated: !!moderator,
+          metricsOrigin: 'Transactions',
+          paymentCoin: model.paymentCoin,
+        }"
+      />
+    </div>
     <OrderDetails
       :options="{
         moderator,
@@ -80,12 +96,11 @@ import {
 } from '../../../../../backbone/utils/order.js';
 import { getCurrencyByCode as getWalletCurByCode } from '../../../../../backbone/data/walletCurrencies.js';
 import { checkValidParticipantObject } from '../../../../utils/utils';
-import StateProgressBar from '../../../../../backbone/views/modals/orderDetail/summaryTab/StateProgressBar';
 import Payments from '../../../../../backbone/views/modals/orderDetail/summaryTab/Payments';
 import TimeoutInfo from '../../../../../backbone/views/modals/orderDetail/summaryTab/TimeoutInfo';
-import PayForOrder from '../../../../../backbone/views/modals/purchase/Payment';
-import ProcessingError from '../../../../../backbone/views/modals/orderDetail/summaryTab/ProcessingError';
 
+import StateProgressBar from './StateProgressBar.vue';
+import PayForOrder from '../../purchase/Payment.vue';
 import Accepted from './Accepted.vue';
 import Refunded from './Refunded.vue';
 import CompleteOrderForm from './CompleteOrderForm.vue';
@@ -95,9 +110,12 @@ import DisputeStarted from './DisputeStarted.vue';
 import DisputePayout from './DisputePayout.vue';
 import DisputeAcceptance from './DisputeAcceptance.vue';
 import OrderDetails from './OrderDetails.vue';
+import ProcessingError from './ProcessingError.vue';
 
 export default {
   components: {
+    StateProgressBar,
+    PayForOrder,
     Accepted,
     Refunded,
     CompleteOrderForm,
@@ -107,6 +125,7 @@ export default {
     DisputePayout,
     DisputeAcceptance,
     OrderDetails,
+    ProcessingError,
   },
   props: {
     options: {
@@ -118,6 +137,8 @@ export default {
   data () {
     return {
       moderator: undefined,
+
+      showPayForOrder: false,
 
       showAccepted: false,
       acceptedOptions: {},
@@ -140,6 +161,9 @@ export default {
 
       showDisputeAcceptance: false,
       disputeAcceptanceOptions: {},
+
+      showProcessingError: false,
+      processingErrorOptions: {},
     };
   },
   created () {
@@ -329,7 +353,6 @@ export default {
       }
 
       this.listenTo(this.model, 'change:state', (md, state) => {
-        this.stateProgressBar.setState(this.progressBarState);
         if (this.payments) this.payments.render();
         if (this.shouldShowAcceptedSection()) {
           if (!this.showAccepted) this.renderAcceptedView();
@@ -356,9 +379,8 @@ export default {
         }
 
         if (state === 'PROCESSING_ERROR') {
-          if (this.payForOrder && !this.shouldShowPayForOrderSection()) {
-            this.payForOrder.remove();
-            this.payForOrder = null;
+          if (this.showPayForOrder && !this.shouldShowPayForOrderSection()) {
+            this.showPayForOrder = false;
           }
         }
 
@@ -372,9 +394,8 @@ export default {
 
       if (!this.model.isCase) {
         this.listenTo(this.contract, 'update:transactions', () => {
-          if (this.payForOrder && !this.shouldShowPayForOrderSection()) {
-            this.payForOrder.remove();
-            this.payForOrder = null;
+          if (this.showPayForOrder && !this.shouldShowPayForOrderSection()) {
+            this.showPayForOrder = false;
           }
 
           if (this.payments) {
@@ -993,18 +1014,7 @@ export default {
       const { paymentCoin } = this.model;
 
       if (getWalletCurByCode(paymentCoin)) {
-        if (this.payForOrder) this.payForOrder.remove();
-
-        this.payForOrder = this.createChild(PayForOrder, {
-          balanceRemaining: this.model.getBalanceRemaining(),
-          paymentAddress: this.paymentAddress,
-          orderID: this.model.id,
-          isModerated: !!this.moderator,
-          metricsOrigin: 'Transactions',
-          paymentCoin: this.model.paymentCoin,
-        });
-
-        $('.js-payForOrderWrap').html(this.payForOrder.render().el);
+        this.showPayForOrder = true;
       }
     },
 
@@ -1118,10 +1128,7 @@ export default {
 
     renderProcessingError () {
       if (!this.model.vendorProcessingError) {
-        if (this.processingError) {
-          this.processingError.remove();
-          this.processingError = null;
-        }
+        this.ProcessingError = false;
 
         return;
       }
@@ -1139,15 +1146,15 @@ export default {
         errors: this.contract.get('erroredMessages') || [],
       };
 
-      if (!this.processingError) {
-        this.processingError = this.createChild(ProcessingError, {
-          orderID: this.model.id,
-          initialState: state,
-        });
-        $('.js-processingErrorContainer')
-          .html(this.processingError.render().el);
+      this.processingErrorOptions = {
+        orderID: this.model.id,
+        initialState: state,
+      };
+
+      if (this.ProcessingError) {
+        this.$refs.processingError.setState(state);
       } else {
-        this.processingError.setState(state);
+        this.ProcessingError = true;
       }
     },
 
@@ -1157,12 +1164,6 @@ export default {
 
     render () {
       const { paymentCoin } = this.model;
-
-      if (this.stateProgressBar) this.stateProgressBar.remove();
-      this.stateProgressBar = this.createChild(StateProgressBar, {
-        initialState: this.progressBarState,
-      });
-      $('.js-statusProgressBarContainer').html(this.stateProgressBar.render().el);
 
       if (this.shouldShowPayForOrderSection()) {
         this.renderPayForOrder();

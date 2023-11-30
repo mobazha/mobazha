@@ -59,31 +59,31 @@
             <tr>
               <td><b>{{ ob.polyT('ratingLabels.overall') }}</b></td>
               <td class="ratingsContainer">
-                <RatingsStrip :options="{ curRating: model.get('overall') || 0, }" />
+                <RatingsStrip :rating="model.get('overall')" />
               </td>
             </tr>
             <tr>
               <td>{{ ob.polyT('ratingLabels.quality') }}</td>
               <td class="ratingsContainer">
-                <RatingsStrip :options="{ curRating: model.get('quality') || 0, }" />
+                <RatingsStrip :rating="model.get('quality')" />
               </td>
             </tr>
             <tr>
               <td>{{ ob.polyT('ratingLabels.asAdvertised') }}</td>
               <td class="ratingsContainer">
-                <RatingsStrip :options="{ curRating: model.get('description') || 0, }" />
+                <RatingsStrip :rating="model.get('description')" />
               </td>
             </tr>
             <tr>
               <td>{{ ob.polyT('ratingLabels.delivery') }}</td>
               <td class="ratingsContainer">
-                <RatingsStrip :options="{ curRating: model.get('deliverySpeed') || 0, }" />
+                <RatingsStrip :rating="model.get('deliverySpeed')" />
               </td>
             </tr>
             <tr>
               <td>{{ ob.polyT('ratingLabels.service') }}</td>
               <td class="ratingsContainer">
-                <RatingsStrip :options="{ curRating: model.get('customerService') || 0, }" />
+                <RatingsStrip :rating="model.get('customerService')" />
               </td>
             </tr>
           </table>

@@ -11,23 +11,23 @@
         <div class="col3 ratingsCol">
           <div class="row">
             <div class="txB tx5">{{ ob.polyT('ratingLabels.overall') }}</div>
-            <RatingsStrip :options="{ curRating: rating['overall'] || 0, }" />
+            <RatingsStrip :rating="rating.overall" />
           </div>
           <div class="row">
             <div class="txB tx5">{{ ob.polyT('ratingLabels.quality') }}</div>
-            <RatingsStrip :options="{ curRating: rating['quality'] || 0, }" />
+            <RatingsStrip :rating="rating.quality" />
           </div>
           <div class="row">
             <div class="txB tx5">{{ ob.polyT('ratingLabels.asAdvertised') }}</div>
-            <RatingsStrip :options="{ curRating: rating['description'] || 0, }" />
+            <RatingsStrip :rating="rating.description" />
           </div>
           <div class="row">
             <div class="txB tx5">{{ ob.polyT('ratingLabels.delivery') }}</div>
-            <RatingsStrip :options="{ curRating: rating['deliverySpeed'] || 0, }" />
+            <RatingsStrip :rating="rating.deliverySpeed" />
           </div>
           <div class="row">
             <div class="txB tx5">{{ ob.polyT('ratingLabels.service') }}</div>
-            <RatingsStrip :options="{ curRating: rating['customerService'] || 0, }" />
+            <RatingsStrip :rating="rating.customerService" />
           </div>
         </div>
       </div>

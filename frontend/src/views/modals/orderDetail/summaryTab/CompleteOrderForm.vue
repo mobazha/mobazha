@@ -30,27 +30,27 @@
           <div class="row">
             <div class="txB tx5">{{ ob.polyT('ratingLabels.overall') }}</div>
             <FormError v-if="ob.errors.overall" :errors="ob.errors.overall" />
-            <div class="ratingsContainer" data-rating-type="overall"></div>
+            <RatingsStrip v-model:rating="ratingData.overall" :options="{ clickable: true, }" />
           </div>
           <div class="row">
             <div class="txB tx5">{{ ob.polyT('ratingLabels.quality') }}</div>
             <FormError v-if="ob.errors.quality" :errors="ob.errors.quality" />
-            <div class="ratingsContainer" data-rating-type="quality"></div>
+            <RatingsStrip v-model:rating="ratingData.quality" :options="{ clickable: true, }" />
           </div>
           <div class="row">
             <div class="txB tx5">{{ ob.polyT('ratingLabels.asAdvertised') }}</div>
             <FormError v-if="ob.errors.description" :errors="ob.errors.description" />
-            <div class="ratingsContainer" data-rating-type="description"></div>
+            <RatingsStrip v-model:rating="ratingData.description" :options="{ clickable: true, }" />
           </div>
           <div class="row">
             <div class="txB tx5">{{ ob.polyT('ratingLabels.delivery') }}</div>
             <FormError v-if="ob.errors.deliverySpeed" :errors="ob.errors.deliverySpeed" />
-            <div class="ratingsContainer" data-rating-type="deliverySpeed"></div>
+            <RatingsStrip v-model:rating="ratingData.deliverySpeed" :options="{ clickable: true, }" />
           </div>
           <div class="row">
             <div class="txB tx5">{{ ob.polyT('ratingLabels.service') }}</div>
             <FormError v-if="ob.errors.customerService" :errors="ob.errors.customerService" />
-            <div class="ratingsContainer" data-rating-type="customerService"></div>
+            <RatingsStrip v-model:rating="ratingData.customerService" :options="{ clickable: true, }" />
           </div>
         </div>
       </div>
@@ -69,10 +69,13 @@ import {
 } from '../../../../../backbone/utils/order';
 import { recordEvent } from '../../../../../backbone/utils/metrics';
 import Rating from '../../../../../backbone/models/order/orderCompletion/Rating';
-import RatingsStrip from '../../../../../backbone/views/RatingsStrip';
 
+import RatingsStrip from '../../../RatingsStrip.vue';
 
 export default {
+  components: {
+    RatingsStrip,
+  },
   props: {
     options: {
       type: Object,
@@ -88,6 +91,16 @@ export default {
       formData: {
         review: '',
       },
+      // If a rating is not set, the RatingStrip view will return 0. We'll
+      // send undefined in that case since it gives us the error message we
+      // prefer.
+      ratingData: {
+        overall: undefined,
+        quality: undefined,
+        description: undefined,
+        deliverySpeed: undefined,
+        customerService: undefined,
+      },
       isCompleting: false,
     };
   },
@@ -97,7 +110,6 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob () {
@@ -144,6 +156,17 @@ export default {
         ratings.push(this.rating);
       }
 
+      const ratingFields = [
+        'overall',
+        'quality',
+        'description',
+        'deliverySpeed',
+        'customerService',
+      ];
+      ratingFields.forEach((type) => {
+        this.ratingData[type] = this.rating.get(type);
+      })
+
       this.isCompleting = !!completingOrder(this._model.id);
       this.listenTo(orderEvents, 'completingOrder', () => {
         this.isCompleting = true;
@@ -158,14 +181,7 @@ export default {
       const data = {
         ...this.formData,
         anonymous: !formData.anonymous,
-        // If a rating is not set, the RatingStrip view will return 0. We'll
-        // send undefined in that case since it gives us the error message we
-        // prefer.
-        overall: this.ratingStrips.overall.rating || undefined,
-        quality: this.ratingStrips.quality.rating || undefined,
-        description: this.ratingStrips.description.rating || undefined,
-        deliverySpeed: this.ratingStrips.deliverySpeed.rating || undefined,
-        customerService: this.ratingStrips.customerService.rating || undefined,
+        ...this.ratingData,
         slug: this.slug,
       };
 
@@ -180,31 +196,6 @@ export default {
       const $firstErr = $('.errorList:first');
       if ($firstErr.length) $firstErr[0].scrollIntoViewIfNeeded();
     },
-
-    render () {
-      $('.ratingsContainer').each((index, element) => {
-        const $el = $(element);
-        const type = $el.data('ratingType');
-
-        if (!type) {
-          throw new Error('Unable to render a ratings strips because it\'s container does not ' +
-            'specify a type.');
-        }
-
-        if (this.ratingStrips[type]) this.ratingStrips[type].remove();
-        this.ratingStrips[type] = this.createChild(RatingsStrip, {
-          initialState: {
-            curRating: this.rating.get(type) || 0,
-            clickable: true,
-          },
-        });
-
-        $el.append(this.ratingStrips[type].render().el);
-      });
-
-      return this;
-    }
-
   }
 }
 </script>

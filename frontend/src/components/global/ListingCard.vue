@@ -266,7 +266,7 @@
 
             <div class="cl2amp clrT2 tx6 flexVCent gutterHSm">
               <div class="ratingStrip"
-                v-html="ob.vendor && ob.vendor.stats ? ob.formatRating(averageStoreRating, totalStoreRatings) : ob.formatRating(0, 0)">
+                v-html="ob.vendor && ob.vendor.stats ? ob.formatRating(ob.vendor.stats.averageRating, ob.vendor.stats.ratingCount) : ob.formatRating(0, 0)">
               </div>
               <div class="verifiedModWrapper">
                 <div class="js-verifiedMod">
@@ -581,10 +581,11 @@ export default {
     },
     priceRowTextClass() {
       let priceRowTextClass = '';
+      const ob = this.ob;
 
       try {
-        const formattedRating = this.ob.formatRating(ob.averageRating, ob.ratingCount);
-        const priceLength = this.ob.price.amount.toFormat().length;
+        const formattedRating = ob.formatRating(ob.averageRating, ob.ratingCount);
+        const priceLength = ob.price.amount.toFormat().length;
         const ratingLength = ($(`<div>${formattedRating}</div>`).text()).length;
 
         if (priceLength + ratingLength > 17) {

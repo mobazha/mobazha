@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="listingDetailModal">
     <div v-if="!showNsfwWarning && showModal" class="modal listingDetail modalScrollPage" @click="onDocumentClick">
       <BaseModal @close="close">
         <template v-slot:component>
@@ -228,7 +228,13 @@
                 </template>
               </div>
             </template>
-            <div ref="reviews" class="js-reviews"></div>
+            <div class="reviews js-reviews">
+              <Reviews ref="reviews" :key="reviewIDs" :reviewIDs="reviewIDs" :options="{
+                async: true,
+                showListingData: true,
+                isFetchingRatings: !ratingData.fetched,
+              }"/>
+            </div>
 
             <!-- Attachments are not yet available -->
             <!--
@@ -330,7 +336,7 @@
 <script>
 import $ from 'jquery';
 import _ from 'underscore';
-import Backbone, { Collection } from 'backbone';
+import { Collection } from 'backbone';
 import bigNumber from 'bignumber.js';
 import 'jquery-zoom';
 import is from 'is_js';
@@ -348,8 +354,6 @@ import { getTranslatedCountries } from '../../../../backbone/data/countries';
 import { events as listingEvents } from '../../../../backbone/models/listing';
 import Listings from '../../../../backbone/collections/Listings';
 
-import Reviews from '../../../../backbone/views/reviews/Reviews';
-
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 
 import PopInMessage, { buildRefreshAlertMessage } from '../../../../backbone/views/components/PopInMessage';
@@ -360,6 +364,7 @@ import Rating from './Rating.vue';
 import NsfwWarning from '../NsfwWarning.vue';
 import MoreListings from './MoreListings.vue';
 import ShippingOptions from './ShippingOptions.vue'
+import Reviews from '../../reviews/Reviews.vue';
 import PurchaseError from '@/views/modals/listingDetail/PurchaseError.vue'
 import Purchase from '../purchase/Purchase.vue'
 import EditListing from '../editListing/EditListing.vue'
@@ -370,6 +375,7 @@ export default {
     NsfwWarning,
     MoreListings,
     ShippingOptions,
+    Reviews,
     Purchase,
     PurchaseError,
     EditListing,
@@ -403,6 +409,8 @@ export default {
         ratingCount: 0,
         fetched: false,
       },
+      reviewIDs: [],
+
       _showNsfwWarning: true,
 
       moreListingsData: undefined,
@@ -707,14 +715,6 @@ export default {
           );
         });
 
-      this.reviews = this.createChild(Reviews, {
-        async: true,
-        showListingData: true,
-        initialState: {
-          isFetchingRatings: true,
-        },
-      });
-
       if (this.model.isCrypto) {
         // Commenting out for since inventory fetch is currently broken on the server.
 
@@ -782,8 +782,7 @@ export default {
         fetched: true,
       }
 
-      this.reviews.reviewIDs = pData.ratings || [];
-      this.reviews.setState({ isFetchingRatings: false });
+      this.reviewIDs = pData.ratings || [];
     },
 
     onClickEditListing () {
@@ -885,13 +884,13 @@ export default {
 
     gotoPhotos () {
       recordEvent('Listing_GoToPhotos', { ownListing: this.model.isOwnListing });
-      $(this.$refs.photoSection).velocity(
-        'scroll',
-        {
-          duration: 500,
-          easing: 'easeOutSine',
-          container: this.$el,
-        });
+
+      this.$scrollTo('.photoSection', 500, {
+        container: '.listingDetailModal', //设置滚动容器
+        easing: 'ease-out', //动画效果
+        x: false, //是否在x轴滚动
+        y: true, //是否在y轴滚动
+      });
     },
 
     clickRating () {
@@ -900,13 +899,12 @@ export default {
     },
 
     gotoReviews () {
-      this.$reviews.velocity(
-        'scroll',
-        {
-          duration: 500,
-          easing: 'easeOutSine',
-          container: this.$el,
-        });
+      this.$scrollTo('.reviews', 500, {
+        container: '.listingDetailModal', //设置滚动容器
+        easing: 'ease-out', //动画效果
+        x: false, //是否在x轴滚动
+        y: true, //是否在y轴滚动
+      });
     },
 
     onClickPhotoSelect (photoIndex) {
@@ -1090,9 +1088,6 @@ export default {
 
     render () {
       if (this.dataChangePopIn) this.dataChangePopIn.remove();
-
-      this.$reviews = $(this.$refs.reviews);
-      this.$reviews.append(this.reviews.render().$el);
 
       if (this._latestHash !== this.model.get('hash')) {
         this.outdateHash = true;

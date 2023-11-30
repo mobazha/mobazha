@@ -5,9 +5,13 @@
         <h2 class="txUnb">{{ ob.polyT('listingDetail.moreBy', { name: ob.vendor.name }) }}</h2>
       </template>
       <div class="listingsGrid flex js-cardWrapper">
-        <template v-for="listing in ob.listings" :key="listing.id">
+        <template v-for="listing in ob.listings" :key="listing.slug">
           <ListingCard
-            :options="cardOptions"
+            :options="{
+              listingBaseUrl: `${ob.vendor.peerID}/store/`,
+              vendor: options.vendor,
+              onStore: true,
+            }"
             :bb="cardBB(listing)"
           />
         </template>
@@ -43,13 +47,6 @@ export default {
       return {
         ...this.templateHelpers,
         ...this.options,
-      };
-    },
-
-    cardOptions () {
-      return {
-          vendor: this.options.vendor,
-          onStore: true,
       };
     },
   },

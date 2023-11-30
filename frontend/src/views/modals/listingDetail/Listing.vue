@@ -1,5 +1,5 @@
 <template>
-  <div class="listingDetailModal">
+  <div>
     <div v-if="!showNsfwWarning && showModal" class="modal listingDetail modalScrollPage" @click="onDocumentClick">
       <BaseModal @close="close">
         <template v-slot:component>
@@ -885,22 +885,18 @@ export default {
     gotoPhotos () {
       recordEvent('Listing_GoToPhotos', { ownListing: this.model.isOwnListing });
 
-      this.$scrollTo('.photoSection', 500, {
-        container: '.listingDetailModal', //设置滚动容器
-        easing: 'ease-out', //动画效果
-        x: false, //是否在x轴滚动
-        y: true, //是否在y轴滚动
-      });
+      this.scrollToSection('.photoSection');
     },
 
     clickRating () {
       recordEvent('Listing_ClickOnRatings', { ownListing: this.model.isOwnListing });
-      this.gotoReviews();
+      this.scrollToSection('.reviews');
     },
 
-    gotoReviews () {
-      this.$scrollTo('.reviews', 500, {
-        container: '.listingDetailModal', //设置滚动容器
+    scrollToSection(el) {
+      this.$scrollTo(el, 500, {
+        offset: -10,
+        container: '.listingDetail', //设置滚动容器
         easing: 'ease-out', //动画效果
         x: false, //是否在x轴滚动
         y: true, //是否在y轴滚动

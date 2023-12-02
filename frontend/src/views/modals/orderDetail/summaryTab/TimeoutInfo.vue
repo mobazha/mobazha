@@ -6,7 +6,7 @@
     </div>
     <div class="innerContent border clrBr padMd">
       <div class="flexCol flexCent gutterVSm">
-        <p :class="messageClass">{{ message }} <span :class="`toolTip clrT ${tipClass}`" :data-tip="tip"><i class="ion-help-circled"></i></span></p>
+        <p :class="messageClass" v-html="message"></p>
         <div class="flexCent gutterH">
           <template v-if="ob.showDisputeBtn">
             <button class="btn tx5b clrErr clrBrDec1 clrTOnEmph " @click="onClickDisputeOrder">{{ ob.polyT('orderDetail.summaryTab.timeoutInfo.btnDisputeOrder') }}</button>
@@ -69,8 +69,6 @@ export default {
 
       message: '',
       messageClass: 'txCtr',
-      tip: '',
-      tipClass: '',
     };
   },
   created () {
@@ -81,7 +79,14 @@ export default {
   mounted () {
   },
   computed: {
-    isCase () {
+    ob(){
+      return {
+        ...this.templateHelpers,
+        ...this._state,
+      };
+    },
+    isCase() {
+      const ob = this.ob;
       return ob.ownPeerID !== ob.buyer && ob.ownPeerID !== ob.vendor;
     },
   },
@@ -90,6 +95,26 @@ export default {
       if (!options.orderID) {
         throw new Error('Please provide an orderID');
       }
+
+      this.baseInit({
+        ...options,
+        initialState: {
+          awaitingBlockHeight: false,
+          isFundingConfirmed: false,
+          isDisputed: false,
+          hasDisputeEscrowExpired: false,
+          canBuyerComplete: false,
+          isPaymentClaimable: false,
+          isPaymentFinalized: false,
+          showDisputeBtn: false,
+          showDiscussBtn: false,
+          showResolveDisputeBtn: false,
+          isClaimingPayment: releasingEscrow(options.orderID),
+          invalidContractData: false,
+          dataUnavailable: false,
+          ...options.initialState,
+        },
+      });
 
       this.orderID = options.orderID;
 
@@ -121,6 +146,8 @@ export default {
       let tip;
       let tipClass = '';
 
+      const ob = this.ob;
+
       if (ob.invalidContractData) {
         if (ob.moderator) {
           message = ob.polyT('orderDetail.summaryTab.timeoutInfo.modInvalidContractData');
@@ -143,7 +170,7 @@ export default {
 
         messageClass = 'txCtr clrTErr';
         tipClass = 'hide';
-      } else if (!isCase) {
+      } else if (!this.isCase) {
         tip = ob.ownPeerID === ob.buyer ?
           ob.polyT('orderDetail.summaryTab.timeoutInfo.tipClaimAfterTimeoutBuyer') :
           ob.polyT('orderDetail.summaryTab.timeoutInfo.tipClaimAfterTimeoutVendor');
@@ -217,10 +244,8 @@ export default {
         tipClass = 'hide';
       }
 
-      this.message = message;
+      this.message = message + `<span class="toolTip clrT ${tipClass}" data-tip="${tip}"><i class="ion-help-circled"></i></span>`;
       this.messageClass = messageClass;
-      this.tip = tip;
-      this.tipClass = tipClass;
     },
 
     onClickDisputeOrder () {

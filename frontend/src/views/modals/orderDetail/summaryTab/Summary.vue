@@ -17,7 +17,13 @@
     </div>
     <hr class="clrBr rowLg" />
 
-    <div class="js-timeoutInfoContainer"></div>
+    <div class="js-timeoutInfoContainer">
+      <TimeoutInfo ref="timeoutInfo" v-if="showTimeoutInfo" :options="timeoutInfoOptions"
+        @clickDisputeOrder="$emit('clickDisputeOrder')"
+        @clickDiscussOrder="$emit('clickDiscussOrder')"
+        @clickResolveDispute="$emit('clickResolveDispute')"
+      />
+    </div>
     <div class="js-subSections">
       <CompleteOrderForm ref="completeOrderForm" v-if="showCompleteOrderForm"
         :options="{
@@ -40,7 +46,19 @@
       <Refunded ref="refunded" v-if="showRefunded" :options="refundedOptions"/>
     </div>
     <template v-if="!ob.isCase">
-      <div ref="paymentsWrap" class="js-paymentsWrap"></div>
+      <div ref="paymentsWrap" class="js-paymentsWrap">
+        <Payments :key="paymentsInKey" :options="{
+          orderID: model.id,
+          collection: model.paymentsIn,
+          orderPrice: model.orderPrice,
+          paymentCoin: model.paymentCoin,
+          vendor,
+          isOrderCancelable: () => model.isOrderCancelable,
+          isCrypto: contract.type === 'CRYPTOCURRENCY',
+          isOrderConfirmable: () => model.get('state') === 'PENDING' && isVendor && !contract.get('orderConfirmation'),
+          // paymentCoin,
+        }" />
+      </div>
     </template>
 
     <template v-else>
@@ -96,14 +114,14 @@ import {
 } from '../../../../../backbone/utils/order.js';
 import { getCurrencyByCode as getWalletCurByCode } from '../../../../../backbone/data/walletCurrencies.js';
 import { checkValidParticipantObject } from '../../../../utils/utils';
-import Payments from '../../../../../backbone/views/modals/orderDetail/summaryTab/Payments';
-import TimeoutInfo from '../../../../../backbone/views/modals/orderDetail/summaryTab/TimeoutInfo';
 
 import StateProgressBar from './StateProgressBar.vue';
+import TimeoutInfo from './TimeoutInfo.vue';
 import PayForOrder from '../../purchase/Payment.vue';
 import Accepted from './Accepted.vue';
 import Refunded from './Refunded.vue';
 import CompleteOrderForm from './CompleteOrderForm.vue';
+import Payments from './Payments.vue';
 import Fulfilled from './Fulfilled.vue';
 import OrderComplete from './OrderComplete.vue';
 import DisputeStarted from './DisputeStarted.vue';
@@ -115,10 +133,12 @@ import ProcessingError from './ProcessingError.vue';
 export default {
   components: {
     StateProgressBar,
+    TimeoutInfo,
     PayForOrder,
     Accepted,
     Refunded,
     CompleteOrderForm,
+    Payments,
     Fulfilled,
     OrderComplete,
     DisputeStarted,
@@ -138,6 +158,9 @@ export default {
     return {
       moderator: undefined,
 
+      showTimeoutInfo: false,
+      timeoutInfoOptions: {},
+
       showPayForOrder: false,
 
       showAccepted: false,
@@ -147,6 +170,8 @@ export default {
       refundedOptions: {},
 
       showCompleteOrderForm: false,
+
+      paymentsInKey: 0,
 
       showFulfilled: false,
       fulfilledOptions: {},
@@ -327,6 +352,9 @@ export default {
       return this.paymentCoinData
         ? paymentCoinData.getBlockChainAddressUrl(this.paymentAddress, app.serverConfig.testnet)
         : false;
+    },
+    isVendor() {
+      return this.vendor.id === app.profile.id;
     }
   },
   methods: {
@@ -353,7 +381,8 @@ export default {
       }
 
       this.listenTo(this.model, 'change:state', (md, state) => {
-        if (this.payments) this.payments.render();
+        this.paymentsInKey += 1;
+
         if (this.shouldShowAcceptedSection()) {
           if (!this.showAccepted) this.renderAcceptedView();
         } else if (this.showAccepted) {
@@ -398,9 +427,7 @@ export default {
             this.showPayForOrder = false;
           }
 
-          if (this.payments) {
-            this.payments.collection.set(this.model.paymentsIn.models);
-          }
+          this.paymentsInKey += 1;
         });
 
         this.listenTo(this.contract, 'change:refunds', () => this.renderRefundView());
@@ -531,7 +558,7 @@ export default {
       const balanceMd = app.walletBalances.get(this.model.paymentCoin);
       const bindHeightChange = (md) => {
         this.listenTo(md, 'change:height', () => {
-          if (this.timeoutInfo || this.shouldShowTimeoutInfoView) {
+          if (this.showTimeoutInfo || this.shouldShowTimeoutInfoView) {
             this.renderTimeoutInfoView();
           }
         });
@@ -574,8 +601,8 @@ export default {
       const { isCase } = this.model;
 
       if (!this.shouldShowTimeoutInfoView) {
-        if (this.timeoutInfo) this.timeoutInfo.remove();
-        this.timeoutInfo = null;
+        this.showTimeoutInfo = false;
+
         clearTimeout(this.disputeCountdownTimeout);
         return;
       }
@@ -735,21 +762,14 @@ export default {
       // restore the days timeout threshold
       moment.relativeTimeThreshold('d', prevMomentDaysThreshold);
 
-      if (this.timeoutInfo) {
-        this.timeoutInfo.setState(state);
+      if (this.showTimeoutInfo) {
+        this.$refs.timeoutInfo.setState(state);
       } else {
-        this.timeoutInfo = this.createChild(TimeoutInfo, {
+        this.timeoutInfoOptions = {
           orderID: this.model.id,
           initialState: state,
-        });
-
-        $('.js-timeoutInfoContainer').html(this.timeoutInfo.render().el);
-
-        this.listenTo(this.timeoutInfo, 'clickDisputeOrder', () => this.$emit('clickDisputeOrder'));
-
-        this.listenTo(this.timeoutInfo, 'clickDiscussOrder', () => this.$emit('clickDiscussOrder'));
-
-        this.listenTo(this.timeoutInfo, 'clickResolveDispute', () => this.$emit('clickResolveDispute'));
+        };
+        this.showTimeoutInfo = true;
       }
     },
 
@@ -782,14 +802,13 @@ export default {
       }
 
       const orderState = this.model.get('state');
-      const isVendor = this.vendor.id === app.profile.id;
-      const canFulfill = isVendor && [
+      const canFulfill = this.isVendor && [
         'AWAITING_FULFILLMENT',
         'PARTIALLY_FULFILLED',
       ].indexOf(orderState) > -1;
       const initialState = {
         timestamp: vendorOrderConfirmation.timestamp,
-        showRefundButton: isVendor && [
+        showRefundButton: this.isVendor && [
           'AWAITING_FULFILLMENT',
           'PARTIALLY_FULFILLED',
         ].indexOf(orderState) > -1,
@@ -798,7 +817,7 @@ export default {
       };
 
       if (!this.model.isCase) {
-        if (isVendor) {
+        if (this.isVendor) {
           // vendor looking at the order
           if (canFulfill) {
             initialState.infoText = app.polyglot.t('orderDetail.summaryTab.accepted.vendorCanFulfill');
@@ -1163,30 +1182,11 @@ export default {
     },
 
     render () {
-      const { paymentCoin } = this.model;
-
       if (this.shouldShowPayForOrderSection()) {
         this.renderPayForOrder();
       }
 
       this.renderTimeoutInfoView();
-
-      if (!this.model.isCase) {
-        if (this.payments) this.payments.remove();
-        this.payments = this.createChild(Payments, {
-          orderID: this.model.id,
-          collection: this.model.paymentsIn,
-          orderPrice: this.model.orderPrice,
-          paymentCoin,
-          vendor: this.vendor,
-          isOrderCancelable: () => this.model.isOrderCancelable,
-          isCrypto: this.contract.type === 'CRYPTOCURRENCY',
-          isOrderConfirmable: () => this.model.get('state') === 'PENDING'
-            && this.vendor.id === app.profile.id && !this.contract.get('orderConfirmation'),
-          // paymentCoin,
-        });
-        $(this.$refs.paymentsWrap).html(this.payments.render().el);
-      }
 
       if (this.shouldShowAcceptedSection()) this.renderAcceptedView();
       this.renderSubSections();

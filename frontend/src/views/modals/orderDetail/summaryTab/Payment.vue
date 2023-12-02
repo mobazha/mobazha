@@ -101,7 +101,6 @@
 </template>
 
 <script>
-import $ from 'jquery';
 import moment from 'moment';
 import bigNumber from 'bignumber.js';
 import app from '../../../../../backbone/app';
@@ -147,18 +146,12 @@ export default {
   },
   computed: {
     ob () {
-      const coinInfo = app.walletBalances.get(this._state.paymentCoin);
-      let confirmations = 0;
-      if (coinInfo && coinInfo.get('height') !== 0 && (+this.model.get('height'))) {
-        confirmations = coinInfo.get('height') - this.model.get('height');
-      }
-
       return {
         ...this.templateHelpers,
         ...this._state,
         ...this.model.toJSON(),
         value: integerToDecimal(this.model.get('value'), this._state.paymentCoinDivis),
-        confirmations,
+        confirmations: this.confirmations,
         abbrNum,
         moment,
       };
@@ -178,7 +171,7 @@ export default {
       const ob = this.ob;
 
       const priceFrag = ob.currencyMod.pairedCurrency(
-        integerToDecimal(model.get('value'), _state.paymentCoinDivis),
+        integerToDecimal(this.model.get('value'), ob.paymentCoinDivis),
         ob.paymentCoin,
         ob.userCurrency
       );
@@ -220,7 +213,7 @@ export default {
       let roundedAmountShort = ob.amountShort;
 
       try {
-        roundedAmountShort = ob.amountShort.dp(paymentCoinDivis);
+        roundedAmountShort = ob.amountShort.dp(ob.paymentCoinDivis);
       } catch (e) {
         // pass
       }

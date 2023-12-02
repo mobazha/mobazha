@@ -167,6 +167,8 @@ export default {
     return {
       app: app,
       description: '',
+
+      modProfile: undefined,
     };
   },
   created () {

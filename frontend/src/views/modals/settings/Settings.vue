@@ -14,6 +14,7 @@
           </div>
           <div class="flexExpand posR">
             <div class="js-settings-tabContent tabContent">
+              <Page ref="Page" v-if="activeTab == 'Page'" @unrecognizedModelError="onUnrecognizedModelError" />
               <Store ref="Store" v-if="activeTab == 'Store'" @unrecognizedModelError="onUnrecognizedModelError" />
             </div>
           </div>
@@ -30,23 +31,27 @@ import app from '../../../../backbone/app';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import { recordEvent } from '../../../../backbone/utils/metrics';
 import { capitalize } from '../../../../backbone/utils/string';
-// import General from './General.vue';
-// import Page from './Page.vue';
-import Store from './Store.vue';
-// import Addresses from './Addresses.vue';
-// import Advanced from './advanced/Advanced.vue';
-// import Moderation from './Moderation.vue';
-// import Blocked from './Blocked.vue';
 
 import General from '../../../../backbone/views/modals/Settings/General';
-import Page from '../../../../backbone/views/modals/Settings/Page';
 import Advanced from '../../../../backbone/views/modals/Settings/advanced/Advanced'
 import Addresses from '../../../../backbone/views/modals/Settings/Addresses'
 import Moderation from '../../../../backbone/views/modals/Settings/Moderation';
 import Blocked from '../../../../backbone/views/modals/Settings/Blocked';
 
+// import General from './General.vue';
+// import Page from './Page.vue';
+
+import Page from './Page.vue';
+import Store from './Store.vue';
+
+// import Addresses from './Addresses.vue';
+// import Advanced from './advanced/Advanced.vue';
+// import Moderation from './Moderation.vue';
+// import Blocked from './Blocked.vue';
+
 export default {
   components: {
+    Page,
     Store,
   },
   props: {
@@ -121,7 +126,7 @@ export default {
       const targetTab = targ;
 
       if (!this.currentTabView || currentTab !== targetTab) {
-        if (this.currentTabView && currentTab !== 'Store') this.currentTabView.$el.detach();
+        if (this.currentTabView && currentTab !== 'Store' && currentTab !== 'Page') this.currentTabView.$el.detach();
 
         this.activeTab = targetTab;
         this.$nextTick(() => {
@@ -129,6 +134,8 @@ export default {
 
           if (targetTab === 'Store') {
             tabView = this.$refs.Store;
+          } else if (targetTab === 'Page') {
+            tabView = this.$refs.Page;
           } else {
             tabView = this.tabViewCache[targetTab];
             if (!tabView) {

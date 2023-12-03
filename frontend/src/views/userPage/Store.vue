@@ -248,7 +248,7 @@ export default {
   },
   watch: {
     _collection() {
-      this.$emit('listingsUpdate', this._collection);
+      this.$emit('listingsUpdate', this.collection);
     }
   },
   methods: {

@@ -6,12 +6,12 @@
           <template v-for="(address, index2) in addressRow">
             <div class="col6">
               <div class="addressBox border clrP clrBr">
-                <span class="txB">{{ `${address.name}${address.company ? '<br />' : ''}` }}</span>
-                {{ `${address.company}${address.addressLineOne ? '<br />' : ''}` }}
-                {{ `${address.addressLineOne}${address.addressLineTwo ? ` ${address.addressLineTwo}` : ''}${address.city ? '<br />' : ''}` }}
-                {{ `${address.city}${address.state ? `, ${address.state}` : ''}${address.postalCode ? ` ${address.postalCode}` : ''}${address.country ? '<br />' : ''}` }}
-                {{ `${ob.polyT(`countries.${address.country}`)}${address.addressNotes ? '<br />' : ''}` }}
-                <p v-if="address.addressNotes" class="notes">{{ address.addressNotes }}</p>
+                <span class="txB" v-html="`${address.name}${address.company ? '<br />' : ''}`"></span>
+                <span v-html="`${address.company}${address.addressLineOne ? '<br />' : ''}`"></span>
+                <span v-html="`${address.addressLineOne}${address.addressLineTwo ? ` ${address.addressLineTwo}` : ''}${address.city ? '<br />' : ''}`"></span>
+                <span v-html="`${address.city}${address.state ? `, ${address.state}` : ''}${address.postalCode ? ` ${address.postalCode}` : ''}${address.country ? '<br />' : ''}`"></span>
+                <span v-html="`${ob.polyT(`countries.${address.country}`)}${address.addressNotes ? '<br />' : ''}`"></span>
+                <p v-if="address.addressNotes" class="notes" v-html="address.addressNotes"></p>
                 <a class="btn clrP clrBr clrSh2 " @click="onClickDelete(index1 * 2 + index2)">{{ ob.polyT('settings.addressesTab.btnDelete') }}</a>
               </div>
             </div>
@@ -24,7 +24,6 @@
 </template>
 
 <script>
-import $ from 'jquery';
 import { splitIntoRows } from '../../../../backbone/utils';
 
 export default {
@@ -40,8 +39,6 @@ export default {
     };
   },
   created () {
-    this.initEventChain();
-
     this.loadData(this.options);
   },
   mounted () {
@@ -51,8 +48,7 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        errors,
-        addresses: splitIntoRows(this._collection, 2),
+        addresses: splitIntoRows(this.collection.toJSON(), 2),
       };
     }
   },

@@ -29,7 +29,6 @@
 </template>
 
 <script>
-import $ from 'jquery';
 import app from '../../../../backbone/app';
 import { unblock, isUnblocking, events as blockEvents } from '../../../../backbone/utils/block';
 
@@ -65,8 +64,7 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      const calcBlockedList = () => app.settings.get('blockedNodes')
-        .filter(peerID => !isUnblocking(peerID));
+      const calcBlockedList = () => app.settings.get('blockedNodes').filter(peerID => !isUnblocking(peerID));
 
       this.baseInit({
         ...options,

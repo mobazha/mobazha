@@ -14,8 +14,9 @@
           </div>
           <div class="flexExpand posR">
             <div class="js-settings-tabContent tabContent">
-              <Page ref="Page" v-if="activeTab == 'Page'" @unrecognizedModelError="onUnrecognizedModelError" />
-              <Store ref="Store" v-if="activeTab == 'Store'" @unrecognizedModelError="onUnrecognizedModelError" />
+              <template v-for="tab in ['General', 'Page', 'Store', 'Addresses', 'Blocked', 'Moderation', 'Advanced']">
+                <component :is="tab" :ref="tab" v-if="activeTab == tab" @unrecognizedModelError="onUnrecognizedModelError" />
+              </template>
             </div>
           </div>
         </div>
@@ -32,27 +33,24 @@ import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessa
 import { recordEvent } from '../../../../backbone/utils/metrics';
 import { capitalize } from '../../../../backbone/utils/string';
 
-import General from '../../../../backbone/views/modals/Settings/General';
-import Advanced from '../../../../backbone/views/modals/Settings/advanced/Advanced'
-import Addresses from '../../../../backbone/views/modals/Settings/Addresses'
-import Moderation from '../../../../backbone/views/modals/Settings/Moderation';
-import Blocked from '../../../../backbone/views/modals/Settings/Blocked';
-
-// import General from './General.vue';
-// import Page from './Page.vue';
-
+import General from './General.vue';
 import Page from './Page.vue';
 import Store from './Store.vue';
+import Addresses from './Addresses.vue';
+import Blocked from './Blocked.vue';
+import Moderation from './Moderation.vue';
+import Advanced from './advanced/Advanced.vue';
 
-// import Addresses from './Addresses.vue';
-// import Advanced from './advanced/Advanced.vue';
-// import Moderation from './Moderation.vue';
-// import Blocked from './Blocked.vue';
 
 export default {
   components: {
+    General,
     Page,
     Store,
+    Addresses,
+    Blocked,
+    Moderation,
+    Advanced,
   },
   props: {
     options: {
@@ -66,6 +64,8 @@ export default {
     return {
       initialTab: 'General',
       activeTab: '',
+
+      currentTabView: undefined,
     };
   },
   created () {
@@ -126,32 +126,13 @@ export default {
       const targetTab = targ;
 
       if (!this.currentTabView || currentTab !== targetTab) {
-        if (this.currentTabView && currentTab !== 'Store' && currentTab !== 'Page') this.currentTabView.$el.detach();
-
         this.activeTab = targetTab;
+
         this.$nextTick(() => {
-          let tabView;
+          this.currentTabView = this.$refs[targetTab];
 
-          if (targetTab === 'Store') {
-            tabView = this.$refs.Store;
-          } else if (targetTab === 'Page') {
-            tabView = this.$refs.Page;
-          } else {
-            tabView = this.tabViewCache[targetTab];
-            if (!tabView) {
-              tabView = this.createChild(this.tabViews[targetTab]);
-              this.tabViewCache[targetTab] = tabView;
-              tabView.render();
-              this.listenTo(tabView, 'unrecognizedModelError', this.onUnrecognizedModelError);
-            }
-
-            this.$tabContent.append(tabView.$el);
-          }
-
-          this.currentTabView = tabView;
-
-          if (options.scrollTo && typeof tabView.scrollTo === 'function') {
-            setTimeout(() => tabView.scrollTo(options.scrollTo));
+          if (options.scrollTo && typeof this.currentTabView.scrollTo === 'function') {
+            setTimeout(() => this.currentTabView.scrollTo(options.scrollTo));
           }
         }); 
       }

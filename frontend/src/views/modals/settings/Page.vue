@@ -368,7 +368,14 @@ export default {
       headerMinHeight: 700,
 
       formData: {
-        contactInfo: {},
+        name: '',
+        shortDescription: '',
+        location: '',
+        about:'',
+        contactInfo: {
+          website: '',
+          email: '',
+        },
         // colors: {},
       }
     };

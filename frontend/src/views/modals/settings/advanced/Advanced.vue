@@ -1,11 +1,11 @@
 <template>
-  <div class="settingsAdvanced">
+  <div class="rootTag settingsAdvanced">
     <div class="gutterVMd2">
       <div class="contentBox padMd clrP clrBr clrSh3">
         <div class="flexHCent">
           <h2 class="h3 clrT">{{ ob.polyT('settings.advancedTab.sectionName') }}</h2>
           <ProcessingButton
-            className="btn clrP clrBAttGrad clrBrDec1 clrTOnEmph modalContentCornerBtn js-save"
+            :className="`btn clrP clrBAttGrad clrBrDec1 clrTOnEmph modalContentCornerBtn js-save ${isSaving ? 'processing' : ''}`"
             @click="save"
             :btnText="ob.polyT('settings.btnSave')" />
         </div>
@@ -21,23 +21,11 @@
                 <div class="col9">
                   <div class="btnStrip">
                     <div class="btnRadio clrBr">
-                      <input type="radio"
-                        data-persistence-location="local"
-                        name="showAdvancedVisualEffects"
-                        value="true"
-                        id="advancedTabVisualEffectsOn"
-                        data-var-type="boolean"
-                        :checked="ob.showAdvancedVisualEffects">
+                      <input type="radio" v-model="localData.showAdvancedVisualEffects" value="true" id="advancedTabVisualEffectsOn">
                       <label for="advancedTabVisualEffectsOn">{{ ob.polyT('settings.on') }}</label>
                     </div>
                     <div class="btnRadio clrBr">
-                      <input type="radio"
-                        data-persistence-location="local"
-                        name="showAdvancedVisualEffects"
-                        value="false"
-                        id="advancedTabVisualEffectsOff"
-                        data-var-type="boolean"
-                        :checked="!ob.showAdvancedVisualEffects">
+                      <input type="radio" v-model="localData.showAdvancedVisualEffects" value="false" id="advancedTabVisualEffectsOff">
                       <label for="advancedTabVisualEffectsOff">{{ ob.polyT('settings.off') }}</label>
                     </div>
                   </div>
@@ -51,22 +39,11 @@
                 <div class="col9">
                   <div class="btnStrip">
                     <div class="btnRadio clrBr">
-                      <input type="radio"
-                        data-persistence-location="local"
-                        name="windowControlStyle"
-                        value="mac"
-                        id="windowControlStyleMac"
-                        data-var-type="string"
-                        :checked="ob.windowControlStyle == 'mac'">
+                      <input type="radio" v-model="localData.windowControlStyle" value="mac" id="windowControlStyleMac">
                       <label for="windowControlStyleMac">{{ ob.polyT('settings.advancedTab.appearance.macOS') }}</label>
                     </div>
                     <div class="btnRadio clrBr">
-                      <input type="radio"
-                        data-persistence-location="local"
-                        name="windowControlStyle" value="win"
-                        id="windowControlStyleWindows"
-                        data-var-type="string"
-                        :checked="ob.windowControlStyle == 'win'">
+                      <input type="radio" v-model="localData.windowControlStyle" value="win" id="windowControlStyleWindows">
                       <label for="windowControlStyleWindows">{{ ob.polyT('settings.advancedTab.appearance.windowsOS') }}</label>
                     </div>
                   </div>
@@ -90,23 +67,11 @@
                 <div class="col9">
                   <div class="btnStrip">
                     <div class="btnRadio clrBr">
-                      <input type="radio"
-                        data-persistence-location="local"
-                        name="saveTransactionMetadata"
-                        value="true"
-                        id="saveTransactionMetadataOn"
-                        data-var-type="boolean"
-                        :checked="ob.saveTransactionMetadata">
+                      <input type="radio" v-model="localData.saveTransactionMetadata" value="true" id="saveTransactionMetadataOn">
                       <label for="saveTransactionMetadataOn">{{ ob.polyT('settings.on') }}</label>
                     </div>
                     <div class="btnRadio clrBr">
-                      <input type="radio"
-                        data-persistence-location="local"
-                        name="saveTransactionMetadata"
-                        value="false"
-                        id="saveTransactionsMetadataOff"
-                        data-var-type="boolean"
-                        :checked="!ob.saveTransactionMetadata">
+                      <input type="radio" v-model="localData.saveTransactionMetadata" value="false" id="saveTransactionsMetadataOff">
                       <label for="saveTransactionsMetadataOff">{{ ob.polyT('settings.off') }}</label>
                     </div>
                   </div>
@@ -121,43 +86,19 @@
                   <FormError v-if="ob.errors['defaultTransactionFee']" :errors="ob.errors['defaultTransactionFee']" />
                   <div class="btnStrip">
                     <div class="btnRadio clrBr">
-                      <input type="radio"
-                        data-persistence-location="local"
-                        name="defaultTransactionFee"
-                        value="SUPER_ECONOMIC"
-                        id="defaultTransactionFeeSuperLow"
-                        data-var-type="string"
-                        :checked="ob.defaultTransactionFee == 'SUPER_ECONOMIC'">
+                      <input type="radio" v-model="localData.defaultTransactionFee" value="SUPER_ECONOMIC" id="defaultTransactionFeeSuperLow">
                       <label for="defaultTransactionFeeSuperLow">{{ ob.polyT('settings.advancedTab.transaction.superlow') }}</label>
                     </div>
                     <div class="btnRadio clrBr">
-                      <input type="radio"
-                        data-persistence-location="local"
-                        name="defaultTransactionFee"
-                        value="ECONOMIC"
-                        id="defaultTransactionFeeLow"
-                        data-var-type="string"
-                        :checked="ob.defaultTransactionFee == 'ECONOMIC'">
+                      <input type="radio" v-model="localData.defaultTransactionFee" value="ECONOMIC" id="defaultTransactionFeeLow">
                       <label for="defaultTransactionFeeLow">{{ ob.polyT('settings.advancedTab.transaction.low') }}</label>
                     </div>
                     <div class="btnRadio clrBr">
-                      <input type="radio"
-                        data-persistence-location="local"
-                        name="defaultTransactionFee"
-                        value="NORMAL"
-                        id="defaultTransactionFeeMedium"
-                        data-var-type="string"
-                        :checked="ob.defaultTransactionFee == 'NORMAL'">
+                      <input type="radio" v-model="localData.defaultTransactionFee" value="NORMAL" id="defaultTransactionFeeMedium">
                       <label for="defaultTransactionFeeMedium">{{ ob.polyT('settings.advancedTab.transaction.medium') }}</label>
                     </div>
                     <div class="btnRadio clrBr">
-                      <input type="radio"
-                        data-persistence-location="local"
-                        name="defaultTransactionFee"
-                        value="PRIORITY"
-                        id="defaultTransactionFeeHigh"
-                        data-var-type="string"
-                        :checked="ob.defaultTransactionFee == 'PRIORITY'">
+                      <input type="radio" v-model="localData.defaultTransactionFee" value="PRIORITY" id="defaultTransactionFeeHigh">
                       <label for="defaultTransactionFeeHigh">{{ ob.polyT('settings.advancedTab.transaction.high') }}</label>
                     </div>
                   </div>
@@ -175,7 +116,7 @@
                 <div class="col9">
                   <div class="flexVCent gutterH">
                     <ProcessingButton
-                      :className="`btn clrP clrBr clrSh2 js-blockData ${ob.isGettingBlockData ? 'processing' : ''}`"
+                      :className="`btn clrP clrBr clrSh2 js-blockData ${fetchingBlockData ? 'processing' : ''}`"
                       @click="clickBlockData"
                       :btnText="ob.polyT('settings.advancedTab.server.blockDataBtn')" />
                   </div>
@@ -230,10 +171,10 @@
                 <div class="col9">
                   <div class="flexVCent gutterH">
                     <ProcessingButton
-                      :className="`btn clrP clrBr clrSh2 js-purge ${ob.isPurging ? 'processing' : ''}`"
+                      :className="`btn clrP clrBr clrSh2 js-purge ${isPurging ? 'processing' : ''}`"
                       @click="clickPurge"
                       :btnText="ob.polyT('settings.advancedTab.server.purgeBtn')" />
-                    <div class="js-purgeComplete hide">
+                    <div class="js-purgeComplete" v-show="isPurgeComplete">
                       <i class="h4 clrTEmph1">{{ ob.polyT('settings.advancedTab.server.purgeComplete') }}</i>
                     </div>
                   </div>
@@ -286,7 +227,7 @@
       <div class="contentBox padMd clrP clrBr clrSh3">
         <div class="flexHRight">
           <ProcessingButton
-            className="btn clrP clrBAttGrad clrBrDec1 clrTOnEmph js-save"
+            :className="`btn clrP clrBAttGrad clrBrDec1 clrTOnEmph js-save ${isSaving ? 'processing' : ''}`"
             @click="save"
             :btnText="ob.polyT('settings.btnSave')" />
         </div>
@@ -297,15 +238,16 @@
 </template>
 
 <script>
+import _ from 'underscore';
 import $ from 'jquery';
 import { ipc } from '../../../../utils/ipcRenderer.js';
 import app from '../../../../../backbone/app.js';
 import { openSimpleMessage } from '../../../../../backbone/views/modals/SimpleMessage';
-import Dialog from '../../../../backbone/views/modals/Dialog';
+import Dialog from '../../../../../backbone/views/modals/Dialog';
 import { endAjaxEvent, recordEvent, startAjaxEvent } from '../../../../../backbone/utils/metrics.js';
-import WalletSeed from './WalletSeed';
-import SmtpSettings from './SmtpSettings';
-import MetricsStatus from './MetricsStatus';
+import WalletSeed from '../../../../../backbone/views/modals/Settings/advanced/WalletSeed.js';
+import SmtpSettings from '../../../../../backbone/views/modals/Settings/advanced/SmtpSettings';
+import MetricsStatus from '../../../../../backbone/views/modals/Settings/advanced/MetricsStatus';
 
 
 export default {
@@ -318,6 +260,17 @@ export default {
   },
   data () {
     return {
+      isSaving: false,
+      isPurging: false,
+      isPurgeComplete: false,
+      fetchingBlockData: false,
+
+      localData: {
+        showAdvancedVisualEffects: false,
+        windowControlStyle: '',
+        saveTransactionMetadata: false,
+        defaultTransactionFee: '',
+      }
     };
   },
   created () {
@@ -338,11 +291,9 @@ export default {
           ...(this.settings.validationError || {}),
           ...(this.localSettings.validationError || {}),
         },
-        isPurging: this.purge && this.purge.state() === 'pending',
-        isGettingBlockData: this.blockData && this.blockData.state() === 'pending',
         bundled,
-        ...this._settings,
-        ...this._localSettings,
+        ...this.settings.toJSON(),
+        ...this.localSettings.toJSON(),
       };
     }
   },
@@ -362,6 +313,9 @@ export default {
 
       this.localSettings = app.localSettings.clone();
 
+      this.initLocalSettingData();
+      this.localSettings.on('change', () => this.initLocalSettingData());
+
       // Sync our clone with any changes made to the global local settings model.
       this.listenTo(app.localSettings, 'someChange',
         (md, opts) => this.localSettings.set(opts.setAttrs));
@@ -369,6 +323,10 @@ export default {
       // Sync the global local settings model with any changes we save via our clone.
       this.listenTo(this.localSettings, 'sync',
         (md, resp, opts) => app.localSettings.set(this.localSettings.toJSON(opts.attrs)));
+    },
+
+    initLocalSettingData() {
+      this.localData = _.pick(this.localSettings.toJSON(), _.keys(this.localData));
     },
 
     onClickShowSeed () {
@@ -403,10 +361,6 @@ export default {
       app.connectionManagmentModal.open();
     },
 
-    getFormDataEx (subset = this.$formFields) {
-      return this.getFormData(subset);
-    },
-
     clickPurge () {
       recordEvent('Settings_PurgeCache');
       this.purgeCache();
@@ -418,12 +372,13 @@ export default {
      * the call fails, even if they have navigated away from the view.
      */
     purgeCache () {
-      $('.js-purge').addClass('processing');
-      $('.js-purgeComplete').addClass('hide');
+      this.isPurging = true;
+
+      this.isPurgeComplete = false;
 
       this.purge = $.post(app.getServerUrl('ob/purgecache'))
         .always(() => {
-          $('.js-purge').removeClass('processing');
+          this.isPurging = false;
         })
         .fail((xhr) => {
           const failReason = xhr.responseJSON && xhr.responseJSON.reason || '';
@@ -432,7 +387,7 @@ export default {
             failReason);
         })
         .done(() => {
-          $('.js-purgeComplete').removeClass('hide');
+          this.isPurgeComplete = true;
         });
     },
 
@@ -445,11 +400,11 @@ export default {
      * Calls the server to retrieve and display information about the block the transactions are on
      */
     showBlockData () {
-      $('.js-blockData').addClass('processing');
+      this.fetchingBlockData = true;
 
       this.blockData = $.get(app.getServerUrl('wallet/status'))
         .always(() => {
-          $('.js-blockData').removeClass('processing');
+          this.fetchingBlockData = false;
         })
         .fail((xhr) => {
           const failReason = xhr.responseJSON && xhr.responseJSON.reason || '';
@@ -490,12 +445,11 @@ export default {
     },
 
     save () {
-      this.localSettings.set(this.getFormDataEx(this.$localFields));
+      this.localSettings.set(this.loadData);
       this.localSettings.set({}, { validate: true });
 
       this.smtpSettings.setModelData();
       const serverFormData = {
-        ...this.getFormDataEx(),
         smtpSettings: this.smtpSettings.model.toJSON(),
       };
       this.settings.set(serverFormData, { validate: true });
@@ -547,7 +501,7 @@ export default {
             });
           })
           .always(() => {
-            $('.js-save').removeClass('processing');
+            this.isSaving = false;
             setTimeout(() => statusMessage.remove(), 3000);
           });
       }
@@ -555,7 +509,7 @@ export default {
       this.render();
 
       if (!this.localSettings.validationError && !this.settings.validationError) {
-        $('.js-save').addClass('processing');
+        this.isSaving = true;
       } else {
         const $firstErr = $('.errorList:first');
 
@@ -580,14 +534,6 @@ export default {
 
     render () {
       const bundled = ipc.sendSync('controller.system.getGlobal', 'isBundledApp');
-      const formFieldsSelector = `
-        .contentBox:not(.js-contentBoxEmailIntegration) select[name],
-        .contentBox:not(.js-contentBoxEmailIntegration) input[name],
-        .contentBox:not(.js-contentBoxEmailIntegration) textarea[name]
-      `;
-      this.$formFields = $(formFieldsSelector)
-        .not('[data-persistence-location="local"]');
-      this.$localFields = $('[data-persistence-location="local"]');
 
       if (this.walletSeed) this.walletSeed.remove();
       this.walletSeed = this.createChild(WalletSeed, {

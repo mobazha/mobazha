@@ -153,20 +153,21 @@ export default {
         throw new Error('Please provide a selector');
       }
   
-      if (!(typeof selector === 'string'
-        || _.isElement(selector) || selector instanceof $)) {
+      if (!(typeof selector === 'string')) {
         throw new Error('The selector must be a string, DOM element or jQuery object.');
       }
-  
-      let $el;
-  
-      if (typeof selector === 'string') {
-        $el = this.getCachedEl(selector);
-      } else if (!(selector instanceof $)) {
-        $el = $(selector);
+
+      if (_.isElement('rootTag')) {
+        throw new Error('The scroll container with \'rootTag\' selector name must be provided.');
       }
   
-      $el[0].scrollIntoView();
+      this.$scrollTo(selector, 500, {
+        offset: -10,
+        container: '.rootTag', //设置滚动容器
+        easing: 'ease-out', //动画效果
+        x: false, //是否在x轴滚动
+        y: true, //是否在y轴滚动
+      });
     },
   
     /**

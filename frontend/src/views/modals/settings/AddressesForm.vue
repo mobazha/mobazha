@@ -79,7 +79,7 @@
         <div class="col6 clrSh2">
           <FormError v-if="ob.errors.country" :errors="ob.errors.country" />
           <Select2 id="settingsAddressCountry" v-model="formData.country">
-            <template v-for="(country, j) in ob.countryList" :key="j">
+            <template v-for="(country, j) in countryList" :key="j">
               <option :value="country.dataName" :selected="country.dataName == formData.country">{{ country.name }}</option>
             </template>
           </Select2>
@@ -114,6 +114,8 @@ export default {
   },
   data () {
     return {
+      countryList: undefined,
+
       formData: {
         name: '',
         company: '',
@@ -136,7 +138,6 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        countryList: this.countryList,
         errors: this.model.validationError || {},
       };
     }

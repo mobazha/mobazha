@@ -1,6 +1,6 @@
 <template>
   <div class="userPage">
-    <div class="pageContent">
+    <div class="pageContent" v-if="!errorContent">
       <div class="rowLg">
         <div class="flex">
           <h1 class="flexExpand">{{ ob.polyT('connectedPeersPage.heading') }}</h1>
@@ -10,7 +10,7 @@
       <div class="userPageFollow">
         <div class="userCardsContainer flexRow js-peerWrapper">
           <template v-for="peer in peers">
-            <UserCard :options="{ guid: peer, }"/>
+            <UserCard :options="{ guid: peer }"/>
           </template>
         </div>
       </div>
@@ -47,6 +47,9 @@ export default {
 
       peersToShow: [],
 
+      loadPeersUpTo: 0,
+      peersIterator: 12,
+
       errorContent: '',
     };
   },
@@ -56,10 +59,9 @@ export default {
     this.loadData();
   },
   mounted () {
-    this.loadPeers();
+    if (this.peerFetch) this.peerFetch.abort();
   },
   unmounted () {
-    this.peerFetch.abort();
   },
   computed: {
     ob () {
@@ -85,7 +87,9 @@ export default {
     loadData () {
       this.peerFetch = $.get(app.getServerUrl('ob/peers')).done((data) => {
         const peersData = data || [];
-        this.peers = peersData.map((peer) => (peer.slice(peer.lastIndexOf('/') + 1)));
+        this._peers = peersData.map((peer) => (peer.slice(peer.lastIndexOf('/') + 1)));
+
+        this._peersKey += 1;
       }).fail((xhr) => {
         let content = '<p>There was an error retrieving the connected peers.</p>';
         if (xhr.responseText) {
@@ -93,9 +97,6 @@ export default {
         }
         this.errorContent = content;
       });
-
-      this.loadPeersUpTo = 0;
-      this.peersIterator = 12;
     },
 
     loadPeers () {

@@ -232,7 +232,6 @@ export default {
   mounted () {
   },
   unmounted() {
-    if (this.unreadNotifCountFetch) this.unreadNotifCountFetch.abort();
   },
   computed: {
     ob () {
@@ -358,8 +357,6 @@ export default {
     },
 
     fetchUnreadNotifCount () {
-      if (this.unreadNotifCountFetch) this.unreadNotifCountFetch.abort();
-
       // We'll send a bogus filter because all we want is the count - we don't
       // want to weight the returned payload down with any notifications. Those
       // will be lazy loaded in when the notif menu is opened.

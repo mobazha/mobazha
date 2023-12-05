@@ -217,7 +217,7 @@ import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessa
 import ShippingOptionMd from '../../../../backbone/models/listing/ShippingOption';
 import Service from '../../../../backbone/models/listing/Service';
 import Express from './Express.vue';
-import ShippingOption from '../editListing/ShippingOption.vue';
+import ShippingOption from './ShippingOption.vue';
 
 export default {
   components: {

@@ -2,7 +2,7 @@
   <section>
     <div class="contentBox pad clrP clrBr clrSh3 tx3">
       <form class="padSmKids padStack">
-        <!-- <div class="flexVCent">
+        <div class="flexVCent">
           <h2 class="h4 clrT flexExpand" :required="ob.listPosition === 1">
             {{ ob.polyT('editListing.shippingOptions.optionHeading', { listPosition: ob.listPosition }) }}
           </h2>
@@ -10,7 +10,7 @@
             ob.polyT('editListing.shippingOptions.btnDeleteShippingOption')
           }}</a>
         </div>
-        <hr class="clrBr rowMd" /> -->
+        <hr class="clrBr rowMd" />
         <div class="flexRow">
           <label :for="`shipDestinationsSelect_${ob.cid}`" class="required">{{ ob.polyT('editListing.shippingOptions.shippingDestinations') }}</label>
           <div class="flexExpand">
@@ -68,8 +68,8 @@
             </Select2>
           </div>
         </div>
-        <!--       <div class="flexRow gutterH js-serviceSection" v-show="formData.type !== 'LOCAL_PICKUP'">
-     <div class="col3">
+        <div class="flexRow gutterH js-serviceSection" v-show="formData.type !== 'LOCAL_PICKUP'">
+          <div class="col3">
             <label class="required">{{ ob.polyT('editListing.shippingOptions.services.nameLabel') }}</label>
           </div>
           <div class="col3">
@@ -81,8 +81,8 @@
           <div class="col3">
             <label class="required">{{ ob.polyT('editListing.shippingOptions.services.additionalWeightPriceLabel') }}</label>
           </div>
-        </div> -->
-        <!-- <div class="js-servicesWrap js-serviceSection servicesWrap padKids padStack padTop0" v-show="formData.type !== 'LOCAL_PICKUP'">
+        </div>
+        <div class="js-servicesWrap js-serviceSection servicesWrap padKids padStack padTop0" v-show="formData.type !== 'LOCAL_PICKUP'">
           <template v-for="serviceMd in model.get('services')">
             <Service
               ref="serviceViews"
@@ -99,7 +99,7 @@
         </div>
         <div class="flexRow pad js-serviceSection" v-show="formData.type !== 'LOCAL_PICKUP'">
           <a class="clrBr clrP clrTEm js-btnAddService" @click="onClickAddService">{{ ob.polyT('editListing.shippingOptions.services.addService') }}</a>
-        </div> -->
+        </div>
       </form>
     </div>
   </section>

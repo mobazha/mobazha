@@ -8,7 +8,11 @@
         </div>
       </div>
       <div class="userPageFollow">
-        <div class="userCardsContainer flexRow js-peerWrapper"></div>
+        <div class="userCardsContainer flexRow js-peerWrapper">
+          <template v-for="peer in peers">
+            <UserCard :options="{ guid: peer, }"/>
+          </template>
+        </div>
       </div>
 
       <div class="js-morePeers" :hidden="peers.length > loadPeersUpTo">
@@ -16,16 +20,19 @@
         <a class="btn clrBr clrP " @click="loadPeers">{{ ob.polyT('connectedPeersPage.loadMore') }}</a>
       </div>
     </div>
+    <GenericError v-if="errorContent" :content="errorContent"/>
 
   </div>
 </template>
 
 <script>
-import userShort from '../../backbone/views/UserCard';
 import $ from 'jquery';
+import app from '../../backbone/app';
+import GenericError from './error-pages/GenericError.vue';
 
 
 export default {
+  components: { GenericError },
   props: {
     options: {
       type: Object,
@@ -34,14 +41,25 @@ export default {
   },
   data () {
     return {
+      _peers: [],
+      _peersKey: 0,
+      peerFetch: undefined,
+
+      peersToShow: [],
+
+      errorContent: '',
     };
   },
   created () {
     this.initEventChain();
 
-    this.loadData(this.options);
+    this.loadData();
   },
   mounted () {
+    this.loadPeers();
+  },
+  unmounted () {
+    this.peerFetch.abort();
   },
   computed: {
     ob () {
@@ -49,43 +67,45 @@ export default {
         ...this.templateHelpers,
         peers: this.peers,
       };
+    },
+    peers() {
+      let access = this._peersKey;
+
+      return this._peers;
+    }
+  },
+  watch: {
+    peers() {
+      this.peersToShow = this.peers.slice(0, this.peersIterator);
+
+      this.loadPeersUpTo = this.peersIterator;
     }
   },
   methods: {
-    loadData (options = {}) {
-      this.baseInit(options);
+    loadData () {
+      this.peerFetch = $.get(app.getServerUrl('ob/peers')).done((data) => {
+        const peersData = data || [];
+        this.peers = peersData.map((peer) => (peer.slice(peer.lastIndexOf('/') + 1)));
+      }).fail((xhr) => {
+        let content = '<p>There was an error retrieving the connected peers.</p>';
+        if (xhr.responseText) {
+          content += `<p>${xhr.responseJSON && xhr.responseJSON.reason || xhr.responseText}</p>`;
+        }
+        this.errorContent = content;
+      });
 
-      if (!options.peers) {
-        throw new Error('Please provide a list of peers');
-      }
-
-      this.peers = options.peers;
       this.loadPeersUpTo = 0;
       this.peersIterator = 12;
     },
 
     loadPeers () {
       if (this.peers.length > this.loadPeersUpTo) {
-        const docFrag = $(document.createDocumentFragment());
-        this.peers.slice(this.loadPeersUpTo, this.loadPeersUpTo + this.peersIterator)
-          .forEach((peer) => {
-            const user = this.createChild(userShort, {
-              guid: peer,
-            });
-            docFrag.append(user.render().$el);
-          });
-        this.$el.querySelector('.js-peerWrapper').append(docFrag);
+        this.peersToShow = this.peers.slice(0, this.loadPeersUpTo + this.peersIterator);
+
         this.loadPeersUpTo += this.peersIterator;
       }
     },
-
-    render () {
-      this.loadPeers();
-
-      return this;
-    }
-
-  }
+  },
 }
 </script>
 <style lang="scss" scoped></style>

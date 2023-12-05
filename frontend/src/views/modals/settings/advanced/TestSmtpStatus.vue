@@ -14,26 +14,21 @@
 </template>
 
 <script>
-
-
 export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        success: true,
+        msg: '',
+      },
     },
   },
   data () {
     return {
-      _state: {
-        isFetching: false,
-        success: true,
-        msg: '',
-      }
     };
   },
   created () {
-    this.loadData(this.options);
   },
   mounted () {
   },
@@ -41,24 +36,13 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this._state,
+        success: true,
+        msg: '',
+        ...this.options,
       };
     }
   },
   methods: {
-    loadData (options = {}) {
-      const opts = {
-        initialState: {
-          isFetching: false,
-          success: true,
-          msg: '',
-          ...options.initialState || {},
-        },
-        ...options,
-      };
-
-      this.baseInit(opts);
-    },
 
   }
 }

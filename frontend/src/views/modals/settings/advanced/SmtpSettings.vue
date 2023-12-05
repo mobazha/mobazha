@@ -9,28 +9,17 @@
         <FormError v-if="ob.errors['notifications']" :errors="ob.errors['notifications']" />
         <div class="btnStrip">
           <div class="btnRadio clrBr">
-            <input type="radio"
-              name="notifications"
-              value="true"
-              id="smtpNotificationsOn"
-              data-var-type="boolean"
-              :checked="ob.notifications" />
+            <input type="radio" v-model="formData.notifications" value="true" id="smtpNotificationsOn" @input="onChangeShowSmtpNotifications" />
             <label for="smtpNotificationsOn">{{ ob.polyT('settings.on') }}</label>
           </div>
           <div class="btnRadio clrBr">
-            <input type="radio"
-              name="notifications"
-              value="false"
-              id="smtpNotificationsOff"
-              data-var-type="boolean"
-              :checked="!ob.notifications" />
+            <input type="radio" v-model="formData.notifications" value="false" id="smtpNotificationsOff" @input="onChangeShowSmtpNotifications" />
             <label for="smtpNotificationsOff">{{ ob.polyT('settings.off') }}</label>
           </div>
         </div>
       </div>
     </div>
-    <div class="padMdKids padStack smtpSettings"
-      v-show="!!(ob.notifications || smtpSettingsErrorFields.some(field => !!ob.errors[field]))">
+    <div class="padMdKids padStack smtpSettings" v-show="!!(formData.notifications || smtpSettingsErrorFields.some(field => !!ob.errors[field]))">
       <div class="flexRow gutterH">
         <div class="col3">
           <label for="smtpServerAddress" class="required">{{ ob.polyT('settings.advancedTab.smtp.serverAddress')
@@ -39,16 +28,10 @@
         </div>
         <div class="col6">
           <FormError v-if="ob.errors['serverAddress']" :errors="ob.errors['serverAddress']" />
-          <input class="clrBr clrSh2"
-            type="text"
-            name="serverAddress"
-            id="smtpServerAddress"
-            :placeholder="ob.polyT('settings.advancedTab.smtp.placeholderServerAddress')"
-            :value="ob.serverAddress" />
+          <input class="clrBr clrSh2" type="text" v-model="formData.serverAddress" id="smtpServerAddress"
+            :placeholder="ob.polyT('settings.advancedTab.smtp.placeholderServerAddress')" />
           <div class="clrT2 txBase padSm" v-html='ob.polyT("settings.advancedTab.smtp.helperNewEmail", {
-            helperGmailLink: `<a
-              href="https://accounts.google.com/SignUp"
-              class="clrTEm">${ob.polyT("settings.advancedTab.smtp.helperGmailLink")}</a>`
+            helperGmailLink: `<a href="https://accounts.google.com/SignUp" class="clrTEm">${ob.polyT("settings.advancedTab.smtp.helperGmailLink")}</a>`
           })'></div>
         </div>
       </div>
@@ -59,12 +42,8 @@
         </div>
         <div class="col6">
           <FormError v-if="ob.errors['username']" :errors="ob.errors['username']" />
-          <input class="clrBr clrSh2"
-            type="text"
-            name="username"
-            id="smtpUsername"
-            :placeholder="ob.polyT('settings.advancedTab.smtp.placeholderUsername')"
-            :value="ob.username" />
+          <input class="clrBr clrSh2" type="text" v-model="formData.username" id="smtpUsername"
+            :placeholder="ob.polyT('settings.advancedTab.smtp.placeholderUsername')" />
         </div>
       </div>
       <div class="flexRow gutterH">
@@ -74,12 +53,8 @@
         </div>
         <div class="col6">
           <FormError v-if="ob.errors['password']" :errors="ob.errors['password']" />
-          <input class="clrBr clrSh2"
-            type="password"
-            name="password"
-            id="smtpPassword"
-            :placeholder="ob.polyT('settings.advancedTab.smtp.placeholderPassword')"
-            :value="ob.password" />
+          <input class="clrBr clrSh2" type="password" v-model="formData.password" id="smtpPassword"
+            :placeholder="ob.polyT('settings.advancedTab.smtp.placeholderPassword')" />
         </div>
       </div>
       <div class="flexRow gutterH">
@@ -89,12 +64,8 @@
         </div>
         <div class="col6">
           <FormError v-if="ob.errors['senderEmail']" :errors="ob.errors['senderEmail']" />
-          <input class="clrBr clrSh2"
-            type="email"
-            name="senderEmail"
-            id="smtpSenderEmail"
-            :placeholder="ob.polyT('settings.advancedTab.smtp.placeholderSendFrom')"
-            :value="ob.senderEmail" />
+          <input class="clrBr clrSh2" type="email" v-model="formData.senderEmail" id="smtpSenderEmail"
+            :placeholder="ob.polyT('settings.advancedTab.smtp.placeholderSendFrom')" />
         </div>
       </div>
       <div class="flexRow gutterH">
@@ -104,12 +75,8 @@
         </div>
         <div class="col6">
           <FormError v-if="ob.errors['recipientEmail']" :errors="ob.errors['recipientEmail']" />
-          <input class="clrBr clrSh2"
-            type="email"
-            name="recipientEmail"
-            id="smtpRecipientEmail"
-            :placeholder="ob.polyT('settings.advancedTab.smtp.placeholderSendTo')"
-            :value="ob.recipientEmail" />
+          <input class="clrBr clrSh2" type="email" v-model="formData.recipientEmail" id="smtpRecipientEmail"
+            :placeholder="ob.polyT('settings.advancedTab.smtp.placeholderSendTo')" />
         </div>
       </div>
       <div class="flexRow">
@@ -120,14 +87,11 @@
             <div class="flexNoShrink">
               <div class="flexVCent gutterH">
                 <div class="flexNoShrink">
-                  <input class="clrBr clrP clrTEm"
-                    type="reset"
-                    :value="ob.polyT('settings.advancedTab.smtp.clearAction')" />
+                  <input class="clrBr clrP clrTEm" type="reset" @click="resetForm" :value="ob.polyT('settings.advancedTab.smtp.clearAction')" />
                 </div>
                 <div
-                  :class="`flexNoShrink smtpTestButtonWrap js-smtpTestButtonWrap ${ob.testingSmtp ? 'testInProgress' : ''}`">
-                  <a class="btn clrP clrBr clrSh2  btnTest" @click="onClickTest">{{
-                    ob.polyT('settings.advancedTab.smtp.testAction') }}</a>
+                  :class="`flexNoShrink smtpTestButtonWrap js-smtpTestButtonWrap ${testingSmtp ? 'testInProgress' : ''}`">
+                  <a class="btn clrP clrBr clrSh2  btnTest" @click="onClickTest">{{ ob.polyT('settings.advancedTab.smtp.testAction') }}</a>
                   <a class="btn clrP clrBr clrSh2  btnCancelTest" @click="onClickCancelTest">
                     <SpinnerSVG className="spinnerSm padSm" />
                     {{ ob.polyT('settings.advancedTab.smtp.testSmtpCancel') }}
@@ -136,7 +100,9 @@
               </div>
             </div>
             <div>
-              <div class="flexVCent js-testSmtpStatusContainer"></div>
+              <div class="flexVCent js-testSmtpStatusContainer">
+                <TestSmtpStatus :options="{ success, msg, }"/>
+              </div>
             </div>
           </div>
         </div>
@@ -150,10 +116,14 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import app from '../../../../../backbone/app';
-import TestSmtpStatus from './TestSmtpStatus';
+
+import TestSmtpStatus from './TestSmtpStatus.vue';
 
 
 export default {
+  components: {
+    TestSmtpStatus,
+  },
   props: {
     options: {
       type: Object,
@@ -163,6 +133,20 @@ export default {
   },
   data () {
     return {
+      formData: {
+        notifications: false,
+        serverAddress: '',
+        username: '',
+        password: '',
+        senderEmail: '',
+        recipientEmail: '',
+      },
+
+      success: true,
+      msg: '',
+
+      testingSmtp: false,
+
       smtpSettingsErrorFields: [
         'serverAddress',
         'username',
@@ -176,7 +160,6 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   unmounted () {
     if (this.testSmtpPost) this.testSmtpPost.abort();
@@ -186,66 +169,54 @@ export default {
       return {
         ...this.templateHelpers,
         errors: this.model.validationError || {},
-        testingSmtp: this.testSmtpPost && this.testSmtpPost.state() === 'pending',
-        ...this.model.toJSON(),
       };
     }
   },
   methods: {
-    loadData (options = {}) {
-      this.baseInit(options);
-
+    loadData () {
       if (!this.model) {
         throw new Error('Please provide a SMTPSettings model.');
       }
-    },
 
-    get events () {
-      return {
-        'change [name=notifications]': 'onChangeShowSmtpNotifications',
-        'click input[type=reset]': 'resetForm',
-      };
+      this.formData = _.pick(this.model.toJSON(), _.keys(this.formData));
     },
 
     onChangeShowSmtpNotifications () {
       this.setModelData();
-      this.render();
     },
 
     resetForm () {
+      if (this.testSmtpPost) this.testSmtpPost.abort();
+
       this.model.set({
         ..._.omit(this.model.defaults(), 'notifications'),
       });
-      if (this.testSmtpPost) this.testSmtpPost.abort();
-      if (this.testSmtpStatus) {
-        this.testSmtpStatus.setState({
-          isFetching: false,
-          msg: '',
-        });
-      }
+      this.formData = _.pick(this.model.toJSON(), _.keys(this.formData));
+
+      this.success = true;
+      this.msg = '';
     },
 
     onClickTest () {
       if (this.testSmtpPost) this.testSmtpPost.abort();
       this.setModelData();
       this.model.set({}, { validate: true });
-      this.testSmtpStatus.setState({ msg: '' });
+
+      this.msg = '';
 
       if (this.model.validationError) {
-        this.render();
         return;
       }
 
+      this.testingSmtp = true;
       this.testSmtpPost = $.post({
         url: app.getServerUrl('ob/testemailnotifications'),
         data: JSON.stringify(this.model.toJSON()),
         dataType: 'json',
         contentType: 'application/json',
       }).done(() => {
-        this.testSmtpStatus.setState({
-          success: true,
-          msg: app.polyglot.t('settings.advancedTab.smtp.testSmtpSuccess'),
-        });
+        this.success = true;
+        this.msg = app.polyglot.t('settings.advancedTab.smtp.testSmtpSuccess');
       }).fail(xhr => {
         if (xhr.statusText === 'abort') return;
         const err = xhr.responseJSON && xhr.responseJSON.reason || '';
@@ -253,44 +224,24 @@ export default {
           app.polyglot.t('settings.advancedTab.smtp.testSmtpFailWithError', { err }) :
           app.polyglot.t('settings.advancedTab.smtp.testSmtpFail');
 
-        this.testSmtpStatus.setState({
-          success: false,
-          msg,
-        });
+        this.success = false;
+        this.msg = msg;
       })
         .always(() => {
-          $('.js-smtpTestButtonWrap')
-            .removeClass('testInProgress');
+          this.testingSmtp = false;
         });
     },
 
     onClickCancelTest () {
       if (this.testSmtpPost) this.testSmtpPost.abort();
-      $('.js-smtpTestButtonWrap')
-        .removeClass('testInProgress');
+
+      this.testingSmtp = false;
     },
 
     // Sets the model based on the current data in the UI.
     setModelData (options = {}) {
-      this.model.set(this.getFormData(), options);
+      this.model.set(this.formData, options);
     },
-
-    render () {
-      const testSmtpStatusInitialState = {
-        ...(this.testSmtpStatus && this.testSmtpStatus.getState() || {}),
-      };
-
-      if (this.testSmtpStatus) this.testSmtpStatus.remove();
-      this.testSmtpStatus = this.createChild(TestSmtpStatus, {
-        initialState: {
-          ...testSmtpStatusInitialState,
-        },
-      });
-      $('.js-testSmtpStatusContainer').html(this.testSmtpStatus.render().el);
-
-      return this;
-    }
-
   }
 }
 </script>

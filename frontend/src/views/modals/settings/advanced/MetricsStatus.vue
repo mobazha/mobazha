@@ -32,15 +32,18 @@ export default {
   },
   data () {
     return {
+      updateKey: 0,
     };
   },
   created () {
-    this.loadData(this.options);
+    this.listenTo(app.localSettings, 'change:shareMetrics', () => this.updateKey += 1);
   },
   mounted () {
   },
   computed: {
     ob () {
+      let access = this.updateKey;
+
       return {
         ...this.templateHelpers,
         shareMetrics: app.localSettings.get('shareMetrics'),
@@ -49,17 +52,10 @@ export default {
     }
   },
   methods: {
-    loadData (options = {}) {
-      this.baseInit(options);
-
-      this.listenTo(app.localSettings, 'change:shareMetrics', () => this.render());
-    },
-
     onClickChangeSharing () {
       recordEvent('Settings_Advanced_ChangeSharing');
       showMetricsModal();
     },
-
   }
 }
 </script>

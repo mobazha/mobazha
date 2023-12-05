@@ -190,13 +190,19 @@
                   </div>
                 </div>
                 <div class="col9 js-walletSeedContainer">
+                  <WalletSeed
+                    :options="{
+                      seed: mnemonic || '',
+                      isFetching: isSeedFetching,
+                    }"
+                    @clickShowSeed="onClickShowSeed" />
                 </div>
               </div>
             </form>
           </div>
         </div>
       </div>
-      <template v-if="ob.bundled">
+      <template v-if="isBundledApp">
         <div class="contentBox padMd clrP clrBr clrSh3">
           <h2 class="h4 clrT">{{ ob.polyT('settings.advancedTab.integrations.sectionName') }}</h2>
           <hr class="clrBr" />
@@ -210,7 +216,9 @@
                     </label>
                     <div class="clrT2 txSm">{{ ob.polyT('settings.advancedTab.integrations.sharingHelper') }}</div>
                   </div>
-                  <div class="col9 js-metricsStatusWrapper"></div>
+                  <div class="col9 js-metricsStatusWrapper">
+                    <MetricsStatus />
+                  </div>
                 </div>
               </form>
             </div>
@@ -221,7 +229,15 @@
         <h2 class="h4 clrT">{{ ob.polyT('settings.advancedTab.smtp.sectionName') }}</h2>
         <hr class="clrBr" />
         <div class="tabFormWrapper clrS">
-          <div class="js-smtpSettingsContainer"></div>
+          <div class="js-smtpSettingsContainer">
+            <SmtpSettings ref="smtpSettings"
+              :bb="() => {
+                return {
+                  model: settings.get('smtpSettings')
+                };
+              }"
+            />
+          </div>
         </div>
       </div>
       <div class="contentBox padMd clrP clrBr clrSh3">
@@ -245,12 +261,17 @@ import app from '../../../../../backbone/app.js';
 import { openSimpleMessage } from '../../../../../backbone/views/modals/SimpleMessage';
 import Dialog from '../../../../../backbone/views/modals/Dialog';
 import { endAjaxEvent, recordEvent, startAjaxEvent } from '../../../../../backbone/utils/metrics.js';
-import WalletSeed from '../../../../../backbone/views/modals/Settings/advanced/WalletSeed.js';
-import SmtpSettings from '../../../../../backbone/views/modals/Settings/advanced/SmtpSettings';
-import MetricsStatus from '../../../../../backbone/views/modals/Settings/advanced/MetricsStatus';
 
+import WalletSeed from './WalletSeed.vue';
+import SmtpSettings from './SmtpSettings.vue';
+import MetricsStatus from './MetricsStatus.vue';
 
 export default {
+  components: {
+    WalletSeed,
+    SmtpSettings,
+    MetricsStatus,
+  },
   props: {
     options: {
       type: Object,
@@ -265,6 +286,12 @@ export default {
       isPurgeComplete: false,
       fetchingBlockData: false,
 
+      isBundledApp: false,
+
+      mnemonic: '',
+      isSeedFetching: false,
+      walletSeedFetch: undefined,
+
       localData: {
         showAdvancedVisualEffects: false,
         windowControlStyle: '',
@@ -276,14 +303,14 @@ export default {
   created () {
     this.initEventChain();
 
+    this.isBundledApp = ipc.sendSync('controller.system.getGlobal', 'isBundledApp');
+
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob () {
-      const bundled = ipc.sendSync('controller.system.getGlobal', 'isBundledApp');
 
       return {
         ...this.templateHelpers,
@@ -291,7 +318,6 @@ export default {
           ...(this.settings.validationError || {}),
           ...(this.localSettings.validationError || {}),
         },
-        bundled,
         ...this.settings.toJSON(),
         ...this.localSettings.toJSON(),
       };
@@ -334,17 +360,14 @@ export default {
         return this.walletSeedFetch;
       }
 
-      if (this.walletSeed) this.walletSeed.setState({ isFetching: true });
+      this.isSeedFetching = true;
 
       recordEvent('Settings_Advanced_ShowSeed');
 
       this.walletSeedFetch = $.get(app.getServerUrl('wallet/mnemonic')).done((data) => {
         this.mnemonic = data.mnemonic;
-        if (this.walletSeed) {
-          this.walletSeed.setState({ seed: data.mnemonic });
-        }
       }).always(() => {
-        if (this.walletSeed) this.walletSeed.setState({ isFetching: false });
+        this.isSeedFetching = false;
       })
         .fail(xhr => {
           openSimpleMessage(
@@ -352,8 +375,6 @@ export default {
             xhr.responseJSON && xhr.responseJSON.reason || ''
           );
         });
-
-      return this.walletSeedFetch;
     },
 
     showConnectionManagement () {
@@ -448,9 +469,9 @@ export default {
       this.localSettings.set(this.loadData);
       this.localSettings.set({}, { validate: true });
 
-      this.smtpSettings.setModelData();
+      this.$refs.smtpSettings.setModelData();
       const serverFormData = {
-        smtpSettings: this.smtpSettings.model.toJSON(),
+        smtpSettings: this.$refs.smtpSettings.model.toJSON(),
       };
       this.settings.set(serverFormData, { validate: true });
 
@@ -506,8 +527,6 @@ export default {
           });
       }
 
-      this.render();
-
       if (!this.localSettings.validationError && !this.settings.validationError) {
         this.isSaving = true;
       } else {
@@ -523,43 +542,6 @@ export default {
         }
       }
     },
-
-    get $smtpSettingsFields () {
-      const selector = `.js-smtpSettingsForm select[name], .js-smtpSettingsForm input[name],
-      .js-smtpSettingsForm textarea[name]:not([class*="trumbowyg"]),
-      .js-smtpSettingsForm div[contenteditable][name]`;
-
-      return $(selector);
-    },
-
-    render () {
-      const bundled = ipc.sendSync('controller.system.getGlobal', 'isBundledApp');
-
-      if (this.walletSeed) this.walletSeed.remove();
-      this.walletSeed = this.createChild(WalletSeed, {
-        initialState: {
-          seed: this.mnemonic || '',
-          isFetching: this.walletSeedFetch && this.walletSeedFetch.state() === 'pending',
-        },
-      });
-      this.listenTo(this.walletSeed, 'clickShowSeed', this.onClickShowSeed);
-      $('.js-walletSeedContainer').append(this.walletSeed.render().el);
-
-      if (this.smtpSettings) this.smtpSettings.remove();
-      this.smtpSettings = this.createChild(SmtpSettings, {
-        model: this.settings.get('smtpSettings'),
-      });
-      $('.js-smtpSettingsContainer').html(this.smtpSettings.render().el);
-
-      if (this.metricsStatus) this.metricsStatus.remove();
-      if (bundled) {
-        this.metricsStatus = this.createChild(MetricsStatus);
-        $('.js-metricsStatusWrapper').append(this.metricsStatus.render().el);
-      }
-
-      return this;
-    }
-
   }
 }
 </script>

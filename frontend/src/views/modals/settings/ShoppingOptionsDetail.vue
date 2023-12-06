@@ -13,8 +13,8 @@
       <th>挂号费</th>
     </tr>
     <tbody>
-      <tr v-for="item in data.options" :key="index">
-        <td>{{ item.server }}</td>
+      <tr v-for="(item, index) in data.options" :key="index">
+        <td>{{ item.service }}</td>
         <td>{{ item.deliveryTime }}</td>
         <td>{{ item.startWeight }}</td>
         <td>{{ item.endWeight }}</td>
@@ -27,7 +27,7 @@
     </tbody>
   </table>
   <!-- <el-table :data="data.options" :border="true" scrollbar-always-on>
-    <el-table-column label="服务" prop="server" show-overflow-tooltip />
+    <el-table-column label="服务" prop="service" show-overflow-tooltip />
     <el-table-column label="运送时间" prop="deliveryTime" show-overflow-tooltip />
     <el-table-column label="开始重量" prop="startWeight" show-overflow-tooltip />
     <el-table-column label="结束重量" prop="endWeight" show-overflow-tooltip />

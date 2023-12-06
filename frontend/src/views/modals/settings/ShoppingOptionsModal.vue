@@ -17,8 +17,8 @@
       <el-table :data="formData.options" :border="true" row-class-name="form-table" cell-class-name="cell-form-table">
         <el-table-column label="服务" width="130">
           <template v-slot="{ row, $index }">
-            <el-form-item :prop="`options.${$index}.server`" :rules="rules.server">
-              <el-input v-model="row.server" placeholder="例如标准，中通快递，隔日到" clearable maxlength="20" />
+            <el-form-item :prop="`options.${$index}.service`" :rules="rules.service">
+              <el-input v-model="row.service" placeholder="例如标准，中通快递，隔日到" clearable maxlength="20" />
             </el-form-item>
           </template>
         </el-table-column>
@@ -108,7 +108,7 @@ export default {
         templateId: '',
         options: [
           {
-            server: '',
+            service: '',
             deliveryTime: '',
             startWeight: '',
             endWeight: '',
@@ -128,7 +128,7 @@ export default {
             trigger: ['change', 'blur'],
           },
         ],
-        server: [
+        service: [
           {
             required: true,
             message: '请输入服务',
@@ -203,7 +203,7 @@ export default {
       this.formData = {
         templateId: '',
         options: [
-          { server: '', deliveryTime: '', startWeight: '', endWeight: '', firstPrice: '', firstFreight: '', renewalFee: '', price: '', registrationFee: '' },
+          { service: '', deliveryTime: '', startWeight: '', endWeight: '', firstPrice: '', firstFreight: '', renewalFee: '', price: '', registrationFee: '' },
         ],
       };
       this.visible = false;
@@ -213,7 +213,7 @@ export default {
     },
     doAdd() {
       this.formData.options.push({
-        server: '',
+        service: '',
         deliveryTime: '',
         startWeight: '',
         endWeight: '',

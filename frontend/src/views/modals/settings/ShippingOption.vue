@@ -68,7 +68,7 @@
             </Select2>
           </div>
         </div>
-        <div class="flexRow gutterH js-serviceSection" v-show="formData.type !== 'LOCAL_PICKUP'">
+        <!-- <div class="flexRow gutterH js-serviceSection" v-show="formData.type !== 'LOCAL_PICKUP'">
           <div class="col3">
             <label class="required">{{ ob.polyT('editListing.shippingOptions.services.nameLabel') }}</label>
           </div>
@@ -96,11 +96,13 @@
               @click-remove="onRemoveService"
             />
           </template>
-        </div>
+        </div> -->
+        <ShoppingOptionsDetail v-if="expressInfo.options.length" :data="{ templateId: expressInfo.templateId, options: expressInfo.options }" />
         <div class="flexRow pad js-serviceSection" v-show="formData.type !== 'LOCAL_PICKUP'">
-          <a class="clrBr clrP clrTEm js-btnAddService" @click="onClickAddService">{{ ob.polyT('editListing.shippingOptions.services.addService') }}</a>
+          <a class="clrBr clrP clrTEm js-btnAddService" @click="addExpressInfo">{{ ob.polyT('editListing.shippingOptions.services.addService') }}</a>
         </div>
       </form>
+      <ShoppingOptionsModal ref="modal" @getExpressInfo="getExpressInfo" />
     </div>
   </section>
 </template>
@@ -114,9 +116,14 @@ import { getCurrenciesSortedByCode } from '../../../../backbone/data/currencies'
 import ServiceMd from '../../../../backbone/models/listing/Service';
 import Service from './Service.vue';
 
+import ShoppingOptionsDetail from './ShoppingOptionsDetail.vue';
+import ShoppingOptionsModal from './ShoppingOptionsModal.vue';
+
 export default {
   components: {
     Service,
+    ShoppingOptionsDetail,
+    ShoppingOptionsModal,
   },
   emits: ['click-remove'],
   props: {
@@ -134,6 +141,11 @@ export default {
         type: '',
       },
       currencies: getCurrenciesSortedByCode(),
+
+      expressInfo: {
+        templateId: '0',
+        options: []
+      },
     };
   },
   created() {
@@ -261,6 +273,14 @@ export default {
       });
 
       return selectedRegions;
+    },
+
+    addExpressInfo() {
+      this.$refs.modal.open();
+    },
+    getExpressInfo({ templateId, options }) {
+      this.expressInfo.templateId = templateId;
+      this.expressInfo.options = options;
     },
 
     render() {

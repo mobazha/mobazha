@@ -136,19 +136,6 @@
               </div>
             </div>
           </div>
-          <Express :ob="ob" :shippingOptions="shippingOptions" @onClickAddShippingOption="onClickAddShippingOption">
-            <template v-slot="{ item: { $index, ...item } }">
-              <ShippingOption
-                ref="shippingOptionViews"
-                :options="{
-                  getCurrency: () => formData.metadata.pricingCurrency.code,
-                  listPosition: $index + 1,
-                }"
-                :bb="() => ({ model: item })"
-                @click-remove="onRemoveShippingOption"
-              />
-            </template>
-          </Express>
           <div class="box padMdKids padStack">
             <div class="flexRow gutterH">
               <div class="col3">

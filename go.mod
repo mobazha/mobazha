@@ -1,6 +1,6 @@
 module github.com/cpacia/openbazaar3.0
 
-go 1.18
+go 1.19
 
 replace (
 	github.com/cpacia/go-onion-transport => /Users/mingfeng/go/src/github.com/cpacia/go-onion-transport

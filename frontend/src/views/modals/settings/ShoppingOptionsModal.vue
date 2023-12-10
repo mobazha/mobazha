@@ -17,15 +17,15 @@
       <el-table :data="formData.options" :border="true" row-class-name="form-table" cell-class-name="cell-form-table">
         <el-table-column label="服务" width="130">
           <template v-slot="{ row, $index }">
-            <el-form-item :prop="`options.${$index}.service`" :rules="rules.service">
-              <el-input v-model="row.service" placeholder="例如标准，中通快递，隔日到" clearable maxlength="20" />
+            <el-form-item :prop="`options.${$index}.name`" :rules="rules.name">
+              <el-input v-model="row.name" placeholder="例如标准，中通快递，隔日到" clearable maxlength="20" />
             </el-form-item>
           </template>
         </el-table-column>
         <el-table-column label="运送时间" width="110">
           <template v-slot="{ row, $index }">
-            <el-form-item :prop="`options.${$index}.deliveryTime`" :rules="rules.deliveryTime">
-              <el-input v-model="row.deliveryTime" placeholder="例如5-7天" clearable maxlength="20" />
+            <el-form-item :prop="`options.${$index}.estimatedDelivery`" :rules="rules.estimatedDelivery">
+              <el-input v-model="row.estimatedDelivery" placeholder="例如5-7天" clearable maxlength="20" />
             </el-form-item>
           </template>
         </el-table-column>
@@ -43,34 +43,46 @@
             </el-form-item>
           </template>
         </el-table-column>
-        <el-table-column v-if="formData.templateId === '0'" label="价格（首重）">
-          <template v-slot="{ row, $index }">
-            <el-form-item :prop="`options.${$index}.firstPrice`" :rules="rules.firstPrice">
-              <el-input v-model="row.firstPrice" placeholder="请输入" clearable maxlength="20" type="number" />
-            </el-form-item>
-          </template>
-        </el-table-column>
-        <el-table-column label="首重运费">
-          <template v-slot="{ row, $index }">
-            <el-form-item :prop="`options.${$index}.firstFreight`" :rules="rules.firstFreight">
-              <el-input v-model="row.firstFreight" placeholder="请输入" clearable maxlength="20" type="number" />
-            </el-form-item>
-          </template>
-        </el-table-column>
-        <el-table-column v-if="formData.templateId === '0'" label="价格（续重）">
-          <template v-slot="{ row, $index }">
-            <el-form-item :prop="`options.${$index}.renewalFee`" :rules="rules.renewalFee">
-              <el-input v-model="row.renewalFee" placeholder="请输入" clearable maxlength="20" type="number" />
-            </el-form-item>
-          </template>
-        </el-table-column>
-        <el-table-column label="单价">
-          <template v-slot="{ row, $index }">
-            <el-form-item :prop="`options.${$index}.price`" :rules="rules.price">
-              <el-input v-model="row.price" placeholder="请输入" clearable maxlength="20" type="number" />
-            </el-form-item>
-          </template>
-        </el-table-column>
+        <template v-if="formData.templateId === '0'">
+          <el-table-column label="首重">
+            <template v-slot="{ row, $index }">
+              <el-form-item :prop="`options.${$index}.firstWeight`" :rules="rules.firstWeight">
+                <el-input v-model="row.firstWeight" placeholder="请输入" clearable maxlength="20" type="number" />
+              </el-form-item>
+            </template>
+          </el-table-column>
+          <el-table-column label="首重运费">
+            <template v-slot="{ row, $index }">
+              <el-form-item :prop="`options.${$index}.firstFreight`" :rules="rules.firstFreight">
+                <el-input v-model="row.firstFreight" placeholder="请输入" clearable maxlength="20" type="number" />
+              </el-form-item>
+            </template>
+          </el-table-column>
+          <el-table-column label="续重单位重量">
+            <template v-slot="{ row, $index }">
+              <el-form-item :prop="`options.${$index}.renewalUnitWeight`" :rules="rules.renewalUnitWeight">
+                <el-input v-model="row.renewalUnitWeight" placeholder="请输入" clearable maxlength="20" type="number" />
+              </el-form-item>
+            </template>
+          </el-table-column>
+          <el-table-column label="单价">
+            <template v-slot="{ row, $index }">
+              <el-form-item :prop="`options.${$index}.renewalUnitPrice`" :rules="rules.renewalUnitPrice">
+                <el-input v-model="row.renewalUnitPrice" placeholder="请输入" clearable maxlength="20" type="number" />
+              </el-form-item>
+            </template>
+          </el-table-column>
+        </template>
+        <template v-else>
+          <el-table-column label="费用">
+            <template v-slot="{ row, $index }">
+              <el-form-item :prop="`options.${$index}.firstFreight`" :rules="rules.firstFreight">
+                <el-input v-model="row.firstFreight" placeholder="请输入" clearable maxlength="20" type="number" />
+              </el-form-item>
+            </template>
+          </el-table-column>
+        </template>
+        
         <el-table-column label="挂号费">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`options.${$index}.registrationFee`" :rules="rules.registrationFee">
@@ -108,14 +120,14 @@ export default {
         templateId: '',
         options: [
           {
-            service: '',
-            deliveryTime: '',
+            name: '',
+            estimatedDelivery: '',
             startWeight: '',
             endWeight: '',
-            firstPrice: '',
+            firstWeight: '',
             firstFreight: '',
-            renewalFee: '',
-            price: '',
+            renewalUnitWeight: '',
+            renewalUnitPrice: '',
             registrationFee: '',
           },
         ],
@@ -128,14 +140,14 @@ export default {
             trigger: ['change', 'blur'],
           },
         ],
-        service: [
+        name: [
           {
             required: true,
             message: '请输入服务',
             trigger: ['change', 'blur'],
           },
         ],
-        deliveryTime: [
+        estimatedDelivery: [
           {
             required: true,
             message: '请输入运送时间',
@@ -156,10 +168,10 @@ export default {
             trigger: ['change', 'blur'],
           },
         ],
-        firstPrice: [
+        firstWeight: [
           {
             required: true,
-            message: '请输入首重价格',
+            message: '请输入首重',
             trigger: ['change', 'blur'],
           },
         ],
@@ -170,14 +182,14 @@ export default {
             trigger: ['change', 'blur'],
           },
         ],
-        renewalFee: [
+        renewalUnitWeight: [
           {
             required: true,
-            message: '请输入续重价格',
+            message: '请输入续重单位重量',
             trigger: ['change', 'blur'],
           },
         ],
-        price: [
+        renewalUnitPrice: [
           {
             required: true,
             message: '请输入单价',
@@ -203,7 +215,7 @@ export default {
       this.formData = {
         templateId: '',
         options: [
-          { service: '', deliveryTime: '', startWeight: '', endWeight: '', firstPrice: '', firstFreight: '', renewalFee: '', price: '', registrationFee: '' },
+          { name: '', estimatedDelivery: '', startWeight: '', endWeight: '', firstWeight: 0, firstFreight: '', renewalUnitWeight: '', renewalUnitPrice: '', registrationFee: '' },
         ],
       };
       this.visible = false;
@@ -213,14 +225,14 @@ export default {
     },
     doAdd() {
       this.formData.options.push({
-        service: '',
-        deliveryTime: '',
+        name: '',
+        estimatedDelivery: '',
         startWeight: '',
         endWeight: '',
-        firstPrice: '',
+        firstWeight: 0,
         firstFreight: '',
-        renewalFee: '',
-        price: '',
+        renewalUnitWeight: '',
+        renewalUnitPrice: '',
         registrationFee: '',
       });
     },

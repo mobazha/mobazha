@@ -203,14 +203,12 @@ import BulkCoinUpdateBtn from './BulkCoinUpdateBtn.vue';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import ShippingOptionMd from '../../../../backbone/models/listing/ShippingOption';
 import Service from '../../../../backbone/models/listing/Service';
-import Express from './Express.vue';
 import ShippingOption from './ShippingOption.vue';
 
 export default {
   components: {
     BulkCoinUpdateBtn,
     ShippingOption,
-    Express,
   },
   props: {
     options: {

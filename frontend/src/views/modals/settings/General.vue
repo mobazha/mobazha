@@ -22,10 +22,10 @@
                   <option :value="lang.code" :selected="lang.code == localData.language">{{ lang.name }}</option>
                 </template>
               </Select2>
-              <div class="clrT2 txSm padSm">{{ ob.polyT('settings.generalTab.helperTranslations', {
-                helperTranslationsLink: `<a href="https://www.transifex.com/ob1/openbazaar/"
-                  class="clrTEm">${ob.polyT('settings.generalTab.helperTranslationsLink')}</a>`
-              }) }}</div>
+              <div class="clrT2 txSm padSm" v-html='ob.polyT("settings.generalTab.helperTranslations", {
+                helperTranslationsLink: `<a href="https://www.transifex.com/mobazha/mobazha/"
+                  class="clrTEm">${ob.polyT("settings.generalTab.helperTranslationsLink")}</a>`
+              })'></div>
             </div>
           </div>
           <div class="flexRow gutterH">

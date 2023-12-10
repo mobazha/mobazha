@@ -27,7 +27,7 @@
               <template v-else>
                 {{
                   ob.currencyMod.convertAndFormatCurrency(
-                    service.price,
+                    service.firstFreight,
                     option.currency,
                     ob.displayCurrency
                   )
@@ -35,14 +35,14 @@
               </template>
             </td>
             <td>
-              <template v-if="service.additionalWeightPrice && service.additionalWeightPrice.eq(0)">
+              <template v-if="service.renewalUnitPrice && service.renewalUnitPrice.eq(0)">
                 <div class="clrE1 clrTOnEmph phraseBox floL">{{ ob.polyT('listingDetail.freeShippingBanner') }}</div>
               </template>
 
               <template v-else>
                 {{
                   ob.currencyMod.convertAndFormatCurrency(
-                    service.additionalWeightPrice,
+                    service.renewalUnitPrice,
                     option.currency,
                     ob.displayCurrency
                   )
@@ -104,7 +104,7 @@ export default {
         })
     },
     fShp (service) {
-      return service.price && service.price.eq(0) ? true : false;
+      return service.firstFreight && service.firstFreight.eq(0) ? true : false;
     }
   }
 }

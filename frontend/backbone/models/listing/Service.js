@@ -10,10 +10,16 @@ export default class extends BaseModel {
   defaults() {
     return {
       name: '',
-      price: '',
-      additionalWeightPrice: '',
       estimatedDelivery: '',
       currency: '',
+
+      startWeight: 0,
+      endWeight: 0,
+      firstWeight: 0,
+      firstFreight: '',
+      renewalUnitWeight: 0,
+      renewalUnitPrice: '',
+      registrationFee: '',
     };
   }
 
@@ -47,11 +53,11 @@ export default class extends BaseModel {
     
     this.validateCurrencyAmount(
       {
-        amount: attrs.price,
+        amount: attrs.firstFreight,
         currency: curDefCurrency,
       },
       addError,
-      `price`,
+      `firstFreight`,
       {
         validationOptions: {
           rangeType: CUR_VAL_RANGE_TYPES.GREATER_THAN_OR_EQUAL_ZERO,
@@ -61,11 +67,25 @@ export default class extends BaseModel {
 
     this.validateCurrencyAmount(
       {
-        amount: attrs.additionalWeightPrice,
+        amount: attrs.renewalUnitPrice,
         currency: curDefCurrency,
       },
       addError,
-      `additionalWeightPrice`,
+      `renewalUnitPrice`,
+      {
+        validationOptions: {
+          rangeType: CUR_VAL_RANGE_TYPES.GREATER_THAN_OR_EQUAL_ZERO,
+        },
+      }
+    );
+
+    this.validateCurrencyAmount(
+      {
+        amount: attrs.registrationFee,
+        currency: curDefCurrency,
+      },
+      addError,
+      `registrationFee`,
       {
         validationOptions: {
           rangeType: CUR_VAL_RANGE_TYPES.GREATER_THAN_OR_EQUAL_ZERO,

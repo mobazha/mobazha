@@ -90,15 +90,18 @@ export default class extends BaseModel {
         const coinDiv = getCoinDivisibility(shipOpt.currency);
 
         shipOpt.services.forEach(service => {
-          service.price = decimalToInteger(
-            service.price,
+          service.firstFreight = decimalToInteger(
+            service.firstFreight,
             coinDiv
           );
-          service.additionalWeightPrice =
-            decimalToInteger(
-              service.additionalWeightPrice,
-              coinDiv
-            );
+          service.renewalUnitPrice = decimalToInteger(
+            service.renewalUnitPrice,
+            coinDiv
+          );
+          service.registrationFee = decimalToInteger(
+            service.registrationFee,
+            coinDiv
+          );
         });
       });
     }
@@ -134,17 +137,21 @@ export default class extends BaseModel {
 
         if (shipOpt.services && shipOpt.services.length) {
           shipOpt.services.forEach(service => {
-            service.price = integerToDecimal(
-              service.price,
+            service.firstFreight = integerToDecimal(
+              service.firstFreight,
               coinDiv,
-              { fieldName: 'service.price' }
+              { fieldName: 'service.firstFreight' }
             );
-            service.additionalWeightPrice =
-              integerToDecimal(
-                service.additionalWeightPrice,
-                coinDiv,
-                { fieldName: 'service.additionalWeightPrice' }
-              );
+            service.renewalUnitPrice = integerToDecimal(
+              service.renewalUnitPrice,
+              coinDiv,
+              { fieldName: 'service.renewalUnitPrice' }
+            );
+            service.registrationFee = integerToDecimal(
+              service.registrationFee,
+              coinDiv,
+              { fieldName: 'service.registrationFee' }
+            );
           });
         }
       });

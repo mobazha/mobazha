@@ -715,17 +715,21 @@ export default class extends BaseModel {
           parsedResponse.shippingOptions.forEach((shipOpt, shipOptIndex) => {
             if (shipOpt.services && shipOpt.services.length) {
               shipOpt.services.forEach(service => {
-                service.price = integerToDecimal(
-                  service.price,
+                service.firstFreight = integerToDecimal(
+                  service.firstFreight,
                   coinDiv,
-                  { fieldName: 'service.price' }
+                  { fieldName: 'service.firstFreight' }
                 );
-                service.additionalWeightPrice =
-                  integerToDecimal(
-                    service.additionalWeightPrice,
-                    coinDiv,
-                    { fieldName: 'service.additionalWeightPrice' }
-                  );
+                service.renewalUnitPrice = integerToDecimal(
+                  service.renewalUnitPrice,
+                  coinDiv,
+                  { fieldName: 'service.renewalUnitPrice' }
+                );
+                service.registrationFee = integerToDecimal(
+                  service.registrationFee,
+                  coinDiv,
+                  { fieldName: 'service.registrationFee' }
+                );
               });
             }
 

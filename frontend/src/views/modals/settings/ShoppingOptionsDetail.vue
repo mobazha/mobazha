@@ -6,35 +6,45 @@
       <th>运送时间</th>
       <th>开始重量</th>
       <th>结束重量</th>
-      <th v-if="data.templateId === '0'">价格（首重）</th>
-      <th>首重运费</th>
-      <th v-if="data.templateId === '0'">价格（续重）</th>
-      <th>单价</th>
+      <template v-if="data.templateId === '0'">
+        <th>首重</th>
+        <th>首重运费</th>
+        <th>续重单位重量</th>
+        <th>单价</th>
+      </template>
+      <template v-else>
+        <th>费用</th>
+      </template>
       <th>挂号费</th>
     </tr>
     <tbody>
       <tr v-for="(item, index) in data.options" :key="index">
         <td>{{ item.service }}</td>
-        <td>{{ item.deliveryTime }}</td>
+        <td>{{ item.estimatedDelivery }}</td>
         <td>{{ item.startWeight }}</td>
         <td>{{ item.endWeight }}</td>
-        <td v-if="data.templateId === '0'">{{ item.firstPrice }}</td>
-        <td>{{ item.firstFreight }}</td>
-        <td v-if="data.templateId === '0'">{{ item.renewalFee }}</td>
-        <td>{{ item.price }}</td>
+        <template v-if="data.templateId === '0'">
+          <td>{{ item.firstWeight }}</td>
+          <td>{{ item.firstFreight }}</td>
+          <td>{{ item.renewalUnitWeight }}</td>
+          <td>{{ item.renewalUnitPrice }}</td>
+        </template>
+        <template v-else>
+          <td>{{ item.firstFreight }}</td>
+        </template>
         <td>{{ item.registrationFee }}</td>
       </tr>
     </tbody>
   </table>
   <!-- <el-table :data="data.options" :border="true" scrollbar-always-on>
     <el-table-column label="服务" prop="service" show-overflow-tooltip />
-    <el-table-column label="运送时间" prop="deliveryTime" show-overflow-tooltip />
+    <el-table-column label="运送时间" prop="estimatedDelivery" show-overflow-tooltip />
     <el-table-column label="开始重量" prop="startWeight" show-overflow-tooltip />
     <el-table-column label="结束重量" prop="endWeight" show-overflow-tooltip />
     <el-table-column label="价格（首重）" prop="firstPrice" show-overflow-tooltip />
     <el-table-column label="首重运费" prop="firstFreight" show-overflow-tooltip />
     <el-table-column label="价格（续重）" prop="renewalFee" show-overflow-tooltip />
-    <el-table-column label="单价" prop="price" show-overflow-tooltip />
+    <el-table-column label="单价" prop="renewalUnitPrice" show-overflow-tooltip />
     <el-table-column label="挂号费" prop="registrationFee" show-overflow-tooltip />
   </el-table> -->
 </template>

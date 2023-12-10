@@ -6,9 +6,11 @@ import is from 'is_js';
 export default class extends BaseModel {
   defaults() {
     return {
+      id: -1,
       name: '',
       type: 'FIXED_PRICE',
       currency: '',
+      serviceType: '',
       regions: [],
       services: new Services(),
     };

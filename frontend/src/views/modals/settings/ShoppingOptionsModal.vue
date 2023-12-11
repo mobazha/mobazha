@@ -30,7 +30,7 @@
         <el-table-column label="开始重量">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.startWeight`" :rules="rules.startWeight">
-              <el-input v-model.number="row.startWeight" placeholder="请输入" clearable maxlength="20" />
+              <el-input v-model.number="row.startWeight" placeholder="0" disabled clearable maxlength="20" />
             </el-form-item>
           </template>
         </el-table-column>

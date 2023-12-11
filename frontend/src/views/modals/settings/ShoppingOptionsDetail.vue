@@ -1,16 +1,16 @@
 <template>
   <div class="template-name" v-if="templateName">{{ templateName }}</div>
+  <div class="tips" v-if="formData.serviceType">
+    <span class="tips-btn">说明!</span>{{ serviceTypeTip }}
+  </div>
   <table class="table" width="100%" border="1" cellpadding="0" cellspacing="0">
     <tr>
       <th>服务</th>
       <th>运送时间</th>
-      <th>开始重量</th>
-      <th>结束重量</th>
+      <th>重量范围</th>
       <template v-if="formData.serviceType === 'FIRST_RENEWAL_FEE'">
-        <th>首重</th>
-        <th>首重运费</th>
-        <th>续重单位重量</th>
-        <th>单价</th>
+        <th>首重/首重费用</th>
+        <th>续重单位重量/单价</th>
       </template>
       <template v-else>
         <th>费用</th>
@@ -21,13 +21,10 @@
       <tr v-for="(item, index) in formData.services" :key="index">
         <td>{{ item.name }}</td>
         <td>{{ item.estimatedDelivery }}</td>
-        <td>{{ item.startWeight }}</td>
-        <td>{{ item.endWeight }}</td>
+        <td>{{ `${item.startWeight}g ~ ${item.endWeight}g` }}</td>
         <template v-if="formData.serviceType === 'FIRST_RENEWAL_FEE'">
-          <td>{{ item.firstWeight }}</td>
-          <td>{{ item.firstFreight }}</td>
-          <td>{{ item.renewalUnitWeight }}</td>
-          <td>{{ item.renewalUnitPrice }}</td>
+          <td>{{ `${item.firstWeight}g / ${item.firstFreight}` }}</td>
+          <td>{{ `${item.renewalUnitWeight}g / ${item.renewalUnitPrice}` }}</td>
         </template>
         <template v-else>
           <td>{{ item.firstFreight }}</td>
@@ -73,6 +70,14 @@ export default {
       if (!this.formData.serviceType) return '';
       return this.options.find((item) => item.value === this.formData.serviceType)?.label ?? '';
     },
+    serviceTypeTip() {
+      if (this.formData.serviceType === 'FIRST_RENEWAL_FEE') {
+        return '运费=首重费用+ (包裹重量-首重)/续重单位重量单价+挂号费';
+      } else if (this.formData.serviceType === 'SAME_WEIGHT_SAME_FEE') {
+        return '运费=费用+挂号费';
+      }
+      return '';
+    },
   },
   methods: {
     loadData () {
@@ -103,6 +108,18 @@ export default {
   line-height: 40px;
   font-size: 14px;
   font-weight: bold;
+}
+.tips {
+  display: flex;
+  align-items: center;
+  color: #999;
+  margin-bottom: 10px;
+  &-btn {
+    padding: 2px 14px;
+    background: green;
+    color: #fff;
+    margin-right: 10px;
+  }
 }
 .table {
   border-collapse: collapse;

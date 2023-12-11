@@ -68,41 +68,24 @@
             </Select2>
           </div>
         </div>
-        <!-- <div class="flexRow gutterH js-serviceSection" v-show="formData.type !== 'LOCAL_PICKUP'">
-          <div class="col3">
-            <label class="required">{{ ob.polyT('editListing.shippingOptions.services.nameLabel') }}</label>
-          </div>
-          <div class="col3">
-            <label class="required">{{ ob.polyT('editListing.shippingOptions.services.estimatedDeliveryLabel') }}</label>
-          </div>
-          <div class="col3">
-            <label class="required">{{ ob.polyT('editListing.shippingOptions.services.priceLabel') }}</label>
-          </div>
-          <div class="col3">
-            <label class="required">{{ ob.polyT('editListing.shippingOptions.services.additionalWeightPriceLabel') }}</label>
-          </div>
-        </div>
-        <div class="js-servicesWrap js-serviceSection servicesWrap padKids padStack padTop0" v-show="formData.type !== 'LOCAL_PICKUP'">
-          <template v-for="serviceMd in model.get('services')">
-            <Service
-              ref="serviceViews"
-              :bb="
-                function () {
-                  return {
-                    model: serviceMd,
-                  };
-                }
-              "
-              @click-remove="onRemoveService"
-            />
-          </template>
-        </div> -->
-        <ShoppingOptionsDetail v-if="expressInfo.options.length" :data="{ templateId: expressInfo.templateId, options: expressInfo.options }" />
+        <ShoppingOptionsDetail v-show="formData.type !== 'LOCAL_PICKUP' && model.get('services').length"
+          :bb="() => {
+            return {
+              shippingOption: model,
+            }
+          }"
+        />
         <div class="flexRow pad js-serviceSection" v-show="formData.type !== 'LOCAL_PICKUP'">
           <a class="clrBr clrP clrTEm js-btnAddService" @click="addExpressInfo">{{ ob.polyT('editListing.shippingOptions.services.addService') }}</a>
         </div>
       </form>
-      <ShoppingOptionsModal ref="modal" @getExpressInfo="getExpressInfo" />
+      <ShoppingOptionsModal ref="modal"
+        :bb="() => {
+          return {
+            shippingOption: model,
+          }
+        }"
+      />
     </div>
   </section>
 </template>
@@ -141,11 +124,6 @@ export default {
         type: '',
       },
       currencies: getCurrenciesSortedByCode(),
-
-      expressInfo: {
-        templateId: '0',
-        options: []
-      },
     };
   },
   created() {
@@ -244,8 +222,6 @@ export default {
       // set the data for our nested Services views
       if (this.formData.type === 'LOCAL_PICKUP') {
         this.model.set('services', []);
-      } else {
-        (this.$refs.serviceViews ?? []).forEach((serviceVw) => serviceVw.setModelData());
       }
 
       this.model.set(this.getFormDataEx());
@@ -277,10 +253,6 @@ export default {
 
     addExpressInfo() {
       this.$refs.modal.open();
-    },
-    getExpressInfo({ templateId, options }) {
-      this.expressInfo.templateId = templateId;
-      this.expressInfo.options = options;
     },
 
     render() {

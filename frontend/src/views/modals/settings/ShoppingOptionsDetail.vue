@@ -6,7 +6,7 @@
       <th>运送时间</th>
       <th>开始重量</th>
       <th>结束重量</th>
-      <template v-if="data.templateId === '0'">
+      <template v-if="formData.serviceType === 'FIRST_RENEWAL_FEE'">
         <th>首重</th>
         <th>首重运费</th>
         <th>续重单位重量</th>
@@ -18,12 +18,12 @@
       <th>挂号费</th>
     </tr>
     <tbody>
-      <tr v-for="(item, index) in data.options" :key="index">
-        <td>{{ item.service }}</td>
+      <tr v-for="(item, index) in formData.services" :key="index">
+        <td>{{ item.name }}</td>
         <td>{{ item.estimatedDelivery }}</td>
         <td>{{ item.startWeight }}</td>
         <td>{{ item.endWeight }}</td>
-        <template v-if="data.templateId === '0'">
+        <template v-if="formData.serviceType === 'FIRST_RENEWAL_FEE'">
           <td>{{ item.firstWeight }}</td>
           <td>{{ item.firstFreight }}</td>
           <td>{{ item.renewalUnitWeight }}</td>
@@ -50,26 +50,51 @@
 </template>
 <script>
 export default {
+  props: {
+    bb: Function,
+  },
   data() {
     return {
+      formData: {
+        serviceType: 'FIRST_RENEWAL_FEE',
+        services: [],
+      },
       options: [
-        { label: '模板一', value: '0' },
-        { label: '模板二', value: '1' },
+        { label: '按首重续费计算', value: 'FIRST_RENEWAL_FEE' },
+        { label: '同重量段费用相同', value: 'SAME_WEIGHT_SAME_FEE' },
       ],
     };
   },
-  props: {
-    data: {
-      type: Object,
-      default: () => ({ templateId: '', options: [] }),
-    },
+  created () {
+    this.loadData();
   },
   computed: {
     templateName() {
-      if (!this.data.templateId) return '';
-      return this.options.find((item) => item.value === this.data.templateId)?.label ?? '';
+      if (!this.formData.serviceType) return '';
+      return this.options.find((item) => item.value === this.formData.serviceType)?.label ?? '';
     },
   },
+  methods: {
+    loadData () {
+      if (!this.shippingOption) {
+        throw new Error('Please provide a shippingOption model.');
+      }
+
+      this.initFormData();
+
+      this.shippingOption.on('change', () => this.initFormData());
+      this.shippingOption.get('services').on('change', () => this.initFormData());
+    },
+
+    initFormData() {
+      const optionData = this.shippingOption.toJSON();
+
+      this.formData = {
+        serviceType: optionData.serviceType,
+        services: optionData.services,
+      }
+    }
+  }
 };
 </script>
 <style lang="scss" scoped>

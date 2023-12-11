@@ -2,15 +2,15 @@
   <el-dialog class="form-dialog" title="添加服务" v-model="visible" width="1080px" append-to-body :before-close="onCancel">
     <el-form ref="form" size="small" :model="formData" :rules="rules" label-width="0">
       <div class="form-head">
-        <el-form-item label="模板" label-width="auto" prop="serviceType" :rules="rules.serviceType">
-          <el-select @change="changeSelect" v-model="formData.serviceType" placeholder="请选择模板">
-            <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-button class="add-btn" link type="success" @click="doAdd">+添加</el-button>
-      </div>
-      <div class="tips" v-if="formData.serviceType">
-        <span class="tips-btn">说明!</span>{{ serviceTypeTip }}
+        <div class="form-head__select">
+          <el-form-item label="模板" label-width="auto" prop="serviceType" :rules="rules.serviceType">
+            <el-select @change="changeSelect" v-model="formData.serviceType" placeholder="请选择模板">
+              <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
+          </el-form-item>
+          <el-button class="add-btn" link type="success" @click="doAdd">+添加</el-button>
+        </div>
+        <div class="tips" v-if="formData.serviceType"><span class="tips-btn">说明!</span>{{ serviceTypeTip }}</div>
       </div>
       <el-table :data="formData.services" :border="true" row-class-name="form-table" cell-class-name="cell-form-table">
         <el-table-column label="服务" width="130">
@@ -80,7 +80,7 @@
             </template>
           </el-table-column>
         </template>
-        
+
         <el-table-column label="挂号费">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.registrationFee`" :rules="rules.registrationFee">
@@ -158,41 +158,35 @@ export default {
             trigger: ['change', 'blur'],
           },
         ],
-        name: [
-          { required: true, message: '请输入服务',  trigger: ['change', 'blur'], },
-        ],
-        estimatedDelivery: [
-          { required: true, message: '请输入运送时间', trigger: ['change', 'blur'], },
-        ],
-        startWeight: [
-          { required: true, message: '请输入开始重量', trigger: ['change', 'blur'], },
-        ],
+        name: [{ required: true, message: '请输入服务', trigger: ['change', 'blur'] }],
+        estimatedDelivery: [{ required: true, message: '请输入运送时间', trigger: ['change', 'blur'] }],
+        startWeight: [{ required: true, message: '请输入开始重量', trigger: ['change', 'blur'] }],
         endWeight: [
-          { required: true, message: '请输入结束重量', trigger: ['change', 'blur'], },
+          { required: true, message: '请输入结束重量', trigger: ['change', 'blur'] },
           { type: 'number', message: 'Input must be a number' },
-          { validator: checkPositiveVal, trigger: ['change', 'blur'] }
+          { validator: checkPositiveVal, trigger: ['change', 'blur'] },
         ],
         firstWeight: [
-          { required: true, message: '请输入首重', trigger: ['change', 'blur'], },
+          { required: true, message: '请输入首重', trigger: ['change', 'blur'] },
           { type: 'number', message: 'Input must be a number' },
-          { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] }
+          { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] },
         ],
         firstFreight: [
-          { required: true, message: '请输入首重运费', trigger: ['change', 'blur'], },
-          { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] }
+          { required: true, message: '请输入首重运费', trigger: ['change', 'blur'] },
+          { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] },
         ],
         renewalUnitWeight: [
-          { required: true, message: '请输入续重单位重量', trigger: ['change', 'blur'], },
+          { required: true, message: '请输入续重单位重量', trigger: ['change', 'blur'] },
           { type: 'number', message: 'Input must be a number' },
-          { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] }
+          { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] },
         ],
         renewalUnitPrice: [
-          { required: true, message: '请输入单价', trigger: ['change', 'blur'], },
-          { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] }
+          { required: true, message: '请输入单价', trigger: ['change', 'blur'] },
+          { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] },
         ],
         registrationFee: [
-          { required: true, message: '请输入挂号费', trigger: ['change', 'blur'], },
-          { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] }
+          { required: true, message: '请输入挂号费', trigger: ['change', 'blur'] },
+          { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] },
         ],
       },
     };
@@ -204,7 +198,7 @@ export default {
     async open() {
       this.visible = true;
     },
-    loadData () {
+    loadData() {
       if (!this.shippingOption) {
         throw new Error('Please provide a shippingOption model.');
       }
@@ -219,7 +213,7 @@ export default {
       this.formData = {
         serviceType: optionData.serviceType,
         services: optionData.services,
-      }
+      };
       if (optionData.services.length > 0) {
         this.formData.services = optionData.services;
       } else {
@@ -227,7 +221,17 @@ export default {
       }
     },
     createEmptyService() {
-      return { name: '', estimatedDelivery: '', startWeight: '', endWeight: '', firstWeight: 0, firstFreight: '', renewalUnitWeight: '', renewalUnitPrice: '', registrationFee: '' };
+      return {
+        name: '',
+        estimatedDelivery: '',
+        startWeight: '',
+        endWeight: '',
+        firstWeight: 0,
+        firstFreight: '',
+        renewalUnitWeight: '',
+        renewalUnitPrice: '',
+        registrationFee: '',
+      };
     },
     onCancel() {
       this.visible = false;
@@ -249,7 +253,7 @@ export default {
             service.firstFreight = bigNumber(service.firstFreight);
             service.renewalUnitPrice = bigNumber(service.renewalUnitPrice);
             service.registrationFee = bigNumber(service.registrationFee);
-          })
+          });
 
           this.shippingOption.set(this.formData);
 
@@ -264,9 +268,13 @@ export default {
 <style lang="scss" scoped>
 .form-dialog {
   .form-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    margin-bottom: 10px;
+    &__select {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
   }
 
   .add-btn {
@@ -277,7 +285,6 @@ export default {
   display: flex;
   align-items: center;
   color: #999;
-  margin-bottom: 10px;
   &-btn {
     padding: 2px 14px;
     background: green;
@@ -286,16 +293,16 @@ export default {
   }
 }
 ::v-deep() {
-  .form-table.el-form-item__content {
-    margin-left: 0 !important;
-  }
-  .form-table .is-error .el-form-item__content {
-    margin-bottom: 0;
-  }
   .cell-form-table {
     vertical-align: top !important;
   }
-
+  .el-form-item {
+    margin-bottom: 0;
+  }
+  .el-form-item__error {
+    position: static;
+    line-height: 1.2;
+  }
   input {
     border: none !important;
     padding: 0 !important;

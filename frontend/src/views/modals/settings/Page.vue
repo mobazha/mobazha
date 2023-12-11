@@ -6,7 +6,9 @@
           <h2 class="h3 clrT">{{ ob.polyT('settings.pageTab.sectionName') }}</h2>
           <ProcessingButton
             :className="`btn clrP clrBAttGrad clrBrDec1 clrTOnEmph modalContentCornerBtn js-save ${isSaving ? 'processing' : ''}`"
-            @click="save" :btnText="ob.polyT('settings.btnSave')" />
+            @click="save"
+            :btnText="ob.polyT('settings.btnSave')"
+          />
         </div>
         <hr class="clrBr" />
 
@@ -18,8 +20,7 @@
               </div>
               <div class="col6">
                 <FormError v-if="ob.errors['name']" :errors="ob.errors['name']" />
-                <input type="text" class="clrBr clrSh2" v-model="formData.name" id="settingsName"
-                  :placeholder="ob.polyT('settings.pageTab.placeholderName')">
+                <input type="text" class="clrBr clrSh2" v-model="formData.name" id="settingsName" :placeholder="ob.polyT('settings.pageTab.placeholderName')" />
               </div>
             </div>
             <div v-if="false" class="flexRow gutterH TODO">
@@ -29,12 +30,18 @@
               </div>
               <div class="col6">
                 <FormError v-if="ob.errors['handle']" :errors="ob.errors['handle']" />
-                <input type="text" class="clrBr clrSh2" v-model="formData.handle" id="settingsHandle"
-                  :placeholder="ob.polyT('settings.pageTab.placeholderHandle')">
-                <div class="clrT2 txSm padSm">{{ ob.polyT('settings.pageTab.helperHandleRegister', {
-                  helperHandleRegisterLink: `<a href="https://onename.com"
-                    class="clrTEm">${ob.polyT('settings.pageTab.helperHandleRegisterLink')}</a>`
-                }) }}</div>
+                <input
+                  type="text"
+                  class="clrBr clrSh2"
+                  v-model="formData.handle"
+                  id="settingsHandle"
+                  :placeholder="ob.polyT('settings.pageTab.placeholderHandle')"
+                />
+                <div class="clrT2 txSm padSm">
+                  {{ ob.polyT('settings.pageTab.helperHandleRegister', { helperHandleRegisterLink: `<a href="https://onename.com" class="clrTEm"
+                    >${ob.polyT('settings.pageTab.helperHandleRegisterLink')}</a
+                  >` }) }}
+                </div>
               </div>
             </div>
             <div class="flexRow gutterH">
@@ -44,9 +51,15 @@
               </div>
               <div class="col9">
                 <FormError v-if="ob.errors['shortDescription']" :errors="ob.errors['shortDescription']" />
-                <textarea rows="3" maxlength="160" v-model="formData.shortDescription" id="settingsShortDescription"
+                <textarea
+                  rows="3"
+                  maxlength="160"
+                  v-model="formData.shortDescription"
+                  id="settingsShortDescription"
                   class="clrBr clrSh2"
-                  :placeholder="ob.polyT('settings.pageTab.placeholderShortDescription')">{{ ob.shortDescription }}</textarea>
+                  :placeholder="ob.polyT('settings.pageTab.placeholderShortDescription')"
+                  >{{ ob.shortDescription }}</textarea
+                >
               </div>
             </div>
             <div class="flexRow gutterH">
@@ -56,18 +69,28 @@
               </div>
               <div class="col6">
                 <FormError v-if="ob.errors['location']" :errors="ob.errors['location']" />
-                <input type="text" class="clrBr clrSh2" v-model="formData.location" id="settingsLocation"
-                  :placeholder="ob.polyT('settings.pageTab.placeholderLocation')" :maxlength="ob.max.locationLength">
+                <input
+                  type="text"
+                  class="clrBr clrSh2"
+                  v-model="formData.location"
+                  id="settingsLocation"
+                  :placeholder="ob.polyT('settings.pageTab.placeholderLocation')"
+                  :maxlength="ob.max.locationLength"
+                />
               </div>
             </div>
 
             <div class="flexRow gutterH">
               <div class="col3">
                 <label>{{ ob.polyT('settings.avatar') }}</label>
-                <div class="clrT2 txSm">{{ ob.polyT('settings.loadAvatarHelp', {
-                  minWidth: ob.avatarMinWidth, minHeight:
-                    ob.avatarMinHeight
-                }) }}</div>
+                <div class="clrT2 txSm">
+                  {{
+                    ob.polyT('settings.loadAvatarHelp', {
+                      minWidth: ob.avatarMinWidth,
+                      minHeight: ob.avatarMinHeight,
+                    })
+                  }}
+                </div>
               </div>
               <div class="col9 contentBox clrBr clrP clrSh2 padLg">
                 <div id="avatarCropper" ref="avatarCropper" class="flexRow gutterH">
@@ -76,8 +99,14 @@
                     <div class="flexColRows gutterV">
                       <div>
                         <div class="flex gutterH">
-                          <a :class="`iconBtn ion-reply flexExpand clrP clrBr clrSh2 js-avatarLeft ${!hasAvatarLoaded ? 'disabled' : ''}`" @click="avatarLeftClick"></a>
-                          <a :class="`iconBtn ion-forward flexExpand clrP clrBr clrSh2 js-avatarRight ${!hasAvatarLoaded ? 'disabled' : ''}`" @click="avatarRightClick"></a>
+                          <a
+                            :class="`iconBtn ion-reply flexExpand clrP clrBr clrSh2 js-avatarLeft ${!hasAvatarLoaded ? 'disabled' : ''}`"
+                            @click="avatarLeftClick"
+                          ></a>
+                          <a
+                            :class="`iconBtn ion-forward flexExpand clrP clrBr clrSh2 js-avatarRight ${!hasAvatarLoaded ? 'disabled' : ''}`"
+                            @click="avatarRightClick"
+                          ></a>
                         </div>
                       </div>
                       <div class="posR">
@@ -103,23 +132,11 @@
                 <FormError v-if="ob.errors['nsfw']" :errors="ob.errors['nsfw']" />
                 <div class="btnStrip">
                   <div class="btnRadio clrBr">
-                    <input
-                      type="radio"
-                      name="nsfw"
-                      value="true"
-                      id="settingsNSFWInputTrue"
-                      data-var-type="boolean"
-                      :checked="ob.NSFW">
+                    <input type="radio" name="nsfw" value="true" id="settingsNSFWInputTrue" data-var-type="boolean" :checked="ob.NSFW" />
                     <label for="settingsNSFWInputTrue">{{ ob.polyT('settings.yes') }}</label>
                   </div>
                   <div class="btnRadio clrBr">
-                    <input
-                      type="radio"
-                      name="nsfw"
-                      value="false"
-                      id="settingsNSFWInputFalse"
-                      data-var-type="boolean"
-                      :checked="!ob.NSFW">
+                    <input type="radio" name="nsfw" value="false" id="settingsNSFWInputFalse" data-var-type="boolean" :checked="!ob.NSFW" />
                     <label for="settingsNSFWInputFalse">{{ ob.polyT('settings.no') }}</label>
                   </div>
                 </div>
@@ -137,11 +154,16 @@
             <div class="flexRow gutterH">
               <div class="col12">
                 <FormError v-if="ob.errors['about']" :errors="ob.errors['about']" />
-                <Tinymce class="clrBr clrSh2" id="settingsAbout" v-model="formData.about"
+                <Tinymce
+                  class="clrBr clrSh2"
+                  id="settingsAbout"
+                  v-model="formData.about"
                   :menubar="'file edit insert view'"
                   :toolbar="['bold italic link image hr bullist numlist formatselect fontselect fontsizeselect fullscreen']"
-                  :height="350" :placeholder="ob.polyT('settings.pageTab.placeholderAbout')" ></Tinymce>
-                  <div class="clrT2 txSm padSm">{{ ob.polyT('settings.pageTab.helperAbout') }}</div>
+                  :height="350"
+                  :placeholder="ob.polyT('settings.pageTab.placeholderAbout')"
+                ></Tinymce>
+                <div class="clrT2 txSm padSm">{{ ob.polyT('settings.pageTab.helperAbout') }}</div>
               </div>
             </div>
           </form>
@@ -160,8 +182,13 @@
               </div>
               <div class="col6">
                 <FormError v-if="ob.errors['contactInfo.website']" :errors="ob.errors['contactInfo.website']" />
-                <input type="text" class="clrBr clrSh2" v-model="formData.contactInfo.website" id="settingsWebsite"
-                  :placeholder="ob.polyT('settings.pageTab.placeholderWebsite')">
+                <input
+                  type="text"
+                  class="clrBr clrSh2"
+                  v-model="formData.contactInfo.website"
+                  id="settingsWebsite"
+                  :placeholder="ob.polyT('settings.pageTab.placeholderWebsite')"
+                />
               </div>
             </div>
             <div class="flexRow gutterH">
@@ -171,8 +198,13 @@
               </div>
               <div class="col6">
                 <FormError v-if="ob.errors['contactInfo.email']" :errors="ob.errors['contactInfo.email']" />
-                <input type="text" class="clrBr clrSh2" v-model="formData.contactInfo.email" id="settingsEmail"
-                  :placeholder="ob.polyT('settings.pageTab.placeholderEmail')">
+                <input
+                  type="text"
+                  class="clrBr clrSh2"
+                  v-model="formData.contactInfo.email"
+                  id="settingsEmail"
+                  :placeholder="ob.polyT('settings.pageTab.placeholderEmail')"
+                />
               </div>
             </div>
             <div class="flexRow gutterH">
@@ -182,10 +214,14 @@
               </div>
             </div>
             <div class="js-socialAccounts">
-              <SocialAccounts :options="{ maxAccounts: profile.get('contactInfo').maxSocialAccounts }"
-                :bb="() => {
-                  return {collection: profile.get('contactInfo').get('social')};
-                }" />
+              <SocialAccounts
+                :options="{ maxAccounts: profile.get('contactInfo').maxSocialAccounts }"
+                :bb="
+                  () => {
+                    return { collection: profile.get('contactInfo').get('social') };
+                  }
+                "
+              />
             </div>
           </form>
         </div>
@@ -199,10 +235,14 @@
             <div class="flexRow gutterH">
               <div class="col3">
                 <label>{{ ob.polyT('settings.header') }}</label>
-                <div class="clrT2 txSm">{{ ob.polyT('settings.loadHeaderHelp', {
-                  minWidth: ob.headerMinWidth, minHeight:
-                    ob.headerMinHeight
-                }) }}</div>
+                <div class="clrT2 txSm">
+                  {{
+                    ob.polyT('settings.loadHeaderHelp', {
+                      minWidth: ob.headerMinWidth,
+                      minHeight: ob.headerMinHeight,
+                    })
+                  }}
+                </div>
               </div>
               <div class="col9 row contentBox clrBr clrP clrSh2 pad">
                 <div id="headerCropper" ref="headerCropper" class="flexColRows gutterV">
@@ -235,16 +275,25 @@
                 <div class="clrT2 txSm">{{ ob.polyT('settings.pageTab.helperPrimaryColor') }}</div>
               </div>
               <div class="col1">
-                <input class="colorPicker clrBr" id="primaryColorPicker" v-model="formData.colors.primary"
-                  data-hex-input-id="#settingsPrimaryColor" type="color"
-                  :placeholder="ob.polyT('settings.pageTab.placeholderPrimaryColor')">
+                <input
+                  class="colorPicker clrBr"
+                  id="primaryColorPicker"
+                  v-model="formData.colors.primary"
+                  data-hex-input-id="#settingsPrimaryColor"
+                  type="color"
+                  :placeholder="ob.polyT('settings.pageTab.placeholderPrimaryColor')"
+                />
               </div>
               <div class="col2">
                 <FormError v-if="ob.errors['colors.primary']" :errors="ob.errors['colors.primary']" />
-                <input type="text" class="clrBr clrSh2" v-model="formData.colors.primary"
+                <input
+                  type="text"
+                  class="clrBr clrSh2"
+                  v-model="formData.colors.primary"
                   id="settingsPrimaryColor"
                   :placeholder="ob.polyT('settings.pageTab.placeholderPrimaryColor')"
-                  data-color-picker-id="#primaryColorPicker">
+                  data-color-picker-id="#primaryColorPicker"
+                />
               </div>
             </div>
             <div v-if="false" class="flexRow gutterH TODO">
@@ -253,15 +302,25 @@
                 <div class="clrT2 txSm">{{ ob.polyT('settings.pageTab.helperSecondaryColor') }}</div>
               </div>
               <div class="col1">
-                <input class="colorPicker clrBr" id="secondaryColorPicker" v-model="formData.colors.secondary"
-                  data-hex-input-id="#settingsSecondaryColor" type="color"
-                  :placeholder="ob.polyT('settings.pageTab.placeholderSecondaryColor')">
+                <input
+                  class="colorPicker clrBr"
+                  id="secondaryColorPicker"
+                  v-model="formData.colors.secondary"
+                  data-hex-input-id="#settingsSecondaryColor"
+                  type="color"
+                  :placeholder="ob.polyT('settings.pageTab.placeholderSecondaryColor')"
+                />
               </div>
               <div class="col2">
                 <FormError v-if="ob.errors['colors.secondary']" :errors="ob.errors['colors.secondary']" />
-                <input type="text" class="clrBr clrSh2" id="settingsSecondaryColor" v-model="formData.colors.secondary"
+                <input
+                  type="text"
+                  class="clrBr clrSh2"
+                  id="settingsSecondaryColor"
+                  v-model="formData.colors.secondary"
                   :placeholder="ob.polyT('settings.pageTab.placeholderSecondaryColor')"
-                  data-color-picker-id="#secondaryColorPicker">
+                  data-color-picker-id="#secondaryColorPicker"
+                />
               </div>
             </div>
             <div v-if="false" class="flexRow gutterH TODO">
@@ -270,15 +329,25 @@
                 <div class="clrT2 txSm">{{ ob.polyT('settings.pageTab.helperTextColor') }}</div>
               </div>
               <div class="col1">
-                <input class="colorPicker clrBr " id="textColorPicker" v-model="formData.colors.text"
-                  data-hex-input-id="#settingsTextColor" type="color"
-                  :placeholder="ob.polyT('settings.pageTab.placeholderTextColor')">
+                <input
+                  class="colorPicker clrBr"
+                  id="textColorPicker"
+                  v-model="formData.colors.text"
+                  data-hex-input-id="#settingsTextColor"
+                  type="color"
+                  :placeholder="ob.polyT('settings.pageTab.placeholderTextColor')"
+                />
               </div>
               <div class="col2">
                 <FormError v-if="ob.errors['colors.text']" :errors="ob.errors['colors.text']" />
-                <input type="text" class="clrBr clrSh2 " id="settingsTextColor" v-model="formData.colors.text"
+                <input
+                  type="text"
+                  class="clrBr clrSh2"
+                  id="settingsTextColor"
+                  v-model="formData.colors.text"
                   :placeholder="ob.polyT('settings.pageTab.placeholderTextColor')"
-                  data-color-picker-id="#textColorPicker">
+                  data-color-picker-id="#textColorPicker"
+                />
               </div>
             </div>
             <div v-if="false" class="flexRow gutterH TODO">
@@ -287,33 +356,51 @@
                 <div class="clrT2 txSm">{{ ob.polyT('settings.pageTab.helperHighlightColor') }}</div>
               </div>
               <div class="col1">
-                <input class="colorPicker clrBr " v-model="formData.colors.highlight"
-                  data-hex-input-id="#settingsHighlightColor" type="color"
-                  :placeholder="ob.polyT('settings.pageTab.placeholderHighlightTextColor')">
+                <input
+                  class="colorPicker clrBr"
+                  v-model="formData.colors.highlight"
+                  data-hex-input-id="#settingsHighlightColor"
+                  type="color"
+                  :placeholder="ob.polyT('settings.pageTab.placeholderHighlightTextColor')"
+                />
               </div>
               <div class="col2">
                 <FormError v-if="ob.errors['colors.highlight']" :errors="ob.errors['colors.highlight']" />
-                <input type="text" class="clrBr clrSh2 " id="settingsHighlightColor" v-model="formData.colors.highlight"
+                <input
+                  type="text"
+                  class="clrBr clrSh2"
+                  id="settingsHighlightColor"
+                  v-model="formData.colors.highlight"
                   :placeholder="ob.polyT('settings.pageTab.placeholderHighlightColor')"
-                  data-color-picker-id="#highlightColorPicker">
+                  data-color-picker-id="#highlightColorPicker"
+                />
               </div>
             </div>
             <div v-if="false" class="flexRow gutterH TODO">
               <div class="col3">
-                <label for="settingsHighlightTextColor" class="required">{{ ob.polyT('settings.highlightTextColor')
-                }}</label>
+                <label for="settingsHighlightTextColor" class="required">{{ ob.polyT('settings.highlightTextColor') }}</label>
                 <div class="clrT2 txSm">{{ ob.polyT('settings.pageTab.helperHighlightTextColor') }}</div>
               </div>
               <div class="col1">
-                <input class="colorPicker clrBr " id="highlightTextColorPicker" v-model="formData.colors.highlightText"
-                  data-hex-input-id="#settingsHighlightTextColor" type="color"
-                  :placeholder="ob.polyT('settings.pageTab.placeholderHighlightTextColor')">
+                <input
+                  class="colorPicker clrBr"
+                  id="highlightTextColorPicker"
+                  v-model="formData.colors.highlightText"
+                  data-hex-input-id="#settingsHighlightTextColor"
+                  type="color"
+                  :placeholder="ob.polyT('settings.pageTab.placeholderHighlightTextColor')"
+                />
               </div>
               <div class="col2">
                 <FormError v-if="ob.errors['color.highlightText']" :errors="ob.errors['color.highlightText']" />
-                <input type="text" class="clrBr clrSh2 " id="settingsHighlightTextColor" v-model="formData.colors.highlightText"
+                <input
+                  type="text"
+                  class="clrBr clrSh2"
+                  id="settingsHighlightTextColor"
+                  v-model="formData.colors.highlightText"
                   :placeholder="ob.polyT('settings.pageTab.placeholderHighlightTextColor')"
-                  data-color-picker-id="#highlightTextColorPicker">
+                  data-color-picker-id="#highlightTextColorPicker"
+                />
               </div>
             </div>
           </form>
@@ -325,11 +412,11 @@
           <ProcessingButton
             :className="`btn clrP clrBAttGrad clrBrDec1 clrTOnEmph js-save ${isSaving ? 'processing' : ''}`"
             @click="save"
-            :btnText="ob.polyT('settings.btnSave')" />
+            :btnText="ob.polyT('settings.btnSave')"
+          />
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -356,7 +443,7 @@ export default {
     },
     bb: Function,
   },
-  data () {
+  data() {
     return {
       isSaving: false,
       hasAvatarLoaded: false,
@@ -371,25 +458,25 @@ export default {
         name: '',
         shortDescription: '',
         location: '',
-        about:'',
+        about: '',
         contactInfo: {
           website: '',
           email: '',
         },
         // colors: {},
-      }
+      },
     };
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.options);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         errors: this.profile.validationError || {},
@@ -400,10 +487,10 @@ export default {
         headerMinHeight: this.headerMinHeight,
         headerMinWidth: this.headerMinWidth,
       };
-    }
+    },
   },
   methods: {
-    loadData (options = {}) {
+    loadData(options = {}) {
       this.baseInit(options);
 
       this.profile = app.profile.clone();
@@ -416,8 +503,8 @@ export default {
         contactInfo: {
           website: this.profile.get('contactInfo').get('website'),
           email: this.profile.get('contactInfo').get('email'),
-        }
-      }
+        },
+      };
 
       // Sync our clone with any changes made to the global profile.
       this.listenTo(app.profile, 'someChange', (md, opts) => this.profile.set(opts.setAttrs));
@@ -428,44 +515,43 @@ export default {
       });
     },
 
-    avatarRotate (direction) {
+    avatarRotate(direction) {
       if (this.avatarCropper.cropit('imageSrc')) {
         this.avatarCropper.cropit(direction > 0 ? 'rotateCW' : 'rotateCCW');
         this.avatarChanged = true;
       }
     },
 
-    avatarLeftClick () {
+    avatarLeftClick() {
       this.avatarRotate(-1);
     },
 
-    avatarRightClick () {
+    avatarRightClick() {
       this.avatarRotate(1);
     },
 
-    headerRotate (direction) {
+    headerRotate(direction) {
       if (this.headerCropper.cropit('imageSrc')) {
         this.headerCropper.cropit(direction > 0 ? 'rotateCW' : 'rotateCCW');
         this.headerChanged = true;
       }
     },
 
-    headerLeftClick () {
+    headerLeftClick() {
       this.headerRotate(-1);
     },
 
-    headerRightClick () {
+    headerRightClick() {
       this.headerRotate(1);
     },
 
-    saveHeader () {
+    saveHeader() {
       const imageURI = this.headerCropper.cropit('export', {
         type: 'image/jpeg',
         quality: 1,
         originalSize: true,
       });
-      const headerData = JSON.stringify(
-        { header: imageURI.replace(/^data:image\/(png|jpeg|webp);base64,/, '') });
+      const headerData = JSON.stringify({ header: imageURI.replace(/^data:image\/(png|jpeg|webp);base64,/, '') });
       return $.ajax({
         type: 'POST',
         url: app.getServerUrl('ob/header'),
@@ -475,14 +561,13 @@ export default {
       });
     },
 
-    saveAvatar () {
+    saveAvatar() {
       const imageURI = this.avatarCropper.cropit('export', {
         type: 'image/jpeg',
         quality: 1,
         originalSize: true,
       });
-      const avatarData = JSON.stringify(
-        { avatar: imageURI.replace(/^data:image\/(png|jpeg|webp);base64,/, '') });
+      const avatarData = JSON.stringify({ avatar: imageURI.replace(/^data:image\/(png|jpeg|webp);base64,/, '') });
       return $.ajax({
         type: 'POST',
         url: app.getServerUrl('ob/avatar'),
@@ -492,7 +577,7 @@ export default {
       });
     },
 
-    getFormData () {
+    getFormData() {
       const formData = this.formData;
 
       while (formData.handle.startsWith('@')) {
@@ -500,18 +585,17 @@ export default {
       }
 
       if (formData.colors) {
-        Object.keys(formData.colors)
-          .forEach((colorField) => {
-            if (!formData.colors[colorField].startsWith('#')) {
-              formData.colors[colorField] = `#${formData.colors[colorField]}`;
-            }
-          });
+        Object.keys(formData.colors).forEach((colorField) => {
+          if (!formData.colors[colorField].startsWith('#')) {
+            formData.colors[colorField] = `#${formData.colors[colorField]}`;
+          }
+        });
       }
 
       return formData;
     },
 
-    save () {
+    save() {
       const formData = this.getFormData();
 
       // set the model data for the social accounts
@@ -524,13 +608,11 @@ export default {
       let saveHeader;
 
       if (save) {
-        if (this.avatarOffsetOnLoad !== this.avatarCropper.cropit('offset')
-          || this.avatarZoomOnLoad !== this.avatarCropper.cropit('zoom')) {
+        if (this.avatarOffsetOnLoad !== this.avatarCropper.cropit('offset') || this.avatarZoomOnLoad !== this.avatarCropper.cropit('zoom')) {
           this.avatarChanged = true;
         }
 
-        if (this.headerOffsetOnLoad !== this.headerCropper.cropit('offset')
-          || this.headerZoomOnLoad !== this.headerCropper.cropit('zoom')) {
+        if (this.headerOffsetOnLoad !== this.headerCropper.cropit('offset') || this.headerZoomOnLoad !== this.headerCropper.cropit('zoom')) {
           this.headerChanged = true;
         }
 
@@ -599,7 +681,7 @@ export default {
       }
     },
 
-    render () {
+    render() {
       let avatarURI = false;
       let headerURI = false;
 
@@ -682,25 +764,23 @@ export default {
         if (avatarURI) {
           this.avatarCropper.cropit('imageSrc', avatarURI);
         } else if (this.profile.get('avatarHashes').get('original')) {
-          this.avatarCropper.cropit(
-            'imageSrc',
-            app.getServerUrl(`ob/image/${this.profile.get('avatarHashes').get('original')}`),
-          );
+          this.avatarCropper.cropit('imageSrc', app.getServerUrl(`ob/image/${this.profile.get('avatarHashes').get('original')}`));
         }
 
         if (headerURI) {
           this.headerCropper.cropit('imageSrc', headerURI);
         } else if (this.profile.get('headerHashes').get('original')) {
-          this.headerCropper.cropit(
-            'imageSrc',
-            app.getServerUrl(`ob/image/${this.profile.get('headerHashes').get('original')}`),
-          );
+          this.headerCropper.cropit('imageSrc', app.getServerUrl(`ob/image/${this.profile.get('headerHashes').get('original')}`));
         }
       }, 0);
 
       return this;
-    }
-  }
-}
+    },
+  },
+};
 </script>
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+::v-deep(.tox-fullscreen) {
+  top: 50px !important;
+}
+</style>

@@ -1,38 +1,38 @@
 <template>
-  <div class="template-name" v-if="templateName">{{ templateName }}</div>
-  <div class="tips" v-if="formData.serviceType">
-    <span class="tips-btn">说明!</span>{{ serviceTypeTip }}
-  </div>
-  <table class="table" width="100%" border="1" cellpadding="0" cellspacing="0">
-    <tr>
-      <th>服务</th>
-      <th>运送时间</th>
-      <th>重量范围</th>
-      <template v-if="formData.serviceType === 'FIRST_RENEWAL_FEE'">
-        <th>首重/首重费用</th>
-        <th>续重单位重量/单价</th>
-      </template>
-      <template v-else>
-        <th>费用</th>
-      </template>
-      <th>挂号费</th>
-    </tr>
-    <tbody>
-      <tr v-for="(item, index) in formData.services" :key="index">
-        <td>{{ item.name }}</td>
-        <td>{{ item.estimatedDelivery }}</td>
-        <td>{{ `${item.startWeight}g ~ ${item.endWeight}g` }}</td>
+  <div class="detail-wrapper">
+    <div class="template-name" v-if="templateName">{{ templateName }}</div>
+    <div class="tips" v-if="formData.serviceType"><span class="tips-btn">说明!</span>{{ serviceTypeTip }}</div>
+    <table class="table" width="100%" border="1" cellpadding="0" cellspacing="0">
+      <tr>
+        <th>服务</th>
+        <th>运送时间</th>
+        <th>重量范围</th>
         <template v-if="formData.serviceType === 'FIRST_RENEWAL_FEE'">
-          <td>{{ `${item.firstWeight}g / ${item.firstFreight}` }}</td>
-          <td>{{ `${item.renewalUnitWeight}g / ${item.renewalUnitPrice}` }}</td>
+          <th>首重/首重费用</th>
+          <th>续重单位重量/单价</th>
         </template>
         <template v-else>
-          <td>{{ item.firstFreight }}</td>
+          <th>费用</th>
         </template>
-        <td>{{ item.registrationFee }}</td>
+        <th>挂号费</th>
       </tr>
-    </tbody>
-  </table>
+      <tbody>
+        <tr v-for="(item, index) in formData.services" :key="index">
+          <td>{{ item.name }}</td>
+          <td>{{ item.estimatedDelivery }}</td>
+          <td>{{ `${item.startWeight}g ~ ${item.endWeight}g` }}</td>
+          <template v-if="formData.serviceType === 'FIRST_RENEWAL_FEE'">
+            <td>{{ `${item.firstWeight}g / ${item.firstFreight}` }}</td>
+            <td>{{ `${item.renewalUnitWeight}g / ${item.renewalUnitPrice}` }}</td>
+          </template>
+          <template v-else>
+            <td>{{ item.firstFreight }}</td>
+          </template>
+          <td>{{ item.registrationFee }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
   <!-- <el-table :data="data.options" :border="true" scrollbar-always-on>
     <el-table-column label="服务" prop="service" show-overflow-tooltip />
     <el-table-column label="运送时间" prop="estimatedDelivery" show-overflow-tooltip />
@@ -62,7 +62,7 @@ export default {
       ],
     };
   },
-  created () {
+  created() {
     this.loadData();
   },
   computed: {
@@ -80,7 +80,7 @@ export default {
     },
   },
   methods: {
-    loadData () {
+    loadData() {
       if (!this.shippingOption) {
         throw new Error('Please provide a shippingOption model.');
       }
@@ -97,12 +97,15 @@ export default {
       this.formData = {
         serviceType: optionData.serviceType,
         services: optionData.services,
-      }
-    }
-  }
+      };
+    },
+  },
 };
 </script>
 <style lang="scss" scoped>
+.detail-wrapper {
+  padding: 0 5px;
+}
 .template-name {
   height: 40px;
   line-height: 40px;
@@ -132,6 +135,7 @@ export default {
     padding: 5px 5px;
     text-align: left;
     box-sizing: border-box;
+    text-align: center;
   }
   td {
     font-weight: 400;

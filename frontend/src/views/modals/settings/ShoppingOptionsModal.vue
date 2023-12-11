@@ -27,14 +27,14 @@
             </el-form-item>
           </template>
         </el-table-column>
-        <el-table-column label="开始重量">
+        <el-table-column label="开始重量(g)">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.startWeight`" :rules="rules.startWeight">
               <el-input v-model.number="row.startWeight" placeholder="0" disabled clearable maxlength="20" />
             </el-form-item>
           </template>
         </el-table-column>
-        <el-table-column label="结束重量">
+        <el-table-column label="结束重量(g)">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.endWeight`" :rules="rules.endWeight">
               <el-input v-model.number="row.endWeight" placeholder="请输入" clearable maxlength="20" />
@@ -42,7 +42,7 @@
           </template>
         </el-table-column>
         <template v-if="formData.serviceType === 'FIRST_RENEWAL_FEE'">
-          <el-table-column label="首重">
+          <el-table-column label="首重(g)">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.firstWeight`" :rules="rules.firstWeight">
                 <el-input v-model.number="row.firstWeight" placeholder="请输入" clearable maxlength="20" />
@@ -56,7 +56,7 @@
               </el-form-item>
             </template>
           </el-table-column>
-          <el-table-column label="续重单位重量">
+          <el-table-column label="续重单位重量(g)">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.renewalUnitWeight`" :rules="rules.renewalUnitWeight">
                 <el-input v-model.number="row.renewalUnitWeight" placeholder="请输入" clearable maxlength="20" />

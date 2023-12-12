@@ -3,8 +3,8 @@
     <el-form ref="form" size="small" :model="formData" :rules="rules" label-width="0">
       <div class="form-head">
         <div class="form-head__select">
-          <el-form-item label="模板" label-width="auto" prop="serviceType" :rules="rules.serviceType">
-            <el-select @change="changeSelect" v-model="formData.serviceType" placeholder="请选择模板">
+          <el-form-item :label="ob.polyT('editListing.shippingOptions.modal.template')" label-width="auto" prop="serviceType" :rules="rules.serviceType">
+            <el-select @change="changeSelect" v-model="formData.serviceType" :placeholder="ob.polyT('editListing.shippingOptions.modal.selectTemplate')">
               <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
           </el-form-item>
@@ -13,28 +13,28 @@
         <div class="tips" v-if="formData.serviceType"><span class="tips-btn">说明!</span>{{ serviceTypeTip }}</div>
       </div>
       <el-table :data="formData.services" :border="true" row-class-name="form-table" cell-class-name="cell-form-table">
-        <el-table-column label="服务" width="130">
+        <el-table-column :label="ob.polyT('editListing.shippingOptions.services.nameLabel')" width="130">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.name`" :rules="rules.name">
-              <el-input v-model="row.name" placeholder="例如标准，中通快递，隔日到" clearable maxlength="20" />
+              <el-input v-model="row.name" :placeholder="ob.polyT('editListing.shippingOptions.services.namePlaceholder')" clearable maxlength="20" />
             </el-form-item>
           </template>
         </el-table-column>
-        <el-table-column label="运送时间" width="110">
+        <el-table-column :label="ob.polyT('editListing.shippingOptions.services.estimatedDeliveryLabel')" width="110">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.estimatedDelivery`" :rules="rules.estimatedDelivery">
-              <el-input v-model="row.estimatedDelivery" placeholder="例如5-7天" clearable maxlength="20" />
+              <el-input v-model="row.estimatedDelivery" :placeholder="ob.polyT('editListing.shippingOptions.services.estimatedDeliveryPlaceholder')" clearable maxlength="20" />
             </el-form-item>
           </template>
         </el-table-column>
-        <el-table-column label="开始重量(g)">
+        <el-table-column :label="`${ob.polyT('editListing.shippingOptions.services.startWeight')}(g)`">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.startWeight`" :rules="rules.startWeight">
               <el-input v-model.number="row.startWeight" placeholder="0" disabled clearable maxlength="20" />
             </el-form-item>
           </template>
         </el-table-column>
-        <el-table-column label="结束重量(g)">
+        <el-table-column :label="`${ob.polyT('editListing.shippingOptions.services.endWeight')}(g)`">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.endWeight`" :rules="rules.endWeight">
               <el-input v-model.number="row.endWeight" placeholder="请输入" clearable maxlength="20" />
@@ -42,28 +42,28 @@
           </template>
         </el-table-column>
         <template v-if="formData.serviceType === 'FIRST_RENEWAL_FEE'">
-          <el-table-column label="首重(g)">
+          <el-table-column :label="`${ob.polyT('editListing.shippingOptions.services.firstWeight')}(g)`">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.firstWeight`" :rules="rules.firstWeight">
                 <el-input v-model.number="row.firstWeight" placeholder="请输入" clearable maxlength="20" />
               </el-form-item>
             </template>
           </el-table-column>
-          <el-table-column label="首重运费">
+          <el-table-column :label="ob.polyT('editListing.shippingOptions.services.firstFreight')">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.firstFreight`" :rules="rules.firstFreight">
                 <el-input v-model.number="row.firstFreight" placeholder="请输入" clearable maxlength="20" data-var-type="bignumber" />
               </el-form-item>
             </template>
           </el-table-column>
-          <el-table-column label="续重单位重量(g)">
+          <el-table-column :label="`${ob.polyT('editListing.shippingOptions.services.renewalUnitWeight')}(g)`">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.renewalUnitWeight`" :rules="rules.renewalUnitWeight">
                 <el-input v-model.number="row.renewalUnitWeight" placeholder="请输入" clearable maxlength="20" />
               </el-form-item>
             </template>
           </el-table-column>
-          <el-table-column label="单价">
+          <el-table-column :label="ob.polyT('editListing.shippingOptions.services.renewalUnitPrice')">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.renewalUnitPrice`" :rules="rules.renewalUnitPrice">
                 <el-input v-model.number="row.renewalUnitPrice" placeholder="请输入" clearable maxlength="20" data-var-type="bignumber" />
@@ -72,7 +72,7 @@
           </el-table-column>
         </template>
         <template v-else>
-          <el-table-column label="费用">
+          <el-table-column :label="ob.polyT('editListing.shippingOptions.services.fee')">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.firstFreight`" :rules="rules.firstFreight">
                 <el-input v-model.number="row.firstFreight" step="0.01" placeholder="请输入" clearable maxlength="20" data-var-type="bignumber" />
@@ -81,24 +81,24 @@
           </el-table-column>
         </template>
 
-        <el-table-column label="挂号费">
+        <el-table-column :label="ob.polyT('editListing.shippingOptions.services.registrationFee')">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.registrationFee`" :rules="rules.registrationFee">
               <el-input v-model.number="row.registrationFee" placeholder="请输入" clearable maxlength="20" />
             </el-form-item>
           </template>
         </el-table-column>
-        <el-table-column label="操作" fixed="right" width="90">
+        <el-table-column :label="ob.polyT('editListing.shippingOptions.services.action')" fixed="right" width="90">
           <template v-slot="{ $index }">
-            <el-button class="p0" size="small" type="danger" link @click="doDelete($index)">删除</el-button>
+            <el-button class="p0" size="small" type="danger" link @click="doDelete($index)">{{ ob.polyT('editListing.shippingOptions.services.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-form>
     <template #footer>
-      <el-button size="small" @click="onCancel"> 取 消 </el-button>
-      <el-button size="small" class="form-btn" type="primary" :disabled="isSubmitIng" :loading="isSubmitIng" @click="onConfirm">{{
-        isSubmitIng ? '提交中...' : '确 定'
+      <el-button size="small" @click="onCancel"> {{ ob.polyT('editListing.shippingOptions.services.cancel') }} </el-button>
+      <el-button size="small" class="form-btn" type="primary" :disabled="isSubmitting" :loading="isSubmitting" @click="onConfirm">{{
+        isSubmitting ? ob.polyT('editListing.shippingOptions.services.submitting') : ob.polyT('editListing.shippingOptions.services.confirm')
       }}</el-button>
     </template>
   </el-dialog>
@@ -145,7 +145,7 @@ export default {
         { label: '同重量段费用相同', value: 'SAME_WEIGHT_SAME_FEE' },
       ],
       visible: false,
-      isSubmitIng: false,
+      isSubmitting: false,
       formData: {
         serviceType: '',
         services: [],

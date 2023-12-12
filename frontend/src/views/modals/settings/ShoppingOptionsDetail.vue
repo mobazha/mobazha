@@ -4,17 +4,17 @@
     <div class="tips" v-if="formData.serviceType"><span class="tips-btn">说明!</span>{{ serviceTypeTip }}</div>
     <table class="table" width="100%" border="1" cellpadding="0" cellspacing="0">
       <tr>
-        <th>服务</th>
-        <th>运送时间</th>
-        <th>重量范围</th>
+        <th>{{ ob.polyT('editListing.shippingOptions.services.nameLabel') }}</th>
+        <th>{{ ob.polyT('editListing.shippingOptions.services.estimatedDeliveryLabel') }}</th>
+        <th>{{ ob.polyT('editListing.shippingOptions.services.weightRange') }}</th>
         <template v-if="formData.serviceType === 'FIRST_RENEWAL_FEE'">
-          <th>首重/首重费用</th>
-          <th>续重单位重量/单价</th>
+          <th>{{ ob.polyT('editListing.shippingOptions.services.firstWeightAndFee') }}</th>
+          <th>{{ ob.polyT('editListing.shippingOptions.services.renewalUnitWeightAndFee') }}</th>
         </template>
         <template v-else>
-          <th>费用</th>
+          <th>{{ ob.polyT('editListing.shippingOptions.services.Fee') }}</th>
         </template>
-        <th>挂号费</th>
+        <th>{{ ob.polyT('editListing.shippingOptions.services.registrationFee') }}</th>
       </tr>
       <tbody>
         <tr v-for="(item, index) in formData.services" :key="index">

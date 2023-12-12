@@ -1250,6 +1250,11 @@
         "namePlaceholder": "e.g. Standard, Express, Overnight",
         "estimatedDeliveryLabel": "Est. Delivery Time",
         "estimatedDeliveryPlaceholder": "e.g. 5-7 days",
+        "weightRange": "Weight Range",
+        "firstWeightAndFee": "First Weight/Fee",
+        "renewalUnitWeightAndFee": "Renewal Unit Weight/Unit Price",
+        "fee": "Fee",
+
         "priceLabel": "Price (first weight)",
         "additionalWeightPriceLabel": "Price (additional weight)",
         "pricePlaceholder": "0.00",
@@ -1265,8 +1270,7 @@
         "renewalUnitPrice": "Renewal Unit Price",
         "registrationFee": "Registration Fee",
         "sameWeightTemplate": "Same price for the same weight class",
-        "sameWeightExplanation": "Freight = fee + registration fee",
-        "fee": "Fee"
+        "sameWeightExplanation": "Freight = fee + registration fee"
       },
       "toolTip": {
         "delete": "Delete"

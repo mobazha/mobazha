@@ -98,10 +98,10 @@
                   <div class="footer" v-if="oneStoreTotalPrice(index).quantity > 0">
                     <div class="total">
                       <div class="total-price"><span class="total-name">Total:</span>${{ oneStoreTotalPrice(index).total }}</div>
-                      <div class="count-price">Subtotal:$183.97</div>
-                      <div class="freight">Shipping & handling: Free</div>
+                      <div v-if="false" class="count-price">Subtotal:$183.97</div>
+                      <div v-if="false" class="freight">Shipping & handling: Free</div>
                     </div>
-                    <button class="btn-primary pay-btn" @click="pay(index)">Pay</button>
+                    <button v-if="false" class="btn-primary pay-btn" @click="pay(index)">Pay</button>
                   </div>
                 </div>
               </div>

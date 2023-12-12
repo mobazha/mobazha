@@ -5,7 +5,7 @@
         <div class="flexHCent">
           <h2 class="h3 clrT">{{ ob.polyT('settings.storeTab.sectionName') }}</h2>
           <ProcessingButton
-            className="btn clrP clrBAttGrad clrBrDec1 clrTOnEmph modalContentCornerBtn js-save"
+            :className="`btn clrP clrBAttGrad clrBrDec1 clrTOnEmph modalContentCornerBtn js-save ${isSaving ? 'processing' : ''}`"
             @click="save"
             :btnText="ob.polyT('settings.btnSave')"
           />
@@ -63,7 +63,6 @@
                       sort: true,
                     }"
                     v-model:activeCurs="formData.currencies"
-                    @currencyClicked="handleCurrencyClicked"
                   />
                 </div>
                 <div class="flexHRight">
@@ -84,15 +83,30 @@
                 <div class="flexColRows gutterV">
                   <div class="row">
                     <h5>{{ ob.polyT('settings.storeTab.selectedModerators') }}</h5>
-                    <div class="js-modListSelected"></div>
+                    <div class="js-modListSelected">
+                      <Moderators
+                        ref="modsSelected"
+                        :key="verifiedModsKey"
+                        :options="{
+                          cardState: 'selected',
+                          controlsOnInvalid: true,
+                          fetchErrorTitle: ob.polyT('settings.storeTab.errors.selectedModsTitle'),
+                          notSelected: 'deselected',
+                          showInvalid: true,
+                          showSpinner: false,
+                        }"
+                        :preferredCurs="formData.currencies"
+                      />
+                    </div>
                   </div>
                   <ul class="unstyled errorList hide js-submitModByIDInputError">
-                    <li><i class="ion-alert-circled"></i><span class="js-submitModByIDInputErrorText"></span></li>
+                    <li><i class="ion-alert-circled"></i><span class="js-submitModByIDInputErrorText" v-html="modByIDInputText"></span></li>
                   </ul>
                   <div class="flex gutterH">
                     <input
                       type="text"
                       class="btnHeight clrBr clrP clrSh2 js-submitModByIDInput"
+                      v-model="inputModID"
                       :placeholder="ob.polyT('settings.storeTab.moderatorByIDPlaceholder')"
                     />
                     <ProcessingButton
@@ -101,7 +115,23 @@
                       :btnText="ob.polyT('settings.storeTab.moderatoryByIDSubmit')"
                     />
                   </div>
-                  <div class="js-modListByID"></div>
+                  <div class="js-modListByID">
+                    <Moderators
+                      ref="modsByID"
+                      :key="verifiedModsKey"
+                      v-show="showModListByID"
+                      :options="{
+                        async: false,
+                        excludeIDs: currentMods,
+                        fetchErrorTitle: ob.polyT('settings.storeTab.errors.modNotFoundTitle'),
+                        showInvalid: true,
+                        showSpinner: false,
+                        wrapperClasses: 'noMin',
+                      }"
+                      :preferredCurs="formData.currencies"
+                      :noModsFound="noModsByIDFound"
+                    />
+                  </div>
                   <div>
                     <div class="rowLg">
                       <!-- // just a spacer -->
@@ -118,8 +148,22 @@
                     <ul class="unstyled errorList hide js-modListAvailableError">
                       <li><i class="ion-alert-circled"></i><span class="js-modListAvailableErrorText"></span></li>
                     </ul>
-                    <div class="js-modListAvailable"></div>
-                    <div class="noModsAdded flex clrBr js-noModsAdded" v-show="!ob.modsAvailable.length">
+                    <div class="js-modListAvailable">
+                      <Moderators
+                        ref="modsAvailable"
+                        :key="verifiedModsKey"
+                        v-show="showModListAvailable"
+                        :options="{
+                          apiPath: 'moderators',
+                          excludeIDs: currentMods,
+                          fetchErrorTitle: ob.polyT('settings.storeTab.errors.availableModsTitle'),
+                          showLoadBtn: true,
+                        }"
+                        :preferredCurs="formData.currencies"
+                        :showVerifiedOnly="showVerifiedOnly"
+                      />
+                    </div>
+                    <div class="noModsAdded flex clrBr js-noModsAdded" v-show="!showModListAvailable">
                       <button class="btn clrP clrBr browseMods" @click="fetchAvailableModerators">
                         {{ ob.polyT('settings.storeTab.browseModerators') }}
                       </button>
@@ -183,7 +227,7 @@
 
       <div class="contentBox padMd clrP clrBr clrSh3">
         <div class="flexHRight">
-          <ProcessingButton className="btn clrP clrBAttGrad clrBrDec1 clrTOnEmph js-save" @click="save" :btnText="ob.polyT('settings.btnSave')" />
+          <ProcessingButton :className="`btn clrP clrBAttGrad clrBrDec1 clrTOnEmph js-save ${isSaving ? 'processing' : ''}`" @click="save" :btnText="ob.polyT('settings.btnSave')" />
         </div>
       </div>
     </div>
@@ -226,7 +270,21 @@ export default {
         currencies: [...new Set(app.profile.get('currencies'))],
       },
 
+      currentMods: [],
+
+      inputModID: '',
+
+      showModListByID: false,
+      showModListAvailable: false,
+
+      showModByIDInputError: false,
+      modByIDInputText: '',
+
+      verifiedModsKey: 0,
+
       shippingOptions: [],
+
+      isSaving: false,
     };
   },
   created() {
@@ -237,18 +295,10 @@ export default {
   mounted() {
     this.render();
   },
-  watch: {
-    showVerifiedOnly(val) {
-      if (this.modsAvailable) {
-        this.modsAvailable.setState({ showVerifiedOnly: val });
-      }
-    },
-  },
   computed: {
     ob() {
       return {
         ...this.templateHelpers,
-        modsAvailable: this.modsAvailable.allIDs,
         errors: {
           ...(this.profile.validationError || {}),
           ...(this.settings.validationError || {}),
@@ -281,72 +331,10 @@ export default {
 
       this.formData.vendor = this.profile.get('vendor');
 
-      const preferredCurs = [...new Set(app.profile.get('currencies'))];
-
       this.currentMods = this.settings.get('storeModerators');
       this.showVerifiedOnly = true;
 
-      this.modsSelected = new Moderators({
-        cardState: 'selected',
-        controlsOnInvalid: true,
-        fetchErrorTitle: app.polyglot.t('settings.storeTab.errors.selectedModsTitle'),
-        notSelected: 'deselected',
-        showInvalid: true,
-        showSpinner: false,
-        initialState: {
-          preferredCurs,
-        },
-      });
-
-      this.modsByID = new Moderators({
-        async: false,
-        excludeIDs: this.currentMods,
-        fetchErrorTitle: app.polyglot.t('settings.storeTab.errors.modNotFoundTitle'),
-        showInvalid: true,
-        showSpinner: false,
-        wrapperClasses: 'noMin',
-        initialState: {
-          preferredCurs,
-        },
-      });
-
-      this.listenTo(this.modsByID, 'noModsFound', (mOpts) => this.noModsByIDFound(mOpts.guids));
-
-      this.modsAvailable = new Moderators({
-        apiPath: 'moderators',
-        excludeIDs: this.currentMods,
-        fetchErrorTitle: app.polyglot.t('settings.storeTab.errors.availableModsTitle'),
-        showLoadBtn: true,
-        initialState: {
-          preferredCurs,
-          showVerifiedOnly: true,
-        },
-      });
-
-      const modsToCheckOnVerifiedUpdate = [
-        {
-          view: this.modsSelected,
-          hasVerifiedMods: app.verifiedMods.matched(this.modsSelected.allIDs).length > 0,
-        },
-        {
-          view: this.modsByID,
-          hasVerifiedMods: app.verifiedMods.matched(this.modsByID.allIDs).length > 0,
-        },
-        {
-          view: this.modsAvailable,
-          hasVerifiedMods: app.verifiedMods.matched(this.modsAvailable.allIDs).length > 0,
-        },
-      ];
-
-      this.listenTo(app.verifiedMods, 'update', () => {
-        modsToCheckOnVerifiedUpdate.forEach((obj) => {
-          const nowSelected = app.verifiedMods.matched(obj.view.allIDs).length > 0;
-          if (nowSelected !== obj.hasVerifiedMods) {
-            obj.hasVerifiedMods = nowSelected;
-            obj.view.render();
-          }
-        });
-      });
+      this.listenTo(app.verifiedMods, 'update', () => this.verifiedModsKey += 1);
       this.shippingOptions = this.settings.get('shippingOptions');
     },
     onClickAddShippingOption() {
@@ -392,44 +380,36 @@ export default {
       }
     },
 
-    noModsByIDFound(guids) {
+    noModsByIDFound({guids}) {
       const modsNotFound = app.polyglot.t('settings.storeTab.errors.modsNotFound', { guids, smart_count: guids.length });
       this.showModByIDError(modsNotFound);
-      if (this.modsByID.modCount === 0) {
-        $('.js-modListByID').addClass('hide');
+      if (this.$refs.modsByID.modCount === 0) {
+        this.showModListByID = false;
       }
     },
 
     fetchAvailableModerators() {
       // get the verified mods via POST
-      this.modsAvailable.getModeratorsByID({
+      this.$refs.modsAvailable.getModeratorsByID({
         moderatorIDs: app.verifiedMods.pluck('peerID'),
         useCache: true,
         method: 'POST',
         apiPath: 'fetchprofiles',
       });
       // get random mods via GET
-      this.modsAvailable.getModeratorsByID();
-      $('.js-modListAvailable').removeClass('hide');
-      $('.js-noModsAdded').addClass('hide');
+      this.$refs.modsAvailable.getModeratorsByID();
+      this.showModListAvailable = true;
     },
 
     showModByIDError(msg) {
-      $('.js-submitModByIDInputError').removeClass('hide');
-      $('.js-submitModByIDInputErrorText').text(msg);
-    },
-
-    handleCurrencyClicked(opts) {
-      const preferredCurs = opts.activeCurs;
-      this.modsSelected.setState({ preferredCurs });
-      this.modsByID.setState({ preferredCurs });
-      this.modsAvailable.setState({ preferredCurs });
+      this.showModByIDInputError = true;
+      this.modByIDInputText = msg;
     },
 
     clickSubmitModByID() {
-      let modID = $('.js-submitModByIDInput').val();
+      let modID = this.inputModID;
 
-      $('.js-submitModByIDInputError').addClass('hide');
+      this.showModByIDInputError = false;
 
       if (modID) {
         // trim unwanted copy and paste characters
@@ -440,8 +420,8 @@ export default {
         if (isIPFS.multihash(modID)) {
           if (!this.currentMods.includes(modID)) {
             if (modID !== app.profile.id) {
-              this.modsByID.getModeratorsByID({ moderatorIDs: [modID] });
-              $('.js-modListByID').removeClass('hide');
+              this.$refs.modsByID.getModeratorsByID({ moderatorIDs: [modID] });
+              this.showModListByID = true;
             } else {
               const ownGUID = app.polyglot.t('settings.storeTab.errors.ownGUID', { guid: modID });
               this.showModByIDError(ownGUID);
@@ -463,9 +443,9 @@ export default {
     getSettingsData() {
       let selected = app.settings.get('storeModerators');
       // The mods may not have loaded in the interface yet. Subtract only explicitly de-selected ones.
-      selected = _.without(selected, ...this.modsSelected.unselectedIDs);
-      const byID = this.modsByID.selectedIDs;
-      const available = this.modsAvailable.selectedIDs;
+      selected = _.without(selected, ...this.$refs.modsSelected.unselectedIDs);
+      const byID = this.$refs.modsByID.selectedIDs;
+      const available = this.$refs.modsAvailable.selectedIDs;
       return {
         storeModerators: [...new Set([...selected, ...byID, ...available])],
         shippingOptions: this.shippingOptions.toJSON(),
@@ -485,7 +465,7 @@ export default {
       this.settings.set(settingsFormData, { validate: true });
 
       if (!this.profile.validationError && !this.settings.validationError) {
-        $('.js-save').addClass('processing');
+        this.isSaving = true;
 
         const msg = {
           msg: app.polyglot.t('settings.storeTab.status.saving'),
@@ -517,26 +497,26 @@ export default {
 
             // move the changed moderators
             this.currentMods = this.settings.get('storeModerators');
-            const unSel = this.modsSelected.unselectedIDs;
-            const remSel = this.modsSelected.removeModeratorsByID(unSel);
-            const remByID = this.modsByID.removeModeratorsByID(this.modsByID.selectedIDs);
-            const remAvail = this.modsAvailable.removeModeratorsByID(this.modsAvailable.selectedIDs);
+            const unSel = this.$refs.modsSelected.unselectedIDs;
+            const remSel = this.$refs.modsSelected.removeModeratorsByID(unSel);
+            const remByID = this.$refs.modsByID.removeModeratorsByID(this.$refs.modsByID.selectedIDs);
+            const remAvail = this.$refs.modsAvailable.removeModeratorsByID(this.$refs.modsAvailable.selectedIDs);
 
-            this.modsByID.excludeIDs = this.currentMods;
-            this.modsByID.moderatorsStatus.setState({
+            this.$refs.modsByID.excludeIDs = this.currentMods;
+            this.$refs.modsByID.moderatorsStatus.setState({
               hidden: true,
             });
 
-            this.modsSelected.moderatorsCol.add([...remByID, ...remAvail]);
-            this.modsSelected.moderatorsStatus.setState({
+            this.$refs.modsSelected.moderatorsCol.add([...remByID, ...remAvail]);
+            this.$refs.modsSelected.moderatorsStatus.setState({
               hidden: true,
             });
 
-            this.modsAvailable.excludeIDs = this.currentMods;
-            this.modsAvailable.moderatorsCol.add(remSel);
-            this.modsAvailable.moderatorsStatus.setState({
+            this.$refs.modsAvailable.excludeIDs = this.currentMods;
+            this.$refs.modsAvailable.moderatorsCol.add(remSel);
+            this.$refs.modsAvailable.moderatorsStatus.setState({
               hidden: false,
-              total: this.modsAvailable.modCount,
+              total: this.$refs.modsAvailable.modCount,
               showSpinner: false,
             });
 
@@ -557,7 +537,7 @@ export default {
             });
           })
           .always(() => {
-            $('.js-save').removeClass('processing');
+            this.isSaving = false;
             setTimeout(() => statusMessage.remove(), 3000);
             this.render();
           });
@@ -575,17 +555,13 @@ export default {
       }
     },
     render() {
-      this.modsSelected.delegateEvents();
-      $('.js-modListSelected').append(this.modsSelected.render().el);
-      if (!this.modsSelected.modFetches.length) {
-        this.modsSelected.getModeratorsByID({ moderatorIDs: this.currentMods });
+      if (!this.$refs.modsSelected.modFetches.length) {
+        this.$refs.modsSelected.getModeratorsByID({ moderatorIDs: this.currentMods });
       }
 
-      this.modsByID.delegateEvents();
-      $('.js-modListByID').append(this.modsByID.render().el).toggleClass('hide', !this.modsByID.allIDs.length);
+      this.showModListByID = !!this.$refs.modsByID.allIDs.length;
 
-      this.modsAvailable.delegateEvents();
-      $('.js-modListAvailable').append(this.modsAvailable.render().el).toggleClass('hide', !this.modsAvailable.allIDs.length);
+      this.showModListAvailable = !!this.$refs.modsAvailable.allIDs.length;
 
       return this;
     },

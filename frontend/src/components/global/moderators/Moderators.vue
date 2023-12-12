@@ -41,7 +41,7 @@
             initialState: {
               // Moderators that aren't being rendered should never be selected.
               selectedState: modShouldRender(card.model) ? innerOptions.cardState : innerOptions.notSelected,
-              preferredCurs: getState().preferredCurs,
+              preferredCurs,
             },
           }"
           :bb="() => {
@@ -106,12 +106,15 @@ export default {
     modCurrency: {
       type: String,
       default: '',
+    },
+    preferredCurs: {
+      type: Object,
+      default: [],
     }
   },
   data() {
     return {
       _state: {
-        preferredCurs: [],
         loading: false,
       },
 
@@ -239,7 +242,6 @@ export default {
         ...this.innerOptions,
         ...options,
         initialState: {
-          preferredCurs: [],
           loading: false,
           ...options.initialState,
         },

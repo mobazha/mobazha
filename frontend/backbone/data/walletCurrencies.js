@@ -6,6 +6,11 @@ import app from '../app';
 // If a currency does not support fee bumping or you want to disable it, do not provide a
 // feeBumpTransactionSize setting.
 
+const isValidETHAddress = (address) => {
+  const regex = new RegExp('^0x[0-9a-fA-F]{40}$');
+  return regex.test(address);
+};
+
 let _currencies = [
   {
     code: 'BTC',
@@ -101,6 +106,7 @@ let _currencies = [
         ? `https://testnet.bscscan.com/tx/${txid}`
         : `https://bscscan.com/tx/${txid}`
     ),
+    isValidAddress: isValidETHAddress,
     supportsEscrowTimeout: true,
     blockTime: 1000 * 3,
     externallyFundableOrders: true,
@@ -130,6 +136,7 @@ let _currencies = [
         ? `https://testnet.bscscan.com/tx/${txid}`
         : `https://bscscan.com/tx/${txid}`
     ),
+    isValidAddress: isValidETHAddress,
     supportsEscrowTimeout: true,
     blockTime: 1000 * 3,
     externallyFundableOrders: true,
@@ -159,6 +166,7 @@ let _currencies = [
         ? `https://testnet.bscscan.com/tx/${txid}`
         : `https://bscscan.com/tx/${txid}`
     ),
+    isValidAddress: isValidETHAddress,
     supportsEscrowTimeout: true,
     blockTime: 1000 * 3,
     externallyFundableOrders: true,
@@ -188,6 +196,7 @@ let _currencies = [
         ? `https://testnet.bscscan.com/tx/${txid}`
         : `https://bscscan.com/tx/${txid}`
     ),
+    isValidAddress: isValidETHAddress,
     supportsEscrowTimeout: true,
     blockTime: 1000 * 3,
     externallyFundableOrders: true,
@@ -217,6 +226,7 @@ let _currencies = [
         ? `https://mumbai.polygonscan.com/tx/${txid}`
         : `https://polygonscan.com/tx/${txid}`
     ),
+    isValidAddress: isValidETHAddress,
     supportsEscrowTimeout: true,
     blockTime: 1000 * 3,
     externallyFundableOrders: true,
@@ -246,6 +256,7 @@ let _currencies = [
         ? `https://mumbai.polygonscan.com/tx/${txid}`
         : `https://polygonscan.com/tx/${txid}`
     ),
+    isValidAddress: isValidETHAddress,
     supportsEscrowTimeout: true,
     blockTime: 1000 * 3,
     externallyFundableOrders: true,
@@ -275,6 +286,7 @@ let _currencies = [
         ? `https://mumbai.polygonscan.com/tx/${txid}`
         : `https://polygonscan.com/tx/${txid}`
     ),
+    isValidAddress: isValidETHAddress,
     supportsEscrowTimeout: true,
     blockTime: 1000 * 3,
     externallyFundableOrders: true,
@@ -304,6 +316,7 @@ let _currencies = [
         ? `https://mumbai.polygonscan.com/tx/${txid}`
         : `https://polygonscan.com/tx/${txid}`
     ),
+    isValidAddress: isValidETHAddress,
     supportsEscrowTimeout: true,
     blockTime: 1000 * 3,
     externallyFundableOrders: true,
@@ -346,6 +359,7 @@ let _currencies = [
         ? `https://rinkeby.etherscan.io/tx/${txid}`
         : `https://blockchair.com/ethereum/transaction/${txid}`
     ),
+    isValidAddress: isValidETHAddress,
     supportsEscrowTimeout: true,
     blockTime: 1000 * 10,
     externallyFundableOrders: false,

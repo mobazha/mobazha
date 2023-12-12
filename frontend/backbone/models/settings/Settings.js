@@ -25,6 +25,7 @@ export default class extends BaseModel {
       refundPolicy: '',
       blockedNodes: [],
       storeModerators: [],
+      externalPaymentAddresses: {},
       shippingAddresses: new ShippingAddresses(),
       shippingOptions: new ShippingOptions(),
       smtpSettings: new SMTPSettings(),

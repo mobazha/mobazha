@@ -221,6 +221,7 @@
       "wallet": "钱包",
       "notifications": "通知",
       "shoppingCart": "购物车",
+      "favorite": "收藏",
       "nav": "导航",
       "close": "关闭"
     },
@@ -1228,8 +1229,8 @@
       "namePlaceholder": "例如美国海运，International等等",
       "typeLabel": "类型",
       "shippingTypes": {
-        "FIXED_PRICE": "固定价格",
-        "LOCAL_PICKUP": "货到付款"
+        "FIXED_PRICE": "快递",
+        "LOCAL_PICKUP": "上门自取"
       },
       "btnAddShippingOption": "添加快递选项",
       "btnDeleteShippingOption": "删除",

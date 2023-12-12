@@ -80,8 +80,8 @@
                 </div>
               </a>
               <a class="navBtn toolTipNoWrap " @click="onClickShoppingCartBtn"
-                :data-tip="ob.polyT('pageNav.toolTip.shoppingCart')" id="Nav_ShoppingCart">
-                <i class="iconBtn ion-android-cart"></i>
+                :data-tip="ob.polyT('pageNav.toolTip.favorite')" id="Nav_ShoppingCart">
+                <i class="iconBtn ion-android-favorite"></i>
                 <div
                   :class="`discTn notifUnreadBadge js-cartItemsCountBadge clrE1 clrTOnEmph clrBr2 clrSh2 ${cartItemsCount > 99 ? 'ellipsisShown' : ''}`"
                   v-show="serverConnected && cartItemsCount">

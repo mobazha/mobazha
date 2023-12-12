@@ -6,9 +6,9 @@
           <div class="page-head">
             <div class="page-head__left">
               <div class="page-head__name">
-                Shopping Cart<span v-if="tableData.length > 0">({{ cartNum }})</span>
+                Favorite<span v-if="tableData.length > 0">({{ cartNum }})</span>
               </div>
-              <div class="clean-btn" v-if="tableData.length > 0" @click="clearCart">Clear Cart</div>
+              <div class="clean-btn" v-if="tableData.length > 0" @click="clearCart">Clear All</div>
             </div>
             <div class="page-head__right" v-if="tableData.length > 0">
               <el-input v-model="params.keyword" placeholder="Search Orders" :prefix-icon="Search" />
@@ -29,11 +29,7 @@
               </div>
               <div class="card">
                 <div class="card-item" v-for="(item, index) in tableData" :key="index">
-                  <el-table
-                    :header-cell-style="headerCellStyle"
-                    ref="table"
-                    class="table-hearder-one"
-                    :data="item.items"
+                  <el-table ref="table" :header-cell-style="headerCellStyle" class="table-hearder-one" :data="item.items"
                     @selection-change="handleSelectionChange($event, index)"
                   >
                     <el-table-column>
@@ -211,11 +207,16 @@ export default {
                 let listing = item.listingExt.toJSON();
                 item.listing = listing;
                 item.pricingCurrency = listing.metadata.pricingCurrency;
-                item.priceAmount = curDefToDecimal({
-                  amount: listing.item.price,
-                  currency: item.pricingCurrency,
-                });
-                item.price = convertAndFormatCurrency(item.priceAmount, item.pricingCurrency.code, app.settings.get('localCurrency'));
+                if (listing.item.price && item.pricingCurrency) {
+                  item.priceAmount = curDefToDecimal({
+                    amount: listing.item.price,
+                    currency: item.pricingCurrency,
+                  });
+                  item.price = convertAndFormatCurrency(item.priceAmount, item.pricingCurrency.code, app.settings.get('localCurrency'));
+                } else {
+                  item.priceAmount = 0;
+                  item.price = 0;
+                }
               });
             });
 

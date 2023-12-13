@@ -1241,10 +1241,36 @@
         "namePlaceholder": "例如标准，中通快递，隔日到",
         "estimatedDeliveryLabel": "预计递送时间",
         "estimatedDeliveryPlaceholder": "例如5-7天",
-        "priceLabel": "价格（首重）",
-        "additionalWeightPriceLabel": "价格（续重）",
+
+        "weightRange": "重量范围",
+        "firstWeightAndFee": "首重/首重费用",
+        "renewalUnitWeightAndFee": "续重单位重量/单价",
+        "fee": "费用",
         "pricePlaceholder": "0.00",
-        "addService": "+添加服务"
+        "addService": "+添加服务",
+
+        "firstRenewalTemplate": "按首重续费计算",
+        "firstRenewalExplanation": "运费=首重费用+ (包裹重量-首重)/续重单位重量单价+挂号费",
+        "startWeight": "开始重量",
+        "endWeight": "结束重量",
+        "firstWeight": "首重",
+        "firstFreight": "首重运费",
+        "renewalUnitWeight": "续重单位重量",
+        "renewalUnitPrice": "单价",
+        "registrationFee": "挂号费",
+        "sameWeightTemplate": "同重量段费用相同",
+        "sameWeightExplanation": "运费=费用+挂号费",
+
+        "action": "操作",
+        "delete": "删除",
+        "cancel": "取 消",
+        "submitting": "提交中...",
+        "confirm": "确 认"
+      },
+      "modal": {
+        "template": "模板",
+        "selectTemplate": "请选择模板",
+        "add": "添加"
       },
       "toolTip": {
         "delete": "删除"
@@ -2078,7 +2104,8 @@
   },
   "fixedFeeModelErrors": {
     "noCurrency": "如果您的费用类型是固定值或固定值外加百分比，您必须为您的费用设置有效货币。",
-    "noAmount": "如果您的费用类型是固定值或固定值外加百分比，则必须为固定费用设置有效金额。如果包含小数点，则应使用小数点作为分隔符，例如“0.00”。"
+    "fixedFeeAsNumber": "如果您的费用类型是固定值或固定值外加百分比，则必须为固定费用设置有效金额。如果包含小数点，则应使用小数点作为分隔符，例如“0.00”。",
+    "amountGreaterThanZero": "If your fee type is fixed or fixed plus percentage, the fixed fee amount must be greater than zero."
   },
   "skuModelErrors": {
     "provideQuantity": "请提供数量",

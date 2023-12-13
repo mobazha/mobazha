@@ -1255,8 +1255,6 @@
         "renewalUnitWeightAndFee": "Renewal Unit Weight/Unit Price",
         "fee": "Fee",
 
-        "priceLabel": "Price (first weight)",
-        "additionalWeightPriceLabel": "Price (additional weight)",
         "pricePlaceholder": "0.00",
         "addService": "+ Add Service",
 
@@ -1270,7 +1268,18 @@
         "renewalUnitPrice": "Renewal Unit Price",
         "registrationFee": "Registration Fee",
         "sameWeightTemplate": "Same price for the same weight class",
-        "sameWeightExplanation": "Freight = fee + registration fee"
+        "sameWeightExplanation": "Freight = fee + registration fee",
+
+        "action": "Action",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "submitting": "Submitting...",
+        "confirm": "Confirm"
+      },
+      "modal": {
+        "template": "Template",
+        "selectTemplate": "Please select a template",
+        "add": "Add"
       },
       "toolTip": {
         "delete": "Delete"

@@ -1242,8 +1242,37 @@
         "estimatedDeliveryPlaceholder": "مثال. 5-7 أيام",
         "priceLabel": "السعر (الوزن الأول)",
         "additionalWeightPriceLabel": "السعر (الوزن الإضافي)",
+
+        "weightRange": "Weight Range",
+        "firstWeightAndFee": "First Weight/Fee",
+        "renewalUnitWeightAndFee": "Renewal Unit Weight/Unit Price",
+        "fee": "Fee",
+
         "pricePlaceholder": "0.00",
-        "addService": "+ اضف خدمة"
+        "addService": "+ اضف خدمة",
+
+        "firstRenewalTemplate": "Billed based on the first and renewal weight",
+        "firstRenewalExplanation": "Freight = first weight fee + (package weight - first weight) / unit weight of additional weight * unit price + registration fee",
+        "startWeight": "Start Weight",
+        "endWeight": "End Weight",
+        "firstWeight": "First Weight",
+        "firstFreight": "First Freight",
+        "renewalUnitWeight": "Renewal Unit Weight",
+        "renewalUnitPrice": "Renewal Unit Price",
+        "registrationFee": "Registration Fee",
+        "sameWeightTemplate": "Same price for the same weight class",
+        "sameWeightExplanation": "Freight = fee + registration fee",
+
+        "action": "Action",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "submitting": "Submitting...",
+        "confirm": "Confirm"
+      },
+      "modal": {
+        "template": "Template",
+        "selectTemplate": "Please select a template",
+        "add": "Add"
       },
       "toolTip": {
         "delete": "حذف"
@@ -2077,7 +2106,8 @@
   },
   "fixedFeeModelErrors": {
     "noCurrency": "إذا كان نوع الرسوم الثابتة أو الثابتة بالإضافة إلى النسبة المئوية، يجب عليك تعيين عملة صالحة للرسوم الخاصة بك.",
-    "noAmount": "إذا كان نوع الرسوم ثابتة أو ثابتة بالإضافة إلى النسبة المئوية، فيجب عليك تحديد نسبة ثابته. إذا تضمنت العلامة العشرية، فيجب توضيحها، على سبيل المثال \"0.00\"."
+    "fixedFeeAsNumber": "إذا كان نوع الرسوم ثابتة أو ثابتة بالإضافة إلى النسبة المئوية، فيجب عليك تحديد نسبة ثابته. إذا تضمنت العلامة العشرية، فيجب توضيحها، على سبيل المثال \"0.00\".",
+    "amountGreaterThanZero": "If your fee type is fixed or fixed plus percentage, the fixed fee amount must be greater than zero."
   },
   "skuModelErrors": {
     "provideQuantity": "يرجى وضع كمية.",

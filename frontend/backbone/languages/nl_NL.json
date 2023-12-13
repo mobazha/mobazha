@@ -1240,10 +1240,37 @@
         "namePlaceholder": "b.v. Standaard, Express, Overnight",
         "estimatedDeliveryLabel": "Verwachte leveringsdatum",
         "estimatedDeliveryPlaceholder": "b.v. 5-7 dagen",
-        "priceLabel": "Prijs (eerste gewicht)",
-        "additionalWeightPriceLabel": "Prijs (extra gewicht)",
+
+        "weightRange": "Weight Range",
+        "firstWeightAndFee": "First Weight/Fee",
+        "renewalUnitWeightAndFee": "Renewal Unit Weight/Unit Price",
+        "fee": "Fee",
+
         "pricePlaceholder": "0.00",
-        "addService": "+ Voeg service toe"
+        "addService": "+ Voeg service toe",
+
+        "firstRenewalTemplate": "Billed based on the first and renewal weight",
+        "firstRenewalExplanation": "Freight = first weight fee + (package weight - first weight) / unit weight of additional weight * unit price + registration fee",
+        "startWeight": "Start Weight",
+        "endWeight": "End Weight",
+        "firstWeight": "First Weight",
+        "firstFreight": "First Freight",
+        "renewalUnitWeight": "Renewal Unit Weight",
+        "renewalUnitPrice": "Renewal Unit Price",
+        "registrationFee": "Registration Fee",
+        "sameWeightTemplate": "Same price for the same weight class",
+        "sameWeightExplanation": "Freight = fee + registration fee",
+
+        "action": "Action",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "submitting": "Submitting...",
+        "confirm": "Confirm"
+      },
+      "modal": {
+        "template": "Template",
+        "selectTemplate": "Please select a template",
+        "add": "Add"
       },
       "toolTip": {
         "delete": "Verwijder"
@@ -2077,7 +2104,8 @@
   },
   "fixedFeeModelErrors": {
     "noCurrency": "Als je fee type vast is of vast plus percentage, dan moet je een geldige valuta instellen voor je fee.",
-    "noAmount": "Als je fee type vast is of vast plus percentage, dan moet je een geldige hoeveelheid instellen voor je vaste fee. Als een decimaal wordt gebruikt, moet een punt als scheidingsteken worden gebruikt, bijvoorbeeld \"0.00\"."
+    "fixedFeeAsNumber": "Als je fee type vast is of vast plus percentage, dan moet je een geldige hoeveelheid instellen voor je vaste fee. Als een decimaal wordt gebruikt, moet een punt als scheidingsteken worden gebruikt, bijvoorbeeld \"0.00\".",
+    "amountGreaterThanZero": "If your fee type is fixed or fixed plus percentage, the fixed fee amount must be greater than zero."
   },
   "skuModelErrors": {
     "provideQuantity": "Voer een hoeveelheid in.",

@@ -57,8 +57,8 @@ export default {
         services: [],
       },
       options: [
-        { label: '按首重续费计算', value: 'FIRST_RENEWAL_FEE' },
-        { label: '同重量段费用相同', value: 'SAME_WEIGHT_SAME_FEE' },
+        { label: app.polyglot.t('editListing.shippingOptions.services.firstRenewalTemplate'), value: 'FIRST_RENEWAL_FEE' },
+        { label: app.polyglot.t('editListing.shippingOptions.services.sameWeightTemplate'), value: 'SAME_WEIGHT_SAME_FEE' },
       ],
     };
   },
@@ -72,9 +72,9 @@ export default {
     },
     serviceTypeTip() {
       if (this.formData.serviceType === 'FIRST_RENEWAL_FEE') {
-        return '运费=首重费用+ (包裹重量-首重)/续重单位重量单价+挂号费';
+        return app.polyglot.t('editListing.shippingOptions.services.firstRenewalExplanation');
       } else if (this.formData.serviceType === 'SAME_WEIGHT_SAME_FEE') {
-        return '运费=费用+挂号费';
+        return app.polyglot.t('editListing.shippingOptions.services.sameWeightExplanation');
       }
       return '';
     },

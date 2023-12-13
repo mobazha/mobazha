@@ -1240,10 +1240,37 @@
         "namePlaceholder": "e.g. Standard, Express, Overnight",
         "estimatedDeliveryLabel": "Est. Delivery Time",
         "estimatedDeliveryPlaceholder": "e.g. 5-7 days",
-        "priceLabel": "Cena (pierwsza waga)",
-        "additionalWeightPriceLabel": "Cena (dodatkowa waga)",
+
+        "weightRange": "Weight Range",
+        "firstWeightAndFee": "First Weight/Fee",
+        "renewalUnitWeightAndFee": "Renewal Unit Weight/Unit Price",
+        "fee": "Fee",
+
         "pricePlaceholder": "0.00",
-        "addService": "+ Add Service"
+        "addService": "+ Add Service",
+
+        "firstRenewalTemplate": "Billed based on the first and renewal weight",
+        "firstRenewalExplanation": "Freight = first weight fee + (package weight - first weight) / unit weight of additional weight * unit price + registration fee",
+        "startWeight": "Start Weight",
+        "endWeight": "End Weight",
+        "firstWeight": "First Weight",
+        "firstFreight": "First Freight",
+        "renewalUnitWeight": "Renewal Unit Weight",
+        "renewalUnitPrice": "Renewal Unit Price",
+        "registrationFee": "Registration Fee",
+        "sameWeightTemplate": "Same price for the same weight class",
+        "sameWeightExplanation": "Freight = fee + registration fee",
+
+        "action": "Action",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "submitting": "Submitting...",
+        "confirm": "Confirm"
+      },
+      "modal": {
+        "template": "Template",
+        "selectTemplate": "Please select a template",
+        "add": "Add"
       },
       "toolTip": {
         "delete": "Usuń"
@@ -2077,7 +2104,8 @@
   },
   "fixedFeeModelErrors": {
     "noCurrency": "If your fee type is fixed or fixed plus percentage, you must set a valid currency for your fee.",
-    "noAmount": "If your fee type is fixed or fixed plus percentage, you must set a valid amount for your fixed fee. If including a decimal, a period should be used as the seperator, for example \"0.00\"."
+    "fixedFeeAsNumber": "If your fee type is fixed or fixed plus percentage, you must set a valid amount for your fixed fee. If including a decimal, a period should be used as the seperator, for example \"0.00\".",
+    "amountGreaterThanZero": "If your fee type is fixed or fixed plus percentage, the fixed fee amount must be greater than zero."
   },
   "skuModelErrors": {
     "provideQuantity": "Please provide a quantity.",

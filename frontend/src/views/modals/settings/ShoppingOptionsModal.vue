@@ -37,7 +37,7 @@
         <el-table-column :label="`${ob.polyT('editListing.shippingOptions.services.endWeight')}(g)`">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.endWeight`" :rules="rules.endWeight">
-              <el-input v-model.number="row.endWeight" placeholder="请输入" clearable maxlength="20" />
+              <el-input v-model.number="row.endWeight" placeholder="0" clearable maxlength="20" />
             </el-form-item>
           </template>
         </el-table-column>
@@ -45,28 +45,28 @@
           <el-table-column :label="`${ob.polyT('editListing.shippingOptions.services.firstWeight')}(g)`">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.firstWeight`" :rules="rules.firstWeight">
-                <el-input v-model.number="row.firstWeight" placeholder="请输入" clearable maxlength="20" />
+                <el-input v-model.number="row.firstWeight" placeholder="0" clearable maxlength="20" />
               </el-form-item>
             </template>
           </el-table-column>
           <el-table-column :label="ob.polyT('editListing.shippingOptions.services.firstFreight')">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.firstFreight`" :rules="rules.firstFreight">
-                <el-input v-model.number="row.firstFreight" placeholder="请输入" clearable maxlength="20" data-var-type="bignumber" />
+                <el-input v-model.number="row.firstFreight" step="0.01" :placeholder="ob.polyT('editListing.shippingOptions.services.pricePlaceholder')" clearable maxlength="20" data-var-type="bignumber" />
               </el-form-item>
             </template>
           </el-table-column>
           <el-table-column :label="`${ob.polyT('editListing.shippingOptions.services.renewalUnitWeight')}(g)`">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.renewalUnitWeight`" :rules="rules.renewalUnitWeight">
-                <el-input v-model.number="row.renewalUnitWeight" placeholder="请输入" clearable maxlength="20" />
+                <el-input v-model.number="row.renewalUnitWeight" placeholder="0" clearable maxlength="20" />
               </el-form-item>
             </template>
           </el-table-column>
           <el-table-column :label="ob.polyT('editListing.shippingOptions.services.renewalUnitPrice')">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.renewalUnitPrice`" :rules="rules.renewalUnitPrice">
-                <el-input v-model.number="row.renewalUnitPrice" placeholder="请输入" clearable maxlength="20" data-var-type="bignumber" />
+                <el-input v-model.number="row.renewalUnitPrice" step="0.01" :placeholder="ob.polyT('editListing.shippingOptions.services.pricePlaceholder')" clearable maxlength="20" data-var-type="bignumber" />
               </el-form-item>
             </template>
           </el-table-column>
@@ -75,7 +75,7 @@
           <el-table-column :label="ob.polyT('editListing.shippingOptions.services.fee')">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.firstFreight`" :rules="rules.firstFreight">
-                <el-input v-model.number="row.firstFreight" step="0.01" placeholder="请输入" clearable maxlength="20" data-var-type="bignumber" />
+                <el-input v-model.number="row.firstFreight" step="0.01" :placeholder="ob.polyT('editListing.shippingOptions.services.pricePlaceholder')" clearable maxlength="20" data-var-type="bignumber" />
               </el-form-item>
             </template>
           </el-table-column>
@@ -84,7 +84,7 @@
         <el-table-column :label="ob.polyT('editListing.shippingOptions.services.registrationFee')">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.registrationFee`" :rules="rules.registrationFee">
-              <el-input v-model.number="row.registrationFee" placeholder="请输入" clearable maxlength="20" />
+              <el-input v-model.number="row.registrationFee" step="0.01" :placeholder="ob.polyT('editListing.shippingOptions.services.pricePlaceholder')" clearable maxlength="20" />
             </el-form-item>
           </template>
         </el-table-column>
@@ -131,9 +131,9 @@ export default {
   computed: {
     serviceTypeTip() {
       if (this.formData.serviceType === 'FIRST_RENEWAL_FEE') {
-        return '运费=首重费用+ (包裹重量-首重)/续重单位重量单价+挂号费';
+        return app.polyglot.t('editListing.shippingOptions.services.firstRenewalExplanation');
       } else if (this.formData.serviceType === 'SAME_WEIGHT_SAME_FEE') {
-        return '运费=费用+挂号费';
+        return app.polyglot.t('editListing.shippingOptions.services.sameWeightExplanation');
       }
       return '';
     },
@@ -141,8 +141,8 @@ export default {
   data() {
     return {
       options: [
-        { label: '按首重续费计算', value: 'FIRST_RENEWAL_FEE' },
-        { label: '同重量段费用相同', value: 'SAME_WEIGHT_SAME_FEE' },
+        { label: app.polyglot.t('editListing.shippingOptions.services.firstRenewalTemplate'), value: 'FIRST_RENEWAL_FEE' },
+        { label: app.polyglot.t('editListing.shippingOptions.services.sameWeightTemplate'), value: 'SAME_WEIGHT_SAME_FEE' },
       ],
       visible: false,
       isSubmitting: false,
@@ -154,7 +154,7 @@ export default {
         serviceType: [
           {
             required: true,
-            message: '请选择模板',
+            message: app.polyglot.t('editListing.shippingOptions.modal.selectTemplate'),
             trigger: ['change', 'blur'],
           },
         ],

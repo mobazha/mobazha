@@ -799,7 +799,8 @@
           "addService": "Inserir Serviço",
           "template": "Template",
           "selectTemplate": "Please select a template",
-          "add": "+ Add"
+          "add": "+ Add",
+          "pleaseInput": "Please input"
         },
         "toolTip": {
           "delete": "Apagar"

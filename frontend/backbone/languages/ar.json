@@ -801,7 +801,8 @@
           "addService": "اضف خدمة",
           "template": "Template",
           "selectTemplate": "Please select a template",
-          "add": "+ Add"
+          "add": "+ Add",
+          "pleaseInput": "Please input"
         },
         "toolTip": {
           "delete": "حذف"

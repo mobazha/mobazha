@@ -139,6 +139,7 @@ export default {
     },
   },
   data() {
+    const pleaseInput = app.polyglot.t('settings.storeTab.shippingOptions.modal.pleaseInput');
     return {
       options: [
         { label: app.polyglot.t('settings.storeTab.shippingOptions.services.firstRenewalTemplate'), value: 'FIRST_RENEWAL_FEE' },
@@ -158,34 +159,34 @@ export default {
             trigger: ['change', 'blur'],
           },
         ],
-        name: [{ required: true, message: '请输入服务', trigger: ['change', 'blur'] }],
+        name: [{ required: true, message: pleaseInput, trigger: ['change', 'blur'] }],
         estimatedDelivery: [{ required: true, message: '请输入运送时间', trigger: ['change', 'blur'] }],
         startWeight: [{ required: true, message: '请输入开始重量', trigger: ['change', 'blur'] }],
         endWeight: [
-          { required: true, message: '请输入结束重量', trigger: ['change', 'blur'] },
+          { required: true, message: pleaseInput, trigger: ['change', 'blur'] },
           { type: 'number', message: 'Input must be a number' },
           { validator: checkPositiveVal, trigger: ['change', 'blur'] },
         ],
         firstWeight: [
-          { required: true, message: '请输入首重', trigger: ['change', 'blur'] },
+          { required: true, message: pleaseInput, trigger: ['change', 'blur'] },
           { type: 'number', message: 'Input must be a number' },
           { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] },
         ],
         firstFreight: [
-          { required: true, message: '请输入首重运费', trigger: ['change', 'blur'] },
+          { required: true, message: pleaseInput, trigger: ['change', 'blur'] },
           { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] },
         ],
         renewalUnitWeight: [
-          { required: true, message: '请输入续重单位重量', trigger: ['change', 'blur'] },
+          { required: true, message: pleaseInput, trigger: ['change', 'blur'] },
           { type: 'number', message: 'Input must be a number' },
           { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] },
         ],
         renewalUnitPrice: [
-          { required: true, message: '请输入单价', trigger: ['change', 'blur'] },
+          { required: true, message: pleaseInput, trigger: ['change', 'blur'] },
           { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] },
         ],
         registrationFee: [
-          { required: true, message: '请输入挂号费', trigger: ['change', 'blur'] },
+          { required: true, message: pleaseInput, trigger: ['change', 'blur'] },
           { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] },
         ],
       },

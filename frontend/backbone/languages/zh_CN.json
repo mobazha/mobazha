@@ -799,7 +799,8 @@
           "addService": "添加服务",
           "template": "模板",
           "selectTemplate": "请选择模板",
-          "add": "+ 添加"
+          "add": "+ 添加",
+          "pleaseInput": "请输入"
         },
         "toolTip": {
           "delete": "删除"

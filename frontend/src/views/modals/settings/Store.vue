@@ -492,22 +492,19 @@ export default {
             const remAvail = this.$refs.modsAvailable.removeModeratorsByID(this.$refs.modsAvailable.selectedIDs);
 
             this.$refs.modsByID.excludeIDs = this.currentMods;
-            this.$refs.modsByID.moderatorsStatus.setState({
-              hidden: true,
-            });
+            this.$refs.modsByID.showStatus = false;
 
             this.$refs.modsSelected.moderatorsCol.add([...remByID, ...remAvail]);
-            this.$refs.modsSelected.moderatorsStatus.setState({
-              hidden: true,
-            });
+            this.$refs.modsSelected.showStatus = false;
 
             this.$refs.modsAvailable.excludeIDs = this.currentMods;
             this.$refs.modsAvailable.moderatorsCol.add(remSel);
-            this.$refs.modsAvailable.moderatorsStatus.setState({
-              hidden: false,
-              total: this.$refs.modsAvailable.modCount,
-              showSpinner: false,
-            });
+            this.$refs.modsSelected.showStatus = true;
+            if (this.$refs.modsAvailable.$refs.moderatorsStatus) {
+              this.$refs.modsAvailable.$refs.moderatorsStatus.setState({
+                showSpinner: false,
+              });
+            }
 
             // If any of the mods moved to the available collect are unverified, show them
             if (app.verifiedMods.matched(unSel).length !== unSel.length) {

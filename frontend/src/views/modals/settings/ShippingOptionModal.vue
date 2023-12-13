@@ -224,8 +224,8 @@ export default {
       return {
         name: '',
         estimatedDelivery: '',
-        startWeight: '',
-        endWeight: '',
+        startWeight: 0,
+        endWeight: 0,
         firstWeight: 0,
         firstFreight: '',
         renewalUnitWeight: '',
@@ -256,6 +256,8 @@ export default {
           });
 
           this.shippingOption.set(this.formData);
+
+          this.$emit('shippingOptionUpdated');
 
           this.visible = false;
         }

@@ -88,7 +88,6 @@ export default {
       this.initFormData();
 
       this.shippingOption.on('change', () => this.initFormData());
-      this.shippingOption.get('services').on('change', () => this.initFormData());
     },
 
     initFormData() {

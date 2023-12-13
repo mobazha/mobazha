@@ -749,6 +749,63 @@
         "error": "لا يمكن حذف خيار الشحن الوحيد.",
         "noShippingOption": "هناك قوائم فعلية في المتجر. ينبغي توفير خيار شحن واحد على الأقل."
       },
+      "shippingOptions": {
+        "optionHeading": "خيارات الشحن #%{listPosition}",
+        "shippingDestinations": "الوجهات",
+        "regionsPlaceholder": "إدخال البلدان ...",
+        "nameLabel": "عنوان الخيار",
+        "namePlaceholder": "مثلا تُشحن الولايات المتحدة الأمريكية، دوليًا، وما إلى ذلك",
+        "typeLabel": "النوع",
+        "shippingTypes": {
+          "FIXED_PRICE": "سعر ثابت",
+          "LOCAL_PICKUP": "أخذ محلي"
+        },
+        "btnAddShippingOption": "إضافة خيار الشحن",
+        "btnDeleteShippingOption": "حذف",
+        "clearAll": "مسح الكل",
+        "services": {
+          "nameLabel": "خدمة",
+          "namePlaceholder": "مثلا عادي، سريع، صباح اليوم التالي",
+          "estimatedDeliveryLabel": "موعد التسليم ,المقدر",
+          "estimatedDeliveryPlaceholder": "مثال. 5-7 أيام",
+          "priceLabel": "السعر (الوزن الأول)",
+          "additionalWeightPriceLabel": "السعر (الوزن الإضافي)",
+  
+          "weightRange": "Weight Range",
+          "firstWeightAndFee": "First Weight/Fee",
+          "renewalUnitWeightAndFee": "Renewal Unit Weight/Unit Price",
+          "fee": "Fee",
+  
+          "pricePlaceholder": "0.00",
+          "addService": "+ اضف خدمة",
+  
+          "firstRenewalTemplate": "Billed based on the first and renewal weight",
+          "firstRenewalExplanation": "Freight = first weight fee + (package weight - first weight) / unit weight of additional weight * unit price + registration fee",
+          "startWeight": "Start Weight",
+          "endWeight": "End Weight",
+          "firstWeight": "First Weight",
+          "firstFreight": "First Freight",
+          "renewalUnitWeight": "Renewal Unit Weight",
+          "renewalUnitPrice": "Renewal Unit Price",
+          "registrationFee": "Registration Fee",
+          "sameWeightTemplate": "Same price for the same weight class",
+          "sameWeightExplanation": "Freight = fee + registration fee",
+  
+          "action": "Action",
+          "delete": "Delete",
+          "cancel": "Cancel",
+          "submitting": "Submitting...",
+          "confirm": "Confirm"
+        },
+        "modal": {
+          "template": "Template",
+          "selectTemplate": "Please select a template",
+          "add": "Add"
+        },
+        "toolTip": {
+          "delete": "حذف"
+        }
+      },
       "errors": {
         "modNotFoundTitle": "المشرف غير متوفر",
         "modsNotFound": "%{guids} لا يمكن العثور عليها بالشبكة. قد يكون معرف النظير غير صالح. |||| %{guids} لا يمكن العثور عليها بالشبكة. قد تكون معرفات النظير غير صالحة.",
@@ -1220,63 +1277,6 @@
       "priceModifierPlaceholder": "0.00 (market rate)",
       "helperPriceModifier": "Trade at market rate, or specify a price modifier (+/-)",
       "lblReceive": "Receive"
-    },
-    "shippingOptions": {
-      "optionHeading": "خيارات الشحن #%{listPosition}",
-      "shippingDestinations": "الوجهات",
-      "regionsPlaceholder": "إدخال البلدان ...",
-      "nameLabel": "عنوان الخيار",
-      "namePlaceholder": "مثلا تُشحن الولايات المتحدة الأمريكية، دوليًا، وما إلى ذلك",
-      "typeLabel": "النوع",
-      "shippingTypes": {
-        "FIXED_PRICE": "سعر ثابت",
-        "LOCAL_PICKUP": "أخذ محلي"
-      },
-      "btnAddShippingOption": "إضافة خيار الشحن",
-      "btnDeleteShippingOption": "حذف",
-      "clearAll": "مسح الكل",
-      "services": {
-        "nameLabel": "خدمة",
-        "namePlaceholder": "مثلا عادي، سريع، صباح اليوم التالي",
-        "estimatedDeliveryLabel": "موعد التسليم ,المقدر",
-        "estimatedDeliveryPlaceholder": "مثال. 5-7 أيام",
-        "priceLabel": "السعر (الوزن الأول)",
-        "additionalWeightPriceLabel": "السعر (الوزن الإضافي)",
-
-        "weightRange": "Weight Range",
-        "firstWeightAndFee": "First Weight/Fee",
-        "renewalUnitWeightAndFee": "Renewal Unit Weight/Unit Price",
-        "fee": "Fee",
-
-        "pricePlaceholder": "0.00",
-        "addService": "+ اضف خدمة",
-
-        "firstRenewalTemplate": "Billed based on the first and renewal weight",
-        "firstRenewalExplanation": "Freight = first weight fee + (package weight - first weight) / unit weight of additional weight * unit price + registration fee",
-        "startWeight": "Start Weight",
-        "endWeight": "End Weight",
-        "firstWeight": "First Weight",
-        "firstFreight": "First Freight",
-        "renewalUnitWeight": "Renewal Unit Weight",
-        "renewalUnitPrice": "Renewal Unit Price",
-        "registrationFee": "Registration Fee",
-        "sameWeightTemplate": "Same price for the same weight class",
-        "sameWeightExplanation": "Freight = fee + registration fee",
-
-        "action": "Action",
-        "delete": "Delete",
-        "cancel": "Cancel",
-        "submitting": "Submitting...",
-        "confirm": "Confirm"
-      },
-      "modal": {
-        "template": "Template",
-        "selectTemplate": "Please select a template",
-        "add": "Add"
-      },
-      "toolTip": {
-        "delete": "حذف"
-      }
     },
     "coupons": {
       "titleLabel": "عنوان",

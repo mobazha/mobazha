@@ -749,6 +749,61 @@
         "error": "Nie można usunąć jedynej opcji wysyłki.",
         "noShippingOption": "There are physical listings in the Store. At least one shipping option should be provided."
       },
+      "shippingOptions": {
+        "optionHeading": "Opcja dostawy #%{listPosition}",
+        "shippingDestinations": "Destinations",
+        "regionsPlaceholder": "Enter countries…",
+        "nameLabel": "Option Title",
+        "namePlaceholder": "e.g. USA Shipping, International, etc",
+        "typeLabel": "Typ",
+        "shippingTypes": {
+          "FIXED_PRICE": "Fixed Price",
+          "LOCAL_PICKUP": "Odbiór osobisty"
+        },
+        "btnAddShippingOption": "Add Shipping Option",
+        "btnDeleteShippingOption": "Usuń",
+        "clearAll": "Wyczyść wszystko",
+        "services": {
+          "nameLabel": "Usługa",
+          "namePlaceholder": "e.g. Standard, Express, Overnight",
+          "estimatedDeliveryLabel": "Est. Delivery Time",
+          "estimatedDeliveryPlaceholder": "e.g. 5-7 days",
+  
+          "weightRange": "Weight Range",
+          "firstWeightAndFee": "First Weight/Fee",
+          "renewalUnitWeightAndFee": "Renewal Unit Weight/Unit Price",
+          "fee": "Fee",
+  
+          "pricePlaceholder": "0.00",
+          "addService": "+ Add Service",
+  
+          "firstRenewalTemplate": "Billed based on the first and renewal weight",
+          "firstRenewalExplanation": "Freight = first weight fee + (package weight - first weight) / unit weight of additional weight * unit price + registration fee",
+          "startWeight": "Start Weight",
+          "endWeight": "End Weight",
+          "firstWeight": "First Weight",
+          "firstFreight": "First Freight",
+          "renewalUnitWeight": "Renewal Unit Weight",
+          "renewalUnitPrice": "Renewal Unit Price",
+          "registrationFee": "Registration Fee",
+          "sameWeightTemplate": "Same price for the same weight class",
+          "sameWeightExplanation": "Freight = fee + registration fee",
+  
+          "action": "Action",
+          "delete": "Delete",
+          "cancel": "Cancel",
+          "submitting": "Submitting...",
+          "confirm": "Confirm"
+        },
+        "modal": {
+          "template": "Template",
+          "selectTemplate": "Please select a template",
+          "add": "Add"
+        },
+        "toolTip": {
+          "delete": "Usuń"
+        }
+      },
       "errors": {
         "modNotFoundTitle": "Nie znaleziono moderatora",
         "modsNotFound": "%{guids} could not be found on the network. It may not be a valid peer ID. |||| %{guids} could not be found on the network. They may not be valid peer IDs.",
@@ -1220,61 +1275,6 @@
       "priceModifierPlaceholder": "0.00 (market rate)",
       "helperPriceModifier": "Trade at market rate, or specify a price modifier (+/-)",
       "lblReceive": "Receive"
-    },
-    "shippingOptions": {
-      "optionHeading": "Opcja dostawy #%{listPosition}",
-      "shippingDestinations": "Destinations",
-      "regionsPlaceholder": "Enter countries…",
-      "nameLabel": "Option Title",
-      "namePlaceholder": "e.g. USA Shipping, International, etc",
-      "typeLabel": "Typ",
-      "shippingTypes": {
-        "FIXED_PRICE": "Fixed Price",
-        "LOCAL_PICKUP": "Odbiór osobisty"
-      },
-      "btnAddShippingOption": "Add Shipping Option",
-      "btnDeleteShippingOption": "Usuń",
-      "clearAll": "Wyczyść wszystko",
-      "services": {
-        "nameLabel": "Usługa",
-        "namePlaceholder": "e.g. Standard, Express, Overnight",
-        "estimatedDeliveryLabel": "Est. Delivery Time",
-        "estimatedDeliveryPlaceholder": "e.g. 5-7 days",
-
-        "weightRange": "Weight Range",
-        "firstWeightAndFee": "First Weight/Fee",
-        "renewalUnitWeightAndFee": "Renewal Unit Weight/Unit Price",
-        "fee": "Fee",
-
-        "pricePlaceholder": "0.00",
-        "addService": "+ Add Service",
-
-        "firstRenewalTemplate": "Billed based on the first and renewal weight",
-        "firstRenewalExplanation": "Freight = first weight fee + (package weight - first weight) / unit weight of additional weight * unit price + registration fee",
-        "startWeight": "Start Weight",
-        "endWeight": "End Weight",
-        "firstWeight": "First Weight",
-        "firstFreight": "First Freight",
-        "renewalUnitWeight": "Renewal Unit Weight",
-        "renewalUnitPrice": "Renewal Unit Price",
-        "registrationFee": "Registration Fee",
-        "sameWeightTemplate": "Same price for the same weight class",
-        "sameWeightExplanation": "Freight = fee + registration fee",
-
-        "action": "Action",
-        "delete": "Delete",
-        "cancel": "Cancel",
-        "submitting": "Submitting...",
-        "confirm": "Confirm"
-      },
-      "modal": {
-        "template": "Template",
-        "selectTemplate": "Please select a template",
-        "add": "Add"
-      },
-      "toolTip": {
-        "delete": "Usuń"
-      }
     },
     "coupons": {
       "titleLabel": "Tytuł",

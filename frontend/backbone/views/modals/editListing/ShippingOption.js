@@ -117,7 +117,7 @@ export default class extends BaseView {
 
     if (listPosition !== prevPosition) {
       this.$headline.text(
-        app.polyglot.t('editListing.shippingOptions.optionHeading', { listPosition }),
+        app.polyglot.t('settings.storeTab.shippingOptions.optionHeading', { listPosition }),
       );
     }
   }

@@ -749,6 +749,61 @@
         "error": "Неможливо видалити єдиний варіант доставки.",
         "noShippingOption": "There are physical listings in the Store. At least one shipping option should be provided."
       },
+      "shippingOptions": {
+        "optionHeading": "Опція доставки #%{listPosition}",
+        "shippingDestinations": "Пункти призначення",
+        "regionsPlaceholder": "Вкажіть країни...",
+        "nameLabel": "Назва опції",
+        "namePlaceholder": "наприклад, Укрпошта, Нова Пошта, тощо",
+        "typeLabel": "Тип",
+        "shippingTypes": {
+          "FIXED_PRICE": "Фіксована ціна",
+          "LOCAL_PICKUP": "Локальний самовивіз"
+        },
+        "btnAddShippingOption": "Додати варіант доставки",
+        "btnDeleteShippingOption": "Видалити",
+        "clearAll": "Очистити все",
+        "services": {
+          "nameLabel": "Послуга",
+          "namePlaceholder": "наприклад, Стандарт, Експрес, Нічне перевезення, тощо",
+          "estimatedDeliveryLabel": "Орієнтовний термін доставки",
+          "estimatedDeliveryPlaceholder": "наприклад, 5-7 днів",
+  
+          "weightRange": "Weight Range",
+          "firstWeightAndFee": "First Weight/Fee",
+          "renewalUnitWeightAndFee": "Renewal Unit Weight/Unit Price",
+          "fee": "Fee",
+  
+          "pricePlaceholder": "0.00",
+          "addService": "+ Додати сервіс",
+  
+          "firstRenewalTemplate": "Billed based on the first and renewal weight",
+          "firstRenewalExplanation": "Freight = first weight fee + (package weight - first weight) / unit weight of additional weight * unit price + registration fee",
+          "startWeight": "Start Weight",
+          "endWeight": "End Weight",
+          "firstWeight": "First Weight",
+          "firstFreight": "First Freight",
+          "renewalUnitWeight": "Renewal Unit Weight",
+          "renewalUnitPrice": "Renewal Unit Price",
+          "registrationFee": "Registration Fee",
+          "sameWeightTemplate": "Same price for the same weight class",
+          "sameWeightExplanation": "Freight = fee + registration fee",
+  
+          "action": "Action",
+          "delete": "Delete",
+          "cancel": "Cancel",
+          "submitting": "Submitting...",
+          "confirm": "Confirm"
+        },
+        "modal": {
+          "template": "Template",
+          "selectTemplate": "Please select a template",
+          "add": "Add"
+        },
+        "toolTip": {
+          "delete": "Видалити"
+        }
+      },
       "errors": {
         "modNotFoundTitle": "Модератора не знайдено",
         "modsNotFound": "% {guids} не вдалося знайти в мережі. Це не може бути дійсним ідентифікатором ID. |||| % {guids} не вдалося знайти в мережі. Цей одноранговий ідентифікатор ID  недійсний.",
@@ -1220,61 +1275,6 @@
       "priceModifierPlaceholder": "0.00 (ринкова ставка)",
       "helperPriceModifier": "Обміняйте за ринковим курсом або вкажіть модифікатор ціни (+/-)",
       "lblReceive": "Отримати"
-    },
-    "shippingOptions": {
-      "optionHeading": "Опція доставки #%{listPosition}",
-      "shippingDestinations": "Пункти призначення",
-      "regionsPlaceholder": "Вкажіть країни...",
-      "nameLabel": "Назва опції",
-      "namePlaceholder": "наприклад, Укрпошта, Нова Пошта, тощо",
-      "typeLabel": "Тип",
-      "shippingTypes": {
-        "FIXED_PRICE": "Фіксована ціна",
-        "LOCAL_PICKUP": "Локальний самовивіз"
-      },
-      "btnAddShippingOption": "Додати варіант доставки",
-      "btnDeleteShippingOption": "Видалити",
-      "clearAll": "Очистити все",
-      "services": {
-        "nameLabel": "Послуга",
-        "namePlaceholder": "наприклад, Стандарт, Експрес, Нічне перевезення, тощо",
-        "estimatedDeliveryLabel": "Орієнтовний термін доставки",
-        "estimatedDeliveryPlaceholder": "наприклад, 5-7 днів",
-
-        "weightRange": "Weight Range",
-        "firstWeightAndFee": "First Weight/Fee",
-        "renewalUnitWeightAndFee": "Renewal Unit Weight/Unit Price",
-        "fee": "Fee",
-
-        "pricePlaceholder": "0.00",
-        "addService": "+ Додати сервіс",
-
-        "firstRenewalTemplate": "Billed based on the first and renewal weight",
-        "firstRenewalExplanation": "Freight = first weight fee + (package weight - first weight) / unit weight of additional weight * unit price + registration fee",
-        "startWeight": "Start Weight",
-        "endWeight": "End Weight",
-        "firstWeight": "First Weight",
-        "firstFreight": "First Freight",
-        "renewalUnitWeight": "Renewal Unit Weight",
-        "renewalUnitPrice": "Renewal Unit Price",
-        "registrationFee": "Registration Fee",
-        "sameWeightTemplate": "Same price for the same weight class",
-        "sameWeightExplanation": "Freight = fee + registration fee",
-
-        "action": "Action",
-        "delete": "Delete",
-        "cancel": "Cancel",
-        "submitting": "Submitting...",
-        "confirm": "Confirm"
-      },
-      "modal": {
-        "template": "Template",
-        "selectTemplate": "Please select a template",
-        "add": "Add"
-      },
-      "toolTip": {
-        "delete": "Видалити"
-      }
     },
     "coupons": {
       "titleLabel": "Назва",

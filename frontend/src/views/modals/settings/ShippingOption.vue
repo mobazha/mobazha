@@ -4,18 +4,18 @@
       <form class="padSmKids padStack">
         <div class="flexVCent">
           <h2 class="h4 clrT flexExpand" :required="ob.listPosition === 1">
-            {{ ob.polyT('editListing.shippingOptions.optionHeading', { listPosition: ob.listPosition }) }}
+            {{ ob.polyT('settings.storeTab.shippingOptions.optionHeading', { listPosition: ob.listPosition }) }}
           </h2>
           <a class="clrBr clrP clrSh2 margRSm btn js-removeShippingOption" @click="onClickRemoveShippingOption">{{
-            ob.polyT('editListing.shippingOptions.btnDeleteShippingOption')
+            ob.polyT('settings.storeTab.shippingOptions.btnDeleteShippingOption')
           }}</a>
         </div>
         <hr class="clrBr rowMd" />
         <div class="flexRow">
-          <label :for="`shipDestinationsSelect_${ob.cid}`" class="required">{{ ob.polyT('editListing.shippingOptions.shippingDestinations') }}</label>
+          <label :for="`shipDestinationsSelect_${ob.cid}`" class="required">{{ ob.polyT('settings.storeTab.shippingOptions.shippingDestinations') }}</label>
           <div class="flexExpand">
             <div class="flexHRight flexVCent">
-              <a class="js-clearAllShipDest tx6" @click="onClickClearShipDest">{{ ob.polyT('editListing.shippingOptions.clearAll') }}</a>
+              <a class="js-clearAllShipDest tx6" @click="onClickClearShipDest">{{ ob.polyT('settings.storeTab.shippingOptions.clearAll') }}</a>
             </div>
           </div>
         </div>
@@ -25,22 +25,22 @@
           ref="shipDestinationSelect"
           multiple
           class="clrBr clrP clrSh2"
-          :placeholder="ob.polyT('editListing.shippingOptions.regionsPlaceholder')"
+          :placeholder="ob.polyT('settings.storeTab.shippingOptions.regionsPlaceholder')"
         ></select>
         <div class="flexRow gutterH">
           <div class="col6 simpleFlexCol">
-            <label :for="`shipOptionTitle_${ob.cid}`" class="required">{{ ob.polyT('editListing.shippingOptions.nameLabel') }}</label>
+            <label :for="`shipOptionTitle_${ob.cid}`" class="required">{{ ob.polyT('settings.storeTab.shippingOptions.nameLabel') }}</label>
             <FormError v-if="ob.errors['name']" :errors="ob.errors['name']" />
             <input
               type="text"
               class="clrBr clrP clrSh2 marginTopAuto"
               v-model="formData.name"
               :id="`shipOptionTitle_${ob.cid}`"
-              :placeholder="ob.polyT('editListing.shippingOptions.namePlaceholder')"
+              :placeholder="ob.polyT('settings.storeTab.shippingOptions.namePlaceholder')"
             />
           </div>
           <div class="col4 simpleFlexCol">
-            <label :for="`shipOptionType_${ob.cid}`" class="required">{{ ob.polyT('editListing.shippingOptions.typeLabel') }}</label>
+            <label :for="`shipOptionType_${ob.cid}`" class="required">{{ ob.polyT('settings.storeTab.shippingOptions.typeLabel') }}</label>
             <FormError v-if="ob.errors['type']" :errors="ob.errors['type']" />
             <Select2
               :id="`shipOptionType_${ob.cid}`"
@@ -51,7 +51,7 @@
             >
               <template v-for="(shippingType, j) in ob.shippingTypes" :key="j">
                 <option :value="shippingType" :selected="formData.type === shippingType">
-                  {{ ob.polyT(`editListing.shippingOptions.shippingTypes.${shippingType}`) }}
+                  {{ ob.polyT(`settings.storeTab.shippingOptions.shippingTypes.${shippingType}`) }}
                 </option>
               </template>
             </Select2>
@@ -76,7 +76,7 @@
           }"
         />
         <div class="flexRow pad js-serviceSection" v-show="formData.type !== 'LOCAL_PICKUP'">
-          <a class="clrBr clrP clrTEm js-btnAddService" @click="addExpressInfo">{{ ob.polyT('editListing.shippingOptions.services.addService') }}</a>
+          <a class="clrBr clrP clrTEm js-btnAddService" @click="addExpressInfo">{{ ob.polyT('settings.storeTab.shippingOptions.services.addService') }}</a>
         </div>
       </form>
       <ShoppingOptionsModal ref="modal"

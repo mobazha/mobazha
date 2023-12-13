@@ -211,11 +211,11 @@
                 <div class="contentBox padMd clrP clrBr clrSh3 tx3 shipOptPlaceholder">
                   <FormError v-if="ob.errors['shippingOptions']" :errors="ob.errors['shippingOptions']" :class="topLevelShipOptErrs" />
                   <h2 class="h4 clrT js-addShipOptSectionHeading">
-                    {{ ob.polyT('editListing.shippingOptions.optionHeading', { listPosition: shippingOptions.length + 1 }) }}
+                    {{ ob.polyT('settings.storeTab.shippingOptions.optionHeading', { listPosition: shippingOptions.length + 1 }) }}
                   </h2>
                   <hr class="clrBr rowMd" />
                   <a class="btn clrBr clrP clrSh2 rowSm" @click="onClickAddShippingOption">{{
-                    ob.polyT('editListing.shippingOptions.btnAddShippingOption')
+                    ob.polyT('settings.storeTab.shippingOptions.btnAddShippingOption')
                   }}</a>
                   <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperShipping') }}</div>
                 </div>

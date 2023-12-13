@@ -176,7 +176,7 @@ export default class extends BaseModal {
 
       this.$addShipOptSectionHeading
         .text(app.polyglot.t(
-          'editListing.shippingOptions.optionHeading',
+          'settings.storeTab.shippingOptions.optionHeading',
           { listPosition: this.shippingOptions.length + 1 },
         ));
     });

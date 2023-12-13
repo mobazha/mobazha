@@ -3,8 +3,8 @@
     <el-form ref="form" size="small" :model="formData" :rules="rules" label-width="0">
       <div class="form-head">
         <div class="form-head__select">
-          <el-form-item :label="ob.polyT('editListing.shippingOptions.modal.template')" label-width="auto" prop="serviceType" :rules="rules.serviceType">
-            <el-select @change="changeSelect" v-model="formData.serviceType" :placeholder="ob.polyT('editListing.shippingOptions.modal.selectTemplate')">
+          <el-form-item :label="ob.polyT('settings.storeTab.shippingOptions.modal.template')" label-width="auto" prop="serviceType" :rules="rules.serviceType">
+            <el-select @change="changeSelect" v-model="formData.serviceType" :placeholder="ob.polyT('settings.storeTab.shippingOptions.modal.selectTemplate')">
               <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
           </el-form-item>
@@ -13,28 +13,28 @@
         <div class="tips" v-if="formData.serviceType"><span class="tips-btn">说明!</span>{{ serviceTypeTip }}</div>
       </div>
       <el-table :data="formData.services" :border="true" row-class-name="form-table" cell-class-name="cell-form-table">
-        <el-table-column :label="ob.polyT('editListing.shippingOptions.services.nameLabel')" width="130">
+        <el-table-column :label="ob.polyT('settings.storeTab.shippingOptions.services.nameLabel')" width="130">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.name`" :rules="rules.name">
-              <el-input v-model="row.name" :placeholder="ob.polyT('editListing.shippingOptions.services.namePlaceholder')" clearable maxlength="20" />
+              <el-input v-model="row.name" :placeholder="ob.polyT('settings.storeTab.shippingOptions.services.namePlaceholder')" clearable maxlength="20" />
             </el-form-item>
           </template>
         </el-table-column>
-        <el-table-column :label="ob.polyT('editListing.shippingOptions.services.estimatedDeliveryLabel')" width="110">
+        <el-table-column :label="ob.polyT('settings.storeTab.shippingOptions.services.estimatedDeliveryLabel')" width="110">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.estimatedDelivery`" :rules="rules.estimatedDelivery">
-              <el-input v-model="row.estimatedDelivery" :placeholder="ob.polyT('editListing.shippingOptions.services.estimatedDeliveryPlaceholder')" clearable maxlength="20" />
+              <el-input v-model="row.estimatedDelivery" :placeholder="ob.polyT('settings.storeTab.shippingOptions.services.estimatedDeliveryPlaceholder')" clearable maxlength="20" />
             </el-form-item>
           </template>
         </el-table-column>
-        <el-table-column :label="`${ob.polyT('editListing.shippingOptions.services.startWeight')}(g)`">
+        <el-table-column :label="`${ob.polyT('settings.storeTab.shippingOptions.services.startWeight')}(g)`">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.startWeight`" :rules="rules.startWeight">
               <el-input v-model.number="row.startWeight" placeholder="0" disabled clearable maxlength="20" />
             </el-form-item>
           </template>
         </el-table-column>
-        <el-table-column :label="`${ob.polyT('editListing.shippingOptions.services.endWeight')}(g)`">
+        <el-table-column :label="`${ob.polyT('settings.storeTab.shippingOptions.services.endWeight')}(g)`">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.endWeight`" :rules="rules.endWeight">
               <el-input v-model.number="row.endWeight" placeholder="0" clearable maxlength="20" />
@@ -42,63 +42,63 @@
           </template>
         </el-table-column>
         <template v-if="formData.serviceType === 'FIRST_RENEWAL_FEE'">
-          <el-table-column :label="`${ob.polyT('editListing.shippingOptions.services.firstWeight')}(g)`">
+          <el-table-column :label="`${ob.polyT('settings.storeTab.shippingOptions.services.firstWeight')}(g)`">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.firstWeight`" :rules="rules.firstWeight">
                 <el-input v-model.number="row.firstWeight" placeholder="0" clearable maxlength="20" />
               </el-form-item>
             </template>
           </el-table-column>
-          <el-table-column :label="ob.polyT('editListing.shippingOptions.services.firstFreight')">
+          <el-table-column :label="ob.polyT('settings.storeTab.shippingOptions.services.firstFreight')">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.firstFreight`" :rules="rules.firstFreight">
-                <el-input v-model.number="row.firstFreight" step="0.01" :placeholder="ob.polyT('editListing.shippingOptions.services.pricePlaceholder')" clearable maxlength="20" data-var-type="bignumber" />
+                <el-input v-model.number="row.firstFreight" step="0.01" :placeholder="ob.polyT('settings.storeTab.shippingOptions.services.pricePlaceholder')" clearable maxlength="20" data-var-type="bignumber" />
               </el-form-item>
             </template>
           </el-table-column>
-          <el-table-column :label="`${ob.polyT('editListing.shippingOptions.services.renewalUnitWeight')}(g)`">
+          <el-table-column :label="`${ob.polyT('settings.storeTab.shippingOptions.services.renewalUnitWeight')}(g)`">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.renewalUnitWeight`" :rules="rules.renewalUnitWeight">
                 <el-input v-model.number="row.renewalUnitWeight" placeholder="0" clearable maxlength="20" />
               </el-form-item>
             </template>
           </el-table-column>
-          <el-table-column :label="ob.polyT('editListing.shippingOptions.services.renewalUnitPrice')">
+          <el-table-column :label="ob.polyT('settings.storeTab.shippingOptions.services.renewalUnitPrice')">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.renewalUnitPrice`" :rules="rules.renewalUnitPrice">
-                <el-input v-model.number="row.renewalUnitPrice" step="0.01" :placeholder="ob.polyT('editListing.shippingOptions.services.pricePlaceholder')" clearable maxlength="20" data-var-type="bignumber" />
+                <el-input v-model.number="row.renewalUnitPrice" step="0.01" :placeholder="ob.polyT('settings.storeTab.shippingOptions.services.pricePlaceholder')" clearable maxlength="20" data-var-type="bignumber" />
               </el-form-item>
             </template>
           </el-table-column>
         </template>
         <template v-else>
-          <el-table-column :label="ob.polyT('editListing.shippingOptions.services.fee')">
+          <el-table-column :label="ob.polyT('settings.storeTab.shippingOptions.services.fee')">
             <template v-slot="{ row, $index }">
               <el-form-item :prop="`services.${$index}.firstFreight`" :rules="rules.firstFreight">
-                <el-input v-model.number="row.firstFreight" step="0.01" :placeholder="ob.polyT('editListing.shippingOptions.services.pricePlaceholder')" clearable maxlength="20" data-var-type="bignumber" />
+                <el-input v-model.number="row.firstFreight" step="0.01" :placeholder="ob.polyT('settings.storeTab.shippingOptions.services.pricePlaceholder')" clearable maxlength="20" data-var-type="bignumber" />
               </el-form-item>
             </template>
           </el-table-column>
         </template>
 
-        <el-table-column :label="ob.polyT('editListing.shippingOptions.services.registrationFee')">
+        <el-table-column :label="ob.polyT('settings.storeTab.shippingOptions.services.registrationFee')">
           <template v-slot="{ row, $index }">
             <el-form-item :prop="`services.${$index}.registrationFee`" :rules="rules.registrationFee">
-              <el-input v-model.number="row.registrationFee" step="0.01" :placeholder="ob.polyT('editListing.shippingOptions.services.pricePlaceholder')" clearable maxlength="20" />
+              <el-input v-model.number="row.registrationFee" step="0.01" :placeholder="ob.polyT('settings.storeTab.shippingOptions.services.pricePlaceholder')" clearable maxlength="20" />
             </el-form-item>
           </template>
         </el-table-column>
-        <el-table-column :label="ob.polyT('editListing.shippingOptions.services.action')" fixed="right" width="90">
+        <el-table-column :label="ob.polyT('settings.storeTab.shippingOptions.services.action')" fixed="right" width="90">
           <template v-slot="{ $index }">
-            <el-button class="p0" size="small" type="danger" link @click="doDelete($index)">{{ ob.polyT('editListing.shippingOptions.services.delete') }}</el-button>
+            <el-button class="p0" size="small" type="danger" link @click="doDelete($index)">{{ ob.polyT('settings.storeTab.shippingOptions.services.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-form>
     <template #footer>
-      <el-button size="small" @click="onCancel"> {{ ob.polyT('editListing.shippingOptions.services.cancel') }} </el-button>
+      <el-button size="small" @click="onCancel"> {{ ob.polyT('settings.storeTab.shippingOptions.services.cancel') }} </el-button>
       <el-button size="small" class="form-btn" type="primary" :disabled="isSubmitting" :loading="isSubmitting" @click="onConfirm">{{
-        isSubmitting ? ob.polyT('editListing.shippingOptions.services.submitting') : ob.polyT('editListing.shippingOptions.services.confirm')
+        isSubmitting ? ob.polyT('settings.storeTab.shippingOptions.services.submitting') : ob.polyT('settings.storeTab.shippingOptions.services.confirm')
       }}</el-button>
     </template>
   </el-dialog>
@@ -131,9 +131,9 @@ export default {
   computed: {
     serviceTypeTip() {
       if (this.formData.serviceType === 'FIRST_RENEWAL_FEE') {
-        return app.polyglot.t('editListing.shippingOptions.services.firstRenewalExplanation');
+        return app.polyglot.t('settings.storeTab.shippingOptions.services.firstRenewalExplanation');
       } else if (this.formData.serviceType === 'SAME_WEIGHT_SAME_FEE') {
-        return app.polyglot.t('editListing.shippingOptions.services.sameWeightExplanation');
+        return app.polyglot.t('settings.storeTab.shippingOptions.services.sameWeightExplanation');
       }
       return '';
     },
@@ -141,8 +141,8 @@ export default {
   data() {
     return {
       options: [
-        { label: app.polyglot.t('editListing.shippingOptions.services.firstRenewalTemplate'), value: 'FIRST_RENEWAL_FEE' },
-        { label: app.polyglot.t('editListing.shippingOptions.services.sameWeightTemplate'), value: 'SAME_WEIGHT_SAME_FEE' },
+        { label: app.polyglot.t('settings.storeTab.shippingOptions.services.firstRenewalTemplate'), value: 'FIRST_RENEWAL_FEE' },
+        { label: app.polyglot.t('settings.storeTab.shippingOptions.services.sameWeightTemplate'), value: 'SAME_WEIGHT_SAME_FEE' },
       ],
       visible: false,
       isSubmitting: false,
@@ -154,7 +154,7 @@ export default {
         serviceType: [
           {
             required: true,
-            message: app.polyglot.t('editListing.shippingOptions.modal.selectTemplate'),
+            message: app.polyglot.t('settings.storeTab.shippingOptions.modal.selectTemplate'),
             trigger: ['change', 'blur'],
           },
         ],

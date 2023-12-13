@@ -750,6 +750,60 @@
         "error": "无法删除唯一的快递选项。",
         "noShippingOption": "商店中有物理商品，应至少提供一种快递选项。"
       },
+      "shippingOptions": {
+        "optionHeading": "快递选项#%{listPosition}",
+        "shippingDestinations": "目的地",
+        "regionsPlaceholder": "输入国家...",
+        "nameLabel": "选项标题",
+        "namePlaceholder": "例如美国海运，International等等",
+        "typeLabel": "类型",
+        "shippingTypes": {
+          "FIXED_PRICE": "快递",
+          "LOCAL_PICKUP": "上门自取"
+        },
+        "btnAddShippingOption": "添加快递选项",
+        "btnDeleteShippingOption": "删除",
+        "clearAll": "全部清除",
+        "services": {
+          "nameLabel": "服务",
+          "namePlaceholder": "例如标准，中通快递，隔日到",
+          "estimatedDeliveryLabel": "预计递送时间",
+          "estimatedDeliveryPlaceholder": "例如5-7天",
+  
+          "weightRange": "重量范围",
+          "firstWeightAndFee": "首重/首重费用",
+          "renewalUnitWeightAndFee": "续重单位重量/单价",
+          "fee": "费用",
+          "pricePlaceholder": "0.00",
+          "addService": "+添加服务",
+  
+          "firstRenewalTemplate": "按首重续费计算",
+          "firstRenewalExplanation": "运费=首重费用+ (包裹重量-首重)/续重单位重量单价+挂号费",
+          "startWeight": "开始重量",
+          "endWeight": "结束重量",
+          "firstWeight": "首重",
+          "firstFreight": "首重运费",
+          "renewalUnitWeight": "续重单位重量",
+          "renewalUnitPrice": "单价",
+          "registrationFee": "挂号费",
+          "sameWeightTemplate": "同重量段费用相同",
+          "sameWeightExplanation": "运费=费用+挂号费",
+  
+          "action": "操作",
+          "delete": "删除",
+          "cancel": "取 消",
+          "submitting": "提交中...",
+          "confirm": "确 认"
+        },
+        "modal": {
+          "template": "模板",
+          "selectTemplate": "请选择模板",
+          "add": "添加"
+        },
+        "toolTip": {
+          "delete": "删除"
+        }
+      },
       "errors": {
         "modNotFoundTitle": "未找到仲裁人",
         "modsNotFound": "在网络上找不到%{guids}，它可能不是有效的节点ID。 ||||| 在网络上找不到 {guids}，它们可能不是有效的节点ID。",
@@ -1221,60 +1275,6 @@
       "priceModifierPlaceholder": "0.00 （市场利率）",
       "helperPriceModifier": "按市场价格交易，或者指定一个价格修改器（+/-）",
       "lblReceive": "接收"
-    },
-    "shippingOptions": {
-      "optionHeading": "快递选项#%{listPosition}",
-      "shippingDestinations": "目的地",
-      "regionsPlaceholder": "输入国家...",
-      "nameLabel": "选项标题",
-      "namePlaceholder": "例如美国海运，International等等",
-      "typeLabel": "类型",
-      "shippingTypes": {
-        "FIXED_PRICE": "快递",
-        "LOCAL_PICKUP": "上门自取"
-      },
-      "btnAddShippingOption": "添加快递选项",
-      "btnDeleteShippingOption": "删除",
-      "clearAll": "全部清除",
-      "services": {
-        "nameLabel": "服务",
-        "namePlaceholder": "例如标准，中通快递，隔日到",
-        "estimatedDeliveryLabel": "预计递送时间",
-        "estimatedDeliveryPlaceholder": "例如5-7天",
-
-        "weightRange": "重量范围",
-        "firstWeightAndFee": "首重/首重费用",
-        "renewalUnitWeightAndFee": "续重单位重量/单价",
-        "fee": "费用",
-        "pricePlaceholder": "0.00",
-        "addService": "+添加服务",
-
-        "firstRenewalTemplate": "按首重续费计算",
-        "firstRenewalExplanation": "运费=首重费用+ (包裹重量-首重)/续重单位重量单价+挂号费",
-        "startWeight": "开始重量",
-        "endWeight": "结束重量",
-        "firstWeight": "首重",
-        "firstFreight": "首重运费",
-        "renewalUnitWeight": "续重单位重量",
-        "renewalUnitPrice": "单价",
-        "registrationFee": "挂号费",
-        "sameWeightTemplate": "同重量段费用相同",
-        "sameWeightExplanation": "运费=费用+挂号费",
-
-        "action": "操作",
-        "delete": "删除",
-        "cancel": "取 消",
-        "submitting": "提交中...",
-        "confirm": "确 认"
-      },
-      "modal": {
-        "template": "模板",
-        "selectTemplate": "请选择模板",
-        "add": "添加"
-      },
-      "toolTip": {
-        "delete": "删除"
-      }
     },
     "coupons": {
       "titleLabel": "标题",

@@ -4,17 +4,17 @@
     <div class="tips" v-if="formData.serviceType"><span class="tips-btn">说明!</span>{{ serviceTypeTip }}</div>
     <table class="table" width="100%" border="1" cellpadding="0" cellspacing="0">
       <tr>
-        <th>{{ ob.polyT('editListing.shippingOptions.services.nameLabel') }}</th>
-        <th>{{ ob.polyT('editListing.shippingOptions.services.estimatedDeliveryLabel') }}</th>
-        <th>{{ ob.polyT('editListing.shippingOptions.services.weightRange') }}</th>
+        <th>{{ ob.polyT('settings.storeTab.shippingOptions.services.nameLabel') }}</th>
+        <th>{{ ob.polyT('settings.storeTab.shippingOptions.services.estimatedDeliveryLabel') }}</th>
+        <th>{{ ob.polyT('settings.storeTab.shippingOptions.services.weightRange') }}</th>
         <template v-if="formData.serviceType === 'FIRST_RENEWAL_FEE'">
-          <th>{{ ob.polyT('editListing.shippingOptions.services.firstWeightAndFee') }}</th>
-          <th>{{ ob.polyT('editListing.shippingOptions.services.renewalUnitWeightAndFee') }}</th>
+          <th>{{ ob.polyT('settings.storeTab.shippingOptions.services.firstWeightAndFee') }}</th>
+          <th>{{ ob.polyT('settings.storeTab.shippingOptions.services.renewalUnitWeightAndFee') }}</th>
         </template>
         <template v-else>
-          <th>{{ ob.polyT('editListing.shippingOptions.services.Fee') }}</th>
+          <th>{{ ob.polyT('settings.storeTab.shippingOptions.services.Fee') }}</th>
         </template>
-        <th>{{ ob.polyT('editListing.shippingOptions.services.registrationFee') }}</th>
+        <th>{{ ob.polyT('settings.storeTab.shippingOptions.services.registrationFee') }}</th>
       </tr>
       <tbody>
         <tr v-for="(item, index) in formData.services" :key="index">
@@ -57,8 +57,8 @@ export default {
         services: [],
       },
       options: [
-        { label: app.polyglot.t('editListing.shippingOptions.services.firstRenewalTemplate'), value: 'FIRST_RENEWAL_FEE' },
-        { label: app.polyglot.t('editListing.shippingOptions.services.sameWeightTemplate'), value: 'SAME_WEIGHT_SAME_FEE' },
+        { label: app.polyglot.t('settings.storeTab.shippingOptions.services.firstRenewalTemplate'), value: 'FIRST_RENEWAL_FEE' },
+        { label: app.polyglot.t('settings.storeTab.shippingOptions.services.sameWeightTemplate'), value: 'SAME_WEIGHT_SAME_FEE' },
       ],
     };
   },
@@ -72,9 +72,9 @@ export default {
     },
     serviceTypeTip() {
       if (this.formData.serviceType === 'FIRST_RENEWAL_FEE') {
-        return app.polyglot.t('editListing.shippingOptions.services.firstRenewalExplanation');
+        return app.polyglot.t('settings.storeTab.shippingOptions.services.firstRenewalExplanation');
       } else if (this.formData.serviceType === 'SAME_WEIGHT_SAME_FEE') {
-        return app.polyglot.t('editListing.shippingOptions.services.sameWeightExplanation');
+        return app.polyglot.t('settings.storeTab.shippingOptions.services.sameWeightExplanation');
       }
       return '';
     },

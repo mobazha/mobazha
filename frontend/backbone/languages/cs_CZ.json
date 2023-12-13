@@ -749,6 +749,61 @@
         "error": "Nelze smazat jedinou možnost dopravy.",
         "noShippingOption": "V obchodě jsou fyzické záznamy. Měla by být poskytnuta alespoň jedna možnost dopravy."
       },
+      "shippingOptions": {
+        "optionHeading": "Možnost dodání #%{listPosition}",
+        "shippingDestinations": "Destinace",
+        "regionsPlaceholder": "Zadej země...",
+        "nameLabel": "Volitelný název",
+        "namePlaceholder": "např. doprava do USA, mezinárodní, atd",
+        "typeLabel": "Typ",
+        "shippingTypes": {
+          "FIXED_PRICE": "Fixní cena",
+          "LOCAL_PICKUP": "Lokální vyzvednutí"
+        },
+        "btnAddShippingOption": "Přidat možnost dopravy",
+        "btnDeleteShippingOption": "Smazat",
+        "clearAll": "Vymaž vše",
+        "services": {
+          "nameLabel": "Servis",
+          "namePlaceholder": "např. Standardní, Expresní, Přes noc",
+          "estimatedDeliveryLabel": "Odhadovaná Dodací lhůta",
+          "estimatedDeliveryPlaceholder": "např. 5-7 dní",
+  
+          "weightRange": "Weight Range",
+          "firstWeightAndFee": "First Weight/Fee",
+          "renewalUnitWeightAndFee": "Renewal Unit Weight/Unit Price",
+          "fee": "Fee",
+  
+          "pricePlaceholder": "0.00",
+          "addService": "+ Přidat službu",
+  
+          "firstRenewalTemplate": "Billed based on the first and renewal weight",
+          "firstRenewalExplanation": "Freight = first weight fee + (package weight - first weight) / unit weight of additional weight * unit price + registration fee",
+          "startWeight": "Start Weight",
+          "endWeight": "End Weight",
+          "firstWeight": "First Weight",
+          "firstFreight": "First Freight",
+          "renewalUnitWeight": "Renewal Unit Weight",
+          "renewalUnitPrice": "Renewal Unit Price",
+          "registrationFee": "Registration Fee",
+          "sameWeightTemplate": "Same price for the same weight class",
+          "sameWeightExplanation": "Freight = fee + registration fee",
+  
+          "action": "Action",
+          "delete": "Delete",
+          "cancel": "Cancel",
+          "submitting": "Submitting...",
+          "confirm": "Confirm"
+        },
+        "modal": {
+          "template": "Template",
+          "selectTemplate": "Please select a template",
+          "add": "Add"
+        },
+        "toolTip": {
+          "delete": "Smazat"
+        }
+      },
       "errors": {
         "modNotFoundTitle": "Moderátor nalezen",
         "modsNotFound": "%{guids} nelze najít v síti. Nemusí to být platný peer ID. |||| %{guids} nelze najít v síti. Nemusí to být platné peer ID.",
@@ -1220,61 +1275,6 @@
       "priceModifierPlaceholder": "0,00 (tržní sazba)",
       "helperPriceModifier": "Obchoduj za tržní cenu nebo zadej modifikátor ceny (+/-)",
       "lblReceive": "Příjmout"
-    },
-    "shippingOptions": {
-      "optionHeading": "Možnost dodání #%{listPosition}",
-      "shippingDestinations": "Destinace",
-      "regionsPlaceholder": "Zadej země...",
-      "nameLabel": "Volitelný název",
-      "namePlaceholder": "např. doprava do USA, mezinárodní, atd",
-      "typeLabel": "Typ",
-      "shippingTypes": {
-        "FIXED_PRICE": "Fixní cena",
-        "LOCAL_PICKUP": "Lokální vyzvednutí"
-      },
-      "btnAddShippingOption": "Přidat možnost dopravy",
-      "btnDeleteShippingOption": "Smazat",
-      "clearAll": "Vymaž vše",
-      "services": {
-        "nameLabel": "Servis",
-        "namePlaceholder": "např. Standardní, Expresní, Přes noc",
-        "estimatedDeliveryLabel": "Odhadovaná Dodací lhůta",
-        "estimatedDeliveryPlaceholder": "např. 5-7 dní",
-
-        "weightRange": "Weight Range",
-        "firstWeightAndFee": "First Weight/Fee",
-        "renewalUnitWeightAndFee": "Renewal Unit Weight/Unit Price",
-        "fee": "Fee",
-
-        "pricePlaceholder": "0.00",
-        "addService": "+ Přidat službu",
-
-        "firstRenewalTemplate": "Billed based on the first and renewal weight",
-        "firstRenewalExplanation": "Freight = first weight fee + (package weight - first weight) / unit weight of additional weight * unit price + registration fee",
-        "startWeight": "Start Weight",
-        "endWeight": "End Weight",
-        "firstWeight": "First Weight",
-        "firstFreight": "First Freight",
-        "renewalUnitWeight": "Renewal Unit Weight",
-        "renewalUnitPrice": "Renewal Unit Price",
-        "registrationFee": "Registration Fee",
-        "sameWeightTemplate": "Same price for the same weight class",
-        "sameWeightExplanation": "Freight = fee + registration fee",
-
-        "action": "Action",
-        "delete": "Delete",
-        "cancel": "Cancel",
-        "submitting": "Submitting...",
-        "confirm": "Confirm"
-      },
-      "modal": {
-        "template": "Template",
-        "selectTemplate": "Please select a template",
-        "add": "Add"
-      },
-      "toolTip": {
-        "delete": "Smazat"
-      }
     },
     "coupons": {
       "titleLabel": "Titulek",

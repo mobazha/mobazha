@@ -749,6 +749,61 @@
         "error": "Невозможно удалить единственный вариант доставки.",
         "noShippingOption": "There are physical listings in the Store. At least one shipping option should be provided."
       },
+      "shippingOptions": {
+        "optionHeading": "Shipping Option #%{listPosition}",
+        "shippingDestinations": "Destinations",
+        "regionsPlaceholder": "Введите страны...",
+        "nameLabel": "Option Title",
+        "namePlaceholder": "e.g. USA Shipping, International, etc",
+        "typeLabel": "Тип",
+        "shippingTypes": {
+          "FIXED_PRICE": "Фиксированная цена",
+          "LOCAL_PICKUP": "Самовывоз"
+        },
+        "btnAddShippingOption": "Добавить опцию доставки",
+        "btnDeleteShippingOption": "Удалить",
+        "clearAll": "Clear All",
+        "services": {
+          "nameLabel": "Услуга",
+          "namePlaceholder": "e.g. Standard, Express, Overnight",
+          "estimatedDeliveryLabel": "Est. Delivery Time",
+          "estimatedDeliveryPlaceholder": "например, 5-7 дней",
+  
+          "weightRange": "Weight Range",
+          "firstWeightAndFee": "First Weight/Fee",
+          "renewalUnitWeightAndFee": "Renewal Unit Weight/Unit Price",
+          "fee": "Fee",
+  
+          "pricePlaceholder": "0.00",
+          "addService": "+ Добавить услугу",
+  
+          "firstRenewalTemplate": "Billed based on the first and renewal weight",
+          "firstRenewalExplanation": "Freight = first weight fee + (package weight - first weight) / unit weight of additional weight * unit price + registration fee",
+          "startWeight": "Start Weight",
+          "endWeight": "End Weight",
+          "firstWeight": "First Weight",
+          "firstFreight": "First Freight",
+          "renewalUnitWeight": "Renewal Unit Weight",
+          "renewalUnitPrice": "Renewal Unit Price",
+          "registrationFee": "Registration Fee",
+          "sameWeightTemplate": "Same price for the same weight class",
+          "sameWeightExplanation": "Freight = fee + registration fee",
+  
+          "action": "Action",
+          "delete": "Delete",
+          "cancel": "Cancel",
+          "submitting": "Submitting...",
+          "confirm": "Confirm"
+        },
+        "modal": {
+          "template": "Template",
+          "selectTemplate": "Please select a template",
+          "add": "Add"
+        },
+        "toolTip": {
+          "delete": "Удалить"
+        }
+      },
       "errors": {
         "modNotFoundTitle": "Модератор не найден",
         "modsNotFound": "%{guids} could not be found on the network. It may not be a valid peer ID. |||| %{guids} could not be found on the network. They may not be valid peer IDs.",
@@ -1220,61 +1275,6 @@
       "priceModifierPlaceholder": "0.00 (market rate)",
       "helperPriceModifier": "Trade at market rate, or specify a price modifier (+/-)",
       "lblReceive": "Получить"
-    },
-    "shippingOptions": {
-      "optionHeading": "Shipping Option #%{listPosition}",
-      "shippingDestinations": "Destinations",
-      "regionsPlaceholder": "Введите страны...",
-      "nameLabel": "Option Title",
-      "namePlaceholder": "e.g. USA Shipping, International, etc",
-      "typeLabel": "Тип",
-      "shippingTypes": {
-        "FIXED_PRICE": "Фиксированная цена",
-        "LOCAL_PICKUP": "Самовывоз"
-      },
-      "btnAddShippingOption": "Добавить опцию доставки",
-      "btnDeleteShippingOption": "Удалить",
-      "clearAll": "Clear All",
-      "services": {
-        "nameLabel": "Услуга",
-        "namePlaceholder": "e.g. Standard, Express, Overnight",
-        "estimatedDeliveryLabel": "Est. Delivery Time",
-        "estimatedDeliveryPlaceholder": "например, 5-7 дней",
-
-        "weightRange": "Weight Range",
-        "firstWeightAndFee": "First Weight/Fee",
-        "renewalUnitWeightAndFee": "Renewal Unit Weight/Unit Price",
-        "fee": "Fee",
-
-        "pricePlaceholder": "0.00",
-        "addService": "+ Добавить услугу",
-
-        "firstRenewalTemplate": "Billed based on the first and renewal weight",
-        "firstRenewalExplanation": "Freight = first weight fee + (package weight - first weight) / unit weight of additional weight * unit price + registration fee",
-        "startWeight": "Start Weight",
-        "endWeight": "End Weight",
-        "firstWeight": "First Weight",
-        "firstFreight": "First Freight",
-        "renewalUnitWeight": "Renewal Unit Weight",
-        "renewalUnitPrice": "Renewal Unit Price",
-        "registrationFee": "Registration Fee",
-        "sameWeightTemplate": "Same price for the same weight class",
-        "sameWeightExplanation": "Freight = fee + registration fee",
-
-        "action": "Action",
-        "delete": "Delete",
-        "cancel": "Cancel",
-        "submitting": "Submitting...",
-        "confirm": "Confirm"
-      },
-      "modal": {
-        "template": "Template",
-        "selectTemplate": "Please select a template",
-        "add": "Add"
-      },
-      "toolTip": {
-        "delete": "Удалить"
-      }
     },
     "coupons": {
       "titleLabel": "Название",

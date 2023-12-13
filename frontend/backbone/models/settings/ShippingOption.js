@@ -1,5 +1,5 @@
-import app from '../../app';
-import BaseModel from '../BaseModel';
+import app from '../../app.js';
+import BaseModel from '../BaseModel.js';
 import Services from '../../collections/Services.js';
 import is from 'is_js';
 
@@ -10,7 +10,7 @@ export default class extends BaseModel {
       name: '',
       type: 'FIXED_PRICE',
       currency: '',
-      serviceType: '',
+      serviceType: 'SAME_WEIGHT_SAME_FEE',
       regions: [],
       services: new Services(),
     };

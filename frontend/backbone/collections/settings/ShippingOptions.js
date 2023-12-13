@@ -1,6 +1,6 @@
 import { guid } from '../../utils';
 import { Collection } from 'backbone';
-import ShippingOption from '../../models/listing/ShippingOption';
+import ShippingOption from '../../models/settings/ShippingOption';
 
 export default class extends Collection {
   model(attrs, options) {

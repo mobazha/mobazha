@@ -3,7 +3,7 @@ import _ from 'underscore';
 import app from '../../app';
 import BaseModel from '../BaseModel';
 import ShippingAddresses from '../../collections/ShippingAddresses';
-import ShippingOptions from '../../collections/listing/ShippingOptions'
+import ShippingOptions from '../../collections/settings/ShippingOptions'
 import SMTPSettings from './SMTPSettings';
 
 import {
@@ -88,22 +88,24 @@ export default class extends BaseModel {
 
     if (method !== 'read' && method !== 'delete') {
       (options.attrs.shippingOptions ?? []).forEach(shipOpt => {
-        const coinDiv = getCoinDivisibility(shipOpt.currency);
+        if (shipOpt.services && shipOpt.services.length) {
+          const coinDiv = getCoinDivisibility(shipOpt.currency);
 
-        shipOpt.services.forEach(service => {
-          service.firstFreight = decimalToInteger(
-            service.firstFreight,
-            coinDiv
-          );
-          service.renewalUnitPrice = decimalToInteger(
-            service.renewalUnitPrice,
-            coinDiv
-          );
-          service.registrationFee = decimalToInteger(
-            service.registrationFee,
-            coinDiv
-          );
-        });
+          shipOpt.services.forEach(service => {
+            service.firstFreight = decimalToInteger(
+              service.firstFreight,
+              coinDiv
+            );
+            service.renewalUnitPrice = decimalToInteger(
+              service.renewalUnitPrice,
+              coinDiv
+            );
+            service.registrationFee = decimalToInteger(
+              service.registrationFee,
+              coinDiv
+            );
+          });
+        }
       });
     }
 

@@ -6,7 +6,7 @@ import regions, {
   getTranslatedRegions,
   getIndexedRegions,
 } from '../../../data/regions';
-import ServiceMd from '../../../models/listing/Service';
+import ServiceMd from '../../../models/settings/Service';
 import app from '../../../app';
 import Service from './Service';
 import BaseView from '../../baseVw';

@@ -21,7 +21,7 @@ import { upToFixed } from '../../utils/number';
 import BaseModel, { flattenAttrs } from '../BaseModel';
 import Item from './Item';
 import Metadata from './Metadata';
-import ShippingOptions from '../../collections/listing/ShippingOptions.js';
+import ShippingOptions from '../../collections/settings/ShippingOptions.js';
 import Coupons from '../../collections/listing/Coupons.js';
 
 export default class extends BaseModel {

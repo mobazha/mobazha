@@ -12,7 +12,7 @@
           <th>{{ ob.polyT('settings.storeTab.shippingOptions.services.renewalUnitWeightAndFee') }}</th>
         </template>
         <template v-else>
-          <th>{{ ob.polyT('settings.storeTab.shippingOptions.services.Fee') }}</th>
+          <th>{{ ob.polyT('settings.storeTab.shippingOptions.services.fee') }}</th>
         </template>
         <th>{{ ob.polyT('settings.storeTab.shippingOptions.services.registrationFee') }}</th>
       </tr>

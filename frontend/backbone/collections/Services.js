@@ -1,6 +1,6 @@
 import { guid } from '../utils';
 import { Collection } from 'backbone';
-import Service from '../models/listing/Service';
+import Service from '../models/settings/Service';
 
 export default class extends Collection {
   model(attrs, options) {

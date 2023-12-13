@@ -214,7 +214,7 @@ export default {
         serviceType: optionData.serviceType,
         services: optionData.services,
       };
-      if (optionData.services.length > 0) {
+      if (optionData.services && optionData.services.length > 0) {
         this.formData.services = optionData.services;
       } else {
         this.formData.services = [this.createEmptyService()];

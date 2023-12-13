@@ -97,7 +97,7 @@ import '../../../../backbone/utils/lib/selectize';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 import regions, { getTranslatedRegions, getIndexedRegions } from '../../../../backbone/data/regions';
 import { getCurrenciesSortedByCode } from '../../../../backbone/data/currencies';
-import ServiceMd from '../../../../backbone/models/listing/Service';
+import ServiceMd from '../../../../backbone/models/settings/Service';
 
 import ShippingOptionDetail from './ShippingOptionDetail.vue';
 import ShippingOptionModal from './ShippingOptionModal.vue';

@@ -245,8 +245,8 @@ import { supportedWalletCurs } from '../../../../backbone/data/walletCurrencies'
 import Moderators from '../../../../backbone/views/components/moderators/Moderators';
 import BulkCoinUpdateBtn from './BulkCoinUpdateBtn.vue';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
-import ShippingOptionMd from '../../../../backbone/models/listing/ShippingOption';
-import Service from '../../../../backbone/models/listing/Service';
+import ShippingOptionMd from '../../../../backbone/models/settings/ShippingOption';
+import Service from '../../../../backbone/models/settings/Service';
 import ShippingOption from './ShippingOption.vue';
 
 export default {
@@ -338,18 +338,11 @@ export default {
       this.shippingOptions = this.settings.get('shippingOptions');
     },
     onClickAddShippingOption() {
-      this.shippingOptions.push(
-        Object.assign(
-          {},
-          new ShippingOptionMd({
-            services: [new Service()],
-          }),
-          {
-            templateId: '',
-            options: [],
-          }
-        )
-      );
+      this.shippingOptions.push(new ShippingOptionMd({
+        services: [
+          new Service(),
+        ],
+      }));
     },
     hasPhysicalListing() {
       const stats = app.profile.get('stats');

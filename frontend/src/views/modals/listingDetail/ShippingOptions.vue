@@ -2,7 +2,7 @@
   <template v-if="ob.shippingOptions.length">
     <template v-for="(option, tdi) in ob.shippingOptions" :key="option">
       <template v-if="option.get('type') !== 'LOCAL_PICKUP'">
-        <ShippingOptionsDetail class="tx5 clrBr borderBottom" v-show="option.get('services').length"
+        <ShippingOptionDetail class="tx5 clrBr borderBottom" v-show="option.get('services').length"
           :bb="() => {
             return {
               shippingOption: option,
@@ -70,11 +70,11 @@
 </template>
 
 <script>
-import ShippingOptionsDetail from '@/views/modals/settings/ShippingOptionsDetail.vue';
+import ShippingOptionDetail from '@/views/modals/settings/ShippingOptionDetail.vue';
 
 export default {
   components: {
-    ShippingOptionsDetail,
+    ShippingOptionDetail,
   },
   props: {
     options: {

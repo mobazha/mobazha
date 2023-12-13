@@ -68,7 +68,7 @@ export default {
       let price = '';
 
       try {
-        price = ob.currencyMod.convertAndFormatCurrency(service.price, ob.metadata.pricingCurrency.code, ob.displayCurrency);
+        price = ob.currencyMod.convertAndFormatCurrency(service.firstFreight, ob.metadata.pricingCurrency.code, ob.displayCurrency);
       } catch (e) {
         // pass
       }

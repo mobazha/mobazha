@@ -68,7 +68,7 @@
             </Select2>
           </div>
         </div>
-        <ShoppingOptionsDetail v-show="formData.type !== 'LOCAL_PICKUP' && model.get('services').length"
+        <ShippingOptionsDetail v-show="formData.type !== 'LOCAL_PICKUP' && model.get('services').length"
           :bb="() => {
             return {
               shippingOption: model,
@@ -79,7 +79,7 @@
           <a class="clrBr clrP clrTEm js-btnAddService" @click="addExpressInfo">{{ ob.polyT('settings.storeTab.shippingOptions.services.addService') }}</a>
         </div>
       </form>
-      <ShoppingOptionsModal ref="modal"
+      <ShippingOptionsModal ref="modal"
         :bb="() => {
           return {
             shippingOption: model,
@@ -98,13 +98,13 @@ import regions, { getTranslatedRegions, getIndexedRegions } from '../../../../ba
 import { getCurrenciesSortedByCode } from '../../../../backbone/data/currencies';
 import ServiceMd from '../../../../backbone/models/listing/Service';
 
-import ShoppingOptionsDetail from './ShoppingOptionsDetail.vue';
-import ShoppingOptionsModal from './ShoppingOptionsModal.vue';
+import ShippingOptionsDetail from './ShippingOptionsDetail.vue';
+import ShippingOptionsModal from './ShippingOptionsModal.vue';
 
 export default {
   components: {
-    ShoppingOptionsDetail,
-    ShoppingOptionsModal,
+    ShippingOptionsDetail,
+    ShippingOptionsModal,
   },
   emits: ['click-remove'],
   props: {

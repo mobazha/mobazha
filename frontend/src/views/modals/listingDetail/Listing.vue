@@ -363,11 +363,11 @@ import api from '../../../api';
 import Rating from './Rating.vue';
 import NsfwWarning from '../NsfwWarning.vue';
 import MoreListings from './MoreListings.vue';
-import ShippingOptions from './ShippingOptions.vue'
+import ShippingOptions from './ShippingOptions.vue';
 import Reviews from '../../reviews/Reviews.vue';
-import PurchaseError from '@/views/modals/listingDetail/PurchaseError.vue'
-import Purchase from '../purchase/Purchase.vue'
-import EditListing from '../editListing/EditListing.vue'
+import PurchaseError from '@/views/modals/listingDetail/PurchaseError.vue';
+import Purchase from '../purchase/Purchase.vue';
+import EditListing from '../editListing/EditListing.vue';
 
 export default {
   components: {
@@ -532,14 +532,14 @@ export default {
     },
 
     shippingOptionsInfo() {
-      const shippingOptions = this.model.get('shippingOptions').toJSON();
-      const templateData = shippingOptions.filter((option) => {
-        if (this.shippingDestination === 'ALL') return option.regions;
-        return option.regions.includes(this.shippingDestination);
+      const shippingOptions = this.model.get('shippingOptions');
+      const filteredOptions = shippingOptions.filter((option) => {
+        if (this.shippingDestination === 'ALL') return option.get('regions');
+        return option.get('regions').includes(this.shippingDestination);
       });
 
       return {
-        templateData,
+        shippingOptions: filteredOptions,
         displayCurrency: app.settings.get('localCurrency'),
       };
     },

@@ -1,58 +1,64 @@
 <template>
-  <template v-if="ob.templateData.length">
-    <table class="shippingTable clrBr">
-      <template v-for="(option, tdi) in ob.templateData" :key="option">
-        <tr class="tx5 clrBr borderBottom">
-          <th>{{ option.name }}</th>
-          <template v-if="option.type === 'LOCAL_PICKUP'">
-            <th colspan="3">{{ ob.polyT('listingDetail.localPickup') }}</th>
-          </template>
-
-          <template v-else>
-            <th>{{ ob.polyT('listingDetail.deliveryTime') }}</th>
-            <th>{{ ob.polyT('listingDetail.priceFirst') }}</th>
-            <th>{{ ob.polyT('listingDetail.priceSecond') }}</th>
-          </template>
-        </tr>
-
-        <template v-for="(service, si) in sortedService(option)" :key="service">
-          <tr :class="`${fShp(service) ? 'txB' : ''} ${si === option.services.length - 1 ? 'lastRow' : ''}`">
-            <td>{{ service.name }}</td>
-            <td>{{ service.estimatedDelivery }}</td>
-            <td>
-              <template v-if="fShp(service)">
-                <div class="clrE1 clrTOnEmph phraseBox floL">{{ ob.polyT('listingDetail.freeShippingBanner') }}</div>
-              </template>
-
-              <template v-else>
-                {{
-                  ob.currencyMod.convertAndFormatCurrency(
-                    service.firstFreight,
-                    option.currency,
-                    ob.displayCurrency
-                  )
-                }}
-              </template>
-            </td>
-            <td>
-              <template v-if="service.renewalUnitPrice && service.renewalUnitPrice.eq(0)">
-                <div class="clrE1 clrTOnEmph phraseBox floL">{{ ob.polyT('listingDetail.freeShippingBanner') }}</div>
-              </template>
-
-              <template v-else>
-                {{
-                  ob.currencyMod.convertAndFormatCurrency(
-                    service.renewalUnitPrice,
-                    option.currency,
-                    ob.displayCurrency
-                  )
-                }}
-              </template>
-            </td>
-          </tr>
-        </template>
+  <template v-if="ob.shippingOptions.length">
+    <template v-for="(option, tdi) in ob.shippingOptions" :key="option">
+      <template v-if="option.get('type') !== 'LOCAL_PICKUP'">
+        <ShippingOptionsDetail class="tx5 clrBr borderBottom" v-show="option.get('services').length"
+          :bb="() => {
+            return {
+              shippingOption: option,
+            }
+          }"
+        />
       </template>
-    </table>
+      <template v-else>
+        <table class="shippingTable clrBr">
+          <tr class="tx5 clrBr borderBottom">
+            <th>{{ option.get('name') }}</th>
+            <template v-if="option.get('type') === 'LOCAL_PICKUP'">
+              <th colspan="3">{{ ob.polyT('listingDetail.localPickup') }}</th>
+            </template>
+          </tr>
+
+          <!-- <template v-for="(service, si) in sortedService(option)" :key="service">
+            <tr :class="`${fShp(service) ? 'txB' : ''} ${si === option.services.length - 1 ? 'lastRow' : ''}`">
+              <td>{{ service.name }}</td>
+              <td>{{ service.estimatedDelivery }}</td>
+              <td>
+                <template v-if="fShp(service)">
+                  <div class="clrE1 clrTOnEmph phraseBox floL">{{ ob.polyT('listingDetail.freeShippingBanner') }}</div>
+                </template>
+
+                <template v-else>
+                  {{
+                    ob.currencyMod.convertAndFormatCurrency(
+                      service.firstFreight,
+                      option.currency,
+                      ob.displayCurrency
+                    )
+                  }}
+                </template>
+              </td>
+              <td>
+                <template v-if="service.renewalUnitPrice && service.renewalUnitPrice.eq(0)">
+                  <div class="clrE1 clrTOnEmph phraseBox floL">{{ ob.polyT('listingDetail.freeShippingBanner') }}</div>
+                </template>
+
+                <template v-else>
+                  {{
+                    ob.currencyMod.convertAndFormatCurrency(
+                      service.renewalUnitPrice,
+                      option.currency,
+                      ob.displayCurrency
+                    )
+                  }}
+                </template>
+              </td>
+            </tr>
+          </template> -->
+        </table>
+      </template>
+    </template>
+    
   </template>
 
   <template v-else>
@@ -64,8 +70,12 @@
 </template>
 
 <script>
+import ShippingOptionsDetail from '@/views/modals/settings/ShippingOptionsDetail.vue';
 
 export default {
+  components: {
+    ShippingOptionsDetail,
+  },
   props: {
     options: {
       type: Object,

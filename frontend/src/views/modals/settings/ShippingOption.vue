@@ -134,7 +134,11 @@ export default {
   mounted() {
     this.render();
   },
-  watch: {},
+  watch: {
+    'formData.name'(){
+      this.model.set('name', this.formData.name);
+    }
+  },
   computed: {
     ob() {
       return {
@@ -197,11 +201,6 @@ export default {
     },
 
     onChangeShippingType(val) {
-      if (val !== 'LOCAL_PICKUP') {
-        const services = this.model.get('services');
-
-        if (!services.length) services.push(new ServiceMd());
-      }
     },
 
     getFormDataEx() {

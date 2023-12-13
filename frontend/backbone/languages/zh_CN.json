@@ -796,9 +796,10 @@
           "confirm": "确 认"
         },
         "modal": {
+          "addService": "添加服务",
           "template": "模板",
           "selectTemplate": "请选择模板",
-          "add": "添加"
+          "add": "+ 添加"
         },
         "toolTip": {
           "delete": "删除"

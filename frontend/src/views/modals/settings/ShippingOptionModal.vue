@@ -1,5 +1,5 @@
 <template>
-  <el-dialog class="form-dialog" title="添加服务" v-model="visible" width="1080px" append-to-body :before-close="onCancel">
+  <el-dialog class="form-dialog" :title="ob.polyT('settings.storeTab.shippingOptions.modal.addService')" v-model="visible" width="1080px" append-to-body :before-close="onCancel">
     <el-form ref="form" size="small" :model="formData" :rules="rules" label-width="0">
       <div class="form-head">
         <div class="form-head__select">
@@ -8,7 +8,7 @@
               <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
           </el-form-item>
-          <el-button class="add-btn" link type="success" @click="doAdd">+添加</el-button>
+          <el-button class="add-btn" link type="success" @click="doAdd">{{ ob.polyT('settings.storeTab.shippingOptions.modal.add') }}</el-button>
         </div>
         <div class="tips" v-if="formData.serviceType"><span class="tips-btn">说明!</span>{{ serviceTypeTip }}</div>
       </div>

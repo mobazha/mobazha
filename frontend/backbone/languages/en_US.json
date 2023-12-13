@@ -801,9 +801,10 @@
           "confirm": "Confirm"
         },
         "modal": {
+          "addService": "Add Service",
           "template": "Template",
           "selectTemplate": "Please select a template",
-          "add": "Add"
+          "add": "+ Add"
         },
         "toolTip": {
           "delete": "Delete"

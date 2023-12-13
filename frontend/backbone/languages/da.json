@@ -796,9 +796,10 @@
           "confirm": "Confirm"
         },
         "modal": {
+          "addService": "Tilføj service",
           "template": "Template",
           "selectTemplate": "Please select a template",
-          "add": "Add"
+          "add": "+ Add"
         },
         "toolTip": {
           "delete": "Slet"

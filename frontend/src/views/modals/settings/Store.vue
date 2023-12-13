@@ -338,11 +338,7 @@ export default {
       this.shippingOptions = this.settings.get('shippingOptions');
     },
     onClickAddShippingOption() {
-      this.shippingOptions.push(new ShippingOptionMd({
-        services: [
-          new Service(),
-        ],
-      }));
+      this.shippingOptions.push(new ShippingOptionMd());
     },
     hasPhysicalListing() {
       const stats = app.profile.get('stats');

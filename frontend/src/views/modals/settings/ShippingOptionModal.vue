@@ -159,9 +159,12 @@ export default {
             trigger: ['change', 'blur'],
           },
         ],
-        name: [{ required: true, message: pleaseInput, trigger: ['change', 'blur'] }],
-        estimatedDelivery: [{ required: true, message: '请输入运送时间', trigger: ['change', 'blur'] }],
-        startWeight: [{ required: true, message: '请输入开始重量', trigger: ['change', 'blur'] }],
+        name: [
+          { required: true, message: pleaseInput, trigger: ['change', 'blur'] },
+          { validator: this.checkNameDuplicate, trigger: ['change'] },
+        ],
+        estimatedDelivery: [{ required: true, message: 'pleaseInput', trigger: ['change', 'blur'] }],
+        startWeight: [{ required: true, message: 'pleaseInput', trigger: ['change', 'blur'] }],
         endWeight: [
           { required: true, message: pleaseInput, trigger: ['change', 'blur'] },
           { type: 'number', message: 'Input must be a number' },
@@ -263,6 +266,20 @@ export default {
           this.visible = false;
         }
       });
+    },
+    checkNameDuplicate(rule, value, callback) {
+      for (let i = 0; i < this.formData.services.length; i++) {
+        if (`services.${i}.name` === rule.field) {
+          // skip self check
+          continue;
+        }
+
+        if (this.formData.services[i].name === value) {
+          callback(new Error(app.polyglot.t('settings.storeTab.shippingOptions.modal.serviceNameDuplicate')));
+          return;
+        }
+      }
+      callback();
     },
   },
 };

@@ -74,6 +74,12 @@ export default class extends BaseModel {
       addError('shippingOptions', 'A nested ShippingOptions collection is required.');
     }
 
+    // check no duplicate shippingOption name
+    const optionNames = attrs.shippingOptions.map((option) => option.get('name'));
+    if (_.uniq(optionNames).length != optionNames.length) {
+      addError('shippingOptions', 'ShippingOptions names cannot be duplicated.');
+    }
+
     if (Object.keys(errObj).length) return errObj;
 
     return undefined;

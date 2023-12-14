@@ -800,7 +800,8 @@
           "template": "Template",
           "selectTemplate": "Please select a template",
           "add": "+ Add",
-          "pleaseInput": "Please input"
+          "pleaseInput": "Please input",
+          "serviceNameDuplicate": "Service name is duplicated"
         },
         "toolTip": {
           "delete": "Slett"

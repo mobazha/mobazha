@@ -187,6 +187,7 @@
               </div>
             </div>
             <section ref="sectionShipping" class="shippingSection js-sectionShipping">
+              <FormError v-if="ob.errors['shippingOptions']" :errors="ob.errors['shippingOptions']" />
               <div class="gutterVMd">
                 <div class="js-shippingOptionsWrap shippingOptionsWrap gutterVMd">
                   <template v-for="(shipOpt, shipOptIndex) in shippingOptions" :key="shipOpt.cid">

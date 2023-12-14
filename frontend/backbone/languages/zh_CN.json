@@ -778,7 +778,7 @@
           "addService": "+添加服务",
   
           "firstRenewalTemplate": "按首重续费计算",
-          "firstRenewalExplanation": "运费=首重费用+ (包裹重量-首重)/续重单位重量单价+挂号费",
+          "firstRenewalExplanation": "运费=首重费用+(包裹重量-首重)/续重单位重量单价+挂号费",
           "startWeight": "开始重量",
           "endWeight": "结束重量",
           "firstWeight": "首重",
@@ -800,7 +800,8 @@
           "template": "模板",
           "selectTemplate": "请选择模板",
           "add": "+ 添加",
-          "pleaseInput": "请输入"
+          "pleaseInput": "请输入",
+          "serviceNameDuplicate": "服务名称重复"
         },
         "toolTip": {
           "delete": "删除"

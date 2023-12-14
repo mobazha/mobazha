@@ -1,5 +1,5 @@
 <template>
-  <div v-if="!cardError" @click.stop="onClick"
+  <div v-if="!cardError" @click.stop.prevent="onClick"
     :class="`listingCard col clrBr clrHover clrT clrP clrSh2 contentBox ${ownListing ? 'ownListing' : ''} ${destroyClass} ${blocked ? 'blocked' : ''} ${hideNsfw ? 'hideNsfw' : ''} ${model.get('nsfw') ? 'nsfw' : ''}`">
     <div v-if="ob.viewType === 'grid'" class="gridViewContent posR">
       <div class="listingImage" >

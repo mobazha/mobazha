@@ -6,13 +6,13 @@
           <div class="page-head">
             <div class="page-head__left">
               <div class="page-head__name">
-                Favorite<span v-if="tableData.length > 0">({{ cartNum }})</span>
+                Favorite <span v-if="tableData.length > 0">({{ cartNum }})</span>
               </div>
               <div class="clean-btn" v-if="tableData.length > 0" @click="clearCart">Clear All</div>
             </div>
-            <div class="page-head__right" v-if="tableData.length > 0">
-              <el-input v-model="params.keyword" placeholder="Search Orders" :prefix-icon="Search" />
-            </div>
+            <!-- <div class="page-head__right" v-if="tableData.length > 0">
+              <el-input v-model="params.keyword" placeholder="Search Orders" prefix-icon="Search" />
+            </div> -->
           </div>
           <div class="page-body" v-loading="loading">
             <template v-if="tableData.length > 0">
@@ -89,7 +89,7 @@
                         </el-table-column>
                         <el-table-column width="100">
                           <template v-slot="{ row }">
-                            <el-button @click="doDelete(row, index)" type="info" :icon="deleteIcon" circle />
+                            <el-button @click="doDelete(row, index)" type="info" icon="Delete" circle />
                           </template>
                         </el-table-column>
                       </template>
@@ -97,7 +97,7 @@
                   </el-table>
                   <div class="footer" v-if="oneStoreTotalPrice(index).quantity > 0">
                     <div class="total">
-                      <div class="total-price"><span class="total-name">Total:</span>${{ oneStoreTotalPrice(index).total }}</div>
+                      <div class="total-price"><span class="total-name">Total: </span>{{ oneStoreTotalPrice(index).total }}</div>
                       <div v-if="false" class="count-price">Subtotal:$183.97</div>
                       <div v-if="false" class="freight">Shipping & handling: Free</div>
                     </div>
@@ -115,14 +115,13 @@
 </template>
 
 <script>
-import { Delete, Search } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import $ from 'jquery';
 import app from '../../backbone/app';
 import Empty from '@/components/Empty.vue';
 import api from '../api';
 import { getCachedProfiles } from '../../backbone/models/profile/Profile';
-import { convertAndFormatCurrency, curDefToDecimal } from '../../backbone/utils/currency';
+import { convertCurrency, formatCurrency, convertAndFormatCurrency } from '../../backbone/utils/currency';
 import Purchase from './modals/purchase/Purchase.vue';
 import Listing from '../../backbone/models/listing/Listing';
 
@@ -134,8 +133,6 @@ export default {
   name: 'App',
   data() {
     return {
-      deleteIcon: Delete,
-      Search,
       params: { keyword: '' },
       tableData: [],
       table: {},
@@ -155,10 +152,14 @@ export default {
     this.loadData();
   },
   computed: {
+    localCurrency() {
+      return app.settings.get('localCurrency');
+    },
+
     //每个商品总价
     countRowPrice() {
       return (row) =>
-        row.priceAmount ? convertAndFormatCurrency(row.priceAmount * row.quantity, row.pricingCurrency?.code, window['app']?.settings.get('localCurrency')) : 0;
+        row.priceAmount ? convertAndFormatCurrency(row.priceAmount * row.quantity, row.pricingCurrency?.code, this.localCurrency) : 0;
     },
 
     //每个商店商品总价
@@ -166,7 +167,9 @@ export default {
       return (index) => {
         let list = this.selectors[index];
         if (!list) return 0;
-        return { quantity: list.length, total: list.reduce((cur, next) => cur + next.priceAmount * next.quantity, 0) };
+
+        const total = list.reduce((cur, next) => cur + convertCurrency(next.priceAmount * next.quantity, next.pricingCurrency?.code, this.localCurrency), 0);
+        return { quantity: list.length, total: formatCurrency(total, this.localCurrency) };
       };
     },
 
@@ -208,11 +211,8 @@ export default {
                 item.listing = listing;
                 item.pricingCurrency = listing.metadata.pricingCurrency;
                 if (listing.item.price && item.pricingCurrency) {
-                  item.priceAmount = curDefToDecimal({
-                    amount: listing.item.price,
-                    currency: item.pricingCurrency,
-                  });
-                  item.price = convertAndFormatCurrency(item.priceAmount, item.pricingCurrency.code, app.settings.get('localCurrency'));
+                  item.priceAmount = listing.item.price;
+                  item.price = convertAndFormatCurrency(item.priceAmount, item.pricingCurrency.code, this.localCurrency);
                 } else {
                   item.priceAmount = 0;
                   item.price = 0;

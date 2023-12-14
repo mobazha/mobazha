@@ -3,13 +3,13 @@
     <template v-if="!isHasAddress">
       <div class="external-desc">You could provide an external wallet address toreceive Tether for order payment</div>
       <div class="external-box">
-        <button v-if="!isAdd" class="btn-primary small" @click="addAddress">Add External Wallet address</button>
+        <button v-if="!isAdd" class="btn-primary small" @click.stop="addAddress">Add External Wallet address</button>
         <el-form v-if="isAdd" ref="formData" inline :model="formData" :rules="rules" label-width="0">
           <el-form-item prop="address">
             <el-input placeholder="Please input your Tether wallet address" v-model="formData.address" maxlength="200" size="large" />
           </el-form-item>
           <el-form-item>
-            <button class="btn-primary small" @click="onSubmit">Add</button>
+            <button class="btn-primary small" @click.stop="onSubmit">Add</button>
           </el-form-item>
         </el-form>
       </div>

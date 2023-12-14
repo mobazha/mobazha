@@ -46,10 +46,17 @@
                   <div>
                     <div class="flexColWide clrP clrSh3">
                       <div class="js-sendReceiveNavContainer rowMd"></div>
-                      <SendReceiveNav class="rowMd" :sendModeOn="sendModeOn" @clickSend="onClickSend" @clickReceive="onClickReceive" />
+                      <SendReceiveNav class="rowMd" :tabActive="tabActive" @changeTab="changeTab" />
                       <div class="js-sendReceiveContainer sendReceiveContainer clrP">
-                        <SendMoney v-if="sendModeOn" ref="sendeMoneyVw" :options="{ coinType: activeCoin }" />
-                        <ReceiveMoney v-else ref="receiveMoneyVw" :coinType="activeCoin" :fetching="fetchingAddress" :address="receiveAddress" />
+                        <SendMoney v-if="tabActive === 1" ref="sendeMoneyVw" :options="{ coinType: activeCoin }" />
+                        <ReceiveMoney
+                          v-if="tabActive === 2"
+                          ref="receiveMoneyVw"
+                          :coinType="activeCoin"
+                          :fetching="fetchingAddress"
+                          :address="receiveAddress"
+                        />
+                        <External v-if="tabActive === 3" ref="external" />
                       </div>
                     </div>
                   </div>
@@ -104,6 +111,7 @@ import CoinStats from './CoinStats.vue';
 import SendReceiveNav from './SendReceiveNav.vue';
 import SendMoney from './SendMoney.vue';
 import ReceiveMoney from './ReceiveMoney.vue';
+import External from './External.vue';
 import TransactionsVw from './transactions/Transactions.vue';
 import ReloadTransactions from './ReloadTransactions.vue';
 import CryptoListingsTeaser from './CryptoListingsTeaser.vue';
@@ -118,6 +126,7 @@ export default {
     ReloadTransactions,
     TransactionsVw,
     CryptoListingsTeaser,
+    External,
   },
   props: {
     options: {
@@ -132,7 +141,7 @@ export default {
 
       activeCoin: '',
       viewCryptoListingsUrl: '',
-      sendModeOn: true,
+      tabActive: 1,
 
       transactionsCount: 0,
 
@@ -147,7 +156,7 @@ export default {
     this.loadData(this.options);
   },
   mounted() {
-    if (this.sendModeOn) {
+    if (this.tabActive === 1) {
       if (this.$refs.sendeMoneyVw) this.$refs.sendeMoneyVw.focusAddress();
     }
   },
@@ -168,8 +177,8 @@ export default {
         this.fetchAddress(coin);
       }
 
-      if (this.sendModeOn && !(this.walletBalances.get(coin) && this.walletBalances.get(coin).get('confirmed'))) {
-        this.sendModeOn = false;
+      if (this.tabActive === 1 && !(this.walletBalances.get(coin) && this.walletBalances.get(coin).get('confirmed'))) {
+        this.tabActive = 2;
       }
 
       this.transactionsVwKey += 1;
@@ -214,7 +223,7 @@ export default {
         bumpFeeXhrs: transactionsState.bumpFeeAttempts || undefined,
       };
     },
-    
+
     navCoins() {
       let supportedCoins = this.supportedCoins();
 
@@ -228,10 +237,10 @@ export default {
           clientSupported: true,
         };
       });
-    }
+    },
   },
   methods: {
-    supportedCoins () {
+    supportedCoins() {
       return supportedWalletCurs({ clientSupported: false }).sort((a, b) => {
         const aSortVal = app.polyglot.t(`cryptoCurrencies.${a}`, { _: a });
         const bSortVal = app.polyglot.t(`cryptoCurrencies.${b}`, { _: b });
@@ -248,9 +257,8 @@ export default {
       // are null, it indicates that none of the wallet currencies are supported by
       // this client.
 
-      this.sendModeOn = !!(this.walletBalances.get(initialActiveCoin) && this.walletBalances.get(initialActiveCoin).get('confirmed')) || false,
-
-      this.activeCoin = initialActiveCoin;
+      (this.tabActive = !!(this.walletBalances.get(initialActiveCoin) && this.walletBalances.get(initialActiveCoin).get('confirmed')) ? 1 : 2),
+        (this.activeCoin = initialActiveCoin);
 
       this.addressFetches = {};
       this.needAddress = supportedCoins.reduce((acc, coin) => {
@@ -362,13 +370,8 @@ export default {
     onClickViewCryptoListings() {
       recordEvent('Wallet_ViewCryptoListings');
     },
-
-    onClickSend() {
-      this.sendModeOn = true;
-    },
-
-    onClickReceive() {
-      this.sendModeOn = false;
+    changeTab(val) {
+      this.tabActive = val;
     },
 
     checkCoinType(coinType) {

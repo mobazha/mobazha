@@ -35,7 +35,9 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        getTotalShippingPrice: undefined,
+      },
     },
     bb: Function,
   },
@@ -65,10 +67,14 @@ export default {
     getPrice (service) {
       const ob = this.ob;
 
-      let price = '';
+      let shippingTotal = {};
+      if (this.options.getTotalShippingPrice) {
+        shippingTotal = this.options.getTotalShippingPrice(service.name, service.service);
+      }
 
+      let price = '';
       try {
-        price = ob.currencyMod.convertAndFormatCurrency(service.firstFreight, ob.metadata.pricingCurrency.code, ob.displayCurrency);
+        price = ob.currencyMod.convertAndFormatCurrency(shippingTotal.price, shippingTotal.currency, ob.displayCurrency);
       } catch (e) {
         // pass
       }

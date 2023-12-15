@@ -31,6 +31,7 @@
       :options="{
         validOptions,
         selectedOption,
+        getTotalShippingPrice,
       }"
       :bb="function() {
         return {
@@ -58,7 +59,9 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        getTotalShippingPrice: undefined,
+      },
 	  },
     bb: Function,
   },
@@ -143,14 +146,15 @@ export default {
       extractedOptions.forEach(option => {
         if (option.type === 'LOCAL_PICKUP') {
           // local pickup options need a service with a name and price
-          option.services[0] = { name: app.polyglot.t('purchase.localPickup'), price: 0 };
+          option.services[0] = { name: app.polyglot.t('purchase.localPickup'), firstFreight: 0 };
         }
-        option.services = _.sortBy(option.services, 'price');
+        option.services = _.sortBy(option.services, 'firstFreight');
         option.services.forEach(optionService => {
           validOptions.push({
             ...optionService,
             name: option.name,
             service: optionService.name,
+            currency: option.currency,
           });
         });
       });

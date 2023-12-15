@@ -118,7 +118,7 @@
             <div class="constrainedWidth">
               <div class="flexHRight">
                 <b>
-                  {{ ob.currencyMod.formatCurrency(priceObj.shippingTotal, viewingCurrency) }}
+                  {{ ob.currencyMod.convertAndFormatCurrency(priceObj.shippingTotal.price ?? 0, priceObj.shippingTotal.currency ?? viewingCurrency, viewingCurrency) }}
                 </b>
               </div>
             </div>
@@ -134,8 +134,12 @@
         <div class="constrainedWidth">
           <div class="flexHRight">
             <b>
-              {{ priceObj.subTotal ? ob.currencyMod.formatCurrency(priceObj.subTotal.plus(priceObj.shippingTotal),
-                viewingCurrency) : '' }}
+              {{ priceObj.subTotal
+              ? ob.currencyMod.formatCurrency(
+                priceObj.subTotal.plus(ob.currencyMod.convertCurrency(priceObj.shippingTotal.price ?? 0, priceObj.shippingTotal.currency ?? viewingCurrency, viewingCurrency)),
+                viewingCurrency
+              )
+              : '' }}
             </b>
           </div>
         </div>
@@ -165,6 +169,7 @@ export default {
         prices: [],
         coupons: [],
         showTotalTip: true,
+        totalShippingPrice: {price: 0, currency: ''},
       },
 	  },
     bb: Function,
@@ -255,7 +260,7 @@ export default {
           }
         });
         priceObj.subTotal = itemTotal.times(priceObj.quantity);
-        priceObj.shippingTotal = priceObj.shippingPrice.plus(priceObj.additionalShippingPrice.times(priceObj.quantity.minus(1)));
+        priceObj.shippingTotal = this.options.totalShippingPrice;
 
         let quantity =
           priceObj.quantity &&

@@ -84,27 +84,27 @@
                             <label for="cryptoAmount" class="clrT txB required">{{ ob.polyT('purchase.cryptoAmount') }}</label>
                             <div class="inputSelect">
                               <input
-                                type="text"
+                                type="number"
                                 class="clrBr clrP clrSh2"
-                                name="quantity"
                                 id="cryptoAmount"
                                 @change="onChangeCryptoAmount"
-                                :value="ob.uiQuantity"
+                                :value="ob.quantity"
                                 @keyup="keyupQuantity"
                                 placeholder="0.0000"
                                 size="8"
                                 data-var-type="bignumber">
-                              <template v-if="ob.displayCurrency !== listing.item.cryptoListingCurrencyCode">
-                                <select
+                              <template v-if="displayCurrency !== listing.item.cryptoListingCurrencyCode">
+                                <Select2
                                   id="cryptoAmountCurrency"
+                                  v-model="cryptoAmountCurrency"
                                   @change="changeCryptoAmountCurrency"
                                   class="clrBr clrP nestInputRight">
                                   <option
-                                    v-for="(cur, j) in [listing.item.cryptoListingCurrencyCode, ob.displayCurrency]"
-                                    :key="j"
+                                    v-for="cur in [listing.item.cryptoListingCurrencyCode, displayCurrency]"
+                                    :key="cur"
                                     :value="cur"
-                                    :selected="cur === ob.cryptoAmountCurrency">{{ cur }}</option>
-                                </select>
+                                    :selected="cur === cryptoAmountCurrency">{{ cur }}</option>
+                                </Select2>
                               </template>
                             </div>
                           </div>
@@ -154,6 +154,9 @@
                   <Shipping
                     ref="shipping"
                     v-if="listing.get('shippingOptions').length"
+                    :options="{
+                      getTotalShippingPrice: totalShippingPriceFunc,
+                    }"
                     :bb="function() {
                       return {
                         model: listing,
@@ -358,6 +361,7 @@
                     prices: prices,
                     coupons: couponObj,
                     showTotalTip: _state.phase === 'pay',
+                    totalShippingPrice: selectedShippingPrice,
                   }"
                   :bb="function() {
                     return {
@@ -473,12 +477,16 @@ export default {
       moderators: undefined,
       couponObj: [],
 
+      cryptoAmountCurrency: '',
+      _cryptoQuantity: 0,
+
       coinName: '',
       moderatorIDs: [],
       showVerifiedOnly: true,
       shipping: {
         selectedAddress: '',
       },
+      shippingOptionKey: 0,
 
       outdatedHash: false,
 
@@ -529,7 +537,6 @@ export default {
         variants: this.variants,
         prices: this.prices,
         quantity: uiQuantity,
-        cryptoAmountCurrency: this.cryptoAmountCurrency,
         isCrypto: this.listing.isCrypto,
         phaseClass: `phase${capitalize(this._state.phase)}`,
         hasCoupons: this.listing.get('coupons').length
@@ -578,32 +585,30 @@ export default {
     totalPrice() {
       return this.prices[0].price.plus(this.prices[0].vPrice);
     },
-
-    cryptoAmountCurrency () {
-      return this._cryptoAmountCurrency
-        || this.listing.get('item')
-          .get('cryptoListingCurrencyCode');
+    displayCurrency() {
+      return app.settings.get('localCurrency');
     },
+    pricingCurrency() {
+      return this.listing.price.currencyCode;
+    },
+    totalShippingPriceFunc() {
+      return this.getTotalShippingPrice.bind(this);
+    },
+    selectedShippingPrice() {
+      let access1 = this.formData.itemsData[0].quantity;
+      let access2 = this.shippingOptionKey;
 
-    coinDivisibility () {
-      let currencyCode;
-      try {
-        currencyCode = this.listing.isCrypto ? this.listing.get('item').cryptoListingCurrencyCode : this.listing.get('metadata').get('pricingCurrency').code;
-      } catch (e) {
-        // pass
+      const item = this.order.get('items').at(0);
+
+      const shipping = item.get('shipping');
+      if (!shipping) {
+        return bigNumber(0);
       }
 
-      let coinDiv;
-      try {
-        coinDiv = getCoinDivisibility(currencyCode);
-      } catch (e) {
-        // pass
-      }
-      return coinDiv;
-    },
+      const sName = shipping.get('name');
+      const sService = shipping.get('service');
 
-    isModerated () {
-      return this.$refs.moderators ? this.$refs.moderators.selectedIDs.length > 0 : false;
+      return this.getTotalShippingPrice(sName, sService);
     },
 
     itemConstraints () {
@@ -628,12 +633,6 @@ export default {
 
       return currencies;
     },
-    displayCurrency() {
-      return app.settings.get('localCurrency');
-    },
-    pricingCurrency() {
-      return this.listing.price.currencyCode;
-    },
   },
   methods: {
     isSupportedWalletCur,
@@ -654,6 +653,37 @@ export default {
         // pass
       }
       return coinDiv;
+    },
+
+   getTotalShippingPrice(shippingOptionName, shippingServiceName) {
+      const sOpt = this.listing.get('shippingOptions').findWhere({ name: shippingOptionName });
+      const sOptService = sOpt ? sOpt.get('services').findWhere({ name: shippingServiceName }) : '';
+
+      if (!sOpt || !sOptService || sOpt.type === 'LOCAL_PICKUP') {
+        return {price: bigNumber(0), currency: ''};
+      }
+
+      const sOption = sOpt.toJSON();
+      const sService = sOptService.toJSON();
+
+      const itemGrams = this.listing.get('item').get('grams');
+
+      let gramsTotal = bigNumber(0);
+      this.order.get('items').forEach((item) => gramsTotal = gramsTotal.plus(bigNumber(itemGrams).times(bigNumber(item.get('quantity')))));
+      if (gramsTotal.eq(bigNumber(0))) {
+        return {price: bigNumber(0), currency: sOption.currency};
+      }
+
+      const firstFreight = bigNumber(sService.firstFreight);
+      let renewalFee = bigNumber(0)
+      if (sOption.serviceType === 'FIRST_RENEWAL_FEE') {
+        if (gramsTotal.gt(bigNumber(sService.firstWeight))) {
+          const unitAmount = gramsTotal.minus(bigNumber(sService.firstWeight)).div(bigNumber(sService.renewalUnitWeight).integerValue(bigNumber.ROUND_CEIL));
+          renewalFee = bigNumber(sService.renewalUnitPrice).times(unitAmount)
+        }
+      }
+
+      return {price: firstFreight.plus(renewalFee).plus(bigNumber(sService.registrationFee)), currency: sOption.currency};
     },
 
     init() {
@@ -879,12 +909,12 @@ export default {
       this.order.get('items').at(0).set({ quantity });
     },
 
-    changeCryptoAmountCurrency (e) {
-      this._cryptoAmountCurrency = e.target.value;
-      const { quantity } = this.getFormData(
-        $('#cryptoAmount'),
-      );
-      this.setModelQuantity(quantity);
+    onChangeCryptoAmount(e) {
+      this._cryptoQuantity = e.target.value;
+    },
+
+    changeCryptoAmountCurrency () {
+      this.setModelQuantity(this._cryptoQuantity);
     },
 
     keyupQuantity () {
@@ -941,6 +971,8 @@ export default {
     updateShippingOption (selectedOption) {
       // Set the shipping option.
       this.order.get('items').at(0).get('shipping').set(selectedOption);
+
+      this.shippingOptionKey += 1;
     },
 
     outdateHash () {

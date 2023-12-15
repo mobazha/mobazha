@@ -576,7 +576,6 @@ export default {
         return {
           price: bigNumber(this.listing.price.amount),
           sPrice: bigNumber(sOptService ? sOptService.get('firstFreight') || 0 : 0),
-          aPrice: bigNumber(sOptService ? sOptService.get('renewalUnitPrice') || 0 : 0),
           vPrice: bigNumber(sku ? sku.get('surcharge') || 0 : 0),
           quantity: bigNumber(item.get('quantity')),
         };
@@ -660,7 +659,7 @@ export default {
       const sOptService = sOpt ? sOpt.get('services').findWhere({ name: shippingServiceName }) : '';
 
       if (!sOpt || !sOptService || sOpt.type === 'LOCAL_PICKUP') {
-        return {price: bigNumber(0), currency: ''};
+        return {price: bigNumber(0), currency: undefined};
       }
 
       const sOption = sOpt.toJSON();

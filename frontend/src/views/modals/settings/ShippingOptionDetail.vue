@@ -22,13 +22,13 @@
           <td>{{ item.estimatedDelivery }}</td>
           <td>{{ `${item.startWeight}g ~ ${item.endWeight}g` }}</td>
           <template v-if="formData.serviceType === 'FIRST_RENEWAL_FEE'">
-            <td>{{ `${item.firstWeight}g / ${item.firstFreight}` }}</td>
-            <td>{{ `${item.renewalUnitWeight}g / ${item.renewalUnitPrice}` }}</td>
+            <td>{{ `${item.firstWeight}g / ${formatCurrency(item.firstFreight, currency)}` }}</td>
+            <td>{{ `${item.renewalUnitWeight}g / ${formatCurrency(item.renewalUnitPrice, currency)}` }}</td>
           </template>
           <template v-else>
             <td>{{ item.firstFreight }}</td>
           </template>
-          <td>{{ item.registrationFee }}</td>
+          <td>{{ formatCurrency(item.registrationFee, currency) }}</td>
         </tr>
       </tbody>
     </table>
@@ -46,6 +46,9 @@
   </el-table> -->
 </template>
 <script>
+
+import { formatCurrency } from '../../../../backbone/utils/currency';
+
 export default {
   props: {
     bb: Function,
@@ -60,6 +63,7 @@ export default {
         { label: app.polyglot.t('settings.storeTab.shippingOptions.services.firstRenewalTemplate'), value: 'FIRST_RENEWAL_FEE' },
         { label: app.polyglot.t('settings.storeTab.shippingOptions.services.sameWeightTemplate'), value: 'SAME_WEIGHT_SAME_FEE' },
       ],
+      currency: ''
     };
   },
   created() {
@@ -80,6 +84,8 @@ export default {
     },
   },
   methods: {
+    formatCurrency,
+
     loadData() {
       if (!this.shippingOption) {
         throw new Error('Please provide a shippingOption model.');
@@ -97,6 +103,8 @@ export default {
         serviceType: optionData.serviceType,
         services: optionData.services,
       };
+
+      this.currency = this.shippingOption.get('currency');
     },
   },
 };

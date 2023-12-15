@@ -182,7 +182,7 @@ export default {
         renewalUnitWeight: [
           { required: true, message: pleaseInput, trigger: ['change', 'blur'] },
           { type: 'number', message: 'Input must be a number' },
-          { validator: checkNonNegtiveVal, trigger: ['change', 'blur'] },
+          { validator: checkPositiveVal, trigger: ['change', 'blur'] },
         ],
         renewalUnitPrice: [
           { required: true, message: pleaseInput, trigger: ['change', 'blur'] },

@@ -9,7 +9,7 @@ export default class extends BaseModel {
       id: -1,
       name: '',
       type: 'FIXED_PRICE',
-      currency: '',
+      currency: app.settings.get('localCurrency'),
       serviceType: 'SAME_WEIGHT_SAME_FEE',
       regions: [],
       services: new Services(),

@@ -247,7 +247,6 @@ import Moderators from '../../../../backbone/views/components/moderators/Moderat
 import BulkCoinUpdateBtn from './BulkCoinUpdateBtn.vue';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import ShippingOptionMd from '../../../../backbone/models/settings/ShippingOption';
-import Service from '../../../../backbone/models/settings/Service';
 import ShippingOption from './ShippingOption.vue';
 
 export default {

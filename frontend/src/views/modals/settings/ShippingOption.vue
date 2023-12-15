@@ -93,6 +93,7 @@
 
 <script>
 import $ from 'jquery';
+import app from '../../../../backbone/app';
 import '../../../../backbone/utils/lib/selectize';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 import regions, { getTranslatedRegions, getIndexedRegions } from '../../../../backbone/data/regions';
@@ -121,6 +122,7 @@ export default {
         regions: [],
         name: '',
         type: '',
+        currency: app.settings.get('localCurrency'),
       },
       currencies: getCurrenciesSortedByCode(),
       shippingOptionKey: 0,

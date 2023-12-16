@@ -777,6 +777,7 @@
           "pricePlaceholder": "0.00",
           "addService": "+ Добавить услугу",
   
+          "notice": "Notice!",
           "firstRenewalTemplate": "Billed based on the first and renewal weight",
           "firstRenewalExplanation": "Freight = first weight fee + (package weight - first weight) / unit weight of additional weight * unit price + registration fee",
           "startWeight": "Start Weight",

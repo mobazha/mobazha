@@ -10,7 +10,7 @@
           </el-form-item>
           <el-button class="add-btn" link type="success" @click="doAdd">{{ ob.polyT('settings.storeTab.shippingOptions.modal.add') }}</el-button>
         </div>
-        <div class="tips" v-if="formData.serviceType"><span class="tips-btn">说明!</span>{{ serviceTypeTip }}</div>
+        <div class="tips" v-if="formData.serviceType"><span class="tips-btn">{{ ob.polyT('settings.storeTab.shippingOptions.services.notice') }}</span>{{ serviceTypeTip }}</div>
       </div>
       <el-table :data="formData.services" :border="true" row-class-name="form-table" cell-class-name="cell-form-table">
         <el-table-column :label="ob.polyT('settings.storeTab.shippingOptions.services.nameLabel')" width="130">

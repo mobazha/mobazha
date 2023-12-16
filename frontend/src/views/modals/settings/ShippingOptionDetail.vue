@@ -1,7 +1,7 @@
 <template>
   <div class="detail-wrapper">
     <div class="template-name">{{ `${this.shippingOption.get('name')}: ${templateName}` }}</div>
-    <div class="tips" v-if="formData.serviceType"><span class="tips-btn">说明!</span>{{ serviceTypeTip }}</div>
+    <div class="tips" v-if="formData.serviceType"><span class="tips-btn">{{ ob.polyT('settings.storeTab.shippingOptions.services.notice') }}</span>{{ serviceTypeTip }}</div>
     <table class="table" width="100%" border="1" cellpadding="0" cellspacing="0">
       <tr>
         <th>{{ ob.polyT('settings.storeTab.shippingOptions.services.nameLabel') }}</th>

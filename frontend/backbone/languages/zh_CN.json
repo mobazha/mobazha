@@ -777,6 +777,7 @@
           "pricePlaceholder": "0.00",
           "addService": "+添加服务",
   
+          "notice": "说明!",
           "firstRenewalTemplate": "按首重续费计算",
           "firstRenewalExplanation": "运费=首重费用+(包裹重量-首重)/续重单位重量*单价+挂号费",
           "startWeight": "开始重量",

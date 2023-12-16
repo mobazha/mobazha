@@ -15,6 +15,11 @@
             </div> -->
           </div>
           <div class="page-body" v-loading="loading">
+            <div>
+              <p>Notice:</p>
+              <p>1. Purchasing non-physical items from shopping cart is not currently supported yet.</p>
+              <p>2. You can only purchase items from one store at a time.</p>
+            </div>
             <template v-if="tableData.length > 0">
               <div class="table-hc">
                 <el-table :header-row-style="headerRowStyle" :data="[]" :height="38">
@@ -101,7 +106,7 @@
                       <div v-if="false" class="count-price">Subtotal:$183.97</div>
                       <div v-if="false" class="freight">Shipping & handling: Free</div>
                     </div>
-                    <button v-if="false" class="btn-primary pay-btn" @click="pay(index)">Pay</button>
+                    <button class="btn-primary pay-btn small" @click="pay(index)">{{ ob.polyT('listingDetail.buyNow') }}</button>
                   </div>
                 </div>
               </div>

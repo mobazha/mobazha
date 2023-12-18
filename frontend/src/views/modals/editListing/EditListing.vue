@@ -1224,7 +1224,7 @@ export default {
      */
     setModelData() {
       let formData = this.formData;
-      if (!_.isEmpty(formData.item.price)) {
+      if (formData.item.price != null) {
         formData.item.price = bigNumber(formData.item.price);
       }
 

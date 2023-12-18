@@ -16,9 +16,9 @@
           </div>
           <div class="page-body" v-loading="loading">
             <div>
-              <p>Notice:</p>
-              <p>1. Purchasing non-physical items from shopping cart is not currently supported yet.</p>
-              <p>2. You can only purchase items from one store at a time.</p>
+              <p>{{ ob.polyT('shoppingCart.header.notice') }}</p>
+              <p>{{ ob.polyT('shoppingCart.header.notice1') }}</p>
+              <p>{{ ob.polyT('shoppingCart.header.notice2') }}</p>
             </div>
             <template v-if="tableData.length > 0">
               <div class="table-hc">
@@ -236,15 +236,15 @@ export default {
 
     //删除单个商品
     doDelete(row, index) {
-      ElMessageBox.confirm('确定删除该商品吗？', '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
+      ElMessageBox.confirm(app.polyglot.t('shoppingCart.deleteConfirm.body'), app.polyglot.t('shoppingCart.deleteConfirm.heading'), {
+        confirmButtonText: app.polyglot.t('shoppingCart.deleteConfirm.btnDelete'),
+        cancelButtonText: app.polyglot.t('shoppingCart.deleteConfirm.btnCancel'),
         type: 'warning',
         callback: (action) => {
           if (action === 'confirm') {
             //this.tableData.splice(index, 1)为展示效果，调用删除接口，再刷新
             this.tableData.splice(index, 1);
-            ElMessage({ type: 'success', message: '已删除' });
+            ElMessage({ type: 'success', message: app.polyglot.t('shoppingCart.deleteConfirm.tip') });
             this.loadData();
           }
         },

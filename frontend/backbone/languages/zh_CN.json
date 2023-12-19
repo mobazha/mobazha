@@ -1075,6 +1075,20 @@
     "fetchErrorWithMsg": "获取库存时出错: %{msg}",
     "unknownInventory": "未知"
   },
+  "shoppingCart": {
+    "header": {
+      "notice": "Notice:",
+      "notice1": "1. Purchasing non-physical items from shopping cart is not currently supported yet.",
+      "notice2": "2. You can only purchase items from one store at a time."
+    },
+    "deleteConfirm": {
+      "heading": "确定删除吗？",
+      "body": "该商品将从购物车中被删除。",
+      "btnCancel": "取消",
+      "btnDelete": "是的，删除",
+      "tip": "%{item}已被删除。"
+    }
+  },
   "listingDetail": {
     "edit": "编辑",
     "delete": "删除",

@@ -1077,6 +1077,20 @@
     "fetchErrorWithMsg": "Une erreur s'est produite lors de l'obtention de l'inventaire : %{msg}",
     "unknownInventory": "Inconnu"
   },
+  "shoppingCart": {
+    "header": {
+      "notice": "Notice:",
+      "notice1": "1. Purchasing non-physical items from shopping cart is not currently supported yet.",
+      "notice2": "2. You can only purchase items from one store at a time."
+    },
+    "deleteConfirm": {
+      "heading": "Are you sure?",
+      "body": "This listing item will be removed from shopping cart.",
+      "btnCancel": "Cancel",
+      "btnDelete": "Yes, remove",
+      "tip": "%{item} has been removed."
+    }
+  },
   "listingDetail": {
     "edit": "Modifier",
     "delete": "Supprimer",

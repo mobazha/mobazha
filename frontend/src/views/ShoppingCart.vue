@@ -204,6 +204,8 @@ export default {
               item.listingExt = new Listing({ slug: item.slug }, { guid: cart.vendorID, hash: item.listingHash });
               cart.listings.push(item.listingExt);
 
+              item.vendorID = cart.vendorID;
+
               const listingFetch = item.listingExt.fetch();
               fetches.push(listingFetch);
             });
@@ -243,9 +245,15 @@ export default {
         callback: (action) => {
           if (action === 'confirm') {
             //this.tableData.splice(index, 1)为展示效果，调用删除接口，再刷新
-            this.tableData.splice(index, 1);
-            ElMessage({ type: 'success', message: app.polyglot.t('shoppingCart.deleteConfirm.tip') });
-            this.loadData();
+            api.removeCartItem(row.vendorID, {
+              slug: row.listing?.slug,
+              options: row.options,
+            }).then(() => {
+              ElMessage({ type: 'success', message: app.polyglot.t('shoppingCart.deleteConfirm.tip', {item: row.listing?.item.title}) });
+              this.loadData();
+            }).fail((jqXHR) => {
+              ElMessage({ type: 'error', message: jqXHR?.responseJSON?.reason });
+            })
           }
         },
       });

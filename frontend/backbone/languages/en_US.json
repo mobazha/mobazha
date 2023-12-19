@@ -1091,7 +1091,7 @@
       "body": "This listing item will be removed from shopping cart.",
       "btnCancel": "Cancel",
       "btnDelete": "Yes, remove",
-      "tip": "Has been removed"
+      "tip": "%{item} has been removed."
     }
   },
   "listingDetail": {

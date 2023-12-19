@@ -129,6 +129,7 @@ import { getCachedProfiles } from '../../backbone/models/profile/Profile';
 import { convertCurrency, formatCurrency, convertAndFormatCurrency } from '../../backbone/utils/currency';
 import Purchase from './modals/purchase/Purchase.vue';
 import Listing from '../../backbone/models/listing/Listing';
+import OrderListings from '../../backbone/collections/OrderListings';
 
 export default {
   components: {
@@ -282,7 +283,27 @@ export default {
     pay(index) {
       this.$store.commit('cart/updateCart', this.tableData[0], { module: 'cart' });
 
-      window.vueApp.launchPurchaseModal();
+      const item = this.tableData[index];
+      const vendor = {
+        peerID: item.vendorID,
+        name: item.profile?.name,
+        handle: item.profile?.handle,
+        avatarHashes:  item.profile?.avatarHashes,
+      };
+
+      const itemsToPurchase = new OrderListings();
+      const purchaseInfo = [];
+
+      const rows = this.selectors[index];
+      rows.forEach((row) => {
+        itemsToPurchase.push(row.listingExt);
+
+        purchaseInfo.push({quantity: row.quantity, variants: row.options});
+      });
+
+      window.vueApp.launchPurchaseModal({itemsInfo: purchaseInfo, vendor}, () => {
+        return {itemsToPurchase};
+      });
     },
 
     //修改头部样式

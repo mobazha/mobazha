@@ -26,17 +26,12 @@
         </div>
       </template>
     </div>
-    <ShippingOptions
+    <ShippingOptions :key="model"
       v-if="ob.userAddresses.length"
       :options="{
         validOptions,
         selectedOption,
         getTotalShippingPrice,
-      }"
-      :bb="function() {
-        return {
-          model,
-        };
       }"
       @shippingOptionSelected="onSelectShippingOption"
     />
@@ -48,7 +43,7 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import app from '../../../../backbone/app';
-import Listing from '../../../../backbone/models/listing/Listing';
+import ShippingOptionsCol from '../../../../backbone/collections/settings/ShippingOptions';
 import ShippingOptions from './ShippingOptions.vue';
 import ShippingAddress from '../../../../backbone/models/settings/ShippingAddress';
 
@@ -108,8 +103,8 @@ export default {
     loadData (options = {}) {
       this.baseInit(options);
 
-      if (!this.model || !(this.model instanceof Listing)) {
-        throw new Error('Please provide a listing model');
+      if (!this.model || !(this.model instanceof ShippingOptionsCol)) {
+        throw new Error('Please provide a ShippingOptions model');
       }
 
       this.validOptions = [];
@@ -140,7 +135,7 @@ export default {
       const validOptions = [];
       const countryCode = address ? address.get('country') : '';
 
-      const extractedOptions = this.model.get('shippingOptions').toJSON().filter(option =>
+      const extractedOptions = this.model.toJSON().filter(option =>
         option.regions.includes(countryCode) || option.regions.includes('ALL'));
 
       extractedOptions.forEach(option => {

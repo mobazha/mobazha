@@ -1083,7 +1083,7 @@
     },
     "deleteConfirm": {
       "heading": "确定删除吗？",
-      "body": "该商品将从购物车中被删除。",
+      "body": "该商品将从购物车中删除。",
       "btnCancel": "取消",
       "btnDelete": "是的，删除",
       "tip": "%{item}已被删除。"

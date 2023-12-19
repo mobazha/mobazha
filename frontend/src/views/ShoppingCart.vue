@@ -24,8 +24,9 @@
               <div class="table-hc">
                 <el-table :header-row-style="headerRowStyle" :data="[]" :height="38">
                   <el-table-column width="48"></el-table-column>
-                  <el-table-column label="Title" width="350"></el-table-column>
-                  <el-table-column label="Type" width="160"></el-table-column>
+                  <el-table-column label="Title" width="200"></el-table-column>
+                  <el-table-column label="Type" width="150"></el-table-column>
+                  <el-table-column label="Variants" width="160"></el-table-column>
                   <el-table-column label="Price"></el-table-column>
                   <el-table-column label="Quantity" width="100"></el-table-column>
                   <el-table-column label="Total"></el-table-column>
@@ -49,7 +50,7 @@
                       </template>
                       <template #default>
                         <el-table-column type="selection" width="48"> </el-table-column>
-                        <el-table-column width="350">
+                        <el-table-column width="200">
                           <template v-slot="{ row }">
                             <div class="goods">
                               <div class="goods-left">
@@ -73,6 +74,7 @@
                             </div>
                           </template>
                         </el-table-column>
+                        <el-table-column prop="type" width="150"></el-table-column>
                         <el-table-column width="160">
                           <template v-slot="{ row }">
                             <div class="sku">
@@ -225,6 +227,7 @@ export default {
                   item.priceAmount = 0;
                   item.price = 0;
                 }
+                item.type = app.polyglot.t(`formats.${listing.metadata.contractType}`)
               });
             });
 

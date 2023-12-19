@@ -199,7 +199,7 @@ export default {
       return totalTip;
     },
     updatedPrice() {
-      const updatedPrice = this.prices;
+      const updatedPrice = this.options.prices;
       updatedPrice.forEach((priceObj, i) => {
         // convert the prices here, to prevent rounding errors in the display
         const basePrice = convertCurrency(priceObj.price, priceObj.currency, this.viewingCurrency);
@@ -275,11 +275,6 @@ export default {
         throw new Error('Please provide the prices array');
       }
     },
-
-    updatePrices (prices) {
-      this.prices = prices;
-    },
-
   }
 }
 </script>

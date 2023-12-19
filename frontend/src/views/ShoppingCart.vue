@@ -6,7 +6,7 @@
           <div class="page-head">
             <div class="page-head__left">
               <div class="page-head__name">
-                Favorite <span v-if="tableData.length > 0">({{ cartNum }})</span>
+                {{ ob.polyT('shoppingCart.title') }} <span v-if="tableData.length > 0">({{ cartNum }})</span>
               </div>
               <div class="clean-btn" v-if="tableData.length > 0" @click="clearCart">Clear All</div>
             </div>

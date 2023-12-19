@@ -231,10 +231,10 @@ export default {
         startWeight: 0,
         endWeight: 0,
         firstWeight: 0,
-        firstFreight: '',
-        renewalUnitWeight: '',
-        renewalUnitPrice: '',
-        registrationFee: '',
+        firstFreight: 0,
+        renewalUnitWeight: 0,
+        renewalUnitPrice: 0,
+        registrationFee: 0,
       };
     },
     onCancel() {

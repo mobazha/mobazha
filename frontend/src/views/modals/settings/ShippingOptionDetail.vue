@@ -26,7 +26,7 @@
             <td>{{ `${item.renewalUnitWeight}g / ${formatCurrency(item.renewalUnitPrice, currency)}` }}</td>
           </template>
           <template v-else>
-            <td>{{ item.firstFreight }}</td>
+            <td>{{ formatCurrency(item.firstFreight, currency) }}</td>
           </template>
           <td>{{ formatCurrency(item.registrationFee, currency) }}</td>
         </tr>

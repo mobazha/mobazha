@@ -9,7 +9,7 @@
                 <WalletIcon />
               </div>
               <span>{{ ob.polyT('wallet.title') }}</span>
-              <a class="jsModalClose tx6 txU">{{ ob.polyT('wallet.closeLink') }}</a>
+              <a class="jsModalClose tx6 txU" @click.stop="onClose">{{ ob.polyT('wallet.closeLink') }}</a>
             </div>
             <div class="js-tickerContainer tickerContainer flexHRight">
               <CryptoTicker v-if="activeCoin" :coinType="activeCoin" />

@@ -58,7 +58,7 @@
               <a href="#search" class="toolTipNoWrap js-discover" :data-tip="ob.polyT('pageNav.toolTip.discover')" id="Nav_Discover">
                 <div class="discoverBtn navBtn" style="background-image: url('../imgs/obVectorIconSmall2.png')"></div>
               </a>
-              <template v-if="ob.showDiscoverCallout">
+              <template v-if="showDiscoverCallout">
                 <div class="discoverCallout js-discoverCallout arrowBoxTop confirmBox clrP clrSh1 clrBr">
                   <div class="tx3 txB rowSm">{{ ob.polyT('pageNav.discoverCalloutTitle') }}</div>
                   <p>{{ ob.polyT('pageNav.discoverCalloutBody') }}</p>
@@ -217,6 +217,8 @@ export default {
       notifContainerOpened: false,
 
       addressBarText: '',
+
+      showDiscoverCallout: false,
     };
   },
   created () {
@@ -228,6 +230,11 @@ export default {
     unreadNotifCount() {
       setUnreadNotifCount(this.unreadNotifCount);
     },
+    $route(to) {
+      if (to.name === 'Search') {
+        this.onRouteSearch();
+      }
+    }
   },
   mounted () {
   },
@@ -245,17 +252,14 @@ export default {
         connectedServer = null;
       }
 
-      let showDiscoverCallout = false;
-
-      if (connectedServer && !connectedServer.dismissedDiscoverCallout) {
-        showDiscoverCallout = true;
+      if (connectedServer) {
+        this.showDiscoverCallout = !connectedServer.dismissedDiscoverCallout;
       }
 
       return {
         ...this.templateHelpers,
         connectedServer,
         testnet: app.serverConfig.testnet,
-        showDiscoverCallout,
         ...((app.profile && app.profile.toJSON()) || {}),
       };
     }
@@ -283,7 +287,6 @@ export default {
         this.serverConnected = true;
         this.toggleKey += 1;
 
-        this.listenTo(app.router, 'route:search', this.onRouteSearch);
         this.fetchUnreadNotifCount().done((data) => {
           this.unreadNotifCount = (this.unreadNotifCount || 0) + data.unread;
         });
@@ -298,7 +301,6 @@ export default {
         this.toggleKey += 1;
 
         this.torIndicatorOn = false;
-        this.stopListening(app.router, null, this.onRouteSearch);
         this.stopListening(e.socket, 'message', this.onSocketMessage);
       });
     },
@@ -403,9 +405,9 @@ export default {
 
       if (connectedServer && connectedServer.server) {
         connectedServer.server.save({ dismissedDiscoverCallout: true });
-      }
 
-      $('.js-discoverCallout').remove();
+        this.showDiscoverCallout = false;
+      }
     },
 
     onMouseEnterConnectedServerListItem () {

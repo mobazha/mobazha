@@ -5,4 +5,8 @@ export default class extends Collection {
   model(attrs, options) {
     return new Listing(attrs, options);
   }
+
+  modelId(attrs) {
+    return attrs.hash;
+  }
 }

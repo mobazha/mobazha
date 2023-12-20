@@ -41,7 +41,7 @@
               <b>
                 {{ coupon.percentDiscount ? `-${coupon.percentDiscount}%`
                   : (coupon.priceDiscount && !coupon.priceDiscount.isNaN() ?
-                    `-${convertAndFormatCurrency(coupon.priceDiscount, ob.listingCurrency, viewingCurrency)}` : "") }}
+                    `-${convertAndFormatCurrency(coupon.priceDiscount, priceObj.currency, viewingCurrency)}` : "") }}
               </b>
             </div>
           </div>
@@ -160,8 +160,7 @@ export default {
       return {
         ...this.templateHelpers,
         ...this.model.toJSON(),
-        listing: this._listing,
-        listingCurrency: this._listing.metadata.pricingCurrency.code,
+        listing: this.listing.toJSON(),
         displayCurrency,
         paymentCoin: this.paymentCoin,
         showTotalTip: this.showTotalTip,
@@ -171,17 +170,25 @@ export default {
     displayCurrency() {
       return app.settings.get('localCurrency');
     },
-    listingCurrency () {
-      return this._listing.metadata.pricingCurrency.code;
-    },
     viewingCurrency () {
-      return getExchangeRate(this.displayCurrency) !== undefined ? this.displayCurrency : this.listingCurrency;
+      return getExchangeRate(this.displayCurrency) !== undefined ? this.displayCurrency : this.prices[0].currency;
     },
     totalTip () {
       let totalTip = "";
-      if (this.viewingCurrency !== this.listingCurrency) {
+      let hasNonViewingCurrency = false;
+      let hasNonPaymentCurrency = false;
+      this.prices.forEach((priceObj, i) => {
+        if (priceObj.currency !== this.viewingCurrency) {
+          hasNonViewingCurrency = true;
+        }
+        if (priceObj.currency !== this.paymentCoin) {
+          hasNonPaymentCurrency = true;
+        }
+      });
+
+      if (hasNonViewingCurrency) {
         totalTip = this.ob.polyT('purchase.receipt.totalWarning1', { currency: this.viewingCurrency });
-      } else if (this.viewingCurrency !== this.paymentCoin) {
+      } else if (hasNonPaymentCurrency) {
         if (this.paymentCoin) {
           totalTip = this.ob.polyT('purchase.receipt.totalWarning2', { currency: this.paymentCoin });
         } else {
@@ -192,14 +199,14 @@ export default {
       return totalTip;
     },
     updatedPrice() {
-      const updatedPrice = this.prices;
+      const updatedPrice = this.options.prices;
       updatedPrice.forEach((priceObj, i) => {
         // convert the prices here, to prevent rounding errors in the display
-        const basePrice = convertCurrency(priceObj.price, this.listingCurrency, this.viewingCurrency);
+        const basePrice = convertCurrency(priceObj.price, priceObj.currency, this.viewingCurrency);
 
         priceObj.shippingPrice = this.options.totalShippingPrice;
 
-        const surcharge = convertCurrency(priceObj.vPrice, this.listingCurrency, this.viewingCurrency);
+        const surcharge = convertCurrency(priceObj.vPrice, priceObj.currency, this.viewingCurrency);
 
         const validQuantity = priceObj.quantity && !priceObj.quantity.isNaN() && priceObj.quantity.gt(0);
 
@@ -219,7 +226,7 @@ export default {
             const convertPriceDiscount =
               convertCurrency(
                 coupon.priceDiscount,
-                this.listingCurrency,
+                priceObj.currency,
                 this.viewingCurrency
               );
             itemTotal = itemTotal.minus(convertPriceDiscount);
@@ -268,11 +275,6 @@ export default {
         throw new Error('Please provide the prices array');
       }
     },
-
-    updatePrices (prices) {
-      this.prices = prices;
-    },
-
   }
 }
 </script>

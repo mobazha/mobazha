@@ -1,7 +1,7 @@
 <template>
   <div class="shippingOptions">
     <template v-if="ob.validOptions.length">
-      <div class="flexColRows boxList border borderStacked clrP clrBr" :key="ob.metadata.pricingCurrency.code">
+      <div class="flexColRows boxList border borderStacked clrP clrBr" :key="ob.displayCurrency">
         <template v-for="(service, i) in ob.validOptions" :key="service.name">
           <div class="btnRadio width100">
             <input type="radio" @click="onSelectShippingOption(service)" :id="`option${i}`" :checked="isServiceSelected(service)" name="shippingOption">
@@ -53,7 +53,6 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this.model.toJSON(),
         ...this.options,
         displayCurrency: app.settings.get('localCurrency'),
       };

@@ -107,7 +107,7 @@
                       <button
                         :class="`btnHg clrBAttGrad clrBrDec1 clrTOnEmph js-addToCartBtn ${templateOptions.buyNowClass}`"
                         @click="addToCart">
-                        {{ ob.polyT('listingDetail.addToFavorite') }}
+                        {{ ob.polyT('listingDetail.addToCart') }}
                       </button>
 
                       <div class="js-purchaseErrorWrap">
@@ -300,10 +300,10 @@
     <Teleport to="#js-vueModal">
       <NsfwWarning v-if="showNsfwWarning" @canceled="close" @close="onNsfwWarningClose" />
       <Purchase ref="purchaseModal" v-else-if="showPurchase"
-        :options="{ variants: selectedVariants, vendor, phase: 'pay',}"
+        :options="{itemsInfo: [{quantity: '1', variants: selectedVariants}], vendor}"
         :bb="function() {
           return {
-            listing: model,
+            itemsToPurchase,
           };
         }"
         @clickReloadOutdated="onPurchaseReloadOutdated"
@@ -353,6 +353,8 @@ import { getTranslatedCountries } from '../../../../backbone/data/countries';
 // import QuantityDisplay from '../../components/QuantityDisplay';
 import { events as listingEvents } from '../../../../backbone/models/listing';
 import Listings from '../../../../backbone/collections/Listings';
+
+import OrderListings from '../../../../backbone/collections/OrderListings';
 
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 
@@ -470,6 +472,9 @@ export default {
         isCrypto: this.model.isCrypto,
         _: { sortBy: _.sortBy },
       };
+    },
+    itemsToPurchase() {
+      return new OrderListings([this.model]);
     },
     templateOptions () {
       const ob = this.ob;

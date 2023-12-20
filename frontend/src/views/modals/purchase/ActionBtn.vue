@@ -104,7 +104,7 @@ export default {
     },
 
     initPay () {
-      return (this.listing.shippingOptions && this.listing.shippingOptions.length) || this.showOutdatedHashErr;
+      return (this.oneListing.shippingOptions && this.oneListing.shippingOptions.length) || this.showOutdatedHashErr;
     },
 
     errTip () {
@@ -116,7 +116,7 @@ export default {
   },
   methods: {
     loadData () {
-      if (!this.listing || !(this.listing instanceof Listing)) {
+      if (!this.oneListing || !(this.oneListing instanceof Listing)) {
         throw new Error('Please provide a listing model.');
       }
     },

@@ -77,7 +77,6 @@
 <script>
 import app from '../../../../backbone/app';
 import ChatMessage from '../../../../backbone/models/chat/ChatMessage';
-import Listing from '../../../../backbone/models/listing/Listing';
 
 export default {
   props: {
@@ -85,7 +84,6 @@ export default {
       type: Object,
       default: {},
 	  },
-    bb: Function,
   },
   data () {
     return {
@@ -125,10 +123,6 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      if (!this.listing || !(this.listing instanceof Listing)) {
-        throw new Error('Please provide a listing model');
-      }
-
       if (!options.vendor) {
         throw new Error('Please provide a vendor object');
       }

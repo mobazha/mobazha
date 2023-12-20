@@ -1076,6 +1076,7 @@
     "unknownInventory": "Unknown"
   },
   "shoppingCart": {
+    "title": "Shopping Cart",
     "header": {
       "notice": "Notice:",
       "notice1": "1. Purchasing non-physical items from shopping cart is not currently supported yet.",

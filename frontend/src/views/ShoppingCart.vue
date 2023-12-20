@@ -6,7 +6,7 @@
           <div class="page-head">
             <div class="page-head__left">
               <div class="page-head__name">
-                Favorite <span v-if="tableData.length > 0">({{ cartNum }})</span>
+                {{ ob.polyT('shoppingCart.title') }} <span v-if="tableData.length > 0">({{ cartNum }})</span>
               </div>
               <div class="clean-btn" v-if="tableData.length > 0" @click="clearCart">Clear All</div>
             </div>
@@ -22,8 +22,9 @@
               <div class="table-hc">
                 <el-table :header-row-style="headerRowStyle" :data="[]" :height="38">
                   <el-table-column width="48"></el-table-column>
-                  <el-table-column label="Title" width="350"></el-table-column>
-                  <el-table-column label="Type" width="160"></el-table-column>
+                  <el-table-column label="Title" width="200"></el-table-column>
+                  <el-table-column label="Type" width="150"></el-table-column>
+                  <el-table-column label="Variants" width="160"></el-table-column>
                   <el-table-column label="Price"></el-table-column>
                   <el-table-column label="Quantity" width="100"></el-table-column>
                   <el-table-column label="Total"></el-table-column>
@@ -50,8 +51,8 @@
                         </div>
                       </template>
                       <template #default>
-                        <el-table-column type="selection" width="48"> </el-table-column>
-                        <el-table-column width="350">
+                        <el-table-column type="selection" width="48" :selectable="itemSelectable"> </el-table-column>
+                        <el-table-column width="200">
                           <template v-slot="{ row }">
                             <div class="goods">
                               <div class="goods-left">
@@ -75,6 +76,7 @@
                             </div>
                           </template>
                         </el-table-column>
+                        <el-table-column prop="type" width="150"></el-table-column>
                         <el-table-column width="160">
                           <template v-slot="{ row }">
                             <div class="sku">
@@ -131,6 +133,7 @@ import { getCachedProfiles } from '../../backbone/models/profile/Profile';
 import { convertCurrency, formatCurrency, convertAndFormatCurrency } from '../../backbone/utils/currency';
 import Purchase from './modals/purchase/Purchase.vue';
 import Listing from '../../backbone/models/listing/Listing';
+import OrderListings from '../../backbone/collections/OrderListings';
 
 export default {
   components: {
@@ -217,13 +220,20 @@ export default {
               cart.items?.forEach((item) => {
                 let listing = item.listingExt.toJSON();
                 item.listing = listing;
-                item.pricingCurrency = listing.metadata.pricingCurrency;
-                if (listing.item.price && item.pricingCurrency) {
+                item.pricingCurrency = listing.metadata?.pricingCurrency;
+                if (listing.item?.price && item.pricingCurrency) {
                   item.priceAmount = listing.item.price;
                   item.price = convertAndFormatCurrency(item.priceAmount, item.pricingCurrency.code, this.localCurrency);
+
+                  item.type = app.polyglot.t(`formats.${listing.metadata.contractType}`)
+
+                  item.available = true;
                 } else {
                   item.priceAmount = 0;
                   item.price = 0;
+
+                  // failed to fetch item
+                  item.available = false;
                 }
               });
             });
@@ -235,6 +245,10 @@ export default {
       } catch {
         this.loading = false;
       }
+    },
+
+    itemSelectable(row, index) {
+      return row.available && row.listing?.metadata?.contractType === 'PHYSICAL_GOOD';
     },
 
     //删除单个商品
@@ -286,7 +300,27 @@ export default {
     pay(index) {
       this.$store.commit('cart/updateCart', this.tableData[0], { module: 'cart' });
 
-      window.vueApp.launchPurchaseModal();
+      const item = this.tableData[index];
+      const vendor = {
+        peerID: item.vendorID,
+        name: item.profile?.name,
+        handle: item.profile?.handle,
+        avatarHashes:  item.profile?.avatarHashes,
+      };
+
+      const itemsToPurchase = new OrderListings();
+      const purchaseInfo = [];
+
+      const rows = this.selectors[index];
+      rows.forEach((row) => {
+        itemsToPurchase.push(row.listingExt);
+
+        purchaseInfo.push({quantity: row.quantity, variants: row.options});
+      });
+
+      window.vueApp.launchPurchaseModal({itemsInfo: purchaseInfo, vendor}, () => {
+        return {itemsToPurchase};
+      });
     },
 
     //修改头部样式

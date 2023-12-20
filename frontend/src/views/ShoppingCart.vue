@@ -49,7 +49,7 @@
                         </div>
                       </template>
                       <template #default>
-                        <el-table-column type="selection" width="48"> </el-table-column>
+                        <el-table-column type="selection" width="48" :selectable="itemSelectable"> </el-table-column>
                         <el-table-column width="200">
                           <template v-slot="{ row }">
                             <div class="goods">
@@ -219,15 +219,21 @@ export default {
               cart.items?.forEach((item) => {
                 let listing = item.listingExt.toJSON();
                 item.listing = listing;
-                item.pricingCurrency = listing.metadata.pricingCurrency;
-                if (listing.item.price && item.pricingCurrency) {
+                item.pricingCurrency = listing.metadata?.pricingCurrency;
+                if (listing.item?.price && item.pricingCurrency) {
                   item.priceAmount = listing.item.price;
                   item.price = convertAndFormatCurrency(item.priceAmount, item.pricingCurrency.code, this.localCurrency);
+
+                  item.type = app.polyglot.t(`formats.${listing.metadata.contractType}`)
+
+                  item.available = true;
                 } else {
                   item.priceAmount = 0;
                   item.price = 0;
+
+                  // failed to fetch item
+                  item.available = false;
                 }
-                item.type = app.polyglot.t(`formats.${listing.metadata.contractType}`)
               });
             });
 
@@ -238,6 +244,10 @@ export default {
       } catch {
         this.loading = false;
       }
+    },
+
+    itemSelectable(row, index) {
+      return row.available && row.listing?.metadata?.contractType === 'PHYSICAL_GOOD';
     },
 
     //删除单个商品

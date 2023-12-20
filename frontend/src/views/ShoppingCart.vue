@@ -15,11 +15,9 @@
             </div> -->
           </div>
           <div class="page-body" v-loading="loading">
-            <div>
-              <p>{{ ob.polyT('shoppingCart.header.notice') }}</p>
-              <p>{{ ob.polyT('shoppingCart.header.notice1') }}</p>
-              <p>{{ ob.polyT('shoppingCart.header.notice2') }}</p>
-            </div>
+            <el-alert class="notice" :title="ob.polyT('shoppingCart.header.notice')" type="info" :closable="false">
+              <template #default> {{ ob.polyT('shoppingCart.header.notice1') }}<br />{{ ob.polyT('shoppingCart.header.notice2') }} </template>
+            </el-alert>
             <template v-if="tableData.length > 0">
               <div class="table-hc">
                 <el-table :header-row-style="headerRowStyle" :data="[]" :height="38">
@@ -34,7 +32,11 @@
               </div>
               <div class="card">
                 <div class="card-item" v-for="(item, index) in tableData" :key="index">
-                  <el-table ref="table" :header-cell-style="headerCellStyle" class="table-hearder-one" :data="item.items"
+                  <el-table
+                    ref="table"
+                    :header-cell-style="headerCellStyle"
+                    class="table-hearder-one"
+                    :data="item.items"
                     @selection-change="handleSelectionChange($event, index)"
                   >
                     <el-table-column>
@@ -163,8 +165,7 @@ export default {
 
     //每个商品总价
     countRowPrice() {
-      return (row) =>
-        row.priceAmount ? convertAndFormatCurrency(row.priceAmount * row.quantity, row.pricingCurrency?.code, this.localCurrency) : 0;
+      return (row) => (row.priceAmount ? convertAndFormatCurrency(row.priceAmount * row.quantity, row.pricingCurrency?.code, this.localCurrency) : 0);
     },
 
     //每个商店商品总价
@@ -245,15 +246,18 @@ export default {
         callback: (action) => {
           if (action === 'confirm') {
             //this.tableData.splice(index, 1)为展示效果，调用删除接口，再刷新
-            api.removeCartItem(row.vendorID, {
-              slug: row.listing?.slug,
-              options: row.options,
-            }).then(() => {
-              ElMessage({ type: 'success', message: app.polyglot.t('shoppingCart.deleteConfirm.tip', {item: row.listing?.item.title}) });
-              this.loadData();
-            }).fail((jqXHR) => {
-              ElMessage({ type: 'error', message: jqXHR?.responseJSON?.reason });
-            })
+            api
+              .removeCartItem(row.vendorID, {
+                slug: row.listing?.slug,
+                options: row.options,
+              })
+              .then(() => {
+                ElMessage({ type: 'success', message: app.polyglot.t('shoppingCart.deleteConfirm.tip', { item: row.listing?.item.title }) });
+                this.loadData();
+              })
+              .fail((jqXHR) => {
+                ElMessage({ type: 'error', message: jqXHR?.responseJSON?.reason });
+              });
           }
         },
       });
@@ -327,13 +331,18 @@ export default {
     }
   }
 }
-
+.notice {
+  margin-bottom: 10px;
+}
 .card {
+  overflow-y: auto;
+  height: calc(100vh - 290px);
+  box-sizing: border-box;
+  padding-bottom: 20px;
   &-item {
     padding: 0 20px 20px 20px;
     border: 1px solid #e0e0e0;
     background: #fff;
-
     &:not(:last-child) {
       margin-bottom: 20px;
     }

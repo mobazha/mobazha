@@ -576,6 +576,7 @@ export default {
         const sku = listing.get('item').get('skus').find((v) => _.isEqual(v.get('selections'), selections));
 
         return {
+          title: listing.get('item').get('title'),
           price: bigNumber(listing.price.amount),
           sPrice: bigNumber(sOptService ? sOptService.get('firstFreight') || 0 : 0),
           vPrice: bigNumber(sku ? sku.get('surcharge') || 0 : 0),
@@ -716,7 +717,7 @@ export default {
 
       this.showModerators = this.moderatorIDs.length > 0;
 
-      this.couponObj = [];
+      this.couponObj = new Array(this.itemsToPurchase.length).fill([]);
 
       this.order = new Order(
         {},
@@ -946,7 +947,7 @@ export default {
       const filteredCoupons = this.itemsToPurchase.at(idx).get('coupons').filter(
         (coupon) => hashesAndCodes.indexOf(coupon.get('hash') || coupon.get('discountCode')) !== -1,
       );
-      this.couponObj = filteredCoupons.map((coupon) => coupon.toJSON());
+      this.couponObj[idx] = filteredCoupons.map((coupon) => coupon.toJSON());
 
       this.order.get('items').at(idx).set('coupons', codes);
     },

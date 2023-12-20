@@ -6,7 +6,7 @@
     <template v-for="(priceObj, i) in updatedPrice" :key="i">
       <div class="flexRow gutterHSm">
         <span class="flexExpand">
-          <div v-if="!ob.isCrypto" v-html="ob.polyT('purchase.receipt.listing')" />
+          <div v-if="!ob.isCrypto" v-html="`${priceObj.title} x ${ob.number.toStandardNotation(priceObj.quantity)}`" />
           <template v-else>
             <CryptoTradingPair :options="ob.crypto.tradingPairOptions({
               className: 'cryptoTradingPairSm cryptoTradingPair',
@@ -31,7 +31,7 @@
           </div>
         </div>
       </div>
-      <template v-for="(coupon, j) in options.coupons" :key="j">
+      <template v-for="(coupon, j) in options.coupons[i]" :key="j">
         <div class="flexRow gutterHSm">
           <span class="flexExpand">
             {{ ob.polyT('purchase.receipt.coupon') }}
@@ -48,71 +48,58 @@
         </div>
       </template>
 
-      <template v-if="ob.listing.shippingOptions && ob.listing.shippingOptions.length">
+      <hr class="clrBr">
+
+      <template v-if="!ob.isCrypto">
         <div class="flexRow gutterHSm">
           <span class="flexExpand">
-            {{ ob.polyT('purchase.receipt.shipping') }}
+            {{ ob.polyT('purchase.receipt.subtotal') }}
           </span>
           <div class="constrainedWidth">
             <div class="flexHRight">
               <b>
-                {{ priceObj.shippingTotal ? priceObj.shippingTotal : 0 }}
+                {{ priceObj.subTotal ? ob.currencyMod.formatCurrency(priceObj.subTotal, viewingCurrency) : 0 }}
               </b>
             </div>
           </div>
         </div>
       </template>
-      <hr class="clrBr">
-      <template v-if="priceObj.quantity && priceObj.quantity.gt(0)">
-        <template v-if="!ob.isCrypto">
-          <div class="flexRow gutterHSm">
-            <span class="flexExpand">
-              {{ ob.polyT('purchase.receipt.subtotal', { quantity: ob.number.toStandardNotation(priceObj.quantity) }) }}
-            </span>
-            <div class="constrainedWidth">
-              <div class="flexHRight">
-                <b>
-                  {{ priceObj.subTotal ? ob.currencyMod.formatCurrency(priceObj.subTotal, viewingCurrency) : 0 }}
-                </b>
-              </div>
-            </div>
-          </div>
-        </template>
-        <template v-if="ob.listing.shippingOptions && ob.listing.shippingOptions.length && priceObj.shippingTotal">
-          <div class="flexRow gutterHSm">
-            <span class="flexExpand">
-              {{ ob.polyT('purchase.receipt.shippingTotal') }}
-            </span>
-            <div class="constrainedWidth">
-              <div class="flexHRight">
-                <b>
-                  {{ priceObj.shippingTotal }}
-                </b>
-              </div>
-            </div>
-          </div>
-        </template>
-      </template>
-      <div class="flexRow">
+
+      <br/>
+
+    </template>
+
+    <hr class="clrBr">
+
+    <template v-if="ob.listing.shippingOptions && ob.listing.shippingOptions.length && shippingTotal">
+      <div class="flexRow gutterHSm">
         <span class="flexExpand">
-          {{ ob.polyT('purchase.receipt.total') }}
-          <span class="toolTip clrTAlert" :data-tip="totalTip" v-show="showTotalTip"><span
-              class="ion-alert-circled padSm"></span></span>
+          {{ ob.polyT('purchase.receipt.shippingTotal') }}
         </span>
         <div class="constrainedWidth">
           <div class="flexHRight">
             <b>
-              {{ priceObj.subTotal
-              ? ob.currencyMod.formatCurrency(
-                priceObj.subTotal.plus(ob.currencyMod.convertCurrency(priceObj.shippingPrice.price ?? 0, priceObj.shippingPrice.currency ?? viewingCurrency, viewingCurrency)),
-                viewingCurrency
-              )
-              : '' }}
+              {{ shippingTotal }}
             </b>
           </div>
         </div>
       </div>
     </template>
+
+    <div class="flexRow">
+      <span class="flexExpand">
+        {{ ob.polyT('purchase.receipt.total') }}
+        <span class="toolTip clrTAlert" :data-tip="totalTip" v-show="showTotalTip"><span
+            class="ion-alert-circled padSm"></span></span>
+      </span>
+      <div class="constrainedWidth">
+        <div class="flexHRight">
+          <b>
+            {{ ob.currencyMod.formatCurrency(totalPrice, viewingCurrency) }}
+          </b>
+        </div>
+      </div>
+    </div>
 
   </div>
 </template>
@@ -198,13 +185,28 @@ export default {
 
       return totalTip;
     },
+
+    shippingTotal() {
+      const shippingPrice = this.options.totalShippingPrice;
+
+      return convertAndFormatCurrency(shippingPrice.price ?? 0, shippingPrice.currency ?? this.viewingCurrency, this.viewingCurrency);
+    },
+
+    totalPrice() {
+      const shippingPrice = this.options.totalShippingPrice;
+      const shippingTotal = convertCurrency(shippingPrice.price ?? 0, shippingPrice.currency ?? this.viewingCurrency, this.viewingCurrency);
+
+      let total = shippingTotal;
+      this.updatedPrice.forEach(priceObj => total = total.plus(priceObj.subTotal));
+
+      return total;
+    },
+    
     updatedPrice() {
       const updatedPrice = this.options.prices;
       updatedPrice.forEach((priceObj, i) => {
         // convert the prices here, to prevent rounding errors in the display
         const basePrice = convertCurrency(priceObj.price, priceObj.currency, this.viewingCurrency);
-
-        priceObj.shippingPrice = this.options.totalShippingPrice;
 
         const surcharge = convertCurrency(priceObj.vPrice, priceObj.currency, this.viewingCurrency);
 
@@ -217,7 +219,7 @@ export default {
 
         let itemTotal = basePrice.plus(surcharge);
         priceObj.preCouponPrice = itemTotal;
-        this.options.coupons.forEach((coupon) => {
+        this.options.coupons[i].forEach((coupon) => {
           if (coupon.percentDiscount) {
             itemTotal = itemTotal.minus(
               itemTotal.times(0.01).times(coupon.percentDiscount)
@@ -233,7 +235,6 @@ export default {
           }
         });
         priceObj.subTotal = itemTotal.times(priceObj.quantity);
-        priceObj.shippingTotal = convertAndFormatCurrency(priceObj.shippingPrice.price ?? 0, priceObj.shippingPrice.currency ?? this.viewingCurrency, this.viewingCurrency);
 
         let quantity =
           priceObj.quantity &&

@@ -21,6 +21,7 @@
 </template>
 
 <script>
+import bigNumber from 'bignumber.js';
 import app from '../../../../backbone/app';
 import { NoExchangeRateDataError } from '../../../../backbone/utils/currency';
 
@@ -34,8 +35,6 @@ export default {
         name: '',
         balance: undefined,
         clientSupported: false,
-
-        displayCur: (app && app.settings && app.settings.get('localCurrency')) || 'USD',
       },
     },
   },
@@ -58,9 +57,11 @@ export default {
       return (app && app.settings && app.settings.get('localCurrency')) || 'USD';
     },
     formattedBalance() {
+      const ob = this.ob;
+
       let convertedCurrency;
       try {
-        convertedCurrency = this.ob.currencyMod.convertCurrency(this.ob.balance, this.mnCode, this.ob.displayCur);
+        convertedCurrency = ob.currencyMod.convertCurrency(ob.balance, this.mnCode, this.displayCur);
       } catch (e) {
         if (e instanceof NoExchangeRateDataError) {
           // pass - we'll just show the unconverted amount if the exchange rate data isn't
@@ -70,18 +71,19 @@ export default {
 
       let formattedBalance = '';
 
-      if (typeof this.ob.balance === 'number') {
-        formattedBalance =
-          convertedCurrency === undefined
-            ? this.ob.currencyMod.formatCurrency(this.ob.balance, this.mnCode, { maxDisplayDecimals: 4 })
-            : this.ob.currencyMod.formatCurrency(convertedCurrency, this.ob.displayCur, {
-                maxDisplayDecimals: ob.currencyMod.isFiatCur(this.ob.displayCur) ? 2 : 4,
+      if (typeof ob.balance === 'number' || ob.balance instanceof bigNumber) {
+        formattedBalance = convertedCurrency === undefined
+            ? ob.currencyMod.formatCurrency(ob.balance, this.mnCode, { maxDisplayDecimals: 4 })
+            : ob.currencyMod.formatCurrency(convertedCurrency, this.displayCur, {
+                maxDisplayDecimals: ob.currencyMod.isFiatCur(this.displayCur) ? 2 : 4,
               });
       }
       return formattedBalance;
     },
     mnCode() {
-      return this.ob.code && this.ob.crypto.ensureMainnetCode(this.ob.code);
+      const ob = this.ob;
+
+      return ob.code && ob.crypto.ensureMainnetCode(ob.code);
     },
   },
   methods: {

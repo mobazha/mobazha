@@ -5,11 +5,11 @@
         <div ref="popInMessages" class="popInMessageHolder js-popInMessages"></div>
 
         <div class="topControls gutterHSm flex">
-          <template v-if="ob.vendor">
+          <template v-if="vendor">
             <div class="contentBox clrP clrSh3 clrBr clrT">
               <div class="padSm gutterHSm overflowAuto margRSm flexVCent">
-                <a class="clrBr2 clrSh1 discTn flexNoShrink" :style="ob.getAvatarBgImage(ob.vendor.avatarHashes)"></a>
-                <p class="txUnl tx3 clamp">{{ ob.vendor.name }}</p>
+                <a class="clrBr2 clrSh1 discTn flexNoShrink" :style="ob.getAvatarBgImage(vendor.avatarHashes)"></a>
+                <p class="txUnl tx3 clamp">{{ vendor.name }}</p>
                 <a class="link flexNoShrink tx6" @click="clickGoToListing">{{ origin === 'ShoppingCart' ? ob.polyT('purchase.returnToCart') : ob.polyT('purchase.returnToListing') }}</a>
               </div>
             </div>
@@ -530,11 +530,7 @@ export default {
         ...this.order.toJSON(),
         ...this._state,
         listings: this.itemsToPurchase.toJSON(),
-        listingPrice: this.oneListing.price,
-        itemConstraints: this.order.get('items')
-          .at(0)
-          .constraints,
-        vendor: this.vendor,
+        itemConstraints: this.order.get('items').at(0).constraints,
         quantity: uiQuantity,
         isCrypto: this.oneListing.isCrypto,
         phaseClass: `phase${capitalize(this._state.phase)}`,
@@ -606,12 +602,6 @@ export default {
       const sService = shipping.get('service');
 
       return this.getTotalShippingPrice(sName, sService);
-    },
-
-    itemConstraints () {
-      return this.order.get('items')
-            .at(0)
-            .constraints;
     },
 
     currencies () {
@@ -707,9 +697,6 @@ export default {
 
       this.oneListing = this.itemsToPurchase.at(0);
 
-      // this.oneListing = opts.listing;
-      // this.variants = opts.variants;
-      // this.vendor = opts.vendor;
       this.shippingOptions = this.oneListing.get('shippingOptions');
       const moderatorIDs = this.oneListing.get('moderators') || [];
       const disallowedIDs = [app.profile.id, this.vendor.peerID];

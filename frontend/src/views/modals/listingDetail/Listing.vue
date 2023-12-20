@@ -107,7 +107,7 @@
                       <button
                         :class="`btnHg clrBAttGrad clrBrDec1 clrTOnEmph js-addToCartBtn ${templateOptions.buyNowClass}`"
                         @click="addToCart">
-                        {{ ob.polyT('listingDetail.addToFavorite') }}
+                        {{ ob.polyT('listingDetail.addToCart') }}
                       </button>
 
                       <div class="js-purchaseErrorWrap">

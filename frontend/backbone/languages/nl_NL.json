@@ -1449,6 +1449,7 @@
   "purchase": {
     "purchaseDataChangedPopin": "De informatie van dit artikel is gewijzigd.",
     "returnToListing": "Terug naar artikel.",
+    "returnToCart": "Return To Cart",
     "optional": "optioneel",
     "shippingTitle": "Verzending",
     "cryptoCurrencyTitle": "Valuta",

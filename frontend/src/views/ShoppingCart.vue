@@ -318,7 +318,7 @@ export default {
         purchaseInfo.push({quantity: row.quantity, variants: row.options});
       });
 
-      window.vueApp.launchPurchaseModal({itemsInfo: purchaseInfo, vendor}, () => {
+      window.vueApp.launchPurchaseModal({itemsInfo: purchaseInfo, vendor, origin: 'ShoppingCart'}, () => {
         return {itemsToPurchase};
       });
     },

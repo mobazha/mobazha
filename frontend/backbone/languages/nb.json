@@ -1449,6 +1449,7 @@
   "purchase": {
     "purchaseDataChangedPopin": "Data for denne oppføringen er blitt endret.",
     "returnToListing": "Tilbake til oppføring",
+    "returnToCart": "Return To Cart",
     "optional": "valgfri",
     "shippingTitle": "Frakt",
     "cryptoCurrencyTitle": "Valuta",

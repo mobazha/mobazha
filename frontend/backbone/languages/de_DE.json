@@ -1449,6 +1449,7 @@
   "purchase": {
     "purchaseDataChangedPopin": "Die Artikeldaten wurden geändert.",
     "returnToListing": "Zurück zum Artikel",
+    "returnToCart": "Return To Cart",
     "optional": "optional",
     "shippingTitle": "Versand",
     "cryptoCurrencyTitle": "Währung",

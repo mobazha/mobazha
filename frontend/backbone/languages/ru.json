@@ -1449,6 +1449,7 @@
   "purchase": {
     "purchaseDataChangedPopin": "The data for this listing has changed.",
     "returnToListing": "Вернуться к товару",
+    "returnToCart": "Return To Cart",
     "optional": "необязательно",
     "shippingTitle": "Доставка",
     "cryptoCurrencyTitle": "Валюта",

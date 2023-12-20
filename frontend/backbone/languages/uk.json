@@ -1449,6 +1449,7 @@
   "purchase": {
     "purchaseDataChangedPopin": "Дані товару було оновлено.",
     "returnToListing": "Повернутися до товару",
+    "returnToCart": "Return To Cart",
     "optional": "опціонально",
     "shippingTitle": "Доставка",
     "cryptoCurrencyTitle": "Валюта",

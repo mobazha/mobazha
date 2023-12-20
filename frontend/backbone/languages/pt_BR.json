@@ -1449,6 +1449,7 @@
   "purchase": {
     "purchaseDataChangedPopin": "Os dados deste anúncio foram modificados.",
     "returnToListing": "Voltar ao anúncio",
+    "returnToCart": "Return To Cart",
     "optional": "opcional",
     "shippingTitle": "Frete",
     "cryptoCurrencyTitle": "Moeda",

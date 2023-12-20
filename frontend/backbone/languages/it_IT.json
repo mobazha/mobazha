@@ -1449,6 +1449,7 @@
   "purchase": {
     "purchaseDataChangedPopin": "I dati di questo annuncio sono cambiati.",
     "returnToListing": "Ritorna agli annunci",
+    "returnToCart": "Return To Cart",
     "optional": "opzionale",
     "shippingTitle": "Spedizione",
     "cryptoCurrencyTitle": "Valuta",

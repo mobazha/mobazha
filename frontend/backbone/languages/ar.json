@@ -1451,6 +1451,7 @@
   "purchase": {
     "purchaseDataChangedPopin": "تم تغيير بيانات هذه القائمة.",
     "returnToListing": "العودة إلى القائمة",
+    "returnToCart": "Return To Cart",
     "optional": "اختياري",
     "shippingTitle": "الشحن",
     "cryptoCurrencyTitle": "العملة",

@@ -1449,6 +1449,7 @@
   "purchase": {
     "purchaseDataChangedPopin": "此商品信息的数据已更改。",
     "returnToListing": "返回商品信息",
+    "returnToCart": "Return To Cart",
     "optional": "可选",
     "shippingTitle": "快递",
     "cryptoCurrencyTitle": "货币",

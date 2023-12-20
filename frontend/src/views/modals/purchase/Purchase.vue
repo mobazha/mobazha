@@ -10,7 +10,7 @@
               <div class="padSm gutterHSm overflowAuto margRSm flexVCent">
                 <a class="clrBr2 clrSh1 discTn flexNoShrink" :style="ob.getAvatarBgImage(ob.vendor.avatarHashes)"></a>
                 <p class="txUnl tx3 clamp">{{ ob.vendor.name }}</p>
-                <a class="link flexNoShrink tx6" @click="clickGoToListing">{{ ob.polyT('purchase.returnToListing') }}</a>
+                <a class="link flexNoShrink tx6" @click="clickGoToListing">{{ origin === 'ShoppingCart' ? ob.polyT('purchase.returnToCart') : ob.polyT('purchase.returnToListing') }}</a>
               </div>
             </div>
           </template>
@@ -851,6 +851,13 @@ export default {
     },
 
     clickGoToListing() {
+      if (this.origin === 'ShoppingCart') {
+        this.close();
+
+        window.vueApp.launchModal('ShoppingCart');
+
+        return;
+      }
       this.goToListing();
     },
 

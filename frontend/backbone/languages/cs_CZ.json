@@ -1449,6 +1449,7 @@
   "purchase": {
     "purchaseDataChangedPopin": "Data pro tento záznam se změnila.",
     "returnToListing": "Vrátit se na záznam",
+    "returnToCart": "Return To Cart",
     "optional": "volitelné",
     "shippingTitle": "Doprava",
     "cryptoCurrencyTitle": "Měna",

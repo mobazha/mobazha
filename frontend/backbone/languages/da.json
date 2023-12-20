@@ -1449,6 +1449,7 @@
   "purchase": {
     "purchaseDataChangedPopin": "The data for this listing has changed.",
     "returnToListing": "Tilbage til listning",
+    "returnToCart": "Return To Cart",
     "optional": "valgfri",
     "shippingTitle": "Forsendelse",
     "cryptoCurrencyTitle": "Valuta",

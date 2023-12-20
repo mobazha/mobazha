@@ -28,7 +28,7 @@
                     />
                   </ul>
                 </div>
-                <div class="js-cryptoListingsTeaser border clrP clrBr clrSh3">
+                <div v-if="false" class="js-cryptoListingsTeaser border clrP clrBr clrSh3">
                   <CryptoListingsTeaser
                     :viewCryptoListingsUrl="viewCryptoListingsUrl"
                     @createListing="onClickCreateListing"

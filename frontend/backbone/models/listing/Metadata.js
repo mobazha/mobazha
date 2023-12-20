@@ -24,7 +24,8 @@ export default class extends BaseModel {
       'PHYSICAL_GOOD',
       'DIGITAL_GOOD',
       'SERVICE',
-      'CRYPTOCURRENCY',
+      // 2023.12.20, temporarily disable CRYPTOCURRENCY, check if there is some request in future
+      // 'CRYPTOCURRENCY',
     ];
   }
 

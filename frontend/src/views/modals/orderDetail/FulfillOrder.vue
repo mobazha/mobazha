@@ -221,7 +221,7 @@ export default {
         formData.digitalDelivery = this.formData.digitalDelivery;
       } else if (this.contractType === 'CRYPTOCURRENCY') {
         formData.cryptocurrencyDelivery = this.formData.cryptocurrencyDelivery;
-      } else if (this.contractType === 'PHYSICAL_GOOD' && !context.isLocalPickup) {
+      } else if (this.contractType === 'PHYSICAL_GOOD' && !this.isLocalPickup) {
         formData.physicalDelivery = this.formData.physicalDelivery;
       }
 

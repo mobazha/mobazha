@@ -20,8 +20,7 @@
               @click="onClickCompleteOrder" />
             <div class="gutterHSm">
               <FormError v-if="ob.errors.anonymous" :errors="ob.errors.anonymous" />
-              <input type="checkbox" name="anonymous" id="completeOrderAnon" class="centerLabel" data-var-type="boolean"
-                :checked="!rating.anonymous">
+              <input type="checkbox" v-model="formData.nonAnonymous" id="completeOrderAnon" class="centerLabel" data-var-type="boolean">
               <label for="completeOrderAnon" class="clrT2 tx5b">{{ ob.polyT('orderDetail.summaryTab.completeOrderForm.anonCheckLabel') }}</label>
             </div>
           </div>
@@ -90,6 +89,7 @@ export default {
 
       formData: {
         review: '',
+        nonAnonymous: true,
       },
       // If a rating is not set, the RatingStrip view will return 0. We'll
       // send undefined in that case since it gives us the error message we
@@ -180,7 +180,7 @@ export default {
     onClickCompleteOrder () {
       const data = {
         ...this.formData,
-        anonymous: !formData.anonymous,
+        anonymous: !this.formData.nonAnonymous,
         ...this.ratingData,
         slug: this.slug,
       };

@@ -7,8 +7,9 @@ import app from '../app';
 // feeBumpTransactionSize setting.
 
 const isValidETHAddress = (address) => {
-  const regex = new RegExp('^0x[0-9a-fA-F]{40}$');
-  return regex.test(address);
+  const regex1 = new RegExp('^0x[0-9a-fA-F]{40}$');
+  const regex2 = new RegExp('^0x[0-9a-fA-F]{64}$'); // for contract payment address
+  return regex1.test(address) || regex2.test(address);
 };
 
 let _currencies = [

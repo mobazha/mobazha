@@ -70,7 +70,7 @@ export default {
       // CSS and hover all the previos icons on hover, the icons are
       // displayed in reverse order via flex-direction. This requires index
       // calculations to be computed from the end.
-      this.$emit('update:rating', this.maxRating - val);
+      this.$emit('update:rating', this.ob.maxRating - val + 1);
     },
   }
 }

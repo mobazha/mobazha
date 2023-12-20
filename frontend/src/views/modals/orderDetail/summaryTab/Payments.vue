@@ -169,19 +169,19 @@ export default {
 
     onCancelingOrder(e) {
       if (e.id === this.orderID) {
-        setLastPaymentState({ cancelInProgress: true });
+        this.setLastPaymentState({ cancelInProgress: true });
       }
     },
 
     onCancelOrderAlways(e) {
       if (e.id === this.orderID) {
-        setLastPaymentState({ cancelInProgress: false });
+        this.setLastPaymentState({ cancelInProgress: false });
       }
     },
 
     onCancelOrderComplete(e) {
       if (e.id === this.orderID) {
-        setLastPaymentState({ showCancelButton: false });
+        this.setLastPaymentState({ showCancelButton: false });
       }
     },
 
@@ -191,19 +191,19 @@ export default {
 
     onAcceptingOrder(e) {
       if (e.id === this.orderID) {
-        setLastPaymentState({ acceptInProgress: true });
+        this.setLastPaymentState({ acceptInProgress: true });
       }
     },
 
     onAcceptOrderAlways(e) {
       if (e.id === this.orderID) {
-        setLastPaymentState({ acceptInProgress: false });
+        this.setLastPaymentState({ acceptInProgress: false });
       }
     },
 
     onAcceptOrderComplete(e) {
       if (e.id === this.orderID) {
-        setLastPaymentState({ showAcceptButton: false });
+        this.setLastPaymentState({ showAcceptButton: false });
       }
     },
 
@@ -213,19 +213,19 @@ export default {
 
     onRejectingOrder(e) {
       if (e.id === this.orderID) {
-        setLastPaymentState({ rejectInProgress: true });
+        this.setLastPaymentState({ rejectInProgress: true });
       }
     },
 
     onRejectOrderAlways(e) {
       if (e.id === this.orderID) {
-        setLastPaymentState({ rejectInProgress: false });
+        this.setLastPaymentState({ rejectInProgress: false });
       }
     },
 
     onRejectOrderComplete(e) {
       if (e.id === this.orderID) {
-        setLastPaymentState({ showRejectButton: false });
+        this.setLastPaymentState({ showRejectButton: false });
       }
     },
 

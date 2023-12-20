@@ -67,7 +67,7 @@
                       <div class="pad flexNoShrink"><b>{{ ob.currencyMod.convertAndFormatCurrency(totalPrice(idx), pricingCurrency(idx), displayCurrency) }}</b></div>
                     </div>
                     <div class="col6">
-                      <template v-if="hasCoupons(listing)">
+                      <template v-if="hasCoupons(listing) && ob.phase === 'pay'">
                         <div class="rowTn">
                           <label for="couponCode" class="tx5">{{ ob.polyT('purchase.couponCode') }}</label>
                         </div>
@@ -723,7 +723,7 @@ export default {
         const item = new Item(
           {
             listingHash: listing.get('hash'),
-            quantity: this.itemsInfo[i].quantity || bigNumber('1'),
+            quantity: this.itemsInfo[i].quantity ? bigNumber(this.itemsInfo[i].quantity) : bigNumber('1'),
             options: this.itemsInfo[i].variants || [], // Need update to the selected listing variants for each listing
           },
           {
@@ -901,7 +901,7 @@ export default {
 
       this.quantityKeyUpTimer = setTimeout(() => {
         let { quantity } = this.formData.itemsData[idx];
-        if (!_.isEmpty(quantity)) {
+        if (quantity != null) {
           quantity = bigNumber(quantity);
         }
         if (this.oneListing.isCrypto) this._cryptoQuantity = quantity;

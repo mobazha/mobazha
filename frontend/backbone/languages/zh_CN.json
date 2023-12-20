@@ -988,6 +988,7 @@
     },
     "sendBtn": "发送",
     "receiveBtn": "接收",
+    "externalBtn": "External",
     "sendMoney": {
       "toLabel": "转账到",
       "toPlaceholder": "输入%{cur}地址",
@@ -1001,6 +1002,13 @@
     },
     "receiveMoney": {
       "title": "扫描或发送货币到该地址"
+    },
+    "external": {
+      "description": "You could provide an external wallet address to receive %{coin} for order payment",
+      "addAddress": "Add External Wallet Address",
+      "notice": "* The address must be in Polygon network.",
+      "enableLabel": "Enable this external wallet address for order payment reception",
+      "add": "Add"
     },
     "spendConfirmBox": {
       "heading": "你确定吗？",

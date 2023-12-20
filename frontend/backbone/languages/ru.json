@@ -988,6 +988,7 @@
     },
     "sendBtn": "Отправить",
     "receiveBtn": "Получить",
+    "externalBtn": "External",
     "sendMoney": {
       "toLabel": "Для",
       "toPlaceholder": "Enter a %{cur} Address",
@@ -1001,6 +1002,13 @@
     },
     "receiveMoney": {
       "title": "Сканировать или отправить монеты по адресу"
+    },
+    "external": {
+      "description": "You could provide an external wallet address to receive %{coin} for order payment",
+      "addAddress": "Add External Wallet Address",
+      "notice": "* The address must be in Polygon network.",
+      "enableLabel": "Enable this external wallet address for order payment reception",
+      "add": "Add"
     },
     "spendConfirmBox": {
       "heading": "Вы уверены?",

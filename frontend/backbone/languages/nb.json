@@ -988,6 +988,7 @@
     },
     "sendBtn": "Send",
     "receiveBtn": "Receive",
+    "externalBtn": "External",
     "sendMoney": {
       "toLabel": "Til",
       "toPlaceholder": "Skriv inn en %{cur} Adresse",
@@ -1001,6 +1002,13 @@
     },
     "receiveMoney": {
       "title": "Scan or send coins to this address"
+    },
+    "external": {
+      "description": "You could provide an external wallet address to receive %{coin} for order payment",
+      "addAddress": "Add External Wallet Address",
+      "notice": "* The address must be in Polygon network.",
+      "enableLabel": "Enable this external wallet address for order payment reception",
+      "add": "Add"
     },
     "spendConfirmBox": {
       "heading": "Er du sikker?",

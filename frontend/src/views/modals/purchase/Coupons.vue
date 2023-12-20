@@ -108,7 +108,7 @@ export default {
             this.totalDiscount = this.totalDiscount.plus(discount);
             this.couponCodes.push(code);
             this.couponHashes.push(hashedCode);
-            this.$emit('changeCoupons', this.couponHashes, this.couponCodes);
+            this.$emit('changeCoupons', { hashes: this.couponHashes, codes: this.couponCodes });
           } else {
             this.codeResult = { type: 'excessive', code };
           }
@@ -120,13 +120,13 @@ export default {
     },
 
     findCoupon (hashedCode, code) {
-      return this.coupons.findWhere({ hash: hashedCode }) ||
-        this.coupons.findWhere({ discountCode: code });
+      return this.coupons.find(item => item.hash === hashedCode) ||
+        this.coupons.find(item => item.discountCode === code);
     },
 
     couponDiscount (coupon) {
-      const percDis = coupon && coupon.get('percentDiscount') || 0;
-      const pricDis = coupon && coupon.get('priceDiscount') || 0;
+      const percDis = coupon && coupon.percentDiscount || 0;
+      const pricDis = coupon && coupon.priceDiscount || 0;
       return (this.listingPrice.times(percDis * 0.01).plus(pricDis));
     },
 
@@ -138,7 +138,7 @@ export default {
         this.totalDiscount.minus(
           this.couponDiscount(this.findCoupon('', code))
         );
-      this.$emit('changeCoupons', this.couponHashes, this.couponCodes);
+      this.$emit('changeCoupons', { hashes: this.couponHashes, codes: this.couponCodes });
       this.codeResult = { type: 'valid', code };
     },
   }

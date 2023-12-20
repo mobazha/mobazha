@@ -66,6 +66,35 @@
                       </template>
                       <div class="pad flexNoShrink"><b>{{ ob.currencyMod.convertAndFormatCurrency(totalPrice(idx), pricingCurrency(idx), displayCurrency) }}</b></div>
                     </div>
+                    <div class="col6">
+                      <template v-if="hasCoupons(listing)">
+                        <div class="rowTn">
+                          <label for="couponCode" class="tx5">{{ ob.polyT('purchase.couponCode') }}</label>
+                        </div>
+                        <div class="flex gutterH row">
+                          <input
+                            class="btnHeight clrBr clrP"
+                            type="text"
+                            id="couponCode"
+                            @keyup.enter="applyCoupon(idx)"
+                            v-model="formData.itemsData[idx].couponCode"
+                            :placeholder="ob.polyT('purchase.couponCodePlaceholder')">
+                          <button class="btn clrP clrBr clrSh2 flexNoShrink" @click="applyCoupon(idx)">
+                            {{ ob.polyT('purchase.applyCode') }}
+                          </button>
+                        </div>
+                        <div class="js-couponsWrapper">
+                          <Coupons
+                            ref="coupons"
+                            :options="{
+                              coupons: listing.coupons,
+                              listingPrice: this.prices[idx].price,
+                            }"
+                            @changeCoupons="changeCoupons(idx, $event)"/>
+                          <!-- // coupons are inserted here after they are added by the user. -->
+                        </div>
+                      </template>
+                    </div>
                   </template>
 
                   <template v-else>
@@ -258,35 +287,6 @@
                       <span class="txSm clrT2">{{ ob.polyT('purchase.emailNote') }}</span>
                     </div>
                   </div>
-                  <div class="col6">
-                    <template v-if="ob.hasCoupons">
-                      <div class="rowTn">
-                        <label for="couponCode" class="tx5">{{ ob.polyT('purchase.couponCode') }}</label>
-                      </div>
-                      <div class="flex gutterH row">
-                        <input
-                          class="btnHeight clrBr clrP"
-                          type="text"
-                          id="couponCode"
-                          @keyup.enter="applyCoupon"
-                          v-model="formData.couponCode"
-                          :placeholder="ob.polyT('purchase.couponCodePlaceholder')">
-                        <button class="btn clrP clrBr clrSh2 flexNoShrink" @click="applyCoupon">
-                          {{ ob.polyT('purchase.applyCode') }}
-                        </button>
-                      </div>
-                      <div class="js-couponsWrapper">
-                        <Coupons
-                          ref="coupons"
-                          :options="{
-                            coupons: oneListing.get('coupons'),
-                            listingPrice: ob.bigNumber(oneListing.price.amount),
-                          }"
-                          @changeCoupons="changeCoupons"/>
-                        <!-- // coupons are inserted here after they are added by the user. -->
-                      </div>
-                    </template>
-                  </div>
                 </div>
                 <hr class="clrBr row">
                 <div class="rowTn">
@@ -456,12 +456,13 @@ export default {
           {
             quantity: 0,
             memo: '',
+            couponCode: '',
+
             coupons: [],
-          }
+          },
         ],
         activeCurs: [],
         emailAddress: '',
-        couponCode: '',
       },
 
       _state: {
@@ -473,6 +474,7 @@ export default {
       order: undefined,
       orderKey: 0,
 
+      oneListing: undefined,
       listings: undefined,
       moderators: undefined,
       couponObj: [],
@@ -536,8 +538,6 @@ export default {
         quantity: uiQuantity,
         isCrypto: this.oneListing.isCrypto,
         phaseClass: `phase${capitalize(this._state.phase)}`,
-        hasCoupons: this.oneListing.get('coupons').length
-          && this.oneListing.get('metadata').get('contractType') !== 'CRYPTOCURRENCY',
       }
     },
     helperMessage () {
@@ -613,11 +613,6 @@ export default {
             .constraints;
     },
 
-    hasCoupons () {
-      return this.oneListing && this.oneListing.get('coupons').length
-            && this.oneListing.get('metadata').get('contractType') !== 'CRYPTOCURRENCY';
-    },
-
     currencies () {
       let currencies = this.oneListing.get('metadata').get('acceptedCurrencies') || [];
       const locale = app.localSettings.standardizedTranslatedLang() || 'en-US';
@@ -690,6 +685,10 @@ export default {
       }
 
       return {price: firstFreight.plus(renewalFee).plus(bigNumber(sService.registrationFee)), currency: sOption.currency};
+    },
+
+    hasCoupons(listing) {
+      return listing && listing?.coupons.length && listing?.metadata.contractType !== 'CRYPTOCURRENCY';
     },
 
     loadData (options = {}) {
@@ -919,13 +918,13 @@ export default {
       launchSettingsModal({ initialTab: 'Addresses' });
     },
 
-    applyCoupon () {
-      this.$refs.coupons
-        .addCode(this.formData.couponCode)
+    applyCoupon(idx) {
+      this.$refs.coupons[idx]
+        .addCode(this.formData.itemsData[idx].couponCode)
         .then((result) => {
           // if the result is valid, clear the input field
           if (result.type === 'valid') {
-            this.formData.couponCode = '';
+            this.formData.itemsData[idx].couponCode = '';
           }
         });
     },
@@ -938,16 +937,18 @@ export default {
       this.order.get('items').at(0).set('memo', this.formData.itemsData[0].memo);
     },
 
-    changeCoupons (hashes, codes) {
+    changeCoupons (idx, $event) {
+      const { hashes, codes } = $event;
+
       // combine the codes and hashes so the receipt can check both.
       // if this is the user's own listing they will have codes instead of hashes
       const hashesAndCodes = hashes.concat(codes);
-      const filteredCoupons = this.oneListing.get('coupons').filter(
+      const filteredCoupons = this.itemsToPurchase.at(idx).get('coupons').filter(
         (coupon) => hashesAndCodes.indexOf(coupon.get('hash') || coupon.get('discountCode')) !== -1,
       );
       this.couponObj = filteredCoupons.map((coupon) => coupon.toJSON());
 
-      this.order.get('items').at(0).set('coupons', codes);
+      this.order.get('items').at(idx).set('coupons', codes);
     },
 
     updateShippingOption (selectedOption) {

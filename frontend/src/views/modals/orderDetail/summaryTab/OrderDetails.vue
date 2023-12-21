@@ -4,24 +4,41 @@
     <h2 class="tx4 margRTn">{{ ob.polyT('orderDetail.summaryTab.orderDetails.heading') }}</h2>
     <span class="clrT2 tx5b">{{ ob.moment(ob.order.timestamp).format('lll') }}</span>
     <div class="border clrBr padMd">
-      <div class="flex gutterH clrT">
-        <a :href="`#${`${ob.listing.vendorID.peerID}/store/${ob.listing.slug}`}`" class="listingThumbCol flexNoShrink" :style="ob.getAvatarBgImage(ob.listing.item.images[0])"></a>
-        <div class="flexExpand tx5">
-          <div class="flex gutterH">
-            <div class="flexExpand">
-              <a :href="`#${`${ob.listing.vendorID.peerID}/store/${ob.listing.slug}`}`" :class="`txB clrT inlineBlock ${ob.description || isCrypto ? 'rowTn' : ''}`" v-html="title"></a>
-              <div v-if="ob.sku">{{ ob.polyT('orderDetail.summaryTab.orderDetails.skuLabel') }}: {{ ob.sku }}</div>
-              <div v-if="item.options && item.options.length">{{ item.options.map(option => `${option.name}:&nbsp;${option.value}`).join(',&nbsp;') }}</div>
-              <template v-if="isCrypto">
-                <div class="rowTn">
-                  <span class="txB">{{ ob.polyT('orderDetail.summaryTab.orderDetails.quantityHeading') }}:</span>
-                  {{ ob.currencyMod.convertAndFormatCurrency(item.quantity, coinType) }}
-                  <a class=" clrTEm" v-if="item.quantity" @click="onClickCopyCryptoQuantity(item.quantity)"> {{ ob.polyT('orderDetail.summaryTab.orderDetails.copyLink') }}</a>
-                </div>
-                <div class="clrT2 hide orderDetailsCopiedToClipboard js-cryptoQuantityCopiedToClipboard">{{ ob.polyT('copiedToClipboard') }}</div>
-              </template>
+      <template v-for="(listing, idx) in listings">
+        <div class="flex gutterH clrT">
+          <a :href="`#${`${listing.vendorID.peerID}/store/${listing.slug}`}`" class="listingThumbCol flexNoShrink" :style="ob.getAvatarBgImage(listing.item.images[0])"></a>
+          <div class="flexExpand tx5">
+            <div class="flexRow gutterH row">
+              <div class="flexExpand col4">
+                <a :href="`#${`${listing.vendorID.peerID}/store/${listing.slug}`}`" :class="`txB clrT inlineBlock ${ob.description || isCrypto ? 'rowTn' : ''}`" v-html="listing.item.title"></a>
+                <div v-if="ob.sku">{{ ob.polyT('orderDetail.summaryTab.orderDetails.skuLabel') }}: {{ ob.sku }}</div>
+                <div v-if="order.items[idx].options && order.items[idx].options.length">{{ order.items[idx].options.map(option => `${option.name}:&nbsp;${option.value}`).join(',&nbsp;') }}</div>
+                <template v-if="isCrypto">
+                  <div class="rowTn">
+                    <span class="txB">{{ ob.polyT('orderDetail.summaryTab.orderDetails.quantityHeading') }}:</span>
+                    {{ ob.currencyMod.convertAndFormatCurrency(order.items[idx].quantity, coinType) }}
+                    <a class=" clrTEm" v-if="order.items[idx].quantity" @click="onClickCopyCryptoQuantity(order.items[idx].quantity)"> {{ ob.polyT('orderDetail.summaryTab.orderDetails.copyLink') }}</a>
+                  </div>
+                  <div class="clrT2 hide orderDetailsCopiedToClipboard js-cryptoQuantityCopiedToClipboard">{{ ob.polyT('copiedToClipboard') }}</div>
+                </template>
+              </div>
+
+              <div class="col4">
+                <div class="txB">{{ ob.polyT('orderDetail.summaryTab.orderDetails.couponHeading') }}</div>
+                <div v-if="order.items[idx].couponCodes && order.items[idx].couponCodes.length">{{ order.items[idx].couponCodes.join(', ') }}</div>
+                <div v-else>{{ ob.polyT('orderDetail.summaryTab.notApplicable') }}</div>
+              </div>
+              <div v-if="!isCrypto" class="col4">
+                <div class="txB rowTn">{{ ob.polyT('orderDetail.summaryTab.orderDetails.quantityHeading') }}</div>
+                <div>{{ order.items[idx].quantity }}</div>
+              </div>
             </div>
           </div>
+        </div>
+      </template>
+      <div>
+        <div class="flexExpand tx5">
+
           <hr class="clrBr" />
           <div class="flexRow gutterH">
             <div class="col4">
@@ -70,17 +87,7 @@
             </div>
             <div class="col8">
               <div class="row">
-                <div class="flexRow gutterH row">
-                  <div class="col6">
-                    <div class="txB">{{ ob.polyT('orderDetail.summaryTab.orderDetails.couponHeading') }}</div>
-                    <div v-if="item.couponCodes && item.couponCodes.length">{{ item.couponCodes.join(', ') }}</div>
-                    <div v-else>{{ ob.polyT('orderDetail.summaryTab.notApplicable') }}</div>
-                  </div>
-                  <div v-if="!isCrypto" class="col6">
-                    <div class="txB rowTn">{{ ob.polyT('orderDetail.summaryTab.orderDetails.quantityHeading') }}</div>
-                    <div>{{ item.quantity }}</div>
-                  </div>
-                </div>
+                
                 <div class="flexRow gutterH row">
                   <div class="col6">
                     <div class="txB rowTn">{{ ob.polyT('orderDetail.summaryTab.orderDetails.moderatorHeading') }}</div>
@@ -168,6 +175,9 @@ export default {
       app: app,
       description: '',
 
+      oneListing: undefined,
+      listings: undefined,
+
       modProfile: undefined,
     };
   },
@@ -182,7 +192,7 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        listing: this.listing,
+        listing: this.oneListing,
         order: this.order,
         getCountryByDataName,
         userCurrency: app.settings.get('localCurrency'),
@@ -194,11 +204,11 @@ export default {
       };
     },
     isCrypto () {
-      return this.listing.metadata.contractType === 'CRYPTOCURRENCY';
+      return this.oneListing.metadata.contractType === 'CRYPTOCURRENCY';
     },
 
     coinType () {
-      return this.listing.metadata.pricingCurrency.code;
+      return this.oneListing.metadata.pricingCurrency.code;
     },
 
     item () {
@@ -210,12 +220,12 @@ export default {
     title () {
       const ob = this.ob;
 
-      let title = this.listing.item.title;
+      let title = this.oneListing.item.title;
 
       if (this.isCrypto) {
         title = ob.crypto.tradingPair({
           className: 'cryptoTradingPairSm',
-          fromCur: listing.metadata.acceptedCurrencies[0],
+          fromCur: this.oneListing.metadata.acceptedCurrencies[0],
           toCur: coinType,
         });
       }
@@ -299,7 +309,7 @@ export default {
       let orderOptions;
       let options;
       let skus;
-      const listing = this.listing;
+      const listing = this.oneListing;
 
       try {
         orderOptions = this.order.items[0].options;
@@ -368,7 +378,9 @@ export default {
           });
       }
 
-      this.listing = this.model.get('orderOpen').listings[0].listing;
+      this.listings = this.model.get('orderOpen').listings.map(item => item.listing);
+      this.oneListing = this.listings[0];
+
       this.order = this.model.get('orderOpen');
     },
 

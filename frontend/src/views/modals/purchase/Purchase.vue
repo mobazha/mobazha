@@ -948,7 +948,9 @@ export default {
 
     updateShippingOption (selectedOption) {
       // Set the shipping option.
-      this.order.get('items').at(0).get('shipping').set(selectedOption);
+      this.order.get('items').forEach((item) => {
+        item.get('shipping').set(selectedOption);
+      });
 
       this.shippingOptionKey += 1;
     },

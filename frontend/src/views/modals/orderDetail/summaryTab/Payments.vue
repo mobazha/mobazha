@@ -1,7 +1,7 @@
 <template>
   <div class="payments">
     <template v-for="(payment, index) in reversedPayments">
-      <Payment ref="payments" :options="paymentOptions(payment, reversedPayments.length - index)"
+      <Payment ref="payments" :options="paymentOptions(payment, (reversedPayments.length - 1) - index)"
         :bb="() => {
           return {
             model: payment,
@@ -159,7 +159,11 @@ export default {
 
     setLastPaymentState(state) {
       if (this.$refs.payments) {
-        this.$refs.payments[0].setState(state);
+        if (this.reversedPayments.length === 1) {
+          this.$refs.payments.setState(state);
+        } else {
+          this.$refs.payments[0].setState(state);
+        }
       }
     },
 
@@ -251,7 +255,7 @@ export default {
     paymentOptions(payment, index) {
       return {
         initialState: {
-          paymentNumber: index,
+          paymentNumber: index + 1,
           amountShort: this.options.orderPrice.minus(this.paidSoFar[index]),
           showAcceptRejectButtons: this.isMostRecentPayment(index) && this.options.isOrderConfirmable(),
           showCancelButton: this.isMostRecentPayment(index) && this.options.isOrderCancelable(),

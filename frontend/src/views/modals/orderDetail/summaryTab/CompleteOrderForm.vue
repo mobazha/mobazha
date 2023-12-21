@@ -87,6 +87,9 @@ export default {
       _model: undefined,
       _modelKey: 0,
 
+      rating: undefined,
+      ratings: undefined,
+
       formData: {
         review: '',
         nonAnonymous: true,
@@ -133,8 +136,8 @@ export default {
         throw new Error('Please provide the orderID.');
       }
 
-      if (!options.slug) {
-        throw new Error('Please provide the listing slug.');
+      if (!options.listings) {
+        throw new Error('Please provide the listings.');
       }
 
       this.baseInit(options);
@@ -147,13 +150,12 @@ export default {
 
       this.ratingStrips = {};
 
-      const ratings = this._model.get('ratings');
+      this.ratings = this._model.get('ratings');
 
-      if (ratings.length) {
-        this.rating = ratings.at(0);
+      if (this.ratings.length) {
+        this.rating = this.ratings.at(0);
       } else {
         this.rating = new Rating();
-        ratings.push(this.rating);
       }
 
       const ratingFields = [
@@ -185,10 +187,23 @@ export default {
         slug: this.slug,
       };
 
-      this.rating.set(data);
-      this.rating.set(data, { validate: true });
+      // Use the same ratings for all items from shopping cart
+      this.ratings.reset();
+      let hasError = false;
+      this.listings.forEach(listing => {
+        const rating = new Rating();
+        data.slug = listing.slug;
 
-      if (!this.rating.validationError) {
+        rating.set(data);
+        rating.set(data, { validate: true });
+        if (rating.validationError) {
+          hasError = true;
+        } else {
+          this.ratings.push(rating);
+        }
+      })
+
+      if (!hasError) {
         completeOrder(this.model.id, this.model.toJSON());
         recordEvent('OrderDetails_CompleteOrder');
       }

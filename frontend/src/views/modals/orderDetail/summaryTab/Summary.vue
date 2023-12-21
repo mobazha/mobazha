@@ -28,7 +28,7 @@
       <CompleteOrderForm ref="completeOrderForm" v-if="showCompleteOrderForm"
         :options="{
           orderID: model.id,
-          slug: contract.get('orderOpen').listings[0].listing.slug,
+          listings,
         }"/>
       <OrderComplete ref="orderComplete" v-if="showOrderComplete" :dataObject="contract.get('orderComplete')" />
       <DisputePayout ref="disputePayout" v-if="showDisputePayout" :options="{
@@ -355,6 +355,9 @@ export default {
     },
     isVendor() {
       return this.vendor.id === app.profile.id;
+    },
+    listings() {
+      return this.contract.get('orderOpen').listings.map(item => item.listing);
     }
   },
   methods: {
@@ -920,7 +923,7 @@ export default {
       };
 
       if (this.contract.type === 'CRYPTOCURRENCY') {
-        fulfilledState.coinType = this.contract.get('orderOpen').listings[0].listing.metadata.coinType;
+        fulfilledState.coinType = this.listings[0].metadata.coinType;
       }
 
       this.fulfilledOptions = {

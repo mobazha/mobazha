@@ -106,7 +106,7 @@ export default {
       return {
         ...this.templateHelpers,
         displayCurrency: app.settings.get('localCurrency'),
-        processingTime: this._listing.item.processingTime || app.polyglot.t('purchase.completeSection.noData'),
+        processingTime: app.polyglot.t('purchase.completeSection.noData'), // this._listing.item.processingTime || app.polyglot.t('purchase.completeSection.noData')
         maxMessageLength: ChatMessage.max.messageLength,
         ownProfile: app.profile.toJSON(),
         orderID: this.orderID,
@@ -114,7 +114,7 @@ export default {
       };
     },
     vendorPeerID() {
-      return this._listing.vendorID.peerID;
+      return this.vendor.peerID;
     },
     shareBody() {
       const ob = this.ob;

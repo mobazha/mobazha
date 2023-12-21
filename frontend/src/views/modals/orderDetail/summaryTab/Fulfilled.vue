@@ -105,13 +105,14 @@ export default {
     return {
       dataObject: {
         cryptocurrencyDelivery: undefined,
+        physicalDelivery: undefined,
+        digitalDelivery: undefined,
       },
       _state: {
         contractType: 'PHYSICAL_GOOD',
         isLocalPickup: false,
         showPassword: false,
-        noteFromLabel:
-          app.polyglot.t('orderDetail.summaryTab.fulfilled.noteFromVendorLabel'),
+        noteFromLabel: app.polyglot.t('orderDetail.summaryTab.fulfilled.noteFromVendorLabel'),
         coinType: '',
       }
     };
@@ -138,12 +139,10 @@ export default {
       };
     },
     physicalDelivery () {
-      const ob = this.ob;
-      return ob.physicalDelivery && ob.physicalDelivery[0] || {};
+      return this.dataObject.physicalDelivery || {};
     },
     digitalDelivery () {
-      const ob = this.ob;
-      return ob.digitalDelivery && ob.digitalDelivery[0] || {};
+      return this.dataObject.digitalDelivery || {};
     },
     coinTypeVerbose () {
       const ob = this.ob;

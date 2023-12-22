@@ -1004,11 +1004,13 @@
       "title": "扫描或发送货币到该地址"
     },
     "external": {
-      "description": "You could provide an external wallet address to receive %{coin} for order payment",
-      "addAddress": "Add External Wallet Address",
-      "notice": "* The address must be in Polygon network.",
-      "enableLabel": "Enable this external wallet address for order payment reception",
-      "add": "Add"
+      "description": "你可以提供一个外部钱包地址来接收订单的%{coin}付款",
+      "addAddress": "添加外部钱包地址",
+      "inputPlaceHolder": "请输入你的钱包地址",
+      "invalidAddress": "不是一个有效的钱包地址，地址格式一般为：0x7DAf18eqf59a6f2c5974740f13fEC4563207B92d",
+      "notice": "* 该地址必须为Polygon网络上的钱包地址。",
+      "enableLabel": "激活这个外部钱包地址来接收订单付款",
+      "add": "添加"
     },
     "spendConfirmBox": {
       "heading": "你确定吗？",

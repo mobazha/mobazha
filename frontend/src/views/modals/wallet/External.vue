@@ -1,12 +1,12 @@
 <template>
   <div class="external">
     <template v-if="!isHasAddress">
-      <div class="external-desc">{{ ob.polyT('wallet.external.description', {coin: ob.polyT(`cryptoCurrencies.${mnCode}`, { _: mnCode })}) }}</div>
+      <div class="external-desc">{{ ob.polyT('wallet.external.description', {coin: coinName}) }}</div>
       <div class="external-box">
-        <button v-if="!isAdd" class="btn-primary small" @click.stop="addAddress">{{ ob.polyT('wallet.external.addAddress') }}</button>
-        <el-form v-if="isAdd" ref="formData" inline :model="formData" :rules="rules" label-width="0">
+        <button v-if="!added" class="btn-primary small" @click.stop="addAddress">{{ ob.polyT('wallet.external.addAddress') }}</button>
+        <el-form v-if="added" ref="formData" inline :model="formData" :rules="rules" label-width="0">
           <el-form-item prop="address">
-            <el-input placeholder="Please input your Tether wallet address" v-model="formData.address" maxlength="200" size="large" />
+            <el-input :placeholder="ob.polyT('wallet.external.inputPlaceHolder', {coin: coinName})" v-model="formData.address" maxlength="200" size="large" />
           </el-form-item>
           <el-form-item>
             <button class="btn-primary small" @click.stop="onSubmit">{{ ob.polyT('wallet.external.add') }}</button>
@@ -20,7 +20,7 @@
       <div class="qrcode">
         <img class="qrcode-img" :src="qrUrl" />
       </div>
-      <div class="code">0x7DAf18eqf59a6f2c5974740f13fEC4563207B92d <el-button class="copy-btn" link @click="copy">Edit Copy</el-button></div>
+      <div class="code">{{ formData.address }} <el-button class="copy-edit-btn" link @click="copy">Edit</el-button><el-button class="copy-edit-btn" link @click="edit">Copy</el-button></div>
       <el-checkbox v-model="checked" :label="ob.polyT('wallet.external.enableLabel')" />
     </template>
   </div>
@@ -30,6 +30,8 @@
 import qr from 'qr-encode';
 import useClipboard from 'vue-clipboard3';
 import { ElMessage } from 'element-plus';
+import app from '../../../../backbone/app.js';
+import { isValidETHAddress } from '../../../../backbone/data/walletCurrencies.js';
 export default {
   props: {
     code: {
@@ -42,7 +44,7 @@ export default {
       qrUrl: '',
       checked: false,
       isHasAddress: false,
-      isAdd: false,
+      added: false,
       formData: {
         address: '',
       },
@@ -51,9 +53,9 @@ export default {
           {
             required: true,
             validator(_rule, value, callback) {
-              if (!value) return callback(new Error('Please input your Tether wallet address'));
-              if (value !== '666') {
-                return callback(new Error('Not a valid polygon wallet address'));
+              if (!value) return callback(new Error(app.polyglot.t('wallet.external.inputPlaceHolder')));
+              if (!isValidETHAddress(value)) {
+                return callback(new Error(app.polyglot.t('wallet.external.invalidAddress')));
               }
               callback();
             },
@@ -65,27 +67,27 @@ export default {
   },
   computed: {
     mnCode() {
-      const ob = this.ob;
-
-      return this.code && ob.crypto.ensureMainnetCode(this.code);
+      return this.code && this.ob.crypto.ensureMainnetCode(this.code);
     },
+    coinName() {
+      return this.ob.polyT(`cryptoCurrencies.${this.mnCode}`, { _: this.mnCode });
+    }
   },
   methods: {
     addAddress() {
-      this.isAdd = true;
+      this.added = true;
     },
     copy() {
       const ob = this.ob;
 
       const { toClipboard } = useClipboard();
-      toClipboard('0x7DAf18eqf59a6f2c5974740f13fEC4563207B92d');
+      toClipboard('0x7DAf18e9f59a6f2c5974740f13fEC4563207B92d');
       ElMessage.success(ob.polyT('copiedToClipboardShort'));
     },
     onSubmit() {
       this.$refs.formData.validate((valid) => {
         if (valid) {
-          let qrUrl = qr('https://www.baidu.com', { type: 7, size: 5, level: 'M' });
-          this.qrUrl = qrUrl;
+          this.qrUrl = qr(this.formData.address, { type: 7, size: 5, level: 'M' });
           this.isHasAddress = true;
         }
       });
@@ -130,7 +132,7 @@ export default {
     font-size: 14px;
     margin-bottom: 10px;
   }
-  .copy-btn {
+  .copy-edit-btn {
     text-decoration: underline;
     margin-left: 10px;
   }

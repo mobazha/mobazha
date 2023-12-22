@@ -6,7 +6,7 @@ import app from '../app';
 // If a currency does not support fee bumping or you want to disable it, do not provide a
 // feeBumpTransactionSize setting.
 
-const isValidETHAddress = (address) => {
+export const isValidETHAddress = (address) => {
   const regex1 = new RegExp('^0x[0-9a-fA-F]{40}$');
   const regex2 = new RegExp('^0x[0-9a-fA-F]{64}$'); // for contract payment address
   return regex1.test(address) || regex2.test(address);

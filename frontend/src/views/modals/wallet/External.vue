@@ -1,6 +1,6 @@
 <template>
   <div class="external">
-    <template v-if="!isHasAddress">
+    <template v-if="!hasAddress">
       <div class="external-desc">{{ ob.polyT('wallet.external.description', {coin: coinName}) }}</div>
       <div class="external-box">
         <button v-if="!added" class="btn-primary small" @click.stop="addAddress">{{ ob.polyT('wallet.external.addAddress') }}</button>
@@ -20,7 +20,7 @@
       <div class="qrcode">
         <img class="qrcode-img" :src="qrUrl" />
       </div>
-      <div class="code">{{ formData.address }} <el-button class="copy-edit-btn" link @click="copy">Edit</el-button><el-button class="copy-edit-btn" link @click="edit">Copy</el-button></div>
+      <div class="code">{{ formData.address }} <el-button class="copy-edit-btn" link @click="edit">{{ ob.polyT('wallet.external.edit') }}</el-button><el-button class="copy-edit-btn" link @click="copy">{{ ob.polyT('wallet.external.copy') }}</el-button></div>
       <el-checkbox v-model="checked" :label="ob.polyT('wallet.external.enableLabel')" />
     </template>
   </div>
@@ -43,7 +43,7 @@ export default {
     return {
       qrUrl: '',
       checked: false,
-      isHasAddress: false,
+      hasAddress: false,
       added: false,
       formData: {
         address: '',
@@ -81,14 +81,14 @@ export default {
       const ob = this.ob;
 
       const { toClipboard } = useClipboard();
-      toClipboard('0x7DAf18e9f59a6f2c5974740f13fEC4563207B92d');
+      toClipboard(this.formData.address);
       ElMessage.success(ob.polyT('copiedToClipboardShort'));
     },
     onSubmit() {
       this.$refs.formData.validate((valid) => {
         if (valid) {
           this.qrUrl = qr(this.formData.address, { type: 7, size: 5, level: 'M' });
-          this.isHasAddress = true;
+          this.hasAddress = true;
         }
       });
     },

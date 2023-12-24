@@ -56,7 +56,7 @@
                           :fetching="fetchingAddress"
                           :address="receiveAddress"
                         />
-                        <External v-if="tabActive === 3" ref="external" :code="activeCoin" />
+                        <External v-if="tabActive === 3" ref="external" :key="activeCoin" :coinType="activeCoin" />
                       </div>
                     </div>
                   </div>

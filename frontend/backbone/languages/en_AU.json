@@ -1012,7 +1012,17 @@
       "enableLabel": "Enable this external wallet address for order payment reception",
       "add": "Add",
       "edit": "Edit",
-      "copy": "Copy"
+      "copy": "Copy",
+      "statusAddingAddress": "Adding external order payment reception address for %{coin}…",
+      "statusAddAddressComplete": "External order payment reception address for %{coin} added.",
+      "statusAddressEnabled": "External order payment reception address for %{coin} enabled.",
+      "statusAddressDisabled": "External order payment reception address for %{coin} disabled.",
+      "statusAddAddressFailed": "Unable to add external order payment reception address for %{coin}.",
+      "statusEnableAddressFailed": "Unable to enable external order payment reception address for %{coin}.",
+      "statusDisableAddressFailed": "Unable to disable external order payment reception address for %{coin}.",
+      "addAddressErrorAlertTitle": "Unable to add external wallet address for %{coin}",
+      "enableAddressErrorAlertTitle": "Unable to enable external wallet address for %{coin}",
+      "disableAddressErrorAlertTitle": "Unable to disable external wallet address for %{coin}"
     },
     "spendConfirmBox": {
       "heading": "Are you sure?",

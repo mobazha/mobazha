@@ -1012,7 +1012,17 @@
       "enableLabel": "激活这个外部钱包地址来接收订单付款",
       "add": "添加",
       "edit": "编辑",
-      "copy": "复制"
+      "copy": "复制",
+      "statusAddingAddress": "为%{coin}添加订单外部收款地址…",
+      "statusAddAddressComplete": "%{coin}的订单外部收款地址已添加。",
+      "statusAddressEnabled": "%{coin}的订单外部收款地址已激活。",
+      "statusAddressDisabled": "%{coin}的订单外部收款地址已禁用。",
+      "statusAddAddressFailed": "添加%{coin}的订单外部收款地址失败。",
+      "statusEnableAddressFailed": "激活%{coin}的订单外部收款地址失败。",
+      "statusDisableAddressFailed": "禁用%{coin}的订单外部收款地址失败。",
+      "addAddressErrorAlertTitle": "不能添加%{coin}的订单外部收款地址",
+      "enableAddressErrorAlertTitle": "不能激活%{coin}的订单外部收款地址",
+      "disableAddressErrorAlertTitle": "不能禁用%{coin}的订单外部收款地址"
     },
     "spendConfirmBox": {
       "heading": "你确定吗？",

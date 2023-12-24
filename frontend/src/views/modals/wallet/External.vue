@@ -1,15 +1,15 @@
 <template>
   <div class="external">
-    <template v-if="!hasAddress">
+    <template v-if="editMode">
       <div class="external-desc">{{ ob.polyT('wallet.external.description', {coin: coinName}) }}</div>
       <div class="external-box">
-        <button v-if="!added" class="btn-primary small" @click.stop="addAddress">{{ ob.polyT('wallet.external.addAddress') }}</button>
-        <el-form v-if="added" ref="formData" inline :model="formData" :rules="rules" label-width="0">
+        <el-button v-if="blankScreen" class="btn-primary small" @click.stop="beginAdd">{{ ob.polyT('wallet.external.addAddress') }}</el-button>
+        <el-form v-if="!blankScreen" ref="formData" inline :model="formData" @validate="validateHandler" :rules="rules" label-width="0">
           <el-form-item prop="address">
             <el-input :placeholder="ob.polyT('wallet.external.inputPlaceHolder', {coin: coinName})" v-model="formData.address" maxlength="200" size="large" />
           </el-form-item>
           <el-form-item>
-            <button class="btn-primary small" @click.stop="onSubmit">{{ ob.polyT('wallet.external.add') }}</button>
+            <el-button class="btn-primary small" :disabled="!formValidity.address" @click.stop="onSubmit">{{ ob.polyT('wallet.external.add') }}</el-button>
           </el-form-item>
         </el-form>
       </div>
@@ -18,10 +18,10 @@
     <template v-else>
       <div class="external-desc">{{ ob.polyT('wallet.receiveMoney.title') }}</div>
       <div class="qrcode">
-        <img class="qrcode-img" :src="qrUrl" />
+        <img class="qrcode-img" :src="qrDataUri" />
       </div>
-      <div class="code">{{ formData.address }} <el-button class="copy-edit-btn" link @click="edit">{{ ob.polyT('wallet.external.edit') }}</el-button><el-button class="copy-edit-btn" link @click="copy">{{ ob.polyT('wallet.external.copy') }}</el-button></div>
-      <el-checkbox v-model="checked" :label="ob.polyT('wallet.external.enableLabel')" />
+      <div class="code">{{ formData.address }} <el-button class="copy-edit-btn" link @click="onEdit">{{ ob.polyT('wallet.external.edit') }}</el-button><el-button class="copy-edit-btn" link @click="onCopy">{{ ob.polyT('wallet.external.copy') }}</el-button></div>
+      <el-checkbox v-model="checked" @change="onChecked" :label="ob.polyT('wallet.external.enableLabel')" />
     </template>
   </div>
 </template>
@@ -31,22 +31,27 @@ import qr from 'qr-encode';
 import useClipboard from 'vue-clipboard3';
 import { ElMessage } from 'element-plus';
 import app from '../../../../backbone/app.js';
-import { isValidETHAddress } from '../../../../backbone/data/walletCurrencies.js';
+import { isValidETHAddress, getCurrencyByCode } from '../../../../backbone/data/walletCurrencies.js';
 export default {
   props: {
-    code: {
+    coinType: {
       type: String,
       default: '',
     },
   },
   data() {
     return {
-      qrUrl: '',
+      editMode: false,
+      blankScreen: true,
+
+      lastAddress: '',
       checked: false,
-      hasAddress: false,
-      added: false,
+      externalPaymentAddresses: {},
       formData: {
         address: '',
+      },
+      formValidity: {
+        address: false,
       },
       rules: {
         address: [
@@ -67,30 +72,155 @@ export default {
   },
   computed: {
     mnCode() {
-      return this.code && this.ob.crypto.ensureMainnetCode(this.code);
+      return this.coinType && this.ob.crypto.ensureMainnetCode(this.coinType);
     },
     coinName() {
       return this.ob.polyT(`cryptoCurrencies.${this.mnCode}`, { _: this.mnCode });
+    },
+    qrDataUri () {
+      // defaulting to an empty image - needed for proper spacing
+      // when the spinner is showing
+      let qrDataUri = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+      let walletCur;
+
+      try {
+        walletCur = getCurrencyByCode(this.coinType);
+      } catch (e) {
+        // pass
+      }
+
+      if (this.lastAddress && walletCur) {
+        qrDataUri = qr(walletCur.qrCodeText(this.lastAddress), { type: 7, size: 5, level: 'M' });
+      }
+      return qrDataUri;
     }
   },
+  created() {
+    this.initEventChain();
+
+    this.loadData();
+  },
   methods: {
-    addAddress() {
-      this.added = true;
+    validateHandler(propName, isValid) {
+      this.formValidity[propName] = isValid;
     },
-    copy() {
+
+    loadData() {
+      this.settings = app.settings.clone();
+
+      // Sync our clone with any changes made to the global settings model.
+      this.listenTo(app.settings, 'someChange', (md, sOpts) => this.settings.set(sOpts.setAttrs));
+
+      // Sync the global settings model with any changes we save via our clone.
+      this.listenTo(this.settings, 'sync', (md, resp, sOpts) => app.settings.set(this.settings.toJSON(sOpts.attrs)));
+
+      this.externalPaymentAddresses = this.settings.get('externalPaymentAddresses') || {};
+      this.lastAddress = this.externalPaymentAddresses[this.coinType]?.address;
+      this.checked = this.externalPaymentAddresses[this.coinType]?.enable;
+      this.formData.address = this.lastAddress;
+
+      this.editMode = !this.lastAddress;
+      this.blankScreen = !this.lastAddress;
+    },
+
+    beginAdd() {
+      this.blankScreen = false;
+    },
+    onEdit() {
+      this.editMode = true;
+    },
+    onCopy() {
       const ob = this.ob;
 
       const { toClipboard } = useClipboard();
-      toClipboard(this.formData.address);
+      toClipboard(this.lastAddress);
       ElMessage.success(ob.polyT('copiedToClipboardShort'));
     },
     onSubmit() {
-      this.$refs.formData.validate((valid) => {
-        if (valid) {
-          this.qrUrl = qr(this.formData.address, { type: 7, size: 5, level: 'M' });
-          this.hasAddress = true;
-        }
+      this.save();
+    },
+
+    onChecked() {
+      this.save(true);
+    },
+
+    save (updateCheck) {
+      if (!updateCheck && this.lastAddress === this.formData.address) {
+        this.editMode = false;
+        this.blankScreen = false;
+
+        return;
+      }
+
+      this.externalPaymentAddresses[this.coinType] = {
+        address: this.formData.address,
+        // if not updateCheck, add new address, default to false
+        enable: updateCheck ? this.checked : false,
+      }
+      const data = { externalPaymentAddresses: this.externalPaymentAddresses };
+      this.settings.set(data);
+
+      const save = this.settings.save(data, {
+        attrs: data,
+        type: 'PUT',
       });
+
+      if (save) {
+        const msg = {
+          msg: app.polyglot.t('wallet.external.statusAddingAddress',
+            { coin: `<em>${this.coinName}</em>` }),
+          type: 'message',
+        };
+
+        const statusMessage = app.statusBar.pushMessage({
+          ...msg,
+          duration: 99999999999999,
+        });
+
+        save.done(() => {
+          this.lastAddress = this.externalPaymentAddresses[this.coinType].address;
+          this.editMode = false;
+          this.blankScreen = false;
+
+          let msgTag = 'wallet.external.statusAddAddressComplete';
+          if (updateCheck) {
+            msgTag = this.checked ? 'wallet.external.statusAddressEnabled' : 'wallet.external.statusAddressDisabled';
+          }
+          statusMessage.update({
+            msg: app.polyglot.t(msgTag, { coin: `<em>${this.coinName}</em>` }),
+            type: 'confirmed',
+          });
+        }).fail((...args) => {
+          let titleTag = 'wallet.external.addAddressErrorAlertTitle';
+          let failedMsgTag = 'wallet.external.statusAddAddressFailed';
+          if (updateCheck) {
+            titleTag = this.checked ? 'wallet.external.enableAddressErrorAlertTitle' : 'wallet.external.disableAddressErrorAlertTitle';
+            failedMsgTag = this.checked ? 'wallet.external.statusEnableAddressFailed' : 'wallet.external.statusDisableAddressFailed';
+          }
+
+          if (!updateCheck) {
+            // restore original externalPaymentAddresses
+            this.externalPaymentAddresses[this.coinType].address = this.lastAddress;
+            this.settings.set({ externalPaymentAddresses: this.externalPaymentAddresses });
+          } else {
+            this.checked = !this.checked;
+          }
+          
+          const errMsg = args[0] && args[0].responseJSON && args[0].responseJSON.reason || '';
+
+          openSimpleMessage(
+            app.polyglot.t(titleTag, { coin: `<em>${this.coinName}</em>` }),
+            errMsg
+          );
+
+          statusMessage.update({
+            msg: app.polyglot.t(failedMsgTag, { coin: `<em>${this.coinName}</em>` }),
+            type: 'warning',
+          });
+        }).always(() => {
+          setTimeout(() => statusMessage.remove(), 3000);
+        });
+      }
     },
   },
 };

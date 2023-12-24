@@ -158,12 +158,8 @@ export default {
     },
 
     setLastPaymentState(state) {
-      if (this.$refs.payments) {
-        if (this.reversedPayments.length === 1) {
-          this.$refs.payments.setState(state);
-        } else {
-          this.$refs.payments[0].setState(state);
-        }
+      if (this.$refs.payments && this.$refs.payments.length > 0) {
+        this.$refs.payments[0].setState(state);
       }
     },
 

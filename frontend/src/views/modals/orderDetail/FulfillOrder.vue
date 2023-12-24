@@ -224,6 +224,7 @@ export default {
       } else if (this.contractType === 'PHYSICAL_GOOD' && !this.isLocalPickup) {
         formData.physicalDelivery = this.formData.physicalDelivery;
       }
+      formData.note = this.formData.note;
 
       this.model.set(formData);
       this.model.set({}, { validate: true });

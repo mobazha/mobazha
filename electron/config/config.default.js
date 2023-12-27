@@ -192,6 +192,10 @@ module.exports = (appInfo) => {
       jreVersion: 'jre1.8.0_201',
       opt: '-server -Xms512M -Xmx512M -Xss512k -Dspring.profiles.active=prod -Dserver.port=${port} -Dlogging.file.path="${path}" ',
       name: 'java-app.jar'
+    },
+    localServer: {
+      enable: true,
+      port: 18080,
     }
   };
 

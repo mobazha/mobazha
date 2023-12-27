@@ -223,7 +223,7 @@ export default {
   },
   beforeRouteUpdate(to) {
     if (this.activeTab !== to.params.state) {
-      this.activeTab = to.params.state ?? 'store';
+      this.activeTab = to.params.state ? to.params.state : 'store';
     }
   },
   created() {

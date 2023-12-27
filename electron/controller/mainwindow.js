@@ -16,6 +16,8 @@ class MainWindowController extends Controller {
 
     this.mainWindow = this.app.electron.mainWindow;
     this.closeConfirmed = false;
+
+    global.serverLog = '';
   }
 
   async doMainWindowAction (action, event) {

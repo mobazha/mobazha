@@ -505,6 +505,8 @@ function ensureValidSettingsCurrency() {
   return ensureValidSettingsCurDeferred.promise();
 }
 
+const isBundledApp = ipc.sendSync('controller.system.getGlobal', 'isBundledApp');
+
 // let's start our flow - do we need onboarding?,
 // fetching app-wide models...
 function start() {
@@ -722,8 +724,6 @@ app.connectionManagmentModal = new ConnectionManagement({
   dismissOnEscPress: false,
   showCloseButton: false,
 }).render();
-
-const isBundledApp = ipc.sendSync('controller.system.getGlobal', 'isBundledApp');
 
 // get the saved server configurations
 app.serverConfigs.fetch().done(() => {

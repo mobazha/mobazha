@@ -1,11 +1,12 @@
 import $ from 'jquery';
 import { Events } from 'backbone';
 import _ from 'underscore';
-import { ipc } from '../../src/utils/ipcRenderer.js';
+import { ipc } from '@/utils/ipcRenderer.js';
 import Socket from './Socket';
 import { guid } from '.';
 import app from '../app';
 import ServerConfig from '../models/ServerConfig';
+import LocalServerProxy from './localServerProxy';
 
 /*
   The module is used to establish a connection with a server as well as monitor
@@ -29,7 +30,9 @@ const events = {
 
 export { events };
 
-const getLocalServer = _.once(() => (ipc.sendSync('controller.system.getGlobal', 'localServer')));
+const isBundledApp = ipc.sendSync('controller.localServer.isEnabled');
+
+const getLocalServer = _.once(() => isBundledApp ? new LocalServerProxy() : null);
 
 let currentConnection = null;
 let debugLog = '';
@@ -243,7 +246,6 @@ export default function connect(server, options = {}) {
     };
 
     let aggregateData = {
-      localServer,
       server,
       socket,
       ...data,
@@ -256,8 +258,6 @@ export default function connect(server, options = {}) {
         totalConnectAttempts: opts.attempts,
       };
     }
-
-    if (localServer) aggregateData.localServer = localServer;
 
     return aggregateData;
   };
@@ -310,7 +310,7 @@ export default function connect(server, options = {}) {
     if (connectAttempt) connectAttempt.cancel();
   };
 
-  if (server.get('builtIn') && !localServer) {
+  if (server.get('builtIn') && !isBundledApp) {
     // This should never happen to normal users. The only way it would is if you are a dev
     // and mucking with localStorage and / or fudging the source for the app to masquerade
     // as a bundled app.
@@ -320,7 +320,7 @@ export default function connect(server, options = {}) {
 
   const newServerDataDir = server.get('dataDir');
 
-  let commandLineArgs = ['-v'];
+  let commandLineArgs = [];
 
   if (server.get('useTor')) commandLineArgs.push('--tor');
   const torPw = server.get('torPassword');
@@ -335,7 +335,7 @@ export default function connect(server, options = {}) {
   // If we're not connecting to the local bundled server or it's running with incompatible
   // command line arguments, let's ensure it's stopped.
   if (
-    localServer &&
+    isBundledApp &&
     localServer.isRunning &&
     (
       !server.get('builtIn') ||

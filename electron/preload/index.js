@@ -13,4 +13,6 @@ module.exports = async () => {
   Addon.get('security').create();
   Addon.get('awaken').create();
   Addon.get('autoUpdater').create();
+
+  Addon.get('localServer').create ();
 }

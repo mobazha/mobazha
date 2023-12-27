@@ -9,7 +9,7 @@ package-lock.json
 public/electron/
 pnpm-lock.yaml
 
-mobazha/
+build/extraResources/mobazha/
 MOBAZHA_TEMP/
 
 .env

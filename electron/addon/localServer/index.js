@@ -1,35 +1,41 @@
-import { ipcMain } from 'electron';
-import _ from 'underscore';
-import { EOL, platform } from 'os';
-import { Events } from 'backbone';
-import path from 'path';
-import fs from 'fs';
-import childProcess from 'child_process';
+const { app: electronApp, ipcMain } = require('electron');
+const _ = require('underscore');
+const { EOL, platform } = require('os');
+const { Events } = require('backbone');
+const path = require('path');
+const fs = require('fs');
+const childProcess = require('child_process');
+const UtilsPs = require('ee-core/ps');
 
-export default class LocalServer {
-  constructor(options) {
-    if (!options.serverPath) {
-      throw new Error('Please provide a server path.');
-    }
+const Log = require('ee-core/log');
+const Conf = require('ee-core/config');
 
-    if (!options.serverFilename) {
-      throw new Error('Please provide a server filename.');
-    }
+function s4() {
+  return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
+}
 
-    if (!options.errorLogPath) {
-      throw new Error('Please provide an error log path.');
-    }
+function guid(prefix = '') {
+  return `${prefix}${s4()}${s4()}-${s4()}-${s4()}-${s4()}-${s4()}${s4()}${s4()}`;
+}
 
-    if (!options.getMainWindow || typeof options.getMainWindow !== 'function') {
-      throw new Error('Please provide a function that, if available, returns a mainWindow '
-        + 'instance.');
-    }
+class LocalServerAddon {
+  constructor() {
+    console.log('in LocalServer constructor')
+  }
 
+  create () {
     _.extend(this, Events);
-    this.serverPath = options.serverPath;
-    this.serverFilename = options.serverFilename;
-    this.errorLogPath = options.errorLogPath;
-    this._getMainWindow = options.getMainWindow;
+    this.serverPath = path.join(UtilsPs.getExtraResourcesDir(), 'mobazha');
+    this.serverFilename = process.platform === 'darwin' || process.platform === 'linux' ? 'mobazhad' : 'mobazhad.exe';
+    // If not bundled app, don't use local server.
+    this._isBundledApp = fs.existsSync(path.join(this.serverPath, this.serverFilename));
+    if (!this._isBundledApp) {
+      return;
+    }
+
+    global.isBundledApp = this._isBundledApp;
+    global.authCookie = guid();
+
     this._isRunning = false;
     this._isStopping = false;
     this._debugLog = '';
@@ -42,10 +48,19 @@ export default class LocalServer {
         const logMsg = `The server shutdown via api request failed${reasonInsert}. `
           + 'Will forcibly shutdown.';
 
-        this.log(logMsg);
+        Log.info(logMsg);
         this._forceKill();
       }
     });
+
+    // some cleanup when our app is exiting
+    process.on('exit', () => {
+      this.stop();
+    });
+  }
+
+  get isEnabled() {
+    return this._isBundledApp;
   }
 
   get isRunning() {
@@ -71,7 +86,7 @@ export default class LocalServer {
       this.serverSubProcess.once('exit', () => this.startAfterStop(commandLineArgs));
       const debugInfo = 'Attempt to start server while an existing one'
         + ' is the process of shutting down. Will start after shut down is complete.';
-      this.log(debugInfo);
+      Log.info(debugInfo);
       return;
     }
 
@@ -92,7 +107,7 @@ export default class LocalServer {
       serverStartArgs = serverStartArgs.concat(['--apicookie', global.authCookie]);
     }
 
-    this.log(`Starting local server via '${serverStartArgs.join(' ')}'.`);
+    Log.info(`Starting local server via '${serverStartArgs.join(' ')}'.`);
     console.log(`Starting local server via '${serverStartArgs.join(' ')}'.`);
 
     this._lastStartCommandLineArgs = commandLineArgs;
@@ -113,21 +128,11 @@ export default class LocalServer {
     this.serverSubProcess.on('error', (err) => {
       const errOutput = `The local server child process has an error: ${err}`;
 
-      fs.appendFile(this.errorLogPath, errOutput, (appendFileErr) => {
-        if (appendFileErr) {
-          console.log(`Unable to write to the error log: ${err}`);
-        }
-      });
-
-      this.log(errOutput);
+      Log.error('[addon:localServer] ', errOutput);
     });
 
     this.serverSubProcess.stderr.on('data', (buf) => {
-      fs.appendFile(this.errorLogPath, String(buf), (err) => {
-        if (err) {
-          console.log(`Unable to write to the error log: ${err}`);
-        }
-      });
+      Log.error('[addon:localServer] ', String(buf));
 
       this.obServerLog(`${buf}`, 'STDERR');
     });
@@ -142,7 +147,7 @@ export default class LocalServer {
       }
 
       console.log(logMsg);
-      this.log(logMsg, 'EXIT');
+      Log.info(logMsg, 'EXIT');
       this._isRunning = false;
       this.lastCloseCode = code;
       this.trigger('exit', { code });
@@ -162,7 +167,7 @@ export default class LocalServer {
     }
 
     if (this.serverSubProcess) {
-      this.log('Forcibly shutting down the server via taskkill.');
+      Log.info('Forcibly shutting down the server via taskkill.');
       childProcess.spawn('taskkill', ['/pid', this.serverSubProcess.pid, '/f', '/t']);
     }
   }
@@ -178,13 +183,13 @@ export default class LocalServer {
     this._isStopping = true;
     this.serverSubProcess.once('exit', () => (this._isStopping = false));
 
-    this.log('Shutting down server');
+    Log.info('Shutting down server');
     console.log('Shutting down server');
 
     if (platform() === 'darwin' || platform() === 'linux') {
       this.serverSubProcess.kill('SIGINT');
     } else {
-      const mw = this._getMainWindow();
+      const mw = electronApp.mainWindow;
 
       if (mw) {
         mw.webContents.send('server-shutdown');
@@ -195,7 +200,7 @@ export default class LocalServer {
   }
 
   getServerStatus(commandLineArgs = []) {
-    this.log('Starting local server in status mode.');
+    Log.info('Starting local server in status mode.');
     console.log('Starting local server in status mode.');
 
     const subProcess = childProcess.spawn(
@@ -213,21 +218,11 @@ export default class LocalServer {
     subProcess.on('error', (err) => {
       const errOutput = `Starting local server in status mode produced an error: ${err}`;
 
-      fs.appendFile(this.errorLogPath, errOutput, (appendFileErr) => {
-        if (appendFileErr) {
-          console.log(`Unable to write to the error log: ${err}`);
-        }
-      });
-
-      this.log(errOutput);
+      Log.error('[addon:localServer] ', errOutput);
     });
 
     subProcess.stderr.on('data', (buf) => {
-      fs.appendFile(this.errorLogPath, `[OB-SERVER-STATUS] ${String(buf)}`, (err) => {
-        if (err) {
-          console.log(`Unable to write to the error log: ${err}`);
-        }
-      });
+      Log.error('[addon:localServer] ', `[OB-SERVER-STATUS] ${String(buf)}`);
 
       this.obServerStatusLog(`${buf}`, 'STDERR', true);
     });
@@ -262,7 +257,7 @@ export default class LocalServer {
       }
 
       console.log(logMsg);
-      this.log(logMsg, 'EXIT');
+      Log.info(logMsg, 'EXIT');
     });
 
     subProcess.unref();
@@ -305,3 +300,6 @@ export default class LocalServer {
     this.obServerLog(msg, type, '[OB-SERVER-STATUS]');
   }
 }
+
+LocalServerAddon.toString = () => '[class LocalServerAddon]';
+module.exports = LocalServerAddon;

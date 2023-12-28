@@ -1,7 +1,7 @@
 <template>
   <div :class="`notificationsList navList listBox ${!collection.length ? 'noNotifications' : ''}`">
     <div class="js-notifsContainer">
-      <template v-for="notif in collection.models">
+      <template v-for="notif in collection">
         <Notification ref="notifViews" @navigate="$emit('notifNavigate')" :bb="() => {
           return {
             model: notif,
@@ -57,6 +57,10 @@ export default {
     this.initEventChain();
 
     this.loadData(this.options);
+
+    window.addEventListener('scroll', ()=>{
+      console.log('scroll in notifications')
+    });
   },
   mounted() {
     this.fetchState = {

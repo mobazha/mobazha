@@ -20,13 +20,14 @@ function guid(prefix = '') {
 
 class LocalServerAddon {
   constructor() {
-    console.log('in LocalServer constructor')
   }
 
   create () {
+    Log.info('[addon:localServer] load');
+
     _.extend(this, Events);
     this.serverPath = path.join(UtilsPs.getExtraResourcesDir(), 'mobazha');
-    this.serverFilename = process.platform === 'darwin' || process.platform === 'linux' ? 'mobazhad' : 'mobazhad.exe';
+    this.serverFilename = process.platform === 'darwin' || process.platform === 'linux' ? 'mobazhad' : 'mobazha.exe';
     // If not bundled app, don't use local server.
     this._isBundledApp = fs.existsSync(path.join(this.serverPath, this.serverFilename));
     if (!this._isBundledApp) {

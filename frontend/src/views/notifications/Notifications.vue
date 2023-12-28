@@ -2,26 +2,31 @@
   <section class="notifications clrBr border clrP clrSh1">
     <h1>{{ ob.polyT('notifications.title') }}</h1>
     <div class="flex tabs">
-      <a :class="`js-tab clrBr clrT2 ${ob.tab === 'all' ? 'active' : ''}`" data-tab="all">{{ ob.polyT('notifications.tabAll') }}</a>
-      <a :class="`js-tab clrBr clrT2 ${ob.tab === 'orders' ? 'active' : ''}`" data-tab="orders">{{ ob.polyT('notifications.tabOrders') }}</a>
-      <a :class="`js-tab clrBr clrT2 ${ob.tab === 'followers' ? 'active' : ''}`" data-tab="followers">{{ ob.polyT('notifications.tabFollowers') }}</a>
+      <template v-for="tab in ['all', 'orders', 'followers']">
+        <a :class="`js-tab clrBr clrT2 ${tab === activeTab ? 'active' : ''}`" @click="onClickTab(tab)">{{ ob.polyT(`notifications.tab${capitalize(tab)}`) }}</a>
+      </template>
     </div>
-    <div class="js-tabContainer tabContainer scrollBox clrBr"></div>
+    <div ref="tabContainer" class="js-tabContainer tabContainer scrollBox clrBr">
+      <NotificationsList :key="activeTab" ref="notifLists" :options="{ filter, scrollContainer }"
+        @notifNavigate="$emit('notifNavigate', { list })"
+      />
+    </div>
   </section>
 </template>
 
 <script>
-/* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import app from '../../../backbone/app';
 import { capitalize } from '../../../backbone/utils/string';
 import { recordEvent } from '../../../backbone/utils/metrics';
-import loadTemplate from '../../../backbone/utils/loadTemplate';
-import Notifications from '../../../backbone/collections/Notifications';
-import NotificationsList from './NotificationsList';
+
+import NotificationsList from './NotificationsList.vue';
 
 
 export default {
+  components: {
+    NotificationsList,
+  },
   props: {
     options: {
       type: Object,
@@ -31,161 +36,88 @@ export default {
   },
   data () {
     return {
+      activeTab: 'all',
+
+      list: 'all',
     };
   },
   created () {
     this.initEventChain();
 
-    this.loadData(this.options);
+    this.loadData();
   },
   mounted () {
-    this.render();
   },
   computed: {
-    ob () {
-      return {
-        ...this.templateHelpers,
-        ...this._state(),
-      };
+    filter() {
+      switch (this.activeTab) {
+        case 'orders':
+          this.list = 'order';
+          return 'order,orderDeclined,cancel,refund,fulfillment,orderComplete,disputeOpen,'
+            + 'disputeUpdate,disputeClose,disputeAccepted,vendorDisputeTimeout,buyerDisputeTimeout'
+            + 'buyerDisputeExpiry,moderatorDisputeExpiry';
+        case 'followers':
+          this.list = 'follow';
+          return 'follow';
+        default:
+          this.list = 'all';
+          return '';
+      }
+    },
+
+    scrollContainer() {
+      return $(this.$refs.tabContainer);
     }
   },
 	methods: {
-  loadData(options = {}) {
-    const opts = {
-      initialState: {
-        tab: 'all',
-      },
-      ...options,
-    };
+    capitalize,
 
-    this.baseInit(opts);
-    this.options = opts;
-    this.notifListsCache = {};
-  },
+    loadData() {
+      this.activeTab = this.options.tab;
+    },
 
+    onClickTab(tab) {
+      recordEvent('Notifications_Tab', { tab });
+      // Timeout needed so event can bubble to a page nav handler before the view is re-rendered
+      // and the target element is ripped out of the dom.
+      setTimeout(() => {
+        this.activeTab = tab;
+      });
+    },
 
-  events() {
-    return {
-      'click .js-tab[data-tab]': 'onClickTab',
-    };
-  },
+    /**
+     * If there are any loaded notifications, this method will kick off a server
+     * call that will mark all notifications (seen and unseen) as read. If there
+     * are no loaded notifications (possibly because a initial page is being fetched),
+     * it will return false and not kick off any server call.
+     * @return {boolean|object} False if no notifications have been loaded, otherwise
+     *   the xhr of the call to the server
+     */
+    markNotifsAsRead() {
+      // Going to optimistically mark all as read and switch back if the call fails.
+      const notifs = [];
 
-  onClickTab(e) {
-    const tab = e.target.getAttribute('data-tab');
-    recordEvent('Notifications_Tab', { tab });
-    // Timeout needed so event can bubble to a page nav handler before the view is re-rendered
-    // and the target element is ripped out of the dom.
-    setTimeout(() => {
-      this.setState({ tab });
-    });
-  },
-
-  /**
-   * If there are any loaded notifications, this method will kick off a server
-   * call that will mark all notifications (seen and unseen) as read. If there
-   * are no loaded notifications (possibly because a initial page is being fetched),
-   * it will return false and not kick off any server call.
-   * @return {boolean|object} False if no notifications have been loaded, otherwise
-   *   the xhr of the call to the server
-   */
-  markNotifsAsRead() {
-    // Going to optimistically mark all as read and switch back if the call fails.
-    const notifs = [];
-
-    Object.keys(this.notifListsCache).forEach((listType) => {
-      this.notifListsCache[listType].collection
-        .forEach((notif) => {
+      if (this.$refs.notifLists) {
+        this.$refs.notifLists.collection.forEach((notif) => {
           notif.set('read', true);
           notifs.push(notif);
         });
-    });
-
-    if (!notifs.length) return false;
-
-    return $.post(app.getServerUrl('ob/marknotificationsasread'))
-      .fail(() => notifs.forEach((notif) => notif.set('read', false)));
-  },
-
-  /**
-   * Will set the tab to 'All' and set the scroll position to the top - useful
-   * when hiding the menu so that it resets to a standard initial position. It will
-   * leave the collections intact, so the user won't need to fetch notifications
-   * already fetched.
-   */
-  reset() {
-    this.setState({ tab: 'all' });
-    this.getCachedEl('.js-tabContainer')[0].scrollTop = 0;
-  },
-
-  createAllNotifList() {
-    const notifList = this.createChild(NotificationsList, {
-      collection: new Notifications(),
-    });
-
-    this.listenTo(notifList, 'notifNavigate', () => this.trigger('notifNavigate', { list: 'all' }));
-
-    return notifList;
-  },
-
-  createOrdersNotifList() {
-    const notifList = this.createChild(NotificationsList, {
-      collection: new Notifications(),
-      filter: 'order,orderDeclined,cancel,refund,fulfillment,orderComplete,disputeOpen,'
-        + 'disputeUpdate,disputeClose,disputeAccepted,vendorDisputeTimeout,buyerDisputeTimeout'
-        + 'buyerDisputeExpiry,moderatorDisputeExpiry',
-    });
-
-    this.listenTo(notifList, 'notifNavigate', () => this.trigger('notifNavigate', { list: 'order' }));
-
-    return notifList;
-  },
-
-  createFollowersNotifList() {
-    const notifList = this.createChild(NotificationsList, {
-      collection: new Notifications(),
-      filter: 'follow',
-    });
-
-    this.listenTo(notifList, 'notifNavigate', () => this.trigger('notifNavigate', { list: 'follow' }));
-
-    return notifList;
-  },
-
-  render() {
-    super.render();
-    const state = this.getState();
-
-    loadTemplate('notifications/notifications.html', (t) => {
-      this.$el.html(t({
-        ...this.getState(),
-      }));
-    });
-
-    let notifList = this.notifListsCache[state.tab];
-
-    if (!notifList) {
-      const createMethodName = `create${capitalize(state.tab)}NotifList`;
-      if (this[createMethodName]) {
-        notifList = this[createMethodName].call(this);
-        notifList.render();
-        this.notifListsCache[state.tab] = notifList;
-      } else {
-        throw new Error(`Unable to populate the ${state.tab} tab, because I was unable to `
-          + `find the ${createMethodName} function`);
       }
-    }
 
-    // If the tab we want is already the active one, do nothing.
-    if (notifList !== this.activeNotifList) {
-      notifList.delegateEvents();
-      this.getCachedEl('.js-tabContainer').html(notifList.el);
-      notifList.$scrollContainer = this.getCachedEl('.js-tabContainer');
-      this.activeNotifList = notifList;
-    }
+      return $.post(app.getServerUrl('ob/marknotificationsasread'))
+        .fail(() => notifs.forEach((notif) => notif.set('read', false)));
+    },
 
-    return this;
-  }
-
+    /**
+     * Will set the tab to 'All' and set the scroll position to the top - useful
+     * when hiding the menu so that it resets to a standard initial position. It will
+     * leave the collections intact, so the user won't need to fetch notifications
+     * already fetched.
+     */
+    reset() {
+      this.activeTab = 'all';
+      this.scrollContainer.scrollTop = 0;
+    },
   }
 }
 </script>

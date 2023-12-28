@@ -10,8 +10,8 @@
           :style="ob[isOrderNotif ? 'getListingBgImage' : 'getAvatarBgImage'](ob.notification.thumbnail || ob.notification.avatarHashes || {})">
         </div>
         <div class="flexExpand">
-          <div class="rowTn clamp2 notifMsg">{{ ob.notifText }}</div>
-          <div class="clrT2 tx6">{{ ob.renderedTimeAgo }}</div>
+          <div class="rowTn clamp2 notifMsg" v-html="ob.notifText"></div>
+          <div class="clrT2 tx6">{{ renderedTimeAgo }}</div>
         </div>
       </div>
     </div>
@@ -35,27 +35,27 @@ export default {
   },
   data () {
     return {
+      renderedTimeAgo: '',
     };
   },
   created() {
     this.initEventChain();
 
-    this.loadData(this.options);
+    this.loadData();
   },
   mounted() {
-    this.render();
+  },
+  unmounted () {
+    this.timeAgoInterval.cancel();
   },
   computed: {
     ob() {
-      this.renderedTimeAgo = moment(this.model.get('timestamp')).fromNow();
-
       return {
         ...this.templateHelpers,
         ...this._state,
         ...this.model.toJSON(),
         notifText: this.getNotifDisplayData().text,
         ownGuid: app.profile.id,
-        renderedTimeAgo: this.renderedTimeAgo,
         moment,
       };
     },
@@ -63,28 +63,17 @@ export default {
     isOrderNotif() {
       const notification = this.model.toJSON().notification;
       return !!notification.orderID || !!notification.purchaseOrderID || !!notification.disputeCaseId;
-    }
+    },
   },
   methods: {
-    loadData(options = {}) {
-      const opts = {
-        initialState: {
-          ...options.initialState || {},
-        },
-        ...options,
-      };
-
-      if (!options.model) {
+    loadData() {
+      if (!this.model) {
         throw new Error('Please provide a model.');
       }
 
-      this.baseInit(opts);
-      this.options = opts;
-      this.listenTo(this.model, 'change', () => this.render());
-
+      this.renderedTimeAgo = moment(this.model.get('timestamp')).fromNow();
       this.timeAgoInterval = setTimeagoInterval(this.model.get('timestamp'), () => {
-        const timeAgo = moment(this.model.get('timestamp')).fromNow();
-        if (timeAgo !== this.renderedTimeAgo) this.render();
+        this.renderedTimeAgo = moment(this.model.get('timestamp')).fromNow();
       });
     },
 
@@ -102,11 +91,6 @@ export default {
 
     getNotifDisplayData() {
       return getNotifDisplayData(this.model.toJSON().notification);
-    },
-
-    remove(){
-      this.timeAgoInterval.cancel();
-      super.remove();
     },
   }
 }

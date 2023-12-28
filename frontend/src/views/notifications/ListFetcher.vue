@@ -1,18 +1,18 @@
 <template>
   <div class="listFetcher">
-    <template v-if="ob.isFetching">
+    <template v-if="fetchState.isFetching">
       <div class="loadingSpinnerWrap">
         <SpinnerSVG className="spinnerMd" />
       </div>
     </template>
 
-    <template v-else-if="ob.fetchFailed">
+    <template v-else-if="fetchState.fetchFailed">
       <p>{{ ob.polyT('notifications.errorHeading') }}</p>
-      <p v-if="ob.fetchError">{{ ob.fetchError }}</p>
+      <p v-if="fetchState.fetchError">{{ fetchState.fetchError }}</p>
       <button class="btn normalBtn clrP clrBr " @click="onClickRetry">{{ ob.polyT('notifications.btnRetry') }}</button>
     </template>
 
-    <template v-else-if="ob.noResults">
+    <template v-else-if="fetchState.noResults">
       <p>{{ ob.polyT('notifications.noResults') }}</p>
     </template>
 
@@ -28,9 +28,14 @@
 
 export default {
   props: {
-    options: {
+    fetchState: {
       type: Object,
-      default: {},
+      default: {
+        isFetching: false,
+        fetchFailed: false,
+        noResults: false,
+        fetchError: '',
+      },
     },
     bb: Function,
   },
@@ -40,35 +45,13 @@ export default {
   },
   created () {
     this.initEventChain();
-
-    this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
-    ob () {
-      return {
-        ...this.templateHelpers,
-        ...this._state,
-      };
-    }
+
   },
   methods: {
-    loadData (options = {}) {
-      const opts = {
-        initialState: {
-          isFetching: false,
-          noResults: false,
-          fetchError: '',
-          ...options.initialState || {},
-        },
-        ...options,
-      };
-
-      this.baseInit(opts);
-    },
-
     onClickRetry () {
       this.$emit('retry-click');
     },

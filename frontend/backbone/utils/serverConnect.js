@@ -30,7 +30,7 @@ const events = {
 
 export { events };
 
-const isBundledApp = ipc.sendSync('controller.localServer.isEnabled');
+const isBundledApp = ipc.sendSync('controller.system.getGlobal', 'isBundledApp');
 
 const getLocalServer = _.once(() => isBundledApp ? new LocalServerProxy() : null);
 

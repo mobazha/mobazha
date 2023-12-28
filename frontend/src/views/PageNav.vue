@@ -88,7 +88,9 @@
                   {{ cartItemsCount > 99 ? '…' : cartItemsCount }}
                 </div>
               </a>
-              <div :class="`js-notifContainer notifContainer foldDown ${notifContainerOpened ? 'open' : ''}`" @click.stop="onClickNotifContainer"></div>
+              <div :class="`js-notifContainer notifContainer foldDown ${notifContainerOpened ? 'open' : ''}`" @click.stop="onClickNotifContainer">
+                <Notifications v-if="serverConnected && profileReady" ref="notifications" @notifNavigate="closeNotifications"/>
+              </div>
               <a id="AvatarBtn" class="discSm clrBr2 clrSh1 navListBtn toolTipNoWrap" @click.stop="navListBtnClick"
                 :style="ob.getAvatarBgImage(avatarHashes || ob.avatarHashes)" :data-tip="ob.polyT('pageNav.toolTip.nav')"></a>
               <nav :class="`navListWrapper foldDown js-navList ${navListOpened ? 'open' : ''}`" @click.stop="onNavListClick">
@@ -178,15 +180,16 @@ import {
 } from '../../backbone/utils/modalManager.js';
 import Listing from '../../backbone/models/listing/Listing.js';
 import { getNotifDisplayData } from '../../backbone/collections/Notifications.js';
-import Notifications from '../../backbone/views/notifications/Notifications.js';
 
 import PageNavServersMenu from './PageNavServersMenu.vue';
 import AddressBarIndicators from './AddressBarIndicators.vue';
+import Notifications from './notifications/Notifications.vue';
 
 export default {
   components: {
     PageNavServersMenu,
     AddressBarIndicators,
+    Notifications,
   },
   props: {
     options: {
@@ -209,6 +212,7 @@ export default {
       cartItemsCount: 0,
 
       serverConnected: false,
+      profileReady: false,
 
       avatarHashes: '',
       navListOpened: false,
@@ -373,6 +377,7 @@ export default {
       // when this view is created, the app.profile doesn't exist
       this.listenTo(app.profile.get('avatarHashes'), 'change', this.updateAvatar);
       
+      this.profileReady = true;
       this.toggleKey += 1;
     },
 
@@ -490,13 +495,6 @@ export default {
         this.navOverlayOpened = true;
         recordEvent('NavClick', { target: 'notificationsOpen' });
 
-        // open notifications menu
-        if (!this.notifications) {
-          this.notifications = new Notifications();
-          $('.js-notifContainer').html(this.notifications.render().el);
-          this.listenTo(this.notifications, 'notifNavigate', () => this.closeNotifications());
-        }
-
         this.notifContainerOpened = true;
       }
     },
@@ -516,10 +514,10 @@ export default {
       this.notifContainerOpened = false;
       if (opts.closeOverlay) this.navOverlayOpened = false;
 
-      if (this.notifications) {
+      if (this.$refs.notifications) {
         const count = this.unreadNotifCount;
         if (this.unreadNotifCount) {
-          const markAsRead = this.notifications.markNotifsAsRead();
+          const markAsRead = this.$refs.notifications.markNotifsAsRead();
           if (markAsRead) {
             this.unreadNotifCount = 0;
             markAsRead.fail(() => {
@@ -528,7 +526,7 @@ export default {
           }
         }
 
-        this.notifications.reset();
+        this.$refs.notifications.reset();
       }
     },
 

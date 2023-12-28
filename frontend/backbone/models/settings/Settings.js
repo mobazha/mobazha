@@ -92,7 +92,7 @@ export default class extends BaseModel {
       options.type = 'PUT';
     }
 
-    if (method !== 'read' && method !== 'delete') {
+    if (method !== 'read' && method !== 'delete' && options.attrs) {
       (options.attrs.shippingOptions ?? []).forEach(shipOpt => {
         if (shipOpt.services && shipOpt.services.length) {
           const coinDiv = getCoinDivisibility(shipOpt.currency);

@@ -18,7 +18,7 @@ import { getAvatarBgImage } from '../utils/responsive';
 import PageNavServersMenu from './PageNavServersMenu';
 import AddressBarIndicators from './AddressBarIndicators';
 import { getNotifDisplayData } from '../collections/Notifications';
-import Notifications from './notifications/Notificiations';
+import Notifications from './notifications/Notifications';
 
 export default class extends BaseVw {
   constructor(options) {

@@ -178,7 +178,7 @@ import {
 } from '../../backbone/utils/modalManager.js';
 import Listing from '../../backbone/models/listing/Listing.js';
 import { getNotifDisplayData } from '../../backbone/collections/Notifications.js';
-import Notifications from '../../backbone/views/notifications/Notificiations';
+import Notifications from '../../backbone/views/notifications/Notifications.js';
 
 import PageNavServersMenu from './PageNavServersMenu.vue';
 import AddressBarIndicators from './AddressBarIndicators.vue';

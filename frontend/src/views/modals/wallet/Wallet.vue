@@ -48,10 +48,11 @@
                       <div class="js-sendReceiveNavContainer rowMd"></div>
                       <SendReceiveNav class="rowMd" :tabActive="tabActive" :activeCoin="activeCoin" @changeTab="changeTab" />
                       <div class="js-sendReceiveContainer sendReceiveContainer clrP">
-                        <SendMoney v-if="tabActive === 1" ref="sendeMoneyVw" :options="{ coinType: activeCoin }" />
+                        <SendMoney v-if="tabActive === 1" ref="sendeMoneyVw" :key="activeCoin" :options="{ coinType: activeCoin }" />
                         <ReceiveMoney
                           v-if="tabActive === 2"
                           ref="receiveMoneyVw"
+                          :key="activeCoin"
                           :coinType="activeCoin"
                           :fetching="fetchingAddress"
                           :address="receiveAddress"
@@ -137,6 +138,7 @@ export default {
   },
   data() {
     return {
+      balanceKey: 0,
       transactionsVwKey: 0,
 
       activeCoin: '',
@@ -197,8 +199,12 @@ export default {
       return (app && app.settings && app.settings.get('localCurrency')) || 'USD';
     },
     coinStatsState() {
+      let access = this.balanceKey;
+
       const { activeCoin } = this;
-      const balance = this._walletBalances.find((item) => item.code === activeCoin);
+
+      const balances = this.walletBalances.toJSON();
+      const balance = balances.find((item) => item.code === activeCoin);
       return {
         cryptoCur: activeCoin && ensureMainnetCode(activeCoin),
         confirmed: balance && balance.confirmed,
@@ -228,9 +234,10 @@ export default {
 
     navCoins() {
       let supportedCoins = this.supportedCoins();
+      const balances = this.walletBalances.toJSON();
 
       return supportedCoins.map((coin) => {
-        const balanceMd = this._walletBalances.find((item) => item.code === coin);
+        const balanceMd = balances.find((item) => item.code === coin);
         return {
           active: coin === this.activeCoin,
           code: coin,
@@ -280,9 +287,13 @@ export default {
 
       const serverSocket = getSocket();
 
+      app.walletBalances.on('change', () => this.balanceKey += 1);
+
       if (initialActiveCoin && serverSocket) {
         this.listenTo(serverSocket, 'message', (e) => {
           if (e.jsonData.wallet && e.jsonData.wallet.transaction) {
+            this.transactionsVwKey += 1;
+
             let walletCur;
 
             try {

@@ -697,9 +697,11 @@ export function convertCurrency(amount, fromCur, toCur) {
   const bigNum = amount instanceof bigNumber
     ? amount : bigNumber(amount);
 
-  const converted = bigNum
+  let result = bigNum
     .times(toRate / fromRate)
     .multipliedBy(bigNumber(10).pow(fromDivisibility - toDivisibility));
+
+  const converted = result.decimalPlaces(toDivisibility);
 
   if (amount instanceof bigNumber) {
     return converted;

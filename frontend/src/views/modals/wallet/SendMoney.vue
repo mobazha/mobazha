@@ -63,6 +63,7 @@
 
 <script>
 import _ from 'underscore';
+import $ from 'jquery';
 import bigNumber from 'bignumber.js';
 import app from '../../../../backbone/app';
 import { getCurrenciesSortedByCode } from '../../../../backbone/data/currencies';
@@ -92,7 +93,10 @@ export default {
         amount: 0,
         currency: '',
         memo: '',
-      }
+      },
+
+      _model: undefined,
+      modelKey: 0,
     };
   },
   created () {
@@ -116,6 +120,12 @@ export default {
         saveInProgress: this.saveInProgress,
         coinType: this.coinType,
       };
+    },
+
+    model() {
+      let access = this.modelKey;
+
+      return this._model;
     }
   },
   methods: {
@@ -126,8 +136,10 @@ export default {
 
       this.baseInit(options);
 
-      this.model = new Spend({ wallet: options.coinType });
-      this.formData = _.pick(this.model.toJSON(), _.keys(this.formData));
+      this._model = new Spend({ wallet: options.coinType });
+      this._model.on('change', () => this.modelKey += 1);
+
+      this.formData = _.pick(this._model.toJSON(), _.keys(this.formData));
       this.formData.currency = this.defaultCur;
     },
 
@@ -165,7 +177,7 @@ export default {
 
     onClickSend () {
       const formData = this.formData;
-      if (!_.isEmpty(formData.amount)) {
+      if (!_.isNull(formData.amount)) {
         formData.amount = bigNumber(formData.amount);
       }
 
@@ -178,7 +190,7 @@ export default {
         this.fetchFeeEstimate();
       }
 
-      const $firstErr = this.$el.querySelectorAll('.errorList:first');
+      const $firstErr = $('.errorList:first');
       if ($firstErr.length) $firstErr[0].scrollIntoViewIfNeeded();
     },
 

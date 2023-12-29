@@ -87,13 +87,7 @@ let _currencies = [
     testnetCode: 'BNB',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
-      let prefixedAddress = address;
-
-      const prefix = app.serverConfig.testnet ? 'bnbtest' : 'bnb';
-      prefixedAddress = address.startsWith(prefix)
-        ? prefixedAddress : `${prefix}:${address}`;
-
-      return prefixedAddress;
+      return address;
     },
     icon: 'imgs/cryptoIcons/BNB-icon.png',
     url: 'https://bitcoincash.org/',
@@ -117,13 +111,7 @@ let _currencies = [
     testnetCode: 'BNBUSDT',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
-      let prefixedAddress = address;
-
-      const prefix = app.serverConfig.testnet ? 'bnbtest' : 'bnb';
-      prefixedAddress = address.startsWith(prefix)
-        ? prefixedAddress : `${prefix}:${address}`;
-
-      return prefixedAddress;
+      return address;
     },
     icon: 'imgs/cryptoIcons/USDT-icon.png',
     url: 'https://bitcoincash.org/',
@@ -147,13 +135,7 @@ let _currencies = [
     testnetCode: 'BNBUSDC',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
-      let prefixedAddress = address;
-
-      const prefix = app.serverConfig.testnet ? 'bnbtest' : 'bnb';
-      prefixedAddress = address.startsWith(prefix)
-        ? prefixedAddress : `${prefix}:${address}`;
-
-      return prefixedAddress;
+      return address;
     },
     icon: 'imgs/cryptoIcons/USDC-icon.png',
     url: 'https://bitcoincash.org/',
@@ -177,13 +159,7 @@ let _currencies = [
     testnetCode: 'BNBMBZ',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
-      let prefixedAddress = address;
-
-      const prefix = app.serverConfig.testnet ? 'bnbtest' : 'bnb';
-      prefixedAddress = address.startsWith(prefix)
-        ? prefixedAddress : `${prefix}:${address}`;
-
-      return prefixedAddress;
+      return address;
     },
     icon: 'imgs/cryptoIcons/MBZ-icon.png',
     url: 'https://bitcoincash.org/',
@@ -207,13 +183,7 @@ let _currencies = [
     testnetCode: 'MATIC',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
-      let prefixedAddress = address;
-
-      const prefix = app.serverConfig.testnet ? 'bnbtest' : 'bnb';
-      prefixedAddress = address.startsWith(prefix)
-        ? prefixedAddress : `${prefix}:${address}`;
-
-      return prefixedAddress;
+      return address;
     },
     icon: 'imgs/cryptoIcons/MATIC-icon.png',
     url: 'https://bitcoincash.org/',
@@ -237,13 +207,7 @@ let _currencies = [
     testnetCode: 'MATICUSDT',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
-      let prefixedAddress = address;
-
-      const prefix = app.serverConfig.testnet ? 'bnbtest' : 'bnb';
-      prefixedAddress = address.startsWith(prefix)
-        ? prefixedAddress : `${prefix}:${address}`;
-
-      return prefixedAddress;
+      return address;
     },
     icon: 'imgs/cryptoIcons/USDT-icon.png',
     url: 'https://bitcoincash.org/',
@@ -267,13 +231,7 @@ let _currencies = [
     testnetCode: 'MATICUSDC',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
-      let prefixedAddress = address;
-
-      const prefix = app.serverConfig.testnet ? 'bnbtest' : 'bnb';
-      prefixedAddress = address.startsWith(prefix)
-        ? prefixedAddress : `${prefix}:${address}`;
-
-      return prefixedAddress;
+      return address;
     },
     icon: 'imgs/cryptoIcons/USDC-icon.png',
     url: 'https://bitcoincash.org/',
@@ -297,13 +255,7 @@ let _currencies = [
     testnetCode: 'MATICMBZ',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
-      let prefixedAddress = address;
-
-      const prefix = app.serverConfig.testnet ? 'bnbtest' : 'bnb';
-      prefixedAddress = address.startsWith(prefix)
-        ? prefixedAddress : `${prefix}:${address}`;
-
-      return prefixedAddress;
+      return address;
     },
     icon: 'imgs/cryptoIcons/MBZ-icon.png',
     url: 'https://bitcoincash.org/',

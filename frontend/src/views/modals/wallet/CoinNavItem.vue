@@ -8,7 +8,6 @@
         <div class="flexVCent flexHRight">
           <i v-if="ob.active" class="ion-arrow-right-c clrT2 activeBalanceIcon"></i>
           <span v-else-if="ob.balance > 0" class="clrTEm txB">{{ formattedBalance }}</span>
-          <template v-else>{{ formattedBalance }}</template>
         </div>
       </template>
       <template v-else>
@@ -16,6 +15,7 @@
           <i class="ion-help-circled"></i>
         </span>
       </template>
+      <span v-if="externalEnabled" class="extflag txB flexHRight">Ext-enabled</span>
     </div>
   </li>
 </template>
@@ -85,9 +85,23 @@ export default {
 
       return ob.code && ob.crypto.ensureMainnetCode(ob.code);
     },
+    externalEnabled() {
+      let externalPaymentAddresses = app.settings.get('externalPaymentAddresses') || {};
+      const { code } = this.options;
+      const lastAddress = externalPaymentAddresses[code]?.address;
+      const enabled = externalPaymentAddresses[code]?.enable;
+
+      return lastAddress && enabled;
+    }
   },
   methods: {
   },
 };
 </script>
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.extflag {
+  color: #cc920b;
+  font-size: 14px;
+  margin-top: 3px;
+}
+</style>

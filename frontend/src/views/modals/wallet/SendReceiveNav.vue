@@ -7,8 +7,8 @@
       <button :class="['btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm', { active: tabActive === 2 }]" @click="changeTab(2, 'Wallet_ReceiveShow')">
         {{ ob.polyT('wallet.receiveBtn') }}
       </button>
-      <button :class="['btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm', { active: tabActive === 3 }]" @click="changeTab(3, 'Wallet_External')">
-        External
+      <button v-if="activeCoin !== 'MATICMBZ'" :class="['btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm', { active: tabActive === 3 }]" @click="changeTab(3, 'Wallet_External')">
+        {{ ob.polyT('wallet.externalBtn') }}
       </button>
     </div>
   </div>
@@ -23,6 +23,10 @@ export default {
       type: Number,
       default: 1,
     },
+    activeCoin: {
+      type: String,
+      default: 'MATICUSDT'
+    }
   },
   data() {
     return {};

@@ -46,7 +46,7 @@
                   <div>
                     <div class="flexColWide clrP clrSh3">
                       <div class="js-sendReceiveNavContainer rowMd"></div>
-                      <SendReceiveNav class="rowMd" :tabActive="tabActive" @changeTab="changeTab" />
+                      <SendReceiveNav class="rowMd" :tabActive="tabActive" :activeCoin="activeCoin" @changeTab="changeTab" />
                       <div class="js-sendReceiveContainer sendReceiveContainer clrP">
                         <SendMoney v-if="tabActive === 1" ref="sendeMoneyVw" :options="{ coinType: activeCoin }" />
                         <ReceiveMoney
@@ -56,7 +56,7 @@
                           :fetching="fetchingAddress"
                           :address="receiveAddress"
                         />
-                        <External v-if="tabActive === 3" ref="external" :key="activeCoin" :coinType="activeCoin" />
+                        <External v-if="tabActive === 3 && activeCoin !== 'MATICMBZ'" ref="external" :key="activeCoin" :coinType="activeCoin" />
                       </div>
                     </div>
                   </div>
@@ -179,6 +179,8 @@ export default {
 
       if (this.tabActive === 1 && !(this.walletBalances.get(coin) && this.walletBalances.get(coin).get('confirmed'))) {
         this.tabActive = 2;
+      } else {
+        this.tabActive = 1;
       }
 
       this.transactionsVwKey += 1;

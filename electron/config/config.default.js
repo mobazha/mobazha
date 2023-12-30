@@ -181,8 +181,9 @@ module.exports = (appInfo) => {
       macOS: true, 
       linux: false,
       options: {
-        provider: 'generic', 
-        url: 'http://kodo.qiniu.com/'
+        provider: 'github',
+        owner: 'mobazha',
+        repo: 'mobazha'
       },
       force: false,
     },

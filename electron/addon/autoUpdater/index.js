@@ -45,12 +45,12 @@ class AutoUpdaterAddon {
     const version = electronApp.getVersion();
     Log.info('[addon:autoUpdater] current version: ', version);
   
-    // 设置下载服务器地址
-    let server = cfg.options.url;
-    let lastChar = server.substring(server.length - 1);
-    server = lastChar === '/' ? server : server + "/";
-    //Log.info('[addon:autoUpdater] server: ', server);
-    cfg.options.url = server;
+    // // 设置下载服务器地址
+    // let server = cfg.options.url;
+    // let lastChar = server.substring(server.length - 1);
+    // server = lastChar === '/' ? server : server + "/";
+    // //Log.info('[addon:autoUpdater] server: ', server);
+    // cfg.options.url = server;
   
     // 是否后台自动下载
     autoUpdater.autoDownload = cfg.force ? true : false;

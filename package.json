@@ -1,7 +1,7 @@
 {
   "name": "mobazha-desktop",
   "productName": "MobazhaDesktopClient",
-  "version": "3.0.3",
+  "version": "3.0.5",
   "description": "Decentralized p2p marketplace that uses Cryptocurrencies.",
   "main": "main.js",
   "scripts": {

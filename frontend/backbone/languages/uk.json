@@ -984,7 +984,8 @@
       "transactionsHeader": "Транзакції"
     },
     "coinNav": {
-      "unsupportedCurTip": "Наразі це не є підтримувана валюта."
+      "unsupportedCurTip": "Наразі це не є підтримувана валюта.",
+      "extEnabled": "External wallet address to receive %{cur} order payment is enabled."
     },
     "sendBtn": "Відправити",
     "receiveBtn": "Отримати",

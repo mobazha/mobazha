@@ -984,7 +984,8 @@
       "transactionsHeader": "Transações"
     },
     "coinNav": {
-      "unsupportedCurTip": "Essa moeda atualmente não é suportada."
+      "unsupportedCurTip": "Essa moeda atualmente não é suportada.",
+      "extEnabled": "External wallet address to receive %{cur} order payment is enabled."
     },
     "sendBtn": "Enviar",
     "receiveBtn": "Receber",

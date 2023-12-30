@@ -15,7 +15,7 @@
           <i class="ion-help-circled"></i>
         </span>
       </template>
-      <span v-if="externalEnabled" class="extflag txB flexHRight">Ext-enabled</span>
+      <span v-if="externalEnabled" class="extflag txB flexHRight toolTip" :data-tip="ob.polyT('wallet.coinNav.extEnabled', {cur: ob.polyT(`cryptoCurrencies.${mnCode}`)})">Ext-enabled</span>
     </div>
   </li>
 </template>

@@ -215,6 +215,7 @@
             </div>
             <div class="js-socialAccounts">
               <SocialAccounts
+                ref="socialAccounts"
                 :options="{ maxAccounts: profile.get('contactInfo').maxSocialAccounts }"
                 :bb="
                   () => {
@@ -580,7 +581,7 @@ export default {
     getFormData() {
       const formData = this.formData;
 
-      while (formData.handle.startsWith('@')) {
+      while (formData.handle && formData.handle.startsWith('@')) {
         formData.handle = formData.handle.slice(1);
       }
 
@@ -599,7 +600,7 @@ export default {
       const formData = this.getFormData();
 
       // set the model data for the social accounts
-      this.socialAccounts.setCollectionData();
+      this.$refs.socialAccounts.setCollectionData();
 
       this.profile.set(formData);
 

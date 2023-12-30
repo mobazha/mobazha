@@ -984,7 +984,8 @@
       "transactionsHeader": "Transakce"
     },
     "coinNav": {
-      "unsupportedCurTip": "Toto je aktuálně nepodporovaná měna."
+      "unsupportedCurTip": "Toto je aktuálně nepodporovaná měna.",
+      "extEnabled": "External wallet address to receive %{cur} order payment is enabled."
     },
     "sendBtn": "Poslat",
     "receiveBtn": "Příjmout",

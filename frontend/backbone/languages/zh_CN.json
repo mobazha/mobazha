@@ -984,7 +984,8 @@
       "transactionsHeader": "交易"
     },
     "coinNav": {
-      "unsupportedCurTip": "这是一个目前尚未支持的货币。"
+      "unsupportedCurTip": "这是一个目前尚未支持的货币。",
+      "extEnabled": "External wallet address to receive %{cur} order payment is enabled."
     },
     "sendBtn": "发送",
     "receiveBtn": "接收",

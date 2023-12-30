@@ -118,7 +118,7 @@ export function estimateFee(coinType, feeLevel, amount, options = {}) {
 
     const queryArgs = `feeLevel=${feeLevel}&amount=${amountInBaseUnits}`;
     const estimateFeeXhr =
-      $.get(app.getServerUrl(`wallet/estimatefee/${coinType}?${queryArgs}`))
+      $.getJSON(app.getServerUrl(`wallet/estimatefee/${coinType}?${queryArgs}`))
         .done((...args) => {
           let convertedAmount;
 

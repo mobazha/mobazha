@@ -32,7 +32,7 @@ export default class extends BaseModal {
 
     this.currentTabName = opts.initialTab;
     this.isBundledApp = ipc.sendSync('controller.system.getGlobal', 'isBundledApp');
-    this.updatesSupported = ipc.sendSync('controller.system.getGlobal', 'updatesSupported');
+    this.updatesSupported = true; //ipc.sendSync('controller.system.getGlobal', 'updatesSupported');
   }
 
   className() {

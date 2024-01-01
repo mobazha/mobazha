@@ -22,14 +22,14 @@
                   <div class="btnRadio clrBr">
                     <input type="radio"
                       v-model="formData.moderator"
-                      value="true"
+                      :value="true"
                       id="settingsModerationStatusTrue">
                     <label for="settingsModerationStatusTrue">{{ ob.polyT('settings.on') }}</label>
                   </div>
                   <div class="btnRadio clrBr">
                     <input type="radio"
                       v-model="formData.moderator"
-                      value="false"
+                      :value="false"
                       id="settingsModerationStatusFalse">
                     <label for="settingsModerationStatusFalse">{{ ob.polyT('settings.off') }}</label>
                   </div>
@@ -56,26 +56,30 @@
                       </option>
                     </Select2>
                   </div>
-                  <div :class="`col2 js-feeFixedInput ${!formData.moderatorInfo.fee || (formData.moderatorInfo.fee.feeType === ob.feeTypes.PERCENTAGE) ? 'visuallyHidden' : ''}`">
-                    <input
-                      type="number"
-                      class="noSpin clrBr clrSh2"
-                      v-model="formData.moderatorInfo.fee.fixedFee.amount"
-                      data-var-type="bignumber"
-                      placeholder="0.00">
-                  </div>
-                  <div :class="`col4 js-feeFixedInput ${!formData.moderatorInfo.fee || (formData.moderatorInfo.fee.feeType === ob.feeTypes.PERCENTAGE) ? 'visuallyHidden' : ''}`">
-                    <Select2 id="moderationCurrency" v-model="formData.moderatorInfo.fee.fixedFee.currency.code" class="clrBr clrP clrSh2" style="width: 100%">
-                      <template v-for="currency in currencyList" :key="currency.code">
-                        <option :value="currency.code" :selected="currency.code === ccode">{{ currency.nameWithCode }}</option>
-                      </template>
-                    </Select2>
-                  </div>
-                  <div :class="`col2 js-feePercentageInput ${formData.moderatorInfo.fee.feeType === 'FIXED' ? 'visuallyHidden' : ''}`">
-                    <div class="inputPercentWrapper clrBr clrSh2">
-                      <input type="number" maxlength="5" v-model="formData.moderatorInfo.fee.percentage" placeholder="0">
+                  <template v-if="formData.moderatorInfo.fee && formData.moderatorInfo.fee.feeType !== ob.feeTypes.PERCENTAGE">
+                    <div class="col2 js-feeFixedInput">
+                      <input
+                        type="number"
+                        class="noSpin clrBr clrSh2"
+                        v-model="formData.moderatorInfo.fee.fixedFee.amount"
+                        data-var-type="bignumber"
+                        placeholder="0.00">
                     </div>
-                  </div>
+                    <div class="col4 js-feeFixedInput">
+                      <Select2 id="moderationCurrency" v-model="formData.moderatorInfo.fee.fixedFee.currency.code" class="clrBr clrP clrSh2" style="width: 100%">
+                        <template v-for="currency in currencyList" :key="currency.code">
+                          <option :value="currency.code" :selected="currency.code === ccode">{{ currency.nameWithCode }}</option>
+                        </template>
+                      </Select2>
+                    </div>
+                  </template>
+                  <template v-else-if="formData.moderatorInfo.fee && formData.moderatorInfo.fee.feeType !== ob.feeTypes.FIXED">
+                    <div class="col2 js-feePercentageInput">
+                      <div class="inputPercentWrapper clrBr clrSh2">
+                        <input type="number" maxlength="5" v-model="formData.moderatorInfo.fee.percentage" placeholder="0">
+                      </div>
+                    </div>
+                  </template>
                 </div>
                 <div class="tx6 txPlaceholder">
                   {{ ob.polyT('settings.moderationTab.feeTypeHelper') }}
@@ -127,7 +131,7 @@
                 <ul class="unstyled errorList js-moderationConfirmError" v-show="!hideModerationConfirmError">
                   <li><i class="ion-alert-circled"></i> {{ ob.polyT('settings.moderationTab.errors.confirm') }}</li>
                 </ul>
-                <input type="checkbox" id="acceptGuidelines" :checked="acceptGuidelinesChecked">
+                <input type="checkbox" id="acceptGuidelines" v-model="acceptGuidelinesChecked">
                 <label class="tx5b" for="acceptGuidelines">
                   <span v-html='ob.polyT("settings.moderationTab.acceptGuidelines", {
                       acceptGuidelinesLink: `<a
@@ -141,7 +145,7 @@
             <div class="flexRow gutterH">
               <div class="col3"></div>
               <div class="col9">
-                <input type="checkbox" id="understandRequirements" :checked="understandRequirementsChecked">
+                <input type="checkbox" id="understandRequirements" v-model="understandRequirementsChecked">
                 <label class="tx5b" for="understandRequirements">
                   <span>{{ ob.polyT('settings.moderationTab.understandRequirements') }}</span>
                 </label>
@@ -344,7 +348,7 @@ export default {
 
       // The user must check both boxes at the bottom of the page if they want to be a moderator,
       // but the values aren't part of the model, they only exist in the DOM and aren't saved.
-      if (formData.moderator && !(acceptGuidelinesChecked && understandRequirementsChecked)) {
+      if (formData.moderator && !(this.acceptGuidelinesChecked && this.understandRequirementsChecked)) {
         this.hideModerationConfirmError = false;
         return;
       }

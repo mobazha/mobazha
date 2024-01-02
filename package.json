@@ -41,7 +41,7 @@
     "Mogaolei",
     "Mobazha"
   ],
-  "author": "Mogaolei",
+  "author": "Mogaolei <526567244@qq.com>",
   "license": "MGL",
   "devDependencies": {
     "@electron-forge/cli": "^6.0.4",

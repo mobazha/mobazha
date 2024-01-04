@@ -1,6 +1,6 @@
 <template>
   <div :class="`notificationsList navList listBox ${!collection.length ? 'noNotifications' : ''}`">
-    <div class="js-notifsContainer">
+    <div class="js-notifsContainer reverseorder">
       <template v-for="notif in collection">
         <Notification ref="notifViews" @navigate="$emit('notifNavigate')" :bb="() => {
           return {
@@ -37,13 +37,12 @@ export default {
         scrollContainer: undefined,
       },
     },
-    bb: Function,
   },
   data() {
     return {
       notifsPerFetch: 4, // 20
 
-      _collection: undefined,
+      _collection: new Notifications(),
       collectionKey: 0,
 
       fetchState: {
@@ -87,8 +86,6 @@ export default {
   },
 	methods: {
     loadData() {
-      this._collection = new Notifications();
-
       // This count represents the total number of notifications that this list
       // is to show. It's used to know when all pages have been loaded. It's determined
       // based off of the returned total from the fetch of the first page + any new
@@ -189,15 +186,15 @@ export default {
         limit: this.notifsPerFetch,
       };
 
-      if (this.collection.length) {
-        fetchParams.offsetID = this.collection.at(0).id;
+      if (this._collection.length) {
+        fetchParams.offsetID = this._collection.at(0).id;
       }
 
       if (this.options.filter) {
         fetchParams.filter = this.options.filter;
       }
 
-      this.notifFetch = this.collection.fetch({
+      this.notifFetch = this._collection.fetch({
         data: fetchParams,
         remove: false,
       });
@@ -250,4 +247,8 @@ export default {
 }
 </script>
 <style lang="scss" scoped>
+.reverseorder {
+  display: flex;
+  flex-direction: column-reverse;
+}
 </style>

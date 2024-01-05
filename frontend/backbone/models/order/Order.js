@@ -162,7 +162,7 @@ class Order extends BaseOrder {
 
       response.contract.disputeClose = Order.parseDisputePayout(
         response.contract.disputeClose,
-        this.paymentCoin,
+        response.contract.orderOpen?.payment?.coin,
       );
     }
 

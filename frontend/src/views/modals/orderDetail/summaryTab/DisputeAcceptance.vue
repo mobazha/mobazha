@@ -57,21 +57,23 @@ export default {
     introLine () {
       const ob = this.ob;
 
-      if (this.closerName) {
-        return ob.polyT('orderDetail.summaryTab.disputeAcceptance.userAcceptedPayout', { name: this.closerName, });
+      if (ob.closerName) {
+        return ob.polyT('orderDetail.summaryTab.disputeAcceptance.userAcceptedPayout', { name: ob.closerName, });
       } else {
-        return this.acceptedByBuyer ?
+        return ob.acceptedByBuyer ?
           ob.polyT('orderDetail.summaryTab.disputeAcceptance.genericBuyerAcceptedPayout') :
           ob.polyT('orderDetail.summaryTab.disputeAcceptance.genericVendorAcceptedPayout');
       }
     },
 
     subText () {
-      if (!this.vendorProcessingError) {
+      const ob = this.ob;
+
+      if (!ob.vendorProcessingError) {
         // Since the text indicates the order will be complete after leaving a review and you
         // can't leave a review if the vendor has an error processing the order, we'll omit the
         // text in that case.
-        return this.buyerViewing ?
+        return ob.buyerViewing ?
           ob.polyT('orderDetail.summaryTab.disputeAcceptance.orderCompleteWhenYouReview') :
           ob.polyT('orderDetail.summaryTab.disputeAcceptance.orderCompleteWhenBuyerReviews');
       }

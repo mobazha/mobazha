@@ -656,8 +656,7 @@ export default {
             if (isCase) {
               disputeStartTime = this.model.get('timestamp');
             } else {
-              disputeStartTime = this.localDisputeStartTime
-                || this.contract.get('disputeOpen').timestamp;
+              disputeStartTime = this.localDisputeStartTime || this.contract.get('disputeOpen')?.timestamp;
             }
           } catch (e) {
             throw e;

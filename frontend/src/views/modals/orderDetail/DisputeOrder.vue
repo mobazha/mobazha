@@ -55,6 +55,7 @@
 </template>
 
 <script>
+import $ from 'jquery';
 import OrderDispute from '../../../../backbone/models/order/OrderDispute';
 import {
   openingDispute,
@@ -159,8 +160,8 @@ export default {
         openDispute(this.model.id, this.model.toJSON());
       }
 
-      const $firstErr = $('.errorList:first');
-      if ($firstErr.length) $firstErr[0].scrollIntoViewIfNeeded();
+      const firstErr = $('.errorList:first');
+      if (firstErr.length) firstErr[0].scrollIntoViewIfNeeded();
     },
 
     onOpeningDisputeOrder (e) {

@@ -82,6 +82,7 @@
                 <section class="tabContent">
                   <Summary
                     v-if="activeTab === 'summary'"
+                    :key="model"
                     :options="tabViewData"
                     :bb="function() {
                       return {

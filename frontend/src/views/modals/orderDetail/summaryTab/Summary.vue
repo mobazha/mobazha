@@ -766,7 +766,7 @@ export default {
       moment.relativeTimeThreshold('d', prevMomentDaysThreshold);
 
       if (this.showTimeoutInfo) {
-        this.$refs.timeoutInfo.setState(state);
+        this.$nextTick(() => this.$refs.timeoutInfo && this.$refs.timeoutInfo.setState(state));
       } else {
         this.timeoutInfoOptions = {
           orderID: this.model.id,

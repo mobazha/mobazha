@@ -18,7 +18,7 @@
     <hr class="clrBr rowLg" />
 
     <div class="js-timeoutInfoContainer">
-      <TimeoutInfo ref="timeoutInfo" v-if="showTimeoutInfo" :options="timeoutInfoOptions"
+      <TimeoutInfo ref="timeoutInfo" v-if="showTimeoutInfo" :key="timeoutInfoOptions" :options="timeoutInfoOptions"
         @clickDisputeOrder="$emit('clickDisputeOrder')"
         @clickDiscussOrder="$emit('clickDiscussOrder')"
         @clickResolveDispute="$emit('clickResolveDispute')"
@@ -32,12 +32,10 @@
         }"/>
       <OrderComplete ref="orderComplete" v-if="showOrderComplete" :dataObject="contract.get('orderComplete')" />
       <DisputePayout ref="disputePayout" v-if="showDisputePayout" :options="{
+        ...(model.isCase ? model.get('disputeClose') : contract.get('disputeClose')),
         orderID: model.id,
-        initialState: {
-          ...(model.isCase ? model.get('disputeClose') : contract.get('disputeClose')),
-          showAcceptButton: !model.isCase && model.get('state') === 'DECIDED',
-          paymentCoin: model.paymentCoin,
-        },
+        showAcceptButton: !model.isCase && model.get('state') === 'DECIDED',
+        paymentCoin: model.paymentCoin,
       }" />
       <DisputeAcceptance ref="disputeAcceptance" v-if="showDisputeAcceptance" :options="disputeAcceptanceOptions" />
       <DisputeStarted ref="disputeStarted" v-if="showDisputeStarted" :options="disputeStartedOptions" @clickResolveDispute="$emit('clickResolveDispute')" />

@@ -86,11 +86,7 @@ export default {
   },
   data () {
     return {
-      _state: {
-        userCurrency: app.settings.get('localCurrency') || 'USD',
-        showAcceptButton: false,
-        paymentCoin: undefined,
-      },
+      userCurrency: app.settings.get('localCurrency') || 'USD',
 
       acceptConfirmOn: false,
       acceptInProgress: false,
@@ -107,7 +103,8 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this._state,
+        showAcceptButton: false,
+        ...this.options,
         moment,
       };
     },
@@ -132,7 +129,7 @@ export default {
         partyInfo.priceLines[type] = ob.currencyMod.pairedCurrency(
           ob.releaseInfo[`${type}Amount`],
           ob.paymentCoin,
-          ob.userCurrency
+          this.userCurrency
         );
       });
 
@@ -149,19 +146,10 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      this.baseInit({
-        ...options,
-        initialState: {
-          userCurrency: app.settings.get('localCurrency') || 'USD',
-          showAcceptButton: false,
-          paymentCoin: undefined,
-          ...options.initialState,
-        },
-      });
-
       if (!options.orderID) {
         throw new Error('Please provide the orderID');
       }
+      this.orderID = options.orderID;
 
       this.acceptInProgress = acceptingPayout(this.orderID);
       this.listenTo(orderEvents, 'acceptingPayout', e => {
@@ -175,14 +163,6 @@ export default {
           this.acceptInProgress = false;
         }
       });
-
-      this.listenTo(orderEvents, 'acceptPayoutComplete', e => {
-        if (e.id === this.orderID) {
-          this.setState({ showAcceptButton: false });
-        }
-      });
-
-      
     },
 
     onDocumentClick () {

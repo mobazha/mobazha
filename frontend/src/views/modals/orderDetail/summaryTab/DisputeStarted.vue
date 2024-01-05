@@ -9,7 +9,7 @@
         <div class="statusIconCol"><span class="clrBr ion-alert-circled"></span></div>
         <div class="flexExpand tx5">
           <div class="rowTn txB">{{ introLine }}</div>
-          <div>{{ ob.reason || ob.polyT('orderDetail.summaryTab.disputeStarted.noReasonProvided') }}</div>
+          <div v-html="ob.reason || ob.polyT('orderDetail.summaryTab.disputeStarted.noReasonProvided')"></div>
         </div>
         <template v-if="ob.showResolveButton">
           <div class="col">

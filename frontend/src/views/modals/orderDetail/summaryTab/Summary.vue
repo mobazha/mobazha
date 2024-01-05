@@ -667,8 +667,6 @@ export default {
           }
         }
 
-        console.log(this.model.contract);
-
         if (
           (orderState !== 'DISPUTED' && !escrowTimeoutHours)
           || (this.model.contract.dispute !== undefined)
@@ -968,10 +966,7 @@ export default {
     },
 
     renderDisputeStartedView () {
-      const data = this.model.isCase ? {
-        timestamp: this.model.get('timestamp'),
-        claim: this.model.get('claim'),
-      } : this.contract.get('disputeOpen');
+      const data = this.model.isCase ? this.model.get('disputeOpen') : this.contract.get('disputeOpen');
 
       if (!data) {
         throw new Error('Unable to create the Dispute Started view because the dispute '

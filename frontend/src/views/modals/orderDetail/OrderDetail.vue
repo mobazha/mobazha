@@ -302,6 +302,7 @@ export default {
     },
   },
   methods: {
+    recordEvent,
     loadData (options = {}) {
       const opts = {
         initialState: {

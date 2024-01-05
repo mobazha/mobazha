@@ -35,6 +35,7 @@ export default {
         maxPeerIDLength: 8,
         showAvatar: false,
       },
+      peerID: '',
       modKey: 0,
     };
   },
@@ -79,6 +80,8 @@ export default {
           ...options.initialState,
         },
       });
+
+      this.peerID = this.model.get('peerID');
 
       this.verifiedModModel = app.verifiedMods.get(this.peerID);
 

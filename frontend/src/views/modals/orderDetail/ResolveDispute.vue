@@ -20,7 +20,7 @@
           <FormError v-if="ob.errors['buyerPercentage']" :errors="ob.errors['buyerPercentage']" />
           <div class="flex gutterH">
             <div class="inputBuyerAmountWrap flexNoShrink">
-              <input type="text" class="clrBr clrSh2" name="buyerPercentage" id="resolveDisputeBuyerAmount" v-model="buyerPercentage" placeholder="" data-var-type="number" />
+              <input type="number" class="clrBr clrSh2" name="buyerPercentage" id="resolveDisputeBuyerAmount" v-model="buyerPercentage" placeholder="" data-var-type="number" />
               <div class="avatar disc clrBr2 clrSh1" :style="ob.getAvatarBgImage(ob.buyerAvatarHashes)"></div>
             </div>
             <p class="buyerContractUnarrivedMsg"><i class="ion-alert-circled margRSm clrTAlert"></i>{{ ob.polyT(`orderDetail.resolveDisputeTab.buyerContractUnavailable`) }} <span class="toolTip clrT" :data-tip="ob.polyT(`orderDetail.resolveDisputeTab.buyerContractUnavailableTip`)"><i class="ion-help-circled"></i></span></p>
@@ -36,7 +36,7 @@
           <FormError v-if="ob.errors['vendorPercentage']" :errors="ob.errors['vendorPercentage']" />
           <div class="flex gutterH">
             <div class="inputVendorAmountWrap js-inputVendorWrap flexNoShrink">
-              <input type="text" class="clrBr clrSh2" name="vendorPercentage" id="resolveDisputeVendorAmount" v-model="vendorPercentage" placeholder="" data-var-type="number" />
+              <input type="number" class="clrBr clrSh2" name="vendorPercentage" id="resolveDisputeVendorAmount" v-model="vendorPercentage" placeholder="" data-var-type="number" />
               <div class="avatar disc clrBr2 clrSh1" :style="ob.getAvatarBgImage(ob.vendorAvatarHashes)">
               </div>
             </div>
@@ -136,6 +136,7 @@ export default {
   computed: {
     ob () {
       return {
+        ...this.templateHelpers,
         ...this.model.toJSON(),
         errors: this.model.validationError || {},
       };

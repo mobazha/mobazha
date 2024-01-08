@@ -89,7 +89,7 @@
                 </div>
               </a>
               <div :class="`js-notifContainer notifContainer foldDown ${notifContainerOpened ? 'open' : ''}`" @click.stop="onClickNotifContainer">
-                <Notifications v-if="serverConnected && profileReady" ref="notifications" @notifNavigate="closeNotifications"/>
+                <Notifications v-if="serverConnected && profileReady && notifContainerOpened" ref="notifications" @notifNavigate="closeNotifications"/>
               </div>
               <a id="AvatarBtn" class="discSm clrBr2 clrSh1 navListBtn toolTipNoWrap" @click.stop="navListBtnClick"
                 :style="ob.getAvatarBgImage(avatarHashes || ob.avatarHashes)" :data-tip="ob.polyT('pageNav.toolTip.nav')"></a>

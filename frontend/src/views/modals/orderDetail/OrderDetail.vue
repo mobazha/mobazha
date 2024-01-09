@@ -468,8 +468,8 @@ export default {
         }
       }
 
-      if (e.jsonData.message
-        && e.jsonData.message.subject === this.model.id
+      if (e.jsonData.chatMessage
+        && e.jsonData.chatMessage.orderID === this.model.id
         && this.activeTab !== 'discussion') {
         const count = this.model.get('unreadChatMessages');
         this.model.set('unreadChatMessages', count + 1);

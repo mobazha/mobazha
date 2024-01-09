@@ -257,10 +257,10 @@ export default {
     },
 
     onSocketMessage(e) {
-      if (e.jsonData.message) {
+      if (e.jsonData.chatMessage) {
         // If a chat message comes in for a transaction in our list,
         // we'll update the unread count.
-        const transaction = this.collection.get(e.jsonData.message.subject);
+        const transaction = this.collection.get(e.jsonData.chatMessage.orderID);
 
         if (transaction) {
           const count = transaction.get('unreadChatMessages');

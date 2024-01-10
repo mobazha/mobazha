@@ -31,12 +31,7 @@
           listings,
         }"/>
       <OrderComplete ref="orderComplete" v-if="showOrderComplete" :dataObject="contract.get('orderComplete')" />
-      <DisputePayout ref="disputePayout" v-if="showDisputePayout" :options="{
-        ...(model.isCase ? model.get('disputeClose') : contract.get('disputeClose')),
-        orderID: model.id,
-        showAcceptButton: !model.isCase && model.get('state') === 'DECIDED',
-        paymentCoin: model.paymentCoin,
-      }" />
+      <DisputePayout ref="disputePayout" v-if="showDisputePayout" :options="disputePayoutOptions" />
       <DisputeAcceptance ref="disputeAcceptance" v-if="showDisputeAcceptance" :options="disputeAcceptanceOptions" />
       <DisputeStarted ref="disputeStarted" v-if="showDisputeStarted" :options="disputeStartedOptions" @clickResolveDispute="$emit('clickResolveDispute')" />
       <Fulfilled ref="fulfilled" v-if="showFulfilled" :options="fulfilledOptions" />
@@ -186,6 +181,7 @@ export default {
       disputeStartedOptions: {},
 
       showDisputePayout: false,
+      disputePayoutOptions: {},
 
       showDisputeAcceptance: false,
       disputeAcceptanceOptions: {},
@@ -535,9 +531,7 @@ export default {
         this.listenTo(this.contract, 'change:disputeAccept', () => {
           this.renderDisputeAcceptanceView();
 
-          if (this.$refs.disputePayout) {
-            this.$refs.disputePayout.setState({ showAcceptButton: false });
-          }
+          this.disputePayoutOptions.showAcceptButton = false;
         });
       } else {
         this.listenTo(orderEvents, 'resolveDisputeComplete', (e) => {
@@ -964,8 +958,7 @@ export default {
     },
 
     renderDisputePayoutView () {
-      const data = this.model.isCase ? this.model.get('disputeClose')
-        : this.contract.get('disputeClose');
+      const data = this.model.isCase ? this.model.get('disputeClose') : this.contract.get('disputeClose');
       if (!data) {
         throw new Error('Unable to create the Dispute Payout view because the resolution '
           + 'data object has not been set.');
@@ -973,17 +966,18 @@ export default {
 
       this.showDisputePayout = true;
 
-      this.$nextTick(() => {
-        ['buyer', 'vendor', 'moderator'].forEach((type) => {
-          this[type].getProfile().done((profile) => {
-            const state = {};
-            state[`${type}Name`] = profile.get('name');
-            state[`${type}AvatarHashes`] = profile.get('avatarHashes').toJSON();
+      this.disputePayoutOptions = {
+        ...(this.model.isCase ? this.model.get('disputeClose') : this.contract.get('disputeClose')),
+        orderID: this.model.id,
+        showAcceptButton: !this.model.isCase && this.model.get('state') === 'DECIDED',
+        paymentCoin: this.model.paymentCoin,
+      };
 
-            if (this.$refs.disputePayout) {
-              this.$refs.disputePayout.setState(state);
-            }
-          });
+      const roles = ['buyer', 'vendor', 'moderator'];
+      roles.forEach((type) => {
+        this[type].getProfile().done((profile) => {
+          this.disputePayoutOptions[`${type}Name`] = profile.get('name');
+          this.disputePayoutOptions[`${type}AvatarHashes`] = profile.get('avatarHashes').toJSON();
         });
       });
     },

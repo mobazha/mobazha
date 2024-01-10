@@ -34,14 +34,15 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        disputerName: '',
+        claim: '',
+      },
     },
   },
   data () {
     return {
       _state: {
-        disputerName: '',
-        claim: '',
         showResolveButton: false,
       }
     };
@@ -64,6 +65,7 @@ export default {
     ob() {
       return {
         ...this.templateHelpers,
+        ...this.options,
         ...this._state,
         moment,
       };
@@ -71,15 +73,10 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      this.baseInit(options);
-
       this._state = {
-        disputerName: '',
-        claim: '',
         showResolveButton: false,
         ...options.initialState || {},
       };
-
       this.listenTo(orderEvents, 'resolveDisputeComplete', () => {
         this.setState({ showResolveButton: false, });
       });

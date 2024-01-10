@@ -58,18 +58,17 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
-    },
-  },
-  data () {
-    return {
-      _state: {
+      default: {
         isBuyer: false,
         isModerated: false,
         isOrderCancelable: false,
         isDisputable: false,
         errors: [],
-      }
+      },
+    },
+  },
+  data () {
+    return {
     };
   },
   created () {
@@ -83,7 +82,7 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this._state,
+        ...this.options,
       };
     }
   },
@@ -92,19 +91,6 @@ export default {
       if (!options.orderID) {
         throw new Error('Please provide the order id.');
       }
-
-      const opts = {
-        initialState: {
-          isBuyer: false,
-          isModerated: false,
-          isOrderCancelable: false,
-          isDisputable: false,
-          errors: [],
-          ...options.initialState || {},
-        },
-      };
-
-      this.baseInit(opts);
     },
   }
 }

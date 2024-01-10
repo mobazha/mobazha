@@ -41,7 +41,11 @@
       <DisputeStarted ref="disputeStarted" v-if="showDisputeStarted" :options="disputeStartedOptions" @clickResolveDispute="$emit('clickResolveDispute')" />
       <Fulfilled ref="fulfilled" v-if="showFulfilled" :options="fulfilledOptions" />
       <Accepted ref="accepted" v-if="showAccepted" :options="acceptedOptions" @clickFulfillOrder="$emit('clickFulfillOrder')" />
-      <Refunded ref="refunded" v-if="showRefunded" :options="refundedOptions"/>
+      <Refunded ref="refunded" v-if="showRefunded" :options="refundedOptions" :bb="() => {
+        return {
+          model: contract.get('refunds')[0]
+        }
+      }"/>
     </div>
     <template v-if="!ob.isCase">
       <div ref="paymentsWrap" class="js-paymentsWrap">
@@ -103,6 +107,7 @@
 
 <script>
 import $ from 'jquery';
+import _ from 'underscore';
 import moment from 'moment';
 import { ipc } from '../../../../utils/ipcRenderer.js';
 import app from '../../../../../backbone/app.js';
@@ -390,18 +395,14 @@ export default {
           this.showAccepted = false;
         }
 
-        if (
-          ['REFUNDED', 'FULFILLED', 'DISPUTED', 'DECIDED', 'RESOLVED', 'COMPLETED']
-            .indexOf(state) > -1 && this.showAccepted) {
-          this.$nextTick(() => {
-            const acceptedState = {
-              showFulfillButton: false,
-              infoText: app.polyglot.t('orderDetail.summaryTab.accepted.vendorReceived'),
-              showRefundButton: false,
-            };
+        if (['REFUNDED', 'FULFILLED', 'DISPUTED', 'DECIDED', 'RESOLVED', 'COMPLETED'].indexOf(state) > -1) {
+          const acceptedState = {
+            showFulfillButton: false,
+            infoText: app.polyglot.t('orderDetail.summaryTab.accepted.vendorReceived'),
+            showRefundButton: false,
+          };
 
-            this.$refs.accepted && this.$refs.accepted.setState(acceptedState);
-          })
+          _.extend(this.acceptedOptions, acceptedState);
         }
 
         if (['FULFILLED', 'RESOLVED'].indexOf(state) === -1) {
@@ -626,9 +627,9 @@ export default {
         isPaymentFinalized: false,
         showDisputeBtn: false,
         showDiscussBtn: orderState === 'DISPUTED',
-        showResolveDisputeBtn: false,
         dataUnavailable: false,
       };
+      let showResolveDisputeBtn = false;
 
       if (orderState === 'PAYMENT_FINALIZED') {
         state.isPaymentFinalized = true;
@@ -674,8 +675,8 @@ export default {
             ...state,
             invalidContractData: true,
             showDisputeBtn: this.model.isOrderStateDisputable,
-            showResolveDisputeBtn: isCase,
           };
+          showResolveDisputeBtn = isCase;
         } else if (!paymentCurData || !curHeight) {
           // The order was paid in a coin not supported by this client or we don't have
           // the current height of the paymentCoin, which means we don't know the
@@ -728,8 +729,8 @@ export default {
             state = {
               ...state,
               buyerOpened: this.model.get('buyerOpened'),
-              showResolveDisputeBtn: !hasDisputeEscrowExpired,
             };
+            showResolveDisputeBtn = !hasDisputeEscrowExpired;
           } else if (orderState === 'DISPUTED') {
             state = {
               ...state,
@@ -760,15 +761,14 @@ export default {
       // restore the days timeout threshold
       moment.relativeTimeThreshold('d', prevMomentDaysThreshold);
 
-      if (this.showTimeoutInfo) {
-        this.$nextTick(() => this.$refs.timeoutInfo && this.$refs.timeoutInfo.setState(state));
-      } else {
-        this.timeoutInfoOptions = {
-          orderID: this.model.id,
-          initialState: state,
-        };
-        this.showTimeoutInfo = true;
-      }
+      this.timeoutInfoOptions = {
+        orderID: this.model.id,
+        ...state,
+        initialState: {
+          showResolveDisputeBtn,
+        },
+      };
+      this.showTimeoutInfo = true;
     },
 
     shouldShowPayForOrderSection () {
@@ -793,65 +793,50 @@ export default {
 
     renderAcceptedView () {
       const vendorOrderConfirmation = this.contract.get('orderConfirmation');
-
       if (!vendorOrderConfirmation) {
         throw new Error('Unable to create the accepted view because the vendorOrderConfirmation '
           + 'data object has not been set.');
       }
 
       const orderState = this.model.get('state');
-      const canFulfill = this.isVendor && [
-        'AWAITING_FULFILLMENT',
-        'PARTIALLY_FULFILLED',
-      ].indexOf(orderState) > -1;
-      const initialState = {
+      const canFulfill = this.isVendor && ['AWAITING_FULFILLMENT', 'PARTIALLY_FULFILLED'].indexOf(orderState) > -1;
+
+      this.acceptedOptions = {
+        orderID: this.model.id,
         timestamp: vendorOrderConfirmation.timestamp,
-        showRefundButton: this.isVendor && [
-          'AWAITING_FULFILLMENT',
-          'PARTIALLY_FULFILLED',
-        ].indexOf(orderState) > -1,
+        showRefundButton: canFulfill,
         showFulfillButton: canFulfill,
         paymentCoin: this.model.paymentCoin,
       };
 
+      let acceptedInfoText = '';
       if (!this.model.isCase) {
         if (this.isVendor) {
           // vendor looking at the order
           if (canFulfill) {
-            initialState.infoText = app.polyglot.t('orderDetail.summaryTab.accepted.vendorCanFulfill');
+            acceptedInfoText = app.polyglot.t('orderDetail.summaryTab.accepted.vendorCanFulfill');
           } else {
-            initialState.infoText = app.polyglot.t('orderDetail.summaryTab.accepted.vendorReceived');
+            acceptedInfoText = app.polyglot.t('orderDetail.summaryTab.accepted.vendorReceived');
           }
         } else {
           // buyer looking at the order
-          initialState.infoText = app.polyglot.t('orderDetail.summaryTab.accepted.buyerOrderAccepted');
+          acceptedInfoText = app.polyglot.t('orderDetail.summaryTab.accepted.buyerOrderAccepted');
         }
       } else {
         // mod looking at the order
-        initialState.infoText = app.polyglot.t('orderDetail.summaryTab.accepted.modOrderAccepted');
+        acceptedInfoText = app.polyglot.t('orderDetail.summaryTab.accepted.modOrderAccepted');
       }
+      this.acceptedOptions.infoText = acceptedInfoText;
 
-      this.acceptedOptions = {
-        orderID: this.model.id,
-        initialState,
-      }
+      this.vendor.getProfile().done((profile) => {
+        this.acceptedOptions.avatarHashes = profile.get('avatarHashes').toJSON();
+      });
+
       this.showAccepted = true;
-
-      this.$nextTick(() => {
-        this.vendor.getProfile()
-          .done((profile) => {
-            this.$refs.accepted && this.$refs.accepted.setState({
-              avatarHashes: profile.get('avatarHashes').toJSON(),
-            });
-          });
-      })
     },
 
     renderRefundView () {
       const refundMd = this.contract.get('refunds')[0];
-
-      if (this.refunded) this.refunded.remove();
-
       if (!refundMd) {
         console.error('Unable to create the refunded view because the refunds '
           + 'data object has not been set.');
@@ -882,65 +867,47 @@ export default {
       }
 
       this.refundedOptions = {
-        model: refundMd,
-        initialState: {
-          isCrypto: this.contract.type === 'CRYPTOCURRENCY',
-          blockChainTxUrl,
-          paymentCoin,
-          confirmations,
-        },
+        isCrypto: this.contract.type === 'CRYPTOCURRENCY',
+        blockChainTxUrl,
+        paymentCoin,
+        confirmations,
       };
       this.showRefunded = true;
 
-      this.$nextTick(() => {
-        this.buyer.getProfile()
-          .done((profile) => this.$refs.refunded && this.$refs.refunded.setState({ buyerName: profile.get('name') }));
-      })
+      this.buyer.getProfile().done((profile) => this.refundedOptions.buyerName = profile.get('name'));
     },
 
     shouldShowCompleteOrderForm () {
-      return this.buyer.id === app.profile.id
-        && this.model.canBuyerComplete;
+      return this.buyer.id === app.profile.id && this.model.canBuyerComplete;
     },
 
     renderFulfilledView () {
       const data = this.contract.get('orderFulfillments');
-
       if (!data) {
         throw new Error('Unable to create the fulfilled view because the vendorOrderFulfillment '
           + 'data object has not been set.');
       }
 
-      const fulfilledState = {
+      this.fulfilledOptions = {
+        dataObject: data[0],
         contractType: this.contract.type,
         showPassword: (this.moderator && this.moderator.id !== app.profile.id) || true,
         isLocalPickup: this.contract.isLocalPickup,
       };
 
       if (this.contract.type === 'CRYPTOCURRENCY') {
-        fulfilledState.coinType = this.listings[0].metadata.coinType;
+        this.fulfilledOptions.coinType = this.listings[0].metadata.coinType;
       }
 
-      this.fulfilledOptions = {
-        dataObject: data[0],
-        initialState: fulfilledState,
-      };
       this.showFulfilled = true;
 
-      this.$nextTick(() => {
-        if (app.profile.id === this.vendor.id) {
-          this.$refs.fulfilled && this.$refs.fulfilled.setState({
-            noteFromLabel: app.polyglot.t('orderDetail.summaryTab.fulfilled.yourNoteLabel'),
-          });
-        } else {
-          this.vendor.getProfile()
-            .done((profile) => {
-              this.$refs.fulfilled && this.$refs.fulfilled.setState({
-                noteFromLabel: app.polyglot.t('orderDetail.summaryTab.fulfilled.noteFromStoreLabel', { store: profile.get('name') }),
-              });
-            });
-        }
-      })
+      if (app.profile.id === this.vendor.id) {
+        this.fulfilledOptions.noteFromLabel = app.polyglot.t('orderDetail.summaryTab.fulfilled.yourNoteLabel');
+      } else {
+        this.vendor.getProfile().done((profile) => {
+          this.fulfilledOptions.noteFromLabel = app.polyglot.t('orderDetail.summaryTab.fulfilled.noteFromStoreLabel', { store: profile.get('name') });
+        });
+      }
 
       if (this.shouldShowCompleteOrderForm()) this.showCompleteOrderForm = true;
     },
@@ -964,14 +931,12 @@ export default {
 
     renderDisputeStartedView () {
       const data = this.model.isCase ? this.model.get('disputeOpen') : this.contract.get('disputeOpen');
-
       if (!data) {
         throw new Error('Unable to create the Dispute Started view because the dispute '
           + 'data object has not been set.');
       }
 
       let paymentCoinData;
-
       try {
         paymentCoinData = getWalletCurByCode(this.model.paymentCoin);
       } catch (e) {
@@ -979,6 +944,7 @@ export default {
       }
 
       this.disputeStartedOptions = {
+        ...data,
         initialState: {
           ...data,
           showResolveButton: this.model.get('state') === 'DISPUTED'
@@ -988,15 +954,13 @@ export default {
       };
       this.showDisputeStarted = true;
 
-      this.$nextTick(() => {
-        // this is only set on the Case.
-        const buyerOpened = this.model.get('buyerOpened');
-        if (typeof buyerOpened !== 'undefined') {
-          const disputeOpener = buyerOpened ? this.buyer : this.vendor;
-          disputeOpener.getProfile()
-            .done((profile) => this.$refs.disputeStarted && this.$refs.disputeStarted.setState({ disputerName: profile.get('name') }));
-        }
-      })
+      // this is only set on the Case.
+      const buyerOpened = this.model.get('buyerOpened');
+      if (typeof buyerOpened !== 'undefined') {
+        const disputeOpener = buyerOpened ? this.buyer : this.vendor;
+        disputeOpener.getProfile()
+          .done((profile) => this.disputeStartedOptions.disputerName = profile.get('name'));
+      }
     },
 
     renderDisputePayoutView () {
@@ -1044,21 +1008,16 @@ export default {
         === this.buyer.id ? this.buyer : this.vendor;
 
       this.disputeAcceptanceOptions = {
-        initialState: {
-          timestamp: data.timestamp,
-          acceptedByBuyer: closer.id === this.buyer.id,
-          buyerViewing: app.profile.id === this.buyer.id,
-          vendorProcessingError: this.model.vendorProcessingError,
-        },
+        timestamp: data.timestamp,
+        acceptedByBuyer: closer.id === this.buyer.id,
+        buyerViewing: app.profile.id === this.buyer.id,
+        vendorProcessingError: this.model.vendorProcessingError,
       };
       this.showDisputeAcceptance = true;
 
-      this.$nextTick(() => {
-        closer.getProfile()
-          .done((profile) => this.$refs.disputeAcceptance && this.$refs.disputeAcceptance.setState({
-            closerName: profile.get('name'),
-            closerAvatarHashes: profile.get('avatarHashes').toJSON(),
-          }));
+      closer.getProfile().done((profile) => {
+        this.disputeAcceptanceOptions.closerName = profile.get('name');
+        this.disputeAcceptanceOptions.closerAvatarHashes = profile.get('avatarHashes').toJSON();
       });
 
       if (this.shouldShowCompleteOrderForm()) this.showCompleteOrderForm = true;
@@ -1098,9 +1057,7 @@ export default {
       }
 
       if (this.contract.get('disputeOpen') || isCase) {
-        const timestamp = isCase
-          ? this.model.get('timestamp')
-          : this.contract.get('disputeOpen').timestamp;
+        const timestamp = isCase ? this.model.get('timestamp') : this.contract.get('disputeOpen').timestamp;
 
         sections.push({
           function: this.renderDisputeStartedView,
@@ -1148,7 +1105,8 @@ export default {
       }
 
       const isBuyer = this.buyer.id === app.profile.id;
-      const state = {
+      this.processingErrorOptions = {
+        orderID: this.model.id,
         isBuyer,
         isModerator: !!(this.moderator && this.moderator.id),
         isOrderCancelable: this.model.isOrderCancelable,
@@ -1160,16 +1118,7 @@ export default {
         errors: this.contract.get('erroredMessages') || [],
       };
 
-      this.processingErrorOptions = {
-        orderID: this.model.id,
-        initialState: state,
-      };
-
-      if (this.ProcessingError) {
-        this.$refs.processingError.setState(state);
-      } else {
-        this.ProcessingError = true;
-      }
+      this.ProcessingError = true;
     },
 
     remove () {

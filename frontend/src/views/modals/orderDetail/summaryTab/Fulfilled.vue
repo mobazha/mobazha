@@ -98,8 +98,15 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
+      default: {
+        contractType: 'PHYSICAL_GOOD',
+        isLocalPickup: false,
+        showPassword: false,
+        noteFromLabel: app.polyglot.t('orderDetail.summaryTab.fulfilled.noteFromVendorLabel'),
+        coinType: '',
+      },
     },
+    bb: Function
   },
   data () {
     return {
@@ -108,13 +115,6 @@ export default {
         physicalDelivery: undefined,
         digitalDelivery: undefined,
       },
-      _state: {
-        contractType: 'PHYSICAL_GOOD',
-        isLocalPickup: false,
-        showPassword: false,
-        noteFromLabel: app.polyglot.t('orderDetail.summaryTab.fulfilled.noteFromVendorLabel'),
-        coinType: '',
-      }
     };
   },
   created () {
@@ -131,8 +131,13 @@ export default {
 
       return {
         ...this.templateHelpers,
-        ...this._state,
-        ...this.dataObject,
+        contractType: 'PHYSICAL_GOOD',
+        isLocalPickup: false,
+        showPassword: false,
+        noteFromLabel: app.polyglot.t('orderDetail.summaryTab.fulfilled.noteFromVendorLabel'),
+        coinType: '',
+        ...this.options,
+        ...this.options.dataObject,
         transactionID: transactionID.replace(/["]/g, '[!$quote$!]'),
         encodedTxId: this.revealEscapeChars(transactionID),
         moment,
@@ -163,17 +168,6 @@ export default {
     moment,
 
     loadData (options = {}) {
-      this.baseInit({
-        initialState: {
-          contractType: 'PHYSICAL_GOOD',
-          isLocalPickup: false,
-          showPassword: false,
-          noteFromLabel:
-            app.polyglot.t('orderDetail.summaryTab.fulfilled.noteFromVendorLabel'),
-          coinType: '',
-          ...options.initialState,
-        },
-      });
       if (!options.dataObject) {
         throw new Error('Please provide a vendorOrderFulfillment data object.');
       }

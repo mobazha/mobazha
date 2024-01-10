@@ -45,12 +45,7 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
-    },
-  },
-  data () {
-    return {
-      _state: {
+      default: {
         awaitingBlockHeight: false,
         isFundingConfirmed: false,
         isDisputed: false,
@@ -60,11 +55,13 @@ export default {
         isPaymentFinalized: false,
         showDisputeBtn: false,
         showDiscussBtn: false,
-        showResolveDisputeBtn: false,
         invalidContractData: false,
         dataUnavailable: false,
       },
-
+    },
+  },
+  data () {
+    return {
       isClaimingPayment: false,
 
       message: '',
@@ -82,6 +79,19 @@ export default {
     ob(){
       return {
         ...this.templateHelpers,
+        awaitingBlockHeight: false,
+        isFundingConfirmed: false,
+        isDisputed: false,
+        hasDisputeEscrowExpired: false,
+        canBuyerComplete: false,
+        isPaymentClaimable: false,
+        isPaymentFinalized: false,
+        showDisputeBtn: false,
+        showDiscussBtn: false,
+        showResolveDisputeBtn: false,
+        invalidContractData: false,
+        dataUnavailable: false,
+        ...this.options,
         ...this._state,
       };
     },
@@ -97,28 +107,15 @@ export default {
       }
 
       this.baseInit({
-        ...options,
         initialState: {
-          awaitingBlockHeight: false,
-          isFundingConfirmed: false,
-          isDisputed: false,
-          hasDisputeEscrowExpired: false,
-          canBuyerComplete: false,
-          isPaymentClaimable: false,
-          isPaymentFinalized: false,
-          showDisputeBtn: false,
-          showDiscussBtn: false,
           showResolveDisputeBtn: false,
-          isClaimingPayment: releasingEscrow(options.orderID),
-          invalidContractData: false,
-          dataUnavailable: false,
           ...options.initialState,
         },
       });
 
       this.orderID = options.orderID;
 
-      this.isClaimingPayment = releasingEscrow(options.orderID);
+      this.isClaimingPayment = releasingEscrow(this.orderID);
       this.listenTo(orderEvents, 'releasingEscrow', e => {
         if (e.id === this.orderID) {
           this.isClaimingPayment = true;

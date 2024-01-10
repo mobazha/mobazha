@@ -44,23 +44,21 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
-    },
-  },
-  data () {
-    return {
-      _state: {
+      default: {
         buyerName: '',
         userCurrency: app.settings.get('localCurrency') || 'BTC',
         isCrypto: false,
         blockChainTxUrl: '',
-      }
+      },
+    },
+    bb: Function,
+  },
+  data () {
+    return {
     };
   },
   created () {
     this.initEventChain();
-
-    this.loadData(this.options);
   },
   mounted () {
   },
@@ -68,7 +66,11 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this._state,
+        buyerName: '',
+        userCurrency: app.settings.get('localCurrency') || 'BTC',
+        isCrypto: false,
+        blockChainTxUrl: '',
+        ...this.options,
         ...this.model,
         abbrNum,
         moment,
@@ -113,21 +115,6 @@ export default {
   },
   methods: {
     abbrNum, moment,
-    loadData (options = {}) {
-      this.baseInit({
-        ...options,
-        initialState: {
-          buyerName: '',
-          userCurrency: app.settings.get('localCurrency') || 'BTC',
-          isCrypto: false,
-          blockChainTxUrl: '',
-          ...options.initialState,
-        },
-      });
-      if (!this.model) {
-        throw new Error('Please provide a model.');
-      }
-    },
   }
 }
 </script>

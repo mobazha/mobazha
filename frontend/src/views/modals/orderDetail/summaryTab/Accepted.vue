@@ -79,12 +79,7 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
-    },
-  },
-  data () {
-    return {
-      _state: {
+      default: {
         infoText: '',
         showRefundButton: false,
         showFulfillButton: false,
@@ -92,6 +87,10 @@ export default {
         
         paymentCoin: undefined,
       },
+    },
+  },
+  data () {
+    return {
       refundConfirmOn: false,
       fulfillInProgress: false,
       refundOrderInProgress: false,
@@ -108,7 +107,7 @@ export default {
     ob () {
       return {
         ...this.templateHelpers,
-        ...this._state,
+        ...this.options,
         moment,
       };
     }
@@ -117,18 +116,6 @@ export default {
     moment,
 
     loadData (options = {}) {
-      this.baseInit({
-        ...options,
-        initialState: {
-          infoText: '',
-          showRefundButton: false,
-          showFulfillButton: false,
-          avatarHashes: {},
-          paymentCoin: undefined,
-          ...options.initialState,
-        },
-      });
-
       if (!options.orderID) {
         throw new Error('Please provide the order id.');
       }

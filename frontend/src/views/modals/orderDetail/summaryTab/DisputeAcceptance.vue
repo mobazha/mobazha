@@ -25,23 +25,20 @@ export default {
   props: {
     options: {
       type: Object,
-      default: {},
-    },
-  },
-  data () {
-    return {
-      _state: {
+      default: {
         closerName: '',
         closerAvatarHashes: {},
         buyerViewing: false,
         vendorProcessingError: false,
-      }
+      },
+    },
+  },
+  data () {
+    return {
     };
   },
   created () {
     this.initEventChain();
-
-    this.loadData(this.options);
   },
   mounted () {
   },
@@ -49,7 +46,7 @@ export default {
     ob() {
       return {
         ...this.templateHelpers,
-        ...this._state,
+        ...this.options,
         moment,
       };
     },
@@ -82,18 +79,6 @@ export default {
   },
   methods: {
     moment,
-    loadData (options = {}) {
-      this.baseInit(options);
-
-      this._state = {
-        closerName: '',
-        closerAvatarHashes: {},
-        buyerViewing: false,
-        vendorProcessingError: false,
-        ...options.initialState || {},
-      };
-    },
-
   }
 }
 </script>

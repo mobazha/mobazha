@@ -49,7 +49,7 @@ require (
 	github.com/mobazha/go-ethwallet v0.0.0-20230716015322-58c84d02d1b1
 	github.com/mobazha/multiwallet v0.0.0-00010101000000-000000000000
 	github.com/mobazha/wallet-interface v1.0.0
-	github.com/multiformats/go-multiaddr v0.11.0
+	github.com/multiformats/go-multiaddr v0.12.0
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/natefinch/lumberjack v2.0.0+incompatible
@@ -302,7 +302,7 @@ require (
 	go.uber.org/zap v1.24.0 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc // indirect
-	golang.org/x/image v0.6.0 // indirect
+	golang.org/x/image v0.14.0 // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect

@@ -1,28 +1,34 @@
 <template>
   <div :class="`notificationsList navList listBox ${!collection.length ? 'noNotifications' : ''}`">
     <div class="js-notifsContainer reverseorder">
-      <template v-for="notif in collection">
-        <Notification ref="notifViews" @navigate="$emit('notifNavigate')" :bb="() => {
-          return {
-            model: notif,
+      <Notification
+        v-for="(notif, index) in collection"
+        :key="index"
+        ref="notifViews"
+        @navigate="$emit('notifNavigate')"
+        :bb="
+          () => {
+            return {
+              model: notif,
+            };
           }
-        }"/>
-      </template>
+        "
+      />
     </div>
     <div class="js-fetcherContainer fetcherContainer">
-      <ListFetcher :fetchState="fetchState" @retry-click="onRetryClick"/>
+      <ListFetcher :fetchState="fetchState" @retry-click="onRetryClick" />
     </div>
   </div>
 </template>
 
 <script>
+import $ from 'jquery';
 import _ from 'underscore';
 import { getSocket } from '../../../backbone/utils/serverConnect';
 import { getCachedProfiles } from '../../../backbone/models/profile/Profile';
 import Notifications from '../../../backbone/collections/Notifications';
 import ListFetcher from './ListFetcher.vue';
 import Notification from './Notification.vue';
-
 
 export default {
   components: {
@@ -49,17 +55,13 @@ export default {
         isFetching: false,
         fetchFailed: false,
         fetchError: '',
-      }
+      },
     };
   },
   created() {
     this.initEventChain();
 
     this.loadData(this.options);
-
-    window.addEventListener('scroll', ()=>{
-      console.log('scroll in notifications')
-    });
   },
   mounted() {
     this.fetchState = {
@@ -82,9 +84,9 @@ export default {
       let access = this.collectionKey;
 
       return this._collection;
-    }
+    },
   },
-	methods: {
+  methods: {
     loadData() {
       // This count represents the total number of notifications that this list
       // is to show. It's used to know when all pages have been loaded. It's determined
@@ -101,14 +103,13 @@ export default {
             const types = ['follow', 'moderatorAdd', 'moderatorRemove'];
 
             if (types.indexOf(innerNotif.type) > -1) {
-              getCachedProfiles([innerNotif.peerID])[0]
-                .done((profile) => {
-                  notif.set('notification', {
-                    ...innerNotif,
-                    handle: profile.get('handle') || '',
-                    avatarHashes: (profile.get('avatarHashes') && profile.get('avatarHashes').toJSON()) || {},
-                  });
+              getCachedProfiles([innerNotif.peerID])[0].done((profile) => {
+                notif.set('notification', {
+                  ...innerNotif,
+                  handle: profile.get('handle') || '',
+                  avatarHashes: (profile.get('avatarHashes') && profile.get('avatarHashes').toJSON()) || {},
                 });
+              });
             }
           });
 
@@ -116,17 +117,14 @@ export default {
         }
       });
 
-      this.throttledOnScroll = _.throttle(this.onScroll, 100).bind(this);
-
-      this.options.scrollContainer.on('scroll', this.throttledOnScroll);
-
       const serverSocket = getSocket();
 
       if (serverSocket) {
         serverSocket.on('message', (e) => {
           if (e.jsonData.notification && e.jsonData.notification.type !== 'unfollow') {
             const { type } = e.jsonData.notification;
-            const filters = (this.options.filter || '').split(',')
+            const filters = (this.options.filter || '')
+              .split(',')
               .filter((filter) => filter.trim().length)
               .map((filter) => filter.trim());
 
@@ -135,9 +133,9 @@ export default {
               this._collection.add({
                 id: e.jsonData.notification.notificationID,
                 read: false,
-                timestamp: (new Date()).toISOString(),
+                timestamp: new Date().toISOString(),
                 notification: {
-                  ...(_.omit(e.jsonData.notification, 'notificationID')),
+                  ..._.omit(e.jsonData.notification, 'notificationID'),
                 },
               });
             }
@@ -147,7 +145,6 @@ export default {
 
       this.fetchNotifications();
     },
-
     onScroll() {
       const isFetching = this.notifFetch && this.notifFetch.state() === 'pending';
 
@@ -166,17 +163,16 @@ export default {
     },
 
     /*
-    * isScrolledIntoView from util/dom.js is not accurately returning a result for
-    * a notification because the notifications menu markup is inside the very narrow
-    * pageNav bar. Since the notification is outside the pageNav's "viewport", it thinks
-    * nothing within the notif menu is ever in view. It's a unique enough case that we'll
-    * create a custom function here.
-    */
+     * isScrolledIntoView from util/dom.js is not accurately returning a result for
+     * a notification because the notifications menu markup is inside the very narrow
+     * pageNav bar. Since the notification is outside the pageNav's "viewport", it thinks
+     * nothing within the notif menu is ever in view. It's a unique enough case that we'll
+     * create a custom function here.
+     */
     isNotifScrolledIntoView(notifEl) {
       const notifRect = notifEl.getBoundingClientRect();
-      const scrollRect = this.options.scrollContainer.getBoundingClientRect();
-
-      return notifRect.top <= scrollRect.top + this.options.scrollContainer.clientHeight;
+      const scrollRect = $('.js-tabNotifContainer')[0].getBoundingClientRect();
+      return -Math.floor(notifRect.top) <= scrollRect.top + $('.js-tabNotifContainer')[0].clientHeight;
     },
 
     fetchNotifications() {
@@ -206,32 +202,36 @@ export default {
         fetchError: '',
       };
 
-      this.notifFetch.done((data, txtStatus, xhr) => {
-        if (xhr.statusText === 'abort') return;
+      this.notifFetch
+        .done((data, txtStatus, xhr) => {
+          if (xhr.statusText === 'abort') return;
 
-        const state = {
-          isFetching: false,
-          fetchFailed: false,
-          noResults: false,
-          fetchError: '',
-        };
+          this.collectionKey += 1;
 
-        if (!fetchParams.offsetID) {
-          this.totalNotifs += data.total;
+          const state = {
+            isFetching: false,
+            fetchFailed: false,
+            noResults: false,
+            fetchError: '',
+          };
 
-          if (!data.notifications.length) {
-            state.noResults = true;
+          if (!fetchParams.offsetID) {
+            this.totalNotifs += data.total;
+
+            if (!data.notifications.length) {
+              state.noResults = true;
+            }
           }
-        }
 
-        this.fetchState = state;
-      }).fail((xhr) => {
-        this.fetchState = {
-          isFetching: false,
-          fetchFailed: true,
-          fetchError: (xhr.responseJSON && xhr.responseJSON.reason) || '',
-        };
-      });
+          this.fetchState = state;
+        })
+        .fail((xhr) => {
+          this.fetchState = {
+            isFetching: false,
+            fetchFailed: true,
+            fetchError: (xhr.responseJSON && xhr.responseJSON.reason) || '',
+          };
+        });
     },
 
     onRetryClick() {
@@ -243,8 +243,8 @@ export default {
         this.fetchNotifications();
       });
     },
-  }
-}
+  },
+};
 </script>
 <style lang="scss" scoped>
 .reverseorder {

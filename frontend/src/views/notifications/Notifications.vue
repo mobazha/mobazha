@@ -6,10 +6,8 @@
         <a :class="`js-tab clrBr clrT2 ${tab === activeTab ? 'active' : ''}`" @click="onClickTab(tab)">{{ ob.polyT(`notifications.tab${capitalize(tab)}`) }}</a>
       </template>
     </div>
-    <div ref="tabContainer" class="js-tabContainer tabContainer scrollBox clrBr">
-      <NotificationsList :key="activeTab" ref="notifLists" :options="{ filter, scrollContainer }"
-        @notifNavigate="$emit('notifNavigate', { list })"
-      />
+    <div v-infinite-scroll="onScroll" ref="tabContainer" class="js-tabNotifContainer tabContainer scrollBox clrBr">
+      <NotificationsList :key="activeTab" ref="notifLists" :options="{ filter, scrollContainer }" @notifNavigate="$emit('notifNavigate', { list })" />
     </div>
   </section>
 </template>
@@ -22,7 +20,6 @@ import { recordEvent } from '../../../backbone/utils/metrics';
 
 import NotificationsList from './NotificationsList.vue';
 
-
 export default {
   components: {
     NotificationsList,
@@ -34,28 +31,27 @@ export default {
     },
     bb: Function,
   },
-  data () {
+  data() {
     return {
       activeTab: 'all',
 
       list: 'all',
     };
   },
-  created () {
+  created() {
     this.initEventChain();
-
-    this.loadData();
   },
-  mounted () {
-  },
+  mounted() {},
   computed: {
     filter() {
       switch (this.activeTab) {
         case 'orders':
           this.list = 'order';
-          return 'order,orderDeclined,cancel,refund,fulfillment,orderComplete,disputeOpen,'
-            + 'disputeUpdate,disputeClose,disputeAccepted,vendorDisputeTimeout,buyerDisputeTimeout'
-            + 'buyerDisputeExpiry,moderatorDisputeExpiry';
+          return (
+            'order,orderDeclined,cancel,refund,fulfillment,orderComplete,disputeOpen,' +
+            'disputeUpdate,disputeClose,disputeAccepted,vendorDisputeTimeout,buyerDisputeTimeout' +
+            'buyerDisputeExpiry,moderatorDisputeExpiry'
+          );
         case 'followers':
           this.list = 'follow';
           return 'follow';
@@ -66,10 +62,13 @@ export default {
     },
 
     scrollContainer() {
-      return $(this.$refs.tabContainer);
-    }
+      return $('.js-tabNotifContainer');
+    },
   },
-	methods: {
+  methods: {
+    onScroll() {
+      this.$refs.notifLists.onScroll();
+    },
     capitalize,
 
     loadData() {
@@ -104,8 +103,7 @@ export default {
         });
       }
 
-      return $.post(app.getServerUrl('ob/marknotificationsasread'))
-        .fail(() => notifs.forEach((notif) => notif.set('read', false)));
+      return $.post(app.getServerUrl('ob/marknotificationsasread')).fail(() => notifs.forEach((notif) => notif.set('read', false)));
     },
 
     /**
@@ -118,8 +116,7 @@ export default {
       this.activeTab = 'all';
       this.scrollContainer.scrollTop = 0;
     },
-  }
-}
+  },
+};
 </script>
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>

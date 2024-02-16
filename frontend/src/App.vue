@@ -1,9 +1,7 @@
 <template>
   <div class="app-container">
     <section id="pageNavContainer">
-      <PageNav ref="pageNav" :options="{
-        serverConfigs: app.serverConfigs,
-      }" />
+      <PageNav ref="pageNav" />
     </section>
     <section id="contentFrame" class="clrBr">
       <div id="pageContainer">

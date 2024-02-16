@@ -14,9 +14,6 @@
     <div id="chatCloseBtn" class="chatCloseBtn js-chatClose ion-ios-close-empty iconBtn clrP clrBr4 clrT2"></div>
     <div id="chatContainer"></div>
     <div id="chatConvoContainer" class="clrP clrBr3"></div>
-    <div id="js-vueModal"></div>
-
-    <Purchase ref="purchaseModal" v-if="showPurchase" :options="purchaseOptions" :bb="purchaseBBFunc" @close="onPurchaseClose" />
 
     <!-- <KeepAlive v-if="initialized" :exclude="['EditListing', 'Settings', 'About', 'ShoppingCart', 'Purchase', 'ModeratorDetails']"> -->
       <component v-if="modalName" :is="modalName" :name="modalName" ref="modalInstance"
@@ -25,6 +22,8 @@
         @close="closeModal">
       </component>
     <!-- </KeepAlive> -->
+
+    <div id="js-vueModal"></div>
 
     <LoadingModal v-if="initialized" v-show="showLoadingModal" />
   </div>
@@ -61,14 +60,9 @@ export default {
       initialized: false,
       showLoadingModal: false,
 
-      showPurchase: false,
-
       toggleVue: false,
 
       app: app,
-
-      purchaseOptions: {},
-      purchaseBBFunc: undefined,
 
       modalName: '',
       modalOptions: {},
@@ -79,19 +73,6 @@ export default {
   },
   watch: {},
   methods: {
-    onPurchaseClose() {
-      this.showPurchase = false;
-    },
-    launchPurchaseModal(options, bbFunc = undefined) {
-      this.closeModal();
-
-      this.purchaseOptions = options;
-      this.purchaseBBFunc = bbFunc;
-      this.showPurchase = true;
-
-      return this.$refs.purchaseModal;
-    },
-
     launchModal(modalName, options, bbFunc = undefined) {
       if (modalName === 'ShoppingCart') {
         this.showPurchase = false;

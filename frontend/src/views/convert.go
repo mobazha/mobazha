@@ -12,9 +12,8 @@ import (
 )
 
 var baseDir = "/Users/mingfeng/dev/openbazaar/openbazaar-desktop/frontend"
-var htmlTemplateFolder = "backbone/templates/modals/wallet"
-var jsComponentFolder = "backbone/views/modals/wallet"
-var targetVueFolder = "src/views_draft"
+var htmlTemplateFolder = "backbone/templates/modals/onboarding"
+var jsComponentFolder = "backbone/views/modals/onboarding"
 
 type EventHandler struct {
 	Raw         string

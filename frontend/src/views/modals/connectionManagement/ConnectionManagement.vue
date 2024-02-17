@@ -41,7 +41,6 @@
 import app from '../../../../backbone/app';
 import serverConnect from '../../../../backbone/utils/serverConnect';
 import ServerConfig from '../../../../backbone/models/ServerConfig';
-import BaseModal from '../BaseModal';
 import Configurations from './Configurations.vue';
 import ConfigurationForm from './ConfigurationForm.vue';
 

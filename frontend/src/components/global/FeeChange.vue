@@ -2,13 +2,19 @@
   <div class="feeChange">
     {{ ob.polyT('feeChangeWidget.label') }} <span :class="ob.feeLevelClass">{{ ob.polyT(`feeLevels.${ob.feeLevel}`) }}</span> <button :class="ob.changeLinkClass" @click="onClickChangeFee">{{ ob.polyT('feeChangeWidget.btnChange') }}</button>
   </div>
+  <Teleport to="#js-vueModal">
+    <Settings v-if="showSettings" :options="{ initialTab: 'Advanced', scrollTo: '.js-feeSection', }" @close="closeSettings" />
+  </Teleport>
 </template>
 
 <script>
 import app from '../../../backbone/app';
-import { launchSettingsModal } from '../../../backbone/utils/modalManager';
+import Settings from '@/views/modals/settings/Settings.vue';
 
 export default {
+  components: {
+    Settings,
+  },
   props: {
     options: {
       type: Object,
@@ -21,7 +27,9 @@ export default {
         feeLevel: app.localSettings.get('defaultTransactionFee'),
         feeLevelClass: 'txB',
         changeLinkClass: 'btnAsLink clrT2',
-      }
+      },
+
+      showSettings: false,
     };
   },
   created() {
@@ -54,8 +62,12 @@ export default {
     },
 
     onClickChangeFee() {
-      launchSettingsModal({ initialTab: 'Advanced', scrollTo: '.js-feeSection', });
+      this.showSettings = true;
     },
+
+    closeSettings() {
+      this.showSettings = false;
+    }
   },
 };
 </script>

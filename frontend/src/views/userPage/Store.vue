@@ -103,6 +103,9 @@
         </div>
       </div>
     </template>
+    <Teleport to="#js-vueModal">
+      <Settings v-if="showSettings" :options="{ initialTab: 'Store' }" @close="closeSettings" />
+    </Teleport>
   </div>
 </template>
 
@@ -114,7 +117,6 @@ import 'velocity-animate/velocity.ui';
 import { getTranslatedCountries } from '../../../backbone/data/countries';
 import app from '../../../backbone/app';
 import { convertCurrency, NoExchangeRateDataError } from '../../../backbone/utils/currency';
-import { launchSettingsModal } from '../../../backbone/utils/modalManager';
 import Listings from '../../../backbone/collections/Listings';
 import { events as listingEvents } from '../../../backbone/models/listing';
 
@@ -123,6 +125,7 @@ import TypeFilter from './TypeFilter.vue';
 import ListingsGrid from './ListingsGrid.vue'
 import PopInMessage, { buildRefreshAlertMessage } from '../../../backbone/views/components/PopInMessage';
 import { localizeNumber, isValidNumber } from '../../../backbone/utils/number';
+import Settings from '@/views/modals/settings/Settings.vue';
 
 const defaultFilter = {
   category: 'all',
@@ -138,6 +141,7 @@ export default {
     CategoryFilter,
     TypeFilter,
     ListingsGrid,
+    Settings,
   },
   props: {
     bb: Function,
@@ -158,6 +162,8 @@ export default {
 
       fetchKey: 0,
       retryPressed: false,
+
+      showSettings: false,
     };
   },
   created() {
@@ -392,7 +398,10 @@ export default {
     },
 
     onClickActivateStore() {
-      launchSettingsModal({ initialTab: 'Store' });
+      this.showSettings = true;
+    },
+    closeSettings(){
+      this.showSettings = false;
     },
     showDataChangedMessage() {
       if (this.dataChangePopIn && !this.dataChangePopIn.isRemoved()) {

@@ -132,6 +132,8 @@
         @refresh="listingKey += 1"
         @close="onListingDetailClose"
       />
+
+      <Settings v-if="showSettings" :options="{ initialTab: 'Page' }" @close="closeSettings" />
     </Teleport>
     
   </div>
@@ -163,6 +165,7 @@ import Store from './Store.vue';
 import Follow from './Follow.vue';
 import Reputation from './Reputation.vue';
 import ListingDetail from '../modals/listingDetail/Listing.vue';
+import Settings from '@/views/modals/settings/Settings.vue';
 
 const [DefineTabHeader, ReuseTabHeader] = createReusableTemplate();
 
@@ -183,6 +186,7 @@ export default {
     Reputation,
 
     ListingDetail,
+    Settings,
   },
   props: {
     options: {
@@ -212,6 +216,8 @@ export default {
       showUserLoading: false,
       showPageNotFound: false,
       showBlockedModal: false,
+
+      showSettings: false,
 
       isBlockedUser: false,
 
@@ -508,7 +514,12 @@ export default {
 
     clickCustomize() {
       recordEvent('Settings_Open', { origin: 'userPage' });
-      launchSettingsModal({ initialTab: 'Page' });
+
+      this.showSettings = true;
+    },
+
+    closeSettings(){
+      this.showSettings = false;
     },
 
     clickCreateListing() {

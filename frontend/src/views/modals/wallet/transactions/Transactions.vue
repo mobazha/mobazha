@@ -41,6 +41,9 @@
         {{ ob.polyT('wallet.transactions.noTransactionsPlaceholder', { coinType: ob.polyT(`cryptoCurrencies.${ob.coinType}`, { _: ob.coinType }) }) }}
       </div>
     </template>
+    <Teleport to="#js-vueModal">
+      <Settings v-if="showSettings" :options="{ initialTab: 'Advanced', scrollTo: '.js-backupWalletSection', }" @close="closeSettings" />
+    </Teleport>
   </div>
 </template>
 
@@ -50,14 +53,15 @@ import app from '../../../../../backbone/app';
 import { isScrolledIntoView } from '../../../../../backbone/utils/dom';
 import { getSocket, getCurrentConnection } from '../../../../../backbone/utils/serverConnect';
 import { openSimpleMessage } from '../../../../../backbone/views/modals/SimpleMessage';
-import { launchSettingsModal } from '../../../../../backbone/utils/modalManager';
 import Transaction from './Transaction.vue';
 import TransactionFetchState from './TransactionFetchState.vue';
+import Settings from '@/views/modals/settings/Settings.vue';
 
 export default {
   components: {
     Transaction,
     TransactionFetchState,
+    Settings,
   },
   props: {
     options: {
@@ -89,7 +93,9 @@ export default {
         // individual transaction views, please provide an indexed object (indexed by txid)
         // of them here.
         bumpFeeXhrs: undefined,
-      }
+      },
+
+      showSettings: false,
     };
   },
   created() {
@@ -237,10 +243,7 @@ export default {
               );
 
               warning.$el.on('click', '.js-recoverWalletSeed', () => {
-                launchSettingsModal({
-                  initialTab: 'Advanced',
-                  scrollTo: '.js-backupWalletSection',
-                });
+                this.showSettings = true;
                 warning.remove();
               });
 
@@ -263,6 +266,10 @@ export default {
 
       this.fetchFailed = false;
       this.fetchErrorMessage = '';
+    },
+
+    closeSettings() {
+      this.showSettings = false;
     },
 
     showNewTransactionPopup() {

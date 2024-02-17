@@ -192,6 +192,8 @@ import PageNavServersMenu from './PageNavServersMenu.vue';
 import AddressBarIndicators from './AddressBarIndicators.vue';
 import Notifications from './notifications/Notifications.vue';
 import Wallet from '@/views/modals/wallet/Wallet.vue';
+import Settings from '@/views/modals/settings/Settings.vue';
+import EditListing from '@/views/modals/editListing/EditListing.vue';
 import ShoppingCart from './ShoppingCart.vue';
 
 export default {
@@ -200,6 +202,8 @@ export default {
     AddressBarIndicators,
     Notifications,
     Wallet,
+    Settings,
+    EditListing,
     ShoppingCart,
   },
   props: {
@@ -236,6 +240,7 @@ export default {
       showDiscoverCallout: false,
 
       showWallet: false,
+      showSettings: false,
       showShoppingCart: false,
     };
   },
@@ -548,7 +553,7 @@ export default {
       this.showShoppingCart = true;
     },
 
-    onCloseShoppingCart() {
+    closeShoppingCart() {
       this.showShoppingCart = false;
     },
 
@@ -603,7 +608,12 @@ export default {
       // This is recorded as two events that belong to different metrics we're comparing.
       recordEvent('NavMenu_Click', { target: 'settings' });
       recordEvent('Settings_Open', { origin: 'navMenu' });
-      launchSettingsModal();
+
+      this.showSettings = true;
+    },
+
+    closeSettings() {
+      this.showSettings = false;
     },
 
     navHelpClick () {

@@ -381,6 +381,9 @@
         </div>
       </template>
     </BaseModal>
+    <Teleport to="#js-vueModal">
+      <Settings v-if="showSettings" :options="{ initialTab: 'Addresses' }" @close="closeSettings" />
+    </Teleport>
   </div>
 </template>
 
@@ -393,7 +396,6 @@ import 'velocity-animate';
 import { ERROR_DUST_AMOUNT } from '../../../../backbone/constants';
 import { removeProp } from '../../../../backbone/utils/object';
 import app from '../../../../backbone/app';
-import { launchSettingsModal } from '../../../../backbone/utils/modalManager';
 // import {
 //   getInventory,
 //   events as inventoryEvents,
@@ -423,8 +425,8 @@ import Payment from './Payment.vue'
 import Receipt from './Receipt.vue';
 import Shipping from './Shipping.vue';
 
+import Settings from '@/views/modals/settings/Settings.vue';
 
-import { toRaw } from 'vue';
 
 export default {
   components: {
@@ -435,6 +437,7 @@ export default {
     DirectPayment,
     Payment,
     Shipping,
+    Settings,
   },
   props: {
     options: {
@@ -497,6 +500,8 @@ export default {
       orderID: '',
       showModerators: false,
       isModerated: false,
+
+      showSettings: false,
 
       paymentData: undefined,
 
@@ -907,7 +912,11 @@ export default {
     },
 
     clickNewAddress () {
-      launchSettingsModal({ initialTab: 'Addresses' });
+      this.showSettings = true;
+    },
+
+    closeSettings() {
+      this.showSettings = false;
     },
 
     applyCoupon(idx) {

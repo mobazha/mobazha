@@ -161,7 +161,14 @@
       </nav>
     </header>
     <div :class="`navOverlay modal js-navOverlay ${navOverlayOpened ? 'open' :'' }`"></div>
-
+    <Teleport v-if="navigable" to="#js-vueModal">
+      <ShoppingCart v-show="showShoppingCart" @close="onCloseShoppingCart" />
+      <Wallet v-show="showWallet" :bb="() => {
+        return {
+          walletBalances: app.walletBalances,
+        };
+      }" @close="closeWallet" />
+    </Teleport>
   </div>
 </template>
 
@@ -184,12 +191,16 @@ import { getNotifDisplayData } from '../../backbone/collections/Notifications.js
 import PageNavServersMenu from './PageNavServersMenu.vue';
 import AddressBarIndicators from './AddressBarIndicators.vue';
 import Notifications from './notifications/Notifications.vue';
+import Wallet from '@/views/modals/wallet/Wallet.vue';
+import ShoppingCart from './ShoppingCart.vue';
 
 export default {
   components: {
     PageNavServersMenu,
     AddressBarIndicators,
     Notifications,
+    Wallet,
+    ShoppingCart,
   },
   props: {
     options: {
@@ -223,6 +234,9 @@ export default {
       addressBarText: '',
 
       showDiscoverCallout: false,
+
+      showWallet: false,
+      showShoppingCart: false,
     };
   },
   created () {
@@ -277,10 +291,6 @@ export default {
         navigable: false,
         ...options,
       };
-
-      if (!opts.serverConfigs) {
-        throw new Error('Please provide a Server Configs collection');
-      }
 
       this.baseInit(opts);
 
@@ -535,7 +545,11 @@ export default {
     },
 
     onClickShoppingCartBtn () {
-      window.vueApp.launchModal('ShoppingCart');
+      this.showShoppingCart = true;
+    },
+
+    onCloseShoppingCart() {
+      this.showShoppingCart = false;
     },
 
     onDocClick () {
@@ -610,7 +624,12 @@ export default {
 
     navWalletClick () {
       recordEvent('NavClick', { target: 'walletOpen' });
-      launchWallet();
+
+      this.showWallet = true;
+    },
+
+    closeWallet() {
+      this.showWallet = false;
     },
 
     navCreateListingClick () {

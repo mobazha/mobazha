@@ -29,8 +29,7 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import app from '../../backbone/app';
-import serverConnect,
-{ events as serverConnectEvents, getCurrentConnection } from '../../backbone/utils/serverConnect';
+import serverConnect, { events as serverConnectEvents, getCurrentConnection } from '../../backbone/utils/serverConnect';
 
 export default {
   props: {

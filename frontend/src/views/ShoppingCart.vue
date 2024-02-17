@@ -121,7 +121,11 @@
       </template>
     </BaseModal>
     <Teleport to="#js-vueModal">
-      <Purchase ref="purchaseModal" v-if="showPurchase" :options="purchaseOptions" :bb="purchaseBBFunc" @close="onPurchaseClose" />
+      <Purchase v-if="showPurchase" :key="itemsToPurchase" :options="purchaseOptions" :bb="() => {
+          return {itemsToPurchase};
+        }"
+        @close="onPurchaseClose"
+      />
     </Teleport>
   </div>
 </template>

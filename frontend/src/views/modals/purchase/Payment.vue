@@ -86,6 +86,13 @@
       <p>{{ ob.polyT('purchase.pendingSection.note4') }}</p>
     </div>
 
+    <Teleport to="#js-vueModal">
+      <Wallet ref="walletModal" v-show="showWallet" :bb="() => {
+        return {
+          walletBalances: app.walletBalances,
+        };
+      }" @close="closeWallet" />
+    </Teleport>
   </div>
 </template>
 
@@ -108,18 +115,19 @@ import { getCurrencyByCode as getWalletCurByCode } from '../../../../backbone/da
 import { getSocket } from '../../../../backbone/utils/serverConnect';
 import { orderSpend } from '../../../../backbone/models/wallet/Spend';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
-import { launchWallet } from '../../../../backbone/utils/modalManager';
 import {
   startPrefixedAjaxEvent,
   endPrefixedAjaxEvent,
   recordPrefixedEvent,
 } from '../../../../backbone/utils/metrics';
 
+import Wallet from '@/views/modals/wallet/Wallet.vue';
 import SpendConfirmBox from '../wallet/SpendConfirmBox.vue';
 
 export default {
   components: {
     SpendConfirmBox,
+    Wallet,
   },
   props: {
     options: {
@@ -132,6 +140,8 @@ export default {
       copyAmountActive: false,
       copyAddressActive: false,
       isPaying: false,
+
+      showWallet: false,
     };
   },
   created () {
@@ -149,7 +159,8 @@ export default {
   computed: {
     ob () {
       return {
-        ...this.templateHelpers,
+          ...this.templateHelpers,
+          app,
           amountDueLine: this.amountDueLine,
           paymentAddress: this.paymentAddress,
           qrDataUri: this.qrDataUri,
@@ -342,8 +353,14 @@ export default {
     },
 
     clickFundWallet () {
-      launchWallet().sendModeOn = false;
+      this.showWallet = true;
+
+      this.$refs.walletModal.tabActive = 'receive';
     },
+
+    closeWallet() {
+      this.showWallet = false;
+    }
   }
 }
 </script>

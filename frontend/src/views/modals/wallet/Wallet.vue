@@ -48,16 +48,16 @@
                       <div class="js-sendReceiveNavContainer rowMd"></div>
                       <SendReceiveNav class="rowMd" :tabActive="tabActive" :activeCoin="activeCoin" @changeTab="changeTab" />
                       <div class="js-sendReceiveContainer sendReceiveContainer clrP">
-                        <SendMoney v-if="tabActive === 1" ref="sendeMoneyVw" :key="activeCoin" :options="{ coinType: activeCoin }" />
+                        <SendMoney v-if="tabActive === 'send'" ref="sendeMoneyVw" :key="activeCoin" :options="{ coinType: activeCoin }" />
                         <ReceiveMoney
-                          v-if="tabActive === 2"
+                          v-if="tabActive === 'receive'"
                           ref="receiveMoneyVw"
                           :key="activeCoin"
                           :coinType="activeCoin"
                           :fetching="fetchingAddress"
                           :address="receiveAddress"
                         />
-                        <External v-if="tabActive === 3 && activeCoin !== 'MATICMBZ'" ref="external" :key="activeCoin" :coinType="activeCoin" />
+                        <External v-if="tabActive === 'external' && activeCoin !== 'MATICMBZ'" ref="external" :key="activeCoin" :coinType="activeCoin" />
                       </div>
                     </div>
                   </div>
@@ -143,7 +143,7 @@ export default {
 
       activeCoin: '',
       viewCryptoListingsUrl: '',
-      tabActive: 1,
+      tabActive: 'send',
 
       transactionsCount: 0,
 
@@ -158,7 +158,7 @@ export default {
     this.loadData(this.options);
   },
   mounted() {
-    if (this.tabActive === 1) {
+    if (this.tabActive === 'send') {
       if (this.$refs.sendeMoneyVw) this.$refs.sendeMoneyVw.focusAddress();
     }
   },
@@ -179,10 +179,10 @@ export default {
         this.fetchAddress(coin);
       }
 
-      if (this.tabActive === 1 && !(this.walletBalances.get(coin) && this.walletBalances.get(coin).get('confirmed'))) {
-        this.tabActive = 2;
+      if (this.tabActive === 'send' && !(this.walletBalances.get(coin) && this.walletBalances.get(coin).get('confirmed'))) {
+        this.tabActive = 'receive';
       } else {
-        this.tabActive = 1;
+        this.tabActive = 'send';
       }
 
       this.transactionsVwKey += 1;
@@ -266,7 +266,7 @@ export default {
       // are null, it indicates that none of the wallet currencies are supported by
       // this client.
 
-      (this.tabActive = !!(this.walletBalances.get(initialActiveCoin) && this.walletBalances.get(initialActiveCoin).get('confirmed')) ? 1 : 2),
+      (this.tabActive = !!(this.walletBalances.get(initialActiveCoin) && this.walletBalances.get(initialActiveCoin).get('confirmed')) ? 'send' : 'receive'),
         (this.activeCoin = initialActiveCoin);
 
       this.addressFetches = {};
@@ -383,6 +383,7 @@ export default {
     onClickViewCryptoListings() {
       recordEvent('Wallet_ViewCryptoListings');
     },
+
     changeTab(val) {
       this.tabActive = val;
     },

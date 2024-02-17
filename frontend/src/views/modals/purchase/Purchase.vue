@@ -840,9 +840,6 @@ export default {
     clickGoToListing() {
       if (this.origin === 'ShoppingCart') {
         this.close();
-
-        window.vueApp.launchModal('ShoppingCart');
-
         return;
       }
       this.goToListing();

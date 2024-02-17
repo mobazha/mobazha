@@ -1,13 +1,13 @@
 <template>
   <div class="sendReceiveNav clrP">
     <div class="flexBtnWrapper flexBtnTop flexRow">
-      <button :class="['btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm', { active: tabActive === 1 }]" @click="changeTab(1, 'Wallet_SendShow')">
+      <button :class="['btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm', { active: activeTab === 'send' }]" @click="changeTab('send', 'Wallet_SendShow')">
         {{ ob.polyT('wallet.sendBtn') }}
       </button>
-      <button :class="['btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm', { active: tabActive === 2 }]" @click="changeTab(2, 'Wallet_ReceiveShow')">
+      <button :class="['btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm', { active: activeTab === 'receive' }]" @click="changeTab('receive', 'Wallet_ReceiveShow')">
         {{ ob.polyT('wallet.receiveBtn') }}
       </button>
-      <button v-if="activeCoin !== 'MATICMBZ'" :class="['btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm', { active: tabActive === 3 }]" @click="changeTab(3, 'Wallet_External')">
+      <button v-if="activeCoin !== 'MATICMBZ'" :class="['btnFlx col6 flexExpand underlineOnly clrP clrBr gutterHSm', { active: activeTab === 'external' }]" @click="changeTab('external', 'Wallet_External')">
         {{ ob.polyT('wallet.externalBtn') }}
       </button>
     </div>
@@ -19,9 +19,9 @@ import { recordEvent } from '../../../../backbone/utils/metrics';
 
 export default {
   props: {
-    tabActive: {
-      type: Number,
-      default: 1,
+    activeTab: {
+      type: String,
+      default: 'send',
     },
     activeCoin: {
       type: String,

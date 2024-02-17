@@ -162,12 +162,21 @@
     </header>
     <div :class="`navOverlay modal js-navOverlay ${navOverlayOpened ? 'open' :'' }`"></div>
     <Teleport v-if="navigable" to="#js-vueModal">
-      <ShoppingCart v-show="showShoppingCart" @close="onCloseShoppingCart" />
+      <Settings v-show="showSettings" @close="closeSettings" />
+
+      <EditListing v-if="showEditListing" :bb="() => {
+        return {
+          model: editListingModel,
+        };
+      }" @close="closeEditListingModal" />
+
       <Wallet v-show="showWallet" :bb="() => {
         return {
           walletBalances: app.walletBalances,
         };
       }" @close="closeWallet" />
+
+      <ShoppingCart v-show="showShoppingCart" @close="closeShoppingCart" />
     </Teleport>
   </div>
 </template>
@@ -181,10 +190,7 @@ import { events as serverConnectEvents, getCurrentConnection } from '../../backb
 import { setUnreadNotifCount, launchNativeNotification } from '../../backbone/utils/notification.js';
 import { recordEvent } from '../../backbone/utils/metrics.js';
 import app from '../../backbone/app.js';
-import {
-  launchEditListingModal, launchAboutModal,
-  launchWallet, launchSettingsModal,
-} from '../../backbone/utils/modalManager.js';
+import { launchAboutModal, } from '../../backbone/utils/modalManager.js';
 import Listing from '../../backbone/models/listing/Listing.js';
 import { getNotifDisplayData } from '../../backbone/collections/Notifications.js';
 
@@ -241,6 +247,10 @@ export default {
 
       showWallet: false,
       showSettings: false,
+
+      showEditListing: false,
+      editListingModel: {},
+
       showShoppingCart: false,
     };
   },
@@ -650,12 +660,13 @@ export default {
       // This is recorded as two events that belong to different metrics we're comparing.
       recordEvent('NavMenu_Click', { target: 'newListing' });
       recordEvent('Listing_New', { origin: 'navMenu' });
-      const listingModel = new Listing({}, { guid: app.profile.id });
+      this.editListingModel = new Listing({}, { guid: app.profile.id });
 
-      launchEditListingModal({
-        model: listingModel,
-      });
+      this.showEditListing = true;
     },
+    closeEditListingModal() {
+      this.showEditListing = false;
+    }
   }
 }
 </script>

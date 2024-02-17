@@ -409,6 +409,15 @@
 				@refresh="listingDetailKey += 1"
 				@close="onListingDetailClose"
 			/>
+
+      <EditListing v-if="showEditListing"
+        :bb="() => {
+          return {
+            model: editListingModel,
+          };
+        }"
+        @close="closeEditListingModal"
+      />
 		</Teleport>
   </div>
   <div v-else class="listingCard col clrBr clrT clrP clrSh2 contentBox ListingCard-errorCard" v-html="cardErrorInfo"></div>
@@ -420,7 +429,6 @@ import _ from 'underscore';
 import $ from 'jquery';
 import app from '../../../backbone/app';
 import { abbrNum } from '../../../backbone/utils';
-import { launchEditListingModal } from '../../../backbone/utils/modalManager';
 import { isBlocked, isUnblocking, events as blockEvents } from '../../../backbone/utils/block';
 import { isHiRez } from '../../../backbone/utils/responsive';
 import { startAjaxEvent, endAjaxEvent, recordEvent } from '../../../backbone/utils/metrics';
@@ -436,12 +444,14 @@ import { getListingOptions } from '@/utils/verifiedMod'
 import BlockedWarning from '../../views/modals/BlockedWarning.vue';
 import LoadingUser from '../../views/modals/LoadingUser.vue';
 import ListingDetail from '../../views/modals/listingDetail/Listing.vue';
+import EditListing from '@/views/modals/editListing/EditListing.vue';
 
 export default {
   components: {
 		BlockedWarning,
 		LoadingUser,
 		ListingDetail,
+    EditListing,
 	},
   props: {
     options: {
@@ -472,6 +482,9 @@ export default {
       routeNameOnOpen: '',
 
       app: app,
+
+      editListingModel: {},
+      showEditListing: false,
     };
   },
   created() {
@@ -703,14 +716,16 @@ export default {
         .done((xhr) => {
           if (xhr.statusText === 'abort' || this.isRemoved()) return;
 
-          launchEditListingModal({
-            model: this.getFullListing(),
-          });
+          this.editListingModel = this.getFullListing();
+          this.showEditListing = true;
         })
         .always(() => {
           if (this.isRemoved()) return;
           app.loadingModal.close();
         });
+    },
+    closeEditListingModal() {
+      this.showEditListing = false;
     },
 
     onClickDelete() {
@@ -725,9 +740,9 @@ export default {
       this.fetchFullListing()
         .done((xhr) => {
           if (xhr.statusText === 'abort' || this.isRemoved()) return;
-          launchEditListingModal({
-            model: this.getFullListing().cloneListing(),
-          });
+
+          this.editListingModel = this.getFullListing().cloneListing(),
+          this.showEditListing = true;
         })
         .always(() => {
           if (this.isRemoved()) return;

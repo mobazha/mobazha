@@ -13,14 +13,6 @@
     <div id="chatContainer"></div>
     <div id="chatConvoContainer" class="clrP clrBr3"></div>
 
-    <!-- <KeepAlive v-if="initialized" :exclude="['EditListing', 'Settings', 'About', 'ShoppingCart', 'Purchase', 'ModeratorDetails']"> -->
-      <component v-if="modalName" :is="modalName" :name="modalName" ref="modalInstance"
-        :options="modalOptions"
-        :bb="modalBBFunc"
-        @close="closeModal">
-      </component>
-    <!-- </KeepAlive> -->
-
     <div id="js-vueModal"></div>
 
     <LoadingModal v-if="initialized" v-show="showLoadingModal" />
@@ -71,20 +63,6 @@ export default {
   },
   watch: {},
   methods: {
-    launchModal(modalName, options, bbFunc = undefined) {
-      if (modalName === 'ShoppingCart') {
-        this.showPurchase = false;
-      }
-
-      this.modalName = modalName;
-      this.modalOptions = options;
-      this.modalBBFunc = bbFunc;
-
-      return this.$refs.modalInstance;
-    },
-    closeModal() {
-      this.modalName = '';
-    }
   },
 };
 </script>

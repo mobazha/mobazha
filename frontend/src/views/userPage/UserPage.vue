@@ -133,6 +133,15 @@
         @close="onListingDetailClose"
       />
 
+      <EditListing v-if="showEditListing"
+        :bb="() => {
+          return {
+            model: editListingModel,
+          };
+        }"
+        @close="closeEditListingModal"
+      />
+
       <Settings v-if="showSettings" :options="{ initialTab: 'Page' }" @close="closeSettings" />
     </Teleport>
     
@@ -147,7 +156,6 @@ import app from '../../../backbone/app';
 import { abbrNum } from '../../../backbone/utils';
 import { isHiRez } from '../../../backbone/utils/responsive';
 import { startAjaxEvent, endAjaxEvent, recordEvent } from '../../../backbone/utils/metrics';
-import { launchEditListingModal, launchSettingsModal } from '../../../backbone/utils/modalManager';
 import { isBlocked, isUnblocking, events as blockEvents } from '../../../backbone/utils/block';
 import { isValidUserRoute }from '../../../backbone/utils/routeCheck'
 import { getCurrentConnection } from '../../../backbone/utils/serverConnect';
@@ -166,6 +174,7 @@ import Follow from './Follow.vue';
 import Reputation from './Reputation.vue';
 import ListingDetail from '../modals/listingDetail/Listing.vue';
 import Settings from '@/views/modals/settings/Settings.vue';
+import EditListing from '@/views/modals/editListing/EditListing.vue';
 
 const [DefineTabHeader, ReuseTabHeader] = createReusableTemplate();
 
@@ -186,6 +195,7 @@ export default {
     Reputation,
 
     ListingDetail,
+    EditListing,
     Settings,
   },
   props: {
@@ -218,6 +228,9 @@ export default {
       showBlockedModal: false,
 
       showSettings: false,
+
+      showEditListing: false,
+      editListingModel: {},
 
       isBlockedUser: false,
 
@@ -524,11 +537,13 @@ export default {
 
     clickCreateListing() {
       recordEvent('Listing_New', { origin: 'userPage' });
-      const listingModel = new Listing({}, { guid: app.profile.id });
+      this.editListingModel = new Listing({}, { guid: app.profile.id });
 
-      launchEditListingModal({
-        model: listingModel,
-      });
+      this.showEditListing = true;
+    },
+
+    closeEditListingModal() {
+      this.showEditListing = false;
     },
 
     clickCloseStoreWelcomeCallout() {

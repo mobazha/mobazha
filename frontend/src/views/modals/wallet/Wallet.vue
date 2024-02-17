@@ -91,6 +91,16 @@
         </div>
       </template>
     </BaseModal>
+    <Teleport to="#js-vueModal">
+      <EditListing v-if="showEditListing"
+        :bb="() => {
+          return {
+            model: editListingModel,
+          };
+        }"
+        @close="closeEditListingModal"
+      />
+		</Teleport>
   </div>
 </template>
 
@@ -104,7 +114,6 @@ import defaultSearchProviders from '../../../../backbone/data/defaultSearchProvi
 import { recordEvent } from '../../../../backbone/utils/metrics';
 import { getSocket } from '../../../../backbone/utils/serverConnect';
 import app from '../../../../backbone/app';
-import { launchEditListingModal } from '../../../../backbone/utils/modalManager';
 import Transactions from '../../../../backbone/collections/wallet/Transactions';
 import Listing from '../../../../backbone/models/listing/Listing';
 import CoinNavItem from './CoinNavItem.vue';
@@ -116,6 +125,7 @@ import External from './External.vue';
 import TransactionsVw from './transactions/Transactions.vue';
 import ReloadTransactions from './ReloadTransactions.vue';
 import CryptoListingsTeaser from './CryptoListingsTeaser.vue';
+import EditListing from '@/views/modals/editListing/EditListing.vue';
 
 export default {
   components: {
@@ -128,6 +138,7 @@ export default {
     TransactionsVw,
     CryptoListingsTeaser,
     External,
+    EditListing,
   },
   props: {
     options: {
@@ -150,6 +161,9 @@ export default {
       fetchingAddress: true,
       receiveAddress: '',
       transactionsState: {},
+
+      showEditListing: false,
+      editListingModel: {},
     };
   },
   created() {
@@ -369,7 +383,7 @@ export default {
     },
 
     onClickCreateListing() {
-      const model = new Listing({
+      this.editListingModel = new Listing({
         metadata: {
           contractType: 'CRYPTOCURRENCY',
         },
@@ -377,7 +391,11 @@ export default {
 
       recordEvent('Listing_NewCryptoFromWallet');
 
-      launchEditListingModal({ model });
+      this.showEditListing = true;
+    },
+
+    closeEditListingModal() {
+      this.showEditListing = false;
     },
 
     onClickViewCryptoListings() {

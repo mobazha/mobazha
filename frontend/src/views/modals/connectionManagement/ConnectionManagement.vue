@@ -13,7 +13,22 @@
 
           </div>
           <div class="flexExpand">
-            <div class="js-tabContent tabContent"></div>
+            <div class="js-tabContent tabContent">
+              <Configurations
+                v-show="activeTab === 'Configurations'"
+                :bb="() => {
+                  return { collection: app.serverConfigs, }
+                }"
+                @editConfig="onEditConfig"
+                @newClick="onNewConfigClick"
+              />
+              <ConfigurationForm
+                v-show="activeTab === 'ConfigForm'"
+                :key="configFormModel"
+                @cancel="onConfigurationFormCancel"
+                @saved="onConfigurationFormSaved"
+              />
+            </div>
           </div>
         </div>
 
@@ -23,17 +38,19 @@
 </template>
 
 <script>
-import $ from 'jquery';
 import app from '../../../../backbone/app';
 import serverConnect from '../../../../backbone/utils/serverConnect';
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
 import ServerConfig from '../../../../backbone/models/ServerConfig';
 import BaseModal from '../BaseModal';
-import Configurations from './Configurations';
-import ConfigurationForm from './ConfigurationForm';
+import Configurations from './Configurations.vue';
+import ConfigurationForm from './ConfigurationForm.vue';
 
 
 export default {
+  components: {
+    Configurations,
+    ConfigurationForm,
+  },
   props: {
     options: {
       type: Object,
@@ -44,6 +61,8 @@ export default {
   data () {
     return {
       activeTab: 'Configurations',
+
+      configFormModel: {},
     };
   },
   created () {
@@ -58,83 +77,40 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      const opts = {
-        initialTabView: 'Configurations',
-        ...options,
-      };
-
-      this.baseInit(opts);
-      this.options = opts;
-
-      this.tabViewCache = {};
-      this.tabViews = {
-        Configurations,
-        ConfigurationForm,
-      };
+      this.baseInit(options);
     },
 
     onTabClick (tab) {
       this.selectTab(tab);
     },
 
-    createConfigurationsTabView () {
-      const configTab = this.createChild(Configurations, {
-        collection: app.serverConfigs,
-      });
-
-      this.listenTo(configTab, 'editConfig',
-        e => this.selectTab('ConfigForm', { viewOptions: e || {} }));
-      this.listenTo(configTab, 'newClick', () => this.selectTab('ConfigForm'));
-
-      return configTab;
+    onEditConfig(e) {
+      this.selectTab('ConfigForm', { viewOptions: e || {} });
     },
 
-    createConfigurationFormView (viewOptions = {}) {
-      if (!viewOptions.model) {
-        throw new Error('Please provide a server config model.');
-      }
+    onNewConfigClick() {
+      this.selectTab('ConfigForm');
+    },
 
-      const configForm = new ConfigurationForm({ ...viewOptions });
-      this.listenTo(configForm, 'cancel', () => this.selectTab('Configurations'));
-      this.listenTo(configForm, 'saved', () => {
-        this.selectTab('Configurations');
-        app.serverConfigs.add(configForm.model, { merge: true });
-        serverConnect(configForm.model);
-      });
+    onConfigurationFormCancel() {
+      this.selectTab('Configurations');
+    },
 
-      return configForm;
+    onConfigurationFormSaved() {
+      this.selectTab('Configurations');
+      app.serverConfigs.add(configForm.model, { merge: true });
+      serverConnect(configForm.model);
     },
 
     selectTab (tabViewName, data = {}) {
-      let tabView = this.tabViewCache[tabViewName];
       data.viewOptions = data.viewOptions || {};
 
-      if (!this.currentTabView || this.currentTabView !== tabView) {
-        if (this.currentTabView) this.currentTabView.$el.detach();
-
+      if (tabViewName != this.activeTab) {
         if (tabViewName === 'ConfigForm') {
-          // we won't cache the Config Form tab and we'll manage it ourselves
-          this.currentTabView =
-            this.createConfigurationFormView({
-              ...data.viewOptions,
-              model: data.viewOptions.model || new ServerConfig(),
-            });
-          this.$tabContent.append(this.currentTabView.render().el);
-        } else {
-          if (!tabView) {
-            if (this[`create${tabViewName}TabView`]) {
-              tabView = this[`create${tabViewName}TabView`].apply(this, [data.viewOptions || {}]);
-            } else {
-              tabView = this.createChild(this.tabViews[tabViewName]);
-            }
-
-            this.tabViewCache[tabViewName] = tabView;
-            tabView.render();
-          }
-
-          this.$tabContent.append(tabView.$el);
-          this.currentTabView = tabView;
+          this.configFormModel = data.viewOptions.model || new ServerConfig();
         }
+
+        this.activeTab = tabViewName;
       }
     },
 
@@ -145,14 +121,7 @@ export default {
     },
 
     render () {
-      loadTemplate('modals/connectionManagement/connectionManagement.html', t => {
-        this.$el.html(t());
-        super.render();
-
-        this.$tabContent = $('.js-tabContent');
-
-        this.selectTab(this.options.initialTabView);
-      });
+      this.selectTab(this.activeTab);
 
       return this;
     }

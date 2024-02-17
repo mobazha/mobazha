@@ -76,11 +76,10 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      if (!options.collection) {
+      if (!this.collection) {
         throw new Error('Please provide a server configurations collection.');
       }
 
-      this.baseInit(options);
       this.configViews = [];
       this.emptyConfigs = !!this.collection.length;
       this.pendingDisconnectServerId = null;
@@ -131,8 +130,7 @@ export default {
         // change the button state.
         if (this.pendingDisconnectServerId === e.server.id) {
           this.pendingDisconnectServerId = null;
-          let disconnectedServer =
-            this.configViews.filter(vw => vw.model.id === e.server.id);
+          let disconnectedServer = this.configViews.filter(vw => vw.model.id === e.server.id);
           disconnectedServer = disconnectedServer && disconnectedServer[0];
           if (disconnectedServer) disconnectedServer.setState({ status: 'not-connected' });
           return;
@@ -332,7 +330,7 @@ export default {
       this.listenTo(configVw, 'editClick', e => this.$emit('editConfig', { model: e.view.model }));
 
       return configVw;
-    }
+    },
 
   get $statusBarOuterWrap () {
       return this._$statusBarOuterWrap ||

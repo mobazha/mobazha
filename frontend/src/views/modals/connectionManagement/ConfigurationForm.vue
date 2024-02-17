@@ -18,7 +18,7 @@
         {{ ob.polyT('connectionManagement.configurationForm.torNotAvailableMessage') }}
       </div>
 
-      <form :class="`padMdKids padStack ${ob.useTor ? 'useTor' : ''}`">
+      <form :class="`padMdKids padStack ${formData.useTor ? 'useTor' : ''}`">
         <div class="padMdKids padStack pad0 js-standAloneSection" v-show="!ob.builtIn">
           <div class="flexRow">
             <div class="col3">
@@ -27,7 +27,8 @@
             <div class="col9">
               <FormError v-if="ob.errors['name']" :errors="ob.errors['name']" />
               <input type="text" class="clrBr clrSh2 js-inputName" name="name" id="serverConfigName"
-                :value="ob.name"
+                v-focus
+                v-model="formData.name"
                 :placeholder="ob.polyT('connectionManagement.configurationForm.placeholderName')"
                 data-field-standalone />
             </div>
@@ -39,9 +40,8 @@
             <div class="col9">
               <FormError v-if="ob.errors['serverIp']" :errors="ob.errors['serverIp']" />
               <input type="text" class="clrBr clrSh2" name="serverIp" id="serverConfigServerIp"
-                @change="onChangeServerIp"
-                :value="ob.serverIp"
                 :placeholder="ob.polyT('connectionManagement.configurationForm.placeholderServerIp')"
+                v-model="formData.serverIp"
                 data-field-standalone />
             </div>
           </div>
@@ -52,7 +52,7 @@
             <div class="col9">
               <FormError v-if="ob.errors['username']" :errors="ob.errors['username']" />
               <input type="text" class="clrBr clrSh2" name="username" id="serverConfigUsername"
-                :value="ob.username"
+                v-model="formData.username"
                 :placeholder="ob.polyT('connectionManagement.configurationForm.placeholderUsername')"
                 data-field-standalone>
             </div>
@@ -64,7 +64,7 @@
             <div class="col9">
               <FormError v-if="ob.errors['password']" :errors="ob.errors['password']" />
               <input type="password" class="clrBr clrSh2" name="password" id="serverConfigPassword"
-                :value="ob.password"
+                v-model="formData.password"
                 :placeholder="ob.polyT('connectionManagement.configurationForm.placeholderPassword')"
                 data-field-standalone>
             </div>
@@ -78,16 +78,14 @@
               <div class="btnStrip">
                 <div class="btnRadio clrBr">
                   <input type="radio" name="SSL" value="true" id="serverConfigSSLOn"
-                    data-var-type="boolean"
                     data-field-standalone
-                    v-model="ob.SSL">
+                    v-model="formData.SSL">
                   <label for="serverConfigSSLOn">{{ ob.polyT('connectionManagement.configurationForm.sslOn') }}</label>
                 </div>
                 <div class="btnRadio clrBr">
                   <input type="radio" name="SSL" value="false" id="serverConfigSSLOff"
-                    data-var-type="boolean"
                     data-field-standalone
-                    v-model="ob.SSL">
+                    v-model="formData.SSL">
                   <label for="serverConfigSSLOff">{{ ob.polyT('connectionManagement.configurationForm.sslOff') }}</label>
                 </div>
               </div>
@@ -99,9 +97,8 @@
             </div>
             <div class="col9">
               <FormError v-if="ob.errors['port']" :errors="ob.errors['port']" />
-              <input type="text" class="clrBr clrSh2" name="port" id="serverConfigPort"
-                :value="ob.port"
-                data-var-type="number"
+              <input type="number" class="clrBr clrSh2" name="port" id="serverConfigPort"
+                v-model="formData.port"
                 :placeholder="ob.polyT('connectionManagement.configurationForm.placeholderPort')"
                 data-field-standalone>
             </div>
@@ -114,8 +111,7 @@
           <div class="col9">
             <FormError v-if="ob.errors['useTor']" :errors="ob.errors['useTor']" />
             <input type="checkbox" id="serverConfigUseTor" name="useTor"
-              @change="onChangeUseTor"
-              :checked="ob.useTor"
+              v-model="formData.useTor"
               data-field-standalone
               data-field-builtin />
             <label for="serverConfigUseTor">{{ ob.polyT('connectionManagement.configurationForm.useTor') }}</label>
@@ -132,7 +128,7 @@
             <div class="col9">
               <FormError v-if="ob.errors['torProxy']" :errors="ob.errors['torProxy']" />
               <input type="text" class="clrBr clrSh2 required" name="torProxy" id="serverConfigTorProxy"
-                :value="ob.torProxy"
+                v-model="formData.torProxy"
                 :placeholder="ob.polyT('connectionManagement.configurationForm.torProxyPlaceholder')"
                 data-field-standalone data-field-builtin>
             </div>
@@ -144,7 +140,7 @@
             <div class="col9">
               <FormError v-if="ob.errors['torPassword']" :errors="ob.errors['torPassword']" />
               <input type="password" class="clrBr clrSh2" name="torPassword" id="serverConfigTorPw"
-                :value="ob.torPassword"
+                v-model="formData.torPassword"
                 :placeholder="ob.polyT('connectionManagement.configurationForm.torPwPlaceholder')"
                 data-field-standalone data-field-builtin>
             </div>
@@ -156,8 +152,8 @@
       <div class="flexHRight flexVCent gutterHLg">
         <a @click="onCancelClick">{{ ob.polyT('connectionManagement.configurationForm.btnCancel') }}</a>
         <div class="posR">
-          <a class="btn clrP clrBr clrSh2 " @click="onSaveClick">{{ ob.polyT('connectionManagement.configurationForm.btnSave') }}</a>
-          <div js-saveConfirmBox class=" confirmBox saveConfirmBox arrowBoxBottom tx5 clrBr clrP clrT hide" @click="onClickSaveConfirmBox">
+          <a class="btn clrP clrBr clrSh2 " @click.stop.prevent="onSaveClick">{{ ob.polyT('connectionManagement.configurationForm.btnSave') }}</a>
+          <div js-saveConfirmBox v-show="showSaveConfirmBox" class=" confirmBox saveConfirmBox arrowBoxBottom tx5 clrBr clrP clrT" @click.stop.prevent>
             <div class="tx3 txB rowSm">{{ ob.polyT('connectionManagement.configurationForm.saveConfirm.title') }}</div>
             <p>{{ ob.polyT('connectionManagement.configurationForm.saveConfirm.body') }}</p>
             <hr class="clrBr row" />
@@ -174,10 +170,10 @@
 </template>
 
 <script>
+import _ from 'underscore';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import { getCurrentConnection } from '../../../../backbone/utils/serverConnect';
 import app from '../../../../backbone/app';
-import loadTemplate from '../../../../backbone/utils/loadTemplate';
 
 
 export default {
@@ -188,8 +184,25 @@ export default {
     },
     bb: Function,
   },
+  watch: {
+    'formData.serverIp'() {
+      this.onChangeServerIp();
+    },
+  },
   data () {
     return {
+      showSaveConfirmBox: false,
+
+      formData: {
+        name: '',
+        serverIp: '',
+        username: '',
+        password: '',
+        SSL: true,
+        useTor: false,
+        torProxy: '',
+        torPassword: ''
+      }
     };
   },
   created () {
@@ -198,7 +211,6 @@ export default {
     this.loadData(this.options);
   },
   mounted () {
-    this.render();
   },
   computed: {
     ob () {
@@ -216,15 +228,14 @@ export default {
   },
   methods: {
     loadData (options = {}) {
-      const opts = {
-        ...options,
-      };
+      this.baseInit(options);
 
-      this.baseInit(opts);
-
-      if (!opts.model) {
+      if (!options.model) {
         throw new Error('Please provide a model.');
       }
+
+      this._lastSavedAttrs = this.model.toJSON();
+      this.formData = _.pick(this._lastSavedAttrs, _.keys(this.formData));
 
       const curConn = getCurrentConnection();
       this.showConfigureTorMessage = false;
@@ -238,8 +249,6 @@ export default {
         }
       }
 
-      this._lastSavedAttrs = this.model.toJSON();
-
       this.title = this.model.isNew() ?
         app.polyglot.t('connectionManagement.configurationForm.tabName') :
         this.model.get('name');
@@ -250,24 +259,12 @@ export default {
       });
     },
 
-    events () {
-      return {
-        'change [name=serverType]': 'onChangeServerType',
-      };
-    },
-
     onDocumentClick () {
-      this.getCachedEl('.js-saveConfirmBox').addClass('hide');
-    },
-
-    onClickSaveConfirmBox (e) {
-      // Do not allow clicks to get to the doc handler and result in the
-      // confirm box closing.
-      e.stopPropagation();
+      this.showSaveConfirmBox = false;
     },
 
     onClickSaveConfirmCancel () {
-      this.getCachedEl('.js-saveConfirmBox').addClass('hide');
+      this.showSaveConfirmBox = false;
     },
 
     onCancelClick () {
@@ -279,58 +276,45 @@ export default {
       this.model.set({}, { validate: true });
 
       if (this.model.validationError) {
-        this.render();
         return;
       }
 
       if (!this.model.isLocalServer() && !this.model.get('SSL')) {
-        this.getCachedEl('.js-saveConfirmBox').removeClass('hide');
+        this.showSaveConfirmBox = true;
       } else {
         this.save();
       }
-
-      // don't bubble to the doc handler
-      e.stopPropagation();
     },
 
     onSaveConfirmedClick () {
       this.save();
     },
 
-    onChangeServerIp (e) {
-      this.model.set(this.getFormData(e.target));
+    onChangeServerIp () {
+      this.model.set(this.getFormData());
 
       if (!this.model.isLocalServer()) {
         // If you switched from a local to a remote IP, we'll default SSL
         // to on.
         if (this.model.isLocalServer(this.model.previousAttributes().serverIp)) {
-          this.getCachedEl('#serverConfigSSLOn')[0].checked = true;
+          this.formData.SSL = true;
         }
       }
-
-      this.getCachedEl('.js-torPwLabel')
-        .toggleClass('required', this.model.isTorPwRequired());
     },
 
-    onChangeUseTor (e) {
-      this.getCachedEl('form')
-        .toggleClass('useTor', e.target.checked);
-    },
+    getFormData() {
+      const builtIn = this.model.get('builtIn');
+      if (builtIn) {
+        return _.pick(this.formData, ['useTor', 'torProxy', 'torPassword']);
+      }
 
-    onChangeServerType (e) {
-      this.getCachedEl('.js-standAloneSection')
-        .toggleClass('hide', e.target.value === 'BUILT_IN');
+      return this.formData;
     },
 
     setModelFromForm () {
-      const serverType = this.getFormData(this.getCachedEl('[name=serverType]')).serverType;
-      const builtIn = this.model.isNew() ? serverType === 'BUILT_IN' : this.model.get('builtIn');
-      const formFieldsDataAttr = builtIn ? 'data-field-builtin' : 'data-field-standalone';
-      const formData = this.getFormData(
-        this.getCachedEl(`select[${formFieldsDataAttr}], input[${formFieldsDataAttr}], ` +
-          `textarea[${formFieldsDataAttr}]`)
-      );
-      delete formData.serverType;
+      const builtIn = this.model.get('builtIn');
+      const formData = this.getFormData();
+
       this.model.set({
         ...this.model.lastSyncedAttrs || {},
         ...formData,
@@ -356,36 +340,7 @@ export default {
           openSimpleMessage('Unable to save server configuration');
         });
       }
-
-      this.render();
     },
-
-    render () {
-      super.render();
-      loadTemplate('modals/connectionManagement/configurationForm.html', (t) => {
-        this.$el.html(t({
-          ...this.model.toJSON(),
-          errors: this.model.validationError || {},
-          isRemote: !this.model.isLocalServer(),
-          title: this.title,
-          showConfigureTorMessage: this.showConfigureTorMessage,
-          showTorUnavailableMessage: this.showTorUnavailableMessage,
-          isTorPwRequired: this.model.isTorPwRequired(),
-        }));
-
-        if (!this.rendered) {
-          this.rendered = true;
-          setTimeout(() => {
-            if (!this.showConfigureTorMessage && !this.showTorUnavailableMessage) {
-              this.getCachedEl('.js-inputName').focus();
-            }
-          });
-        }
-      });
-
-      return this;
-    }
-
   }
 }
 </script>

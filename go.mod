@@ -12,6 +12,9 @@ replace (
 	github.com/mobazha/go-ethwallet => /Users/mingfeng/dev/openbazaar/bnb_example
 	github.com/mobazha/multiwallet => /Users/mingfeng/go/src/github.com/cpacia/multiwallet
 	github.com/mobazha/wallet-interface => /Users/mingfeng/go/src/github.com/cpacia/wallet-interface
+
+// github.com/multiformats/go-multiaddr => /Users/mingfeng/go/src/github.com/multiformats/go-multiaddr
+// github.com/multiformats/iface => /Users/mingfeng/go/src/github.com/multiformats/iface
 )
 
 require (
@@ -302,13 +305,13 @@ require (
 	go.uber.org/zap v1.24.0 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc // indirect
-	golang.org/x/image v0.14.0 // indirect
+	golang.org/x/image v0.15.0 // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/tools v0.16.1 // indirect
+	golang.org/x/tools v0.17.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	gonum.org/v1/gonum v0.13.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

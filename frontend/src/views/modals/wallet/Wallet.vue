@@ -185,7 +185,7 @@ export default {
         Object.keys(this.transactionsState[coinType].bumpFeeAttempts).forEach((txId) => this.transactionsState[coinType].bumpFeeAttempts[txId].abort());
       }
     });
-    this.popInTimeouts.forEach((timeout) => timeout.remove());
+    this.popInTimeouts.forEach((timeout) => clearTimeout(timeout));
   },
   watch: {
     activeCoin(coin, oldVal) {

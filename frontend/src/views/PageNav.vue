@@ -176,7 +176,7 @@
         };
       }" @close="closeWallet" />
 
-      <ShoppingCart v-show="showShoppingCart" @close="closeShoppingCart" />
+      <ShoppingCart v-if="showShoppingCart" @close="closeShoppingCart" />
     </Teleport>
   </div>
 </template>
@@ -225,7 +225,7 @@ export default {
       torIndicatorOn: false,
 
       windowStyle: 'win',
-      app: app,
+      app,
 
       toggleKey: 0,
 

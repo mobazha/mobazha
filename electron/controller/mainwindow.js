@@ -1,6 +1,6 @@
 'use strict';
 
-const { session } = require('electron');
+const { app, session } = require('electron');
 const { Controller } = require('ee-core');
 const Log = require('ee-core/log');
 const Addon = require('ee-core/addon');
@@ -77,7 +77,7 @@ class MainWindowController extends Controller {
     // setBadgeCount is only available on certain environements:
     // https://github.com/electron/electron/blob/master/docs/api/app.md#appsetbadgecountcount-linux-macos
     try {
-      this.app.setBadgeCount(count);
+      app.setBadgeCount(count);
     } catch (err) {
       // pass
       console.log(err);

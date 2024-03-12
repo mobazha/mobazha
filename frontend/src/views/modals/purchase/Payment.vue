@@ -137,6 +137,8 @@ export default {
   },
   data () {
     return {
+      app,
+
       copyAmountActive: false,
       copyAddressActive: false,
       isPaying: false,
@@ -160,7 +162,6 @@ export default {
     ob () {
       return {
           ...this.templateHelpers,
-          app,
           amountDueLine: this.amountDueLine,
           paymentAddress: this.paymentAddress,
           qrDataUri: this.qrDataUri,

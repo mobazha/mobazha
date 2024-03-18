@@ -85,6 +85,7 @@ let _currencies = [
   {
     code: 'BNB',
     testnetCode: 'BNB',
+    chainName: 'Binance Smart Chain',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
       return address;
@@ -109,6 +110,7 @@ let _currencies = [
   {
     code: 'BNBUSDT',
     testnetCode: 'BNBUSDT',
+    mainChain: 'BNB',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
       return address;
@@ -133,6 +135,7 @@ let _currencies = [
   {
     code: 'BNBUSDC',
     testnetCode: 'BNBUSDC',
+    mainChain: 'BNB',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
       return address;
@@ -157,6 +160,7 @@ let _currencies = [
   {
     code: 'BNBMBZ',
     testnetCode: 'BNBMBZ',
+    mainChain: 'BNB',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
       return address;
@@ -181,6 +185,7 @@ let _currencies = [
   {
     code: 'MATIC',
     testnetCode: 'MATIC',
+    chainName: 'Polygon Chain',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
       return address;
@@ -205,6 +210,7 @@ let _currencies = [
   {
     code: 'MATICUSDT',
     testnetCode: 'MATICUSDT',
+    mainChain: 'MATIC',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
       return address;
@@ -229,6 +235,7 @@ let _currencies = [
   {
     code: 'MATICUSDC',
     testnetCode: 'MATICUSDC',
+    mainChain: 'MATIC',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
       return address;
@@ -253,6 +260,7 @@ let _currencies = [
   {
     code: 'MATICMBZ',
     testnetCode: 'MATICMBZ',
+    mainChain: 'MATIC',
     feeBumpTransactionSize: 154,
     qrCodeText: (address) => {
       return address;

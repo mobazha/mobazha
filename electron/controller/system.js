@@ -91,6 +91,25 @@ class SystemController extends Controller {
     const rootDir = Ps.getHomeDir();
     return require(path.join(rootDir, variablePath, langFile));
   }
+
+  async printLog(args, event) {
+    const { type, content } = args;
+
+    switch (type) {
+      case 'error':
+        Log.error(content);
+        break;
+      case 'debug':
+        Log.debug(content);
+        break;
+      case 'warn':
+        Log.warn(content);
+        break;
+      default:
+        Log.info(content);
+        break;
+    }
+  }
 }
 
 SystemController.toString = () => '[class SystemController]';

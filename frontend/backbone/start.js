@@ -24,6 +24,7 @@ import { addMetrics, showMetricsModal, isNewerVersion } from './utils/metrics';
 import { showUpdateStatus, updateReady } from './utils/autoUpdate';
 import { handleLinks } from './utils/dom';
 import { persist as persistOutdatedListingHashes } from './utils/outdatedListingHashes';
+import { printLog } from './utils/log.js';
 import Chat from './views/chat/Chat';
 import ChatHeads from './collections/ChatHeads';
 import LoadingModal from './views/modals/Loading';
@@ -551,15 +552,21 @@ function start() {
           if (externalRoute) {
             // handle opening the app from an an external ob link
             location.hash = `#${externalRoute}`;
-          } else if (location.pathname === '/' || !location.hash) {
+
+            printLog({content: `root page with externalRoute: ${externalRoute}`})
+          } else if (location.pathname === '/' || !location.hash || location.hash === '#/home') {
             // If for some reason the route to start on is empty, we'll change it to be
             // the user's profile.
             const href = location.href.replace(/(javascript:|#).*$/, '');
             location.replace(`${href}#${app.profile.id}`);
+
+            printLog({content: `root page with home path: ${href}#${app.profile.id}`})
           } else if (curConn.server
             && curConn.server.id !== localStorage.serverIdAtLastStart) {
             // When switching servers, we'll land on the user page of the new node
             location.hash = `#${app.profile.id}`;
+
+            printLog({content: `root page with profile id: ${href}#${app.profile.id}`})
           }
 
           localStorage.serverIdAtLastStart = curConn && curConn.server && curConn.server.id;

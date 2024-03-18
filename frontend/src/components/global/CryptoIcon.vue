@@ -1,8 +1,7 @@
-
 <template>
   <div class="cryptoIcon crypto-icon">
-    <i :class="`cryptoIcon ${className} crypto-icon__large`" :style="style"></i>
-    <i v-if="style2" :class="`cryptoIcon ${className} crypto-icon__small`" :style="style2"></i>
+    <i :class="`${className} crypto-icon__large`" :style="style"></i>
+    <i v-if="style2" :class="`${className} crypto-icon__small`" :style="style2"></i>
   </div>
 </template>
 
@@ -20,17 +19,15 @@ export default {
       default: '',
     },
   },
-  data () {
+  data() {
     return {
       defaultIcon: 'default-coin-icon.png',
     };
   },
-  created () {
-  },
-  mounted () {
-  },
+  created() {},
+  mounted() {},
   computed: {
-    style () {
+    style() {
       const baseIconPath = '../../../imgs/cryptoIcons/';
 
       const iconUrl = this.code ? `url(${baseIconPath}${this.code}-icon.png),` : '';
@@ -38,9 +35,9 @@ export default {
 
       return `background-image: ${iconUrl}${defaultIcon}`;
     },
-    style2 () {
+    style2() {
       const baseIconPath = '../../../imgs/cryptoIcons/';
-      
+
       const coinData = getCurrencyByCode(this.code);
 
       if (!coinData || !coinData.mainChain) {
@@ -50,22 +47,23 @@ export default {
       const iconUrl = `url(${baseIconPath}${coinData.mainChain}-icon.png),`;
       const defaultIcon = this.defaultIcon ? `url(${baseIconPath}${this.defaultIcon})` : '';
 
-      console.log('iconUrl token: ', iconUrl)
-
       return `background-image: ${iconUrl}${defaultIcon}`;
     },
   },
-  methods: {
-  },
-}
+  methods: {},
+};
 </script>
 <style lang="scss" scoped>
 .crypto-icon {
   position: relative;
-
+  font-size: initial;
   &__large {
     width: 100%;
     height: 100%;
+    background-size: contain;
+    display: inline-block;
+    background-repeat: no-repeat;
+    background-position: center;
   }
   &__small {
     position: absolute;
@@ -73,6 +71,10 @@ export default {
     bottom: -12%;
     width: 50%;
     height: 50%;
+    background-size: contain;
+    display: inline-block;
+    background-repeat: no-repeat;
+    background-position: center;
   }
 }
 </style>

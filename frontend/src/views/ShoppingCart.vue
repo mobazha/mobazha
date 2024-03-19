@@ -65,9 +65,9 @@
                               <div class="goods-right">
                                 <div class="goods-title" @click="goToListing(item.vendorID, row.listing?.slug)">{{ row.listing?.item.title }}</div>
                                 <div class="goods-currency">
-                                  <img
-                                    class="currency-icon"
-                                    :src="`../../imgs/cryptoIcons/${currency}-icon.png`"
+                                  <CryptoIcon
+                                    :code="currency"
+                                    className="currency-icon"
                                     v-for="(currency, index) in row.listing?.metadata.acceptedCurrencies"
                                     :key="index"
                                   />

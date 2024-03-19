@@ -28,7 +28,7 @@ export default {
   mounted() {},
   computed: {
     style() {
-      const baseIconPath = '../../../imgs/cryptoIcons/';
+      const baseIconPath = '../imgs/cryptoIcons/';
 
       const iconUrl = this.code ? `url(${baseIconPath}${this.code}-icon.png),` : '';
       const defaultIcon = this.defaultIcon ? `url(${baseIconPath}${this.defaultIcon})` : '';
@@ -36,7 +36,7 @@ export default {
       return `background-image: ${iconUrl}${defaultIcon}`;
     },
     style2() {
-      const baseIconPath = '../../../imgs/cryptoIcons/';
+      const baseIconPath = '../imgs/cryptoIcons/';
 
       const coinData = getCurrencyByCode(this.code);
 

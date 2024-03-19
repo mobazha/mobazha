@@ -1,7 +1,7 @@
 <template>
-  <div class="cryptoIcon crypto-icon">
-    <i :class="`${className} crypto-icon__large`" :style="style"></i>
-    <i v-if="style2" :class="`${className} crypto-icon__small`" :style="style2"></i>
+  <div :class="`cryptoIcon crypto-icon ${className}`">
+    <i class="crypto-icon__large" :style="style"></i>
+    <i v-if="style2" class="crypto-icon__small" :style="style2"></i>
   </div>
 </template>
 

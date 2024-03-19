@@ -3,7 +3,7 @@
     <div class="js-notifsContainer reverseorder">
       <Notification
         v-for="(notif, index) in collection"
-        :key="index"
+        :key="notif.id"
         ref="notifViews"
         @navigate="$emit('notifNavigate')"
         :bb="

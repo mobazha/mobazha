@@ -13,6 +13,8 @@ replace (
 	github.com/mobazha/multiwallet => /Users/mingfeng/go/src/github.com/cpacia/multiwallet
 	github.com/mobazha/wallet-interface => /Users/mingfeng/go/src/github.com/cpacia/wallet-interface
 
+	github.com/nanmu42/etherscan-api => /Users/mingfeng/go/src/github.com/mobazha/etherscan-api
+
 // github.com/multiformats/go-multiaddr => /Users/mingfeng/go/src/github.com/multiformats/go-multiaddr
 // github.com/multiformats/iface => /Users/mingfeng/go/src/github.com/multiformats/iface
 )

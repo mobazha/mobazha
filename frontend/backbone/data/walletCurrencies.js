@@ -191,7 +191,7 @@ let _currencies = [
       return address;
     },
     icon: 'imgs/cryptoIcons/MATIC-icon.png',
-    url: 'https://bitcoincash.org/',
+    url: 'https://polygon.technology/',
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
         ? `https://mumbai.polygonscan.com/address/${address}`
@@ -216,7 +216,7 @@ let _currencies = [
       return address;
     },
     icon: 'imgs/cryptoIcons/USDT-icon.png',
-    url: 'https://bitcoincash.org/',
+    url: 'https://polygon.technology/',
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
         ? `https://mumbai.polygonscan.com/address/${address}`
@@ -241,7 +241,7 @@ let _currencies = [
       return address;
     },
     icon: 'imgs/cryptoIcons/USDC-icon.png',
-    url: 'https://bitcoincash.org/',
+    url: 'https://polygon.technology/',
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
         ? `https://mumbai.polygonscan.com/address/${address}`
@@ -266,7 +266,7 @@ let _currencies = [
       return address;
     },
     icon: 'imgs/cryptoIcons/MBZ-icon.png',
-    url: 'https://bitcoincash.org/',
+    url: 'https://polygon.technology/',
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
         ? `https://mumbai.polygonscan.com/address/${address}`
@@ -285,24 +285,101 @@ let _currencies = [
   {
     code: 'CFX',
     testnetCode: 'CFX',
-    qrCodeText: (address) => `conflux:${address}`,
+    chainName: 'Conflux Chain',
+    qrCodeText: (address) => {
+      return address;
+    },
     icon: 'imgs/cryptoIcons/CFX-icon.png',
     url: 'https://confluxnetwork.org',
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
-        ? `https://testnet.confluxscan.io/address/${address}`
-        : `https://testnet.confluxscan.io/address/${address}`
-        // `https://confluxscan.io/address/${address}`
+        ? `https://evmtestnet.confluxscan.io/address/${address}`
+        : `https://evm.confluxscan.io/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
       isTestnet
-        ? `https://testnet.confluxscan.io/transaction/${txid}`
-        : `https://testnet.confluxscan.io/transaction/${txid}`
-        // `https://confluxscan.io/transaction/${txid}`
+        ? `https://evmtestnet.confluxscan.io/tx/${txid}`
+        : `https://evm.confluxscan.io/address/tx/${txid}`
     ),
+    isValidAddress: isValidETHAddress,
     supportsEscrowTimeout: true,
-    blockTime: 1000 * 1,
+    blockTime: 1000 * 0.5,
     externallyFundableOrders: false,
+  },
+  {
+    code: 'CFXUSDT',
+    testnetCode: 'CFXUSDT',
+    mainChain: 'CFX',
+    feeBumpTransactionSize: 154,
+    qrCodeText: (address) => {
+      return address;
+    },
+    icon: 'imgs/cryptoIcons/USDT-icon.png',
+    url: 'https://confluxnetwork.org',
+    getBlockChainAddressUrl: (address, isTestnet) => (
+      isTestnet
+        ? `https://evmtestnet.confluxscan.io/address/${address}`
+        : `https://evm.confluxscan.io/address/${address}`
+    ),
+    getBlockChainTxUrl: (txid, isTestnet) => (
+      isTestnet
+        ? `https://evmtestnet.confluxscan.io/tx/${txid}`
+        : `https://evm.confluxscan.io/address/tx/${txid}`
+    ),
+    isValidAddress: isValidETHAddress,
+    supportsEscrowTimeout: true,
+    blockTime: 1000 * 0.5,
+    externallyFundableOrders: true,
+  },
+  {
+    code: 'CFXUSDC',
+    testnetCode: 'CFXUSDC',
+    mainChain: 'CFX',
+    feeBumpTransactionSize: 154,
+    qrCodeText: (address) => {
+      return address;
+    },
+    icon: 'imgs/cryptoIcons/USDC-icon.png',
+    url: 'https://confluxnetwork.org',
+    getBlockChainAddressUrl: (address, isTestnet) => (
+      isTestnet
+        ? `https://evmtestnet.confluxscan.io/address/${address}`
+        : `https://evm.confluxscan.io/address/${address}`
+    ),
+    getBlockChainTxUrl: (txid, isTestnet) => (
+      isTestnet
+        ? `https://evmtestnet.confluxscan.io/tx/${txid}`
+        : `https://evm.confluxscan.io/address/tx/${txid}`
+    ),
+    isValidAddress: isValidETHAddress,
+    supportsEscrowTimeout: true,
+    blockTime: 1000 * 0.5,
+    externallyFundableOrders: true,
+  },
+  {
+    code: 'CFXMBZ',
+    testnetCode: 'CFXMBZ',
+    mainChain: 'CFX',
+    feeBumpTransactionSize: 154,
+    qrCodeText: (address) => {
+      return address;
+    },
+    icon: 'imgs/cryptoIcons/MBZ-icon.png',
+    url: 'https://confluxnetwork.org',
+    getBlockChainAddressUrl: (address, isTestnet) => (
+      isTestnet
+        ? `https://evmtestnet.confluxscan.io/address/${address}`
+        : `https://evm.confluxscan.io/address/${address}`
+    ),
+    getBlockChainTxUrl: (txid, isTestnet) => (
+      isTestnet
+        ? `https://evmtestnet.confluxscan.io/tx/${txid}`
+        : `https://evm.confluxscan.io/address/tx/${txid}`
+    ),
+    isValidAddress: isValidETHAddress,
+    supportsEscrowTimeout: true,
+    blockTime: 1000 * 0.5,
+    externallyFundableOrders: true,
   },
   {
     code: 'ETH',

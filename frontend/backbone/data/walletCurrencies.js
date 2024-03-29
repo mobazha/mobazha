@@ -324,7 +324,7 @@ let _currencies = [
     getBlockChainTxUrl: (txid, isTestnet) => (
       isTestnet
         ? `https://evmtestnet.confluxscan.io/tx/${txid}`
-        : `https://evm.confluxscan.io/address/tx/${txid}`
+        : `https://evm.confluxscan.io/tx/${txid}`
     ),
     isValidAddress: isValidETHAddress,
     supportsEscrowTimeout: true,

@@ -285,7 +285,7 @@ let _currencies = [
   {
     code: 'CFX',
     testnetCode: 'CFX',
-    chainName: 'Conflux Chain',
+    chainName: 'Conflux eSpace',
     qrCodeText: (address) => {
       return address;
     },

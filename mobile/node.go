@@ -82,7 +82,7 @@ func NewNode(cfg *Config) (*Node, error) {
 	rcfg := &repo.Config{
 		IPNSQuorum:             2,
 		LogLevel:               logLevel,
-		EnabledWallets:         []string{"BCH", "MATIC", "MATICUSDT", "MATICUSDC", "MATICMBZ"},
+		EnabledWallets:         []string{"BCH", "CFX", "CFXUSDT", "CFXUSDC", "CFXMBZ"},
 		DisableNATPortMap:      true,
 		DataDir:                dataDir,
 		LogDir:                 logDir,

@@ -7,6 +7,8 @@ replace (
 	github.com/cpacia/go-store-and-forward => /Users/mingfeng/go/src/github.com/cpacia/go-store-and-forward
 	github.com/cpacia/proxyclient => /Users/mingfeng/go/src/github.com/cpacia/proxyclient
 
+	github.com/ethereum/go-ethereum => /Users/mingfeng/go/src/github.com/ethereum/go-ethereum
+
 	github.com/mobazha/ethereum-watcher => /Users/mingfeng/go/src/github.com/mobazha/ethereum-watcher
 
 	github.com/mobazha/go-ethwallet => /Users/mingfeng/dev/openbazaar/bnb_example
@@ -63,8 +65,8 @@ require (
 	github.com/teserakt-io/golang-ed25519 v0.0.0-20210104091850-3888c087a4c8
 	github.com/tyler-smith/go-bip39 v1.1.0
 	go.uber.org/fx v1.19.3
-	golang.org/x/crypto v0.19.0
-	golang.org/x/net v0.21.0
+	golang.org/x/crypto v0.21.0
+	golang.org/x/net v0.22.0
 	google.golang.org/protobuf v1.31.0
 	gorm.io/driver/sqlite v1.4.4
 	gorm.io/gorm v1.24.5
@@ -308,12 +310,13 @@ require (
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc // indirect
 	golang.org/x/image v0.15.0 // indirect
-	golang.org/x/mod v0.15.0 // indirect
+	golang.org/x/mobile v0.0.0-20240329164231-365c35338770 // indirect
+	golang.org/x/mod v0.16.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/sys v0.17.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/tools v0.18.0 // indirect
+	golang.org/x/tools v0.19.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	gonum.org/v1/gonum v0.13.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

@@ -170,7 +170,7 @@
         };
       }" @close="closeEditListingModal" />
 
-      <Wallet v-show="showWallet" :bb="() => {
+      <Wallet v-if="showWallet" :bb="() => {
         return {
           walletBalances: app.walletBalances,
         };

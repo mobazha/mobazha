@@ -49,7 +49,7 @@
                   />
               </div>
             </div>
-            <div class="mainCtaWrap hide" v-show="!ob.isFetching && !ob.fetchFailed">
+            <div class="mainCtaWrap" v-show="!ob.isFetching && !ob.fetchFailed">
               <ProcessingButton className="btn clrBAttGrad clrBrDec1 clrTOnEmph" btnText="Accept Order"/>
             </div>
             <div class="js-actionBarContainer">

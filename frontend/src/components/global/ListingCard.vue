@@ -60,7 +60,7 @@
                 :data-tip="ob.polyT('listingCard.deleteListingTooltip')"
                 ><span class="ion-trash-b"></span>
               </a>
-              <div v-show="deleteConfirmOn" class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxBottom clrBr clrP clrT hide" @click.stop="onClickDeleteConfirmBox">
+              <div v-show="deleteConfirmOn" class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxBottom clrBr clrP clrT" @click.stop="onClickDeleteConfirmBox">
                 <div class="tx3 txB rowSm">{{ ob.polyT('listingCard.confirmDelete.title') }}</div>
                 <p>{{ ob.polyT('listingCard.confirmDelete.body') }}</p>
                 <hr class="clrBr row" />

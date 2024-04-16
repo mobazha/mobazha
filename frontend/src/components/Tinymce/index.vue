@@ -103,11 +103,11 @@ export default {
       return {
         selector: `#${this.tinymceId}`,
         language: lang,
-        language_url: lang ? `/tinymce/langs/${lang}.js` : null,
+        language_url: lang ? `../tinymce/langs/${lang}.js` : null,
 
         skin: 'oxide',
-        skin_url: '/tinymce/skins/ui/oxide',
-        content_css: '/tinymce/skins/content/default/content.min.css',
+        skin_url: '../tinymce/skins/ui/oxide',
+        content_css: '../tinymce/skins/content/default/content.min.css',
 
         height: this.height,
         width: this.width,

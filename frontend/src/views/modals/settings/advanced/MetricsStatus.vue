@@ -36,6 +36,8 @@ export default {
     };
   },
   created () {
+    this.initEventChain();
+    
     this.listenTo(app.localSettings, 'change:shareMetrics', () => this.updateKey += 1);
   },
   mounted () {

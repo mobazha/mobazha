@@ -60,7 +60,7 @@
                 :data-tip="ob.polyT('listingCard.deleteListingTooltip')"
                 ><span class="ion-trash-b"></span>
               </a>
-              <div v-show="deleteConfirmOn" class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxBottom clrBr clrP clrT" @click.stop="onClickDeleteConfirmBox">
+              <div v-if="deleteConfirmOn" class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxBottom clrBr clrP clrT" @click.stop="onClickDeleteConfirmBox">
                 <div class="tx3 txB rowSm">{{ ob.polyT('listingCard.confirmDelete.title') }}</div>
                 <p>{{ ob.polyT('listingCard.confirmDelete.body') }}</p>
                 <hr class="clrBr row" />
@@ -331,7 +331,7 @@
             >
               <span class="ion-trash-b"></span>
             </button>
-            <div v-show="deleteConfirmOn" class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxBottom clrBr clrP clrT hide" @click.stop="onClickDeleteConfirmBox">
+            <div v-if="deleteConfirmOn" class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxBottom clrBr clrP clrT" @click.stop="onClickDeleteConfirmBox">
               <div class="tx3 txB rowSm">{{ ob.polyT('listingCard.confirmDelete.title') }}</div>
               <p>{{ ob.polyT('listingCard.confirmDelete.body') }}</p>
               <hr class="clrBr row" />
@@ -485,6 +485,8 @@ export default {
 
       editListingModel: {},
       showEditListing: false,
+
+      deleteConfirmOn: false,
     };
   },
   created() {
@@ -669,7 +671,7 @@ export default {
 
         this.viewType = opts.viewType;
         this.reportsUrl = opts.reportsUrl;
-        this.deleteConfirmOn = false;
+
         // This should be initialized as null, so we could determine whether the user
         // never set this (null), or explicitly clicked to show / hide nsfw (true / false)
         this._userClickedShowNsfw = null;

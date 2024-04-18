@@ -212,6 +212,7 @@
     "myPage": "My Page",
     "customizePage": "Customize Page",
     "createListing": "Create Listing",
+    "tools": "Tools",
     "purchases": "Purchases",
     "sales": "Sales",
     "cases": "Cases",
@@ -232,6 +233,9 @@
     "serversMenu": {
       "newServer": "New Server",
       "manageServers": "Manage Servers"
+    },
+    "toolsMenu": {
+      "wooImporter": "WooCommerce Importer"
     }
   },
   "chat": {

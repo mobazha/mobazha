@@ -118,6 +118,12 @@
                     <a class="listItem js-navListItem" @click="navCreateListingClick">
                       <span>{{ ob.polyT('pageNav.createListing') }}</span><span class="clrT2 TODO">Cltrl + ?</span>
                     </a>
+                    <a class="listItem js-navListItem"
+                      @mouseenter="onMouseEnterToolsItem"
+                      @mouseleave="onMouseLeaveToolsItem">
+                      <span>{{ ob.polyT('pageNav.tools') }}</span>
+                      <span><i class="ion-arrow-right-b floR"></i></span>
+                    </a>
                   </div>
                   <div class="listGroup clrP clrBr">
                     <a href="#transactions/sales" class="listItem js-navListItem" @click="onNavListItemClick">
@@ -155,6 +161,11 @@
                     };
                   }" />
               </nav>
+              <nav :class="`connManagementContainer foldDown clrSh1 ${toolsContainerOpened ? 'open' : ''}`"
+                @mouseenter="onMouseEnterToolsContainer"
+                @mouseleave="onMouseLeaveToolsContainer">
+                <PageNavToolsMenu @onWooImporterClick="onWooImporterClick" />
+              </nav>
             </div>
           </div>
         </div>
@@ -163,6 +174,8 @@
     <div :class="`navOverlay modal js-navOverlay ${navOverlayOpened ? 'open' :'' }`"></div>
     <Teleport v-if="navigable" to="#js-vueModal">
       <Settings v-show="showSettings" @close="closeSettings" />
+
+      <WooImporter v-show="showWooImporter" @close="closeWooImporter" />
 
       <EditListing v-if="showEditListing" :bb="() => {
         return {
@@ -195,21 +208,25 @@ import Listing from '../../backbone/models/listing/Listing.js';
 import { getNotifDisplayData } from '../../backbone/collections/Notifications.js';
 
 import PageNavServersMenu from './PageNavServersMenu.vue';
+import PageNavToolsMenu from './PageNavToolsMenu.vue';
 import AddressBarIndicators from './AddressBarIndicators.vue';
 import Notifications from './notifications/Notifications.vue';
 import Wallet from '@/views/modals/wallet/Wallet.vue';
 import Settings from '@/views/modals/settings/Settings.vue';
 import EditListing from '@/views/modals/editListing/EditListing.vue';
+import WooImporter from '@/views/modals/WooImporter.vue';
 import ShoppingCart from './ShoppingCart.vue';
 
 export default {
   components: {
     PageNavServersMenu,
+    PageNavToolsMenu,
     AddressBarIndicators,
     Notifications,
     Wallet,
     Settings,
     EditListing,
+    WooImporter,
     ShoppingCart,
   },
   props: {
@@ -239,6 +256,7 @@ export default {
       navListOpened: false,
       navOverlayOpened: false,
       connManagementContainerOpened: false,
+      toolsContainerOpened: false,
       notifContainerOpened: false,
 
       addressBarText: '',
@@ -247,6 +265,8 @@ export default {
 
       showWallet: false,
       showSettings: false,
+
+      showWooImporter: false,
 
       showEditListing: false,
       editListingModel: {},
@@ -467,6 +487,43 @@ export default {
           this.connManagementContainerOpened = false;
         }
       }, 100);
+    },
+
+    onMouseEnterToolsItem() {
+      this.overToolsItem = true;
+      this.toolsContainerOpened = true;
+    },
+
+    onMouseLeaveToolsItem() {
+      this.overToolsItem = false;
+
+      setTimeout(() => {
+        if (!this.overToolsContainer) {
+          this.toolsContainerOpened = false;
+        }
+      }, 100);
+    },
+
+    onMouseEnterToolsContainer () {
+      this.overToolsContainer = true;
+    },
+
+    onMouseLeaveToolsContainer () {
+      this.overToolsContainer = false;
+
+      setTimeout(() => {
+        if (!this.overToolsItem) {
+          this.toolsContainerOpened = false;
+        }
+      }, 100);
+    },
+
+    onWooImporterClick() {
+      this.showWooImporter = true;
+    },
+
+    closeWooImporter() {
+      this.showWooImporter = false;
     },
 
     onNavListItemClick () {

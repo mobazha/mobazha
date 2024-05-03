@@ -80,10 +80,10 @@ app.localSettings.on('change:language', (localSettings, lang) => {
     .open();
 });
 
-window.addEventListener('contextmenu', (e) => {
-  e.preventDefault();
-  ipc.send('contextmenu-click');
-}, false);
+// window.addEventListener('contextmenu', (e) => {
+//   e.preventDefault();
+//   ipc.send('contextmenu-click');
+// }, false);
 
 
 // MyChatSDK.emit(window.TUIKit.TIM.EVENT.SDK_READY, {});

@@ -15,7 +15,7 @@
         </div>
       </div>
       <div class="deleteAccountWrapper margL">
-        <button class="iconBtn form ion-trash-b clrP clrBr " @click="onClickRemove"></button>
+        <button class="iconBtn form ion-trash-b clrP clrBr " @click.stop="onClickRemove"></button>
       </div>
     </div>
 

@@ -1,5 +1,15 @@
 const { Application } = require('ee-core');
 
+const contextMenu = require('electron-context-menu');
+
+contextMenu({
+  showSaveImageAs: true,
+  showInspectElement: false,
+  showLookUpSelection: false,
+  showSearchWithGoogle: false,
+  showServices: false,
+});
+
 class Index extends Application {
 
   constructor() {

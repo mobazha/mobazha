@@ -32,6 +32,21 @@ export default class extends baseVw {
     return 'convoMessage';
   }
 
+  events() {
+    return {
+      'click .js-image': 'openImageModal',
+      'click .js-image-close': 'closeImageModal',
+    };
+  }
+
+  openImageModal() {
+    this.getCachedEl('.js-imageModal').removeClass('hide');
+  }
+
+  closeImageModal() {
+    this.getCachedEl('.js-imageModal').addClass('hide');
+  }
+
   getState() {
     return this._state;
   }
@@ -56,12 +71,14 @@ export default class extends baseVw {
   render() {
     this.renderedTimeAgo = moment(this.model.get('timestamp')).fromNow();
 
+    const fileInChat = this.model.get('file');
     loadTemplate('chat/convoMessage.html', (t) => {
       this.$el.html(t({
         ...this.model.toJSON(),
         ...this.getState(),
         moment,
         message: this.model.get('message'),
+        image: fileInChat && fileInChat.type === 'image'? app.getServerUrl(`ob/image/${fileInChat.hash}`) : null,
         renderedTimeAgo: this.renderedTimeAgo,
         ownGuid: app.profile.id,
       }));

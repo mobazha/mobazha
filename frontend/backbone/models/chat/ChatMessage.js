@@ -111,6 +111,7 @@ export default class ChatMessage extends BaseModel {
     return {
       orderID: '',
       message: '',
+      file: null,
       read: false,
       outgoing: true,
     };
@@ -132,7 +133,7 @@ export default class ChatMessage extends BaseModel {
   }
 
   url() {
-    if (this.get('message') === '') {
+    if (this.get('message') === '' && this.get('file') === null) {
       return app.getServerUrl(
         `ob/${this.isGroupChatMessage ? 'grouptypingmessage' : 'typingmessage'}`,
       );
@@ -209,6 +210,10 @@ export default class ChatMessage extends BaseModel {
 
     if (attrs.message.length > max.messageLength) {
       addError('message', `The message exceeds the max length of ${max.messageLength}`);
+    }
+
+    if (attrs.file && (!attrs.file.type || !attrs.file.hash)) {
+      addError('file', `The file doesn't have type or hash.`);
     }
 
     if (Object.keys(errObj).length) return errObj;

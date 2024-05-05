@@ -3,8 +3,9 @@
 
 import $ from 'jquery';
 import _ from 'underscore';
-import app from '../app';
 import twemoji from 'twemoji';
+import path from 'path';
+import app from '../app';
 
 export function getGuid(handle, resolver) {
   const deferred = $.Deferred();
@@ -196,4 +197,25 @@ export function deparam(queryStr = '') {
   }
 
   return parsed;
+}
+
+export function truncateImageFilename(filename) {
+  if (!filename || typeof filename !== 'string') {
+    throw new Error('Please provide a filename as a string.');
+  }
+
+  const truncated = filename;
+
+  const maxImageFilenameLength = 255;
+  if (filename.length > maxImageFilenameLength) {
+    const parsed = path.parse(filename);
+    const nameParseLen = maxImageFilenameLength - parsed.ext.length;
+
+    // acounting for rare edge case of the extension in and of itself
+    // exceeding the max length
+    return parsed.name.slice(0, nameParseLen < 0 ? 0 : nameParseLen)
+      + parsed.ext.slice(0, maxImageFilenameLength);
+  }
+
+  return truncated;
 }

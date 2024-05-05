@@ -17,6 +17,7 @@ import baseVw from '../baseVw';
 import ConvoProfileHeader from './ConvoProfileHeader';
 import ConvoMessages from './ConvoMessages';
 import EmojiMenu from './EmojiMenu';
+import { truncateImageFilename } from '../../utils/index';
 
 export default class extends baseVw {
   constructor(options = {}) {
@@ -51,6 +52,7 @@ export default class extends baseVw {
     this.fetching = false;
     this.fetchedAllMessages = false;
     this.ignoreScroll = false;
+    this.imageUploads = [];
 
     if (options.profile instanceof Profile) {
       this.profile = this.options.profile;
@@ -125,6 +127,10 @@ export default class extends baseVw {
       'keydown .js-inputMessage': 'onKeyDownMessageInput',
       'blur .js-inputMessage': 'onBlurMessageInput',
       'click .js-emojiMenuTrigger': 'onClickEmojiMenuTrigger',
+
+      'click .js-addImage': 'onClickAddImage',
+      'change #inputImageUpload': 'onChangeImageUploadInput',
+      'click .js-cancelImageUploads': 'onClickCancelImageUploads',
     };
   }
 
@@ -277,9 +283,9 @@ export default class extends baseVw {
     this.trigger('newOutgoingMessage', { model: chatMessage });
   }
 
-  sendMessage(msg) {
-    if (!msg) {
-      throw new Error('Please provide a message to send.');
+  sendMessage(msg, file = null) {
+    if (!msg && !file) {
+      throw new Error('Please provide a message or file to send.');
     }
 
     this.lastTypingSentAt = null;
@@ -288,6 +294,7 @@ export default class extends baseVw {
       peerID: this.guid,
       orderID: this.orderID,
       message: msg,
+      file,
     }, { parse: true });
 
     recordEvent('Chat_MessageSent');
@@ -581,6 +588,80 @@ export default class extends baseVw {
       });
   }
 
+  onChangeImageUploadInput() {
+    let imageFile = this.$inputImageUpload[0].files[0];
+
+    this.$inputImageUpload.val('');
+
+    this.$imageUploadingLabel.removeClass('hide');
+
+    const fileReader = new FileReader();
+    fileReader.readAsDataURL(imageFile);
+
+    fileReader.onload = () => {
+      const toUpload = {
+        filename: truncateImageFilename(imageFile.name),
+        image: fileReader.result.replace(/^data:image\/(png|jpeg|webp);base64,/, ''),
+        type: 'image',
+      };
+  
+      this.uploadImage(toUpload);
+    };
+
+    fileReader.onerror = (error) => {
+      openSimpleMessage( 'fail to read uploaded image', fileReader.error);
+    };
+  }
+
+  uploadImage(file) {
+    if (!file) {
+      throw new Error('Please provide a image to upload.');
+    }
+
+    let filesToUpload = [file];
+
+    const upload = $.ajax({
+      url: app.getServerUrl('ob/images'),
+      type: 'POST',
+      data: JSON.stringify(filesToUpload),
+      dataType: 'json',
+      contentType: 'application/json',
+    }).always(() => {
+      if (this.isRemoved()) return;
+      if (!this.inProgressImageUploads.length) this.$imageUploadingLabel.addClass('hide');
+    }).done((uploadedFiles) => {
+      if (this.isRemoved()) return;
+      if (!uploadedFiles.length) return;
+
+      const fileInChat = {filename: uploadedFiles[0].name, hash: uploadedFiles[0].hash, type: file.type};
+      this.sendMessage('', fileInChat);
+    })
+      .fail((jqXhr) => {
+        openSimpleMessage(
+          app.polyglot.t(
+            'editListing.errors.uploadImageErrorTitle',
+            { smart_count: filesToUpload.length },
+          ),
+          jqXhr.responseJSON && jqXhr.responseJSON.reason || '',
+        );
+      });
+
+      this.imageUploads.push(upload);
+  }
+
+  get inProgressImageUploads() {
+    return this.imageUploads
+      .filter((upload) => upload.state() === 'pending');
+  }
+
+  onClickAddImage() {
+    this.$inputImageUpload.trigger('click');
+  }
+
+  onClickCancelImageUploads() {
+    this.inProgressImageUploads.forEach((imageUpload) => imageUpload.abort());
+  }
+
   getTypingIndicatorContent() {
     let name = this.guid;
 
@@ -639,8 +720,19 @@ export default class extends baseVw {
       (this._$messageInput = this.$('.js-inputMessage'));
   }
 
+  get $inputImageUpload() {
+    return this._$inputImageUpload
+      || (this._$inputImageUpload = this.$('#inputImageUpload'));
+  }
+
+  get $imageUploadingLabel() {
+    return this._$imageUploadingLabel
+      || (this._$imageUploadingLabel = this.$('.js-imageUploadingLabel'));
+  }
+
   remove() {
     this.$el.off(null, this.boundOnFocusin);
+    this.inProgressImageUploads.forEach((upload) => upload.abort());
     super.remove();
   }
 
@@ -652,6 +744,7 @@ export default class extends baseVw {
         showLoadMessagesError: this.showLoadMessagesError,
         typingIndicator: this.getTypingIndicatorContent(),
         maxMessageLength: ChatMessage.max.messageLength,
+        imageUploadInprogress: !!this.inProgressImageUploads.length,
       }));
 
       this._$subMenu = null;
@@ -661,6 +754,9 @@ export default class extends baseVw {
       this._$typingIndicator = null;
       this._$emojiMenuContainer = null;
       this._$messageInput = null;
+
+      this._$inputImageUpload = null;
+      this._$imageUploadingLabel = null;
 
       if (this.convoProfileHeader) this.convoProfileHeader.remove();
 

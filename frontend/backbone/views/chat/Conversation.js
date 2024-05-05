@@ -290,12 +290,15 @@ export default class extends baseVw {
 
     this.lastTypingSentAt = null;
 
-    const chatMessage = new ChatMessage({
+    const chatMessage = new ChatMessage(file ? {
       peerID: this.guid,
       orderID: this.orderID,
       message: msg,
       file,
-    }, { parse: true });
+    } : {
+      peerID: this.guid,
+      orderID: this.orderID,
+      message: msg,}, { parse: true });
 
     recordEvent('Chat_MessageSent');
 

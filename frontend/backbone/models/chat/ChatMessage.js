@@ -111,7 +111,6 @@ export default class ChatMessage extends BaseModel {
     return {
       orderID: '',
       message: '',
-      file: null,
       read: false,
       outgoing: true,
     };

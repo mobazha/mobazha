@@ -1238,6 +1238,7 @@
     "sectionNames": {
       "general": "Général",
       "photos": "Photos",
+      "introVideo": "Introduction Video",
       "attachments": "Pièces jointes",
       "shipping": "Expédition",
       "tags": "Mots-clés",
@@ -1378,6 +1379,7 @@
       "tooManyPhotosTitle": "Trop de photos",
       "tooManyPhotosBody": "Certaines de vos photos n'ont pas pu être chargées car vous avez dépassé la quantité maximale autorisée.",
       "unableToLoadImages": "Nous n'avons pas pu charger votre image. |||| Nous n'avons pas pu charger vos images.",
+      "uploadVideoErrorTitle": "There was an error uploading your video."
       "uploadImageErrorTitle": "Une erreur s'est produite lors du chargement de votre image. |||| Il y a eu une erreur lors du chargement de vos images."
     }
   },

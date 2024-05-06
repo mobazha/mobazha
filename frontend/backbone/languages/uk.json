@@ -1238,6 +1238,7 @@
     "sectionNames": {
       "general": "Загальні",
       "photos": "Зображення",
+      "introVideo": "Introduction Video",
       "attachments": "Вкладення",
       "shipping": "Доставка",
       "tags": "Tags, Теги",
@@ -1378,6 +1379,7 @@
       "tooManyPhotosTitle": "Забагато фотографій",
       "tooManyPhotosBody": "Деякі або всі ваші фотографії не можна завантажувати через те, що ви перевищили максимально допустиму кількість.",
       "unableToLoadImages": "Ми не змогли завантажити ваше зображення. |||| Ми не змогли завантажити ваші зображення.",
+      "uploadVideoErrorTitle": "There was an error uploading your video."
       "uploadImageErrorTitle": "Ой! Під час завантаження зображення виникла помилка. |||| Ой! Під час завантаження ваших зображень виникла помилка."
     }
   },

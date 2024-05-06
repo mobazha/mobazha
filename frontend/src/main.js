@@ -7,6 +7,9 @@ import 'element-plus/dist/index.css';
 import './assets/scss/main.scss';
 // import { TUIComponents, TUICore } from './TUIKit';
 
+import VueVideoPlayer from '@videojs-player/vue'
+import 'video.js/dist/video-js.css'
+
 import '/node_modules/ionicons/css/ionicons.min.css';
 import '/node_modules/trumbowyg/dist/ui/trumbowyg.min.css';
 import '/node_modules/selectize/dist/css/selectize.css';
@@ -40,6 +43,8 @@ function mountVueApp(container) {
   const vueApp = createApp(App);
   vueApp.config.productionTip = false;
   vueApp.use(VueScrollTo);
+  vueApp.use(VueVideoPlayer);
+
   vueApp.use(ElementPlus);
   for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
     vueApp.component(key, component);

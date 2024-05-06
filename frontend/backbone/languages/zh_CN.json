@@ -1238,6 +1238,7 @@
     "sectionNames": {
       "general": "通用",
       "photos": "照片",
+      "introVideo": "Introduction Video",
       "attachments": "附件",
       "shipping": "快递",
       "tags": "标签",
@@ -1378,6 +1379,7 @@
       "tooManyPhotosTitle": "照片过多",
       "tooManyPhotosBody": "您的部分或全部照片被阻止上传，因为已经超过了允许的最大数量。",
       "unableToLoadImages": "我们无法加载你的图片。 |||| 我们无法加载您的图片。",
+      "uploadVideoErrorTitle": "There was an error uploading your video."
       "uploadImageErrorTitle": "上传图片时出错。 |||| 上传图片时出错。"
     }
   },

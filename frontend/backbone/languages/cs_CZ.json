@@ -1238,6 +1238,7 @@
     "sectionNames": {
       "general": "Základní",
       "photos": "Fotografie",
+      "introVideo": "Introduction Video",
       "attachments": "Přílohy",
       "shipping": "Doprava",
       "tags": "Tagy",
@@ -1378,6 +1379,7 @@
       "tooManyPhotosTitle": "Příliš mnoho fotografií",
       "tooManyPhotosBody": "Některé nebo všechny tvé fotografie nemohly být nahrány, protože bys překročil maximální povolenou částku.",
       "unableToLoadImages": "Nepovedlo se nám nahrát tvůj obrázek. |||| Nepovedlo se nám nahrát tvé obrázky.",
+      "uploadVideoErrorTitle": "There was an error uploading your video."
       "uploadImageErrorTitle": "Při nahrávání tvého obrázku došlo k chybě. |||| Při nahrávání tvých obrázků došlo k chybě."
     }
   },

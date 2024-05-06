@@ -210,12 +210,36 @@
                 <div class="clrT2 txSm helper">{{ ob.polyT('editListing.helperPhotos', { maxPhotos: ob.max.photos }) }}</div>
               </section>
 
+              <section ref="sectionIntroVideo" class="photosSection photoUploadSection contentBox padMd clrP clrBr clrSh3 tx3">
+                <div class="overflowAuto">
+                  <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.introVideo') }}</h2>
+                  <div class="js-videoUploadingLabel floR" v-show="!!ob.videoUploadInprogress">
+                    {{ ob.polyT('editListing.uploading') }} <a class="" @click="onClickCancelVideoUploads">{{ ob.polyT('editListing.btnCancelUpload') }}</a>
+                  </div>
+                  <hr class="clrBr rowMd" />
+                </div>
+                <FormError v-if="ob.errors['item.introVideo']" :errors="ob.errors['item.introVideo']" />
+                <input type="file" id="introVideoUpload" ref="introVideoUpload" @change="onIntroVideoUploadInput" accept="video/*" class="hide" />
+                <ul ref="introVideoUploadItems" class="unstyled uploadItems clrBr rowSm js-introVideoUploadItems">
+                  <li class="addElement tile js-addIntroVideoWrap">
+                    <span class="imagesIcon ion-images clrT4"></span>
+                    <button class="btn clrP clrBr clrT tx6" @click="$refs.introVideoUpload.click()">{{ ob.polyT('editListing.btnAddPhoto') }}</button>
+                  </li>
+                  <li v-if="formData.item.introVideo" class="tile">
+                    <video-player-item :key="formData.item.introVideo.hash" class="videoIntro floR clrT4" :url="app.getServerUrl(`ob/file/${formData.item.introVideo.hash}`)" />
+                    <a class="closeIcon tx2" @click="onRemoveIntroVideo">
+                      <span class="ion-ios-close-empty clrBr clrP clrT"></span>
+                    </a>
+                  </li>
+                </ul>
+              </section>
+
               <section ref="sectionTags" class="tagsSection contentBox padMd clrP clrBr clrSh3 tx3">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.tagsDetailed') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['item.tags']" :errors="ob.errors['item.tags']" />
                 <div class="js-maxTagsWarning">
-                  <div v-if="ob.item.tags.length >= ob.max.tags" class="clrT2 tx5 row">{{ ob.polyT('editListing.maxTagsWarning') }}</div>
+                  <div v-if="formData.item.tags.length >= ob.max.tags" class="clrT2 tx5 row">{{ ob.polyT('editListing.maxTagsWarning') }}</div>
                 </div>
                 <input
                   type="text"
@@ -452,13 +476,16 @@ export default {
   },
   data() {
     return {
-      activeTab: 'general',
+      app,
 
-      images: undefined,
+      activeTab: 'general',
 
       fixedNav: false,
 
+      images: undefined,
       photoUploadsKey: 0,
+
+      videoUploadsKey: 0,
 
       currencies: [],
       expandedReturnPolicy: false,
@@ -474,6 +501,7 @@ export default {
           title: '',
           price: 0,
           condition: '',
+          introVideo: undefined,
           productID: '',
           nsfw: true,
           description: '',
@@ -503,6 +531,8 @@ export default {
   },
   unmounted() {
     this.inProgressPhotoUploads.forEach((upload) => upload.abort());
+
+    this.inProgressVideoUploads.forEach((upload) => upload.abort());
   },
   computed: {
     ob() {
@@ -511,6 +541,7 @@ export default {
 
       return {
         ...this.templateHelpers,
+        app,
         createMode: this.createMode,
         returnText: this.options.returnText,
         countryList: this.countryList,
@@ -523,6 +554,7 @@ export default {
           })),
         errors: this.model.validationError || {},
         photoUploadInprogress: !!this.inProgressPhotoUploads.length,
+        videoUploadInprogress: !!this.inProgressVideoUploads.length,
         expandedReturnPolicy: this.expandedReturnPolicy || !!this.formData.refundPolicy,
         expandedTermsAndConditions: this.expandedTermsAndConditions || !!this.formData.termsAndConditions,
         max: {
@@ -604,6 +636,12 @@ export default {
       return this.photoUploads.filter((upload) => upload.state() === 'pending');
     },
 
+    inProgressVideoUploads() {
+      let access = this.videoUploadsKey;
+
+      return this.videoUploads.filter((upload) => upload.state() === 'pending');
+    },
+
     receiveCur() {
       const acceptedCurs = this.model.get('metadata').get('acceptedCurrencies');
       return this.model.isCrypto ? (acceptedCurs.length && acceptedCurs()[0]) || null : null;
@@ -638,6 +676,7 @@ export default {
           price: toStandardNotation(model.item.price),
           condition: model.item.condition,
           grams: model.item.grams,
+          introVideo: model.item.introVideo,
           productID: model.item.productID,
           nsfw: model.item.nsfw,
           tags: model.item.tags,
@@ -717,6 +756,7 @@ export default {
       this.createMode = !(this.model.lastSyncedAttrs && this.model.lastSyncedAttrs.slug);
       this.photoUploads = [];
       this.images = this.model.get('item').get('images');
+      this.videoUploads = [];
       this.countryList = getTranslatedCountries();
 
       getCryptoCursByName().then(
@@ -764,6 +804,11 @@ export default {
     onClickCancelPhotoUploads() {
       this.inProgressPhotoUploads.forEach((photoUpload) => photoUpload.abort());
       this.photoUploadsKey += 1;
+    },
+
+    onClickCancelVideoUploads() {
+      this.inProgressVideoUploads.forEach((videoUpload) => videoUpload.abort());
+      this.videoUploadsKey += 1;
     },
 
     getOrientation(file, callback) {
@@ -932,6 +977,43 @@ export default {
           }
         };
       });
+    },
+
+    onIntroVideoUploadInput() {
+      var formData = new FormData(); 
+      var files = this.$refs.introVideoUpload.files[0];
+      formData.append('file', files);
+
+      this.$refs.introVideoUpload.value = '';
+
+      const upload = $.ajax({
+        url: app.getServerUrl('ob/file'),
+        type: 'POST',
+        data: formData,
+        processData: false,  // tell jQuery not to process the data
+        contentType: false,  // tell jQuery not to set contentType
+      })
+        .done((uploadedFile) => {
+          if (this.isRemoved()) return;
+
+          this.formData.item.introVideo = {filename: uploadedFile.name, hash: uploadedFile.hash, type: 'video'};
+        })
+        .fail((jqXhr) => {
+          openSimpleMessage(
+            app.polyglot.t('editListing.errors.uploadVideoErrorTitle', { smart_count: imagesToUpload.length }),
+            (jqXhr.responseJSON && jqXhr.responseJSON.reason) || ''
+          );
+        })
+        .always(() => {
+          this.videoUploadsKey += 1;
+        });
+
+        this.videoUploads.push(upload);
+        this.videoUploadsKey += 1;
+    },
+
+    onRemoveIntroVideo() {
+      delete this.formData.item.introVideo;
     },
 
     onClickAddReturnPolicy() {
@@ -1400,5 +1482,10 @@ export default {
 <style lang="scss" scoped>
 ::v-deep(.tox-fullscreen) {
   top: 50px !important;
+}
+
+.videoIntro {
+  width: 102px;
+  height: 102px;
 }
 </style>

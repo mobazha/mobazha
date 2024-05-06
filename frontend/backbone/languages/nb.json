@@ -1238,6 +1238,7 @@
     "sectionNames": {
       "general": "Generelt",
       "photos": "Bilder",
+      "introVideo": "Introduction Video",
       "attachments": "Vedlegg",
       "shipping": "Frakt",
       "tags": "Merkelapper",
@@ -1378,6 +1379,7 @@
       "tooManyPhotosTitle": "For mange bilder",
       "tooManyPhotosBody": "Noen eller alle bildene dine kunne ikke lastes opp fordi du ville brutt grensen for maks antall bilder.",
       "unableToLoadImages": "Vi kunne ikke laste bildet ditt. |||| Vi kunne ikke laste bildene dine.",
+      "uploadVideoErrorTitle": "There was an error uploading your video."
       "uploadImageErrorTitle": "Det oppstod en feil ved opplasting av bildet ditt. |||| Det oppstod en feil ved opplasting av bildene dine."
     }
   },

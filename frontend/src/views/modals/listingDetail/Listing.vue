@@ -71,9 +71,10 @@
               </div>
               <div class="flex gutterHLg">
                 <div class="mainImageWrapper">
-                  <div class="mainImage clrBr " @click="onClickGotoPhotos" :style="ob.item.images.length
+                  <div v-if="!ob.item.introVideo" class="mainImage clrBr " @click="onClickGotoPhotos" :style="ob.item.images.length
                     ? `background-image: url(${ob.getServerUrl(`ob/image/${ob.isHiRez() ? ob.item.images[0].large : ob.item.images[0].medium}`)}), url('../imgs/defaultItem.png')`
                     : `background-image: url('../imgs/defaultItem.png')`"></div>
+                  <video-player-item v-if="ob.item.introVideo" class="mainImage clrBr " :url="app.getServerUrl(`ob/file/${ob.item.introVideo.hash}`)" />
                   <div class="txCtr">
                     <a class="tx5 " @click="onClickGotoPhotos">
                       <u>{{ ob.polyT('listingDetail.viewPhotos', {
@@ -391,6 +392,8 @@ export default {
   },
   data () {
     return {
+      app,
+
       showModal: true,
 
       PURCHASE_MODAL_CREATE: 'PURCHASE_MODAL_CREATE',

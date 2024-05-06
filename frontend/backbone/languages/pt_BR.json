@@ -1238,6 +1238,7 @@
     "sectionNames": {
       "general": "Geral",
       "photos": "Fotos",
+      "introVideo": "Introduction Video",
       "attachments": "Anexos",
       "shipping": "Frete",
       "tags": "Tags",
@@ -1378,6 +1379,7 @@
       "tooManyPhotosTitle": "Existem fotos em excesso",
       "tooManyPhotosBody": "Algumas de suas fotos não foram enviadas porque você excedeu a quantia máxima permitida.",
       "unableToLoadImages": "Não foi possível carregar a sua imagem. |||| Não foi possível carregar as suas imagens.",
+      "uploadVideoErrorTitle": "There was an error uploading your video."
       "uploadImageErrorTitle": "Houve um erro ao enviar a sua imagem. |||| Houve um erro ao enviar as suas imagens."
     }
   },

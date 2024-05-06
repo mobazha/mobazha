@@ -1238,6 +1238,7 @@
     "sectionNames": {
       "general": "Algemeen",
       "photos": "Foto's",
+      "introVideo": "Introduction Video",
       "attachments": "Bijlagen",
       "shipping": "Verzending",
       "tags": "Tags",
@@ -1378,6 +1379,7 @@
       "tooManyPhotosTitle": "Teveel foto's",
       "tooManyPhotosBody": "Enkele of al je foto's zijn niet geupload, omdate je het maximaal aantal foto's bereikt hebt.",
       "unableToLoadImages": "Je afbeelding kon niet worden geladen. |||| Je  afbeelding kon niet worden geladen.",
+      "uploadVideoErrorTitle": "There was an error uploading your video."
       "uploadImageErrorTitle": "Fout bij het uploaden van je afbeelding. |||| Fout bij het uploaden van je afbeelding."
     }
   },

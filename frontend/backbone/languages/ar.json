@@ -1240,6 +1240,7 @@
     "sectionNames": {
       "general": "عام",
       "photos": "الصور",
+      "introVideo": "Introduction Video",
       "attachments": "مرفقات",
       "shipping": "الشحن",
       "tags": "وسوم Tags",
@@ -1380,6 +1381,7 @@
       "tooManyPhotosTitle": "عدد كبير جدا من الصور",
       "tooManyPhotosBody": "تم منع تحميل بعض أو كل صورك لأنك تجاوزت الحد الأقصى من الكمية المسموح به.",
       "unableToLoadImages": "تعذر تحميل صورتك. |||| تعذر تحميل الصور.",
+      "uploadVideoErrorTitle": "There was an error uploading your video."
       "uploadImageErrorTitle": "حدث خطأ أثناء تحميل الصورة. |||| حدث خطأ أثناء تحميل الصور."
     }
   },

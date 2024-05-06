@@ -1238,6 +1238,7 @@
     "sectionNames": {
       "general": "General",
       "photos": "Fotos",
+      "introVideo": "Introduction Video",
       "attachments": "Adjuntos",
       "shipping": "Envío",
       "tags": "Etiquetas",
@@ -1378,6 +1379,7 @@
       "tooManyPhotosTitle": "Demasiadas fotos",
       "tooManyPhotosBody": "Alguna de sus fotografías no se subieron porque habría excedido la cantidad máxima permitida.",
       "unableToLoadImages": "No pudimos cargar su imagen. |||| No hemos podido cargar sus imágenes.",
+      "uploadVideoErrorTitle": "There was an error uploading your video."
       "uploadImageErrorTitle": "Ha ocurrido un error subiendo su imagen. |||| Ha ocurrido un error subiendo sus imágenes."
     }
   },

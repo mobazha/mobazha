@@ -1238,6 +1238,7 @@
     "sectionNames": {
       "general": "Generelt",
       "photos": "Fotos",
+      "introVideo": "Introduction Video",
       "attachments": "Vedhæftninger",
       "shipping": "Forsendelse",
       "tags": "Mærkater",
@@ -1378,6 +1379,7 @@
       "tooManyPhotosTitle": "For mange fotos",
       "tooManyPhotosBody": "Nogle af eller alle dine billeder blev forhindret i at blive uploadet, da du ellers ville overskride det maksimalt tilladte antal.",
       "unableToLoadImages": "Dit billede kunne ikke indlæses. |||| Dine billeder kunne ikke indlæses.",
+      "uploadVideoErrorTitle": "There was an error uploading your video."
       "uploadImageErrorTitle": "Dit billede kunne ikke uploades. |||| Dine billeder kunne ikke uploades."
     }
   },

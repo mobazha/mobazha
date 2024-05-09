@@ -219,7 +219,7 @@
                   <hr class="clrBr rowMd" />
                 </div>
                 <FormError v-if="ob.errors['item.introVideo']" :errors="ob.errors['item.introVideo']" />
-                <input type="file" id="introVideoUpload" ref="introVideoUpload" @change="onIntroVideoUploadInput" accept="video/*" class="hide" />
+                <input type="file" id="introVideoUpload" ref="introVideoUpload" @change="onIntroVideoUploadInput" accept="video/mp4" class="hide" />
                 <ul ref="introVideoUploadItems" class="unstyled uploadItems clrBr rowSm js-introVideoUploadItems">
                   <li class="addElement tile js-addIntroVideoWrap">
                     <span class="imagesIcon ion-images clrT4"></span>
@@ -983,6 +983,7 @@ export default {
       var formData = new FormData(); 
       var files = this.$refs.introVideoUpload.files[0];
       formData.append('file', files);
+      formData.append('type', 'introVideo');
 
       this.$refs.introVideoUpload.value = '';
 
@@ -1000,7 +1001,7 @@ export default {
         })
         .fail((jqXhr) => {
           openSimpleMessage(
-            app.polyglot.t('editListing.errors.uploadVideoErrorTitle', { smart_count: imagesToUpload.length }),
+            app.polyglot.t('editListing.errors.uploadVideoErrorTitle'),
             (jqXhr.responseJSON && jqXhr.responseJSON.reason) || ''
           );
         })

@@ -316,7 +316,7 @@ export default {
             endPrefixedAjaxEvent('SpendFromWallet', this.metricsOrigin, { currency });
           })
           .fail((jqXhr) => {
-            const err = jqXhr.responseText || '';
+            const err = jqXhr.responseJSON && jqXhr.responseJSON.reason || jqXhr.responseText;
             this.showSpendError(err);
             endPrefixedAjaxEvent('SpendFromWallet', this.metricsOrigin, {
               currency,

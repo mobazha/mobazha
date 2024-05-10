@@ -1240,7 +1240,7 @@
     "sectionNames": {
       "general": "عام",
       "photos": "الصور",
-      "introVideo": "Introduction Video",
+      "introVideo": "Introduction Video(mp4, <15MB)",
       "attachments": "مرفقات",
       "shipping": "الشحن",
       "tags": "وسوم Tags",

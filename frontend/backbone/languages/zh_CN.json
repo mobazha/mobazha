@@ -1238,7 +1238,7 @@
     "sectionNames": {
       "general": "通用",
       "photos": "照片",
-      "introVideo": "Introduction Video",
+      "introVideo": "Introduction Video(mp4, <15MB)",
       "attachments": "附件",
       "shipping": "快递",
       "tags": "标签",

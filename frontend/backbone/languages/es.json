@@ -1238,7 +1238,7 @@
     "sectionNames": {
       "general": "General",
       "photos": "Fotos",
-      "introVideo": "Introduction Video",
+      "introVideo": "Introduction Video(mp4, <15MB)",
       "attachments": "Adjuntos",
       "shipping": "Envío",
       "tags": "Etiquetas",

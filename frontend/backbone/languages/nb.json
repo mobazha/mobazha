@@ -1238,7 +1238,7 @@
     "sectionNames": {
       "general": "Generelt",
       "photos": "Bilder",
-      "introVideo": "Introduction Video",
+      "introVideo": "Introduction Video(mp4, <15MB)",
       "attachments": "Vedlegg",
       "shipping": "Frakt",
       "tags": "Merkelapper",

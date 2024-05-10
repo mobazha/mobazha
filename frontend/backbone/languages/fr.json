@@ -1240,7 +1240,7 @@
     "sectionNames": {
       "general": "Général",
       "photos": "Photos",
-      "introVideo": "Introduction Video",
+      "introVideo": "Introduction Video(mp4, <15MB)",
       "attachments": "Pièces jointes",
       "shipping": "Expédition",
       "tags": "Mots-clés",

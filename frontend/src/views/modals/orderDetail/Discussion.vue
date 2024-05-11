@@ -309,8 +309,11 @@ export default {
     onChangeImageUpload(event) {
       let imageFile = event.target.files[0];
 
-      this.imageUploadInprogress = true;
-
+      if (imageFile) {
+        this.imageUploadInprogress = true;
+      }
+      this.$refs.inputImageUpload.value = '';
+      
       const fileReader = new FileReader();
       fileReader.readAsDataURL(imageFile);
 

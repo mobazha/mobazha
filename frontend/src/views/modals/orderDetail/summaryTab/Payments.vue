@@ -76,7 +76,7 @@ export default {
       } catch (e) {
         // pass
       }
-      return paymentCoinData;
+      return paymentCoinData ? paymentCoinData : {};
     },
     paidSoFar() {
       let access = this.collectionKey;

@@ -152,6 +152,42 @@
                 // colored by theme
               }
             }
+
+            .image-modal {
+              position: fixed;
+              z-index: 1;
+              padding-top: 80px;
+              left: 0;
+              top: 0;
+              width: 100%;
+              height: 100%;
+              overflow: auto;
+              background-color: black;
+            }
+    
+            .image-modal-content {
+              position: relative;
+              background-color: #fefefe;
+              margin: auto;
+              padding: 0;
+              width: 95%;
+            }
+    
+            .image-close {
+              color: white;
+              position: absolute;
+              top: 60px;
+              right: 25px;
+              font-size: 50px;
+              font-weight: bold;
+            }
+    
+            .image-close:hover,
+            .image-close:focus {
+              color: #999;
+              text-decoration: none;
+              cursor: pointer;
+            }
           }
 
           .avatar {

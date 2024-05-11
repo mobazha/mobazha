@@ -34,6 +34,21 @@ export default class extends BaseVw {
     return 'convoMessage';
   }
 
+  events() {
+    return {
+      'click .js-image': 'openImageModal',
+      'click .js-image-close': 'closeImageModal',
+    };
+  }
+
+  openImageModal() {
+    this.getCachedEl('.js-imageModal').removeClass('hide');
+  }
+
+  closeImageModal() {
+    this.getCachedEl('.js-imageModal').addClass('hide');
+  }
+
   remove() {
     this.timeAgoInterval.cancel();
     super.remove();
@@ -41,6 +56,7 @@ export default class extends BaseVw {
 
   render() {
     let message = this.model.get('message');
+    const fileInChat = this.model.get('file');
 
     // Give any links the emphasis color.
     const $msgHtml = $(`<div>${message}</div>`);
@@ -58,6 +74,7 @@ export default class extends BaseVw {
         ...this._state,
         moment,
         message,
+        image: fileInChat && fileInChat.type === 'image'? app.getServerUrl(`ob/image/${fileInChat.hash}`) : null,
         capitalize,
         ownGuid: app.profile.id,
       }));

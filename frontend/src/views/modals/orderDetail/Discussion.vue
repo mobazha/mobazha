@@ -1,6 +1,11 @@
 <template>
   <div :class="`discussionTab clrP ${messages.length ? 'noMessages' : ''} ${loadingMessages ? 'loadingMessages' : ''} ${isTyping ? 'isTyping' : ''}`">
     <div class="typingIndicator tx5 noOverflow clrBr clrP clrT2 clrSh1">{{ typingIndicatorContent }}</div>
+    <div class="btnStrip flexNoShrink">
+      <a class="ion-image iconBtn js-addImage floR clrBr2 clrSh1" @click="onClickAddImage"></a>
+      <div v-show="imageUploadInprogress" class="floR">{{ ob.polyT('editListing.uploading') }}<a @click="cancelImageUpload">{{ob.polyT('editListing.btnCancelUpload')}}</a></div>
+    </div>
+    <input ref="inputImageUpload" type="file" accept="image/*" @change="onChangeImageUpload" class="hide" />
     <div ref="convoMessagesWindow" class="convoMessagesWindow tx6 js-convoMessagesWindow">
       <SpinnerSVG />
       <div class="clrTErr messagesFetchError" v-show="ob.showLoadMessagesError">
@@ -51,7 +56,8 @@ import GroupMessages from '../../../../backbone/collections/GroupMessages';
 import ChatMessage from '../../../../backbone/models/chat/ChatMessage';
 import { checkValidParticipantObject } from '../../../utils/utils';
 import ConvoMessages from '../../../../backbone/views/modals/orderDetail/ConvoMessages.js';
-
+import { truncateImageFilename } from '../../../../backbone/utils/index';
+import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 
 export default {
   props: {
@@ -85,6 +91,9 @@ export default {
       moderator: {
         isTyping: false,
       },
+
+      imageUploads: [],
+      imageUploadInprogress: false,
 
       sendDisabled: false,
     };
@@ -289,6 +298,72 @@ export default {
       }
     },
 
+    onClickAddImage() {
+      this.$refs.inputImageUpload.click();
+    },
+
+    cancelImageUpload() {
+      this.inProgressImageUploads().forEach((imageUpload) => imageUpload.abort());
+    },
+
+    onChangeImageUpload(event) {
+      let imageFile = event.target.files[0];
+
+      this.imageUploadInprogress = true;
+
+      const fileReader = new FileReader();
+      fileReader.readAsDataURL(imageFile);
+
+      fileReader.onload = () => {
+        const toUpload = {
+          filename: truncateImageFilename(imageFile.name),
+          image: fileReader.result.replace(/^data:image\/(png|jpeg|webp);base64,/, ''),
+          type: 'image',
+        };
+    
+        this.uploadImage(toUpload);
+      };
+
+      fileReader.onerror = (error) => {
+        openSimpleMessage( 'fail to read uploaded image', fileReader.error);
+      };
+    },
+
+    inProgressImageUploads() {
+      return this.imageUploads.filter((upload) => upload.state() === 'pending');
+    },
+
+    uploadImage(file) {
+      if (!file) {
+        throw new Error('Please provide a image to upload.');
+      }
+
+      let filesToUpload = [file];
+
+      const upload = $.ajax({
+        url: app.getServerUrl('ob/images'),
+        type: 'POST',
+        data: JSON.stringify(filesToUpload),
+        dataType: 'json',
+        contentType: 'application/json',
+      }).always(() => {
+        if (!this.inProgressImageUploads().length)this.imageUploadInprogress = false;
+      }).done((uploadedFiles) => {
+        if (!uploadedFiles.length) return;
+
+        const fileInChat = {filename: uploadedFiles[0].name, hash: uploadedFiles[0].hash, type: file.type};
+        this.sendMessage('', fileInChat);
+      })
+        .fail((jqXhr) => {
+          openSimpleMessage(
+            app.polyglot.t('editListing.errors.uploadImageErrorTitle'),
+            jqXhr.responseJSON && jqXhr.responseJSON.reason || '',
+          );
+        });
+
+        this.imageUploads.push(upload);
+    },
+
     onClickRetryLoadMessage () {
       this.fetchMessages(...this.lastFetchMessagesArgs);
     },
@@ -436,15 +511,19 @@ export default {
       this.isTyping = false;
     },
 
-
-    sendMessage (msg) {
-      if (!msg) {
+    sendMessage (msg, file = null) {
+      if (!msg && !file) {
         throw new Error('Please provide a message to send.');
       }
 
       this.lastTypingSentAt = null;
 
-      const chatMessage = new ChatMessage({
+      const chatMessage = new ChatMessage(file ? {
+        peerIDs: this.sendToIds,
+        orderID: this.model.id,
+        message: msg,
+        file,
+      } : {
         peerIDs: this.sendToIds,
         orderID: this.model.id,
         message: msg,

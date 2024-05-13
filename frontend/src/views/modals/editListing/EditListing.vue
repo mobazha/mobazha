@@ -1014,7 +1014,7 @@ export default {
     },
 
     onRemoveIntroVideo() {
-      delete this.formData.item.introVideo;
+      this.formData.item.introVideo = undefined;
     },
 
     onClickAddReturnPolicy() {

@@ -546,20 +546,22 @@ export default {
     avatarHashes() {
       let avatarHashes;
 
-      if (_.has(this, 'profile') && this.profile) {
-        avatarHashes = this.profile.get('avatarHashes').toJSON();
-      } else if (this.options.vendor) {
+      if (this.options.vendor) {
         avatarHashes = this.options.vendor.avatarHashes;
+      }
+      else if (_.has(this, 'profile') && this.profile) {
+        avatarHashes = this.profile.get('avatarHashes').toJSON();
       }
       return avatarHashes;
     },
     storeName() {
       let storeName = `${this.ownerGuid.slice(0, 8)}…`;
 
-      if (_.has(this, 'profile') && this.profile) {
-        storeName = this.profile.get('name');
-      } else if (this.options.vendor) {
+      if (this.options.vendor) {
         storeName = this.options.vendor.name;
+      }
+      else if (_.has(this, 'profile') && this.profile) {
+        storeName = this.profile.get('name');
       }
 
       if (storeName.length > 40) {

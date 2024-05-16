@@ -166,7 +166,7 @@
         <span v-if="ob.shipsFreeToMe" class="clrE1 clrTOnEmph phraseBox">{{ ob.polyT('listingCard.freeShippingBanner') }}</span>
       </div>
       <div class="verifiedModWrapper js-verifiedMod">
-        <VerifiedMod :options="getListingOptions({
+        <VerifiedMod :key="verifiedModsKey" :options="getListingOptions({
             model: verifiedModID && app.verifiedMods.get(verifiedModID),
           })"/>
       </div>
@@ -205,7 +205,7 @@
             <div class="flexNoShrink ratingStrip" v-html="ob.formatRating(ob.averageRating, ob.ratingCount)">
             </div>
             <div class="verifiedModWrapper js-verifiedMod">
-              <VerifiedMod :options="getListingOptions({
+              <VerifiedMod :key="verifiedModsKey" :options="getListingOptions({
                 model: verifiedModID && app.verifiedMods.get(verifiedModID),
               })"/>
             </div>
@@ -270,7 +270,7 @@
               </div>
               <div class="verifiedModWrapper">
                 <div class="js-verifiedMod">
-                  <VerifiedMod :options="getListingOptions({
+                  <VerifiedMod :key="verifiedModsKey" :options="getListingOptions({
                     model: verifiedModID && app.verifiedMods.get(verifiedModID),
                   })"/>
                 </div>
@@ -481,7 +481,8 @@ export default {
       routeOnOpen: '',
       routeNameOnOpen: '',
 
-      app: app,
+      app,
+      verifiedModsKey: 0,
 
       editListingModel: {},
       showEditListing: false,
@@ -493,6 +494,8 @@ export default {
     this.initEventChain();
 
     this.loadData(this.options);
+
+    this.listenTo(app.verifiedMods, 'update', (e) => {this.verifiedModsKey++});
   },
   mounted() {
     this.render();
@@ -627,6 +630,8 @@ export default {
       }
     },
     verifiedModID() {
+      let key = this.verifiedModsKey;
+
       const moderators = this.model.get('moderators') || [];
       const verifiedIDs = app.verifiedMods.matched(moderators);
       return verifiedIDs[0];

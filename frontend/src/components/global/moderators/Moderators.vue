@@ -286,7 +286,7 @@ export default {
         this.moderatorsColKey += 1;
 
         const removeIndex = this.modCards.findIndex((card) => card.model === md);
-        this.modCards.splice(removeIndex, 1)[0].remove();
+        this.modCards.splice(removeIndex, 1);
       });
       this.modCards = [];
 

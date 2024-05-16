@@ -1,5 +1,5 @@
 <template>
-  <div class="verifiedMod" @click.stop.prevent>
+  <div class="verifiedMod">
     <div :class="`innerWrap ${ob.verified ? 'verified' : 'unverified'}`">
       <template v-if="!ob.wrapInfoIcon">
         <div class="arrowBoxTipWrap">

@@ -51,7 +51,7 @@ function getBaseOptions(options = {}) {
           ? app.polyglot.t('verifiedMod.modVerified.tipBody', {
             name: `<b>${app.verifiedMods.data.name}</b>`,
             link: app.verifiedMods.data.link
-              ? `<a class="txU noWrap" href="${app.verifiedMods.data.link}" data-open-external>`
+              ? `<a class="txU noWrap" href="${app.verifiedMods.data.link}" target="_blank">`
                 + `${app.polyglot.t('verifiedMod.modVerified.link')}</a>`
               : '',
           })

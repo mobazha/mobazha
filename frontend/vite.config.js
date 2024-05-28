@@ -9,6 +9,14 @@ export default defineConfig(({ command, mode }) => {
     server: {
       host: true,
       port: 8088,
+      proxy: {
+        '/api': {
+          target: 'http://127.0.0.1:5102',
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/api/, '')
+        },
+      },
     },
     // 基础配置
     base: './',
@@ -44,5 +52,8 @@ export default defineConfig(({ command, mode }) => {
         },
       },
     },
+    define: {
+      'process.env': process.env
+    }
   };
 });

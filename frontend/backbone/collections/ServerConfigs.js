@@ -5,8 +5,6 @@ import app from '../app';
 import LocalStorageSync from '../utils/lib/backboneLocalStorage';
 import ServerConfig from '../models/ServerConfig';
 
-const platform = ipc.sendSync('controller.system.getPlatform', {});
-
 export default class extends Collection {
   localStorage() {
     return new LocalStorageSync('__serverConfigs');
@@ -71,34 +69,6 @@ export default class extends Collection {
     }
   }
 
-  get homedir() {
-    if (!this._homedir) {
-      this._homedir = ipc.sendSync('controller.system.getHomedir', {});
-    }
-
-    return this._homedir;
-  }
-
-  get walletCurrencyToDataDir() {
-    return {
-      BTC: {
-        win32: `${this.homedir}/OpenBazaar2.0`,
-        darwin: `${this.homedir}/Library/Application Support/OpenBazaar2.0`,
-        linux: `${this.homedir}/.openbazaar2.0`,
-      },
-      BCH: {
-        win32: `${this.homedir}/OpenBazaar2.0-bitcoincash`,
-        darwin: `${this.homedir}/Library/Application Support/OpenBazaar2.0-bitcoincash`,
-        linux: `${this.homedir}/.openbazaar2.0-bitcoincash`,
-      },
-      ZEC: {
-        win32: `${this.homedir}/OpenBazaar2.0-zcash`,
-        darwin: `${this.homedir}/Library/Application Support/OpenBazaar2.0-zcash`,
-        linux: `${this.homedir}/.openbazaar2.0-zcash`,
-      },
-    };
-  }
-
   migrate() {
     let builtInCount = 0;
 
@@ -138,30 +108,6 @@ export default class extends Collection {
         }
 
         builtInCount += 1;
-      }
-
-      // Migrate a walletCurrency to a dataDir.
-      const walletCurrency = serverConfig.get('walletCurrency');
-
-      if (walletCurrency) {
-        serverConfig.unset('walletCurrency');
-
-        if (typeof walletCurrency === 'string') {
-          const walletCurPaths = this.walletCurrencyToDataDir[walletCurrency];
-
-          if (walletCurPaths) {
-            const dataDir = walletCurPaths[platform];
-            if (dataDir) {
-              const configSave = serverConfig.save({ dataDir });
-
-              if (!configSave) {
-                // developer error or wonky data
-                console.error('There was an error migrating the dataDir for server '
-                  + `config ${serverConfig.get('name')}.`);
-              }
-            }
-          }
-        }
       }
     });
 

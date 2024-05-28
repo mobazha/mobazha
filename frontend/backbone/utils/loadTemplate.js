@@ -6,7 +6,7 @@ const templateCache = {};
 
 let helpers = {};
 
-export default function loadTemplate(templateFile, callback, root = `${__dirname}/../templates/`) {
+export default function loadTemplate(templateFile, callback) {
   if (!templateFile) {
     throw new Error('Please provide a path to the template.');
   }

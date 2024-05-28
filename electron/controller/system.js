@@ -7,7 +7,7 @@ const Services = require('ee-core/services');
 const Ps = require('ee-core/ps');
 
 const { clipboard, shell } = require('electron');
-const { platform, homedir } = require('os');
+const { platform } = require('os');
 
 const fs = require('fs');
 const path = require('path');
@@ -68,10 +68,6 @@ class SystemController extends Controller {
 
   getPlatform (key, event) {
     return platform();
-  }
-
-  getHomedir (key, event) {
-    return homedir();
   }
 
   readTemplateFileSync (templateFile, event) {

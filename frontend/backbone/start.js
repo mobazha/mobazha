@@ -845,7 +845,7 @@ ipc.on('app.updater', (e, infoInput) => {
       updateReady(info);
       break;
     case autoUpdateStatus.error:
-      showUpdateStatus(app.polyglot.t('update.error', { error: info.desc }), 'warning');
+      showUpdateStatus(app.polyglot.t('update.error', { error: infoInput }), 'warning');
       break;
     
     default:

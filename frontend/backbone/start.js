@@ -826,7 +826,8 @@ const autoUpdateStatus = {
   checking: 5,
 }
 
-ipc.on('app.updater', (e, info) => {
+ipc.on('app.updater', (e, infoInput) => {
+  const info = JSON.parse(infoInput);
   switch (info.status) {
     case autoUpdateStatus.checking:
       showUpdateStatus(app.polyglot.t('update.checking'));

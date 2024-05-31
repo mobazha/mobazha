@@ -817,6 +817,41 @@ ipc.on('updateNotAvailable', () => showUpdateStatus(app.polyglot.t('update.notAv
 ipc.on('updateError', (msg) => showUpdateStatus(app.polyglot.t('update.error', { error: msg }), 'warning'));
 ipc.on('updateReadyForInstall', (e, opts) => updateReady(opts));
 
+const autoUpdateStatus = {
+  error: -1,
+  available: 1,
+  noAvailable: 2,
+  downloading: 3,
+  downloaded: 4,
+  checking: 5,
+}
+
+ipc.on('app.updater', (e, info) => {
+  switch (info.status) {
+    case autoUpdateStatus.checking:
+      showUpdateStatus(app.polyglot.t('update.checking'));
+      break;
+    case autoUpdateStatus.available:
+      showUpdateStatus(app.polyglot.t('update.available'));
+      break;
+    case autoUpdateStatus.noAvailable:
+      showUpdateStatus(app.polyglot.t('update.notAvailable'));
+      break;
+    case autoUpdateStatus.downloading:
+      showUpdateStatus(info.text);
+      break;
+    case autoUpdateStatus.downloaded:
+      updateReady(info);
+      break;
+    case autoUpdateStatus.error:
+      showUpdateStatus(app.polyglot.t('update.error', { error: info.desc }), 'warning');
+      break;
+    
+    default:
+      break;
+  }
+})
+
 // Allow main.js to send messages to the console
 ipc.on('consoleMsg', (e, msg) => console.log(msg));
 

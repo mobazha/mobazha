@@ -62,7 +62,7 @@ class AutoUpdaterAddon {
     }
   
     autoUpdater.on('checking-for-update', () => {
-      //sendStatusToWindow('正在检查更新...');
+      this.sendStatusToWindow('正在检查更新...');
     })
     autoUpdater.on('update-available', (info) => {
       info.status = status.available;
@@ -79,13 +79,14 @@ class AutoUpdaterAddon {
         status: status.error,
         desc: err
       }
+      Log.info('[addon:autoUpdater] error: ', err);
       this.sendStatusToWindow(info);
     })
     autoUpdater.on('download-progress', (progressObj) => {
       let percentNumber = parseInt(progressObj.percent);
       let totalSize = this.bytesChange(progressObj.total);
       let transferredSize = this.bytesChange(progressObj.transferred);
-      let text = '已下载 ' + percentNumber + '%';
+      let text = 'Have downloaded ' + percentNumber + '%';
       text = text + ' (' + transferredSize + "/" + totalSize + ')';
   
       let info = {
@@ -100,11 +101,13 @@ class AutoUpdaterAddon {
     })
     autoUpdater.on('update-downloaded', (info) => {
       info.status = status.downloaded;
-      info.desc = '下载完成';
+      info.desc = 'Download Complete';
       this.sendStatusToWindow(info);
+
+      // this.sendStatusToWindow(opts);
       // quit and update
       // app.appQuit();
-      autoUpdater.quitAndInstall();
+      // autoUpdater.quitAndInstall();
     });
   }
 

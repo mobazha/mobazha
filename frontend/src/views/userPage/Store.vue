@@ -119,6 +119,7 @@ import app from '../../../backbone/app';
 import { convertCurrency, NoExchangeRateDataError } from '../../../backbone/utils/currency';
 import Listings from '../../../backbone/collections/Listings';
 import { events as listingEvents } from '../../../backbone/models/listing';
+import { getContentFrame } from '../../../backbone/utils/selectors';
 
 import CategoryFilter from './CategoryFilter.vue';
 import TypeFilter from './TypeFilter.vue';
@@ -173,8 +174,13 @@ export default {
   },
   mounted() {
     this.render();
+
+    const scrollHandler = e => this._onStoreListingsScroll.call(this, e);
+    this.storeListingsScrollHandler = _.debounce(scrollHandler, 100);
+    getContentFrame().on('scroll', this.storeListingsScrollHandler);
   },
   unmounted() {
+    getContentFrame().off('scroll', this.storeListingsScrollHandler);
   },
   computed: {
     ob() {
@@ -517,12 +523,6 @@ export default {
       if (e.target.scrollTop + $(e.target).innerHeight() >= e.target.scrollHeight - 150) {
         this.storeListingsCol.add(this.filteredCollection.slice(currentLength, currentLength + this.LISTINGS_PER_PAGE));
       }
-    },
-
-    onStoreListingsScroll(e) {
-      _.debounce(() => {
-        this._onStoreListingsScroll(e);
-      }, 100);
     },
 
     onCategoryChange(cat) {

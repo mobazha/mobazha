@@ -87,7 +87,7 @@ export default {
   },
   data() {
     return {
-      _tab: 'purchases',
+      _tab: this.$route.params?.tab || 'purchases',
       tabKey: 0,
 
       tabCount: {

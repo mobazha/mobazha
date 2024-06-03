@@ -1723,6 +1723,7 @@
       "enterMessagePlaceholder": "Vul bericht in...",
       "enterMessageNoMoreModPlaceholder": "Voer bericht in...(de moderator heeft een beslissing genomen en zal niet nieuwe berichten ontvangen)",
       "modCannotChat": "Je hebt een beslissing genomen en kunt geen berichten meer sturen.",
+      "addImage": "Add Image",
       "loadMessagesError": "Er was een fout bij het ophalen van de berichten. ",
       "retryLink": "opnieuw proberen",
       "btnSend": "Verzend"

@@ -1723,6 +1723,7 @@
       "enterMessagePlaceholder": "Indtast besked…",
       "enterMessageNoMoreModPlaceholder": "Indtast besked… (moderatoren har bekendtgjort sin beslutning og vil ikke længere se nye chatbeskeder)",
       "modCannotChat": "Du har bekendtgjort en beslutning og kan ikke længere sende beskeder.",
+      "addImage": "Add Image",
       "loadMessagesError": "En fejl opstod under indlæsning af beskederne. ",
       "retryLink": "Prøv igen",
       "btnSend": "Send"

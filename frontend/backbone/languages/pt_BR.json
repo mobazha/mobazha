@@ -1723,6 +1723,7 @@
       "enterMessagePlaceholder": "Inserir mensagem...",
       "enterMessageNoMoreModPlaceholder": "Insira uma mensagem... (o moderador já emitiu uma decisão e não irá mais ver novas mensagens de chat)",
       "modCannotChat": "Você já emitiu uma decisão e não pode mais enviar mensagens.",
+      "addImage": "Add Image",
       "loadMessagesError": "Houve um erro ao carregar as mensagens. ",
       "retryLink": "tentar novamente",
       "btnSend": "Enviar"

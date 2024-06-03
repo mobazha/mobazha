@@ -1725,6 +1725,7 @@
       "enterMessagePlaceholder": "أدخل رسالة ...",
       "enterMessageNoMoreModPlaceholder": "أدخل الرسالة... (أصدر المشرف قرارًا ولن يرى أي رسائل دردشة جديدة)",
       "modCannotChat": "لقد أصدرت قرارًا ولا يمكنك إرسال رسائل مرة أخرى.",
+      "addImage": "Add Image",
       "loadMessagesError": "حدث خطأ أثناء تحميل الرسائل ",
       "retryLink": "أعد المحاوله",
       "btnSend": "ارسل"

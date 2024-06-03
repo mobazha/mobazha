@@ -1723,6 +1723,7 @@
       "enterMessagePlaceholder": "Wprowadź wiadomość...",
       "enterMessageNoMoreModPlaceholder": "Enter message... (the moderator has issued a decision and will no longer see any new chat messages)",
       "modCannotChat": "You have issued a decision and cannot send further messages.",
+      "addImage": "Add Image",
       "loadMessagesError": "Wystąpił błąd wczytywania wiadomości. ",
       "retryLink": "ponów",
       "btnSend": "Wyślij"

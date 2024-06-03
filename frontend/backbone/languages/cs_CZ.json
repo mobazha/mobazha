@@ -1723,6 +1723,7 @@
       "enterMessagePlaceholder": "Vlož zprávu...",
       "enterMessageNoMoreModPlaceholder": "Zadej zprávu... (moderátor vydal rozhodnutí a již neuvidí žádné nové chatové zprávy)",
       "modCannotChat": "Vydal jsi rozhodnutí a nemůžeš posílat další zprávy.",
+      "addImage": "Add Image",
       "loadMessagesError": "Při načítání tvých zpráv nastala chyba. ",
       "retryLink": "zkusit znovu",
       "btnSend": "Poslat"

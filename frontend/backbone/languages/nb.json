@@ -1723,6 +1723,7 @@
       "enterMessagePlaceholder": "Skriv melding...",
       "enterMessageNoMoreModPlaceholder": "Skriv melding... (moderatoren har tatt en avgjørelse og vil ikke lenger se nye meldinger)",
       "modCannotChat": "Du har tatt en avgjørelse og kan ikke sende flere meldinger.",
+      "addImage": "Add Image",
       "loadMessagesError": "Det oppstod en feil ved henting av meldinger. ",
       "retryLink": "prøv på nytt",
       "btnSend": "Send"

@@ -1723,6 +1723,7 @@
       "enterMessagePlaceholder": "输入消息...",
       "enterMessageNoMoreModPlaceholder": "输入消息...（仲裁人发布了一个决定，将不再看到任何新的聊天消息）",
       "modCannotChat": "您已发布决定，无法发送更多消息。",
+      "addImage": "Add Image",
       "loadMessagesError": "加载消息时发生错误。",
       "retryLink": "重试",
       "btnSend": "发送"

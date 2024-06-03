@@ -1725,6 +1725,7 @@
       "enterMessagePlaceholder": "Entrez un message...",
       "enterMessageNoMoreModPlaceholder": "Entrez un message... (le modérateur a émis une décision et ne verra plus aucun nouveau message de chat)",
       "modCannotChat": "Vous avez pris une décision et ne pouvez pas envoyer d'autres messages.",
+      "addImage": "Add Image",
       "loadMessagesError": "Une erreur s'est produite lors du chargement des messages. ",
       "retryLink": "réessayer",
       "btnSend": "Envoyer"

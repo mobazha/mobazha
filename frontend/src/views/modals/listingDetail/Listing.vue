@@ -11,7 +11,9 @@
                 <div class="padSm gutterHSm overflowAuto margRSm flexVCent">
                   <a class="clrBr2 clrSh1 disc storeOwnerAvatar flexNoShrink js-storeOwnerAvatar" :style="ob.getAvatarBgImage(vendor.avatarHashes)"></a>
                   <p class="txUnl tx3 clamp">{{ vendor.name }}</p>
-                  <a class="link flexNoShrink tx6 " @click="onClickGoToStore">{{ ob.openedFromStore ? ob.polyT('listingDetail.returnToStore') : ob.polyT('listingDetail.goToStore') }}</a>
+                  <a class="link flexNoShrink tx6" @click="onClickGoToStore">{{
+                    ob.openedFromStore ? ob.polyT('listingDetail.returnToStore') : ob.polyT('listingDetail.goToStore')
+                  }}</a>
                 </div>
               </div>
             </template>
@@ -23,7 +25,8 @@
                   <ProcessingButton
                     :className="`btn js-deleteListing clrP clrBr ${isDeleting ? 'processing' : ''}`"
                     @click.stop="onClickDeleteListing"
-                    :btnText="ob.polyT('listingDetail.delete')" />
+                    :btnText="ob.polyT('listingDetail.delete')"
+                  />
                 </div>
               </div>
               <div class="js-deleteConfirmedBox confirmBox deleteConfirm tx5 arrowBoxTop clrBr clrP clrT" v-show="showDeleteConfirmedBox" @click.stop.prevent>
@@ -32,7 +35,9 @@
                 <hr class="clrBr row" />
                 <div class="flexHRight flexVCent gutterHLg buttonBar">
                   <a class="" @click.stop="onClickConfirmCancel">{{ ob.polyT('listingDetail.confirmDelete.btnCancel') }}</a>
-                  <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph " @click.stop="onClickConfirmedDelete">{{ ob.polyT('listingDetail.confirmDelete.btnConfirm') }}</a>
+                  <a class="btn clrBAttGrad clrBrDec1 clrTOnEmph" @click.stop="onClickConfirmedDelete">{{
+                    ob.polyT('listingDetail.confirmDelete.btnConfirm')
+                  }}</a>
                 </div>
               </div>
             </template>
@@ -40,12 +45,11 @@
             <template v-else>
               <div class="flexNoShrink" style="margin-left: auto">
                 <div class="js-socialBtns">
-                  <SocialBtns :options="{ targetID: vendor.peerID, }" />
+                  <SocialBtns :options="{ targetID: vendor.peerID }" />
                 </div>
               </div>
             </template>
           </div>
-
 
           <div class="listingContent flexColRow gutterVMd2">
             <div class="contentBox padLg clrP clrBr clrSh3">
@@ -59,28 +63,41 @@
                   <h2 class="flexExpand js-cryptoTitle cryptoTitle">
                     <CryptoTradingPairWrap :options="cryptoTradingPairOptions" />
                   </h2>
-                  <CryptoPrice :options="{
-                        priceAmount: ob.price.amount,
-                        priceCurrencyCode: ob.price.currencyCode,
-                        displayCurrency: ob.displayCurrency,
-                        priceModifier: ob.price.modifier,
-                        wrappingTag: 'h2',
-                        wrappingClass: 'flexNoShrink txRgt tx3',
-                      }" />
+                  <CryptoPrice
+                    :options="{
+                      priceAmount: ob.price.amount,
+                      priceCurrencyCode: ob.price.currencyCode,
+                      displayCurrency: ob.displayCurrency,
+                      priceModifier: ob.price.modifier,
+                      wrappingTag: 'h2',
+                      wrappingClass: 'flexNoShrink txRgt tx3',
+                    }"
+                  />
                 </template>
               </div>
               <div class="flex gutterHLg">
                 <div class="mainImageWrapper">
-                  <div v-if="!ob.item.introVideo" class="mainImage clrBr " @click="onClickGotoPhotos" :style="ob.item.images.length
-                    ? `background-image: url(${ob.getServerUrl(`ob/image/${ob.isHiRez() ? ob.item.images[0].large : ob.item.images[0].medium}`)}), url('../imgs/defaultItem.png')`
-                    : `background-image: url('../imgs/defaultItem.png')`"></div>
-                  <video-player-item v-if="ob.item.introVideo" class="mainImage clrBr " :url="app.getServerUrl(`ob/file/${ob.item.introVideo.hash}`)" />
+                  <div
+                    v-if="!ob.item.introVideo"
+                    class="mainImage clrBr"
+                    @click="onClickGotoPhotos"
+                    :style="
+                      ob.item.images.length
+                        ? `background-image: url(${ob.getServerUrl(
+                            `ob/image/${ob.isHiRez() ? ob.item.images[0].large : ob.item.images[0].medium}`
+                          )}), url('../imgs/defaultItem.png')`
+                        : `background-image: url('../imgs/defaultItem.png')`
+                    "
+                  ></div>
+                  <video-player-item v-if="ob.item.introVideo" class="mainImage clrBr" :url="app.getServerUrl(`ob/file/${ob.item.introVideo.hash}`)" />
                   <div class="txCtr">
-                    <a class="tx5 " @click="onClickGotoPhotos">
-                      <u>{{ ob.polyT('listingDetail.viewPhotos', {
-                        count: ob.item.images.length, smart_count:
-                          ob.item.images.length
-                      }) }}</u>
+                    <a class="tx5" @click="onClickGotoPhotos">
+                      <u>{{
+                        ob.polyT('listingDetail.viewPhotos', {
+                          count: ob.item.images.length,
+                          smart_count: ob.item.images.length,
+                        })
+                      }}</u>
                     </a>
                   </div>
                 </div>
@@ -99,66 +116,129 @@
                           </div>
                         </div>
                       </template>
-
-                      <button
-                        :class="`btnHg clrBAttGrad clrBrDec1 clrTOnEmph js-purchaseBtn ${templateOptions.buyNowClass} ${outdateHash ? 'disabled' : ''}`"
-                        @click="startPurchase">
-                        {{ ob.polyT(templateOptions.buyNowTranslationKey) }}
-                      </button>
-                      <button
-                        :class="`btnHg clrBAttGrad clrBrDec1 clrTOnEmph js-addToCartBtn ${templateOptions.buyNowClass}`"
-                        @click="addToCart">
-                        {{ ob.polyT('listingDetail.addToCart') }}
-                      </button>
-
+                      <!-- <div class="flex">
+                        <button
+                          :class="`btnHg clrBAttGrad clrBrDec1 clrTOnEmph js-purchaseBtn flex-1 ${templateOptions.buyNowClass} ${
+                            outdateHash ? 'disabled' : ''
+                          }`"
+                          @click="startPurchase"
+                        >
+                          {{ ob.polyT(templateOptions.buyNowTranslationKey) }}
+                        </button>
+                        <button :class="`btnHg clrBAttGrad clrBrDec1 clrTOnEmph js-addToCartBtn  flex-1 ${templateOptions.buyNowClass}`" @click="addToCart">
+                          {{ ob.polyT('listingDetail.addToCart') }}
+                        </button>
+                      </div> -->
+                      <div class="flex">
+                        <button :class="`warning-btn flex-1 ${templateOptions.buyNowClass}`" type="success" round @click="addToCart">
+                          {{ ob.polyT('listingDetail.addToCart') }}
+                        </button>
+                        <button :class="`success-btn flex-1 ${templateOptions.buyNowClass} ${outdateHash ? 'disabled' : ''}`" @click="startPurchase">
+                          {{ ob.polyT(templateOptions.buyNowTranslationKey) }}
+                        </button>
+                      </div>
                       <div class="js-purchaseErrorWrap">
                         <template v-if="outdateHash">
-                          <PurchaseError @click.stop="onClickReloadOutdated" :tip='ob.polyT("listingDetail.errors.outdatedHash", {
-                            reloadLink: `<a class="js-reloadOutdated" id="reloadOutdated">${ob.polyT("listingDetail.errors.reloadOutdatedHash")}<a>`,
-                          })'></PurchaseError>
+                          <PurchaseError
+                            @click.stop="onClickReloadOutdated"
+                            :tip="
+                              ob.polyT('listingDetail.errors.outdatedHash', {
+                                reloadLink: `<a class=&quot;js-reloadOutdated&quot; id=&quot;reloadOutdated&quot;>${ob.polyT(
+                                  'listingDetail.errors.reloadOutdatedHash'
+                                )}<a>`,
+                              })
+                            "
+                          ></PurchaseError>
                         </template>
                         <template v-else-if="templateOptions.unpurchaseable">
                           <PurchaseError :tip="templateOptions.tip"></PurchaseError>
                         </template>
                       </div>
-
                       <div class="flexHCent gutterH">
                         <div class="tx6 js-rating rating" @click="clickRating">
-                          <Rating :options="ratingData"/>
+                          <Rating :options="ratingData" />
                         </div>
                         <template v-if="ob.shipsFreeToMe">
                           <div class="txCtr">
-                            <a class="clrE1 clrTOnEmph phraseBox txNoUnd " @click="onClickFreeShippingLabel">{{
-                              ob.polyT('listingDetail.freeShippingBanner') }}</a>
+                            <a class="clrE1 clrTOnEmph phraseBox txNoUnd" @click="onClickFreeShippingLabel">{{
+                              ob.polyT('listingDetail.freeShippingBanner')
+                            }}</a>
                           </div>
                         </template>
                       </div>
                     </div>
                   </div>
                   <div class="flexHCent gutterHLg tx5 rowLg">
-                    <div v-html="ob.polyT('listingDetail.type', {
-                        type: `<b>${ob.polyT(`formats.${ob.metadata.contractType}`)}</b>`
-                      })">
-                    </div>
+                    <div
+                      v-html="
+                        ob.polyT('listingDetail.type', {
+                          type: `<b>${ob.polyT(`formats.${ob.metadata.contractType}`)}</b>`,
+                        })
+                      "
+                    ></div>
                     <!-- // not showing the inventory for now since it's broken on the server -->
                     <template v-if="ob.isCrypto && false">
-                      <div v-html='ob.polyT("listingDetail.inventory", {
-                        inventory: `<span class="js-cryptoInventory"></span>`
-                      })'>
-                      </div>
+                      <div
+                        v-html="
+                          ob.polyT('listingDetail.inventory', {
+                            inventory: `<span class=&quot;js-cryptoInventory&quot;></span>`,
+                          })
+                        "
+                      ></div>
                     </template>
-
                     <template v-else-if="ob.metadata.contractType === 'PHYSICAL_GOOD'">
-                      <div v-html="ob.polyT('listingDetail.condition', {
-                        condition:
-                          `<b>${ob.polyT(`conditionTypes.${ob.item.condition.toUpperCase()}`, { _: ob.item.condition })}</b>`
-                      })">
-                      </div>
-                      <div v-html="ob.polyT('listingDetail.weight', { weight: `<b>${ob.item.grams ? ob.item.grams : 0}</b>` })">
-                      </div>
+                      <div
+                        v-html="
+                          ob.polyT('listingDetail.condition', {
+                            condition: `<b>${ob.polyT(`conditionTypes.${ob.item.condition.toUpperCase()}`, { _: ob.item.condition })}</b>`,
+                          })
+                        "
+                      ></div>
+                      <div v-html="ob.polyT('listingDetail.weight', { weight: `<b>${ob.item.grams ? ob.item.grams : 0}</b>` })"></div>
                     </template>
                   </div>
-                  <hr class="rowLg">
+                  <hr class="rowLg" />
+                  <table class="table">
+                    <tr>
+                      <th><input type="checkbox" @change="changeCheckAll" :checked="isCheckAll" /></th>
+                      <th>Name</th>
+                      <th>Surcharge</th>
+                      <th>SKU</th>
+                      <th>Image</th>
+                    </tr>
+                    <tr>
+                      <td>
+                        <input type="checkbox" name="checked" :value="1" v-model="checkBoxValue" />
+                      </td>
+                      <td>Name</td>
+                      <td>Surcharge</td>
+                      <td>SKU</td>
+                      <td>
+                        <el-image
+                          style="width: 60px; height: 60px"
+                          src="https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg"
+                          fit="cover"
+                          :preview-src-list="['https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg']"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <input type="checkbox" name="checked" :value="2" v-model="checkBoxValue" />
+                      </td>
+                      <td>Name</td>
+                      <td>Surcharge</td>
+                      <td>SKU</td>
+                      <td>
+                        <el-image
+                          style="width: 60px; height: 60px"
+                          src="https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg"
+                          fit="cover"
+                          :preview-src-list="['https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg']"
+                        />
+                      </td>
+                    </tr>
+                  </table>
                   <h5>{{ ob.polyT('listingDetail.tags') }}</h5>
                   <div class="tagWrapper rowLg">
                     <template v-for="tag in ob.item.tags">
@@ -170,25 +250,31 @@
                   </div>
                   <h5>{{ ob.polyT('listingDetail.paymentsAccepted') }}</h5>
                   <div class="js-supportedCurrenciesList">
-                    <SupportedCurrenciesList :options="{
-                      initialState: {
-                        currencies: model.get('metadata').get('acceptedCurrencies'),
-                      },
-                    }"/>
+                    <SupportedCurrenciesList
+                      :options="{
+                        initialState: {
+                          currencies: model.get('metadata').get('acceptedCurrencies'),
+                        },
+                      }"
+                    />
                   </div>
                   <template v-if="ob.hasVerifiedMods">
                     <div class="verifiedModBox clrBrAlert2 clrBAlert2Grad">
                       <div class="flexVCent flexHCent gutterHTn rowSm">
-                        <div class="badge"
-                          :style="`background-image: url(${ob.defaultBadge.tiny}), url('../imgs/verifiedModeratorBadgeDefault.png');`">
-                        </div>
+                        <div class="badge" :style="`background-image: url(${ob.defaultBadge.tiny}), url('../imgs/verifiedModeratorBadgeDefault.png');`"></div>
                         <div class="tx5 txB">{{ ob.polyT('verifiedMod.modVerified.titleLong') }}</div>
                       </div>
                       <div class="flexColRows gutterVSm tx5b">
-                        <div v-html='ob.polyT("verifiedMod.genericDescription", {
-                          name: `<b>${ob.verifiedModsData.name}</b>`,
-                          link: `<a class="txU noWrap" href="${ob.verifiedModsData.link}" data-open-external>${ob.polyT("verifiedMod.link")}</a>`
-                        })'></div>
+                        <div
+                          v-html="
+                            ob.polyT('verifiedMod.genericDescription', {
+                              name: `<b>${ob.verifiedModsData.name}</b>`,
+                              link: `<a class=&quot;txU noWrap&quot; href=&quot;${ob.verifiedModsData.link}&quot; data-open-external>${ob.polyT(
+                                'verifiedMod.link'
+                              )}</a>`,
+                            })
+                          "
+                        ></div>
                       </div>
                     </div>
                   </template>
@@ -207,34 +293,44 @@
             <template v-if="ob.item.images.length">
               <div ref="photoSection" class="contentBox clrSh3 photoSection js-photoSection">
                 <div ref="photoSelected" class="flexCent photoSelected js-photoSelected">
-                  <img ref="photoSelectedInner" class="photoSelectedInner js-photoSelectedInner">
+                  <img ref="photoSelectedInner" class="photoSelectedInner js-photoSelectedInner" />
                 </div>
                 <template v-if="ob.item.images.length > 1">
-                  <button class="btn ion-ios-arrow-left photoPrev " @click="onClickPhotoPrev"></button>
-                  <button class="btn ion-ios-arrow-right photoNext " @click="onClickPhotoNext"></button>
+                  <button class="btn ion-ios-arrow-left photoPrev" @click="onClickPhotoPrev"></button>
+                  <button class="btn ion-ios-arrow-right photoNext" @click="onClickPhotoNext"></button>
                 </template>
                 <template v-if="ob.item.images.length > 1">
                   <div class="photoStrip flex gutterH">
                     <template v-for="(image, photoIndex) in ob.item.images">
-                      <input type="radio" name="photoStripThumbnails" class="js-photoSelect"
+                      <input
+                        type="radio"
+                        name="photoStripThumbnails"
+                        class="js-photoSelect"
                         :id="`photoStrip${photoIndex}`"
                         :value="photoIndex"
                         v-model="activePhotoIndex"
-                        @click="onClickPhotoSelect(photoIndex)">
+                        @click="onClickPhotoSelect(photoIndex)"
+                      />
                       <label
                         :style="`background-image: url(` + ob.getServerUrl(`ob/image/${ob.isHiRez() ? image.small : image.tiny}`) + `)`"
-                        :for="`photoStrip${photoIndex}`"></label>
+                        :for="`photoStrip${photoIndex}`"
+                      ></label>
                     </template>
                   </div>
                 </template>
               </div>
             </template>
             <div class="reviews js-reviews">
-              <Reviews ref="reviews" :key="reviewIDs" :reviewIDs="reviewIDs" :options="{
-                async: true,
-                showListingData: true,
-                isFetchingRatings: !ratingData.fetched,
-              }"/>
+              <Reviews
+                ref="reviews"
+                :key="reviewIDs"
+                :reviewIDs="reviewIDs"
+                :options="{
+                  async: true,
+                  showListingData: true,
+                  isFetchingRatings: !ratingData.fetched,
+                }"
+              />
             </div>
 
             <!-- Attachments are not yet available -->
@@ -286,48 +382,60 @@
             </div>
 
             <div class="js-moreListings">
-              <MoreListings :options="{
-                vendor,
-                listings: moreListingsData,
-              }" />
+              <MoreListings
+                :options="{
+                  vendor,
+                  listings: moreListingsData,
+                }"
+              />
             </div>
-
           </div>
-
         </template>
       </BaseModal>
-      
     </div>
     <Teleport to="#js-vueModal">
       <NsfwWarning v-if="showNsfwWarning" @canceled="close" @close="onNsfwWarningClose" />
-      <Purchase ref="purchaseModal" v-else-if="showPurchase"
-        :options="{ itemsInfo: [{quantity: '1', variants: selectedVariants}], vendor, origin: 'Listing' }"
-        :bb="function() {
-          return {
-            itemsToPurchase,
-          };
-        }"
+      <Purchase
+        ref="purchaseModal"
+        v-else-if="showPurchase"
+        :options="{ itemsInfo: [{ quantity: '1', variants: selectedVariants }], vendor, origin: 'Listing' }"
+        :bb="
+          function () {
+            return {
+              itemsToPurchase,
+            };
+          }
+        "
         @clickReloadOutdated="onPurchaseReloadOutdated"
-        @close="onPurchaseClose" />
-      <EditListing ref="editModal" v-else-if="showEditListing"
+        @close="onPurchaseClose"
+      />
+      <EditListing
+        ref="editModal"
+        v-else-if="showEditListing"
         :options="{
           returnText: ob.polyT('listingDetail.editListingReturnText'),
           onClickViewListing: onEditModalClickReturn,
         }"
-        :bb="function() {
-          return {
-            model,
-          };
-        }"
+        :bb="
+          function () {
+            return {
+              model,
+            };
+          }
+        "
         @click-return="onEditModalClickReturn"
         @close="onCloseEditModal"
       />
-      <EditListing ref="cloneModal" v-else-if="showCloneListing"
-        :bb="function() {
-          return {
-            model: model.cloneListing(),
-          };
-        }"
+      <EditListing
+        ref="cloneModal"
+        v-else-if="showCloneListing"
+        :bb="
+          function () {
+            return {
+              model: model.cloneListing(),
+            };
+          }
+        "
         @close="onCloseCloneModal"
       />
     </Teleport>
@@ -390,8 +498,10 @@ export default {
     },
     bb: Function,
   },
-  data () {
+  data() {
     return {
+      isCheckAll: false,
+      checkBoxValue: [],
       app,
 
       showModal: true,
@@ -428,12 +538,12 @@ export default {
       showCloneListing: false,
     };
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.options);
   },
-  mounted () {
+  mounted() {
     this.render();
   },
   watch: {
@@ -455,7 +565,7 @@ export default {
     if (this.moreListingsFetch) this.moreListingsFetch.abort();
   },
   computed: {
-    ob () {
+    ob() {
       const defaultBadge = app.verifiedMods.defaultBadge(this.model.get('moderators'));
       const flatModel = this.model.toJSON();
 
@@ -479,14 +589,12 @@ export default {
     itemsToPurchase() {
       return new OrderListings([this.model]);
     },
-    templateOptions () {
+    templateOptions() {
       const ob = this.ob;
 
       let tip;
       let buyNowClass = 'disabled';
-      let buyNowTranslationKey = ob.metadata.contractType !== 'CRYPTOCURRENCY' ?
-        'listingDetail.buyNow' :
-        'listingDetail.buyCryptoNow';
+      let buyNowTranslationKey = ob.metadata.contractType !== 'CRYPTOCURRENCY' ? 'listingDetail.buyNow' : 'listingDetail.buyCryptoNow';
       let unpurchaseable = true;
 
       let coinTypeRateAvailable;
@@ -498,19 +606,14 @@ export default {
       }
 
       if (!ob.crypto.anySupportedByWallet(ob.metadata.acceptedCurrencies)) {
-        tip = ob.polyT('listingDetail.unableToPurchase.incompatibleCrypto',
-          {
-            acceptedCurs: ob.metadata.acceptedCurrencies.join(', '),
-            walletCurs: ob.crypto.supportedWalletCurs()
-              .join(', '),
-          });
+        tip = ob.polyT('listingDetail.unableToPurchase.incompatibleCrypto', {
+          acceptedCurs: ob.metadata.acceptedCurrencies.join(', '),
+          walletCurs: ob.crypto.supportedWalletCurs().join(', '),
+        });
       } else if (
         ob.metadata.contractType !== 'CRYPTOCURRENCY' &&
         !ob.currencyMod.getExchangeRate(ob.price.currencyCode) &&
-        !(
-          ob.crypto.supportedWalletCurs().includes(ob.price.currencyCode) &&
-          ob.metadata.acceptedCurrencies.includes(ob.price.currencyCode)
-        )
+        !(ob.crypto.supportedWalletCurs().includes(ob.price.currencyCode) && ob.metadata.acceptedCurrencies.includes(ob.price.currencyCode))
       ) {
         // If it's priced in a wallet cur and that cur is one of the accepted
         // curs, we won't disable purchase even if there's no exchange rate for the
@@ -518,7 +621,7 @@ export default {
         // pricing and payment curs the same and therefore the exchange rate
         // unnecessary.
         tip = ob.polyT('listingDetail.unableToPurchase.noExchangeRateInfo', {
-          cur: ob.price.currencyCode
+          cur: ob.price.currencyCode,
         });
       } else if (
         ob.metadata.contractType === 'CRYPTOCURRENCY' &&
@@ -536,7 +639,7 @@ export default {
         unpurchaseable = false;
       }
 
-      return { tip, buyNowClass, buyNowTranslationKey, unpurchaseable }
+      return { tip, buyNowClass, buyNowTranslationKey, unpurchaseable };
     },
 
     shippingOptionsInfo() {
@@ -552,26 +655,19 @@ export default {
       };
     },
     showNsfwWarning() {
-      return this._showNsfwWarning
-        && this.checkNsfw
-        && this.model.get('item').get('nsfw')
-        && !this.model.isOwnListing && !app.settings.get('showNsfw');
+      return this._showNsfwWarning && this.checkNsfw && this.model.get('item').get('nsfw') && !this.model.isOwnListing && !app.settings.get('showNsfw');
     },
     totalPriceInfo() {
       let priceInfo;
       try {
-        priceInfo = convertAndFormatCurrency(
-          this.totalPrice,
-          this.model.get('metadata').get('pricingCurrency').code,
-          app.settings.get('localCurrency')
-        );
+        priceInfo = convertAndFormatCurrency(this.totalPrice, this.model.get('metadata').get('pricingCurrency').code, app.settings.get('localCurrency'));
       } catch (e) {
         // pass
         console.error(e);
       }
       return priceInfo;
     },
-    selectedVariants () {
+    selectedVariants() {
       const { options } = this.model.toJSON().item;
 
       return this.variantOptions.map((val, idx) => ({
@@ -605,8 +701,21 @@ export default {
       return {};
     },
   },
+  watch: {
+    checkBoxValue: {
+      handler(values) {
+        let data = [1, 2];
+        this.isCheckAll = data.every((item) => values.includes(item));
+      },
+      immediate: true,
+    },
+  },
   methods: {
-    loadData (options = {}) {
+    changeCheckAll(e) {
+      let data = [1, 2];
+      this.checkBoxValue = e.target.checked ? [...data] : [];
+    },
+    loadData(options = {}) {
       if (!this.model) {
         throw new Error('Please provide a model.');
       }
@@ -665,13 +774,11 @@ export default {
 
       this.listenTo(app.settings, 'change:country', () => (this.shipsFreeToMe = this.model.shipsFreeToMe));
 
-      this.listenTo(app.settings.get('shippingAddresses'), 'update',
-        (cl, updateOpts) => {
-          if (updateOpts.changes.added.length || updateOpts.changes.removed.length) {
-            this.shipsFreeToMe = this.model.shipsFreeToMe;
-          }
-        },
-      );
+      this.listenTo(app.settings.get('shippingAddresses'), 'update', (cl, updateOpts) => {
+        if (updateOpts.changes.added.length || updateOpts.changes.removed.length) {
+          this.shipsFreeToMe = this.model.shipsFreeToMe;
+        }
+      });
 
       if (this.model.isOwnListing) {
         this.listenTo(listingEvents, 'saved', (md, e) => {
@@ -686,7 +793,7 @@ export default {
             const cur = md.toJSON();
             delete cur.item.cryptoQuantity;
 
-            if (!(_.isEqual(prev, cur))) {
+            if (!_.isEqual(prev, cur)) {
               this.showDataChangedMessage();
             }
           }
@@ -716,16 +823,12 @@ export default {
         .done((data) => this.onRatings(data))
         .fail((jqXhr) => {
           if (jqXhr.statusText === 'abort') return;
-          const failReason = jqXhr.responseJSON && jqXhr.responseJSON.reason || '';
-          openSimpleMessage(
-            app.polyglot.t('listingDetail.errors.fetchRatings'),
-            failReason,
-          );
+          const failReason = (jqXhr.responseJSON && jqXhr.responseJSON.reason) || '';
+          openSimpleMessage(app.polyglot.t('listingDetail.errors.fetchRatings'), failReason);
         });
 
       if (this.model.isCrypto) {
         // Commenting out for since inventory fetch is currently broken on the server.
-
         // startAjaxEvent('Listing_InventoryFetch');
         // this.inventoryFetch = getInventory(this.vendor.peerID, {
         //   slug: this.model.get('slug'),
@@ -734,13 +837,11 @@ export default {
         // })
         //   .done(e => {
         //     this._inventory = e.inventory;
-
         //     if (this.cryptoInventory) {
         //       this.cryptoInventory.setState({
         //         amount: this._inventory,
         //       });
         //     }
-
         //     endAjaxEvent('Listing_InventoryFetch', {
         //       ownListing: this.model.isOwnListing,
         //     });
@@ -757,43 +858,43 @@ export default {
 
       this.moreListingsCol = new Listings([], { guid: this.vendor.peerID });
 
-      const fetchOpts = this.vendor.peerID === app.profile.id ? {}
-        : {
-          data: $.param({
-            'max-age': 60 * 60, // 1 hour
-          }),
-        };
+      const fetchOpts =
+        this.vendor.peerID === app.profile.id
+          ? {}
+          : {
+              data: $.param({
+                'max-age': 60 * 60, // 1 hour
+              }),
+            };
 
-      this.moreListingsFetch = this.moreListingsCol.fetch(fetchOpts)
-        .done(() => {
-          this.moreListingsData = this.randomizeMoreListings(this.moreListingsCol);
-        });
+      this.moreListingsFetch = this.moreListingsCol.fetch(fetchOpts).done(() => {
+        this.moreListingsData = this.randomizeMoreListings(this.moreListingsCol);
+      });
 
       this._outdatedHashState = null;
     },
 
-    onDocumentClick () {
+    onDocumentClick() {
       this.showDeleteConfirmedBox = false;
     },
 
     defaultCountry() {
-      return app.settings.get('shippingAddresses').length
-        ? app.settings.get('shippingAddresses').at(0).get('country') : app.settings.get('country');
+      return app.settings.get('shippingAddresses').length ? app.settings.get('shippingAddresses').at(0).get('country') : app.settings.get('country');
     },
 
-    onRatings (data) {
+    onRatings(data) {
       const pData = data || {};
 
       this.ratingData = {
         averageRating: pData.average,
         ratingCount: pData.count,
         fetched: true,
-      }
+      };
 
       this.reviewIDs = pData.ratings || [];
     },
 
-    onClickEditListing () {
+    onClickEditListing() {
       recordEvent('Listing_EditFromListing');
 
       this.showEditListing = true;
@@ -801,12 +902,11 @@ export default {
     },
 
     onEditModalClickReturn() {
-      this.$refs.editModal.confirmClose()
-        .done(() => {
-          this.showEditListing = false;
+      this.$refs.editModal.confirmClose().done(() => {
+        this.showEditListing = false;
 
-          this.showModal = true;
-        });
+        this.showModal = true;
+      });
     },
 
     onCloseEditModal() {
@@ -814,7 +914,7 @@ export default {
       this.showModal = true;
     },
 
-    onClickCloneListing () {
+    onClickCloneListing() {
       recordEvent('Listing_CloneFromListing');
 
       this.showCloneListing = true;
@@ -826,12 +926,12 @@ export default {
       this.showModal = true;
     },
 
-    onClickDeleteListing () {
+    onClickDeleteListing() {
       recordEvent('Listing_DeleteFromListing');
       this.showDeleteConfirmedBox = true;
     },
 
-    onClickConfirmedDelete () {
+    onClickConfirmedDelete() {
       recordEvent('Listing_DeleteFromListingConfirm');
       if (this.destroyRequest && this.destroyRequest.state === 'pending') return;
       this.destroyRequest = this.model.destroy({ wait: true });
@@ -839,47 +939,46 @@ export default {
       if (this.destroyRequest) {
         this.isDeleting = true;
 
-        this.destroyRequest.done(() => {
-          if (this.destroyRequest.statusText === 'abort'
-            || this.isRemoved()) return;
+        this.destroyRequest
+          .done(() => {
+            if (this.destroyRequest.statusText === 'abort' || this.isRemoved()) return;
 
-          this.close();
-        }).always(() => {
-          this.isDeleting = false;
-        });
+            this.close();
+          })
+          .always(() => {
+            this.isDeleting = false;
+          });
       }
     },
 
-    onClickConfirmCancel () {
+    onClickConfirmCancel() {
       recordEvent('Listing_DeleteFromListingCancel');
       this.showDeleteConfirmedBox = false;
     },
 
-    onClickGotoPhotos () {
+    onClickGotoPhotos() {
       recordEvent('Listing_GoToPhotos', { ownListing: this.model.isOwnListing });
       this.gotoPhotos();
     },
 
-    onClickGoToStore () {
+    onClickGoToStore() {
       if (this.options.openedFromStore) {
-        recordEvent('Listing_GoToStore',
-          {
-            OpenedFromStore: true,
-            ownListing: this.model.isOwnListing,
-          });
+        recordEvent('Listing_GoToStore', {
+          OpenedFromStore: true,
+          ownListing: this.model.isOwnListing,
+        });
         this.close();
       } else {
-        recordEvent('Listing_GoToStore',
-          {
-            OpenedFromStore: false,
-            ownListing: this.model.isOwnListing,
-          });
+        recordEvent('Listing_GoToStore', {
+          OpenedFromStore: false,
+          ownListing: this.model.isOwnListing,
+        });
         const base = this.vendor.handle ? `@${this.vendor.handle}` : this.vendor.peerID;
         app.router.navigateUser(`${base}/store`, this.vendor.peerID, { trigger: true });
       }
     },
 
-    randomizeMoreListings (cl) {
+    randomizeMoreListings(cl) {
       if (!(cl instanceof Collection)) {
         throw new Error('Please provide a Collection instance.');
       }
@@ -890,13 +989,13 @@ export default {
         .slice(0, 8);
     },
 
-    gotoPhotos () {
+    gotoPhotos() {
       recordEvent('Listing_GoToPhotos', { ownListing: this.model.isOwnListing });
 
       this.scrollToSection('.photoSection');
     },
 
-    clickRating () {
+    clickRating() {
       recordEvent('Listing_ClickOnRatings', { ownListing: this.model.isOwnListing });
       this.scrollToSection('.reviews');
     },
@@ -911,12 +1010,12 @@ export default {
       });
     },
 
-    onClickPhotoSelect (photoIndex) {
+    onClickPhotoSelect(photoIndex) {
       recordEvent('Listing_ClickOnPhoto', { ownListing: this.model.isOwnListing });
       this.setSelectedPhoto(photoIndex);
     },
 
-    setSelectedPhoto (photoIndex) {
+    setSelectedPhoto(photoIndex) {
       if (is.not.number(photoIndex)) {
         throw new Error('Please provide an index for the selected photo.');
       }
@@ -932,9 +1031,8 @@ export default {
       this.photoSelectedInner.attr('src', phSrc);
     },
 
-    activateZoom () {
-      if (this.photoSelectedInner.width() >= this.getPhotoSelectedEl().width()
-        || this.photoSelectedInner.height() >= this.getPhotoSelectedEl().height()) {
+    activateZoom() {
+      if (this.photoSelectedInner.width() >= this.getPhotoSelectedEl().width() || this.photoSelectedInner.height() >= this.getPhotoSelectedEl().height()) {
         this.getPhotoSelectedEl()
           .removeClass('unzoomable')
           .zoom({
@@ -952,7 +1050,7 @@ export default {
       }
     },
 
-    onClickPhotoPrev () {
+    onClickPhotoPrev() {
       recordEvent('Listing_ClickOnPhotoPrev', { ownListing: this.model.isOwnListing });
       let targetIndex = this.activePhotoIndex - 1;
       const imagesLength = parseInt(this.model.toJSON().item.images.length, 10);
@@ -961,7 +1059,7 @@ export default {
       this.setSelectedPhoto(targetIndex);
     },
 
-    onClickPhotoNext () {
+    onClickPhotoNext() {
       recordEvent('Listing_ClickOnPhotoNext', { ownListing: this.model.isOwnListing });
       let targetIndex = this.activePhotoIndex + 1;
       const imagesLength = parseInt(this.model.toJSON().item.images.length, 10);
@@ -970,26 +1068,24 @@ export default {
       this.setSelectedPhoto(targetIndex);
     },
 
-    onClickFreeShippingLabel () {
+    onClickFreeShippingLabel() {
       recordEvent('Listing_ClickFreeShippingLabel', { ownListing: this.model.isOwnListing });
       this.gotoShippingOptions();
     },
 
-    gotoShippingOptions () {
-      $(this.$refs.shippingSection).velocity(
-        'scroll',
-        {
-          duration: 500,
-          easing: 'easeOutSine',
-          container: this.$el,
-        });
+    gotoShippingOptions() {
+      $(this.$refs.shippingSection).velocity('scroll', {
+        duration: 500,
+        easing: 'easeOutSine',
+        container: this.$el,
+      });
     },
 
-    onChangeVariantSelect () {
+    onChangeVariantSelect() {
       this.adjustPriceBySku();
     },
 
-    adjustPriceBySku () {
+    adjustPriceBySku() {
       const { options } = this.model.toJSON().item;
       const selections = this.variantOptions.map((val, idx) => ({
         option: options[idx].name,
@@ -1013,16 +1109,15 @@ export default {
       }
     },
 
-    showDataChangedMessage () {
+    showDataChangedMessage() {
       if (this.dataChangePopIn && !this.dataChangePopIn.isRemoved()) {
         this.dataChangePopIn.$el.velocity('callout.shake', { duration: 500 });
       } else {
         this.dataChangePopIn = this.createChild(PopInMessage, {
-          messageText:
-            buildRefreshAlertMessage(app.polyglot.t('listingDetail.listingDataChangedPopin')),
+          messageText: buildRefreshAlertMessage(app.polyglot.t('listingDetail.listingDataChangedPopin')),
         });
 
-        this.listenTo(this.dataChangePopIn, 'clickRefresh', () => (this.$emit('refresh')));
+        this.listenTo(this.dataChangePopIn, 'clickRefresh', () => this.$emit('refresh'));
 
         this.listenTo(this.dataChangePopIn, 'clickDismiss', () => {
           this.dataChangePopIn.remove();
@@ -1033,19 +1128,16 @@ export default {
       }
     },
 
-    onClickReloadOutdated (e) {
+    onClickReloadOutdated(e) {
       if (e.target.id !== 'reloadOutdated') return;
 
       this.$emit('refresh');
     },
 
-    startPurchase () {
+    startPurchase() {
       if (!this.model.isCrypto) {
         if (this.totalPrice.lte(0)) {
-          openSimpleMessage(
-            app.polyglot.t('listingDetail.errors.noPurchaseTitle'),
-            app.polyglot.t('listingDetail.errors.zeroPriceMsg'),
-          );
+          openSimpleMessage(app.polyglot.t('listingDetail.errors.noPurchaseTitle'), app.polyglot.t('listingDetail.errors.zeroPriceMsg'));
           return;
         }
         // Commenting out inventory related stuff for now since it's broken on the server.
@@ -1067,19 +1159,19 @@ export default {
 
     onPurchaseReloadOutdated() {
       this.showPurchase = false;
-      this.showModal = true; 
+      this.showModal = true;
     },
     onPurchaseClose() {
       this.showPurchase = false;
       this.close();
     },
 
-    addToCart () {
+    addToCart() {
       api.addToShoppingCart(this.vendor.peerID, {
         slug: this.model.get('slug'),
         quantity: '1',
         options: this.selectedVariants || [],
-      })
+      });
     },
 
     getPhotoSelectedEl() {
@@ -1090,7 +1182,7 @@ export default {
       this._showNsfwWarning = false;
     },
 
-    render () {
+    render() {
       if (this.dataChangePopIn) this.dataChangePopIn.remove();
 
       if (this._latestHash !== this.model.get('hash')) {
@@ -1110,8 +1202,57 @@ export default {
       this._renderedHash = this.model.get('hash');
 
       return this;
-    }
+    },
+  },
+};
+</script>
+<style lang="scss" scoped>
+.flex {
+  &-1 {
+    flex: 1;
+  }
+  button {
+    font-size: 16px;
+    padding: 0 12px;
+  }
+  button + button {
+    margin-left: 10px;
   }
 }
-</script>
-<style lang="scss" scoped></style>
+.warning-btn,
+.success-btn {
+  height: 52px;
+  border-radius: 26px;
+  background-color: #eb9b3a;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #e8b16e;
+  font-size: 18px;
+  color: #fff;
+  box-sizing: border-box;
+  &:hover {
+    opacity: 0.8;
+  }
+}
+.success-btn {
+  background-color: #01bf65;
+  border-color: #66e9ac;
+}
+.table {
+  border-spacing: 0;
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 20px;
+  input[type='checkbox'] {
+    display: inline-block;
+  }
+  th,
+  td {
+    border-width: 1px;
+    border-style: solid;
+    padding: 10px;
+    word-break: break-word;
+    box-sizing: border-box;
+  }
+}
+</style>

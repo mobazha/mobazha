@@ -1,30 +1,22 @@
 <template>
   <div>
     <template v-if="!collection.length">
-      <div class="rowMd">{{ ob.polyT('editListing.variantInventory.placeholderNeedMoreData') }}</div>
+      <a class="btn clrP clrBr clrSh2 addFirstVariant" @click="add">Add Optional Features</a>
     </template>
 
     <template v-else>
-      <div class="inventoryTableWrap rowSm">
+      <div class="inventoryTableWrap mb2">
         <table>
           <tr>
-            <th class="clrBr">图片</th>
-            <template v-for="(column, j) in ob.columns" :key="j">
-              <th class="clrBr">{{ column }}</th>
-            </template>
+            <th class="clrBr">Name</th>
             <th class="clrBr surcharge">{{ ob.polyT('editListing.variantInventory.surcharge') }}</th>
-            <th class="clrBr totalPrice">{{ ob.polyT('editListing.variantInventory.totalPrice') }}</th>
             <th class="clrBr">{{ ob.polyT('editListing.variantInventory.sku') }}</th>
-            <th class="clrBr quantityCol">{{ ob.polyT('editListing.variantInventory.quantity') }}</th>
-            <th class="clrBr">操作</th>
+            <th class="clrBr">Image</th>
+            <th class="clrBr">Operate</th>
           </tr>
           <template v-for="item in collection" :key="item.cid">
-            <VariantInventoryItem
+            <OptionalFeaturesItem
               ref="itemViews"
-              :options="{
-                basePrice: options.basePrice,
-                listingCurrency: options.listingCurrency,
-              }"
               :bb="
                 function () {
                   return {
@@ -36,7 +28,7 @@
           </template>
         </table>
       </div>
-      <div class="clrT2 txSm helper">{{ ob.polyT('editListing.variantInventory.helperText') }}</div>
+      <a class="clrBr clrP clrTEm" v-show="collection.length > 0" @click="onClickAddVariant">Add Optional Features</a>
     </template>
   </div>
 </template>
@@ -44,11 +36,11 @@
 <script>
 import _ from 'underscore';
 import Sku from '../../../../backbone/models/listing/Sku';
-import VariantInventoryItem from './VariantInventoryItem.vue';
+import OptionalFeaturesItem from './OptionalFeaturesItem.vue';
 
 export default {
   components: {
-    VariantInventoryItem,
+    OptionalFeaturesItem,
   },
   props: {
     options: {
@@ -138,6 +130,7 @@ export default {
     },
   },
   methods: {
+    add() {},
     loadData() {
       if (!this.collection) {
         throw new Error('Please provide a Skus collection.');

@@ -1,6 +1,6 @@
 <template>
   <div class="modal modalScrollPage tabbedModal orderDetail">
-    <BaseModal @close="close" >
+    <BaseModal @close="close">
       <template v-slot:component>
         <div class="topControls flex">
           <!-- // This is something found at the top of multiple modals. Would be nice to make this into a template
@@ -17,28 +17,38 @@
 
         <div class="flex gutterH">
           <div class="tabColumn gutterV">
-            <div class="contentBox clrP clrBr clrSh3 tx4 featuredProfile js-featuredProfile"
-              :disabled="ob.isFetching || ob.fetchFailed">
-              <ProfileBox v-if="featuredProfileMd"
+            <div class="contentBox clrP clrBr clrSh3 tx4 featuredProfile js-featuredProfile" :disabled="ob.isFetching || ob.fetchFailed">
+              <ProfileBox
+                v-if="featuredProfileMd"
                 :options="{
                   isFetching: !featuredProfilePeerID,
                   peerID: featuredProfilePeerID,
                 }"
-                :bb="function() {
-                  return {
-                    model: featuredProfileMd,
-                  };
-                }"
+                :bb="
+                  function () {
+                    return {
+                      model: featuredProfileMd,
+                    };
+                  }
+                "
               />
             </div>
             <div class="contentBox padMd clrP clrBr clrSh3" :disabled="ob.isFetching || ob.fetchFailed">
               <h1 class="h4 txUp clrT">{{ ob.polyT('tabMenuHeading') }}</h1>
               <div class="boxList tx4 clrTx1Br tabHeads">
-                <a :class="`tab clrT row ${activeTab === 'summary' ? 'clrT active' : ''}`" @click="selectTab('summary')">{{ ob.polyT('orderDetail.navMenu.summary') }}</a>
+                <a :class="`tab clrT row ${activeTab === 'summary' ? 'clrT active' : ''}`" @click="selectTab('summary')">{{
+                  ob.polyT('orderDetail.navMenu.summary')
+                }}</a>
                 <a :class="`tab row ${activeTab === 'discussion' ? 'clrT active' : ''}`" @click="selectTab('discussion')">
-                  <span>{{ ob.polyT('orderDetail.navMenu.discussion') }}<span class="unreadBadge discSm clrE1 clrBrEmph1 clrTOnEmph">{{ unreadChatMessagesText }}</span></span>
+                  <el-tooltip class="box-item" effect="dark" content="discussion" placement="right">
+                    <span
+                      >{{ ob.polyT('orderDetail.navMenu.discussion')
+                      }}<span class="unreadBadge discSm clrE1 clrBrEmph1 clrTOnEmph">{{ unreadChatMessagesText }}</span></span
+                    >
+                  </el-tooltip>
                 </a>
-                <ContractMenuItem ref="contractMenuItem"
+                <ContractMenuItem
+                  ref="contractMenuItem"
                   :options="{
                     initialState: {
                       ...contractMenuItemState,
@@ -46,20 +56,22 @@
                   }"
                   :active="activeTab === 'contract'"
                   @click="selectTab('contract')"
-                  />
+                />
               </div>
             </div>
             <div class="mainCtaWrap" v-show="!ob.isFetching && !ob.fetchFailed">
-              <ProcessingButton className="btn clrBAttGrad clrBrDec1 clrTOnEmph" btnText="Accept Order"/>
+              <ProcessingButton className="btn clrBAttGrad clrBrDec1 clrTOnEmph" btnText="Accept Order" />
             </div>
             <div class="js-actionBarContainer">
-              <ActionBar v-if="!ob.isFetching && !ob.fetchError"
+              <ActionBar
+                v-if="!ob.isFetching && !ob.fetchError"
                 ref="actionBar"
                 :options="{
                   orderID: model.id,
                   initialState: actionBarButtonState,
                 }"
-                @clickOpenDispute="onClickOpenDispute" />
+                @clickOpenDispute="onClickOpenDispute"
+              />
             </div>
           </div>
           <div class="flexExpand posR">
@@ -84,42 +96,54 @@
                     v-if="activeTab === 'summary'"
                     :key="model"
                     :options="tabViewData"
-                    :bb="function() {
-                      return {
-                        model,
-                      };
-                    }"
+                    :bb="
+                      function () {
+                        return {
+                          model,
+                        };
+                      }
+                    "
                     @clickFulfillOrder="selectTab('fulfillOrder')"
-                    @clickResolveDispute="() => {
-                      recordEvent('OrderDetails_DisputeResolveStart');
-                      selectTab('resolveDispute');
-                    }"
+                    @clickResolveDispute="
+                      () => {
+                        recordEvent('OrderDetails_DisputeResolveStart');
+                        selectTab('resolveDispute');
+                      }
+                    "
                     @clickDisputeOrder="onClickOpenDispute"
                     @clickDiscussOrder="selectTab('discussion')"
                   />
                   <Discussion
                     v-if="activeTab === 'discussion'"
                     :options="tabViewData"
-                    :bb="function() {
-                      return {
-                        model,
-                      };
-                    }"
-                    @convoMarkedAsRead="() => {
-                      model.set('unreadChatMessages', 0);
-                      $emit('convoMarkedAsRead', model.id);
-                    }"
+                    :bb="
+                      function () {
+                        return {
+                          model,
+                        };
+                      }
+                    "
+                    @convoMarkedAsRead="
+                      () => {
+                        model.set('unreadChatMessages', 0);
+                        $emit('convoMarkedAsRead', model.id);
+                      }
+                    "
                   />
                   <ContractTab
                     v-if="activeTab === 'contract'"
-                    :bb="function() {
-                      return {
-                        model,
-                      };
-                    }"
-                    @clickBackToSummary="() => {
-                      selectTab('summary');
-                    }"
+                    :bb="
+                      function () {
+                        return {
+                          model,
+                        };
+                      }
+                    "
+                    @clickBackToSummary="
+                      () => {
+                        selectTab('summary');
+                      }
+                    "
                   />
                   <FulfillOrder
                     v-if="activeTab === 'fulfillOrder'"
@@ -128,37 +152,51 @@
                       contractType: model.get('contract').type,
                       isLocalPickup: model.get('contract').isLocalPickup,
                     }"
-                    @clickBackToSummary="() => {
-                      selectTab('summary');
-                    }"
-                    @clickCancel="() => {
-                      selectTab('summary');
-                    }"
+                    @clickBackToSummary="
+                      () => {
+                        selectTab('summary');
+                      }
+                    "
+                    @clickCancel="
+                      () => {
+                        selectTab('summary');
+                      }
+                    "
                   />
                   <DisputeOrder
                     v-if="activeTab === 'disputeOrder'"
                     :options="disputeOrderOptions()"
-                    @clickBackToSummary="() => {
-                      selectTab('summary');
-                    }"
-                    @clickCancel="() => {
-                      selectTab('summary');
-                    }"
+                    @clickBackToSummary="
+                      () => {
+                        selectTab('summary');
+                      }
+                    "
+                    @clickCancel="
+                      () => {
+                        selectTab('summary');
+                      }
+                    "
                   />
                   <ResolveDispute
                     v-if="activeTab === 'resolveDispute'"
                     :options="resolveDisputeOptions()"
-                    :bb="function() {
-                      return {
-                        case: model,
-                      };
-                    }"
-                    @clickBackToSummary="() => {
-                      selectTab('summary');
-                    }"
-                    @clickCancel="() => {
-                      selectTab('summary');
-                    }"
+                    :bb="
+                      function () {
+                        return {
+                          case: model,
+                        };
+                      }
+                    "
+                    @clickBackToSummary="
+                      () => {
+                        selectTab('summary');
+                      }
+                    "
+                    @clickCancel="
+                      () => {
+                        selectTab('summary');
+                      }
+                    "
                   />
                   <!-- insert the tab subview here -->
                 </section>
@@ -176,22 +214,19 @@ import $ from 'jquery';
 import app from '../../../../backbone/app';
 import { getSocket } from '../../../../backbone/utils/serverConnect';
 import { getCurrencyByCode as getWalletCurByCode } from '../../../../backbone/data/walletCurrencies';
-import {
-  resolvingDispute,
-  events as orderEvents,
-} from '../../../../backbone/utils/order';
+import { resolvingDispute, events as orderEvents } from '../../../../backbone/utils/order';
 import { getCachedProfiles } from '../../../../backbone/models/profile/Profile';
 import { recordEvent } from '../../../../backbone/utils/metrics';
 import Case from '../../../../backbone/models/order/Case';
-import ActionBar from './ActionBar.vue'
-import ContractMenuItem from './ContractMenuItem.vue'
+import ActionBar from './ActionBar.vue';
+import ContractMenuItem from './ContractMenuItem.vue';
 import Summary from './summaryTab/Summary.vue';
 import Discussion from './Discussion.vue';
 import ContractTab from './contractTab/ContractTab.vue';
 import FulfillOrder from './FulfillOrder.vue';
-import DisputeOrder from './DisputeOrder.vue'
-import ResolveDispute from './ResolveDispute.vue'
-import ProfileBox from './ProfileBox.vue'
+import DisputeOrder from './DisputeOrder.vue';
+import ResolveDispute from './ResolveDispute.vue';
+import ProfileBox from './ProfileBox.vue';
 
 export default {
   components: {
@@ -212,7 +247,7 @@ export default {
     },
     bb: Function,
   },
-  data () {
+  data() {
     return {
       _state: {
         isFetching: false,
@@ -227,15 +262,14 @@ export default {
       tabViewData: {},
     };
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.options);
   },
-  mounted () {
-  },
+  mounted() {},
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         ...this._state,
@@ -244,24 +278,24 @@ export default {
         type: this.type,
       };
     },
-    type () {
+    type() {
       return this.model instanceof Case ? 'case' : this.model.type;
     },
-    contract () {
+    contract() {
       return this.model.get('contract');
     },
     /**
      * Returns whether different action bar buttons should be displayed or not
      * based upon the order state.
      */
-    actionBarButtonState () {
+    actionBarButtonState() {
       const paymentCurData = this.model.paymentCoinData;
 
       return {
         showDisputeOrderButton: (!paymentCurData || !paymentCurData.supportsEscrowTimeout) && this.model.isOrderDisputable,
       };
     },
-    contractMenuItemState () {
+    contractMenuItemState() {
       let tip = '';
 
       if (this.model.isCase && !this.model.bothContractsValid) {
@@ -272,10 +306,8 @@ export default {
           tip = app.polyglot.t('orderDetail.contractMenuItem.tipBothContractsHaveError');
         } else {
           // "contract" here means the contract we're guaranteed to have
-          const isContractValid = this.model.get('buyerOpened')
-            ? this.model.isBuyerContractValid : this.model.isVendorContractValid;
-          const otherContract = this.model.get('buyerOpened')
-            ? this.model.get('vendorContract') : this.model.get('buyerContract');
+          const isContractValid = this.model.get('buyerOpened') ? this.model.isBuyerContractValid : this.model.isVendorContractValid;
+          const otherContract = this.model.get('buyerOpened') ? this.model.get('vendorContract') : this.model.get('buyerContract');
           const type = this.model.get('buyerOpened') ? 'Buyer' : 'Vendor';
           const otherType = this.model.get('buyerOpened') ? 'Vendor' : 'Buyer';
 
@@ -284,18 +316,16 @@ export default {
           }
 
           if (!otherContract) {
-            tip += `${tip ? ' ' : ''}`
-              + `${app.polyglot.t(`orderDetail.contractMenuItem.tip${otherType}ContractNotArrived`)}`;
+            tip += `${tip ? ' ' : ''}` + `${app.polyglot.t(`orderDetail.contractMenuItem.tip${otherType}ContractNotArrived`)}`;
           } else if (!this.model.isContractValid(!this.model.get('buyerOpened'))) {
-            tip += `${tip ? ' ' : ''}`
-              + `${app.polyglot.t(`orderDetail.contractMenuItem.tip${type}ContractHasError`)}`;
+            tip += `${tip ? ' ' : ''}` + `${app.polyglot.t(`orderDetail.contractMenuItem.tip${type}ContractHasError`)}`;
           }
         }
       }
 
       return { tip };
     },
-    unreadChatMessagesText () {
+    unreadChatMessagesText() {
       let count = this.model.get('unreadChatMessages');
       count = count > 0 ? count : '';
       count = count > 99 ? '…' : count;
@@ -304,7 +334,7 @@ export default {
   },
   methods: {
     recordEvent,
-    loadData (options = {}) {
+    loadData(options = {}) {
       const opts = {
         initialState: {
           isFetching: false,
@@ -355,41 +385,43 @@ export default {
         this.listenTo(socket, 'message', this.onSocketMessage);
       }
 
-      this.model.fetch().done(()=>{
+      this.model.fetch().done(() => {
         this.initTabViewData();
       });
     },
 
-    onOrderRequest (md, xhr) {
+    onOrderRequest(md, xhr) {
       this.setState({
         isFetching: true,
         fetchError: '',
         fetchFailed: false,
       });
 
-      xhr.done(() => {
-        this.setState({
-          isFetching: false,
-          fetchFailed: false,
+      xhr
+        .done(() => {
+          this.setState({
+            isFetching: false,
+            fetchFailed: false,
+          });
+        })
+        .fail((jqXhr) => {
+          if (jqXhr.statusText === 'abort') return;
+
+          let fetchError = '';
+
+          if (jqXhr.responseJSON && jqXhr.responseJSON.reason) {
+            fetchError = jqXhr.responseJSON.reason;
+          }
+
+          this.setState({
+            isFetching: false,
+            fetchFailed: true,
+            fetchError,
+          });
         });
-      }).fail((jqXhr) => {
-        if (jqXhr.statusText === 'abort') return;
-
-        let fetchError = '';
-
-        if (jqXhr.responseJSON && jqXhr.responseJSON.reason) {
-          fetchError = jqXhr.responseJSON.reason;
-        }
-
-        this.setState({
-          isFetching: false,
-          fetchFailed: true,
-          fetchError,
-        });
-      });
     },
 
-    onFirstOrderSync () {
+    onFirstOrderSync() {
       this.stopListening(this.model, null, this.onOrderRequest);
 
       let featuredProfileFetch;
@@ -415,11 +447,11 @@ export default {
       });
     },
 
-    onClickRetryFetch () {
+    onClickRetryFetch() {
       this.model.fetch();
     },
 
-    onSocketMessage (e) {
+    onSocketMessage(e) {
       const notificationTypes = [
         // A notification for the buyer that a payment has come in for the order. Let's refetch
         // our model so we have the data for the new transaction and can show it in the UI.
@@ -468,15 +500,13 @@ export default {
         }
       }
 
-      if (e.jsonData.chatMessage
-        && e.jsonData.chatMessage.orderID === this.model.id
-        && this.activeTab !== 'discussion') {
+      if (e.jsonData.chatMessage && e.jsonData.chatMessage.orderID === this.model.id && this.activeTab !== 'discussion') {
         const count = this.model.get('unreadChatMessages');
         this.model.set('unreadChatMessages', count + 1);
       }
     },
 
-    _getParticipantProfile (participantType) {
+    _getParticipantProfile(participantType) {
       const peerID = this.model[`${participantType}ID`];
       const profileKey = `_${participantType}Profile`;
 
@@ -496,25 +526,25 @@ export default {
     /**
      * Returns a promise that resolves with the buyer's Profile model.
      */
-    getBuyerProfile () {
+    getBuyerProfile() {
       return this._getParticipantProfile('buyer');
     },
 
     /**
      * Returns a promise that resolves with the vendor's Profile model.
      */
-    getVendorProfile () {
+    getVendorProfile() {
       return this._getParticipantProfile('vendor');
     },
 
     /**
      * Returns a promise that resolves with the moderator's Profile model.
      */
-    getModeratorProfile () {
+    getModeratorProfile() {
       return this._getParticipantProfile('moderator');
     },
 
-    selectTab (targ) {
+    selectTab(targ) {
       this.activeTab = targ;
     },
 
@@ -523,14 +553,14 @@ export default {
       this.selectTab('disputeOrder');
     },
 
-    recordDisputeStart () {
+    recordDisputeStart() {
       recordEvent('OrderDetails_DisputeStart', {
         type: this.type,
         state: this.model.get('state'),
       });
     },
 
-    initTabViewData () {
+    initTabViewData() {
       this.tabViewData = {
         orderID: this.model.id,
         buyer: {
@@ -551,16 +581,13 @@ export default {
       }
     },
 
-    disputeOrderOptions () {
+    disputeOrderOptions() {
       const translationKeySuffix = app.profile.id === this.model.buyerID ? 'Buyer' : 'Vendor';
       let timeoutMessage = '';
 
       try {
         timeoutMessage = getWalletCurByCode(this.model.paymentCoin).supportsEscrowTimeout
-          ? app.polyglot.t(
-            `orderDetail.disputeOrderTab.timeoutMessage${translationKeySuffix}`,
-            { timeoutAmount: this.contract.disputeExpiryVerbose },
-          )
+          ? app.polyglot.t(`orderDetail.disputeOrderTab.timeoutMessage${translationKeySuffix}`, { timeoutAmount: this.contract.disputeExpiryVerbose })
           : '';
       } catch (e) {
         // pass
@@ -574,9 +601,9 @@ export default {
           getProfile: this.getModeratorProfile.bind(this),
         },
         timeoutMessage,
-      }
+      };
     },
-    resolveDisputeOptions () {
+    resolveDisputeOptions() {
       return {
         vendor: {
           id: this.model.vendorID,
@@ -588,7 +615,7 @@ export default {
         },
       };
     },
-  }
-}
+  },
+};
 </script>
 <style lang="scss" scoped></style>

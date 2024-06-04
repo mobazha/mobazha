@@ -9,3 +9,10 @@
         line-height: var(--el-input-inner-height) !important;
     }
 }
+.custom-input {
+    input {
+        border: none !important;
+        padding: 0 !important;
+        line-height: var(--el-input-inner-height) !important;
+    }
+}

@@ -1,5 +1,13 @@
 <template>
   <tr>
+    <td class="clrBr">
+      <el-image
+        style="width: 60px; height: 60px"
+        src="https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg"
+        fit="cover"
+        :preview-src-list="['https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg']"
+      />
+    </td>
     <template v-for="(choice, j) in ob.choices" :key="j">
       <td class="clrBr">{{ choice }}</td>
     </template>
@@ -10,15 +18,33 @@
     <td class="clrBr js-totalPrice">{{ ob.calculateTotalPrice(formData.surcharge || ob.bigNumber('0')) }}</td>
     <td class="clrBr">
       <FormError v-if="ob.errors['productID']" :errors="ob.errors['productID']" />
-      <input type="text" class="clrBr clrP clrSh2" name="productID" v-model="formData.productID" :placeholder="ob.polyT('editListing.variantInventory.placeholderSKU')" :maxlength="ob.max.productIdLength" />
+      <input
+        type="text"
+        class="clrBr clrP clrSh2"
+        name="productID"
+        v-model="formData.productID"
+        :placeholder="ob.polyT('editListing.variantInventory.placeholderSKU')"
+        :maxlength="ob.max.productIdLength"
+      />
     </td>
     <td class="clrBr unconstrainedWidth quantityCol">
       <FormError v-if="ob.errors['quantity']" :errors="ob.errors['quantity']" />
       <div class="flexVCent gutterH">
-        <input type="number" class="clrBr clrP clrSh2 " v-model="formData.quantity" :placeholder="quantityPlaceholder" data-var-type="bignumber"/>
-        <input type="checkbox" :id="`${ob.cid}_inventoryItemUnlimtedCheckbox`" class="centerLabel" v-model="formData.infiniteInventory" @change="changeInfinite">
-        <label class="tx5b flexNoShrink" :for="`${ob.cid}_inventoryItemUnlimtedCheckbox`">{{ ob.polyT('editListing.variantInventory.unlimitedQuantityLabel') }}</label>
+        <input type="number" class="clrBr clrP clrSh2" v-model="formData.quantity" :placeholder="quantityPlaceholder" data-var-type="bignumber" />
+        <input
+          type="checkbox"
+          :id="`${ob.cid}_inventoryItemUnlimtedCheckbox`"
+          class="centerLabel"
+          v-model="formData.infiniteInventory"
+          @change="changeInfinite"
+        />
+        <label class="tx5b flexNoShrink" :for="`${ob.cid}_inventoryItemUnlimtedCheckbox`">{{
+          ob.polyT('editListing.variantInventory.unlimitedQuantityLabel')
+        }}</label>
       </div>
+    </td>
+    <td class="clrBr">
+      <a class="iconBtn clrBr clrP clrSh2 margLSm btnRemoveVariant" @click="onClickRemove"><i class="ion-trash-b"></i> </a>
     </td>
   </tr>
 </template>
@@ -36,7 +62,7 @@ export default {
     },
     bb: Function,
   },
-  data () {
+  data() {
     return {
       infiniteQuantityChar: '—',
 
@@ -45,16 +71,15 @@ export default {
         productID: '',
         quantity: '',
         infiniteInventory: true,
-      }
+      },
     };
   },
-  created () {
+  created() {
     this.loadData(this.options);
   },
-  mounted () {
-  },
+  mounted() {},
   computed: {
-    ob () {
+    ob() {
       return {
         ...this.templateHelpers,
         ...this.model.toJSON(),
@@ -72,7 +97,7 @@ export default {
       } else {
         return 0;
       }
-    }
+    },
   },
   methods: {
     initFormData() {
@@ -82,13 +107,13 @@ export default {
         productID: model.productID,
         quantity: model.quantity,
         infiniteInventory: model.infiniteInventory,
-      }
+      };
 
       if (this.formData.infiniteInventory) {
         this.formData.quantity = this.infiniteQuantityChar;
       }
     },
-    loadData () {
+    loadData() {
       if (!this.model) {
         throw new Error('Please provide a model.');
       }
@@ -105,7 +130,7 @@ export default {
     },
 
     // Sets the model based on the current data in the UI.
-    setModelData () {
+    setModelData() {
       const formData = this.formData;
 
       if (!_.isEmpty(formData.surcharge)) {
@@ -122,7 +147,7 @@ export default {
       this.model.set(formData, { validate: true });
     },
 
-    calculateTotalPrice (surcharge) {
+    calculateTotalPrice(surcharge) {
       const listingPrice = this.options.basePrice;
 
       let formatted;
@@ -135,7 +160,6 @@ export default {
 
       return formatted;
     },
-  }
-}
+  },
+};
 </script>
-<style lang="scss" scoped></style>

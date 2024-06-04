@@ -1,7 +1,9 @@
 <div class="clrBr clrP flexVCent gutterH padSm convoHeader" style="height: 50px">
   <div class="flexExpand js-convoProfileHeaderContainer"></div>
   <div class="btnStrip flexNoShrink">
-    <div class="js-imageUploadingLabel <% if (!ob.imageUploadInprogress) print('hide') %>"><%= ob.polyT('editListing.uploading') %> <a class="js-cancelImageUpload"><%= ob.polyT('editListing.btnCancelUpload') %></a></div>
+    <div class="js-imageUploadingLabel <% if (!ob.imageUploadInprogress) print('hide') %>">
+      <%= ob.polyT('editListing.uploading') %> <a class="js-cancelImageUpload"><%= ob.polyT('editListing.btnCancelUpload') %></a>
+    </div>
     <a class="ion-image iconBtn js-addImage <% if (ob.imageUploadInprogress) print('disabled') %>"></a>
     <a class="ion-android-more-vertical iconBtn subMenuTrigger js-subMenuTrigger"></a>
     <a class="ion-ios-close-empty iconBtn js-closeConvo"></a>
@@ -17,19 +19,23 @@
   </div>
   <div class="convoMessagesWindow tx6 js-convoMessagesWindow">
     <div class="typingIndicator txBase noOverflow clrBr clrP clrT2 clrSh1 js-typingIndicator"><%= ob.typingIndicator %></div>
-    <%= ob.spinner() %>
-    <%
-      const retryLink = `<a class="js-retryLoadMessage">${ob.polyT('chat.conversation.retryLink')}</a>`;
-      const loadMessagesError = ob.polyT('chat.conversation.loadMessagesError');
-    %>
-    <div class="clrTErr messagesFetchError js-loadMessagesError <% if (!ob.showLoadMessagesError) print('hide') %>"><%= loadMessagesError %><%= retryLink %></div>
+    <%= ob.spinner() %> <% const retryLink = `<a class="js-retryLoadMessage">${ob.polyT('chat.conversation.retryLink')}</a>`; const loadMessagesError =
+    ob.polyT('chat.conversation.loadMessagesError'); %>
+    <div class="clrTErr messagesFetchError js-loadMessagesError <% if (!ob.showLoadMessagesError) print('hide') %>">
+      <%= loadMessagesError %><%= retryLink %>
+    </div>
     <div class="js-convoMessagesContainer"></div>
   </div>
   <div class="emojiMenuContainer clrP clrBr js-emojiMenuContainer"></div>
 </div>
 <div class="clrBr clrP convoFooter">
   <div class="flexCent">
-    <textarea class="clrP tx6 js-inputMessage" placeholder="<%= ob.polyT('chat.conversation.messageInputPlaceholder') %>" maxlength="<%= ob.maxMessageLength %>" rows="1"></textarea>
+    <textarea
+      class="clrP tx6 js-inputMessage"
+      placeholder="<%= ob.polyT('chat.conversation.messageInputPlaceholder') %>"
+      maxlength="<%= ob.maxMessageLength %>"
+      rows="1"
+    ></textarea>
     <button class="btn clrP emojiMenuTrigger js-emojiMenuTrigger"><%= ob.parseEmojis('😀') %></button>
   </div>
 </div>

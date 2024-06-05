@@ -10,7 +10,9 @@
               <div class="padSm gutterHSm overflowAuto margRSm flexVCent">
                 <a class="clrBr2 clrSh1 discTn flexNoShrink" :style="ob.getAvatarBgImage(vendor.avatarHashes)"></a>
                 <p class="txUnl tx3 clamp">{{ vendor.name }}</p>
-                <a class="link flexNoShrink tx6" @click="clickGoToListing">{{ origin === 'ShoppingCart' ? ob.polyT('purchase.returnToCart') : ob.polyT('purchase.returnToListing') }}</a>
+                <a class="link flexNoShrink tx6" @click="clickGoToListing">{{
+                  origin === 'ShoppingCart' ? ob.polyT('purchase.returnToCart') : ob.polyT('purchase.returnToListing')
+                }}</a>
               </div>
             </div>
           </template>
@@ -59,12 +61,15 @@
                                 v-model="formData.itemsData[idx].quantity"
                                 @keyup="keyupQuantity(idx)"
                                 placeholder="0"
-                                data-var-type="bignumber">
+                                data-var-type="bignumber"
+                              />
                             </div>
                           </div>
                         </div>
                       </template>
-                      <div class="pad flexNoShrink"><b>{{ ob.currencyMod.convertAndFormatCurrency(totalPrice(idx), pricingCurrency(idx), displayCurrency) }}</b></div>
+                      <div class="pad flexNoShrink">
+                        <b>{{ ob.currencyMod.convertAndFormatCurrency(totalPrice(idx), pricingCurrency(idx), displayCurrency) }}</b>
+                      </div>
                     </div>
                     <div class="col6">
                       <template v-if="hasCoupons(listing) && ob.phase === 'pay'">
@@ -78,7 +83,8 @@
                             id="couponCode"
                             @keyup.enter="applyCoupon(idx)"
                             v-model="formData.itemsData[idx].couponCode"
-                            :placeholder="ob.polyT('purchase.couponCodePlaceholder')">
+                            :placeholder="ob.polyT('purchase.couponCodePlaceholder')"
+                          />
                           <button class="btn clrP clrBr clrSh2 flexNoShrink" @click="applyCoupon(idx)">
                             {{ ob.polyT('purchase.applyCode') }}
                           </button>
@@ -90,22 +96,46 @@
                               coupons: listing.coupons,
                               listingPrice: this.prices[idx].price,
                             }"
-                            @changeCoupons="changeCoupons(idx, $event)"/>
+                            @changeCoupons="changeCoupons(idx, $event)"
+                          />
                           <!-- // coupons are inserted here after they are added by the user. -->
                         </div>
                       </template>
+                    </div>
+                    <div class="cell mt2">
+                      <h5>Optional Features</h5>
+                      <div class="cell-item">
+                        1. Name1, Surcharge 1, SKU1,
+                        <el-image
+                          style="width: 16px; height: 16px"
+                          src="https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg"
+                          fit="cover"
+                          :preview-src-list="['https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg']"
+                        />
+                      </div>
+                      <div class="cell-item">
+                        2. Name1, Surcharge 1, SKU1,
+                        <el-image
+                          style="width: 16px; height: 16px"
+                          src="https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg"
+                          fit="cover"
+                          :preview-src-list="['https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg']"
+                        />
+                      </div>
                     </div>
                   </template>
 
                   <template v-else>
                     <div class="flexVCent gutterHLg row cryptoTitleWrap">
                       <div ref="cryptoTitle" :class="`js-cryptoTitle ${ob.phase !== 'pay' && ob.phase !== 'processing' ? 'flexExpand' : ''}`">
-                        <CryptoTradingPairWrap :options="{
-                          tradingPairClass: 'cryptoTradingPairXL',
-                          exchangeRateClass: 'clrT2 tx6',
-                          fromCur: listing.get('metadata').get('acceptedCurrencies')[0],
-                          toCur: listing.get('item').get('cryptoListingCurrencyCode'),
-                        }"/>
+                        <CryptoTradingPairWrap
+                          :options="{
+                            tradingPairClass: 'cryptoTradingPairXL',
+                            exchangeRateClass: 'clrT2 tx6',
+                            fromCur: listing.get('metadata').get('acceptedCurrencies')[0],
+                            toCur: listing.get('item').get('cryptoListingCurrencyCode'),
+                          }"
+                        />
                       </div>
                       <template v-if="ob.phase === 'pay' || ob.phase === 'processing'">
                         <div class="flexExpand">
@@ -121,18 +151,23 @@
                                 @keyup="keyupQuantity(idx)"
                                 placeholder="0.0000"
                                 size="8"
-                                data-var-type="bignumber">
+                                data-var-type="bignumber"
+                              />
                               <template v-if="displayCurrency !== listing.item.cryptoListingCurrencyCode">
                                 <Select2
                                   id="cryptoAmountCurrency"
                                   v-model="cryptoAmountCurrency"
                                   @change="changeCryptoAmountCurrency(idx)"
-                                  class="clrBr clrP nestInputRight">
+                                  class="clrBr clrP nestInputRight"
+                                >
                                   <option
                                     v-for="cur in [listing.item.cryptoListingCurrencyCode, displayCurrency]"
                                     :key="cur"
                                     :value="cur"
-                                    :selected="cur === cryptoAmountCurrency">{{ cur }}</option>
+                                    :selected="cur === cryptoAmountCurrency"
+                                  >
+                                    {{ cur }}
+                                  </option>
                                 </Select2>
                               </template>
                             </div>
@@ -140,12 +175,14 @@
                         </div>
                       </template>
                       <div class="pad flexNoShrink">
-                        <CryptoPrice :options="{
-                          priceAmount: totalPrice(idx),
-                          priceCurrencyCode: pricingCurrency(idx),
-                          displayCurrency: displayCurrency,
-                          priceModifier: listing.item.cryptoListingPriceModifier,
-                        }" />
+                        <CryptoPrice
+                          :options="{
+                            priceAmount: totalPrice(idx),
+                            priceCurrencyCode: pricingCurrency(idx),
+                            displayCurrency: displayCurrency,
+                            priceModifier: listing.item.cryptoListingPriceModifier,
+                          }"
+                        />
                       </div>
                     </div>
                     <hr class="clrBr rowLg" />
@@ -156,13 +193,15 @@
                       <FormError v-if="errors['items-paymentAddress']" :errors="errors['items-paymentAddress']" />
                     </div>
                     <template v-if="ob.phase === 'pay' || ob.phase === 'processing'">
-                      <input type="text"
+                      <input
+                        type="text"
                         id="purchaseCryptoAddress"
                         @change="changeCryptoAddress"
                         :value="ob.items[0].paymentAddress"
-                        :placeholder="ob.polyT('purchase.cryptoAddressPlaceholder', { coinType: coinName})"
+                        :placeholder="ob.polyT('purchase.cryptoAddressPlaceholder', { coinType: coinName })"
                         class="clrBr clrP rowSm"
-                        :maxlength="ob.itemConstraints.maxPaymentAddressLength" />
+                        :maxlength="ob.itemConstraints.maxPaymentAddressLength"
+                      />
                     </template>
 
                     <template v-else>
@@ -186,14 +225,16 @@
                     :options="{
                       getTotalShippingPrice: totalShippingPriceFunc,
                     }"
-                    :bb="function() {
-                      return {
-                        model: shippingOptions,
-                      };
-                    }"
+                    :bb="
+                      function () {
+                        return {
+                          model: shippingOptions,
+                        };
+                      }
+                    "
                     @shippingOptionSelected="updateShippingOption"
                     @newAddress="clickNewAddress"
-                    />
+                  />
                 </section>
               </template>
               <section class="contentBox padMd clrP clrBr clrSh3">
@@ -213,7 +254,8 @@
                         sort: false,
                       }"
                       v-model:activeCurs="formData.activeCurs"
-                      @currencyClicked="onCurrencyClicked"/>
+                      @currencyClicked="onCurrencyClicked"
+                    />
                   </div>
                 </div>
               </section>
@@ -222,7 +264,7 @@
                   <div class="flexVCentClearMarg">
                     <h2 class="h4 flexExpand required">{{ ob.polyT('purchase.paymentTypeTitle') }}</h2>
                     <template v-if="showModerators">
-                      <input type="checkbox" id="purchaseVerifiedOnly" v-model="showVerifiedOnly">
+                      <input type="checkbox" id="purchaseVerifiedOnly" v-model="showVerifiedOnly" />
                       <label class="tx5b" for="purchaseVerifiedOnly">{{ ob.polyT('settings.storeTab.verifiedOnly') }}</label>
                     </template>
                   </div>
@@ -256,7 +298,7 @@
                     <div>
                       <div class="clrT2 tx6 rowMd">{{ ob.polyT('purchase.moderatorsDisclaimer') }}</div>
                     </div>
-                    <hr class="clrBr row">
+                    <hr class="clrBr row" />
                   </template>
                   <DirectPayment class="moderatorsList" :active="!isModerated" @click="handleDirectPurchaseClick" />
                 </div>
@@ -281,14 +323,15 @@
                         name="alternateContactInfo"
                         v-model="formData.emailAddress"
                         @blur="blurEmailAddress"
-                        :placeholder="ob.polyT('purchase.emailPlaceholder')">
+                        :placeholder="ob.polyT('purchase.emailPlaceholder')"
+                      />
                     </div>
                     <div>
                       <span class="txSm clrT2">{{ ob.polyT('purchase.emailNote') }}</span>
                     </div>
                   </div>
                 </div>
-                <hr class="clrBr row">
+                <hr class="clrBr row" />
                 <div class="rowTn">
                   <label for="memo" class="tx5">
                     {{ ob.polyT('purchase.memo') }}
@@ -301,7 +344,8 @@
                   maxlength="5000"
                   rows="6"
                   :placeholder="ob.polyT('purchase.memoPlaceholder')"
-                  v-model="formData.itemsData[0].memo"></textarea>
+                  v-model="formData.itemsData[0].memo"
+                ></textarea>
               </section>
             </template>
             <template v-if="ob.phase === 'pending'">
@@ -322,7 +366,8 @@
             </template>
             <template v-if="ob.phase === 'complete'">
               <section class="contentBox padMd clrP clrBr clrSh3 js-complete">
-                <Complete :options="{
+                <Complete
+                  :options="{
                     vendor,
                     orderID,
                   }"
@@ -338,11 +383,13 @@
                   ref="actionBtn"
                   :phase="ob.phase"
                   :outdatedHash="outdatedHash"
-                  :bb="function() {
-                    return {
-                      oneListing,
-                    };
-                  }"
+                  :bb="
+                    function () {
+                      return {
+                        oneListing,
+                      };
+                    }
+                  "
                   @purchase="purchaseListing"
                   @close="close"
                   @reloadOutdated="onReloadOutdated"
@@ -359,15 +406,17 @@
                     showTotalTip: _state.phase === 'pay',
                     totalShippingPrice: selectedShippingPrice,
                   }"
-                  :bb="function() {
-                    return {
-                      model: order,
-                      listing: oneListing,
-                    };
-                  }"
+                  :bb="
+                    function () {
+                      return {
+                        model: order,
+                        listing: oneListing,
+                      };
+                    }
+                  "
                 />
                 <template v-if="showModerators">
-                  <hr class="clrBr">
+                  <hr class="clrBr" />
                   <div class="padSm txSm txCtr clrT2">
                     {{ ob.polyT('purchase.moderatorNote') }}
                   </div>
@@ -402,12 +451,7 @@ import app from '../../../../backbone/app';
 // } from '../../../utils/inventory';
 import { startAjaxEvent, endAjaxEvent } from '../../../../backbone/utils/metrics';
 import { toStandardNotation } from '../../../../backbone/utils/number';
-import {
-  decimalToInteger,
-  isValidCoinDivisibility,
-  curDefToDecimal,
-  getCoinDivisibility,
-} from '../../../../backbone/utils/currency';
+import { decimalToInteger, isValidCoinDivisibility, curDefToDecimal, getCoinDivisibility } from '../../../../backbone/utils/currency';
 import { capitalize } from '../../../../backbone/utils/string';
 import { events as outdatedListingHashesEvents } from '../../../../backbone/utils/outdatedListingHashes';
 import { isSupportedWalletCur } from '../../../../backbone/data/walletCurrencies';
@@ -421,12 +465,11 @@ import ActionBtn from './ActionBtn.vue';
 import Complete from './Complete.vue';
 import Coupons from './Coupons.vue';
 import DirectPayment from './DirectPayment.vue';
-import Payment from './Payment.vue'
+import Payment from './Payment.vue';
 import Receipt from './Receipt.vue';
 import Shipping from './Shipping.vue';
 
 import Settings from '@/views/modals/settings/Settings.vue';
-
 
 export default {
   components: {
@@ -445,12 +488,12 @@ export default {
       default: {
         itemsInfo: [],
         vendor: {},
-        phase: 'pay'
+        phase: 'pay',
       },
     },
     bb: Function,
   },
-  data () {
+  data() {
     return {
       viewKey: 0,
 
@@ -508,26 +551,24 @@ export default {
       errors: {},
     };
   },
-  created () {
+  created() {
     this.initEventChain();
 
     this.loadData(this.options);
   },
-  mounted () {
-  },
+  mounted() {},
   unmounted() {
     if (this.orderSubmit) this.orderSubmit.abort();
     if (this.inventoryFetch) this.inventoryFetch.abort();
     clearTimeout(this.quantityKeyUpTimer);
   },
   computed: {
-    ob () {
+    ob() {
       const item = this.order.get('items').at(0);
       let uiQuantity = item ? item.get('quantity') : 0;
 
       if (this.oneListing?.isCrypto && this._cryptoQuantity !== undefined) {
-        uiQuantity = uiQuantity instanceof bigNumber && !uiQuantity.isNaN()
-          ? toStandardNotation(this._cryptoQuantity) : this._cryptoQuantity;
+        uiQuantity = uiQuantity instanceof bigNumber && !uiQuantity.isNaN() ? toStandardNotation(this._cryptoQuantity) : this._cryptoQuantity;
       }
 
       return {
@@ -539,12 +580,13 @@ export default {
         quantity: uiQuantity,
         isCrypto: this.oneListing.isCrypto,
         phaseClass: `phase${capitalize(this._state.phase)}`,
-      }
+      };
     },
-    helperMessage () {
-      const warning = this.phase === 'pay' || this.phase === 'processing' ?
-        `<b>${ob.polyT('purchase.cryptoAddressHelperWarning')}</b>` :
-        `<b>${ob.polyT('purchase.cryptoAddressHelperWarning2')}</b>`;
+    helperMessage() {
+      const warning =
+        this.phase === 'pay' || this.phase === 'processing'
+          ? `<b>${ob.polyT('purchase.cryptoAddressHelperWarning')}</b>`
+          : `<b>${ob.polyT('purchase.cryptoAddressHelperWarning2')}</b>`;
 
       return ob.polyT('purchase.cryptoAddressHelper', {
         name: this.vendor.name,
@@ -552,10 +594,10 @@ export default {
         warning,
       });
     },
-    paymentCoin () {
+    paymentCoin() {
       return this.formData.activeCurs[0];
     },
-    prices () {
+    prices() {
       let access = this.orderKey;
 
       // return an array of price objects that matches the items in the order
@@ -572,9 +614,12 @@ export default {
           variant: option.value,
         }));
 
-        const listing = this.itemsToPurchase.get(item.id)
+        const listing = this.itemsToPurchase.get(item.id);
 
-        const sku = listing.get('item').get('skus').find((v) => _.isEqual(v.get('selections'), selections));
+        const sku = listing
+          .get('item')
+          .get('skus')
+          .find((v) => _.isEqual(v.get('selections'), selections));
 
         return {
           title: listing.get('item').get('title'),
@@ -582,7 +627,7 @@ export default {
           sPrice: bigNumber(sOptService ? sOptService.get('firstFreight') || 0 : 0),
           vPrice: bigNumber(sku ? sku.get('surcharge') || 0 : 0),
           quantity: bigNumber(item.get('quantity')),
-          currency: listing.price.currencyCode
+          currency: listing.price.currencyCode,
         };
       });
     },
@@ -609,7 +654,7 @@ export default {
       return this.getTotalShippingPrice(sName, sService);
     },
 
-    currencies () {
+    currencies() {
       let currencies = this.oneListing.get('metadata').get('acceptedCurrencies') || [];
       const locale = app.localSettings.standardizedTranslatedLang() || 'en-US';
       currencies.sort((a, b) => {
@@ -649,12 +694,12 @@ export default {
       return coinDiv;
     },
 
-   getTotalShippingPrice(shippingOptionName, shippingServiceName) {
+    getTotalShippingPrice(shippingOptionName, shippingServiceName) {
       const sOpt = this.shippingOptions.findWhere({ name: shippingOptionName });
       const sOptService = sOpt ? sOpt.get('services').findWhere({ name: shippingServiceName }) : '';
 
       if (!sOpt || !sOptService || sOpt.type === 'LOCAL_PICKUP') {
-        return {price: bigNumber(0), currency: undefined};
+        return { price: bigNumber(0), currency: undefined };
       }
 
       const sOption = sOpt.toJSON();
@@ -665,29 +710,29 @@ export default {
         const listing = this.itemsToPurchase.get(item.id);
         const itemGrams = listing.get('item').get('grams');
 
-        gramsTotal = gramsTotal.plus(bigNumber(itemGrams).times(bigNumber(item.get('quantity'))))
+        gramsTotal = gramsTotal.plus(bigNumber(itemGrams).times(bigNumber(item.get('quantity'))));
       });
       if (gramsTotal.eq(bigNumber(0))) {
-        return {price: bigNumber(0), currency: sOption.currency};
+        return { price: bigNumber(0), currency: sOption.currency };
       }
 
       const firstFreight = bigNumber(sService.firstFreight);
-      let renewalFee = bigNumber(0)
+      let renewalFee = bigNumber(0);
       if (sOption.serviceType === 'FIRST_RENEWAL_FEE') {
         if (gramsTotal.gt(bigNumber(sService.firstWeight))) {
           const unitAmount = gramsTotal.minus(bigNumber(sService.firstWeight)).div(bigNumber(sService.renewalUnitWeight).integerValue(bigNumber.ROUND_CEIL));
-          renewalFee = bigNumber(sService.renewalUnitPrice).times(unitAmount)
+          renewalFee = bigNumber(sService.renewalUnitPrice).times(unitAmount);
         }
       }
 
-      return {price: firstFreight.plus(renewalFee).plus(bigNumber(sService.registrationFee)), currency: sOption.currency};
+      return { price: firstFreight.plus(renewalFee).plus(bigNumber(sService.registrationFee)), currency: sOption.currency };
     },
 
     hasCoupons(listing) {
       return listing && listing?.coupons.length && listing?.metadata.contractType !== 'CRYPTOCURRENCY';
     },
 
-    loadData (options = {}) {
+    loadData(options = {}) {
       if (!this.itemsToPurchase || !(this.itemsToPurchase instanceof OrderListings)) {
         throw new Error('Please provide a OrderListings model');
       }
@@ -748,7 +793,7 @@ export default {
         this.formData.itemsData.push({
           quantity: item.get('quantity'),
         });
-      })
+      });
 
       let currencies = this.oneListing.get('metadata').get('acceptedCurrencies') || [];
       this.formData.activeCurs = currencies.length && this.oneListing.isCrypto ? [currencies[0]] : [];
@@ -815,13 +860,12 @@ export default {
       });
     },
 
-    showDataChangedMessage () {
+    showDataChangedMessage() {
       if (this.dataChangePopIn && !this.dataChangePopIn.isRemoved()) {
         this.dataChangePopIn.$el.velocity('callout.shake', { duration: 500 });
       } else {
         this.dataChangePopIn = this.createChild(PopInMessage, {
-          messageText:
-            buildRefreshAlertMessage(app.polyglot.t('purchase.purchaseDataChangedPopin')),
+          messageText: buildRefreshAlertMessage(app.polyglot.t('purchase.purchaseDataChangedPopin')),
         });
 
         this.listenTo(this.dataChangePopIn, 'clickRefresh', () => {
@@ -861,7 +905,6 @@ export default {
       if (this.$refs.moderators) {
         this.$refs.moderators.deselectOthers();
         this.isModerated = this.$refs.moderators.selectedIDs.length > 0;
-
       }
     },
 
@@ -869,14 +912,12 @@ export default {
       this.isModerated = this.$refs.moderators.selectedIDs.length > 0;
     },
 
-    changeCryptoAddress (e) {
-      this.order.get('items')
-        .at(0)
-        .set('paymentAddress', e.target.value);
+    changeCryptoAddress(e) {
+      this.order.get('items').at(0).set('paymentAddress', e.target.value);
     },
 
-    setModelQuantity (idx, quantity) {
-      let cur = this.cryptoAmountCurrency
+    setModelQuantity(idx, quantity) {
+      let cur = this.cryptoAmountCurrency;
 
       if (this.oneListing.isCrypto && (typeof cur !== 'string' || !cur)) {
         throw new Error('Please provide the currency code as a valid, non-empty string.');
@@ -891,11 +932,11 @@ export default {
       this._cryptoQuantity = e.target.value;
     },
 
-    changeCryptoAmountCurrency (idx) {
+    changeCryptoAmountCurrency(idx) {
       this.setModelQuantity(idx, this._cryptoQuantity);
     },
 
-    keyupQuantity (idx) {
+    keyupQuantity(idx) {
       // wait until they stop typing
       if (this.quantityKeyUpTimer) {
         clearTimeout(this.quantityKeyUpTimer);
@@ -911,7 +952,7 @@ export default {
       }, 150);
     },
 
-    clickNewAddress () {
+    clickNewAddress() {
       this.showSettings = true;
     },
 
@@ -920,39 +961,38 @@ export default {
     },
 
     applyCoupon(idx) {
-      this.$refs.coupons[idx]
-        .addCode(this.formData.itemsData[idx].couponCode)
-        .then((result) => {
-          // if the result is valid, clear the input field
-          if (result.type === 'valid') {
-            this.formData.itemsData[idx].couponCode = '';
-          }
-        });
+      this.$refs.coupons[idx].addCode(this.formData.itemsData[idx].couponCode).then((result) => {
+        // if the result is valid, clear the input field
+        if (result.type === 'valid') {
+          this.formData.itemsData[idx].couponCode = '';
+        }
+      });
     },
 
-    blurEmailAddress () {
+    blurEmailAddress() {
       this.order.set('alternateContactInfo', this.formData.emailAddress);
     },
 
-    blurMemo () {
+    blurMemo() {
       this.order.get('items').at(0).set('memo', this.formData.itemsData[0].memo);
     },
 
-    changeCoupons (idx, $event) {
+    changeCoupons(idx, $event) {
       const { hashes, codes } = $event;
 
       // combine the codes and hashes so the receipt can check both.
       // if this is the user's own listing they will have codes instead of hashes
       const hashesAndCodes = hashes.concat(codes);
-      const filteredCoupons = this.itemsToPurchase.at(idx).get('coupons').filter(
-        (coupon) => hashesAndCodes.indexOf(coupon.get('hash') || coupon.get('discountCode')) !== -1,
-      );
+      const filteredCoupons = this.itemsToPurchase
+        .at(idx)
+        .get('coupons')
+        .filter((coupon) => hashesAndCodes.indexOf(coupon.get('hash') || coupon.get('discountCode')) !== -1);
       this.couponObj[idx] = filteredCoupons.map((coupon) => coupon.toJSON());
 
       this.order.get('items').at(idx).set('coupons', codes);
     },
 
-    updateShippingOption (selectedOption) {
+    updateShippingOption(selectedOption) {
       // Set the shipping option.
       this.order.get('items').forEach((item) => {
         item.get('shipping').set(selectedOption);
@@ -961,22 +1001,17 @@ export default {
       this.shippingOptionKey += 1;
     },
 
-    outdateHash () {
+    outdateHash() {
       this.outdatedHash = true;
     },
 
-    purchaseListing () {
+    purchaseListing() {
       // Clear any old errors.
       this.errors = {};
 
       // Don't allow a zero or negative price purchase.
       const priceObj = this.prices[0];
-      if (
-        priceObj
-          .price
-          .plus(priceObj.vPrice)
-          .plus(priceObj.sPrice).lte(0)
-      ) {
+      if (priceObj.price.plus(priceObj.vPrice).plus(priceObj.sPrice).lte(0)) {
         this.insertErrors('js-errors', [app.polyglot.t('purchase.errors.zeroPrice')]);
         this.setState({ phase: 'pay' });
         return;
@@ -992,7 +1027,7 @@ export default {
       }
 
       // Set the moderator.
-      const moderator = this.$refs.moderators && this.$refs.moderators.selectedIDs.length > 0 && this.$refs.moderators.selectedIDs[0] || '';
+      const moderator = (this.$refs.moderators && this.$refs.moderators.selectedIDs.length > 0 && this.$refs.moderators.selectedIDs[0]) || '';
       this.order.set({ moderator });
       this.order.set({}, { validate: true });
 
@@ -1025,10 +1060,7 @@ export default {
           if (this.oneListing.isCrypto) {
             if (!isValidCoinDivisibility(coinDivisibility)[0]) {
               this.setState({ phase: 'pay' });
-              openSimpleMessage(
-                app.polyglot.t('purchase.errors.genericPurchaseErrTitle'),
-                app.polyglot.t('purchase.errors.invalidCoinDiv')
-              );
+              openSimpleMessage(app.polyglot.t('purchase.errors.genericPurchaseErrTitle'), app.polyglot.t('purchase.errors.invalidCoinDiv'));
               return;
             }
 
@@ -1038,18 +1070,12 @@ export default {
                 const item = items.at(i);
                 cryptoItems.push({
                   ...item.toJSON(),
-                  quantity: decimalToInteger(
-                    item.get('quantity'),
-                    coinDivisibility,
-                  ),
+                  quantity: decimalToInteger(item.get('quantity'), coinDivisibility),
                 });
               }
             } catch (e) {
               this.setState({ phase: 'pay' });
-              openSimpleMessage(
-                app.polyglot.t('purchase.errors.genericPurchaseErrTitle'),
-                app.polyglot.t('purchase.errors.unableToConvertCryptoQuantity')
-              );
+              openSimpleMessage(app.polyglot.t('purchase.errors.genericPurchaseErrTitle'), app.polyglot.t('purchase.errors.unableToConvertCryptoQuantity'));
               console.error(e);
               return;
             }
@@ -1061,10 +1087,9 @@ export default {
           const postData = removeProp(
             {
               ...this.order.toJSON(),
-              items: this.oneListing.isCrypto
-                ? cryptoItems : this.order.get('items').toJSON(),
+              items: this.oneListing.isCrypto ? cryptoItems : this.order.get('items').toJSON(),
             },
-            'cid',
+            'cid'
           );
 
           $.post({
@@ -1075,7 +1100,7 @@ export default {
           })
             .done((data) => {
               this.setState({ phase: 'pending' });
-              
+
               this.paymentData = data;
 
               endAjaxEvent('Purchase');
@@ -1086,11 +1111,8 @@ export default {
               let errTitle = app.polyglot.t('purchase.errors.orderError');
               let errMsg = (jqXHR.responseJSON && jqXHR.responseJSON.reason) || '';
 
-              if (jqXHR.responseJSON
-                && jqXHR.responseJSON.code === 'ERR_INSUFFICIENT_INVENTORY'
-                && typeof jqXHR.responseJSON.remainingInventory === 'number') {
-                this.inventory = jqXHR.responseJSON.remainingInventory
-                  / coinDivisibility;
+              if (jqXHR.responseJSON && jqXHR.responseJSON.code === 'ERR_INSUFFICIENT_INVENTORY' && typeof jqXHR.responseJSON.remainingInventory === 'number') {
+                this.inventory = jqXHR.responseJSON.remainingInventory / coinDivisibility;
                 errTitle = app.polyglot.t('purchase.errors.insufficientInventoryTitle');
                 errMsg = app.polyglot.t('purchase.errors.insufficientInventoryBody', {
                   smart_count: this.inventory,
@@ -1131,27 +1153,27 @@ export default {
       }
     },
 
-    insertErrors (container, errors = []) {
+    insertErrors(container, errors = []) {
       this.errors[container] = errors;
     },
 
-    completePurchase (data) {
+    completePurchase(data) {
       this.orderID = data.orderID;
 
       this.setState({ phase: 'complete' });
     },
 
-    render () {
+    render() {
       this._renderedHash = this.oneListing.get('hash');
 
       return this;
-    }
-  }
-}
+    },
+  },
+};
 </script>
 <style lang="scss" scoped>
 .purchaseQuantity {
-  input[type=number] {
+  input[type='number'] {
     width: 100px;
   }
 }

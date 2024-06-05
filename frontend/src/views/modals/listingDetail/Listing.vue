@@ -198,6 +198,7 @@
                     </template>
                   </div>
                   <hr class="rowLg" />
+                  <h5>Optional Features</h5>
                   <table class="table">
                     <tr>
                       <th><input type="checkbox" @change="changeCheckAll" :checked="isCheckAll" /></th>
@@ -1237,22 +1238,5 @@ export default {
 .success-btn {
   background-color: #01bf65;
   border-color: #66e9ac;
-}
-.table {
-  border-spacing: 0;
-  border-collapse: collapse;
-  width: 100%;
-  margin-bottom: 20px;
-  input[type='checkbox'] {
-    display: inline-block;
-  }
-  th,
-  td {
-    border-width: 1px;
-    border-style: solid;
-    padding: 10px;
-    word-break: break-word;
-    box-sizing: border-box;
-  }
 }
 </style>

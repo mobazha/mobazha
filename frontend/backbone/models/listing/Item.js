@@ -10,6 +10,7 @@ import BaseModel from '../BaseModel';
 import Image from './Image';
 import VariantOptions from '../../collections/listing/VariantOptions';
 import Skus from '../../collections/listing/Skus';
+import OptionalFeatures from '../../collections/listing/OptionalFeatures';
 
 /*
  * This model has a few inventory related properties that don't directly map to the
@@ -62,6 +63,7 @@ export default class extends BaseModel {
       images: new ListingImages(),
       options: new VariantOptions(),
       skus: new Skus(),
+      optionalFeatures: new OptionalFeatures(),
       infiniteInventory: true,
     };
   }
@@ -71,6 +73,7 @@ export default class extends BaseModel {
       images: ListingImages,
       options: VariantOptions,
       skus: Skus,
+      optionalFeatures: OptionalFeatures,
     };
   }
 

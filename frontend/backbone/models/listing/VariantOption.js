@@ -16,6 +16,7 @@ export default class extends BaseModel {
       name: '',
       description: '',
       variants: new Variants(),
+      variation: false,
     };
   }
 

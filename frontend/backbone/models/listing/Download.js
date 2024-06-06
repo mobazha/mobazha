@@ -11,7 +11,7 @@ export default class extends BaseModel {
   }
 
   get idAttribute() {
-    return 'downloadID';
+    return '_clientID';
   }
 
   static get maxFilenameLength() {

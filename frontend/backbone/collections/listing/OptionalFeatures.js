@@ -5,12 +5,12 @@ import OptionalFeature from '../../models/listing/OptionalFeature';
 export default class extends Collection {
   model(attrs, options) {
     return new OptionalFeature({
-      featureID: attrs.featureID || guid(),
+      _clientID: attrs._clientID || guid(),
       ...attrs,
     }, options);
   }
 
   modelId(attrs) {
-    return attrs.featureID;
+    return attrs._clientID;
   }
 }

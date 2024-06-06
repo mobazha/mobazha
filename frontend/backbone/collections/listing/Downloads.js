@@ -5,12 +5,12 @@ import Download from '../../models/listing/Download';
 export default class extends Collection {
   model(attrs, options) {
     return new Download({
-      downloadID: attrs.downloadID || guid(),
+      _clientID: attrs._clientID || guid(),
       ...attrs,
     }, options);
   }
 
   modelId(attrs) {
-    return attrs.downloadID;
+    return attrs._clientID;
   }
 }

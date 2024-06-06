@@ -385,26 +385,25 @@
                   />
                 </div>
               </section>
-              <section ref="optionalFeatures" class="contentBox optionalFeatures padMd clrP clrBr clrSh3 tx3">
-                <h2 class="h4 clrT">Optional Features</h2>
+              <section ref="sectionOptionalFeatures" class="contentBox optionalFeatures padMd clrP clrBr clrSh3 tx3">
+                <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.optionalFeatures') }}</h2>
                 <hr class="clrBr rowMd" />
                 <FormError v-if="ob.errors['item.skus']" :errors="ob.errors['item.skus']" />
-                <div class="js-variantInventoryTableContainer">
+                <div>
                   <OptionalFeatures
                     ref="optionalFeatures"
-                    :key="`${formData.item.price}_${formData.metadata.pricingCurrency.code}_${variantOptionsKey}`"
                     :options="{
-                      basePrice: formData.item.price,
-                      listingCurrency: formData.metadata.pricingCurrency.code,
+                      maxVariantCount: ob.max.optionCount,
+                      errors: variantErrors,
                     }"
                     :bb="
                       function () {
                         return {
-                          collection: model.get('item').get('skus'),
-                          optionsCl: variantOptionsCl,
+                          collection: optionalFeaturesCl,
                         };
                       }
                     "
+                    @update="onUpdateOptionalFeatures"
                   />
                 </div>
               </section>
@@ -522,6 +521,7 @@ import { setDeepValue } from '../../../../backbone/utils/object';
 import Image from '../../../../backbone/models/listing/Image';
 import Coupon from '../../../../backbone/models/listing/Coupon';
 import VariantOption from '../../../../backbone/models/listing/VariantOption';
+import OptionalFeature from '../../../../backbone/models/listing/OptionalFeature';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 import { capitalize } from '../../../../backbone/utils/string';
 import { toStandardNotation } from '../../../../backbone/utils/number';
@@ -581,6 +581,8 @@ export default {
       variantOptionsCl: [],
       variantOptionsKey: 0,
       coupons: [],
+      optionalFeaturesCl: [],
+      optionalFeaturesKey: 0,
 
       formData: {
         item: {
@@ -851,8 +853,10 @@ export default {
       this.coupons = this.model.get('coupons');
 
       this.variantOptionsCl = this.model.get('item').get('options');
-
       this.listenTo(this.variantOptionsCl, 'update', this.onUpdateVariantOptions);
+
+      this.optionalFeaturesCl = this.model.get('item').get('optionalFeatures');
+      this.listenTo(this.optionalFeaturesCl, 'update', this.onUpdateOptionalFeatures);
     },
 
     onClickReturn() {
@@ -1150,6 +1154,20 @@ export default {
       if (e.target.id === 'scrollToVariantInventory') {
         this.scrollTo('variantInventory');
       }
+    },
+
+    onClickAddFirstOptionalFeature() {
+      this.optionalFeaturesCl.add(new OptionalFeature());
+
+      // if (this.optionalFeaturesCl.length === 1) {
+      //   this.$nextTick(() => {
+      //     $(this.$refs.sectionOptionalFeatures).find('.variant input[name=name]').focus();
+      //   });
+      // }
+    },
+
+    onUpdateOptionalFeatures() {
+      this.optionalFeaturesKey += 1;
     },
 
     confirmClose() {

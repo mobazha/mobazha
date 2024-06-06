@@ -1257,6 +1257,7 @@
       "variants": "Variants",
       "variantsDetailed": "Variants (Add additional sizes, colors, materials, etc)",
       "inventory": "Inventory",
+      "optionalFeatures": "Optional Features",
       "returnPolicy": "Return Policy",
       "termsAndConditions": "Terms and Conditions",
       "coupons": "Coupons",
@@ -1376,6 +1377,15 @@
       "totalPrice": "Total Price",
       "sku": "SKU",
       "quantity": "Quantity"
+    },
+    "optionalFeatures": {
+      "btnAddOptionalFeature": "Add Optional Feature",
+      "btnDeleteOptionalFeature": "Delete",
+      "addOptionalFeature": "+ Add Optional Feature",
+      "titleLabel": "Title",
+      "toolTip": {
+        "delete": "Delete"
+      }
     },
     "confirmCloseDialog": {
       "title": "You have unsaved changes",

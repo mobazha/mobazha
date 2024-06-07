@@ -1248,6 +1248,7 @@
       "variants": "Varianter",
       "variantsDetailed": "Varianter (tilføj yderligere størrelser, farver, materialer, osv.)",
       "inventory": "Lagerbeholdning",
+      "optionalFeatures": "Optional Features",
       "returnPolicy": "Politik om returret",
       "termsAndConditions": "Betingelser og vilkår",
       "coupons": "Rabatkuponer",
@@ -1364,6 +1365,18 @@
       "totalPrice": "Total Price",
       "sku": "Varenr.",
       "quantity": "Antal"
+    },
+    "optionalFeatures": {
+      "btnAddOptionalFeature": "Add Optional Feature",
+      "btnDeleteOptionalFeature": "Delete",
+      "addOptionalFeature": "+ Add Optional Feature",
+      "name": "Name",
+      "surcharge": "Surcharge",
+      "sku": "SKU",
+      "image": "Image",
+      "toolTip": {
+        "delete": "Delete"
+      }
     },
     "confirmCloseDialog": {
       "title": "You have unsaved changes",

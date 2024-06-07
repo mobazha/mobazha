@@ -1248,6 +1248,7 @@
       "variants": "Варианты",
       "variantsDetailed": "Варианты (добавьте дополнительные размеры, цвета, материалы и т. д.)",
       "inventory": "Inventory",
+      "optionalFeatures": "Optional Features",
       "returnPolicy": "Политика возвратов",
       "termsAndConditions": "Правила и условия",
       "coupons": "Купоны",
@@ -1364,6 +1365,18 @@
       "totalPrice": "Total Price",
       "sku": "Артикул",
       "quantity": "Количество"
+    },
+    "optionalFeatures": {
+      "btnAddOptionalFeature": "Add Optional Feature",
+      "btnDeleteOptionalFeature": "Delete",
+      "addOptionalFeature": "+ Add Optional Feature",
+      "name": "Name",
+      "surcharge": "Surcharge",
+      "sku": "SKU",
+      "image": "Image",
+      "toolTip": {
+        "delete": "Delete"
+      }
     },
     "confirmCloseDialog": {
       "title": "Имеются несохраненные изменения",

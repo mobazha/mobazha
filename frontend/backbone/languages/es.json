@@ -1248,6 +1248,7 @@
       "variants": "Variantes",
       "variantsDetailed": "Variantes (Añade tamaños, colores, materiales, etc. adicionales)",
       "inventory": "Inventario",
+      "optionalFeatures": "Optional Features",
       "returnPolicy": "Política de devoluciones",
       "termsAndConditions": "Términos y Condiciones",
       "coupons": "Cupones",
@@ -1364,6 +1365,18 @@
       "totalPrice": "Total Price",
       "sku": "SKU",
       "quantity": "Cantidad"
+    },
+    "optionalFeatures": {
+      "btnAddOptionalFeature": "Add Optional Feature",
+      "btnDeleteOptionalFeature": "Delete",
+      "addOptionalFeature": "+ Add Optional Feature",
+      "name": "Name",
+      "surcharge": "Surcharge",
+      "sku": "SKU",
+      "image": "Image",
+      "toolTip": {
+        "delete": "Delete"
+      }
     },
     "confirmCloseDialog": {
       "title": "Tiene mensajes no guardados",

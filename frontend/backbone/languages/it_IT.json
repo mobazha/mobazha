@@ -1248,6 +1248,7 @@
       "variants": "Varianti",
       "variantsDetailed": "Varianti (aggiungi le taglie, i colori, i materiali disponibili, ecc.)",
       "inventory": "Iventario",
+      "optionalFeatures": "Optional Features",
       "returnPolicy": "Politica di reso",
       "termsAndConditions": "Termini e condizioni",
       "coupons": "Codici promozionali",
@@ -1364,6 +1365,18 @@
       "totalPrice": "Total Price",
       "sku": "SKU",
       "quantity": "Quantità"
+    },
+    "optionalFeatures": {
+      "btnAddOptionalFeature": "Add Optional Feature",
+      "btnDeleteOptionalFeature": "Delete",
+      "addOptionalFeature": "+ Add Optional Feature",
+      "name": "Name",
+      "surcharge": "Surcharge",
+      "sku": "SKU",
+      "image": "Image",
+      "toolTip": {
+        "delete": "Delete"
+      }
     },
     "confirmCloseDialog": {
       "title": "Hai delle modifiche non salvate",

@@ -1248,6 +1248,7 @@
       "variants": "Varianter",
       "variantsDetailed": "Varianter (Legg til flere størrelser, farger, materialer, osv)",
       "inventory": "Inventar",
+      "optionalFeatures": "Optional Features",
       "returnPolicy": "Regler for retur",
       "termsAndConditions": "Vilkår og betingelser",
       "coupons": "Kuponger",
@@ -1364,6 +1365,18 @@
       "totalPrice": "Total Price",
       "sku": "SKU",
       "quantity": "Antall"
+    },
+    "optionalFeatures": {
+      "btnAddOptionalFeature": "Add Optional Feature",
+      "btnDeleteOptionalFeature": "Delete",
+      "addOptionalFeature": "+ Add Optional Feature",
+      "name": "Name",
+      "surcharge": "Surcharge",
+      "sku": "SKU",
+      "image": "Image",
+      "toolTip": {
+        "delete": "Delete"
+      }
     },
     "confirmCloseDialog": {
       "title": "Du har endringer som ikke er lagret",

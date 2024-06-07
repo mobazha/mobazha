@@ -1248,6 +1248,7 @@
       "variants": "Varianten",
       "variantsDetailed": "Varianten (Fügen Sie zusätzliche Größen, Farben, Materiale, usw. hinzu)",
       "inventory": "Bestand",
+      "optionalFeatures": "Optional Features",
       "returnPolicy": "Rücknahmegarantie",
       "termsAndConditions": "Geschäftsbedingungen",
       "coupons": "Gutscheine",
@@ -1364,6 +1365,18 @@
       "totalPrice": "Total Price",
       "sku": "SKU",
       "quantity": "Anzahl"
+    },
+    "optionalFeatures": {
+      "btnAddOptionalFeature": "Add Optional Feature",
+      "btnDeleteOptionalFeature": "Delete",
+      "addOptionalFeature": "+ Add Optional Feature",
+      "name": "Name",
+      "surcharge": "Surcharge",
+      "sku": "SKU",
+      "image": "Image",
+      "toolTip": {
+        "delete": "Delete"
+      }
     },
     "confirmCloseDialog": {
       "title": "Sie haben nicht gespeicherte Änderungen.",

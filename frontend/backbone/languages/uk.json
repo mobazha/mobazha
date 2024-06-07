@@ -1248,6 +1248,7 @@
       "variants": "Варіанти",
       "variantsDetailed": "Варіанти (Додавання додаткових розмірів, кольорів, матеріалів, тощо)",
       "inventory": "Інвентар",
+      "optionalFeatures": "Optional Features",
       "returnPolicy": "Умови повернення товару",
       "termsAndConditions": "Правила роботи магазину",
       "coupons": "Купони",
@@ -1364,6 +1365,18 @@
       "totalPrice": "Сумарна ціна",
       "sku": "Номер Товару",
       "quantity": "Кількість"
+    },
+    "optionalFeatures": {
+      "btnAddOptionalFeature": "Add Optional Feature",
+      "btnDeleteOptionalFeature": "Delete",
+      "addOptionalFeature": "+ Add Optional Feature",
+      "name": "Name",
+      "surcharge": "Surcharge",
+      "sku": "SKU",
+      "image": "Image",
+      "toolTip": {
+        "delete": "Delete"
+      }
     },
     "confirmCloseDialog": {
       "title": "Ви маєте незбережені зміни",

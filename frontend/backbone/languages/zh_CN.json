@@ -1248,6 +1248,7 @@
       "variants": "可变量",
       "variantsDetailed": "可变量（添加其他尺寸，颜色，材质等）",
       "inventory": "库存",
+      "optionalFeatures": "Optional Features",
       "returnPolicy": "退货条款",
       "termsAndConditions": "条款和条件",
       "coupons": "优惠券",
@@ -1364,6 +1365,18 @@
       "totalPrice": "总价",
       "sku": "SKU",
       "quantity": "数量"
+    },
+    "optionalFeatures": {
+      "btnAddOptionalFeature": "Add Optional Feature",
+      "btnDeleteOptionalFeature": "Delete",
+      "addOptionalFeature": "+ Add Optional Feature",
+      "name": "Name",
+      "surcharge": "Surcharge",
+      "sku": "SKU",
+      "image": "Image",
+      "toolTip": {
+        "delete": "Delete"
+      }
     },
     "confirmCloseDialog": {
       "title": "您有未保存的更改",

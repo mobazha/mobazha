@@ -1,34 +1,35 @@
 <template>
   <div>
     <template v-if="!collection.length">
-      <a class="btn clrP clrBr clrSh2 addFirstVariant" @click="add">{{ ob.polyT('editListing.optionalFeatures.btnAddOptionalFeature') }}</a>
+      <a class="btn clrP clrBr clrSh2" @click="onClickAddOptionalFeature">{{ ob.polyT('editListing.optionalFeatures.btnAddOptionalFeature') }}</a>
     </template>
 
     <template v-else>
-      <div class="inventoryTableWrap mb2">
+      <div class="mb2">
         <table>
           <tr>
-            <th class="clrBr">Name</th>
-            <th class="clrBr surcharge">{{ ob.polyT('editListing.variantInventory.surcharge') }}</th>
-            <th class="clrBr">{{ ob.polyT('editListing.variantInventory.sku') }}</th>
-            <th class="clrBr">Image</th>
-            <th class="clrBr">Operate</th>
+            <th class="clrBr"><label class="required">{{ ob.polyT('editListing.optionalFeatures.name') }}</label></th>
+            <th class="clrBr surcharge"><label class="required">{{ ob.polyT('editListing.optionalFeatures.surcharge') }}</label></th>
+            <th class="clrBr">{{ ob.polyT('editListing.optionalFeatures.sku') }}</th>
+            <th class="clrBr">{{ ob.polyT('editListing.optionalFeatures.image') }}</th>
+            <th class="clrBr"></th>
           </tr>
-          <template v-for="item in collection" :key="item.cid">
+          <template v-for="model in collection" :key="model.cid">
             <OptionalFeatureItem
               ref="itemViews"
               :bb="
                 function () {
                   return {
-                    model: item,
+                    model,
                   };
                 }
               "
+              @removeClick="onRemoveClick"
             />
           </template>
         </table>
       </div>
-      <a class="clrBr clrP clrTEm" v-show="collection.length > 0" @click="onClickAddVariant">{{ ob.polyT('editListing.optionalFeatures.addOptionalFeature') }}</a>
+      <a class="clrBr clrP clrTEm" v-show="collection.length > 0 && collection.length < ob.maxOptionalFeatureCount" @click="onClickAddOptionalFeature">{{ ob.polyT('editListing.optionalFeatures.addOptionalFeature') }}</a>
     </template>
   </div>
 </template>
@@ -49,9 +50,6 @@ export default {
     },
     bb: Function,
   },
-  data() {
-    return {};
-  },
   created() {
     this.loadData(this.options);
   },
@@ -60,8 +58,7 @@ export default {
     ob() {
       return {
         ...this.templateHelpers,
-        variants: this.collection.toJSON(),
-        maxVariantCount: this.options.maxVariantCount,
+        maxOptionalFeatureCount: this.options.maxOptionalFeatureCount,
       };
     }
   },
@@ -71,8 +68,8 @@ export default {
         throw new Error('Please provide an VariantOptions collection.');
       }
 
-      if (typeof options.maxVariantCount === 'undefined') {
-        throw new Error('Please provide the maximum variant count.');
+      if (typeof options.maxOptionalFeatureCount === 'undefined') {
+        throw new Error('Please provide the maximum optional feature count.');
       }
 
       // Certain variant validations are not possible to do purely in the model and
@@ -87,40 +84,12 @@ export default {
 
     onClickAddOptionalFeature() {
       this.collection.add(new OptionalFeature());
-
-      this.$nextTick(() => {
-        if (this.collection.length) (this.$refs.itemViews[this.collection.length - 1]).setFocus();
-      });
     },
 
     setCollectionData() {
       this.$nextTick(() => {
         (this.$refs.itemViews ?? []).forEach((item) => item.setModelData());
       });
-    },
-
-    setModelData(index) {
-      if (typeof index !== 'number') {
-        throw new Error('Please provide a numeric index.');
-      }
-
-      const view = this.$refs.itemViews[index];
-      if (view) view.setModelData();
-    },
-
-    variantViewOptions(model) {
-      const errors = {};
-
-      if (this.options.errors) {
-        Object.keys(this.options.errors)
-          .forEach(errKey => {
-            if (errKey.startsWith(`options[${model.cid}]`)) {
-              errors[errKey.slice(errKey.indexOf('.') + 1)] = this.options.errors[errKey];
-            }
-          });
-      }
-
-      return { errors };
     },
 
     onRemoveClick(model) {
@@ -131,9 +100,6 @@ export default {
 </script>
 <style lang="scss" scoped>
 .surcharge {
-  width: 100px;
-}
-.totalPrice {
-  min-width: 120px !important;
+  width: 120px;
 }
 </style>

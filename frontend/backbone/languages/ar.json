@@ -1250,6 +1250,7 @@
       "variants": "المتغيرات",
       "variantsDetailed": "المتغيرات (إضافة أحجام وألوان ومواد وما إلى ذلك)",
       "inventory": "المخزون",
+      "optionalFeatures": "Optional Features",
       "returnPolicy": "سياسة العائدات",
       "termsAndConditions": "الأحكام والشروط",
       "coupons": "قسائم",
@@ -1366,6 +1367,18 @@
       "totalPrice": "Total Price",
       "sku": "وحدة حفظ الأوراق المالية SKU",
       "quantity": "كمية"
+    },
+    "optionalFeatures": {
+      "btnAddOptionalFeature": "Add Optional Feature",
+      "btnDeleteOptionalFeature": "Delete",
+      "addOptionalFeature": "+ Add Optional Feature",
+      "name": "Name",
+      "surcharge": "Surcharge",
+      "sku": "SKU",
+      "image": "Image",
+      "toolTip": {
+        "delete": "Delete"
+      }
     },
     "confirmCloseDialog": {
       "title": "لم تحفظ التغييرات",

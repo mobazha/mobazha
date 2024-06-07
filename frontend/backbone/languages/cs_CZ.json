@@ -1248,6 +1248,7 @@
       "variants": "Varianty",
       "variantsDetailed": "Varianty (přidej další velikosti, barvy, materiály atd.)",
       "inventory": "Inventář",
+      "optionalFeatures": "Optional Features",
       "returnPolicy": "Podmínky vrácení",
       "termsAndConditions": "Všeobecné obchodní podmínky",
       "coupons": "Kupóny",
@@ -1364,6 +1365,18 @@
       "totalPrice": "Celková cena",
       "sku": "SKU",
       "quantity": "Množství"
+    },
+    "optionalFeatures": {
+      "btnAddOptionalFeature": "Add Optional Feature",
+      "btnDeleteOptionalFeature": "Delete",
+      "addOptionalFeature": "+ Add Optional Feature",
+      "name": "Name",
+      "surcharge": "Surcharge",
+      "sku": "SKU",
+      "image": "Image",
+      "toolTip": {
+        "delete": "Delete"
+      }
     },
     "confirmCloseDialog": {
       "title": "Máš neuložené změny",

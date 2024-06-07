@@ -388,24 +388,20 @@
               <section ref="sectionOptionalFeatures" class="contentBox optionalFeatures padMd clrP clrBr clrSh3 tx3">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.optionalFeatures') }}</h2>
                 <hr class="clrBr rowMd" />
-                <FormError v-if="ob.errors['item.skus']" :errors="ob.errors['item.skus']" />
-                <div>
-                  <OptionalFeatures
-                    ref="optionalFeatures"
-                    :options="{
-                      maxVariantCount: ob.max.optionCount,
-                      errors: variantErrors,
-                    }"
-                    :bb="
-                      function () {
-                        return {
-                          collection: optionalFeaturesCl,
-                        };
-                      }
-                    "
-                    @update="onUpdateOptionalFeatures"
-                  />
-                </div>
+                <OptionalFeatures
+                  ref="optionalFeatures"
+                  :options="{
+                    maxOptionalFeatureCount: ob.max.optionalFeatureCount,
+                    errors: variantErrors,
+                  }"
+                  :bb="
+                    function () {
+                      return {
+                        collection: optionalFeaturesCl,
+                      };
+                    }
+                  "
+                />
               </section>
               <section ref="sectionReturnPolicy" class="returnPolicySection contentBox padMd clrP clrBr clrSh3 tx3">
                 <h2 class="h4 clrT">{{ ob.polyT('editListing.sectionNames.returnPolicy') }}</h2>
@@ -582,7 +578,6 @@ export default {
       variantOptionsKey: 0,
       coupons: [],
       optionalFeaturesCl: [],
-      optionalFeaturesKey: 0,
 
       formData: {
         item: {
@@ -650,6 +645,7 @@ export default {
           productIdLength: item.max.productIdLength,
           photos: this.MAX_PHOTOS,
           optionCount: item.max.optionCount,
+          optionalFeatureCount: item.max.optionalFeatureCount,
         },
         ...this.model.toJSON(),
       };
@@ -680,6 +676,10 @@ export default {
         {
           key: 'variants',
           name: ob.polyT('editListing.sectionNames.variants'),
+        },
+        {
+          key: 'optionalFeatures',
+          name: ob.polyT('editListing.sectionNames.optionalFeatures'),
         },
         {
           key: 'returnPolicy',
@@ -856,7 +856,6 @@ export default {
       this.listenTo(this.variantOptionsCl, 'update', this.onUpdateVariantOptions);
 
       this.optionalFeaturesCl = this.model.get('item').get('optionalFeatures');
-      this.listenTo(this.optionalFeaturesCl, 'update', this.onUpdateOptionalFeatures);
     },
 
     onClickReturn() {
@@ -1156,20 +1155,6 @@ export default {
       }
     },
 
-    onClickAddFirstOptionalFeature() {
-      this.optionalFeaturesCl.add(new OptionalFeature());
-
-      // if (this.optionalFeaturesCl.length === 1) {
-      //   this.$nextTick(() => {
-      //     $(this.$refs.sectionOptionalFeatures).find('.variant input[name=name]').focus();
-      //   });
-      // }
-    },
-
-    onUpdateOptionalFeatures() {
-      this.optionalFeaturesKey += 1;
-    },
-
     confirmClose() {
       const deferred = $.Deferred();
 
@@ -1418,6 +1403,7 @@ export default {
       this.$refs.variantsView.setCollectionData();
       this.$refs.variantInventory.setCollectionData();
       this.$refs.couponsView.setCollectionData();
+      this.$refs.optionalFeatures.setCollectionData();
 
       if (!isCrypto) {
         if (item.get('options').length) {

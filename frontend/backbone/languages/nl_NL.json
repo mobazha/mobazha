@@ -1248,6 +1248,7 @@
       "variants": "Uitvoeringen",
       "variantsDetailed": "Uitvoeringen (voeg maten, kleuren, materialen etc. toe)",
       "inventory": "Inventaris",
+      "optionalFeatures": "Optional Features",
       "returnPolicy": "Terugstuurbeleid",
       "termsAndConditions": "Voorwaarden",
       "coupons": "Coupons",
@@ -1364,6 +1365,18 @@
       "totalPrice": "Total Price",
       "sku": "SKU",
       "quantity": "Hoeveelheid"
+    },
+    "optionalFeatures": {
+      "btnAddOptionalFeature": "Add Optional Feature",
+      "btnDeleteOptionalFeature": "Delete",
+      "addOptionalFeature": "+ Add Optional Feature",
+      "name": "Name",
+      "surcharge": "Surcharge",
+      "sku": "SKU",
+      "image": "Image",
+      "toolTip": {
+        "delete": "Delete"
+      }
     },
     "confirmCloseDialog": {
       "title": "U heeft niet opgeslagen wijzigingen",

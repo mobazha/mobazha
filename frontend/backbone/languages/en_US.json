@@ -1382,7 +1382,10 @@
       "btnAddOptionalFeature": "Add Optional Feature",
       "btnDeleteOptionalFeature": "Delete",
       "addOptionalFeature": "+ Add Optional Feature",
-      "titleLabel": "Title",
+      "name": "Name",
+      "surcharge": "Surcharge",
+      "sku": "SKU",
+      "image": "Image",
       "toolTip": {
         "delete": "Delete"
       }
@@ -2140,6 +2143,7 @@
     "tooManyCats": "You have exceeded the maximum allowable amount of %{maxCats} categories.",
     "duplicateOptionName": "You already have a variant with this name.",
     "tooManyOptions": "You cannot have more than %{maxOptionCount} options.",
+    "tooManyOptionalFeatures": "You cannot have more than %{maxOptionalFeatureCount} optional features.",
     "provideQuantity": "Please provide a quantity.",
     "provideNumericQuantity": "Please provide the quantity as a number.",
     "quantityMustBePositive": "The quantity must be more than zero.",

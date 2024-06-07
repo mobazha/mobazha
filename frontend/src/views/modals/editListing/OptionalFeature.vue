@@ -9,27 +9,25 @@
       <input type="number" class="clrBr clrP clrSh2" v-model="formData.surcharge" placeholder="0.00" data-var-type="bignumber" />
     </td>
     <td class="clrBr">
-      <FormError v-if="ob.errors['productID']" :errors="ob.errors['productID']" />
+      <FormError v-if="ob.errors['skuID']" :errors="ob.errors['skuID']" />
       <input
         type="text"
         class="clrBr clrP clrSh2"
-        name="productID"
-        v-model="formData.productID"
+        name="skuID"
+        v-model="formData.skuID"
         :placeholder="ob.polyT('editListing.variantInventory.placeholderSKU')"
         :maxlength="ob.max?.productIdLength"
       />
     </td>
     <td class="clrBr">
-      <FormError v-if="ob.errors['images']" :errors="ob.errors['images']" />
+      <FormError v-if="ob.errors['image']" :errors="ob.errors['image']" />
       <input type="file" id="inputPhotoUpload" ref="inputPhotoUpload" @change="onChangePhotoUploadInput" accept="image/*" class="hide" multiple />
       <ul ref="photoUploadItems" class="unstyled uploadItems clrBr rowSm js-photoUploadItems">
         <li class="addElement tile js-addPhotoWrap">
-          <span class="imagesIcon ion-images clrT4"></span>
+          <span class="imageIcon ion-images clrT4"></span>
           <button class="btn clrP clrBr clrT tx6" @click="$refs.inputPhotoUpload.click()">{{ ob.polyT('editListing.btnAddPhoto') }}</button>
         </li>
-        <template v-for="(image, j) in formData.images" :key="image.id">
-          <UploadPhoto :image="image" @closeIcon="onClickRemoveImage(j)" />
-        </template>
+        <UploadPhoto :image="formData.image" @closeIcon="onClickRemoveImage(j)" />
       </ul>
     </td>
     <td class="clrBr">
@@ -48,14 +46,15 @@ export default {
       type: Object,
       default: {},
     },
+    bb: Function,
   },
   data() {
     return {
       formData: {
         name: '',
         surcharge: 0,
-        productID: '',
-        images: [],
+        skuID: '',
+        image: undefined,
       },
     };
   },
@@ -73,6 +72,10 @@ export default {
     },
   },
   methods: {
+    onClickRemove() {
+      this.$emit('removeClick', this.model);
+    },
+
     // Sets the model based on the current data in the UI.
     setModelData() {
       const formData = this.formData;
@@ -81,11 +84,58 @@ export default {
       }
       this.model.set(formData, { validate: true });
     },
+
+    onChangePhotoUploadInput(images) {
+      let photoFiles = Array.prototype.slice.call(this.$refs.inputPhotoUpload.files, 0);
+
+      // prune out any non-image files
+      photoFiles = photoFiles.filter((file) => file.type.startsWith('image'));
+
+      this.$refs.inputPhotoUpload.value = '';
+
+      let imagesToUpload = images;
+
+      if (!images) {
+        throw new Error('Please provide a list of images to upload.');
+      }
+
+      if (typeof images === 'string') {
+        imagesToUpload = [images];
+      }
+
+      const upload = $.ajax({
+        url: app.getServerUrl('ob/productimages'),
+        type: 'POST',
+        data: JSON.stringify(imagesToUpload),
+        dataType: 'json',
+        contentType: 'application/json',
+      })
+        .done((uploadedImages) => {
+          if (this.isRemoved()) return;
+
+          this.images.add(
+            uploadedImages.map((image) => ({
+              filename: image.filename,
+              original: image.original,
+              large: image.large,
+              medium: image.medium,
+              small: image.small,
+              tiny: image.tiny,
+            }))
+          );
+        })
+        .fail((jqXhr) => {
+          openSimpleMessage(
+            app.polyglot.t('editListing.errors.uploadImageErrorTitle', { smart_count: imagesToUpload.length }),
+            (jqXhr.responseJSON && jqXhr.responseJSON.reason) || ''
+          );
+        })
+    },
   },
 };
 </script>
 <style lang="scss" scoped>
-.imagesIcon {
+.imageIcon {
   font-size: 50px;
   position: absolute;
   top: 50%;

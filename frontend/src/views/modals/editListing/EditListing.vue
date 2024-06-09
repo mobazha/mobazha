@@ -536,6 +536,7 @@ import OptionalFeatures from './OptionalFeatures.vue';
 import Coupons from './Coupons.vue';
 
 import Tinymce from './../../../components/Tinymce/index.vue';
+import { truncateImageFilename } from '../../../../backbone/utils/index';
 
 export default {
   components: {
@@ -937,25 +938,6 @@ export default {
       reader.readAsArrayBuffer(file.slice(0, 64 * 1024));
     },
 
-    truncateImageFilename(filename) {
-      if (!filename || typeof filename !== 'string') {
-        throw new Error('Please provide a filename as a string.');
-      }
-
-      const truncated = filename;
-
-      if (filename.length > Image.maxFilenameLength) {
-        const parsed = path.parse(filename);
-        const nameParseLen = Image.maxFilenameLength - parsed.ext.length;
-
-        // acounting for rare edge case of the extension in and of itself
-        // exceeding the max length
-        return parsed.name.slice(0, nameParseLen < 0 ? 0 : nameParseLen) + parsed.ext.slice(0, Image.maxFilenameLength);
-      }
-
-      return truncated;
-    },
-
     onChangePhotoUploadInput() {
       let photoFiles = Array.prototype.slice.call(this.$refs.inputPhotoUpload.files, 0);
 
@@ -1038,7 +1020,7 @@ export default {
 
             ctx.drawImage(newImage, 0, 0, imgW, imgH);
             toUpload.push({
-              filename: this.truncateImageFilename(photoFile.name),
+              filename: truncateImageFilename(photoFile.name),
               image: canvas.toDataURL('image/jpeg', 0.9).replace(/^data:image\/(png|jpeg|webp);base64,/, ''),
             });
 

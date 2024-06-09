@@ -21,14 +21,7 @@
     </td>
     <td class="clrBr">
       <FormError v-if="ob.errors['image']" :errors="ob.errors['image']" />
-      <input type="file" id="inputPhotoUpload" ref="inputPhotoUpload" @change="onChangePhotoUploadInput" accept="image/*" class="hide" multiple />
-      <ul ref="photoUploadItems" class="unstyled uploadItems clrBr rowSm js-photoUploadItems">
-        <li class="addElement tile js-addPhotoWrap">
-          <span class="imageIcon ion-images clrT4"></span>
-          <button class="btn clrP clrBr clrT tx6" @click="$refs.inputPhotoUpload.click()">{{ ob.polyT('editListing.btnAddPhoto') }}</button>
-        </li>
-        <UploadPhoto :image="formData.image" @closeIcon="onClickRemoveImage(j)" />
-      </ul>
+      <UploadPhoto2 @imageChange="onImageChange" @closeIcon="onClickRemoveImage()" />
     </td>
     <td class="clrBr">
       <a class="iconBtn clrBr clrP clrSh2 margLSm btnRemoveVariant" @click="onClickRemove"><i class="ion-trash-b"></i> </a>
@@ -39,8 +32,12 @@
 <script>
 import _ from 'underscore';
 import bigNumber from 'bignumber.js';
+import UploadPhoto2 from './UploadPhoto2.vue';
 
 export default {
+  components: {
+    UploadPhoto2,
+  },
   props: {
     options: {
       type: Object,
@@ -85,52 +82,9 @@ export default {
       this.model.set(formData, { validate: true });
     },
 
-    onChangePhotoUploadInput(images) {
-      let photoFiles = Array.prototype.slice.call(this.$refs.inputPhotoUpload.files, 0);
-
-      // prune out any non-image files
-      photoFiles = photoFiles.filter((file) => file.type.startsWith('image'));
-
-      this.$refs.inputPhotoUpload.value = '';
-
-      let imagesToUpload = images;
-
-      if (!images) {
-        throw new Error('Please provide a list of images to upload.');
-      }
-
-      if (typeof images === 'string') {
-        imagesToUpload = [images];
-      }
-
-      const upload = $.ajax({
-        url: app.getServerUrl('ob/productimages'),
-        type: 'POST',
-        data: JSON.stringify(imagesToUpload),
-        dataType: 'json',
-        contentType: 'application/json',
-      })
-        .done((uploadedImages) => {
-          if (this.isRemoved()) return;
-
-          this.images.add(
-            uploadedImages.map((image) => ({
-              filename: image.filename,
-              original: image.original,
-              large: image.large,
-              medium: image.medium,
-              small: image.small,
-              tiny: image.tiny,
-            }))
-          );
-        })
-        .fail((jqXhr) => {
-          openSimpleMessage(
-            app.polyglot.t('editListing.errors.uploadImageErrorTitle', { smart_count: imagesToUpload.length }),
-            (jqXhr.responseJSON && jqXhr.responseJSON.reason) || ''
-          );
-        })
-    },
+    onImageChange(image) {
+      this.formData.image = image;
+    }
   },
 };
 </script>

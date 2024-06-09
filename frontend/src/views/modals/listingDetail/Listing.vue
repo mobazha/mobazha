@@ -56,7 +56,7 @@
               <div :class="`${ob.metadata.contractType !== 'CRYPTOCURRENCY' ? 'flex' : 'flexVCent'} gutterHLg`">
                 <template v-if="ob.metadata.contractType !== 'CRYPTOCURRENCY'">
                   <h2 class="txUnb flexExpand">{{ ob.item.title }}</h2>
-                  <h2 class="txUnb flexNoShrink js-price" v-html="totalPriceInfo"></h2>
+                  <h2 class="txUnb flexNoShrink js-price" v-html="renderPrice(totalPrice)"></h2>
                 </template>
 
                 <template v-else>
@@ -84,7 +84,7 @@
                     :style="
                       ob.item.images.length
                         ? `background-image: url(${ob.getServerUrl(
-                            `ob/image/${ob.isHiRez() ? ob.item.images[0].large : ob.item.images[0].medium}`
+                            `ob/image/${ob.isHiRez() ? mainImage.large : mainImage.medium}`
                           )}), url('../imgs/defaultItem.png')`
                         : `background-image: url('../imgs/defaultItem.png')`
                     "
@@ -198,47 +198,35 @@
                     </template>
                   </div>
                   <hr class="rowLg" />
-                  <h5>Optional Features</h5>
+                  <h5>{{ ob.polyT('editListing.sectionNames.optionalFeatures') }}</h5>
                   <table class="table">
                     <tr>
                       <th><input type="checkbox" @change="changeCheckAll" :checked="isCheckAll" /></th>
-                      <th>Name</th>
-                      <th>Surcharge</th>
-                      <th>SKU</th>
-                      <th>Image</th>
+                      <th>{{ ob.polyT('editListing.optionalFeatures.name') }}</th>
+                      <th>{{ ob.polyT('editListing.optionalFeatures.surcharge') }}</th>
+                      <th>{{ ob.polyT('editListing.optionalFeatures.sku') }}</th>
+                      <th>{{ ob.polyT('editListing.optionalFeatures.image') }}</th>
                     </tr>
-                    <tr>
-                      <td>
-                        <input type="checkbox" name="checked" :value="1" v-model="checkBoxValue" />
-                      </td>
-                      <td>Name</td>
-                      <td>Surcharge</td>
-                      <td>SKU</td>
-                      <td>
-                        <el-image
-                          style="width: 60px; height: 60px"
-                          src="https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg"
-                          fit="cover"
-                          :preview-src-list="['https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg']"
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <input type="checkbox" name="checked" :value="2" v-model="checkBoxValue" />
-                      </td>
-                      <td>Name</td>
-                      <td>Surcharge</td>
-                      <td>SKU</td>
-                      <td>
-                        <el-image
-                          style="width: 60px; height: 60px"
-                          src="https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg"
-                          fit="cover"
-                          :preview-src-list="['https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg']"
-                        />
-                      </td>
-                    </tr>
+                    <template v-for="optionalFeature in ob.item.optionalFeatures">
+                      <tr>
+                        <td>
+                          <input type="checkbox" name="checked" :value="1" v-model="checkBoxValue" />
+                        </td>
+                        <td>{{ optionalFeature.name }}</td>
+                        <td>{{ renderPrice(optionalFeature.surcharge) }}</td>
+                        <td>{{ optionalFeature.skuID }}</td>
+                        <td>
+                          <el-image
+                            v-if="optionalFeature.image"
+                            style="width: 60px; height: 60px"
+                            :src="ob.getServerUrl(`ob/image/${optionalFeature.image.small}`)"
+                            fit="cover"
+                            :preview-src-list="[ob.getServerUrl(`ob/image/${ob.isHiRez() ? optionalFeature.image.large : optionalFeature.image.medium}`)]"
+                          />
+                        </td>
+                      </tr>
+                    </template>
+                    
                   </table>
                   <h5>{{ ob.polyT('listingDetail.tags') }}</h5>
                   <div class="tagWrapper rowLg">
@@ -508,12 +496,11 @@ export default {
       showModal: true,
 
       PURCHASE_MODAL_CREATE: 'PURCHASE_MODAL_CREATE',
-
       outdateHash: false,
-
       vendor: undefined,
-
       variantOptions: [],
+
+      totalPrice: bigNumber(0),
 
       activePhotoIndex: 0,
 
@@ -658,23 +645,35 @@ export default {
     showNsfwWarning() {
       return this._showNsfwWarning && this.checkNsfw && this.model.get('item').get('nsfw') && !this.model.isOwnListing && !app.settings.get('showNsfw');
     },
-    totalPriceInfo() {
-      let priceInfo;
-      try {
-        priceInfo = convertAndFormatCurrency(this.totalPrice, this.model.get('metadata').get('pricingCurrency').code, app.settings.get('localCurrency'));
-      } catch (e) {
-        // pass
-        console.error(e);
+    mainImage() {
+      let mainImage = undefined
+      if (!_.isEmpty(this.selectedSKU?.get('image'))) {
+        mainImage = this.selectedSKU.get('image').toJSON();
+      } else {
+        const images = this.model.get('item').get('images').toJSON();
+        mainImage = images.length > 0 ? images[0] : null;
       }
-      return priceInfo;
+
+      return mainImage;
     },
     selectedVariants() {
+      return this.selectedSKU ? this.selectedSKU.get('selections').map((v) => {
+        return {name: v.option, value: v.variant}
+      }) : [];
+    },
+    selectedSKU() {
       const { options } = this.model.toJSON().item;
 
-      return this.variantOptions.map((val, idx) => ({
-        name: options[idx].name,
-        value: val,
+      const selections = this.variantOptions.map((val, idx) => ({
+        option: options[idx].name,
+        variant: val,
       }));
+
+      // each sku has a code that matches the selected variant index combos
+      return this.model
+        .get('item')
+        .get('skus')
+        .find((v) => _.isEqual(v.get('selections'), selections));
     },
     cryptoTradingPairOptions() {
       if (this.model.isCrypto) {
@@ -877,6 +876,17 @@ export default {
 
     onDocumentClick() {
       this.showDeleteConfirmedBox = false;
+    },
+
+    renderPrice(price) {
+      let priceInfo;
+      try {
+        priceInfo = convertAndFormatCurrency(price, this.model.get('metadata').get('pricingCurrency').code, app.settings.get('localCurrency'));
+      } catch (e) {
+        // pass
+        console.error(e);
+      }
+      return priceInfo;
     },
 
     defaultCountry() {

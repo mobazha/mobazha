@@ -758,19 +758,19 @@ export default class extends BaseModel {
             }
           });
         }
+      }
 
-        if (parsedResponse.optionalFeatures) {
-          parsedResponse.optionalFeatures.forEach(feature => {
-            if (feature.surcharge) {
-              feature.surcharge =
-                integerToDecimal(
-                  feature.surcharge,
-                  coinDiv,
-                  { fieldName: 'feature.surcharge' }
-                );
-            }
-          });
-        }
+      if (parsedResponse.item.optionalFeatures) {
+        parsedResponse.item.optionalFeatures.forEach(feature => {
+          if (feature.surcharge) {
+            feature.surcharge =
+              integerToDecimal(
+                feature.surcharge,
+                coinDiv,
+                { fieldName: 'feature.surcharge' }
+              );
+          }
+        });
       }
 
       // Re-organize variant structure so a "dummy" SKU (if present) has its quanitity

@@ -514,10 +514,8 @@ import {
 } from '../../../../backbone/data/cryptoListingCurrencies';
 import { supportedWalletCurs } from '../../../../backbone/data/walletCurrencies';
 import { setDeepValue } from '../../../../backbone/utils/object';
-import Image from '../../../../backbone/models/listing/Image';
 import Coupon from '../../../../backbone/models/listing/Coupon';
 import VariantOption from '../../../../backbone/models/listing/VariantOption';
-import OptionalFeature from '../../../../backbone/models/listing/OptionalFeature';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 import { capitalize } from '../../../../backbone/utils/string';
 import { toStandardNotation } from '../../../../backbone/utils/number';

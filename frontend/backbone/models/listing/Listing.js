@@ -541,6 +541,10 @@ export default class extends BaseModel {
           options.attrs.item.skus.forEach(sku => {
             sku.surcharge = decimalToInteger(sku.surcharge, coinDiv);
           });
+
+          options.attrs.item.optionalFeatures.forEach(feature => {
+            feature.surcharge = decimalToInteger(feature.surcharge, coinDiv);
+          });
         } else {
           // Don't send over the price on crypto listings.
           delete options.attrs.item.price;
@@ -750,6 +754,19 @@ export default class extends BaseModel {
                   coupon.priceDiscount,
                   coinDiv,
                   { fieldName: 'coupon.priceDiscount' }
+                );
+            }
+          });
+        }
+
+        if (parsedResponse.optionalFeatures) {
+          parsedResponse.optionalFeatures.forEach(feature => {
+            if (feature.surcharge) {
+              feature.surcharge =
+                integerToDecimal(
+                  feature.surcharge,
+                  coinDiv,
+                  { fieldName: 'feature.surcharge' }
                 );
             }
           });

@@ -1,12 +1,7 @@
 <template>
   <tr>
     <td class="clrBr">
-      <el-image
-        style="width: 60px; height: 60px"
-        src="https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg"
-        fit="cover"
-        :preview-src-list="['https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg']"
-      />
+      <UploadPhoto2 :image="formData.image" @imageChange="onImageChange" />
     </td>
     <template v-for="(choice, j) in ob.choices" :key="j">
       <td class="clrBr">{{ choice }}</td>
@@ -50,11 +45,14 @@
 </template>
 
 <script>
-import _ from 'underscore';
 import bigNumber from 'bignumber.js';
 import { formatCurrency } from '../../../../backbone/utils/currency';
+import UploadPhoto2 from './UploadPhoto2.vue';
 
 export default {
+  components: {
+    UploadPhoto2,
+  },
   props: {
     options: {
       type: Object,
@@ -71,6 +69,7 @@ export default {
         productID: '',
         quantity: '',
         infiniteInventory: true,
+        image: undefined,
       },
     };
   },
@@ -107,6 +106,7 @@ export default {
         productID: model.productID,
         quantity: model.quantity,
         infiniteInventory: model.infiniteInventory,
+        image: model.image,
       };
 
       if (this.formData.infiniteInventory) {
@@ -133,14 +133,14 @@ export default {
     setModelData() {
       const formData = this.formData;
 
-      if (!_.isEmpty(formData.surcharge)) {
+      if (formData.surcharge != null) {
         formData.surcharge = bigNumber(formData.surcharge);
       }
 
       if (formData.infiniteInventory) {
         delete formData.quantity;
         this.model.unset('quantity');
-      } else if (!_.isEmpty(formData.quantity)) {
+      } else if (formData.quantity != null) {
         formData.quantity = bigNumber(formData.quantity);
       }
 
@@ -160,6 +160,10 @@ export default {
 
       return formatted;
     },
+
+    onImageChange(image) {
+      this.formData.image = image;
+    }
   },
 };
 </script>

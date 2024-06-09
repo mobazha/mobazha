@@ -168,7 +168,6 @@
 
 <script>
 import $ from 'jquery';
-import _ from 'underscore';
 import bigNumber from 'bignumber.js';
 import '../../../../backbone/utils/lib/selectize';
 import app from '../../../../backbone/app';
@@ -337,7 +336,7 @@ export default {
 
     getFormData () {
       const formData = this.formData;
-      if (!_.isEmpty(formData.moderatorInfo.fee.fixedFee.amount)) {
+      if (formData.moderatorInfo.fee.fixedFee.amount != null) {
         formData.moderatorInfo.fee.fixedFee.amount = bigNumber(formData.moderatorInfo.fee.fixedFee.amount);
       }
       return formData;

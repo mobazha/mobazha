@@ -9,7 +9,7 @@
         <table>
           <tr>
             <th class="clrBr"><label class="required">{{ ob.polyT('editListing.optionalFeatures.name') }}</label></th>
-            <th class="clrBr surcharge"><label class="required">{{ ob.polyT('editListing.optionalFeatures.surcharge') }}</label></th>
+            <th class="clrBr surcharge">{{ ob.polyT('editListing.optionalFeatures.surcharge') }}</th>
             <th class="clrBr">{{ ob.polyT('editListing.optionalFeatures.sku') }}</th>
             <th class="clrBr">{{ ob.polyT('editListing.optionalFeatures.image') }}</th>
             <th class="clrBr"></th>

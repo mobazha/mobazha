@@ -99,7 +99,6 @@
 </template>
 
 <script>
-import _ from 'underscore';
 import bigNumber from 'bignumber.js';
 import app from '../../../../backbone/app';
 import { supportedWalletCurs } from '../../../../backbone/data/walletCurrencies';
@@ -143,7 +142,7 @@ export default {
           // Restore acceptedCurrencies if not CRYPTOCURRENCY to switch back
           val.metadata.acceptedCurrencies = this.model.get('metadata').get('acceptedCurrencies');
         }
-        if (!_.isEmpty(val.item.cryptoQuantity)) {
+        if (val.item.cryptoQuantity != null) {
           val.item.cryptoQuantity = bigNumber(val.item.cryptoQuantity);
         }
         this.$emit('update:modelValue', val);

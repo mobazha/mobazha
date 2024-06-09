@@ -21,7 +21,7 @@
     </td>
     <td class="clrBr">
       <FormError v-if="ob.errors['image']" :errors="ob.errors['image']" />
-      <UploadPhoto2 @imageChange="onImageChange" @closeIcon="onClickRemoveImage()" />
+      <UploadPhoto2 :image="formData.image" @imageChange="onImageChange" />
     </td>
     <td class="clrBr">
       <a class="iconBtn clrBr clrP clrSh2 margLSm btnRemoveVariant" @click="onClickRemove"><i class="ion-trash-b"></i> </a>
@@ -30,7 +30,6 @@
 </template>
 
 <script>
-import _ from 'underscore';
 import bigNumber from 'bignumber.js';
 import UploadPhoto2 from './UploadPhoto2.vue';
 
@@ -55,7 +54,9 @@ export default {
       },
     };
   },
-  created() {},
+  created() {
+    this.loadData();
+  },
   mounted() {},
   computed: {
     ob() {
@@ -69,6 +70,23 @@ export default {
     },
   },
   methods: {
+    initFormData() {
+      const model = this.model.toJSON();
+      this.formData = {
+        name: model.name,
+        surcharge: model.surcharge,
+        skuID: model.skuID,
+        image: model.image,
+      };
+    },
+    loadData() {
+      if (!this.model) {
+        throw new Error('Please provide a model.');
+      }
+
+      this.initFormData();
+    },
+
     onClickRemove() {
       this.$emit('removeClick', this.model);
     },
@@ -76,7 +94,7 @@ export default {
     // Sets the model based on the current data in the UI.
     setModelData() {
       const formData = this.formData;
-      if (!_.isEmpty(formData.surcharge)) {
+      if (formData.surcharge != null) {
         formData.surcharge = bigNumber(formData.surcharge);
       }
       this.model.set(formData, { validate: true });

@@ -5,12 +5,12 @@
     </div>
     <input type="file" ref="inputPhotoUpload" @change="onChangePhotoUploadInput" accept="image/*" class="hide" />
 
-    <div class="unstyled clrBr rowSm">
-      <div v-if="!image" class="addElement tile js-addPhotoWrap">
+    <div class="unstyled clrBr">
+      <div v-if="!image" class="addElement customTile">
         <span class="imageIcon ion-images clrT4"></span>
         <button class="btn clrP clrBr clrT tx6" @click="$refs.inputPhotoUpload.click()">{{ ob.polyT('editListing.btnAddPhoto') }}</button>
       </div>
-      <div v-if="!!image" class="tile">
+      <div v-if="!!image" class="customTile">
         <el-image
           :src="ob.getServerUrl(`ob/image/${image.small}`)"
           fit="cover"
@@ -30,16 +30,19 @@ import { truncateImageFilename } from '../../../../backbone/utils/index';
 
 export default {
   props: {
+    image: {
+      type: Object,
+      default: undefined,
+    },
   },
   data () {
     return {
-      image: undefined,
       imageUpload: undefined,
     };
   },
   methods: {
-    onImageChange() {
-      this.$emit('imageChange', this.image);
+    onImageChange(image) {
+      this.$emit('imageChange', image);
     },
 
     onChangePhotoUploadInput() {
@@ -75,16 +78,15 @@ export default {
         .done((uploadedImages) => {
           if (this.isRemoved()) return;
 
-          this.image = uploadedImages.map((image) => ({
-              filename: image.filename,
-              original: image.original,
-              large: image.large,
-              medium: image.medium,
-              small: image.small,
-              tiny: image.tiny,
-            }))[0];
-          
-          this.onImageChange();
+          const resultImage = uploadedImages[0];
+          this.onImageChange({
+              filename: resultImage.filename,
+              original: resultImage.original,
+              large: resultImage.large,
+              medium: resultImage.medium,
+              small: resultImage.small,
+              tiny: resultImage.tiny,
+            });
         })
         .fail((jqXhr) => {
           openSimpleMessage(
@@ -101,17 +103,43 @@ export default {
       }
     },
 
-    onClickRemoveImage() {
-      this.image = undefined
-      
-      this.onImageChange();
-    },
-
     onCloseIcon() {
-      this.$emit('closeIcon')
+      this.onImageChange(undefined);
     }
   },
 }
 
 </script>
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+@import '../../../../styles/variables';
+@import '../../../../styles/mixins';
+.customTile {
+  // width: 60px;
+  // height: 60px;
+  border: 1px solid;
+  border-color: inherit;
+  border-radius: $corner;
+  float: left;
+  margin-right: $pad;
+  margin-bottom: $pad;
+  position: relative;
+
+  .closeIcon {
+    width: 24px;
+    height: 24px;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .btn {
+    width: 35px;
+    height: 28px;
+    position: absolute;
+    bottom: 10px;
+    padding: 0;
+    line-height: 1;
+    @include center(true, false);
+  }
+}
+</style>

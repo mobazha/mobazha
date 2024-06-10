@@ -108,7 +108,7 @@
                         <div class="flexVCent gutterHLg">
                           <div class="col4 h5 txUnl">{{ item.name }}</div>
                           <div class="col8 txLft">
-                            <Select2 class="js-variantSelect" v-model="variantOptions[optionIndex]" @change="onChangeVariantSelect" :name="item.name">
+                            <Select2 class="js-variantSelect" v-model="variantOptions[optionIndex]" :name="item.name">
                               <template v-for="variant in item.variants" :key="variant.name">
                                 <option :value="variant.name">{{ variant.name }}</option>
                               </template>
@@ -201,16 +201,16 @@
                   <h5>{{ ob.polyT('editListing.sectionNames.optionalFeatures') }}</h5>
                   <table class="table">
                     <tr>
-                      <th><input type="checkbox" @change="changeCheckAll" :checked="isCheckAll" /></th>
+                      <th><input type="checkbox" @change="changeCheckAll" :checked="allOptionalFeaturesChecked" /></th>
                       <th>{{ ob.polyT('editListing.optionalFeatures.name') }}</th>
                       <th>{{ ob.polyT('editListing.optionalFeatures.surcharge') }}</th>
                       <th>{{ ob.polyT('editListing.optionalFeatures.sku') }}</th>
                       <th>{{ ob.polyT('editListing.optionalFeatures.image') }}</th>
                     </tr>
-                    <template v-for="optionalFeature in ob.item.optionalFeatures">
+                    <template v-for="(optionalFeature, i) in ob.item.optionalFeatures" :key="optionalFeature.name">
                       <tr>
                         <td>
-                          <input type="checkbox" name="checked" :value="1" v-model="checkBoxValue" />
+                          <input type="checkbox" v-model="optionalFeaturesCheckBox[i]" />
                         </td>
                         <td>{{ optionalFeature.name }}</td>
                         <td>{{ renderPrice(optionalFeature.surcharge) }}</td>
@@ -387,7 +387,7 @@
       <Purchase
         ref="purchaseModal"
         v-else-if="showPurchase"
-        :options="{ itemsInfo: [{ quantity: '1', variants: selectedVariants }], vendor, origin: 'Listing' }"
+        :options="{ itemsInfo: [{ quantity: '1', variants: selectedVariants, optionalFeatures: selectedOptionalFeatures.map(item => item.name) }], vendor, origin: 'Listing' }"
         :bb="
           function () {
             return {
@@ -489,8 +489,6 @@ export default {
   },
   data() {
     return {
-      isCheckAll: false,
-      checkBoxValue: [],
       app,
 
       showModal: true,
@@ -499,8 +497,7 @@ export default {
       outdateHash: false,
       vendor: undefined,
       variantOptions: [],
-
-      totalPrice: bigNumber(0),
+      optionalFeaturesCheckBox: [],
 
       activePhotoIndex: 0,
 
@@ -675,6 +672,32 @@ export default {
         .get('skus')
         .find((v) => _.isEqual(v.get('selections'), selections));
     },
+    selectedOptionalFeatures() {
+      let features = [];
+      const optionalFeatures = this.model.get('item').get('optionalFeatures').toJSON();
+      for (let i = 0; i < this.optionalFeaturesCheckBox.length; i++) {
+        if (this.optionalFeaturesCheckBox[i]) {
+          features.push(optionalFeatures[i]);
+        }
+      }
+      return features;
+    },
+    allOptionalFeaturesChecked() {
+      return this.optionalFeaturesCheckBox.every((item) => item);
+    },
+    totalPrice() {
+      let _totalPrice = this.model.price?.amount || bigNumber('0');
+
+      const sku = this.selectedSKU;
+      const surcharge = sku ? sku.get('surcharge') : bigNumber('0');
+      try {
+        _totalPrice = _totalPrice.plus(surcharge || bigNumber('0'));
+      } catch (e) {
+        // pass
+      }
+
+      return _totalPrice;
+    },
     cryptoTradingPairOptions() {
       if (this.model.isCrypto) {
         const metadata = this.model.get('metadata');
@@ -701,20 +724,7 @@ export default {
       return {};
     },
   },
-  watch: {
-    checkBoxValue: {
-      handler(values) {
-        let data = [1, 2];
-        this.isCheckAll = data.every((item) => values.includes(item));
-      },
-      immediate: true,
-    },
-  },
   methods: {
-    changeCheckAll(e) {
-      let data = [1, 2];
-      this.checkBoxValue = e.target.checked ? [...data] : [];
-    },
     loadData(options = {}) {
       if (!this.model) {
         throw new Error('Please provide a model.');
@@ -730,16 +740,6 @@ export default {
 
       this.shipsFreeToMe = this.model.shipsFreeToMe;
       this.activePhotoIndex = 0;
-
-      // Set to an empty bigNumber instance so if we can't fill it with a legitmate
-      // value, at least bigNumber ops won't fail.
-      this.totalPrice = bigNumber();
-
-      try {
-        this.totalPrice = this.model.get('item').get('price');
-      } catch (e) {
-        // pass
-      }
 
       this._latestHash = this.model.get('hash');
       this._renderedHash = null;
@@ -771,6 +771,9 @@ export default {
           this.variantOptions.push('');
         }
       }
+
+      const optionalFeatureCount = this.model.get('item').get('optionalFeatures').length;
+      this.optionalFeaturesCheckBox = new Array(optionalFeatureCount).fill(false);
 
       this.listenTo(app.settings, 'change:country', () => (this.shipsFreeToMe = this.model.shipsFreeToMe));
 
@@ -891,6 +894,12 @@ export default {
 
     defaultCountry() {
       return app.settings.get('shippingAddresses').length ? app.settings.get('shippingAddresses').at(0).get('country') : app.settings.get('country');
+    },
+
+    changeCheckAll(event) {
+      this.$nextTick(() => {
+        this.optionalFeaturesCheckBox = new Array(this.optionalFeaturesCheckBox.length).fill(event.target.checked)
+      });
     },
 
     onRatings(data) {
@@ -1092,34 +1101,6 @@ export default {
       });
     },
 
-    onChangeVariantSelect() {
-      this.adjustPriceBySku();
-    },
-
-    adjustPriceBySku() {
-      const { options } = this.model.toJSON().item;
-      const selections = this.variantOptions.map((val, idx) => ({
-        option: options[idx].name,
-        variant: val,
-      }));
-
-      // each sku has a code that matches the selected variant index combos
-      const sku = this.model
-        .get('item')
-        .get('skus')
-        .find((v) => _.isEqual(v.get('selections'), selections));
-      const surcharge = sku ? sku.get('surcharge') : bigNumber('0');
-
-      try {
-        const _totalPrice = this.model.price.amount.plus(surcharge || bigNumber('0'));
-        if (!_totalPrice.eq(this.totalPrice)) {
-          this.totalPrice = _totalPrice;
-        }
-      } catch (e) {
-        // pass
-      }
-    },
-
     showDataChangedMessage() {
       if (this.dataChangePopIn && !this.dataChangePopIn.isRemoved()) {
         this.dataChangePopIn.$el.velocity('callout.shake', { duration: 500 });
@@ -1182,6 +1163,7 @@ export default {
         slug: this.model.get('slug'),
         quantity: '1',
         options: this.selectedVariants || [],
+        optionalFeatures: this.selectedOptionalFeatures.map(item => item.name) || [],
       });
     },
 
@@ -1205,10 +1187,6 @@ export default {
       this.photoSelectedInner.on('load', () => this.activateZoom());
 
       this.setSelectedPhoto(this.activePhotoIndex);
-
-      if (!this.model.isCrypto) {
-        this.adjustPriceBySku();
-      }
 
       this._renderedHash = this.model.get('hash');
 

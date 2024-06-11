@@ -387,7 +387,7 @@
       <Purchase
         ref="purchaseModal"
         v-else-if="showPurchase"
-        :options="{ itemsInfo: [{ quantity: '1', variants: selectedVariants, optionalFeatures: selectedOptionalFeatures.map(item => item.name) }], vendor, origin: 'Listing' }"
+        :options="{ itemsInfo: [{ quantity: '1', variants: selectedVariants, optionalFeatures: selectedOptionalFeatures }], vendor, origin: 'Listing' }"
         :bb="
           function () {
             return {
@@ -1163,7 +1163,7 @@ export default {
         slug: this.model.get('slug'),
         quantity: '1',
         options: this.selectedVariants || [],
-        optionalFeatures: this.selectedOptionalFeatures.map(item => item.name) || [],
+        optionalFeatures: this.selectedOptionalFeatures?.map(item => item.name) || [],
       });
     },
 

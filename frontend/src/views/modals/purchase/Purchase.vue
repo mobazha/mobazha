@@ -71,6 +71,9 @@
                         <b>{{ ob.currencyMod.convertAndFormatCurrency(totalPrice(idx), pricingCurrency(idx), displayCurrency) }}</b>
                       </div>
                     </div>
+
+                    <OptionalFeatureLine :optionalFeatures="itemsInfo[idx].optionalFeatures" :pricingCurrency="pricingCurrency(idx)" :displayCurrency="displayCurrency" />
+
                     <div class="col6">
                       <template v-if="hasCoupons(listing) && ob.phase === 'pay'">
                         <div class="rowTn">
@@ -101,27 +104,6 @@
                           <!-- // coupons are inserted here after they are added by the user. -->
                         </div>
                       </template>
-                    </div>
-                    <div class="cell mt2">
-                      <h5>Optional Features</h5>
-                      <div class="cell-item">
-                        1. Name1, Surcharge 1, SKU1,
-                        <el-image
-                          style="width: 16px; height: 16px"
-                          src="https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg"
-                          fit="cover"
-                          :preview-src-list="['https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg']"
-                        />
-                      </div>
-                      <div class="cell-item">
-                        2. Name1, Surcharge 1, SKU1,
-                        <el-image
-                          style="width: 16px; height: 16px"
-                          src="https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg"
-                          fit="cover"
-                          :preview-src-list="['https://fuss10.elemecdn.com/a/3f/3302e58f9a181d2509f3dc0fa68b0jpeg.jpeg']"
-                        />
-                      </div>
                     </div>
                   </template>
 
@@ -601,31 +583,36 @@ export default {
       let access = this.orderKey;
 
       // return an array of price objects that matches the items in the order
-      return this.order.get('items').map((item) => {
+      return this.order.get('items').map((item, idx) => {
         const shipping = item.get('shipping');
         const sName = shipping.get('name');
         const sService = shipping.get('service');
         const sOpt = this.shippingOptions.findWhere({ name: sName });
         const sOptService = sOpt ? sOpt.get('services').findWhere({ name: sService }) : '';
 
-        const options = item.get('options');
+        const options = item.get('options').toJSON();
         const selections = options.map((option) => ({
           option: option.name,
           variant: option.value,
         }));
-
         const listing = this.itemsToPurchase.get(item.id);
-
         const sku = listing
           .get('item')
           .get('skus')
           .find((v) => _.isEqual(v.get('selections'), selections));
+
+        const optionalFeatures = this.itemsInfo[idx].optionalFeatures || [];
+        let oPrice = bigNumber(0);
+        optionalFeatures.forEach((feature) => {
+            oPrice = oPrice.plus(feature.surcharge);
+        });
 
         return {
           title: listing.get('item').get('title'),
           price: bigNumber(listing.price.amount),
           sPrice: bigNumber(sOptService ? sOptService.get('firstFreight') || 0 : 0),
           vPrice: bigNumber(sku ? sku.get('surcharge') || 0 : 0),
+          oPrice,
           quantity: bigNumber(item.get('quantity')),
           currency: listing.price.currencyCode,
         };
@@ -775,6 +762,7 @@ export default {
             listingHash: listing.get('hash'),
             quantity: this.itemsInfo[i].quantity ? bigNumber(this.itemsInfo[i].quantity) : bigNumber('1'),
             options: this.itemsInfo[i].variants || [], // Need update to the selected listing variants for each listing
+            optionalFeatures: this.itemsInfo[i].optionalFeatures?.map(item => item.name) || [],
           },
           {
             isCrypto: listing.isCrypto,

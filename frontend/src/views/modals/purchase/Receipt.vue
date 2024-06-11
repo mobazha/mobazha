@@ -209,6 +209,7 @@ export default {
         const basePrice = convertCurrency(priceObj.price, priceObj.currency, this.viewingCurrency);
 
         const surcharge = convertCurrency(priceObj.vPrice, priceObj.currency, this.viewingCurrency);
+        const optionalPrice = convertCurrency(priceObj.oPrice, priceObj.currency, this.viewingCurrency);
 
         const validQuantity = priceObj.quantity && !priceObj.quantity.isNaN() && priceObj.quantity.gt(0);
 
@@ -217,7 +218,7 @@ export default {
           priceObj.quantity = validQuantity ? priceObj.quantity : bigNumber(0);
         }
 
-        let itemTotal = basePrice.plus(surcharge);
+        let itemTotal = basePrice.plus(surcharge).plus(optionalPrice);
         priceObj.preCouponPrice = itemTotal;
         this.options.coupons[i].forEach((coupon) => {
           if (coupon.percentDiscount) {

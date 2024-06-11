@@ -74,6 +74,7 @@
                                 </div>
                               </div>
                             </div>
+                            <OptionalFeatureLine :optionalFeatures="getRowOptionalFeatures(row)" :pricingCurrency="row.pricingCurrency?.code" :displayCurrency="localCurrency" />
                           </template>
                         </el-table-column>
                         <el-table-column prop="type" width="150"></el-table-column>
@@ -94,7 +95,7 @@
                           </template>
                         </el-table-column>
                         <el-table-column show-overflow-tooltip>
-                          <template v-slot="{ row }">{{ countRowPrice(row) }}</template>
+                          <template v-slot="{ row }">{{ countRowPrice(row).price }}</template>
                         </el-table-column>
                         <el-table-column width="100">
                           <template v-slot="{ row }">
@@ -137,6 +138,7 @@
 </template>
 
 <script>
+import _ from 'underscore';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import $ from 'jquery';
 import app from '../../backbone/app';
@@ -147,6 +149,7 @@ import { convertCurrency, formatCurrency, convertAndFormatCurrency } from '../..
 import Purchase from './modals/purchase/Purchase.vue';
 import Listing from '../../backbone/models/listing/Listing';
 import OrderListings from '../../backbone/collections/OrderListings';
+import { bigNumber } from '../../backbone/utils/templateHelpers';
 
 export default {
   components: {
@@ -184,7 +187,23 @@ export default {
 
     //每个商品总价
     countRowPrice() {
-      return (row) => (row.priceAmount ? convertAndFormatCurrency(row.priceAmount * row.quantity, row.pricingCurrency?.code, this.localCurrency) : 0);
+      return (row) => {
+        if (!row.priceAmount) {
+          return 0;
+        }
+
+        let itemPrice = bigNumber(row.priceAmount || 0);
+
+        const optionalFeatures = this.getRowOptionalFeatures(row);
+        optionalFeatures.forEach((feature) => {
+          if (feature.surcharge) {
+            itemPrice = itemPrice.plus(bigNumber(feature.surcharge));
+          }
+        });
+
+        let total = convertCurrency(itemPrice * row.quantity, row.pricingCurrency?.code, this.localCurrency)
+        return {total, price: formatCurrency(total, this.localCurrency)};
+      };
     },
 
     //每个商店商品总价
@@ -193,7 +212,7 @@ export default {
         let list = this.selectors[index];
         if (!list) return 0;
 
-        const total = list.reduce((cur, next) => cur + convertCurrency(next.priceAmount * next.quantity, next.pricingCurrency?.code, this.localCurrency), 0);
+        const total = list.reduce((cur, next) => cur + this.countRowPrice(next).total, 0);
         return { quantity: list.length, total: formatCurrency(total, this.localCurrency) };
       };
     },
@@ -236,9 +255,16 @@ export default {
               cart.items?.forEach((item) => {
                 let listing = item.listingExt.toJSON();
                 item.listing = listing;
+
+                const selections = item.options?.map((option) => ({
+                  option: option.name,
+                  variant: option.value,
+                }));
+                item.sku = selections ? listing.item.skus?.find((v) => _.isEqual(v.selections, selections)) : undefined;
+
                 item.pricingCurrency = listing.metadata?.pricingCurrency;
                 if (listing.item?.price && item.pricingCurrency) {
-                  item.priceAmount = listing.item.price;
+                  item.priceAmount = bigNumber(listing.item.price).plus(item.sku?.surcharge || 0) ;
                   item.price = convertAndFormatCurrency(item.priceAmount, item.pricingCurrency.code, this.localCurrency);
 
                   item.type = app.polyglot.t(`formats.${listing.metadata.contractType}`);
@@ -312,6 +338,21 @@ export default {
       });
     },
 
+    getRowOptionalFeatures(row) {
+      if (!row.listing) return [];
+
+      const optionalFeatures = [];
+      if (row.optionalFeatures) {
+        row.optionalFeatures.forEach((featureName) => {
+          const match = row.listing.item.optionalFeatures?.find((v) => v.name === featureName);
+          if (match) {
+            optionalFeatures.push(match);
+          }
+        });
+      }
+      return optionalFeatures;
+    },
+
     //提交当前选中的商店商品
     pay(index) {
       this.$store.commit('cart/updateCart', this.tableData[0], { module: 'cart' });
@@ -331,7 +372,9 @@ export default {
       rows.forEach((row) => {
         itemsToPurchase.push(row.listingExt);
 
-        purchaseInfo.push({ quantity: row.quantity, variants: row.options });
+        const optionalFeatures = this.getRowOptionalFeatures(row);
+
+        purchaseInfo.push({ quantity: row.quantity, variants: row.options, optionalFeatures });
       });
 
       this.purchaseOptions = { itemsInfo: purchaseInfo, vendor, origin: 'ShoppingCart' };

@@ -40,6 +40,7 @@ export default class extends BaseModel {
       shipping: new Shipping(),
       memo: '',
       coupons: [], // just the coupon codes
+      OptionalFeatures: [],
     };
   }
 

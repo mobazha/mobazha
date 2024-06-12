@@ -6,9 +6,9 @@
         {{ `${j+1}.` }}
         <el-image
         style="width: 16px; height: 16px"
-        :src="ob.getServerUrl(`ob/image/${optionalFeature.image.small}`)"
+        :src="ob.getServerUrl(`ob/image/${optionalFeature.images[0].small}`)"
         fit="cover"
-        :preview-src-list="[ob.getServerUrl(`ob/image/${ob.isHiRez() ? optionalFeature.image.large : optionalFeature.image.medium}`)]"
+        :preview-src-list="[ob.getServerUrl(`ob/image/${ob.isHiRez() ? optionalFeature.images[0].large : optionalFeature.images[0].medium}`)]"
         />
         {{ `${optionalFeature.name}, ${ob.currencyMod.convertAndFormatCurrency(optionalFeature.surcharge, pricingCurrency, displayCurrency)}${optionalFeature.skuID ? `, SKU: ${optionalFeature.skuID}` : ''}` }}
       </div>

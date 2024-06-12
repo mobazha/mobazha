@@ -21,7 +21,7 @@
     </td>
     <td class="clrBr">
       <FormError v-if="ob.errors['image']" :errors="ob.errors['image']" />
-      <UploadPhoto2 :image="formData.image" @imageChange="onImageChange" />
+      <UploadPhoto2 :image="formData.images[0]" @imageChange="onImageChange" />
     </td>
     <td class="clrBr">
       <a class="iconBtn clrBr clrP clrSh2 margLSm btnRemoveVariant" @click="onClickRemove"><i class="ion-trash-b"></i> </a>
@@ -50,7 +50,7 @@ export default {
         name: '',
         surcharge: 0,
         skuID: '',
-        image: undefined,
+        images: [undefined],
       },
     };
   },
@@ -76,7 +76,7 @@ export default {
         name: model.name,
         surcharge: model.surcharge,
         skuID: model.skuID,
-        image: model.image,
+        images: model.images,
       };
     },
     loadData() {
@@ -101,7 +101,7 @@ export default {
     },
 
     onImageChange(image) {
-      this.formData.image = image;
+      this.formData.images[0] = image;
     }
   },
 };

@@ -1,7 +1,7 @@
 <template>
   <tr>
     <td class="clrBr">
-      <UploadPhoto2 :image="formData.image" @imageChange="onImageChange" />
+      <UploadPhoto2 :image="formData.images[0]" @imageChange="onImageChange" />
     </td>
     <template v-for="(choice, j) in ob.choices" :key="j">
       <td class="clrBr">{{ choice }}</td>
@@ -69,7 +69,7 @@ export default {
         productID: '',
         quantity: '',
         infiniteInventory: true,
-        image: undefined,
+        images: [undefined],
       },
     };
   },
@@ -106,7 +106,7 @@ export default {
         productID: model.productID,
         quantity: model.quantity,
         infiniteInventory: model.infiniteInventory,
-        image: model.image,
+        images: model.images,
       };
 
       if (this.formData.infiniteInventory) {
@@ -162,7 +162,7 @@ export default {
     },
 
     onImageChange(image) {
-      this.formData.image = image;
+      this.formData.images[0] = image;
     }
   },
 };

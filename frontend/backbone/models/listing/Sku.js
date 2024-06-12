@@ -3,7 +3,7 @@ import bigNumber from 'bignumber.js';
 import { isValidNumber } from '../../utils/number';
 import app from '../../app';
 import BaseModel from '../BaseModel';
-import Image from './Image';
+import ListingImages from '../../collections/listing/ListingImages';
 import Downloads from '../../collections/listing/Downloads';
 
 export default class extends BaseModel {
@@ -12,13 +12,14 @@ export default class extends BaseModel {
       productID: '',
       infiniteInventory: false,
       surcharge: bigNumber('0'),
+      images: new ListingImages(),
       downloadable: false,
     };
   }
 
   get nested() {
     return {
-      image: Image,
+      images: ListingImages,
       downloads: Downloads,
     };
   }

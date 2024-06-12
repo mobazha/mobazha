@@ -2,12 +2,10 @@
 /* eslint-disable class-methods-use-this */
 /* eslint-disable max-classes-per-file */
 import is from 'is_js';
-import { Collection } from 'backbone';
-import { guid } from '../../utils';
 import { isValidNumber } from '../../utils/number';
 import app from '../../app';
 import BaseModel from '../BaseModel';
-import Image from './Image';
+import ListingImages from '../../collections/listing/ListingImages';
 import VariantOptions from '../../collections/listing/VariantOptions';
 import Skus from '../../collections/listing/Skus';
 import OptionalFeatures from '../../collections/listing/OptionalFeatures';
@@ -36,19 +34,6 @@ import OptionalFeatures from '../../collections/listing/OptionalFeatures';
  * quantity and infiniteInventory fields on the SKU model instead of setting
  * anything on this model related to those fields.
  */
-
-class ListingImages extends Collection {
-  model(attrs, options) {
-    return new Image({
-      _clientID: attrs._clientID || guid(),
-      ...attrs,
-    }, options);
-  }
-
-  modelId(attrs) {
-    return attrs._clientID;
-  }
-}
 
 export default class extends BaseModel {
   defaults() {

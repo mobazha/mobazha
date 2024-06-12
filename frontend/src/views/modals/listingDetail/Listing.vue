@@ -94,8 +94,8 @@
                     <a class="tx5" @click="onClickGotoPhotos">
                       <u>{{
                         ob.polyT('listingDetail.viewPhotos', {
-                          count: ob.item.images.length,
-                          smart_count: ob.item.images.length,
+                          count: imageGallary.length,
+                          smart_count: imageGallary.length,
                         })
                       }}</u>
                     </a>
@@ -279,18 +279,18 @@
               </template>
             </div>
 
-            <template v-if="ob.item.images.length">
+            <template v-if="imageGallary.length">
               <div ref="photoSection" class="contentBox clrSh3 photoSection js-photoSection">
                 <div ref="photoSelected" class="flexCent photoSelected js-photoSelected">
-                  <img ref="photoSelectedInner" class="photoSelectedInner js-photoSelectedInner" />
+                  <img ref="photoSelectedInner" class="photoSelectedInner" />
                 </div>
-                <template v-if="ob.item.images.length > 1">
+                <template v-if="imageGallary.length > 1">
                   <button class="btn ion-ios-arrow-left photoPrev" @click="onClickPhotoPrev"></button>
                   <button class="btn ion-ios-arrow-right photoNext" @click="onClickPhotoNext"></button>
                 </template>
-                <template v-if="ob.item.images.length > 1">
+                <template v-if="imageGallary.length > 1">
                   <div class="photoStrip flex gutterH">
-                    <template v-for="(image, photoIndex) in ob.item.images">
+                    <template v-for="(image, photoIndex) in imageGallary">
                       <input
                         type="radio"
                         name="photoStripThumbnails"
@@ -643,15 +643,13 @@ export default {
       return this._showNsfwWarning && this.checkNsfw && this.model.get('item').get('nsfw') && !this.model.isOwnListing && !app.settings.get('showNsfw');
     },
     mainImage() {
-      let mainImage = undefined
-      if (!_.isEmpty(this.selectedSKU?.get('image'))) {
-        mainImage = this.selectedSKU.get('image').toJSON();
-      } else {
         const images = this.model.get('item').get('images').toJSON();
-        mainImage = images.length > 0 ? images[0] : null;
-      }
-
-      return mainImage;
+        return images.length > 0 ? images[0] : null;
+    },
+    imageGallary() {
+      const commonImages = this.model.get('item').get('images').toJSON();
+      const skuImages = this.selectedSKU?.get('images').toJSON();
+      return [...skuImages, ...commonImages];
     },
     selectedVariants() {
       return this.selectedSKU ? this.selectedSKU.get('selections').map((v) => {
@@ -1042,8 +1040,7 @@ export default {
       if (photoIndex < 0) {
         throw new Error('Please provide a valid index for the selected photo.');
       }
-      const photoCol = this.model.toJSON().item.images;
-      const photoHash = photoCol[photoIndex].original;
+      const photoHash = this.imageGallary[photoIndex].original;
       const phSrc = app.getServerUrl(`ob/image/${photoHash}`);
 
       this.activePhotoIndex = photoIndex;
@@ -1073,18 +1070,16 @@ export default {
     onClickPhotoPrev() {
       recordEvent('Listing_ClickOnPhotoPrev', { ownListing: this.model.isOwnListing });
       let targetIndex = this.activePhotoIndex - 1;
-      const imagesLength = parseInt(this.model.toJSON().item.images.length, 10);
 
-      targetIndex = targetIndex < 0 ? imagesLength - 1 : targetIndex;
+      targetIndex = targetIndex < 0 ? this.imageGallary.length - 1 : targetIndex;
       this.setSelectedPhoto(targetIndex);
     },
 
     onClickPhotoNext() {
       recordEvent('Listing_ClickOnPhotoNext', { ownListing: this.model.isOwnListing });
       let targetIndex = this.activePhotoIndex + 1;
-      const imagesLength = parseInt(this.model.toJSON().item.images.length, 10);
 
-      targetIndex = targetIndex >= imagesLength ? 0 : targetIndex;
+      targetIndex = targetIndex >= this.imageGallary.length ? 0 : targetIndex;
       this.setSelectedPhoto(targetIndex);
     },
 

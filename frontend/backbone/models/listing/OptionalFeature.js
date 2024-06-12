@@ -1,7 +1,7 @@
 import is from 'is_js';
 import bigNumber from 'bignumber.js';
 import BaseModel from '../BaseModel';
-import Image from './Image';
+import ListingImages from '../../collections/listing/ListingImages';
 
 export default class extends BaseModel {
   defaults() {
@@ -9,12 +9,13 @@ export default class extends BaseModel {
       name: '',
       surcharge: bigNumber('0'),
       skuID: '',
+      images: new ListingImages(),
     };
   }
 
   get nested() {
     return {
-      image: Image,
+      images: ListingImages,
     };
   }
 

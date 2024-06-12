@@ -36,7 +36,7 @@
             />
           </template>
         </table>
-        <a class="clrBr clrP clrTEm" @click="onClickAddMissingSkus" v-if="collection.length < fullSkus.length">{{ ob.polyT('editListing.variantInventory.addMissingSku') }}</a>
+        <a class="clrBr clrP clrTEm" @click="onClickAddMissingSkus" v-if="collection.length < fullSkus.fullSkus.length">{{ ob.polyT('editListing.variantInventory.addMissingSku') }}</a>
       </div>
       <div class="clrT2 txSm helper">{{ ob.polyT('editListing.variantInventory.helperText') }}</div>
     </template>
@@ -91,8 +91,8 @@ export default {
       // ensure the Sku collection has the latest data from the UI
       this.setCollectionData();
 
-      const existingInventoryData = [];
-      const missingInventoryData = [];
+      const existingSkus = [];
+      const missingSkus = [];
       this.allPossibleCombos(options.map((option) => option.variants))
         .sort()
         .map((strCombo) => JSON.parse(`[${strCombo}]`))
@@ -124,7 +124,7 @@ export default {
               ...data,
               ...sku.toJSON(),
             };
-            existingInventoryData.push(data);
+            existingSkus.push(data);
           } else {
             // If no sku, we'll merge in a new Sku model so the model's
             // defaults get into the data
@@ -133,18 +133,19 @@ export default {
               ...new Sku().toJSON(),
               mappingId: id,
             };
-            missingInventoryData.push(data);
+            missingSkus.push(data);
           }
         });
 
-        return [...existingInventoryData, ...missingInventoryData];
+        const fullSkus = [...existingSkus, ...missingSkus];
+        return {existingSkus, missingSkus, fullSkus}
     },
   },
   watch: {
     variationOptions: {
       handler() {
         if (!this.isSkusMatch()) {
-          this.collection.reset(this.fullSkus);
+          this.collection.reset(this.fullSkus.fullSkus);
         }
       },
       immediate: true
@@ -168,6 +169,8 @@ export default {
           sku.set('mappingId', this.buildIdFromSelections(selections));
         });
       }
+
+      this.collection.reset(this.fullSkus.existingSkus);
     },
 
     setCollectionData() {
@@ -175,7 +178,7 @@ export default {
     },
 
     onClickAddMissingSkus() {
-      this.collection.set(this.fullSkus);
+      this.collection.push(this.fullSkus.missingSkus);
     },
 
     onRemoveClick(model) {

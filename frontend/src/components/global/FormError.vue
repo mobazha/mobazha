@@ -8,7 +8,7 @@
   
 <script setup>
 const props = defineProps({
-  errors: [],
+  errors: Array,
   id: String,
   class: String,
 })

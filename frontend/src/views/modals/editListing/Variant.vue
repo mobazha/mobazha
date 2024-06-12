@@ -1,6 +1,6 @@
 <template>
   <div :class="`variant flexRow gutterH ${hasError ? 'hasError' : ''}`">
-    <div class="col6 simpleFlexCol">
+    <div class="col4 simpleFlexCol">
       <FormError v-if="ob.errors['name']" :errors="ob.errors['name']" />
       <input
         type="text"
@@ -14,14 +14,18 @@
     </div>
     <div class="col6 simpleFlexCol">
       <FormError v-if="variantsErrs.length" :errors="variantsErrs" />
+      <select
+        ref="variants"
+        multiple
+        name="variants"
+        class="clrBr clrP clrSh2 hideDropDown flexExpand"
+        :placeholder="ob.polyT('editListing.variants.choicesPlaceholder')"
+      ></select>
+    </div>
+    <div class="col2 simpleFlexCol">
+      <FormError v-if="variantsErrs.length" :errors="variantsErrs" />
       <div class="flexRow marginTopAuto">
-        <select
-          ref="variants"
-          multiple
-          name="variants"
-          class="clrBr clrP clrSh2 hideDropDown flexExpand"
-          :placeholder="ob.polyT('editListing.variants.choicesPlaceholder')"
-        ></select>
+        <input type="checkbox" v-model="variation" />
         <a
           class="iconBtn clrBr clrP clrSh2 margLSm toolTipNoWrap btnRemoveVariant"
           @click="onClickRemove"
@@ -46,7 +50,9 @@ export default {
     bb: Function,
   },
   data() {
-    return {};
+    return {
+      variation: true,
+    };
   },
   created() {
     this.loadData(this.options);

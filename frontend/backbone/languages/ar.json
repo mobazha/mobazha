@@ -1343,6 +1343,8 @@
       "titleLabel": "عنوان",
       "titlePlaceholder": "مثلا الحجم، اللون، المادة، الخ",
       "choicesLabel": "اختيارات",
+      "variationLabel": "Variation",
+      "variationTip": "Used for variations",
       "choicesPlaceholder": "مثلا صغيرة، متوسطة، كبيرة، الخ",
       "toolTip": {
         "delete": "حذف"

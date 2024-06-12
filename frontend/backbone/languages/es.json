@@ -1341,6 +1341,8 @@
       "titleLabel": "Título",
       "titlePlaceholder": "ej. Talle, Color, Material, etc",
       "choicesLabel": "Opciones",
+      "variationLabel": "Variation",
+      "variationTip": "Used for variations",
       "choicesPlaceholder": "ej. S, M, L, etc",
       "toolTip": {
         "delete": "Borrar"

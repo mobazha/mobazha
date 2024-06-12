@@ -1353,6 +1353,8 @@
       "titleLabel": "Title",
       "titlePlaceholder": "e.g. Size, Color, Material, etc",
       "choicesLabel": "Choices",
+      "variationLabel": "Variation",
+      "variationTip": "Used for variations",
       "choicesPlaceholder": "e.g. Small, Medium, Large, etc",
       "toolTip": {
         "delete": "Delete"

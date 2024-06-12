@@ -1343,6 +1343,8 @@
       "titleLabel": "Titre",
       "titlePlaceholder": "par exemple taille, couleur, matériau, ...",
       "choicesLabel": "Choix",
+      "variationLabel": "Variation",
+      "variationTip": "Used for variations",
       "choicesPlaceholder": "par exemple petit, moyen, grand, ...",
       "toolTip": {
         "delete": "Supprimer"

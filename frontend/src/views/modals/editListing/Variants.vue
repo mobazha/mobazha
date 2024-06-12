@@ -1,11 +1,14 @@
 <template>
   <div>
     <div class="flexRow gutterH">
-      <div class="col6">
+      <div class="col4">
         <label class="required">{{ ob.polyT('editListing.variants.titleLabel') }}</label>
       </div>
       <div class="col6">
         <label class="required">{{ ob.polyT('editListing.variants.choicesLabel') }}</label>
+      </div>
+      <div class="col2">
+        <label class="required">{{ ob.polyT('editListing.variants.variationLabel') }}</label>
       </div>
     </div>
     <div class="js-variantsWrap padKids padStack padTop0">

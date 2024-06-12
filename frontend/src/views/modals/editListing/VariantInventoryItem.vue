@@ -163,7 +163,11 @@ export default {
 
     onImageChange(image) {
       this.formData.images[0] = image;
-    }
+    },
+
+    onClickRemove() {
+      this.$emit('removeClick', this.model);
+    },
   },
 };
 </script>

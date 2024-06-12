@@ -198,8 +198,8 @@
                     </template>
                   </div>
                   <hr class="rowLg" />
-                  <h5>{{ ob.polyT('editListing.sectionNames.optionalFeatures') }}</h5>
-                  <table class="table">
+                  <h5 v-if="ob.item.optionalFeatures.length > 0">{{ ob.polyT('editListing.sectionNames.optionalFeatures') }}</h5>
+                  <table class="table" v-if="ob.item.optionalFeatures.length > 0">
                     <tr>
                       <th><input type="checkbox" @change="changeCheckAll" :checked="allOptionalFeaturesChecked" /></th>
                       <th>{{ ob.polyT('editListing.optionalFeatures.name') }}</th>
@@ -226,7 +226,6 @@
                         </td>
                       </tr>
                     </template>
-                    
                   </table>
                   <h5>{{ ob.polyT('listingDetail.tags') }}</h5>
                   <div class="tagWrapper rowLg">
@@ -647,8 +646,8 @@ export default {
         return images.length > 0 ? images[0] : null;
     },
     imageGallary() {
-      const commonImages = this.model.get('item').get('images').toJSON();
-      const skuImages = this.selectedSKU?.get('images').toJSON();
+      const commonImages = this.model.get('item').get('images').toJSON() || [];
+      const skuImages = this.selectedSKU?.get('images').toJSON() || [];
       return [...skuImages, ...commonImages];
     },
     selectedVariants() {

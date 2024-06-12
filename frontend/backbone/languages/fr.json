@@ -1368,7 +1368,9 @@
       "surcharge": "Supplément",
       "totalPrice": "Total",
       "sku": "SKU",
-      "quantity": "Quantité"
+      "quantity": "Quantité",
+      "operation": "Operation",
+      "addMissingSku": "+ Add Missing SKU"
     },
     "optionalFeatures": {
       "btnAddOptionalFeature": "Add Optional Feature",

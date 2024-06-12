@@ -8,15 +8,15 @@
       <div class="inventoryTableWrap rowSm">
         <table>
           <tr>
-            <th class="clrBr">图片</th>
-            <template v-for="(column, j) in ob.columns" :key="j">
+            <th class="clrBr">{{ ob.polyT('editListing.optionalFeatures.image') }}</th>
+            <template v-for="(column, j) in columns" :key="j">
               <th class="clrBr">{{ column }}</th>
             </template>
             <th class="clrBr surcharge">{{ ob.polyT('editListing.variantInventory.surcharge') }}</th>
             <th class="clrBr totalPrice">{{ ob.polyT('editListing.variantInventory.totalPrice') }}</th>
             <th class="clrBr">{{ ob.polyT('editListing.variantInventory.sku') }}</th>
             <th class="clrBr quantityCol">{{ ob.polyT('editListing.variantInventory.quantity') }}</th>
-            <th class="clrBr">操作</th>
+            <th class="clrBr"></th>
           </tr>
           <template v-for="item in collection" :key="item.cid">
             <VariantInventoryItem
@@ -32,9 +32,11 @@
                   };
                 }
               "
+              @removeClick="onRemoveClick"
             />
           </template>
         </table>
+        <a class="clrBr clrP clrTEm" @click="onClickAddMissingSkus" v-if="collection.length < fullSkus.length">{{ ob.polyT('editListing.variantInventory.addMissingSku') }}</a>
       </div>
       <div class="clrT2 txSm helper">{{ ob.polyT('editListing.variantInventory.helperText') }}</div>
     </template>
@@ -66,27 +68,31 @@ export default {
   mounted() {},
   computed: {
     ob() {
-      const inventoryData = this.inventoryData;
-      this.collection.set(inventoryData.inventory);
-
       return {
         ...this.templateHelpers,
-        columns: inventoryData.columns,
       };
     },
-    // todo: good unit test candidate
-    inventoryData() {
-      const options = this.optionsCl
+
+    variationOptions() {
+      return this.optionsCl
         .toJSON()
         // only process options that have at least one variant
-        .filter((option) => option.variants && option.variants.length);
+        .filter((option) => option.variation && option.variants && option.variants.length);
+    },
 
-      const columns = options.map((option) => option.name);
-      const inventoryData = [];
+    columns() {
+      return this.variationOptions.map((option) => option.name);
+    },
+
+    // todo: good unit test candidate
+    fullSkus() {
+      const options = this.variationOptions;
 
       // ensure the Sku collection has the latest data from the UI
       this.setCollectionData();
 
+      const existingInventoryData = [];
+      const missingInventoryData = [];
       this.allPossibleCombos(options.map((option) => option.variants))
         .sort()
         .map((strCombo) => JSON.parse(`[${strCombo}]`))
@@ -118,6 +124,7 @@ export default {
               ...data,
               ...sku.toJSON(),
             };
+            existingInventoryData.push(data);
           } else {
             // If no sku, we'll merge in a new Sku model so the model's
             // defaults get into the data
@@ -126,15 +133,21 @@ export default {
               ...new Sku().toJSON(),
               mappingId: id,
             };
+            missingInventoryData.push(data);
           }
-
-          inventoryData.push(data);
         });
 
-      return {
-        columns,
-        inventory: inventoryData,
-      };
+        return [...existingInventoryData, ...missingInventoryData];
+    },
+  },
+  watch: {
+    variationOptions: {
+      handler() {
+        if (!this.isSkusMatch()) {
+          this.collection.reset(this.fullSkus);
+        }
+      },
+      immediate: true
     },
   },
   methods: {
@@ -159,6 +172,40 @@ export default {
 
     setCollectionData() {
       (this.$refs.itemViews ?? []).forEach((item) => item.setModelData());
+    },
+
+    onClickAddMissingSkus() {
+      this.collection.set(this.fullSkus);
+    },
+
+    onRemoveClick(model) {
+      this.collection.remove(model);
+    },
+
+    isSkusMatch() {
+      const collection = this.collection.toJSON();
+      const optionsCl = this.variationOptions;
+      
+      const options = {};
+      optionsCl.forEach((option) => {
+        options[option.name] = option.variants.map((variant) => variant.name);
+      });
+
+      for (let i = 0; i < collection.length; i += 1) {
+        const selections = collection[i].selections;
+        if (selections.length !== optionsCl.length) {
+          return false;
+        }
+
+        for (let j = 0; j < selections.length; j += 1) {
+          const selection = selections[j];
+          if (!options[selection.option] || !options[selection.option].includes(selection.variant)) {
+            return false;
+          }
+        }
+      }
+
+      return true;
     },
 
     // Inpsired by: http://stackoverflow.com/a/4331218/632806

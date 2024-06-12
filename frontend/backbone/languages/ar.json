@@ -1368,7 +1368,9 @@
       "surcharge": "Surcharge",
       "totalPrice": "Total Price",
       "sku": "وحدة حفظ الأوراق المالية SKU",
-      "quantity": "كمية"
+      "quantity": "كمية",
+      "operation": "Operation",
+      "addMissingSku": "+ Add Missing SKU"
     },
     "optionalFeatures": {
       "btnAddOptionalFeature": "Add Optional Feature",

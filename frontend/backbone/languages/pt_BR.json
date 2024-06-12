@@ -1366,7 +1366,9 @@
       "surcharge": "Cobrança adicional",
       "totalPrice": "Preço Total",
       "sku": "Unidade de Manutenção de Estoque (SKU)",
-      "quantity": "Quantidade"
+      "quantity": "Quantidade",
+      "operation": "Operation",
+      "addMissingSku": "+ Add Missing SKU"
     },
     "optionalFeatures": {
       "btnAddOptionalFeature": "Add Optional Feature",

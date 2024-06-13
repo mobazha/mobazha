@@ -25,7 +25,7 @@
     <div class="col2 simpleFlexCol">
       <FormError v-if="variantsErrs.length" :errors="variantsErrs" />
       <div class="flexRow marginTopAuto">
-        <input type="checkbox" v-model="variation" />
+        <input class="checkbox" type="checkbox" v-model="variation" />
         <a
           class="iconBtn clrBr clrP clrSh2 margLSm toolTipNoWrap btnRemoveVariant"
           @click="onClickRemove"
@@ -184,4 +184,8 @@ export default {
   },
 };
 </script>
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.checkbox {
+  display: inline-block;
+}
+</style>

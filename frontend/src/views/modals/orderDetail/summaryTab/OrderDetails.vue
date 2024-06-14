@@ -21,6 +21,7 @@
                   </div>
                   <div class="clrT2 hide orderDetailsCopiedToClipboard js-cryptoQuantityCopiedToClipboard">{{ ob.polyT('copiedToClipboard') }}</div>
                 </template>
+                <OptionalFeatureLine :optionalFeatures="getItemOptionalFeatures(idx)" :pricingCurrency="listing.price?.currencyCode" :displayCurrency="ob.displayCurrency" />
               </div>
 
               <div class="col4">
@@ -195,7 +196,7 @@ export default {
         listing: this.oneListing,
         order: this.order,
         getCountryByDataName,
-        userCurrency: app.settings.get('localCurrency'),
+        displayCurrency: app.settings.get('localCurrency'),
         moment,
         isModerated: this.isModerated,
         sku: this.sku,
@@ -382,6 +383,22 @@ export default {
       this.oneListing = this.listings[0];
 
       this.order = this.model.get('orderOpen');
+    },
+
+    getItemOptionalFeatures(idx) {
+      if (!this.listings) return [];
+      const item = this.order.items[idx];
+
+      const optionalFeatures = [];
+      if (item.optionalFeatures) {
+        item.optionalFeatures.forEach((featureName) => {
+          const match = this.listings[idx].item.optionalFeatures?.find((v) => v.name === featureName);
+          if (match) {
+            optionalFeatures.push(match);
+          }
+        });
+      }
+      return optionalFeatures;
     },
 
     getCopiedToClipboardEl () {

@@ -5,10 +5,11 @@
       <div class="cell-item">
         {{ `${j+1}.` }}
         <el-image
-        style="width: 16px; height: 16px"
-        :src="ob.getServerUrl(`ob/image/${optionalFeature.images[0].small}`)"
-        fit="cover"
-        :preview-src-list="[ob.getServerUrl(`ob/image/${ob.isHiRez() ? optionalFeature.images[0].large : optionalFeature.images[0].medium}`)]"
+          style="width: 16px; height: 16px"
+          v-if="optionalFeature.images?.length"
+          :src="ob.getServerUrl(`ob/image/${optionalFeature.images[0].small}`)"
+          fit="cover"
+          :preview-src-list="[ob.getServerUrl(`ob/image/${ob.isHiRez() ? optionalFeature.images[0].large : optionalFeature.images[0].medium}`)]"
         />
         {{ `${optionalFeature.name}, ${ob.currencyMod.convertAndFormatCurrency(optionalFeature.surcharge, pricingCurrency, displayCurrency)}${optionalFeature.skuID ? `, SKU: ${optionalFeature.skuID}` : ''}` }}
       </div>

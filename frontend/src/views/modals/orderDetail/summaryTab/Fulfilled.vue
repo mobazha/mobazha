@@ -138,6 +138,7 @@ export default {
         coinType: '',
         ...this.options,
         ...this.options.dataObject,
+        ...this.dataObject,
         transactionID: transactionID.replace(/["]/g, '[!$quote$!]'),
         encodedTxId: this.revealEscapeChars(transactionID),
         moment,

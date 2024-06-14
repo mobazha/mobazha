@@ -118,12 +118,12 @@
                     <a class="listItem js-navListItem" @click="navCreateListingClick">
                       <span>{{ ob.polyT('pageNav.createListing') }}</span><span class="clrT2 TODO">Cltrl + ?</span>
                     </a>
-                    <a class="listItem js-navListItem"
+                    <!-- <a class="listItem js-navListItem"
                       @mouseenter="onMouseEnterToolsItem"
                       @mouseleave="onMouseLeaveToolsItem">
                       <span>{{ ob.polyT('pageNav.tools') }}</span>
                       <span><i class="ion-arrow-right-b floR"></i></span>
-                    </a>
+                    </a> -->
                   </div>
                   <div class="listGroup clrP clrBr">
                     <a href="#transactions/sales" class="listItem js-navListItem" @click="onNavListItemClick">

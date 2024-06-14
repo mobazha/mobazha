@@ -132,7 +132,7 @@ export default class ChatMessage extends BaseModel {
   }
 
   url() {
-    if (this.get('message') === '' && this.get('file') === null) {
+    if (this.get('message') === '' && !this.get('file')) {
       return app.getServerUrl(
         `ob/${this.isGroupChatMessage ? 'grouptypingmessage' : 'typingmessage'}`,
       );

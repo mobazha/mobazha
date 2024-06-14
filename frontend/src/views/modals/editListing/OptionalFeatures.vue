@@ -87,9 +87,7 @@ export default {
     },
 
     setCollectionData() {
-      this.$nextTick(() => {
-        (this.$refs.itemViews ?? []).forEach((item) => item.setModelData());
-      });
+      (this.$refs.itemViews ?? []).forEach((item) => item.setModelData());
     },
 
     onRemoveClick(model) {

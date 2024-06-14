@@ -681,9 +681,9 @@ export default {
       }
     },
     selectedVariants() {
-      return this.selectedSKU ? this.selectedSKU.get('selections').map((v) => {
-        return {name: v.option, value: v.variant}
-      }) : [];
+      return this.skuOptions.map((option, index) => {
+        return {name: option.name, value: this.variantOptions[index]};
+      });
     },
     selectedSKU() {
       const selections = [];

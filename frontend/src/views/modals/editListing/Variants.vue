@@ -92,9 +92,7 @@ export default {
     },
 
     setCollectionData () {
-      this.$nextTick(() => {
-        (this.$refs._variantViews ?? []).forEach((variant) => variant.setModelData());
-      });
+      (this.$refs._variantViews ?? []).forEach((variant) => variant.setModelData());
     },
 
     setModelData (index) {

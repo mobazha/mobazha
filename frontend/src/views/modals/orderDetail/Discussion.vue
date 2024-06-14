@@ -2,7 +2,8 @@
   <div :class="`discussionTab clrP ${messages.length ? 'noMessages' : ''} ${loadingMessages ? 'loadingMessages' : ''} ${isTyping ? 'isTyping' : ''}`">
     <div class="typingIndicator tx5 noOverflow clrBr clrP clrT2 clrSh1">{{ typingIndicatorContent }}</div>
     <div class="btnStrip flexNoShrink">
-      <a class="ion-android-more-vertical floR iconBtn subMenuTrigger js-subMenuTrigger" @click="onClickSubMenuTrigger"></a>
+      <div class="avatar clrBr2 clrSh1 discSm" :style="ob.getAvatarBgImage(ob.ownProfile.avatarHashes)"></div>
+      <a class="ion-android-more-vertical floR iconBtn subMenuTrigger js-subMenuTrigger" v-if="model.type === 'sale'" @click="onClickSubMenuTrigger"></a>
       <a class="ion-image iconBtn js-addImage floR clrBr2 clrSh1" @click="onClickAddImage" :data-tip="ob.polyT('orderDetail.discussionTab.addImage')"></a>
       <div v-show="imageUploadInprogress" class="floR">
         {{ ob.polyT('editListing.uploading') }}<a @click="cancelImageUpload">{{ ob.polyT('editListing.btnCancelUpload') }}</a>
@@ -10,14 +11,14 @@
     </div>
     <input ref="inputImageUpload" type="file" accept="image/*" @change="onChangeImageUpload" class="hide" />
     <div ref="convoMessagesWindow" class="convoMessagesWindow tx6 js-convoMessagesWindow">
-      <div class="overlay hide js-messagesOverlay" @click="onViewClick"></div>
-      <div class="subMenu boxList clrBr clrP clrSh1 hide js-subMenu">
-        <a class="clrT" @click="onClickSubMenuLink">Add customer service</a>
+      <div class="overlay" v-show="showMessagesOverlay" @click="onViewClick"></div>
+      <div class="subMenu boxList clrBr clrP clrSh1 js-subMenu" v-show="subMenuVisible">
+        <a class="clrT" @click="onAddCustomerService">{{ ob.polyT("orderDetail.discussionTab.addCustomerService") }}</a>
       </div>
       <SpinnerSVG />
       <div class="clrTErr messagesFetchError" v-show="ob.showLoadMessagesError">
         {{ ob.polyT('orderDetail.discussionTab.loadMessagesError') }}
-        <a @click="onClickRetryLoadMessage">${ob.polyT("orderDetail.discussionTab.retryLink")}</a>
+        <a @click="onClickRetryLoadMessage">{{ ob.polyT("orderDetail.discussionTab.retryLink") }}</a>
       </div>
       <div ref="convoMessagesContainer" class="js-convoMessagesContainer">
         <!-- <ConvoMessages :options="{
@@ -51,6 +52,21 @@
         </button>
       </div>
     </div>
+    <el-dialog v-model="csDialogVisible" :title="ob.polyT('orderDetail.discussionTab.addCustomerService')" width="600">
+      <el-form :model="form">
+        <el-form-item label="User ID" label-width="80px">
+          <el-input v-model="form.name" autocomplete="off" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="csDialogVisible = false">{{ ob.polyT('orderDetail.discussionTab.cancel') }}</el-button>
+          <el-button type="primary" @click="csDialogVisible = false">
+            {{ ob.polyT('orderDetail.discussionTab.confirm') }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -104,6 +120,12 @@ export default {
       imageUploadInprogress: false,
 
       sendDisabled: false,
+
+      showMessagesOverlay: false,
+      subMenuVisible: false,
+
+      csDialogVisible: false,
+      form: {}
     };
   },
   created() {
@@ -165,12 +187,6 @@ export default {
       }
       return app.polyglot.t('chat.conversation.messageInputPlaceholder');
     },
-    $subMenu() {
-      return $('.js-subMenu');
-    },
-    $messagesOverlay() {
-      return $('.js-messagesOverlay');
-    },
   },
   methods: {
     onViewClick(e) {
@@ -179,7 +195,7 @@ export default {
       }
     },
     onClickSubMenuTrigger() {
-      if (this.isSubmenuOpen()) {
+      if (this.subMenuVisible) {
         this.hideSubMenu();
       } else {
         this.showSubMenu();
@@ -187,19 +203,18 @@ export default {
 
       return false; // don't bubble to onViewClick
     },
-    isSubmenuOpen() {
-      return !this.$subMenu.hasClass('hide');
-    },
     showSubMenu() {
-      this.$messagesOverlay.removeClass('hide');
-      this.$subMenu.removeClass('hide');
+      this.showMessagesOverlay = true;
+      this.subMenuVisible = true;
     },
     hideSubMenu() {
-      this.$messagesOverlay.addClass('hide');
-      this.$subMenu.addClass('hide');
+      this.showMessagesOverlay = false;
+      this.subMenuVisible = false;
     },
-    onClickSubMenuLink() {
+    onAddCustomerService() {
       this.hideSubMenu();
+
+      this.csDialogVisible = true;
     },
     loadData(options = {}) {
       if (!options.orderID) {

@@ -1743,7 +1743,10 @@
       "addImage": "Add Image",
       "loadMessagesError": "Під час завантаження повідомлень сталася помилка. ",
       "retryLink": "повторити спробу",
-      "btnSend": "Відправити"
+      "btnSend": "Відправити",
+      "addCustomerService": "Add Customer Service",
+      "cancel": "Cancel",
+      "confirm": "Confirm"
     },
     "contractTab": {
       "heading": "Контракт (JSON)",

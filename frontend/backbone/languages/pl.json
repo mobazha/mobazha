@@ -1743,7 +1743,10 @@
       "addImage": "Add Image",
       "loadMessagesError": "Wystąpił błąd wczytywania wiadomości. ",
       "retryLink": "ponów",
-      "btnSend": "Wyślij"
+      "btnSend": "Wyślij",
+      "addCustomerService": "Add Customer Service",
+      "cancel": "Cancel",
+      "confirm": "Confirm"
     },
     "contractTab": {
       "heading": "Contract (JSON)",

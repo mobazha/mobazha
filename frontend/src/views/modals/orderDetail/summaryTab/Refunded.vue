@@ -46,7 +46,6 @@ export default {
       type: Object,
       default: {
         buyerName: '',
-        userCurrency: app.settings.get('localCurrency') || 'BTC',
         isCrypto: false,
         blockChainTxUrl: '',
       },

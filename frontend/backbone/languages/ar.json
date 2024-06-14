@@ -1745,7 +1745,10 @@
       "addImage": "Add Image",
       "loadMessagesError": "حدث خطأ أثناء تحميل الرسائل ",
       "retryLink": "أعد المحاوله",
-      "btnSend": "ارسل"
+      "btnSend": "ارسل",
+      "addCustomerService": "Add Customer Service",
+      "cancel": "Cancel",
+      "confirm": "Confirm"
     },
     "contractTab": {
       "heading": "الإتفاقية (JSON)",

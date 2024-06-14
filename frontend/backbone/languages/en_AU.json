@@ -1743,7 +1743,10 @@
       "addImage": "Add Image",
       "loadMessagesError": "There was an error loading the messages. ",
       "retryLink": "retry",
-      "btnSend": "Send"
+      "btnSend": "Send",
+      "addCustomerService": "Add Customer Service",
+      "cancel": "Cancel",
+      "confirm": "Confirm"
     },
     "contractTab": {
       "heading": "Contract (JSON)",

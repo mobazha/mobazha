@@ -1743,7 +1743,10 @@
       "addImage": "Add Image",
       "loadMessagesError": "Při načítání tvých zpráv nastala chyba. ",
       "retryLink": "zkusit znovu",
-      "btnSend": "Poslat"
+      "btnSend": "Poslat",
+      "addCustomerService": "Add Customer Service",
+      "cancel": "Cancel",
+      "confirm": "Confirm"
     },
     "contractTab": {
       "heading": "Smlouva (JSON)",

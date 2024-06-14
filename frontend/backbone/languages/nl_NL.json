@@ -1743,7 +1743,10 @@
       "addImage": "Add Image",
       "loadMessagesError": "Er was een fout bij het ophalen van de berichten. ",
       "retryLink": "opnieuw proberen",
-      "btnSend": "Verzend"
+      "btnSend": "Verzend",
+      "addCustomerService": "Add Customer Service",
+      "cancel": "Cancel",
+      "confirm": "Confirm"
     },
     "contractTab": {
       "heading": "Contract (JSON)",

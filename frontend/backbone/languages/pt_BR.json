@@ -1743,7 +1743,10 @@
       "addImage": "Add Image",
       "loadMessagesError": "Houve um erro ao carregar as mensagens. ",
       "retryLink": "tentar novamente",
-      "btnSend": "Enviar"
+      "btnSend": "Enviar",
+      "addCustomerService": "Add Customer Service",
+      "cancel": "Cancel",
+      "confirm": "Confirm"
     },
     "contractTab": {
       "heading": "Contrato (JSON)",

@@ -1743,7 +1743,10 @@
       "addImage": "Add Image",
       "loadMessagesError": "Beim Laden der Nachricht ist ein Fehler aufgetreten. ",
       "retryLink": "erneut versuchen",
-      "btnSend": "Senden"
+      "btnSend": "Senden",
+      "addCustomerService": "Add Customer Service",
+      "cancel": "Cancel",
+      "confirm": "Confirm"
     },
     "contractTab": {
       "heading": "Kaufvertrag (JSON)",

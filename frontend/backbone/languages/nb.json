@@ -1743,7 +1743,10 @@
       "addImage": "Add Image",
       "loadMessagesError": "Det oppstod en feil ved henting av meldinger. ",
       "retryLink": "prøv på nytt",
-      "btnSend": "Send"
+      "btnSend": "Send",
+      "addCustomerService": "Add Customer Service",
+      "cancel": "Cancel",
+      "confirm": "Confirm"
     },
     "contractTab": {
       "heading": "Kontrakt (JSON)",

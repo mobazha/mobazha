@@ -25,7 +25,8 @@
     <div class="col2 simpleFlexCol">
       <FormError v-if="variantsErrs.length" :errors="variantsErrs" />
       <div class="flexRow marginTopAuto">
-        <input class="checkbox" type="checkbox" v-model="variation" />
+        <label for="variation"></label>
+        <input class="checkbox" type="checkbox" id="variation" v-model="variation" name="variation" @change="setModelData"/>
         <a
           class="iconBtn clrBr clrP clrSh2 margLSm toolTipNoWrap btnRemoveVariant"
           @click="onClickRemove"
@@ -106,6 +107,7 @@ export default {
         throw new Error('Please provide a VariantOption model.');
       }
 
+      this.variation = this.model.get('variation');
       // any parent level errors can be passed in options.errors, e.g.
       // options.errors = {
       //   <field-name>: ['err1', 'err2', 'err3']

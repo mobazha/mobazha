@@ -62,7 +62,7 @@ export default {
   },
   data() {
     return {
-      infiniteQuantityChar: '—',
+      infiniteQuantityChar: '99999999',
 
       formData: {
         surcharge: 0,

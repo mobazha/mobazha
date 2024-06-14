@@ -145,7 +145,12 @@ export default {
     variationOptions: {
       handler() {
         if (!this.isSkusMatch()) {
-          this.collection.reset(this.fullSkus.fullSkus);
+          const fullSkus = this.fullSkus;
+          if (fullSkus.existingSkus.length > 0 ) {
+            this.collection.reset(fullSkus.existingSkus);
+          } else {
+            this.collection.reset(this.fullSkus.fullSkus);
+          }
         }
       },
       immediate: true

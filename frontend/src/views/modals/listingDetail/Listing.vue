@@ -108,11 +108,22 @@
                         <div class="flexVCent gutterHLg">
                           <div class="col4 h5 txUnl">{{ item.name }}</div>
                           <div class="col8 txLft">
-                            <Select2 class="js-variantSelect" v-model="variantOptions[optionIndex]" :name="item.name">
-                              <template v-for="variant in item.variants" :key="variant.name">
-                                <option :value="variant.name">{{ variant.name }}</option>
+                            <el-select
+                              v-model="variantOptions[optionIndex]"
+                              @change="onVariantSelectionChange(optionIndex)"
+                            >
+                              <el-option
+                                v-for="variant in selectableSkuVariants(optionIndex)"
+                                :key="variant"
+                                :label="variant"
+                                :value="variant"
+                              />
+                            </el-select>
+                            <!-- <Select2 v-model="variantOptions[optionIndex]" @change="onVariantSelectionChange(optionIndex)" :name="item.name">
+                              <template v-for="variant in selectableSkuVariants(optionIndex)" :key="variant">
+                                <option :value="variant">{{ variant }}</option>
                               </template>
-                            </Select2>
+                            </Select2> -->
                           </div>
                         </div>
                       </template>
@@ -530,18 +541,6 @@ export default {
   mounted() {
     this.render();
   },
-  watch: {
-    '_model.item.options'(options) {
-      this.variantOptions = [];
-      for (let option of options) {
-        if (option.variants && option.variants.length > 0) {
-          this.variantOptions.push(option.variants[0]);
-        } else {
-          this.variantOptions.push('');
-        }
-      }
-    },
-  },
   unmounted() {
     if (this.destroyRequest) this.destroyRequest.abort();
     if (this.ratingsFetch) this.ratingsFetch.abort();
@@ -650,18 +649,49 @@ export default {
       const skuImages = this.selectedSKU?.get('images').toJSON() || [];
       return [...skuImages, ...commonImages];
     },
+    skuOptions() {
+      return this.model.get('item').get('options')?.toJSON() || [];
+    },
+    variationOptions() {
+      return this.skuOptions.filter((option) => option.variation && option.variants && option.variants.length).map((option) => option.name);
+    },
+    skus() {
+      return this.model.get('item').get('skus')?.toJSON() || [];
+    },
+    selectableSkuVariants() {
+      return (optionIndex) => {
+        if (!this.variationOptions.includes(this.skuOptions[optionIndex].name)) {
+          return this.skuOptions[optionIndex].variants?.map((v) => v.name);
+        }
+
+        let subSelection = [];
+        for (let i = 0; i < this.variantOptions.length; i++) {
+          if (i < optionIndex) {
+            const skuOption = this.skuOptions[i].name;
+            if (this.variationOptions.includes(skuOption)) {
+              subSelection.push({ option: skuOption, variant: this.variantOptions[i]});
+            }
+          }
+        }
+        if (subSelection.length == 0){
+          return this.skuOptions[optionIndex].variants?.map((v) => v.name);
+        }
+
+        return this.getNextVariantsFromMatchedSkus(subSelection);
+      }
+    },
     selectedVariants() {
       return this.selectedSKU ? this.selectedSKU.get('selections').map((v) => {
         return {name: v.option, value: v.variant}
       }) : [];
     },
     selectedSKU() {
-      const { options } = this.model.toJSON().item;
-
-      const selections = this.variantOptions.map((val, idx) => ({
-        option: options[idx].name,
-        variant: val,
-      }));
+      const selections = [];
+      for (let i = 0; i < this.variantOptions.length; i++) {
+        if (this.variationOptions.includes(this.skuOptions[i].name)) {
+          selections.push({option: this.skuOptions[i].name, variant: this.variantOptions[i]});
+        }
+      }
 
       // each sku has a code that matches the selected variant index combos
       return this.model
@@ -760,12 +790,15 @@ export default {
       this.vendor = this.vendor || opts.vendor;
 
       this.variantOptions = [];
-      const itemOptions = this.model.get('item').get('options').toJSON();
-      for (let option of itemOptions) {
+      let skuSelectionIdx = 0;
+      for (let i = 0; i < this.skuOptions.length; i++) {
+        const option = this.skuOptions[i];
         if (option.variants && option.variants.length > 0) {
-          this.variantOptions.push(option.variants[0].name);
-        } else {
-          this.variantOptions.push('');
+          if (!option.variation) {
+            this.variantOptions.push(option.variants[0].name);
+          } else {
+            this.variantOptions.push(this.skus[0].selections[skuSelectionIdx++].variant);
+          }
         }
       }
 
@@ -897,6 +930,49 @@ export default {
       this.$nextTick(() => {
         this.optionalFeaturesCheckBox = new Array(this.optionalFeaturesCheckBox.length).fill(event.target.checked)
       });
+    },
+
+    onVariantSelectionChange(optionIndex) {
+      // non variation option, do nothing
+      if (!this.variationOptions.includes(this.skuOptions[optionIndex].name)) {
+        return;
+      }
+
+      let subSelection = [];
+      for (let i = 0; i < this.variantOptions.length; i++) {
+        if (i <= optionIndex) {
+          const skuOption = this.skuOptions[i].name;
+          if (this.variationOptions.includes(skuOption)) {
+            subSelection.push({ option: skuOption, variant: this.variantOptions[i]});
+          }
+        } else {
+          const nextVariants = this.getNextVariantsFromMatchedSkus(subSelection);
+          if (nextVariants.length == 0) {
+            return;
+          } else {
+            this.variantOptions[i] = nextVariants[0];
+          }
+        }
+      }
+    },
+
+    getNextVariantsFromMatchedSkus(subSelection) {
+      if (this.skus.length === 0) {
+        return [];
+      }
+
+      if (this.skus[0].selections?.length <= subSelection?.length) {
+        return [];
+      }
+
+      const matchedSkus = this.model
+        .get('item')
+        .get('skus')
+        .filter((v) => _.isEqual(v.get('selections').slice(0, subSelection.length), subSelection));
+      if (matchedSkus.length === 0) {
+        return [];
+      }
+      return _.uniq(matchedSkus.map((v) => v.get('selections')[subSelection.length].variant), true) ;
     },
 
     onRatings(data) {

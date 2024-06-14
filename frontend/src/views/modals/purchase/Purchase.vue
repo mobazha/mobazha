@@ -590,12 +590,17 @@ export default {
         const sOpt = this.shippingOptions.findWhere({ name: sName });
         const sOptService = sOpt ? sOpt.get('services').findWhere({ name: sService }) : '';
 
-        const options = item.get('options').toJSON();
-        const selections = options.map((option) => ({
-          option: option.name,
-          variant: option.value,
-        }));
         const listing = this.itemsToPurchase.get(item.id);
+        const variationOptions = listing.get('item').get('options').toJSON().filter((option) => option.variation && option.variants && option.variants.length).map((option) => option.name);
+
+        const options = item.get('options').toJSON();
+        const selections = [];
+        options.forEach((option) => {
+          if (variationOptions.includes(option.name)) {
+            selections.push({ option: option.name, variant: option.value });
+          }
+        });
+
         const sku = listing
           .get('item')
           .get('skus')

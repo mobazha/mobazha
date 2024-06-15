@@ -104,10 +104,9 @@ class AutoUpdaterAddon {
       info.desc = 'Download Complete';
       this.sendStatusToWindow(info);
 
-      // this.sendStatusToWindow(opts);
       // quit and update
       // app.appQuit();
-      // autoUpdater.quitAndInstall();
+      autoUpdater.quitAndInstall();
     });
   }
 

@@ -32,7 +32,7 @@ class IpcHttpCustom {
       case 'controller.mainwindow.setActiveServer':
 
       case 'controller.system.writeToClipboard':
-        
+        navigator.clipboard.writeText(args);
         break;
     
       default:

@@ -198,6 +198,7 @@
 import * as isIPFS from 'is-ipfs';
 import Backbone from 'backbone';
 import $ from 'jquery';
+import process from 'process';
 import { ipc } from '../utils/ipcRenderer.js';
 import { events as serverConnectEvents, getCurrentConnection } from '../../backbone/utils/serverConnect.js';
 import { setUnreadNotifCount, launchNativeNotification } from '../../backbone/utils/notification.js';

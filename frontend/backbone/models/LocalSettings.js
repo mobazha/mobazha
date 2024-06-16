@@ -1,6 +1,7 @@
 /* eslint-disable class-methods-use-this */
 import { Model } from 'backbone';
 import is from 'is_js';
+import process from 'process';
 import LocalStorageSync from '../utils/lib/backboneLocalStorage';
 import { feeLevels } from '../utils/fees';
 import { getTranslationLangByCode } from '../data/languages';

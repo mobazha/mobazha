@@ -10,11 +10,17 @@ export default defineConfig(({ command, mode }) => {
       host: true,
       port: 8088,
       proxy: {
-        '/api': {
+        '/v1': {
           target: 'http://127.0.0.1:5102',
           changeOrigin: true,
           secure: false,
-          rewrite: (path) => path.replace(/^\/api/, '')
+          // rewrite: (path) => path.replace(/^\/api/, '')
+        },
+        '/info': {
+          target: 'https://mobazha.info',
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/info/, '')
         },
       },
     },
@@ -51,9 +57,6 @@ export default defineConfig(({ command, mode }) => {
           drop_debugger: true,
         },
       },
-    },
-    define: {
-      'process.env': process.env
     }
   };
 });

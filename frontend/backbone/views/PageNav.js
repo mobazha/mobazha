@@ -2,6 +2,7 @@
 import * as isIPFS from 'is-ipfs';
 import Backbone from 'backbone';
 import $ from 'jquery';
+import process from 'process';
 import { ipc } from '../../src/utils/ipcRenderer.js';
 import { events as serverConnectEvents, getCurrentConnection } from '../utils/serverConnect';
 import { setUnreadNotifCount, launchNativeNotification } from '../utils/notification';

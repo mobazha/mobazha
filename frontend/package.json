@@ -39,6 +39,7 @@
     "ionicons": "^2.0.1",
     "is_js": "0.9.0",
     "is-ipfs": "^6.0.2",
+    "is-url": "^1.2.4",
     "jquery": "^3.6.3",
     "jquery-zoom": "^1.7.21",
     "microplugin": "^0.0.3",

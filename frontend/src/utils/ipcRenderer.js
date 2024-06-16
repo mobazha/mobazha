@@ -1,3 +1,6 @@
+import process from 'process';
+import { ipcHttpCustom } from './ipcHttpCustom';
+
 const Renderer = (window.require && window.require('electron')) || window.electron || {};
 
 /**
@@ -20,7 +23,7 @@ const Renderer = (window.require && window.require('electron')) || window.electr
 /**
  * ipc
  */
-const ipc = Renderer.ipcRenderer || undefined;
+const ipc = process.platform ? (Renderer.ipcRenderer || undefined) : ipcHttpCustom;
 
 /**
  * 是否为EE环境

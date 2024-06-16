@@ -1,6 +1,6 @@
 /* eslint-disable class-methods-use-this */
 import { Model } from 'backbone';
-import is from 'is_js';
+import isUrl from 'is-url';
 import process from 'process';
 import LocalStorageSync from '../utils/lib/backboneLocalStorage';
 import { feeLevels } from '../utils/fees';
@@ -43,6 +43,11 @@ export default class extends Model {
 
     const language = (langDataObj && langDataObj.code) || 'en_US';
 
+    let verifiedModsProvider = `${location.origin}/info/api/moderator/verified`;
+    if (process.platform) {
+      verifiedModsProvider = `https://${process.env.TESTNET === 'true' ? 'console.' : ''}mobazha.info/api/moderator/verified`;
+    }
+
     return {
       windowControlStyle: process.platform === 'darwin' ? 'mac' : 'win',
       showAdvancedVisualEffects: true,
@@ -51,7 +56,7 @@ export default class extends Model {
       language,
       listingsGridViewType: 'grid',
       bitcoinUnit: 'BTC',
-      verifiedModsProvider: `https://${process.env.TESTNET === 'true' ? 'console.' : ''}mobazha.info/api/moderator/verified`,
+      verifiedModsProvider,
       verifiedModsProviderTor: 'http://my7nrnmkscxr32zo.onion/verified_moderators',
       dontShowTorExternalLinkWarning: false,
     };
@@ -96,7 +101,7 @@ export default class extends Model {
       addError(`bitcoinUnit needs to be one of ${this.bitcoinUnits}.`);
     }
 
-    if (is.not.url(attrs.verifiedModsProvider)) {
+    if (!isUrl(attrs.verifiedModsProvider)) {
       addError('verifiedModsProvider', app.polyglot.t('localSettingsModelErrors.verifiedModsProvider'));
     }
 

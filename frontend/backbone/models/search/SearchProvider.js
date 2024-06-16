@@ -1,5 +1,6 @@
 import app from '../../app';
 import is from 'is_js';
+import isUrl from 'is-url';
 import LocalStorageSync from '../../utils/lib/backboneLocalStorage';
 import { curConnOnTor } from '../../utils/serverConnect';
 import BaseModel from '../BaseModel';
@@ -58,14 +59,14 @@ export default class extends BaseModel {
       addError('name', app.polyglot.t('searchProviderModelErrors.invalidName'));
     }
 
-    if (attrs.logo && is.not.url(attrs.logo)) {
+    if (attrs.logo && !isUrl(attrs.logo)) {
       addError('logo', app.polyglot.t('searchProviderModelErrors.invalidLogo'));
     }
 
     // a provider can be created with less than all of the urls. The view is expected to retrieve
     // and save the missing urls when the search api is called
     urlTypes.forEach(urlType => {
-      if (attrs[urlType] && is.not.url(attrs[urlType])) {
+      if (attrs[urlType] && !isUrl(attrs[urlType])) {
         addError(urlType, app.polyglot.t(`searchProviderModelErrors.invalid${urlType}`));
       }
     });

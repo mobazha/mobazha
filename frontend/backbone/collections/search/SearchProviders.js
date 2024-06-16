@@ -1,5 +1,5 @@
 import { Collection } from 'backbone';
-import is from 'is_js';
+import isUrl from 'is-url';
 import Provider from '../../models/search/SearchProvider';
 import LocalStorageSync from '../../utils/lib/backboneLocalStorage';
 import { curConnOnTor } from '../../utils/serverConnect';
@@ -10,7 +10,7 @@ import { curConnOnTor } from '../../utils/serverConnect';
  * @returns {string} - The URL domain and pathname without any trailing slashes.
  */
 function baseUrl(url) {
-  if (!url || is.not.url(url)) throw new Error('Please provide a valid URL.');
+  if (!url || !isUrl(url)) throw new Error('Please provide a valid URL.');
 
   const tempUrl = new URL(url);
   return (`${tempUrl.host}${tempUrl.pathname}`).replace(/\/$/, '');
@@ -62,7 +62,7 @@ export default class extends Collection {
    * @returns {object} - A search provider model.
    */
   getProviderByURL(url) {
-    if (!url || is.not.url(url)) throw new Error('Please provide a valid URL.');
+    if (!url || !isUrl(url)) throw new Error('Please provide a valid URL.');
 
     return this.models.find(md => {
       let match = false;

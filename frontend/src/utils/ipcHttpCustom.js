@@ -22,7 +22,7 @@ class IpcHttpCustom {
         break;
 
       case 'controller.system.openExternal':
-      
+        break;
 
       case 'controller.mainwindow.setProxy': {
         this.trigger('proxy-set', args, args?.id);
@@ -30,6 +30,7 @@ class IpcHttpCustom {
       }
 
       case 'controller.mainwindow.setActiveServer':
+        break;
 
       case 'controller.system.writeToClipboard':
         navigator.clipboard.writeText(args);

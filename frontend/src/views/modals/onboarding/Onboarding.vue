@@ -52,7 +52,7 @@
                 <div class="row">
                   <label for="onboardingName" class="required">{{ ob.polyT('onboarding.infoScreen.nameLbl') }}</label>
                     <FormError v-if="ob.profileErrors['name']" :errors="ob.profileErrors['name']" />
-                    <input type="text" class="clrBr clrSh2" name="name" id="onboardingName" :value="ob.profile.name" :placeholder="ob.polyT('onboarding.infoScreen.placeholderName')" data-model="profile">
+                    <input type="text" class="clrBr clrSh2" v-model="formData.profile.name" id="onboardingName" :placeholder="ob.polyT('onboarding.infoScreen.placeholderName')">
                 </div>
                 <div class="row">
                   <div class="flexVBase">
@@ -60,32 +60,32 @@
                     <div class="clrT2 tx6">{{ ob.polyT('onboarding.infoScreen.descriptionHelper', { count: ob.profileConstraints.shortDescriptionLength }) }}</div>
                   </div>
                     <FormError v-if="ob.profileErrors['shortDescription']" :errors="ob.profileErrors['shortDescription']" />
-                    <textarea rows="3" :maxlength="ob.profileConstraints.shortDescriptionLength" name="shortDescription"
+                    <textarea rows="3" :maxlength="ob.profileConstraints.shortDescriptionLength"
+                      v-model="formData.profile.shortDescription"
                       id="onboardingShortDescription" class="clrBr clrSh2"
-                      :placeholder="ob.polyT('onboarding.infoScreen.placeholderDescription')"
-                      data-model="profile">{{ ob.profile.shortDescription }}</textarea>
+                      :placeholder="ob.polyT('onboarding.infoScreen.placeholderDescription')"></textarea>
                 </div>
                 <div class="row">
                   <label>{{ ob.polyT('onboarding.infoScreen.avatarLbl') }}</label>
                   <div class="border clrBr pad avatarCropperWrap">
-                    <div class="flexRow flexVCent gutterH" id="avatarCropper">
-                      <div class="contentBox avatarPreview clrP clrBr2 clrSh1 flexNoShrink js-avatarPreview"></div>
+                    <div ref="avatarCropper" class="flexRow flexVCent gutterH" id="avatarCropper">
+                      <div ref="avatarPreview" class="contentBox avatarPreview clrP clrBr2 clrSh1 flexNoShrink"></div>
                       <div class="flexNoShrink">
                         <div class="flexColRows gutterVTn avatarCropControls">
                           <div>
                             <div class="flex gutterH">
-                              <button class="iconBtn ion-reply flexExpand clrP clrBr clrSh2 disabled avatarLeft " @click="onAvatarLeftClick"></button>
-                              <button class="iconBtn ion-forward flexExpand clrP clrBr clrSh2 disabled avatarRight " @click="onAvatarRightClick"></button>
+                              <button class="iconBtn ion-reply flexExpand clrP clrBr clrSh2 avatarLeft" :disabled="!imageLoaded" @click="onAvatarLeftClick"></button>
+                              <button class="iconBtn ion-forward flexExpand clrP clrBr clrSh2 avatarRight" :disabled="!imageLoaded" @click="onAvatarRightClick"></button>
                             </div>
                           </div>
                           <div class="posR">
-                            <input type="range" class="cropit-image-zoom-input disabled js-avatarZoom clrP" value=0 />
+                            <input type="range" class="cropit-image-zoom-input clrP" :disabled="!imageLoaded" value=0 />
                           </div>
                         </div>
                       </div>
                       <div>
-                        <input type="file" id="avatarInput" class="cropit-image-input invisible posA" tabindex="-1" />
-                        <button for="avatarInput" class="btn clrP clrBr clrSh2 tx6 " @click="onClickChangeAvatar">
+                        <input type="file" ref="avatarInput" class="cropit-image-input invisible posA" tabindex="-1" />
+                        <button class="btn clrP clrBr clrSh2 tx6 " @click="$refs.avatarInput.click()">
                           {{ ob.polyT('onboarding.infoScreen.changeAvatarLbl') }}
                         </button>
                       </div>
@@ -95,20 +95,20 @@
                 <div class="row">
                   <label for="onboardingCountry" class="required">{{ ob.polyT('onboarding.infoScreen.countryLbl') }}</label>
                     <FormError v-if="ob.settingsErrors['country']" :errors="ob.settingsErrors['country']" />
-                    <select id="onboardingCountry" name="country" class="clrSh2" data-model="settings">
-                      <template v-for="(country, j) in ob.countryList" :key="country.dataName">
+                    <Select2 id="onboardingCountry" v-model="formData.settings.country" class="clrSh2">
+                      <template  v-for="(country, j) in ob.countryList" :key="country.dataName">
                         <option :value="country.dataName" :selected="country.dataName == ob.settings.country">{{ country.name }}</option>
                       </template>
-                    </select>
+                    </Select2>
                 </div>
                 <div class="row">
                   <label for="onboardingCurrency" class="required">{{ ob.polyT('onboarding.infoScreen.currencyLbl') }}</label>
                     <FormError v-if="ob.settingsErrors['currency']" :errors="ob.settingsErrors['currency']" />
-                    <select id="onboardingCurrency" name="localCurrency" class="clrSh2" data-model="settings">
+                    <Select2 id="onboardingCurrency" v-model="formData.settings.localCurrency" class="clrSh2">
                       <template v-for="(currency, j) in ob.currencyList" :key="currency.code">
                         <option :value="currency.code" :selected="currency.code == ob.settings.localCurrency">{{ currency.nameWithCode }}</option>
                       </template>
-                    </select>
+                    </Select2>
                 </div>
               </form>
             </template>
@@ -164,6 +164,14 @@ export default {
   },
   data () {
     return {
+      imageLoaded: false,
+
+      formData: {
+        settings: {
+          country: '',
+          localCurrency: '',
+        }
+      },
     };
   },
   created () {
@@ -262,10 +270,6 @@ export default {
       this.setState({ screen: newScreen });
     },
 
-    onClickChangeAvatar () {
-      this.getCachedEl('#avatarInput')[0].click();
-    },
-
     onAvatarLeftClick () {
       this.avatarRotate(-1);
     },
@@ -318,12 +322,8 @@ export default {
     },
 
     setModelsFromForm () {
-      const $settingsFields = this.getCachedEl('select[data-model=settings], ' +
-        'input[data-model=settings], textarea[data-model=settings]');
-      app.settings.set(this.getFormData($settingsFields));
-      const $profileFields = this.getCachedEl('select[data-model=profile], ' +
-        'input[data-model=profile], textarea[data-model=profile]');
-      app.profile.set(this.getFormData($profileFields));
+      app.settings.set(this.formData.settings);
+      app.profile.set(this.formData.profile);
     },
 
     saveAvatar () {
@@ -372,70 +372,42 @@ export default {
         this.$avatarCropper = null;
       }
 
-      this.clearCachedElementMap();
+      if (state.screen === 'info') {
+        setTimeout(() => {
+          this.$avatarCropper = this.refs.avatarCropper.cropit({
+            $preview: this.$refs.avatarPreview,
+            $fileInput: this.$refs.avatarInput,
+            smallImage: 'stretch',
+            allowDragNDrop: false,
+            maxZoom: 2,
+            onImageLoaded: () => {
+              this.imageLoaded = true;
+              this.$avatarCropper.cropit('zoom', this.lastAvatarZoom);
 
-      loadTemplate('modals/onboarding/onboarding.html', t => {
-        loadTemplate('components/brandingBox.html', brandingBoxT => {
-          const state = this.getState();
-
-          this.$el.html(t({
-            brandingBoxT,
-            ...state,
-            curConn: getCurrentConnection(),
-            profile: app.profile.toJSON(),
-            profileErrors: app.profile.validationError || {},
-            profileConstraints: app.profile.max,
-            settings: app.settings.toJSON(),
-            settingsErrors: app.settings.validationError || {},
-            countryList: this.countryList,
-            currencyList: this.currencyList,
-          }));
-
-          super.render();
-
-          if (state.screen === 'info') {
-            setTimeout(() => {
-              this.getCachedEl('#onboardingCountry').select2();
-              this.getCachedEl('#onboardingCurrency').select2();
-
-              this.$avatarCropper = this.getCachedEl('#avatarCropper').cropit({
-                $preview: this.getCachedEl('.js-avatarPreview'),
-                $fileInput: this.getCachedEl('#avatarInput'),
-                smallImage: 'stretch',
-                allowDragNDrop: false,
-                maxZoom: 2,
-                onImageLoaded: () => {
-                  this.getCachedEl('.js-avatarLeft').removeClass('disabled');
-                  this.getCachedEl('.js-avatarRight').removeClass('disabled');
-                  this.getCachedEl('.js-avatarZoom').removeClass('disabled');
-                  this.$avatarCropper.cropit('zoom', this.lastAvatarZoom);
-
-                  for (let i = 0; i < this.lastAvatarImageRotate; i++) {
-                    this.$avatarCropper.cropit('rotateCW');
-                  }
-                },
-                onFileChange: () => {
-                  this.lastAvatarImageRotate = 0;
-                  this.lastAvatarImageSrc = '';
-                  this.lastAvatarZoom = 0;
-                  this.avatarChanged = true;
-                },
-                onFileReaderError: (data) => {
-                  console.log('file reader error');
-                  console.log(data);
-                },
-                onImageError: (errorObject) => {
-                  console.log(errorObject.code);
-                  console.log(errorObject.message);
-                },
-                imageState: {
-                  src: this.lastAvatarImageSrc || '',
-                },
-              });
-            }, 0);
-          }
-        });
-      });
+              for (let i = 0; i < this.lastAvatarImageRotate; i++) {
+                this.$avatarCropper.cropit('rotateCW');
+              }
+            },
+            onFileChange: () => {
+              this.lastAvatarImageRotate = 0;
+              this.lastAvatarImageSrc = '';
+              this.lastAvatarZoom = 0;
+              this.avatarChanged = true;
+            },
+            onFileReaderError: (data) => {
+              console.log('file reader error');
+              console.log(data);
+            },
+            onImageError: (errorObject) => {
+              console.log(errorObject.code);
+              console.log(errorObject.message);
+            },
+            imageState: {
+              src: this.lastAvatarImageSrc || '',
+            },
+          });
+        }, 0);
+      }
 
       return this;
     }

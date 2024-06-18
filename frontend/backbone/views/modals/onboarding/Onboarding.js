@@ -92,14 +92,20 @@ export default class extends BaseModal {
 
   onClickChangeAvatar() {
     this.getCachedEl('#avatarInput')[0].click();
+
+    return false;
   }
 
   onAvatarLeftClick() {
     this.avatarRotate(-1);
+
+    return false;
   }
 
   onAvatarRightClick() {
     this.avatarRotate(1);
+
+    return false;
   }
 
   onClickTosAgree() {

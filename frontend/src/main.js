@@ -69,14 +69,14 @@ function mountVueApp(container) {
     },
   });
 
-  let app = vueApp.use(Router).use(store).use(VueBackbone).mount(container);
+  const appInstance = vueApp.use(Router).use(store).use(VueBackbone).mount(container);
   Router.beforeEach((to, from) => {
-    app.showLoadingModal = true;
+    appInstance.showLoadingModal = true;
   });
 
   Router.afterEach(() => {
-    app.showLoadingModal = false;
+    appInstance.showLoadingModal = false;
   });
-  return app;
+  return appInstance;
 }
 window.vueApp = mountVueApp('#appFrame');

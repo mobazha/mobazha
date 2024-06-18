@@ -1,3 +1,4 @@
+import $ from 'jquery';
 import _ from 'underscore';
 import { Events } from 'backbone';
 
@@ -30,6 +31,20 @@ class IpcHttpCustom {
       }
 
       case 'controller.mainwindow.setActiveServer':
+        const server = args;
+        if (server.authenticate) {
+          // $.ajaxSetup({
+          //   beforeSend: function(jqXHR, settings) {
+          //     if (settings.url.startsWith(server.httpUrl) || settings.url.startsWith(server.socketUrl)){
+          //       const un = server.username;
+          //       const pw = server.password;
+  
+          //       jqXHR.setRequestHeader('Authorization', `Basic ${btoa(`${un}:${pw}`)}}`); 
+          //     }
+          //   }
+          // });
+        };
+        
         break;
 
       case 'controller.system.writeToClipboard':

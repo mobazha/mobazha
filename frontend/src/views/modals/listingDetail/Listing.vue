@@ -228,11 +228,11 @@
                         <td>{{ optionalFeature.skuID }}</td>
                         <td>
                           <el-image
-                            v-if="optionalFeature.image"
+                            v-if="optionalFeature.images?.length"
                             style="width: 60px; height: 60px"
-                            :src="ob.getServerUrl(`ob/image/${optionalFeature.image.small}`)"
+                            :src="ob.getServerUrl(`ob/image/${optionalFeature.images[0].small}`)"
                             fit="cover"
-                            :preview-src-list="[ob.getServerUrl(`ob/image/${ob.isHiRez() ? optionalFeature.image.large : optionalFeature.image.medium}`)]"
+                            :preview-src-list="[ob.getServerUrl(`ob/image/${ob.isHiRez() ? optionalFeature.images[0].large : optionalFeature.images[0].medium}`)]"
                           />
                         </td>
                       </tr>
@@ -291,8 +291,14 @@
 
             <template v-if="imageGallary.length">
               <div ref="photoSection" class="contentBox clrSh3 photoSection js-photoSection">
-                <div ref="photoSelected" class="flexCent photoSelected js-photoSelected">
-                  <img ref="photoSelectedInner" class="photoSelectedInner" />
+                <div class="flexCent photoSelected">
+                  <!-- <img class="photoSelectedInner" :src="selectedPhoto" /> -->
+                  <el-image
+                    style="width: 100%; height: 100%"
+                    :src="selectedPhoto"
+                    fit="contain"
+                    :preview-src-list="[selectedPhoto]"
+                  />
                 </div>
                 <template v-if="imageGallary.length > 1">
                   <button class="btn ion-ios-arrow-left photoPrev" @click="onClickPhotoPrev"></button>
@@ -649,6 +655,10 @@ export default {
       const skuImages = this.selectedSKU?.get('images').toJSON() || [];
       return [...skuImages, ...commonImages];
     },
+    selectedPhoto() {
+      const photoHash = this.imageGallary[this.activePhotoIndex].original;
+      return app.getServerUrl(`ob/image/${photoHash}`);
+    },
     skuOptions() {
       return this.model.get('item').get('options')?.toJSON() || [];
     },
@@ -749,7 +759,7 @@ export default {
         };
       }
       return {};
-    },
+    }
   },
   methods: {
     loadData(options = {}) {
@@ -1115,31 +1125,8 @@ export default {
       if (photoIndex < 0) {
         throw new Error('Please provide a valid index for the selected photo.');
       }
-      const photoHash = this.imageGallary[photoIndex].original;
-      const phSrc = app.getServerUrl(`ob/image/${photoHash}`);
 
       this.activePhotoIndex = photoIndex;
-      this.getPhotoSelectedEl().trigger('zoom.destroy'); // old zoom must be removed
-      this.photoSelectedInner.attr('src', phSrc);
-    },
-
-    activateZoom() {
-      if (this.photoSelectedInner.width() >= this.getPhotoSelectedEl().width() || this.photoSelectedInner.height() >= this.getPhotoSelectedEl().height()) {
-        this.getPhotoSelectedEl()
-          .removeClass('unzoomable')
-          .zoom({
-            url: this.photoSelectedInner.attr('src'),
-            on: 'click',
-            onZoomIn: () => {
-              this.getPhotoSelectedEl().addClass('open');
-            },
-            onZoomOut: () => {
-              this.getPhotoSelectedEl().removeClass('open');
-            },
-          });
-      } else {
-        this.getPhotoSelectedEl().addClass('unzoomable');
-      }
     },
 
     onClickPhotoPrev() {
@@ -1237,10 +1224,6 @@ export default {
       });
     },
 
-    getPhotoSelectedEl() {
-      return $(this.$refs.photoSelected);
-    },
-
     onNsfwWarningClose() {
       this._showNsfwWarning = false;
     },
@@ -1251,10 +1234,6 @@ export default {
       if (this._latestHash !== this.model.get('hash')) {
         this.outdateHash = true;
       }
-
-      this.photoSelectedInner = $(this.$refs.photoSelectedInner);
-
-      this.photoSelectedInner.on('load', () => this.activateZoom());
 
       this.setSelectedPhoto(this.activePhotoIndex);
 

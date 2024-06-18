@@ -88,9 +88,6 @@ export default {
     fullSkus() {
       const options = this.variationOptions;
 
-      // ensure the Sku collection has the latest data from the UI
-      this.setCollectionData();
-
       const existingSkus = [];
       const missingSkus = [];
       this.allPossibleCombos(options.map((option) => option.variants))

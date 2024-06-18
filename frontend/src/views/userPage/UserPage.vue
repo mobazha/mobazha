@@ -487,7 +487,7 @@ export default {
 
       if (prevHash === locationHash) {
         // there is no previous page, let's navigate to our home page
-        this.navigate(`${app.profile.id}`, { trigger: true, });
+        app.router.navigate(`${app.profile.id}`, { trigger: true, });
       } else {
         // go back to previous page
         window.history.back();

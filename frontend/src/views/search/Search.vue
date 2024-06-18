@@ -111,6 +111,7 @@
 import _ from 'underscore';
 import $ from 'jquery';
 import is from 'is_js';
+import process from 'process';
 import app from '../../../backbone/app';
 import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
 import ResultsCol from '../../../backbone/collections/Results';
@@ -488,11 +489,14 @@ export default {
           if (data.name && data.links) {
             const dataUpdate = this.buildProviderUpdate(data);
 
-            // update the defaults but do not save them
-            if (!this.providerIsADefault(this._search.provider.id)) {
-              this._search.provider.save(dataUpdate.update, { urlTypes: dataUpdate.urlTypes });
-            } else {
-              this._search.provider.set(dataUpdate.update, { urlTypes: dataUpdate.urlTypes });
+            // for browser mode, don't update search provider
+            if (process.platform) {
+              // update the defaults but do not save them
+              if (!this.providerIsADefault(this._search.provider.id)) {
+                this._search.provider.save(dataUpdate.update, { urlTypes: dataUpdate.urlTypes });
+              } else {
+                this._search.provider.set(dataUpdate.update, { urlTypes: dataUpdate.urlTypes });
+              }
             }
 
             this.setState({

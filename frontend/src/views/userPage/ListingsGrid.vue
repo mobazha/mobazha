@@ -4,7 +4,6 @@
       <ListingCard :options="getCardOptions(model)" :bb="function() {
           return {
             model,
-            profile: storeOwnerProfile,
           }
         }"
       />
@@ -66,6 +65,12 @@ export default {
       return {
         listingBaseUrl,
         viewType: this.viewType,
+        vendor: {
+          peerID: this.storeOwnerProfile.id,
+          name: this.storeOwnerProfile.get('name'),
+          handle: this.storeOwnerProfile.get('handle'),
+          avatarHashes: this.storeOwnerProfile.get('avatarHashes').toJSON(),
+        },
 
         // Flag so the listing card knows it's on a store. This is useful to
         // the listing detail modal and will be passed into there.

@@ -402,7 +402,6 @@
 				}"
 				:bb="function() {
 					return {
-						profile: profile,
 						model: fullListing,
 					}
 				}"
@@ -547,24 +546,13 @@ export default {
       return this.avatarHashes ? app.getServerUrl(`ob/image/${isHiRez() ? this.avatarHashes.small : this.avatarHashes.tiny}`) : '';
     },
     avatarHashes() {
-      let avatarHashes;
-
-      if (this.options.vendor) {
-        avatarHashes = this.options.vendor.avatarHashes;
-      }
-      else if (_.has(this, 'profile') && this.profile) {
-        avatarHashes = this.profile.get('avatarHashes').toJSON();
-      }
-      return avatarHashes;
+      return this.options.vendor.avatarHashes;
     },
     storeName() {
       let storeName = `${this.ownerGuid.slice(0, 8)}…`;
 
       if (this.options.vendor) {
         storeName = this.options.vendor.name;
-      }
-      else if (_.has(this, 'profile') && this.profile) {
-        storeName = this.profile.get('name');
       }
 
       if (storeName.length > 40) {
@@ -618,16 +606,12 @@ export default {
       return priceRowTextClass;
     },
     ownerGuid() {
-      if (_.has(this, 'profile') && this.profile) {
-        // If a profile model of the listing owner is available, please pass it in.
-        return this.profile.id;
-      } else if (this.model.get('vendor')) {
-        // If a vendor object is available (part of proposed search API), please pass it in.
-        return this.model.get('vendor').peerID;
-      } else {
-        // Otherwise please provide the store owner's guid.
-        this.ownerGuid = this.options.ownerGuid;
+      if (this.options.vendor.peerID) {
+        return this.options.vendor.peerID;
       }
+      
+      // If a vendor object is available (part of proposed search API), please pass it in.
+      return this.model.get('vendor').peerID;
     },
     verifiedModID() {
       let key = this.verifiedModsKey;

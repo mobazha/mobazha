@@ -123,9 +123,16 @@
         @clickCancel="onClickLoadingCancel" @clickRetry="onClickLoadingRetry"/>
       <ListingDetail v-else-if="activeTab === 'store' && listing"
         :key="`${listing.cid}_${listingKey}`"
+        :options="{
+          vendor: {
+            peerID: model.id,
+            name: model.get('name'),
+            handle: model.get('handle'),
+            avatarHashes: model.get('avatarHashes').toJSON(),
+          },
+				}"
         :bb="function() {
           return {
-            profile: model,
             model: listing,
           }
         }"

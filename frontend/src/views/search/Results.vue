@@ -24,7 +24,7 @@
       </div>
     </div>
     <div ref="resultsGrid" :class="`listingsGrid ${ob.viewTypeClass} flex js-resultsGrid`">
-      <template v-for="model in pageCols[_search.p]">
+      <template v-for="model in pageCols[_search.p]" :key="`${model.get('hash')}_${model.get('slug')}`">
         <ListingCard v-if="isListingCardModel(model)"
           :options="cardViewOptions(model)"
           :bb="function() {

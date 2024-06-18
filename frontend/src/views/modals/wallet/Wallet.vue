@@ -193,6 +193,8 @@ export default {
         this.fetchAddress(coin);
       }
 
+      $.post(app.getServerUrl(`wallet/status/${coin}`));
+
       if (this.tabActive === 'send' && !(this.walletBalances.get(coin) && this.walletBalances.get(coin).get('confirmed'))) {
         this.tabActive = 'receive';
       } else {

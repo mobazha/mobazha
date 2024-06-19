@@ -1,7 +1,11 @@
 <template>
   <div>
-    <template v-if="!collection.length">
+    <template v-if="!collection.length && !fullSkus.fullSkus.length">
       <div class="rowMd">{{ ob.polyT('editListing.variantInventory.placeholderNeedMoreData') }}</div>
+    </template>
+    
+    <template v-if="!collection.length && fullSkus.fullSkus.length">
+      <a class="clrBr clrP clrTEm" @click="onClickAddMissingSkus" v-if="collection.length < fullSkus.fullSkus.length">{{ ob.polyT('editListing.variantInventory.addMissingSku') }}</a>
     </template>
 
     <template v-else>

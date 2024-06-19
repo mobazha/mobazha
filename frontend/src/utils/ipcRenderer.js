@@ -1,4 +1,3 @@
-import process from 'process';
 import { ipcHttpCustom } from './ipcHttpCustom';
 
 const Renderer = (window.require && window.require('electron')) || window.electron || {};
@@ -23,7 +22,7 @@ const Renderer = (window.require && window.require('electron')) || window.electr
 /**
  * ipc
  */
-const ipc = process.platform ? (Renderer.ipcRenderer || undefined) : ipcHttpCustom;
+const ipc = import.meta.env.VITE_APP ? (Renderer.ipcRenderer || undefined) : ipcHttpCustom;
 
 /**
  * 是否为EE环境

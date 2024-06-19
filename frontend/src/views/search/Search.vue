@@ -111,7 +111,6 @@
 import _ from 'underscore';
 import $ from 'jquery';
 import is from 'is_js';
-import process from 'process';
 import app from '../../../backbone/app';
 import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
 import ResultsCol from '../../../backbone/collections/Results';
@@ -490,7 +489,7 @@ export default {
             const dataUpdate = this.buildProviderUpdate(data);
 
             // for browser mode, don't update search provider
-            if (process.platform) {
+            if (import.meta.env.VITE_APP) {
               // update the defaults but do not save them
               if (!this.providerIsADefault(this._search.provider.id)) {
                 this._search.provider.save(dataUpdate.update, { urlTypes: dataUpdate.urlTypes });

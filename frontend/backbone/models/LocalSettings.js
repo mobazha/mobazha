@@ -44,7 +44,7 @@ export default class extends Model {
     const language = (langDataObj && langDataObj.code) || 'en_US';
 
     let verifiedModsProvider = `${location.origin}/info/api/moderator/verified`;
-    if (process.platform) {
+    if (import.meta.env.VITE_APP) {
       verifiedModsProvider = `https://${process.env.TESTNET === 'true' ? 'console.' : ''}mobazha.info/api/moderator/verified`;
     }
 

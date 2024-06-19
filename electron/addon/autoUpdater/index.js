@@ -4,6 +4,7 @@ const is = require('ee-core/utils/is');
 const Log = require('ee-core/log');
 const Conf = require('ee-core/config');
 const CoreWindow = require('ee-core/electron/window');
+const Electron = require('ee-core/electron');
 
 /**
  * 自动升级插件
@@ -61,15 +62,16 @@ class AutoUpdaterAddon {
       Log.error('[addon:autoUpdater] setFeedURL error : ', error);
     }
   
-    autoUpdater.on('checking-for-update', () => {
-      this.sendStatusToWindow('正在检查更新...');
+    autoUpdater.on('checking-for-update', (info = {}) => {
+      info.status = status.checking;
+      this.sendStatusToWindow(info);
     })
-    autoUpdater.on('update-available', (info) => {
+    autoUpdater.on('update-available', (info = {}) => {
       info.status = status.available;
       info.desc = '有可用更新';
       this.sendStatusToWindow(info);
     })
-    autoUpdater.on('update-not-available', (info) => {
+    autoUpdater.on('update-not-available', (info = {}) => {
       info.status = status.noAvailable;
       info.desc = '没有可用更新';
       this.sendStatusToWindow(info);
@@ -99,14 +101,10 @@ class AutoUpdaterAddon {
       Log.info('[addon:autoUpdater] progress: ', text);
       this.sendStatusToWindow(info);
     })
-    autoUpdater.on('update-downloaded', (info) => {
+    autoUpdater.on('update-downloaded', (info = {}) => {
       info.status = status.downloaded;
       info.desc = 'Download Complete';
       this.sendStatusToWindow(info);
-
-      // quit and update
-      // app.appQuit();
-      autoUpdater.quitAndInstall();
     });
   }
 
@@ -118,6 +116,10 @@ class AutoUpdaterAddon {
   }
 
   installUpdate () {
+    Log.info('[addon:autoUpdater] installUpdate, quitAndInstall');
+    // 托盘插件默认会阻止窗口关闭，这里设置允许关闭窗口
+    Electron.extra.closeWindow = true;
+
     autoUpdater.quitAndInstall();
   }
   

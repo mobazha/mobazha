@@ -1,8 +1,7 @@
-import process from 'process';
 import app from '../app';
 
 const defaultSearchProviders = [
-  process.platform ? {
+  import.meta.env.VITE_APP ? {
     id: 'mbz',
     name: 'Mobazha',
     logo: '../imgs/mbzSearchLogo.png',

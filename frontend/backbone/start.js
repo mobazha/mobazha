@@ -810,13 +810,6 @@ ipc.on('show-server-log', (event, serverLog) => {
   launchDebugLogModal();
 });
 
-// Handle update events from main.js
-ipc.on('updateChecking', () => showUpdateStatus(app.polyglot.t('update.checking')));
-ipc.on('updateAvailable', () => showUpdateStatus(app.polyglot.t('update.available')));
-ipc.on('updateNotAvailable', () => showUpdateStatus(app.polyglot.t('update.notAvailable')));
-ipc.on('updateError', (msg) => showUpdateStatus(app.polyglot.t('update.error', { error: msg }), 'warning'));
-ipc.on('updateReadyForInstall', (e, opts) => updateReady(opts));
-
 const autoUpdateStatus = {
   error: -1,
   available: 1,
@@ -828,7 +821,7 @@ const autoUpdateStatus = {
 
 ipc.on('app.updater', (e, infoInput) => {
   const info = JSON.parse(infoInput);
-  switch (info.status) {
+  switch (info?.status) {
     case autoUpdateStatus.checking:
       showUpdateStatus(app.polyglot.t('update.checking'));
       break;

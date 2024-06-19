@@ -55,7 +55,10 @@ export function updateReady(opts = {}) {
       fragment: 'installUpdate',
       className: 'btnFlx clrP clrBAttGrad clrBrDec1 clrTOnEmph',
     }],
-  }).on('click-installUpdate', () => ipc.send('controller.mainwindow.installUpdate'))
+  }).on('click-installUpdate', () => {
+        updateReadyDialog.close();
+        ipc.send('controller.mainwindow.installUpdate');
+      })
     .on('click-cancelInstall', () => updateReadyDialog.close())
     .render()
     .open();

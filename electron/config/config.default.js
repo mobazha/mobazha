@@ -185,7 +185,7 @@ module.exports = (appInfo) => {
         owner: 'mobazha',
         repo: 'mobazha'
       },
-      force: false,
+      force: true,
     },
     javaServer: {
       enable: false,

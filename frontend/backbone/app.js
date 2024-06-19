@@ -1,7 +1,5 @@
 // Object where we can (very judiciously) attach any app-wide
 // shared state (e.g. router)
-import process from "process";
-
 export default {
   serverConfig: {},
 
@@ -12,7 +10,7 @@ export default {
         ' been attached to this instance.');
     }
 
-    if (process.platform) {
+    if (import.meta.env.VITE_APP) {
       return this.serverConfigs.activeServer ? `${this.serverConfigs.activeServer.httpUrl}v1/${urlFrag}` : '';
     }
     return `/v1/${urlFrag}`;

@@ -90,7 +90,6 @@ function bindBBToVue(vm, key) {
  */
 function unbindBBFromVue(vm, key) {
 	var ctx = vm._vuebackbone[key];
-	delete vm._vuebackbone[key];
 	
 	if (ctx) {
 		ctx.bb.off(null, ctx.onchange);

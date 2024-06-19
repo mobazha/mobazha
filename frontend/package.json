@@ -1,7 +1,7 @@
 {
   "name": "ee",
   "version": "1.0.0",
-  "serverVersionRequired": "1.0.15",
+  "serverVersionRequired": "1.0.16",
   "scripts": {
     "dev": "vite --host --port 8088",
     "serve": "vite --host --port 8088",

@@ -38,6 +38,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.1
 	github.com/gosimple/slug v1.13.1
+	github.com/h2non/filetype v1.1.3
 	github.com/ipfs/boxo v0.10.2
 	github.com/ipfs/fs-repo-migrations/tools v0.0.0-20230628085149-3fc3a1aa00e4
 	github.com/ipfs/go-cid v0.4.1

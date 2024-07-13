@@ -50,6 +50,7 @@ export default class extends BaseModel {
       skus: new Skus(),
       optionalFeatures: new OptionalFeatures(),
       infiniteInventory: true,
+      altIntroVideoLinks: []
     };
   }
 

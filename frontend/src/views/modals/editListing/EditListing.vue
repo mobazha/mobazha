@@ -780,6 +780,7 @@ export default {
           condition: model.item.condition,
           grams: model.item.grams,
           introVideo: model.item.introVideo,
+          altIntroVideoLinks: model.item.altIntroVideoLinks,
           productID: model.item.productID,
           nsfw: model.item.nsfw,
           tags: model.item.tags,

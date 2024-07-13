@@ -277,7 +277,22 @@
                       <span class="ion-ios-close-empty clrBr clrP clrT"></span>
                     </a>
                   </li>
+                  <template v-for="(link, j) in formData.item.altIntroVideoLinks || []" :key="link">
+                    <li class="tile">
+                      <video-player-item ref="introVideoPlayers" class="videoIntro floR clrT4" :url="`${link}#t=1.75`" @play="onPlayIntroVideo($event, j)" />
+                      <a class="closeIcon tx2" @click="onRemoveAltIntroVideoLink(j)">
+                        <span class="ion-ios-close-empty clrBr clrP clrT"></span>
+                      </a>
+                    </li>
+                  </template>
+                  <el-dialog v-model="showVideoPopup" :align-center="true">
+                    <video-player-item v-if="showVideoPopup" :url="formData.item.altIntroVideoLinks[videoPopupIdx]" class="popupVideoIntro"/>
+                  </el-dialog>
                 </ul>
+                <div>
+                  <el-input v-model="altIntroVideoLink" style="width: 450px" placeholder="Please input extra external video link" />
+                  <el-button class="addAltIntroVideoLink" @click="onAddAltIntroVideoLink">{{ ob.polyT('editListing.btnAddPhoto') }}</el-button>
+                </div>
               </section>
 
               <section ref="sectionTags" class="tagsSection contentBox padMd clrP clrBr clrSh3 tx3">
@@ -599,6 +614,9 @@ export default {
         refundPolicy: '',
         termsAndConditions: '',
       },
+      altIntroVideoLink: '',
+      videoPopupIdx: 0,
+      showVideoPopup: false,
       trackInventoryBy: '',
       saving: false,
     };
@@ -1077,8 +1095,31 @@ export default {
       this.videoUploadsKey += 1;
     },
 
+    onAddAltIntroVideoLink() {
+      if (!this.formData.item.altIntroVideoLinks) {
+        this.formData.item.altIntroVideoLinks = [];
+      }
+
+      if (this.altIntroVideoLink && !this.formData.item.altIntroVideoLinks?.includes(this.altIntroVideoLink)) {
+        this.formData.item.altIntroVideoLinks.push(this.altIntroVideoLink);
+      }
+
+      this.altIntroVideoLink = "";
+    },
+
     onRemoveIntroVideo() {
       this.formData.item.introVideo = undefined;
+    },
+
+    onRemoveAltIntroVideoLink(idx) {
+      this.formData.item.altIntroVideoLinks.splice(idx, 1);
+    },
+
+    onPlayIntroVideo(event, idx) {
+      event.target.player.pause();
+
+      this.videoPopupIdx = idx;
+      this.showVideoPopup = true;
     },
 
     onClickAddReturnPolicy() {
@@ -1551,7 +1592,16 @@ export default {
 }
 
 .videoIntro {
-  width: 102px;
-  height: 102px;
+  width: 100px;
+  height: 100px;
+}
+
+.popupVideoIntro {
+  width: 600px;
+  height: 600px;
+}
+
+.addAltIntroVideoLink {
+  margin-left: 15px;
 }
 </style>

@@ -1,6 +1,6 @@
 <template>
   <video-player ref="videoPlayer" :options="playerOptions" controls :playsinline="true"
-    @play="onPlayerPlay($event)" @canplay="playerCanplay($event)" @ready="playerReadied">
+    @canplay="playerCanplay($event)" @ready="playerReadied">
   </video-player>
 </template>
 <script>
@@ -28,7 +28,7 @@ export default {
           type: "video/mp4",// 这里的种类支持很多种：基本视频格式、直播、流媒体等，具体可以参看git网址项目
           src: this.url // url地址
         }],
-        poster: this.imgUrl, // 你的封面地址
+        // poster: this.imgUrl, // 你的封面地址
         controlBar: {
           timeDivider: true,
           durationDisplay: true,
@@ -48,10 +48,6 @@ export default {
   mounted () {
   },
   methods: {
-    //方法不止这么点，需要其它的可以去看看官网
-    onPlayerPlay (player) {
-      this.$emit('play');
-    },
     onPlayerPause (player) {
       player.pause();
     },
@@ -61,7 +57,6 @@ export default {
     },
     currentVideoPause () {
       this.$refs.videoPlayer.player.pause();
-
     },
     currentVideoPlay () {
       this.$refs.videoPlayer.player.play();

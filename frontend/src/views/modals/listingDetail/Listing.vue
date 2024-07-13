@@ -78,7 +78,7 @@
               <div class="flex gutterHLg">
                 <div class="mainImageWrapper">
                   <div
-                    v-if="!ob.item.introVideo"
+                    v-if="!introVideoLinks.length"
                     class="mainImage clrBr"
                     @click="onClickGotoPhotos"
                     :style="
@@ -89,7 +89,13 @@
                         : `background-image: url('../imgs/defaultItem.png')`
                     "
                   ></div>
-                  <video-player-item v-if="ob.item.introVideo" class="mainImage clrBr" :url="app.getServerUrl(`ob/file/${ob.item.introVideo.hash}`)" />
+                  <el-carousel v-else-if="introVideoLinks.length > 1" class="carousel clrBr" :autoplay="false" trigger="click">
+                    <el-carousel-item v-for="link in introVideoLinks" :key="link">
+                      <video-player-item class="introVideoItem" :url="link" />
+                    </el-carousel-item>
+                  </el-carousel>
+                  <video-player-item v-else class="mainImage clrBr" :url="introVideoLinks[0]" />
+                  
                   <div class="txCtr">
                     <a class="tx5" @click="onClickGotoPhotos">
                       <u>{{
@@ -578,6 +584,20 @@ export default {
     itemsToPurchase() {
       return new OrderListings([this.model]);
     },
+
+    introVideoLinks() {
+      const links = [];
+      if (this.ob.item.introVideo) {
+        links.push(app.getServerUrl(`ob/file/${this.ob.item.introVideo.hash}`));
+      }
+
+      (this.ob.item.altIntroVideoLinks || []).forEach((link) => {
+        links.push(link);
+      });
+
+      return links;
+    },
+
     templateOptions() {
       const ob = this.ob;
 
@@ -671,7 +691,7 @@ export default {
     selectableSkuVariants() {
       return (optionIndex) => {
         if (!this.variationOptions.includes(this.skuOptions[optionIndex].name)) {
-          return this.skuOptions[optionIndex].variants?.map((v) => v.name);
+          return this.skuOptions[optionIndex].variants?.map((v) => v.name) || [];
         }
 
         let subSelection = [];
@@ -1275,5 +1295,15 @@ export default {
 .success-btn {
   background-color: #01bf65;
   border-color: #66e9ac;
+}
+
+.carousel {
+  width: 530px;
+  height: 530px;
+}
+
+.introVideoItem {
+  width: 330px;
+  height: 300px;
 }
 </style>

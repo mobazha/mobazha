@@ -293,13 +293,13 @@ let _currencies = [
     url: 'https://confluxnetwork.org',
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
-        ? `https://evmtestnet.confluxscan.io/address/${address}`
-        : `https://evm.confluxscan.io/address/${address}`
+        ? `https://evmtestnet.confluxscan.net/address/${address}`
+        : `https://evm.confluxscan.net/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
       isTestnet
-        ? `https://evmtestnet.confluxscan.io/tx/${txid}`
-        : `https://evm.confluxscan.io/address/tx/${txid}`
+        ? `https://evmtestnet.confluxscan.net/tx/${txid}`
+        : `https://evm.confluxscan.net/tx/${txid}`
     ),
     isValidAddress: isValidETHAddress,
     supportsEscrowTimeout: true,
@@ -318,13 +318,13 @@ let _currencies = [
     url: 'https://confluxnetwork.org',
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
-        ? `https://evmtestnet.confluxscan.io/address/${address}`
-        : `https://evm.confluxscan.io/address/${address}`
+        ? `https://evmtestnet.confluxscan.net/address/${address}`
+        : `https://evm.confluxscan.net/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
       isTestnet
-        ? `https://evmtestnet.confluxscan.io/tx/${txid}`
-        : `https://evm.confluxscan.io/tx/${txid}`
+        ? `https://evmtestnet.confluxscan.net/tx/${txid}`
+        : `https://evm.confluxscan.net/tx/${txid}`
     ),
     isValidAddress: isValidETHAddress,
     supportsEscrowTimeout: true,
@@ -343,13 +343,13 @@ let _currencies = [
     url: 'https://confluxnetwork.org',
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
-        ? `https://evmtestnet.confluxscan.io/address/${address}`
-        : `https://evm.confluxscan.io/address/${address}`
+        ? `https://evmtestnet.confluxscan.net/address/${address}`
+        : `https://evm.confluxscan.net/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
       isTestnet
-        ? `https://evmtestnet.confluxscan.io/tx/${txid}`
-        : `https://evm.confluxscan.io/address/tx/${txid}`
+        ? `https://evmtestnet.confluxscan.net/tx/${txid}`
+        : `https://evm.confluxscan.net/tx/${txid}`
     ),
     isValidAddress: isValidETHAddress,
     supportsEscrowTimeout: true,
@@ -368,13 +368,13 @@ let _currencies = [
     url: 'https://confluxnetwork.org',
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
-        ? `https://evmtestnet.confluxscan.io/address/${address}`
-        : `https://evm.confluxscan.io/address/${address}`
+        ? `https://evmtestnet.confluxscan.net/address/${address}`
+        : `https://evm.confluxscan.net/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
       isTestnet
-        ? `https://evmtestnet.confluxscan.io/tx/${txid}`
-        : `https://evm.confluxscan.io/address/tx/${txid}`
+        ? `https://evmtestnet.confluxscan.net/tx/${txid}`
+        : `https://evm.confluxscan.net/tx/${txid}`
     ),
     isValidAddress: isValidETHAddress,
     supportsEscrowTimeout: true,

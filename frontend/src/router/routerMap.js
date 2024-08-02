@@ -28,6 +28,11 @@ const constantRouterMap = [
         component: () => import('@/views/example/hello/Index.vue')
       },
       {
+        path: '/callback',
+        name: 'Callback',
+        component: () => import('@/views/CallbackPage.vue')
+      },
+      {
         path: '/transactions',
         name: 'Transactions',
         component: () => import('@/views/transactions/Transactions.vue')

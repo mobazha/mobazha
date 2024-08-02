@@ -51,6 +51,7 @@ import VerifiedModsError from './views/modals/VerifiedModsFetchError';
 
 import MyChatSDK from '../src/TUIKit/myChatSDK';
 
+import * as casdoor from '../src/utils/casdoor';
 
 fixLinuxZoomIssue();
 handleServerShutdownRequests();
@@ -60,6 +61,18 @@ $(function() {
 
   $.trumbowyg.svgPath = '../node_modules/trumbowyg/dist/ui/icons.svg';
 });
+
+if (location.pathname === '/callback') {
+  casdoor.signin().then((res) => {
+    if (res.status === 'ok') {
+      casdoor.setToken(res.data);
+    } else {
+      console.log(`Login failed: ${res.msg}`);
+    }
+
+    window.location.href = '/'
+  })
+}
 
 app.localSettings.on('change:language', (localSettings, lang) => {
   moment.locale(lang);
@@ -640,8 +653,7 @@ function start() {
   });
 }
 
-function connectToServer() {
-  const server = app.serverConfigs.activeServer;
+function connectToServer(server = app.serverConfigs.activeServer) {
   let connectAttempt = null;
 
   startupConnectMessaging
@@ -657,7 +669,7 @@ function connectToServer() {
       app.loadingModal.close();
     });
 
-  connectAttempt = serverConnect(app.serverConfigs.activeServer)
+  connectAttempt = serverConnect(server)
     .done(() => start())
     .fail(() => {
       app.connectionManagmentModal.open();
@@ -735,7 +747,21 @@ app.connectionManagmentModal = new ConnectionManagement({
 // get the saved server configurations
 app.serverConfigs.fetch().done(() => {
   app.serverConfigs.migrate();
-  if (!app.serverConfigs.length) {
+
+  if (!import.meta.env.VITE_APP) {
+    const serverConfig = new ServerConfig({
+      name: 'HostingServer',
+      id: 'backend',
+      serverIp: 'localhost',
+      port: '8080',
+      authenticate: false,
+    });
+    serverConfig.save();
+    app.serverConfigs.reset();
+    app.serverConfigs.add(serverConfig);
+
+    connectToServer(serverConfig);
+  } else if (!app.serverConfigs.length) {
     // no saved server configurations
     if (isBundledApp) {
       // for a bundled app, we'll create a

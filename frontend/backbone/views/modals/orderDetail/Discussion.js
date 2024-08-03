@@ -1,6 +1,7 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import app from '../../../app';
+import { myPost } from '../../../../src/api/api';
 import { capitalize } from '../../../utils/string';
 import { getSocket } from '../../../utils/serverConnect';
 import loadTemplate from '../../../utils/loadTemplate';
@@ -426,13 +427,8 @@ export default class extends baseVw {
   }
 
   markConvoAsRead() {
-    $.post({
-      url: app.getServerUrl('ob/markchatasread'),
-      data: JSON.stringify({
-        orderID: this.model.id,
-      }),
-      dataType: 'json',
-      contentType: 'application/json',
+    myPost(app.getServerUrl('ob/markchatasread'), {
+      orderID: this.model.id,
     });
     this.trigger('convoMarkedAsRead');
   }

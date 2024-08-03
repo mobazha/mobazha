@@ -16,7 +16,7 @@ import serverConnect, {
   getSocket,
   getCurrentConnection,
 } from './utils/serverConnect';
-import { myGet } from '../src/api/api';
+import { myGet, myPost } from '../src/api/api';
 
 import ObRouter from './router';
 import { getChatContainer, getBody } from './utils/selectors';
@@ -903,7 +903,7 @@ function setPublishingStatus(msg) {
       // to update
       clearTimeout(retryPublishTimeout);
       retryPublishTimeout = setTimeout(() => {
-        $.post(app.getServerUrl('ob/publish'))
+        myPost(app.getServerUrl('ob/publish'))
           .fail((jqXhr) => {
             setPublishingStatus({
               msg: app.polyglot.t('publish.statusPublishFailed', {

@@ -7,6 +7,7 @@ import 'velocity-animate';
 import { ERROR_DUST_AMOUNT } from '../../../constants';
 import { removeProp } from '../../../utils/object';
 import app from '../../../app';
+import { myPost } from '../../../../src/api/api';
 import loadTemplate from '../../../utils/loadTemplate';
 import { launchSettingsModal } from '../../../utils/modalManager';
 // import {
@@ -553,12 +554,7 @@ export default class extends BaseModal {
           'cid',
         );
 
-        $.post({
-          url: app.getServerUrl('ob/purchase'),
-          data: JSON.stringify(postData),
-          dataType: 'json',
-          contentType: 'application/json',
-        })
+        myPost(app.getServerUrl('ob/purchase'), postData)
           .done((data) => {
             this.setState({ phase: 'pending' });
             this.payment = this.createChild(Payment, {

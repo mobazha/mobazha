@@ -1,6 +1,7 @@
 /* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import moment from 'moment';
+import { myPost } from '../../../../../src/api/api.js';
 import { ipc } from '../../../../../src/utils/ipcRenderer.js';
 import { setTimeagoInterval } from '../../../../utils';
 import { getFees } from '../../../../utils/fees';
@@ -139,7 +140,7 @@ export default class extends BaseVw {
   }
 
   onClickRetryConfirmed() {
-    const post = $.post(app.getServerUrl(`wallet/bumpfee/${this.model.id}`));
+    const post = myPost(app.getServerUrl(`wallet/bumpfee/${this.model.id}`));
     this.onPostBumpFee(post);
   }
 

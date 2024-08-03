@@ -2,6 +2,7 @@ import $ from 'jquery';
 import _ from 'underscore';
 import 'velocity-animate';
 import app from '../../app';
+import { myPost, myAjax } from '../../../src/api/api';
 import { getBody } from '../../utils/selectors';
 import { getSocket } from '../../utils/serverConnect';
 import { openSimpleMessage } from '../modals/SimpleMessage';
@@ -413,7 +414,7 @@ export default class extends baseVw {
   onClickDeleteConvo() {
     this.$el.addClass('isDeleting');
 
-    const request = $.ajax({
+    const request = myAjax({
       url: app.getServerUrl(`ob/chatconversation/${this.guid}`),
       type: 'DELETE',
     }).fail((xhr) => {
@@ -509,14 +510,9 @@ export default class extends baseVw {
   //   otherwise been marked as read, but the call was held off because the app was
   //   not in focus.
   markConvoAsRead() {
-    $.post({
-      url: app.getServerUrl('ob/markchatasread'),
-      data: JSON.stringify({
-        peerID: this.guid,
-        orderID: this.orderID,
-      }),
-      dataType: 'json',
-      contentType: 'application/json',
+    myPost(app.getServerUrl('ob/markchatasread'), {
+      peerID: this.guid,
+      orderID: this.orderID,
     });
     this.trigger('convoMarkedAsRead');
     this.markAsReadOnFocus = false;
@@ -623,7 +619,7 @@ export default class extends baseVw {
 
     let filesToUpload = [file];
 
-    const upload = $.ajax({
+    const upload = myAjax({
       url: app.getServerUrl('ob/images'),
       type: 'POST',
       data: JSON.stringify(filesToUpload),

@@ -1,5 +1,5 @@
-import $ from 'jquery';
 import app from '../../app';
+import { myAjax } from '../../../src/api/api';
 import loadTemplate from '../../utils/loadTemplate';
 import BaseModal from './BaseModal';
 
@@ -41,7 +41,7 @@ export default class extends BaseModal {
     if (this.getCachedEl('.js-checkboxNsfw').is(':checked')) {
       this.stopListening(app.settings, null, this.onChangeNsfw);
       app.settings.set('showNsfw', true);
-      $.ajax({
+      myAjax({
         type: 'PUT',
         url: app.getServerUrl('ob/preferences'),
         data: JSON.stringify({ showNsfw: true }),

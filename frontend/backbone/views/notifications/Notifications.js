@@ -1,6 +1,6 @@
 /* eslint-disable class-methods-use-this */
-import $ from 'jquery';
 import app from '../../app';
+import { myPost } from '../../../src/api/api';
 import { capitalize } from '../../utils/string';
 import { recordEvent } from '../../utils/metrics';
 import loadTemplate from '../../utils/loadTemplate';
@@ -68,7 +68,7 @@ export default class extends BaseVw {
 
     if (!notifs.length) return false;
 
-    return $.post(app.getServerUrl('ob/marknotificationsasread'))
+    return myPost(app.getServerUrl('ob/marknotificationsasread'))
       .fail(() => notifs.forEach((notif) => notif.set('read', false)));
   }
 

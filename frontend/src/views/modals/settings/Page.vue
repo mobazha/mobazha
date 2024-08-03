@@ -426,6 +426,7 @@
 import app from '../../../../backbone/app';
 import $ from 'jquery';
 import '../../../../backbone/lib/whenAll.jquery';
+import { myAjax } from '../../../api/api';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import 'cropit';
 
@@ -553,7 +554,7 @@ export default {
         originalSize: true,
       });
       const headerData = JSON.stringify({ header: imageURI.replace(/^data:image\/(png|jpeg|webp);base64,/, '') });
-      return $.ajax({
+      return myAjax({
         type: 'POST',
         url: app.getServerUrl('ob/header'),
         contentType: 'application/json; charset=utf-8',
@@ -569,7 +570,7 @@ export default {
         originalSize: true,
       });
       const avatarData = JSON.stringify({ avatar: imageURI.replace(/^data:image\/(png|jpeg|webp);base64,/, '') });
-      return $.ajax({
+      return myAjax({
         type: 'POST',
         url: app.getServerUrl('ob/avatar'),
         contentType: 'application/json; charset=utf-8',

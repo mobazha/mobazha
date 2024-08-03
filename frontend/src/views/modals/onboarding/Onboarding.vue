@@ -147,6 +147,7 @@
 import $ from 'jquery';
 import 'cropit';
 import app from '../../../../backbone/app';
+import { myAjax } from '../../../api/api';
 import { getCurrentConnection } from '../../../../backbone/utils/serverConnect';
 import { getTranslatedCountries } from '../../../../backbone/data/countries';
 import { getCurrencies } from '../../../../backbone/data/currencies';
@@ -335,7 +336,7 @@ export default {
       const avatarData = JSON.stringify(
         { avatar: this.avatarExport.replace(/^data:image\/(png|jpeg|webp);base64,/, '') });
 
-      return $.ajax({
+      return myAjax({
         type: 'POST',
         url: app.getServerUrl('ob/avatar'),
         contentType: 'application/json; charset=utf-8',

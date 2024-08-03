@@ -113,9 +113,9 @@
 </template>
 
 <script>
-import $ from 'jquery';
 import _ from 'underscore';
 import app from '../../../../../backbone/app';
+import { myPost } from '../../../..//api/api';
 
 import TestSmtpStatus from './TestSmtpStatus.vue';
 
@@ -209,12 +209,8 @@ export default {
       }
 
       this.testingSmtp = true;
-      this.testSmtpPost = $.post({
-        url: app.getServerUrl('ob/testemailnotifications'),
-        data: JSON.stringify(this.model.toJSON()),
-        dataType: 'json',
-        contentType: 'application/json',
-      }).done(() => {
+      this.testSmtpPost = myPost(app.getServerUrl('ob/testemailnotifications'), this.model.toJSON())
+      .done(() => {
         this.success = true;
         this.msg = app.polyglot.t('settings.advancedTab.smtp.testSmtpSuccess');
       }).fail(xhr => {

@@ -520,6 +520,7 @@ import Backbone from 'backbone';
 import bigNumber from 'bignumber.js';
 import 'velocity-animate/velocity.ui';
 import app from '../../../../backbone/app';
+import { myAjax } from '../../../api/api';
 import { isScrolledIntoView, openExternal } from '../../../../backbone/utils/dom';
 import { startAjaxEvent, endAjaxEvent } from '../../../../backbone/utils/metrics';
 import { getCurrenciesSortedByCode, getCurrencyByCode } from '../../../../backbone/data/currencies';
@@ -1073,7 +1074,7 @@ export default {
 
       this.$refs.introVideoUpload.value = '';
 
-      const upload = $.ajax({
+      const upload = myAjax({
         url: app.getServerUrl('ob/file'),
         type: 'POST',
         data: formData,
@@ -1230,7 +1231,7 @@ export default {
         imagesToUpload = [images];
       }
 
-      const upload = $.ajax({
+      const upload = myAjax({
         url: app.getServerUrl('ob/productimages'),
         type: 'POST',
         data: JSON.stringify(imagesToUpload),

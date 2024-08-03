@@ -25,7 +25,7 @@
 </template>
 
 <script>
-import $ from 'jquery';
+import { myAjax } from '../../../api/api';
 import { truncateImageFilename } from '../../../../backbone/utils/index';
 
 export default {
@@ -68,7 +68,7 @@ export default {
     },
 
     uploadImage(image) {
-      this.imageUpload = $.ajax({
+      this.imageUpload = myAjax({
         url: app.getServerUrl('ob/productimages'),
         type: 'POST',
         data: JSON.stringify([image]),

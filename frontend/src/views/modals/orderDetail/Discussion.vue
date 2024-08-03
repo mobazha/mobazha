@@ -74,6 +74,7 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import app from '../../../../backbone/app';
+import { myPost, myAjax } from '../../../api/api';
 import { capitalize } from '../../../../backbone/utils/string';
 import { getSocket } from '../../../../backbone/utils/serverConnect';
 import GroupMessages from '../../../../backbone/collections/GroupMessages';
@@ -394,7 +395,7 @@ export default {
 
       let filesToUpload = [file];
 
-      const upload = $.ajax({
+      const upload = myAjax({
         url: app.getServerUrl('ob/images'),
         type: 'POST',
         data: JSON.stringify(filesToUpload),
@@ -641,7 +642,7 @@ export default {
     },
 
     markConvoAsRead() {
-      $.post({
+      myPost({
         url: app.getServerUrl('ob/markchatasread'),
         data: JSON.stringify({
           orderID: this.model.id,

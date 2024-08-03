@@ -62,8 +62,8 @@
 <script>
 import $ from 'jquery';
 import app from '../../../backbone/app';
+import { myAjax } from '../../api/api';
 import { openSimpleMessage } from './SimpleMessage';
-
 
 export default {
   props: {
@@ -138,7 +138,7 @@ export default {
       this.setState({
         reporting: true,
       });
-      $.ajax({
+      myAjax({
         url: this.url,
         data: JSON.stringify(data),
         type: 'POST',

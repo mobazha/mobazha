@@ -1,5 +1,5 @@
 import $ from 'jquery';
-import { myGet } from '../../../../../src/api/api.js';
+import { myGet, myPost } from '../../../../../src/api/api.js';
 import { ipc } from '../../../../../src/utils/ipcRenderer.js';
 import app from '../../../../app';
 import { openSimpleMessage } from '../../SimpleMessage';
@@ -98,7 +98,7 @@ export default class extends baseVw {
     this.getCachedEl('.js-purge').addClass('processing');
     this.getCachedEl('.js-purgeComplete').addClass('hide');
 
-    this.purge = $.post(app.getServerUrl('ob/purgecache'))
+    this.purge = myPost(app.getServerUrl('ob/purgecache'))
       .always(() => {
         this.getCachedEl('.js-purge').removeClass('processing');
       })

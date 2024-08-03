@@ -15,6 +15,7 @@
 <script>
 import $ from 'jquery';
 import app from '../../../backbone/app';
+import { myPost } from '../../api/api';
 import { capitalize } from '../../../backbone/utils/string';
 import { recordEvent } from '../../../backbone/utils/metrics';
 
@@ -103,7 +104,7 @@ export default {
         });
       }
 
-      return $.post(app.getServerUrl('ob/marknotificationsasread')).fail(() => notifs.forEach((notif) => notif.set('read', false)));
+      return myPost(app.getServerUrl('ob/marknotificationsasread')).fail(() => notifs.forEach((notif) => notif.set('read', false)));
     },
 
     /**

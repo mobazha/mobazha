@@ -1,6 +1,6 @@
-import $ from 'jquery';
 import _ from 'underscore';
 import app from '../../../../app';
+import { myPost } from '../../../../../src/api/api';
 import loadTemplate from '../../../../utils/loadTemplate';
 import BaseVw from '../../../baseVw';
 import TestSmtpStatus from './TestSmtpStatus';
@@ -62,12 +62,8 @@ export default class extends BaseVw {
       return;
     }
 
-    this.testSmtpPost = $.post({
-      url: app.getServerUrl('ob/testemailnotifications'),
-      data: JSON.stringify(this.model.toJSON()),
-      dataType: 'json',
-      contentType: 'application/json',
-    }).done(() => {
+    this.testSmtpPost = myPost(app.getServerUrl('ob/testemailnotifications'), this.model.toJSON())
+    .done(() => {
       this.testSmtpStatus.setState({
         success: true,
         msg: app.polyglot.t('settings.advancedTab.smtp.testSmtpSuccess'),

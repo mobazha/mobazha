@@ -1,6 +1,6 @@
 /* eslint-disable class-methods-use-this */
-import $ from 'jquery';
 import _ from 'underscore';
+import { myAjax } from '../../../src/api/api';
 import BaseVw from '../baseVw';
 import loadTemplate from '../../utils/loadTemplate';
 import { getSocket } from '../../utils/serverConnect';
@@ -102,7 +102,7 @@ export default class extends BaseVw {
     if (start < revLength) {
       this.getCachedEl('.js-loadMoreBtn').addClass('processing');
       this.getCachedEl('.js-errors').html('');
-      $.ajax({
+      myAjax({
         url: app.getServerUrl(`ob/fetchratings?async=${asyncUpdate}`),
         data: JSON.stringify(this.reviewIDs.slice(start, start + ps)),
         dataType: 'json',

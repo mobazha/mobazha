@@ -1,6 +1,7 @@
 /* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import app from '../../app';
+import { myAjax } from '../../../src/api/api';
 import loadTemplate from '../../utils/loadTemplate';
 import { abbrNum } from '../../utils';
 import { launchEditListingModal } from '../../utils/modalManager';
@@ -402,12 +403,7 @@ export default class extends baseVw {
           hash: listingHash,
           showErrorOnFetchFail: false,
         });
-        ipnsFetch = $.ajax(
-          Listing.getIpnsUrl(
-            this.ownerGuid,
-            this.model.get('slug'),
-          ),
-        );
+        ipnsFetch = myAjax({url: Listing.getIpnsUrl(this.ownerGuid, this.model.get('slug'))});
       } else {
         ipnsFetch = this.fullListing.fetch({ showErrorOnFetchFail: false });
       }

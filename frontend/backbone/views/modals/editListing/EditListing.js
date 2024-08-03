@@ -8,6 +8,7 @@ import Backbone from 'backbone';
 import { tagsDelimiter } from '../../../utils/lib/selectize';
 import 'velocity-animate/velocity.ui';
 import app from '../../../app';
+import { myAjax } from '../../../../src/api/api';
 import { isScrolledIntoView, openExternal } from '../../../utils/dom';
 import { installRichEditor } from '../../../utils/lib/trumbowyg';
 import { startAjaxEvent, endAjaxEvent } from '../../../utils/metrics';
@@ -689,7 +690,7 @@ export default class extends BaseModal {
       imagesToUpload = [images];
     }
 
-    const upload = $.ajax({
+    const upload = myAjax({
       url: app.getServerUrl('ob/productimages'),
       type: 'POST',
       data: JSON.stringify(imagesToUpload),

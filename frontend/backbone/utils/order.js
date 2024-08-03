@@ -1,6 +1,6 @@
-import $ from 'jquery';
 import { Events } from 'backbone';
 import app from '../app';
+import { myPost } from '../../src/api/api';
 import OrderFulfillment from '../models/order/orderFulfillment/OrderFulfillment';
 import { openSimpleMessage } from '../views/modals/SimpleMessage';
 import OrderCompletion from '../models/order/orderCompletion/OrderCompletion';
@@ -34,14 +34,9 @@ function confirmOrder(orderID, reject = false) {
   }
 
   if (!post) {
-    post = $.post({
-      url: app.getServerUrl('ob/orderconfirmation'),
-      data: JSON.stringify({
-        orderID,
-        reject,
-      }),
-      dataType: 'json',
-      contentType: 'application/json',
+    post = myPost(app.getServerUrl('ob/orderconfirmation'), {
+      orderID,
+      reject,
     })
       .always(() => {
         if (reject) {
@@ -114,13 +109,8 @@ export function cancelOrder(orderID) {
   let post = cancelPosts[orderID];
 
   if (!post) {
-    post = $.post({
-      url: app.getServerUrl('ob/ordercancel'),
-      data: JSON.stringify({
-        orderID,
-      }),
-      dataType: 'json',
-      contentType: 'application/json',
+    post = myPost(app.getServerUrl('ob/ordercancel'), {
+      orderID,
     }).always(() => {
       delete cancelPosts[orderID];
     }).done(() => {
@@ -219,13 +209,8 @@ export function refundOrder(orderID) {
   let post = refundPosts[orderID];
 
   if (!post) {
-    post = $.post({
-      url: app.getServerUrl('ob/orderrefund'),
-      data: JSON.stringify({
-        orderID,
-      }),
-      dataType: 'json',
-      contentType: 'application/json',
+    post = myPost(app.getServerUrl('ob/orderrefund'), {
+      orderID,
     }).always(() => {
       delete refundPosts[orderID];
     }).done(() => {
@@ -453,13 +438,8 @@ export function acceptPayout(orderID) {
   let post = acceptPayoutPosts[orderID];
 
   if (!post) {
-    post = $.post({
-      url: app.getServerUrl('ob/releasefunds'),
-      data: JSON.stringify({
-        orderID,
-      }),
-      dataType: 'json',
-      contentType: 'application/json',
+    post = myPost(app.getServerUrl('ob/releasefunds'), {
+      orderID,
     }).always(() => {
       delete acceptPayoutPosts[orderID];
     }).done(() => {
@@ -503,13 +483,8 @@ export function releaseEscrow(orderID) {
   let post = releaseEscrowPosts[orderID];
 
   if (!post) {
-    post = $.post({
-      url: app.getServerUrl('ob/releaseescrow'),
-      data: JSON.stringify({
-        orderID,
-      }),
-      dataType: 'json',
-      contentType: 'application/json',
+    post = myPost(app.getServerUrl('ob/releaseescrow'), {
+      orderID,
     }).always(() => {
       delete releaseEscrowPosts[orderID];
     }).done(() => {

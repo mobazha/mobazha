@@ -77,10 +77,10 @@
 <script>
 /* eslint-disable class-methods-use-this */
 import _ from 'underscore';
-import $ from 'jquery';
 import bigNumber from 'bignumber.js';
 import { guid } from '../../../../backbone/utils';
 import app from '../../../../backbone/app';
+import { myAjax } from '../../../api/api';
 import { anySupportedByWallet } from '../../../../backbone/data/walletCurrencies';
 import { getSocket } from '../../../../backbone/utils/serverConnect';
 import Moderators from '../../../../backbone/collections/Moderators';
@@ -392,7 +392,7 @@ export default {
           }
         }
 
-        const fetch = $.ajax({
+        const fetch = myAjax({
           url,
           data: JSON.stringify(IDs),
           method: op.method,

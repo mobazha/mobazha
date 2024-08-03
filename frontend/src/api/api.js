@@ -30,12 +30,41 @@ api.interceptors.response.use(
   },
 );
 
-export function myGet(url, params = {}, config = {}) {
+export function myGet(url, data = {}, config = {}) {
   const deferred = $.Deferred();
 
   const controller = new AbortController();
   api.get(url, { 
-    params,
+    params: data,
+    ...config,
+    signal: controller.signal
+  })
+    .then((response) => {
+      deferred.resolve(response.data, response.statusText, response);
+    })
+    .catch((error) => {
+      if (error.name === 'AbortError') {
+        error.statusText = 'abort';
+      }
+      if (error.response) {
+        error.responseJSON = error.response.data;
+      }
+
+      deferred.reject(error);
+    });
+
+  deferred.abort = () => {
+    controller.abort();
+  };
+
+  return deferred;
+}
+
+export function myPost(url, data = {}, config = {}) {
+  const deferred = $.Deferred();
+
+  const controller = new AbortController();
+  api.post(url, data, {
     ...config,
     signal: controller.signal
   })
@@ -73,7 +102,7 @@ export function myAjax(options) {
     method: type,
     url,
     data,
-    headers: options.headers,
+    headers: options.headers ? {...options.headers, 'Content-Type': 'application/json'} : {'Content-Type': 'application/json'},
     signal: controller.signal
     // Other Axios options as needed
   };

@@ -1,6 +1,6 @@
-import $ from 'jquery';
 import { Model, Events } from 'backbone';
 import * as isIPFS from 'is-ipfs';
+import { myAjax } from '../../src/api/api';
 import { openSimpleMessage } from '../views/modals/SimpleMessage';
 import app from '../app';
 
@@ -80,7 +80,7 @@ function blockUnblock(_block, peerIDs) {
 
   lastSentBlockedNodes = [...blockedNodes];
 
-  latestSettingsSave = $.ajax({
+  latestSettingsSave = myAjax({
     type: 'PUT',
     url: app.getServerUrl('ob/preferences'),
     data: JSON.stringify({ blockedNodes }),

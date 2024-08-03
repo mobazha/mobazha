@@ -37,8 +37,8 @@
 
 <script>
 /* eslint-disable class-methods-use-this */
-import $ from 'jquery';
 import _ from 'underscore';
+import { myAjax } from '../../api/api';
 import { getSocket } from '../../../backbone/utils/serverConnect';
 import app from '../../../backbone/app';
 import Collection from '../../../backbone/collections/Reviews';
@@ -157,7 +157,7 @@ export default {
       if (start < revLength) {
         this.loadingMore = true;
         this.errorMsg = '';
-        $.ajax({
+        myAjax({
           url: app.getServerUrl(`ob/fetchratings?async=${asyncUpdate}`),
           data: JSON.stringify(this.reviewIDs.slice(start, start + ps)),
           dataType: 'json',

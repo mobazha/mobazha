@@ -427,6 +427,7 @@
 import _ from 'underscore';
 import $ from 'jquery';
 import app from '../../../backbone/app';
+import { myAjax } from '../../api/api';
 import { abbrNum } from '../../../backbone/utils';
 import { isBlocked, isUnblocking, events as blockEvents } from '../../../backbone/utils/block';
 import { isHiRez } from '../../../backbone/utils/responsive';
@@ -842,11 +843,7 @@ export default {
           hash: listingHash,
           showErrorOnFetchFail: false,
         });
-        this.ipnsFetch = $.ajax(
-          Listing.getIpnsUrl(
-            this.ownerGuid,
-            this.model.get('slug'),
-          ),
+        this.ipnsFetch = myAjax({url: Listing.getIpnsUrl(this.ownerGuid, this.model.get('slug'))}
         );
       } else {
         this.ipnsFetch = this.getFullListing().fetch({ showErrorOnFetchFail: false });

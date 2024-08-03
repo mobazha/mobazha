@@ -1,11 +1,11 @@
 // Putting start-up related one offs here that are too small for their own module and
 // aren't appropriate to be in any existing module
 
-import $ from 'jquery';
 import { Renderer, ipc } from '../../src/utils/ipcRenderer.js';
 import { getBody } from '../utils/selectors';
 import { getCurrentConnection } from '../utils/serverConnect';
 import app from '../app';
+import { myPost } from '../../src/api/api.js';
 
 const platform = ipc.sendSync('controller.system.getPlatform', {});
 
@@ -53,7 +53,7 @@ export function handleServerShutdownRequests() {
     }
 
     try {
-      $.post(app.getServerUrl('ob/shutdown'))
+      myPost(app.getServerUrl('ob/shutdown'))
         .fail((xhr) => ipc.send('server-shutdown-fail', {
           xhr,
           reason: (xhr && xhr.responseJSON && xhr.responseJSON.reason) || '',

@@ -1,5 +1,4 @@
-import $ from 'jquery';
-import { myGet, myAjax } from './api';
+import { myGet, myPost, myAjax } from './api';
 
 export default {
   getShoppingCarts() {
@@ -19,20 +18,10 @@ export default {
   },
 
   addToShoppingCart(peerID, purchaseItem) {
-    return $.post({
-      url: app.getServerUrl(`ob/carts/${peerID}/add`),
-      data: JSON.stringify(purchaseItem),
-      dataType: 'json',
-      contentType: 'application/json',
-    });
+    return myPost(app.getServerUrl(`ob/carts/${peerID}/add`), purchaseItem);
   },
 
   removeCartItem(peerID, purchaseItem) {
-    return $.post({
-      url: app.getServerUrl(`ob/carts/${peerID}/remove`),
-      data: JSON.stringify(purchaseItem),
-      dataType: 'json',
-      contentType: 'application/json',
-    });
+    return myPost(app.getServerUrl(`ob/carts/${peerID}/remove`), purchaseItem);
   },
 };

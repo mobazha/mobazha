@@ -1,9 +1,10 @@
 /* eslint-disable class-methods-use-this */
-import app from '../../../app';
-import loadTemplate from '../../../utils/loadTemplate';
-import baseVw from '../../baseVw';
 import $ from 'jquery';
 import '../../../lib/whenAll.jquery';
+import app from '../../../app';
+import { myAjax } from '../../../../src/api/api';
+import loadTemplate from '../../../utils/loadTemplate';
+import baseVw from '../../baseVw';
 import { openSimpleMessage } from '../SimpleMessage';
 import 'cropit';
 import { installRichEditor } from '../../../utils/lib/trumbowyg';
@@ -109,7 +110,7 @@ export default class extends baseVw {
     });
     const headerData = JSON.stringify(
       { header: imageURI.replace(/^data:image\/(png|jpeg|webp);base64,/, '') });
-    return $.ajax({
+    return myAjax({
       type: 'POST',
       url: app.getServerUrl('ob/header'),
       contentType: 'application/json; charset=utf-8',
@@ -126,7 +127,7 @@ export default class extends baseVw {
     });
     const avatarData = JSON.stringify(
       { avatar: imageURI.replace(/^data:image\/(png|jpeg|webp);base64,/, '') });
-    return $.ajax({
+    return myAjax({
       type: 'POST',
       url: app.getServerUrl('ob/avatar'),
       contentType: 'application/json; charset=utf-8',

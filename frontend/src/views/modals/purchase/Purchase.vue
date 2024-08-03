@@ -427,6 +427,7 @@ import 'velocity-animate';
 import { ERROR_DUST_AMOUNT } from '../../../../backbone/constants';
 import { removeProp } from '../../../../backbone/utils/object';
 import app from '../../../../backbone/app';
+import { myPost } from '../../..//api/api';
 // import {
 //   getInventory,
 //   events as inventoryEvents,
@@ -1085,12 +1086,7 @@ export default {
             'cid'
           );
 
-          $.post({
-            url: app.getServerUrl('ob/purchase'),
-            data: JSON.stringify(postData),
-            dataType: 'json',
-            contentType: 'application/json',
-          })
+          myPost(app.getServerUrl('ob/purchase'), postData)
             .done((data) => {
               this.setState({ phase: 'pending' });
 

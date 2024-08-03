@@ -1,6 +1,7 @@
 /* eslint-disable class-methods-use-this */
 import $ from 'jquery';
 import app from '../../app';
+import { myPost } from '../../../src/api/api';
 import { guid } from '../../utils';
 import { getSocket } from '../../utils/serverConnect';
 import {
@@ -403,12 +404,8 @@ export function getCachedProfiles(peerIDs = []) {
 
       socket.on('message', onSocketMessage);
 
-      $.post({
-        url: app.getServerUrl(`ob/fetchprofiles?async=true&usecache=true&asyncID=${fetchId}`),
-        data: JSON.stringify(profilesToFetch),
-        dataType: 'json',
-        contentType: 'application/json',
-      }).fail((jqXhr) => {
+      myPost(app.getServerUrl(`ob/fetchprofiles?async=true&usecache=true&asyncID=${fetchId}`), profilesToFetch)
+      .fail((jqXhr) => {
         socket.off('message', onSocketMessage);
         promises.forEach((promise) => {
           promise.reject({

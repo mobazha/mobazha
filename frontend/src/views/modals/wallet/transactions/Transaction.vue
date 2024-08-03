@@ -81,8 +81,8 @@
 
 <script>
 /* eslint-disable class-methods-use-this */
-import $ from 'jquery';
 import moment from 'moment';
+import { myPost } from '../../../../api/api.js';
 import { ipc } from '../../../../utils/ipcRenderer.js';
 import { setTimeagoInterval } from '../../../../../backbone/utils/index.js';
 import { getFees } from '../../../../../backbone/utils/fees.js';
@@ -290,7 +290,7 @@ export default {
     },
 
     onClickRetryConfirmed() {
-      const post = $.post(app.getServerUrl(`wallet/bumpfee/${this.model.id}`));
+      const post = myPost(app.getServerUrl(`wallet/bumpfee/${this.model.id}`));
       this.onPostBumpFee(post);
     },
 

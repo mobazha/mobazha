@@ -1,6 +1,7 @@
 import $ from 'jquery';
 import 'cropit';
 import app from '../../../app';
+import { myAjax } from '../../../../src/api/api';
 import { getCurrentConnection } from '../../../utils/serverConnect';
 import { getTranslatedCountries } from '../../../data/countries';
 import { getCurrencies } from '../../../data/currencies';
@@ -169,7 +170,7 @@ export default class extends BaseModal {
     const avatarData = JSON.stringify(
       { avatar: this.avatarExport.replace(/^data:image\/(png|jpeg|webp);base64,/, '') });
 
-    return $.ajax({
+    return myAjax({
       type: 'POST',
       url: app.getServerUrl('ob/avatar'),
       contentType: 'application/json; charset=utf-8',

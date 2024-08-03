@@ -4,6 +4,7 @@ import $ from 'jquery';
 import bigNumber from 'bignumber.js';
 import { guid } from '../../../utils';
 import app from '../../../app';
+import { myAjax } from '../../../../src/api/api';
 import { anySupportedByWallet } from '../../../data/walletCurrencies';
 import loadTemplate from '../../../utils/loadTemplate';
 import { getSocket } from '../../../utils/serverConnect';
@@ -233,7 +234,7 @@ export default class extends baseVw {
         }
       }
 
-      const fetch = $.ajax({
+      const fetch = myAjax({
         url,
         data: JSON.stringify(IDs),
         method: op.method,

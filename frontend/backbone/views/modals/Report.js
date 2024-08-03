@@ -1,5 +1,6 @@
 import $ from 'jquery';
 import app from '../../app';
+import { myAjax } from '../../../src/api/api';
 import loadTemplate from '../../utils/loadTemplate';
 import BaseModal from './BaseModal';
 import { openSimpleMessage } from './SimpleMessage';
@@ -63,7 +64,7 @@ export default class extends BaseModal {
     this.setState({
       reporting: true,
     });
-    $.ajax({
+    myAjax({
       url: this.url,
       data: JSON.stringify(data),
       type: 'POST',

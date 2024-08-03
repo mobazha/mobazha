@@ -1,5 +1,5 @@
-import $ from 'jquery';
 import { Events } from 'backbone';
+import { myPost } from '../../src/api/api';
 import { getServer } from './serverConnect';
 import { supportedWalletCurs } from '../data/walletCurrencies';
 import { openSimpleMessage } from '../views/modals/SimpleMessage';
@@ -144,7 +144,7 @@ export default function resyncBlockchain(coinType) {
 
   const _server = server;
 
-  const post = $.post(app.getServerUrl(`wallet/resyncblockchain/${coinType}`))
+  const post = myPost(app.getServerUrl(`wallet/resyncblockchain/${coinType}`))
     .fail((xhr) => {
       if (xhr.statusText === 'abort') return;
       const failReason = (xhr.responseJSON && xhr.responseJSON.reason) || '';

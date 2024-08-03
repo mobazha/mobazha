@@ -107,8 +107,7 @@
 <script>
 /* eslint-disable class-methods-use-this */
 import _ from 'underscore';
-import $ from 'jquery';
-import { myGet } from '../../../api/api';
+import { myGet, myPost } from '../../../api/api';
 import bigNumber from 'bignumber.js';
 import { isSupportedWalletCur, ensureMainnetCode, supportedWalletCurs } from '../../../../backbone/data/walletCurrencies';
 import defaultSearchProviders from '../../../../backbone/data/defaultSearchProviders';
@@ -194,7 +193,7 @@ export default {
         this.fetchAddress(coin);
       }
 
-      $.post(app.getServerUrl(`wallet/status/${coin}`));
+      myPost(app.getServerUrl(`wallet/status/${coin}`));
 
       if (this.tabActive === 'send' && !(app.walletBalances.get(coin) && app.walletBalances.get(coin).get('confirmed'))) {
         this.tabActive = 'receive';

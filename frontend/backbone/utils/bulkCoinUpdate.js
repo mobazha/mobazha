@@ -1,5 +1,5 @@
-import $ from 'jquery';
 import { Events } from 'backbone';
+import { myPost } from '../../src/api/api';
 import { openSimpleMessage } from '../views/modals/SimpleMessage';
 import app from '../app';
 
@@ -27,11 +27,8 @@ export function bulkCoinUpdate(coins) {
     throw new Error('An update is in process, new updates must wait until it is finished.');
   } else {
     events.trigger('bulkCoinUpdating');
-    bulkCoinUpdateSave = $.post({
-      url: app.getServerUrl('ob/bulkupdatecurrency'),
-      data: JSON.stringify({ currencies: newCoins }),
-      dataType: 'json',
-    }).done(() => {
+    bulkCoinUpdateSave = myPost(app.getServerUrl('ob/bulkupdatecurrency'), { currencies: newCoins })
+    .done(() => {
       events.trigger('bulkCoinUpdateDone');
     }).fail((xhr) => {
       const reason = xhr.responseJSON && xhr.responseJSON.reason || xhr.statusText || '';

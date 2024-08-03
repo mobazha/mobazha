@@ -256,7 +256,7 @@
 <script>
 import _ from 'underscore';
 import $ from 'jquery';
-import { myGet } from '../../../../api/api';
+import { myGet, myPost } from '../../../../api/api';
 import { ipc } from '../../../../utils/ipcRenderer.js';
 import app from '../../../../../backbone/app.js';
 import { openSimpleMessage } from '../../../../../backbone/views/modals/SimpleMessage';
@@ -398,7 +398,7 @@ export default {
 
       this.isPurgeComplete = false;
 
-      this.purge = $.post(app.getServerUrl('ob/purgecache'))
+      this.purge = myPost(app.getServerUrl('ob/purgecache'))
         .always(() => {
           this.isPurging = false;
         })

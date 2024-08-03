@@ -6,6 +6,7 @@ import _ from 'underscore';
 import twemoji from 'twemoji';
 import path from 'path';
 import app from '../app';
+import { myGet } from '../../src/api/api';
 
 export function getGuid(handle, resolver) {
   const deferred = $.Deferred();
@@ -18,8 +19,8 @@ export function getGuid(handle, resolver) {
   url = url.charAt(url.length - 1) !== '/' ? `${url}/` : url;
   url += handle;
 
-  $.get(url).done(peerID => deferred.resolve(peerID))
-    .fail(xhr => deferred.reject(xhr));
+  myGet(url).done(peerID => deferred.resolve(peerID))
+    .fail(error => deferred.reject(error));
 
   return deferred.promise();
 }

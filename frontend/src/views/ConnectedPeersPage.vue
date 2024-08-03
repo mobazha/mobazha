@@ -26,7 +26,7 @@
 </template>
 
 <script>
-import $ from 'jquery';
+import { myGet } from '../api/api';
 import app from '../../backbone/app';
 import GenericError from './error-pages/GenericError.vue';
 
@@ -85,16 +85,14 @@ export default {
   },
   methods: {
     loadData () {
-      this.peerFetch = $.get(app.getServerUrl('ob/peers')).done((data) => {
+      this.peerFetch = myGet(app.getServerUrl('ob/peers')).done((data) => {
         const peersData = data || [];
         this._peers = peersData.map((peer) => (peer.slice(peer.lastIndexOf('/') + 1)));
 
         this._peersKey += 1;
-      }).fail((xhr) => {
+      }).fail((error) => {
         let content = '<p>There was an error retrieving the connected peers.</p>';
-        if (xhr.responseText) {
-          content += `<p>${xhr.responseJSON && xhr.responseJSON.reason || xhr.responseText}</p>`;
-        }
+        content += `<p>${error.responseJSON && error.responseJSON.reason || error.toJSON()}</p>`;
         this.errorContent = content;
       });
     },

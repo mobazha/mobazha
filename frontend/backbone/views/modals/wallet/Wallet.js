@@ -1,7 +1,7 @@
 /* eslint-disable class-methods-use-this */
 import _ from 'underscore';
-import $ from 'jquery';
 import bigNumber from 'bignumber.js';
+import { myGet } from '../../../../src/api/api';
 import {
   isSupportedWalletCur,
   ensureMainnetCode,
@@ -404,7 +404,7 @@ export default class extends BaseModal {
 
     this.needAddress[coinType] = false;
 
-    const fetch = $.get(app.getServerUrl(`wallet/address/${coinType}`))
+    const fetch = myGet(app.getServerUrl(`wallet/address/${coinType}`))
       .done((data) => {
         if (receiveMoneyVw && !receiveMoneyVw.isRemoved()) {
           receiveMoneyVw.setState({

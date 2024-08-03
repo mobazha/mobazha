@@ -1,6 +1,7 @@
 import $ from 'jquery';
 import { Events } from 'backbone';
 import _ from 'underscore';
+import { myGet } from '../../src/api/api';
 import { ipc } from '@/utils/ipcRenderer.js';
 import Socket from './Socket';
 import { guid } from '.';
@@ -136,7 +137,7 @@ function authenticate(server) {
 
   const deferred = $.Deferred();
 
-  const fetchConfig = $.get(`${server.httpUrl}v1/ob/config`)
+  const fetchConfig = myGet(`${server.httpUrl}v1/ob/config`)
     .done(() => deferred.resolve())
     .fail((e) => deferred.reject('failed', e));
 

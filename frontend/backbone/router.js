@@ -4,6 +4,7 @@ import { Router } from 'backbone';
 import * as isIPFS from 'is-ipfs';
 import { ipc } from '../src/utils/ipcRenderer.js';
 import app from './app';
+import { myGet } from '../src/api/api';
 import { getGuid } from './utils';
 import { getPageContainer } from './utils/selectors';
 import { isPromise } from './utils/object';
@@ -628,19 +629,17 @@ export default class ObRouter extends Router {
   }
 
   connectedPeers() {
-    const peerFetch = $.get(app.getServerUrl('ob/peers')).done((data) => {
+    const peerFetch = myGet(app.getServerUrl('ob/peers')).done((data) => {
       const peersData = data || [];
       const peers = peersData.map((peer) => (peer.slice(peer.lastIndexOf('/') + 1)));
 
       this.loadPage(
         new ConnectedPeersPage({ peers }).render(),
       );
-    }).fail((xhr) => {
+    }).fail((error) => {
       let content = '<p>There was an error retrieving the connected peers.</p>';
 
-      if (xhr.responseText) {
-        content += `<p>${xhr.responseJSON && xhr.responseJSON.reason || xhr.responseText}</p>`;
-      }
+      content += `<p>${error.responseJSON && error.responseJSON.reason || error.toJSON()}</p>`;
 
       this.genericError({ content });
     });

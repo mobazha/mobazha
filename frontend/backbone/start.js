@@ -16,6 +16,7 @@ import serverConnect, {
   getSocket,
   getCurrentConnection,
 } from './utils/serverConnect';
+import { myGet } from '../src/api/api';
 
 import ObRouter from './router';
 import { getChatContainer, getBody } from './utils/selectors';
@@ -138,9 +139,9 @@ let walletCurDefFetch;
 
 function fetchStartupData1() {
   configFetch = !configFetch || configFetch.state() === 'rejected'
-    ? $.get(app.getServerUrl('ob/config')) : configFetch;
+    ? myGet(app.getServerUrl('ob/config')) : configFetch;
   walletCurDefFetch = !walletCurDefFetch || walletCurDefFetch.state() === 'rejected'
-    ? $.get(app.getServerUrl('wallet/currencies')) : walletCurDefFetch;
+    ? myGet(app.getServerUrl('wallet/currencies')) : walletCurDefFetch;
 
   const fetches = [
     configFetch,

@@ -1,16 +1,13 @@
 import $ from 'jquery';
+import { myGet, myAjax } from './api';
 
 export default {
-  getShoppingCarts(params = {}) {
-    return $.get({
-      url: app.getServerUrl('ob/carts'),
-      dataType: 'json',
-      contentType: 'application/json',
-    });
+  getShoppingCarts() {
+    return myGet(app.getServerUrl('ob/carts'));
   },
 
   clearShoppingCarts(params = {}, callback) {
-    $.ajax({
+    myAjax({
       url: window.app.getServerUrl('ob/carts'),
       type: 'DELETE',
       success: function (result) {

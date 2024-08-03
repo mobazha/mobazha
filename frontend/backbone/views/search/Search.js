@@ -3,6 +3,7 @@ import _ from 'underscore';
 import $ from 'jquery';
 import is from 'is_js';
 import app from '../../app';
+import { myGet } from '../../../src/api/api';
 import baseVw from '../baseVw';
 import Results from './Results';
 import Providers from './SearchProviders';
@@ -276,14 +277,11 @@ export default class extends baseVw {
     this.setState({
       tab: 'listings',
       fetching: true,
-      xhr: null,
+      xhrError: null,
     });
 
-    const searchFetch = $.get({
-      url: createSearchURL(opts),
-      dataType: 'json',
-    })
-      .done((data, status, xhr) => {
+    const searchFetch = myGet(createSearchURL(opts))
+      .done((data) => {
         // make sure minimal data is present. If it isn't, it's probably an invalid endpoint.
         if (data.name && data.links) {
           const dataUpdate = this.buildProviderUpdate(data);
@@ -305,16 +303,15 @@ export default class extends baseVw {
           this.setState({
             fetching: false,
             data: {},
-            xhr,
           });
         }
       })
-      .fail((xhr) => {
-        if (xhr.statusText !== 'abort') {
+      .fail((xhrError) => {
+        if (xhrError.name !== 'AbortError') {
           this.setState({
             fetching: false,
             data: {},
-            xhr,
+            xhrError,
           });
         }
       });
@@ -466,11 +463,11 @@ export default class extends baseVw {
 
     this.getCachedEl('.js-resultsWrapper').html(this.resultsView.render().el);
 
-    this.listenTo(this.resultsView, 'searchError', (xhr) => {
+    this.listenTo(this.resultsView, 'searchError', (xhrError) => {
       this.setState({
         fetching: false,
         data: {},
-        xhr,
+        xhrError,
       });
     });
     this.listenTo(this.resultsView, 'loadingPage', () => scrollPageIntoView());
@@ -538,10 +535,10 @@ export default class extends baseVw {
     let errTitle;
     let errMsg;
 
-    if (state.xhr) {
+    if (state.xhrError) {
       const provider = this._search.provider.get('name') || this.currentBaseUrl;
       errTitle = app.polyglot.t('search.errors.searchFailTitle', { provider });
-      const failReason = state.xhr.responseJSON ? state.xhr.responseJSON.reason : '';
+      const failReason = xhrError.toJSON();
       errMsg = failReason
         ? app.polyglot.t('search.errors.searchFailReason', { error: failReason })
         : app.polyglot.t('search.errors.searchFailData');

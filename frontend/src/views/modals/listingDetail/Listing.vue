@@ -481,6 +481,7 @@ import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessa
 import PopInMessage, { buildRefreshAlertMessage } from '../../../../backbone/views/components/PopInMessage';
 
 import api from '../../../api';
+import { myGet } from '../../../api/api';
 
 import Rating from './Rating.vue';
 import NsfwWarning from '../NsfwWarning.vue';
@@ -882,7 +883,7 @@ export default {
       });
 
       // get the ratings data, if any
-      this.ratingsFetch = $.get(app.getServerUrl(`ob/ratingindex/${this.vendor.peerID}/${this.model.get('slug')}`))
+      this.ratingsFetch = myGet(app.getServerUrl(`ob/ratingindex/${this.vendor.peerID}/${this.model.get('slug')}`))
         .done((data) => this.onRatings(data))
         .fail((jqXhr) => {
           if (jqXhr.statusText === 'abort') return;

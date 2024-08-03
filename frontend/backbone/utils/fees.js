@@ -1,4 +1,5 @@
 import $ from 'jquery';
+import { myGet } from '../../src/api/api';
 import {
   ERROR_INSUFFICIENT_FUNDS,
   ERROR_DUST_AMOUNT,
@@ -118,14 +119,14 @@ export function estimateFee(coinType, feeLevel, amount, options = {}) {
 
     const queryArgs = `feeLevel=${feeLevel}&amount=${amountInBaseUnits}`;
     const estimateFeeXhr =
-      $.getJSON(app.getServerUrl(`wallet/estimatefee/${coinType}?${queryArgs}`))
-        .done((...args) => {
+      myGet(app.getServerUrl(`wallet/estimatefee/${coinType}?${queryArgs}`))
+        .done((data) => {
           let convertedAmount;
 
           try {
             convertedAmount = integerToDecimal(
-              args[0].amount,
-              args[0].currency.divisibility,
+              data.amount,
+              data.currency.divisibility,
               { returnNaNOnError: false },
             );
           } catch (e) {
@@ -138,7 +139,6 @@ export function estimateFee(coinType, feeLevel, amount, options = {}) {
 
           deferred.resolve(
             convertedAmount,
-            ...args.slice(1),
           );
         }).fail((xhr) => {
           const reason = (xhr && xhr.responseJSON && xhr.responseJSON.reason) || '';
@@ -185,7 +185,7 @@ export function getFees(coinType) {
       createdAt: Date.now(),
     };
 
-    $.get(app.getServerUrl(`wallet/fees/${coinType}`))
+    myGet(app.getServerUrl(`wallet/fees/${coinType}`))
       .done((data) => {
         let superEconomic;
         let economic;

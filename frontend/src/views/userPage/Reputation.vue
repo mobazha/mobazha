@@ -33,7 +33,7 @@
 </template>
 
 <script>
-import $ from 'jquery';
+import { myGet } from '../..//api/api';
 import app from '../../../backbone/app';
 import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
 import Profile from '../../../backbone/models/profile/Profile';
@@ -94,7 +94,7 @@ export default {
 
       // fetch the ratings immediately. They are asyncronous, and should not be refetched
       // if the view re-renders.
-      this.ratingsFetch = $.get(app.getServerUrl(`ob/ratingindex/${this.model.get('peerID')}`))
+      this.ratingsFetch = myGet(app.getServerUrl(`ob/ratingindex/${this.model.get('peerID')}`))
         .done((data) => this.onRatings(data))
         .fail((jqXhr) => {
           if (jqXhr.statusText === 'abort') return;

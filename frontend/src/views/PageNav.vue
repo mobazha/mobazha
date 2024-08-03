@@ -197,8 +197,8 @@
 <script>
 import * as isIPFS from 'is-ipfs';
 import Backbone from 'backbone';
-import $ from 'jquery';
 import process from 'process';
+import { myGet } from '../api/api.js';
 import { ipc } from '../utils/ipcRenderer.js';
 import { events as serverConnectEvents, getCurrentConnection } from '../../backbone/utils/serverConnect.js';
 import { setUnreadNotifCount, launchNativeNotification } from '../../backbone/utils/notification.js';
@@ -412,11 +412,11 @@ export default {
       // We'll send a bogus filter because all we want is the count - we don't
       // want to weight the returned payload down with any notifications. Those
       // will be lazy loaded in when the notif menu is opened.
-      return $.get(app.getServerUrl('ob/notifications?filter=blah-blah'));
+      return myGet(app.getServerUrl('ob/notifications?filter=blah-blah'));
     },
 
     fetchCartItemsCount () {
-      return $.get(app.getServerUrl('ob/carts/itemsCount'));
+      return myGet(app.getServerUrl('ob/carts/itemsCount'));
     },
 
     setAppProfile () {

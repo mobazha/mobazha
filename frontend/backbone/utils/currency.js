@@ -1,10 +1,10 @@
 /* eslint-disable max-classes-per-file */
 import _ from 'underscore';
 
-import $ from 'jquery';
 import bigNumber from 'bignumber.js';
 import { Events } from 'backbone';
 import app from '../app';
+import { myGet } from '../../src/api/api';
 import {
   preciseRound,
   validateNumberType,
@@ -583,7 +583,7 @@ let exchangeRates = {};
  * cached values via getExchangeRate() or more commonly convertCurrency().
  */
 export function fetchExchangeRates(options = {}) {
-  const xhr = $.get(app.getServerUrl('ob/exchangerates'), options)
+  const xhr = myGet(app.getServerUrl('ob/exchangerates'), options)
     .done((data) => {
       const changed = new Set();
 

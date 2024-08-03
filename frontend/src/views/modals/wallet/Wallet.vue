@@ -108,6 +108,7 @@
 /* eslint-disable class-methods-use-this */
 import _ from 'underscore';
 import $ from 'jquery';
+import { myGet } from '../../../api/api';
 import bigNumber from 'bignumber.js';
 import { isSupportedWalletCur, ensureMainnetCode, supportedWalletCurs } from '../../../../backbone/data/walletCurrencies';
 import defaultSearchProviders from '../../../../backbone/data/defaultSearchProviders';
@@ -250,7 +251,7 @@ export default {
 
     navCoins() {
       let access = this.balanceKey;
-      
+
       let supportedCoins = this.supportedCoins();
       const balances = app.walletBalances.toJSON();
 
@@ -427,7 +428,7 @@ export default {
 
       this.needAddress[coinType] = false;
 
-      const fetch = $.get(app.getServerUrl(`wallet/address/${coinType}`))
+      const fetch = myGet(app.getServerUrl(`wallet/address/${coinType}`))
         .done((data) => {
           this.fetchingAddress = false;
           this.receiveAddress = data.address;

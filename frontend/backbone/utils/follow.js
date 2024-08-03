@@ -1,4 +1,4 @@
-import $ from 'jquery';
+import { myGet, myAjax } from '../../src/api/api';
 import { capitalize } from './string';
 import app from '../app';
 import Dialog from '../views/modals/Dialog';
@@ -12,7 +12,7 @@ export function followsYou(guid) {
     throw new Error('Please provide a guid');
   }
 
-  return $.get(`${app.getServerUrl(`ob/followsme/${guid}`)}`);
+  return myGet(`${app.getServerUrl(`ob/followsme/${guid}`)}`);
 }
 
 export function followUnfollow(guid, type = 'follow') {
@@ -29,7 +29,7 @@ export function followUnfollow(guid, type = 'follow') {
     throw new Error('You can not follow or unfollow your own guid');
   }
 
-  return $.ajax({
+  return myAjax({
     type: 'POST',
     url: app.getServerUrl(`ob/${type}/${guid}`),
   })

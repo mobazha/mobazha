@@ -1,4 +1,5 @@
 import $ from 'jquery';
+import { myGet } from '../../src/api/api';
 import app from '../app';
 import { Events } from 'backbone';
 import { events as listingEvents } from '../models/listing/';
@@ -161,7 +162,7 @@ export function getInventory(peerID, options = {}) {
       `ob/inventory/${peerID}${opts.slug ? `/${opts.slug}` : ''}` +
         `${useCache ? '?usecache=true' : ''}`;
 
-    const xhr = $.get(app.getServerUrl(url))
+    const xhr = myGet(app.getServerUrl(url))
       .done(data => {
         let inventoryData = {};
 
@@ -198,7 +199,7 @@ export function getInventory(peerID, options = {}) {
           errCode: failedXhr.statusText === 'abort' ?
             'CANCELED' : 'SERVER_ERROR',
           error: xhr.responseJSON && xhr.responseJSON.reason || '',
-          statusCode: xhr.status,
+          statusCode: xhr.response?.status,
         });
 
         events.trigger('inventory-fetch-fail', {

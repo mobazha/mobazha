@@ -33,6 +33,7 @@ import CryptoTradingPair from '../../components/CryptoTradingPair';
 import SupportedCurrenciesList from '../../components/SupportedCurrenciesList';
 
 import api from '../../../../src/api';
+import { myGet } from '../../../../src/api/api';
 
 export default class extends BaseModal {
   constructor(options = {}) {
@@ -150,7 +151,7 @@ export default class extends BaseModal {
     this.rating = this.createChild(Rating);
 
     // get the ratings data, if any
-    this.ratingsFetch = $.get(app.getServerUrl(`ob/ratingindex/${this.vendor.peerID}/${this.model.get('slug')}`))
+    this.ratingsFetch = myGet(app.getServerUrl(`ob/ratingindex/${this.vendor.peerID}/${this.model.get('slug')}`))
       .done((data) => this.onRatings(data))
       .fail((jqXhr) => {
         if (jqXhr.statusText === 'abort') return;

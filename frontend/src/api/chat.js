@@ -1,15 +1,15 @@
-import $ from 'jquery';
+import { myGet } from './api';
 
 export default {
   getConversationList(params = {}) {
-    return $.get(window.app.getServerUrl('ob/chatconversations'), params);
+    return myGet(window.app.getServerUrl('ob/chatconversations'), params);
   },
 
   getMyProfile(params = {}) {
-    return $.get(window.app.getServerUrl('ob/profile'), params);
+    return myGet(window.app.getServerUrl('ob/profile'), params);
   },
 
   getConversationMessage(params) {
-    return $.get(window.app.getServerUrl(`ob/chatmessages/${params.peerID}`, params));
+    return myGet(window.app.getServerUrl(`ob/chatmessages/${params.peerID}`, params));
   },
 };

@@ -1,4 +1,4 @@
-import $ from 'jquery';
+import { myGet } from '../../../src/api/api';
 import BaseVw from '../baseVw';
 import loadTemplate from '../../utils/loadTemplate';
 import app from '../../app';
@@ -34,7 +34,7 @@ export default class extends BaseVw {
     // fetch the ratings immediately. They are asyncronous, and should not be refetched
     // if the view re-renders.
     this.ratingsFetch =
-      $.get(app.getServerUrl(`ob/ratingindex/${this.options.model.get('peerID')}`))
+      myGet(app.getServerUrl(`ob/ratingindex/${this.options.model.get('peerID')}`))
         .done(data => this.onRatings(data))
         .fail((jqXhr) => {
           if (jqXhr.statusText === 'abort') return;

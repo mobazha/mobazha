@@ -1,4 +1,5 @@
 import $ from 'jquery';
+import { myGet } from '../../../../../src/api/api.js';
 import { ipc } from '../../../../../src/utils/ipcRenderer.js';
 import app from '../../../../app';
 import { openSimpleMessage } from '../../SimpleMessage';
@@ -56,7 +57,7 @@ export default class extends baseVw {
 
     recordEvent('Settings_Advanced_ShowSeed');
 
-    this.walletSeedFetch = $.get(app.getServerUrl('wallet/mnemonic')).done((data) => {
+    this.walletSeedFetch = myGet(app.getServerUrl('wallet/mnemonic')).done((data) => {
       this.mnemonic = data.mnemonic;
       if (this.walletSeed) {
         this.walletSeed.setState({ seed: data.mnemonic });
@@ -123,7 +124,7 @@ export default class extends baseVw {
   showBlockData() {
     this.getCachedEl('.js-blockData').addClass('processing');
 
-    this.blockData = $.get(app.getServerUrl('wallet/status'))
+    this.blockData = myGet(app.getServerUrl('wallet/status'))
       .always(() => {
         this.getCachedEl('.js-blockData').removeClass('processing');
       })

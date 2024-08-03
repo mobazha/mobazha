@@ -256,6 +256,7 @@
 <script>
 import _ from 'underscore';
 import $ from 'jquery';
+import { myGet } from '../../../../api/api';
 import { ipc } from '../../../../utils/ipcRenderer.js';
 import app from '../../../../../backbone/app.js';
 import { openSimpleMessage } from '../../../../../backbone/views/modals/SimpleMessage';
@@ -364,7 +365,7 @@ export default {
 
       recordEvent('Settings_Advanced_ShowSeed');
 
-      this.walletSeedFetch = $.get(app.getServerUrl('wallet/mnemonic')).done((data) => {
+      this.walletSeedFetch = myGet(app.getServerUrl('wallet/mnemonic')).done((data) => {
         this.mnemonic = data.mnemonic;
       }).always(() => {
         this.isSeedFetching = false;
@@ -423,7 +424,7 @@ export default {
     showBlockData () {
       this.fetchingBlockData = true;
 
-      this.blockData = $.get(app.getServerUrl('wallet/status'))
+      this.blockData = myGet(app.getServerUrl('wallet/status'))
         .always(() => {
           this.fetchingBlockData = false;
         })

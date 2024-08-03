@@ -112,6 +112,7 @@ import _ from 'underscore';
 import $ from 'jquery';
 import is from 'is_js';
 import app from '../../../backbone/app';
+import { myGet } from '../../api/api';
 import { openSimpleMessage } from '../../../backbone/views/modals/SimpleMessage';
 import ResultsCol from '../../../backbone/collections/Results';
 import ProviderMd from '../../../backbone/models/search/SearchProvider';
@@ -479,11 +480,8 @@ export default {
         xhr: null,
       });
 
-      const searchFetch = $.get({
-        url: createSearchURL(opts),
-        dataType: 'json',
-      })
-        .done((data, status, xhr) => {
+      const searchFetch = myGet(createSearchURL(opts))
+        .done((data) => {
           // make sure minimal data is present. If it isn't, it's probably an invalid endpoint.
           if (data.name && data.links) {
             const dataUpdate = this.buildProviderUpdate(data);
@@ -508,7 +506,6 @@ export default {
             this.setState({
               fetching: false,
               data: {},
-              xhr,
             });
           }
         })

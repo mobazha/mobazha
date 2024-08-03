@@ -195,7 +195,7 @@ export default {
 
       $.post(app.getServerUrl(`wallet/status/${coin}`));
 
-      if (this.tabActive === 'send' && !(this.walletBalances.get(coin) && this.walletBalances.get(coin).get('confirmed'))) {
+      if (this.tabActive === 'send' && !(app.walletBalances.get(coin) && app.walletBalances.get(coin).get('confirmed'))) {
         this.tabActive = 'receive';
       } else {
         this.tabActive = 'send';
@@ -219,7 +219,7 @@ export default {
 
       const { activeCoin } = this;
 
-      const balances = this.walletBalances.toJSON();
+      const balances = app.walletBalances.toJSON();
       const balance = balances.find((item) => item.code === activeCoin);
       return {
         cryptoCur: activeCoin && ensureMainnetCode(activeCoin),
@@ -249,8 +249,10 @@ export default {
     },
 
     navCoins() {
+      let access = this.balanceKey;
+      
       let supportedCoins = this.supportedCoins();
-      const balances = this.walletBalances.toJSON();
+      const balances = app.walletBalances.toJSON();
 
       return supportedCoins.map((coin) => {
         const balanceMd = balances.find((item) => item.code === coin);
@@ -282,7 +284,7 @@ export default {
       // are null, it indicates that none of the wallet currencies are supported by
       // this client.
 
-      (this.tabActive = !!(this.walletBalances.get(initialActiveCoin) && this.walletBalances.get(initialActiveCoin).get('confirmed')) ? 'send' : 'receive'),
+      (this.tabActive = !!(app.walletBalances.get(initialActiveCoin) && app.walletBalances.get(initialActiveCoin).get('confirmed')) ? 'send' : 'receive'),
         (this.activeCoin = initialActiveCoin);
 
       this.addressFetches = {};
@@ -451,7 +453,7 @@ export default {
     },
 
     onBumpFeeSuccess(e) {
-      this.walletBalances.get(this.activeCoin).set({
+      app.walletBalances.get(this.activeCoin).set({
         confirmed: e.data.confirmed,
         unconfirmed: e.data.unconfirmed,
       });

@@ -87,11 +87,7 @@
     </div>
 
     <Teleport to="#js-vueModal">
-      <Wallet ref="walletModal" v-show="showWallet" :bb="() => {
-        return {
-          walletBalances: app.walletBalances,
-        };
-      }" @close="closeWallet" />
+      <Wallet ref="walletModal" v-show="showWallet" @close="closeWallet" />
     </Teleport>
   </div>
 </template>

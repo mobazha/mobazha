@@ -1,60 +1,46 @@
-import Backbone from 'backbone';
-import axios from 'axios';
+import $ from 'jquery';
+import Backbone, { Model, Collection } from 'backbone';
+import api from '../src/api/api';
+import { CancelToken } from 'axios';
 
-// Axios interceptor for token check
-axios.interceptors.request.use(config => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+if (!import.meta.env.VITE_APP) {
+  const source = CancelToken.source();
 
-});
+  Backbone.ajax = function (options) {
+    const {
+      url,
+      type = 'GET',
+      data,
+      // Add other jQuery.ajax options as needed
+    } = options;
 
-// Axios interceptor for handling 401 responses
-axios.interceptors.response.use(response => {
-  return response;
-}, error => {
-  if (error.response && error.response.status === 401) {
-    router.push('/login'); // Redirect to login page
-  }
-  return Promise.reject(error);
-});
+    const axiosConfig = {
+      method: type,
+      url,
+      data,
+      headers: options.headers,
+      cancelToken: source.token
+      // Other Axios options as needed
+    };
 
-Backbone.sync = function(method, model, options) {
-  // Map Backbone methods to Axios methods
-  const axiosMethodMap = {
-    'create': 'post',
-    'read': 'get',
-    'update': 'put',
-    'delete': 'delete'
+    const deferred = $.Deferred();
+
+    api(axiosConfig)
+      .then((response) => {
+        if (options.success) options.success(response.data);
+
+        deferred.resolve(response.data, response.statusText, response);
+      })
+      .catch((error) => {
+        deferred.reject(error);
+      });
+
+    deferred.abort = (statusText) => {
+      source.cancel(statusText);
+    };
+
+    return deferred;
   };
+}
 
-  const axiosMethod = axiosMethodMap[method.toLowerCase()];
-
-  // Build Axios request configuration
-  const config = {
-    method: axiosMethod,
-    url: options.url,
-    data: model.toJSON(), // For create and update
-    headers: options.headers
-  };
-
-  return axios(config)
-    .then(response => {
-      // Handle successful response
-      if (options.success) {
-        options.success(response.data);
-      }
-      return response.data;
-    })
-    .catch(error => {
-      // Handle errors
-      if (options.error) {
-        options.error(error);
-      }
-      return error;
-    });
-};
-
-export default Backbone;
+export { Backbone, Model, Collection };

@@ -1,5 +1,5 @@
 import _ from 'underscore';
-import { Model, Collection } from 'backbone';
+import { Model, Collection } from '../updatedBackbone';
 import app from '../app';
 import { removeProp } from '../utils/object';
 import {

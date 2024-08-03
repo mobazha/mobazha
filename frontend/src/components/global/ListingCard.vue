@@ -821,7 +821,7 @@ export default {
       this.showListingDetailModal = false;
 
       if (this.ipfsFetch) this.ipfsFetch.abort();
-      this.ipnsFetch.abort();
+      if (this.ipnsFetch) this.ipnsFetch.abort();
 
       // in page close instead of route change close
       if (this.$route.name === this.routeNameOnOpen) {
@@ -941,7 +941,7 @@ export default {
     },
 
     onClickLoadingCancel() {
-      this.ipnsFetch.abort();
+      if (this.ipnsFetch) this.ipnsFetch.abort();
       if (this.ipfsFetch) this.ipfsFetch.abort();
 
       this.showListingLoading = false;

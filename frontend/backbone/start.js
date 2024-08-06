@@ -63,18 +63,6 @@ $(function() {
   $.trumbowyg.svgPath = '../node_modules/trumbowyg/dist/ui/icons.svg';
 });
 
-if (location.pathname === '/callback') {
-  casdoor.signin().then((res) => {
-    if (res.status === 'ok') {
-      casdoor.setToken(res.data);
-    } else {
-      console.log(`Login failed: ${res.msg}`);
-    }
-
-    window.location.href = '/'
-  })
-}
-
 app.localSettings.on('change:language', (localSettings, lang) => {
   moment.locale(lang);
 
@@ -736,81 +724,107 @@ const sendMainActiveServer = (activeServer) => {
 // Alert the main process if we are changing the active server.
 app.serverConfigs.on('activeServerChange', (activeServer) => sendMainActiveServer(activeServer));
 
-// Let's create our Connection Management modal so that it's
-// available to show when needed.
-app.connectionManagmentModal = new ConnectionManagement({
-  removeOnRoute: false,
-  dismissOnOverlayClick: false,
-  dismissOnEscPress: false,
-  showCloseButton: false,
-}).render();
+function doLogin() {
+  window.location.href = casdoor.getSigninUrl();
+}
 
-// get the saved server configurations
-app.serverConfigs.fetch().done(() => {
-  app.serverConfigs.migrate();
+if (location.pathname === '/callback') {
+  casdoor.signin().then((res) => {
+    if (res.status === 'ok') {
+      casdoor.setToken(res.data);
+    } else {
+      console.log(`Login failed: ${res.msg}`);
+    }
 
-  if (!import.meta.env.VITE_APP) {
-    const serverConfig = new ServerConfig({
-      name: 'HostingServer',
-      id: 'backend',
-      serverIp: 'localhost',
-      port: '8080',
-      authenticate: false,
-    });
-    serverConfig.save();
-    app.serverConfigs.reset();
-    app.serverConfigs.add(serverConfig);
+    window.location.href = '/'
+  })
+} else {
+  // Let's create our Connection Management modal so that it's
+  // available to show when needed.
+  app.connectionManagmentModal = new ConnectionManagement({
+    removeOnRoute: false,
+    dismissOnOverlayClick: false,
+    dismissOnEscPress: false,
+    showCloseButton: false,
+  }).render();
 
-    connectToServer(serverConfig);
-  } else if (!app.serverConfigs.length) {
-    // no saved server configurations
-    if (isBundledApp) {
-      // for a bundled app, we'll create a
-      // "default" one and try to connect
-      const serverConfig = new ServerConfig({
-        builtIn: true,
-        name: app.polyglot.t('connectionManagement.builtInServerName'),
-      });
+  // get the saved server configurations
+  app.serverConfigs.fetch().done(() => {
+    app.serverConfigs.migrate();
 
-      serverConfig.save({}, {
-        success: (md) => {
-          setTimeout(() => {
-            app.serverConfigs.activeServer = app.serverConfigs.add(md);
-            connectToServer();
+    // Web version
+    if (!import.meta.env.VITE_APP) {
+      if (!casdoor.isLoggedIn()) {
+        doLogin();
+      } else {
+        // Use API to get the socket port.
+        myGet('/api/serverInfo').done((serverInfo) => {
+          const serverConfig = new ServerConfig({
+            name: 'HostingServer',
+            id: 'backend',
+            serverIp: 'localhost',
+            port: serverInfo.gatewayPort,
+            authenticate: false,
           });
-        },
-      });
+          serverConfig.save();
+          app.serverConfigs.reset();
+          app.serverConfigs.add(serverConfig);
+    
+          connectToServer(serverConfig);
+        }).fail(() => {
+          doLogin();
+        })
+      }
+    } else if (!app.serverConfigs.length) {
+      // no saved server configurations
+      if (isBundledApp) {
+        // for a bundled app, we'll create a
+        // "default" one and try to connect
+        const serverConfig = new ServerConfig({
+          builtIn: true,
+          name: app.polyglot.t('connectionManagement.builtInServerName'),
+        });
 
-      if (serverConfig.validationError) {
-        console.error('There was an error creating the builtIn server config:');
-        console.dir(serverConfig.validationError);
+        serverConfig.save({}, {
+          success: (md) => {
+            setTimeout(() => {
+              app.serverConfigs.activeServer = app.serverConfigs.add(md);
+              connectToServer();
+            });
+          },
+        });
+
+        if (serverConfig.validationError) {
+          console.error('There was an error creating the builtIn server config:');
+          console.dir(serverConfig.validationError);
+        }
+      } else {
+        app.connectionManagmentModal.open();
+        serverConnectEvents.once('connected', () => {
+          app.loadingModal.open();
+          start();
+        });
       }
     } else {
-      app.connectionManagmentModal.open();
-      serverConnectEvents.once('connected', () => {
-        app.loadingModal.open();
-        start();
-      });
-    }
-  } else {
-    let { activeServer } = app.serverConfigs;
+      let { activeServer } = app.serverConfigs;
 
-    if (activeServer) {
-      sendMainActiveServer(activeServer);
-    } else {
-      app.serverConfigs.activeServer = app.serverConfigs.at(0);
-      activeServer = app.serverConfigs.at(0);
-    }
+      if (activeServer) {
+        sendMainActiveServer(activeServer);
+      } else {
+        app.serverConfigs.activeServer = app.serverConfigs.at(0);
+        activeServer = app.serverConfigs.at(0);
+      }
 
-    if (activeServer.get('builtIn') && !isBundledApp) {
-      // Your active server is the locally bundled server, but you're
-      // not running the bundled app. You have bad data!
-      activeServer.set('builtIn', false);
-    }
+      if (activeServer.get('builtIn') && !isBundledApp) {
+        // Your active server is the locally bundled server, but you're
+        // not running the bundled app. You have bad data!
+        activeServer.set('builtIn', false);
+      }
 
-    connectToServer();
-  }
-});
+      connectToServer();
+    }
+  });
+}
 
 // Clear localServer events on browser refresh.
 $(window).on('beforeunload', () => {

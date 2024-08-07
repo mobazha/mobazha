@@ -763,7 +763,8 @@ if (location.pathname === '/callback') {
             name: 'HostingServer',
             id: 'backend',
             serverIp: 'localhost',
-            port: serverInfo.gatewayPort,
+            port: 8080,
+            innerPort: serverInfo.gatewayPort,
             authenticate: false,
           });
           serverConfig.save();

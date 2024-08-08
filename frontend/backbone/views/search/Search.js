@@ -277,7 +277,7 @@ export default class extends baseVw {
     this.setState({
       tab: 'listings',
       fetching: true,
-      xhrError: null,
+      xhr: null,
     });
 
     const searchFetch = myGet(createSearchURL(opts))
@@ -306,12 +306,12 @@ export default class extends baseVw {
           });
         }
       })
-      .fail((xhrError) => {
-        if (xhrError.name !== 'AbortError') {
+      .fail((xhr) => {
+        if (xhr.statusText !== 'abort') {
           this.setState({
             fetching: false,
             data: {},
-            xhrError,
+            xhr,
           });
         }
       });
@@ -463,11 +463,11 @@ export default class extends baseVw {
 
     this.getCachedEl('.js-resultsWrapper').html(this.resultsView.render().el);
 
-    this.listenTo(this.resultsView, 'searchError', (xhrError) => {
+    this.listenTo(this.resultsView, 'searchError', (xhr) => {
       this.setState({
         fetching: false,
         data: {},
-        xhrError,
+        xhr,
       });
     });
     this.listenTo(this.resultsView, 'loadingPage', () => scrollPageIntoView());
@@ -535,10 +535,10 @@ export default class extends baseVw {
     let errTitle;
     let errMsg;
 
-    if (state.xhrError) {
+    if (state.xhr) {
       const provider = this._search.provider.get('name') || this.currentBaseUrl;
       errTitle = app.polyglot.t('search.errors.searchFailTitle', { provider });
-      const failReason = xhrError.toJSON();
+      const failReason = state.xhr.responseJSON ? state.xhr.responseJSON.reason : '';
       errMsg = failReason
         ? app.polyglot.t('search.errors.searchFailReason', { error: failReason })
         : app.polyglot.t('search.errors.searchFailData');

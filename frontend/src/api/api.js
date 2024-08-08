@@ -33,6 +33,27 @@ if (!import.meta.env.VITE_APP) {
   );
 }
 
+function handleError(deferred, error, options = {}) {
+  const xhr = error.request;
+  deferred.xhr = xhr;
+
+  if (error.name === 'AbortError') {
+    xhr.statusText = 'abort';
+  }
+
+  if (error.response) {
+    xhr.responseJSON = error.response.data;
+
+    if (options.error) options.error(xhr, error.response.statusText, error.response.data);
+
+    deferred.reject(xhr, error.response.statusText, error.response.data);
+  } else {
+    if (options.error) options.error(xhr, xhr.statusText, error.message);
+
+    deferred.reject(xhr, xhr.statusText, error.message);
+  }
+}
+
 export function myGet(url, data = {}, config = {}) {
   const deferred = $.Deferred();
 
@@ -43,17 +64,10 @@ export function myGet(url, data = {}, config = {}) {
     signal: controller.signal
   })
     .then((response) => {
-      deferred.resolve(response.data, response.statusText, response);
+      deferred.resolve(response.data, "success", response.request);
     })
     .catch((error) => {
-      if (error.name === 'AbortError') {
-        error.statusText = 'abort';
-      }
-      if (error.response) {
-        error.responseJSON = error.response.data;
-      }
-
-      deferred.reject(error);
+      handleError(deferred, error);
     });
 
   deferred.abort = () => {
@@ -72,17 +86,10 @@ export function myPost(url, data = {}, config = {}) {
     signal: controller.signal
   })
     .then((response) => {
-      deferred.resolve(response.data, response.statusText, response);
+      deferred.resolve(response.data, "success", response.request);
     })
     .catch((error) => {
-      if (error.name === 'AbortError') {
-        error.statusText = 'abort';
-      }
-      if (error.response) {
-        error.responseJSON = error.response.data;
-      }
-
-      deferred.reject(error);
+      handleError(deferred, error);
     });
 
   deferred.abort = () => {
@@ -116,19 +123,10 @@ export function myAjax(options) {
     .then((response) => {
       if (options.success) options.success(response.data);
 
-      deferred.resolve(response.data, response.statusText, response);
+      deferred.resolve(response.data, "success", response.request);
     })
     .catch((error) => {
-      if (error.name === 'AbortError') {
-        error.statusText = 'abort';
-      }
-      if (error.response) {
-        error.responseJSON = error.response.data;
-      }
-
-      if (options.error) options.error(error, error.statusText);
-
-      deferred.reject(error);
+      handleError(deferred, error, options);
     });
 
   deferred.abort = () => {

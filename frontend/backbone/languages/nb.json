@@ -213,6 +213,7 @@
     "cases": "Saker",
     "settings": "Innstillinger",
     "help": "Hjelp",
+    "logout": "Logout",
     "toolTip": {
       "back": "Tilbake",
       "forward": "Fremover",

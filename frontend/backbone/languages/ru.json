@@ -213,6 +213,7 @@
     "cases": "История",
     "settings": "Настройки",
     "help": "Помощь",
+    "logout": "Logout",
     "toolTip": {
       "back": "Назад",
       "forward": "Вперед",

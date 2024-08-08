@@ -100,7 +100,7 @@
                       <span class="txB tx4 noOverflow">{{ ob.name }}</span>
                     </a>
                   </div>
-                  <div class="listGroup clrP clrBr">
+                  <div v-if="import.meta.env.VITE_APP" class="listGroup clrP clrBr">
                     <a class="listItem connectedServerListItem"
                       @mouseenter="onMouseEnterConnectedServerListItem"
                       @mouseleave="onMouseLeaveConnectedServerListItem">
@@ -142,6 +142,11 @@
                     </a>
                     <a class="listItem js-navListItem" @click="navHelpClick">
                       <span>{{ ob.polyT('pageNav.help') }}</span><span class="clrT2 TODO">Cltrl + ?</span>
+                    </a>
+                  </div>
+                  <div v-if="!import.meta.env.VITE_APP" class="listGroup clrP clrBr">
+                    <a class="listItem js-navListItem" @click="navLogoutClick">
+                      <span>{{ ob.polyT('pageNav.logout') }}</span><span class="clrT2 TODO">Cltrl + ?</span>
                     </a>
                   </div>
                   <!-- <div class="listGroup clrP clrBr">
@@ -204,6 +209,7 @@ import { events as serverConnectEvents, getCurrentConnection } from '../../backb
 import { setUnreadNotifCount, launchNativeNotification } from '../../backbone/utils/notification.js';
 import { recordEvent } from '../../backbone/utils/metrics.js';
 import app from '../../backbone/app.js';
+import * as casdoor from '../utils/casdoor';
 import { launchAboutModal, } from '../../backbone/utils/modalManager.js';
 import Listing from '../../backbone/models/listing/Listing.js';
 import { getNotifDisplayData } from '../../backbone/collections/Notifications.js';
@@ -704,6 +710,12 @@ export default {
       recordEvent('NavClick', { target: 'walletOpen' });
 
       this.showWallet = true;
+    },
+
+    navLogoutClick() {
+      casdoor.logout();
+
+      casdoor.goToLink('/');
     },
 
     closeWallet() {

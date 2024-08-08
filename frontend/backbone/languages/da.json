@@ -213,6 +213,7 @@
     "cases": "Sager",
     "settings": "Indstillinger",
     "help": "Hjælp",
+    "logout": "Logout",
     "toolTip": {
       "back": "Tilbage",
       "forward": "Frem",

@@ -213,6 +213,7 @@
     "cases": "Litiges",
     "settings": "Paramètres",
     "help": "Help",
+    "logout": "Logout",
     "toolTip": {
       "back": "Reculer",
       "forward": "Avancer",

@@ -100,7 +100,7 @@
                       <span class="txB tx4 noOverflow">{{ ob.name }}</span>
                     </a>
                   </div>
-                  <div v-if="import.meta.env.VITE_APP" class="listGroup clrP clrBr">
+                  <div v-if="isApp" class="listGroup clrP clrBr">
                     <a class="listItem connectedServerListItem"
                       @mouseenter="onMouseEnterConnectedServerListItem"
                       @mouseleave="onMouseLeaveConnectedServerListItem">
@@ -144,7 +144,7 @@
                       <span>{{ ob.polyT('pageNav.help') }}</span><span class="clrT2 TODO">Cltrl + ?</span>
                     </a>
                   </div>
-                  <div v-if="!import.meta.env.VITE_APP" class="listGroup clrP clrBr">
+                  <div v-if="!isApp" class="listGroup clrP clrBr">
                     <a class="listItem js-navListItem" @click="navLogoutClick">
                       <span>{{ ob.polyT('pageNav.logout') }}</span><span class="clrT2 TODO">Cltrl + ?</span>
                     </a>
@@ -245,6 +245,8 @@ export default {
   },
   data () {
     return {
+      isApp: import.meta.env.VITE_APP,
+
       navigable: false,
       torIndicatorOn: false,
 

@@ -160,7 +160,8 @@
     "connectMessaging": {
       "cancelLink": "取消",
       "connectAttemptMsg": "连接到%{serverName}。 %{cancelLink}"
-    }
+    },
+    "user_store": "%{userName}的店铺"
   },
   "notifications": {
     "title": "通知",

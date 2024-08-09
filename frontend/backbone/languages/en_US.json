@@ -164,7 +164,8 @@
     "connectMessaging": {
       "cancelLink": "cancel",
       "connectAttemptMsg": "Connecting to %{serverName}. %{cancelLink}"
-    }
+    },
+    "user_store": "Store for %{userName}"
   },
   "notifications": {
     "title": "Notifications",

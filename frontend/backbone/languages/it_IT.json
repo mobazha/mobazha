@@ -160,7 +160,8 @@
     "connectMessaging": {
       "cancelLink": "cancella",
       "connectAttemptMsg": "Connessione a %{serverName}. %{cancelLink}"
-    }
+    },
+    "user_store": "Store for %{userName}"
   },
   "notifications": {
     "title": "Notifiche",

@@ -762,8 +762,9 @@ if (location.pathname === '/callback') {
           const serverConfig = new ServerConfig({
             name: 'HostingServer',
             id: 'backend',
-            serverIp: 'localhost',
-            port: 8080,
+            serverIp: 'store.mobazha.org',
+            SSL: true,
+            port: 443,
             innerPort: serverInfo.gatewayPort,
             authenticate: false,
           });

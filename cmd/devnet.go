@@ -37,14 +37,14 @@ func (x *DevNet) Execute(args []string) error {
 	}
 
 	vendorCfg := newConfig("vendor", "/ip4/127.0.0.1/tcp/4007", "/ip4/127.0.0.1/tcp/4004")
-	vendorCfg.BoostrapAddrs = []string{fmt.Sprintf("%s/p2p/%s", buyerCfg.SwarmAddrs[0], buyer.Identity().Pretty())}
+	vendorCfg.BoostrapAddrs = []string{fmt.Sprintf("%s/p2p/%s", buyerCfg.SwarmAddrs[0], buyer.Identity())}
 	vendor, err := core.NewNode(context.Background(), vendorCfg)
 	if err != nil {
 		return err
 	}
 
 	moderatorCfg := newConfig("moderator", "/ip4/127.0.0.1/tcp/4008", "/ip4/127.0.0.1/tcp/4005")
-	moderatorCfg.BoostrapAddrs = []string{fmt.Sprintf("%s/p2p/%s", buyerCfg.SwarmAddrs[0], buyer.Identity().Pretty())}
+	moderatorCfg.BoostrapAddrs = []string{fmt.Sprintf("%s/p2p/%s", buyerCfg.SwarmAddrs[0], buyer.Identity())}
 	moderator, err := core.NewNode(context.Background(), moderatorCfg)
 	if err != nil {
 		return err

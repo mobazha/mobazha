@@ -13,7 +13,7 @@ import (
 	"github.com/cpacia/openbazaar3.0/core/coreiface"
 	"github.com/cpacia/openbazaar3.0/models"
 	"github.com/cpacia/openbazaar3.0/models/factory"
-	"github.com/cpacia/openbazaar3.0/orders/pb"
+	pb "github.com/cpacia/openbazaar3.0/orders/mbzpb"
 	"github.com/cpacia/openbazaar3.0/repo"
 	"github.com/cpacia/openbazaar3.0/wallet"
 	"github.com/libp2p/go-libp2p/core/peer"

@@ -19,9 +19,9 @@ android_framework: ## Build Android Framework for mobile
 .PHONY: protos
 protos:
 	cd net/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ *.proto
-	cd orders/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ --proto_path=../../net/pb --proto_path=./ *.proto
+	cd orders/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ --proto_path=../../net/mbzpb --proto_path=./ *.proto
 	cd orders/pb && sed -i 's/OrderList/pb.OrderList/' orders.pb.go
-	cd orders/pb && sed -i '11i\"github.com/cpacia/openbazaar3.0/net/pb"\' orders.pb.go
+	cd orders/pb && sed -i '11i\"github.com/cpacia/openbazaar3.0/net/mbzpb"\' orders.pb.go
 	cd orders/pb && sed -i 's/file_msg_proto_init()//' orders.pb.go
 	cd orders/pb && gofmt -s -w orders.pb.go
 	cd channels/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ *.proto

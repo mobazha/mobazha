@@ -20,7 +20,7 @@ import (
 
 var log = logging.MustGetLogger("CMD")
 
-// Start is the main entry point for openbazaar-go. The options to this
+// Start is the main entry point for mobazha-go. The options to this
 // command are the same as the Mobazha node config options.
 type Start struct {
 	repo.Config

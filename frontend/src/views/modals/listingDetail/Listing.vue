@@ -55,7 +55,7 @@
             <div class="contentBox padLg clrP clrBr clrSh3">
               <div :class="`${ob.metadata.contractType !== 'CRYPTOCURRENCY' ? 'flex' : 'flexVCent'} gutterHLg`">
                 <template v-if="ob.metadata.contractType !== 'CRYPTOCURRENCY'">
-                  <h2 class="txUnb flexExpand">{{ ob.item.title }}</h2>
+                  <h2 class="txUnb flexExpand"><div v-html="ob.item.title" /></h2>
                   <h2 class="txUnb flexNoShrink js-price" v-html="renderPrice(totalPrice)"></h2>
                 </template>
 

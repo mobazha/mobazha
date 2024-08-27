@@ -3,22 +3,21 @@ module github.com/cpacia/openbazaar3.0
 go 1.23
 
 replace (
-	github.com/cpacia/go-onion-transport => /Users/mingfeng/go/src/github.com/cpacia/go-onion-transport
-	github.com/cpacia/go-store-and-forward => /Users/mingfeng/go/src/github.com/cpacia/go-store-and-forward
-	github.com/cpacia/proxyclient => /Users/mingfeng/go/src/github.com/cpacia/proxyclient
+	github.com/cpacia/go-onion-transport => /Users/mingfeng/other/ob/go-onion-transport
+	github.com/cpacia/go-store-and-forward => /Users/mingfeng/other/ob/go-store-and-forward
+	github.com/cpacia/proxyclient => /Users/mingfeng/other/ob/proxyclient
 
-	github.com/ethereum/go-ethereum => /Users/mingfeng/go/src/github.com/ethereum/go-ethereum
+	github.com/ipfs/kubo => /Users/mingfeng/go/src/github.com/mobazha/kubo
 
-	github.com/mobazha/ethereum-watcher => /Users/mingfeng/go/src/github.com/mobazha/ethereum-watcher
+	github.com/mobazha/ethereum-watcher => /Users/mingfeng/other/ob/ethereum-watcher
 
-	github.com/mobazha/go-ethwallet => /Users/mingfeng/dev/openbazaar/bnb_example
-	github.com/mobazha/multiwallet => /Users/mingfeng/go/src/github.com/cpacia/multiwallet
-	github.com/mobazha/wallet-interface => /Users/mingfeng/go/src/github.com/cpacia/wallet-interface
+	github.com/mobazha/go-ethwallet => /Users/mingfeng/other/ob/go-bscwallet
+	github.com/mobazha/multiwallet => /Users/mingfeng/other/ob/multiwallet
+	github.com/mobazha/wallet-interface => /Users/mingfeng/other/ob/wallet-interface
 
-
-	// github.com/multiformats/go-multiaddr => /Users/mingfeng/go/src/github.com/multiformats/go-multiaddr
+	github.com/multiformats/go-multiaddr => /Users/mingfeng/go/src/github.com/multiformats/go-multiaddr
 	github.com/nanmu42/etherscan-api => /Users/mingfeng/go/src/github.com/mobazha/etherscan-api
-	// github.com/wlynxg/anet => /Users/mingfeng/go/src/github.com/wlynxg/anet
+	github.com/wlynxg/anet => /Users/mingfeng/go/src/github.com/wlynxg/anet
 )
 
 require (

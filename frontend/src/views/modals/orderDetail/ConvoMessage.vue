@@ -84,7 +84,7 @@ export default {
       $msgHtml.find('a').addClass('clrTEm');
 
       // Convert any unicode emoji characters to images via Twemoji
-      message = twemoji.parse($msgHtml.html(), icon => (`../imgs/emojis/72X72/${icon}.png`));
+      message = twemoji.parse($msgHtml.html(), icon => (`/imgs/emojis/72X72/${icon}.png`));
       
       return {
         ...this.templateHelpers,

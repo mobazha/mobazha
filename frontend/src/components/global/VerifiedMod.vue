@@ -99,7 +99,7 @@ export default {
     
     badgeUrlInfo() {
       const state = this._state;
-      return `${state.badgeUrl ? `url(${state.badgeUrl}),` : ''}url('../imgs/verifiedModeratorBadgeDefault-tiny.png')`;
+      return `${state.badgeUrl ? `url(${state.badgeUrl}),` : ''}url('/imgs/verifiedModeratorBadgeDefault-tiny.png')`;
     }
   },
   methods: {

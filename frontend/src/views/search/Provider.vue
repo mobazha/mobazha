@@ -36,7 +36,7 @@ export default {
 
       const logo = ob.logo ? `url(${ob.logo}),` : '';
       const local = ob.localLogo ? `url(${ob.localLogo}),` : '';
-      return `${logo}${local}url(../imgs/defaultProvider.png)`;
+      return `${logo}${local}url(/imgs/defaultProvider.png)`;
     },
     ob () {
       return {

@@ -93,7 +93,7 @@ func NewNode(cfg *Config) (*Node, error) {
 		Testnet:                cfg.Testnet,
 		UserAgentComment:       cfg.UserAgentComment,
 		APICookie:              cfg.APICookie,
-		IPNSResolver:           cfg.IPNSResolver,
+		IPNSResolver:           "https://store.mobazha.org/api/ipns",
 		GatewayAddr:            cfg.GatewayAddress,
 	}
 

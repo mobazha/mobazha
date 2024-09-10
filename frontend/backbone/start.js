@@ -223,14 +223,14 @@ function isOnboardingNeeded() {
       if (state !== 'success') {
         const jqXhr = args[0];
 
-        if (jqXhr === profileFetch) {
+        if (jqXhr === profileFetch || jqXhr === profileFetch.xhr) {
           if (jqXhr.status === 404) {
             onboardProfile = true;
             profileFailed = false;
           } else {
             profileFailed = true;
           }
-        } else if (jqXhr === settingsFetch) {
+        } else if (jqXhr === settingsFetch || jqXhr === settingsFetch.xhr) {
           if (jqXhr.status === 404) {
             onboardSettings = true;
             settingsFailed = false;

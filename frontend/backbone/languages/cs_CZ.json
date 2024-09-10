@@ -205,6 +205,8 @@
     "torOnTooltip": "Aktivní Tor",
     "discoverCalloutTitle": "Objevit",
     "discoverCalloutBody": "Procházej a nakupuj ve stovkách obchodů na Mobazhau",
+    "connectWallet": "Connect Wallet",
+    "disconnectWallet": "Disconnect Wallet",
     "myPage": "Moje stránka",
     "customizePage": "Přizpůsobit stránku",
     "createListing": "Vytvořit záznam",

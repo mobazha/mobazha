@@ -205,6 +205,8 @@
     "torOnTooltip": "Tor activo",
     "discoverCalloutTitle": "Descubre",
     "discoverCalloutBody": "Navega y compra en cientos de tiendas en Mobazha",
+    "connectWallet": "Connect Wallet",
+    "disconnectWallet": "Disconnect Wallet",
     "myPage": "Mi página",
     "customizePage": "Personalizar Página",
     "createListing": "Nuevo Listado",

@@ -62,7 +62,7 @@ export default {
       modalBBFunc: undefined,
     };
   },
-  mounted() {
+  created() {
     const injected = injectedModule();
 
     const infuraKey = '<INFURA_KEY>'
@@ -117,6 +117,8 @@ export default {
         }
       ]
     })
+  },
+  mounted() {
   },
   watch: {},
   methods: {

@@ -109,6 +109,11 @@
                     </a>
                   </div>
                   <div class="listGroup clrP clrBr">
+                    <a class="listItem js-navListItem" @click="onClickWalletConnect">
+                      <span>{{ connectWalletMenuDisplay }}</span><span class="clrT2 TODO">Cltrl + ?</span>
+                    </a>
+                  </div>
+                  <div class="listGroup clrP clrBr">
                     <a class="listItem js-navListItem" @click="onNavListItemClick" :href="`#${ob.peerID}`">
                       <span>{{ ob.polyT('pageNav.myPage') }}</span><span class="clrT2 TODO">Cltrl + ?</span>
                     </a>
@@ -224,6 +229,8 @@ import EditListing from '@/views/modals/editListing/EditListing.vue';
 import WooImporter from '@/views/modals/WooImporter.vue';
 import ShoppingCart from './ShoppingCart.vue';
 
+import { useOnboard } from '@web3-onboard/vue';
+
 export default {
   components: {
     PageNavServersMenu,
@@ -281,12 +288,16 @@ export default {
       editListingModel: {},
 
       showShoppingCart: false,
+
+      onboard: {},
     };
   },
   created () {
     this.initEventChain();
 
     this.loadData(this.options);
+
+    this.onboard = useOnboard();
   },
   watch: {
     unreadNotifCount() {
@@ -324,7 +335,17 @@ export default {
         testnet: app.serverConfig.testnet,
         ...((app.profile && app.profile.toJSON()) || {}),
       };
-    }
+    },
+
+    connectWalletMenuDisplay() {
+      if (!this.onboard) return;
+
+      let access = this.navListOpened;
+
+      return this.onboard.connectingWallet
+        ? this.ob.polyT('pageNav.walletConnecting')
+        : this.onboard.connectedWallet ? this.ob.polyT('pageNav.disconnectWallet') : this.ob.polyT('pageNav.connectWallet');
+    },
   },
   methods: {
     loadData (options) {
@@ -533,6 +554,19 @@ export default {
 
     closeWooImporter() {
       this.showWooImporter = false;
+    },
+
+    onClickWalletConnect() {
+      setTimeout(() => {
+        this.closeNavMenu();
+      });
+
+      const { provider, label } = this.onboard.connectedWallet || {}
+      if (provider && label) {
+        this.onboard.disconnectWallet({ label })
+      } else {
+        this.onboard.connectWallet()
+      }
     },
 
     onNavListItemClick () {

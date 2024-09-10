@@ -117,7 +117,7 @@ app.loadingModal = new LoadingModal({
 handleLinks(document);
 
 // add the feedback mechanism
-addFeedback();
+// addFeedback();
 
 app.verifiedMods = new VerifiedMods();
 

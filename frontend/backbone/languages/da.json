@@ -205,6 +205,7 @@
     "torOnTooltip": "Tor er aktiv",
     "discoverCalloutTitle": "Udforsk",
     "discoverCalloutBody": "Udforsk og handl i hundreder af forretninger på Mobazha",
+    "walletConnecting": "Wallet Connecting...",
     "connectWallet": "Connect Wallet",
     "disconnectWallet": "Disconnect Wallet",
     "myPage": "Min side",

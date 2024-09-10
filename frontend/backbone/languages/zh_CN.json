@@ -206,6 +206,7 @@
     "torOnTooltip": "Tor有效",
     "discoverCalloutTitle": "发现",
     "discoverCalloutBody": "浏览Mobazha上的数百家商店并购物",
+    "walletConnecting": "Wallet Connecting...",
     "connectWallet": "Connect Wallet",
     "disconnectWallet": "Disconnect Wallet",
     "myPage": "我的主页",

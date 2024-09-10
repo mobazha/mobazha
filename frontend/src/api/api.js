@@ -34,10 +34,10 @@ if (!import.meta.env.VITE_APP) {
 }
 
 function handleError(deferred, error, options = {}) {
-  const xhr = error.request;
+  const xhr = error.request || {};
   deferred.xhr = xhr;
 
-  if (error.name === 'AbortError') {
+  if (error.name === 'AbortError' || error.name === 'CanceledError') {
     xhr.statusText = 'abort';
   }
 

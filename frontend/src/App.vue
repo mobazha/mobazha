@@ -31,6 +31,9 @@ import Purchase from '@/views/modals/purchase/Purchase.vue';
 import LoadingModal from '@/views/modals/Loading.vue';
 import PageNav from '@/views/PageNav.vue'
 
+import { init } from '@web3-onboard/vue'
+import injectedModule from '@web3-onboard/injected-wallets'
+
 export default {
   components: {
     Settings,
@@ -60,6 +63,60 @@ export default {
     };
   },
   mounted() {
+    const injected = injectedModule();
+
+    const infuraKey = '<INFURA_KEY>'
+    const rpcUrl = `https://mainnet.infura.io/v3/${infuraKey}`
+
+    init({
+      wallets: [injected],
+      chains: [
+      // {
+      //     id: '0x1',
+      //     token: 'ETH',
+      //     label: 'Ethereum Mainnet',
+      //     rpcUrl
+      //   },
+      //   {
+      //     id: 42161,
+      //     token: 'ARB-ETH',
+      //     label: 'Arbitrum One',
+      //     rpcUrl: 'https://rpc.ankr.com/arbitrum'
+      //   },
+      //   {
+      //     id: '0xa4ba',
+      //     token: 'ARB',
+      //     label: 'Arbitrum Nova',
+      //     rpcUrl: 'https://nova.arbitrum.io/rpc'
+      //   },
+      //   {
+      //     id: '0xa4ec',
+      //     token: 'ETH',
+      //     label: 'Celo',
+      //     rpcUrl: 'https://1rpc.io/celo'
+      //   },
+      //   {
+      //     id: 666666666,
+      //     token: 'DEGEN',
+      //     label: 'Degen',
+      //     rpcUrl: 'https://rpc.degen.tips'
+      //   },
+        {
+          id: 1030,
+          token: 'CFX',
+          label: 'Conflux',
+          icon: 'imgs/cryptoIcons/CFX-icon.png',
+          rpcUrl: 'https://evm.confluxrpc.com/GGna2h7aru3XSNFpeLrfT2ahYqM3YFeiX4FfgCgChdSfM9CbMXPik9762LBpKrzbC4c7kENDz2ikAYdyHQWjGiDvJ'
+        },
+        {
+          id: 137,
+          token: 'MATIC',
+          label: 'Polygon',
+          icon: 'imgs/cryptoIcons/MATIC-icon.png',
+          rpcUrl: 'https://polygon-bor-rpc.publicnode.com'
+        }
+      ]
+    })
   },
   watch: {},
   methods: {

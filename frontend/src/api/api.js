@@ -37,7 +37,7 @@ function handleError(deferred, error, options = {}) {
   const xhr = error.request || {};
   deferred.xhr = xhr;
 
-  if (['AbortError', 'CanceledError', 'AxiosError'].includes(error.name)) {
+  if (['AbortError', 'CanceledError'].includes(error.name)) {
     xhr.statusText = 'abort';
   }
 

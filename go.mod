@@ -33,6 +33,7 @@ require (
 	github.com/ethereum/go-ethereum v1.13.14
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/fatih/color v1.13.0
+	github.com/go-resty/resty/v2 v2.15.3
 	github.com/gogo/protobuf v1.3.2
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3

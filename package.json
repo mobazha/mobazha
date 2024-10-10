@@ -62,6 +62,7 @@
   },
   "dependencies": {
     "backbone": "npm:@fengzie/backbone@^1.4.1",
+    "bitcoinjs-lib": "^7.0.0-rc.0",
     "dayjs": "^1.10.7",
     "ee-core": "^2.4.0",
     "electron-context-menu": "^3.6.1",

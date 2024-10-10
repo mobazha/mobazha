@@ -1,10 +1,44 @@
 import _ from 'underscore';
-// import bitcoreLib from 'bitcore-lib';
-import bech32 from 'bech32';
+import * as bitcoin from 'bitcoinjs-lib';
 import app from '../app';
 
 // If a currency does not support fee bumping or you want to disable it, do not provide a
 // feeBumpTransactionSize setting.
+
+export const TIP_ADDRESSES = {
+  LTC: app.serverConfig.testnet ? 'tltc1qw4djyk8kha88y63phwpc845z0gaeesq0nvuhft':'ltc1qwl0504xgvfzvxgxsg5xmkan6zuy3n6na3randf',
+  BTC: 'bc1qnn0ezj6nh7kvm2pqyatx5hpphkuqvwydmwhw60',
+  ZEC: 't1ZHA4i9aquxasN5nhSita11uYyccTQeEYY',
+  BCH: app.serverConfig.testnet ? 'qrxmtql3l39n44tnu29ccjy0kjkwr4tx8ywhugjrak':'qp0xmudvwvswlcgh80pt98ysxph6r4wfggzeqh68hr',
+  ETH: '0x03bC67c2AEBc572397B19199f540C811F2904718',
+  CFX: '0x03bC67c2AEBc572397B19199f540C811F2904718',
+  MATIC: '0x03bC67c2AEBc572397B19199f540C811F2904718',
+  MATICUSDT: '0x03bC67c2AEBc572397B19199f540C811F2904718',
+  MATICUSDC: '0x03bC67c2AEBc572397B19199f540C811F2904718',
+  CFX: 'cfx:aaph2me2h30nfwp6ha24zz00xpp187th76e3xurre9',
+};
+
+export const isValidAddress = (address, coinType) => {
+  if (['btc', 'bch', 'ltc', 'zec'].includes(coinType.toLowerCase())) {
+    return isValidBTCLikeAddress(address);
+  }
+
+  return isValidETHAddress(address);
+}
+
+export const isValidBTCLikeAddress = (address) => {
+  try {
+    bitcoin.address.fromBech32(address);
+    return true;
+  } catch (error) {
+    try {
+      bitcoin.address.fromBase58Check(address, networkParams);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+}
 
 export const isValidETHAddress = (address) => {
   const regex1 = new RegExp('^0x[0-9a-fA-F]{40}$');
@@ -25,30 +59,14 @@ let _currencies = [
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
         ? `https://chain.so/address/BTCTEST/${address}`
-        : `https://blockchair.com/bitcoin/address/${address}`
+        : `https://www.oklink.com/btc/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
       isTestnet
         ? `https://chain.so/tx/BTCTEST/${txid}`
-        : `https://blockchair.com/bitcoin/transaction/${txid}`
+        : `https://www.oklink.com/btc/tx/${txid}`
     ),
-    isValidAddress: (address) => {
-      if (typeof address !== 'string') {
-        throw new Error('Please provide a string.');
-      }
-
-      try {
-        // bitcoreLib.encoding.Base58Check.decode(address);
-        return true;
-      } catch (exc) {
-        try {
-          bech32.decode(address);
-          return true;
-        } catch (exc2) {
-          return false;
-        }
-      }
-    },
+    isValidAddress: isValidBTCLikeAddress,
     supportsEscrowTimeout: true,
     blockTime: 1000 * 60 * 10,
     externallyFundableOrders: true,
@@ -71,13 +89,14 @@ let _currencies = [
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
         ? `https://explorer.bitcoin.com/tbch/address/bchtest:${address}`
-        : `https://blockchair.com/bitcoin-cash/address/${address}`
+        : `https://www.oklink.com/bch/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
       isTestnet
         ? `https://explorer.bitcoin.com/tbch/tx/${txid}`
-        : `https://blockchair.com/bitcoin-cash/transaction/${txid}`
+        : `https://www.oklink.com/bch/tx/${txid}`
     ),
+    isValidAddress: isValidBTCLikeAddress,
     supportsEscrowTimeout: true,
     blockTime: 1000 * 60 * 10,
     externallyFundableOrders: true,
@@ -412,13 +431,14 @@ let _currencies = [
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
         ? `https://chain.so/address/LTCTEST/${address}`
-        : `https://blockchair.com/litecoin/address/${address}`
+        : `https://www.oklink.com/ltc/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
       isTestnet
         ? `https://chain.so/tx/LTCTEST/${txid}`
-        : `https://blockchair.com/litecoin/transaction/${txid}`
+        : `https://www.oklink.com/ltc/tx/${txid}`
     ),
+    isValidAddress: isValidBTCLikeAddress,
     supportsEscrowTimeout: true,
     blockTime: 1000 * 60 * 2.5,
     externallyFundableOrders: true,
@@ -433,13 +453,14 @@ let _currencies = [
     getBlockChainAddressUrl: (address, isTestnet) => (
       isTestnet
         ? `https://explorer.testnet.z.cash/address/${address}`
-        : `https://explorer.zcha.in/accounts/${address}`
+        : `https://www.oklink.com/zec/address/${address}`
     ),
     getBlockChainTxUrl: (txid, isTestnet) => (
       isTestnet
         ? `https://explorer.testnet.z.cash/tx/${txid}`
-        : `https://explorer.zcha.in/transactions/${txid}`
+        : `https://www.oklink.com/zec/tx/${txid}`
     ),
+    isValidAddress: isValidBTCLikeAddress,
     supportsEscrowTimeout: false,
     blockTime: 1000 * 60 * 2.5,
     externallyFundableOrders: true,

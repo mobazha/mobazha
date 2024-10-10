@@ -13,7 +13,7 @@
           </el-form-item>
         </el-form>
       </div>
-      <div class="tips">{{ ob.polyT('wallet.external.notice') }}</div>
+      <div class="tips">{{ ob.polyT('wallet.external.notice', {coin: coinName}) }}</div>
     </template>
     <template v-else>
       <div class="external-desc">{{ ob.polyT('wallet.receiveMoney.title') }}</div>
@@ -31,7 +31,7 @@ import qr from 'qr-encode';
 import useClipboard from 'vue-clipboard3';
 import { ElMessage } from 'element-plus';
 import app from '../../../../backbone/app.js';
-import { isValidETHAddress, getCurrencyByCode } from '../../../../backbone/data/walletCurrencies.js';
+import { isValidAddress, TIP_ADDRESSES, getCurrencyByCode } from '../../../../backbone/data/walletCurrencies.js';
 export default {
   props: {
     coinType: {
@@ -57,13 +57,7 @@ export default {
         address: [
           {
             required: true,
-            validator(_rule, value, callback) {
-              if (!value) return callback(new Error(app.polyglot.t('wallet.external.inputPlaceHolder')));
-              if (!isValidETHAddress(value)) {
-                return callback(new Error(app.polyglot.t('wallet.external.invalidAddress')));
-              }
-              callback();
-            },
+            validator: this.validateInputAddress,
             trigger: ['change', 'blur'],
           },
         ],
@@ -103,6 +97,14 @@ export default {
   methods: {
     validateHandler(propName, isValid) {
       this.formValidity[propName] = isValid;
+    },
+
+    validateInputAddress(_rule, value, callback) {
+      if (!value) return callback(new Error(app.polyglot.t('wallet.external.inputPlaceHolder')));
+      if (!isValidAddress(value, this.coinType)) {
+        return callback(new Error(app.polyglot.t('wallet.external.invalidAddress', { coin: this.coinName, addr: TIP_ADDRESSES[this.coinType] })));
+      }
+      callback();
     },
 
     loadData() {

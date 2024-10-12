@@ -122,6 +122,7 @@ export default class extends baseVw {
       this.$el.html(t({
         ...this.model.toJSON(),
         ...this._state,
+        isApp: import.meta.env.VITE_APP,
       }));
 
       this._$deleteConfirm = null;

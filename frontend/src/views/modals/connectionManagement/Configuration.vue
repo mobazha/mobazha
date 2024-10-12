@@ -9,8 +9,8 @@
       <div class="col4">
         <div class="flexHRight">
           <div class="gutterHTn">
-            <a v-if="!ob.builtIn" :class="`iconBtn clrP clrBr ion-trash-b js-btnDelete ${ob.deleteConfirmOn ? 'confirmDisabled' : ''}`" @click="onDeleteClick"></a>
-            <a class="iconBtn clrP clrBr ion-ios-gear " @click="onEditClick"></a>
+            <a v-if="!ob.builtIn && isApp" :class="`iconBtn clrP clrBr ion-trash-b js-btnDelete ${ob.deleteConfirmOn ? 'confirmDisabled' : ''}`" @click="onDeleteClick"></a>
+            <a v-if="isApp" class="iconBtn clrP clrBr ion-ios-gear " @click="onEditClick"></a>
             <a v-if="ob.status === 'connecting'" class="btn clrP clrBr  btnConnectCancel" @click="onCancelClick">
               {{ ob.spinner({ className: 'spinnerSm' }) }}
               {{ ob.polyT('connectionManagement.configurations.btnCancel') }}
@@ -69,6 +69,7 @@ export default {
         ...this.templateHelpers,
         ...this.model.toJSON(),
         ...this._state,
+        isApp: import.meta.env.VITE_APP,
       };
     }
   },

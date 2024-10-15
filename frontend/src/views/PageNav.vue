@@ -56,7 +56,7 @@
           <div>
             <div class="flexVCent box margLSm posR">
               <a href="#search" class="toolTipNoWrap js-discover" :data-tip="ob.polyT('pageNav.toolTip.discover')" id="Nav_Discover">
-                <div class="discoverBtn navBtn" style="background-image: url('/imgs/obVectorIconSmall2.png')"></div>
+                <div class="discoverBtn navBtn" style="background-image: url('./imgs/obVectorIconSmall2.png')"></div>
               </a>
               <template v-if="showDiscoverCallout">
                 <div class="discoverCallout js-discoverCallout arrowBoxTop confirmBox clrP clrSh1 clrBr">

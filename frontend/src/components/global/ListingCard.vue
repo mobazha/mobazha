@@ -5,10 +5,10 @@
       <div class="listingImage" >
         <el-image ref="listingImage" fit="cover" lazy class="main-img" :src="listingImageUrl">
           <template #placeholder>
-            <img src="/imgs/defaultItem.png" class="placeholder-img" />
+            <img src="~@/../imgs/defaultItem.png" class="placeholder-img" />
           </template>
           <template #error>
-            <img src="/imgs/defaultItem.png" class="placeholder-img" />
+            <img src="~@/../imgs/defaultItem.png" class="placeholder-img" />
           </template>
         </el-image>
 
@@ -97,10 +97,10 @@
           <a class="userIconWrapper js-userLink" :href="`#${ob.vendor.peerID}/store`" @click.stop="onClickUserLink">
             <el-image ref="avatarImage" lazy class="userIcon disc clrBr2 clrSh1 toolTipNoWrap js-vendorIcon" :src="vendorAvatarUrl" :data-tip="ob.vendor.name">
                 <template #placeholder>
-                  <img src="/imgs/defaultAvatar.png" class="placeholder-img" />
+                  <img src="~@/../imgs/defaultAvatar.png" class="placeholder-img" />
                 </template>
                 <template #error>
-                  <img src="/imgs/defaultAvatar.png" class="placeholder-img" />
+                  <img src="~@/../imgs/defaultAvatar.png" class="placeholder-img" />
                 </template>
               </el-image>
           </a>
@@ -179,10 +179,10 @@
           <div class="listingImage posR">
             <el-image ref="listingImage" fit="cover" lazy class="main-img" :src="listingImageUrl">
               <template #placeholder>
-                <img src="/imgs/defaultItem.png" class="placeholder-img" />
+                <img src="~@/../imgs/defaultItem.png" class="placeholder-img" />
               </template>
               <template #error>
-                <img src="/imgs/defaultItem.png" class="placeholder-img" />
+                <img src="~@/../imgs/defaultItem.png" class="placeholder-img" />
               </template>
             </el-image>
           </div>

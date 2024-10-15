@@ -31,8 +31,8 @@
         class="header js-header"
         :style="
           headerHash
-            ? `background-image: url(${ob.getServerUrl(`ob/image/${headerHash}`)}), url('/imgs/defaultHeader.png')`
-            : `background-image: url('/imgs/defaultHeader.png')`
+            ? `background-image: url('${ob.getServerUrl(`ob/image/${headerHash}`)}'), url('./imgs/defaultHeader.png')`
+            : `background-image: url('./imgs/defaultHeader.png')`
         "
       >
         <div class="blockedOverlay clrP">

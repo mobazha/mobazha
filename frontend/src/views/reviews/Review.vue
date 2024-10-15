@@ -9,12 +9,12 @@
         <div class="col8 flex gutterHMd">
           <template v-if="!ob.showListingData">
             <template v-if="slugLink">
-              <a class="thumbHg flexNoShrink" :style="`background-image: url(${background}), url('/imgs/defaultItem.png')`" :href="slugLink">
+              <a class="thumbHg flexNoShrink" :style="`background-image: url('${background}'), url('./imgs/defaultItem.png')`" :href="slugLink">
               </a>
             </template>
 
             <template v-else>
-              <div class="thumbHg flexNoShrink" :style="`background-image: url(${background}), url('/imgs/defaultItem.png')`">
+              <div class="thumbHg flexNoShrink" :style="`background-image: url('${background}'), url('./imgs/defaultItem.png')`">
               </div>
             </template>
           </template>

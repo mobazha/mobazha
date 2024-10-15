@@ -1,6 +1,6 @@
 <template>
   <div :class="`brandingBoxWrap ${ob.wrapClass}`">
-    <div class="brandingLogo" style="background-image: url('/imgs/obVectorIconSmall2.png')"></div>
+    <div class="brandingLogo" style="background-image: url('./imgs/obVectorIconSmall2.png')"></div>
     <div class="brandingText">Mobazha</div>
   </div>
 </template>

@@ -28,7 +28,7 @@
         </div>
       </nav>
       <div class="header js-header">
-        <img class="bkgImg" :src="headerHash ? ob.getServerUrl(`ob/image/${headerHash}`) : '~@/../imgs/defaultHeader.png'" />
+        <img class="bkgImg" :src="headerHash ? ob.getServerUrl(`ob/image/${headerHash}`) : ob.getImagePath('defaultHeader.png')" />
         <div class="blockedOverlay clrP">
           <div class="flexCol flexHCent tx4">
             <i class="ion-eye-disabled tx1"></i>

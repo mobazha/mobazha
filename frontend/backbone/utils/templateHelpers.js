@@ -103,6 +103,7 @@ export function formatRating(average, count, skipCount) {
 }
 
 export const getServerUrl = app.getServerUrl.bind(app);
+export const getImagePath = app.getImagePath.bind(app);
 
 const currencyExport = {
   formatCurrency: gracefulException(formatCurrency),

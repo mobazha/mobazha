@@ -15,4 +15,11 @@ export default {
     }
     return `/v1/${urlFrag}`;
   },
+
+  getImagePath(imgName) {
+    if (import.meta.env.VITE_APP) {
+      return `../imgs/${imgName}`;
+    }
+    return `/imgs/${imgName}`;
+  },
 };

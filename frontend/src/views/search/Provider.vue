@@ -3,7 +3,7 @@
     <button
       :class="`clrP clrBr clrSh2 providerBtn ${ob.showSelectDefault ? 'showSelectDefault' : ''} ${ob.name ? 'toolTipNoWrap' : ''}`"
       @click="onClickProvider" :data-tip="ob.name">
-      <img class="thumb providerInner" :src="ob.logo ? ob.logo : (ob.localLogo ? ob.localLogo : '~@/../imgs/defaultProvider.png')" />
+      <img class="thumb providerInner" :src="ob.logo ? ob.logo : (ob.localLogo ? ob.localLogo : ob.getImagePath('defaultProvider.png'))" />
     </button>
   </div>
 </template>

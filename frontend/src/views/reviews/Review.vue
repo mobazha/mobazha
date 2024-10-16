@@ -9,11 +9,11 @@
         <div class="col8 flex gutterHMd">
           <template v-if="!ob.showListingData">
             <template v-if="slugLink">
-              <a :href="slugLink"><img class="thumbHg flexNoShrink" :src="ob.vendorSig.thumbnail ? background : '~@/../imgs/defaultItem.png'" /></a>
+              <a :href="slugLink"><img class="thumbHg flexNoShrink" :src="ob.vendorSig.thumbnail ? background : ob.getImagePath('defaultItem.png')" /></a>
             </template>
 
             <template v-else>
-              <img class="thumbHg flexNoShrink" :src="ob.vendorSig.thumbnail ? background : '~@/../imgs/defaultItem.png'" />
+              <img class="thumbHg flexNoShrink" :src="ob.vendorSig.thumbnail ? background : ob.getImagePath('defaultItem.png')" />
             </template>
           </template>
           <div class="flexExpand gutterVSm">

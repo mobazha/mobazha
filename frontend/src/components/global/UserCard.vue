@@ -2,12 +2,12 @@
   <div :class="`userCard ${isBlocked ? 'isBlocked' : ''}`">
     <div class="contentBox clrBr clrP clrSh2 <% if (ob.notFound) { %>disabled<% } %>">
       <div class="shortHeader pointer Img-container" @click="nameClick">
-        <img class="bkgImg" :src="headerHash ? ob.getServerUrl(`ob/image/${headerHash}`) : '~@/../imgs/defaultHeader.png'"/>
+        <img class="bkgImg" :src="headerHash ? ob.getServerUrl(`ob/image/${headerHash}`) : ob.getImagePath('defaultHeader.png')"/>
         <div class="blockedOverlay clrP flexCent tx5">
           <div>{{ ob.polyT('userShort.blockedUserOverlayText') }}</div>
         </div>
         <div class="userIconWrap">
-          <a><img class="userIcon disc clrBr2 clrSh1" :src="avatarHash ? ob.getServerUrl(`ob/image/${avatarHash}`) : '~@/../imgs/defaultAvatar.png'" /></a>
+          <a><img class="userIcon disc clrBr2 clrSh1" :src="avatarHash ? ob.getServerUrl(`ob/image/${avatarHash}`) : ob.getImagePath('defaultAvatar.png')" /></a>
           <div class="blockedAvatarOverlay disc clrBr2 clrSh1 clrP clrT"><i class="ion-eye-disabled center"></i></div>
         </div>
         <template v-if="!ob.hideControls">

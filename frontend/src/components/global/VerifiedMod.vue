@@ -4,7 +4,7 @@
       <template v-if="!ob.wrapInfoIcon">
         <div class="arrowBoxTipWrap">
           <div :class="`textWrapper ${ob.textWrapperClass}`">
-            <img v-if="ob.verified" class="badge" :src="ob.badgeUrl ? ob.badgeUrl : '~@/../imgs/verifiedModeratorBadgeDefault-tiny.png'" tabindex="0" />
+            <img v-if="ob.verified" class="badge" :src="badgeUrlInfo" tabindex="0" />
             <div v-else class="warning"><i class="ion-alert-circled clrTAlert"></i></div>
 
             <span v-if="ob.text" class="${ob.textClass}">{{ob.text}}<i :class="ob.infoIconClass"></i></span>
@@ -12,7 +12,7 @@
 
           <div :class="`arrowBox ${arrowBoxClass}`">
             <div :class="`titleWrapper ${ob.titleWrapperClass}`">
-              <img v-if="ob.verified" class="badge" :style="ob.badgeUrl ? ob.badgeUrl : '~@/../imgs/verifiedModeratorBadgeDefault-tiny.png'" tabindex="0" />
+              <img v-if="ob.verified" class="badge" :src="badgeUrlInfo" tabindex="0" />
               <div v-else class="warning"><i class="ion-alert-circled clrTAlert"></i></div>
 
               <div :class="ob.tipTitleClass" v-html="ob.tipTitle"></div>
@@ -23,7 +23,7 @@
       </template>
       <template v-else>
         <div :class="`textWrapper ${ob.textWrapperClass}`">
-          <img v-if="ob.verified" class="badge" :style="ob.badgeUrl ? ob.badgeUrl : '~@/../imgs/verifiedModeratorBadgeDefault-tiny.png'" tabindex="0" />
+          <img v-if="ob.verified" class="badge" :src="badgeUrlInfo" tabindex="0" />
           <div v-else class="warning"><i class="ion-alert-circled clrTAlert"></i></div>
 
           <span v-if="ob.text" class="${ob.textClass}">
@@ -33,7 +33,7 @@
 
               <div :class="`arrowBox ${arrowBoxClass}`">
                 <div :class="`titleWrapper ${ob.titleWrapperClass}`">
-                  <img v-if="ob.verified" class="badge" :style="ob.badgeUrl ? ob.badgeUrl : '~@/../imgs/verifiedModeratorBadgeDefault-tiny.png'" tabindex="0" />
+                  <img v-if="ob.verified" class="badge" :src="badgeUrlInfo" tabindex="0" />
                   <div v-else class="warning"><i class="ion-alert-circled clrTAlert"></i></div>
                   <div :class="ob.tipTitleClass" v-html="ob.tipTitle"></div>
                 </div>
@@ -96,6 +96,11 @@ export default {
       const ob = this.ob;
       return `${ob.arrowClass} ${ob.verified ? 'clrBrAlert2 clrBAlert2Grad' : 'clrP clrBr'}`;
     },
+    
+    badgeUrlInfo() {
+      const state = this._state;
+      return state.badgeUrl ? state.badgeUrl : this.templateHelpers.getImagePath('verifiedModeratorBadgeDefault-tiny.png');
+    }
   },
   methods: {
     loadData(options = {}) {

@@ -1,7 +1,7 @@
 <template>
   <div :class="`cryptoIcon crypto-icon ${className}`">
-    <i class="crypto-icon__large"><img class="bkgImg" :src="`~@/../imgs/cryptoIcons/${coin1Icon}`" /></i>
-    <i v-if="coin2Icon" class="crypto-icon__small"><img class="bkgImg" :src="`~@/../imgs/cryptoIcons/${coin2Icon}`" /></i>
+    <i class="crypto-icon__large"><img class="bkgImg" :src="coin1Icon" /></i>
+    <i v-if="coin2Icon" class="crypto-icon__small"><img class="bkgImg" :src="coin2Icon" /></i>
   </div>
 </template>
 
@@ -21,6 +21,7 @@ export default {
   },
   data() {
     return {
+      isApp: import.meta.env.VITE_APP,
       defaultIcon: 'default-coin',
     };
   },
@@ -28,16 +29,23 @@ export default {
   mounted() {},
   computed: {
     coin1Icon() {
-      return `${this.code ? this.code : this.defaultIcon}-icon.png`
+      let icon = `${this.code ? this.code : this.defaultIcon}-icon.png`;
+
+      if (this.isApp) {
+        return `../imgs/cryptoIcons/${icon}`;
+      }
+      return `/imgs/cryptoIcons/${icon}`
     },
     coin2Icon() {
       const coinData = getCurrencyByCode(this.code);
-
       if (!coinData || !coinData.mainChain) {
         return '';
       }
 
-      return `${coinData.mainChain}-icon.png`;
+      if (this.isApp) {
+        return `../imgs/cryptoIcons/${coinData.mainChain}-icon.png`;
+      }
+      return `/imgs/cryptoIcons/${coinData.mainChain}-icon.png`;
     },
   },
   methods: {},

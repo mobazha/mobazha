@@ -108,7 +108,7 @@
                       <span><i class="ion-arrow-right-b floR"></i></span>
                     </a>
                   </div>
-                  <div class="listGroup clrP clrBr">
+                  <div v-if="!isApp" class="listGroup clrP clrBr">
                     <a class="listItem js-navListItem" @click="onClickWalletConnect">
                       <span>{{ connectWalletMenuDisplay }}</span><span class="clrT2 TODO">Cltrl + ?</span>
                     </a>

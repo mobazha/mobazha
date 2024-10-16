@@ -103,7 +103,7 @@ export default {
       if (this.overwriteClickRating) {
         this.$emit('clickRating')
       } else {
-        app.router.navigate(`ob://${options.model.id}/reputation`, { trigger: true });
+        app.router.navigate(`ob://${this.model.id}/reputation`, { trigger: true });
       }
     },
 

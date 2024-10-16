@@ -1,15 +1,13 @@
 <template>
   <div :class="`userCard ${isBlocked ? 'isBlocked' : ''}`">
     <div class="contentBox clrBr clrP clrSh2 <% if (ob.notFound) { %>disabled<% } %>">
-      <div class="shortHeader pointer " @click="nameClick"
-        :style="headerHash ? `background-image: url(${ob.getServerUrl(`ob/image/${headerHash}`)}), url('./imgs/defaultHeader.png')` : `background-image: url('./imgs/defaultHeader.png')`">
+      <div class="shortHeader pointer Img-container" @click="nameClick">
+        <img class="bkgImg" :src="headerHash ? ob.getServerUrl(`ob/image/${headerHash}`) : '~@/../imgs/defaultHeader.png'"/>
         <div class="blockedOverlay clrP flexCent tx5">
           <div>{{ ob.polyT('userShort.blockedUserOverlayText') }}</div>
         </div>
         <div class="userIconWrap">
-          <a class="userIcon disc clrBr2 clrSh1"
-            :style="avatarHash ? `background-image: url(${ob.getServerUrl(`ob/image/${avatarHash}`)}), url('./imgs/defaultAvatar.png')` : `background-image: url('./imgs/defaultAvatar.png')`">
-          </a>
+          <a><img class="userIcon disc clrBr2 clrSh1" :src="avatarHash ? ob.getServerUrl(`ob/image/${avatarHash}`) : '~@/../imgs/defaultAvatar.png'" /></a>
           <div class="blockedAvatarOverlay disc clrBr2 clrSh1 clrP clrT"><i class="ion-eye-disabled center"></i></div>
         </div>
         <template v-if="!ob.hideControls">
@@ -360,4 +358,16 @@ export default {
   }
 }
 </script>
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.Img-container {
+  position: relative;
+}
+.bkgImg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+</style>

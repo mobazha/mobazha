@@ -27,14 +27,8 @@
           </div>
         </div>
       </nav>
-      <div
-        class="header js-header"
-        :style="
-          headerHash
-            ? `background-image: url('${ob.getServerUrl(`ob/image/${headerHash}`)}'), url('./imgs/defaultHeader.png')`
-            : `background-image: url('./imgs/defaultHeader.png')`
-        "
-      >
+      <div class="header js-header">
+        <img class="bkgImg" :src="headerHash ? ob.getServerUrl(`ob/image/${headerHash}`) : '~@/../imgs/defaultHeader.png'" />
         <div class="blockedOverlay clrP">
           <div class="flexCol flexHCent tx4">
             <i class="ion-eye-disabled tx1"></i>
@@ -619,4 +613,13 @@ export default {
   },
 };
 </script>
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.bkgImg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+</style>

@@ -3,7 +3,7 @@
     <button
       :class="`clrP clrBr clrSh2 providerBtn ${ob.showSelectDefault ? 'showSelectDefault' : ''} ${ob.name ? 'toolTipNoWrap' : ''}`"
       @click="onClickProvider" :data-tip="ob.name">
-      <div class="thumb providerInner" :style="`background-image: ${bkg}`"></div>
+      <img class="thumb providerInner" :src="ob.logo ? ob.logo : (ob.localLogo ? ob.localLogo : '~@/../imgs/defaultProvider.png')" />
     </button>
   </div>
 </template>
@@ -31,13 +31,6 @@ export default {
   mounted () {
   },
   computed: {
-    bkg () {
-      const ob = this.ob;
-
-      const logo = ob.logo ? `url(${ob.logo}),` : '';
-      const local = ob.localLogo ? `url(${ob.localLogo}),` : '';
-      return `${logo}${local}url('./imgs/defaultProvider.png')`;
-    },
     ob () {
       return {
         ...this.templateHelpers,

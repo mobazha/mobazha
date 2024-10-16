@@ -77,18 +77,12 @@
               </div>
               <div class="flex gutterHLg">
                 <div class="mainImageWrapper">
-                  <div
+                  <img
                     v-if="!introVideoLinks.length"
                     class="mainImage clrBr"
                     @click="onClickGotoPhotos"
-                    :style="
-                      ob.item.images.length
-                        ? `background-image: url(${ob.getServerUrl(
-                            `ob/image/${ob.isHiRez() ? mainImage.large : mainImage.medium}`
-                          )}), url('./imgs/defaultItem.png')`
-                        : `background-image: url('./imgs/defaultItem.png')`
-                    "
-                  ></div>
+                    :src="ob.item.images.length ? ob.getServerUrl(`ob/image/${ob.isHiRez() ? mainImage.large : mainImage.medium}`) : '~@/../imgs/defaultItem.png'"
+                  />
                   <el-carousel v-else-if="introVideoLinks.length > 1" class="carousel clrBr" :autoplay="false" trigger="click">
                     <el-carousel-item v-for="link in introVideoLinks" :key="link">
                       <video-player-item class="introVideoItem" :url="link" />
@@ -266,7 +260,7 @@
                   <template v-if="ob.hasVerifiedMods">
                     <div class="verifiedModBox clrBrAlert2 clrBAlert2Grad">
                       <div class="flexVCent flexHCent gutterHTn rowSm">
-                        <div class="badge" :style="`background-image: url('${ob.defaultBadge.tiny}'), url('./imgs/verifiedModeratorBadgeDefault.png');`"></div>
+                        <img class="badge" :src="ob.defaultBadge.tiny ? ob.defaultBadge.tiny : '~@/../imgs/verifiedModeratorBadgeDefault.png'" />
                         <div class="tx5 txB">{{ ob.polyT('verifiedMod.modVerified.titleLong') }}</div>
                       </div>
                       <div class="flexColRows gutterVSm tx5b">

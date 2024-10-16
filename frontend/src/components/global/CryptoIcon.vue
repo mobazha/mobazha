@@ -1,7 +1,7 @@
 <template>
   <div :class="`cryptoIcon crypto-icon ${className}`">
-    <i class="crypto-icon__large" :style="style"></i>
-    <i v-if="style2" class="crypto-icon__small" :style="style2"></i>
+    <i class="crypto-icon__large"><img class="bkgImg" :src="`~@/../imgs/cryptoIcons/${coin1Icon}`" /></i>
+    <i v-if="coin2Icon" class="crypto-icon__small"><img class="bkgImg" :src="`~@/../imgs/cryptoIcons/${coin2Icon}`" /></i>
   </div>
 </template>
 
@@ -21,33 +21,23 @@ export default {
   },
   data() {
     return {
-      defaultIcon: 'default-coin-icon.png',
+      defaultIcon: 'default-coin',
     };
   },
   created() {},
   mounted() {},
   computed: {
-    style() {
-      const baseIconPath = './imgs/cryptoIcons/';
-
-      const iconUrl = this.code ? `url(${baseIconPath}${this.code}-icon.png),` : '';
-      const defaultIcon = this.defaultIcon ? `url(${baseIconPath}${this.defaultIcon})` : '';
-
-      return `background-image: ${iconUrl}${defaultIcon}`;
+    coin1Icon() {
+      return `${this.code ? this.code : this.defaultIcon}-icon.png`
     },
-    style2() {
-      const baseIconPath = './imgs/cryptoIcons/';
-
+    coin2Icon() {
       const coinData = getCurrencyByCode(this.code);
 
       if (!coinData || !coinData.mainChain) {
         return '';
       }
 
-      const iconUrl = `url(${baseIconPath}${coinData.mainChain}-icon.png),`;
-      const defaultIcon = this.defaultIcon ? `url(${baseIconPath}${this.defaultIcon})` : '';
-
-      return `background-image: ${iconUrl}${defaultIcon}`;
+      return `${coinData.mainChain}-icon.png`;
     },
   },
   methods: {},
@@ -76,5 +66,13 @@ export default {
     background-repeat: no-repeat;
     background-position: center;
   }
+}
+.bkgImg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 </style>

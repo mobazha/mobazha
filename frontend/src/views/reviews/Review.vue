@@ -9,13 +9,11 @@
         <div class="col8 flex gutterHMd">
           <template v-if="!ob.showListingData">
             <template v-if="slugLink">
-              <a class="thumbHg flexNoShrink" :style="`background-image: url('${background}'), url('./imgs/defaultItem.png')`" :href="slugLink">
-              </a>
+              <a :href="slugLink"><img class="thumbHg flexNoShrink" :src="ob.vendorSig.thumbnail ? background : '~@/../imgs/defaultItem.png'" /></a>
             </template>
 
             <template v-else>
-              <div class="thumbHg flexNoShrink" :style="`background-image: url('${background}'), url('./imgs/defaultItem.png')`">
-              </div>
+              <img class="thumbHg flexNoShrink" :src="ob.vendorSig.thumbnail ? background : '~@/../imgs/defaultItem.png'" />
             </template>
           </template>
           <div class="flexExpand gutterVSm">
@@ -147,13 +145,7 @@ export default {
       return ob.vendorID && ob.vendorSig.slug ? `ob://${ob.vendorID.peerID}/store/${ob.vendorSig.slug}` : '';
     },
     background () {
-      let background = '';
-
-      const ob = this.ob;
-      if (ob.vendorSig.thumbnail) {
-        background = ob.getServerUrl(`ob/image/${ob.isHiRez() ? ob.vendorSig.metadata.thumbnail.small : ob.vendorSig.metadata.thumbnail.tiny}`);
-      }
-      return background;
+      return ob.getServerUrl(`ob/image/${ob.isHiRez() ? ob.vendorSig.metadata.thumbnail.small : ob.vendorSig.metadata.thumbnail.tiny}`);
     },
   },
   methods: {

@@ -7,6 +7,7 @@
 
 <script>
 import { getCurrencyByCode } from '../../../backbone/data/walletCurrencies';
+import app from '../../../backbone/app';
 
 export default {
   props: {
@@ -21,20 +22,14 @@ export default {
   },
   data() {
     return {
-      isApp: import.meta.env.VITE_APP,
-      defaultIcon: 'default-coin',
     };
   },
   created() {},
   mounted() {},
   computed: {
     coin1Icon() {
-      let icon = `${this.code ? this.code : this.defaultIcon}-icon.png`;
-
-      if (this.isApp) {
-        return `../imgs/cryptoIcons/${icon}`;
-      }
-      return `/imgs/cryptoIcons/${icon}`
+      const coin = this.code ? this.code : 'default-coin';
+      return app.getImagePath(`/cryptoIcons/${coin}-icon.png`);
     },
     coin2Icon() {
       const coinData = getCurrencyByCode(this.code);
@@ -42,10 +37,7 @@ export default {
         return '';
       }
 
-      if (this.isApp) {
-        return `../imgs/cryptoIcons/${coinData.mainChain}-icon.png`;
-      }
-      return `/imgs/cryptoIcons/${coinData.mainChain}-icon.png`;
+      return app.getImagePath(`/cryptoIcons/${coinData.mainChain}-icon.png`);
     },
   },
   methods: {},

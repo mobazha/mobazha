@@ -163,11 +163,14 @@ export default {
     },
     feeAmount() {
       const ob = this.ob;
-      return ob.currencyMod.convertAndFormatCurrency(
-        ob.moderatorInfo.fee.fixedFee.amount,
-        ob.moderatorInfo.fee.fixedFee.currency.code,
-        ob.displayCurrency
-      );
+      if (ob.moderatorInfo.fee.fixedFee && ob.moderatorInfo.fee.fixedFee.amount) {
+        return ob.currencyMod.convertAndFormatCurrency(
+          ob.moderatorInfo.fee.fixedFee.amount,
+          ob.moderatorInfo.fee.fixedFee.currency.code,
+          ob.displayCurrency
+        );
+      }
+      return 0;
     },
     ownMod() {
       let access = this.modsKey;

@@ -237,7 +237,7 @@ export default class extends baseVw {
       const fetch = myAjax({
         url,
         data: JSON.stringify(IDs),
-        method: op.method,
+        type: op.method,
       })
         .done((data) => {
           if (!op.async) {

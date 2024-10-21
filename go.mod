@@ -11,6 +11,9 @@ replace (
 
 	github.com/mobazha/ethereum-watcher => /Users/mingfeng/other/ob/ethereum-watcher
 
+	github.com/mobazha/config => /Users/mingfeng/go/src/github.com/mobazha/config
+
+
 	github.com/mobazha/go-ethwallet => /Users/mingfeng/other/ob/go-bscwallet
 	github.com/mobazha/multiwallet => /Users/mingfeng/other/ob/multiwallet
 	github.com/mobazha/wallet-interface => /Users/mingfeng/other/ob/wallet-interface
@@ -56,6 +59,7 @@ require (
 	github.com/libp2p/go-libp2p-testing v0.12.0
 	github.com/libp2p/go-msgio v0.3.0
 	github.com/microcosm-cc/bluemonday v1.0.21
+	github.com/mobazha/config v0.0.0-20241021020414-f0619948373d
 	github.com/mobazha/go-ethwallet v0.0.0-20230716015322-58c84d02d1b1
 	github.com/mobazha/multiwallet v0.0.0-00010101000000-000000000000
 	github.com/mobazha/wallet-interface v1.0.0

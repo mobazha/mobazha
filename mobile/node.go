@@ -86,14 +86,12 @@ func NewNode(cfg *Config) (*Node, error) {
 		DisableNATPortMap:      true,
 		DataDir:                dataDir,
 		LogDir:                 logDir,
-		ExchangeRateProviders:  []string{"https://info.mobazha.org/api/ticker"},
 		DHTClientOnly:          true,
 		BoostrapAddrs:          bootstrapAddrs,
 		StoreAndForwardServers: snfServers,
 		Testnet:                cfg.Testnet,
 		UserAgentComment:       cfg.UserAgentComment,
 		APICookie:              cfg.APICookie,
-		IPNSResolver:           "https://store.mobazha.org/api/ipns",
 		GatewayAddr:            cfg.GatewayAddress,
 	}
 

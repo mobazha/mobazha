@@ -1,4 +1,5 @@
 /* eslint-disable class-methods-use-this */
+import WAValidator from 'multicoin-address-validator';
 import {
   convertCurrency,
   getExchangeRate,
@@ -90,8 +91,7 @@ class Spend extends BaseModel {
       if (walletCur) {
         if (!attrs.address) {
           addError('address', app.polyglot.t('spendModelErrors.provideAddress'));
-        } else if (typeof walletCur.isValidAddress === 'function'
-          && !walletCur.isValidAddress(attrs.address)) {
+        } else if (!WAValidator.validate(attrs.address, walletCurCode)) {
           const cur = app.polyglot.t(
             `cryptoCurrencies.${walletCurCode}`,
             { _: walletCurCode },

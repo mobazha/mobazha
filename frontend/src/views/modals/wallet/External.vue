@@ -30,8 +30,9 @@
 import qr from 'qr-encode';
 import useClipboard from 'vue-clipboard3';
 import { ElMessage } from 'element-plus';
+import WAValidator from 'multicoin-address-validator';
 import app from '../../../../backbone/app.js';
-import { isValidAddress, TIP_ADDRESSES, getCurrencyByCode } from '../../../../backbone/data/walletCurrencies.js';
+import { TIP_ADDRESSES, getCurrencyByCode } from '../../../../backbone/data/walletCurrencies.js';
 export default {
   props: {
     coinType: {
@@ -101,7 +102,7 @@ export default {
 
     validateInputAddress(_rule, value, callback) {
       if (!value) return callback(new Error(app.polyglot.t('wallet.external.inputPlaceHolder')));
-      if (!isValidAddress(value, this.coinType)) {
+      if (!WAValidator.validate(value, this.coinType)) {
         return callback(new Error(app.polyglot.t('wallet.external.invalidAddress', { coin: this.coinName, addr: TIP_ADDRESSES[this.coinType] })));
       }
       callback();

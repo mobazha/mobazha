@@ -65,6 +65,7 @@
 import _ from 'underscore';
 import $ from 'jquery';
 import bigNumber from 'bignumber.js';
+import WAValidator from 'multicoin-address-validator';
 import app from '../../../../backbone/app';
 import { getCurrenciesSortedByCode } from '../../../../backbone/data/currencies';
 import { endAjaxEvent, recordEvent, startAjaxEvent } from '../../../../backbone/utils/metrics';
@@ -196,6 +197,11 @@ export default {
 
     onClickClear () {
       this.clearForm();
+    },
+
+    onInputAddress() {
+      if (!WAValidator.validate(this.formData.address, this.coinType)) {
+      }
     },
 
     focusAddress () {

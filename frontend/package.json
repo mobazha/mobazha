@@ -33,7 +33,6 @@
     "axios": "^1.7.7",
     "backbone": "npm:@fengzie/backbone@^1.4.1",
     "backbone.localstorage": "1.1.16",
-    "bech32": "2.0.0",
     "bignumber.js": "9.1.1",
     "bitcore-lib": "^10.0.5",
     "casdoor-js-sdk": "^0.14.0",

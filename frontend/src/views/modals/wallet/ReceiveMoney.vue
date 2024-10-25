@@ -20,6 +20,7 @@
 <script>
 import $ from 'jquery';
 import qr from 'qr-encode';
+import { myGet } from '../../../api/api';
 import { ipc } from '../../../utils/ipcRenderer.js';
 import { getCurrencyByCode as getWalletCurByCode } from '../../../../backbone/data/walletCurrencies.js';
 import app from '../../../../backbone/app.js';
@@ -30,14 +31,6 @@ export default {
       type: Object,
       default: {},
     },
-    fetching: {
-      type: Boolean,
-      default: true,
-    },
-    address: {
-      type: String,
-      default: '',
-    },
     coinType: {
       type: String,
       default: '',
@@ -45,9 +38,15 @@ export default {
   },
   data () {
     return {
+      fetching: true,
+      address: '',
     };
   },
   created () {
+    myGet(app.getServerUrl(`wallet/address/${this.coinType}`)).done((data) => {
+      this.address = data.address;
+      this.fetching = false;
+    });
   },
   mounted () {
   },

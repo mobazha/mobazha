@@ -54,8 +54,6 @@
                           ref="receiveMoneyVw"
                           :key="activeCoin"
                           :coinType="activeCoin"
-                          :fetching="fetchingAddress"
-                          :address="receiveAddress"
                         />
                         <External v-if="tabActive === 'external' && activeCoin !== 'MATICMBZ'" ref="external" :key="activeCoin" :coinType="activeCoin" />
                       </div>
@@ -158,8 +156,6 @@ export default {
 
       transactionsCount: 0,
 
-      fetchingAddress: true,
-      receiveAddress: '',
       transactionsState: {},
 
       showEditListing: false,
@@ -177,9 +173,6 @@ export default {
     }
   },
   unmounted() {
-    Object.keys(this.addressFetches).forEach((coinType) => {
-      this.addressFetches[coinType].forEach((fetch) => fetch.abort());
-    });
     Object.keys(this.transactionsState).forEach((coinType) => {
       if (this.transactionsState[coinType] && typeof this.transactionsState[coinType].bumpFeeAttempts === 'object') {
         Object.keys(this.transactionsState[coinType].bumpFeeAttempts).forEach((txId) => this.transactionsState[coinType].bumpFeeAttempts[txId].abort());
@@ -189,10 +182,6 @@ export default {
   },
   watch: {
     activeCoin(coin, oldVal) {
-      if (this.needAddress[coin]) {
-        this.fetchAddress(coin);
-      }
-
       myPost(app.getServerUrl(`wallet/status/${coin}`));
 
       if (this.tabActive === 'send' && !(app.walletBalances.get(coin) && app.walletBalances.get(coin).get('confirmed'))) {
@@ -287,11 +276,6 @@ export default {
       (this.tabActive = !!(app.walletBalances.get(initialActiveCoin) && app.walletBalances.get(initialActiveCoin).get('confirmed')) ? 'send' : 'receive'),
         (this.activeCoin = initialActiveCoin);
 
-      this.addressFetches = {};
-      this.needAddress = supportedCoins.reduce((acc, coin) => {
-        acc[coin] = true;
-        return acc;
-      }, {});
       // The majority of the TransactionsVw state is managed within the component, but
       // some of it we'll manage so as you nav from coin to coin, certain state is maintained.
       this.transactionsState = supportedCoins.reduce((acc, coin) => {
@@ -362,18 +346,11 @@ export default {
 
               if (bigNumber(e.jsonData.wallet.transaction.value).gt(0)) {
                 // for incoming new transactions, we'll need a new receiving address
-                if (this.activeCoin === walletCur) {
-                  this.fetchAddress();
-                } else {
-                  this.needAddress[walletCur] = true;
-                }
               }
             }
           }
         });
       }
-
-      if (initialActiveCoin) this.fetchAddress();
     },
 
     onClose() {
@@ -414,35 +391,6 @@ export default {
       if (typeof coinType !== 'string' || !coinType) {
         throw new Error('Please provide the coinType as a string.');
       }
-    },
-
-    fetchAddress(coinType = this.activeCoin) {
-      this.checkCoinType(coinType);
-
-      if (this.addressFetches[coinType]) {
-        const pendingFetch = this.addressFetches[coinType].find((xhr) => xhr.state() === 'pending');
-        if (pendingFetch) return pendingFetch;
-      }
-      this.fetchingAddress = true;
-
-      this.needAddress[coinType] = false;
-
-      const fetch = myGet(app.getServerUrl(`wallet/address/${coinType}`))
-        .done((data) => {
-          this.fetchingAddress = false;
-          this.receiveAddress = data.address;
-        })
-        .fail((xhr) => {
-          if (xhr.statusText === 'abort') return;
-          this.needAddress[coinType] = true;
-
-          this.fetchingAddress = false;
-        });
-
-      this.addressFetches[coinType] = this.addressFetches[coinType] || [];
-      this.addressFetches[coinType].push(fetch);
-
-      return fetch;
     },
 
     onBumpFeeAttempt(e) {

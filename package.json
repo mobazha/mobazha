@@ -69,7 +69,6 @@
     "jquery-zoom": "1.7.21",
     "lodash": "^4.17.21",
     "microplugin": "^0.0.3",
-    "multicoin-address-validator": "^0.5.22",
     "selectize": "^0.12.6",
     "sifter": "^0.5.4",
     "velocity-animate": "1.5.2",

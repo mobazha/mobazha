@@ -202,7 +202,8 @@ let vueBackboneMixin = {
 				if (bb.on && (bb.attributes || bb.models)) {
 					initBBAndVue(vm, key, bb, prop);
 				} else {
-					throw `VueBackbone: Unrecognized Backbone object in Vue instantiation (${key}), must be a Collection or Model`;
+					console.log(`VueBackbone: Unrecognized Backbone object in Vue instantiation (${key}), must be a Collection or Model`);
+					// throw `VueBackbone: Unrecognized Backbone object in Vue instantiation (${key}), must be a Collection or Model`;
 				}
 			});
 		}

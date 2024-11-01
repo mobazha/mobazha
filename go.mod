@@ -9,10 +9,9 @@ replace (
 
 	github.com/ipfs/kubo => /Users/mingfeng/go/src/github.com/mobazha/kubo
 
-	github.com/mobazha/ethereum-watcher => /Users/mingfeng/other/ob/ethereum-watcher
-
 	github.com/mobazha/config => /Users/mingfeng/go/src/github.com/mobazha/config
 
+	github.com/mobazha/ethereum-watcher => /Users/mingfeng/other/ob/ethereum-watcher
 
 	github.com/mobazha/go-ethwallet => /Users/mingfeng/other/ob/go-bscwallet
 	github.com/mobazha/multiwallet => /Users/mingfeng/other/ob/multiwallet
@@ -103,7 +102,6 @@ require (
 	github.com/btcsuite/btcwallet/wallet/txsizes v1.2.3 // indirect
 	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
-	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/ceramicnetwork/go-dag-jose v0.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

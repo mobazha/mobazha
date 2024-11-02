@@ -70,29 +70,19 @@ func NewNode(cfg *Config) (*Node, error) {
 	if cfg.LogLevel != "" {
 		logLevel = cfg.LogLevel
 	}
-	bootstrapAddrs := repo.DefaultMainnetBootstrapAddrs
-	if cfg.Testnet {
-		bootstrapAddrs = repo.DefaultTestnetBootstrapAddrs
-	}
-	snfServers := repo.DefaultMainnetSNFServers
-	if cfg.Testnet {
-		snfServers = repo.DefaultTestnetSNFServers
-	}
 
 	rcfg := &repo.Config{
-		IPNSQuorum:             2,
-		LogLevel:               logLevel,
-		EnabledWallets:         []string{"BTC", "BCH", "LTC", "ZEC", "CFX", "MATIC", "MATICUSDT", "MATICUSDC", "MATICMBZ"},
-		DisableNATPortMap:      true,
-		DataDir:                dataDir,
-		LogDir:                 logDir,
-		DHTClientOnly:          true,
-		BoostrapAddrs:          bootstrapAddrs,
-		StoreAndForwardServers: snfServers,
-		Testnet:                cfg.Testnet,
-		UserAgentComment:       cfg.UserAgentComment,
-		APICookie:              cfg.APICookie,
-		GatewayAddr:            cfg.GatewayAddress,
+		IPNSQuorum:        2,
+		LogLevel:          logLevel,
+		EnabledWallets:    []string{"BTC", "BCH", "LTC", "ZEC", "CFX", "MATIC", "MATICUSDT", "MATICUSDC", "MATICMBZ"},
+		DisableNATPortMap: true,
+		DataDir:           dataDir,
+		LogDir:            logDir,
+		DHTClientOnly:     true,
+		Testnet:           cfg.Testnet,
+		UserAgentComment:  cfg.UserAgentComment,
+		APICookie:         cfg.APICookie,
+		GatewayAddr:       cfg.GatewayAddress,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background()) //nolint

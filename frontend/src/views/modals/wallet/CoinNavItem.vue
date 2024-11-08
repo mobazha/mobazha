@@ -12,8 +12,8 @@
     <div :class="`${ob.balance > 0 ? 'clrTEm' : ''} flexNoShrink balanceText`">
       <template v-if="ob.clientSupported">
         <div class="flexVCent flexHRight">
+          <span v-if="ob.balance > 0" class="clrTEm txB">{{ formattedBalance }}</span>
           <i v-if="ob.active" class="ion-arrow-right-c clrT2 activeBalanceIcon"></i>
-          <span v-else-if="ob.balance > 0" class="clrTEm txB">{{ formattedBalance }}</span>
         </div>
       </template>
       <template v-else>

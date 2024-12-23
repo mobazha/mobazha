@@ -65,12 +65,15 @@ class TrayAddon {
     this.tray.setToolTip(cfg.title);
     const contextMenu = Menu.buildFromTemplate(trayMenuTemplate);
     this.tray.setContextMenu(contextMenu);
+    this.tray.on('double-click', () => {
+      mainWindow.show()
+    })
 
     // 使用默认浏览器打开链接
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
       shell.openExternal(url);
       return { action: 'deny' }
-    })    
+    })
   }
 }
 

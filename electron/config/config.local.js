@@ -9,12 +9,21 @@ module.exports = (appInfo) => {
   /**
    * 开发者工具
    */
-  config.openDevTools = true;
+  config.openDevTools = {
+    mode: 'undocked'
+  };
 
   /**
    * 应用程序顶部菜单
    */
   config.openAppMenu = true;
+
+  /**
+   * jobs
+   */
+  config.jobs = {
+    messageLog: true
+  };   
 
   return {
     ...config

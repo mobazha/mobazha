@@ -10,27 +10,6 @@ module.exports = (appInfo) => {
   const config = {};
 
   /**
-   * 应用模式配置
-   */
-  config.developmentMode = {
-    default: 'vue',
-    mode: {
-      vue: {
-        hostname: 'localhost',
-        port: 8088
-      },
-      react: {
-        hostname: 'localhost',
-        port: 3000
-      },
-      html: {
-        hostname: 'localhost',
-        indexPage: 'index.html'
-      },
-    }
-  };
-
-  /**
    * 开发者工具
    */
   config.openDevTools = false;
@@ -97,7 +76,8 @@ module.exports = (appInfo) => {
     transports: ["polling", "websocket"],
     cors: {
       origin: true,
-    }
+    },
+    channel: 'c1'
   };
 
   /**
@@ -110,6 +90,7 @@ module.exports = (appInfo) => {
       key: '/public/ssl/localhost+1.key',
       cert: '/public/ssl/localhost+1.pem'
     },
+    host: '127.0.0.1',
     port: 7071,
     cors: {
       origin: "*"
@@ -142,7 +123,7 @@ module.exports = (appInfo) => {
    * 硬件加速
    */
   config.hardGpu = {
-    enable: false
+    enable: true
   };
 
   /**
@@ -152,6 +133,13 @@ module.exports = (appInfo) => {
     mainExit: false,
     childExit: true,
     rendererExit: true,
+  };
+
+  /**
+   * jobs
+   */
+  config.jobs = {
+    messageLog: true
   };  
 
   /**
@@ -186,13 +174,6 @@ module.exports = (appInfo) => {
         repo: 'mobazha'
       },
       force: true,
-    },
-    javaServer: {
-      enable: false,
-      port: 18080,
-      jreVersion: 'jre1.8.0_201',
-      opt: '-server -Xms512M -Xmx512M -Xss512k -Dspring.profiles.active=prod -Dserver.port=${port} -Dlogging.file.path="${path}" ',
-      name: 'java-app.jar'
     },
     localServer: {
       enable: true,

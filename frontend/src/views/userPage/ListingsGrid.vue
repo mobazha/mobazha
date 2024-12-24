@@ -37,12 +37,14 @@ export default {
   },
   watch: {
     viewType(type) {
-      if (['list', 'grid'].indexOf(type) === '-1') {
+      if (['list', 'grid'].indexOf(type) === -1) {
         throw new Error('The type provided is not one of the available types.');
       }
 
       // This just sets the flag. It's up to you to re-render to update the UI.
-      app.localSettings.save('listingsGridViewType', type);
+      if (app.localSettings.get('listingsGridViewType') !== type) {
+        app.localSettings.save('listingsGridViewType', type);
+      }
     },
   },
   methods: {
@@ -81,4 +83,3 @@ export default {
 };
 </script>
 <style lang="scss" scoped></style>
-  

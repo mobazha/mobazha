@@ -237,16 +237,18 @@ export default {
       this.setSortFunction(col);
       col.sort();
 
-      // todo: exceptionally tall screens may fit an entire page
-      // with room to spare. Which means no scrollbar, which means subsequent
-      // pages will not load. Handle that case.
-      this.storeListingsCol = new Listings(col.slice(0, this.LISTINGS_PER_PAGE), { guid: this.model.id });
-      this.listingsGridKey += 1;
+      // Avoid unnecessary updates
+      if (JSON.stringify(this.storeListingsCol.models) !== JSON.stringify(col.slice(0, this.LISTINGS_PER_PAGE))) {
+        // todo: exceptionally tall screens may fit an entire page
+        // with room to spare. Which means no scrollbar, which means subsequent
+        // pages will not load. Handle that case.
+        this.storeListingsCol = new Listings(col.slice(0, this.LISTINGS_PER_PAGE), { guid: this.model.id });
+        this.listingsGridKey += 1;
+      }
 
       return col;
     },
     
-
     fullListingCount() {
       const col = this.filteredCollection;
 

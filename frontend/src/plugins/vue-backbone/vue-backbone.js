@@ -53,7 +53,10 @@ function getDataKey(key) {
 function bindCollectionToVue(vm, key, ctx, bb) {
 	// Changes to collection array will require a full reset (for reactivity)
 	ctx.onchange = () => {
-		vm.$data[getDataKey(key)] = rawSrcCollection(bb);
+		const newValue = rawSrcCollection(bb);
+		if (JSON.stringify(vm.$data[getDataKey(key)]) !== JSON.stringify(newValue)) {
+			vm.$data[getDataKey(key)] = newValue;
+		}
 	};
 	bb.on("reset sort remove add", ctx.onchange);
 }
@@ -64,15 +67,17 @@ function bindCollectionToVue(vm, key, ctx, bb) {
  */
 function bindModelToVue(vm, key, ctx, bb) {
 	ctx.onchange = () => {
-		// Test for new attribute
-		if (bb.keys().length > Object.keys(bb._previousAttributes).length) {
-			// Not an error, as it may be the case this attribute is not needed for Vue at all
-			console.warn(
-				"VueBackbone: Adding new Model attributes after binding is not supported, provide defaults for all properties"
-			);
+		const newValue = rawSrc(bb);
+		if (JSON.stringify(vm.$data[getDataKey(key)]) !== JSON.stringify(newValue)) {
+			// Test for new attribute
+			if (bb.keys().length > Object.keys(bb._previousAttributes).length) {
+				// Not an error, as it may be the case this attribute is not needed for Vue at all
+				console.warn(
+					"VueBackbone: Adding new Model attributes after binding is not supported, provide defaults for all properties"
+				);
+			}
+			vm.$data[getDataKey(key)] = newValue;
 		}
-
-		vm.$data[getDataKey(key)] = rawSrc(bb);
 	};
 
 	bb.on("change", ctx.onchange);

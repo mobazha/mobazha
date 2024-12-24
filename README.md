@@ -13,6 +13,9 @@ To create a local development copy of the reference client, clone the client rep
 
 Make sure you have Node.js and NPM installed. Node versions older than 20.18.1 or NPM versions older than 10.8.2 may not work.
 
+## Preparation
+
+Download the Mobazha node for your current OS version from latest [Mobazha node release](https://github.com/mobazha/mobazha-go/releases) and place it in the `build/extraResources/mobazha` subdirectory. The node should be named `mobazha.exe` for Windows or `mobazhad` for macOS/Linux.
 
 ### Running
 

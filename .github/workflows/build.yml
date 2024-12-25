@@ -1,0 +1,38 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '20.18.1'
+
+    - name: Build application
+      shell: bash
+      run: |
+        if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+          ./build.sh linux
+        elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+          ./build.sh osx
+        elif [ "${{ matrix.os }}" == "windows-latest" ]; then
+          ./build.sh win
+        fi

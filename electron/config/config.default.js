@@ -171,7 +171,7 @@ module.exports = (appInfo) => {
       options: {
         provider: 'github',
         owner: 'mobazha',
-        repo: 'mobazha'
+        repo: 'mobazha-desktop'
       },
       force: true,
     },

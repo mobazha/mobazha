@@ -98,12 +98,13 @@ export default {
       if (!options.search.provider || !(options.search.provider instanceof ProviderMd)) {
         throw new Error('Please provide a provider model.');
       }
+      const { initialState = {}, ...restOptions } = options;
       const opts = {
         viewType: 'grid',
-        ...options,
+        ...restOptions,
         initialState: {
           loading: false,
-          ...options.initialState,
+          ...initialState,
         },
       };
       this.baseInit(opts);

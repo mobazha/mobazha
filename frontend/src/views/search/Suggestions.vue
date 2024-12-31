@@ -43,6 +43,7 @@ export default {
   },
   methods: {
     loadData (options = {}) {
+      const { initialState = {}, ...restOptions } = options;
       const opts = {
         initialState: {
           suggestions: [
@@ -58,9 +59,9 @@ export default {
             'Games',
             'Music',
           ],
-          ...options.initialState || {},
+          ...initialState,
         },
-        ...options,
+        ...restOptions,
       };
 
       this.baseInit(opts);

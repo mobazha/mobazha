@@ -83,13 +83,7 @@ export default {
     },
 
     selected (val, key) {
-      let selected = false;
-      if (this.sortBySelected) {
-        selected = key === this.sortBySelected;
-      } else {
-        selected = val.default;
-      }
-      return selected;
+      return this.sortBySelected ? key === this.sortBySelected : val.default;
     }
   }
 }

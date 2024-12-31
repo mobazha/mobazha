@@ -259,6 +259,20 @@ export default {
       };
 
       this.baseInit(opts);
+      this.initializeSearch(opts);
+      this.initializeCategorySearches();
+
+      // If a query was passed in from the router, extract the data from it.
+      if (options.query) {
+        this.handleQueryParams(options.query);
+      } else if (this._search.provider.id === defaultSearchProviders[0].id) {
+        this.buildCategories();
+      } else {
+        this.setSearch({}, { force: true });
+      }
+    },
+
+    initializeSearch (opts) {
       const queryKeys = ['q', 'p', 'ps', 'sortBy'];
 
       // Allow router to pass in a search type for future use with vendor searches.
@@ -286,7 +300,9 @@ export default {
         this.setCurrentDefaultProvider(app.searchProviders.at(0));
       }
       this._search.provider = this.currentDefaultProvider || app.searchProviders.at(0);
+    },
 
+    initializeCategorySearches () {
       this._categoryTerms = [
         'Art',
         'Music',
@@ -323,67 +339,62 @@ export default {
       this.categoryViews = [];
       this.searchFetches = [];
       this._setHistory = false; // The router has already set the history.
+    },
 
-      // If a query was passed in from the router, extract the data from it.
-      if (options.query) {
-        recordEvent('Discover_SearchFromAddressBar');
-        recordEvent('Discover_Search', { type: 'addressBar' });
+    handleQueryParams (query) {
+      recordEvent('Discover_SearchFromAddressBar');
+      recordEvent('Discover_Search', { type: 'addressBar' });
 
-        const queryParams = (new URL(`${this.currentBaseUrl}?${options.query}`)).searchParams;
+      const queryParams = (new URL(`${this.currentBaseUrl}?${query}`)).searchParams;
 
-        // If the query had a providerQ parameter, use that as the provider URL instead.
-        if (queryParams.get('providerQ')) {
-          const subURL = new URL(queryParams.get('providerQ'));
-          queryParams.delete('providerQ');
-          // The first parameter after the ? will be part of the providerQ, transfer it over.
-          for (const param of subURL.searchParams.entries()) {
-            queryParams.append(param[0], param[1]);
-          }
-          const base = `${subURL.origin}${subURL.pathname}`;
+      // If the query had a providerQ parameter, use that as the provider URL instead.
+      if (queryParams.get('providerQ')) {
+        const subURL = new URL(queryParams.get('providerQ'));
+        queryParams.delete('providerQ');
+        // The first parameter after the ? will be part of the providerQ, transfer it over.
+        for (const param of subURL.searchParams.entries()) {
+          queryParams.append(param[0], param[1]);
+        }
+        const base = `${subURL.origin}${subURL.pathname}`;
+        /*
+         If the query provider model doesn't already exist, create a new provider model for it.
+         One quirk to note: if a tor url is passed in while the user is in clear mode, and an
+         existing provider has that tor url, that provider will be activated but will use its
+         clear url if it has one. The opposite is also true.
+         */
+        const matchedProvider = is.url(base) ? app.searchProviders.getProviderByURL(base) : '';
+        if (!matchedProvider) {
+          this._search.provider = new ProviderMd();
           /*
-           If the query provider model doesn't already exist, create a new provider model for it.
-           One quirk to note: if a tor url is passed in while the user is in clear mode, and an
-           existing provider has that tor url, that provider will be activated but will use its
-           clear url if it has one. The opposite is also true.
+           We don't actually know what type of search the url is for, we'll assume for example a
+           user in tor mode is only pasting in a tor url. If there is a mismatch, the correct
+           values will be saved after the endpoint returns them.
            */
-          const matchedProvider = is.url(base) ? app.searchProviders.getProviderByURL(base) : '';
-          if (!matchedProvider) {
-            this._search.provider = new ProviderMd();
-            /*
-             We don't actually know what type of search the url is for, we'll assume for example a
-             user in tor mode is only pasting in a tor url. If there is a mismatch, the correct
-             values will be saved after the endpoint returns them.
-             */
-            const searchAttribute = `${curConnOnTor() ? 'tor' : ''}${this._search.searchType}`;
-            this._search.provider.set(searchAttribute, base);
-            if (!this._search.provider.isValid()) {
-              openSimpleMessage(app.polyglot.t('search.errors.invalidUrl'));
-              this._search.provider = app.searchProviders.at(0);
-              recordEvent('Discover_InvalidQueryProvider', { url: base });
-            }
-          } else {
-            this._search.provider = matchedProvider;
+          const searchAttribute = `${curConnOnTor() ? 'tor' : ''}${this._search.searchType}`;
+          this._search.provider.set(searchAttribute, base);
+          if (!this._search.provider.isValid()) {
+            openSimpleMessage(app.polyglot.t('search.errors.invalidUrl'));
+            this._search.provider = app.searchProviders.at(0);
+            recordEvent('Discover_InvalidQueryProvider', { url: base });
           }
+        } else {
+          this._search.provider = matchedProvider;
         }
-
-        const params = {};
-
-        for (const key of queryParams.keys()) {
-          // checkbox params are represented by the same key multiple times. Convert them into a
-          // single key with an array of values
-          const val = queryParams.getAll(key);
-          params[key] = val.length === 1 ? val[0] : val;
-        }
-
-        // set the params in the search object
-        const filters = { ...this._search.filters, ..._.omit(params, [...queryKeys]) };
-
-        this.setSearch({ ..._.pick(params, ...queryKeys), filters }, { force: true });
-      } else if (this._search.provider.id === defaultSearchProviders[0].id) {
-        this.buildCategories();
-      } else {
-        this.setSearch({}, { force: true });
       }
+
+      const params = {};
+
+      for (const key of queryParams.keys()) {
+        // checkbox params are represented by the same key multiple times. Convert them into a
+        // single key with an array of values
+        const val = queryParams.getAll(key);
+        params[key] = val.length === 1 ? val[0] : val;
+      }
+
+      // set the params in the search object
+      const filters = { ...this._search.filters, ..._.omit(params, [...queryKeys]) };
+
+      this.setSearch({ ..._.pick(params, ...queryKeys), filters }, { force: true });
     },
 
     isExistingProvider (md) {

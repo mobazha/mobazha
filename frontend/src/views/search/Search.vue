@@ -133,6 +133,7 @@ import Filters from './Filters.vue'
 import SortBy from './SortBy.vue'
 import Results from './Results.vue'
 
+const queryKeys = ['q', 'p', 'ps', 'sortBy'];
 
 export default {
   components: {
@@ -273,8 +274,6 @@ export default {
     },
 
     initializeSearch (opts) {
-      const queryKeys = ['q', 'p', 'ps', 'sortBy'];
-
       // Allow router to pass in a search type for future use with vendor searches.
       const searchType = searchTypes.includes(opts.initialState.tab)
         ? opts.initialState.tab : 'listings';

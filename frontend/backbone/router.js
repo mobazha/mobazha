@@ -23,6 +23,49 @@ import TemplateOnly from './views/TemplateOnly';
 import BlockedWarning from './views/modals/BlockedWarning';
 import UserLoadingModal from './views/userPage/Loading';
 
+// 路由配置
+const routes = {
+  userRoutes: [
+    [/^(?:ob:\/\/)@([^\/]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'userViaHandle'],
+    [/^@([^\/]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'userViaHandle'],
+    [/^(?:ob:\/\/)(Qm[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'user'],
+    [/^(Qm[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'user']
+  ],
+  vueRoutes: [
+    [/^(?:ob:\/\/)(12D3Koo[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'loadVueApp'],
+    [/^(12D3Koo[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'loadVueApp'],
+    ['(ob://)transactions(/)', 'loadVueApp'],
+    ['(ob://)transactions/:tab(/)', 'loadVueApp'],
+    ['(ob://)search(/:tab)(?:query)', 'loadVueApp']
+  ],
+  otherRoutes: [
+    ['(ob://)connected-peers(/)', 'connectedPeers'],
+    ['(ob://)*path', 'pageNotFound']
+  ]
+};
+
+// 路由工具类
+class RouterUtils {
+  static standardizeRoute(route) {
+    let standardized = route;
+    if (standardized.startsWith('#')) standardized = standardized.slice(1);
+    if (standardized.startsWith('/')) standardized = standardized.slice(1); 
+    if (standardized.startsWith('ob://')) standardized = standardized.slice(5);
+    if (standardized.endsWith('/')) standardized = standardized.slice(0, -1);
+    return standardized;
+  }
+
+  static isValidUserRoute(guid, state, deepRouteParts) {
+    const validStates = ['home', 'store', 'following', 'followers', 'reputation'];
+    if (!guid || !validStates.includes(state)) return false;
+    
+    if (state === 'store') {
+      return deepRouteParts.length <= 1;
+    }
+    return deepRouteParts.length === 0;
+  }
+}
+
 export default class ObRouter extends Router {
   constructor(options = {}) {
     super(options);
@@ -35,25 +78,24 @@ export default class ObRouter extends Router {
     // routes with guids in the history, but diplaying a version with the handle in the
     // address bar.
     this.guidHandleMap = new Map();
+    this.initializeRoutes();
+    this.initializeEventListeners();
+  }
 
-    const routes = [
-      [/^(?:ob:\/\/)@([^\/]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'userViaHandle'],
-      [/^@([^\/]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'userViaHandle'],
-      [/^(?:ob:\/\/)(Qm[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'user'],
-      [/^(Qm[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'user'],
-      [/^(?:ob:\/\/)(12D3Koo[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'loadVueApp'],
-      [/^(12D3Koo[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'loadVueApp'],
-      ['(ob://)transactions(/)', 'loadVueApp'],
-      ['(ob://)transactions/:tab(/)', 'loadVueApp'],
-      ['(ob://)connected-peers(/)', 'connectedPeers'],
-      ['(ob://)search(/:tab)(?:query)', 'loadVueApp'],
-      ['(ob://)*path', 'pageNotFound'],
+  get maxCachedHandles() {
+    return 1000;
+  }
+
+  initializeRoutes() {
+    const allRoutes = [
+      ...routes.userRoutes,
+      ...routes.vueRoutes, 
+      ...routes.otherRoutes
     ];
+    allRoutes.slice(0).reverse().forEach(route => this.route.apply(this, route));
+  }
 
-    routes.slice(0)
-      .reverse()
-      .forEach((route) => this.route.apply(this, route));
-
+  initializeEventListeners() {
     this.setAddressBarText();
     this._curHash = location.hash;
 
@@ -69,10 +111,6 @@ export default class ObRouter extends Router {
         this.navigate(route, { trigger: true });
       }
     });
-  }
-
-  get maxCachedHandles() {
-    return 1000;
   }
 
   // FYI - There is a scenario where the prevHash will be inaccurate. More details in
@@ -133,25 +171,7 @@ export default class ObRouter extends Router {
   }
 
   standardizedRoute(route = location.hash) {
-    let standardized = route;
-
-    if (standardized.startsWith('#')) {
-      standardized = standardized.slice(1);
-    }
-
-    if (standardized.startsWith('/')) {
-      standardized = standardized.slice(1);
-    }
-
-    if (standardized.startsWith('ob://')) {
-      standardized = standardized.slice(5);
-    }
-
-    if (standardized.endsWith('/')) {
-      standardized = standardized.slice(0, standardized.length - 1);
-    }
-
-    return standardized;
+    return RouterUtils.standardizeRoute(route);
   }
 
   setAddressBarText(route = location.hash) {
@@ -176,6 +196,31 @@ export default class ObRouter extends Router {
     }
 
     app.pageNav.setAddressBar(displayRoute);
+  }
+
+  loadPage(view) {
+    window.vueApp.toggleVue = false;
+    
+    if (this.currentPage) {
+      this.currentPage.remove();
+      this.currentPage = null;
+    }
+
+    try {
+      this.currentPage = view;
+      getPageContainer().append(view.el);
+    } finally {
+      app.loadingModal.close();
+    }
+  }
+
+  loadVueApp() {
+    if (this.currentPage) {
+      this.currentPage.remove(); 
+      this.currentPage = null;
+    }
+    window.vueApp.toggleVue = true;
+    app.loadingModal.close();
   }
 
   execute(callback, args, name, options = {}) {
@@ -261,32 +306,6 @@ export default class ObRouter extends Router {
     return undefined;
   }
 
-  loadPage(vw) {
-    window.vueApp.toggleVue = false;
-
-    // This block is intentionally duplicated here in case a route
-    // method was called directly on the app.router instance therefore
-    // bypassing execute.
-    if (this.currentPage) {
-      this.currentPage.remove();
-      this.currentPage = null;
-    }
-
-    this.currentPage = vw;
-    getPageContainer().append(vw.el);
-    app.loadingModal.close();
-  }
-
-  loadVueApp() {
-    if (this.currentPage) {
-      this.currentPage.remove();
-      this.currentPage = null;
-    }
-    window.vueApp.toggleVue = true;
-
-    app.loadingModal.close();
-  }
-
   /**
    * If you need to navigate to a user page via a handle and you have the user's guid, use
    * this method which is mostly a wrapper around the standard Router.navigate. The addition
@@ -347,38 +366,6 @@ export default class ObRouter extends Router {
     });
   }
 
-  get userStates() {
-    return [
-      'home',
-      'store',
-      'following',
-      'followers',
-      'reputation',
-    ];
-  }
-
-  /**
-   * Based on the route arguments, determine whether we
-   * have a valid user route.
-   */
-  isValidUserRoute(guid, state, ...deepRouteParts) {
-    if (!guid || this.userStates.indexOf(state) === -1) {
-      return false;
-    }
-
-    if (state === 'store') {
-      // so far store is the only state that could have
-      // route parts beyond the state, e.g @themes/store/<slug>
-      if (deepRouteParts.length > 1) {
-        return false;
-      }
-    } else if (deepRouteParts.length) {
-      return false;
-    }
-
-    return true;
-  }
-
   user(guid, state, ...args) {
     let functionArgs = [...args];
 
@@ -396,7 +383,7 @@ export default class ObRouter extends Router {
     const pageState = state || 'store';
     const deepRouteParts = functionArgs.filter((arg) => arg !== null);
 
-    if (!this.isValidUserRoute(guid, pageState, ...deepRouteParts)) {
+    if (!RouterUtils.isValidUserRoute(guid, pageState, ...deepRouteParts)) {
       this.pageNotFound();
       return;
     }

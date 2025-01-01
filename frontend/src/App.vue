@@ -5,7 +5,7 @@
     </section>
     <section id="contentFrame" class="clrBr">
       <div id="pageContainer">
-        <router-view v-if="toggleVue && initialized" :key="$route.params[$route.meta.watchParam]" />
+        <router-view v-if="initialized" :key="$route.params[$route.meta.watchParam]" />
       </div>
     </section>
     <section id="statusBar"></section>
@@ -52,8 +52,6 @@ export default {
     return {
       initialized: false,
       showLoadingModal: false,
-
-      toggleVue: false,
 
       app: app,
 

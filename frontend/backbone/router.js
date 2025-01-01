@@ -2,47 +2,10 @@
 import $ from 'jquery';
 import { Router } from 'backbone';
 import * as isIPFS from 'is-ipfs';
-import { ipc } from '../src/utils/ipcRenderer.js';
 import app from './app';
-import { myGet } from '../src/api/api';
-import { getGuid } from './utils';
-import { getPageContainer } from './utils/selectors';
 import { isPromise } from './utils/object';
-import { startAjaxEvent, endAjaxEvent, recordEvent } from './utils/metrics';
-import { getCurrentConnection } from './utils/serverConnect';
-import { isBlocked, isUnblocking, events as blockEvents } from './utils/block';
 import './lib/whenAll.jquery';
-import Profile from './models/profile/Profile';
-import Listing from './models/listing/Listing';
 import { getOpenModals } from './views/modals/BaseModal';
-import UserPage from './views/userPage/UserPage';
-import Search from './views/search/Search';
-import Transactions from './views/transactions/Transactions';
-import ConnectedPeersPage from './views/ConnectedPeersPage';
-import TemplateOnly from './views/TemplateOnly';
-import BlockedWarning from './views/modals/BlockedWarning';
-import UserLoadingModal from './views/userPage/Loading';
-
-// 路由配置
-const routes = {
-  userRoutes: [
-    [/^(?:ob:\/\/)@([^\/]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'userViaHandle'],
-    [/^@([^\/]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'userViaHandle'],
-    [/^(?:ob:\/\/)(Qm[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'user'],
-    [/^(Qm[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'user']
-  ],
-  vueRoutes: [
-    [/^(?:ob:\/\/)(12D3Koo[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'loadVueApp'],
-    [/^(12D3Koo[a-zA-Z0-9]+)[\/]?([^\/]*)[\/]?([^\/]*)[\/]?([^\/]*)\/?$/, 'loadVueApp'],
-    ['(ob://)transactions(/)', 'loadVueApp'],
-    ['(ob://)transactions/:tab(/)', 'loadVueApp'],
-    ['(ob://)search(/:tab)(?:query)', 'loadVueApp']
-  ],
-  otherRoutes: [
-    ['(ob://)connected-peers(/)', 'connectedPeers'],
-    ['(ob://)*path', 'pageNotFound']
-  ]
-};
 
 // 路由工具类
 class RouterUtils {
@@ -78,39 +41,10 @@ export default class ObRouter extends Router {
     // routes with guids in the history, but diplaying a version with the handle in the
     // address bar.
     this.guidHandleMap = new Map();
-    this.initializeRoutes();
-    this.initializeEventListeners();
   }
 
   get maxCachedHandles() {
     return 1000;
-  }
-
-  initializeRoutes() {
-    const allRoutes = [
-      ...routes.userRoutes,
-      ...routes.vueRoutes, 
-      ...routes.otherRoutes
-    ];
-    allRoutes.slice(0).reverse().forEach(route => this.route.apply(this, route));
-  }
-
-  initializeEventListeners() {
-    this.setAddressBarText();
-    this._curHash = location.hash;
-
-    $(window).on('hashchange', () => {
-      this.setAddressBarText();
-      if (window.Countly) {
-        window.Countly.q.push(['track_pageview', location.hash]);
-      }
-    });
-
-    ipc.on('external-route', (e, route) => {
-      if (app.pageNav.navigable) {
-        this.navigate(route, { trigger: true });
-      }
-    });
   }
 
   // FYI - There is a scenario where the prevHash will be inaccurate. More details in
@@ -122,25 +56,6 @@ export default class ObRouter extends Router {
 
   get prevHash() {
     return this._prevHash;
-  }
-
-  /**
-   * Our own profile is not available when the router is constructed, so please call this method
-   * when it is.
-   */
-  onProfileSet() {
-    this.stopListening(app.profile, null, this.onOwnHandleChange);
-    this.listenTo(app.profile, 'change:handle', this.onOwnHandleChange);
-  }
-
-  onOwnHandleChange() {
-    this.cacheGuidHandle(app.profile.id, app.profile.get('handle'));
-
-    // If we're on our own user page, we'll call router.setAddressBarText, which
-    // will ensure the updated handle is reflected in the address bar.
-    if (location.hash.slice(1).startsWith(app.profile.id)) {
-      this.setAddressBarText();
-    }
   }
 
   /**
@@ -196,31 +111,6 @@ export default class ObRouter extends Router {
     }
 
     app.pageNav.setAddressBar(displayRoute);
-  }
-
-  loadPage(view) {
-    window.vueApp.toggleVue = false;
-    
-    if (this.currentPage) {
-      this.currentPage.remove();
-      this.currentPage = null;
-    }
-
-    try {
-      this.currentPage = view;
-      getPageContainer().append(view.el);
-    } finally {
-      app.loadingModal.close();
-    }
-  }
-
-  loadVueApp() {
-    if (this.currentPage) {
-      this.currentPage.remove(); 
-      this.currentPage = null;
-    }
-    window.vueApp.toggleVue = true;
-    app.loadingModal.close();
   }
 
   execute(callback, args, name, options = {}) {
@@ -358,305 +248,12 @@ export default class ObRouter extends Router {
   }
 
   userViaHandle(handle, ...args) {
-    getGuid(handle).done((guid) => {
-      // hack to pass in the handle to this.user - forgive me code gods
-      this.user(guid, ...[args[0], { handle }, ...args.slice(1)]);
-    }).fail(() => {
-      this.userNotFound(handle);
-    });
+    // getGuid(handle).done((guid) => {
+    //   // hack to pass in the handle to this.user - forgive me code gods
+    //   this.user(guid, ...[args[0], { handle }, ...args.slice(1)]);
+    // }).fail(() => {
+    //   this.userNotFound(handle);
+    // });
   }
 
-  user(guid, state, ...args) {
-    let functionArgs = [...args];
-
-    // Hack to pass the handle into this function, which should really only
-    // happen when called from userViaHandle(). If a handle is being passed in,
-    // it will be passed in as { handle: 'charlie' } as the first element of the
-    // ...args argument.
-    let handle;
-
-    if (args.length && args[0] && args[0].hasOwnProperty('handle')) {
-      functionArgs = functionArgs.slice(1);
-      handle = args[0].handle;
-    }
-
-    const pageState = state || 'store';
-    const deepRouteParts = functionArgs.filter((arg) => arg !== null);
-
-    if (!RouterUtils.isValidUserRoute(guid, pageState, ...deepRouteParts)) {
-      this.pageNotFound();
-      return;
-    }
-
-    const standardizedHash = (hash) => (hash.endsWith('/') ? hash.slice(0, hash.length - 1) : hash);
-
-    if (isBlocked(guid) && !isUnblocking(guid)) {
-      app.loadingModal.close();
-      const blockedWarningModal = new BlockedWarning({ peerID: guid })
-        .render()
-        .open();
-
-      const onBlockWarningCanceled = () => {
-        const prevHash = standardizedHash(this.prevHash);
-        const locationHash = standardizedHash(location.hash);
-
-        if (prevHash === locationHash) {
-          // means there is no previous page - will go to our own node page
-          this.navigate(`${app.profile.id}`, {
-            replace: true,
-            trigger: true,
-          });
-        } else {
-          this.navigate(`${this.prevHash.slice(1)}`, {
-            replace: true,
-            trigger: true,
-          });
-        }
-      };
-
-      const onUnblock = (data) => {
-        if (data.peerIDs.includes(guid)) {
-          app.loadingModal.open();
-          this.user(guid, state, ...args);
-        }
-      };
-
-      const cleanUpBlockedModal = () => {
-        blockEvents.off(null, onUnblock);
-      };
-
-      blockedWarningModal.on('canceled', onBlockWarningCanceled);
-      blockEvents.on('unblocking unblocked', onUnblock);
-      blockedWarningModal.on('close', cleanUpBlockedModal);
-      return;
-    }
-
-    let profile;
-    let profileFetch;
-    let listing;
-    let listingFetch;
-    let userPageFetchError = '';
-    let slug;
-
-    startAjaxEvent('UserPageLoad');
-
-    if (guid === app.profile.id) {
-      // don't fetch our own profile, since we have it already
-      profileFetch = $.Deferred().resolve();
-      profile = app.profile;
-    } else {
-      profile = new Profile({ peerID: guid });
-      profileFetch = profile.fetch();
-    }
-
-    if (state === 'store') {
-      if (deepRouteParts[0]) {
-        slug = deepRouteParts[0];
-        listing = new Listing({
-          slug,
-        }, { guid });
-
-        listingFetch = listing.fetch();
-      }
-    }
-
-    app.loadingModal.close();
-
-    if (this.userLoadingModal) {
-      this.userLoadingModal.remove();
-    }
-
-    this.userLoadingModal = new UserLoadingModal({
-      initialState: {
-        contentText: app.polyglot.t('userPage.loading.loadingText', {
-          name: `<b>${handle || `${guid.slice(0, 8)}…`}</b>`,
-        }),
-        isProcessing: true,
-      },
-    })
-      .on('clickCancel', () => {
-        const prevHash = standardizedHash(this.prevHash);
-        const locationHash = standardizedHash(location.hash);
-
-        if (prevHash === locationHash) {
-          // there is no previous page, let's navigate to our home page
-          this.navigate(`${app.profile.id}`, {
-            trigger: true,
-          });
-        } else {
-          // go back to previous page
-          window.history.back();
-        }
-      })
-      .on('clickRetry', () => this.user(guid, state, ...args));
-
-    this.userLoadingModal.render()
-      .open();
-
-    const onWillRoute = () => {
-      // The app has been routed to a new route, let's
-      // clean up by aborting all fetches
-      if (profileFetch.abort) profileFetch.abort();
-      if (listingFetch) listingFetch.abort();
-      this.userLoadingModal.remove();
-    };
-
-    this.once('will-route', onWillRoute);
-
-    $.whenAll(profileFetch, listingFetch).done(() => {
-      handle = profile.get('handle');
-      this.cacheGuidHandle(guid, handle);
-      this.userLoadingModal.remove();
-
-      // Setting the address bar which will ensure the most up to date handle (or none) is
-      // shown in the address bar.
-      this.setAddressBarText();
-
-      if (pageState === 'store' && !profile.get('vendor') && guid !== app.profile.id) {
-        // the user does not have an active store and this is not our own node
-        if (state) {
-          // You've explicitly tried to navigate to the store tab. Since it's not
-          // available, we'll re-route to page-not-found
-          this.pageNotFound();
-          return;
-        }
-
-        // You've attempted to find a user with no particular tab. Since store is not available
-        // we'll take you to the home tab.
-        this.navigate(`${guid}/home/${deepRouteParts ? deepRouteParts.join('/') : ''}`, {
-          replace: true,
-          trigger: true,
-        });
-        return;
-      }
-
-      if (!state) {
-        this.navigate(`${guid}/store/${deepRouteParts ? deepRouteParts.join('/') : ''}`, {
-          replace: true,
-        });
-      }
-
-      this.loadPage(
-        new UserPage({
-          model: profile,
-          state: pageState,
-          listing,
-        }).render(),
-      );
-    }).fail((...failArgs) => {
-      const jqXhr = failArgs[0];
-      const reason = (jqXhr && jqXhr.responseJSON && jqXhr.responseJSON.reason)
-        || (jqXhr && jqXhr.responseText) || '';
-
-      if (jqXhr === profileFetch && profileFetch.statusText === 'abort') return;
-      if (jqXhr === listingFetch && listingFetch.statusText === 'abort') return;
-
-      if (profileFetch.state() === 'rejected') {
-        userPageFetchError = 'User Not Found';
-      } else if (listingFetch.state() === 'rejected') {
-        userPageFetchError = 'Listing Not Found';
-      }
-
-      userPageFetchError = userPageFetchError
-        ? `${userPageFetchError} - ${reason || 'unknown'}`
-        : reason || 'unknown';
-
-      let contentText = app.polyglot.t('userPage.loading.failTextStore', {
-        store: `<b>${handle || `${guid.slice(0, 8)}…`}</b>`,
-      });
-
-      if (profileFetch.state() === 'resolved' && listingFetch.state() === 'rejected') {
-        const linkText = app.polyglot.t('userPage.loading.failTextListingLink');
-        const listingSlug = slug.length > 25
-          ? `${slug.slice(0, 25)}…` : slug;
-        contentText = app.polyglot.t('userPage.loading.failTextListingWithLink', {
-          listing: `<b>${listingSlug}</b>`,
-          link: `<a href="#${guid}/store">${linkText}</a>`,
-        });
-      }
-
-      this.userLoadingModal.setState({
-        contentText,
-        isProcessing: false,
-      });
-    })
-      .always(() => {
-        this.off(null, onWillRoute);
-        const dismissedCallout = getCurrentConnection()
-          && getCurrentConnection().server.get('dismissedDiscoverCallout');
-        endAjaxEvent('UserPageLoad', {
-          ownPage: guid === app.profile.id,
-          tab: pageState,
-          dismissedCallout,
-          listing: !!listingFetch,
-          errors: userPageFetchError || 'none',
-        });
-      });
-  }
-
-  transactions(tab) {
-    if (tab && ['sales', 'cases', 'purchases'].indexOf(tab) === -1) {
-      this.pageNotFound();
-      return;
-    }
-
-    if (!tab) {
-      this.navigate('transactions/sales');
-    }
-
-    const initialTab = tab || 'sales';
-
-    this.loadPage(
-      new Transactions({ initialTab }).render(),
-    );
-
-    recordEvent('Transactions_PageLoad', {
-      tab: initialTab,
-    });
-  }
-
-  connectedPeers() {
-    const peerFetch = myGet(app.getServerUrl('ob/peers')).done((data) => {
-      const peersData = data || [];
-      const peers = peersData.map((peer) => (peer.slice(peer.lastIndexOf('/') + 1)));
-
-      this.loadPage(
-        new ConnectedPeersPage({ peers }).render(),
-      );
-    }).fail((error) => {
-      let content = '<p>There was an error retrieving the connected peers.</p>';
-
-      content += `<p>${error.responseJSON && error.responseJSON.reason || error.toJSON()}</p>`;
-
-      this.genericError({ content });
-    });
-
-    this.once('will-route', () => (peerFetch.abort()));
-  }
-
-  search(tab = 'listings', query) {
-    this.loadPage(
-      new Search({ query, initialState: { tab } }),
-    );
-  }
-
-  userNotFound(user) {
-    this.loadPage(
-      new TemplateOnly({ template: 'error-pages/userNotFound.html' }).render({ user }),
-    );
-  }
-
-  pageNotFound() {
-    this.loadPage(
-      new TemplateOnly({
-        template: 'error-pages/pageNotFound.html',
-      }).render(),
-    );
-  }
-
-  genericError(context = {}) {
-    this.loadPage(
-      new TemplateOnly({ template: 'error-pages/genericError.html' }).render(context),
-    );
-  }
 }

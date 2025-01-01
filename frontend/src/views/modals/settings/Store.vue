@@ -243,7 +243,6 @@ import app from '../../../../backbone/app';
 import '../../../../backbone/lib/whenAll.jquery';
 import { bulkCoinUpdate } from '../../../../backbone/utils/bulkCoinUpdate';
 import { supportedWalletCurs } from '../../../../backbone/data/walletCurrencies';
-import Moderators from '../../../../backbone/views/components/moderators/Moderators';
 import BulkCoinUpdateBtn from './BulkCoinUpdateBtn.vue';
 import { openSimpleMessage } from '../../../../backbone/views/modals/SimpleMessage';
 import ShippingOptionMd from '../../../../backbone/models/settings/ShippingOption';

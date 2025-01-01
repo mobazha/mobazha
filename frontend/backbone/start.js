@@ -521,7 +521,7 @@ function start() {
   fetchStartupData1().done((data) => {
     app.serverConfig = data.serverConfig || {};
     app.profile = new Profile({ peerID: data.serverConfig.peerID });
-    app.router.onProfileSet();
+
     app.settings = new Settings();
     initWalletCurs(app.serverConfig.wallets, data.walletCurDef);
     app.walletCurDef = data.walletCurDef;

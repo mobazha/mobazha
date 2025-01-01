@@ -1086,7 +1086,8 @@
     }
   },
   "formats": {
-    "PHYSICAL_GOOD": "物理商品",
+    "ALL": "全部",
+    "PHYSICAL_GOOD": "实物商品",
     "DIGITAL_GOOD": "数字商品",
     "SERVICE": "服务",
     "CRYPTOCURRENCY": "加密货币"

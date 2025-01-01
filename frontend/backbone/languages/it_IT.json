@@ -1086,6 +1086,7 @@
     }
   },
   "formats": {
+    "ALL": "All",
     "PHYSICAL_GOOD": "Bene fisico",
     "DIGITAL_GOOD": "Bene digitale",
     "SERVICE": "Servizio",

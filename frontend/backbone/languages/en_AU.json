@@ -1086,6 +1086,7 @@
     }
   },
   "formats": {
+    "ALL": "All",
     "PHYSICAL_GOOD": "Physical Good",
     "DIGITAL_GOOD": "Digital Good",
     "SERVICE": "Service",

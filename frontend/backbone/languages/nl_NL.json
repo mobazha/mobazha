@@ -1086,6 +1086,7 @@
     }
   },
   "formats": {
+    "ALL": "All",
     "PHYSICAL_GOOD": "Fysiek goed",
     "DIGITAL_GOOD": "Digitaal goed",
     "SERVICE": "Dienst",

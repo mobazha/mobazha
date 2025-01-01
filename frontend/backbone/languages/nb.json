@@ -1086,6 +1086,7 @@
     }
   },
   "formats": {
+    "ALL": "All",
     "PHYSICAL_GOOD": "Fysisk Vare",
     "DIGITAL_GOOD": "Digital Vare",
     "SERVICE": "Tjeneste",

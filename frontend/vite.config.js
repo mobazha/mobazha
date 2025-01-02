@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import plugins from './src/plugins';
 import path from 'path';
+import fs from 'fs';
 // https://vitejs.dev/config/
 export default defineConfig(({ command, mode }) => {
   return {
@@ -57,6 +58,33 @@ export default defineConfig(({ command, mode }) => {
           drop_debugger: true,
         },
       },
-    }
+    },
+    define: {
+      global: {}
+    },
+    plugins: [
+      ...plugins,
+      {
+        name: 'handle-backbone-templates',
+        enforce: 'pre',
+        configureServer(server) {
+          // 添加自定义中间件来处理模板文件
+          server.middlewares.use((req, res, next) => {
+            if (req.url?.includes('/backbone/templates/')) {
+              const filePath = path.join(__dirname, req.url);
+              try {
+                const content = fs.readFileSync(filePath, 'utf-8');
+                res.setHeader('Content-Type', 'text/plain');
+                res.end(content);
+              } catch (err) {
+                next(err);
+              }
+              return;
+            }
+            next();
+          });
+        },
+      }
+    ]
   };
 });

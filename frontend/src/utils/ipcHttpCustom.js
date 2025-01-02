@@ -95,9 +95,9 @@ class IpcHttpCustom {
         return undefined;
 
       case 'controller.system.readTemplateFileSync':
-        return this.synchronousRequest("/templates/"+args);
+        return this.synchronousRequest("/backbone/templates/"+args);
       case 'controller.system.getlanguageFileContent':
-        return JSON.parse(this.synchronousRequest("/languages/"+args));
+        return JSON.parse(this.synchronousRequest("/backbone/languages/"+args));
       default:
         break;
     }

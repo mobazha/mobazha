@@ -86,7 +86,7 @@ func NewNode(cfg *Config) (*Node, error) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background()) //nolint
-	obNode, err := core.NewNode(ctx, rcfg)
+	obNode, err := core.NewNode(ctx, rcfg, core.DefaultUserID, true)
 	if err != nil {
 		return nil, err //nolint
 	}

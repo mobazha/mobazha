@@ -31,21 +31,21 @@ func (x *DevNet) Execute(args []string) error {
 
 	// Create buyer, vendor, and moderator nodes
 	buyerCfg := newConfig("buyer", "/ip4/127.0.0.1/tcp/4006", "/ip4/127.0.0.1/tcp/4003")
-	buyer, err := core.NewNode(context.Background(), buyerCfg, core.DefaultUserID, true)
+	buyer, err := core.NewNode(context.Background(), buyerCfg, repo.DefaultUserID, true)
 	if err != nil {
 		return err
 	}
 
 	vendorCfg := newConfig("vendor", "/ip4/127.0.0.1/tcp/4007", "/ip4/127.0.0.1/tcp/4004")
 	vendorCfg.BoostrapAddrs = []string{fmt.Sprintf("%s/p2p/%s", buyerCfg.SwarmAddrs[0], buyer.Identity())}
-	vendor, err := core.NewNode(context.Background(), vendorCfg, core.DefaultUserID, true)
+	vendor, err := core.NewNode(context.Background(), vendorCfg, repo.DefaultUserID, true)
 	if err != nil {
 		return err
 	}
 
 	moderatorCfg := newConfig("moderator", "/ip4/127.0.0.1/tcp/4008", "/ip4/127.0.0.1/tcp/4005")
 	moderatorCfg.BoostrapAddrs = []string{fmt.Sprintf("%s/p2p/%s", buyerCfg.SwarmAddrs[0], buyer.Identity())}
-	moderator, err := core.NewNode(context.Background(), moderatorCfg, core.DefaultUserID, true)
+	moderator, err := core.NewNode(context.Background(), moderatorCfg, repo.DefaultUserID, true)
 	if err != nil {
 		return err
 	}

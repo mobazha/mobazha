@@ -37,7 +37,7 @@ func (x *Init) Execute(args []string) error {
 
 	os.RemoveAll(x.DataDir)
 
-	cfg, err := repo.LoadConfig()
+	cfg, err := repo.LoadConfig("")
 	if err != nil {
 		return err
 	}

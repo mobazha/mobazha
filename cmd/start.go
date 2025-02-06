@@ -28,7 +28,7 @@ type Start struct {
 
 // Execute starts the Mobazha node.
 func (x *Start) Execute(args []string) error {
-	cfg, err := repo.LoadConfig()
+	cfg, err := repo.LoadConfig("")
 	if err != nil {
 		return err
 	}

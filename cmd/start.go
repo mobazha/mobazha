@@ -33,7 +33,7 @@ func (x *Start) Execute(args []string) error {
 		return err
 	}
 	printSplashScreen()
-	n, err := core.NewNode(context.Background(), cfg, repo.DefaultNodeID, true)
+	n, err := core.NewNode(context.Background(), cfg, repo.DefaultNodeID)
 	if err != nil {
 		return err
 	}

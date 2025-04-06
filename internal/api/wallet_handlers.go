@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/core/coreiface"
-	"github.com/mobazha/mobazha3.0/internal/models"
-	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
-	"github.com/mobazha/mobazha3.0/internal/orders/mbzpb"
 	"github.com/gorilla/mux"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"gorm.io/gorm"
 )
 
@@ -559,7 +559,7 @@ func (g *Gateway) handlePOSTResyncBlockchain(w http.ResponseWriter, r *http.Requ
 
 	select {
 	case <-done:
-	sanitizedStringResponse(w, `{}`)
+		sanitizedStringResponse(w, `{}`)
 		return
 	case <-time.After(time.Second * 60):
 		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")

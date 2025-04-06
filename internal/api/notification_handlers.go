@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/core/coreiface"
 	"github.com/gorilla/mux"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 )
 
 func (g *Gateway) handleGetNotifications(w http.ResponseWriter, r *http.Request) {

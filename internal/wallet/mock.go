@@ -13,9 +13,9 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/mobazha/mobazha3.0/internal/events"
-	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
 	"github.com/jarcoal/httpmock"
+	"github.com/mobazha/mobazha3.0/pkg/events"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 // MockWalletNetwork is a network of mock wallets connected

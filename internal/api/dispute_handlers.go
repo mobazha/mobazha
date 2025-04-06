@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/core/coreiface"
-	"github.com/mobazha/mobazha3.0/internal/models"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 func (g *Gateway) handlePOSTOpenDispute(w http.ResponseWriter, r *http.Request) {

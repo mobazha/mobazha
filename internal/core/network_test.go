@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/events"
-	"github.com/mobazha/mobazha3.0/internal/models"
-	"github.com/mobazha/mobazha3.0/internal/models/factory"
 	"github.com/mobazha/mobazha3.0/internal/net"
-	pb "github.com/mobazha/mobazha3.0/internal/net/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha3.0/pkg/models/factory"
+	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 )
 
 func Test_SendAndReceiveAcks(t *testing.T) {

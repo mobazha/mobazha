@@ -3,7 +3,7 @@ package utils
 import (
 	"fmt"
 
-	pb "github.com/mobazha/mobazha3.0/internal/orders/mbzpb"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 )
 
 // ExtractListing will return the listing with the given hash from the provided

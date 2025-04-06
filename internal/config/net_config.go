@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 
-	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 type NetConfig struct {

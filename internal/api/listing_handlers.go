@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/mobazha/mobazha3.0/internal/core/coreiface"
-	"github.com/mobazha/mobazha3.0/internal/models"
-	pb "github.com/mobazha/mobazha3.0/internal/orders/mbzpb"
 	"github.com/gorilla/mux"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 

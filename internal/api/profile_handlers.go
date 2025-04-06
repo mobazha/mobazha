@@ -14,11 +14,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/core/coreiface"
-	"github.com/mobazha/mobazha3.0/internal/models"
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/gorilla/mux"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 func (g *Gateway) handleGETProfile(w http.ResponseWriter, r *http.Request) {

@@ -3,8 +3,8 @@ package utils
 import (
 	"encoding/hex"
 
-	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
-	pb "github.com/mobazha/mobazha3.0/internal/orders/mbzpb"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 func GetPaymentAddress(orderOpen *pb.OrderOpen) (iwallet.AddressEx, error) {

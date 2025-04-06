@@ -30,7 +30,7 @@ protos:
 	cd internal/net/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ *.proto
 	cd internal/orders/mbzpb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ --proto_path=../../net/mbzpb --proto_path=./ *.proto
 	cd internal/orders/mbzpb && sed -i 's/OrderList/pb.OrderList/' orders.pb.go
-	cd internal/orders/mbzpb && sed -i '11i\"github.com/mobazha/mobazha3.0/internal/net/mbzpb"\' orders.pb.go
+	cd internal/orders/mbzpb && sed -i '11i\"github.com/mobazha/mobazha3.0/pkg/net/mbzpb"\' orders.pb.go
 	cd internal/orders/mbzpb && sed -i 's/file_msg_proto_init()//' orders.pb.go
 	cd internal/orders/mbzpb && gofmt -s -w orders.pb.go
 	cd internal/channels/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ *.proto

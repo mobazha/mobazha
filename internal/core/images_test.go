@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/models"
 	ipath "github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 var (

@@ -1,0 +1,46 @@
+syntax = "proto3";
+option go_package = "../mbzpb";
+package mbzpb;
+
+message Currency {
+    string code         = 1;
+    uint32 divisibility = 2;
+}
+
+message CurrencyValue {
+    Currency currency = 1;
+    string amount     = 2;
+}
+
+message ID {
+    string peerID       = 1;
+    string handle       = 2;
+    Pubkeys pubkeys     = 3;
+    bytes sig           = 4; // secp256k1 signature covering peerID
+
+    message Pubkeys {
+        bytes identity   = 1; // IPFS public key
+        bytes escrow     = 2; // Cryptocurrency escrow public key
+        bytes eth        = 3; // Cryptocurrency eth public key
+    }
+}
+
+message Image {
+    string filename = 1;
+    string original = 2;
+    string large    = 3;
+    string medium   = 4;
+    string small    = 5;
+    string tiny     = 6;
+}
+
+message File {
+    string type     = 1;
+    string hash     = 2;
+    string filename = 3;
+}
+
+message EscrowSignature {
+    uint32 inputIndex = 1;
+    bytes sig         = 2;
+}

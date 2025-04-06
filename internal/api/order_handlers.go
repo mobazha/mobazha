@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/core/coreiface"
-	"github.com/mobazha/mobazha3.0/internal/models"
-	pb "github.com/mobazha/mobazha3.0/internal/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 )
 
 type APIError struct {

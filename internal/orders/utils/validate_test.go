@@ -8,9 +8,9 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
-	pb "github.com/mobazha/mobazha3.0/internal/orders/mbzpb"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

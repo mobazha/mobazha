@@ -21,10 +21,10 @@ import (
 	"github.com/ipfs/kubo/plugin/loader"
 	"github.com/ipfs/kubo/repo/fsrepo"
 	"github.com/mobazha/mobazha3.0/internal/common"
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/database/ffsqlite"
-	"github.com/mobazha/mobazha3.0/internal/models"
 	"github.com/mobazha/mobazha3.0/internal/version"
+	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/op/go-logging"
 	"github.com/tyler-smith/go-bip39"
 

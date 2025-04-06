@@ -1,0 +1,176 @@
+syntax = "proto3";
+option go_package = "../mbzpb";
+package mbzpb;
+
+import "countrycodes.proto";
+import "common.proto";
+import "google/protobuf/timestamp.proto";
+
+message Listing {
+    string slug                             = 1;
+    ID vendorID                             = 2;
+    Metadata metadata                       = 3;
+    Item item                               = 4;
+    repeated ShippingOption shippingOptions = 5;
+    repeated Tax taxes                      = 6;
+    repeated Coupon coupons                 = 7;
+    repeated string moderators              = 8;
+    string termsAndConditions               = 9;
+    string refundPolicy                     = 10;
+    string status                           = 11; // "draft", "pending", "private" and "published". Default is "published".
+    bool featured                           = 12;
+
+    message Metadata {
+        uint32 version                     = 1;
+        ContractType contractType          = 2;
+        Format format                      = 3;
+        google.protobuf.Timestamp expiry   = 4;
+        repeated string acceptedCurrencies = 5;
+        string language                    = 6;
+        uint32 escrowTimeoutHours          = 7;
+        Currency pricingCurrency           = 9;
+
+        enum ContractType {
+            PHYSICAL_GOOD  = 0;
+            DIGITAL_GOOD   = 1;
+            SERVICE        = 2;
+            CLASSIFIED     = 3;
+            CRYPTOCURRENCY = 4;
+        }
+
+        enum Format {
+            FIXED_PRICE  = 0;
+            MARKET_PRICE = 1;
+        }
+    }
+
+    message Item {
+        string title                                = 1;
+        string description                          = 2;
+        string shortDescription                     = 3;
+        string processingTime                       = 4;
+        bool nsfw                                   = 5;
+        repeated string tags                        = 6;
+        repeated Image images                       = 7;
+        File introVideo                             = 8;
+        repeated string categories                  = 9;
+        uint32 grams                                = 10;
+        Dimensions dimensions                       = 11;
+        string condition                            = 12;
+        repeated Option options                     = 13;
+        repeated Sku skus                           = 14;
+        string price                                = 15;
+        string regularPrice                         = 16;
+        string salePrice                            = 17;
+        repeated OptionalFeature optionalFeatures   = 18;
+        string cryptoListingCurrencyCode            = 19;
+        uint32 cryptoListingDivisibility            = 20;
+        float cryptoListingPriceModifier            = 21;
+        repeated string altIntroVideoLinks          = 22;
+
+        message Option {
+            string name                = 1;
+            string description         = 2;
+            repeated Variant variants  = 3;
+            bool variation             = 4;
+
+            message Variant {
+                string name = 1;
+                Image image = 2;
+            }
+        }
+
+        message Sku {
+            repeated Selection selections = 1;
+            string productID              = 2;
+            string quantity               = 3;
+            string surcharge              = 4;
+            repeated Image images         = 5;
+            bool downloadable             = 6;
+            repeated Download downloads   = 7;
+
+            message Selection {
+                string option  = 1;
+                string variant = 2;
+            }
+
+            message Download {
+                string downloadID   = 1;
+                string name         = 2;
+                string file         = 3;
+            }
+        }
+
+        message Dimensions {
+            uint32 length              = 1;
+            uint32 width               = 2;
+            uint32 height              = 3;
+        }
+
+        message OptionalFeature {
+            string name                = 2;
+            string surcharge           = 3;
+            string skuID               = 4;
+            repeated Image images      = 5;
+        }
+    }
+
+    message ShippingOption {
+        uint32 optionID              = 1;
+        string name                  = 2;
+        ShippingType type            = 3;
+        string currency              = 4;
+        ServiceType serviceType      = 5;
+        repeated CountryCode regions = 6;
+        repeated Service services    = 7;
+
+        enum ShippingType {
+            LOCAL_PICKUP = 0;
+            FIXED_PRICE  = 1;
+        }
+
+        enum ServiceType {
+            FIRST_RENEWAL_FEE = 0;
+            SAME_WEIGHT_SAME_FEE  = 1;
+        }
+
+        message Service {
+            string name              = 1;
+            string estimatedDelivery = 2;
+            uint32 startWeight       = 3;
+            uint32 endWeight         = 4;
+
+            uint32 firstWeight       = 5;
+            string firstFreight      = 6;
+            uint32 renewalUnitWeight = 7;
+            string renewalUnitPrice  = 8;
+
+            string registrationFee   = 9;
+        }
+    }
+
+    message Tax {
+        string taxType                  = 1;
+        repeated CountryCode taxRegions = 2;
+        bool taxShipping                = 3;
+        float percentage                = 4;
+    }
+
+    message Coupon {
+        string title = 1;
+        oneof code {
+            string hash         = 2;
+            string discountCode = 3;
+        }
+        oneof discount {
+            float percentDiscount = 4;
+            string priceDiscount  = 5;
+        }
+    }
+}
+
+message SignedListing {
+    Listing listing     = 1;
+    string cid          = 2;
+    bytes signature     = 3;
+}

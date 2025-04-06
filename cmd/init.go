@@ -9,8 +9,8 @@ import (
 	"github.com/ipfs/kubo/repo/fsrepo"
 	"github.com/mobazha/mobazha3.0/internal/core"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
-	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
 	"github.com/mobazha/mobazha3.0/internal/repo"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 // Init initializes a new OpenBazaar node at the provided path.

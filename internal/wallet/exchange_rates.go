@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/models"
-	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
-	"github.com/mobazha/mobazha3.0/pkg/proxyclient"
+	"github.com/mobazha/mobazha3.0/libs/proxyclient"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 // ReserveCurrency is the currency used to calculate the exchange rates

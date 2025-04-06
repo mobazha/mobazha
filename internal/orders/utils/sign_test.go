@@ -4,9 +4,9 @@ import (
 	"crypto/rand"
 	"testing"
 
-	npb "github.com/mobazha/mobazha3.0/internal/net/mbzpb"
-	pb "github.com/mobazha/mobazha3.0/internal/orders/mbzpb"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
+	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )

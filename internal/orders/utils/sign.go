@@ -1,8 +1,8 @@
 package utils
 
 import (
-	pb "github.com/mobazha/mobazha3.0/internal/net/mbzpb"
 	"github.com/libp2p/go-libp2p/core/crypto"
+	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	"google.golang.org/protobuf/proto"
 )
 

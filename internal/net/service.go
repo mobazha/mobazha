@@ -5,13 +5,13 @@ import (
 	"io"
 	"sync"
 
-	pb "github.com/mobazha/mobazha3.0/internal/net/mbzpb"
 	ctxio "github.com/jbenet/go-context/io"
 	host "github.com/libp2p/go-libp2p/core/host"
 	inet "github.com/libp2p/go-libp2p/core/network"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
 	msgio "github.com/libp2p/go-msgio"
+	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	"github.com/op/go-logging"
 	"google.golang.org/protobuf/proto"
 )

@@ -13,7 +13,7 @@ import (
 	"github.com/cretz/bine/tor"
 	"github.com/ipsn/go-libtor"
 	"github.com/libp2p/go-libp2p"
-	oniontransport "github.com/mobazha/mobazha3.0/pkg/onion-transport"
+	oniontransport "github.com/mobazha/mobazha3.0/libs/onion-transport"
 	"golang.org/x/net/proxy"
 )
 

@@ -1,0 +1,348 @@
+syntax = "proto3";
+option go_package = "../mbzpb";
+package mbzpb;
+
+import "google/protobuf/timestamp.proto";
+import "countrycodes.proto";
+import "listing.proto";
+import "common.proto";
+import "msg.proto";
+
+message OrderOpen {
+    repeated SignedListing listings     = 1;
+    string refundAddress                = 2;
+    Shipping shipping                   = 3;
+    ID buyerID                          = 4;
+    google.protobuf.Timestamp timestamp = 5;
+    repeated Item items                 = 6;
+    Payment payment                     = 7;
+    repeated bytes ratingKeys           = 8;
+    string alternateContactInfo         = 9;
+
+    message Shipping {
+        string shipTo       = 1;
+        string address      = 2;
+        string city         = 3;
+        string state        = 4;
+        string postalCode   = 5;
+        CountryCode country = 6;
+        string addressNotes = 7;
+    }
+
+    message Item {
+        string listingHash                  = 1;
+        string quantity                     = 2;
+        repeated Option options             = 3;
+        ShippingOption shippingOption       = 4;
+        string memo                         = 5;
+        repeated string couponCodes         = 6;
+        string paymentAddress               = 7;
+        repeated string optionalFeatures    = 8;
+
+        message Option {
+            string name  = 1;
+            string value = 2;
+        }
+
+        message ShippingOption {
+            string name    = 1;
+            string service = 2;
+        }
+    }
+
+    message Payment {
+        Method method             = 1;
+        string moderator          = 2;
+        string amount             = 3; // Satoshis
+        string chaincode          = 4; // Hex encoded
+        string address            = 5; // B58check encoded
+        string script             = 6; // Hex encoded, usually redeem script.
+        bytes  moderatorKey       = 7;
+        string coin               = 8;
+        string escrowReleaseFee   = 9;
+        string platformAmount     = 10; // Satoshis
+        string platformAddr       = 11;
+        string platformRewardAddr = 12; // Platform token reward
+
+        enum Method {
+            DIRECT     = 0; // Address request
+            CANCELABLE = 1; // 1 of 2 cancelable address
+            MODERATED  = 2; // 2 of 3 escrow address
+        }
+    }
+}
+
+message OrderReject {
+    RejectType type                     = 1;
+    string reason                       = 2;
+    google.protobuf.Timestamp timestamp = 3;
+
+    enum RejectType {
+        USER_REJECT      = 0;
+        VALIDATION_ERROR = 1;
+    }
+}
+
+message OrderConfirmation {
+    string transactionID                = 1; // Only cancelable orders.
+    google.protobuf.Timestamp timestamp = 2;
+}
+
+message OrderCancel {
+    string transactionID                = 1; // Only cancelable orders.
+    google.protobuf.Timestamp timestamp = 2;
+}
+
+message RatingSignatures {
+    repeated RatingSignature sigs       = 1;
+    google.protobuf.Timestamp timestamp = 2;
+}
+
+message RatingSignature {
+    string     slug       = 1;
+    bytes ratingKey       = 2;
+    bytes vendorSignature = 3; // The signature covers the serialization of this object with the signature emptied.
+}
+
+message OrderFulfillment {
+    repeated FulfilledItem fulfillments = 1;
+    EscrowRelease releaseInfo           = 2; // Moderated orders only.
+    google.protobuf.Timestamp timestamp = 3;
+
+    message FulfilledItem {
+        uint32 itemIndex = 1;
+        string note      = 2;
+        oneof delivery {
+            // Physical goods only
+            PhysicalDelivery physicalDelivery             = 3;
+
+            // Digital goods only
+            DigitalDelivery digitalDelivery               = 4;
+
+            // CryptoCurrency items only
+            CryptocurrencyDelivery cryptocurrencyDelivery = 5;
+        }
+
+        message PhysicalDelivery {
+            string shipper        = 1;
+            string trackingNumber = 2;
+        }
+
+        message DigitalDelivery {
+            string url      = 1;
+            string password = 2;
+        }
+
+        message CryptocurrencyDelivery {
+            string transactionID = 1;
+        }
+    }
+}
+
+message OrderComplete {
+    repeated Rating ratings             = 1;
+    EscrowRelease releaseInfo           = 2; // Moderated orders only.
+    google.protobuf.Timestamp timestamp = 3;
+}
+
+message Rating {
+    ID vendorID                         = 1;
+    RatingSignature vendorSig           = 2;
+    ID buyerID                          = 3; // optional
+    string buyerName                    = 4; // optional
+    bytes buyerSig                      = 5; // optional
+
+    google.protobuf.Timestamp timestamp = 6;
+
+    uint32 overall                      = 7;
+    uint32 quality                      = 8;
+    uint32 description                  = 9;
+    uint32 deliverySpeed                = 10;
+    uint32 customerService              = 11;
+    string review                       = 12;
+
+    bytes ratingSignature               = 13;
+}
+
+
+message DisputeOpen {
+    Party openedBy                      = 1;
+    string reason                       = 2;
+    google.protobuf.Timestamp timestamp = 3;
+    bytes contract                      = 4;
+    string payoutAddress                = 5;
+
+    enum Party {
+        BUYER  = 0;
+        VENDOR = 1;
+    }
+}
+
+message DisputeUpdate {
+    google.protobuf.Timestamp timestamp = 1;
+    string payoutAddress                = 2;
+    bytes contract                      = 3;
+}
+
+message DisputeClose {
+    string verdict                      = 1;
+    ModeratedEscrowRelease releaseInfo  = 2;
+    google.protobuf.Timestamp timestamp = 3;
+
+    message ModeratedEscrowRelease {
+        repeated Signature escrowSignatures = 1;
+        repeated Outpoint outpoints         = 2;
+
+        string buyerAddress                 = 3;
+        string buyerAmount                  = 4;
+
+        string vendorAddress                = 5;
+        string vendorAmount                 = 6;
+
+        string moderatorAddress             = 7;
+        string moderatorAmount              = 8;
+
+        string transactionFee               = 9;
+    }
+}
+
+message Outpoint {
+    bytes fromID                        = 1;
+    string value                        = 2;
+}
+
+message DisputeAccept {
+    google.protobuf.Timestamp timestamp = 1;
+    string closedBy                     = 2;
+}
+
+message Refund {
+    oneof refundInfo {
+        string transactionID      = 1;
+        EscrowRelease releaseInfo = 2;
+    }
+    string amount                       = 3;
+    google.protobuf.Timestamp timestamp = 4;
+}
+
+message PaymentSent {
+    string transactionID = 1;
+}
+
+message PaymentFinalized {
+    google.protobuf.Timestamp timestamp = 1;
+}
+
+message EscrowRelease {
+    repeated Signature escrowSignatures = 1;
+    repeated Outpoint outpoints         = 2;
+    string toAddress                    = 3;
+    string toAmount                     = 4;
+    string platformAddress              = 5;
+    string platformAmount               = 6;
+    string transactionFee               = 7;
+}
+
+message Signature {
+    bytes from      = 1;
+    bytes signature = 2;
+    uint32 index    = 3;
+}
+
+message PaymentSentList {
+    repeated Message messages = 1;
+
+    message Message {
+        PaymentSent paymentSentMessage = 1;
+        bytes signature                = 2;
+    }
+}
+
+message FulfillmentList {
+    repeated Message messages = 1;
+
+    message Message {
+        OrderFulfillment fulfillmentMessage = 1;
+        bytes signature                     = 2;
+    }
+}
+
+message RefundList {
+    repeated Message messages = 1;
+
+    message Message {
+        Refund refundMessage = 1;
+        bytes signature      = 2;
+    }
+}
+
+message Contract {
+    string OrderID = 1;
+    string Role    = 2;
+
+    OrderOpen orderOpen = 3;
+    bool orderOpenAcked = 4;
+
+    OrderReject orderReject = 5;
+    bool orderRejectAcked   = 6;
+
+    OrderCancel orderCancel = 7;
+    bool orderCancelAcked   = 8;
+
+    OrderConfirmation orderConfirmation = 9;
+    bool orderConfirmationAcked         = 10;
+
+    OrderComplete orderComplete = 11;
+    bool orderCompleteAcked     = 12;
+
+    DisputeOpen disputeOpen         = 13;
+    bool disputeOpenOtherPartyAcked = 14;
+    bool disputeOpenModeratorAcked  = 15;
+
+    DisputeClose disputeClose = 16;
+    bool disputeCloseAcked    = 17;
+
+    DisputeUpdate disputeUpdate = 18;
+    bool disputeUpdateAcked     = 19;
+
+    DisputeAccept disputeAccept = 20;
+    bool disputeAcceptAcked     = 21;
+
+    PaymentFinalized paymentFinalized = 22;
+    bool paymentFinalizedAcked        = 23;
+
+    repeated OrderFulfillment orderFulfillments = 24;
+    bool fulfillmentsAcked            = 25;
+
+    repeated Refund refunds = 26;
+    bool refundsAcked  = 27;
+
+    repeated PaymentSent paymentsSent = 28;
+    bool paymentsSentAcked       = 29;
+
+    OrderList parkedMessages  = 30;
+    OrderList erroredMessages = 31;
+
+    repeated Transaction transactions = 32;
+
+    message Transaction {
+        string txid                         = 1;
+        bytes fromID                        = 2;
+        string value                        = 3;
+        uint64 height                       = 4;
+        google.protobuf.Timestamp timestamp = 5;
+    }
+}
+
+message Case {
+    string OrderID                                 = 1;
+    Contract buyerContract                         = 2;
+    Contract vendorContract                        = 3;
+    repeated string buyerContractValidationErrors  = 4;
+    repeated string vendorContractValidationErrors = 5;
+    DisputeOpen disputeOpen                        = 6;
+    DisputeClose disputeClose                      = 7;
+    string state                                   = 8;
+    bool read                                      = 9;
+	uint64 unreadChatMessages                      = 10;
+}

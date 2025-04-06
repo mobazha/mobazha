@@ -10,10 +10,10 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
-	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
-	pb "github.com/mobazha/mobazha3.0/internal/orders/mbzpb"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"google.golang.org/protobuf/proto"
 )
 

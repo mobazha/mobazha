@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/mobazha/mobazha3.0/internal/net/mbzpb"
 	ggio "github.com/gogo/protobuf/io"
 	inet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 )
 
 type messageSender struct {

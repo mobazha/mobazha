@@ -5,8 +5,8 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/mobazha/mobazha3.0/internal/models"
-	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 // ConvertCurrencyAmount converts the value of one currency into another using the exchange rate.

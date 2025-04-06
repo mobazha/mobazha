@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/mobazha/mobazha3.0/internal/core/coreiface"
-	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/gorilla/mux"
 	"github.com/ipfs/kubo/core/corehttp"
+	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/op/go-logging"
 )
 

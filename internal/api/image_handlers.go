@@ -9,11 +9,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/core/coreiface"
-	"github.com/mobazha/mobazha3.0/internal/models"
 	"github.com/gorilla/mux"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 func (g *Gateway) handleGETImage(w http.ResponseWriter, r *http.Request) {

@@ -1,0 +1,130 @@
+syntax = "proto3";
+option go_package = "../mbzpb";
+package mbzpb;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+message Message {
+    MessageType messageType     = 1;
+    string messageID            = 2;
+    uint32 sequence             = 3;
+    google.protobuf.Any payload = 4;
+
+    enum MessageType {
+        ACK                      = 0;
+        PING                     = 1;
+        PONG                     = 2;
+        CHAT                     = 3;
+        FOLLOW                   = 4;
+        UNFOLLOW                 = 5;
+        STORE                    = 6;
+        ORDER                    = 7;
+        DISPUTE                  = 8;
+        ADDRESS_REQUEST          = 9;
+        ADDRESS_RESPONSE         = 10;
+        CHANNEL_REQUEST          = 11;
+        CHANNEL_RESPONSE         = 12;
+        CHAT_GROUP               = 13;
+    }
+}
+
+message ChatMessage {
+    string orderID                      = 1;
+    string message                      = 2;
+    FileInChat file                     = 3;
+    google.protobuf.Timestamp timestamp = 4;
+    Flag flag                           = 5;
+
+    // Only used when Flag is READ.
+    string readID                       = 6;
+
+    message FileInChat {
+        string type     = 1;
+        string hash     = 2;
+        string filename = 3;
+    }
+
+    enum Flag {
+        MESSAGE = 0;
+        TYPING  = 1;
+        READ    = 2;
+    }
+}
+
+message ChatGroupMessage {
+    string groupID                      = 1;
+    string orderID                      = 2;
+    string groupName                    = 3;
+    string owner                        = 4;
+    repeated string peers               = 5;
+    google.protobuf.Timestamp timestamp = 6;
+    Flag flag                           = 7;
+
+    enum Flag {
+        GROUP_CREATE            = 0;
+        GROUP_UPDATE            = 1;
+        GROUP_DELETE            = 2;
+    }
+}
+
+message StoreMessage {
+    repeated bytes cids = 1;
+}
+
+message AckMessage {
+    string ackedMessageID = 1;
+}
+
+message OrderMessage {
+    string orderID              = 1;
+    MessageType messageType     = 2;
+    google.protobuf.Any message = 3;
+    bytes signature             = 4;
+
+    enum MessageType {
+        ORDER_OPEN         = 0;
+        ORDER_REJECT       = 1;
+        ORDER_CANCEL       = 2;
+        ORDER_CONFIRMATION = 3;
+        RATING_SIGNATURES  = 4;
+        ORDER_FULFILLMENT  = 5;
+        ORDER_COMPLETE     = 6;
+        DISPUTE_OPEN       = 7;
+        DISPUTE_UPDATE     = 8;
+        DISPUTE_CLOSE      = 9;
+        DISPUTE_ACCEPT     = 10;
+        REFUND             = 11;
+        PAYMENT_SENT       = 12;
+        PAYMENT_FINALIZED  = 13;
+    }
+}
+
+message OrderList {
+    repeated OrderMessage messages = 1;
+}
+
+message AddressRequestMessage {
+    string coin = 1;
+}
+
+message AddressResponseMessage {
+    string address = 1;
+    string coin    = 2;
+}
+
+message ChannelRequestMessage {
+    string topic = 1;
+}
+
+message ChannelResponseMessage {
+    string topic        = 1;
+    repeated bytes cids = 2;
+}
+
+
+message Envelope {
+    bytes senderPubkey = 1;
+    Message message    = 2;
+    bytes signature    = 3;
+}

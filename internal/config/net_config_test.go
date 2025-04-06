@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 func TestGenerateJson(t *testing.T) {

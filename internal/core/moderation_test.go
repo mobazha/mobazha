@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/models"
-	"github.com/mobazha/mobazha3.0/internal/models/factory"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha3.0/pkg/models/factory"
 )
 
 func TestOpenBazaarNode_SetAndRemoveSelfAsModerator(t *testing.T) {

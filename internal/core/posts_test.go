@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/models"
-	postsPb "github.com/mobazha/mobazha3.0/internal/posts/pb"
+	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
 )
 
 func TestOpenBazaarNode_AddPost(t *testing.T) {

@@ -5,13 +5,13 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/internal/core/coreiface"
-	"github.com/mobazha/mobazha3.0/internal/models"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
-	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
 	"github.com/mobazha/mobazha3.0/internal/version"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
-	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 func TestSettingsHandlers(t *testing.T) {

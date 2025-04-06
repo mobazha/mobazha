@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/internal/core/coreiface"
 	tnet "github.com/libp2p/go-libp2p-testing/net"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 )
 
 type apiTests []apiTest

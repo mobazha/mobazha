@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/events"
+	"github.com/mobazha/mobazha3.0/pkg/events"
 )
 
 func TestOpenBazaarNode_PingNode(t *testing.T) {

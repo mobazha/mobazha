@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/jarcoal/httpmock"
-	"github.com/mobazha/mobazha3.0/internal/models"
-	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 
 	mcfg "github.com/mobazha/mobazha3.0/internal/config"
 )

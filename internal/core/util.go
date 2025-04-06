@@ -6,7 +6,7 @@ import (
 	"image"
 	"image/jpeg"
 
-	"github.com/mobazha/mobazha3.0/internal/models"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 // NormalizeCurrencyCode standardizes the format for the given currency code.

@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	pb "github.com/mobazha/mobazha3.0/internal/net/mbzpb"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
+	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 )
 
 func TestNetworkService(t *testing.T) {

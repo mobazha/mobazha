@@ -4,14 +4,14 @@ import (
 	"encoding/hex"
 	"math/big"
 
-	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/events"
-	"github.com/mobazha/mobazha3.0/internal/models"
-	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
-	npb "github.com/mobazha/mobazha3.0/internal/net/mbzpb"
-	pb "github.com/mobazha/mobazha3.0/internal/orders/mbzpb"
-	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/internal/orders/utils"
+	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/pkg/errors"
 )
 

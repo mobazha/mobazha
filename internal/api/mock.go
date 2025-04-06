@@ -4,17 +4,18 @@ import (
 	"context"
 	"io"
 
-	"github.com/mobazha/mobazha3.0/internal/core/coreiface"
-	"github.com/mobazha/mobazha3.0/internal/events"
-	"github.com/mobazha/mobazha3.0/internal/models"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
-	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
-	pb "github.com/mobazha/mobazha3.0/internal/orders/mbzpb"
-	postsPb "github.com/mobazha/mobazha3.0/internal/posts/pb"
-	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/kubo/core"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/internal/multiwallet"
+	"github.com/mobazha/mobazha3.0/internal/wallet"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 type mockNode struct {
@@ -102,6 +103,10 @@ type mockNode struct {
 	nodeIDFunc                              func() string
 	identityFunc                            func() peer.ID
 	subscribeEventFunc                      func(event interface{}) (events.Subscription, error)
+	startFunc                               func()
+	destroyNodeFunc                         func()
+	eventBusFunc                            func() events.Bus
+	dbFunc                                  func() database.Database
 	stopFunc                                func(force bool) error
 	setProfileFunc                          func(profile *models.Profile, done chan<- struct{}) error
 	getMyProfileFunc                        func() (*models.Profile, error)
@@ -387,8 +392,20 @@ func (m *mockNode) Identity() peer.ID {
 func (m *mockNode) SubscribeEvent(event interface{}) (events.Subscription, error) {
 	return m.subscribeEventFunc(event)
 }
+func (m *mockNode) Start() {
+	m.startFunc()
+}
 func (m *mockNode) Stop(force bool) error {
 	return m.stopFunc(force)
+}
+func (m *mockNode) DestroyNode() {
+	m.destroyNodeFunc()
+}
+func (m *mockNode) EventBus() events.Bus {
+	return m.eventBusFunc()
+}
+func (m *mockNode) DB() database.Database {
+	return m.dbFunc()
 }
 func (m *mockNode) SetProfile(profile *models.Profile, done chan<- struct{}) error {
 	return m.setProfileFunc(profile, done)

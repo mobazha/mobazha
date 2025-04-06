@@ -11,10 +11,10 @@ import (
 
 	"github.com/h2non/filetype"
 
-	"github.com/mobazha/mobazha3.0/internal/core/coreiface"
-	"github.com/mobazha/mobazha3.0/internal/models"
 	"github.com/gorilla/mux"
 	"github.com/ipfs/go-cid"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 func (g *Gateway) handleGETFile(w http.ResponseWriter, r *http.Request) {

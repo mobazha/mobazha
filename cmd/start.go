@@ -11,10 +11,10 @@ import (
 	"github.com/fatih/color"
 	ipfscore "github.com/ipfs/kubo/core"
 	"github.com/mobazha/mobazha3.0/internal/core"
-	"github.com/mobazha/mobazha3.0/internal/core/coreiface"
-	"github.com/mobazha/mobazha3.0/internal/events"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/version"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/op/go-logging"
 )
 

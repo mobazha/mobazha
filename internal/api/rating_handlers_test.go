@@ -8,11 +8,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/internal/core/coreiface"
-	"github.com/mobazha/mobazha3.0/internal/models"
-	pb "github.com/mobazha/mobazha3.0/internal/orders/mbzpb"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 )
 
 func TestRatingHandlers(t *testing.T) {

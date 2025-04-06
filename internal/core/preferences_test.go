@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/models"
-	"github.com/mobazha/mobazha3.0/internal/models/factory"
+	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha3.0/pkg/models/factory"
 )
 
 func TestOpenBazaarNode_SavePreferences(t *testing.T) {

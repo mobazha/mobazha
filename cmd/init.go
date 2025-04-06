@@ -8,9 +8,9 @@ import (
 
 	"github.com/cpacia/openbazaar3.0/core"
 	"github.com/cpacia/openbazaar3.0/multiwallet"
+	iwallet "github.com/cpacia/openbazaar3.0/multiwallet/wallet-interface"
 	"github.com/cpacia/openbazaar3.0/repo"
 	"github.com/ipfs/kubo/repo/fsrepo"
-	iwallet "github.com/mobazha/wallet-interface"
 )
 
 // Init initializes a new OpenBazaar node at the provided path.

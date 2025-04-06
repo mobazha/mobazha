@@ -13,11 +13,11 @@ import (
 	"github.com/cpacia/openbazaar3.0/core/coreiface"
 	"github.com/cpacia/openbazaar3.0/models"
 	"github.com/cpacia/openbazaar3.0/models/factory"
+	iwallet "github.com/cpacia/openbazaar3.0/multiwallet/wallet-interface"
 	pb "github.com/cpacia/openbazaar3.0/orders/mbzpb"
 	"github.com/cpacia/openbazaar3.0/repo"
 	"github.com/cpacia/openbazaar3.0/wallet"
 	"github.com/libp2p/go-libp2p/core/peer"
-	iwallet "github.com/mobazha/wallet-interface"
 )
 
 // DevNet spins up a network of three nodes running on localhost.

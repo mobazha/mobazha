@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cpacia/openbazaar3.0/core"
-	"github.com/cpacia/openbazaar3.0/multiwallet"
-	iwallet "github.com/cpacia/openbazaar3.0/multiwallet/wallet-interface"
-	"github.com/cpacia/openbazaar3.0/repo"
 	"github.com/ipfs/kubo/repo/fsrepo"
+	"github.com/mobazha/mobazha3.0/internal/core"
+	"github.com/mobazha/mobazha3.0/internal/multiwallet"
+	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
+	"github.com/mobazha/mobazha3.0/internal/repo"
 )
 
 // Init initializes a new OpenBazaar node at the provided path.

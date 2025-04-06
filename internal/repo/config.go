@@ -1,0 +1,333 @@
+package repo
+
+import (
+	"bufio"
+	"bytes"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/mobazha/mobazha3.0/internal/version"
+	ipfslogging "github.com/ipfs/go-log/writer"
+	"github.com/jessevdk/go-flags"
+	"github.com/natefinch/lumberjack"
+	"github.com/op/go-logging"
+)
+
+const (
+	defaultConfigFilename = "mobazha.conf"
+	defaultLogDirname     = "logs"
+	defaultLogFilename    = "mobazha.log"
+)
+
+var (
+	DefaultHomeDir = AppDataDir("mobazha", false)
+
+	fileLogFormat   = logging.MustStringFormatter(`%{time:2006-01-02 T15:04:05.000} [%{level}] [%{module}] %{message}`)
+	stdoutLogFormat = logging.MustStringFormatter(`%{color:reset}%{color}%{time:15:04:05} [%{level}] [%{module}] %{message}`)
+	LogLevelMap     = map[string]logging.Level{
+		"debug":    logging.DEBUG,
+		"info":     logging.INFO,
+		"notice":   logging.NOTICE,
+		"warning":  logging.WARNING,
+		"error":    logging.ERROR,
+		"critical": logging.CRITICAL,
+	}
+
+	DefaultMainnetBootstrapAddrs = []string{
+		"/ip4/23.94.43.104/tcp/4001/p2p/12D3KooWD1GpGf11qVtcDhat8q8rB2du9nohFEFu2DgciUYWY2BC",
+		"/ip4/192.227.231.231/tcp/4001/p2p/12D3KooWSsoZBMiQjvPctdqckrAGukta3q7kAZS7cQRwfwbet7zG",
+		"/ip4/43.157.46.194/tcp/4001/p2p/12D3KooWLSei5eJ8o8mWoS8SsEj5ymL93kFYvNgHA4PpdVhhZyuu",
+		"/ip4/43.153.84.212/tcp/4001/p2p/12D3KooWC37TxYV9UGrcxwi3kmupGaDNC5YTo1BDL7TrWQHPfh5S",
+	}
+
+	DefaultTestnetBootstrapAddrs = []string{
+		"/ip4/23.94.43.104/tcp/4011/p2p/12D3KooWGkqSo8BZh9GMWpgBnFayG99KuAP3k8fNSC6Nc7RwX76y",
+		"/ip4/192.227.231.231/tcp/4011/p2p/12D3KooWAJcabjdM2AQBYn6bNpKPHkoRb6DcutS8z59ZmxyAYZtw",
+		"/ip4/43.157.46.194/tcp/4011/p2p/12D3KooWAREpvFoVdj1G97tHp287okV8srZt8Jmokn1gReNg2nEr",
+		"/ip4/43.153.84.212/tcp/4011/p2p/12D3KooWAmT26qKkGRoWQjLHFbgiRC8wpFLhrGYgSK5a3MCh6ah5",
+	}
+
+	DefaultMainnetSNFServers = []string{
+		"12D3KooWD1GpGf11qVtcDhat8q8rB2du9nohFEFu2DgciUYWY2BC",
+		"12D3KooWSsoZBMiQjvPctdqckrAGukta3q7kAZS7cQRwfwbet7zG",
+		"12D3KooWLSei5eJ8o8mWoS8SsEj5ymL93kFYvNgHA4PpdVhhZyuu",
+		"12D3KooWC37TxYV9UGrcxwi3kmupGaDNC5YTo1BDL7TrWQHPfh5S",
+	}
+
+	DefaultTestnetSNFServers = []string{
+		"12D3KooWGkqSo8BZh9GMWpgBnFayG99KuAP3k8fNSC6Nc7RwX76y",
+		"12D3KooWAJcabjdM2AQBYn6bNpKPHkoRb6DcutS8z59ZmxyAYZtw",
+		"12D3KooWAREpvFoVdj1G97tHp287okV8srZt8Jmokn1gReNg2nEr",
+		"12D3KooWAmT26qKkGRoWQjLHFbgiRC8wpFLhrGYgSK5a3MCh6ah5",
+	}
+)
+
+// Config defines the configuration options for Mobazha.
+//
+// See loadConfig for details on the configuration load process.
+type Config struct {
+	ConfigVersion          uint     `long:"configversion" description:"Configuration file version"`
+	ShowVersion            bool     `short:"v" long:"version" description:"Display version information and exit"`
+	ConfigFile             string   `short:"C" long:"configfile" description:"Path to configuration file"`
+	DataDir                string   `short:"d" long:"datadir" description:"Directory to store data"`
+	LogDir                 string   `long:"logdir" description:"Directory to log output."`
+	LogLevel               string   `short:"l" long:"loglevel" description:"set the logging level [debug, info, notice, warning, error, critical]" default:"info"`
+	BoostrapAddrs          []string `long:"bootstrapaddr" description:"Override the default bootstrap addresses with the provided values"`
+	SwarmAddrs             []string `long:"swarmaddr" description:"Override the default swarm addresses with the provided values"`
+	GatewayAddr            string   `long:"gatewayaddr" description:"Override the default gateway address with the provided value"`
+	StoreAndForwardServers []string `long:"snfserver" description:"A peerID of a store and forward server to use for receiving messages while offline."`
+	Testnet                bool     `short:"t" long:"testnet" description:"Use the test network"`
+	DisableNATPortMap      bool     `long:"noupnp" description:"Disable use of upnp."`
+	IPNSQuorum             uint     `long:"ipnsquorum" description:"The size of the IPNS quorum to use. Smaller is faster but less up-to-date." default:"2"`
+	NoIPNSPubsub           bool     `long:"noipnsps" description:"Disable use of IPNS pubsub."`
+	UseSSL                 bool     `long:"ssl" description:"Use SSL on the API"`
+	SSLCertFile            string   `long:"sslcertfile" description:"Path to the SSL certificate file"`
+	SSLKeyFile             string   `long:"sslkeyfile" description:"Path to the SSL key file"`
+	APIUsername            string   `short:"u" long:"apiusername" description:"The username to use with the API authentication"`
+	APIPassword            string   `short:"P" long:"apipassword" description:"The password to use with the API authentication"`
+	APICookie              string   `long:"apicookie" description:"A cookie to use for authentication in addition or in place of the un/pw. If set the cookie must be put in the request header."`
+	APIAllowedIPs          []string `long:"allowedip" description:"Only allow API connections from these IP addresses"`
+	APIAllowAllOrigins     bool     `long:"apiallowallorigins" description:"Cors option to allow all origins on the API."`
+	APIPublicGateway       bool     `long:"publicgateway" description:"When this option is used only public GET methods will be allowed in the API"`
+	Profile                string   `long:"profile" description:"Enable HTTP profiling on given port -- NOTE port must be between 1024 and 65536"`
+	CPUProfile             string   `long:"cpuprofile" description:"Write CPU profile to the specified file"`
+	IPFSOnly               bool     `long:"ipfsonly" description:"Disable all Mobazha functionality except the IPFS networking."`
+	EnabledWallets         []string `long:"enabledwallet" description:"Only enable wallets in this list. Available wallets: [BTC, BCH, LTC, ZEC, ETH, BNB, MATICUSDT, MATICUSDC]"`
+	UserAgentComment       string   `long:"uacomment" description:"Comment to add to the user agent."`
+	EnableSNFServer        bool     `long:"enablesnfserver" description:"Enable this node to operate as a store-and-forward server."`
+	SNFServerPeers         []string `long:"snfpeer" description:"A list of other store-and-forward servers to replicate snf data to. This is only used when the snf server is enabled."`
+	Tor                    bool     `long:"tor" description:"Proxy all incoming and outgoing connections over the Tor network exclusively."`
+	DualStack              bool     `long:"dualstack" description:"Listen for incoming connections via Tor in addition to via the clearnet. This mode is not private."`
+	DHTClientOnly          bool     `long:"dhtclientonly" description:"Disable participating in serving data in the DHT. This should be used if your node is undialable."`
+}
+
+// LoadConfig initializes and parses the config using a config file and command
+// line options.
+//
+// The configuration proceeds as follows:
+//  1. Start with a default config with sane settings
+//  2. Pre-parse the command line to check for an alternative config file
+//  3. Load configuration file overwriting defaults with any specified options
+//  4. Parse CLI options and overwrite/add any specified options
+//
+// The above results in Mobazha functioning properly without any config settings
+// while still allowing the user to override settings with config files and
+// command line options.  Command line options always take precedence.
+func LoadConfig(dataDir string) (*Config, error) {
+	// Pre-parse the command line options to see if an alternative config
+	// file or the version flag was specified.  Any errors aside from the
+	// help message error can be ignored here since they will be caught by
+	// the final parse below.
+	preCfg := Config{}
+	preParser := flags.NewParser(&preCfg, flags.HelpFlag)
+	_, err := preParser.Parse()
+	if err != nil {
+		if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {
+			return nil, err
+		}
+	}
+
+	if preCfg.DataDir != "" {
+		preCfg.ConfigFile = filepath.Join(preCfg.DataDir, defaultConfigFilename)
+	}
+
+	// Show the version and exit if the version flag was specified.
+	appName := filepath.Base(os.Args[0])
+	appName = strings.TrimSuffix(appName, filepath.Ext(appName))
+	usageMessage := fmt.Sprintf("Use %s -h to show usage", appName)
+	if preCfg.ShowVersion {
+		fmt.Println(appName, "version", version.String())
+		os.Exit(0)
+	}
+
+	// Default config.
+	cfg := preCfg
+	if dataDir != "" {
+		cfg.DataDir = dataDir
+		if preCfg.Testnet {
+			cfg.DataDir = dataDir + "-testnet"
+		}
+	} else if preCfg.DataDir == "" {
+		cfg.DataDir = DefaultHomeDir
+		if preCfg.Testnet {
+			cfg.DataDir = DefaultHomeDir + "-testnet"
+		}
+	}
+	if preCfg.ConfigFile == "" {
+		cfg.ConfigFile = filepath.Join(cfg.DataDir, defaultConfigFilename)
+	}
+
+	// Load additional config from file.
+	var configFileError error
+	parser := flags.NewParser(&cfg, flags.Default)
+	if _, err := os.Stat(cfg.ConfigFile); os.IsNotExist(err) {
+		err := createDefaultConfigFile(cfg.ConfigFile, cfg.Testnet)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating a default config file: %v\n", err)
+			return nil, err
+		}
+	}
+
+	err = flags.NewIniParser(parser).ParseFile(cfg.ConfigFile)
+	if err != nil {
+		if _, ok := err.(*os.PathError); !ok {
+			fmt.Fprintf(os.Stderr, "Error parsing config file: %v\n", err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, err
+		}
+		configFileError = err
+	}
+
+	checkConfigFileMigration := func() error {
+		if cfg.ConfigVersion < 4 {
+			err = os.Rename(cfg.ConfigFile, cfg.ConfigFile+"_bak_"+time.Now().Format("2006-01-02"))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error backup config file: %v\n", err)
+				return err
+			}
+
+			err := createDefaultConfigFile(cfg.ConfigFile, cfg.Testnet)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error creating a default config file: %v\n", err)
+				return err
+			}
+
+			err = flags.NewIniParser(parser).ParseFile(cfg.ConfigFile)
+			if err != nil {
+				if _, ok := err.(*os.PathError); !ok {
+					fmt.Fprintf(os.Stderr, "Error parsing config file: %v\n", err)
+					fmt.Fprintln(os.Stderr, usageMessage)
+					return err
+				}
+				configFileError = err
+			}
+		}
+		return nil
+	}
+	err = checkConfigFileMigration()
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.Tor && cfg.DualStack {
+		return nil, errors.New("tor and dualstack options cannot be used together")
+	}
+
+	_, ok := LogLevelMap[strings.ToLower(cfg.LogLevel)]
+	if !ok {
+		return nil, errors.New("invalid log level")
+	}
+
+	cfg.DataDir = cleanAndExpandPath(cfg.DataDir)
+	if cfg.LogDir == "" {
+		cfg.LogDir = cleanAndExpandPath(path.Join(cfg.DataDir, "logs"))
+	}
+
+	// Validate profile port number
+	if cfg.Profile != "" {
+		profilePort, err := strconv.Atoi(cfg.Profile)
+		if err != nil || profilePort < 1024 || profilePort > 65535 {
+			return nil, fmt.Errorf("%d: The profile port must be between 1024 and 65535", profilePort)
+		}
+	}
+
+	// Warn about missing config file only after all other configuration is
+	// done.  This prevents the warning on help messages and invalid
+	// options.  Note this should go directly before the return.
+	if configFileError != nil {
+		log.Errorf("%v", configFileError)
+	}
+	return &cfg, nil
+}
+
+// SetupLogging sets up logging for this node
+func SetupLogging(logDir, logLevel string) {
+	backendStdout := logging.NewLogBackend(os.Stdout, "", 0)
+	backendStdoutFormatter := logging.NewBackendFormatter(backendStdout, stdoutLogFormat)
+
+	if logDir != "" {
+		rotator := &lumberjack.Logger{
+			Filename:   path.Join(logDir, defaultLogFilename),
+			MaxSize:    10, // Megabytes
+			MaxBackups: 3,
+			MaxAge:     30, // Days
+		}
+
+		backendFile := logging.NewLogBackend(rotator, "", 0)
+		backendFileFormatter := logging.NewBackendFormatter(backendFile, fileLogFormat)
+		logging.SetBackend(backendStdoutFormatter, backendFileFormatter)
+
+		mirrorWriter := ipfslogging.NewMirrorWriter()
+		w2 := &lumberjack.Logger{
+			Filename:   path.Join(logDir, "ipfs.log"),
+			MaxSize:    10, // Megabytes
+			MaxBackups: 3,
+			MaxAge:     30, // Days
+		}
+		mirrorWriter.AddWriter(w2)
+	} else {
+		logging.SetBackend(backendStdoutFormatter)
+	}
+	logging.SetLevel(LogLevelMap[strings.ToLower(logLevel)], "")
+}
+
+// createDefaultConfig copies the sample-bchd.conf content to the given destination path,
+// and populates it with some randomly generated RPC username and password.
+func createDefaultConfigFile(destinationPath string, testnet bool) error {
+	// Create the destination directory if it does not exists
+	err := os.MkdirAll(filepath.Dir(destinationPath), 0700)
+	if err != nil {
+		return err
+	}
+
+	sampleBytes, err := Asset("sample-mobazha.conf")
+	if err != nil {
+		return err
+	}
+	src := bytes.NewReader(sampleBytes)
+
+	dest, err := os.OpenFile(destinationPath,
+		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	defer dest.Close()
+
+	// We copy every line from the sample config file to the destination,
+	// only replacing the two lines for rpcuser and rpcpass
+	reader := bufio.NewReader(src)
+	for err != io.EOF {
+		var line string
+		line, err = reader.ReadString('\n')
+		if err != nil && err != io.EOF {
+			return err
+		}
+
+		if _, err := dest.WriteString(line); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// cleanAndExpandPath expands environment variables and leading ~ in the
+// passed path, cleans the result, and returns it.
+func cleanAndExpandPath(path string) string {
+	// Expand initial ~ to OS specific home directory.
+	if strings.HasPrefix(path, "~") {
+		homeDir := filepath.Dir(DefaultHomeDir)
+		path = strings.Replace(path, "~", homeDir, 1)
+	}
+
+	// NOTE: The os.ExpandEnv doesn't work with Windows-style %VARIABLE%,
+	// but they variables can still be expanded via POSIX-style $VARIABLE.
+	return filepath.Clean(os.ExpandEnv(path))
+}

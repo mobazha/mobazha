@@ -9,14 +9,14 @@ import (
 	"path"
 	"time"
 
-	"github.com/cpacia/openbazaar3.0/core"
-	"github.com/cpacia/openbazaar3.0/core/coreiface"
-	"github.com/cpacia/openbazaar3.0/models"
-	"github.com/cpacia/openbazaar3.0/models/factory"
-	iwallet "github.com/cpacia/openbazaar3.0/multiwallet/wallet-interface"
-	pb "github.com/cpacia/openbazaar3.0/orders/mbzpb"
-	"github.com/cpacia/openbazaar3.0/repo"
-	"github.com/cpacia/openbazaar3.0/wallet"
+	"github.com/mobazha/mobazha3.0/internal/core"
+	"github.com/mobazha/mobazha3.0/internal/core/coreiface"
+	"github.com/mobazha/mobazha3.0/internal/models"
+	"github.com/mobazha/mobazha3.0/internal/models/factory"
+	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
+	pb "github.com/mobazha/mobazha3.0/internal/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 

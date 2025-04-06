@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cpacia/openbazaar3.0/repo"
+	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/ipfs/kubo/repo/fsrepo"
 )
 

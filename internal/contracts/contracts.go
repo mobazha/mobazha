@@ -1,0 +1,64 @@
+package contracts
+
+import (
+	"github.com/mobazha/mobazha3.0/internal/multiwallet"
+	iwallet "github.com/mobazha/mobazha3.0/internal/multiwallet/wallet-interface"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	peer "github.com/libp2p/go-libp2p/core/peer"
+)
+
+type Contracts struct {
+	cfg         multiwallet.Config
+	rpcEndpoint string
+	client      *ethclient.Client
+}
+
+func NewContracts(opts ...multiwallet.Option) (*Contracts, error) {
+	var cfg multiwallet.Config
+	if err := cfg.Apply(append([]multiwallet.Option{multiwallet.Defaults}, opts...)...); err != nil {
+		return nil, err
+	}
+
+	rpcEndpoint := cfg.WalletAPIs[iwallet.CtMATIC].MainnetRpc
+	if cfg.UseTestnet {
+		rpcEndpoint = cfg.WalletAPIs[iwallet.CtMATIC].TestnetRpc
+	}
+
+	client, err := ethclient.Dial(rpcEndpoint[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return &Contracts{
+		cfg:         cfg,
+		rpcEndpoint: rpcEndpoint[0],
+		client:      client,
+	}, nil
+}
+
+func (contracts *Contracts) GetBlockedIds() ([]peer.ID, error) {
+	address := common.HexToAddress(MATIC_BAN_NODES_CONTRACT_ADDRESS)
+	if contracts.cfg.UseTestnet {
+		address = common.HexToAddress(MATIC_BAN_NODES_CONTRACT_ADDRESS_TESTNET)
+	}
+	banNodesInstance, err := NewBanNodes(address, contracts.client)
+	if err != nil {
+		return nil, err
+	}
+
+	blockedIds, err := banNodesInstance.GetBlockedIds(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var ret []peer.ID
+	for _, pid := range blockedIds {
+		id, err := peer.Decode(pid)
+		if err != nil {
+			continue
+		}
+		ret = append(ret, id)
+	}
+	return ret, nil
+}

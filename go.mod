@@ -1,4 +1,4 @@
-module github.com/cpacia/openbazaar3.0
+module github.com/mobazha/mobazha3.0
 
 go 1.22
 

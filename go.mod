@@ -3,19 +3,9 @@ module github.com/cpacia/openbazaar3.0
 go 1.22
 
 replace (
-	github.com/cpacia/go-onion-transport => /Users/mingfeng/other/ob/go-onion-transport
-	github.com/cpacia/go-store-and-forward => /Users/mingfeng/other/ob/go-store-and-forward
-	github.com/cpacia/proxyclient => /Users/mingfeng/other/ob/proxyclient
+	github.com/ethereum/go-ethereum => /Users/mingfeng/go/src/github.com/ethereum/go-ethereum
 
 	github.com/ipfs/kubo => /Users/mingfeng/go/src/github.com/mobazha/kubo
-
-	github.com/mobazha/config => /Users/mingfeng/go/src/github.com/mobazha/config
-
-	github.com/mobazha/ethereum-watcher => /Users/mingfeng/other/ob/ethereum-watcher
-
-	github.com/mobazha/go-ethwallet => /Users/mingfeng/other/ob/go-bscwallet
-	github.com/mobazha/multiwallet => /Users/mingfeng/other/ob/multiwallet
-	github.com/mobazha/wallet-interface => /Users/mingfeng/other/ob/wallet-interface
 
 	github.com/multiformats/go-multiaddr => /Users/mingfeng/go/src/github.com/multiformats/go-multiaddr
 	github.com/nanmu42/etherscan-api => /Users/mingfeng/go/src/github.com/mobazha/etherscan-api
@@ -23,20 +13,29 @@ replace (
 )
 
 require (
+	github.com/OpenBazaar/golang-socketio v0.0.0-20200109001351-4147b5f0d294
 	github.com/bep/debounce v1.2.1
 	github.com/btcsuite/btcd v0.23.4
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2
 	github.com/btcsuite/btcd/btcutil v1.1.3
-	github.com/cpacia/go-onion-transport v0.0.0-00010101000000-000000000000
-	github.com/cpacia/go-store-and-forward v0.0.0-00010101000000-000000000000
-	github.com/cpacia/proxyclient v0.0.0-20200503052644-89c0e5cb8be7
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
+	github.com/btcsuite/btcwallet/wallet/txauthor v1.3.3
+	github.com/btcsuite/btcwallet/wallet/txrules v1.2.0
+	github.com/btcsuite/btcwallet/wallet/txsizes v1.2.3
+	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cretz/bine v0.2.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/ethereum/go-ethereum v1.13.14
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/fatih/color v1.13.0
+	github.com/gagliardetto/binary v0.8.0
+	github.com/gagliardetto/solana-go v1.12.0
+	github.com/gcash/bchd v0.19.0
+	github.com/gcash/bchutil v0.0.0-20210113190856-6ea28dff4000
+	github.com/gcash/bchwallet v0.10.0
 	github.com/go-resty/resty/v2 v2.15.3
 	github.com/gogo/protobuf v1.3.2
+	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
@@ -45,6 +44,7 @@ require (
 	github.com/ipfs/boxo v0.23.0
 	github.com/ipfs/fs-repo-migrations/tools v0.0.0-20230628085149-3fc3a1aa00e4
 	github.com/ipfs/go-cid v0.4.1
+	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ipld-format v0.6.0
 	github.com/ipfs/go-log v1.0.5
 	github.com/ipfs/kubo v0.29.0
@@ -57,22 +57,35 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.11.0
 	github.com/libp2p/go-libp2p-testing v0.12.0
 	github.com/libp2p/go-msgio v0.3.0
+	github.com/ltcsuite/ltcd v0.22.1-beta
+	github.com/ltcsuite/ltcd/btcec/v2 v2.1.0
+	github.com/ltcsuite/ltcd/ltcutil v1.1.0
+	github.com/ltcsuite/ltcwallet/wallet/txauthor v1.1.0
+	github.com/ltcsuite/ltcwallet/wallet/txrules v1.2.0
+	github.com/martinboehm/btcd v0.0.0-20221101112928-408689e15809
+	github.com/martinboehm/btcutil v0.0.0-20211010173611-6ef1889c1819
 	github.com/microcosm-cc/bluemonday v1.0.21
-	github.com/mobazha/config v0.0.0-20241021020414-f0619948373d
-	github.com/mobazha/go-ethwallet v0.0.0-20230716015322-58c84d02d1b1
-	github.com/mobazha/multiwallet v0.0.0-00010101000000-000000000000
-	github.com/mobazha/wallet-interface v1.0.0
+	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
+	github.com/mobazha/ethereum-watcher v0.0.0-20240109073302-d1cf31cdeef6
+	github.com/mobazha/go-ethereum-hdwallet v0.1.5
+	github.com/multiformats/go-base32 v0.1.0
 	github.com/multiformats/go-multiaddr v0.13.0
 	github.com/multiformats/go-multiaddr-dns v0.3.1
+	github.com/multiformats/go-multiaddr-fmt v0.1.0
 	github.com/multiformats/go-multihash v0.2.3
+	github.com/nanmu42/etherscan-api v1.10.0
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pkg/errors v0.9.1
+	github.com/shopspring/decimal v1.3.1
+	github.com/sirupsen/logrus v1.9.3
+	github.com/stretchr/testify v1.9.0
 	github.com/teserakt-io/golang-ed25519 v0.0.0-20210104091850-3888c087a4c8
 	github.com/tyler-smith/go-bip39 v1.1.0
 	go.uber.org/fx v1.22.1
-	golang.org/x/crypto v0.25.0
+	golang.org/x/crypto v0.33.0
 	golang.org/x/net v0.27.0
+	google.golang.org/grpc v1.64.0
 	google.golang.org/protobuf v1.34.2
 	gorm.io/driver/sqlite v1.4.4
 	gorm.io/gorm v1.24.5
@@ -81,28 +94,25 @@ require (
 require (
 	bazil.org/fuse v0.0.0-20200407214033-5883e5a4b512 // indirect
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2 // indirect
+	filippo.io/edwards25519 v1.0.0-rc.1 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/Groestlcoin/go-groestl-hash v0.1.0 // indirect
 	github.com/Jorropo/jsync v1.0.1 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
-	github.com/OpenBazaar/golang-socketio v0.0.0-20200109001351-4147b5f0d294 // indirect
 	github.com/aead/siphash v1.0.1 // indirect
 	github.com/alecthomas/units v0.0.0-20240626203959-61d1e3462e30 // indirect
 	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
+	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.13.0 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
-	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2 // indirect
+	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f // indirect
-	github.com/btcsuite/btcwallet/wallet/txauthor v1.3.3 // indirect
-	github.com/btcsuite/btcwallet/wallet/txrules v1.2.0 // indirect
-	github.com/btcsuite/btcwallet/wallet/txsizes v1.2.3 // indirect
 	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
-	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/ceramicnetwork/go-dag-jose v0.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cheggaaa/pb v1.0.29 // indirect
@@ -133,10 +143,8 @@ require (
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.4 // indirect
-	github.com/gcash/bchd v0.19.0 // indirect
+	github.com/gagliardetto/treeout v0.1.4 // indirect
 	github.com/gcash/bchlog v0.0.0-20180913005452-b4f036f92fa6 // indirect
-	github.com/gcash/bchutil v0.0.0-20210113190856-6ea28dff4000 // indirect
-	github.com/gcash/bchwallet v0.10.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
@@ -146,11 +154,11 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/glog v1.2.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
+	github.com/gorilla/rpc v1.2.0 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -167,7 +175,6 @@ require (
 	github.com/ipfs/go-block-format v0.2.0 // indirect
 	github.com/ipfs/go-blockservice v0.5.2 // indirect
 	github.com/ipfs/go-cidutil v0.1.0 // indirect
-	github.com/ipfs/go-datastore v0.6.0 // indirect
 	github.com/ipfs/go-ds-badger v0.3.0 // indirect
 	github.com/ipfs/go-ds-flatfs v0.5.1 // indirect
 	github.com/ipfs/go-ds-leveldb v0.5.0 // indirect
@@ -199,6 +206,7 @@ require (
 	github.com/jbenet/goprocess v0.1.4 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kkdai/bstream v1.0.0 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
@@ -220,16 +228,10 @@ require (
 	github.com/libp2p/go-reuseport v0.4.0 // indirect
 	github.com/libp2p/go-yamux/v4 v4.0.1 // indirect
 	github.com/libp2p/zeroconf/v2 v2.2.0 // indirect
-	github.com/ltcsuite/ltcd v0.22.1-beta // indirect
-	github.com/ltcsuite/ltcd/btcec/v2 v2.1.0 // indirect
-	github.com/ltcsuite/ltcd/ltcutil v1.1.0 // indirect
-	github.com/ltcsuite/ltcwallet/wallet/txauthor v1.1.0 // indirect
-	github.com/ltcsuite/ltcwallet/wallet/txrules v1.2.0 // indirect
+	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/ltcsuite/ltcwallet/wallet/txsizes v1.1.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
-	github.com/martinboehm/btcd v0.0.0-20221101112928-408689e15809 // indirect
-	github.com/martinboehm/btcutil v0.0.0-20211010173611-6ef1889c1819 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
@@ -238,22 +240,20 @@ require (
 	github.com/miekg/dns v1.1.61 // indirect
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
-	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
+	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
-	github.com/mobazha/ethereum-watcher v0.0.0-20240109073302-d1cf31cdeef6 // indirect
-	github.com/mobazha/go-ethereum-hdwallet v0.1.5 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/mostynb/zstdpool-freelist v0.0.0-20201229113212-927304c0c3b1 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
-	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect
-	github.com/multiformats/go-multiaddr-fmt v0.1.0 // indirect
 	github.com/multiformats/go-multibase v0.2.0 // indirect
 	github.com/multiformats/go-multicodec v0.9.0 // indirect
 	github.com/multiformats/go-multistream v0.5.0 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/nanmu42/etherscan-api v1.10.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.19.1 // indirect
 	github.com/opencontainers/runtime-spec v1.2.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
@@ -291,10 +291,9 @@ require (
 	github.com/rs/cors v1.10.1 // indirect
 	github.com/samber/lo v1.46.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
-	github.com/shopspring/decimal v1.3.1 // indirect
-	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
-	github.com/stretchr/testify v1.9.0 // indirect
+	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/supranational/blst v0.3.11 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d // indirect
 	github.com/tklauser/go-sysconf v0.3.13 // indirect
@@ -311,6 +310,7 @@ require (
 	github.com/wlynxg/anet v0.0.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	github.com/zquestz/grab v0.0.0-20190224022517-abcee96e61b1 // indirect
+	go.mongodb.org/mongo-driver v1.12.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.52.0 // indirect
 	go.opentelemetry.io/otel v1.28.0 // indirect
@@ -327,21 +327,22 @@ require (
 	go.uber.org/dig v1.17.1 // indirect
 	go.uber.org/mock v0.4.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/ratelimit v0.2.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/image v0.16.0 // indirect
-	golang.org/x/mobile v0.0.0-20240506190922-a1a533f289d3 // indirect
 	golang.org/x/mod v0.19.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
-	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/sys v0.24.0 // indirect
-	golang.org/x/text v0.16.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/time v0.6.0 // indirect
 	golang.org/x/tools v0.23.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240716161551-93cc26a95ae9 // indirect
 	gonum.org/v1/gonum v0.15.0 // indirect
 	google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4 // indirect
-	google.golang.org/grpc v1.64.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.5.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

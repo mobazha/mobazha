@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/cpacia/openbazaar3.0/core"
+	"github.com/cpacia/openbazaar3.0/multiwallet"
 	"github.com/cpacia/openbazaar3.0/repo"
 	"github.com/ipfs/kubo/repo/fsrepo"
-	"github.com/mobazha/multiwallet"
 	iwallet "github.com/mobazha/wallet-interface"
 )
 

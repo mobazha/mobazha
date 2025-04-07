@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	config "github.com/ipfs/kubo/config"
-	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 

@@ -17,6 +17,20 @@ type FeatureManager struct {
 	mu      sync.RWMutex
 }
 
+// 全局 FeatureManager 实例
+var (
+	globalFeatureManager     *FeatureManager
+	globalFeatureManagerOnce sync.Once
+)
+
+// GetGlobalFeatureManager 获取全局 FeatureManager 实例
+func GetGlobalFeatureManager() *FeatureManager {
+	globalFeatureManagerOnce.Do(func() {
+		globalFeatureManager = NewFeatureManager()
+	})
+	return globalFeatureManager
+}
+
 // NewFeatureManager 创建一个新的功能开关管理器
 func NewFeatureManager() *FeatureManager {
 	return &FeatureManager{
@@ -48,18 +62,6 @@ func (m *FeatureManager) Enable(name Feature) error {
 
 	if toggle, exists := m.toggles[name]; exists {
 		toggle.enabled = true
-		return nil
-	}
-	return fmt.Errorf("功能开关 %s 不存在", name)
-}
-
-// Disable 禁用指定的功能
-func (m *FeatureManager) Disable(name Feature) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if toggle, exists := m.toggles[name]; exists {
-		toggle.enabled = false
 		return nil
 	}
 	return fmt.Errorf("功能开关 %s 不存在", name)

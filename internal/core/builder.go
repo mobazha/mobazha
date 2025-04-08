@@ -43,6 +43,7 @@ import (
 	oniontransport "github.com/mobazha/mobazha3.0/libs/onion-transport"
 	"github.com/mobazha/mobazha3.0/libs/proxyclient"
 	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -313,6 +314,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 			ipnsResolver:         netConfig.GetIPNSResolver(),
 			shutdownTorFunc:      shutdownTorFunc,
 			eventBus:             events.NewBus(),
+			featureManager:       pkgconfig.GetGlobalFeatureManager(),
 			initialBootstrapChan: make(chan struct{}),
 			shutdown:             make(chan struct{}),
 		}
@@ -432,6 +434,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 		channels:               make(map[string]*channels.Channel),
 		shutdownTorFunc:        shutdownTorFunc,
 		publishChan:            make(chan pubCloser),
+		featureManager:         pkgconfig.GetGlobalFeatureManager(),
 		initialBootstrapChan:   make(chan struct{}),
 		shutdown:               make(chan struct{}),
 	}
@@ -476,6 +479,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 		ExchangeRateProvider: erp,
 		EventBus:             bus,
 		CalcCIDFunc:          obNode.cid,
+		FeatureManager:       obNode.featureManager,
 	})
 
 	obNode.registerHandlers()
@@ -622,6 +626,11 @@ func (n *OpenBazaarNode) listenNetworkEvents() {
 }
 
 func (n *OpenBazaarNode) listenWalletEvents() {
+	if n.featureManager.IsEnabled(pkgconfig.FeatureNoBuildinWallet) {
+		log.Info("No buildin wallet, skipping buildin wallet info update")
+		return
+	}
+
 	blockChan := make(chan iwallet.CoinType)
 	txChan := make(chan iwallet.CoinType)
 	for ct, w := range n.multiwallet {

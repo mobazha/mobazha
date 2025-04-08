@@ -17,6 +17,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/multiwallet/coins/eth/util"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
@@ -46,6 +47,7 @@ type Config struct {
 	ExchangeRateProvider *wallet.ExchangeRateProvider
 	EventBus             events.Bus
 	CalcCIDFunc          func(file []byte) (cid.Cid, error)
+	FeatureManager       *pkgconfig.FeatureManager
 }
 
 // OrderProcessor is used to deterministically process orders.
@@ -59,6 +61,7 @@ type OrderProcessor struct {
 	erp                *wallet.ExchangeRateProvider
 	bus                events.Bus
 	calcCIDFunc        func(file []byte) (cid.Cid, error)
+	featureManager     *pkgconfig.FeatureManager
 	shutdown           chan struct{}
 }
 
@@ -74,6 +77,7 @@ func NewOrderProcessor(cfg *Config) *OrderProcessor {
 		erp:                cfg.ExchangeRateProvider,
 		bus:                cfg.EventBus,
 		calcCIDFunc:        cfg.CalcCIDFunc,
+		featureManager:     cfg.FeatureManager,
 		shutdown:           make(chan struct{}),
 	}
 }
@@ -81,6 +85,13 @@ func NewOrderProcessor(cfg *Config) *OrderProcessor {
 // Start begins listening for transactions from the wallets that pertain to our
 // orders. When we find one we record the payment.
 func (op *OrderProcessor) Start() {
+	if op.featureManager.IsEnabled(pkgconfig.FeatureNoBuildinWallet) {
+		log.Info("No buildin wallet, skipping buildin wallet transaction listening")
+		// if new tx, directly call processWalletTransaction()
+		// op.processWalletTransaction(tx)
+		return
+	}
+
 	for _, wallet := range op.multiwallet {
 		go func(w iwallet.Wallet) {
 			sub := w.SubscribeTransactions()

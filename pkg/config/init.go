@@ -8,7 +8,7 @@ import (
 func InitFeatureManager() {
 	fm := GetGlobalFeatureManager()
 
-	fm.RegisterToggle(FeatureBuildinWalletPaymentDisabled, true)
+	fm.RegisterToggle(FeatureNoBuildinWallet, true)
 
 	allToggles := fm.GetAllToggles()
 	log.Println("功能开关初始化完成，当前所有功能开关状态：")

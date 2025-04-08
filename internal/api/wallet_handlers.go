@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -509,6 +510,11 @@ func (g *Gateway) handleGETFees(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePOSTResyncOrders(w http.ResponseWriter, r *http.Request) {
+	if g.featureManager.IsEnabled(pkgconfig.FeatureNoBuildinWallet) {
+		sanitizedStringResponse(w, `{}`)
+		return
+	}
+
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	mw := node.Multiwallet()
@@ -533,6 +539,11 @@ func (g *Gateway) handlePOSTResyncOrders(w http.ResponseWriter, r *http.Request)
 }
 
 func (g *Gateway) handlePOSTResyncBlockchain(w http.ResponseWriter, r *http.Request) {
+	if g.featureManager.IsEnabled(pkgconfig.FeatureNoBuildinWallet) {
+		sanitizedStringResponse(w, `{}`)
+		return
+	}
+
 	coinType := mux.Vars(r)["coinType"]
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)

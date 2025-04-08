@@ -20,6 +20,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -130,6 +131,8 @@ type OpenBazaarNode struct {
 	// channels holds active chat channels
 	channels map[string]*channels.Channel
 
+	featureManager *pkgconfig.FeatureManager
+
 	// shutdownTorFunc is used to shutdown the embedded Tor client.
 	shutdownTorFunc func() error
 
@@ -165,12 +168,20 @@ func (n *OpenBazaarNode) Start() {
 		go n.syncMessages()
 		go func() {
 			n.multiwallet.Start()
-			n.listenWalletEvents()
+
+			if !n.featureManager.IsEnabled(pkgconfig.FeatureNoBuildinWallet) {
+				n.listenWalletEvents()
+			} else {
+				log.Info("No buildin wallet, skipping buildin wallet info update")
+			}
 
 			if n.IsDefaultNode() {
 				go n.SharedManager().Start()
 			}
-			n.orderProcessor.CheckForMorePayments(false)
+
+			if !n.featureManager.IsEnabled(pkgconfig.FeatureNoBuildinWallet) {
+				n.orderProcessor.CheckForMorePayments(false)
+			}
 		}()
 
 		go n.notifier.Start()

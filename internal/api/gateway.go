@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/ipfs/kubo/core/corehttp"
 	"github.com/mobazha/mobazha3.0/internal/repo"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/op/go-logging"
 )
@@ -35,14 +36,15 @@ type GatewayConfig struct {
 
 // Gateway represents an HTTP API gateway
 type Gateway struct {
-	listener    net.Listener
-	nodeManager coreiface.NodeManagerIface
-	handler     http.Handler
-	config      *GatewayConfig
-	hubs        map[string]*hub
-	hubsMtx     sync.RWMutex
-	shutdown    chan struct{}
-	mu          sync.RWMutex
+	listener       net.Listener
+	nodeManager    coreiface.NodeManagerIface
+	handler        http.Handler
+	config         *GatewayConfig
+	hubs           map[string]*hub
+	hubsMtx        sync.RWMutex
+	shutdown       chan struct{}
+	mu             sync.RWMutex
+	featureManager *pkgconfig.FeatureManager
 }
 
 // NewGateway instantiates a new gateway. We multiplex the ob API along with the
@@ -50,12 +52,13 @@ type Gateway struct {
 func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig, options ...corehttp.ServeOption) (*Gateway, error) {
 	var (
 		g = &Gateway{
-			nodeManager: nodeManager,
-			config:      config,
-			listener:    config.Listener,
-			shutdown:    make(chan struct{}),
-			hubs:        make(map[string]*hub),
-			hubsMtx:     sync.RWMutex{},
+			nodeManager:    nodeManager,
+			config:         config,
+			listener:       config.Listener,
+			shutdown:       make(chan struct{}),
+			hubs:           make(map[string]*hub),
+			hubsMtx:        sync.RWMutex{},
+			featureManager: pkgconfig.GetGlobalFeatureManager(),
 		}
 		topMux = http.NewServeMux()
 	)

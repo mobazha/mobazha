@@ -25,6 +25,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -141,6 +142,7 @@ func MockNode() (*OpenBazaarNode, error) {
 		channels:             make(map[string]*channels.Channel),
 		initialBootstrapChan: make(chan struct{}),
 		publishChan:          make(chan pubCloser),
+		featureManager:       pkgconfig.GetGlobalFeatureManager(),
 	}
 
 	node.messenger, err = net.NewMessenger(&net.MessengerConfig{
@@ -162,6 +164,7 @@ func MockNode() (*OpenBazaarNode, error) {
 		ExchangeRateProvider: erp,
 		EventBus:             bus,
 		CalcCIDFunc:          node.cid,
+		FeatureManager:       node.featureManager,
 	})
 
 	node.registerHandlers()
@@ -301,6 +304,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			channels:             make(map[string]*channels.Channel),
 			initialBootstrapChan: make(chan struct{}),
 			publishChan:          make(chan pubCloser),
+			featureManager:       pkgconfig.GetGlobalFeatureManager(),
 		}
 
 		node.messenger, err = net.NewMessenger(&net.MessengerConfig{
@@ -322,6 +326,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			ExchangeRateProvider: erp,
 			EventBus:             bus,
 			CalcCIDFunc:          node.cid,
+			FeatureManager:       node.featureManager,
 		})
 
 		node.registerHandlers()

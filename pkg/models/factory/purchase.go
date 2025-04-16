@@ -14,7 +14,6 @@ func NewPurchase() *models.Purchase {
 		PostalCode:   "90210",
 		CountryCode:  pb.CountryCode_UNITED_STATES.String(),
 		AddressNotes: "asdf",
-		Moderator:    "",
 		Items: []models.PurchaseItem{
 			{
 				Quantity: "1",
@@ -36,6 +35,6 @@ func NewPurchase() *models.Purchase {
 			},
 		},
 		AlternateContactInfo: "peter@protonmail.com",
-		PaymentCoin:          "MCK",
+		PricingCoin:          "MCK",
 	}
 }

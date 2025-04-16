@@ -23,7 +23,7 @@ var (
 	// ErrDuplicateTransaction signifies a duplicate transaction was saved in the order.
 	ErrDuplicateTransaction = errors.New("duplicate transaction")
 
-	// ErrDuplicateTransaction signifies the order transaction does not exist in the order.
+	// ErrTransactionDoesNotExist signifies the order transaction does not exist in the order.
 	ErrTransactionDoesNotExist = errors.New("transaction not saved in order")
 
 	marshaler = protojson.MarshalOptions{
@@ -86,6 +86,10 @@ type Order struct {
 	OrderOpenSignature  string
 	OrderOpenAcked      bool
 
+	SerializedPaymentSent []byte
+	PaymentSentAcked      bool
+	PaymentSentSignature  string
+
 	SerializedOrderReject []byte
 	OrderRejectSignature  string
 	OrderRejectAcked      bool
@@ -133,9 +137,6 @@ type Order struct {
 	SerializedRefunds []byte
 	RefundAcked       bool
 
-	SerializedPaymentSent []byte
-	PaymentSentAcked      bool
-
 	ParkedMessages  []byte
 	ErroredMessages []byte
 
@@ -182,14 +183,14 @@ func (o *Order) Vendor() (peer.ID, error) {
 
 // Moderator returns the peer ID of the moderator for this order.
 func (o *Order) Moderator() (peer.ID, error) {
-	orderOpen, err := o.OrderOpenMessage()
+	paymentSent, err := o.PaymentSentMessage()
 	if err != nil {
 		return "", err
 	}
-	if orderOpen.Payment.Moderator == "" {
+	if paymentSent.Moderator == "" {
 		return "", errors.New("no moderator for order")
 	}
-	return peer.Decode(orderOpen.Payment.Moderator)
+	return peer.Decode(paymentSent.Moderator)
 }
 
 // Timestamp returns the timestamp at which this order was opened.
@@ -204,9 +205,17 @@ func (o *Order) Timestamp() (time.Time, error) {
 	return orderOpen.Timestamp.AsTime(), nil
 }
 
+func (o *Order) GetPaymentAddress() (string, error) {
+	paymentSent, err := o.PaymentSentMessage()
+	if err != nil {
+		return "", err
+	}
+	return paymentSent.ToAddress, nil
+}
+
 // GetTransactions returns all the transactions associated with this order.
 func (o *Order) GetTransactions() ([]iwallet.Transaction, error) {
-	if o.Transactions == nil || len(o.Transactions) == 0 {
+	if len(o.Transactions) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	var transactions []iwallet.Transaction
@@ -437,20 +446,17 @@ func (o *Order) Refunds() ([]*pb.Refund, error) {
 	return refunds, nil
 }
 
-// PaymentSentMessages returns a list of PaymentSent objects.
-func (o *Order) PaymentSentMessages() ([]*pb.PaymentSent, error) {
+// PaymentSentMessage returns the unmarshalled proto object if it exists in the order.
+func (o *Order) PaymentSentMessage() (*pb.PaymentSent, error) {
 	if o.SerializedPaymentSent == nil || len(o.SerializedPaymentSent) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
-	paymentList := new(pb.PaymentSentList)
-	if err := protojson.Unmarshal(o.SerializedPaymentSent, paymentList); err != nil {
+	paymentSent := new(pb.PaymentSent)
+	if err := protojson.Unmarshal(o.SerializedPaymentSent, paymentSent); err != nil {
 		return nil, err
 	}
-	payments := make([]*pb.PaymentSent, 0, len(paymentList.Messages))
-	for _, m := range paymentList.Messages {
-		payments = append(payments, m.PaymentSentMessage)
-	}
-	return payments, nil
+
+	return paymentSent, nil
 }
 
 // PaymentFinalizedMessage returns the unmarshalled proto object if it exists in the order.
@@ -491,6 +497,10 @@ func (o *Order) PutMessage(message *npb.OrderMessage) error {
 		msg = new(pb.OrderConfirmation)
 		setMessage = func(ser []byte) { o.SerializedOrderConfirmation = ser }
 		o.OrderConfirmationSignature = sig
+	case npb.OrderMessage_PAYMENT_SENT:
+		msg = new(pb.PaymentSent)
+		setMessage = func(ser []byte) { o.SerializedPaymentSent = ser }
+		o.PaymentSentSignature = sig
 	case npb.OrderMessage_RATING_SIGNATURES:
 		msg = new(pb.RatingSignatures)
 		setMessage = func(ser []byte) { o.SerializedRatingSignatures = ser }
@@ -577,31 +587,6 @@ func (o *Order) PutMessage(message *npb.OrderMessage) error {
 		ser := marshaler.Format(refundList)
 
 		o.SerializedRefunds = []byte(ser)
-		return nil
-	case npb.OrderMessage_PAYMENT_SENT:
-		pymtSentMsg := new(pb.PaymentSent)
-		if err := message.Message.UnmarshalTo(pymtSentMsg); err != nil {
-			return err
-		}
-
-		paymentList := new(pb.PaymentSentList)
-		if o.SerializedPaymentSent != nil {
-			if err := protojson.Unmarshal(o.SerializedPaymentSent, paymentList); err != nil {
-				return err
-			}
-		}
-		for _, m := range paymentList.Messages {
-			if m.PaymentSentMessage.TransactionID == pymtSentMsg.TransactionID {
-				return ErrDuplicateTransaction
-			}
-		}
-		paymentList.Messages = append(paymentList.Messages, &pb.PaymentSentList_Message{
-			PaymentSentMessage: pymtSentMsg,
-			Signature:          message.Signature,
-		})
-		ser := marshaler.Format(paymentList)
-
-		o.SerializedPaymentSent = []byte(ser)
 		return nil
 	case npb.OrderMessage_PAYMENT_FINALIZED:
 		msg = new(pb.PaymentFinalized)
@@ -738,6 +723,11 @@ func (o *Order) CanConfirm() bool {
 		return false
 	}
 
+	// PaymentSent must exist.
+	if o.SerializedPaymentSent == nil {
+		return false
+	}
+
 	// Cannot confirm if the order has progressed passed order open.
 	if o.SerializedOrderReject != nil || o.SerializedOrderCancel != nil ||
 		o.SerializedOrderConfirmation != nil || o.SerializedOrderFulfillments != nil ||
@@ -779,8 +769,8 @@ func (o *Order) CanCancel() bool {
 // CanRefund returns whether or not this order is in a state where the user can
 // refund the order.
 func (o *Order) CanRefund() bool {
-	// OrderOpen must exist.
-	orderOpen, err := o.OrderOpenMessage()
+	// PaymentSent must exist.
+	paymentSent, err := o.PaymentSentMessage()
 	if err != nil {
 		return false
 	}
@@ -791,7 +781,7 @@ func (o *Order) CanRefund() bool {
 	}
 
 	// Can't refund cancelable.
-	if orderOpen.Payment == nil || orderOpen.Payment.Method == pb.OrderOpen_Payment_CANCELABLE {
+	if paymentSent == nil || paymentSent.Method == pb.PaymentSent_CANCELABLE {
 		return false
 	}
 
@@ -1016,15 +1006,19 @@ func (o *Order) IsDisputeAccepted() bool {
 
 // IsFunded returns whether this order is fully funded or not.
 func (o *Order) IsFunded() (bool, error) {
-	orderOpen, err := o.OrderOpenMessage()
+	if o.SerializedPaymentSent == nil {
+		return false, nil
+	}
+
+	paymentSent, err := o.PaymentSentMessage()
 	if err != nil {
 		return false, err
 	}
 
 	var (
-		requestedAmount = iwallet.NewAmount(orderOpen.Payment.Amount)
-		paymentAddress  = orderOpen.Payment.Address
-		platformAddr    = orderOpen.Payment.PlatformAddr
+		requestedAmount = iwallet.NewAmount(paymentSent.Amount)
+		paymentAddress  = paymentSent.ToAddress
+		platformAddr    = paymentSent.PlatformAddr
 		totalPaid       iwallet.Amount
 	)
 
@@ -1071,13 +1065,13 @@ func (o *Order) IsFulfilled() (bool, error) {
 
 // FundingTotal returns the total amount paid to this order.
 func (o *Order) FundingTotal() (iwallet.Amount, error) {
-	orderOpen, err := o.OrderOpenMessage()
+	paymentSent, err := o.PaymentSentMessage()
 	if err != nil {
 		return iwallet.NewAmount(0), err
 	}
 
 	var (
-		paymentAddress = orderOpen.Payment.Address
+		paymentAddress = paymentSent.ToAddress
 		totalPaid      iwallet.Amount
 	)
 
@@ -1174,7 +1168,7 @@ func (o *Order) toProtobuf() (*pb.Contract, error) {
 	if err != nil && !errors.Is(err, ErrMessageDoesNotExist) {
 		return nil, err
 	}
-	contract.PaymentsSent, err = o.PaymentSentMessages()
+	contract.PaymentSent, err = o.PaymentSentMessage()
 	if err != nil && !errors.Is(err, ErrMessageDoesNotExist) {
 		return nil, err
 	}
@@ -1228,7 +1222,7 @@ func (o *Order) toProtobuf() (*pb.Contract, error) {
 	contract.PaymentFinalizedAcked = o.PaymentFinalizedAcked
 	contract.FulfillmentsAcked = o.OrderFulfillmentAcked
 	contract.RefundsAcked = o.RefundAcked
-	contract.PaymentsSentAcked = o.PaymentSentAcked
+	contract.PaymentSentAcked = o.PaymentSentAcked
 
 	if contract.DisputeOpen != nil && (contract.DisputeOpen.OpenedBy == pb.DisputeOpen_BUYER && o.Role() == RoleBuyer ||
 		contract.DisputeOpen.OpenedBy == pb.DisputeOpen_VENDOR && o.Role() == RoleVendor) {

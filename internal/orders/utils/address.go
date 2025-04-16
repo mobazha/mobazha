@@ -7,14 +7,14 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-func GetPaymentAddress(orderOpen *pb.OrderOpen) (iwallet.AddressEx, error) {
-	addr := iwallet.NewAddress(orderOpen.Payment.Address, iwallet.CoinType(orderOpen.Payment.Coin))
+func GetPaymentAddress(paymentSent *pb.PaymentSent) (iwallet.AddressEx, error) {
+	addr := iwallet.NewAddress(paymentSent.ToAddress, iwallet.CoinType(paymentSent.Coin))
 	var (
 		script []byte
 		err    error
 	)
-	if len(orderOpen.Payment.Script) > 0 {
-		script, err = hex.DecodeString(orderOpen.Payment.Script)
+	if len(paymentSent.Script) > 0 {
+		script, err = hex.DecodeString(paymentSent.Script)
 	}
 	return iwallet.NewAddressEx(addr, script), err
 }

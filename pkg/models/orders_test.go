@@ -64,12 +64,16 @@ func TestOrder_ReturnRole(t *testing.T) {
 		BuyerID: &pb.ID{
 			PeerID: "QmPFZPt6FJMZFQABX44RnxmZGh2XGW8ev7KKEMpL8YMxd4",
 		},
-		Payment: &pb.OrderOpen_Payment{
-			Moderator: "QmW4cc8jh8vNDza49YVCmFX56tb7QtEGfvcihXEWAKwdcf",
-		},
 	}
+	paymentSent := &pb.PaymentSent{
+		Moderator: "QmW4cc8jh8vNDza49YVCmFX56tb7QtEGfvcihXEWAKwdcf",
+	}
+
 	var order Order
 	if err := order.PutMessage(utils.MustWrapOrderMessage(orderOpen)); err != nil {
+		t.Fatal(err)
+	}
+	if err := order.PutMessage(utils.MustWrapOrderMessage(paymentSent)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -96,12 +100,12 @@ func TestOrder_ReturnRole(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if moderatorID.String() != orderOpen.Payment.Moderator {
-		t.Errorf("Incorrect peerID. Expected %s, got %s", orderOpen.Payment.Moderator, moderatorID.String())
+	if moderatorID.String() != paymentSent.Moderator {
+		t.Errorf("Incorrect peerID. Expected %s, got %s", paymentSent.Moderator, moderatorID.String())
 	}
 
-	orderOpen.Payment.Moderator = ""
-	if err := order.PutMessage(utils.MustWrapOrderMessage(orderOpen)); err != nil {
+	paymentSent.Moderator = ""
+	if err := order.PutMessage(utils.MustWrapOrderMessage(paymentSent)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -346,18 +350,10 @@ func TestOrder_Payments(t *testing.T) {
 	var (
 		order Order
 		id0   = "xyz"
-		id1   = "abc"
 	)
 
 	err := order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
 		TransactionID: id0,
-	}))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
-		TransactionID: id1,
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -370,16 +366,13 @@ func TestOrder_Payments(t *testing.T) {
 		t.Errorf("Failed to return duplicate transaction error")
 	}
 
-	payments, err := order.PaymentSentMessages()
+	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for payments[0].TransactionID != id0 {
-		t.Errorf("Incorrect txid returned. Expected %s, got %s", id0, payments[0].TransactionID)
-	}
-	for payments[1].TransactionID != id1 {
-		t.Errorf("Incorrect txid returned. Expected %s, got %s", id1, payments[1].TransactionID)
+	if paymentSent.TransactionID != id0 {
+		t.Errorf("Incorrect txid returned. Expected %s, got %s", id0, paymentSent.TransactionID)
 	}
 }
 
@@ -963,9 +956,6 @@ func TestOrder_CanDispute(t *testing.T) {
 			// Success vendor
 			setup: func(order *Order) error {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Method: pb.OrderOpen_Payment_DIRECT,
-					},
 					Items: []*pb.OrderOpen_Item{
 						{
 							ListingHash: "abc",
@@ -975,6 +965,14 @@ func TestOrder_CanDispute(t *testing.T) {
 				if err != nil {
 					return err
 				}
+
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_DIRECT,
+				}))
+				if err != nil {
+					return err
+				}
+
 				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderFulfillment{
 					Fulfillments: []*pb.OrderFulfillment_FulfilledItem{
 						{
@@ -1080,12 +1078,14 @@ func TestOrder_CanRefund(t *testing.T) {
 		{
 			// Success
 			setup: func(order *Order) error {
-				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Method: pb.OrderOpen_Payment_DIRECT,
-					},
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
+				if err != nil {
+					return err
+				}
+
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_DIRECT,
 				}))
-				return err
 			},
 			ourRole:   RoleVendor,
 			canRefund: true,
@@ -1102,12 +1102,14 @@ func TestOrder_CanRefund(t *testing.T) {
 		{
 			// Is buyer
 			setup: func(order *Order) error {
-				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Method: pb.OrderOpen_Payment_DIRECT,
-					},
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
+				if err != nil {
+					return err
+				}
+
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_DIRECT,
 				}))
-				return err
 			},
 			ourRole:   RoleBuyer,
 			canRefund: false,
@@ -1124,12 +1126,14 @@ func TestOrder_CanRefund(t *testing.T) {
 			// Cancelable
 			setup: func(order *Order) error {
 				order.SerializedOrderReject = []byte{0x00}
-				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Method: pb.OrderOpen_Payment_CANCELABLE,
-					},
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
+				if err != nil {
+					return err
+				}
+
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_CANCELABLE,
 				}))
-				return err
 			},
 			ourRole:   RoleVendor,
 			canRefund: false,
@@ -1138,12 +1142,14 @@ func TestOrder_CanRefund(t *testing.T) {
 			// Non nil cancel
 			setup: func(order *Order) error {
 				order.SerializedOrderCancel = []byte{0x00}
-				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Method: pb.OrderOpen_Payment_DIRECT,
-					},
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
+				if err != nil {
+					return err
+				}
+
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_DIRECT,
 				}))
-				return err
 			},
 			ourRole:   RoleVendor,
 			canRefund: false,
@@ -1152,12 +1158,14 @@ func TestOrder_CanRefund(t *testing.T) {
 			// Non nil complete
 			setup: func(order *Order) error {
 				order.SerializedOrderComplete = []byte{0x00}
-				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Method: pb.OrderOpen_Payment_DIRECT,
-					},
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
+				if err != nil {
+					return err
+				}
+
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_DIRECT,
 				}))
-				return err
 			},
 			ourRole:   RoleVendor,
 			canRefund: false,
@@ -1166,12 +1174,14 @@ func TestOrder_CanRefund(t *testing.T) {
 			// Non nil payment finalized
 			setup: func(order *Order) error {
 				order.SerializedPaymentFinalized = []byte{0x00}
-				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Method: pb.OrderOpen_Payment_DIRECT,
-					},
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
+				if err != nil {
+					return err
+				}
+
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_DIRECT,
 				}))
-				return err
 			},
 			ourRole:   RoleVendor,
 			canRefund: false,
@@ -1202,14 +1212,17 @@ func TestOrder_CanFulfill(t *testing.T) {
 			// Success
 			setup: func(order *Order) error {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Method: pb.OrderOpen_Payment_DIRECT,
-					},
 					Items: []*pb.OrderOpen_Item{
 						{
 							ListingHash: "abc",
 						},
 					},
+				}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_DIRECT,
 				}))
 				if err != nil {
 					return err
@@ -1224,15 +1237,18 @@ func TestOrder_CanFulfill(t *testing.T) {
 			// Unfunded
 			setup: func(order *Order) error {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Method: pb.OrderOpen_Payment_DIRECT,
-						Amount: iwallet.NewAmount(1).String(),
-					},
 					Items: []*pb.OrderOpen_Item{
 						{
 							ListingHash: "abc",
 						},
 					},
+				}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_DIRECT,
+					Amount: iwallet.NewAmount(1).String(),
 				}))
 				if err != nil {
 					return err
@@ -1247,14 +1263,17 @@ func TestOrder_CanFulfill(t *testing.T) {
 			// Already fulfilled
 			setup: func(order *Order) error {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Method: pb.OrderOpen_Payment_DIRECT,
-					},
 					Items: []*pb.OrderOpen_Item{
 						{
 							ListingHash: "abc",
 						},
 					},
+				}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_DIRECT,
 				}))
 				if err != nil {
 					return err
@@ -1279,14 +1298,17 @@ func TestOrder_CanFulfill(t *testing.T) {
 			// Is buyer
 			setup: func(order *Order) error {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Method: pb.OrderOpen_Payment_DIRECT,
-					},
 					Items: []*pb.OrderOpen_Item{
 						{
 							ListingHash: "abc",
 						},
 					},
+				}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_DIRECT,
 				}))
 				return err
 			},
@@ -1306,14 +1328,17 @@ func TestOrder_CanFulfill(t *testing.T) {
 			setup: func(order *Order) error {
 				order.SerializedOrderReject = []byte{0x00}
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Method: pb.OrderOpen_Payment_CANCELABLE,
-					},
 					Items: []*pb.OrderOpen_Item{
 						{
 							ListingHash: "abc",
 						},
 					},
+				}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_CANCELABLE,
 				}))
 				return err
 			},
@@ -1325,14 +1350,17 @@ func TestOrder_CanFulfill(t *testing.T) {
 			setup: func(order *Order) error {
 				order.SerializedOrderCancel = []byte{0x00}
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Method: pb.OrderOpen_Payment_DIRECT,
-					},
 					Items: []*pb.OrderOpen_Item{
 						{
 							ListingHash: "abc",
 						},
 					},
+				}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_DIRECT,
 				}))
 				if err != nil {
 					return err
@@ -1348,14 +1376,17 @@ func TestOrder_CanFulfill(t *testing.T) {
 			setup: func(order *Order) error {
 				order.SerializedOrderComplete = []byte{0x00}
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Method: pb.OrderOpen_Payment_DIRECT,
-					},
 					Items: []*pb.OrderOpen_Item{
 						{
 							ListingHash: "abc",
 						},
 					},
+				}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_DIRECT,
 				}))
 				if err != nil {
 					return err
@@ -1371,14 +1402,17 @@ func TestOrder_CanFulfill(t *testing.T) {
 			setup: func(order *Order) error {
 				order.SerializedPaymentFinalized = []byte{0x00}
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Method: pb.OrderOpen_Payment_DIRECT,
-					},
 					Items: []*pb.OrderOpen_Item{
 						{
 							ListingHash: "abc",
 						},
 					},
+				}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_DIRECT,
 				}))
 				if err != nil {
 					return err
@@ -1703,11 +1737,13 @@ func TestOrder_IsFunded(t *testing.T) {
 		// Funded
 		{
 			setup: func(order *Order) error {
-				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Amount:  "1000",
-						Address: "aaaaaa",
-					},
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Amount:    "1000",
+					ToAddress: "aaaaaa",
 				}))
 				if err != nil {
 					return err
@@ -1727,11 +1763,13 @@ func TestOrder_IsFunded(t *testing.T) {
 		// Multiple payments
 		{
 			setup: func(order *Order) error {
-				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Amount:  "1000",
-						Address: "aaaaaa",
-					},
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Amount:    "1000",
+					ToAddress: "aaaaaa",
 				}))
 				if err != nil {
 					return err
@@ -1764,11 +1802,13 @@ func TestOrder_IsFunded(t *testing.T) {
 		// Short
 		{
 			setup: func(order *Order) error {
-				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Amount:  "1000",
-						Address: "aaaaaa",
-					},
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Amount:    "1000",
+					ToAddress: "aaaaaa",
 				}))
 				if err != nil {
 					return err
@@ -1812,10 +1852,6 @@ func TestOrder_IsFulfilled(t *testing.T) {
 		{
 			setup: func(order *Order) error {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Amount:  "1000",
-						Address: "aaaaaa",
-					},
 					Items: []*pb.OrderOpen_Item{
 						{
 							ListingHash: "abc",
@@ -1824,6 +1860,13 @@ func TestOrder_IsFulfilled(t *testing.T) {
 							ListingHash: "123",
 						},
 					},
+				}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Amount:    "1000",
+					ToAddress: "aaaaaa",
 				}))
 				if err != nil {
 					return err
@@ -1846,10 +1889,6 @@ func TestOrder_IsFulfilled(t *testing.T) {
 		{
 			setup: func(order *Order) error {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Amount:  "1000",
-						Address: "aaaaaa",
-					},
 					Items: []*pb.OrderOpen_Item{
 						{
 							ListingHash: "abc",
@@ -1858,6 +1897,13 @@ func TestOrder_IsFulfilled(t *testing.T) {
 							ListingHash: "123",
 						},
 					},
+				}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Amount:    "1000",
+					ToAddress: "aaaaaa",
 				}))
 				if err != nil {
 					return err
@@ -1876,11 +1922,7 @@ func TestOrder_IsFulfilled(t *testing.T) {
 		// No fulfillments
 		{
 			setup: func(order *Order) error {
-				return order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Amount:  "1000",
-						Address: "aaaaaa",
-					},
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
 					Items: []*pb.OrderOpen_Item{
 						{
 							ListingHash: "abc",
@@ -1889,6 +1931,13 @@ func TestOrder_IsFulfilled(t *testing.T) {
 							ListingHash: "123",
 						},
 					},
+				}))
+				if err != nil {
+					return err
+				}
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Amount:    "1000",
+					ToAddress: "aaaaaa",
 				}))
 			},
 			isFulfilled: false,
@@ -1918,10 +1967,12 @@ func TestOrder_FundingTotal(t *testing.T) {
 	}{
 		{
 			setup: func(order *Order) error {
-				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Address: "aaaaaa",
-					},
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					ToAddress: "aaaaaa",
 				}))
 				if err != nil {
 					return err
@@ -1941,11 +1992,13 @@ func TestOrder_FundingTotal(t *testing.T) {
 		// Multiple payments
 		{
 			setup: func(order *Order) error {
-				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Amount:  "1000",
-						Address: "aaaaaa",
-					},
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Amount:    "1000",
+					ToAddress: "aaaaaa",
 				}))
 				if err != nil {
 					return err
@@ -1978,11 +2031,13 @@ func TestOrder_FundingTotal(t *testing.T) {
 		// No payments
 		{
 			setup: func(order *Order) error {
-				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
-					Payment: &pb.OrderOpen_Payment{
-						Amount:  "1000",
-						Address: "aaaaaa",
-					},
+				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
+				if err != nil {
+					return err
+				}
+				err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Amount:    "1000",
+					ToAddress: "aaaaaa",
 				}))
 				if err != nil {
 					return err

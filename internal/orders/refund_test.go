@@ -126,10 +126,10 @@ func TestOrderProcessor_processRefundMessage(t *testing.T) {
 				Identity: pubkeyBytes,
 			},
 		},
-		Payment: &pb.OrderOpen_Payment{
-			Coin:    "MCK",
-			Address: addr.String(),
-		},
+	}
+	paymentSent := &pb.PaymentSent{
+		Coin:      "MCK",
+		ToAddress: addr.String(),
 	}
 
 	tests := []struct {
@@ -143,10 +143,19 @@ func TestOrderProcessor_processRefundMessage(t *testing.T) {
 			setup: func(order *models.Order) error {
 				order.ID = "1234"
 				order.PaymentAddress = addr.String()
-				return order.PutMessage(&npb.OrderMessage{
+				err := order.PutMessage(&npb.OrderMessage{
 					Signature: []byte("abc"),
 					Message:   mustBuildAny(orderOpen),
 				})
+				if err != nil {
+					return err
+				}
+				order.PutMessage(&npb.OrderMessage{
+					Signature:   []byte("abc"),
+					Message:     mustBuildAny(paymentSent),
+					MessageType: npb.OrderMessage_PAYMENT_SENT,
+				})
+				return nil
 			},
 			expectedError: nil,
 			expectedEvent: &events.Refund{

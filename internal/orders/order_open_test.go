@@ -3,14 +3,9 @@ package orders
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/hex"
-	"errors"
-	"fmt"
 	"reflect"
 	"testing"
-	"time"
 
-	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -72,8 +67,8 @@ func TestOrderProcessor_processOrderOpenMessage(t *testing.T) {
 					ListingType: orderOpen.Listings[0].Listing.Metadata.ContractType.String(),
 					OrderID:     orderID.B58String(),
 					Price: events.ListingPrice{
-						Amount:        orderOpen.Payment.Amount,
-						CurrencyCode:  orderOpen.Payment.Coin,
+						Amount:        orderOpen.Amount,
+						CurrencyCode:  orderOpen.PricingCoin,
 						PriceModifier: orderOpen.Listings[0].Listing.Item.CryptoListingPriceModifier,
 					},
 					Slug: orderOpen.Listings[0].Listing.Slug,
@@ -99,7 +94,6 @@ func TestOrderProcessor_processOrderOpenMessage(t *testing.T) {
 		{
 			// Order open already exists.
 			setup: func(order *models.Order, orderOpen *pb.OrderOpen) error {
-				order.PaymentAddress = orderOpen.Payment.Address
 				order.SetRole(models.RoleVendor)
 				return order.PutMessage(&npb.OrderMessage{
 					Signature: []byte("abc"),
@@ -123,7 +117,7 @@ func TestOrderProcessor_processOrderOpenMessage(t *testing.T) {
 
 	for i, test := range tests {
 		order := &models.Order{}
-		orderOpen, err := factory.NewOrder()
+		orderOpen, _, err := factory.NewOrder()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -167,10 +161,6 @@ func TestOrderProcessor_processOrderOpenMessage(t *testing.T) {
 				ser := m.Format(orderOpen)
 				if !bytes.Equal(order.SerializedOrderOpen, []byte(ser)) {
 					t.Errorf("Test %d: Failed to save order open message to the order", i)
-				}
-
-				if order.PaymentAddress != orderOpen.Payment.Address {
-					t.Errorf("Test %d: Saved incorrect payment address: Expected %s, got %s", i, orderOpen.Payment.Address, order.PaymentAddress)
 				}
 			}
 			if test.expectedEvent != nil {
@@ -372,7 +362,7 @@ func TestCalculateOrderTotal(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, test := range tests {
-		order, err := factory.NewOrder()
+		order, _, err := factory.NewOrder()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -425,7 +415,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Normal listing
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -439,7 +429,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Listing slug not found
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -454,7 +444,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Unpurchaseable classified listing
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -469,7 +459,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Listing serialization not found
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -484,7 +474,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Listing doesn't exist for order item
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -499,7 +489,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Nil listings
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -514,11 +504,10 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Nil payment
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
-				order.Payment = nil
 				return order, nil
 			},
 			valid: false,
@@ -529,7 +518,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Nil items
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -544,7 +533,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Nil timestamp
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -559,7 +548,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Nil buyerID
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -574,7 +563,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Nil ratings
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -589,7 +578,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Nil item
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -604,7 +593,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Cryptocurrency listing with "" address.
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -629,7 +618,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Item quantity zero
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -644,7 +633,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Too few options
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -659,7 +648,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Option does not exist
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -674,7 +663,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Option value does not exist
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -689,7 +678,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Shipping option does not exist
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -704,7 +693,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Shipping option service does not exist
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -717,190 +706,9 @@ func Test_validateOrderOpen(t *testing.T) {
 			},
 		},
 		{
-			// Order payment amount is ""
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				order.Payment.Amount = ""
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Order payment amount is not base 10
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				order.Payment.Amount = "asdfasdf"
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Order payment address is ""
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				order.Payment.Address = ""
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Unknown payment coin
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				order.Payment.Coin = "abc"
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Correct direct payment address
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				wal, err := processor.multiwallet.WalletForCurrencyCode("MCK")
-				if err != nil {
-					return nil, err
-				}
-				addr, err := wal.NewAddress()
-				if err != nil {
-					return nil, err
-				}
-				order.Payment.Method = pb.OrderOpen_Payment_DIRECT
-				order.Payment.Address = addr.String()
-
-				return order, nil
-			},
-			valid: true,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Direct payment address where wallet doesn't have the key
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				order.Payment.Method = pb.OrderOpen_Payment_DIRECT
-				order.Payment.Address = "fasdfasdf"
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Escrow release fee is ""
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				order.Payment.EscrowReleaseFee = ""
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Escrow release fee is invalid
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				order.Payment.EscrowReleaseFee = "asdfad"
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Invalid moderator peer ID
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				order.Payment.Method = pb.OrderOpen_Payment_MODERATED
-				order.Payment.Moderator = "asdf"
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Moderator key is nil
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				order.Payment.Method = pb.OrderOpen_Payment_MODERATED
-				order.Payment.Moderator = "12D3KooWHHcLYLNxcfxNojVAEHErv75DagcaezKAX86qVrP9QXqM"
-				order.Payment.ModeratorKey = nil
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Moderator key is invalid
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				order.Payment.Method = pb.OrderOpen_Payment_MODERATED
-				order.Payment.Moderator = "12D3KooWHHcLYLNxcfxNojVAEHErv75DagcaezKAX86qVrP9QXqM"
-				order.Payment.ModeratorKey = []byte{0x00}
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
 			// Invalid rating keys
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -915,7 +723,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Buyer ID pubkeys is nil
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -930,7 +738,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Invalid buyer ID pubkey
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -945,7 +753,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// ID pubkey does not match peer ID
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -960,7 +768,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Invalid escrow pubkey
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -975,7 +783,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Signature parse error
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -990,7 +798,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Signature invalid
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -1003,272 +811,9 @@ func Test_validateOrderOpen(t *testing.T) {
 			},
 		},
 		{
-			// Valid moderated address
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				priv, err := btcec.NewPrivateKey()
-				if err != nil {
-					return nil, err
-				}
-				chaincode, err := hex.DecodeString(order.Payment.Chaincode)
-				if err != nil {
-					return nil, fmt.Errorf("chaincode parse error: %s", err)
-				}
-				vendorEscrowPubkey, err := btcec.ParsePubKey(order.Listings[0].Listing.VendorID.Pubkeys.Escrow)
-				if err != nil {
-					return nil, err
-				}
-				vendorKey, err := utils.GenerateEscrowPublicKey(vendorEscrowPubkey, chaincode)
-				if err != nil {
-					return nil, err
-				}
-				buyerEscrowPubkey, err := btcec.ParsePubKey(order.BuyerID.Pubkeys.Escrow)
-				if err != nil {
-					return nil, err
-				}
-				buyerKey, err := utils.GenerateEscrowPublicKey(buyerEscrowPubkey, chaincode)
-				if err != nil {
-					return nil, err
-				}
-				moderatorEscrowPubkey := priv.PubKey()
-				moderatorKey, err := utils.GenerateEscrowPublicKey(moderatorEscrowPubkey, chaincode)
-				if err != nil {
-					return nil, err
-				}
-				wal, err := processor.multiwallet.WalletForCurrencyCode("MCK")
-				if err != nil {
-					return nil, err
-				}
-				escrowWallet, ok := wal.(iwallet.EscrowWithTimeout)
-				if !ok {
-					return nil, errors.New("wallet does not support escrow")
-				}
-				address, script, err := escrowWallet.CreateMultisigWithTimeout([]btcec.PublicKey{*buyerKey, *vendorKey, *moderatorKey}, chaincode, 2, time.Hour*time.Duration(order.Listings[0].Listing.Metadata.EscrowTimeoutHours), *vendorKey)
-				if err != nil {
-					return nil, err
-				}
-
-				order.Payment.Method = pb.OrderOpen_Payment_MODERATED
-				order.Payment.Moderator = "12D3KooWDUcbMF23kLEVAV3ES7ysWiD2GBh87DHDx3buRNDLFpo8"
-				order.Payment.ModeratorKey = priv.PubKey().SerializeCompressed()
-				order.Payment.Address = address.String()
-				order.Payment.Script = hex.EncodeToString(script)
-
-				return order, nil
-			},
-			valid: true,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Invalid moderated address
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				priv, err := btcec.NewPrivateKey()
-				if err != nil {
-					return nil, err
-				}
-
-				order.Payment.Method = pb.OrderOpen_Payment_MODERATED
-				order.Payment.ModeratorKey = priv.PubKey().SerializeCompressed()
-				order.Payment.Moderator = "12D3KooWHHcLYLNxcfxNojVAEHErv65DagcaezKAX86qVrP9QXqM"
-				order.Payment.Address = "asdfadsf"
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Invalid moderated script
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				priv, err := btcec.NewPrivateKey()
-				if err != nil {
-					return nil, err
-				}
-				chaincode, err := hex.DecodeString(order.Payment.Chaincode)
-				if err != nil {
-					return nil, fmt.Errorf("chaincode parse error: %s", err)
-				}
-				vendorEscrowPubkey, err := btcec.ParsePubKey(order.Listings[0].Listing.VendorID.Pubkeys.Escrow)
-				if err != nil {
-					return nil, err
-				}
-				vendorKey, err := utils.GenerateEscrowPublicKey(vendorEscrowPubkey, chaincode)
-				if err != nil {
-					return nil, err
-				}
-				buyerEscrowPubkey, err := btcec.ParsePubKey(order.BuyerID.Pubkeys.Escrow)
-				if err != nil {
-					return nil, err
-				}
-				buyerKey, err := utils.GenerateEscrowPublicKey(buyerEscrowPubkey, chaincode)
-				if err != nil {
-					return nil, err
-				}
-				moderatorEscrowPubkey := priv.PubKey()
-				moderatorKey, err := utils.GenerateEscrowPublicKey(moderatorEscrowPubkey, chaincode)
-				if err != nil {
-					return nil, err
-				}
-				wal, err := processor.multiwallet.WalletForCurrencyCode("MCK")
-				if err != nil {
-					return nil, err
-				}
-				escrowWallet, ok := wal.(iwallet.Escrow)
-				if !ok {
-					return nil, errors.New("wallet does not support escrow")
-				}
-				address, _, err := escrowWallet.CreateMultisigAddress([]btcec.PublicKey{*buyerKey, *vendorKey, *moderatorKey}, chaincode, 2)
-				if err != nil {
-					return nil, err
-				}
-
-				order.Payment.Method = pb.OrderOpen_Payment_MODERATED
-				order.Payment.Moderator = "12D3KooWDUcbMF23kLEVAV3ES7ysWiD2GBh87DHDx3buRNDLFpo8"
-				order.Payment.ModeratorKey = priv.PubKey().SerializeCompressed()
-				order.Payment.Address = address.String()
-				order.Payment.Script = "fasdfad"
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Valid cancelable address
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				chaincode, err := hex.DecodeString(order.Payment.Chaincode)
-				if err != nil {
-					return nil, fmt.Errorf("chaincode parse error: %s", err)
-				}
-				vendorEscrowPubkey, err := btcec.ParsePubKey(order.Listings[0].Listing.VendorID.Pubkeys.Escrow)
-				if err != nil {
-					return nil, err
-				}
-				vendorKey, err := utils.GenerateEscrowPublicKey(vendorEscrowPubkey, chaincode)
-				if err != nil {
-					return nil, err
-				}
-				buyerEscrowPubkey, err := btcec.ParsePubKey(order.BuyerID.Pubkeys.Escrow)
-				if err != nil {
-					return nil, err
-				}
-				buyerKey, err := utils.GenerateEscrowPublicKey(buyerEscrowPubkey, chaincode)
-				if err != nil {
-					return nil, err
-				}
-				wal, err := processor.multiwallet.WalletForCurrencyCode("MCK")
-				if err != nil {
-					return nil, err
-				}
-				escrowWallet, ok := wal.(iwallet.Escrow)
-				if !ok {
-					return nil, errors.New("wallet does not support escrow")
-				}
-				address, script, err := escrowWallet.CreateMultisigAddress([]btcec.PublicKey{*buyerKey, *vendorKey}, chaincode, 1)
-				if err != nil {
-					return nil, err
-				}
-
-				order.Payment.Method = pb.OrderOpen_Payment_CANCELABLE
-				order.Payment.Address = address.String()
-				order.Payment.Script = hex.EncodeToString(script)
-				return order, nil
-			},
-			valid: true,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Invalid cancelable script
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-				chaincode, err := hex.DecodeString(order.Payment.Chaincode)
-				if err != nil {
-					return nil, fmt.Errorf("chaincode parse error: %s", err)
-				}
-				vendorEscrowPubkey, err := btcec.ParsePubKey(order.Listings[0].Listing.VendorID.Pubkeys.Escrow)
-				if err != nil {
-					return nil, err
-				}
-				vendorKey, err := utils.GenerateEscrowPublicKey(vendorEscrowPubkey, chaincode)
-				if err != nil {
-					return nil, err
-				}
-				buyerEscrowPubkey, err := btcec.ParsePubKey(order.BuyerID.Pubkeys.Escrow)
-				if err != nil {
-					return nil, err
-				}
-				buyerKey, err := utils.GenerateEscrowPublicKey(buyerEscrowPubkey, chaincode)
-				if err != nil {
-					return nil, err
-				}
-				wal, err := processor.multiwallet.WalletForCurrencyCode("MCK")
-				if err != nil {
-					return nil, err
-				}
-				escrowWallet, ok := wal.(iwallet.Escrow)
-				if !ok {
-					return nil, errors.New("wallet does not support escrow")
-				}
-				address, _, err := escrowWallet.CreateMultisigAddress([]btcec.PublicKey{*buyerKey, *vendorKey}, chaincode, 1)
-				if err != nil {
-					return nil, err
-				}
-
-				order.Payment.Method = pb.OrderOpen_Payment_CANCELABLE
-				order.Payment.Address = address.String()
-				order.Payment.Script = "afsdaf"
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Invalid cancelable script
-			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
-
-				order.Payment.Method = pb.OrderOpen_Payment_CANCELABLE
-				order.Payment.Address = "fasdfasdf"
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
 			// Invalid orderID
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}
@@ -1282,7 +827,7 @@ func Test_validateOrderOpen(t *testing.T) {
 		{
 			// Len ratings keys doesn't match len items.
 			order: func() (*pb.OrderOpen, error) {
-				order, err := factory.NewOrder()
+				order, _, err := factory.NewOrder()
 				if err != nil {
 					return nil, err
 				}

@@ -649,6 +649,15 @@ func (w *MockWallet) GetTransaction(id iwallet.TransactionID) (*iwallet.Transact
 	return &tx, nil
 }
 
+func (w *MockWallet) AddTransaction(id iwallet.TransactionID, tx iwallet.Transaction) error {
+	w.mtx.RLock()
+	defer w.mtx.RUnlock()
+
+	w.transactions[id] = tx
+
+	return nil
+}
+
 // GetAddressTransactions returns the transactions sending to or spending from this address.
 // Note this will only ever be called for an order's payment address transaction so for the
 // purpose of this method the wallet only needs to be able to track transactions paid to a

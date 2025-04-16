@@ -153,17 +153,17 @@ func ValidateBuyerID(id *pb.ID) error {
 	return nil
 }
 
-func ValidatePayment(order *pb.OrderOpen, escrowTimeoutHours uint32, wal iwallet.Wallet) error {
-	if order.Payment.Amount == "" {
+func ValidatePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTimeoutHours uint32, wal iwallet.Wallet) error {
+	if paymentSent.Amount == "" {
 		return errors.New("payment amount not set")
 	}
-	if ok := validateBigString(order.Payment.Amount); !ok {
+	if ok := validateBigString(paymentSent.Amount); !ok {
 		return errors.New("payment amount not valid")
 	}
-	if order.Payment.Address == "" {
+	if paymentSent.ToAddress == "" {
 		return errors.New("order payment address is empty")
 	}
-	chaincode, err := hex.DecodeString(order.Payment.Chaincode)
+	chaincode, err := hex.DecodeString(paymentSent.Chaincode)
 	if err != nil {
 		return fmt.Errorf("chaincode parse error: %s", err)
 	}
@@ -203,8 +203,8 @@ func ValidatePayment(order *pb.OrderOpen, escrowTimeoutHours uint32, wal iwallet
 		}
 	}
 
-	if order.Payment.Method == pb.OrderOpen_Payment_MODERATED {
-		_, err := peer.Decode(order.Payment.Moderator)
+	if paymentSent.Method == pb.PaymentSent_MODERATED {
+		_, err := peer.Decode(paymentSent.Moderator)
 		if err != nil {
 			return errors.New("invalid moderator selection")
 		}
@@ -214,12 +214,12 @@ func ValidatePayment(order *pb.OrderOpen, escrowTimeoutHours uint32, wal iwallet
 		)
 
 		if isETHLikeCoin {
-			moderatorKey, err = btcec.ParsePubKey(order.Payment.ModeratorKey)
+			moderatorKey, err = btcec.ParsePubKey(paymentSent.ModeratorKey)
 			if err != nil {
 				return fmt.Errorf("generate vendor pub key failed, %s", err)
 			}
 		} else {
-			moderatorEscrowPubkey, err := btcec.ParsePubKey(order.Payment.ModeratorKey)
+			moderatorEscrowPubkey, err := btcec.ParsePubKey(paymentSent.ModeratorKey)
 			if err != nil {
 				return err
 			}
@@ -254,13 +254,13 @@ func ValidatePayment(order *pb.OrderOpen, escrowTimeoutHours uint32, wal iwallet
 			}
 		}
 
-		if order.Payment.Address != address.String() {
+		if paymentSent.ToAddress != address.String() {
 			return errors.New("invalid moderated payment address")
 		}
-		if order.Payment.Script != hex.EncodeToString(script) {
+		if paymentSent.Script != hex.EncodeToString(script) {
 			return errors.New("invalid moderated payment script")
 		}
-	} else if order.Payment.Method == pb.OrderOpen_Payment_CANCELABLE {
+	} else if paymentSent.Method == pb.PaymentSent_CANCELABLE {
 		escrowWallet, ok := wal.(iwallet.Escrow)
 		if !ok {
 			return errors.New("wallet does not support escrow")
@@ -269,20 +269,20 @@ func ValidatePayment(order *pb.OrderOpen, escrowTimeoutHours uint32, wal iwallet
 		if err != nil {
 			return err
 		}
-		if order.Payment.Address != address.String() {
+		if paymentSent.ToAddress != address.String() {
 			return errors.New("invalid cancelable payment address")
 		}
-		if order.Payment.Script != hex.EncodeToString(script) {
+		if paymentSent.Script != hex.EncodeToString(script) {
 			return errors.New("invalid cancelable payment script")
 		}
-	} else if order.Payment.Method != pb.OrderOpen_Payment_DIRECT {
+	} else if paymentSent.Method != pb.PaymentSent_DIRECT {
 		return errors.New("invalid payment method")
 	}
-	if order.Payment.Method != pb.OrderOpen_Payment_DIRECT {
-		if order.Payment.EscrowReleaseFee == "" {
+	if paymentSent.Method != pb.PaymentSent_DIRECT {
+		if paymentSent.EscrowReleaseFee == "" {
 			return errors.New("escrow release fee is empty")
 		}
-		if ok := validateBigString(order.Payment.EscrowReleaseFee); !ok {
+		if ok := validateBigString(paymentSent.EscrowReleaseFee); !ok {
 			return errors.New("escrow release fee not valid")
 		}
 	}

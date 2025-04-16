@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -90,11 +92,59 @@ type Purchase struct {
 	PostalCode           string         `json:"postalCode"`
 	CountryCode          string         `json:"countryCode"`
 	AddressNotes         string         `json:"addressNotes"`
-	Moderator            string         `json:"moderator"`
 	Items                []PurchaseItem `json:"items"`
 	AlternateContactInfo string         `json:"alternateContactInfo"`
-	RefundAddress        *string        `json:"refundAddress"` //optional, can be left out of json
-	PaymentCoin          string         `json:"paymentCoin"`
+	PricingCoin          string         `json:"pricingCoin"`
+}
+
+type PaymentData struct {
+	OrderID     string `json:"orderID"`
+	Method      string `json:"method"`
+	Moderator   string `json:"moderator"`
+	Amount      string `json:"amount"`
+	Chaincode   string `json:"chaincode"`
+	FromAddress string `json:"fromAddress"`
+	/*
+		id := make([]byte, 36)
+		copy(id[:32], prevHash[:])
+		copy(id[32:], index)
+		reference: internal/multiwallet/client/blockbook -> buildTransaction()
+	*/
+	FromID             []byte    `json:"fromID"` // 36 bytes
+	ToAddress          string    `json:"toAddress"`
+	ToID               []byte    `json:"toID"` // 36 bytes
+	Script             string    `json:"script"`
+	ModeratorKey       []byte    `json:"moderatorKey"`
+	Coin               string    `json:"coin"`
+	EscrowReleaseFee   string    `json:"escrowReleaseFee"`
+	PlatformAmount     string    `json:"platformAmount"`
+	PlatformAddr       string    `json:"platformAddr"`
+	PlatformRewardAddr string    `json:"platformRewardAddr"`
+	RefundAddress      string    `json:"refundAddress"`
+	Timestamp          time.Time `json:"timestamp"`
+	TransactionID      string    `json:"transactionID"`
+}
+
+func (p *PaymentData) BuildTransaction() iwallet.Transaction {
+	tx := iwallet.Transaction{
+		ID: iwallet.TransactionID(p.TransactionID),
+		From: []iwallet.SpendInfo{
+			{
+				ID:      p.FromID[:36],
+				Address: iwallet.NewAddress(p.FromAddress, iwallet.CoinType(p.Coin)),
+				Amount:  iwallet.NewAmount(p.Amount),
+			},
+		},
+		To: []iwallet.SpendInfo{
+			{
+				ID:      p.ToID[:36],
+				Address: iwallet.NewAddress(p.ToAddress, iwallet.CoinType(p.Coin)),
+				Amount:  iwallet.NewAmount(p.Amount),
+			},
+		},
+		Value: iwallet.NewAmount(p.Amount),
+	}
+	return tx
 }
 
 // OrderTotals represents a breakdown of the various charges of the order.

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -65,14 +65,30 @@ func (op *OrderProcessor) processWalletTransaction(transaction iwallet.Transacti
 	}
 }
 
-// processIncomingPayment processes payments into an order's payment address.
-func (op *OrderProcessor) processIncomingPayment(dbtx database.Tx, order *models.Order, tx iwallet.Transaction) error {
-	err := order.PutTransaction(tx)
+func (op *OrderProcessor) ProcessOrderPayment(dbtx database.Tx, order *models.Order, message *npb.OrderMessage, realTx iwallet.Transaction) error {
+	paymentSent := new(pb.PaymentSent)
+	if err := message.Message.UnmarshalTo(paymentSent); err != nil {
+		return err
+	}
+
+	err := order.PutTransaction(realTx)
 	if models.IsDuplicateTransactionError(err) {
-		log.Debugf("Received duplicate transaction %s", tx.ID.String())
+		log.Debugf("Received duplicate transaction %s", realTx.ID.String())
 		return nil
 	} else if err != nil {
 		return err
+	}
+	order.PaymentAddress = paymentSent.ToAddress
+
+	op.bus.Emit(&events.TransactionReceived{
+		Transaction:  realTx,
+		CurrencyCode: paymentSent.Coin,
+	})
+
+	if order.Role() == models.RoleBuyer {
+		if err := order.PutMessage(message); err != nil {
+			return err
+		}
 	}
 
 	funded, err := order.IsFunded()
@@ -87,27 +103,8 @@ func (op *OrderProcessor) processIncomingPayment(dbtx database.Tx, order *models
 
 	switch order.Role() {
 	case models.RoleBuyer:
-		payment := pb.PaymentSent{
-			TransactionID: tx.ID.String(),
-		}
-
-		paymentAny := &anypb.Any{}
-		if err := paymentAny.MarshalFrom(&payment); err != nil {
-			return err
-		}
-
-		resp := npb.OrderMessage{
-			OrderID:     order.ID.String(),
-			MessageType: npb.OrderMessage_PAYMENT_SENT,
-			Message:     paymentAny,
-		}
-
-		if err := utils.SignOrderMessage(&resp, op.identityPrivateKey); err != nil {
-			return err
-		}
-
 		payload := &anypb.Any{}
-		if err := payload.MarshalFrom(&resp); err != nil {
+		if err := payload.MarshalFrom(message); err != nil {
 			return err
 		}
 
@@ -116,7 +113,7 @@ func (op *OrderProcessor) processIncomingPayment(dbtx database.Tx, order *models
 			return err
 		}
 
-		message := npb.Message{
+		msg := npb.Message{
 			MessageType: npb.Message_ORDER,
 			MessageID:   hex.EncodeToString(messageID),
 			Payload:     payload,
@@ -127,11 +124,7 @@ func (op *OrderProcessor) processIncomingPayment(dbtx database.Tx, order *models
 			return err
 		}
 
-		if err := op.messenger.ReliablySendMessage(dbtx, vendor, &message, nil); err != nil {
-			return err
-		}
-
-		if err := order.PutMessage(&resp); err != nil {
+		if err := op.messenger.ReliablySendMessage(dbtx, vendor, &msg, nil); err != nil {
 			return err
 		}
 
@@ -144,7 +137,7 @@ func (op *OrderProcessor) processIncomingPayment(dbtx database.Tx, order *models
 				op.bus.Emit(&events.OrderPaymentReceived{
 					OrderID:      order.ID.String(),
 					FundingTotal: fundingTotal.String(),
-					CoinType:     orderOpen.Payment.Coin,
+					CoinType:     paymentSent.Coin,
 				})
 			})
 			log.Infof("Payment detected: Order %s fully funded", order.ID)
@@ -167,8 +160,8 @@ func (op *OrderProcessor) processIncomingPayment(dbtx database.Tx, order *models
 					ListingType: orderOpen.Listings[0].Listing.Metadata.ContractType.String(),
 					OrderID:     order.ID.String(),
 					Price: events.ListingPrice{
-						Amount:        orderOpen.Payment.Amount,
-						CurrencyCode:  orderOpen.Payment.Coin,
+						Amount:        paymentSent.Amount,
+						CurrencyCode:  paymentSent.Coin,
 						PriceModifier: orderOpen.Listings[0].Listing.Item.CryptoListingPriceModifier,
 					},
 					Slug: orderOpen.Listings[0].Listing.Slug,
@@ -184,6 +177,11 @@ func (op *OrderProcessor) processIncomingPayment(dbtx database.Tx, order *models
 			log.Infof("Payment detected: Order %s partially funded", order.ID)
 		}
 	}
+	return nil
+}
+
+// processIncomingPayment processes payments into an order's payment address.
+func (op *OrderProcessor) processIncomingPayment(dbtx database.Tx, order *models.Order, tx iwallet.Transaction) error {
 	return nil
 }
 
@@ -229,31 +227,31 @@ func (op *OrderProcessor) CheckForMorePayments(force bool) {
 				continue
 			}
 
-			orderOpen, err := order.OrderOpenMessage()
+			paymentSent, err := order.PaymentSentMessage()
 			if err != nil {
-				log.Errorf("Error loading orderOpen message %s", err)
+				log.Errorf("Error loading paymentSent message %s", err)
 				continue
 			}
 
-			addr, err := utils.GetPaymentAddress(orderOpen)
+			addr, err := utils.GetPaymentAddress(paymentSent)
 			if err != nil {
 				log.Errorf("Error payment address from orderOpen message %s", err)
 				continue
 			}
 
-			addrs, ok := addressesToWatch[iwallet.CoinType(orderOpen.Payment.Coin)]
+			addrs, ok := addressesToWatch[iwallet.CoinType(paymentSent.Coin)]
 			if ok {
 				addrs = append(addrs, addr)
-				addressesToWatch[iwallet.CoinType(orderOpen.Payment.Coin)] = addrs
+				addressesToWatch[iwallet.CoinType(paymentSent.Coin)] = addrs
 			} else {
-				addressesToWatch[iwallet.CoinType(orderOpen.Payment.Coin)] = []iwallet.AddressEx{addr}
+				addressesToWatch[iwallet.CoinType(paymentSent.Coin)] = []iwallet.AddressEx{addr}
 			}
 
 			if !force && !shouldWeQuery(timestamp, order.LastCheckForPayments) {
 				continue
 			}
 
-			wallet, err := op.multiwallet.WalletForCurrencyCode(orderOpen.Payment.Coin)
+			wallet, err := op.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
 			if err != nil {
 				// log.Errorf("Error loading wallet for order %s: %s", order.ID, err)
 				continue
@@ -261,9 +259,9 @@ func (op *OrderProcessor) CheckForMorePayments(force bool) {
 
 			_, ok = wallet.(iwallet.WalletScanner)
 			if ok {
-				earliest, ok := rescanMap[iwallet.CoinType(orderOpen.Payment.Coin)]
+				earliest, ok := rescanMap[iwallet.CoinType(paymentSent.Coin)]
 				if !ok || timestamp.Before(earliest) {
-					rescanMap[iwallet.CoinType(orderOpen.Payment.Coin)] = timestamp
+					rescanMap[iwallet.CoinType(paymentSent.Coin)] = timestamp
 				}
 				order.RescanPerformed = true
 			}
@@ -279,17 +277,10 @@ func (op *OrderProcessor) CheckForMorePayments(force bool) {
 				knownTxsMap[tx.ID] = true
 			}
 
-			paymentMsgs, err := order.PaymentSentMessages()
-			if err == nil {
-				for _, msg := range paymentMsgs {
-					txid := iwallet.TransactionID(msg.TransactionID)
-					if !knownTxsMap[txid] {
-						missingTxids = append(missingTxids, txid)
-						knownTxsMap[txid] = true
-					}
-				}
-			} else if !models.IsMessageNotExistError(err) {
-				log.Errorf("Error loading payment sent messages: %s", err)
+			txid := iwallet.TransactionID(paymentSent.TransactionID)
+			if !knownTxsMap[txid] {
+				missingTxids = append(missingTxids, txid)
+				knownTxsMap[txid] = true
 			}
 
 			refundMsgs, err := order.Refunds()

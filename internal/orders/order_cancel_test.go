@@ -91,9 +91,10 @@ func TestOrderProcessor_processCancelMessage(t *testing.T) {
 				Identity: pubkeyBytes,
 			},
 		},
-		Payment: &pb.OrderOpen_Payment{
-			Coin: iwallet.CtMock,
-		},
+	}
+
+	paymentSent := &pb.PaymentSent{
+		Coin: iwallet.CtMock,
 	}
 
 	tests := []struct {
@@ -106,10 +107,18 @@ func TestOrderProcessor_processCancelMessage(t *testing.T) {
 			setup: func(order *models.Order) error {
 				order.ID = models.OrderID(orderID)
 
-				return order.PutMessage(&npb.OrderMessage{
+				err := order.PutMessage(&npb.OrderMessage{
 					Signature:   []byte("abc"),
 					Message:     mustBuildAny(orderOpen),
 					MessageType: npb.OrderMessage_ORDER_OPEN,
+				})
+				if err != nil {
+					return err
+				}
+				return order.PutMessage(&npb.OrderMessage{
+					Signature:   []byte("abc"),
+					Message:     mustBuildAny(paymentSent),
+					MessageType: npb.OrderMessage_PAYMENT_SENT,
 				})
 			},
 			expectedError: nil,

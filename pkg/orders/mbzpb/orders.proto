@@ -10,14 +10,16 @@ import "msg.proto";
 
 message OrderOpen {
     repeated SignedListing listings     = 1;
-    string refundAddress                = 2;
-    Shipping shipping                   = 3;
-    ID buyerID                          = 4;
-    google.protobuf.Timestamp timestamp = 5;
-    repeated Item items                 = 6;
-    Payment payment                     = 7;
-    repeated bytes ratingKeys           = 8;
-    string alternateContactInfo         = 9;
+    Shipping shipping                   = 2;
+    ID buyerID                          = 3;
+    google.protobuf.Timestamp timestamp = 4;
+    repeated Item items                 = 5;
+    repeated bytes ratingKeys           = 6;
+    string alternateContactInfo         = 7;
+    string chaincode                    = 8; // unique id for payment, 32
+    string pricingCoin                  = 9;
+    string amount                       = 10; // Satoshis
+
 
     message Shipping {
         string shipTo       = 1;
@@ -47,27 +49,6 @@ message OrderOpen {
         message ShippingOption {
             string name    = 1;
             string service = 2;
-        }
-    }
-
-    message Payment {
-        Method method             = 1;
-        string moderator          = 2;
-        string amount             = 3; // Satoshis
-        string chaincode          = 4; // Hex encoded
-        string address            = 5; // B58check encoded
-        string script             = 6; // Hex encoded, usually redeem script.
-        bytes  moderatorKey       = 7;
-        string coin               = 8;
-        string escrowReleaseFee   = 9;
-        string platformAmount     = 10; // Satoshis
-        string platformAddr       = 11;
-        string platformRewardAddr = 12; // Platform token reward
-
-        enum Method {
-            DIRECT     = 0; // Address request
-            CANCELABLE = 1; // 1 of 2 cancelable address
-            MODERATED  = 2; // 2 of 3 escrow address
         }
     }
 }
@@ -226,7 +207,28 @@ message Refund {
 }
 
 message PaymentSent {
-    string transactionID = 1;
+    string transactionID                = 1;
+    string chaincode                    = 2; // Hex encoded
+    Method method                       = 3;
+    string moderator                    = 4; // 仲裁者（可选）
+    bytes  moderatorKey                 = 5;
+    string amount                       = 6; // 支付金额, Satoshis
+    string coin                         = 7; // 支付货币
+    string fromAddress                  = 8; // 支付地址
+    string toAddress                    = 9; // 目标地址
+    string script                       = 10; // Hex encoded, usually redeem script.
+    string escrowReleaseFee             = 11;
+    uint32 escrowTimeoutHours           = 12;
+    string platformAmount               = 13; // Satoshis
+    string platformAddr                 = 14;
+    string refundAddress                = 15; // 退款地址
+    google.protobuf.Timestamp timestamp = 16;
+
+    enum Method {
+        DIRECT     = 0; // Address request
+        CANCELABLE = 1; // 1 of 2 cancelable address
+        MODERATED  = 2; // 2 of 3 escrow address
+    }
 }
 
 message PaymentFinalized {
@@ -247,15 +249,6 @@ message Signature {
     bytes from      = 1;
     bytes signature = 2;
     uint32 index    = 3;
-}
-
-message PaymentSentList {
-    repeated Message messages = 1;
-
-    message Message {
-        PaymentSent paymentSentMessage = 1;
-        bytes signature                = 2;
-    }
 }
 
 message FulfillmentList {
@@ -317,8 +310,8 @@ message Contract {
     repeated Refund refunds = 26;
     bool refundsAcked  = 27;
 
-    repeated PaymentSent paymentsSent = 28;
-    bool paymentsSentAcked       = 29;
+    PaymentSent paymentSent = 28;
+    bool paymentSentAcked       = 29;
 
     OrderList parkedMessages  = 30;
     OrderList erroredMessages = 31;

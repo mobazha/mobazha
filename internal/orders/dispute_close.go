@@ -103,14 +103,14 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 		return errors.New("no moderator signature in dispute resolution")
 	}
 
-	orderOpen, err := order.OrderOpenMessage()
+	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
-		errMsg := fmt.Sprintf("failed to get order open message, order id: %s", order.ID)
+		errMsg := fmt.Sprintf("failed to get payment sent message, order id: %s", order.ID)
 		log.Error(errMsg)
 		return errors.New(errMsg)
 	}
 
-	_, err = op.multiwallet.WalletForCurrencyCode(orderOpen.Payment.Coin)
+	_, err = op.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
 	if err != nil {
 		return fmt.Errorf("cannot validate order. coin not supported. %w", err)
 	}

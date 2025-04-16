@@ -43,12 +43,20 @@ func (op *OrderProcessor) processOrderConfirmationMessage(dbtx database.Tx, orde
 		return nil, err
 	}
 
-	wallet, err := op.multiwallet.WalletForCurrencyCode(orderOpen.Payment.Coin)
+	paymentSent, err := order.PaymentSentMessage()
+	if models.IsMessageNotExistError(err) {
+		return nil, order.ParkMessage(message)
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	if orderConfirmation.TransactionID != "" && orderOpen.Payment.Method == pb.OrderOpen_Payment_CANCELABLE {
+	wallet, err := op.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
+	if err != nil {
+		return nil, err
+	}
+
+	if orderConfirmation.TransactionID != "" && paymentSent.Method == pb.PaymentSent_CANCELABLE {
 		// If this fails it's OK as the processor's unfunded order checking loop will
 		// retry at it's next interval.
 		tx, err := wallet.GetTransaction(iwallet.TransactionID(orderConfirmation.TransactionID))

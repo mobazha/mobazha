@@ -15,6 +15,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
+	"github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -92,6 +93,7 @@ func newMockOrderProcessor() (*OrderProcessor, func(), error) {
 			ExchangeRateProvider: erp,
 			EventBus:             events.NewBus(),
 			CalcCIDFunc:          calcMockCID,
+			FeatureManager:       config.GetGlobalFeatureManager(),
 		}), func() {
 			ipfsNode.Close()
 			r.DestroyRepo()

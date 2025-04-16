@@ -118,8 +118,8 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 			ListingType: orderOpen.Listings[0].Listing.Metadata.ContractType.String(),
 			OrderID:     message.OrderID,
 			Price: events.ListingPrice{
-				Amount:        orderOpen.Payment.Amount,
-				CurrencyCode:  orderOpen.Payment.Coin,
+				Amount:        orderOpen.Amount,
+				CurrencyCode:  orderOpen.PricingCoin,
 				PriceModifier: orderOpen.Listings[0].Listing.Item.CryptoListingPriceModifier,
 			},
 			Slug: orderOpen.Listings[0].Listing.Slug,
@@ -132,31 +132,6 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 	}
 
 	if err := order.PutMessage(message); err != nil {
-		return nil, err
-	}
-	if orderOpen.Payment != nil {
-		order.PaymentAddress = orderOpen.Payment.Address
-	}
-
-	wallet, err := op.multiwallet.WalletForCurrencyCode(orderOpen.Payment.Coin)
-	if err != nil {
-		return nil, err
-	}
-	wtx, err := wallet.Begin()
-	if err != nil {
-		return nil, err
-	}
-	addr, err := utils.GetPaymentAddress(orderOpen)
-	if err != nil {
-		wtx.Rollback()
-		return nil, fmt.Errorf("get payment address failed, %v", err)
-	}
-	err = wallet.WatchAddress(wtx, addr)
-	if err != nil {
-		wtx.Rollback()
-		return nil, fmt.Errorf("add watch address failed, %v", err)
-	}
-	if err := wtx.Commit(); err != nil {
 		return nil, err
 	}
 
@@ -175,9 +150,6 @@ func (op *OrderProcessor) validateOrderOpen(dbtx database.Tx, order *pb.OrderOpe
 	if order.Listings == nil {
 		return errors.New("listings field is nil")
 	}
-	if order.Payment == nil {
-		return errors.New("payment field is nil")
-	}
 	if order.Items == nil {
 		return errors.New("items field is nil")
 	}
@@ -189,11 +161,6 @@ func (op *OrderProcessor) validateOrderOpen(dbtx database.Tx, order *pb.OrderOpe
 	}
 	if order.RatingKeys == nil {
 		return errors.New("rating keys field is nil")
-	}
-
-	wal, err := op.multiwallet.WalletForCurrencyCode(order.Payment.Coin)
-	if err != nil {
-		return err
 	}
 
 	if role == models.RoleVendor { // If we are vendor.
@@ -232,17 +199,6 @@ func (op *OrderProcessor) validateOrderOpen(dbtx database.Tx, order *pb.OrderOpe
 				return fmt.Errorf("item %s is not for sale", listing.Listing.Slug)
 			}
 		}
-
-		// TODO: HasKey() check is not passed for MATICUSDT, need check
-		// if order.Payment.Method == pb.OrderOpen_Payment_DIRECT {
-		// 	has, err := wal.HasKey(iwallet.NewAddress(order.Payment.Address, iwallet.CoinType(order.Payment.Coin)))
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	if !has {
-		// 		return errors.New("direct payment address not found in wallet")
-		// 	}
-		// }
 	}
 
 	var escrowTimeoutHours uint32
@@ -324,11 +280,6 @@ func (op *OrderProcessor) validateOrderOpen(dbtx database.Tx, order *pb.OrderOpe
 		return fmt.Errorf("invalid buyer ID: %s", err.Error())
 	}
 
-	// Validate payment
-	if err := utils.ValidatePayment(order, escrowTimeoutHours, wal); err != nil {
-		return fmt.Errorf("invalid payment: %s", err.Error())
-	}
-
 	// Validate rating keys
 	if len(order.RatingKeys) != len(order.Items) {
 		return errors.New("incorrect number of ratings keys")
@@ -359,9 +310,9 @@ func CalculateOrderTotal(order *pb.OrderOpen, erp *wallet.ExchangeRateProvider) 
 		physicalGoods                                    = make(map[string]*pb.Listing)
 	)
 
-	paymentCurrency, err := models.CurrencyDefinitions.Lookup(order.Payment.Coin)
+	paymentCurrency, err := models.CurrencyDefinitions.Lookup(order.PricingCoin)
 	if err != nil {
-		return models.OrderTotals{}, fmt.Errorf("failed to lookup payment coin: %s", order.Payment.Coin)
+		return models.OrderTotals{}, fmt.Errorf("failed to lookup payment coin: %s", order.PricingCoin)
 	}
 
 	// Calculate the price of each item

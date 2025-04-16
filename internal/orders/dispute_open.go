@@ -60,7 +60,12 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 
-	if orderOpen.Payment.Moderator == "" || orderOpen.Payment.Method != pb.OrderOpen_Payment_MODERATED {
+	paymentSent, err := order.PaymentSentMessage()
+	if err != nil {
+		return nil, err
+	}
+
+	if paymentSent.Moderator == "" || paymentSent.Method != pb.PaymentSent_MODERATED {
 		return nil, errors.New("dispute opened processed for non-moderated order")
 	}
 
@@ -99,7 +104,7 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 			return nil, err
 		}
 
-		payoutAddress, err := op.GetPayoutAddress(dbtx, orderOpen.Payment.Coin)
+		payoutAddress, err := op.GetPayoutAddress(dbtx, paymentSent.Coin)
 		if err != nil {
 			return nil, err
 		}
@@ -141,7 +146,7 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 			Payload:     payload,
 		}
 
-		moderator, err := peer.Decode(orderOpen.Payment.Moderator)
+		moderator, err := peer.Decode(paymentSent.Moderator)
 		if err != nil {
 			return nil, err
 		}

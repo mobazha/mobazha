@@ -15,7 +15,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -74,9 +73,6 @@ func Test_processRatingSignaturesMessage(t *testing.T) {
 					},
 				},
 			},
-		},
-		Payment: &pb.OrderOpen_Payment{
-			Coin: iwallet.CtMock,
 		},
 		RatingKeys: [][]byte{
 			ratingKey.PubKey().SerializeCompressed(),
@@ -259,9 +255,6 @@ func TestOrderProcessor_sendRatingSignatures(t *testing.T) {
 		},
 		BuyerID: &pb.ID{
 			PeerID: buyerID.String(),
-		},
-		Payment: &pb.OrderOpen_Payment{
-			Coin: iwallet.CtMock,
 		},
 		RatingKeys: [][]byte{
 			ratingKey.PubKey().SerializeCompressed(),

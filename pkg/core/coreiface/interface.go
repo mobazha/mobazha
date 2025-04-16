@@ -58,8 +58,9 @@ type CoreIface interface {
 	GetNotificationsUnreadCount() (int, error)
 
 	// Orders
-	PurchaseListing(ctx context.Context, purchase *models.Purchase) (orderID models.OrderID, paymentAddress iwallet.Address, paymentAmount models.CurrencyValue, err error)
+	PurchaseListing(ctx context.Context, purchase *models.Purchase) (orderID models.OrderID, paymentAmount models.CurrencyValue, err error)
 	EstimateOrderTotal(ctx context.Context, purchase *models.Purchase) (models.OrderTotals, error)
+	ProcessOrderPayment(ctx context.Context, paymentData *models.PaymentData) error
 	RejectOrder(orderID models.OrderID, reason string, done chan struct{}) error
 	RefundOrder(orderID models.OrderID, done chan struct{}) error
 	ConfirmOrder(orderID models.OrderID, done chan struct{}) error

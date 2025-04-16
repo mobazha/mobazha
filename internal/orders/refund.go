@@ -34,6 +34,14 @@ func (op *OrderProcessor) processRefundMessage(dbtx database.Tx, order *models.O
 		return nil, err
 	}
 
+	paymentSent, err := order.PaymentSentMessage()
+	if models.IsMessageNotExistError(err) {
+		return nil, order.ParkMessage(message)
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	if err := order.PutMessage(message); err != nil {
 		if models.IsDuplicateTransactionError(err) {
 			return nil, nil
@@ -41,12 +49,12 @@ func (op *OrderProcessor) processRefundMessage(dbtx database.Tx, order *models.O
 		return nil, err
 	}
 
-	wallet, err := op.multiwallet.WalletForCurrencyCode(orderOpen.Payment.Coin)
+	wallet, err := op.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
 	if err != nil {
 		return nil, err
 	}
 
-	if refund.GetTransactionID() != "" && orderOpen.Payment.Method == pb.OrderOpen_Payment_DIRECT {
+	if refund.GetTransactionID() != "" && paymentSent.Method == pb.PaymentSent_DIRECT {
 		// If this fails it's OK as the processor's unfunded order checking loop will
 		// retry at it's next interval.
 		tx, err := wallet.GetTransaction(iwallet.TransactionID(refund.GetTransactionID()))
@@ -59,8 +67,8 @@ func (op *OrderProcessor) processRefundMessage(dbtx database.Tx, order *models.O
 				}
 			}
 		}
-	} else if order.Role() == models.RoleBuyer && refund.GetReleaseInfo() != nil && orderOpen.Payment.Method == pb.OrderOpen_Payment_MODERATED {
-		if err := op.releaseRefundEscrowFunds(wallet, orderOpen, refund.GetReleaseInfo()); err != nil {
+	} else if order.Role() == models.RoleBuyer && refund.GetReleaseInfo() != nil && paymentSent.Method == pb.PaymentSent_MODERATED {
+		if err := op.releaseRefundEscrowFunds(wallet, paymentSent, refund.GetReleaseInfo()); err != nil {
 			log.Errorf("Error releasing funds from escrow during refund processing: %s", err.Error())
 			return nil, err
 		}
@@ -84,13 +92,13 @@ func (op *OrderProcessor) processRefundMessage(dbtx database.Tx, order *models.O
 	return event, nil
 }
 
-func (op *OrderProcessor) releaseRefundEscrowFunds(wallet iwallet.Wallet, orderOpen *pb.OrderOpen, releaseInfo *pb.EscrowRelease) error {
+func (op *OrderProcessor) releaseRefundEscrowFunds(wallet iwallet.Wallet, paymentSent *pb.PaymentSent, releaseInfo *pb.EscrowRelease) error {
 	escrowWallet, ok := wallet.(iwallet.Escrow)
 	if !ok {
 		return errors.New("wallet for moderated order does not support escrow")
 	}
 
-	if releaseInfo.ToAddress != orderOpen.RefundAddress {
+	if releaseInfo.ToAddress != paymentSent.RefundAddress {
 		return errors.New("refund does not pay out to our refund address")
 	}
 	_, ok = new(big.Int).SetString(releaseInfo.ToAmount, 10)
@@ -100,7 +108,7 @@ func (op *OrderProcessor) releaseRefundEscrowFunds(wallet iwallet.Wallet, orderO
 	txn := iwallet.Transaction{
 		To: []iwallet.SpendInfo{
 			{
-				Address: iwallet.NewAddress(releaseInfo.ToAddress, iwallet.CoinType(orderOpen.Payment.Coin)),
+				Address: iwallet.NewAddress(releaseInfo.ToAddress, iwallet.CoinType(paymentSent.Coin)),
 				Amount:  iwallet.NewAmount(releaseInfo.ToAmount),
 			},
 		},
@@ -118,12 +126,12 @@ func (op *OrderProcessor) releaseRefundEscrowFunds(wallet iwallet.Wallet, orderO
 		})
 	}
 
-	script, err := hex.DecodeString(orderOpen.Payment.Script)
+	script, err := hex.DecodeString(paymentSent.Script)
 	if err != nil {
 		return err
 	}
 
-	chainCode, err := hex.DecodeString(orderOpen.Payment.Chaincode)
+	chainCode, err := hex.DecodeString(paymentSent.Chaincode)
 	if err != nil {
 		return err
 	}

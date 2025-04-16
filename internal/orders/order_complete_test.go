@@ -174,10 +174,6 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 				},
 			},
 		},
-		Payment: &pb.OrderOpen_Payment{
-			Coin:      iwallet.CtMock,
-			Chaincode: hex.EncodeToString(chaincode),
-		},
 		RatingKeys: [][]byte{
 			ratingKeys[0].PubKey().SerializeCompressed(),
 		},
@@ -195,6 +191,11 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 		},
 	}
 
+	paymentSent := &pb.PaymentSent{
+		Coin:      iwallet.CtMock,
+		Chaincode: hex.EncodeToString(chaincode),
+	}
+
 	tests := []struct {
 		setup         func(order *models.Order) error
 		expectedError error
@@ -205,9 +206,17 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 			setup: func(order *models.Order) error {
 				order.SetRole(models.RoleVendor)
 				order.ID = models.OrderID(orderID)
-				return order.PutMessage(&npb.OrderMessage{
+				err := order.PutMessage(&npb.OrderMessage{
 					Signature: []byte("abc"),
 					Message:   mustBuildAny(orderOpen),
+				})
+				if err != nil {
+					return err
+				}
+				return order.PutMessage(&npb.OrderMessage{
+					Signature:   []byte("abc"),
+					Message:     mustBuildAny(paymentSent),
+					MessageType: npb.OrderMessage_PAYMENT_SENT,
 				})
 			},
 			expectedError: nil,

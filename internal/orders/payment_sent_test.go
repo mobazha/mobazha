@@ -1,18 +1,17 @@
 package orders
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"reflect"
 	"testing"
 
-	crypto "github.com/libp2p/go-libp2p/core/crypto"
-	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha3.0/pkg/models/factory"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -44,21 +43,21 @@ func Test_processPaymentSentMessage(t *testing.T) {
 
 	op.multiwallet["MCK"] = wn.Wallets()[0]
 
-	_, pub, err := crypto.GenerateEd25519Key(rand.Reader)
+	orderOpen, paymentSent, err := factory.NewOrder()
 	if err != nil {
 		t.Fatal(err)
 	}
-	remotePeer, err := peer.IDFromPublicKey(pub)
-	if err != nil {
-		t.Fatal(err)
-	}
+	paymentSent.TransactionID = txs[0].ID.String()
+	paymentSent.ToAddress = txs[0].To[0].Address.String()
+	paymentSent.Method = pb.PaymentSent_DIRECT
 
-	paymentMsg := &pb.PaymentSent{
-		TransactionID: txs[0].ID.String(),
+	remotePeer, err := peer.Decode(orderOpen.BuyerID.PeerID)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	paymentAny := &anypb.Any{}
-	if err := paymentAny.MarshalFrom(paymentMsg); err != nil {
+	if err := paymentAny.MarshalFrom(paymentSent); err != nil {
 		t.Fatal(err)
 	}
 
@@ -79,15 +78,11 @@ func Test_processPaymentSentMessage(t *testing.T) {
 			setup: func(order *models.Order) error {
 				order.ID = "1234"
 				order.PaymentAddress = addr.String()
-				return order.PutMessage(&npb.OrderMessage{
+				err := order.PutMessage(&npb.OrderMessage{
 					Signature: []byte("abc"),
-					Message: mustBuildAny(&pb.OrderOpen{
-						Payment: &pb.OrderOpen_Payment{
-							Coin:   "MCK",
-							Amount: "1000",
-						},
-					}),
+					Message:   mustBuildAny(orderOpen),
 				})
+				return err
 			},
 			expectedError: nil,
 			expectedEvent: &events.PaymentSentReceived{
@@ -111,13 +106,7 @@ func Test_processPaymentSentMessage(t *testing.T) {
 		{
 			// Duplicate payment
 			setup: func(order *models.Order) error {
-				return order.PutMessage(&npb.OrderMessage{
-					Signature: []byte("abc"),
-					Message: mustBuildAny(&pb.PaymentSent{
-						TransactionID: "xyz",
-					}),
-					MessageType: npb.OrderMessage_PAYMENT_SENT,
-				})
+				return order.PutMessage(orderMsg)
 			},
 			expectedError: nil,
 			expectedEvent: nil,

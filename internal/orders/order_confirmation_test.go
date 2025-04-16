@@ -80,9 +80,10 @@ func TestOrderProcessor_processOrderConfirmationMessage(t *testing.T) {
 				},
 			},
 		},
-		Payment: &pb.OrderOpen_Payment{
-			Coin: iwallet.CtMock,
-		},
+	}
+
+	paymentSent := &pb.PaymentSent{
+		Coin: iwallet.CtMock,
 	}
 
 	tests := []struct {
@@ -94,9 +95,17 @@ func TestOrderProcessor_processOrderConfirmationMessage(t *testing.T) {
 			// Normal case where order open exists.
 			setup: func(order *models.Order) error {
 				order.ID = models.OrderID(orderID)
-				return order.PutMessage(&npb.OrderMessage{
+				err := order.PutMessage(&npb.OrderMessage{
 					Signature: []byte("abc"),
 					Message:   mustBuildAny(orderOpen),
+				})
+				if err != nil {
+					return err
+				}
+				return order.PutMessage(&npb.OrderMessage{
+					Signature:   []byte("abc"),
+					Message:     mustBuildAny(paymentSent),
+					MessageType: npb.OrderMessage_PAYMENT_SENT,
 				})
 			},
 			expectedError: nil,

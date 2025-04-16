@@ -103,11 +103,12 @@ func TestOrderProcessor_processDisputeAcceptMessage(t *testing.T) {
 				Identity: pubkeyBytes,
 			},
 		},
-		Payment: &pb.OrderOpen_Payment{
-			Coin:      iwallet.CtMock,
-			Moderator: "12D3KooWHnpVyu9XDeFoAVayqr9hvc9xPqSSHtCSFLEkKgcz5Wro",
-			Method:    pb.OrderOpen_Payment_MODERATED,
-		},
+	}
+
+	paymentSent := &pb.PaymentSent{
+		Coin:      iwallet.CtMock,
+		Moderator: "12D3KooWHnpVyu9XDeFoAVayqr9hvc9xPqSSHtCSFLEkKgcz5Wro",
+		Method:    pb.PaymentSent_MODERATED,
 	}
 
 	tests := []struct {
@@ -125,7 +126,14 @@ func TestOrderProcessor_processDisputeAcceptMessage(t *testing.T) {
 					Message:     mustBuildAny(orderOpen),
 					MessageType: npb.OrderMessage_ORDER_OPEN,
 				})
-				return err
+				if err != nil {
+					return err
+				}
+				return order.PutMessage(&npb.OrderMessage{
+					Signature:   []byte("abc"),
+					Message:     mustBuildAny(paymentSent),
+					MessageType: npb.OrderMessage_PAYMENT_SENT,
+				})
 			},
 			expectedError: nil,
 			expectedEvent: &events.DisputeAccepted{

@@ -46,12 +46,20 @@ func (op *OrderProcessor) processOrderCancelMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 
-	wallet, err := op.multiwallet.WalletForCurrencyCode(orderOpen.Payment.Coin)
+	paymentSent, err := order.PaymentSentMessage()
+	if models.IsMessageNotExistError(err) {
+		return nil, order.ParkMessage(message)
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	if orderCancel.TransactionID != "" && orderOpen.Payment.Method == pb.OrderOpen_Payment_CANCELABLE {
+	wallet, err := op.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
+	if err != nil {
+		return nil, err
+	}
+
+	if orderCancel.TransactionID != "" && paymentSent.Method == pb.PaymentSent_CANCELABLE {
 		// If this fails it's OK as the processor's unfunded order checking loop will
 		// retry at it's next interval.
 		tx, err := wallet.GetTransaction(iwallet.TransactionID(orderCancel.TransactionID))
@@ -86,21 +94,21 @@ func (op *OrderProcessor) processOrderCancelMessage(dbtx database.Tx, order *mod
 }
 
 func (op *OrderProcessor) releaseFromCancelableAddress(tx database.Tx, order *models.Order) (iwallet.Tx, iwallet.TransactionID, error) {
-	orderOpen, err := order.OrderOpenMessage()
+	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
 		return nil, "", err
 	}
 
-	if orderOpen.Payment.Method != pb.OrderOpen_Payment_CANCELABLE {
+	if paymentSent.Method != pb.PaymentSent_CANCELABLE {
 		return nil, "", errors.New("order payment method is not CANCELABLE")
 	}
 
-	wallet, err := op.multiwallet.WalletForCurrencyCode(orderOpen.Payment.Coin)
+	wallet, err := op.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
 	if err != nil {
 		return nil, "", err
 	}
 
-	toAddress, err := op.GetPayoutAddress(tx, orderOpen.Payment.Coin)
+	toAddress, err := op.GetPayoutAddress(tx, paymentSent.Coin)
 	if err != nil {
 		return nil, "", err
 	}
@@ -128,7 +136,7 @@ func (op *OrderProcessor) releaseFromCancelableAddress(tx database.Tx, order *mo
 	isETHLikeCoin := wallet.CoinCategory() == iwallet.CoinCategoryEthereum
 	for _, tx := range txs {
 		for _, to := range tx.To {
-			if ((!isETHLikeCoin && !spent[hex.EncodeToString(to.ID)]) || isETHLikeCoin) && to.Address.String() == orderOpen.Payment.Address {
+			if ((!isETHLikeCoin && !spent[hex.EncodeToString(to.ID)]) || isETHLikeCoin) && to.Address.String() == paymentSent.ToAddress {
 				txn.From = append(txn.From, to)
 				totalOut = totalOut.Add(to.Amount)
 			}
@@ -152,12 +160,12 @@ func (op *OrderProcessor) releaseFromCancelableAddress(tx database.Tx, order *mo
 		Amount:  totalOut.Sub(escrowFee),
 	})
 
-	script, err := hex.DecodeString(orderOpen.Payment.Script)
+	script, err := hex.DecodeString(paymentSent.Script)
 	if err != nil {
 		return nil, "", err
 	}
 
-	chainCode, err := hex.DecodeString(orderOpen.Payment.Chaincode)
+	chainCode, err := hex.DecodeString(paymentSent.Chaincode)
 	if err != nil {
 		return nil, "", err
 	}

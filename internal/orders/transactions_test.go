@@ -7,6 +7,7 @@ import (
 
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
+	"github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/models/factory"
@@ -16,6 +17,15 @@ import (
 )
 
 func TestOrderProcessor_processWalletTransaction(t *testing.T) {
+	op0, teardown0, err := newMockOrderProcessor()
+	if err != nil {
+		return
+	}
+	if op0.featureManager.IsEnabled(config.FeatureNoBuildinWallet) {
+		t.Skip("Skipping test because the feature is disabled")
+	}
+	defer teardown0()
+
 	tests := []struct {
 		setup    func() (*OrderProcessor, func(), error)
 		tx       iwallet.Transaction
@@ -28,12 +38,16 @@ func TestOrderProcessor_processWalletTransaction(t *testing.T) {
 					return nil, nil, err
 				}
 
+				if op.featureManager.IsEnabled(config.FeatureNoBuildinWallet) {
+					t.Skip("Skipping test because the feature is disabled")
+				}
+
 				err = op.db.Update(func(tx database.Tx) error {
-					orderOpen, err := factory.NewOrder()
+					orderOpen, paymentSent, err := factory.NewOrder()
 					if err != nil {
 						return err
 					}
-					orderOpen.Payment.Address = "abcd"
+					paymentSent.ToAddress = "abcd"
 					order := models.Order{
 						ID:             "1234",
 						PaymentAddress: "abcd",
@@ -87,12 +101,9 @@ func TestOrderProcessor_processWalletTransaction(t *testing.T) {
 				if !funded {
 					return errors.New("failed to set order as funded")
 				}
-				sent, err := order.PaymentSentMessages()
+				_, err = order.PaymentSentMessage()
 				if err != nil {
 					return err
-				}
-				if len(sent) != 1 {
-					return errors.New("failed to payment sent message")
 				}
 				return nil
 			},
@@ -105,11 +116,11 @@ func TestOrderProcessor_processWalletTransaction(t *testing.T) {
 				}
 
 				err = op.db.Update(func(tx database.Tx) error {
-					orderOpen, err := factory.NewOrder()
+					orderOpen, paymentSent, err := factory.NewOrder()
 					if err != nil {
 						return err
 					}
-					orderOpen.Payment.Address = "abcd"
+					paymentSent.ToAddress = "abcd"
 					order := models.Order{
 						ID:             "1234",
 						PaymentAddress: "abcd",
@@ -175,11 +186,11 @@ func TestOrderProcessor_processWalletTransaction(t *testing.T) {
 				}
 
 				err = op.db.Update(func(tx database.Tx) error {
-					orderOpen, err := factory.NewOrder()
+					orderOpen, paymentSent, err := factory.NewOrder()
 					if err != nil {
 						return err
 					}
-					orderOpen.Payment.Address = "abcd"
+					paymentSent.ToAddress = "abcd"
 					order := models.Order{
 						ID:             "1234",
 						PaymentAddress: "abcd",
@@ -250,6 +261,10 @@ func TestOrderProcessor_checkForMorePayments(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if op.featureManager.IsEnabled(config.FeatureNoBuildinWallet) {
+		t.Skip("Skipping test because the feature is disabled")
+	}
+
 	defer teardown()
 
 	wn := wallet.NewMockWalletNetwork(1)
@@ -258,7 +273,7 @@ func TestOrderProcessor_checkForMorePayments(t *testing.T) {
 
 	op.multiwallet[iwallet.CtMock] = wn.Wallets()[0]
 
-	orderOpen, err := factory.NewOrder()
+	orderOpen, paymentSent, err := factory.NewOrder()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,7 +304,7 @@ func TestOrderProcessor_checkForMorePayments(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		fundingTxid, err := wn.Wallets()[0].Spend(wtx, iwallet.NewAddress(orderOpen.Payment.Address, iwallet.CtMock), iwallet.NewAmount(orderOpen.Payment.Amount), iwallet.FlNormal, iwallet.Address{}, iwallet.Amount{})
+		fundingTxid, err := wn.Wallets()[0].Spend(wtx, iwallet.NewAddress(paymentSent.ToAddress, iwallet.CtMock), iwallet.NewAmount(paymentSent.Amount), iwallet.FlNormal, iwallet.Address{}, iwallet.Amount{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -302,7 +317,7 @@ func TestOrderProcessor_checkForMorePayments(t *testing.T) {
 	order := &models.Order{
 		ID:             "abc",
 		Open:           true,
-		PaymentAddress: orderOpen.Payment.Address,
+		PaymentAddress: paymentSent.ToAddress,
 	}
 	if err := order.PutMessage(&npb.OrderMessage{
 		Signature: []byte("abc"),

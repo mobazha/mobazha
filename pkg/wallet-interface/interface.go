@@ -6,7 +6,6 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/gagliardetto/solana-go"
 )
 
 var ErrInsufficientFunds = errors.New("insufficient funds")
@@ -241,18 +240,6 @@ type Escrow interface {
 	BuildAndSend(dbtx Tx, txn Transaction, signatures [][]EscrowSignature, redeemScript []byte, finishType OrderFinishType) (TransactionID, error)
 }
 
-type SOLEscrow interface {
-	EstimateEscrowFee(threshold int, nOuts int, level FeeLevel) (Amount, error)
-
-	CreateMultisigAddress(keys []solana.PublicKey, chaincode []byte, threshold int) (Address, []byte, error)
-
-	SignMultisigTransaction(txn Transaction, key solana.PrivateKey, redeemScript []byte) ([]EscrowSignature, error)
-
-	CanReleaseFunds(txn Transaction, signatures [][]EscrowSignature, redeemScript []byte) (bool, error)
-
-	BuildAndSend(dbtx Tx, txn Transaction, signatures [][]EscrowSignature, redeemScript []byte, finishType OrderFinishType) (TransactionID, error)
-}
-
 // EscrowWithTimeout is an optional interface to be implemented by wallets whos coins
 // are capable of supporting time based release of funds from escrow.
 type EscrowWithTimeout interface {
@@ -266,12 +253,6 @@ type EscrowWithTimeout interface {
 	// ReleaseFundsAfterTimeout will release funds from the escrow. The signature will
 	// be created using the timeoutKey.
 	ReleaseFundsAfterTimeout(dbtx Tx, txn Transaction, timeoutKey btcec.PrivateKey, redeemScript []byte, finishType OrderFinishType) (TransactionID, error)
-}
-
-type SOLEscrowWithTimeout interface {
-	CreateMultisigWithTimeout(keys []solana.PublicKey, chaincode []byte, threshold int, timeout time.Duration, timeoutKey solana.PublicKey) (Address, []byte, error)
-
-	ReleaseFundsAfterTimeout(dbtx Tx, txn Transaction, timeoutKey solana.PrivateKey, redeemScript []byte, finishType OrderFinishType) (TransactionID, error)
 }
 
 // WalletCrypter is an optional interface that the wallet may implement to allow

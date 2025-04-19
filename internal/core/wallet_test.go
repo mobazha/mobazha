@@ -19,14 +19,14 @@ func TestOpenBazaarNode_SaveAndGetTransactionMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	orderOpen, err := factory.NewOrder()
+	orderOpen, paymentSent, err := factory.NewOrder()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var order models.Order
 	order.ID = models.OrderID("123")
-	order.PaymentAddress = orderOpen.Payment.Address
+	order.PaymentAddress = paymentSent.ToAddress
 	if err := order.PutMessage(utils.MustWrapOrderMessage(orderOpen)); err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestOpenBazaarNode_SaveAndGetTransactionMetadata(t *testing.T) {
 
 	memo := "If taxation without consent is not robbery, then any band of robbers have only to declare themselves a government, and all their robberies are legalized."
 	err = mockNode.SaveTransactionMetadata(&models.TransactionMetadata{
-		PaymentAddress: orderOpen.Payment.Address,
+		PaymentAddress: paymentSent.ToAddress,
 		Memo:           memo,
 		Txid:           "abc",
 	})
@@ -59,8 +59,8 @@ func TestOpenBazaarNode_SaveAndGetTransactionMetadata(t *testing.T) {
 	if metadata.Memo != memo {
 		t.Errorf("Expected memo of %s, got %s", memo, metadata.Memo)
 	}
-	if metadata.PaymentAddress != orderOpen.Payment.Address {
-		t.Errorf("Expected payment address of %s, got %s", orderOpen.Payment.Address, metadata.PaymentAddress)
+	if metadata.PaymentAddress != paymentSent.ToAddress {
+		t.Errorf("Expected payment address of %s, got %s", paymentSent.ToAddress, metadata.PaymentAddress)
 	}
 	if metadata.OrderID.String() != order.ID.String() {
 		t.Errorf("Expected order ID of %s, got %s", order.ID.String(), metadata.OrderID.String())

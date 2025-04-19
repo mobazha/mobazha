@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"path"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
@@ -124,7 +125,19 @@ func MockNode() (*OpenBazaarNode, error) {
 		return nil, err
 	}
 
+	// 创建共享管理器
+	cfg := &repo.Config{
+		// 添加必要的配置
+	}
+
+	sharedManager, err := NewSharedManager(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	node := &OpenBazaarNode{
+		nodeID:               repo.DefaultNodeID,
+		sharedManager:        sharedManager,
 		ipfsNode:             ipfsNode,
 		repo:                 r,
 		networkService:       service,
@@ -144,6 +157,7 @@ func MockNode() (*OpenBazaarNode, error) {
 		publishChan:          make(chan pubCloser),
 		featureManager:       pkgconfig.GetGlobalFeatureManager(),
 	}
+	sharedManager.AddNode(repo.DefaultNodeID, node)
 
 	node.messenger, err = net.NewMessenger(&net.MessengerConfig{
 		Privkey: ipfsNode.PrivateKey,
@@ -192,6 +206,16 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 	wn := wallet.NewMockWalletNetwork(numNodes)
 
 	//bootstrap.DefaultBootstrapConfig.MinPeerThreshold = 1
+
+	// 创建共享管理器
+	cfg := &repo.Config{
+		// 添加必要的配置
+	}
+
+	sharedManager, err := NewSharedManager(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	var nodes []*OpenBazaarNode
 	for i := 0; i < numNodes; i++ {
@@ -286,7 +310,14 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			return nil, err
 		}
 
+		nodeID := fmt.Sprintf("node-%d", i)
+		if i == 0 {
+			nodeID = repo.DefaultNodeID
+		}
+
 		node := &OpenBazaarNode{
+			nodeID:               nodeID,
+			sharedManager:        sharedManager,
 			ipfsNode:             ipfsNode,
 			repo:                 r,
 			networkService:       service,
@@ -306,6 +337,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			publishChan:          make(chan pubCloser),
 			featureManager:       pkgconfig.GetGlobalFeatureManager(),
 		}
+		sharedManager.AddNode(nodeID, node)
 
 		node.messenger, err = net.NewMessenger(&net.MessengerConfig{
 			Privkey: ipfsNode.PrivateKey,

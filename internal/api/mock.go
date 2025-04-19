@@ -114,8 +114,9 @@ type mockNode struct {
 	getMyRatingsFunc                        func() (models.RatingIndex, error)
 	getRatingsFunc                          func(ctx context.Context, peerID peer.ID, useCache bool) (models.RatingIndex, error)
 	getRatingFunc                           func(ctx context.Context, cid cid.Cid) (*pb.Rating, error)
-	purchaseFunc                            func(ctx context.Context, purchase *models.Purchase) (orderID models.OrderID, paymentAddress iwallet.Address, paymentAmount models.CurrencyValue, err error)
+	purchaseFunc                            func(ctx context.Context, purchase *models.Purchase) (orderID models.OrderID, paymentAmount models.CurrencyValue, err error)
 	estimateOrderTotalFunc                  func(ctx context.Context, purchase *models.Purchase) (models.OrderTotals, error)
+	processOrderPaymentFunc                 func(ctx context.Context, paymentData *models.PaymentData) error
 	rejectOrderFunc                         func(orderID models.OrderID, reason string, done chan struct{}) error
 	refundOrderFunc                         func(orderID models.OrderID, done chan struct{}) error
 	pingNodeFunc                            func(ctx context.Context, peer peer.ID) error
@@ -425,11 +426,14 @@ func (m *mockNode) GetRatings(ctx context.Context, peerID peer.ID, useCache bool
 func (m *mockNode) GetRating(ctx context.Context, cid cid.Cid) (*pb.Rating, error) {
 	return m.getRatingFunc(ctx, cid)
 }
-func (m *mockNode) PurchaseListing(ctx context.Context, purchase *models.Purchase) (orderID models.OrderID, paymentAddress iwallet.Address, paymentAmount models.CurrencyValue, err error) {
+func (m *mockNode) PurchaseListing(ctx context.Context, purchase *models.Purchase) (orderID models.OrderID, paymentAmount models.CurrencyValue, err error) {
 	return m.purchaseFunc(ctx, purchase)
 }
 func (m *mockNode) EstimateOrderTotal(ctx context.Context, purchase *models.Purchase) (models.OrderTotals, error) {
 	return m.estimateOrderTotalFunc(ctx, purchase)
+}
+func (m *mockNode) ProcessOrderPayment(ctx context.Context, paymentData *models.PaymentData) error {
+	return m.processOrderPaymentFunc(ctx, paymentData)
 }
 func (m *mockNode) RejectOrder(orderID models.OrderID, reason string, done chan struct{}) error {
 	return m.rejectOrderFunc(orderID, reason, done)

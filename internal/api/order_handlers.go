@@ -39,45 +39,18 @@ func (g *Gateway) handlePOSTPurchase(w http.ResponseWriter, r *http.Request) {
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
-	orderID, paymentAddr, amount, err := node.PurchaseListing(r.Context(), &data)
+	orderID, amount, err := node.PurchaseListing(r.Context(), &data)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
 		return
 	}
 	type purchaseReturn struct {
-		PaymentAddress string                `json:"paymentAddress"`
-		Amount         *models.CurrencyValue `json:"amount"`
-		OrderID        string                `json:"orderID"`
+		Amount  *models.CurrencyValue `json:"amount"`
+		OrderID string                `json:"orderID"`
 	}
-	ret := purchaseReturn{paymentAddr.String(), &amount, orderID.String()}
+	ret := purchaseReturn{&amount, orderID.String()}
 
 	sanitizedJSONResponse(w, ret)
-}
-
-func (g *Gateway) updateOrderTransactions(node coreiface.CoreIface, order *models.Order) error {
-	orderOpen, err := order.OrderOpenMessage()
-	if err != nil {
-		return err
-	}
-
-	coinType := orderOpen.Payment.Coin
-	mw := node.Multiwallet()
-	wallet, err := mw.WalletForCurrencyCode(coinType)
-	if err != nil {
-		return err
-	}
-
-	transactions, err := order.GetTransactions()
-	if err != nil {
-		return err
-	}
-	for _, tx := range transactions {
-		if transaction, err := wallet.GetTransaction(tx.ID); err == nil && transaction != nil {
-			order.UpdateTransaction(*transaction)
-		}
-	}
-
-	return nil
 }
 
 func (g *Gateway) handlePOSTCheckoutBreakdown(w http.ResponseWriter, r *http.Request) {
@@ -128,7 +101,6 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
 		return
 	}
-	g.updateOrderTransactions(node, order)
 
 	unreadChatMsgCount, _ := node.GetChatMessagesUnreadCountByOrderID(order.ID)
 
@@ -152,6 +124,46 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sanitizedJSONResponse(w, ret)
+}
+
+// handleNotifyPayment 处理支付通知
+func (g *Gateway) handleNotifyPayment(w http.ResponseWriter, r *http.Request) {
+	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+
+	var req struct {
+		OrderID     string `json:"orderId"`
+		PaymentInfo struct {
+			Method      string `json:"method"`
+			Amount      string `json:"amount"`
+			Coin        string `json:"coin"`
+			FromAddress string `json:"fromAddress"`
+			ToAddress   string `json:"toAddress"`
+			Script      string `json:"script"`
+			Moderator   string `json:"moderator"`
+		} `json:"paymentInfo"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// 创建 paymentData 消息
+	paymentData := &models.PaymentData{
+		OrderID:     req.OrderID,
+		Method:      req.PaymentInfo.Method,
+		Amount:      req.PaymentInfo.Amount,
+		Coin:        req.PaymentInfo.Coin,
+		FromAddress: req.PaymentInfo.FromAddress,
+		ToAddress:   req.PaymentInfo.ToAddress,
+		Script:      req.PaymentInfo.Script,
+		Moderator:   req.PaymentInfo.Moderator,
+		Timestamp:   time.Now(),
+	}
+
+	node.ProcessOrderPayment(r.Context(), paymentData)
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, node coreiface.CoreIface, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
@@ -188,6 +200,12 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, node coreiface.CoreIfa
 			continue
 		}
 
+		paymentSent, err := order.PaymentSentMessage()
+		if err != nil {
+			log.Errorf("Failed to get PaymentSentMessage for order: %s", order.ID.String())
+			continue
+		}
+
 		var listingInfo *pb.Listing
 		if len(orderOpen.Listings) > 0 && orderOpen.Listings[0] != nil {
 			listingInfo = orderOpen.Listings[0].Listing
@@ -203,18 +221,18 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, node coreiface.CoreIfa
 			Title:     listingInfo.Item.Title,
 			Thumbnail: listingInfo.Item.Images[0].Tiny,
 			Total: *models.NewCurrencyValue(
-				orderOpen.Payment.Amount,
-				models.CurrencyDefinitions[orderOpen.Payment.Coin],
+				paymentSent.Amount,
+				models.CurrencyDefinitions[paymentSent.Coin],
 			),
 			VendorID:           listingInfo.VendorID.PeerID,
 			VendorHandle:       listingInfo.VendorID.Handle,
 			ShippingName:       orderOpen.Shipping.ShipTo,
 			ShippingAddress:    orderOpen.Shipping.Address,
-			PaymentCoin:        orderOpen.Payment.Coin,
+			PaymentCoin:        paymentSent.Coin,
 			State:              order.GetState().String(),
 			Read:               order.Read,
 			UnreadChatMessages: order.UnreadChatMessages,
-			Moderated:          orderOpen.Payment.Method == pb.OrderOpen_Payment_MODERATED,
+			Moderated:          paymentSent.Method == pb.PaymentSent_MODERATED,
 		}
 
 		purchases = append(purchases, info)
@@ -289,6 +307,12 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, node coreiface.CoreIface, 
 			continue
 		}
 
+		paymentSent, err := order.PaymentSentMessage()
+		if err != nil {
+			log.Errorf("Failed to get PaymentSentMessage for order: %s", order.ID.String())
+			continue
+		}
+
 		var listingInfo *pb.Listing
 		if len(orderOpen.Listings) > 0 && orderOpen.Listings[0] != nil {
 			listingInfo = orderOpen.Listings[0].Listing
@@ -304,18 +328,18 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, node coreiface.CoreIface, 
 			Title:     listingInfo.Item.Title,
 			Thumbnail: listingInfo.Item.Images[0].Tiny,
 			Total: *models.NewCurrencyValue(
-				orderOpen.Payment.Amount,
-				models.CurrencyDefinitions[orderOpen.Payment.Coin],
+				paymentSent.Amount,
+				models.CurrencyDefinitions[paymentSent.Coin],
 			),
 			BuyerID:            orderOpen.BuyerID.PeerID,
 			BuyerHandle:        orderOpen.BuyerID.Handle,
 			ShippingName:       orderOpen.Shipping.ShipTo,
 			ShippingAddress:    orderOpen.Shipping.Address,
-			PaymentCoin:        orderOpen.Payment.Coin,
+			PaymentCoin:        paymentSent.Coin,
 			State:              order.GetState().String(),
 			Read:               order.Read,
 			UnreadChatMessages: order.UnreadChatMessages,
-			Moderated:          orderOpen.Payment.Method == pb.OrderOpen_Payment_MODERATED,
+			Moderated:          paymentSent.Method == pb.PaymentSent_MODERATED,
 		}
 
 		sales = append(sales, info)
@@ -400,6 +424,7 @@ func (g *Gateway) getCasesImpl(w http.ResponseWriter, node coreiface.CoreIface, 
 		}
 
 		orderOpen := contract.OrderOpen
+		paymentSent := contract.PaymentSent
 
 		var listingInfo *pb.Listing
 		if len(orderOpen.Listings) > 0 && orderOpen.Listings[0] != nil {
@@ -416,14 +441,14 @@ func (g *Gateway) getCasesImpl(w http.ResponseWriter, node coreiface.CoreIface, 
 			Title:     listingInfo.Item.Title,
 			Thumbnail: listingInfo.Item.Images[0].Tiny,
 			Total: *models.NewCurrencyValue(
-				orderOpen.Payment.Amount,
-				models.CurrencyDefinitions[orderOpen.Payment.Coin],
+				paymentSent.Amount,
+				models.CurrencyDefinitions[paymentSent.Coin],
 			),
 			BuyerID:            orderOpen.BuyerID.PeerID,
 			BuyerHandle:        orderOpen.BuyerID.Handle,
 			VendorID:           listingInfo.VendorID.PeerID,
 			VendorHandle:       listingInfo.VendorID.Handle,
-			PaymentCoin:        orderOpen.Payment.Coin,
+			PaymentCoin:        paymentSent.Coin,
 			BuyerOpened:        disputeOpen.OpenedBy == pb.DisputeOpen_BUYER,
 			Read:               aCase.Read,
 			UnreadChatMessages: aCase.UnreadChatMessages,

@@ -135,10 +135,10 @@ type mockNode struct {
 	updateReceivingAccountsFunc             func(receivingAccounts []models.ReceivingAccount) error
 	getStripeConnectURLFunc                 func() (string, error)
 
-	initializeSolEscrowFunc      func(ctx context.Context, params iwallet.InitializeSolEscrowParams) (solana.PublicKey, []solana.Instruction, error)
-	releaseSolEscrowFunc         func(ctx context.Context, params iwallet.ReleaseSolEscrowParams) ([]solana.Instruction, error)
-	initializeSPLTokenEscrowFunc func(ctx context.Context, params iwallet.InitializeSPLTokenParams) (solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
-	releaseSPLTokenEscrowFunc    func(ctx context.Context, params iwallet.ReleaseSPLTokenParams) ([]solana.Instruction, error)
+	initializeSolEscrowFunc      func(ctx context.Context, params models.InitializeSolEscrowData) (solana.PublicKey, []solana.Instruction, error)
+	releaseSolEscrowFunc         func(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	initializeSPLTokenEscrowFunc func(ctx context.Context, params models.InitializeSPLTokenData) (solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
+	releaseSPLTokenEscrowFunc    func(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
 
 	addPostFunc       func(post *postsPb.Post, done chan<- struct{}) error
 	deletePostFunc    func(slug string, done chan<- struct{}) error
@@ -491,17 +491,17 @@ func (m *mockNode) GetStripeConnectURL() (string, error) {
 }
 
 // Escrow
-func (m *mockNode) InitializeSolEscrow(ctx context.Context, params iwallet.InitializeSolEscrowParams) (solana.PublicKey, []solana.Instruction, error) {
+func (m *mockNode) InitializeSolEscrow(ctx context.Context, params models.InitializeSolEscrowData) (solana.PublicKey, []solana.Instruction, error) {
 	return m.initializeSolEscrowFunc(ctx, params)
 }
-func (m *mockNode) ReleaseSolEscrow(ctx context.Context, params iwallet.ReleaseSolEscrowParams) ([]solana.Instruction, error) {
-	return m.releaseSolEscrowFunc(ctx, params)
+func (m *mockNode) ReleaseSolEscrow(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
+	return m.releaseSolEscrowFunc(ctx, orderID, initiator)
 }
-func (m *mockNode) InitializeSPLTokenEscrow(ctx context.Context, params iwallet.InitializeSPLTokenParams) (solana.PublicKey, solana.PublicKey, []solana.Instruction, error) {
+func (m *mockNode) InitializeSPLTokenEscrow(ctx context.Context, params models.InitializeSPLTokenData) (solana.PublicKey, solana.PublicKey, []solana.Instruction, error) {
 	return m.initializeSPLTokenEscrowFunc(ctx, params)
 }
-func (m *mockNode) ReleaseSPLTokenEscrow(ctx context.Context, params iwallet.ReleaseSPLTokenParams) ([]solana.Instruction, error) {
-	return m.releaseSPLTokenEscrowFunc(ctx, params)
+func (m *mockNode) ReleaseSPLTokenEscrow(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
+	return m.releaseSPLTokenEscrowFunc(ctx, orderID, initiator)
 }
 
 func (m *mockNode) SavePreferences(prefs *models.UserPreferences, done chan struct{}) error {

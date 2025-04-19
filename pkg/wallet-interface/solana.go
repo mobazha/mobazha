@@ -21,7 +21,7 @@ type ReleaseSolEscrowParams struct {
 	EscrowAccount solana.PublicKey
 	Initiator     solana.PublicKey
 	Buyer         solana.PublicKey
-	UniqueId      []byte
+	UniqueId      [20]byte
 	Amounts       []uint64
 	Signatures    [][]byte
 	PublicKeys    []solana.PublicKey
@@ -52,7 +52,7 @@ type ReleaseSPLTokenParams struct {
 	Signatures             [][]byte
 	PublicKeys             []solana.PublicKey
 	RecipientTokenAccounts []solana.PublicKey
-	UniqueId               []byte
+	UniqueId               [20]byte
 }
 
 type SOLEscrow interface {

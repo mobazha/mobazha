@@ -168,10 +168,10 @@ type CoreIface interface {
 	UnblockNode(peerID string) (bool, error)
 
 	// Escrow
-	InitializeSolEscrow(ctx context.Context, params iwallet.InitializeSolEscrowParams) (solana.PublicKey, []solana.Instruction, error)
-	ReleaseSolEscrow(ctx context.Context, params iwallet.ReleaseSolEscrowParams) ([]solana.Instruction, error)
-	InitializeSPLTokenEscrow(ctx context.Context, params iwallet.InitializeSPLTokenParams) (solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
-	ReleaseSPLTokenEscrow(ctx context.Context, params iwallet.ReleaseSPLTokenParams) ([]solana.Instruction, error)
+	InitializeSolEscrow(ctx context.Context, params models.InitializeSolEscrowData) (solana.PublicKey, []solana.Instruction, error)
+	ReleaseSolEscrow(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	InitializeSPLTokenEscrow(ctx context.Context, params models.InitializeSPLTokenData) (solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
+	ReleaseSPLTokenEscrow(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
 
 	// Wallet
 	Multiwallet() multiwallet.Multiwallet

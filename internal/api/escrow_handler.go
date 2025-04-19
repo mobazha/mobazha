@@ -6,18 +6,18 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 // InitializeSolEscrow 初始化SOL托管
 func (g *Gateway) handleInitializeSolEscrow(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
-
-	var params iwallet.InitializeSolEscrowParams
+	var params models.InitializeSolEscrowData
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	// 使用 EscrowClient 初始化 SOL 托管
 	escrowAccount, instructions, err := node.InitializeSolEscrow(
@@ -44,15 +44,21 @@ func (g *Gateway) handleInitializeSolEscrow(w http.ResponseWriter, r *http.Reque
 
 // ReleaseSolEscrow 释放SOL
 func (g *Gateway) handleReleaseSolEscrow(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
-	var params iwallet.ReleaseSolEscrowParams
+	type ReleaseSolRequest struct {
+		OrderID   models.OrderID   `json:"orderID"`
+		Initiator solana.PublicKey `json:"initiator"`
+	}
+
+	var params ReleaseSolRequest
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+
 	// 使用 EscrowClient 释放 SOL 托管
-	instructions, err := node.ReleaseSolEscrow(r.Context(), params)
+	instructions, err := node.ReleaseSolEscrow(r.Context(), params.OrderID, params.Initiator)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -72,7 +78,7 @@ func (g *Gateway) handleReleaseSolEscrow(w http.ResponseWriter, r *http.Request)
 // InitializeSPLTokenEscrow 初始化SPL Token托管
 func (g *Gateway) handleInitializeSPLTokenEscrow(w http.ResponseWriter, r *http.Request) {
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
-	var params iwallet.InitializeSPLTokenParams
+	var params models.InitializeSPLTokenData
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -105,15 +111,20 @@ func (g *Gateway) handleInitializeSPLTokenEscrow(w http.ResponseWriter, r *http.
 
 // ReleaseSPLTokenEscrow 释放SPL Token
 func (g *Gateway) handleReleaseSPLTokenEscrow(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
-	var params iwallet.ReleaseSPLTokenParams
+	type ReleaseSPLTokenRequest struct {
+		OrderID   models.OrderID   `json:"orderID"`
+		Initiator solana.PublicKey `json:"initiator"`
+	}
+	var params ReleaseSPLTokenRequest
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+
 	// 使用 EscrowClient 释放 SPL Token 托管
-	instructions, err := node.ReleaseSPLTokenEscrow(r.Context(), params)
+	instructions, err := node.ReleaseSPLTokenEscrow(r.Context(), params.OrderID, params.Initiator)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

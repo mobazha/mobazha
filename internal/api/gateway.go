@@ -171,6 +171,12 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/wallet/status", g.handleUpdateWalletStatus).Methods("POST")
 		r.HandleFunc("/v1/wallet/status/{coinType}", g.handleUpdateWalletStatus).Methods("POST")
 
+		// Escrow
+		r.HandleFunc("/v1/wallet/escrow/sol/initialize", g.handleInitializeSolEscrow).Methods("POST")
+		r.HandleFunc("/v1/wallet/escrow/sol/release", g.handleReleaseSolEscrow).Methods("POST")
+		r.HandleFunc("/v1/wallet/escrow/spl/initialize", g.handleInitializeSPLTokenEscrow).Methods("POST")
+		r.HandleFunc("/v1/wallet/escrow/spl/release", g.handleReleaseSPLTokenEscrow).Methods("POST")
+
 		// 收款账户相关API
 		r.HandleFunc("/v1/wallet/receiving-accounts", g.GetReceivingAccounts).Methods("GET")
 		r.HandleFunc("/v1/wallet/receiving-accounts", g.UpdateReceivingAccounts).Methods("PUT")

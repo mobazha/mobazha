@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/kubo/core"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -165,6 +166,12 @@ type CoreIface interface {
 	SavePreferences(prefs *models.UserPreferences, done chan struct{}) error
 	BlockNode(peerID string) (bool, error)
 	UnblockNode(peerID string) (bool, error)
+
+	// Escrow
+	InitializeSolEscrow(ctx context.Context, params iwallet.InitializeSolEscrowParams) (solana.PublicKey, []solana.Instruction, error)
+	ReleaseSolEscrow(ctx context.Context, params iwallet.ReleaseSolEscrowParams) ([]solana.Instruction, error)
+	InitializeSPLTokenEscrow(ctx context.Context, params iwallet.InitializeSPLTokenParams) (solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
+	ReleaseSPLTokenEscrow(ctx context.Context, params iwallet.ReleaseSPLTokenParams) ([]solana.Instruction, error)
 
 	// Wallet
 	Multiwallet() multiwallet.Multiwallet

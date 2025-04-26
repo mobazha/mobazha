@@ -30,6 +30,7 @@ type Profile struct {
 
 	EscrowPublicKey string `json:"publicKey"`
 	ETHPublicKey    string `json:"ethPublicKey"`
+	SolanaPublicKey string `json:"solanaPublicKey"`
 
 	StoreAndForwardServers []string `json:"storeAndForwardServers"`
 

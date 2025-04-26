@@ -243,6 +243,12 @@ func (n *OpenBazaarNode) checkRepoMigration() error {
 		if err != nil {
 			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Migration error: %v", err)
 		}
+	} else if version == 5 {
+		logger.LogWithIDf(log, n.nodeID, logging.INFO, "Migrate repo from version 5")
+		err = n.migrateRepoFromVersion5()
+		if err != nil {
+			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Migration error: %v", err)
+		}
 	}
 
 	if version != repo.DefaultRepoVersion {
@@ -338,6 +344,43 @@ func (n *OpenBazaarNode) migrateRepoWithListingsUpdate() error {
 
 	select {
 	case <-done:
+		return nil
+	case <-time.After(time.Second * 300):
+		return errors.New("timeout waiting on listing update")
+	}
+}
+
+// Do listings migration about signature due to new fields added
+func (n *OpenBazaarNode) migrateRepoFromVersion5() error {
+	// Add Solana pubkey to profile
+	done1 := make(chan struct{})
+	myProfile, err := n.GetMyProfile()
+	if err != nil {
+		return fmt.Errorf("get my profile failed, %v", err)
+	}
+	err = n.SetProfile(myProfile, done1)
+	if err != nil {
+		return fmt.Errorf("update profile failed, %v", err)
+	}
+
+	select {
+	case <-done1:
+		break
+	case <-time.After(time.Second * 300):
+		return errors.New("timeout waiting on profile update")
+	}
+
+	// Add Solana pubkey to listings
+	done2 := make(chan struct{})
+	err = n.UpdateAllListings(func(listing *pb.Listing) (bool, error) {
+		listing.VendorID.Pubkeys.Solana = n.solPrivKey.PublicKey().Bytes()
+		return true, nil
+	}, done2)
+	if err != nil {
+		return fmt.Errorf("update listings failed, %v", err)
+	}
+	select {
+	case <-done2:
 		return nil
 	case <-time.After(time.Second * 300):
 		return errors.New("timeout waiting on listing update")

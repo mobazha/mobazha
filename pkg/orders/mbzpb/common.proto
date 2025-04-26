@@ -22,7 +22,7 @@ message ID {
         bytes identity   = 1; // IPFS public key
         bytes escrow     = 2; // Cryptocurrency escrow public key (BTC category)
         bytes eth        = 3; // Cryptocurrency eth public key
-        string solana     = 4; // Solana public key
+        bytes solana     = 4; // Solana public key
     }
 }
 

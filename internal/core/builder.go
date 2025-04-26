@@ -16,6 +16,7 @@ import (
 	"github.com/bep/debounce"
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
+	solana "github.com/gagliardetto/solana-go"
 	config "github.com/ipfs/kubo/config"
 	"github.com/ipfs/kubo/core"
 	nlibp2p "github.com/ipfs/kubo/core/node/libp2p"
@@ -35,6 +36,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
+	solanaWal "github.com/mobazha/mobazha3.0/internal/multiwallet/coins/solana"
 	obnet "github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/notifications"
 	"github.com/mobazha/mobazha3.0/internal/orders"
@@ -51,6 +53,7 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/op/go-logging"
+	"github.com/tyler-smith/go-bip39"
 	"go.uber.org/fx"
 	"gorm.io/gorm"
 )
@@ -324,25 +327,60 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 
 	// Load the keys from the db
 	var (
-		dbBip44Key  models.Key
-		dbEscrowKey models.Key
-		dbRatingKey models.Key
-		prefs       models.UserPreferences
+		dbBip44Key   models.Key
+		dbEscrowKey  models.Key
+		dbRatingKey  models.Key
+		dbSolKey     models.Key
+		prefs        models.UserPreferences
+		needDBUpdate bool
 	)
+
 	err = obRepo.DB().View(func(tx database.Tx) error {
 		if err := tx.Read().First(&prefs).Error; err != nil {
-			return err
+			return fmt.Errorf("获取用户偏好失败: %v", err)
 		}
-		if err := tx.Read().Where("name = ?", "bip44").First(&dbBip44Key).Error; err != nil {
-			return err
+		dbEscrowKey, dbBip44Key, dbSolKey, dbRatingKey, err = repo.GetKeysFromDB(tx)
+		if err != nil {
+			log.Info("数据库中缺少密钥，需要更新")
+			needDBUpdate = true
+			return nil
 		}
-		if err := tx.Read().Where("name = ?", "escrow").First(&dbEscrowKey).Error; err != nil {
-			return err
-		}
-		return tx.Read().Where("name = ?", "ratings").First(&dbRatingKey).Error
+		return nil
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	if needDBUpdate {
+		log.Info("更新数据库中的密钥")
+		err = obRepo.DB().Update(func(tx database.Tx) error {
+			var dbMnemonic models.Key
+			err = tx.Read().Where("name = ?", "mnemonic").First(&dbMnemonic).Error
+			if err != nil {
+				return fmt.Errorf("获取助记词失败: %v", err)
+			}
+
+			// 从助记词生成种子
+			hdSeed := bip39.NewSeed(string(dbMnemonic.Value), "")
+			escrowKey, ratingKey, bip44Key, solKey, err := repo.CreateHDKeys(hdSeed)
+			if err != nil {
+				return fmt.Errorf("生成密钥失败: %v", err)
+			}
+
+			// 保存新生成的密钥
+			if err := repo.SaveKeysToDB(tx, escrowKey, bip44Key, solKey, ratingKey); err != nil {
+				return fmt.Errorf("保存密钥失败: %v", err)
+			}
+
+			dbEscrowKey, dbBip44Key, dbSolKey, dbRatingKey, err = repo.GetKeysFromDB(tx)
+			if err != nil {
+				return fmt.Errorf("获取密钥失败: %v", err)
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	bip44Key, _ := hdkeychain.NewKeyFromString(string(dbBip44Key.Value))
@@ -350,6 +388,8 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 
 	escrowKey, _ := btcec.PrivKeyFromBytes(dbEscrowKey.Value)
 	ratingKey, _ := btcec.PrivKeyFromBytes(dbRatingKey.Value)
+
+	solPrivKey := solana.PrivateKey(dbSolKey.Value)
 
 	enabledWallets := make([]iwallet.CoinType, len(cfg.EnabledWallets))
 	for i, ew := range cfg.EnabledWallets {
@@ -418,6 +458,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 		ethMasterKey:           ethMasterKey,
 		escrowMasterKey:        escrowKey,
 		ratingMasterKey:        ratingKey,
+		solPrivKey:             &solPrivKey,
 		ipnsQuorum:             cfg.IPNSQuorum,
 		ipnsResolver:           netConfig.GetIPNSResolver(),
 		netDB:                  netDB,
@@ -519,28 +560,49 @@ func InitializeMultiwallet(mw multiwallet.Multiwallet, db database.Database, cre
 		return fmt.Errorf("cannot decode key, %v", err)
 	}
 
+	// 获取 SOL 私钥
+	var dbSolKey models.Key
+	err = db.View(func(tx database.Tx) error {
+		return tx.Read().Where("name = ?", "solana").First(&dbSolKey).Error
+	})
+	if err != nil {
+		return fmt.Errorf("can not initialize solana wallet: solana key does not exist in database")
+	}
+
+	solPrivKey := solana.PrivateKey(dbSolKey.Value)
+
 	for ct, wallet := range mw {
-		// Create wallet if not exists. This will fail if the bip44 key has been deleted
-		// from the db, however we are not yet deleting keys or the mnemonic for encryption
-		// purposes.
-		if !wallet.WalletExists() {
-			def, err := models.CurrencyDefinitions.Lookup(ct.CurrencyCode())
-			if err != nil {
+		if ct.CurrencyCode() == "SOL" {
+			// 对于 SOL 钱包，使用 solPrivKey
+			solWallet, ok := wallet.(*solanaWal.SolanaWallet)
+			if !ok {
+				return fmt.Errorf("wallet is not a SolanaWallet")
+			}
+			// 直接使用 solPrivKey 初始化钱包
+			if err := solWallet.InitializeWithKey(solPrivKey, creationDate); err != nil {
 				return err
 			}
+		} else {
+			// 其他钱包使用 bip44Key
+			if !wallet.WalletExists() {
+				def, err := models.CurrencyDefinitions.Lookup(ct.CurrencyCode())
+				if err != nil {
+					return err
+				}
 
-			coinTypeKey, err := bip44Key.Derive(hdkeychain.HardenedKeyStart + uint32(def.Bip44Code))
-			if err != nil {
-				return err
-			}
+				coinTypeKey, err := bip44Key.Derive(hdkeychain.HardenedKeyStart + uint32(def.Bip44Code))
+				if err != nil {
+					return err
+				}
 
-			accountKey, err := coinTypeKey.Derive(hdkeychain.HardenedKeyStart + 0)
-			if err != nil {
-				return err
-			}
+				accountKey, err := coinTypeKey.Derive(hdkeychain.HardenedKeyStart + 0)
+				if err != nil {
+					return err
+				}
 
-			if err := wallet.CreateWallet(*accountKey, nil, creationDate); err != nil {
-				return err
+				if err := wallet.CreateWallet(*accountKey, nil, creationDate); err != nil {
+					return err
+				}
 			}
 		}
 	}

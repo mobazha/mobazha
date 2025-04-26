@@ -9,7 +9,7 @@ type InitializeSolEscrowParams struct {
 	Payer              solana.PublicKey
 	Buyer              solana.PublicKey
 	Seller             solana.PublicKey
-	Moderator          solana.PublicKey
+	Moderator          *solana.PublicKey
 	UniqueId           [20]byte
 	RequiredSignatures uint8
 	UnlockHours        uint64
@@ -33,7 +33,7 @@ type InitializeSPLTokenParams struct {
 	Payer              solana.PublicKey
 	Buyer              solana.PublicKey
 	Seller             solana.PublicKey
-	Moderator          solana.PublicKey
+	Moderator          *solana.PublicKey
 	UniqueId           [20]byte
 	RequiredSignatures uint8
 	UnlockHours        uint64

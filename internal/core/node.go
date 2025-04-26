@@ -8,6 +8,7 @@ import (
 	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
+	"github.com/gagliardetto/solana-go"
 	"github.com/ipfs/kubo/core"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/channels"
@@ -51,6 +52,11 @@ type OpenBazaarNode struct {
 	// public key of which is advertised by the node in its profile
 	// and in listings to be used when building escrow transactions.
 	escrowMasterKey *btcec.PrivateKey
+
+	// solPrivKey represents an ed25519 private key, the
+	// public key of which is advertised by the node in its profile
+	// and in listings to be used when building solana escrow transactions.
+	solPrivKey *solana.PrivateKey
 
 	// ratingMasterKey represents an secp256k1 private key that
 	// we used to generate rating keys to sign ratings with.

@@ -122,9 +122,9 @@ func (r *Repo) WriteVersion(version int) error {
 
 func newRepo(dataDir, mnemonicSeed string, inMemoryDB bool, testnet bool) (*Repo, error) {
 	var (
-		dbIdentity, dbEscrowKey, dbRatingKey, dbBip44Key, dbMnemonic, torKey *models.Key
-		err                                                                  error
-		isNew                                                                bool
+		dbIdentity, dbEscrowKey, dbRatingKey, dbBip44Key, dbMnemonic, torKey, dbSolKey *models.Key
+		err                                                                            error
+		isNew                                                                          bool
 	)
 	ipfsDir := path.Join(dataDir, IPFSDirName)
 
@@ -163,7 +163,7 @@ func newRepo(dataDir, mnemonicSeed string, inMemoryDB bool, testnet bool) (*Repo
 		}
 
 		hdSeed := bip39.NewSeed(mnemonicSeed, "")
-		escrowKey, ratingKey, bip44Key, err := createHDKeys(hdSeed)
+		escrowKey, ratingKey, bip44Key, solKey, err := CreateHDKeys(hdSeed)
 		if err != nil {
 			return nil, err
 		}
@@ -188,6 +188,10 @@ func newRepo(dataDir, mnemonicSeed string, inMemoryDB bool, testnet bool) (*Repo
 		dbBip44Key = &models.Key{
 			Name:  "bip44",
 			Value: []byte(bip44Key.String()),
+		}
+		dbSolKey = &models.Key{
+			Name:  "solana",
+			Value: []byte(*solKey),
 		}
 		dbMnemonic = &models.Key{
 			Name:  "mnemonic",
@@ -275,6 +279,11 @@ func newRepo(dataDir, mnemonicSeed string, inMemoryDB bool, testnet bool) (*Repo
 				return err
 			}
 		}
+		if dbSolKey != nil {
+			if err := tx.Save(&dbSolKey); err != nil {
+				return err
+			}
+		}
 		if isNew {
 			err := tx.Save(&models.UserPreferences{
 				AutoConfirm:       true,
@@ -306,6 +315,66 @@ func newRepo(dataDir, mnemonicSeed string, inMemoryDB bool, testnet bool) (*Repo
 		}
 	}
 	return r, nil
+}
+
+func SaveKeysToDB(tx database.Tx, escrowKey *btcec.PrivateKey, bip44Key *hdkeychain.ExtendedKey, solKey *ed25519.PrivateKey, ratingKey *btcec.PrivateKey) error {
+	if err := tx.Save(&models.Key{
+		Name:  "escrow",
+		Value: escrowKey.Serialize(),
+	}); err != nil {
+		return fmt.Errorf("保存托管密钥失败: %v", err)
+	}
+
+	if err := tx.Save(&models.Key{
+		Name:  "ratings",
+		Value: ratingKey.Serialize(),
+	}); err != nil {
+		return fmt.Errorf("保存评分密钥失败: %v", err)
+	}
+
+	if err := tx.Save(&models.Key{
+		Name:  "bip44",
+		Value: []byte(bip44Key.String()),
+	}); err != nil {
+		return fmt.Errorf("保存BIP44密钥失败: %v", err)
+	}
+
+	if err := tx.Save(&models.Key{
+		Name:  "solana",
+		Value: []byte(*solKey),
+	}); err != nil {
+		return fmt.Errorf("保存SOL密钥失败: %v", err)
+	}
+
+	return nil
+}
+
+func GetKeysFromDB(tx database.Tx) (dbEscrowKey, dbBip44Key, dbSolKey, dbRatingKey models.Key, err error) {
+	var escrowKey, ratingKey, bip44Key, solKey models.Key
+	err = func() error {
+		if err := tx.Read().Where("name = ?", "escrow").First(&escrowKey).Error; err != nil {
+			return fmt.Errorf("获取托管密钥失败: %v", err)
+		}
+
+		if err := tx.Read().Where("name = ?", "ratings").First(&ratingKey).Error; err != nil {
+			return fmt.Errorf("获取评分密钥失败: %v", err)
+		}
+
+		if err := tx.Read().Where("name = ?", "bip44").First(&bip44Key).Error; err != nil {
+			return fmt.Errorf("获取BIP44密钥失败: %v", err)
+		}
+
+		if err := tx.Read().Where("name = ?", "solana").First(&solKey).Error; err != nil {
+			return fmt.Errorf("获取SOL密钥失败: %v", err)
+		}
+
+		return nil
+	}()
+	if err != nil {
+		return models.Key{}, models.Key{}, models.Key{}, models.Key{}, err
+	}
+
+	return escrowKey, bip44Key, solKey, ratingKey, nil
 }
 
 func (r *Repo) WriteUserAgent(comment string) error {
@@ -352,43 +421,46 @@ func createMnemonic(newEntropy func(int) ([]byte, error), newMnemonic func([]byt
 	return mnemonic, nil
 }
 
-func createHDKeys(seed []byte) (escrowKey, ratingKey *btcec.PrivateKey, bip44Key *hdkeychain.ExtendedKey, err error) {
+func CreateHDKeys(seed []byte) (escrowKey, ratingKey *btcec.PrivateKey, bip44Key *hdkeychain.ExtendedKey, solKey *ed25519.PrivateKey, err error) {
 	masterPrivKey, err := hdkeychain.NewMaster(seed, &chaincfg.MainNetParams)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	twoZeroNine, err := masterPrivKey.Derive(hdkeychain.HardenedKeyStart + 209)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	bip44Key, err = masterPrivKey.Derive(hdkeychain.HardenedKeyStart + 44)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	escrowHDKey, err := twoZeroNine.Derive(0)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	ratingHDKey, err := twoZeroNine.Derive(1)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	escrowKey, err = escrowHDKey.ECPrivKey()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	ratingKey, err = ratingHDKey.ECPrivKey()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	return escrowKey, ratingKey, bip44Key, nil
+	// 从相同的 seed 生成 SOL 私钥
+	solPriv := ed25519.NewKeyFromSeed(seed[:32]) // 使用 seed 的前 32 字节作为 SOL 私钥
+
+	return escrowKey, ratingKey, bip44Key, &solPriv, nil
 }
 
 // InitializeKeyspace sets the ipns record for the given key to

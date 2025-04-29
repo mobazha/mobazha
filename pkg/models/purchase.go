@@ -98,12 +98,14 @@ type Purchase struct {
 }
 
 type PaymentData struct {
-	OrderID     string `json:"orderID"`
-	Method      string `json:"method"`
-	Moderator   string `json:"moderator"`
-	Amount      string `json:"amount"`
-	Chaincode   string `json:"chaincode"`
-	FromAddress string `json:"fromAddress"`
+	OrderID            string `json:"orderID"`
+	TransactionID      string `json:"transactionID"`
+	Coin               string `json:"coin"`
+	Method             string `json:"method"`
+	Moderator          string `json:"moderator"`
+	ModeratorEscrowKey []byte `json:"moderatorEscrowKey"`
+	Amount             string `json:"amount"`
+	FromAddress        string `json:"fromAddress"`
 	/*
 		id := make([]byte, 36)
 		copy(id[:32], prevHash[:])
@@ -114,15 +116,12 @@ type PaymentData struct {
 	ToAddress          string    `json:"toAddress"`
 	ToID               []byte    `json:"toID"` // 36 bytes
 	Script             string    `json:"script"`
-	ModeratorKey       []byte    `json:"moderatorKey"`
-	Coin               string    `json:"coin"`
 	EscrowReleaseFee   string    `json:"escrowReleaseFee"`
 	PlatformAmount     string    `json:"platformAmount"`
 	PlatformAddr       string    `json:"platformAddr"`
 	PlatformRewardAddr string    `json:"platformRewardAddr"`
 	RefundAddress      string    `json:"refundAddress"`
 	Timestamp          time.Time `json:"timestamp"`
-	TransactionID      string    `json:"transactionID"`
 }
 
 func (p *PaymentData) BuildTransaction() iwallet.Transaction {

@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -296,7 +297,7 @@ func (o *Order) UpdateTransaction(transaction iwallet.Transaction) error {
 
 // OrderOpenMessage returns the unmarshalled proto object if it exists in the order.
 func (o *Order) OrderOpenMessage() (*pb.OrderOpen, error) {
-	if o.SerializedOrderOpen == nil || len(o.SerializedOrderOpen) == 0 {
+	if len(o.SerializedOrderOpen) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	orderOpen := new(pb.OrderOpen)
@@ -306,9 +307,17 @@ func (o *Order) OrderOpenMessage() (*pb.OrderOpen, error) {
 	return orderOpen, nil
 }
 
+func (o *Order) Chaincode() (string, error) {
+	orderOpen, err := o.OrderOpenMessage()
+	if err != nil {
+		return "", fmt.Errorf("get order open message failed: %s", err.Error())
+	}
+	return orderOpen.Chaincode, nil
+}
+
 // OrderRejectMessage returns the unmarshalled proto object if it exists in the order.
 func (o *Order) OrderRejectMessage() (*pb.OrderReject, error) {
-	if o.SerializedOrderReject == nil || len(o.SerializedOrderReject) == 0 {
+	if len(o.SerializedOrderReject) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	orderReject := new(pb.OrderReject)

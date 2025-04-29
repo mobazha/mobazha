@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"path"
@@ -131,34 +132,44 @@ func (g *Gateway) handleNotifyPayment(w http.ResponseWriter, r *http.Request) {
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	var req struct {
-		OrderID     string `json:"orderId"`
-		PaymentInfo struct {
-			Method      string `json:"method"`
-			Amount      string `json:"amount"`
-			Coin        string `json:"coin"`
-			FromAddress string `json:"fromAddress"`
-			ToAddress   string `json:"toAddress"`
-			Script      string `json:"script"`
-			Moderator   string `json:"moderator"`
+		OrderID       string `json:"orderId"`
+		TransactionID string `json:"transactionId"`
+		Coin          string `json:"coin"`
+		PaymentInfo   struct {
+			Method             string `json:"method"`
+			Moderator          string `json:"moderator"`
+			ModeratorEscrowKey string `json:"moderatorEscrowKey"`
+			Amount             string `json:"amount"`
+			FromAddress        string `json:"fromAddress"`
+			ToAddress          string `json:"toAddress"`
+			Script             string `json:"script"`
+			RefundAddress      string `json:"refundAddress"`
 		} `json:"paymentInfo"`
 	}
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "decode request body failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	moderatorEscrowKey, err := hex.DecodeString(req.PaymentInfo.ModeratorEscrowKey)
+	if err != nil {
+		http.Error(w, "decode moderatorEscrowKey failed: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// 创建 paymentData 消息
 	paymentData := &models.PaymentData{
-		OrderID:     req.OrderID,
-		Method:      req.PaymentInfo.Method,
-		Amount:      req.PaymentInfo.Amount,
-		Coin:        req.PaymentInfo.Coin,
-		FromAddress: req.PaymentInfo.FromAddress,
-		ToAddress:   req.PaymentInfo.ToAddress,
-		Script:      req.PaymentInfo.Script,
-		Moderator:   req.PaymentInfo.Moderator,
-		Timestamp:   time.Now(),
+		OrderID:            req.OrderID,
+		Method:             req.PaymentInfo.Method,
+		Moderator:          req.PaymentInfo.Moderator,
+		ModeratorEscrowKey: moderatorEscrowKey,
+		Amount:             req.PaymentInfo.Amount,
+		Coin:               req.Coin,
+		FromAddress:        req.PaymentInfo.FromAddress,
+		ToAddress:          req.PaymentInfo.ToAddress,
+		Script:             req.PaymentInfo.Script,
+		RefundAddress:      req.PaymentInfo.RefundAddress,
+		Timestamp:          time.Now(),
 	}
 
 	node.ProcessOrderPayment(r.Context(), paymentData)

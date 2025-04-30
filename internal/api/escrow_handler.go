@@ -20,7 +20,7 @@ func (g *Gateway) handleInitializeSolEscrow(w http.ResponseWriter, r *http.Reque
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	// 使用 EscrowClient 初始化 SOL 托管
-	escrowAccount, instructions, err := node.InitializeSolEscrow(
+	paymentData, escrowAccount, instructions, err := node.InitializeSolEscrow(
 		r.Context(),
 		params,
 	)
@@ -30,12 +30,14 @@ func (g *Gateway) handleInitializeSolEscrow(w http.ResponseWriter, r *http.Reque
 	}
 
 	type InitializeSolResponse struct {
+		PaymentData   *models.PaymentData  `json:"paymentData"`
 		EscrowAccount solana.PublicKey     `json:"escrowAccount"`
 		Instructions  []solana.Instruction `json:"instructions"`
 	}
 
 	// 返回响应
 	response := InitializeSolResponse{
+		PaymentData:   paymentData,
 		EscrowAccount: escrowAccount,
 		Instructions:  instructions,
 	}
@@ -85,7 +87,7 @@ func (g *Gateway) handleInitializeSPLTokenEscrow(w http.ResponseWriter, r *http.
 	}
 
 	// 使用 EscrowClient 初始化 SPL Token 托管
-	escrowAccount, escrowTokenAccount, instructions, err := node.InitializeSPLTokenEscrow(
+	paymentData, escrowAccount, escrowTokenAccount, instructions, err := node.InitializeSPLTokenEscrow(
 		r.Context(),
 		params,
 	)
@@ -95,6 +97,7 @@ func (g *Gateway) handleInitializeSPLTokenEscrow(w http.ResponseWriter, r *http.
 	}
 
 	type InitializeSPLTokenResponse struct {
+		PaymentData        *models.PaymentData  `json:"paymentData"`
 		EscrowAccount      solana.PublicKey     `json:"escrowAccount"`
 		EscrowTokenAccount solana.PublicKey     `json:"escrowTokenAccount"`
 		Instructions       []solana.Instruction `json:"instructions"`
@@ -102,6 +105,7 @@ func (g *Gateway) handleInitializeSPLTokenEscrow(w http.ResponseWriter, r *http.
 
 	// 返回响应
 	response := InitializeSPLTokenResponse{
+		PaymentData:        paymentData,
 		EscrowAccount:      escrowAccount,
 		EscrowTokenAccount: escrowTokenAccount,
 		Instructions:       instructions,

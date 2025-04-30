@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -98,14 +99,14 @@ type Purchase struct {
 }
 
 type PaymentData struct {
-	OrderID            string `json:"orderID"`
-	TransactionID      string `json:"transactionID"`
-	Coin               string `json:"coin"`
-	Method             string `json:"method"`
-	Moderator          string `json:"moderator"`
-	ModeratorEscrowKey []byte `json:"moderatorEscrowKey"`
-	Amount             string `json:"amount"`
-	FromAddress        string `json:"fromAddress"`
+	OrderID            string                `json:"orderID"`
+	TransactionID      string                `json:"transactionID"`
+	Coin               iwallet.CoinType      `json:"coin"`
+	Method             pb.PaymentSent_Method `json:"method"`
+	Moderator          string                `json:"moderator"`
+	ModeratorEscrowKey []byte                `json:"moderatorEscrowKey"`
+	Amount             uint64                `json:"amount"`
+	FromAddress        string                `json:"fromAddress"`
 	/*
 		id := make([]byte, 36)
 		copy(id[:32], prevHash[:])

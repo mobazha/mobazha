@@ -10,12 +10,16 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
+	"github.com/gagliardetto/solana-go"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/op/go-logging"
 	"google.golang.org/protobuf/proto"
 )
+
+var log = logging.MustGetLogger("UTILS")
 
 // ValidateRating returns an error if the rating is invalid, otherwise nil.
 func ValidateRating(rating *pb.Rating) error {
@@ -168,58 +172,144 @@ func ValidatePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTim
 		return fmt.Errorf("chaincode parse error: %s", err)
 	}
 
-	var (
-		vendorKey *btcec.PublicKey
-		buyerKey  *btcec.PublicKey
-	)
-
-	isETHLikeCoin := wal.CoinCategory() == iwallet.CoinCategoryEthereum
-	if isETHLikeCoin {
-		vendorKey, err = btcec.ParsePubKey(order.Listings[0].Listing.VendorID.Pubkeys.Eth)
-		if err != nil {
-			return fmt.Errorf("generate vendor pub key failed, %s", err)
-		}
-
-		buyerKey, err = btcec.ParsePubKey(order.BuyerID.Pubkeys.Eth)
-		if err != nil {
-			return fmt.Errorf("get buyer pub key failed, %s", err)
-		}
+	if wal.CoinCategory() == iwallet.CoinCategorySolana {
+		return validateSolanaPayment(order, paymentSent, chaincode, wal, escrowTimeoutHours)
+	} else if wal.CoinCategory() == iwallet.CoinCategoryEthereum {
+		return validateETHLikePayment(order, paymentSent, chaincode, wal, escrowTimeoutHours)
 	} else {
-		vendorEscrowPubkey, err := btcec.ParsePubKey(order.Listings[0].Listing.VendorID.Pubkeys.Escrow)
-		if err != nil {
-			return err
-		}
-		vendorKey, err = GenerateEscrowPublicKey(vendorEscrowPubkey, chaincode)
-		if err != nil {
-			return err
-		}
-		buyerEscrowPubkey, err := btcec.ParsePubKey(order.BuyerID.Pubkeys.Escrow)
-		if err != nil {
-			return err
-		}
-		buyerKey, err = GenerateEscrowPublicKey(buyerEscrowPubkey, chaincode)
-		if err != nil {
-			return err
-		}
+		return validateBTCLikePayment(order, paymentSent, chaincode, wal, escrowTimeoutHours)
+	}
+}
+
+// validateETHLikePayment 验证ETH类支付
+func validateETHLikePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, chaincode []byte, wal iwallet.Wallet, escrowTimeoutHours uint32) error {
+	vendorKey, err := btcec.ParsePubKey(order.Listings[0].Listing.VendorID.Pubkeys.Eth)
+	if err != nil {
+		return fmt.Errorf("generate vendor pub key failed, %s", err)
 	}
 
+	buyerKey, err := btcec.ParsePubKey(order.BuyerID.Pubkeys.Eth)
+	if err != nil {
+		return fmt.Errorf("get buyer pub key failed, %s", err)
+	}
+
+	if paymentSent.Method == pb.PaymentSent_MODERATED {
+		return validateEscrowPayment(paymentSent, wal, chaincode, vendorKey, buyerKey, escrowTimeoutHours, true, true)
+	} else if paymentSent.Method == pb.PaymentSent_CANCELABLE {
+		return validateEscrowPayment(paymentSent, wal, chaincode, vendorKey, buyerKey, escrowTimeoutHours, true, false)
+	} else if paymentSent.Method != pb.PaymentSent_DIRECT {
+		return errors.New("invalid payment method")
+	}
+
+	return nil
+}
+
+// validateBTCLikePayment 验证BTC类支付
+func validateBTCLikePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, chaincode []byte, wal iwallet.Wallet, escrowTimeoutHours uint32) error {
+	vendorEscrowPubkey, err := btcec.ParsePubKey(order.Listings[0].Listing.VendorID.Pubkeys.Escrow)
+	if err != nil {
+		return err
+	}
+	vendorKey, err := GenerateEscrowPublicKey(vendorEscrowPubkey, chaincode)
+	if err != nil {
+		return err
+	}
+	buyerEscrowPubkey, err := btcec.ParsePubKey(order.BuyerID.Pubkeys.Escrow)
+	if err != nil {
+		return err
+	}
+	buyerKey, err := GenerateEscrowPublicKey(buyerEscrowPubkey, chaincode)
+	if err != nil {
+		return err
+	}
+
+	if paymentSent.Method == pb.PaymentSent_MODERATED {
+		return validateEscrowPayment(paymentSent, wal, chaincode, vendorKey, buyerKey, escrowTimeoutHours, false, true)
+	} else if paymentSent.Method == pb.PaymentSent_CANCELABLE {
+		return validateEscrowPayment(paymentSent, wal, chaincode, vendorKey, buyerKey, escrowTimeoutHours, false, false)
+	} else if paymentSent.Method != pb.PaymentSent_DIRECT {
+		return errors.New("invalid payment method")
+	}
+
+	return nil
+}
+
+func validateSolanaPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, chaincode []byte, wal iwallet.Wallet, escrowTimeoutHours uint32) error {
+	if len(order.Listings[0].Listing.VendorID.Pubkeys.Solana) != solana.PublicKeyLength {
+		return fmt.Errorf("invalid vendor solana pubkey")
+	}
+	vendorKey := solana.PublicKeyFromBytes(order.Listings[0].Listing.VendorID.Pubkeys.Solana)
+
+	if len(order.BuyerID.Pubkeys.Solana) != solana.PublicKeyLength {
+		return fmt.Errorf("invalid buyer solana pubkey")
+	}
+	buyerKey := solana.PublicKeyFromBytes(order.BuyerID.Pubkeys.Solana)
+
+	escrowWallet := wal.(iwallet.SOLEscrow)
+
+	createEscrowAddressParams := iwallet.CreateEscrowAddressParams{
+		Buyer:              buyerKey,
+		Seller:             vendorKey,
+		UniqueId:           [20]byte(chaincode[:20]),
+		RequiredSignatures: 1,
+		UnlockHours:        uint64(escrowTimeoutHours),
+	}
 	if paymentSent.Method == pb.PaymentSent_MODERATED {
 		_, err := peer.Decode(paymentSent.Moderator)
 		if err != nil {
 			return errors.New("invalid moderator selection")
 		}
 
-		var (
-			moderatorKey *btcec.PublicKey
-		)
+		if len(paymentSent.ModeratorEscrowKey) != solana.PublicKeyLength {
+			return fmt.Errorf("invalid moderator solana pubkey")
+		}
+		moderatorPubkey := solana.PublicKeyFromBytes(paymentSent.ModeratorEscrowKey)
 
-		if isETHLikeCoin {
-			moderatorKey, err = btcec.ParsePubKey(paymentSent.ModeratorKey)
+		createEscrowAddressParams.Moderator = &moderatorPubkey
+		createEscrowAddressParams.RequiredSignatures = 2
+		createEscrowAddressParams.TimeoutKey = vendorKey
+	} else if paymentSent.Method != pb.PaymentSent_CANCELABLE {
+		return errors.New("invalid payment method")
+	}
+
+	address, err := escrowWallet.CreateEscrowAddress(createEscrowAddressParams)
+	if err != nil {
+		return err
+	}
+
+	if paymentSent.ToAddress != address.String() {
+		return errors.New("invalid escrow payment address")
+	}
+
+	// if err := validateEscrowReleaseFee(paymentSent); err != nil {
+	// 	return err
+	// }
+	return nil
+}
+
+// validateEscrowPayment 验证托管支付
+func validateEscrowPayment(paymentSent *pb.PaymentSent, wal iwallet.Wallet, chaincode []byte,
+	vendorKey, buyerKey *btcec.PublicKey, escrowTimeoutHours uint32, isETHLike bool, isModerated bool) error {
+	var (
+		address iwallet.Address
+		script  []byte
+		err     error
+	)
+
+	if isModerated {
+		_, err := peer.Decode(paymentSent.Moderator)
+		if err != nil {
+			return errors.New("invalid moderator selection")
+		}
+
+		var moderatorKey *btcec.PublicKey
+		if isETHLike {
+			moderatorKey, err = btcec.ParsePubKey(paymentSent.ModeratorEscrowKey)
 			if err != nil {
 				return fmt.Errorf("generate vendor pub key failed, %s", err)
 			}
 		} else {
-			moderatorEscrowPubkey, err := btcec.ParsePubKey(paymentSent.ModeratorKey)
+			moderatorEscrowPubkey, err := btcec.ParsePubKey(paymentSent.ModeratorEscrowKey)
 			if err != nil {
 				return err
 			}
@@ -233,10 +323,7 @@ func ValidatePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTim
 		if !walletSupportsEscrowTimeout {
 			escrowTimeoutHours = 0
 		}
-		var (
-			address iwallet.Address
-			script  []byte
-		)
+
 		if escrowTimeoutHours > 0 {
 			timeout := time.Hour * time.Duration(escrowTimeoutHours)
 			address, script, err = escrowTimeoutWallet.CreateMultisigWithTimeout([]btcec.PublicKey{*buyerKey, *vendorKey, *moderatorKey}, chaincode, 2, timeout, *vendorKey)
@@ -253,38 +340,37 @@ func ValidatePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTim
 				return err
 			}
 		}
-
-		if paymentSent.ToAddress != address.String() {
-			return errors.New("invalid moderated payment address")
-		}
-		if paymentSent.Script != hex.EncodeToString(script) {
-			return errors.New("invalid moderated payment script")
-		}
-	} else if paymentSent.Method == pb.PaymentSent_CANCELABLE {
+	} else {
 		escrowWallet, ok := wal.(iwallet.Escrow)
 		if !ok {
 			return errors.New("wallet does not support escrow")
 		}
-		address, script, err := escrowWallet.CreateMultisigAddress([]btcec.PublicKey{*buyerKey, *vendorKey}, chaincode, 1)
+		address, script, err = escrowWallet.CreateMultisigAddress([]btcec.PublicKey{*buyerKey, *vendorKey}, chaincode, 1)
 		if err != nil {
 			return err
 		}
-		if paymentSent.ToAddress != address.String() {
-			return errors.New("invalid cancelable payment address")
-		}
-		if paymentSent.Script != hex.EncodeToString(script) {
-			return errors.New("invalid cancelable payment script")
-		}
-	} else if paymentSent.Method != pb.PaymentSent_DIRECT {
-		return errors.New("invalid payment method")
 	}
-	if paymentSent.Method != pb.PaymentSent_DIRECT {
-		if paymentSent.EscrowReleaseFee == "" {
-			return errors.New("escrow release fee is empty")
-		}
-		if ok := validateBigString(paymentSent.EscrowReleaseFee); !ok {
-			return errors.New("escrow release fee not valid")
-		}
+
+	if paymentSent.ToAddress != address.String() {
+		return errors.New("invalid escrow payment address")
+	}
+	if paymentSent.Script != hex.EncodeToString(script) {
+		return errors.New("invalid escrow payment script")
+	}
+
+	if err := validateEscrowReleaseFee(paymentSent); err != nil {
+		return err
+	}
+	return nil
+}
+
+// validateEscrowReleaseFee 验证托管释放费用
+func validateEscrowReleaseFee(paymentSent *pb.PaymentSent) error {
+	if paymentSent.EscrowReleaseFee == "" {
+		return errors.New("escrow release fee is empty")
+	}
+	if ok := validateBigString(paymentSent.EscrowReleaseFee); !ok {
+		return errors.New("escrow release fee not valid")
 	}
 	return nil
 }

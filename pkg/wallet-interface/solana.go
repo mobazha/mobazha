@@ -4,6 +4,17 @@ import (
 	"github.com/gagliardetto/solana-go"
 )
 
+type CreateEscrowAddressParams struct {
+	Buyer              solana.PublicKey
+	Seller             solana.PublicKey
+	Moderator          *solana.PublicKey
+	IsSPLToken         bool
+	UniqueId           [20]byte
+	RequiredSignatures uint8
+	UnlockHours        uint64
+	TimeoutKey         solana.PublicKey
+}
+
 // InitializeSolEscrowParams 初始化SOL托管参数
 type InitializeSolEscrowParams struct {
 	Payer              solana.PublicKey
@@ -56,6 +67,8 @@ type ReleaseSPLTokenParams struct {
 }
 
 type SOLEscrow interface {
+	CreateEscrowAddress(params CreateEscrowAddressParams) (Address, error)
+
 	InitializeSolEscrow(params InitializeSolEscrowParams) (solana.PublicKey, []solana.Instruction, error)
 	ReleaseSolEscrow(params ReleaseSolEscrowParams) ([]solana.Instruction, error)
 

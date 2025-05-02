@@ -54,3 +54,16 @@ func imageToJpeg(buf *bytes.Buffer, in image.Image, maxSize int) error {
 
 	return nil
 }
+
+// padOrTruncateBytes 将字节切片填充或截断到指定长度
+func padOrTruncateBytes(b []byte, length int) []byte {
+	if len(b) > length {
+		return b[:length]
+	}
+	if len(b) < length {
+		padded := make([]byte, length)
+		copy(padded, b)
+		return padded
+	}
+	return b
+}

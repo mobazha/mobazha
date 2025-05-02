@@ -117,6 +117,7 @@ type PaymentData struct {
 	ToAddress          string    `json:"toAddress"`
 	ToID               []byte    `json:"toID"` // 36 bytes
 	Script             string    `json:"script"`
+	UnlockHours        uint32    `json:"unlockHours"`
 	EscrowReleaseFee   string    `json:"escrowReleaseFee"`
 	PlatformAmount     string    `json:"platformAmount"`
 	PlatformAddr       string    `json:"platformAddr"`

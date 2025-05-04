@@ -30,6 +30,7 @@ func (ra *ReceivingAccount) EnabledTokens() ([]string, error) {
 }
 
 // SetEnabledTokens 设置已启用的代币列表
+// 对于原生代币，使用NATIVE_SYMBOL
 func (ra *ReceivingAccount) SetEnabledTokens(tokens []string) error {
 	data, err := json.Marshal(tokens)
 	if err != nil {

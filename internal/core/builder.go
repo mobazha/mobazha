@@ -511,6 +511,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 	}
 
 	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
+		NodeID:               nodeID,
 		Identity:             ipfsNode.Identity,
 		IdentityPrivateKey:   ipfsNode.PrivateKey,
 		Db:                   obRepo.DB(),

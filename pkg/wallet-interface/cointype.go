@@ -65,6 +65,8 @@ func (ct CoinType) CoinInfo() (CoinInfo, error) {
 	return CoinInfoFromCoinType(ct)
 }
 
+const NATIVE_SYMBOL = "NATIVE"
+
 // CoinInfo 表示完整的币种信息
 type CoinInfo struct {
 	Chain           ChainType // 所属链

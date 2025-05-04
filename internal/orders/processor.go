@@ -13,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet/coins/eth/util"
 	"github.com/mobazha/mobazha3.0/internal/net"
@@ -38,6 +39,7 @@ var (
 
 // Config holds the objects needed to instantiate a new OrderProcessor.
 type Config struct {
+	NodeID               string
 	Identity             peer.ID
 	Db                   database.Database
 	IdentityPrivateKey   crypto.PrivKey
@@ -52,6 +54,7 @@ type Config struct {
 
 // OrderProcessor is used to deterministically process orders.
 type OrderProcessor struct {
+	nodeID             string
 	identity           peer.ID
 	identityPrivateKey crypto.PrivKey
 	db                 database.Database
@@ -68,6 +71,7 @@ type OrderProcessor struct {
 // NewOrderProcessor initializes and returns a new OrderProcessor
 func NewOrderProcessor(cfg *Config) *OrderProcessor {
 	return &OrderProcessor{
+		nodeID:             cfg.NodeID,
 		identity:           cfg.Identity,
 		identityPrivateKey: cfg.IdentityPrivateKey,
 		db:                 cfg.Db,
@@ -86,7 +90,7 @@ func NewOrderProcessor(cfg *Config) *OrderProcessor {
 // orders. When we find one we record the payment.
 func (op *OrderProcessor) Start() {
 	if op.featureManager.IsEnabled(pkgconfig.FeatureNoBuildinWallet) {
-		log.Info("No buildin wallet, skipping buildin wallet transaction listening")
+		logger.LogWithIDf(log, op.nodeID, logging.INFO, "No buildin wallet, skipping buildin wallet transaction listening")
 		// if new tx, directly call processWalletTransaction()
 		// op.processWalletTransaction(tx)
 		return
@@ -156,7 +160,7 @@ func (op *OrderProcessor) ProcessMessage(dbtx database.Tx, peer peer.ID, message
 		// Order does not exist in the DB and the message type is not an order open. This can happen
 		// in the case where we download offline messages out of order. In this case we will park
 		// the message so that we can try again later if we receive other messages.
-		log.Warningf("Received %s message from peer %s for an order that does not exist yet", message.MessageType, peer)
+		logger.LogWithIDf(log, op.nodeID, logging.WARNING, "Received %s message from peer %s for an order that does not exist yet", message.MessageType, peer)
 		order.ID = models.OrderID(message.OrderID)
 		if err := order.ParkMessage(message); err != nil {
 			return nil, err
@@ -167,7 +171,7 @@ func (op *OrderProcessor) ProcessMessage(dbtx database.Tx, peer peer.ID, message
 	orderCopy := order
 	event, err = op.processMessage(dbtx, &order, peer, message)
 	if err != nil {
-		log.Errorf("Error processing order message for order %s: %s", order.ID.String(), err)
+		logger.LogWithIDf(log, op.nodeID, logging.ERROR, "Error processing order message for order %s: %s", order.ID.String(), err)
 		if err1 := orderCopy.PutErrorMessage(message); err1 != nil {
 			dbtx.Save(&orderCopy)
 		}
@@ -190,9 +194,9 @@ func (op *OrderProcessor) ProcessMessage(dbtx database.Tx, peer peer.ID, message
 		}
 		_, err = op.processMessage(dbtx, &order, peer, parked)
 		if err != nil {
-			log.Errorf("Error processing parked message for order %s: %s", order.ID.String(), err)
+			logger.LogWithIDf(log, op.nodeID, logging.ERROR, "Error processing parked message for order %s: %s", order.ID.String(), err)
 			if err := order.PutErrorMessage(message); err != nil {
-				log.Errorf("Error saving errored message for order %s: %s", order.ID.String(), err)
+				logger.LogWithIDf(log, op.nodeID, logging.ERROR, "Error saving errored message for order %s: %s", order.ID.String(), err)
 			}
 		}
 	}
@@ -328,38 +332,51 @@ func verifyOrderMessageSignature(peer peer.ID, message *npb.OrderMessage) error 
 }
 
 // GetPreferences returns the saved preferences for this node.
-func (op *OrderProcessor) GetPreferences(tx database.Tx) (*models.UserPreferences, error) {
-	var prefs models.UserPreferences
-	err := tx.Read().First(&prefs).Error
+func (op *OrderProcessor) GetActiveReceivingAccountByChain(tx database.Tx, chainType string) (*models.ReceivingAccount, error) {
+	var records []models.ReceivingAccount
+	err := tx.Read().Where("chain_type = ?", chainType).Find(&records).Error
 	if err != nil {
 		return nil, err
 	}
-	return &prefs, nil
+
+	for _, r := range records {
+		tokens, err := r.EnabledTokens()
+		if err != nil {
+			return nil, err
+		}
+		if len(tokens) > 0 {
+			return &r, nil
+		}
+	}
+	return nil, errors.New("no active receiving account found")
 }
 
 func (op *OrderProcessor) GetPayoutAddress(tx database.Tx, coinType string) (iwallet.Address, error) {
-	var payoutAddress iwallet.Address
-
-	wallet, err := op.multiwallet.WalletForCurrencyCode(coinType)
+	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(coinType))
 	if err != nil {
-		return payoutAddress, err
+		return iwallet.Address{}, fmt.Errorf("获取币种信息失败: %v", err)
 	}
 
-	// Check preset external wallet address first
-	prefs, err := op.GetPreferences(tx)
-	if err != nil {
-		return payoutAddress, err
-	}
-	extPaymentAddresses, err := prefs.ExternalPaymentAddresses()
-	if err != nil {
-		return payoutAddress, err
-	}
-	extPaymentAddress, ok := extPaymentAddresses[coinType]
-	if ok && len(extPaymentAddress.Address) > 0 && extPaymentAddress.Enable {
-		payoutAddress = iwallet.NewAddress(extPaymentAddress.Address, iwallet.CoinType(coinType))
-	} else {
-		payoutAddress, err = wallet.CurrentAddress()
+	// 从激活的收款账户获取地址
+	account, err := op.GetActiveReceivingAccountByChain(tx, coinInfo.Chain.String())
+	if err == nil && account != nil {
+		logger.LogWithIDf(log, op.nodeID, logging.INFO, "使用激活的收款账户获取地址: %s", account.Address)
+		return iwallet.NewAddress(account.Address, iwallet.CoinType(coinType)), nil
 	}
 
-	return payoutAddress, err
+	// 使用内置钱包获取地址
+	logger.LogWithIDf(log, op.nodeID, logging.INFO, "使用内置钱包获取地址: %s", coinInfo.Chain.String())
+
+	// 使用原生代币获取链的地址信息
+	wallet, err := op.multiwallet.WalletForCurrencyCode(coinInfo.Chain.String())
+	if err != nil {
+		return iwallet.Address{}, fmt.Errorf("获取 %s 钱包失败: %v", coinInfo.Chain.String(), err)
+	}
+
+	address, err := wallet.CurrentAddress()
+	if err != nil {
+		return iwallet.Address{}, fmt.Errorf("获取 %s 钱包地址失败: %v", coinInfo.Chain.String(), err)
+	}
+
+	return address, nil
 }

@@ -209,18 +209,10 @@ func (b *openBazaarAPI) fetchRates(base models.CurrencyCode) (map[models.Currenc
 
 func (b *openBazaarAPI) addAdditionalCurrenciesRates(rateMap map[models.CurrencyCode]*big.Float) {
 	if rate, ok := rateMap["USDT"]; ok {
-		rateMap[iwallet.CtBNBUSDT] = rate
-		rateMap[iwallet.CtMATICUSDT] = rate
-		rateMap[iwallet.CtCFXUSDT] = rate
-
-		rateMap[iwallet.CtBNBMBZ] = rate
-		rateMap[iwallet.CtMATICMBZ] = rate
-		rateMap[iwallet.CtCFXMBZ] = rate
+		rateMap[models.CurrencyCode(iwallet.CtBEP20USDT.CurrencyCode())] = rate
 	}
 
 	if rate, ok := rateMap["USDC"]; ok {
-		rateMap[iwallet.CtBNBUSDC] = rate
-		rateMap[iwallet.CtMATICUSDC] = rate
-		rateMap[iwallet.CtCFXUSDC] = rate
+		rateMap[models.CurrencyCode(iwallet.CtBEP20USDC.CurrencyCode())] = rate
 	}
 }

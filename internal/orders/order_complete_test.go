@@ -192,7 +192,7 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 	}
 
 	paymentSent := &pb.PaymentSent{
-		Coin:      iwallet.CtMock,
+		Coin:      iwallet.CtMock.String(),
 		Chaincode: hex.EncodeToString(chaincode),
 	}
 

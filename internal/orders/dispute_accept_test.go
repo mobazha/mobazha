@@ -106,7 +106,7 @@ func TestOrderProcessor_processDisputeAcceptMessage(t *testing.T) {
 	}
 
 	paymentSent := &pb.PaymentSent{
-		Coin:      iwallet.CtMock,
+		Coin:      iwallet.CtMock.String(),
 		Moderator: "12D3KooWHnpVyu9XDeFoAVayqr9hvc9xPqSSHtCSFLEkKgcz5Wro",
 		Method:    pb.PaymentSent_MODERATED,
 	}

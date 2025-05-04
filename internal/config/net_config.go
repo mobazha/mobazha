@@ -18,11 +18,12 @@ type NetConfig struct {
 	// ExchangeRateProviders API URL to use for exchange rates. Must conform to the BitcoinAverage format.
 	ExchangeRateProviders []string `json:"exchangeRateProviders,omitempty"`
 
-	PlatformAddrs     map[iwallet.CoinType]string `json:"platformAddrs,omitempty"`
-	platformAddrMutex sync.RWMutex                `json:"-"`
+	PlatformAddrs     map[iwallet.ChainType]string `json:"platformAddrs,omitempty"`
+	platformAddrMutex sync.RWMutex                 `json:"-"`
 
-	ExtraFeesPerByte      map[iwallet.CoinType]int32 `json:"extraFeesPerByte,omitempty"`
-	extraFeesPerByteMutex sync.RWMutex               `json:"-"`
+	// ExtraFeesPerByte 从测试看，从一些fee provider拿到的fee比实际的fee要低，所以需要额外加一些fee
+	ExtraFeesPerByte      map[iwallet.ChainType]int32 `json:"extraFeesPerByte,omitempty"`
+	extraFeesPerByteMutex sync.RWMutex                `json:"-"`
 
 	dataMutex sync.RWMutex      `json:"-"`
 	Data      map[string]string `json:"data,omitempty"`
@@ -30,24 +31,24 @@ type NetConfig struct {
 	Testnet bool `json:"-"`
 }
 
-var defaultMainnetPlatformAddrs = map[iwallet.CoinType]string{
-	iwallet.CtBitcoin:     "bc1qq0qpv5l54v2a3vvwq2ygrrdn54pnv3x4rjxpxhlryghrxlmrzr0qds28qd",
-	iwallet.CtEthereum:    "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
-	iwallet.CtBitcoinCash: "ppaz03a9gc9r339wq9ctggf5st79zkjfxgle6qvuss",
-	iwallet.CtLitecoin:    "MTRuWRh99NfdsyRL4oMUaB2NzMqKVKKRkK",
-	iwallet.CtZCash:       "t1VNBTzKypFaAJH8A6uj4Fq67xyMcKhkmyf",
-	iwallet.CtMATIC:       "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
-	iwallet.CtCFX:         "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+var defaultMainnetPlatformAddrs = map[iwallet.ChainType]string{
+	iwallet.ChainBitcoin:     "bc1qq0qpv5l54v2a3vvwq2ygrrdn54pnv3x4rjxpxhlryghrxlmrzr0qds28qd",
+	iwallet.ChainEthereum:    "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainBitcoinCash: "ppaz03a9gc9r339wq9ctggf5st79zkjfxgle6qvuss",
+	iwallet.ChainLitecoin:    "MTRuWRh99NfdsyRL4oMUaB2NzMqKVKKRkK",
+	iwallet.ChainZCash:       "t1VNBTzKypFaAJH8A6uj4Fq67xyMcKhkmyf",
+	iwallet.ChainPolygon:     "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
+	iwallet.ChainConflux:     "0x10d44982e0e50bcbf4c1df72f8c43497baf74668",
 }
 
-var defaultTestnetPlatformAddrs = map[iwallet.CoinType]string{}
+var defaultTestnetPlatformAddrs = map[iwallet.ChainType]string{}
 
-var defaultExtraFeesPerByte = map[iwallet.CoinType]int32{
-	iwallet.CtBitcoin:     0,
-	iwallet.CtEthereum:    0,
-	iwallet.CtBitcoinCash: 3,
-	iwallet.CtLitecoin:    3,
-	iwallet.CtZCash:       0,
+var defaultExtraFeesPerByte = map[iwallet.ChainType]int32{
+	iwallet.ChainBitcoin:     0,
+	iwallet.ChainEthereum:    0,
+	iwallet.ChainBitcoinCash: 3,
+	iwallet.ChainLitecoin:    3,
+	iwallet.ChainZCash:       0,
 }
 
 func DefaultNetConfig() *NetConfig {
@@ -128,25 +129,22 @@ func (config *NetConfig) GetCommission() float64 {
 	return commission
 }
 
-func (config *NetConfig) GetPlatformAddr(coinType iwallet.CoinType) string {
+func (config *NetConfig) GetPlatformAddr(chainType iwallet.ChainType) string {
 	config.platformAddrMutex.RLock()
 	defer config.platformAddrMutex.RUnlock()
 
-	if coinType.IsERC20Token() {
-		coinType = coinType.ChainCoinType()
-	}
-
 	if len(config.PlatformAddrs) == 0 {
 		if config.Testnet {
-			return defaultTestnetPlatformAddrs[coinType]
+			return defaultTestnetPlatformAddrs[chainType]
 		}
-		return defaultMainnetPlatformAddrs[coinType]
+		return defaultMainnetPlatformAddrs[chainType]
 	}
-	return config.PlatformAddrs[coinType]
+	return config.PlatformAddrs[chainType]
 }
 
 func (config *NetConfig) GetCommissionInfo(coinType iwallet.CoinType) (iwallet.Address, float64) {
-	addr := config.GetPlatformAddr(coinType)
+	coinInfo, _ := iwallet.CoinInfoFromCoinType(coinType)
+	addr := config.GetPlatformAddr(coinInfo.Chain)
 	commission := config.GetCommission()
 
 	if len(addr) == 0 {
@@ -156,14 +154,15 @@ func (config *NetConfig) GetCommissionInfo(coinType iwallet.CoinType) (iwallet.A
 	return iwallet.NewAddress(addr, coinType), commission
 }
 
-func (config *NetConfig) GetExtraFeesPerByte(coinType iwallet.CoinType) iwallet.Amount {
+func (config *NetConfig) GetExtraFeesPerByte(chainType iwallet.ChainType) iwallet.Amount {
 	config.extraFeesPerByteMutex.RLock()
 	defer config.extraFeesPerByteMutex.RUnlock()
-	val, ok := config.ExtraFeesPerByte[coinType]
+
+	val, ok := config.ExtraFeesPerByte[chainType]
 	if ok {
 		return iwallet.NewAmount(val)
 	}
-	return iwallet.NewAmount(defaultExtraFeesPerByte[coinType])
+	return iwallet.NewAmount(defaultExtraFeesPerByte[chainType])
 }
 
 // GetVerifiedModEndpoint API URL to get verified moderator IDs.
@@ -175,16 +174,16 @@ func (config *NetConfig) GetVerifiedModEndpoint() string {
 	return "https://info.mobazha.org/api/search/filters/moderators"
 }
 
-func (config *NetConfig) GetFeeUrl(coinType iwallet.CoinType) string {
+func (config *NetConfig) GetFeeUrl(coinType iwallet.ChainType) string {
 	protocol := "bitcoin"
 	switch coinType {
-	case iwallet.CtBitcoin:
+	case iwallet.ChainBitcoin:
 		protocol = "bitcoin"
-	case iwallet.CtLitecoin:
+	case iwallet.ChainLitecoin:
 		protocol = "litecoin"
-	case iwallet.CtBitcoinCash:
+	case iwallet.ChainBitcoinCash:
 		protocol = "bitcoincash"
-	case iwallet.CtZCash:
+	case iwallet.ChainZCash:
 		protocol = "zcash"
 	}
 

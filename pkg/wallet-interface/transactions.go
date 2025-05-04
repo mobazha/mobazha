@@ -120,7 +120,7 @@ func (si *SpendInfo) MarshalJSON() ([]byte, error) {
 		ID: hex.EncodeToString(si.ID),
 		Address: addrJSON{
 			Address:  si.Address.addr,
-			CoinType: si.Address.typ.CurrencyCode(),
+			CoinType: si.Address.typ.String(),
 		},
 		Amount: si.Amount.String(),
 	}

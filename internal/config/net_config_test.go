@@ -24,8 +24,8 @@ func TestGenerateJson(t *testing.T) {
 		ExchangeRateProviders: []string{
 			// "https://info.mobazha.org/api/ticker",
 		},
-		PlatformAddrs: map[iwallet.CoinType]string{
-			iwallet.CtBitcoinCash: "ppaz03a9gc9r339wq9ctggf5st79zkjfxgle6qvuss",
+		PlatformAddrs: map[iwallet.ChainType]string{
+			iwallet.ChainBitcoinCash: "ppaz03a9gc9r339wq9ctggf5st79zkjfxgle6qvuss",
 		},
 		Data: map[string]string{
 			// "netDBEndpoint":       "",
@@ -46,12 +46,12 @@ func TestLoadNetConfig(t *testing.T) {
 	commission := netConfig.GetCommission()
 	t.Logf("commission is %f", commission)
 
-	btcAddr := netConfig.GetPlatformAddr(iwallet.CtBitcoin)
+	btcAddr := netConfig.GetPlatformAddr(iwallet.ChainBitcoin)
 	t.Logf("btcAddr is %s", btcAddr)
 
-	t.Logf("GetExtraFeesPerByte: %s", netConfig.GetExtraFeesPerByte(iwallet.CtBitcoinCash))
+	t.Logf("GetExtraFeesPerByte: %s", netConfig.GetExtraFeesPerByte(iwallet.ChainBitcoinCash))
 }
 
 func TestNetConfig_GetExtraFeesPerByte(t *testing.T) {
-	t.Log(DefaultNetConfig().GetExtraFeesPerByte(iwallet.CtBitcoinCash))
+	t.Log(DefaultNetConfig().GetExtraFeesPerByte(iwallet.ChainBitcoinCash))
 }

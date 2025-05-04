@@ -83,7 +83,7 @@ func TestOrderProcessor_processOrderConfirmationMessage(t *testing.T) {
 	}
 
 	paymentSent := &pb.PaymentSent{
-		Coin: iwallet.CtMock,
+		Coin: iwallet.CtMock.String(),
 	}
 
 	tests := []struct {

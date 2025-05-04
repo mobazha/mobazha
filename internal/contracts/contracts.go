@@ -20,9 +20,9 @@ func NewContracts(opts ...multiwallet.Option) (*Contracts, error) {
 		return nil, err
 	}
 
-	rpcEndpoint := cfg.WalletAPIs[iwallet.CtMATIC].MainnetRpc
+	rpcEndpoint := cfg.ChainAPIs[iwallet.ChainPolygon].MainnetRpc
 	if cfg.UseTestnet {
-		rpcEndpoint = cfg.WalletAPIs[iwallet.CtMATIC].TestnetRpc
+		rpcEndpoint = cfg.ChainAPIs[iwallet.ChainPolygon].TestnetRpc
 	}
 
 	client, err := ethclient.Dial(rpcEndpoint[0])

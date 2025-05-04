@@ -110,7 +110,7 @@ func (g *Gateway) handleGETExchangeRates(w http.ResponseWriter, r *http.Request)
 		}
 		base = *def.CurrencyCode()
 	} else {
-		base = iwallet.CtBitcoin
+		base = models.CurrencyCode(iwallet.CtBitcoin)
 	}
 	rates, err := node.ExchangeRates().GetAllRates(base, false)
 	if err != nil {

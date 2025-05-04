@@ -1,185 +1,289 @@
 package wallet_interface
 
 import (
+	"fmt"
 	"strings"
 	"time"
 )
 
-// CoinType represents a cryptocurrency that has been
-// implemented the wallet interface.
+// ChainType 表示区块链网络类型
+type ChainType string
+
+const (
+	ChainMock        ChainType = "MOCK"
+	ChainBitcoin     ChainType = "BTC"
+	ChainBitcoinCash ChainType = "BCH"
+	ChainLitecoin    ChainType = "LTC"
+	ChainZCash       ChainType = "ZEC"
+	ChainEthereum    ChainType = "ETH"
+	ChainBNB         ChainType = "BNB"
+	ChainPolygon     ChainType = "MATIC"
+	ChainBase        ChainType = "BASE"
+	ChainConflux     ChainType = "CFX"
+	ChainSolana      ChainType = "SOL"
+	ChainExternalPayment      ChainType = "EXTERNAL_PAYMENT"
+	ChainDash        ChainType = "DASH"
+)
+
+func (chaintype ChainType) String() string {
+	return string(chaintype)
+}
+
+// CoinType 表示所有支持的币种名称
 type CoinType string
+
+const (
+	CtMock        CoinType = CoinType(ChainMock)
+	CtBitcoin     CoinType = CoinType(ChainBitcoin)
+	CtBitcoinCash CoinType = CoinType(ChainBitcoinCash)
+	CtLitecoin    CoinType = CoinType(ChainLitecoin)
+	CtZCash       CoinType = CoinType(ChainZCash)
+	CtEthereum    CoinType = CoinType(ChainEthereum)
+	CtBNB         CoinType = CoinType(ChainBNB)
+	CtPolygon     CoinType = CoinType(ChainPolygon)
+	CtBase        CoinType = CoinType(ChainBase)
+	CtConflux     CoinType = CoinType(ChainConflux)
+	CtSolana      CoinType = CoinType(ChainSolana)
+	CtExternalPayment      CoinType = CoinType(ChainExternalPayment)
+	CtDash        CoinType = CoinType(ChainDash)
+
+	CtBEP20USDT CoinType = "BNBUSDT"
+	CtBEP20USDC CoinType = "BNBUSDC"
+	CtMBZ       CoinType = "MBZ"
+)
+
+func (ct CoinType) String() string {
+	return string(ct)
+}
 
 // CurrencyCode returns the coins currency code.
 func (ct CoinType) CurrencyCode() string {
-	return strings.ToUpper(string(ct))
+	return ct.String()
 }
 
-const (
-	// Mainnet
-	CtMock        = "MCK"
-	CtBitcoin     = "BTC"
-	CtBitcoinCash = "BCH"
-	CtLitecoin    = "LTC"
-	CtZCash       = "ZEC"
-	CtEthereum    = "ETH"
-	CtExternalPayment      = "EXTERNAL_PAYMENT"
-	CtDash        = "DASH"
+func (ct CoinType) CoinInfo() (CoinInfo, error) {
+	return CoinInfoFromCoinType(ct)
+}
 
-	CtBNB     = "BNB"
-	CtBNBUSDT = "BNBUSDT"
-	CtBNBUSDC = "BNBUSDC"
-	CtBNBMBZ  = "BNBMBZ"
+// CoinInfo 表示完整的币种信息
+type CoinInfo struct {
+	Chain           ChainType // 所属链
+	Symbol          string    // 代币符号
+	IsNative        bool      // 是否为原生代币
+	Contract        string    // 主网合约地址（非原生代币）
+	TestnetContract string    // 测试网合约地址（非原生代币）
+	Decimals        uint8     // 精度
+	Description     string    // 描述
+}
 
-	CtMATIC     = "MATIC"
-	CtMATICUSDT = "MATICUSDT"
-	CtMATICUSDC = "MATICUSDC"
-	CtMATICMBZ  = "MATICMBZ"
+// 常用代币定义
+var (
+	CtMockInfo = CoinInfo{
+		Chain:       ChainMock,
+		Symbol:      "MOCK",
+		IsNative:    true,
+		Decimals:    0,
+		Description: "Mock",
+	}
 
-	CtCFX     = "CFX"
-	CtCFXUSDT = "CFXUSDT"
-	CtCFXUSDC = "CFXUSDC"
-	CtCFXMBZ  = "CFXMBZ"
+	// 原生代币
+	CtBitcoinInfo = CoinInfo{
+		Chain:       ChainBitcoin,
+		Symbol:      "BTC",
+		IsNative:    true,
+		Decimals:    8,
+		Description: "Bitcoin",
+	}
 
-	CtSolana     CoinType = "SOL"
-	CtSolanaUSDT CoinType = "SOLUSDT"
-	CtSolanaUSDC CoinType = "SOLUSDC"
-	CtSolanaMBZ  CoinType = "SOLMBZ"
+	CtBNBInfo = CoinInfo{
+		Chain:       ChainBNB,
+		Symbol:      "BNB",
+		IsNative:    true,
+		Decimals:    18,
+		Description: "Binance Coin",
+	}
+
+	CtBaseInfo = CoinInfo{
+		Chain:       ChainBase,
+		Symbol:      "ETH",
+		IsNative:    true,
+		Decimals:    18,
+		Description: "Ethereum on Base",
+	}
+
+	CtBitcoinCashInfo = CoinInfo{
+		Chain:       ChainBitcoinCash,
+		Symbol:      "BCH",
+		IsNative:    true,
+		Decimals:    8,
+		Description: "Bitcoin Cash",
+	}
+
+	CtLitecoinInfo = CoinInfo{
+		Chain:       ChainLitecoin,
+		Symbol:      "LTC",
+		IsNative:    true,
+		Decimals:    8,
+		Description: "Litecoin",
+	}
+
+	CtZCashInfo = CoinInfo{
+		Chain:       ChainZCash,
+		Symbol:      "ZEC",
+		IsNative:    true,
+		Decimals:    8,
+		Description: "Zcash",
+	}
+
+	CtEthereumInfo = CoinInfo{
+		Chain:       ChainEthereum,
+		Symbol:      "ETH",
+		IsNative:    true,
+		Decimals:    18,
+		Description: "Ethereum",
+	}
+
+	CtPolygonInfo = CoinInfo{
+		Chain:       ChainPolygon,
+		Symbol:      "MATIC",
+		IsNative:    true,
+		Decimals:    18,
+		Description: "Polygon",
+	}
+
+	CtConfluxInfo = CoinInfo{
+		Chain:       ChainConflux,
+		Symbol:      "CFX",
+		IsNative:    true,
+		Decimals:    18,
+		Description: "Conflux",
+	}
+
+	CtSolanaInfo = CoinInfo{
+		Chain:       ChainSolana,
+		Symbol:      "SOL",
+		IsNative:    true,
+		Decimals:    9,
+		Description: "Solana",
+	}
+
+	// ERC20代币
+	ERC20USDTInfo = CoinInfo{
+		Chain:           ChainEthereum,
+		Symbol:          "USDT",
+		IsNative:        false,
+		Contract:        "0xdac17f958d2ee523a2206206994597c13d831ec7",
+		TestnetContract: "0x79C950C7446B234a6Ad53B908fBF342b01c4d446", // Goerli USDT
+		Decimals:        6,
+		Description:     "Tether USD",
+	}
+
+	// BEP20代币
+	BEP20USDTInfo = CoinInfo{
+		Chain:           ChainBNB,
+		Symbol:          "USDT",
+		IsNative:        false,
+		Contract:        "0x55d398326f99059ff775485246999027b3197955",
+		TestnetContract: "0x337610d27c682E347C9cD60BD4b3b107C9d34dDd", // BSC Testnet USDT
+		Decimals:        18,
+		Description:     "Tether USD on BSC",
+	}
+
+	// SPL代币
+	SPLUSDTInfo = CoinInfo{
+		Chain:           ChainSolana,
+		Symbol:          "USDT",
+		IsNative:        false,
+		Contract:        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+		TestnetContract: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", // Solana Devnet USDT
+		Decimals:        6,
+		Description:     "Tether USD on Solana",
+	}
 )
 
-var codeMap = map[string]CoinType{
-	"MCK":       CtMock,
-	"BTC":       CtBitcoin,
-	"BCH":       CtBitcoinCash,
-	"LTC":       CtLitecoin,
-	"ZEC":       CtZCash,
-	"ETH":       CtEthereum,
-	"EXTERNAL_PAYMENT":       CtExternalPayment,
-	"DASH":      CtDash,
-	"BNB":       CtBNB,
-	"BNBUSDT":   CtBNBUSDT,
-	"BNBUSDC":   CtBNBUSDC,
-	"BNBMBZ":    CtBNBMBZ,
-	"MATIC":     CtMATIC,
-	"MATICUSDT": CtMATICUSDT,
-	"MATICUSDC": CtMATICUSDC,
-	"MATICMBZ":  CtMATICMBZ,
-
-	"CFX":     CtCFX,
-	"CFXUSDT": CtCFXUSDT,
-	"CFXUSDC": CtCFXUSDC,
-	"CFXMBZ":  CtCFXMBZ,
-
-	"SOL":     CtSolana,
-	"SOLUSDT": CtSolanaUSDT,
-	"SOLUSDC": CtSolanaUSDC,
-	"SOLMBZ":  CtSolanaMBZ,
+// 链配置
+var ChainConfigs = map[ChainType]struct {
+	BlockInterval time.Duration
+	Description   string
+}{
+	ChainBitcoin:     {time.Minute * 10, "Bitcoin"},
+	ChainBitcoinCash: {time.Minute * 10, "Bitcoin Cash"},
+	ChainLitecoin:    {time.Second * 150, "Litecoin"},
+	ChainBNB:         {time.Second * 3, "Binance Smart Chain"},
+	ChainPolygon:     {time.Second * 2, "Polygon"},
+	ChainConflux:     {time.Second * 1, "Conflux"},
+	ChainSolana:      {time.Second * 1, "Solana"},
 }
 
-var BlockIntervalDictionary = map[CoinType]time.Duration{
-	"BTC":   time.Minute * 10,
-	"BCH":   time.Minute * 10,
-	"LTC":   time.Second * 150,
-	"BNB":   time.Second * 3,
-	"MATIC": time.Second * 2,
-	"CFX":   time.Second * 1, // actually around 0.44s
+// NewCoinInfo 创建新的币种
+func NewCoinInfo(chain string, token string) (CoinInfo, error) {
+	return CoinInfoFromCoinType(CoinType(chain + token))
 }
 
-var erc20TokenMap = map[CoinType]bool{
-	CtBNBUSDT: true,
-	CtBNBUSDC: true,
-	CtBNBMBZ:  true,
-
-	CtMATICUSDT: true,
-	CtMATICUSDC: true,
-	CtMATICMBZ:  true,
-
-	CtCFXUSDT: true,
-	CtCFXUSDC: true,
-	CtCFXMBZ:  true,
+func (ct CoinInfo) CoinType() CoinType {
+	return CoinType(ct.String())
 }
 
-func (ct CoinType) IsERC20Token() bool {
-	_, ok := erc20TokenMap[ct]
-
-	return ok
+// CurrencyCode 返回币种的货币代码
+func (ct CoinInfo) CurrencyCode() string {
+	return ct.String()
 }
 
-var coinChainMap = map[CoinType]CoinType{
-	CtBNB:     CtBNB,
-	CtBNBUSDT: CtBNB,
-	CtBNBUSDC: CtBNB,
-	CtBNBMBZ:  CtBNB,
-
-	CtMATIC:     CtMATIC,
-	CtMATICUSDT: CtMATIC,
-	CtMATICUSDC: CtMATIC,
-	CtMATICMBZ:  CtMATIC,
-
-	CtCFX:     CtCFX,
-	CtCFXUSDT: CtCFX,
-	CtCFXUSDC: CtCFX,
-	CtCFXMBZ:  CtCFX,
+// String 返回币种的字符串表示
+func (ct CoinInfo) String() string {
+	if ct.IsNative {
+		return string(ct.Chain)
+	}
+	return string(ct.Chain) + ct.Symbol
 }
 
-func (ct CoinType) ChainCoinType() CoinType {
-	return coinChainMap[ct]
+// ContractAddress 返回代币合约地址
+func (ct CoinInfo) ContractAddress(mainnet bool) string {
+	if !mainnet && ct.TestnetContract != "" {
+		return ct.TestnetContract
+	}
+	return ct.Contract
 }
 
-var mainnetContractAddresses = map[CoinType]string{
-	CtBNBUSDT: "0x55d398326f99059ff775485246999027b3197955",
-	CtBNBUSDC: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
-	CtBNBMBZ:  "0xBAD8470f50575Ac41d4FE1C31039554112d31E89",
-
-	CtMATICUSDT: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
-	CtMATICUSDC: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
-	CtMATICMBZ:  "0x4c1A1b21c4471CA57145EE08404Cbaf9C8B83991",
-
-	CtCFXUSDT: "0xfe97E85d13ABD9c1c33384E796F10B73905637cE",
-	CtCFXUSDC: "0x6963EfED0aB40F6C3d7BdA44A05dcf1437C44372",
-	CtCFXMBZ:  "0x4c1A1b21c4471CA57145EE08404Cbaf9C8B83991",
+// BlockInterval 返回链的出块间隔
+func (ct CoinInfo) BlockInterval() time.Duration {
+	if config, ok := ChainConfigs[ct.Chain]; ok {
+		return config.BlockInterval
+	}
+	return time.Minute // 默认值
 }
 
-var testnetContractAddresses = map[CoinType]string{
-	CtBNBUSDT: "0x3DAe8BD5972D7D83A9661E13becd0C2dA9177F3B",
-	CtBNBUSDC: "0xaB1a4d4f1D656d2450692D237fdD6C7f9146e814",
-	CtBNBMBZ:  "0xBAD8470f50575Ac41d4FE1C31039554112d31E89",
+// CoinInfoFromCoinType 从字符串构造 CoinInfo
+// 格式为 "CHAIN" 或 "CHAINTOKEN"，例如 "BTC" 或 "ETHUSDT"
+func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
+	s := string(coinType)
 
-	CtMATICUSDT: "0x393b2FEfA82aB9ddFd7AF920C24A9dB0B27388c7",
-	CtMATICUSDC: "0x3E8966Dbd540D9a762A3e976Fb906407ee1b1D79",
-	CtMATICMBZ:  "0x4c1A1b21c4471CA57145EE08404Cbaf9C8B83991",
-
-	CtCFXUSDT: "0xFc95C7112d16905691d74C80D796ABff93be7d71",
-	CtCFXUSDC: "0x8EC3ec712fd24b11c2Ce369a04249e7C439CB339",
-	CtCFXMBZ:  "0x4c1A1b21c4471CA57145EE08404Cbaf9C8B83991",
-}
-
-func (ct CoinType) ERC20ContractAddress(mainnet bool) string {
-	if mainnet {
-		return mainnetContractAddresses[ct]
+	// 检查是否为原生代币
+	for chain := range ChainConfigs {
+		if string(chain) == s {
+			// 找到对应的原生代币
+			for _, token := range []CoinInfo{CtBitcoinInfo, CtEthereumInfo, CtSolanaInfo} {
+				if token.Chain == chain && token.IsNative {
+					return token, nil
+				}
+			}
+			return CoinInfo{}, fmt.Errorf("no native token found for chain %s", s)
+		}
 	}
 
-	return testnetContractAddresses[ct]
-}
-
-// SPLTokenMintAddress 返回SPL代币的铸币地址
-func (c CoinType) SPLTokenMintAddress(mainnet bool) string {
-	switch c {
-	case CtSolanaUSDT:
-		if mainnet {
-			return "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB" // 主网USDT铸币地址
+	// 检查是否为合约代币
+	for chain := range ChainConfigs {
+		if strings.HasPrefix(s, string(chain)) {
+			tokenSymbol := s[len(chain):]
+			// 查找对应的合约代币
+			for _, token := range []CoinInfo{ERC20USDTInfo, BEP20USDTInfo, SPLUSDTInfo} {
+				if token.Chain == chain && token.Symbol == tokenSymbol {
+					return token, nil
+				}
+			}
+			continue
 		}
-		return "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU" // 测试网USDT铸币地址
-	case CtSolanaUSDC:
-		if mainnet {
-			return "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" // 主网USDC铸币地址
-		}
-		return "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr" // 测试网USDC铸币地址
-	case CtSolanaMBZ:
-		if mainnet {
-			return "MBZCTPCWBpGY5XESJAciZAYXyK1J9tLbS38reJW2DebF" // 主网MBZ铸币地址
-		}
-		return "MBZ12CgCp3KjqpjMBBwYJwsGra4xKy4B32XGiYJvUDY" // 测试网MBZ铸币地址
-	default:
-		return ""
 	}
+
+	return CoinInfo{}, fmt.Errorf("invalid coin type string: %s", s)
 }

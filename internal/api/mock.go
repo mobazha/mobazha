@@ -131,9 +131,17 @@ type mockNode struct {
 	getMnemonicFunc                         func() (string, error)
 	updateWalletStatusFunc                  func(coinTypes []iwallet.CoinType)
 	getExchangeRatesFunc                    func() *wallet.ExchangeRateProvider
-	getReceivingAccountsFunc                func() ([]models.ReceivingAccount, error)
-	updateReceivingAccountsFunc             func(receivingAccounts []models.ReceivingAccount) error
-	getStripeConnectURLFunc                 func() (string, error)
+
+	// 收款账户相关
+	addReceivingAccountFunc         func(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
+	updateReceivingAccountFunc      func(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
+	activateReceivingAccountFunc    func(id int, tokens []string) error
+	deactivateReceivingAccountFunc  func(id int) error
+	deleteReceivingAccountFunc      func(id int) error
+	getReceivingAccountsFunc        func() ([]models.ReceivingAccount, error)
+	getActiveReceivingAccountFunc   func(chainType iwallet.ChainType) (*models.ReceivingAccount, error)
+	getReceivingAccountsByChainFunc func(chainType iwallet.ChainType) ([]models.ReceivingAccount, error)
+	getStripeConnectURLFunc         func() (string, error)
 
 	initializeSolEscrowFunc      func(ctx context.Context, params models.InitializeSolEscrowData) (*models.PaymentData, solana.PublicKey, []solana.Instruction, error)
 	releaseSolEscrowFunc         func(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
@@ -480,11 +488,31 @@ func (m *mockNode) GetMnemonic() (string, error) {
 func (m *mockNode) UpdateWalletStatus(coinTypes []iwallet.CoinType) {
 	m.updateWalletStatusFunc(coinTypes)
 }
+
+// 收款账户相关
+func (m *mockNode) AddReceivingAccount(account *models.ReceivingAccount) (*models.ReceivingAccount, error) {
+	return m.addReceivingAccountFunc(account)
+}
+func (m *mockNode) UpdateReceivingAccount(account *models.ReceivingAccount) (*models.ReceivingAccount, error) {
+	return m.updateReceivingAccountFunc(account)
+}
+func (m *mockNode) ActivateReceivingAccount(id int, tokens []string) error {
+	return m.activateReceivingAccountFunc(id, tokens)
+}
+func (m *mockNode) DeactivateReceivingAccount(id int) error {
+	return m.deactivateReceivingAccountFunc(id)
+}
+func (m *mockNode) DeleteReceivingAccount(id int) error {
+	return m.deleteReceivingAccountFunc(id)
+}
 func (m *mockNode) GetReceivingAccounts() ([]models.ReceivingAccount, error) {
 	return m.getReceivingAccountsFunc()
 }
-func (m *mockNode) UpdateReceivingAccounts(receivingAccounts []models.ReceivingAccount) error {
-	return m.updateReceivingAccountsFunc(receivingAccounts)
+func (m *mockNode) GetActiveReceivingAccount(chainType iwallet.ChainType) (*models.ReceivingAccount, error) {
+	return m.getActiveReceivingAccountFunc(chainType)
+}
+func (m *mockNode) GetReceivingAccountsByChain(chainType iwallet.ChainType) ([]models.ReceivingAccount, error) {
+	return m.getReceivingAccountsByChainFunc(chainType)
 }
 func (m *mockNode) GetStripeConnectURL() (string, error) {
 	return m.getStripeConnectURLFunc()

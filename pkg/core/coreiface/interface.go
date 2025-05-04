@@ -167,6 +167,17 @@ type CoreIface interface {
 	BlockNode(peerID string) (bool, error)
 	UnblockNode(peerID string) (bool, error)
 
+	// 收款账户相关
+	AddReceivingAccount(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
+	UpdateReceivingAccount(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
+	ActivateReceivingAccount(id int, tokens []string) error
+	DeactivateReceivingAccount(id int) error
+	DeleteReceivingAccount(id int) error
+	GetReceivingAccounts() ([]models.ReceivingAccount, error)
+	GetActiveReceivingAccount(chainType iwallet.ChainType) (*models.ReceivingAccount, error)
+	GetReceivingAccountsByChain(chainType iwallet.ChainType) ([]models.ReceivingAccount, error)
+	GetStripeConnectURL() (string, error)
+
 	// Escrow
 	InitializeSolEscrow(ctx context.Context, params models.InitializeSolEscrowData) (*models.PaymentData, solana.PublicKey, []solana.Instruction, error)
 	ReleaseSolEscrow(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
@@ -180,11 +191,6 @@ type CoreIface interface {
 	RequestAddress(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error)
 	GetMnemonic() (string, error)
 	UpdateWalletStatus(coinTypes []iwallet.CoinType)
-
-	// 收款账户相关
-	GetReceivingAccounts() ([]models.ReceivingAccount, error)
-	UpdateReceivingAccounts(receivingAccounts []models.ReceivingAccount) error
-	GetStripeConnectURL() (string, error)
 
 	// Misc
 	UsingTestnet() bool

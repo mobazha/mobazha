@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -674,15 +675,62 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.Case{},
 		&models.Channel{},
 		&models.StoreCartRecord{},
-		&models.ReceivingAccount{},
 	}
 
 	return db.Update(func(tx database.Tx) error {
+		// 先迁移其他表
 		for _, m := range dbModels {
 			if err := tx.Migrate(m); err != nil {
-				return err
+				return fmt.Errorf("迁移表 %s 失败: %v", reflect.TypeOf(m).String(), err)
 			}
 		}
+
+		// 特殊处理 ReceivingAccount 表
+		// 检查表是否存在
+		var count int64
+		if err := tx.Read().Table("receiving_accounts").Count(&count).Error; err != nil {
+			// 表不存在，直接创建
+			if err := tx.Migrate(&models.ReceivingAccount{}); err != nil {
+				return fmt.Errorf("迁移表 ReceivingAccount 失败: %v", err)
+			}
+		} else {
+			// 检查表结构是否匹配
+			type TableInfo struct {
+				Cid       int    `gorm:"column:cid"`
+				Name      string `gorm:"column:name"`
+				Type      string `gorm:"column:type"`
+				NotNull   int    `gorm:"column:notnull"`
+				DfltValue string `gorm:"column:dflt_value"`
+				Pk        int    `gorm:"column:pk"`
+			}
+			var columns []TableInfo
+			if err := tx.Read().Raw("PRAGMA table_info(receiving_accounts)").Scan(&columns).Error; err != nil {
+				return fmt.Errorf("获取表结构失败: %v", err)
+			}
+
+			// 检查是否存在 id 列
+			hasID := false
+			for _, col := range columns {
+				if col.Name == "id" {
+					hasID = true
+					break
+				}
+			}
+
+			// 如果表结构不匹配（没有 id 列），才进行迁移
+			if !hasID {
+				// 删除旧表
+				if err := tx.Read().Exec("DROP TABLE IF EXISTS receiving_accounts").Error; err != nil {
+					return fmt.Errorf("删除旧表 ReceivingAccount 失败: %v", err)
+				}
+
+				// 创建新表
+				if err := tx.Migrate(&models.ReceivingAccount{}); err != nil {
+					return fmt.Errorf("迁移表 ReceivingAccount 失败: %v", err)
+				}
+			}
+		}
+
 		return nil
 	})
 }

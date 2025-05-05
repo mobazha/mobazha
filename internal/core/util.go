@@ -7,10 +7,15 @@ import (
 	"image/jpeg"
 
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 // NormalizeCurrencyCode standardizes the format for the given currency code.
 func normalizeCurrencyCode(currencyCode string) string {
+	if iwallet.IsValidCoinType(iwallet.CoinType(currencyCode)) {
+		return currencyCode
+	}
+
 	var c, err = models.CurrencyDefinitions.Lookup(currencyCode)
 	if err != nil {
 		log.Errorf("invalid currency code (%s): %s", currencyCode, err.Error())

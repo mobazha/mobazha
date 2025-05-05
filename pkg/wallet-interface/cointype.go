@@ -289,3 +289,24 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 
 	return CoinInfo{}, fmt.Errorf("invalid coin type string: %s", s)
 }
+
+func IsValidCoinType(coinType CoinType) bool {
+	_, err := CoinInfoFromCoinType(coinType)
+	return err == nil
+}
+
+func GetAllSupportedCoinTypes() []CoinType {
+	return []CoinType{
+		CtBitcoin, CtEthereum, CtSolana, CtBNB, CtPolygon, CtConflux, CtSolana, CtExternalPayment, CtDash,
+		CtBEP20USDT, CtBEP20USDC, CtMBZ,
+	}
+}
+
+func GetAllSupportedCurrencyCodes() []string {
+	coinTypes := GetAllSupportedCoinTypes()
+	currencyCodes := make([]string, len(coinTypes))
+	for i, coinType := range coinTypes {
+		currencyCodes[i] = coinType.CurrencyCode()
+	}
+	return currencyCodes
+}

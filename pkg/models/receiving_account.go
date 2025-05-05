@@ -99,6 +99,23 @@ func (ra *ReceivingAccount) HasToken(token string) (bool, error) {
 	return false, nil
 }
 
+func (ra *ReceivingAccount) AcceptedCurrencies() []string {
+	tokens, err := ra.EnabledTokens()
+	if err != nil {
+		return []string{}
+	}
+
+	var currencies []string
+	for _, token := range tokens {
+		if token == iwallet.NATIVE_SYMBOL {
+			currencies = append(currencies, string(ra.ChainType))
+		} else {
+			currencies = append(currencies, string(ra.ChainType)+token)
+		}
+	}
+	return currencies
+}
+
 // receivingAccountJSON 用于 JSON 序列化的结构体
 type receivingAccountJSON struct {
 	ID            int               `json:"id"`

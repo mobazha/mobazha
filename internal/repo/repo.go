@@ -708,25 +708,27 @@ func autoMigrateDatabase(db database.Database) error {
 				return fmt.Errorf("获取表结构失败: %v", err)
 			}
 
-			// 检查是否存在 id 列
-			hasID := false
+			// 检查是否需要迁移
+			needsMigration := false
+			columnMap := make(map[string]bool)
 			for _, col := range columns {
-				if col.Name == "id" {
-					hasID = true
-					break
-				}
+				columnMap[col.Name] = true
 			}
 
-			// 如果表结构不匹配（没有 id 列），才进行迁移
-			if !hasID {
+			// 检查新字段是否存在
+			if !columnMap["serialized_active_tokens"] || !columnMap["serialized_inactive_tokens"] || !columnMap["is_active"] {
+				needsMigration = true
+			}
+
+			if needsMigration {
 				// 删除旧表
-				if err := tx.Read().Exec("DROP TABLE IF EXISTS receiving_accounts").Error; err != nil {
-					return fmt.Errorf("删除旧表 ReceivingAccount 失败: %v", err)
+				if err := tx.Read().Exec("DROP TABLE receiving_accounts").Error; err != nil {
+					return fmt.Errorf("删除旧表失败: %v", err)
 				}
 
 				// 创建新表
 				if err := tx.Migrate(&models.ReceivingAccount{}); err != nil {
-					return fmt.Errorf("迁移表 ReceivingAccount 失败: %v", err)
+					return fmt.Errorf("创建新表失败: %v", err)
 				}
 			}
 		}

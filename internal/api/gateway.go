@@ -178,11 +178,11 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/wallet/escrow/spl/release", g.handleReleaseSPLTokenEscrow).Methods("POST")
 
 		// 收款账户相关API
-		r.HandleFunc("/v1/ob/receiving-accounts", g.GetReceivingAccounts).Methods("GET")
-		r.HandleFunc("/v1/ob/receiving-accounts", g.AddReceivingAccount).Methods("POST")
-		r.HandleFunc("/v1/ob/receiving-accounts", g.UpdateReceivingAccount).Methods("PUT")
+		r.HandleFunc("/v1/wallet/receivingaccountlist", g.GetReceivingAccounts).Methods("GET")
+		r.HandleFunc("/v1/wallet/receivingaccount", g.AddReceivingAccount).Methods("POST")
+		r.HandleFunc("/v1/wallet/receivingaccount", g.UpdateReceivingAccount).Methods("PUT")
 		// Stripe连接URL
-		r.HandleFunc("/v1/ob/stripe/connect-url", g.GetStripeConnectURL).Methods("GET")
+		r.HandleFunc("/v1/wallet/stripe/connect-url", g.GetStripeConnectURL).Methods("GET")
 
 		// Chat
 		r.HandleFunc("/v1/ob/chatmessage", g.handlePOSTSendChatMessage).Methods("POST")

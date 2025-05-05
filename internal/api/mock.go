@@ -135,8 +135,6 @@ type mockNode struct {
 	// 收款账户相关
 	addReceivingAccountFunc         func(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
 	updateReceivingAccountFunc      func(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
-	activateReceivingAccountFunc    func(id int, tokens []string) error
-	deactivateReceivingAccountFunc  func(id int) error
 	deleteReceivingAccountFunc      func(id int) error
 	getReceivingAccountsFunc        func() ([]models.ReceivingAccount, error)
 	getActiveReceivingAccountFunc   func(chainType iwallet.ChainType) (*models.ReceivingAccount, error)
@@ -495,12 +493,6 @@ func (m *mockNode) AddReceivingAccount(account *models.ReceivingAccount) (*model
 }
 func (m *mockNode) UpdateReceivingAccount(account *models.ReceivingAccount) (*models.ReceivingAccount, error) {
 	return m.updateReceivingAccountFunc(account)
-}
-func (m *mockNode) ActivateReceivingAccount(id int, tokens []string) error {
-	return m.activateReceivingAccountFunc(id, tokens)
-}
-func (m *mockNode) DeactivateReceivingAccount(id int) error {
-	return m.deactivateReceivingAccountFunc(id)
 }
 func (m *mockNode) DeleteReceivingAccount(id int) error {
 	return m.deleteReceivingAccountFunc(id)

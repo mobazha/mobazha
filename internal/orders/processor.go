@@ -340,7 +340,7 @@ func (op *OrderProcessor) GetActiveReceivingAccountByChain(tx database.Tx, chain
 	}
 
 	for _, r := range records {
-		tokens, err := r.EnabledTokens()
+		tokens, err := r.ActiveTokens()
 		if err != nil {
 			return nil, err
 		}

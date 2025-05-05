@@ -170,8 +170,6 @@ type CoreIface interface {
 	// 收款账户相关
 	AddReceivingAccount(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
 	UpdateReceivingAccount(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
-	ActivateReceivingAccount(id int, tokens []string) error
-	DeactivateReceivingAccount(id int) error
 	DeleteReceivingAccount(id int) error
 	GetReceivingAccounts() ([]models.ReceivingAccount, error)
 	GetActiveReceivingAccount(chainType iwallet.ChainType) (*models.ReceivingAccount, error)

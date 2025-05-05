@@ -10,97 +10,62 @@ import (
 
 // ReceivingAccount 表示用户的收款账户信息
 type ReceivingAccount struct {
-	ID               int               `gorm:"primaryKey" json:"id"`
-	Name             string            `gorm:"type:text" json:"name"`  // 账户名称
-	ChainType        iwallet.ChainType `gorm:"index" json:"chainType"` // 区块链网络类型
-	Address          string            `gorm:"index" json:"address"`   // 用户的收款钱包地址
-	SerializedTokens []byte            `gorm:"type:bytes" json:"-"`    // 序列化的已启用代币列表
-	Email            string            `json:"email,omitempty"`        // 对于Stripe/Paypal，使用Email
+	ID                       int               `gorm:"primaryKey" json:"id"`
+	Name                     string            `gorm:"type:text" json:"name"`  // 账户名称
+	ChainType                iwallet.ChainType `gorm:"index" json:"chainType"` // 区块链网络类型
+	Address                  string            `gorm:"index" json:"address"`   // 用户的收款钱包地址
+	SerializedActiveTokens   []byte            `gorm:"type:bytes" json:"-"`    // 序列化的已激活代币列表
+	SerializedInactiveTokens []byte            `gorm:"type:bytes" json:"-"`    // 序列化的未激活代币列表
+	Email                    string            `json:"email,omitempty"`        // 对于Stripe/Paypal，使用Email
+	Source                   string            `json:"source,omitempty"`       // 来源
+	IsActive                 bool              `json:"isActive"`               // 是否激活
 }
 
-// EnabledTokens 返回已启用的代币列表
-func (ra *ReceivingAccount) EnabledTokens() ([]string, error) {
+// ActiveTokens 返回已激活的代币列表
+func (ra *ReceivingAccount) ActiveTokens() ([]string, error) {
 	var tokens []string
-	if ra.SerializedTokens != nil {
-		if err := json.Unmarshal(ra.SerializedTokens, &tokens); err != nil {
-			return nil, fmt.Errorf("反序列化代币列表失败: %v", err)
+	if ra.SerializedActiveTokens != nil {
+		if err := json.Unmarshal(ra.SerializedActiveTokens, &tokens); err != nil {
+			return nil, fmt.Errorf("反序列化激活代币列表失败: %v", err)
 		}
 	}
 	return tokens, nil
 }
 
-// SetEnabledTokens 设置已启用的代币列表
+// InactiveTokens 返回未激活的代币列表
+func (ra *ReceivingAccount) InactiveTokens() ([]string, error) {
+	var tokens []string
+	if ra.SerializedInactiveTokens != nil {
+		if err := json.Unmarshal(ra.SerializedInactiveTokens, &tokens); err != nil {
+			return nil, fmt.Errorf("反序列化未激活代币列表失败: %v", err)
+		}
+	}
+	return tokens, nil
+}
+
+// SetActiveTokens 设置已激活的代币列表
 // 对于原生代币，使用NATIVE_SYMBOL
-func (ra *ReceivingAccount) SetEnabledTokens(tokens []string) error {
+func (ra *ReceivingAccount) SetActiveTokens(tokens []string) error {
 	data, err := json.Marshal(tokens)
 	if err != nil {
-		return fmt.Errorf("序列化代币列表失败: %v", err)
+		return fmt.Errorf("序列化激活代币列表失败: %v", err)
 	}
-	ra.SerializedTokens = data
+	ra.SerializedActiveTokens = data
 	return nil
 }
 
-// AddToken 添加单个代币到已启用代币列表
-func (ra *ReceivingAccount) AddToken(token string) error {
-	tokens, err := ra.EnabledTokens()
+// SetInactiveTokens 设置未激活的代币列表
+func (ra *ReceivingAccount) SetInactiveTokens(tokens []string) error {
+	data, err := json.Marshal(tokens)
 	if err != nil {
-		return err
+		return fmt.Errorf("序列化未激活代币列表失败: %v", err)
 	}
-
-	// 检查代币是否已存在
-	for _, t := range tokens {
-		if t == token {
-			return fmt.Errorf("代币 %s 已存在", token)
-		}
-	}
-
-	// 添加新代币
-	tokens = append(tokens, token)
-	return ra.SetEnabledTokens(tokens)
-}
-
-// RemoveToken 从已启用代币列表中移除单个代币
-func (ra *ReceivingAccount) RemoveToken(token string) error {
-	tokens, err := ra.EnabledTokens()
-	if err != nil {
-		return err
-	}
-
-	// 查找并移除代币
-	found := false
-	for i, t := range tokens {
-		if t == token {
-			tokens = append(tokens[:i], tokens[i+1:]...)
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		return fmt.Errorf("代币 %s 不存在", token)
-	}
-
-	return ra.SetEnabledTokens(tokens)
-}
-
-// HasToken 检查代币是否在已启用代币列表中
-func (ra *ReceivingAccount) HasToken(token string) (bool, error) {
-	tokens, err := ra.EnabledTokens()
-	if err != nil {
-		return false, err
-	}
-
-	for _, t := range tokens {
-		if t == token {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	ra.SerializedInactiveTokens = data
+	return nil
 }
 
 func (ra *ReceivingAccount) AcceptedCurrencies() []string {
-	tokens, err := ra.EnabledTokens()
+	tokens, err := ra.ActiveTokens()
 	if err != nil {
 		return []string{}
 	}
@@ -118,26 +83,39 @@ func (ra *ReceivingAccount) AcceptedCurrencies() []string {
 
 // receivingAccountJSON 用于 JSON 序列化的结构体
 type receivingAccountJSON struct {
-	ID            int               `json:"id"`
-	Name          string            `json:"name"`
-	ChainType     iwallet.ChainType `json:"chainType"`
-	Address       string            `json:"address"`
-	EnabledTokens []string          `json:"enabledTokens"`
+	ID             int               `json:"id"`
+	Name           string            `json:"name"`
+	ChainType      iwallet.ChainType `json:"chainType"`
+	Address        string            `json:"address"`
+	ActiveTokens   []string          `json:"activeTokens"`
+	InactiveTokens []string          `json:"inactiveTokens"`
+	Email          string            `json:"email,omitempty"`
+	Source         string            `json:"source,omitempty"`
+	IsActive       bool              `json:"isActive"`
 }
 
 // MarshalJSON 实现 JSON 序列化
 func (ra *ReceivingAccount) MarshalJSON() ([]byte, error) {
-	tokens, err := ra.EnabledTokens()
+	activeTokens, err := ra.ActiveTokens()
+	if err != nil {
+		return nil, err
+	}
+
+	inactiveTokens, err := ra.InactiveTokens()
 	if err != nil {
 		return nil, err
 	}
 
 	raJSON := receivingAccountJSON{
-		ID:            ra.ID,
-		Name:          ra.Name,
-		ChainType:     ra.ChainType,
-		Address:       ra.Address,
-		EnabledTokens: tokens,
+		ID:             ra.ID,
+		Name:           ra.Name,
+		ChainType:      ra.ChainType,
+		Address:        ra.Address,
+		ActiveTokens:   activeTokens,
+		InactiveTokens: inactiveTokens,
+		Email:          ra.Email,
+		Source:         ra.Source,
+		IsActive:       ra.IsActive,
 	}
 
 	return json.Marshal(raJSON)
@@ -155,10 +133,17 @@ func (ra *ReceivingAccount) UnmarshalJSON(b []byte) error {
 	ra.ChainType = raJSON.ChainType
 	ra.Address = raJSON.Address
 
-	if err := ra.SetEnabledTokens(raJSON.EnabledTokens); err != nil {
+	if err := ra.SetActiveTokens(raJSON.ActiveTokens); err != nil {
 		return err
 	}
 
+	if err := ra.SetInactiveTokens(raJSON.InactiveTokens); err != nil {
+		return err
+	}
+
+	ra.Email = raJSON.Email
+	ra.Source = raJSON.Source
+	ra.IsActive = raJSON.IsActive
 	return nil
 }
 

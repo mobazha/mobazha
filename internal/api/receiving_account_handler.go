@@ -51,12 +51,15 @@ func (g *Gateway) handleReceivingAccountRequest(w http.ResponseWriter, r *http.R
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	type ReceivingAccountParams struct {
-		ID        int               `json:"id"`
-		Name      string            `json:"name"`            // 账户名称
-		ChainType iwallet.ChainType `json:"chainType"`       // 区块链网络类型
-		Address   string            `json:"address"`         // 用户的收款钱包地址
-		Tokens    []string          `json:"tokens"`          // 序列化的已启用代币列表
-		Email     string            `json:"email,omitempty"` // 对于Stripe/Paypal，使用Email
+		ID             int               `json:"id"`
+		Name           string            `json:"name"`             // 账户名称
+		ChainType      iwallet.ChainType `json:"chainType"`        // 区块链网络类型
+		Address        string            `json:"address"`          // 用户的收款钱包地址
+		ActiveTokens   []string          `json:"activeTokens"`     // 已激活的代币列表
+		InactiveTokens []string          `json:"inactiveTokens"`   // 未激活的代币列表
+		Email          string            `json:"email,omitempty"`  // 对于Stripe/Paypal，使用Email
+		Source         string            `json:"source,omitempty"` // 来源
+		IsActive       bool              `json:"isActive"`         // 是否激活
 	}
 
 	// 解析请求体
@@ -72,8 +75,20 @@ func (g *Gateway) handleReceivingAccountRequest(w http.ResponseWriter, r *http.R
 		Name:      req.Name,
 		ChainType: req.ChainType,
 		Address:   req.Address,
+		Email:     req.Email,
+		Source:    req.Source,
+		IsActive:  req.IsActive,
 	}
-	account.SetEnabledTokens(req.Tokens)
+
+	// 设置激活和未激活的代币列表
+	if err := account.SetActiveTokens(req.ActiveTokens); err != nil {
+		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("设置激活代币失败: %v", err))
+		return
+	}
+	if err := account.SetInactiveTokens(req.InactiveTokens); err != nil {
+		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("设置未激活代币失败: %v", err))
+		return
+	}
 
 	if isUpdate {
 		account, err = node.UpdateReceivingAccount(account)
@@ -87,8 +102,10 @@ func (g *Gateway) handleReceivingAccountRequest(w http.ResponseWriter, r *http.R
 
 	// 返回成功响应
 	resp := struct {
+		Success bool                     `json:"success"`
 		Account *models.ReceivingAccount `json:"account"`
 	}{
+		Success: true,
 		Account: account,
 	}
 

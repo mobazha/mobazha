@@ -2,6 +2,7 @@ package wallet_interface
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 )
@@ -27,6 +28,12 @@ const (
 
 func (chaintype ChainType) String() string {
 	return string(chaintype)
+}
+
+func GetAllSupportedChainTypes() []ChainType {
+	return []ChainType{
+		ChainBitcoin, ChainSolana,
+	}
 }
 
 // CoinType 表示所有支持的币种名称
@@ -180,6 +187,14 @@ var (
 		Description:     "Tether USD",
 	}
 
+	ERC20USDCInfo = CoinInfo{
+		Chain:           ChainEthereum,
+		Symbol:          "USDC",
+		IsNative:        false,
+		Contract:        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+		TestnetContract: "0x79C950C7446B234a6Ad53B908fBF342b01c4d446", // Goerli USDC
+	}
+
 	// BEP20代币
 	BEP20USDTInfo = CoinInfo{
 		Chain:           ChainBNB,
@@ -189,6 +204,14 @@ var (
 		TestnetContract: "0x337610d27c682E347C9cD60BD4b3b107C9d34dDd", // BSC Testnet USDT
 		Decimals:        18,
 		Description:     "Tether USD on BSC",
+	}
+
+	BEP20USDCInfo = CoinInfo{
+		Chain:           ChainBNB,
+		Symbol:          "USDC",
+		IsNative:        false,
+		Contract:        "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+		TestnetContract: "0x337610d27c682E347C9cD60BD4b3b107C9d34dDd", // BSC Testnet USDT
 	}
 
 	// SPL代币
@@ -201,6 +224,14 @@ var (
 		Decimals:        6,
 		Description:     "Tether USD on Solana",
 	}
+
+	SPLUSDCInfo = CoinInfo{
+		Chain:           ChainSolana,
+		Symbol:          "USDC",
+		IsNative:        false,
+		Contract:        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+		TestnetContract: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", // Solana Devnet USDT
+	}
 )
 
 // 链配置
@@ -211,7 +242,10 @@ var ChainConfigs = map[ChainType]struct {
 	ChainBitcoin:     {time.Minute * 10, "Bitcoin"},
 	ChainBitcoinCash: {time.Minute * 10, "Bitcoin Cash"},
 	ChainLitecoin:    {time.Second * 150, "Litecoin"},
+	ChainZCash:       {time.Second * 150, "Zcash"},
+	ChainEthereum:    {time.Second * 3, "Ethereum"},
 	ChainBNB:         {time.Second * 3, "Binance Smart Chain"},
+	ChainBase:        {time.Second * 3, "Base"},
 	ChainPolygon:     {time.Second * 2, "Polygon"},
 	ChainConflux:     {time.Second * 1, "Conflux"},
 	ChainSolana:      {time.Second * 1, "Solana"},
@@ -255,6 +289,11 @@ func (ct CoinInfo) BlockInterval() time.Duration {
 	return time.Minute // 默认值
 }
 
+func (ct CoinInfo) IsEthTypeChain() bool {
+	ethTypeChains := []ChainType{ChainEthereum, ChainBNB, ChainBase, ChainPolygon, ChainConflux}
+	return slices.Contains(ethTypeChains, ct.Chain)
+}
+
 // CoinInfoFromCoinType 从字符串构造 CoinInfo
 // 格式为 "CHAIN" 或 "CHAINTOKEN"，例如 "BTC" 或 "ETHUSDT"
 func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
@@ -264,7 +303,11 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 	for chain := range ChainConfigs {
 		if string(chain) == s {
 			// 找到对应的原生代币
-			for _, token := range []CoinInfo{CtBitcoinInfo, CtEthereumInfo, CtSolanaInfo} {
+			for _, token := range []CoinInfo{
+				CtBitcoinInfo, CtBitcoinCashInfo, CtLitecoinInfo, CtZCashInfo,
+				CtEthereumInfo, CtBNBInfo, CtBaseInfo, CtPolygonInfo, CtConfluxInfo,
+				CtSolanaInfo,
+			} {
 				if token.Chain == chain && token.IsNative {
 					return token, nil
 				}
@@ -278,7 +321,11 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 		if strings.HasPrefix(s, string(chain)) {
 			tokenSymbol := s[len(chain):]
 			// 查找对应的合约代币
-			for _, token := range []CoinInfo{ERC20USDTInfo, BEP20USDTInfo, SPLUSDTInfo} {
+			for _, token := range []CoinInfo{
+				ERC20USDTInfo, ERC20USDCInfo,
+				BEP20USDTInfo, BEP20USDCInfo,
+				SPLUSDTInfo, SPLUSDCInfo,
+			} {
 				if token.Chain == chain && token.Symbol == tokenSymbol {
 					return token, nil
 				}

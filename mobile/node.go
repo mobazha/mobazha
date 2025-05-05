@@ -63,7 +63,6 @@ func NewNode(cfg *Config) (*Node, error) {
 	rcfg := &repo.Config{
 		IPNSQuorum:        2,
 		LogLevel:          logLevel,
-		EnabledWallets:    []string{"BTC", "BCH", "LTC", "ZEC", "CFX", "MATIC", "MATICUSDT", "MATICUSDC", "MATICMBZ"},
 		DisableNATPortMap: true,
 		DataDir:           dataDir,
 		LogDir:            logDir,
@@ -77,6 +76,7 @@ func NewNode(cfg *Config) (*Node, error) {
 	ctx, cancel := context.WithCancel(context.Background()) //nolint
 	obNode, err := core.NewNode(ctx, rcfg, repo.DefaultNodeID)
 	if err != nil {
+		cancel()
 		return nil, err //nolint
 	}
 	return &Node{node: obNode, done: cancel}, nil //nolint

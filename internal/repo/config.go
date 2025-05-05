@@ -99,7 +99,6 @@ type Config struct {
 	Profile                string   `long:"profile" description:"Enable HTTP profiling on given port -- NOTE port must be between 1024 and 65536"`
 	CPUProfile             string   `long:"cpuprofile" description:"Write CPU profile to the specified file"`
 	IPFSOnly               bool     `long:"ipfsonly" description:"Disable all Mobazha functionality except the IPFS networking."`
-	EnabledWallets         []string `long:"enabledwallet" description:"Only enable wallets in this list. Available wallets: [BTC, BCH, LTC, ZEC, ETH, BNB, MATICUSDT, MATICUSDC]"`
 	UserAgentComment       string   `long:"uacomment" description:"Comment to add to the user agent."`
 	EnableSNFServer        bool     `long:"enablesnfserver" description:"Enable this node to operate as a store-and-forward server."`
 	SNFServerPeers         []string `long:"snfpeer" description:"A list of other store-and-forward servers to replicate snf data to. This is only used when the snf server is enabled."`
@@ -166,7 +165,7 @@ func LoadConfig(dataDir string) (*Config, error) {
 
 	// Load additional config from file.
 	var configFileError error
-	parser := flags.NewParser(&cfg, flags.Default)
+	parser := flags.NewParser(&cfg, flags.Default|flags.IgnoreUnknown)
 	if _, err := os.Stat(cfg.ConfigFile); os.IsNotExist(err) {
 		err := createDefaultConfigFile(cfg.ConfigFile, cfg.Testnet)
 		if err != nil {

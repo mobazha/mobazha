@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/ipfs/kubo/repo/fsrepo"
@@ -49,14 +48,11 @@ func (x *Init) Execute(args []string) error {
 		r, err = repo.NewRepo(x.DataDir, x.Testnet)
 	}
 
-	enabledWallets := make([]iwallet.CoinType, len(cfg.EnabledWallets))
-	for i, ew := range cfg.EnabledWallets {
-		enabledWallets[i] = iwallet.CoinType(strings.ToUpper(ew))
-	}
+	enabledChains := iwallet.GetAllSupportedChainTypes()
 
 	opts := []multiwallet.Option{
 		multiwallet.DataDir(cfg.DataDir),
-		multiwallet.Wallets(enabledWallets),
+		multiwallet.Chains(enabledChains),
 		multiwallet.Testnet(x.Testnet),
 	}
 	mw, err := multiwallet.NewMultiwallet(opts...)

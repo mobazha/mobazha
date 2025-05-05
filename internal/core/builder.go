@@ -391,10 +391,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 
 	solPrivKey := solana.PrivateKey(dbSolKey.Value)
 
-	enabledWallets := make([]iwallet.CoinType, len(cfg.EnabledWallets))
-	for i, ew := range cfg.EnabledWallets {
-		enabledWallets[i] = iwallet.CoinType(strings.ToUpper(ew))
-	}
+	enabledChains := iwallet.GetAllSupportedChainTypes()
 
 	erp := sharedManager.ExchangeRateProvider
 
@@ -402,7 +399,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 		multiwallet.NodeID(nodeID),
 		multiwallet.DataDir(repoPath),
 		multiwallet.LogDir(cfg.LogDir),
-		multiwallet.Wallets(enabledWallets),
+		multiwallet.Chains(enabledChains),
 		multiwallet.LogLevel(repo.LogLevelMap[strings.ToLower(cfg.LogLevel)]),
 		multiwallet.NetConfig(netConfig),
 		multiwallet.Testnet(cfg.Testnet),

@@ -9,8 +9,8 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
-// InitializeSolEscrow 初始化SOL托管
-func (g *Gateway) handleInitializeSolEscrow(w http.ResponseWriter, r *http.Request) {
+// handleGetOrderPaymentInstructions 获取初始化SOL托管的指令
+func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *http.Request) {
 	var params models.InitializeSolEscrowData
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -44,11 +44,12 @@ func (g *Gateway) handleInitializeSolEscrow(w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(response)
 }
 
-// ReleaseSolEscrow 释放SOL
-func (g *Gateway) handleReleaseSolEscrow(w http.ResponseWriter, r *http.Request) {
+// GetReleaseCancelableEscrowInstructions 获取释放可取消的SOL托管的指令
+func (g *Gateway) handleGetReleaseCancelableEscrowInstructions(w http.ResponseWriter, r *http.Request) {
 	type ReleaseSolRequest struct {
 		OrderID   models.OrderID   `json:"orderID"`
 		Initiator solana.PublicKey `json:"initiator"`
+		Receiver  solana.PublicKey `json:"receiver"`
 	}
 
 	var params ReleaseSolRequest
@@ -60,7 +61,7 @@ func (g *Gateway) handleReleaseSolEscrow(w http.ResponseWriter, r *http.Request)
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	// 使用 EscrowClient 释放 SOL 托管
-	instructions, err := node.ReleaseSolEscrow(r.Context(), params.OrderID, params.Initiator)
+	instructions, err := node.GetCancelableSOLEscrowReleaseInstructions(params.OrderID, params.Initiator, params.Receiver)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -77,8 +78,8 @@ func (g *Gateway) handleReleaseSolEscrow(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(response)
 }
 
-// InitializeSPLTokenEscrow 初始化SPL Token托管
-func (g *Gateway) handleInitializeSPLTokenEscrow(w http.ResponseWriter, r *http.Request) {
+// GetInitializeSPLTokenInstructions 获取初始化SPL Token托管的指令
+func (g *Gateway) handleGetInitializeSPLTokenInstructions(w http.ResponseWriter, r *http.Request) {
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 	var params models.InitializeSPLTokenData
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
@@ -113,8 +114,8 @@ func (g *Gateway) handleInitializeSPLTokenEscrow(w http.ResponseWriter, r *http.
 	json.NewEncoder(w).Encode(response)
 }
 
-// ReleaseSPLTokenEscrow 释放SPL Token
-func (g *Gateway) handleReleaseSPLTokenEscrow(w http.ResponseWriter, r *http.Request) {
+// GetReleaseSPLTokenInstructions 获取释放SPL Token的指令
+func (g *Gateway) handleGetReleaseSPLTokenInstructions(w http.ResponseWriter, r *http.Request) {
 	type ReleaseSPLTokenRequest struct {
 		OrderID   models.OrderID   `json:"orderID"`
 		Initiator solana.PublicKey `json:"initiator"`

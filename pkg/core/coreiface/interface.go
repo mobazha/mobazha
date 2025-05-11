@@ -62,9 +62,11 @@ type CoreIface interface {
 	PurchaseListing(ctx context.Context, purchase *models.Purchase) (orderID models.OrderID, paymentAmount models.CurrencyValue, err error)
 	EstimateOrderTotal(ctx context.Context, purchase *models.Purchase) (models.OrderTotals, error)
 	ProcessOrderPayment(ctx context.Context, paymentData *models.PaymentData) error
-	RejectOrder(orderID models.OrderID, reason string, done chan struct{}) error
+	RejectOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
 	RefundOrder(orderID models.OrderID, done chan struct{}) error
-	ConfirmOrder(orderID models.OrderID, done chan struct{}) error
+	ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
+	GetConfirmOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	GetRejectOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
 	FulfillOrder(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error
 	CompleteOrder(orderID models.OrderID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	CancelOrder(orderID models.OrderID, done chan struct{}) error
@@ -181,6 +183,8 @@ type CoreIface interface {
 	ReleaseSolEscrow(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
 	InitializeSPLTokenEscrow(ctx context.Context, params models.InitializeSPLTokenData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
 	ReleaseSPLTokenEscrow(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+
+	GetCancelableSOLEscrowReleaseInstructions(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) ([]solana.Instruction, error)
 
 	// Wallet
 	Multiwallet() multiwallet.Multiwallet

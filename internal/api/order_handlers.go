@@ -7,9 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 type APIError struct {
@@ -126,8 +128,8 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 	sanitizedJSONResponse(w, ret)
 }
 
-// handleNotifyPayment 处理支付通知
-func (g *Gateway) handleNotifyPayment(w http.ResponseWriter, r *http.Request) {
+// handlePOSTPayment 处理支付结果通知
+func (g *Gateway) handlePOSTPayment(w http.ResponseWriter, r *http.Request) {
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	var req struct {
@@ -493,8 +495,8 @@ func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) 
 		OrderID string `json:"orderID"`
 	}
 	decoder := json.NewDecoder(r.Body)
-	var cancel orderCancel
-	err := decoder.Decode(&cancel)
+	var cancelParam orderCancel
+	err := decoder.Decode(&cancelParam)
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
@@ -503,7 +505,7 @@ func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	done := make(chan struct{})
-	err = node.CancelOrder(models.OrderID(cancel.OrderID), done)
+	err = node.CancelOrder(models.OrderID(cancelParam.OrderID), done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -519,9 +521,49 @@ func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, r *http.Request) {
+	type Params struct {
+		OrderID   string           `json:"orderID"`
+		Reject    bool             `json:"reject"`
+		Initiator solana.PublicKey `json:"initiator"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	var args Params
+	err := decoder.Decode(&args)
+	if err != nil {
+		ErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	var instructions []solana.Instruction
+	if args.Reject {
+		instructions, err = node.GetRejectOrderInstructions(models.OrderID(args.OrderID), args.Initiator)
+	} else {
+		instructions, err = node.GetConfirmOrderInstructions(models.OrderID(args.OrderID), args.Initiator)
+	}
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	type ConfirmationResponse struct {
+		HasInstructions bool                 `json:"hasInstructions"`
+		Instructions    []solana.Instruction `json:"instructions"`
+	}
+
+	// 返回响应
+	response := ConfirmationResponse{
+		HasInstructions: len(instructions) > 0,
+		Instructions:    instructions,
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
 func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Request) {
 	type orderConf struct {
 		OrderID string `json:"orderID"`
+		TxID    string `json:"txID"`
 		Reject  bool   `json:"reject"`
 	}
 	decoder := json.NewDecoder(r.Body)
@@ -536,9 +578,9 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 
 	done := make(chan struct{})
 	if !conf.Reject {
-		err = node.ConfirmOrder(models.OrderID(conf.OrderID), done)
+		err = node.ConfirmOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TxID), done)
 	} else {
-		err = node.RejectOrder(models.OrderID(conf.OrderID), "", done)
+		err = node.RejectOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TxID), "", done)
 	}
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -660,3 +702,11 @@ func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Reque
 		return
 	}
 }
+
+// func RegisterOrderHandlers(r *mux.Router, g *Gateway) {
+// 	r.HandleFunc("/v1/ob/ordercancel", g.handlePOSTOrderCancel).Methods("POST")
+// 	r.HandleFunc("/v1/ob/orderconfirmation", g.handlePOSTOrderConfirmation).Methods("POST")
+// 	r.HandleFunc("/v1/ob/orderfulfillment", g.handlePOSTOrderFulfillment).Methods("POST")
+// 	r.HandleFunc("/v1/ob/order/confirm/instructions", g.handleGetConfirmOrderInstructions).Methods("GET")
+// 	r.HandleFunc("/v1/ob/order/reject/instructions", g.handleGetRejectOrderInstructions).Methods("GET")
+// }

@@ -33,10 +33,13 @@ type ReleaseSolEscrowParams struct {
 	Initiator     solana.PublicKey
 	Buyer         solana.PublicKey
 	UniqueId      [20]byte
-	Amounts       []uint64
-	Signatures    [][]byte
-	PublicKeys    []solana.PublicKey
-	Recipients    []solana.PublicKey
+	// PublicKeys与Signatures 一一对应
+	Message    []byte
+	PublicKeys []solana.PublicKey
+	Signatures [][]byte
+	// Recipients与Amounts 一一对应
+	Amounts    []uint64
+	Recipients []solana.PublicKey
 }
 
 // InitializeSPLTokenParams 初始化SPL Token托管参数
@@ -55,15 +58,18 @@ type InitializeSPLTokenParams struct {
 
 // ReleaseSPLTokenParams 释放SPL Token参数
 type ReleaseSPLTokenParams struct {
-	EscrowAccount          solana.PublicKey
-	EscrowTokenAccount     solana.PublicKey
-	Initiator              solana.PublicKey
-	Buyer                  solana.PublicKey
+	EscrowAccount      solana.PublicKey
+	EscrowTokenAccount solana.PublicKey
+	Initiator          solana.PublicKey
+	Buyer              solana.PublicKey
+	UniqueId           [20]byte
+	// PublicKeys与Signatures 一一对应
+	Message    []byte
+	PublicKeys []solana.PublicKey
+	Signatures [][]byte
+	// Amounts与RecipientTokenAccounts 一一对应
 	Amounts                []uint64
-	Signatures             [][]byte
-	PublicKeys             []solana.PublicKey
 	RecipientTokenAccounts []solana.PublicKey
-	UniqueId               [20]byte
 }
 
 type SOLEscrow interface {

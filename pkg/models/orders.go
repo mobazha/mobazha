@@ -173,6 +173,14 @@ func (o *Order) Buyer() (peer.ID, error) {
 	return peer.Decode(orderOpen.BuyerID.PeerID)
 }
 
+func (o *Order) BuyerID() (*pb.ID, error) {
+	orderOpen, err := o.OrderOpenMessage()
+	if err != nil {
+		return nil, err
+	}
+	return orderOpen.BuyerID, nil
+}
+
 // Vendor returns the peer ID of the vendor for this order.
 func (o *Order) Vendor() (peer.ID, error) {
 	orderOpen, err := o.OrderOpenMessage()
@@ -180,6 +188,14 @@ func (o *Order) Vendor() (peer.ID, error) {
 		return "", err
 	}
 	return peer.Decode(orderOpen.Listings[0].Listing.VendorID.PeerID)
+}
+
+func (o *Order) VendorID() (*pb.ID, error) {
+	orderOpen, err := o.OrderOpenMessage()
+	if err != nil {
+		return nil, err
+	}
+	return orderOpen.Listings[0].Listing.VendorID, nil
 }
 
 // Moderator returns the peer ID of the moderator for this order.

@@ -45,7 +45,9 @@ type mockNode struct {
 	getSalesFunc                            func(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Order, int64, error)
 	getCaseFunc                             func(orderID string) (*models.Case, error)
 	getCasesFunc                            func(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Case, int64, error)
-	confirmOrderFunc                        func(orderID models.OrderID, done chan struct{}) error
+	confirmOrderFunc                        func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
+	getConfirmOrderInstructionsFunc         func(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	getRejectOrderInstructionsFunc          func(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
 	fulfillOrderFunc                        func(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error
 	completeOrderFunc                       func(orderID models.OrderID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	cancelOrderFunc                         func(orderID models.OrderID, done chan struct{}) error
@@ -118,7 +120,7 @@ type mockNode struct {
 	purchaseFunc                            func(ctx context.Context, purchase *models.Purchase) (orderID models.OrderID, paymentAmount models.CurrencyValue, err error)
 	estimateOrderTotalFunc                  func(ctx context.Context, purchase *models.Purchase) (models.OrderTotals, error)
 	processOrderPaymentFunc                 func(ctx context.Context, paymentData *models.PaymentData) error
-	rejectOrderFunc                         func(orderID models.OrderID, reason string, done chan struct{}) error
+	rejectOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
 	refundOrderFunc                         func(orderID models.OrderID, done chan struct{}) error
 	pingNodeFunc                            func(ctx context.Context, peer peer.ID) error
 	getUserPreferencesFunc                  func() (*models.UserPreferences, error)
@@ -145,6 +147,8 @@ type mockNode struct {
 	releaseSolEscrowFunc         func(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
 	initializeSPLTokenEscrowFunc func(ctx context.Context, params models.InitializeSPLTokenData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
 	releaseSPLTokenEscrowFunc    func(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+
+	getCancelableSOLEscrowReleaseInstructionsFunc func(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) ([]solana.Instruction, error)
 
 	addPostFunc       func(post *postsPb.Post, done chan<- struct{}) error
 	deletePostFunc    func(slug string, done chan<- struct{}) error
@@ -232,9 +236,16 @@ func (m *mockNode) GetCase(orderID string) (*models.Case, error) {
 func (m *mockNode) GetCases(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Case, int64, error) {
 	return m.getCasesFunc(stateFilters, searchTerm, sortByAscending, sortByRead, limit, exclude)
 }
-func (m *mockNode) ConfirmOrder(orderID models.OrderID, done chan struct{}) error {
-	return m.confirmOrderFunc(orderID, done)
+func (m *mockNode) ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {
+	return m.confirmOrderFunc(orderID, txid, done)
 }
+func (m *mockNode) GetConfirmOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
+	return m.getConfirmOrderInstructionsFunc(orderID, initiator)
+}
+func (m *mockNode) GetRejectOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
+	return m.getRejectOrderInstructionsFunc(orderID, initiator)
+}
+
 func (m *mockNode) FulfillOrder(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error {
 	return m.fulfillOrderFunc(orderID, fulfillments, done)
 }
@@ -447,8 +458,8 @@ func (m *mockNode) EstimateOrderTotal(ctx context.Context, purchase *models.Purc
 func (m *mockNode) ProcessOrderPayment(ctx context.Context, paymentData *models.PaymentData) error {
 	return m.processOrderPaymentFunc(ctx, paymentData)
 }
-func (m *mockNode) RejectOrder(orderID models.OrderID, reason string, done chan struct{}) error {
-	return m.rejectOrderFunc(orderID, reason, done)
+func (m *mockNode) RejectOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error {
+	return m.rejectOrderFunc(orderID, txid, reason, done)
 }
 func (m *mockNode) RefundOrder(orderID models.OrderID, done chan struct{}) error {
 	return m.refundOrderFunc(orderID, done)
@@ -522,6 +533,9 @@ func (m *mockNode) InitializeSPLTokenEscrow(ctx context.Context, params models.I
 }
 func (m *mockNode) ReleaseSPLTokenEscrow(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
 	return m.releaseSPLTokenEscrowFunc(ctx, orderID, initiator)
+}
+func (m *mockNode) GetCancelableSOLEscrowReleaseInstructions(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) ([]solana.Instruction, error) {
+	return m.getCancelableSOLEscrowReleaseInstructionsFunc(orderID, initiator, receiver)
 }
 
 func (m *mockNode) SavePreferences(prefs *models.UserPreferences, done chan struct{}) error {

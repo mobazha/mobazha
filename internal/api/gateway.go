@@ -81,8 +81,7 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig, o
 	r.HandleFunc("/ws/{nodeID}", g.WebsocketNodeHandler())
 	r.Handle("/ws", g.AuthenticationMiddleware(newWebsocketHandler(g.hubs[defaultNodeID])))
 
-	topMux.Handle("/v1/ob/", r)
-	topMux.Handle("/v1/wallet/", r)
+	topMux.Handle("/v1/", r)
 	topMux.Handle("/ws/", r)
 	topMux.Handle("/ws", r)
 
@@ -171,19 +170,6 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/wallet/status", g.handleUpdateWalletStatus).Methods("POST")
 		r.HandleFunc("/v1/wallet/status/{coinType}", g.handleUpdateWalletStatus).Methods("POST")
 
-		// Escrow
-		r.HandleFunc("/v1/wallet/escrow/sol/initialize", g.handleInitializeSolEscrow).Methods("POST")
-		r.HandleFunc("/v1/wallet/escrow/sol/release", g.handleReleaseSolEscrow).Methods("POST")
-		r.HandleFunc("/v1/wallet/escrow/spl/initialize", g.handleInitializeSPLTokenEscrow).Methods("POST")
-		r.HandleFunc("/v1/wallet/escrow/spl/release", g.handleReleaseSPLTokenEscrow).Methods("POST")
-
-		// 收款账户相关API
-		r.HandleFunc("/v1/wallet/receivingaccountlist", g.GetReceivingAccounts).Methods("GET")
-		r.HandleFunc("/v1/wallet/receivingaccount", g.AddReceivingAccount).Methods("POST")
-		r.HandleFunc("/v1/wallet/receivingaccount", g.UpdateReceivingAccount).Methods("PUT")
-		// Stripe连接URL
-		r.HandleFunc("/v1/wallet/stripe/connect-url", g.GetStripeConnectURL).Methods("GET")
-
 		// Chat
 		r.HandleFunc("/v1/ob/chatmessage", g.handlePOSTSendChatMessage).Methods("POST")
 		r.HandleFunc("/v1/ob/groupchatmessage", g.handlePOSTSendGroupChatMessage).Methods("POST")
@@ -208,9 +194,24 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/ob/marknotificationasread/{notifID}", g.handlePOSTMarkNotificationMessageAsRead).Methods("POST")
 		r.HandleFunc("/v1/ob/marknotificationsasread", g.handlePOSTMarkNotificationsMessageAsRead).Methods("POST")
 
+		// Escrow
+
+		r.HandleFunc("/v1/escrow/instruction/releaseCancelable", g.handleGetReleaseCancelableEscrowInstructions).Methods("GET")
+		r.HandleFunc("/v1/escrow/instruction/spl/initialize", g.handleGetInitializeSPLTokenInstructions).Methods("GET")
+		r.HandleFunc("/v1/escrow/instruction/spl/release", g.handleGetReleaseSPLTokenInstructions).Methods("GET")
+
+		r.HandleFunc("/v1/instructions/order/payment", g.handleGetOrderPaymentInstructions).Methods("POST")
+		r.HandleFunc("/v1/instructions/order/confirm", g.handleGETOrderConfirmationInstructions).Methods("POST")
+		r.HandleFunc("/v1/instructions/order/reject", g.handleGETOrderConfirmationInstructions).Methods("POST")
+
+		// 收款账户相关API
+		r.HandleFunc("/v1/wallet/receivingaccountlist", g.GetReceivingAccounts).Methods("GET")
+		r.HandleFunc("/v1/wallet/receivingaccount", g.AddReceivingAccount).Methods("POST")
+		r.HandleFunc("/v1/wallet/receivingaccount", g.UpdateReceivingAccount).Methods("PUT")
+		// Stripe连接URL
+		r.HandleFunc("/v1/wallet/stripe/connect-url", g.GetStripeConnectURL).Methods("GET")
+
 		// Orders
-		r.HandleFunc("/v1/ob/purchase", g.handlePOSTPurchase).Methods("POST")
-		r.HandleFunc("/v1/ob/notifyPayment", g.handleNotifyPayment).Methods("POST")
 		r.HandleFunc("/v1/ob/purchases", g.handlePOSTPurchases).Methods("POST")
 		r.HandleFunc("/v1/ob/purchases", g.handleGETPurchases).Methods("GET")
 		r.HandleFunc("/v1/ob/sales", g.handleGETSales).Methods("GET")
@@ -222,10 +223,13 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/ob/order/{orderID}", g.handleGETOrder).Methods("GET")
 		r.HandleFunc("/v1/ob/orderspend", g.handlePostSpendForOrder).Methods("POST")
 		r.HandleFunc("/v1/ob/ordercancel", g.handlePOSTOrderCancel).Methods("POST")
-		r.HandleFunc("/v1/ob/orderconfirmation", g.handlePOSTOrderConfirmation).Methods("POST")
-		r.HandleFunc("/v1/ob/orderfulfillment", g.handlePOSTOrderFulfillment).Methods("POST")
-		r.HandleFunc("/v1/ob/orderrefund", g.handlePOSTOrderRefund).Methods("POST")
-		r.HandleFunc("/v1/ob/ordercompletion", g.handlePOSTOrderCompletion).Methods("POST")
+
+		r.HandleFunc("/v1/order/purchase", g.handlePOSTPurchase).Methods("POST")
+		r.HandleFunc("/v1/order/payment", g.handlePOSTPayment).Methods("POST")
+		r.HandleFunc("/v1/order/confirm", g.handlePOSTOrderConfirmation).Methods("POST")
+		r.HandleFunc("/v1/order/fulfill", g.handlePOSTOrderFulfillment).Methods("POST")
+		r.HandleFunc("/v1/order/refund", g.handlePOSTOrderRefund).Methods("POST")
+		r.HandleFunc("/v1/order/complete", g.handlePOSTOrderCompletion).Methods("POST")
 
 		r.HandleFunc("/v1/ob/estimatetotal", g.handlePOSTEstimateTotal).Methods("POST")
 		r.HandleFunc("/v1/ob/checkoutbreakdown", g.handlePOSTCheckoutBreakdown).Methods("POST")

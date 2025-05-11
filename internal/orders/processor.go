@@ -364,19 +364,25 @@ func (op *OrderProcessor) GetPayoutAddress(tx database.Tx, coinType string) (iwa
 		return iwallet.NewAddress(account.Address, iwallet.CoinType(coinType)), nil
 	}
 
-	// 使用内置钱包获取地址
-	logger.LogWithIDf(log, op.nodeID, logging.INFO, "使用内置钱包获取地址: %s", coinInfo.Chain.String())
-
-	// 使用原生代币获取链的地址信息
-	wallet, err := op.multiwallet.WalletForCurrencyCode(coinInfo.Chain.String())
-	if err != nil {
-		return iwallet.Address{}, fmt.Errorf("获取 %s 钱包失败: %v", coinInfo.Chain.String(), err)
+	if err != nil || account == nil {
+		return iwallet.Address{}, fmt.Errorf("获取激活的收款账户失败: %v", err)
 	}
 
-	address, err := wallet.CurrentAddress()
-	if err != nil {
-		return iwallet.Address{}, fmt.Errorf("获取 %s 钱包地址失败: %v", coinInfo.Chain.String(), err)
-	}
+	return iwallet.Address{}, fmt.Errorf("获取激活的收款账户失败: %v", err)
 
-	return address, nil
+	// // 使用内置钱包获取地址
+	// logger.LogWithIDf(log, n.nodeID, logging.INFO, "使用内置钱包获取地址: %s", coinInfo.Chain.String())
+
+	// // 使用原生代币获取链的地址信息
+	// wallet, err := n.multiwallet.WalletForCurrencyCode(coinInfo.Chain.String())
+	// if err != nil {
+	// 	return iwallet.Address{}, fmt.Errorf("获取 %s 钱包失败: %v", coinInfo.Chain.String(), err)
+	// }
+
+	// address, err := wallet.CurrentAddress()
+	// if err != nil {
+	// 	return iwallet.Address{}, fmt.Errorf("获取 %s 钱包地址失败: %v", coinInfo.Chain.String(), err)
+	// }
+
+	// return address, nil
 }

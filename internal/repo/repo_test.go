@@ -73,7 +73,7 @@ func TestRepo_mustDefaultConfig(t *testing.T) {
 
 func TestNewRepo(t *testing.T) {
 	var dir = path.Join(os.TempDir(), "mobazha", "newRepoTest")
-	r, err := NewRepo(dir, true)
+	r, err := NewRepo("", dir, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestNewRepoWithCustomMnemonicSeed(t *testing.T) {
 		dir      = path.Join(os.TempDir(), "mobazha", "newRepoTest")
 		mnemonic = "abc"
 	)
-	r, err := NewRepoWithCustomMnemonicSeed(dir, mnemonic, true)
+	r, err := NewRepoWithCustomMnemonicSeed("", dir, mnemonic, true)
 	if err != nil {
 		t.Fatal(err)
 	}

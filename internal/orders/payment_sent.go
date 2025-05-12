@@ -5,6 +5,7 @@ import (
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -24,7 +25,7 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 	if order.SerializedPaymentSent != nil && !dup {
-		log.Errorf("Duplicate PAYMENT_SENT message does not match original for order: %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Duplicate PAYMENT_SENT message does not match original for order: %s", order.ID)
 		return nil, ErrChangedMessage
 	} else if dup {
 		return nil, nil
@@ -44,7 +45,7 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 	}
 
 	if err := utils.ValidatePayment(orderOpen, paymentSent, paymentSent.EscrowTimeoutHours, wallet); err != nil {
-		log.Errorf("Failed to validate payment sent message: %s", err)
+		logger.LogInfoWithIDf(log, op.nodeID, "Failed to validate payment sent message: %s", err)
 		return nil, err
 	}
 
@@ -60,7 +61,7 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 
 	for _, tx := range txs {
 		if tx.ID.String() == paymentSent.TransactionID {
-			log.Debugf("Received PAYMENT_SENT message for order %s but already know about transaction", order.ID)
+			logger.LogInfoWithIDf(log, op.nodeID, "Received PAYMENT_SENT message for order %s but already know about transaction", order.ID)
 			return nil, nil
 		}
 	}
@@ -81,10 +82,10 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 			}
 		}
 	} else {
-		log.Errorf("Failed to get transaction from id: %s", paymentSent.TransactionID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Failed to get transaction from id: %s", paymentSent.TransactionID)
 	}
 
-	log.Infof("Received PAYMENT_SENT message for order %s", order.ID)
+	logger.LogInfoWithIDf(log, op.nodeID, "Received PAYMENT_SENT message for order %s", order.ID)
 
 	event := &events.PaymentSentReceived{
 		OrderID: order.ID.String(),

@@ -6,6 +6,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
@@ -22,29 +23,29 @@ func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *mo
 		return nil, err
 	}
 	if order.SerializedDisputeClosed != nil && !dup {
-		log.Errorf("Duplicate DISPUTE_CLOSE message does not match original for order: %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Duplicate DISPUTE_CLOSE message does not match original for order: %s", order.ID)
 		return nil, ErrChangedMessage
 	} else if dup {
 		return nil, nil
 	}
 
 	if order.SerializedOrderComplete != nil {
-		log.Errorf("Received DISPUTE_CLOSE message for order %s after ORDER_COMPLETION", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_CLOSE message for order %s after ORDER_COMPLETION", order.ID)
 		return nil, ErrUnexpectedMessage
 	}
 
 	if order.SerializedPaymentFinalized != nil {
-		log.Errorf("Received DISPUTE_CLOSE message for order %s after PAYMENT_FINALIZED", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_CLOSE message for order %s after PAYMENT_FINALIZED", order.ID)
 		return nil, ErrUnexpectedMessage
 	}
 
 	if order.SerializedOrderReject != nil {
-		log.Errorf("Received DISPUTE_CLOSE message for order %s after ORDER_REJECT", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_CLOSE message for order %s after ORDER_REJECT", order.ID)
 		return nil, ErrUnexpectedMessage
 	}
 
 	if order.SerializedOrderCancel != nil {
-		log.Errorf("Received DISPUTE_CLOSE message for order %s after ORDER_CANCEL", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_CLOSE message for order %s after ORDER_CANCEL", order.ID)
 		return nil, ErrUnexpectedMessage
 	}
 
@@ -63,9 +64,9 @@ func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *mo
 	}
 
 	if op.identity == pid {
-		log.Infof("Processed own DISPUTE_CLOSE for orderID: %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Processed own DISPUTE_CLOSE for orderID: %s", order.ID)
 	} else {
-		log.Infof("Received DISPUTE_CLOSE message for order %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_CLOSE message for order %s", order.ID)
 	}
 
 	var (
@@ -106,7 +107,7 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get payment sent message, order id: %s", order.ID)
-		log.Error(errMsg)
+		logger.LogInfoWithIDf(log, op.nodeID, errMsg)
 		return errors.New(errMsg)
 	}
 

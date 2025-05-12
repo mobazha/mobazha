@@ -24,6 +24,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/common"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/database/ffsqlite"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/version"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/op/go-logging"
@@ -70,15 +71,15 @@ type Repo struct {
 
 // NewRepo returns a new Repo for the given data directory. It will
 // be initialized if it is not already.
-func NewRepo(dataDir string, testnet bool) (*Repo, error) {
-	return newRepo(dataDir, "", false, testnet)
+func NewRepo(nodeID string, dataDir string, testnet bool) (*Repo, error) {
+	return newRepo(nodeID, dataDir, "", false, testnet)
 }
 
 // NewRepoWithCustomMnemonicSeed behaves the same as NewRepo but allows
 // the caller to pass in a custom mnemonic seed. This is usuful for
 // restoring a node from seed.
-func NewRepoWithCustomMnemonicSeed(dataDir, mnemonic string, testnet bool) (*Repo, error) {
-	return newRepo(dataDir, mnemonic, false, testnet)
+func NewRepoWithCustomMnemonicSeed(nodeID string, dataDir, mnemonic string, testnet bool) (*Repo, error) {
+	return newRepo(nodeID, dataDir, mnemonic, false, testnet)
 }
 
 // DB returns the database implementation.
@@ -121,7 +122,7 @@ func (r *Repo) WriteVersion(version int) error {
 	return os.WriteFile(path.Join(r.dataDir, versionFileName), []byte(versionStr), os.ModePerm)
 }
 
-func newRepo(dataDir, mnemonicSeed string, inMemoryDB bool, testnet bool) (*Repo, error) {
+func newRepo(nodeID string, dataDir, mnemonicSeed string, inMemoryDB bool, testnet bool) (*Repo, error) {
 	var (
 		dbIdentity, dbEscrowKey, dbRatingKey, dbBip44Key, dbMnemonic, torKey, dbSolKey *models.Key
 		err                                                                            error
@@ -211,23 +212,23 @@ func newRepo(dataDir, mnemonicSeed string, inMemoryDB bool, testnet bool) (*Repo
 
 		ipfsRepo := mfsr.RepoPath(path.Join(dataDir, IPFSDirName))
 		if err := ipfsRepo.CheckVersion("13"); err == nil {
-			log.Info("update IPFS version file from 13 to 14")
+			logger.LogInfoWithIDf(log, nodeID, "update IPFS version file from 13 to 14")
 			if err = migrateIPFSRepoFrom13To14(dataDir); err == nil {
 				if err = ipfsRepo.WriteVersion("14"); err != nil {
-					log.Error("failed to update version file to 14, %v", err)
+					logger.LogInfoWithIDf(log, nodeID, "failed to update version file to 14, %v", err)
 				}
 			} else {
-				log.Errorf("migration failed, %v", err)
+				logger.LogInfoWithIDf(log, nodeID, "migration failed, %v", err)
 			}
 		} else if err := ipfsRepo.CheckVersion("14"); err == nil {
 			// Nothing need to migrate, directly update the version to 16
 			if err := ipfsRepo.WriteVersion("16"); err != nil {
-				log.Error("failed to update version file to 16, %v", err)
+				logger.LogInfoWithIDf(log, nodeID, "failed to update version file to 16, %v", err)
 			}
 		} else if err := ipfsRepo.CheckVersion("15"); err == nil {
 			// Nothing need to migrate, directly update the version to 16
 			if err := ipfsRepo.WriteVersion("16"); err != nil {
-				log.Error("failed to update version file to 16, %v", err)
+				logger.LogInfoWithIDf(log, nodeID, "failed to update version file to 16, %v", err)
 			}
 		}
 	}

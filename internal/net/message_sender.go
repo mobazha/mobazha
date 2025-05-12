@@ -9,10 +9,12 @@ import (
 	ggio "github.com/gogo/protobuf/io"
 	inet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 )
 
 type messageSender struct {
+	nodeID    string
 	s         inet.Stream
 	w         ggio.WriteCloser
 	r         ggio.ReadCloser
@@ -39,7 +41,7 @@ func (ns *NetworkService) messageSenderForPeer(ctx context.Context, p peer.ID) (
 	// messageSender doesn't exist for this peer so we'll
 	// create a new one and attempt to open a new stream
 	// with them.
-	ms = &messageSender{p: p, ns: ns}
+	ms = &messageSender{nodeID: ns.nodeID, p: p, ns: ns}
 	ns.messageSenders[p] = ms
 	ns.msMtx.Unlock()
 
@@ -147,10 +149,10 @@ func (ms *messageSender) sendMessage(ctx context.Context, pmes *pb.Message) erro
 			}
 
 			if retry {
-				log.Debug("error writing message, bailing: ", err)
+				logger.LogInfoWithIDf(log, ms.nodeID, "error writing message, bailing: %s", err)
 				return err
 			}
-			log.Debug("error writing message, trying again: ", err)
+			logger.LogInfoWithIDf(log, ms.nodeID, "error writing message, trying again: %s", err)
 			retry = true
 			continue
 		}

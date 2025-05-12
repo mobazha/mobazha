@@ -13,6 +13,7 @@ import (
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -55,7 +56,7 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 	// If the validation fails and we are the vendor, we send a REJECT message back
 	// to the buyer. The reject message also gets saved with this order.
 	if err := op.validateOrderOpen(dbtx, orderOpen, order.ID, order.Role()); err != nil {
-		log.Errorf("ORDER_OPEN message for order %s from %s failed to validate: %s", order.ID, orderOpen.BuyerID.PeerID, err)
+		logger.LogInfoWithIDf(log, op.nodeID, "ORDER_OPEN message for order %s from %s failed to validate: %s", order.ID, orderOpen.BuyerID.PeerID, err)
 		if order.Role() == models.RoleVendor {
 			reject := pb.OrderReject{
 				Type:      pb.OrderReject_VALIDATION_ERROR,
@@ -136,9 +137,9 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 	}
 
 	if order.Role() == models.RoleVendor {
-		log.Infof("Received ORDER_OPEN message from %s. OrderID: %s", peer, order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_OPEN message from %s. OrderID: %s", peer, order.ID)
 	} else if order.Role() == models.RoleBuyer {
-		log.Infof("Processed own ORDER_OPEN for orderID: %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Processed own ORDER_OPEN for orderID: %s", order.ID)
 	}
 
 	return event, nil

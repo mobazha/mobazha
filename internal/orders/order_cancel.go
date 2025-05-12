@@ -6,6 +6,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -24,18 +25,18 @@ func (op *OrderProcessor) processOrderCancelMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 	if order.SerializedOrderCancel != nil && !dup {
-		log.Errorf("Duplicate ORDER_CANCEL message does not match original for order: %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Duplicate ORDER_CANCEL message does not match original for order: %s", order.ID)
 		return nil, ErrChangedMessage
 	} else if dup {
 		return nil, nil
 	}
 
 	if order.SerializedOrderReject != nil {
-		log.Warningf("Possible race: Received ORDER_CANCEL message for order %s after ORDER_REJECT", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Possible race: Received ORDER_CANCEL message for order %s after ORDER_REJECT", order.ID)
 	}
 
 	if order.SerializedOrderConfirmation != nil {
-		log.Warningf("Possible race: Received ORDER_CANCEL message for order %s after ORDER_CONFIRMATION", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Possible race: Received ORDER_CANCEL message for order %s after ORDER_CONFIRMATION", order.ID)
 	}
 
 	orderOpen, err := order.OrderOpenMessage()
@@ -85,9 +86,9 @@ func (op *OrderProcessor) processOrderCancelMessage(dbtx database.Tx, order *mod
 	}
 
 	if order.Role() == models.RoleBuyer {
-		log.Infof("Processed own ORDER_CANCEL for orderID: %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Processed own ORDER_CANCEL for orderID: %s", order.ID)
 	} else if order.Role() == models.RoleVendor {
-		log.Infof("Received ORDER_CANCEL message for order %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_CANCEL message for order %s", order.ID)
 	}
 
 	return event, order.PutMessage(message)

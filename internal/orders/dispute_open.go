@@ -7,6 +7,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -26,29 +27,29 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 	if order.SerializedDisputeOpen != nil && !dup {
-		log.Errorf("Duplicate DISPUTE_OPEN message does not match original for order: %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Duplicate DISPUTE_OPEN message does not match original for order: %s", order.ID)
 		return nil, ErrChangedMessage
 	} else if dup {
 		return nil, nil
 	}
 
 	if order.SerializedOrderComplete != nil {
-		log.Errorf("Received DISPUTE_OPEN message for order %s after ORDER_COMPLETION", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_OPEN message for order %s after ORDER_COMPLETION", order.ID)
 		return nil, ErrUnexpectedMessage
 	}
 
 	if order.SerializedPaymentFinalized != nil {
-		log.Errorf("Received DISPUTE_OPEN message for order %s after PAYMENT_FINALIZED", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_OPEN message for order %s after PAYMENT_FINALIZED", order.ID)
 		return nil, ErrUnexpectedMessage
 	}
 
 	if order.SerializedOrderReject != nil {
-		log.Errorf("Received DISPUTE_OPEN message for order %s after ORDER_REJECT", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_OPEN message for order %s after ORDER_REJECT", order.ID)
 		return nil, ErrUnexpectedMessage
 	}
 
 	if order.SerializedOrderCancel != nil {
-		log.Errorf("Received DISPUTE_OPEN message for order %s after ORDER_CANCEL", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_OPEN message for order %s after ORDER_CANCEL", order.ID)
 		return nil, ErrUnexpectedMessage
 	}
 
@@ -97,7 +98,7 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 	if (order.Role() == models.RoleBuyer && disputeOpen.OpenedBy == pb.DisputeOpen_BUYER) ||
 		(order.Role() == models.RoleVendor && disputeOpen.OpenedBy == pb.DisputeOpen_VENDOR) {
 
-		log.Infof("Processed own DISPUTE_OPEN for orderID: %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Processed own DISPUTE_OPEN for orderID: %s", order.ID)
 	} else {
 		serializedContract, err := order.MarshalBinary()
 		if err != nil {
@@ -158,7 +159,7 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 		if err := op.messenger.ReliablySendMessage(dbtx, moderator, &msg, nil); err != nil {
 			return nil, err
 		}
-		log.Infof("Received DISPUTE_OPEN message for order %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_OPEN message for order %s", order.ID)
 	}
 
 	return event, order.PutMessage(message)

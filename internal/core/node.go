@@ -26,7 +26,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	"github.com/op/go-logging"
 )
 
 // OpenBazaarNode holds all the components that make up a network node
@@ -160,7 +159,7 @@ func (n *OpenBazaarNode) Start() {
 	// Check repo migration
 	go func() {
 		if err := n.checkRepoMigration(); err != nil {
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "checkRepoMigration failed, %v", err)
+			logger.LogErrorWithIDf(log, n.nodeID, "checkRepoMigration failed, %v", err)
 		}
 	}()
 
@@ -178,7 +177,7 @@ func (n *OpenBazaarNode) Start() {
 			if !n.featureManager.IsEnabled(pkgconfig.FeatureNoBuildinWallet) {
 				n.listenWalletEvents()
 			} else {
-				log.Info("No buildin wallet, skipping buildin wallet info update")
+				logger.LogInfoWithIDf(log, n.nodeID, "No buildin wallet, skipping buildin wallet info update")
 			}
 
 			if n.IsDefaultNode() {
@@ -193,10 +192,10 @@ func (n *OpenBazaarNode) Start() {
 		go n.notifier.Start()
 		go n.OpenSavedChannels()
 		if err := n.removeDisabledCoinsFromListings(); err != nil && !os.IsNotExist(err) {
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error removing disabled coins from listings: %s", err)
+			logger.LogErrorWithIDf(log, n.nodeID, "Error removing disabled coins from listings: %s", err)
 		}
 		if err := n.updateSNFServers(); err != nil {
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error updating store and forward servers in profile: %s", err)
+			logger.LogErrorWithIDf(log, n.nodeID, "Error updating store and forward servers in profile: %s", err)
 		}
 
 		go n.listenPubsub()
@@ -207,7 +206,7 @@ func (n *OpenBazaarNode) Start() {
 		conns := n.ipfsNode.PeerHost.Network().Conns()
 		for _, conn := range conns {
 			streams := conn.GetStreams()
-			logger.LogWithIDf(log, n.nodeID, logging.DEBUG, "Connection to %s has %d streams",
+			logger.LogDebugWithIDf(log, n.nodeID, "Connection to %s has %d streams",
 				conn.RemotePeer(), len(streams))
 		}
 	}()
@@ -220,34 +219,34 @@ func (n *OpenBazaarNode) checkRepoMigration() error {
 	}
 
 	if version == 0 {
-		logger.LogWithIDf(log, n.nodeID, logging.INFO, "Migrate repo from version 0")
+		logger.LogInfoWithIDf(log, n.nodeID, "Migrate repo from version 0")
 		err = n.migrateRepoFromVersion0()
 		if err != nil {
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Migration error: %v", err)
+			logger.LogErrorWithIDf(log, n.nodeID, "Migration error: %v", err)
 		}
 
-		logger.LogWithIDf(log, n.nodeID, logging.INFO, "Migrate repo from version 1")
+		logger.LogInfoWithIDf(log, n.nodeID, "Migrate repo from version 1")
 		err = n.migrateRepoFromVersion1()
 		if err != nil {
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Migration error: %v", err)
+			logger.LogErrorWithIDf(log, n.nodeID, "Migration error: %v", err)
 		}
 	} else if version == 1 {
-		logger.LogWithIDf(log, n.nodeID, logging.INFO, "Migrate repo from version 1")
+		logger.LogInfoWithIDf(log, n.nodeID, "Migrate repo from version 1")
 		err = n.migrateRepoFromVersion1()
 		if err != nil {
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Migration error: %v", err)
+			logger.LogErrorWithIDf(log, n.nodeID, "Migration error: %v", err)
 		}
 	} else if version == 2 || version == 3 {
-		logger.LogWithIDf(log, n.nodeID, logging.INFO, "Migrate repo from version 2")
+		logger.LogInfoWithIDf(log, n.nodeID, "Migrate repo from version 2")
 		err = n.migrateRepoWithListingsUpdate()
 		if err != nil {
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Migration error: %v", err)
+			logger.LogErrorWithIDf(log, n.nodeID, "Migration error: %v", err)
 		}
 	} else if version == 5 {
-		logger.LogWithIDf(log, n.nodeID, logging.INFO, "Migrate repo from version 5")
+		logger.LogInfoWithIDf(log, n.nodeID, "Migrate repo from version 5")
 		err = n.migrateRepoFromVersion5()
 		if err != nil {
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Migration error: %v", err)
+			logger.LogErrorWithIDf(log, n.nodeID, "Migration error: %v", err)
 		}
 	}
 

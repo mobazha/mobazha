@@ -131,7 +131,7 @@ func TestOpenBazaarNode_syncMessages(t *testing.T) {
 
 	// Reconnecting nodes should trigger node 1 to send the messages to node 0 again.
 	time.Sleep(1)
-	network.Nodes()[0].networkService = net.NewNetworkService(network.Nodes()[0].ipfsNode.PeerHost, net.NewBanManager(nil, nil), true)
+	network.Nodes()[0].networkService = net.NewNetworkService(network.Nodes()[0].nodeID, network.Nodes()[0].ipfsNode.PeerHost, net.NewBanManager(nil, nil), true)
 	network.Nodes()[0].registerHandlers()
 
 	if _, err := network.ipfsNet.LinkPeers(network.Nodes()[0].Identity(), network.Nodes()[1].Identity()); err != nil {

@@ -83,7 +83,7 @@ func MockNode() (*OpenBazaarNode, error) {
 	}
 
 	banManager := net.NewBanManager(nil, nil)
-	service := net.NewNetworkService(ipfsNode.PeerHost, banManager, true)
+	service := net.NewNetworkService("", ipfsNode.PeerHost, banManager, true)
 
 	// Load the keys from the db
 	var (
@@ -268,7 +268,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		}
 
 		banManager := net.NewBanManager(nil, nil)
-		service := net.NewNetworkService(ipfsNode.PeerHost, banManager, true)
+		service := net.NewNetworkService("", ipfsNode.PeerHost, banManager, true)
 
 		// Load the keys from the db
 		var (

@@ -11,6 +11,7 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
 	msgio "github.com/libp2p/go-msgio"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	"github.com/op/go-logging"
 	"google.golang.org/protobuf/proto"
@@ -21,6 +22,8 @@ var log = logging.MustGetLogger("NET")
 type NetworkService struct {
 	ctx       context.Context
 	ctxCancel context.CancelFunc
+
+	nodeID string
 
 	host host.Host
 
@@ -36,7 +39,7 @@ type NetworkService struct {
 	protocolID protocol.ID
 }
 
-func NewNetworkService(host host.Host, banManager *BanManager, useTestnet bool) *NetworkService {
+func NewNetworkService(nodeID string, host host.Host, banManager *BanManager, useTestnet bool) *NetworkService {
 	ctx, cancel := context.WithCancel(context.Background())
 	protocolID := ProtocolAppMainnetTwo
 	if useTestnet {
@@ -45,6 +48,7 @@ func NewNetworkService(host host.Host, banManager *BanManager, useTestnet bool) 
 	ns := &NetworkService{
 		ctx:            ctx,
 		ctxCancel:      cancel,
+		nodeID:         nodeID,
 		host:           host,
 		messageSenders: make(map[peer.ID]*messageSender),
 		msMtx:          sync.RWMutex{},
@@ -97,7 +101,7 @@ func (ns *NetworkService) handleNewMessage(s inet.Stream) {
 	remotePeer := s.Conn().RemotePeer()
 
 	if ns.banManager.IsBanned(remotePeer) {
-		log.Debugf("Received new stream request from banned peer %s. Closing.", remotePeer)
+		logger.LogInfoWithIDf(log, ns.nodeID, "Received new stream request from banned peer %s. Closing.", remotePeer)
 		return
 	}
 
@@ -114,7 +118,7 @@ func (ns *NetworkService) handleNewMessage(s inet.Stream) {
 			reader.ReleaseMsg(msgBytes)
 			s.Reset()
 			if err == io.EOF {
-				log.Debugf("Peer %s closed stream", remotePeer)
+				logger.LogInfoWithIDf(log, ns.nodeID, "Peer %s closed stream", remotePeer)
 			}
 			return
 		}
@@ -126,20 +130,20 @@ func (ns *NetworkService) handleNewMessage(s inet.Stream) {
 		reader.ReleaseMsg(msgBytes)
 		// Check again
 		if ns.banManager.IsBanned(remotePeer) {
-			log.Debugf("Received message from banned peer %s. Closing.", remotePeer)
+			logger.LogInfoWithIDf(log, ns.nodeID, "Received message from banned peer %s. Closing.", remotePeer)
 			return
 		}
 
 		ns.handlerMtx.RLock()
 		handler, ok := ns.handlers[pmes.MessageType]
 		if !ok {
-			log.Warningf("Received message type %s with unregistered handler", pmes.MessageType.String())
+			logger.LogInfoWithIDf(log, ns.nodeID, "Received message type %s with unregistered handler", pmes.MessageType.String())
 			ns.handlerMtx.RUnlock()
 			continue
 		}
 		ns.handlerMtx.RUnlock()
 		if err := handler(remotePeer, pmes); err != nil {
-			log.Errorf("Error processing %s message from %s: %s", pmes.MessageType.String(), remotePeer, err)
+			logger.LogInfoWithIDf(log, ns.nodeID, "Error processing %s message from %s: %s", pmes.MessageType.String(), remotePeer, err)
 		}
 	}
 }

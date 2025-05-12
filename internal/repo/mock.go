@@ -29,5 +29,5 @@ func MockDB() (database.Database, error) {
 func MockRepo() (*Repo, error) {
 	n := rand.Uint32()
 	dataDir := path.Join(os.TempDir(), "mobazha-test", strconv.Itoa(int(n)))
-	return newRepo(dataDir, "", true, true)
+	return newRepo("", dataDir, "", true, true)
 }

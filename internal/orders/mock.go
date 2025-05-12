@@ -63,7 +63,7 @@ func newMockOrderProcessor() (*OrderProcessor, func(), error) {
 	}
 
 	banManager := net.NewBanManager(nil, nil)
-	service := net.NewNetworkService(ipfsNode.PeerHost, banManager, true)
+	service := net.NewNetworkService("", ipfsNode.PeerHost, banManager, true)
 
 	messenger, err := net.NewMessenger(&net.MessengerConfig{
 		Privkey: ipfsNode.PrivateKey,

@@ -6,6 +6,7 @@ import (
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -22,7 +23,7 @@ func (op *OrderProcessor) processRefundMessage(dbtx database.Tx, order *models.O
 	}
 
 	if order.SerializedOrderCancel != nil {
-		log.Errorf("Received REFUND message for order %s after ORDER_CANCEL", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received REFUND message for order %s after ORDER_CANCEL", order.ID)
 		return nil, ErrUnexpectedMessage
 	}
 
@@ -69,15 +70,15 @@ func (op *OrderProcessor) processRefundMessage(dbtx database.Tx, order *models.O
 		}
 	} else if order.Role() == models.RoleBuyer && refund.GetReleaseInfo() != nil && paymentSent.Method == pb.PaymentSent_MODERATED {
 		if err := op.releaseRefundEscrowFunds(wallet, paymentSent, refund.GetReleaseInfo()); err != nil {
-			log.Errorf("Error releasing funds from escrow during refund processing: %s", err.Error())
+			logger.LogInfoWithIDf(log, op.nodeID, "Error releasing funds from escrow during refund processing: %s", err.Error())
 			return nil, err
 		}
 	}
 
 	if order.Role() == models.RoleBuyer {
-		log.Infof("Received REFUND message for order %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received REFUND message for order %s", order.ID)
 	} else if order.Role() == models.RoleVendor {
-		log.Infof("Processed own REFUND for order %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Processed own REFUND for order %s", order.ID)
 	}
 
 	event := &events.Refund{

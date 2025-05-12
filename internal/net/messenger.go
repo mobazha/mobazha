@@ -15,6 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -44,6 +45,7 @@ const (
 // New messages are saved to the database and continually retried
 // until the recipient receives it.
 type Messenger struct {
+	NodeID         string
 	ns             *NetworkService
 	db             database.Database
 	sk             crypto.PrivKey
@@ -58,6 +60,7 @@ type Messenger struct {
 
 // MessengerConfig holds the data needed to construct a new Messenger.
 type MessengerConfig struct {
+	NodeID         string
 	Context        context.Context
 	Service        *NetworkService
 	DB             database.Database
@@ -86,6 +89,7 @@ func NewMessenger(cfg *MessengerConfig) (*Messenger, error) {
 		return nil, err
 	}
 	m := &Messenger{
+		NodeID:         cfg.NodeID,
 		ns:             cfg.Service,
 		db:             cfg.DB,
 		sk:             cfg.Privkey,
@@ -221,22 +225,22 @@ func (m *Messenger) Start() {
 		case msg := <-sub.Out:
 			p, pmes, err := m.decryptMessage(msg.EncryptedMessage)
 			if err != nil {
-				log.Warningf("Decryption failed for message %x", msg.MessageID)
+				logger.LogInfoWithIDf(log, m.NodeID, "Decryption failed for message %x", msg.MessageID)
 			}
 			m.ns.handlerMtx.RLock()
 			handler, ok := m.ns.handlers[pmes.MessageType]
 			m.ns.handlerMtx.RUnlock()
 			if ok {
 				if err := handler(p, pmes); err != nil {
-					log.Errorf("Error processing %s message from %s: %s", pmes.MessageType.String(), p, err)
+					logger.LogInfoWithIDf(log, m.NodeID, "Error processing %s message from %s: %s", pmes.MessageType.String(), p, err)
 				}
 			} else {
-				log.Warningf("No handler for decrypted message %s", pmes.MessageID)
+				logger.LogInfoWithIDf(log, m.NodeID, "No handler for decrypted message %s", pmes.MessageID)
 				continue
 			}
 
 			if err := m.snfClient.AckMessage(context.Background(), msg.MessageID); err != nil {
-				log.Errorf("Error acking message with snf servers: %s", err)
+				logger.LogInfoWithIDf(log, m.NodeID, "Error acking message with snf servers: %s", err)
 			}
 		}
 	}
@@ -257,7 +261,7 @@ func (m *Messenger) trySendMessage(peerID peer.ID, message *pb.Message, done cha
 	defer cancel()
 
 	if err := m.ns.SendMessage(ctx, peerID, message); err != nil && m.snfClient != nil {
-		log.Debugf("Failed to connect to peer %s, error: %v. Sending offline message", peerID, err)
+		logger.LogInfoWithIDf(log, m.NodeID, "Failed to connect to peer %s, error: %v. Sending offline message", peerID, err)
 		// We failed to deliver directly to the peer. Let's send
 		// using the offline system.
 		var record models.StoreAndForwardServers
@@ -269,7 +273,7 @@ func (m *Messenger) trySendMessage(peerID peer.ID, message *pb.Message, done cha
 		})
 		servers, iberr := record.Servers()
 		if dberr != nil || iberr != nil {
-			log.Errorf("Error loading peers snf server addresses %s", err)
+			logger.LogInfoWithIDf(log, m.NodeID, "Error loading peers snf server addresses %s", err)
 			return
 		}
 
@@ -280,15 +284,15 @@ func (m *Messenger) trySendMessage(peerID peer.ID, message *pb.Message, done cha
 			if err == nil {
 				snfServers = profile.StoreAndForwardServers
 			} else {
-				log.Errorf("Error sending offline message: Can't load profile for peer %s, error: %v", peerID, err)
-				log.Info("Use default snfServers instead for message sending")
+				logger.LogInfoWithIDf(log, m.NodeID, "Error sending offline message: Can't load profile for peer %s, error: %v", peerID, err)
+				logger.LogInfoWithIDf(log, m.NodeID, "Use default snfServers instead for message sending")
 				snfServers = repo.DefaultMainnetSNFServers
 				if m.testnet {
 					snfServers = repo.DefaultTestnetSNFServers
 				}
 			}
 			if len(snfServers) == 0 {
-				log.Errorf("Error sending offline message: No inbox peers for peer %s", peerID)
+				logger.LogInfoWithIDf(log, m.NodeID, "Error sending offline message: No inbox peers for peer %s", peerID)
 				return
 			}
 
@@ -303,7 +307,7 @@ func (m *Messenger) trySendMessage(peerID peer.ID, message *pb.Message, done cha
 
 		cipherText, err := m.prepEncryptedMessage(peerID, message)
 		if err != nil {
-			log.Errorf("Error preparing offline message to %s: %s", peerID, err)
+			logger.LogInfoWithIDf(log, m.NodeID, "Error preparing offline message to %s: %s", peerID, err)
 			return
 		}
 
@@ -315,17 +319,17 @@ func (m *Messenger) trySendMessage(peerID peer.ID, message *pb.Message, done cha
 				defer wg.Done()
 				err := m.snfClient.SendMessage(context.Background(), peerID, svr, nil, cipherText, []byte(message.MessageType.String()))
 				if err != nil {
-					log.Warningf("Error pushing offline message %s to server %s: %s", message.MessageID, svr, err)
+					logger.LogInfoWithIDf(log, m.NodeID, "Error pushing offline message %s to server %s: %s", message.MessageID, svr, err)
 					return
 				}
 				atomic.AddUint32(&successes, 1)
 			}(server)
 		}
 		wg.Wait()
-		log.Debugf("Message %s sent to %d of %d servers", message.MessageID, successes, len(servers))
+		logger.LogInfoWithIDf(log, m.NodeID, "Message %s sent to %d of %d servers", message.MessageID, successes, len(servers))
 		return
 	}
-	log.Debugf("Message %s direct send successful", message.MessageID)
+	logger.LogInfoWithIDf(log, m.NodeID, "Message %s direct send successful", message.MessageID)
 }
 
 // retryAllMessages loads all un-ACKed messages from the database and
@@ -344,19 +348,19 @@ func (m *Messenger) retryAllMessages() {
 		return tx.Read().Find(&messages).Error
 	})
 	if err != nil {
-		log.Errorf("Error loading outgoing messages from the database: %s", err)
+		logger.LogInfoWithIDf(log, m.NodeID, "Error loading outgoing messages from the database: %s", err)
 		return
 	}
 
 	for _, message := range messages {
 		pmes := new(pb.Message)
 		if err := proto.Unmarshal(message.SerializedMessage, pmes); err != nil {
-			log.Error("Error unmarshalling outgoing message: %s", err)
+			logger.LogInfoWithIDf(log, m.NodeID, "Error unmarshalling outgoing message: %s", err)
 			continue
 		}
 		pid, err := peer.Decode(message.Recipient)
 		if err != nil {
-			log.Error("Error parsing peer ID in outgoing message: %s", err)
+			logger.LogInfoWithIDf(log, m.NodeID, "Error parsing peer ID in outgoing message: %s", err)
 			continue
 		}
 		if shouldWeRetry(message.Timestamp, message.LastAttempt) {
@@ -367,7 +371,7 @@ func (m *Messenger) retryAllMessages() {
 				return tx.Update("last_attempt", time.Now(), nil, &message)
 			})
 			if err != nil {
-				log.Error("Error updating last attempt for outgoing message: %s", err)
+				logger.LogInfoWithIDf(log, m.NodeID, "Error updating last attempt for outgoing message: %s", err)
 			}
 		}
 	}
@@ -379,22 +383,22 @@ func (m *Messenger) downloadMessages() {
 	if m.snfClient != nil {
 		encryptedMessages, err := m.snfClient.GetMessages(context.Background())
 		if err != nil {
-			log.Error("Error downloading messages from snf client: %s", err)
+			logger.LogInfoWithIDf(log, m.NodeID, "Error downloading messages from snf client: %s", err)
 			return
 		}
-		log.Debugf("Downloaded %d encrypted messages from store-and-forward servers", len(encryptedMessages))
+		logger.LogInfoWithIDf(log, m.NodeID, "Downloaded %d encrypted messages from store-and-forward servers", len(encryptedMessages))
 		type messageWithPeer struct {
 			m *pb.Message
 			p peer.ID
 		}
 		messages := make([]messageWithPeer, 0, len(encryptedMessages))
 		for _, enc := range encryptedMessages {
-			p, m, err := m.decryptMessage(enc.EncryptedMessage)
+			p, msg, err := m.decryptMessage(enc.EncryptedMessage)
 			if err != nil {
-				log.Warningf("Decryption failed for message %x", enc.MessageID)
+				logger.LogInfoWithIDf(log, m.NodeID, "Decryption failed for message %x", enc.MessageID)
 				continue
 			}
-			messages = append(messages, messageWithPeer{m: m, p: p})
+			messages = append(messages, messageWithPeer{m: msg, p: p})
 		}
 		// Sort the messages by sequence so we process the lowest sequences
 		// first.
@@ -407,15 +411,15 @@ func (m *Messenger) downloadMessages() {
 			m.ns.handlerMtx.RUnlock()
 			if ok {
 				if err := handler(mwp.p, mwp.m); err != nil {
-					log.Errorf("Error processing %s message from %s: %s", mwp.m.MessageType.String(), mwp.p, err)
+					logger.LogInfoWithIDf(log, m.NodeID, "Error processing %s message from %s: %s", mwp.m.MessageType.String(), mwp.p, err)
 				}
 			} else {
-				log.Warningf("No handler for decrypted message %s", mwp.m.MessageID)
+				logger.LogInfoWithIDf(log, m.NodeID, "No handler for decrypted message %s", mwp.m.MessageID)
 			}
 		}
 		for _, enc := range encryptedMessages {
 			if err := m.snfClient.AckMessage(context.Background(), enc.MessageID); err != nil {
-				log.Errorf("Error acking message with snf servers: %s", err)
+				logger.LogInfoWithIDf(log, m.NodeID, "Error acking message with snf servers: %s", err)
 			}
 		}
 	}

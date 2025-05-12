@@ -94,7 +94,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 
 	repoPath := path.Join(cfg.DataDir, "nodes", nodeID)
 
-	obRepo, err := repo.NewRepo(repoPath, cfg.Testnet)
+	obRepo, err := repo.NewRepo(nodeID, repoPath, cfg.Testnet)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 		shutdownTorFunc func() error
 	)
 	if cfg.Tor || cfg.DualStack {
-		log.Notice("Starting embedded Tor client")
+		logger.LogNoticeWithID(log, nodeID, "Starting embedded Tor client")
 
 		var torKey models.Key
 		err = obRepo.DB().View(func(tx database.Tx) error {
@@ -341,7 +341,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 		}
 		dbEscrowKey, dbBip44Key, dbSolKey, dbRatingKey, err = repo.GetKeysFromDB(tx)
 		if err != nil {
-			log.Info("数据库中缺少密钥，需要更新")
+			logger.LogInfoWithID(log, nodeID, "数据库中缺少密钥，需要更新")
 			needDBUpdate = true
 			return nil
 		}
@@ -352,7 +352,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 	}
 
 	if needDBUpdate {
-		log.Info("更新数据库中的密钥")
+		logger.LogInfoWithID(log, nodeID, "更新数据库中的密钥")
 		err = obRepo.DB().Update(func(tx database.Tx) error {
 			var dbMnemonic models.Key
 			err = tx.Read().Where("name = ?", "mnemonic").First(&dbMnemonic).Error
@@ -418,10 +418,10 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 	if err == nil {
 		globalBlockedIds, err = contracts.GetBlockedIds()
 		if err != nil {
-			log.Errorf("Failed to get global blocked nodes: %v", err)
+			logger.LogErrorWithIDf(log, nodeID, "Failed to get global blocked nodes: %v", err)
 		}
 	} else {
-		log.Errorf("Failed to create contracts util: %v", err)
+		logger.LogErrorWithIDf(log, nodeID, "Failed to create contracts util: %v", err)
 	}
 
 	blocked, err := prefs.BlockedNodes()
@@ -429,7 +429,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 		return nil, err
 	}
 	bm := obnet.NewBanManager(globalBlockedIds, blocked)
-	service := obnet.NewNetworkService(ipfsNode.PeerHost, bm, cfg.Testnet)
+	service := obnet.NewNetworkService(nodeID, ipfsNode.PeerHost, bm, cfg.Testnet)
 
 	bus := events.NewBus()
 	tracker := NewFollowerTracker(obRepo, bus, ipfsNode.PeerHost)
@@ -495,6 +495,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 	)
 
 	obNode.messenger, err = obnet.NewMessenger(&obnet.MessengerConfig{
+		NodeID:         nodeID,
 		Service:        service,
 		SNFServers:     sharedManager.SNFServers,
 		Privkey:        ipfsNode.PrivateKey,
@@ -666,13 +667,13 @@ func (n *OpenBazaarNode) listenNetworkEvents() {
 
 	connected := func(_ inet.Network, conn inet.Conn) {
 		if serverMap[conn.RemotePeer().String()] {
-			logger.LogWithIDf(log, n.nodeID, logging.DEBUG, "Established connection to store and forward server %s", conn.RemotePeer())
+			logger.LogDebugWithIDf(log, n.nodeID, "Established connection to store and forward server %s", conn.RemotePeer())
 		}
 		n.eventBus.Emit(&events.PeerConnected{Peer: conn.RemotePeer()})
 	}
 	disConnected := func(_ inet.Network, conn inet.Conn) {
 		if serverMap[conn.RemotePeer().String()] {
-			logger.LogWithIDf(log, n.nodeID, logging.DEBUG, "Disconnected from store and forward server %s", conn.RemotePeer())
+			logger.LogDebugWithIDf(log, n.nodeID, "Disconnected from store and forward server %s", conn.RemotePeer())
 		}
 		n.eventBus.Emit(&events.PeerDisconnected{Peer: conn.RemotePeer()})
 	}
@@ -687,7 +688,7 @@ func (n *OpenBazaarNode) listenNetworkEvents() {
 
 func (n *OpenBazaarNode) listenWalletEvents() {
 	if n.featureManager.IsEnabled(pkgconfig.FeatureNoBuildinWallet) {
-		log.Info("No buildin wallet, skipping buildin wallet info update")
+		logger.LogInfoWithID(log, n.nodeID, "No buildin wallet, skipping buildin wallet info update")
 		return
 	}
 
@@ -725,11 +726,11 @@ func (n *OpenBazaarNode) listenWalletEvents() {
 
 		bi, err := w.BlockchainInfo()
 		if err != nil {
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error querying %s wallet for blockchain info: %s", ct.CurrencyCode(), err)
+			logger.LogErrorWithIDf(log, n.nodeID, "Error querying %s wallet for blockchain info: %s", ct.CurrencyCode(), err)
 		}
 		unconfirmed, confirmed, err := w.Balance()
 		if err != nil {
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error querying %s wallet for balance: %s", ct.CurrencyCode(), err)
+			logger.LogErrorWithIDf(log, n.nodeID, "Error querying %s wallet for balance: %s", ct.CurrencyCode(), err)
 		}
 
 		def, _ := models.CurrencyDefinitions.Lookup(ct.CurrencyCode())

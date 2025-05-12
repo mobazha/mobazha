@@ -8,6 +8,7 @@ import (
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -29,7 +30,7 @@ func (op *OrderProcessor) processRatingSignaturesMessage(dbtx database.Tx, order
 		return nil, err
 	}
 	if order.SerializedRatingSignatures != nil && !dup {
-		log.Errorf("Duplicate RATING_SIGNATURES message does not match original for order: %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Duplicate RATING_SIGNATURES message does not match original for order: %s", order.ID)
 		return nil, ErrChangedMessage
 	} else if dup {
 		return nil, nil
@@ -79,7 +80,7 @@ func (op *OrderProcessor) processRatingSignaturesMessage(dbtx database.Tx, order
 		}
 	}
 
-	log.Infof("Received RATING_SIGNATURES message for order %s", order.ID)
+	logger.LogInfoWithIDf(log, op.nodeID, "Received RATING_SIGNATURES message for order %s", order.ID)
 
 	event := &events.RatingSignaturesReceived{
 		OrderID: order.ID.String(),

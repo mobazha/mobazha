@@ -26,7 +26,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	opb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	"github.com/op/go-logging"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gorm.io/gorm"
@@ -77,7 +76,7 @@ func (n *OpenBazaarNode) publish(ctx context.Context, done chan<- struct{}) {
 			n.eventBus.Emit(&events.PublishFinished{
 				ID: publishID,
 			})
-			logger.LogWithIDf(log, n.nodeID, logging.INFO, "Publishing complete")
+			logger.LogInfoWithIDf(log, n.nodeID, "Publishing complete")
 		}
 	}()
 
@@ -97,7 +96,7 @@ func (n *OpenBazaarNode) publish(ctx context.Context, done chan<- struct{}) {
 
 	api, err := coreapi.NewCoreAPI(n.SharedManager().GetIPFSNode())
 	if err != nil {
-		logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error building core API: %s", err.Error())
+		logger.LogErrorWithIDf(log, n.nodeID, "Error building core API: %s", err.Error())
 		publishErr = err
 		return
 	}
@@ -108,27 +107,27 @@ func (n *OpenBazaarNode) publish(ctx context.Context, done chan<- struct{}) {
 	if err == nil {
 		rp, _, err := api.ResolvePath(context.Background(), path.FromCid(currentRoot))
 		if err != nil {
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error resolving path: %s", err.Error())
+			logger.LogErrorWithIDf(log, n.nodeID, "Error resolving path: %s", err.Error())
 			publishErr = err
 			return
 		}
 
 		if err := api.Pin().Rm(context.Background(), rp, options.Pin.RmRecursive(true)); err != nil {
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error unpinning root: %s", err.Error())
+			logger.LogErrorWithIDf(log, n.nodeID, "Error unpinning root: %s", err.Error())
 		}
 	}
 
 	// Add the directory to IPFS
 	stat, err := os.Lstat(n.repo.DB().PublicDataPath())
 	if err != nil {
-		logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error calling Lstat: %s", err.Error())
+		logger.LogErrorWithIDf(log, n.nodeID, "Error calling Lstat: %s", err.Error())
 		publishErr = err
 		return
 	}
 
 	f, err := files.NewSerialFile(n.repo.DB().PublicDataPath(), false, stat)
 	if err != nil {
-		logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error serializing file: %s", err.Error())
+		logger.LogErrorWithIDf(log, n.nodeID, "Error serializing file: %s", err.Error())
 		publishErr = err
 		return
 	}
@@ -138,7 +137,7 @@ func (n *OpenBazaarNode) publish(ctx context.Context, done chan<- struct{}) {
 	}
 	pth, err := api.Unixfs().Add(cctx, files.ToDir(f), opts...)
 	if err != nil {
-		logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error adding root: %s", err.Error())
+		logger.LogErrorWithIDf(log, n.nodeID, "Error adding root: %s", err.Error())
 		publishErr = err
 		return
 	}
@@ -152,7 +151,7 @@ func (n *OpenBazaarNode) publish(ctx context.Context, done chan<- struct{}) {
 
 	record, err := n.ipnsRecord(cctx)
 	if err != nil {
-		logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error getting ipns record: %s", err.Error())
+		logger.LogErrorWithIDf(log, n.nodeID, "Error getting ipns record: %s", err.Error())
 		publishErr = err
 		return
 	}
@@ -160,19 +159,19 @@ func (n *OpenBazaarNode) publish(ctx context.Context, done chan<- struct{}) {
 	if len(n.ipnsResolver) > 0 {
 		err = net.SetIPNSRecordToResolver(cctx, n.ipnsResolver, n.Identity(), record)
 		if err != nil {
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error setting ipns record to resolver: %s", err.Error())
+			logger.LogErrorWithIDf(log, n.nodeID, "Error setting ipns record to resolver: %s", err.Error())
 			publishErr = err
 		}
 	}
 
 	// Publish
 	go func() {
-		logger.LogWithIDf(log, n.nodeID, logging.INFO, "Publishing to IPNS...")
+		logger.LogInfoWithIDf(log, n.nodeID, "Publishing to IPNS...")
 		eol := time.Now().Add(nameValidTime)
 		ipfsNode := n.SharedManager().GetIPFSNode()
 		if err := ipfsNode.Namesys.Publish(cctx, ipfsNode.PrivateKey, pth, nameSysOpts.PublishWithEOL(eol)); err != nil {
 			if err != context.Canceled {
-				logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error namesys publish: %s", err.Error())
+				logger.LogErrorWithIDf(log, n.nodeID, "Error namesys publish: %s", err.Error())
 			}
 			publishErr = err
 			return
@@ -181,10 +180,10 @@ func (n *OpenBazaarNode) publish(ctx context.Context, done chan<- struct{}) {
 
 	// Publish to pubsub all records topic.
 	go func() {
-		logger.LogWithIDf(log, n.nodeID, logging.INFO, "Going to publish to pubsub:")
+		logger.LogInfoWithIDf(log, n.nodeID, "Going to publish to pubsub:")
 
 		if err := n.publishIPNSRecordToPubsub(context.Background()); err != nil {
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error publishing IPNS record to pubsub: %s", err)
+			logger.LogErrorWithIDf(log, n.nodeID, "Error publishing IPNS record to pubsub: %s", err)
 		}
 	}()
 
@@ -192,13 +191,13 @@ func (n *OpenBazaarNode) publish(ctx context.Context, done chan<- struct{}) {
 		return tx.Save(&models.Event{Name: "last_publish", Time: time.Now()})
 	})
 	if err != nil {
-		logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error saving last publish time to the db: %s", err.Error())
+		logger.LogErrorWithIDf(log, n.nodeID, "Error saving last publish time to the db: %s", err.Error())
 	}
 
 	// Send the new graph to our connected followers.
 	graph, err := n.fetchGraph(cctx)
 	if err != nil {
-		logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error fetching graph: %s", err.Error())
+		logger.LogErrorWithIDf(log, n.nodeID, "Error fetching graph: %s", err.Error())
 		publishErr = err
 		return
 	}
@@ -210,7 +209,7 @@ func (n *OpenBazaarNode) publish(ctx context.Context, done chan<- struct{}) {
 
 	any := &anypb.Any{}
 	if err := any.MarshalFrom(storeMsg); err != nil {
-		logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error marshalling store message: %s", err.Error())
+		logger.LogErrorWithIDf(log, n.nodeID, "Error marshalling store message: %s", err.Error())
 		publishErr = err
 		return
 	}
@@ -262,7 +261,7 @@ func (n *OpenBazaarNode) PublishFile(ctx context.Context, cid cid.Cid, done chan
 
 	any := &anypb.Any{}
 	if err := any.MarshalFrom(storeMsg); err != nil {
-		logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error marshalling store message: %s", err.Error())
+		logger.LogErrorWithIDf(log, n.nodeID, "Error marshalling store message: %s", err.Error())
 		return
 	}
 
@@ -299,7 +298,7 @@ func (n *OpenBazaarNode) sendAckMessage(messageID string, to peer.ID) {
 		return tx.Save(&models.IncomingMessage{ID: messageID})
 	})
 	if err != nil {
-		logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error saving incoming message ID to database: %s", err)
+		logger.LogErrorWithIDf(log, n.nodeID, "Error saving incoming message ID to database: %s", err)
 	}
 	n.messenger.SendACK(messageID, to)
 }
@@ -439,13 +438,13 @@ func (n *OpenBazaarNode) handleStoreMessage(from peer.ID, message *pb.Message) e
 		cid, err := cid.Cast(b)
 		if err != nil {
 			failedCids = append(failedCids, cid)
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "store handler cid cast error, %s, %s", cid.String(), err)
+			logger.LogErrorWithIDf(log, n.nodeID, "store handler cid cast error, %s, %s", cid.String(), err)
 			continue
 		}
 		cids = append(cids, cid)
 		if err := n.pin(context.Background(), path.FromCid(cid)); err != nil {
 			failedCids = append(failedCids, cid)
-			logger.LogWithIDf(log, n.nodeID, logging.ERROR, "store handler error pinning file, %s, %s", cid.String(), err)
+			logger.LogErrorWithIDf(log, n.nodeID, "store handler error pinning file, %s, %s", cid.String(), err)
 			continue
 		}
 	}
@@ -456,7 +455,7 @@ func (n *OpenBazaarNode) handleStoreMessage(from peer.ID, message *pb.Message) e
 		Peer: from,
 		Cids: cids,
 	})
-	logger.LogWithIDf(log, n.nodeID, logging.INFO, "Received STORE message from %s", from)
+	logger.LogInfoWithIDf(log, n.nodeID, "Received STORE message from %s", from)
 	return nil
 }
 
@@ -474,14 +473,14 @@ func (n *OpenBazaarNode) isDuplicate(message *pb.Message) bool {
 func (n *OpenBazaarNode) syncMessages() {
 	connectedSub, err := n.eventBus.Subscribe(&events.PeerConnected{})
 	if err != nil {
-		logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error subscribing to PeerConnected event: %s", err)
+		logger.LogErrorWithIDf(log, n.nodeID, "Error subscribing to PeerConnected event: %s", err)
 	}
 	for {
 		select {
 		case event := <-connectedSub.Out():
 			notif, ok := event.(*events.PeerConnected)
 			if !ok {
-				logger.LogWithIDf(log, n.nodeID, logging.ERROR, "syncMessages type assertion failed on PeerConnected")
+				logger.LogErrorWithIDf(log, n.nodeID, "syncMessages type assertion failed on PeerConnected")
 				return
 			}
 			var messages []models.OutgoingMessage
@@ -489,7 +488,7 @@ func (n *OpenBazaarNode) syncMessages() {
 				return tx.Read().Where("recipient = ?", notif.Peer.String()).Find(&messages).Error
 			})
 			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-				logger.LogWithIDf(log, n.nodeID, logging.ERROR, "syncMessages outgoing messages lookup error: %s", err)
+				logger.LogErrorWithIDf(log, n.nodeID, "syncMessages outgoing messages lookup error: %s", err)
 				return
 			}
 			for _, om := range messages {
@@ -501,12 +500,12 @@ func (n *OpenBazaarNode) syncMessages() {
 				}
 				var message pb.Message
 				if err := proto.Unmarshal(om.SerializedMessage, &message); err != nil {
-					logger.LogWithIDf(log, n.nodeID, logging.ERROR, "syncMessages unmarshal error: %s", err)
+					logger.LogErrorWithIDf(log, n.nodeID, "syncMessages unmarshal error: %s", err)
 					continue
 				}
 				recipient, err := peer.Decode(om.Recipient)
 				if err != nil {
-					logger.LogWithIDf(log, n.nodeID, logging.ERROR, "syncMessages peer decode error: %s", err)
+					logger.LogErrorWithIDf(log, n.nodeID, "syncMessages peer decode error: %s", err)
 					continue
 				}
 				go n.networkService.SendMessage(context.Background(), recipient, &message)
@@ -548,7 +547,7 @@ func (n *OpenBazaarNode) publishHandler() {
 		return nil
 	})
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error loading last republish time: %s", err.Error())
+		logger.LogErrorWithIDf(log, n.nodeID, "Error loading last republish time: %s", err.Error())
 	}
 
 	tick := time.After(republishInterval - time.Since(lastPublish))
@@ -564,7 +563,7 @@ func (n *OpenBazaarNode) publishHandler() {
 					return tx.Save(&models.Event{Name: "last_publish", Time: lastPublish})
 				})
 				if err != nil {
-					logger.LogWithIDf(log, n.nodeID, logging.ERROR, "Error saving last publish time to the db: %s", err.Error())
+					logger.LogErrorWithIDf(log, n.nodeID, "Error saving last publish time to the db: %s", err.Error())
 				}
 				go n.Publish(nil)
 			case p := <-n.publishChan:

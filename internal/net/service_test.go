@@ -15,8 +15,8 @@ func TestNetworkService(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	service1 := NewNetworkService(mocknet.Hosts()[0], NewBanManager(nil, nil), true)
-	service2 := NewNetworkService(mocknet.Hosts()[1], NewBanManager(nil, nil), true)
+	service1 := NewNetworkService("", mocknet.Hosts()[0], NewBanManager(nil, nil), true)
+	service2 := NewNetworkService("", mocknet.Hosts()[1], NewBanManager(nil, nil), true)
 
 	ms, err := service1.messageSenderForPeer(context.Background(), mocknet.Hosts()[1].ID())
 	if err != nil {

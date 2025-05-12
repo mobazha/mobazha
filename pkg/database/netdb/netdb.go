@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/op/go-logging"
@@ -37,7 +38,7 @@ func NewNetDB(endpoint string, ownPeerID string, nodePrivateKey crypto.PrivKey) 
 }
 
 func (ndb *NetDB) GetProfile(peerID string) (*models.Profile, error) {
-	log.Infof("Get profile for %s", peerID)
+	logger.LogInfoWithIDf(log, peerID, "Get profile for %s", peerID)
 
 	var netProfile Profile
 	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netProfile).Get(fmt.Sprintf("%s/profile/%s", ndb.endpoint, peerID))
@@ -55,7 +56,7 @@ func (ndb *NetDB) GetProfile(peerID string) (*models.Profile, error) {
 }
 
 func (ndb *NetDB) SetOwnProfile(profile *models.Profile) error {
-	log.Infof("Set own profile")
+	logger.LogInfoWithIDf(log, ndb.ownPeerID, "Set own profile")
 
 	serializedProfile, err := json.Marshal(profile)
 	if err != nil {
@@ -79,7 +80,7 @@ func (ndb *NetDB) SetOwnProfile(profile *models.Profile) error {
 }
 
 func (ndb *NetDB) GetFollowers(peerID string) (models.Followers, error) {
-	log.Infof("Get followers for %s", peerID)
+	logger.LogInfoWithIDf(log, peerID, "Get followers for %s", peerID)
 
 	var netFollowers Followers
 	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netFollowers).Get(fmt.Sprintf("%s/followers/%s", ndb.endpoint, peerID))
@@ -98,7 +99,7 @@ func (ndb *NetDB) GetFollowers(peerID string) (models.Followers, error) {
 
 // SetFollowers sets the followers list.
 func (ndb *NetDB) SetOwnFollowers(followers models.Followers) error {
-	log.Infof("Set own followers")
+	logger.LogInfoWithIDf(log, ndb.ownPeerID, "Set own followers")
 
 	serializedFollowers, err := json.Marshal(followers)
 	if err != nil {
@@ -123,7 +124,7 @@ func (ndb *NetDB) SetOwnFollowers(followers models.Followers) error {
 
 // GetFollowing returns the following list.
 func (ndb *NetDB) GetFollowing(peerID string) (models.Following, error) {
-	log.Infof("Get following for %s", peerID)
+	logger.LogInfoWithIDf(log, peerID, "Get following for %s", peerID)
 
 	var netFollowing Following
 	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netFollowing).Get(fmt.Sprintf("%s/following/%s", ndb.endpoint, peerID))
@@ -142,7 +143,7 @@ func (ndb *NetDB) GetFollowing(peerID string) (models.Following, error) {
 
 // SetFollowing sets the following list.
 func (ndb *NetDB) SetOwnFollowing(following models.Following) error {
-	log.Infof("Set own following")
+	logger.LogInfoWithIDf(log, ndb.ownPeerID, "Set own following")
 
 	serializedFollowing, err := json.Marshal(following)
 	if err != nil {
@@ -167,7 +168,7 @@ func (ndb *NetDB) SetOwnFollowing(following models.Following) error {
 
 // GetListingBySlug returns the listing for the given slug.
 func (ndb *NetDB) GetListingBySlug(peerID string, slug string) (*pb.SignedListing, error) {
-	log.Infof("Get listing for %s by slug %s", peerID, slug)
+	logger.LogInfoWithIDf(log, peerID, "Get listing for %s by slug %s", peerID, slug)
 
 	var netListing Listing
 	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netListing).Get(fmt.Sprintf("%s/listing/%s/%s", ndb.endpoint, peerID, slug))
@@ -186,7 +187,7 @@ func (ndb *NetDB) GetListingBySlug(peerID string, slug string) (*pb.SignedListin
 
 // GetListingByCID fetches the listing from the network given its cid.
 func (ndb *NetDB) GetListingByCID(cid string) (*pb.SignedListing, error) {
-	log.Infof("Get listing by cid %s", cid)
+	logger.LogInfoWithIDf(log, cid, "Get listing by cid %s", cid)
 
 	var netListing Listing
 	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netListing).Get(fmt.Sprintf("%s/listing/%s", ndb.endpoint, cid))
@@ -205,7 +206,7 @@ func (ndb *NetDB) GetListingByCID(cid string) (*pb.SignedListing, error) {
 
 // SetListing saves the given listing.
 func (ndb *NetDB) SetOwnListing(sl *pb.SignedListing) error {
-	log.Infof("Set own listing, slug: %s", sl.Listing.Slug)
+	logger.LogInfoWithIDf(log, ndb.ownPeerID, "Set own listing, slug: %s", sl.Listing.Slug)
 
 	m := protojson.MarshalOptions{
 		EmitUnpopulated: false,
@@ -253,7 +254,7 @@ func (ndb *NetDB) DeleteOwnListing(listingID string) error {
 
 // GetListingIndex returns the listing index.
 func (ndb *NetDB) GetListingIndex(peerID string) (models.ListingIndex, error) {
-	log.Infof("Get listing index for peerID %s", peerID)
+	logger.LogInfoWithIDf(log, peerID, "Get listing index for peerID %s", peerID)
 
 	var netListingIndex ListingIndex
 	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netListingIndex).Get(fmt.Sprintf("%s/listingindex/%s", ndb.endpoint, peerID))
@@ -272,7 +273,7 @@ func (ndb *NetDB) GetListingIndex(peerID string) (models.ListingIndex, error) {
 
 // SetListingIndex sets the listing index.
 func (ndb *NetDB) SetOwnListingIndex(index models.ListingIndex) error {
-	log.Infof("Set own listing index")
+	logger.LogInfoWithIDf(log, ndb.ownPeerID, "Set own listing index")
 
 	serializedIndex, err := json.Marshal(index)
 	if err != nil {
@@ -297,7 +298,7 @@ func (ndb *NetDB) SetOwnListingIndex(index models.ListingIndex) error {
 
 // GetRatingIndex returns the rating index.
 func (ndb *NetDB) GetRatingIndex(peerID string) (models.RatingIndex, error) {
-	log.Infof("Get rating index for peerID %s", peerID)
+	logger.LogInfoWithIDf(log, peerID, "Get rating index for peerID %s", peerID)
 
 	var netRatingIndex RatingIndex
 	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netRatingIndex).Get(fmt.Sprintf("%s/ratingindex/%s", ndb.endpoint, peerID))
@@ -316,7 +317,7 @@ func (ndb *NetDB) GetRatingIndex(peerID string) (models.RatingIndex, error) {
 
 // SetRatingIndex sets the rating index.
 func (ndb *NetDB) SetOwnRatingIndex(index models.RatingIndex) error {
-	log.Infof("Set own rating index")
+	logger.LogInfoWithIDf(log, ndb.ownPeerID, "Set own rating index")
 
 	serializedIndex, err := json.Marshal(index)
 	if err != nil {

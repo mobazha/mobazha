@@ -49,8 +49,8 @@ func TestMessenger(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	service1 := NewNetworkService(h1, NewBanManager(nil, nil), true)
-	service2 := NewNetworkService(h2, NewBanManager(nil, nil), true)
+	service1 := NewNetworkService("", h1, NewBanManager(nil, nil), true)
+	service2 := NewNetworkService("", h2, NewBanManager(nil, nil), true)
 
 	db1, err := repo.MockDB()
 	if err != nil {
@@ -184,8 +184,8 @@ func TestMessenger_retryAllMessages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	service1 := NewNetworkService(h1, NewBanManager(nil, nil), true)
-	service2 := NewNetworkService(h2, NewBanManager(nil, nil), true)
+	service1 := NewNetworkService("", h1, NewBanManager(nil, nil), true)
+	service2 := NewNetworkService("", h2, NewBanManager(nil, nil), true)
 
 	db1, err := repo.MockDB()
 	if err != nil {
@@ -255,7 +255,7 @@ func TestMessenger_encryptDecrypt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	service1 := NewNetworkService(h1, NewBanManager(nil, nil), true)
+	service1 := NewNetworkService("", h1, NewBanManager(nil, nil), true)
 
 	messenger, err := NewMessenger(&MessengerConfig{
 		Service: service1,
@@ -327,14 +327,14 @@ func TestMessenger_DownloadMessages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	service1 := NewNetworkService(h1, NewBanManager(nil, nil), true)
+	service1 := NewNetworkService("", h1, NewBanManager(nil, nil), true)
 	ch := make(chan struct{})
 	service1.RegisterHandler(pb.Message_CHAT, func(p peer.ID, msg *pb.Message) error {
 		ch <- struct{}{}
 		return nil
 	})
 
-	service2 := NewNetworkService(h2, NewBanManager(nil, nil), true)
+	service2 := NewNetworkService("", h2, NewBanManager(nil, nil), true)
 
 	db1, err := repo.MockDB()
 	if err != nil {

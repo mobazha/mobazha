@@ -5,6 +5,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
@@ -67,9 +68,9 @@ func (op *OrderProcessor) processDisputeAcceptMessage(dbtx database.Tx, order *m
 	}
 
 	if op.identity == pid {
-		log.Infof("Processed own DISPUTE_ACCEPT for orderID: %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Processed own DISPUTE_ACCEPT for orderID: %s", order.ID)
 	} else {
-		log.Infof("Received DISPUTE_ACCEPT message for order %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_ACCEPT message for order %s", order.ID)
 	}
 
 	return event, order.PutMessage(message)

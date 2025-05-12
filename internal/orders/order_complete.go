@@ -6,6 +6,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -25,14 +26,14 @@ func (op *OrderProcessor) processOrderCompleteMessage(dbtx database.Tx, order *m
 		return nil, err
 	}
 	if order.SerializedOrderComplete != nil && !dup {
-		log.Errorf("Duplicate ORDER_COMPLETE message does not match original for order: %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Duplicate ORDER_COMPLETE message does not match original for order: %s", order.ID)
 		return nil, ErrChangedMessage
 	} else if dup {
 		return nil, nil
 	}
 
 	if order.SerializedOrderCancel != nil {
-		log.Errorf("Received ORDER_COMPLETE message for order %s after ORDER_CANCEL", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_COMPLETE message for order %s after ORDER_CANCEL", order.ID)
 		return nil, ErrUnexpectedMessage
 	}
 
@@ -82,9 +83,9 @@ func (op *OrderProcessor) processOrderCompleteMessage(dbtx database.Tx, order *m
 	}
 
 	if order.Role() == models.RoleVendor {
-		log.Infof("Received ORDER_COMPLETE message for order %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_COMPLETE message for order %s", order.ID)
 	} else if order.Role() == models.RoleBuyer {
-		log.Infof("Processed own ORDER_COMPLETE for order %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Processed own ORDER_COMPLETE for order %s", order.ID)
 	}
 
 	event := &events.OrderCompletion{

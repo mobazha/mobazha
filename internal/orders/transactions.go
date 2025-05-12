@@ -8,6 +8,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -61,7 +62,7 @@ func (op *OrderProcessor) processWalletTransaction(transaction iwallet.Transacti
 		return nil
 	})
 	if err != nil {
-		log.Errorf("Error handling incoming order transaction %s: %s", transaction.ID, err)
+		logger.LogInfoWithIDf(log, op.nodeID, "Error handling incoming order transaction %s: %s", transaction.ID, err)
 	}
 }
 
@@ -73,7 +74,7 @@ func (op *OrderProcessor) ProcessOrderPayment(dbtx database.Tx, order *models.Or
 
 	err := order.PutTransaction(realTx)
 	if models.IsDuplicateTransactionError(err) {
-		log.Debugf("Received duplicate transaction %s", realTx.ID.String())
+		logger.LogInfoWithIDf(log, op.nodeID, "Received duplicate transaction %s", realTx.ID.String())
 		return nil
 	} else if err != nil {
 		return err
@@ -140,9 +141,9 @@ func (op *OrderProcessor) ProcessOrderPayment(dbtx database.Tx, order *models.Or
 					CoinType:     paymentSent.Coin,
 				})
 			})
-			log.Infof("Payment detected: Order %s fully funded", order.ID)
+			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected: Order %s fully funded", order.ID)
 		} else {
-			log.Infof("Payment detected: Order %s partially funded", order.ID)
+			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected: Order %s partially funded", order.ID)
 		}
 
 	case models.RoleVendor:
@@ -150,7 +151,7 @@ func (op *OrderProcessor) ProcessOrderPayment(dbtx database.Tx, order *models.Or
 			// TODO: mark vendor inventory downwards is not wasFunded.
 
 			if err := op.sendRatingSignatures(dbtx, order, orderOpen); err != nil {
-				log.Errorf("Error sending rating signature message: %s", err)
+				logger.LogInfoWithIDf(log, op.nodeID, "Error sending rating signature message: %s", err)
 			}
 
 			dbtx.RegisterCommitHook(func() {
@@ -172,9 +173,9 @@ func (op *OrderProcessor) ProcessOrderPayment(dbtx database.Tx, order *models.Or
 					Title: orderOpen.Listings[0].Listing.Item.Title,
 				})
 			})
-			log.Infof("Payment detected: Order %s fully funded", order.ID)
+			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected: Order %s fully funded", order.ID)
 		} else {
-			log.Infof("Payment detected: Order %s partially funded", order.ID)
+			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected: Order %s partially funded", order.ID)
 		}
 	}
 	return nil
@@ -189,7 +190,7 @@ func (op *OrderProcessor) processIncomingPayment(dbtx database.Tx, order *models
 func (op *OrderProcessor) processOutgoingPayment(dbtx database.Tx, order *models.Order, tx iwallet.Transaction) error {
 	err := order.PutTransaction(tx)
 	if models.IsDuplicateTransactionError(err) {
-		log.Debugf("Received duplicate transaction %s", tx.ID.String())
+		logger.LogInfoWithIDf(log, op.nodeID, "Received duplicate transaction %s", tx.ID.String())
 		return nil
 	}
 	dbtx.RegisterCommitHook(func() {
@@ -223,19 +224,19 @@ func (op *OrderProcessor) CheckForMorePayments(force bool) {
 		for _, order := range orders {
 			timestamp, err := order.Timestamp()
 			if err != nil {
-				log.Errorf("Error loading order timestamp %s", err)
+				logger.LogInfoWithIDf(log, op.nodeID, "Error loading order timestamp %s", err)
 				continue
 			}
 
 			paymentSent, err := order.PaymentSentMessage()
 			if err != nil {
-				log.Errorf("Error loading paymentSent message %s", err)
+				logger.LogInfoWithIDf(log, op.nodeID, "Error loading paymentSent message %s", err)
 				continue
 			}
 
 			addr, err := utils.GetPaymentAddress(paymentSent)
 			if err != nil {
-				log.Errorf("Error payment address from orderOpen message %s", err)
+				logger.LogInfoWithIDf(log, op.nodeID, "Error payment address from orderOpen message %s", err)
 				continue
 			}
 
@@ -270,7 +271,7 @@ func (op *OrderProcessor) CheckForMorePayments(force bool) {
 
 			knownTxs, err := order.GetTransactions()
 			if err != nil && !models.IsMessageNotExistError(err) {
-				log.Errorf("Error loading known transactions: %s", err)
+				logger.LogInfoWithIDf(log, op.nodeID, "Error loading known transactions: %s", err)
 			}
 			knownTxsMap := make(map[iwallet.TransactionID]bool)
 			for _, tx := range knownTxs {
@@ -295,7 +296,7 @@ func (op *OrderProcessor) CheckForMorePayments(force bool) {
 					}
 				}
 			} else if !models.IsMessageNotExistError(err) {
-				log.Errorf("Error loading refund messages: %s", err)
+				logger.LogInfoWithIDf(log, op.nodeID, "Error loading refund messages: %s", err)
 			}
 
 			orderConfirmationMsg, err := order.OrderConfirmationMessage()
@@ -308,7 +309,7 @@ func (op *OrderProcessor) CheckForMorePayments(force bool) {
 					}
 				}
 			} else if !models.IsMessageNotExistError(err) {
-				log.Errorf("Error loading order confirmation message: %s", err)
+				logger.LogInfoWithIDf(log, op.nodeID, "Error loading order confirmation message: %s", err)
 			}
 
 			orderCancelMsg, err := order.OrderCancelMessage()
@@ -321,7 +322,7 @@ func (op *OrderProcessor) CheckForMorePayments(force bool) {
 					}
 				}
 			} else if !models.IsMessageNotExistError(err) {
-				log.Errorf("Error loading order cancel message: %s", err)
+				logger.LogInfoWithIDf(log, op.nodeID, "Error loading order cancel message: %s", err)
 			}
 
 			for _, missing := range missingTxids {
@@ -342,35 +343,35 @@ func (op *OrderProcessor) CheckForMorePayments(force bool) {
 			}
 			order.LastCheckForPayments = time.Now()
 			if err := dbtx.Save(&order); err != nil {
-				log.Errorf("Error updating LastCheckForPayments: %s", err)
+				logger.LogInfoWithIDf(log, op.nodeID, "Error updating LastCheckForPayments: %s", err)
 			}
 		}
 
 		return nil
 	})
 	if err != nil {
-		log.Errorf("Error checking for more payments: %s", err)
+		logger.LogInfoWithIDf(log, op.nodeID, "Error checking for more payments: %s", err)
 	}
 
 	for ct, addrs := range addressesToWatch {
 		wallet, err := op.multiwallet.WalletForCurrencyCode(ct.CurrencyCode())
 		if err != nil {
-			log.Errorf("Error get wallet for coin %s: %s", ct.CurrencyCode(), err)
+			logger.LogInfoWithIDf(log, op.nodeID, "Error get wallet for coin %s: %s", ct.CurrencyCode(), err)
 			continue
 		}
 		wtx, err := wallet.Begin()
 		if err != nil {
-			log.Errorf("Error saving watch address for coin %s: %s", ct.CurrencyCode(), err)
+			logger.LogInfoWithIDf(log, op.nodeID, "Error saving watch address for coin %s: %s", ct.CurrencyCode(), err)
 			continue
 		}
 		err = wallet.WatchAddress(wtx, addrs...)
 		if err != nil {
 			wtx.Rollback()
-			log.Errorf("Error saving watch address for coin %s: %s", ct.CurrencyCode(), err)
+			logger.LogInfoWithIDf(log, op.nodeID, "Error saving watch address for coin %s: %s", ct.CurrencyCode(), err)
 			continue
 		}
 		if err := wtx.Commit(); err != nil {
-			log.Errorf("Error saving watch address for coin %s: %s", ct.CurrencyCode(), err)
+			logger.LogInfoWithIDf(log, op.nodeID, "Error saving watch address for coin %s: %s", ct.CurrencyCode(), err)
 			continue
 		}
 	}
@@ -382,7 +383,7 @@ func (op *OrderProcessor) CheckForMorePayments(force bool) {
 	for coin, timestamp := range rescanMap {
 		wallet, err := op.multiwallet.WalletForCurrencyCode(coin.CurrencyCode())
 		if err != nil {
-			log.Errorf("Error loading wallet: %s", err)
+			logger.LogInfoWithIDf(log, op.nodeID, "Error loading wallet: %s", err)
 			continue
 		}
 		// scanner := wallet.(iwallet.WalletScanner)

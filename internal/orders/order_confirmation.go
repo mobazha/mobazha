@@ -3,6 +3,7 @@ package orders
 import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
@@ -20,19 +21,19 @@ func (op *OrderProcessor) processOrderConfirmationMessage(dbtx database.Tx, orde
 		return nil, err
 	}
 	if order.SerializedOrderConfirmation != nil && !dup {
-		log.Errorf("Duplicate ORDER_CONFIRMATION message does not match original for order: %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Duplicate ORDER_CONFIRMATION message does not match original for order: %s", order.ID)
 		return nil, ErrChangedMessage
 	} else if dup {
 		return nil, nil
 	}
 
 	if order.SerializedOrderReject != nil {
-		log.Errorf("Received ORDER_CONFIRMATION message for order %s after ORDER_REJECT", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_CONFIRMATION message for order %s after ORDER_REJECT", order.ID)
 		return nil, ErrUnexpectedMessage
 	}
 
 	if order.SerializedOrderCancel != nil {
-		log.Warningf("Possible race: Received ORDER_CONFIRMATION message for order %s after ORDER_CANCEL", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Possible race: Received ORDER_CONFIRMATION message for order %s after ORDER_CANCEL", order.ID)
 	}
 
 	orderOpen, err := order.OrderOpenMessage()
@@ -82,9 +83,9 @@ func (op *OrderProcessor) processOrderConfirmationMessage(dbtx database.Tx, orde
 	}
 
 	if order.Role() == models.RoleBuyer {
-		log.Infof("Received ORDER_CONFIRMATION message for order %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_CONFIRMATION message for order %s", order.ID)
 	} else if order.Role() == models.RoleVendor {
-		log.Infof("Processed own ORDER_CONFIRMATION for order %s", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Processed own ORDER_CONFIRMATION for order %s", order.ID)
 	}
 
 	return event, order.PutMessage(message)

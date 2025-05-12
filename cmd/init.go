@@ -43,9 +43,9 @@ func (x *Init) Execute(args []string) error {
 
 	var r *repo.Repo
 	if x.Mnemonic != "" {
-		r, err = repo.NewRepoWithCustomMnemonicSeed(x.DataDir, x.Mnemonic, x.Testnet)
+		r, err = repo.NewRepoWithCustomMnemonicSeed("", x.DataDir, x.Mnemonic, x.Testnet)
 	} else {
-		r, err = repo.NewRepo(x.DataDir, x.Testnet)
+		r, err = repo.NewRepo("", x.DataDir, x.Testnet)
 	}
 
 	enabledChains := iwallet.GetAllSupportedChainTypes()

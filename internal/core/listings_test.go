@@ -10,7 +10,6 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/models/factory"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -308,51 +307,6 @@ func Test_generateListingSlug(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-	}
-}
-
-func TestOpenBazaarNode_removeDisabledCoinsFromListings(t *testing.T) {
-	node, err := MockNode()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer node.DestroyNode()
-
-	var (
-		listing1                 = factory.NewPhysicalListing("ron-swanson-shirt")
-		expectedAcceptedCurrency = "MCK"
-	)
-	listing1.Metadata.AcceptedCurrencies = []string{expectedAcceptedCurrency, "USD"}
-
-	node.multiwallet[iwallet.CoinType("USD")] = node.multiwallet[iwallet.CtMock]
-
-	done := make(chan struct{})
-	if err := node.SaveListing(listing1, done); err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case <-done:
-	case <-time.After(time.Second * 10):
-		t.Fatal("Timeout waiting on channel")
-	}
-
-	delete(node.multiwallet, iwallet.CoinType("USD"))
-
-	if err := node.removeDisabledCoinsFromListings(); err != nil {
-		t.Fatal(err)
-	}
-
-	retListing, err := node.GetMyListingBySlug("ron-swanson-shirt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(retListing.Listing.Metadata.AcceptedCurrencies) != 1 {
-		t.Errorf("Expected %d accepted currencies, got %d", 1, len(retListing.Listing.Metadata.AcceptedCurrencies))
-	}
-
-	if retListing.Listing.Metadata.AcceptedCurrencies[0] != expectedAcceptedCurrency {
-		t.Errorf("Expected accepted currency %s, got %s", expectedAcceptedCurrency, retListing.Listing.Metadata.AcceptedCurrencies[0])
 	}
 }
 
@@ -906,35 +860,6 @@ func Test_validateListing(t *testing.T) {
 			transform: func(sl *pb.SignedListing) {
 				node.testnet = false
 				sl.Listing.Metadata.EscrowTimeoutHours = 1
-			},
-			valid: false,
-		},
-		{
-			// No accepted currencies
-			listing: factory.NewSignedListing(),
-			transform: func(sl *pb.SignedListing) {
-				sl.Listing.Metadata.AcceptedCurrencies = []string{}
-			},
-			valid: false,
-		},
-		{
-			// Too many accepted currencies
-			listing: factory.NewSignedListing(),
-			transform: func(sl *pb.SignedListing) {
-				sl.Listing.Metadata.AcceptedCurrencies = []string{}
-				for i := 0; i < MaxListItems+1; i++ {
-					sl.Listing.Metadata.AcceptedCurrencies = append(sl.Listing.Metadata.AcceptedCurrencies, "abc")
-				}
-			},
-			valid: false,
-		},
-		{
-			// Accepted currency too long
-			listing: factory.NewSignedListing(),
-			transform: func(sl *pb.SignedListing) {
-				sl.Listing.Metadata.AcceptedCurrencies = []string{
-					strings.Repeat("s", WordMaxCharacters+1),
-				}
 			},
 			valid: false,
 		},

@@ -89,7 +89,6 @@ type ListingMetadata struct {
 	AverageRating      float32          `json:"averageRating"`
 	RatingCount        uint32           `json:"ratingCount"`
 	ModeratorIDs       []string         `json:"moderators"`
-	AcceptedCurrencies []string         `json:"acceptedCurrencies"`
 	CoinType           string           `json:"coinType"`
 }
 
@@ -156,7 +155,6 @@ func NewListingMetadataFromListing(listing *pb.Listing, cid cid.Cid) (*ListingMe
 		FreeShipping:       freeShipping,
 		Language:           listing.Metadata.Language,
 		ModeratorIDs:       listing.Moderators,
-		AcceptedCurrencies: listing.Metadata.AcceptedCurrencies,
 	}
 	return ld, nil
 }

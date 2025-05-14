@@ -7,14 +7,12 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"time"
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/internal/version"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -121,45 +119,8 @@ func (g *Gateway) handleGETExchangeRates(w http.ResponseWriter, r *http.Request)
 }
 
 func (g *Gateway) handlePOSTBulkUpdateCurrency(w http.ResponseWriter, r *http.Request) {
-	type BulkUpdateRequest struct {
-		Currencies []string `json:"currencies"`
-	}
-
-	var bulkUpdate BulkUpdateRequest
-	err := json.NewDecoder(r.Body).Decode(&bulkUpdate)
-	if err != nil {
-		ErrorResponse(w, 400, err.Error())
-		return
-	}
-
-	// Check for no currencies selected
-	if len(bulkUpdate.Currencies) == 0 {
-		sanitizedStringResponse(w, `{"success": "false", "reason":"No currencies specified"}`)
-		return
-	}
-
-	log.Info("Updating currencies for all listings to: ", bulkUpdate.Currencies)
-
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
-
-	done := make(chan struct{})
-	err = node.UpdateAllListings(func(listing *pb.Listing) (bool, error) {
-		listing.Metadata.AcceptedCurrencies = bulkUpdate.Currencies
-		return true, nil
-	}, done)
-	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	select {
-	case <-done:
-		sanitizedStringResponse(w, `{"success": "true"}`)
-		return
-	case <-time.After(time.Second * 300):
-		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")
-		return
-	}
+	// Do nothing. Listing中不再添加acceptedCurrencies，通过下单时卖家设置的货币来决定
+	sanitizedStringResponse(w, `{"success": "true"}`)
 }
 
 func (g *Gateway) handlePOSTPublish(w http.ResponseWriter, r *http.Request) {

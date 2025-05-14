@@ -3,7 +3,6 @@ package core
 import (
 	"errors"
 	"fmt"
-	"os"
 	"sync/atomic"
 	"time"
 
@@ -191,9 +190,7 @@ func (n *OpenBazaarNode) Start() {
 
 		go n.notifier.Start()
 		go n.OpenSavedChannels()
-		if err := n.removeDisabledCoinsFromListings(); err != nil && !os.IsNotExist(err) {
-			logger.LogErrorWithIDf(log, n.nodeID, "Error removing disabled coins from listings: %s", err)
-		}
+
 		if err := n.updateSNFServers(); err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID, "Error updating store and forward servers in profile: %s", err)
 		}
@@ -295,38 +292,22 @@ func (n *OpenBazaarNode) migrateRepoFromVersion0() error {
 
 // Do profile and listings migration with MATIC currencies update
 func (n *OpenBazaarNode) migrateRepoFromVersion1() error {
-	done1 := make(chan struct{})
+	done := make(chan struct{})
 	myProfile, err := n.GetMyProfile()
 	if err != nil {
 		return fmt.Errorf("get my profile failed, %v", err)
 	}
 	myProfile.Currencies = []string{"MATIC", "MATICUSDT", "MATICUSDC"}
-	err = n.SetProfile(myProfile, done1)
+	err = n.SetProfile(myProfile, done)
 	if err != nil {
 		return fmt.Errorf("update profile failed, %v", err)
 	}
 
 	select {
-	case <-done1:
-		break
-	case <-time.After(time.Second * 300):
-		return errors.New("timeout waiting on profile update")
-	}
-
-	done2 := make(chan struct{})
-	err = n.UpdateAllListings(func(listing *pb.Listing) (bool, error) {
-		listing.Metadata.AcceptedCurrencies = []string{"MATIC", "MATICUSDT", "MATICUSDC"}
-		return true, nil
-	}, done2)
-	if err != nil {
-		return fmt.Errorf("update listings failed, %v", err)
-	}
-
-	select {
-	case <-done2:
+	case <-done:
 		return nil
 	case <-time.After(time.Second * 300):
-		return errors.New("timeout waiting on listing update")
+		return errors.New("timeout waiting on profile update")
 	}
 }
 

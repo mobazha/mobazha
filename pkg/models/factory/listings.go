@@ -21,8 +21,7 @@ func NewPhysicalListing(slug string) *pb.Listing {
 		TermsAndConditions: "Sample Terms and Conditions",
 		RefundPolicy:       "Sample Refund policy",
 		Metadata: &pb.Listing_Metadata{
-			Version:            1,
-			AcceptedCurrencies: []string{"MCK"},
+			Version: 1,
 			PricingCurrency: &pb.Currency{
 				Code:         "USD",
 				Divisibility: 2,
@@ -136,8 +135,7 @@ func NewDigitalListing(slug string) *pb.Listing {
 		TermsAndConditions: "Sample Terms and Conditions",
 		RefundPolicy:       "Sample Refund policy",
 		Metadata: &pb.Listing_Metadata{
-			Version:            1,
-			AcceptedCurrencies: []string{"MCK"},
+			Version: 1,
 			PricingCurrency: &pb.Currency{
 				Code:         "USD",
 				Divisibility: 2,

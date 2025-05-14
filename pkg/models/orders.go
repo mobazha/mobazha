@@ -31,6 +31,10 @@ var (
 		EmitUnpopulated: true,
 		Indent:          "    ",
 	}
+
+	unmarshaler = protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
 )
 
 // IsMessageNotExistError returns whether or not the provided error is a
@@ -317,7 +321,7 @@ func (o *Order) OrderOpenMessage() (*pb.OrderOpen, error) {
 		return nil, ErrMessageDoesNotExist
 	}
 	orderOpen := new(pb.OrderOpen)
-	if err := (protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}).Unmarshal(o.SerializedOrderOpen, orderOpen); err != nil {
+	if err := unmarshaler.Unmarshal(o.SerializedOrderOpen, orderOpen); err != nil {
 		return nil, err
 	}
 	return orderOpen, nil
@@ -337,7 +341,7 @@ func (o *Order) OrderRejectMessage() (*pb.OrderReject, error) {
 		return nil, ErrMessageDoesNotExist
 	}
 	orderReject := new(pb.OrderReject)
-	if err := protojson.Unmarshal(o.SerializedOrderReject, orderReject); err != nil {
+	if err := unmarshaler.Unmarshal(o.SerializedOrderReject, orderReject); err != nil {
 		return nil, err
 	}
 	return orderReject, nil
@@ -345,11 +349,11 @@ func (o *Order) OrderRejectMessage() (*pb.OrderReject, error) {
 
 // OrderCancelMessage returns the unmarshalled proto object if it exists in the order.
 func (o *Order) OrderCancelMessage() (*pb.OrderCancel, error) {
-	if o.SerializedOrderCancel == nil || len(o.SerializedOrderCancel) == 0 {
+	if len(o.SerializedOrderCancel) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	orderCancel := new(pb.OrderCancel)
-	if err := protojson.Unmarshal(o.SerializedOrderCancel, orderCancel); err != nil {
+	if err := unmarshaler.Unmarshal(o.SerializedOrderCancel, orderCancel); err != nil {
 		return nil, err
 	}
 	return orderCancel, nil
@@ -357,11 +361,11 @@ func (o *Order) OrderCancelMessage() (*pb.OrderCancel, error) {
 
 // OrderConfirmationMessage returns the unmarshalled proto object if it exists in the order.
 func (o *Order) OrderConfirmationMessage() (*pb.OrderConfirmation, error) {
-	if o.SerializedOrderConfirmation == nil || len(o.SerializedOrderConfirmation) == 0 {
+	if len(o.SerializedOrderConfirmation) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	orderConfirmation := new(pb.OrderConfirmation)
-	if err := protojson.Unmarshal(o.SerializedOrderConfirmation, orderConfirmation); err != nil {
+	if err := unmarshaler.Unmarshal(o.SerializedOrderConfirmation, orderConfirmation); err != nil {
 		return nil, err
 	}
 	return orderConfirmation, nil
@@ -369,11 +373,11 @@ func (o *Order) OrderConfirmationMessage() (*pb.OrderConfirmation, error) {
 
 // RatingSignaturesMessage returns the unmarshalled proto object if it exists in the order.
 func (o *Order) RatingSignaturesMessage() (*pb.RatingSignatures, error) {
-	if o.SerializedRatingSignatures == nil || len(o.SerializedRatingSignatures) == 0 {
+	if len(o.SerializedRatingSignatures) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	ratingSignatures := new(pb.RatingSignatures)
-	if err := protojson.Unmarshal(o.SerializedRatingSignatures, ratingSignatures); err != nil {
+	if err := unmarshaler.Unmarshal(o.SerializedRatingSignatures, ratingSignatures); err != nil {
 		return nil, err
 	}
 	return ratingSignatures, nil
@@ -381,11 +385,11 @@ func (o *Order) RatingSignaturesMessage() (*pb.RatingSignatures, error) {
 
 // OrderFulfillmentMessage returns the unmarshalled proto objects if they exists in the order.
 func (o *Order) OrderFulfillmentMessages() ([]*pb.OrderFulfillment, error) {
-	if o.SerializedOrderFulfillments == nil || len(o.SerializedOrderFulfillments) == 0 {
+	if len(o.SerializedOrderFulfillments) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	fulfillmentList := new(pb.FulfillmentList)
-	if err := protojson.Unmarshal(o.SerializedOrderFulfillments, fulfillmentList); err != nil {
+	if err := unmarshaler.Unmarshal(o.SerializedOrderFulfillments, fulfillmentList); err != nil {
 		return nil, err
 	}
 	fulfillments := make([]*pb.OrderFulfillment, 0, len(fulfillmentList.Messages))
@@ -397,11 +401,11 @@ func (o *Order) OrderFulfillmentMessages() ([]*pb.OrderFulfillment, error) {
 
 // OrderCompleteMessage returns the unmarshalled proto object if it exists in the order.
 func (o *Order) OrderCompleteMessage() (*pb.OrderComplete, error) {
-	if o.SerializedOrderComplete == nil || len(o.SerializedOrderComplete) == 0 {
+	if len(o.SerializedOrderComplete) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	orderComplete := new(pb.OrderComplete)
-	if err := protojson.Unmarshal(o.SerializedOrderComplete, orderComplete); err != nil {
+	if err := unmarshaler.Unmarshal(o.SerializedOrderComplete, orderComplete); err != nil {
 		return nil, err
 	}
 	return orderComplete, nil
@@ -409,11 +413,11 @@ func (o *Order) OrderCompleteMessage() (*pb.OrderComplete, error) {
 
 // DisputeOpenMessage returns the unmarshalled proto object if it exists in the order.
 func (o *Order) DisputeOpenMessage() (*pb.DisputeOpen, error) {
-	if o.SerializedDisputeOpen == nil || len(o.SerializedDisputeOpen) == 0 {
+	if len(o.SerializedDisputeOpen) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	disputeOpen := new(pb.DisputeOpen)
-	if err := protojson.Unmarshal(o.SerializedDisputeOpen, disputeOpen); err != nil {
+	if err := unmarshaler.Unmarshal(o.SerializedDisputeOpen, disputeOpen); err != nil {
 		return nil, err
 	}
 	return disputeOpen, nil
@@ -421,11 +425,11 @@ func (o *Order) DisputeOpenMessage() (*pb.DisputeOpen, error) {
 
 // DisputeUpdateMessage returns the unmarshalled proto object if it exists in the order.
 func (o *Order) DisputeUpdateMessage() (*pb.DisputeUpdate, error) {
-	if o.SerializedDisputeUpdate == nil || len(o.SerializedDisputeUpdate) == 0 {
+	if len(o.SerializedDisputeUpdate) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	disputeUpdate := new(pb.DisputeUpdate)
-	if err := protojson.Unmarshal(o.SerializedDisputeUpdate, disputeUpdate); err != nil {
+	if err := unmarshaler.Unmarshal(o.SerializedDisputeUpdate, disputeUpdate); err != nil {
 		return nil, err
 	}
 	return disputeUpdate, nil
@@ -433,11 +437,11 @@ func (o *Order) DisputeUpdateMessage() (*pb.DisputeUpdate, error) {
 
 // DisputeClosedMessage returns the unmarshalled proto object if it exists in the order.
 func (o *Order) DisputeClosedMessage() (*pb.DisputeClose, error) {
-	if o.SerializedDisputeClosed == nil || len(o.SerializedDisputeClosed) == 0 {
+	if len(o.SerializedDisputeClosed) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	disputeClose := new(pb.DisputeClose)
-	if err := protojson.Unmarshal(o.SerializedDisputeClosed, disputeClose); err != nil {
+	if err := unmarshaler.Unmarshal(o.SerializedDisputeClosed, disputeClose); err != nil {
 		return nil, err
 	}
 	return disputeClose, nil
@@ -445,11 +449,11 @@ func (o *Order) DisputeClosedMessage() (*pb.DisputeClose, error) {
 
 // DisputeAcceptMessage returns the unmarshalled proto object if it exists in the order.
 func (o *Order) DisputeAcceptMessage() (*pb.DisputeAccept, error) {
-	if o.SerializedDisputeAccepted == nil || len(o.SerializedDisputeAccepted) == 0 {
+	if len(o.SerializedDisputeAccepted) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	disputeAccept := new(pb.DisputeAccept)
-	if err := protojson.Unmarshal(o.SerializedDisputeAccepted, disputeAccept); err != nil {
+	if err := unmarshaler.Unmarshal(o.SerializedDisputeAccepted, disputeAccept); err != nil {
 		return nil, err
 	}
 	return disputeAccept, nil
@@ -457,11 +461,11 @@ func (o *Order) DisputeAcceptMessage() (*pb.DisputeAccept, error) {
 
 // RefundMessage returns the unmarshalled proto object if it exists in the order.
 func (o *Order) Refunds() ([]*pb.Refund, error) {
-	if o.SerializedRefunds == nil || len(o.SerializedRefunds) == 0 {
+	if len(o.SerializedRefunds) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	refundList := new(pb.RefundList)
-	if err := protojson.Unmarshal(o.SerializedRefunds, refundList); err != nil {
+	if err := unmarshaler.Unmarshal(o.SerializedRefunds, refundList); err != nil {
 		return nil, err
 	}
 	refunds := make([]*pb.Refund, 0, len(refundList.Messages))
@@ -473,24 +477,23 @@ func (o *Order) Refunds() ([]*pb.Refund, error) {
 
 // PaymentSentMessage returns the unmarshalled proto object if it exists in the order.
 func (o *Order) PaymentSentMessage() (*pb.PaymentSent, error) {
-	if o.SerializedPaymentSent == nil || len(o.SerializedPaymentSent) == 0 {
+	if len(o.SerializedPaymentSent) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	paymentSent := new(pb.PaymentSent)
-	if err := protojson.Unmarshal(o.SerializedPaymentSent, paymentSent); err != nil {
+	if err := unmarshaler.Unmarshal(o.SerializedPaymentSent, paymentSent); err != nil {
 		return nil, err
 	}
-
 	return paymentSent, nil
 }
 
 // PaymentFinalizedMessage returns the unmarshalled proto object if it exists in the order.
 func (o *Order) PaymentFinalizedMessage() (*pb.PaymentFinalized, error) {
-	if o.SerializedPaymentFinalized == nil || len(o.SerializedPaymentFinalized) == 0 {
+	if len(o.SerializedPaymentFinalized) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	paymentFinalized := new(pb.PaymentFinalized)
-	if err := protojson.Unmarshal(o.SerializedPaymentFinalized, paymentFinalized); err != nil {
+	if err := unmarshaler.Unmarshal(o.SerializedPaymentFinalized, paymentFinalized); err != nil {
 		return nil, err
 	}
 	return paymentFinalized, nil
@@ -558,7 +561,7 @@ func (o *Order) PutMessage(message *npb.OrderMessage) error {
 
 		fulfillmentList := new(pb.FulfillmentList)
 		if o.SerializedOrderFulfillments != nil {
-			if err := protojson.Unmarshal(o.SerializedOrderFulfillments, fulfillmentList); err != nil {
+			if err := unmarshaler.Unmarshal(o.SerializedOrderFulfillments, fulfillmentList); err != nil {
 				return err
 			}
 		}
@@ -587,7 +590,7 @@ func (o *Order) PutMessage(message *npb.OrderMessage) error {
 
 		refundList := new(pb.RefundList)
 		if o.SerializedRefunds != nil {
-			if err := protojson.Unmarshal(o.SerializedRefunds, refundList); err != nil {
+			if err := unmarshaler.Unmarshal(o.SerializedRefunds, refundList); err != nil {
 				return err
 			}
 		}
@@ -632,12 +635,12 @@ func (o *Order) PutMessage(message *npb.OrderMessage) error {
 func (o *Order) ParkMessage(message *npb.OrderMessage) error {
 	parkedMessages := new(npb.OrderList)
 	if o.ParkedMessages != nil {
-		if err := protojson.Unmarshal(o.ParkedMessages, parkedMessages); err != nil {
+		if err := unmarshaler.Unmarshal(o.ParkedMessages, parkedMessages); err != nil {
 			return err
 		}
 	}
 	parkedMessages.Messages = append(parkedMessages.Messages, message)
-	ser, err := protojson.Marshal(parkedMessages)
+	ser, err := marshaler.Marshal(parkedMessages)
 	if err != nil {
 		return err
 	}
@@ -649,7 +652,7 @@ func (o *Order) ParkMessage(message *npb.OrderMessage) error {
 func (o *Order) DeleteParkedMessage(messageType npb.OrderMessage_MessageType) error {
 	parkedMessages := new(npb.OrderList)
 	if o.ParkedMessages != nil {
-		if err := protojson.Unmarshal(o.ParkedMessages, parkedMessages); err != nil {
+		if err := unmarshaler.Unmarshal(o.ParkedMessages, parkedMessages); err != nil {
 			return err
 		}
 	}
@@ -659,7 +662,7 @@ func (o *Order) DeleteParkedMessage(messageType npb.OrderMessage_MessageType) er
 			break
 		}
 	}
-	ser, err := protojson.Marshal(parkedMessages)
+	ser, err := marshaler.Marshal(parkedMessages)
 	if err != nil {
 		return err
 	}
@@ -670,10 +673,10 @@ func (o *Order) DeleteParkedMessage(messageType npb.OrderMessage_MessageType) er
 // GetParkedMessages gets the parked messages associated with this order.
 func (o *Order) GetParkedMessages() (*npb.OrderList, error) {
 	parkedMessages := new(npb.OrderList)
-	if o.ParkedMessages == nil || len(o.ParkedMessages) == 0 {
+	if len(o.ParkedMessages) == 0 {
 		return parkedMessages, nil
 	}
-	if err := protojson.Unmarshal(o.ParkedMessages, parkedMessages); err != nil {
+	if err := unmarshaler.Unmarshal(o.ParkedMessages, parkedMessages); err != nil {
 		return parkedMessages, err
 	}
 	return parkedMessages, nil
@@ -683,12 +686,12 @@ func (o *Order) GetParkedMessages() (*npb.OrderList, error) {
 func (o *Order) PutErrorMessage(message *npb.OrderMessage) error {
 	erroredMessages := new(npb.OrderList)
 	if o.ErroredMessages != nil {
-		if err := protojson.Unmarshal(o.ErroredMessages, erroredMessages); err != nil {
+		if err := unmarshaler.Unmarshal(o.ErroredMessages, erroredMessages); err != nil {
 			return err
 		}
 	}
 	erroredMessages.Messages = append(erroredMessages.Messages, message)
-	ser, err := protojson.Marshal(erroredMessages)
+	ser, err := marshaler.Marshal(erroredMessages)
 	if err != nil {
 		return err
 	}
@@ -699,10 +702,10 @@ func (o *Order) PutErrorMessage(message *npb.OrderMessage) error {
 // GetErroredMessages gets the errored messages associated with this order.
 func (o *Order) GetErroredMessages() (*npb.OrderList, error) {
 	erroredMessages := new(npb.OrderList)
-	if o.ErroredMessages == nil || len(o.ErroredMessages) == 0 {
+	if len(o.ErroredMessages) == 0 {
 		return erroredMessages, nil
 	}
-	if err := protojson.Unmarshal(o.ErroredMessages, erroredMessages); err != nil {
+	if err := unmarshaler.Unmarshal(o.ErroredMessages, erroredMessages); err != nil {
 		return erroredMessages, err
 	}
 	return erroredMessages, nil

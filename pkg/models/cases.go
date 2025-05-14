@@ -6,7 +6,6 @@ import (
 	"time"
 
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 )
@@ -44,29 +43,29 @@ func (c *Case) BeforeSave(tx *gorm.DB) (err error) {
 }
 
 func (c *Case) DisuteOpenMessage() (*pb.DisputeOpen, error) {
-	if c.SerializedDisputeOpen == nil || len(c.SerializedDisputeOpen) == 0 {
+	if len(c.SerializedDisputeOpen) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	disputeOpen := new(pb.DisputeOpen)
-	if err := protojson.Unmarshal(c.SerializedDisputeOpen, disputeOpen); err != nil {
+	if err := unmarshaler.Unmarshal(c.SerializedDisputeOpen, disputeOpen); err != nil {
 		return nil, err
 	}
 	return disputeOpen, nil
 }
 
 func (c *Case) DisuteCloseMessage() (*pb.DisputeClose, error) {
-	if c.SerializedDisputeClose == nil || len(c.SerializedDisputeClose) == 0 {
+	if len(c.SerializedDisputeClose) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	disputeClose := new(pb.DisputeClose)
-	if err := protojson.Unmarshal(c.SerializedDisputeClose, disputeClose); err != nil {
+	if err := unmarshaler.Unmarshal(c.SerializedDisputeClose, disputeClose); err != nil {
 		return nil, err
 	}
 	return disputeClose, nil
 }
 
 func (c *Case) BuyerContract() (*pb.Contract, error) {
-	if c.SerializedBuyerContract == nil || len(c.SerializedBuyerContract) == 0 {
+	if len(c.SerializedBuyerContract) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	buyerContract := new(pb.Contract)
@@ -77,7 +76,7 @@ func (c *Case) BuyerContract() (*pb.Contract, error) {
 }
 
 func (c *Case) VendorContract() (*pb.Contract, error) {
-	if c.SerializedVendorContract == nil || len(c.SerializedVendorContract) == 0 {
+	if len(c.SerializedVendorContract) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	vendorContract := new(pb.Contract)
@@ -96,7 +95,7 @@ func (c *Case) OpenedBy() (pb.DisputeOpen_Party, error) {
 }
 
 func (c *Case) BuyerValidationErrors() ([]string, error) {
-	if c.SerializedBuyerValidationErrors == nil || len(c.SerializedBuyerValidationErrors) == 0 {
+	if len(c.SerializedBuyerValidationErrors) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	var validationErrors []string
@@ -107,7 +106,7 @@ func (c *Case) BuyerValidationErrors() ([]string, error) {
 }
 
 func (c *Case) VendorValidationErrors() ([]string, error) {
-	if c.SerializedVendorValidationErrors == nil || len(c.SerializedVendorValidationErrors) == 0 {
+	if len(c.SerializedVendorValidationErrors) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
 	var validationErrors []string

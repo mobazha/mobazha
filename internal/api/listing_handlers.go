@@ -16,7 +16,13 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-var ErrGlobalBannedPeerID = errors.New("the peer ID is globally banned")
+var (
+	ErrGlobalBannedPeerID = errors.New("the peer ID is globally banned")
+
+	unmarshaler = protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+)
 
 func (g *Gateway) handleGETListing(w http.ResponseWriter, r *http.Request) {
 	listingIDStr := mux.Vars(r)["listingID"]
@@ -178,7 +184,7 @@ func (g *Gateway) handlePOSTListing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := protojson.Unmarshal(body, listing); err != nil {
+	if err := unmarshaler.Unmarshal(body, listing); err != nil {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error unmarshaling listing: %s", err.Error()))
 		return
 	}
@@ -215,7 +221,8 @@ func (g *Gateway) handlePUTListing(w http.ResponseWriter, r *http.Request) {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error reading request body: %s", err.Error()))
 		return
 	}
-	if err := protojson.Unmarshal(body, listing); err != nil {
+
+	if err := unmarshaler.Unmarshal(body, listing); err != nil {
 		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error unmarshaling listing: %s", err.Error()))
 		return
 	}

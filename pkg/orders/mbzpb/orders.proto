@@ -243,6 +243,7 @@ message EscrowRelease {
     string platformAddress              = 5;
     string platformAmount               = 6;
     string transactionFee               = 7;
+    string txid                         = 8;
 }
 
 message Signature {

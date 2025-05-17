@@ -179,12 +179,12 @@ type CoreIface interface {
 	GetStripeConnectURL() (string, error)
 
 	// Escrow
-	InitializeSolEscrow(ctx context.Context, params models.InitializeSolEscrowData) (*models.PaymentData, solana.PublicKey, []solana.Instruction, error)
-	ReleaseSolEscrow(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
-	InitializeSPLTokenEscrow(ctx context.Context, params models.InitializeSPLTokenData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
-	ReleaseSPLTokenEscrow(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	BuildInitializeSolEscrowInstructions(ctx context.Context, params models.InitializeSolEscrowData) (*models.PaymentData, solana.PublicKey, []solana.Instruction, error)
+	BuildReleaseSolEscrowInstructions(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	BuildIInitializeSPLTokenEscrowInstructions(ctx context.Context, params models.InitializeSPLTokenData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
+	BuildIReleaseSPLTokenEscrowInstructions(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
 
-	GetCancelableSOLEscrowReleaseInstructions(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) ([]solana.Instruction, error)
+	GetSOLEscrowReleaseInstructions(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) ([]solana.Instruction, error)
 
 	// Wallet
 	Multiwallet() multiwallet.Multiwallet

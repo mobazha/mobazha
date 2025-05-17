@@ -75,8 +75,8 @@ type ReleaseSPLTokenParams struct {
 type SOLEscrow interface {
 	CreateEscrowAddress(params CreateEscrowAddressParams) (Address, error)
 
-	InitializeSolEscrow(params InitializeSolEscrowParams) (solana.PublicKey, []solana.Instruction, error)
-	ReleaseSolEscrow(params ReleaseSolEscrowParams) ([]solana.Instruction, error)
+	BuildInitializeSolEscrowInstructions(params InitializeSolEscrowParams) (solana.PublicKey, []solana.Instruction, error)
+	BuildReleaseSolEscrowInstructions(params ReleaseSolEscrowParams) ([]solana.Instruction, error)
 
 	InitializeSPLToken(params InitializeSPLTokenParams) (solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
 	ReleaseSPLToken(params ReleaseSPLTokenParams) ([]solana.Instruction, error)

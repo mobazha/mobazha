@@ -20,7 +20,7 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	// 使用 EscrowClient 初始化 SOL 托管
-	paymentData, escrowAccount, instructions, err := node.InitializeSolEscrow(
+	paymentData, escrowAccount, instructions, err := node.BuildInitializeSolEscrowInstructions(
 		r.Context(),
 		params,
 	)
@@ -61,7 +61,7 @@ func (g *Gateway) handleGetReleaseCancelableEscrowInstructions(w http.ResponseWr
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	// 使用 EscrowClient 释放 SOL 托管
-	instructions, err := node.GetCancelableSOLEscrowReleaseInstructions(params.OrderID, params.Initiator, params.Receiver)
+	instructions, err := node.GetSOLEscrowReleaseInstructions(params.OrderID, params.Initiator, params.Receiver)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -88,7 +88,7 @@ func (g *Gateway) handleGetInitializeSPLTokenInstructions(w http.ResponseWriter,
 	}
 
 	// 使用 EscrowClient 初始化 SPL Token 托管
-	paymentData, escrowAccount, escrowTokenAccount, instructions, err := node.InitializeSPLTokenEscrow(
+	paymentData, escrowAccount, escrowTokenAccount, instructions, err := node.BuildIInitializeSPLTokenEscrowInstructions(
 		r.Context(),
 		params,
 	)
@@ -129,7 +129,7 @@ func (g *Gateway) handleGetReleaseSPLTokenInstructions(w http.ResponseWriter, r 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	// 使用 EscrowClient 释放 SPL Token 托管
-	instructions, err := node.ReleaseSPLTokenEscrow(r.Context(), params.OrderID, params.Initiator)
+	instructions, err := node.BuildIReleaseSPLTokenEscrowInstructions(r.Context(), params.OrderID, params.Initiator)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

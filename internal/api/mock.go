@@ -522,19 +522,19 @@ func (m *mockNode) GetStripeConnectURL() (string, error) {
 }
 
 // Escrow
-func (m *mockNode) InitializeSolEscrow(ctx context.Context, params models.InitializeSolEscrowData) (*models.PaymentData, solana.PublicKey, []solana.Instruction, error) {
+func (m *mockNode) BuildInitializeSolEscrowInstructions(ctx context.Context, params models.InitializeSolEscrowData) (*models.PaymentData, solana.PublicKey, []solana.Instruction, error) {
 	return m.initializeSolEscrowFunc(ctx, params)
 }
-func (m *mockNode) ReleaseSolEscrow(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
+func (m *mockNode) BuildReleaseSolEscrowInstructions(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
 	return m.releaseSolEscrowFunc(ctx, orderID, initiator)
 }
-func (m *mockNode) InitializeSPLTokenEscrow(ctx context.Context, params models.InitializeSPLTokenData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error) {
+func (m *mockNode) BuildIInitializeSPLTokenEscrowInstructions(ctx context.Context, params models.InitializeSPLTokenData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error) {
 	return m.initializeSPLTokenEscrowFunc(ctx, params)
 }
-func (m *mockNode) ReleaseSPLTokenEscrow(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
+func (m *mockNode) BuildIReleaseSPLTokenEscrowInstructions(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
 	return m.releaseSPLTokenEscrowFunc(ctx, orderID, initiator)
 }
-func (m *mockNode) GetCancelableSOLEscrowReleaseInstructions(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) ([]solana.Instruction, error) {
+func (m *mockNode) GetSOLEscrowReleaseInstructions(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) ([]solana.Instruction, error) {
 	return m.getCancelableSOLEscrowReleaseInstructionsFunc(orderID, initiator, receiver)
 }
 

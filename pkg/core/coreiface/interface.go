@@ -68,7 +68,8 @@ type CoreIface interface {
 	GetConfirmOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
 	GetRejectOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
 	FulfillOrder(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error
-	CompleteOrder(orderID models.OrderID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
+	GetCompleteOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	CompleteOrder(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	CancelOrder(orderID models.OrderID, done chan struct{}) error
 
 	GetOrder(orderID string) (*models.Order, error)

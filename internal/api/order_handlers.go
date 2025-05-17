@@ -669,9 +669,44 @@ func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *http.Request) {
+	type Params struct {
+		OrderID   string           `json:"orderID"`
+		Initiator solana.PublicKey `json:"initiator"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	var args Params
+	err := decoder.Decode(&args)
+	if err != nil {
+		ErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	var instructions []solana.Instruction
+	instructions, err = node.GetCompleteOrderInstructions(models.OrderID(args.OrderID), args.Initiator)
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	type CompletionResponse struct {
+		HasInstructions bool                 `json:"hasInstructions"`
+		Instructions    []solana.Instruction `json:"instructions"`
+	}
+
+	// 返回响应
+	response := CompletionResponse{
+		HasInstructions: len(instructions) > 0,
+		Instructions:    instructions,
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
 func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Request) {
 	type orderCompletion struct {
 		OrderID   string          `json:"orderID"`
+		TxID      string          `json:"txID"`
 		Ratings   []models.Rating `json:"ratings"`
 		Anonymous bool            `json:"anonymous"`
 	}
@@ -687,7 +722,7 @@ func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Reque
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	done := make(chan struct{})
-	err = node.CompleteOrder(models.OrderID(completeParam.OrderID), completeParam.Ratings, !completeParam.Anonymous, done)
+	err = node.CompleteOrder(models.OrderID(completeParam.OrderID), iwallet.TransactionID(completeParam.TxID), completeParam.Ratings, !completeParam.Anonymous, done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return

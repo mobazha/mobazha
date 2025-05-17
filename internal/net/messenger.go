@@ -278,19 +278,20 @@ func (m *Messenger) trySendMessage(peerID peer.ID, message *pb.Message, done cha
 		}
 
 		if (len(servers) == 0 || record.LastUpdated.Add(time.Hour*48).Before(time.Now())) && m.getProfileFunc != nil {
-			snfServers := []string{}
+			var snfServers []string
 
 			profile, err := m.getProfileFunc(context.Background(), peerID, true)
-			if err == nil {
+			if err == nil && len(profile.StoreAndForwardServers) > 0 {
 				snfServers = profile.StoreAndForwardServers
 			} else {
-				logger.LogInfoWithIDf(log, m.NodeID, "Error sending offline message: Can't load profile for peer %s, error: %v", peerID, err)
+				logger.LogInfoWithIDf(log, m.NodeID, "Error sending offline message: Can't load profile for peer %s or no snf servers, error: %v", peerID, err)
 				logger.LogInfoWithIDf(log, m.NodeID, "Use default snfServers instead for message sending")
 				snfServers = repo.DefaultMainnetSNFServers
 				if m.testnet {
 					snfServers = repo.DefaultTestnetSNFServers
 				}
 			}
+
 			if len(snfServers) == 0 {
 				logger.LogInfoWithIDf(log, m.NodeID, "Error sending offline message: No inbox peers for peer %s", peerID)
 				return

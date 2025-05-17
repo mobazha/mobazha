@@ -203,6 +203,7 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/instructions/order/payment", g.handleGetOrderPaymentInstructions).Methods("POST")
 		r.HandleFunc("/v1/instructions/order/confirm", g.handleGETOrderConfirmationInstructions).Methods("POST")
 		r.HandleFunc("/v1/instructions/order/reject", g.handleGETOrderConfirmationInstructions).Methods("POST")
+		r.HandleFunc("/v1/instructions/order/complete", g.handleGETOrderCompleteInstructions).Methods("POST")
 
 		// 收款账户相关API
 		r.HandleFunc("/v1/wallet/receivingaccountlist", g.GetReceivingAccounts).Methods("GET")

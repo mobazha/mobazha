@@ -48,8 +48,9 @@ type mockNode struct {
 	confirmOrderFunc                        func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	getConfirmOrderInstructionsFunc         func(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
 	getRejectOrderInstructionsFunc          func(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	getCompleteOrderInstructionsFunc        func(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
 	fulfillOrderFunc                        func(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error
-	completeOrderFunc                       func(orderID models.OrderID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
+	completeOrderFunc                       func(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	cancelOrderFunc                         func(orderID models.OrderID, done chan struct{}) error
 	openDisputeFunc                         func(orderID models.OrderID, reason string, done chan struct{}) error
 	closeDisputeFunc                        func(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
@@ -242,6 +243,9 @@ func (m *mockNode) ConfirmOrder(orderID models.OrderID, txid iwallet.Transaction
 func (m *mockNode) GetConfirmOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
 	return m.getConfirmOrderInstructionsFunc(orderID, initiator)
 }
+func (m *mockNode) GetCompleteOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
+	return m.getCompleteOrderInstructionsFunc(orderID, initiator)
+}
 func (m *mockNode) GetRejectOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
 	return m.getRejectOrderInstructionsFunc(orderID, initiator)
 }
@@ -249,8 +253,8 @@ func (m *mockNode) GetRejectOrderInstructions(orderID models.OrderID, initiator 
 func (m *mockNode) FulfillOrder(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error {
 	return m.fulfillOrderFunc(orderID, fulfillments, done)
 }
-func (m *mockNode) CompleteOrder(orderID models.OrderID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error {
-	return m.completeOrderFunc(orderID, ratings, includeIDInRating, done)
+func (m *mockNode) CompleteOrder(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error {
+	return m.completeOrderFunc(orderID, txid, ratings, includeIDInRating, done)
 }
 func (m *mockNode) CancelOrder(orderID models.OrderID, done chan struct{}) error {
 	return m.cancelOrderFunc(orderID, done)

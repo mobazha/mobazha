@@ -195,6 +195,7 @@ message Outpoint {
 message DisputeAccept {
     google.protobuf.Timestamp timestamp = 1;
     string closedBy                     = 2;
+    string txid                         = 3;
 }
 
 message Refund {
@@ -211,7 +212,7 @@ message PaymentSent {
     string chaincode                    = 2; // Hex encoded
     Method method                       = 3; // Direct, Cancelable, Moderated
     string moderator                    = 4; // 仲裁者（可选）, peerID
-    bytes  moderatorEscrowKey           = 5; // 仲裁者公钥
+    bytes  moderatorPubKey              = 5; // 仲裁者公钥
     string amount                       = 6; // 支付金额, Satoshis
     string coin                         = 7; // 支付货币
     string fromAddress                  = 8; // 支付地址

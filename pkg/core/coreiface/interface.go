@@ -83,7 +83,8 @@ type CoreIface interface {
 	// Dispute
 	OpenDispute(orderID models.OrderID, reason string, done chan struct{}) error
 	CloseDispute(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
-	ReleaseFunds(orderID models.OrderID, done chan struct{}) error
+	GetReleaseFundsInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	ReleaseFunds(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	ReleaseFundsAfterTimeout(orderID models.OrderID, done chan struct{}) error
 
 	// Following

@@ -260,10 +260,10 @@ func validateSolanaPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, cha
 			return errors.New("invalid moderator selection")
 		}
 
-		if len(paymentSent.ModeratorEscrowKey) != solana.PublicKeyLength {
+		if len(paymentSent.ModeratorPubKey) != solana.PublicKeyLength {
 			return fmt.Errorf("invalid moderator solana pubkey")
 		}
-		moderatorPubkey := solana.PublicKeyFromBytes(paymentSent.ModeratorEscrowKey)
+		moderatorPubkey := solana.PublicKeyFromBytes(paymentSent.ModeratorPubKey)
 
 		createEscrowAddressParams.Moderator = &moderatorPubkey
 		createEscrowAddressParams.RequiredSignatures = 2
@@ -304,12 +304,12 @@ func validateEscrowPayment(paymentSent *pb.PaymentSent, wal iwallet.Wallet, chai
 
 		var moderatorKey *btcec.PublicKey
 		if isETHLike {
-			moderatorKey, err = btcec.ParsePubKey(paymentSent.ModeratorEscrowKey)
+			moderatorKey, err = btcec.ParsePubKey(paymentSent.ModeratorPubKey)
 			if err != nil {
 				return fmt.Errorf("generate vendor pub key failed, %s", err)
 			}
 		} else {
-			moderatorEscrowPubkey, err := btcec.ParsePubKey(paymentSent.ModeratorEscrowKey)
+			moderatorEscrowPubkey, err := btcec.ParsePubKey(paymentSent.ModeratorPubKey)
 			if err != nil {
 				return err
 			}

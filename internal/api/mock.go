@@ -54,7 +54,8 @@ type mockNode struct {
 	cancelOrderFunc                         func(orderID models.OrderID, done chan struct{}) error
 	openDisputeFunc                         func(orderID models.OrderID, reason string, done chan struct{}) error
 	closeDisputeFunc                        func(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
-	releaseFundsFunc                        func(orderID models.OrderID, done chan struct{}) error
+	getReleaseFundsInstructionsFunc         func(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	releaseFundsFunc                        func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	releaseFundsAfterTimeoutFunc            func(orderID models.OrderID, done chan struct{}) error
 	followNodeFunc                          func(peerID peer.ID, done chan<- struct{}) error
 	unfollowNodeFunc                        func(peerID peer.ID, done chan<- struct{}) error
@@ -265,8 +266,11 @@ func (m *mockNode) OpenDispute(orderID models.OrderID, reason string, done chan 
 func (m *mockNode) CloseDispute(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error {
 	return m.closeDisputeFunc(orderID, buyerPercentage, vendorPercentage, resolution, done)
 }
-func (m *mockNode) ReleaseFunds(orderID models.OrderID, done chan struct{}) error {
-	return m.releaseFundsFunc(orderID, done)
+func (m *mockNode) GetReleaseFundsInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
+	return m.getReleaseFundsInstructionsFunc(orderID, initiator)
+}
+func (m *mockNode) ReleaseFunds(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {
+	return m.releaseFundsFunc(orderID, txid, done)
 }
 func (m *mockNode) ReleaseFundsAfterTimeout(orderID models.OrderID, done chan struct{}) error {
 	return m.releaseFundsAfterTimeoutFunc(orderID, done)

@@ -205,6 +205,8 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/instructions/order/reject", g.handleGETOrderConfirmationInstructions).Methods("POST")
 		r.HandleFunc("/v1/instructions/order/complete", g.handleGETOrderCompleteInstructions).Methods("POST")
 
+		r.HandleFunc("/v1/instructions/dispute/release", g.handleGETReleaseFundsInstructions).Methods("POST")
+
 		// 收款账户相关API
 		r.HandleFunc("/v1/wallet/receivingaccountlist", g.GetReceivingAccounts).Methods("GET")
 		r.HandleFunc("/v1/wallet/receivingaccount", g.AddReceivingAccount).Methods("POST")
@@ -235,6 +237,12 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/ob/estimatetotal", g.handlePOSTEstimateTotal).Methods("POST")
 		r.HandleFunc("/v1/ob/checkoutbreakdown", g.handlePOSTCheckoutBreakdown).Methods("POST")
 
+		// Moderation
+		r.HandleFunc("/v1/dispute/open", g.handlePOSTOpenDispute).Methods("POST")
+		r.HandleFunc("/v1/dispute/close", g.handlePOSTCloseDispute).Methods("POST")
+		r.HandleFunc("/v1/dispute/release", g.handlePOSTReleaseFunds).Methods("POST")
+		r.HandleFunc("/v1/dispute/releaseAfterTimeout", g.handlePOSTReleaseEscrow).Methods("POST")
+
 		// Cart
 		r.HandleFunc("/v1/ob/carts/itemsCount", g.handleGETCartsItemsCount).Methods("GET")
 		r.HandleFunc("/v1/ob/carts", g.handleGETCarts).Methods("GET")
@@ -262,12 +270,6 @@ func (g *Gateway) newV1Router() *mux.Router {
 
 		// File
 		r.HandleFunc("/v1/ob/file", g.handlePOSTFile).Methods("POST")
-
-		// Moderation
-		r.HandleFunc("/v1/ob/opendispute", g.handlePOSTOpenDispute).Methods("POST")
-		r.HandleFunc("/v1/ob/closedispute", g.handlePOSTCloseDispute).Methods("POST")
-		r.HandleFunc("/v1/ob/releasefunds", g.handlePOSTReleaseFunds).Methods("POST")
-		r.HandleFunc("/v1/ob/releaseescrow", g.handlePOSTReleaseEscrow).Methods("POST")
 
 		// Profiles
 		r.HandleFunc("/v1/ob/profile", g.handlePOSTProfile).Methods("POST")

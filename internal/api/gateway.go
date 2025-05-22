@@ -195,11 +195,6 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/ob/marknotificationsasread", g.handlePOSTMarkNotificationsMessageAsRead).Methods("POST")
 
 		// Escrow
-
-		r.HandleFunc("/v1/escrow/instruction/releaseCancelable", g.handleGetReleaseCancelableEscrowInstructions).Methods("GET")
-		r.HandleFunc("/v1/escrow/instruction/spl/initialize", g.handleGetInitializeSPLTokenInstructions).Methods("GET")
-		r.HandleFunc("/v1/escrow/instruction/spl/release", g.handleGetReleaseSPLTokenInstructions).Methods("GET")
-
 		r.HandleFunc("/v1/instructions/order/payment", g.handleGetOrderPaymentInstructions).Methods("POST")
 		r.HandleFunc("/v1/instructions/order/confirm", g.handleGETOrderConfirmationInstructions).Methods("POST")
 		r.HandleFunc("/v1/instructions/order/reject", g.handleGETOrderConfirmationInstructions).Methods("POST")

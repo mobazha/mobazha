@@ -1,19 +1,14 @@
 package models
 
-import "github.com/gagliardetto/solana-go"
+import (
+	"github.com/gagliardetto/solana-go"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+)
 
 type InitializeSolEscrowData struct {
 	OrderID   string           `json:"orderID"`
 	Payer     solana.PublicKey `json:"payer"`
 	Moderator string           `json:"moderator"` // peerID
-	Amount    uint64           `json:"amount"`
-}
-
-// InitializeSPLTokenData 初始化SPL Token托管参数
-type InitializeSPLTokenData struct {
-	OrderID   string           `json:"orderID"`
-	Payer     solana.PublicKey `json:"payer"`
-	Moderator string           `json:"moderator"` // peerID
-	Mint      solana.PublicKey `json:"mint"`
+	CoinType  iwallet.CoinType `json:"coinType"`
 	Amount    uint64           `json:"amount"`
 }

@@ -10,7 +10,6 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
-	"github.com/gagliardetto/solana-go"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -173,7 +172,7 @@ func ValidatePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTim
 	}
 
 	if wal.CoinCategory() == iwallet.CoinCategorySolana {
-		return validateSolanaPayment(order, paymentSent, chaincode, wal, escrowTimeoutHours)
+		return validateSolanaPayment(order, paymentSent, wal)
 	} else if wal.CoinCategory() == iwallet.CoinCategoryEthereum {
 		return validateETHLikePayment(order, paymentSent, chaincode, wal, escrowTimeoutHours)
 	} else {
@@ -234,45 +233,14 @@ func validateBTCLikePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, ch
 	return nil
 }
 
-func validateSolanaPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, chaincode []byte, wal iwallet.Wallet, escrowTimeoutHours uint32) error {
-	if len(order.Listings[0].Listing.VendorID.Pubkeys.Solana) != solana.PublicKeyLength {
-		return fmt.Errorf("invalid vendor solana pubkey")
+func validateSolanaPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal iwallet.Wallet) error {
+	escrowInfo, err := GetOrderEscrowInfo(order, paymentSent)
+	if err != nil {
+		return err
 	}
-	vendorKey := solana.PublicKeyFromBytes(order.Listings[0].Listing.VendorID.Pubkeys.Solana)
-
-	if len(order.BuyerID.Pubkeys.Solana) != solana.PublicKeyLength {
-		return fmt.Errorf("invalid buyer solana pubkey")
-	}
-	buyerKey := solana.PublicKeyFromBytes(order.BuyerID.Pubkeys.Solana)
-
 	escrowWallet := wal.(iwallet.SOLEscrow)
 
-	createEscrowAddressParams := iwallet.CreateEscrowAddressParams{
-		Buyer:              buyerKey,
-		Seller:             vendorKey,
-		UniqueId:           [20]byte(chaincode[:20]),
-		RequiredSignatures: 1,
-		UnlockHours:        uint64(escrowTimeoutHours),
-	}
-	if paymentSent.Method == pb.PaymentSent_MODERATED {
-		_, err := peer.Decode(paymentSent.Moderator)
-		if err != nil {
-			return errors.New("invalid moderator selection")
-		}
-
-		if len(paymentSent.ModeratorPubKey) != solana.PublicKeyLength {
-			return fmt.Errorf("invalid moderator solana pubkey")
-		}
-		moderatorPubkey := solana.PublicKeyFromBytes(paymentSent.ModeratorPubKey)
-
-		createEscrowAddressParams.Moderator = &moderatorPubkey
-		createEscrowAddressParams.RequiredSignatures = 2
-		createEscrowAddressParams.TimeoutKey = vendorKey
-	} else if paymentSent.Method != pb.PaymentSent_CANCELABLE {
-		return errors.New("invalid payment method")
-	}
-
-	address, err := escrowWallet.CreateEscrowAddress(createEscrowAddressParams)
+	address, err := escrowWallet.CreateEscrowAddress(escrowInfo)
 	if err != nil {
 		return err
 	}

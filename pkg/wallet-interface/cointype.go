@@ -57,6 +57,9 @@ const (
 	CtBEP20USDT CoinType = "BNBUSDT"
 	CtBEP20USDC CoinType = "BNBUSDC"
 	CtMBZ       CoinType = "MBZ"
+
+	// 测试用的 CoinType
+	CtTestCoin CoinType = "TESTCOIN"
 )
 
 func (ct CoinType) String() string {
@@ -93,6 +96,15 @@ var (
 		IsNative:    true,
 		Decimals:    0,
 		Description: "Mock",
+	}
+
+	// 测试用的 CoinInfo
+	CtTestCoinInfo = CoinInfo{
+		Chain:       ChainMock,
+		Symbol:      "TESTCOIN",
+		IsNative:    true,
+		Decimals:    18,
+		Description: "Test Coin for Testing",
 	}
 
 	// 原生代币
@@ -299,6 +311,11 @@ func (ct CoinInfo) IsEthTypeChain() bool {
 func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 	s := string(coinType)
 
+	// 检查是否为测试币种
+	if s == string(CtTestCoin) {
+		return CtTestCoinInfo, nil
+	}
+
 	// 检查是否为原生代币
 	for chain := range ChainConfigs {
 		if string(chain) == s {
@@ -340,6 +357,11 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 func IsValidCoinType(coinType CoinType) bool {
 	_, err := CoinInfoFromCoinType(coinType)
 	return err == nil
+}
+
+func IsSPLTokenCoinType(coinType CoinType) bool {
+	coinInfo, err := CoinInfoFromCoinType(coinType)
+	return err == nil && coinInfo.Chain == ChainSolana && !coinInfo.IsNative
 }
 
 func GetAllSupportedCoinTypes() []CoinType {

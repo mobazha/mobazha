@@ -181,11 +181,7 @@ type CoreIface interface {
 	GetStripeConnectURL() (string, error)
 
 	// Escrow
-	BuildInitializeSolEscrowInstructions(ctx context.Context, params models.InitializeSolEscrowData) (*models.PaymentData, solana.PublicKey, []solana.Instruction, error)
-	BuildReleaseSolEscrowInstructions(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
-	BuildIInitializeSPLTokenEscrowInstructions(ctx context.Context, params models.InitializeSPLTokenData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
-	BuildIReleaseSPLTokenEscrowInstructions(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
-
+	BuildInitSolEscrowInstructions(ctx context.Context, params models.InitializeSolEscrowData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
 	GetSOLEscrowReleaseInstructions(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) ([]solana.Instruction, error)
 
 	// Wallet

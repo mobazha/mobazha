@@ -638,7 +638,7 @@ func (w *MockWallet) Transactions(limit int, offsetID iwallet.TransactionID) ([]
 // request transactions paid to an order's payment address. This means we expect both
 // internal wallet transactions and transactions sending to or from a watched address
 // to be returned here.
-func (w *MockWallet) GetTransaction(id iwallet.TransactionID) (*iwallet.Transaction, error) {
+func (w *MockWallet) GetTransaction(id iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error) {
 	w.mtx.RLock()
 	defer w.mtx.RUnlock()
 

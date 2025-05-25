@@ -58,7 +58,7 @@ func (op *OrderProcessor) processRefundMessage(dbtx database.Tx, order *models.O
 	if refund.GetTransactionID() != "" && paymentSent.Method == pb.PaymentSent_DIRECT {
 		// If this fails it's OK as the processor's unfunded order checking loop will
 		// retry at it's next interval.
-		tx, err := wallet.GetTransaction(iwallet.TransactionID(refund.GetTransactionID()))
+		tx, err := wallet.GetTransaction(iwallet.TransactionID(refund.GetTransactionID()), iwallet.CoinType(paymentSent.Coin))
 		if err == nil && tx != nil {
 			for _, from := range tx.From {
 				if from.Address.String() == order.PaymentAddress {

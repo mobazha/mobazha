@@ -137,7 +137,7 @@ type Wallet interface {
 	// request transactions paid to an order's payment address. This means we expect both
 	// internal wallet transactions and transactions sending to or from a watched address
 	// to be returned here.
-	GetTransaction(id TransactionID) (*Transaction, error)
+	GetTransaction(id TransactionID, coinType CoinType) (*Transaction, error)
 
 	// GetAddressTransactions returns the transactions sending to or spending from this address.
 	// Note this will only ever be called for an order's payment address transaction so for the

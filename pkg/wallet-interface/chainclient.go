@@ -28,7 +28,7 @@ type ChainClient interface {
 
 	GetAddressTransactions(addr AddressEx, fromHeight uint64) ([]Transaction, error)
 
-	GetTransaction(id TransactionID) (*Transaction, error)
+	GetTransaction(id TransactionID, coinType CoinType) (*Transaction, error)
 
 	IsBlockInMainChain(block BlockInfo) (bool, error)
 

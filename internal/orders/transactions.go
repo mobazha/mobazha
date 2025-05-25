@@ -325,8 +325,9 @@ func (op *OrderProcessor) CheckForMorePayments(force bool) {
 				logger.LogInfoWithIDf(log, op.nodeID, "Error loading order cancel message: %s", err)
 			}
 
+			coinType := iwallet.CoinType(paymentSent.Coin)
 			for _, missing := range missingTxids {
-				tx, err := wallet.GetTransaction(missing)
+				tx, err := wallet.GetTransaction(missing, coinType)
 				if err == nil && tx != nil {
 					txs = append(txs, *tx)
 					knownTxsMap[missing] = true

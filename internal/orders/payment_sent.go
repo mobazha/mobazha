@@ -68,7 +68,7 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 
 	// If this fails it's OK as the processor's unfunded order checking loop will
 	// retry at it's next interval.
-	tx, err := wallet.GetTransaction(iwallet.TransactionID(paymentSent.TransactionID))
+	tx, err := wallet.GetTransaction(iwallet.TransactionID(paymentSent.TransactionID), iwallet.CoinType(paymentSent.Coin))
 	if err == nil && tx != nil {
 		paymentAddress, err := order.GetPaymentAddress()
 		if err != nil {

@@ -364,10 +364,6 @@ func (op *OrderProcessor) GetPayoutAddress(tx database.Tx, coinType string) (iwa
 		return iwallet.NewAddress(account.Address, iwallet.CoinType(coinType)), nil
 	}
 
-	if err != nil || account == nil {
-		return iwallet.Address{}, fmt.Errorf("获取激活的收款账户失败: %v", err)
-	}
-
 	return iwallet.Address{}, fmt.Errorf("获取激活的收款账户失败: %v", err)
 
 	// // 使用内置钱包获取地址

@@ -24,6 +24,8 @@ const (
 	ChainSolana      ChainType = "SOL"
 	ChainExternalPayment      ChainType = "EXTERNAL_PAYMENT"
 	ChainDash        ChainType = "DASH"
+
+	ChainStripe ChainType = "Stripe"
 )
 
 func (chaintype ChainType) String() string {
@@ -53,6 +55,8 @@ const (
 	CtSolana      CoinType = CoinType(ChainSolana)
 	CtExternalPayment      CoinType = CoinType(ChainExternalPayment)
 	CtDash        CoinType = CoinType(ChainDash)
+
+	CtStripe CoinType = CoinType(ChainStripe)
 
 	CtBEP20USDT CoinType = "BNBUSDT"
 	CtBEP20USDC CoinType = "BNBUSDC"
@@ -186,6 +190,14 @@ var (
 		IsNative:    true,
 		Decimals:    9,
 		Description: "Solana",
+	}
+
+	CtStripeInfo = CoinInfo{
+		Chain:       ChainStripe,
+		Symbol:      "Stripe",
+		IsNative:    true,
+		Decimals:    0,
+		Description: "Stripe",
 	}
 
 	// ERC20代币

@@ -17,6 +17,7 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/stripe/stripe-go/v82"
 )
 
 type mockNode struct {
@@ -157,6 +158,12 @@ type mockNode struct {
 	getPostBySlugFunc func(ctx context.Context, peerID peer.ID, slug string, useCache bool) (*postsPb.SignedPost, error)
 	getMyPostsFunc    func() ([]models.PostData, error)
 	getPostsFunc      func(ctx context.Context, peerID peer.ID, useCache bool) ([]models.PostData, error)
+
+	// Stripe相关
+	getStripePublicKeyFunc        func() (string, error)
+	createStripePaymentIntentFunc func(amount int64, currency string) (*stripe.PaymentIntent, error)
+	handleStripeWebhookFunc       func(payload []byte, signature string) error
+	updateOrderPaymentStatusFunc  func(orderID models.OrderID, paymentIntentID, status string) error
 }
 
 func (m *mockNode) RequestAddress(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error) {
@@ -577,6 +584,22 @@ func (m *mockNode) GetPosts(ctx context.Context, peerID peer.ID, useCache bool) 
 }
 func (m *mockNode) IsGlobalBanned(peerID peer.ID) bool {
 	return false
+}
+
+func (m *mockNode) GetStripePublicKey() (string, error) {
+	return m.getStripePublicKeyFunc()
+}
+
+func (m *mockNode) CreateStripePaymentIntent(amount int64, currency string) (*stripe.PaymentIntent, error) {
+	return m.createStripePaymentIntentFunc(amount, currency)
+}
+
+func (m *mockNode) HandleStripeWebhook(payload []byte, signature string) error {
+	return m.handleStripeWebhookFunc(payload, signature)
+}
+
+func (m *mockNode) UpdateOrderPaymentStatus(orderID models.OrderID, paymentIntentID string, status string) error {
+	return m.updateOrderPaymentStatusFunc(orderID, paymentIntentID, status)
 }
 
 type mockNodeManager struct {

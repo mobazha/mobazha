@@ -146,6 +146,11 @@ type OpenBazaarNode struct {
 	// shutdown is closed when the node is stopped. Any listening
 	// goroutines can use this to terminate.
 	shutdown chan struct{}
+
+	// Stripe 配置缓存
+	stripeConfigCache *netdb.StripeConfigCache
+
+	hostService coreiface.HostService
 }
 
 // IsDefaultNode returns whether this node is the default node.

@@ -57,9 +57,9 @@ func (g *Gateway) handleReceivingAccountRequest(w http.ResponseWriter, r *http.R
 		Address        string            `json:"address"`          // 用户的收款钱包地址
 		ActiveTokens   []string          `json:"activeTokens"`     // 已激活的代币列表
 		InactiveTokens []string          `json:"inactiveTokens"`   // 未激活的代币列表
-		Email          string            `json:"email,omitempty"`  // 对于Stripe/Paypal，使用Email
 		Source         string            `json:"source,omitempty"` // 来源
 		IsActive       bool              `json:"isActive"`         // 是否激活
+		Status         string            `json:"status,omitempty"` // 账户状态, 对于Stripe, 则是StripeStatus
 	}
 
 	// 解析请求体
@@ -75,9 +75,9 @@ func (g *Gateway) handleReceivingAccountRequest(w http.ResponseWriter, r *http.R
 		Name:      req.Name,
 		ChainType: req.ChainType,
 		Address:   req.Address,
-		Email:     req.Email,
 		Source:    req.Source,
 		IsActive:  req.IsActive,
+		Status:    req.Status, // 对于Stripe, 则是StripeStatus
 	}
 
 	// 设置激活和未激活的代币列表
@@ -120,32 +120,4 @@ func (g *Gateway) AddReceivingAccount(w http.ResponseWriter, r *http.Request) {
 // UpdateReceivingAccount 更新用户的收款账户信息
 func (g *Gateway) UpdateReceivingAccount(w http.ResponseWriter, r *http.Request) {
 	g.handleReceivingAccountRequest(w, r, true)
-}
-
-// GetStripeConnectURL 获取Stripe OAuth连接URL
-func (g *Gateway) GetStripeConnectURL(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		ErrorResponse(w, http.StatusMethodNotAllowed, "只允许GET请求")
-		return
-	}
-
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
-
-	// 获取Stripe连接URL
-	// 这里需要使用Stripe API生成OAuth URL
-	// 实际实现中需要使用Stripe SDK
-	stripeConnectURL, err := node.GetStripeConnectURL()
-	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	// 返回URL
-	resp := struct {
-		URL string `json:"url"`
-	}{
-		URL: stripeConnectURL,
-	}
-
-	sanitizedJSONResponse(w, resp)
 }

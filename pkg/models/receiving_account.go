@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -11,14 +12,16 @@ import (
 // ReceivingAccount 表示用户的收款账户信息
 type ReceivingAccount struct {
 	ID                       int               `gorm:"primaryKey" json:"id"`
-	Name                     string            `gorm:"type:text" json:"name"`  // 账户名称
-	ChainType                iwallet.ChainType `gorm:"index" json:"chainType"` // 区块链网络类型
-	Address                  string            `gorm:"index" json:"address"`   // 用户的收款钱包地址
-	SerializedActiveTokens   []byte            `gorm:"type:bytes" json:"-"`    // 序列化的已激活代币列表
-	SerializedInactiveTokens []byte            `gorm:"type:bytes" json:"-"`    // 序列化的未激活代币列表
-	Email                    string            `json:"email,omitempty"`        // 对于Stripe/Paypal，使用Email
-	Source                   string            `json:"source,omitempty"`       // 来源
-	IsActive                 bool              `json:"isActive"`               // 是否激活
+	Name                     string            `gorm:"type:text" json:"name"`           // 账户名称
+	ChainType                iwallet.ChainType `gorm:"index" json:"chainType"`          // 区块链网络类型
+	Address                  string            `gorm:"index" json:"address"`            // 用户的收款钱包地址, 对于Stripe, 则是StripeAccountID
+	SerializedActiveTokens   []byte            `gorm:"type:bytes" json:"-"`             // 序列化的已激活代币列表
+	SerializedInactiveTokens []byte            `gorm:"type:bytes" json:"-"`             // 序列化的未激活代币列表
+	Source                   string            `json:"source,omitempty"`                // 来源
+	IsActive                 bool              `json:"isActive"`                        // 是否激活
+	Status                   string            `json:"status,omitempty"`                // 账户状态, 对于Stripe, 则是StripeStatus
+	CreatedAt                time.Time         `gorm:"autoCreateTime" json:"createdAt"` // 创建时间
+	UpdatedAt                time.Time         `gorm:"autoUpdateTime" json:"updatedAt"` // 更新时间
 }
 
 // ActiveTokens 返回已激活的代币列表
@@ -89,9 +92,11 @@ type receivingAccountJSON struct {
 	Address        string            `json:"address"`
 	ActiveTokens   []string          `json:"activeTokens"`
 	InactiveTokens []string          `json:"inactiveTokens"`
-	Email          string            `json:"email,omitempty"`
 	Source         string            `json:"source,omitempty"`
 	IsActive       bool              `json:"isActive"`
+	Status         string            `json:"status,omitempty"`
+	CreatedAt      time.Time         `json:"createdAt"`
+	UpdatedAt      time.Time         `json:"updatedAt"`
 }
 
 // MarshalJSON 实现 JSON 序列化
@@ -113,9 +118,11 @@ func (ra *ReceivingAccount) MarshalJSON() ([]byte, error) {
 		Address:        ra.Address,
 		ActiveTokens:   activeTokens,
 		InactiveTokens: inactiveTokens,
-		Email:          ra.Email,
 		Source:         ra.Source,
 		IsActive:       ra.IsActive,
+		Status:         ra.Status,
+		CreatedAt:      ra.CreatedAt,
+		UpdatedAt:      ra.UpdatedAt,
 	}
 
 	return json.Marshal(raJSON)
@@ -141,9 +148,11 @@ func (ra *ReceivingAccount) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	ra.Email = raJSON.Email
 	ra.Source = raJSON.Source
 	ra.IsActive = raJSON.IsActive
+	ra.Status = raJSON.Status
+	ra.CreatedAt = raJSON.CreatedAt
+	ra.UpdatedAt = raJSON.UpdatedAt
 	return nil
 }
 

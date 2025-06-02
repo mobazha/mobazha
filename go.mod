@@ -80,6 +80,7 @@ require (
 	github.com/shopspring/decimal v1.3.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
+	github.com/stripe/stripe-go/v82 v82.0.0
 	github.com/teserakt-io/golang-ed25519 v0.0.0-20210104091850-3888c087a4c8
 	github.com/tyler-smith/go-bip39 v1.1.0
 	go.uber.org/fx v1.22.1

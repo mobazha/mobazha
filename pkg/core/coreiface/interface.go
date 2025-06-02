@@ -16,6 +16,7 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/stripe/stripe-go/v82"
 )
 
 // CoreIface enumerates the interface of the OpenBazaarNode object in the Core package.
@@ -178,7 +179,6 @@ type CoreIface interface {
 	GetReceivingAccounts() ([]models.ReceivingAccount, error)
 	GetActiveReceivingAccount(chainType iwallet.ChainType) (*models.ReceivingAccount, error)
 	GetReceivingAccountsByChain(chainType iwallet.ChainType) ([]models.ReceivingAccount, error)
-	GetStripeConnectURL() (string, error)
 
 	// Escrow
 	BuildInitSolEscrowInstructions(ctx context.Context, params models.InitializeSolEscrowData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
@@ -200,6 +200,13 @@ type CoreIface interface {
 	PingNode(ctx context.Context, peer peer.ID) error
 	SubscribeEvent(event interface{}) (events.Subscription, error)
 	IsGlobalBanned(peerID peer.ID) bool
+
+	// Stripe相关方法
+	GetStripePublicKey() (string, error)
+	GetStripeConnectURL() (string, error)
+	CreateStripePaymentIntent(amount int64, currency string) (*stripe.PaymentIntent, error)
+	HandleStripeWebhook(payload []byte, signature string) error
+	UpdateOrderPaymentStatus(orderID models.OrderID, paymentIntentID string, status string) error
 }
 
 type NodeManagerIface interface {

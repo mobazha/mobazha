@@ -207,7 +207,10 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/wallet/receivingaccount", g.AddReceivingAccount).Methods("POST")
 		r.HandleFunc("/v1/wallet/receivingaccount", g.UpdateReceivingAccount).Methods("PUT")
 		// Stripe连接URL
-		r.HandleFunc("/v1/wallet/stripe/connect-url", g.GetStripeConnectURL).Methods("GET")
+		r.HandleFunc("/v1/stripe/public-key", g.GetStripePublicKey).Methods("GET")
+		r.HandleFunc("/v1/stripe/connect-url", g.GetStripeConnectURL).Methods("GET")
+		r.HandleFunc("/v1/stripe/payment-intent", g.CreateStripePaymentIntent).Methods("POST")
+		r.HandleFunc("/v1/stripe/webhook", g.HandleStripeWebhook).Methods("POST")
 
 		// Orders
 		r.HandleFunc("/v1/ob/purchases", g.handlePOSTPurchases).Methods("POST")

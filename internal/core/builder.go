@@ -46,6 +46,7 @@ import (
 	"github.com/mobazha/mobazha3.0/libs/proxyclient"
 	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -77,7 +78,12 @@ var (
 var sharedDHT routing.Routing
 
 // NewNode constructs and returns an OpenBazaarNode using the given cfg.
-func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarNode, error) {
+func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService ...coreiface.HostService) (*OpenBazaarNode, error) {
+	var hs coreiface.HostService
+	if len(hostService) > 0 {
+		hs = hostService[0]
+	}
+
 	if err := repo.CheckAndMigrateRepo(cfg.DataDir); err != nil {
 		return nil, fmt.Errorf("repo migration failed: %v", err)
 	}
@@ -320,6 +326,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 			featureManager:       pkgconfig.GetGlobalFeatureManager(),
 			initialBootstrapChan: make(chan struct{}),
 			shutdown:             make(chan struct{}),
+			hostService:          hs,
 		}
 		sharedManager.AddNode(nodeID, obNode)
 		return obNode, nil
@@ -475,6 +482,8 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string) (*OpenBazaarN
 		featureManager:         pkgconfig.GetGlobalFeatureManager(),
 		initialBootstrapChan:   make(chan struct{}),
 		shutdown:               make(chan struct{}),
+		hostService:            hs,
+		stripeConfigCache:      netdb.NewStripeConfigCache(),
 	}
 	sharedManager.AddNode(nodeID, obNode)
 

@@ -204,7 +204,7 @@ type CoreIface interface {
 	// Stripe相关方法
 	GetStripePublicKey() (string, error)
 	GetStripeConnectURL() (string, error)
-	CreateStripePaymentIntent(amount int64, currency string) (*stripe.PaymentIntent, error)
+	CreateStripePaymentIntent(orderID models.OrderID, amount int64, currency string) (*stripe.PaymentIntent, error)
 	HandleStripeWebhook(payload []byte, signature string) error
 	UpdateOrderPaymentStatus(orderID models.OrderID, paymentIntentID string, status string) error
 }

@@ -161,7 +161,7 @@ type mockNode struct {
 
 	// Stripe相关
 	getStripePublicKeyFunc        func() (string, error)
-	createStripePaymentIntentFunc func(amount int64, currency string) (*stripe.PaymentIntent, error)
+	createStripePaymentIntentFunc func(orderID models.OrderID, amount int64, currency string) (*stripe.PaymentIntent, error)
 	handleStripeWebhookFunc       func(payload []byte, signature string) error
 	updateOrderPaymentStatusFunc  func(orderID models.OrderID, paymentIntentID, status string) error
 }
@@ -590,8 +590,8 @@ func (m *mockNode) GetStripePublicKey() (string, error) {
 	return m.getStripePublicKeyFunc()
 }
 
-func (m *mockNode) CreateStripePaymentIntent(amount int64, currency string) (*stripe.PaymentIntent, error) {
-	return m.createStripePaymentIntentFunc(amount, currency)
+func (m *mockNode) CreateStripePaymentIntent(orderID models.OrderID, amount int64, currency string) (*stripe.PaymentIntent, error) {
+	return m.createStripePaymentIntentFunc(orderID, amount, currency)
 }
 
 func (m *mockNode) HandleStripeWebhook(payload []byte, signature string) error {

@@ -339,3 +339,18 @@ func (ndb *NetDB) SetOwnRatingIndex(index models.RatingIndex) error {
 
 	return err
 }
+
+// GetStripeAccountID 通过 PeerID 获取 Stripe 账户 ID
+func (ndb *NetDB) GetStripeAccountID(peerID string) (string, error) {
+	logger.LogInfoWithIDf(log, peerID, "Get stripe account ID for %s", peerID)
+
+	var result struct {
+		StripeAccountID string `json:"stripeAccountID"`
+	}
+	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&result).Get(fmt.Sprintf("%s/stripe/account/%s", ndb.endpoint, peerID))
+	if err != nil {
+		return "", err
+	}
+
+	return result.StripeAccountID, nil
+}

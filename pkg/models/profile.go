@@ -31,6 +31,7 @@ type Profile struct {
 	EscrowPublicKey string `json:"publicKey"`
 	ETHPublicKey    string `json:"ethPublicKey"`
 	SolanaPublicKey string `json:"solanaPublicKey"`
+	StripeAccountID string `json:"stripeAccountID"`
 
 	StoreAndForwardServers []string `json:"storeAndForwardServers"`
 

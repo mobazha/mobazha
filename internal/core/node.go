@@ -60,6 +60,9 @@ type OpenBazaarNode struct {
 	// we used to generate rating keys to sign ratings with.
 	ratingMasterKey *btcec.PrivateKey
 
+	// stripeAccountID represents the stripe account id of the node.
+	stripeAccountID string
+
 	// ipnsQuorum is the size of the IPNS quorum to use. Smaller quorums
 	// resolve faster but run the risk of getting back older records.
 	ipnsQuorum uint

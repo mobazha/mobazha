@@ -214,19 +214,18 @@ message PaymentSent {
     string moderator                    = 4; // 仲裁者（可选）, peerID
     bytes  moderatorPubKey              = 5; // 仲裁者公钥
     string amount                       = 6; // 支付金额, Satoshis
-    string chainType                    = 7; // 支付链类型
-    string coin                         = 8; // 支付货币
-    string fromAddress                  = 9; // 支付地址
-    string toAddress                    = 10; // 目标地址
-    string script                       = 11; // Hex encoded, usually redeem script.
-    string escrowReleaseFee             = 12;
-    uint32 escrowTimeoutHours           = 13;
-    string platformAmount               = 14; // Satoshis
-    string platformAddr                 = 15;
-    string refundAddress                = 16; // 退款地址
-    PaymentMethod paymentMethod         = 17; // 支付方式信息
-    ReceiptInfo receiptInfo             = 18; // 收据信息
-    google.protobuf.Timestamp timestamp = 19;
+    string coin                         = 7; // 支付货币
+    string fromAddress                  = 8; // 支付地址
+    string toAddress                    = 9; // 目标地址
+    string script                       = 10; // Hex encoded, usually redeem script.
+    string escrowReleaseFee             = 11;
+    uint32 escrowTimeoutHours           = 12;
+    string platformAmount               = 13; // Satoshis
+    string platformAddr                 = 14;
+    string refundAddress                = 15; // 退款地址
+    PaymentMethod paymentMethod         = 16; // 支付方式信息
+    ReceiptInfo receiptInfo             = 17; // 收据信息
+    google.protobuf.Timestamp timestamp = 18;
 
     enum Method {
         DIRECT     = 0; // Address request

@@ -154,21 +154,8 @@ func (g *Gateway) newV1Router() *mux.Router {
 
 	if !g.config.PublicOnly {
 		// Wallet
-		r.HandleFunc("/v1/wallet/address", g.handleGETAddress).Methods("GET")
-		r.HandleFunc("/v1/wallet/address/{coinType}", g.handleGETAddress).Methods("GET")
-		r.HandleFunc("/v1/wallet/balance", g.handleGETBalance).Methods("GET")
-		r.HandleFunc("/v1/wallet/balance/{coinType}", g.handleGETBalance).Methods("GET")
-		r.HandleFunc("/v1/wallet/transactions/{coinType}", g.handleGETTransactions).Methods("GET")
 		r.HandleFunc("/v1/wallet/spend", g.handlePOSTSpend).Methods("POST")
 		r.HandleFunc("/v1/wallet/mnemonic", g.handleGETMnemonic).Methods("GET")
-		r.HandleFunc("/v1/wallet/estimatefee/{coinType}", g.handleGETEstimateFee).Methods("GET")
-		r.HandleFunc("/v1/wallet/fees", g.handleGETFees).Methods("GET")
-		r.HandleFunc("/v1/wallet/resyncblockchain", g.handlePOSTResyncOrders).Methods("POST")
-		r.HandleFunc("/v1/wallet/resyncblockchain/{coinType}", g.handlePOSTResyncBlockchain).Methods("POST")
-		r.HandleFunc("/v1/wallet/status", g.handleGETWalletStatus).Methods("GET")
-		r.HandleFunc("/v1/wallet/status/{coinType}", g.handleGETWalletStatus).Methods("GET")
-		r.HandleFunc("/v1/wallet/status", g.handleUpdateWalletStatus).Methods("POST")
-		r.HandleFunc("/v1/wallet/status/{coinType}", g.handleUpdateWalletStatus).Methods("POST")
 
 		// Chat
 		r.HandleFunc("/v1/ob/chatmessage", g.handlePOSTSendChatMessage).Methods("POST")

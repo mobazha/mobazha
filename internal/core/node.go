@@ -181,18 +181,8 @@ func (n *OpenBazaarNode) Start() {
 		go func() {
 			n.multiwallet.Start()
 
-			if !n.featureManager.IsEnabled(pkgconfig.FeatureNoBuildinWallet) {
-				n.listenWalletEvents()
-			} else {
-				logger.LogInfoWithIDf(log, n.nodeID, "No buildin wallet, skipping buildin wallet info update")
-			}
-
 			if n.IsDefaultNode() {
 				go n.SharedManager().Start()
-			}
-
-			if !n.featureManager.IsEnabled(pkgconfig.FeatureNoBuildinWallet) {
-				n.orderProcessor.CheckForMorePayments(false)
 			}
 		}()
 

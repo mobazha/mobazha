@@ -116,24 +116,5 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 		return fmt.Errorf("cannot validate order. coin not supported. %w", err)
 	}
 
-	// TODO: HasKey() check is not passed for MATICUSDT, need check
-	// var addr string
-	// if order.Role() == models.RoleBuyer {
-	// 	addr = releaseInfo.BuyerAddress
-	// } else {
-	// 	addr = releaseInfo.VendorAddress
-	// }
-	// if len(addr) > 0 {
-	// 	pricingCurrency, err := models.CurrencyDefinitions.Lookup(orderOpen.Payment.Coin)
-	// 	if err != nil {
-	// 		return fmt.Errorf("unrecognized coin: %s, %w", orderOpen.Payment.Coin, err)
-	// 	}
-	// 	payAddr := iwallet.NewAddress(addr, iwallet.CoinType(pricingCurrency.String()))
-
-	// 	if ok, err := wal.HasKey(payAddr); !ok {
-	// 		return fmt.Errorf("dispute resolution payout address %s is not defined in your wallet to recieve funds. %w", addr, err)
-	// 	}
-	// }
-
 	return nil
 }

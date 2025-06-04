@@ -107,31 +107,8 @@ type Wallet interface {
 	// for this coin and network. It returns an error if it isn't.
 	ValidateAddress(addr Address) error
 
-	// HasKey returns true if the wallet can spend from the given address.
-	HasKey(addr Address) (bool, error)
-
-	// WatchAddress is used by the escrow system to tell the wallet to listen
-	// on the escrow address. It's expected that payments into and spends from
-	// this address will be pushed back to Mobazha.
-	//
-	// Note a database transaction is used here. Same rules of Commit() and
-	// Rollback() apply.
-	WatchAddress(dbtx Tx, addrs ...AddressEx) error
-
 	// Balance should return the confirmed and unconfirmed balance for the wallet.
 	Balance() (unconfirmed Amount, confirmed Amount, err error)
-
-	// IsDust returns whether the amount passed in is considered dust by network. This
-	// method is called when building payout transactions from the multisig to the various
-	// participants. If the amount that is supposed to be sent to a given party is below
-	// the dust threshold, mobazha will not pay that party to avoid building a transaction
-	// that never confirms.
-	IsDust(iaddr Address, amount Amount) bool
-
-	// Transactions returns a slice of this wallet's transactions. The transactions should
-	// be sorted last to first and the limit and offset respected. The offsetID means
-	// 'return transactions starting with the transaction after offsetID in the sorted list'
-	Transactions(limit int, offsetID TransactionID) ([]Transaction, error)
 
 	// GetTransaction returns a transaction given it's ID. This is used by Mobazha to
 	// request transactions paid to an order's payment address. This means we expect both
@@ -145,21 +122,6 @@ type Wallet interface {
 	// wallet address and any watched addresses.
 	GetAddressTransactions(addr AddressEx) ([]Transaction, error)
 
-	// EstimateSpendFee should return the anticipated fee to transfer a given amount of coins
-	// out of the wallet at the provided fee level. Typically this involves building a
-	// transaction with enough inputs to cover the request amount and calculating the size
-	// of the transaction. It is OK, if a transaction comes in after this function is called
-	// that changes the estimated fee as it's only intended to be an estimate.
-	//
-	// All amounts should be in the coin's base unit (for example: satoshis).
-	EstimateSpendFee(amount Amount, feeLevel FeeLevel, platformAddr Address, platformAmt Amount) (Amount, error)
-
-	// GetFeePerByte returns the current fee per byte for the given fee level. There
-	// are three fee levels ― priority, normal, and economic.
-	//
-	//The returned value should be in the coin's base unit (for example: satoshis).
-	GetFeePerByte(feeLevel FeeLevel) (Amount, error)
-
 	// Spend is a request to send requested amount to the requested address. The
 	// fee level is provided by the user. It's up to the implementation to decide
 	// how best to use the fee level.
@@ -169,20 +131,6 @@ type Wallet interface {
 	// the state changes should be discarded. Only when Commit() is called should
 	// the state changes be applied and the transaction broadcasted to the network.
 	Spend(dbtx Tx, to Address, amt Amount, feeLevel FeeLevel, platformAddr Address, platformAmt Amount) (TransactionID, error)
-
-	// SweepWallet should sweep the full balance of the wallet to the requested
-	// address. It is expected for most coins that the fee will be subtracted
-	// from the amount sent rather than added to it.
-	SweepWallet(dbtx Tx, to Address, level FeeLevel) (TransactionID, error)
-
-	// SubscribeTransactions returns a chan over which the wallet is expected
-	// to push both transactions relevant for this wallet as well as transactions
-	// sending to or spending from a watched address.
-	SubscribeTransactions() <-chan Transaction
-
-	// SubscribeBlocks returns a chan over which the wallet is expected
-	// to push info about new blocks when they arrive.
-	SubscribeBlocks() <-chan BlockInfo
 }
 
 // Escrow is functions related to the Mobazha escrow system. This interface should
@@ -278,19 +226,6 @@ type WalletCrypter interface {
 	// the provided duration after which it should be purged from memory.
 	// If the provided password is incorrect it should error.
 	Unlock(pw []byte, howLong time.Duration) error
-}
-
-// WalletScanner is an interface to be implemented by wallets which cannot query
-// for transactions from an API source. Typically this is either an SPV wallet
-// or a full node. If this interface is implemented Mobazha will use it whenever
-// it think it's likely that it received knowledge of an order transaction after
-// the transaction confirmed in the chain. Thus a rescan is necessary before
-// GetTransaction can be called.
-type WalletScanner interface {
-	// RescanTransactions should start a rescan for all wallet addresses,
-	// including watched address, from the start time. The done chan should
-	// be closed when the rescan is finished.
-	RescanTransactions(start time.Time, done chan struct{}) error
 }
 
 type EscrowWalletScanner interface {

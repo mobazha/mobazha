@@ -79,8 +79,6 @@ type CoreIface interface {
 	GetCase(orderID string) (*models.Case, error)
 	GetCases(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Case, int64, error)
 
-	CheckOrdersForMorePayments()
-
 	// Dispute
 	OpenDispute(orderID models.OrderID, reason string, done chan struct{}) error
 	CloseDispute(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
@@ -190,7 +188,6 @@ type CoreIface interface {
 	GetTransactionMetadata(txid iwallet.TransactionID) (models.TransactionMetadata, error)
 	RequestAddress(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error)
 	GetMnemonic() (string, error)
-	UpdateWalletStatus(coinTypes []iwallet.CoinType)
 
 	// Misc
 	UsingTestnet() bool

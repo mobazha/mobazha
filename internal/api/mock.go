@@ -280,8 +280,6 @@ func (m *mockNode) ReleaseFunds(orderID models.OrderID, txid iwallet.Transaction
 func (m *mockNode) ReleaseFundsAfterTimeout(orderID models.OrderID, done chan struct{}) error {
 	return m.releaseFundsAfterTimeoutFunc(orderID, done)
 }
-func (m *mockNode) CheckOrdersForMorePayments() {
-}
 func (m *mockNode) FollowNode(peerID peer.ID, done chan<- struct{}) error {
 	return m.followNodeFunc(peerID, done)
 }
@@ -506,9 +504,6 @@ func (m *mockNode) GetTransactionMetadata(txid iwallet.TransactionID) (models.Tr
 }
 func (m *mockNode) GetMnemonic() (string, error) {
 	return m.getMnemonicFunc()
-}
-func (m *mockNode) UpdateWalletStatus(coinTypes []iwallet.CoinType) {
-	m.updateWalletStatusFunc(coinTypes)
 }
 
 // 收款账户相关

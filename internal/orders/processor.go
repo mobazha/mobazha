@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
-	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ipfs/go-cid"
@@ -15,7 +13,6 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet/coins/eth/util"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
@@ -28,8 +25,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 )
-
-const rescanTransactionsInterval = time.Minute
 
 var (
 	log                  = logging.MustGetLogger("ORDR")
@@ -65,7 +60,6 @@ type OrderProcessor struct {
 	bus                events.Bus
 	calcCIDFunc        func(file []byte) (cid.Cid, error)
 	featureManager     *pkgconfig.FeatureManager
-	shutdown           chan struct{}
 }
 
 // NewOrderProcessor initializes and returns a new OrderProcessor
@@ -82,56 +76,16 @@ func NewOrderProcessor(cfg *Config) *OrderProcessor {
 		bus:                cfg.EventBus,
 		calcCIDFunc:        cfg.CalcCIDFunc,
 		featureManager:     cfg.FeatureManager,
-		shutdown:           make(chan struct{}),
 	}
 }
 
 // Start begins listening for transactions from the wallets that pertain to our
 // orders. When we find one we record the payment.
 func (op *OrderProcessor) Start() {
-	if op.featureManager.IsEnabled(pkgconfig.FeatureNoBuildinWallet) {
-		logger.LogInfoWithIDf(log, op.nodeID, "No buildin wallet, skipping buildin wallet transaction listening")
-		// if new tx, directly call processWalletTransaction()
-		// op.processWalletTransaction(tx)
-		return
-	}
-
-	for _, wallet := range op.multiwallet {
-		go func(w iwallet.Wallet) {
-			sub := w.SubscribeTransactions()
-			for {
-				select {
-				case tx := <-sub:
-					if w.CoinCategory() == iwallet.CoinCategoryEthereum {
-						currentAddress, _ := w.CurrentAddress()
-						if strings.EqualFold(util.EnsureCorrectPrefix(tx.From[0].Address.String()),
-							util.EnsureCorrectPrefix(currentAddress.String())) {
-							tx.Value = iwallet.NewAmount(0).Sub(tx.From[0].Amount)
-						}
-					}
-
-					op.processWalletTransaction(tx)
-				case <-op.shutdown:
-					return
-				}
-			}
-		}(wallet)
-	}
-
-	ticker := time.NewTicker(rescanTransactionsInterval)
-	for {
-		select {
-		case <-ticker.C:
-			op.CheckForMorePayments(false)
-		case <-op.shutdown:
-			return
-		}
-	}
 }
 
 // Stop shuts down the processor.
 func (op *OrderProcessor) Stop() {
-	close(op.shutdown)
 }
 
 // ProcessMessage is the main handler for the OrderProcessor. It ingests a new message
@@ -365,20 +319,4 @@ func (op *OrderProcessor) GetPayoutAddress(tx database.Tx, coinType string) (iwa
 	}
 
 	return iwallet.Address{}, fmt.Errorf("获取激活的收款账户失败: %v", err)
-
-	// // 使用内置钱包获取地址
-	// logger.LogInfoWithIDf(log, n.nodeID, "使用内置钱包获取地址: %s", coinInfo.Chain.String())
-
-	// // 使用原生代币获取链的地址信息
-	// wallet, err := n.multiwallet.WalletForCurrencyCode(coinInfo.Chain.String())
-	// if err != nil {
-	// 	return iwallet.Address{}, fmt.Errorf("获取 %s 钱包失败: %v", coinInfo.Chain.String(), err)
-	// }
-
-	// address, err := wallet.CurrentAddress()
-	// if err != nil {
-	// 	return iwallet.Address{}, fmt.Errorf("获取 %s 钱包地址失败: %v", coinInfo.Chain.String(), err)
-	// }
-
-	// return address, nil
 }

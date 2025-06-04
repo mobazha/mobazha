@@ -10,10 +10,8 @@ import (
 	"net"
 	"path"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/bep/debounce"
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	solana "github.com/gagliardetto/solana-go"
@@ -693,97 +691,6 @@ func (n *OpenBazaarNode) listenNetworkEvents() {
 	}
 
 	n.ipfsNode.PeerHost.Network().Notify(notifier)
-}
-
-func (n *OpenBazaarNode) listenWalletEvents() {
-	if n.featureManager.IsEnabled(pkgconfig.FeatureNoBuildinWallet) {
-		logger.LogInfoWithID(log, n.nodeID, "No buildin wallet, skipping buildin wallet info update")
-		return
-	}
-
-	blockChan := make(chan iwallet.CoinType)
-	txChan := make(chan iwallet.CoinType)
-	for ct, w := range n.multiwallet {
-		go func(cointype iwallet.CoinType, wallet iwallet.Wallet) {
-			blockSub := wallet.SubscribeBlocks()
-			txSub := wallet.SubscribeTransactions()
-			for {
-				select {
-				case <-n.shutdown:
-					return
-				case bi := <-blockSub:
-					n.eventBus.Emit(&events.BlockReceived{
-						BlockInfo:    bi,
-						CurrencyCode: cointype.CurrencyCode(),
-					})
-					blockChan <- cointype
-				case tx := <-txSub:
-					n.eventBus.Emit(&events.TransactionReceived{
-						Transaction:  tx,
-						CurrencyCode: cointype.CurrencyCode(),
-					})
-					txChan <- cointype
-				}
-			}
-		}(ct, w)
-	}
-
-	updateWalletInfo := func(ct iwallet.CoinType) {
-		update := make(events.WalletUpdate)
-
-		w := n.multiwallet[ct]
-
-		bi, err := w.BlockchainInfo()
-		if err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "Error querying %s wallet for blockchain info: %s", ct.CurrencyCode(), err)
-		}
-		unconfirmed, confirmed, err := w.Balance()
-		if err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "Error querying %s wallet for balance: %s", ct.CurrencyCode(), err)
-		}
-
-		def, _ := models.CurrencyDefinitions.Lookup(ct.CurrencyCode())
-
-		update[ct.CurrencyCode()] = events.WalletInfo{
-			ChainHeight:        bi.Height,
-			ConfirmedBalance:   confirmed,
-			Currency:           *def,
-			UnconfirmedBalance: unconfirmed,
-		}
-		n.eventBus.Emit(&update)
-	}
-
-	go func() {
-		// To avoid multi wallet HTTP API calls when many txs come during rescan
-		debounceMap := map[iwallet.CoinType]func(f func()){}
-		mapMtx := sync.Mutex{}
-		for {
-			select {
-			case <-n.shutdown:
-				return
-			case ct := <-blockChan:
-				w := n.multiwallet[ct]
-				if w.CoinCategory() == iwallet.CoinCategoryBitcoin {
-					updateWalletInfo(ct)
-				}
-				// for ETH kind coin, we watch transactions from order and transfer events and update wallet info
-			case ct := <-txChan:
-				w := n.multiwallet[ct]
-				if w.CoinCategory() == iwallet.CoinCategoryEthereum {
-					mapMtx.Lock()
-					debounced, ok := debounceMap[ct]
-					if !ok {
-						debounced = debounce.New(1 * time.Second)
-						debounceMap[ct] = debounced
-					}
-					mapMtx.Unlock()
-					debounced(func() {
-						updateWalletInfo(ct)
-					})
-				}
-			}
-		}
-	}()
 }
 
 // newMessageWithID returns a new *pb.Message with a random

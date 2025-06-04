@@ -214,21 +214,35 @@ message PaymentSent {
     string moderator                    = 4; // 仲裁者（可选）, peerID
     bytes  moderatorPubKey              = 5; // 仲裁者公钥
     string amount                       = 6; // 支付金额, Satoshis
-    string coin                         = 7; // 支付货币
-    string fromAddress                  = 8; // 支付地址
-    string toAddress                    = 9; // 目标地址
-    string script                       = 10; // Hex encoded, usually redeem script.
-    string escrowReleaseFee             = 11;
-    uint32 escrowTimeoutHours           = 12;
-    string platformAmount               = 13; // Satoshis
-    string platformAddr                 = 14;
-    string refundAddress                = 15; // 退款地址
-    google.protobuf.Timestamp timestamp = 16;
+    string chainType                    = 7; // 支付链类型
+    string coin                         = 8; // 支付货币
+    string fromAddress                  = 9; // 支付地址
+    string toAddress                    = 10; // 目标地址
+    string script                       = 11; // Hex encoded, usually redeem script.
+    string escrowReleaseFee             = 12;
+    uint32 escrowTimeoutHours           = 13;
+    string platformAmount               = 14; // Satoshis
+    string platformAddr                 = 15;
+    string refundAddress                = 16; // 退款地址
+    PaymentMethod paymentMethod         = 17; // 支付方式信息
+    ReceiptInfo receiptInfo             = 18; // 收据信息
+    google.protobuf.Timestamp timestamp = 19;
 
     enum Method {
         DIRECT     = 0; // Address request
         CANCELABLE = 1; // 1 of 2 cancelable address
         MODERATED  = 2; // 2 of 3 escrow address
+    }
+
+    message PaymentMethod {
+        string type  = 1; // 支付方式类型
+        string brand = 2; // 卡品牌（如果是信用卡支付）
+        string last4 = 3; // 卡号后四位（如果是信用卡支付）
+    }
+
+    message ReceiptInfo {
+        string url    = 1; // 收据URL
+        string number = 2; // 收据编号
     }
 }
 

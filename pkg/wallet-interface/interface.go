@@ -96,13 +96,6 @@ type Wallet interface {
 	// detail.
 	CurrentAddress() (Address, error)
 
-	// NewAddress should return a new, never before used address. This is called
-	// by Mobazha to get a fresh address for a direct payment order. It
-	// associates this address with the order and assumes if a payment is received
-	// by this address that it is for the order. Failure to return a never before
-	// used address could put the order in a bad state.
-	NewAddress() (Address, error)
-
 	// ValidateAddress validates that the serialization of the address is correct
 	// for this coin and network. It returns an error if it isn't.
 	ValidateAddress(addr Address) error

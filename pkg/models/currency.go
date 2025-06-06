@@ -55,6 +55,8 @@ var (
 
 		"SOL": {Name: "Solana", Code: CurrencyCode("SOL"), CurrencyType: CurrencyTypeCrypto, Divisibility: 9, Bip44Code: 501, BlockInterval: time.Millisecond * 400},
 
+		"STRIPE": {Name: "Stripe", Code: CurrencyCode("STRIPE"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
+
 		"USDT":  {Name: "Tether", Code: CurrencyCode("USDT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
 		"USDC":  {Name: "USD Coin", Code: CurrencyCode("USDC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
 		"EOS":   {Name: "EOS", Code: CurrencyCode("EOS"), CurrencyType: CurrencyTypeCrypto, Divisibility: 4, Bip44Code: 194},

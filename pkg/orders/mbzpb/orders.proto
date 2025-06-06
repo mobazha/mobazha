@@ -224,8 +224,7 @@ message PaymentSent {
     string platformAddr                 = 14;
     string refundAddress                = 15; // 退款地址
     PaymentMethod paymentMethod         = 16; // 支付方式信息
-    ReceiptInfo receiptInfo             = 17; // 收据信息
-    google.protobuf.Timestamp timestamp = 18;
+    google.protobuf.Timestamp timestamp = 17;
 
     enum Method {
         DIRECT     = 0; // Address request
@@ -237,11 +236,6 @@ message PaymentSent {
         string type  = 1; // 支付方式类型
         string brand = 2; // 卡品牌（如果是信用卡支付）
         string last4 = 3; // 卡号后四位（如果是信用卡支付）
-    }
-
-    message ReceiptInfo {
-        string url    = 1; // 收据URL
-        string number = 2; // 收据编号
     }
 }
 

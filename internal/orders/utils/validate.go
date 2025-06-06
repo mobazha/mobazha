@@ -175,6 +175,8 @@ func ValidatePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTim
 		return validateSolanaPayment(order, paymentSent, wal)
 	} else if wal.CoinCategory() == iwallet.CoinCategoryEthereum {
 		return validateETHLikePayment(order, paymentSent, chaincode, wal, escrowTimeoutHours)
+	} else if wal.CoinCategory() == iwallet.CoinCategoryStripe {
+		return validateStripePayment(order, paymentSent, chaincode, wal, escrowTimeoutHours)
 	} else {
 		return validateBTCLikePayment(order, paymentSent, chaincode, wal, escrowTimeoutHours)
 	}
@@ -252,6 +254,10 @@ func validateSolanaPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal
 	// if err := validateEscrowReleaseFee(paymentSent); err != nil {
 	// 	return err
 	// }
+	return nil
+}
+
+func validateStripePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, chaincode []byte, wal iwallet.Wallet, escrowTimeoutHours uint32) error {
 	return nil
 }
 

@@ -516,17 +516,18 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	}
 
 	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
-		NodeID:               nodeID,
-		Identity:             ipfsNode.Identity,
-		IdentityPrivateKey:   ipfsNode.PrivateKey,
-		Db:                   obRepo.DB(),
-		Multiwallet:          mw,
-		Messenger:            obNode.messenger,
-		EscrowPrivateKey:     escrowKey,
-		ExchangeRateProvider: erp,
-		EventBus:             bus,
-		CalcCIDFunc:          obNode.cid,
-		FeatureManager:       obNode.featureManager,
+		NodeID:                   nodeID,
+		Identity:                 ipfsNode.Identity,
+		IdentityPrivateKey:       ipfsNode.PrivateKey,
+		Db:                       obRepo.DB(),
+		Multiwallet:              mw,
+		Messenger:                obNode.messenger,
+		EscrowPrivateKey:         escrowKey,
+		ExchangeRateProvider:     erp,
+		EventBus:                 bus,
+		CalcCIDFunc:              obNode.cid,
+		FeatureManager:           obNode.featureManager,
+		GetStripeTransactionFunc: obNode.GetStripeTransaction,
 	})
 
 	obNode.registerHandlers()
@@ -578,7 +579,7 @@ func InitializeMultiwallet(mw multiwallet.Multiwallet, db database.Database, cre
 	solPrivKey := solana.PrivateKey(dbSolKey.Value)
 
 	for ct, wallet := range mw {
-		if ct.CurrencyCode() == "SOL" {
+		if ct == iwallet.CtSolana {
 			// 对于 SOL 钱包，使用 solPrivKey
 			solWallet, ok := wallet.(*solanaWal.SolanaWallet)
 			if !ok {
@@ -588,6 +589,8 @@ func InitializeMultiwallet(mw multiwallet.Multiwallet, db database.Database, cre
 			if err := solWallet.InitializeWithKey(solPrivKey, creationDate); err != nil {
 				return err
 			}
+		} else if ct == iwallet.CtStripe {
+			// Do nothing
 		} else {
 			// 其他钱包使用 bip44Key
 			if !wallet.WalletExists() {

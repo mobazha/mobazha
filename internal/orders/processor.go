@@ -34,48 +34,51 @@ var (
 
 // Config holds the objects needed to instantiate a new OrderProcessor.
 type Config struct {
-	NodeID               string
-	Identity             peer.ID
-	Db                   database.Database
-	IdentityPrivateKey   crypto.PrivKey
-	EscrowPrivateKey     *btcec.PrivateKey
-	Messenger            *net.Messenger
-	Multiwallet          multiwallet.Multiwallet
-	ExchangeRateProvider *wallet.ExchangeRateProvider
-	EventBus             events.Bus
-	CalcCIDFunc          func(file []byte) (cid.Cid, error)
-	FeatureManager       *pkgconfig.FeatureManager
+	NodeID                   string
+	Identity                 peer.ID
+	Db                       database.Database
+	IdentityPrivateKey       crypto.PrivKey
+	EscrowPrivateKey         *btcec.PrivateKey
+	Messenger                *net.Messenger
+	Multiwallet              multiwallet.Multiwallet
+	ExchangeRateProvider     *wallet.ExchangeRateProvider
+	EventBus                 events.Bus
+	CalcCIDFunc              func(file []byte) (cid.Cid, error)
+	GetStripeTransactionFunc func(txid iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error)
+	FeatureManager           *pkgconfig.FeatureManager
 }
 
 // OrderProcessor is used to deterministically process orders.
 type OrderProcessor struct {
-	nodeID             string
-	identity           peer.ID
-	identityPrivateKey crypto.PrivKey
-	db                 database.Database
-	messenger          *net.Messenger
-	multiwallet        multiwallet.Multiwallet
-	escrowPrivateKey   *btcec.PrivateKey
-	erp                *wallet.ExchangeRateProvider
-	bus                events.Bus
-	calcCIDFunc        func(file []byte) (cid.Cid, error)
-	featureManager     *pkgconfig.FeatureManager
+	nodeID                   string
+	identity                 peer.ID
+	identityPrivateKey       crypto.PrivKey
+	db                       database.Database
+	messenger                *net.Messenger
+	multiwallet              multiwallet.Multiwallet
+	escrowPrivateKey         *btcec.PrivateKey
+	erp                      *wallet.ExchangeRateProvider
+	bus                      events.Bus
+	calcCIDFunc              func(file []byte) (cid.Cid, error)
+	getStripeTransactionFunc func(txid iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error)
+	featureManager           *pkgconfig.FeatureManager
 }
 
 // NewOrderProcessor initializes and returns a new OrderProcessor
 func NewOrderProcessor(cfg *Config) *OrderProcessor {
 	return &OrderProcessor{
-		nodeID:             cfg.NodeID,
-		identity:           cfg.Identity,
-		identityPrivateKey: cfg.IdentityPrivateKey,
-		db:                 cfg.Db,
-		messenger:          cfg.Messenger,
-		multiwallet:        cfg.Multiwallet,
-		escrowPrivateKey:   cfg.EscrowPrivateKey,
-		erp:                cfg.ExchangeRateProvider,
-		bus:                cfg.EventBus,
-		calcCIDFunc:        cfg.CalcCIDFunc,
-		featureManager:     cfg.FeatureManager,
+		nodeID:                   cfg.NodeID,
+		identity:                 cfg.Identity,
+		identityPrivateKey:       cfg.IdentityPrivateKey,
+		db:                       cfg.Db,
+		messenger:                cfg.Messenger,
+		multiwallet:              cfg.Multiwallet,
+		escrowPrivateKey:         cfg.EscrowPrivateKey,
+		erp:                      cfg.ExchangeRateProvider,
+		bus:                      cfg.EventBus,
+		calcCIDFunc:              cfg.CalcCIDFunc,
+		getStripeTransactionFunc: cfg.GetStripeTransactionFunc,
+		featureManager:           cfg.FeatureManager,
 	}
 }
 

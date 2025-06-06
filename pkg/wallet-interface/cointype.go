@@ -34,7 +34,7 @@ func (chaintype ChainType) String() string {
 
 func GetAllSupportedChainTypes() []ChainType {
 	return []ChainType{
-		ChainBitcoin, ChainSolana,
+		ChainBitcoin, ChainSolana, ChainStripe,
 	}
 }
 
@@ -77,6 +77,10 @@ func (ct CoinType) CurrencyCode() string {
 
 func (ct CoinType) CoinInfo() (CoinInfo, error) {
 	return CoinInfoFromCoinType(ct)
+}
+
+func (ct CoinType) IsStripeChain() bool {
+	return strings.HasPrefix(strings.ToUpper(string(ct)), "STRIPE")
 }
 
 const NATIVE_SYMBOL = "NATIVE"
@@ -326,6 +330,10 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 	// 检查是否为测试币种
 	if s == string(CtTestCoin) {
 		return CtTestCoinInfo, nil
+	}
+
+	if coinType.IsStripeChain() {
+		return CtStripeInfo, nil
 	}
 
 	// 检查是否为原生代币

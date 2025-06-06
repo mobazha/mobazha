@@ -7,4 +7,5 @@ const (
 	CoinCategoryBitcoin  CoinCategory = "Bitcoin"
 	CoinCategoryEthereum CoinCategory = "Ethereum"
 	CoinCategorySolana   CoinCategory = "Solana"
+	CoinCategoryStripe   CoinCategory = "Stripe"
 )

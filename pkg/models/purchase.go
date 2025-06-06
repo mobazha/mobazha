@@ -124,6 +124,17 @@ type PaymentData struct {
 	PlatformRewardAddr string    `json:"platformRewardAddr"`
 	RefundAddress      string    `json:"refundAddress"`
 	Timestamp          time.Time `json:"timestamp"`
+	// 新增支付方式信息
+	PaymentMethod struct {
+		Type  string `json:"type"`  // 支付方式类型
+		Brand string `json:"brand"` // 卡品牌（如果是信用卡支付）
+		Last4 string `json:"last4"` // 卡号后四位（如果是信用卡支付）
+	} `json:"paymentMethod"`
+	// 新增收据信息
+	ReceiptInfo struct {
+		URL    string `json:"url"`    // 收据URL
+		Number string `json:"number"` // 收据编号
+	} `json:"receiptInfo"`
 }
 
 func (p *PaymentData) BuildTransaction() iwallet.Transaction {

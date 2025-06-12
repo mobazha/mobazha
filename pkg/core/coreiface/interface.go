@@ -179,7 +179,7 @@ type CoreIface interface {
 	GetReceivingAccountsByChain(chainType iwallet.ChainType) ([]models.ReceivingAccount, error)
 
 	// Escrow
-	BuildInitSolEscrowInstructions(ctx context.Context, params models.InitializeSolEscrowData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
+	BuildInitSolEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
 	GetSOLEscrowReleaseInstructions(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) ([]solana.Instruction, error)
 
 	// Wallet

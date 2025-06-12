@@ -33,6 +33,8 @@ func GetOrderEscrowInfo(orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent) (i
 	}
 	escrowInfo.CoinType = coinType
 
+	escrowInfo.Payer = paymentSent.PayerPubkey
+
 	chainCode, err := hex.DecodeString(paymentSent.Chaincode)
 	if err != nil {
 		return iwallet.EscrowInfo{}, fmt.Errorf("failed to decode chaincode: %w", err)

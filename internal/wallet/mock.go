@@ -1024,13 +1024,6 @@ func (w *MockWallet) CreateMultisigWithTimeout(keys []btcec.PublicKey, chaincode
 	return addr, redeemScript, nil
 }
 
-// CanReleaseFunds returns whether the wallet can release the funds from escrow. This MUST
-// return false if the wallet is encrypted or if there is insufficient coins in the wallet
-// to pay the transaction fee/gas. This method should not actually move any funds.
-func (w *MockWallet) CanReleaseFunds(txn iwallet.Transaction, signatures [][]iwallet.EscrowSignature, redeemScript []byte) (bool, error) {
-	return true, nil
-}
-
 // ReleaseFundsAfterTimeout will release funds from the escrow. The signature will
 // be created using the timeoutKey.
 func (w *MockWallet) ReleaseFundsAfterTimeout(tx iwallet.Tx, txn iwallet.Transaction, timeoutKey btcec.PrivateKey, redeemScript []byte, finishType iwallet.OrderFinishType) (iwallet.TransactionID, error) {

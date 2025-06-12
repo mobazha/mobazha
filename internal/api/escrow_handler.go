@@ -11,7 +11,7 @@ import (
 
 // handleGetOrderPaymentInstructions 获取初始化SOL托管的指令
 func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *http.Request) {
-	var params models.InitializeSolEscrowData
+	var params models.InitializeEscrowData
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

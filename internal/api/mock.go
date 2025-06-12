@@ -146,7 +146,7 @@ type mockNode struct {
 	getReceivingAccountsByChainFunc func(chainType iwallet.ChainType) ([]models.ReceivingAccount, error)
 	getStripeConnectURLFunc         func() (string, error)
 
-	initializeSolEscrowFunc func(ctx context.Context, params models.InitializeSolEscrowData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
+	initializeSolEscrowFunc func(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
 	releaseSolEscrowFunc    func(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
 
 	getCancelableSOLEscrowReleaseInstructionsFunc func(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) ([]solana.Instruction, error)
@@ -530,7 +530,7 @@ func (m *mockNode) GetStripeConnectURL() (string, error) {
 }
 
 // Escrow
-func (m *mockNode) BuildInitSolEscrowInstructions(ctx context.Context, params models.InitializeSolEscrowData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error) {
+func (m *mockNode) BuildInitSolEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error) {
 	return m.initializeSolEscrowFunc(ctx, params)
 }
 func (m *mockNode) BuildReleaseSolEscrowInstructions(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {

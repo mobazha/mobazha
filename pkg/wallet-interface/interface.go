@@ -6,7 +6,6 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 var ErrInsufficientFunds = errors.New("insufficient funds")
@@ -209,12 +208,4 @@ type WalletCrypter interface {
 	// the provided duration after which it should be purged from memory.
 	// If the provided password is incorrect it should error.
 	Unlock(pw []byte, howLong time.Duration) error
-}
-
-type EthEscrow interface {
-	CreateEscrowAddress(escrowInfo EscrowInfo) (Address, error)
-
-	BuildInitEthEscrowInstructions(params EscrowInfo) (common.Address, []byte, error)
-
-	BuildReleaseEthEscrowInstructions(escrowInfo EscrowInfo, params ReleaseEscrowParams) (any, error)
 }

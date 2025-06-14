@@ -8,6 +8,7 @@ import (
 )
 
 type EscrowInfo struct {
+	ContractAddress    string
 	Payer              []byte
 	Buyer              []byte
 	Seller             []byte
@@ -140,6 +141,8 @@ func (e *ReleaseEscrowParams) GetEthereumUsersInfo() (initiator common.Address, 
 }
 
 type EscrowProcessor interface {
+	GetContractAddress() (Address, error)
+
 	CreateEscrowAddress(escrowInfo EscrowInfo) (Address, error)
 
 	BuildInitEscrowInstructions(params EscrowInfo) (Address, any, error)

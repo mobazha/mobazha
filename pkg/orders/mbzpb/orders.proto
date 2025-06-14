@@ -211,21 +211,22 @@ message PaymentSent {
     string transactionID                = 1;
     string chaincode                    = 2; // Hex encoded
     Method method                       = 3; // Direct, Cancelable, Moderated
-    string payerAddress                 = 4; // 支付者地址
-    string moderator                    = 5; // 仲裁者（可选）, peerID
-    string moderatorAddress             = 6; // 仲裁者地址
-    string amount                       = 7; // 支付金额, Satoshis
-    string coin                         = 8; // 支付货币
-    string fromAddress                  = 9; // 支付地址
-    string toAddress                    = 10; // 目标地址
-    string script                       = 11; // Hex encoded, usually redeem script.
-    string escrowReleaseFee             = 12;
-    uint32 escrowTimeoutHours           = 13;
-    string platformAmount               = 14; // Satoshis
-    string platformAddr                 = 15;
-    string refundAddress                = 16; // 退款地址
-    PaymentMethod paymentMethod         = 17; // 支付方式信息
-    google.protobuf.Timestamp timestamp = 18;
+    string contractAddress              = 4; // 合约地址
+    string payerAddress                 = 5; // 支付者地址
+    string moderator                    = 6; // 仲裁者（可选）, peerID
+    string moderatorAddress             = 7; // 仲裁者地址
+    string amount                       = 8; // 支付金额, Satoshis
+    string coin                         = 9; // 支付货币
+    string fromAddress                  = 10; // 支付地址
+    string toAddress                    = 11; // 目标地址
+    string script                       = 12; // Hex encoded, usually redeem script.
+    string escrowReleaseFee             = 13;
+    uint32 escrowTimeoutHours           = 14;
+    string platformAmount               = 15; // Satoshis
+    string platformAddr                 = 16;
+    string refundAddress                = 17; // 退款地址
+    PaymentMethod paymentMethod         = 18; // 支付方式信息
+    google.protobuf.Timestamp timestamp = 19;
 
     enum Method {
         DIRECT     = 0; // Address request

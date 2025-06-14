@@ -25,6 +25,8 @@ func GetOrderEscrowInfo(orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent) (i
 		escrowInfo.RequiredSignatures = 2
 	}
 
+	escrowInfo.ContractAddress = paymentSent.ContractAddress
+
 	coinType := iwallet.CoinType(paymentSent.Coin)
 	if !iwallet.IsValidCoinType(coinType) {
 		return iwallet.EscrowInfo{}, fmt.Errorf("invalid coin type: %v", coinType)

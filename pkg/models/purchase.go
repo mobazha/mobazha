@@ -103,6 +103,7 @@ type PaymentData struct {
 	TransactionID    string                `json:"transactionID"`
 	Coin             iwallet.CoinType      `json:"coin"`
 	Method           pb.PaymentSent_Method `json:"method"`
+	ContractAddress  string                `json:"contractAddress"`
 	PayerAddress     string                `json:"payerAddress"`
 	Moderator        string                `json:"moderator"`
 	ModeratorAddress string                `json:"moderatorAddress"`

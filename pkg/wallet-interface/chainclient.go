@@ -24,23 +24,9 @@ type EstimateFeeRes struct {
 }
 
 type ChainClient interface {
-	GetBlockchainInfo() (BlockInfo, error)
-
-	GetAddressTransactions(addr AddressEx, fromHeight uint64) ([]Transaction, error)
-
 	GetTransaction(id TransactionID, coinType CoinType) (*Transaction, error)
-
-	IsBlockInMainChain(block BlockInfo) (bool, error)
 
 	EstimateFee(txsize int) (map[FeeLevel]EstimateFeeRes, error)
 
-	SubscribeTransactions(addrs []AddressEx) (*TransactionSubscription, error)
-
-	SubscribeBlocks() (*BlockSubscription, error)
-
 	Broadcast(serializedTx []byte) error
-
-	Open() error
-
-	Close() error
 }

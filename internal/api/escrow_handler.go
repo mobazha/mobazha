@@ -8,7 +8,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
-// handleGetOrderPaymentInstructions 获取初始化SOL托管的指令
+// handleGetOrderPaymentInstructions 获取初始化托管的指令
 func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *http.Request) {
 	var params models.InitializeEscrowData
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
@@ -18,7 +18,7 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
-	// 使用 EscrowClient 初始化 SOL 托管
+	// 使用 EscrowProcessor 构建初始化托管指令
 	paymentData, escrowAccount, instructions, err := node.BuildInitEscrowInstructions(
 		r.Context(),
 		params,

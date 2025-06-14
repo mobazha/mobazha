@@ -158,6 +158,12 @@ func (g *Gateway) handleGETReleaseFundsInstructions(w http.ResponseWriter, r *ht
 		return
 	}
 
+	solInstructions, ok := instructions.([]solana.Instruction)
+	if !ok {
+		ErrorResponse(w, http.StatusInternalServerError, "instructions is not a []solana.Instruction")
+		return
+	}
+
 	type InstructionsResponse struct {
 		HasInstructions bool                 `json:"hasInstructions"`
 		Instructions    []solana.Instruction `json:"instructions"`
@@ -165,8 +171,8 @@ func (g *Gateway) handleGETReleaseFundsInstructions(w http.ResponseWriter, r *ht
 
 	// 返回响应
 	response := InstructionsResponse{
-		HasInstructions: len(instructions) > 0,
-		Instructions:    instructions,
+		HasInstructions: len(solInstructions) > 0,
+		Instructions:    solInstructions,
 	}
 	json.NewEncoder(w).Encode(response)
 }

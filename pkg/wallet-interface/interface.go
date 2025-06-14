@@ -6,6 +6,7 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 var ErrInsufficientFunds = errors.New("insufficient funds")
@@ -165,11 +166,6 @@ type Escrow interface {
 	// why a slice of signatures is returned.
 	SignMultisigTransaction(txn Transaction, key btcec.PrivateKey, redeemScript []byte) ([]EscrowSignature, error)
 
-	// CanReleaseFunds returns whether the wallet can release the funds from escrow. This MUST
-	// return false if the wallet is encrypted or if there is insufficient coins in the wallet
-	// to pay the transaction fee/gas. This method should not actually move any funds.
-	CanReleaseFunds(txn Transaction, signatures [][]EscrowSignature, redeemScript []byte) (bool, error)
-
 	// BuildAndSend should used the passed in signatures to build the transaction.
 	// Note the signatures are a slice of slices. This is because coins like Bitcoin
 	// may require one signature *per input*. In this case the outer slice is the
@@ -221,8 +217,10 @@ type WalletCrypter interface {
 	Unlock(pw []byte, howLong time.Duration) error
 }
 
-type EscrowWalletScanner interface {
-	// ScanContractTransactions scan transactions from scriptHash addresses in contracts
-	// Note this will only ever be called for an order's payment address transaction of ETH like coins
-	ScanContractTransactions(addrs []AddressEx, start time.Time, callback func(txn Transaction), done chan struct{})
+type EthEscrow interface {
+	CreateEscrowAddress(escrowInfo EscrowInfo) (Address, error)
+
+	BuildInitEthEscrowInstructions(params EscrowInfo) (common.Address, []byte, error)
+
+	BuildReleaseEthEscrowInstructions(escrowInfo EscrowInfo, params ReleaseEscrowParams) (any, error)
 }

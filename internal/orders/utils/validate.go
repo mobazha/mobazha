@@ -276,18 +276,17 @@ func validateEscrowPayment(paymentSent *pb.PaymentSent, wal iwallet.Wallet, chai
 			return errors.New("invalid moderator selection")
 		}
 
-		var moderatorKey *btcec.PublicKey
-		if isETHLike {
-			moderatorKey, err = btcec.ParsePubKey(paymentSent.ModeratorPubKey)
-			if err != nil {
-				return fmt.Errorf("generate vendor pub key failed, %s", err)
-			}
-		} else {
-			moderatorEscrowPubkey, err := btcec.ParsePubKey(paymentSent.ModeratorPubKey)
-			if err != nil {
-				return err
-			}
-			moderatorKey, err = GenerateEscrowPublicKey(moderatorEscrowPubkey, chaincode)
+		moderatorEscrowPubkeyBytes, err := hex.DecodeString(paymentSent.ModeratorAddress)
+		if err != nil {
+			return fmt.Errorf("decode moderator pubkey: %s", err.Error())
+		}
+		moderatorKey, err := btcec.ParsePubKey(moderatorEscrowPubkeyBytes)
+		if err != nil {
+			return fmt.Errorf("parse moderator key failed, %v", err)
+		}
+
+		if !isETHLike {
+			moderatorKey, err = GenerateEscrowPublicKey(moderatorKey, chaincode)
 			if err != nil {
 				return err
 			}

@@ -536,7 +536,7 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 	}
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
-	var instructions []solana.Instruction
+	var instructions any
 	if args.Reject {
 		instructions, err = node.GetRejectOrderInstructions(models.OrderID(args.OrderID), args.Initiator)
 	} else {
@@ -552,10 +552,25 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 		Instructions    []solana.Instruction `json:"instructions"`
 	}
 
+	if instructions == nil {
+		response := ConfirmationResponse{
+			HasInstructions: false,
+			Instructions:    []solana.Instruction{},
+		}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	solInstructions, ok := instructions.([]solana.Instruction)
+	if !ok {
+		ErrorResponse(w, http.StatusInternalServerError, "instructions is not a []solana.Instruction")
+		return
+	}
+
 	// 返回响应
 	response := ConfirmationResponse{
-		HasInstructions: len(instructions) > 0,
-		Instructions:    instructions,
+		HasInstructions: len(solInstructions) > 0,
+		Instructions:    solInstructions,
 	}
 	json.NewEncoder(w).Encode(response)
 }
@@ -683,7 +698,7 @@ func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *h
 	}
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
-	var instructions []solana.Instruction
+	var instructions any
 	instructions, err = node.GetCompleteOrderInstructions(models.OrderID(args.OrderID), args.Initiator)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -695,10 +710,25 @@ func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *h
 		Instructions    []solana.Instruction `json:"instructions"`
 	}
 
+	if instructions == nil {
+		response := CompletionResponse{
+			HasInstructions: false,
+			Instructions:    []solana.Instruction{},
+		}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	solInstructions, ok := instructions.([]solana.Instruction)
+	if !ok {
+		ErrorResponse(w, http.StatusInternalServerError, "instructions is not a []solana.Instruction")
+		return
+	}
+
 	// 返回响应
 	response := CompletionResponse{
-		HasInstructions: len(instructions) > 0,
-		Instructions:    instructions,
+		HasInstructions: len(solInstructions) > 0,
+		Instructions:    solInstructions,
 	}
 	json.NewEncoder(w).Encode(response)
 }

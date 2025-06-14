@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
@@ -20,7 +19,7 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	// 使用 EscrowClient 初始化 SOL 托管
-	paymentData, escrowAccount, escrowTokenAccount, instructions, err := node.BuildInitSolEscrowInstructions(
+	paymentData, escrowAccount, instructions, err := node.BuildInitSolEscrowInstructions(
 		r.Context(),
 		params,
 	)
@@ -30,18 +29,16 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 	}
 
 	type InitializeSolResponse struct {
-		PaymentData        *models.PaymentData  `json:"paymentData"`
-		EscrowAccount      solana.PublicKey     `json:"escrowAccount"`
-		EscrowTokenAccount solana.PublicKey     `json:"escrowTokenAccount"`
-		Instructions       []solana.Instruction `json:"instructions"`
+		PaymentData   *models.PaymentData `json:"paymentData"`
+		EscrowAccount string              `json:"escrowAccount"`
+		Instructions  any                 `json:"instructions"`
 	}
 
 	// 返回响应
 	response := InitializeSolResponse{
-		PaymentData:        paymentData,
-		EscrowAccount:      escrowAccount,
-		EscrowTokenAccount: escrowTokenAccount,
-		Instructions:       instructions,
+		PaymentData:   paymentData,
+		EscrowAccount: escrowAccount.String(),
+		Instructions:  instructions,
 	}
 	json.NewEncoder(w).Encode(response)
 }

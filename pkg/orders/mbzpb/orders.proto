@@ -211,9 +211,9 @@ message PaymentSent {
     string transactionID                = 1;
     string chaincode                    = 2; // Hex encoded
     Method method                       = 3; // Direct, Cancelable, Moderated
-    bytes payerPubkey                   = 4; // 支付者公钥
+    string payerAddress                 = 4; // 支付者地址
     string moderator                    = 5; // 仲裁者（可选）, peerID
-    bytes  moderatorPubKey              = 6; // 仲裁者公钥
+    string moderatorAddress             = 6; // 仲裁者地址
     string amount                       = 7; // 支付金额, Satoshis
     string coin                         = 8; // 支付货币
     string fromAddress                  = 9; // 支付地址

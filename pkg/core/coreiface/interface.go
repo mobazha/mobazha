@@ -66,10 +66,10 @@ type CoreIface interface {
 	RejectOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
 	RefundOrder(orderID models.OrderID, done chan struct{}) error
 	ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
-	GetConfirmOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
-	GetRejectOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	GetConfirmOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error)
+	GetRejectOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error)
 	FulfillOrder(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error
-	GetCompleteOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	GetCompleteOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error)
 	CompleteOrder(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	CancelOrder(orderID models.OrderID, done chan struct{}) error
 
@@ -82,7 +82,7 @@ type CoreIface interface {
 	// Dispute
 	OpenDispute(orderID models.OrderID, reason string, done chan struct{}) error
 	CloseDispute(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
-	GetReleaseFundsInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	GetReleaseFundsInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error)
 	ReleaseFunds(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	ReleaseFundsAfterTimeout(orderID models.OrderID, done chan struct{}) error
 
@@ -179,8 +179,8 @@ type CoreIface interface {
 	GetReceivingAccountsByChain(chainType iwallet.ChainType) ([]models.ReceivingAccount, error)
 
 	// Escrow
-	BuildInitSolEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
-	GetSOLEscrowReleaseInstructions(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) ([]solana.Instruction, error)
+	BuildInitSolEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error)
+	GetSOLEscrowReleaseInstructions(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) (any, error)
 
 	// Wallet
 	Multiwallet() multiwallet.Multiwallet

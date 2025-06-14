@@ -289,23 +289,13 @@ func verifyOrderMessageSignature(peer peer.ID, message *npb.OrderMessage) error 
 }
 
 // GetPreferences returns the saved preferences for this node.
-func (op *OrderProcessor) GetActiveReceivingAccountByChain(tx database.Tx, chainType string) (*models.ReceivingAccount, error) {
-	var records []models.ReceivingAccount
-	err := tx.Read().Where("chain_type = ?", chainType).Find(&records).Error
+func (op *OrderProcessor) GetActiveReceivingAccount(tx database.Tx, chainType string) (*models.ReceivingAccount, error) {
+	var record models.ReceivingAccount
+	err := tx.Read().Where("chain_type = ? AND is_active = ?", chainType, true).First(&record).Error
 	if err != nil {
 		return nil, err
 	}
-
-	for _, r := range records {
-		tokens, err := r.ActiveTokens()
-		if err != nil {
-			return nil, err
-		}
-		if len(tokens) > 0 {
-			return &r, nil
-		}
-	}
-	return nil, errors.New("no active receiving account found")
+	return &record, nil
 }
 
 func (op *OrderProcessor) GetPayoutAddress(tx database.Tx, coinType string) (iwallet.Address, error) {
@@ -315,7 +305,7 @@ func (op *OrderProcessor) GetPayoutAddress(tx database.Tx, coinType string) (iwa
 	}
 
 	// 从激活的收款账户获取地址
-	account, err := op.GetActiveReceivingAccountByChain(tx, coinInfo.Chain.String())
+	account, err := op.GetActiveReceivingAccount(tx, coinInfo.Chain.String())
 	if err == nil && account != nil {
 		logger.LogInfoWithIDf(log, op.nodeID, "使用激活的收款账户获取地址: %s", account.Address)
 		return iwallet.NewAddress(account.Address, iwallet.CoinType(coinType)), nil

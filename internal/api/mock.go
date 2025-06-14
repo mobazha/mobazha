@@ -47,15 +47,15 @@ type mockNode struct {
 	getCaseFunc                             func(orderID string) (*models.Case, error)
 	getCasesFunc                            func(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Case, int64, error)
 	confirmOrderFunc                        func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
-	getConfirmOrderInstructionsFunc         func(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
-	getRejectOrderInstructionsFunc          func(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
-	getCompleteOrderInstructionsFunc        func(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	getConfirmOrderInstructionsFunc         func(orderID models.OrderID, initiator solana.PublicKey) (any, error)
+	getRejectOrderInstructionsFunc          func(orderID models.OrderID, initiator solana.PublicKey) (any, error)
+	getCompleteOrderInstructionsFunc        func(orderID models.OrderID, initiator solana.PublicKey) (any, error)
 	fulfillOrderFunc                        func(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error
 	completeOrderFunc                       func(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	cancelOrderFunc                         func(orderID models.OrderID, done chan struct{}) error
 	openDisputeFunc                         func(orderID models.OrderID, reason string, done chan struct{}) error
 	closeDisputeFunc                        func(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
-	getReleaseFundsInstructionsFunc         func(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	getReleaseFundsInstructionsFunc         func(orderID models.OrderID, initiator solana.PublicKey) (any, error)
 	releaseFundsFunc                        func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	releaseFundsAfterTimeoutFunc            func(orderID models.OrderID, done chan struct{}) error
 	followNodeFunc                          func(peerID peer.ID, done chan<- struct{}) error
@@ -108,7 +108,7 @@ type mockNode struct {
 	multiwalletFunc                         func() multiwallet.Multiwallet
 	nodeIDFunc                              func() string
 	identityFunc                            func() peer.ID
-	subscribeEventFunc                      func(event interface{}) (events.Subscription, error)
+	subscribeEventFunc                      func(event any) (events.Subscription, error)
 	startFunc                               func()
 	destroyNodeFunc                         func()
 	eventBusFunc                            func() events.Bus
@@ -134,7 +134,6 @@ type mockNode struct {
 	saveTransactionMetadataFunc             func(metadata *models.TransactionMetadata) error
 	getTransactionMetadataFunc              func(txid iwallet.TransactionID) (models.TransactionMetadata, error)
 	getMnemonicFunc                         func() (string, error)
-	updateWalletStatusFunc                  func(coinTypes []iwallet.CoinType)
 	getExchangeRatesFunc                    func() *wallet.ExchangeRateProvider
 
 	// 收款账户相关
@@ -146,10 +145,10 @@ type mockNode struct {
 	getReceivingAccountsByChainFunc func(chainType iwallet.ChainType) ([]models.ReceivingAccount, error)
 	getStripeConnectURLFunc         func() (string, error)
 
-	initializeSolEscrowFunc func(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error)
-	releaseSolEscrowFunc    func(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error)
+	initializeSolEscrowFunc func(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error)
+	releaseSolEscrowFunc    func(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) (any, error)
 
-	getCancelableSOLEscrowReleaseInstructionsFunc func(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) ([]solana.Instruction, error)
+	getCancelableSOLEscrowReleaseInstructionsFunc func(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) (any, error)
 
 	addPostFunc       func(post *postsPb.Post, done chan<- struct{}) error
 	deletePostFunc    func(slug string, done chan<- struct{}) error
@@ -246,13 +245,13 @@ func (m *mockNode) GetCases(stateFilters []models.OrderState, searchTerm string,
 func (m *mockNode) ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {
 	return m.confirmOrderFunc(orderID, txid, done)
 }
-func (m *mockNode) GetConfirmOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
+func (m *mockNode) GetConfirmOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error) {
 	return m.getConfirmOrderInstructionsFunc(orderID, initiator)
 }
-func (m *mockNode) GetCompleteOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
+func (m *mockNode) GetCompleteOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error) {
 	return m.getCompleteOrderInstructionsFunc(orderID, initiator)
 }
-func (m *mockNode) GetRejectOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
+func (m *mockNode) GetRejectOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error) {
 	return m.getRejectOrderInstructionsFunc(orderID, initiator)
 }
 
@@ -271,7 +270,7 @@ func (m *mockNode) OpenDispute(orderID models.OrderID, reason string, done chan 
 func (m *mockNode) CloseDispute(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error {
 	return m.closeDisputeFunc(orderID, buyerPercentage, vendorPercentage, resolution, done)
 }
-func (m *mockNode) GetReleaseFundsInstructions(orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
+func (m *mockNode) GetReleaseFundsInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error) {
 	return m.getReleaseFundsInstructionsFunc(orderID, initiator)
 }
 func (m *mockNode) ReleaseFunds(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {
@@ -424,7 +423,7 @@ func (m *mockNode) GetNodeID() string {
 func (m *mockNode) Identity() peer.ID {
 	return m.identityFunc()
 }
-func (m *mockNode) SubscribeEvent(event interface{}) (events.Subscription, error) {
+func (m *mockNode) SubscribeEvent(event any) (events.Subscription, error) {
 	return m.subscribeEventFunc(event)
 }
 func (m *mockNode) Start() {
@@ -530,13 +529,13 @@ func (m *mockNode) GetStripeConnectURL() (string, error) {
 }
 
 // Escrow
-func (m *mockNode) BuildInitSolEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, solana.PublicKey, solana.PublicKey, []solana.Instruction, error) {
+func (m *mockNode) BuildInitSolEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error) {
 	return m.initializeSolEscrowFunc(ctx, params)
 }
-func (m *mockNode) BuildReleaseSolEscrowInstructions(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) ([]solana.Instruction, error) {
+func (m *mockNode) BuildReleaseSolEscrowInstructions(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) (any, error) {
 	return m.releaseSolEscrowFunc(ctx, orderID, initiator)
 }
-func (m *mockNode) GetSOLEscrowReleaseInstructions(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) ([]solana.Instruction, error) {
+func (m *mockNode) GetSOLEscrowReleaseInstructions(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) (any, error) {
 	return m.getCancelableSOLEscrowReleaseInstructionsFunc(orderID, initiator, receiver)
 }
 

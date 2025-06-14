@@ -99,15 +99,15 @@ type Purchase struct {
 }
 
 type PaymentData struct {
-	OrderID         string                `json:"orderID"`
-	TransactionID   string                `json:"transactionID"`
-	Coin            iwallet.CoinType      `json:"coin"`
-	Method          pb.PaymentSent_Method `json:"method"`
-	PayerPubKey     []byte                `json:"payerPubKey"`
-	Moderator       string                `json:"moderator"`
-	ModeratorPubKey []byte                `json:"moderatorPubKey"`
-	Amount          uint64                `json:"amount"`
-	FromAddress     string                `json:"fromAddress"`
+	OrderID          string                `json:"orderID"`
+	TransactionID    string                `json:"transactionID"`
+	Coin             iwallet.CoinType      `json:"coin"`
+	Method           pb.PaymentSent_Method `json:"method"`
+	PayerAddress     string                `json:"payerAddress"`
+	Moderator        string                `json:"moderator"`
+	ModeratorAddress string                `json:"moderatorAddress"`
+	Amount           uint64                `json:"amount"`
+	FromAddress      string                `json:"fromAddress"`
 	/*
 		id := make([]byte, 36)
 		copy(id[:32], prevHash[:])

@@ -19,7 +19,7 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	// 使用 EscrowClient 初始化 SOL 托管
-	paymentData, escrowAccount, instructions, err := node.BuildInitSolEscrowInstructions(
+	paymentData, escrowAccount, instructions, err := node.BuildInitEscrowInstructions(
 		r.Context(),
 		params,
 	)
@@ -28,14 +28,14 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 		return
 	}
 
-	type InitializeSolResponse struct {
+	type InitializeEscrowResponse struct {
 		PaymentData   *models.PaymentData `json:"paymentData"`
 		EscrowAccount string              `json:"escrowAccount"`
 		Instructions  any                 `json:"instructions"`
 	}
 
 	// 返回响应
-	response := InitializeSolResponse{
+	response := InitializeEscrowResponse{
 		PaymentData:   paymentData,
 		EscrowAccount: escrowAccount.String(),
 		Instructions:  instructions,

@@ -529,10 +529,10 @@ func (m *mockNode) GetStripeConnectURL() (string, error) {
 }
 
 // Escrow
-func (m *mockNode) BuildInitSolEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error) {
+func (m *mockNode) BuildInitEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error) {
 	return m.initializeSolEscrowFunc(ctx, params)
 }
-func (m *mockNode) BuildReleaseSolEscrowInstructions(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) (any, error) {
+func (m *mockNode) BuildReleaseEscrowInstructions(ctx context.Context, orderID models.OrderID, initiator solana.PublicKey) (any, error) {
 	return m.releaseSolEscrowFunc(ctx, orderID, initiator)
 }
 func (m *mockNode) GetSOLEscrowReleaseInstructions(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) (any, error) {

@@ -240,7 +240,7 @@ func validateSolanaPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal
 	if err != nil {
 		return err
 	}
-	escrowWallet := wal.(iwallet.SOLEscrow)
+	escrowWallet := wal.(iwallet.EscrowProcessor)
 
 	address, err := escrowWallet.CreateEscrowAddress(escrowInfo)
 	if err != nil {

@@ -139,9 +139,9 @@ func (e *ReleaseEscrowParams) GetEthereumUsersInfo() (initiator common.Address, 
 	return initiator, publicKeys, recipients, nil
 }
 
-type SOLEscrow interface {
+type EscrowProcessor interface {
 	CreateEscrowAddress(escrowInfo EscrowInfo) (Address, error)
 
-	BuildInitSolEscrowInstructions(params EscrowInfo) (Address, any, error)
-	BuildReleaseSolEscrowInstructions(escrowInfo EscrowInfo, params ReleaseEscrowParams) (any, error)
+	BuildInitEscrowInstructions(params EscrowInfo) (Address, any, error)
+	BuildReleaseEscrowInstructions(escrowInfo EscrowInfo, params ReleaseEscrowParams) (any, error)
 }

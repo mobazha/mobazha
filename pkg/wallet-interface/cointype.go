@@ -34,7 +34,7 @@ func (chaintype ChainType) String() string {
 
 func GetAllSupportedChainTypes() []ChainType {
 	return []ChainType{
-		ChainBitcoin, ChainSolana, ChainStripe,
+		ChainSolana, ChainStripe, ChainEthereum, ChainBNB,
 	}
 }
 
@@ -248,7 +248,7 @@ var (
 		Symbol:          "USDT",
 		IsNative:        false,
 		Contract:        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-		TestnetContract: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", // Solana Devnet USDT
+		TestnetContract: "68DyGgw3jp9wH1WhEN4NaBFNgzDbWYM8TFM8XeFZTKU4", // Solana Devnet USDT
 		Decimals:        6,
 		Description:     "Tether USD on Solana",
 	}

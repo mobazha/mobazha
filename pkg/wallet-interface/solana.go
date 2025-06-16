@@ -43,23 +43,19 @@ func (e *EscrowInfo) GetSolanaUsersInfo() (payer solana.PublicKey, buyer solana.
 }
 
 func (e *EscrowInfo) GetEthereumUsersInfo() (payer common.Address, buyer common.Address, seller common.Address, moderator common.Address, err error) {
-	if len(e.Payer) != common.AddressLength {
+	if payer, err = PubKeyBytesToEthAddress(e.Payer); err != nil {
 		return common.Address{}, common.Address{}, common.Address{}, common.Address{}, errors.New("invalid payer")
 	}
-	payer = common.BytesToAddress(e.Payer)
-	if len(e.Buyer) != common.AddressLength {
+	if buyer, err = PubKeyBytesToEthAddress(e.Buyer); err != nil {
 		return common.Address{}, common.Address{}, common.Address{}, common.Address{}, errors.New("invalid buyer")
 	}
-	buyer = common.BytesToAddress(e.Buyer)
-	if len(e.Seller) != common.AddressLength {
+	if seller, err = PubKeyBytesToEthAddress(e.Seller); err != nil {
 		return common.Address{}, common.Address{}, common.Address{}, common.Address{}, errors.New("invalid seller")
 	}
-	seller = common.BytesToAddress(e.Seller)
 	if len(e.Moderator) > 0 {
-		if len(e.Moderator) != common.AddressLength {
+		if moderator, err = PubKeyBytesToEthAddress(e.Moderator); err != nil {
 			return common.Address{}, common.Address{}, common.Address{}, common.Address{}, errors.New("invalid moderator")
 		}
-		moderator = common.BytesToAddress(e.Moderator)
 	}
 	return payer, buyer, seller, moderator, nil
 }
@@ -108,20 +104,20 @@ func (e *ReleaseEscrowParams) GetSolanaUsersInfo() (initiator solana.PublicKey, 
 }
 
 func (e *ReleaseEscrowParams) GetEthereumUsersInfo() (initiator common.Address, publicKeys []common.Address, recipients []common.Address, err error) {
-	if len(e.Initiator) != common.AddressLength {
+	if initiator, err = PubKeyBytesToEthAddress(e.Initiator); err != nil {
 		return common.Address{}, nil, nil, errors.New("invalid initiator")
 	}
-	initiator = common.BytesToAddress(e.Initiator)
 
 	for _, publicKey := range e.PublicKeys {
 		if len(publicKey) == 0 {
 			publicKeys = append(publicKeys, common.Address{})
 			continue
 		}
-		if len(publicKey) != common.AddressLength {
+		publicKeyAddress, err := PubKeyBytesToEthAddress(publicKey)
+		if err != nil {
 			return common.Address{}, nil, nil, errors.New("invalid public key")
 		}
-		publicKeys = append(publicKeys, common.BytesToAddress(publicKey))
+		publicKeys = append(publicKeys, publicKeyAddress)
 	}
 
 	for _, recipient := range e.Recipients {
@@ -129,10 +125,11 @@ func (e *ReleaseEscrowParams) GetEthereumUsersInfo() (initiator common.Address, 
 			recipients = append(recipients, common.Address{})
 			continue
 		}
-		if len(recipient) != common.AddressLength {
+		recipientAddress, err := PubKeyBytesToEthAddress(recipient)
+		if err != nil {
 			return common.Address{}, nil, nil, errors.New("invalid recipient")
 		}
-		recipients = append(recipients, common.BytesToAddress(recipient))
+		recipients = append(recipients, recipientAddress)
 		if len(e.Amounts) != len(recipients) {
 			return common.Address{}, nil, nil, errors.New("invalid amounts")
 		}

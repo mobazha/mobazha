@@ -180,7 +180,6 @@ type CoreIface interface {
 
 	// Escrow
 	BuildInitEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error)
-	GetSOLEscrowReleaseInstructions(orderID models.OrderID, initiator solana.PublicKey, receiver solana.PublicKey) (any, error)
 
 	// Wallet
 	Multiwallet() multiwallet.Multiwallet

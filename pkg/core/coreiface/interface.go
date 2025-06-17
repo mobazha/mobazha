@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/kubo/core"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -66,10 +65,10 @@ type CoreIface interface {
 	RejectOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
 	RefundOrder(orderID models.OrderID, done chan struct{}) error
 	ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
-	GetConfirmOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error)
-	GetRejectOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error)
+	GetConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
+	GetRejectOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	FulfillOrder(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error
-	GetCompleteOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error)
+	GetCompleteOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	CompleteOrder(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	CancelOrder(orderID models.OrderID, done chan struct{}) error
 
@@ -82,7 +81,7 @@ type CoreIface interface {
 	// Dispute
 	OpenDispute(orderID models.OrderID, reason string, done chan struct{}) error
 	CloseDispute(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
-	GetReleaseFundsInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error)
+	GetReleaseFundsInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	ReleaseFunds(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	ReleaseFundsAfterTimeout(orderID models.OrderID, done chan struct{}) error
 

@@ -62,7 +62,7 @@ func (e *EscrowInfo) GetEthereumUsersInfo() (payer common.Address, buyer common.
 
 // ReleaseEscrowParams 释放参数
 type ReleaseEscrowParams struct {
-	Initiator []byte
+	InitiatorAddress string
 	// PublicKeys与Signatures 一一对应
 	Message    []byte
 	PublicKeys [][]byte
@@ -73,10 +73,10 @@ type ReleaseEscrowParams struct {
 }
 
 func (e *ReleaseEscrowParams) GetSolanaUsersInfo() (initiator solana.PublicKey, publicKeys []solana.PublicKey, recipients []solana.PublicKey, err error) {
-	if len(e.Initiator) != solana.PublicKeyLength {
+	initiator, err = solana.PublicKeyFromBase58(e.InitiatorAddress)
+	if err != nil {
 		return solana.PublicKey{}, nil, nil, errors.New("invalid initiator")
 	}
-	initiator = solana.PublicKeyFromBytes(e.Initiator)
 
 	for _, publicKey := range e.PublicKeys {
 		if len(publicKey) == 0 {
@@ -104,9 +104,7 @@ func (e *ReleaseEscrowParams) GetSolanaUsersInfo() (initiator solana.PublicKey, 
 }
 
 func (e *ReleaseEscrowParams) GetEthereumUsersInfo() (initiator common.Address, publicKeys []common.Address, recipients []common.Address, err error) {
-	if initiator, err = PubKeyBytesToEthAddress(e.Initiator); err != nil {
-		return common.Address{}, nil, nil, errors.New("invalid initiator")
-	}
+	initiator = common.HexToAddress(e.InitiatorAddress)
 
 	for _, publicKey := range e.PublicKeys {
 		if len(publicKey) == 0 {
@@ -137,11 +135,18 @@ func (e *ReleaseEscrowParams) GetEthereumUsersInfo() (initiator common.Address, 
 	return initiator, publicKeys, recipients, nil
 }
 
+type PayDataInfo struct {
+	UniqueId      []byte
+	Destinations  [][]byte
+	Amounts       []uint64
+	EscrowAddress []byte
+}
+
 type EscrowProcessor interface {
 	GetContractAddress() (Address, error)
 
 	CreateEscrowAddress(escrowInfo EscrowInfo) (Address, error)
 
-	BuildInitEscrowInstructions(params EscrowInfo) (Address, any, error)
-	BuildReleaseEscrowInstructions(escrowInfo EscrowInfo, params ReleaseEscrowParams) (any, error)
+	BuildInitEscrowInstructions(params EscrowInfo) (escrowAddress Address, instructions any, script []byte, err error)
+	BuildReleaseEscrowInstructions(escrowInfo EscrowInfo, params ReleaseEscrowParams) (instructions any, err error)
 }

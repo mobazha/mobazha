@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/kubo/core"
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -47,15 +46,15 @@ type mockNode struct {
 	getCaseFunc                             func(orderID string) (*models.Case, error)
 	getCasesFunc                            func(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Case, int64, error)
 	confirmOrderFunc                        func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
-	getConfirmOrderInstructionsFunc         func(orderID models.OrderID, initiator solana.PublicKey) (any, error)
-	getRejectOrderInstructionsFunc          func(orderID models.OrderID, initiator solana.PublicKey) (any, error)
-	getCompleteOrderInstructionsFunc        func(orderID models.OrderID, initiator solana.PublicKey) (any, error)
+	getConfirmOrderInstructionsFunc         func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
+	getRejectOrderInstructionsFunc          func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
+	getCompleteOrderInstructionsFunc        func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
 	fulfillOrderFunc                        func(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error
 	completeOrderFunc                       func(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	cancelOrderFunc                         func(orderID models.OrderID, done chan struct{}) error
 	openDisputeFunc                         func(orderID models.OrderID, reason string, done chan struct{}) error
 	closeDisputeFunc                        func(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
-	getReleaseFundsInstructionsFunc         func(orderID models.OrderID, initiator solana.PublicKey) (any, error)
+	getReleaseFundsInstructionsFunc         func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
 	releaseFundsFunc                        func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	releaseFundsAfterTimeoutFunc            func(orderID models.OrderID, done chan struct{}) error
 	followNodeFunc                          func(peerID peer.ID, done chan<- struct{}) error
@@ -242,14 +241,14 @@ func (m *mockNode) GetCases(stateFilters []models.OrderState, searchTerm string,
 func (m *mockNode) ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {
 	return m.confirmOrderFunc(orderID, txid, done)
 }
-func (m *mockNode) GetConfirmOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error) {
-	return m.getConfirmOrderInstructionsFunc(orderID, initiator)
+func (m *mockNode) GetConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
+	return m.getConfirmOrderInstructionsFunc(orderID, initiatorAddress)
 }
-func (m *mockNode) GetCompleteOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error) {
-	return m.getCompleteOrderInstructionsFunc(orderID, initiator)
+func (m *mockNode) GetCompleteOrderInstructions(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
+	return m.getCompleteOrderInstructionsFunc(orderID, initiatorAddress)
 }
-func (m *mockNode) GetRejectOrderInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error) {
-	return m.getRejectOrderInstructionsFunc(orderID, initiator)
+func (m *mockNode) GetRejectOrderInstructions(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
+	return m.getRejectOrderInstructionsFunc(orderID, initiatorAddress)
 }
 
 func (m *mockNode) FulfillOrder(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error {
@@ -267,8 +266,8 @@ func (m *mockNode) OpenDispute(orderID models.OrderID, reason string, done chan 
 func (m *mockNode) CloseDispute(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error {
 	return m.closeDisputeFunc(orderID, buyerPercentage, vendorPercentage, resolution, done)
 }
-func (m *mockNode) GetReleaseFundsInstructions(orderID models.OrderID, initiator solana.PublicKey) (any, error) {
-	return m.getReleaseFundsInstructionsFunc(orderID, initiator)
+func (m *mockNode) GetReleaseFundsInstructions(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
+	return m.getReleaseFundsInstructionsFunc(orderID, initiatorAddress)
 }
 func (m *mockNode) ReleaseFunds(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {
 	return m.releaseFundsFunc(orderID, txid, done)

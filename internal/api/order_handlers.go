@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -523,9 +522,9 @@ func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) 
 
 func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, r *http.Request) {
 	type Params struct {
-		OrderID   string           `json:"orderID"`
-		Reject    bool             `json:"reject"`
-		Initiator solana.PublicKey `json:"initiator"`
+		OrderID          string `json:"orderID"`
+		Reject           bool   `json:"reject"`
+		InitiatorAddress string `json:"initiatorAddress"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	var args Params
@@ -536,41 +535,45 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 	}
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	var coinType iwallet.CoinType
 	var instructions any
 	if args.Reject {
-		instructions, err = node.GetRejectOrderInstructions(models.OrderID(args.OrderID), args.Initiator)
+		coinType, instructions, err = node.GetRejectOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress)
 	} else {
-		instructions, err = node.GetConfirmOrderInstructions(models.OrderID(args.OrderID), args.Initiator)
+		coinType, instructions, err = node.GetConfirmOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress)
 	}
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
+	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	chainType := coinInfo.Chain
+
 	type ConfirmationResponse struct {
-		HasInstructions bool                 `json:"hasInstructions"`
-		Instructions    []solana.Instruction `json:"instructions"`
+		PaymentChain    iwallet.ChainType `json:"paymentChain"`
+		HasInstructions bool              `json:"hasInstructions"`
+		Instructions    any               `json:"instructions"`
 	}
 
 	if instructions == nil {
 		response := ConfirmationResponse{
+			PaymentChain:    chainType,
 			HasInstructions: false,
-			Instructions:    []solana.Instruction{},
 		}
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	solInstructions, ok := instructions.([]solana.Instruction)
-	if !ok {
-		ErrorResponse(w, http.StatusInternalServerError, "instructions is not a []solana.Instruction")
-		return
-	}
-
 	// 返回响应
 	response := ConfirmationResponse{
-		HasInstructions: len(solInstructions) > 0,
-		Instructions:    solInstructions,
+		PaymentChain:    chainType,
+		HasInstructions: true,
+		Instructions:    instructions,
 	}
 	json.NewEncoder(w).Encode(response)
 }
@@ -686,8 +689,8 @@ func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) 
 
 func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *http.Request) {
 	type Params struct {
-		OrderID   string           `json:"orderID"`
-		Initiator solana.PublicKey `json:"initiator"`
+		OrderID          string `json:"orderID"`
+		InitiatorAddress string `json:"initiatorAddress"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	var args Params
@@ -698,37 +701,42 @@ func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *h
 	}
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	var coinType iwallet.CoinType
 	var instructions any
-	instructions, err = node.GetCompleteOrderInstructions(models.OrderID(args.OrderID), args.Initiator)
+	coinType, instructions, err = node.GetCompleteOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
+	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	chainType := coinInfo.Chain
+
 	type CompletionResponse struct {
-		HasInstructions bool                 `json:"hasInstructions"`
-		Instructions    []solana.Instruction `json:"instructions"`
+		PaymentChain    iwallet.ChainType `json:"paymentChain"`
+		HasInstructions bool              `json:"hasInstructions"`
+		Instructions    any               `json:"instructions"`
 	}
 
 	if instructions == nil {
 		response := CompletionResponse{
+			PaymentChain:    chainType,
 			HasInstructions: false,
-			Instructions:    []solana.Instruction{},
+			Instructions:    nil,
 		}
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	solInstructions, ok := instructions.([]solana.Instruction)
-	if !ok {
-		ErrorResponse(w, http.StatusInternalServerError, "instructions is not a []solana.Instruction")
-		return
-	}
-
 	// 返回响应
 	response := CompletionResponse{
-		HasInstructions: len(solInstructions) > 0,
-		Instructions:    solInstructions,
+		PaymentChain:    chainType,
+		HasInstructions: true,
+		Instructions:    instructions,
 	}
 	json.NewEncoder(w).Encode(response)
 }

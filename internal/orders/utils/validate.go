@@ -171,38 +171,13 @@ func ValidatePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTim
 		return fmt.Errorf("chaincode parse error: %s", err)
 	}
 
-	if wal.CoinCategory() == iwallet.CoinCategorySolana {
-		return validateSolanaPayment(order, paymentSent, wal)
-	} else if wal.CoinCategory() == iwallet.CoinCategoryEthereum {
-		return validateETHLikePayment(order, paymentSent, chaincode, wal, escrowTimeoutHours)
+	if wal.CoinCategory() == iwallet.CoinCategorySolana || wal.CoinCategory() == iwallet.CoinCategoryEthereum {
+		return validateEscrowPayment(order, paymentSent, wal)
 	} else if wal.CoinCategory() == iwallet.CoinCategoryStripe {
 		return validateStripePayment(order, paymentSent, chaincode, wal, escrowTimeoutHours)
 	} else {
 		return validateBTCLikePayment(order, paymentSent, chaincode, wal, escrowTimeoutHours)
 	}
-}
-
-// validateETHLikePayment 验证ETH类支付
-func validateETHLikePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, chaincode []byte, wal iwallet.Wallet, escrowTimeoutHours uint32) error {
-	vendorKey, err := btcec.ParsePubKey(order.Listings[0].Listing.VendorID.Pubkeys.Eth)
-	if err != nil {
-		return fmt.Errorf("generate vendor pub key failed, %s", err)
-	}
-
-	buyerKey, err := btcec.ParsePubKey(order.BuyerID.Pubkeys.Eth)
-	if err != nil {
-		return fmt.Errorf("get buyer pub key failed, %s", err)
-	}
-
-	if paymentSent.Method == pb.PaymentSent_MODERATED {
-		return validateEscrowPayment(paymentSent, wal, chaincode, vendorKey, buyerKey, escrowTimeoutHours, true, true)
-	} else if paymentSent.Method == pb.PaymentSent_CANCELABLE {
-		return validateEscrowPayment(paymentSent, wal, chaincode, vendorKey, buyerKey, escrowTimeoutHours, true, false)
-	} else if paymentSent.Method != pb.PaymentSent_DIRECT {
-		return errors.New("invalid payment method")
-	}
-
-	return nil
 }
 
 // validateBTCLikePayment 验证BTC类支付
@@ -225,9 +200,9 @@ func validateBTCLikePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, ch
 	}
 
 	if paymentSent.Method == pb.PaymentSent_MODERATED {
-		return validateEscrowPayment(paymentSent, wal, chaincode, vendorKey, buyerKey, escrowTimeoutHours, false, true)
+		return validateBTCEscrowPayment(paymentSent, wal, chaincode, vendorKey, buyerKey, escrowTimeoutHours, true)
 	} else if paymentSent.Method == pb.PaymentSent_CANCELABLE {
-		return validateEscrowPayment(paymentSent, wal, chaincode, vendorKey, buyerKey, escrowTimeoutHours, false, false)
+		return validateBTCEscrowPayment(paymentSent, wal, chaincode, vendorKey, buyerKey, escrowTimeoutHours, false)
 	} else if paymentSent.Method != pb.PaymentSent_DIRECT {
 		return errors.New("invalid payment method")
 	}
@@ -235,7 +210,7 @@ func validateBTCLikePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, ch
 	return nil
 }
 
-func validateSolanaPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal iwallet.Wallet) error {
+func validateEscrowPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal iwallet.Wallet) error {
 	escrowInfo, err := GetOrderEscrowInfo(order, paymentSent)
 	if err != nil {
 		return err
@@ -251,9 +226,6 @@ func validateSolanaPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal
 		return errors.New("invalid escrow payment address")
 	}
 
-	// if err := validateEscrowReleaseFee(paymentSent); err != nil {
-	// 	return err
-	// }
 	return nil
 }
 
@@ -262,8 +234,8 @@ func validateStripePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, cha
 }
 
 // validateEscrowPayment 验证托管支付
-func validateEscrowPayment(paymentSent *pb.PaymentSent, wal iwallet.Wallet, chaincode []byte,
-	vendorKey, buyerKey *btcec.PublicKey, escrowTimeoutHours uint32, isETHLike bool, isModerated bool) error {
+func validateBTCEscrowPayment(paymentSent *pb.PaymentSent, wal iwallet.Wallet, chaincode []byte,
+	vendorKey, buyerKey *btcec.PublicKey, escrowTimeoutHours uint32, isModerated bool) error {
 	var (
 		address iwallet.Address
 		script  []byte
@@ -285,11 +257,9 @@ func validateEscrowPayment(paymentSent *pb.PaymentSent, wal iwallet.Wallet, chai
 			return fmt.Errorf("parse moderator key failed, %v", err)
 		}
 
-		if !isETHLike {
-			moderatorKey, err = GenerateEscrowPublicKey(moderatorKey, chaincode)
-			if err != nil {
-				return err
-			}
+		moderatorKey, err = GenerateEscrowPublicKey(moderatorKey, chaincode)
+		if err != nil {
+			return err
 		}
 
 		escrowTimeoutWallet, walletSupportsEscrowTimeout := wal.(iwallet.EscrowWithTimeout)

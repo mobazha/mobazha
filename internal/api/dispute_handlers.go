@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -140,8 +139,8 @@ func (g *Gateway) handlePOSTReleaseEscrow(w http.ResponseWriter, r *http.Request
 
 func (g *Gateway) handleGETReleaseFundsInstructions(w http.ResponseWriter, r *http.Request) {
 	type RequestParams struct {
-		OrderID   string           `json:"orderID"`
-		Initiator solana.PublicKey `json:"initiator"`
+		OrderID          string `json:"orderID"`
+		InitiatorAddress string `json:"initiatorAddress"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	var params RequestParams
@@ -152,27 +151,29 @@ func (g *Gateway) handleGETReleaseFundsInstructions(w http.ResponseWriter, r *ht
 	}
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
-	instructions, err := node.GetReleaseFundsInstructions(models.OrderID(params.OrderID), params.Initiator)
+	coinType, instructions, err := node.GetReleaseFundsInstructions(models.OrderID(params.OrderID), params.InitiatorAddress)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-
-	solInstructions, ok := instructions.([]solana.Instruction)
-	if !ok {
-		ErrorResponse(w, http.StatusInternalServerError, "instructions is not a []solana.Instruction")
+	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	chainType := coinInfo.Chain
 
 	type InstructionsResponse struct {
-		HasInstructions bool                 `json:"hasInstructions"`
-		Instructions    []solana.Instruction `json:"instructions"`
+		HasInstructions bool              `json:"hasInstructions"`
+		Instructions    any               `json:"instructions"`
+		PaymentChain    iwallet.ChainType `json:"paymentChain"`
 	}
 
 	// 返回响应
 	response := InstructionsResponse{
-		HasInstructions: len(solInstructions) > 0,
-		Instructions:    solInstructions,
+		HasInstructions: true,
+		Instructions:    instructions,
+		PaymentChain:    chainType,
 	}
 	json.NewEncoder(w).Encode(response)
 }

@@ -46,10 +46,11 @@ func (g *Gateway) handlePOSTPurchase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type purchaseReturn struct {
-		Amount  *models.CurrencyValue `json:"amount"`
-		OrderID string                `json:"orderID"`
+		OrderID     string                `json:"orderID"`
+		PricingCoin string                `json:"pricingCoin"`
+		Amount      *models.CurrencyValue `json:"amount"`
 	}
-	ret := purchaseReturn{&amount, orderID.String()}
+	ret := purchaseReturn{orderID.String(), data.PricingCoin, &amount}
 
 	sanitizedJSONResponse(w, ret)
 }
@@ -547,13 +548,6 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 		return
 	}
 
-	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
-	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	chainType := coinInfo.Chain
-
 	type ConfirmationResponse struct {
 		PaymentChain    iwallet.ChainType `json:"paymentChain"`
 		HasInstructions bool              `json:"hasInstructions"`
@@ -562,16 +556,21 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 
 	if instructions == nil {
 		response := ConfirmationResponse{
-			PaymentChain:    chainType,
 			HasInstructions: false,
 		}
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
+	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	// 返回响应
 	response := ConfirmationResponse{
-		PaymentChain:    chainType,
+		PaymentChain:    coinInfo.Chain,
 		HasInstructions: true,
 		Instructions:    instructions,
 	}
@@ -709,13 +708,6 @@ func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *h
 		return
 	}
 
-	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
-	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	chainType := coinInfo.Chain
-
 	type CompletionResponse struct {
 		PaymentChain    iwallet.ChainType `json:"paymentChain"`
 		HasInstructions bool              `json:"hasInstructions"`
@@ -724,7 +716,6 @@ func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *h
 
 	if instructions == nil {
 		response := CompletionResponse{
-			PaymentChain:    chainType,
 			HasInstructions: false,
 			Instructions:    nil,
 		}
@@ -732,9 +723,15 @@ func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *h
 		return
 	}
 
+	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	// 返回响应
 	response := CompletionResponse{
-		PaymentChain:    chainType,
+		PaymentChain:    coinInfo.Chain,
 		HasInstructions: true,
 		Instructions:    instructions,
 	}

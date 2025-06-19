@@ -52,27 +52,24 @@ func GetOrderEscrowInfo(orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent) (i
 		if err != nil {
 			return iwallet.EscrowInfo{}, fmt.Errorf("failed to decode payer address: %w", err)
 		}
-		escrowInfo.Payer = payer.Bytes()
-		escrowInfo.Buyer = buyerID.Pubkeys.Solana
-		escrowInfo.Seller = vendorID.Pubkeys.Solana
-		escrowInfo.Moderator = nil
-		if paymentSent.ModeratorAddress != "" {
-			moderator, err := solana.PublicKeyFromBase58(paymentSent.ModeratorAddress)
-			if err != nil {
-				return iwallet.EscrowInfo{}, fmt.Errorf("failed to decode moderator address: %w", err)
-			}
-			escrowInfo.Moderator = moderator.Bytes()
-		}
+		escrowInfo.PayerAddress = payer.String()
+		escrowInfo.BuyerAddress = solana.PublicKeyFromBytes(buyerID.Pubkeys.Solana).String()
+		escrowInfo.SellerAddress = solana.PublicKeyFromBytes(vendorID.Pubkeys.Solana).String()
+		escrowInfo.ModeratorAddress = paymentSent.ModeratorAddress
 	} else if coinInfo.IsEthTypeChain() {
 		payer := common.HexToAddress(paymentSent.PayerAddress)
-		escrowInfo.Payer = payer.Bytes()
-		escrowInfo.Buyer = buyerID.Pubkeys.Eth
-		escrowInfo.Seller = vendorID.Pubkeys.Eth
-		escrowInfo.Moderator = nil
-		if paymentSent.ModeratorAddress != "" {
-			moderator := common.HexToAddress(paymentSent.ModeratorAddress)
-			escrowInfo.Moderator = moderator.Bytes()
+		escrowInfo.PayerAddress = payer.String()
+		buyer, err := iwallet.PubKeyBytesToEthAddress(buyerID.Pubkeys.Eth)
+		if err != nil {
+			return iwallet.EscrowInfo{}, fmt.Errorf("failed to decode buyer address: %w", err)
 		}
+		escrowInfo.BuyerAddress = buyer.String()
+		seller, err := iwallet.PubKeyBytesToEthAddress(vendorID.Pubkeys.Eth)
+		if err != nil {
+			return iwallet.EscrowInfo{}, fmt.Errorf("failed to decode seller address: %w", err)
+		}
+		escrowInfo.SellerAddress = seller.String()
+		escrowInfo.ModeratorAddress = paymentSent.ModeratorAddress
 	} else {
 		return iwallet.EscrowInfo{}, fmt.Errorf("invalid coin type: %v", escrowInfo.CoinType)
 	}

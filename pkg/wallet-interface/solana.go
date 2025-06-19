@@ -9,10 +9,10 @@ import (
 
 type EscrowInfo struct {
 	ContractAddress    string
-	Payer              []byte
-	Buyer              []byte
-	Seller             []byte
-	Moderator          []byte
+	PayerAddress       string
+	BuyerAddress       string
+	SellerAddress      string
+	ModeratorAddress   string
 	UniqueId           [20]byte
 	RequiredSignatures uint8
 	UnlockHours        uint64
@@ -21,41 +21,34 @@ type EscrowInfo struct {
 }
 
 func (e *EscrowInfo) GetSolanaUsersInfo() (payer solana.PublicKey, buyer solana.PublicKey, seller solana.PublicKey, moderator solana.PublicKey, err error) {
-	if len(e.Payer) != solana.PublicKeyLength {
+	payer, err = solana.PublicKeyFromBase58(e.PayerAddress)
+	if err != nil {
 		return solana.PublicKey{}, solana.PublicKey{}, solana.PublicKey{}, solana.PublicKey{}, errors.New("invalid payer")
 	}
-	payer = solana.PublicKeyFromBytes(e.Payer)
-	if len(e.Buyer) != solana.PublicKeyLength {
+	buyer, err = solana.PublicKeyFromBase58(e.BuyerAddress)
+	if err != nil {
 		return solana.PublicKey{}, solana.PublicKey{}, solana.PublicKey{}, solana.PublicKey{}, errors.New("invalid buyer")
 	}
-	buyer = solana.PublicKeyFromBytes(e.Buyer)
-	if len(e.Seller) != solana.PublicKeyLength {
+	seller, err = solana.PublicKeyFromBase58(e.SellerAddress)
+	if err != nil {
 		return solana.PublicKey{}, solana.PublicKey{}, solana.PublicKey{}, solana.PublicKey{}, errors.New("invalid seller")
 	}
-	seller = solana.PublicKeyFromBytes(e.Seller)
-	if len(e.Moderator) > 0 {
-		if len(e.Moderator) != solana.PublicKeyLength {
+	if e.ModeratorAddress != "" {
+		moderator, err = solana.PublicKeyFromBase58(e.ModeratorAddress)
+		if err != nil {
 			return solana.PublicKey{}, solana.PublicKey{}, solana.PublicKey{}, solana.PublicKey{}, errors.New("invalid moderator")
 		}
-		moderator = solana.PublicKeyFromBytes(e.Moderator)
 	}
 	return payer, buyer, seller, moderator, nil
 }
 
 func (e *EscrowInfo) GetEthereumUsersInfo() (payer common.Address, buyer common.Address, seller common.Address, moderator common.Address, err error) {
-	if payer, err = PubKeyBytesToEthAddress(e.Payer); err != nil {
-		return common.Address{}, common.Address{}, common.Address{}, common.Address{}, errors.New("invalid payer")
-	}
-	if buyer, err = PubKeyBytesToEthAddress(e.Buyer); err != nil {
-		return common.Address{}, common.Address{}, common.Address{}, common.Address{}, errors.New("invalid buyer")
-	}
-	if seller, err = PubKeyBytesToEthAddress(e.Seller); err != nil {
-		return common.Address{}, common.Address{}, common.Address{}, common.Address{}, errors.New("invalid seller")
-	}
-	if len(e.Moderator) > 0 {
-		if moderator, err = PubKeyBytesToEthAddress(e.Moderator); err != nil {
-			return common.Address{}, common.Address{}, common.Address{}, common.Address{}, errors.New("invalid moderator")
-		}
+	payer = common.HexToAddress(e.PayerAddress)
+	buyer = common.HexToAddress(e.BuyerAddress)
+	seller = common.HexToAddress(e.SellerAddress)
+
+	if e.ModeratorAddress != "" {
+		moderator = common.HexToAddress(e.ModeratorAddress)
 	}
 	return payer, buyer, seller, moderator, nil
 }

@@ -209,8 +209,8 @@ var (
 		Chain:           ChainEthereum,
 		Symbol:          "USDT",
 		IsNative:        false,
-		Contract:        "0xdac17f958d2ee523a2206206994597c13d831ec7",
-		TestnetContract: "0x79C950C7446B234a6Ad53B908fBF342b01c4d446", // Goerli USDT
+		Contract:        "0xF36BFeE8fd7F1950c0129714Faf6d1e1F94a66AA",
+		TestnetContract: "0xF36BFeE8fd7F1950c0129714Faf6d1e1F94a66AA", // Goerli USDT
 		Decimals:        6,
 		Description:     "Tether USD",
 	}
@@ -247,7 +247,7 @@ var (
 		Chain:           ChainSolana,
 		Symbol:          "USDT",
 		IsNative:        false,
-		Contract:        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+		Contract:        "68DyGgw3jp9wH1WhEN4NaBFNgzDbWYM8TFM8XeFZTKU4",
 		TestnetContract: "68DyGgw3jp9wH1WhEN4NaBFNgzDbWYM8TFM8XeFZTKU4", // Solana Devnet USDT
 		Decimals:        6,
 		Description:     "Tether USD on Solana",

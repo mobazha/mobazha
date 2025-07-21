@@ -308,6 +308,11 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		}
 	}
 
+	var netDB *netdb.NetDB
+	if len(netConfig.GetNetDBEndpoint()) > 0 {
+		netDB, _ = netdb.NewNetDB(netConfig.GetNetDBEndpoint(), ipfsNode.Identity.String(), ipfsNode.PrivateKey)
+	}
+
 	if cfg.IPFSOnly {
 		obNode := &OpenBazaarNode{
 			sharedManager:        sharedManager,
@@ -319,6 +324,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			torOnly:              cfg.Tor,
 			ipnsQuorum:           cfg.IPNSQuorum,
 			ipnsResolver:         netConfig.GetIPNSResolver(),
+			netDB:                netDB,
 			shutdownTorFunc:      shutdownTorFunc,
 			eventBus:             events.NewBus(),
 			featureManager:       pkgconfig.GetGlobalFeatureManager(),
@@ -444,11 +450,6 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		if err != nil {
 			return nil, errors.New("invalid store and forward peer ID in config")
 		}
-	}
-
-	var netDB *netdb.NetDB
-	if len(netConfig.GetNetDBEndpoint()) > 0 {
-		netDB, _ = netdb.NewNetDB(netConfig.GetNetDBEndpoint(), ipfsNode.Identity.String(), ipfsNode.PrivateKey)
 	}
 
 	// Construct our OpenBazaar node.repo object

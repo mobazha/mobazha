@@ -211,6 +211,10 @@ func validateBTCLikePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, ch
 }
 
 func validateEscrowPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal iwallet.Wallet) error {
+	if order.Listings[0].Listing.Metadata.ContractType == pb.Listing_Metadata_RWA_TOKEN {
+		return nil
+	}
+
 	escrowInfo, err := GetOrderEscrowInfo(order, paymentSent)
 	if err != nil {
 		return err

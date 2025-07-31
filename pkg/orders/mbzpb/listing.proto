@@ -37,6 +37,7 @@ message Listing {
             SERVICE        = 2;
             CLASSIFIED     = 3;
             CRYPTOCURRENCY = 4;
+            RWA_TOKEN      = 5;
         }
 
         enum Format {
@@ -65,9 +66,10 @@ message Listing {
         string salePrice                            = 17;
         repeated OptionalFeature optionalFeatures   = 18;
         string cryptoListingCurrencyCode            = 19;
-        uint32 cryptoListingDivisibility            = 20;
-        float cryptoListingPriceModifier            = 21;
-        repeated string altIntroVideoLinks          = 22;
+        float cryptoListingPriceModifier            = 20;
+        repeated string altIntroVideoLinks          = 21;
+        string minQuantity                          = 22;
+        string maxQuantity                          = 23;
 
         message Option {
             string name                = 1;

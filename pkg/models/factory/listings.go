@@ -184,7 +184,6 @@ func NewDigitalListing(slug string) *pb.Listing {
 func NewCryptoListing(slug string) *pb.Listing {
 	listing := NewPhysicalListing(slug)
 	listing.Item.CryptoListingCurrencyCode = "TETH"
-	listing.Item.CryptoListingDivisibility = 18
 	listing.Metadata.ContractType = pb.Listing_Metadata_CRYPTOCURRENCY
 	listing.Item.Skus = []*pb.Listing_Item_Sku{{Quantity: "100000000"}}
 	listing.ShippingOptions = nil

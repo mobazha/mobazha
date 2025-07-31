@@ -137,6 +137,7 @@ type PaymentData struct {
 		URL    string `json:"url"`    // 收据URL
 		Number string `json:"number"` // 收据编号
 	} `json:"receiptInfo"`
+	IsRwaToken bool `json:"isRwaToken"`
 }
 
 func (p *PaymentData) BuildTransaction() iwallet.Transaction {

@@ -148,10 +148,7 @@ func (g *Gateway) handleGETListingIndex(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	if errors.Is(listingErr, coreiface.ErrNotFound) {
-		ErrorResponse(w, http.StatusNotFound, listingErr.Error())
-		return
-	} else if listingErr != nil {
+	if listingErr != nil && !errors.Is(listingErr, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusInternalServerError, listingErr.Error())
 		return
 	}

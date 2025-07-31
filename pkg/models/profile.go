@@ -78,6 +78,7 @@ type ProfileStats struct {
 	DigitalListingCount        uint32  `json:"digitalListingCount"`
 	ServiceListingCount        uint32  `json:"serviceListingCount"`
 	CryptocurrencyListingCount uint32  `json:"cryptocurrencyListingCount"`
+	RwaTokenListingCount       uint32  `json:"rwaTokenListingCount"`
 	RatingCount                uint32  `json:"ratingCount"`
 	PostCount                  uint32  `json:"postCount"`
 	AverageRating              float32 `json:"averageRating"`

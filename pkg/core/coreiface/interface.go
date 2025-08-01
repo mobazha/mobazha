@@ -61,6 +61,7 @@ type CoreIface interface {
 	// Orders
 	PurchaseListing(ctx context.Context, purchase *models.Purchase) (orderID models.OrderID, paymentAmount models.CurrencyValue, err error)
 	EstimateOrderTotal(ctx context.Context, purchase *models.Purchase) (models.OrderTotals, error)
+	GetOrderInfo(orderID models.OrderID, coinType iwallet.CoinType) (*models.OrderInfo, error)
 	ProcessOrderPayment(ctx context.Context, paymentData *models.PaymentData) error
 	RejectOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
 	RefundOrder(orderID models.OrderID, done chan struct{}) error

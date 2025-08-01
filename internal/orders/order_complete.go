@@ -61,6 +61,8 @@ func (op *OrderProcessor) processOrderCompleteMessage(dbtx database.Tx, order *m
 		if err != nil && !os.IsNotExist(err) {
 			return nil, err
 		}
+
+		// Process all ratings in a single batch to minimize database operations
 		for _, rating := range complete.Ratings {
 			m := protojson.MarshalOptions{Indent: "    "}
 			out := m.Format(rating)
@@ -73,9 +75,16 @@ func (op *OrderProcessor) processOrderCompleteMessage(dbtx database.Tx, order *m
 			if err != nil {
 				return nil, err
 			}
-			if err := dbtx.SetRatingIndex(index); err != nil {
-				return nil, err
-			}
+		}
+
+		// Save rating index once after processing all ratings
+		if err := dbtx.SetRatingIndex(index); err != nil {
+			logger.LogErrorWithIDf(log, op.nodeID, "Failed to save rating index for order %s: %v", order.ID, err)
+			return nil, err
+		}
+
+		// Save individual ratings
+		for _, rating := range complete.Ratings {
 			if err := dbtx.SetRating(rating); err != nil {
 				return nil, err
 			}

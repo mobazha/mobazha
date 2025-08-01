@@ -536,6 +536,28 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 	}
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+
+	order, err := node.GetOrder(args.OrderID)
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
+		return
+	}
+
+	orderOpen, err := order.OrderOpenMessage()
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
+		return
+	}
+	if orderOpen.Listings[0].Listing.Metadata.ContractType == pb.Listing_Metadata_RWA_TOKEN {
+		response := struct {
+			HasInstructions bool `json:"hasInstructions"`
+		}{
+			HasInstructions: false,
+		}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
 	var coinType iwallet.CoinType
 	var instructions any
 	if args.Reject {

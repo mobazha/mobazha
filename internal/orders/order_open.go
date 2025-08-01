@@ -218,9 +218,20 @@ func (op *OrderProcessor) validateOrderOpen(dbtx database.Tx, order *pb.OrderOpe
 		if listing.Metadata.ContractType == pb.Listing_Metadata_CRYPTOCURRENCY && item.PaymentAddress == "" {
 			return fmt.Errorf("payment address for cryptocurrency item %d is empty", i)
 		}
-		if iwallet.NewAmount(item.Quantity).Cmp(iwallet.NewAmount(0)) <= 0 {
-			return fmt.Errorf("item %d quantity must be a positive integer", i)
+
+		// 根据商品类型验证数量
+		if listing.Metadata.ContractType == pb.Listing_Metadata_RWA_TOKEN {
+			// 对于RWA Token，验证小数数量
+			if err := validateRwaTokenQuantity(item.Quantity); err != nil {
+				return fmt.Errorf("item %d quantity validation failed: %s", i, err.Error())
+			}
+		} else {
+			// 对于其他商品类型，使用原有的整数验证
+			if iwallet.NewAmount(item.Quantity).Cmp(iwallet.NewAmount(0)) <= 0 {
+				return fmt.Errorf("item %d quantity must be a positive integer", i)
+			}
 		}
+
 		if listing.Metadata.ContractType == pb.Listing_Metadata_CLASSIFIED {
 			return fmt.Errorf("item %d classified listings cannot be purchased", i)
 		}
@@ -322,16 +333,28 @@ func CalculateOrderTotal(order *pb.OrderOpen, erp *wallet.ExchangeRateProvider) 
 		// for the listing.
 		var (
 			itemTotal    iwallet.Amount
-			itemQuantity = iwallet.NewAmount(item.Quantity)
+			itemQuantity iwallet.Amount
 		)
-
-		if itemQuantity.Cmp(iwallet.NewAmount(0)) <= 0 {
-			return models.OrderTotals{}, fmt.Errorf("item %d quantity is not a positive integer", i)
-		}
 
 		listing, err := utils.ExtractListing(item.ListingHash, order.Listings)
 		if err != nil {
 			return models.OrderTotals{}, fmt.Errorf("listing not found in contract for item %s", item.ListingHash)
+		}
+
+		// 根据商品类型处理数量验证
+		if listing.Metadata.ContractType == pb.Listing_Metadata_RWA_TOKEN {
+			// 对于RWA Token，验证小数数量
+			if err := validateRwaTokenQuantity(item.Quantity); err != nil {
+				return models.OrderTotals{}, fmt.Errorf("item %d quantity validation failed: %s", i, err.Error())
+			}
+			// RWA Token使用1作为数量乘数，因为总价已经在calculateRwaTokenItemTotal中计算
+			itemQuantity = iwallet.NewAmount(1)
+		} else {
+			// 对于其他商品类型，使用原有的整数验证
+			itemQuantity = iwallet.NewAmount(item.Quantity)
+			if itemQuantity.Cmp(iwallet.NewAmount(0)) <= 0 {
+				return models.OrderTotals{}, fmt.Errorf("item %d quantity is not a positive integer", i)
+			}
 		}
 
 		if listing.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD {
@@ -343,7 +366,14 @@ func CalculateOrderTotal(order *pb.OrderOpen, erp *wallet.ExchangeRateProvider) 
 			return models.OrderTotals{}, fmt.Errorf("failed to lookup pricing coin: %s", listing.Metadata.PricingCurrency.Code)
 		}
 
-		if listing.Metadata.Format == pb.Listing_Metadata_MARKET_PRICE {
+		// 根据商品类型计算商品总价
+		if listing.Metadata.ContractType == pb.Listing_Metadata_RWA_TOKEN {
+			// 对于RWA Token，使用专门的计算函数（已包含SKU和可选功能）
+			itemTotal, err = calculateRwaTokenItemTotal(listing, item, pricingCurrency, paymentCurrency, erp)
+			if err != nil {
+				return models.OrderTotals{}, fmt.Errorf("item %d RWA token calculation failed: %s", i, err.Error())
+			}
+		} else if listing.Metadata.Format == pb.Listing_Metadata_MARKET_PRICE {
 			cryptoListingCurrency, err := models.CurrencyDefinitions.Lookup(listing.Item.CryptoListingCurrencyCode)
 			if err != nil {
 				return models.OrderTotals{}, fmt.Errorf("failed to lookup crypto currency: %s", listing.Item.CryptoListingCurrencyCode)
@@ -375,80 +405,86 @@ func CalculateOrderTotal(order *pb.OrderOpen, erp *wallet.ExchangeRateProvider) 
 			}
 		}
 
-		// Add or subtract any surcharge on the selected sku
-		sku, err := getSelectedSku(listing, item.Options)
-		if err != nil {
-			return models.OrderTotals{}, err
-		}
-		surcharge := iwallet.NewAmount(sku.Surcharge)
-		surchargeValue := models.NewCurrencyValue(surcharge.String(), pricingCurrency)
-		convertedSurcharge, err := wallet.ConvertCurrencyAmount(surchargeValue, paymentCurrency, erp)
-		if err != nil {
-			return models.OrderTotals{}, err
-		}
-		itemTotal = itemTotal.Add(convertedSurcharge)
+		// 对于非RWA Token，添加SKU和可选功能附加费用
+		if listing.Metadata.ContractType != pb.Listing_Metadata_RWA_TOKEN {
+			// Add or subtract any surcharge on the selected sku
+			sku, err := getSelectedSku(listing, item.Options)
+			if err != nil {
+				return models.OrderTotals{}, err
+			}
+			surcharge := iwallet.NewAmount(sku.Surcharge)
+			surchargeValue := models.NewCurrencyValue(surcharge.String(), pricingCurrency)
+			convertedSurcharge, err := wallet.ConvertCurrencyAmount(surchargeValue, paymentCurrency, erp)
+			if err != nil {
+				return models.OrderTotals{}, err
+			}
+			itemTotal = itemTotal.Add(convertedSurcharge)
 
-		// Add any surcharge on the optional features
-		optionalFeatures := getSelectedOptionalFeatures(listing, item.OptionalFeatures)
-		for _, optionalFeature := range optionalFeatures {
-			if optionalFeature.Surcharge != "" {
-				surcharge := iwallet.NewAmount(optionalFeature.Surcharge)
-				surchargeValue := models.NewCurrencyValue(surcharge.String(), pricingCurrency)
-				convertedSurcharge, err := wallet.ConvertCurrencyAmount(surchargeValue, paymentCurrency, erp)
-				if err != nil {
-					return models.OrderTotals{}, err
+			// Add any surcharge on the optional features
+			optionalFeatures := getSelectedOptionalFeatures(listing, item.OptionalFeatures)
+			for _, optionalFeature := range optionalFeatures {
+				if optionalFeature.Surcharge != "" {
+					surcharge := iwallet.NewAmount(optionalFeature.Surcharge)
+					surchargeValue := models.NewCurrencyValue(surcharge.String(), pricingCurrency)
+					convertedSurcharge, err := wallet.ConvertCurrencyAmount(surchargeValue, paymentCurrency, erp)
+					if err != nil {
+						return models.OrderTotals{}, err
+					}
+					itemTotal = itemTotal.Add(convertedSurcharge)
 				}
-				itemTotal = itemTotal.Add(convertedSurcharge)
 			}
 		}
 
 		subTotal = subTotal.Add(itemTotal.Mul(itemQuantity))
 
-		// Subtract any coupons
-		for _, couponCode := range item.CouponCodes {
-			couponHash, err := utils.MultihashSha256([]byte(couponCode))
-			if err != nil {
-				return models.OrderTotals{}, fmt.Errorf("hash coupon code: %s", err.Error())
-			}
-			for _, vendorCoupon := range listing.Coupons {
-				if couponCode == vendorCoupon.GetDiscountCode() || couponHash.B58String() == vendorCoupon.GetHash() {
-					if discount := vendorCoupon.GetPriceDiscount(); discount != "" && iwallet.NewAmount(discount).Cmp(iwallet.NewAmount(0)) > 0 {
-						price := models.NewCurrencyValue(discount, pricingCurrency)
-						discountAmount, err := wallet.ConvertCurrencyAmount(price, paymentCurrency, erp)
-						if err != nil {
-							return models.OrderTotals{}, err
+		// 对于非RWA Token，处理优惠券和税费
+		if listing.Metadata.ContractType != pb.Listing_Metadata_RWA_TOKEN {
+			// Subtract any coupons
+			for _, couponCode := range item.CouponCodes {
+				couponHash, err := utils.MultihashSha256([]byte(couponCode))
+				if err != nil {
+					return models.OrderTotals{}, fmt.Errorf("hash coupon code: %s", err.Error())
+				}
+				for _, vendorCoupon := range listing.Coupons {
+					if couponCode == vendorCoupon.GetDiscountCode() || couponHash.B58String() == vendorCoupon.GetHash() {
+						if discount := vendorCoupon.GetPriceDiscount(); discount != "" && iwallet.NewAmount(discount).Cmp(iwallet.NewAmount(0)) > 0 {
+							price := models.NewCurrencyValue(discount, pricingCurrency)
+							discountAmount, err := wallet.ConvertCurrencyAmount(price, paymentCurrency, erp)
+							if err != nil {
+								return models.OrderTotals{}, err
+							}
+							itemTotal = itemTotal.Sub(discountAmount)
+							discountsTotal = discountsTotal.Sub(discountAmount)
+						} else if discount := vendorCoupon.GetPercentDiscount(); discount > 0 {
+							f, _ := new(big.Float).SetString(itemTotal.String())
+							f.Mul(f, big.NewFloat(float64(-discount/100)))
+							discountAmount, _ := f.Int(nil)
+							itemTotal = itemTotal.Add(iwallet.NewAmount(discountAmount))
+							discountsTotal = discountsTotal.Add(iwallet.NewAmount(discountAmount))
 						}
-						itemTotal = itemTotal.Sub(discountAmount)
-						discountsTotal = discountsTotal.Sub(discountAmount)
-					} else if discount := vendorCoupon.GetPercentDiscount(); discount > 0 {
-						f, _ := new(big.Float).SetString(itemTotal.String())
-						f.Mul(f, big.NewFloat(float64(-discount/100)))
-						discountAmount, _ := f.Int(nil)
-						itemTotal = itemTotal.Add(iwallet.NewAmount(discountAmount))
-						discountsTotal = discountsTotal.Add(iwallet.NewAmount(discountAmount))
 					}
 				}
 			}
-		}
-		// Apply tax
-		for _, tax := range listing.Taxes {
-			for _, taxRegion := range tax.TaxRegions {
-				if order.Shipping.Country == taxRegion {
-					f, _ := new(big.Float).SetString(itemTotal.String())
-					f.Mul(f, big.NewFloat(float64(tax.Percentage/100)))
-					govTheft, _ := f.Int(nil)
-					itemTotal = itemTotal.Add(iwallet.NewAmount(govTheft))
-					taxesTotal = taxesTotal.Add(iwallet.NewAmount(govTheft))
-					break
+			// Apply tax
+			for _, tax := range listing.Taxes {
+				for _, taxRegion := range tax.TaxRegions {
+					if order.Shipping.Country == taxRegion {
+						f, _ := new(big.Float).SetString(itemTotal.String())
+						f.Mul(f, big.NewFloat(float64(tax.Percentage/100)))
+						govTheft, _ := f.Int(nil)
+						itemTotal = itemTotal.Add(iwallet.NewAmount(govTheft))
+						taxesTotal = taxesTotal.Add(iwallet.NewAmount(govTheft))
+						break
+					}
 				}
 			}
-		}
-		taxesTotal = taxesTotal.Mul(itemQuantity)
+			taxesTotal = taxesTotal.Mul(itemQuantity)
 
-		// Multiply the item total by the quantity being purchased
-		// In the case of a crypto listing, itemQuantity was set to
-		// one above so this should have no effect.
-		itemTotal = itemTotal.Mul(itemQuantity)
+			// Multiply the item total by the quantity being purchased
+			// In the case of a crypto listing, itemQuantity was set to
+			// one above so this should have no effect.
+			itemTotal = itemTotal.Mul(itemQuantity)
+		}
 
 		// Finally add the item total to the order total.
 		orderTotal = orderTotal.Add(itemTotal)
@@ -651,10 +687,73 @@ func getSelectedOptionalFeatures(listing *pb.Listing, optionalFeatures []string)
 	features := make([]*pb.Listing_Item_OptionalFeature, 0)
 	for _, optionalFeature := range optionalFeatures {
 		for _, feature := range listing.Item.OptionalFeatures {
-			if strings.ToLower(feature.Name) == strings.ToLower(optionalFeature) {
+			if strings.EqualFold(feature.Name, optionalFeature) {
 				features = append(features, feature)
 			}
 		}
 	}
 	return features
+}
+
+// validateRwaTokenQuantity 验证RWA Token的数量
+// RWA Token支持小数数量，但必须大于0
+func validateRwaTokenQuantity(quantity string) error {
+	if quantity == "" {
+		return errors.New("quantity cannot be empty")
+	}
+
+	// 尝试解析为浮点数
+	f, ok := new(big.Float).SetString(quantity)
+	if !ok {
+		return errors.New("invalid quantity format")
+	}
+
+	// 检查是否大于0
+	if f.Cmp(big.NewFloat(0)) <= 0 {
+		return errors.New("quantity must be greater than 0")
+	}
+
+	return nil
+}
+
+// parseRwaTokenQuantity 解析RWA Token的数量字符串为big.Float
+func parseRwaTokenQuantity(quantity string) (*big.Float, error) {
+	if err := validateRwaTokenQuantity(quantity); err != nil {
+		return nil, err
+	}
+
+	f, ok := new(big.Float).SetString(quantity)
+	if !ok {
+		return nil, errors.New("invalid quantity format")
+	}
+
+	return f, nil
+}
+
+// calculateRwaTokenItemTotal 计算RWA Token的商品总价
+// 支持小数数量，但返回整数金额
+func calculateRwaTokenItemTotal(listing *pb.Listing, item *pb.OrderOpen_Item, pricingCurrency *models.Currency, paymentCurrency *models.Currency, erp *wallet.ExchangeRateProvider) (iwallet.Amount, error) {
+	// 解析数量
+	quantity, err := parseRwaTokenQuantity(item.Quantity)
+	if err != nil {
+		return iwallet.NewAmount(0), err
+	}
+
+	// 获取单价
+	price := models.NewCurrencyValue(listing.Item.Price, pricingCurrency)
+	itemTotal, err := wallet.ConvertCurrencyAmount(price, paymentCurrency, erp)
+	if err != nil {
+		return iwallet.NewAmount(0), err
+	}
+
+	// 将单价转换为big.Float进行计算
+	priceFloat, _ := new(big.Float).SetString(itemTotal.String())
+
+	// 计算总价：单价 × 数量
+	totalFloat := new(big.Float).Mul(priceFloat, quantity)
+
+	// 转换为整数（四舍五入）
+	totalInt, _ := totalFloat.Int(nil)
+
+	return iwallet.NewAmount(totalInt), nil
 }

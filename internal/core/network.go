@@ -94,7 +94,7 @@ func (n *OpenBazaarNode) publish(ctx context.Context, done chan<- struct{}) {
 		}
 	}()
 
-	api, err := coreapi.NewCoreAPI(n.SharedManager().GetIPFSNode())
+	api, err := coreapi.NewCoreAPI(n.ipfsNode)
 	if err != nil {
 		logger.LogErrorWithIDf(log, n.nodeID, "Error building core API: %s", err.Error())
 		publishErr = err

@@ -13,6 +13,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/version"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 type nodeConfig struct {
@@ -107,12 +108,11 @@ func (g *Gateway) handleGETExchangeRates(w http.ResponseWriter, r *http.Request)
 		}
 		base = *def.CurrencyCode()
 	} else {
-		base = models.CurrencyCode("USDT")
+		base = models.CurrencyCode(iwallet.CtBitcoin)
 	}
 
 	// 检查是否请求强制刷新（用于获取最新的预言机数据）
 	forceRefresh := r.URL.Query().Get("refresh") == "true"
-
 	rates, err := node.ExchangeRates().GetAllRates(base, forceRefresh)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())

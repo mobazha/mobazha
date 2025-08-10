@@ -117,19 +117,31 @@ func (c *ChainlinkProvider) fetchRates(base models.CurrencyCode) (map[models.Cur
 	// 手动添加USD汇率（USD对USD = 1）
 	rates[models.CurrencyCode("USD")] = new(big.Float).SetFloat64(1.0)
 
-	// 如果基础货币是USDT，直接返回所有汇率
+	// 如果基础货币是BTC，需要计算1个BTC能换多少其他币种
 	if base.String() == ReserveCurrency.String() {
 		result := make(map[models.CurrencyCode]iwallet.Amount)
-		for currency, val := range rates {
+
+		// 获取BTC对USD的价格
+		btcPrice, ok := rates[models.CurrencyCode("BTC")]
+		if !ok {
+			return nil, fmt.Errorf("BTC price not found in Chainlink feeds")
+		}
+
+		for currency, usdPrice := range rates {
+			// 计算1个BTC能换多少该币种
+			// 如果BTC价格是btcPrice USD，该币种价格是usdPrice USD
+			// 那么1 BTC = btcPrice / usdPrice 个该币种
+			btcToCurrency := new(big.Float).Quo(btcPrice, usdPrice)
+
 			def := models.CurrencyDefinitions[currency.String()]
 			divisibility := new(big.Float).SetFloat64(math.Pow10(int(def.Divisibility)))
-			convertedInt, _ := new(big.Float).Mul(val, divisibility).Int(nil)
+			convertedInt, _ := new(big.Float).Mul(btcToCurrency, divisibility).Int(nil)
 			result[currency] = iwallet.NewAmount(convertedInt)
 		}
 		return result, nil
 	}
 
-	// 如果基础货币不是USDT，需要进行转换
+	// 如果基础货币不是BTC，需要进行转换
 	baseMap := make(map[models.CurrencyCode]iwallet.Amount)
 
 	// 获取基础货币对USD的汇率
@@ -138,25 +150,18 @@ func (c *ChainlinkProvider) fetchRates(base models.CurrencyCode) (map[models.Cur
 		return nil, fmt.Errorf("base currency %s not found in Chainlink feeds", base.String())
 	}
 
-	// 对于非USDT基础货币，我们需要计算其他货币相对于基础货币的汇率
-	// Chainlink返回的是所有货币对USD的价格，我们需要转换为对基础货币的价格
-	for currency, rate := range rates {
-		// 计算 currency/base 的汇率
-		// 如果 currency 对 USD 的价格是 rate，base 对 USD 的价格是 baseFloat
-		// 那么 currency/base = rate/baseFloat
-		// 但是对于 USD，我们需要特殊处理：USD/BTC = 1/BTC_USD_price
-		var convertedFloat *big.Float
-		if currency.String() == "USD" {
-			// 当请求 BTC/USD 汇率时，我们需要返回 BTC 对 USD 的价格
-			// 即 1 BTC = baseFloat USD
-			convertedFloat = baseFloat
-		} else {
-			// 其他货币：currency/BTC = currency_USD_price / BTC_USD_price
-			convertedFloat = new(big.Float).Quo(rate, baseFloat)
-		}
+	// 使用与exchange_rates.go相同的逻辑
+	// 计算转换比例：1个基础货币能换多少其他币种
+
+	for currency, usdPrice := range rates {
+		// 计算1个基础货币能换多少该币种
+		// 如果基础货币价格是baseFloat USD，该币种价格是usdPrice USD
+		// 那么1个基础货币 = baseFloat / usdPrice 个该币种
+		baseToCurrency := new(big.Float).Quo(baseFloat, usdPrice)
+
 		def := models.CurrencyDefinitions[currency.String()]
 		divisibility := new(big.Float).SetFloat64(math.Pow10(int(def.Divisibility)))
-		convertedInt, _ := new(big.Float).Mul(convertedFloat, divisibility).Int(nil)
+		convertedInt, _ := new(big.Float).Mul(baseToCurrency, divisibility).Int(nil)
 		baseMap[currency] = iwallet.NewAmount(convertedInt)
 	}
 

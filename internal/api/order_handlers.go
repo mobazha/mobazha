@@ -140,9 +140,19 @@ func (g *Gateway) handlePOSTPayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node.ProcessOrderPayment(r.Context(), req.PaymentData)
+	err := node.ProcessOrderPayment(r.Context(), req.PaymentData)
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
+		return
+	}
 
-	w.WriteHeader(http.StatusOK)
+	// 返回标准成功响应
+	response := struct {
+		Success bool `json:"success"`
+	}{
+		Success: true,
+	}
+	sanitizedJSONResponse(w, response)
 }
 
 func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, node coreiface.CoreIface, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {

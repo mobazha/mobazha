@@ -490,7 +490,7 @@ func (svr *Server) handleStoreMessage(w msgio.Writer, pmes *pb.Message, from pee
 	go func() {
 		connectedness := svr.host.Network().Connectedness(to)
 		if connectedness == inet.Connected {
-			stream, err := svr.host.NewStream(inet.WithUseTransient(svr.ctx, "identify"), to, svr.clientProtocol)
+			stream, err := svr.host.NewStream(inet.WithAllowLimitedConn(svr.ctx, "identify"), to, svr.clientProtocol)
 			if err != nil {
 				log.Errorf("Error relaying message to connected peer %s: %s", to, err)
 				return
@@ -517,7 +517,7 @@ func (svr *Server) handleStoreMessage(w msgio.Writer, pmes *pb.Message, from pee
 	for p, s := range svr.replicationPeers {
 		go func(p peer.ID, s inet.Stream) {
 			if s == nil {
-				s, err = svr.host.NewStream(inet.WithUseTransient(svr.ctx, "identify"), p, svr.serverProtocol)
+				s, err = svr.host.NewStream(inet.WithAllowLimitedConn(svr.ctx, "identify"), p, svr.serverProtocol)
 				if err != nil {
 					log.Errorf("Error replicating message to peer %s: %s", p, err)
 					return

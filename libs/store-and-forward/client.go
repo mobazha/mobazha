@@ -20,6 +20,7 @@ import (
 	"github.com/libp2p/go-msgio"
 	"github.com/mobazha/mobazha3.0/libs/store-and-forward/pb"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // Message represents an encrypted message.
@@ -152,7 +153,7 @@ func (cli *Client) GetMessagesAsync(ctx context.Context) (<-chan Message, error)
 				log.Debugf("Requesting messages from server %s", p)
 				defer wg.Done()
 
-				s, err := cli.host.NewStream(inet.WithUseTransient(ctx, "identify"), p, cli.serverProtocol)
+				s, err := cli.host.NewStream(inet.WithAllowLimitedConn(ctx, "identify"), p, cli.serverProtocol)
 				if err != nil {
 					log.Errorf("Error opening stream with server %s, error: %v", p, err)
 					return
@@ -214,7 +215,7 @@ func (cli *Client) GetMessagesAsync(ctx context.Context) (<-chan Message, error)
 // SendMessage stores the message with the provided server.
 func (cli *Client) SendMessage(ctx context.Context, to, server peer.ID, pubkey crypto.PubKey, encryptedMessage, metadata []byte) error {
 	log.Debugf("Sending message to server %s", server)
-	s, err := cli.host.NewStream(inet.WithUseTransient(ctx, "identify"), server, cli.serverProtocol)
+	s, err := cli.host.NewStream(inet.WithAllowLimitedConn(ctx, "identify"), server, cli.serverProtocol)
 	if err != nil {
 		return err
 	}
@@ -324,7 +325,7 @@ func (cli *Client) AckMessage(ctx context.Context, messageID []byte) error {
 				log.Debugf("Sending ack to server %s", p)
 				defer wg.Done()
 
-				s, err := cli.host.NewStream(inet.WithUseTransient(ctx, "identify"), p, cli.serverProtocol)
+				s, err := cli.host.NewStream(inet.WithAllowLimitedConn(ctx, "identify"), p, cli.serverProtocol)
 				if err != nil {
 					log.Errorf("Error opening stream with server %s", p)
 					return
@@ -458,7 +459,7 @@ func (cli *Client) registerWithServers(expiration time.Duration) {
 }
 
 func (cli *Client) registerSingle(server peer.ID, expiration time.Duration) {
-	s, err := cli.host.NewStream(inet.WithUseTransient(cli.ctx, "identify"), server, cli.serverProtocol)
+	s, err := cli.host.NewStream(inet.WithAllowLimitedConn(cli.ctx, "identify"), server, cli.serverProtocol)
 	if err != nil {
 		log.Errorf("Server %s authentication fail. Error: %s", server, err)
 		return
@@ -469,11 +470,7 @@ func (cli *Client) registerSingle(server peer.ID, expiration time.Duration) {
 	r := msgio.NewVarintReaderSize(contextReader, inet.MessageSizeMax)
 	w := msgio.NewVarintWriter(s)
 
-	ts, err := ptypes.TimestampProto(time.Now().Add(expiration))
-	if err != nil {
-		log.Errorf("Server %s registration error. Error: %s", server, err)
-		return
-	}
+	ts := timestamppb.New(time.Now().Add(expiration))
 	reg := &pb.Message_Registration{
 		Expiry: ts,
 		Server: []byte(server),

@@ -175,6 +175,7 @@ type CoreIface interface {
 	UpdateReceivingAccount(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
 	DeleteReceivingAccount(id int) error
 	GetReceivingAccounts() ([]models.ReceivingAccount, error)
+	GetReceivingAccountByID(id int) (*models.ReceivingAccount, error)
 	GetActiveReceivingAccount(chainType iwallet.ChainType) (*models.ReceivingAccount, error)
 	GetReceivingAccountsByChain(chainType iwallet.ChainType) ([]models.ReceivingAccount, error)
 

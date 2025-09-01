@@ -670,6 +670,16 @@ func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Requ
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
+	if fulfillParam.ReceivingAccountID >= 0 {
+		receivingAccount, err := node.GetReceivingAccountByID(fulfillParam.ReceivingAccountID)
+		if err != nil {
+			ErrorResponse(w, http.StatusBadRequest, "收款账户不存在或无效")
+			return
+		}
+		fulFillment.ReceivingAccountID = fulfillParam.ReceivingAccountID
+		fulFillment.ReceivingAccountAddress = receivingAccount.Address
+	}
+
 	done := make(chan struct{})
 	err = node.FulfillOrder(models.OrderID(fulfillParam.OrderID), []models.Fulfillment{fulFillment}, done)
 	if err != nil {

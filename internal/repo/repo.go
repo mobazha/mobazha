@@ -717,7 +717,7 @@ func autoMigrateDatabase(db database.Database) error {
 			}
 
 			// 检查新字段是否存在
-			if !columnMap["serialized_active_tokens"] || !columnMap["serialized_inactive_tokens"] || !columnMap["is_active"] || !columnMap["status"] {
+			if !columnMap["serialized_active_tokens"] || !columnMap["serialized_inactive_tokens"] || !columnMap["is_active"] || !columnMap["status"] || !columnMap["created_at"] || !columnMap["updated_at"] {
 				needsMigration = true
 			}
 

@@ -141,6 +141,7 @@ type mockNode struct {
 	updateReceivingAccountFunc      func(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
 	deleteReceivingAccountFunc      func(id int) error
 	getReceivingAccountsFunc        func() ([]models.ReceivingAccount, error)
+	getReceivingAccountByIDFunc     func(id int) (*models.ReceivingAccount, error)
 	getActiveReceivingAccountFunc   func(chainType iwallet.ChainType) (*models.ReceivingAccount, error)
 	getReceivingAccountsByChainFunc func(chainType iwallet.ChainType) ([]models.ReceivingAccount, error)
 	getStripeConnectURLFunc         func() (string, error)
@@ -517,6 +518,9 @@ func (m *mockNode) DeleteReceivingAccount(id int) error {
 }
 func (m *mockNode) GetReceivingAccounts() ([]models.ReceivingAccount, error) {
 	return m.getReceivingAccountsFunc()
+}
+func (m *mockNode) GetReceivingAccountByID(id int) (*models.ReceivingAccount, error) {
+	return m.getReceivingAccountByIDFunc(id)
 }
 func (m *mockNode) GetActiveReceivingAccount(chainType iwallet.ChainType) (*models.ReceivingAccount, error) {
 	return m.getActiveReceivingAccountFunc(chainType)

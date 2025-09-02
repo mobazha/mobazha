@@ -476,3 +476,8 @@ func (n *OpenBazaarNode) SubscribeEvent(event interface{}) (events.Subscription,
 func (n *OpenBazaarNode) EventBus() events.Bus {
 	return n.eventBus
 }
+
+// NetService returns the underlying NetworkService for this node.
+func (n *OpenBazaarNode) NetService() *net.NetworkService {
+	return n.networkService
+}

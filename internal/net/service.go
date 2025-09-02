@@ -19,6 +19,14 @@ import (
 
 var log = logging.MustGetLogger("NET")
 
+// LocalDeliverer 定义本地直达消息投递接口，由宿主实现（如 HostService）
+// 返回 true 表示已完成本地直达投递（无须走网络路径）。
+// 注意：该接口不引入对 internal/core 或 internal/net 的依赖循环。
+// 实现方可通过 OpenBazaarNode.NetService().DeliverLocalMessage 完成投递。
+type LocalDeliverer interface {
+	DeliverToLocal(target peer.ID, from peer.ID, msg *pb.Message) bool
+}
+
 type NetworkService struct {
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -37,6 +45,9 @@ type NetworkService struct {
 	banManager *BanManager
 
 	protocolID protocol.ID
+
+	// 可选的本地直达投递器（同进程本机节点快路径）
+	localDeliverer LocalDeliverer
 }
 
 func NewNetworkService(nodeID string, host host.Host, banManager *BanManager, useTestnet bool) *NetworkService {
@@ -79,6 +90,11 @@ func (ns *NetworkService) RegisterHandler(messageType pb.Message_MessageType, ha
 	ns.handlerMtx.Lock()
 	defer ns.handlerMtx.Unlock()
 	ns.handlers[messageType] = handler
+}
+
+// SetLocalDeliverer 设置同进程本机节点本地直达投递器
+func (ns *NetworkService) SetLocalDeliverer(ld LocalDeliverer) {
+	ns.localDeliverer = ld
 }
 
 // HandleNewStream receives new incoming streams from other peers.
@@ -149,9 +165,39 @@ func (ns *NetworkService) handleNewMessage(s inet.Stream) {
 }
 
 func (ns *NetworkService) SendMessage(ctx context.Context, peerID peer.ID, message *pb.Message) error {
+	// 优先尝试同进程本机节点本地直达
+	if ns.localDeliverer != nil {
+		from := ns.host.ID()
+		if ns.localDeliverer.DeliverToLocal(peerID, from, message) {
+			return nil
+		}
+	}
+
 	ms, err := ns.messageSenderForPeer(ctx, peerID)
 	if err != nil {
 		return err
 	}
 	return ms.sendMessage(ctx, message)
+}
+
+// DeliverLocalMessage 提供同进程本地直达的消息分发路径，避免经过网络栈。
+// 要求调用方仅在“同进程本机节点”场景使用。
+func (ns *NetworkService) DeliverLocalMessage(from peer.ID, pmes *pb.Message) error {
+	// 尺寸限制与安全检查，保持与网络路径行为一致
+	if pmes == nil {
+		return nil
+	}
+	if ns.banManager != nil && ns.banManager.IsBanned(from) {
+		logger.LogInfoWithIDf(log, ns.nodeID, "Received local message from banned peer %s. Dropping.", from)
+		return nil
+	}
+
+	ns.handlerMtx.RLock()
+	handler, ok := ns.handlers[pmes.MessageType]
+	ns.handlerMtx.RUnlock()
+	if !ok {
+		logger.LogInfoWithIDf(log, ns.nodeID, "Received local message type %s with unregistered handler", pmes.MessageType.String())
+		return nil
+	}
+	return handler(from, pmes)
 }

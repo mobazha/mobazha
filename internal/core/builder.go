@@ -248,6 +248,12 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	dhtMode := dht.ModeAuto
 	if cfg.DHTClientOnly {
 		dhtMode = dht.ModeClient
+	} else if isDefaultNode {
+		// 默认节点使用服务器模式
+		dhtMode = dht.ModeServer
+	} else {
+		// 其他节点使用客户端模式，减少开销
+		dhtMode = dht.ModeClient
 	}
 
 	ncfg := &core.BuildCfg{
@@ -260,16 +266,23 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		},
 		// 使用共享的DHT
 		Routing: func(args nlibp2p.RoutingOptionArgs) (routing.Routing, error) {
-			if sharedDHT != nil {
+			// 只在服务器模式下共享DHT
+			if dhtMode == dht.ModeServer && sharedDHT != nil {
 				return sharedDHT, nil
 			}
 
-			dht, err := constructDHTRouting(dhtMode)(args)
+			// 客户端模式或首次创建：每个节点使用自己的DHT
+			dhtInstance, err := constructDHTRouting(dhtMode)(args)
 			if err != nil {
 				return nil, err
 			}
-			sharedDHT = dht
-			return dht, nil
+
+			// 只在服务器模式下保存共享引用
+			if dhtMode == dht.ModeServer {
+				sharedDHT = dhtInstance
+			}
+
+			return dhtInstance, nil
 		},
 		Host: constructPeerHost,
 	}
@@ -441,6 +454,11 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	}
 	bm := obnet.NewBanManager(globalBlockedIds, blocked)
 	service := obnet.NewNetworkService(nodeID, ipfsNode.PeerHost, bm, cfg.Testnet)
+	if hs != nil {
+		if ld, ok := any(hs).(obnet.LocalDeliverer); ok {
+			service.SetLocalDeliverer(ld)
+		}
+	}
 
 	bus := events.NewBus()
 	tracker := NewFollowerTracker(obRepo, bus, ipfsNode.PeerHost)
@@ -624,12 +642,14 @@ func InitializeMultiwallet(mw multiwallet.Multiwallet, db database.Database, cre
 func constructDHTRouting(mode dht.ModeOpt) func(args nlibp2p.RoutingOptionArgs) (routing.Routing, error) {
 	return func(args nlibp2p.RoutingOptionArgs) (routing.Routing, error) {
 		dhtOpts := []dht.Option{
-			dht.Concurrency(10),
+			dht.Concurrency(20),
 			dht.Mode(mode),
 			dht.Datastore(args.Datastore),
 			dht.Validator(args.Validator),
 			dht.ProtocolPrefix(ProtocolDHT),
 			dht.MaxRecordAge(maxRecordAge),
+			// 允许本地地址，支持共享端口场景
+			dht.AddressFilter(nil),
 		}
 		if args.OptimisticProvide {
 			dhtOpts = append(dhtOpts, dht.EnableOptimisticProvide())

@@ -13,6 +13,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -105,9 +106,17 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 			return nil, err
 		}
 
-		payoutAddress, err := op.GetPayoutAddress(dbtx, paymentSent.Coin)
-		if err != nil {
-			return nil, err
+		var payoutAddress iwallet.Address
+		if order.Role() == models.RoleBuyer {
+			// For buyer, the payout address is the payer address
+			payoutAddress = iwallet.NewAddress(paymentSent.PayerAddress, iwallet.CoinType(paymentSent.Coin))
+		} else {
+			// For vendor, the payout address is the to address of the first order fulfillment
+			orderFulfillments, err := order.OrderFulfillmentMessages()
+			if err != nil {
+				return nil, err
+			}
+			payoutAddress = iwallet.NewAddress(orderFulfillments[0].ReleaseInfo.ToAddress, iwallet.CoinType(paymentSent.Coin))
 		}
 
 		update := pb.DisputeUpdate{

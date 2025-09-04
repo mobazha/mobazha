@@ -611,9 +611,10 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 
 func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Request) {
 	type orderConf struct {
-		OrderID string `json:"orderID"`
-		TxID    string `json:"txID"`
-		Reject  bool   `json:"reject"`
+		OrderID       string `json:"orderID"`
+		TxID          string `json:"txID"`
+		PayoutAddress string `json:"payoutAddress"`
+		Reject        bool   `json:"reject"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	var conf orderConf
@@ -627,7 +628,7 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 
 	done := make(chan struct{})
 	if !conf.Reject {
-		err = node.ConfirmOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TxID), done)
+		err = node.ConfirmOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TxID), conf.PayoutAddress, done)
 	} else {
 		err = node.RejectOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TxID), "", done)
 	}

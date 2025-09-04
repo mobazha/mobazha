@@ -65,7 +65,7 @@ type CoreIface interface {
 	ProcessOrderPayment(ctx context.Context, paymentData *models.PaymentData) error
 	RejectOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
 	RefundOrder(orderID models.OrderID, done chan struct{}) error
-	ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
+	ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error
 	GetConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	GetRejectOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	FulfillOrder(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error

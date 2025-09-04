@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -111,12 +112,18 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 			// For buyer, the payout address is the payer address
 			payoutAddress = iwallet.NewAddress(paymentSent.PayerAddress, iwallet.CoinType(paymentSent.Coin))
 		} else {
-			// For vendor, the payout address is the to address of the first order fulfillment
-			orderFulfillments, err := order.OrderFulfillmentMessages()
+			// For vendor, the payout address is the payout address of the order confirmation
+			orderConfirmation, err := order.OrderConfirmationMessage()
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to get order confirmation message: %w", err)
 			}
-			payoutAddress = iwallet.NewAddress(orderFulfillments[0].ReleaseInfo.ToAddress, iwallet.CoinType(paymentSent.Coin))
+			payoutAddress = iwallet.NewAddress(orderConfirmation.PayoutAddress, iwallet.CoinType(paymentSent.Coin))
+
+			// If order fulfillment exists, the payout address is the to address of the first order fulfillment
+			orderFulfillments, err := order.OrderFulfillmentMessages()
+			if len(orderFulfillments) > 0 && err == nil {
+				payoutAddress = iwallet.NewAddress(orderFulfillments[0].ReleaseInfo.ToAddress, iwallet.CoinType(paymentSent.Coin))
+			}
 		}
 
 		update := pb.DisputeUpdate{
@@ -127,7 +134,7 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 
 		updateAny := &anypb.Any{}
 		if err := updateAny.MarshalFrom(&update); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to marshal dispute update message: %w", err)
 		}
 
 		resp := npb.OrderMessage{
@@ -137,17 +144,17 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 		}
 
 		if err := utils.SignOrderMessage(&resp, op.identityPrivateKey); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to sign dispute update message: %w", err)
 		}
 
 		payload := &anypb.Any{}
 		if err := payload.MarshalFrom(&resp); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to marshal dispute update message: %w", err)
 		}
 
 		messageID := make([]byte, 20)
 		if _, err := rand.Read(messageID); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to generate message ID: %w", err)
 		}
 
 		msg := npb.Message{
@@ -158,15 +165,15 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 
 		moderator, err := peer.Decode(paymentSent.Moderator)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get moderator: %w", err)
 		}
 
 		if err := order.PutMessage(&resp); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to put dispute update message: %w", err)
 		}
 
 		if err := op.messenger.ReliablySendMessage(dbtx, moderator, &msg, nil); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to send dispute update message: %w", err)
 		}
 		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_OPEN message for order %s", order.ID)
 	}

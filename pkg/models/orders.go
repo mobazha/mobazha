@@ -235,6 +235,14 @@ func (o *Order) GetPaymentAddress() (string, error) {
 	return paymentSent.ToAddress, nil
 }
 
+func (o *Order) GetPaymentCoinType() (iwallet.CoinType, error) {
+	paymentSent, err := o.PaymentSentMessage()
+	if err != nil {
+		return iwallet.CoinType(""), err
+	}
+	return iwallet.CoinType(paymentSent.Coin), nil
+}
+
 // GetTransactions returns all the transactions associated with this order.
 func (o *Order) GetTransactions() ([]iwallet.Transaction, error) {
 	if len(o.Transactions) == 0 {

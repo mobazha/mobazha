@@ -45,7 +45,7 @@ type mockNode struct {
 	getSalesFunc                            func(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Order, int64, error)
 	getCaseFunc                             func(orderID string) (*models.Case, error)
 	getCasesFunc                            func(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Case, int64, error)
-	confirmOrderFunc                        func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
+	confirmOrderFunc                        func(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error
 	getConfirmOrderInstructionsFunc         func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
 	getRejectOrderInstructionsFunc          func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
 	getCompleteOrderInstructionsFunc        func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
@@ -240,8 +240,8 @@ func (m *mockNode) GetCase(orderID string) (*models.Case, error) {
 func (m *mockNode) GetCases(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Case, int64, error) {
 	return m.getCasesFunc(stateFilters, searchTerm, sortByAscending, sortByRead, limit, exclude)
 }
-func (m *mockNode) ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {
-	return m.confirmOrderFunc(orderID, txid, done)
+func (m *mockNode) ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error {
+	return m.confirmOrderFunc(orderID, txid, payoutAddress, done)
 }
 func (m *mockNode) GetConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
 	return m.getConfirmOrderInstructionsFunc(orderID, initiatorAddress)

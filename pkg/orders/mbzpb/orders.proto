@@ -67,6 +67,7 @@ message OrderReject {
 message OrderConfirmation {
     string transactionID                = 1; // Only cancelable orders.
     google.protobuf.Timestamp timestamp = 2;
+    string payoutAddress                = 3;
 }
 
 message OrderCancel {

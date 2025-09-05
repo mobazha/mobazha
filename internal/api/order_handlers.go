@@ -649,8 +649,13 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 
 func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Request) {
 	type orderFulfillment struct {
-		OrderID string `json:"orderID"`
-		models.Fulfillment
+		OrderID                string                         `json:"orderID"`
+		ItemIndex              int                            `json:"itemIndex"`
+		Note                   string                         `json:"note"`
+		PhysicalDelivery       *models.PhysicalDelivery       `json:"physicalDelivery"`
+		DigitalDelivery        *models.DigitalDelivery        `json:"digitalDelivery"`
+		CryptocurrencyDelivery *models.CryptocurrencyDelivery `json:"cryptocurrencyDelivery"`
+		ReceivingAccountID     *int                           `json:"receivingAccountID,omitempty"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -659,6 +664,12 @@ func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
+	}
+
+	// 如果 JSON 反序列化时未提供 ReceivingAccountID，使用默认值 -1
+	receivingAccountID := -1
+	if fulfillParam.ReceivingAccountID != nil {
+		receivingAccountID = *fulfillParam.ReceivingAccountID
 	}
 
 	fulFillment := models.Fulfillment{
@@ -671,13 +682,12 @@ func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Requ
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
-	if fulfillParam.ReceivingAccountID >= 0 {
-		receivingAccount, err := node.GetReceivingAccountByID(fulfillParam.ReceivingAccountID)
+	if receivingAccountID >= 0 {
+		receivingAccount, err := node.GetReceivingAccountByID(receivingAccountID)
 		if err != nil {
 			ErrorResponse(w, http.StatusBadRequest, "收款账户不存在或无效")
 			return
 		}
-		fulFillment.ReceivingAccountID = fulfillParam.ReceivingAccountID
 		fulFillment.ReceivingAccountAddress = receivingAccount.Address
 	}
 

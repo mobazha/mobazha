@@ -36,6 +36,8 @@ var (
 		"LTC":       {Name: "Litecoin", Code: CurrencyCode("LTC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 8, Bip44Code: 2, BlockInterval: time.Second * 150},
 		"ZEC":       {Name: "Zcash", Code: CurrencyCode("ZEC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 8, Bip44Code: 133, BlockInterval: time.Second * 150},
 		"ETH":       {Name: "Ethereum", Code: CurrencyCode("ETH"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, Bip44Code: 60, BlockInterval: time.Second * 12},
+		"ETHUSDT":   {Name: "Tether", Code: CurrencyCode("ETHUSDT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 12},
+		"ETHUSDC":   {Name: "USD Coin", Code: CurrencyCode("ETHUSDC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 12},
 		"EXTERNAL_PAYMENT":       {Name: "ExternalPayment", Code: CurrencyCode("EXTERNAL_PAYMENT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 12, Bip44Code: 128, BlockInterval: time.Minute * 2},
 		"DASH":      {Name: "Dash", Code: CurrencyCode("DASH"), CurrencyType: CurrencyTypeCrypto, Divisibility: 8, Bip44Code: 5, BlockInterval: time.Second * 150},
 		"XRP":       {Name: "Ripple", Code: CurrencyCode("XRP"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, Bip44Code: 144},
@@ -53,7 +55,9 @@ var (
 		"CFXUSDC": {Name: "USD Coin", Code: CurrencyCode("CFXUSDC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, BlockInterval: time.Second * 3},
 		"CFXMBZ":  {Name: "Mobazha Token", Code: CurrencyCode("CFXMBZ"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, BlockInterval: time.Second * 3},
 
-		"SOL": {Name: "Solana", Code: CurrencyCode("SOL"), CurrencyType: CurrencyTypeCrypto, Divisibility: 9, Bip44Code: 501, BlockInterval: time.Millisecond * 400},
+		"SOL":     {Name: "Solana", Code: CurrencyCode("SOL"), CurrencyType: CurrencyTypeCrypto, Divisibility: 9, Bip44Code: 501, BlockInterval: time.Millisecond * 400},
+		"SOLUSDT": {Name: "Tether", Code: CurrencyCode("SOLUSDT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Millisecond * 400},
+		"SOLUSDC": {Name: "USD Coin", Code: CurrencyCode("SOLUSDC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Millisecond * 400},
 
 		"STRIPE": {Name: "Stripe", Code: CurrencyCode("STRIPE"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
 

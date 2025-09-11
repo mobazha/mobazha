@@ -47,7 +47,7 @@ type mockNode struct {
 	getCasesFunc                            func(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Case, int64, error)
 	confirmOrderFunc                        func(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error
 	getConfirmOrderInstructionsFunc         func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
-	getRejectOrderInstructionsFunc          func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
+	getRefundOrderInstructionsFunc          func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
 	getCompleteOrderInstructionsFunc        func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
 	fulfillOrderFunc                        func(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error
 	completeOrderFunc                       func(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
@@ -124,7 +124,7 @@ type mockNode struct {
 	getOrderInfoFunc                        func(orderID models.OrderID, coinType iwallet.CoinType) (*models.OrderInfo, error)
 	processOrderPaymentFunc                 func(ctx context.Context, paymentData *models.PaymentData) error
 	rejectOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
-	refundOrderFunc                         func(orderID models.OrderID, done chan struct{}) error
+	refundOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	pingNodeFunc                            func(ctx context.Context, peer peer.ID) error
 	getUserPreferencesFunc                  func() (*models.UserPreferences, error)
 	saveUserPreferencesFunc                 func(prefs *models.UserPreferences, done chan struct{}) error
@@ -249,8 +249,8 @@ func (m *mockNode) GetConfirmOrderInstructions(orderID models.OrderID, initiator
 func (m *mockNode) GetCompleteOrderInstructions(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
 	return m.getCompleteOrderInstructionsFunc(orderID, initiatorAddress)
 }
-func (m *mockNode) GetRejectOrderInstructions(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
-	return m.getRejectOrderInstructionsFunc(orderID, initiatorAddress)
+func (m *mockNode) GetRefundOrderInstructions(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
+	return m.getRefundOrderInstructionsFunc(orderID, initiatorAddress)
 }
 
 func (m *mockNode) FulfillOrder(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error {
@@ -472,8 +472,8 @@ func (m *mockNode) ProcessOrderPayment(ctx context.Context, paymentData *models.
 func (m *mockNode) RejectOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error {
 	return m.rejectOrderFunc(orderID, txid, reason, done)
 }
-func (m *mockNode) RefundOrder(orderID models.OrderID, done chan struct{}) error {
-	return m.refundOrderFunc(orderID, done)
+func (m *mockNode) RefundOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {
+	return m.refundOrderFunc(orderID, txid, done)
 }
 func (m *mockNode) OpenChannel(topic string) error {
 	return m.openChannel(topic)

@@ -571,7 +571,7 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 	var coinType iwallet.CoinType
 	var instructions any
 	if args.Reject {
-		coinType, instructions, err = node.GetRejectOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress)
+		coinType, instructions, err = node.GetRefundOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress)
 	} else {
 		coinType, instructions, err = node.GetConfirmOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress)
 	}
@@ -612,8 +612,8 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Request) {
 	type orderConf struct {
 		OrderID       string `json:"orderID"`
-		TxID          string `json:"txID"`
-		PayoutAddress string `json:"payoutAddress"`
+		TransactionID string `json:"transactionID"`
+		PayoutAddress string `json:"payoutAddress"` // for confirm order, payout address for seller
 		Reject        bool   `json:"reject"`
 	}
 	decoder := json.NewDecoder(r.Body)
@@ -628,9 +628,9 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 
 	done := make(chan struct{})
 	if !conf.Reject {
-		err = node.ConfirmOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TxID), conf.PayoutAddress, done)
+		err = node.ConfirmOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TransactionID), conf.PayoutAddress, done)
 	} else {
-		err = node.RejectOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TxID), "", done)
+		err = node.RejectOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TransactionID), "", done)
 	}
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -708,9 +708,61 @@ func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+func (g *Gateway) handleGETOrderRefundInstructions(w http.ResponseWriter, r *http.Request) {
+	type Params struct {
+		OrderID          string `json:"orderID"`
+		InitiatorAddress string `json:"initiatorAddress"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	var args Params
+	err := decoder.Decode(&args)
+	if err != nil {
+		ErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	var coinType iwallet.CoinType
+	var instructions any
+	coinType, instructions, err = node.GetRefundOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress)
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	type RefundResponse struct {
+		PaymentChain    iwallet.ChainType `json:"paymentChain"`
+		HasInstructions bool              `json:"hasInstructions"`
+		Instructions    any               `json:"instructions"`
+	}
+
+	if instructions == nil {
+		response := RefundResponse{
+			HasInstructions: false,
+			Instructions:    nil,
+		}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response := RefundResponse{
+		PaymentChain:    coinInfo.Chain,
+		HasInstructions: true,
+		Instructions:    instructions,
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
 func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) {
 	type orderRefund struct {
-		OrderID string `json:"orderID"`
+		OrderID       string `json:"orderID"`
+		TransactionID string `json:"transactionID"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	var refundParam orderRefund
@@ -723,7 +775,7 @@ func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	done := make(chan struct{})
-	err = node.RefundOrder(models.OrderID(refundParam.OrderID), done)
+	err = node.RefundOrder(models.OrderID(refundParam.OrderID), iwallet.TransactionID(refundParam.TransactionID), done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -831,5 +883,5 @@ func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Reque
 // 	r.HandleFunc("/v1/ob/orderconfirmation", g.handlePOSTOrderConfirmation).Methods("POST")
 // 	r.HandleFunc("/v1/ob/orderfulfillment", g.handlePOSTOrderFulfillment).Methods("POST")
 // 	r.HandleFunc("/v1/ob/order/confirm/instructions", g.handleGetConfirmOrderInstructions).Methods("GET")
-// 	r.HandleFunc("/v1/ob/order/reject/instructions", g.handleGetRejectOrderInstructions).Methods("GET")
+// 	r.HandleFunc("/v1/ob/order/reject/instructions", g.handleGetRefundOrderInstructions).Methods("GET")
 // }

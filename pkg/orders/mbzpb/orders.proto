@@ -57,6 +57,7 @@ message OrderReject {
     RejectType type                     = 1;
     string reason                       = 2;
     google.protobuf.Timestamp timestamp = 3;
+    string transactionID                = 4;
 
     enum RejectType {
         USER_REJECT      = 0;

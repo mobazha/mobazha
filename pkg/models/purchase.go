@@ -157,7 +157,8 @@ func (p *PaymentData) BuildTransaction() iwallet.Transaction {
 				Amount:  iwallet.NewAmount(p.Amount),
 			},
 		},
-		Value: iwallet.NewAmount(p.Amount),
+		Value:     iwallet.NewAmount(p.Amount),
+		Timestamp: p.Timestamp,
 	}
 	return tx
 }

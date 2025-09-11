@@ -69,9 +69,11 @@ func (op *OrderProcessor) processRefundMessage(dbtx database.Tx, order *models.O
 			}
 		}
 	} else if order.Role() == models.RoleBuyer && refund.GetReleaseInfo() != nil && paymentSent.Method == pb.PaymentSent_MODERATED {
-		if err := op.releaseRefundEscrowFunds(wallet, paymentSent, refund.GetReleaseInfo()); err != nil {
-			logger.LogInfoWithIDf(log, op.nodeID, "Error releasing funds from escrow during refund processing: %s", err.Error())
-			return nil, err
+		if wallet.CoinCategory() == iwallet.CoinCategoryBitcoin {
+			if err := op.releaseRefundEscrowFunds(wallet, paymentSent, refund.GetReleaseInfo()); err != nil {
+				logger.LogInfoWithIDf(log, op.nodeID, "Error releasing funds from escrow during refund processing: %s", err.Error())
+				return nil, err
+			}
 		}
 	}
 

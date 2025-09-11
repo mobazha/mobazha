@@ -73,6 +73,13 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		tx, err = op.getStripeTransactionFunc(iwallet.TransactionID(paymentSent.TransactionID), iwallet.CoinType(paymentSent.Coin))
 	} else {
 		tx, err = wallet.GetTransaction(iwallet.TransactionID(paymentSent.TransactionID), iwallet.CoinType(paymentSent.Coin))
+		if err != nil {
+			logger.LogErrorWithIDf(log, op.nodeID, "Failed to get transaction from txid: %s, error: %s", paymentSent.TransactionID, err)
+
+			logger.LogInfoWithIDf(log, op.nodeID, "building transaction from payment sent message, txid: %s", paymentSent.TransactionID)
+			tx = utils.BuildPaymentSentTransaction(paymentSent)
+			err = nil
+		}
 	}
 	if err == nil && tx != nil {
 		paymentAddress, err := order.GetPaymentAddress()
@@ -87,7 +94,7 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 			}
 		}
 	} else {
-		logger.LogInfoWithIDf(log, op.nodeID, "Failed to get transaction from id: %s", paymentSent.TransactionID)
+		logger.LogErrorWithIDf(log, op.nodeID, "Failed to get transaction from id: %s, error: %s", paymentSent.TransactionID, err)
 	}
 
 	logger.LogInfoWithIDf(log, op.nodeID, "Received PAYMENT_SENT message for order %s", order.ID)

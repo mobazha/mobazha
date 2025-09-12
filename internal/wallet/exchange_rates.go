@@ -138,7 +138,7 @@ func (e *ExchangeRateProvider) fetchRatesFromProviders(base models.CurrencyCode)
 		}
 
 		// 检查是否是Chainlink provider（第一个provider）
-		if i == 0 && len(e.providers) > 0 {
+		if i == 0 && len(e.providers) > 1 {
 			// 保存Chainlink的数据
 			chainlinkRates = rates
 			combinedRates = make(map[models.CurrencyCode]iwallet.Amount)

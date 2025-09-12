@@ -829,8 +829,8 @@ func (o *Order) CanRefund() bool {
 		return false
 	}
 
-	// Can't refund cancelable.
-	if paymentSent == nil || paymentSent.Method == pb.PaymentSent_CANCELABLE {
+	// Can't refund if payment sent is nil.
+	if paymentSent == nil {
 		return false
 	}
 

@@ -114,9 +114,6 @@ func (c *ChainlinkProvider) fetchRates(base models.CurrencyCode) (map[models.Cur
 	// 添加额外的币种映射
 	c.addAdditionalCurrenciesRates(rates)
 
-	// 手动添加USD汇率（USD对USD = 1）
-	rates[models.CurrencyCode("USD")] = new(big.Float).SetFloat64(1.0)
-
 	// 如果基础货币是BTC，需要计算1个BTC能换多少其他币种
 	if base.String() == ReserveCurrency.String() {
 		result := make(map[models.CurrencyCode]iwallet.Amount)
@@ -219,7 +216,7 @@ func (c *ChainlinkProvider) getPriceFromChainlink(feedAddress string) (float64, 
 
 // isStablecoin 检查是否为稳定币
 func (c *ChainlinkProvider) isStablecoin(symbol string) bool {
-	stablecoins := []string{"USD", "USDT", "USDC"}
+	stablecoins := []string{"USDT", "USDC"}
 	for _, stablecoin := range stablecoins {
 		if symbol == stablecoin {
 			return true

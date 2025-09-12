@@ -187,6 +187,7 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/instructions/order/reject", g.handleGETOrderConfirmationInstructions).Methods("POST")
 		r.HandleFunc("/v1/instructions/order/refund", g.handleGETOrderRefundInstructions).Methods("POST")
 		r.HandleFunc("/v1/instructions/order/complete", g.handleGETOrderCompleteInstructions).Methods("POST")
+		r.HandleFunc("/v1/instructions/order/cancel", g.handleGETOrderCancelInstructions).Methods("POST")
 
 		r.HandleFunc("/v1/instructions/dispute/release", g.handleGETReleaseFundsInstructions).Methods("POST")
 
@@ -212,7 +213,6 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/ob/case/{orderID}", g.handleGetCase).Methods("GET")
 		r.HandleFunc("/v1/ob/order/{orderID}", g.handleGETOrder).Methods("GET")
 		r.HandleFunc("/v1/ob/orderspend", g.handlePostSpendForOrder).Methods("POST")
-		r.HandleFunc("/v1/ob/ordercancel", g.handlePOSTOrderCancel).Methods("POST")
 
 		r.HandleFunc("/v1/order/purchase", g.handlePOSTPurchase).Methods("POST")
 		r.HandleFunc("/v1/order/payment", g.handlePOSTPayment).Methods("POST")
@@ -220,6 +220,7 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/order/fulfill", g.handlePOSTOrderFulfillment).Methods("POST")
 		r.HandleFunc("/v1/order/refund", g.handlePOSTOrderRefund).Methods("POST")
 		r.HandleFunc("/v1/order/complete", g.handlePOSTOrderCompletion).Methods("POST")
+		r.HandleFunc("/v1/order/cancel", g.handlePOSTOrderCancel).Methods("POST")
 
 		r.HandleFunc("/v1/ob/estimatetotal", g.handlePOSTEstimateTotal).Methods("POST")
 		r.HandleFunc("/v1/ob/checkoutbreakdown", g.handlePOSTCheckoutBreakdown).Methods("POST")

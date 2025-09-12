@@ -500,9 +500,16 @@ func (g *Gateway) handlePostSpendForOrder(w http.ResponseWriter, r *http.Request
 	g.handlePOSTSpend(w, r)
 }
 
+func (g *Gateway) handleGETOrderCancelInstructions(w http.ResponseWriter, r *http.Request) {
+	g.handleOrderInstructions(w, r, func(node coreiface.CoreIface, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
+		return node.GetRefundOrderInstructions(orderID, initiatorAddress)
+	})
+}
+
 func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) {
 	type orderCancel struct {
-		OrderID string `json:"orderID"`
+		OrderID       string `json:"orderID"`
+		TransactionID string `json:"transactionID"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	var cancelParam orderCancel
@@ -515,7 +522,7 @@ func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
 	done := make(chan struct{})
-	err = node.CancelOrder(models.OrderID(cancelParam.OrderID), done)
+	err = node.CancelOrder(models.OrderID(cancelParam.OrderID), iwallet.TransactionID(cancelParam.TransactionID), done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -525,7 +532,7 @@ func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) 
 	case <-done:
 		sanitizedStringResponse(w, `{}`)
 		return
-	case <-time.After(time.Second * 10):
+	case <-time.After(time.Second * 15):
 		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")
 		return
 	}
@@ -536,6 +543,7 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 		OrderID          string `json:"orderID"`
 		Reject           bool   `json:"reject"`
 		InitiatorAddress string `json:"initiatorAddress"`
+		PayoutAddress    string `json:"payoutAddress"` // for confirm order, payout address for seller
 	}
 	decoder := json.NewDecoder(r.Body)
 	var args Params
@@ -573,7 +581,7 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 	if args.Reject {
 		coinType, instructions, err = node.GetRefundOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress)
 	} else {
-		coinType, instructions, err = node.GetConfirmOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress)
+		coinType, instructions, err = node.GetConfirmOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress, args.PayoutAddress)
 	}
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -709,54 +717,9 @@ func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Requ
 }
 
 func (g *Gateway) handleGETOrderRefundInstructions(w http.ResponseWriter, r *http.Request) {
-	type Params struct {
-		OrderID          string `json:"orderID"`
-		InitiatorAddress string `json:"initiatorAddress"`
-	}
-	decoder := json.NewDecoder(r.Body)
-	var args Params
-	err := decoder.Decode(&args)
-	if err != nil {
-		ErrorResponse(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
-	var coinType iwallet.CoinType
-	var instructions any
-	coinType, instructions, err = node.GetRefundOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress)
-	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	type RefundResponse struct {
-		PaymentChain    iwallet.ChainType `json:"paymentChain"`
-		HasInstructions bool              `json:"hasInstructions"`
-		Instructions    any               `json:"instructions"`
-	}
-
-	if instructions == nil {
-		response := RefundResponse{
-			HasInstructions: false,
-			Instructions:    nil,
-		}
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
-	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	response := RefundResponse{
-		PaymentChain:    coinInfo.Chain,
-		HasInstructions: true,
-		Instructions:    instructions,
-	}
-	json.NewEncoder(w).Encode(response)
+	g.handleOrderInstructions(w, r, func(node coreiface.CoreIface, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
+		return node.GetRefundOrderInstructions(orderID, initiatorAddress)
+	})
 }
 
 func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) {
@@ -792,39 +755,44 @@ func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) 
 }
 
 func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *http.Request) {
+	g.handleOrderInstructions(w, r, func(node coreiface.CoreIface, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
+		return node.GetCompleteOrderInstructions(orderID, initiatorAddress)
+	})
+}
+
+// handleOrderInstructions 是取消/退款/完成三类订单指令获取接口的通用实现
+func (g *Gateway) handleOrderInstructions(
+	w http.ResponseWriter,
+	r *http.Request,
+	getInstructions func(coreiface.CoreIface, models.OrderID, string) (iwallet.CoinType, any, error),
+) {
 	type Params struct {
 		OrderID          string `json:"orderID"`
 		InitiatorAddress string `json:"initiatorAddress"`
 	}
+
 	decoder := json.NewDecoder(r.Body)
 	var args Params
-	err := decoder.Decode(&args)
-	if err != nil {
+	if err := decoder.Decode(&args); err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
-	var coinType iwallet.CoinType
-	var instructions any
-	coinType, instructions, err = node.GetCompleteOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress)
+	coinType, instructions, err := getInstructions(node, models.OrderID(args.OrderID), args.InitiatorAddress)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	type CompletionResponse struct {
+	type GenericResponse struct {
 		PaymentChain    iwallet.ChainType `json:"paymentChain"`
 		HasInstructions bool              `json:"hasInstructions"`
 		Instructions    any               `json:"instructions"`
 	}
 
 	if instructions == nil {
-		response := CompletionResponse{
-			HasInstructions: false,
-			Instructions:    nil,
-		}
-		json.NewEncoder(w).Encode(response)
+		json.NewEncoder(w).Encode(GenericResponse{HasInstructions: false})
 		return
 	}
 
@@ -834,13 +802,11 @@ func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *h
 		return
 	}
 
-	// 返回响应
-	response := CompletionResponse{
+	json.NewEncoder(w).Encode(GenericResponse{
 		PaymentChain:    coinInfo.Chain,
 		HasInstructions: true,
 		Instructions:    instructions,
-	}
-	json.NewEncoder(w).Encode(response)
+	})
 }
 
 func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Request) {

@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -23,6 +24,14 @@ func (g *Gateway) handleGETMnemonic(w http.ResponseWriter, r *http.Request) {
 		Mnemonic string `json:"mnemonic"`
 	}{
 		Mnemonic: ret,
+	})
+}
+
+func (g *Gateway) handleGETSystemInfo(w http.ResponseWriter, r *http.Request) {
+	sanitizedJSONResponse(w, struct {
+		Timestamp int64 `json:"timestamp"`
+	}{
+		Timestamp: time.Now().Unix(),
 	})
 }
 

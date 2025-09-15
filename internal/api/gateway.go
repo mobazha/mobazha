@@ -285,6 +285,7 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/ob/blocknode/{peerID}", g.handleUnBlockNode).Methods("DELETE")
 
 		r.HandleFunc("/v1/ob/config", g.handleGETConfig).Methods("GET")
+		r.HandleFunc("/v1/ob/systemInfo", g.handleGETSystemInfo).Methods("GET")
 		r.HandleFunc("/v1/wallet/currencies", g.handleGETCurrencies).Methods("GET")
 
 		// Preferences

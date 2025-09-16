@@ -17,7 +17,7 @@ const (
 	ChainLitecoin    ChainType = "LTC"
 	ChainZCash       ChainType = "ZEC"
 	ChainEthereum    ChainType = "ETH"
-	ChainBNB         ChainType = "BNB"
+	ChainBSC         ChainType = "BSC"
 	ChainPolygon     ChainType = "MATIC"
 	ChainBase        ChainType = "BASE"
 	ChainConflux     ChainType = "CFX"
@@ -34,7 +34,7 @@ func (chaintype ChainType) String() string {
 
 func GetAllSupportedChainTypes() []ChainType {
 	return []ChainType{
-		ChainSolana, ChainStripe, ChainEthereum, ChainBNB,
+		ChainSolana, ChainStripe, ChainEthereum, ChainBSC,
 	}
 }
 
@@ -48,7 +48,7 @@ const (
 	CtLitecoin    CoinType = CoinType(ChainLitecoin)
 	CtZCash       CoinType = CoinType(ChainZCash)
 	CtEthereum    CoinType = CoinType(ChainEthereum)
-	CtBNB         CoinType = CoinType(ChainBNB)
+	CtBNB         CoinType = "BNB"
 	CtPolygon     CoinType = CoinType(ChainPolygon)
 	CtBase        CoinType = CoinType(ChainBase)
 	CtConflux     CoinType = CoinType(ChainConflux)
@@ -58,8 +58,8 @@ const (
 
 	CtStripe CoinType = CoinType(ChainStripe)
 
-	CtBEP20USDT   CoinType = "BNBUSDT"
-	CtBEP20USDC   CoinType = "BNBUSDC"
+	CtBEP20USDT   CoinType = "BSCUSDT"
+	CtBEP20USDC   CoinType = "BSCUSDC"
 	CtBaseETH     CoinType = "BASEETH"
 	CtBaseUSDT    CoinType = "BASEUSDT"
 	CtBaseUSDC    CoinType = "BASEUSDC"
@@ -133,7 +133,7 @@ var (
 	}
 
 	CtBNBInfo = CoinInfo{
-		Chain:       ChainBNB,
+		Chain:       ChainBSC,
 		Symbol:      "BNB",
 		IsNative:    true,
 		Decimals:    18,
@@ -233,7 +233,7 @@ var (
 
 	// BEP20代币
 	BEP20USDTInfo = CoinInfo{
-		Chain:           ChainBNB,
+		Chain:           ChainBSC,
 		Symbol:          "USDT",
 		IsNative:        false,
 		Contract:        "0x55d398326f99059ff775485246999027b3197955",
@@ -243,7 +243,7 @@ var (
 	}
 
 	BEP20USDCInfo = CoinInfo{
-		Chain:           ChainBNB,
+		Chain:           ChainBSC,
 		Symbol:          "USDC",
 		IsNative:        false,
 		Contract:        "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
@@ -318,7 +318,7 @@ var ChainConfigs = map[ChainType]struct {
 	ChainLitecoin:    {time.Second * 150, "Litecoin"},
 	ChainZCash:       {time.Second * 150, "Zcash"},
 	ChainEthereum:    {time.Second * 3, "Ethereum"},
-	ChainBNB:         {time.Second * 3, "Binance Smart Chain"},
+	ChainBSC:         {time.Second * 3, "Binance Smart Chain"},
 	ChainBase:        {time.Second * 3, "Base"},
 	ChainPolygon:     {time.Second * 2, "Polygon"},
 	ChainConflux:     {time.Second * 1, "Conflux"},
@@ -364,7 +364,7 @@ func (ct CoinInfo) BlockInterval() time.Duration {
 }
 
 func (ct CoinInfo) IsEthTypeChain() bool {
-	ethTypeChains := []ChainType{ChainEthereum, ChainBNB, ChainBase, ChainPolygon, ChainConflux}
+	ethTypeChains := []ChainType{ChainEthereum, ChainBSC, ChainBase, ChainPolygon, ChainConflux}
 	return slices.Contains(ethTypeChains, ct.Chain)
 }
 

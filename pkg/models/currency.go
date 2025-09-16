@@ -41,10 +41,15 @@ var (
 		"EXTERNAL_PAYMENT":       {Name: "ExternalPayment", Code: CurrencyCode("EXTERNAL_PAYMENT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 12, Bip44Code: 128, BlockInterval: time.Minute * 2},
 		"DASH":      {Name: "Dash", Code: CurrencyCode("DASH"), CurrencyType: CurrencyTypeCrypto, Divisibility: 8, Bip44Code: 5, BlockInterval: time.Second * 150},
 		"XRP":       {Name: "Ripple", Code: CurrencyCode("XRP"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, Bip44Code: 144},
+		"BASE":      {Name: "Base", Code: CurrencyCode("BASE"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, Bip44Code: 60, BlockInterval: time.Second * 3},
+		"BASEETH":   {Name: "Ethereum", Code: CurrencyCode("BASEETH"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, Bip44Code: 60, BlockInterval: time.Second * 3},
+		"BASEUSDT":  {Name: "Tether", Code: CurrencyCode("BASEUSDT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
+		"BASEUSDC":  {Name: "USD Coin", Code: CurrencyCode("BASEUSDC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
+		"BSC":       {Name: "Binance Smart Chain", Code: CurrencyCode("BSC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, Bip44Code: 60, BlockInterval: time.Second * 3},
 		"BNB":       {Name: "Binance Coin", Code: CurrencyCode("BNB"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, Bip44Code: 60, BlockInterval: time.Second * 3},
 		"BSCUSDT":   {Name: "Tether", Code: CurrencyCode("BSCUSDT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
 		"BSCUSDC":   {Name: "USD Coin", Code: CurrencyCode("BSCUSDC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
-		"BNBMBZ":    {Name: "Mobazha Token", Code: CurrencyCode("BNBMBZ"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, BlockInterval: time.Second * 3},
+		"BSCMBZ":    {Name: "Mobazha Token", Code: CurrencyCode("BSCMBZ"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, BlockInterval: time.Second * 3},
 		"MATIC":     {Name: "Polygon", Code: CurrencyCode("MATIC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18, Bip44Code: 60, BlockInterval: time.Second * 3},
 		"MATICUSDT": {Name: "Tether", Code: CurrencyCode("MATICUSDT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
 		"MATICUSDC": {Name: "USD Coin", Code: CurrencyCode("MATICUSDC"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
@@ -257,6 +262,7 @@ func (c CurrencyDictionary) Lookup(code string) (*Currency, error) {
 		def, ok = c[upcase]
 	}
 	if !ok {
+		log.Errorf("CurrencyDefinition undefined: %s", upcase)
 		return nil, ErrCurrencyDefinitionUndefined
 	}
 	if isTestnet {

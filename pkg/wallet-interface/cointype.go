@@ -58,9 +58,17 @@ const (
 
 	CtStripe CoinType = CoinType(ChainStripe)
 
-	CtBEP20USDT CoinType = "BNBUSDT"
-	CtBEP20USDC CoinType = "BNBUSDC"
-	CtMBZ       CoinType = "MBZ"
+	CtBEP20USDT   CoinType = "BNBUSDT"
+	CtBEP20USDC   CoinType = "BNBUSDC"
+	CtBaseETH     CoinType = "BASEETH"
+	CtBaseUSDT    CoinType = "BASEUSDT"
+	CtBaseUSDC    CoinType = "BASEUSDC"
+	CtPolygonUSDT CoinType = "MATICUSDT"
+	CtPolygonUSDC CoinType = "MATICUSDC"
+	CtSPLUSDT     CoinType = "SOLUSDT"
+	CtSPLUSDC     CoinType = "SOLUSDC"
+
+	CtMBZ CoinType = "MBZ"
 
 	// 测试用的 CoinType
 	CtTestCoin CoinType = "TESTCOIN"
@@ -238,8 +246,28 @@ var (
 		Chain:           ChainBNB,
 		Symbol:          "USDC",
 		IsNative:        false,
-		Contract:        "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+		Contract:        "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
 		TestnetContract: "0x337610d27c682E347C9cD60BD4b3b107C9d34dDd", // BSC Testnet USDT
+	}
+
+	// Base USDT
+	BaseUSDTInfo = CoinInfo{
+		Chain:       ChainBase,
+		Symbol:      "USDT",
+		IsNative:    false,
+		Contract:    "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2",
+		Decimals:    6,
+		Description: "Tether USD on Base",
+	}
+
+	// Base USDC
+	BaseUSDCInfo = CoinInfo{
+		Chain:       ChainBase,
+		Symbol:      "USDC",
+		IsNative:    false,
+		Contract:    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+		Decimals:    6,
+		Description: "USD Coin on Base",
 	}
 
 	// SPL代币
@@ -247,7 +275,7 @@ var (
 		Chain:           ChainSolana,
 		Symbol:          "USDT",
 		IsNative:        false,
-		Contract:        "68DyGgw3jp9wH1WhEN4NaBFNgzDbWYM8TFM8XeFZTKU4",
+		Contract:        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
 		TestnetContract: "68DyGgw3jp9wH1WhEN4NaBFNgzDbWYM8TFM8XeFZTKU4", // Solana Devnet USDT
 		Decimals:        6,
 		Description:     "Tether USD on Solana",
@@ -257,8 +285,26 @@ var (
 		Chain:           ChainSolana,
 		Symbol:          "USDC",
 		IsNative:        false,
-		Contract:        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-		TestnetContract: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", // Solana Devnet USDT
+		Contract:        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+		TestnetContract: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", // Solana Devnet USDC
+	}
+
+	PolygonUSDTInfo = CoinInfo{
+		Chain:       ChainPolygon,
+		Symbol:      "USDT",
+		IsNative:    false,
+		Contract:    "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+		Decimals:    6,
+		Description: "Tether USD on Polygon",
+	}
+
+	PolygonUSDCInfo = CoinInfo{
+		Chain:       ChainPolygon,
+		Symbol:      "USDC",
+		IsNative:    false,
+		Contract:    "0x3c499c542cEF5E3811e1192ce70d8cC03d5C3359",
+		Decimals:    6,
+		Description: "USD Coin on Polygon",
 	}
 )
 
@@ -360,7 +406,9 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 			// 查找对应的合约代币
 			for _, token := range []CoinInfo{
 				ERC20USDTInfo, ERC20USDCInfo,
+				BaseUSDTInfo, BaseUSDCInfo,
 				BEP20USDTInfo, BEP20USDCInfo,
+				PolygonUSDTInfo, PolygonUSDCInfo,
 				SPLUSDTInfo, SPLUSDCInfo,
 			} {
 				if token.Chain == chain && token.Symbol == tokenSymbol {
@@ -386,8 +434,8 @@ func IsSPLTokenCoinType(coinType CoinType) bool {
 
 func GetAllSupportedCoinTypes() []CoinType {
 	return []CoinType{
-		CtBitcoin, CtEthereum, CtSolana, CtBNB, CtPolygon, CtConflux, CtSolana, CtExternalPayment, CtDash,
-		CtBEP20USDT, CtBEP20USDC, CtMBZ,
+		CtSolana, CtBNB, CtPolygon, CtBaseETH,
+		CtBEP20USDT, CtBEP20USDC, CtBaseUSDT, CtBaseUSDC, CtPolygonUSDT, CtPolygonUSDC, CtSPLUSDT, CtSPLUSDC,
 	}
 }
 

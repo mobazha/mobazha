@@ -190,9 +190,11 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, node coreiface.CoreIfa
 		}
 
 		paymentSent, err := order.PaymentSentMessage()
-		if err != nil {
-			log.Errorf("Failed to get PaymentSentMessage for order: %s", order.ID.String())
-			continue
+		paymentCoin := ""
+		isModerated := false
+		if err == nil {
+			isModerated = paymentSent.Method == pb.PaymentSent_MODERATED
+			paymentCoin = paymentSent.Coin
 		}
 
 		var listingInfo *pb.Listing
@@ -210,18 +212,18 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, node coreiface.CoreIfa
 			Title:     listingInfo.Item.Title,
 			Thumbnail: listingInfo.Item.Images[0].Tiny,
 			Total: *models.NewCurrencyValue(
-				paymentSent.Amount,
-				models.CurrencyDefinitions[paymentSent.Coin],
+				orderOpen.Amount,
+				models.CurrencyDefinitions[orderOpen.PricingCoin],
 			),
 			VendorID:           listingInfo.VendorID.PeerID,
 			VendorHandle:       listingInfo.VendorID.Handle,
 			ShippingName:       orderOpen.Shipping.ShipTo,
 			ShippingAddress:    orderOpen.Shipping.Address,
-			PaymentCoin:        paymentSent.Coin,
+			PaymentCoin:        paymentCoin,
 			State:              order.GetState().String(),
 			Read:               order.Read,
 			UnreadChatMessages: order.UnreadChatMessages,
-			Moderated:          paymentSent.Method == pb.PaymentSent_MODERATED,
+			Moderated:          isModerated,
 		}
 
 		purchases = append(purchases, info)
@@ -297,9 +299,11 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, node coreiface.CoreIface, 
 		}
 
 		paymentSent, err := order.PaymentSentMessage()
-		if err != nil {
-			log.Errorf("Failed to get PaymentSentMessage for order: %s", order.ID.String())
-			continue
+		isModerated := false
+		paymentCoin := ""
+		if err == nil {
+			isModerated = paymentSent.Method == pb.PaymentSent_MODERATED
+			paymentCoin = paymentSent.Coin
 		}
 
 		var listingInfo *pb.Listing
@@ -317,18 +321,18 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, node coreiface.CoreIface, 
 			Title:     listingInfo.Item.Title,
 			Thumbnail: listingInfo.Item.Images[0].Tiny,
 			Total: *models.NewCurrencyValue(
-				paymentSent.Amount,
-				models.CurrencyDefinitions[paymentSent.Coin],
+				orderOpen.Amount,
+				models.CurrencyDefinitions[orderOpen.PricingCoin],
 			),
 			BuyerID:            orderOpen.BuyerID.PeerID,
 			BuyerHandle:        orderOpen.BuyerID.Handle,
 			ShippingName:       orderOpen.Shipping.ShipTo,
 			ShippingAddress:    orderOpen.Shipping.Address,
-			PaymentCoin:        paymentSent.Coin,
+			PaymentCoin:        paymentCoin,
 			State:              order.GetState().String(),
 			Read:               order.Read,
 			UnreadChatMessages: order.UnreadChatMessages,
-			Moderated:          paymentSent.Method == pb.PaymentSent_MODERATED,
+			Moderated:          isModerated,
 		}
 
 		sales = append(sales, info)

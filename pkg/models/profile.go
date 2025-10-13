@@ -17,6 +17,7 @@ type Profile struct {
 	Nsfw      bool `json:"nsfw"`
 	Vendor    bool `json:"vendor"`
 	Moderator bool `json:"moderator"`
+	Private   bool `json:"private"`
 
 	ModeratorInfo *ModeratorInfo      `json:"moderatorInfo,omitempty"`
 	ContactInfo   *ProfileContactInfo `json:"contactInfo,omitempty"`

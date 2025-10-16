@@ -419,6 +419,12 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 	erp := sharedManager.ExchangeRateProvider
 
+	// 使用 WalletTestnet（如果设置），否则回退到 Testnet
+	walletTestnet := cfg.Testnet
+	if cfg.WalletTestnet {
+		walletTestnet = cfg.WalletTestnet
+	}
+
 	opts := []multiwallet.Option{
 		multiwallet.NodeID(nodeID),
 		multiwallet.DataDir(repoPath),
@@ -426,7 +432,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		multiwallet.Chains(enabledChains),
 		multiwallet.LogLevel(repo.LogLevelMap[strings.ToLower(cfg.LogLevel)]),
 		multiwallet.NetConfig(netConfig),
-		multiwallet.Testnet(cfg.Testnet),
+		multiwallet.Testnet(walletTestnet),
 	}
 	mw, err := multiwallet.NewMultiwallet(opts...)
 	if err != nil {

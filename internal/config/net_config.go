@@ -103,7 +103,7 @@ func (config *NetConfig) GetNetDBEndpoint() string {
 	if len(val) > 0 {
 		return val
 	}
-	return "https://store.mobazha.org/netdb"
+	return "https://info.mobazha.org/api/netdb"
 }
 
 func (config *NetConfig) GetConfig(key string) (string, bool) {

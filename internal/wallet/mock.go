@@ -441,6 +441,10 @@ func (w *MockWallet) CoinCategory() iwallet.CoinCategory {
 	return iwallet.CoinCategoryBitcoin
 }
 
+func (w *MockWallet) IsTestnet() bool {
+	return true
+}
+
 // CurrentAddress is called when requesting this wallet's receiving
 // address. It is customary that the wallet return the first unused
 // address and only return a different address after funds have been

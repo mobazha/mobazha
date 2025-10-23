@@ -215,7 +215,7 @@ func validateEscrowPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal
 		return nil
 	}
 
-	escrowInfo, err := GetOrderEscrowInfo(order, paymentSent)
+	escrowInfo, err := GetOrderEscrowInfo(order, paymentSent, wal.IsTestnet())
 	if err != nil {
 		return err
 	}

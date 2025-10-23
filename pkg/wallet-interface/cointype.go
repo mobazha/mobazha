@@ -348,8 +348,8 @@ func (ct CoinInfo) String() string {
 }
 
 // ContractAddress 返回代币合约地址
-func (ct CoinInfo) ContractAddress(mainnet bool) string {
-	if !mainnet && ct.TestnetContract != "" {
+func (ct CoinInfo) ContractAddress(testnet bool) string {
+	if testnet {
 		return ct.TestnetContract
 	}
 	return ct.Contract

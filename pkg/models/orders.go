@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -494,18 +493,6 @@ func (o *Order) PaymentSentMessage() (*pb.PaymentSent, error) {
 		return nil, err
 	}
 	return paymentSent, nil
-}
-
-func (o *Order) GetEscrowInfo() (iwallet.EscrowInfo, error) {
-	orderOpen, err := o.OrderOpenMessage()
-	if err != nil {
-		return iwallet.EscrowInfo{}, err
-	}
-	paymentSent, err := o.PaymentSentMessage()
-	if err != nil {
-		return iwallet.EscrowInfo{}, err
-	}
-	return utils.GetOrderEscrowInfo(orderOpen, paymentSent)
 }
 
 // PaymentFinalizedMessage returns the unmarshalled proto object if it exists in the order.

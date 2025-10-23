@@ -10,8 +10,10 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-func GetOrderEscrowInfo(orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent) (iwallet.EscrowInfo, error) {
-	escrowInfo := iwallet.EscrowInfo{}
+func GetOrderEscrowInfo(orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, testnet bool) (iwallet.EscrowInfo, error) {
+	escrowInfo := iwallet.EscrowInfo{
+		Testnet: testnet,
+	}
 
 	if paymentSent.Method == pb.PaymentSent_DIRECT {
 		return iwallet.EscrowInfo{}, nil

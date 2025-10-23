@@ -18,6 +18,7 @@ type EscrowInfo struct {
 	UnlockHours        uint64
 	CoinType           CoinType
 	Amount             uint64
+	Testnet            bool // 是否使用测试网
 }
 
 func (e *EscrowInfo) GetSolanaUsersInfo() (payer solana.PublicKey, buyer solana.PublicKey, seller solana.PublicKey, moderator solana.PublicKey, err error) {

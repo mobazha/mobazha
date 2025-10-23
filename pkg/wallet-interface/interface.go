@@ -89,6 +89,9 @@ type Wallet interface {
 	// CoinCategory returns the category of the coin
 	CoinCategory() CoinCategory
 
+	// IsTestnet returns whether the wallet is using testnet
+	IsTestnet() bool
+
 	// CurrentAddress is called when requesting this wallet's receiving
 	// address. It is customary that the wallet return the first unused
 	// address and only return a different address after funds have been

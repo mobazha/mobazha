@@ -261,11 +261,31 @@ func (b *openBazaarAPI) fetchRates(base models.CurrencyCode) (map[models.Currenc
 }
 
 func (b *openBazaarAPI) addAdditionalCurrenciesRates(rateMap map[models.CurrencyCode]*big.Float) {
+	// 为所有不同链上的 USDT 添加汇率映射
 	if rate, ok := rateMap["USDT"]; ok {
+		// ETH 链上的 USDT
+		rateMap[models.CurrencyCode("ETHUSDT")] = rate
+		// BSC 链上的 USDT
 		rateMap[models.CurrencyCode(iwallet.CtBEP20USDT.CurrencyCode())] = rate
+		// Solana 链上的 USDT
+		rateMap[models.CurrencyCode(iwallet.CtSPLUSDT.CurrencyCode())] = rate
+		// Base 链上的 USDT
+		rateMap[models.CurrencyCode(iwallet.CtBaseUSDT.CurrencyCode())] = rate
+		// Polygon 链上的 USDT
+		rateMap[models.CurrencyCode(iwallet.CtPolygonUSDT.CurrencyCode())] = rate
 	}
 
+	// 为所有不同链上的 USDC 添加汇率映射
 	if rate, ok := rateMap["USDC"]; ok {
+		// ETH 链上的 USDC
+		rateMap[models.CurrencyCode("ETHUSDC")] = rate
+		// BSC 链上的 USDC
 		rateMap[models.CurrencyCode(iwallet.CtBEP20USDC.CurrencyCode())] = rate
+		// Solana 链上的 USDC
+		rateMap[models.CurrencyCode(iwallet.CtSPLUSDC.CurrencyCode())] = rate
+		// Base 链上的 USDC
+		rateMap[models.CurrencyCode(iwallet.CtBaseUSDC.CurrencyCode())] = rate
+		// Polygon 链上的 USDC
+		rateMap[models.CurrencyCode(iwallet.CtPolygonUSDC.CurrencyCode())] = rate
 	}
 }

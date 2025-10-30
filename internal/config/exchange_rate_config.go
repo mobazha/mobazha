@@ -25,7 +25,7 @@ type ExchangeRateConfig struct {
 func DefaultExchangeRateConfig() *ExchangeRateConfig {
 	return &ExchangeRateConfig{
 		ChainlinkRPCURL:       "https://polygon-rpc.com",
-		ChainlinkEnabled:      true,
+		ChainlinkEnabled:      false, // 禁用 Chainlink，只使用 ticker API
 		TraditionalAPIEnabled: true,
 		TraditionalAPISources: []string{"https://info.mobazha.org/api/ticker"},
 		CacheTimeoutMinutes:   1,

@@ -19,7 +19,8 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
-	if params.IsRwaToken {
+	// 检查是否为 Token 合约商品
+	if params.IsTokenContract {
 		coinInfo, err := params.CoinType.CoinInfo()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

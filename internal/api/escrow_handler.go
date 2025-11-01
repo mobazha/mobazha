@@ -6,6 +6,7 @@ import (
 
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -19,8 +20,27 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
 
-	// 检查是否为 Token 合约商品
-	if params.IsTokenContract {
+	// ⭐ 从订单数据中获取 ContractType，而不依赖前端传参
+	order, err := node.GetOrder(params.OrderID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	orderOpen, err := order.OrderOpenMessage()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 检查订单的第一个商品的 ContractType 是否为 RWA_TOKEN
+	isRwaToken := false
+	if len(orderOpen.Listings) > 0 {
+		isRwaToken = orderOpen.Listings[0].Listing.Metadata.ContractType == pb.Listing_Metadata_RWA_TOKEN
+	}
+
+	// 检查是否为 RWA Token 合约商品
+	if isRwaToken {
 		coinInfo, err := params.CoinType.CoinInfo()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

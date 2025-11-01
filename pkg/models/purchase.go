@@ -140,8 +140,6 @@ type PaymentData struct {
 	// 支付代币地址（通用字段，适用于所有 Token 支付）
 	PaymentTokenAddress string `json:"paymentTokenAddress,omitempty"` // 支付代币合约地址（ETH为零地址）
 
-	// 智能合约 Token 商品数据（支持 RWA Token、ERC20 等，多商品共用同一个接收地址）
-	IsTokenContract     bool   `json:"isTokenContract"`               // 是否为智能合约 Token 商品
 	BuyerReceiveAddress string `json:"buyerReceiveAddress,omitempty"` // 买家接收 Token 的地址（支持多链地址格式）
 }
 

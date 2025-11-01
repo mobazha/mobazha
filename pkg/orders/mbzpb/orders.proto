@@ -230,7 +230,7 @@ message PaymentSent {
     PaymentMethod paymentMethod         = 18; // 支付方式信息
     google.protobuf.Timestamp timestamp = 19;
     string paymentTokenAddress          = 20; // 支付代币合约地址（通用，适用于所有 Token 支付，ETH为零地址）
-    TokenContractData tokenContractData = 21; // 智能合约 Token 商品数据（RWA Token、ERC20 等）
+    string buyerReceiveAddress          = 21; // 买家接收 Token 的地址（支持多链地址格式，多商品共用）
     
 
     enum Method {
@@ -243,15 +243,6 @@ message PaymentSent {
         string type  = 1; // 支付方式类型
         string brand = 2; // 卡品牌（如果是信用卡支付）
         string last4 = 3; // 卡号后四位（如果是信用卡支付）
-    }
-
-    // 智能合约 Token 商品数据（支持多链：Ethereum、Solana、Base、BSC 等）
-    message TokenContractData {
-        string tokenAddress         = 1; // Token 地址（EVM: 合约地址, Solana: Mint 地址）
-        string tokenAmount          = 2; // Token 数量最小单位（EVM: wei, Solana: lamports）
-        string tokenStandard        = 3; // Token 标准（EVM: "ERC20"/"ERC721"/"ERC1155"/"RWA", Solana: "SPL"/"SPL2022"）
-        string blockchain           = 4; // 区块链网络（"ethereum", "solana", "base", "bsc", "arbitrum"等）
-        string buyerReceiveAddress  = 5; // 买家接收地址（支持多链地址格式）
     }
 }
 

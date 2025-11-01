@@ -70,6 +70,9 @@ message Listing {
         repeated string altIntroVideoLinks          = 21;
         string minQuantity                          = 22;
         string maxQuantity                          = 23;
+        string blockchain                           = 24; // RWA Token 区块链 (ethereum, sepolia, bsc, solana等)
+        string tokenAddress                         = 25; // RWA Token 合约地址
+        string tokenStandard                        = 26; // Token 标准 (RWA, ERC20, ERC721, SPL等)
 
         message Option {
             string name                = 1;

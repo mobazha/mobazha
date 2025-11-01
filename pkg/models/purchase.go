@@ -140,19 +140,9 @@ type PaymentData struct {
 	// 支付代币地址（通用字段，适用于所有 Token 支付）
 	PaymentTokenAddress string `json:"paymentTokenAddress,omitempty"` // 支付代币合约地址（ETH为零地址）
 
-	// 智能合约 Token 商品数据（支持 RWA Token、ERC20 等）
-	IsTokenContract   bool                  `json:"isTokenContract"` // 是否为智能合约 Token 商品
-	TokenContractData *TokenContractPayment `json:"tokenContractData,omitempty"`
-}
-
-// TokenContractPayment 智能合约 Token 商品数据（对应智能合约中的商品数据）
-// 支持多链：Ethereum、Solana、BSC、Polygon 等所有区块链上的 Token
-type TokenContractPayment struct {
-	TokenAddress        string `json:"tokenAddress"`        // Token 地址（EVM: 合约地址, Solana: Mint 地址）
-	TokenAmount         string `json:"tokenAmount"`         // Token 数量最小单位（EVM: wei, Solana: lamports）
-	TokenStandard       string `json:"tokenStandard"`       // Token 标准（EVM: "ERC20"/"ERC721"/"ERC1155"/"RWA", Solana: "SPL"/"SPL2022"）
-	Blockchain          string `json:"blockchain"`          // 区块链网络（"ethereum", "solana", "base", "bsc", "arbitrum"等）
-	BuyerReceiveAddress string `json:"buyerReceiveAddress"` // 买家接收地址（支持多链地址格式）
+	// 智能合约 Token 商品数据（支持 RWA Token、ERC20 等，多商品共用同一个接收地址）
+	IsTokenContract     bool   `json:"isTokenContract"`               // 是否为智能合约 Token 商品
+	BuyerReceiveAddress string `json:"buyerReceiveAddress,omitempty"` // 买家接收 Token 的地址（支持多链地址格式）
 }
 
 func (p *PaymentData) BuildTransaction() iwallet.Transaction {

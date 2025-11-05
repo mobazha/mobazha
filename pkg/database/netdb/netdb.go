@@ -2,8 +2,10 @@ package netdb
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -35,6 +37,48 @@ func NewNetDB(endpoint string, ownPeerID string, nodePrivateKey crypto.PrivKey) 
 		ownPeerID:      ownPeerID,
 		nodePrivateKey: nodePrivateKey,
 	}, nil
+}
+
+// signGetRequest 为 GET 请求生成签名
+// 返回：timestamp, signature, error
+// 注意：签名内容只包含 peerID:timestamp，不包含路径
+// 这样可以避免在请求转发过程中路径变化导致签名验证失败
+func (ndb *NetDB) signGetRequest() (string, string, error) {
+	// 1. 生成时间戳（毫秒）
+	timestamp := time.Now().UnixMilli()
+	timestampStr := fmt.Sprintf("%d", timestamp)
+
+	// 2. 构造签名内容：peerID:timestamp（不包含路径）
+	signatureContent := fmt.Sprintf("%s:%s",
+		ndb.ownPeerID,
+		timestampStr,
+	)
+
+	// 3. 用私钥签名
+	sig, err := ndb.nodePrivateKey.Sign([]byte(signatureContent))
+	if err != nil {
+		return "", "", fmt.Errorf("failed to sign request: %w", err)
+	}
+
+	// 4. Base64 编码签名
+	signatureBase64 := base64.StdEncoding.EncodeToString(sig)
+
+	return timestampStr, signatureBase64, nil
+}
+
+// newSignedRequest 创建一个带签名的 resty Request
+// 这个辅助函数减少了代码重复
+func (ndb *NetDB) newSignedRequest() (*resty.Request, error) {
+	timestamp, signature, err := ndb.signGetRequest()
+	if err != nil {
+		return nil, err
+	}
+
+	return ndb.restyClient.R().
+		ForceContentType("application/json").
+		SetHeader("X-Requestor-PeerID", ndb.ownPeerID).
+		SetHeader("X-Request-Timestamp", timestamp).
+		SetHeader("X-Request-Signature", signature), nil
 }
 
 func (ndb *NetDB) GetProfile(peerID string) (*models.Profile, error) {
@@ -82,8 +126,18 @@ func (ndb *NetDB) SetOwnProfile(profile *models.Profile) error {
 func (ndb *NetDB) GetFollowers(peerID string) (models.Followers, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get followers for %s", peerID)
 
+	requestPath := fmt.Sprintf("/followers/%s", peerID)
+
+	// 创建带签名的请求
+	req, err := ndb.newSignedRequest()
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign request: %w", err)
+	}
+
 	var netFollowers Followers
-	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netFollowers).Get(fmt.Sprintf("%s/followers/%s", ndb.endpoint, peerID))
+	_, err = req.
+		SetResult(&netFollowers).
+		Get(fmt.Sprintf("%s%s", ndb.endpoint, requestPath))
 	if err != nil {
 		return nil, err
 	}
@@ -126,8 +180,18 @@ func (ndb *NetDB) SetOwnFollowers(followers models.Followers) error {
 func (ndb *NetDB) GetFollowing(peerID string) (models.Following, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get following for %s", peerID)
 
+	requestPath := fmt.Sprintf("/following/%s", peerID)
+
+	// 创建带签名的请求
+	req, err := ndb.newSignedRequest()
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign request: %w", err)
+	}
+
 	var netFollowing Following
-	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netFollowing).Get(fmt.Sprintf("%s/following/%s", ndb.endpoint, peerID))
+	_, err = req.
+		SetResult(&netFollowing).
+		Get(fmt.Sprintf("%s%s", ndb.endpoint, requestPath))
 	if err != nil {
 		return nil, err
 	}
@@ -170,8 +234,18 @@ func (ndb *NetDB) SetOwnFollowing(following models.Following) error {
 func (ndb *NetDB) GetListingBySlug(peerID string, slug string) (*pb.SignedListing, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get listing for %s by slug %s", peerID, slug)
 
+	requestPath := fmt.Sprintf("/listing/%s/%s", peerID, slug)
+
+	// 创建带签名的请求
+	req, err := ndb.newSignedRequest()
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign request: %w", err)
+	}
+
 	var netListing Listing
-	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netListing).Get(fmt.Sprintf("%s/listing/%s/%s", ndb.endpoint, peerID, slug))
+	_, err = req.
+		SetResult(&netListing).
+		Get(fmt.Sprintf("%s%s", ndb.endpoint, requestPath))
 	if err != nil {
 		return nil, err
 	}
@@ -189,8 +263,18 @@ func (ndb *NetDB) GetListingBySlug(peerID string, slug string) (*pb.SignedListin
 func (ndb *NetDB) GetListingByCID(cid string) (*pb.SignedListing, error) {
 	logger.LogInfoWithIDf(log, cid, "Get listing by cid %s", cid)
 
+	requestPath := fmt.Sprintf("/listing/%s", cid)
+
+	// 创建带签名的请求
+	req, err := ndb.newSignedRequest()
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign request: %w", err)
+	}
+
 	var netListing Listing
-	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netListing).Get(fmt.Sprintf("%s/listing/%s", ndb.endpoint, cid))
+	_, err = req.
+		SetResult(&netListing).
+		Get(fmt.Sprintf("%s%s", ndb.endpoint, requestPath))
 	if err != nil {
 		return nil, err
 	}
@@ -256,8 +340,18 @@ func (ndb *NetDB) DeleteOwnListing(listingID string) error {
 func (ndb *NetDB) GetListingIndex(peerID string) (models.ListingIndex, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get listing index for peerID %s", peerID)
 
+	requestPath := fmt.Sprintf("/listingindex/%s", peerID)
+
+	// 创建带签名的请求
+	req, err := ndb.newSignedRequest()
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign request: %w", err)
+	}
+
 	var netListingIndex ListingIndex
-	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netListingIndex).Get(fmt.Sprintf("%s/listingindex/%s", ndb.endpoint, peerID))
+	_, err = req.
+		SetResult(&netListingIndex).
+		Get(fmt.Sprintf("%s%s", ndb.endpoint, requestPath))
 	if err != nil {
 		return nil, err
 	}
@@ -300,8 +394,18 @@ func (ndb *NetDB) SetOwnListingIndex(index models.ListingIndex) error {
 func (ndb *NetDB) GetRatingIndex(peerID string) (models.RatingIndex, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get rating index for peerID %s", peerID)
 
+	requestPath := fmt.Sprintf("/ratingindex/%s", peerID)
+
+	// 创建带签名的请求
+	req, err := ndb.newSignedRequest()
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign request: %w", err)
+	}
+
 	var netRatingIndex RatingIndex
-	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netRatingIndex).Get(fmt.Sprintf("%s/ratingindex/%s", ndb.endpoint, peerID))
+	_, err = req.
+		SetResult(&netRatingIndex).
+		Get(fmt.Sprintf("%s%s", ndb.endpoint, requestPath))
 	if err != nil {
 		return nil, err
 	}

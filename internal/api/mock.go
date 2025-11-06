@@ -15,6 +15,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
+	"github.com/mobazha/mobazha3.0/pkg/request"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stripe/stripe-go/v82"
 )
@@ -292,10 +293,10 @@ func (m *mockNode) GetMyFollowers() (models.Followers, error) {
 func (m *mockNode) GetMyFollowing() (models.Following, error) {
 	return m.getMyFollowingFunc()
 }
-func (m *mockNode) GetFollowers(ctx context.Context, peerID peer.ID, useCache bool) (models.Followers, error) {
+func (m *mockNode) GetFollowers(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.Followers, error) {
 	return m.getFollowersFunc(ctx, peerID, useCache)
 }
-func (m *mockNode) GetFollowing(ctx context.Context, peerID peer.ID, useCache bool) (models.Following, error) {
+func (m *mockNode) GetFollowing(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.Following, error) {
 	return m.getFollowingFunc(ctx, peerID, useCache)
 }
 func (m *mockNode) SaveListing(listing *pb.Listing, done chan<- struct{}) error {
@@ -310,7 +311,7 @@ func (m *mockNode) DeleteListing(slug string, done chan<- struct{}) error {
 func (m *mockNode) GetMyListings() (models.ListingIndex, error) {
 	return m.getMyListingsFunc()
 }
-func (m *mockNode) GetListings(ctx context.Context, peerID peer.ID, useCache bool) (models.ListingIndex, error) {
+func (m *mockNode) GetListings(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.ListingIndex, error) {
 	return m.getListingsFunc(ctx, peerID, useCache)
 }
 func (m *mockNode) GetMyListingBySlug(slug string) (*pb.SignedListing, error) {
@@ -319,10 +320,10 @@ func (m *mockNode) GetMyListingBySlug(slug string) (*pb.SignedListing, error) {
 func (m *mockNode) GetMyListingByCID(cid cid.Cid) (*pb.SignedListing, error) {
 	return m.getMyListingByCIDFunc(cid)
 }
-func (m *mockNode) GetListingBySlug(ctx context.Context, peerID peer.ID, slug string, useCache bool) (*pb.SignedListing, error) {
+func (m *mockNode) GetListingBySlug(ctx context.Context, peerID peer.ID, slug string, reqCtx *request.Context, useCache bool) (*pb.SignedListing, error) {
 	return m.getListingBySlugFunc(ctx, peerID, slug, useCache)
 }
-func (m *mockNode) GetListingByCID(ctx context.Context, cid cid.Cid) (*pb.SignedListing, error) {
+func (m *mockNode) GetListingByCID(ctx context.Context, cid cid.Cid, reqCtx *request.Context) (*pb.SignedListing, error) {
 	return m.getListingByCIDFunc(ctx, cid)
 }
 
@@ -445,13 +446,13 @@ func (m *mockNode) SetProfile(profile *models.Profile, done chan<- struct{}) err
 func (m *mockNode) GetMyProfile() (*models.Profile, error) {
 	return m.getMyProfileFunc()
 }
-func (m *mockNode) GetProfile(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error) {
+func (m *mockNode) GetProfile(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error) {
 	return m.getProfileFunc(ctx, peerID, useCache)
 }
 func (m *mockNode) GetMyRatings() (models.RatingIndex, error) {
 	return m.getMyRatingsFunc()
 }
-func (m *mockNode) GetRatings(ctx context.Context, peerID peer.ID, useCache bool) (models.RatingIndex, error) {
+func (m *mockNode) GetRatings(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.RatingIndex, error) {
 	return m.getRatingsFunc(ctx, peerID, useCache)
 }
 func (m *mockNode) GetRating(ctx context.Context, cid cid.Cid) (*pb.Rating, error) {

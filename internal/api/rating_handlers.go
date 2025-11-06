@@ -54,7 +54,8 @@ func (g *Gateway) handleGETPeerRatingsBySlug(w http.ResponseWriter, r *http.Requ
 	if peerIDStr == node.Identity().String() {
 		index, err = node.GetMyRatings()
 	} else {
-		index, err = node.GetRatings(r.Context(), pid, useCache)
+		reqCtx := extractRequestContext(r)
+		index, err = node.GetRatings(r.Context(), pid, reqCtx, useCache)
 	}
 
 	if errors.Is(err, coreiface.ErrNotFound) {
@@ -97,7 +98,8 @@ func (g *Gateway) handleGETRatingIndex(w http.ResponseWriter, r *http.Request) {
 		index, err = node.GetMyRatings()
 	} else {
 		useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
-		index, err = node.GetRatings(r.Context(), pid, useCache)
+		reqCtx := extractRequestContext(r)
+		index, err = node.GetRatings(r.Context(), pid, reqCtx, useCache)
 	}
 
 	if errors.Is(err, coreiface.ErrNotFound) {

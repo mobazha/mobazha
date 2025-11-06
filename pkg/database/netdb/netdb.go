@@ -12,6 +12,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/request"
 	"github.com/op/go-logging"
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -68,20 +69,31 @@ func (ndb *NetDB) signGetRequest() (string, string, error) {
 
 // newSignedRequest 创建一个带签名的 resty Request
 // 这个辅助函数减少了代码重复
-func (ndb *NetDB) newSignedRequest() (*resty.Request, error) {
+// 如果提供了上下文且包含群组信息，会自动添加群组 headers
+func (ndb *NetDB) newSignedRequest(ctx *request.Context) (*resty.Request, error) {
 	timestamp, signature, err := ndb.signGetRequest()
 	if err != nil {
 		return nil, err
 	}
 
-	return ndb.restyClient.R().
+	req := ndb.restyClient.R().
 		ForceContentType("application/json").
 		SetHeader("X-Requestor-PeerID", ndb.ownPeerID).
 		SetHeader("X-Request-Timestamp", timestamp).
-		SetHeader("X-Request-Signature", signature), nil
+		SetHeader("X-Request-Signature", signature)
+
+	// 如果提供了上下文且包含群组信息，添加群组 headers
+	if ctx != nil && ctx.GroupPlatform != "" && ctx.GroupChatID != "" {
+		req.SetHeader("X-Group-Platform", ctx.GroupPlatform).
+			SetHeader("X-Group-ChatID", ctx.GroupChatID)
+		log.Infof("Adding group context headers: platform=%s, chatID=%s",
+			ctx.GroupPlatform, ctx.GroupChatID)
+	}
+
+	return req, nil
 }
 
-func (ndb *NetDB) GetProfile(peerID string) (*models.Profile, error) {
+func (ndb *NetDB) GetProfile(peerID string, ctx *request.Context) (*models.Profile, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get profile for %s", peerID)
 
 	var netProfile Profile
@@ -123,13 +135,13 @@ func (ndb *NetDB) SetOwnProfile(profile *models.Profile) error {
 	return err
 }
 
-func (ndb *NetDB) GetFollowers(peerID string) (models.Followers, error) {
+func (ndb *NetDB) GetFollowers(peerID string, ctx *request.Context) (models.Followers, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get followers for %s", peerID)
 
 	requestPath := fmt.Sprintf("/followers/%s", peerID)
 
 	// 创建带签名的请求
-	req, err := ndb.newSignedRequest()
+	req, err := ndb.newSignedRequest(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
@@ -177,13 +189,13 @@ func (ndb *NetDB) SetOwnFollowers(followers models.Followers) error {
 }
 
 // GetFollowing returns the following list.
-func (ndb *NetDB) GetFollowing(peerID string) (models.Following, error) {
+func (ndb *NetDB) GetFollowing(peerID string, ctx *request.Context) (models.Following, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get following for %s", peerID)
 
 	requestPath := fmt.Sprintf("/following/%s", peerID)
 
 	// 创建带签名的请求
-	req, err := ndb.newSignedRequest()
+	req, err := ndb.newSignedRequest(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
@@ -231,13 +243,13 @@ func (ndb *NetDB) SetOwnFollowing(following models.Following) error {
 }
 
 // GetListingBySlug returns the listing for the given slug.
-func (ndb *NetDB) GetListingBySlug(peerID string, slug string) (*pb.SignedListing, error) {
+func (ndb *NetDB) GetListingBySlug(peerID string, slug string, ctx *request.Context) (*pb.SignedListing, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get listing for %s by slug %s", peerID, slug)
 
 	requestPath := fmt.Sprintf("/listing/%s/%s", peerID, slug)
 
 	// 创建带签名的请求
-	req, err := ndb.newSignedRequest()
+	req, err := ndb.newSignedRequest(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
@@ -260,13 +272,13 @@ func (ndb *NetDB) GetListingBySlug(peerID string, slug string) (*pb.SignedListin
 }
 
 // GetListingByCID fetches the listing from the network given its cid.
-func (ndb *NetDB) GetListingByCID(cid string) (*pb.SignedListing, error) {
+func (ndb *NetDB) GetListingByCID(cid string, ctx *request.Context) (*pb.SignedListing, error) {
 	logger.LogInfoWithIDf(log, cid, "Get listing by cid %s", cid)
 
 	requestPath := fmt.Sprintf("/listing/%s", cid)
 
 	// 创建带签名的请求
-	req, err := ndb.newSignedRequest()
+	req, err := ndb.newSignedRequest(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
@@ -337,13 +349,13 @@ func (ndb *NetDB) DeleteOwnListing(listingID string) error {
 }
 
 // GetListingIndex returns the listing index.
-func (ndb *NetDB) GetListingIndex(peerID string) (models.ListingIndex, error) {
+func (ndb *NetDB) GetListingIndex(peerID string, ctx *request.Context) (models.ListingIndex, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get listing index for peerID %s", peerID)
 
 	requestPath := fmt.Sprintf("/listingindex/%s", peerID)
 
 	// 创建带签名的请求
-	req, err := ndb.newSignedRequest()
+	req, err := ndb.newSignedRequest(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
@@ -391,13 +403,13 @@ func (ndb *NetDB) SetOwnListingIndex(index models.ListingIndex) error {
 }
 
 // GetRatingIndex returns the rating index.
-func (ndb *NetDB) GetRatingIndex(peerID string) (models.RatingIndex, error) {
+func (ndb *NetDB) GetRatingIndex(peerID string, ctx *request.Context) (models.RatingIndex, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get rating index for peerID %s", peerID)
 
 	requestPath := fmt.Sprintf("/ratingindex/%s", peerID)
 
 	// 创建带签名的请求
-	req, err := ndb.newSignedRequest()
+	req, err := ndb.newSignedRequest(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
@@ -445,7 +457,7 @@ func (ndb *NetDB) SetOwnRatingIndex(index models.RatingIndex) error {
 }
 
 // GetStripeAccountID 通过 PeerID 获取 Stripe 账户 ID
-func (ndb *NetDB) GetStripeAccountID(peerID string) (string, error) {
+func (ndb *NetDB) GetStripeAccountID(peerID string, ctx *request.Context) (string, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get stripe account ID for %s", peerID)
 
 	var result struct {

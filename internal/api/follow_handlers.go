@@ -17,6 +17,7 @@ func (g *Gateway) handleGETFollowers(w http.ResponseWriter, r *http.Request) {
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	reqCtx := extractRequestContext(r)
 
 	var (
 		followers models.Followers
@@ -37,7 +38,7 @@ func (g *Gateway) handleGETFollowers(w http.ResponseWriter, r *http.Request) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		followers, err = node.GetFollowers(r.Context(), pid, useCache)
+		followers, err = node.GetFollowers(r.Context(), pid, reqCtx, useCache)
 		if errors.Is(err, coreiface.ErrNotFound) {
 			ErrorResponse(w, http.StatusNotFound, err.Error())
 			return
@@ -58,6 +59,7 @@ func (g *Gateway) handleGETFollowing(w http.ResponseWriter, r *http.Request) {
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	reqCtx := extractRequestContext(r)
 
 	var (
 		following models.Following
@@ -78,7 +80,7 @@ func (g *Gateway) handleGETFollowing(w http.ResponseWriter, r *http.Request) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		following, err = node.GetFollowing(r.Context(), pid, useCache)
+		following, err = node.GetFollowing(r.Context(), pid, reqCtx, useCache)
 		if errors.Is(err, coreiface.ErrNotFound) {
 			ErrorResponse(w, http.StatusNotFound, err.Error())
 			return

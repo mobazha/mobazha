@@ -20,6 +20,7 @@ import (
 	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/request"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gorm.io/gorm"
@@ -51,7 +52,7 @@ type Messenger struct {
 	sk             crypto.PrivKey
 	testnet        bool
 	snfClient      *storeandforward.Client
-	getProfileFunc func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error)
+	getProfileFunc func(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error)
 	done           chan struct{}
 	bootstrapDone  chan struct{}
 	mtx            sync.RWMutex
@@ -67,7 +68,7 @@ type MessengerConfig struct {
 	Privkey        crypto.PrivKey
 	SNFServers     []peer.ID
 	Testnet        bool
-	GetProfileFunc func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error)
+	GetProfileFunc func(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error)
 }
 
 // NewMessenger returns a Messenger and starts the retry service.
@@ -280,7 +281,7 @@ func (m *Messenger) trySendMessage(peerID peer.ID, message *pb.Message, done cha
 		if (len(servers) == 0 || record.LastUpdated.Add(time.Hour*48).Before(time.Now())) && m.getProfileFunc != nil {
 			var snfServers []string
 
-			profile, err := m.getProfileFunc(context.Background(), peerID, true)
+			profile, err := m.getProfileFunc(context.Background(), peerID, nil, true)
 			if err == nil && len(profile.StoreAndForwardServers) > 0 {
 				snfServers = profile.StoreAndForwardServers
 			} else {

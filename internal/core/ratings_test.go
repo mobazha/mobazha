@@ -82,7 +82,7 @@ func TestOpenBazaarNode_Ratings(t *testing.T) {
 		t.Fatal("timed out while publishing")
 	}
 
-	ratings, err = mockNet.Nodes()[1].GetRatings(context.Background(), mockNet.Nodes()[0].Identity(), false)
+	ratings, err = mockNet.Nodes()[1].GetRatings(context.Background(), mockNet.Nodes()[0].Identity(), nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}

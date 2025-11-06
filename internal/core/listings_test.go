@@ -211,7 +211,7 @@ func TestOpenBazaarNode_ListingsGet(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	listing2, err := network.Nodes()[1].GetListingBySlug(context.Background(), network.Nodes()[0].Identity(), listing.Slug, false)
+	listing2, err := network.Nodes()[1].GetListingBySlug(context.Background(), network.Nodes()[0].Identity(), listing.Slug, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +220,7 @@ func TestOpenBazaarNode_ListingsGet(t *testing.T) {
 		t.Errorf("Incorrect slug returned. Expected %s, got %s", listing.Slug, listing2.Listing.Slug)
 	}
 
-	index, err := network.Nodes()[1].GetListings(context.Background(), network.Nodes()[0].Identity(), false)
+	index, err := network.Nodes()[1].GetListings(context.Background(), network.Nodes()[0].Identity(), nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestOpenBazaarNode_ListingsGet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	listing2, err = network.Nodes()[1].GetListingByCID(context.Background(), c)
+	listing2, err = network.Nodes()[1].GetListingByCID(context.Background(), c, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

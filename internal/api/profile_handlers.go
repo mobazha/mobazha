@@ -47,7 +47,8 @@ func (g *Gateway) handleGETProfile(w http.ResponseWriter, r *http.Request) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		profile, err = node.GetProfile(r.Context(), pid, useCache)
+		reqCtx := extractRequestContext(r)
+		profile, err = node.GetProfile(r.Context(), pid, reqCtx, useCache)
 		if errors.Is(err, coreiface.ErrNotFound) {
 			ErrorResponse(w, http.StatusNotFound, err.Error())
 			return
@@ -180,7 +181,7 @@ func (g *Gateway) handlePOSTFetchProfiles(w http.ResponseWriter, r *http.Request
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 				defer cancel()
 
-				profile, err := node.GetProfile(ctx, p, useCache)
+				profile, err := node.GetProfile(ctx, p, nil, useCache)
 				if err != nil {
 					responseChan <- profileError{
 						PeerID: p.String(),
@@ -321,7 +322,7 @@ func (g *Gateway) handleGetModerators(w http.ResponseWriter, r *http.Request) {
 				if strings.ToLower(include) == "profile" {
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 					defer cancel()
-					profile, err := node.GetProfile(ctx, pid, useCache)
+					profile, err := node.GetProfile(ctx, pid, nil, useCache)
 					if err != nil {
 						return
 					}
@@ -362,7 +363,7 @@ func (g *Gateway) handleGetModerators(w http.ResponseWriter, r *http.Request) {
 			for _, pid := range moderatorIDs {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 				defer cancel()
-				profile, err := node.GetProfile(ctx, pid, useCache)
+				profile, err := node.GetProfile(ctx, pid, nil, useCache)
 				if err != nil {
 					continue
 				}

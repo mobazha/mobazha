@@ -13,6 +13,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/request"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -24,12 +25,24 @@ var (
 	}
 )
 
+// extractRequestContext extracts group context from HTTP headers and creates a request.Context
+func extractRequestContext(r *http.Request) *request.Context {
+	groupPlatform := r.Header.Get("X-Group-Platform")
+	groupChatID := r.Header.Get("X-Group-ChatID")
+
+	if groupPlatform != "" && groupChatID != "" {
+		return request.NewContext().WithGroupContext(groupPlatform, groupChatID)
+	}
+	return nil
+}
+
 func (g *Gateway) handleGETListing(w http.ResponseWriter, r *http.Request) {
 	listingIDStr := mux.Vars(r)["listingID"]
 	peerIDStr := mux.Vars(r)["peerID"]
 	slug := mux.Vars(r)["slug"]
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	reqCtx := extractRequestContext(r)
 
 	var (
 		listing *pb.SignedListing
@@ -38,7 +51,7 @@ func (g *Gateway) handleGETListing(w http.ResponseWriter, r *http.Request) {
 	if listingIDStr != "" { // Query by CID
 		id, cerr := cid.Decode(listingIDStr)
 		if cerr == nil {
-			listing, err = node.GetListingByCID(r.Context(), id)
+			listing, err = node.GetListingByCID(r.Context(), id, reqCtx)
 		} else {
 			listing, err = node.GetMyListingBySlug(listingIDStr)
 		}
@@ -61,7 +74,7 @@ func (g *Gateway) handleGETListing(w http.ResponseWriter, r *http.Request) {
 			err = ErrGlobalBannedPeerID
 		} else {
 			useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
-			listing, err = node.GetListingBySlug(r.Context(), pid, slug, useCache)
+			listing, err = node.GetListingBySlug(r.Context(), pid, slug, reqCtx, useCache)
 		}
 	} else {
 		ErrorResponse(w, http.StatusBadRequest, "")
@@ -123,6 +136,7 @@ func (g *Gateway) handleGETListingIndex(w http.ResponseWriter, r *http.Request) 
 	)
 
 	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	reqCtx := extractRequestContext(r)
 
 	if peerIDStr == "" || peerIDStr == node.Identity().String() {
 		listingIndex, listingErr = node.GetMyListings()
@@ -140,10 +154,10 @@ func (g *Gateway) handleGETListingIndex(w http.ResponseWriter, r *http.Request) 
 		if node.IsGlobalBanned(pid) {
 			listingErr = ErrGlobalBannedPeerID
 		} else {
-			listingIndex, listingErr = node.GetListings(r.Context(), pid, useCache)
+			listingIndex, listingErr = node.GetListings(r.Context(), pid, reqCtx, useCache)
 
 			if listingErr == nil {
-				ratingIndex, ratingErr = node.GetRatings(r.Context(), pid, useCache)
+				ratingIndex, ratingErr = node.GetRatings(r.Context(), pid, reqCtx, useCache)
 			}
 		}
 	}

@@ -125,7 +125,7 @@ func TestOpenBazaarNode_GetModerators(t *testing.T) {
 		t.Errorf("Returned incorrect peer ID. Expected %s, got %s", mocknet.Nodes()[0].Identity(), mods[0])
 	}
 
-	profile, err := mocknet.Nodes()[1].GetProfile(context.Background(), mods[0], false)
+	profile, err := mocknet.Nodes()[1].GetProfile(context.Background(), mods[0], nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
+	"github.com/mobazha/mobazha3.0/pkg/request"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stripe/stripe-go/v82"
 )
@@ -92,8 +93,8 @@ type CoreIface interface {
 	FollowsMe(peerID peer.ID) (bool, error)
 	GetMyFollowers() (models.Followers, error)
 	GetMyFollowing() (models.Following, error)
-	GetFollowers(ctx context.Context, peerID peer.ID, useCache bool) (models.Followers, error)
-	GetFollowing(ctx context.Context, peerID peer.ID, useCache bool) (models.Following, error)
+	GetFollowers(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.Followers, error)
+	GetFollowing(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.Following, error)
 
 	// Listings
 	SaveListing(listing *pb.Listing, done chan<- struct{}) error
@@ -101,11 +102,11 @@ type CoreIface interface {
 	DeleteListing(slug string, done chan<- struct{}) error
 	SetModeratorsOnListings(mods []peer.ID, done chan struct{}) error
 	GetMyListings() (models.ListingIndex, error)
-	GetListings(ctx context.Context, peerID peer.ID, useCache bool) (models.ListingIndex, error)
+	GetListings(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.ListingIndex, error)
 	GetMyListingBySlug(slug string) (*pb.SignedListing, error)
 	GetMyListingByCID(cid cid.Cid) (*pb.SignedListing, error)
-	GetListingBySlug(ctx context.Context, peerID peer.ID, slug string, useCache bool) (*pb.SignedListing, error)
-	GetListingByCID(ctx context.Context, cid cid.Cid) (*pb.SignedListing, error)
+	GetListingBySlug(ctx context.Context, peerID peer.ID, slug string, reqCtx *request.Context, useCache bool) (*pb.SignedListing, error)
+	GetListingByCID(ctx context.Context, cid cid.Cid, reqCtx *request.Context) (*pb.SignedListing, error)
 
 	// ShoppingCart
 	GetCartsTotalItemsCount() (int, error)
@@ -141,11 +142,11 @@ type CoreIface interface {
 	// Profiles
 	SetProfile(profile *models.Profile, done chan<- struct{}) error
 	GetMyProfile() (*models.Profile, error)
-	GetProfile(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error)
+	GetProfile(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error)
 
 	// Ratings
 	GetMyRatings() (models.RatingIndex, error)
-	GetRatings(ctx context.Context, peerID peer.ID, useCache bool) (models.RatingIndex, error)
+	GetRatings(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.RatingIndex, error)
 	GetRating(ctx context.Context, cid cid.Cid) (*pb.Rating, error)
 
 	// Posts

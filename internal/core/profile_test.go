@@ -63,7 +63,7 @@ func TestOpenBazaarNode_GetProfile(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	pro, err := mocknet.Nodes()[1].GetProfile(context.Background(), mocknet.Nodes()[0].Identity(), false)
+	pro, err := mocknet.Nodes()[1].GetProfile(context.Background(), mocknet.Nodes()[0].Identity(), nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestOpenBazaarNode_GetProfile(t *testing.T) {
 	}
 
 	// Test fetching from cache
-	pro, err = mocknet.Nodes()[1].GetProfile(context.Background(), mocknet.Nodes()[0].Identity(), true)
+	pro, err = mocknet.Nodes()[1].GetProfile(context.Background(), mocknet.Nodes()[0].Identity(), nil, true)
 	if err != nil {
 		t.Fatal(err)
 	}

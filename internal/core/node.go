@@ -23,6 +23,7 @@ import (
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
+	"github.com/mobazha/mobazha3.0/pkg/encryption"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 )
@@ -154,6 +155,13 @@ type OpenBazaarNode struct {
 	stripeConfigCache *netdb.StripeConfigCache
 
 	hostService coreiface.HostService
+
+	// Phase 2 加密相关服务
+	// keyManager 管理商品和产品组的加密密钥（HKDF 派生）
+	keyManager *encryption.KeyManager
+
+	// localListingCrypto 提供本地商品加密的核心服务（含加解密功能）
+	localListingCrypto *encryption.LocalListingCrypto
 }
 
 // IsDefaultNode returns whether this node is the default node.

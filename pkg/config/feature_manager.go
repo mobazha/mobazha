@@ -33,9 +33,12 @@ func GetGlobalFeatureManager() *FeatureManager {
 
 // NewFeatureManager 创建一个新的功能开关管理器
 func NewFeatureManager() *FeatureManager {
-	return &FeatureManager{
+	fm := &FeatureManager{
 		toggles: make(map[Feature]*Toggle),
 	}
+	fm.RegisterToggle(FeatureLocalEncryptedStorage, false)
+
+	return fm
 }
 
 // RegisterToggle 注册一个新的功能开关

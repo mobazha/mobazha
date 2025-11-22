@@ -41,6 +41,9 @@ var (
 	// ErrNothingToPublish is an error that is returned if a publish call terminates
 	// because the public data directory has not changed since last publish.
 	ErrNothingToPublish = errors.New("nothing to publish")
+
+	// ErrNotAuthorized is returned when a user does not have permission to access a resource.
+	ErrNotAuthorized = errors.New("not authorized")
 )
 
 type ErrTooManyItems []string

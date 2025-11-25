@@ -115,9 +115,10 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 			// For vendor, the payout address is the payout address of the order confirmation
 			orderConfirmation, err := order.OrderConfirmationMessage()
 			if err != nil {
-				return nil, fmt.Errorf("failed to get order confirmation message: %w", err)
+				logger.LogErrorWithIDf(log, op.nodeID, "Failed to get order confirmation message: %v", err)
+			} else {
+				payoutAddress = iwallet.NewAddress(orderConfirmation.PayoutAddress, iwallet.CoinType(paymentSent.Coin))
 			}
-			payoutAddress = iwallet.NewAddress(orderConfirmation.PayoutAddress, iwallet.CoinType(paymentSent.Coin))
 
 			// If order fulfillment exists, the payout address is the to address of the first order fulfillment
 			orderFulfillments, err := order.OrderFulfillmentMessages()

@@ -84,10 +84,9 @@ func (g *Gateway) handlePOSTProfile(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, coreiface.ErrBadRequest) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
-		} else if err != nil {
-			ErrorResponse(w, http.StatusInternalServerError, err.Error())
-			return
 		}
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 	sanitizedJSONResponse(w, struct{}{})
 }
@@ -116,7 +115,7 @@ func (g *Gateway) handlePUTProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var profile models.Profile
-	if json.Unmarshal(patch, &profile); err != nil {
+	if err := json.Unmarshal(patch, &profile); err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -125,10 +124,9 @@ func (g *Gateway) handlePUTProfile(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, coreiface.ErrBadRequest) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
-		} else if err != nil {
-			ErrorResponse(w, http.StatusInternalServerError, err.Error())
-			return
 		}
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 	sanitizedJSONResponse(w, struct{}{})
 }

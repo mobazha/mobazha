@@ -69,7 +69,11 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			}
 		}
 
-		netConfig, err := mcfg.LoadNetConfig(netConfigEndpoint)
+		endpoint := netConfigEndpoint
+		if cfg.NetConfigEndpoint != "" {
+			endpoint = cfg.NetConfigEndpoint
+		}
+		netConfig, err := mcfg.LoadNetConfig(endpoint)
 		if err != nil {
 			log.Infof("Failed to load net config: %s", err)
 		}

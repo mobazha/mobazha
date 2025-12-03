@@ -215,4 +215,8 @@ type NodeManagerIface interface {
 	RemoveNode(nodeID string)
 	GetNodes() map[string]CoreIface
 	GetNode(nodeID string) (CoreIface, bool)
+
+	// Config methods
+	GetMaxImportZipSize() int64
+	GetMaxImportVideoSize() int64
 }

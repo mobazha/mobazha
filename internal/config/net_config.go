@@ -208,3 +208,29 @@ func (config *NetConfig) GetBlockbookWebsocketHeader() http.Header {
 		"User-Agent": []string{userAgent},
 	}
 }
+
+// GetMaxImportZipSize returns the maximum size for batch import ZIP files in bytes.
+// Default is 300MB (314572800 bytes).
+func (config *NetConfig) GetMaxImportZipSize() int64 {
+	val, ok := config.GetConfig("maxImportZipSize")
+	if ok && len(val) > 0 {
+		size, err := strconv.ParseInt(val, 10, 64)
+		if err == nil && size > 0 {
+			return size
+		}
+	}
+	return 300 << 20 // 300MB default
+}
+
+// GetMaxImportVideoSize returns the maximum size for individual video files in batch import.
+// Default is 15MB (15728640 bytes).
+func (config *NetConfig) GetMaxImportVideoSize() int64 {
+	val, ok := config.GetConfig("maxImportVideoSize")
+	if ok && len(val) > 0 {
+		size, err := strconv.ParseInt(val, 10, 64)
+		if err == nil && size > 0 {
+			return size
+		}
+	}
+	return 15 << 20 // 15MB default
+}

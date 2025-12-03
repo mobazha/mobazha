@@ -250,6 +250,9 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/ob/listing", g.handlePUTListing).Methods("PUT")
 		r.HandleFunc("/v1/ob/listing/{slug}", g.handleDELETEListing).Methods("DELETE")
 
+		// Listings Batch Import
+		r.HandleFunc("/v1/ob/listings/import", g.handlePOSTListingsImport).Methods("POST")
+
 		// Images
 		r.HandleFunc("/v1/ob/avatar", g.handlePOSTAvatar).Methods("POST")
 		r.HandleFunc("/v1/ob/header", g.handlePOSTHeader).Methods("POST")
@@ -317,6 +320,7 @@ func (g *Gateway) newV1Router() *mux.Router {
 	r.HandleFunc("/v1/ob/listing/{peerID}/{slug}", g.handleGETListing).Methods("GET")
 	r.HandleFunc("/v1/ob/listingindex/{peerID}", g.handleGETListingIndex).Methods("GET")
 	r.HandleFunc("/v1/ob/listingindex", g.handleGETListingIndex).Methods("GET")
+	r.HandleFunc("/v1/ob/listings/template", g.handleGETListingsTemplate).Methods("GET") // Public: no auth required
 
 	// Profiles
 	r.HandleFunc("/v1/ob/profile/{peerID}", g.handleGETProfile).Methods("GET")

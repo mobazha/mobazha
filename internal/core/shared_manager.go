@@ -164,6 +164,22 @@ func (im *SharedManager) GetNodes() map[string]coreiface.CoreIface {
 	return im.clients
 }
 
+// GetMaxImportZipSize returns the maximum size for batch import ZIP files.
+func (im *SharedManager) GetMaxImportZipSize() int64 {
+	if im.NetConfig != nil {
+		return im.NetConfig.GetMaxImportZipSize()
+	}
+	return 300 << 20 // 300MB default
+}
+
+// GetMaxImportVideoSize returns the maximum size for individual video files in batch import.
+func (im *SharedManager) GetMaxImportVideoSize() int64 {
+	if im.NetConfig != nil {
+		return im.NetConfig.GetMaxImportVideoSize()
+	}
+	return 15 << 20 // 15MB default
+}
+
 func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error) {
 	ipfsNode := im.GetIPFSNode()
 	if ipfsNode == nil {

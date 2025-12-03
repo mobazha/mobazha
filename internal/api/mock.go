@@ -626,3 +626,11 @@ func (m *mockNodeManager) GetNodes() map[string]coreiface.CoreIface {
 func (m *mockNodeManager) RemoveNode(nodeID string) {
 	delete(m.nodes, nodeID)
 }
+
+func (m *mockNodeManager) GetMaxImportZipSize() int64 {
+	return 300 << 20 // 300MB default
+}
+
+func (m *mockNodeManager) GetMaxImportVideoSize() int64 {
+	return 15 << 20 // 15MB default
+}

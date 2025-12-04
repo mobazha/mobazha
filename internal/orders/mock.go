@@ -76,7 +76,7 @@ func newMockOrderProcessor() (*OrderProcessor, func(), error) {
 	}
 
 	mw := multiwallet.Multiwallet{
-		iwallet.CtMock: wallet.NewMockWallet(),
+		iwallet.ChainMock: wallet.NewMockWallet(),
 	}
 
 	erp, err := wallet.NewMockExchangeRates()

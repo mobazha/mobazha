@@ -32,8 +32,8 @@ func (g *Gateway) handleGETConfig(w http.ResponseWriter, r *http.Request) {
 		Tor:     node.UsingTorMode(),
 	}
 
-	for currency := range node.Multiwallet() {
-		ret.Wallets = append(ret.Wallets, currency.CurrencyCode())
+	for chain := range node.Multiwallet() {
+		ret.Wallets = append(ret.Wallets, chain.String())
 	}
 
 	sanitizedJSONResponse(w, &ret)

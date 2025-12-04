@@ -603,8 +603,8 @@ func InitializeMultiwallet(mw multiwallet.Multiwallet, db database.Database, cre
 
 	solPrivKey := solana.PrivateKey(dbSolKey.Value)
 
-	for ct, wallet := range mw {
-		if ct == iwallet.CtSolana {
+	for chain, wallet := range mw {
+		if chain == iwallet.ChainSolana {
 			// 对于 SOL 钱包，使用 solPrivKey
 			solWallet, ok := wallet.(*solanaWal.SolanaWallet)
 			if !ok {
@@ -614,12 +614,12 @@ func InitializeMultiwallet(mw multiwallet.Multiwallet, db database.Database, cre
 			if err := solWallet.InitializeWithKey(solPrivKey, creationDate); err != nil {
 				return err
 			}
-		} else if ct == iwallet.CtStripe {
+		} else if chain == iwallet.ChainStripe {
 			// Do nothing
 		} else {
 			// 其他钱包使用 bip44Key
 			if !wallet.WalletExists() {
-				def, err := models.CurrencyDefinitions.Lookup(ct.CurrencyCode())
+				def, err := models.CurrencyDefinitions.Lookup(chain.String())
 				if err != nil {
 					return err
 				}

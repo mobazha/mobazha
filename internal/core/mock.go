@@ -117,7 +117,7 @@ func MockNode() (*OpenBazaarNode, error) {
 	w.SetEventBus(bus)
 
 	mw := multiwallet.Multiwallet{
-		iwallet.CtMock: w,
+		iwallet.ChainMock: w,
 	}
 
 	erp, err := wallet.NewMockExchangeRates()
@@ -302,7 +302,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		w.SetEventBus(bus)
 
 		mw := multiwallet.Multiwallet{
-			iwallet.CtMock: w,
+			iwallet.ChainMock: w,
 		}
 
 		erp, err := wallet.NewMockExchangeRates()

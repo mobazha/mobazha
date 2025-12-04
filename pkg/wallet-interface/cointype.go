@@ -410,6 +410,11 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 		return CtStripeInfo, nil
 	}
 
+	// 特殊处理：BASEETH 是 Base 链的原生 ETH
+	if coinType == CtBaseETH {
+		return CtBaseInfo, nil
+	}
+
 	// 检查是否为原生代币
 	for chain := range ChainConfigs {
 		if string(chain) == s {

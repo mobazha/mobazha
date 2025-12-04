@@ -7,7 +7,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 // handleGetOrderPaymentInstructions 获取初始化托管的指令
@@ -47,7 +46,7 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 			return
 		}
 
-		if coinInfo.Chain == iwallet.ChainEthereum {
+		if coinInfo.IsEthTypeChain() {
 			orderInfo, err := node.GetOrderInfo(models.OrderID(params.OrderID), params.CoinType)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)

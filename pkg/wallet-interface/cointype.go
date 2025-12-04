@@ -34,7 +34,7 @@ func (chaintype ChainType) String() string {
 
 func GetAllSupportedChainTypes() []ChainType {
 	return []ChainType{
-		ChainSolana, ChainStripe, ChainEthereum, ChainBSC,
+		ChainSolana, ChainStripe, ChainEthereum, ChainBSC, ChainBase,
 	}
 }
 
@@ -366,6 +366,34 @@ func (ct CoinInfo) BlockInterval() time.Duration {
 func (ct CoinInfo) IsEthTypeChain() bool {
 	ethTypeChains := []ChainType{ChainEthereum, ChainBSC, ChainBase, ChainPolygon, ChainConflux}
 	return slices.Contains(ethTypeChains, ct.Chain)
+}
+
+// NativeCoinType 返回该链的原生币种 CoinType，用于获取对应的钱包实例
+func (ct CoinInfo) NativeCoinType() CoinType {
+	switch ct.Chain {
+	case ChainBitcoin:
+		return CtBitcoin
+	case ChainBitcoinCash:
+		return CtBitcoinCash
+	case ChainLitecoin:
+		return CtLitecoin
+	case ChainZCash:
+		return CtZCash
+	case ChainEthereum:
+		return CtEthereum
+	case ChainBSC:
+		return CtBNB
+	case ChainPolygon:
+		return CtPolygon
+	case ChainBase:
+		return CtBase
+	case ChainConflux:
+		return CtConflux
+	case ChainSolana:
+		return CtSolana
+	default:
+		return CoinType(ct.Chain)
+	}
 }
 
 // CoinInfoFromCoinType 从字符串构造 CoinInfo

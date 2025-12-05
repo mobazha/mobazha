@@ -410,9 +410,14 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 		return CtStripeInfo, nil
 	}
 
-	// 特殊处理：BASEETH 是 Base 链的原生 ETH
-	if coinType == CtBaseETH {
+	// 特殊处理：CoinType 和 ChainType 不一致的原生币
+	switch coinType {
+	case CtBaseETH:
+		// BASEETH 是 Base 链的原生 ETH
 		return CtBaseInfo, nil
+	case CtBNB:
+		// BNB 是 BSC 链的原生币（ChainBSC = "BSC"，但 CtBNB = "BNB"）
+		return CtBNBInfo, nil
 	}
 
 	// 检查是否为原生代币

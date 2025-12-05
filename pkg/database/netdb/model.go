@@ -46,12 +46,12 @@ type ListingIndex struct {
 }
 
 type Listing struct {
-	CID               string `gorm:"primaryKey"`
-	PeerID            string
-	Slug              string
-	SerializedListing []byte
+	CID               string `gorm:"primaryKey" json:"CID"`
+	PeerID            string `json:"PeerID"`
+	Slug              string `json:"Slug"`
+	SerializedListing []byte `json:"SerializedListing"`
 
-	Sig []byte `gorm:"-"`
+	Sig []byte `gorm:"-" json:"Sig"`
 }
 
 type RatingIndex struct {

@@ -267,6 +267,7 @@ func (ndb *NetDB) GetListingBySlug(peerID string, slug string, ctx *request.Cont
 	if err != nil {
 		return nil, err
 	}
+	sl.Cid = netListing.CID
 
 	return &sl, nil
 }
@@ -296,6 +297,9 @@ func (ndb *NetDB) GetListingByCID(cid string, ctx *request.Context) (*pb.SignedL
 	if err != nil {
 		return nil, err
 	}
+
+	// 设置从 API 返回的 CID（SerializedListing 中不包含 CID）
+	sl.Cid = netListing.CID
 
 	return &sl, nil
 }

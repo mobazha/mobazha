@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
+	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -120,4 +122,39 @@ func (g *Gateway) AddReceivingAccount(w http.ResponseWriter, r *http.Request) {
 // UpdateReceivingAccount 更新用户的收款账户信息
 func (g *Gateway) UpdateReceivingAccount(w http.ResponseWriter, r *http.Request) {
 	g.handleReceivingAccountRequest(w, r, true)
+}
+
+// DeleteReceivingAccount 删除收款账户
+func (g *Gateway) DeleteReceivingAccount(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		ErrorResponse(w, http.StatusMethodNotAllowed, "只允许DELETE请求")
+		return
+	}
+
+	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+
+	// 从URL路径获取账户ID
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		ErrorResponse(w, http.StatusBadRequest, "无效的账户ID")
+		return
+	}
+
+	// 删除账户
+	err = node.DeleteReceivingAccount(id)
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// 返回成功响应
+	resp := struct {
+		Success bool `json:"success"`
+	}{
+		Success: true,
+	}
+
+	sanitizedJSONResponse(w, resp)
 }

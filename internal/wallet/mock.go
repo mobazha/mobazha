@@ -141,8 +141,8 @@ func (n *MockWalletNetwork) GenerateToAddress(addr iwallet.Address, amount iwall
 }
 
 var _ = iwallet.Wallet(&MockWallet{})
-var _ = iwallet.Escrow(&MockWallet{})
-var _ = iwallet.EscrowWithTimeout(&MockWallet{})
+var _ = iwallet.UTXOEscrow(&MockWallet{})
+var _ = iwallet.UTXOEscrowWithTimeout(&MockWallet{})
 
 // MockWallet is a mock wallet that conforms to the wallet interface. It can
 // be hooked up to the MockWalletNetwork to allow transactions between mock

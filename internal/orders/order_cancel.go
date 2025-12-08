@@ -114,7 +114,7 @@ func (op *OrderProcessor) releaseFromCancelableAddress(tx database.Tx, order *mo
 		return nil, "", err
 	}
 
-	escrowWallet, ok := wallet.(iwallet.Escrow)
+	escrowWallet, ok := wallet.(iwallet.UTXOEscrow)
 	if !ok {
 		return nil, "", errors.New("wallet does not support escrow")
 	}

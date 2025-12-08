@@ -266,7 +266,7 @@ func validateBTCEscrowPayment(paymentSent *pb.PaymentSent, wal iwallet.Wallet, c
 			return err
 		}
 
-		escrowTimeoutWallet, walletSupportsEscrowTimeout := wal.(iwallet.EscrowWithTimeout)
+		escrowTimeoutWallet, walletSupportsEscrowTimeout := wal.(iwallet.UTXOEscrowWithTimeout)
 		if !walletSupportsEscrowTimeout {
 			escrowTimeoutHours = 0
 		}
@@ -278,7 +278,7 @@ func validateBTCEscrowPayment(paymentSent *pb.PaymentSent, wal iwallet.Wallet, c
 				return err
 			}
 		} else {
-			escrowWallet, ok := wal.(iwallet.Escrow)
+			escrowWallet, ok := wal.(iwallet.UTXOEscrow)
 			if !ok {
 				return errors.New("wallet does not support escrow")
 			}
@@ -288,7 +288,7 @@ func validateBTCEscrowPayment(paymentSent *pb.PaymentSent, wal iwallet.Wallet, c
 			}
 		}
 	} else {
-		escrowWallet, ok := wal.(iwallet.Escrow)
+		escrowWallet, ok := wal.(iwallet.UTXOEscrow)
 		if !ok {
 			return errors.New("wallet does not support escrow")
 		}

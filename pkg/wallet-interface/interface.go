@@ -123,11 +123,11 @@ type Wallet interface {
 	Spend(dbtx Tx, to Address, amt Amount, feeLevel FeeLevel, platformAddr Address, platformAmt Amount) (TransactionID, error)
 }
 
-// Escrow is functions related to the Mobazha escrow system. This interface should
+// UTXOEscrow is functions related to the Mobazha escrow system. This interface should
 // be implemented but it's technically optional as some coins like ExternalPayment have a
 // hard time implementing escrow. If it's not implemented then this coin will not
 // be selectable for either escrow payments or offline payments.
-type Escrow interface {
+type UTXOEscrow interface {
 	// EstimateEscrowFee estimates the fee to release the funds from escrow.
 	// this assumes only one input. If there are more inputs Mobazha will
 	// add 50% of the returned fee for each additional input. This is a
@@ -173,9 +173,9 @@ type Escrow interface {
 	BuildAndSend(dbtx Tx, txn Transaction, signatures [][]EscrowSignature, redeemScript []byte, finishType OrderFinishType) (TransactionID, error)
 }
 
-// EscrowWithTimeout is an optional interface to be implemented by wallets whos coins
+// UTXOEscrowWithTimeout is an optional interface to be implemented by wallets whos coins
 // are capable of supporting time based release of funds from escrow.
-type EscrowWithTimeout interface {
+type UTXOEscrowWithTimeout interface {
 	// CreateMultisigWithTimeout is the same as CreateMultisigAddress but it adds
 	// an additional timeout to the address. The address should have two ways to
 	// release the funds:

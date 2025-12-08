@@ -52,9 +52,9 @@ func (x *DevNet) Execute(args []string) error {
 
 	// Build the mock wallet network and set the mock wallet in each node.
 	walletNet := wallet.NewMockWalletNetwork(3)
-	buyer.Multiwallet()[iwallet.CtMock] = walletNet.Wallets()[0]
-	vendor.Multiwallet()[iwallet.CtMock] = walletNet.Wallets()[1]
-	moderator.Multiwallet()[iwallet.CtMock] = walletNet.Wallets()[2]
+	buyer.Multiwallet()[iwallet.ChainMock] = walletNet.Wallets()[0]
+	vendor.Multiwallet()[iwallet.ChainMock] = walletNet.Wallets()[1]
+	moderator.Multiwallet()[iwallet.ChainMock] = walletNet.Wallets()[2]
 
 	walletNet.Wallets()[0].SetEventBus(buyer.EventBus())
 	walletNet.Wallets()[1].SetEventBus(vendor.EventBus())

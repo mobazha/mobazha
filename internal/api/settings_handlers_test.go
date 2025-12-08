@@ -33,7 +33,7 @@ func TestSettingsHandlers(t *testing.T) {
 				}
 				n.multiwalletFunc = func() multiwallet.Multiwallet {
 					m := make(multiwallet.Multiwallet)
-					m[iwallet.CtBitcoin] = nil
+					m[iwallet.ChainBitcoin] = nil
 					return m
 				}
 			},

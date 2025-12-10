@@ -173,6 +173,32 @@ type UTXOEscrow interface {
 	BuildAndSend(dbtx Tx, txn Transaction, signatures [][]EscrowSignature, redeemScript []byte, finishType OrderFinishType) (TransactionID, error)
 }
 
+// UTXODirectPayment is an interface for DIRECT payment release (single-sig P2WPKH)
+// This is used when the seller releases funds from a single-signature payment address
+// to their own address and the platform address.
+type UTXODirectPayment interface {
+	// SpendFromDerivedAddress spends funds from an HD-derived address (identified by utxo)
+	// to multiple outputs using a single private key.
+	//
+	// Parameters:
+	//   - dbtx: Database transaction for atomic operations
+	//   - utxo: The UTXO to spend from (txid, vout, amount, scriptPubKey)
+	//   - outputs: List of outputs (addresses and amounts)
+	//   - signingKey: The private key to sign the transaction
+	//   - feeLevel: Fee level for the transaction
+	//
+	// Returns the transaction ID of the broadcast transaction.
+	SpendFromDerivedAddress(dbtx Tx, utxo UTXO, outputs []SpendInfo, signingKey btcec.PrivateKey, feeLevel FeeLevel) (TransactionID, error)
+}
+
+// UTXO represents an unspent transaction output for SpendFromDerivedAddress
+type UTXO struct {
+	TxID         TransactionID
+	OutputIndex  uint32
+	Amount       Amount
+	ScriptPubKey []byte // The scriptPubKey of the output (for signing)
+}
+
 // UTXOEscrowWithTimeout is an optional interface to be implemented by wallets whos coins
 // are capable of supporting time based release of funds from escrow.
 type UTXOEscrowWithTimeout interface {

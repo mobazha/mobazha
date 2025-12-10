@@ -97,6 +97,56 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		logger.LogErrorWithIDf(log, op.nodeID, "Failed to get transaction from id: %s, error: %s", paymentSent.TransactionID, err)
 	}
 
+	// Check if order is funded and handle role-specific logic
+	funded, _ := order.IsFunded()
+
+	switch order.Role() {
+	case models.RoleBuyer:
+		// Buyer: emit OrderPaymentReceived event
+		if funded {
+			fundingTotal, err := order.FundingTotal()
+			if err == nil {
+				dbtx.RegisterCommitHook(func() {
+					op.bus.Emit(&events.OrderPaymentReceived{
+						OrderID:      order.ID.String(),
+						FundingTotal: fundingTotal.String(),
+						CoinType:     orderOpen.PricingCoin,
+					})
+				})
+			}
+			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected: Order %s fully funded", order.ID)
+		}
+
+	case models.RoleVendor:
+		// Vendor: send rating signatures and emit OrderFunded event
+		if funded {
+			if err := op.sendRatingSignatures(dbtx, order, orderOpen); err != nil {
+				logger.LogInfoWithIDf(log, op.nodeID, "Error sending rating signatures: %s", err)
+			}
+
+			dbtx.RegisterCommitHook(func() {
+				op.bus.Emit(&events.OrderFunded{
+					BuyerHandle: orderOpen.BuyerID.Handle,
+					BuyerID:     orderOpen.BuyerID.PeerID,
+					ListingType: orderOpen.Listings[0].Listing.Metadata.ContractType.String(),
+					OrderID:     order.ID.String(),
+					Price: events.ListingPrice{
+						Amount:        orderOpen.Amount,
+						CurrencyCode:  orderOpen.PricingCoin,
+						PriceModifier: orderOpen.Listings[0].Listing.Item.CryptoListingPriceModifier,
+					},
+					Slug: orderOpen.Listings[0].Listing.Slug,
+					Thumbnail: events.Thumbnail{
+						Tiny:  orderOpen.Listings[0].Listing.Item.Images[0].Tiny,
+						Small: orderOpen.Listings[0].Listing.Item.Images[0].Small,
+					},
+					Title: orderOpen.Listings[0].Listing.Item.Title,
+				})
+			})
+			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected: Order %s fully funded", order.ID)
+		}
+	}
+
 	logger.LogInfoWithIDf(log, op.nodeID, "Received PAYMENT_SENT message for order %s", order.ID)
 
 	event := &events.PaymentSentReceived{

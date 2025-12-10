@@ -173,9 +173,9 @@ type UTXOEscrow interface {
 	BuildAndSend(dbtx Tx, txn Transaction, signatures [][]EscrowSignature, redeemScript []byte, finishType OrderFinishType) (TransactionID, error)
 }
 
-// UTXODirectPayment is an interface for DIRECT payment release (single-sig P2WPKH)
-// This is used when the seller releases funds from a single-signature payment address
-// to their own address and the platform address.
+// UTXODirectPayment is an interface for spending from single-sig P2WPKH addresses.
+// Note: The DIRECT payment mode has been removed in favor of CANCELABLE (1-of-2 multisig).
+// This interface is retained for potential future use cases involving single-sig addresses.
 type UTXODirectPayment interface {
 	// SpendFromDerivedAddress spends funds from an HD-derived address (identified by utxo)
 	// to multiple outputs using a single private key.

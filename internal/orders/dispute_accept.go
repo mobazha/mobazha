@@ -73,5 +73,7 @@ func (op *OrderProcessor) processDisputeAcceptMessage(dbtx database.Tx, order *m
 		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_ACCEPT message for order %s", order.ID)
 	}
 
+	order.Open = false
+
 	return event, order.PutMessage(message)
 }

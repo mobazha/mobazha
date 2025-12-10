@@ -41,5 +41,7 @@ func (op *OrderProcessor) processPaymentFinalizeMessage(dbtx database.Tx, order 
 		logger.LogInfoWithIDf(log, op.nodeID, "Received PAYMENT_FINALIZE message for order %s", order.ID)
 	}
 
+	order.Open = false
+
 	return event, order.PutMessage(message)
 }

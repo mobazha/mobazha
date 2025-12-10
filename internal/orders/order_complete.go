@@ -106,5 +106,8 @@ func (op *OrderProcessor) processOrderCompleteMessage(dbtx database.Tx, order *m
 		BuyerHandle: orderOpen.BuyerID.Handle,
 		BuyerID:     orderOpen.BuyerID.PeerID,
 	}
+
+	order.Open = false
+
 	return event, order.PutMessage(message)
 }

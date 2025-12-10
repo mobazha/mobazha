@@ -89,6 +89,8 @@ func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *mo
 		Buyer:            orderOpen.BuyerID.PeerID,
 	}
 
+	order.Open = false
+
 	return event, order.PutMessage(message)
 }
 

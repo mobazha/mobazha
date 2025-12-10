@@ -43,6 +43,8 @@ func (op *OrderProcessor) processRefundMessage(dbtx database.Tx, order *models.O
 		return nil, err
 	}
 
+	order.Open = false
+
 	if err := order.PutMessage(message); err != nil {
 		if models.IsDuplicateTransactionError(err) {
 			return nil, nil

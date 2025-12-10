@@ -91,6 +91,8 @@ func (op *OrderProcessor) processOrderCancelMessage(dbtx database.Tx, order *mod
 		logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_CANCEL message for order %s", order.ID)
 	}
 
+	order.Open = false
+
 	return event, order.PutMessage(message)
 }
 

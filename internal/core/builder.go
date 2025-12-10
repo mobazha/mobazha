@@ -326,6 +326,12 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		netDB, _ = netdb.NewNetDB(netConfig.GetNetDBEndpoint(), ipfsNode.Identity.String(), ipfsNode.PrivateKey)
 	}
 
+	// 使用 WalletTestnet（如果设置），否则回退到 Testnet
+	walletTestnet := cfg.Testnet
+	if cfg.WalletTestnet {
+		walletTestnet = cfg.WalletTestnet
+	}
+
 	if cfg.IPFSOnly {
 		obNode := &OpenBazaarNode{
 			sharedManager:        sharedManager,
@@ -334,6 +340,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			ipfsNode:             ipfsNode,
 			ipfsOnlyMode:         true,
 			testnet:              cfg.Testnet,
+			walletTestnet:        walletTestnet,
 			torOnly:              cfg.Tor,
 			ipnsQuorum:           cfg.IPNSQuorum,
 			ipnsResolver:         netConfig.GetIPNSResolver(),
@@ -419,12 +426,6 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 	erp := sharedManager.ExchangeRateProvider
 
-	// 使用 WalletTestnet（如果设置），否则回退到 Testnet
-	walletTestnet := cfg.Testnet
-	if cfg.WalletTestnet {
-		walletTestnet = cfg.WalletTestnet
-	}
-
 	opts := []multiwallet.Option{
 		multiwallet.NodeID(nodeID),
 		multiwallet.DataDir(repoPath),
@@ -497,6 +498,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		multiwallet:            mw,
 		exchangeRates:          erp,
 		testnet:                cfg.Testnet,
+		walletTestnet:          walletTestnet,
 		torOnly:                cfg.Tor,
 		storeAndForwardServers: cfg.StoreAndForwardServers,
 		channels:               make(map[string]*channels.Channel),

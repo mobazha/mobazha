@@ -112,8 +112,11 @@ type OpenBazaarNode struct {
 	// and sends them off to the websocket.
 	notifier *notifications.Notifier
 
-	// testnet is whether the this node is configured to use the test network.
+	// testnet is whether the this node is configured to use the test network (IPFS bootstrap).
 	testnet bool
+
+	// walletTestnet is whether the this node is configured to use testnet for wallet transactions.
+	walletTestnet bool
 
 	// torOnly is whether the node is running in tor only mode.
 	torOnly bool
@@ -421,9 +424,15 @@ func (n *OpenBazaarNode) Stop(force bool) error {
 }
 
 // UsingTestnet returns whether or not this node is running on
-// the test network.
+// the test network (IPFS bootstrap).
 func (n *OpenBazaarNode) UsingTestnet() bool {
 	return n.testnet
+}
+
+// UsingWalletTestnet returns whether or not this node is using
+// testnet for wallet transactions (coins and chains).
+func (n *OpenBazaarNode) UsingWalletTestnet() bool {
+	return n.walletTestnet
 }
 
 // UsingTorMode returns whether or not this node is using the tor
@@ -488,4 +497,9 @@ func (n *OpenBazaarNode) EventBus() events.Bus {
 // NetService returns the underlying NetworkService for this node.
 func (n *OpenBazaarNode) NetService() *net.NetworkService {
 	return n.networkService
+}
+
+// NetConfig returns the network configuration.
+func (n *OpenBazaarNode) NetConfig() *config.NetConfig {
+	return n.netConfig
 }

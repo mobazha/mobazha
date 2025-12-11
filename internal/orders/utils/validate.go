@@ -305,20 +305,8 @@ func validateBTCEscrowPayment(paymentSent *pb.PaymentSent, wal iwallet.Wallet, c
 		return errors.New("invalid escrow payment script")
 	}
 
-	if err := validateEscrowReleaseFee(paymentSent); err != nil {
-		return err
-	}
-	return nil
-}
-
-// validateEscrowReleaseFee 验证托管释放费用
-func validateEscrowReleaseFee(paymentSent *pb.PaymentSent) error {
-	if paymentSent.EscrowReleaseFee == "" {
-		return errors.New("escrow release fee is empty")
-	}
-	if ok := validateBigString(paymentSent.EscrowReleaseFee); !ok {
-		return errors.New("escrow release fee not valid")
-	}
+	// Note: EscrowReleaseFee validation removed - external wallets handle fee estimation
+	// and actual release will re-estimate fees based on current network conditions
 	return nil
 }
 

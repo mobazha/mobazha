@@ -256,8 +256,6 @@ func (b *openBazaarAPI) fetchRates(base models.CurrencyCode) (map[models.Currenc
 	}
 	conversionFloat := new(big.Float).Quo(reserveFloat, baseFloat)
 
-	fmt.Printf("baseFloat:%s, reserveFloat: %s, conversionFloat: %s\n", baseFloat, reserveFloat, conversionFloat)
-
 	for currency, rate := range reserveMap {
 		convertedFloat := new(big.Float).Mul(rate, conversionFloat)
 

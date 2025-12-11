@@ -1176,18 +1176,27 @@ func NewMockExchangeRates() (*ExchangeRateProvider, error) {
 	mockedHTTPClient := http.Client{}
 	httpmock.ActivateNonDefault(&mockedHTTPClient)
 
-	httpmock.RegisterResponder(http.MethodGet, "https://testrates.com/api",
-		func(req *http.Request) (*http.Response, error) {
-			return httpmock.NewJsonResponse(http.StatusInternalServerError, MockExchangeRateResponse)
-		},
-	)
+	// Mock all possible exchange rate API endpoints
+	mockURLs := []string{
+		"https://testrates.com/api",
+		"https://info.mobazha.org/api/ticker",
+	}
+
+	for _, url := range mockURLs {
+		httpmock.RegisterResponder(http.MethodGet, url,
+			func(req *http.Request) (*http.Response, error) {
+				return httpmock.NewJsonResponse(http.StatusOK, MockExchangeRateResponse)
+			},
+		)
+	}
 
 	provider := NewExchangeRateProvider([]string{"https://testrates.com/api"})
-	obAPI, ok := provider.providers[0].(*openBazaarAPI)
-	if !ok {
-		return nil, errors.New("type assertion failure provider 0 is not openBazaarAPI")
+	// Find and configure ALL openBazaarAPI providers with mocked client
+	for _, p := range provider.providers {
+		if obAPI, ok := p.(*openBazaarAPI); ok {
+			obAPI.client = &mockedHTTPClient
+		}
 	}
-	obAPI.client = &mockedHTTPClient
 
 	return provider, nil
 }

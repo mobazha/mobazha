@@ -313,6 +313,7 @@ var ChainConfigs = map[ChainType]struct {
 	BlockInterval time.Duration
 	Description   string
 }{
+	ChainMock:        {time.Second * 1, "Mock Chain (Testing)"},
 	ChainBitcoin:     {time.Minute * 10, "Bitcoin"},
 	ChainBitcoinCash: {time.Minute * 10, "Bitcoin Cash"},
 	ChainLitecoin:    {time.Second * 150, "Litecoin"},
@@ -425,6 +426,7 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 		if string(chain) == s {
 			// 找到对应的原生代币
 			for _, token := range []CoinInfo{
+				CtMockInfo, // Mock chain for testing
 				CtBitcoinInfo, CtBitcoinCashInfo, CtLitecoinInfo, CtZCashInfo,
 				CtEthereumInfo, CtBNBInfo, CtBaseInfo, CtPolygonInfo, CtConfluxInfo,
 				CtSolanaInfo,
@@ -487,8 +489,9 @@ func GetAllSupportedCurrencyCodes() []string {
 }
 
 // IsUTXOChain returns true if the chain uses UTXO model (Bitcoin-like)
+// Note: ChainMock is included for testing purposes
 func (c ChainType) IsUTXOChain() bool {
-	utxoChains := []ChainType{ChainBitcoin, ChainLitecoin, ChainBitcoinCash, ChainZCash, ChainDash}
+	utxoChains := []ChainType{ChainBitcoin, ChainLitecoin, ChainBitcoinCash, ChainZCash, ChainDash, ChainMock}
 	return slices.Contains(utxoChains, c)
 }
 

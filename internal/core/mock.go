@@ -7,6 +7,7 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
+	solana "github.com/gagliardetto/solana-go"
 	"github.com/ipfs/boxo/bootstrap"
 	"github.com/ipfs/boxo/namesys"
 	"github.com/ipfs/kubo/core"
@@ -110,6 +111,9 @@ func MockNode() (*MobazhaNode, error) {
 	escrowKey, _ := btcec.PrivKeyFromBytes(dbEscrowKey.Value)
 	ratingKey, _ := btcec.PrivKeyFromBytes(dbRatingKey.Value)
 
+	// Generate a mock Solana private key for testing
+	mockSolPrivKey := solana.NewWallet().PrivateKey
+
 	bus := events.NewBus()
 	tracker := NewFollowerTracker(r, bus, ipfsNode.PeerHost)
 
@@ -149,6 +153,7 @@ func MockNode() (*MobazhaNode, error) {
 		ethMasterKey:         ethMasterKey,
 		escrowMasterKey:      escrowKey,
 		ratingMasterKey:      ratingKey,
+		solPrivKey:           &mockSolPrivKey,
 		multiwallet:          mw,
 		followerTracker:      tracker,
 		exchangeRates:        erp,
@@ -295,6 +300,9 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		escrowKey, _ := btcec.PrivKeyFromBytes(dbEscrowKey.Value)
 		ratingKey, _ := btcec.PrivKeyFromBytes(dbRatingKey.Value)
 
+		// Generate a mock Solana private key for testing
+		mockSolPrivKey := solana.NewWallet().PrivateKey
+
 		bus := events.NewBus()
 		tracker := NewFollowerTracker(r, bus, ipfsNode.PeerHost)
 
@@ -329,6 +337,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			ethMasterKey:         ethMasterKey,
 			escrowMasterKey:      escrowKey,
 			ratingMasterKey:      ratingKey,
+			solPrivKey:           &mockSolPrivKey,
 			multiwallet:          mw,
 			followerTracker:      tracker,
 			exchangeRates:        erp,

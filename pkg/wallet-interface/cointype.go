@@ -485,3 +485,56 @@ func GetAllSupportedCurrencyCodes() []string {
 	}
 	return currencyCodes
 }
+
+// IsUTXOChain returns true if the chain uses UTXO model (Bitcoin-like)
+func (c ChainType) IsUTXOChain() bool {
+	utxoChains := []ChainType{ChainBitcoin, ChainLitecoin, ChainBitcoinCash, ChainZCash, ChainDash}
+	return slices.Contains(utxoChains, c)
+}
+
+// SupportsHDDerivation returns true if the chain supports HD key derivation (BIP32/44)
+func (c ChainType) SupportsHDDerivation() bool {
+	// All UTXO chains support HD derivation
+	return c.IsUTXOChain()
+}
+
+// DerivationType represents the address derivation type for UTXO chains
+type DerivationType string
+
+const (
+	DerivationNativeSegwit DerivationType = "native_segwit" // BIP84 - bc1q... (BTC), ltc1q... (LTC)
+	DerivationSegwit       DerivationType = "segwit"        // BIP49 - 3... (BTC), M... (LTC)
+	DerivationLegacy       DerivationType = "legacy"        // BIP44 - 1... (BTC), L... (LTC)
+	DerivationCashAddr     DerivationType = "cashaddr"      // BCH CashAddr format
+	DerivationTransparent  DerivationType = "transparent"   // ZEC transparent addresses (t1...)
+)
+
+// GetDefaultDerivationType returns the default derivation type for a chain
+func (c ChainType) GetDefaultDerivationType() DerivationType {
+	switch c {
+	case ChainBitcoin, ChainLitecoin:
+		return DerivationNativeSegwit
+	case ChainBitcoinCash:
+		return DerivationCashAddr
+	case ChainZCash:
+		return DerivationTransparent
+	default:
+		return DerivationLegacy
+	}
+}
+
+// GetSupportedDerivationTypes returns all supported derivation types for a chain
+func (c ChainType) GetSupportedDerivationTypes() []DerivationType {
+	switch c {
+	case ChainBitcoin:
+		return []DerivationType{DerivationNativeSegwit, DerivationSegwit, DerivationLegacy}
+	case ChainLitecoin:
+		return []DerivationType{DerivationNativeSegwit, DerivationSegwit, DerivationLegacy}
+	case ChainBitcoinCash:
+		return []DerivationType{DerivationCashAddr, DerivationLegacy}
+	case ChainZCash:
+		return []DerivationType{DerivationTransparent}
+	default:
+		return []DerivationType{}
+	}
+}

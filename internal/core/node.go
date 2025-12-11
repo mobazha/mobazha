@@ -15,6 +15,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
+	"github.com/mobazha/mobazha3.0/internal/multiwallet/utxo"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/notifications"
 	"github.com/mobazha/mobazha3.0/internal/orders"
@@ -154,6 +155,9 @@ type OpenBazaarNode struct {
 	// goroutines can use this to terminate.
 	shutdown chan struct{}
 
+	// utxoMonitor monitors UTXO payment addresses for incoming transactions
+	utxoMonitor *utxo.Monitor
+
 	// Stripe 配置缓存
 	stripeConfigCache *netdb.StripeConfigCache
 
@@ -205,6 +209,9 @@ func (n *OpenBazaarNode) Start() {
 		}
 
 		go n.listenPubsub()
+
+		// Start UTXO payment monitor for external wallet payments
+		go n.startUTXOPaymentMonitor()
 	}
 
 	// Add log to verify connection reuse

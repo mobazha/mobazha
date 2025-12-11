@@ -148,6 +148,9 @@ type mockNode struct {
 	getStripeConnectURLFunc         func() (string, error)
 
 	buildInitEscrowInstructionsFunc func(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error)
+	getUTXOPaymentInfoFunc          func(ctx context.Context, orderID string, moderator string, coinType iwallet.CoinType) (*models.PaymentData, error)
+	getTotalPaidToAddressFunc       func(order *models.Order) (uint64, error)
+	cancelPartialPaymentFunc        func(orderID string) (string, uint64, error)
 
 	addPostFunc       func(post *postsPb.Post, done chan<- struct{}) error
 	deletePostFunc    func(slug string, done chan<- struct{}) error
@@ -536,6 +539,18 @@ func (m *mockNode) GetStripeConnectURL() (string, error) {
 // Escrow
 func (m *mockNode) BuildInitEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error) {
 	return m.buildInitEscrowInstructionsFunc(ctx, params)
+}
+func (m *mockNode) GetUTXOPaymentInfo(ctx context.Context, orderID string, moderator string, coinType iwallet.CoinType) (*models.PaymentData, error) {
+	return m.getUTXOPaymentInfoFunc(ctx, orderID, moderator, coinType)
+}
+func (m *mockNode) GetTotalPaidToAddress(order *models.Order) (uint64, error) {
+	return m.getTotalPaidToAddressFunc(order)
+}
+func (m *mockNode) CancelPartialPayment(orderID string) (string, uint64, error) {
+	return m.cancelPartialPaymentFunc(orderID)
+}
+func (m *mockNode) StopWatchingPayment(orderID string) error {
+	return nil // Mock implementation
 }
 
 func (m *mockNode) SavePreferences(prefs *models.UserPreferences, done chan struct{}) error {

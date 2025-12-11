@@ -76,7 +76,24 @@ const (
 type Order struct {
 	ID OrderID `gorm:"primaryKey"`
 
+	// PaymentAddress stores the payment address (set when buyer gets payment info)
+	// Used to recover monitoring after node restart
 	PaymentAddress string `gorm:"index"`
+
+	// PendingPaymentCoin stores the pending payment coin type (e.g., "BTC", "LTC")
+	// Set when buyer calls GetUTXOPaymentInfo, updated when user switches payment method
+	// Used with PaymentAddress to recover monitoring after node restart
+	PendingPaymentCoin string
+
+	// PendingPaymentAmount stores the locked expected payment amount in satoshis/wei
+	// Set when buyer first calls GetUTXOPaymentInfo for a specific coin type
+	// This prevents exchange rate fluctuation from affecting buyer's payment
+	PendingPaymentAmount uint64
+
+	// PendingPaymentScriptPubKey stores the scriptPubKey for the payment address
+	// Required for Electrum subscription to detect payments
+	// For P2WSH addresses: OP_0 + OP_PUSHDATA32 + SHA256(witnessScript)
+	PendingPaymentScriptPubKey []byte
 
 	Transactions []byte
 

@@ -49,6 +49,10 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 
+	// Set payment address from PaymentSent message for future reference
+	// This is needed by refund, cancel, and other operations that need to match addresses
+	order.PaymentAddress = paymentSent.ToAddress
+
 	err = order.PutMessage(message)
 	if models.IsDuplicateTransactionError(err) {
 		return nil, nil
@@ -144,6 +148,28 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 				})
 			})
 			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected: Order %s fully funded", order.ID)
+		}
+
+		// For CANCELABLE UTXO payments, emit event to trigger auto-confirm in core layer
+		// This decouples message processing (orders layer) from wallet operations (core layer)
+		if paymentSent.Method == pb.PaymentSent_CANCELABLE {
+			coinType := iwallet.CoinType(paymentSent.Coin)
+			if coinInfo, err := coinType.CoinInfo(); err == nil && coinInfo.Chain.IsUTXOChain() {
+				// Parse amount from string
+				var amount uint64
+				if tx != nil {
+					amount = uint64(tx.Value.Int64())
+				}
+				dbtx.RegisterCommitHook(func() {
+					op.bus.Emit(&events.UTXOCancelablePaymentReady{
+						OrderID:       order.ID.String(),
+						TransactionID: paymentSent.TransactionID,
+						Coin:          paymentSent.Coin,
+						Amount:        amount,
+					})
+				})
+				logger.LogInfoWithIDf(log, op.nodeID, "CANCELABLE UTXO payment ready for auto-confirm: order %s", order.ID)
+			}
 		}
 	}
 

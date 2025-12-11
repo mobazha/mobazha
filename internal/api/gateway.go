@@ -214,6 +214,9 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/ob/case/{orderID}", g.handleGetCase).Methods("GET")
 		r.HandleFunc("/v1/ob/order/{orderID}", g.handleGETOrder).Methods("GET")
 		r.HandleFunc("/v1/ob/orderspend", g.handlePostSpendForOrder).Methods("POST")
+		r.HandleFunc("/v1/order/{orderID}/payment/remaining", g.handleGETPaymentRemaining).Methods("GET")
+		r.HandleFunc("/v1/order/{orderID}/payment/cancel-partial", g.handlePOSTCancelPartialPayment).Methods("POST")
+		r.HandleFunc("/v1/order/{orderID}/payment/watch", g.handleDELETEPaymentWatch).Methods("DELETE")
 
 		r.HandleFunc("/v1/order/purchase", g.handlePOSTPurchase).Methods("POST")
 		r.HandleFunc("/v1/order/payment", g.handlePOSTPayment).Methods("POST")

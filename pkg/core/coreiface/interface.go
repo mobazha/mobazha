@@ -182,6 +182,23 @@ type CoreIface interface {
 
 	// Escrow
 	BuildInitEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error)
+	// GetUTXOPaymentInfo 获取 UTXO 链（BTC/LTC/BCH/ZEC）的支付信息
+	// - orderID: 订单ID
+	// - moderator: 仲裁者 PeerID（可选，有则使用 MODERATED 2-of-3）
+	// - coinType: 支付币种
+	// 支付方式：无 moderator 时使用 CANCELABLE（1-of-2），有 moderator 时使用 MODERATED（2-of-3）
+	GetUTXOPaymentInfo(ctx context.Context, orderID string, moderator string, coinType iwallet.CoinType) (*models.PaymentData, error)
+
+	// GetTotalPaidToAddress returns the total amount paid to the order's payment address
+	GetTotalPaidToAddress(order *models.Order) (uint64, error)
+
+	// CancelPartialPayment cancels partial payment and returns funds to buyer
+	// Returns transaction ID and refunded amount
+	CancelPartialPayment(orderID string) (txid string, refundedAmount uint64, err error)
+
+	// StopWatchingPayment stops watching a payment address for an order
+	// Called when buyer closes payment UI or payment is complete
+	StopWatchingPayment(orderID string) error
 
 	// Wallet
 	Multiwallet() multiwallet.Multiwallet

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -855,3 +856,144 @@ func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Reque
 // 	r.HandleFunc("/v1/ob/order/confirm/instructions", g.handleGetConfirmOrderInstructions).Methods("GET")
 // 	r.HandleFunc("/v1/ob/order/reject/instructions", g.handleGetRefundOrderInstructions).Methods("GET")
 // }
+
+// PaymentRemainingResponse represents the response for payment remaining endpoint
+type PaymentRemainingResponse struct {
+	OrderID         string `json:"orderID"`
+	ExpectedAmount  uint64 `json:"expectedAmount"`
+	PaidAmount      uint64 `json:"paidAmount"`
+	RemainingAmount uint64 `json:"remainingAmount"`
+	Coin            string `json:"coin"`
+	PaymentAddress  string `json:"paymentAddress"`
+}
+
+// handleGETPaymentRemaining returns the remaining payment amount for an order
+// GET /v1/order/{orderID}/payment/remaining
+func (g *Gateway) handleGETPaymentRemaining(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
+	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+
+	// Get order
+	order, err := node.GetOrder(orderID)
+	if err != nil {
+		ErrorResponse(w, http.StatusNotFound, "order not found")
+		return
+	}
+
+	// Check if there's pending payment info
+	if order.PendingPaymentAmount == 0 || order.PaymentAddress == "" {
+		ErrorResponse(w, http.StatusBadRequest, "no pending payment for this order")
+		return
+	}
+
+	// Calculate total paid
+	paidAmount, err := node.GetTotalPaidToAddress(order)
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, "failed to calculate paid amount")
+		return
+	}
+
+	remainingAmount := uint64(0)
+	if order.PendingPaymentAmount > paidAmount {
+		remainingAmount = order.PendingPaymentAmount - paidAmount
+	}
+
+	response := PaymentRemainingResponse{
+		OrderID:         orderID,
+		ExpectedAmount:  order.PendingPaymentAmount,
+		PaidAmount:      paidAmount,
+		RemainingAmount: remainingAmount,
+		Coin:            order.PendingPaymentCoin,
+		PaymentAddress:  order.PaymentAddress,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// CancelPartialPaymentRequest represents the request for canceling partial payment
+type CancelPartialPaymentRequest struct {
+	OrderID string `json:"orderID"`
+}
+
+// CancelPartialPaymentResponse represents the response for cancel partial payment
+type CancelPartialPaymentResponse struct {
+	Success        bool   `json:"success"`
+	TransactionID  string `json:"transactionID,omitempty"`
+	RefundedAmount uint64 `json:"refundedAmount,omitempty"`
+	Message        string `json:"message,omitempty"`
+}
+
+// handlePOSTCancelPartialPayment cancels partial payment and refunds to buyer
+// POST /v1/order/{orderID}/payment/cancel-partial
+func (g *Gateway) handlePOSTCancelPartialPayment(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
+	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+
+	// Get order
+	order, err := node.GetOrder(orderID)
+	if err != nil {
+		ErrorResponse(w, http.StatusNotFound, "order not found")
+		return
+	}
+
+	// Check if there's partial payment to cancel
+	if order.PaymentAddress == "" {
+		ErrorResponse(w, http.StatusBadRequest, "no payment address for this order")
+		return
+	}
+
+	// Check if PaymentSent already exists (if so, cannot cancel partial)
+	if _, err := order.PaymentSentMessage(); err == nil {
+		ErrorResponse(w, http.StatusBadRequest, "payment already sent, cannot cancel partial payment")
+		return
+	}
+
+	// Cancel partial payment
+	txid, refundedAmount, err := node.CancelPartialPayment(orderID)
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response := CancelPartialPaymentResponse{
+		Success:        true,
+		TransactionID:  txid,
+		RefundedAmount: refundedAmount,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleDELETEPaymentWatch stops watching a payment address for an order
+// DELETE /v1/order/{orderID}/payment/watch
+// Called when buyer closes payment UI
+func (g *Gateway) handleDELETEPaymentWatch(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
+	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+
+	// Stop watching the payment address
+	if err := node.StopWatchingPayment(orderID); err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}

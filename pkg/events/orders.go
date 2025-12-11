@@ -180,3 +180,31 @@ type ModeratorDisputeExpiry struct {
 	ExpiresIn uint      `json:"expiresIn"`
 	Thumbnail Thumbnail `json:"thumbnail"`
 }
+
+// UTXOCancelablePaymentReady is emitted when a CANCELABLE UTXO payment is ready to be auto-confirmed
+// This is triggered when the seller receives PAYMENT_SENT for a CANCELABLE payment
+type UTXOCancelablePaymentReady struct {
+	OrderID       string `json:"orderID"`
+	TransactionID string `json:"transactionID"`
+	Coin          string `json:"coin"`
+	Amount        uint64 `json:"amount"`
+}
+
+// PartialPaymentReceived is emitted when buyer's payment is less than expected
+// Frontend should refresh QR code to show remaining amount
+type PartialPaymentReceived struct {
+	OrderID         string `json:"orderID"`
+	PaidAmount      uint64 `json:"paidAmount"`
+	ExpectedAmount  uint64 `json:"expectedAmount"`
+	RemainingAmount uint64 `json:"remainingAmount"`
+	Coin            string `json:"coin"`
+}
+
+// ExcessPaymentRefunded is emitted when an excess payment is automatically refunded
+// This happens when buyer sends additional payment after PaymentSent was already sent
+type ExcessPaymentRefunded struct {
+	OrderID        string `json:"orderID"`
+	RefundTxID     string `json:"refundTxID"`
+	RefundedAmount uint64 `json:"refundedAmount"`
+	Coin           string `json:"coin"`
+}

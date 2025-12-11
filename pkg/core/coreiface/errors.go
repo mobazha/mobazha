@@ -44,6 +44,9 @@ var (
 
 	// ErrNotAuthorized is returned when a user does not have permission to access a resource.
 	ErrNotAuthorized = errors.New("not authorized")
+
+	// ErrCoinSwitchRequiresConfirmation is returned when switching coin type with existing partial payments
+	ErrCoinSwitchRequiresConfirmation = errors.New("coin switch requires confirmation due to existing partial payments")
 )
 
 type ErrTooManyItems []string

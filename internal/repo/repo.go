@@ -57,12 +57,12 @@ const (
 
 var log = logging.MustGetLogger("REPO")
 
-// Repo is a representation of an OpenBazaar data directory.
+// Repo is a representation of an Mobazha data directory.
 // In this we store:
 // - IPFS node data
-// - The openbazaar.conf file
+// - The mobazha.conf file
 // - The node's data root directory
-// - The OpenBazaar database
+// - The Mobazha database
 // - A wallet directory which holds wallet plugin data
 type Repo struct {
 	db      database.Database
@@ -773,10 +773,10 @@ func migrateRepoToNodesStructure(rootPath string) error {
 		return fmt.Errorf("failed to create nodes directory structure: %v", err)
 	}
 
-	const oldOpenbazaarFilesDirName = "openbazaar-files"
+	const oldMobazhaFilesDirName = "openbazaar-files"
 	itemsToMove := []string{
 		IPFSDirName,
-		oldOpenbazaarFilesDirName,
+		oldMobazhaFilesDirName,
 		common.PublicDirName,
 		common.DatabaseFileName,
 		common.MultiwalletFileName,
@@ -786,7 +786,7 @@ func migrateRepoToNodesStructure(rootPath string) error {
 	for _, item := range itemsToMove {
 		srcPath := path.Join(rootPath, item)
 		dstPath := path.Join(defaultNodePath, item)
-		if item == oldOpenbazaarFilesDirName {
+		if item == oldMobazhaFilesDirName {
 			dstPath = path.Join(defaultNodePath, MobazhaFilesDirName)
 		}
 

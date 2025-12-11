@@ -12,7 +12,7 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-// Init initializes a new OpenBazaar node at the provided path.
+// Init initializes a new Mobazha node at the provided path.
 type Init struct {
 	DataDir            string `short:"d" long:"datadir" description:"Directory to store data"`
 	Testnet            bool   `short:"t" long:"testnet" description:"Configure this node to use the test network"`
@@ -21,7 +21,7 @@ type Init struct {
 	WalletCreationDate string `short:"w" long:"walletcreationdate" description:"Specify the date the seed was created. If omitted the wallet will sync from the oldest checkpoint."`
 }
 
-// Execute initializes the OpenBazaar node.
+// Execute initializes the Mobazha node.
 func (x *Init) Execute(args []string) error {
 	if x.DataDir == "" {
 		x.DataDir = repo.DefaultHomeDir

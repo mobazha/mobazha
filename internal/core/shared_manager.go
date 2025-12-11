@@ -27,7 +27,7 @@ type SharedManager struct {
 	mu                   sync.RWMutex
 	clients              map[string]coreiface.CoreIface
 
-	// httpGateway is the openbazaar API.
+	// httpGateway is the Mobazha API.
 	httpGateway *api.Gateway
 
 	SNFServers []peer.ID

@@ -30,7 +30,7 @@ import (
 )
 
 // MobazhaNode holds all the components that make up a network node
-// on the OpenBazaar network. It also exposes an exported API which can
+// on the Mobazha network. It also exposes an exported API which can
 // be used to control the node.
 type MobazhaNode struct {
 	nodeID string
@@ -87,7 +87,7 @@ type MobazhaNode struct {
 	messenger *net.Messenger
 
 	// networkService manages the sending and receiving of messages
-	// on the OpenBazaar protocol.
+	// on the Mobazha protocol.
 	networkService *net.NetworkService
 
 	// banManager holds a list of peers that have been banned by this node.

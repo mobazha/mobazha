@@ -388,7 +388,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 	return &Mocknet{nodes, mn, wn}, nil
 }
 
-// Nodes returns the OpenBazaar nodes in this network.
+// Nodes returns the Mobazha nodes in this network.
 func (mn *Mocknet) Nodes() []*MobazhaNode {
 	return mn.nodes
 }

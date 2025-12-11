@@ -103,7 +103,7 @@ func (ns *NetworkService) SetLocalDeliverer(ld LocalDeliverer) {
 // is an abstraction which allows you to multiplex multiple streams of data
 // over the same connection. Each stream does not technically need to be
 // a different protocol. You could, for example, have multiple streams open
-// to the same peer using the OpenBazaarProtocol. This would allow for each
+// to the same peer using the MobazhaProtocol. This would allow for each
 // stream operating in parallel with each other *as if* each one were a
 // different connection.
 func (ns *NetworkService) HandleNewStream(s inet.Stream) {

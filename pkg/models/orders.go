@@ -49,7 +49,7 @@ func IsDuplicateTransactionError(err error) bool {
 	return err == ErrDuplicateTransaction
 }
 
-// OrderID is an OpenBazaar order ID.
+// OrderID is an Mobazha order ID.
 type OrderID string
 
 // String returns the string representation of the ID.

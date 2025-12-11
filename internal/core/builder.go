@@ -477,7 +477,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		}
 	}
 
-	// Construct our OpenBazaar node.repo object
+	// Construct our Mobazha node.repo object
 	obNode := &MobazhaNode{
 		sharedManager:          sharedManager,
 		nodeID:                 nodeID,

@@ -392,12 +392,12 @@ func (w *MockWallet) WalletExists() bool {
 }
 
 // CreateWallet should initialize the wallet. This will be called by
-// OpenBazaar if WalletExists() returns false.
+// Mobazha if WalletExists() returns false.
 //
 // The xPriv may be used to create a bip44 keychain. The xPriv is
 // `cointype` level in the bip44 path. For example in the following
 // path the wallet should only derive the paths after `account` as
-// m, purpose', and coin_type' are kept private by OpenBazaar so this
+// m, purpose', and coin_type' are kept private by Mobazha so this
 // wallet cannot derive keys from other wallets.
 //
 // m / purpose' / coin_type' / account' / change / address_index
@@ -411,13 +411,13 @@ func (w *MockWallet) CreateWallet(xpriv hd.ExtendedKey, pw []byte, birthday time
 	return nil
 }
 
-// Open wallet will be called each time on OpenBazaar start. It
+// Open wallet will be called each time on Mobazha start. It
 // will also be called after CreateWallet().
 func (w *MockWallet) OpenWallet() error {
 	return nil
 }
 
-// CloseWallet will be called when OpenBazaar shuts down.
+// CloseWallet will be called when Mobazha shuts down.
 func (w *MockWallet) CloseWallet() error {
 	close(w.done)
 	return nil
@@ -473,7 +473,7 @@ func (w *MockWallet) CurrentAddress() (iwallet.Address, error) {
 }
 
 // NewAddress should return a new, never before used address. This is called
-// by OpenBazaar to get a fresh address for a direct payment order. It
+// by Mobazha to get a fresh address for a direct payment order. It
 // associates this address with the order and assumes if a payment is received
 // by this address that it is for the order. Failure to return a never before
 // used address could put the order in a bad state.
@@ -638,7 +638,7 @@ func (w *MockWallet) Transactions(limit int, offsetID iwallet.TransactionID) ([]
 	return sorted.transactions[offset:limit], nil
 }
 
-// GetTransaction returns a transaction given it's ID. This is used by OpenBazaar to
+// GetTransaction returns a transaction given it's ID. This is used by Mobazha to
 // request transactions paid to an order's payment address. This means we expect both
 // internal wallet transactions and transactions sending to or from a watched address
 // to be returned here.
@@ -928,7 +928,7 @@ func (w *MockWallet) SubscribeBlocks() <-chan iwallet.BlockInfo {
 
 // WatchAddress is used by the escrow system to tell the wallet to listen
 // on the escrow address. It's expected that payments into and spends from
-// this address will be pushed back to OpenBazaar.
+// this address will be pushed back to Mobazha.
 //
 // Note a database transaction is used here. Same rules of Commit() and
 // Rollback() apply.
@@ -949,7 +949,7 @@ func (w *MockWallet) WatchAddress(tx iwallet.Tx, addrs ...iwallet.AddressEx) err
 }
 
 // EstimateEscrowFee estimates the fee to release the funds from escrow.
-// this assumes only one input. If there are more inputs OpenBazaar will
+// this assumes only one input. If there are more inputs Mobazha will
 // will add 50% of the returned fee for each additional input. This is a
 // crude fee calculating but it simplifies things quite a bit.
 func (w *MockWallet) EstimateEscrowFee(threshold int, nOuts int, feeLevel iwallet.FeeLevel) (iwallet.Amount, error) {
@@ -977,7 +977,7 @@ func (w *MockWallet) EstimateEscrowFee(threshold int, nOuts int, feeLevel iwalle
 // CreateMultisigAddress creates a new threshold multisig address using the
 // provided pubkeys and the threshold. The multisig address is returned along
 // with a byte slice. The byte slice will typically be the redeem script for
-// the address (in Bitcoin related coins). The slice will be saved in OpenBazaar
+// the address (in Bitcoin related coins). The slice will be saved in Mobazha
 // with the order and passed back into the wallet when signing the transaction.
 // In practice this does not need to be a redeem script so long as the wallet
 // knows how to sign the transaction when it sees it.
@@ -986,7 +986,7 @@ func (w *MockWallet) EstimateEscrowFee(threshold int, nOuts int, feeLevel iwalle
 // in the same set of keys and expecting to get back the same address and redeem
 // script. If this is not the case the vendor will reject the order.
 //
-// Note that this is normally a 2 of 3 escrow in the normal case, however OpenBazaar
+// Note that this is normally a 2 of 3 escrow in the normal case, however Mobazha
 // also uses 1 of 2 multisigs as a form of a "cancelable" address when sending to
 // a node that is offline. This allows the sender to cancel the payment if the vendor
 // never comes back online.

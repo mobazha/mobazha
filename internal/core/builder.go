@@ -512,11 +512,17 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	}
 	sharedManager.AddNode(nodeID, obNode)
 
-	// If this is the default node, we need to create the HTTP gateway
+	// If this is the default node, we need to create the HTTP gateway and initialize SNF Proxy
 	if isDefaultNode {
 		_, err = sharedManager.initHTTPGateway(cfg)
 		if err != nil {
 			return nil, err
+		}
+
+		// Initialize SNF Proxy using the default node's host as transport
+		if err := sharedManager.InitSNFProxy(ipfsNode.PeerHost); err != nil {
+			logger.LogErrorWithIDf(log, nodeID, "Failed to initialize SNF Proxy: %v", err)
+			// Continue without proxy - will use direct connections
 		}
 	} else {
 		sharedManager.GetHTTPGateway().EnsureHubForUser(nodeID)
@@ -528,16 +534,35 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID),
 	)
 
-	obNode.messenger, err = obnet.NewMessenger(&obnet.MessengerConfig{
+	// Create messenger with appropriate SNF client
+	messengerCfg := &obnet.MessengerConfig{
 		NodeID:         nodeID,
 		Service:        service,
-		SNFServers:     sharedManager.SNFServers,
 		Privkey:        ipfsNode.PrivateKey,
 		Context:        ipfsNode.Context(),
 		DB:             obRepo.DB(),
 		Testnet:        cfg.Testnet,
 		GetProfileFunc: obNode.GetProfile,
-	})
+	}
+
+	// For non-default nodes, use the SNF Proxy's LocalClient if available
+	if !isDefaultNode && sharedManager.HasSNFProxy() {
+		proxy := sharedManager.GetSNFProxy()
+		localClient, err := proxy.RegisterNode(ipfsNode.Identity, ipfsNode.PrivateKey)
+		if err != nil {
+			logger.LogErrorWithIDf(log, nodeID, "Failed to register with SNF Proxy: %v, falling back to direct connection", err)
+			// Fall back to direct connection
+			messengerCfg.SNFServers = sharedManager.SNFServers
+		} else {
+			messengerCfg.SNFClient = localClient
+			logger.LogInfoWithIDf(log, nodeID, "Using SNF Proxy for store-and-forward messaging")
+		}
+	} else {
+		// Default node or no proxy available - use direct connection
+		messengerCfg.SNFServers = sharedManager.SNFServers
+	}
+
+	obNode.messenger, err = obnet.NewMessenger(messengerCfg)
 	if err != nil {
 		return nil, err
 	}

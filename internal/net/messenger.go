@@ -51,7 +51,7 @@ type Messenger struct {
 	db             database.Database
 	sk             crypto.PrivKey
 	testnet        bool
-	snfClient      *storeandforward.Client
+	snfClient      storeandforward.SNFClientInterface
 	getProfileFunc func(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error)
 	done           chan struct{}
 	bootstrapDone  chan struct{}
@@ -69,33 +69,58 @@ type MessengerConfig struct {
 	SNFServers     []peer.ID
 	Testnet        bool
 	GetProfileFunc func(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error)
+
+	// SNFClient is an optional pre-configured SNF client (e.g., LocalClient from SNFProxy).
+	// If provided, SNFServers will be ignored and this client will be used instead.
+	SNFClient storeandforward.SNFClientInterface
+
+	// BootstrapDone is an optional channel that will be closed when SNF bootstrap is complete.
+	// Only used when SNFClient is provided.
+	BootstrapDone chan struct{}
 }
 
 // NewMessenger returns a Messenger and starts the retry service.
 func NewMessenger(cfg *MessengerConfig) (*Messenger, error) {
-	snfServerProtocol := ProtocolStoreAndForwardMainnet_Server
-	snfClientProtocol := ProtocolStoreAndForwardMainnet_Client
-	if cfg.Testnet {
-		snfServerProtocol = ProtocolStoreAndForwardTestnet_Server
-		snfClientProtocol = ProtocolStoreAndForwardTestnet_Client
+	var snfClient storeandforward.SNFClientInterface
+	var bootstrapDone chan struct{}
+
+	if cfg.SNFClient != nil {
+		// Use the provided SNF client (e.g., LocalClient from SNFProxy)
+		snfClient = cfg.SNFClient
+		bootstrapDone = cfg.BootstrapDone
+		if bootstrapDone == nil {
+			// Create a closed channel if not provided
+			bootstrapDone = make(chan struct{})
+			close(bootstrapDone)
+		}
+	} else {
+		// Create a new traditional SNF client
+		snfServerProtocol := ProtocolStoreAndForwardMainnet_Server
+		snfClientProtocol := ProtocolStoreAndForwardMainnet_Client
+		if cfg.Testnet {
+			snfServerProtocol = ProtocolStoreAndForwardTestnet_Server
+			snfClientProtocol = ProtocolStoreAndForwardTestnet_Client
+		}
+		bootstrapDone = make(chan struct{})
+		clientOpts := []storeandforward.Option{
+			storeandforward.ServerProtocols(protocol.ID(snfServerProtocol)),
+			storeandforward.ClientProtocols(protocol.ID(snfClientProtocol)),
+			storeandforward.BootstrapDone(bootstrapDone),
+		}
+		client, err := storeandforward.NewClient(cfg.Context, cfg.Privkey, cfg.SNFServers, cfg.Service.host, clientOpts...)
+		if err != nil {
+			return nil, err
+		}
+		snfClient = client
 	}
-	bootstrapDone := make(chan struct{})
-	clientOpts := []storeandforward.Option{
-		storeandforward.ServerProtocols(protocol.ID(snfServerProtocol)),
-		storeandforward.ClientProtocols(protocol.ID(snfClientProtocol)),
-		storeandforward.BootstrapDone(bootstrapDone),
-	}
-	client, err := storeandforward.NewClient(cfg.Context, cfg.Privkey, cfg.SNFServers, cfg.Service.host, clientOpts...)
-	if err != nil {
-		return nil, err
-	}
+
 	m := &Messenger{
 		NodeID:         cfg.NodeID,
 		ns:             cfg.Service,
 		db:             cfg.DB,
 		sk:             cfg.Privkey,
 		testnet:        cfg.Testnet,
-		snfClient:      client,
+		snfClient:      snfClient,
 		getProfileFunc: cfg.GetProfileFunc,
 		done:           make(chan struct{}),
 		bootstrapDone:  bootstrapDone,

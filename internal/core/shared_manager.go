@@ -11,11 +11,15 @@ import (
 
 	"github.com/ipfs/kubo/core"
 	"github.com/ipfs/kubo/core/corehttp"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/mobazha/mobazha3.0/internal/api"
 	mcfg "github.com/mobazha/mobazha3.0/internal/config"
+	obnet "github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
+	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -31,6 +35,15 @@ type SharedManager struct {
 	httpGateway *api.Gateway
 
 	SNFServers []peer.ID
+
+	// snfProxy is the shared SNF proxy for multi-node hosting
+	snfProxy *storeandforward.SNFProxy
+
+	// testnet indicates if running on testnet
+	testnet bool
+
+	// ctx is the context for the manager
+	ctx context.Context
 
 	NetConfig *mcfg.NetConfig
 }
@@ -112,9 +125,58 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			SNFServers:           snfServers,
 			NetConfig:            netConfig,
 			clients:              make(map[string]coreiface.CoreIface),
+			testnet:              cfg.Testnet,
+			ctx:                  ctx,
 		}
 	})
 	return SharedManagerInstance, nil
+}
+
+// InitSNFProxy initializes the shared SNF proxy using the default node's host.
+// This should be called after the default node is created.
+func (im *SharedManager) InitSNFProxy(transportHost host.Host) error {
+	im.mu.Lock()
+	defer im.mu.Unlock()
+
+	if im.snfProxy != nil {
+		return nil // Already initialized
+	}
+
+	snfServerProtocol := obnet.ProtocolStoreAndForwardMainnet_Server
+	snfClientProtocol := obnet.ProtocolStoreAndForwardMainnet_Client
+	if im.testnet {
+		snfServerProtocol = obnet.ProtocolStoreAndForwardTestnet_Server
+		snfClientProtocol = obnet.ProtocolStoreAndForwardTestnet_Client
+	}
+
+	proxy, err := storeandforward.NewSNFProxy(im.ctx, &storeandforward.ProxyConfig{
+		TransportHost:        transportHost,
+		Servers:              im.SNFServers,
+		ServerProtocol:       protocol.ID(snfServerProtocol),
+		ClientProtocol:       protocol.ID(snfClientProtocol),
+		RegistrationDuration: 0, // Use default
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create SNF proxy: %w", err)
+	}
+
+	im.snfProxy = proxy
+	log.Info("SNF Proxy initialized successfully")
+	return nil
+}
+
+// GetSNFProxy returns the shared SNF proxy
+func (im *SharedManager) GetSNFProxy() *storeandforward.SNFProxy {
+	im.mu.RLock()
+	defer im.mu.RUnlock()
+	return im.snfProxy
+}
+
+// HasSNFProxy returns true if the SNF proxy is initialized
+func (im *SharedManager) HasSNFProxy() bool {
+	im.mu.RLock()
+	defer im.mu.RUnlock()
+	return im.snfProxy != nil
 }
 
 func (im *SharedManager) GetDefaultNode() coreiface.CoreIface {

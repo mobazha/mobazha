@@ -87,12 +87,22 @@ func (svr *Server) handleNewStream(s inet.Stream) {
 	go svr.streamHandler(s)
 }
 
+// streamSession tracks the authenticated client identity for a stream (for proxy mode support)
+type streamSession struct {
+	authenticatedID peer.ID // The actual authenticated client ID (may differ in proxy mode)
+}
+
 func (svr *Server) streamHandler(s inet.Stream) {
 	defer s.Close()
 	contextReader := ctxio.NewReader(svr.ctx, s)
 	reader := msgio.NewVarintReaderSize(contextReader, inet.MessageSizeMax)
 	writer := msgio.NewVarintWriter(s)
 	remotePeer := s.Conn().RemotePeer()
+
+	// Session tracking for proxy mode
+	session := &streamSession{
+		authenticatedID: remotePeer, // Default to connection peer
+	}
 
 	defer func() {
 		svr.mtx.Lock()
@@ -128,13 +138,21 @@ func (svr *Server) streamHandler(s inet.Stream) {
 
 		switch pmes.Type {
 		case pb.Message_REGISTER:
-			err = svr.handleRegister(writer, pmes, remotePeer)
+			var clientID peer.ID
+			clientID, err = svr.handleRegisterWithSession(writer, pmes, remotePeer)
+			if err == nil && clientID != "" {
+				session.authenticatedID = clientID
+			}
 		case pb.Message_UNREGISTER:
-			err = svr.handleUnregister(writer, pmes, remotePeer)
+			err = svr.handleUnregister(writer, pmes, session.authenticatedID)
 		case pb.Message_GET_MESSAGES:
-			err = svr.handleGetMessages(writer, pmes, remotePeer)
+			var clientID peer.ID
+			clientID, err = svr.handleGetMessagesWithSession(writer, pmes, remotePeer)
+			if err == nil && clientID != "" {
+				session.authenticatedID = clientID
+			}
 		case pb.Message_MESSAGE_ACK:
-			err = svr.handleAckMessage(writer, pmes, remotePeer)
+			err = svr.handleAckMessage(writer, pmes, session.authenticatedID)
 		case pb.Message_PROVE_REGISTRATION:
 			err = svr.handleProveRegistrationMessage(writer, pmes, remotePeer)
 		case pb.Message_STORE_MESSAGE:
@@ -166,67 +184,79 @@ func (svr *Server) streamHandler(s inet.Stream) {
 
 // handleRegister saves a user registration in the db. Duplicate registrations are allowed
 // and a prior registration is overridden.
-func (svr *Server) handleRegister(w msgio.Writer, pmes *pb.Message, from peer.ID) error {
+// handleRegisterWithSession handles registration and returns the authenticated client ID
+func (svr *Server) handleRegisterWithSession(w msgio.Writer, pmes *pb.Message, from peer.ID) (peer.ID, error) {
 	log.Debugf("handleRegister: peer %s", from)
 	regMsg := pmes.GetRegistration()
 	if regMsg == nil {
-		return writeStatusMessage(w, pb.Message_MALFORMED_MESSAGE)
+		return "", writeStatusMessage(w, pb.Message_MALFORMED_MESSAGE)
 	}
 	if peer.ID(regMsg.Server) != svr.host.ID() {
-		return writeStatusMessage(w, pb.Message_PEERID_INVALID)
+		return "", writeStatusMessage(w, pb.Message_PEERID_INVALID)
 	}
 
 	var (
-		pubKey crypto.PubKey
-		err    error
+		pubKey   crypto.PubKey
+		err      error
+		clientID peer.ID // The actual client identity (may differ from connection peer in proxy mode)
 	)
+
+	// If pubkey is provided in the message, use it to derive the client identity
+	// This supports "proxy mode" where multiple clients connect through a shared transport
 	if regMsg.GetPubkey() != nil {
 		pubKey, err = crypto.UnmarshalPublicKey(regMsg.GetPubkey())
+		if err != nil {
+			return "", writeStatusMessage(w, pb.Message_PUBKEY_INVALID)
+		}
+		clientID, err = peer.IDFromPublicKey(pubKey)
+		if err != nil {
+			return "", writeStatusMessage(w, pb.Message_PUBKEY_INVALID)
+		}
+		log.Debugf("handleRegister: proxy mode, client %s via transport %s", clientID, from)
 	} else {
+		// Traditional mode: use connection peer ID
 		pubKey, err = from.ExtractPublicKey()
-	}
-	if err != nil {
-		return writeStatusMessage(w, pb.Message_PUBKEY_INVALID)
-	}
-
-	checkID, err := peer.IDFromPublicKey(pubKey)
-	if err != nil {
-		return writeStatusMessage(w, pb.Message_PUBKEY_INVALID)
-	}
-	if checkID != from {
-		return writeStatusMessage(w, pb.Message_PUBKEY_INVALID)
+		if err != nil {
+			return "", writeStatusMessage(w, pb.Message_PUBKEY_INVALID)
+		}
+		clientID = from
 	}
 
+	// Verify signature with the provided/derived public key
 	m := proto.Clone(regMsg)
 	regCpy := m.(*pb.Message_Registration)
 	regCpy.Signature = nil
 	sigSer, err := proto.Marshal(regCpy)
 	if err != nil {
-		return err
+		return "", err
 	}
 	valid, err := pubKey.Verify(sigSer, regMsg.Signature)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if !valid {
-		return writeStatusMessage(w, pb.Message_SIGNATURE_INVALID)
+		return "", writeStatusMessage(w, pb.Message_SIGNATURE_INVALID)
 	}
 
 	ser, err := proto.Marshal(regMsg)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	err = svr.ds.Put(svr.ctx, registrationKey(from), ser)
+	// Store registration using the actual client identity
+	err = svr.ds.Put(svr.ctx, registrationKey(clientID), ser)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return writeStatusMessage(w, pb.Message_SUCCESS)
+	if err := writeStatusMessage(w, pb.Message_SUCCESS); err != nil {
+		return "", err
+	}
+	return clientID, nil
 }
 
 // handleUnregister unregisters a peer from this server.
-func (svr *Server) handleUnregister(w msgio.Writer, pmes *pb.Message, from peer.ID) error {
+func (svr *Server) handleUnregister(w msgio.Writer, _ *pb.Message, from peer.ID) error {
 	log.Debugf("handleUnregister: peer %s", from)
 	err := svr.ds.Delete(svr.ctx, registrationKey(from))
 	if err != nil {
@@ -336,42 +366,73 @@ func (svr *Server) handleGetMessage(w msgio.Writer, pmes *pb.Message, from peer.
 
 // handleGetMessages loads all the messages for the given peer from the database and sends
 // them in separate MESSAGE messages.
-func (svr *Server) handleGetMessages(w msgio.Writer, pmes *pb.Message, peer peer.ID) error {
-	log.Debugf("handleGetMessages: peer %s", peer)
-	record, err := svr.ds.Get(svr.ctx, registrationKey(peer))
+// handleGetMessagesWithSession handles GET_MESSAGES and returns the authenticated client ID
+func (svr *Server) handleGetMessagesWithSession(w msgio.Writer, pmes *pb.Message, connPeer peer.ID) (peer.ID, error) {
+	log.Debugf("handleGetMessages: connection peer %s", connPeer)
+
+	// Determine the actual client identity
+	// In proxy mode, the request may include a Registration with pubkey to identify the client
+	clientID := connPeer
+	if reg := pmes.GetRegistration(); reg != nil && reg.GetPubkey() != nil {
+		// Proxy mode: verify the client identity from the registration
+		pubKey, err := crypto.UnmarshalPublicKey(reg.GetPubkey())
+		if err != nil {
+			return "", writeStatusMessage(w, pb.Message_PUBKEY_INVALID)
+		}
+		clientID, err = peer.IDFromPublicKey(pubKey)
+		if err != nil {
+			return "", writeStatusMessage(w, pb.Message_PUBKEY_INVALID)
+		}
+
+		// Verify signature to prove ownership of the private key
+		m := proto.Clone(reg)
+		regCpy := m.(*pb.Message_Registration)
+		regCpy.Signature = nil
+		sigSer, err := proto.Marshal(regCpy)
+		if err != nil {
+			return "", err
+		}
+		valid, err := pubKey.Verify(sigSer, reg.Signature)
+		if err != nil || !valid {
+			return "", writeStatusMessage(w, pb.Message_SIGNATURE_INVALID)
+		}
+		log.Debugf("handleGetMessages: proxy mode, client %s via transport %s", clientID, connPeer)
+	}
+
+	record, err := svr.ds.Get(svr.ctx, registrationKey(clientID))
 	if err != nil && err == datastore.ErrNotFound {
-		return writeStatusMessage(w, pb.Message_NOT_REGISTERED)
+		return "", writeStatusMessage(w, pb.Message_NOT_REGISTERED)
 	}
 
 	reg := new(pb.Message_Registration)
 	err = proto.Unmarshal(record, reg)
 	if err != nil {
-		return err
+		return "", err
 	}
 	expiry, err := ptypes.Timestamp(reg.Expiry)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if expiry.Before(time.Now()) {
-		err := svr.ds.Delete(svr.ctx, registrationKey(peer))
+		err := svr.ds.Delete(svr.ctx, registrationKey(clientID))
 		if err != nil {
-			return err
+			return "", err
 		}
-		return writeStatusMessage(w, pb.Message_NOT_REGISTERED)
+		return "", writeStatusMessage(w, pb.Message_NOT_REGISTERED)
 	}
 
 	q := query.Query{
-		Prefix: messageKeyPrefix + peer.String(),
+		Prefix: messageKeyPrefix + clientID.String(),
 	}
 	results, err := svr.ds.Query(svr.ctx, q)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	for {
 		result, more := results.NextSync()
 		if !more {
-			return writeMsgWithTimeout(w, &pb.Message{
+			err := writeMsgWithTimeout(w, &pb.Message{
 				Type: pb.Message_MESSAGE,
 				Payload: &pb.Message_EncryptedMessage_{
 					EncryptedMessage: &pb.Message_EncryptedMessage{
@@ -379,13 +440,17 @@ func (svr *Server) handleGetMessages(w msgio.Writer, pmes *pb.Message, peer peer
 					},
 				},
 			})
+			if err != nil {
+				return "", err
+			}
+			return clientID, nil
 		}
 
 		s := strings.Split(result.Key, "/")
 
 		messageID, err := base32.RawStdEncoding.DecodeString(s[4])
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		err = writeMsgWithTimeout(w, &pb.Message{
@@ -399,7 +464,7 @@ func (svr *Server) handleGetMessages(w msgio.Writer, pmes *pb.Message, peer peer
 			},
 		})
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
 }

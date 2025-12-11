@@ -19,7 +19,7 @@ import (
 	"github.com/stripe/stripe-go/v82"
 )
 
-// CoreIface enumerates the interface of the OpenBazaarNode object in the Core package.
+// CoreIface enumerates the interface of the MobazhaNode object in the Core package.
 // We primarily use this to get around circular imports though it should serve as the API
 // contract for the Core package.
 type CoreIface interface {

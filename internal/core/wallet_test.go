@@ -13,7 +13,7 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-func TestOpenBazaarNode_SaveAndGetTransactionMetadata(t *testing.T) {
+func TestMobazhaNode_SaveAndGetTransactionMetadata(t *testing.T) {
 	mockNode, err := MockNode()
 	if err != nil {
 		t.Fatal(err)

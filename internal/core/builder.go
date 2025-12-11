@@ -75,8 +75,8 @@ var (
 // 创建共享的DHT实例
 var sharedDHT routing.Routing
 
-// NewNode constructs and returns an OpenBazaarNode using the given cfg.
-func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService ...coreiface.HostService) (*OpenBazaarNode, error) {
+// NewNode constructs and returns an MobazhaNode using the given cfg.
+func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService ...coreiface.HostService) (*MobazhaNode, error) {
 	var hs coreiface.HostService
 	if len(hostService) > 0 {
 		hs = hostService[0]
@@ -333,7 +333,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	}
 
 	if cfg.IPFSOnly {
-		obNode := &OpenBazaarNode{
+		obNode := &MobazhaNode{
 			sharedManager:        sharedManager,
 			nodeID:               nodeID,
 			repo:                 obRepo,
@@ -478,7 +478,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	}
 
 	// Construct our OpenBazaar node.repo object
-	obNode := &OpenBazaarNode{
+	obNode := &MobazhaNode{
 		sharedManager:          sharedManager,
 		nodeID:                 nodeID,
 		ipfsNode:               ipfsNode,
@@ -681,7 +681,7 @@ func constructDHTRouting(mode dht.ModeOpt) func(args nlibp2p.RoutingOptionArgs) 
 	}
 }
 
-func (n *OpenBazaarNode) registerHandlers() {
+func (n *MobazhaNode) registerHandlers() {
 	n.networkService.RegisterHandler(pb.Message_CHAT, n.handleChatMessage)
 	n.networkService.RegisterHandler(pb.Message_CHAT_GROUP, n.handleChatGroupMessage)
 	n.networkService.RegisterHandler(pb.Message_ACK, n.handleAckMessage)
@@ -698,7 +698,7 @@ func (n *OpenBazaarNode) registerHandlers() {
 	n.networkService.RegisterHandler(pb.Message_CHANNEL_RESPONSE, n.handleChannelResponse)
 }
 
-func (n *OpenBazaarNode) listenNetworkEvents() {
+func (n *MobazhaNode) listenNetworkEvents() {
 	serverMap := make(map[string]bool)
 	for _, server := range n.storeAndForwardServers {
 		serverMap[server] = true

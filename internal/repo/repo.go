@@ -631,7 +631,7 @@ func autoMigrateIPFSConfig(dataDir string, testnet bool) error {
 // even using this key as we prefer to use one derived from a mnemonic, but
 // second we don't want it sitting in the config file anyway. So this function
 // removes the identity object from the config. The identity object will be
-// added back into the config with the correct key/identity by the OpenBazaarNode
+// added back into the config with the correct key/identity by the MobazhaNode
 // builder.
 func cleanIdentityFromConfig(dataDir string) error {
 	configPath := path.Join(dataDir, "config")

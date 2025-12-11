@@ -35,7 +35,7 @@ import (
 // MockNode builds a mock node with a temp data directory,
 // in-memory database, mock IPFS node, and mock network
 // service.
-func MockNode() (*OpenBazaarNode, error) {
+func MockNode() (*MobazhaNode, error) {
 	r, err := repo.MockRepo()
 	if err != nil {
 		return nil, err
@@ -135,7 +135,7 @@ func MockNode() (*OpenBazaarNode, error) {
 		return nil, err
 	}
 
-	node := &OpenBazaarNode{
+	node := &MobazhaNode{
 		nodeID:               repo.DefaultNodeID,
 		sharedManager:        sharedManager,
 		ipfsNode:             ipfsNode,
@@ -190,7 +190,7 @@ func MockNode() (*OpenBazaarNode, error) {
 
 // MockNet represents a network of connected mock nodes.
 type Mocknet struct {
-	nodes   []*OpenBazaarNode
+	nodes   []*MobazhaNode
 	ipfsNet mocknet.Mocknet
 	wn      *wallet.MockWalletNetwork
 }
@@ -217,7 +217,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		return nil, err
 	}
 
-	var nodes []*OpenBazaarNode
+	var nodes []*MobazhaNode
 	for i := 0; i < numNodes; i++ {
 		r, err := repo.MockRepo()
 		if err != nil {
@@ -315,7 +315,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			nodeID = repo.DefaultNodeID
 		}
 
-		node := &OpenBazaarNode{
+		node := &MobazhaNode{
 			nodeID:               nodeID,
 			sharedManager:        sharedManager,
 			ipfsNode:             ipfsNode,
@@ -389,7 +389,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 }
 
 // Nodes returns the OpenBazaar nodes in this network.
-func (mn *Mocknet) Nodes() []*OpenBazaarNode {
+func (mn *Mocknet) Nodes() []*MobazhaNode {
 	return mn.nodes
 }
 

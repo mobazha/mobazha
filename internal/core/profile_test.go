@@ -10,7 +10,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
-func TestOpenBazaarNode_Profile(t *testing.T) {
+func TestMobazhaNode_Profile(t *testing.T) {
 	node, err := MockNode()
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +37,7 @@ func TestOpenBazaarNode_Profile(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_GetProfile(t *testing.T) {
+func TestMobazhaNode_GetProfile(t *testing.T) {
 	mocknet, err := NewMocknet(2)
 	if err != nil {
 		t.Fatal(err)
@@ -250,7 +250,7 @@ func Test_updateSNFServers(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_validateProfile(t *testing.T) {
+func TestMobazhaNode_validateProfile(t *testing.T) {
 	tests := []struct {
 		name    string
 		profile *models.Profile

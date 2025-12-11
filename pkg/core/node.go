@@ -8,8 +8,8 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/repo"
 )
 
-type OpenBazaarNode = core.OpenBazaarNode
+type MobazhaNode = core.MobazhaNode
 
-func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService coreiface.HostService) (*OpenBazaarNode, error) {
+func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService coreiface.HostService) (*MobazhaNode, error) {
 	return core.NewNode(ctx, cfg, nodeID, hostService)
 }

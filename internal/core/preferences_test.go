@@ -10,7 +10,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models/factory"
 )
 
-func TestOpenBazaarNode_SavePreferences(t *testing.T) {
+func TestMobazhaNode_SavePreferences(t *testing.T) {
 	node, err := MockNode()
 	if err != nil {
 		t.Fatal(err)
@@ -89,7 +89,7 @@ func TestOpenBazaarNode_SavePreferences(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_BlockNode(t *testing.T) {
+func TestMobazhaNode_BlockNode(t *testing.T) {
 	node, err := MockNode()
 	if err != nil {
 		t.Fatal(err)

@@ -29,10 +29,10 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 )
 
-// OpenBazaarNode holds all the components that make up a network node
+// MobazhaNode holds all the components that make up a network node
 // on the OpenBazaar network. It also exposes an exported API which can
 // be used to control the node.
-type OpenBazaarNode struct {
+type MobazhaNode struct {
 	nodeID string
 
 	sharedManager *SharedManager
@@ -172,12 +172,12 @@ type OpenBazaarNode struct {
 }
 
 // IsDefaultNode returns whether this node is the default node.
-func (n *OpenBazaarNode) IsDefaultNode() bool {
+func (n *MobazhaNode) IsDefaultNode() bool {
 	return n.nodeID == repo.DefaultNodeID
 }
 
 // Start gets the node up and running and listens for a signal interrupt.
-func (n *OpenBazaarNode) Start() {
+func (n *MobazhaNode) Start() {
 	// Check repo migration
 	go func() {
 		if err := n.checkRepoMigration(); err != nil {
@@ -225,7 +225,7 @@ func (n *OpenBazaarNode) Start() {
 	}()
 }
 
-func (n *OpenBazaarNode) checkRepoMigration() error {
+func (n *MobazhaNode) checkRepoMigration() error {
 	version, err := n.repo.ReadVersion()
 	if err != nil {
 		return err
@@ -272,7 +272,7 @@ func (n *OpenBazaarNode) checkRepoMigration() error {
 }
 
 // Do profile and listings migration with ETH pubKey adding
-func (n *OpenBazaarNode) migrateRepoFromVersion0() error {
+func (n *MobazhaNode) migrateRepoFromVersion0() error {
 	done1 := make(chan struct{})
 	myProfile, err := n.GetMyProfile()
 	if err != nil {
@@ -307,7 +307,7 @@ func (n *OpenBazaarNode) migrateRepoFromVersion0() error {
 }
 
 // Do profile and listings migration with MATIC currencies update
-func (n *OpenBazaarNode) migrateRepoFromVersion1() error {
+func (n *MobazhaNode) migrateRepoFromVersion1() error {
 	done := make(chan struct{})
 	myProfile, err := n.GetMyProfile()
 	if err != nil {
@@ -328,7 +328,7 @@ func (n *OpenBazaarNode) migrateRepoFromVersion1() error {
 }
 
 // Do listings migration about signature due to new fields added
-func (n *OpenBazaarNode) migrateRepoWithListingsUpdate() error {
+func (n *MobazhaNode) migrateRepoWithListingsUpdate() error {
 	done := make(chan struct{})
 	err := n.UpdateAllListings(func(listing *pb.Listing) (bool, error) {
 		// do nothing, just update the signature using existing flow
@@ -347,7 +347,7 @@ func (n *OpenBazaarNode) migrateRepoWithListingsUpdate() error {
 }
 
 // Do listings migration about signature due to new fields added
-func (n *OpenBazaarNode) migrateRepoFromVersion5() error {
+func (n *MobazhaNode) migrateRepoFromVersion5() error {
 	// Add Solana pubkey to profile
 	done1 := make(chan struct{})
 	myProfile, err := n.GetMyProfile()
@@ -383,9 +383,9 @@ func (n *OpenBazaarNode) migrateRepoFromVersion5() error {
 	}
 }
 
-// Stop cleanly shutsdown the OpenBazaarNode and signals to any
+// Stop cleanly shutsdown the MobazhaNode and signals to any
 // listening goroutines that it's time to stop.
-func (n *OpenBazaarNode) Stop(force bool) error {
+func (n *MobazhaNode) Stop(force bool) error {
 	if atomic.LoadInt32(&n.publishActive) > 0 && !force {
 		return coreiface.ErrPublishingActive
 	}
@@ -432,81 +432,81 @@ func (n *OpenBazaarNode) Stop(force bool) error {
 
 // UsingTestnet returns whether or not this node is running on
 // the test network (IPFS bootstrap).
-func (n *OpenBazaarNode) UsingTestnet() bool {
+func (n *MobazhaNode) UsingTestnet() bool {
 	return n.testnet
 }
 
 // UsingWalletTestnet returns whether or not this node is using
 // testnet for wallet transactions (coins and chains).
-func (n *OpenBazaarNode) UsingWalletTestnet() bool {
+func (n *MobazhaNode) UsingWalletTestnet() bool {
 	return n.walletTestnet
 }
 
 // UsingTorMode returns whether or not this node is using the tor
 // network exclusively. Dual stack returns false for this.
-func (n *OpenBazaarNode) UsingTorMode() bool {
+func (n *MobazhaNode) UsingTorMode() bool {
 	return n.torOnly
 }
 
 // DestroyNode shutsdown the node and deletes the entire data directory.
 // This should only be used during testing as destroying a live node will
 // result in data loss.
-func (n *OpenBazaarNode) DestroyNode() {
+func (n *MobazhaNode) DestroyNode() {
 	n.Stop(true)
 	n.repo.DestroyRepo()
 }
 
 // IPFSNode returns the underlying IPFS node instance.
-func (n *OpenBazaarNode) IPFSNode() *core.IpfsNode {
+func (n *MobazhaNode) IPFSNode() *core.IpfsNode {
 	return n.ipfsNode
 }
 
 // Multiwallet returns the underlying Multiwallet instance.
-func (n *OpenBazaarNode) Multiwallet() multiwallet.Multiwallet {
+func (n *MobazhaNode) Multiwallet() multiwallet.Multiwallet {
 	return n.multiwallet
 }
 
 // DB returns the node's database.
-func (n *OpenBazaarNode) DB() database.Database {
+func (n *MobazhaNode) DB() database.Database {
 	return n.repo.DB()
 }
 
 // ExchangeRates returns the node's exchange rate provider.
-func (n *OpenBazaarNode) ExchangeRates() *wallet.ExchangeRateProvider {
+func (n *MobazhaNode) ExchangeRates() *wallet.ExchangeRateProvider {
 	return n.exchangeRates
 }
 
 // GetNodeID returns the user ID for this node.
-func (n *OpenBazaarNode) GetNodeID() string {
+func (n *MobazhaNode) GetNodeID() string {
 	return n.nodeID
 }
 
-func (n *OpenBazaarNode) SharedManager() *SharedManager {
+func (n *MobazhaNode) SharedManager() *SharedManager {
 	return n.sharedManager
 }
 
 // Identity returns the peer ID for this node.
-func (n *OpenBazaarNode) Identity() peer.ID {
+func (n *MobazhaNode) Identity() peer.ID {
 	return n.ipfsNode.Identity
 }
 
 // SubscribeEvent returns a subscription to the provided event. The event argument
 // may be an interface slice.
-func (n *OpenBazaarNode) SubscribeEvent(event interface{}) (events.Subscription, error) {
+func (n *MobazhaNode) SubscribeEvent(event interface{}) (events.Subscription, error) {
 	return n.eventBus.Subscribe(event)
 }
 
 // EventBus returns the node's event bus.
-func (n *OpenBazaarNode) EventBus() events.Bus {
+func (n *MobazhaNode) EventBus() events.Bus {
 	return n.eventBus
 }
 
 // NetService returns the underlying NetworkService for this node.
-func (n *OpenBazaarNode) NetService() *net.NetworkService {
+func (n *MobazhaNode) NetService() *net.NetworkService {
 	return n.networkService
 }
 
 // NetConfig returns the network configuration.
-func (n *OpenBazaarNode) NetConfig() *config.NetConfig {
+func (n *MobazhaNode) NetConfig() *config.NetConfig {
 	return n.netConfig
 }

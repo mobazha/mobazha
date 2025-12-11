@@ -21,7 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestOpenBazaarNode_Ratings(t *testing.T) {
+func TestMobazhaNode_Ratings(t *testing.T) {
 	mockNet, err := NewMocknet(2)
 	if err != nil {
 		t.Fatal(err)

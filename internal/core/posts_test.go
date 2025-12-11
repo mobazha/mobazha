@@ -11,7 +11,7 @@ import (
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
 )
 
-func TestOpenBazaarNode_AddPost(t *testing.T) {
+func TestMobazhaNode_AddPost(t *testing.T) {
 	node, err := MockNode()
 	if err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func TestOpenBazaarNode_AddPost(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_PostGet(t *testing.T) {
+func TestMobazhaNode_PostGet(t *testing.T) {
 	network, err := NewMocknet(2)
 	if err != nil {
 		t.Fatal(err)

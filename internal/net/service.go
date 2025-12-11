@@ -22,7 +22,7 @@ var log = logging.MustGetLogger("NET")
 // LocalDeliverer 定义本地直达消息投递接口，由宿主实现（如 HostService）
 // 返回 true 表示已完成本地直达投递（无须走网络路径）。
 // 注意：该接口不引入对 internal/core 或 internal/net 的依赖循环。
-// 实现方可通过 OpenBazaarNode.NetService().DeliverLocalMessage 完成投递。
+// 实现方可通过 MobazhaNode.NetService().DeliverLocalMessage 完成投递。
 type LocalDeliverer interface {
 	DeliverToLocal(target peer.ID, from peer.ID, msg *pb.Message) bool
 }

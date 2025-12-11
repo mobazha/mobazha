@@ -33,9 +33,9 @@ func NewDefaultConfig() *Config {
 	}
 }
 
-// Node wraps an OpenBazaarNode in a way that can be compiled to mobile devices.
+// Node wraps an MobazhaNode in a way that can be compiled to mobile devices.
 type Node struct {
-	node *core.OpenBazaarNode
+	node *core.MobazhaNode
 	done context.CancelFunc
 }
 

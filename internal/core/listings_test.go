@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestOpenBazaarNode_SaveListing(t *testing.T) {
+func TestMobazhaNode_SaveListing(t *testing.T) {
 	node, err := MockNode()
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func TestOpenBazaarNode_SaveListing(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_UpdateAllListings(t *testing.T) {
+func TestMobazhaNode_UpdateAllListings(t *testing.T) {
 	node, err := MockNode()
 	if err != nil {
 		t.Fatal(err)
@@ -146,7 +146,7 @@ func TestOpenBazaarNode_UpdateAllListings(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_DeleteListing(t *testing.T) {
+func TestMobazhaNode_DeleteListing(t *testing.T) {
 	node, err := MockNode()
 	if err != nil {
 		t.Fatal(err)
@@ -191,7 +191,7 @@ func TestOpenBazaarNode_DeleteListing(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_ListingsGet(t *testing.T) {
+func TestMobazhaNode_ListingsGet(t *testing.T) {
 	network, err := NewMocknet(2)
 	if err != nil {
 		t.Fatal(err)

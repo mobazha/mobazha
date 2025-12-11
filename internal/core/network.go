@@ -46,14 +46,14 @@ const (
 // It will interrupt the publish if a shutdown happens during.
 //
 // This cannot be called with the database lock held.
-func (n *OpenBazaarNode) Publish(done chan<- struct{}) {
+func (n *MobazhaNode) Publish(done chan<- struct{}) {
 	go func() {
 		<-n.initialBootstrapChan
 		n.publishChan <- pubCloser{done}
 	}()
 }
 
-func (n *OpenBazaarNode) publish(ctx context.Context, done chan<- struct{}) {
+func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 	atomic.AddInt32(&n.publishActive, 1)
 
 	publishID := rand.Intn(math.MaxInt32)
@@ -241,7 +241,7 @@ func (n *OpenBazaarNode) publish(ctx context.Context, done chan<- struct{}) {
 
 // PublishFile will publish the given file to SNF servers and followers for storage.
 // It will interrupt the publish if a shutdown happens during.
-func (n *OpenBazaarNode) PublishFile(ctx context.Context, cid cid.Cid, done chan<- struct{}) {
+func (n *MobazhaNode) PublishFile(ctx context.Context, cid cid.Cid, done chan<- struct{}) {
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -293,7 +293,7 @@ func (n *OpenBazaarNode) PublishFile(ctx context.Context, cid cid.Cid, done chan
 // sendAckMessage saves the incoming message ID in the database so we can
 // check for duplicate messages later. Then it sends the ACK message to
 // the remote peer.
-func (n *OpenBazaarNode) sendAckMessage(messageID string, to peer.ID) {
+func (n *MobazhaNode) sendAckMessage(messageID string, to peer.ID) {
 	err := n.repo.DB().Update(func(tx database.Tx) error {
 		return tx.Save(&models.IncomingMessage{ID: messageID})
 	})
@@ -306,7 +306,7 @@ func (n *OpenBazaarNode) sendAckMessage(messageID string, to peer.ID) {
 // handleAckMessage is the handler for the ACK message. It sends it off to the messenger
 // for processing. If this is an order message it also sends it to the order processor
 // to be recorded there as well.
-func (n *OpenBazaarNode) handleAckMessage(from peer.ID, message *pb.Message) error {
+func (n *MobazhaNode) handleAckMessage(from peer.ID, message *pb.Message) error {
 	if message.MessageType != pb.Message_ACK {
 		return errors.New("message is not type ACK")
 	}
@@ -340,7 +340,7 @@ func (n *OpenBazaarNode) handleAckMessage(from peer.ID, message *pb.Message) err
 
 // handleOrderMessage is the handler for the ORDER message. It sends it off to the order
 // order processor for processing.
-func (n *OpenBazaarNode) handleOrderMessage(from peer.ID, message *pb.Message) error {
+func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) error {
 	defer n.sendAckMessage(message.MessageID, from)
 
 	if n.isDuplicate(message) {
@@ -388,7 +388,7 @@ func (n *OpenBazaarNode) handleOrderMessage(from peer.ID, message *pb.Message) e
 	return nil
 }
 
-func (n *OpenBazaarNode) isSelfDefaultSNFServer() bool {
+func (n *MobazhaNode) isSelfDefaultSNFServer() bool {
 	snfServers := repo.DefaultMainnetSNFServers
 	if n.testnet {
 		snfServers = repo.DefaultTestnetSNFServers
@@ -405,7 +405,7 @@ func (n *OpenBazaarNode) isSelfDefaultSNFServer() bool {
 
 // handleStoreMessage is the handler for the STORE message. It will download and
 // pin any objects sent to it from its followers.
-func (n *OpenBazaarNode) handleStoreMessage(from peer.ID, message *pb.Message) error {
+func (n *MobazhaNode) handleStoreMessage(from peer.ID, message *pb.Message) error {
 	if message.MessageType != pb.Message_STORE {
 		return errors.New("message is not type STORE")
 	}
@@ -460,7 +460,7 @@ func (n *OpenBazaarNode) handleStoreMessage(from peer.ID, message *pb.Message) e
 }
 
 // isDuplicate checks if the message ID exists in the incoming messages database.
-func (n *OpenBazaarNode) isDuplicate(message *pb.Message) bool {
+func (n *MobazhaNode) isDuplicate(message *pb.Message) bool {
 	err := n.repo.DB().View(func(tx database.Tx) error {
 		return tx.Read().Where("id = ?", message.MessageID).First(&models.IncomingMessage{}).Error
 	})
@@ -470,7 +470,7 @@ func (n *OpenBazaarNode) isDuplicate(message *pb.Message) bool {
 // syncMessages listens for new connections to peers and checks to see if we have
 // any outgoing messages for them. If so we send the messages over the direct
 // connection.
-func (n *OpenBazaarNode) syncMessages() {
+func (n *MobazhaNode) syncMessages() {
 	connectedSub, err := n.eventBus.Subscribe(&events.PeerConnected{})
 	if err != nil {
 		logger.LogErrorWithIDf(log, n.nodeID, "Error subscribing to PeerConnected event: %s", err)
@@ -517,7 +517,7 @@ func (n *OpenBazaarNode) syncMessages() {
 }
 
 // bootstrapIPFS bootstraps the IPFS node.
-func (n *OpenBazaarNode) bootstrapIPFS() error {
+func (n *MobazhaNode) bootstrapIPFS() error {
 	if err := n.ipfsNode.Bootstrap(bootstrap.DefaultBootstrapConfig); err != nil {
 		return err
 	}
@@ -536,7 +536,7 @@ type pubCloser struct {
 // The only reason we have this republish functionality at all is to publish ratings and followers/follows
 // that do not otherwise trigger an automatic publish. So we essentially batch and publish these
 // changes every 36 hours if the user does not trigger a publish in the interim.
-func (n *OpenBazaarNode) publishHandler() {
+func (n *MobazhaNode) publishHandler() {
 	var lastPublish time.Time
 	err := n.repo.DB().View(func(tx database.Tx) error {
 		var event models.Event

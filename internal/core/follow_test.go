@@ -11,7 +11,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
-func TestOpenBazaarNode_Follow(t *testing.T) {
+func TestMobazhaNode_Follow(t *testing.T) {
 	node, err := MockNode()
 	if err != nil {
 		t.Fatal(err)
@@ -93,7 +93,7 @@ func TestOpenBazaarNode_Follow(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_GetFollowing(t *testing.T) {
+func TestMobazhaNode_GetFollowing(t *testing.T) {
 	mocknet, err := NewMocknet(2)
 	if err != nil {
 		t.Fatal(err)
@@ -132,7 +132,7 @@ func TestOpenBazaarNode_GetFollowing(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_GetFollowers(t *testing.T) {
+func TestMobazhaNode_GetFollowers(t *testing.T) {
 	mocknet, err := NewMocknet(2)
 	if err != nil {
 		t.Fatal(err)
@@ -256,7 +256,7 @@ func Test_handleFollowAndUnfollow(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_FollowSequence(t *testing.T) {
+func TestMobazhaNode_FollowSequence(t *testing.T) {
 	node, err := MockNode()
 	if err != nil {
 		t.Fatal(err)

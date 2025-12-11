@@ -10,7 +10,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models/factory"
 )
 
-func TestOpenBazaarNode_SetAndRemoveSelfAsModerator(t *testing.T) {
+func TestMobazhaNode_SetAndRemoveSelfAsModerator(t *testing.T) {
 	node, err := MockNode()
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +50,7 @@ func TestOpenBazaarNode_SetAndRemoveSelfAsModerator(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_GetVerifiedModerators(t *testing.T) {
+func TestMobazhaNode_GetVerifiedModerators(t *testing.T) {
 	node, err := MockNode()
 	if err != nil {
 		t.Fatal(err)
@@ -64,7 +64,7 @@ func TestOpenBazaarNode_GetVerifiedModerators(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_GetModerators(t *testing.T) {
+func TestMobazhaNode_GetModerators(t *testing.T) {
 	mocknet, err := NewMocknet(2)
 	if err != nil {
 		t.Fatal(err)
@@ -147,7 +147,7 @@ func TestOpenBazaarNode_GetModerators(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_SetModeratorsOnListings(t *testing.T) {
+func TestMobazhaNode_SetModeratorsOnListings(t *testing.T) {
 	l1 := factory.NewPhysicalListing("tshirt")
 	l1.Moderators = []string{}
 	l2 := factory.NewPhysicalListing("shoes")

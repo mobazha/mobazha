@@ -8,7 +8,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 )
 
-func TestOpenBazaarNode_PingNode(t *testing.T) {
+func TestMobazhaNode_PingNode(t *testing.T) {
 	network, err := NewMocknet(2)
 	if err != nil {
 		t.Fatal(err)

@@ -15,7 +15,7 @@ const maxPongDelay = time.Second * 10
 // PingNode sends a PING message to the provided peer. If we are able to successfully
 // connect and receive an PONG message back we return nil. If we don't receive a
 // PONG message back an error is returned.
-func (n *OpenBazaarNode) PingNode(ctx context.Context, peer peer.ID) error {
+func (n *MobazhaNode) PingNode(ctx context.Context, peer peer.ID) error {
 	sub, err := n.eventBus.Subscribe(&events.PongReceived{})
 	if err != nil {
 		return err
@@ -37,7 +37,7 @@ func (n *OpenBazaarNode) PingNode(ctx context.Context, peer peer.ID) error {
 	return coreiface.ErrPeerUnreachable
 }
 
-func (n *OpenBazaarNode) handlePingMessage(from peer.ID, message *pb.Message) error {
+func (n *MobazhaNode) handlePingMessage(from peer.ID, message *pb.Message) error {
 	n.eventBus.Emit(&events.PingReceived{
 		Peer: from,
 	})
@@ -46,7 +46,7 @@ func (n *OpenBazaarNode) handlePingMessage(from peer.ID, message *pb.Message) er
 	return n.networkService.SendMessage(context.Background(), from, m)
 }
 
-func (n *OpenBazaarNode) handlePongMessage(from peer.ID, message *pb.Message) error {
+func (n *MobazhaNode) handlePongMessage(from peer.ID, message *pb.Message) error {
 	n.eventBus.Emit(&events.PongReceived{
 		Peer: from,
 	})

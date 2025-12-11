@@ -83,7 +83,7 @@ func Test_SendAndReceiveAcks(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_syncMessages(t *testing.T) {
+func TestMobazhaNode_syncMessages(t *testing.T) {
 	network, err := NewMocknet(2)
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +154,7 @@ func TestOpenBazaarNode_syncMessages(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_PublishToFollowers(t *testing.T) {
+func TestMobazhaNode_PublishToFollowers(t *testing.T) {
 	mocknet, err := NewMocknet(2)
 	if err != nil {
 		t.Fatal(err)
@@ -239,7 +239,7 @@ func TestOpenBazaarNode_PublishToFollowers(t *testing.T) {
 	}
 }
 
-func TestOpenBazaarNode_republish(t *testing.T) {
+func TestMobazhaNode_republish(t *testing.T) {
 	mocknet, err := NewMocknet(2)
 	if err != nil {
 		t.Fatal(err)

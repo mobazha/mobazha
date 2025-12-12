@@ -26,8 +26,14 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *models.Order, peer peer.ID, message *npb.OrderMessage) (interface{}, error) {
+func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *models.Order, message *npb.OrderMessage) (interface{}, error) {
 	order.ID = models.OrderID(message.OrderID)
+
+	// Get sender peer ID from message
+	senderPeer, err := peer.Decode(message.SenderPeerID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid sender peer ID: %w", err)
+	}
 
 	orderOpen := new(pb.OrderOpen)
 	if err := message.Message.UnmarshalTo(orderOpen); err != nil {
@@ -95,7 +101,7 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 				Payload:     payload,
 			}
 
-			if err := op.messenger.ReliablySendMessage(dbtx, peer, &message, nil); err != nil {
+			if err := op.messenger.ReliablySendMessage(dbtx, senderPeer, &message, nil); err != nil {
 				return nil, err
 			}
 
@@ -112,7 +118,7 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 
 	var event interface{}
 	// TODO: do we want to emit an event in the case of a validation error?
-	if !validationError && op.identity != peer {
+	if !validationError && op.identity != senderPeer {
 		event = &events.NewOrder{
 			BuyerHandle: orderOpen.BuyerID.Handle,
 			BuyerID:     orderOpen.BuyerID.PeerID,
@@ -137,7 +143,7 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 	}
 
 	if order.Role() == models.RoleVendor {
-		logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_OPEN message from %s. OrderID: %s", peer, order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_OPEN message from %s. OrderID: %s", senderPeer, order.ID)
 	} else if order.Role() == models.RoleBuyer {
 		logger.LogInfoWithIDf(log, op.nodeID, "Processed own ORDER_OPEN for orderID: %s", order.ID)
 	}

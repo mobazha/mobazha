@@ -9,7 +9,7 @@ import (
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
+	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
@@ -35,7 +35,7 @@ var (
 // Config holds the objects needed to instantiate a new OrderProcessor.
 type Config struct {
 	NodeID                   string
-	Identity                 peer.ID
+	Identity                 libp2ppeer.ID
 	Db                       database.Database
 	IdentityPrivateKey       crypto.PrivKey
 	EscrowPrivateKey         *btcec.PrivateKey
@@ -51,7 +51,7 @@ type Config struct {
 // OrderProcessor is used to deterministically process orders.
 type OrderProcessor struct {
 	nodeID                   string
-	identity                 peer.ID
+	identity                 libp2ppeer.ID
 	identityPrivateKey       crypto.PrivKey
 	db                       database.Database
 	messenger                *net.Messenger
@@ -103,12 +103,20 @@ func (op *OrderProcessor) Stop() {
 //
 // If the processing of the message triggers an event to emitted onto the bus, the event is
 // returned.
-func (op *OrderProcessor) ProcessMessage(dbtx database.Tx, peer peer.ID, message *npb.OrderMessage) (interface{}, error) {
+func (op *OrderProcessor) ProcessMessage(dbtx database.Tx, message *npb.OrderMessage) (interface{}, error) {
+	// Get sender peer ID from message (set by SignOrderMessage)
+	if message.SenderPeerID == "" {
+		return nil, errors.New("message has no sender peer ID")
+	}
+	peer, err := libp2ppeer.Decode(message.SenderPeerID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid sender peer ID: %w", err)
+	}
+
 	// Load the order if it exists.
 	var (
 		order models.Order
 		event interface{}
-		err   error
 	)
 	err = dbtx.Read().Where("id = ?", message.OrderID).First(&order).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -126,7 +134,7 @@ func (op *OrderProcessor) ProcessMessage(dbtx database.Tx, peer peer.ID, message
 	}
 
 	orderCopy := order
-	event, err = op.processMessage(dbtx, &order, peer, message)
+	event, err = op.processMessage(dbtx, &order, message)
 	if err != nil {
 		logger.LogInfoWithIDf(log, op.nodeID, "Error processing order message for order %s: %s", order.ID.String(), err)
 		if err1 := orderCopy.PutErrorMessage(message); err1 != nil {
@@ -149,10 +157,10 @@ func (op *OrderProcessor) ProcessMessage(dbtx database.Tx, peer peer.ID, message
 		if proto.Equal(parked, message) {
 			continue
 		}
-		_, err = op.processMessage(dbtx, &order, peer, parked)
+		_, err = op.processMessage(dbtx, &order, parked)
 		if err != nil {
 			logger.LogInfoWithIDf(log, op.nodeID, "Error processing parked message for order %s: %s", order.ID.String(), err)
-			if err := order.PutErrorMessage(message); err != nil {
+			if err := order.PutErrorMessage(parked); err != nil {
 				logger.LogInfoWithIDf(log, op.nodeID, "Error saving errored message for order %s: %s", order.ID.String(), err)
 			}
 		}
@@ -215,38 +223,38 @@ func (op *OrderProcessor) ProcessACK(tx database.Tx, om *models.OutgoingMessage)
 }
 
 // processMessage passes the message off to the appropriate handler.
-func (op *OrderProcessor) processMessage(dbtx database.Tx, order *models.Order, peer peer.ID, message *npb.OrderMessage) (event interface{}, err error) {
-	err = verifyOrderMessageSignature(peer, message)
+func (op *OrderProcessor) processMessage(dbtx database.Tx, order *models.Order, message *npb.OrderMessage) (event interface{}, err error) {
+	err = verifyOrderMessageSignature(message)
 	if err != nil {
 		return nil, err
 	}
 	switch message.MessageType {
 	case npb.OrderMessage_ORDER_OPEN:
-		event, err = op.processOrderOpenMessage(dbtx, order, peer, message)
+		event, err = op.processOrderOpenMessage(dbtx, order, message)
 	case npb.OrderMessage_PAYMENT_SENT:
-		event, err = op.processPaymentSentMessage(dbtx, order, peer, message)
+		event, err = op.processPaymentSentMessage(dbtx, order, message)
 	case npb.OrderMessage_RATING_SIGNATURES:
-		event, err = op.processRatingSignaturesMessage(dbtx, order, peer, message)
+		event, err = op.processRatingSignaturesMessage(dbtx, order, message)
 	case npb.OrderMessage_ORDER_REJECT:
-		event, err = op.processOrderRejectMessage(dbtx, order, peer, message)
+		event, err = op.processOrderRejectMessage(dbtx, order, message)
 	case npb.OrderMessage_ORDER_CONFIRMATION:
-		event, err = op.processOrderConfirmationMessage(dbtx, order, peer, message)
+		event, err = op.processOrderConfirmationMessage(dbtx, order, message)
 	case npb.OrderMessage_ORDER_CANCEL:
-		event, err = op.processOrderCancelMessage(dbtx, order, peer, message)
+		event, err = op.processOrderCancelMessage(dbtx, order, message)
 	case npb.OrderMessage_REFUND:
-		event, err = op.processRefundMessage(dbtx, order, peer, message)
+		event, err = op.processRefundMessage(dbtx, order, message)
 	case npb.OrderMessage_ORDER_FULFILLMENT:
-		event, err = op.processOrderFulfillmentMessage(dbtx, order, peer, message)
+		event, err = op.processOrderFulfillmentMessage(dbtx, order, message)
 	case npb.OrderMessage_ORDER_COMPLETE:
-		event, err = op.processOrderCompleteMessage(dbtx, order, peer, message)
+		event, err = op.processOrderCompleteMessage(dbtx, order, message)
 	case npb.OrderMessage_DISPUTE_OPEN:
-		event, err = op.processDisputeOpenMessage(dbtx, order, peer, message)
+		event, err = op.processDisputeOpenMessage(dbtx, order, message)
 	case npb.OrderMessage_DISPUTE_CLOSE:
-		event, err = op.processDisputeCloseMessage(dbtx, order, peer, message)
+		event, err = op.processDisputeCloseMessage(dbtx, order, message)
 	case npb.OrderMessage_DISPUTE_ACCEPT:
-		event, err = op.processDisputeAcceptMessage(dbtx, order, peer, message)
+		event, err = op.processDisputeAcceptMessage(dbtx, order, message)
 	case npb.OrderMessage_PAYMENT_FINALIZED:
-		event, err = op.processPaymentFinalizeMessage(dbtx, order, peer, message)
+		event, err = op.processPaymentFinalizeMessage(dbtx, order, message)
 	default:
 		return nil, errors.New("unknown order message type")
 	}
@@ -266,13 +274,25 @@ func isDuplicate(message proto.Message, serialized []byte) (bool, error) {
 	return bytes.Equal([]byte(ser), serialized), nil
 }
 
-func verifyOrderMessageSignature(peer peer.ID, message *npb.OrderMessage) error {
-	peerPubkey, err := peer.ExtractPublicKey()
+func verifyOrderMessageSignature(message *npb.OrderMessage) error {
+	if message.SenderPeerID == "" {
+		return errors.New("message has no sender peer ID for signature verification")
+	}
 
-	msgCpy := *message
+	peer, err := libp2ppeer.Decode(message.SenderPeerID)
+	if err != nil {
+		return fmt.Errorf("invalid sender peer ID: %w", err)
+	}
+
+	peerPubkey, err := peer.ExtractPublicKey()
+	if err != nil {
+		return fmt.Errorf("failed to extract public key from peer %s: %w", peer.String(), err)
+	}
+
+	msgCpy := proto.Clone(message).(*npb.OrderMessage)
 	msgCpy.Signature = nil
 
-	ser, err := proto.Marshal(&msgCpy)
+	ser, err := proto.Marshal(msgCpy)
 	if err != nil {
 		return err
 	}
@@ -298,6 +318,8 @@ func (op *OrderProcessor) GetActiveReceivingAccount(tx database.Tx, chainType st
 	return &record, nil
 }
 
+// getMessageSenderPeer determines the peer ID of the expected sender based on message type.
+// This is used when processing parked messages where the original sender peer ID is not available.
 func (op *OrderProcessor) GetPayoutAddress(tx database.Tx, coinType string) (iwallet.Address, error) {
 	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(coinType))
 	if err != nil {

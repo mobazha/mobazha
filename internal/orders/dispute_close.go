@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -13,7 +12,7 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 )
 
-func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *models.Order, pid peer.ID, message *npb.OrderMessage) (interface{}, error) {
+func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *models.Order, message *npb.OrderMessage) (interface{}, error) {
 	disputeClose := new(pb.DisputeClose)
 	if err := message.Message.UnmarshalTo(disputeClose); err != nil {
 		return nil, err
@@ -63,7 +62,7 @@ func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *mo
 		return nil, err
 	}
 
-	if op.identity == pid {
+	if op.identity.String() == message.SenderPeerID {
 		logger.LogInfoWithIDf(log, op.nodeID, "Processed own DISPUTE_CLOSE for orderID: %s", order.ID)
 	} else {
 		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_CLOSE message for order %s", order.ID)

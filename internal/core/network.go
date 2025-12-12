@@ -361,7 +361,7 @@ func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) erro
 		tx.Read().Where("id = ?", orderMsg.OrderID).First(&order)
 
 		var err error
-		event, err = n.orderProcessor.ProcessMessage(tx, from, orderMsg)
+		event, err = n.orderProcessor.ProcessMessage(tx, orderMsg)
 		return err
 	})
 	if err != nil {

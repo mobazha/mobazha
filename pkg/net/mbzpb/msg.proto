@@ -81,6 +81,7 @@ message OrderMessage {
     MessageType messageType     = 2;
     google.protobuf.Any message = 3;
     bytes signature             = 4;
+    string senderPeerID         = 5;
 
     enum MessageType {
         ORDER_OPEN         = 0;

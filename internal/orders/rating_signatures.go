@@ -6,7 +6,6 @@ import (
 	"errors"
 
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
-	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -19,7 +18,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func (op *OrderProcessor) processRatingSignaturesMessage(dbtx database.Tx, order *models.Order, peer peer.ID, message *npb.OrderMessage) (interface{}, error) {
+func (op *OrderProcessor) processRatingSignaturesMessage(dbtx database.Tx, order *models.Order, message *npb.OrderMessage) (interface{}, error) {
 	rs := new(pb.RatingSignatures)
 	if err := message.Message.UnmarshalTo(rs); err != nil {
 		return nil, err

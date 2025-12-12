@@ -19,7 +19,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *models.Order, pid peer.ID, message *npb.OrderMessage) (interface{}, error) {
+func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *models.Order, message *npb.OrderMessage) (interface{}, error) {
 	disputeOpen := new(pb.DisputeOpen)
 	if err := message.Message.UnmarshalTo(disputeOpen); err != nil {
 		return nil, err

@@ -3,7 +3,6 @@ package orders
 import (
 	"errors"
 
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -12,7 +11,7 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 )
 
-func (op *OrderProcessor) processDisputeAcceptMessage(dbtx database.Tx, order *models.Order, pid peer.ID, message *npb.OrderMessage) (interface{}, error) {
+func (op *OrderProcessor) processDisputeAcceptMessage(dbtx database.Tx, order *models.Order, message *npb.OrderMessage) (interface{}, error) {
 	disputeAccept := new(pb.DisputeAccept)
 	if err := message.Message.UnmarshalTo(disputeAccept); err != nil {
 		return nil, err
@@ -46,10 +45,12 @@ func (op *OrderProcessor) processDisputeAcceptMessage(dbtx database.Tx, order *m
 		otherPartyHandle = ""
 	)
 
-	if orderOpen.Listings[0].Listing.VendorID.PeerID == pid.String() {
+	// SenderPeerID is set by SignOrderMessage
+	senderPeerID := message.SenderPeerID
+	if orderOpen.Listings[0].Listing.VendorID.PeerID == senderPeerID {
 		otherPartyID = orderOpen.Listings[0].Listing.VendorID.PeerID
 		otherPartyHandle = orderOpen.Listings[0].Listing.VendorID.Handle
-	} else if orderOpen.BuyerID.PeerID == pid.String() {
+	} else if orderOpen.BuyerID.PeerID == senderPeerID {
 		otherPartyID = orderOpen.BuyerID.PeerID
 		otherPartyHandle = orderOpen.BuyerID.Handle
 	} else {
@@ -67,7 +68,7 @@ func (op *OrderProcessor) processDisputeAcceptMessage(dbtx database.Tx, order *m
 		Buyer:            orderOpen.BuyerID.PeerID,
 	}
 
-	if op.identity == pid {
+	if op.identity.String() == senderPeerID {
 		logger.LogInfoWithIDf(log, op.nodeID, "Processed own DISPUTE_ACCEPT for orderID: %s", order.ID)
 	} else {
 		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_ACCEPT message for order %s", order.ID)

@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"errors"
 
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -15,7 +14,7 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-func (op *OrderProcessor) processOrderCancelMessage(dbtx database.Tx, order *models.Order, peer peer.ID, message *npb.OrderMessage) (interface{}, error) {
+func (op *OrderProcessor) processOrderCancelMessage(dbtx database.Tx, order *models.Order, message *npb.OrderMessage) (interface{}, error) {
 	orderCancel := new(pb.OrderCancel)
 	if err := message.Message.UnmarshalTo(orderCancel); err != nil {
 		return nil, err

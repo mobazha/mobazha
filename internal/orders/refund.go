@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"math/big"
 
-	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -16,7 +15,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (op *OrderProcessor) processRefundMessage(dbtx database.Tx, order *models.Order, peer peer.ID, message *npb.OrderMessage) (interface{}, error) {
+func (op *OrderProcessor) processRefundMessage(dbtx database.Tx, order *models.Order, message *npb.OrderMessage) (interface{}, error) {
 	refund := new(pb.Refund)
 	if err := message.Message.UnmarshalTo(refund); err != nil {
 		return nil, err

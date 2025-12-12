@@ -34,6 +34,6 @@ func (op *OrderProcessor) ProcessOrderPayment(dbtx database.Tx, order *models.Or
 	}
 
 	// Process the order message
-	_, err = op.processMessage(dbtx, order, op.identity, orderMessage)
+	_, err = op.processMessage(dbtx, order, orderMessage)
 	return err
 }

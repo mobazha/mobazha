@@ -1,7 +1,6 @@
 package orders
 
 import (
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -10,7 +9,7 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 )
 
-func (op *OrderProcessor) processPaymentFinalizeMessage(dbtx database.Tx, order *models.Order, pid peer.ID, message *npb.OrderMessage) (interface{}, error) {
+func (op *OrderProcessor) processPaymentFinalizeMessage(dbtx database.Tx, order *models.Order, message *npb.OrderMessage) (interface{}, error) {
 	paymentFinalized := new(pb.PaymentFinalized)
 	if err := message.Message.UnmarshalTo(paymentFinalized); err != nil {
 		return nil, err
@@ -35,7 +34,7 @@ func (op *OrderProcessor) processPaymentFinalizeMessage(dbtx database.Tx, order 
 		OrderID: order.ID.String(),
 	}
 
-	if op.identity == pid {
+	if op.identity.String() == message.SenderPeerID {
 		logger.LogInfoWithIDf(log, op.nodeID, "Processed own PAYMENT_FINALIZE for orderID: %s", order.ID)
 	} else {
 		logger.LogInfoWithIDf(log, op.nodeID, "Received PAYMENT_FINALIZE message for order %s", order.ID)

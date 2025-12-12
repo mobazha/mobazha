@@ -576,6 +576,9 @@ func TestOrder_ParkedMessages(t *testing.T) {
 		t.Error("Messages should be nil")
 	}
 
+	// Set SenderPeerID (normally set by SignOrderMessage)
+	msg1.SenderPeerID = "12D3KooWTestPeer"
+	msg2.SenderPeerID = "12D3KooWTestPeer"
 	if err := order.ParkMessage(msg1); err != nil {
 		t.Fatal(err)
 	}

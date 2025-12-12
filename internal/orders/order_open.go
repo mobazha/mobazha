@@ -321,16 +321,22 @@ func (op *OrderProcessor) validateOrderOpen(dbtx database.Tx, order *pb.OrderOpe
 }
 
 // CalculateOrderTotal calculates and returns the total for the order with all
-// the provided options.
+// the provided options. The result is in the order's PricingCoin currency.
 func CalculateOrderTotal(order *pb.OrderOpen, erp *wallet.ExchangeRateProvider) (models.OrderTotals, error) {
+	return CalculateOrderTotalInCurrency(order, order.PricingCoin, erp)
+}
+
+// CalculateOrderTotalInCurrency calculates and returns the total for the order
+// converted to the specified target currency.
+func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode string, erp *wallet.ExchangeRateProvider) (models.OrderTotals, error) {
 	var (
 		orderTotal, subTotal, taxesTotal, discountsTotal iwallet.Amount
 		physicalGoods                                    = make(map[string]*pb.Listing)
 	)
 
-	paymentCurrency, err := models.CurrencyDefinitions.Lookup(order.PricingCoin)
+	paymentCurrency, err := models.CurrencyDefinitions.Lookup(targetCurrencyCode)
 	if err != nil {
-		return models.OrderTotals{}, fmt.Errorf("failed to lookup payment coin: %s", order.PricingCoin)
+		return models.OrderTotals{}, fmt.Errorf("failed to lookup payment coin: %s", targetCurrencyCode)
 	}
 
 	// Calculate the price of each item

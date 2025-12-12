@@ -108,7 +108,7 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get payment sent message, order id: %s", order.ID)
-		logger.LogInfoWithIDf(log, op.nodeID, errMsg)
+		logger.LogInfoWithID(log, op.nodeID, errMsg)
 		return errors.New(errMsg)
 	}
 

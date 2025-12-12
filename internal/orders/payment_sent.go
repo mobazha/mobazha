@@ -62,42 +62,48 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 
+	// Check if transaction is already known
+	// If known, skip fetching/recording but continue to event emission logic
+	transactionKnown := false
 	for _, tx := range txs {
 		if tx.ID.String() == paymentSent.TransactionID {
 			logger.LogInfoWithIDf(log, op.nodeID, "Received PAYMENT_SENT message for order %s but already know about transaction", order.ID)
-			return nil, nil
+			transactionKnown = true
+			break
 		}
 	}
 
 	// If this fails it's OK as the processor's unfunded order checking loop will
 	// retry at it's next interval.
 	var tx *iwallet.Transaction
-	if iwallet.CoinType(paymentSent.Coin).IsStripeChain() {
-		tx, err = op.getStripeTransactionFunc(iwallet.TransactionID(paymentSent.TransactionID), iwallet.CoinType(paymentSent.Coin))
-	} else {
-		tx, err = wallet.GetTransaction(iwallet.TransactionID(paymentSent.TransactionID), iwallet.CoinType(paymentSent.Coin))
-		if err != nil {
-			logger.LogErrorWithIDf(log, op.nodeID, "Failed to get transaction from txid: %s, error: %s", paymentSent.TransactionID, err)
+	if !transactionKnown {
+		if iwallet.CoinType(paymentSent.Coin).IsStripeChain() {
+			tx, err = op.getStripeTransactionFunc(iwallet.TransactionID(paymentSent.TransactionID), iwallet.CoinType(paymentSent.Coin))
+		} else {
+			tx, err = wallet.GetTransaction(iwallet.TransactionID(paymentSent.TransactionID), iwallet.CoinType(paymentSent.Coin))
+			if err != nil {
+				logger.LogErrorWithIDf(log, op.nodeID, "Failed to get transaction from txid: %s, error: %s", paymentSent.TransactionID, err)
 
-			logger.LogInfoWithIDf(log, op.nodeID, "building transaction from payment sent message, txid: %s", paymentSent.TransactionID)
-			tx = utils.BuildPaymentSentTransaction(paymentSent)
-			err = nil
-		}
-	}
-	if err == nil && tx != nil {
-		paymentAddress, err := order.GetPaymentAddress()
-		if err != nil {
-			return nil, err
-		}
-		for _, to := range tx.To {
-			if to.Address.String() == paymentAddress {
-				if err := op.ProcessOrderPayment(dbtx, order, message, *tx); err != nil {
-					return nil, err
-				}
+				logger.LogInfoWithIDf(log, op.nodeID, "building transaction from payment sent message, txid: %s", paymentSent.TransactionID)
+				tx = utils.BuildPaymentSentTransaction(paymentSent)
+				err = nil
 			}
 		}
-	} else {
-		logger.LogErrorWithIDf(log, op.nodeID, "Failed to get transaction from id: %s, error: %s", paymentSent.TransactionID, err)
+		if err == nil && tx != nil {
+			paymentAddress, err := order.GetPaymentAddress()
+			if err != nil {
+				return nil, err
+			}
+			for _, to := range tx.To {
+				if to.Address.String() == paymentAddress {
+					if err := op.ProcessOrderPayment(dbtx, order, message, *tx); err != nil {
+						return nil, err
+					}
+				}
+			}
+		} else {
+			logger.LogErrorWithIDf(log, op.nodeID, "Failed to get transaction from id: %s, error: %s", paymentSent.TransactionID, err)
+		}
 	}
 
 	// Check if order is funded and handle role-specific logic
@@ -113,7 +119,7 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 					op.bus.Emit(&events.OrderPaymentReceived{
 						OrderID:      order.ID.String(),
 						FundingTotal: fundingTotal.String(),
-						CoinType:     orderOpen.PricingCoin,
+						CoinType:     paymentSent.Coin,
 					})
 				})
 			}

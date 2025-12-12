@@ -108,14 +108,13 @@ type PaymentData struct {
 	Moderator        string                `json:"moderator"`
 	ModeratorAddress string                `json:"moderatorAddress"`
 	Amount           uint64                `json:"amount"`
-	FromAddress      string                `json:"fromAddress"`
 	/*
 		id := make([]byte, 36)
 		copy(id[:32], prevHash[:])
 		copy(id[32:], index)
 		reference: internal/multiwallet/client/blockbook -> buildTransaction()
 	*/
-	FromID             []byte    `json:"fromID"` // 36 bytes
+	FromID             []byte    `json:"fromID"` // 36 bytes, derived from PayerAddress
 	ToAddress          string    `json:"toAddress"`
 	ToID               []byte    `json:"toID"` // 36 bytes
 	Script             string    `json:"script"`
@@ -174,7 +173,7 @@ func (p *PaymentData) BuildTransaction() iwallet.Transaction {
 		From: []iwallet.SpendInfo{
 			{
 				ID:      fromID,
-				Address: iwallet.NewAddress(p.FromAddress, iwallet.CoinType(p.Coin)),
+				Address: iwallet.NewAddress(p.PayerAddress, iwallet.CoinType(p.Coin)), // 使用 PayerAddress
 				Amount:  iwallet.NewAmount(p.Amount),
 			},
 		},

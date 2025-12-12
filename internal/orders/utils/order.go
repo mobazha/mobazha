@@ -84,7 +84,7 @@ func BuildPaymentSentTransaction(paymentSent *pb.PaymentSent) *iwallet.Transacti
 		ID: iwallet.TransactionID(paymentSent.TransactionID),
 		From: []iwallet.SpendInfo{
 			{
-				Address: iwallet.NewAddress(paymentSent.FromAddress, iwallet.CoinType(paymentSent.Coin)),
+				Address: iwallet.NewAddress(paymentSent.PayerAddress, iwallet.CoinType(paymentSent.Coin)), // 使用 PayerAddress
 				Amount:  iwallet.NewAmount(paymentSent.Amount),
 			},
 		},

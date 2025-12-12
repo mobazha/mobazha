@@ -60,7 +60,7 @@ func TestOrderProcessor_processRefundMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	op.multiwallet["MCK"] = wn.Wallets()[0]
+	op.multiwallet[iwallet.ChainMock] = wn.Wallets()[0]
 
 	_, pub, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
@@ -128,7 +128,7 @@ func TestOrderProcessor_processRefundMessage(t *testing.T) {
 		},
 	}
 	paymentSent := &pb.PaymentSent{
-		Coin:      "MCK",
+		Coin:      iwallet.CtMock.String(),
 		ToAddress: addr.String(),
 	}
 
@@ -217,7 +217,7 @@ func TestOrderProcessor_processRefundMessage(t *testing.T) {
 			continue
 		}
 		err := op.db.Update(func(tx database.Tx) error {
-			event, err := op.processRefundMessage(tx, order, remotePeer, orderMsg)
+			event, err := op.processRefundMessage(tx, order, orderMsg)
 			if err != test.expectedError {
 				return fmt.Errorf("incorrect error returned. Expected %t, got %t", test.expectedError, err)
 			}

@@ -2,12 +2,9 @@ package orders
 
 import (
 	"bytes"
-	"crypto/rand"
 	"reflect"
 	"testing"
 
-	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
@@ -34,15 +31,6 @@ func TestOrderProcessor_processOrderOpenMessage(t *testing.T) {
 		sl := factory.NewSignedListing()
 		return tx.SetListing(sl)
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, pub, err := crypto.GenerateEd25519Key(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	remotePeer, err := peer.IDFromPublicKey(pub)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,12 +132,13 @@ func TestOrderProcessor_processOrderOpenMessage(t *testing.T) {
 		}
 
 		orderMsg := &npb.OrderMessage{
-			OrderID:     orderHash.B58String(),
-			MessageType: npb.OrderMessage_ORDER_OPEN,
-			Message:     openAny,
+			OrderID:      orderHash.B58String(),
+			MessageType:  npb.OrderMessage_ORDER_OPEN,
+			Message:      openAny,
+			SenderPeerID: orderOpen.BuyerID.PeerID,
 		}
 		err = op.db.Update(func(tx database.Tx) error {
-			event, err := op.processOrderOpenMessage(tx, order, remotePeer, orderMsg)
+			event, err := op.processOrderOpenMessage(tx, order, orderMsg)
 			if err != test.expectedError {
 				t.Errorf("Test %d: Incorrect error returned. Expected %t, got %t", i, test.expectedError, err)
 			}

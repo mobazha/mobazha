@@ -168,7 +168,7 @@ func TestOrderProcessor_processOrderConfirmationMessage(t *testing.T) {
 			continue
 		}
 		err := op.db.Update(func(tx database.Tx) error {
-			event, err := op.processOrderConfirmationMessage(tx, order, remotePeer, orderMsg)
+			event, err := op.processOrderConfirmationMessage(tx, order, orderMsg)
 			if err != test.expectedError {
 				return fmt.Errorf("incorrect error returned. Expected %t, got %t", test.expectedError, err)
 			}

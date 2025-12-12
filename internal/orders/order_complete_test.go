@@ -283,7 +283,7 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 			continue
 		}
 		err := op.db.Update(func(tx database.Tx) error {
-			event, err := op.processOrderCompleteMessage(tx, order, buyer, orderMsg)
+			event, err := op.processOrderCompleteMessage(tx, order, orderMsg)
 			if err != test.expectedError {
 				return fmt.Errorf("incorrect error returned. Expected %t, got %t", test.expectedError, err)
 			}

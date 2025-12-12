@@ -214,7 +214,7 @@ func TestOrderProcessor_processDisputeOpenMessage(t *testing.T) {
 			continue
 		}
 		err := op.db.Update(func(tx database.Tx) error {
-			event, err := op.processDisputeOpenMessage(tx, order, remotePeer, orderMsg)
+			event, err := op.processDisputeOpenMessage(tx, order, orderMsg)
 			if err != test.expectedError {
 				return fmt.Errorf("incorrect error returned. Expected %t, got %t", test.expectedError, err)
 			}

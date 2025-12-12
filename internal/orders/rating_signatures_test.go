@@ -34,10 +34,6 @@ func Test_processRatingSignaturesMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	remotePeer, err := peer.IDFromPublicKey(pub)
-	if err != nil {
-		t.Fatal(err)
-	}
 	orderID := "1234"
 
 	ratingKey, err := btcec.NewPrivateKey()
@@ -183,7 +179,7 @@ func Test_processRatingSignaturesMessage(t *testing.T) {
 			continue
 		}
 		err := op.db.Update(func(tx database.Tx) error {
-			event, err := op.processRatingSignaturesMessage(tx, order, remotePeer, orderMsg)
+			event, err := op.processRatingSignaturesMessage(tx, order, orderMsg)
 			if err != test.expectedError {
 				return fmt.Errorf("incorrect error returned. Expected %t, got %t", test.expectedError, err)
 			}

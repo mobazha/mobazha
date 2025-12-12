@@ -24,7 +24,7 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 	}
 	defer teardown()
 
-	wal, err := op.multiwallet.WalletForCurrencyCode("MCK")
+	wal, err := op.multiwallet.WalletForCurrencyCode(iwallet.CtMock.String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,15 +55,6 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 	remotePeer, err := peer.IDFromPublicKey(pub)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, modPub, err := crypto.GenerateEd25519Key(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	modPeer, err := peer.IDFromPublicKey(modPub)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,7 +288,7 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 			continue
 		}
 		err := op.db.Update(func(tx database.Tx) error {
-			event, err := op.processDisputeCloseMessage(tx, order, modPeer, orderMsg)
+			event, err := op.processDisputeCloseMessage(tx, order, orderMsg)
 			if err != test.expectedError {
 				return fmt.Errorf("incorrect error returned. Expected %t, got %t", test.expectedError, err)
 			}

@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -50,11 +49,6 @@ func Test_processPaymentSentMessage(t *testing.T) {
 	paymentSent.TransactionID = txs[0].ID.String()
 	paymentSent.ToAddress = txs[0].To[0].Address.String()
 	paymentSent.Method = pb.PaymentSent_DIRECT
-
-	remotePeer, err := peer.Decode(orderOpen.BuyerID.PeerID)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	paymentAny := &anypb.Any{}
 	if err := paymentAny.MarshalFrom(paymentSent); err != nil {
@@ -135,7 +129,7 @@ func Test_processPaymentSentMessage(t *testing.T) {
 			continue
 		}
 		err := op.db.Update(func(tx database.Tx) error {
-			event, err := op.processPaymentSentMessage(tx, order, remotePeer, orderMsg)
+			event, err := op.processPaymentSentMessage(tx, order, orderMsg)
 			if err != test.expectedError {
 				return fmt.Errorf("incorrect error returned. Expected %t, got %t", test.expectedError, err)
 			}

@@ -1,13 +1,10 @@
 package orders
 
 import (
-	"crypto/rand"
 	"fmt"
 	"reflect"
 	"testing"
 
-	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -22,16 +19,6 @@ func TestOrderProcessor_processPaymentFinalizeMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer teardown()
-
-	_, pub, err := crypto.GenerateEd25519Key(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	remotePeer, err := peer.IDFromPublicKey(pub)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	orderID := "1234"
 
@@ -91,7 +78,7 @@ func TestOrderProcessor_processPaymentFinalizeMessage(t *testing.T) {
 			continue
 		}
 		err := op.db.Update(func(tx database.Tx) error {
-			event, err := op.processPaymentFinalizeMessage(tx, order, remotePeer, orderMsg)
+			event, err := op.processPaymentFinalizeMessage(tx, order, orderMsg)
 			if err != test.expectedError {
 				return fmt.Errorf("incorrect error returned. Expected %t, got %t", test.expectedError, err)
 			}

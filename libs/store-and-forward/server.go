@@ -569,6 +569,7 @@ func (svr *Server) handleStoreMessage(w msgio.Writer, pmes *pb.Message, from pee
 					EncryptedMessage: &pb.Message_EncryptedMessage{
 						MessageID: id[:],
 						Message:   encMsg.Message,
+						PeerID:    []byte(to), // Include target peer ID for routing in proxy mode
 					},
 				},
 			})

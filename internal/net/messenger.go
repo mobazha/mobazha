@@ -57,6 +57,11 @@ type Messenger struct {
 	bootstrapDone  chan struct{}
 	mtx            sync.RWMutex
 	wg             sync.WaitGroup
+
+	// recentlyProcessed tracks recently processed message IDs to prevent duplicate processing
+	// when messages arrive via both subscription and polling paths
+	recentlyProcessed   map[string]time.Time
+	recentlyProcessedMu sync.Mutex
 }
 
 // MessengerConfig holds the data needed to construct a new Messenger.
@@ -115,17 +120,18 @@ func NewMessenger(cfg *MessengerConfig) (*Messenger, error) {
 	}
 
 	m := &Messenger{
-		NodeID:         cfg.NodeID,
-		ns:             cfg.Service,
-		db:             cfg.DB,
-		sk:             cfg.Privkey,
-		testnet:        cfg.Testnet,
-		snfClient:      snfClient,
-		getProfileFunc: cfg.GetProfileFunc,
-		done:           make(chan struct{}),
-		bootstrapDone:  bootstrapDone,
-		mtx:            sync.RWMutex{},
-		wg:             sync.WaitGroup{},
+		NodeID:            cfg.NodeID,
+		ns:                cfg.Service,
+		db:                cfg.DB,
+		sk:                cfg.Privkey,
+		testnet:           cfg.Testnet,
+		snfClient:         snfClient,
+		getProfileFunc:    cfg.GetProfileFunc,
+		done:              make(chan struct{}),
+		bootstrapDone:     bootstrapDone,
+		mtx:               sync.RWMutex{},
+		wg:                sync.WaitGroup{},
+		recentlyProcessed: make(map[string]time.Time),
 	}
 	return m, nil
 }
@@ -135,6 +141,28 @@ func NewMessenger(cfg *MessengerConfig) (*Messenger, error) {
 func (m *Messenger) Stop() {
 	close(m.done)
 	m.wg.Wait()
+}
+
+// markMessageProcessed marks a message as recently processed and returns true if it was already processed.
+// This prevents duplicate processing when messages arrive via both subscription and polling paths.
+func (m *Messenger) markMessageProcessed(messageID string) bool {
+	m.recentlyProcessedMu.Lock()
+	defer m.recentlyProcessedMu.Unlock()
+
+	// Clean up old entries (older than 5 minutes)
+	cutoff := time.Now().Add(-5 * time.Minute)
+	for id, t := range m.recentlyProcessed {
+		if t.Before(cutoff) {
+			delete(m.recentlyProcessed, id)
+		}
+	}
+
+	if _, exists := m.recentlyProcessed[messageID]; exists {
+		return true // Already processed
+	}
+
+	m.recentlyProcessed[messageID] = time.Now()
+	return false
 }
 
 // ReliablySendMessage persists the message to the database before sending, then continually retries
@@ -251,8 +279,21 @@ func (m *Messenger) Start() {
 		case msg := <-sub.Out:
 			p, pmes, err := m.decryptMessage(msg.EncryptedMessage)
 			if err != nil {
-				logger.LogInfoWithIDf(log, m.NodeID, "Decryption failed for message %x", msg.MessageID)
+				logger.LogInfoWithIDf(log, m.NodeID, "Decryption failed for message %x: %v", msg.MessageID, err)
+				continue // Skip messages we can't decrypt (not for us)
 			}
+
+			// Check for duplicate processing (message might arrive via both subscription and polling)
+			if m.markMessageProcessed(pmes.MessageID) {
+				logger.LogDebugWithIDf(log, m.NodeID, "Skipping duplicate message %s from subscription", pmes.MessageID)
+				// Still ACK the message to remove it from SNF servers
+				if err := m.snfClient.AckMessage(context.Background(), msg.MessageID); err != nil {
+					logger.LogInfoWithIDf(log, m.NodeID, "Error acking duplicate message with snf servers: %s", err)
+				}
+				continue
+			}
+
+			logger.LogDebugWithIDf(log, m.NodeID, "Decrypted message %x from peer %s, type=%s", msg.MessageID, p.String(), pmes.MessageType.String())
 			m.ns.handlerMtx.RLock()
 			handler, ok := m.ns.handlers[pmes.MessageType]
 			m.ns.handlerMtx.RUnlock()
@@ -433,6 +474,12 @@ func (m *Messenger) downloadMessages() {
 			return messages[i].m.Sequence < messages[j].m.Sequence
 		})
 		for _, mwp := range messages {
+			// Check for duplicate processing (message might have been processed via subscription)
+			if m.markMessageProcessed(mwp.m.MessageID) {
+				logger.LogDebugWithIDf(log, m.NodeID, "Skipping duplicate message %s from download", mwp.m.MessageID)
+				continue
+			}
+
 			m.ns.handlerMtx.RLock()
 			handler, ok := m.ns.handlers[mwp.m.MessageType]
 			m.ns.handlerMtx.RUnlock()
@@ -493,8 +540,13 @@ func (m *Messenger) decryptMessage(cipherText []byte) (peer.ID, *pb.Message, err
 
 	senderPubkey, err := crypto.UnmarshalPublicKey(env.SenderPubkey)
 	if err != nil {
+		logger.LogErrorWithIDf(log, m.NodeID, "decryptMessage: failed to unmarshal sender pubkey: %v, pubkey len=%d", err, len(env.SenderPubkey))
 		return peer.ID(""), nil, err
 	}
+
+	// Derive sender peer ID for logging
+	senderPeerID, _ := peer.IDFromPublicKey(senderPubkey)
+	logger.LogDebugWithIDf(log, m.NodeID, "decryptMessage: sender pubkey type=%d, derived peer ID=%s", senderPubkey.Type(), senderPeerID.String())
 
 	sig := env.Signature
 	env.Signature = nil
@@ -505,9 +557,11 @@ func (m *Messenger) decryptMessage(cipherText []byte) (peer.ID, *pb.Message, err
 
 	valid, err := senderPubkey.Verify(ser, sig)
 	if err != nil {
+		logger.LogErrorWithIDf(log, m.NodeID, "decryptMessage: envelope signature verify error: %v", err)
 		return peer.ID(""), nil, err
 	}
 	if !valid {
+		logger.LogErrorWithIDf(log, m.NodeID, "decryptMessage: INVALID envelope signature from sender %s", senderPeerID.String())
 		return peer.ID(""), nil, errors.New("invalid signature")
 	}
 

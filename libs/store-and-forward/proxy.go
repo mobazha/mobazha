@@ -77,6 +77,9 @@ type LocalClient struct {
 	// recentlyRelayed tracks recently relayed messages to avoid duplicates
 	recentlyRelayed map[string]bool
 
+	// recentlyRelayedTime tracks when messages were relayed for cleanup
+	recentlyRelayedTime map[string]time.Time
+
 	mtx sync.RWMutex
 }
 
@@ -143,9 +146,13 @@ func (p *SNFProxy) RegisterNode(peerID peer.ID, privateKey crypto.PrivKey) (*Loc
 		subs:                make(map[int32]*Subscription),
 		cachedRegistrations: make(map[peer.ID]time.Time),
 		recentlyRelayed:     make(map[string]bool),
+		recentlyRelayedTime: make(map[string]time.Time),
 	}
 
 	p.localClients[peerID] = client
+
+	// Start cleanup goroutine for this client
+	go client.cleanupRecentlyRelayed()
 
 	// Start registration with all servers
 	go client.registerWithAllServers()
@@ -214,36 +221,48 @@ func (p *SNFProxy) streamHandler(s inet.Stream) {
 		enc := pmes.GetEncryptedMessage()
 		messageIDStr := hex.EncodeToString(enc.MessageID)
 
-		// Route message to all local clients (they will filter by their own logic)
-		p.mtx.RLock()
-		for _, client := range p.localClients {
-			client.mtx.Lock()
-			_, alreadyRelayed := client.recentlyRelayed[messageIDStr]
-			if !alreadyRelayed {
-				client.recentlyRelayed[messageIDStr] = true
-				// Clean up after 5 minutes
-				go func(c *LocalClient, msgID string) {
-					time.Sleep(5 * time.Minute)
-					c.mtx.Lock()
-					delete(c.recentlyRelayed, msgID)
-					c.mtx.Unlock()
-				}(client, messageIDStr)
-
-				// Notify subscribers
-				for _, sub := range client.subs {
-					select {
-					case sub.Out <- Message{
-						MessageID:        enc.MessageID,
-						EncryptedMessage: enc.Message,
-					}:
-					default:
-						// Channel full, skip
-					}
-				}
-			}
-			client.mtx.Unlock()
+		// Route message directly to target client using peer ID (O(1) lookup)
+		if len(enc.PeerID) == 0 {
+			log.Debugf("Received message without PeerID from server %s, ignoring", remotePeer)
+			continue
 		}
+
+		targetPeerID := peer.ID(enc.PeerID)
+		p.mtx.RLock()
+		client, ok := p.localClients[targetPeerID]
 		p.mtx.RUnlock()
+
+		if ok {
+			p.deliverToClient(client, messageIDStr, enc)
+		}
+		// If client not found, message is not for any of our nodes - ignore
+	}
+}
+
+// deliverToClient delivers a message to a specific LocalClient with deduplication
+func (p *SNFProxy) deliverToClient(client *LocalClient, messageIDStr string, enc *pb.Message_EncryptedMessage) {
+	client.mtx.Lock()
+	defer client.mtx.Unlock()
+
+	_, alreadyRelayed := client.recentlyRelayed[messageIDStr]
+	if alreadyRelayed {
+		return
+	}
+
+	client.recentlyRelayed[messageIDStr] = true
+	client.recentlyRelayedTime[messageIDStr] = time.Now()
+
+	// Notify subscribers
+	for _, sub := range client.subs {
+		select {
+		case sub.Out <- Message{
+			MessageID:        enc.MessageID,
+			EncryptedMessage: enc.Message,
+		}:
+		default:
+			// Channel full, message will be retrieved via GetMessages later
+			log.Warnf("LocalClient %s: subscription channel full, message %s deferred to polling", client.peerID.ShortString(), messageIDStr)
+		}
 	}
 }
 
@@ -253,6 +272,30 @@ func (p *SNFProxy) openStreamToServer(ctx context.Context, server peer.ID) (inet
 }
 
 // ============== LocalClient Methods ==============
+
+// cleanupRecentlyRelayed periodically cleans up old entries from recentlyRelayed map
+// This uses a single goroutine per client instead of one goroutine per message
+func (c *LocalClient) cleanupRecentlyRelayed() {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-c.proxy.ctx.Done():
+			return
+		case <-ticker.C:
+			c.mtx.Lock()
+			now := time.Now()
+			for msgID, relayedAt := range c.recentlyRelayedTime {
+				if now.Sub(relayedAt) > 5*time.Minute {
+					delete(c.recentlyRelayed, msgID)
+					delete(c.recentlyRelayedTime, msgID)
+				}
+			}
+			c.mtx.Unlock()
+		}
+	}
+}
 
 // registerWithAllServers registers this client with all SNF servers
 func (c *LocalClient) registerWithAllServers() {

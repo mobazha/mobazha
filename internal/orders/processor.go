@@ -323,7 +323,7 @@ func (op *OrderProcessor) GetActiveReceivingAccount(tx database.Tx, chainType st
 func (op *OrderProcessor) GetPayoutAddress(tx database.Tx, coinType string) (iwallet.Address, error) {
 	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(coinType))
 	if err != nil {
-		return iwallet.Address{}, fmt.Errorf("获取币种信息失败: %v", err)
+		return iwallet.Address{}, fmt.Errorf("failed to get coin info: %v", err)
 	}
 
 	// 从激活的收款账户获取地址
@@ -333,5 +333,5 @@ func (op *OrderProcessor) GetPayoutAddress(tx database.Tx, coinType string) (iwa
 		return iwallet.NewAddress(account.Address, iwallet.CoinType(coinType)), nil
 	}
 
-	return iwallet.Address{}, fmt.Errorf("获取激活的收款账户失败: %v", err)
+	return iwallet.Address{}, fmt.Errorf("failed to get active receiving account: %v", err)
 }

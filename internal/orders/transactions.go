@@ -28,7 +28,9 @@ func (op *OrderProcessor) ProcessOrderPayment(dbtx database.Tx, order *models.Or
 	err := order.PutTransaction(tx)
 	if models.IsDuplicateTransactionError(err) {
 		logger.LogInfoWithIDf(log, op.nodeID, "Received duplicate transaction %s", tx.ID.String())
-		return nil
+		// Continue to process message even if transaction is duplicate
+		// This handles the case where transaction was recorded but message wasn't processed
+		// (e.g., node crashed between recording transaction and processing message for UTXO)
 	} else if err != nil {
 		return err
 	}

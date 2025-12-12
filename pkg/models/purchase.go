@@ -153,18 +153,34 @@ type PaymentData struct {
 }
 
 func (p *PaymentData) BuildTransaction() iwallet.Transaction {
+	// 安全获取 FromID，避免切片越界
+	var fromID []byte
+	if len(p.FromID) >= 36 {
+		fromID = p.FromID[:36]
+	} else if len(p.FromID) > 0 {
+		fromID = p.FromID
+	}
+
+	// 安全获取 ToID，避免切片越界
+	var toID []byte
+	if len(p.ToID) >= 36 {
+		toID = p.ToID[:36]
+	} else if len(p.ToID) > 0 {
+		toID = p.ToID
+	}
+
 	tx := iwallet.Transaction{
 		ID: iwallet.TransactionID(p.TransactionID),
 		From: []iwallet.SpendInfo{
 			{
-				ID:      p.FromID[:36],
+				ID:      fromID,
 				Address: iwallet.NewAddress(p.FromAddress, iwallet.CoinType(p.Coin)),
 				Amount:  iwallet.NewAmount(p.Amount),
 			},
 		},
 		To: []iwallet.SpendInfo{
 			{
-				ID:      p.ToID[:36],
+				ID:      toID,
 				Address: iwallet.NewAddress(p.ToAddress, iwallet.CoinType(p.Coin)),
 				Amount:  iwallet.NewAmount(p.Amount),
 			},

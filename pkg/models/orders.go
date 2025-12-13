@@ -71,6 +71,18 @@ const (
 	RoleModerator OrderRole = "moderator"
 )
 
+// PendingUTXOPaymentInfo stores all temporary payment info for UTXO chains
+// This is stored as JSON in Order.PendingPaymentInfo and cleared/updated when switching payment method
+type PendingUTXOPaymentInfo struct {
+	Coin            string `json:"coin,omitempty"`            // Payment coin type (BTC, LTC, etc)
+	Amount          uint64 `json:"amount,omitempty"`          // Locked expected amount in satoshis
+	ScriptPubKey    []byte `json:"scriptPubKey,omitempty"`    // ScriptPubKey for Electrum subscription
+	Script          string `json:"script,omitempty"`          // Hex encoded redeem script
+	Moderator       string `json:"moderator,omitempty"`       // Moderator peer ID (empty for CANCELABLE)
+	ModeratorPubkey string `json:"moderatorPubkey,omitempty"` // Moderator escrow pubkey hex
+	UnlockHours     uint32 `json:"unlockHours,omitempty"`     // Escrow timeout hours for MODERATED
+}
+
 // Order holds the state of all orders. This model is saved in the
 // database indexed by the order ID.
 type Order struct {
@@ -80,20 +92,10 @@ type Order struct {
 	// Used to recover monitoring after node restart
 	PaymentAddress string `gorm:"index"`
 
-	// PendingPaymentCoin stores the pending payment coin type (e.g., "BTC", "LTC")
-	// Set when buyer calls GetUTXOPaymentInfo, updated when user switches payment method
-	// Used with PaymentAddress to recover monitoring after node restart
-	PendingPaymentCoin string
-
-	// PendingPaymentAmount stores the locked expected payment amount in satoshis/wei
-	// Set when buyer first calls GetUTXOPaymentInfo for a specific coin type
-	// This prevents exchange rate fluctuation from affecting buyer's payment
-	PendingPaymentAmount uint64
-
-	// PendingPaymentScriptPubKey stores the scriptPubKey for the payment address
-	// Required for Electrum subscription to detect payments
-	// For P2WSH addresses: OP_0 + OP_PUSHDATA32 + SHA256(witnessScript)
-	PendingPaymentScriptPubKey []byte
+	// PendingPaymentInfo stores all temporary UTXO payment info as JSON
+	// Contains: Coin, Amount, ScriptPubKey, Script, Moderator, ModeratorPubkey, UnlockHours
+	// Cleared after PaymentSent or when switching payment method
+	PendingPaymentInfo []byte
 
 	Transactions []byte
 
@@ -358,6 +360,39 @@ func (o *Order) Chaincode() (string, error) {
 		return "", fmt.Errorf("get order open message failed: %s", err.Error())
 	}
 	return orderOpen.Chaincode, nil
+}
+
+// SetPendingPaymentInfo stores temporary UTXO payment info as JSON
+func (o *Order) SetPendingPaymentInfo(info *PendingUTXOPaymentInfo) error {
+	if info == nil {
+		o.PendingPaymentInfo = nil
+		return nil
+	}
+	data, err := json.Marshal(info)
+	if err != nil {
+		return fmt.Errorf("marshal pending payment info: %w", err)
+	}
+	o.PendingPaymentInfo = data
+	return nil
+}
+
+// GetPendingPaymentInfo retrieves temporary UTXO payment info from JSON
+func (o *Order) GetPendingPaymentInfo() (*PendingUTXOPaymentInfo, error) {
+	if len(o.PendingPaymentInfo) == 0 {
+		return nil, nil
+	}
+	var info PendingUTXOPaymentInfo
+	if err := json.Unmarshal(o.PendingPaymentInfo, &info); err != nil {
+		return nil, fmt.Errorf("unmarshal pending payment info: %w", err)
+	}
+	return &info, nil
+}
+
+// ClearPendingPaymentInfo clears all temporary payment info
+// Called after PaymentSent is sent or when clearing pending payment
+func (o *Order) ClearPendingPaymentInfo() {
+	o.PendingPaymentInfo = nil
+	// Keep PaymentAddress for reference (e.g., for displaying in UI)
 }
 
 // OrderRejectMessage returns the unmarshalled proto object if it exists in the order.

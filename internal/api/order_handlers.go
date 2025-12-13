@@ -858,13 +858,24 @@ func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Reque
 // }
 
 // PaymentRemainingResponse represents the response for payment remaining endpoint
+// PaymentTransactionInfo represents a transaction in the payment history
+type PaymentTransactionInfo struct {
+	TxID      string `json:"txid"`
+	Amount    uint64 `json:"amount"`
+	Height    uint64 `json:"height"`
+	Timestamp string `json:"timestamp,omitempty"`
+}
+
+// PaymentRemainingResponse - Frontend generates PaymentURI/QRCode using paymentAddress + remainingAmount + coin
 type PaymentRemainingResponse struct {
-	OrderID         string `json:"orderID"`
-	ExpectedAmount  uint64 `json:"expectedAmount"`
-	PaidAmount      uint64 `json:"paidAmount"`
-	RemainingAmount uint64 `json:"remainingAmount"`
-	Coin            string `json:"coin"`
-	PaymentAddress  string `json:"paymentAddress"`
+	OrderID           string                   `json:"orderID"`
+	ExpectedAmount    uint64                   `json:"expectedAmount"`
+	PaidAmount        uint64                   `json:"paidAmount"`
+	RemainingAmount   uint64                   `json:"remainingAmount"`
+	Coin              string                   `json:"coin"`
+	PaymentAddress    string                   `json:"paymentAddress"`
+	Transactions      []PaymentTransactionInfo `json:"transactions,omitempty"`
+	HasPartialPayment bool                     `json:"hasPartialPayment"`
 }
 
 // handleGETPaymentRemaining returns the remaining payment amount for an order
@@ -886,7 +897,8 @@ func (g *Gateway) handleGETPaymentRemaining(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Check if there's pending payment info
-	if order.PendingPaymentAmount == 0 || order.PaymentAddress == "" {
+	pendingInfo, _ := order.GetPendingPaymentInfo()
+	if pendingInfo == nil || pendingInfo.Amount == 0 || order.PaymentAddress == "" {
 		ErrorResponse(w, http.StatusBadRequest, "no pending payment for this order")
 		return
 	}
@@ -899,17 +911,43 @@ func (g *Gateway) handleGETPaymentRemaining(w http.ResponseWriter, r *http.Reque
 	}
 
 	remainingAmount := uint64(0)
-	if order.PendingPaymentAmount > paidAmount {
-		remainingAmount = order.PendingPaymentAmount - paidAmount
+	if pendingInfo.Amount > paidAmount {
+		remainingAmount = pendingInfo.Amount - paidAmount
+	}
+
+	// Get existing transactions
+	var txInfos []PaymentTransactionInfo
+	txs, err := order.GetTransactions()
+	if err == nil && len(txs) > 0 {
+		for _, tx := range txs {
+			// Calculate amount paid to payment address in this transaction
+			var txAmount uint64
+			for _, to := range tx.To {
+				if to.Address.String() == order.PaymentAddress {
+					txAmount = to.Amount.Uint64()
+					break
+				}
+			}
+			if txAmount > 0 {
+				txInfos = append(txInfos, PaymentTransactionInfo{
+					TxID:      tx.ID.String(),
+					Amount:    txAmount,
+					Height:    tx.Height,
+					Timestamp: tx.Timestamp.Format("2006-01-02 15:04:05"),
+				})
+			}
+		}
 	}
 
 	response := PaymentRemainingResponse{
-		OrderID:         orderID,
-		ExpectedAmount:  order.PendingPaymentAmount,
-		PaidAmount:      paidAmount,
-		RemainingAmount: remainingAmount,
-		Coin:            order.PendingPaymentCoin,
-		PaymentAddress:  order.PaymentAddress,
+		OrderID:           orderID,
+		ExpectedAmount:    pendingInfo.Amount,
+		PaidAmount:        paidAmount,
+		RemainingAmount:   remainingAmount,
+		Coin:              pendingInfo.Coin,
+		PaymentAddress:    order.PaymentAddress,
+		Transactions:      txInfos,
+		HasPartialPayment: paidAmount > 0 && remainingAmount > 0,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

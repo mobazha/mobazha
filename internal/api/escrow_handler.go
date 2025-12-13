@@ -26,7 +26,6 @@ type UTXOPaymentInfoResponse struct {
 	PaymentAddress string                `json:"paymentAddress"` // 支付地址
 	PaymentURI     string                `json:"paymentURI"`     // BIP21 URI
 	Amount         uint64                `json:"amount"`         // 金额（satoshi）
-	AmountStr      string                `json:"amountStr"`      // 金额（币单位）
 	Coin           string                `json:"coin"`           // 币种
 	ChainType      iwallet.ChainType     `json:"chainType"`      // 链类型
 	QRCodeData     string                `json:"qrCodeData"`     // 二维码数据
@@ -182,7 +181,6 @@ func (g *Gateway) handleGetUTXOPaymentInfo(w http.ResponseWriter, r *http.Reques
 		PaymentAddress: paymentData.ToAddress,
 		PaymentURI:     paymentURI,
 		Amount:         paymentData.Amount,
-		AmountStr:      fmt.Sprintf("%.8f", amountInCoin),
 		Coin:           string(params.CoinType),
 		ChainType:      coinInfo.Chain,
 		QRCodeData:     paymentURI,

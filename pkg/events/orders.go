@@ -198,6 +198,7 @@ type PartialPaymentReceived struct {
 	ExpectedAmount  uint64 `json:"expectedAmount"`
 	RemainingAmount uint64 `json:"remainingAmount"`
 	Coin            string `json:"coin"`
+	PaymentAddress  string `json:"paymentAddress"`
 }
 
 // ExcessPaymentRefunded is emitted when an excess payment is automatically refunded

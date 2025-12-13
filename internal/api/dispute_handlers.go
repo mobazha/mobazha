@@ -165,13 +165,14 @@ func (g *Gateway) handleGETReleaseFundsInstructions(w http.ResponseWriter, r *ht
 
 	type InstructionsResponse struct {
 		HasInstructions bool              `json:"hasInstructions"`
-		Instructions    any               `json:"instructions"`
+		Instructions    any               `json:"instructions,omitempty"`
 		PaymentChain    iwallet.ChainType `json:"paymentChain"`
 	}
 
 	// 返回响应
+	// For UTXO chains, instructions is nil - frontend should call /v1/dispute/release directly
 	response := InstructionsResponse{
-		HasInstructions: true,
+		HasInstructions: instructions != nil,
 		Instructions:    instructions,
 		PaymentChain:    chainType,
 	}

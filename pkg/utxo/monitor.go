@@ -84,14 +84,15 @@ type PaymentSource interface {
 // Monitor monitors addresses for transactions and provides a subscription interface
 // This is designed to be similar to the original multiwallet's SubscribeTransactions pattern
 type Monitor struct {
-	sources      map[iwallet.ChainType][]PaymentSource
-	watching     map[string]*WatchedAddress
-	watchMu      sync.RWMutex
-	pollInterval time.Duration
-	gracePeriod  time.Duration
-	shutdown     chan struct{}
-	wg           sync.WaitGroup
-	stopOnce     sync.Once // Ensures Stop() is only executed once
+	sources             map[iwallet.ChainType][]PaymentSource
+	watching            map[string]*WatchedAddress
+	watchMu             sync.RWMutex
+	pollInterval        time.Duration
+	gracePeriod         time.Duration
+	subscribeAllSources bool // If true, subscribe to all sources; if false, use first successful only
+	shutdown            chan struct{}
+	wg                  sync.WaitGroup
+	stopOnce            sync.Once // Ensures Stop() is only executed once
 
 	// isShared indicates this monitor is shared by multiple nodes (created by HostService)
 	// When true, Stop() is a no-op (lifecycle managed by HostService)
@@ -106,19 +107,27 @@ type Monitor struct {
 	// Callback receives both the transaction and the WatchedAddress (containing OrderID, etc.)
 	nodeCallbacks   map[string]func(tx iwallet.Transaction, wa *WatchedAddress)
 	nodeCallbacksMu sync.RWMutex
+
+	// Transaction deduplication cache
+	// Key: "address:txid", Value: timestamp of first seen
+	// Used to prevent duplicate notifications when multiple sources detect same transaction
+	seenTxs   map[string]time.Time
+	seenTxsMu sync.RWMutex
 }
 
 // MonitorConfig holds configuration for the transaction monitor
 type MonitorConfig struct {
-	PollInterval time.Duration
-	GracePeriod  time.Duration // How long to keep monitoring after expiry
+	PollInterval        time.Duration
+	GracePeriod         time.Duration // How long to keep monitoring after expiry
+	SubscribeAllSources bool          // If true, subscribe to all sources for redundancy; if false, use first successful only
 }
 
 // DefaultMonitorConfig returns default configuration
 func DefaultMonitorConfig() *MonitorConfig {
 	return &MonitorConfig{
-		PollInterval: 30 * time.Second,
-		GracePeriod:  2 * time.Hour, // Continue monitoring 2 hours after expiry
+		PollInterval:        30 * time.Second,
+		GracePeriod:         2 * time.Hour, // Continue monitoring 2 hours after expiry
+		SubscribeAllSources: false,         // Default: use first successful source only
 	}
 }
 
@@ -129,13 +138,15 @@ func NewMonitor(config *MonitorConfig) *Monitor {
 	}
 
 	return &Monitor{
-		sources:       make(map[iwallet.ChainType][]PaymentSource),
-		watching:      make(map[string]*WatchedAddress),
-		pollInterval:  config.PollInterval,
-		gracePeriod:   config.GracePeriod,
-		shutdown:      make(chan struct{}),
-		subscribers:   make([]chan iwallet.Transaction, 0),
-		nodeCallbacks: make(map[string]func(tx iwallet.Transaction, wa *WatchedAddress)),
+		sources:             make(map[iwallet.ChainType][]PaymentSource),
+		watching:            make(map[string]*WatchedAddress),
+		pollInterval:        config.PollInterval,
+		gracePeriod:         config.GracePeriod,
+		subscribeAllSources: config.SubscribeAllSources,
+		shutdown:            make(chan struct{}),
+		subscribers:         make([]chan iwallet.Transaction, 0),
+		nodeCallbacks:       make(map[string]func(tx iwallet.Transaction, wa *WatchedAddress)),
+		seenTxs:             make(map[string]time.Time),
 	}
 }
 
@@ -158,6 +169,14 @@ func (m *Monitor) Start() {
 // When shared, Stop() becomes a no-op (use ForceStop() to actually stop)
 func (m *Monitor) SetShared(shared bool) {
 	m.isShared = shared
+}
+
+// SetSubscribeAllSources enables or disables subscribing to all sources
+// When enabled, all sources are subscribed for faster detection (whichever detects first wins)
+// When disabled (default), only the first successful source is used
+func (m *Monitor) SetSubscribeAllSources(enabled bool) {
+	m.subscribeAllSources = enabled
+	log.Infof("SubscribeAllSources set to %v", enabled)
 }
 
 // Stop stops the transaction monitor
@@ -310,7 +329,7 @@ func (m *Monitor) WatchAddress(wa *WatchedAddress) error {
 	m.watching[wa.Address] = wa
 	m.watchMu.Unlock()
 
-	// Try to subscribe via all available sources
+	// Try to subscribe via available sources
 	sources := m.sources[wa.ChainType]
 	if len(sources) == 0 {
 		log.Warningf("No sources available for chain %s, using polling only", wa.ChainType)
@@ -318,6 +337,8 @@ func (m *Monitor) WatchAddress(wa *WatchedAddress) error {
 	}
 
 	ctx := context.Background()
+	subscribedCount := 0
+
 	for _, source := range sources {
 		if !source.IsHealthy() {
 			continue
@@ -331,16 +352,28 @@ func (m *Monitor) WatchAddress(wa *WatchedAddress) error {
 			continue
 		}
 
-		// Mark as subscribed
+		subscribedCount++
+		log.Infof("Subscribed to address %s via source (count: %d)", wa.Address, subscribedCount)
+
+		// If not subscribing to all sources, return after first success
+		if !m.subscribeAllSources {
+			m.watchMu.Lock()
+			wa.Subscribed = true
+			m.watchMu.Unlock()
+			return nil
+		}
+	}
+
+	// Mark as subscribed if at least one source succeeded
+	if subscribedCount > 0 {
 		m.watchMu.Lock()
 		wa.Subscribed = true
 		m.watchMu.Unlock()
-
-		log.Infof("Subscribed to address %s via source", wa.Address)
-		return nil
+		log.Infof("Address %s subscribed via %d source(s)", wa.Address, subscribedCount)
+	} else {
+		log.Warningf("All subscription attempts failed for %s, using polling only", wa.Address)
 	}
 
-	log.Warningf("All subscription attempts failed for %s, using polling", wa.Address)
 	return nil
 }
 
@@ -364,7 +397,23 @@ func (m *Monitor) UnwatchAddress(address string) error {
 		}
 	}
 
+	// Clean up seen transactions for this address to prevent memory leak
+	m.cleanupSeenTxsForAddress(address)
+
 	return nil
+}
+
+// cleanupSeenTxsForAddress removes all seen transaction entries for a given address
+func (m *Monitor) cleanupSeenTxsForAddress(address string) {
+	prefix := address + ":"
+	m.seenTxsMu.Lock()
+	defer m.seenTxsMu.Unlock()
+
+	for key := range m.seenTxs {
+		if len(key) > len(prefix) && key[:len(prefix)] == prefix {
+			delete(m.seenTxs, key)
+		}
+	}
 }
 
 func (m *Monitor) pollLoop() {
@@ -413,6 +462,11 @@ func (m *Monitor) pollAllAddresses() {
 			log.Infof("Removed watch address after grace period: %s", addr)
 		}
 		m.watchMu.Unlock()
+
+		// Also clean up seenTxs cache for these addresses
+		for _, addr := range fullyExpiredAddresses {
+			m.cleanupSeenTxsForAddress(addr)
+		}
 	}
 
 	// Poll addresses that need it
@@ -497,6 +551,19 @@ func (m *Monitor) pollAddress(wa *WatchedAddress) {
 }
 
 func (m *Monitor) handleTransaction(wa *WatchedAddress, tx *iwallet.Transaction) {
+	// Deduplication: check if we've already processed this transaction for this address
+	// This prevents duplicate notifications when multiple sources detect the same transaction
+	dedupeKey := wa.Address + ":" + string(tx.ID)
+
+	m.seenTxsMu.Lock()
+	if _, seen := m.seenTxs[dedupeKey]; seen {
+		m.seenTxsMu.Unlock()
+		log.Debugf("Skipping duplicate transaction %s for address %s", tx.ID, wa.Address)
+		return
+	}
+	m.seenTxs[dedupeKey] = time.Now()
+	m.seenTxsMu.Unlock()
+
 	// Determine payment status
 	status := m.determinePaymentStatus(wa, tx)
 

@@ -155,8 +155,8 @@ type MobazhaNode struct {
 	// goroutines can use this to terminate.
 	shutdown chan struct{}
 
-	// utxoMonitor monitors UTXO payment addresses for incoming transactions
-	utxoMonitor *utxo.Monitor
+	// monitorService provides unified UTXO monitoring operations
+	monitorService utxo.UTXOMonitorService
 
 	// Stripe 配置缓存
 	stripeConfigCache *netdb.StripeConfigCache
@@ -409,6 +409,8 @@ func (n *MobazhaNode) Stop(force bool) error {
 	if n.shutdownTorFunc != nil {
 		n.shutdownTorFunc()
 	}
+	// Stop UTXO payment monitor (unregister from shared service if applicable)
+	n.StopUTXOPaymentMonitor()
 	close(n.shutdown)
 	n.repo.Close()
 

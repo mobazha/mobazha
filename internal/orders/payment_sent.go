@@ -155,26 +155,26 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected: Order %s fully funded", order.ID)
 		}
 
-		// For CANCELABLE UTXO payments, emit event to trigger auto-confirm in core layer
+		// For CANCELABLE payments, emit event to trigger auto-confirm in core layer
 		// This decouples message processing (orders layer) from wallet operations (core layer)
+		// The core layer will determine how to handle based on chain type:
+		// - UTXO chains: direct release via multisig
+		// - EVM/Solana chains: release via platform relay API
 		if paymentSent.Method == pb.PaymentSent_CANCELABLE {
-			coinType := iwallet.CoinType(paymentSent.Coin)
-			if coinInfo, err := coinType.CoinInfo(); err == nil && coinInfo.Chain.IsUTXOChain() {
-				// Parse amount from string
-				var amount uint64
-				if tx != nil {
-					amount = uint64(tx.Value.Int64())
-				}
-				dbtx.RegisterCommitHook(func() {
-					op.bus.Emit(&events.UTXOCancelablePaymentReady{
-						OrderID:       order.ID.String(),
-						TransactionID: paymentSent.TransactionID,
-						Coin:          paymentSent.Coin,
-						Amount:        amount,
-					})
-				})
-				logger.LogInfoWithIDf(log, op.nodeID, "CANCELABLE UTXO payment ready for auto-confirm: order %s", order.ID)
+			// Parse amount from string
+			var amount uint64
+			if tx != nil {
+				amount = uint64(tx.Value.Int64())
 			}
+			dbtx.RegisterCommitHook(func() {
+				op.bus.Emit(&events.CancelablePaymentReady{
+					OrderID:       order.ID.String(),
+					TransactionID: paymentSent.TransactionID,
+					Coin:          paymentSent.Coin,
+					Amount:        amount,
+				})
+			})
+			logger.LogInfoWithIDf(log, op.nodeID, "CANCELABLE payment ready for auto-confirm: order %s (coin=%s)", order.ID, paymentSent.Coin)
 		}
 	}
 

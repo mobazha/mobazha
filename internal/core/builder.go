@@ -509,6 +509,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		shutdown:               make(chan struct{}),
 		hostService:            hs,
 		stripeConfigCache:      netdb.NewStripeConfigCache(),
+		relayAPIURL:            cfg.RelayAPIURL,
 	}
 	sharedManager.AddNode(nodeID, obNode)
 

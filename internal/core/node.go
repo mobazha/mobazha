@@ -169,6 +169,10 @@ type MobazhaNode struct {
 
 	// localListingCrypto 提供本地商品加密的核心服务（含加解密功能）
 	localListingCrypto *encryption.LocalListingCrypto
+
+	// relayAPIURL is the platform relay API URL for gas fee payment (EVM CANCELABLE payments)
+	// Note: Solana support requires additional relay service implementation
+	relayAPIURL string
 }
 
 // IsDefaultNode returns whether this node is the default node.
@@ -212,6 +216,10 @@ func (n *MobazhaNode) Start() {
 
 		// Start UTXO payment monitor for external wallet payments
 		go n.startUTXOPaymentMonitor()
+
+		// Start unified cancelable payment monitor for auto-confirmation
+		// This handles UTXO, EVM, and (future) Solana chains via event dispatch
+		n.startCancelablePaymentMonitor()
 	}
 
 	// Add log to verify connection reuse

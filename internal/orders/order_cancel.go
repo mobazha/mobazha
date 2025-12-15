@@ -110,9 +110,23 @@ func (op *OrderProcessor) releaseFromCancelableAddress(tx database.Tx, order *mo
 		return nil, "", err
 	}
 
-	toAddress, err := op.GetPayoutAddress(tx, paymentSent.Coin)
-	if err != nil {
-		return nil, "", err
+	coinType := iwallet.CoinType(paymentSent.Coin)
+	var toAddress iwallet.Address
+
+	if order.Role() == models.RoleBuyer {
+		// Buyer receiving ORDER_REJECT or ORDER_CANCEL: refund to refund address
+		if paymentSent.PayerAddress == "" {
+			return nil, "", errors.New("refund address is empty")
+		}
+		toAddress = iwallet.NewAddress(paymentSent.PayerAddress, coinType)
+		logger.LogInfoWithIDf(log, op.nodeID, "Releasing CANCELABLE funds to payer address: %s", paymentSent.PayerAddress)
+	} else {
+		// Vendor confirming order: use payout address (receiving account)
+		toAddress, err = op.GetPayoutAddress(tx, paymentSent.Coin)
+		if err != nil {
+			return nil, "", err
+		}
+		logger.LogInfoWithIDf(log, op.nodeID, "Releasing CANCELABLE funds to payout address: %s", toAddress.String())
 	}
 
 	escrowWallet, ok := wallet.(iwallet.UTXOEscrow)

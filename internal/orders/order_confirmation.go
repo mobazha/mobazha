@@ -61,10 +61,26 @@ func (op *OrderProcessor) processOrderConfirmationMessage(dbtx database.Tx, orde
 		// retry at it's next interval.
 		tx, err := wallet.GetTransaction(iwallet.TransactionID(orderConfirmation.TransactionID), iwallet.CoinType(paymentSent.Coin))
 		if err == nil && tx != nil {
-			for _, from := range tx.From {
-				if from.Address.String() == order.PaymentAddress {
-					if err := op.processOutgoingPayment(dbtx, order, *tx); err != nil {
-						return nil, err
+			coinInfo, coinErr := iwallet.CoinType(paymentSent.Coin).CoinInfo()
+			if coinErr == nil && coinInfo.IsEthTypeChain() {
+				// For EVM chains: the escrow Executed event has different address structure:
+				// - tx.From = script hash (not contract address)
+				// - tx.To = destination addresses (seller, platform fee, etc.)
+				// - Neither matches order.PaymentAddress (escrow contract)
+				// Since GetTransaction succeeded, the transaction exists and is confirmed.
+				// We can safely add it to the order without address verification.
+				if err := op.processOutgoingPayment(dbtx, order, *tx); err != nil {
+					return nil, err
+				}
+			} else {
+				// For UTXO chains: the release transaction is sent from the multisig address
+				// Check if 'from' address matches the payment address (multisig)
+				for _, from := range tx.From {
+					if from.Address.String() == order.PaymentAddress {
+						if err := op.processOutgoingPayment(dbtx, order, *tx); err != nil {
+							return nil, err
+						}
+						break
 					}
 				}
 			}

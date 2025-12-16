@@ -454,29 +454,74 @@ func (m *Messenger) downloadMessages() {
 			logger.LogInfoWithIDf(log, m.NodeID, "Error downloading messages from snf client: %s", err)
 			return
 		}
-		logger.LogInfoWithIDf(log, m.NodeID, "Downloaded %d encrypted messages from store-and-forward servers", len(encryptedMessages))
-		type messageWithPeer struct {
-			m *pb.Message
-			p peer.ID
+		if len(encryptedMessages) > 0 {
+			logger.LogInfoWithIDf(log, m.NodeID, "Downloaded %d encrypted messages from store-and-forward servers", len(encryptedMessages))
 		}
-		messages := make([]messageWithPeer, 0, len(encryptedMessages))
+
+		type messageWithPeer struct {
+			m      *pb.Message
+			p      peer.ID
+			encIDs [][]byte // Track all enc.MessageIDs for this application message
+		}
+
+		// First pass: decrypt and deduplicate by application-layer message ID
+		// This prevents processing the same logical message multiple times
+		// (sender retries create multiple encrypted copies with the same app message ID)
+		uniqueMessages := make(map[string]*messageWithPeer)
+		decryptionFailures := 0
+
 		for _, enc := range encryptedMessages {
 			p, msg, err := m.decryptMessage(enc.EncryptedMessage)
 			if err != nil {
-				logger.LogInfoWithIDf(log, m.NodeID, "Decryption failed for message %x", enc.MessageID)
+				decryptionFailures++
 				continue
 			}
-			messages = append(messages, messageWithPeer{m: msg, p: p})
+
+			// Deduplicate by application message ID
+			if existing, ok := uniqueMessages[msg.MessageID]; ok {
+				// Same application message, just track the enc.MessageID for ACK
+				existing.encIDs = append(existing.encIDs, enc.MessageID)
+			} else {
+				uniqueMessages[msg.MessageID] = &messageWithPeer{
+					m:      msg,
+					p:      p,
+					encIDs: [][]byte{enc.MessageID},
+				}
+			}
 		}
-		// Sort the messages by sequence so we process the lowest sequences
-		// first.
+
+		if decryptionFailures > 0 {
+			logger.LogDebugWithIDf(log, m.NodeID, "Decryption failed for %d messages (not for this node)", decryptionFailures)
+		}
+
+		// Convert to slice and sort by sequence
+		messages := make([]*messageWithPeer, 0, len(uniqueMessages))
+		for _, mwp := range uniqueMessages {
+			messages = append(messages, mwp)
+		}
 		sort.SliceStable(messages, func(i, j int) bool {
 			return messages[i].m.Sequence < messages[j].m.Sequence
 		})
+
+		// Log deduplication stats if significant
+		totalEncrypted := len(encryptedMessages) - decryptionFailures
+		if totalEncrypted > len(messages) && totalEncrypted > 1 {
+			logger.LogDebugWithIDf(log, m.NodeID, "Deduplicated %d encrypted messages to %d unique application messages",
+				totalEncrypted, len(messages))
+		}
+
+		processedCount := 0
+		skippedCount := 0
 		for _, mwp := range messages {
 			// Check for duplicate processing (message might have been processed via subscription)
 			if m.markMessageProcessed(mwp.m.MessageID) {
-				logger.LogDebugWithIDf(log, m.NodeID, "Skipping duplicate message %s from download", mwp.m.MessageID)
+				skippedCount++
+				// Still ACK all the encrypted copies
+				for _, encID := range mwp.encIDs {
+					if err := m.snfClient.AckMessage(context.Background(), encID); err != nil {
+						logger.LogDebugWithIDf(log, m.NodeID, "Error acking duplicate message: %s", err)
+					}
+				}
 				continue
 			}
 
@@ -486,15 +531,26 @@ func (m *Messenger) downloadMessages() {
 			if ok {
 				if err := handler(mwp.p, mwp.m); err != nil {
 					logger.LogInfoWithIDf(log, m.NodeID, "Error processing %s message from %s: %s", mwp.m.MessageType.String(), mwp.p, err)
+				} else {
+					processedCount++
 				}
 			} else {
 				logger.LogInfoWithIDf(log, m.NodeID, "No handler for decrypted message %s", mwp.m.MessageID)
 			}
-		}
-		for _, enc := range encryptedMessages {
-			if err := m.snfClient.AckMessage(context.Background(), enc.MessageID); err != nil {
-				logger.LogInfoWithIDf(log, m.NodeID, "Error acking message with snf servers: %s", err)
+
+			// ACK all encrypted copies of this message
+			for _, encID := range mwp.encIDs {
+				if err := m.snfClient.AckMessage(context.Background(), encID); err != nil {
+					logger.LogDebugWithIDf(log, m.NodeID, "Error acking message: %s", err)
+				}
 			}
+		}
+
+		if skippedCount > 0 {
+			logger.LogDebugWithIDf(log, m.NodeID, "Skipped %d already-processed messages from download", skippedCount)
+		}
+		if processedCount > 0 {
+			logger.LogInfoWithIDf(log, m.NodeID, "Successfully processed %d new messages", processedCount)
 		}
 	}
 }

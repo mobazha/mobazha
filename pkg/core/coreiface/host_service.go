@@ -1,6 +1,7 @@
 package coreiface
 
 import (
+	"github.com/mobazha/mobazha3.0/pkg/relay"
 	"github.com/mobazha/mobazha3.0/pkg/utxo"
 )
 
@@ -21,4 +22,9 @@ type HostService interface {
 	// GetUTXOMonitor 获取共享的 UTXO Monitor 服务
 	// 如果 HostService 不支持共享 Monitor，返回 nil
 	GetUTXOMonitor() utxo.UTXOMonitorService
+
+	// GetEVMRelayService 获取共享的 EVM Relay 服务
+	// 如果 HostService 不支持 Relay，返回 nil
+	// Hosting 模式下直接调用，省去 HTTP 中转
+	GetEVMRelayService() relay.EVMRelayService
 }

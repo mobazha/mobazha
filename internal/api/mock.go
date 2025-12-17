@@ -188,6 +188,9 @@ func (m *mockNode) MarkChatMessagesAsRead(peer peer.ID, orderID models.OrderID) 
 func (m *mockNode) GetChatConversations() ([]models.ChatConversation, error) {
 	return m.getChatConversationsFunc()
 }
+func (m *mockNode) GetOrderConversations() ([]models.ChatConversation, error) {
+	return []models.ChatConversation{}, nil
+}
 func (m *mockNode) GetChatMessagesByPeer(peer peer.ID, limit int, offsetID string) ([]models.ChatMessage, error) {
 	return m.getChatMessagesByPeerFunc(peer, limit, offsetID)
 }
@@ -212,6 +215,9 @@ func (m *mockNode) SaveChatGroup(chatGroup *models.ChatGroup) (string, error) {
 }
 func (m *mockNode) GetChatGroup(groupID string, orderID models.OrderID) (*models.ChatGroup, error) {
 	return m.getChatGroupFunc(groupID, orderID)
+}
+func (m *mockNode) GetChatGroups() ([]*models.ChatGroup, error) {
+	return []*models.ChatGroup{}, nil
 }
 func (m *mockNode) DeleteChatGroup(groupID string) error {
 	return m.deleteChatGroupFunc(groupID)

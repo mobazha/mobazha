@@ -164,6 +164,7 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/ob/grouptypingmessage", g.handlePOSTSendGroupTypingMessage).Methods("POST")
 		r.HandleFunc("/v1/ob/markchatasread", g.handlePOSTMarkChatMessageAsRead).Methods("POST")
 		r.HandleFunc("/v1/ob/chatconversations", g.handleGETChatConversations).Methods("GET")
+		r.HandleFunc("/v1/ob/orderconversations", g.handleGETOrderConversations).Methods("GET")
 		r.HandleFunc("/v1/ob/chatmessages/{peerID}", g.handleGETChatMessages).Methods("GET")
 		r.HandleFunc("/v1/ob/chatmessages", g.handleGETMyChatMessages).Methods("GET")
 		r.HandleFunc("/v1/ob/groupchatmessages/{orderID}", g.handleGETGroupChatMessages).Methods("GET")
@@ -172,6 +173,7 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/ob/chatconversation/{peerID}", g.handleDELETEChatConversation).Methods("DELETE")
 
 		// Chat group
+		r.HandleFunc("/v1/ob/chatgroups", g.handleGetChatGroups).Methods("GET")
 		r.HandleFunc("/v1/ob/chatGroup", g.handleSaveChatGroup).Methods("POST")
 		r.HandleFunc("/v1/ob/chatGroup", g.handleGetChatGroup).Methods("GET")
 		r.HandleFunc("/v1/ob/chatGroup", g.handleDeleteChatGroup).Methods("DELETE")

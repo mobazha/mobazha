@@ -41,6 +41,7 @@ type CoreIface interface {
 	SendGroupTypingMessage(tos []peer.ID, orderID models.OrderID) (string, error)
 	MarkChatMessagesAsRead(peer peer.ID, orderID models.OrderID) error
 	GetChatConversations() ([]models.ChatConversation, error)
+	GetOrderConversations() ([]models.ChatConversation, error)
 	GetChatMessagesByPeer(peer peer.ID, limit int, offsetID string) ([]models.ChatMessage, error)
 	GetChatMessagesByOrderID(orderID models.OrderID, limit int, offsetID string) ([]models.ChatMessage, error)
 	GetChatMessagesUnreadCountByOrderID(orderID models.OrderID) (int64, error)
@@ -51,6 +52,7 @@ type CoreIface interface {
 	// Chat group
 	SaveChatGroup(chatGroup *models.ChatGroup) (string, error)
 	GetChatGroup(groupID string, orderID models.OrderID) (*models.ChatGroup, error)
+	GetChatGroups() ([]*models.ChatGroup, error)
 	DeleteChatGroup(groupID string) error
 
 	// Notification

@@ -43,7 +43,7 @@ func (c *connection) reader() {
 				pong := []byte(`{"type":"pong"}`)
 				select {
 				case c.send <- pong:
-					log.Debugf("Sent pong response to nodeID: %s", c.h.nodeID)
+					// pong 响应成功，不需要日志
 				default:
 					log.Warningf("Failed to send pong, channel full, nodeID: %s", c.h.nodeID)
 				}

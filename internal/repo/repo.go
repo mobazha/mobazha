@@ -677,6 +677,7 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.Channel{},
 		&models.StoreCartRecord{},
 		&models.MatrixKeyBackup{},
+		&models.MatrixCredentials{},
 	}
 
 	return db.Update(func(tx database.Tx) error {

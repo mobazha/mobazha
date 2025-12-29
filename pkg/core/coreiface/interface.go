@@ -216,13 +216,19 @@ type CoreIface interface {
 	DeleteMatrixKeyBackup(deviceID string) error
 	ListMatrixKeyBackups() ([]models.MatrixKeyBackupInfo, error)
 
+	// Matrix Credentials (password derived from mnemonic, for direct Matrix login)
+	GetMatrixCredentials() (*models.MatrixCredentialsResponse, error)
+	SaveMatrixCredentials(matrixUserID, serverName string) error
+	IsMatrixRegistered() (bool, error)
+	GetDerivedMatrixPassword() (string, error)
+
 	// Misc
 	UsingTestnet() bool
 	UsingTorMode() bool
 	ExchangeRates() *wallet.ExchangeRateProvider
 	Publish(done chan<- struct{})
 	PingNode(ctx context.Context, peer peer.ID) error
-	SubscribeEvent(event interface{}) (events.Subscription, error)
+	SubscribeEvent(event any) (events.Subscription, error)
 	IsGlobalBanned(peerID peer.ID) bool
 
 	// Stripe相关方法

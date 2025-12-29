@@ -185,6 +185,11 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/matrix/key-backup/info", g.handleGETMatrixKeyBackupInfo).Methods("GET")
 		r.HandleFunc("/v1/matrix/key-backup/list", g.handleGETMatrixKeyBackupList).Methods("GET")
 
+		// Matrix Credentials (for direct password login, decentralized)
+		r.HandleFunc("/v1/matrix/credentials", g.handleGETMatrixCredentials).Methods("GET")
+		r.HandleFunc("/v1/matrix/credentials", g.handlePOSTMatrixCredentials).Methods("POST")
+		r.HandleFunc("/v1/matrix/password", g.handleGETMatrixPassword).Methods("GET")
+
 		// Notification
 		r.HandleFunc("/v1/ob/notifications", g.handleGetNotifications).Methods("GET")
 		r.HandleFunc("/v1/ob/marknotificationasread/{notifID}", g.handlePOSTMarkNotificationMessageAsRead).Methods("POST")

@@ -637,6 +637,28 @@ func (m *mockNode) ListMatrixKeyBackups() ([]models.MatrixKeyBackupInfo, error) 
 	return nil, nil
 }
 
+func (m *mockNode) GetMatrixCredentials() (*models.MatrixCredentialsResponse, error) {
+	return &models.MatrixCredentialsResponse{
+		MatrixUserID:  "@mock_user:matrix.mobazha.org",
+		Password:      "mock_password",
+		ServerName:    "matrix.mobazha.org",
+		HomeserverURL: "https://matrix.mobazha.org",
+		Registered:    true,
+	}, nil
+}
+
+func (m *mockNode) SaveMatrixCredentials(matrixUserID, serverName string) error {
+	return nil
+}
+
+func (m *mockNode) IsMatrixRegistered() (bool, error) {
+	return true, nil
+}
+
+func (m *mockNode) GetDerivedMatrixPassword() (string, error) {
+	return "mock_derived_password", nil
+}
+
 type mockNodeManager struct {
 	nodes map[string]coreiface.CoreIface
 }

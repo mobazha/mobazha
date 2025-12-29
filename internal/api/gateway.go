@@ -178,6 +178,13 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/ob/chatGroup", g.handleGetChatGroup).Methods("GET")
 		r.HandleFunc("/v1/ob/chatGroup", g.handleDeleteChatGroup).Methods("DELETE")
 
+		// Matrix E2EE Key Backup (stored locally, encrypted with wallet mnemonic)
+		r.HandleFunc("/v1/matrix/key-backup", g.handlePOSTMatrixKeyBackup).Methods("POST")
+		r.HandleFunc("/v1/matrix/key-backup", g.handleGETMatrixKeyBackup).Methods("GET")
+		r.HandleFunc("/v1/matrix/key-backup", g.handleDELETEMatrixKeyBackup).Methods("DELETE")
+		r.HandleFunc("/v1/matrix/key-backup/info", g.handleGETMatrixKeyBackupInfo).Methods("GET")
+		r.HandleFunc("/v1/matrix/key-backup/list", g.handleGETMatrixKeyBackupList).Methods("GET")
+
 		// Notification
 		r.HandleFunc("/v1/ob/notifications", g.handleGetNotifications).Methods("GET")
 		r.HandleFunc("/v1/ob/marknotificationasread/{notifID}", g.handlePOSTMarkNotificationMessageAsRead).Methods("POST")

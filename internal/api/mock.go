@@ -616,6 +616,27 @@ func (m *mockNode) UpdateOrderPaymentStatus(orderID models.OrderID, paymentInten
 	return m.updateOrderPaymentStatusFunc(orderID, paymentIntentID, status)
 }
 
+// Matrix E2EE Key Backup mock implementations
+func (m *mockNode) SaveMatrixKeyBackup(deviceID string, keysJSON string) error {
+	return nil
+}
+
+func (m *mockNode) GetMatrixKeyBackup(deviceID string) (*models.MatrixKeyBackupResponse, error) {
+	return nil, nil
+}
+
+func (m *mockNode) GetMatrixKeyBackupInfo(deviceID string) (*models.MatrixKeyBackupInfo, error) {
+	return nil, nil
+}
+
+func (m *mockNode) DeleteMatrixKeyBackup(deviceID string) error {
+	return nil
+}
+
+func (m *mockNode) ListMatrixKeyBackups() ([]models.MatrixKeyBackupInfo, error) {
+	return nil, nil
+}
+
 type mockNodeManager struct {
 	nodes map[string]coreiface.CoreIface
 }

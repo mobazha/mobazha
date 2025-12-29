@@ -209,6 +209,13 @@ type CoreIface interface {
 	RequestAddress(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error)
 	GetMnemonic() (string, error)
 
+	// Matrix E2EE Key Backup (stored locally, encrypted with wallet mnemonic)
+	SaveMatrixKeyBackup(deviceID string, keysJSON string) error
+	GetMatrixKeyBackup(deviceID string) (*models.MatrixKeyBackupResponse, error)
+	GetMatrixKeyBackupInfo(deviceID string) (*models.MatrixKeyBackupInfo, error)
+	DeleteMatrixKeyBackup(deviceID string) error
+	ListMatrixKeyBackups() ([]models.MatrixKeyBackupInfo, error)
+
 	// Misc
 	UsingTestnet() bool
 	UsingTorMode() bool

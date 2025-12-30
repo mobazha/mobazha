@@ -678,6 +678,7 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.StoreCartRecord{},
 		&models.MatrixKeyBackup{},
 		&models.MatrixCredentials{},
+		&models.MatrixSecretsBundle{},
 	}
 
 	return db.Update(func(tx database.Tx) error {

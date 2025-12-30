@@ -209,14 +209,20 @@ type CoreIface interface {
 	RequestAddress(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error)
 	GetMnemonic() (string, error)
 
-	// Matrix E2EE Key Backup (stored locally, encrypted with wallet mnemonic)
+	// Matrix E2EE Key Backup (stored locally, encrypted with node private key)
 	SaveMatrixKeyBackup(deviceID string, keysJSON string) error
 	GetMatrixKeyBackup(deviceID string) (*models.MatrixKeyBackupResponse, error)
 	GetMatrixKeyBackupInfo(deviceID string) (*models.MatrixKeyBackupInfo, error)
 	DeleteMatrixKeyBackup(deviceID string) error
 	ListMatrixKeyBackups() ([]models.MatrixKeyBackupInfo, error)
 
-	// Matrix Credentials (password derived from mnemonic, for direct Matrix login)
+	// Matrix Secrets Bundle (cross-signing keys, encrypted with node private key)
+	SaveMatrixSecretsBundle(deviceID string, secretsJSON string) error
+	GetMatrixSecretsBundle() (*models.MatrixSecretsBundleResponse, error)
+	GetMatrixSecretsBundleInfo() (*models.MatrixSecretsBundleInfo, error)
+	DeleteMatrixSecretsBundle() error
+
+	// Matrix Credentials (password derived from node private key, for direct Matrix login)
 	GetMatrixCredentials() (*models.MatrixCredentialsResponse, error)
 	SaveMatrixCredentials(matrixUserID, serverName string) error
 	IsMatrixRegistered() (bool, error)

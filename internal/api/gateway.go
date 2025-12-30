@@ -190,6 +190,12 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/matrix/credentials", g.handlePOSTMatrixCredentials).Methods("POST")
 		r.HandleFunc("/v1/matrix/password", g.handleGETMatrixPassword).Methods("GET")
 
+		// Matrix Secrets Bundle (cross-signing keys, encrypted with node private key)
+		r.HandleFunc("/v1/matrix/secrets-bundle", g.handlePOSTMatrixSecretsBundle).Methods("POST")
+		r.HandleFunc("/v1/matrix/secrets-bundle", g.handleGETMatrixSecretsBundle).Methods("GET")
+		r.HandleFunc("/v1/matrix/secrets-bundle", g.handleDELETEMatrixSecretsBundle).Methods("DELETE")
+		r.HandleFunc("/v1/matrix/secrets-bundle/info", g.handleGETMatrixSecretsBundleInfo).Methods("GET")
+
 		// Notification
 		r.HandleFunc("/v1/ob/notifications", g.handleGetNotifications).Methods("GET")
 		r.HandleFunc("/v1/ob/marknotificationasread/{notifID}", g.handlePOSTMarkNotificationMessageAsRead).Methods("POST")

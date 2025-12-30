@@ -659,6 +659,23 @@ func (m *mockNode) GetDerivedMatrixPassword() (string, error) {
 	return "mock_derived_password", nil
 }
 
+// Matrix Secrets Bundle mock implementations
+func (m *mockNode) SaveMatrixSecretsBundle(deviceID string, secretsJSON string) error {
+	return nil
+}
+
+func (m *mockNode) GetMatrixSecretsBundle() (*models.MatrixSecretsBundleResponse, error) {
+	return nil, nil
+}
+
+func (m *mockNode) GetMatrixSecretsBundleInfo() (*models.MatrixSecretsBundleInfo, error) {
+	return &models.MatrixSecretsBundleInfo{Exists: false}, nil
+}
+
+func (m *mockNode) DeleteMatrixSecretsBundle() error {
+	return nil
+}
+
 type mockNodeManager struct {
 	nodes map[string]coreiface.CoreIface
 }

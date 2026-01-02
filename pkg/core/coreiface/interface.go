@@ -59,7 +59,10 @@ type CoreIface interface {
 	GetNotifications(offsetID string, limit int, typeFilters []string) ([]models.NotificationRecord, int64, error)
 	MarkNotificationAsRead(notifID string) error
 	MarkAllNotificationsAsRead() error
+	BatchMarkNotificationsAsRead(ids []string) error
+	BatchDeleteNotifications(ids []string) error
 	GetNotificationsUnreadCount() (int, error)
+	GetNotificationsTotalCount() (int64, error)
 
 	// Orders
 	PurchaseListing(ctx context.Context, purchase *models.Purchase) (orderID models.OrderID, paymentAmount models.CurrencyValue, err error)

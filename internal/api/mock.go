@@ -232,6 +232,15 @@ func (m *mockNode) MarkNotificationAsRead(notifID string) error {
 func (m *mockNode) MarkAllNotificationsAsRead() error {
 	return m.markAllNotificationsAsReadFunc()
 }
+func (m *mockNode) BatchMarkNotificationsAsRead(ids []string) error {
+	return nil
+}
+func (m *mockNode) BatchDeleteNotifications(ids []string) error {
+	return nil
+}
+func (m *mockNode) GetNotificationsTotalCount() (int64, error) {
+	return 0, nil
+}
 func (m *mockNode) GetNotificationsUnreadCount() (int, error) {
 	return m.getNotificationsUnreadCountFunc()
 }

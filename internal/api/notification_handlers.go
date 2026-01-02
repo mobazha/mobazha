@@ -96,3 +96,76 @@ func (g *Gateway) handlePOSTMarkNotificationsMessageAsRead(w http.ResponseWriter
 	}
 	sanitizedJSONResponse(w, struct{}{})
 }
+
+// handleGetNotificationCount 获取通知未读数量（轻量级 API，用于轮询）
+func (g *Gateway) handleGetNotificationCount(w http.ResponseWriter, r *http.Request) {
+	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+
+	unread, err := node.GetNotificationsUnreadCount()
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// 使用专门的 count 方法，不加载通知数据
+	total, err := node.GetNotificationsTotalCount()
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	type countResponse struct {
+		Unread int   `json:"unread"`
+		Total  int64 `json:"total"`
+	}
+
+	sanitizedJSONResponse(w, countResponse{
+		Unread: unread,
+		Total:  total,
+	})
+}
+
+// handleBatchNotifications 批量操作通知
+func (g *Gateway) handleBatchNotifications(w http.ResponseWriter, r *http.Request) {
+	type batchRequest struct {
+		Action string   `json:"action"` // "markAsRead" or "delete"
+		IDs    []string `json:"ids"`
+	}
+
+	var req batchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		ErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		ErrorResponse(w, http.StatusBadRequest, "ids is required")
+		return
+	}
+
+	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+
+	var err error
+	switch req.Action {
+	case "markAsRead":
+		err = node.BatchMarkNotificationsAsRead(req.IDs)
+	case "delete":
+		err = node.BatchDeleteNotifications(req.IDs)
+	default:
+		ErrorResponse(w, http.StatusBadRequest, "invalid action, must be 'markAsRead' or 'delete'")
+		return
+	}
+
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	sanitizedJSONResponse(w, struct {
+		Success bool `json:"success"`
+		Count   int  `json:"count"`
+	}{
+		Success: true,
+		Count:   len(req.IDs),
+	})
+}

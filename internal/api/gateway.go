@@ -198,6 +198,8 @@ func (g *Gateway) newV1Router() *mux.Router {
 
 		// Notification
 		r.HandleFunc("/v1/ob/notifications", g.handleGetNotifications).Methods("GET")
+		r.HandleFunc("/v1/ob/notifications/count", g.handleGetNotificationCount).Methods("GET")
+		r.HandleFunc("/v1/ob/notifications/batch", g.handleBatchNotifications).Methods("POST")
 		r.HandleFunc("/v1/ob/marknotificationasread/{notifID}", g.handlePOSTMarkNotificationMessageAsRead).Methods("POST")
 		r.HandleFunc("/v1/ob/marknotificationsasread", g.handlePOSTMarkNotificationsMessageAsRead).Methods("POST")
 

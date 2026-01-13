@@ -72,7 +72,9 @@ message Listing {
         string maxQuantity                          = 23;
         string blockchain                           = 24; // RWA Token 区块链 (ethereum, sepolia, bsc, solana等)
         string tokenAddress                         = 25; // RWA Token 合约地址
-        string tokenStandard                        = 26; // Token 标准 (RWA, ERC20, ERC721, SPL等)
+        string tokenStandard                        = 26; // Token 标准 (RWA, ERC20, ERC721, ERC1155, ERC3525, SPL等)
+        string tokenId                              = 27; // Token ID (ERC721/ERC1155/ERC3525 必填)
+        string slotId                               = 28; // Slot ID (ERC3525 专用，表示资产类别/剧目)
 
         message Option {
             string name                = 1;

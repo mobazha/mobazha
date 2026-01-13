@@ -1103,6 +1103,13 @@ func (o *Order) IsFunded() (bool, error) {
 		return false, err
 	}
 
+	// RWA 原子交换模式: 只要有 PAYMENT_SENT 消息且有交易ID/授权哈希就认为已 "funded"
+	// 因为原子交换模式下，资金不需要预先锁定到托管地址，而是买家预授权
+	if paymentSent.Method == pb.PaymentSent_RWA_ATOMIC_SWAP {
+		// 检查是否有交易ID或授权哈希
+		return paymentSent.TransactionID != "" || paymentSent.ApprovalTxHash != "", nil
+	}
+
 	var (
 		requestedAmount = iwallet.NewAmount(paymentSent.Amount)
 		paymentAddress  = paymentSent.ToAddress

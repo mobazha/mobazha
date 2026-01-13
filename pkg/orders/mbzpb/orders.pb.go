@@ -7,12 +7,13 @@
 package mbzpb
 
 import (
-	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	reflect "reflect"
+	sync "sync"
+
+	"github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
-	reflect "reflect"
-	sync "sync"
 )
 
 const (
@@ -1838,8 +1839,8 @@ type Contract struct {
 	RefundsAcked               bool                    `protobuf:"varint,27,opt,name=refundsAcked,proto3" json:"refundsAcked,omitempty"`
 	PaymentSent                *PaymentSent            `protobuf:"bytes,28,opt,name=paymentSent,proto3" json:"paymentSent,omitempty"`
 	PaymentSentAcked           bool                    `protobuf:"varint,29,opt,name=paymentSentAcked,proto3" json:"paymentSentAcked,omitempty"`
-	ParkedMessages             *pb.OrderList           `protobuf:"bytes,30,opt,name=parkedMessages,proto3" json:"parkedMessages,omitempty"`
-	ErroredMessages            *pb.OrderList           `protobuf:"bytes,31,opt,name=erroredMessages,proto3" json:"erroredMessages,omitempty"`
+	ParkedMessages             *mbzpb.OrderList        `protobuf:"bytes,30,opt,name=parkedMessages,proto3" json:"parkedMessages,omitempty"`
+	ErroredMessages            *mbzpb.OrderList        `protobuf:"bytes,31,opt,name=erroredMessages,proto3" json:"erroredMessages,omitempty"`
 	Transactions               []*Contract_Transaction `protobuf:"bytes,32,rep,name=transactions,proto3" json:"transactions,omitempty"`
 }
 
@@ -2078,14 +2079,14 @@ func (x *Contract) GetPaymentSentAcked() bool {
 	return false
 }
 
-func (x *Contract) GetParkedMessages() *pb.OrderList {
+func (x *Contract) GetParkedMessages() *mbzpb.OrderList {
 	if x != nil {
 		return x.ParkedMessages
 	}
 	return nil
 }
 
-func (x *Contract) GetErroredMessages() *pb.OrderList {
+func (x *Contract) GetErroredMessages() *mbzpb.OrderList {
 	if x != nil {
 		return x.ErroredMessages
 	}
@@ -3792,7 +3793,7 @@ var file_orders_proto_goTypes = []any{
 	(*SignedListing)(nil),                                         // 39: mbzpb.SignedListing
 	(*ID)(nil),                                                    // 40: mbzpb.ID
 	(*timestamppb.Timestamp)(nil),                                 // 41: google.protobuf.Timestamp
-	(*pb.OrderList)(nil),                                          // 42: mbzpb.OrderList
+	(*mbzpb.OrderList)(nil),                                       // 42: mbzpb.OrderList
 	(CountryCode)(0),                                              // 43: mbzpb.CountryCode
 }
 var file_orders_proto_depIdxs = []int32{
@@ -3846,8 +3847,8 @@ var file_orders_proto_depIdxs = []int32{
 	9,  // 47: mbzpb.Contract.orderFulfillments:type_name -> mbzpb.OrderFulfillment
 	17, // 48: mbzpb.Contract.refunds:type_name -> mbzpb.Refund
 	18, // 49: mbzpb.Contract.paymentSent:type_name -> mbzpb.PaymentSent
-	42, // 50: mbzpb.Contract.parkedMessages:type_name -> mbzpb.pb.OrderList
-	42, // 51: mbzpb.Contract.erroredMessages:type_name -> mbzpb.pb.OrderList
+	42, // 50: mbzpb.Contract.parkedMessages:type_name -> mbzpb.OrderList
+	42, // 51: mbzpb.Contract.erroredMessages:type_name -> mbzpb.OrderList
 	38, // 52: mbzpb.Contract.transactions:type_name -> mbzpb.Contract.Transaction
 	24, // 53: mbzpb.Case.buyerContract:type_name -> mbzpb.Contract
 	24, // 54: mbzpb.Case.vendorContract:type_name -> mbzpb.Contract
@@ -3879,7 +3880,6 @@ func file_orders_proto_init() {
 	file_countrycodes_proto_init()
 	file_listing_proto_init()
 	file_common_proto_init()
-
 	if !protoimpl.UnsafeEnabled {
 		file_orders_proto_msgTypes[0].Exporter = func(v any, i int) any {
 			switch v := v.(*OrderOpen); i {

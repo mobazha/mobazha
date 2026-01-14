@@ -98,6 +98,7 @@ message OrderMessage {
         REFUND             = 11;
         PAYMENT_SENT       = 12;
         PAYMENT_FINALIZED  = 13;
+        PAYMENT_AUTHORIZED = 14;  // RWA 原子交换预授权
     }
 }
 

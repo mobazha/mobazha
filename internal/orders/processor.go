@@ -216,6 +216,8 @@ func (op *OrderProcessor) ProcessACK(tx database.Tx, om *models.OutgoingMessage)
 		key = "rating_signatures_acked"
 	case npb.OrderMessage_PAYMENT_FINALIZED:
 		key = "payment_finalized_acked"
+	case npb.OrderMessage_PAYMENT_AUTHORIZED:
+		key = "payment_authorized_acked"
 	default:
 		return fmt.Errorf("unknown order message type")
 	}
@@ -255,6 +257,8 @@ func (op *OrderProcessor) processMessage(dbtx database.Tx, order *models.Order, 
 		event, err = op.processDisputeAcceptMessage(dbtx, order, message)
 	case npb.OrderMessage_PAYMENT_FINALIZED:
 		event, err = op.processPaymentFinalizeMessage(dbtx, order, message)
+	case npb.OrderMessage_PAYMENT_AUTHORIZED:
+		event, err = op.processPaymentAuthorizedMessage(dbtx, order, message)
 	default:
 		return nil, errors.New("unknown order message type")
 	}

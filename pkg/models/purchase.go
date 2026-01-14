@@ -141,6 +141,9 @@ type PaymentData struct {
 
 	BuyerReceiveAddress string `json:"buyerReceiveAddress,omitempty"` // 买家接收 Token 的地址（支持多链地址格式）
 
+	// RWA 原子交换相关
+	ApprovalTxHash string `json:"approvalTxHash,omitempty"` // 买家 approve 交易哈希（RWA 原子交换模式）
+
 	// 币种切换检测相关字段
 	HasPartialPayment bool   `json:"hasPartialPayment,omitempty"` // 是否已有部分支付（用于币种切换时提示）
 	PaidAmount        uint64 `json:"paidAmount,omitempty"`        // 已支付金额

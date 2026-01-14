@@ -231,14 +231,11 @@ message PaymentSent {
     google.protobuf.Timestamp timestamp = 19;
     string paymentTokenAddress          = 20; // 支付代币合约地址（通用，适用于所有 Token 支付，ETH为零地址）
     string buyerReceiveAddress          = 21; // 买家接收 Token 的地址（支持多链地址格式，多商品共用）
-    string approvalTxHash               = 22; // RWA 原子交换: 买家 approve 交易哈希
-    string universalSwapOrderId         = 23; // RWA 原子交换: UniversalSwap 合约订单ID
 
     enum Method {
         DIRECT          = 0; // Address request
         CANCELABLE      = 1; // 1 of 2 cancelable address
         MODERATED       = 2; // 2 of 3 escrow address
-        RWA_ATOMIC_SWAP = 3; // RWA 原子交换预授权模式
     }
 
     message PaymentMethod {
@@ -250,6 +247,19 @@ message PaymentSent {
 
 message PaymentFinalized {
     google.protobuf.Timestamp timestamp = 1;
+}
+
+// RWA 原子交换预授权消息
+// 买家完成 approve 后发送给卖家，表示已授权支付代币
+message PaymentAuthorized {
+    string approvalTxHash       = 1;  // 买家 approve 交易哈希
+    string chaincode            = 2;  // Hex encoded，与 OrderOpen 一致
+    string coin                 = 3;  // 支付币种 (如 ETHUSDT)
+    string amount               = 4;  // 授权金额
+    string paymentTokenAddress  = 5;  // 支付代币合约地址
+    string buyerReceiveAddress  = 6;  // 买家接收 RWA Token 的地址
+    string universalSwapAddress = 7;  // UniversalSwap 合约地址
+    google.protobuf.Timestamp timestamp = 8;
 }
 
 message EscrowRelease {

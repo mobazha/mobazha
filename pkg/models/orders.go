@@ -832,8 +832,9 @@ func (o *Order) CanConfirm() bool {
 		return false
 	}
 
-	// PaymentSent must exist.
-	if o.SerializedPaymentSent == nil {
+	// PaymentSent or PaymentAuthorized must exist.
+	// For RWA atomic swap orders, buyer sends PaymentAuthorized instead of PaymentSent.
+	if o.SerializedPaymentSent == nil && o.SerializedPaymentAuthorized == nil {
 		return false
 	}
 

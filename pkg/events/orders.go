@@ -55,6 +55,7 @@ type PaymentSentReceived struct {
 // PaymentAuthorizedReceived is emitted when the vendor receives a PaymentAuthorized message
 // for RWA atomic swap orders. The buyer has approved the payment token for swap.
 type PaymentAuthorizedReceived struct {
+	Notification
 	OrderID        string    `json:"orderID"`
 	BuyerHandle    string    `json:"buyerHandle"`
 	Thumbnail      Thumbnail `json:"thumbnail"`

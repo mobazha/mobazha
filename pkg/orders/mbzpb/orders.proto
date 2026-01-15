@@ -249,17 +249,18 @@ message PaymentFinalized {
     google.protobuf.Timestamp timestamp = 1;
 }
 
-// RWA 原子交换预授权消息
-// 买家完成 approve 后发送给卖家，表示已授权支付代币
-message PaymentAuthorized {
-    string approvalTxHash       = 1;  // 买家 approve 交易哈希
-    string chaincode            = 2;  // Hex encoded，与 OrderOpen 一致
-    string coin                 = 3;  // 支付币种 (如 ETHUSDT)
-    string amount               = 4;  // 授权金额
-    string paymentTokenAddress  = 5;  // 支付代币合约地址
-    string buyerReceiveAddress  = 6;  // 买家接收 RWA Token 的地址
-    string universalSwapAddress = 7;  // UniversalSwap 合约地址
-    google.protobuf.Timestamp timestamp = 8;
+// RWA 资金锁定消息（确认交易模式）
+// 买家付款后资金锁定在合约中，等待卖家确认
+message PaymentLocked {
+    string transactionHash              = 1;  // 锁定交易哈希
+    string amount                       = 2;  // 锁定金额
+    string coin                         = 3;  // 支付币种
+    string paymentTokenAddress          = 4;  // 支付代币合约地址
+    uint64 lockedAt                     = 5;  // 锁定时间戳（Unix秒）
+    uint64 expiresAt                    = 6;  // 过期时间戳（Unix秒）
+    string buyerReceiveAddress          = 7;  // 买家接收 RWA Token 的地址
+    string universalSwapAddress         = 8;  // UniversalSwap 合约地址
+    google.protobuf.Timestamp timestamp = 9;
 }
 
 message EscrowRelease {
@@ -341,9 +342,9 @@ message Contract {
     PaymentSent paymentSent = 28;
     bool paymentSentAcked       = 29;
 
-    // RWA 原子交换预授权消息
-    PaymentAuthorized paymentAuthorized = 33;
-    bool paymentAuthorizedAcked         = 34;
+    // RWA 资金锁定（确认交易模式）
+    PaymentLocked paymentLocked = 33;
+    bool paymentLockedAcked     = 34;
 
     OrderList parkedMessages  = 30;
     OrderList erroredMessages = 31;

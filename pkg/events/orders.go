@@ -52,19 +52,41 @@ type PaymentSentReceived struct {
 	Txid    string `json:"transactionID"`
 }
 
-// PaymentAuthorizedReceived is emitted when the vendor receives a PaymentAuthorized message
-// for RWA atomic swap orders. The buyer has approved the payment token for swap.
-type PaymentAuthorizedReceived struct {
+// PaymentLockedReceived is emitted when the vendor receives a PaymentLocked message
+// for RWA confirm-required orders. The buyer has locked payment in the escrow contract.
+type PaymentLockedReceived struct {
 	Notification
-	OrderID        string    `json:"orderID"`
-	BuyerHandle    string    `json:"buyerHandle"`
-	BuyerID        string    `json:"buyerID"`
-	Slug           string    `json:"slug"`
-	Thumbnail      Thumbnail `json:"thumbnail"`
-	Title          string    `json:"title"`
-	ApprovalTxHash string    `json:"approvalTxHash"`
-	Coin           string    `json:"coin"`
-	Amount         string    `json:"amount"`
+	OrderID         string    `json:"orderID"`
+	BuyerHandle     string    `json:"buyerHandle"`
+	BuyerID         string    `json:"buyerID"`
+	Slug            string    `json:"slug"`
+	Thumbnail       Thumbnail `json:"thumbnail"`
+	Title           string    `json:"title"`
+	TransactionHash string    `json:"transactionHash"`
+	Coin            string    `json:"coin"`
+	Amount          string    `json:"amount"`
+	ExpiresAt       uint64    `json:"expiresAt"`
+}
+
+// PaymentExpiredNotification is emitted when an escrow payment expires
+// and funds are returned to the buyer
+type PaymentExpiredNotification struct {
+	Notification
+	OrderID   string    `json:"orderID"`
+	Thumbnail Thumbnail `json:"thumbnail"`
+	Amount    string    `json:"amount"`
+	Coin      string    `json:"coin"`
+}
+
+// PaymentCancelledByBuyer is emitted when buyer cancels an escrow payment
+type PaymentCancelledByBuyer struct {
+	Notification
+	OrderID     string    `json:"orderID"`
+	Thumbnail   Thumbnail `json:"thumbnail"`
+	BuyerHandle string    `json:"buyerHandle"`
+	BuyerID     string    `json:"buyerID"`
+	Amount      string    `json:"amount"`
+	Coin        string    `json:"coin"`
 }
 
 type RatingSignaturesReceived struct {

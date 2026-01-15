@@ -114,10 +114,6 @@ type Order struct {
 	PaymentSentAcked      bool
 	PaymentSentSignature  string
 
-	SerializedPaymentAuthorized []byte // RWA 原子交换预授权消息
-	PaymentAuthorizedAcked      bool
-	PaymentAuthorizedSignature  string
-
 	SerializedOrderReject []byte
 	OrderRejectSignature  string
 	OrderRejectAcked      bool
@@ -563,19 +559,6 @@ func (o *Order) PaymentFinalizedMessage() (*pb.PaymentFinalized, error) {
 	return paymentFinalized, nil
 }
 
-// PaymentAuthorizedMessage returns the unmarshalled proto object if it exists in the order.
-// This is used for RWA atomic swap orders where buyer pre-authorizes payment tokens.
-func (o *Order) PaymentAuthorizedMessage() (*pb.PaymentAuthorized, error) {
-	if len(o.SerializedPaymentAuthorized) == 0 {
-		return nil, ErrMessageDoesNotExist
-	}
-	paymentAuthorized := new(pb.PaymentAuthorized)
-	if err := unmarshaler.Unmarshal(o.SerializedPaymentAuthorized, paymentAuthorized); err != nil {
-		return nil, err
-	}
-	return paymentAuthorized, nil
-}
-
 // PutMessage serializes the message and saves it in the object at
 // the correct location.
 func (o *Order) PutMessage(message *npb.OrderMessage) error {
@@ -697,10 +680,6 @@ func (o *Order) PutMessage(message *npb.OrderMessage) error {
 		msg = new(pb.PaymentFinalized)
 		setMessage = func(ser []byte) { o.SerializedPaymentFinalized = ser }
 		o.PaymentFinalizedSignature = sig
-	case npb.OrderMessage_PAYMENT_AUTHORIZED:
-		msg = new(pb.PaymentAuthorized)
-		setMessage = func(ser []byte) { o.SerializedPaymentAuthorized = ser }
-		o.PaymentAuthorizedSignature = sig
 	}
 
 	if err := message.Message.UnmarshalTo(msg); err != nil {
@@ -832,9 +811,8 @@ func (o *Order) CanConfirm() bool {
 		return false
 	}
 
-	// PaymentSent or PaymentAuthorized must exist.
-	// For RWA atomic swap orders, buyer sends PaymentAuthorized instead of PaymentSent.
-	if o.SerializedPaymentSent == nil && o.SerializedPaymentAuthorized == nil {
+	// PaymentSent must exist.
+	if o.SerializedPaymentSent == nil {
 		return false
 	}
 
@@ -1116,18 +1094,6 @@ func (o *Order) IsDisputeAccepted() bool {
 
 // IsFunded returns whether this order is fully funded or not.
 func (o *Order) IsFunded() (bool, error) {
-	// RWA 原子交换模式: 检查 PaymentAuthorized 消息
-	// 买家已授权支付代币转移，合约层面会验证授权有效性
-	if o.SerializedPaymentAuthorized != nil {
-		paymentAuth, err := o.PaymentAuthorizedMessage()
-		if err != nil {
-			return false, err
-		}
-		// 只要有有效的授权交易哈希就认为已 "funded"
-		return paymentAuth.ApprovalTxHash != "", nil
-	}
-
-	// 传统支付模式: 检查 PaymentSent 消息
 	if o.SerializedPaymentSent == nil {
 		return false, nil
 	}
@@ -1294,11 +1260,6 @@ func (o *Order) toProtobuf() (*pb.Contract, error) {
 	if err != nil && !errors.Is(err, ErrMessageDoesNotExist) {
 		return nil, err
 	}
-	contract.PaymentAuthorized, err = o.PaymentAuthorizedMessage()
-	if err != nil && !errors.Is(err, ErrMessageDoesNotExist) {
-		return nil, err
-	}
-	contract.PaymentAuthorizedAcked = o.PaymentAuthorizedAcked
 
 	contract.ParkedMessages, err = o.GetParkedMessages()
 	if err != nil && !errors.Is(err, ErrMessageDoesNotExist) {

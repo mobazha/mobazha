@@ -30,6 +30,8 @@ message Listing {
         string language                    = 6;
         uint32 escrowTimeoutHours          = 7;
         Currency pricingCurrency           = 9;
+        RwaTradeMode rwaTradeMode          = 10; // RWA 交易模式
+        uint64 rwaEscrowTimeoutSeconds     = 11; // RWA 托管超时时间（秒），默认86400（24小时）
 
         enum ContractType {
             PHYSICAL_GOOD  = 0;
@@ -43,6 +45,11 @@ message Listing {
         enum Format {
             FIXED_PRICE  = 0;
             MARKET_PRICE = 1;
+        }
+
+        enum RwaTradeMode {
+            RWA_TRADE_MODE_INSTANT          = 0; // 即时交易（默认）
+            RWA_TRADE_MODE_CONFIRM_REQUIRED = 1; // 需要确认
         }
     }
 

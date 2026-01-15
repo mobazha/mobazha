@@ -27,13 +27,20 @@ android_framework: ## Build Android Framework for mobile
 ##
 
 protos:
-	cd pkg/net/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ *.proto
+	# 生成 net/mbzpb 消息定义
+	cd pkg/net/mbzpb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ *.proto
+	# 生成 orders/mbzpb 订单定义
 	cd pkg/orders/mbzpb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ --proto_path=../../net/mbzpb --proto_path=./ *.proto
-	cd pkg/orders/mbzpb && sed -i 's/OrderList/pb.OrderList/' orders.pb.go
-	cd pkg/orders/mbzpb && sed -i '11i\"github.com/mobazha/mobazha3.0/pkg/net/mbzpb"\' orders.pb.go
-	cd pkg/orders/mbzpb && sed -i 's/file_msg_proto_init()//' orders.pb.go
+	# 修复 OrderList 引用 (OrderList 定义在 net/mbzpb 中)
+	cd pkg/orders/mbzpb && sed -i '' 's/\*OrderList/\*mbzpb.OrderList/g' orders.pb.go
+	# 添加导入 (在 sync 导入后添加)
+	cd pkg/orders/mbzpb && sed -i '' 's|sync "sync"|sync "sync"\n\n\t"github.com/mobazha/mobazha3.0/pkg/net/mbzpb"|' orders.pb.go
+	# 移除无效的 file_msg_proto_init 调用
+	cd pkg/orders/mbzpb && sed -i '' 's/file_msg_proto_init()//' orders.pb.go
+	# 格式化代码
 	cd pkg/orders/mbzpb && gofmt -s -w orders.pb.go
-	cd pkg/channels/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ *.proto
+	# 生成 channels/pb
+	cd internal/channels/pb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ *.proto
 
 ##
 ## Sample config file

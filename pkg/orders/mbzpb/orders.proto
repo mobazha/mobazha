@@ -341,6 +341,10 @@ message Contract {
     PaymentSent paymentSent = 28;
     bool paymentSentAcked       = 29;
 
+    // RWA 原子交换预授权消息
+    PaymentAuthorized paymentAuthorized = 33;
+    bool paymentAuthorizedAcked         = 34;
+
     OrderList parkedMessages  = 30;
     OrderList erroredMessages = 31;
 

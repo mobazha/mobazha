@@ -1294,6 +1294,11 @@ func (o *Order) toProtobuf() (*pb.Contract, error) {
 	if err != nil && !errors.Is(err, ErrMessageDoesNotExist) {
 		return nil, err
 	}
+	contract.PaymentAuthorized, err = o.PaymentAuthorizedMessage()
+	if err != nil && !errors.Is(err, ErrMessageDoesNotExist) {
+		return nil, err
+	}
+	contract.PaymentAuthorizedAcked = o.PaymentAuthorizedAcked
 
 	contract.ParkedMessages, err = o.GetParkedMessages()
 	if err != nil && !errors.Is(err, ErrMessageDoesNotExist) {

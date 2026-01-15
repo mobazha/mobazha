@@ -1896,38 +1896,41 @@ type Contract struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	OrderID                    string                  `protobuf:"bytes,1,opt,name=OrderID,proto3" json:"OrderID,omitempty"`
-	Role                       string                  `protobuf:"bytes,2,opt,name=Role,proto3" json:"Role,omitempty"`
-	OrderOpen                  *OrderOpen              `protobuf:"bytes,3,opt,name=orderOpen,proto3" json:"orderOpen,omitempty"`
-	OrderOpenAcked             bool                    `protobuf:"varint,4,opt,name=orderOpenAcked,proto3" json:"orderOpenAcked,omitempty"`
-	OrderReject                *OrderReject            `protobuf:"bytes,5,opt,name=orderReject,proto3" json:"orderReject,omitempty"`
-	OrderRejectAcked           bool                    `protobuf:"varint,6,opt,name=orderRejectAcked,proto3" json:"orderRejectAcked,omitempty"`
-	OrderCancel                *OrderCancel            `protobuf:"bytes,7,opt,name=orderCancel,proto3" json:"orderCancel,omitempty"`
-	OrderCancelAcked           bool                    `protobuf:"varint,8,opt,name=orderCancelAcked,proto3" json:"orderCancelAcked,omitempty"`
-	OrderConfirmation          *OrderConfirmation      `protobuf:"bytes,9,opt,name=orderConfirmation,proto3" json:"orderConfirmation,omitempty"`
-	OrderConfirmationAcked     bool                    `protobuf:"varint,10,opt,name=orderConfirmationAcked,proto3" json:"orderConfirmationAcked,omitempty"`
-	OrderComplete              *OrderComplete          `protobuf:"bytes,11,opt,name=orderComplete,proto3" json:"orderComplete,omitempty"`
-	OrderCompleteAcked         bool                    `protobuf:"varint,12,opt,name=orderCompleteAcked,proto3" json:"orderCompleteAcked,omitempty"`
-	DisputeOpen                *DisputeOpen            `protobuf:"bytes,13,opt,name=disputeOpen,proto3" json:"disputeOpen,omitempty"`
-	DisputeOpenOtherPartyAcked bool                    `protobuf:"varint,14,opt,name=disputeOpenOtherPartyAcked,proto3" json:"disputeOpenOtherPartyAcked,omitempty"`
-	DisputeOpenModeratorAcked  bool                    `protobuf:"varint,15,opt,name=disputeOpenModeratorAcked,proto3" json:"disputeOpenModeratorAcked,omitempty"`
-	DisputeClose               *DisputeClose           `protobuf:"bytes,16,opt,name=disputeClose,proto3" json:"disputeClose,omitempty"`
-	DisputeCloseAcked          bool                    `protobuf:"varint,17,opt,name=disputeCloseAcked,proto3" json:"disputeCloseAcked,omitempty"`
-	DisputeUpdate              *DisputeUpdate          `protobuf:"bytes,18,opt,name=disputeUpdate,proto3" json:"disputeUpdate,omitempty"`
-	DisputeUpdateAcked         bool                    `protobuf:"varint,19,opt,name=disputeUpdateAcked,proto3" json:"disputeUpdateAcked,omitempty"`
-	DisputeAccept              *DisputeAccept          `protobuf:"bytes,20,opt,name=disputeAccept,proto3" json:"disputeAccept,omitempty"`
-	DisputeAcceptAcked         bool                    `protobuf:"varint,21,opt,name=disputeAcceptAcked,proto3" json:"disputeAcceptAcked,omitempty"`
-	PaymentFinalized           *PaymentFinalized       `protobuf:"bytes,22,opt,name=paymentFinalized,proto3" json:"paymentFinalized,omitempty"`
-	PaymentFinalizedAcked      bool                    `protobuf:"varint,23,opt,name=paymentFinalizedAcked,proto3" json:"paymentFinalizedAcked,omitempty"`
-	OrderFulfillments          []*OrderFulfillment     `protobuf:"bytes,24,rep,name=orderFulfillments,proto3" json:"orderFulfillments,omitempty"`
-	FulfillmentsAcked          bool                    `protobuf:"varint,25,opt,name=fulfillmentsAcked,proto3" json:"fulfillmentsAcked,omitempty"`
-	Refunds                    []*Refund               `protobuf:"bytes,26,rep,name=refunds,proto3" json:"refunds,omitempty"`
-	RefundsAcked               bool                    `protobuf:"varint,27,opt,name=refundsAcked,proto3" json:"refundsAcked,omitempty"`
-	PaymentSent                *PaymentSent            `protobuf:"bytes,28,opt,name=paymentSent,proto3" json:"paymentSent,omitempty"`
-	PaymentSentAcked           bool                    `protobuf:"varint,29,opt,name=paymentSentAcked,proto3" json:"paymentSentAcked,omitempty"`
-	ParkedMessages             *mbzpb.OrderList        `protobuf:"bytes,30,opt,name=parkedMessages,proto3" json:"parkedMessages,omitempty"`
-	ErroredMessages            *mbzpb.OrderList        `protobuf:"bytes,31,opt,name=erroredMessages,proto3" json:"erroredMessages,omitempty"`
-	Transactions               []*Contract_Transaction `protobuf:"bytes,32,rep,name=transactions,proto3" json:"transactions,omitempty"`
+	OrderID                    string              `protobuf:"bytes,1,opt,name=OrderID,proto3" json:"OrderID,omitempty"`
+	Role                       string              `protobuf:"bytes,2,opt,name=Role,proto3" json:"Role,omitempty"`
+	OrderOpen                  *OrderOpen          `protobuf:"bytes,3,opt,name=orderOpen,proto3" json:"orderOpen,omitempty"`
+	OrderOpenAcked             bool                `protobuf:"varint,4,opt,name=orderOpenAcked,proto3" json:"orderOpenAcked,omitempty"`
+	OrderReject                *OrderReject        `protobuf:"bytes,5,opt,name=orderReject,proto3" json:"orderReject,omitempty"`
+	OrderRejectAcked           bool                `protobuf:"varint,6,opt,name=orderRejectAcked,proto3" json:"orderRejectAcked,omitempty"`
+	OrderCancel                *OrderCancel        `protobuf:"bytes,7,opt,name=orderCancel,proto3" json:"orderCancel,omitempty"`
+	OrderCancelAcked           bool                `protobuf:"varint,8,opt,name=orderCancelAcked,proto3" json:"orderCancelAcked,omitempty"`
+	OrderConfirmation          *OrderConfirmation  `protobuf:"bytes,9,opt,name=orderConfirmation,proto3" json:"orderConfirmation,omitempty"`
+	OrderConfirmationAcked     bool                `protobuf:"varint,10,opt,name=orderConfirmationAcked,proto3" json:"orderConfirmationAcked,omitempty"`
+	OrderComplete              *OrderComplete      `protobuf:"bytes,11,opt,name=orderComplete,proto3" json:"orderComplete,omitempty"`
+	OrderCompleteAcked         bool                `protobuf:"varint,12,opt,name=orderCompleteAcked,proto3" json:"orderCompleteAcked,omitempty"`
+	DisputeOpen                *DisputeOpen        `protobuf:"bytes,13,opt,name=disputeOpen,proto3" json:"disputeOpen,omitempty"`
+	DisputeOpenOtherPartyAcked bool                `protobuf:"varint,14,opt,name=disputeOpenOtherPartyAcked,proto3" json:"disputeOpenOtherPartyAcked,omitempty"`
+	DisputeOpenModeratorAcked  bool                `protobuf:"varint,15,opt,name=disputeOpenModeratorAcked,proto3" json:"disputeOpenModeratorAcked,omitempty"`
+	DisputeClose               *DisputeClose       `protobuf:"bytes,16,opt,name=disputeClose,proto3" json:"disputeClose,omitempty"`
+	DisputeCloseAcked          bool                `protobuf:"varint,17,opt,name=disputeCloseAcked,proto3" json:"disputeCloseAcked,omitempty"`
+	DisputeUpdate              *DisputeUpdate      `protobuf:"bytes,18,opt,name=disputeUpdate,proto3" json:"disputeUpdate,omitempty"`
+	DisputeUpdateAcked         bool                `protobuf:"varint,19,opt,name=disputeUpdateAcked,proto3" json:"disputeUpdateAcked,omitempty"`
+	DisputeAccept              *DisputeAccept      `protobuf:"bytes,20,opt,name=disputeAccept,proto3" json:"disputeAccept,omitempty"`
+	DisputeAcceptAcked         bool                `protobuf:"varint,21,opt,name=disputeAcceptAcked,proto3" json:"disputeAcceptAcked,omitempty"`
+	PaymentFinalized           *PaymentFinalized   `protobuf:"bytes,22,opt,name=paymentFinalized,proto3" json:"paymentFinalized,omitempty"`
+	PaymentFinalizedAcked      bool                `protobuf:"varint,23,opt,name=paymentFinalizedAcked,proto3" json:"paymentFinalizedAcked,omitempty"`
+	OrderFulfillments          []*OrderFulfillment `protobuf:"bytes,24,rep,name=orderFulfillments,proto3" json:"orderFulfillments,omitempty"`
+	FulfillmentsAcked          bool                `protobuf:"varint,25,opt,name=fulfillmentsAcked,proto3" json:"fulfillmentsAcked,omitempty"`
+	Refunds                    []*Refund           `protobuf:"bytes,26,rep,name=refunds,proto3" json:"refunds,omitempty"`
+	RefundsAcked               bool                `protobuf:"varint,27,opt,name=refundsAcked,proto3" json:"refundsAcked,omitempty"`
+	PaymentSent                *PaymentSent        `protobuf:"bytes,28,opt,name=paymentSent,proto3" json:"paymentSent,omitempty"`
+	PaymentSentAcked           bool                `protobuf:"varint,29,opt,name=paymentSentAcked,proto3" json:"paymentSentAcked,omitempty"`
+	// RWA 原子交换预授权消息
+	PaymentAuthorized      *PaymentAuthorized      `protobuf:"bytes,33,opt,name=paymentAuthorized,proto3" json:"paymentAuthorized,omitempty"`
+	PaymentAuthorizedAcked bool                    `protobuf:"varint,34,opt,name=paymentAuthorizedAcked,proto3" json:"paymentAuthorizedAcked,omitempty"`
+	ParkedMessages         *mbzpb.OrderList        `protobuf:"bytes,30,opt,name=parkedMessages,proto3" json:"parkedMessages,omitempty"`
+	ErroredMessages        *mbzpb.OrderList        `protobuf:"bytes,31,opt,name=erroredMessages,proto3" json:"erroredMessages,omitempty"`
+	Transactions           []*Contract_Transaction `protobuf:"bytes,32,rep,name=transactions,proto3" json:"transactions,omitempty"`
 }
 
 func (x *Contract) Reset() {
@@ -2161,6 +2164,20 @@ func (x *Contract) GetPaymentSent() *PaymentSent {
 func (x *Contract) GetPaymentSentAcked() bool {
 	if x != nil {
 		return x.PaymentSentAcked
+	}
+	return false
+}
+
+func (x *Contract) GetPaymentAuthorized() *PaymentAuthorized {
+	if x != nil {
+		return x.PaymentAuthorized
+	}
+	return nil
+}
+
+func (x *Contract) GetPaymentAuthorizedAcked() bool {
+	if x != nil {
+		return x.PaymentAuthorizedAcked
 	}
 	return false
 }
@@ -3687,7 +3704,7 @@ var file_orders_proto_rawDesc = []byte{
 	0x52, 0x65, 0x66, 0x75, 0x6e, 0x64, 0x52, 0x0d, 0x72, 0x65, 0x66, 0x75, 0x6e, 0x64, 0x4d, 0x65,
 	0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x1c, 0x0a, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75,
 	0x72, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74,
-	0x75, 0x72, 0x65, 0x22, 0xad, 0x0e, 0x0a, 0x08, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74,
+	0x75, 0x72, 0x65, 0x22, 0xad, 0x0f, 0x0a, 0x08, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x61, 0x63, 0x74,
 	0x12, 0x18, 0x0a, 0x07, 0x4f, 0x72, 0x64, 0x65, 0x72, 0x49, 0x44, 0x18, 0x01, 0x20, 0x01, 0x28,
 	0x09, 0x52, 0x07, 0x4f, 0x72, 0x64, 0x65, 0x72, 0x49, 0x44, 0x12, 0x12, 0x0a, 0x04, 0x52, 0x6f,
 	0x6c, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x52, 0x6f, 0x6c, 0x65, 0x12, 0x2e,
@@ -3780,7 +3797,15 @@ var file_orders_proto_rawDesc = []byte{
 	0x0b, 0x70, 0x61, 0x79, 0x6d, 0x65, 0x6e, 0x74, 0x53, 0x65, 0x6e, 0x74, 0x12, 0x2a, 0x0a, 0x10,
 	0x70, 0x61, 0x79, 0x6d, 0x65, 0x6e, 0x74, 0x53, 0x65, 0x6e, 0x74, 0x41, 0x63, 0x6b, 0x65, 0x64,
 	0x18, 0x1d, 0x20, 0x01, 0x28, 0x08, 0x52, 0x10, 0x70, 0x61, 0x79, 0x6d, 0x65, 0x6e, 0x74, 0x53,
-	0x65, 0x6e, 0x74, 0x41, 0x63, 0x6b, 0x65, 0x64, 0x12, 0x38, 0x0a, 0x0e, 0x70, 0x61, 0x72, 0x6b,
+	0x65, 0x6e, 0x74, 0x41, 0x63, 0x6b, 0x65, 0x64, 0x12, 0x46, 0x0a, 0x11, 0x70, 0x61, 0x79, 0x6d,
+	0x65, 0x6e, 0x74, 0x41, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x69, 0x7a, 0x65, 0x64, 0x18, 0x21, 0x20,
+	0x01, 0x28, 0x0b, 0x32, 0x18, 0x2e, 0x6d, 0x62, 0x7a, 0x70, 0x62, 0x2e, 0x50, 0x61, 0x79, 0x6d,
+	0x65, 0x6e, 0x74, 0x41, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x69, 0x7a, 0x65, 0x64, 0x52, 0x11, 0x70,
+	0x61, 0x79, 0x6d, 0x65, 0x6e, 0x74, 0x41, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x69, 0x7a, 0x65, 0x64,
+	0x12, 0x36, 0x0a, 0x16, 0x70, 0x61, 0x79, 0x6d, 0x65, 0x6e, 0x74, 0x41, 0x75, 0x74, 0x68, 0x6f,
+	0x72, 0x69, 0x7a, 0x65, 0x64, 0x41, 0x63, 0x6b, 0x65, 0x64, 0x18, 0x22, 0x20, 0x01, 0x28, 0x08,
+	0x52, 0x16, 0x70, 0x61, 0x79, 0x6d, 0x65, 0x6e, 0x74, 0x41, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x69,
+	0x7a, 0x65, 0x64, 0x41, 0x63, 0x6b, 0x65, 0x64, 0x12, 0x38, 0x0a, 0x0e, 0x70, 0x61, 0x72, 0x6b,
 	0x65, 0x64, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x18, 0x1e, 0x20, 0x01, 0x28, 0x0b,
 	0x32, 0x10, 0x2e, 0x6d, 0x62, 0x7a, 0x70, 0x62, 0x2e, 0x4f, 0x72, 0x64, 0x65, 0x72, 0x4c, 0x69,
 	0x73, 0x74, 0x52, 0x0e, 0x70, 0x61, 0x72, 0x6b, 0x65, 0x64, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67,
@@ -3950,29 +3975,30 @@ var file_orders_proto_depIdxs = []int32{
 	9,  // 48: mbzpb.Contract.orderFulfillments:type_name -> mbzpb.OrderFulfillment
 	17, // 49: mbzpb.Contract.refunds:type_name -> mbzpb.Refund
 	18, // 50: mbzpb.Contract.paymentSent:type_name -> mbzpb.PaymentSent
-	43, // 51: mbzpb.Contract.parkedMessages:type_name -> mbzpb.OrderList
-	43, // 52: mbzpb.Contract.erroredMessages:type_name -> mbzpb.OrderList
-	39, // 53: mbzpb.Contract.transactions:type_name -> mbzpb.Contract.Transaction
-	25, // 54: mbzpb.Case.buyerContract:type_name -> mbzpb.Contract
-	25, // 55: mbzpb.Case.vendorContract:type_name -> mbzpb.Contract
-	12, // 56: mbzpb.Case.disputeOpen:type_name -> mbzpb.DisputeOpen
-	14, // 57: mbzpb.Case.disputeClose:type_name -> mbzpb.DisputeClose
-	44, // 58: mbzpb.OrderOpen.Shipping.country:type_name -> mbzpb.CountryCode
-	29, // 59: mbzpb.OrderOpen.Item.options:type_name -> mbzpb.OrderOpen.Item.Option
-	30, // 60: mbzpb.OrderOpen.Item.shippingOption:type_name -> mbzpb.OrderOpen.Item.ShippingOption
-	32, // 61: mbzpb.OrderFulfillment.FulfilledItem.physicalDelivery:type_name -> mbzpb.OrderFulfillment.FulfilledItem.PhysicalDelivery
-	33, // 62: mbzpb.OrderFulfillment.FulfilledItem.digitalDelivery:type_name -> mbzpb.OrderFulfillment.FulfilledItem.DigitalDelivery
-	34, // 63: mbzpb.OrderFulfillment.FulfilledItem.cryptocurrencyDelivery:type_name -> mbzpb.OrderFulfillment.FulfilledItem.CryptocurrencyDelivery
-	22, // 64: mbzpb.DisputeClose.ModeratedEscrowRelease.escrowSignatures:type_name -> mbzpb.Signature
-	15, // 65: mbzpb.DisputeClose.ModeratedEscrowRelease.outpoints:type_name -> mbzpb.Outpoint
-	9,  // 66: mbzpb.FulfillmentList.Message.fulfillmentMessage:type_name -> mbzpb.OrderFulfillment
-	17, // 67: mbzpb.RefundList.Message.refundMessage:type_name -> mbzpb.Refund
-	42, // 68: mbzpb.Contract.Transaction.timestamp:type_name -> google.protobuf.Timestamp
-	69, // [69:69] is the sub-list for method output_type
-	69, // [69:69] is the sub-list for method input_type
-	69, // [69:69] is the sub-list for extension type_name
-	69, // [69:69] is the sub-list for extension extendee
-	0,  // [0:69] is the sub-list for field type_name
+	20, // 51: mbzpb.Contract.paymentAuthorized:type_name -> mbzpb.PaymentAuthorized
+	43, // 52: mbzpb.Contract.parkedMessages:type_name -> mbzpb.OrderList
+	43, // 53: mbzpb.Contract.erroredMessages:type_name -> mbzpb.OrderList
+	39, // 54: mbzpb.Contract.transactions:type_name -> mbzpb.Contract.Transaction
+	25, // 55: mbzpb.Case.buyerContract:type_name -> mbzpb.Contract
+	25, // 56: mbzpb.Case.vendorContract:type_name -> mbzpb.Contract
+	12, // 57: mbzpb.Case.disputeOpen:type_name -> mbzpb.DisputeOpen
+	14, // 58: mbzpb.Case.disputeClose:type_name -> mbzpb.DisputeClose
+	44, // 59: mbzpb.OrderOpen.Shipping.country:type_name -> mbzpb.CountryCode
+	29, // 60: mbzpb.OrderOpen.Item.options:type_name -> mbzpb.OrderOpen.Item.Option
+	30, // 61: mbzpb.OrderOpen.Item.shippingOption:type_name -> mbzpb.OrderOpen.Item.ShippingOption
+	32, // 62: mbzpb.OrderFulfillment.FulfilledItem.physicalDelivery:type_name -> mbzpb.OrderFulfillment.FulfilledItem.PhysicalDelivery
+	33, // 63: mbzpb.OrderFulfillment.FulfilledItem.digitalDelivery:type_name -> mbzpb.OrderFulfillment.FulfilledItem.DigitalDelivery
+	34, // 64: mbzpb.OrderFulfillment.FulfilledItem.cryptocurrencyDelivery:type_name -> mbzpb.OrderFulfillment.FulfilledItem.CryptocurrencyDelivery
+	22, // 65: mbzpb.DisputeClose.ModeratedEscrowRelease.escrowSignatures:type_name -> mbzpb.Signature
+	15, // 66: mbzpb.DisputeClose.ModeratedEscrowRelease.outpoints:type_name -> mbzpb.Outpoint
+	9,  // 67: mbzpb.FulfillmentList.Message.fulfillmentMessage:type_name -> mbzpb.OrderFulfillment
+	17, // 68: mbzpb.RefundList.Message.refundMessage:type_name -> mbzpb.Refund
+	42, // 69: mbzpb.Contract.Transaction.timestamp:type_name -> google.protobuf.Timestamp
+	70, // [70:70] is the sub-list for method output_type
+	70, // [70:70] is the sub-list for method input_type
+	70, // [70:70] is the sub-list for extension type_name
+	70, // [70:70] is the sub-list for extension extendee
+	0,  // [0:70] is the sub-list for field type_name
 }
 
 func init() { file_orders_proto_init() }

@@ -58,6 +58,8 @@ type PaymentAuthorizedReceived struct {
 	Notification
 	OrderID        string    `json:"orderID"`
 	BuyerHandle    string    `json:"buyerHandle"`
+	BuyerID        string    `json:"buyerID"`
+	Slug           string    `json:"slug"`
 	Thumbnail      Thumbnail `json:"thumbnail"`
 	Title          string    `json:"title"`
 	ApprovalTxHash string    `json:"approvalTxHash"`

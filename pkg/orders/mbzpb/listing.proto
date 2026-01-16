@@ -25,8 +25,7 @@ message Listing {
         ContractType contractType          = 2;
         Format format                      = 3;
         google.protobuf.Timestamp expiry   = 4;
-        // Listing中不再添加acceptedCurrencies，通过下单时卖家设置的货币来决定
-        // repeated string acceptedCurrencies = 5;
+        repeated string acceptedCurrencies = 5; // RWA/Crypto 商品接受的支付币种
         string language                    = 6;
         uint32 escrowTimeoutHours          = 7;
         Currency pricingCurrency           = 9;

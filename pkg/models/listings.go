@@ -89,9 +89,10 @@ type ListingMetadata struct {
 	AverageRating      float32          `json:"averageRating"`
 	RatingCount        uint32           `json:"ratingCount"`
 	ModeratorIDs       []string         `json:"moderators"`
-	CoinType           string           `json:"coinType"`
-	RwaTradeMode       int32            `json:"rwaTradeMode,omitempty"`  // RWA 交易模式: 0=即时, 1=需确认
-	TokenStandard      string           `json:"tokenStandard,omitempty"` // 代币标准: ERC721/ERC1155/ERC3525
+	CoinType                 string           `json:"coinType"`
+	RwaTradeMode             int32            `json:"rwaTradeMode,omitempty"`             // RWA 交易模式: 0=即时, 1=需确认
+	RwaEscrowTimeoutSeconds  uint64           `json:"rwaEscrowTimeoutSeconds,omitempty"`  // RWA 托管超时时间（秒）
+	TokenStandard            string           `json:"tokenStandard,omitempty"`            // 代币标准: ERC721/ERC1155/ERC3525
 }
 
 // NewListingMetadataFromListing returns a new ListingMetadata object given a
@@ -156,9 +157,10 @@ func NewListingMetadataFromListing(listing *pb.Listing, cid cid.Cid) (*ListingMe
 		ShipsTo:            shipsTo,
 		FreeShipping:       freeShipping,
 		Language:           listing.Metadata.Language,
-		ModeratorIDs:       listing.Moderators,
-		RwaTradeMode:       int32(listing.Metadata.RwaTradeMode),
-		TokenStandard:      listing.Item.TokenStandard,
+		ModeratorIDs:            listing.Moderators,
+		RwaTradeMode:            int32(listing.Metadata.RwaTradeMode),
+		RwaEscrowTimeoutSeconds: listing.Metadata.RwaEscrowTimeoutSeconds,
+		TokenStandard:           listing.Item.TokenStandard,
 	}
 	return ld, nil
 }

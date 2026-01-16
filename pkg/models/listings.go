@@ -90,6 +90,7 @@ type ListingMetadata struct {
 	RatingCount        uint32           `json:"ratingCount"`
 	ModeratorIDs       []string         `json:"moderators"`
 	CoinType           string           `json:"coinType"`
+	RwaTradeMode       int32            `json:"rwaTradeMode,omitempty"` // RWA 交易模式: 0=即时, 1=需确认
 }
 
 // NewListingMetadataFromListing returns a new ListingMetadata object given a
@@ -155,6 +156,7 @@ func NewListingMetadataFromListing(listing *pb.Listing, cid cid.Cid) (*ListingMe
 		FreeShipping:       freeShipping,
 		Language:           listing.Metadata.Language,
 		ModeratorIDs:       listing.Moderators,
+		RwaTradeMode:       int32(listing.Metadata.RwaTradeMode),
 	}
 	return ld, nil
 }

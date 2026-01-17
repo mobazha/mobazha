@@ -236,6 +236,7 @@ message PaymentSent {
         DIRECT          = 0; // Address request
         CANCELABLE      = 1; // 1 of 2 cancelable address
         MODERATED       = 2; // 2 of 3 escrow address
+        RWA_LOCKED      = 3; // RWA 确认交易模式：资金锁定在 UniversalSwap 合约中
     }
 
     message PaymentMethod {

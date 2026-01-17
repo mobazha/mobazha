@@ -72,27 +72,27 @@ func (li *ListingIndex) Count() int {
 // ListingMetadata is the metadata for an individual listing.
 // The node's listing index is an array of these objects.
 type ListingMetadata struct {
-	CID                string           `json:"cid"`
-	Slug               string           `json:"slug"`
-	Title              string           `json:"title"`
-	Categories         []string         `json:"categories"`
-	NSFW               bool             `json:"nsfw"`
-	ContractType       string           `json:"contractType"`
-	Description        string           `json:"description"`
-	Thumbnail          ListingThumbnail `json:"thumbnail"`
-	IntroVideo         string           `json:"introVideo"`
-	AltIntroVideoLinks []string         `json:"altIntroVideoLinks"`
-	Price              CurrencyValue    `json:"price"`
-	ShipsTo            []string         `json:"shipsTo"`
-	FreeShipping       []string         `json:"freeShipping"`
-	Language           string           `json:"language"`
-	AverageRating      float32          `json:"averageRating"`
-	RatingCount        uint32           `json:"ratingCount"`
-	ModeratorIDs       []string         `json:"moderators"`
-	CoinType                 string           `json:"coinType"`
-	RwaTradeMode             int32            `json:"rwaTradeMode,omitempty"`             // RWA 交易模式: 0=即时, 1=需确认
-	RwaEscrowTimeoutSeconds  uint64           `json:"rwaEscrowTimeoutSeconds,omitempty"`  // RWA 托管超时时间（秒）
-	TokenStandard            string           `json:"tokenStandard,omitempty"`            // 代币标准: ERC721/ERC1155/ERC3525
+	CID                     string           `json:"cid"`
+	Slug                    string           `json:"slug"`
+	Title                   string           `json:"title"`
+	Categories              []string         `json:"categories"`
+	NSFW                    bool             `json:"nsfw"`
+	ContractType            string           `json:"contractType"`
+	Description             string           `json:"description"`
+	Thumbnail               ListingThumbnail `json:"thumbnail"`
+	IntroVideo              string           `json:"introVideo"`
+	AltIntroVideoLinks      []string         `json:"altIntroVideoLinks"`
+	Price                   CurrencyValue    `json:"price"`
+	ShipsTo                 []string         `json:"shipsTo"`
+	FreeShipping            []string         `json:"freeShipping"`
+	Language                string           `json:"language"`
+	AverageRating           float32          `json:"averageRating"`
+	RatingCount             uint32           `json:"ratingCount"`
+	ModeratorIDs            []string         `json:"moderators"`
+	CoinType                string           `json:"coinType"`
+	RwaTradeMode            int32            `json:"rwaTradeMode,omitempty"`            // RWA 交易模式: 0=即时, 1=需确认
+	RwaEscrowTimeoutSeconds uint64           `json:"rwaEscrowTimeoutSeconds,omitempty"` // RWA 托管超时时间（秒）
+	TokenStandard           string           `json:"tokenStandard,omitempty"`           // 代币标准: ERC721/ERC1155/ERC3525
 }
 
 // NewListingMetadataFromListing returns a new ListingMetadata object given a
@@ -151,12 +151,12 @@ func NewListingMetadataFromListing(listing *pb.Listing, cid cid.Cid) (*ListingMe
 			Small:  listing.Item.Images[0].Small,
 			Medium: listing.Item.Images[0].Medium,
 		},
-		IntroVideo:         introVideoHash,
-		AltIntroVideoLinks: listing.Item.AltIntroVideoLinks,
-		Price:              *cv,
-		ShipsTo:            shipsTo,
-		FreeShipping:       freeShipping,
-		Language:           listing.Metadata.Language,
+		IntroVideo:              introVideoHash,
+		AltIntroVideoLinks:      listing.Item.AltIntroVideoLinks,
+		Price:                   *cv,
+		ShipsTo:                 shipsTo,
+		FreeShipping:            freeShipping,
+		Language:                listing.Metadata.Language,
 		ModeratorIDs:            listing.Moderators,
 		RwaTradeMode:            int32(listing.Metadata.RwaTradeMode),
 		RwaEscrowTimeoutSeconds: listing.Metadata.RwaEscrowTimeoutSeconds,

@@ -144,6 +144,10 @@ type PaymentData struct {
 	// RWA 原子交换相关
 	ApprovalTxHash string `json:"approvalTxHash,omitempty"` // 买家 approve 交易哈希（RWA 原子交换模式）
 
+	// RWA 双模式交易相关
+	RwaTradeMode      int  `json:"rwaTradeMode,omitempty"`      // 0: 即时交易, 1: 确认交易
+	RwaOrderCompleted bool `json:"rwaOrderCompleted,omitempty"` // 链上订单是否已完成（即时模式为 true）
+
 	// 币种切换检测相关字段
 	HasPartialPayment bool   `json:"hasPartialPayment,omitempty"` // 是否已有部分支付（用于币种切换时提示）
 	PaidAmount        uint64 `json:"paidAmount,omitempty"`        // 已支付金额

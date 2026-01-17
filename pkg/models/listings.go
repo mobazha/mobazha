@@ -92,6 +92,7 @@ type ListingMetadata struct {
 	CoinType                string           `json:"coinType"`
 	RwaTradeMode            int32            `json:"rwaTradeMode,omitempty"`            // RWA 交易模式: 0=即时, 1=需确认
 	RwaEscrowTimeoutSeconds uint64           `json:"rwaEscrowTimeoutSeconds,omitempty"` // RWA 托管超时时间（秒）
+	RwaListingId            uint64           `json:"rwaListingId,omitempty"`            // RWA 合约 Listing ID（延迟模式必填）
 	TokenStandard           string           `json:"tokenStandard,omitempty"`           // 代币标准: ERC721/ERC1155/ERC3525
 }
 
@@ -160,6 +161,7 @@ func NewListingMetadataFromListing(listing *pb.Listing, cid cid.Cid) (*ListingMe
 		ModeratorIDs:            listing.Moderators,
 		RwaTradeMode:            int32(listing.Metadata.RwaTradeMode),
 		RwaEscrowTimeoutSeconds: listing.Metadata.RwaEscrowTimeoutSeconds,
+		RwaListingId:            listing.Metadata.RwaListingId,
 		TokenStandard:           listing.Item.TokenStandard,
 	}
 	return ld, nil

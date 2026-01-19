@@ -220,6 +220,10 @@ func (n *MobazhaNode) Start() {
 		// Start unified cancelable payment monitor for auto-confirmation
 		// This handles UTXO, EVM, and (future) Solana chains via event dispatch
 		n.startCancelablePaymentMonitor()
+
+		// Start RWA instant buy monitor for auto-confirmation
+		// This handles RWA instant buy (atomic swap) orders that complete on-chain
+		n.startRwaInstantBuyMonitor()
 	}
 
 	// Add log to verify connection reuse

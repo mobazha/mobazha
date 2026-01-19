@@ -42,3 +42,7 @@ mobazha-go*
 mobile.aar
 mobile-sources.jar
 Mobile.xcframework
+
+# Stripe 配置
+scripts/stripe_config.sh
+.vscode/launch.json

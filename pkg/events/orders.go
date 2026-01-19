@@ -232,6 +232,16 @@ type CancelablePaymentReady struct {
 	Amount        uint64 `json:"amount"`
 }
 
+// RwaInstantBuyCompleted is emitted when an RWA instant buy (atomic swap) has completed on-chain
+// This is triggered when the seller receives PAYMENT_SENT with method=RWA_INSTANT_BUY
+// The atomic swap has already transferred tokens, so this just triggers the order confirmation
+// Handled by handleRwaInstantBuyCompleted() in rwa_instant_buy.go
+type RwaInstantBuyCompleted struct {
+	OrderID       string `json:"orderID"`
+	TransactionID string `json:"transactionID"`
+	Coin          string `json:"coin"`
+}
+
 // PartialPaymentReceived is emitted when buyer's payment is less than expected
 // Frontend should refresh QR code to show remaining amount
 type PartialPaymentReceived struct {

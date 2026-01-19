@@ -176,6 +176,19 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 			})
 			logger.LogInfoWithIDf(log, op.nodeID, "CANCELABLE payment ready for auto-confirm: order %s (coin=%s)", order.ID, paymentSent.Coin)
 		}
+
+		// For RWA_INSTANT payments (method=4), the atomic swap has already completed on-chain
+		// Emit event to trigger auto-confirm in core layer
+		if paymentSent.Method == pb.PaymentSent_RWA_INSTANT {
+			dbtx.RegisterCommitHook(func() {
+				op.bus.Emit(&events.RwaInstantBuyCompleted{
+					OrderID:       order.ID.String(),
+					TransactionID: paymentSent.TransactionID,
+					Coin:          paymentSent.Coin,
+				})
+			})
+			logger.LogInfoWithIDf(log, op.nodeID, "RWA instant buy completed, ready for auto-confirm: order %s", order.ID)
+		}
 	}
 
 	logger.LogInfoWithIDf(log, op.nodeID, "Received PAYMENT_SENT message for order %s", order.ID)

@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -961,4 +962,510 @@ func (g *Gateway) convertPriceToInt(priceStr string, divisibility int) (string, 
 	}
 
 	return result, nil
+}
+
+// ============================================================================
+// JSON Import Handler
+// ============================================================================
+
+// JSONListingInput represents a single listing in JSON import format
+type JSONListingInput struct {
+	Title              string             `json:"title"`
+	ContractType       string             `json:"contractType"`
+	Price              string             `json:"price"`
+	PricingCurrency    string             `json:"pricingCurrency"`
+	Description        string             `json:"description"`
+	ShortDescription   string             `json:"shortDescription"`
+	Categories         []string           `json:"categories"`
+	Tags               []string           `json:"tags"`
+	Condition          string             `json:"condition"`
+	NSFW               bool               `json:"nsfw"`
+	Images             []string           `json:"images"`
+	IntroVideo         string             `json:"introVideo"`
+	ProcessingTime     string             `json:"processingTime"`
+	Grams              uint32             `json:"grams"`
+	TermsAndConditions string             `json:"termsAndConditions"`
+	RefundPolicy       string             `json:"refundPolicy"`
+	Variants           []JSONVariantInput `json:"variants"`
+	Quantity           string             `json:"quantity"`
+
+	// RWA Token fields
+	RwaTokenAddress         string   `json:"rwaTokenAddress"`
+	RwaTokenStandard        string   `json:"rwaTokenStandard"`
+	RwaTokenId              string   `json:"rwaTokenId"`
+	RwaSlotId               string   `json:"rwaSlotId"` // ERC3525 专用
+	RwaBlockchain           string   `json:"rwaBlockchain"`
+	RwaTradeMode            int      `json:"rwaTradeMode"`
+	RwaEscrowTimeoutSeconds uint64   `json:"rwaEscrowTimeoutSeconds"`
+	RwaAcceptedCurrencies   []string `json:"rwaAcceptedCurrencies"`
+}
+
+// JSONVariantInput represents a variant/SKU in JSON import format
+type JSONVariantInput struct {
+	Selections map[string]string `json:"selections"` // e.g., {"Color": "Red", "Size": "S"}
+	Surcharge  string            `json:"surcharge"`
+	Quantity   string            `json:"quantity"`
+	ProductID  string            `json:"productID"`
+}
+
+// JSONImportPayload represents the root JSON structure
+type JSONImportPayload struct {
+	Listings []JSONListingInput `json:"listings"`
+}
+
+// handlePOSTListingsImportJSON handles the batch import of listings from a ZIP file with JSON data
+func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Request) {
+	// Get size limits from config
+	maxZipSize := g.nodeManager.GetMaxImportZipSize()
+	maxVideoSize := g.nodeManager.GetMaxImportVideoSize()
+
+	// Limit request body size
+	r.Body = http.MaxBytesReader(w, r.Body, maxZipSize)
+
+	// Parse multipart form
+	if err := r.ParseMultipartForm(maxZipSize); err != nil {
+		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("file too large or invalid: %s", err.Error()))
+		return
+	}
+
+	// Get the uploaded file
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error reading file: %s", err.Error()))
+		return
+	}
+	defer file.Close()
+
+	// Check file extension
+	if !strings.HasSuffix(strings.ToLower(header.Filename), ".zip") {
+		ErrorResponse(w, http.StatusBadRequest, "file must be a ZIP archive")
+		return
+	}
+
+	// Read file into memory
+	zipData, err := io.ReadAll(file)
+	if err != nil {
+		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error reading file: %s", err.Error()))
+		return
+	}
+
+	// Open ZIP archive
+	zipReader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
+	if err != nil {
+		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid ZIP file: %s", err.Error()))
+		return
+	}
+
+	// Extract files from ZIP
+	var jsonFile *zip.File
+	images := make(map[string][]byte)
+	videos := make(map[string][]byte)
+
+	for _, f := range zipReader.File {
+		// Skip directories and macOS metadata
+		if f.FileInfo().IsDir() || strings.HasPrefix(f.Name, "__MACOSX") {
+			continue
+		}
+
+		normalizedName := strings.TrimPrefix(strings.ToLower(f.Name), "./")
+		filename := filepath.Base(f.Name)
+
+		switch {
+		case strings.HasSuffix(normalizedName, "listings.json") || strings.HasSuffix(normalizedName, ".json"):
+			if jsonFile == nil { // Take the first JSON file found
+				jsonFile = f
+			}
+		case strings.HasPrefix(normalizedName, "images/") || strings.Contains(normalizedName, "/images/"):
+			if data, err := readZipFile(f); err == nil {
+				images[filename] = data
+			}
+		case strings.HasPrefix(normalizedName, "videos/") || strings.Contains(normalizedName, "/videos/"):
+			if data, err := readZipFile(f); err == nil && int64(len(data)) <= maxVideoSize {
+				videos[filename] = data
+			}
+		}
+	}
+
+	if jsonFile == nil {
+		ErrorResponse(w, http.StatusBadRequest, "no JSON file found in ZIP archive")
+		return
+	}
+
+	// Read JSON file
+	jsonData, err := readZipFile(jsonFile)
+	if err != nil {
+		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error reading JSON file: %s", err.Error()))
+		return
+	}
+
+	// Parse JSON
+	var payload JSONImportPayload
+	if err := json.Unmarshal(jsonData, &payload); err != nil {
+		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("error parsing JSON file: %s", err.Error()))
+		return
+	}
+
+	// Get node
+	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+
+	// Process import
+	result, err := g.processListingsImportJSON(node, payload.Listings, images, videos)
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	sanitizedJSONResponse(w, result)
+}
+
+// processListingsImportJSON processes the JSON data and creates/updates listings
+func (g *Gateway) processListingsImportJSON(node coreiface.CoreIface, listings []JSONListingInput, images, videos map[string][]byte) (*ImportResult, error) {
+	result := &ImportResult{
+		CreatedItems: []ImportedItem{},
+		UpdatedItems: []ImportedItem{},
+		Errors:       []ImportError{},
+	}
+
+	// Get existing listings for duplicate detection
+	existingListings, _ := node.GetMyListings()
+	existingByTitle := make(map[string]string) // title -> slug
+	for _, listing := range existingListings {
+		existingByTitle[listing.Title] = listing.Slug
+	}
+
+	// Process each listing
+	for i, input := range listings {
+		rowNum := i + 1
+
+		listing, err := g.parseJSONListing(input)
+		if err != nil {
+			result.Errors = append(result.Errors, ImportError{
+				Row:   rowNum,
+				Title: input.Title,
+				Error: err.Error(),
+			})
+			result.Failed++
+			continue
+		}
+
+		// Process images
+		if imgErr := g.processJSONListingImages(node, listing, input.Images, images); imgErr != nil {
+			result.Errors = append(result.Errors, ImportError{
+				Row:   rowNum,
+				Title: listing.Item.Title,
+				Error: imgErr.Error(),
+			})
+			result.Failed++
+			continue
+		}
+
+		// Process intro video
+		if input.IntroVideo != "" {
+			if vidErr := g.processJSONListingVideo(node, listing, input.IntroVideo, videos); vidErr != nil {
+				result.Errors = append(result.Errors, ImportError{
+					Row:   rowNum,
+					Title: listing.Item.Title,
+					Error: vidErr.Error(),
+				})
+				result.Failed++
+				continue
+			}
+		}
+
+		// Process variants
+		g.processJSONListingVariants(listing, input.Variants)
+
+		// Validate: at least one image is required
+		if len(listing.Item.Images) == 0 {
+			result.Errors = append(result.Errors, ImportError{
+				Row:   rowNum,
+				Title: listing.Item.Title,
+				Error: "at least one image is required",
+			})
+			result.Failed++
+			continue
+		}
+
+		// Check if listing exists (by title)
+		isUpdate := false
+		if existingSlug, exists := existingByTitle[listing.Item.Title]; exists {
+			listing.Slug = existingSlug
+			isUpdate = true
+		}
+
+		// Save listing
+		saveErr := node.SaveListing(listing, nil)
+
+		if saveErr != nil {
+			result.Errors = append(result.Errors, ImportError{
+				Row:   rowNum,
+				Title: listing.Item.Title,
+				Error: saveErr.Error(),
+			})
+			result.Failed++
+			continue
+		}
+
+		if isUpdate {
+			result.Updated++
+			result.UpdatedItems = append(result.UpdatedItems, ImportedItem{
+				Slug:  listing.Slug,
+				Title: listing.Item.Title,
+			})
+		} else {
+			result.Created++
+			result.CreatedItems = append(result.CreatedItems, ImportedItem{
+				Slug:  listing.Slug,
+				Title: listing.Item.Title,
+			})
+			// Add to existing map for subsequent duplicate detection
+			existingByTitle[listing.Item.Title] = listing.Slug
+		}
+
+		result.Total++
+	}
+
+	return result, nil
+}
+
+// parseJSONListing converts a JSONListingInput to a pb.Listing
+func (g *Gateway) parseJSONListing(input JSONListingInput) (*pb.Listing, error) {
+	if input.Title == "" {
+		return nil, errors.New("title is required")
+	}
+
+	if input.Price == "" {
+		return nil, errors.New("price is required")
+	}
+
+	currency := input.PricingCurrency
+	if currency == "" {
+		currency = "USD"
+	}
+
+	// Convert price to integer format
+	priceInt, err := g.convertPriceToInt(input.Price, 2)
+	if err != nil {
+		return nil, fmt.Errorf("invalid price format: %w", err)
+	}
+
+	contractType := g.parseContractType(input.ContractType)
+
+	listing := &pb.Listing{
+		Metadata: &pb.Listing_Metadata{
+			ContractType: contractType,
+			Format:       pb.Listing_Metadata_FIXED_PRICE,
+			PricingCurrency: &pb.Currency{
+				Code:         strings.ToUpper(currency),
+				Divisibility: 2,
+			},
+			Expiry: timestamppb.New(time.Date(2037, 12, 31, 0, 0, 0, 0, time.UTC)),
+		},
+		Item: &pb.Listing_Item{
+			Title:            input.Title,
+			Description:      input.Description,
+			ShortDescription: input.ShortDescription,
+			Price:            priceInt,
+			Condition:        input.Condition,
+			ProcessingTime:   input.ProcessingTime,
+			Nsfw:             input.NSFW,
+			Categories:       input.Categories,
+			Tags:             input.Tags,
+			Grams:            input.Grams,
+		},
+		TermsAndConditions: input.TermsAndConditions,
+		RefundPolicy:       input.RefundPolicy,
+	}
+
+	// Handle RWA Token fields
+	if contractType == pb.Listing_Metadata_RWA_TOKEN {
+		// Set RWA metadata
+		listing.Metadata.AcceptedCurrencies = input.RwaAcceptedCurrencies
+		listing.Metadata.RwaTradeMode = pb.Listing_Metadata_RwaTradeMode(input.RwaTradeMode)
+		if input.RwaEscrowTimeoutSeconds > 0 {
+			listing.Metadata.RwaEscrowTimeoutSeconds = input.RwaEscrowTimeoutSeconds
+		} else {
+			listing.Metadata.RwaEscrowTimeoutSeconds = 86400 // Default 24 hours
+		}
+
+		// Set RWA item fields
+		listing.Item.Blockchain = input.RwaBlockchain
+		listing.Item.TokenAddress = input.RwaTokenAddress
+		listing.Item.TokenStandard = input.RwaTokenStandard
+		listing.Item.TokenId = input.RwaTokenId
+		listing.Item.SlotId = input.RwaSlotId
+
+		// Generate cryptoListingCurrencyCode
+		// Format: CHAIN_ADDRESS_STANDARD_ID
+		// - ERC721/ERC1155: use tokenId
+		// - ERC3525: use slotId
+		chain := strings.ToUpper(input.RwaBlockchain)
+		addr := strings.ToLower(input.RwaTokenAddress)
+		standard := strings.ToUpper(input.RwaTokenStandard)
+
+		var id string
+		if standard == "ERC3525" {
+			id = input.RwaSlotId
+		} else {
+			id = input.RwaTokenId
+		}
+
+		if chain != "" && addr != "" && standard != "" && id != "" {
+			listing.Item.CryptoListingCurrencyCode = fmt.Sprintf("%s_%s_%s_%s", chain, addr, standard, id)
+		}
+	}
+
+	return listing, nil
+}
+
+// processJSONListingImages processes and uploads images for a listing from JSON input
+func (g *Gateway) processJSONListingImages(node coreiface.CoreIface, listing *pb.Listing, imageNames []string, images map[string][]byte) error {
+	for _, imgName := range imageNames {
+		imgName = strings.TrimSpace(imgName)
+		if imgName == "" {
+			continue
+		}
+
+		imgData, ok := images[imgName]
+		if !ok {
+			// Try to find with case-insensitive match
+			for name, data := range images {
+				if strings.EqualFold(name, imgName) {
+					imgData = data
+					ok = true
+					break
+				}
+			}
+		}
+
+		if !ok {
+			continue // Skip missing images
+		}
+
+		// Check if it's a valid image
+		if !filetype.IsImage(imgData) {
+			continue
+		}
+
+		// Upload image
+		base64Data := base64.StdEncoding.EncodeToString(imgData)
+		hashes, err := node.SetProductImage(base64Data, imgName)
+		if err != nil {
+			return fmt.Errorf("failed to upload image %s: %w", imgName, err)
+		}
+
+		listing.Item.Images = append(listing.Item.Images, &pb.Image{
+			Filename: imgName,
+			Original: hashes.Original,
+			Large:    hashes.Large,
+			Medium:   hashes.Medium,
+			Small:    hashes.Small,
+			Tiny:     hashes.Tiny,
+		})
+	}
+
+	return nil
+}
+
+// processJSONListingVideo processes and uploads intro video for a listing from JSON input
+func (g *Gateway) processJSONListingVideo(node coreiface.CoreIface, listing *pb.Listing, videoName string, videos map[string][]byte) error {
+	videoName = strings.TrimSpace(videoName)
+	if videoName == "" {
+		return nil
+	}
+
+	videoData, ok := videos[videoName]
+	if !ok {
+		// Try case-insensitive match
+		for name, data := range videos {
+			if strings.EqualFold(name, videoName) {
+				videoData = data
+				ok = true
+				break
+			}
+		}
+	}
+
+	if !ok {
+		return nil // Skip missing video
+	}
+
+	// Check video size
+	maxVideoSize := g.nodeManager.GetMaxImportVideoSize()
+	if int64(len(videoData)) > maxVideoSize {
+		return fmt.Errorf("video %s exceeds maximum size of %dMB", videoName, maxVideoSize/(1<<20))
+	}
+
+	// Check if it's a valid video
+	if !filetype.IsVideo(videoData) {
+		return fmt.Errorf("file %s is not a valid video", videoName)
+	}
+
+	// Upload video
+	hash, err := node.AddIntroVideo(videoData, videoName)
+	if err != nil {
+		return fmt.Errorf("failed to upload video %s: %w", videoName, err)
+	}
+
+	listing.Item.IntroVideo = &pb.File{
+		Filename: videoName,
+		Hash:     hash.Hash,
+	}
+
+	return nil
+}
+
+// processJSONListingVariants adds variants to a listing from JSON input
+func (g *Gateway) processJSONListingVariants(listing *pb.Listing, variants []JSONVariantInput) {
+	if len(variants) == 0 {
+		return
+	}
+
+	// Collect all options and their variants
+	optionVariants := make(map[string]map[string]bool)
+
+	for _, v := range variants {
+		for optName, variantName := range v.Selections {
+			if optionVariants[optName] == nil {
+				optionVariants[optName] = make(map[string]bool)
+			}
+			optionVariants[optName][variantName] = true
+		}
+	}
+
+	// Create options with their variants
+	for optName, variantSet := range optionVariants {
+		option := &pb.Listing_Item_Option{
+			Name:      optName,
+			Variation: true,
+		}
+
+		for variantName := range variantSet {
+			option.Variants = append(option.Variants, &pb.Listing_Item_Option_Variant{
+				Name: variantName,
+			})
+		}
+
+		listing.Item.Options = append(listing.Item.Options, option)
+	}
+
+	// Create SKUs from variants
+	for _, v := range variants {
+		var selections []*pb.Listing_Item_Sku_Selection
+		for optName, variantName := range v.Selections {
+			selections = append(selections, &pb.Listing_Item_Sku_Selection{
+				Option:  optName,
+				Variant: variantName,
+			})
+		}
+
+		sku := &pb.Listing_Item_Sku{
+			ProductID:  v.ProductID,
+			Surcharge:  v.Surcharge,
+			Quantity:   v.Quantity,
+			Selections: selections,
+		}
+
+		listing.Item.Skus = append(listing.Item.Skus, sku)
+	}
 }

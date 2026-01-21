@@ -278,6 +278,7 @@ func (g *Gateway) newV1Router() *mux.Router {
 
 		// Listings Batch Import
 		r.HandleFunc("/v1/ob/listings/import", g.handlePOSTListingsImport).Methods("POST")
+		r.HandleFunc("/v1/ob/listings/import/json", g.handlePOSTListingsImportJSON).Methods("POST")
 
 		// Images
 		r.HandleFunc("/v1/ob/avatar", g.handlePOSTAvatar).Methods("POST")

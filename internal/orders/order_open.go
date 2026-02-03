@@ -547,12 +547,12 @@ func getShippingInfo(order *pb.OrderOpen, listings map[string]*pb.Listing) (*pb.
 		return option, nil, nil
 	}
 
-	// Check that this option ships to us
+	// Check that this option ships to us (case-insensitive comparison)
 	regions := make(map[string]bool)
 	for _, country := range option.Regions {
-		regions[country] = true
+		regions[strings.ToUpper(country)] = true
 	}
-	_, shipsToMe := regions[order.Shipping.Country]
+	_, shipsToMe := regions[strings.ToUpper(order.Shipping.Country)]
 	_, shipsToAll := regions["ALL"]
 	if !shipsToMe && !shipsToAll {
 		return option, nil, errors.New("listing does ship to selected country")

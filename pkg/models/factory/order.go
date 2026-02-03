@@ -100,7 +100,7 @@ func NewOrder() (*pb.OrderOpen, *pb.PaymentSent, error) {
 			City:         "Quahog",
 			State:        "RI",
 			PostalCode:   "90210",
-			Country:      pb.CountryCode_UNITED_STATES,
+			Country:      "US",
 			AddressNotes: "Don't leave in on the porch. Cleveland steals my packages.",
 		},
 		BuyerID: &pb.ID{

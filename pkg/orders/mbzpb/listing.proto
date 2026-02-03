@@ -2,7 +2,6 @@ syntax = "proto3";
 option go_package = "../mbzpb";
 package mbzpb;
 
-import "countrycodes.proto";
 import "common.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -136,8 +135,9 @@ message Listing {
         ShippingType type            = 3;
         string currency              = 4;
         ServiceType serviceType      = 5;
-        repeated CountryCode regions = 6;
+        repeated string regions = 6;  // ISO 3166-1 alpha-2 codes: "CN", "US", "ALL"
         repeated Service services    = 7;
+        FreeShippingThreshold freeShippingThreshold = 8;  // 满额免邮配置
 
         enum ShippingType {
             LOCAL_PICKUP = 0;
@@ -162,11 +162,17 @@ message Listing {
 
             string registrationFee   = 9;
         }
+
+        // 满额免邮配置
+        message FreeShippingThreshold {
+            bool enabled     = 1;  // 是否启用满额免邮
+            string minAmount = 2;  // 最低金额（最小单位）
+        }
     }
 
     message Tax {
         string taxType                  = 1;
-        repeated CountryCode taxRegions = 2;
+        repeated string taxRegions      = 2;  // ISO 3166-1 alpha-2 codes
         bool taxShipping                = 3;
         float percentage                = 4;
     }

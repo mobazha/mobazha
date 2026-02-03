@@ -2,7 +2,6 @@ package factory
 
 import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 )
 
 func NewPurchase() *models.Purchase {
@@ -12,7 +11,7 @@ func NewPurchase() *models.Purchase {
 		City:         "Quahog",
 		State:        "RI",
 		PostalCode:   "90210",
-		CountryCode:  pb.CountryCode_UNITED_STATES.String(),
+		CountryCode:  "US",
 		AddressNotes: "asdf",
 		Items: []models.PurchaseItem{
 			{

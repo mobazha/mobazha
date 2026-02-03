@@ -80,7 +80,7 @@ func ConvertShippingOption(option ShippingOption) *pb.Listing_ShippingOption {
 	}
 
 	for _, region := range option.Regions {
-		shippingOption.Regions = append(shippingOption.Regions, pb.CountryCode(pb.CountryCode_value[strings.ToUpper(region)]))
+		shippingOption.Regions = append(shippingOption.Regions, strings.ToUpper(region))
 	}
 
 	for _, service := range option.Services {

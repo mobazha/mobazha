@@ -3,7 +3,6 @@ option go_package = "../mbzpb";
 package mbzpb;
 
 import "google/protobuf/timestamp.proto";
-import "countrycodes.proto";
 import "listing.proto";
 import "common.proto";
 import "msg.proto";
@@ -27,7 +26,7 @@ message OrderOpen {
         string city         = 3;
         string state        = 4;
         string postalCode   = 5;
-        CountryCode country = 6;
+        string country      = 6;  // ISO 3166-1 alpha-2 code: "CN", "US"
         string addressNotes = 7;
     }
 

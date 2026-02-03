@@ -100,7 +100,7 @@ func NewPhysicalListing(slug string) *pb.Listing {
 				Percentage:  7,
 				TaxShipping: true,
 				TaxType:     "Sales tax",
-				TaxRegions:  []pb.CountryCode{pb.CountryCode_UNITED_STATES},
+				TaxRegions:  []string{"US"},
 			},
 		},
 		ShippingOptions: []*pb.Listing_ShippingOption{
@@ -108,7 +108,7 @@ func NewPhysicalListing(slug string) *pb.Listing {
 				Name:        "usps",
 				Type:        pb.Listing_ShippingOption_FIXED_PRICE,
 				Currency:    "USD",
-				Regions:     []pb.CountryCode{pb.CountryCode_ALL},
+				Regions:     []string{"ALL"},
 				ServiceType: pb.Listing_ShippingOption_SAME_WEIGHT_SAME_FEE,
 				Services: []*pb.Listing_ShippingOption_Service{
 					{
@@ -168,7 +168,7 @@ func NewDigitalListing(slug string) *pb.Listing {
 				Percentage:  7,
 				TaxShipping: true,
 				TaxType:     "Sales tax",
-				TaxRegions:  []pb.CountryCode{pb.CountryCode_UNITED_STATES},
+				TaxRegions:  []string{"US"},
 			},
 		},
 		Coupons: []*pb.Listing_Coupon{

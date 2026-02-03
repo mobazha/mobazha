@@ -520,9 +520,7 @@ func Test_validatePhysicalListing(t *testing.T) {
 			listing: factory.NewPhysicalListing("test-listing"),
 			transform: func(listing *pb.Listing) {
 				listing.ShippingOptions[0].Name = strings.Repeat("s", WordMaxCharacters+1)
-				listing.ShippingOptions[0].Regions = []pb.CountryCode{
-					pb.CountryCode_UNITED_ARAB_EMIRATES,
-				}
+				listing.ShippingOptions[0].Regions = []string{"AE"}
 			},
 			valid: false,
 		},
@@ -533,10 +531,8 @@ func Test_validatePhysicalListing(t *testing.T) {
 				listing.ShippingOptions = []*pb.Listing_ShippingOption{}
 				for i := 0; i < 2; i++ {
 					listing.ShippingOptions = append(listing.ShippingOptions, &pb.Listing_ShippingOption{
-						Name: "fadsfa",
-						Regions: []pb.CountryCode{
-							pb.CountryCode_UNITED_ARAB_EMIRATES,
-						},
+						Name:    "fadsfa",
+						Regions: []string{"AE"},
 					})
 				}
 			},
@@ -547,9 +543,7 @@ func Test_validatePhysicalListing(t *testing.T) {
 			listing: factory.NewPhysicalListing("test-listing"),
 			transform: func(listing *pb.Listing) {
 				listing.ShippingOptions[0].Name = "afsdf"
-				listing.ShippingOptions[0].Regions = []pb.CountryCode{
-					pb.CountryCode_UNITED_ARAB_EMIRATES,
-				}
+				listing.ShippingOptions[0].Regions = []string{"AE"}
 				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE + 1
 			},
 			valid: false,
@@ -560,31 +554,27 @@ func Test_validatePhysicalListing(t *testing.T) {
 			transform: func(listing *pb.Listing) {
 				listing.ShippingOptions[0].Name = "afsdf"
 				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Regions = []pb.CountryCode{}
+				listing.ShippingOptions[0].Regions = []string{}
 			},
 			valid: false,
 		},
 		{
-			// Invalid country code
+			// Invalid country code (empty string)
 			listing: factory.NewPhysicalListing("test-listing"),
 			transform: func(listing *pb.Listing) {
 				listing.ShippingOptions[0].Name = "afsdf"
 				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Regions = []pb.CountryCode{
-					0,
-				}
+				listing.ShippingOptions[0].Regions = []string{""}
 			},
 			valid: false,
 		},
 		{
-			// Region out of enum range
+			// Invalid region code (single char)
 			listing: factory.NewPhysicalListing("test-listing"),
 			transform: func(listing *pb.Listing) {
 				listing.ShippingOptions[0].Name = "afsdf"
 				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Regions = []pb.CountryCode{
-					501,
-				}
+				listing.ShippingOptions[0].Regions = []string{"X"}
 			},
 			valid: false,
 		},
@@ -594,9 +584,9 @@ func Test_validatePhysicalListing(t *testing.T) {
 			transform: func(listing *pb.Listing) {
 				listing.ShippingOptions[0].Name = "afsdf"
 				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Regions = []pb.CountryCode{}
+				listing.ShippingOptions[0].Regions = []string{}
 				for i := 0; i < MaxCountryCodes+1; i++ {
-					listing.ShippingOptions[0].Regions = append(listing.ShippingOptions[0].Regions, pb.CountryCode_AFGHANISTAN)
+					listing.ShippingOptions[0].Regions = append(listing.ShippingOptions[0].Regions, "AF")
 				}
 			},
 			valid: false,
@@ -1706,7 +1696,7 @@ func Test_validateListing(t *testing.T) {
 					},
 				}
 				for i := 0; i < MaxCountryCodes+1; i++ {
-					sl.Listing.Taxes[0].TaxRegions = append(sl.Listing.Taxes[0].TaxRegions, pb.CountryCode_ALBANIA)
+					sl.Listing.Taxes[0].TaxRegions = append(sl.Listing.Taxes[0].TaxRegions, "AL")
 				}
 			},
 			valid: false,
@@ -1718,7 +1708,7 @@ func Test_validateListing(t *testing.T) {
 				sl.Listing.Taxes = []*pb.Listing_Tax{
 					{
 						TaxType:    "asdf",
-						TaxRegions: []pb.CountryCode{pb.CountryCode_ALBANIA},
+						TaxRegions: []string{"AL"},
 						Percentage: 0,
 					},
 				}
@@ -1732,7 +1722,7 @@ func Test_validateListing(t *testing.T) {
 				sl.Listing.Taxes = []*pb.Listing_Tax{
 					{
 						TaxType:    "asdf",
-						TaxRegions: []pb.CountryCode{pb.CountryCode_ALBANIA},
+						TaxRegions: []string{"AL"},
 						Percentage: 101,
 					},
 				}

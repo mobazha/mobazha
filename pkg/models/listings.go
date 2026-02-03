@@ -117,16 +117,16 @@ func NewListingMetadataFromListing(listing *pb.Listing, cid cid.Cid) (*ListingMe
 	var freeShipping []string
 	for _, shippingOption := range listing.ShippingOptions {
 		for _, region := range shippingOption.Regions {
-			if !contains(shipsTo, region.String()) {
-				shipsTo = append(shipsTo, region.String())
+			if !contains(shipsTo, region) {
+				shipsTo = append(shipsTo, region)
 			}
 			for _, service := range shippingOption.Services {
 				amt, success := new(big.Int).SetString(service.FirstFreight, 10)
 				if !success {
 					continue
 				}
-				if amt.Cmp(big.NewInt(0)) == 0 && !contains(freeShipping, region.String()) {
-					freeShipping = append(freeShipping, region.String())
+				if amt.Cmp(big.NewInt(0)) == 0 && !contains(freeShipping, region) {
+					freeShipping = append(freeShipping, region)
 				}
 			}
 		}

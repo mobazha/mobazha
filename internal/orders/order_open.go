@@ -505,7 +505,7 @@ func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode strin
 	// Add in shipping
 	shippingTotal := iwallet.NewAmount(0)
 	if len(physicalGoods) > 0 {
-		shippingTotal, err = calculateShippingTotalForListings(order, physicalGoods, paymentCurrency, erp)
+		shippingTotal, err = calculateShippingTotalForListings(order, physicalGoods, paymentCurrency, erp, subTotal)
 		if err != nil {
 			return models.OrderTotals{}, fmt.Errorf("shipping total: %s", err.Error())
 		}
@@ -548,12 +548,12 @@ func getShippingInfo(order *pb.OrderOpen, listings map[string]*pb.Listing) (*pb.
 	}
 
 	// Check that this option ships to us
-	regions := make(map[pb.CountryCode]bool)
+	regions := make(map[string]bool)
 	for _, country := range option.Regions {
 		regions[country] = true
 	}
 	_, shipsToMe := regions[order.Shipping.Country]
-	_, shipsToAll := regions[pb.CountryCode_ALL]
+	_, shipsToAll := regions["ALL"]
 	if !shipsToMe && !shipsToAll {
 		return option, nil, errors.New("listing does ship to selected country")
 	}
@@ -571,7 +571,7 @@ func getShippingInfo(order *pb.OrderOpen, listings map[string]*pb.Listing) (*pb.
 	return option, service, nil
 }
 
-func calculateShippingTotalForListings(order *pb.OrderOpen, listings map[string]*pb.Listing, paymentCurrency *models.Currency, erp *wallet.ExchangeRateProvider) (iwallet.Amount, error) {
+func calculateShippingTotalForListings(order *pb.OrderOpen, listings map[string]*pb.Listing, paymentCurrency *models.Currency, erp *wallet.ExchangeRateProvider, subtotal iwallet.Amount) (iwallet.Amount, error) {
 	type itemShipping struct {
 		// primary               iwallet.Amount
 		// secondary             iwallet.Amount
@@ -593,6 +593,21 @@ func calculateShippingTotalForListings(order *pb.OrderOpen, listings map[string]
 		return shippingTotal, nil
 	}
 
+	// 检查满额免邮条件
+	if threshold := shippingOption.FreeShippingThreshold; threshold != nil && threshold.Enabled {
+		minAmount := iwallet.NewAmount(threshold.MinAmount)
+		// 将阈值转换为支付货币进行比较
+		pricingCurrency, err := models.CurrencyDefinitions.Lookup(shippingOption.Currency)
+		if err == nil {
+			thresholdVal := models.CurrencyValue{Amount: minAmount, Currency: pricingCurrency}
+			convertedThreshold, convErr := wallet.ConvertCurrencyAmount(&thresholdVal, paymentCurrency, erp)
+			if convErr == nil && subtotal.Cmp(convertedThreshold) >= 0 {
+				// 订单金额达到免邮阈值，返回 0 运费
+				return shippingTotal, nil
+			}
+		}
+	}
+
 	// First loop through to validate and filter out non-physical items
 	for i, item := range order.Items {
 		if item.Quantity == "" {
@@ -609,7 +624,7 @@ func calculateShippingTotalForListings(order *pb.OrderOpen, listings map[string]
 		// Calculate tax percentage
 		var shippingTaxPercentage float32
 		for _, tax := range aListing.Taxes {
-			regions := make(map[pb.CountryCode]bool)
+			regions := make(map[string]bool)
 			for _, taxRegion := range tax.TaxRegions {
 				regions[taxRegion] = true
 			}
@@ -636,13 +651,26 @@ func calculateShippingTotalForListings(order *pb.OrderOpen, listings map[string]
 
 	freight := iwallet.NewAmount(0)
 	if shippingOption.ServiceType == pb.Listing_ShippingOption_FIRST_RENEWAL_FEE {
+		// 首重+续重模式：使用前端选择的 service
 		renewalFee := iwallet.NewAmount(0)
 		if gramsTotal > shippingService.FirstWeight {
 			renewalFee = iwallet.NewAmount(shippingService.RenewalUnitPrice).Mul(iwallet.NewAmount(math.Ceil(float64(gramsTotal-shippingService.FirstWeight) / float64(shippingService.RenewalUnitWeight))))
 		}
 		freight = iwallet.NewAmount(shippingService.FirstFreight).Add(renewalFee).Add(iwallet.NewAmount(shippingService.RegistrationFee))
 	} else {
-		freight = iwallet.NewAmount(shippingService.FirstFreight).Add(iwallet.NewAmount(shippingService.RegistrationFee))
+		// SAME_WEIGHT_SAME_FEE 模式：根据总重量匹配对应的服务区间
+		var matchedService *pb.Listing_ShippingOption_Service
+		for _, svc := range shippingOption.Services {
+			if gramsTotal >= svc.StartWeight && gramsTotal <= svc.EndWeight {
+				matchedService = svc
+				break
+			}
+		}
+		if matchedService == nil {
+			// 如果没有匹配的区间，使用前端选择的 service（向后兼容）
+			matchedService = shippingService
+		}
+		freight = iwallet.NewAmount(matchedService.FirstFreight).Add(iwallet.NewAmount(matchedService.RegistrationFee))
 	}
 	pricingCurrency, err := models.CurrencyDefinitions.Lookup(shippingOption.Currency)
 	if err != nil {

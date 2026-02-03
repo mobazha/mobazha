@@ -155,9 +155,7 @@ func TestNewListingMetadataFromListing(t *testing.T) {
 		},
 		ShippingOptions: []*pb.Listing_ShippingOption{
 			{
-				Regions: []pb.CountryCode{
-					pb.CountryCode_ALBANIA,
-				},
+				Regions: []string{"AL"},
 				Services: []*pb.Listing_ShippingOption_Service{
 					{
 						Name:         "asdf",

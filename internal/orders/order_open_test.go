@@ -375,6 +375,97 @@ func TestCalculateOrderTotal(t *testing.T) {
 	}
 }
 
+func TestFreeShippingThresholdUsesDiscountedSubtotal(t *testing.T) {
+	erp, err := wallet.NewMockExchangeRates()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name       string
+		transform  func(order *pb.OrderOpen) error
+		expectFree bool
+	}{
+		{
+			name: "taxes excluded from threshold",
+			transform: func(order *pb.OrderOpen) error {
+				order.PricingCoin = "USD"
+				order.Listings[0].Listing.ShippingOptions[0].FreeShippingThreshold = &pb.Listing_ShippingOption_FreeShippingThreshold{
+					Enabled:   true,
+					MinAmount: "101",
+				}
+				hash, err := utils.HashListing(order.Listings[0])
+				if err != nil {
+					return err
+				}
+				order.Items[0].ListingHash = hash.B58String()
+				return nil
+			},
+			expectFree: false,
+		},
+		{
+			name: "discounts reduce eligible subtotal",
+			transform: func(order *pb.OrderOpen) error {
+				order.PricingCoin = "USD"
+				order.Items[0].CouponCodes = []string{"insider"}
+				order.Listings[0].Listing.ShippingOptions[0].FreeShippingThreshold = &pb.Listing_ShippingOption_FreeShippingThreshold{
+					Enabled:   true,
+					MinAmount: "100",
+				}
+				hash, err := utils.HashListing(order.Listings[0])
+				if err != nil {
+					return err
+				}
+				order.Items[0].ListingHash = hash.B58String()
+				return nil
+			},
+			expectFree: false,
+		},
+		{
+			name: "eligible subtotal meets threshold",
+			transform: func(order *pb.OrderOpen) error {
+				order.PricingCoin = "USD"
+				order.Listings[0].Listing.ShippingOptions[0].FreeShippingThreshold = &pb.Listing_ShippingOption_FreeShippingThreshold{
+					Enabled:   true,
+					MinAmount: "90",
+				}
+				hash, err := utils.HashListing(order.Listings[0])
+				if err != nil {
+					return err
+				}
+				order.Items[0].ListingHash = hash.B58String()
+				return nil
+			},
+			expectFree: true,
+		},
+	}
+
+	for _, test := range tests {
+		order, _, err := factory.NewOrder()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := test.transform(order); err != nil {
+			t.Fatalf("test %s transform error: %s", test.name, err)
+		}
+
+		totals, err := CalculateOrderTotal(order, erp)
+		if err != nil {
+			t.Fatalf("test %s calculate totals error: %s", test.name, err)
+		}
+
+		if test.expectFree {
+			if totals.Shipping.Cmp(iwallet.NewAmount(0)) != 0 {
+				t.Fatalf("test %s expected free shipping, got %s", test.name, totals.Shipping.String())
+			}
+		} else {
+			if totals.Shipping.Cmp(iwallet.NewAmount(0)) == 0 {
+				t.Fatalf("test %s expected shipping charge, got %s", test.name, totals.Shipping.String())
+			}
+		}
+	}
+}
+
 func Test_validateOrderOpen(t *testing.T) {
 	processor, teardown, err := newMockOrderProcessor()
 	if err != nil {

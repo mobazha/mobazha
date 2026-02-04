@@ -503,11 +503,11 @@ func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode strin
 	}
 
 	// Add in shipping
-	// Note: Pass orderTotal (which includes coupon discounts and taxes) for free shipping threshold calculation,
-	// not subTotal (which is only the raw item prices before adjustments)
+	// Note: Free shipping threshold should use discounted subtotal before taxes.
+	eligibleSubtotal := subTotal.Add(discountsTotal)
 	shippingTotal := iwallet.NewAmount(0)
 	if len(physicalGoods) > 0 {
-		shippingTotal, err = calculateShippingTotalForListings(order, physicalGoods, paymentCurrency, erp, orderTotal)
+		shippingTotal, err = calculateShippingTotalForListings(order, physicalGoods, paymentCurrency, erp, eligibleSubtotal)
 		if err != nil {
 			return models.OrderTotals{}, fmt.Errorf("shipping total: %s", err.Error())
 		}
@@ -573,7 +573,7 @@ func getShippingInfo(order *pb.OrderOpen, listings map[string]*pb.Listing) (*pb.
 	return option, service, nil
 }
 
-func calculateShippingTotalForListings(order *pb.OrderOpen, listings map[string]*pb.Listing, paymentCurrency *models.Currency, erp *wallet.ExchangeRateProvider, subtotal iwallet.Amount) (iwallet.Amount, error) {
+func calculateShippingTotalForListings(order *pb.OrderOpen, listings map[string]*pb.Listing, paymentCurrency *models.Currency, erp *wallet.ExchangeRateProvider, eligibleSubtotal iwallet.Amount) (iwallet.Amount, error) {
 	type itemShipping struct {
 		// primary               iwallet.Amount
 		// secondary             iwallet.Amount
@@ -603,7 +603,7 @@ func calculateShippingTotalForListings(order *pb.OrderOpen, listings map[string]
 		if err == nil {
 			thresholdVal := models.CurrencyValue{Amount: minAmount, Currency: pricingCurrency}
 			convertedThreshold, convErr := wallet.ConvertCurrencyAmount(&thresholdVal, paymentCurrency, erp)
-			if convErr == nil && subtotal.Cmp(convertedThreshold) >= 0 {
+			if convErr == nil && eligibleSubtotal.Cmp(convertedThreshold) >= 0 {
 				// 订单金额达到免邮阈值，返回 0 运费
 				return shippingTotal, nil
 			}

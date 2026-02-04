@@ -477,19 +477,19 @@ func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode strin
 					}
 				}
 			}
-			// Apply tax
-			for _, tax := range listing.Taxes {
-				for _, taxRegion := range tax.TaxRegions {
-					if order.Shipping.Country == taxRegion {
-						f, _ := new(big.Float).SetString(itemTotal.String())
-						f.Mul(f, big.NewFloat(float64(tax.Percentage/100)))
-						govTheft, _ := f.Int(nil)
-						itemTotal = itemTotal.Add(iwallet.NewAmount(govTheft))
-						taxesTotal = taxesTotal.Add(iwallet.NewAmount(govTheft))
-						break
-					}
+		// Apply tax (case-insensitive comparison for region codes)
+		for _, tax := range listing.Taxes {
+			for _, taxRegion := range tax.TaxRegions {
+				if strings.EqualFold(order.Shipping.Country, taxRegion) {
+					f, _ := new(big.Float).SetString(itemTotal.String())
+					f.Mul(f, big.NewFloat(float64(tax.Percentage/100)))
+					govTheft, _ := f.Int(nil)
+					itemTotal = itemTotal.Add(iwallet.NewAmount(govTheft))
+					taxesTotal = taxesTotal.Add(iwallet.NewAmount(govTheft))
+					break
 				}
 			}
+		}
 			taxesTotal = taxesTotal.Mul(itemQuantity)
 
 			// Multiply the item total by the quantity being purchased
@@ -621,14 +621,14 @@ func calculateShippingTotalForListings(order *pb.OrderOpen, listings map[string]
 
 		gramsTotal += aListing.Item.Grams * uint32(iwallet.NewAmount(item.Quantity).Int64())
 
-		// Calculate tax percentage
+		// Calculate tax percentage (case-insensitive comparison for region codes)
 		var shippingTaxPercentage float32
 		for _, tax := range aListing.Taxes {
 			regions := make(map[string]bool)
 			for _, taxRegion := range tax.TaxRegions {
-				regions[taxRegion] = true
+				regions[strings.ToUpper(taxRegion)] = true
 			}
-			_, ok := regions[order.Shipping.Country]
+			_, ok := regions[strings.ToUpper(order.Shipping.Country)]
 			if ok && tax.TaxShipping {
 				shippingTaxPercentage = tax.Percentage / 100
 			}

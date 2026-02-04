@@ -477,19 +477,19 @@ func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode strin
 					}
 				}
 			}
-		// Apply tax (case-insensitive comparison for region codes)
-		for _, tax := range listing.Taxes {
-			for _, taxRegion := range tax.TaxRegions {
-				if strings.EqualFold(order.Shipping.Country, taxRegion) {
-					f, _ := new(big.Float).SetString(itemTotal.String())
-					f.Mul(f, big.NewFloat(float64(tax.Percentage/100)))
-					govTheft, _ := f.Int(nil)
-					itemTotal = itemTotal.Add(iwallet.NewAmount(govTheft))
-					taxesTotal = taxesTotal.Add(iwallet.NewAmount(govTheft))
-					break
+			// Apply tax (case-insensitive comparison for region codes)
+			for _, tax := range listing.Taxes {
+				for _, taxRegion := range tax.TaxRegions {
+					if strings.EqualFold(order.Shipping.Country, taxRegion) {
+						f, _ := new(big.Float).SetString(itemTotal.String())
+						f.Mul(f, big.NewFloat(float64(tax.Percentage/100)))
+						govTheft, _ := f.Int(nil)
+						itemTotal = itemTotal.Add(iwallet.NewAmount(govTheft))
+						taxesTotal = taxesTotal.Add(iwallet.NewAmount(govTheft))
+						break
+					}
 				}
 			}
-		}
 			taxesTotal = taxesTotal.Mul(itemQuantity)
 
 			// Multiply the item total by the quantity being purchased
@@ -503,9 +503,11 @@ func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode strin
 	}
 
 	// Add in shipping
+	// Note: Pass orderTotal (which includes coupon discounts and taxes) for free shipping threshold calculation,
+	// not subTotal (which is only the raw item prices before adjustments)
 	shippingTotal := iwallet.NewAmount(0)
 	if len(physicalGoods) > 0 {
-		shippingTotal, err = calculateShippingTotalForListings(order, physicalGoods, paymentCurrency, erp, subTotal)
+		shippingTotal, err = calculateShippingTotalForListings(order, physicalGoods, paymentCurrency, erp, orderTotal)
 		if err != nil {
 			return models.OrderTotals{}, fmt.Errorf("shipping total: %s", err.Error())
 		}

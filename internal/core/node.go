@@ -189,6 +189,18 @@ func (n *MobazhaNode) Start() {
 		}
 	}()
 
+	// Migrate and sync shipping profiles at startup
+	// 1. CheckAndMigrateShippingProfiles: For users who haven't migrated yet (have shippingOptions but no shippingProfiles)
+	// 2. SyncShippingProfilesToListings: For users who migrated via frontend but listings weren't updated
+	go func() {
+		if err := n.CheckAndMigrateShippingProfiles(); err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "CheckAndMigrateShippingProfiles failed, %v", err)
+		}
+		if err := n.SyncShippingProfilesToListings(); err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "SyncShippingProfilesToListings failed, %v", err)
+		}
+	}()
+
 	go n.bootstrapIPFS()
 	if !n.ipfsOnlyMode {
 		n.publishHandler()

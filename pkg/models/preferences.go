@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -15,8 +16,10 @@ type UserPreferences struct {
 	PaymentDataInQR     bool    `json:"paymentDataInQR"`
 	ShowNotifications   bool    `json:"showNotifications"`
 	ShowNsfw            bool    `json:"showNsfw"`
-	ShippingAddresses   []byte  `json:"shippingAddresses"` // Self receiving address
-	ShippingOptions     []byte  `json:"shippingOptions"`   // As vendor, for the buyer to delivery choose
+	ShippingAddresses   []byte  `json:"shippingAddresses"`  // Self receiving address
+	ShippingOptions     []byte  `json:"shippingOptions"`    // 旧版：作为 vendor，供买家选择的运费选项（向后兼容）
+	ShippingProfiles    []byte  `json:"shippingProfiles"`   // 新版：配送档案列表（Shopify 模式）
+	ShippingLocations   []byte  `json:"shippingLocations"`  // v2：发货地点列表
 	LocalCurrency       string  `json:"localCurrency"`
 	Country             string  `json:"country"`
 	TermsAndConditions  string  `json:"termsAndConditions"`
@@ -61,13 +64,97 @@ type ShippingOption_Service struct {
 }
 
 type ShippingOption struct {
-	ID          int                       `json:"id" gorm:"primaryKey"`
-	Name        string                    `json:"name"`
-	Type        string                    `json:"type"`
-	Currency    string                    `json:"currency"`
-	ServiceType string                    `json:"serviceType"`
-	Regions     []string                  `json:"regions"`
-	Services    []*ShippingOption_Service `json:"services"`
+	ID                    int                        `json:"id" gorm:"primaryKey"`
+	Name                  string                     `json:"name"`
+	Type                  string                     `json:"type"`
+	Currency              string                     `json:"currency"`
+	ServiceType           string                     `json:"serviceType"`
+	Regions               []string                   `json:"regions"`
+	Services              []*ShippingOption_Service  `json:"services"`
+	FreeShippingThreshold *FreeShippingThreshold     `json:"freeShippingThreshold,omitempty"`
+}
+
+// FreeShippingThreshold 满额免邮配置
+type FreeShippingThreshold struct {
+	Enabled   bool   `json:"enabled"`
+	MinAmount string `json:"minAmount"`
+}
+
+// ============== Shopify 风格配送系统 (v2) ==============
+
+// ShippingLocation 发货地点
+type ShippingLocation struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Address   string `json:"address,omitempty"`
+	IsDefault bool   `json:"isDefault"`
+}
+
+// RateCondition 费率条件（可选）
+type RateCondition struct {
+	Type     string `json:"type"`     // "weight" | "price"
+	MinValue uint32 `json:"minValue"` // 最小值（重量为克，价格为最小单位）
+	MaxValue uint32 `json:"maxValue"` // 最大值（0 表示无上限）
+}
+
+// ShippingRate 配送费率（对应 Shopify 的 Rate）
+type ShippingRate struct {
+	ID                    string                 `json:"id"`
+	Name                  string                 `json:"name"`                            // 如 "标准配送"、"快递"
+	Price                 string                 `json:"price"`                           // 支持加密货币精度
+	Currency              string                 `json:"currency"`
+	EstimatedDelivery     string                 `json:"estimatedDelivery"`
+	Condition             *RateCondition         `json:"condition,omitempty"`             // 可选条件
+	FreeShippingThreshold *FreeShippingThreshold `json:"freeShippingThreshold,omitempty"` // 满额免邮
+}
+
+// ShippingZone 配送区域（对应 Shopify 的 Delivery Zone）
+type ShippingZone struct {
+	ID      string          `json:"id"`
+	Name    string          `json:"name"`    // 如 "全球"、"亚洲"、"北美"
+	Regions []string        `json:"regions"` // ISO 国家代码
+	Rates   []*ShippingRate `json:"rates"`
+}
+
+// LocationGroup 发货地点组（对应 Shopify 的 Location Group）
+type LocationGroup struct {
+	ID          string          `json:"id"`
+	LocationIDs []string        `json:"locationIds"` // 关联的发货地点
+	Zones       []*ShippingZone `json:"zones"`
+}
+
+// ShippingProfile 配送档案 - 允许卖家创建多个配送方案（Shopify 风格）
+// 支持两种模式：
+// - 简化模式（单一发货地点）：使用 Zones 字段
+// - 完整模式（多发货地点）：使用 LocationGroups 字段
+type ShippingProfile struct {
+	ProfileID string `json:"profileId"`
+	Name      string `json:"name"`
+	IsDefault bool   `json:"isDefault"`
+	// Shopify 风格字段
+	Zones          []*ShippingZone  `json:"zones,omitempty"`          // 简化模式
+	LocationGroups []*LocationGroup `json:"locationGroups,omitempty"` // 完整模式
+	// 元数据
+	CreatedAt string `json:"createdAt,omitempty"`
+	UpdatedAt string `json:"updatedAt,omitempty"`
+}
+
+// IsUsingLocationGroups 检查是否使用多仓库模式
+func (p *ShippingProfile) IsUsingLocationGroups() bool {
+	return len(p.LocationGroups) > 0
+}
+
+// GetAllZones 获取所有配送区域（无论是简化模式还是完整模式）
+func (p *ShippingProfile) GetAllZones() []*ShippingZone {
+	if len(p.LocationGroups) > 0 {
+		// 完整模式：合并所有 LocationGroup 的 Zones
+		var zones []*ShippingZone
+		for _, lg := range p.LocationGroups {
+			zones = append(zones, lg.Zones...)
+		}
+		return zones
+	}
+	return p.Zones
 }
 
 func ConvertShippingOption(option ShippingOption) *pb.Listing_ShippingOption {
@@ -97,6 +184,14 @@ func ConvertShippingOption(option ShippingOption) *pb.Listing_ShippingOption {
 		})
 	}
 
+	// 处理满额免邮配置
+	if option.FreeShippingThreshold != nil {
+		shippingOption.FreeShippingThreshold = &pb.Listing_ShippingOption_FreeShippingThreshold{
+			Enabled:   option.FreeShippingThreshold.Enabled,
+			MinAmount: option.FreeShippingThreshold.MinAmount,
+		}
+	}
+
 	return shippingOption
 }
 
@@ -108,6 +203,133 @@ func ConvertShippingOptions(options []ShippingOption) []*pb.Listing_ShippingOpti
 	return shippingOptions
 }
 
+// ConvertShippingOptionFromPointer 从指针类型的 ShippingOption 转换
+func ConvertShippingOptionFromPointer(option *ShippingOption) *pb.Listing_ShippingOption {
+	if option == nil {
+		return nil
+	}
+	return ConvertShippingOption(*option)
+}
+
+// ConvertShippingOptionsFromPointers 从指针数组转换
+func ConvertShippingOptionsFromPointers(options []*ShippingOption) []*pb.Listing_ShippingOption {
+	shippingOptions := make([]*pb.Listing_ShippingOption, 0, len(options))
+	for _, option := range options {
+		if option != nil {
+			shippingOptions = append(shippingOptions, ConvertShippingOption(*option))
+		}
+	}
+	return shippingOptions
+}
+
+// ConvertShippingProfileToProto 将 JSON 格式的 ShippingProfile 转换为 protobuf 格式
+func ConvertShippingProfileToProto(profile *ShippingProfile) *pb.ShippingProfile {
+	if profile == nil {
+		return nil
+	}
+
+	pbProfile := &pb.ShippingProfile{
+		ProfileID: profile.ProfileID,
+		Name:      profile.Name,
+		IsDefault: profile.IsDefault,
+	}
+
+	// 转换 Zones
+	for _, zone := range profile.Zones {
+		if zone == nil {
+			continue
+		}
+		pbZone := convertZoneToProto(zone)
+		pbProfile.Zones = append(pbProfile.Zones, pbZone)
+	}
+
+	// 转换 LocationGroups
+	for _, lg := range profile.LocationGroups {
+		if lg == nil {
+			continue
+		}
+		pbLG := &pb.LocationGroup{
+			Id:          lg.ID,
+			LocationIds: lg.LocationIDs,
+		}
+		for _, zone := range lg.Zones {
+			if zone != nil {
+				pbLG.Zones = append(pbLG.Zones, convertZoneToProto(zone))
+			}
+		}
+		pbProfile.LocationGroups = append(pbProfile.LocationGroups, pbLG)
+	}
+
+	return pbProfile
+}
+
+// convertZoneToProto 将 ShippingZone 转换为 protobuf 格式
+func convertZoneToProto(zone *ShippingZone) *pb.ShippingZone {
+	if zone == nil {
+		return nil
+	}
+
+	pbZone := &pb.ShippingZone{
+		Id:      zone.ID,
+		Name:    zone.Name,
+		Regions: zone.Regions,
+	}
+
+	for _, rate := range zone.Rates {
+		if rate == nil {
+			continue
+		}
+		pbRate := &pb.ShippingRate{
+			Id:                rate.ID,
+			Name:              rate.Name,
+			Price:             rate.Price,
+			Currency:          rate.Currency,
+			EstimatedDelivery: rate.EstimatedDelivery,
+		}
+
+		// 转换条件
+		if rate.Condition != nil {
+			condType := pb.ShippingRate_RateCondition_NONE
+			switch rate.Condition.Type {
+			case "weight":
+				condType = pb.ShippingRate_RateCondition_WEIGHT
+			case "price":
+				condType = pb.ShippingRate_RateCondition_PRICE
+			}
+			pbRate.Condition = &pb.ShippingRate_RateCondition{
+				Type:     condType,
+				MinValue: rate.Condition.MinValue,
+				MaxValue: rate.Condition.MaxValue,
+			}
+		}
+
+		// 转换满额免邮
+		if rate.FreeShippingThreshold != nil {
+			pbRate.FreeShippingThreshold = &pb.ShippingRate_FreeShippingThreshold{
+				Enabled:   rate.FreeShippingThreshold.Enabled,
+				MinAmount: rate.FreeShippingThreshold.MinAmount,
+			}
+		}
+
+		pbZone.Rates = append(pbZone.Rates, pbRate)
+	}
+
+	return pbZone
+}
+
+// ConvertShippingLocationToProto 将 ShippingLocation 转换为 protobuf 格式
+func ConvertShippingLocationToProto(location *ShippingLocation) *pb.ShippingLocation {
+	if location == nil {
+		return nil
+	}
+	return &pb.ShippingLocation{
+		Id:        location.ID,
+		Name:      location.Name,
+		Address:   location.Address,
+		IsDefault: location.IsDefault,
+	}
+}
+
 type prefsJSON struct {
 	UserAgent                string                       `json:"userAgent"`
 	PaymentDataInQR          bool                         `json:"paymentDataInQR"`
@@ -115,6 +337,8 @@ type prefsJSON struct {
 	ShowNsfw                 bool                         `json:"showNsfw"`
 	ShippingAddresses        []shippingAddress            `json:"shippingAddresses"`
 	ShippingOptions          []ShippingOption             `json:"shippingOptions"`
+	ShippingProfiles         []*ShippingProfile           `json:"shippingProfiles,omitempty"`
+	ShippingLocations        []*ShippingLocation          `json:"shippingLocations,omitempty"`
 	LocalCurrency            string                       `json:"localCurrency"`
 	Country                  string                       `json:"country"`
 	TermsAndConditions       string                       `json:"termsAndConditions"`
@@ -147,6 +371,134 @@ func (prefs *UserPreferences) GetShippingOptions() ([]ShippingOption, error) {
 		}
 	}
 	return options, nil
+}
+
+// GetShippingProfiles 获取配送档案列表
+func (prefs *UserPreferences) GetShippingProfiles() ([]*ShippingProfile, error) {
+	var profiles []*ShippingProfile
+	if prefs.ShippingProfiles != nil {
+		if err := json.Unmarshal(prefs.ShippingProfiles, &profiles); err != nil {
+			return nil, err
+		}
+	}
+	return profiles, nil
+}
+
+// GetShippingLocations 获取发货地点列表
+func (prefs *UserPreferences) GetShippingLocations() ([]*ShippingLocation, error) {
+	var locations []*ShippingLocation
+	if prefs.ShippingLocations != nil {
+		if err := json.Unmarshal(prefs.ShippingLocations, &locations); err != nil {
+			return nil, err
+		}
+	}
+	return locations, nil
+}
+
+// SetShippingLocations 设置发货地点列表
+func (prefs *UserPreferences) SetShippingLocations(locations []*ShippingLocation) error {
+	data, err := json.Marshal(locations)
+	if err != nil {
+		return err
+	}
+	prefs.ShippingLocations = data
+	return nil
+}
+
+// GetDefaultShippingLocation 获取默认发货地点
+func (prefs *UserPreferences) GetDefaultShippingLocation() (*ShippingLocation, error) {
+	locations, err := prefs.GetShippingLocations()
+	if err != nil {
+		return nil, err
+	}
+	for _, loc := range locations {
+		if loc.IsDefault {
+			return loc, nil
+		}
+	}
+	// 如果没有设置默认地点，返回第一个
+	if len(locations) > 0 {
+		return locations[0], nil
+	}
+	return nil, nil
+}
+
+// HasMultipleLocations 检查是否有多个发货地点
+func (prefs *UserPreferences) HasMultipleLocations() bool {
+	locations, err := prefs.GetShippingLocations()
+	if err != nil {
+		return false
+	}
+	return len(locations) > 1
+}
+
+// EnsureDefaultLocation 确保存在默认发货地点（用于迁移）
+func (prefs *UserPreferences) EnsureDefaultLocation(locationID, locationName string) error {
+	locations, err := prefs.GetShippingLocations()
+	if err != nil {
+		return err
+	}
+	if len(locations) > 0 {
+		return nil // 已有发货地点
+	}
+	// 创建默认发货地点
+	defaultLocation := &ShippingLocation{
+		ID:        locationID,
+		Name:      locationName,
+		IsDefault: true,
+	}
+	return prefs.SetShippingLocations([]*ShippingLocation{defaultLocation})
+}
+
+// GetDefaultShippingProfile 获取默认配送档案
+func (prefs *UserPreferences) GetDefaultShippingProfile() (*ShippingProfile, error) {
+	profiles, err := prefs.GetShippingProfiles()
+	if err != nil {
+		return nil, err
+	}
+	for _, profile := range profiles {
+		if profile.IsDefault {
+			return profile, nil
+		}
+	}
+	// 如果没有设置默认档案，返回第一个
+	if len(profiles) > 0 {
+		return profiles[0], nil
+	}
+	return nil, nil
+}
+
+// GetShippingProfileByID 根据ID获取配送档案
+func (prefs *UserPreferences) GetShippingProfileByID(profileID string) (*ShippingProfile, error) {
+	profiles, err := prefs.GetShippingProfiles()
+	if err != nil {
+		return nil, err
+	}
+	for _, profile := range profiles {
+		if profile.ProfileID == profileID {
+			return profile, nil
+		}
+	}
+	return nil, nil
+}
+
+// SetShippingProfiles 设置配送档案列表
+func (prefs *UserPreferences) SetShippingProfiles(profiles []*ShippingProfile) error {
+	data, err := json.Marshal(profiles)
+	if err != nil {
+		return err
+	}
+	prefs.ShippingProfiles = data
+	return nil
+}
+
+// HasShippingProfiles 检查是否有配送档案（用于判断是否使用新版配送系统）
+func (prefs *UserPreferences) HasShippingProfiles() bool {
+	profiles, err := prefs.GetShippingProfiles()
+	if err != nil {
+		return false
+	}
+	return len(profiles) > 0
 }
 
 // StoreModerators returns the moderator peer IDs.
@@ -291,6 +643,8 @@ func (prefs *UserPreferences) MarshalJSON() ([]byte, error) {
 	c0.ShowNsfw = prefs.ShowNsfw
 	c0.ShippingAddresses, _ = prefs.GetShippingAddresses()
 	c0.ShippingOptions, _ = prefs.GetShippingOptions()
+	c0.ShippingProfiles, _ = prefs.GetShippingProfiles()
+	c0.ShippingLocations, _ = prefs.GetShippingLocations()
 	c0.LocalCurrency = prefs.LocalCurrency
 	c0.Country = prefs.Country
 	c0.TermsAndConditions = prefs.TermsAndConditions
@@ -328,6 +682,14 @@ func (prefs *UserPreferences) UnmarshalJSON(b []byte) error {
 		if err != nil {
 			return err
 		}
+		shippingProfiles, err := json.Marshal(c0.ShippingProfiles)
+		if err != nil {
+			return err
+		}
+		shippingLocations, err := json.Marshal(c0.ShippingLocations)
+		if err != nil {
+			return err
+		}
 		blockedNodes, err := json.Marshal(c0.BlockedNodes)
 		if err != nil {
 			return err
@@ -354,6 +716,8 @@ func (prefs *UserPreferences) UnmarshalJSON(b []byte) error {
 		prefs.ShowNsfw = c0.ShowNsfw
 		prefs.ShippingAddresses = shippingAddrs
 		prefs.ShippingOptions = shippingOptions
+		prefs.ShippingProfiles = shippingProfiles
+		prefs.ShippingLocations = shippingLocations
 		prefs.LocalCurrency = c0.LocalCurrency
 		prefs.Country = c0.Country
 		prefs.TermsAndConditions = c0.TermsAndConditions
@@ -369,4 +733,130 @@ func (prefs *UserPreferences) UnmarshalJSON(b []byte) error {
 	}
 
 	return err
+}
+
+// NeedsMigrationFromLegacy 检查是否需要从最早版本的 ShippingOptions 迁移
+func (prefs *UserPreferences) NeedsMigrationFromLegacy() bool {
+	// 如果已有配送档案，不需要迁移
+	if prefs.HasShippingProfiles() {
+		return false
+	}
+	// 如果有旧版运费选项，需要迁移
+	options, err := prefs.GetShippingOptions()
+	if err != nil {
+		return false
+	}
+	return len(options) > 0
+}
+
+// MigrateFromLegacyShippingOptions 将最早版本的 ShippingOptions 迁移到新的 Zones 格式
+// profileID 是新创建的默认档案的 ID（由调用方提供，通常是 UUID）
+// profileName 是默认档案的名称
+// locationID 是默认发货地点的 ID
+// locationName 是默认发货地点的名称
+func (prefs *UserPreferences) MigrateFromLegacyShippingOptions(profileID, profileName, locationID, locationName string) error {
+	if !prefs.NeedsMigrationFromLegacy() {
+		return nil
+	}
+
+	options, err := prefs.GetShippingOptions()
+	if err != nil {
+		return err
+	}
+
+	if len(options) == 0 {
+		return nil
+	}
+
+	// 将旧的 ShippingOptions 转换为新的 Zones 格式
+	zones := make([]*ShippingZone, 0, len(options))
+	for _, option := range options {
+		zone := convertLegacyOptionToZone(&option)
+		if zone != nil {
+			zones = append(zones, zone)
+		}
+	}
+
+	// 创建默认配送档案
+	defaultProfile := &ShippingProfile{
+		ProfileID: profileID,
+		Name:      profileName,
+		IsDefault: true,
+		Zones:     zones,
+	}
+
+	// 保存配送档案
+	if err := prefs.SetShippingProfiles([]*ShippingProfile{defaultProfile}); err != nil {
+		return err
+	}
+
+	// 创建默认发货地点
+	return prefs.EnsureDefaultLocation(locationID, locationName)
+}
+
+// convertLegacyOptionToZone 将最早版本的 ShippingOption 转换为 ShippingZone
+func convertLegacyOptionToZone(option *ShippingOption) *ShippingZone {
+	if option == nil {
+		return nil
+	}
+
+	// 生成唯一 ID（使用简单的格式）
+	zoneID := generateZoneID(option.Name)
+
+	// 将 Services 转换为 Rates
+	rates := make([]*ShippingRate, 0, len(option.Services))
+	for i, service := range option.Services {
+		rateID := generateRateID(service.Name, i)
+		rate := &ShippingRate{
+			ID:                rateID,
+			Name:              service.Name,
+			Price:             service.FirstFreight, // 使用首重费用作为固定价格
+			Currency:          option.Currency,
+			EstimatedDelivery: service.EstimatedDelivery,
+		}
+		rates = append(rates, rate)
+	}
+
+	// 如果没有服务，创建一个默认费率
+	if len(rates) == 0 {
+		rates = append(rates, &ShippingRate{
+			ID:       "default_rate",
+			Name:     option.Name,
+			Price:    "0",
+			Currency: option.Currency,
+		})
+	}
+
+	// 处理满额免邮（应用到第一个费率）
+	if option.FreeShippingThreshold != nil && len(rates) > 0 {
+		rates[0].FreeShippingThreshold = option.FreeShippingThreshold
+	}
+
+	return &ShippingZone{
+		ID:      zoneID,
+		Name:    option.Name,
+		Regions: option.Regions,
+		Rates:   rates,
+	}
+}
+
+// generateZoneID 生成区域 ID
+func generateZoneID(name string) string {
+	// 简单实现：使用名称的小写形式加后缀
+	return strings.ToLower(strings.ReplaceAll(name, " ", "_")) + "_zone"
+}
+
+// generateRateID 生成费率 ID
+func generateRateID(name string, index int) string {
+	base := strings.ToLower(strings.ReplaceAll(name, " ", "_"))
+	return fmt.Sprintf("%s_rate_%d", base, index)
+}
+
+// GetMigrationDefaultProfileID 获取迁移后的默认档案 ID（用于更新现有商品）
+func (prefs *UserPreferences) GetMigrationDefaultProfileID() string {
+	profile, err := prefs.GetDefaultShippingProfile()
+	if err != nil || profile == nil {
+		return ""
+	}
+	return profile.ProfileID
 }

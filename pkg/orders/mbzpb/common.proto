@@ -33,6 +33,7 @@ message Image {
     string medium   = 4;
     string small    = 5;
     string tiny     = 6;
+    string alt      = 7; // Alt text for accessibility and SEO
 }
 
 message File {

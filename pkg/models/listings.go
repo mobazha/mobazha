@@ -11,7 +11,59 @@ import (
 const (
 	// ShortDescriptionLength is the maximum length of the short description.
 	ShortDescriptionLength = 160
+
+	// Listing statuses
+	ListingStatusDraft     = "draft"
+	ListingStatusPublished = "published"
+	ListingStatusPrivate   = "private"
+
+	// ListingStatusDefault is the default status for new listings.
+	ListingStatusDefault = ListingStatusPublished
+
+	// Weight units
+	WeightUnitGram    = "g"
+	WeightUnitKilo    = "kg"
+	WeightUnitPound   = "lb"
+	WeightUnitOunce   = "oz"
+	WeightUnitDefault = WeightUnitGram
+
+	// Inventory policies
+	InventoryPolicyDeny     = "deny"
+	InventoryPolicyContinue = "continue"
+	InventoryPolicyDefault  = InventoryPolicyDeny
+
+	// Dimension units
+	DimensionUnitCm      = "cm"
+	DimensionUnitInch    = "in"
+	DimensionUnitDefault = DimensionUnitCm
 )
+
+// ValidListingStatuses contains all valid listing status values.
+var ValidListingStatuses = map[string]bool{
+	ListingStatusDraft:     true,
+	ListingStatusPublished: true,
+	ListingStatusPrivate:   true,
+}
+
+// ValidWeightUnits contains all valid weight unit values.
+var ValidWeightUnits = map[string]bool{
+	WeightUnitGram:  true,
+	WeightUnitKilo:  true,
+	WeightUnitPound: true,
+	WeightUnitOunce: true,
+}
+
+// ValidInventoryPolicies contains all valid inventory policy values.
+var ValidInventoryPolicies = map[string]bool{
+	InventoryPolicyDeny:     true,
+	InventoryPolicyContinue: true,
+}
+
+// ValidDimensionUnits contains all valid dimension unit values.
+var ValidDimensionUnits = map[string]bool{
+	DimensionUnitCm:   true,
+	DimensionUnitInch: true,
+}
 
 // ListingIndex is a list of metadata objects. It is saved
 // in the public data directory.
@@ -90,6 +142,7 @@ type ListingMetadata struct {
 	RatingCount             uint32           `json:"ratingCount"`
 	ModeratorIDs            []string         `json:"moderators"`
 	CoinType                string           `json:"coinType"`
+	Status                  string           `json:"status,omitempty"`                  // See ListingStatus* constants
 	RwaTradeMode            int32            `json:"rwaTradeMode,omitempty"`            // RWA 交易模式: 0=即时, 1=需确认
 	RwaEscrowTimeoutSeconds uint64           `json:"rwaEscrowTimeoutSeconds,omitempty"` // RWA 托管超时时间（秒）
 	RwaListingId            uint64           `json:"rwaListingId,omitempty"`            // RWA 合约 Listing ID（延迟模式必填）
@@ -138,6 +191,12 @@ func NewListingMetadataFromListing(listing *pb.Listing, cid cid.Cid) (*ListingMe
 	if listing.Item.IntroVideo != nil {
 		introVideoHash = listing.Item.IntroVideo.Hash
 	}
+	// Normalize status: default to published if not set
+	status := listing.Status
+	if status == "" {
+		status = ListingStatusDefault
+	}
+
 	ld := &ListingMetadata{
 		CID:          cid.String(),
 		Slug:         listing.Slug,
@@ -159,6 +218,7 @@ func NewListingMetadataFromListing(listing *pb.Listing, cid cid.Cid) (*ListingMe
 		FreeShipping:            freeShipping,
 		Language:                listing.Metadata.Language,
 		ModeratorIDs:            listing.Moderators,
+		Status:                  status,
 		RwaTradeMode:            int32(listing.Metadata.RwaTradeMode),
 		RwaEscrowTimeoutSeconds: listing.Metadata.RwaEscrowTimeoutSeconds,
 		RwaListingId:            listing.Metadata.RwaListingId,

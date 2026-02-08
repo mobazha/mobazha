@@ -16,7 +16,7 @@ message Listing {
     repeated string moderators              = 8;
     string termsAndConditions               = 9;
     string refundPolicy                     = 10;
-    string status                           = 11; // "draft", "pending", "private" and "published". Default is "published".
+    string status                           = 11; // "draft", "published", "private". Default is "published".
     bool featured                           = 12;
     ShippingProfile shippingProfile         = 13; // Shopify 风格配送档案（包含完整配送信息）
 
@@ -82,6 +82,13 @@ message Listing {
         string tokenStandard                        = 26; // Token 标准 (RWA, ERC20, ERC721, ERC1155, ERC3525, SPL等)
         string tokenId                              = 27; // Token ID (ERC721/ERC1155/ERC3525 必填)
         string slotId                               = 28; // Slot ID (ERC3525 专用，表示资产类别/剧目)
+        string weightUnit                           = 29; // 重量单位: "g"(默认)/"kg"/"lb"/"oz"
+        string inventoryPolicy                      = 30; // 库存策略: "deny"(默认)/"continue" - 缺货时是否继续销售
+        float  packageLength                        = 31; // 包裹长度
+        float  packageWidth                         = 32; // 包裹宽度
+        float  packageHeight                        = 33; // 包裹高度
+        string dimensionUnit                        = 34; // 尺寸单位: "cm"(默认)/"in"
+        string brand                                = 35; // 品牌名称
 
         message Option {
             string name                = 1;

@@ -17,6 +17,8 @@ type PurchaseItemOption struct {
 type PurchaseShippingOption struct {
 	Name    string `json:"name"`
 	Service string `json:"service"`
+	ZoneId  string `json:"zoneId,omitempty"`  // ShippingZone.id（可选，精确匹配优先）
+	RateId  string `json:"rateId,omitempty"`  // ShippingRate.id（可选，精确匹配优先）
 }
 
 // PurchaseItem is information about the item in the purchase.

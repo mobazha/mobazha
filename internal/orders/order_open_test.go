@@ -1195,3 +1195,720 @@ func Test_validateOrderOpen(t *testing.T) {
 		})
 	}
 }
+
+// ============================================================================
+// ShippingProfile 模型测试（新版运费计算）
+// ============================================================================
+
+// makeProfileOrder 创建一个使用 ShippingProfile 的订单（清除旧版 ShippingOptions 和 Taxes）
+// 注意：所有对 listing 的修改都应在此函数内完成，因为函数末尾会重新计算 listing hash。
+// 如果调用后还需修改 listing，需要重新调用 utils.HashListing 更新 hash。
+func makeProfileOrder(profile *pb.ShippingProfile, zoneName, rateName string) (*pb.OrderOpen, error) {
+	return makeProfileOrderWithIDs(profile, zoneName, rateName, "", "")
+}
+
+// makeProfileOrderWithIDs 创建使用 ShippingProfile 的订单，支持传入 zone/rate ID
+func makeProfileOrderWithIDs(profile *pb.ShippingProfile, zoneName, rateName, zoneId, rateId string) (*pb.OrderOpen, error) {
+	order, _, err := factory.NewOrder()
+	if err != nil {
+		return nil, err
+	}
+
+	// 替换为新版 ShippingProfile，清除旧版
+	order.Listings[0].Listing.ShippingOptions = nil
+	order.Listings[0].Listing.ShippingProfile = profile
+	// 清除 Taxes 简化测试（避免测试后修改 listing 导致 hash 不匹配）
+	order.Listings[0].Listing.Taxes = nil
+
+	// 更新 item 的 shipping 选择
+	order.Items[0].ShippingOption = &pb.OrderOpen_Item_ShippingOption{
+		Name:    zoneName,
+		Service: rateName,
+		ZoneId:  zoneId,
+		RateId:  rateId,
+	}
+
+	// 重新计算 listing hash（必须在所有 listing 修改之后）
+	hash, err := utils.HashListing(order.Listings[0])
+	if err != nil {
+		return nil, err
+	}
+	order.Items[0].ListingHash = hash.B58String()
+
+	return order, nil
+}
+
+func TestShippingProfileFlatRate(t *testing.T) {
+	erp, err := wallet.NewMockExchangeRates()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	profile := &pb.ShippingProfile{
+		ProfileID: "test-profile",
+		Name:      "Standard Shipping",
+		IsDefault: true,
+		Zones: []*pb.ShippingZone{
+			{
+				Id:      "zone-1",
+				Name:    "Domestic",
+				Regions: []string{"US"},
+				Rates: []*pb.ShippingRate{
+					{
+						Id:       "rate-1",
+						Name:     "Standard",
+						Price:    "500", // $5.00
+						Currency: "USD",
+					},
+					{
+						Id:       "rate-2",
+						Name:     "Express",
+						Price:    "1500", // $15.00
+						Currency: "USD",
+					},
+				},
+			},
+			{
+				Id:      "zone-2",
+				Name:    "International",
+				Regions: []string{"ALL"},
+				Rates: []*pb.ShippingRate{
+					{
+						Id:       "rate-3",
+						Name:     "International Standard",
+						Price:    "2000", // $20.00
+						Currency: "USD",
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name           string
+		zoneName       string
+		rateName       string
+		zoneId         string
+		rateId         string
+		country        string
+		pricingCoin    string
+		expectError    bool
+		expectShipping bool
+	}{
+		{
+			name:           "domestic standard",
+			zoneName:       "Domestic",
+			rateName:       "Standard",
+			country:        "US",
+			pricingCoin:    "USD",
+			expectShipping: true,
+		},
+		{
+			name:           "domestic express",
+			zoneName:       "Domestic",
+			rateName:       "Express",
+			country:        "US",
+			pricingCoin:    "USD",
+			expectShipping: true,
+		},
+		{
+			name:           "international standard",
+			zoneName:       "International",
+			rateName:       "International Standard",
+			country:        "CN",
+			pricingCoin:    "USD",
+			expectShipping: true,
+		},
+		{
+			name:        "zone not found",
+			zoneName:    "NonExistent",
+			rateName:    "Standard",
+			country:     "US",
+			pricingCoin: "USD",
+			expectError: true,
+		},
+		{
+			name:        "rate not found",
+			zoneName:    "Domestic",
+			rateName:    "NonExistent",
+			country:     "US",
+			pricingCoin: "USD",
+			expectError: true,
+		},
+		{
+			name:        "region not matched",
+			zoneName:    "Domestic",
+			rateName:    "Standard",
+			country:     "CN", // Domestic zone only covers US
+			pricingCoin: "USD",
+			expectError: true,
+		},
+		// ID 匹配测试
+		{
+			name:           "ID match domestic standard",
+			zoneName:       "Domestic",
+			rateName:       "Standard",
+			zoneId:         "zone-1",
+			rateId:         "rate-1",
+			country:        "US",
+			pricingCoin:    "USD",
+			expectShipping: true,
+		},
+		{
+			name:           "ID match overrides wrong name",
+			zoneName:       "WrongName",
+			rateName:       "WrongRate",
+			zoneId:         "zone-1",
+			rateId:         "rate-1",
+			country:        "US",
+			pricingCoin:    "USD",
+			expectShipping: true,
+		},
+		{
+			name:        "ID match wrong zone id",
+			zoneName:    "Domestic",
+			rateName:    "Standard",
+			zoneId:      "wrong-zone",
+			rateId:      "rate-1",
+			country:     "US",
+			pricingCoin: "USD",
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		order, err := makeProfileOrderWithIDs(profile, test.zoneName, test.rateName, test.zoneId, test.rateId)
+		if err != nil {
+			t.Fatalf("test %s: makeProfileOrder error: %s", test.name, err)
+		}
+		order.Shipping.Country = test.country
+		order.PricingCoin = test.pricingCoin
+
+		totals, err := CalculateOrderTotal(order, erp)
+		if test.expectError {
+			if err == nil {
+				t.Errorf("test %s: expected error but got none", test.name)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatalf("test %s: unexpected error: %s", test.name, err)
+		}
+		if test.expectShipping && totals.Shipping.Cmp(iwallet.NewAmount(0)) <= 0 {
+			t.Errorf("test %s: expected positive shipping cost but got %s", test.name, totals.Shipping.String())
+		}
+	}
+}
+
+func TestShippingProfileWeightCondition(t *testing.T) {
+	erp, err := wallet.NewMockExchangeRates()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	profile := &pb.ShippingProfile{
+		ProfileID: "weight-profile",
+		Name:      "Weight Based",
+		IsDefault: true,
+		Zones: []*pb.ShippingZone{
+			{
+				Id:      "zone-1",
+				Name:    "Domestic",
+				Regions: []string{"ALL"},
+				Rates: []*pb.ShippingRate{
+					{
+						Id:       "rate-light",
+						Name:     "Light",
+						Price:    "500",
+						Currency: "USD",
+						Condition: &pb.ShippingRate_RateCondition{
+							Type:     pb.ShippingRate_RateCondition_WEIGHT,
+							MinValue: 0,
+							MaxValue: 500,
+						},
+					},
+					{
+						Id:       "rate-heavy",
+						Name:     "Heavy",
+						Price:    "1500",
+						Currency: "USD",
+						Condition: &pb.ShippingRate_RateCondition{
+							Type:     pb.ShippingRate_RateCondition_WEIGHT,
+							MinValue: 501,
+							MaxValue: 5000,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name           string
+		rateName       string
+		itemGrams      uint32
+		expectShipping bool
+	}{
+		{
+			name:           "light item in light range",
+			rateName:       "Light",
+			itemGrams:      100,
+			expectShipping: true,
+		},
+		{
+			name:           "heavy item in heavy range",
+			rateName:       "Heavy",
+			itemGrams:      1000,
+			expectShipping: true,
+		},
+		{
+			name:           "light rate selected but item too heavy - no shipping charged",
+			rateName:       "Light",
+			itemGrams:      1000, // exceeds Light's max of 500
+			expectShipping: false,
+		},
+		{
+			name:           "boundary value at max weight",
+			rateName:       "Light",
+			itemGrams:      500, // exactly at max
+			expectShipping: true,
+		},
+	}
+
+	for _, test := range tests {
+		order, err := makeProfileOrder(profile, "Domestic", test.rateName)
+		if err != nil {
+			t.Fatalf("test %s: makeProfileOrder error: %s", test.name, err)
+		}
+		order.Listings[0].Listing.Item.Grams = test.itemGrams
+		order.PricingCoin = "USD"
+
+		// Re-hash after modifying grams
+		hash, err := utils.HashListing(order.Listings[0])
+		if err != nil {
+			t.Fatalf("test %s: hash error: %s", test.name, err)
+		}
+		order.Items[0].ListingHash = hash.B58String()
+
+		totals, err := CalculateOrderTotal(order, erp)
+		if err != nil {
+			t.Fatalf("test %s: unexpected error: %s", test.name, err)
+		}
+
+		hasShipping := totals.Shipping.Cmp(iwallet.NewAmount(0)) > 0
+		if test.expectShipping && !hasShipping {
+			t.Errorf("test %s: expected shipping cost but got zero", test.name)
+		}
+		if !test.expectShipping && hasShipping {
+			t.Errorf("test %s: expected zero shipping but got %s", test.name, totals.Shipping.String())
+		}
+	}
+}
+
+func TestShippingProfileFreeShippingThreshold(t *testing.T) {
+	erp, err := wallet.NewMockExchangeRates()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name       string
+		minAmount  string
+		expectFree bool
+	}{
+		{
+			name:       "subtotal below threshold - charge shipping",
+			minAmount:  "200", // item price is 100
+			expectFree: false,
+		},
+		{
+			name:       "subtotal meets threshold - free shipping",
+			minAmount:  "90", // item price is 100
+			expectFree: true,
+		},
+	}
+
+	for _, test := range tests {
+		profile := &pb.ShippingProfile{
+			ProfileID: "free-test",
+			Name:      "Free Shipping Test",
+			IsDefault: true,
+			Zones: []*pb.ShippingZone{
+				{
+					Id:      "zone-1",
+					Name:    "Global",
+					Regions: []string{"ALL"},
+					Rates: []*pb.ShippingRate{
+						{
+							Id:       "rate-1",
+							Name:     "Standard",
+							Price:    "1000", // $10.00
+							Currency: "USD",
+							FreeShippingThreshold: &pb.ShippingRate_FreeShippingThreshold{
+								Enabled:   true,
+								MinAmount: test.minAmount,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		order, err := makeProfileOrder(profile, "Global", "Standard")
+		if err != nil {
+			t.Fatalf("test %s: makeProfileOrder error: %s", test.name, err)
+		}
+		order.PricingCoin = "USD"
+
+		totals, err := CalculateOrderTotal(order, erp)
+		if err != nil {
+			t.Fatalf("test %s: unexpected error: %s", test.name, err)
+		}
+
+		isFree := totals.Shipping.Cmp(iwallet.NewAmount(0)) == 0
+		if test.expectFree && !isFree {
+			t.Errorf("test %s: expected free shipping but got %s", test.name, totals.Shipping.String())
+		}
+		if !test.expectFree && isFree {
+			t.Errorf("test %s: expected shipping charge but got free", test.name)
+		}
+	}
+}
+
+func TestShippingProfileRegionCaseInsensitive(t *testing.T) {
+	erp, err := wallet.NewMockExchangeRates()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name    string
+		region  string
+		country string
+		wantErr bool
+	}{
+		{name: "uppercase match", region: "US", country: "US", wantErr: false},
+		{name: "lowercase region", region: "us", country: "US", wantErr: false},
+		{name: "lowercase country", region: "US", country: "us", wantErr: false},
+		{name: "mixed case", region: "Us", country: "uS", wantErr: false},
+		{name: "ALL matches any", region: "ALL", country: "JP", wantErr: false},
+		{name: "mismatch", region: "US", country: "CN", wantErr: true},
+	}
+
+	for _, test := range tests {
+		profile := &pb.ShippingProfile{
+			ProfileID: "region-test",
+			Name:      "Region Test",
+			IsDefault: true,
+			Zones: []*pb.ShippingZone{
+				{
+					Id:      "zone-1",
+					Name:    "TestZone",
+					Regions: []string{test.region},
+					Rates: []*pb.ShippingRate{
+						{Id: "rate-1", Name: "Standard", Price: "500", Currency: "USD"},
+					},
+				},
+			},
+		}
+
+		order, err := makeProfileOrder(profile, "TestZone", "Standard")
+		if err != nil {
+			t.Fatalf("test %s: makeProfileOrder error: %s", test.name, err)
+		}
+		order.Shipping.Country = test.country
+		order.PricingCoin = "USD"
+
+		_, err = CalculateOrderTotal(order, erp)
+		if test.wantErr && err == nil {
+			t.Errorf("test %s: expected error but got none", test.name)
+		}
+		if !test.wantErr && err != nil {
+			t.Errorf("test %s: unexpected error: %s", test.name, err)
+		}
+	}
+}
+
+func TestShippingProfileZoneNameCaseInsensitive(t *testing.T) {
+	erp, err := wallet.NewMockExchangeRates()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	profile := &pb.ShippingProfile{
+		ProfileID: "case-test",
+		Name:      "Case Test",
+		IsDefault: true,
+		Zones: []*pb.ShippingZone{
+			{
+				Id:      "zone-1",
+				Name:    "Domestic",
+				Regions: []string{"ALL"},
+				Rates: []*pb.ShippingRate{
+					{Id: "rate-1", Name: "Express", Price: "1000", Currency: "USD"},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		zoneName string
+		rateName string
+		wantErr  bool
+	}{
+		{name: "exact match", zoneName: "Domestic", rateName: "Express", wantErr: false},
+		{name: "lowercase zone", zoneName: "domestic", rateName: "Express", wantErr: false},
+		{name: "uppercase zone", zoneName: "DOMESTIC", rateName: "Express", wantErr: false},
+		{name: "lowercase rate", zoneName: "Domestic", rateName: "express", wantErr: false},
+		{name: "all uppercase", zoneName: "DOMESTIC", rateName: "EXPRESS", wantErr: false},
+	}
+
+	for _, test := range tests {
+		order, err := makeProfileOrder(profile, test.zoneName, test.rateName)
+		if err != nil {
+			t.Fatalf("test %s: makeProfileOrder error: %s", test.name, err)
+		}
+		order.PricingCoin = "USD"
+
+		_, err = CalculateOrderTotal(order, erp)
+		if test.wantErr && err == nil {
+			t.Errorf("test %s: expected error but got none", test.name)
+		}
+		if !test.wantErr && err != nil {
+			t.Errorf("test %s: unexpected error: %s", test.name, err)
+		}
+	}
+}
+
+func TestValidateShippingFromProfile(t *testing.T) {
+	profile := &pb.ShippingProfile{
+		Zones: []*pb.ShippingZone{
+			{
+				Id:   "zone-dom",
+				Name: "Domestic",
+				Rates: []*pb.ShippingRate{
+					{Id: "rate-std", Name: "Standard"},
+					{Id: "rate-exp", Name: "Express"},
+				},
+			},
+			{
+				Id:   "zone-intl",
+				Name: "International",
+				Rates: []*pb.ShippingRate{
+					{Id: "rate-eco", Name: "Economy"},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name    string
+		zone    string
+		rate    string
+		zoneId  string
+		rateId  string
+		wantErr bool
+	}{
+		// 名称匹配（旧订单/未传 ID）
+		{name: "valid domestic standard", zone: "Domestic", rate: "Standard", wantErr: false},
+		{name: "valid domestic express", zone: "Domestic", rate: "Express", wantErr: false},
+		{name: "valid international economy", zone: "International", rate: "Economy", wantErr: false},
+		{name: "case insensitive zone", zone: "domestic", rate: "Standard", wantErr: false},
+		{name: "case insensitive rate", zone: "Domestic", rate: "standard", wantErr: false},
+		{name: "zone not found", zone: "NonExistent", rate: "Standard", wantErr: true},
+		{name: "rate not found in zone", zone: "Domestic", rate: "Economy", wantErr: true},
+		{name: "rate from wrong zone", zone: "International", rate: "Express", wantErr: true},
+		// ID 匹配（新订单路径）
+		{name: "valid ID match", zone: "Domestic", rate: "Standard", zoneId: "zone-dom", rateId: "rate-std", wantErr: false},
+		{name: "valid ID match intl", zone: "International", rate: "Economy", zoneId: "zone-intl", rateId: "rate-eco", wantErr: false},
+		{name: "ID match wrong zone id", zone: "Domestic", rate: "Standard", zoneId: "zone-wrong", rateId: "rate-std", wantErr: true},
+		{name: "ID match wrong rate id", zone: "Domestic", rate: "Standard", zoneId: "zone-dom", rateId: "rate-wrong", wantErr: true},
+		{name: "ID match rate in wrong zone", zone: "Domestic", rate: "Economy", zoneId: "zone-dom", rateId: "rate-eco", wantErr: true},
+		// ID 优先于名称（即使名称错误，ID 正确也能通过）
+		{name: "ID overrides wrong name", zone: "WrongName", rate: "WrongRate", zoneId: "zone-dom", rateId: "rate-std", wantErr: false},
+	}
+
+	for _, test := range tests {
+		err := validateShippingFromProfile(profile, &pb.OrderOpen_Item_ShippingOption{
+			Name:    test.zone,
+			Service: test.rate,
+			ZoneId:  test.zoneId,
+			RateId:  test.rateId,
+		})
+		if test.wantErr && err == nil {
+			t.Errorf("test %s: expected error but got nil", test.name)
+		}
+		if !test.wantErr && err != nil {
+			t.Errorf("test %s: unexpected error: %s", test.name, err)
+		}
+	}
+}
+
+func TestValidateShippingFromLegacy(t *testing.T) {
+	options := []*pb.Listing_ShippingOption{
+		{
+			Name: "USPS",
+			Services: []*pb.Listing_ShippingOption_Service{
+				{Name: "standard"},
+				{Name: "priority"},
+			},
+		},
+		{
+			Name: "FedEx",
+			Services: []*pb.Listing_ShippingOption_Service{
+				{Name: "ground"},
+			},
+		},
+	}
+
+	tests := []struct {
+		name    string
+		option  string
+		service string
+		wantErr bool
+	}{
+		{name: "valid usps standard", option: "USPS", service: "standard", wantErr: false},
+		{name: "valid usps priority", option: "USPS", service: "priority", wantErr: false},
+		{name: "valid fedex ground", option: "FedEx", service: "ground", wantErr: false},
+		{name: "case insensitive option", option: "usps", service: "standard", wantErr: false},
+		{name: "case insensitive service", option: "USPS", service: "STANDARD", wantErr: false},
+		{name: "option not found", option: "DHL", service: "standard", wantErr: true},
+		{name: "service not found", option: "USPS", service: "overnight", wantErr: true},
+		{name: "service from wrong option", option: "FedEx", service: "priority", wantErr: true},
+	}
+
+	for _, test := range tests {
+		err := validateShippingFromLegacy(options, &pb.OrderOpen_Item_ShippingOption{
+			Name:    test.option,
+			Service: test.service,
+		})
+		if test.wantErr && err == nil {
+			t.Errorf("test %s: expected error but got nil", test.name)
+		}
+		if !test.wantErr && err != nil {
+			t.Errorf("test %s: unexpected error: %s", test.name, err)
+		}
+	}
+}
+
+// TestShippingProfilePriceCondition 测试基于价格条件的运费计算
+// PRICE 条件根据订单金额（eligibleSubtotal）判断是否收取运费
+func TestShippingProfilePriceCondition(t *testing.T) {
+	erp, err := wallet.NewMockExchangeRates()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 默认商品价格为 "100"（最小单位）
+	// PRICE 条件的 MinValue/MaxValue 也是最小单位
+	profile := &pb.ShippingProfile{
+		ProfileID: "price-profile",
+		Name:      "Price Based",
+		IsDefault: true,
+		Zones: []*pb.ShippingZone{
+			{
+				Id:      "zone-1",
+				Name:    "Domestic",
+				Regions: []string{"ALL"},
+				Rates: []*pb.ShippingRate{
+					{
+						Id:       "rate-low",
+						Name:     "Low Value",
+						Price:    "500", // $5.00 shipping
+						Currency: "USD",
+						Condition: &pb.ShippingRate_RateCondition{
+							Type:     pb.ShippingRate_RateCondition_PRICE,
+							MinValue: 0,
+							MaxValue: 200, // 订单金额 <= 200
+						},
+					},
+					{
+						Id:       "rate-high",
+						Name:     "High Value",
+						Price:    "1000", // $10.00 shipping
+						Currency: "USD",
+						Condition: &pb.ShippingRate_RateCondition{
+							Type:     pb.ShippingRate_RateCondition_PRICE,
+							MinValue: 201,
+							MaxValue: 0, // 0 = 无上限
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name           string
+		rateName       string
+		itemPrice      string // 商品价格（最小单位）
+		expectShipping bool
+	}{
+		{
+			name:           "low value order within range",
+			rateName:       "Low Value",
+			itemPrice:      "100", // 在 [0, 200] 范围内
+			expectShipping: true,
+		},
+		{
+			name:           "low value order at max boundary",
+			rateName:       "Low Value",
+			itemPrice:      "200", // 恰好在 max 边界
+			expectShipping: true,
+		},
+		{
+			name:           "low value rate selected but order exceeds max",
+			rateName:       "Low Value",
+			itemPrice:      "300", // 超出 Low Value 的 max=200
+			expectShipping: false,
+		},
+		{
+			name:           "high value order - unlimited max",
+			rateName:       "High Value",
+			itemPrice:      "500", // 在 [201, ∞) 范围内
+			expectShipping: true,
+		},
+		{
+			name:           "high value rate at min boundary",
+			rateName:       "High Value",
+			itemPrice:      "201", // 恰好在 min 边界
+			expectShipping: true,
+		},
+		{
+			name:           "high value rate selected but order below min",
+			rateName:       "High Value",
+			itemPrice:      "100", // 低于 High Value 的 min=201
+			expectShipping: false,
+		},
+	}
+
+	for _, test := range tests {
+		order, err := makeProfileOrder(profile, "Domestic", test.rateName)
+		if err != nil {
+			t.Fatalf("test %s: makeProfileOrder error: %s", test.name, err)
+		}
+		order.Listings[0].Listing.Item.Price = test.itemPrice
+		order.PricingCoin = "USD"
+
+		// Re-hash after modifying price
+		hash, err := utils.HashListing(order.Listings[0])
+		if err != nil {
+			t.Fatalf("test %s: hash error: %s", test.name, err)
+		}
+		order.Items[0].ListingHash = hash.B58String()
+
+		totals, err := CalculateOrderTotal(order, erp)
+		if err != nil {
+			t.Fatalf("test %s: unexpected error: %s", test.name, err)
+		}
+
+		hasShipping := totals.Shipping.Cmp(iwallet.NewAmount(0)) > 0
+		if test.expectShipping && !hasShipping {
+			t.Errorf("test %s: expected shipping cost but got zero", test.name)
+		}
+		if !test.expectShipping && hasShipping {
+			t.Errorf("test %s: expected zero shipping but got %s", test.name, totals.Shipping.String())
+		}
+	}
+}

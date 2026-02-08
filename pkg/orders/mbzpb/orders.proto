@@ -46,8 +46,10 @@ message OrderOpen {
         }
 
         message ShippingOption {
-            string name    = 1;
-            string service = 2;
+            string name    = 1;  // zone name (新版) / option name (旧版)
+            string service = 2;  // rate name (新版) / service name (旧版)
+            string zoneId  = 3;  // ShippingZone.id（可选，精确匹配优先）
+            string rateId  = 4;  // ShippingRate.id（可选，精确匹配优先）
         }
     }
 }

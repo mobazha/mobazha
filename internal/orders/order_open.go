@@ -9,6 +9,7 @@ import (
 	"math"
 	"math/big"
 	"strings"
+	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -413,20 +414,21 @@ func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode strin
 			}
 		}
 
-		// 对于非RWA Token，添加SKU和可选功能附加费用
+		// 对于非RWA Token，处理SKU定价和可选功能附加费用
 		if listing.Metadata.ContractType != pb.Listing_Metadata_RWA_TOKEN {
-			// Add or subtract any surcharge on the selected sku
+			// Shopify 风格绝对定价：如果 SKU 有独立价格则使用 SKU 价格，否则使用 item.price
 			sku, err := getSelectedSku(listing, item.Options)
 			if err != nil {
 				return models.OrderTotals{}, err
 			}
-			surcharge := iwallet.NewAmount(sku.Surcharge)
-			surchargeValue := models.NewCurrencyValue(surcharge.String(), pricingCurrency)
-			convertedSurcharge, err := wallet.ConvertCurrencyAmount(surchargeValue, paymentCurrency, erp)
-			if err != nil {
-				return models.OrderTotals{}, err
+			if sku.Price != "" && iwallet.NewAmount(sku.Price).Cmp(iwallet.NewAmount(0)) > 0 {
+				skuPrice := models.NewCurrencyValue(sku.Price, pricingCurrency)
+				convertedSkuPrice, err := wallet.ConvertCurrencyAmount(skuPrice, paymentCurrency, erp)
+				if err != nil {
+					return models.OrderTotals{}, err
+				}
+				itemTotal = convertedSkuPrice // 替换为 SKU 绝对价格
 			}
-			itemTotal = itemTotal.Add(convertedSurcharge)
 
 			// Add any surcharge on the optional features
 			optionalFeatures := getSelectedOptionalFeatures(listing, item.OptionalFeatures)
@@ -455,20 +457,41 @@ func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode strin
 				}
 				for _, vendorCoupon := range listing.Coupons {
 					if couponCode == vendorCoupon.GetDiscountCode() || couponHash.B58String() == vendorCoupon.GetHash() {
-						if discount := vendorCoupon.GetPriceDiscount(); discount != "" && iwallet.NewAmount(discount).Cmp(iwallet.NewAmount(0)) > 0 {
-							price := models.NewCurrencyValue(discount, pricingCurrency)
-							discountAmount, err := wallet.ConvertCurrencyAmount(price, paymentCurrency, erp)
-							if err != nil {
-								return models.OrderTotals{}, err
+						// 检查优惠券有效期
+						now := time.Now()
+						if vendorCoupon.StartsAt != nil && vendorCoupon.StartsAt.AsTime().After(now) {
+							continue // 优惠券尚未生效
+						}
+						if vendorCoupon.ExpiresAt != nil && vendorCoupon.ExpiresAt.AsTime().Before(now) {
+							continue // 优惠券已过期
+						}
+					// 检查最低订单金额（使用行项目总金额 = 单价 × 数量）
+					if vendorCoupon.MinimumOrderAmount != "" && iwallet.NewAmount(vendorCoupon.MinimumOrderAmount).Cmp(iwallet.NewAmount(0)) > 0 {
+						lineTotal := itemTotal.Mul(itemQuantity)
+						if lineTotal.Cmp(iwallet.NewAmount(vendorCoupon.MinimumOrderAmount)) < 0 {
+							continue // 未达到最低订单金额
+						}
+					}
+						// 根据折扣类型计算折扣
+						switch vendorCoupon.DiscountType {
+						case pb.Listing_Coupon_FIXED:
+							if discount := vendorCoupon.GetPriceDiscount(); discount != "" && iwallet.NewAmount(discount).Cmp(iwallet.NewAmount(0)) > 0 {
+								price := models.NewCurrencyValue(discount, pricingCurrency)
+								discountAmount, err := wallet.ConvertCurrencyAmount(price, paymentCurrency, erp)
+								if err != nil {
+									return models.OrderTotals{}, err
+								}
+								itemTotal = itemTotal.Sub(discountAmount)
+								discountsTotal = discountsTotal.Sub(discountAmount)
 							}
-							itemTotal = itemTotal.Sub(discountAmount)
-							discountsTotal = discountsTotal.Sub(discountAmount)
-						} else if discount := vendorCoupon.GetPercentDiscount(); discount > 0 {
-							f, _ := new(big.Float).SetString(itemTotal.String())
-							f.Mul(f, big.NewFloat(float64(-discount/100)))
-							discountAmount, _ := f.Int(nil)
-							itemTotal = itemTotal.Add(iwallet.NewAmount(discountAmount))
-							discountsTotal = discountsTotal.Add(iwallet.NewAmount(discountAmount))
+						case pb.Listing_Coupon_PERCENT:
+							if discount := vendorCoupon.GetPercentDiscount(); discount > 0 {
+								f, _ := new(big.Float).SetString(itemTotal.String())
+								f.Mul(f, big.NewFloat(float64(-discount/100)))
+								discountAmount, _ := f.Int(nil)
+								itemTotal = itemTotal.Add(iwallet.NewAmount(discountAmount))
+								discountsTotal = discountsTotal.Add(iwallet.NewAmount(discountAmount))
+							}
 						}
 					}
 				}
@@ -931,7 +954,7 @@ func calculateShippingTax(shippingTaxPercentage float32, shippingRate iwallet.Am
 // getSelectedSku returns the SKU from the listing which matches the provided options.
 func getSelectedSku(listing *pb.Listing, options []*pb.OrderOpen_Item_Option) (*pb.Listing_Item_Sku, error) {
 	if len(listing.Item.Options) == 0 {
-		return &pb.Listing_Item_Sku{Surcharge: "0"}, nil
+		return &pb.Listing_Item_Sku{}, nil
 	}
 	opts := make(map[string]string)
 	for _, option := range options {

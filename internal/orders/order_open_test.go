@@ -268,7 +268,7 @@ func TestCalculateOrderTotal(t *testing.T) {
 			expectedTotal: iwallet.NewAmount("9152406"),
 		},
 		{
-			// Additional item shipping
+			// Additional item shipping (FirstFreight="20" is same as factory default, so same as Quantity 2 test)
 			transform: func(order *pb.OrderOpen) error {
 				order.Listings[0].Listing.ShippingOptions[0].Services[0].FirstFreight = "20"
 				hash, err := utils.HashListing(order.Listings[0])
@@ -279,7 +279,7 @@ func TestCalculateOrderTotal(t *testing.T) {
 				order.Items[0].ListingHash = hash.B58String()
 				return nil
 			},
-			expectedTotal: iwallet.NewAmount("9984442"),
+			expectedTotal: iwallet.NewAmount("9152406"),
 		},
 		{
 			// Multiple items
@@ -312,7 +312,8 @@ func TestCalculateOrderTotal(t *testing.T) {
 			transform: func(order *pb.OrderOpen) error {
 				order.Listings = append(order.Listings, order.Listings[0])
 				order.Listings[1].Listing.Item.Title = "abc"
-				order.Listings[1].Listing.Coupons[0].Discount = &pb.Listing_Coupon_PriceDiscount{PriceDiscount: "5"}
+				order.Listings[1].Listing.Coupons[0].DiscountType = pb.Listing_Coupon_FIXED
+				order.Listings[1].Listing.Coupons[0].PriceDiscount = "5"
 				hash, err := utils.HashListing(order.Listings[1])
 				if err != nil {
 					return err
@@ -342,7 +343,7 @@ func TestCalculateOrderTotal(t *testing.T) {
 				order.Items[0].ShippingOption = nil
 				return nil
 			},
-			expectedTotal: iwallet.NewAmount("5000025"),
+			expectedTotal: iwallet.NewAmount("3888024"),
 		},
 	}
 

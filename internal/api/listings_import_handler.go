@@ -146,7 +146,7 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 		}
 
 		// Variants sheet headers - selections format: "Option1:Value1,Option2:Value2"
-		variantHeaders := []string{"productTitle", "selections", "surcharge", "quantity", "productID"}
+		variantHeaders := []string{"productTitle", "selections", "price", "quantity", "productID"}
 		for i, h := range variantHeaders {
 			cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 			f.SetCellValue(variantsSheet, cell, h)
@@ -154,9 +154,9 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 
 		// Add variant examples - Color x Size combinations
 		variantExamples := [][]interface{}{
-			{"Example Product", "Color:Red,Size:S", "0", "50", "SKU-RED-S"},
-			{"Example Product", "Color:Red,Size:M", "0", "60", "SKU-RED-M"},
-			{"Example Product", "Color:Red,Size:L", "10", "40", "SKU-RED-L"},
+			{"Example Product", "Color:Red,Size:S", "2999", "50", "SKU-RED-S"},
+			{"Example Product", "Color:Red,Size:M", "2999", "60", "SKU-RED-M"},
+			{"Example Product", "Color:Red,Size:L", "3499", "40", "SKU-RED-L"},
 			{"Example Product", "Color:Blue,Size:S", "0", "30", "SKU-BLUE-S"},
 			{"Example Product", "Color:Blue,Size:M", "0", "80", "SKU-BLUE-M"},
 			{"Example Product", "Color:Blue,Size:L", "10", "25", "SKU-BLUE-L"},
@@ -193,7 +193,7 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 		}
 
 		// Variants sheet headers - selections format: "选项1:值1,选项2:值2"
-		variantHeaders := []string{"关联商品标题", "选项组合", "加价", "库存数量", "SKU编号"}
+		variantHeaders := []string{"关联商品标题", "选项组合", "价格", "库存数量", "SKU编号"}
 		for i, h := range variantHeaders {
 			cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 			f.SetCellValue(variantsSheet, cell, h)
@@ -772,7 +772,7 @@ type Selection struct {
 type VariantData struct {
 	ProductTitle string
 	Selections   []Selection // e.g., [{Option: "Color", Variant: "Red"}, {Option: "Size", Variant: "S"}]
-	Surcharge    string
+	Price        string      // 变体绝对价格（Shopify 风格）
 	Quantity     string
 	ProductID    string
 }
@@ -816,8 +816,8 @@ func (g *Gateway) readVariants(xlsx *excelize.File, sheetName string, lang strin
 			columns["productTitle"] = i
 		case "selections", "选项组合":
 			columns["selections"] = i
-		case "surcharge", "加价":
-			columns["surcharge"] = i
+		case "price", "价格":
+			columns["price"] = i
 		case "quantity", "库存数量":
 			columns["quantity"] = i
 		case "productID", "SKU编号":
@@ -837,7 +837,7 @@ func (g *Gateway) readVariants(xlsx *excelize.File, sheetName string, lang strin
 		variant := VariantData{
 			ProductTitle: g.getCellValue(row, columns["productTitle"]),
 			Selections:   selections,
-			Surcharge:    g.getCellValue(row, columns["surcharge"]),
+			Price:        g.getCellValue(row, columns["price"]),
 			Quantity:     g.getCellValue(row, columns["quantity"]),
 			ProductID:    g.getCellValue(row, columns["productID"]),
 		}
@@ -872,8 +872,7 @@ func (g *Gateway) processListingVariants(listing *pb.Listing, productTitle strin
 	// Create options with their variants
 	for optName, variantSet := range optionVariants {
 		option := &pb.Listing_Item_Option{
-			Name:      optName,
-			Variation: true,
+			Name: optName,
 		}
 
 		for variantName := range variantSet {
@@ -899,9 +898,19 @@ func (g *Gateway) processListingVariants(listing *pb.Listing, productTitle strin
 			})
 		}
 
+		// Convert variant price to integer format (same as base price)
+		skuPrice := v.Price
+		if skuPrice != "" && skuPrice != "0" {
+			priceInt, err := g.convertPriceToInt(skuPrice, 2)
+			if err == nil {
+				skuPrice = priceInt
+			}
+			// If conversion fails, use original value (may be already in integer format)
+		}
+
 		sku := &pb.Listing_Item_Sku{
 			ProductID:  v.ProductID,
-			Surcharge:  v.Surcharge,
+			Price:      skuPrice,
 			Quantity:   v.Quantity,
 			Selections: selections,
 		}
@@ -1003,7 +1012,7 @@ type JSONListingInput struct {
 // JSONVariantInput represents a variant/SKU in JSON import format
 type JSONVariantInput struct {
 	Selections map[string]string `json:"selections"` // e.g., {"Color": "Red", "Size": "S"}
-	Surcharge  string            `json:"surcharge"`
+	Price      string            `json:"price"`      // 变体绝对价格（Shopify 风格）
 	Quantity   string            `json:"quantity"`
 	ProductID  string            `json:"productID"`
 }
@@ -1436,8 +1445,7 @@ func (g *Gateway) processJSONListingVariants(listing *pb.Listing, variants []JSO
 	// Create options with their variants
 	for optName, variantSet := range optionVariants {
 		option := &pb.Listing_Item_Option{
-			Name:      optName,
-			Variation: true,
+			Name: optName,
 		}
 
 		for variantName := range variantSet {
@@ -1461,7 +1469,7 @@ func (g *Gateway) processJSONListingVariants(listing *pb.Listing, variants []JSO
 
 		sku := &pb.Listing_Item_Sku{
 			ProductID:  v.ProductID,
-			Surcharge:  v.Surcharge,
+			Price:      v.Price,
 			Quantity:   v.Quantity,
 			Selections: selections,
 		}

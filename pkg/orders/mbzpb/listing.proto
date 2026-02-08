@@ -87,7 +87,7 @@ message Listing {
             string name                = 1;
             string description         = 2;
             repeated Variant variants  = 3;
-            bool variation             = 4;
+            // bool variation = 4; // 已移除：Shopify 模型中所有 option 均参与变体组合
 
             message Variant {
                 string name = 1;
@@ -99,10 +99,13 @@ message Listing {
             repeated Selection selections = 1;
             string productID              = 2;
             string quantity               = 3;
-            string surcharge              = 4;
+            string price                  = 4;   // 变体绝对价格（Shopify 风格，替代 surcharge）
             repeated Image images         = 5;
             bool downloadable             = 6;
             repeated Download downloads   = 7;
+            string compareAtPrice         = 8;   // 划线价/原价（展示折扣用）
+            string barcode                = 9;   // 条码（UPC/EAN/ISBN）
+            uint32 weight                 = 10;  // 变体重量（克），覆盖 Item.grams
 
             message Selection {
                 string option  = 1;
@@ -179,15 +182,20 @@ message Listing {
     }
 
     message Coupon {
-        string title = 1;
-        oneof code {
-            string hash         = 2;
-            string discountCode = 3;
+        string title                           = 1;
+        string hash                            = 2;   // 折扣码哈希
+        string discountCode                    = 3;   // 折扣码（明文）
+        enum DiscountType {
+            PERCENT = 0;
+            FIXED   = 1;
         }
-        oneof discount {
-            float percentDiscount = 4;
-            string priceDiscount  = 5;
-        }
+        DiscountType discountType              = 4;   // 折扣类型
+        float percentDiscount                  = 5;   // 百分比折扣（0-99）
+        string priceDiscount                   = 6;   // 固定金额折扣（最小单位）
+        int32 usageLimit                       = 7;   // 最大使用次数，0 = 无限
+        google.protobuf.Timestamp startsAt     = 8;   // 生效时间
+        google.protobuf.Timestamp expiresAt    = 9;   // 过期时间
+        string minimumOrderAmount              = 10;  // 最低订单金额
     }
 }
 

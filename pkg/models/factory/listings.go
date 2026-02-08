@@ -42,7 +42,6 @@ func NewPhysicalListing(slug string) *pb.Listing {
 						{Name: "Small", Image: NewImage()},
 						{Name: "Large", Image: NewImage()},
 					},
-					Variation: true,
 				},
 				{
 					Name:        "Color",
@@ -51,7 +50,6 @@ func NewPhysicalListing(slug string) *pb.Listing {
 						{Name: "Red", Image: NewImage()},
 						{Name: "Green", Image: NewImage()},
 					},
-					Variation: true,
 				},
 			},
 			Nsfw:           false,
@@ -74,12 +72,12 @@ func NewPhysicalListing(slug string) *pb.Listing {
 							Variant: "Red",
 						},
 					},
-					Surcharge: "0",
+					Price:     "100",
 					Quantity:  "12",
 					ProductID: "1",
 				},
 				{
-					Surcharge: "0",
+					Price:     "100",
 					Quantity:  "44",
 					ProductID: "2",
 					Selections: []*pb.Listing_Item_Sku_Selection{
@@ -121,9 +119,10 @@ func NewPhysicalListing(slug string) *pb.Listing {
 		},
 		Coupons: []*pb.Listing_Coupon{
 			{
-				Title:    "Insider's Discount",
-				Code:     &pb.Listing_Coupon_DiscountCode{DiscountCode: "insider"},
-				Discount: &pb.Listing_Coupon_PercentDiscount{PercentDiscount: 5},
+				Title:           "Insider's Discount",
+				DiscountCode:    "insider",
+				DiscountType:    pb.Listing_Coupon_PERCENT,
+				PercentDiscount: 5,
 			},
 		},
 	}
@@ -157,7 +156,7 @@ func NewDigitalListing(slug string) *pb.Listing {
 			Images:         []*pb.Image{NewImage(), NewImage()},
 			Skus: []*pb.Listing_Item_Sku{
 				{
-					Surcharge: "0",
+					Price:     "100",
 					Quantity:  "12",
 					ProductID: "1",
 				},
@@ -173,9 +172,10 @@ func NewDigitalListing(slug string) *pb.Listing {
 		},
 		Coupons: []*pb.Listing_Coupon{
 			{
-				Title:    "Insider's Discount",
-				Code:     &pb.Listing_Coupon_DiscountCode{DiscountCode: "insider"},
-				Discount: &pb.Listing_Coupon_PercentDiscount{PercentDiscount: 5},
+				Title:           "Insider's Discount",
+				DiscountCode:    "insider",
+				DiscountType:    pb.Listing_Coupon_PERCENT,
+				PercentDiscount: 5,
 			},
 		},
 	}

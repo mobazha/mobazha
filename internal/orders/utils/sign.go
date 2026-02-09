@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"errors"
+
 	"github.com/mobazha/mobazha-core/contracts"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	"google.golang.org/protobuf/proto"
@@ -10,6 +12,10 @@ import (
 // The protobuf serialization of the message (without the signature field)
 // is what gets signed. It also sets the SenderPeerID from the signer's PeerID.
 func SignOrderMessage(message *pb.OrderMessage, signer contracts.Signer) error {
+	if signer == nil {
+		return errors.New("signer must not be nil")
+	}
+
 	// Set sender peer ID from signer
 	message.SenderPeerID = signer.PeerID().String()
 

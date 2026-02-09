@@ -5,6 +5,8 @@ go 1.24.0
 toolchain go1.24.5
 
 replace (
+	// Use local mobazha-core for development
+	github.com/mobazha/mobazha-core => /Users/mingfeng/dev/mobazha/core
 	// github.com/ipfs/kubo => /Users/mingfeng/go/src/github.com/mobazha/kubo
 
 	// github.com/multiformats/go-multiaddr => /Users/mingfeng/go/src/github.com/multiformats/go-multiaddr

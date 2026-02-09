@@ -1,47 +1,32 @@
 package models
 
-import "github.com/gogo/protobuf/proto"
+import "github.com/mobazha/mobazha-core/orders"
 
-type OrderState int32
+// OrderState is a type alias for the canonical definition in mobazha-core.
+// This ensures mobazha3.0 and mobazha-cloud share the same OrderState type.
+type OrderState = orders.OrderState
 
+// Backward-compatible constants mapping to mobazha-core values.
+// Existing code can continue using OrderState_PENDING etc. without changes.
 const (
-	// Order has been funded and sent to the vendor but vendor has not yet responded
-	OrderState_PENDING OrderState = 0
-	// Waiting for the buyer to fund the payment address
-	OrderState_AWAITING_PAYMENT OrderState = 1
-	// Waiting for the customer to pick up the order (customer pickup option only)
-	OrderState_AWAITING_PICKUP OrderState = 2
-	// Order has been fully funded and we're waiting for the vendor to fulfill
-	OrderState_AWAITING_FULFILLMENT OrderState = 3
-	// Vendor has fulfilled part of the order
-	OrderState_PARTIALLY_FULFILLED OrderState = 4
-	// Vendor has fulfilled the order
-	OrderState_FULFILLED OrderState = 5
-	// Buyer has completed the order and left a review
-	OrderState_COMPLETED OrderState = 6
-	// Buyer canceled the order (offline order only)
-	OrderState_CANCELED OrderState = 7
-	// Vendor declined to confirm the order (offline order only)
-	OrderState_DECLINED OrderState = 8
-	// Vendor refunded the order
-	OrderState_REFUNDED OrderState = 9
-	// Contract is under active dispute
-	OrderState_DISPUTED OrderState = 10
-	// The moderator has resolved the dispute and we are waiting for the winning party to
-	// accept the payout.
-	OrderState_DECIDED OrderState = 11
-	// The winning party has accepted the dispute and it is now complete. After the buyer
-	// leaves a review the state should be set to COMPLETE.
-	OrderState_RESOLVED OrderState = 12
-	// Escrow has been released after waiting the timeout period. After the buyer
-	// leaves a review the state should be set to COMPLETE.
-	OrderState_PAYMENT_FINALIZED OrderState = 13
-	// We screwed up and produced a order which didn't validate. This state is only used for offline orders. If a processing
-	// error occurred with an open connection between buyer and vendor the vendor just rejects the order on the spot neither party
-	// commits the order to the database.
-	OrderState_PROCESSING_ERROR OrderState = 14
+	OrderState_PENDING              = orders.StatePending
+	OrderState_AWAITING_PAYMENT     = orders.StateAwaitingPayment
+	OrderState_AWAITING_PICKUP      = orders.StateAwaitingPickup
+	OrderState_AWAITING_FULFILLMENT = orders.StateAwaitingFulfillment
+	OrderState_PARTIALLY_FULFILLED  = orders.StatePartiallyFulfilled
+	OrderState_FULFILLED            = orders.StateFulfilled
+	OrderState_COMPLETED            = orders.StateCompleted
+	OrderState_CANCELED             = orders.StateCanceled
+	OrderState_DECLINED             = orders.StateDeclined
+	OrderState_REFUNDED             = orders.StateRefunded
+	OrderState_DISPUTED             = orders.StateDisputed
+	OrderState_DECIDED              = orders.StateDecided
+	OrderState_RESOLVED             = orders.StateResolved
+	OrderState_PAYMENT_FINALIZED    = orders.StatePaymentFinalized
+	OrderState_PROCESSING_ERROR     = orders.StateProcessingError
 )
 
+// OrderState_name maps int32 values to string names (kept for protobuf compatibility).
 var OrderState_name = map[int32]string{
 	0:  "PENDING",
 	1:  "AWAITING_PAYMENT",
@@ -60,6 +45,7 @@ var OrderState_name = map[int32]string{
 	14: "PROCESSING_ERROR",
 }
 
+// OrderState_value maps string names to int32 values (kept for protobuf compatibility).
 var OrderState_value = map[string]int32{
 	"PENDING":              0,
 	"AWAITING_PAYMENT":     1,
@@ -76,8 +62,4 @@ var OrderState_value = map[string]int32{
 	"RESOLVED":             12,
 	"PAYMENT_FINALIZED":    13,
 	"PROCESSING_ERROR":     14,
-}
-
-func (x OrderState) String() string {
-	return proto.EnumName(OrderState_name, int32(x))
 }

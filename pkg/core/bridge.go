@@ -15,6 +15,7 @@ import (
 // IdentityBridge bridges legacy identity code with mobazha-core identity module.
 type IdentityBridge struct {
 	keyPair *identity.KeyPair
+	peerID  identity.PeerID
 }
 
 // NewIdentityBridge creates a new identity bridge.
@@ -33,32 +34,53 @@ func NewIdentityBridge(existingPrivateKey ed25519.PrivateKey) (*IdentityBridge, 
 		return nil, fmt.Errorf("failed to create key pair: %w", err)
 	}
 
-	return &IdentityBridge{keyPair: keyPair}, nil
+	peerID, err := identity.PeerIDFromPublicKey(keyPair.PubKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive peer ID: %w", err)
+	}
+
+	return &IdentityBridge{keyPair: keyPair, peerID: peerID}, nil
 }
 
 // PeerID returns the Peer ID derived from the public key.
 func (b *IdentityBridge) PeerID() identity.PeerID {
-	return identity.PeerIDFromPublicKey(b.keyPair.PublicKey)
+	return b.peerID
 }
 
 // PublicKey returns the public key.
 func (b *IdentityBridge) PublicKey() ed25519.PublicKey {
-	return b.keyPair.PublicKey
+	publicKey, err := b.keyPair.RawPublicKey()
+	if err != nil {
+		return nil
+	}
+	return publicKey
 }
 
 // PrivateKey returns the private key (use with caution).
 func (b *IdentityBridge) PrivateKey() ed25519.PrivateKey {
-	return b.keyPair.PrivateKey
+	privateKey, err := b.keyPair.RawPrivateKey()
+	if err != nil {
+		return nil
+	}
+	return privateKey
 }
 
 // Sign signs a message using the private key.
 func (b *IdentityBridge) Sign(message []byte) (crypto.Signature, error) {
-	return crypto.Sign(b.keyPair.PrivateKey, message)
+	privateKey, err := b.keyPair.RawPrivateKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get raw private key: %w", err)
+	}
+	return crypto.Sign(privateKey, message)
 }
 
 // Verify verifies a signature against a message.
 func (b *IdentityBridge) Verify(message []byte, signature crypto.Signature) bool {
-	return crypto.Verify(b.keyPair.PublicKey, message, signature)
+	publicKey, err := b.keyPair.RawPublicKey()
+	if err != nil {
+		return false
+	}
+	return crypto.Verify(publicKey, message, signature)
 }
 
 // OrderStateBridge bridges legacy order state handling with mobazha-core order module.

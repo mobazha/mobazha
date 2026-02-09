@@ -9,6 +9,7 @@ import (
 	coremock "github.com/ipfs/kubo/core/mock"
 	"github.com/ipfs/kubo/repo/fsrepo"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
+	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
 	"github.com/mobazha/mobazha3.0/internal/net"
@@ -84,9 +85,14 @@ func newMockOrderProcessor() (*OrderProcessor, func(), error) {
 		return nil, nil, err
 	}
 
+	signer, err := corecontracts.NewKeyPairSignerFromMarshaledKey(dbIdentityKey.Value)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return NewOrderProcessor(&Config{
 			Identity:             ipfsNode.Identity,
-			IdentityPrivateKey:   ipfsNode.PrivateKey,
+			Signer:              signer,
 			Db:                   r.DB(),
 			Messenger:            messenger,
 			Multiwallet:          mw,

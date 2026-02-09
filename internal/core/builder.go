@@ -40,6 +40,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/repo"
+	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	oniontransport "github.com/mobazha/mobazha3.0/libs/onion-transport"
 	"github.com/mobazha/mobazha3.0/libs/proxyclient"
 	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
@@ -568,10 +569,18 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		return nil, err
 	}
 
+	// Create a Signer from the node's marshaled private key.
+	// This is the standard contracts.Signer implementation from mobazha-core.
+	signer, err := corecontracts.NewKeyPairSignerFromMarshaledKey(dbIdentityKey.Value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signer: %w", err)
+	}
+	obNode.signer = signer
+
 	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
 		NodeID:                   nodeID,
 		Identity:                 ipfsNode.Identity,
-		IdentityPrivateKey:       ipfsNode.PrivateKey,
+		Signer:                   signer,
 		Db:                       obRepo.DB(),
 		Multiwallet:              mw,
 		Messenger:                obNode.messenger,

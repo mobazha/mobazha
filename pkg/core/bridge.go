@@ -17,12 +17,10 @@ import (
 // Compile-time check: IdentityBridge implements contracts.Signer
 var _ contracts.Signer = (*IdentityBridge)(nil)
 
-// IdentityBridge bridges legacy identity code with mobazha-core identity module.
-// It implements the contracts.Signer interface, allowing it to be used by both
-// mobazha-node (local keys) and mobazha-cloud (multi-tenant key vault).
+// IdentityBridge wraps contracts.KeyPairSigner and adds legacy accessors
+// for libp2p key types needed by Messenger, IPFS node, and other P2P operations.
 type IdentityBridge struct {
-	keyPair *identity.KeyPair
-	peerID  identity.PeerID
+	*contracts.KeyPairSigner
 }
 
 // NewIdentityBridge creates a new identity bridge from a raw Ed25519 private key.
@@ -46,63 +44,37 @@ func NewIdentityBridge(existingPrivateKey ed25519.PrivateKey) (*IdentityBridge, 
 		return nil, fmt.Errorf("failed to derive peer ID: %w", err)
 	}
 
-	return &IdentityBridge{keyPair: keyPair, peerID: peerID}, nil
+	return &IdentityBridge{
+		KeyPairSigner: contracts.NewKeyPairSigner(keyPair, peerID),
+	}, nil
 }
 
 // NewIdentityBridgeFromMarshaledKey creates an IdentityBridge from libp2p marshaled
 // private key bytes (the format stored in the database).
 func NewIdentityBridgeFromMarshaledKey(marshaledKey []byte) (*IdentityBridge, error) {
-	keyPair, err := identity.KeyPairFromMarshaledPrivateKey(marshaledKey)
+	signer, err := contracts.NewKeyPairSignerFromMarshaledKey(marshaledKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal key: %w", err)
+		return nil, err
 	}
-
-	peerID, err := identity.PeerIDFromPublicKey(keyPair.PubKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive peer ID: %w", err)
-	}
-
-	return &IdentityBridge{keyPair: keyPair, peerID: peerID}, nil
+	return &IdentityBridge{KeyPairSigner: signer}, nil
 }
 
-// --- contracts.Signer interface ---
-
-// Sign signs a message using the private key and returns the signature bytes.
-func (b *IdentityBridge) Sign(message []byte) ([]byte, error) {
-	return b.keyPair.PrivKey.Sign(message)
-}
-
-// Verify verifies a signature against this signer's public key.
-func (b *IdentityBridge) Verify(message []byte, signature []byte) (bool, error) {
-	return b.keyPair.PubKey.Verify(message, signature)
-}
-
-// PublicKey returns the raw Ed25519 public key.
-func (b *IdentityBridge) PublicKey() (ed25519.PublicKey, error) {
-	return b.keyPair.RawPublicKey()
-}
-
-// PeerID returns the libp2p Peer ID.
-func (b *IdentityBridge) PeerID() identity.PeerID {
-	return b.peerID
-}
-
-// --- Legacy accessors (for backward compatibility during migration) ---
+// --- Legacy accessors (for code that still needs libp2p key types) ---
 
 // RawPrivateKey returns the raw Ed25519 private key (use with caution).
 func (b *IdentityBridge) RawPrivateKey() (ed25519.PrivateKey, error) {
-	return b.keyPair.RawPrivateKey()
+	return b.KeyPair().RawPrivateKey()
 }
 
 // Libp2pPrivKey returns the underlying libp2p private key.
 // Needed for IPFS node, Messenger, store-and-forward, and other P2P operations.
 func (b *IdentityBridge) Libp2pPrivKey() libp2pcrypto.PrivKey {
-	return b.keyPair.PrivKey
+	return b.KeyPair().PrivKey
 }
 
 // Libp2pPubKey returns the underlying libp2p public key.
 func (b *IdentityBridge) Libp2pPubKey() libp2pcrypto.PubKey {
-	return b.keyPair.PubKey
+	return b.KeyPair().PubKey
 }
 
 // OrderStateBridge bridges legacy order state handling with mobazha-core order module.

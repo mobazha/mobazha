@@ -27,6 +27,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
+	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -173,9 +174,15 @@ func MockNode() (*MobazhaNode, error) {
 	if err != nil {
 		return nil, err
 	}
+	signer, err := corecontracts.NewKeyPairSignerFromMarshaledKey(dbIdentityKey.Value)
+	if err != nil {
+		return nil, err
+	}
+	node.signer = signer
+
 	node.orderProcessor = orders.NewOrderProcessor(&orders.Config{
 		Identity:             ipfsNode.Identity,
-		IdentityPrivateKey:   ipfsNode.PrivateKey,
+		Signer:              signer,
 		Db:                   r.DB(),
 		Multiwallet:          mw,
 		Messenger:            node.messenger,
@@ -357,9 +364,15 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		if err != nil {
 			return nil, err
 		}
+		signer, err := corecontracts.NewKeyPairSignerFromMarshaledKey(dbIdentityKey.Value)
+		if err != nil {
+			return nil, err
+		}
+		node.signer = signer
+
 		node.orderProcessor = orders.NewOrderProcessor(&orders.Config{
 			Identity:             ipfsNode.Identity,
-			IdentityPrivateKey:   ipfsNode.PrivateKey,
+			Signer:              signer,
 			Db:                   r.DB(),
 			Messenger:            node.messenger,
 			Multiwallet:          mw,

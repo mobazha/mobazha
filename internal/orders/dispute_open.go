@@ -144,7 +144,7 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 			Message:     updateAny,
 		}
 
-		if err := utils.SignOrderMessage(&resp, op.identityPrivateKey); err != nil {
+		if err := utils.SignOrderMessage(&resp, op.signer); err != nil {
 			return nil, fmt.Errorf("failed to sign dispute update message: %w", err)
 		}
 

@@ -1,10 +1,10 @@
 package utils
 
 import (
-	"crypto/rand"
 	"testing"
 
-	crypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/mobazha/mobazha-core/contracts"
+	"github.com/mobazha/mobazha-core/identity"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"google.golang.org/protobuf/proto"
@@ -12,10 +12,16 @@ import (
 )
 
 func TestSignOrderMessage(t *testing.T) {
-	priv, pub, err := crypto.GenerateEd25519Key(rand.Reader)
+	// Create a signer using mobazha-core
+	keyPair, err := identity.GenerateKeyPair()
 	if err != nil {
 		t.Fatal(err)
 	}
+	peerID, err := identity.PeerIDFromPublicKey(keyPair.PubKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer := contracts.NewKeyPairSigner(keyPair, peerID)
 
 	orderOpen := pb.OrderOpen{
 		AlternateContactInfo: "1234",
@@ -32,11 +38,17 @@ func TestSignOrderMessage(t *testing.T) {
 		OrderID:     "abc",
 	}
 
-	err = SignOrderMessage(&order, priv)
+	err = SignOrderMessage(&order, signer)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Verify PeerID was set correctly
+	if order.SenderPeerID != peerID.String() {
+		t.Errorf("expected SenderPeerID %s, got %s", peerID, order.SenderPeerID)
+	}
+
+	// Verify signature using the signer's Verify method
 	cpy := proto.Clone(&order)
 	cpy.(*npb.OrderMessage).Signature = nil
 
@@ -45,7 +57,7 @@ func TestSignOrderMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	valid, err := pub.Verify(ser, order.Signature)
+	valid, err := signer.Verify(ser, order.Signature)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/ipfs/kubo/core"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/channels"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -39,6 +40,9 @@ type MobazhaNode struct {
 
 	// ipfsNode is the IPFS instance that powers this node.
 	ipfsNode *core.IpfsNode
+
+	// signer is the contracts.Signer for signing order messages and other data.
+	signer corecontracts.Signer
 
 	// repo holds the database and public data directory.
 	repo *repo.Repo

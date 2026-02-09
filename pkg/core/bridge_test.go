@@ -80,7 +80,7 @@ func TestIdentityBridge_FromMarshaledKey(t *testing.T) {
 	}
 
 	// Marshal the key (simulating database storage)
-	marshaledKey, err := bridge1.keyPair.MarshalPrivateKey()
+	marshaledKey, err := bridge1.KeyPair().MarshalPrivateKey()
 	if err != nil {
 		t.Fatalf("MarshalPrivateKey() error: %v", err)
 	}

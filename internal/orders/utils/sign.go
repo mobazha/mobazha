@@ -1,30 +1,26 @@
 package utils
 
 import (
-	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha-core/contracts"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	"google.golang.org/protobuf/proto"
 )
 
-// SignOrderMessage puts a signature on an order message using the IPFS private
-// key. The protobuf serialization of the message object without the signature
-// is what is signed. It also sets the SenderPeerID from the private key.
-func SignOrderMessage(message *pb.OrderMessage, privKey crypto.PrivKey) error {
-	// Derive and set sender peer ID from private key
-	senderID, err := peer.IDFromPrivateKey(privKey)
-	if err != nil {
-		return err
-	}
-	message.SenderPeerID = senderID.String()
+// SignOrderMessage signs an order message using the provided Signer.
+// The protobuf serialization of the message (without the signature field)
+// is what gets signed. It also sets the SenderPeerID from the signer's PeerID.
+func SignOrderMessage(message *pb.OrderMessage, signer contracts.Signer) error {
+	// Set sender peer ID from signer
+	message.SenderPeerID = signer.PeerID().String()
 
+	// Clear signature, marshal, sign, then set signature
 	message.Signature = nil
 	ser, err := proto.Marshal(message)
 	if err != nil {
 		return err
 	}
 
-	sig, err := privKey.Sign(ser)
+	sig, err := signer.Sign(ser)
 	if err != nil {
 		return err
 	}

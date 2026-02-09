@@ -8,8 +8,8 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ipfs/go-cid"
-	"github.com/libp2p/go-libp2p/core/crypto"
 	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
@@ -37,7 +37,7 @@ type Config struct {
 	NodeID                   string
 	Identity                 libp2ppeer.ID
 	Db                       database.Database
-	IdentityPrivateKey       crypto.PrivKey
+	Signer                   contracts.Signer
 	EscrowPrivateKey         *btcec.PrivateKey
 	Messenger                *net.Messenger
 	Multiwallet              multiwallet.Multiwallet
@@ -52,7 +52,7 @@ type Config struct {
 type OrderProcessor struct {
 	nodeID                   string
 	identity                 libp2ppeer.ID
-	identityPrivateKey       crypto.PrivKey
+	signer                   contracts.Signer
 	db                       database.Database
 	messenger                *net.Messenger
 	multiwallet              multiwallet.Multiwallet
@@ -69,7 +69,7 @@ func NewOrderProcessor(cfg *Config) *OrderProcessor {
 	return &OrderProcessor{
 		nodeID:                   cfg.NodeID,
 		identity:                 cfg.Identity,
-		identityPrivateKey:       cfg.IdentityPrivateKey,
+		signer:                   cfg.Signer,
 		db:                       cfg.Db,
 		messenger:                cfg.Messenger,
 		multiwallet:              cfg.Multiwallet,

@@ -109,7 +109,7 @@ func (op *OrderProcessor) sendRatingSignatures(dbtx database.Tx, order *models.O
 			return err
 		}
 
-		sig, err := op.identityPrivateKey.Sign(ser)
+		sig, err := op.signer.Sign(ser)
 		if err != nil {
 			return err
 		}
@@ -129,7 +129,7 @@ func (op *OrderProcessor) sendRatingSignatures(dbtx database.Tx, order *models.O
 		Message:     rsAny,
 	}
 
-	if err := utils.SignOrderMessage(&om, op.identityPrivateKey); err != nil {
+	if err := utils.SignOrderMessage(&om, op.signer); err != nil {
 		return err
 	}
 

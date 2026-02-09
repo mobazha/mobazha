@@ -306,7 +306,7 @@ func TestOrderProcessor_sendRatingSignatures(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	valid, err := op.identityPrivateKey.GetPublic().Verify(ser, rs.Sigs[0].VendorSignature)
+	valid, err := op.signer.Verify(ser, rs.Sigs[0].VendorSignature)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -82,7 +82,7 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 				Message:     rejectAny,
 			}
 
-			if err := utils.SignOrderMessage(&resp, op.identityPrivateKey); err != nil {
+			if err := utils.SignOrderMessage(&resp, op.signer); err != nil {
 				return nil, err
 			}
 

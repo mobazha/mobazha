@@ -59,20 +59,25 @@ func NewIdentityBridgeFromMarshaledKey(marshaledKey []byte) (*IdentityBridge, er
 	return &IdentityBridge{KeyPairSigner: signer}, nil
 }
 
-// --- Legacy accessors (for code that still needs libp2p key types) ---
+// --- Legacy accessors ---
+// These provide direct access to libp2p key types for code that cannot
+// use the abstract Signer interface (e.g., IPFS node, Messenger, matrix).
+// New code should prefer contracts.Signer methods where possible.
 
-// RawPrivateKey returns the raw Ed25519 private key (use with caution).
+// Deprecated: RawPrivateKey returns the raw Ed25519 private key.
+// Prefer using Signer.Sign() instead of direct key access.
 func (b *IdentityBridge) RawPrivateKey() (ed25519.PrivateKey, error) {
 	return b.KeyPair().RawPrivateKey()
 }
 
 // Libp2pPrivKey returns the underlying libp2p private key.
-// Needed for IPFS node, Messenger, store-and-forward, and other P2P operations.
+// Required for: IPFS node initialization, Messenger, store-and-forward.
 func (b *IdentityBridge) Libp2pPrivKey() libp2pcrypto.PrivKey {
 	return b.KeyPair().PrivKey
 }
 
 // Libp2pPubKey returns the underlying libp2p public key.
+// Required for: IPFS node initialization, peer verification.
 func (b *IdentityBridge) Libp2pPubKey() libp2pcrypto.PubKey {
 	return b.KeyPair().PubKey
 }

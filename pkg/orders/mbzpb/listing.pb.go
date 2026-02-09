@@ -804,14 +804,15 @@ func (x *ShippingLocation) GetIsDefault() bool {
 	return false
 }
 
-// LocationGroup 发货地点组（用于多仓库场景）
+// LocationGroup 发货地点组
+// locationIds 留空表示适用于所有发货地点（默认行为）
 type LocationGroup struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
 	Id          string          `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                   // 地点组 ID
-	LocationIds []string        `protobuf:"bytes,2,rep,name=locationIds,proto3" json:"locationIds,omitempty"` // 关联的发货地点 ID 列表
+	LocationIds []string        `protobuf:"bytes,2,rep,name=locationIds,proto3" json:"locationIds,omitempty"` // 关联的发货地点 ID 列表（留空 = 全局适用）
 	Zones       []*ShippingZone `protobuf:"bytes,3,rep,name=zones,proto3" json:"zones,omitempty"`             // 该地点组的配送区域
 }
 
@@ -869,9 +870,8 @@ func (x *LocationGroup) GetZones() []*ShippingZone {
 }
 
 // ShippingProfile 配送档案（Shopify 风格）
-// 支持两种模式：
-// - 简化模式（单一发货地点）：使用 zones 字段
-// - 完整模式（多发货地点）：使用 locationGroups 字段
+// 始终使用 locationGroups，每个 LocationGroup 包含独立的配送区域
+// 单仓库卖家自动创建一个默认 LocationGroup（locationIds 留空）
 type ShippingProfile struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -880,10 +880,9 @@ type ShippingProfile struct {
 	ProfileID      string                 `protobuf:"bytes,1,opt,name=profileID,proto3" json:"profileID,omitempty"`           // UUID，唯一标识
 	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`                     // 档案名称：如"默认配送"、"易碎品配送"
 	IsDefault      bool                   `protobuf:"varint,3,opt,name=isDefault,proto3" json:"isDefault,omitempty"`          // 是否为默认档案
-	Zones          []*ShippingZone        `protobuf:"bytes,4,rep,name=zones,proto3" json:"zones,omitempty"`                   // 配送区域列表（简化模式）
-	LocationGroups []*LocationGroup       `protobuf:"bytes,5,rep,name=locationGroups,proto3" json:"locationGroups,omitempty"` // 发货地点组列表（完整模式，多仓库）
-	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=createdAt,proto3" json:"createdAt,omitempty"`           // 创建时间
-	UpdatedAt      *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`           // 更新时间
+	LocationGroups []*LocationGroup       `protobuf:"bytes,4,rep,name=locationGroups,proto3" json:"locationGroups,omitempty"` // 发货地点组列表（至少一个）
+	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=createdAt,proto3" json:"createdAt,omitempty"`           // 创建时间
+	UpdatedAt      *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`           // 更新时间
 }
 
 func (x *ShippingProfile) Reset() {
@@ -937,13 +936,6 @@ func (x *ShippingProfile) GetIsDefault() bool {
 		return x.IsDefault
 	}
 	return false
-}
-
-func (x *ShippingProfile) GetZones() []*ShippingZone {
-	if x != nil {
-		return x.Zones
-	}
-	return nil
 }
 
 func (x *ShippingProfile) GetLocationGroups() []*LocationGroup {
@@ -2881,28 +2873,25 @@ var file_listing_proto_rawDesc = []byte{
 	0x6f, 0x6e, 0x49, 0x64, 0x73, 0x12, 0x29, 0x0a, 0x05, 0x7a, 0x6f, 0x6e, 0x65, 0x73, 0x18, 0x03,
 	0x20, 0x03, 0x28, 0x0b, 0x32, 0x13, 0x2e, 0x6d, 0x62, 0x7a, 0x70, 0x62, 0x2e, 0x53, 0x68, 0x69,
 	0x70, 0x70, 0x69, 0x6e, 0x67, 0x5a, 0x6f, 0x6e, 0x65, 0x52, 0x05, 0x7a, 0x6f, 0x6e, 0x65, 0x73,
-	0x22, 0xbe, 0x02, 0x0a, 0x0f, 0x53, 0x68, 0x69, 0x70, 0x70, 0x69, 0x6e, 0x67, 0x50, 0x72, 0x6f,
+	0x22, 0x93, 0x02, 0x0a, 0x0f, 0x53, 0x68, 0x69, 0x70, 0x70, 0x69, 0x6e, 0x67, 0x50, 0x72, 0x6f,
 	0x66, 0x69, 0x6c, 0x65, 0x12, 0x1c, 0x0a, 0x09, 0x70, 0x72, 0x6f, 0x66, 0x69, 0x6c, 0x65, 0x49,
 	0x44, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x70, 0x72, 0x6f, 0x66, 0x69, 0x6c, 0x65,
 	0x49, 0x44, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
 	0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x1c, 0x0a, 0x09, 0x69, 0x73, 0x44, 0x65, 0x66, 0x61,
 	0x75, 0x6c, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x08, 0x52, 0x09, 0x69, 0x73, 0x44, 0x65, 0x66,
-	0x61, 0x75, 0x6c, 0x74, 0x12, 0x29, 0x0a, 0x05, 0x7a, 0x6f, 0x6e, 0x65, 0x73, 0x18, 0x04, 0x20,
-	0x03, 0x28, 0x0b, 0x32, 0x13, 0x2e, 0x6d, 0x62, 0x7a, 0x70, 0x62, 0x2e, 0x53, 0x68, 0x69, 0x70,
-	0x70, 0x69, 0x6e, 0x67, 0x5a, 0x6f, 0x6e, 0x65, 0x52, 0x05, 0x7a, 0x6f, 0x6e, 0x65, 0x73, 0x12,
-	0x3c, 0x0a, 0x0e, 0x6c, 0x6f, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x47, 0x72, 0x6f, 0x75, 0x70,
-	0x73, 0x18, 0x05, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x6d, 0x62, 0x7a, 0x70, 0x62, 0x2e,
-	0x4c, 0x6f, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x47, 0x72, 0x6f, 0x75, 0x70, 0x52, 0x0e, 0x6c,
-	0x6f, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x47, 0x72, 0x6f, 0x75, 0x70, 0x73, 0x12, 0x38, 0x0a,
-	0x09, 0x63, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x41, 0x74, 0x18, 0x06, 0x20, 0x01, 0x28, 0x0b,
-	0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62,
-	0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x52, 0x09, 0x63, 0x72,
-	0x65, 0x61, 0x74, 0x65, 0x64, 0x41, 0x74, 0x12, 0x38, 0x0a, 0x09, 0x75, 0x70, 0x64, 0x61, 0x74,
-	0x65, 0x64, 0x41, 0x74, 0x18, 0x07, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f,
-	0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d,
-	0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x52, 0x09, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x41,
-	0x74, 0x42, 0x0a, 0x5a, 0x08, 0x2e, 0x2e, 0x2f, 0x6d, 0x62, 0x7a, 0x70, 0x62, 0x62, 0x06, 0x70,
-	0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x61, 0x75, 0x6c, 0x74, 0x12, 0x3c, 0x0a, 0x0e, 0x6c, 0x6f, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e,
+	0x47, 0x72, 0x6f, 0x75, 0x70, 0x73, 0x18, 0x04, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x6d,
+	0x62, 0x7a, 0x70, 0x62, 0x2e, 0x4c, 0x6f, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x47, 0x72, 0x6f,
+	0x75, 0x70, 0x52, 0x0e, 0x6c, 0x6f, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x47, 0x72, 0x6f, 0x75,
+	0x70, 0x73, 0x12, 0x38, 0x0a, 0x09, 0x63, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x41, 0x74, 0x18,
+	0x05, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d,
+	0x70, 0x52, 0x09, 0x63, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x41, 0x74, 0x12, 0x38, 0x0a, 0x09,
+	0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x41, 0x74, 0x18, 0x06, 0x20, 0x01, 0x28, 0x0b, 0x32,
+	0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
+	0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x52, 0x09, 0x75, 0x70, 0x64,
+	0x61, 0x74, 0x65, 0x64, 0x41, 0x74, 0x42, 0x0a, 0x5a, 0x08, 0x2e, 0x2e, 0x2f, 0x6d, 0x62, 0x7a,
+	0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -2969,40 +2958,39 @@ var file_listing_proto_depIdxs = []int32{
 	29, // 9: mbzpb.ShippingRate.freeShippingThreshold:type_name -> mbzpb.ShippingRate.FreeShippingThreshold
 	9,  // 10: mbzpb.ShippingZone.rates:type_name -> mbzpb.ShippingRate
 	10, // 11: mbzpb.LocationGroup.zones:type_name -> mbzpb.ShippingZone
-	10, // 12: mbzpb.ShippingProfile.zones:type_name -> mbzpb.ShippingZone
-	12, // 13: mbzpb.ShippingProfile.locationGroups:type_name -> mbzpb.LocationGroup
-	31, // 14: mbzpb.ShippingProfile.createdAt:type_name -> google.protobuf.Timestamp
-	31, // 15: mbzpb.ShippingProfile.updatedAt:type_name -> google.protobuf.Timestamp
-	0,  // 16: mbzpb.Listing.Metadata.contractType:type_name -> mbzpb.Listing.Metadata.ContractType
-	1,  // 17: mbzpb.Listing.Metadata.format:type_name -> mbzpb.Listing.Metadata.Format
-	31, // 18: mbzpb.Listing.Metadata.expiry:type_name -> google.protobuf.Timestamp
-	32, // 19: mbzpb.Listing.Metadata.pricingCurrency:type_name -> mbzpb.Currency
-	2,  // 20: mbzpb.Listing.Metadata.rwaTradeMode:type_name -> mbzpb.Listing.Metadata.RwaTradeMode
-	33, // 21: mbzpb.Listing.Item.images:type_name -> mbzpb.Image
-	34, // 22: mbzpb.Listing.Item.introVideo:type_name -> mbzpb.File
-	21, // 23: mbzpb.Listing.Item.dimensions:type_name -> mbzpb.Listing.Item.Dimensions
-	19, // 24: mbzpb.Listing.Item.options:type_name -> mbzpb.Listing.Item.Option
-	20, // 25: mbzpb.Listing.Item.skus:type_name -> mbzpb.Listing.Item.Sku
-	22, // 26: mbzpb.Listing.Item.optionalFeatures:type_name -> mbzpb.Listing.Item.OptionalFeature
-	3,  // 27: mbzpb.Listing.ShippingOption.type:type_name -> mbzpb.Listing.ShippingOption.ShippingType
-	4,  // 28: mbzpb.Listing.ShippingOption.serviceType:type_name -> mbzpb.Listing.ShippingOption.ServiceType
-	26, // 29: mbzpb.Listing.ShippingOption.services:type_name -> mbzpb.Listing.ShippingOption.Service
-	27, // 30: mbzpb.Listing.ShippingOption.freeShippingThreshold:type_name -> mbzpb.Listing.ShippingOption.FreeShippingThreshold
-	5,  // 31: mbzpb.Listing.Coupon.discountType:type_name -> mbzpb.Listing.Coupon.DiscountType
-	31, // 32: mbzpb.Listing.Coupon.startsAt:type_name -> google.protobuf.Timestamp
-	31, // 33: mbzpb.Listing.Coupon.expiresAt:type_name -> google.protobuf.Timestamp
-	23, // 34: mbzpb.Listing.Item.Option.variants:type_name -> mbzpb.Listing.Item.Option.Variant
-	24, // 35: mbzpb.Listing.Item.Sku.selections:type_name -> mbzpb.Listing.Item.Sku.Selection
-	33, // 36: mbzpb.Listing.Item.Sku.images:type_name -> mbzpb.Image
-	25, // 37: mbzpb.Listing.Item.Sku.downloads:type_name -> mbzpb.Listing.Item.Sku.Download
-	33, // 38: mbzpb.Listing.Item.OptionalFeature.images:type_name -> mbzpb.Image
-	33, // 39: mbzpb.Listing.Item.Option.Variant.image:type_name -> mbzpb.Image
-	6,  // 40: mbzpb.ShippingRate.RateCondition.type:type_name -> mbzpb.ShippingRate.RateCondition.ConditionType
-	41, // [41:41] is the sub-list for method output_type
-	41, // [41:41] is the sub-list for method input_type
-	41, // [41:41] is the sub-list for extension type_name
-	41, // [41:41] is the sub-list for extension extendee
-	0,  // [0:41] is the sub-list for field type_name
+	12, // 12: mbzpb.ShippingProfile.locationGroups:type_name -> mbzpb.LocationGroup
+	31, // 13: mbzpb.ShippingProfile.createdAt:type_name -> google.protobuf.Timestamp
+	31, // 14: mbzpb.ShippingProfile.updatedAt:type_name -> google.protobuf.Timestamp
+	0,  // 15: mbzpb.Listing.Metadata.contractType:type_name -> mbzpb.Listing.Metadata.ContractType
+	1,  // 16: mbzpb.Listing.Metadata.format:type_name -> mbzpb.Listing.Metadata.Format
+	31, // 17: mbzpb.Listing.Metadata.expiry:type_name -> google.protobuf.Timestamp
+	32, // 18: mbzpb.Listing.Metadata.pricingCurrency:type_name -> mbzpb.Currency
+	2,  // 19: mbzpb.Listing.Metadata.rwaTradeMode:type_name -> mbzpb.Listing.Metadata.RwaTradeMode
+	33, // 20: mbzpb.Listing.Item.images:type_name -> mbzpb.Image
+	34, // 21: mbzpb.Listing.Item.introVideo:type_name -> mbzpb.File
+	21, // 22: mbzpb.Listing.Item.dimensions:type_name -> mbzpb.Listing.Item.Dimensions
+	19, // 23: mbzpb.Listing.Item.options:type_name -> mbzpb.Listing.Item.Option
+	20, // 24: mbzpb.Listing.Item.skus:type_name -> mbzpb.Listing.Item.Sku
+	22, // 25: mbzpb.Listing.Item.optionalFeatures:type_name -> mbzpb.Listing.Item.OptionalFeature
+	3,  // 26: mbzpb.Listing.ShippingOption.type:type_name -> mbzpb.Listing.ShippingOption.ShippingType
+	4,  // 27: mbzpb.Listing.ShippingOption.serviceType:type_name -> mbzpb.Listing.ShippingOption.ServiceType
+	26, // 28: mbzpb.Listing.ShippingOption.services:type_name -> mbzpb.Listing.ShippingOption.Service
+	27, // 29: mbzpb.Listing.ShippingOption.freeShippingThreshold:type_name -> mbzpb.Listing.ShippingOption.FreeShippingThreshold
+	5,  // 30: mbzpb.Listing.Coupon.discountType:type_name -> mbzpb.Listing.Coupon.DiscountType
+	31, // 31: mbzpb.Listing.Coupon.startsAt:type_name -> google.protobuf.Timestamp
+	31, // 32: mbzpb.Listing.Coupon.expiresAt:type_name -> google.protobuf.Timestamp
+	23, // 33: mbzpb.Listing.Item.Option.variants:type_name -> mbzpb.Listing.Item.Option.Variant
+	24, // 34: mbzpb.Listing.Item.Sku.selections:type_name -> mbzpb.Listing.Item.Sku.Selection
+	33, // 35: mbzpb.Listing.Item.Sku.images:type_name -> mbzpb.Image
+	25, // 36: mbzpb.Listing.Item.Sku.downloads:type_name -> mbzpb.Listing.Item.Sku.Download
+	33, // 37: mbzpb.Listing.Item.OptionalFeature.images:type_name -> mbzpb.Image
+	33, // 38: mbzpb.Listing.Item.Option.Variant.image:type_name -> mbzpb.Image
+	6,  // 39: mbzpb.ShippingRate.RateCondition.type:type_name -> mbzpb.ShippingRate.RateCondition.ConditionType
+	40, // [40:40] is the sub-list for method output_type
+	40, // [40:40] is the sub-list for method input_type
+	40, // [40:40] is the sub-list for extension type_name
+	40, // [40:40] is the sub-list for extension extendee
+	0,  // [0:40] is the sub-list for field type_name
 }
 
 func init() { file_listing_proto_init() }

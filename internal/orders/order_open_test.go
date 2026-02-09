@@ -1249,36 +1249,41 @@ func TestShippingProfileFlatRate(t *testing.T) {
 		ProfileID: "test-profile",
 		Name:      "Standard Shipping",
 		IsDefault: true,
-		Zones: []*pb.ShippingZone{
+		LocationGroups: []*pb.LocationGroup{
 			{
-				Id:      "zone-1",
-				Name:    "Domestic",
-				Regions: []string{"US"},
-				Rates: []*pb.ShippingRate{
+				Id: "default",
+				Zones: []*pb.ShippingZone{
 					{
-						Id:       "rate-1",
-						Name:     "Standard",
-						Price:    "500", // $5.00
-						Currency: "USD",
+						Id:      "zone-1",
+						Name:    "Domestic",
+						Regions: []string{"US"},
+						Rates: []*pb.ShippingRate{
+							{
+								Id:       "rate-1",
+								Name:     "Standard",
+								Price:    "500", // $5.00
+								Currency: "USD",
+							},
+							{
+								Id:       "rate-2",
+								Name:     "Express",
+								Price:    "1500", // $15.00
+								Currency: "USD",
+							},
+						},
 					},
 					{
-						Id:       "rate-2",
-						Name:     "Express",
-						Price:    "1500", // $15.00
-						Currency: "USD",
-					},
-				},
-			},
-			{
-				Id:      "zone-2",
-				Name:    "International",
-				Regions: []string{"ALL"},
-				Rates: []*pb.ShippingRate{
-					{
-						Id:       "rate-3",
-						Name:     "International Standard",
-						Price:    "2000", // $20.00
-						Currency: "USD",
+						Id:      "zone-2",
+						Name:    "International",
+						Regions: []string{"ALL"},
+						Rates: []*pb.ShippingRate{
+							{
+								Id:       "rate-3",
+								Name:     "International Standard",
+								Price:    "2000", // $20.00
+								Currency: "USD",
+							},
+						},
 					},
 				},
 			},
@@ -1411,32 +1416,37 @@ func TestShippingProfileWeightCondition(t *testing.T) {
 		ProfileID: "weight-profile",
 		Name:      "Weight Based",
 		IsDefault: true,
-		Zones: []*pb.ShippingZone{
+		LocationGroups: []*pb.LocationGroup{
 			{
-				Id:      "zone-1",
-				Name:    "Domestic",
-				Regions: []string{"ALL"},
-				Rates: []*pb.ShippingRate{
+				Id: "default",
+				Zones: []*pb.ShippingZone{
 					{
-						Id:       "rate-light",
-						Name:     "Light",
-						Price:    "500",
-						Currency: "USD",
-						Condition: &pb.ShippingRate_RateCondition{
-							Type:     pb.ShippingRate_RateCondition_WEIGHT,
-							MinValue: 0,
-							MaxValue: 500,
-						},
-					},
-					{
-						Id:       "rate-heavy",
-						Name:     "Heavy",
-						Price:    "1500",
-						Currency: "USD",
-						Condition: &pb.ShippingRate_RateCondition{
-							Type:     pb.ShippingRate_RateCondition_WEIGHT,
-							MinValue: 501,
-							MaxValue: 5000,
+						Id:      "zone-1",
+						Name:    "Domestic",
+						Regions: []string{"ALL"},
+						Rates: []*pb.ShippingRate{
+							{
+								Id:       "rate-light",
+								Name:     "Light",
+								Price:    "500",
+								Currency: "USD",
+								Condition: &pb.ShippingRate_RateCondition{
+									Type:     pb.ShippingRate_RateCondition_WEIGHT,
+									MinValue: 0,
+									MaxValue: 500,
+								},
+							},
+							{
+								Id:       "rate-heavy",
+								Name:     "Heavy",
+								Price:    "1500",
+								Currency: "USD",
+								Condition: &pb.ShippingRate_RateCondition{
+									Type:     pb.ShippingRate_RateCondition_WEIGHT,
+										MinValue: 501,
+									MaxValue: 5000,
+								},
+							},
 						},
 					},
 				},
@@ -1534,20 +1544,25 @@ func TestShippingProfileFreeShippingThreshold(t *testing.T) {
 			ProfileID: "free-test",
 			Name:      "Free Shipping Test",
 			IsDefault: true,
-			Zones: []*pb.ShippingZone{
+			LocationGroups: []*pb.LocationGroup{
 				{
-					Id:      "zone-1",
-					Name:    "Global",
-					Regions: []string{"ALL"},
-					Rates: []*pb.ShippingRate{
+					Id: "default",
+					Zones: []*pb.ShippingZone{
 						{
-							Id:       "rate-1",
-							Name:     "Standard",
-							Price:    "1000", // $10.00
-							Currency: "USD",
-							FreeShippingThreshold: &pb.ShippingRate_FreeShippingThreshold{
-								Enabled:   true,
-								MinAmount: test.minAmount,
+							Id:      "zone-1",
+							Name:    "Global",
+							Regions: []string{"ALL"},
+							Rates: []*pb.ShippingRate{
+								{
+									Id:       "rate-1",
+									Name:     "Standard",
+									Price:    "1000", // $10.00
+									Currency: "USD",
+									FreeShippingThreshold: &pb.ShippingRate_FreeShippingThreshold{
+										Enabled:   true,
+										MinAmount: test.minAmount,
+									},
+								},
 							},
 						},
 					},
@@ -1601,13 +1616,18 @@ func TestShippingProfileRegionCaseInsensitive(t *testing.T) {
 			ProfileID: "region-test",
 			Name:      "Region Test",
 			IsDefault: true,
-			Zones: []*pb.ShippingZone{
+			LocationGroups: []*pb.LocationGroup{
 				{
-					Id:      "zone-1",
-					Name:    "TestZone",
-					Regions: []string{test.region},
-					Rates: []*pb.ShippingRate{
-						{Id: "rate-1", Name: "Standard", Price: "500", Currency: "USD"},
+					Id: "default",
+					Zones: []*pb.ShippingZone{
+						{
+							Id:      "zone-1",
+							Name:    "TestZone",
+							Regions: []string{test.region},
+							Rates: []*pb.ShippingRate{
+								{Id: "rate-1", Name: "Standard", Price: "500", Currency: "USD"},
+							},
+						},
 					},
 				},
 			},
@@ -1640,13 +1660,18 @@ func TestShippingProfileZoneNameCaseInsensitive(t *testing.T) {
 		ProfileID: "case-test",
 		Name:      "Case Test",
 		IsDefault: true,
-		Zones: []*pb.ShippingZone{
+		LocationGroups: []*pb.LocationGroup{
 			{
-				Id:      "zone-1",
-				Name:    "Domestic",
-				Regions: []string{"ALL"},
-				Rates: []*pb.ShippingRate{
-					{Id: "rate-1", Name: "Express", Price: "1000", Currency: "USD"},
+				Id: "default",
+				Zones: []*pb.ShippingZone{
+					{
+						Id:      "zone-1",
+						Name:    "Domestic",
+						Regions: []string{"ALL"},
+						Rates: []*pb.ShippingRate{
+							{Id: "rate-1", Name: "Express", Price: "1000", Currency: "USD"},
+						},
+					},
 				},
 			},
 		},
@@ -1684,20 +1709,25 @@ func TestShippingProfileZoneNameCaseInsensitive(t *testing.T) {
 
 func TestValidateShippingFromProfile(t *testing.T) {
 	profile := &pb.ShippingProfile{
-		Zones: []*pb.ShippingZone{
+		LocationGroups: []*pb.LocationGroup{
 			{
-				Id:   "zone-dom",
-				Name: "Domestic",
-				Rates: []*pb.ShippingRate{
-					{Id: "rate-std", Name: "Standard"},
-					{Id: "rate-exp", Name: "Express"},
-				},
-			},
-			{
-				Id:   "zone-intl",
-				Name: "International",
-				Rates: []*pb.ShippingRate{
-					{Id: "rate-eco", Name: "Economy"},
+				Id: "default",
+				Zones: []*pb.ShippingZone{
+					{
+						Id:   "zone-dom",
+						Name: "Domestic",
+						Rates: []*pb.ShippingRate{
+							{Id: "rate-std", Name: "Standard"},
+							{Id: "rate-exp", Name: "Express"},
+						},
+					},
+					{
+						Id:   "zone-intl",
+						Name: "International",
+						Rates: []*pb.ShippingRate{
+							{Id: "rate-eco", Name: "Economy"},
+						},
+					},
 				},
 			},
 		},
@@ -1793,46 +1823,110 @@ func TestValidateShippingFromLegacy(t *testing.T) {
 	}
 }
 
-// TestShippingProfilePriceCondition 测试基于价格条件的运费计算
-// PRICE 条件根据订单金额（eligibleSubtotal）判断是否收取运费
-func TestShippingProfilePriceCondition(t *testing.T) {
+// ============================================================================
+// LocationGroups 模式测试（多仓库配送）
+// ============================================================================
+
+// makeLocationGroupProfileOrder 创建一个使用 LocationGroups 模式的 ShippingProfile 订单
+func makeLocationGroupProfileOrder(profile *pb.ShippingProfile, zoneName, rateName string) (*pb.OrderOpen, error) {
+	return makeLocationGroupProfileOrderWithIDs(profile, zoneName, rateName, "", "")
+}
+
+func makeLocationGroupProfileOrderWithIDs(profile *pb.ShippingProfile, zoneName, rateName, zoneId, rateId string) (*pb.OrderOpen, error) {
+	order, _, err := factory.NewOrder()
+	if err != nil {
+		return nil, err
+	}
+
+	// 替换为新版 ShippingProfile（使用 LocationGroups 模式，无直接 Zones）
+	order.Listings[0].Listing.ShippingOptions = nil
+	order.Listings[0].Listing.ShippingProfile = profile
+	order.Listings[0].Listing.Taxes = nil
+
+	// 更新 item 的 shipping 选择
+	order.Items[0].ShippingOption = &pb.OrderOpen_Item_ShippingOption{
+		Name:    zoneName,
+		Service: rateName,
+		ZoneId:  zoneId,
+		RateId:  rateId,
+	}
+
+	// 重新计算 listing hash
+	hash, err := utils.HashListing(order.Listings[0])
+	if err != nil {
+		return nil, err
+	}
+	order.Items[0].ListingHash = hash.B58String()
+
+	return order, nil
+}
+
+func TestLocationGroupShippingProfileFlatRate(t *testing.T) {
 	erp, err := wallet.NewMockExchangeRates()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// 默认商品价格为 "100"（最小单位）
-	// PRICE 条件的 MinValue/MaxValue 也是最小单位
+	// 创建使用 LocationGroups 模式的 ShippingProfile（无直接 Zones）
 	profile := &pb.ShippingProfile{
-		ProfileID: "price-profile",
-		Name:      "Price Based",
+		ProfileID: "multi-warehouse-profile",
+		Name:      "Multi Warehouse Shipping",
 		IsDefault: true,
-		Zones: []*pb.ShippingZone{
+		// 注意：Zones 为空，只使用 LocationGroups
+		LocationGroups: []*pb.LocationGroup{
 			{
-				Id:      "zone-1",
-				Name:    "Domestic",
-				Regions: []string{"ALL"},
-				Rates: []*pb.ShippingRate{
+				Id:          "lg-beijing",
+				LocationIds: []string{"loc-beijing"},
+				Zones: []*pb.ShippingZone{
 					{
-						Id:       "rate-low",
-						Name:     "Low Value",
-						Price:    "500", // $5.00 shipping
-						Currency: "USD",
-						Condition: &pb.ShippingRate_RateCondition{
-							Type:     pb.ShippingRate_RateCondition_PRICE,
-							MinValue: 0,
-							MaxValue: 200, // 订单金额 <= 200
+						Id:      "zone-cn",
+						Name:    "China Domestic",
+						Regions: []string{"CN"},
+						Rates: []*pb.ShippingRate{
+							{
+								Id:       "rate-cn-std",
+								Name:     "Standard",
+								Price:    "500",
+								Currency: "USD",
+							},
+							{
+								Id:       "rate-cn-exp",
+								Name:     "Express",
+								Price:    "1500",
+								Currency: "USD",
+							},
+						},
+					},
+				},
+			},
+			{
+				Id:          "lg-us",
+				LocationIds: []string{"loc-us-west"},
+				Zones: []*pb.ShippingZone{
+					{
+						Id:      "zone-us",
+						Name:    "US Domestic",
+						Regions: []string{"US"},
+						Rates: []*pb.ShippingRate{
+							{
+								Id:       "rate-us-std",
+								Name:     "Standard",
+								Price:    "800",
+								Currency: "USD",
+							},
 						},
 					},
 					{
-						Id:       "rate-high",
-						Name:     "High Value",
-						Price:    "1000", // $10.00 shipping
-						Currency: "USD",
-						Condition: &pb.ShippingRate_RateCondition{
-							Type:     pb.ShippingRate_RateCondition_PRICE,
-							MinValue: 201,
-							MaxValue: 0, // 0 = 无上限
+						Id:      "zone-intl",
+						Name:    "International",
+						Regions: []string{"ALL"},
+						Rates: []*pb.ShippingRate{
+							{
+								Id:       "rate-intl-std",
+								Name:     "International Standard",
+								Price:    "2000",
+								Currency: "USD",
+							},
 						},
 					},
 				},
@@ -1842,45 +1936,361 @@ func TestShippingProfilePriceCondition(t *testing.T) {
 
 	tests := []struct {
 		name           string
+		zoneName       string
 		rateName       string
-		itemPrice      string // 商品价格（最小单位）
+		zoneId         string
+		rateId         string
+		country        string
+		pricingCoin    string
+		expectError    bool
 		expectShipping bool
 	}{
 		{
-			name:           "low value order within range",
-			rateName:       "Low Value",
-			itemPrice:      "100", // 在 [0, 200] 范围内
+			name:           "CN domestic standard by name",
+			zoneName:       "China Domestic",
+			rateName:       "Standard",
+			country:        "CN",
+			pricingCoin:    "USD",
 			expectShipping: true,
 		},
 		{
-			name:           "low value order at max boundary",
-			rateName:       "Low Value",
-			itemPrice:      "200", // 恰好在 max 边界
+			name:           "CN domestic express by name",
+			zoneName:       "China Domestic",
+			rateName:       "Express",
+			country:        "CN",
+			pricingCoin:    "USD",
 			expectShipping: true,
 		},
 		{
-			name:           "low value rate selected but order exceeds max",
-			rateName:       "Low Value",
-			itemPrice:      "300", // 超出 Low Value 的 max=200
-			expectShipping: false,
-		},
-		{
-			name:           "high value order - unlimited max",
-			rateName:       "High Value",
-			itemPrice:      "500", // 在 [201, ∞) 范围内
+			name:           "US domestic standard by name",
+			zoneName:       "US Domestic",
+			rateName:       "Standard",
+			country:        "US",
+			pricingCoin:    "USD",
 			expectShipping: true,
 		},
 		{
-			name:           "high value rate at min boundary",
-			rateName:       "High Value",
-			itemPrice:      "201", // 恰好在 min 边界
+			name:           "international by name",
+			zoneName:       "International",
+			rateName:       "International Standard",
+			country:        "JP",
+			pricingCoin:    "USD",
 			expectShipping: true,
 		},
 		{
-			name:           "high value rate selected but order below min",
-			rateName:       "High Value",
-			itemPrice:      "100", // 低于 High Value 的 min=201
-			expectShipping: false,
+			name:           "CN domestic by ID",
+			zoneName:       "China Domestic",
+			rateName:       "Standard",
+			zoneId:         "zone-cn",
+			rateId:         "rate-cn-std",
+			country:        "CN",
+			pricingCoin:    "USD",
+			expectShipping: true,
+		},
+		{
+			name:           "US domestic by ID",
+			zoneName:       "US Domestic",
+			rateName:       "Standard",
+			zoneId:         "zone-us",
+			rateId:         "rate-us-std",
+			country:        "US",
+			pricingCoin:    "USD",
+			expectShipping: true,
+		},
+		{
+			name:        "zone not found",
+			zoneName:    "NonExistent",
+			rateName:    "Standard",
+			country:     "US",
+			pricingCoin: "USD",
+			expectError: true,
+		},
+		{
+			name:        "rate not found",
+			zoneName:    "China Domestic",
+			rateName:    "NonExistent",
+			country:     "CN",
+			pricingCoin: "USD",
+			expectError: true,
+		},
+		{
+			name:        "region mismatch - CN zone but US country",
+			zoneName:    "China Domestic",
+			rateName:    "Standard",
+			country:     "US", // China Domestic only covers CN
+			pricingCoin: "USD",
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		order, err := makeLocationGroupProfileOrderWithIDs(profile, test.zoneName, test.rateName, test.zoneId, test.rateId)
+		if err != nil {
+			t.Fatalf("test %s: makeLocationGroupProfileOrder error: %s", test.name, err)
+		}
+		order.Shipping.Country = test.country
+		order.PricingCoin = test.pricingCoin
+
+		totals, err := CalculateOrderTotal(order, erp)
+		if test.expectError {
+			if err == nil {
+				t.Errorf("test %s: expected error but got none", test.name)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatalf("test %s: unexpected error: %s", test.name, err)
+		}
+		if test.expectShipping && totals.Shipping.Cmp(iwallet.NewAmount(0)) <= 0 {
+			t.Errorf("test %s: expected positive shipping cost but got %s", test.name, totals.Shipping.String())
+		}
+	}
+}
+
+func TestValidateShippingFromProfileWithLocationGroups(t *testing.T) {
+	// 创建只有 LocationGroups 模式的 profile（无直接 Zones）
+	profile := &pb.ShippingProfile{
+		LocationGroups: []*pb.LocationGroup{
+			{
+				Id:          "lg-1",
+				LocationIds: []string{"loc-1"},
+				Zones: []*pb.ShippingZone{
+					{
+						Id:   "zone-dom",
+						Name: "Domestic",
+						Rates: []*pb.ShippingRate{
+							{Id: "rate-std", Name: "Standard"},
+							{Id: "rate-exp", Name: "Express"},
+						},
+					},
+				},
+			},
+			{
+				Id:          "lg-2",
+				LocationIds: []string{"loc-2"},
+				Zones: []*pb.ShippingZone{
+					{
+						Id:   "zone-intl",
+						Name: "International",
+						Rates: []*pb.ShippingRate{
+							{Id: "rate-eco", Name: "Economy"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name    string
+		zone    string
+		rate    string
+		zoneId  string
+		rateId  string
+		wantErr bool
+	}{
+		// 名称匹配
+		{name: "valid domestic standard", zone: "Domestic", rate: "Standard", wantErr: false},
+		{name: "valid domestic express", zone: "Domestic", rate: "Express", wantErr: false},
+		{name: "valid international economy", zone: "International", rate: "Economy", wantErr: false},
+		{name: "zone not found", zone: "NonExistent", rate: "Standard", wantErr: true},
+		{name: "rate not found in zone", zone: "Domestic", rate: "Economy", wantErr: true},
+		// ID 匹配
+		{name: "valid ID match domestic", zone: "Domestic", rate: "Standard", zoneId: "zone-dom", rateId: "rate-std", wantErr: false},
+		{name: "valid ID match international", zone: "International", rate: "Economy", zoneId: "zone-intl", rateId: "rate-eco", wantErr: false},
+		{name: "ID match wrong zone id", zone: "Domestic", rate: "Standard", zoneId: "zone-wrong", rateId: "rate-std", wantErr: true},
+		{name: "ID overrides wrong name", zone: "WrongName", rate: "WrongRate", zoneId: "zone-dom", rateId: "rate-std", wantErr: false},
+	}
+
+	for _, test := range tests {
+		err := validateShippingFromProfile(profile, &pb.OrderOpen_Item_ShippingOption{
+			Name:    test.zone,
+			Service: test.rate,
+			ZoneId:  test.zoneId,
+			RateId:  test.rateId,
+		})
+		if test.wantErr && err == nil {
+			t.Errorf("test %s: expected error but got nil", test.name)
+		}
+		if !test.wantErr && err != nil {
+			t.Errorf("test %s: unexpected error: %s", test.name, err)
+		}
+	}
+}
+
+func TestLocationGroupFreeShippingThreshold(t *testing.T) {
+	erp, err := wallet.NewMockExchangeRates()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name       string
+		minAmount  string
+		expectFree bool
+	}{
+		{
+			name:       "subtotal below threshold - charge shipping",
+			minAmount:  "200",
+			expectFree: false,
+		},
+		{
+			name:       "subtotal meets threshold - free shipping",
+			minAmount:  "90",
+			expectFree: true,
+		},
+	}
+
+	for _, test := range tests {
+		profile := &pb.ShippingProfile{
+			ProfileID: "lg-free-test",
+			Name:      "LocationGroup Free Shipping Test",
+			IsDefault: true,
+			LocationGroups: []*pb.LocationGroup{
+				{
+					Id:          "lg-1",
+					LocationIds: []string{"loc-1"},
+					Zones: []*pb.ShippingZone{
+						{
+							Id:      "zone-1",
+							Name:    "Global",
+							Regions: []string{"ALL"},
+							Rates: []*pb.ShippingRate{
+								{
+									Id:       "rate-1",
+									Name:     "Standard",
+									Price:    "1000",
+									Currency: "USD",
+									FreeShippingThreshold: &pb.ShippingRate_FreeShippingThreshold{
+										Enabled:   true,
+										MinAmount: test.minAmount,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		order, err := makeLocationGroupProfileOrder(profile, "Global", "Standard")
+		if err != nil {
+			t.Fatalf("test %s: makeLocationGroupProfileOrder error: %s", test.name, err)
+		}
+		order.PricingCoin = "USD"
+
+		totals, err := CalculateOrderTotal(order, erp)
+		if err != nil {
+			t.Fatalf("test %s: unexpected error: %s", test.name, err)
+		}
+
+		isFree := totals.Shipping.Cmp(iwallet.NewAmount(0)) == 0
+		if test.expectFree && !isFree {
+			t.Errorf("test %s: expected free shipping but got %s", test.name, totals.Shipping.String())
+		}
+		if !test.expectFree && isFree {
+			t.Errorf("test %s: expected shipping charge but got free", test.name)
+		}
+	}
+}
+
+// TestShippingProfilePriceCondition 测试基于价格条件的运费计算
+// Shopify 风格设计：PRICE 条件是前端展示过滤器，后端直接收取选定费率的价格。
+// 条件校验由前端在下单前完成，后端不再重新校验。
+func TestShippingProfilePriceCondition(t *testing.T) {
+	erp, err := wallet.NewMockExchangeRates()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	profile := &pb.ShippingProfile{
+		ProfileID: "price-profile",
+		Name:      "Price Based",
+		IsDefault: true,
+		LocationGroups: []*pb.LocationGroup{
+			{
+				Id: "default",
+				Zones: []*pb.ShippingZone{
+					{
+						Id:      "zone-1",
+						Name:    "Domestic",
+						Regions: []string{"ALL"},
+						Rates: []*pb.ShippingRate{
+							{
+								Id:       "rate-low",
+								Name:     "Low Value",
+								Price:    "500", // $5.00 shipping
+								Currency: "USD",
+								Condition: &pb.ShippingRate_RateCondition{
+									Type:     pb.ShippingRate_RateCondition_PRICE,
+									MinValue: 0,
+									MaxValue: 200,
+								},
+							},
+							{
+								Id:       "rate-high",
+								Name:     "High Value",
+								Price:    "1000", // $10.00 shipping
+								Currency: "USD",
+								Condition: &pb.ShippingRate_RateCondition{
+									Type:     pb.ShippingRate_RateCondition_PRICE,
+									MinValue: 201,
+									MaxValue: 0, // 0 = 无上限
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Shopify 风格：无论订单金额是否匹配条件范围，选定的费率直接收取其价格。
+	// PRICE 条件仅用于前端展示过滤，后端不再重新校验。
+	tests := []struct {
+		name          string
+		rateName      string
+		itemPrice     string
+		expectedPrice string // 预期运费（费率的 price）
+	}{
+		// 正常匹配场景
+		{
+			name:          "low value rate - order within range",
+			rateName:      "Low Value",
+			itemPrice:     "100", // 在 [0, 200] 范围内
+			expectedPrice: "500",
+		},
+		{
+			name:          "high value rate - order within range",
+			rateName:      "High Value",
+			itemPrice:     "500", // 在 [201, ∞) 范围内
+			expectedPrice: "1000",
+		},
+		// 边界场景
+		{
+			name:          "low value rate at max boundary",
+			rateName:      "Low Value",
+			itemPrice:     "200", // 恰好在 max 边界
+			expectedPrice: "500",
+		},
+		{
+			name:          "high value rate at min boundary",
+			rateName:      "High Value",
+			itemPrice:     "201", // 恰好在 min 边界
+			expectedPrice: "1000",
+		},
+		// 条件不匹配场景（Shopify 风格：后端不校验，仍收取费率价格）
+		{
+			name:          "low value rate selected but order exceeds max - still charges",
+			rateName:      "Low Value",
+			itemPrice:     "500", // 超出 Low Value 的 max=200，但后端不校验
+			expectedPrice: "500",
+		},
+		{
+			name:          "high value rate selected but order below min - still charges",
+			rateName:      "High Value",
+			itemPrice:     "100", // 低于 High Value 的 min=201，但后端不校验
+			expectedPrice: "1000",
 		},
 	}
 
@@ -1904,12 +2314,9 @@ func TestShippingProfilePriceCondition(t *testing.T) {
 			t.Fatalf("test %s: unexpected error: %s", test.name, err)
 		}
 
-		hasShipping := totals.Shipping.Cmp(iwallet.NewAmount(0)) > 0
-		if test.expectShipping && !hasShipping {
-			t.Errorf("test %s: expected shipping cost but got zero", test.name)
-		}
-		if !test.expectShipping && hasShipping {
-			t.Errorf("test %s: expected zero shipping but got %s", test.name, totals.Shipping.String())
+		expected := iwallet.NewAmount(test.expectedPrice)
+		if totals.Shipping.Cmp(expected) != 0 {
+			t.Errorf("test %s: expected shipping %s but got %s", test.name, expected.String(), totals.Shipping.String())
 		}
 	}
 }

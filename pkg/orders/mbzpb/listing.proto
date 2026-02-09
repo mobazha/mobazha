@@ -260,23 +260,22 @@ message ShippingLocation {
     bool isDefault   = 4;  // 是否为默认地点
 }
 
-// LocationGroup 发货地点组（用于多仓库场景）
+// LocationGroup 发货地点组
+// locationIds 留空表示适用于所有发货地点（默认行为）
 message LocationGroup {
     string id                     = 1;  // 地点组 ID
-    repeated string locationIds   = 2;  // 关联的发货地点 ID 列表
+    repeated string locationIds   = 2;  // 关联的发货地点 ID 列表（留空 = 全局适用）
     repeated ShippingZone zones   = 3;  // 该地点组的配送区域
 }
 
 // ShippingProfile 配送档案（Shopify 风格）
-// 支持两种模式：
-// - 简化模式（单一发货地点）：使用 zones 字段
-// - 完整模式（多发货地点）：使用 locationGroups 字段
+// 始终使用 locationGroups，每个 LocationGroup 包含独立的配送区域
+// 单仓库卖家自动创建一个默认 LocationGroup（locationIds 留空）
 message ShippingProfile {
     string profileID                        = 1;  // UUID，唯一标识
     string name                             = 2;  // 档案名称：如"默认配送"、"易碎品配送"
     bool isDefault                          = 3;  // 是否为默认档案
-    repeated ShippingZone zones             = 4;  // 配送区域列表（简化模式）
-    repeated LocationGroup locationGroups   = 5;  // 发货地点组列表（完整模式，多仓库）
-    google.protobuf.Timestamp createdAt     = 6;  // 创建时间
-    google.protobuf.Timestamp updatedAt     = 7;  // 更新时间
+    repeated LocationGroup locationGroups   = 4;  // 发货地点组列表（至少一个）
+    google.protobuf.Timestamp createdAt     = 5;  // 创建时间
+    google.protobuf.Timestamp updatedAt     = 6;  // 更新时间
 }

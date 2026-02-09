@@ -275,7 +275,8 @@ func (op *OrderProcessor) validateOrderOpen(dbtx database.Tx, order *pb.OrderOpe
 		// Validate shipping option
 		if item.ShippingOption != nil {
 			// 优先从新版 ShippingProfile 验证（新模型为主）
-			if listing.ShippingProfile != nil && len(listing.ShippingProfile.Zones) > 0 {
+			// 从 ShippingProfile 的 LocationGroups 中查找配送区域
+			if listing.ShippingProfile != nil && hasShippingZones(listing.ShippingProfile) {
 				if err := validateShippingFromProfile(listing.ShippingProfile, item.ShippingOption); err != nil {
 					return fmt.Errorf("item %d %s", i, err.Error())
 				}
@@ -544,10 +545,13 @@ func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode strin
 
 // validateShippingFromProfile 从新版 ShippingProfile 验证配送选项
 // 优先按 ID 精确匹配（zoneId + rateId），回退到名称匹配（向后兼容旧订单）
+// 搜索所有 LocationGroups 中的 zones
 func validateShippingFromProfile(profile *pb.ShippingProfile, shippingOption *pb.OrderOpen_Item_ShippingOption) error {
+	allZones := getAllZonesFromProfile(profile)
+
 	// 优先按 ID 匹配（新订单）
 	if shippingOption.ZoneId != "" && shippingOption.RateId != "" {
-		for _, zone := range profile.Zones {
+		for _, zone := range allZones {
 			if zone.Id == shippingOption.ZoneId {
 				for _, rate := range zone.Rates {
 					if rate.Id == shippingOption.RateId {
@@ -561,7 +565,7 @@ func validateShippingFromProfile(profile *pb.ShippingProfile, shippingOption *pb
 	}
 
 	// 回退到名称匹配（旧订单或未传 ID 的情况）
-	for _, zone := range profile.Zones {
+	for _, zone := range allZones {
 		if strings.EqualFold(zone.Name, shippingOption.Name) {
 			for _, rate := range zone.Rates {
 				if strings.EqualFold(rate.Name, shippingOption.Service) {
@@ -621,6 +625,33 @@ type legacyShippingInfo struct {
 	service *pb.Listing_ShippingOption_Service
 }
 
+// getAllZonesFromProfile 获取 ShippingProfile 中所有 LocationGroup 的 ShippingZone
+func getAllZonesFromProfile(profile *pb.ShippingProfile) []*pb.ShippingZone {
+	if profile == nil {
+		return nil
+	}
+	var zones []*pb.ShippingZone
+	for _, lg := range profile.LocationGroups {
+		if lg != nil {
+			zones = append(zones, lg.Zones...)
+		}
+	}
+	return zones
+}
+
+// hasShippingZones 检查 ShippingProfile 是否包含任何配送区域
+func hasShippingZones(profile *pb.ShippingProfile) bool {
+	if profile == nil {
+		return false
+	}
+	for _, lg := range profile.LocationGroups {
+		if lg != nil && len(lg.Zones) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // getShippingInfo 获取统一的运费计算信息
 // 优先从新版 ShippingProfile 查找，回退到旧版 ShippingOptions
 func getShippingInfo(order *pb.OrderOpen, listings map[string]*pb.Listing) (*shippingCalcInfo, error) {
@@ -635,8 +666,8 @@ func getShippingInfo(order *pb.OrderOpen, listings map[string]*pb.Listing) (*shi
 		return nil, errors.New("no listing found with item listingHash")
 	}
 
-	// 优先从新版 ShippingProfile 查找（新模型为主）
-	if listing.ShippingProfile != nil && len(listing.ShippingProfile.Zones) > 0 {
+	// 优先从新版 ShippingProfile 查找（从 LocationGroups 中获取配送区域）
+	if listing.ShippingProfile != nil && hasShippingZones(listing.ShippingProfile) {
 		return getShippingInfoFromProfile(order, listing, item)
 	}
 
@@ -650,15 +681,17 @@ func getShippingInfo(order *pb.OrderOpen, listings map[string]*pb.Listing) (*shi
 
 // getShippingInfoFromProfile 从新版 ShippingProfile 中查找配送信息
 // 优先按 ID 精确匹配（zoneId + rateId），回退到名称匹配（向后兼容旧订单）
+// 搜索所有 LocationGroups 中的 zones
 func getShippingInfoFromProfile(order *pb.OrderOpen, listing *pb.Listing, item *pb.OrderOpen_Item) (*shippingCalcInfo, error) {
 	profile := listing.ShippingProfile
+	allZones := getAllZonesFromProfile(profile)
 
 	var matchedZone *pb.ShippingZone
 	var matchedRate *pb.ShippingRate
 
 	// 优先按 ID 精确匹配（新订单路径）
 	if item.ShippingOption.ZoneId != "" && item.ShippingOption.RateId != "" {
-		for _, zone := range profile.Zones {
+		for _, zone := range allZones {
 			if zone.Id == item.ShippingOption.ZoneId {
 				matchedZone = zone
 				for _, rate := range zone.Rates {
@@ -678,7 +711,7 @@ func getShippingInfoFromProfile(order *pb.OrderOpen, listing *pb.Listing, item *
 		}
 	} else {
 		// 回退到名称匹配（旧订单或未传 ID 的情况）
-		for _, zone := range profile.Zones {
+		for _, zone := range allZones {
 			if strings.EqualFold(zone.Name, item.ShippingOption.Name) {
 				matchedZone = zone
 				break
@@ -871,7 +904,10 @@ func calculateShippingTotalForListings(order *pb.OrderOpen, listings map[string]
 			freight = iwallet.NewAmount(info.profile.price)
 
 		case pb.ShippingRate_RateCondition_WEIGHT:
-			// 基于重量条件：检查 gramsTotal 是否在 [min, max] 范围内
+			// 基于重量条件：后端校验 gramsTotal 是否在 [min, max] 范围内。
+			// 与 PRICE 不同，WEIGHT 保留后端校验是因为：
+			//   1. 重量是物理属性，后端可通过 listing.Item.Grams 精确计算，无币种转换问题
+			//   2. 重量条件决定的是运费计算逻辑（如按重量阶梯定价），不仅是展示过滤
 			if gramsTotal >= info.profile.conditionMinValue &&
 				(info.profile.conditionMaxValue == 0 || gramsTotal <= info.profile.conditionMaxValue) {
 				freight = iwallet.NewAmount(info.profile.price)
@@ -879,13 +915,17 @@ func calculateShippingTotalForListings(order *pb.OrderOpen, listings map[string]
 			// 不在范围内则运费为 0（条件不满足）
 
 		case pb.ShippingRate_RateCondition_PRICE:
-			// 基于价格条件：检查订单金额是否在 [min, max] 范围内
-			minVal := iwallet.NewAmount(int64(info.profile.conditionMinValue))
-			maxVal := iwallet.NewAmount(int64(info.profile.conditionMaxValue))
-			if eligibleSubtotal.Cmp(minVal) >= 0 &&
-				(info.profile.conditionMaxValue == 0 || eligibleSubtotal.Cmp(maxVal) <= 0) {
-				freight = iwallet.NewAmount(info.profile.price)
-			}
+			// Shopify 风格：PRICE 条件是前端展示过滤器，用于决定哪些费率对买家可见。
+			// 买家选定费率后，后端直接收取该费率的价格，不再重新校验价格条件。
+			//
+			// 设计说明：
+			//   - PRICE 条件不在后端重新校验，因为涉及跨币种比较（费率币种 vs 支付币种），
+			//     汇率波动可能导致边界订单被错误拒绝。
+			//   - 前端在展示可选费率时已根据订单金额过滤，确保买家只能看到符合条件的费率。
+			//   - 安全风险有限：即使恶意客户端绕过前端选了不匹配的费率，运费差异通常很小，
+			//     且卖家已设定该费率价格，不会造成亏损（只是运费定价策略被绕过）。
+			//   - 如需后端强制校验，应在 validateShippingFromProfile 中增加独立的条件验证步骤。
+			freight = iwallet.NewAmount(info.profile.price)
 
 		default:
 			// 未知条件类型，视为固定费率

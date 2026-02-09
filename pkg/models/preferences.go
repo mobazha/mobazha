@@ -124,37 +124,24 @@ type LocationGroup struct {
 }
 
 // ShippingProfile 配送档案 - 允许卖家创建多个配送方案（Shopify 风格）
-// 支持两种模式：
-// - 简化模式（单一发货地点）：使用 Zones 字段
-// - 完整模式（多发货地点）：使用 LocationGroups 字段
+// 始终使用 LocationGroups，每个 LocationGroup 包含独立的配送区域
+// 单仓库卖家自动创建一个默认 LocationGroup（LocationIDs 留空 = 全局适用）
 type ShippingProfile struct {
-	ProfileID string `json:"profileId"`
-	Name      string `json:"name"`
-	IsDefault bool   `json:"isDefault"`
-	// Shopify 风格字段
-	Zones          []*ShippingZone  `json:"zones,omitempty"`          // 简化模式
-	LocationGroups []*LocationGroup `json:"locationGroups,omitempty"` // 完整模式
-	// 元数据
-	CreatedAt string `json:"createdAt,omitempty"`
-	UpdatedAt string `json:"updatedAt,omitempty"`
+	ProfileID      string           `json:"profileId"`
+	Name           string           `json:"name"`
+	IsDefault      bool             `json:"isDefault"`
+	LocationGroups []*LocationGroup  `json:"locationGroups,omitempty"` // 发货地点组（至少一个）
+	CreatedAt      string           `json:"createdAt,omitempty"`
+	UpdatedAt      string           `json:"updatedAt,omitempty"`
 }
 
-// IsUsingLocationGroups 检查是否使用多仓库模式
-func (p *ShippingProfile) IsUsingLocationGroups() bool {
-	return len(p.LocationGroups) > 0
-}
-
-// GetAllZones 获取所有配送区域（无论是简化模式还是完整模式）
+// GetAllZones 获取所有 LocationGroup 中的配送区域
 func (p *ShippingProfile) GetAllZones() []*ShippingZone {
-	if len(p.LocationGroups) > 0 {
-		// 完整模式：合并所有 LocationGroup 的 Zones
-		var zones []*ShippingZone
-		for _, lg := range p.LocationGroups {
-			zones = append(zones, lg.Zones...)
-		}
-		return zones
+	var zones []*ShippingZone
+	for _, lg := range p.LocationGroups {
+		zones = append(zones, lg.Zones...)
 	}
-	return p.Zones
+	return zones
 }
 
 func ConvertShippingOption(option ShippingOption) *pb.Listing_ShippingOption {
@@ -232,15 +219,6 @@ func ConvertShippingProfileToProto(profile *ShippingProfile) *pb.ShippingProfile
 		ProfileID: profile.ProfileID,
 		Name:      profile.Name,
 		IsDefault: profile.IsDefault,
-	}
-
-	// 转换 Zones
-	for _, zone := range profile.Zones {
-		if zone == nil {
-			continue
-		}
-		pbZone := convertZoneToProto(zone)
-		pbProfile.Zones = append(pbProfile.Zones, pbZone)
 	}
 
 	// 转换 LocationGroups
@@ -777,12 +755,17 @@ func (prefs *UserPreferences) MigrateFromLegacyShippingOptions(profileID, profil
 		}
 	}
 
-	// 创建默认配送档案
+	// 创建默认配送档案，将 zones 放入默认 LocationGroup
 	defaultProfile := &ShippingProfile{
 		ProfileID: profileID,
 		Name:      profileName,
 		IsDefault: true,
-		Zones:     zones,
+		LocationGroups: []*LocationGroup{
+			{
+				ID:    "default",
+				Zones: zones,
+			},
+		},
 	}
 
 	// 保存配送档案

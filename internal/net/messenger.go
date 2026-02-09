@@ -62,6 +62,10 @@ type Messenger struct {
 	// when messages arrive via both subscription and polling paths
 	recentlyProcessed   map[string]time.Time
 	recentlyProcessedMu sync.Mutex
+
+	// 防止 retryAllMessages / downloadMessages 重叠执行
+	retryRunning    atomic.Bool
+	downloadRunning atomic.Bool
 }
 
 // MessengerConfig holds the data needed to construct a new Messenger.
@@ -273,9 +277,21 @@ func (m *Messenger) Start() {
 			requeryTicker.Stop()
 			return
 		case <-retryTicker.C:
-			go m.retryAllMessages()
+			go func() {
+				if !m.retryRunning.CompareAndSwap(false, true) {
+					return // 上一次尚未完成，跳过
+				}
+				defer m.retryRunning.Store(false)
+				m.retryAllMessages()
+			}()
 		case <-requeryTicker.C:
-			go m.downloadMessages()
+			go func() {
+				if !m.downloadRunning.CompareAndSwap(false, true) {
+					return // 上一次尚未完成，跳过
+				}
+				defer m.downloadRunning.Store(false)
+				m.downloadMessages()
+			}()
 		case msg := <-sub.Out:
 			p, pmes, err := m.decryptMessage(msg.EncryptedMessage)
 			if err != nil {

@@ -162,6 +162,13 @@ func (t *FollowerTracker) listenEvents() {
 	t.bus.Emit(&events.TrackerStarted{})
 	for {
 		select {
+		case <-t.shutdown:
+			ticker.Stop()
+			connectedSub.Close()
+			disonnectedSub.Close()
+			followerSub.Close()
+			unfollowerSub.Close()
+			return
 		case <-ticker.C:
 			go t.tryConnectFollowers()
 		case event := <-connectedSub.Out():

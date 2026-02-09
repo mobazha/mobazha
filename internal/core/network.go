@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -164,12 +165,14 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 		}
 	}
 
-	// Publish
+	// Publish（带 5 分钟超时保护）
 	go func() {
+		publishCtx, publishCancel := context.WithTimeout(cctx, 5*time.Minute)
+		defer publishCancel()
 		logger.LogInfoWithIDf(log, n.nodeID, "Publishing to IPNS...")
 		eol := time.Now().Add(nameValidTime)
 		ipfsNode := n.SharedManager().GetIPFSNode()
-		if err := ipfsNode.Namesys.Publish(cctx, ipfsNode.PrivateKey, pth, nameSysOpts.PublishWithEOL(eol)); err != nil {
+		if err := ipfsNode.Namesys.Publish(publishCtx, ipfsNode.PrivateKey, pth, nameSysOpts.PublishWithEOL(eol)); err != nil {
 			if err != context.Canceled {
 				logger.LogErrorWithIDf(log, n.nodeID, "Error namesys publish: %s", err.Error())
 			}
@@ -178,11 +181,12 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 		}
 	}()
 
-	// Publish to pubsub all records topic.
+	// Publish to pubsub all records topic（带超时）
 	go func() {
+		pubsubCtx, pubsubCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer pubsubCancel()
 		logger.LogInfoWithIDf(log, n.nodeID, "Going to publish to pubsub:")
-
-		if err := n.publishIPNSRecordToPubsub(context.Background()); err != nil {
+		if err := n.publishIPNSRecordToPubsub(pubsubCtx); err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID, "Error publishing IPNS record to pubsub: %s", err)
 		}
 	}()
@@ -228,15 +232,37 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 	msg := newMessageWithID()
 	msg.MessageType = pb.Message_STORE
 	msg.Payload = any
-	for _, peer := range n.followerTracker.ConnectedFollowers() {
-		if _, ok := svrMap[peer]; !ok {
-			go n.networkService.SendMessage(context.Background(), peer, msg)
-		}
-	}
 
-	for peer := range svrMap {
-		go n.networkService.SendMessage(context.Background(), peer, msg)
-	}
+	// 有界并发发送消息给 followers 和 SNF servers（后台执行，不阻塞 Publish 返回）
+	go func() {
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, 10) // 最多 10 个并发发送
+		sendCtx, sendCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer sendCancel()
+
+		for _, p := range n.followerTracker.ConnectedFollowers() {
+			if _, ok := svrMap[p]; !ok {
+				wg.Add(1)
+				sem <- struct{}{}
+				go func(target peer.ID) {
+					defer wg.Done()
+					defer func() { <-sem }()
+					n.networkService.SendMessage(sendCtx, target, msg)
+				}(p)
+			}
+		}
+
+		for p := range svrMap {
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(target peer.ID) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				n.networkService.SendMessage(sendCtx, target, msg)
+			}(p)
+		}
+		wg.Wait()
+	}()
 }
 
 // PublishFile will publish the given file to SNF servers and followers for storage.
@@ -279,15 +305,37 @@ func (n *MobazhaNode) PublishFile(ctx context.Context, cid cid.Cid, done chan<- 
 	msg := newMessageWithID()
 	msg.MessageType = pb.Message_STORE
 	msg.Payload = any
-	for _, peer := range n.followerTracker.ConnectedFollowers() {
-		if _, ok := svrMap[peer]; !ok {
-			go n.networkService.SendMessage(context.Background(), peer, msg)
-		}
-	}
 
-	for peer := range svrMap {
-		go n.networkService.SendMessage(context.Background(), peer, msg)
-	}
+	// 有界并发发送消息（后台执行，不阻塞 PublishFile 返回）
+	go func() {
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, 10)
+		sendCtx, sendCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer sendCancel()
+
+		for _, p := range n.followerTracker.ConnectedFollowers() {
+			if _, ok := svrMap[p]; !ok {
+				wg.Add(1)
+				sem <- struct{}{}
+				go func(target peer.ID) {
+					defer wg.Done()
+					defer func() { <-sem }()
+					n.networkService.SendMessage(sendCtx, target, msg)
+				}(p)
+			}
+		}
+
+		for p := range svrMap {
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(target peer.ID) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				n.networkService.SendMessage(sendCtx, target, msg)
+			}(p)
+		}
+		wg.Wait()
+	}()
 }
 
 // sendAckMessage saves the incoming message ID in the database so we can

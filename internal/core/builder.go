@@ -99,7 +99,12 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 	repoPath := path.Join(cfg.DataDir, "nodes", nodeID)
 
-	obRepo, err := repo.NewRepo(nodeID, repoPath, cfg.Testnet)
+	var obRepo *repo.Repo
+	if len(cfg.IdentityKey) > 0 {
+		obRepo, err = repo.NewRepoWithIdentityKey(nodeID, repoPath, cfg.IdentityKey, cfg.Testnet)
+	} else {
+		obRepo, err = repo.NewRepo(nodeID, repoPath, cfg.Testnet)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -200,13 +205,22 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		ipfsConfig.Swarm.DisableNatPortMap = true
 	}
 
-	// Load our identity key from the db and set it in the config.
-	var dbIdentityKey models.Key
-	err = obRepo.DB().View(func(tx database.Tx) error {
-		return tx.Read().Where("name = ?", "identity").First(&dbIdentityKey).Error
-	})
+	// Load identity key: use external key from config if provided, otherwise load from DB.
+	var identityKeyBytes []byte
+	if len(cfg.IdentityKey) > 0 {
+		identityKeyBytes = cfg.IdentityKey
+	} else {
+		var dbIdentityKey models.Key
+		err = obRepo.DB().View(func(tx database.Tx) error {
+			return tx.Read().Where("name = ?", "identity").First(&dbIdentityKey).Error
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to load identity key from DB: %w", err)
+		}
+		identityKeyBytes = dbIdentityKey.Value
+	}
 
-	ipfsConfig.Identity, err = repo.IdentityFromKey(dbIdentityKey.Value)
+	ipfsConfig.Identity, err = repo.IdentityFromKey(identityKeyBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -569,9 +583,9 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		return nil, err
 	}
 
-	// Create a Signer from the node's marshaled private key.
+	// Create a Signer from the node's identity key (external or DB-loaded).
 	// This is the standard contracts.Signer implementation from mobazha-core.
-	signer, err := corecontracts.NewKeyPairSignerFromMarshaledKey(dbIdentityKey.Value)
+	signer, err := corecontracts.NewKeyPairSignerFromMarshaledKey(identityKeyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signer: %w", err)
 	}

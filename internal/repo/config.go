@@ -108,6 +108,11 @@ type Config struct {
 	DHTClientOnly          bool     `long:"dhtclientonly" description:"Disable participating in serving data in the DHT. This should be used if your node is undialable."`
 	NetConfigEndpoint      string   `long:"netconfigendpoint" description:"Override the default net config endpoint with the provided value"`
 	RelayAPIURL            string   `long:"relayapiurl" description:"Platform Relay API URL for gas fee payment (EVM/Solana CANCELABLE payments)"`
+
+	// IdentityKey is an optional externally-provided identity key in libp2p marshaled format.
+	// When set, the node uses this key instead of generating one from a mnemonic.
+	// This is used by mobazha_hosting to inject keys from KeyVault.
+	IdentityKey []byte `long:"-" description:"External identity key (libp2p marshaled format)"`
 }
 
 // LoadConfig initializes and parses the config using a config file and command

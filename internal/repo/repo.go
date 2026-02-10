@@ -72,14 +72,22 @@ type Repo struct {
 // NewRepo returns a new Repo for the given data directory. It will
 // be initialized if it is not already.
 func NewRepo(nodeID string, dataDir string, testnet bool) (*Repo, error) {
-	return newRepo(nodeID, dataDir, "", false, testnet)
+	return newRepo(nodeID, dataDir, "", nil, false, testnet)
 }
 
 // NewRepoWithCustomMnemonicSeed behaves the same as NewRepo but allows
-// the caller to pass in a custom mnemonic seed. This is usuful for
+// the caller to pass in a custom mnemonic seed. This is useful for
 // restoring a node from seed.
 func NewRepoWithCustomMnemonicSeed(nodeID string, dataDir, mnemonic string, testnet bool) (*Repo, error) {
-	return newRepo(nodeID, dataDir, mnemonic, false, testnet)
+	return newRepo(nodeID, dataDir, mnemonic, nil, false, testnet)
+}
+
+// NewRepoWithIdentityKey creates a new Repo using an externally provided identity key
+// (in libp2p marshaled format). The mnemonic is still generated for wallet keys,
+// but the identity key comes from KeyVault. If the repo already exists, the external
+// identity key is stored/updated in the DB.
+func NewRepoWithIdentityKey(nodeID string, dataDir string, identityKey []byte, testnet bool) (*Repo, error) {
+	return newRepo(nodeID, dataDir, "", identityKey, false, testnet)
 }
 
 // DB returns the database implementation.
@@ -122,7 +130,7 @@ func (r *Repo) WriteVersion(version int) error {
 	return os.WriteFile(path.Join(r.dataDir, versionFileName), []byte(versionStr), os.ModePerm)
 }
 
-func newRepo(nodeID string, dataDir, mnemonicSeed string, inMemoryDB bool, testnet bool) (*Repo, error) {
+func newRepo(nodeID string, dataDir, mnemonicSeed string, externalIdentityKey []byte, inMemoryDB bool, testnet bool) (*Repo, error) {
 	var (
 		dbIdentity, dbEscrowKey, dbRatingKey, dbBip44Key, dbMnemonic, torKey, dbSolKey *models.Key
 		err                                                                            error
@@ -144,10 +152,17 @@ func newRepo(nodeID string, dataDir, mnemonicSeed string, inMemoryDB bool, testn
 			}
 		}
 
-		identitySeed := bip39.NewSeed(mnemonicSeed, "Secret Passphrase")
-		identityKey, err := IdentityKeyFromSeed(identitySeed, 0)
-		if err != nil {
-			return nil, err
+		// Determine identity key: use external key from KeyVault if provided,
+		// otherwise derive from mnemonic seed.
+		var identityKey []byte
+		if len(externalIdentityKey) > 0 {
+			identityKey = externalIdentityKey
+		} else {
+			identitySeed := bip39.NewSeed(mnemonicSeed, "Secret Passphrase")
+			identityKey, err = IdentityKeyFromSeed(identitySeed, 0)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		identity, err := IdentityFromKey(identityKey)

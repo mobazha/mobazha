@@ -41,6 +41,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
+	coreorders "github.com/mobazha/mobazha-core/orders"
 	oniontransport "github.com/mobazha/mobazha3.0/libs/onion-transport"
 	"github.com/mobazha/mobazha3.0/libs/proxyclient"
 	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
@@ -604,12 +605,31 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		CalcCIDFunc:              obNode.cid,
 		FeatureManager:           obNode.featureManager,
 		GetStripeTransactionFunc: obNode.GetStripeTransaction,
+		StateValidator:           &coreStateBridge{},
 	})
 
 	obNode.registerHandlers()
 	obNode.listenNetworkEvents()
 
 	return obNode, nil
+}
+
+// coreStateBridge wraps mobazha-core order state machine for transition validation.
+// This is defined here (instead of using pkg/core.OrderStateBridge) to avoid import cycles.
+type coreStateBridge struct{}
+
+func (b *coreStateBridge) ValidateTransition(currentState, event int) (int, bool) {
+	result := coreorders.Transition(coreorders.OrderState(currentState), coreorders.OrderEvent(event))
+	return int(result.NewState), result.Valid
+}
+
+func (b *coreStateBridge) GetAllowedEvents(state int) []int {
+	allowed := coreorders.AllowedEvents(coreorders.OrderState(state))
+	result := make([]int, len(allowed))
+	for i, e := range allowed {
+		result[i] = int(e)
+	}
+	return result
 }
 
 type dummyListener struct {

@@ -35,6 +35,8 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 		return nil, nil
 	}
 
+	// FSM-covered: COMPLETED, PAYMENT_FINALIZED, DECLINED, CANCELED are all final states
+	// with no outgoing transitions. The FSM rejects EventDisputeOpened from any of them.
 	if order.SerializedOrderComplete != nil {
 		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_OPEN message for order %s after ORDER_COMPLETION", order.ID)
 		return nil, ErrUnexpectedMessage

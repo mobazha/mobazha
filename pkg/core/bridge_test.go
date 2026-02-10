@@ -22,36 +22,93 @@ func newTestSigner(t *testing.T) *contracts.KeyPairSigner {
 	return contracts.NewKeyPairSigner(kp, pid)
 }
 
-func TestOrderStateBridge_ValidTransition(t *testing.T) {
+func TestOrderStateBridge_HappyPath(t *testing.T) {
 	bridge := NewOrderStateBridge()
 
-	newState, valid := bridge.ValidateTransition(int(orders.StatePending), int(orders.EventPaymentSent))
+	// AWAITING_PAYMENT + PaymentSent → PENDING
+	newState, valid := bridge.ValidateTransition(
+		int(orders.StateAwaitingPayment), int(orders.EventPaymentSent))
 	if !valid {
-		t.Error("Expected valid transition from Pending on PaymentSent")
+		t.Fatal("Expected valid transition AwaitingPayment + PaymentSent")
 	}
-	if newState != int(orders.StateAwaitingPayment) {
-		t.Errorf("Expected AwaitingPayment state, got %d", newState)
+	if newState != int(orders.StatePending) {
+		t.Errorf("Expected Pending, got %d", newState)
+	}
+
+	// PENDING + VendorConfirm → AWAITING_FULFILLMENT
+	newState, valid = bridge.ValidateTransition(
+		int(orders.StatePending), int(orders.EventVendorConfirm))
+	if !valid {
+		t.Fatal("Expected valid transition Pending + VendorConfirm")
+	}
+	if newState != int(orders.StateAwaitingFulfillment) {
+		t.Errorf("Expected AwaitingFulfillment, got %d", newState)
+	}
+
+	// AWAITING_FULFILLMENT + OrderFulfilled → FULFILLED
+	newState, valid = bridge.ValidateTransition(
+		int(orders.StateAwaitingFulfillment), int(orders.EventOrderFulfilled))
+	if !valid {
+		t.Fatal("Expected valid transition AwaitingFulfillment + OrderFulfilled")
+	}
+	if newState != int(orders.StateFulfilled) {
+		t.Errorf("Expected Fulfilled, got %d", newState)
+	}
+
+	// FULFILLED + BuyerComplete → COMPLETED
+	newState, valid = bridge.ValidateTransition(
+		int(orders.StateFulfilled), int(orders.EventBuyerComplete))
+	if !valid {
+		t.Fatal("Expected valid transition Fulfilled + BuyerComplete")
+	}
+	if newState != int(orders.StateCompleted) {
+		t.Errorf("Expected Completed, got %d", newState)
 	}
 }
 
 func TestOrderStateBridge_InvalidTransition(t *testing.T) {
 	bridge := NewOrderStateBridge()
 
-	_, valid := bridge.ValidateTransition(int(orders.StateCompleted), int(orders.EventPaymentSent))
-	if valid {
-		t.Error("Expected invalid transition from Completed on PaymentSent")
+	tests := []struct {
+		name  string
+		state orders.OrderState
+		event orders.OrderEvent
+	}{
+		{"completed cannot transition", orders.StateCompleted, orders.EventPaymentSent},
+		{"awaiting payment cannot be confirmed", orders.StateAwaitingPayment, orders.EventVendorConfirm},
+		{"canceled cannot transition", orders.StateCanceled, orders.EventPaymentSent},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, valid := bridge.ValidateTransition(int(tt.state), int(tt.event))
+			if valid {
+				t.Errorf("Expected invalid transition %s + %s", tt.state, tt.event)
+			}
+		})
 	}
 }
 
 func TestOrderStateBridge_AllowedEvents(t *testing.T) {
 	bridge := NewOrderStateBridge()
 
-	allowed := bridge.GetAllowedEvents(int(orders.StatePending))
-	if len(allowed) == 0 {
-		t.Error("Expected some allowed events for Pending state")
+	// AwaitingPayment should only have PaymentSent
+	allowed := bridge.GetAllowedEvents(int(orders.StateAwaitingPayment))
+	if len(allowed) != 1 {
+		t.Errorf("Expected 1 allowed event for AwaitingPayment, got %d: %v", len(allowed), allowed)
 	}
 
-	t.Logf("Allowed events for Pending: %v", allowed)
+	// Pending should have 6 allowed events
+	allowed = bridge.GetAllowedEvents(int(orders.StatePending))
+	if len(allowed) != 6 {
+		t.Errorf("Expected 6 allowed events for Pending, got %d: %v", len(allowed), allowed)
+	}
+
+	// Completed (final state) should have no allowed events
+	allowed = bridge.GetAllowedEvents(int(orders.StateCompleted))
+	if len(allowed) != 0 {
+		t.Errorf("Expected 0 allowed events for Completed, got %d: %v", len(allowed), allowed)
+	}
 }
 
 func TestMessageBridge_CreateSignedMessage(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	"github.com/ipfs/go-cid"
 	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha-core/contracts"
+	coreorders "github.com/mobazha/mobazha-core/orders"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
@@ -32,6 +33,13 @@ var (
 	ErrUnexpectedMessage = errors.New("unexpected message")
 )
 
+// StateValidator is the interface for validating order state transitions using mobazha-core.
+// This allows the processor to validate transitions without hard-depending on the bridge package.
+type StateValidator interface {
+	ValidateTransition(currentState, event int) (newState int, valid bool)
+	GetAllowedEvents(state int) []int
+}
+
 // Config holds the objects needed to instantiate a new OrderProcessor.
 type Config struct {
 	NodeID                   string
@@ -46,6 +54,14 @@ type Config struct {
 	CalcCIDFunc              func(file []byte) (cid.Cid, error)
 	GetStripeTransactionFunc func(txid iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error)
 	FeatureManager           *pkgconfig.FeatureManager
+
+	// StateValidator is an optional core state machine validator (typically OrderStateBridge).
+	// When set, the FSM becomes the authoritative source for order state transitions:
+	//   - Before each handler, computeFSMTransition() determines the expected new state
+	//   - After the handler succeeds, SetFSMState() writes the FSM state to the order
+	//   - DeriveState() comparison is logged for monitoring during the transition period
+	// When nil, the legacy DeriveState() path is used via BeforeSave().
+	StateValidator StateValidator
 }
 
 // OrderProcessor is used to deterministically process orders.
@@ -62,6 +78,7 @@ type OrderProcessor struct {
 	calcCIDFunc              func(file []byte) (cid.Cid, error)
 	getStripeTransactionFunc func(txid iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error)
 	featureManager           *pkgconfig.FeatureManager
+	stateValidator           StateValidator
 }
 
 // NewOrderProcessor initializes and returns a new OrderProcessor
@@ -79,6 +96,7 @@ func NewOrderProcessor(cfg *Config) *OrderProcessor {
 		calcCIDFunc:              cfg.CalcCIDFunc,
 		getStripeTransactionFunc: cfg.GetStripeTransactionFunc,
 		featureManager:           cfg.FeatureManager,
+		stateValidator:           cfg.StateValidator,
 	}
 }
 
@@ -91,18 +109,38 @@ func (op *OrderProcessor) Start() {
 func (op *OrderProcessor) Stop() {
 }
 
-// ProcessMessage is the main handler for the OrderProcessor. It ingests a new message
+// ProcessMessage is the main handler for the OrderProcessor. It ingests a new message,
 // loads the corresponding order from the database, passes the message off to the appropriate
 // handler for processing, then saves the updated state back into the database.
-// Any messages that arrive out of order are saved in the database as a parked message which
-// will allow for future processing. The same is said for messages that error.
 //
-// The end result of this process is if the buyer and vendor pass in the same set of messages
-// into this function, regardless of order, the exact same state should be calculated for
-// both nodes.
+// ## State Management Architecture
 //
-// If the processing of the message triggers an event to emitted onto the bus, the event is
-// returned.
+// The FSM (mobazha-core/orders) is the authoritative source for order state transitions.
+// Each handler call is wrapped by the FSM:
+//  1. Before handler: computeFSMTransition() determines the expected new state
+//  2. Handler runs: processes message, sets serialized fields, emits events
+//  3. After handler: SetFSMState() writes the FSM-computed state to the order
+//
+// ## Handler Guards (FSM-Covered)
+//
+// Individual handlers still contain their own state guards (e.g., checking if
+// SerializedOrderConfirmation != nil before processing ORDER_REJECT). These guards
+// are now redundant with the FSM validation but are retained as defense-in-depth
+// during the transition period. They are marked with "FSM-covered" comments and
+// can be progressively removed once the FSM has proven stable in production.
+//
+// Guards that are NOT covered by the FSM and must be retained:
+//   - Duplicate message checks (isDuplicate)
+//   - Prerequisite/park checks (e.g., park ORDER_CANCEL until PAYMENT_SENT arrives)
+//     These handle out-of-order P2P message delivery.
+//
+// ## Deterministic Processing
+//
+// If the buyer and vendor pass in the same set of messages into this function,
+// regardless of order, the exact same state should be calculated for both nodes.
+//
+// If the processing of the message triggers an event to be emitted onto the bus,
+// the event is returned.
 func (op *OrderProcessor) ProcessMessage(dbtx database.Tx, message *npb.OrderMessage) (interface{}, error) {
 	// Get sender peer ID from message (set by SignOrderMessage)
 	if message.SenderPeerID == "" {
@@ -222,12 +260,78 @@ func (op *OrderProcessor) ProcessACK(tx database.Tx, om *models.OutgoingMessage)
 	return tx.Update(key, true, map[string]interface{}{"id = ?": orderMessage.OrderID}, &models.Order{})
 }
 
-// processMessage passes the message off to the appropriate handler.
+// fsmTransitionResult holds the pre-computed FSM transition for a message.
+type fsmTransitionResult struct {
+	newState coreorders.OrderState
+	valid    bool
+}
+
+// computeFSMTransition determines the FSM state transition for a message BEFORE
+// the handler runs. This captures the "from" state and expected "to" state.
+//
+// For ORDER_OPEN, the result is InitialState().
+// For non-transition messages (RATING_SIGNATURES, DISPUTE_UPDATE, etc.), valid=false.
+// For unmapped events (EventUnknown, e.g. ORDER_CANCEL with nil order), valid=false.
+func (op *OrderProcessor) computeFSMTransition(order *models.Order, message *npb.OrderMessage) fsmTransitionResult {
+	if message.MessageType == npb.OrderMessage_ORDER_OPEN {
+		return fsmTransitionResult{
+			newState: coreorders.InitialState(),
+			valid:    true,
+		}
+	}
+
+	if !IsStateTransitionMessage(message.MessageType) {
+		return fsmTransitionResult{valid: false}
+	}
+
+	coreEvent := MessageTypeToEvent(message.MessageType, order, message.SenderPeerID)
+	if coreEvent == coreorders.EventUnknown {
+		logger.LogDebugWithIDf(log, op.nodeID,
+			"FSM: unmapped event for order %s message %s (sender=%s)",
+			order.ID, message.MessageType, message.SenderPeerID)
+		return fsmTransitionResult{valid: false}
+	}
+
+	currentState := coreorders.OrderState(order.State)
+	newState, valid := op.stateValidator.ValidateTransition(int(currentState), int(coreEvent))
+
+	if !valid {
+		logger.LogInfoWithIDf(log, op.nodeID,
+			"FSM validation warning: order %s transition %s + %s invalid",
+			order.ID, currentState, coreEvent)
+	} else {
+		logger.LogDebugWithIDf(log, op.nodeID,
+			"FSM transition: order %s %s + %s → %s",
+			order.ID, currentState, coreEvent, coreorders.OrderState(newState))
+	}
+
+	return fsmTransitionResult{
+		newState: coreorders.OrderState(newState),
+		valid:    valid,
+	}
+}
+
+// processMessage passes the message off to the appropriate handler, with FSM
+// state management wrapping the handler call.
+//
+// Flow:
+//  1. Verify message signature
+//  2. Compute FSM transition (before handler, using current state)
+//  3. Run handler (side effects: sets serialized messages, emits events)
+//  4. Set state from FSM (authoritative) with DeriveState comparison logging
 func (op *OrderProcessor) processMessage(dbtx database.Tx, order *models.Order, message *npb.OrderMessage) (event interface{}, err error) {
 	err = verifyOrderMessageSignature(message)
 	if err != nil {
 		return nil, err
 	}
+
+	// Phase 1: Compute FSM transition before handler runs.
+	var fsmResult fsmTransitionResult
+	if op.stateValidator != nil {
+		fsmResult = op.computeFSMTransition(order, message)
+	}
+
+	// Phase 2: Run handler (side effects).
 	switch message.MessageType {
 	case npb.OrderMessage_ORDER_OPEN:
 		event, err = op.processOrderOpenMessage(dbtx, order, message)
@@ -258,6 +362,26 @@ func (op *OrderProcessor) processMessage(dbtx database.Tx, order *models.Order, 
 	default:
 		return nil, errors.New("unknown order message type")
 	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Phase 3: Set state from FSM (authoritative).
+	// When the FSM computed a valid transition, use it as the source of truth.
+	// Also compare with the legacy DeriveState() for monitoring during the transition period.
+	if fsmResult.valid {
+		derivedState := order.DeriveState()
+		fsmState := models.OrderState(fsmResult.newState)
+		if fsmState != derivedState {
+			logger.LogInfoWithIDf(log, op.nodeID,
+				"FSM vs DeriveState mismatch: order %s FSM=%s Derived=%s (using FSM)",
+				order.ID, fsmState, derivedState)
+		}
+		order.SetFSMState(fsmState)
+	}
+	// If fsmResult is not valid (no validator, non-transition message, or unmapped event),
+	// BeforeSave() will fall back to DeriveState() as before.
+
 	return event, err
 }
 

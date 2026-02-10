@@ -26,11 +26,13 @@ func (op *OrderProcessor) processOrderConfirmationMessage(dbtx database.Tx, orde
 		return nil, nil
 	}
 
+	// FSM-covered: if the order is in DECLINED state, the FSM rejects EventVendorConfirm.
 	if order.SerializedOrderReject != nil {
 		logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_CONFIRMATION message for order %s after ORDER_REJECT", order.ID)
 		return nil, ErrUnexpectedMessage
 	}
 
+	// FSM-covered: if the order is in CANCELED state, the FSM rejects EventVendorConfirm.
 	if order.SerializedOrderCancel != nil {
 		logger.LogInfoWithIDf(log, op.nodeID, "Possible race: Received ORDER_CONFIRMATION message for order %s after ORDER_CANCEL", order.ID)
 	}

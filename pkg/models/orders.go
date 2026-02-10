@@ -165,16 +165,29 @@ type Order struct {
 	ErroredMessages []byte
 
 	State              OrderState
+	fsmStateSet        bool `gorm:"-"` // transient: true if State was set by FSM (not persisted)
 	Read               bool
 	UnreadChatMessages int
 	CreatedAt          time.Time
 }
 
 func (o *Order) BeforeSave(tx *gorm.DB) (err error) {
-	o.State = o.GetState()
+	if !o.fsmStateSet {
+		// Legacy path: derive state from serialized message fields.
+		o.State = o.DeriveState()
+	}
+	// When fsmStateSet is true, o.State was already set by SetFSMState().
 
 	tx.Statement.SetColumn("State", o.State)
 	return nil
+}
+
+// SetFSMState sets the order state from the FSM and prevents BeforeSave
+// from overriding it with DeriveState(). This makes the FSM the source
+// of truth for state transitions.
+func (o *Order) SetFSMState(state OrderState) {
+	o.State = state
+	o.fsmStateSet = true
 }
 
 // Role returns the role of the user for this order.
@@ -1004,8 +1017,12 @@ func (o *Order) CanDispute() bool {
 	return true
 }
 
-// GetState returns the order state
-func (o *Order) GetState() OrderState {
+// DeriveState computes the order state by examining the serialized message fields.
+// This is the legacy state derivation logic retained for comparison and fallback.
+// In the FSM-authoritative flow, the processor calls SetFSMState() instead.
+//
+// Deprecated: prefer reading order.State directly (set by FSM or BeforeSave).
+func (o *Order) DeriveState() OrderState {
 	cloneOrder := *o
 
 	funded, _ := cloneOrder.IsFunded()

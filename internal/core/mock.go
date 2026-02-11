@@ -143,6 +143,10 @@ func MockNode() (*MobazhaNode, error) {
 	node := &MobazhaNode{
 		nodeID:               repo.DefaultNodeID,
 		sharedManager:        sharedManager,
+		peerID:               ipfsNode.Identity,
+		privKey:              ipfsNode.PrivateKey,
+		peerHost:             ipfsNode.PeerHost,
+		nodeCtx:              ipfsNode.Context(),
 		ipfsNode:             ipfsNode,
 		repo:                 r,
 		networkService:       service,
@@ -333,6 +337,10 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		node := &MobazhaNode{
 			nodeID:               nodeID,
 			sharedManager:        sharedManager,
+			peerID:               ipfsNode.Identity,
+			privKey:              ipfsNode.PrivateKey,
+			peerHost:             ipfsNode.PeerHost,
+			nodeCtx:              ipfsNode.Context(),
 			ipfsNode:             ipfsNode,
 			repo:                 r,
 			networkService:       service,

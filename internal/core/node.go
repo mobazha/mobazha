@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync/atomic"
@@ -9,6 +10,8 @@ import (
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/gagliardetto/solana-go"
 	"github.com/ipfs/kubo/core"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/channels"
@@ -38,7 +41,17 @@ type MobazhaNode struct {
 
 	sharedManager *SharedManager
 
+	// Identity fields — always available, independent of ipfsNode.
+	// For full nodes these are populated from ipfsNode; for lightweight
+	// nodes they come from a minimal libp2p Host.
+	peerID     peer.ID
+	privKey    crypto.PrivKey
+	peerHost   host.Host
+	nodeCtx    context.Context
+	nodeCancel context.CancelFunc
+
 	// ipfsNode is the IPFS instance that powers this node.
+	// May be nil for lightweight (non-default) nodes.
 	ipfsNode *core.IpfsNode
 
 	// signer is the contracts.Signer for signing order messages and other data.
@@ -244,7 +257,10 @@ func (n *MobazhaNode) Start() {
 
 	// Add log to verify connection reuse
 	go func() {
-		conns := n.ipfsNode.PeerHost.Network().Conns()
+		if n.peerHost == nil {
+			return
+		}
+		conns := n.peerHost.Network().Conns()
 		for _, conn := range conns {
 			streams := conn.GetStreams()
 			logger.LogDebugWithIDf(log, n.nodeID, "Connection to %s has %d streams",
@@ -442,20 +458,31 @@ func (n *MobazhaNode) Stop(force bool) error {
 	close(n.shutdown)
 	n.repo.Close()
 
-	stop := make(chan struct{})
-	go func() {
-		n.ipfsNode.Context().Done()
-		n.ipfsNode.Close()
-		time.AfterFunc(time.Second, func() {
-			n.eventBus.Emit(&events.IPFSShutdown{})
-		})
-		close(stop)
-	}()
-	select {
-	case <-time.After(time.Second * 2):
-		return coreiface.ErrIPFSDelayedShutdown
-	case <-stop:
-
+	if n.ipfsNode != nil {
+		// Full node: close the IPFS node
+		stop := make(chan struct{})
+		go func() {
+			n.ipfsNode.Context().Done()
+			n.ipfsNode.Close()
+			time.AfterFunc(time.Second, func() {
+				n.eventBus.Emit(&events.IPFSShutdown{})
+			})
+			close(stop)
+		}()
+		select {
+		case <-time.After(time.Second * 2):
+			return coreiface.ErrIPFSDelayedShutdown
+		case <-stop:
+		}
+	} else {
+		// Lightweight node: close the minimal libp2p host
+		if n.peerHost != nil {
+			n.peerHost.Close()
+		}
+		if n.nodeCancel != nil {
+			n.nodeCancel()
+		}
+		n.eventBus.Emit(&events.IPFSShutdown{})
 	}
 	return nil
 }
@@ -517,7 +544,30 @@ func (n *MobazhaNode) SharedManager() *SharedManager {
 
 // Identity returns the peer ID for this node.
 func (n *MobazhaNode) Identity() peer.ID {
-	return n.ipfsNode.Identity
+	return n.peerID
+}
+
+// PrivKey returns the libp2p private key for this node.
+func (n *MobazhaNode) PrivKey() crypto.PrivKey {
+	return n.privKey
+}
+
+// PeerHost returns the libp2p host for this node.
+func (n *MobazhaNode) PeerHost() host.Host {
+	return n.peerHost
+}
+
+// getIPFSNode returns the IPFS node for content operations.
+// For full nodes, returns the node's own IPFS instance.
+// For lightweight nodes, falls back to the shared IPFS node.
+func (n *MobazhaNode) getIPFSNode() (*core.IpfsNode, error) {
+	if n.ipfsNode != nil {
+		return n.ipfsNode, nil
+	}
+	if shared := n.SharedManager().GetIPFSNode(); shared != nil {
+		return shared, nil
+	}
+	return nil, errors.New("no IPFS node available")
 }
 
 // SubscribeEvent returns a subscription to the provided event. The event argument

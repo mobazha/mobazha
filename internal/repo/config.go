@@ -113,6 +113,11 @@ type Config struct {
 	// When set, the node uses this key instead of generating one from a mnemonic.
 	// This is used by mobazha_hosting to inject keys from KeyVault.
 	IdentityKey []byte `long:"-" description:"External identity key (libp2p marshaled format)"`
+
+	// LightweightMode, when true, skips IPFS node creation. The node will use
+	// the SharedManager's IPFS node for content operations and a minimal
+	// libp2p Host for identity. Used by mobazha_hosting for non-default tenant nodes.
+	LightweightMode bool `long:"-" description:"Skip IPFS node creation, use shared IPFS instead"`
 }
 
 // LoadConfig initializes and parses the config using a config file and command

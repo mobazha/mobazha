@@ -95,7 +95,14 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 		}
 	}()
 
-	api, err := coreapi.NewCoreAPI(n.ipfsNode)
+	ipfsNodeForContent, err := n.getIPFSNode()
+	if err != nil {
+		logger.LogErrorWithIDf(log, n.nodeID, "No IPFS node available for publishing")
+		publishErr = err
+		return
+	}
+
+	api, err := coreapi.NewCoreAPI(ipfsNodeForContent)
 	if err != nil {
 		logger.LogErrorWithIDf(log, n.nodeID, "Error building core API: %s", err.Error())
 		publishErr = err
@@ -171,8 +178,15 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 		defer publishCancel()
 		logger.LogInfoWithIDf(log, n.nodeID, "Publishing to IPNS...")
 		eol := time.Now().Add(nameValidTime)
-		ipfsNode := n.SharedManager().GetIPFSNode()
-		if err := ipfsNode.Namesys.Publish(publishCtx, ipfsNode.PrivateKey, pth, nameSysOpts.PublishWithEOL(eol)); err != nil {
+		ipfsForIPNS, err := n.getIPFSNode()
+		if err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "No IPFS node available for IPNS publish")
+			publishErr = err
+			return
+		}
+		// Use the current node's private key (not the shared IPFS node's key)
+		// to publish the IPNS record under this node's PeerID.
+		if err := ipfsForIPNS.Namesys.Publish(publishCtx, n.privKey, pth, nameSysOpts.PublishWithEOL(eol)); err != nil {
 			if err != context.Canceled {
 				logger.LogErrorWithIDf(log, n.nodeID, "Error namesys publish: %s", err.Error())
 			}
@@ -565,7 +579,13 @@ func (n *MobazhaNode) syncMessages() {
 }
 
 // bootstrapIPFS bootstraps the IPFS node.
+// For lightweight nodes (ipfsNode == nil), skip bootstrap and signal ready immediately.
 func (n *MobazhaNode) bootstrapIPFS() error {
+	if n.ipfsNode == nil {
+		// Lightweight node: no IPFS to bootstrap; signal ready immediately.
+		close(n.initialBootstrapChan)
+		return nil
+	}
 	if err := n.ipfsNode.Bootstrap(bootstrap.DefaultBootstrapConfig); err != nil {
 		return err
 	}

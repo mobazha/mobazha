@@ -149,6 +149,15 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		}
 	}
 
+	// ── Lightweight node path ──────────────────────────────────────────
+	// When LightweightMode is enabled, skip IPFS node creation entirely.
+	// Instead create a minimal libp2p Host (identity only, no listen addrs)
+	// and share the default node's IPFS infrastructure for content ops.
+	if cfg.LightweightMode {
+		return newLightweightNode(ctx, cfg, nodeID, obRepo, sharedManager, shutdownTorFunc, hs)
+	}
+
+	// ── Full node path ─────────────────────────────────────────────────
 	// Load the IPFS Repo
 	ipfsRepo, err := fsrepo.Open(path.Join(repoPath, repo.IPFSDirName))
 	if err != nil {
@@ -352,6 +361,10 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		obNode := &MobazhaNode{
 			sharedManager:        sharedManager,
 			nodeID:               nodeID,
+			peerID:               ipfsNode.Identity,
+			privKey:              ipfsNode.PrivateKey,
+			peerHost:             ipfsNode.PeerHost,
+			nodeCtx:              ipfsNode.Context(),
 			repo:                 obRepo,
 			ipfsNode:             ipfsNode,
 			ipfsOnlyMode:         true,
@@ -497,6 +510,10 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	obNode := &MobazhaNode{
 		sharedManager:          sharedManager,
 		nodeID:                 nodeID,
+		peerID:                 ipfsNode.Identity,
+		privKey:                ipfsNode.PrivateKey,
+		peerHost:               ipfsNode.PeerHost,
+		nodeCtx:                ipfsNode.Context(),
 		ipfsNode:               ipfsNode,
 		repo:                   obRepo,
 		ethMasterKey:           ethMasterKey,
@@ -537,7 +554,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		}
 
 		// Initialize SNF Proxy using the default node's host as transport
-		if err := sharedManager.InitSNFProxy(ipfsNode.PeerHost); err != nil {
+		if err := sharedManager.InitSNFProxy(obNode.peerHost); err != nil {
 			logger.LogErrorWithIDf(log, nodeID, "Failed to initialize SNF Proxy: %v", err)
 			// Continue without proxy - will use direct connections
 		}
@@ -555,8 +572,8 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	messengerCfg := &obnet.MessengerConfig{
 		NodeID:         nodeID,
 		Service:        service,
-		Privkey:        ipfsNode.PrivateKey,
-		Context:        ipfsNode.Context(),
+		Privkey:        obNode.privKey,
+		Context:        obNode.nodeCtx,
 		DB:             obRepo.DB(),
 		Testnet:        cfg.Testnet,
 		GetProfileFunc: obNode.GetProfile,
@@ -565,7 +582,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	// For non-default nodes, use the SNF Proxy's LocalClient if available
 	if !isDefaultNode && sharedManager.HasSNFProxy() {
 		proxy := sharedManager.GetSNFProxy()
-		localClient, err := proxy.RegisterNode(ipfsNode.Identity, ipfsNode.PrivateKey)
+		localClient, err := proxy.RegisterNode(obNode.peerID, obNode.privKey)
 		if err != nil {
 			logger.LogErrorWithIDf(log, nodeID, "Failed to register with SNF Proxy: %v, falling back to direct connection", err)
 			// Fall back to direct connection
@@ -594,7 +611,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
 		NodeID:                   nodeID,
-		Identity:                 ipfsNode.Identity,
+		Identity:                 obNode.peerID,
 		Signer:                   signer,
 		Db:                       obRepo.DB(),
 		Multiwallet:              mw,
@@ -791,7 +808,7 @@ func (n *MobazhaNode) listenNetworkEvents() {
 		DisconnectedF: disConnected,
 	}
 
-	n.ipfsNode.PeerHost.Network().Notify(notifier)
+	n.peerHost.Network().Notify(notifier)
 }
 
 // newMessageWithID returns a new *pb.Message with a random
@@ -802,4 +819,304 @@ func newMessageWithID() *pb.Message {
 	return &pb.Message{
 		MessageID: hex.EncodeToString(messageID),
 	}
+}
+
+// newLightweightNode creates a non-default node without its own IPFS node.
+// It creates a minimal libp2p Host for identity and messaging, and shares
+// the default node's IPFS infrastructure for content operations.
+//
+// Skipped (compared to full node):
+//   - fsrepo.Open / core.NewNode (no IPFS repo or node)
+//   - DHT, Bitswap, Blockstore initialization
+//   - Swarm/Gateway port allocation
+//   - SNF Server (only default node runs it)
+//   - bootstrapIPFS()
+//
+// Retained:
+//   - Mobazha repo (DB, keys) — already created by caller
+//   - Key derivation (escrow, bip44, sol, rating)
+//   - NetworkService (uses minimal Host)
+//   - Messenger (via SNF Proxy)
+//   - OrderProcessor
+//   - Multiwallet
+//   - FollowerTracker (uses minimal Host)
+func newLightweightNode(
+	ctx context.Context,
+	cfg *repo.Config,
+	nodeID string,
+	obRepo *repo.Repo,
+	sharedManager *SharedManager,
+	shutdownTorFunc func() error,
+	hs coreiface.HostService,
+) (*MobazhaNode, error) {
+	netConfig := sharedManager.NetConfig
+
+	// ── 1. Load identity key and create minimal libp2p Host ──────────
+	var identityKeyBytes []byte
+	if len(cfg.IdentityKey) > 0 {
+		identityKeyBytes = cfg.IdentityKey
+	} else {
+		var dbIdentityKey models.Key
+		err := obRepo.DB().View(func(tx database.Tx) error {
+			return tx.Read().Where("name = ?", "identity").First(&dbIdentityKey).Error
+		})
+		if err != nil {
+			return nil, fmt.Errorf("lightweight: failed to load identity key from DB: %w", err)
+		}
+		identityKeyBytes = dbIdentityKey.Value
+	}
+
+	privKey, nodePeerID, err := repo.PrivKeyAndPeerIDFromKey(identityKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("lightweight: failed to parse identity key: %w", err)
+	}
+
+	// Create a minimal libp2p host — identity only, no listen addresses.
+	// This host is used for NetworkService protocol handling and peer identity.
+	nodeCtx, nodeCancel := context.WithCancel(ctx)
+	minimalHost, err := libp2p.New(
+		libp2p.Identity(privKey),
+		libp2p.NoListenAddrs,
+	)
+	if err != nil {
+		nodeCancel()
+		return nil, fmt.Errorf("lightweight: failed to create minimal host: %w", err)
+	}
+
+	// Cleanup on failure — released on success path at the end.
+	success := false
+	defer func() {
+		if !success {
+			minimalHost.Close()
+			nodeCancel()
+		}
+	}()
+
+	// ── 2. NetDB (optional) ──────────────────────────────────────────
+	var netDB *netdb.NetDB
+	if len(netConfig.GetNetDBEndpoint()) > 0 {
+		netDB, _ = netdb.NewNetDB(netConfig.GetNetDBEndpoint(), nodePeerID.String(), privKey)
+	}
+
+	walletTestnet := cfg.Testnet
+	if cfg.WalletTestnet {
+		walletTestnet = cfg.WalletTestnet
+	}
+
+	// ── 3. Load wallet keys ──────────────────────────────────────────
+	var (
+		dbBip44Key   models.Key
+		dbEscrowKey  models.Key
+		dbRatingKey  models.Key
+		dbSolKey     models.Key
+		prefs        models.UserPreferences
+		needDBUpdate bool
+	)
+
+	err = obRepo.DB().View(func(tx database.Tx) error {
+		if err := tx.Read().First(&prefs).Error; err != nil {
+			return fmt.Errorf("failed to load user preferences: %v", err)
+		}
+		dbEscrowKey, dbBip44Key, dbSolKey, dbRatingKey, err = repo.GetKeysFromDB(tx)
+		if err != nil {
+			logger.LogInfoWithID(log, nodeID, "Keys missing from DB, need derivation")
+			needDBUpdate = true
+			return nil
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if needDBUpdate {
+		logger.LogInfoWithID(log, nodeID, "Deriving wallet keys from mnemonic")
+		err = obRepo.DB().Update(func(tx database.Tx) error {
+			var dbMnemonic models.Key
+			err = tx.Read().Where("name = ?", "mnemonic").First(&dbMnemonic).Error
+			if err != nil {
+				return fmt.Errorf("failed to load mnemonic: %v", err)
+			}
+			hdSeed := bip39.NewSeed(string(dbMnemonic.Value), "")
+			escrowKey, ratingKey, bip44Key, solKey, err := repo.CreateHDKeys(hdSeed)
+			if err != nil {
+				return fmt.Errorf("failed to derive HD keys: %v", err)
+			}
+			if err := repo.SaveKeysToDB(tx, escrowKey, bip44Key, solKey, ratingKey); err != nil {
+				return fmt.Errorf("failed to save keys: %v", err)
+			}
+			dbEscrowKey, dbBip44Key, dbSolKey, dbRatingKey, err = repo.GetKeysFromDB(tx)
+			if err != nil {
+				return fmt.Errorf("failed to reload keys: %v", err)
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	bip44Key, _ := hdkeychain.NewKeyFromString(string(dbBip44Key.Value))
+	ethMasterKey, _ := utils.GenerateEthPrivateKey(bip44Key)
+	escrowKey, _ := btcec.PrivKeyFromBytes(dbEscrowKey.Value)
+	ratingKey, _ := btcec.PrivKeyFromBytes(dbRatingKey.Value)
+	solPrivKey := solana.PrivateKey(dbSolKey.Value)
+
+	// ── 4. Multiwallet ───────────────────────────────────────────────
+	enabledChains := iwallet.GetAllSupportedChainTypes()
+	erp := sharedManager.ExchangeRateProvider
+
+	opts := []multiwallet.Option{
+		multiwallet.NodeID(nodeID),
+		multiwallet.DataDir(path.Join(cfg.DataDir, "nodes", nodeID)),
+		multiwallet.LogDir(cfg.LogDir),
+		multiwallet.Chains(enabledChains),
+		multiwallet.LogLevel(repo.LogLevelMap[strings.ToLower(cfg.LogLevel)]),
+		multiwallet.NetConfig(netConfig),
+		multiwallet.Testnet(walletTestnet),
+	}
+	mw, err := multiwallet.NewMultiwallet(opts...)
+	if err != nil {
+		return nil, err
+	}
+	if err := InitializeMultiwallet(mw, obRepo.DB(), time.Now()); err != nil {
+		return nil, err
+	}
+
+	// ── 5. NetworkService & FollowerTracker ───────────────────────────
+	globalBlockedIds := []peer.ID{}
+	contracts, err := contracts.NewContracts(opts...)
+	if err == nil {
+		globalBlockedIds, err = contracts.GetBlockedIds()
+		if err != nil {
+			logger.LogErrorWithIDf(log, nodeID, "Failed to get global blocked nodes: %v", err)
+		}
+	} else {
+		logger.LogErrorWithIDf(log, nodeID, "Failed to create contracts util: %v", err)
+	}
+
+	blocked, err := prefs.BlockedNodes()
+	if err != nil {
+		return nil, err
+	}
+	bm := obnet.NewBanManager(globalBlockedIds, blocked)
+	service := obnet.NewNetworkService(nodeID, minimalHost, bm, cfg.Testnet)
+	if hs != nil {
+		if ld, ok := any(hs).(obnet.LocalDeliverer); ok {
+			service.SetLocalDeliverer(ld)
+		}
+	}
+
+	bus := events.NewBus()
+	tracker := NewFollowerTracker(obRepo, bus, minimalHost)
+
+	// ── 6. Construct the MobazhaNode ─────────────────────────────────
+	obNode := &MobazhaNode{
+		sharedManager:          sharedManager,
+		nodeID:                 nodeID,
+		peerID:                 nodePeerID,
+		privKey:                privKey,
+		peerHost:               minimalHost,
+		nodeCtx:                nodeCtx,
+		nodeCancel:             nodeCancel,
+		ipfsNode:               nil, // lightweight: no IPFS node
+		repo:                   obRepo,
+		ethMasterKey:           ethMasterKey,
+		escrowMasterKey:        escrowKey,
+		ratingMasterKey:        ratingKey,
+		solPrivKey:             &solPrivKey,
+		ipnsQuorum:             cfg.IPNSQuorum,
+		ipnsResolver:           netConfig.GetIPNSResolver(),
+		netDB:                  netDB,
+		netConfig:              netConfig,
+		networkService:         service,
+		banManager:             bm,
+		eventBus:               bus,
+		followerTracker:        tracker,
+		multiwallet:            mw,
+		exchangeRates:          erp,
+		testnet:                cfg.Testnet,
+		walletTestnet:          walletTestnet,
+		torOnly:                cfg.Tor,
+		storeAndForwardServers: cfg.StoreAndForwardServers,
+		channels:               make(map[string]*channels.Channel),
+		shutdownTorFunc:        shutdownTorFunc,
+		publishChan:            make(chan pubCloser),
+		featureManager:         pkgconfig.GetGlobalFeatureManager(),
+		initialBootstrapChan:   make(chan struct{}),
+		shutdown:               make(chan struct{}),
+		hostService:            hs,
+		stripeConfigCache:      netdb.NewStripeConfigCache(),
+		relayAPIURL:            cfg.RelayAPIURL,
+	}
+	sharedManager.AddNode(nodeID, obNode)
+
+	// Lightweight nodes always use the shared HTTP gateway
+	sharedManager.GetHTTPGateway().EnsureHubForUser(nodeID)
+
+	obNode.notifier = notifications.NewNotifier(
+		bus,
+		obRepo.DB(),
+		sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID),
+	)
+
+	// ── 7. Messenger (via SNF Proxy) ─────────────────────────────────
+	messengerCfg := &obnet.MessengerConfig{
+		NodeID:         nodeID,
+		Service:        service,
+		Privkey:        privKey,
+		Context:        nodeCtx,
+		DB:             obRepo.DB(),
+		Testnet:        cfg.Testnet,
+		GetProfileFunc: obNode.GetProfile,
+	}
+
+	if sharedManager.HasSNFProxy() {
+		proxy := sharedManager.GetSNFProxy()
+		localClient, err := proxy.RegisterNode(nodePeerID, privKey)
+		if err != nil {
+			logger.LogErrorWithIDf(log, nodeID, "Lightweight: Failed to register with SNF Proxy: %v, falling back to direct", err)
+			messengerCfg.SNFServers = sharedManager.SNFServers
+		} else {
+			messengerCfg.SNFClient = localClient
+			logger.LogInfoWithIDf(log, nodeID, "Lightweight: Using SNF Proxy for store-and-forward messaging")
+		}
+	} else {
+		messengerCfg.SNFServers = sharedManager.SNFServers
+	}
+
+	obNode.messenger, err = obnet.NewMessenger(messengerCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// ── 8. Signer & OrderProcessor ───────────────────────────────────
+	signer, err := corecontracts.NewKeyPairSignerFromMarshaledKey(identityKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("lightweight: failed to create signer: %w", err)
+	}
+	obNode.signer = signer
+
+	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
+		NodeID:                   nodeID,
+		Identity:                 nodePeerID,
+		Signer:                   signer,
+		Db:                       obRepo.DB(),
+		Multiwallet:              mw,
+		Messenger:                obNode.messenger,
+		EscrowPrivateKey:         escrowKey,
+		ExchangeRateProvider:     erp,
+		EventBus:                 bus,
+		CalcCIDFunc:              obNode.cid,
+		FeatureManager:           obNode.featureManager,
+		GetStripeTransactionFunc: obNode.GetStripeTransaction,
+		StateValidator:           &coreStateBridge{},
+	})
+
+	obNode.registerHandlers()
+	obNode.listenNetworkEvents()
+
+	success = true
+	logger.LogInfoWithIDf(log, nodeID, "Lightweight node created: PeerID=%s", nodePeerID)
+	return obNode, nil
 }

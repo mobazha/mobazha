@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha-core/identity"
 
 	config "github.com/ipfs/kubo/config"
@@ -38,6 +39,28 @@ func IdentityFromKey(privkey []byte) (config.Identity, error) {
 	ident.PeerID = peerID.String()
 
 	return ident, nil
+}
+
+// PrivKeyAndPeerIDFromKey parses marshaled identity key bytes and returns
+// the libp2p private key and derived peer ID. This is used by the lightweight
+// node path to create a minimal libp2p Host without going through IPFS config.
+func PrivKeyAndPeerIDFromKey(privkeyBytes []byte) (crypto.PrivKey, peer.ID, error) {
+	keyPair, err := identity.KeyPairFromMarshaledPrivateKey(privkeyBytes)
+	if err != nil {
+		return nil, "", err
+	}
+
+	peerIDStr, err := identity.PeerIDFromPublicKey(keyPair.PubKey)
+	if err != nil {
+		return nil, "", err
+	}
+
+	pid, err := peer.Decode(string(peerIDStr))
+	if err != nil {
+		return nil, "", err
+	}
+
+	return keyPair.PrivKey, pid, nil
 }
 
 // IdentityKeyFromSeed derives an identity key from a BIP39 seed.

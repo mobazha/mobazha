@@ -569,7 +569,7 @@ func Test_validatePhysicalListing(t *testing.T) {
 			valid: false,
 		},
 		{
-			// Invalid region code (single char)
+			// Invalid region code (single char) - must be at least 2 characters
 			listing: factory.NewPhysicalListing("test-listing"),
 			transform: func(listing *pb.Listing) {
 				listing.ShippingOptions[0].Name = "afsdf"
@@ -804,10 +804,10 @@ func Test_validateListing(t *testing.T) {
 			valid: false,
 		},
 		{
-			// Contract type out of enum range
+			// Contract type out of enum range (RWA_TOKEN is now the last valid type)
 			listing: factory.NewSignedListing(),
 			transform: func(sl *pb.SignedListing) {
-				sl.Listing.Metadata.ContractType = pb.Listing_Metadata_CRYPTOCURRENCY + 1
+				sl.Listing.Metadata.ContractType = pb.Listing_Metadata_RWA_TOKEN + 1
 			},
 			valid: false,
 		},
@@ -845,11 +845,11 @@ func Test_validateListing(t *testing.T) {
 			valid: false,
 		},
 		{
-			// Escrow timeout hours is incorrect
+			// Escrow timeout hours exceeds maximum (mainnet only validates > EscrowTimeout)
 			listing: factory.NewSignedListing(),
 			transform: func(sl *pb.SignedListing) {
 				node.testnet = false
-				sl.Listing.Metadata.EscrowTimeoutHours = 1
+				sl.Listing.Metadata.EscrowTimeoutHours = EscrowTimeout + 1
 			},
 			valid: false,
 		},
@@ -1073,11 +1073,11 @@ func Test_validateListing(t *testing.T) {
 			valid: false,
 		},
 		{
-			// Category too long
+			// Category too long (validation limit is WordMaxCharacters*2)
 			listing: factory.NewSignedListing(),
 			transform: func(sl *pb.SignedListing) {
 				sl.Listing.Item.Categories = []string{
-					strings.Repeat("s", WordMaxCharacters+1),
+					strings.Repeat("s", WordMaxCharacters*2+1),
 				}
 			},
 			valid: false,
@@ -1758,10 +1758,8 @@ func Test_validateListing(t *testing.T) {
 			transform: func(sl *pb.SignedListing) {
 				sl.Listing.Coupons = []*pb.Listing_Coupon{
 					{
-						Title: "asdf",
-						Code: &pb.Listing_Coupon_DiscountCode{
-							DiscountCode: strings.Repeat("s", CodeMaxCharacters+1),
-						},
+						Title:        "asdf",
+						DiscountCode: strings.Repeat("s", CodeMaxCharacters+1),
 					},
 				}
 			},
@@ -1773,10 +1771,8 @@ func Test_validateListing(t *testing.T) {
 			transform: func(sl *pb.SignedListing) {
 				sl.Listing.Coupons = []*pb.Listing_Coupon{
 					{
-						Title: "asdf",
-						Discount: &pb.Listing_Coupon_PercentDiscount{
-							PercentDiscount: 101,
-						},
+						Title:           "asdf",
+						PercentDiscount: 101,
 					},
 				}
 			},
@@ -1788,10 +1784,8 @@ func Test_validateListing(t *testing.T) {
 			transform: func(sl *pb.SignedListing) {
 				sl.Listing.Coupons = []*pb.Listing_Coupon{
 					{
-						Title: "asdf",
-						Discount: &pb.Listing_Coupon_PriceDiscount{
-							PriceDiscount: strings.Repeat("1", SentenceMaxCharacters+1),
-						},
+						Title:         "asdf",
+						PriceDiscount: strings.Repeat("1", SentenceMaxCharacters+1),
 					},
 				}
 			},
@@ -1803,10 +1797,8 @@ func Test_validateListing(t *testing.T) {
 			transform: func(sl *pb.SignedListing) {
 				sl.Listing.Coupons = []*pb.Listing_Coupon{
 					{
-						Title: "asdf",
-						Discount: &pb.Listing_Coupon_PriceDiscount{
-							PriceDiscount: "0",
-						},
+						Title:         "asdf",
+						PriceDiscount: "0",
 					},
 				}
 			},
@@ -1916,7 +1908,7 @@ func Test_validateListing(t *testing.T) {
 			valid: false,
 		},
 		{
-			// Listing signature invalid
+			// Listing signature invalid (tampered)
 			listing: factory.NewSignedListing(),
 			transform: func(sl *pb.SignedListing) {
 				sl.Signature[25] = 0x00
@@ -1939,8 +1931,10 @@ func Test_validateListing(t *testing.T) {
 	}
 
 	for i, test := range tests {
+		savedTestnet := node.testnet
 		test.transform(test.listing)
 		err := node.validateListing(test.listing)
+		node.testnet = savedTestnet // restore after each test to prevent side effects
 		if test.valid && err != nil {
 			t.Errorf("Test %d failed when it should not have: %s", i, err)
 		} else if !test.valid && err == nil {

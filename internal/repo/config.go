@@ -112,18 +112,18 @@ type Config struct {
 	// IdentityKey is an optional externally-provided identity key in libp2p marshaled format.
 	// When set, the node uses this key instead of generating one from a mnemonic.
 	// This is used by mobazha_hosting to inject keys from KeyVault.
-	IdentityKey []byte `long:"-" description:"External identity key (libp2p marshaled format)"`
+	IdentityKey []byte `no-flag:"true" description:"External identity key (libp2p marshaled format)"`
 
 	// LightweightMode, when true, skips IPFS node creation. The node will use
 	// the SharedManager's IPFS node for content operations and a minimal
 	// libp2p Host for identity. Used by mobazha_hosting for non-default tenant nodes.
-	LightweightMode bool `long:"-" description:"Skip IPFS node creation, use shared IPFS instead"`
+	LightweightMode bool `no-flag:"true" description:"Skip IPFS node creation, use shared IPFS instead"`
 
 	// SharedDB is an optional *gorm.DB connection for multi-tenant shared database.
 	// When set, the node uses TenantDB (tenant-scoped wrapper) instead of creating
 	// its own SQLite file. Used together with LightweightMode by mobazha_hosting.
 	// The value must be a *gorm.DB pointer.
-	SharedDB interface{} `long:"-" description:"Shared GORM DB connection for multi-tenant mode"`
+	SharedDB interface{} `no-flag:"true" description:"Shared GORM DB connection for multi-tenant mode"`
 }
 
 // LoadConfig initializes and parses the config using a config file and command

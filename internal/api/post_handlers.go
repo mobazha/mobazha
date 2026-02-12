@@ -197,7 +197,11 @@ func (g *Gateway) handlePOSTSignMessage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node, ok := getCoreIface(r)
+	if !ok {
+		http.Error(w, "Not available in SaaS mode", http.StatusNotImplemented)
+		return
+	}
 
 	sig, pubKey, err := signPayload([]byte(req.Content), node.IPFSNode().PrivateKey)
 	if err != nil {

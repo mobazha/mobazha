@@ -11,6 +11,7 @@ import (
 	"github.com/ipfs/kubo/core/corehttp"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/op/go-logging"
 )
@@ -380,6 +381,22 @@ func (g *Gateway) newV1Router() *mux.Router {
 
 func wrapError(err error) string {
 	return fmt.Sprintf(`{"error": "%s"}`, err.Error())
+}
+
+// getNodeService extracts contracts.NodeService from the request context.
+// This works for both MobazhaNode and TenantService.
+// Handlers that only use NodeService methods should prefer this over getCoreIface.
+func getNodeService(r *http.Request) contracts.NodeService {
+	return r.Context().Value(nodeContextKey).(contracts.NodeService)
+}
+
+// getCoreIface attempts to extract coreiface.CoreIface from the request context.
+// Returns (nil, false) if the node is a TenantService (which only implements NodeService).
+// Handlers that need CoreIface-only methods (DB, Multiwallet, IPFSNode, ExchangeRates,
+// Stripe, etc.) must use this with a 501 fallback for SaaS mode.
+func getCoreIface(r *http.Request) (coreiface.CoreIface, bool) {
+	ci, ok := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	return ci, ok
 }
 
 // NodeSelectionMiddleware adds middleware for node selection

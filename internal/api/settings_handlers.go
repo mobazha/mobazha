@@ -24,7 +24,11 @@ type nodeConfig struct {
 }
 
 func (g *Gateway) handleGETConfig(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node, ok := getCoreIface(r)
+	if !ok {
+		http.Error(w, "Not available in SaaS mode", http.StatusNotImplemented)
+		return
+	}
 
 	ret := nodeConfig{
 		PeerID:  node.Identity().String(),
@@ -40,7 +44,7 @@ func (g *Gateway) handleGETConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePutUserPreferences(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	currentPrefs, err := node.GetPreferences()
 	if err != nil && !errors.Is(err, coreiface.ErrNotFound) {
@@ -83,7 +87,7 @@ func (g *Gateway) handlePutUserPreferences(w http.ResponseWriter, r *http.Reques
 }
 
 func (g *Gateway) handleGetUserPreferences(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	prefs, err := node.GetPreferences()
 	if err != nil {
@@ -95,7 +99,11 @@ func (g *Gateway) handleGetUserPreferences(w http.ResponseWriter, r *http.Reques
 }
 
 func (g *Gateway) handleGETExchangeRates(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node, ok := getCoreIface(r)
+	if !ok {
+		http.Error(w, "Not available in SaaS mode", http.StatusNotImplemented)
+		return
+	}
 
 	currencyCode := mux.Vars(r)["currencyCode"]
 
@@ -127,7 +135,7 @@ func (g *Gateway) handlePOSTBulkUpdateCurrency(w http.ResponseWriter, r *http.Re
 }
 
 func (g *Gateway) handlePOSTPublish(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	node.Publish(nil)
 
@@ -135,7 +143,11 @@ func (g *Gateway) handlePOSTPublish(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePOSTPurgeCache(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node, ok := getCoreIface(r)
+	if !ok {
+		http.Error(w, "Not available in SaaS mode", http.StatusNotImplemented)
+		return
+	}
 
 	ctx := context.Background()
 	ch, err := node.IPFSNode().Blockstore.AllKeysChan(ctx)
@@ -157,7 +169,11 @@ func (g *Gateway) handlePOSTPurgeCache(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePOSTShutdown(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node, ok := getCoreIface(r)
+	if !ok {
+		http.Error(w, "Not available in SaaS mode", http.StatusNotImplemented)
+		return
+	}
 
 	node.Stop(true)
 	os.Exit(1)
@@ -166,7 +182,11 @@ func (g *Gateway) handlePOSTShutdown(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleGETPeers(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node, ok := getCoreIface(r)
+	if !ok {
+		http.Error(w, "Not available in SaaS mode", http.StatusNotImplemented)
+		return
+	}
 
 	peers := node.IPFSNode().PeerHost.Network().Peers()
 

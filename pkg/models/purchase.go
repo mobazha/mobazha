@@ -114,7 +114,7 @@ type PaymentData struct {
 		id := make([]byte, 36)
 		copy(id[:32], prevHash[:])
 		copy(id[32:], index)
-		reference: internal/multiwallet/client/blockbook -> buildTransaction()
+		reference: (legacy) previously from blockbook buildTransaction(), now via UTXOChainClient
 	*/
 	FromID             []byte    `json:"fromID"` // 36 bytes, derived from PayerAddress
 	ToAddress          string    `json:"toAddress"`

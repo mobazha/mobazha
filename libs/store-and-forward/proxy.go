@@ -124,6 +124,32 @@ func NewSNFProxy(ctx context.Context, cfg *ProxyConfig) (*SNFProxy, error) {
 	// Set up stream handler for incoming messages
 	cfg.TransportHost.SetStreamHandler(cfg.ClientProtocol, proxy.handleIncomingStream)
 
+	// Listen for connection events to trigger immediate registration
+	// when an SNF server becomes reachable.
+	serverSet := make(map[peer.ID]struct{}, len(cfg.Servers))
+	for _, s := range cfg.Servers {
+		serverSet[s] = struct{}{}
+	}
+	notifier := &inet.NotifyBundle{
+		ConnectedF: func(n inet.Network, conn inet.Conn) {
+			p := conn.RemotePeer()
+			if _, isServer := serverSet[p]; !isServer {
+				return
+			}
+			proxy.mtx.RLock()
+			defer proxy.mtx.RUnlock()
+			for _, client := range proxy.localClients {
+				client.mtx.RLock()
+				_, registered := client.registeredServers[p]
+				client.mtx.RUnlock()
+				if !registered {
+					go client.registerWithServer(p)
+				}
+			}
+		},
+	}
+	cfg.TransportHost.Network().Notify(notifier)
+
 	return proxy, nil
 }
 
@@ -309,7 +335,7 @@ func (c *LocalClient) registerWithAllServers() {
 
 func (c *LocalClient) registrationLoop() {
 	reregisterTicker := time.NewTicker(c.proxy.registrationDuration - time.Minute*10)
-	retryTicker := time.NewTicker(time.Minute)
+	retryTicker := time.NewTicker(10 * time.Second)
 
 	for {
 		select {

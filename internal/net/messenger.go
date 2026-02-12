@@ -58,6 +58,11 @@ type Messenger struct {
 	mtx            sync.RWMutex
 	wg             sync.WaitGroup
 
+	// fallbackSNFServers holds the configured SNF servers to use as fallback
+	// when the target peer's profile SNF servers can't be loaded.
+	// This includes both user-configured and default servers.
+	fallbackSNFServers []peer.ID
+
 	// recentlyProcessed tracks recently processed message IDs to prevent duplicate processing
 	// when messages arrive via both subscription and polling paths
 	recentlyProcessed   map[string]time.Time
@@ -123,19 +128,36 @@ func NewMessenger(cfg *MessengerConfig) (*Messenger, error) {
 		snfClient = client
 	}
 
+	// Build fallback SNF servers: use the configured list if available,
+	// otherwise fall back to hardcoded defaults.
+	fallbackServers := cfg.SNFServers
+	if len(fallbackServers) == 0 {
+		defaultServers := repo.DefaultMainnetSNFServers
+		if cfg.Testnet {
+			defaultServers = repo.DefaultTestnetSNFServers
+		}
+		for _, s := range defaultServers {
+			pid, err := peer.Decode(s)
+			if err == nil {
+				fallbackServers = append(fallbackServers, pid)
+			}
+		}
+	}
+
 	m := &Messenger{
-		NodeID:            cfg.NodeID,
-		ns:                cfg.Service,
-		db:                cfg.DB,
-		sk:                cfg.Privkey,
-		testnet:           cfg.Testnet,
-		snfClient:         snfClient,
-		getProfileFunc:    cfg.GetProfileFunc,
-		done:              make(chan struct{}),
-		bootstrapDone:     bootstrapDone,
-		mtx:               sync.RWMutex{},
-		wg:                sync.WaitGroup{},
-		recentlyProcessed: make(map[string]time.Time),
+		NodeID:             cfg.NodeID,
+		ns:                 cfg.Service,
+		db:                 cfg.DB,
+		sk:                 cfg.Privkey,
+		testnet:            cfg.Testnet,
+		snfClient:          snfClient,
+		getProfileFunc:     cfg.GetProfileFunc,
+		fallbackSNFServers: fallbackServers,
+		done:               make(chan struct{}),
+		bootstrapDone:      bootstrapDone,
+		mtx:                sync.RWMutex{},
+		wg:                 sync.WaitGroup{},
+		recentlyProcessed:  make(map[string]time.Time),
 	}
 	return m, nil
 }
@@ -361,31 +383,26 @@ func (m *Messenger) trySendMessage(peerID peer.ID, message *pb.Message, done cha
 		}
 
 		if (len(servers) == 0 || record.LastUpdated.Add(time.Hour*48).Before(time.Now())) && m.getProfileFunc != nil {
-			var snfServers []string
-
 			profile, err := m.getProfileFunc(context.Background(), peerID, nil, true)
 			if err == nil && len(profile.StoreAndForwardServers) > 0 {
-				snfServers = profile.StoreAndForwardServers
+				servers = []peer.ID{}
+				for _, peerStr := range profile.StoreAndForwardServers {
+					pid, err := peer.Decode(peerStr)
+					if err == nil {
+						servers = append(servers, pid)
+					}
+				}
 			} else {
 				logger.LogInfoWithIDf(log, m.NodeID, "Error sending offline message: Can't load profile for peer %s or no snf servers, error: %v", peerID, err)
-				logger.LogInfoWithIDf(log, m.NodeID, "Use default snfServers instead for message sending")
-				snfServers = repo.DefaultMainnetSNFServers
-				if m.testnet {
-					snfServers = repo.DefaultTestnetSNFServers
-				}
+				logger.LogInfoWithIDf(log, m.NodeID, "Use configured fallback snfServers instead for message sending")
+				// Use the configured fallback servers (which include both user-configured and default servers)
+				// instead of only the hardcoded defaults, so custom SNF servers (e.g., in E2E testing) are used.
+				servers = m.fallbackSNFServers
 			}
 
-			if len(snfServers) == 0 {
+			if len(servers) == 0 {
 				logger.LogInfoWithIDf(log, m.NodeID, "Error sending offline message: No inbox peers for peer %s", peerID)
 				return
-			}
-
-			servers = []peer.ID{}
-			for _, peerStr := range snfServers {
-				pid, err := peer.Decode(peerStr)
-				if err == nil {
-					servers = append(servers, pid)
-				}
 			}
 		}
 

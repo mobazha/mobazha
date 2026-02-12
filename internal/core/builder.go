@@ -586,21 +586,22 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		GetProfileFunc: obNode.GetProfile,
 	}
 
-	// For non-default nodes, use the SNF Proxy's LocalClient if available
-	if !isDefaultNode && sharedManager.HasSNFProxy() {
+	// Always set SNFServers so the messenger has a proper fallback list
+	// (used when the target peer's profile can't be loaded).
+	messengerCfg.SNFServers = sharedManager.SNFServers
+
+	// Use the SNF Proxy's LocalClient if available (for both default and tenant nodes).
+	// This is important: the proxy's stream handler must not be overridden by
+	// a standalone Client's stream handler on the same transport host.
+	if sharedManager.HasSNFProxy() {
 		proxy := sharedManager.GetSNFProxy()
 		localClient, err := proxy.RegisterNode(obNode.peerID, obNode.privKey)
 		if err != nil {
 			logger.LogErrorWithIDf(log, nodeID, "Failed to register with SNF Proxy: %v, falling back to direct connection", err)
-			// Fall back to direct connection
-			messengerCfg.SNFServers = sharedManager.SNFServers
 		} else {
 			messengerCfg.SNFClient = localClient
 			logger.LogInfoWithIDf(log, nodeID, "Using SNF Proxy for store-and-forward messaging")
 		}
-	} else {
-		// Default node or no proxy available - use direct connection
-		messengerCfg.SNFServers = sharedManager.SNFServers
 	}
 
 	obNode.messenger, err = obnet.NewMessenger(messengerCfg)
@@ -1078,18 +1079,19 @@ func newLightweightNode(
 		GetProfileFunc: obNode.GetProfile,
 	}
 
+	// Always set SNFServers so the messenger has a proper fallback list
+	// (used when the target peer's profile can't be loaded).
+	messengerCfg.SNFServers = sharedManager.SNFServers
+
 	if sharedManager.HasSNFProxy() {
 		proxy := sharedManager.GetSNFProxy()
 		localClient, err := proxy.RegisterNode(nodePeerID, privKey)
 		if err != nil {
 			logger.LogErrorWithIDf(log, nodeID, "Lightweight: Failed to register with SNF Proxy: %v, falling back to direct", err)
-			messengerCfg.SNFServers = sharedManager.SNFServers
 		} else {
 			messengerCfg.SNFClient = localClient
 			logger.LogInfoWithIDf(log, nodeID, "Lightweight: Using SNF Proxy for store-and-forward messaging")
 		}
-	} else {
-		messengerCfg.SNFServers = sharedManager.SNFServers
 	}
 
 	obNode.messenger, err = obnet.NewMessenger(messengerCfg)

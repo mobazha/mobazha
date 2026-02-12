@@ -63,7 +63,7 @@ func NewClient(ctx context.Context, sk crypto.PrivKey, servers []peer.ID, h host
 
 	serverMap := make(map[peer.ID]bool)
 	for _, peer := range servers {
-		serverMap[peer] = true
+		serverMap[peer] = false // false = known server, not yet registered
 	}
 
 	if len(cfg.ServerProtocols) == 0 {
@@ -433,9 +433,24 @@ func (cli *Client) registerWithServers(expiration time.Duration) {
 		cli.registerSingle(p, expiration)
 	}
 
+	// Listen for connection events to trigger immediate registration
+	// when an SNF server becomes reachable.
+	notifier := &inet.NotifyBundle{
+		ConnectedF: func(n inet.Network, conn inet.Conn) {
+			p := conn.RemotePeer()
+			cli.mtx.RLock()
+			registered, isServer := cli.servers[p]
+			cli.mtx.RUnlock()
+			if isServer && !registered {
+				go cli.registerSingle(p, expiration)
+			}
+		},
+	}
+	cli.host.Network().Notify(notifier)
+
 	go func() {
 		newRegistrationTicker := time.NewTicker(expiration - time.Minute*10)
-		boostrapTicker := time.NewTicker(time.Minute)
+		boostrapTicker := time.NewTicker(10 * time.Second)
 
 		for {
 			select {

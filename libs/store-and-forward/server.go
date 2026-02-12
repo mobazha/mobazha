@@ -43,6 +43,12 @@ type Server struct {
 	serverProtocol   protocol.ID
 	clientProtocol   protocol.ID
 	mtx              sync.RWMutex
+
+	// proxyTransports maps a registered client peer ID to the transport host
+	// peer ID that registered on its behalf (proxy mode). This enables message
+	// push through the transport host when the client isn't directly connected.
+	proxyTransports   map[peer.ID]peer.ID
+	proxyTransportsMu sync.RWMutex
 }
 
 // NewServer returns a new store and forward server.
@@ -74,6 +80,7 @@ func NewServer(ctx context.Context, h host.Host, opts ...Option) (*Server, error
 		clientProtocol:   cfg.ClientProtocols[0],
 		replicationPeers: repPeersMap,
 		mtx:              sync.RWMutex{},
+		proxyTransports:  make(map[peer.ID]peer.ID),
 	}
 
 	for _, protocol := range cfg.ServerProtocols {
@@ -249,6 +256,15 @@ func (svr *Server) handleRegisterWithSession(w msgio.Writer, pmes *pb.Message, f
 		return "", err
 	}
 
+	// In proxy mode, remember which transport host registered this client
+	// so we can push messages through the transport host later.
+	if clientID != from {
+		svr.proxyTransportsMu.Lock()
+		svr.proxyTransports[clientID] = from
+		svr.proxyTransportsMu.Unlock()
+		log.Infof("Proxy transport mapping stored: client %s -> transport %s", clientID, from)
+	}
+
 	if err := writeStatusMessage(w, pb.Message_SUCCESS); err != nil {
 		return "", err
 	}
@@ -262,6 +278,12 @@ func (svr *Server) handleUnregister(w msgio.Writer, _ *pb.Message, from peer.ID)
 	if err != nil {
 		return err
 	}
+
+	// Clean up proxy transport mapping if exists
+	svr.proxyTransportsMu.Lock()
+	delete(svr.proxyTransports, from)
+	svr.proxyTransportsMu.Unlock()
+
 	return writeStatusMessage(w, pb.Message_SUCCESS)
 }
 
@@ -513,7 +535,7 @@ func (svr *Server) handleAckMessage(w msgio.Writer, pmes *pb.Message, peer peer.
 // Further, we check to see if the recipient is connected to us and if so relay
 // the message to them.
 func (svr *Server) handleStoreMessage(w msgio.Writer, pmes *pb.Message, from peer.ID) error {
-	log.Debugf("handleStore: peer %s", from)
+	log.Debugf("handleStore: from=%s", from)
 	encMsg := pmes.GetEncryptedMessage()
 	if encMsg == nil {
 		return writeStatusMessage(w, pb.Message_MALFORMED_MESSAGE)
@@ -523,9 +545,11 @@ func (svr *Server) handleStoreMessage(w msgio.Writer, pmes *pb.Message, from pee
 	}
 
 	to := peer.ID(encMsg.GetPeerID())
+	log.Debugf("handleStore: from=%s to=%s", from, to)
 
 	record, err := svr.ds.Get(svr.ctx, registrationKey(to))
 	if err != nil && err == datastore.ErrNotFound {
+		log.Debugf("handleStore: to=%s NOT_REGISTERED", to)
 		return writeStatusMessage(w, pb.Message_NOT_REGISTERED)
 	}
 
@@ -553,29 +577,64 @@ func (svr *Server) handleStoreMessage(w msgio.Writer, pmes *pb.Message, from pee
 	}
 
 	go func() {
+		relayMsg := &pb.Message{
+			Type: pb.Message_MESSAGE,
+			Payload: &pb.Message_EncryptedMessage_{
+				EncryptedMessage: &pb.Message_EncryptedMessage{
+					MessageID: id[:],
+					Message:   encMsg.Message,
+					PeerID:    []byte(to), // Include target peer ID for routing in proxy mode
+				},
+			},
+		}
+
+		// Try direct push to the target peer first
 		connectedness := svr.host.Network().Connectedness(to)
+		log.Debugf("Relay: to=%s connectedness=%v", to, connectedness)
 		if connectedness == inet.Connected {
 			stream, err := svr.host.NewStream(inet.WithAllowLimitedConn(svr.ctx, "identify"), to, svr.clientProtocol)
 			if err != nil {
-				log.Errorf("Error relaying message to connected peer %s: %s", to, err)
+				log.Debugf("Relay: direct push to %s failed: %s", to, err)
+			} else {
+				writer := msgio.NewVarintWriter(stream)
+				err = writeMsgWithTimeout(writer, relayMsg)
+				stream.Close()
+				if err != nil {
+					log.Errorf("Relay: write to %s failed: %s", to, err)
+				} else {
+					log.Debugf("Relay: direct push to %s succeeded", to)
+					return // Successfully relayed directly
+				}
+			}
+		}
+
+		// If direct push failed or peer not connected, try proxy transport host
+		svr.proxyTransportsMu.RLock()
+		transportHost, hasProxy := svr.proxyTransports[to]
+		svr.proxyTransportsMu.RUnlock()
+
+		log.Debugf("Relay: proxy lookup for %s: hasProxy=%v, transportHost=%s", to, hasProxy, transportHost)
+
+		if hasProxy && svr.host.Network().Connectedness(transportHost) == inet.Connected {
+			log.Debugf("Relay: pushing to %s via transport %s", to, transportHost)
+			stream, err := svr.host.NewStream(inet.WithAllowLimitedConn(svr.ctx, "identify"), transportHost, svr.clientProtocol)
+			if err != nil {
+				log.Errorf("Relay: proxy push to %s via %s failed: %s", to, transportHost, err)
 				return
 			}
 			defer stream.Close()
 
 			writer := msgio.NewVarintWriter(stream)
-			err = writeMsgWithTimeout(writer, &pb.Message{
-				Type: pb.Message_MESSAGE,
-				Payload: &pb.Message_EncryptedMessage_{
-					EncryptedMessage: &pb.Message_EncryptedMessage{
-						MessageID: id[:],
-						Message:   encMsg.Message,
-						PeerID:    []byte(to), // Include target peer ID for routing in proxy mode
-					},
-				},
-			})
+			err = writeMsgWithTimeout(writer, relayMsg)
 			if err != nil {
-				log.Errorf("Error relaying message to connected peer %s: %s", to, err)
+				log.Errorf("Relay: proxy write to %s via %s failed: %s", to, transportHost, err)
+			} else {
+				log.Debugf("Relay: proxy push to %s via %s succeeded", to, transportHost)
 			}
+		} else if hasProxy {
+			log.Debugf("Relay: transport %s not connected for client %s", transportHost, to)
+		} else {
+			log.Debugf("Relay: no proxy mapping for %s, message stored only", to)
 		}
 	}()
 

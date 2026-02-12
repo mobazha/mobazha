@@ -95,10 +95,15 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 		snfServers := func() []peer.ID {
 			// Merge the snf server addresses from the config with the ones from the net config.
 			servers := append(netConfig.StoreAndForwardServers, cfg.StoreAndForwardServers...)
-			if cfg.Testnet {
-				servers = append(servers, repo.DefaultTestnetSNFServers...)
-			} else {
-				servers = append(servers, repo.DefaultMainnetSNFServers...)
+			// Only add hardcoded default servers when no explicit servers are configured.
+			// This allows E2E tests and custom deployments to use only their own SNF servers
+			// without the overhead of trying to dial unreachable production servers.
+			if len(servers) == 0 {
+				if cfg.Testnet {
+					servers = append(servers, repo.DefaultTestnetSNFServers...)
+				} else {
+					servers = append(servers, repo.DefaultMainnetSNFServers...)
+				}
 			}
 
 			serverMap := make(map[string]bool)

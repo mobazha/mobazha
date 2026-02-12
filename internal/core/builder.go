@@ -101,7 +101,14 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	repoPath := path.Join(cfg.DataDir, "nodes", nodeID)
 
 	var obRepo *repo.Repo
-	if len(cfg.IdentityKey) > 0 {
+	if cfg.SharedDB != nil {
+		// Multi-tenant shared DB mode: use TenantDB wrapper
+		sharedGormDB, ok := cfg.SharedDB.(*gorm.DB)
+		if !ok {
+			return nil, fmt.Errorf("SharedDB must be a *gorm.DB, got %T", cfg.SharedDB)
+		}
+		obRepo, err = repo.NewRepoWithSharedDB(nodeID, repoPath, sharedGormDB, cfg.IdentityKey, cfg.Testnet)
+	} else if len(cfg.IdentityKey) > 0 {
 		obRepo, err = repo.NewRepoWithIdentityKey(nodeID, repoPath, cfg.IdentityKey, cfg.Testnet)
 	} else {
 		obRepo, err = repo.NewRepo(nodeID, repoPath, cfg.Testnet)

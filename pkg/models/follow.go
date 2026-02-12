@@ -30,6 +30,7 @@ func (f *Following) IsFollowing(peer peer.ID) bool {
 // FollowSequence is a database model which holds the sequence
 // number for our outgoing follow and unfollow notifications.
 type FollowSequence struct {
-	PeerID string `gorm:"primaryKey"`
-	Num    int
+	TenantID string `gorm:"column:tenant_id;primaryKey;default:''" json:"-"`
+	PeerID   string `gorm:"primaryKey"`
+	Num      int
 }

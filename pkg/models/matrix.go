@@ -10,8 +10,9 @@ import "time"
 // Password is derived from node private key using HKDF
 // This allows direct Matrix login without relying on hosting server
 type MatrixCredentials struct {
+	TenantID     string    `gorm:"column:tenant_id;uniqueIndex:idx_cred_tenant_peer;default:''" json:"-"`
 	ID           uint      `gorm:"primaryKey" json:"id"`
-	PeerID       string    `gorm:"uniqueIndex;not null" json:"peerId"`  // Mobazha peer ID
+	PeerID       string    `gorm:"uniqueIndex:idx_cred_tenant_peer;not null" json:"peerId"`  // Mobazha peer ID
 	MatrixUserID string    `gorm:"not null" json:"matrixUserId"`        // Matrix user ID (e.g., @peer_xxx:matrix.mobazha.org)
 	ServerName   string    `gorm:"size:255;not null" json:"serverName"` // Matrix server name (e.g., matrix.mobazha.org)
 	Registered   bool      `gorm:"default:false" json:"registered"`     // Whether user has been registered on Matrix server
@@ -51,8 +52,9 @@ type MatrixRegisterResponse struct {
 // Keys are encrypted using a key derived from the node's private key
 // All encryption/decryption happens server-side
 type MatrixKeyBackup struct {
+	TenantID      string    `gorm:"column:tenant_id;uniqueIndex:idx_backup_tenant_device;default:''" json:"-"`
 	ID            uint      `gorm:"primaryKey" json:"id"`
-	DeviceID      string    `gorm:"uniqueIndex;not null" json:"deviceId"` // Matrix device ID
+	DeviceID      string    `gorm:"uniqueIndex:idx_backup_tenant_device;not null" json:"deviceId"` // Matrix device ID
 	EncryptedKeys []byte    `gorm:"type:blob;not null" json:"-"`          // Encrypted room keys (not exposed in JSON)
 	KeyCount      int       `json:"keyCount"`                             // Number of keys in backup
 	Algorithm     string    `gorm:"size:50;not null;default:'aes-256-gcm'" json:"algorithm"`
@@ -94,8 +96,9 @@ type MatrixKeyBackupInfo struct {
 // Keys are encrypted using a key derived from the node's private key
 // All encryption/decryption happens server-side
 type MatrixSecretsBundle struct {
+	TenantID         string    `gorm:"column:tenant_id;uniqueIndex:idx_secrets_tenant_device;default:''" json:"-"`
 	ID               uint      `gorm:"primaryKey" json:"id"`
-	DeviceID         string    `gorm:"uniqueIndex;not null" json:"deviceId"` // Matrix device ID that created the backup
+	DeviceID         string    `gorm:"uniqueIndex:idx_secrets_tenant_device;not null" json:"deviceId"` // Matrix device ID that created the backup
 	EncryptedSecrets []byte    `gorm:"type:blob;not null" json:"-"`          // Encrypted secrets bundle (not exposed in JSON)
 	Algorithm        string    `gorm:"size:50;not null;default:'aes-256-gcm'" json:"algorithm"`
 	CreatedAt        time.Time `json:"createdAt"`

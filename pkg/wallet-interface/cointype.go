@@ -34,8 +34,8 @@ func (chaintype ChainType) String() string {
 
 func GetAllSupportedChainTypes() []ChainType {
 	return []ChainType{
-		// UTXO chains (external wallet payment)
-		ChainBitcoin, ChainLitecoin,
+		// TODO(FeatureNoBuildinWallet): Re-enable when built-in wallet is restored.
+		// ChainBitcoin, ChainLitecoin,
 		// EVM and Solana chains (AppKit wallet)
 		ChainSolana, ChainStripe, ChainEthereum, ChainBSC, ChainBase,
 	}

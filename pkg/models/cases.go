@@ -11,6 +11,7 @@ import (
 )
 
 type Case struct {
+	TenantMixin
 	ID OrderID `gorm:"primaryKey"`
 
 	SerializedBuyerContract  []byte

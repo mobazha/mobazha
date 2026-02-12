@@ -118,6 +118,12 @@ type Config struct {
 	// the SharedManager's IPFS node for content operations and a minimal
 	// libp2p Host for identity. Used by mobazha_hosting for non-default tenant nodes.
 	LightweightMode bool `long:"-" description:"Skip IPFS node creation, use shared IPFS instead"`
+
+	// SharedDB is an optional *gorm.DB connection for multi-tenant shared database.
+	// When set, the node uses TenantDB (tenant-scoped wrapper) instead of creating
+	// its own SQLite file. Used together with LightweightMode by mobazha_hosting.
+	// The value must be a *gorm.DB pointer.
+	SharedDB interface{} `long:"-" description:"Shared GORM DB connection for multi-tenant mode"`
 }
 
 // LoadConfig initializes and parses the config using a config file and command
@@ -232,6 +238,12 @@ func LoadConfig(dataDir string) (*Config, error) {
 		return nil, errors.New("tor and dualstack options cannot be used together")
 	}
 
+	// Ensure LogLevel has a valid default. When LoadConfig is called from a
+	// hosting process (not a standalone node), the pre-parser may not apply
+	// struct tag defaults, leaving LogLevel as "".
+	if cfg.LogLevel == "" {
+		cfg.LogLevel = "info"
+	}
 	_, ok := LogLevelMap[strings.ToLower(cfg.LogLevel)]
 	if !ok {
 		return nil, errors.New("invalid log level")

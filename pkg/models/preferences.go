@@ -11,6 +11,7 @@ import (
 
 // UserPreferences are set by the client and persisted in the database.
 type UserPreferences struct {
+	TenantMixin
 	ID                  int     `json:"-" gorm:"primaryKey"`
 	UserAgent           string  `json:"userAgent"`
 	PaymentDataInQR     bool    `json:"paymentDataInQR"`

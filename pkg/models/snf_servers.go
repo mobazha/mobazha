@@ -8,6 +8,7 @@ import (
 )
 
 type StoreAndForwardServers struct {
+	TenantID    string `gorm:"column:tenant_id;primaryKey;default:''" json:"-"`
 	PeerID      string `gorm:"primaryKey"`
 	SNFServers  []byte
 	LastUpdated time.Time

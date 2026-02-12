@@ -86,6 +86,7 @@ type PendingUTXOPaymentInfo struct {
 // Order holds the state of all orders. This model is saved in the
 // database indexed by the order ID.
 type Order struct {
+	TenantMixin
 	ID OrderID `gorm:"primaryKey"`
 
 	// PaymentAddress stores the payment address (set when buyer gets payment info)

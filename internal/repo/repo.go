@@ -11,7 +11,6 @@ import (
 	"path"
 	"reflect"
 	"strconv"
-	"strings"
 	"sync"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
@@ -29,6 +28,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/op/go-logging"
 	"github.com/tyler-smith/go-bip39"
+	"gorm.io/gorm"
 
 	ft "github.com/ipfs/boxo/ipld/unixfs"
 	nsys "github.com/ipfs/boxo/namesys"
@@ -55,7 +55,15 @@ const (
 	MobazhaFilesDirName = "mobazha-files"
 )
 
-var log = logging.MustGetLogger("REPO")
+var (
+	log = logging.MustGetLogger("REPO")
+
+	// sharedDBMigrateOnce ensures schema migration runs only once for the shared DB.
+	// Multiple tenants may call NewRepoWithSharedDB concurrently, but DDL is global
+	// and idempotent — running it once is sufficient.
+	sharedDBMigrateOnce sync.Once
+	sharedDBMigrateErr  error
+)
 
 // Repo is a representation of an Mobazha data directory.
 // In this we store:
@@ -88,6 +96,83 @@ func NewRepoWithCustomMnemonicSeed(nodeID string, dataDir, mnemonic string, test
 // identity key is stored/updated in the DB.
 func NewRepoWithIdentityKey(nodeID string, dataDir string, identityKey []byte, testnet bool) (*Repo, error) {
 	return newRepo(nodeID, dataDir, "", identityKey, false, testnet)
+}
+
+// NewRepoWithSharedDB creates a Repo backed by a shared *gorm.DB (multi-tenant mode).
+// Instead of creating its own SQLite, it wraps the shared DB with a TenantDB that
+// automatically scopes all queries to the given tenantID.
+//
+// If identityKey is provided (from KeyVault), it uses that key. Otherwise it checks
+// the shared DB for existing keys.
+//
+// Note: Tor keys are NOT generated in shared-DB mode. SaaS tenant nodes communicate
+// via SNF proxy and do not need Tor onion services. If Tor support is needed in the
+// future, it should be added here alongside the other keys.
+func NewRepoWithSharedDB(nodeID string, dataDir string, sharedDB *gorm.DB, identityKey []byte, testnet bool) (*Repo, error) {
+	if sharedDB == nil {
+		return nil, fmt.Errorf("sharedDB must not be nil")
+	}
+	if nodeID == "" {
+		return nil, fmt.Errorf("nodeID must not be empty for shared DB mode")
+	}
+
+	// Ensure the per-tenant data directory exists (for flat-file public data)
+	publicDataDir := path.Join(dataDir, common.PublicDirName)
+	if err := os.MkdirAll(publicDataDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create public data dir: %w", err)
+	}
+
+	db, err := ffsqlite.NewTenantDB(sharedDB, nodeID, publicDataDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tenant DB: %w", err)
+	}
+
+	// Schema migration for shared DB runs only once (DDL is global, not per-tenant).
+	// Uses autoMigrateDatabaseManagedEscrow which avoids DROP TABLE — destructive DDL would
+	// affect all tenants sharing the database.
+	sharedDBMigrateOnce.Do(func() {
+		sharedDBMigrateErr = autoMigrateDatabaseManagedEscrow(db)
+	})
+	if sharedDBMigrateErr != nil {
+		return nil, fmt.Errorf("failed to auto-migrate shared DB: %w", sharedDBMigrateErr)
+	}
+
+	// Check if this tenant already has keys
+	hasKeys := false
+	if err := db.View(func(tx database.Tx) error {
+		var key models.Key
+		if err := tx.Read().Where("name = ?", "identity").First(&key).Error; err != nil {
+			return err
+		}
+		hasKeys = true
+		return nil
+	}); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("failed to check tenant keys: %w", err)
+	}
+
+	if !hasKeys {
+		keys, err := generateNodeKeys("", identityKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate node keys: %w", err)
+		}
+		if err := db.Update(func(tx database.Tx) error {
+			if err := saveNodeKeys(tx, keys); err != nil {
+				return err
+			}
+			return saveDefaultPreferences(tx)
+		}); err != nil {
+			return nil, fmt.Errorf("failed to save tenant keys: %w", err)
+		}
+	} else if len(identityKey) > 0 {
+		// Existing tenant but identity key provided (e.g., from KeyVault) — update it
+		if err := db.Update(func(tx database.Tx) error {
+			return tx.Save(&models.Key{Name: "identity", Value: identityKey})
+		}); err != nil {
+			return nil, fmt.Errorf("failed to update identity key: %w", err)
+		}
+	}
+
+	return &Repo{dataDir: dataDir, db: db}, nil
 }
 
 // DB returns the database implementation.
@@ -132,40 +217,29 @@ func (r *Repo) WriteVersion(version int) error {
 
 func newRepo(nodeID string, dataDir, mnemonicSeed string, externalIdentityKey []byte, inMemoryDB bool, testnet bool) (*Repo, error) {
 	var (
-		dbIdentity, dbEscrowKey, dbRatingKey, dbBip44Key, dbMnemonic, torKey, dbSolKey *models.Key
-		err                                                                            error
-		isNew                                                                          bool
+		keys  *nodeKeys
+		err   error
+		isNew bool
 	)
 	ipfsDir := path.Join(dataDir, IPFSDirName)
 
 	// Install IPFS database plugins. This is guarded by a sync.Once.
 	installDatabasePlugins(ipfsDir)
 
+	var torKey *models.Key
+
 	if !fsrepo.IsInitialized(ipfsDir) {
 		if err := checkWriteable(ipfsDir); err != nil {
 			return nil, err
 		}
-		if mnemonicSeed == "" {
-			mnemonicSeed, err = createMnemonic(bip39.NewEntropy, bip39.NewMnemonic)
-			if err != nil {
-				return nil, err
-			}
+
+		keys, err = generateNodeKeys(mnemonicSeed, externalIdentityKey)
+		if err != nil {
+			return nil, err
 		}
 
-		// Determine identity key: use external key from KeyVault if provided,
-		// otherwise derive from mnemonic seed.
-		var identityKey []byte
-		if len(externalIdentityKey) > 0 {
-			identityKey = externalIdentityKey
-		} else {
-			identitySeed := bip39.NewSeed(mnemonicSeed, "Secret Passphrase")
-			identityKey, err = IdentityKeyFromSeed(identitySeed, 0)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		identity, err := IdentityFromKey(identityKey)
+		// Initialize IPFS repo with the identity key
+		identity, err := IdentityFromKey(keys.identityKey)
 		if err != nil {
 			return nil, err
 		}
@@ -174,57 +248,23 @@ func newRepo(nodeID string, dataDir, mnemonicSeed string, externalIdentityKey []
 		if err := fsrepo.Init(ipfsDir, conf); err != nil {
 			return nil, err
 		}
-
-		if err := initializeIpnsKeyspace(ipfsDir, identityKey); err != nil {
+		if err := initializeIpnsKeyspace(ipfsDir, keys.identityKey); err != nil {
 			return nil, err
 		}
 
-		hdSeed := bip39.NewSeed(mnemonicSeed, "")
-		escrowKey, ratingKey, bip44Key, solKey, err := CreateHDKeys(hdSeed)
-		if err != nil {
-			return nil, err
-		}
-
+		// Generate Tor key (standalone nodes only, not needed for SaaS)
 		_, torPriv, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
 			return nil, err
 		}
+		torKey = &models.Key{Name: "tor", Value: torPriv.Seed()}
 
-		dbIdentity = &models.Key{
-			Name:  "identity",
-			Value: identityKey,
-		}
-		dbEscrowKey = &models.Key{
-			Name:  "escrow",
-			Value: escrowKey.Serialize(),
-		}
-		dbRatingKey = &models.Key{
-			Name:  "ratings",
-			Value: ratingKey.Serialize(),
-		}
-		dbBip44Key = &models.Key{
-			Name:  "bip44",
-			Value: []byte(bip44Key.String()),
-		}
-		dbSolKey = &models.Key{
-			Name:  "solana",
-			Value: []byte(*solKey),
-		}
-		dbMnemonic = &models.Key{
-			Name:  "mnemonic",
-			Value: []byte(mnemonicSeed),
-		}
-		torKey = &models.Key{
-			Name:  "tor",
-			Value: torPriv.Seed(),
-		}
 		if err := cleanIdentityFromConfig(ipfsDir); err != nil {
 			return nil, err
 		}
 		isNew = true
 	} else {
-		// autoMigrateIPFSConfig(dataDir)
-
+		// Existing IPFS repo — run version migrations
 		ipfsRepo := mfsr.RepoPath(path.Join(dataDir, IPFSDirName))
 		if err := ipfsRepo.CheckVersion("13"); err == nil {
 			logger.LogInfoWithIDf(log, nodeID, "update IPFS version file from 13 to 14")
@@ -236,12 +276,10 @@ func newRepo(nodeID string, dataDir, mnemonicSeed string, externalIdentityKey []
 				logger.LogInfoWithIDf(log, nodeID, "migration failed, %v", err)
 			}
 		} else if err := ipfsRepo.CheckVersion("14"); err == nil {
-			// Nothing need to migrate, directly update the version to 16
 			if err := ipfsRepo.WriteVersion("16"); err != nil {
 				logger.LogInfoWithIDf(log, nodeID, "failed to update version file to 16, %v", err)
 			}
 		} else if err := ipfsRepo.CheckVersion("15"); err == nil {
-			// Nothing need to migrate, directly update the version to 16
 			if err := ipfsRepo.WriteVersion("16"); err != nil {
 				logger.LogInfoWithIDf(log, nodeID, "failed to update version file to 16, %v", err)
 			}
@@ -251,81 +289,37 @@ func newRepo(nodeID string, dataDir, mnemonicSeed string, externalIdentityKey []
 	var db database.Database
 	if inMemoryDB {
 		db, err = ffsqlite.NewFFMemoryDB(dataDir)
-		if err != nil {
-			return nil, err
-		}
 	} else {
 		db, err = ffsqlite.NewFFSqliteDB(dataDir)
-		if err != nil {
-			return nil, err
-		}
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	if err := autoMigrateDatabase(db); err != nil {
 		return nil, err
 	}
 
-	err = db.Update(func(tx database.Tx) error {
-		if dbIdentity != nil {
-			if err := tx.Save(&dbIdentity); err != nil {
+	if isNew {
+		err = db.Update(func(tx database.Tx) error {
+			if err := saveNodeKeys(tx, keys); err != nil {
 				return err
 			}
-		}
-		if dbEscrowKey != nil {
-			if err := tx.Save(&dbEscrowKey); err != nil {
+			if err := tx.Save(torKey); err != nil {
 				return err
 			}
+			return saveDefaultPreferences(tx)
+		})
+		if err != nil {
+			return nil, err
 		}
-		if dbRatingKey != nil {
-			if err := tx.Save(&dbRatingKey); err != nil {
-				return err
-			}
-		}
-		if dbBip44Key != nil {
-			if err := tx.Save(&dbBip44Key); err != nil {
-				return err
-			}
-		}
-		if dbMnemonic != nil {
-			if err := tx.Save(&dbMnemonic); err != nil {
-				return err
-			}
-		}
-		if torKey != nil {
-			if err := tx.Save(&torKey); err != nil {
-				return err
-			}
-		}
-		if dbSolKey != nil {
-			if err := tx.Save(&dbSolKey); err != nil {
-				return err
-			}
-		}
-		if isNew {
-			err := tx.Save(&models.UserPreferences{
-				AutoConfirm:       true,
-				MisPaymentBuffer:  defaultMispaymentBuffer,
-				ShowNsfw:          true,
-				ShowNotifications: true,
-			})
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
 
 	if err := CheckAndSetUlimit(); err != nil {
 		return nil, err
 	}
 
-	r := &Repo{
-		dataDir: dataDir,
-		db:      db,
-	}
+	r := &Repo{dataDir: dataDir, db: db}
 	if isNew {
 		if err := r.WriteVersion(DefaultRepoVersion); err != nil {
 			return nil, err
@@ -436,6 +430,82 @@ func createMnemonic(newEntropy func(int) ([]byte, error), newMnemonic func([]byt
 		return "", err
 	}
 	return mnemonic, nil
+}
+
+// nodeKeys holds all cryptographic keys generated for a node.
+type nodeKeys struct {
+	identityKey  []byte
+	escrowKey    *btcec.PrivateKey
+	ratingKey    *btcec.PrivateKey
+	bip44Key     *hdkeychain.ExtendedKey
+	solKey       *ed25519.PrivateKey
+	mnemonicSeed string
+}
+
+// generateNodeKeys creates all node cryptographic keys.
+// If mnemonicSeed is empty, a new one is generated.
+// If externalIdentityKey is provided, it overrides the mnemonic-derived identity key.
+func generateNodeKeys(mnemonicSeed string, externalIdentityKey []byte) (*nodeKeys, error) {
+	var err error
+	if mnemonicSeed == "" {
+		mnemonicSeed, err = createMnemonic(bip39.NewEntropy, bip39.NewMnemonic)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var identityKey []byte
+	if len(externalIdentityKey) > 0 {
+		identityKey = externalIdentityKey
+	} else {
+		identitySeed := bip39.NewSeed(mnemonicSeed, "Secret Passphrase")
+		identityKey, err = IdentityKeyFromSeed(identitySeed, 0)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	hdSeed := bip39.NewSeed(mnemonicSeed, "")
+	escrowKey, ratingKey, bip44Key, solKey, err := CreateHDKeys(hdSeed)
+	if err != nil {
+		return nil, err
+	}
+
+	return &nodeKeys{
+		identityKey:  identityKey,
+		escrowKey:    escrowKey,
+		ratingKey:    ratingKey,
+		bip44Key:     bip44Key,
+		solKey:       solKey,
+		mnemonicSeed: mnemonicSeed,
+	}, nil
+}
+
+// saveNodeKeys persists all node keys (identity, wallet, mnemonic) to the database.
+func saveNodeKeys(tx database.Tx, keys *nodeKeys) error {
+	for _, k := range []*models.Key{
+		{Name: "identity", Value: keys.identityKey},
+		{Name: "escrow", Value: keys.escrowKey.Serialize()},
+		{Name: "ratings", Value: keys.ratingKey.Serialize()},
+		{Name: "bip44", Value: []byte(keys.bip44Key.String())},
+		{Name: "solana", Value: []byte(*keys.solKey)},
+		{Name: "mnemonic", Value: []byte(keys.mnemonicSeed)},
+	} {
+		if err := tx.Save(k); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// saveDefaultPreferences saves the default user preferences for a new node.
+func saveDefaultPreferences(tx database.Tx) error {
+	return tx.Save(&models.UserPreferences{
+		AutoConfirm:       true,
+		MisPaymentBuffer:  defaultMispaymentBuffer,
+		ShowNsfw:          true,
+		ShowNotifications: true,
+	})
 }
 
 func CreateHDKeys(seed []byte) (escrowKey, ratingKey *btcec.PrivateKey, bip44Key *hdkeychain.ExtendedKey, solKey *ed25519.PrivateKey, err error) {
@@ -602,46 +672,6 @@ func installDatabasePlugins(ipfsDir string) {
 	})
 }
 
-// This was used for IPFS with 4002 migration to 5102 in the beginning. No need now.
-func autoMigrateIPFSConfig(dataDir string, testnet bool) error {
-	if testnet {
-		return nil
-	}
-
-	configPath := path.Join(dataDir, IPFSDirName, "config")
-	configFile, err := os.ReadFile(configPath)
-	if err != nil {
-		return err
-	}
-
-	// Version 1.0.0 build uses 4002/4001/9005 ports, which are conflict with old ones.
-	var oldCfg config.Config
-	if err := json.Unmarshal(configFile, &oldCfg); err != nil {
-		return err
-	}
-	if !strings.Contains(oldCfg.Addresses.Gateway[0], "4002") {
-		return nil
-	}
-
-	var cfgIface interface{}
-	if err := json.Unmarshal(configFile, &cfgIface); err != nil {
-		return err
-	}
-	cfg, ok := cfgIface.(map[string]interface{})
-	if !ok {
-		return errors.New("invalid config file")
-	}
-
-	defaultConfig := mustDefaultConfig(testnet)
-	cfg["Addresses"] = defaultConfig.Addresses
-
-	out, err := json.MarshalIndent(cfg, "", "    ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(configPath, out, os.ModePerm)
-}
-
 // The IPFS config file holds the private key to the node. First we aren't
 // even using this key as we prefer to use one derived from a mnemonic, but
 // second we don't want it sitting in the config file anyway. So this function
@@ -752,6 +782,48 @@ func autoMigrateDatabase(db database.Database) error {
 			}
 		}
 
+		return nil
+	})
+}
+
+// autoMigrateDatabaseManagedEscrow is the shared-DB variant of autoMigrateDatabase.
+// It creates all tables using AutoMigrate only — no DROP TABLE, no PRAGMA table_info.
+// This is safe for multi-tenant shared databases where destructive DDL would affect
+// all tenants. The shared DB is always freshly created by initSharedNodeDB, so legacy
+// schema migration is unnecessary.
+func autoMigrateDatabaseManagedEscrow(db database.Database) error {
+	allModels := []interface{}{
+		&models.Key{},
+		&models.CachedIPNSEntry{},
+		&models.CachedIPNSRecord{},
+		&models.OutgoingMessage{},
+		&models.IncomingMessage{},
+		&models.ChatMessage{},
+		&models.ChatGroup{},
+		&models.NotificationRecord{},
+		&models.FollowerStat{},
+		&models.FollowSequence{},
+		&models.Coupon{},
+		&models.Event{},
+		&models.Order{},
+		&models.TransactionMetadata{},
+		&models.UserPreferences{},
+		&models.StoreAndForwardServers{},
+		&models.Case{},
+		&models.Channel{},
+		&models.StoreCartRecord{},
+		&models.MatrixKeyBackup{},
+		&models.MatrixCredentials{},
+		&models.MatrixSecretsBundle{},
+		&models.ReceivingAccount{},
+	}
+
+	return db.Update(func(tx database.Tx) error {
+		for _, m := range allModels {
+			if err := tx.Migrate(m); err != nil {
+				return fmt.Errorf("migrate %s failed: %v", reflect.TypeOf(m).String(), err)
+			}
+		}
 		return nil
 	})
 }

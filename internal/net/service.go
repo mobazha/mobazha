@@ -169,8 +169,10 @@ func (ns *NetworkService) SendMessage(ctx context.Context, peerID peer.ID, messa
 	if ns.localDeliverer != nil {
 		from := ns.host.ID()
 		if ns.localDeliverer.DeliverToLocal(peerID, from, message) {
+			logger.LogDebugWithIDf(log, ns.nodeID, "Message %s delivered locally to %s", message.MessageID, peerID)
 			return nil
 		}
+		logger.LogDebugWithIDf(log, ns.nodeID, "Local delivery failed for %s, falling back to network", peerID)
 	}
 
 	ms, err := ns.messageSenderForPeer(ctx, peerID)

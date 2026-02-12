@@ -68,6 +68,7 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 	github.com/mobazha/ethereum-watcher v0.0.0-20240109073302-d1cf31cdeef6
+	github.com/mobazha/mobazha-core v0.0.0-00010101000000-000000000000
 	github.com/multiformats/go-base32 v0.1.0
 	github.com/multiformats/go-multiaddr v0.16.0
 	github.com/multiformats/go-multiaddr-dns v0.4.1
@@ -251,7 +252,6 @@ require (
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
-	github.com/mobazha/mobazha-core v0.0.0-00010101000000-000000000000 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mostynb/zstdpool-freelist v0.0.0-20201229113212-927304c0c3b1 // indirect

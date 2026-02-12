@@ -8,6 +8,7 @@ import (
 // metadata. The actual notification is serialized as JSON so as to
 // make this model suitable for the database.
 type NotificationRecord struct {
+	TenantMixin
 	ID           string    `gorm:"primaryKey" json:"-"`
 	Timestamp    time.Time `json:"timestamp"`
 	Read         bool      `json:"read"`

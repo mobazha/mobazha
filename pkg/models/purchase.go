@@ -214,7 +214,12 @@ type StoreCart struct {
 	Items    []ShoppingCartItem `json:"items"`
 }
 
+// StoreCartRecord stores a shopping cart keyed by vendor.
+// In multi-tenant shared DB mode, the composite primary key
+// (TenantID, VendorID) ensures different tenants' carts for the
+// same vendor don't conflict.
 type StoreCartRecord struct {
+	TenantID string `gorm:"column:tenant_id;primaryKey;default:''" json:"-"`
 	VendorID string `gorm:"primaryKey"`
 	Items    []byte
 }

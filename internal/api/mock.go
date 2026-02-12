@@ -10,6 +10,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -686,30 +687,38 @@ func (m *mockNode) DeleteMatrixSecretsBundle() error {
 }
 
 type mockNodeManager struct {
-	nodes map[string]coreiface.CoreIface
+	nodes map[string]contracts.NodeService
 }
 
-func (m *mockNodeManager) GetNode(nodeID string) (coreiface.CoreIface, bool) {
+func (m *mockNodeManager) GetNode(nodeID string) (contracts.NodeService, bool) {
 	node, ok := m.nodes[nodeID]
 	return node, ok
 }
 
-func (m *mockNodeManager) AddNode(nodeID string, node coreiface.CoreIface) {
+func (m *mockNodeManager) AddNode(nodeID string, node contracts.NodeService) {
 	if m.nodes == nil {
-		m.nodes = make(map[string]coreiface.CoreIface)
+		m.nodes = make(map[string]contracts.NodeService)
 	}
 	m.nodes[nodeID] = node
 }
 
 func (m *mockNodeManager) GetDefaultNode() coreiface.CoreIface {
-	return m.nodes["default"]
+	node, ok := m.nodes["default"]
+	if !ok {
+		return nil
+	}
+	ci, ok := node.(coreiface.CoreIface)
+	if !ok {
+		return nil
+	}
+	return ci
 }
 
 func (m *mockNodeManager) GetIPFSNode() *core.IpfsNode {
 	return nil
 }
 
-func (m *mockNodeManager) GetNodes() map[string]coreiface.CoreIface {
+func (m *mockNodeManager) GetNodes() map[string]contracts.NodeService {
 	return m.nodes
 }
 

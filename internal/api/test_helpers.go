@@ -10,7 +10,7 @@ import (
 
 	tnet "github.com/libp2p/go-libp2p-testing/net"
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 )
 
 type apiTests []apiTest
@@ -37,7 +37,7 @@ func runAPITests(t *testing.T, tests apiTests) {
 	}
 	gateway := &Gateway{
 		nodeManager: &mockNodeManager{
-			nodes: map[string]coreiface.CoreIface{
+			nodes: map[string]contracts.NodeService{
 				"test_peer_id": node,
 			},
 		},

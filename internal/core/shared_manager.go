@@ -20,16 +20,18 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
 
-// SharedManager Manages shared resources
+// SharedManager Manages shared resources.
+// clients stores contracts.NodeService to support both MobazhaNode and TenantService.
 type SharedManager struct {
 	ExchangeRateProvider *wallet.ExchangeRateProvider
 	mu                   sync.RWMutex
-	clients              map[string]coreiface.CoreIface
+	clients              map[string]contracts.NodeService
 
 	// httpGateway is the Mobazha API.
 	httpGateway *api.Gateway
@@ -129,7 +131,7 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			ExchangeRateProvider: erp,
 			SNFServers:           snfServers,
 			NetConfig:            netConfig,
-			clients:              make(map[string]coreiface.CoreIface),
+			clients:              make(map[string]contracts.NodeService),
 			testnet:              cfg.Testnet,
 			ctx:                  ctx,
 		}
@@ -187,26 +189,39 @@ func (im *SharedManager) HasSNFProxy() bool {
 func (im *SharedManager) GetDefaultNode() coreiface.CoreIface {
 	im.mu.RLock()
 	defer im.mu.RUnlock()
-	return im.clients[repo.DefaultNodeID]
+	node, ok := im.clients[repo.DefaultNodeID]
+	if !ok {
+		return nil
+	}
+	// Default node is always a MobazhaNode (CoreIface).
+	ci, ok := node.(coreiface.CoreIface)
+	if !ok {
+		return nil
+	}
+	return ci
 }
 
 func (im *SharedManager) GetIPFSNode() *core.IpfsNode {
 	im.mu.RLock()
 	defer im.mu.RUnlock()
 
-	obNode, ok := im.clients[repo.DefaultNodeID]
+	node, ok := im.clients[repo.DefaultNodeID]
 	if !ok {
 		return nil
 	}
-
-	return obNode.IPFSNode()
+	// Only MobazhaNode (CoreIface) has IPFSNode.
+	ci, ok := node.(coreiface.CoreIface)
+	if !ok {
+		return nil
+	}
+	return ci.IPFSNode()
 }
 
 func (im *SharedManager) GetHTTPGateway() *api.Gateway {
 	return im.httpGateway
 }
 
-func (im *SharedManager) AddNode(nodeID string, node coreiface.CoreIface) {
+func (im *SharedManager) AddNode(nodeID string, node contracts.NodeService) {
 	im.mu.Lock()
 	defer im.mu.Unlock()
 	im.clients[nodeID] = node
@@ -218,14 +233,14 @@ func (im *SharedManager) RemoveNode(nodeID string) {
 	delete(im.clients, nodeID)
 }
 
-func (im *SharedManager) GetNode(nodeID string) (coreiface.CoreIface, bool) {
+func (im *SharedManager) GetNode(nodeID string) (contracts.NodeService, bool) {
 	im.mu.RLock()
 	defer im.mu.RUnlock()
 	node, ok := im.clients[nodeID]
 	return node, ok
 }
 
-func (im *SharedManager) GetNodes() map[string]coreiface.CoreIface {
+func (im *SharedManager) GetNodes() map[string]contracts.NodeService {
 	im.mu.RLock()
 	defer im.mu.RUnlock()
 	return im.clients

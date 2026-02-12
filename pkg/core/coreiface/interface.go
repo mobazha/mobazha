@@ -52,14 +52,27 @@ type CoreIface interface {
 	UpdateOrderPaymentStatus(orderID models.OrderID, paymentIntentID string, status string) error
 }
 
+// NodeManagerIface manages node instances in the shared manager.
+//
+// AddNode/GetNode/GetNodes use contracts.NodeService to support both
+// MobazhaNode (CoreIface) and TenantService (NodeService only).
+// GetDefaultNode returns CoreIface because the default node is always
+// a full MobazhaNode — callers needing IPFSNode/DB/Multiwallet use this.
 type NodeManagerIface interface {
+	// GetDefaultNode returns the default node as CoreIface.
+	// The default node is always a MobazhaNode (full node).
 	GetDefaultNode() CoreIface
 	GetIPFSNode() *core.IpfsNode
 
-	AddNode(nodeID string, node CoreIface)
+	// AddNode registers a node (MobazhaNode or TenantService) by ID.
+	AddNode(nodeID string, node contracts.NodeService)
 	RemoveNode(nodeID string)
-	GetNodes() map[string]CoreIface
-	GetNode(nodeID string) (CoreIface, bool)
+
+	// GetNodes returns all registered nodes as NodeService.
+	GetNodes() map[string]contracts.NodeService
+
+	// GetNode returns a node by ID as NodeService.
+	GetNode(nodeID string) (contracts.NodeService, bool)
 
 	// Config methods
 	GetMaxImportZipSize() int64

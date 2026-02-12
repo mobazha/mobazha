@@ -6,14 +6,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 func TestGateway_AuthenticationMiddleware(t *testing.T) {
 	gateway := &Gateway{
 		nodeManager: &mockNodeManager{
-			nodes: map[string]coreiface.CoreIface{
+			nodes: map[string]contracts.NodeService{
 				"test_peer_id": &mockNode{
 					getMyProfileFunc: func() (*models.Profile, error) { return nil, nil },
 				},

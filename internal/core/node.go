@@ -563,17 +563,17 @@ func (n *MobazhaNode) PrivKey() crypto.PrivKey {
 	return n.privKey
 }
 
-// SignMessage signs a payload with the node's identity key.
+// SignMessage signs a payload with the node's identity key via the injected Signer.
 // Returns (signature, publicKeyBytes, error).
 func (n *MobazhaNode) SignMessage(payload []byte) ([]byte, []byte, error) {
-	if n.privKey == nil {
-		return nil, nil, fmt.Errorf("private key not available")
+	if n.signer == nil {
+		return nil, nil, fmt.Errorf("signer not available")
 	}
-	sig, err := n.privKey.Sign(payload)
+	sig, err := n.signer.Sign(payload)
 	if err != nil {
 		return nil, nil, fmt.Errorf("signing payload: %w", err)
 	}
-	pubkey, err := n.privKey.GetPublic().Raw()
+	pubkey, err := n.signer.PublicKey()
 	if err != nil {
 		return nil, nil, fmt.Errorf("getting public key: %w", err)
 	}

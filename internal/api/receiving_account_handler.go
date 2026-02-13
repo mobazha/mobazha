@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -19,7 +18,7 @@ func (g *Gateway) GetReceivingAccounts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	// 从数据库获取用户的收款账户信息
 	receivingAccounts, err := node.GetReceivingAccounts()
@@ -50,7 +49,7 @@ func (g *Gateway) handleReceivingAccountRequest(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	type ReceivingAccountParams struct {
 		ID             int               `json:"id"`
@@ -131,7 +130,7 @@ func (g *Gateway) DeleteReceivingAccount(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	// 从URL路径获取账户ID
 	vars := mux.Vars(r)

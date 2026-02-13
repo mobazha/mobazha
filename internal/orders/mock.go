@@ -95,7 +95,7 @@ func newMockOrderProcessor() (*OrderProcessor, func(), error) {
 			Signer:              signer,
 			Db:                   r.DB(),
 			Messenger:            messenger,
-			Multiwallet:          mw,
+			Multiwallet:          &mw,
 			ExchangeRateProvider: erp,
 			EventBus:             events.NewBus(),
 			CalcCIDFunc:          calcMockCID,

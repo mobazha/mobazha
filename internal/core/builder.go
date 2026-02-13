@@ -537,7 +537,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		banManager:             bm,
 		eventBus:               bus,
 		followerTracker:        tracker,
-		multiwallet:            mw,
+		multiwallet:            &mw,
 		exchangeRates:          erp,
 		testnet:                cfg.Testnet,
 		walletTestnet:          walletTestnet,
@@ -553,6 +553,14 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		stripeConfigCache:      netdb.NewStripeConfigCache(),
 		relayAPIURL:            cfg.RelayAPIURL,
 	}
+	// Initialize content store with IPFS backend.
+	obNode.contentStore = newIPFSContentStore(
+		obNode.getIPFSNode,
+		sharedManager.GetIPFSNode,
+		obRepo.DataDir(),
+		obNode.shutdown,
+	)
+
 	sharedManager.AddNode(nodeID, obNode)
 
 	// If this is the default node, we need to create the HTTP gateway and initialize SNF Proxy
@@ -624,12 +632,12 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		Identity:                 obNode.peerID,
 		Signer:                   signer,
 		Db:                       obRepo.DB(),
-		Multiwallet:              mw,
+		Multiwallet:              obNode.multiwallet,
 		Messenger:                obNode.messenger,
 		EscrowPrivateKey:         escrowKey,
 		ExchangeRateProvider:     erp,
 		EventBus:                 bus,
-		CalcCIDFunc:              obNode.cid,
+		CalcCIDFunc:              obNode.contentStore.ComputeCID,
 		FeatureManager:           obNode.featureManager,
 		GetStripeTransactionFunc: obNode.GetStripeTransaction,
 		StateValidator:           &coreStateBridge{},
@@ -1043,7 +1051,7 @@ func newLightweightNode(
 		banManager:             bm,
 		eventBus:               bus,
 		followerTracker:        tracker,
-		multiwallet:            mw,
+		multiwallet:            &mw,
 		exchangeRates:          erp,
 		testnet:                cfg.Testnet,
 		walletTestnet:          walletTestnet,
@@ -1059,6 +1067,15 @@ func newLightweightNode(
 		stripeConfigCache:      netdb.NewStripeConfigCache(),
 		relayAPIURL:            cfg.RelayAPIURL,
 	}
+
+	// Initialize content store — lightweight nodes use shared IPFS.
+	obNode.contentStore = newIPFSContentStore(
+		obNode.getIPFSNode,
+		sharedManager.GetIPFSNode,
+		obRepo.DataDir(),
+		obNode.shutdown,
+	)
+
 	sharedManager.AddNode(nodeID, obNode)
 
 	// Lightweight nodes always use the shared HTTP gateway
@@ -1113,12 +1130,12 @@ func newLightweightNode(
 		Identity:                 nodePeerID,
 		Signer:                   signer,
 		Db:                       obRepo.DB(),
-		Multiwallet:              mw,
+		Multiwallet:              obNode.multiwallet,
 		Messenger:                obNode.messenger,
 		EscrowPrivateKey:         escrowKey,
 		ExchangeRateProvider:     erp,
 		EventBus:                 bus,
-		CalcCIDFunc:              obNode.cid,
+		CalcCIDFunc:              obNode.contentStore.ComputeCID,
 		FeatureManager:           obNode.featureManager,
 		GetStripeTransactionFunc: obNode.GetStripeTransaction,
 		StateValidator:           &coreStateBridge{},

@@ -3,7 +3,6 @@ package coreiface
 import (
 	"github.com/ipfs/kubo/core"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 )
@@ -30,9 +29,9 @@ type CoreIface interface {
 	// TenantService would use shared DB with tenant scoping instead.
 	DB() database.Database
 
-	// Multiwallet returns the internal multiwallet instance.
-	// In SaaS mode, this is a SharedMode multiwallet (keys only).
-	Multiwallet() multiwallet.Multiwallet
+	// Multiwallet returns the WalletOperator interface for wallet operations.
+	// Internal callers that need the concrete map type can type-assert.
+	Multiwallet() contracts.WalletOperator
 
 	// ExchangeRates returns the internal exchange rate provider.
 	ExchangeRates() *wallet.ExchangeRateProvider

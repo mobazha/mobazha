@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/multiwallet"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -40,7 +41,8 @@ func Test_processPaymentSentMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	op.multiwallet["MCK"] = wn.Wallets()[0]
+	mw := op.multiwallet.(*multiwallet.Multiwallet)
+	(*mw)[iwallet.ChainMock] = wn.Wallets()[0]
 
 	orderOpen, paymentSent, err := factory.NewOrder()
 	if err != nil {

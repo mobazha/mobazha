@@ -160,7 +160,7 @@ func MockNode() (*MobazhaNode, error) {
 		escrowMasterKey:      escrowKey,
 		ratingMasterKey:      ratingKey,
 		solPrivKey:           &mockSolPrivKey,
-		multiwallet:          mw,
+		multiwallet:          &mw,
 		followerTracker:      tracker,
 		exchangeRates:        erp,
 		channels:             make(map[string]*channels.Channel),
@@ -168,6 +168,15 @@ func MockNode() (*MobazhaNode, error) {
 		publishChan:          make(chan pubCloser),
 		featureManager:       pkgconfig.GetGlobalFeatureManager(),
 	}
+
+	// Initialize content store for mock node.
+	node.contentStore = newIPFSContentStore(
+		func() (*core.IpfsNode, error) { return ipfsNode, nil },
+		func() *core.IpfsNode { return ipfsNode },
+		r.DataDir(),
+		node.shutdown,
+	)
+
 	sharedManager.AddNode(repo.DefaultNodeID, node)
 
 	node.messenger, err = net.NewMessenger(&net.MessengerConfig{
@@ -189,12 +198,12 @@ func MockNode() (*MobazhaNode, error) {
 		Identity:             ipfsNode.Identity,
 		Signer:              signer,
 		Db:                   r.DB(),
-		Multiwallet:          mw,
+		Multiwallet:          node.multiwallet,
 		Messenger:            node.messenger,
 		EscrowPrivateKey:     escrowKey,
 		ExchangeRateProvider: erp,
 		EventBus:             bus,
-		CalcCIDFunc:          node.cid,
+		CalcCIDFunc:          node.contentStore.ComputeCID,
 		FeatureManager:       node.featureManager,
 	})
 
@@ -355,7 +364,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			escrowMasterKey:      escrowKey,
 			ratingMasterKey:      ratingKey,
 			solPrivKey:           &mockSolPrivKey,
-			multiwallet:          mw,
+			multiwallet:          &mw,
 			followerTracker:      tracker,
 			exchangeRates:        erp,
 			channels:             make(map[string]*channels.Channel),
@@ -363,6 +372,14 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			publishChan:          make(chan pubCloser),
 			featureManager:       pkgconfig.GetGlobalFeatureManager(),
 		}
+		// Initialize content store for mock node.
+		node.contentStore = newIPFSContentStore(
+			node.getIPFSNode,
+			sharedManager.GetIPFSNode,
+			r.DataDir(),
+			node.shutdown,
+		)
+
 		sharedManager.AddNode(nodeID, node)
 
 		node.messenger, err = net.NewMessenger(&net.MessengerConfig{
@@ -385,11 +402,11 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			Signer:              signer,
 			Db:                   r.DB(),
 			Messenger:            node.messenger,
-			Multiwallet:          mw,
+			Multiwallet:          node.multiwallet,
 			EscrowPrivateKey:     escrowKey,
 			ExchangeRateProvider: erp,
 			EventBus:             bus,
-			CalcCIDFunc:          node.cid,
+			CalcCIDFunc:          node.contentStore.ComputeCID,
 			FeatureManager:       node.featureManager,
 		})
 

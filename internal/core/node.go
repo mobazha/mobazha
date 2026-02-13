@@ -17,8 +17,8 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/channels"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet/utxo"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/notifications"
@@ -58,6 +58,11 @@ type MobazhaNode struct {
 
 	// signer is the contracts.Signer for signing order messages and other data.
 	signer corecontracts.Signer
+
+	// contentStore abstracts content-addressed storage (IPFS).
+	// Standalone: backed by a local/shared IPFS node.
+	// SaaS: backed by a shared IPFS gateway or HTTP API.
+	contentStore contracts.ContentStore
 
 	// db is the injectable database interface. Both standalone (FFSqliteDB) and
 	// SaaS (TenantDB) modes provide an implementation. Business methods should
@@ -109,11 +114,11 @@ type MobazhaNode struct {
 	// Generally you should always send messages using this and not the
 	// NetworkService as the later will only attempt to send direct messages
 	// and will not retry.
-	messenger *net.Messenger
+	messenger contracts.Messenger
 
 	// networkService manages the sending and receiving of messages
 	// on the Mobazha protocol.
-	networkService *net.NetworkService
+	networkService contracts.NetworkService
 
 	// banManager holds a list of peers that have been banned by this node.
 	banManager *net.BanManager
@@ -125,8 +130,10 @@ type MobazhaNode struct {
 	// followers so that we can use them to push data for redundancy.
 	followerTracker *FollowerTracker
 
-	// multiwallet is a map of cyptocurrency wallets.
-	multiwallet multiwallet.Multiwallet
+	// multiwallet abstracts multi-currency wallet operations.
+	// Standalone: backed by a real Multiwallet.
+	// SaaS: backed by KeyVault + shared chain services.
+	multiwallet contracts.WalletOperator
 
 	// orderProcessor is the engine we use for processing all orders.
 	orderProcessor *orders.OrderProcessor
@@ -526,8 +533,10 @@ func (n *MobazhaNode) IPFSNode() *core.IpfsNode {
 	return n.ipfsNode
 }
 
-// Multiwallet returns the underlying Multiwallet instance.
-func (n *MobazhaNode) Multiwallet() multiwallet.Multiwallet {
+// Multiwallet returns the WalletOperator interface.
+// Internal callers that need concrete map access can type-assert to
+// *multiwallet.Multiwallet.
+func (n *MobazhaNode) Multiwallet() contracts.WalletOperator {
 	return n.multiwallet
 }
 
@@ -616,7 +625,7 @@ func (n *MobazhaNode) EventBus() events.Bus {
 }
 
 // NetService returns the underlying NetworkService for this node.
-func (n *MobazhaNode) NetService() *net.NetworkService {
+func (n *MobazhaNode) NetService() contracts.NetworkService {
 	return n.networkService
 }
 

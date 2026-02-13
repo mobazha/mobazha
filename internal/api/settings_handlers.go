@@ -35,8 +35,10 @@ func (g *Gateway) handleGETConfig(w http.ResponseWriter, r *http.Request) {
 	// In SaaS mode these default to false/empty, which is correct.
 	if ci, ok := getCoreIface(r); ok {
 		ret.Tor = ci.UsingTorMode()
-		for chain := range ci.Multiwallet() {
-			ret.Wallets = append(ret.Wallets, chain.String())
+		if mw := ci.Multiwallet(); mw != nil {
+			for _, chain := range mw.SupportedChains() {
+				ret.Wallets = append(ret.Wallets, chain.String())
+			}
 		}
 	}
 

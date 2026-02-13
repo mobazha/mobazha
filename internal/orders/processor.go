@@ -13,9 +13,8 @@ import (
 	coreorders "github.com/mobazha/mobazha-core/orders"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
-	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
+	pkgcontracts "github.com/mobazha/mobazha3.0/pkg/contracts"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -47,8 +46,8 @@ type Config struct {
 	Db                       database.Database
 	Signer                   contracts.Signer
 	EscrowPrivateKey         *btcec.PrivateKey
-	Messenger                *net.Messenger
-	Multiwallet              multiwallet.Multiwallet
+	Messenger                pkgcontracts.Messenger
+	Multiwallet              pkgcontracts.WalletOperator
 	ExchangeRateProvider     *wallet.ExchangeRateProvider
 	EventBus                 events.Bus
 	CalcCIDFunc              func(file []byte) (cid.Cid, error)
@@ -70,8 +69,8 @@ type OrderProcessor struct {
 	identity                 libp2ppeer.ID
 	signer                   contracts.Signer
 	db                       database.Database
-	messenger                *net.Messenger
-	multiwallet              multiwallet.Multiwallet
+	messenger                pkgcontracts.Messenger
+	multiwallet              pkgcontracts.WalletOperator
 	escrowPrivateKey         *btcec.PrivateKey
 	erp                      *wallet.ExchangeRateProvider
 	bus                      events.Bus

@@ -504,7 +504,7 @@ func (n *MobazhaNode) handleStoreMessage(from peer.ID, message *pb.Message) erro
 			continue
 		}
 		cids = append(cids, cid)
-		if err := n.pin(context.Background(), path.FromCid(cid)); err != nil {
+		if err := n.contentStore.Pin(context.Background(), cid); err != nil {
 			failedCids = append(failedCids, cid)
 			logger.LogErrorWithIDf(log, n.nodeID, "store handler error pinning file, %s, %s", cid.String(), err)
 			continue

@@ -8,7 +8,6 @@ import (
 	"github.com/ipfs/kubo/core"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -106,7 +105,7 @@ type mockNode struct {
 	usingTestnetFunc                        func() bool
 	usingTorFunc                            func() bool
 	ipfsNodeFunc                            func() *core.IpfsNode
-	multiwalletFunc                         func() multiwallet.Multiwallet
+	multiwalletFunc                         func() contracts.WalletOperator
 	nodeIDFunc                              func() string
 	identityFunc                            func() peer.ID
 	subscribeEventFunc                      func(event any) (events.Subscription, error)
@@ -448,7 +447,7 @@ func (m *mockNode) UsingTorMode() bool {
 func (m *mockNode) IPFSNode() *core.IpfsNode {
 	return m.ipfsNodeFunc()
 }
-func (m *mockNode) Multiwallet() multiwallet.Multiwallet {
+func (m *mockNode) Multiwallet() contracts.WalletOperator {
 	return m.multiwalletFunc()
 }
 func (m *mockNode) GetNodeID() string {

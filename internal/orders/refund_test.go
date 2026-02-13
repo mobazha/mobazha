@@ -10,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/multiwallet"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -60,7 +61,8 @@ func TestOrderProcessor_processRefundMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	op.multiwallet[iwallet.ChainMock] = wn.Wallets()[0]
+	mw := op.multiwallet.(*multiwallet.Multiwallet)
+	(*mw)[iwallet.ChainMock] = wn.Wallets()[0]
 
 	_, pub, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {

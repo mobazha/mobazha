@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/core"
 	"github.com/mobazha/mobazha3.0/internal/repo"
+	"github.com/mobazha/mobazha3.0/internal/multiwallet"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -52,21 +53,24 @@ func (x *DevNet) Execute(args []string) error {
 
 	// Build the mock wallet network and set the mock wallet in each node.
 	walletNet := wallet.NewMockWalletNetwork(3)
-	buyer.Multiwallet()[iwallet.ChainMock] = walletNet.Wallets()[0]
-	vendor.Multiwallet()[iwallet.ChainMock] = walletNet.Wallets()[1]
-	moderator.Multiwallet()[iwallet.ChainMock] = walletNet.Wallets()[2]
+	buyerMW := buyer.Multiwallet().(*multiwallet.Multiwallet)
+	vendorMW := vendor.Multiwallet().(*multiwallet.Multiwallet)
+	moderatorMW := moderator.Multiwallet().(*multiwallet.Multiwallet)
+	(*buyerMW)[iwallet.ChainMock] = walletNet.Wallets()[0]
+	(*vendorMW)[iwallet.ChainMock] = walletNet.Wallets()[1]
+	(*moderatorMW)[iwallet.ChainMock] = walletNet.Wallets()[2]
 
 	walletNet.Wallets()[0].SetEventBus(buyer.EventBus())
 	walletNet.Wallets()[1].SetEventBus(vendor.EventBus())
 	walletNet.Wallets()[2].SetEventBus(moderator.EventBus())
 
-	if err := core.InitializeMultiwallet(buyer.Multiwallet(), buyer.DB(), time.Now()); err != nil {
+	if err := core.InitializeMultiwallet(*buyerMW, buyer.DB(), time.Now()); err != nil {
 		return err
 	}
-	if err := core.InitializeMultiwallet(vendor.Multiwallet(), vendor.DB(), time.Now()); err != nil {
+	if err := core.InitializeMultiwallet(*vendorMW, vendor.DB(), time.Now()); err != nil {
 		return err
 	}
-	if err := core.InitializeMultiwallet(moderator.Multiwallet(), moderator.DB(), time.Now()); err != nil {
+	if err := core.InitializeMultiwallet(*moderatorMW, moderator.DB(), time.Now()); err != nil {
 		return err
 	}
 

@@ -8,6 +8,7 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
 	"github.com/mobazha/mobazha3.0/internal/version"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -31,11 +32,12 @@ func TestSettingsHandlers(t *testing.T) {
 				n.usingTorFunc = func() bool {
 					return true
 				}
-				n.multiwalletFunc = func() multiwallet.Multiwallet {
-					m := make(multiwallet.Multiwallet)
-					m[iwallet.ChainBitcoin] = nil
-					return m
+			n.multiwalletFunc = func() contracts.WalletOperator {
+				m := multiwallet.Multiwallet{
+					iwallet.ChainBitcoin: nil,
 				}
+				return &m
+			}
 			},
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {

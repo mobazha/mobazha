@@ -126,14 +126,14 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 	}
 
 	// Add the directory to IPFS
-	stat, err := os.Lstat(n.repo.DB().PublicDataPath())
+	stat, err := os.Lstat(n.db.PublicDataPath())
 	if err != nil {
 		logger.LogErrorWithIDf(log, n.nodeID, "Error calling Lstat: %s", err.Error())
 		publishErr = err
 		return
 	}
 
-	f, err := files.NewSerialFile(n.repo.DB().PublicDataPath(), false, stat)
+	f, err := files.NewSerialFile(n.db.PublicDataPath(), false, stat)
 	if err != nil {
 		logger.LogErrorWithIDf(log, n.nodeID, "Error serializing file: %s", err.Error())
 		publishErr = err
@@ -205,7 +205,7 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 		}
 	}()
 
-	err = n.repo.DB().Update(func(tx database.Tx) error {
+	err = n.db.Update(func(tx database.Tx) error {
 		return tx.Save(&models.Event{Name: "last_publish", Time: time.Now()})
 	})
 	if err != nil {
@@ -356,7 +356,7 @@ func (n *MobazhaNode) PublishFile(ctx context.Context, cid cid.Cid, done chan<- 
 // check for duplicate messages later. Then it sends the ACK message to
 // the remote peer.
 func (n *MobazhaNode) sendAckMessage(messageID string, to peer.ID) {
-	err := n.repo.DB().Update(func(tx database.Tx) error {
+	err := n.db.Update(func(tx database.Tx) error {
 		return tx.Save(&models.IncomingMessage{ID: messageID})
 	})
 	if err != nil {
@@ -377,7 +377,7 @@ func (n *MobazhaNode) handleAckMessage(from peer.ID, message *pb.Message) error 
 		return err
 	}
 
-	err := n.repo.DB().Update(func(tx database.Tx) error {
+	err := n.db.Update(func(tx database.Tx) error {
 		var outgoingMessage models.OutgoingMessage
 		if err := tx.Read().Where("id = ?", ack.AckedMessageID).First(&outgoingMessage).Error; err != nil {
 			return err
@@ -419,7 +419,7 @@ func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) erro
 
 	var event interface{}
 	var order models.Order
-	err := n.repo.DB().Update(func(tx database.Tx) error {
+	err := n.db.Update(func(tx database.Tx) error {
 		tx.Read().Where("id = ?", orderMsg.OrderID).First(&order)
 
 		var err error
@@ -477,7 +477,7 @@ func (n *MobazhaNode) handleStoreMessage(from peer.ID, message *pb.Message) erro
 			following models.Following
 			err       error
 		)
-		err = n.repo.DB().View(func(tx database.Tx) error {
+		err = n.db.View(func(tx database.Tx) error {
 			following, err = tx.GetFollowing()
 			return err
 		})
@@ -523,7 +523,7 @@ func (n *MobazhaNode) handleStoreMessage(from peer.ID, message *pb.Message) erro
 
 // isDuplicate checks if the message ID exists in the incoming messages database.
 func (n *MobazhaNode) isDuplicate(message *pb.Message) bool {
-	err := n.repo.DB().View(func(tx database.Tx) error {
+	err := n.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("id = ?", message.MessageID).First(&models.IncomingMessage{}).Error
 	})
 	return err == nil
@@ -546,7 +546,7 @@ func (n *MobazhaNode) syncMessages() {
 				return
 			}
 			var messages []models.OutgoingMessage
-			err = n.repo.DB().View(func(tx database.Tx) error {
+			err = n.db.View(func(tx database.Tx) error {
 				return tx.Read().Where("recipient = ?", notif.Peer.String()).Find(&messages).Error
 			})
 			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -606,7 +606,7 @@ type pubCloser struct {
 // changes every 36 hours if the user does not trigger a publish in the interim.
 func (n *MobazhaNode) publishHandler() {
 	var lastPublish time.Time
-	err := n.repo.DB().View(func(tx database.Tx) error {
+	err := n.db.View(func(tx database.Tx) error {
 		var event models.Event
 		if err := tx.Read().Where("name = ?", "last_publish").First(&event).Error; err != nil {
 			return err
@@ -627,7 +627,7 @@ func (n *MobazhaNode) publishHandler() {
 			case <-tick:
 				lastPublish = time.Now()
 				tick = time.After(republishInterval - time.Since(lastPublish))
-				err = n.repo.DB().Update(func(tx database.Tx) error {
+				err = n.db.Update(func(tx database.Tx) error {
 					return tx.Save(&models.Event{Name: "last_publish", Time: lastPublish})
 				})
 				if err != nil {

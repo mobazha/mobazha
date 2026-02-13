@@ -59,6 +59,12 @@ type MobazhaNode struct {
 	// signer is the contracts.Signer for signing order messages and other data.
 	signer corecontracts.Signer
 
+	// db is the injectable database interface. Both standalone (FFSqliteDB) and
+	// SaaS (TenantDB) modes provide an implementation. Business methods should
+	// use n.db instead of n.repo.DB() so that the dependency is explicit and
+	// injectable.
+	db database.Database
+
 	// repo holds the database and public data directory.
 	repo *repo.Repo
 
@@ -527,7 +533,7 @@ func (n *MobazhaNode) Multiwallet() multiwallet.Multiwallet {
 
 // DB returns the node's database.
 func (n *MobazhaNode) DB() database.Database {
-	return n.repo.DB()
+	return n.db
 }
 
 // ExchangeRates returns the node's exchange rate provider.

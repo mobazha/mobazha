@@ -27,6 +27,7 @@ import (
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/stripe/stripe-go/v82"
 )
 
 // IdentityService provides node identity and lifecycle operations.
@@ -39,6 +40,12 @@ type IdentityService interface {
 
 	// UsingTestnet returns whether the node is on testnet.
 	UsingTestnet() bool
+
+	// SignMessage signs a payload with the node's identity key.
+	// Returns (signature, publicKeyBytes, error).
+	// Standalone: uses IPFS node private key.
+	// SaaS: delegates to KeyVault.
+	SignMessage(payload []byte) ([]byte, []byte, error)
 }
 
 // ChatService handles messaging operations.
@@ -232,6 +239,24 @@ type PreferencesService interface {
 	UnblockNode(peerID string) (bool, error)
 }
 
+// ExchangeRateService provides currency exchange rate queries.
+// Both standalone and SaaS modes need exchange rates:
+//   - Standalone: MobazhaNode delegates to internal ExchangeRateProvider
+//   - SaaS: TenantService receives a shared ExchangeRateService via SharedInfra
+type ExchangeRateService interface {
+	// GetAllRates returns all exchange rates for the given base currency.
+	// If breakCache is true, forces a refresh from providers.
+	GetAllRates(base models.CurrencyCode, breakCache bool) (map[models.CurrencyCode]iwallet.Amount, error)
+}
+
+// StripeService handles Stripe payment integration.
+type StripeService interface {
+	GetStripePublicKey() (string, error)
+	GetStripeConnectURL() (string, error)
+	CreateStripePaymentIntent(ctx context.Context, orderID models.OrderID, amount int64, currency string) (*stripe.PaymentIntent, error)
+	HandleStripeWebhook(payload []byte, signature string) error
+}
+
 // NodeService is the top-level aggregate interface that combines all domain services.
 // Both MobazhaNode (standalone) and TenantService (SaaS) implement this interface.
 //
@@ -249,6 +274,8 @@ type NodeService interface {
 	SocialService
 	MatrixService
 	PreferencesService
+	StripeService
+	ExchangeRateService
 
 	// EventBus returns the event bus for pub/sub.
 	EventBus() events.Bus

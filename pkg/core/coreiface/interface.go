@@ -1,15 +1,11 @@
 package coreiface
 
 import (
-	"context"
-
 	"github.com/ipfs/kubo/core"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/stripe/stripe-go/v82"
 )
 
 // CoreIface enumerates the interface of the MobazhaNode object in the Core package.
@@ -43,13 +39,6 @@ type CoreIface interface {
 
 	// UsingTorMode returns whether the node is using Tor.
 	UsingTorMode() bool
-
-	// Stripe methods (depend on stripe-go types)
-	GetStripePublicKey() (string, error)
-	GetStripeConnectURL() (string, error)
-	CreateStripePaymentIntent(ctx context.Context, orderID models.OrderID, amount int64, currency string) (*stripe.PaymentIntent, error)
-	HandleStripeWebhook(payload []byte, signature string) error
-	UpdateOrderPaymentStatus(orderID models.OrderID, paymentIntentID string, status string) error
 }
 
 // NodeManagerIface manages node instances in the shared manager.
@@ -73,6 +62,11 @@ type NodeManagerIface interface {
 
 	// GetNode returns a node by ID as NodeService.
 	GetNode(nodeID string) (contracts.NodeService, bool)
+
+	// GetExchangeRateService returns the shared exchange rate service.
+	// Used by external packages (e.g., hosting) to provide exchange rates
+	// to TenantService via SharedInfra.
+	GetExchangeRateService() contracts.ExchangeRateService
 
 	// Config methods
 	GetMaxImportZipSize() int64

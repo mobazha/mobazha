@@ -137,6 +137,7 @@ type mockNode struct {
 	getTransactionMetadataFunc              func(txid iwallet.TransactionID) (models.TransactionMetadata, error)
 	getMnemonicFunc                         func() (string, error)
 	getExchangeRatesFunc                    func() *wallet.ExchangeRateProvider
+	getAllRatesFunc                         func(base models.CurrencyCode, breakCache bool) (map[models.CurrencyCode]iwallet.Amount, error)
 
 	// 收款账户相关
 	addReceivingAccountFunc         func(account *models.ReceivingAccount) (*models.ReceivingAccount, error)
@@ -426,6 +427,21 @@ func (m *mockNode) Publish(done chan<- struct{}) {
 func (m *mockNode) UsingTestnet() bool {
 	return m.usingTestnetFunc()
 }
+func (m *mockNode) SignMessage(payload []byte) ([]byte, []byte, error) {
+	return nil, nil, nil
+}
+func (m *mockNode) GetStripePublicKey() (string, error) {
+	return "", nil
+}
+func (m *mockNode) GetStripeConnectURL() (string, error) {
+	return "", nil
+}
+func (m *mockNode) CreateStripePaymentIntent(_ context.Context, _ models.OrderID, _ int64, _ string) (*stripe.PaymentIntent, error) {
+	return nil, nil
+}
+func (m *mockNode) HandleStripeWebhook(_ []byte, _ string) error {
+	return nil
+}
 func (m *mockNode) UsingTorMode() bool {
 	return m.usingTorFunc()
 }
@@ -548,10 +564,6 @@ func (m *mockNode) GetActiveReceivingAccount(chainType iwallet.ChainType) (*mode
 func (m *mockNode) GetReceivingAccountsByChain(chainType iwallet.ChainType) ([]models.ReceivingAccount, error) {
 	return m.getReceivingAccountsByChainFunc(chainType)
 }
-func (m *mockNode) GetStripeConnectURL() (string, error) {
-	return m.getStripeConnectURLFunc()
-}
-
 // Escrow
 func (m *mockNode) BuildInitEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error) {
 	return m.buildInitEscrowInstructionsFunc(ctx, params)
@@ -584,6 +596,12 @@ func (m *mockNode) UnblockNode(peerID string) (bool, error) {
 func (m *mockNode) ExchangeRates() *wallet.ExchangeRateProvider {
 	return m.getExchangeRatesFunc()
 }
+func (m *mockNode) GetAllRates(base models.CurrencyCode, breakCache bool) (map[models.CurrencyCode]iwallet.Amount, error) {
+	if m.getAllRatesFunc != nil {
+		return m.getAllRatesFunc(base, breakCache)
+	}
+	return nil, nil
+}
 
 func (m *mockNode) AddPost(post *postsPb.Post, done chan<- struct{}) error {
 	return m.addPostFunc(post, done)
@@ -608,22 +626,6 @@ func (m *mockNode) GetPosts(ctx context.Context, peerID peer.ID, useCache bool) 
 }
 func (m *mockNode) IsGlobalBanned(peerID peer.ID) bool {
 	return false
-}
-
-func (m *mockNode) GetStripePublicKey() (string, error) {
-	return m.getStripePublicKeyFunc()
-}
-
-func (m *mockNode) CreateStripePaymentIntent(ctx context.Context, orderID models.OrderID, amount int64, currency string) (*stripe.PaymentIntent, error) {
-	return m.createStripePaymentIntentFunc(ctx, orderID, amount, currency)
-}
-
-func (m *mockNode) HandleStripeWebhook(payload []byte, signature string) error {
-	return m.handleStripeWebhookFunc(payload, signature)
-}
-
-func (m *mockNode) UpdateOrderPaymentStatus(orderID models.OrderID, paymentIntentID string, status string) error {
-	return m.updateOrderPaymentStatusFunc(orderID, paymentIntentID, status)
 }
 
 // Matrix E2EE Key Backup mock implementations
@@ -732,4 +734,8 @@ func (m *mockNodeManager) GetMaxImportZipSize() int64 {
 
 func (m *mockNodeManager) GetMaxImportVideoSize() int64 {
 	return 15 << 20 // 15MB default
+}
+
+func (m *mockNodeManager) GetExchangeRateService() contracts.ExchangeRateService {
+	return nil
 }

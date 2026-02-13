@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/h2non/filetype"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/xuri/excelize/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -341,7 +341,7 @@ func (g *Gateway) handlePOSTListingsImport(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Get node
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	// Process import
 	result, err := g.processListingsImport(node, xlsx, lang, images, videos)
@@ -354,7 +354,7 @@ func (g *Gateway) handlePOSTListingsImport(w http.ResponseWriter, r *http.Reques
 }
 
 // processListingsImport processes the Excel data and creates/updates listings
-func (g *Gateway) processListingsImport(node coreiface.CoreIface, xlsx *excelize.File, lang string, images, videos map[string][]byte) (*ImportResult, error) {
+func (g *Gateway) processListingsImport(node contracts.NodeService, xlsx *excelize.File, lang string, images, videos map[string][]byte) (*ImportResult, error) {
 	result := &ImportResult{
 		CreatedItems: []ImportedItem{},
 		UpdatedItems: []ImportedItem{},
@@ -660,7 +660,7 @@ func (g *Gateway) getCellValue(row []string, index int) string {
 }
 
 // processListingImages processes and uploads images for a listing
-func (g *Gateway) processListingImages(node coreiface.CoreIface, listing *pb.Listing, row []string, columns map[string]int, images map[string][]byte) error {
+func (g *Gateway) processListingImages(node contracts.NodeService, listing *pb.Listing, row []string, columns map[string]int, images map[string][]byte) error {
 	imagesStr := g.getCellValue(row, columns["images"])
 	if imagesStr == "" {
 		return nil
@@ -715,7 +715,7 @@ func (g *Gateway) processListingImages(node coreiface.CoreIface, listing *pb.Lis
 }
 
 // processListingVideo processes and uploads intro video for a listing
-func (g *Gateway) processListingVideo(node coreiface.CoreIface, listing *pb.Listing, row []string, columns map[string]int, videos map[string][]byte) error {
+func (g *Gateway) processListingVideo(node contracts.NodeService, listing *pb.Listing, row []string, columns map[string]int, videos map[string][]byte) error {
 	videoName := g.getCellValue(row, columns["introVideo"])
 	if videoName == "" {
 		return nil
@@ -1115,7 +1115,7 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 	}
 
 	// Get node
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	// Process import
 	result, err := g.processListingsImportJSON(node, payload.Listings, images, videos)
@@ -1128,7 +1128,7 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 }
 
 // processListingsImportJSON processes the JSON data and creates/updates listings
-func (g *Gateway) processListingsImportJSON(node coreiface.CoreIface, listings []JSONListingInput, images, videos map[string][]byte) (*ImportResult, error) {
+func (g *Gateway) processListingsImportJSON(node contracts.NodeService, listings []JSONListingInput, images, videos map[string][]byte) (*ImportResult, error) {
 	result := &ImportResult{
 		CreatedItems: []ImportedItem{},
 		UpdatedItems: []ImportedItem{},
@@ -1328,7 +1328,7 @@ func (g *Gateway) parseJSONListing(input JSONListingInput) (*pb.Listing, error) 
 }
 
 // processJSONListingImages processes and uploads images for a listing from JSON input
-func (g *Gateway) processJSONListingImages(node coreiface.CoreIface, listing *pb.Listing, imageNames []string, images map[string][]byte) error {
+func (g *Gateway) processJSONListingImages(node contracts.NodeService, listing *pb.Listing, imageNames []string, images map[string][]byte) error {
 	for _, imgName := range imageNames {
 		imgName = strings.TrimSpace(imgName)
 		if imgName == "" {
@@ -1377,7 +1377,7 @@ func (g *Gateway) processJSONListingImages(node coreiface.CoreIface, listing *pb
 }
 
 // processJSONListingVideo processes and uploads intro video for a listing from JSON input
-func (g *Gateway) processJSONListingVideo(node coreiface.CoreIface, listing *pb.Listing, videoName string, videos map[string][]byte) error {
+func (g *Gateway) processJSONListingVideo(node contracts.NodeService, listing *pb.Listing, videoName string, videos map[string][]byte) error {
 	videoName = strings.TrimSpace(videoName)
 	if videoName == "" {
 		return nil

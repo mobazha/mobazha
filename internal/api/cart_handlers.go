@@ -6,18 +6,17 @@ import (
 
 	"github.com/gorilla/mux"
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 func (g *Gateway) handleGETCartsItemsCount(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	count, _ := node.GetCartsTotalItemsCount()
 	sanitizedJSONResponse(w, count)
 }
 
 func (g *Gateway) handleGETCarts(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	carts, err := node.GetCarts()
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -28,7 +27,7 @@ func (g *Gateway) handleGETCarts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleClearCarts(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	err := node.ClearAllCarts()
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -53,7 +52,7 @@ func (g *Gateway) handleAddToCart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	err = node.AddToCart(pid, cartItem)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -78,7 +77,7 @@ func (g *Gateway) handleRemoveCartItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	err = node.RemoveCartItem(pid, cartItem)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())

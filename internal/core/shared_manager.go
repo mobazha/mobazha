@@ -262,6 +262,12 @@ func (im *SharedManager) GetMaxImportVideoSize() int64 {
 	return 15 << 20 // 15MB default
 }
 
+// GetExchangeRateService returns the shared ExchangeRateProvider as contracts.ExchangeRateService.
+// The ExchangeRateProvider is a singleton shared across all nodes/tenants.
+func (im *SharedManager) GetExchangeRateService() contracts.ExchangeRateService {
+	return im.ExchangeRateProvider
+}
+
 func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error) {
 	ipfsNode := im.GetIPFSNode()
 	if ipfsNode == nil {

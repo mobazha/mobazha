@@ -26,7 +26,7 @@ func (g *Gateway) handleGETProfile(w http.ResponseWriter, r *http.Request) {
 
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	var (
 		profile *models.Profile
@@ -61,7 +61,7 @@ func (g *Gateway) handleGETProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePOSTProfile(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	peerIDStr := mux.Vars(r)["peerID"]
 	if peerIDStr != "" && peerIDStr != node.Identity().String() {
@@ -92,7 +92,7 @@ func (g *Gateway) handlePOSTProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePUTProfile(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	peerIDStr := mux.Vars(r)["peerID"]
 	if peerIDStr != "" && peerIDStr != node.Identity().String() {
@@ -132,7 +132,7 @@ func (g *Gateway) handlePUTProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePOSTFetchProfiles(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	// useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 	useCache := false
@@ -233,7 +233,7 @@ func (g *Gateway) handlePOSTFetchProfiles(w http.ResponseWriter, r *http.Request
 }
 
 func (g *Gateway) handleSetModerator(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	var moderatorInfo models.ModeratorInfo
 	if err := json.NewDecoder(r.Body).Decode(&moderatorInfo); err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
@@ -259,7 +259,7 @@ func (g *Gateway) handleSetModerator(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleUnsetModerator(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	done := make(chan struct{})
 	err := node.RemoveSelfAsModerator(r.Context(), done)
@@ -284,7 +284,7 @@ func (g *Gateway) handleGetModerators(w http.ResponseWriter, r *http.Request) {
 	// useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 	useCache := false
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	if async {
 		id := r.URL.Query().Get("asyncID")
@@ -381,7 +381,7 @@ func (g *Gateway) handleGetModerators(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleBlockNode(w http.ResponseWriter, r *http.Request) {
 	_, peerID := path.Split(r.URL.Path)
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	_, err := node.BlockNode(peerID)
 	if err != nil {
@@ -394,7 +394,7 @@ func (g *Gateway) handleBlockNode(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleUnBlockNode(w http.ResponseWriter, r *http.Request) {
 	_, peerID := path.Split(r.URL.Path)
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	_, err := node.UnblockNode(peerID)
 	if err != nil {

@@ -99,11 +99,7 @@ func (g *Gateway) handleGetUserPreferences(w http.ResponseWriter, r *http.Reques
 }
 
 func (g *Gateway) handleGETExchangeRates(w http.ResponseWriter, r *http.Request) {
-	node, ok := getCoreIface(r)
-	if !ok {
-		http.Error(w, "Not available in SaaS mode", http.StatusNotImplemented)
-		return
-	}
+	node := getNodeService(r)
 
 	currencyCode := mux.Vars(r)["currencyCode"]
 
@@ -121,7 +117,7 @@ func (g *Gateway) handleGETExchangeRates(w http.ResponseWriter, r *http.Request)
 
 	// 检查是否请求强制刷新（用于获取最新的预言机数据）
 	forceRefresh := r.URL.Query().Get("refresh") == "true"
-	rates, err := node.ExchangeRates().GetAllRates(base, forceRefresh)
+	rates, err := node.GetAllRates(base, forceRefresh)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return

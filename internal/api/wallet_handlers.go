@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
@@ -13,7 +12,7 @@ func (g *Gateway) handleGETCurrencies(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleGETMnemonic(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	ret, err := node.GetMnemonic()
 	if err != nil {

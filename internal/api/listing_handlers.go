@@ -41,7 +41,7 @@ func (g *Gateway) handleGETListing(w http.ResponseWriter, r *http.Request) {
 	peerIDStr := mux.Vars(r)["peerID"]
 	slug := mux.Vars(r)["slug"]
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	reqCtx := extractRequestContext(r)
 
 	var (
@@ -105,7 +105,7 @@ func (g *Gateway) handleGETMyListing(w http.ResponseWriter, r *http.Request) {
 		slug = slugOrCid
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	if slug != "" {
 		listing, err = node.GetMyListingBySlug(slug)
@@ -135,7 +135,7 @@ func (g *Gateway) handleGETListingIndex(w http.ResponseWriter, r *http.Request) 
 		listingErr   error
 	)
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	reqCtx := extractRequestContext(r)
 
 	if peerIDStr == "" || peerIDStr == node.Identity().String() {
@@ -200,7 +200,7 @@ func (g *Gateway) handlePOSTListing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	if _, err := node.GetMyListingBySlug(listing.Slug); !errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusConflict, "listing exists. use PUT to update")
@@ -238,7 +238,7 @@ func (g *Gateway) handlePUTListing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	if _, err := node.GetMyListingBySlug(listing.Slug); errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusConflict, "listing does not exist. use POST to create")
@@ -265,7 +265,7 @@ func (g *Gateway) handlePUTListing(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleDELETEListing(w http.ResponseWriter, r *http.Request) {
 	slug := mux.Vars(r)["slug"]
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	if err := node.DeleteListing(slug, nil); err != nil {
 		if errors.Is(err, coreiface.ErrNotFound) {

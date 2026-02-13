@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/multiwallet/utxo"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -68,7 +69,7 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	// 获取订单信息
 	order, err := node.GetOrder(params.OrderID)
@@ -112,7 +113,7 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 // ============================================================================
 
 // handleGetRWATokenPaymentInfo 处理 RWA Token 支付
-func (g *Gateway) handleGetRWATokenPaymentInfo(w http.ResponseWriter, r *http.Request, node coreiface.CoreIface, params models.InitializeEscrowData, coinInfo iwallet.CoinInfo) {
+func (g *Gateway) handleGetRWATokenPaymentInfo(w http.ResponseWriter, r *http.Request, node contracts.NodeService, params models.InitializeEscrowData, coinInfo iwallet.CoinInfo) {
 	if !coinInfo.IsEthTypeChain() {
 		http.Error(w, "RWA Token only supports EVM chains", http.StatusBadRequest)
 		return
@@ -132,7 +133,7 @@ func (g *Gateway) handleGetRWATokenPaymentInfo(w http.ResponseWriter, r *http.Re
 }
 
 // handleGetUTXOPaymentInfo 处理 UTXO 链外部钱包支付（BTC/LTC/BCH/ZEC）
-func (g *Gateway) handleGetUTXOPaymentInfo(w http.ResponseWriter, r *http.Request, node coreiface.CoreIface, params models.InitializeEscrowData, coinInfo iwallet.CoinInfo) {
+func (g *Gateway) handleGetUTXOPaymentInfo(w http.ResponseWriter, r *http.Request, node contracts.NodeService, params models.InitializeEscrowData, coinInfo iwallet.CoinInfo) {
 	// 获取支付信息
 	// 支付方式由 Moderator 决定：
 	// - 无 Moderator → CANCELABLE（1-of-2 多签，买家可取消，卖家可确认）
@@ -194,7 +195,7 @@ func (g *Gateway) handleGetUTXOPaymentInfo(w http.ResponseWriter, r *http.Reques
 }
 
 // handleGetEVMPaymentInfo 处理智能合约托管支付（EVM/Solana）
-func (g *Gateway) handleGetEVMPaymentInfo(w http.ResponseWriter, r *http.Request, node coreiface.CoreIface, params models.InitializeEscrowData) {
+func (g *Gateway) handleGetEVMPaymentInfo(w http.ResponseWriter, r *http.Request, node contracts.NodeService, params models.InitializeEscrowData) {
 	paymentData, escrowAccount, instructions, err := node.BuildInitEscrowInstructions(
 		r.Context(),
 		params,

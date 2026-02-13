@@ -33,7 +33,7 @@ func (g *Gateway) handlePOSTPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	// If the post already exists in path, tell them to use PUT
 	if post.Slug != "" && node.PostExist(post.Slug) {
@@ -67,7 +67,7 @@ func (g *Gateway) handlePUTPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	if !node.PostExist(post.Slug) {
 		ErrorResponse(w, http.StatusConflict, "post does not exist. use POST to create")
@@ -87,7 +87,7 @@ func (g *Gateway) handlePUTPost(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleDELETEPost(w http.ResponseWriter, r *http.Request) {
 	_, slug := path.Split(r.URL.Path)
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	err := node.DeletePost(slug, nil)
 	if errors.Is(err, coreiface.ErrNotFound) {
@@ -109,7 +109,7 @@ func (g *Gateway) handleGETPosts(w http.ResponseWriter, r *http.Request) {
 		err   error
 	)
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	if peerIDStr == "" || peerIDStr == node.Identity().String() {
 		index, err = node.GetMyPosts()
 	} else {
@@ -137,7 +137,7 @@ func (g *Gateway) handleGETPosts(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleGETMyPost(w http.ResponseWriter, r *http.Request) {
 	slug := mux.Vars(r)["slug"]
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	signedPost, err := node.GetMyPostBySlug(slug)
 
@@ -157,7 +157,7 @@ func (g *Gateway) handleGETPost(w http.ResponseWriter, r *http.Request) {
 	peerIDStr := mux.Vars(r)["peerID"]
 	slug := mux.Vars(r)["slug"]
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	var (
 		post *pb.SignedPost
@@ -197,13 +197,9 @@ func (g *Gateway) handlePOSTSignMessage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	node, ok := getCoreIface(r)
-	if !ok {
-		http.Error(w, "Not available in SaaS mode", http.StatusNotImplemented)
-		return
-	}
+	node := getNodeService(r)
 
-	sig, pubKey, err := signPayload([]byte(req.Content), node.IPFSNode().PrivateKey)
+	sig, pubKey, err := node.SignMessage([]byte(req.Content))
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return

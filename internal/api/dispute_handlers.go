@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -23,7 +22,7 @@ func (g *Gateway) handlePOSTOpenDispute(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	done := make(chan struct{})
 	err = node.OpenDispute(models.OrderID(d.OrderID), d.Claim, done)
@@ -57,7 +56,7 @@ func (g *Gateway) handlePOSTCloseDispute(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	done := make(chan struct{})
 	err = node.CloseDispute(models.OrderID(d.OrderID), d.BuyerPercentage, d.VendorPercentage, d.Resolution, done)
@@ -89,7 +88,7 @@ func (g *Gateway) handlePOSTReleaseFunds(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	done := make(chan struct{})
 	err = node.ReleaseFunds(models.OrderID(rel.OrderID), iwallet.TransactionID(rel.TxID), done)
 	if err != nil {
@@ -120,7 +119,7 @@ func (g *Gateway) handlePOSTReleaseEscrow(w http.ResponseWriter, r *http.Request
 	}
 
 	done := make(chan struct{})
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	err = node.ReleaseFundsAfterTimeout(models.OrderID(rel.OrderID), done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -150,7 +149,7 @@ func (g *Gateway) handleGETReleaseFundsInstructions(w http.ResponseWriter, r *ht
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	coinType, instructions, err := node.GetReleaseFundsInstructions(models.OrderID(params.OrderID), params.InitiatorAddress)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())

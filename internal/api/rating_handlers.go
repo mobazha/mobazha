@@ -19,7 +19,7 @@ import (
 )
 
 func (g *Gateway) handleGETMyRatingIndex(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	index, err := node.GetMyRatings()
 	if errors.Is(err, coreiface.ErrNotFound) {
@@ -47,7 +47,7 @@ func (g *Gateway) handleGETPeerRatingsBySlug(w http.ResponseWriter, r *http.Requ
 	}
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	var index models.RatingIndex
 	var err error
@@ -87,7 +87,7 @@ func (g *Gateway) handleGETRatingIndex(w http.ResponseWriter, r *http.Request) {
 		slug = peerIDOrSlug
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	var (
 		index models.RatingIndex
@@ -152,7 +152,7 @@ func (g *Gateway) handleGETRating(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	rating, err := node.GetRating(r.Context(), id)
 
@@ -195,7 +195,7 @@ func (g *Gateway) handlePOSTFetchRatings(w http.ResponseWriter, r *http.Request)
 		marshaler    = protojson.MarshalOptions{Indent: "    "}
 	)
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	wg.Add(len(ratingIDs))
 	go func() {

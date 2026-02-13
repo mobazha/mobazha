@@ -30,7 +30,9 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/encryption"
 	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 // MobazhaNode holds all the components that make up a network node
@@ -533,6 +535,15 @@ func (n *MobazhaNode) ExchangeRates() *wallet.ExchangeRateProvider {
 	return n.exchangeRates
 }
 
+// GetAllRates implements contracts.ExchangeRateService.
+// Delegates to the internal ExchangeRateProvider.
+func (n *MobazhaNode) GetAllRates(base models.CurrencyCode, breakCache bool) (map[models.CurrencyCode]iwallet.Amount, error) {
+	if n.exchangeRates == nil {
+		return nil, fmt.Errorf("exchange rate provider not available")
+	}
+	return n.exchangeRates.GetAllRates(base, breakCache)
+}
+
 // GetNodeID returns the user ID for this node.
 func (n *MobazhaNode) GetNodeID() string {
 	return n.nodeID
@@ -550,6 +561,23 @@ func (n *MobazhaNode) Identity() peer.ID {
 // PrivKey returns the libp2p private key for this node.
 func (n *MobazhaNode) PrivKey() crypto.PrivKey {
 	return n.privKey
+}
+
+// SignMessage signs a payload with the node's identity key.
+// Returns (signature, publicKeyBytes, error).
+func (n *MobazhaNode) SignMessage(payload []byte) ([]byte, []byte, error) {
+	if n.privKey == nil {
+		return nil, nil, fmt.Errorf("private key not available")
+	}
+	sig, err := n.privKey.Sign(payload)
+	if err != nil {
+		return nil, nil, fmt.Errorf("signing payload: %w", err)
+	}
+	pubkey, err := n.privKey.GetPublic().Raw()
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting public key: %w", err)
+	}
+	return sig, pubkey, nil
 }
 
 // PeerHost returns the libp2p host for this node.

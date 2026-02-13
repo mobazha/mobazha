@@ -29,7 +29,7 @@ func (g *Gateway) handleGETFile(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Second*45)
 	defer cancel()
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	reader, err := node.GetFile(ctx, id)
 	if errors.Is(err, coreiface.ErrNotFound) {
@@ -63,7 +63,7 @@ func (g *Gateway) handlePOSTFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	fileType := r.FormValue("type")
 	var fileHash models.FileHash

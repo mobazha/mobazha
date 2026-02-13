@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -39,7 +39,7 @@ func (g *Gateway) handlePOSTPurchase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	orderID, amount, err := node.PurchaseListing(r.Context(), &data)
 	if err != nil {
@@ -65,7 +65,7 @@ func (g *Gateway) handlePOSTCheckoutBreakdown(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	orderTotals, err := node.EstimateOrderTotal(r.Context(), &data)
 	if err != nil {
@@ -84,7 +84,7 @@ func (g *Gateway) handlePOSTEstimateTotal(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	orderTotals, err := node.EstimateOrderTotal(r.Context(), &data)
 	if err != nil {
@@ -97,7 +97,7 @@ func (g *Gateway) handlePOSTEstimateTotal(w http.ResponseWriter, r *http.Request
 func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 	_, orderID := path.Split(r.URL.Path)
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	order, err := node.GetOrder(orderID)
 	if err != nil {
@@ -131,7 +131,7 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 
 // handlePOSTPayment 处理支付结果通知
 func (g *Gateway) handlePOSTPayment(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	var req struct {
 		PaymentData *models.PaymentData `json:"paymentData"`
@@ -156,7 +156,7 @@ func (g *Gateway) handlePOSTPayment(w http.ResponseWriter, r *http.Request) {
 	sanitizedJSONResponse(w, response)
 }
 
-func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, node coreiface.CoreIface, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
+func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, node contracts.NodeService, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
 	orders, total, err := node.GetPurchases(stateFilters, searchTerm, sortByAscending, sortByRead, limit, exclude)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
@@ -248,7 +248,7 @@ func (g *Gateway) handlePOSTPurchases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	g.getPurchasesImpl(w, node, convertOrderStates(query.OrderStates), query.SearchTerm, query.SortByAscending, query.SortByRead, query.Limit, query.Exclude)
 }
@@ -260,12 +260,12 @@ func (g *Gateway) handleGETPurchases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	g.getPurchasesImpl(w, node, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
 }
 
-func (g *Gateway) getSalesImpl(w http.ResponseWriter, node coreiface.CoreIface, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
+func (g *Gateway) getSalesImpl(w http.ResponseWriter, node contracts.NodeService, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
 	orders, total, err := node.GetSales(stateFilters, searchTerm, sortByAscending, sortByRead, limit, exclude)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
@@ -355,7 +355,7 @@ func (g *Gateway) handleGETSales(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	g.getSalesImpl(w, node, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
 }
@@ -369,12 +369,12 @@ func (g *Gateway) handlePostSales(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	g.getSalesImpl(w, node, convertOrderStates(query.OrderStates), query.SearchTerm, query.SortByAscending, query.SortByRead, query.Limit, query.Exclude)
 }
 
-func (g *Gateway) getCasesImpl(w http.ResponseWriter, node coreiface.CoreIface, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
+func (g *Gateway) getCasesImpl(w http.ResponseWriter, node contracts.NodeService, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
 	cases, total, err := node.GetCases(stateFilters, searchTerm, sortByAscending, sortByRead, limit, exclude)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
@@ -468,7 +468,7 @@ func (g *Gateway) handleGETCases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	g.getCasesImpl(w, node, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
 }
@@ -482,7 +482,7 @@ func (g *Gateway) handlePostCases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	g.getCasesImpl(w, node, convertOrderStates(query.OrderStates), query.SearchTerm, query.SortByAscending, query.SortByRead, query.Limit, query.Exclude)
 }
@@ -490,7 +490,7 @@ func (g *Gateway) handlePostCases(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleGetCase(w http.ResponseWriter, r *http.Request) {
 	_, orderID := path.Split(r.URL.Path)
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	disputeCase, err := node.GetCase(orderID)
 	if err != nil {
@@ -506,7 +506,7 @@ func (g *Gateway) handlePostSpendForOrder(w http.ResponseWriter, r *http.Request
 }
 
 func (g *Gateway) handleGETOrderCancelInstructions(w http.ResponseWriter, r *http.Request) {
-	g.handleOrderInstructions(w, r, func(node coreiface.CoreIface, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
+	g.handleOrderInstructions(w, r, func(node contracts.NodeService, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
 		return node.GetRefundOrderInstructions(orderID, initiatorAddress)
 	})
 }
@@ -524,7 +524,7 @@ func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	done := make(chan struct{})
 	err = node.CancelOrder(models.OrderID(cancelParam.OrderID), iwallet.TransactionID(cancelParam.TransactionID), done)
@@ -558,7 +558,7 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	order, err := node.GetOrder(args.OrderID)
 	if err != nil {
@@ -637,7 +637,7 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	done := make(chan struct{})
 	if !conf.Reject {
@@ -693,7 +693,7 @@ func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Requ
 		CryptocurrencyDelivery: fulfillParam.CryptocurrencyDelivery,
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	if receivingAccountID >= 0 {
 		receivingAccount, err := node.GetReceivingAccountByID(receivingAccountID)
@@ -722,7 +722,7 @@ func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Requ
 }
 
 func (g *Gateway) handleGETOrderRefundInstructions(w http.ResponseWriter, r *http.Request) {
-	g.handleOrderInstructions(w, r, func(node coreiface.CoreIface, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
+	g.handleOrderInstructions(w, r, func(node contracts.NodeService, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
 		return node.GetRefundOrderInstructions(orderID, initiatorAddress)
 	})
 }
@@ -740,7 +740,7 @@ func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	done := make(chan struct{})
 	err = node.RefundOrder(models.OrderID(refundParam.OrderID), iwallet.TransactionID(refundParam.TransactionID), done)
@@ -760,7 +760,7 @@ func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) 
 }
 
 func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *http.Request) {
-	g.handleOrderInstructions(w, r, func(node coreiface.CoreIface, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
+	g.handleOrderInstructions(w, r, func(node contracts.NodeService, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
 		return node.GetCompleteOrderInstructions(orderID, initiatorAddress)
 	})
 }
@@ -769,7 +769,7 @@ func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *h
 func (g *Gateway) handleOrderInstructions(
 	w http.ResponseWriter,
 	r *http.Request,
-	getInstructions func(coreiface.CoreIface, models.OrderID, string) (iwallet.CoinType, any, error),
+	getInstructions func(contracts.NodeService, models.OrderID, string) (iwallet.CoinType, any, error),
 ) {
 	type Params struct {
 		OrderID          string `json:"orderID"`
@@ -783,7 +783,7 @@ func (g *Gateway) handleOrderInstructions(
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	coinType, instructions, err := getInstructions(node, models.OrderID(args.OrderID), args.InitiatorAddress)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -830,7 +830,7 @@ func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	done := make(chan struct{})
 	err = node.CompleteOrder(models.OrderID(completeParam.OrderID), iwallet.TransactionID(completeParam.TxID), completeParam.Ratings, !completeParam.Anonymous, done)
@@ -887,7 +887,7 @@ func (g *Gateway) handleGETPaymentRemaining(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	// Get order
 	order, err := node.GetOrder(orderID)
@@ -976,7 +976,7 @@ func (g *Gateway) handlePOSTCancelPartialPayment(w http.ResponseWriter, r *http.
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	// Get order
 	order, err := node.GetOrder(orderID)
@@ -1024,7 +1024,7 @@ func (g *Gateway) handleDELETEPaymentWatch(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	// Stop watching the payment address
 	if err := node.StopWatchingPayment(orderID); err != nil {

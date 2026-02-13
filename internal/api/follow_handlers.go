@@ -16,7 +16,7 @@ func (g *Gateway) handleGETFollowers(w http.ResponseWriter, r *http.Request) {
 
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	reqCtx := extractRequestContext(r)
 
 	var (
@@ -58,7 +58,7 @@ func (g *Gateway) handleGETFollowing(w http.ResponseWriter, r *http.Request) {
 
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	reqCtx := extractRequestContext(r)
 
 	var (
@@ -103,7 +103,7 @@ func (g *Gateway) handleGETFollowsMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	ret, err := node.FollowsMe(pid)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -124,7 +124,7 @@ func (g *Gateway) handlePOSTFollow(w http.ResponseWriter, r *http.Request) {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	err = node.FollowNode(pid, nil)
 	if errors.Is(err, coreiface.ErrBadRequest) {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
@@ -143,7 +143,7 @@ func (g *Gateway) handlePOSTUnFollow(w http.ResponseWriter, r *http.Request) {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 	err = node.UnfollowNode(pid, nil)
 	if errors.Is(err, coreiface.ErrBadRequest) {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())

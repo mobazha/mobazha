@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 )
 
 func (g *Gateway) handleGetNotifications(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +31,7 @@ func (g *Gateway) handleGetNotifications(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	notifications, total, err := node.GetNotifications(offsetID, l, filters)
 	if err != nil {
@@ -76,7 +75,7 @@ func (g *Gateway) handleGetNotifications(w http.ResponseWriter, r *http.Request)
 func (g *Gateway) handlePOSTMarkNotificationMessageAsRead(w http.ResponseWriter, r *http.Request) {
 	notifID := mux.Vars(r)["notifID"]
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	err := node.MarkNotificationAsRead(notifID)
 	if err != nil {
@@ -87,7 +86,7 @@ func (g *Gateway) handlePOSTMarkNotificationMessageAsRead(w http.ResponseWriter,
 }
 
 func (g *Gateway) handlePOSTMarkNotificationsMessageAsRead(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	err := node.MarkAllNotificationsAsRead()
 	if err != nil {
@@ -97,9 +96,9 @@ func (g *Gateway) handlePOSTMarkNotificationsMessageAsRead(w http.ResponseWriter
 	sanitizedJSONResponse(w, struct{}{})
 }
 
-// handleGetNotificationCount 获取通知未读数量（轻量级 API，用于轮询）
+// handleGetNotificationCount returns unread and total notification counts (lightweight polling API).
 func (g *Gateway) handleGetNotificationCount(w http.ResponseWriter, r *http.Request) {
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	unread, err := node.GetNotificationsUnreadCount()
 	if err != nil {
@@ -107,7 +106,6 @@ func (g *Gateway) handleGetNotificationCount(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// 使用专门的 count 方法，不加载通知数据
 	total, err := node.GetNotificationsTotalCount()
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -125,7 +123,7 @@ func (g *Gateway) handleGetNotificationCount(w http.ResponseWriter, r *http.Requ
 	})
 }
 
-// handleBatchNotifications 批量操作通知
+// handleBatchNotifications handles batch notification operations.
 func (g *Gateway) handleBatchNotifications(w http.ResponseWriter, r *http.Request) {
 	type batchRequest struct {
 		Action string   `json:"action"` // "markAsRead" or "delete"
@@ -143,7 +141,7 @@ func (g *Gateway) handleBatchNotifications(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	node := r.Context().Value(nodeContextKey).(coreiface.CoreIface)
+	node := getNodeService(r)
 
 	var err error
 	switch req.Action {

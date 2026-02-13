@@ -24,20 +24,20 @@ type nodeConfig struct {
 }
 
 func (g *Gateway) handleGETConfig(w http.ResponseWriter, r *http.Request) {
-	node, ok := getCoreIface(r)
-	if !ok {
-		http.Error(w, "Not available in SaaS mode", http.StatusNotImplemented)
-		return
-	}
+	ns := getNodeService(r)
 
 	ret := nodeConfig{
-		PeerID:  node.Identity().String(),
-		Testnet: node.UsingTestnet(),
-		Tor:     node.UsingTorMode(),
+		PeerID:  ns.Identity().String(),
+		Testnet: ns.UsingTestnet(),
 	}
 
-	for chain := range node.Multiwallet() {
-		ret.Wallets = append(ret.Wallets, chain.String())
+	// Tor and Wallets are only available on full nodes (CoreIface).
+	// In SaaS mode these default to false/empty, which is correct.
+	if ci, ok := getCoreIface(r); ok {
+		ret.Tor = ci.UsingTorMode()
+		for chain := range ci.Multiwallet() {
+			ret.Wallets = append(ret.Wallets, chain.String())
+		}
 	}
 
 	sanitizedJSONResponse(w, &ret)

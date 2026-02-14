@@ -56,7 +56,7 @@ func (g *Gateway) handleGETListing(w http.ResponseWriter, r *http.Request) {
 			listing, err = node.GetMyListingBySlug(listingIDStr)
 		}
 
-		if err == nil && listing != nil {
+		if err == nil && listing != nil && listing.Listing != nil && listing.Listing.VendorID != nil {
 			pid, _ := peer.Decode(listing.Listing.VendorID.PeerID)
 			if node.IsGlobalBanned(pid) {
 				err = ErrGlobalBannedPeerID

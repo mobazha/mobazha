@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -28,6 +27,9 @@ func TestListingHandlers(t *testing.T) {
 						CID:  "h",
 					})
 					return i, nil
+				}
+				n.getMyRatingsFunc = func() (models.RatingIndex, error) {
+					return nil, nil
 				}
 			},
 			statusCode: http.StatusOK,
@@ -56,6 +58,9 @@ func TestListingHandlers(t *testing.T) {
 						CID:  "h",
 					})
 					return i, nil
+				}
+				n.getRatingsFunc = func(ctx context.Context, pid peer.ID, useCache bool) (models.RatingIndex, error) {
+					return nil, nil
 				}
 			},
 			statusCode: http.StatusOK,
@@ -91,6 +96,9 @@ func TestListingHandlers(t *testing.T) {
 					}
 					return i, nil
 				}
+				n.getRatingsFunc = func(ctx context.Context, pid peer.ID, useCache bool) (models.RatingIndex, error) {
+					return nil, nil
+				}
 			},
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
@@ -119,7 +127,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "invalid peer id: failed to parse peer ID: selected encoding not supported"}`)), nil
+				return []byte(wrapErrorMessage("invalid peer id: failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -132,9 +140,10 @@ func TestListingHandlers(t *testing.T) {
 					return nil, coreiface.ErrNotFound
 				}
 			},
-			statusCode: http.StatusNotFound,
+			// Handler returns empty listing index (200) for ErrNotFound, not 404
+			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found"}`)), nil
+				return marshalAndSanitizeJSON(models.ListingIndex(nil))
 			},
 		},
 		{
@@ -149,7 +158,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal"}`)), nil
+				return []byte(wrapErrorMessage("internal")), nil
 			},
 		},
 		{
@@ -237,23 +246,20 @@ func TestListingHandlers(t *testing.T) {
 			},
 		},
 		{
+			// When CID decode fails, handler falls back to GetMyListingBySlug as a slug lookup.
+			// If the slug is also not found, handler returns 404.
 			name:   "Get listing by invalid CID",
 			path:   "/v1/ob/listing/asdfadf",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
-				n.getListingByCIDFunc = func(ctx context.Context, cid cid.Cid) (*pb.SignedListing, error) {
-					l := &pb.SignedListing{
-						Listing: &pb.Listing{
-							Slug: "t-shirt",
-						},
-					}
-					return l, nil
+				n.getMyListingBySlugFunc = func(slug string) (*pb.SignedListing, error) {
+					return nil, coreiface.ErrNotFound
 				}
 			},
-			statusCode: http.StatusBadRequest,
+			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "invalid listing id: selected encoding not supported"}`)), nil
+				return []byte(wrapErrorMessage("not found")), nil
 			},
 		},
 		{
@@ -273,7 +279,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "invalid peer id: failed to parse peer ID: selected encoding not supported"}`)), nil
+				return []byte(wrapErrorMessage("invalid peer id: failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -288,7 +294,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found"}`)), nil
+				return []byte(wrapErrorMessage("not found")), nil
 			},
 		},
 		{
@@ -303,7 +309,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal"}`)), nil
+				return []byte(wrapErrorMessage("internal")), nil
 			},
 		},
 		{
@@ -368,7 +374,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found"}`)), nil
+				return []byte(wrapErrorMessage("not found")), nil
 			},
 		},
 		{
@@ -383,7 +389,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal"}`)), nil
+				return []byte(wrapErrorMessage("internal")), nil
 			},
 		},
 		{
@@ -422,7 +428,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "error unmarshaling listing: unexpected EOF"}`)), nil
+				return []byte(wrapErrorMessage("error unmarshaling listing: proto: unexpected EOF")), nil
 			},
 		},
 		{
@@ -440,7 +446,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusConflict,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "listing exists. use PUT to update"}`)), nil
+				return []byte(wrapErrorMessage("listing exists. use PUT to update")), nil
 			},
 		},
 		{
@@ -458,7 +464,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "bad request"}`)), nil
+				return []byte(wrapErrorMessage("bad request")), nil
 			},
 		},
 		{
@@ -476,7 +482,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal"}`)), nil
+				return []byte(wrapErrorMessage("internal")), nil
 			},
 		},
 		{
@@ -515,7 +521,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "error unmarshaling listing: unexpected EOF"}`)), nil
+				return []byte(wrapErrorMessage("error unmarshaling listing: proto: unexpected EOF")), nil
 			},
 		},
 		{
@@ -533,7 +539,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusConflict,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "listing does not exist. use POST to create"}`)), nil
+				return []byte(wrapErrorMessage("listing does not exist. use POST to create")), nil
 			},
 		},
 		{
@@ -551,7 +557,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "bad request"}`)), nil
+				return []byte(wrapErrorMessage("bad request")), nil
 			},
 		},
 		{
@@ -569,7 +575,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal"}`)), nil
+				return []byte(wrapErrorMessage("internal")), nil
 			},
 		},
 		{
@@ -599,7 +605,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found"}`)), nil
+				return []byte(wrapErrorMessage("not found")), nil
 			},
 		},
 		{
@@ -614,7 +620,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal"}`)), nil
+				return []byte(wrapErrorMessage("internal")), nil
 			},
 		},
 	})

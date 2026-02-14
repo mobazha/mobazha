@@ -42,7 +42,7 @@ func (g *Gateway) handleGETPeerRatingsBySlug(w http.ResponseWriter, r *http.Requ
 
 	pid, perr := peer.Decode(peerIDStr)
 	if perr != nil {
-		ErrorResponse(w, http.StatusBadRequest, wrapError(fmt.Errorf("invalid peer id: %s", perr.Error())))
+		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid peer id: %s", perr.Error()))
 		return
 	}
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
@@ -148,7 +148,7 @@ func (g *Gateway) handleGETRating(w http.ResponseWriter, r *http.Request) {
 
 	id, cerr := cid.Decode(ratingIDStr)
 	if cerr != nil {
-		ErrorResponse(w, http.StatusBadRequest, wrapError(fmt.Errorf("invalid rating id: %s", cerr.Error())))
+		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid rating id: %s", cerr.Error()))
 		return
 	}
 

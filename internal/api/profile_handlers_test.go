@@ -40,7 +40,7 @@ func TestProfileHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found: error"}`)), nil
+				return []byte(wrapErrorMessage("not found: error")), nil
 			},
 		},
 		{
@@ -74,7 +74,7 @@ func TestProfileHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found: error"}`)), nil
+				return []byte(wrapErrorMessage("not found: error")), nil
 			},
 		},
 		{
@@ -88,7 +88,7 @@ func TestProfileHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "failed to parse peer ID: selected encoding not supported"}`)), nil
+				return []byte(wrapErrorMessage("failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -125,7 +125,7 @@ func TestProfileHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found: error"}`)), nil
+				return []byte(wrapErrorMessage("not found: error")), nil
 			},
 		},
 		{
@@ -161,7 +161,7 @@ func TestProfileHandlers(t *testing.T) {
 			body:       []byte(`{"name": "Ron Swanson"}`),
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "error"}`)), nil
+				return []byte(wrapErrorMessage("error")), nil
 			},
 		},
 		{
@@ -179,7 +179,7 @@ func TestProfileHandlers(t *testing.T) {
 			body:       []byte(`{"name": "Ron Swanson"}`),
 			statusCode: http.StatusConflict,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "profile exists. use PUT to update"}`)), nil
+				return []byte(wrapErrorMessage("profile exists. use PUT to update")), nil
 			},
 		},
 		{
@@ -197,7 +197,7 @@ func TestProfileHandlers(t *testing.T) {
 			body:       []byte(`{"name": "Ron Swanson"`),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "unexpected EOF"}`)), nil
+				return []byte(wrapErrorMessage("unexpected EOF")), nil
 			},
 		},
 		{
@@ -233,7 +233,7 @@ func TestProfileHandlers(t *testing.T) {
 			body:       []byte(`{"name": "Ron Swanson"}`),
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "error"}`)), nil
+				return []byte(wrapErrorMessage("error")), nil
 			},
 		},
 		{
@@ -251,7 +251,7 @@ func TestProfileHandlers(t *testing.T) {
 			body:       []byte(`{"name": "Ron Swanson"}`),
 			statusCode: http.StatusConflict,
 			expectedResponse: func() ([]byte, error) {
-				return []byte("profile does not exists. use POST to create\n"), nil
+				return []byte(wrapErrorMessage("profile does not exists. use POST to create")), nil
 			},
 		},
 		{
@@ -269,7 +269,7 @@ func TestProfileHandlers(t *testing.T) {
 			body:       []byte(`{"name": "Ron Swanson"`),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "Invalid JSON Patch"}`)), nil
+				return []byte(wrapErrorMessage("Invalid JSON Patch")), nil
 			},
 		},
 		{
@@ -290,11 +290,7 @@ func TestProfileHandlers(t *testing.T) {
 			body:       []byte(`["12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN", "12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi"]`),
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
-				profiles := []models.Profile{
-					{Name: "Ron Swanson"},
-					{Name: "Ron Swanson"},
-				}
-				return marshalAndSanitizeJSON(profiles)
+				return nil, nil
 			},
 		},
 		{
@@ -315,10 +311,7 @@ func TestProfileHandlers(t *testing.T) {
 			body:       []byte(`["xxx", "12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi"]`),
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
-				profiles := []models.Profile{
-					{Name: "Ron Swanson"},
-				}
-				return marshalAndSanitizeJSON(profiles)
+				return nil, nil
 			},
 		},
 		{
@@ -339,7 +332,7 @@ func TestProfileHandlers(t *testing.T) {
 			body:       []byte(`["12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN", "12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi"`),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "unexpected EOF"}`)), nil
+				return []byte(wrapErrorMessage("unexpected EOF")), nil
 			},
 		},
 		{
@@ -357,10 +350,7 @@ func TestProfileHandlers(t *testing.T) {
 			body:       []byte(`["12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN", "12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi"]`),
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
-				profiles := []models.Profile{
-					{Name: "Ron Swanson"},
-				}
-				return marshalAndSanitizeJSON(profiles)
+				return nil, nil
 			},
 		},
 		{

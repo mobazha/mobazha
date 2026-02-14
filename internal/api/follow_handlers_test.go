@@ -61,7 +61,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found: error"}`)), nil
+				return []byte(wrapErrorMessage("not found: error")), nil
 			},
 		},
 		{
@@ -110,7 +110,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found: error"}`)), nil
+				return []byte(wrapErrorMessage("not found: error")), nil
 			},
 		},
 		{
@@ -148,7 +148,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "failed to parse peer ID: selected encoding not supported"}`)), nil
+				return []byte(wrapErrorMessage("failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -162,7 +162,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found: error"}`)), nil
+				return []byte(wrapErrorMessage("not found: error")), nil
 			},
 		},
 		{
@@ -200,7 +200,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "failed to parse peer ID: selected encoding not supported"}`)), nil
+				return []byte(wrapErrorMessage("failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -214,7 +214,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found: error"}`)), nil
+				return []byte(wrapErrorMessage("not found: error")), nil
 			},
 		},
 		{
@@ -245,7 +245,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "error"}`)), nil
+				return []byte(wrapErrorMessage("error")), nil
 			},
 		},
 		{
@@ -259,7 +259,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "failed to parse peer ID: selected encoding not supported"}`)), nil
+				return []byte(wrapErrorMessage("failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -290,7 +290,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "error"}`)), nil
+				return []byte(wrapErrorMessage("error")), nil
 			},
 		},
 		{
@@ -304,7 +304,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "failed to parse peer ID: selected encoding not supported"}`)), nil
+				return []byte(wrapErrorMessage("failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 	})

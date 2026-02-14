@@ -359,11 +359,13 @@ func TestOrder_Payments(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// PutMessage is a pure storage method; duplicate check should be in the processing pipeline.
+	// Calling PutMessage with the same TransactionID should succeed (overwrite).
 	err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
 		TransactionID: id0,
 	}))
-	if err != ErrDuplicateTransaction {
-		t.Errorf("Failed to return duplicate transaction error")
+	if err != nil {
+		t.Errorf("PutMessage should allow overwriting PaymentSent, got error: %s", err)
 	}
 
 	paymentSent, err := order.PaymentSentMessage()
@@ -1126,7 +1128,7 @@ func TestOrder_CanRefund(t *testing.T) {
 			canRefund: false,
 		},
 		{
-			// Cancelable
+			// Cancelable - vendor can refund from 1-of-2 address
 			setup: func(order *Order) error {
 				order.SerializedOrderReject = []byte{0x00}
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
@@ -1139,7 +1141,7 @@ func TestOrder_CanRefund(t *testing.T) {
 				}))
 			},
 			ourRole:   RoleVendor,
-			canRefund: false,
+			canRefund: true,
 		},
 		{
 			// Non nil cancel
@@ -1449,10 +1451,15 @@ func TestOrder_CanConfirm(t *testing.T) {
 		canConfirm bool
 	}{
 		{
-			// Success
+			// Success - OrderOpen + PaymentSent must both exist for vendor to confirm
 			setup: func(order *Order) error {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
-				return err
+				if err != nil {
+					return err
+				}
+				return order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
+					Method: pb.PaymentSent_DIRECT,
+				}))
 			},
 			ourRole:    RoleVendor,
 			canConfirm: true,

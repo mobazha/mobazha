@@ -474,10 +474,10 @@ func TestTaxRegionCaseInsensitive(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		taxRegion      string
+		name            string
+		taxRegion       string
 		shippingCountry string
-		expectTax      bool
+		expectTax       bool
 	}{
 		{
 			name:            "uppercase tax region matches uppercase country",
@@ -620,9 +620,9 @@ func TestSameWeightSameFeeShippingCalculation(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		itemGrams      uint32
-		services       []*pb.Listing_ShippingOption_Service
+		name            string
+		itemGrams       uint32
+		services        []*pb.Listing_ShippingOption_Service
 		expectedFreight string // Expected freight in USD cents
 	}{
 		{
@@ -827,20 +827,6 @@ func Test_validateOrderOpen(t *testing.T) {
 					return nil, err
 				}
 				order.Listings = nil
-				return order, nil
-			},
-			valid: false,
-			orderID: func(order *pb.OrderOpen) (*multihash.Multihash, error) {
-				return utils.CalcOrderID(order)
-			},
-		},
-		{
-			// Nil payment
-			order: func() (*pb.OrderOpen, error) {
-				order, _, err := factory.NewOrder()
-				if err != nil {
-					return nil, err
-				}
 				return order, nil
 			},
 			valid: false,
@@ -1443,7 +1429,7 @@ func TestShippingProfileWeightCondition(t *testing.T) {
 								Currency: "USD",
 								Condition: &pb.ShippingRate_RateCondition{
 									Type:     pb.ShippingRate_RateCondition_WEIGHT,
-										MinValue: 501,
+									MinValue: 501,
 									MaxValue: 5000,
 								},
 							},

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -42,7 +41,7 @@ func TestImageHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "invalid image id: selected encoding not supported"}`)), nil
+				return []byte(wrapErrorMessage("invalid image id: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -56,7 +55,7 @@ func TestImageHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found"}`)), nil
+				return []byte(wrapErrorMessage("not found")), nil
 			},
 		},
 		{
@@ -70,7 +69,7 @@ func TestImageHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal"}`)), nil
+				return []byte(wrapErrorMessage("internal")), nil
 			},
 		},
 		{
@@ -98,7 +97,7 @@ func TestImageHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "invalid peer id: failed to parse peer ID: selected encoding not supported"}`)), nil
+				return []byte(wrapErrorMessage("invalid peer id: failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -112,7 +111,7 @@ func TestImageHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found"}`)), nil
+				return []byte(wrapErrorMessage("not found")), nil
 			},
 		},
 		{
@@ -126,7 +125,7 @@ func TestImageHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal"}`)), nil
+				return []byte(wrapErrorMessage("internal")), nil
 			},
 		},
 		{
@@ -154,7 +153,7 @@ func TestImageHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "invalid peer id: failed to parse peer ID: selected encoding not supported"}`)), nil
+				return []byte(wrapErrorMessage("invalid peer id: failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -168,7 +167,7 @@ func TestImageHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found"}`)), nil
+				return []byte(wrapErrorMessage("not found")), nil
 			},
 		},
 		{
@@ -182,7 +181,7 @@ func TestImageHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal"}`)), nil
+				return []byte(wrapErrorMessage("internal")), nil
 			},
 		},
 		{
@@ -222,7 +221,7 @@ func TestImageHandlers(t *testing.T) {
 			body:       []byte(``),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "EOF"}`)), nil
+				return []byte(wrapErrorMessage("EOF")), nil
 			},
 		},
 		{
@@ -237,7 +236,7 @@ func TestImageHandlers(t *testing.T) {
 			body:       []byte(`{"avatar": "aa"}`),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "bad request"}`)), nil
+				return []byte(wrapErrorMessage("bad request")), nil
 			},
 		},
 		{
@@ -252,7 +251,7 @@ func TestImageHandlers(t *testing.T) {
 			body:       []byte(`{"avatar": "aa"}`),
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal server error"}`)), nil
+				return []byte(wrapErrorMessage("internal server error")), nil
 			},
 		},
 		{
@@ -292,7 +291,7 @@ func TestImageHandlers(t *testing.T) {
 			body:       []byte(``),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "EOF"}`)), nil
+				return []byte(wrapErrorMessage("EOF")), nil
 			},
 		},
 		{
@@ -307,7 +306,7 @@ func TestImageHandlers(t *testing.T) {
 			body:       []byte(`{"header": "aa"}`),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "bad request"}`)), nil
+				return []byte(wrapErrorMessage("bad request")), nil
 			},
 		},
 		{
@@ -322,12 +321,12 @@ func TestImageHandlers(t *testing.T) {
 			body:       []byte(`{"header": "aa"}`),
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal server error"}`)), nil
+				return []byte(wrapErrorMessage("internal server error")), nil
 			},
 		},
 		{
 			name:   "Post image",
-			path:   "/v1/ob/images",
+			path:   "/v1/ob/productimages",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setProductImageFunc = func(b64ImageData string, filename string) (models.ImageHashes, error) {
@@ -355,7 +354,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post image bad data",
-			path:   "/v1/ob/images",
+			path:   "/v1/ob/productimages",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setProductImageFunc = func(b64ImageData string, filename string) (models.ImageHashes, error) {
@@ -367,12 +366,12 @@ func TestImageHandlers(t *testing.T) {
 			body:       []byte(``),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "EOF"}`)), nil
+				return []byte(wrapErrorMessage("EOF")), nil
 			},
 		},
 		{
 			name:   "Post image bad request",
-			path:   "/v1/ob/images",
+			path:   "/v1/ob/productimages",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setProductImageFunc = func(b64ImageData string, filename string) (models.ImageHashes, error) {
@@ -382,12 +381,12 @@ func TestImageHandlers(t *testing.T) {
 			body:       []byte(`[{"image": "aa", "filename": "image.jpg"}]`),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "bad request"}`)), nil
+				return []byte(wrapErrorMessage("bad request")), nil
 			},
 		},
 		{
 			name:   "Post image internal error",
-			path:   "/v1/ob/images",
+			path:   "/v1/ob/productimages",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setProductImageFunc = func(b64ImageData string, filename string) (models.ImageHashes, error) {
@@ -397,7 +396,7 @@ func TestImageHandlers(t *testing.T) {
 			body:       []byte(`[{"image": "aa", "filename": "image.jpg"}]`),
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal server error"}`)), nil
+				return []byte(wrapErrorMessage("internal server error")), nil
 			},
 		},
 	})

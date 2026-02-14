@@ -18,6 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
+	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/channels"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -27,7 +28,6 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
-	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -196,7 +196,7 @@ func MockNode() (*MobazhaNode, error) {
 
 	node.orderProcessor = orders.NewOrderProcessor(&orders.Config{
 		Identity:             ipfsNode.Identity,
-		Signer:              signer,
+		Signer:               signer,
 		Db:                   r.DB(),
 		Multiwallet:          node.multiwallet,
 		Messenger:            node.messenger,
@@ -399,7 +399,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 
 		node.orderProcessor = orders.NewOrderProcessor(&orders.Config{
 			Identity:             ipfsNode.Identity,
-			Signer:              signer,
+			Signer:               signer,
 			Db:                   r.DB(),
 			Messenger:            node.messenger,
 			Multiwallet:          node.multiwallet,

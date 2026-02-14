@@ -2,10 +2,13 @@ package api
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"strings"
 	"testing"
 
 	tnet "github.com/libp2p/go-libp2p-testing/net"
@@ -38,7 +41,7 @@ func runAPITests(t *testing.T, tests apiTests) {
 	gateway := &Gateway{
 		nodeManager: &mockNodeManager{
 			nodes: map[string]contracts.NodeService{
-				"test_peer_id": node,
+				"test_user_id": node,
 			},
 		},
 		config: &GatewayConfig{},
@@ -74,8 +77,24 @@ func runAPITests(t *testing.T, tests apiTests) {
 			log.Fatal(err)
 		}
 		if expected != nil && !bytes.Equal(response, expected) {
-			t.Errorf("%s: Expected response %s, got %s", test.name, string(expected), string(response))
-			continue
+			// Normalize non-breaking spaces (U+00A0) to regular spaces for comparison.
+			// protojson error messages use NBSP which differs from regular space in test expectations.
+			normalizedExpected := strings.ReplaceAll(string(expected), "\u00a0", " ")
+			normalizedResponse := strings.ReplaceAll(string(response), "\u00a0", " ")
+			if normalizedExpected == normalizedResponse {
+				continue
+			}
+			// 尝试 JSON 语义比较（忽略空白和 key 顺序差异）
+			var expectedJSON, actualJSON interface{}
+			if json.Unmarshal([]byte(normalizedExpected), &expectedJSON) == nil && json.Unmarshal([]byte(normalizedResponse), &actualJSON) == nil {
+				if !reflect.DeepEqual(expectedJSON, actualJSON) {
+					t.Errorf("%s: Expected response %q, got %q", test.name, normalizedExpected, normalizedResponse)
+					continue
+				}
+			} else {
+				t.Errorf("%s: Expected response %q, got %q", test.name, normalizedExpected, normalizedResponse)
+				continue
+			}
 		}
 	}
 }

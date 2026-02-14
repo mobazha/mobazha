@@ -111,7 +111,7 @@ type CoinInfo struct {
 var (
 	CtMockInfo = CoinInfo{
 		Chain:       ChainMock,
-		Symbol:      "MOCK",
+		Symbol:      "MCK",
 		IsNative:    true,
 		Decimals:    0,
 		Description: "Mock",
@@ -408,6 +408,11 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 	// 检查是否为测试币种
 	if s == string(CtTestCoin) {
 		return CtTestCoinInfo, nil
+	}
+
+	// MCK 是 CurrencyDefinitions 中 Mock 币种的代码，映射到 ChainMock 钱包
+	if s == "MCK" {
+		return CtMockInfo, nil
 	}
 
 	if coinType.IsStripeChain() {

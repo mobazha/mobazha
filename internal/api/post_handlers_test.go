@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -90,7 +89,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "invalid peer id: failed to parse peer ID: selected encoding not supported"}`)), nil
+				return []byte(wrapErrorMessage("invalid peer id: failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -105,7 +104,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found"}`)), nil
+				return []byte(wrapErrorMessage("not found")), nil
 			},
 		},
 		{
@@ -120,7 +119,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal"}`)), nil
+				return []byte(wrapErrorMessage("internal")), nil
 			},
 		},
 		{
@@ -160,7 +159,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found"}`)), nil
+				return []byte(wrapErrorMessage("not found")), nil
 			},
 		},
 		{
@@ -175,7 +174,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal"}`)), nil
+				return []byte(wrapErrorMessage("internal")), nil
 			},
 		},
 		{
@@ -214,7 +213,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(`{"error": "error unmarshaling post: proto: unexpected EOF"}`), nil
+				return []byte(wrapErrorMessage("error unmarshaling post: proto: unexpected EOF")), nil
 			},
 		},
 		{
@@ -232,7 +231,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusConflict,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "post exists. use PUT to update"}`)), nil
+				return []byte(wrapErrorMessage("post exists. use PUT to update")), nil
 			},
 		},
 		{
@@ -250,7 +249,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "bad request"}`)), nil
+				return []byte(wrapErrorMessage("bad request")), nil
 			},
 		},
 		{
@@ -268,7 +267,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal"}`)), nil
+				return []byte(wrapErrorMessage("internal")), nil
 			},
 		},
 		{
@@ -298,7 +297,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "not found"}`)), nil
+				return []byte(wrapErrorMessage("not found")), nil
 			},
 		},
 		{
@@ -313,7 +312,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "internal"}`)), nil
+				return []byte(wrapErrorMessage("internal")), nil
 			},
 		},
 	})

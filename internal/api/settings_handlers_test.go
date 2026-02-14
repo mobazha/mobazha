@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -82,7 +81,7 @@ func TestSettingsHandlers(t *testing.T) {
 			body:       []byte(`{"RefundPolicy": "asdf"}`),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(fmt.Sprintf("%s\n", `{"error": "bad request"}`)), nil
+				return []byte(wrapErrorMessage("bad request")), nil
 			},
 		},
 		{
@@ -106,9 +105,12 @@ func TestSettingsHandlers(t *testing.T) {
 			path:   "/v1/ob/exchangerates",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
-				n.getExchangeRatesFunc = func() *wallet.ExchangeRateProvider {
-					erp, _ := wallet.NewMockExchangeRates()
-					return erp
+				n.getAllRatesFunc = func(base models.CurrencyCode, breakCache bool) (map[models.CurrencyCode]iwallet.Amount, error) {
+					erp, err := wallet.NewMockExchangeRates()
+					if err != nil {
+						return nil, err
+					}
+					return erp.GetAllRates(base, breakCache)
 				}
 			},
 			statusCode: http.StatusOK,
@@ -117,7 +119,7 @@ func TestSettingsHandlers(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				rates, err := erp.GetAllRates(models.CurrencyCode(iwallet.CtBitcoin), true)
+				rates, err := erp.GetAllRates(models.CurrencyCode(iwallet.CtBitcoin), false)
 				if err != nil {
 					return nil, err
 				}

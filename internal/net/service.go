@@ -12,6 +12,7 @@ import (
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
 	msgio "github.com/libp2p/go-msgio"
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	"github.com/op/go-logging"
 	"google.golang.org/protobuf/proto"
@@ -26,6 +27,9 @@ var log = logging.MustGetLogger("NET")
 type LocalDeliverer interface {
 	DeliverToLocal(target peer.ID, from peer.ID, msg *pb.Message) bool
 }
+
+// Compile-time check: *NetworkService implements contracts.NetworkService.
+var _ contracts.NetworkService = (*NetworkService)(nil)
 
 type NetworkService struct {
 	ctx       context.Context

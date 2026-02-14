@@ -18,6 +18,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
@@ -41,6 +42,9 @@ const (
 	// servers.
 	SendTimeout = time.Second * 5
 )
+
+// Compile-time check: *Messenger implements contracts.Messenger.
+var _ contracts.Messenger = (*Messenger)(nil)
 
 // Messenger manages the reliable sending of outgoing messages.
 // New messages are saved to the database and continually retried

@@ -1038,6 +1038,7 @@ func newLightweightNode(
 		nodeCtx:                nodeCtx,
 		nodeCancel:             nodeCancel,
 		ipfsNode:               nil, // lightweight: no IPFS node
+		db:                     obRepo.DB(),
 		repo:                   obRepo,
 		ethMasterKey:           ethMasterKey,
 		escrowMasterKey:        escrowKey,

@@ -31,6 +31,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/mobazha/mobazha3.0/internal/channels"
 	"github.com/mobazha/mobazha3.0/internal/contracts"
+	pkgcontracts "github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
@@ -981,9 +982,17 @@ func newLightweightNode(
 	solPrivKey := solana.PrivateKey(dbSolKey.Value)
 
 	// ── 4. Multiwallet ───────────────────────────────────────────────
-	enabledChains := iwallet.GetAllSupportedChainTypes()
 	erp := sharedManager.ExchangeRateProvider
 
+	// When an external WalletOperator is provided (e.g. by hosting via
+	// cfg.WalletOperatorOverride), use it instead of creating a built-in
+	// Multiwallet. This enables SaaS mode to inject KeyVault signing +
+	// shared chain services once that infrastructure is ready.
+	//
+	// Until then, all nodes (including SaaS tenants) create a real
+	// Multiwallet — SaaS tenants need wallets to process orders.
+	var walletOp pkgcontracts.WalletOperator
+	enabledChains := iwallet.GetAllSupportedChainTypes()
 	opts := []multiwallet.Option{
 		multiwallet.NodeID(nodeID),
 		multiwallet.DataDir(path.Join(cfg.DataDir, "nodes", nodeID)),
@@ -993,12 +1002,20 @@ func newLightweightNode(
 		multiwallet.NetConfig(netConfig),
 		multiwallet.Testnet(walletTestnet),
 	}
-	mw, err := multiwallet.NewMultiwallet(opts...)
-	if err != nil {
-		return nil, err
-	}
-	if err := InitializeMultiwallet(mw, obRepo.DB(), time.Now()); err != nil {
-		return nil, err
+
+	if cfg.WalletOperatorOverride != nil {
+		// Hosting provided an external WalletOperator (e.g. SaaS wallet adapter).
+		walletOp = cfg.WalletOperatorOverride.(pkgcontracts.WalletOperator)
+		logger.LogInfoWithID(log, nodeID, "Using external WalletOperator override")
+	} else {
+		mw, err := multiwallet.NewMultiwallet(opts...)
+		if err != nil {
+			return nil, err
+		}
+		if err := InitializeMultiwallet(mw, obRepo.DB(), time.Now()); err != nil {
+			return nil, err
+		}
+		walletOp = &mw
 	}
 
 	// ── 5. NetworkService & FollowerTracker ───────────────────────────
@@ -1052,7 +1069,7 @@ func newLightweightNode(
 		banManager:             bm,
 		eventBus:               bus,
 		followerTracker:        tracker,
-		multiwallet:            &mw,
+		multiwallet:            walletOp,
 		exchangeRates:          erp,
 		testnet:                cfg.Testnet,
 		walletTestnet:          walletTestnet,

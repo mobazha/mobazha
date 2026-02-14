@@ -126,13 +126,18 @@ type Config struct {
 	SharedDB interface{} `no-flag:"true" description:"Shared GORM DB connection for multi-tenant mode"`
 
 	// SaaSMode marks this node as a SaaS tenant node. When true, the builder
-	// may skip heavy infrastructure that SaaS nodes don't need (e.g. full
-	// wallet initialization) and use lighter alternatives where available.
+	// may use lighter alternatives where available (e.g. simplified Messenger).
 	// Used together with LightweightMode and SharedDB by mobazha_hosting.
-	//
-	// Current behavior: informational flag only. Future builder changes will
-	// check this flag to skip wallet creation, use simplified Messenger, etc.
 	SaaSMode bool `no-flag:"true" description:"SaaS tenant node mode"`
+
+	// WalletOperatorOverride, when set, replaces the built-in Multiwallet.
+	// The value must implement contracts.WalletOperator.
+	//
+	// This allows mobazha_hosting to inject a SaaS wallet adapter (backed
+	// by KeyVault signing + shared chain services) once that infrastructure
+	// is ready. Until then, leave nil — all nodes create a real Multiwallet
+	// because SaaS tenants need wallets to process orders.
+	WalletOperatorOverride interface{} `no-flag:"true" description:"External WalletOperator to replace built-in Multiwallet"`
 }
 
 // LoadConfig initializes and parses the config using a config file and command

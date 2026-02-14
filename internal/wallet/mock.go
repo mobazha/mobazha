@@ -690,26 +690,6 @@ txloop:
 	return txs, nil
 }
 
-// EstimateSpendFee should return the anticipated fee to transfer a given amount of coins
-// out of the wallet at the provided fee level. Typically this involves building a
-// transaction with enough inputs to cover the request amount and calculating the size
-// of the transaction. It is OK, if a transaction comes in after this function is called
-// that changes the estimated fee as it's only intended to be an estimate.
-//
-// All amounts should be in the coin's base unit (for example: satoshis).
-func (w *MockWallet) EstimateSpendFee(amount iwallet.Amount, feeLevel iwallet.FeeLevel, platformAddr iwallet.Address, platformAmt iwallet.Amount) (iwallet.Amount, error) {
-	var fee iwallet.Amount
-	switch feeLevel {
-	case iwallet.FlEconomic:
-		fee = iwallet.NewAmount(250)
-	case iwallet.FlNormal:
-		fee = iwallet.NewAmount(500)
-	case iwallet.FlPriority:
-		fee = iwallet.NewAmount(750)
-	}
-	return fee, nil
-}
-
 // GetFeePerByte returns the current fee per byte for the given fee level. There
 // are three fee levels ― priority, normal, and economic.
 //

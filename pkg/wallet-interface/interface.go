@@ -111,7 +111,12 @@ type Wallet interface {
 	// internal wallet transactions and transactions sending to or from a watched address
 	// to be returned here.
 	GetTransaction(id TransactionID, coinType CoinType) (*Transaction, error)
+}
 
+// Spender is an optional interface for wallets that support spending funds directly.
+// In the new architecture, UTXO wallets are primarily used for signing and escrow,
+// and do not implement Spender. Mock and EVM wallets may still implement it.
+type Spender interface {
 	// Spend is a request to send requested amount to the requested address. The
 	// fee level is provided by the user. It's up to the implementation to decide
 	// how best to use the fee level.

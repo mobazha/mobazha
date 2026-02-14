@@ -359,13 +359,11 @@ func TestOrder_Payments(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// PutMessage is a pure storage method; duplicate check should be in the processing pipeline.
-	// Calling PutMessage with the same TransactionID should succeed (overwrite).
 	err = order.PutMessage(utils.MustWrapOrderMessage(&pb.PaymentSent{
 		TransactionID: id0,
 	}))
-	if err != nil {
-		t.Errorf("PutMessage should allow overwriting PaymentSent, got error: %s", err)
+	if err != ErrDuplicateTransaction {
+		t.Errorf("expected ErrDuplicateTransaction, got %v", err)
 	}
 
 	paymentSent, err := order.PaymentSentMessage()

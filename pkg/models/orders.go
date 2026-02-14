@@ -600,7 +600,20 @@ func (o *Order) PutMessage(message *npb.OrderMessage) error {
 		setMessage = func(ser []byte) { o.SerializedOrderConfirmation = ser }
 		o.OrderConfirmationSignature = sig
 	case npb.OrderMessage_PAYMENT_SENT:
-		msg = new(pb.PaymentSent)
+		paymentSentMsg := new(pb.PaymentSent)
+		if err := message.Message.UnmarshalTo(paymentSentMsg); err != nil {
+			return err
+		}
+		// Check for duplicate transaction
+		if o.SerializedPaymentSent != nil {
+			existing := new(pb.PaymentSent)
+			if err := unmarshaler.Unmarshal(o.SerializedPaymentSent, existing); err == nil {
+				if existing.TransactionID != "" && existing.TransactionID == paymentSentMsg.TransactionID {
+					return ErrDuplicateTransaction
+				}
+			}
+		}
+		msg = paymentSentMsg
 		setMessage = func(ser []byte) { o.SerializedPaymentSent = ser }
 		o.PaymentSentSignature = sig
 	case npb.OrderMessage_RATING_SIGNATURES:

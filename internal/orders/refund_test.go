@@ -47,7 +47,11 @@ func TestOrderProcessor_processRefundMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = wn.Wallets()[0].Spend(wdbtx, addr2, iwallet.NewAmount(1000), iwallet.FlNormal, iwallet.Address{}, iwallet.Amount{})
+	spender, ok := wn.Wallets()[0].(iwallet.Spender)
+	if !ok {
+		t.Fatal("wallet does not implement Spender interface")
+	}
+	_, err = spender.Spend(wdbtx, addr2, iwallet.NewAmount(1000), iwallet.FlNormal, iwallet.Address{}, iwallet.Amount{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -114,30 +114,18 @@ type Config struct {
 	// This is used by mobazha_hosting to inject keys from KeyVault.
 	IdentityKey []byte `no-flag:"true" description:"External identity key (libp2p marshaled format)"`
 
-	// LightweightMode, when true, skips IPFS node creation. The node will use
-	// the SharedManager's IPFS node for content operations and a minimal
-	// libp2p Host for identity. Used by mobazha_hosting for non-default tenant nodes.
-	LightweightMode bool `no-flag:"true" description:"Skip IPFS node creation, use shared IPFS instead"`
+	// SaaSMode marks this node as a SaaS tenant node. When true, the builder:
+	//   - Skips IPFS node creation (uses SharedManager's IPFS via minimal libp2p Host)
+	//   - Uses SharedDB for multi-tenant data isolation (TenantDB)
+	//   - May use lighter alternatives where available
+	// Set by mobazha_hosting for non-default tenant nodes.
+	SaaSMode bool `no-flag:"true" description:"SaaS tenant node mode (lightweight IPFS, shared DB)"`
 
 	// SharedDB is an optional *gorm.DB connection for multi-tenant shared database.
 	// When set, the node uses TenantDB (tenant-scoped wrapper) instead of creating
-	// its own SQLite file. Used together with LightweightMode by mobazha_hosting.
+	// its own SQLite file. Used together with SaaSMode by mobazha_hosting.
 	// The value must be a *gorm.DB pointer.
 	SharedDB interface{} `no-flag:"true" description:"Shared GORM DB connection for multi-tenant mode"`
-
-	// SaaSMode marks this node as a SaaS tenant node. When true, the builder
-	// may use lighter alternatives where available (e.g. simplified Messenger).
-	// Used together with LightweightMode and SharedDB by mobazha_hosting.
-	SaaSMode bool `no-flag:"true" description:"SaaS tenant node mode"`
-
-	// WalletOperatorOverride, when set, replaces the built-in Multiwallet.
-	// The value must implement contracts.WalletOperator.
-	//
-	// This allows mobazha_hosting to inject a SaaS wallet adapter (backed
-	// by KeyVault signing + shared chain services) once that infrastructure
-	// is ready. Until then, leave nil — all nodes create a real Multiwallet
-	// because SaaS tenants need wallets to process orders.
-	WalletOperatorOverride interface{} `no-flag:"true" description:"External WalletOperator to replace built-in Multiwallet"`
 }
 
 // LoadConfig initializes and parses the config using a config file and command

@@ -157,11 +157,11 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		}
 	}
 
-	// ── Lightweight node path ──────────────────────────────────────────
-	// When LightweightMode is enabled, skip IPFS node creation entirely.
+	// ── SaaS / lightweight node path ──────────────────────────────────
+	// When SaaSMode is enabled, skip IPFS node creation entirely.
 	// Instead create a minimal libp2p Host (identity only, no listen addrs)
 	// and share the default node's IPFS infrastructure for content ops.
-	if cfg.LightweightMode {
+	if cfg.SaaSMode {
 		return newLightweightNode(ctx, cfg, nodeID, obRepo, sharedManager, shutdownTorFunc, hs)
 	}
 
@@ -984,14 +984,12 @@ func newLightweightNode(
 	// ── 4. Multiwallet ───────────────────────────────────────────────
 	erp := sharedManager.ExchangeRateProvider
 
-	// When an external WalletOperator is provided (e.g. by hosting via
-	// cfg.WalletOperatorOverride), use it instead of creating a built-in
-	// Multiwallet. This enables SaaS mode to inject KeyVault signing +
-	// shared chain services once that infrastructure is ready.
-	//
-	// Until then, all nodes (including SaaS tenants) create a real
-	// Multiwallet — SaaS tenants need wallets to process orders.
-	var walletOp pkgcontracts.WalletOperator
+	// SaaS tenant nodes use SharedMode: wallet objects are created for key
+	// derivation and signing only, WITHOUT per-tenant chain client connections.
+	//   - EVM wallets: no ethclient.Dial (shared RPC via hosting infra)
+	//   - Solana: SolanaWalletLite (no RPC/WS)
+	//   - UTXO: ChainClient nil at creation, injected via configureUTXOWallets()
+	// This eliminates 5+ RPC connections per tenant while preserving signing.
 	enabledChains := iwallet.GetAllSupportedChainTypes()
 	opts := []multiwallet.Option{
 		multiwallet.NodeID(nodeID),
@@ -1002,32 +1000,35 @@ func newLightweightNode(
 		multiwallet.NetConfig(netConfig),
 		multiwallet.Testnet(walletTestnet),
 	}
-
-	if cfg.WalletOperatorOverride != nil {
-		// Hosting provided an external WalletOperator (e.g. SaaS wallet adapter).
-		walletOp = cfg.WalletOperatorOverride.(pkgcontracts.WalletOperator)
-		logger.LogInfoWithID(log, nodeID, "Using external WalletOperator override")
-	} else {
-		mw, err := multiwallet.NewMultiwallet(opts...)
-		if err != nil {
-			return nil, err
-		}
-		if err := InitializeMultiwallet(mw, obRepo.DB(), time.Now()); err != nil {
-			return nil, err
-		}
-		walletOp = &mw
+	if cfg.SaaSMode {
+		opts = append(opts, multiwallet.SharedModeOpt(true))
+		logger.LogInfoWithID(log, nodeID, "Multiwallet SharedMode enabled (no per-tenant chain connections)")
 	}
 
+	mw, err := multiwallet.NewMultiwallet(opts...)
+	if err != nil {
+		return nil, err
+	}
+	if err := InitializeMultiwallet(mw, obRepo.DB(), time.Now()); err != nil {
+		return nil, err
+	}
+	var walletOp pkgcontracts.WalletOperator = &mw
+
 	// ── 5. NetworkService & FollowerTracker ───────────────────────────
+	// SaaS nodes skip contracts.NewContracts() — it creates per-tenant EVM
+	// chain connections just to query blocked IDs, which the default node
+	// already handles. This saves additional RPC dials per tenant.
 	globalBlockedIds := []peer.ID{}
-	contracts, err := contracts.NewContracts(opts...)
-	if err == nil {
-		globalBlockedIds, err = contracts.GetBlockedIds()
-		if err != nil {
-			logger.LogErrorWithIDf(log, nodeID, "Failed to get global blocked nodes: %v", err)
+	if !cfg.SaaSMode {
+		contracts, err := contracts.NewContracts(opts...)
+		if err == nil {
+			globalBlockedIds, err = contracts.GetBlockedIds()
+			if err != nil {
+				logger.LogErrorWithIDf(log, nodeID, "Failed to get global blocked nodes: %v", err)
+			}
+		} else {
+			logger.LogErrorWithIDf(log, nodeID, "Failed to create contracts util: %v", err)
 		}
-	} else {
-		logger.LogErrorWithIDf(log, nodeID, "Failed to create contracts util: %v", err)
 	}
 
 	blocked, err := prefs.BlockedNodes()

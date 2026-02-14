@@ -124,6 +124,15 @@ type Config struct {
 	// its own SQLite file. Used together with LightweightMode by mobazha_hosting.
 	// The value must be a *gorm.DB pointer.
 	SharedDB interface{} `no-flag:"true" description:"Shared GORM DB connection for multi-tenant mode"`
+
+	// SaaSMode marks this node as a SaaS tenant node. When true, the builder
+	// may skip heavy infrastructure that SaaS nodes don't need (e.g. full
+	// wallet initialization) and use lighter alternatives where available.
+	// Used together with LightweightMode and SharedDB by mobazha_hosting.
+	//
+	// Current behavior: informational flag only. Future builder changes will
+	// check this flag to skip wallet creation, use simplified Messenger, etc.
+	SaaSMode bool `no-flag:"true" description:"SaaS tenant node mode"`
 }
 
 // LoadConfig initializes and parses the config using a config file and command

@@ -999,11 +999,9 @@ func newLightweightNode(
 		multiwallet.LogLevel(repo.LogLevelMap[strings.ToLower(cfg.LogLevel)]),
 		multiwallet.NetConfig(netConfig),
 		multiwallet.Testnet(walletTestnet),
+		multiwallet.SharedModeOpt(true),
 	}
-	if cfg.SaaSMode {
-		opts = append(opts, multiwallet.SharedModeOpt(true))
-		logger.LogInfoWithID(log, nodeID, "Multiwallet SharedMode enabled (no per-tenant chain connections)")
-	}
+	logger.LogInfoWithID(log, nodeID, "Multiwallet SharedMode enabled (no per-tenant chain connections)")
 
 	mw, err := multiwallet.NewMultiwallet(opts...)
 	if err != nil {
@@ -1015,21 +1013,10 @@ func newLightweightNode(
 	var walletOp pkgcontracts.WalletOperator = &mw
 
 	// ── 5. NetworkService & FollowerTracker ───────────────────────────
-	// SaaS nodes skip contracts.NewContracts() — it creates per-tenant EVM
-	// chain connections just to query blocked IDs, which the default node
-	// already handles. This saves additional RPC dials per tenant.
+	// newLightweightNode is SaaS-only — skip contracts.NewContracts() which
+	// creates EVM connections just to query blocked IDs. The default node
+	// already handles this.
 	globalBlockedIds := []peer.ID{}
-	if !cfg.SaaSMode {
-		contracts, err := contracts.NewContracts(opts...)
-		if err == nil {
-			globalBlockedIds, err = contracts.GetBlockedIds()
-			if err != nil {
-				logger.LogErrorWithIDf(log, nodeID, "Failed to get global blocked nodes: %v", err)
-			}
-		} else {
-			logger.LogErrorWithIDf(log, nodeID, "Failed to create contracts util: %v", err)
-		}
-	}
 
 	blocked, err := prefs.BlockedNodes()
 	if err != nil {

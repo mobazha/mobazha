@@ -1000,11 +1000,10 @@ func newLightweightNode(
 	// ── 4. Multiwallet ───────────────────────────────────────────────
 	erp := sharedManager.ExchangeRateProvider
 
-	// SaaS tenant nodes use SharedMode: wallet objects are created for key
-	// derivation and signing only, WITHOUT per-tenant chain client connections.
-	//   - EVM wallets: nil ChainClient, injected via startEVMChainClients()
-	//   - Solana: nil ChainClient, injected via startSolanaChainClients()
-	//   - UTXO: nil ChainClient, injected via startUTXOPaymentMonitor()
+	// All wallets are constructed with nil ChainClient — chain clients are
+	// injected during MobazhaNode.Start() based on mode:
+	//   - SaaS: shared clients from HostService (one connection per chain)
+	//   - Standalone: per-node clients from ChainAPIs config or defaults
 	// This eliminates 5+ RPC connections per tenant while preserving signing.
 	enabledChains := iwallet.GetAllSupportedChainTypes()
 	opts := []multiwallet.Option{
@@ -1015,9 +1014,7 @@ func newLightweightNode(
 		multiwallet.LogLevel(repo.LogLevelMap[strings.ToLower(cfg.LogLevel)]),
 		multiwallet.NetConfig(netConfig),
 		multiwallet.Testnet(walletTestnet),
-		multiwallet.SharedModeOpt(true),
 	}
-	logger.LogInfoWithID(log, nodeID, "Multiwallet SharedMode enabled (no per-tenant chain connections)")
 
 	mw, err := multiwallet.NewMultiwallet(opts...)
 	if err != nil {

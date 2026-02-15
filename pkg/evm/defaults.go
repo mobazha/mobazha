@@ -6,7 +6,7 @@ import (
 
 // defaultEVMChainDef holds the canonical RPC URLs and registry addresses for an EVM chain.
 // Used by hosting's initSharedEVMClients() and as fallback for standalone nodes
-// when ChainAPIs are not available (see startEVMChainClients in evm_configure.go).
+// when ChainAPIs are not available (see startEVMChainClients in chain_evm.go).
 type defaultEVMChainDef struct {
 	Chain           iwallet.ChainType
 	MainnetRpc      string

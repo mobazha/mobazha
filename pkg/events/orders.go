@@ -221,7 +221,7 @@ type ModeratorDisputeExpiry struct {
 // CancelablePaymentReady is emitted when a CANCELABLE payment is ready to be auto-confirmed
 // This is triggered when the seller receives PAYMENT_SENT for a CANCELABLE payment
 // Works for all chain types: UTXO, EVM, and Solana
-// Handled by dispatchCancelablePayment() in cancelable_payment.go, which routes to:
+// Handled by dispatchCancelablePayment() in payment_dispatcher.go, which routes to:
 // - UTXO chains: handleCancelablePaymentForUTXO → releases via multisig
 // - EVM chains: handleCancelablePaymentForEVM → releases via platform relay API
 // - Solana chains: (future) will use similar relay pattern
@@ -235,7 +235,7 @@ type CancelablePaymentReady struct {
 // RwaInstantBuyCompleted is emitted when an RWA instant buy (atomic swap) has completed on-chain
 // This is triggered when the seller receives PAYMENT_SENT with method=RWA_INSTANT_BUY
 // The atomic swap has already transferred tokens, so this just triggers the order confirmation
-// Handled by handleRwaInstantBuyCompleted() in rwa_instant_buy.go
+// Handled by handleRwaInstantBuyCompleted() in payment_rwa.go
 type RwaInstantBuyCompleted struct {
 	OrderID       string `json:"orderID"`
 	TransactionID string `json:"transactionID"`

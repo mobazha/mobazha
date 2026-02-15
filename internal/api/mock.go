@@ -584,6 +584,7 @@ func (m *mockNode) GetActiveReceivingAccount(chainType iwallet.ChainType) (*mode
 func (m *mockNode) GetReceivingAccountsByChain(chainType iwallet.ChainType) ([]models.ReceivingAccount, error) {
 	return m.getReceivingAccountsByChainFunc(chainType)
 }
+
 // Escrow
 func (m *mockNode) BuildInitEscrowInstructions(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error) {
 	return m.buildInitEscrowInstructionsFunc(ctx, params)

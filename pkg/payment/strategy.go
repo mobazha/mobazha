@@ -17,9 +17,9 @@
 // transition requires a chain-specific operation (e.g., escrow release,
 // fund refund), it queries the registry to get the appropriate strategy.
 //
-// Phases:
-//   - Phase 1-2: AutoConfirm dispatch (all chains registered)
-//   - Phase 4:   Full order lifecycle instruction generation
+// Capabilities:
+//   - AutoConfirm dispatch: handles CANCELABLE payment auto-confirmation
+//   - Instruction generation: full order lifecycle instruction generation
 package payment
 
 import (
@@ -82,12 +82,17 @@ type InstructionParams struct {
 	Script string
 
 	// OrderData carries the pre-fetched order object to avoid redundant DB fetches.
-	// Type: *models.Order (passed as any to minimize pkg/payment dependencies).
-	// Set by the calling code; adapters type-assert as needed.
+	//
+	// Concrete type: *models.Order (pkg/models.Order).
+	// Passed as any to keep pkg/payment free of model imports — adapters in
+	// internal/core/ type-assert to *models.Order.
 	OrderData any
 
 	// ReleaseInfo carries fulfillment release data for complete operations.
-	// Type: *pb.EscrowRelease (passed as any to avoid pkg/payment importing pb).
+	//
+	// Concrete type: *pb.EscrowRelease (pkg/orders/mbzpb.EscrowRelease).
+	// Passed as any to keep pkg/payment free of protobuf imports — adapters
+	// in internal/core/ type-assert to *pb.EscrowRelease.
 	ReleaseInfo any
 }
 
@@ -111,7 +116,7 @@ type InstructionResult struct {
 // involving an on-chain transaction needs chain-specific logic. PaymentStrategy
 // provides a unified interface for these operations.
 //
-// # Instruction Generation Methods (Phase 4)
+// # Instruction Generation Methods
 //
 // Each GetXxxInstructions method returns:
 //   - nil Instructions → backend handles the operation (UTXO monitored model)
@@ -126,13 +131,13 @@ type PaymentStrategy interface {
 	// Model returns the payment paradigm for this chain.
 	Model() PaymentModel
 
-	// ── Auto-Confirm (Phase 1-2) ───────────────────────
+	// ── Auto-Confirm ───────────────────────────────────
 
 	// AutoConfirm handles auto-confirmation for a CANCELABLE payment.
 	// Called asynchronously by the cancelable payment dispatcher.
 	AutoConfirm(ctx context.Context, event *events.CancelablePaymentReady) error
 
-	// ── Instruction Generation (Phase 4) ───────────────
+	// ── Instruction Generation ─────────────────────────
 
 	// GetConfirmInstructions returns instructions for confirming a CANCELABLE order.
 	//

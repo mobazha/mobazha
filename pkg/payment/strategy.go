@@ -17,9 +17,9 @@
 // transition requires a chain-specific operation (e.g., escrow release,
 // fund refund), it queries the registry to get the appropriate strategy.
 //
-// Phase 1 covers auto-confirmation (CANCELABLE → AWAITING_FULFILLMENT).
-// Future phases will expand PaymentStrategy to cover the full order lifecycle:
-// payment instructions, cancel, fulfill, complete, refund, and dispute.
+// Phases:
+//   - Phase 1-2: AutoConfirm dispatch (all chains registered)
+//   - Phase 4:   Full order lifecycle instruction generation
 package payment
 
 import (
@@ -49,49 +49,124 @@ const (
 	PaymentModelThirdParty PaymentModel = "third_party"
 )
 
-// PaymentStrategy defines chain-level payment operations.
+// ── Instruction Params / Result ─────────────────────────────────
+
+// InstructionParams provides context for chain-specific instruction generation.
+// Each lifecycle method uses the subset of fields it needs.
+//
+// The caller (in internal/core/) populates these from the order and request,
+// then the strategy adapter generates chain-specific instructions.
+type InstructionParams struct {
+	// OrderID is the order identifier.
+	OrderID string
+
+	// InitiatorAddr is the wallet address of the caller (frontend user).
+	// Used as the payer/signer address in generated instructions.
+	InitiatorAddr string
+
+	// PayoutAddr is the destination address for fund release.
+	// For confirm: vendor payout address.
+	// For cancel: buyer refund address.
+	PayoutAddr string
+
+	// PaymentCoin is the payment coin code (e.g., "ETH", "BTC").
+	PaymentCoin string
+
+	// PaymentAmount is the payment amount in minimal units (satoshis, wei, lamports).
+	PaymentAmount string
+
+	// Chaincode is the hex-encoded chaincode from PaymentSent message.
+	Chaincode string
+
+	// Script is the hex-encoded script from PaymentSent message (EVM only).
+	Script string
+
+	// OrderData carries the pre-fetched order object to avoid redundant DB fetches.
+	// Type: *models.Order (passed as any to minimize pkg/payment dependencies).
+	// Set by the calling code; adapters type-assert as needed.
+	OrderData any
+
+	// ReleaseInfo carries fulfillment release data for complete operations.
+	// Type: *pb.EscrowRelease (passed as any to avoid pkg/payment importing pb).
+	ReleaseInfo any
+}
+
+// InstructionResult contains chain-specific instructions for the frontend.
+// A nil Instructions field means the backend handles the operation directly
+// (e.g., UTXO chains where the backend signs and broadcasts).
+type InstructionResult struct {
+	// Instructions contains chain-specific data for the frontend.
+	// nil = no frontend action needed (backend handles it).
+	// EVM: contract call data ({to, data, value}).
+	// Solana: program instructions ([]SolanaGoInstruction).
+	Instructions any
+}
+
+// ── PaymentStrategy Interface ───────────────────────────────────
+
+// PaymentStrategy defines chain-level payment operations covering the full
+// order lifecycle.
 //
 // The order state machine itself is chain-agnostic, but each state transition
 // involving an on-chain transaction needs chain-specific logic. PaymentStrategy
 // provides a unified interface for these operations.
 //
-// # Phase 1 (current)
+// # Instruction Generation Methods (Phase 4)
 //
-// Only [PaymentStrategy.Model] and [PaymentStrategy.AutoConfirm] are active.
-// These power the CANCELABLE payment auto-confirmation dispatch.
+// Each GetXxxInstructions method returns:
+//   - nil Instructions → backend handles the operation (UTXO monitored model)
+//   - non-nil Instructions → frontend must sign and submit txHash
 //
-// # Future expansion (Phase 2-4)
-//
-// The interface will grow to cover the full order lifecycle:
-//
-//   - Payment:  GeneratePaymentInstructions, ValidatePaymentProof
-//   - Confirm:  GetConfirmInstructions (manual MODERATED confirm)
-//   - Cancel:   BuildCancelInstructions
-//   - Fulfill:  BuildFulfillmentRelease
-//   - Complete: BuildCompletionRelease
-//   - Refund:   BuildRefundInstructions
-//   - Dispute:  BuildDisputePayout
-//
-// Each new method will be added when its corresponding phase is implemented,
-// ensuring all existing implementations compile without stub methods.
+// The calling code (internal/core/ lifecycle files) handles order validation,
+// DB operations, and message sending. Strategy methods only handle the
+// chain-specific instruction generation or fund release.
 type PaymentStrategy interface {
+	// ── Meta ────────────────────────────────────────────
+
 	// Model returns the payment paradigm for this chain.
-	// Used by the frontend to determine how to render the payment UI
-	// (QR code for monitored, wallet connect for client_signed, etc.).
 	Model() PaymentModel
 
-	// AutoConfirm handles auto-confirmation for a CANCELABLE payment (vendor side).
-	//
-	// Called asynchronously (in a goroutine) by the cancelable payment dispatcher
-	// when a [events.CancelablePaymentReady] event fires.
-	//
-	// Implementation responsibilities:
-	//   - Fetch the order by event.OrderID
-	//   - Acquire auto-confirm lock (prevent concurrent processing)
-	//   - Release escrow funds to vendor (chain-specific)
-	//   - Send ORDER_CONFIRMATION message to buyer
-	//
-	// Returns nil on success or if auto-confirm is not applicable.
-	// Errors are logged by the dispatcher; the operation is fire-and-forget.
+	// ── Auto-Confirm (Phase 1-2) ───────────────────────
+
+	// AutoConfirm handles auto-confirmation for a CANCELABLE payment.
+	// Called asynchronously by the cancelable payment dispatcher.
 	AutoConfirm(ctx context.Context, event *events.CancelablePaymentReady) error
+
+	// ── Instruction Generation (Phase 4) ───────────────
+
+	// GetConfirmInstructions returns instructions for confirming a CANCELABLE order.
+	//
+	// Monitored (UTXO): returns nil — backend releases funds via ConfirmOrder.
+	// ClientSigned (EVM/Solana): returns escrow release instructions for frontend.
+	//
+	// Params used: OrderID, InitiatorAddr, PayoutAddr, PaymentCoin, PaymentAmount,
+	// Chaincode, Script.
+	GetConfirmInstructions(ctx context.Context, params InstructionParams) (*InstructionResult, error)
+
+	// GetCancelInstructions returns instructions for canceling a CANCELABLE order.
+	//
+	// Monitored (UTXO): returns nil — backend releases funds back to buyer.
+	// ClientSigned (EVM/Solana): returns escrow release instructions for frontend.
+	//
+	// Params used: OrderID, InitiatorAddr, PayoutAddr (buyer refund address),
+	// PaymentCoin, PaymentAmount, Chaincode, Script.
+	GetCancelInstructions(ctx context.Context, params InstructionParams) (*InstructionResult, error)
+
+	// GetCompleteInstructions returns instructions for completing a MODERATED order.
+	//
+	// Monitored (UTXO): returns nil — backend handles multisig signing.
+	// ClientSigned (EVM/Solana): returns escrow release instructions for frontend.
+	//
+	// Params used: OrderID, InitiatorAddr, PaymentCoin, PaymentAmount,
+	// Chaincode, Script, ReleaseInfo.
+	GetCompleteInstructions(ctx context.Context, params InstructionParams) (*InstructionResult, error)
+
+	// GetDisputeReleaseInstructions returns instructions for releasing dispute funds.
+	//
+	// Monitored (UTXO): returns nil — backend handles signing.
+	// ClientSigned (EVM/Solana): returns release instructions for frontend.
+	//
+	// Params used: OrderID, InitiatorAddr, PaymentCoin, PaymentAmount,
+	// Chaincode, Script.
+	GetDisputeReleaseInstructions(ctx context.Context, params InstructionParams) (*InstructionResult, error)
 }

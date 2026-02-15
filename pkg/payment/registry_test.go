@@ -18,6 +18,18 @@ func (m *mockStrategy) Model() payment.PaymentModel { return m.model }
 func (m *mockStrategy) AutoConfirm(_ context.Context, _ *events.CancelablePaymentReady) error {
 	return nil
 }
+func (m *mockStrategy) GetConfirmInstructions(_ context.Context, _ payment.InstructionParams) (*payment.InstructionResult, error) {
+	return &payment.InstructionResult{Instructions: nil}, nil
+}
+func (m *mockStrategy) GetCancelInstructions(_ context.Context, _ payment.InstructionParams) (*payment.InstructionResult, error) {
+	return &payment.InstructionResult{Instructions: nil}, nil
+}
+func (m *mockStrategy) GetCompleteInstructions(_ context.Context, _ payment.InstructionParams) (*payment.InstructionResult, error) {
+	return &payment.InstructionResult{Instructions: nil}, nil
+}
+func (m *mockStrategy) GetDisputeReleaseInstructions(_ context.Context, _ payment.InstructionParams) (*payment.InstructionResult, error) {
+	return &payment.InstructionResult{Instructions: nil}, nil
+}
 
 func TestRegistry_Register_And_Lookup(t *testing.T) {
 	r := payment.NewRegistry()

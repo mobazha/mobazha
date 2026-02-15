@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"path"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -28,6 +30,24 @@ func ErrorResponse(w http.ResponseWriter, errorCode int, reason string) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(errorCode)
 	sanitizedJSONResponse(w, apiErr)
+}
+
+// orderActionErrorResponse maps order action errors to appropriate HTTP status codes.
+// Relay-specific errors are mapped to 503/501 so clients know to fall back to the
+// instructions + frontend wallet flow.
+func orderActionErrorResponse(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, coreiface.ErrRelayNotAvailable):
+		ErrorResponse(w, http.StatusServiceUnavailable, err.Error())
+	case errors.Is(err, coreiface.ErrRelayChainNotSupported):
+		ErrorResponse(w, http.StatusNotImplemented, err.Error())
+	case errors.Is(err, coreiface.ErrBadRequest):
+		ErrorResponse(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, coreiface.ErrNotFound):
+		ErrorResponse(w, http.StatusNotFound, err.Error())
+	default:
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+	}
 }
 
 func (g *Gateway) handlePOSTPurchase(w http.ResponseWriter, r *http.Request) {
@@ -527,9 +547,16 @@ func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) 
 	node := getNodeService(r)
 
 	done := make(chan struct{})
-	err = node.CancelOrder(models.OrderID(cancelParam.OrderID), iwallet.TransactionID(cancelParam.TransactionID), done)
+
+	if cancelParam.TransactionID != "" {
+		// Frontend-signed mode: txid already provided (via AppKit wallet)
+		err = node.CancelOrder(models.OrderID(cancelParam.OrderID), iwallet.TransactionID(cancelParam.TransactionID), done)
+	} else {
+		// Relay mode: no txid — backend handles get-instructions + relay + cancel
+		err = node.CancelOrderViaRelay(models.OrderID(cancelParam.OrderID), done)
+	}
 	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		orderActionErrorResponse(w, err)
 		return
 	}
 
@@ -628,6 +655,7 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 		TransactionID string `json:"transactionID"`
 		PayoutAddress string `json:"payoutAddress"` // for confirm order, payout address for seller
 		Reject        bool   `json:"reject"`
+		Reason        string `json:"reason"` // for reject order, reason for rejection
 	}
 	decoder := json.NewDecoder(r.Body)
 	var conf orderConf
@@ -643,10 +671,16 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 	if !conf.Reject {
 		err = node.ConfirmOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TransactionID), conf.PayoutAddress, done)
 	} else {
-		err = node.RejectOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TransactionID), "", done)
+		if conf.TransactionID != "" {
+			// Frontend-signed mode: txid already provided (via AppKit wallet)
+			err = node.RejectOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TransactionID), conf.Reason, done)
+		} else {
+			// Relay mode: no txid — backend handles get-instructions + relay + reject
+			err = node.RejectOrderViaRelay(models.OrderID(conf.OrderID), conf.Reason, done)
+		}
 	}
 	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		orderActionErrorResponse(w, err)
 		return
 	}
 
@@ -654,7 +688,7 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 	case <-done:
 		sanitizedStringResponse(w, `{}`)
 		return
-	case <-time.After(time.Second * 10):
+	case <-time.After(time.Second * 15):
 		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")
 		return
 	}
@@ -743,9 +777,18 @@ func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) 
 	node := getNodeService(r)
 
 	done := make(chan struct{})
-	err = node.RefundOrder(models.OrderID(refundParam.OrderID), iwallet.TransactionID(refundParam.TransactionID), done)
+
+	if refundParam.TransactionID != "" {
+		// Frontend-signed mode: txid already provided (via AppKit wallet)
+		err = node.RefundOrder(models.OrderID(refundParam.OrderID), iwallet.TransactionID(refundParam.TransactionID), done)
+	} else {
+		// Relay mode: no txid — backend handles get-instructions + relay + refund
+		// For UTXO: backend signs and broadcasts internally
+		// For EVM: builds instructions → relays via gas wallet → completes refund
+		err = node.RefundOrderViaRelay(models.OrderID(refundParam.OrderID), done)
+	}
 	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		orderActionErrorResponse(w, err)
 		return
 	}
 
@@ -753,7 +796,7 @@ func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) 
 	case <-done:
 		sanitizedStringResponse(w, `{}`)
 		return
-	case <-time.After(time.Second * 10):
+	case <-time.After(time.Second * 15):
 		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")
 		return
 	}

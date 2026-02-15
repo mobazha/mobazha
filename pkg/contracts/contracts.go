@@ -98,6 +98,15 @@ type OrderService interface {
 	CompleteOrder(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	CancelOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 
+	// ViaRelay methods: combine get-instructions + relay-execute + action into a single call.
+	// Used by hosting mode where there is no frontend wallet (AppKit) to sign transactions.
+	// For UTXO chains, these fall through to the standard methods (backend handles signing).
+	// For EVM/Solana, these build instructions, relay via platform gas wallet, then complete the action.
+	// Returns ErrRelayNotAvailable if relay service is not configured.
+	RefundOrderViaRelay(orderID models.OrderID, done chan struct{}) error
+	RejectOrderViaRelay(orderID models.OrderID, reason string, done chan struct{}) error
+	CancelOrderViaRelay(orderID models.OrderID, done chan struct{}) error
+
 	GetOrder(orderID string) (*models.Order, error)
 	GetPurchases(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Order, int64, error)
 	GetSales(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Order, int64, error)

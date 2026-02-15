@@ -53,6 +53,9 @@ type mockNode struct {
 	fulfillOrderFunc                        func(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error
 	completeOrderFunc                       func(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	cancelOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
+	refundOrderViaRelayFunc                 func(orderID models.OrderID, done chan struct{}) error
+	rejectOrderViaRelayFunc                 func(orderID models.OrderID, reason string, done chan struct{}) error
+	cancelOrderViaRelayFunc                 func(orderID models.OrderID, done chan struct{}) error
 	openDisputeFunc                         func(orderID models.OrderID, reason string, done chan struct{}) error
 	closeDisputeFunc                        func(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
 	getReleaseFundsInstructionsFunc         func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
@@ -281,6 +284,24 @@ func (m *mockNode) CompleteOrder(orderID models.OrderID, txid iwallet.Transactio
 }
 func (m *mockNode) CancelOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {
 	return m.cancelOrderFunc(orderID, txid, done)
+}
+func (m *mockNode) RefundOrderViaRelay(orderID models.OrderID, done chan struct{}) error {
+	if m.refundOrderViaRelayFunc != nil {
+		return m.refundOrderViaRelayFunc(orderID, done)
+	}
+	return nil
+}
+func (m *mockNode) RejectOrderViaRelay(orderID models.OrderID, reason string, done chan struct{}) error {
+	if m.rejectOrderViaRelayFunc != nil {
+		return m.rejectOrderViaRelayFunc(orderID, reason, done)
+	}
+	return nil
+}
+func (m *mockNode) CancelOrderViaRelay(orderID models.OrderID, done chan struct{}) error {
+	if m.cancelOrderViaRelayFunc != nil {
+		return m.cancelOrderViaRelayFunc(orderID, done)
+	}
+	return nil
 }
 func (m *mockNode) OpenDispute(orderID models.OrderID, reason string, done chan struct{}) error {
 	return m.openDisputeFunc(orderID, reason, done)

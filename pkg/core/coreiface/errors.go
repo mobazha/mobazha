@@ -47,6 +47,15 @@ var (
 
 	// ErrCoinSwitchRequiresConfirmation is returned when switching coin type with existing partial payments
 	ErrCoinSwitchRequiresConfirmation = errors.New("coin switch requires confirmation due to existing partial payments")
+
+	// ErrRelayNotAvailable is returned when a ViaRelay method is called but
+	// no relay service is configured (neither HostService relay nor HTTP relay URL).
+	// Callers should fall back to the instructions + frontend wallet flow.
+	ErrRelayNotAvailable = errors.New("relay service not available")
+
+	// ErrRelayChainNotSupported is returned when a ViaRelay method is called for a
+	// chain type that the relay service does not yet support (e.g., Solana relay).
+	ErrRelayChainNotSupported = errors.New("relay not supported for this chain type")
 )
 
 type ErrTooManyItems []string

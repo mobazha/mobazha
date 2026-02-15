@@ -33,6 +33,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/evm"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -217,6 +218,10 @@ type MobazhaNode struct {
 	// Used by startSolanaChainClients() in standalone mode to create the SolanaClient
 	// and resolve the escrow program ID. In SaaS mode this is nil (clients come from HostService).
 	solanaChainConfig *SolanaChainConfig
+
+	// paymentRegistry maps ChainType to PaymentStrategy for dispatching
+	// chain-specific payment operations. Initialized in registerPaymentStrategies().
+	paymentRegistry *payment.Registry
 }
 
 // IsDefaultNode returns whether this node is the default node.
@@ -280,6 +285,10 @@ func (n *MobazhaNode) Start() {
 		// Inject Solana chain client into wallet (symmetric with EVM and UTXO above)
 		// SaaS: shared client from HostService; Standalone: per-node client + escrow resolution
 		n.startSolanaChainClients()
+
+		// Register payment strategies for all supported chains.
+		// Must be called before startCancelablePaymentMonitor which uses the registry.
+		n.registerPaymentStrategies()
 
 		// Start unified cancelable payment monitor for auto-confirmation
 		// This handles UTXO, EVM, and (future) Solana chains via event dispatch

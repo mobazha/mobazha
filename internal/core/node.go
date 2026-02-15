@@ -212,6 +212,11 @@ type MobazhaNode struct {
 	// to create chain clients that respect user-configured RPC URLs (instead of
 	// compiled-in factory defaults). In SaaS mode this is nil (clients come from HostService).
 	evmChainConfigs []evm.EVMClientConfig
+
+	// solanaChainConfig holds Solana chain config derived from multiwallet ChainAPIs.
+	// Used by startSolanaChainClients() in standalone mode to create the SolanaClient
+	// and resolve the escrow program ID. In SaaS mode this is nil (clients come from HostService).
+	solanaChainConfig *SolanaChainConfig
 }
 
 // IsDefaultNode returns whether this node is the default node.
@@ -271,6 +276,10 @@ func (n *MobazhaNode) Start() {
 		// Inject EVM chain clients into wallets (symmetric with UTXO monitor above)
 		// SaaS: shared clients from HostService; Standalone: per-node clients via factory
 		n.startEVMChainClients()
+
+		// Inject Solana chain client into wallet (symmetric with EVM and UTXO above)
+		// SaaS: shared client from HostService; Standalone: per-node client + escrow resolution
+		n.startSolanaChainClients()
 
 		// Start unified cancelable payment monitor for auto-confirmation
 		// This handles UTXO, EVM, and (future) Solana chains via event dispatch

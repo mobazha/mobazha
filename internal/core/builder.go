@@ -488,6 +488,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	var mwCfg multiwallet.Config
 	_ = mwCfg.Apply(append([]multiwallet.Option{multiwallet.Defaults}, opts...)...)
 	evmConfigs := extractEVMConfigs(mwCfg.ChainAPIs, walletTestnet)
+	solanaConfig := extractSolanaConfig(mwCfg.ChainAPIs, walletTestnet)
 
 	globalBlockedIds := []peer.ID{}
 	contracts, err := contracts.NewContracts(opts...)
@@ -567,6 +568,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		stripeConfigCache:      netdb.NewStripeConfigCache(),
 		relayAPIURL:            cfg.RelayAPIURL,
 		evmChainConfigs:        evmConfigs,
+		solanaChainConfig:      solanaConfig,
 	}
 	// Initialize content store with IPFS backend.
 	obNode.contentStore = newIPFSContentStore(
@@ -1000,9 +1002,9 @@ func newLightweightNode(
 
 	// SaaS tenant nodes use SharedMode: wallet objects are created for key
 	// derivation and signing only, WITHOUT per-tenant chain client connections.
-	//   - EVM wallets: no ethclient.Dial (shared RPC via hosting infra)
-	//   - Solana: SolanaWalletLite (no RPC/WS)
-	//   - UTXO: ChainClient nil at creation, injected via configureUTXOWallets()
+	//   - EVM wallets: nil ChainClient, injected via startEVMChainClients()
+	//   - Solana: nil ChainClient, injected via startSolanaChainClients()
+	//   - UTXO: nil ChainClient, injected via startUTXOPaymentMonitor()
 	// This eliminates 5+ RPC connections per tenant while preserving signing.
 	enabledChains := iwallet.GetAllSupportedChainTypes()
 	opts := []multiwallet.Option{
@@ -1026,8 +1028,10 @@ func newLightweightNode(
 	}
 	var walletOp pkgcontracts.WalletOperator = &mw
 
-	// EVM chain client injection is now deferred to MobazhaNode.Start() via
-	// startEVMChainClients(), which is symmetric with UTXO's startUTXOPaymentMonitor().
+	// Chain client injection is deferred to MobazhaNode.Start():
+	//   - EVM: startEVMChainClients()
+	//   - Solana: startSolanaChainClients()
+	//   - UTXO: startUTXOPaymentMonitor()
 	// Both SaaS and standalone modes inject during Start(), not at construction time.
 
 	// ── 5. NetworkService & FollowerTracker ───────────────────────────

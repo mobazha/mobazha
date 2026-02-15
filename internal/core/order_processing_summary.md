@@ -37,7 +37,7 @@ Payment Registry（ChainType → PaymentStrategy 映射）
 
 ## 2. 订单生命周期
 
-### 2.1 订单创建（`purchase.go`）
+### 2.1 订单创建（`order_purchase.go`）
 - 买家选择商品，验证 listing、卖家身份、价格
 - 生成 OrderID、构建支付信息（含 escrow 参数）
 - 根据支付方式生成 CANCELABLE 或 MODERATED 支付地址
@@ -66,14 +66,14 @@ Payment Registry（ChainType → PaymentStrategy 映射）
 - `RWA_ESCROW`：通过 `createOrderFromListing` 锁定资金，需卖家确认
 - `RWA_INSTANT`：通过 `instantBuy` 原子交换完成
 
-### 2.3 订单拒绝（`reject.go`）
+### 2.3 订单拒绝（`order_reject.go`）
 - **入口**: `RejectOrder` / `GetRefundOrderInstructions`
 - 卖家拒绝订单（仅限订单已打开且未进一步操作）
 - 若订单已付款且非 CANCELABLE：自动触发退款（`buildRefundMessage`）
 - EVM/Solana：`GetRefundOrderInstructions` → 获取退款指令 → 前端钱包签名
 - 发送 ORDER_REJECT + REFUND 消息给买家
 
-### 2.4 订单确认（`confirm.go`）
+### 2.4 订单确认（`order_confirm.go`）
 - **入口**: `ConfirmOrder` / `GetConfirmOrderInstructions`
 - 卖家确认订单并释放 CANCELABLE 资金
 - UTXO：`releaseFromCancelableAddress` → 后端签名广播
@@ -81,14 +81,14 @@ Payment Registry（ChainType → PaymentStrategy 映射）
 - Solana：`GetConfirmOrderInstructions` → 构建指令 → 前端钱包签名
 - 发送 ORDER_CONFIRMATION 消息给买家
 
-### 2.5 订单取消（`cancel.go`）
+### 2.5 订单取消（`order_cancel.go`）
 - **入口**: `CancelOrder` / `GetEscrowReleaseInstructions`
 - 仅限 CANCELABLE 订单，买家发起
 - UTXO：后端自动释放回买家地址
 - EVM/Solana：前端获取指令后钱包签名
 - 发送 ORDER_CANCEL 消息给卖家
 
-### 2.6 订单履行（`fulfillment.go`）
+### 2.6 订单履行（`order_fulfillment.go`）
 - **入口**: `FulfillOrder`
 - 卖家发送物流信息（物理商品）、数字交付（URL/密码）或加密货币交付（含 RWA Token）
 - **MODERATED 订单**：卖家在履行时预签 escrow 释放（`buildEscrowRelease`），构建 `ReleaseInfo`
@@ -97,13 +97,13 @@ Payment Registry（ChainType → PaymentStrategy 映射）
 - 发送 ORDER_FULFILLMENT（含 ReleaseInfo）消息给买家
 - 可多次调用（部分履行 → 完全履行）
 
-### 2.7 订单完成（`completion.go`）
+### 2.7 订单完成（`order_completion.go`）
 - **入口**: `CompleteOrder` / `GetCompleteOrderInstructions`
 - 买家确认收货、评价商品
 - MODERATED 订单：`releaseCompleteEscrowFunds` 签名 escrow 释放
 - 发送 ORDER_COMPLETE（含评价 + EscrowRelease）给卖家
 
-### 2.8 退款（`refund.go`）
+### 2.8 退款（`order_refund.go`）
 - **入口**: `RefundOrder` / `GetRefundOrderInstructions` / `RefundOrderViaRelay`
 - 卖家主动退款
 - **EVM/Solana**（所有支付方式，含 CANCELABLE 和 MODERATED）：
@@ -125,7 +125,7 @@ Payment Registry（ChainType → PaymentStrategy 映射）
 - **UTXO MODERATED**：`buildEscrowRelease` 构建释放参数 + 卖家签名 → 发送 REFUND（含 ReleaseInfo）→ 买家节点自动补签+广播
 - 发送 REFUND 消息给买家
 
-### 2.9 争议处理（`disputes.go`）
+### 2.9 争议处理（`order_disputes.go`）
 - **发起争议**: `OpenDispute` — 买家或卖家发起，发送完整合约给仲裁人
 - **关闭争议**: `CloseDispute`（仲裁人）— 决定资金分配（买家/卖家/仲裁人三方）、签名释放
 - **接受裁决**: `ReleaseFunds` — 买家/卖家接受仲裁结果并执行释放
@@ -172,11 +172,11 @@ UTXO:   escrowWallet.SignMultisigTransaction(txn, key, script) → chain-native
 
 | Node 方法 | 用途 | 对应文件 |
 |-----------|------|----------|
-| `GetConfirmOrderInstructions` | 确认 CANCELABLE 订单 | `confirm.go` |
-| `GetEscrowReleaseInstructions` | 取消 CANCELABLE 订单 | `cancel.go` |
-| `GetCompleteOrderInstructions` | 完成 MODERATED 订单 | `completion.go` |
-| `GetReleaseFundsInstructions` | 释放争议资金 | `disputes.go` |
-| `GetRefundOrderInstructions` | 退款/拒绝订单 | `reject.go` |
+| `GetConfirmOrderInstructions` | 确认 CANCELABLE 订单 | `order_confirm.go` |
+| `GetEscrowReleaseInstructions` | 取消 CANCELABLE 订单 | `order_cancel.go` |
+| `GetCompleteOrderInstructions` | 完成 MODERATED 订单 | `order_completion.go` |
+| `GetReleaseFundsInstructions` | 释放争议资金 | `order_disputes.go` |
+| `GetRefundOrderInstructions` | 退款/拒绝订单 | `order_reject.go` |
 
 ### 4.2 PaymentStrategy 接口方法
 
@@ -321,14 +321,15 @@ EVM/Solana 智能合约的 `_verifyTransaction` / `verify_signatures_with_timelo
 
 | 文件 | 职责 |
 |------|------|
-| `purchase.go` | 订单创建 |
-| `reject.go` | 订单拒绝（卖家拒绝） |
-| `confirm.go` | 订单确认（卖家确认 CANCELABLE） |
-| `cancel.go` | 订单取消（买家取消 CANCELABLE） |
-| `fulfillment.go` | 订单履行（卖家发货/交付） |
-| `completion.go` | 订单完成（买家完成 MODERATED） |
-| `refund.go` | 退款处理（DIRECT/MODERATED/EVM/Solana） |
-| `disputes.go` | 争议处理（开启/关闭/释放/超时释放） |
+| `order_purchase.go` | 订单创建 |
+| `order_reject.go` | 订单拒绝（卖家拒绝） |
+| `order_confirm.go` | 订单确认（卖家确认 CANCELABLE） |
+| `order_cancel.go` | 订单取消（买家取消 CANCELABLE） |
+| `order_fulfillment.go` | 订单履行（卖家发货/交付） |
+| `order_completion.go` | 订单完成（买家完成 MODERATED） |
+| `order_refund.go` | 退款处理（DIRECT/MODERATED/EVM/Solana） |
+| `order_disputes.go` | 争议处理（开启/关闭/释放/超时释放） |
+| `order_address_request.go` | 订单支付地址请求 |
 | `payment_dispatcher.go` | 策略注册 + 自动确认监控 + 共享辅助函数 |
 | `payment_strategy_utxo.go` | UTXO 链支付策略适配器 |
 | `payment_strategy_evm.go` | EVM 链支付策略适配器 |

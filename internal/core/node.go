@@ -18,6 +18,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/evm"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet/utxo"
 	"github.com/mobazha/mobazha3.0/internal/net"
@@ -205,6 +206,12 @@ type MobazhaNode struct {
 	// relayAPIURL is the platform relay API URL for gas fee payment (EVM CANCELABLE payments)
 	// Note: Solana support requires additional relay service implementation
 	relayAPIURL string
+
+	// evmChainConfigs holds per-chain EVM client configs derived from the node's
+	// multiwallet ChainAPIs config. Used by startEVMChainClients() in standalone mode
+	// to create chain clients that respect user-configured RPC URLs (instead of
+	// compiled-in factory defaults). In SaaS mode this is nil (clients come from HostService).
+	evmChainConfigs []evm.EVMClientConfig
 }
 
 // IsDefaultNode returns whether this node is the default node.
@@ -260,6 +267,10 @@ func (n *MobazhaNode) Start() {
 
 		// Start UTXO payment monitor for external wallet payments
 		go n.startUTXOPaymentMonitor()
+
+		// Inject EVM chain clients into wallets (symmetric with UTXO monitor above)
+		// SaaS: shared clients from HostService; Standalone: per-node clients via factory
+		n.startEVMChainClients()
 
 		// Start unified cancelable payment monitor for auto-confirmation
 		// This handles UTXO, EVM, and (future) Solana chains via event dispatch

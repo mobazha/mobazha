@@ -482,6 +482,13 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		return nil, err
 	}
 
+	// Extract EVM chain configs from multiwallet ChainAPIs for standalone client creation.
+	// This is done here (not in Start()) so the node stores user-configured RPC URLs.
+	// Must prepend Defaults (same as NewMultiwallet does internally) to populate ChainAPIs.
+	var mwCfg multiwallet.Config
+	_ = mwCfg.Apply(append([]multiwallet.Option{multiwallet.Defaults}, opts...)...)
+	evmConfigs := extractEVMConfigs(mwCfg.ChainAPIs, walletTestnet)
+
 	globalBlockedIds := []peer.ID{}
 	contracts, err := contracts.NewContracts(opts...)
 	if err == nil {
@@ -491,6 +498,12 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		}
 	} else {
 		logger.LogErrorWithIDf(log, nodeID, "Failed to create contracts util: %v", err)
+	}
+
+	// Share global blocked IDs with HostService for SaaS tenant nodes to reuse,
+	// avoiding per-tenant contract queries.
+	if hs != nil && len(globalBlockedIds) > 0 {
+		hs.SetGlobalBlockedIDs(globalBlockedIds)
 	}
 
 	blocked, err := prefs.BlockedNodes()
@@ -553,6 +566,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		hostService:            hs,
 		stripeConfigCache:      netdb.NewStripeConfigCache(),
 		relayAPIURL:            cfg.RelayAPIURL,
+		evmChainConfigs:        evmConfigs,
 	}
 	// Initialize content store with IPFS backend.
 	obNode.contentStore = newIPFSContentStore(
@@ -1012,11 +1026,20 @@ func newLightweightNode(
 	}
 	var walletOp pkgcontracts.WalletOperator = &mw
 
+	// EVM chain client injection is now deferred to MobazhaNode.Start() via
+	// startEVMChainClients(), which is symmetric with UTXO's startUTXOPaymentMonitor().
+	// Both SaaS and standalone modes inject during Start(), not at construction time.
+
 	// ── 5. NetworkService & FollowerTracker ───────────────────────────
-	// newLightweightNode is SaaS-only — skip contracts.NewContracts() which
-	// creates EVM connections just to query blocked IDs. The default node
-	// already handles this.
+	// Get global blocked IDs from HostService (cached by default node),
+	// avoiding per-tenant contract query connections.
 	globalBlockedIds := []peer.ID{}
+	if hs != nil {
+		if ids := hs.GetGlobalBlockedIDs(); len(ids) > 0 {
+			globalBlockedIds = ids
+			logger.LogInfoWithIDf(log, nodeID, "Using %d global blocked IDs from HostService", len(ids))
+		}
+	}
 
 	blocked, err := prefs.BlockedNodes()
 	if err != nil {

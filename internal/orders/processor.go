@@ -99,6 +99,15 @@ func NewOrderProcessor(cfg *Config) *OrderProcessor {
 	}
 }
 
+// GetStripeTransaction exposes the Stripe transaction lookup for use by the
+// payment verification loop in the core layer.
+func (op *OrderProcessor) GetStripeTransaction(txid iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error) {
+	if op.getStripeTransactionFunc == nil {
+		return nil, fmt.Errorf("stripe transaction function not configured")
+	}
+	return op.getStripeTransactionFunc(txid, coinType)
+}
+
 // Start begins listening for transactions from the wallets that pertain to our
 // orders. When we find one we record the payment.
 func (op *OrderProcessor) Start() {

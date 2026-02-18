@@ -60,8 +60,9 @@ func (op *OrderProcessor) processOrderCancelMessage(dbtx database.Tx, order *mod
 	}
 
 	if orderCancel.TransactionID != "" && paymentSent.Method == pb.PaymentSent_CANCELABLE {
-		// If this fails it's OK as the processor's unfunded order checking loop will
-		// retry at it's next interval.
+		// Best-effort: record the outgoing refund transaction for bookkeeping.
+		// Failure is acceptable — the funds have already moved on-chain; this
+		// only affects the local transaction ledger display.
 		tx, err := wallet.GetTransaction(iwallet.TransactionID(orderCancel.TransactionID), iwallet.CoinType(paymentSent.Coin))
 		if err == nil && tx != nil {
 			for _, from := range tx.From {

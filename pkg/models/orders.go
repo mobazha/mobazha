@@ -2,6 +2,8 @@ package models
 
 import (
 	"encoding/base64"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -114,6 +116,7 @@ type Order struct {
 	SerializedPaymentSent []byte
 	PaymentSentAcked      bool
 	PaymentSentSignature  string
+	PaymentVerified       bool // chain-verified; gates financial operations (auto-confirm, funded events)
 
 	SerializedOrderReject []byte
 	OrderRejectSignature  string
@@ -1309,14 +1312,27 @@ func (o *Order) toProtobuf() (*pb.Contract, error) {
 	}
 	for _, tx := range txs {
 		ts := timestamppb.New(tx.Timestamp)
-		if ts.CheckValid() != nil {
-			return nil, err
+		if tsErr := ts.CheckValid(); tsErr != nil {
+			return nil, fmt.Errorf("invalid transaction timestamp for tx %s: %w", tx.ID, tsErr)
 		}
 
 		var fromID []byte
 		for _, to := range tx.To {
 			if to.Address.String() == o.PaymentAddress {
 				fromID = to.ID
+			}
+		}
+
+		// Fallback: if fromID is empty but we have a valid transaction,
+		// construct a synthetic outpoint from the transaction ID.
+		// This handles cases where the transaction was created via API
+		// (ProcessOrderPayment) without proper UTXO outpoint data.
+		if len(fromID) == 0 && tx.ID != "" {
+			txidBytes, decErr := hex.DecodeString(string(tx.ID))
+			if decErr == nil && len(txidBytes) >= 32 {
+				idx := make([]byte, 4)
+				binary.BigEndian.PutUint32(idx, 0)
+				fromID = append(txidBytes[:32], idx...)
 			}
 		}
 

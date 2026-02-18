@@ -1105,9 +1105,12 @@ func (w *MockWallet) BuildAndSend(tx iwallet.Tx, txn iwallet.Transaction, signat
 	txn.ID = iwallet.TransactionID(hex.EncodeToString(txidBytes))
 
 	for i, in := range txn.From {
+		if len(in.ID) < 36 {
+			continue
+		}
 		outpointIndex := binary.BigEndian.Uint32(in.ID[32:])
 		prev, ok := w.transactions[iwallet.TransactionID(hex.EncodeToString(in.ID[:32]))]
-		if ok {
+		if ok && int(outpointIndex) < len(prev.To) {
 			txn.From[i].Address = prev.To[outpointIndex].Address
 			txn.From[i].Amount = prev.To[outpointIndex].Amount
 		}

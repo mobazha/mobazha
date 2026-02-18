@@ -79,22 +79,3 @@ func GetOrderEscrowInfo(orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, te
 	return escrowInfo, nil
 }
 
-func BuildPaymentSentTransaction(paymentSent *pb.PaymentSent) *iwallet.Transaction {
-	return &iwallet.Transaction{
-		ID: iwallet.TransactionID(paymentSent.TransactionID),
-		From: []iwallet.SpendInfo{
-			{
-				Address: iwallet.NewAddress(paymentSent.PayerAddress, iwallet.CoinType(paymentSent.Coin)), // 使用 PayerAddress
-				Amount:  iwallet.NewAmount(paymentSent.Amount),
-			},
-		},
-		To: []iwallet.SpendInfo{
-			{
-				Address: iwallet.NewAddress(paymentSent.ToAddress, iwallet.CoinType(paymentSent.Coin)),
-				Amount:  iwallet.NewAmount(paymentSent.Amount),
-			},
-		},
-		Value:     iwallet.NewAmount(paymentSent.Amount),
-		Timestamp: paymentSent.Timestamp.AsTime(),
-	}
-}

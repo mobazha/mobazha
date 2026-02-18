@@ -261,3 +261,13 @@ type ExcessPaymentRefunded struct {
 	RefundedAmount uint64 `json:"refundedAmount"`
 	Coin           string `json:"coin"`
 }
+
+// PaymentVerificationExpired is emitted when a PaymentSent transaction cannot be
+// verified on-chain within the allowed window (48h). The vendor should inspect the
+// order and decide whether to cancel or manually re-verify.
+type PaymentVerificationExpired struct {
+	OrderID       string `json:"orderID"`
+	TransactionID string `json:"transactionID"`
+	Coin          string `json:"coin"`
+	Reason        string `json:"reason"` // "timeout" or "address_mismatch"
+}

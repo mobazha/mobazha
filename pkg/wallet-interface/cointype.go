@@ -11,7 +11,7 @@ import (
 type ChainType string
 
 const (
-	ChainMock        ChainType = "MOCK"
+	ChainMock        ChainType = "MCK"
 	ChainBitcoin     ChainType = "BTC"
 	ChainBitcoinCash ChainType = "BCH"
 	ChainLitecoin    ChainType = "LTC"

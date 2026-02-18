@@ -121,7 +121,8 @@ Payment Registry（ChainType → PaymentStrategy 映射）
     4. 全程无需前端钱包交互
   - 买家收到 REFUND 消息后仅记录 txid，**无需任何链上操作**
 - **UTXO DIRECT**：从卖家内置钱包直接转账退还买家
-- **UTXO CANCELABLE**：不支持自动退款（资金已释放到外部钱包，卖家需手动退款）
+- **UTXO CANCELABLE（未确认）**：资金仍在 1-of-2 escrow → `releaseFromCancelableAddressWithParams` 释放回买家地址（从交易输入提取买家地址）
+- **UTXO CANCELABLE（已确认）**：资金已释放到卖家外部钱包 → 不支持自动退款，卖家需手动退款
 - **UTXO MODERATED**：`buildEscrowRelease` 构建释放参数 + 卖家签名 → 发送 REFUND（含 ReleaseInfo）→ 买家节点自动补签+广播
 - 发送 REFUND 消息给买家
 
@@ -338,6 +339,7 @@ EVM/Solana 智能合约的 `_verifyTransaction` / `verify_signatures_with_timelo
 | `payment_relay.go` | ViaRelay 方法 + relayOrDirect + relayInstructions |
 | `payment_monitor_utxo.go` | UTXO 支付监控 + 地址订阅 + 多笔聚合 |
 | `payment_stripe.go` | Stripe 支付集成（Connect 账户 + PaymentIntent） |
+| `payment_verification.go` | 支付链上验证循环（ADR-7） |
 | `payment_rwa.go` | RWA 即时购买监控 + 自动确认 |
 | `payment_escrow.go` | Escrow 操作（获取指令、查询状态） |
 | `payment_receiving_account.go` | 收款账户管理（CRUD + 默认切换） |
@@ -413,3 +415,41 @@ EVM/Solana 智能合约的 `_verifyTransaction` / `verify_signatures_with_timelo
 - 多人并行开发同一域 → 优先提取该域的 Service
 
 **原则**：渐进式重构，每次只提取一个域，确保编译通过 + 测试覆盖，避免大爆炸式重写。
+
+### ADR-7: 链上验证优先 (Chain Verification First)
+
+**Status**: Accepted
+
+**Context**: `PaymentSent` 是买家通过 P2P 发送的声明消息，不包含链上证明。
+`ValidatePayment` 仅验证地址格式和金额匹配，不验证链上到账。
+此前代码在 `GetTransaction` 失败时会构造合成交易 (`BuildPaymentSentTransaction`)
+直接标记订单为 funded，存在假支付攻击面。
+
+**Decision**:
+- FSM 在消息层面正常转换状态（PAYMENT_SENT → PENDING），这代表"买家声称已付款，订单等待处理"
+- 金融操作（OrderFunded 事件、CancelablePaymentReady、RwaInstantBuyCompleted、auto-confirm）
+  gate behind `Order.PaymentVerified` 布尔字段
+- MobazhaNode 层 `startPaymentVerificationLoop()` 每 30s 重试 `GetTransaction`
+  直到链上确认，确认后设置 `PaymentVerified = true` 并发射事件
+- 禁止基于未验证的 P2P 消息构造合成交易
+
+**Timeout & Failure Handling**:
+- 0–2h: 每 30s 检查一次
+- 2–48h: 降频至每 5min 检查一次
+- 48h+: 停止重试，发射 `PaymentVerificationExpired` 事件通知卖家
+- 地址不匹配: 交易存在但收款地址与订单不符，立即标记为 expired (reason=address_mismatch)
+- 不自动取消订单 — 由卖家决定后续操作（可能是 RPC 临时故障）
+
+**Outgoing Transaction Recording** (order_confirmation.go / order_cancel.go):
+- 记录释放/退款的链上交易仅用于本地账本（best-effort）
+- 失败不影响订单流程，资金已在链上完成转移
+
+**Key Files**:
+- `pkg/models/orders.go` — `PaymentVerified` 字段
+- `pkg/events/orders.go` — `PaymentVerificationExpired` 事件
+- `internal/orders/payment_sent.go` — 事件发射 gated behind `PaymentVerified`
+- `internal/core/payment_verification.go` — 验证循环（含 timeout + 地址匹配）
+
+**Consequences**: 验证延迟（秒~分钟级），消除假支付攻击面。
+UTXO 链有独立的 UTXO monitor 作为额外验证路径，验证循环主要服务 EVM/Solana 链。
+`BuildPaymentSentTransaction` 已删除（无调用者），不再作为 fallback。

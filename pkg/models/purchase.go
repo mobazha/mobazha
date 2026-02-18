@@ -1,6 +1,10 @@
 package models
 
 import (
+	"crypto/rand"
+	"encoding/binary"
+	"encoding/hex"
+	"fmt"
 	"time"
 
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -161,12 +165,41 @@ type PaymentData struct {
 	RemainingAmount uint64 `json:"remainingAmount,omitempty"` // 剩余待支付金额
 }
 
-func (p *PaymentData) BuildTransaction() iwallet.Transaction {
+// EnsureTransactionFields populates TransactionID and FromID on PaymentData
+// if they are empty. Call this before BuildTransaction to guarantee non-empty values.
+func (p *PaymentData) EnsureTransactionFields() error {
+	if p.TransactionID == "" {
+		txidBytes := make([]byte, 32)
+		if _, err := rand.Read(txidBytes); err != nil {
+			return fmt.Errorf("generate transaction ID: %w", err)
+		}
+		p.TransactionID = hex.EncodeToString(txidBytes)
+	}
+
+	if len(p.FromID) == 0 {
+		prevBytes := make([]byte, 36)
+		if _, err := rand.Read(prevBytes); err != nil {
+			return fmt.Errorf("generate FromID: %w", err)
+		}
+		p.FromID = prevBytes
+	}
+
+	return nil
+}
+
+func (p *PaymentData) BuildTransaction() (iwallet.Transaction, error) {
+	if p.TransactionID == "" {
+		return iwallet.Transaction{}, fmt.Errorf("TransactionID is required: call EnsureTransactionFields first")
+	}
+	if len(p.FromID) == 0 {
+		return iwallet.Transaction{}, fmt.Errorf("FromID is required: call EnsureTransactionFields first")
+	}
+
 	// 安全获取 FromID，避免切片越界
 	var fromID []byte
 	if len(p.FromID) >= 36 {
 		fromID = p.FromID[:36]
-	} else if len(p.FromID) > 0 {
+	} else {
 		fromID = p.FromID
 	}
 
@@ -178,12 +211,25 @@ func (p *PaymentData) BuildTransaction() iwallet.Transaction {
 		toID = p.ToID
 	}
 
+	txID := iwallet.TransactionID(p.TransactionID)
+
+	// Auto-generate ToID (outpoint) if not provided
+	// Format: 32 bytes txid + 4 bytes output index (big-endian)
+	if len(toID) == 0 {
+		txidBytes, err := hex.DecodeString(string(txID))
+		if err == nil && len(txidBytes) >= 32 {
+			idx := make([]byte, 4)
+			binary.BigEndian.PutUint32(idx, 0)
+			toID = append(txidBytes[:32], idx...)
+		}
+	}
+
 	tx := iwallet.Transaction{
-		ID: iwallet.TransactionID(p.TransactionID),
+		ID: txID,
 		From: []iwallet.SpendInfo{
 			{
 				ID:      fromID,
-				Address: iwallet.NewAddress(p.PayerAddress, iwallet.CoinType(p.Coin)), // 使用 PayerAddress
+				Address: iwallet.NewAddress(p.PayerAddress, iwallet.CoinType(p.Coin)),
 				Amount:  iwallet.NewAmount(p.Amount),
 			},
 		},
@@ -197,7 +243,7 @@ func (p *PaymentData) BuildTransaction() iwallet.Transaction {
 		Value:     iwallet.NewAmount(p.Amount),
 		Timestamp: p.Timestamp,
 	}
-	return tx
+	return tx, nil
 }
 
 // OrderTotals represents a breakdown of the various charges of the order.

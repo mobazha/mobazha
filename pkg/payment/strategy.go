@@ -26,6 +26,7 @@ import (
 	"context"
 
 	"github.com/mobazha/mobazha3.0/pkg/events"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 // PaymentModel declares the payment paradigm used by a chain.
@@ -107,6 +108,28 @@ type InstructionResult struct {
 	Instructions any
 }
 
+// ── Escrow Signing Params / Result ──────────────────────────────
+
+// SignEscrowParams provides parameters for escrow signing operations.
+// Used by SignEscrowRelease to generate chain-specific signatures.
+type SignEscrowParams struct {
+	// Transaction is the escrow transaction to sign.
+	// UTXO: uses From (inputs) + To (outputs) for multisig signing.
+	// EVM/Solana: only uses To (outputs) for signature generation.
+	Transaction iwallet.Transaction
+
+	// Script is the redeem script (hex-decoded).
+	// UTXO: multisig redeem script. EVM: contract address bytes. Solana: unused.
+	Script []byte
+
+	// ChainCode is the HD chain code for key derivation (hex-decoded).
+	ChainCode []byte
+
+	// CoinCode is the currency code (e.g. "MCK", "BTC") for wallet resolution.
+	// Needed because the UTXO adapter is shared across all UTXO chains.
+	CoinCode string
+}
+
 // ── PaymentStrategy Interface ───────────────────────────────────
 
 // PaymentStrategy defines chain-level payment operations covering the full
@@ -125,6 +148,12 @@ type InstructionResult struct {
 // The calling code (internal/core/ lifecycle files) handles order validation,
 // DB operations, and message sending. Strategy methods only handle the
 // chain-specific instruction generation or fund release.
+//
+// # Escrow Operations
+//
+// SignEscrowRelease and EstimateEscrowFee centralize chain-specific escrow
+// operations that were previously scattered across order lifecycle files as
+// 3-way if/else branches (UTXO vs EVM vs Solana).
 type PaymentStrategy interface {
 	// ── Meta ────────────────────────────────────────────
 
@@ -136,6 +165,29 @@ type PaymentStrategy interface {
 	// AutoConfirm handles auto-confirmation for a CANCELABLE payment.
 	// Called asynchronously by the cancelable payment dispatcher.
 	AutoConfirm(ctx context.Context, event *events.CancelablePaymentReady) error
+
+	// ── Escrow Operations ──────────────────────────────
+
+	// SignEscrowRelease signs an escrow release transaction using the
+	// chain-specific key and signing method.
+	//
+	// UTXO: derives escrow private key from escrowMasterKey + chainCode,
+	//       calls escrowWallet.SignMultisigTransaction.
+	// EVM:  signs with ethMasterKey via evmpayment.SignEscrowRelease.
+	// Solana: signs with solPrivKey via solanapayment.SignEscrowRelease.
+	//
+	// This method eliminates the 3-way signing branch that was previously
+	// duplicated in buildEscrowRelease, releaseCompleteEscrowFunds, and
+	// CloseDispute.
+	SignEscrowRelease(ctx context.Context, params SignEscrowParams) ([]iwallet.EscrowSignature, error)
+
+	// EstimateEscrowFee returns the estimated fee for an escrow release.
+	//
+	// UTXO: calculates based on nIn/nOut via escrowWallet.EstimateEscrowFee.
+	// EVM/Solana: returns 0 (fees are paid separately on-chain by the signer).
+	//
+	// coinCode is needed to resolve the correct chain wallet (e.g. "BTC", "LTC").
+	EstimateEscrowFee(coinCode string, nIn, nOut int, feeLevel iwallet.FeeLevel) (iwallet.Amount, error)
 
 	// ── Instruction Generation ─────────────────────────
 

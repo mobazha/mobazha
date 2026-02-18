@@ -18,6 +18,12 @@ func (m *mockStrategy) Model() payment.PaymentModel { return m.model }
 func (m *mockStrategy) AutoConfirm(_ context.Context, _ *events.CancelablePaymentReady) error {
 	return nil
 }
+func (m *mockStrategy) SignEscrowRelease(_ context.Context, _ payment.SignEscrowParams) ([]iwallet.EscrowSignature, error) {
+	return nil, nil
+}
+func (m *mockStrategy) EstimateEscrowFee(_ string, _, _ int, _ iwallet.FeeLevel) (iwallet.Amount, error) {
+	return iwallet.NewAmount(0), nil
+}
 func (m *mockStrategy) GetConfirmInstructions(_ context.Context, _ payment.InstructionParams) (*payment.InstructionResult, error) {
 	return &payment.InstructionResult{Instructions: nil}, nil
 }

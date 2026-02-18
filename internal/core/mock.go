@@ -207,6 +207,8 @@ func MockNode() (*MobazhaNode, error) {
 		FeatureManager:       node.featureManager,
 	})
 
+	node.registerPaymentStrategies()
+	node.paymentRegistry.Register(iwallet.ChainMock, &utxoAutoConfirmAdapter{node: node})
 	node.registerHandlers()
 	node.listenNetworkEvents()
 	node.publishHandler()
@@ -410,6 +412,8 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			FeatureManager:       node.featureManager,
 		})
 
+		node.registerPaymentStrategies()
+		node.paymentRegistry.Register(iwallet.ChainMock, &utxoAutoConfirmAdapter{node: node})
 		node.registerHandlers()
 		node.listenNetworkEvents()
 		node.publishHandler()

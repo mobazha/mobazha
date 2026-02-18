@@ -73,8 +73,8 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		}
 	}
 
-	// If this fails it's OK as the processor's unfunded order checking loop will
-	// retry at it's next interval.
+	// ADR-7: Chain Verification First — only record transaction if wallet confirms it on-chain.
+	// If GetTransaction fails, the MobazhaNode-level payment verification loop will retry.
 	var tx *iwallet.Transaction
 	if !transactionKnown {
 		if iwallet.CoinType(paymentSent.Coin).IsStripeChain() {
@@ -82,11 +82,9 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		} else {
 			tx, err = wallet.GetTransaction(iwallet.TransactionID(paymentSent.TransactionID), iwallet.CoinType(paymentSent.Coin))
 			if err != nil {
-				logger.LogErrorWithIDf(log, op.nodeID, "Failed to get transaction from txid: %s, error: %s", paymentSent.TransactionID, err)
-
-				logger.LogInfoWithIDf(log, op.nodeID, "building transaction from payment sent message, txid: %s", paymentSent.TransactionID)
-				tx = utils.BuildPaymentSentTransaction(paymentSent)
-				err = nil
+				logger.LogInfoWithIDf(log, op.nodeID,
+					"Payment tx %s not yet on-chain for order %s, will retry in verification loop",
+					paymentSent.TransactionID, order.ID)
 			}
 		}
 		if err == nil && tx != nil {
@@ -99,11 +97,12 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 					if err := op.ProcessOrderPayment(dbtx, order, message, *tx); err != nil {
 						return nil, err
 					}
+					order.PaymentVerified = true
 				}
 			}
-		} else {
-			logger.LogErrorWithIDf(log, op.nodeID, "Failed to get transaction from id: %s, error: %s", paymentSent.TransactionID, err)
 		}
+	} else {
+		order.PaymentVerified = true
 	}
 
 	// Check if order is funded and handle role-specific logic
@@ -127,8 +126,10 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		}
 
 	case models.RoleVendor:
-		// Vendor: send rating signatures and emit OrderFunded event
-		if funded {
+		// ADR-7: Financial operations are gated behind PaymentVerified.
+		// If not verified, the MobazhaNode verification loop will retry GetTransaction
+		// and emit these events once chain confirmation succeeds.
+		if funded && order.PaymentVerified {
 			if err := op.sendRatingSignatures(dbtx, order, orderOpen); err != nil {
 				logger.LogInfoWithIDf(log, op.nodeID, "Error sending rating signatures: %s", err)
 			}
@@ -152,16 +153,10 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 					Title: orderOpen.Listings[0].Listing.Item.Title,
 				})
 			})
-			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected: Order %s fully funded", order.ID)
+			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected and chain-verified: Order %s fully funded", order.ID)
 		}
 
-		// For CANCELABLE payments, emit event to trigger auto-confirm in core layer
-		// This decouples message processing (orders layer) from wallet operations (core layer)
-		// The core layer will determine how to handle based on chain type:
-		// - UTXO chains: direct release via multisig
-		// - EVM/Solana chains: release via platform relay API
-		if paymentSent.Method == pb.PaymentSent_CANCELABLE {
-			// Parse amount from string
+		if paymentSent.Method == pb.PaymentSent_CANCELABLE && order.PaymentVerified {
 			var amount uint64
 			if tx != nil {
 				amount = uint64(tx.Value.Int64())
@@ -174,12 +169,10 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 					Amount:        amount,
 				})
 			})
-			logger.LogInfoWithIDf(log, op.nodeID, "CANCELABLE payment ready for auto-confirm: order %s (coin=%s)", order.ID, paymentSent.Coin)
+			logger.LogInfoWithIDf(log, op.nodeID, "CANCELABLE payment chain-verified, ready for auto-confirm: order %s (coin=%s)", order.ID, paymentSent.Coin)
 		}
 
-		// For RWA_INSTANT payments (method=4), the atomic swap has already completed on-chain
-		// Emit event to trigger auto-confirm in core layer
-		if paymentSent.Method == pb.PaymentSent_RWA_INSTANT {
+		if paymentSent.Method == pb.PaymentSent_RWA_INSTANT && order.PaymentVerified {
 			dbtx.RegisterCommitHook(func() {
 				op.bus.Emit(&events.RwaInstantBuyCompleted{
 					OrderID:       order.ID.String(),
@@ -187,7 +180,11 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 					Coin:          paymentSent.Coin,
 				})
 			})
-			logger.LogInfoWithIDf(log, op.nodeID, "RWA instant buy completed, ready for auto-confirm: order %s", order.ID)
+			logger.LogInfoWithIDf(log, op.nodeID, "RWA instant buy chain-verified, ready for auto-confirm: order %s", order.ID)
+		}
+
+		if !order.PaymentVerified {
+			logger.LogInfoWithIDf(log, op.nodeID, "Order %s: PaymentSent received but not yet chain-verified, financial events deferred", order.ID)
 		}
 	}
 

@@ -278,6 +278,9 @@ func (n *MobazhaNode) Start() {
 		// Start UTXO payment monitor for external wallet payments
 		go n.startUTXOPaymentMonitor()
 
+		// ADR-7: Verify unconfirmed PaymentSent transactions on-chain
+		go n.startPaymentVerificationLoop()
+
 		// Inject EVM chain clients into wallets (symmetric with UTXO monitor above)
 		// SaaS: shared clients from HostService; Standalone: per-node clients via factory
 		n.startEVMChainClients()

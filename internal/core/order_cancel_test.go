@@ -135,7 +135,10 @@ func TestMobazhaNode_CancelOrder(t *testing.T) {
 	rand.Read(toIDBytes)
 	paymentData.ToID = toIDBytes
 
-	tx := paymentData.BuildTransaction()
+	tx, err := paymentData.BuildTransaction()
+	if err != nil {
+		t.Fatalf("BuildTransaction failed: %v", err)
+	}
 	// Use IngestTransaction instead of AddTransaction to trigger events via network
 	bw, _ := buyerNode.Multiwallet().WalletForChain(iwallet.ChainMock)
 	buyerWal, ok := bw.(*wallet.MockWallet)

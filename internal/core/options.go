@@ -63,9 +63,10 @@ func (n *MobazhaNode) initPaymentService() {
 		NodeID:      n.nodeID,
 		Shutdown:    n.shutdown,
 
-		GetProfile:    n.GetProfile,
-		GetPayoutAddr: n.GetPayoutAddress,
-		ConfirmOrder:  n.ConfirmOrder,
+		GetProfile:        n.GetProfile,
+		GetPayoutAddr:     n.GetPayoutAddress,
+		ConfirmOrder:      n.ConfirmOrder,
+		ReleaseCancelable: n.releaseFromCancelableAddress,
 
 		EVMRelayService: evmRelay,
 		RelayAPIURL:     n.relayAPIURL,

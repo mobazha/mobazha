@@ -291,6 +291,8 @@ func (n *MobazhaNode) initPaymentService() {
 		Keys:                n.keyProvider,
 		ProcessOrderPayment: n.ProcessOrderPayment,
 
+		ExchangeRates: n.exchangeRates,
+
 		EVMRelayService: evmRelay,
 		RelayAPIURL:     n.relayAPIURL,
 	})

@@ -110,36 +110,21 @@ func (n *MobazhaNode) GetMonitorService() utxo.UTXOMonitorService {
 // ── Thin delegates to PaymentAppService ─────────────────────────────────
 
 func (n *MobazhaNode) handleCancelablePaymentForUTXO(event *events.CancelablePaymentReady) {
-	if n.paymentService != nil {
-		n.paymentService.HandleCancelablePaymentForUTXO(event)
-		return
-	}
+	n.paymentService.HandleCancelablePaymentForUTXO(event)
 }
 
 func (n *MobazhaNode) handleUTXOPayment(tx iwallet.Transaction, wa *utxo.WatchedAddress) {
-	if n.paymentService != nil {
-		n.paymentService.HandleUTXOPayment(tx, wa)
-		return
-	}
+	n.paymentService.HandleUTXOPayment(tx, wa)
 }
 
 func (n *MobazhaNode) WatchPaymentAddress(orderID string, address string, chainType iwallet.ChainType, scriptPubKey []byte) error {
-	if n.paymentService != nil {
-		return n.paymentService.WatchPaymentAddress(orderID, address, chainType, scriptPubKey)
-	}
-	return nil
+	return n.paymentService.WatchPaymentAddress(orderID, address, chainType, scriptPubKey)
 }
 
 func (n *MobazhaNode) StopWatchingPayment(orderID string) error {
-	if n.paymentService != nil {
-		return n.paymentService.StopWatchingPayment(orderID)
-	}
-	return nil
+	return n.paymentService.StopWatchingPayment(orderID)
 }
 
 func (n *MobazhaNode) autoConfirmCancelablePayment(order *models.Order) {
-	if n.paymentService != nil {
-		n.paymentService.autoConfirmCancelablePayment(order)
-		return
-	}
+	n.paymentService.autoConfirmCancelablePayment(order)
 }

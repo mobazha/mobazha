@@ -95,7 +95,7 @@ func TestMobazhaNode_Dispute(t *testing.T) {
 	purchase := factory.NewPurchase()
 	purchase.Items[0].ListingHash = index[0].CID
 
-	orderID, _, err := network.Nodes()[1].PurchaseListing(context.Background(), purchase)
+	orderID, _, err := network.Nodes()[1].Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestMobazhaNode_Dispute(t *testing.T) {
 
 	// Step: Buyer gets MODERATED payment info (resolves moderator escrow key via P2P)
 	moderatorPeerID := network.Nodes()[2].Identity().String()
-	paymentData, err := network.Nodes()[1].GetUTXOPaymentInfo(
+	paymentData, err := network.Nodes()[1].Wallet().GetUTXOPaymentInfo(
 		context.Background(),
 		orderID.String(),
 		moderatorPeerID,
@@ -143,7 +143,7 @@ func TestMobazhaNode_Dispute(t *testing.T) {
 
 	// Ingest tx into seller wallet so vendor GetTransaction succeeds (PaymentVerified)
 	ingestPaymentToWallets(t, paymentData, network.Nodes()[0], network.Nodes()[1])
-	err = network.Nodes()[1].ProcessOrderPayment(context.Background(), paymentData)
+	err = network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +181,7 @@ func TestMobazhaNode_Dispute(t *testing.T) {
 	}
 
 	done4 := make(chan struct{})
-	if err := network.Nodes()[0].ConfirmOrder(orderID, "", "abcd", done4); err != nil {
+	if err := network.Nodes()[0].Order().ConfirmOrder(orderID, "", "abcd", done4); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -232,7 +232,7 @@ func TestMobazhaNode_Dispute(t *testing.T) {
 	}
 
 	done5 := make(chan struct{})
-	if err := network.Nodes()[1].OpenDispute(orderID, "Got scammed", done5); err != nil {
+	if err := network.Nodes()[1].Order().OpenDispute(orderID, "Got scammed", done5); err != nil {
 		t.Fatal(err)
 	}
 
@@ -353,7 +353,7 @@ func TestMobazhaNode_Dispute(t *testing.T) {
 	}
 
 	done6 := make(chan struct{})
-	if err := network.Nodes()[2].CloseDispute(orderID, 50, 50, "Resolve dispute", done6); err != nil {
+	if err := network.Nodes()[2].Order().CloseDispute(orderID, 50, 50, "Resolve dispute", done6); err != nil {
 		t.Fatal(err)
 	}
 
@@ -407,7 +407,7 @@ func TestMobazhaNode_Dispute(t *testing.T) {
 	}
 
 	done7 := make(chan struct{})
-	if err := network.Nodes()[1].ReleaseFunds(orderID, iwallet.TransactionID(""), done7); err != nil {
+	if err := network.Nodes()[1].Order().ReleaseFunds(orderID, iwallet.TransactionID(""), done7); err != nil {
 		t.Fatal(err)
 	}
 
@@ -455,7 +455,7 @@ func TestMobazhaNode_Dispute(t *testing.T) {
 }
 
 func getNodeTotalBalance(network *Mocknet, index int) (iwallet.Amount, error) {
-	wallet, err := network.Nodes()[index].multiwallet.WalletForCurrencyCode(iwallet.CtMock.String())
+	wallet, err := network.Nodes()[index].Multiwallet().WalletForCurrencyCode(iwallet.CtMock.String())
 	if err != nil {
 		return iwallet.NewAmount(0), err
 	}
@@ -554,7 +554,7 @@ func TestMobazhaNode_ReleaseFundsAfterTimeout(t *testing.T) {
 	purchase := factory.NewPurchase()
 	purchase.Items[0].ListingHash = index[0].CID
 
-	orderID, _, err := network.Nodes()[1].PurchaseListing(context.Background(), purchase)
+	orderID, _, err := network.Nodes()[1].Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -573,7 +573,7 @@ func TestMobazhaNode_ReleaseFundsAfterTimeout(t *testing.T) {
 
 	// Step: Buyer gets MODERATED payment info (resolves moderator escrow key via P2P)
 	moderatorPeerID2 := network.Nodes()[2].Identity().String()
-	paymentData2, err := network.Nodes()[1].GetUTXOPaymentInfo(
+	paymentData2, err := network.Nodes()[1].Wallet().GetUTXOPaymentInfo(
 		context.Background(),
 		orderID.String(),
 		moderatorPeerID2,
@@ -601,7 +601,7 @@ func TestMobazhaNode_ReleaseFundsAfterTimeout(t *testing.T) {
 
 	// Ingest tx into seller wallet so vendor GetTransaction succeeds (PaymentVerified)
 	ingestPaymentToWallets(t, paymentData2, network.Nodes()[0], network.Nodes()[1])
-	err = network.Nodes()[1].ProcessOrderPayment(context.Background(), paymentData2)
+	err = network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -639,7 +639,7 @@ func TestMobazhaNode_ReleaseFundsAfterTimeout(t *testing.T) {
 	}
 
 	done4 := make(chan struct{})
-	if err := network.Nodes()[0].ConfirmOrder(orderID, "", "abcd", done4); err != nil {
+	if err := network.Nodes()[0].Order().ConfirmOrder(orderID, "", "abcd", done4); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -690,7 +690,7 @@ func TestMobazhaNode_ReleaseFundsAfterTimeout(t *testing.T) {
 	}
 
 	done5 := make(chan struct{})
-	if err := network.Nodes()[1].OpenDispute(orderID, "Got scammed", done5); err != nil {
+	if err := network.Nodes()[1].Order().OpenDispute(orderID, "Got scammed", done5); err != nil {
 		t.Fatal(err)
 	}
 
@@ -792,7 +792,7 @@ func TestMobazhaNode_ReleaseFundsAfterTimeout(t *testing.T) {
 	// mock clock from github.com/benbjohnson/clock need check source. To run this test, we need set a breakpoint here,
 	// and manually change system time.
 	done6 := make(chan struct{})
-	if err := network.Nodes()[0].ReleaseFundsAfterTimeout(orderID, done6); err != nil {
+	if err := network.Nodes()[0].Order().ReleaseFundsAfterTimeout(orderID, done6); err != nil {
 		t.Fatal(err)
 	}
 

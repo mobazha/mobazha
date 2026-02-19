@@ -106,7 +106,7 @@ func TestMobazhaNode_PurchaseListing(t *testing.T) {
 	purchase.Items[0].ListingHash = index[0].CID
 
 	// Have node 1 purchase the listing from node 0.
-	_, paymentAmount, err := network.Nodes()[1].PurchaseListing(context.Background(), purchase)
+	_, paymentAmount, err := network.Nodes()[1].Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func TestMobazhaNode_PurchaseListing(t *testing.T) {
 		Coin:      iwallet.CoinType(orderOpen.PricingCoin),
 		ToAddress: "abcd",
 	}
-	err = network.Nodes()[1].ProcessOrderPayment(context.Background(), paymentData)
+	err = network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +246,7 @@ func TestMobazhaNode_PurchaseListing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	orderID, paymentAmount, err := network.Nodes()[1].PurchaseListing(context.Background(), purchase)
+	orderID, paymentAmount, err := network.Nodes()[1].Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,7 +370,7 @@ func TestMobazhaNode_EstimateOrderSubtotal(t *testing.T) {
 		PricingCoin:          "MCK",
 	}
 
-	val, err := network.Nodes()[1].EstimateOrderTotal(context.Background(), purchase)
+	val, err := network.Nodes()[1].Order().EstimateOrderTotal(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}

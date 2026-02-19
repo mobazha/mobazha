@@ -121,6 +121,9 @@ type OrderService interface {
 	GetReleaseFundsInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	ReleaseFunds(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	ReleaseFundsAfterTimeout(orderID models.OrderID, done chan struct{}) error
+
+	// Request address from a remote peer
+	RequestAddress(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error)
 }
 
 // ListingService handles product listing management.
@@ -326,6 +329,4 @@ type NodeService interface {
 	// SubscribeEvent subscribes to a specific event type.
 	SubscribeEvent(event any) (events.Subscription, error)
 
-	// Request address
-	RequestAddress(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error)
 }

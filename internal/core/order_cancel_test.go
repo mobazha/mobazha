@@ -92,7 +92,7 @@ func TestMobazhaNode_CancelOrder(t *testing.T) {
 	if err := network.ipfsNet.UnlinkPeers(sellerNode.Identity(), buyerNode.Identity()); err != nil {
 		t.Fatal(err)
 	}
-	orderID2, paymentAmount, err := buyerNode.PurchaseListing(context.Background(), purchase)
+	orderID2, paymentAmount, err := buyerNode.Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestMobazhaNode_CancelOrder(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	paymentData, err := buyerNode.GetUTXOPaymentInfo(context.Background(), orderID2.String(), "", iwallet.CtMock)
+	paymentData, err := buyerNode.Wallet().GetUTXOPaymentInfo(context.Background(), orderID2.String(), "", iwallet.CtMock)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestMobazhaNode_CancelOrder(t *testing.T) {
 	}
 	buyerWal.IngestTransaction(tx)
 
-	err = buyerNode.ProcessOrderPayment(context.Background(), paymentData)
+	err = buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +199,7 @@ func TestMobazhaNode_CancelOrder(t *testing.T) {
 	}
 
 	done5 := make(chan struct{})
-	if err := buyerNode.CancelOrder(orderID2, "", done5); err != nil {
+	if err := buyerNode.Order().CancelOrder(orderID2, "", done5); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -299,7 +299,7 @@ func TestMobazhaNode_releaseFromCancelableAddress(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := node.releaseFromCancelableAddress(order)
+	result, err := node.orderService.releaseFromCancelableAddress(order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +324,7 @@ func TestMobazhaNode_releaseFromCancelableAddress(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = node.releaseFromCancelableAddress(order)
+	_, err = node.orderService.releaseFromCancelableAddress(order)
 	if err == nil {
 		t.Fatal("Expected error spending non-existent coins")
 	}

@@ -17,6 +17,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/request"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -94,10 +95,14 @@ func (n *MobazhaNode) initPreferencesService() {
 		return
 	}
 	n.preferencesService = NewPreferencesAppService(PreferencesAppServiceConfig{
-		DB:                    n.db,
-		BanManager:            n.banManager,
-		UpdateAllListingsFunc: n.listingService.UpdateAllListings,
-		GetMyListingsFunc:     n.listingService.GetMyListings,
+		DB:         n.db,
+		BanManager: n.banManager,
+		UpdateAllListingsFunc: func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error {
+			return n.listingService.UpdateAllListings(updateFunc, done)
+		},
+		GetMyListingsFunc: func() (models.ListingIndex, error) {
+			return n.listingService.GetMyListings()
+		},
 	})
 }
 
@@ -216,8 +221,12 @@ func (n *MobazhaNode) initOrderService() {
 		Testnet:         n.testnet,
 		ExchangeRates:   n.exchangeRates,
 
-		GetPayoutAddr:               n.GetPayoutAddress,
-		ReleaseCancelableWithParams: n.releaseFromCancelableAddressWithParams,
+		GetPayoutAddr: func(coinType string) (iwallet.Address, error) {
+			return n.paymentService.GetPayoutAddress(coinType)
+		},
+		ReleaseCancelableWithParams: func(order *models.Order, params releaseFromCancelableAddressParams) (iwallet.Tx, *iwallet.Transaction, error) {
+			return n.paymentService.ReleaseFromCancelableAddressWithParams(order, params)
+		},
 		ReleaseCancelableFunds: func(order *models.Order, payoutAddress string) (iwallet.TransactionID, string, error) {
 			if n.paymentService != nil {
 				return n.paymentService.ReleaseCancelableFunds(order, payoutAddress)
@@ -233,14 +242,17 @@ func (n *MobazhaNode) initOrderService() {
 		GetListingByCID: func(ctx context.Context, c cid.Cid, reqCtx interface{}) (*pb.SignedListing, error) {
 			return n.listingService.GetListingByCID(ctx, c, nil)
 		},
-		EnsureListingCurrent: func(ctx context.Context, listing *pb.SignedListing, listingHash string) error {
-			return n.ensureListingIsCurrent(ctx, listing, listingHash)
+		GetListings: func(ctx context.Context, peerID peer.ID) (models.ListingIndex, error) {
+			return n.listingService.GetListings(ctx, peerID, nil, false)
 		},
 		ProcessStripePayment: func(paymentData *models.PaymentData) error {
 			return n.paymentService.ProcessStripePaymentData(paymentData)
 		},
 		FetchOrderByID: func(orderID string) (*models.Order, error) {
-			return n.fetchOrderByID(orderID)
+			return n.paymentService.FetchOrderByID(orderID)
+		},
+		RelayInstructions: func(orderID string, coinType iwallet.CoinType, instructions any) (string, error) {
+			return n.paymentService.RelayInstructions(orderID, coinType, instructions)
 		},
 	})
 }
@@ -278,18 +290,28 @@ func (n *MobazhaNode) initPaymentService() {
 		NodeID:      n.nodeID,
 		Shutdown:    n.shutdown,
 
-		GetProfile:              n.profileService.GetProfile,
-		ConfirmOrder:            n.ConfirmOrder,
-		FulfillOrder:            n.FulfillOrder,
+		GetProfile: func(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error) {
+			return n.profileService.GetProfile(ctx, peerID, reqCtx, useCache)
+		},
+		ConfirmOrder: func(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error {
+			return n.orderService.ConfirmOrder(orderID, txid, payoutAddress, done)
+		},
+		FulfillOrder: func(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error {
+			return n.orderService.FulfillOrder(orderID, fulfillments, done)
+		},
 		GetStripeConfigFromHost: getStripeConfigFromHost,
 		RegisterStripeAccount:   registerStripeAccountFn,
 		GetStripeAccountID:      getStripeAccountIDFn,
 		StripeConfigCache:       n.stripeConfigCache,
-		ReleaseCancelable:       n.releaseFromCancelableAddress,
-		EscrowMasterPubKey:      n.escrowMasterKey.PubKey(),
+		ReleaseCancelable: func(order *models.Order, payoutAddress ...string) (*ReleaseResult, error) {
+			return n.orderService.releaseFromCancelableAddress(order, payoutAddress...)
+		},
+		EscrowMasterPubKey: n.escrowMasterKey.PubKey(),
 
-		Keys:                n.keyProvider,
-		ProcessOrderPayment: n.ProcessOrderPayment,
+		Keys: n.keyProvider,
+		ProcessOrderPayment: func(ctx context.Context, paymentData *models.PaymentData) error {
+			return n.orderService.ProcessOrderPayment(ctx, paymentData)
+		},
 
 		ExchangeRates: n.exchangeRates,
 
@@ -328,7 +350,9 @@ func (n *MobazhaNode) initProfileService() {
 		SolanaPubKeyStr:        solanaPubKeyStr,
 		StripeAccountID:        n.stripeAccountID,
 		StoreAndForwardServers: n.storeAndForwardServers,
-		GetAcceptedCurrencies:  n.GetAcceptedCurrencies,
+		GetAcceptedCurrencies: func() ([]string, error) {
+			return n.paymentService.GetAcceptedCurrencies()
+		},
 	})
 }
 
@@ -465,7 +489,9 @@ func (n *MobazhaNode) initModerationService() {
 		VerifiedModEndpoint:   verifiedModEndpoint,
 		ExchangeRates:         n.exchangeRates,
 		GetMyProfile:          getMyProfile,
-		GetAcceptedCurrencies: n.GetAcceptedCurrencies,
+		GetAcceptedCurrencies: func() ([]string, error) {
+			return n.paymentService.GetAcceptedCurrencies()
+		},
 		AnnounceAsModerator:   announceAsModerator,
 		RemoveAsModerator:     removeAsModerator,
 		FindModeratorsAsync:   findModeratorsAsync,

@@ -14,7 +14,7 @@ func TestMobazhaNode_RequestAddress(t *testing.T) {
 	}
 	defer network.TearDown()
 
-	address, err := network.Nodes()[0].RequestAddress(context.Background(), network.Nodes()[1].Identity(), iwallet.CtMock)
+	address, err := network.Nodes()[0].Order().RequestAddress(context.Background(), network.Nodes()[1].Identity(), iwallet.CtMock)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func TestMobazhaNode_RequestAddress(t *testing.T) {
 		t.Errorf("Expected address length of 20 got %d", len(address.String()))
 	}
 
-	_, err = network.Nodes()[0].RequestAddress(context.Background(), network.Nodes()[1].Identity(), iwallet.CtBitcoin)
+	_, err = network.Nodes()[0].Order().RequestAddress(context.Background(), network.Nodes()[1].Identity(), iwallet.CtBitcoin)
 	if err == nil {
 		t.Error("Expected request for unknown cointype to error")
 	}

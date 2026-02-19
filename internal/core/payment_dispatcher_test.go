@@ -227,23 +227,23 @@ func TestRegistryDispatch_UnknownCoinNotInRegistry(t *testing.T) {
 // ── tryLockAutoConfirm ──────────────────────────────────────────────────
 
 func TestTryLockAutoConfirm_SingleOrder(t *testing.T) {
-	n := &MobazhaNode{nodeID: "test-node"}
+	svc := &PaymentAppService{}
 
 	// First lock should succeed
-	unlock := n.tryLockAutoConfirm("order-1")
+	unlock := svc.TryLockAutoConfirm("order-1")
 	if unlock == nil {
 		t.Fatal("first tryLockAutoConfirm should succeed")
 	}
 
 	// Second lock for same order should fail
-	unlock2 := n.tryLockAutoConfirm("order-1")
+	unlock2 := svc.TryLockAutoConfirm("order-1")
 	if unlock2 != nil {
 		t.Fatal("second tryLockAutoConfirm for same order should return nil")
 	}
 
 	// After unlock, should be able to lock again
 	unlock()
-	unlock3 := n.tryLockAutoConfirm("order-1")
+	unlock3 := svc.TryLockAutoConfirm("order-1")
 	if unlock3 == nil {
 		t.Fatal("tryLockAutoConfirm should succeed after unlock")
 	}
@@ -251,16 +251,16 @@ func TestTryLockAutoConfirm_SingleOrder(t *testing.T) {
 }
 
 func TestTryLockAutoConfirm_DifferentOrders(t *testing.T) {
-	n := &MobazhaNode{nodeID: "test-node"}
+	svc := &PaymentAppService{}
 
-	unlock1 := n.tryLockAutoConfirm("order-1")
+	unlock1 := svc.TryLockAutoConfirm("order-1")
 	if unlock1 == nil {
 		t.Fatal("lock for order-1 should succeed")
 	}
 	defer unlock1()
 
 	// Different order should also succeed
-	unlock2 := n.tryLockAutoConfirm("order-2")
+	unlock2 := svc.TryLockAutoConfirm("order-2")
 	if unlock2 == nil {
 		t.Fatal("lock for order-2 should succeed while order-1 is locked")
 	}
@@ -268,7 +268,7 @@ func TestTryLockAutoConfirm_DifferentOrders(t *testing.T) {
 }
 
 func TestTryLockAutoConfirm_ConcurrentSafety(t *testing.T) {
-	n := &MobazhaNode{nodeID: "test-node"}
+	svc := &PaymentAppService{}
 	const orderID = "concurrent-order"
 
 	var lockCount int32
@@ -277,7 +277,7 @@ func TestTryLockAutoConfirm_ConcurrentSafety(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			unlock := n.tryLockAutoConfirm(orderID)
+			unlock := svc.TryLockAutoConfirm(orderID)
 			if unlock != nil {
 				atomic.AddInt32(&lockCount, 1)
 				// Hold lock briefly

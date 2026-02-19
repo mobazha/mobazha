@@ -94,7 +94,7 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 	purchase.Items[0].ListingHash = index[0].CID
 
 	// Address request direct order
-	orderID, paymentAmount, err := network.Nodes()[1].PurchaseListing(context.Background(), purchase)
+	orderID, paymentAmount, err := network.Nodes()[1].Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 	}
 
 	done4 := make(chan struct{})
-	if err := network.Nodes()[0].ConfirmOrder(orderID, "", "abcd", done4); err != nil {
+	if err := network.Nodes()[0].Order().ConfirmOrder(orderID, "", "abcd", done4); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -177,7 +177,7 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 		Coin:      iwallet.CoinType(paymentAmount.Currency.String()),
 		ToAddress: "abcd",
 	}
-	err = network.Nodes()[1].ProcessOrderPayment(context.Background(), paymentData)
+	err = network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +223,7 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 			},
 		},
 	}
-	if err := network.Nodes()[0].FulfillOrder(orderID, fulfillments, done5); err != nil {
+	if err := network.Nodes()[0].Order().FulfillOrder(orderID, fulfillments, done5); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -264,7 +264,7 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 			Review:          "Excellent",
 		},
 	}
-	if err := network.Nodes()[1].CompleteOrder(orderID, iwallet.TransactionID(""), ratings, true, done6); err != nil {
+	if err := network.Nodes()[1].Order().CompleteOrder(orderID, iwallet.TransactionID(""), ratings, true, done6); err != nil {
 		t.Fatal(err)
 	}
 
@@ -364,7 +364,7 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 	purchase.Items[0].ListingHash = index[0].CID
 
 	// Address request direct order
-	orderID, paymentAmount, err = network.Nodes()[1].PurchaseListing(context.Background(), purchase)
+	orderID, paymentAmount, err = network.Nodes()[1].Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -392,7 +392,7 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 	}
 
 	done4 = make(chan struct{})
-	if err := network.Nodes()[0].ConfirmOrder(orderID, "", "abcd", done4); err != nil {
+	if err := network.Nodes()[0].Order().ConfirmOrder(orderID, "", "abcd", done4); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -435,7 +435,7 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 		Coin:      iwallet.CoinType(paymentAmount.Currency.String()),
 		ToAddress: "abcd",
 	}
-	err = network.Nodes()[1].ProcessOrderPayment(context.Background(), paymentData)
+	err = network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -481,7 +481,7 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 			},
 		},
 	}
-	if err := network.Nodes()[0].FulfillOrder(orderID, fulfillments, done5); err != nil {
+	if err := network.Nodes()[0].Order().FulfillOrder(orderID, fulfillments, done5); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -522,7 +522,7 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 			Review:          "Excellent",
 		},
 	}
-	if err := network.Nodes()[1].CompleteOrder(orderID, iwallet.TransactionID(""), ratings, true, done6); err != nil {
+	if err := network.Nodes()[1].Order().CompleteOrder(orderID, iwallet.TransactionID(""), ratings, true, done6); err != nil {
 		t.Fatal(err)
 	}
 

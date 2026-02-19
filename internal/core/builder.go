@@ -829,18 +829,44 @@ func constructDHTRouting(mode dht.ModeOpt) func(args nlibp2p.RoutingOptionArgs) 
 }
 
 func (n *MobazhaNode) registerHandlers() {
-	n.networkService.RegisterHandler(pb.Message_CHAT, n.handleChatMessage)
-	n.networkService.RegisterHandler(pb.Message_CHAT_GROUP, n.handleChatGroupMessage)
+	n.networkService.RegisterHandler(pb.Message_CHAT, func(from peer.ID, message *pb.Message) error {
+		if n.chatService != nil {
+			return n.chatService.HandleChatMessage(from, message)
+		}
+		return fmt.Errorf("chat service not initialized")
+	})
+	n.networkService.RegisterHandler(pb.Message_CHAT_GROUP, func(from peer.ID, message *pb.Message) error {
+		if n.chatService != nil {
+			return n.chatService.HandleChatGroupMessage(from, message)
+		}
+		return fmt.Errorf("chat service not initialized")
+	})
 	n.networkService.RegisterHandler(pb.Message_ACK, n.handleAckMessage)
-	n.networkService.RegisterHandler(pb.Message_FOLLOW, n.handleFollowMessage)
-	n.networkService.RegisterHandler(pb.Message_UNFOLLOW, n.handleUnFollowMessage)
+	n.networkService.RegisterHandler(pb.Message_FOLLOW, func(from peer.ID, message *pb.Message) error {
+		if n.followService != nil {
+			return n.followService.HandleFollowMessage(from, message)
+		}
+		return fmt.Errorf("follow service not initialized")
+	})
+	n.networkService.RegisterHandler(pb.Message_UNFOLLOW, func(from peer.ID, message *pb.Message) error {
+		if n.followService != nil {
+			return n.followService.HandleUnFollowMessage(from, message)
+		}
+		return fmt.Errorf("follow service not initialized")
+	})
 	n.networkService.RegisterHandler(pb.Message_STORE, n.handleStoreMessage)
 	n.networkService.RegisterHandler(pb.Message_ORDER, n.handleOrderMessage)
-	n.networkService.RegisterHandler(pb.Message_ADDRESS_REQUEST, n.handleAddressRequest)
-	n.networkService.RegisterHandler(pb.Message_ADDRESS_RESPONSE, n.handleAddressResponse)
+	n.networkService.RegisterHandler(pb.Message_ADDRESS_REQUEST, func(from peer.ID, message *pb.Message) error {
+		return n.orderService.handleAddressRequest(from, message)
+	})
+	n.networkService.RegisterHandler(pb.Message_ADDRESS_RESPONSE, func(from peer.ID, message *pb.Message) error {
+		return n.orderService.handleAddressResponse(from, message)
+	})
 	n.networkService.RegisterHandler(pb.Message_PING, n.handlePingMessage)
 	n.networkService.RegisterHandler(pb.Message_PONG, n.handlePongMessage)
-	n.networkService.RegisterHandler(pb.Message_DISPUTE, n.handleDisputeMessage)
+	n.networkService.RegisterHandler(pb.Message_DISPUTE, func(from peer.ID, message *pb.Message) error {
+		return n.orderService.handleDisputeMessage(from, message, n.isDuplicate, n.sendAckMessage)
+	})
 	n.networkService.RegisterHandler(pb.Message_CHANNEL_REQUEST, n.handleChannelRequest)
 	n.networkService.RegisterHandler(pb.Message_CHANNEL_RESPONSE, n.handleChannelResponse)
 }

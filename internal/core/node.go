@@ -273,10 +273,13 @@ func (n *MobazhaNode) Start() {
 	// 1. CheckAndMigrateShippingProfiles: For users who haven't migrated yet (have shippingOptions but no shippingProfiles)
 	// 2. SyncShippingProfilesToListings: For users who migrated via frontend but listings weren't updated
 	go func() {
-		if err := n.CheckAndMigrateShippingProfiles(); err != nil {
+		if n.preferencesService == nil {
+			return
+		}
+		if err := n.preferencesService.CheckAndMigrateShippingProfiles(); err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID, "CheckAndMigrateShippingProfiles failed, %v", err)
 		}
-		if err := n.SyncShippingProfilesToListings(); err != nil {
+		if err := n.preferencesService.SyncShippingProfilesToListings(); err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID, "SyncShippingProfilesToListings failed, %v", err)
 		}
 	}()
@@ -326,7 +329,7 @@ func (n *MobazhaNode) Start() {
 
 		// Start unified cancelable payment monitor for auto-confirmation
 		// This handles UTXO, EVM, and (future) Solana chains via event dispatch
-		n.startCancelablePaymentMonitor()
+		n.paymentService.StartCancelablePaymentMonitor()
 
 		// Start RWA instant buy monitor for auto-confirmation
 		// This handles RWA instant buy (atomic swap) orders that complete on-chain

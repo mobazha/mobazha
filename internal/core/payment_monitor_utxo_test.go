@@ -336,7 +336,7 @@ func TestMobazhaNode_GetTotalPaidToAddress(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get total paid
-	totalPaid, err := node.GetTotalPaidToAddress(order)
+	totalPaid, err := node.Wallet().GetTotalPaidToAddress(order)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(80000), totalPaid, "Total should be 50000 + 30000 = 80000")
 }
@@ -414,7 +414,7 @@ func TestPaymentCalculation(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			totalPaid, err := node.GetTotalPaidToAddress(order)
+			totalPaid, err := node.Wallet().GetTotalPaidToAddress(order)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantTotal, totalPaid)
 
@@ -494,7 +494,7 @@ func TestCoinSwitchDetection(t *testing.T) {
 	assert.True(t, hasCoinSwitch, "Should detect coin switch from BTC to LTC")
 
 	// Verify partial payment exists
-	totalPaid, err := node.GetTotalPaidToAddress(order)
+	totalPaid, err := node.Wallet().GetTotalPaidToAddress(order)
 	require.NoError(t, err)
 	assert.Greater(t, totalPaid, uint64(0))
 }

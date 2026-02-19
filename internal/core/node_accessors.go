@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -15,13 +16,14 @@ import (
 // Each returns the corresponding App Service (or a thin facade that
 // composes multiple App Services when a domain spans several).
 
-func (n *MobazhaNode) IdentityInfo() contracts.IdentityService { return n }
-
-func (n *MobazhaNode) IsGlobalBanned(peerID peer.ID) bool {
-	if n.listingService == nil {
-		return false
+func (n *MobazhaNode) IdentityInfo() contracts.IdentityService {
+	return &identityInfoAdapter{
+		nodeID:         n.nodeID,
+		peerID:         n.peerID,
+		testnet:        n.testnet,
+		signer:         n.signer,
+		listingService: n.listingService,
 	}
-	return n.listingService.IsGlobalBanned(peerID)
 }
 func (n *MobazhaNode) Chat() contracts.ChatService                 { return n.chatService }
 func (n *MobazhaNode) Notification() contracts.NotificationService { return n.notificationService }
@@ -33,9 +35,12 @@ func (n *MobazhaNode) ShoppingCart() contracts.ShoppingCartService  { return n.s
 func (n *MobazhaNode) Stripe() contracts.StripeService             { return n.paymentService }
 func (n *MobazhaNode) ExchangeRate() contracts.ExchangeRateService { return &exchangeRateAdapter{n.exchangeRates} }
 
-// Order still returns MobazhaNode itself because ViaRelay methods and
-// PaymentService-backed instructions are not yet on OrderAppService.
-func (n *MobazhaNode) Order() contracts.OrderService { return n }
+func (n *MobazhaNode) Order() contracts.OrderService {
+	return &orderServiceFacade{
+		OrderAppService: n.orderService,
+		payment:         n.paymentService,
+	}
+}
 
 func (n *MobazhaNode) Listing() contracts.ListingService {
 	return &listingServiceFacade{
@@ -117,4 +122,40 @@ type socialServiceFacade struct {
 	*RatingsAppService
 	*PostsAppService
 	*ChannelsAppService
+}
+
+// identityInfoAdapter composes infrastructure fields and ListingAppService
+// to satisfy contracts.IdentityService without MobazhaNode returning itself.
+type identityInfoAdapter struct {
+	nodeID         string
+	peerID         peer.ID
+	testnet        bool
+	signer         corecontracts.Signer
+	listingService *ListingAppService
+}
+
+func (a *identityInfoAdapter) GetNodeID() string    { return a.nodeID }
+func (a *identityInfoAdapter) Identity() peer.ID     { return a.peerID }
+func (a *identityInfoAdapter) UsingTestnet() bool    { return a.testnet }
+
+func (a *identityInfoAdapter) SignMessage(payload []byte) ([]byte, []byte, error) {
+	if a.signer == nil {
+		return nil, nil, fmt.Errorf("signer not available")
+	}
+	sig, err := a.signer.Sign(payload)
+	if err != nil {
+		return nil, nil, fmt.Errorf("signing payload: %w", err)
+	}
+	pubkey, err := a.signer.PublicKey()
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting public key: %w", err)
+	}
+	return sig, pubkey, nil
+}
+
+func (a *identityInfoAdapter) IsGlobalBanned(peerID peer.ID) bool {
+	if a.listingService == nil {
+		return false
+	}
+	return a.listingService.IsGlobalBanned(peerID)
 }

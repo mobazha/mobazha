@@ -226,7 +226,7 @@ func MockNode() (*MobazhaNode, error) {
 		multiwallet:    node.multiwallet,
 		keys:           node.keyProvider,
 		onAutoConfirm:  node.handleCancelablePaymentForUTXO,
-		getPaymentInfo: node.GetUTXOPaymentInfo,
+		getPaymentInfo: node.paymentService.GetUTXOPaymentInfo,
 	})
 	node.registerHandlers()
 	node.listenNetworkEvents()
@@ -451,7 +451,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		multiwallet:    node.multiwallet,
 		keys:           node.keyProvider,
 		onAutoConfirm:  node.handleCancelablePaymentForUTXO,
-		getPaymentInfo: node.GetUTXOPaymentInfo,
+		getPaymentInfo: node.paymentService.GetUTXOPaymentInfo,
 	})
 		node.registerHandlers()
 		node.listenNetworkEvents()

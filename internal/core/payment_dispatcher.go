@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -35,7 +34,7 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		multiwallet:    n.multiwallet,
 		keys:           n.keyProvider,
 		onAutoConfirm:  n.handleCancelablePaymentForUTXO,
-		getPaymentInfo: n.GetUTXOPaymentInfo,
+		getPaymentInfo: n.paymentService.GetUTXOPaymentInfo,
 	}
 	for _, chain := range []iwallet.ChainType{
 		iwallet.ChainBitcoin, iwallet.ChainBitcoinCash,
@@ -48,10 +47,10 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	evmOps := &evmChainOps{
 		keys:            n.keyProvider,
 		multiwallet:     n.multiwallet,
-		buildReleaseTxn: n.buildReleaseTransaction,
+		buildReleaseTxn: n.orderService.buildDisputeReleaseTransaction,
 		onAutoConfirm:   n.handleCancelablePaymentForEVM,
 	}
-	evmStrategy := newClientSignedAdapter(evmOps, n.BuildInitEscrowInstructions, n.GetEscrowReleaseInstructions)
+	evmStrategy := newClientSignedAdapter(evmOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions)
 	for _, chain := range evmChains {
 		n.paymentRegistry.Register(chain, evmStrategy)
 	}
@@ -60,10 +59,10 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	solOps := &solanaChainOps{
 		keys:            n.keyProvider,
 		multiwallet:     n.multiwallet,
-		buildReleaseTxn: n.buildReleaseTransaction,
+		buildReleaseTxn: n.orderService.buildDisputeReleaseTransaction,
 		nodeID:          n.nodeID,
 	}
-	n.paymentRegistry.Register(iwallet.ChainSolana, newClientSignedAdapter(solOps, n.BuildInitEscrowInstructions, n.GetEscrowReleaseInstructions))
+	n.paymentRegistry.Register(iwallet.ChainSolana, newClientSignedAdapter(solOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions))
 
 	logger.LogInfoWithIDf(log, n.nodeID, "Registered payment strategies for %d chains", len(n.paymentRegistry.Chains()))
 
@@ -76,20 +75,3 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	}
 }
 
-// startCancelablePaymentMonitor delegates to PaymentAppService.
-func (n *MobazhaNode) startCancelablePaymentMonitor() {
-	if n.paymentService != nil {
-		n.paymentService.StartCancelablePaymentMonitor()
-		return
-	}
-}
-
-// tryLockAutoConfirm delegates to PaymentAppService.
-func (n *MobazhaNode) tryLockAutoConfirm(orderID string) func() {
-	return n.paymentService.TryLockAutoConfirm(orderID)
-}
-
-// fetchOrderByID delegates to PaymentAppService.
-func (n *MobazhaNode) fetchOrderByID(orderID string) (*models.Order, error) {
-	return n.paymentService.FetchOrderByID(orderID)
-}

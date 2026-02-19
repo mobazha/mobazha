@@ -58,7 +58,7 @@ func TestMobazhaNode_ConfirmOrder(t *testing.T) {
 	purchase.Items[0].ListingHash = index[0].CID
 
 	// Address request direct order
-	orderID, paymentAmount, err := network.Nodes()[1].PurchaseListing(context.Background(), purchase)
+	orderID, paymentAmount, err := network.Nodes()[1].Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestMobazhaNode_ConfirmOrder(t *testing.T) {
 		Coin:          iwallet.CtMock,
 		ToAddress:     "abcd",
 	}
-	if err := network.Nodes()[1].ProcessOrderPayment(context.Background(), paymentData); err != nil {
+	if err := network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
 		t.Fatal(err)
 	}
 
@@ -129,7 +129,7 @@ func TestMobazhaNode_ConfirmOrder(t *testing.T) {
 	}
 
 	done4 := make(chan struct{})
-	if err := network.Nodes()[0].ConfirmOrder(orderID, "", "abcd", done4); err != nil {
+	if err := network.Nodes()[0].Order().ConfirmOrder(orderID, "", "abcd", done4); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -228,7 +228,7 @@ func TestMobazhaNode_ConfirmOrder_Cancelable_Reconnect(t *testing.T) {
 	if err := network.ipfsNet.UnlinkPeers(network.Nodes()[0].Identity(), network.Nodes()[1].Identity()); err != nil {
 		t.Fatal(err)
 	}
-	orderID2, paymentAmount, err := network.Nodes()[1].PurchaseListing(context.Background(), purchase)
+	orderID2, paymentAmount, err := network.Nodes()[1].Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +271,7 @@ func TestMobazhaNode_ConfirmOrder_Cancelable_Reconnect(t *testing.T) {
 		Coin:          iwallet.CoinType(paymentAmount.Currency.String()),
 		ToAddress:     "abcd",
 	}
-	err = network.Nodes()[1].ProcessOrderPayment(context.Background(), paymentData)
+	err = network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,7 +336,7 @@ func TestMobazhaNode_ConfirmOrder_Cancelable_Reconnect(t *testing.T) {
 	}
 
 	done5 := make(chan struct{})
-	if err := network.Nodes()[0].ConfirmOrder(orderID2, "", "abcd", done5); err != nil {
+	if err := network.Nodes()[0].Order().ConfirmOrder(orderID2, "", "abcd", done5); err != nil {
 		t.Fatal(err)
 	}
 	select {

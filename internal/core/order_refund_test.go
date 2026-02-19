@@ -92,7 +92,7 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 	}
 
 	// Address request direct order
-	orderID, paymentAmount, err := network.Nodes()[1].PurchaseListing(context.Background(), purchase)
+	orderID, paymentAmount, err := network.Nodes()[1].Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	paymentData, err := network.Nodes()[1].GetUTXOPaymentInfo(
+	paymentData, err := network.Nodes()[1].Wallet().GetUTXOPaymentInfo(
 		context.Background(),
 		orderID.String(),
 		"", // empty moderator for CANCELABLE
@@ -187,7 +187,7 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 	paymentData.PayerAddress = addr1.String()
 	// Ingest tx into seller wallet so vendor GetTransaction succeeds (PaymentVerified)
 	ingestPaymentToWallets(t, paymentData, network.Nodes()[0], network.Nodes()[1])
-	err = network.Nodes()[1].ProcessOrderPayment(context.Background(), paymentData)
+	err = network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +214,7 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 	}
 
 	done4 := make(chan struct{})
-	if err := network.Nodes()[0].RefundOrder(order.ID, "", done4); err != nil {
+	if err := network.Nodes()[0].Order().RefundOrder(order.ID, "", done4); err != nil {
 		t.Fatal(err)
 	}
 
@@ -272,7 +272,7 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	orderID2, paymentAmount, err := network.Nodes()[1].PurchaseListing(context.Background(), purchase)
+	orderID2, paymentAmount, err := network.Nodes()[1].Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +324,7 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 	}
 
 	moderatorPeerID := network.Nodes()[2].Identity().String()
-	paymentData, err = network.Nodes()[1].GetUTXOPaymentInfo(
+	paymentData, err = network.Nodes()[1].Wallet().GetUTXOPaymentInfo(
 		context.Background(),
 		orderID2.String(),
 		moderatorPeerID,
@@ -335,7 +335,7 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 	}
 	// Ingest tx into seller wallet so vendor GetTransaction succeeds (PaymentVerified)
 	ingestPaymentToWallets(t, paymentData, network.Nodes()[0], network.Nodes()[1])
-	err = network.Nodes()[1].ProcessOrderPayment(context.Background(), paymentData)
+	err = network.Nodes()[1].Order().ProcessOrderPayment(context.Background(), paymentData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +358,7 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 	}
 
 	done6 := make(chan struct{})
-	if err := network.Nodes()[0].RefundOrder(orderID2, "", done6); err != nil {
+	if err := network.Nodes()[0].Order().RefundOrder(orderID2, "", done6); err != nil {
 		t.Fatal(err)
 	}
 
@@ -647,7 +647,7 @@ func Test_buildRefundMessage(t *testing.T) {
 			t.Errorf("Test %d: setup failed: %s", i, err)
 		}
 
-		_, msg, err := n.buildRefundMessage(&order, net.Wallets()[0], "")
+		_, msg, err := n.orderService.buildRefundMessage(&order, net.Wallets()[0], "")
 		if err != nil {
 			t.Errorf("Test %d: build failed: %s", i, err)
 			continue

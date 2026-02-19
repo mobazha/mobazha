@@ -27,7 +27,7 @@ func newMockUTXOAdapter(node *MobazhaNode) *utxoAutoConfirmAdapter {
 		multiwallet:    node.multiwallet,
 		keys:           node.keyProvider,
 		onAutoConfirm:  node.handleCancelablePaymentForUTXO,
-		getPaymentInfo: node.GetUTXOPaymentInfo,
+		getPaymentInfo: node.Wallet().GetUTXOPaymentInfo,
 	}
 }
 
@@ -215,7 +215,7 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 	}
 
 	// Start the cancelable payment monitor (same as production)
-	sellerNode.startCancelablePaymentMonitor()
+	sellerNode.paymentService.StartCancelablePaymentMonitor()
 
 	// Start order processors for message handling
 	for _, node := range network.Nodes() {
@@ -255,7 +255,7 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 	purchase := factory.NewPurchase()
 	purchase.Items[0].ListingHash = index[0].CID
 
-	orderID, paymentAmount, err := buyerNode.PurchaseListing(context.Background(), purchase)
+	orderID, paymentAmount, err := buyerNode.Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,7 +296,7 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 	// Ingest into both wallets so vendor GetTransaction succeeds (PaymentVerified)
 	ingestPaymentToWallets(t, paymentData, buyerNode, sellerNode)
 
-	if err := buyerNode.ProcessOrderPayment(context.Background(), paymentData); err != nil {
+	if err := buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
 		t.Fatal(err)
 	}
 
@@ -314,7 +314,7 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 	}
 
 	done4 := make(chan struct{})
-	if err := sellerNode.ConfirmOrder(orderID, "", "mock-payout-addr", done4); err != nil {
+	if err := sellerNode.Order().ConfirmOrder(orderID, "", "mock-payout-addr", done4); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -353,7 +353,7 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 			},
 		},
 	}
-	if err := sellerNode.FulfillOrder(orderID, fulfillments, done5); err != nil {
+	if err := sellerNode.Order().FulfillOrder(orderID, fulfillments, done5); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -393,7 +393,7 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 			Review:          "Great product — full lifecycle with registry works!",
 		},
 	}
-	if err := buyerNode.CompleteOrder(orderID, iwallet.TransactionID(""), ratings, true, done6); err != nil {
+	if err := buyerNode.Order().CompleteOrder(orderID, iwallet.TransactionID(""), ratings, true, done6); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -516,7 +516,7 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 	}
 
 	// Start the cancelable payment monitor (key for auto-confirm)
-	sellerNode.startCancelablePaymentMonitor()
+	sellerNode.paymentService.StartCancelablePaymentMonitor()
 
 	// Start order processors for message handling
 	for _, node := range network.Nodes() {
@@ -556,7 +556,7 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 	purchase := factory.NewPurchase()
 	purchase.Items[0].ListingHash = index[0].CID
 
-	orderID, _, err := buyerNode.PurchaseListing(context.Background(), purchase)
+	orderID, _, err := buyerNode.Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -586,7 +586,7 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 
 	// ── Step 3: Buyer Gets CANCELABLE Payment Info ───────────────
 	// GetUTXOPaymentInfo generates CANCELABLE escrow address (1-of-2 multisig)
-	paymentData, err := buyerNode.GetUTXOPaymentInfo(
+	paymentData, err := buyerNode.Wallet().GetUTXOPaymentInfo(
 		context.Background(),
 		orderID.String(),
 		"", // empty moderator = CANCELABLE
@@ -608,7 +608,7 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := buyerNode.ProcessOrderPayment(context.Background(), paymentData); err != nil {
+	if err := buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
 		t.Fatal(err)
 	}
 
@@ -643,7 +643,7 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 			},
 		},
 	}
-	if err := sellerNode.FulfillOrder(orderID, fulfillments, done5); err != nil {
+	if err := sellerNode.Order().FulfillOrder(orderID, fulfillments, done5); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -683,7 +683,7 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 			Review:          "CANCELABLE auto-confirm lifecycle works perfectly!",
 		},
 	}
-	if err := buyerNode.CompleteOrder(orderID, iwallet.TransactionID(""), ratings, true, done6); err != nil {
+	if err := buyerNode.Order().CompleteOrder(orderID, iwallet.TransactionID(""), ratings, true, done6); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -831,7 +831,7 @@ func TestOrderLifecycle_Cancelable_BuyerCancel(t *testing.T) {
 	purchase := factory.NewPurchase()
 	purchase.Items[0].ListingHash = index[0].CID
 
-	orderID, _, err := buyerNode.PurchaseListing(context.Background(), purchase)
+	orderID, _, err := buyerNode.Order().PurchaseListing(context.Background(), purchase)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -848,7 +848,7 @@ func TestOrderLifecycle_Cancelable_BuyerCancel(t *testing.T) {
 	}
 
 	// ── Step 3: Buyer Gets CANCELABLE Payment Info ───────────────
-	paymentData, err := buyerNode.GetUTXOPaymentInfo(
+	paymentData, err := buyerNode.Wallet().GetUTXOPaymentInfo(
 		context.Background(),
 		orderID.String(),
 		"", // empty moderator = CANCELABLE
@@ -874,7 +874,7 @@ func TestOrderLifecycle_Cancelable_BuyerCancel(t *testing.T) {
 	buyerWal.IngestTransaction(tx)
 
 	// ── Step 4: Buyer Sends CANCELABLE Payment ───────────────────
-	if err := buyerNode.ProcessOrderPayment(context.Background(), paymentData); err != nil {
+	if err := buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
 		t.Fatal(err)
 	}
 
@@ -903,7 +903,7 @@ func TestOrderLifecycle_Cancelable_BuyerCancel(t *testing.T) {
 
 	// ── Step 5: Buyer Cancels Order ──────────────────────────────
 	doneCh := make(chan struct{})
-	if err := buyerNode.CancelOrder(orderID, "", doneCh); err != nil {
+	if err := buyerNode.Order().CancelOrder(orderID, "", doneCh); err != nil {
 		t.Fatal(err)
 	}
 	select {

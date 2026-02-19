@@ -3,7 +3,6 @@ package core
 import (
 	"sync"
 
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
@@ -87,28 +86,10 @@ func (n *MobazhaNode) startCancelablePaymentMonitor() {
 
 // tryLockAutoConfirm delegates to PaymentAppService.
 func (n *MobazhaNode) tryLockAutoConfirm(orderID string) func() {
-	if n.paymentService != nil {
-		return n.paymentService.TryLockAutoConfirm(orderID)
-	}
-	if _, loaded := cancelableAutoConfirmInProgress.LoadOrStore(orderID, true); loaded {
-		return nil
-	}
-	return func() {
-		cancelableAutoConfirmInProgress.Delete(orderID)
-	}
+	return n.paymentService.TryLockAutoConfirm(orderID)
 }
 
 // fetchOrderByID delegates to PaymentAppService.
 func (n *MobazhaNode) fetchOrderByID(orderID string) (*models.Order, error) {
-	if n.paymentService != nil {
-		return n.paymentService.FetchOrderByID(orderID)
-	}
-	var order models.Order
-	err := n.db.View(func(dbtx database.Tx) error {
-		return dbtx.Read().Where("id = ?", orderID).First(&order).Error
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &order, nil
+	return n.paymentService.FetchOrderByID(orderID)
 }

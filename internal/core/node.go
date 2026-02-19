@@ -112,6 +112,9 @@ type MobazhaNode struct {
 	// matrixService encapsulates Matrix credential management and E2EE key backup logic.
 	matrixService *MatrixAppService
 
+	// preferencesService encapsulates user preferences and block-list management.
+	preferencesService *PreferencesAppService
+
 	// notificationService encapsulates notification query and management logic.
 	notificationService *NotificationAppService
 

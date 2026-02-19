@@ -45,6 +45,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initOrderService()
 	n.initChatService()
 	n.initMatrixService()
+	n.initPreferencesService()
 	n.initNotificationService()
 	n.initShoppingCartService()
 }
@@ -61,6 +62,19 @@ func (n *MobazhaNode) initMatrixService() {
 		DB:      n.db,
 		PrivKey: n.privKey,
 		PeerID:  n.peerID,
+	})
+}
+
+// initPreferencesService creates the PreferencesAppService.
+func (n *MobazhaNode) initPreferencesService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+	n.preferencesService = NewPreferencesAppService(PreferencesAppServiceConfig{
+		DB:                    n.db,
+		BanManager:            n.banManager,
+		UpdateAllListingsFunc: n.UpdateAllListings,
+		GetMyListingsFunc:     n.GetMyListings,
 	})
 }
 

@@ -33,7 +33,7 @@ func TestMobazhaNode_SavePreferences(t *testing.T) {
 		RefundPolicy: "asdf",
 	}
 
-	if err := node.SavePreferences(&prefs, nil); err != nil {
+	if err := node.Preferences().SavePreferences(&prefs, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -52,7 +52,7 @@ func TestMobazhaNode_SavePreferences(t *testing.T) {
 		Blocked: []byte(`["aasdf"]`),
 	}
 
-	if err := node.SavePreferences(&prefs, nil); err == nil {
+	if err := node.Preferences().SavePreferences(&prefs, nil); err == nil {
 		t.Errorf("Expected error got nil")
 	}
 
@@ -60,7 +60,7 @@ func TestMobazhaNode_SavePreferences(t *testing.T) {
 		Mods: []byte(`["aasdf"]`),
 	}
 
-	if err := node.SavePreferences(&prefs, nil); err == nil {
+	if err := node.Preferences().SavePreferences(&prefs, nil); err == nil {
 		t.Errorf("Expected error got nil")
 	}
 
@@ -73,7 +73,7 @@ func TestMobazhaNode_SavePreferences(t *testing.T) {
 		Mods: out,
 	}
 
-	if err := node.SavePreferences(&prefs, nil); err != nil {
+	if err := node.Preferences().SavePreferences(&prefs, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -97,7 +97,7 @@ func TestMobazhaNode_BlockNode(t *testing.T) {
 	defer node.repo.DestroyRepo()
 
 	peerID := "12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN"
-	addedToBlock, err := node.BlockNode(peerID)
+	addedToBlock, err := node.Preferences().BlockNode(peerID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestMobazhaNode_BlockNode(t *testing.T) {
 		t.Error("addedToBlock flag is false ")
 	}
 
-	prefs, err := node.GetPreferences()
+	prefs, err := node.Preferences().GetPreferences()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,14 +120,14 @@ func TestMobazhaNode_BlockNode(t *testing.T) {
 		t.Error("Blocked node peer ID not matched")
 	}
 
-	removeFromBlock, err := node.UnblockNode(peerID)
+	removeFromBlock, err := node.Preferences().UnblockNode(peerID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !removeFromBlock {
 		t.Error("removeFromBlock flag is false ")
 	}
-	prefs, err = node.GetPreferences()
+	prefs, err = node.Preferences().GetPreferences()
 	if err != nil {
 		t.Fatal(err)
 	}

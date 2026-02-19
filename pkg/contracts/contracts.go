@@ -289,23 +289,30 @@ type ShoppingCartService interface {
 // NodeService is the top-level aggregate interface that combines all domain services.
 // Both MobazhaNode (standalone) and TenantService (SaaS) implement this interface.
 //
-// This interface is the primary contract for API handlers — they should depend on
-// NodeService rather than the concrete MobazhaNode type.
+// Design: Service Accessor pattern — each domain is exposed via a typed accessor
+// method (e.g. Chat() ChatService) rather than flat embedding. This eliminates
+// ~130 pass-through delegates on the implementor and ensures new domain methods
+// never require changes to NodeService or its implementors.
+//
+// Note: IdentityInfo() is named to avoid conflict with IdentityService.Identity().
 type NodeService interface {
-	IdentityService
-	ChatService
-	NotificationService
-	OrderService
-	ListingService
-	ProfileService
-	WalletService
-	MediaService
-	SocialService
-	MatrixService
-	PreferencesService
-	StripeService
-	ExchangeRateService
-	ShoppingCartService
+	// Domain service accessors
+	IdentityInfo() IdentityService
+	Chat() ChatService
+	Notification() NotificationService
+	Order() OrderService
+	Listing() ListingService
+	Profile() ProfileService
+	Wallet() WalletService
+	Media() MediaService
+	Social() SocialService
+	Matrix() MatrixService
+	Preferences() PreferencesService
+	Stripe() StripeService
+	ExchangeRate() ExchangeRateService
+	ShoppingCart() ShoppingCartService
+
+	// Cross-cutting methods (kept directly on NodeService)
 
 	// EventBus returns the event bus for pub/sub.
 	EventBus() events.Bus

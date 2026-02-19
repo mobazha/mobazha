@@ -173,6 +173,22 @@ type mockNode struct {
 	updateOrderPaymentStatusFunc  func(orderID models.OrderID, paymentIntentID, status string) error
 }
 
+// Service accessors — mockNode returns itself for each sub-interface.
+func (m *mockNode) IdentityInfo() contracts.IdentityService         { return m }
+func (m *mockNode) Chat() contracts.ChatService                     { return m }
+func (m *mockNode) Notification() contracts.NotificationService     { return m }
+func (m *mockNode) Order() contracts.OrderService                   { return m }
+func (m *mockNode) Listing() contracts.ListingService               { return m }
+func (m *mockNode) Profile() contracts.ProfileService               { return m }
+func (m *mockNode) Wallet() contracts.WalletService                 { return m }
+func (m *mockNode) Media() contracts.MediaService                   { return m }
+func (m *mockNode) Social() contracts.SocialService                 { return m }
+func (m *mockNode) Matrix() contracts.MatrixService                 { return m }
+func (m *mockNode) Preferences() contracts.PreferencesService       { return m }
+func (m *mockNode) Stripe() contracts.StripeService                 { return m }
+func (m *mockNode) ExchangeRate() contracts.ExchangeRateService     { return m }
+func (m *mockNode) ShoppingCart() contracts.ShoppingCartService     { return m }
+
 func (m *mockNode) RequestAddress(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error) {
 	return m.requestAddressFunc(ctx, to, coinType)
 }

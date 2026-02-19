@@ -26,7 +26,7 @@ func Test_SendAndReceiveAcks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := network.Nodes()[0].SendChatMessage(network.nodes[1].Identity(), "hola", nil, "", nil); err != nil {
+	if _, err := network.Nodes()[0].Chat().SendChatMessage(network.nodes[1].Identity(), "hola", nil, "", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -111,15 +111,15 @@ func TestMobazhaNode_syncMessages(t *testing.T) {
 	if err := network.ipfsNet.UnlinkPeers(network.Nodes()[0].Identity(), network.Nodes()[1].Identity()); err != nil {
 		t.Fatal(err)
 	}
-	_, err = network.Nodes()[1].SendChatMessage(network.Nodes()[0].Identity(), "message1", nil, "", nil)
+	_, err = network.Nodes()[1].Chat().SendChatMessage(network.Nodes()[0].Identity(), "message1", nil, "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = network.Nodes()[1].SendChatMessage(network.Nodes()[0].Identity(), "message2", nil, "", nil)
+	_, err = network.Nodes()[1].Chat().SendChatMessage(network.Nodes()[0].Identity(), "message2", nil, "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = network.Nodes()[1].SendChatMessage(network.Nodes()[0].Identity(), "message3", nil, "", nil)
+	_, err = network.Nodes()[1].Chat().SendChatMessage(network.Nodes()[0].Identity(), "message3", nil, "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestMobazhaNode_syncMessages(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	messages, err := network.Nodes()[1].GetChatMessagesByPeer(network.Nodes()[0].Identity(), -1, "")
+	messages, err := network.Nodes()[1].Chat().GetChatMessagesByPeer(network.Nodes()[0].Identity(), -1, "")
 	if err != nil {
 		t.Fatal(err)
 	}

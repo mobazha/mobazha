@@ -39,7 +39,7 @@ func TestMobazhaNode_SaveAndGetTransactionMetadata(t *testing.T) {
 	}
 
 	memo := "If taxation without consent is not robbery, then any band of robbers have only to declare themselves a government, and all their robberies are legalized."
-	err = mockNode.SaveTransactionMetadata(&models.TransactionMetadata{
+	err = mockNode.Wallet().SaveTransactionMetadata(&models.TransactionMetadata{
 		PaymentAddress: paymentSent.ToAddress,
 		Memo:           memo,
 		Txid:           "abc",
@@ -48,7 +48,7 @@ func TestMobazhaNode_SaveAndGetTransactionMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	metadata, err := mockNode.GetTransactionMetadata(iwallet.TransactionID("abc"))
+	metadata, err := mockNode.Wallet().GetTransactionMetadata(iwallet.TransactionID("abc"))
 	if err != nil {
 		t.Fatal(err)
 	}

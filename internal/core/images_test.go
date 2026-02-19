@@ -40,7 +40,7 @@ func TestMobazhaNode_SetImages(t *testing.T) {
 	}
 
 	done2 := make(chan struct{})
-	hashes, err := m.SetAvatarImage(jpgImageB64, done2)
+	hashes, err := m.Media().SetAvatarImage(jpgImageB64, done2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestMobazhaNode_SetHeader(t *testing.T) {
 	}
 
 	done2 := make(chan struct{})
-	hashes, err := m.SetHeaderImage(jpgImageB64, done2)
+	hashes, err := m.Media().SetHeaderImage(jpgImageB64, done2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +245,7 @@ func TestMobazhaNode_SetProductImage(t *testing.T) {
 		t.Fatal("timed out waiting on channel")
 	}
 
-	hashes, err := m.SetProductImage(jpgImageB64, "testfile")
+	hashes, err := m.Media().SetProductImage(jpgImageB64, "testfile")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,12 +350,12 @@ func TestGIFAndPNG(t *testing.T) {
 		t.Fatal("timed out waiting on channel")
 	}
 
-	_, err = m.SetAvatarImage(gifImageB64, nil)
+	_, err = m.Media().SetAvatarImage(gifImageB64, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = m.SetAvatarImage(pngImageB64, nil)
+	_, err = m.Media().SetAvatarImage(pngImageB64, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

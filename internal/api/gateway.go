@@ -394,24 +394,20 @@ func getNodeService(r *http.Request) contracts.NodeService {
 	return r.Context().Value(nodeContextKey).(contracts.NodeService)
 }
 
-func getIdentityService(r *http.Request) contracts.IdentityService { return getNodeService(r) }
-func getChatService(r *http.Request) contracts.ChatService               { return getNodeService(r) }
-func getNotificationService(r *http.Request) contracts.NotificationService {
-	return getNodeService(r)
-}
-func getOrderService(r *http.Request) contracts.OrderService       { return getNodeService(r) }
-func getListingService(r *http.Request) contracts.ListingService   { return getNodeService(r) }
-func getProfileService(r *http.Request) contracts.ProfileService   { return getNodeService(r) }
-func getSocialService(r *http.Request) contracts.SocialService     { return getNodeService(r) }
-func getWalletService(r *http.Request) contracts.WalletService     { return getNodeService(r) }
-func getMediaService(r *http.Request) contracts.MediaService       { return getNodeService(r) }
-func getMatrixService(r *http.Request) contracts.MatrixService     { return getNodeService(r) }
-func getPreferencesService(r *http.Request) contracts.PreferencesService {
-	return getNodeService(r)
-}
-func getShoppingCartService(r *http.Request) contracts.ShoppingCartService { return getNodeService(r) }
-func getStripeService(r *http.Request) contracts.StripeService             { return getNodeService(r) }
-func getExchangeRateService(r *http.Request) contracts.ExchangeRateService { return getNodeService(r) }
+func getIdentityService(r *http.Request) contracts.IdentityService         { return getNodeService(r).IdentityInfo() }
+func getChatService(r *http.Request) contracts.ChatService                 { return getNodeService(r).Chat() }
+func getNotificationService(r *http.Request) contracts.NotificationService { return getNodeService(r).Notification() }
+func getOrderService(r *http.Request) contracts.OrderService               { return getNodeService(r).Order() }
+func getListingService(r *http.Request) contracts.ListingService           { return getNodeService(r).Listing() }
+func getProfileService(r *http.Request) contracts.ProfileService           { return getNodeService(r).Profile() }
+func getSocialService(r *http.Request) contracts.SocialService             { return getNodeService(r).Social() }
+func getWalletService(r *http.Request) contracts.WalletService             { return getNodeService(r).Wallet() }
+func getMediaService(r *http.Request) contracts.MediaService               { return getNodeService(r).Media() }
+func getMatrixService(r *http.Request) contracts.MatrixService             { return getNodeService(r).Matrix() }
+func getPreferencesService(r *http.Request) contracts.PreferencesService   { return getNodeService(r).Preferences() }
+func getShoppingCartService(r *http.Request) contracts.ShoppingCartService { return getNodeService(r).ShoppingCart() }
+func getStripeService(r *http.Request) contracts.StripeService             { return getNodeService(r).Stripe() }
+func getExchangeRateService(r *http.Request) contracts.ExchangeRateService { return getNodeService(r).ExchangeRate() }
 
 // getCoreIface attempts to extract coreiface.CoreIface from the request context.
 // Returns (nil, false) if the node is a TenantService (which only implements NodeService).

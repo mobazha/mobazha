@@ -208,6 +208,7 @@ func MockNode() (*MobazhaNode, error) {
 	})
 
 	node.initOrderService()
+	node.initChatService()
 	node.registerPaymentStrategies()
 	node.paymentRegistry.Register(iwallet.ChainMock, &utxoAutoConfirmAdapter{
 		multiwallet:    node.multiwallet,
@@ -419,6 +420,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		})
 
 		node.initOrderService()
+		node.initChatService()
 		node.registerPaymentStrategies()
 		node.paymentRegistry.Register(iwallet.ChainMock, &utxoAutoConfirmAdapter{
 		multiwallet:    node.multiwallet,

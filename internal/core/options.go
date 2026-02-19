@@ -43,6 +43,24 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	}
 	n.initPaymentService()
 	n.initOrderService()
+	n.initChatService()
+}
+
+// initChatService creates the ChatAppService if the necessary
+// dependencies are available. IPFSOnly nodes skip this.
+func (n *MobazhaNode) initChatService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+
+	n.chatService = NewChatAppService(ChatAppServiceConfig{
+		DB:             n.db,
+		Messenger:      n.messenger,
+		NetworkService: n.networkService,
+		EventBus:       n.eventBus,
+		NodeID:         n.nodeID,
+		PeerID:         n.peerID,
+	})
 }
 
 // initOrderService creates the OrderAppService if the necessary

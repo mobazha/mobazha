@@ -1,0 +1,1280 @@
+package core
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math/big"
+	"os"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	btcec "github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
+	"github.com/gosimple/slug"
+	ipath "github.com/ipfs/boxo/path"
+	"github.com/ipfs/go-cid"
+	crypto "github.com/libp2p/go-libp2p/core/crypto"
+	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/microcosm-cc/bluemonday"
+	corecontracts "github.com/mobazha/mobazha-core/contracts"
+	"github.com/mobazha/mobazha-core/identity"
+	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/database/ffsqlite"
+	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/internal/orders/utils"
+	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/encryption"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/request"
+	"github.com/multiformats/go-multihash"
+	"google.golang.org/protobuf/encoding/protojson"
+	"gorm.io/gorm"
+
+	mbznet "github.com/mobazha/mobazha3.0/internal/net"
+)
+
+// FetchIPNSRecordFunc, UpdateAndSaveProfileFunc are declared in other app service files.
+// No new type aliases needed here.
+
+// ListingAppService encapsulates listing CRUD, validation, signing, and network sync.
+type ListingAppService struct {
+	db                 database.Database
+	signer             corecontracts.Signer
+	contentStore       contracts.ContentStore
+	netDB              *netdb.NetDB
+	banManager         *mbznet.BanManager
+	keys               contracts.KeyProvider
+	featureManager     *pkgconfig.FeatureManager
+	localListingCrypto *encryption.LocalListingCrypto
+	nodeID             peer.ID
+	testnet            bool
+
+	publish               PublishFunc
+	fetchIPNSRecord       FetchIPNSRecordFunc
+	getMyProfile          GetMyProfileFunc
+	updateAndSaveProfile  UpdateAndSaveProfileFunc
+}
+
+type ListingAppServiceConfig struct {
+	DB                 database.Database
+	Signer             corecontracts.Signer
+	ContentStore       contracts.ContentStore
+	NetDB              *netdb.NetDB
+	BanManager         *mbznet.BanManager
+	Keys               contracts.KeyProvider
+	FeatureManager     *pkgconfig.FeatureManager
+	LocalListingCrypto *encryption.LocalListingCrypto
+	NodeID             peer.ID
+	Testnet            bool
+
+	Publish               PublishFunc
+	FetchIPNSRecord       FetchIPNSRecordFunc
+	GetMyProfile          GetMyProfileFunc
+	UpdateAndSaveProfile  UpdateAndSaveProfileFunc
+}
+
+func NewListingAppService(cfg ListingAppServiceConfig) *ListingAppService {
+	return &ListingAppService{
+		db:                 cfg.DB,
+		signer:             cfg.Signer,
+		contentStore:       cfg.ContentStore,
+		netDB:              cfg.NetDB,
+		banManager:         cfg.BanManager,
+		keys:               cfg.Keys,
+		featureManager:     cfg.FeatureManager,
+		localListingCrypto: cfg.LocalListingCrypto,
+		nodeID:             cfg.NodeID,
+		testnet:            cfg.Testnet,
+		publish:            cfg.Publish,
+		fetchIPNSRecord:    cfg.FetchIPNSRecord,
+		getMyProfile:       cfg.GetMyProfile,
+		updateAndSaveProfile: cfg.UpdateAndSaveProfile,
+	}
+}
+
+func (s *ListingAppService) IsGlobalBanned(peerID peer.ID) bool {
+	return s.banManager.IsGlobalBanned(peerID)
+}
+
+func (s *ListingAppService) SaveListing(listing *pb.Listing, done chan<- struct{}) error {
+	err := s.db.Update(func(tx database.Tx) error {
+		var currentPrefs models.UserPreferences
+		err := tx.Read().First(&currentPrefs).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		if len(listing.Moderators) == 0 {
+			mods, err := currentPrefs.StoreModerators()
+			if err != nil {
+				return err
+			}
+			modStrs := make([]string, 0, len(mods))
+			for _, mod := range mods {
+				modStrs = append(modStrs, mod.String())
+			}
+			listing.Moderators = modStrs
+		}
+
+		if listing.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD {
+			if currentPrefs.HasShippingProfiles() {
+				var profile *models.ShippingProfile
+				if listing.ShippingProfile != nil && listing.ShippingProfile.ProfileID != "" {
+					profile, err = currentPrefs.GetShippingProfileByID(listing.ShippingProfile.ProfileID)
+					if err != nil {
+						return err
+					}
+					if profile == nil {
+						return fmt.Errorf("shipping profile not found: %s", listing.ShippingProfile.ProfileID)
+					}
+				} else {
+					profile, err = currentPrefs.GetDefaultShippingProfile()
+					if err != nil {
+						return err
+					}
+					if profile == nil {
+						return fmt.Errorf("%w: no default shipping profile configured", coreiface.ErrBadRequest)
+					}
+				}
+				listing.ShippingProfile = models.ConvertShippingProfileToProto(profile)
+			} else if listing.ShippingProfile == nil && len(listing.ShippingOptions) == 0 {
+				shippingOptions, err := currentPrefs.GetShippingOptions()
+				if err != nil {
+					return err
+				}
+				listing.ShippingOptions = models.ConvertShippingOptions(shippingOptions)
+			}
+		}
+
+		cid, err := s.saveListingToDB(tx, listing)
+		if err != nil {
+			return err
+		}
+
+		lmd, err := models.NewListingMetadataFromListing(listing, cid)
+		if err != nil {
+			return err
+		}
+
+		index, err := tx.GetListingIndex()
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		index.UpdateListing(*lmd)
+
+		if err := tx.SetListingIndex(index); err != nil {
+			return err
+		}
+
+		if err := s.updateAndSaveProfile(tx); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		maybeCloseDone(done)
+		return err
+	}
+
+	if listing.Status == models.ListingStatusDraft {
+		maybeCloseDone(done)
+		return nil
+	}
+
+	go func() {
+		if s.netDB != nil {
+			if sl, err := s.GetMyListingBySlug(listing.Slug); err == nil {
+				if err := s.netDB.SetOwnListing(sl); err != nil {
+					logger.LogDebugWithIDf(log, s.nodeID.String(), "SetOwnListing, error: %s", err)
+				}
+			}
+
+			if listingIndex, err := s.GetMyListings(); err == nil {
+				if err = s.netDB.SetOwnListingIndex(listingIndex); err != nil {
+					logger.LogDebugWithIDf(log, s.nodeID.String(), "SetOwnListingIndex, error: %s", err)
+				}
+			}
+		}
+	}()
+
+	s.publish(done)
+	return nil
+}
+
+func (s *ListingAppService) UpdateAllListings(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error {
+	var (
+		listingsUpdated = false
+		err             error
+	)
+	err = s.db.Update(func(tx database.Tx) error {
+		listingsUpdated, err = s.updateAllListings(tx, updateFunc)
+		return err
+	})
+	if err != nil {
+		maybeCloseDone(done)
+		return err
+	}
+	if !listingsUpdated {
+		maybeCloseDone(done)
+		return nil
+	}
+
+	go func() {
+		if s.netDB != nil {
+			if listingIndex, err := s.GetMyListings(); err == nil {
+				s.netDB.SetOwnListingIndex(listingIndex)
+
+				for _, lmd := range listingIndex {
+					if sl, err := s.GetMyListingBySlug(lmd.Slug); err == nil {
+						s.netDB.SetOwnListing(sl)
+					}
+				}
+			}
+
+			if profile, err := s.getMyProfile(); err == nil {
+				s.netDB.SetOwnProfile(profile)
+			}
+		}
+	}()
+
+	s.publish(done)
+	return nil
+}
+
+func (s *ListingAppService) DeleteListing(slugStr string, done chan<- struct{}) error {
+	listing, _ := s.GetMyListingBySlug(slugStr)
+
+	err := s.db.Update(func(tx database.Tx) error {
+		if err := tx.Delete("slug", slugStr, nil, &models.Coupon{}); err != nil {
+			return err
+		}
+
+		index, err := tx.GetListingIndex()
+		if err != nil {
+			return fmt.Errorf("%w: listing index not found", coreiface.ErrNotFound)
+		}
+		index.DeleteListing(slugStr)
+		if err := tx.SetListingIndex(index); err != nil {
+			return err
+		}
+
+		if err := tx.DeleteListing(slugStr); err != nil {
+			return fmt.Errorf("%w: listing not found", coreiface.ErrNotFound)
+		}
+
+		if err := s.updateAndSaveProfile(tx); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		maybeCloseDone(done)
+		return err
+	}
+
+	go func() {
+		if listing != nil && s.netDB != nil {
+			s.netDB.DeleteOwnListing(listing.Cid)
+		}
+	}()
+
+	s.publish(done)
+	return nil
+}
+
+func (s *ListingAppService) GetMyListings() (models.ListingIndex, error) {
+	var index models.ListingIndex
+	err := s.db.View(func(tx database.Tx) error {
+		var txErr error
+		index, txErr = tx.GetListingIndex()
+		if txErr != nil {
+			if os.IsNotExist(txErr) {
+				index = models.ListingIndex{}
+				return nil
+			}
+			return txErr
+		}
+		return nil
+	})
+	return index, err
+}
+
+func (s *ListingAppService) GetListings(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.ListingIndex, error) {
+	getDatafromIPNS := func() (models.ListingIndex, error) {
+		record, err := s.fetchIPNSRecord(ctx, peerID, useCache)
+		if err != nil {
+			return nil, err
+		}
+		pth, err := record.Value()
+		if err != nil {
+			return nil, err
+		}
+		pth1, err := ipath.Join(pth, ffsqlite.ListingIndexFile)
+		if err != nil {
+			return nil, err
+		}
+		indexBytes, err := s.contentStore.Cat(ctx, pth1.String())
+		if err != nil {
+			return nil, err
+		}
+		var index models.ListingIndex
+		if err := json.Unmarshal(indexBytes, &index); err != nil {
+			return nil, err
+		}
+		return index, nil
+	}
+
+	if preferIPNS || s.netDB == nil {
+		index, err := getDatafromIPNS()
+		if err != nil && s.netDB != nil {
+			logger.LogDebugWithIDf(log, s.nodeID.String(), "Failed to get listings from p2p network: %s, error: %s", peerID, err)
+			return s.netDB.GetListingIndex(peerID.String(), reqCtx)
+		}
+		return index, err
+	}
+
+	index, err := s.netDB.GetListingIndex(peerID.String(), reqCtx)
+	if err != nil {
+		return getDatafromIPNS()
+	}
+
+	hasEmptyContractType := false
+	for _, listing := range index {
+		if listing.ContractType == "" {
+			hasEmptyContractType = true
+			break
+		}
+	}
+
+	if hasEmptyContractType {
+		return getDatafromIPNS()
+	}
+
+	return index, err
+}
+
+func (s *ListingAppService) GetMyListingBySlug(slugStr string) (*pb.SignedListing, error) {
+	var (
+		listing *pb.SignedListing
+		coupons []models.Coupon
+		err     error
+	)
+	err = s.db.View(func(tx database.Tx) error {
+		index, err := tx.GetListingIndex()
+		if err != nil {
+			return fmt.Errorf("%w: listing index not found", coreiface.ErrNotFound)
+		}
+
+		id, err := index.GetListingCID(slugStr)
+		if err != nil {
+			return fmt.Errorf("%w: listing not found", coreiface.ErrNotFound)
+		}
+
+		readPlaintext := func() error {
+			var err error
+			listing, err = tx.GetListing(slugStr)
+			if err != nil {
+				return fmt.Errorf("%w: listing not found", coreiface.ErrNotFound)
+			}
+			listing.Cid = id.String()
+			return nil
+		}
+
+		useEncryption := s.featureManager != nil && s.featureManager.IsEnabled(pkgconfig.FeatureLocalEncryptedStorage)
+		if !useEncryption {
+			return readPlaintext()
+		}
+
+		encryptedData, err := tx.GetEncryptedListing(slugStr)
+		if err != nil {
+			return readPlaintext()
+		}
+
+		decryptedData, err := s.localListingCrypto.TryDecryptListingData(encryptedData, slugStr)
+		if err != nil {
+			log.Warningf("Failed to decrypt listing %s, falling back to plaintext: %v", slugStr, err)
+			return readPlaintext()
+		}
+
+		var sl pb.SignedListing
+		if err := (protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}).Unmarshal(decryptedData, &sl); err != nil {
+			return fmt.Errorf("failed to unmarshal decrypted listing: %w", err)
+		}
+		listing = &sl
+
+		if err := tx.Read().Where("slug = ?", slugStr).Find(&coupons).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		listing.Cid = id.String()
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if listing.Listing.Coupons != nil {
+		swapCouponHashesWithDiscountCodes(listing, coupons)
+	}
+	return listing, nil
+}
+
+func (s *ListingAppService) GetMyListingByCID(c cid.Cid) (*pb.SignedListing, error) {
+	var (
+		listing *pb.SignedListing
+		coupons []models.Coupon
+		err     error
+	)
+	err = s.db.View(func(tx database.Tx) error {
+		index, err := tx.GetListingIndex()
+		if err != nil {
+			return fmt.Errorf("%w: listing index not found", coreiface.ErrNotFound)
+		}
+		slugStr, err := index.GetListingSlug(c)
+		if err != nil {
+			return fmt.Errorf("%w: listing not found in index", coreiface.ErrNotFound)
+		}
+		listing, err = tx.GetListing(slugStr)
+		if err != nil {
+			return fmt.Errorf("%w: listing not found", coreiface.ErrNotFound)
+		}
+		if err := tx.Read().Where("slug = ?", slugStr).Find(&coupons).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		listing.Cid = c.String()
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if listing.Listing.Coupons != nil {
+		swapCouponHashesWithDiscountCodes(listing, coupons)
+	}
+	return listing, nil
+}
+
+func (s *ListingAppService) GetListingBySlug(ctx context.Context, peerID peer.ID, slugStr string, reqCtx *request.Context, useCache bool) (*pb.SignedListing, error) {
+	getDatafromIPNS := func() (*pb.SignedListing, error) {
+		record, err := s.fetchIPNSRecord(ctx, peerID, useCache)
+		if err != nil {
+			return nil, err
+		}
+		pth, err := record.Value()
+		if err != nil {
+			return nil, err
+		}
+		pth1, err := ipath.Join(pth, "listings", slugStr+".json")
+		if err != nil {
+			return nil, err
+		}
+		listingBytes, err := s.contentStore.Cat(ctx, pth1.String())
+		if err != nil {
+			return nil, err
+		}
+		c, err := s.contentStore.ComputeCID(listingBytes)
+		if err != nil {
+			return nil, err
+		}
+		return s.deserializeAndValidateListing(listingBytes, c)
+	}
+
+	if preferIPNS || s.netDB == nil {
+		sl, err := getDatafromIPNS()
+		if err != nil && s.netDB != nil {
+			return s.netDB.GetListingBySlug(peerID.String(), slugStr, reqCtx)
+		}
+		return sl, err
+	}
+
+	sl, err := s.netDB.GetListingBySlug(peerID.String(), slugStr, reqCtx)
+	if err != nil {
+		return getDatafromIPNS()
+	}
+	return sl, err
+}
+
+func (s *ListingAppService) GetListingByCID(ctx context.Context, c cid.Cid, reqCtx *request.Context) (*pb.SignedListing, error) {
+	getDatafromIPNS := func() (*pb.SignedListing, error) {
+		listingBytes, err := s.contentStore.Cat(ctx, ipath.FromCid(c).String())
+		if err != nil {
+			return nil, err
+		}
+		return s.deserializeAndValidateListing(listingBytes, c)
+	}
+
+	if preferIPNS || s.netDB == nil {
+		sl, err := getDatafromIPNS()
+		if err != nil && s.netDB != nil {
+			return s.netDB.GetListingByCID(c.String(), reqCtx)
+		}
+		return sl, err
+	}
+
+	sl, err := s.netDB.GetListingByCID(c.String(), reqCtx)
+	if err != nil {
+		return getDatafromIPNS()
+	}
+	return sl, err
+}
+
+// --- Private methods ---
+
+func (s *ListingAppService) generateListingSlug(dbtx database.Tx, title string) (string, error) {
+	title = strings.Replace(title, "/", "", -1)
+	counter := 1
+
+	l := SentenceMaxCharacters - SlugBuffer
+
+	var rx = regexp.MustCompile(EmojiPattern)
+	title = rx.ReplaceAllStringFunc(title, func(str string) string {
+		r, _ := utf8.DecodeRuneInString(str)
+		html := fmt.Sprintf(`&#x%X;`, r)
+		return html
+	})
+
+	slugBase := slug.Make(title)
+	if len(slugBase) < SentenceMaxCharacters-SlugBuffer {
+		l = len(slugBase)
+	}
+	slugBase = slugBase[:l]
+
+	slugToTry := slugBase
+	for {
+		index, err := dbtx.GetListingIndex()
+		if os.IsNotExist(err) {
+			return slugToTry, nil
+		} else if err != nil {
+			return "", err
+		}
+
+		_, err = index.GetListingCID(slugToTry)
+		if err != nil {
+			return slugToTry, nil
+		}
+		slugToTry = slugBase + strconv.Itoa(counter)
+		counter++
+	}
+}
+
+func (s *ListingAppService) updateAllListings(tx database.Tx, updateFunc func(l *pb.Listing) (bool, error)) (listingsUpdated bool, _ error) {
+	index, err := tx.GetListingIndex()
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	var updatedMetadata []models.ListingMetadata
+	for _, lmd := range index {
+		signedListing, err := tx.GetListing(lmd.Slug)
+		if err != nil {
+			return false, err
+		}
+		listing := signedListing.Listing
+
+		updated, err := updateFunc(listing)
+		if err != nil {
+			return false, err
+		}
+
+		if updated {
+			c, err := s.saveListingToDB(tx, listing)
+			if err != nil {
+				return false, err
+			}
+
+			newLmd, err := models.NewListingMetadataFromListing(listing, c)
+			if err != nil {
+				return false, err
+			}
+
+			updatedMetadata = append(updatedMetadata, *newLmd)
+			listingsUpdated = true
+		}
+	}
+	if !listingsUpdated {
+		return false, nil
+	}
+
+	for _, lmd := range updatedMetadata {
+		index.UpdateListing(lmd)
+	}
+
+	if err := tx.SetListingIndex(index); err != nil {
+		return true, err
+	}
+
+	return true, s.updateAndSaveProfile(tx)
+}
+
+func (s *ListingAppService) saveListingToDB(dbtx database.Tx, listing *pb.Listing) (cid.Cid, error) {
+	if listing.Item == nil {
+		return cid.Cid{}, fmt.Errorf("%w: no item in listing", coreiface.ErrBadRequest)
+	}
+
+	if s.testnet {
+		if listing.Metadata.EscrowTimeoutHours == 0 {
+			listing.Metadata.EscrowTimeoutHours = 1
+		}
+	} else {
+		listing.Metadata.EscrowTimeoutHours = EscrowTimeout
+	}
+
+	if listing.Slug == "" {
+		var err error
+		listing.Slug, err = s.generateListingSlug(dbtx, listing.Item.Title)
+		if err != nil {
+			return cid.Cid{}, err
+		}
+	}
+
+	sanitizer := bluemonday.UGCPolicy()
+	for _, opt := range listing.Item.Options {
+		opt.Name = sanitizer.Sanitize(opt.Name)
+		for _, v := range opt.Variants {
+			v.Name = sanitizer.Sanitize(v.Name)
+		}
+	}
+	for _, so := range listing.ShippingOptions {
+		so.Name = sanitizer.Sanitize(so.Name)
+		for _, serv := range so.Services {
+			serv.Name = sanitizer.Sanitize(serv.Name)
+		}
+	}
+
+	if listing.Metadata.Version <= 0 {
+		listing.Metadata.Version = ListingVersion
+	}
+
+	profile, err := dbtx.GetProfile()
+	if err != nil && !os.IsNotExist(err) {
+		return cid.Cid{}, err
+	}
+	rawPubKey, err := s.signer.PublicKey()
+	if err != nil {
+		return cid.Cid{}, err
+	}
+	pubkey, err := identity.MarshalPublicKeyFromEd25519(rawPubKey)
+	if err != nil {
+		return cid.Cid{}, err
+	}
+
+	escrowKey, err := s.keys.EscrowMasterKey()
+	if err != nil {
+		return cid.Cid{}, fmt.Errorf("failed to get escrow master key: %w", err)
+	}
+	ethKey, err := s.keys.EVMMasterKey()
+	if err != nil {
+		return cid.Cid{}, fmt.Errorf("failed to get EVM master key: %w", err)
+	}
+	solKey, err := s.keys.SolanaMasterKey()
+	if err != nil {
+		return cid.Cid{}, fmt.Errorf("failed to get Solana master key: %w", err)
+	}
+
+	idHash := sha256.Sum256([]byte(s.nodeID.String()))
+	sig := ecdsa.Sign(escrowKey, idHash[:])
+
+	listing.VendorID = &pb.ID{
+		PeerID: s.nodeID.String(),
+		Pubkeys: &pb.ID_Pubkeys{
+			Identity: pubkey,
+			Escrow:   escrowKey.PubKey().SerializeCompressed(),
+			Eth:      ethKey.PubKey().SerializeCompressed(),
+			Solana:   solKey.PublicKey().Bytes(),
+		},
+		Sig: sig.Serialize(),
+	}
+	if profile != nil {
+		listing.VendorID.Handle = profile.Handle
+	}
+
+	var couponsToStore []models.Coupon
+	for i, coupon := range listing.Coupons {
+		hash := coupon.GetHash()
+		code := coupon.GetDiscountCode()
+
+		_, err := multihash.FromB58String(hash)
+		if err != nil {
+			couponMH, err := utils.MultihashSha256([]byte(code))
+			if err != nil {
+				return cid.Cid{}, err
+			}
+			listing.Coupons[i].Hash = couponMH.B58String()
+			hash = couponMH.B58String()
+		}
+
+		r := make([]byte, 20)
+		rand.Read(r)
+		id := hex.EncodeToString(r)
+		coupon := models.Coupon{ID: id, Slug: listing.Slug, Code: code, Hash: hash}
+		couponsToStore = append(couponsToStore, coupon)
+	}
+	if err := dbtx.Delete("slug", listing.Slug, nil, &models.Coupon{}); err != nil {
+		return cid.Cid{}, err
+	}
+	if len(couponsToStore) > 0 {
+		for _, coupon := range couponsToStore {
+			if err := dbtx.Save(&coupon); err != nil {
+				return cid.Cid{}, err
+			}
+		}
+	}
+
+	sl, err := s.signListing(listing)
+	if err != nil {
+		return cid.Cid{}, err
+	}
+
+	if err := s.validateListing(sl); err != nil {
+		if errors.Is(err, coreiface.ErrInternalServer) {
+			return cid.Cid{}, err
+		}
+		return cid.Cid{}, fmt.Errorf("%w: %s", coreiface.ErrBadRequest, err)
+	}
+
+	m := protojson.MarshalOptions{
+		EmitUnpopulated: false,
+	}
+	ser := m.Format(sl)
+	var out bytes.Buffer
+	json.Indent(&out, []byte(ser), "", "    ")
+	plaintextCID, err := s.contentStore.ComputeCID(out.Bytes())
+	if err != nil {
+		return cid.Cid{}, err
+	}
+
+	savePlaintext := func() error {
+		return dbtx.SetListing(sl)
+	}
+
+	useEncryption := s.featureManager != nil && s.featureManager.IsEnabled(pkgconfig.FeatureLocalEncryptedStorage)
+	if !useEncryption {
+		if err := savePlaintext(); err != nil {
+			return cid.Cid{}, err
+		}
+		return plaintextCID, nil
+	}
+
+	profile, err = dbtx.GetProfile()
+	if err != nil {
+		return cid.Cid{}, err
+	}
+
+	_, encryptedData, err := s.localListingCrypto.EncryptListing(sl)
+	if err != nil {
+		log.Warningf("Failed to encrypt listing %s, saving as plaintext: %v", listing.Slug, err)
+		if err := savePlaintext(); err != nil {
+			return cid.Cid{}, err
+		}
+		return plaintextCID, nil
+	}
+
+	if err := dbtx.SetEncryptedListing(listing.Slug, encryptedData); err != nil {
+		return cid.Cid{}, err
+	}
+
+	return plaintextCID, nil
+}
+
+func (s *ListingAppService) signListing(listing *pb.Listing) (*pb.SignedListing, error) {
+	m := protojson.MarshalOptions{
+		EmitUnpopulated: false,
+	}
+	ser := m.Format(listing)
+
+	var out bytes.Buffer
+	json.Indent(&out, []byte(ser), "", "")
+	sig, err := s.signer.Sign(out.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	return &pb.SignedListing{Listing: listing, Signature: sig}, nil
+}
+
+func (s *ListingAppService) validateListing(sl *pb.SignedListing) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			switch x := r.(type) {
+			case string:
+				err = errors.New(x)
+			case error:
+				err = x
+			default:
+				err = errors.New("unknown panic")
+			}
+		}
+	}()
+
+	if sl.Listing.Slug == "" {
+		return coreiface.ErrMissingField("slug")
+	}
+	if len(sl.Listing.Slug) > SentenceMaxCharacters {
+		return coreiface.ErrTooManyCharacters{"slug", strconv.Itoa(SentenceMaxCharacters)}
+	}
+	if strings.Contains(sl.Listing.Slug, " ") {
+		return errors.New("slugs cannot contain spaces")
+	}
+	if strings.Contains(sl.Listing.Slug, "/") {
+		return errors.New("slugs cannot contain file separators")
+	}
+
+	if sl.Listing.Status != "" {
+		if !models.ValidListingStatuses[sl.Listing.Status] {
+			return fmt.Errorf("invalid listing status: %s (must be draft, published, or private)", sl.Listing.Status)
+		}
+	}
+
+	if sl.Listing.Item.WeightUnit != "" {
+		if !models.ValidWeightUnits[sl.Listing.Item.WeightUnit] {
+			return fmt.Errorf("invalid weight unit: %s (must be g, kg, lb, or oz)", sl.Listing.Item.WeightUnit)
+		}
+	}
+
+	if sl.Listing.Item.InventoryPolicy != "" {
+		if !models.ValidInventoryPolicies[sl.Listing.Item.InventoryPolicy] {
+			return fmt.Errorf("invalid inventory policy: %s (must be deny or continue)", sl.Listing.Item.InventoryPolicy)
+		}
+	}
+
+	if sl.Listing.Item.DimensionUnit != "" {
+		if !models.ValidDimensionUnits[sl.Listing.Item.DimensionUnit] {
+			return fmt.Errorf("invalid dimension unit: %s (must be cm or in)", sl.Listing.Item.DimensionUnit)
+		}
+	}
+
+	if len(sl.Listing.Item.Brand) > WordMaxCharacters {
+		return coreiface.ErrTooManyCharacters{"item.brand", strconv.Itoa(WordMaxCharacters)}
+	}
+
+	if sl.Listing.Item.PackageLength < 0 || sl.Listing.Item.PackageWidth < 0 || sl.Listing.Item.PackageHeight < 0 {
+		return fmt.Errorf("package dimensions must be non-negative")
+	}
+
+	if sl.Listing.Metadata == nil {
+		return coreiface.ErrMissingField("metadata")
+	}
+	if sl.Listing.Metadata.ContractType > pb.Listing_Metadata_RWA_TOKEN {
+		return errors.New("invalid contract type")
+	}
+	if sl.Listing.Metadata.Format > pb.Listing_Metadata_MARKET_PRICE {
+		return errors.New("invalid listing format")
+	}
+	if sl.Listing.Metadata.Expiry == nil {
+		return coreiface.ErrMissingField("metadata.expiry")
+	}
+	if time.Unix(sl.Listing.Metadata.Expiry.Seconds, 0).Before(time.Now()) {
+		return errors.New("listing expiration must be in the future")
+	}
+	if len(sl.Listing.Metadata.Language) > WordMaxCharacters {
+		return coreiface.ErrTooManyCharacters{"metadata.language", strconv.Itoa(WordMaxCharacters)}
+	}
+	if !s.testnet && sl.Listing.Metadata.EscrowTimeoutHours > EscrowTimeout {
+		return fmt.Errorf("escrow timeout must be less than or equal to %d hours", EscrowTimeout)
+	}
+	if sl.Listing.Metadata.Format != pb.Listing_Metadata_MARKET_PRICE && sl.Listing.Metadata.PricingCurrency == nil {
+		return coreiface.ErrMissingField("metadata.pricingcurrency")
+	}
+	if sl.Listing.Metadata.PricingCurrency != nil {
+		if sl.Listing.Metadata.PricingCurrency.Code == "" {
+			return coreiface.ErrMissingField("metadata.pricingcurrency.code")
+		}
+		if len(sl.Listing.Metadata.PricingCurrency.Code) > WordMaxCharacters {
+			return coreiface.ErrTooManyCharacters{"metadata.pricingcurrency.code", strconv.Itoa(WordMaxCharacters)}
+		}
+		def, err := models.CurrencyDefinitions.Lookup(sl.Listing.Metadata.PricingCurrency.Code)
+		if err != nil {
+			return errors.New("unknown pricing currency")
+		}
+		if sl.Listing.Metadata.PricingCurrency.Divisibility != uint32(def.Divisibility) {
+			return errors.New("divisibility differs from expected value")
+		}
+	}
+
+	if sl.Listing.Item.Title == "" {
+		return coreiface.ErrMissingField("item.title")
+	}
+	price, _ := new(big.Int).SetString(sl.Listing.Item.Price, 10)
+	if (sl.Listing.Metadata.ContractType != pb.Listing_Metadata_CRYPTOCURRENCY &&
+		sl.Listing.Metadata.ContractType != pb.Listing_Metadata_CLASSIFIED) &&
+		price.Cmp(big.NewInt(0)) == 0 {
+		return errors.New("zero price listings are not allowed")
+	}
+	if sl.Listing.Metadata.ContractType == pb.Listing_Metadata_CLASSIFIED && len(sl.Listing.ShippingOptions) > 0 {
+		return errors.New("classified listings can not have shipping")
+	}
+	if len(sl.Listing.Item.Title) > TitleMaxCharacters {
+		return coreiface.ErrTooManyCharacters{"item.title", strconv.Itoa(TitleMaxCharacters)}
+	}
+	if len(sl.Listing.Item.Description) > DescriptionMaxCharacters {
+		return coreiface.ErrTooManyCharacters{"item.description", strconv.Itoa(DescriptionMaxCharacters)}
+	}
+	if len(sl.Listing.Item.ProcessingTime) > SentenceMaxCharacters {
+		return coreiface.ErrTooManyCharacters{"item.processingtime", strconv.Itoa(SentenceMaxCharacters)}
+	}
+	if len(sl.Listing.Item.Tags) > MaxTags {
+		return fmt.Errorf("number of tags exceeds the max of %d", MaxTags)
+	}
+	for _, tag := range sl.Listing.Item.Tags {
+		if tag == "" {
+			return errors.New("tags must not be empty")
+		}
+		if len(tag) > WordMaxCharacters {
+			return coreiface.ErrTooManyCharacters{"item.tags", strconv.Itoa(WordMaxCharacters)}
+		}
+	}
+	if len(sl.Listing.Item.Images) == 0 {
+		return coreiface.ErrMissingField("item.images")
+	}
+	if len(sl.Listing.Item.Images) > MaxListItems {
+		return coreiface.ErrTooManyItems{"item.images", strconv.Itoa(MaxListItems)}
+	}
+	for _, img := range sl.Listing.Item.Images {
+		_, err := cid.Decode(img.Tiny)
+		if err != nil {
+			return errors.New("tiny image hashes must be properly formatted CID")
+		}
+		_, err = cid.Decode(img.Small)
+		if err != nil {
+			return errors.New("small image hashes must be properly formatted CID")
+		}
+		_, err = cid.Decode(img.Medium)
+		if err != nil {
+			return errors.New("medium image hashes must be properly formatted CID")
+		}
+		_, err = cid.Decode(img.Large)
+		if err != nil {
+			return errors.New("large image hashes must be properly formatted CID")
+		}
+		_, err = cid.Decode(img.Original)
+		if err != nil {
+			return errors.New("original image hashes must be properly formatted CID")
+		}
+		if img.Filename == "" {
+			return errors.New("image file names must not be nil")
+		}
+		if len(img.Filename) > FilenameMaxCharacters {
+			return coreiface.ErrTooManyCharacters{"item.images.filename", strconv.Itoa(FilenameMaxCharacters)}
+		}
+		if len(img.Alt) > SentenceMaxCharacters {
+			return coreiface.ErrTooManyCharacters{"item.images.alt", strconv.Itoa(SentenceMaxCharacters)}
+		}
+	}
+	if len(sl.Listing.Item.Categories) > MaxCategories {
+		return fmt.Errorf("number of categories must be less than max of %d", MaxCategories)
+	}
+	for _, category := range sl.Listing.Item.Categories {
+		if category == "" {
+			return coreiface.ErrMissingField("item.category")
+		}
+		if len(category) > WordMaxCharacters*2 {
+			return coreiface.ErrTooManyCharacters{"item.categories", strconv.Itoa(WordMaxCharacters)}
+		}
+	}
+
+	maxCombos := 1
+	optionMap := make(map[string]map[string]struct{})
+	for _, option := range sl.Listing.Item.Options {
+		if _, ok := optionMap[option.Name]; ok {
+			return errors.New("option names must be unique")
+		}
+		if option.Name == "" {
+			return coreiface.ErrMissingField("item.options.name")
+		}
+		if len(option.Variants) < 2 {
+			return errors.New("options must have more than one variants")
+		}
+		if len(option.Name) > WordMaxCharacters {
+			return coreiface.ErrTooManyCharacters{"item.options.name", strconv.Itoa(WordMaxCharacters)}
+		}
+		if len(option.Description) > SentenceMaxCharacters {
+			return coreiface.ErrTooManyCharacters{"item.options.description", strconv.Itoa(SentenceMaxCharacters)}
+		}
+		if len(option.Variants) > MaxListItems {
+			return coreiface.ErrTooManyItems{"item.options.variants", strconv.Itoa(MaxListItems)}
+		}
+		varMap := make(map[string]struct{})
+		for _, variant := range option.Variants {
+			if _, ok := varMap[variant.Name]; ok {
+				return errors.New("variant names must be unique")
+			}
+			if len(variant.Name) > WordMaxCharacters {
+				return coreiface.ErrTooManyCharacters{"item.options.variants.name", strconv.Itoa(WordMaxCharacters)}
+			}
+			if variant.Image != nil && (variant.Image.Filename != "" ||
+				variant.Image.Large != "" || variant.Image.Medium != "" || variant.Image.Small != "" ||
+				variant.Image.Tiny != "" || variant.Image.Original != "") {
+				_, err := cid.Decode(variant.Image.Tiny)
+				if err != nil {
+					return errors.New("tiny image hashes must be properly formatted CID")
+				}
+				_, err = cid.Decode(variant.Image.Small)
+				if err != nil {
+					return errors.New("small image hashes must be properly formatted CID")
+				}
+				_, err = cid.Decode(variant.Image.Medium)
+				if err != nil {
+					return errors.New("medium image hashes must be properly formatted CID")
+				}
+				_, err = cid.Decode(variant.Image.Large)
+				if err != nil {
+					return errors.New("large image hashes must be properly formatted CID")
+				}
+				_, err = cid.Decode(variant.Image.Original)
+				if err != nil {
+					return errors.New("original image hashes must be properly formatted CID")
+				}
+				if variant.Image.Filename == "" {
+					return coreiface.ErrMissingField("items.options.variants.image.file")
+				}
+				if len(variant.Image.Filename) > FilenameMaxCharacters {
+					return coreiface.ErrTooManyCharacters{"item.options.variants.image.filename", strconv.Itoa(FilenameMaxCharacters)}
+				}
+			}
+			varMap[variant.Name] = struct{}{}
+		}
+		maxCombos *= len(option.Variants)
+		optionMap[option.Name] = varMap
+	}
+
+	if len(sl.Listing.Item.Skus) > maxCombos {
+		return errors.New("more skus than variant combinations")
+	}
+	comboMap := make(map[string]bool)
+	for _, sku := range sl.Listing.Item.Skus {
+		if maxCombos > 1 && len(sku.Selections) == 0 {
+			return errors.New("skus must specify a variant combo when options are used")
+		}
+		if len(sku.ProductID) > WordMaxCharacters {
+			return coreiface.ErrTooManyCharacters{"item.sku.productID", strconv.Itoa(WordMaxCharacters)}
+		}
+		formatted, err := json.Marshal(sku.Selections)
+		if err != nil {
+			return err
+		}
+		_, ok := comboMap[string(formatted)]
+		if !ok {
+			comboMap[string(formatted)] = true
+		} else {
+			return errors.New("duplicate sku")
+		}
+		expectedSelectionCount := 0
+		for _, option := range sl.Listing.Item.Options {
+			if len(option.Variants) > 0 {
+				expectedSelectionCount++
+			}
+		}
+		if len(sku.Selections) != expectedSelectionCount {
+			return errors.New("incorrect number of variants in sku combination")
+		}
+		for _, selection := range sku.Selections {
+			variantMap, ok := optionMap[selection.Option]
+			if !ok {
+				return errors.New("sku option not listed in listing")
+			}
+			if _, ok := variantMap[selection.Variant]; !ok {
+				return errors.New("sku variant not listed in option")
+			}
+		}
+	}
+	if len(sl.Listing.Item.Price) > SentenceMaxCharacters {
+		return coreiface.ErrTooManyCharacters{"item.price", strconv.Itoa(SentenceMaxCharacters)}
+	}
+	if sl.Listing.Metadata.Format != pb.Listing_Metadata_MARKET_PRICE {
+		_, ok := new(big.Int).SetString(sl.Listing.Item.Price, 10)
+		if !ok {
+			return errors.New("invalid item price")
+		}
+	}
+
+	if len(sl.Listing.Taxes) > MaxListItems {
+		return coreiface.ErrTooManyItems{"taxes", strconv.Itoa(MaxListItems)}
+	}
+	for _, tax := range sl.Listing.Taxes {
+		if tax.TaxType == "" {
+			return coreiface.ErrMissingField("taxes.taxtype")
+		}
+		if len(tax.TaxType) > WordMaxCharacters {
+			return coreiface.ErrTooManyCharacters{"taxes.taxtype", strconv.Itoa(WordMaxCharacters)}
+		}
+		if len(tax.TaxRegions) == 0 {
+			return errors.New("tax must specify at least one region")
+		}
+		if len(tax.TaxRegions) > MaxCountryCodes {
+			return fmt.Errorf("number of tax regions is greater than the max of %d", MaxCountryCodes)
+		}
+		if tax.Percentage == 0 || tax.Percentage > 100 {
+			return errors.New("tax percentage must be between 0 and 100")
+		}
+	}
+
+	if len(sl.Listing.Coupons) > MaxListItems {
+		return coreiface.ErrTooManyItems{"coupons", strconv.Itoa(MaxListItems)}
+	}
+	for _, coupon := range sl.Listing.Coupons {
+		if len(coupon.Title) > CouponTitleMaxCharacters {
+			return coreiface.ErrTooManyCharacters{"coupons.title", strconv.Itoa(SentenceMaxCharacters)}
+		}
+		if len(coupon.GetDiscountCode()) > CodeMaxCharacters {
+			return coreiface.ErrTooManyCharacters{"coupons.discountcode", strconv.Itoa(CodeMaxCharacters)}
+		}
+		if coupon.GetPercentDiscount() > 100 {
+			return errors.New("percent discount cannot be over 100 percent")
+		}
+		n, _ := new(big.Int).SetString(sl.Listing.Item.Price, 10)
+		discountVal := coupon.GetPriceDiscount()
+		flag := false
+		if discountVal != "" {
+			if len(discountVal) > SentenceMaxCharacters {
+				return coreiface.ErrTooManyCharacters{"coupons.pricediscount", strconv.Itoa(SentenceMaxCharacters)}
+			}
+			discount0, ok := new(big.Int).SetString(discountVal, 10)
+			if !ok {
+				return errors.New("invalid price discount")
+			}
+			if n.Cmp(discount0) < 0 {
+				return errors.New("price discount cannot be greater than the item price")
+			}
+			if discount0.Cmp(big.NewInt(0)) == 0 {
+				flag = true
+			}
+		}
+		if coupon.GetPercentDiscount() == 0 && flag {
+			return errors.New("coupons must have at least one positive discount value")
+		}
+	}
+
+	if len(sl.Listing.Moderators) > MaxListItems {
+		return coreiface.ErrTooManyItems{"moderators", strconv.Itoa(MaxListItems)}
+	}
+	for _, moderator := range sl.Listing.Moderators {
+		_, err := peer.Decode(moderator)
+		if err != nil {
+			return errors.New("moderator IDs must be valid")
+		}
+	}
+
+	if len(sl.Listing.TermsAndConditions) > PolicyMaxCharacters {
+		return coreiface.ErrTooManyCharacters{"termsandconditions", strconv.Itoa(PolicyMaxCharacters)}
+	}
+
+	if len(sl.Listing.RefundPolicy) > PolicyMaxCharacters {
+		return coreiface.ErrTooManyCharacters{"refundpolicy", strconv.Itoa(PolicyMaxCharacters)}
+	}
+
+	if sl.Listing.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD {
+		err := validatePhysicalListing(sl.Listing)
+		if err != nil {
+			return err
+		}
+	} else if sl.Listing.Metadata.ContractType == pb.Listing_Metadata_CRYPTOCURRENCY {
+		err := s.validateCryptocurrencyListing(sl.Listing)
+		if err != nil {
+			return err
+		}
+	}
+
+	if sl.Listing.Metadata.Format == pb.Listing_Metadata_MARKET_PRICE {
+		err := validateMarketPriceListing(sl.Listing)
+		if err != nil {
+			return err
+		}
+	}
+
+	if sl.Listing.VendorID == nil {
+		return coreiface.ErrMissingField("vendorID")
+	}
+	if len(sl.Listing.VendorID.Handle) > SentenceMaxCharacters {
+		return coreiface.ErrTooManyCharacters{"vendorID.handle", strconv.Itoa(SentenceMaxCharacters)}
+	}
+	if sl.Listing.VendorID.Pubkeys == nil {
+		return coreiface.ErrMissingField("vendorID.pubkeys")
+	}
+	identityPubkey, err := crypto.UnmarshalPublicKey(sl.Listing.VendorID.Pubkeys.Identity)
+	if err != nil {
+		return errors.New("invalid vendor identity public key")
+	}
+	peerID, err := peer.IDFromPublicKey(identityPubkey)
+	if err != nil {
+		return fmt.Errorf("%w: %s", coreiface.ErrInternalServer, err)
+	}
+	if peerID.String() != sl.Listing.VendorID.PeerID {
+		return errors.New("vendor peerID does not match public key")
+	}
+	if len(sl.Listing.VendorID.Pubkeys.Escrow) != 33 {
+		return errors.New("vendor escrow pubkey invalid length")
+	}
+	ecPubkey, err := btcec.ParsePubKey(sl.Listing.VendorID.Pubkeys.Escrow)
+	if err != nil {
+		return errors.New("invalid vendor escrow public key")
+	}
+	sigParsed, err := ecdsa.ParseSignature(sl.Listing.VendorID.Sig)
+	if err != nil {
+		return errors.New("invalid vendor identity signature")
+	}
+	idHash := sha256.Sum256([]byte(sl.Listing.VendorID.PeerID))
+	valid := sigParsed.Verify(idHash[:], ecPubkey)
+	if !valid {
+		return errors.New("invalid secp256k1 signature on vendor identity key")
+	}
+
+	m := protojson.MarshalOptions{
+		EmitUnpopulated: false,
+	}
+	ser := m.Format(sl.Listing)
+
+	var out bytes.Buffer
+	err = json.Indent(&out, []byte(ser), "", "")
+	if err != nil {
+		return fmt.Errorf("%w: %s", coreiface.ErrInternalServer, err)
+	}
+	valid, err = identityPubkey.Verify(out.Bytes(), sl.Signature)
+	if err != nil {
+		return fmt.Errorf("%w: %s", coreiface.ErrInternalServer, err)
+	}
+	if !valid {
+		return errors.New("invalid signature on listing")
+	}
+
+	return nil
+}
+
+func (s *ListingAppService) deserializeAndValidateListing(listingBytes []byte, c cid.Cid) (*pb.SignedListing, error) {
+	signedListing := new(pb.SignedListing)
+	if err := (protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}).Unmarshal(listingBytes, signedListing); err != nil {
+		return nil, fmt.Errorf("%w: %s", coreiface.ErrNotFound, err)
+	}
+	if err := s.validateListing(signedListing); err != nil {
+		return nil, fmt.Errorf("%w: %s", coreiface.ErrNotFound, err)
+	}
+	signedListing.Cid = c.String()
+	return signedListing, nil
+}
+
+func (s *ListingAppService) validateCryptocurrencyListing(listing *pb.Listing) error {
+	switch {
+	case len(listing.Coupons) > 0:
+		return coreiface.ErrCryptocurrencyListingIllegalField("coupons")
+	case len(listing.Item.Options) > 0:
+		return coreiface.ErrCryptocurrencyListingIllegalField("item.options")
+	case len(listing.ShippingOptions) > 0:
+		return coreiface.ErrCryptocurrencyListingIllegalField("shippingOptions")
+	case len(listing.Item.Condition) > 0:
+		return coreiface.ErrCryptocurrencyListingIllegalField("item.condition")
+	}
+	return nil
+}

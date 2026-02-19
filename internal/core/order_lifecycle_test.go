@@ -25,7 +25,7 @@ import (
 func newMockUTXOAdapter(node *MobazhaNode) *utxoAutoConfirmAdapter {
 	return &utxoAutoConfirmAdapter{
 		multiwallet:    node.multiwallet,
-		escrowKey:      node.escrowMasterKey,
+		keys:           node.keyProvider,
 		onAutoConfirm:  node.handleCancelablePaymentForUTXO,
 		getPaymentInfo: node.GetUTXOPaymentInfo,
 	}

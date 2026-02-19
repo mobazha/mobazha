@@ -34,7 +34,7 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	// ── UTXO ────────────────────────────────────────────────────
 	utxoStrategy := &utxoAutoConfirmAdapter{
 		multiwallet:    n.multiwallet,
-		escrowKey:      n.escrowMasterKey,
+		keys:           n.keyProvider,
 		onAutoConfirm:  n.handleCancelablePaymentForUTXO,
 		getPaymentInfo: n.GetUTXOPaymentInfo,
 	}
@@ -47,7 +47,7 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 
 	// ── EVM ─────────────────────────────────────────────────────
 	evmOps := &evmChainOps{
-		ethKey:          n.ethMasterKey,
+		keys:            n.keyProvider,
 		multiwallet:     n.multiwallet,
 		buildReleaseTxn: n.buildReleaseTransaction,
 		onAutoConfirm:   n.handleCancelablePaymentForEVM,
@@ -59,7 +59,7 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 
 	// ── Solana ──────────────────────────────────────────────────
 	solOps := &solanaChainOps{
-		solKey:          n.solPrivKey,
+		keys:            n.keyProvider,
 		multiwallet:     n.multiwallet,
 		buildReleaseTxn: n.buildReleaseTransaction,
 		nodeID:          n.nodeID,

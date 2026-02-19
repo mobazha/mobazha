@@ -5,12 +5,19 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"strings"
 
 	ipfsfiles "github.com/ipfs/boxo/files"
 	ipath "github.com/ipfs/boxo/path"
+	"github.com/ipfs/go-cid"
 	"github.com/ipfs/kubo/core/coreapi"
+	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 // NodeOption configures optional dependencies on a MobazhaNode after
@@ -60,6 +67,10 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initShoppingCartService()
 	n.initProfileService()
 	n.initFollowService()
+	n.initPostsService()
+	n.initModerationService()
+	n.initChannelsService()
+	n.initListingService()
 }
 
 // initMatrixService creates the MatrixAppService.
@@ -197,10 +208,40 @@ func (n *MobazhaNode) initOrderService() {
 		Signer:          n.signer,
 		OrderProcessor:  n.orderProcessor,
 		Messenger:       n.messenger,
+		NetworkService:  n.networkService,
+		EventBus:        n.eventBus,
 		NodeID:          n.nodeID,
+		KeyProvider:     n.keyProvider,
+		PeerID:          n.Identity,
+		Testnet:         n.testnet,
+		ExchangeRates:   n.exchangeRates,
 
 		GetPayoutAddr:               n.GetPayoutAddress,
 		ReleaseCancelableWithParams: n.releaseFromCancelableAddressWithParams,
+		ReleaseCancelableFunds: func(order *models.Order, payoutAddress string) (iwallet.TransactionID, string, error) {
+			if n.paymentService != nil {
+				return n.paymentService.ReleaseCancelableFunds(order, payoutAddress)
+			}
+			return "", "", nil
+		},
+		ValidateListing: func(sl *pb.SignedListing) error {
+			return n.validateListing(sl)
+		},
+		GetModeratorFee: func(totalOut iwallet.Amount, coinCode string) (iwallet.Amount, error) {
+			return n.GetModeratorFee(totalOut, coinCode)
+		},
+		GetListingByCID: func(ctx context.Context, c cid.Cid, reqCtx interface{}) (*pb.SignedListing, error) {
+			return n.GetListingByCID(ctx, c, nil)
+		},
+		EnsureListingCurrent: func(ctx context.Context, listing *pb.SignedListing, listingHash string) error {
+			return n.ensureListingIsCurrent(ctx, listing, listingHash)
+		},
+		ProcessStripePayment: func(paymentData *models.PaymentData) error {
+			return n.paymentService.ProcessStripePaymentData(paymentData)
+		},
+		FetchOrderByID: func(orderID string) (*models.Order, error) {
+			return n.fetchOrderByID(orderID)
+		},
 	})
 }
 
@@ -245,6 +286,10 @@ func (n *MobazhaNode) initPaymentService() {
 		GetStripeAccountID:      getStripeAccountIDFn,
 		StripeConfigCache:       n.stripeConfigCache,
 		ReleaseCancelable:       n.releaseFromCancelableAddress,
+		EscrowMasterPubKey:      n.escrowMasterKey.PubKey(),
+
+		Keys:                n.keyProvider,
+		ProcessOrderPayment: n.ProcessOrderPayment,
 
 		EVMRelayService: evmRelay,
 		RelayAPIURL:     n.relayAPIURL,
@@ -285,6 +330,33 @@ func (n *MobazhaNode) initProfileService() {
 	})
 }
 
+// initPostsService creates the PostsAppService.
+// Must be called after initProfileService since it depends on profileService callbacks.
+func (n *MobazhaNode) initPostsService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+
+	var updateProfile UpdateAndSaveProfileFunc
+	var getMyProfile GetMyProfileFunc
+	if n.profileService != nil {
+		updateProfile = n.profileService.UpdateAndSaveProfile
+		getMyProfile = n.profileService.GetMyProfile
+	}
+
+	n.postsService = NewPostsAppService(PostsAppServiceConfig{
+		DB:                   n.db,
+		ContentStore:         n.contentStore,
+		Signer:               n.signer,
+		Keys:                 n.keyProvider,
+		PeerID:               n.peerID,
+		FetchIPNSRecord:      n.fetchIPNSRecord,
+		Publish:              n.Publish,
+		UpdateAndSaveProfile: updateProfile,
+		GetMyProfile:         getMyProfile,
+	})
+}
+
 // initFollowService creates the FollowAppService.
 // Must be called after initProfileService since it depends on profileService.
 func (n *MobazhaNode) initFollowService() {
@@ -309,5 +381,145 @@ func (n *MobazhaNode) initFollowService() {
 		NetDB:                n.netDB,
 		UpdateAndSaveProfile: updateProfile,
 		GetMyProfile:         getMyProfile,
+	})
+}
+
+// initModerationService creates the ModerationAppService.
+// Must be called after initProfileService since it depends on profileService.GetMyProfile.
+func (n *MobazhaNode) initModerationService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+
+	var getMyProfile GetMyProfileFunc
+	if n.profileService != nil {
+		getMyProfile = n.profileService.GetMyProfile
+	}
+
+	var announceAsModerator DHTAnnounceModeratorFunc
+	var removeAsModerator DHTRemoveModeratorFunc
+	var findModeratorsAsync DHTFindModeratorsAsyncFunc
+
+	announceAsModerator = func(ctx context.Context) error {
+		ipfsNode, err := n.getIPFSNode()
+		if err != nil {
+			return err
+		}
+		api, err := coreapi.NewCoreAPI(ipfsNode)
+		if err != nil {
+			return err
+		}
+		_, err = api.Block().Put(ctx, strings.NewReader(moderatorTopic))
+		return err
+	}
+
+	removeAsModerator = func(ctx context.Context) error {
+		ipfsNode, err := n.getIPFSNode()
+		if err != nil {
+			return err
+		}
+		api, err := coreapi.NewCoreAPI(ipfsNode)
+		if err != nil {
+			return err
+		}
+		pth, err := ipath.NewPath(moderatorCid)
+		if err != nil {
+			return err
+		}
+		return api.Block().Rm(ctx, pth)
+	}
+
+	findModeratorsAsync = func(ctx context.Context, maxCount int) <-chan peer.ID {
+		ch := make(chan peer.ID)
+		go func() {
+			defer close(ch)
+			c, err := cid.Decode(moderatorCid)
+			if err != nil {
+				logger.LogErrorWithIDf(log, n.nodeID, "Error decoding moderator cid: %s", err)
+				return
+			}
+			ipfsNode, err := n.getIPFSNode()
+			if err != nil {
+				logger.LogErrorWithIDf(log, n.nodeID, "No IPFS node available for moderator discovery")
+				return
+			}
+			provCh := ipfsNode.Routing.FindProvidersAsync(ctx, c, maxCount)
+			for prov := range provCh {
+				ch <- prov.ID
+			}
+		}()
+		return ch
+	}
+
+	var verifiedModEndpoint string
+	if n.netConfig != nil {
+		verifiedModEndpoint = n.netConfig.GetVerifiedModEndpoint()
+	}
+
+	n.moderationService = NewModerationAppService(ModerationAppServiceConfig{
+		DB:                    n.db,
+		Publish:               n.Publish,
+		NodeID:                n.nodeID,
+		VerifiedModEndpoint:   verifiedModEndpoint,
+		ExchangeRates:         n.exchangeRates,
+		GetMyProfile:          getMyProfile,
+		GetAcceptedCurrencies: n.GetAcceptedCurrencies,
+		AnnounceAsModerator:   announceAsModerator,
+		RemoveAsModerator:     removeAsModerator,
+		FindModeratorsAsync:   findModeratorsAsync,
+		UpdateAllListings:     n.UpdateAllListings,
+	})
+}
+
+// initChannelsService creates the ChannelsAppService.
+// Must be called after initPreferencesService since it depends on preferences callbacks.
+func (n *MobazhaNode) initChannelsService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+
+	var getPrefs GetPreferencesFunc
+	var savePrefs SavePreferencesFunc
+	if n.preferencesService != nil {
+		getPrefs = n.preferencesService.GetPreferences
+		savePrefs = n.preferencesService.SavePreferences
+	}
+
+	n.channelsService = NewChannelsAppService(ChannelsAppServiceConfig{
+		DB:                   n.db,
+		NetworkService:       n.networkService,
+		EventBus:             n.eventBus,
+		GetIPFSNode:          n.getIPFSNode,
+		GetPreferences:       getPrefs,
+		SavePreferences:      savePrefs,
+		InitialBootstrapChan: n.initialBootstrapChan,
+	})
+}
+
+func (n *MobazhaNode) initListingService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+
+	var getMyProfile GetMyProfileFunc
+	if n.profileService != nil {
+		getMyProfile = n.profileService.GetMyProfile
+	}
+
+	n.listingService = NewListingAppService(ListingAppServiceConfig{
+		DB:                 n.db,
+		Signer:             n.signer,
+		ContentStore:       n.contentStore,
+		NetDB:              n.netDB,
+		BanManager:         n.banManager,
+		Keys:               n.keyProvider,
+		FeatureManager:     n.featureManager,
+		LocalListingCrypto: n.localListingCrypto,
+		NodeID:             n.Identity(),
+		Testnet:            n.testnet,
+		Publish:            n.Publish,
+		FetchIPNSRecord:    n.fetchIPNSRecord,
+		GetMyProfile:       getMyProfile,
+		UpdateAndSaveProfile: n.updateAndSaveProfile,
 	})
 }

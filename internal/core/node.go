@@ -14,7 +14,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
-	"github.com/mobazha/mobazha3.0/internal/channels"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -118,8 +117,12 @@ type MobazhaNode struct {
 	mediaService *MediaAppService
 
 	ratingsService  *RatingsAppService
-	profileService  *ProfileAppService
-	followService   *FollowAppService
+	profileService *ProfileAppService
+	followService  *FollowAppService
+	postsService      *PostsAppService
+	moderationService *ModerationAppService
+	channelsService   *ChannelsAppService
+	listingService    *ListingAppService
 
 	// notificationService encapsulates notification query and management logic.
 	notificationService *NotificationAppService
@@ -206,9 +209,6 @@ type MobazhaNode struct {
 
 	// boostrapPeers holds the peers we use to bootstrap the node.
 	boostrapPeers []peer.ID
-
-	// channels holds active chat channels
-	channels map[string]*channels.Channel
 
 	featureManager *pkgconfig.FeatureManager
 
@@ -526,8 +526,8 @@ func (n *MobazhaNode) Stop(force bool) error {
 		if n.notifier != nil {
 			n.notifier.Stop()
 		}
-		for _, channel := range n.channels {
-			channel.Close()
+		if n.channelsService != nil {
+			n.channelsService.CloseAll()
 		}
 	}
 	if n.shutdownTorFunc != nil {

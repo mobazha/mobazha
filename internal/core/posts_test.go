@@ -215,7 +215,7 @@ func Test_generatePostSlug(t *testing.T) {
 
 	for _, test := range tests {
 		err := node.repo.DB().View(func(dbtx database.Tx) error {
-			slug, err := node.generatePostSlug(dbtx, test.title)
+			slug, err := generatePostSlug(dbtx, test.title)
 			if err != nil {
 				return err
 			}

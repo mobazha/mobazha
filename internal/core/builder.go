@@ -31,7 +31,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	coreorders "github.com/mobazha/mobazha-core/orders"
-	"github.com/mobazha/mobazha3.0/internal/channels"
 	"github.com/mobazha/mobazha3.0/internal/contracts"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -559,7 +558,6 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		walletTestnet:          walletTestnet,
 		torOnly:                cfg.Tor,
 		storeAndForwardServers: cfg.StoreAndForwardServers,
-		channels:               make(map[string]*channels.Channel),
 		shutdownTorFunc:        shutdownTorFunc,
 		publishChan:            make(chan pubCloser),
 		featureManager:         pkgconfig.GetGlobalFeatureManager(),
@@ -1110,7 +1108,6 @@ func newLightweightNode(
 		walletTestnet:          walletTestnet,
 		torOnly:                cfg.Tor,
 		storeAndForwardServers: cfg.StoreAndForwardServers,
-		channels:               make(map[string]*channels.Channel),
 		shutdownTorFunc:        shutdownTorFunc,
 		publishChan:            make(chan pubCloser),
 		featureManager:         pkgconfig.GetGlobalFeatureManager(),

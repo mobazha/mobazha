@@ -19,7 +19,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
-	"github.com/mobazha/mobazha3.0/internal/channels"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
@@ -163,7 +162,6 @@ func MockNode() (*MobazhaNode, error) {
 		multiwallet:          &mw,
 		followerTracker:      tracker,
 		exchangeRates:        erp,
-		channels:             make(map[string]*channels.Channel),
 		initialBootstrapChan: make(chan struct{}),
 		publishChan:          make(chan pubCloser),
 		featureManager:       pkgconfig.GetGlobalFeatureManager(),
@@ -207,6 +205,8 @@ func MockNode() (*MobazhaNode, error) {
 		FeatureManager:       node.featureManager,
 	})
 
+	node.keyProvider = newFileKeyProvider(node.ethMasterKey, node.escrowMasterKey, node.ratingMasterKey, node.solPrivKey)
+
 	node.initOrderService()
 	node.initChatService()
 	node.initMatrixService()
@@ -216,11 +216,15 @@ func MockNode() (*MobazhaNode, error) {
 	node.initNotificationService()
 	node.initProfileService()
 	node.initFollowService()
+	node.initPostsService()
+	node.initModerationService()
+	node.initChannelsService()
+	node.initListingService()
 	node.initShoppingCartService()
 	node.registerPaymentStrategies()
 	node.paymentRegistry.Register(iwallet.ChainMock, &utxoAutoConfirmAdapter{
 		multiwallet:    node.multiwallet,
-		escrowKey:      node.escrowMasterKey,
+		keys:           node.keyProvider,
 		onAutoConfirm:  node.handleCancelablePaymentForUTXO,
 		getPaymentInfo: node.GetUTXOPaymentInfo,
 	})
@@ -384,7 +388,6 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			multiwallet:          &mw,
 			followerTracker:      tracker,
 			exchangeRates:        erp,
-			channels:             make(map[string]*channels.Channel),
 			initialBootstrapChan: make(chan struct{}),
 			publishChan:          make(chan pubCloser),
 			featureManager:       pkgconfig.GetGlobalFeatureManager(),
@@ -427,6 +430,8 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			FeatureManager:       node.featureManager,
 		})
 
+		node.keyProvider = newFileKeyProvider(node.ethMasterKey, node.escrowMasterKey, node.ratingMasterKey, node.solPrivKey)
+
 		node.initOrderService()
 		node.initChatService()
 		node.initMatrixService()
@@ -436,11 +441,15 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		node.initNotificationService()
 		node.initProfileService()
 		node.initFollowService()
+		node.initPostsService()
+		node.initModerationService()
+		node.initChannelsService()
+		node.initListingService()
 		node.initShoppingCartService()
 		node.registerPaymentStrategies()
 		node.paymentRegistry.Register(iwallet.ChainMock, &utxoAutoConfirmAdapter{
 		multiwallet:    node.multiwallet,
-		escrowKey:      node.escrowMasterKey,
+		keys:           node.keyProvider,
 		onAutoConfirm:  node.handleCancelablePaymentForUTXO,
 		getPaymentInfo: node.GetUTXOPaymentInfo,
 	})

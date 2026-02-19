@@ -10,14 +10,14 @@ import (
 )
 
 func (g *Gateway) handleGETCartsItemsCount(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
-	count, _ := node.GetCartsTotalItemsCount()
+	svc := getShoppingCartService(r)
+	count, _ := svc.GetCartsTotalItemsCount()
 	sanitizedJSONResponse(w, count)
 }
 
 func (g *Gateway) handleGETCarts(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
-	carts, err := node.GetCarts()
+	svc := getShoppingCartService(r)
+	carts, err := svc.GetCarts()
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -27,8 +27,8 @@ func (g *Gateway) handleGETCarts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleClearCarts(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
-	err := node.ClearAllCarts()
+	svc := getShoppingCartService(r)
+	err := svc.ClearAllCarts()
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -52,8 +52,8 @@ func (g *Gateway) handleAddToCart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
-	err = node.AddToCart(pid, cartItem)
+	svc := getShoppingCartService(r)
+	err = svc.AddToCart(pid, cartItem)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -77,8 +77,8 @@ func (g *Gateway) handleRemoveCartItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
-	err = node.RemoveCartItem(pid, cartItem)
+	svc := getShoppingCartService(r)
+	err = svc.RemoveCartItem(pid, cartItem)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return

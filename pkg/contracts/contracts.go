@@ -276,6 +276,16 @@ type StripeService interface {
 	HandleStripeWebhook(payload []byte, signature string) error
 }
 
+// ShoppingCartService handles shopping cart operations.
+type ShoppingCartService interface {
+	GetCartsTotalItemsCount() (int, error)
+	GetCarts() ([]models.StoreCart, error)
+	AddToCart(peerID peer.ID, item models.ShoppingCartItem) error
+	RemoveCartItem(peerID peer.ID, item models.ShoppingCartItem) error
+	ClearCarts(vendorID peer.ID) error
+	ClearAllCarts() error
+}
+
 // NodeService is the top-level aggregate interface that combines all domain services.
 // Both MobazhaNode (standalone) and TenantService (SaaS) implement this interface.
 //
@@ -295,6 +305,7 @@ type NodeService interface {
 	PreferencesService
 	StripeService
 	ExchangeRateService
+	ShoppingCartService
 
 	// EventBus returns the event bus for pub/sub.
 	EventBus() events.Bus
@@ -307,14 +318,6 @@ type NodeService interface {
 
 	// SubscribeEvent subscribes to a specific event type.
 	SubscribeEvent(event any) (events.Subscription, error)
-
-	// Shopping cart
-	GetCartsTotalItemsCount() (int, error)
-	GetCarts() ([]models.StoreCart, error)
-	AddToCart(peerID peer.ID, item models.ShoppingCartItem) error
-	RemoveCartItem(peerID peer.ID, item models.ShoppingCartItem) error
-	ClearCarts(vendorID peer.ID) error
-	ClearAllCarts() error
 
 	// Request address
 	RequestAddress(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error)

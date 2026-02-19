@@ -409,6 +409,7 @@ func getMatrixService(r *http.Request) contracts.MatrixService     { return getN
 func getPreferencesService(r *http.Request) contracts.PreferencesService {
 	return getNodeService(r)
 }
+func getShoppingCartService(r *http.Request) contracts.ShoppingCartService { return getNodeService(r) }
 func getStripeService(r *http.Request) contracts.StripeService             { return getNodeService(r) }
 func getExchangeRateService(r *http.Request) contracts.ExchangeRateService { return getNodeService(r) }
 

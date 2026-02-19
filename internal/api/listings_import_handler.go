@@ -340,11 +340,11 @@ func (g *Gateway) handlePOSTListingsImport(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	// Get node
-	node := getNodeService(r)
+	listingSvc := getListingService(r)
+	mediaSvc := getMediaService(r)
 
 	// Process import
-	result, err := g.processListingsImport(node, xlsx, lang, images, videos)
+	result, err := g.processListingsImport(listingSvc, mediaSvc, xlsx, lang, images, videos)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -354,7 +354,7 @@ func (g *Gateway) handlePOSTListingsImport(w http.ResponseWriter, r *http.Reques
 }
 
 // processListingsImport processes the Excel data and creates/updates listings
-func (g *Gateway) processListingsImport(node contracts.NodeService, xlsx *excelize.File, lang string, images, videos map[string][]byte) (*ImportResult, error) {
+func (g *Gateway) processListingsImport(listingSvc contracts.ListingService, mediaSvc contracts.MediaService, xlsx *excelize.File, lang string, images, videos map[string][]byte) (*ImportResult, error) {
 	result := &ImportResult{
 		CreatedItems: []ImportedItem{},
 		UpdatedItems: []ImportedItem{},
@@ -386,7 +386,7 @@ func (g *Gateway) processListingsImport(node contracts.NodeService, xlsx *exceli
 	variants := g.readVariants(xlsx, variantsSheet, lang)
 
 	// Get existing listings for duplicate detection
-	existingListings, _ := node.GetMyListings()
+	existingListings, _ := listingSvc.GetMyListings()
 	existingByTitle := make(map[string]string) // title -> slug
 	for _, listing := range existingListings {
 		existingByTitle[listing.Title] = listing.Slug
@@ -412,7 +412,7 @@ func (g *Gateway) processListingsImport(node contracts.NodeService, xlsx *exceli
 		}
 
 		// Process images
-		if imgErr := g.processListingImages(node, listing, row, columns, images); imgErr != nil {
+		if imgErr := g.processListingImages(mediaSvc, listing, row, columns, images); imgErr != nil {
 			result.Errors = append(result.Errors, ImportError{
 				Row:   rowNum,
 				Title: listing.Item.Title,
@@ -423,7 +423,7 @@ func (g *Gateway) processListingsImport(node contracts.NodeService, xlsx *exceli
 		}
 
 		// Process intro video
-		if vidErr := g.processListingVideo(node, listing, row, columns, videos); vidErr != nil {
+		if vidErr := g.processListingVideo(mediaSvc, listing, row, columns, videos); vidErr != nil {
 			result.Errors = append(result.Errors, ImportError{
 				Row:   rowNum,
 				Title: listing.Item.Title,
@@ -455,7 +455,7 @@ func (g *Gateway) processListingsImport(node contracts.NodeService, xlsx *exceli
 		}
 
 		// Save listing
-		saveErr := node.SaveListing(listing, nil)
+		saveErr := listingSvc.SaveListing(listing, nil)
 
 		if saveErr != nil {
 			result.Errors = append(result.Errors, ImportError{
@@ -660,7 +660,7 @@ func (g *Gateway) getCellValue(row []string, index int) string {
 }
 
 // processListingImages processes and uploads images for a listing
-func (g *Gateway) processListingImages(node contracts.NodeService, listing *pb.Listing, row []string, columns map[string]int, images map[string][]byte) error {
+func (g *Gateway) processListingImages(mediaSvc contracts.MediaService, listing *pb.Listing, row []string, columns map[string]int, images map[string][]byte) error {
 	imagesStr := g.getCellValue(row, columns["images"])
 	if imagesStr == "" {
 		return nil
@@ -696,7 +696,7 @@ func (g *Gateway) processListingImages(node contracts.NodeService, listing *pb.L
 
 		// Upload image
 		base64Data := base64.StdEncoding.EncodeToString(imgData)
-		hashes, err := node.SetProductImage(base64Data, imgName)
+		hashes, err := mediaSvc.SetProductImage(base64Data, imgName)
 		if err != nil {
 			return fmt.Errorf("failed to upload image %s: %w", imgName, err)
 		}
@@ -715,7 +715,7 @@ func (g *Gateway) processListingImages(node contracts.NodeService, listing *pb.L
 }
 
 // processListingVideo processes and uploads intro video for a listing
-func (g *Gateway) processListingVideo(node contracts.NodeService, listing *pb.Listing, row []string, columns map[string]int, videos map[string][]byte) error {
+func (g *Gateway) processListingVideo(mediaSvc contracts.MediaService, listing *pb.Listing, row []string, columns map[string]int, videos map[string][]byte) error {
 	videoName := g.getCellValue(row, columns["introVideo"])
 	if videoName == "" {
 		return nil
@@ -749,7 +749,7 @@ func (g *Gateway) processListingVideo(node contracts.NodeService, listing *pb.Li
 	}
 
 	// Upload video
-	hash, err := node.AddIntroVideo(videoData, videoName)
+	hash, err := mediaSvc.AddIntroVideo(videoData, videoName)
 	if err != nil {
 		return fmt.Errorf("failed to upload video %s: %w", videoName, err)
 	}
@@ -1114,11 +1114,11 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Get node
-	node := getNodeService(r)
+	listingSvc := getListingService(r)
+	mediaSvc := getMediaService(r)
 
 	// Process import
-	result, err := g.processListingsImportJSON(node, payload.Listings, images, videos)
+	result, err := g.processListingsImportJSON(listingSvc, mediaSvc, payload.Listings, images, videos)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1128,7 +1128,7 @@ func (g *Gateway) handlePOSTListingsImportJSON(w http.ResponseWriter, r *http.Re
 }
 
 // processListingsImportJSON processes the JSON data and creates/updates listings
-func (g *Gateway) processListingsImportJSON(node contracts.NodeService, listings []JSONListingInput, images, videos map[string][]byte) (*ImportResult, error) {
+func (g *Gateway) processListingsImportJSON(listingSvc contracts.ListingService, mediaSvc contracts.MediaService, listings []JSONListingInput, images, videos map[string][]byte) (*ImportResult, error) {
 	result := &ImportResult{
 		CreatedItems: []ImportedItem{},
 		UpdatedItems: []ImportedItem{},
@@ -1136,7 +1136,7 @@ func (g *Gateway) processListingsImportJSON(node contracts.NodeService, listings
 	}
 
 	// Get existing listings for duplicate detection
-	existingListings, _ := node.GetMyListings()
+	existingListings, _ := listingSvc.GetMyListings()
 	existingByTitle := make(map[string]string) // title -> slug
 	for _, listing := range existingListings {
 		existingByTitle[listing.Title] = listing.Slug
@@ -1158,7 +1158,7 @@ func (g *Gateway) processListingsImportJSON(node contracts.NodeService, listings
 		}
 
 		// Process images
-		if imgErr := g.processJSONListingImages(node, listing, input.Images, images); imgErr != nil {
+		if imgErr := g.processJSONListingImages(mediaSvc, listing, input.Images, images); imgErr != nil {
 			result.Errors = append(result.Errors, ImportError{
 				Row:   rowNum,
 				Title: listing.Item.Title,
@@ -1170,7 +1170,7 @@ func (g *Gateway) processListingsImportJSON(node contracts.NodeService, listings
 
 		// Process intro video
 		if input.IntroVideo != "" {
-			if vidErr := g.processJSONListingVideo(node, listing, input.IntroVideo, videos); vidErr != nil {
+			if vidErr := g.processJSONListingVideo(mediaSvc, listing, input.IntroVideo, videos); vidErr != nil {
 				result.Errors = append(result.Errors, ImportError{
 					Row:   rowNum,
 					Title: listing.Item.Title,
@@ -1203,7 +1203,7 @@ func (g *Gateway) processListingsImportJSON(node contracts.NodeService, listings
 		}
 
 		// Save listing
-		saveErr := node.SaveListing(listing, nil)
+		saveErr := listingSvc.SaveListing(listing, nil)
 
 		if saveErr != nil {
 			result.Errors = append(result.Errors, ImportError{
@@ -1328,7 +1328,7 @@ func (g *Gateway) parseJSONListing(input JSONListingInput) (*pb.Listing, error) 
 }
 
 // processJSONListingImages processes and uploads images for a listing from JSON input
-func (g *Gateway) processJSONListingImages(node contracts.NodeService, listing *pb.Listing, imageNames []string, images map[string][]byte) error {
+func (g *Gateway) processJSONListingImages(mediaSvc contracts.MediaService, listing *pb.Listing, imageNames []string, images map[string][]byte) error {
 	for _, imgName := range imageNames {
 		imgName = strings.TrimSpace(imgName)
 		if imgName == "" {
@@ -1358,7 +1358,7 @@ func (g *Gateway) processJSONListingImages(node contracts.NodeService, listing *
 
 		// Upload image
 		base64Data := base64.StdEncoding.EncodeToString(imgData)
-		hashes, err := node.SetProductImage(base64Data, imgName)
+		hashes, err := mediaSvc.SetProductImage(base64Data, imgName)
 		if err != nil {
 			return fmt.Errorf("failed to upload image %s: %w", imgName, err)
 		}
@@ -1377,7 +1377,7 @@ func (g *Gateway) processJSONListingImages(node contracts.NodeService, listing *
 }
 
 // processJSONListingVideo processes and uploads intro video for a listing from JSON input
-func (g *Gateway) processJSONListingVideo(node contracts.NodeService, listing *pb.Listing, videoName string, videos map[string][]byte) error {
+func (g *Gateway) processJSONListingVideo(mediaSvc contracts.MediaService, listing *pb.Listing, videoName string, videos map[string][]byte) error {
 	videoName = strings.TrimSpace(videoName)
 	if videoName == "" {
 		return nil
@@ -1411,7 +1411,7 @@ func (g *Gateway) processJSONListingVideo(node contracts.NodeService, listing *p
 	}
 
 	// Upload video
-	hash, err := node.AddIntroVideo(videoData, videoName)
+	hash, err := mediaSvc.AddIntroVideo(videoData, videoName)
 	if err != nil {
 		return fmt.Errorf("failed to upload video %s: %w", videoName, err)
 	}

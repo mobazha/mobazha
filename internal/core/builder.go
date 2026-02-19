@@ -841,7 +841,9 @@ func (n *MobazhaNode) registerHandlers() {
 		}
 		return fmt.Errorf("chat service not initialized")
 	})
-	n.networkService.RegisterHandler(pb.Message_ACK, n.handleAckMessage)
+	n.networkService.RegisterHandler(pb.Message_ACK, func(from peer.ID, message *pb.Message) error {
+		return n.handleAckMessage(from, message)
+	})
 	n.networkService.RegisterHandler(pb.Message_FOLLOW, func(from peer.ID, message *pb.Message) error {
 		if n.followService != nil {
 			return n.followService.HandleFollowMessage(from, message)
@@ -854,21 +856,39 @@ func (n *MobazhaNode) registerHandlers() {
 		}
 		return fmt.Errorf("follow service not initialized")
 	})
-	n.networkService.RegisterHandler(pb.Message_STORE, n.handleStoreMessage)
-	n.networkService.RegisterHandler(pb.Message_ORDER, n.handleOrderMessage)
+	n.networkService.RegisterHandler(pb.Message_STORE, func(from peer.ID, message *pb.Message) error {
+		return n.handleStoreMessage(from, message)
+	})
+	n.networkService.RegisterHandler(pb.Message_ORDER, func(from peer.ID, message *pb.Message) error {
+		return n.handleOrderMessage(from, message)
+	})
 	n.networkService.RegisterHandler(pb.Message_ADDRESS_REQUEST, func(from peer.ID, message *pb.Message) error {
 		return n.orderService.handleAddressRequest(from, message)
 	})
 	n.networkService.RegisterHandler(pb.Message_ADDRESS_RESPONSE, func(from peer.ID, message *pb.Message) error {
 		return n.orderService.handleAddressResponse(from, message)
 	})
-	n.networkService.RegisterHandler(pb.Message_PING, n.handlePingMessage)
-	n.networkService.RegisterHandler(pb.Message_PONG, n.handlePongMessage)
+	n.networkService.RegisterHandler(pb.Message_PING, func(from peer.ID, message *pb.Message) error {
+		return n.handlePingMessage(from, message)
+	})
+	n.networkService.RegisterHandler(pb.Message_PONG, func(from peer.ID, message *pb.Message) error {
+		return n.handlePongMessage(from, message)
+	})
 	n.networkService.RegisterHandler(pb.Message_DISPUTE, func(from peer.ID, message *pb.Message) error {
 		return n.orderService.handleDisputeMessage(from, message, n.isDuplicate, n.sendAckMessage)
 	})
-	n.networkService.RegisterHandler(pb.Message_CHANNEL_REQUEST, n.handleChannelRequest)
-	n.networkService.RegisterHandler(pb.Message_CHANNEL_RESPONSE, n.handleChannelResponse)
+	n.networkService.RegisterHandler(pb.Message_CHANNEL_REQUEST, func(from peer.ID, message *pb.Message) error {
+		if n.channelsService != nil {
+			return n.channelsService.handleChannelRequest(from, message)
+		}
+		return fmt.Errorf("channels service not initialized")
+	})
+	n.networkService.RegisterHandler(pb.Message_CHANNEL_RESPONSE, func(from peer.ID, message *pb.Message) error {
+		if n.channelsService != nil {
+			return n.channelsService.handleChannelResponse(from, message)
+		}
+		return fmt.Errorf("channels service not initialized")
+	})
 }
 
 func (n *MobazhaNode) listenNetworkEvents() {

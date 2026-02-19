@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
+	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -20,14 +21,14 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-// newMockUTXOAdapter creates a utxoAutoConfirmAdapter wired to a MobazhaNode's
+// newMockUTXOAdapter creates a UTXOAutoConfirmAdapter wired to a MobazhaNode's
 // callbacks. Used in tests to register ChainMock with the payment registry.
-func newMockUTXOAdapter(node *MobazhaNode) *utxoAutoConfirmAdapter {
-	return &utxoAutoConfirmAdapter{
-		multiwallet:    node.multiwallet,
-		keys:           node.keyProvider,
-		onAutoConfirm:  node.handleCancelablePaymentForUTXO,
-		getPaymentInfo: node.Wallet().GetUTXOPaymentInfo,
+func newMockUTXOAdapter(node *MobazhaNode) *adapters.UTXOAutoConfirmAdapter {
+	return &adapters.UTXOAutoConfirmAdapter{
+		Multiwallet:    node.multiwallet,
+		Keys:           node.keyProvider,
+		OnAutoConfirm:  node.handleCancelablePaymentForUTXO,
+		GetPaymentInfo: node.Wallet().GetUTXOPaymentInfo,
 	}
 }
 

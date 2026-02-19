@@ -1278,3 +1278,180 @@ func (s *ListingAppService) validateCryptocurrencyListing(listing *pb.Listing) e
 	}
 	return nil
 }
+
+const preferIPNS = false
+
+func validatePhysicalListing(listing *pb.Listing) error {
+	if len(listing.Item.Condition) > SentenceMaxCharacters {
+		return coreiface.ErrTooManyCharacters{"item.condition", strconv.Itoa(SentenceMaxCharacters)}
+	}
+	if len(listing.Item.Options) > MaxListItems {
+		return fmt.Errorf("number of options is greater than the max of %d", MaxListItems)
+	}
+
+	if listing.ShippingProfile != nil && listing.ShippingProfile.ProfileID != "" {
+		return validateShippingProfile(listing.ShippingProfile)
+	}
+
+	if len(listing.ShippingOptions) == 0 {
+		return coreiface.ErrMissingField("shippingoptions")
+	}
+	if len(listing.ShippingOptions) > MaxListItems {
+		return fmt.Errorf("number of shipping options is greater than the max of %d", MaxListItems)
+	}
+	var shippingTitles []string
+	for _, shippingOption := range listing.ShippingOptions {
+		if shippingOption.Name == "" {
+			return coreiface.ErrMissingField("shippingoptions.name")
+		}
+		if len(shippingOption.Name) > WordMaxCharacters {
+			return coreiface.ErrTooManyCharacters{"shippingoptions.name", strconv.Itoa(WordMaxCharacters)}
+		}
+		for _, t := range shippingTitles {
+			if t == shippingOption.Name {
+				return errors.New("shipping option titles must be unique")
+			}
+		}
+		shippingTitles = append(shippingTitles, shippingOption.Name)
+		if shippingOption.Type > pb.Listing_ShippingOption_FIXED_PRICE {
+			return errors.New("unknown shipping option type")
+		}
+		if len(shippingOption.Regions) == 0 {
+			return coreiface.ErrMissingField("shippingoptions.regions")
+		}
+		if err := validShippingRegion(shippingOption); err != nil {
+			return fmt.Errorf("invalid shipping option (%s): %s", shippingOption.String(), err.Error())
+		}
+		if len(shippingOption.Regions) > MaxCountryCodes {
+			return fmt.Errorf("number of shipping regions is greater than the max of %d", MaxCountryCodes)
+		}
+		if len(shippingOption.Services) == 0 && shippingOption.Type != pb.Listing_ShippingOption_LOCAL_PICKUP {
+			return errors.New("at least one service must be specified for a shipping option when not local pickup")
+		}
+		if len(shippingOption.Services) > MaxListItems {
+			return fmt.Errorf("number of shipping services is greater than the max of %d", MaxListItems)
+		}
+		var serviceTitles []string
+		for _, option := range shippingOption.Services {
+			if option.Name == "" {
+				return coreiface.ErrMissingField("shippingoptions.services.name")
+			}
+			if len(option.Name) > WordMaxCharacters {
+				return coreiface.ErrTooManyCharacters{"shippingoptions.services.name", strconv.Itoa(WordMaxCharacters)}
+			}
+			for _, t := range serviceTitles {
+				if t == option.Name {
+					return errors.New("shipping option services names must be unique")
+				}
+			}
+			serviceTitles = append(serviceTitles, option.Name)
+			if option.EstimatedDelivery == "" {
+				return coreiface.ErrMissingField("shippingoptions.services.estimateddelivery")
+			}
+			if len(option.EstimatedDelivery) > SentenceMaxCharacters {
+				return coreiface.ErrTooManyCharacters{"shippingoptions.services.estimateddelivery", strconv.Itoa(SentenceMaxCharacters)}
+			}
+			if len(option.FirstFreight) > WordMaxCharacters {
+				return coreiface.ErrTooManyCharacters{"shippingoptions.services.price", strconv.Itoa(WordMaxCharacters)}
+			}
+			if len(option.RenewalUnitPrice) > WordMaxCharacters {
+				return coreiface.ErrTooManyCharacters{"shippingoptions.services.price", strconv.Itoa(WordMaxCharacters)}
+			}
+		}
+	}
+
+	return nil
+}
+
+func validateMarketPriceListing(listing *pb.Listing) error {
+	if listing.Item.Price != "" {
+		n, _ := new(big.Int).SetString(listing.Item.Price, 10)
+		if n.Cmp(big.NewInt(0)) > 0 {
+			return coreiface.ErrMarketPriceListingIllegalField("item.price")
+		}
+	}
+
+	if listing.Item.CryptoListingPriceModifier != 0 {
+		listing.Item.CryptoListingPriceModifier = float32(int(listing.Item.CryptoListingPriceModifier*100.0)) / 100.0
+	}
+
+	if listing.Item.CryptoListingPriceModifier < PriceModifierMin ||
+		listing.Item.CryptoListingPriceModifier > PriceModifierMax {
+		return coreiface.ErrPriceModifierOutOfRange{
+			Min: PriceModifierMin,
+			Max: PriceModifierMax,
+		}
+	}
+
+	return nil
+}
+
+func validateShippingProfile(profile *pb.ShippingProfile) error {
+	if profile == nil {
+		return coreiface.ErrMissingField("shippingprofile")
+	}
+	if profile.ProfileID == "" {
+		return coreiface.ErrMissingField("shippingprofile.profileid")
+	}
+	if len(profile.LocationGroups) == 0 {
+		return coreiface.ErrMissingField("shippingprofile.locationgroups")
+	}
+	for _, lg := range profile.LocationGroups {
+		if lg == nil {
+			continue
+		}
+		if len(lg.Zones) == 0 {
+			return coreiface.ErrMissingField("shippingprofile.locationgroup.zones")
+		}
+		for _, zone := range lg.Zones {
+			if err := validateShippingZone(zone); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateShippingZone(zone *pb.ShippingZone) error {
+	if zone.Id == "" {
+		return coreiface.ErrMissingField("shippingprofile.zone.id")
+	}
+	if len(zone.Regions) == 0 {
+		return coreiface.ErrMissingField("shippingprofile.zone.regions")
+	}
+	if len(zone.Rates) == 0 {
+		return coreiface.ErrMissingField("shippingprofile.zone.rates")
+	}
+	return nil
+}
+
+func validShippingRegion(shippingOption *pb.Listing_ShippingOption) error {
+	for _, region := range shippingOption.Regions {
+		if region == "" {
+			return coreiface.ErrMissingField("shippingoptions.regions")
+		}
+		if len(region) < 2 {
+			return fmt.Errorf("invalid shipping region code: %s (must be at least 2 characters)", region)
+		}
+		for _, c := range region {
+			if !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_') {
+				return fmt.Errorf("invalid shipping region code: %s (must contain only letters or underscores)", region)
+			}
+		}
+	}
+	return nil
+}
+
+func swapCouponHashesWithDiscountCodes(listing *pb.SignedListing, coupons []models.Coupon) *pb.SignedListing {
+	couponMap := make(map[string]string)
+	for _, coupon := range coupons {
+		couponMap[coupon.Hash] = coupon.Code
+	}
+	for i, listingCoupon := range listing.Listing.Coupons {
+		code, ok := couponMap[listingCoupon.GetHash()]
+		if ok {
+			listing.Listing.Coupons[i].DiscountCode = code
+		}
+	}
+	return listing
+}

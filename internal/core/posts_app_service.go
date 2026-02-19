@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -388,4 +389,169 @@ func deserializeAndValidatePost(postBytes []byte, c cid.Cid) (*postsPb.SignedPos
 	}
 	signedPost.Hash = c.String()
 	return signedPost, nil
+}
+
+// Constants for validation
+const (
+	PostStatusMaxCharacters    = 280
+	PostLongFormMaxCharacters  = 50000
+	PostMaximumTotalTags       = 50
+	PostMaximumTotalChannels   = 30
+	PostTagsMaxCharacters      = 256
+	PostChannelsMaxCharacters = 256
+	PostReferenceMaxCharacters = 256
+)
+
+// Errors
+var (
+	ErrPostUnknownValidationPanic    = errors.New("unexpected validation panic")
+	ErrPostSlugNotEmpty              = errors.New("slug must not be empty")
+	ErrPostSlugTooLong               = fmt.Errorf("slug is longer than the max of %d", SentenceMaxCharacters)
+	ErrPostSlugContainsSpaces        = errors.New("slugs cannot contain spaces")
+	ErrPostSlugContainsSlashes       = errors.New("slugs cannot contain file separators")
+	ErrPostInvalidType               = errors.New("invalid post type")
+	ErrPostStatusTooLong             = fmt.Errorf("status is longer than the max of %d", PostStatusMaxCharacters)
+	ErrPostBodyTooLong               = fmt.Errorf("post is longer than the max of %d characters", PostLongFormMaxCharacters)
+	ErrPostTagsTooMany               = fmt.Errorf("tags in the post is longer than the max of %d", PostMaximumTotalTags)
+	ErrPostTagsEmpty                 = errors.New("tags must not be empty")
+	ErrPostTagTooLong                = fmt.Errorf("tags must be less than max of %d characters", PostTagsMaxCharacters)
+	ErrPostChannelsTooMany           = fmt.Errorf("channels in the post is longer than the max of %d", PostMaximumTotalChannels)
+	ErrPostChannelTooLong            = fmt.Errorf("channels must be less than max of %d characters", PostChannelsMaxCharacters)
+	ErrPostReferenceEmpty            = errors.New("reference must not be empty")
+	ErrPostReferenceTooLong          = fmt.Errorf("reference is longer than the max of %d", PostReferenceMaxCharacters)
+	ErrPostReferenceContainsSpaces   = errors.New("reference cannot contain spaces")
+	ErrPostImagesTooMany             = fmt.Errorf("number of post images is greater than the max of %d", MaxListItems)
+	ErrPostImageTinyFormatInvalid    = errors.New("tiny image hashes must be properly formatted CID")
+	ErrPostImageSmallFormatInvalid   = errors.New("small image hashes must be properly formatted CID")
+	ErrPostImageMediumFormatInvalid  = errors.New("medium image hashes must be properly formatted CID")
+	ErrPostImageLargeFormatInvalid   = errors.New("large image hashes must be properly formatted CID")
+	ErrPostImageOriginalFormatInvalid = errors.New("original image hashes must be properly formatted CID")
+	ErrPostImageFilenameNil          = errors.New("image file names must not be nil")
+	ErrPostImageFilenameTooLong      = fmt.Errorf("image filename length must be less than the max of %d", FilenameMaxCharacters)
+)
+
+// makeUnique returns a new slice of unique strings based on src which is not mutated
+func makeUnique(src []string, maxLength int) []string {
+	result := make([]string, 0, maxLength)
+	uniqueMap := make(map[string]struct{}, maxLength)
+	for _, v := range src {
+		if _, ok := uniqueMap[v]; ok {
+			continue
+		}
+		uniqueMap[v] = struct{}{}
+
+		result = append(result, v)
+		if len(result) >= maxLength {
+			break
+		}
+	}
+	return result
+}
+
+// validatePost validates a post's fields.
+func validatePost(post *postsPb.Post) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			switch x := r.(type) {
+			case string:
+				err = errors.New(x)
+			case error:
+				err = x
+			default:
+				err = ErrPostUnknownValidationPanic
+			}
+		}
+	}()
+
+	if post.Slug == "" {
+		return ErrPostSlugNotEmpty
+	}
+	if len(post.Slug) > SentenceMaxCharacters {
+		return ErrPostSlugTooLong
+	}
+	if strings.Contains(post.Slug, " ") {
+		return ErrPostSlugContainsSpaces
+	}
+	if strings.Contains(post.Slug, "/") {
+		return ErrPostSlugContainsSlashes
+	}
+
+	if _, ok := postsPb.Post_PostType_value[post.PostType.String()]; !ok {
+		return ErrPostInvalidType
+	}
+
+	if len(post.Status) > PostStatusMaxCharacters {
+		return ErrPostStatusTooLong
+	}
+
+	if len(post.LongForm) > PostLongFormMaxCharacters {
+		return ErrPostBodyTooLong
+	}
+
+	if len(post.Tags) > PostMaximumTotalTags {
+		return ErrPostTagsTooMany
+	}
+	for _, tag := range post.Tags {
+		if tag == "" {
+			return ErrPostTagsEmpty
+		}
+		if len(tag) > PostTagsMaxCharacters {
+			return ErrPostTagTooLong
+		}
+	}
+
+	if len(post.Channels) > PostMaximumTotalChannels {
+		return ErrPostChannelsTooMany
+	}
+	for _, channel := range post.Channels {
+		if len(channel) > PostChannelsMaxCharacters {
+			return ErrPostChannelTooLong
+		}
+	}
+
+	if post.PostType == postsPb.Post_COMMENT || post.PostType == postsPb.Post_REPOST {
+		if post.Reference == "" {
+			return ErrPostReferenceEmpty
+		}
+		if len(post.Reference) > PostReferenceMaxCharacters {
+			return ErrPostReferenceTooLong
+		}
+		if strings.Contains(post.Reference, " ") {
+			return ErrPostReferenceContainsSpaces
+		}
+	}
+
+	if len(post.Images) > MaxListItems {
+		return ErrPostImagesTooMany
+	}
+	for _, img := range post.Images {
+		_, err := cid.Decode(img.Tiny)
+		if err != nil {
+			return ErrPostImageTinyFormatInvalid
+		}
+		_, err = cid.Decode(img.Small)
+		if err != nil {
+			return ErrPostImageSmallFormatInvalid
+		}
+		_, err = cid.Decode(img.Medium)
+		if err != nil {
+			return ErrPostImageMediumFormatInvalid
+		}
+		_, err = cid.Decode(img.Large)
+		if err != nil {
+			return ErrPostImageLargeFormatInvalid
+		}
+		_, err = cid.Decode(img.Original)
+		if err != nil {
+			return ErrPostImageOriginalFormatInvalid
+		}
+		if img.Filename == "" {
+			return ErrPostImageFilenameNil
+		}
+		if len(img.Filename) > FilenameMaxCharacters {
+			return ErrPostImageFilenameTooLong
+		}
+	}
+
+	return nil
 }

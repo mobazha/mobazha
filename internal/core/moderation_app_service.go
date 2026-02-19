@@ -271,3 +271,9 @@ func (s *ModerationAppService) calculateFixedFee(total iwallet.Amount, currencyC
 	}
 	return convertedModFee, nil
 }
+
+const (
+	moderatorTopic = "mobazha:moderators"
+	moderatorCid   = "QmbA5NkFQV6LxpWxJYXFtTq3J15WySojT9QWgxHYEostNY"
+	maxModerators  = 200
+)

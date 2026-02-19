@@ -1,0 +1,155 @@
+package adapters
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+)
+
+// ChainOps defines the chain-specific operations that differ between
+// ClientSigned chains (EVM, Solana, future SUI, etc.).
+// All orchestration logic lives in ClientSignedAdapter; only the
+// truly chain-specific bits are injected via this interface.
+type ChainOps interface {
+	AutoConfirm(event *events.CancelablePaymentReady) error
+	SignEscrowRelease(params payment.SignEscrowParams) ([]iwallet.EscrowSignature, error)
+	BuildCancelableRelease(order *models.Order, initiator, receiver string) (any, error)
+	BuildCompleteEscrow(order *models.Order, initiator string, release *pb.EscrowRelease) (any, error)
+	BuildDisputeRelease(order *models.Order, initiator string) (any, error)
+}
+
+// BuildInitEscrowFn builds escrow initialization instructions.
+// Signature matches MobazhaNode.BuildInitEscrowInstructions.
+type BuildInitEscrowFn func(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error)
+
+// GetEscrowReleaseFn returns escrow release instructions for confirm flow.
+// Signature matches MobazhaNode.GetEscrowReleaseInstructions.
+type GetEscrowReleaseFn func(orderID models.OrderID, initiator, payout string) (iwallet.CoinType, any, error)
+
+// ClientSignedAdapter implements PaymentStrategy for all ClientSigned chains
+// (EVM, Solana, future SUI). Shared logic lives here; chain-specific operations
+// are delegated to the injected ChainOps implementation.
+//
+// Adding a new ClientSigned chain only requires implementing ChainOps (~5 methods)
+// and registering via NewClientSignedAdapter — no boilerplate duplication.
+//
+// Dependencies are injected at construction time — no direct reference to MobazhaNode.
+type ClientSignedAdapter struct {
+	ops             ChainOps
+	buildInitEscrow BuildInitEscrowFn
+	getReleaseInstr GetEscrowReleaseFn
+}
+
+// NewClientSignedAdapter creates a ClientSignedAdapter with the given chain ops and callbacks.
+func NewClientSignedAdapter(ops ChainOps, buildInitEscrow BuildInitEscrowFn, getReleaseInstr GetEscrowReleaseFn) *ClientSignedAdapter {
+	return &ClientSignedAdapter{
+		ops:             ops,
+		buildInitEscrow: buildInitEscrow,
+		getReleaseInstr: getReleaseInstr,
+	}
+}
+
+// ── Meta ────────────────────────────────────────────────────────
+
+func (a *ClientSignedAdapter) Model() payment.PaymentModel {
+	return payment.PaymentModelClientSigned
+}
+
+// ── Delegated to ChainOps ───────────────────────────────────────
+
+func (a *ClientSignedAdapter) AutoConfirm(_ context.Context, event *events.CancelablePaymentReady) error {
+	return a.ops.AutoConfirm(event)
+}
+
+func (a *ClientSignedAdapter) SignEscrowRelease(_ context.Context, params payment.SignEscrowParams) ([]iwallet.EscrowSignature, error) {
+	return a.ops.SignEscrowRelease(params)
+}
+
+// ── Shared: fee is always 0 for ClientSigned chains ─────────────
+
+func (a *ClientSignedAdapter) EstimateEscrowFee(_ string, _, _ int, _ iwallet.FeeLevel) (iwallet.Amount, error) {
+	return iwallet.NewAmount(0), nil
+}
+
+// ── Shared: payment setup via BuildInitEscrowInstructions ───────
+
+func (a *ClientSignedAdapter) GeneratePaymentInstructions(ctx context.Context, params payment.PaymentSetupParams) (*payment.PaymentSetupResult, error) {
+	initParams := models.InitializeEscrowData{
+		OrderID:      params.OrderID,
+		PayerAddress: params.PayerAddress,
+		Moderator:    params.Moderator,
+		CoinType:     params.CoinType,
+		Amount:       params.Amount,
+	}
+	paymentData, escrowAccount, instructions, err := a.buildInitEscrow(ctx, initParams)
+	if err != nil {
+		return nil, err
+	}
+	return &payment.PaymentSetupResult{
+		PaymentModel: payment.PaymentModelClientSigned,
+		PaymentData:  paymentData,
+		EscrowAddr:   escrowAccount.String(),
+		Instructions: instructions,
+	}, nil
+}
+
+// ── Shared: confirm uses GetEscrowReleaseInstructions ───────────
+
+func (a *ClientSignedAdapter) GetConfirmInstructions(_ context.Context, params payment.InstructionParams) (*payment.InstructionResult, error) {
+	_, instructions, err := a.getReleaseInstr(
+		models.OrderID(params.OrderID),
+		params.InitiatorAddr,
+		params.PayoutAddr,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &payment.InstructionResult{Instructions: instructions}, nil
+}
+
+// ── Delegated to ChainOps (with shared type-assert boilerplate) ─
+
+func (a *ClientSignedAdapter) GetCancelInstructions(_ context.Context, params payment.InstructionParams) (*payment.InstructionResult, error) {
+	order, ok := params.OrderData.(*models.Order)
+	if !ok || order == nil {
+		return nil, fmt.Errorf("GetCancelInstructions: OrderData must be *models.Order")
+	}
+	instructions, err := a.ops.BuildCancelableRelease(order, params.InitiatorAddr, params.PayoutAddr)
+	if err != nil {
+		return nil, err
+	}
+	return &payment.InstructionResult{Instructions: instructions}, nil
+}
+
+func (a *ClientSignedAdapter) GetCompleteInstructions(_ context.Context, params payment.InstructionParams) (*payment.InstructionResult, error) {
+	order, ok := params.OrderData.(*models.Order)
+	if !ok || order == nil {
+		return nil, fmt.Errorf("GetCompleteInstructions: OrderData must be *models.Order")
+	}
+	releaseInfo, ok := params.ReleaseInfo.(*pb.EscrowRelease)
+	if !ok || releaseInfo == nil {
+		return nil, fmt.Errorf("GetCompleteInstructions: ReleaseInfo must be *pb.EscrowRelease")
+	}
+	instructions, err := a.ops.BuildCompleteEscrow(order, params.InitiatorAddr, releaseInfo)
+	if err != nil {
+		return nil, err
+	}
+	return &payment.InstructionResult{Instructions: instructions}, nil
+}
+
+func (a *ClientSignedAdapter) GetDisputeReleaseInstructions(_ context.Context, params payment.InstructionParams) (*payment.InstructionResult, error) {
+	order, ok := params.OrderData.(*models.Order)
+	if !ok || order == nil {
+		return nil, fmt.Errorf("GetDisputeReleaseInstructions: OrderData must be *models.Order")
+	}
+	instructions, err := a.ops.BuildDisputeRelease(order, params.InitiatorAddr)
+	if err != nil {
+		return nil, err
+	}
+	return &payment.InstructionResult{Instructions: instructions}, nil
+}

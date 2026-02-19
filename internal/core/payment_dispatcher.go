@@ -3,6 +3,7 @@ package core
 import (
 	"sync"
 
+	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -30,11 +31,11 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	n.paymentRegistry = payment.NewRegistry()
 
 	// ── UTXO ────────────────────────────────────────────────────
-	utxoStrategy := &utxoAutoConfirmAdapter{
-		multiwallet:    n.multiwallet,
-		keys:           n.keyProvider,
-		onAutoConfirm:  n.handleCancelablePaymentForUTXO,
-		getPaymentInfo: n.paymentService.GetUTXOPaymentInfo,
+	utxoStrategy := &adapters.UTXOAutoConfirmAdapter{
+		Multiwallet:    n.multiwallet,
+		Keys:           n.keyProvider,
+		OnAutoConfirm:  n.handleCancelablePaymentForUTXO,
+		GetPaymentInfo: n.paymentService.GetUTXOPaymentInfo,
 	}
 	for _, chain := range []iwallet.ChainType{
 		iwallet.ChainBitcoin, iwallet.ChainBitcoinCash,
@@ -44,25 +45,25 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	}
 
 	// ── EVM ─────────────────────────────────────────────────────
-	evmOps := &evmChainOps{
-		keys:            n.keyProvider,
-		multiwallet:     n.multiwallet,
-		buildReleaseTxn: n.orderService.buildDisputeReleaseTransaction,
-		onAutoConfirm:   n.handleCancelablePaymentForEVM,
+	evmOps := &adapters.EVMChainOps{
+		Keys:            n.keyProvider,
+		Multiwallet:     n.multiwallet,
+		BuildReleaseTxn: n.orderService.buildDisputeReleaseTransaction,
+		OnAutoConfirm:   n.handleCancelablePaymentForEVM,
 	}
-	evmStrategy := newClientSignedAdapter(evmOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions)
+	evmStrategy := adapters.NewClientSignedAdapter(evmOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions)
 	for _, chain := range evmChains {
 		n.paymentRegistry.Register(chain, evmStrategy)
 	}
 
 	// ── Solana ──────────────────────────────────────────────────
-	solOps := &solanaChainOps{
-		keys:            n.keyProvider,
-		multiwallet:     n.multiwallet,
-		buildReleaseTxn: n.orderService.buildDisputeReleaseTransaction,
-		nodeID:          n.nodeID,
+	solOps := &adapters.SolanaChainOps{
+		Keys:            n.keyProvider,
+		Multiwallet:     n.multiwallet,
+		BuildReleaseTxn: n.orderService.buildDisputeReleaseTransaction,
+		NodeID:          n.nodeID,
 	}
-	n.paymentRegistry.Register(iwallet.ChainSolana, newClientSignedAdapter(solOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions))
+	n.paymentRegistry.Register(iwallet.ChainSolana, adapters.NewClientSignedAdapter(solOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions))
 
 	logger.LogInfoWithIDf(log, n.nodeID, "Registered payment strategies for %d chains", len(n.paymentRegistry.Chains()))
 

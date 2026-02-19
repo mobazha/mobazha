@@ -3,10 +3,12 @@ package core
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"image"
 	"image/jpeg"
 	"io"
+	"strings"
 
 	"github.com/disintegration/imaging"
 	ipath "github.com/ipfs/boxo/path"
@@ -286,5 +288,28 @@ func (s *MediaAppService) addResizedImage(dbtx database.Tx, img image.Image, w, 
 		Size:       size,
 		Name:       name,
 	})
+}
+
+func decodeImageData(base64ImageData string) (image.Image, error) {
+	reader := base64.NewDecoder(base64.StdEncoding, strings.NewReader(base64ImageData))
+	img, err := imaging.Decode(reader, imaging.AutoOrientation(true))
+	if err != nil {
+		return nil, err
+	}
+	return img, err
+}
+
+func getImageAttributes(targetWidth, targetHeight, imgWidth, imgHeight int) (width, height int) {
+	targetRatio := float32(targetWidth) / float32(targetHeight)
+	imageRatio := float32(imgWidth) / float32(imgHeight)
+	var h, w float32
+	if imageRatio > targetRatio {
+		h = float32(targetHeight)
+		w = float32(targetHeight) * imageRatio
+	} else {
+		w = float32(targetWidth)
+		h = float32(targetWidth) * (float32(imgHeight) / float32(imgWidth))
+	}
+	return int(w), int(h)
 }
 

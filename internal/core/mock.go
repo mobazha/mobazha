@@ -214,6 +214,8 @@ func MockNode() (*MobazhaNode, error) {
 	node.initMediaService()
 	node.initRatingsService()
 	node.initNotificationService()
+	node.initProfileService()
+	node.initFollowService()
 	node.initShoppingCartService()
 	node.registerPaymentStrategies()
 	node.paymentRegistry.Register(iwallet.ChainMock, &utxoAutoConfirmAdapter{
@@ -432,6 +434,8 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		node.initMediaService()
 		node.initRatingsService()
 		node.initNotificationService()
+		node.initProfileService()
+		node.initFollowService()
 		node.initShoppingCartService()
 		node.registerPaymentStrategies()
 		node.paymentRegistry.Register(iwallet.ChainMock, &utxoAutoConfirmAdapter{

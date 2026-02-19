@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 
@@ -57,6 +58,8 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initRatingsService()
 	n.initNotificationService()
 	n.initShoppingCartService()
+	n.initProfileService()
+	n.initFollowService()
 }
 
 // initMatrixService creates the MatrixAppService.
@@ -245,5 +248,66 @@ func (n *MobazhaNode) initPaymentService() {
 
 		EVMRelayService: evmRelay,
 		RelayAPIURL:     n.relayAPIURL,
+	})
+}
+
+// initProfileService creates the ProfileAppService.
+func (n *MobazhaNode) initProfileService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+
+	var escrowPubKeyHex, ethPubKeyHex, solanaPubKeyStr string
+	if n.escrowMasterKey != nil {
+		escrowPubKeyHex = hex.EncodeToString(n.escrowMasterKey.PubKey().SerializeCompressed())
+	}
+	if n.ethMasterKey != nil {
+		ethPubKeyHex = hex.EncodeToString(n.ethMasterKey.PubKey().SerializeCompressed())
+	}
+	if n.solPrivKey != nil {
+		solanaPubKeyStr = n.solPrivKey.PublicKey().String()
+	}
+
+	n.profileService = NewProfileAppService(ProfileAppServiceConfig{
+		DB:                     n.db,
+		ContentStore:           n.contentStore,
+		FetchIPNSRecord:        n.fetchIPNSRecord,
+		Publish:                n.Publish,
+		NetDB:                  n.netDB,
+		NodeID:                 n.nodeID,
+		PeerID:                 n.peerID,
+		EscrowPubKeyHex:        escrowPubKeyHex,
+		ETHPubKeyHex:           ethPubKeyHex,
+		SolanaPubKeyStr:        solanaPubKeyStr,
+		StripeAccountID:        n.stripeAccountID,
+		StoreAndForwardServers: n.storeAndForwardServers,
+		GetAcceptedCurrencies:  n.GetAcceptedCurrencies,
+	})
+}
+
+// initFollowService creates the FollowAppService.
+// Must be called after initProfileService since it depends on profileService.
+func (n *MobazhaNode) initFollowService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+
+	var updateProfile UpdateAndSaveProfileFunc
+	var getMyProfile GetMyProfileFunc
+	if n.profileService != nil {
+		updateProfile = n.profileService.UpdateAndSaveProfile
+		getMyProfile = n.profileService.GetMyProfile
+	}
+
+	n.followService = NewFollowAppService(FollowAppServiceConfig{
+		DB:                   n.db,
+		Messenger:            n.messenger,
+		ContentStore:         n.contentStore,
+		FetchIPNSRecord:      n.fetchIPNSRecord,
+		EventBus:             n.eventBus,
+		NodeID:               n.nodeID,
+		NetDB:                n.netDB,
+		UpdateAndSaveProfile: updateProfile,
+		GetMyProfile:         getMyProfile,
 	})
 }

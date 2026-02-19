@@ -117,7 +117,9 @@ type MobazhaNode struct {
 
 	mediaService *MediaAppService
 
-	ratingsService *RatingsAppService
+	ratingsService  *RatingsAppService
+	profileService  *ProfileAppService
+	followService   *FollowAppService
 
 	// notificationService encapsulates notification query and management logic.
 	notificationService *NotificationAppService

@@ -208,7 +208,12 @@ func MockNode() (*MobazhaNode, error) {
 	})
 
 	node.registerPaymentStrategies()
-	node.paymentRegistry.Register(iwallet.ChainMock, &utxoAutoConfirmAdapter{node: node})
+	node.paymentRegistry.Register(iwallet.ChainMock, &utxoAutoConfirmAdapter{
+		multiwallet:    node.multiwallet,
+		escrowKey:      node.escrowMasterKey,
+		onAutoConfirm:  node.handleCancelablePaymentForUTXO,
+		getPaymentInfo: node.GetUTXOPaymentInfo,
+	})
 	node.registerHandlers()
 	node.listenNetworkEvents()
 	node.publishHandler()
@@ -413,7 +418,12 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		})
 
 		node.registerPaymentStrategies()
-		node.paymentRegistry.Register(iwallet.ChainMock, &utxoAutoConfirmAdapter{node: node})
+		node.paymentRegistry.Register(iwallet.ChainMock, &utxoAutoConfirmAdapter{
+		multiwallet:    node.multiwallet,
+		escrowKey:      node.escrowMasterKey,
+		onAutoConfirm:  node.handleCancelablePaymentForUTXO,
+		getPaymentInfo: node.GetUTXOPaymentInfo,
+	})
 		node.registerHandlers()
 		node.listenNetworkEvents()
 		node.publishHandler()

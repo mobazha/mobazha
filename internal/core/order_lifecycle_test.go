@@ -20,6 +20,17 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
+// newMockUTXOAdapter creates a utxoAutoConfirmAdapter wired to a MobazhaNode's
+// callbacks. Used in tests to register ChainMock with the payment registry.
+func newMockUTXOAdapter(node *MobazhaNode) *utxoAutoConfirmAdapter {
+	return &utxoAutoConfirmAdapter{
+		multiwallet:    node.multiwallet,
+		escrowKey:      node.escrowMasterKey,
+		onAutoConfirm:  node.handleCancelablePaymentForUTXO,
+		getPaymentInfo: node.GetUTXOPaymentInfo,
+	}
+}
+
 // setupMockNetDB creates a mock HTTP server that serves listing index data
 // from the provided nodes' local databases, then creates and sets a NetDB
 // instance on each node. This mirrors the production path (netDB → HTTP →
@@ -192,7 +203,7 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 	// This verifies that registry initialization doesn't interfere with
 	// the normal order processing pipeline.
 	sellerNode.registerPaymentStrategies()
-	sellerNode.paymentRegistry.Register(iwallet.ChainMock, &utxoAutoConfirmAdapter{node: sellerNode})
+	sellerNode.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(sellerNode))
 
 	// Verify registry is populated correctly
 	strategy, err := sellerNode.paymentRegistry.ForCoin(iwallet.CtMock)
@@ -493,7 +504,7 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 	// ── Registry Setup ──────────────────────────────────────────
 	// Initialize the payment registry and register ChainMock
 	sellerNode.registerPaymentStrategies()
-	sellerNode.paymentRegistry.Register(iwallet.ChainMock, &utxoAutoConfirmAdapter{node: sellerNode})
+	sellerNode.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(sellerNode))
 
 	// Verify registry is populated
 	strategy, err := sellerNode.paymentRegistry.ForCoin(iwallet.CtMock)
@@ -956,7 +967,7 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 	n.registerPaymentStrategies()
 
 	// Register ChainMock (same as what happy path tests do)
-	n.paymentRegistry.Register(iwallet.ChainMock, &utxoAutoConfirmAdapter{node: n})
+	n.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(n))
 
 	// Verify all expected chains are registered
 	chains := n.paymentRegistry.Chains()

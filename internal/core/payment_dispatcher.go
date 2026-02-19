@@ -27,12 +27,19 @@ var cancelableAutoConfirmInProgress sync.Map
 //
 // UTXO chains use utxoAutoConfirmAdapter directly.
 // EVM and Solana chains use clientSignedAdapter with chain-specific chainOps.
+//
+// Dependencies are injected into adapters via explicit fields / callbacks,
+// not via a *MobazhaNode reference (hexagonal architecture Phase A).
 func (n *MobazhaNode) registerPaymentStrategies() {
 	n.paymentRegistry = payment.NewRegistry()
 
-	// Register UTXO chains — all share the same auto-confirm logic
-	// (release from cancelable multisig address via ConfirmOrder)
-	utxoStrategy := &utxoAutoConfirmAdapter{node: n}
+	// ── UTXO ────────────────────────────────────────────────────
+	utxoStrategy := &utxoAutoConfirmAdapter{
+		multiwallet:    n.multiwallet,
+		escrowKey:      n.escrowMasterKey,
+		onAutoConfirm:  n.handleCancelablePaymentForUTXO,
+		getPaymentInfo: n.GetUTXOPaymentInfo,
+	}
 	for _, chain := range []iwallet.ChainType{
 		iwallet.ChainBitcoin, iwallet.ChainBitcoinCash,
 		iwallet.ChainLitecoin, iwallet.ChainZCash,
@@ -40,15 +47,26 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		n.paymentRegistry.Register(chain, utxoStrategy)
 	}
 
-	// Register EVM chains — auto-confirm via platform relay service
-	// (builds escrow release instructions, relays tx, then calls ConfirmOrder)
-	evmStrategy := newClientSignedAdapter(n, &evmChainOps{node: n})
+	// ── EVM ─────────────────────────────────────────────────────
+	evmOps := &evmChainOps{
+		ethKey:          n.ethMasterKey,
+		multiwallet:     n.multiwallet,
+		buildReleaseTxn: n.buildReleaseTransaction,
+		onAutoConfirm:   n.handleCancelablePaymentForEVM,
+	}
+	evmStrategy := newClientSignedAdapter(evmOps, n.BuildInitEscrowInstructions, n.GetEscrowReleaseInstructions)
 	for _, chain := range evmChains {
 		n.paymentRegistry.Register(chain, evmStrategy)
 	}
 
-	// Register Solana — relay not yet implemented, logs manual confirmation required
-	n.paymentRegistry.Register(iwallet.ChainSolana, newClientSignedAdapter(n, &solanaChainOps{node: n}))
+	// ── Solana ──────────────────────────────────────────────────
+	solOps := &solanaChainOps{
+		solKey:          n.solPrivKey,
+		multiwallet:     n.multiwallet,
+		buildReleaseTxn: n.buildReleaseTransaction,
+		nodeID:          n.nodeID,
+	}
+	n.paymentRegistry.Register(iwallet.ChainSolana, newClientSignedAdapter(solOps, n.BuildInitEscrowInstructions, n.GetEscrowReleaseInstructions))
 
 	logger.LogInfoWithIDf(log, n.nodeID, "Registered payment strategies for %d chains", len(n.paymentRegistry.Chains()))
 }

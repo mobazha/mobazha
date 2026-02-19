@@ -94,6 +94,11 @@ type MobazhaNode struct {
 	// we used to generate rating keys to sign ratings with.
 	ratingMasterKey *btcec.PrivateKey
 
+	// keyProvider abstracts access to cryptographic master keys.
+	// Standalone: fileKeyProvider (reads from the fields above).
+	// SaaS: injected keyVaultProvider (reads from centralized KeyVault).
+	keyProvider contracts.KeyProvider
+
 	// stripeAccountID represents the stripe account id of the node.
 	stripeAccountID string
 

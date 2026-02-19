@@ -60,6 +60,7 @@ func (n *MobazhaNode) initOrderService() {
 		Messenger:       n.messenger,
 		NodeID:          n.nodeID,
 
+		GetPayoutAddr:               n.GetPayoutAddress,
 		ReleaseCancelableWithParams: n.releaseFromCancelableAddressWithParams,
 	})
 }

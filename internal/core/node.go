@@ -109,6 +109,12 @@ type MobazhaNode struct {
 	// chatService encapsulates chat and chat-group business logic.
 	chatService *ChatAppService
 
+	// notificationService encapsulates notification query and management logic.
+	notificationService *NotificationAppService
+
+	// shoppingCartService encapsulates shopping cart business logic.
+	shoppingCartService *ShoppingCartAppService
+
 	// stripeAccountID represents the stripe account id of the node.
 	stripeAccountID string
 

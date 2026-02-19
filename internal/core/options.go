@@ -44,6 +44,30 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initPaymentService()
 	n.initOrderService()
 	n.initChatService()
+	n.initNotificationService()
+	n.initShoppingCartService()
+}
+
+// initNotificationService creates the NotificationAppService.
+func (n *MobazhaNode) initNotificationService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+	n.notificationService = NewNotificationAppService(NotificationAppServiceConfig{
+		DB: n.db,
+	})
+}
+
+// initShoppingCartService creates the ShoppingCartAppService.
+func (n *MobazhaNode) initShoppingCartService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+	n.shoppingCartService = NewShoppingCartAppService(ShoppingCartAppServiceConfig{
+		DB:       n.db,
+		EventBus: n.eventBus,
+		NodeID:   n.nodeID,
+	})
 }
 
 // initChatService creates the ChatAppService if the necessary

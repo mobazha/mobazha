@@ -1,18 +1,16 @@
 // Package contracts defines aggregate service interfaces for the Mobazha node.
 //
-// These interfaces represent focused business capabilities that can be implemented
-// by both the full MobazhaNode (standalone mode) and the lightweight TenantService
-// (SaaS shared mode). They bridge the gap between fine-grained wallet/order contracts
-// and the monolithic CoreIface.
+// These interfaces represent focused business capabilities. MobazhaNode is the
+// sole implementation; SaaS and standalone modes differ only by which infrastructure
+// adapters (Ports) are injected at construction time.
 //
 // Design principles:
 //   - Use only types from pkg/ (not internal/) so external consumers can depend on them
 //   - Each interface covers a single business domain
 //   - NodeService aggregates all domain interfaces into a single composite
-//   - MobazhaNode implements NodeService (via adapter if needed)
-//   - TenantService implements NodeService using shared infrastructure
+//   - MobazhaNode implements NodeService (standalone and SaaS via adapter injection)
 //
-// Created as part of C.4 architecture evolution (SaaS hybrid mode).
+// Architecture: see docs/ARCHITECTURE_ROADMAP.md for the hexagonal evolution plan.
 package contracts
 
 import (

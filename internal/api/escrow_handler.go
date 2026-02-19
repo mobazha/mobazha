@@ -13,6 +13,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -61,7 +62,7 @@ type EVMPaymentInfoResponse struct {
 // ============================================================================
 
 // handleGetOrderPaymentInstructions 获取订单支付指令
-// 根据商品类型和支付币种，返回不同的支付指令
+// 通过 PaymentStrategy 分发，根据 PaymentModel 格式化响应
 func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *http.Request) {
 	var params models.InitializeEscrowData
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
@@ -71,40 +72,58 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 
 	node := getNodeService(r)
 
-	// 获取订单信息
+	// RWA Token is a special product type, not a payment paradigm
 	order, err := node.GetOrder(params.OrderID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
 	orderOpen, err := order.OrderOpenMessage()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if len(orderOpen.Listings) > 0 && orderOpen.Listings[0].Listing.Metadata.ContractType == pb.Listing_Metadata_RWA_TOKEN {
+		coinInfo, err := params.CoinType.CoinInfo()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		g.handleGetRWATokenPaymentInfo(w, r, node, params, coinInfo)
+		return
+	}
 
-	// 获取币种信息
-	coinInfo, err := params.CoinType.CoinInfo()
+	// Dispatch via payment strategy registry — no chain type branching
+	result, err := node.GeneratePaymentInstructions(r.Context(), params)
 	if err != nil {
+		if result != nil && result.PaymentData != nil {
+			if paymentData, ok := result.PaymentData.(*models.PaymentData); ok && paymentData != nil {
+				if errors.Is(err, coreiface.ErrCoinSwitchRequiresConfirmation) {
+					response := UTXOPaymentInfoResponse{
+						PaymentType:       "external_wallet",
+						HasPartialPayment: paymentData.HasPartialPayment,
+						PaidAmount:        paymentData.PaidAmount,
+						PaidCoin:          paymentData.PaidCoin,
+						PaidAddress:       paymentData.PaidAddress,
+					}
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusConflict)
+					json.NewEncoder(w).Encode(response)
+					return
+				}
+			}
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 检查商品类型
-	isRwaToken := false
-	if len(orderOpen.Listings) > 0 {
-		isRwaToken = orderOpen.Listings[0].Listing.Metadata.ContractType == pb.Listing_Metadata_RWA_TOKEN
-	}
-
-	// 根据场景分发处理
-	switch {
-	case isRwaToken:
-		g.handleGetRWATokenPaymentInfo(w, r, node, params, coinInfo)
-	case coinInfo.Chain.IsUTXOChain():
-		g.handleGetUTXOPaymentInfo(w, r, node, params, coinInfo)
+	switch result.PaymentModel {
+	case payment.PaymentModelMonitored:
+		g.formatMonitoredPaymentResponse(w, params, result)
+	case payment.PaymentModelClientSigned:
+		g.formatClientSignedPaymentResponse(w, result)
 	default:
-		g.handleGetEVMPaymentInfo(w, r, node, params)
+		http.Error(w, fmt.Sprintf("unsupported payment model: %s", result.PaymentModel), http.StatusInternalServerError)
 	}
 }
 
@@ -112,7 +131,7 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 // 场景处理函数
 // ============================================================================
 
-// handleGetRWATokenPaymentInfo 处理 RWA Token 支付
+// handleGetRWATokenPaymentInfo 处理 RWA Token 支付（特殊产品类型，不走 PaymentStrategy）
 func (g *Gateway) handleGetRWATokenPaymentInfo(w http.ResponseWriter, r *http.Request, node contracts.NodeService, params models.InitializeEscrowData, coinInfo iwallet.CoinInfo) {
 	if !coinInfo.IsEthTypeChain() {
 		http.Error(w, "RWA Token only supports EVM chains", http.StatusBadRequest)
@@ -129,49 +148,31 @@ func (g *Gateway) handleGetRWATokenPaymentInfo(w http.ResponseWriter, r *http.Re
 		BuyerAddress:  orderInfo.BuyerAddress,
 		VendorAddress: orderInfo.VendorAddress,
 	}
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
-// handleGetUTXOPaymentInfo 处理 UTXO 链外部钱包支付（BTC/LTC/BCH/ZEC）
-func (g *Gateway) handleGetUTXOPaymentInfo(w http.ResponseWriter, r *http.Request, node contracts.NodeService, params models.InitializeEscrowData, coinInfo iwallet.CoinInfo) {
-	// 获取支付信息
-	// 支付方式由 Moderator 决定：
-	// - 无 Moderator → CANCELABLE（1-of-2 多签，买家可取消，卖家可确认）
-	// - 有 Moderator → MODERATED（2-of-3 多签）
-	paymentData, err := node.GetUTXOPaymentInfo(
-		r.Context(),
-		params.OrderID,
-		params.Moderator,
-		params.CoinType,
-	)
-	if err != nil {
-		// 检查是否是币种切换需要确认的错误
-		if errors.Is(err, coreiface.ErrCoinSwitchRequiresConfirmation) && paymentData != nil {
-			// 返回需要确认的响应
-			response := UTXOPaymentInfoResponse{
-				PaymentType:       "external_wallet",
-				HasPartialPayment: paymentData.HasPartialPayment,
-				PaidAmount:        paymentData.PaidAmount,
-				PaidCoin:          paymentData.PaidCoin,
-				PaidAddress:       paymentData.PaidAddress,
-			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusConflict) // 409 Conflict
-			json.NewEncoder(w).Encode(response)
-			return
-		}
-		http.Error(w, fmt.Sprintf("Failed to get UTXO payment info: %v", err), http.StatusInternalServerError)
+// formatMonitoredPaymentResponse formats the response for Monitored (UTXO) payments.
+func (g *Gateway) formatMonitoredPaymentResponse(w http.ResponseWriter, params models.InitializeEscrowData, result *payment.PaymentSetupResult) {
+	w.Header().Set("Content-Type", "application/json")
+	paymentData, ok := result.PaymentData.(*models.PaymentData)
+	if !ok || paymentData == nil {
+		http.Error(w, "invalid payment data for monitored chain", http.StatusInternalServerError)
 		return
 	}
 
-	// 解析 script 计算 scripthash
+	coinInfo, err := params.CoinType.CoinInfo()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	scriptPubKey, err := hex.DecodeString(paymentData.Script)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to decode script: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	// 生成支付 URI 和 scripthash
 	amountInCoin := float64(paymentData.Amount) / 1e8
 	paymentURI := utxo.GeneratePaymentURI(coinInfo.Chain, paymentData.ToAddress, amountInCoin)
 	scriptHash := utxo.AddressToScriptHash(scriptPubKey)
@@ -194,21 +195,19 @@ func (g *Gateway) handleGetUTXOPaymentInfo(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(response)
 }
 
-// handleGetEVMPaymentInfo 处理智能合约托管支付（EVM/Solana）
-func (g *Gateway) handleGetEVMPaymentInfo(w http.ResponseWriter, r *http.Request, node contracts.NodeService, params models.InitializeEscrowData) {
-	paymentData, escrowAccount, instructions, err := node.BuildInitEscrowInstructions(
-		r.Context(),
-		params,
-	)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+// formatClientSignedPaymentResponse formats the response for ClientSigned (EVM/Solana) payments.
+func (g *Gateway) formatClientSignedPaymentResponse(w http.ResponseWriter, result *payment.PaymentSetupResult) {
+	w.Header().Set("Content-Type", "application/json")
+	paymentData, ok := result.PaymentData.(*models.PaymentData)
+	if !ok || paymentData == nil {
+		http.Error(w, "invalid payment data for client-signed chain", http.StatusInternalServerError)
 		return
 	}
 
 	response := EVMPaymentInfoResponse{
 		PaymentData:   paymentData,
-		EscrowAccount: escrowAccount.String(),
-		Instructions:  instructions,
+		EscrowAccount: result.EscrowAddr,
+		Instructions:  result.Instructions,
 	}
 	json.NewEncoder(w).Encode(response)
 }

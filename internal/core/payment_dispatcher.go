@@ -25,8 +25,8 @@ var cancelableAutoConfirmInProgress sync.Map
 // All chains are registered here — the dispatcher uses registry-only lookup
 // with no legacy fallback.
 //
-// Chain adapters (payment_strategy_utxo.go, payment_strategy_evm.go, payment_strategy_solana.go)
-// implement PaymentStrategy by delegating to MobazhaNode methods.
+// UTXO chains use utxoAutoConfirmAdapter directly.
+// EVM and Solana chains use clientSignedAdapter with chain-specific chainOps.
 func (n *MobazhaNode) registerPaymentStrategies() {
 	n.paymentRegistry = payment.NewRegistry()
 
@@ -42,13 +42,13 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 
 	// Register EVM chains — auto-confirm via platform relay service
 	// (builds escrow release instructions, relays tx, then calls ConfirmOrder)
-	evmStrategy := &evmAutoConfirmAdapter{node: n}
+	evmStrategy := newClientSignedAdapter(n, &evmChainOps{node: n})
 	for _, chain := range evmChains {
 		n.paymentRegistry.Register(chain, evmStrategy)
 	}
 
 	// Register Solana — relay not yet implemented, logs manual confirmation required
-	n.paymentRegistry.Register(iwallet.ChainSolana, &solanaAutoConfirmAdapter{node: n})
+	n.paymentRegistry.Register(iwallet.ChainSolana, newClientSignedAdapter(n, &solanaChainOps{node: n}))
 
 	logger.LogInfoWithIDf(log, n.nodeID, "Registered payment strategies for %d chains", len(n.paymentRegistry.Chains()))
 }

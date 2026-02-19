@@ -24,6 +24,9 @@ func (m *mockStrategy) SignEscrowRelease(_ context.Context, _ payment.SignEscrow
 func (m *mockStrategy) EstimateEscrowFee(_ string, _, _ int, _ iwallet.FeeLevel) (iwallet.Amount, error) {
 	return iwallet.NewAmount(0), nil
 }
+func (m *mockStrategy) GeneratePaymentInstructions(_ context.Context, _ payment.PaymentSetupParams) (*payment.PaymentSetupResult, error) {
+	return &payment.PaymentSetupResult{PaymentModel: m.model}, nil
+}
 func (m *mockStrategy) GetConfirmInstructions(_ context.Context, _ payment.InstructionParams) (*payment.InstructionResult, error) {
 	return &payment.InstructionResult{Instructions: nil}, nil
 }

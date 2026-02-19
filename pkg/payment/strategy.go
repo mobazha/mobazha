@@ -130,6 +130,46 @@ type SignEscrowParams struct {
 	CoinCode string
 }
 
+// ── Payment Setup Params / Result ───────────────────────────────
+
+// PaymentSetupParams provides parameters for generating initial payment
+// instructions (the "order/payment" endpoint). Each strategy adapter uses
+// these to build chain-specific escrow initialization or address generation.
+type PaymentSetupParams struct {
+	// OrderID is the order identifier.
+	OrderID string
+
+	// PayerAddress is the buyer's wallet address (format depends on chain).
+	PayerAddress string
+
+	// Moderator is the moderator's peer ID (empty for no moderator).
+	Moderator string
+
+	// CoinType is the payment coin (e.g., "BTC", "ETH", "SOL").
+	CoinType iwallet.CoinType
+
+	// Amount is the payment amount in minimal units (satoshis, wei, lamports).
+	Amount uint64
+}
+
+// PaymentSetupResult contains the result of payment instruction generation.
+// The handler formats the JSON response differently based on PaymentModel.
+type PaymentSetupResult struct {
+	// PaymentModel indicates which payment paradigm this result follows.
+	PaymentModel PaymentModel
+
+	// PaymentData carries chain-specific payment data.
+	// Concrete type: *models.PaymentData — adapters populate this.
+	PaymentData any
+
+	// EscrowAddr is the escrow account address (ClientSigned only, empty for Monitored).
+	EscrowAddr string
+
+	// Instructions contains chain-specific instructions for the frontend.
+	// nil for Monitored (backend handles it), non-nil for ClientSigned.
+	Instructions any
+}
+
 // ── PaymentStrategy Interface ───────────────────────────────────
 
 // PaymentStrategy defines chain-level payment operations covering the full
@@ -188,6 +228,19 @@ type PaymentStrategy interface {
 	//
 	// coinCode is needed to resolve the correct chain wallet (e.g. "BTC", "LTC").
 	EstimateEscrowFee(coinCode string, nIn, nOut int, feeLevel iwallet.FeeLevel) (iwallet.Amount, error)
+
+	// ── Payment Setup ────────────────────────────────────
+
+	// GeneratePaymentInstructions generates initial payment instructions
+	// for the "order/payment" endpoint. This is the entry point for setting
+	// up a payment — it creates the escrow or payment address and returns
+	// data the frontend needs to execute the payment.
+	//
+	// Monitored (UTXO): returns payment address + script for monitoring.
+	// ClientSigned (EVM/Solana): returns escrow init instructions for frontend.
+	//
+	// This method eliminates the 3-way chain type switch in the API handler.
+	GeneratePaymentInstructions(ctx context.Context, params PaymentSetupParams) (*PaymentSetupResult, error)
 
 	// ── Instruction Generation ─────────────────────────
 

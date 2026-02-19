@@ -172,16 +172,18 @@ func TestRegistryDispatch_UTXOAdapterModel(t *testing.T) {
 }
 
 func TestRegistryDispatch_EVMAdapterModel(t *testing.T) {
-	adapter := &evmAutoConfirmAdapter{node: &MobazhaNode{nodeID: "test"}}
+	node := &MobazhaNode{nodeID: "test"}
+	adapter := newClientSignedAdapter(node, &evmChainOps{node: node})
 	if adapter.Model() != payment.PaymentModelClientSigned {
-		t.Errorf("evmAutoConfirmAdapter.Model() = %s, want %s", adapter.Model(), payment.PaymentModelClientSigned)
+		t.Errorf("clientSignedAdapter(evm).Model() = %s, want %s", adapter.Model(), payment.PaymentModelClientSigned)
 	}
 }
 
 func TestRegistryDispatch_SolanaAdapterModel(t *testing.T) {
-	adapter := &solanaAutoConfirmAdapter{node: &MobazhaNode{nodeID: "test"}}
+	node := &MobazhaNode{nodeID: "test"}
+	adapter := newClientSignedAdapter(node, &solanaChainOps{node: node})
 	if adapter.Model() != payment.PaymentModelClientSigned {
-		t.Errorf("solanaAutoConfirmAdapter.Model() = %s, want %s", adapter.Model(), payment.PaymentModelClientSigned)
+		t.Errorf("clientSignedAdapter(solana).Model() = %s, want %s", adapter.Model(), payment.PaymentModelClientSigned)
 	}
 }
 

@@ -109,6 +109,9 @@ type MobazhaNode struct {
 	// chatService encapsulates chat and chat-group business logic.
 	chatService *ChatAppService
 
+	// matrixService encapsulates Matrix credential management and E2EE key backup logic.
+	matrixService *MatrixAppService
+
 	// notificationService encapsulates notification query and management logic.
 	notificationService *NotificationAppService
 

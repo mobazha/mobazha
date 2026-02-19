@@ -44,8 +44,24 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initPaymentService()
 	n.initOrderService()
 	n.initChatService()
+	n.initMatrixService()
 	n.initNotificationService()
 	n.initShoppingCartService()
+}
+
+// initMatrixService creates the MatrixAppService.
+func (n *MobazhaNode) initMatrixService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+	if n.privKey == nil {
+		return
+	}
+	n.matrixService = NewMatrixAppService(MatrixAppServiceConfig{
+		DB:      n.db,
+		PrivKey: n.privKey,
+		PeerID:  n.peerID,
+	})
 }
 
 // initNotificationService creates the NotificationAppService.

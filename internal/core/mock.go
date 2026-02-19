@@ -209,6 +209,7 @@ func MockNode() (*MobazhaNode, error) {
 
 	node.initOrderService()
 	node.initChatService()
+	node.initMatrixService()
 	node.initNotificationService()
 	node.initShoppingCartService()
 	node.registerPaymentStrategies()
@@ -423,6 +424,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 
 		node.initOrderService()
 		node.initChatService()
+		node.initMatrixService()
 		node.initNotificationService()
 		node.initShoppingCartService()
 		node.registerPaymentStrategies()

@@ -103,6 +103,9 @@ type MobazhaNode struct {
 	// Owns escrow instruction generation, cancelable payment dispatching, etc.
 	paymentService *PaymentAppService
 
+	// orderService encapsulates order lifecycle business logic (reject, refund).
+	orderService *OrderAppService
+
 	// stripeAccountID represents the stripe account id of the node.
 	stripeAccountID string
 

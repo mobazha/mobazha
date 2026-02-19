@@ -42,6 +42,26 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 		)
 	}
 	n.initPaymentService()
+	n.initOrderService()
+}
+
+// initOrderService creates the OrderAppService if the necessary
+// dependencies are available. IPFSOnly nodes skip this.
+func (n *MobazhaNode) initOrderService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+
+	n.orderService = NewOrderAppService(OrderAppServiceConfig{
+		DB:              n.db,
+		Multiwallet:     n.multiwallet,
+		Signer:          n.signer,
+		OrderProcessor:  n.orderProcessor,
+		Messenger:       n.messenger,
+		NodeID:          n.nodeID,
+
+		ReleaseCancelableWithParams: n.releaseFromCancelableAddressWithParams,
+	})
 }
 
 // initPaymentService creates the PaymentAppService if the necessary

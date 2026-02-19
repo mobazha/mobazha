@@ -68,9 +68,12 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 
 	logger.LogInfoWithIDf(log, n.nodeID, "Registered payment strategies for %d chains", len(n.paymentRegistry.Chains()))
 
-	// Wire the registry to PaymentAppService
+	// Wire the registry to App Services
 	if n.paymentService != nil {
 		n.paymentService.SetRegistry(n.paymentRegistry)
+	}
+	if n.orderService != nil {
+		n.orderService.SetRegistry(n.paymentRegistry)
 	}
 }
 

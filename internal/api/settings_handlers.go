@@ -24,11 +24,11 @@ type nodeConfig struct {
 }
 
 func (g *Gateway) handleGETConfig(w http.ResponseWriter, r *http.Request) {
-	ns := getNodeService(r)
+	identity := getIdentityService(r)
 
 	ret := nodeConfig{
-		PeerID:  ns.Identity().String(),
-		Testnet: ns.UsingTestnet(),
+		PeerID:  identity.Identity().String(),
+		Testnet: identity.UsingTestnet(),
 	}
 
 	// Tor and Wallets are only available on full nodes (CoreIface).
@@ -46,9 +46,9 @@ func (g *Gateway) handleGETConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePutUserPreferences(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
+	prefsSvc := getPreferencesService(r)
 
-	currentPrefs, err := node.GetPreferences()
+	currentPrefs, err := prefsSvc.GetPreferences()
 	if err != nil && !errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -77,7 +77,7 @@ func (g *Gateway) handlePutUserPreferences(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	err = node.SavePreferences(&prefs, nil)
+	err = prefsSvc.SavePreferences(&prefs, nil)
 	if errors.Is(err, coreiface.ErrBadRequest) {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
@@ -89,9 +89,9 @@ func (g *Gateway) handlePutUserPreferences(w http.ResponseWriter, r *http.Reques
 }
 
 func (g *Gateway) handleGetUserPreferences(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
+	prefsSvc := getPreferencesService(r)
 
-	prefs, err := node.GetPreferences()
+	prefs, err := prefsSvc.GetPreferences()
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -101,7 +101,7 @@ func (g *Gateway) handleGetUserPreferences(w http.ResponseWriter, r *http.Reques
 }
 
 func (g *Gateway) handleGETExchangeRates(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
+	exchange := getExchangeRateService(r)
 
 	currencyCode := mux.Vars(r)["currencyCode"]
 
@@ -117,9 +117,8 @@ func (g *Gateway) handleGETExchangeRates(w http.ResponseWriter, r *http.Request)
 		base = models.CurrencyCode(iwallet.CtBitcoin)
 	}
 
-	// 检查是否请求强制刷新（用于获取最新的预言机数据）
 	forceRefresh := r.URL.Query().Get("refresh") == "true"
-	rates, err := node.GetAllRates(base, forceRefresh)
+	rates, err := exchange.GetAllRates(base, forceRefresh)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return

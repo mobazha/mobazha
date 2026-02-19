@@ -33,15 +33,15 @@ func (g *Gateway) handlePOSTPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	social := getSocialService(r)
 
 	// If the post already exists in path, tell them to use PUT
-	if post.Slug != "" && node.PostExist(post.Slug) {
+	if post.Slug != "" && social.PostExist(post.Slug) {
 		ErrorResponse(w, http.StatusConflict, "post exists. use PUT to update")
 		return
 	}
 
-	err = node.AddPost(post, nil)
+	err = social.AddPost(post, nil)
 	if errors.Is(err, coreiface.ErrBadRequest) {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
@@ -67,14 +67,14 @@ func (g *Gateway) handlePUTPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	social := getSocialService(r)
 
-	if !node.PostExist(post.Slug) {
+	if !social.PostExist(post.Slug) {
 		ErrorResponse(w, http.StatusConflict, "post does not exist. use POST to create")
 		return
 	}
 
-	err = node.AddPost(post, nil)
+	err = social.AddPost(post, nil)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -87,9 +87,9 @@ func (g *Gateway) handlePUTPost(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleDELETEPost(w http.ResponseWriter, r *http.Request) {
 	_, slug := path.Split(r.URL.Path)
 
-	node := getNodeService(r)
+	social := getSocialService(r)
 
-	err := node.DeletePost(slug, nil)
+	err := social.DeletePost(slug, nil)
 	if errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusNotFound, err.Error())
 		return
@@ -109,9 +109,9 @@ func (g *Gateway) handleGETPosts(w http.ResponseWriter, r *http.Request) {
 		err   error
 	)
 
-	node := getNodeService(r)
-	if peerIDStr == "" || peerIDStr == node.Identity().String() {
-		index, err = node.GetMyPosts()
+	social := getSocialService(r)
+	if peerIDStr == "" || peerIDStr == getIdentityService(r).Identity().String() {
+		index, err = social.GetMyPosts()
 	} else {
 		pid, perr := peer.Decode(peerIDStr)
 		if perr != nil {
@@ -120,7 +120,7 @@ func (g *Gateway) handleGETPosts(w http.ResponseWriter, r *http.Request) {
 		}
 		useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
-		index, err = node.GetPosts(r.Context(), pid, useCache)
+		index, err = social.GetPosts(r.Context(), pid, useCache)
 	}
 	if errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusNotFound, err.Error())
@@ -137,9 +137,9 @@ func (g *Gateway) handleGETPosts(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleGETMyPost(w http.ResponseWriter, r *http.Request) {
 	slug := mux.Vars(r)["slug"]
 
-	node := getNodeService(r)
+	social := getSocialService(r)
 
-	signedPost, err := node.GetMyPostBySlug(slug)
+	signedPost, err := social.GetMyPostBySlug(slug)
 
 	if errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusNotFound, err.Error())
@@ -157,7 +157,7 @@ func (g *Gateway) handleGETPost(w http.ResponseWriter, r *http.Request) {
 	peerIDStr := mux.Vars(r)["peerID"]
 	slug := mux.Vars(r)["slug"]
 
-	node := getNodeService(r)
+	social := getSocialService(r)
 
 	var (
 		post *pb.SignedPost
@@ -170,7 +170,7 @@ func (g *Gateway) handleGETPost(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
-		post, err = node.GetPostBySlug(r.Context(), pid, slug, useCache)
+		post, err = social.GetPostBySlug(r.Context(), pid, slug, useCache)
 	}
 
 	if errors.Is(err, coreiface.ErrNotFound) {
@@ -197,9 +197,9 @@ func (g *Gateway) handlePOSTSignMessage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	node := getNodeService(r)
+	identity := getIdentityService(r)
 
-	sig, pubKey, err := node.SignMessage([]byte(req.Content))
+	sig, pubKey, err := identity.SignMessage([]byte(req.Content))
 	if err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
@@ -208,7 +208,7 @@ func (g *Gateway) handlePOSTSignMessage(w http.ResponseWriter, r *http.Request) 
 	sanitizedStringResponse(w, fmt.Sprintf(`{"signature": "%s","pubkey":"%s","peerId":"%s"}`,
 		hex.EncodeToString(sig),
 		hex.EncodeToString(pubKey),
-		node.Identity().String()))
+		identity.Identity().String()))
 }
 
 func (g *Gateway) handlePOSTVerifyMessage(w http.ResponseWriter, r *http.Request) {

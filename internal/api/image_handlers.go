@@ -28,7 +28,7 @@ func (g *Gateway) handleGETImage(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Second*45)
 	defer cancel()
 
-	node := getNodeService(r)
+	node := getMediaService(r)
 
 	reader, err := node.GetImage(ctx, id)
 	if errors.Is(err, coreiface.ErrNotFound) {
@@ -56,7 +56,7 @@ func (g *Gateway) handleGETAvatar(w http.ResponseWriter, r *http.Request) {
 
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
-	node := getNodeService(r)
+	node := getMediaService(r)
 	reader, err := node.GetAvatar(r.Context(), pid, models.ImageSize(sizeStr), useCache)
 	if errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusNotFound, err.Error())
@@ -81,7 +81,7 @@ func (g *Gateway) handleGETHeader(w http.ResponseWriter, r *http.Request) {
 
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
-	node := getNodeService(r)
+	node := getMediaService(r)
 	reader, err := node.GetHeader(r.Context(), pid, models.ImageSize(sizeStr), useCache)
 	if errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusNotFound, err.Error())
@@ -105,7 +105,7 @@ func (g *Gateway) handlePOSTAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	node := getMediaService(r)
 	hashes, err := node.SetAvatarImage(data.Avatar, nil)
 	if errors.Is(err, coreiface.ErrBadRequest) {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
@@ -129,7 +129,7 @@ func (g *Gateway) handlePOSTHeader(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	node := getMediaService(r)
 	hashes, err := node.SetHeaderImage(data.Header, nil)
 	if errors.Is(err, coreiface.ErrBadRequest) {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
@@ -153,7 +153,7 @@ func (g *Gateway) handlePOSTImages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	node := getMediaService(r)
 
 	var imgs []models.FileHash
 
@@ -183,7 +183,7 @@ func (g *Gateway) handlePOSTProductImage(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	node := getNodeService(r)
+	node := getMediaService(r)
 
 	var imgs []models.ImageHashes
 

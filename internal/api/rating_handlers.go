@@ -19,9 +19,9 @@ import (
 )
 
 func (g *Gateway) handleGETMyRatingIndex(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
+	social := getSocialService(r)
 
-	index, err := node.GetMyRatings()
+	index, err := social.GetMyRatings()
 	if errors.Is(err, coreiface.ErrNotFound) {
 		emptyRatingInfo := models.RatingInfo{}
 		sanitizedJSONResponse(w, emptyRatingInfo)
@@ -47,15 +47,15 @@ func (g *Gateway) handleGETPeerRatingsBySlug(w http.ResponseWriter, r *http.Requ
 	}
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
-	node := getNodeService(r)
+	social := getSocialService(r)
 
 	var index models.RatingIndex
 	var err error
-	if peerIDStr == node.Identity().String() {
-		index, err = node.GetMyRatings()
+	if peerIDStr == getIdentityService(r).Identity().String() {
+		index, err = social.GetMyRatings()
 	} else {
 		reqCtx := extractRequestContext(r)
-		index, err = node.GetRatings(r.Context(), pid, reqCtx, useCache)
+		index, err = social.GetRatings(r.Context(), pid, reqCtx, useCache)
 	}
 
 	if errors.Is(err, coreiface.ErrNotFound) {
@@ -87,19 +87,19 @@ func (g *Gateway) handleGETRatingIndex(w http.ResponseWriter, r *http.Request) {
 		slug = peerIDOrSlug
 	}
 
-	node := getNodeService(r)
+	social := getSocialService(r)
 
 	var (
 		index models.RatingIndex
 		err   error
 	)
 
-	if pid.String() == "" || pid.String() == node.Identity().String() {
-		index, err = node.GetMyRatings()
+	if pid.String() == "" || pid.String() == getIdentityService(r).Identity().String() {
+		index, err = social.GetMyRatings()
 	} else {
 		useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 		reqCtx := extractRequestContext(r)
-		index, err = node.GetRatings(r.Context(), pid, reqCtx, useCache)
+		index, err = social.GetRatings(r.Context(), pid, reqCtx, useCache)
 	}
 
 	if errors.Is(err, coreiface.ErrNotFound) {
@@ -152,9 +152,9 @@ func (g *Gateway) handleGETRating(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	social := getSocialService(r)
 
-	rating, err := node.GetRating(r.Context(), id)
+	rating, err := social.GetRating(r.Context(), id)
 
 	if errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusNotFound, err.Error())
@@ -195,7 +195,8 @@ func (g *Gateway) handlePOSTFetchRatings(w http.ResponseWriter, r *http.Request)
 		marshaler    = protojson.MarshalOptions{Indent: "    "}
 	)
 
-	node := getNodeService(r)
+	social := getSocialService(r)
+	nodeID := getIdentityService(r).GetNodeID()
 
 	wg.Add(len(ratingIDs))
 	go func() {
@@ -211,7 +212,7 @@ func (g *Gateway) handlePOSTFetchRatings(w http.ResponseWriter, r *http.Request)
 			}
 			go func(id cid.Cid) {
 				defer wg.Done()
-				rating, err := node.GetRating(r.Context(), id)
+				rating, err := social.GetRating(r.Context(), id)
 				if err != nil {
 					responseChan <- ratingError{
 						RatingID: id.String(),
@@ -255,10 +256,10 @@ func (g *Gateway) handlePOSTFetchRatings(w http.ResponseWriter, r *http.Request)
 				switch p := i.(type) {
 				case ratingWithAsyncID:
 					p.ID = asyncID
-					g.NotifyWebsockets(node.GetNodeID())(p)
+					g.NotifyWebsockets(nodeID)(p)
 				case ratingError:
 					p.ID = asyncID
-					g.NotifyWebsockets(node.GetNodeID())(p)
+					g.NotifyWebsockets(nodeID)(p)
 				}
 			}
 		}()

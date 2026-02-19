@@ -45,6 +45,9 @@ type IdentityService interface {
 	// Standalone: uses IPFS node private key.
 	// SaaS: delegates to KeyVault.
 	SignMessage(payload []byte) ([]byte, []byte, error)
+
+	// IsGlobalBanned checks if a peer is globally banned.
+	IsGlobalBanned(peerID peer.ID) bool
 }
 
 // ChatService handles messaging operations.
@@ -134,11 +137,18 @@ type ListingService interface {
 	GetListingByCID(ctx context.Context, cid cid.Cid, reqCtx *request.Context) (*pb.SignedListing, error)
 }
 
-// ProfileService handles user profile management.
+// ProfileService handles user profile management and moderation.
 type ProfileService interface {
 	SetProfile(profile *models.Profile, done chan<- struct{}) error
 	GetMyProfile() (*models.Profile, error)
 	GetProfile(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error)
+
+	// Moderation
+	SetSelfAsModerator(ctx context.Context, modInfo *models.ModeratorInfo, done chan struct{}) error
+	RemoveSelfAsModerator(ctx context.Context, done chan<- struct{}) error
+	GetModerators(ctx context.Context) []peer.ID
+	GetModeratorsAsync(ctx context.Context) <-chan peer.ID
+	GetVerifiedModerators(ctx context.Context) []peer.ID
 }
 
 // WalletService provides wallet capabilities — key signing and multisig address generation.
@@ -298,9 +308,6 @@ type NodeService interface {
 	// SubscribeEvent subscribes to a specific event type.
 	SubscribeEvent(event any) (events.Subscription, error)
 
-	// IsGlobalBanned checks if a peer is globally banned.
-	IsGlobalBanned(peerID peer.ID) bool
-
 	// Shopping cart
 	GetCartsTotalItemsCount() (int, error)
 	GetCarts() ([]models.StoreCart, error)
@@ -308,13 +315,6 @@ type NodeService interface {
 	RemoveCartItem(peerID peer.ID, item models.ShoppingCartItem) error
 	ClearCarts(vendorID peer.ID) error
 	ClearAllCarts() error
-
-	// Moderation
-	SetSelfAsModerator(ctx context.Context, modInfo *models.ModeratorInfo, done chan struct{}) error
-	RemoveSelfAsModerator(ctx context.Context, done chan<- struct{}) error
-	GetModerators(ctx context.Context) []peer.ID
-	GetModeratorsAsync(ctx context.Context) <-chan peer.ID
-	GetVerifiedModerators(ctx context.Context) []peer.ID
 
 	// Request address
 	RequestAddress(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error)

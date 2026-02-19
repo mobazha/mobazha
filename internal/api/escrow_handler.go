@@ -70,10 +70,10 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 		return
 	}
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
+	walletSvc := getWalletService(r)
 
-	// RWA Token is a special product type, not a payment paradigm
-	order, err := node.GetOrder(params.OrderID)
+	order, err := orderSvc.GetOrder(params.OrderID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -89,12 +89,11 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		g.handleGetRWATokenPaymentInfo(w, r, node, params, coinInfo)
+		g.handleGetRWATokenPaymentInfo(w, r, orderSvc, params, coinInfo)
 		return
 	}
 
-	// Dispatch via payment strategy registry — no chain type branching
-	result, err := node.GeneratePaymentInstructions(r.Context(), params)
+	result, err := walletSvc.GeneratePaymentInstructions(r.Context(), params)
 	if err != nil {
 		if result != nil && result.PaymentData != nil {
 			if paymentData, ok := result.PaymentData.(*models.PaymentData); ok && paymentData != nil {
@@ -132,13 +131,13 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 // ============================================================================
 
 // handleGetRWATokenPaymentInfo 处理 RWA Token 支付（特殊产品类型，不走 PaymentStrategy）
-func (g *Gateway) handleGetRWATokenPaymentInfo(w http.ResponseWriter, r *http.Request, node contracts.NodeService, params models.InitializeEscrowData, coinInfo iwallet.CoinInfo) {
+func (g *Gateway) handleGetRWATokenPaymentInfo(w http.ResponseWriter, r *http.Request, orderSvc contracts.OrderService, params models.InitializeEscrowData, coinInfo iwallet.CoinInfo) {
 	if !coinInfo.IsEthTypeChain() {
 		http.Error(w, "RWA Token only supports EVM chains", http.StatusBadRequest)
 		return
 	}
 
-	orderInfo, err := node.GetOrderInfo(models.OrderID(params.OrderID), params.CoinType)
+	orderInfo, err := orderSvc.GetOrderInfo(models.OrderID(params.OrderID), params.CoinType)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

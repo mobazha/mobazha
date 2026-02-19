@@ -18,7 +18,7 @@ func (g *Gateway) GetReceivingAccounts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	node := getWalletService(r)
 
 	// 从数据库获取用户的收款账户信息
 	receivingAccounts, err := node.GetReceivingAccounts()
@@ -49,7 +49,7 @@ func (g *Gateway) handleReceivingAccountRequest(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	node := getNodeService(r)
+	node := getWalletService(r)
 
 	type ReceivingAccountParams struct {
 		ID             int               `json:"id"`
@@ -130,7 +130,7 @@ func (g *Gateway) DeleteReceivingAccount(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	node := getNodeService(r)
+	node := getWalletService(r)
 
 	// 从URL路径获取账户ID
 	vars := mux.Vars(r)

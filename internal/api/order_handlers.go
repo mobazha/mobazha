@@ -59,9 +59,9 @@ func (g *Gateway) handlePOSTPurchase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	order := getOrderService(r)
 
-	orderID, amount, err := node.PurchaseListing(r.Context(), &data)
+	orderID, amount, err := order.PurchaseListing(r.Context(), &data)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
 		return
@@ -85,9 +85,9 @@ func (g *Gateway) handlePOSTCheckoutBreakdown(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	node := getNodeService(r)
+	order := getOrderService(r)
 
-	orderTotals, err := node.EstimateOrderTotal(r.Context(), &data)
+	orderTotals, err := order.EstimateOrderTotal(r.Context(), &data)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -104,9 +104,9 @@ func (g *Gateway) handlePOSTEstimateTotal(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	node := getNodeService(r)
+	order := getOrderService(r)
 
-	orderTotals, err := node.EstimateOrderTotal(r.Context(), &data)
+	orderTotals, err := order.EstimateOrderTotal(r.Context(), &data)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -117,15 +117,15 @@ func (g *Gateway) handlePOSTEstimateTotal(w http.ResponseWriter, r *http.Request
 func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 	_, orderID := path.Split(r.URL.Path)
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
-	order, err := node.GetOrder(orderID)
+	order, err := orderSvc.GetOrder(orderID)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
 		return
 	}
 
-	unreadChatMsgCount, _ := node.GetChatMessagesUnreadCountByOrderID(order.ID)
+	unreadChatMsgCount, _ := getChatService(r).GetChatMessagesUnreadCountByOrderID(order.ID)
 
 	type OrderRespApi struct {
 		Contract           *models.Order `json:"contract,omitempty"`
@@ -151,7 +151,7 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 
 // handlePOSTPayment 处理支付结果通知
 func (g *Gateway) handlePOSTPayment(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
 	var req struct {
 		PaymentData *models.PaymentData `json:"paymentData"`
@@ -161,7 +161,7 @@ func (g *Gateway) handlePOSTPayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := node.ProcessOrderPayment(r.Context(), req.PaymentData)
+	err := orderSvc.ProcessOrderPayment(r.Context(), req.PaymentData)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
 		return
@@ -176,8 +176,8 @@ func (g *Gateway) handlePOSTPayment(w http.ResponseWriter, r *http.Request) {
 	sanitizedJSONResponse(w, response)
 }
 
-func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, node contracts.NodeService, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
-	orders, total, err := node.GetPurchases(stateFilters, searchTerm, sortByAscending, sortByRead, limit, exclude)
+func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, orderSvc contracts.OrderService, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
+	orders, total, err := orderSvc.GetPurchases(stateFilters, searchTerm, sortByAscending, sortByRead, limit, exclude)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
 		return
@@ -268,9 +268,9 @@ func (g *Gateway) handlePOSTPurchases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
-	g.getPurchasesImpl(w, node, convertOrderStates(query.OrderStates), query.SearchTerm, query.SortByAscending, query.SortByRead, query.Limit, query.Exclude)
+	g.getPurchasesImpl(w, orderSvc, convertOrderStates(query.OrderStates), query.SearchTerm, query.SortByAscending, query.SortByRead, query.Limit, query.Exclude)
 }
 
 func (g *Gateway) handleGETPurchases(w http.ResponseWriter, r *http.Request) {
@@ -280,13 +280,13 @@ func (g *Gateway) handleGETPurchases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
-	g.getPurchasesImpl(w, node, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
+	g.getPurchasesImpl(w, orderSvc, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
 }
 
-func (g *Gateway) getSalesImpl(w http.ResponseWriter, node contracts.NodeService, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
-	orders, total, err := node.GetSales(stateFilters, searchTerm, sortByAscending, sortByRead, limit, exclude)
+func (g *Gateway) getSalesImpl(w http.ResponseWriter, orderSvc contracts.OrderService, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
+	orders, total, err := orderSvc.GetSales(stateFilters, searchTerm, sortByAscending, sortByRead, limit, exclude)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
 		return
@@ -375,9 +375,9 @@ func (g *Gateway) handleGETSales(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
-	g.getSalesImpl(w, node, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
+	g.getSalesImpl(w, orderSvc, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
 }
 
 func (g *Gateway) handlePostSales(w http.ResponseWriter, r *http.Request) {
@@ -389,13 +389,13 @@ func (g *Gateway) handlePostSales(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
-	g.getSalesImpl(w, node, convertOrderStates(query.OrderStates), query.SearchTerm, query.SortByAscending, query.SortByRead, query.Limit, query.Exclude)
+	g.getSalesImpl(w, orderSvc, convertOrderStates(query.OrderStates), query.SearchTerm, query.SortByAscending, query.SortByRead, query.Limit, query.Exclude)
 }
 
-func (g *Gateway) getCasesImpl(w http.ResponseWriter, node contracts.NodeService, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
-	cases, total, err := node.GetCases(stateFilters, searchTerm, sortByAscending, sortByRead, limit, exclude)
+func (g *Gateway) getCasesImpl(w http.ResponseWriter, orderSvc contracts.OrderService, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
+	cases, total, err := orderSvc.GetCases(stateFilters, searchTerm, sortByAscending, sortByRead, limit, exclude)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
 		return
@@ -488,9 +488,9 @@ func (g *Gateway) handleGETCases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
-	g.getCasesImpl(w, node, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
+	g.getCasesImpl(w, orderSvc, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
 }
 
 func (g *Gateway) handlePostCases(w http.ResponseWriter, r *http.Request) {
@@ -502,17 +502,17 @@ func (g *Gateway) handlePostCases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
-	g.getCasesImpl(w, node, convertOrderStates(query.OrderStates), query.SearchTerm, query.SortByAscending, query.SortByRead, query.Limit, query.Exclude)
+	g.getCasesImpl(w, orderSvc, convertOrderStates(query.OrderStates), query.SearchTerm, query.SortByAscending, query.SortByRead, query.Limit, query.Exclude)
 }
 
 func (g *Gateway) handleGetCase(w http.ResponseWriter, r *http.Request) {
 	_, orderID := path.Split(r.URL.Path)
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
-	disputeCase, err := node.GetCase(orderID)
+	disputeCase, err := orderSvc.GetCase(orderID)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
 		return
@@ -526,8 +526,8 @@ func (g *Gateway) handlePostSpendForOrder(w http.ResponseWriter, r *http.Request
 }
 
 func (g *Gateway) handleGETOrderCancelInstructions(w http.ResponseWriter, r *http.Request) {
-	g.handleOrderInstructions(w, r, func(node contracts.NodeService, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
-		return node.GetRefundOrderInstructions(orderID, initiatorAddress)
+	g.handleOrderInstructions(w, r, func(orderSvc contracts.OrderService, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
+		return orderSvc.GetRefundOrderInstructions(orderID, initiatorAddress)
 	})
 }
 
@@ -544,16 +544,14 @@ func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
 	done := make(chan struct{})
 
 	if cancelParam.TransactionID != "" {
-		// Frontend-signed mode: txid already provided (via AppKit wallet)
-		err = node.CancelOrder(models.OrderID(cancelParam.OrderID), iwallet.TransactionID(cancelParam.TransactionID), done)
+		err = orderSvc.CancelOrder(models.OrderID(cancelParam.OrderID), iwallet.TransactionID(cancelParam.TransactionID), done)
 	} else {
-		// Relay mode: no txid — backend handles get-instructions + relay + cancel
-		err = node.CancelOrderViaRelay(models.OrderID(cancelParam.OrderID), done)
+		err = orderSvc.CancelOrderViaRelay(models.OrderID(cancelParam.OrderID), done)
 	}
 	if err != nil {
 		orderActionErrorResponse(w, err)
@@ -575,7 +573,7 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 		OrderID          string `json:"orderID"`
 		Reject           bool   `json:"reject"`
 		InitiatorAddress string `json:"initiatorAddress"`
-		PayoutAddress    string `json:"payoutAddress"` // for confirm order, payout address for seller
+		PayoutAddress    string `json:"payoutAddress"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	var args Params
@@ -585,9 +583,9 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 		return
 	}
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
-	order, err := node.GetOrder(args.OrderID)
+	order, err := orderSvc.GetOrder(args.OrderID)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
 		return
@@ -611,9 +609,9 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 	var coinType iwallet.CoinType
 	var instructions any
 	if args.Reject {
-		coinType, instructions, err = node.GetRefundOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress)
+		coinType, instructions, err = orderSvc.GetRefundOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress)
 	} else {
-		coinType, instructions, err = node.GetConfirmOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress, args.PayoutAddress)
+		coinType, instructions, err = orderSvc.GetConfirmOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress, args.PayoutAddress)
 	}
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -653,9 +651,9 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 	type orderConf struct {
 		OrderID       string `json:"orderID"`
 		TransactionID string `json:"transactionID"`
-		PayoutAddress string `json:"payoutAddress"` // for confirm order, payout address for seller
+		PayoutAddress string `json:"payoutAddress"`
 		Reject        bool   `json:"reject"`
-		Reason        string `json:"reason"` // for reject order, reason for rejection
+		Reason        string `json:"reason"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	var conf orderConf
@@ -665,18 +663,16 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
 	done := make(chan struct{})
 	if !conf.Reject {
-		err = node.ConfirmOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TransactionID), conf.PayoutAddress, done)
+		err = orderSvc.ConfirmOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TransactionID), conf.PayoutAddress, done)
 	} else {
 		if conf.TransactionID != "" {
-			// Frontend-signed mode: txid already provided (via AppKit wallet)
-			err = node.RejectOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TransactionID), conf.Reason, done)
+			err = orderSvc.RejectOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TransactionID), conf.Reason, done)
 		} else {
-			// Relay mode: no txid — backend handles get-instructions + relay + reject
-			err = node.RejectOrderViaRelay(models.OrderID(conf.OrderID), conf.Reason, done)
+			err = orderSvc.RejectOrderViaRelay(models.OrderID(conf.OrderID), conf.Reason, done)
 		}
 	}
 	if err != nil {
@@ -727,10 +723,10 @@ func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Requ
 		CryptocurrencyDelivery: fulfillParam.CryptocurrencyDelivery,
 	}
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
 	if receivingAccountID >= 0 {
-		receivingAccount, err := node.GetReceivingAccountByID(receivingAccountID)
+		receivingAccount, err := getWalletService(r).GetReceivingAccountByID(receivingAccountID)
 		if err != nil {
 			ErrorResponse(w, http.StatusBadRequest, "收款账户不存在或无效")
 			return
@@ -739,7 +735,7 @@ func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Requ
 	}
 
 	done := make(chan struct{})
-	err = node.FulfillOrder(models.OrderID(fulfillParam.OrderID), []models.Fulfillment{fulFillment}, done)
+	err = orderSvc.FulfillOrder(models.OrderID(fulfillParam.OrderID), []models.Fulfillment{fulFillment}, done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -756,8 +752,8 @@ func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Requ
 }
 
 func (g *Gateway) handleGETOrderRefundInstructions(w http.ResponseWriter, r *http.Request) {
-	g.handleOrderInstructions(w, r, func(node contracts.NodeService, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
-		return node.GetRefundOrderInstructions(orderID, initiatorAddress)
+	g.handleOrderInstructions(w, r, func(orderSvc contracts.OrderService, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
+		return orderSvc.GetRefundOrderInstructions(orderID, initiatorAddress)
 	})
 }
 
@@ -774,18 +770,14 @@ func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
 	done := make(chan struct{})
 
 	if refundParam.TransactionID != "" {
-		// Frontend-signed mode: txid already provided (via AppKit wallet)
-		err = node.RefundOrder(models.OrderID(refundParam.OrderID), iwallet.TransactionID(refundParam.TransactionID), done)
+		err = orderSvc.RefundOrder(models.OrderID(refundParam.OrderID), iwallet.TransactionID(refundParam.TransactionID), done)
 	} else {
-		// Relay mode: no txid — backend handles get-instructions + relay + refund
-		// For UTXO: backend signs and broadcasts internally
-		// For EVM: builds instructions → relays via gas wallet → completes refund
-		err = node.RefundOrderViaRelay(models.OrderID(refundParam.OrderID), done)
+		err = orderSvc.RefundOrderViaRelay(models.OrderID(refundParam.OrderID), done)
 	}
 	if err != nil {
 		orderActionErrorResponse(w, err)
@@ -803,8 +795,8 @@ func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) 
 }
 
 func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *http.Request) {
-	g.handleOrderInstructions(w, r, func(node contracts.NodeService, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
-		return node.GetCompleteOrderInstructions(orderID, initiatorAddress)
+	g.handleOrderInstructions(w, r, func(orderSvc contracts.OrderService, orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error) {
+		return orderSvc.GetCompleteOrderInstructions(orderID, initiatorAddress)
 	})
 }
 
@@ -812,7 +804,7 @@ func (g *Gateway) handleGETOrderCompleteInstructions(w http.ResponseWriter, r *h
 func (g *Gateway) handleOrderInstructions(
 	w http.ResponseWriter,
 	r *http.Request,
-	getInstructions func(contracts.NodeService, models.OrderID, string) (iwallet.CoinType, any, error),
+	getInstructions func(contracts.OrderService, models.OrderID, string) (iwallet.CoinType, any, error),
 ) {
 	type Params struct {
 		OrderID          string `json:"orderID"`
@@ -826,8 +818,8 @@ func (g *Gateway) handleOrderInstructions(
 		return
 	}
 
-	node := getNodeService(r)
-	coinType, instructions, err := getInstructions(node, models.OrderID(args.OrderID), args.InitiatorAddress)
+	orderSvc := getOrderService(r)
+	coinType, instructions, err := getInstructions(orderSvc, models.OrderID(args.OrderID), args.InitiatorAddress)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -873,10 +865,10 @@ func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
 	done := make(chan struct{})
-	err = node.CompleteOrder(models.OrderID(completeParam.OrderID), iwallet.TransactionID(completeParam.TxID), completeParam.Ratings, !completeParam.Anonymous, done)
+	err = orderSvc.CompleteOrder(models.OrderID(completeParam.OrderID), iwallet.TransactionID(completeParam.TxID), completeParam.Ratings, !completeParam.Anonymous, done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -930,24 +922,21 @@ func (g *Gateway) handleGETPaymentRemaining(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
-	// Get order
-	order, err := node.GetOrder(orderID)
+	order, err := orderSvc.GetOrder(orderID)
 	if err != nil {
 		ErrorResponse(w, http.StatusNotFound, "order not found")
 		return
 	}
 
-	// Check if there's pending payment info
 	pendingInfo, _ := order.GetPendingPaymentInfo()
 	if pendingInfo == nil || pendingInfo.Amount == 0 || order.PaymentAddress == "" {
 		ErrorResponse(w, http.StatusBadRequest, "no pending payment for this order")
 		return
 	}
 
-	// Calculate total paid
-	paidAmount, err := node.GetTotalPaidToAddress(order)
+	paidAmount, err := getWalletService(r).GetTotalPaidToAddress(order)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, "failed to calculate paid amount")
 		return
@@ -1019,29 +1008,25 @@ func (g *Gateway) handlePOSTCancelPartialPayment(w http.ResponseWriter, r *http.
 		return
 	}
 
-	node := getNodeService(r)
+	orderSvc := getOrderService(r)
 
-	// Get order
-	order, err := node.GetOrder(orderID)
+	order, err := orderSvc.GetOrder(orderID)
 	if err != nil {
 		ErrorResponse(w, http.StatusNotFound, "order not found")
 		return
 	}
 
-	// Check if there's partial payment to cancel
 	if order.PaymentAddress == "" {
 		ErrorResponse(w, http.StatusBadRequest, "no payment address for this order")
 		return
 	}
 
-	// Check if PaymentSent already exists (if so, cannot cancel partial)
 	if _, err := order.PaymentSentMessage(); err == nil {
 		ErrorResponse(w, http.StatusBadRequest, "payment already sent, cannot cancel partial payment")
 		return
 	}
 
-	// Cancel partial payment
-	txid, refundedAmount, err := node.CancelPartialPayment(orderID)
+	txid, refundedAmount, err := getWalletService(r).CancelPartialPayment(orderID)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1067,10 +1052,9 @@ func (g *Gateway) handleDELETEPaymentWatch(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	node := getNodeService(r)
+	wallet := getWalletService(r)
 
-	// Stop watching the payment address
-	if err := node.StopWatchingPayment(orderID); err != nil {
+	if err := wallet.StopWatchingPayment(orderID); err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}

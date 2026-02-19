@@ -388,10 +388,29 @@ func wrapError(err error) string {
 
 // getNodeService extracts contracts.NodeService from the request context.
 // This works for both MobazhaNode and TenantService.
-// Handlers that only use NodeService methods should prefer this over getCoreIface.
+// Prefer the domain-specific getters below when the handler only needs
+// a single domain's methods — they return narrower interface types.
 func getNodeService(r *http.Request) contracts.NodeService {
 	return r.Context().Value(nodeContextKey).(contracts.NodeService)
 }
+
+func getIdentityService(r *http.Request) contracts.IdentityService { return getNodeService(r) }
+func getChatService(r *http.Request) contracts.ChatService               { return getNodeService(r) }
+func getNotificationService(r *http.Request) contracts.NotificationService {
+	return getNodeService(r)
+}
+func getOrderService(r *http.Request) contracts.OrderService       { return getNodeService(r) }
+func getListingService(r *http.Request) contracts.ListingService   { return getNodeService(r) }
+func getProfileService(r *http.Request) contracts.ProfileService   { return getNodeService(r) }
+func getSocialService(r *http.Request) contracts.SocialService     { return getNodeService(r) }
+func getWalletService(r *http.Request) contracts.WalletService     { return getNodeService(r) }
+func getMediaService(r *http.Request) contracts.MediaService       { return getNodeService(r) }
+func getMatrixService(r *http.Request) contracts.MatrixService     { return getNodeService(r) }
+func getPreferencesService(r *http.Request) contracts.PreferencesService {
+	return getNodeService(r)
+}
+func getStripeService(r *http.Request) contracts.StripeService             { return getNodeService(r) }
+func getExchangeRateService(r *http.Request) contracts.ExchangeRateService { return getNodeService(r) }
 
 // getCoreIface attempts to extract coreiface.CoreIface from the request context.
 // Returns (nil, false) if the node is a TenantService (which only implements NodeService).

@@ -31,7 +31,7 @@ func (g *Gateway) handleGetNotifications(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	node := getNodeService(r)
+	node := getNotificationService(r)
 
 	notifications, total, err := node.GetNotifications(offsetID, l, filters)
 	if err != nil {
@@ -75,7 +75,7 @@ func (g *Gateway) handleGetNotifications(w http.ResponseWriter, r *http.Request)
 func (g *Gateway) handlePOSTMarkNotificationMessageAsRead(w http.ResponseWriter, r *http.Request) {
 	notifID := mux.Vars(r)["notifID"]
 
-	node := getNodeService(r)
+	node := getNotificationService(r)
 
 	err := node.MarkNotificationAsRead(notifID)
 	if err != nil {
@@ -86,7 +86,7 @@ func (g *Gateway) handlePOSTMarkNotificationMessageAsRead(w http.ResponseWriter,
 }
 
 func (g *Gateway) handlePOSTMarkNotificationsMessageAsRead(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
+	node := getNotificationService(r)
 
 	err := node.MarkAllNotificationsAsRead()
 	if err != nil {
@@ -98,7 +98,7 @@ func (g *Gateway) handlePOSTMarkNotificationsMessageAsRead(w http.ResponseWriter
 
 // handleGetNotificationCount returns unread and total notification counts (lightweight polling API).
 func (g *Gateway) handleGetNotificationCount(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
+	node := getNotificationService(r)
 
 	unread, err := node.GetNotificationsUnreadCount()
 	if err != nil {
@@ -141,7 +141,7 @@ func (g *Gateway) handleBatchNotifications(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	node := getNodeService(r)
+	node := getNotificationService(r)
 
 	var err error
 	switch req.Action {

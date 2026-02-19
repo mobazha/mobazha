@@ -26,14 +26,14 @@ func (g *Gateway) handleGETProfile(w http.ResponseWriter, r *http.Request) {
 
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
-	node := getNodeService(r)
+	prof := getProfileService(r)
 
 	var (
 		profile *models.Profile
 		err     error
 	)
-	if peerIDStr == "" || peerIDStr == node.Identity().String() {
-		profile, err = node.GetMyProfile()
+	if peerIDStr == "" || peerIDStr == getIdentityService(r).Identity().String() {
+		profile, err = prof.GetMyProfile()
 		if errors.Is(err, coreiface.ErrNotFound) {
 			ErrorResponse(w, http.StatusNotFound, err.Error())
 			return
@@ -48,7 +48,7 @@ func (g *Gateway) handleGETProfile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		reqCtx := extractRequestContext(r)
-		profile, err = node.GetProfile(r.Context(), pid, reqCtx, useCache)
+		profile, err = prof.GetProfile(r.Context(), pid, reqCtx, useCache)
 		if errors.Is(err, coreiface.ErrNotFound) {
 			ErrorResponse(w, http.StatusNotFound, err.Error())
 			return
@@ -61,15 +61,15 @@ func (g *Gateway) handleGETProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePOSTProfile(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
+	prof := getProfileService(r)
 
 	peerIDStr := mux.Vars(r)["peerID"]
-	if peerIDStr != "" && peerIDStr != node.Identity().String() {
+	if peerIDStr != "" && peerIDStr != getIdentityService(r).Identity().String() {
 		ErrorResponse(w, http.StatusConflict, "profile id doesn't match with local")
 		return
 	}
 
-	if _, err := node.GetMyProfile(); !errors.Is(err, coreiface.ErrNotFound) {
+	if _, err := prof.GetMyProfile(); !errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusConflict, "profile exists. use PUT to update")
 		return
 	}
@@ -80,7 +80,7 @@ func (g *Gateway) handlePOSTProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := node.SetProfile(&profile, nil); err != nil {
+	if err := prof.SetProfile(&profile, nil); err != nil {
 		if errors.Is(err, coreiface.ErrBadRequest) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
@@ -92,15 +92,15 @@ func (g *Gateway) handlePOSTProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePUTProfile(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
+	prof := getProfileService(r)
 
 	peerIDStr := mux.Vars(r)["peerID"]
-	if peerIDStr != "" && peerIDStr != node.Identity().String() {
+	if peerIDStr != "" && peerIDStr != getIdentityService(r).Identity().String() {
 		ErrorResponse(w, http.StatusBadRequest, "profile id doesn't match with local")
 		return
 	}
 
-	myProfile, err := node.GetMyProfile()
+	myProfile, err := prof.GetMyProfile()
 	if errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusConflict, "profile does not exists. use POST to create")
 		return
@@ -120,7 +120,7 @@ func (g *Gateway) handlePUTProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := node.SetProfile(&profile, nil); err != nil {
+	if err := prof.SetProfile(&profile, nil); err != nil {
 		if errors.Is(err, coreiface.ErrBadRequest) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
@@ -132,7 +132,8 @@ func (g *Gateway) handlePUTProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePOSTFetchProfiles(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
+	prof := getProfileService(r)
+	nodeID := getIdentityService(r).GetNodeID()
 
 	// useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 	useCache := false
@@ -179,7 +180,7 @@ func (g *Gateway) handlePOSTFetchProfiles(w http.ResponseWriter, r *http.Request
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 				defer cancel()
 
-				profile, err := node.GetProfile(ctx, p, nil, useCache)
+				profile, err := prof.GetProfile(ctx, p, nil, useCache)
 				if err != nil {
 					responseChan <- profileError{
 						PeerID: p.String(),
@@ -222,10 +223,10 @@ func (g *Gateway) handlePOSTFetchProfiles(w http.ResponseWriter, r *http.Request
 				switch p := i.(type) {
 				case profileWithAsyncID:
 					p.ID = asyncID
-					g.NotifyWebsockets(node.GetNodeID())(p)
+					g.NotifyWebsockets(nodeID)(p)
 				case profileError:
 					p.ID = asyncID
-					g.NotifyWebsockets(node.GetNodeID())(p)
+					g.NotifyWebsockets(nodeID)(p)
 				}
 			}
 		}()
@@ -233,16 +234,15 @@ func (g *Gateway) handlePOSTFetchProfiles(w http.ResponseWriter, r *http.Request
 }
 
 func (g *Gateway) handleSetModerator(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
+	ps := getProfileService(r)
 	var moderatorInfo models.ModeratorInfo
 	if err := json.NewDecoder(r.Body).Decode(&moderatorInfo); err != nil {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	// Save self as moderator
 	done := make(chan struct{})
-	err := node.SetSelfAsModerator(r.Context(), &moderatorInfo, done)
+	err := ps.SetSelfAsModerator(r.Context(), &moderatorInfo, done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -259,10 +259,10 @@ func (g *Gateway) handleSetModerator(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleUnsetModerator(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
+	ps := getProfileService(r)
 
 	done := make(chan struct{})
-	err := node.RemoveSelfAsModerator(r.Context(), done)
+	err := ps.RemoveSelfAsModerator(r.Context(), done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -281,10 +281,10 @@ func (g *Gateway) handleUnsetModerator(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleGetModerators(w http.ResponseWriter, r *http.Request) {
 	async, _ := strconv.ParseBool(r.URL.Query().Get("async"))
 	include := r.URL.Query().Get("include")
-	// useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 	useCache := false
 
-	node := getNodeService(r)
+	ps := getProfileService(r)
+	is := getIdentityService(r)
 
 	if async {
 		id := r.URL.Query().Get("asyncID")
@@ -308,7 +308,6 @@ func (g *Gateway) handleGetModerators(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				// Check and set the peer in `found` with locking
 				foundMu.Lock()
 				if found[pidStr] {
 					foundMu.Unlock()
@@ -320,7 +319,7 @@ func (g *Gateway) handleGetModerators(w http.ResponseWriter, r *http.Request) {
 				if strings.ToLower(include) == "profile" {
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 					defer cancel()
-					profile, err := node.GetProfile(ctx, pid, nil, useCache)
+					profile, err := ps.GetProfile(ctx, pid, nil, useCache)
 					if err != nil {
 						return
 					}
@@ -331,29 +330,29 @@ func (g *Gateway) handleGetModerators(w http.ResponseWriter, r *http.Request) {
 						Profile *models.Profile `json:"profile,omitempty"`
 					}
 					resp := PeerAndProfileWithID{Id: id, PeerId: pidStr, Profile: profile}
-					g.NotifyWebsockets(node.GetNodeID())(resp)
+					g.NotifyWebsockets(is.GetNodeID())(resp)
 				} else {
 					type wsResp struct {
 						ID     string `json:"id"`
 						PeerID string `json:"peerId"`
 					}
 					resp := wsResp{id, pidStr}
-					g.NotifyWebsockets(node.GetNodeID())(resp)
+					g.NotifyWebsockets(is.GetNodeID())(resp)
 				}
 			}
 
-			for _, mod := range node.GetVerifiedModerators(context.Background()) {
+			for _, mod := range ps.GetVerifiedModerators(context.Background()) {
 				go notifyModInfo(mod.String())
 			}
 
-			for mod := range node.GetModeratorsAsync(context.Background()) {
+			for mod := range ps.GetModeratorsAsync(context.Background()) {
 				go notifyModInfo(mod.String())
 			}
 		}()
 	} else {
-		moderatorIDs := node.GetModerators(context.Background())
+		moderatorIDs := ps.GetModerators(context.Background())
 
-		verifiedModIDs := node.GetVerifiedModerators(context.Background())
+		verifiedModIDs := ps.GetVerifiedModerators(context.Background())
 		moderatorIDs = append(moderatorIDs, verifiedModIDs...)
 
 		if strings.ToLower(include) == "profile" {
@@ -361,7 +360,7 @@ func (g *Gateway) handleGetModerators(w http.ResponseWriter, r *http.Request) {
 			for _, pid := range moderatorIDs {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 				defer cancel()
-				profile, err := node.GetProfile(ctx, pid, nil, useCache)
+				profile, err := ps.GetProfile(ctx, pid, nil, useCache)
 				if err != nil {
 					continue
 				}
@@ -381,9 +380,9 @@ func (g *Gateway) handleGetModerators(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleBlockNode(w http.ResponseWriter, r *http.Request) {
 	_, peerID := path.Split(r.URL.Path)
 
-	node := getNodeService(r)
+	prefs := getPreferencesService(r)
 
-	_, err := node.BlockNode(peerID)
+	_, err := prefs.BlockNode(peerID)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -394,9 +393,9 @@ func (g *Gateway) handleBlockNode(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleUnBlockNode(w http.ResponseWriter, r *http.Request) {
 	_, peerID := path.Split(r.URL.Path)
 
-	node := getNodeService(r)
+	prefs := getPreferencesService(r)
 
-	_, err := node.UnblockNode(peerID)
+	_, err := prefs.UnblockNode(peerID)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return

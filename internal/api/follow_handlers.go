@@ -16,15 +16,15 @@ func (g *Gateway) handleGETFollowers(w http.ResponseWriter, r *http.Request) {
 
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
-	node := getNodeService(r)
+	social := getSocialService(r)
 	reqCtx := extractRequestContext(r)
 
 	var (
 		followers models.Followers
 		err       error
 	)
-	if peerIDStr == "" || peerIDStr == node.Identity().String() {
-		followers, err = node.GetMyFollowers()
+	if peerIDStr == "" || peerIDStr == getIdentityService(r).Identity().String() {
+		followers, err = social.GetMyFollowers()
 		if errors.Is(err, coreiface.ErrNotFound) {
 			ErrorResponse(w, http.StatusNotFound, err.Error())
 			return
@@ -38,7 +38,7 @@ func (g *Gateway) handleGETFollowers(w http.ResponseWriter, r *http.Request) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		followers, err = node.GetFollowers(r.Context(), pid, reqCtx, useCache)
+		followers, err = social.GetFollowers(r.Context(), pid, reqCtx, useCache)
 		if errors.Is(err, coreiface.ErrNotFound) {
 			ErrorResponse(w, http.StatusNotFound, err.Error())
 			return
@@ -58,15 +58,15 @@ func (g *Gateway) handleGETFollowing(w http.ResponseWriter, r *http.Request) {
 
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
-	node := getNodeService(r)
+	social := getSocialService(r)
 	reqCtx := extractRequestContext(r)
 
 	var (
 		following models.Following
 		err       error
 	)
-	if peerIDStr == "" || peerIDStr == node.Identity().String() {
-		following, err = node.GetMyFollowing()
+	if peerIDStr == "" || peerIDStr == getIdentityService(r).Identity().String() {
+		following, err = social.GetMyFollowing()
 		if errors.Is(err, coreiface.ErrNotFound) {
 			ErrorResponse(w, http.StatusNotFound, err.Error())
 			return
@@ -80,7 +80,7 @@ func (g *Gateway) handleGETFollowing(w http.ResponseWriter, r *http.Request) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		following, err = node.GetFollowing(r.Context(), pid, reqCtx, useCache)
+		following, err = social.GetFollowing(r.Context(), pid, reqCtx, useCache)
 		if errors.Is(err, coreiface.ErrNotFound) {
 			ErrorResponse(w, http.StatusNotFound, err.Error())
 			return
@@ -103,8 +103,8 @@ func (g *Gateway) handleGETFollowsMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
-	ret, err := node.FollowsMe(pid)
+	social := getSocialService(r)
+	ret, err := social.FollowsMe(pid)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -124,8 +124,8 @@ func (g *Gateway) handlePOSTFollow(w http.ResponseWriter, r *http.Request) {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	node := getNodeService(r)
-	err = node.FollowNode(pid, nil)
+	social := getSocialService(r)
+	err = social.FollowNode(pid, nil)
 	if errors.Is(err, coreiface.ErrBadRequest) {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
@@ -143,8 +143,8 @@ func (g *Gateway) handlePOSTUnFollow(w http.ResponseWriter, r *http.Request) {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	node := getNodeService(r)
-	err = node.UnfollowNode(pid, nil)
+	social := getSocialService(r)
+	err = social.UnfollowNode(pid, nil)
 	if errors.Is(err, coreiface.ErrBadRequest) {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return

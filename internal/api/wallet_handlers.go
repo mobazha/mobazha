@@ -12,9 +12,9 @@ func (g *Gateway) handleGETCurrencies(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleGETMnemonic(w http.ResponseWriter, r *http.Request) {
-	node := getNodeService(r)
+	wallet := getWalletService(r)
 
-	ret, err := node.GetMnemonic()
+	ret, err := wallet.GetMnemonic()
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return

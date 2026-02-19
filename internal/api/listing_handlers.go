@@ -41,7 +41,8 @@ func (g *Gateway) handleGETListing(w http.ResponseWriter, r *http.Request) {
 	peerIDStr := mux.Vars(r)["peerID"]
 	slug := mux.Vars(r)["slug"]
 
-	node := getNodeService(r)
+	ls := getListingService(r)
+	is := getIdentityService(r)
 	reqCtx := extractRequestContext(r)
 
 	var (
@@ -51,30 +52,30 @@ func (g *Gateway) handleGETListing(w http.ResponseWriter, r *http.Request) {
 	if listingIDStr != "" { // Query by CID
 		id, cerr := cid.Decode(listingIDStr)
 		if cerr == nil {
-			listing, err = node.GetListingByCID(r.Context(), id, reqCtx)
+			listing, err = ls.GetListingByCID(r.Context(), id, reqCtx)
 		} else {
-			listing, err = node.GetMyListingBySlug(listingIDStr)
+			listing, err = ls.GetMyListingBySlug(listingIDStr)
 		}
 
 		if err == nil && listing != nil && listing.Listing != nil && listing.Listing.VendorID != nil {
 			pid, _ := peer.Decode(listing.Listing.VendorID.PeerID)
-			if node.IsGlobalBanned(pid) {
+			if is.IsGlobalBanned(pid) {
 				err = ErrGlobalBannedPeerID
 			}
 		}
-	} else if peerIDStr == node.Identity().String() {
-		listing, err = node.GetMyListingBySlug(slug)
-	} else if peerIDStr != "" && slug != "" { // Query by peerID/slug{
+	} else if peerIDStr == is.Identity().String() {
+		listing, err = ls.GetMyListingBySlug(slug)
+	} else if peerIDStr != "" && slug != "" { // Query by peerID/slug
 		pid, perr := peer.Decode(peerIDStr)
 		if perr != nil {
 			ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid peer id: %s", perr.Error()))
 			return
 		}
-		if node.IsGlobalBanned(pid) {
+		if is.IsGlobalBanned(pid) {
 			err = ErrGlobalBannedPeerID
 		} else {
 			useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
-			listing, err = node.GetListingBySlug(r.Context(), pid, slug, reqCtx, useCache)
+			listing, err = ls.GetListingBySlug(r.Context(), pid, slug, reqCtx, useCache)
 		}
 	} else {
 		ErrorResponse(w, http.StatusBadRequest, "")
@@ -105,12 +106,12 @@ func (g *Gateway) handleGETMyListing(w http.ResponseWriter, r *http.Request) {
 		slug = slugOrCid
 	}
 
-	node := getNodeService(r)
+	ls := getListingService(r)
 
 	if slug != "" {
-		listing, err = node.GetMyListingBySlug(slug)
+		listing, err = ls.GetMyListingBySlug(slug)
 	} else {
-		listing, err = node.GetMyListingByCID(cid)
+		listing, err = ls.GetMyListingByCID(cid)
 		w.Header().Set("Cache-Control", "public, max-age=29030400, immutable")
 	}
 
@@ -135,14 +136,16 @@ func (g *Gateway) handleGETListingIndex(w http.ResponseWriter, r *http.Request) 
 		listingErr   error
 	)
 
-	node := getNodeService(r)
+	ls := getListingService(r)
+	is := getIdentityService(r)
+	ss := getSocialService(r)
 	reqCtx := extractRequestContext(r)
 
-	if peerIDStr == "" || peerIDStr == node.Identity().String() {
-		listingIndex, listingErr = node.GetMyListings()
+	if peerIDStr == "" || peerIDStr == is.Identity().String() {
+		listingIndex, listingErr = ls.GetMyListings()
 
 		if listingErr == nil {
-			ratingIndex, ratingErr = node.GetMyRatings()
+			ratingIndex, ratingErr = ss.GetMyRatings()
 		}
 	} else {
 		pid, err := peer.Decode(peerIDStr)
@@ -151,13 +154,13 @@ func (g *Gateway) handleGETListingIndex(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		if node.IsGlobalBanned(pid) {
+		if is.IsGlobalBanned(pid) {
 			listingErr = ErrGlobalBannedPeerID
 		} else {
-			listingIndex, listingErr = node.GetListings(r.Context(), pid, reqCtx, useCache)
+			listingIndex, listingErr = ls.GetListings(r.Context(), pid, reqCtx, useCache)
 
 			if listingErr == nil {
-				ratingIndex, ratingErr = node.GetRatings(r.Context(), pid, reqCtx, useCache)
+				ratingIndex, ratingErr = ss.GetRatings(r.Context(), pid, reqCtx, useCache)
 			}
 		}
 	}
@@ -200,14 +203,14 @@ func (g *Gateway) handlePOSTListing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	ls := getListingService(r)
 
-	if _, err := node.GetMyListingBySlug(listing.Slug); !errors.Is(err, coreiface.ErrNotFound) {
+	if _, err := ls.GetMyListingBySlug(listing.Slug); !errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusConflict, "listing exists. use PUT to update")
 		return
 	}
 
-	if err := node.SaveListing(listing, nil); err != nil {
+	if err := ls.SaveListing(listing, nil); err != nil {
 		if errors.Is(err, coreiface.ErrBadRequest) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
@@ -238,14 +241,14 @@ func (g *Gateway) handlePUTListing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node := getNodeService(r)
+	ls := getListingService(r)
 
-	if _, err := node.GetMyListingBySlug(listing.Slug); errors.Is(err, coreiface.ErrNotFound) {
+	if _, err := ls.GetMyListingBySlug(listing.Slug); errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusConflict, "listing does not exist. use POST to create")
 		return
 	}
 
-	if err := node.SaveListing(listing, nil); err != nil {
+	if err := ls.SaveListing(listing, nil); err != nil {
 		if errors.Is(err, coreiface.ErrBadRequest) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
@@ -265,9 +268,9 @@ func (g *Gateway) handlePUTListing(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleDELETEListing(w http.ResponseWriter, r *http.Request) {
 	slug := mux.Vars(r)["slug"]
 
-	node := getNodeService(r)
+	ls := getListingService(r)
 
-	if err := node.DeleteListing(slug, nil); err != nil {
+	if err := ls.DeleteListing(slug, nil); err != nil {
 		if errors.Is(err, coreiface.ErrNotFound) {
 			ErrorResponse(w, http.StatusNotFound, err.Error())
 			return

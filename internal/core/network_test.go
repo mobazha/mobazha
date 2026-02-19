@@ -94,7 +94,7 @@ func TestMobazhaNode_syncMessages(t *testing.T) {
 	listing := factory.NewPhysicalListing("tshirt")
 
 	done := make(chan struct{})
-	if err := network.Nodes()[0].SaveListing(listing, done); err != nil {
+	if err := network.Nodes()[0].Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -177,7 +177,7 @@ func TestMobazhaNode_PublishToFollowers(t *testing.T) {
 
 	// Set profile node 0
 	done1 := make(chan struct{})
-	if err := mocknet.Nodes()[0].SetProfile(&models.Profile{Name: "Peter Griffin"}, done1); err != nil {
+	if err := mocknet.Nodes()[0].Profile().SetProfile(&models.Profile{Name: "Peter Griffin"}, done1); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -188,7 +188,7 @@ func TestMobazhaNode_PublishToFollowers(t *testing.T) {
 
 	// Node 1 send follow
 	done2 := make(chan struct{})
-	if err := mocknet.Nodes()[1].FollowNode(mocknet.Nodes()[0].Identity(), done2); err != nil {
+	if err := mocknet.Nodes()[1].Social().FollowNode(mocknet.Nodes()[0].Identity(), done2); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -208,7 +208,7 @@ func TestMobazhaNode_PublishToFollowers(t *testing.T) {
 
 	// Set profile again with a new publish.
 	done3 := make(chan struct{})
-	if err := mocknet.Nodes()[0].SetProfile(&models.Profile{Name: "Peter Griffin2"}, done3); err != nil {
+	if err := mocknet.Nodes()[0].Profile().SetProfile(&models.Profile{Name: "Peter Griffin2"}, done3); err != nil {
 		t.Fatal(err)
 	}
 	select {

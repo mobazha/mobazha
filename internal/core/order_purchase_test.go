@@ -57,7 +57,7 @@ func TestMobazhaNode_PurchaseListing(t *testing.T) {
 
 	// Save the listing in node 0 and block until saving is finished.
 	done := make(chan struct{})
-	if err := network.Nodes()[0].SaveListing(listing, done); err != nil {
+	if err := network.Nodes()[0].Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -67,14 +67,14 @@ func TestMobazhaNode_PurchaseListing(t *testing.T) {
 	}
 
 	// Fetch the listing index form node 0.
-	index, err := network.Nodes()[0].GetMyListings()
+	index, err := network.Nodes()[0].Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set the profile on the moderator node (node 2) and block until saving is finished.
 	done2 := make(chan struct{})
-	if err := network.Nodes()[2].SetProfile(&models.Profile{Name: "Ron Paul"}, done2); err != nil {
+	if err := network.Nodes()[2].Profile().SetProfile(&models.Profile{Name: "Ron Paul"}, done2); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -92,7 +92,7 @@ func TestMobazhaNode_PurchaseListing(t *testing.T) {
 		},
 	}
 	done3 := make(chan struct{})
-	if err := network.Nodes()[2].SetSelfAsModerator(context.Background(), modInfo, done3); err != nil {
+	if err := network.Nodes()[2].Profile().SetSelfAsModerator(context.Background(), modInfo, done3); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -322,7 +322,7 @@ func TestMobazhaNode_EstimateOrderSubtotal(t *testing.T) {
 	listing := factory.NewPhysicalListing("tshirt")
 
 	done := make(chan struct{})
-	if err := network.Nodes()[0].SaveListing(listing, done); err != nil {
+	if err := network.Nodes()[0].Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 
@@ -332,7 +332,7 @@ func TestMobazhaNode_EstimateOrderSubtotal(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	index, err := network.Nodes()[0].GetMyListings()
+	index, err := network.Nodes()[0].Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,7 +390,7 @@ func TestMobazhaNode_createOrder(t *testing.T) {
 	listing := factory.NewPhysicalListing("tshirt")
 
 	done := make(chan struct{})
-	if err := network.Nodes()[0].SaveListing(listing, done); err != nil {
+	if err := network.Nodes()[0].Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -399,7 +399,7 @@ func TestMobazhaNode_createOrder(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	index, err := network.Nodes()[0].GetMyListings()
+	index, err := network.Nodes()[0].Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -408,13 +408,13 @@ func TestMobazhaNode_createOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sl, err := network.Nodes()[1].GetListingByCID(context.Background(), lid, nil)
+	sl, err := network.Nodes()[1].Listing().GetListingByCID(context.Background(), lid, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	done2 := make(chan struct{})
-	if err := network.Nodes()[1].SetProfile(&models.Profile{Name: "Ron Paul"}, done2); err != nil {
+	if err := network.Nodes()[1].Profile().SetProfile(&models.Profile{Name: "Ron Paul"}, done2); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -431,7 +431,7 @@ func TestMobazhaNode_createOrder(t *testing.T) {
 		},
 	}
 	done3 := make(chan struct{})
-	if err := network.Nodes()[1].SetSelfAsModerator(context.Background(), modInfo, done3); err != nil {
+	if err := network.Nodes()[1].Profile().SetSelfAsModerator(context.Background(), modInfo, done3); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -622,7 +622,7 @@ func Test_createOrderUnkownVersion(t *testing.T) {
 	listing.Metadata.Version = ListingVersion + 1
 
 	done := make(chan struct{})
-	if err := network.Nodes()[0].SaveListing(listing, done); err != nil {
+	if err := network.Nodes()[0].Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -631,7 +631,7 @@ func Test_createOrderUnkownVersion(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	index, err := network.Nodes()[0].GetMyListings()
+	index, err := network.Nodes()[0].Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -26,7 +26,7 @@ func TestMobazhaNode_SetImages(t *testing.T) {
 
 	done := make(chan struct{})
 
-	err = m.SetProfile(&models.Profile{
+	err = m.Profile().SetProfile(&models.Profile{
 		Name: "Ron Paul",
 	}, done)
 	if err != nil {
@@ -129,7 +129,7 @@ func TestMobazhaNode_SetHeader(t *testing.T) {
 
 	done := make(chan struct{})
 
-	err = m.SetProfile(&models.Profile{
+	err = m.Profile().SetProfile(&models.Profile{
 		Name: "Ron Paul",
 	}, done)
 	if err != nil {
@@ -232,7 +232,7 @@ func TestMobazhaNode_SetProductImage(t *testing.T) {
 
 	done := make(chan struct{})
 
-	err = m.SetProfile(&models.Profile{
+	err = m.Profile().SetProfile(&models.Profile{
 		Name: "Ron Paul",
 	}, done)
 	if err != nil {
@@ -337,7 +337,7 @@ func TestGIFAndPNG(t *testing.T) {
 
 	done := make(chan struct{})
 
-	err = m.SetProfile(&models.Profile{
+	err = m.Profile().SetProfile(&models.Profile{
 		Name: "Ron Paul",
 	}, done)
 	if err != nil {

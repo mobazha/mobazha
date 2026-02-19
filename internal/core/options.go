@@ -96,8 +96,8 @@ func (n *MobazhaNode) initPreferencesService() {
 	n.preferencesService = NewPreferencesAppService(PreferencesAppServiceConfig{
 		DB:                    n.db,
 		BanManager:            n.banManager,
-		UpdateAllListingsFunc: n.UpdateAllListings,
-		GetMyListingsFunc:     n.GetMyListings,
+		UpdateAllListingsFunc: n.listingService.UpdateAllListings,
+		GetMyListingsFunc:     n.listingService.GetMyListings,
 	})
 }
 
@@ -225,13 +225,13 @@ func (n *MobazhaNode) initOrderService() {
 			return "", "", nil
 		},
 		ValidateListing: func(sl *pb.SignedListing) error {
-			return n.validateListing(sl)
+			return n.listingService.validateListing(sl)
 		},
 		GetModeratorFee: func(totalOut iwallet.Amount, coinCode string) (iwallet.Amount, error) {
-			return n.GetModeratorFee(totalOut, coinCode)
+			return n.moderationService.GetModeratorFee(totalOut, coinCode)
 		},
 		GetListingByCID: func(ctx context.Context, c cid.Cid, reqCtx interface{}) (*pb.SignedListing, error) {
-			return n.GetListingByCID(ctx, c, nil)
+			return n.listingService.GetListingByCID(ctx, c, nil)
 		},
 		EnsureListingCurrent: func(ctx context.Context, listing *pb.SignedListing, listingHash string) error {
 			return n.ensureListingIsCurrent(ctx, listing, listingHash)
@@ -278,7 +278,7 @@ func (n *MobazhaNode) initPaymentService() {
 		NodeID:      n.nodeID,
 		Shutdown:    n.shutdown,
 
-		GetProfile:              n.GetProfile,
+		GetProfile:              n.profileService.GetProfile,
 		ConfirmOrder:            n.ConfirmOrder,
 		FulfillOrder:            n.FulfillOrder,
 		GetStripeConfigFromHost: getStripeConfigFromHost,
@@ -469,7 +469,7 @@ func (n *MobazhaNode) initModerationService() {
 		AnnounceAsModerator:   announceAsModerator,
 		RemoveAsModerator:     removeAsModerator,
 		FindModeratorsAsync:   findModeratorsAsync,
-		UpdateAllListings:     n.UpdateAllListings,
+		UpdateAllListings:     n.listingService.UpdateAllListings,
 	})
 }
 
@@ -522,6 +522,6 @@ func (n *MobazhaNode) initListingService() {
 		Publish:            n.Publish,
 		FetchIPNSRecord:    n.fetchIPNSRecord,
 		GetMyProfile:       getMyProfile,
-		UpdateAndSaveProfile: n.updateAndSaveProfile,
+		UpdateAndSaveProfile: n.profileService.UpdateAndSaveProfile,
 	})
 }

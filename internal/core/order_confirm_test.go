@@ -40,7 +40,7 @@ func TestMobazhaNode_ConfirmOrder(t *testing.T) {
 	listing := factory.NewPhysicalListing("tshirt")
 
 	done := make(chan struct{})
-	if err := network.Nodes()[0].SaveListing(listing, done); err != nil {
+	if err := network.Nodes()[0].Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -49,7 +49,7 @@ func TestMobazhaNode_ConfirmOrder(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	index, err := network.Nodes()[0].GetMyListings()
+	index, err := network.Nodes()[0].Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestMobazhaNode_ConfirmOrder_Cancelable_Reconnect(t *testing.T) {
 	listing := factory.NewPhysicalListing("tshirt")
 
 	done := make(chan struct{})
-	if err := network.Nodes()[0].SaveListing(listing, done); err != nil {
+	if err := network.Nodes()[0].Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -207,7 +207,7 @@ func TestMobazhaNode_ConfirmOrder_Cancelable_Reconnect(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	index, err := network.Nodes()[0].GetMyListings()
+	index, err := network.Nodes()[0].Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}

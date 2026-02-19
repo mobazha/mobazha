@@ -60,7 +60,7 @@ func TestMobazhaNode_Ratings(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ratings, err := mockNet.Nodes()[0].GetMyRatings()
+	ratings, err := mockNet.Nodes()[0].Social().GetMyRatings()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestMobazhaNode_Ratings(t *testing.T) {
 		t.Fatal("timed out while publishing")
 	}
 
-	ratings, err = mockNet.Nodes()[1].GetRatings(context.Background(), mockNet.Nodes()[0].Identity(), nil, false)
+	ratings, err = mockNet.Nodes()[1].Social().GetRatings(context.Background(), mockNet.Nodes()[0].Identity(), nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestMobazhaNode_Ratings(t *testing.T) {
 		t.Errorf("Expected cid %s, got %s", id, ratings[0].Ratings[0])
 	}
 
-	rating2, err := mockNet.Nodes()[1].GetRating(context.Background(), id)
+	rating2, err := mockNet.Nodes()[1].Social().GetRating(context.Background(), id)
 	if err != nil {
 		t.Fatal(err)
 	}

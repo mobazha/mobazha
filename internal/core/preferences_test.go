@@ -20,7 +20,7 @@ func TestMobazhaNode_SavePreferences(t *testing.T) {
 	listing := factory.NewPhysicalListing("ron-swanson-shirt")
 
 	done := make(chan struct{})
-	if err := node.SaveListing(listing, done); err != nil {
+	if err := node.Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -77,7 +77,7 @@ func TestMobazhaNode_SavePreferences(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sl, err := node.GetMyListingBySlug("ron-swanson-shirt")
+	sl, err := node.Listing().GetMyListingBySlug("ron-swanson-shirt")
 	if err != nil {
 		t.Fatal(err)
 	}

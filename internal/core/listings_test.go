@@ -24,7 +24,7 @@ func TestMobazhaNode_SaveListing(t *testing.T) {
 	listing := factory.NewPhysicalListing("ron-swanson-shirt")
 
 	done := make(chan struct{})
-	if err := node.SaveListing(listing, done); err != nil {
+	if err := node.Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -33,12 +33,12 @@ func TestMobazhaNode_SaveListing(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	_, err = node.GetMyListingBySlug("ron-swanson-shirt")
+	_, err = node.Listing().GetMyListingBySlug("ron-swanson-shirt")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	index, err := node.GetMyListings()
+	index, err := node.Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func TestMobazhaNode_SaveListing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = node.GetMyListingByCID(c)
+	_, err = node.Listing().GetMyListingByCID(c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestMobazhaNode_UpdateAllListings(t *testing.T) {
 	)
 
 	done := make(chan struct{})
-	if err := node.SaveListing(listing1, done); err != nil {
+	if err := node.Listing().SaveListing(listing1, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -81,7 +81,7 @@ func TestMobazhaNode_UpdateAllListings(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 	done2 := make(chan struct{})
-	if err := node.SaveListing(listing2, done2); err != nil {
+	if err := node.Listing().SaveListing(listing2, done2); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -90,13 +90,13 @@ func TestMobazhaNode_UpdateAllListings(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	oldIndex, err := node.GetMyListings()
+	oldIndex, err := node.Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	done3 := make(chan struct{})
-	err = node.UpdateAllListings(func(listing *pb.Listing) (bool, error) {
+	err = node.Listing().UpdateAllListings(func(listing *pb.Listing) (bool, error) {
 		listing.Item.Title = newTitle
 		return true, nil
 	}, done3)
@@ -109,7 +109,7 @@ func TestMobazhaNode_UpdateAllListings(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	newListing1, err := node.GetMyListingBySlug("ron-swanson-shirt")
+	newListing1, err := node.Listing().GetMyListingBySlug("ron-swanson-shirt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestMobazhaNode_UpdateAllListings(t *testing.T) {
 		t.Error("Failed to update title on listing1")
 	}
 
-	newListing2, err := node.GetMyListingBySlug("bag-of-shit")
+	newListing2, err := node.Listing().GetMyListingBySlug("bag-of-shit")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestMobazhaNode_UpdateAllListings(t *testing.T) {
 		t.Error("Failed to update title on listing2")
 	}
 
-	newIndex, err := node.GetMyListings()
+	newIndex, err := node.Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ func TestMobazhaNode_DeleteListing(t *testing.T) {
 	listing := factory.NewPhysicalListing("ron-swanson-shirt")
 
 	done := make(chan struct{})
-	if err := node.SaveListing(listing, done); err != nil {
+	if err := node.Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -167,7 +167,7 @@ func TestMobazhaNode_DeleteListing(t *testing.T) {
 	}
 
 	done2 := make(chan struct{})
-	if err := node.DeleteListing(listing.Slug, done2); err != nil {
+	if err := node.Listing().DeleteListing(listing.Slug, done2); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -176,12 +176,12 @@ func TestMobazhaNode_DeleteListing(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	_, err = node.GetMyListingBySlug("ron-swanson-shirt")
+	_, err = node.Listing().GetMyListingBySlug("ron-swanson-shirt")
 	if err == nil {
 		t.Fatal(err)
 	}
 
-	index, err := node.GetMyListings()
+	index, err := node.Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestMobazhaNode_ListingsGet(t *testing.T) {
 	listing := factory.NewPhysicalListing("ron-swanson-shirt")
 
 	done := make(chan struct{})
-	if err := network.Nodes()[0].SaveListing(listing, done); err != nil {
+	if err := network.Nodes()[0].Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -211,7 +211,7 @@ func TestMobazhaNode_ListingsGet(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	listing2, err := network.Nodes()[1].GetListingBySlug(context.Background(), network.Nodes()[0].Identity(), listing.Slug, nil, false)
+	listing2, err := network.Nodes()[1].Listing().GetListingBySlug(context.Background(), network.Nodes()[0].Identity(), listing.Slug, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +220,7 @@ func TestMobazhaNode_ListingsGet(t *testing.T) {
 		t.Errorf("Incorrect slug returned. Expected %s, got %s", listing.Slug, listing2.Listing.Slug)
 	}
 
-	index, err := network.Nodes()[1].GetListings(context.Background(), network.Nodes()[0].Identity(), nil, false)
+	index, err := network.Nodes()[1].Listing().GetListings(context.Background(), network.Nodes()[0].Identity(), nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestMobazhaNode_ListingsGet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	listing2, err = network.Nodes()[1].GetListingByCID(context.Background(), c, nil)
+	listing2, err = network.Nodes()[1].Listing().GetListingByCID(context.Background(), c, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +254,7 @@ func Test_generateListingSlug(t *testing.T) {
 	listing := factory.NewPhysicalListing("ron-swanson-shirt")
 
 	done := make(chan struct{})
-	if err := node.SaveListing(listing, done); err != nil {
+	if err := node.Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -295,7 +295,7 @@ func Test_generateListingSlug(t *testing.T) {
 
 	for _, test := range tests {
 		err := node.repo.DB().View(func(dbtx database.Tx) error {
-			slug, err := node.generateListingSlug(dbtx, test.title)
+			slug, err := node.listingService.generateListingSlug(dbtx, test.title)
 			if err != nil {
 				return err
 			}
@@ -377,7 +377,7 @@ func Test_validateCryptocurrencyListing(t *testing.T) {
 
 	for i, test := range tests {
 		test.transform(test.listing)
-		err := node.validateCryptocurrencyListing(test.listing)
+		err := node.listingService.validateCryptocurrencyListing(test.listing)
 		if test.valid && err != nil {
 			t.Errorf("Test %d failed when it should not have: %s", i, err)
 		} else if !test.valid && err == nil {
@@ -1933,7 +1933,7 @@ func Test_validateListing(t *testing.T) {
 	for i, test := range tests {
 		savedTestnet := node.testnet
 		test.transform(test.listing)
-		err := node.validateListing(test.listing)
+		err := node.listingService.validateListing(test.listing)
 		node.testnet = savedTestnet // restore after each test to prevent side effects
 		if test.valid && err != nil {
 			t.Errorf("Test %d failed when it should not have: %s", i, err)

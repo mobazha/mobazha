@@ -18,7 +18,7 @@ func TestMobazhaNode_SetAndRemoveSelfAsModerator(t *testing.T) {
 
 	defer node.DestroyNode()
 
-	if err := node.SetProfile(&models.Profile{Name: "Ron Paul"}, nil); err != nil {
+	if err := node.Profile().SetProfile(&models.Profile{Name: "Ron Paul"}, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -30,7 +30,7 @@ func TestMobazhaNode_SetAndRemoveSelfAsModerator(t *testing.T) {
 	}
 
 	done := make(chan struct{})
-	if err := node.SetSelfAsModerator(context.Background(), modInfo, done); err != nil {
+	if err := node.Profile().SetSelfAsModerator(context.Background(), modInfo, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -40,7 +40,7 @@ func TestMobazhaNode_SetAndRemoveSelfAsModerator(t *testing.T) {
 	}
 
 	done2 := make(chan struct{})
-	if err := node.RemoveSelfAsModerator(context.Background(), done2); err != nil {
+	if err := node.Profile().RemoveSelfAsModerator(context.Background(), done2); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -58,7 +58,7 @@ func TestMobazhaNode_GetVerifiedModerators(t *testing.T) {
 
 	defer node.DestroyNode()
 
-	mods := node.GetVerifiedModerators(context.Background())
+	mods := node.Profile().GetVerifiedModerators(context.Background())
 	if len(mods) == 0 {
 		t.Fatal("Expected moderators")
 	}
@@ -74,7 +74,7 @@ func TestMobazhaNode_GetModerators(t *testing.T) {
 
 	done0 := make(chan struct{})
 	originalProfile := &models.Profile{Name: "Ron Paul"}
-	if err := mocknet.Nodes()[0].SetProfile(originalProfile, done0); err != nil {
+	if err := mocknet.Nodes()[0].Profile().SetProfile(originalProfile, done0); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -91,7 +91,7 @@ func TestMobazhaNode_GetModerators(t *testing.T) {
 	}
 
 	done := make(chan struct{})
-	if err := mocknet.Nodes()[0].SetSelfAsModerator(context.Background(), modInfo, done); err != nil {
+	if err := mocknet.Nodes()[0].Profile().SetSelfAsModerator(context.Background(), modInfo, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -100,7 +100,7 @@ func TestMobazhaNode_GetModerators(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	mods := mocknet.Nodes()[1].GetModerators(context.Background())
+	mods := mocknet.Nodes()[1].Profile().GetModerators(context.Background())
 
 	if len(mods) != 1 {
 		t.Fatalf("Returned incorrect number of moderators. Expected %d, got %d", 1, len(mods))
@@ -110,7 +110,7 @@ func TestMobazhaNode_GetModerators(t *testing.T) {
 		t.Errorf("Returned incorrect peer ID. Expected %s, got %s", mocknet.Nodes()[0].Identity(), mods[0])
 	}
 
-	ch := mocknet.Nodes()[1].GetModeratorsAsync(context.Background())
+	ch := mocknet.Nodes()[1].Profile().GetModeratorsAsync(context.Background())
 
 	mods = []peer.ID{}
 	for mod := range ch {
@@ -125,7 +125,7 @@ func TestMobazhaNode_GetModerators(t *testing.T) {
 		t.Errorf("Returned incorrect peer ID. Expected %s, got %s", mocknet.Nodes()[0].Identity(), mods[0])
 	}
 
-	profile, err := mocknet.Nodes()[1].GetProfile(context.Background(), mods[0], nil, false)
+	profile, err := mocknet.Nodes()[1].Profile().GetProfile(context.Background(), mods[0], nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,11 +158,11 @@ func TestMobazhaNode_SetModeratorsOnListings(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := n.SaveListing(l1, nil); err != nil {
+	if err := n.Listing().SaveListing(l1, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := n.SaveListing(l2, nil); err != nil {
+	if err := n.Listing().SaveListing(l2, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -174,11 +174,11 @@ func TestMobazhaNode_SetModeratorsOnListings(t *testing.T) {
 
 	mods := []peer.ID{pid}
 
-	if err := n.SetModeratorsOnListings(mods, nil); err != nil {
+	if err := n.Listing().SetModeratorsOnListings(mods, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	ls, err := n.GetMyListings()
+	ls, err := n.Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +191,7 @@ func TestMobazhaNode_SetModeratorsOnListings(t *testing.T) {
 		if l.ModeratorIDs[0] != modID {
 			t.Errorf("Expected mod ID %s, got %s", modID, l.ModeratorIDs[0])
 		}
-		listing, err := n.GetMyListingBySlug(l.Slug)
+		listing, err := n.Listing().GetMyListingBySlug(l.Slug)
 		if err != nil {
 			t.Fatal(err)
 		}

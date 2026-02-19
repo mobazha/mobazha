@@ -23,12 +23,12 @@ func TestMobazhaNode_Follow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := node.SetProfile(&models.Profile{Name: "Ron Paul"}, nil); err != nil {
+	if err := node.Profile().SetProfile(&models.Profile{Name: "Ron Paul"}, nil); err != nil {
 		t.Fatal(err)
 	}
 
 	done := make(chan struct{})
-	if err := node.FollowNode(p, done); err != nil {
+	if err := node.Social().FollowNode(p, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -37,7 +37,7 @@ func TestMobazhaNode_Follow(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	following, err := node.GetMyFollowing()
+	following, err := node.Social().GetMyFollowing()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestMobazhaNode_Follow(t *testing.T) {
 	}
 
 	done = make(chan struct{})
-	if err := node.FollowNode(p2, done); err != nil {
+	if err := node.Social().FollowNode(p2, done); err != nil {
 		t.Fatal(err)
 	}
 
@@ -66,7 +66,7 @@ func TestMobazhaNode_Follow(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	following, err = node.GetMyFollowing()
+	following, err = node.Social().GetMyFollowing()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestMobazhaNode_Follow(t *testing.T) {
 		t.Errorf("Incorrect following peer returned. Expected %s, got %s", p.String(), following[1])
 	}
 
-	profile, err := node.GetMyProfile()
+	profile, err := node.Profile().GetMyProfile()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestMobazhaNode_GetFollowing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := mocknet.Nodes()[0].FollowNode(p, nil); err != nil {
+	if err := mocknet.Nodes()[0].Social().FollowNode(p, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -118,7 +118,7 @@ func TestMobazhaNode_GetFollowing(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	following, err := mocknet.Nodes()[1].GetFollowing(context.Background(), mocknet.Nodes()[0].Identity(), nil, false)
+	following, err := mocknet.Nodes()[1].Social().GetFollowing(context.Background(), mocknet.Nodes()[0].Identity(), nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestMobazhaNode_GetFollowers(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	followers, err := mocknet.Nodes()[1].GetFollowers(context.Background(), mocknet.Nodes()[0].Identity(), nil, false)
+	followers, err := mocknet.Nodes()[1].Social().GetFollowers(context.Background(), mocknet.Nodes()[0].Identity(), nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func Test_handleFollowAndUnfollow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := mocknet.Nodes()[0].FollowNode(mocknet.Nodes()[1].Identity(), nil); err != nil {
+	if err := mocknet.Nodes()[0].Social().FollowNode(mocknet.Nodes()[1].Identity(), nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -207,7 +207,7 @@ func Test_handleFollowAndUnfollow(t *testing.T) {
 		t.Errorf("Received incorrect peer ID in follow notification. Expected %s, got %s", mocknet.Nodes()[0].Identity(), notif.PeerID)
 	}
 
-	followers, err := mocknet.Nodes()[1].GetMyFollowers()
+	followers, err := mocknet.Nodes()[1].Social().GetMyFollowers()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +226,7 @@ func Test_handleFollowAndUnfollow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := mocknet.Nodes()[0].UnfollowNode(mocknet.Nodes()[1].Identity(), nil); err != nil {
+	if err := mocknet.Nodes()[0].Social().UnfollowNode(mocknet.Nodes()[1].Identity(), nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -246,7 +246,7 @@ func Test_handleFollowAndUnfollow(t *testing.T) {
 		t.Errorf("Received incorrect peer ID in unfollow notification. Expected %s, got %s", mocknet.Nodes()[0].Identity(), notif2.PeerID)
 	}
 
-	followers, err = mocknet.Nodes()[1].GetMyFollowers()
+	followers, err = mocknet.Nodes()[1].Social().GetMyFollowers()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,12 +268,12 @@ func TestMobazhaNode_FollowSequence(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := node.SetProfile(&models.Profile{Name: "Ron Paul"}, nil); err != nil {
+	if err := node.Profile().SetProfile(&models.Profile{Name: "Ron Paul"}, nil); err != nil {
 		t.Fatal(err)
 	}
 
 	done := make(chan struct{})
-	if err := node.FollowNode(p, done); err != nil {
+	if err := node.Social().FollowNode(p, done); err != nil {
 		t.Fatal(err)
 	}
 
@@ -296,7 +296,7 @@ func TestMobazhaNode_FollowSequence(t *testing.T) {
 	}
 
 	done = make(chan struct{})
-	if err := node.UnfollowNode(p, done); err != nil {
+	if err := node.Social().UnfollowNode(p, done); err != nil {
 		t.Fatal(err)
 	}
 

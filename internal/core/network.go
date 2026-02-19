@@ -436,7 +436,7 @@ func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) erro
 			complete := new(opb.OrderComplete)
 			if err := orderMsg.Message.UnmarshalTo(complete); err == nil {
 				if order.Role() == models.RoleVendor && len(complete.Ratings) > 0 {
-					if ratingIndex, err := n.GetMyRatings(); err == nil {
+					if ratingIndex, err := n.ratingsService.GetMyRatings(); err == nil {
 						n.netDB.SetOwnRatingIndex(ratingIndex)
 					}
 				}

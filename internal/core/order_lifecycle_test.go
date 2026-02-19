@@ -60,7 +60,7 @@ func setupMockNetDB(t *testing.T, nodes []*MobazhaNode) {
 			return
 		}
 
-		index, err := node.GetMyListings()
+		index, err := node.Listing().GetMyListings()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -228,7 +228,7 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 	// ── Step 1: Seller Creates Listing ────────────────────────────
 	listing := factory.NewPhysicalListing("tshirt")
 	done := make(chan struct{})
-	if err := sellerNode.SaveListing(listing, done); err != nil {
+	if err := sellerNode.Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -237,7 +237,7 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 		t.Fatal("Timeout saving listing")
 	}
 
-	index, err := sellerNode.GetMyListings()
+	index, err := sellerNode.Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -529,7 +529,7 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 	// ── Step 1: Seller Creates Listing ────────────────────────────
 	listing := factory.NewPhysicalListing("tshirt")
 	done := make(chan struct{})
-	if err := sellerNode.SaveListing(listing, done); err != nil {
+	if err := sellerNode.Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -538,7 +538,7 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 		t.Fatal("Timeout saving listing")
 	}
 
-	index, err := sellerNode.GetMyListings()
+	index, err := sellerNode.Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -804,7 +804,7 @@ func TestOrderLifecycle_Cancelable_BuyerCancel(t *testing.T) {
 	// ── Step 1: Seller Creates Listing ────────────────────────────
 	listing := factory.NewPhysicalListing("tshirt")
 	done := make(chan struct{})
-	if err := sellerNode.SaveListing(listing, done); err != nil {
+	if err := sellerNode.Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -813,7 +813,7 @@ func TestOrderLifecycle_Cancelable_BuyerCancel(t *testing.T) {
 		t.Fatal("Timeout saving listing")
 	}
 
-	index, err := sellerNode.GetMyListings()
+	index, err := sellerNode.Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}

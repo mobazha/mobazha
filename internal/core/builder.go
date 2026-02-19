@@ -51,6 +51,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/request"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/op/go-logging"
@@ -603,13 +604,15 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 	// Create messenger with appropriate SNF client
 	messengerCfg := &obnet.MessengerConfig{
-		NodeID:         nodeID,
-		Service:        service,
-		Privkey:        obNode.privKey,
-		Context:        obNode.nodeCtx,
-		DB:             obRepo.DB(),
-		Testnet:        cfg.Testnet,
-		GetProfileFunc: obNode.GetProfile,
+		NodeID:  nodeID,
+		Service: service,
+		Privkey: obNode.privKey,
+		Context: obNode.nodeCtx,
+		DB:      obRepo.DB(),
+		Testnet: cfg.Testnet,
+		GetProfileFunc: func(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error) {
+			return obNode.profileService.GetProfile(ctx, peerID, reqCtx, useCache)
+		},
 	}
 
 	// Always set SNFServers so the messenger has a proper fallback list
@@ -644,19 +647,21 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	obNode.signer = signer
 
 	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
-		NodeID:                   nodeID,
-		Identity:                 obNode.peerID,
-		Signer:                   signer,
-		Db:                       obRepo.DB(),
-		Multiwallet:              obNode.multiwallet,
-		Messenger:                obNode.messenger,
-		EscrowPrivateKey:         escrowKey,
-		ExchangeRateProvider:     erp,
-		EventBus:                 bus,
-		CalcCIDFunc:              obNode.contentStore.ComputeCID,
-		FeatureManager:           obNode.featureManager,
-		GetStripeTransactionFunc: obNode.GetStripeTransaction,
-		StateValidator:           &coreStateBridge{},
+		NodeID:               nodeID,
+		Identity:             obNode.peerID,
+		Signer:               signer,
+		Db:                   obRepo.DB(),
+		Multiwallet:          obNode.multiwallet,
+		Messenger:            obNode.messenger,
+		EscrowPrivateKey:     escrowKey,
+		ExchangeRateProvider: erp,
+		EventBus:             bus,
+		CalcCIDFunc:          obNode.contentStore.ComputeCID,
+		FeatureManager:       obNode.featureManager,
+		GetStripeTransactionFunc: func(txid iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error) {
+			return obNode.paymentService.GetStripeTransaction(txid, coinType)
+		},
+		StateValidator: &coreStateBridge{},
 	})
 
 	obNode.applyOptions(nil)
@@ -1139,13 +1144,15 @@ func newLightweightNode(
 
 	// ── 7. Messenger (via SNF Proxy) ─────────────────────────────────
 	messengerCfg := &obnet.MessengerConfig{
-		NodeID:         nodeID,
-		Service:        service,
-		Privkey:        privKey,
-		Context:        nodeCtx,
-		DB:             obRepo.DB(),
-		Testnet:        cfg.Testnet,
-		GetProfileFunc: obNode.GetProfile,
+		NodeID:  nodeID,
+		Service: service,
+		Privkey: privKey,
+		Context: nodeCtx,
+		DB:      obRepo.DB(),
+		Testnet: cfg.Testnet,
+		GetProfileFunc: func(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error) {
+			return obNode.profileService.GetProfile(ctx, peerID, reqCtx, useCache)
+		},
 	}
 
 	// Always set SNFServers so the messenger has a proper fallback list
@@ -1178,17 +1185,19 @@ func newLightweightNode(
 	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
 		NodeID:                   nodeID,
 		Identity:                 nodePeerID,
-		Signer:                   signer,
-		Db:                       obRepo.DB(),
-		Multiwallet:              obNode.multiwallet,
-		Messenger:                obNode.messenger,
-		EscrowPrivateKey:         escrowKey,
-		ExchangeRateProvider:     erp,
-		EventBus:                 bus,
-		CalcCIDFunc:              obNode.contentStore.ComputeCID,
-		FeatureManager:           obNode.featureManager,
-		GetStripeTransactionFunc: obNode.GetStripeTransaction,
-		StateValidator:           &coreStateBridge{},
+		Signer:               signer,
+		Db:                   obRepo.DB(),
+		Multiwallet:          obNode.multiwallet,
+		Messenger:            obNode.messenger,
+		EscrowPrivateKey:     escrowKey,
+		ExchangeRateProvider: erp,
+		EventBus:             bus,
+		CalcCIDFunc:          obNode.contentStore.ComputeCID,
+		FeatureManager:       obNode.featureManager,
+		GetStripeTransactionFunc: func(txid iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error) {
+			return obNode.paymentService.GetStripeTransaction(txid, coinType)
+		},
+		StateValidator: &coreStateBridge{},
 	})
 
 	obNode.applyOptions(nil)

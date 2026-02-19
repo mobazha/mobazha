@@ -21,7 +21,7 @@ func TestMobazhaNode_AddPost(t *testing.T) {
 	name := "Ron Swanson"
 
 	done0 := make(chan struct{})
-	err = node.SetProfile(&models.Profile{
+	err = node.Profile().SetProfile(&models.Profile{
 		Name:            name,
 		EscrowPublicKey: strings.Repeat("s", 66),
 	}, done0)
@@ -43,7 +43,7 @@ func TestMobazhaNode_AddPost(t *testing.T) {
 	}
 
 	done1 := make(chan struct{})
-	if err := node.AddPost(post, done1); err != nil {
+	if err := node.Social().AddPost(post, done1); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -52,7 +52,7 @@ func TestMobazhaNode_AddPost(t *testing.T) {
 		t.Fatal("Timeout waiting on add post channel")
 	}
 
-	signedPost, err := node.GetMyPostBySlug(slug)
+	signedPost, err := node.Social().GetMyPostBySlug(slug)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestMobazhaNode_AddPost(t *testing.T) {
 		t.Errorf("Returned status doesn't match. Expected %s, got %s", content, signedPost.Post.Status)
 	}
 
-	index, err := node.GetMyPosts()
+	index, err := node.Social().GetMyPosts()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestMobazhaNode_AddPost(t *testing.T) {
 		t.Errorf("Returned incorrect number of posts. Expected %d, got %d", 1, len(index))
 	}
 
-	profile, err := node.GetMyProfile()
+	profile, err := node.Profile().GetMyProfile()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestMobazhaNode_AddPost(t *testing.T) {
 	}
 
 	done2 := make(chan struct{})
-	if err = node.DeletePost(slug, done2); err != nil {
+	if err = node.Social().DeletePost(slug, done2); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -90,7 +90,7 @@ func TestMobazhaNode_AddPost(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	index, err = node.GetMyPosts()
+	index, err = node.Social().GetMyPosts()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestMobazhaNode_AddPost(t *testing.T) {
 		t.Errorf("Returned incorrect number of posts. Expected %d, got %d", 0, len(index))
 	}
 
-	profile, err = node.GetMyProfile()
+	profile, err = node.Profile().GetMyProfile()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestMobazhaNode_PostGet(t *testing.T) {
 	}
 
 	done := make(chan struct{})
-	if err := network.Nodes()[0].AddPost(post, done); err != nil {
+	if err := network.Nodes()[0].Social().AddPost(post, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -134,7 +134,7 @@ func TestMobazhaNode_PostGet(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	post2, err := network.Nodes()[1].GetPostBySlug(context.Background(), network.Nodes()[0].Identity(), slug, false)
+	post2, err := network.Nodes()[1].Social().GetPostBySlug(context.Background(), network.Nodes()[0].Identity(), slug, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestMobazhaNode_PostGet(t *testing.T) {
 		t.Errorf("Incorrect slug returned. Expected %s, got %s", slug, post2.Post.Slug)
 	}
 
-	index, err := network.Nodes()[1].GetPosts(context.Background(), network.Nodes()[0].Identity(), false)
+	index, err := network.Nodes()[1].Social().GetPosts(context.Background(), network.Nodes()[0].Identity(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func Test_generatePostSlug(t *testing.T) {
 	}
 
 	done := make(chan struct{})
-	if err := node.AddPost(post, done); err != nil {
+	if err := node.Social().AddPost(post, done); err != nil {
 		t.Fatal(err)
 	}
 	select {

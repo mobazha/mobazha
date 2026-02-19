@@ -64,7 +64,7 @@ func TestMobazhaNode_CancelOrder(t *testing.T) {
 	listing := factory.NewPhysicalListing("tshirt")
 
 	done := make(chan struct{})
-	if err := sellerNode.SaveListing(listing, done); err != nil {
+	if err := sellerNode.Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -73,7 +73,7 @@ func TestMobazhaNode_CancelOrder(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	index, err := sellerNode.GetMyListings()
+	index, err := sellerNode.Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}

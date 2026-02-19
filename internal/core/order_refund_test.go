@@ -37,7 +37,7 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 	listing := factory.NewPhysicalListing("tshirt")
 
 	done := make(chan struct{})
-	if err := network.Nodes()[0].SaveListing(listing, done); err != nil {
+	if err := network.Nodes()[0].Listing().SaveListing(listing, done); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -46,13 +46,13 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	index, err := network.Nodes()[0].GetMyListings()
+	index, err := network.Nodes()[0].Listing().GetMyListings()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	done2 := make(chan struct{})
-	if err := network.Nodes()[2].SetProfile(&models.Profile{Name: "Ron Paul"}, done2); err != nil {
+	if err := network.Nodes()[2].Profile().SetProfile(&models.Profile{Name: "Ron Paul"}, done2); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -69,7 +69,7 @@ func TestMobazhaNode_RefundOrder(t *testing.T) {
 		},
 	}
 	done3 := make(chan struct{})
-	if err := network.Nodes()[2].SetSelfAsModerator(context.Background(), modInfo, done3); err != nil {
+	if err := network.Nodes()[2].Profile().SetSelfAsModerator(context.Background(), modInfo, done3); err != nil {
 		t.Fatal(err)
 	}
 	select {

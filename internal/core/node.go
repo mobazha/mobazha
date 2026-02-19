@@ -30,10 +30,8 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/encryption"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/evm"
-	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 // MobazhaNode holds all the components that make up a network node
@@ -300,9 +298,9 @@ func (n *MobazhaNode) Start() {
 		}()
 
 		go n.notifier.Start()
-		go n.OpenSavedChannels()
+		go n.channelsService.OpenSavedChannels()
 
-		if err := n.updateSNFServers(); err != nil {
+		if err := n.profileService.UpdateSNFServers(); err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID, "Error updating store and forward servers in profile: %s", err)
 		}
 
@@ -398,11 +396,11 @@ func (n *MobazhaNode) checkRepoMigration() error {
 // Do profile and listings migration with ETH pubKey adding
 func (n *MobazhaNode) migrateRepoFromVersion0() error {
 	done1 := make(chan struct{})
-	myProfile, err := n.GetMyProfile()
+	myProfile, err := n.profileService.GetMyProfile()
 	if err != nil {
 		return fmt.Errorf("get my profile failed, %v", err)
 	}
-	err = n.SetProfile(myProfile, done1)
+	err = n.profileService.SetProfile(myProfile, done1)
 	if err != nil {
 		return fmt.Errorf("update profile failed, %v", err)
 	}
@@ -415,7 +413,7 @@ func (n *MobazhaNode) migrateRepoFromVersion0() error {
 	}
 
 	done2 := make(chan struct{})
-	err = n.UpdateAllListings(func(listing *pb.Listing) (bool, error) {
+	err = n.listingService.UpdateAllListings(func(listing *pb.Listing) (bool, error) {
 		listing.VendorID.Pubkeys.Eth = n.ethMasterKey.PubKey().SerializeCompressed()
 		return true, nil
 	}, done2)
@@ -433,12 +431,12 @@ func (n *MobazhaNode) migrateRepoFromVersion0() error {
 // Do profile and listings migration with MATIC currencies update
 func (n *MobazhaNode) migrateRepoFromVersion1() error {
 	done := make(chan struct{})
-	myProfile, err := n.GetMyProfile()
+	myProfile, err := n.profileService.GetMyProfile()
 	if err != nil {
 		return fmt.Errorf("get my profile failed, %v", err)
 	}
 	myProfile.Currencies = []string{"MATIC", "MATICUSDT", "MATICUSDC"}
-	err = n.SetProfile(myProfile, done)
+	err = n.profileService.SetProfile(myProfile, done)
 	if err != nil {
 		return fmt.Errorf("update profile failed, %v", err)
 	}
@@ -454,7 +452,7 @@ func (n *MobazhaNode) migrateRepoFromVersion1() error {
 // Do listings migration about signature due to new fields added
 func (n *MobazhaNode) migrateRepoWithListingsUpdate() error {
 	done := make(chan struct{})
-	err := n.UpdateAllListings(func(listing *pb.Listing) (bool, error) {
+	err := n.listingService.UpdateAllListings(func(listing *pb.Listing) (bool, error) {
 		// do nothing, just update the signature using existing flow
 		return true, nil
 	}, done)
@@ -474,11 +472,11 @@ func (n *MobazhaNode) migrateRepoWithListingsUpdate() error {
 func (n *MobazhaNode) migrateRepoFromVersion5() error {
 	// Add Solana pubkey to profile
 	done1 := make(chan struct{})
-	myProfile, err := n.GetMyProfile()
+	myProfile, err := n.profileService.GetMyProfile()
 	if err != nil {
 		return fmt.Errorf("get my profile failed, %v", err)
 	}
-	err = n.SetProfile(myProfile, done1)
+	err = n.profileService.SetProfile(myProfile, done1)
 	if err != nil {
 		return fmt.Errorf("update profile failed, %v", err)
 	}
@@ -492,7 +490,7 @@ func (n *MobazhaNode) migrateRepoFromVersion5() error {
 
 	// Add Solana pubkey to listings
 	done2 := make(chan struct{})
-	err = n.UpdateAllListings(func(listing *pb.Listing) (bool, error) {
+	err = n.listingService.UpdateAllListings(func(listing *pb.Listing) (bool, error) {
 		listing.VendorID.Pubkeys.Solana = n.solPrivKey.PublicKey().Bytes()
 		return true, nil
 	}, done2)
@@ -613,15 +611,6 @@ func (n *MobazhaNode) DB() database.Database {
 // ExchangeRates returns the node's exchange rate provider.
 func (n *MobazhaNode) ExchangeRates() *wallet.ExchangeRateProvider {
 	return n.exchangeRates
-}
-
-// GetAllRates implements contracts.ExchangeRateService.
-// Delegates to the internal ExchangeRateProvider.
-func (n *MobazhaNode) GetAllRates(base models.CurrencyCode, breakCache bool) (map[models.CurrencyCode]iwallet.Amount, error) {
-	if n.exchangeRates == nil {
-		return nil, fmt.Errorf("exchange rate provider not available")
-	}
-	return n.exchangeRates.GetAllRates(base, breakCache)
 }
 
 // GetNodeID returns the user ID for this node.

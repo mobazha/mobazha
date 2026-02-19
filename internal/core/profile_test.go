@@ -19,7 +19,7 @@ func TestMobazhaNode_Profile(t *testing.T) {
 
 	name := "Ron Swanson"
 
-	err = node.SetProfile(&models.Profile{
+	err = node.Profile().SetProfile(&models.Profile{
 		Name:            name,
 		EscrowPublicKey: strings.Repeat("s", 66),
 	}, nil)
@@ -27,7 +27,7 @@ func TestMobazhaNode_Profile(t *testing.T) {
 		t.Error(err)
 	}
 
-	pro, err := node.GetMyProfile()
+	pro, err := node.Profile().GetMyProfile()
 	if err != nil {
 		t.Error(err)
 	}
@@ -50,7 +50,7 @@ func TestMobazhaNode_GetProfile(t *testing.T) {
 	)
 	done := make(chan struct{})
 	mocknet.Nodes()[0].storeAndForwardServers = []string{snfServer}
-	err = mocknet.Nodes()[0].SetProfile(&models.Profile{
+	err = mocknet.Nodes()[0].Profile().SetProfile(&models.Profile{
 		Name:            name,
 		EscrowPublicKey: strings.Repeat("s", 66),
 	}, done)
@@ -63,7 +63,7 @@ func TestMobazhaNode_GetProfile(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	pro, err := mocknet.Nodes()[1].GetProfile(context.Background(), mocknet.Nodes()[0].Identity(), nil, false)
+	pro, err := mocknet.Nodes()[1].Profile().GetProfile(context.Background(), mocknet.Nodes()[0].Identity(), nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestMobazhaNode_GetProfile(t *testing.T) {
 	// Change name
 	name2 := "Peter Griffin"
 	done = make(chan struct{})
-	err = mocknet.Nodes()[0].SetProfile(&models.Profile{
+	err = mocknet.Nodes()[0].Profile().SetProfile(&models.Profile{
 		Name:            name2,
 		EscrowPublicKey: strings.Repeat("s", 66),
 	}, done)
@@ -89,7 +89,7 @@ func TestMobazhaNode_GetProfile(t *testing.T) {
 	}
 
 	// Test fetching from cache
-	pro, err = mocknet.Nodes()[1].GetProfile(context.Background(), mocknet.Nodes()[0].Identity(), nil, true)
+	pro, err = mocknet.Nodes()[1].Profile().GetProfile(context.Background(), mocknet.Nodes()[0].Identity(), nil, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func Test_updateProfileStats(t *testing.T) {
 			return err
 		}
 
-		return node.updateProfileStats(tx, profile)
+		return node.profileService.updateProfileStats(tx, profile)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -175,7 +175,7 @@ func Test_updateAndSaveProfile(t *testing.T) {
 		name    = "Ron Paul"
 		profile = &models.Profile{Name: name}
 	)
-	if err := node.SetProfile(profile, nil); err != nil {
+	if err := node.Profile().SetProfile(profile, nil); err != nil {
 		t.Fatal(err)
 	}
 	err = node.repo.DB().Update(func(tx database.Tx) error {
@@ -187,13 +187,13 @@ func Test_updateAndSaveProfile(t *testing.T) {
 			return err
 		}
 
-		return node.updateAndSaveProfile(tx)
+		return node.listingService.updateAndSaveProfile(tx)
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ret, err := node.GetMyProfile()
+	ret, err := node.Profile().GetMyProfile()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,19 +228,19 @@ func Test_updateSNFServers(t *testing.T) {
 		profile = &models.Profile{Name: name}
 	)
 
-	if err := node.SetProfile(profile, nil); err != nil {
+	if err := node.Profile().SetProfile(profile, nil); err != nil {
 		t.Fatal(err)
 	}
 
 	server := "adsf"
 	node.storeAndForwardServers = []string{server}
 
-	err = node.updateSNFServers()
+	err = node.profileService.UpdateSNFServers()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	pro, err := node.GetMyProfile()
+	pro, err := node.Profile().GetMyProfile()
 	if err != nil {
 		t.Fatal(err)
 	}

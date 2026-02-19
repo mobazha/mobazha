@@ -7,7 +7,6 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/multiwallet/base"
 	internalutxo "github.com/mobazha/mobazha3.0/internal/multiwallet/utxo"
 	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -125,6 +124,3 @@ func (n *MobazhaNode) StopWatchingPayment(orderID string) error {
 	return n.paymentService.StopWatchingPayment(orderID)
 }
 
-func (n *MobazhaNode) autoConfirmCancelablePayment(order *models.Order) {
-	n.paymentService.autoConfirmCancelablePayment(order)
-}

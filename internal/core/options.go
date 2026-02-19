@@ -50,12 +50,24 @@ func (n *MobazhaNode) initPaymentService() {
 	if n.ipfsOnlyMode {
 		return
 	}
+
+	var evmRelay EVMRelayService
+	if n.hostService != nil {
+		evmRelay = n.hostService.GetEVMRelayService()
+	}
+
 	n.paymentService = NewPaymentAppService(PaymentAppServiceConfig{
-		DB:         n.db,
+		DB:          n.db,
 		Multiwallet: n.multiwallet,
-		EventBus:   n.eventBus,
-		NodeID:     n.nodeID,
-		Shutdown:   n.shutdown,
-		GetProfile: n.GetProfile,
+		EventBus:    n.eventBus,
+		NodeID:      n.nodeID,
+		Shutdown:    n.shutdown,
+
+		GetProfile:    n.GetProfile,
+		GetPayoutAddr: n.GetPayoutAddress,
+		ConfirmOrder:  n.ConfirmOrder,
+
+		EVMRelayService: evmRelay,
+		RelayAPIURL:     n.relayAPIURL,
 	})
 }

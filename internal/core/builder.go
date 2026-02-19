@@ -391,6 +391,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			hostService:          hs,
 		}
 		sharedManager.AddNode(nodeID, obNode)
+		obNode.applyOptions(nil)
 		return obNode, nil
 	}
 
@@ -660,10 +661,32 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		StateValidator:           &coreStateBridge{},
 	})
 
+	obNode.applyOptions(nil)
 	obNode.registerHandlers()
 	obNode.listenNetworkEvents()
 
 	return obNode, nil
+}
+
+// NewNodeWithOptions creates a MobazhaNode with explicit HostService and
+// functional options. This allows hosting (SaaS) to inject custom adapters
+// such as KeyVaultProvider without modifying the core construction flow.
+//
+// Usage:
+//
+//	node, err := core.NewNodeWithOptions(ctx, cfg, userID, hostService,
+//	    core.WithKeyProvider(keyVaultProvider),
+//	)
+func NewNodeWithOptions(ctx context.Context, cfg *repo.Config, nodeID string,
+	hs coreiface.HostService, opts ...NodeOption) (*MobazhaNode, error) {
+	node, err := NewNode(ctx, cfg, nodeID, hs)
+	if err != nil {
+		return nil, err
+	}
+	for _, opt := range opts {
+		opt(node)
+	}
+	return node, nil
 }
 
 // coreStateBridge wraps mobazha-core order state machine for transition validation.
@@ -1171,6 +1194,7 @@ func newLightweightNode(
 		StateValidator:           &coreStateBridge{},
 	})
 
+	obNode.applyOptions(nil)
 	obNode.registerHandlers()
 	obNode.listenNetworkEvents()
 

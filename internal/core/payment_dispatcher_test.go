@@ -298,14 +298,15 @@ func TestTryLockAutoConfirm_ConcurrentSafety(t *testing.T) {
 // ── dispatchCancelablePayment safety ────────────────────────────────────
 
 func TestDispatchCancelablePayment_NilRegistrySafety(t *testing.T) {
-	// A node with nil paymentRegistry should not panic
-	n := &MobazhaNode{nodeID: "test-dispatch-nil"}
+	svc := NewPaymentAppService(PaymentAppServiceConfig{
+		NodeID: "test-dispatch-nil",
+	})
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("dispatchCancelablePayment panicked with nil registry: %v", r)
 		}
 	}()
-	n.dispatchCancelablePayment(&events.CancelablePaymentReady{
+	svc.dispatchCancelablePayment(&events.CancelablePaymentReady{
 		OrderID:       "test-nil-registry",
 		TransactionID: "test-tx",
 		Coin:          string(iwallet.CtBitcoin),
@@ -314,9 +315,13 @@ func TestDispatchCancelablePayment_NilRegistrySafety(t *testing.T) {
 }
 
 func TestDispatchCancelablePayment_UnknownCoinSafety(t *testing.T) {
-	// Unknown / empty coins should not panic — logged and dropped
 	n := &MobazhaNode{nodeID: "test-dispatch"}
 	n.registerPaymentStrategies()
+
+	svc := NewPaymentAppService(PaymentAppServiceConfig{
+		NodeID:          "test-dispatch",
+		PaymentRegistry: n.paymentRegistry,
+	})
 
 	testCases := []struct {
 		name string
@@ -333,7 +338,7 @@ func TestDispatchCancelablePayment_UnknownCoinSafety(t *testing.T) {
 					t.Errorf("dispatchCancelablePayment panicked for coin %q: %v", tc.coin, r)
 				}
 			}()
-			n.dispatchCancelablePayment(&events.CancelablePaymentReady{
+			svc.dispatchCancelablePayment(&events.CancelablePaymentReady{
 				OrderID:       "test-order-" + tc.name,
 				TransactionID: "test-tx",
 				Coin:          tc.coin,

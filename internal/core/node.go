@@ -99,6 +99,10 @@ type MobazhaNode struct {
 	// SaaS: injected keyVaultProvider (reads from centralized KeyVault).
 	keyProvider contracts.KeyProvider
 
+	// paymentService is the extracted App Service for payment operations.
+	// Owns escrow instruction generation, cancelable payment dispatching, etc.
+	paymentService *PaymentAppService
+
 	// stripeAccountID represents the stripe account id of the node.
 	stripeAccountID string
 

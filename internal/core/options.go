@@ -157,7 +157,6 @@ func (n *MobazhaNode) initPaymentService() {
 		Shutdown:    n.shutdown,
 
 		GetProfile:        n.GetProfile,
-		GetPayoutAddr:     n.GetPayoutAddress,
 		ConfirmOrder:      n.ConfirmOrder,
 		ReleaseCancelable: n.releaseFromCancelableAddress,
 

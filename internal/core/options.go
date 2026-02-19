@@ -149,6 +149,20 @@ func (n *MobazhaNode) initPaymentService() {
 		evmRelay = n.hostService.GetEVMRelayService()
 	}
 
+	var getStripeConfigFromHost GetStripeConfigFromHostFunc
+	var registerStripeAccountFn RegisterStripeAccountFunc
+	if n.hostService != nil {
+		getStripeConfigFromHost = n.hostService.GetStripeConfig
+		registerStripeAccountFn = n.hostService.RegisterStripeAccount
+	}
+
+	var getStripeAccountIDFn GetStripeAccountIDFunc
+	if n.netDB != nil {
+		getStripeAccountIDFn = func(peerID string) (string, error) {
+			return n.netDB.GetStripeAccountID(peerID, nil)
+		}
+	}
+
 	n.paymentService = NewPaymentAppService(PaymentAppServiceConfig{
 		DB:          n.db,
 		Multiwallet: n.multiwallet,
@@ -156,10 +170,13 @@ func (n *MobazhaNode) initPaymentService() {
 		NodeID:      n.nodeID,
 		Shutdown:    n.shutdown,
 
-		GetProfile:        n.GetProfile,
-		ConfirmOrder:      n.ConfirmOrder,
-		GetStripeTx:       n.GetStripeTransaction,
-		ReleaseCancelable: n.releaseFromCancelableAddress,
+		GetProfile:              n.GetProfile,
+		ConfirmOrder:            n.ConfirmOrder,
+		GetStripeConfigFromHost: getStripeConfigFromHost,
+		RegisterStripeAccount:   registerStripeAccountFn,
+		GetStripeAccountID:      getStripeAccountIDFn,
+		StripeConfigCache:       n.stripeConfigCache,
+		ReleaseCancelable:       n.releaseFromCancelableAddress,
 
 		EVMRelayService: evmRelay,
 		RelayAPIURL:     n.relayAPIURL,

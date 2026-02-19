@@ -1,6 +1,13 @@
 package core
 
 import (
+	"context"
+	"fmt"
+	"io"
+
+	ipfsfiles "github.com/ipfs/boxo/files"
+	ipath "github.com/ipfs/boxo/path"
+	"github.com/ipfs/kubo/core/coreapi"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 )
@@ -46,6 +53,8 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initChatService()
 	n.initMatrixService()
 	n.initPreferencesService()
+	n.initMediaService()
+	n.initRatingsService()
 	n.initNotificationService()
 	n.initShoppingCartService()
 }
@@ -75,6 +84,61 @@ func (n *MobazhaNode) initPreferencesService() {
 		BanManager:            n.banManager,
 		UpdateAllListingsFunc: n.UpdateAllListings,
 		GetMyListingsFunc:     n.GetMyListings,
+	})
+}
+
+// initMediaService creates the MediaAppService with IPFS infrastructure callbacks.
+func (n *MobazhaNode) initMediaService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+
+	var getIPFSFile GetIPFSFileFunc
+	if n.sharedManager != nil {
+		getIPFSFile = func(ctx context.Context, path ipath.Path) (io.ReadSeeker, error) {
+			api, err := coreapi.NewCoreAPI(n.sharedManager.GetIPFSNode())
+			if err != nil {
+				return nil, err
+			}
+			nd, err := api.Unixfs().Get(ctx, path)
+			if err != nil {
+				return nil, err
+			}
+			f, ok := nd.(ipfsfiles.File)
+			if !ok {
+				return nil, fmt.Errorf("error asserting ipfs file type")
+			}
+			return f, nil
+		}
+	}
+
+	n.mediaService = NewMediaAppService(MediaAppServiceConfig{
+		DB:              n.db,
+		ContentStore:    n.contentStore,
+		NodeID:          n.nodeID,
+		GetIPFSFile:     getIPFSFile,
+		FetchIPNSRecord: n.fetchIPNSRecord,
+		Publish:         n.Publish,
+		PublishFile:     n.PublishFile,
+	})
+}
+
+// initRatingsService creates the RatingsAppService.
+func (n *MobazhaNode) initRatingsService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+
+	var getRatingIndex GetRatingIndexFromNetDBFunc
+	if n.netDB != nil {
+		getRatingIndex = n.netDB.GetRatingIndex
+	}
+
+	n.ratingsService = NewRatingsAppService(RatingsAppServiceConfig{
+		DB:              n.db,
+		ContentStore:    n.contentStore,
+		FetchIPNSRecord: n.fetchIPNSRecord,
+		GetRatingIndex:  getRatingIndex,
 	})
 }
 
@@ -172,6 +236,7 @@ func (n *MobazhaNode) initPaymentService() {
 
 		GetProfile:              n.GetProfile,
 		ConfirmOrder:            n.ConfirmOrder,
+		FulfillOrder:            n.FulfillOrder,
 		GetStripeConfigFromHost: getStripeConfigFromHost,
 		RegisterStripeAccount:   registerStripeAccountFn,
 		GetStripeAccountID:      getStripeAccountIDFn,

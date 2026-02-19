@@ -115,6 +115,10 @@ type MobazhaNode struct {
 	// preferencesService encapsulates user preferences and block-list management.
 	preferencesService *PreferencesAppService
 
+	mediaService *MediaAppService
+
+	ratingsService *RatingsAppService
+
 	// notificationService encapsulates notification query and management logic.
 	notificationService *NotificationAppService
 

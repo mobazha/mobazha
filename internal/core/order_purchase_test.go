@@ -600,7 +600,7 @@ func TestMobazhaNode_createOrder(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		order, err := network.Nodes()[0].createOrder(context.Background(), test.purchase)
+		order, err := network.Nodes()[0].orderService.createOrder(context.Background(), test.purchase)
 		if err != nil {
 			t.Errorf("Test %d: Failed to create order: %s", i, err)
 			continue
@@ -660,7 +660,7 @@ func Test_createOrderUnkownVersion(t *testing.T) {
 		PricingCoin: "MCK",
 	}
 
-	_, err = network.Nodes()[0].createOrder(context.Background(), purchase)
+	_, err = network.Nodes()[0].orderService.createOrder(context.Background(), purchase)
 	if err != coreiface.ErrUnknownListingVersion {
 		t.Errorf("Expected test to failed due to unknown listing version")
 	}

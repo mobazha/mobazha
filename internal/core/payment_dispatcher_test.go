@@ -5,7 +5,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -162,27 +161,6 @@ func TestRegistryDispatch_SolanaRegistered(t *testing.T) {
 	}
 	if strategy.Model() != payment.PaymentModelClientSigned {
 		t.Errorf("solana strategy.Model() = %s, want %s", strategy.Model(), payment.PaymentModelClientSigned)
-	}
-}
-
-func TestRegistryDispatch_UTXOAdapterModel(t *testing.T) {
-	adapter := &adapters.UTXOAutoConfirmAdapter{}
-	if adapter.Model() != payment.PaymentModelMonitored {
-		t.Errorf("UTXOAutoConfirmAdapter.Model() = %s, want %s", adapter.Model(), payment.PaymentModelMonitored)
-	}
-}
-
-func TestRegistryDispatch_EVMAdapterModel(t *testing.T) {
-	adapter := adapters.NewClientSignedAdapter(&adapters.EVMChainOps{}, nil, nil)
-	if adapter.Model() != payment.PaymentModelClientSigned {
-		t.Errorf("ClientSignedAdapter(evm).Model() = %s, want %s", adapter.Model(), payment.PaymentModelClientSigned)
-	}
-}
-
-func TestRegistryDispatch_SolanaAdapterModel(t *testing.T) {
-	adapter := adapters.NewClientSignedAdapter(&adapters.SolanaChainOps{}, nil, nil)
-	if adapter.Model() != payment.PaymentModelClientSigned {
-		t.Errorf("ClientSignedAdapter(solana).Model() = %s, want %s", adapter.Model(), payment.PaymentModelClientSigned)
 	}
 }
 

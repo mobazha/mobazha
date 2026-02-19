@@ -88,6 +88,9 @@ type hub struct {
 
 	// Unregister requests from connections
 	unregister chan *connection
+
+	// stop signals the run loop to exit gracefully
+	stop chan struct{}
 }
 
 func newHub(nodeID string) *hub {
@@ -97,22 +100,33 @@ func newHub(nodeID string) *hub {
 		register:    make(chan *connection),
 		unregister:  make(chan *connection),
 		connections: make(map[*connection]bool),
+		stop:        make(chan struct{}),
 	}
 }
 
 func (h *hub) run() {
-	// 协议级 ping 间隔（用于保持 nginx 等代理的连接）
 	protocolPingTicker := time.NewTicker(45 * time.Second)
 	defer func() {
 		protocolPingTicker.Stop()
+		for c := range h.connections {
+			close(c.send)
+		}
 	}()
 
 	for {
 		select {
+		case <-h.stop:
+			return
 		case c := <-h.register:
+			if c == nil {
+				continue
+			}
 			h.connections[c] = true
 			log.Debugf("Registered new websocket connection, nodeID: %s, total connections: %d", h.nodeID, len(h.connections))
 		case c := <-h.unregister:
+			if c == nil {
+				continue
+			}
 			if _, ok := h.connections[c]; ok {
 				delete(h.connections, c)
 				close(c.send)
@@ -123,20 +137,15 @@ func (h *hub) run() {
 				select {
 				case c.send <- m:
 				default:
-					// 发送失败，可能是客户端断开，清理连接
 					log.Warningf("Failed to send message to connection, removing, nodeID: %s", h.nodeID)
 					delete(h.connections, c)
 					close(c.send)
 				}
 			}
-		// 协议级 WebSocket ping（用于保持代理连接，如 nginx）
-		// 参考: https://nginx.org/en/docs/http/websocket.html
-		// "By default, the connection will be closed if the proxied server does not transmit any data within 60 seconds."
 		case <-protocolPingTicker.C:
 			for c := range h.connections {
 				if err := c.ws.WriteMessage(websocket.PingMessage, nil); err != nil {
 					log.Warningf("Protocol ping failed, nodeID: %s, error: %s", h.nodeID, err.Error())
-					// 不在这里删除连接，让 reader 处理关闭
 				}
 			}
 		}

@@ -15,6 +15,7 @@ import (
 
 func TestNewNode(t *testing.T) {
 	dataDir := path.Join(os.TempDir(), "mobazha-test", "TestNewNode")
+	os.RemoveAll(dataDir)
 
 	cfg := repo.Config{
 		DataDir:       dataDir,

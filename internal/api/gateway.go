@@ -44,6 +44,7 @@ type Gateway struct {
 	hubs           map[string]*hub
 	hubsMtx        sync.RWMutex
 	shutdown       chan struct{}
+	closeOnce      sync.Once
 	mu             sync.RWMutex
 	featureManager *pkgconfig.FeatureManager
 }
@@ -100,19 +101,21 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig, o
 	return g, nil
 }
 
-// Close shutsdown the Gateway listener.
+// Close shutsdown the Gateway listener. ManagedEscrow to call multiple times.
 func (g *Gateway) Close() error {
-	close(g.shutdown)
+	var err error
+	g.closeOnce.Do(func() {
+		close(g.shutdown)
 
-	g.hubsMtx.Lock()
-	for _, hub := range g.hubs {
-		close(hub.Broadcast)
-		close(hub.register)
-		close(hub.unregister)
-	}
-	g.hubsMtx.Unlock()
+		g.hubsMtx.Lock()
+		for _, hub := range g.hubs {
+			close(hub.stop)
+		}
+		g.hubsMtx.Unlock()
 
-	return g.listener.Close()
+		err = g.listener.Close()
+	})
+	return err
 }
 
 // NotifyWebsockets marshals the message to JSON and broadcasts it

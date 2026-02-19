@@ -158,6 +158,7 @@ func (n *MobazhaNode) initPaymentService() {
 
 		GetProfile:        n.GetProfile,
 		ConfirmOrder:      n.ConfirmOrder,
+		GetStripeTx:       n.GetStripeTransaction,
 		ReleaseCancelable: n.releaseFromCancelableAddress,
 
 		EVMRelayService: evmRelay,

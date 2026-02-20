@@ -498,7 +498,7 @@ func validateProfile(profile *models.Profile) error {
 		}
 	}
 	if len(profile.EscrowPublicKey) != 66 {
-		return fmt.Errorf("secp256k1 public key character length is greater than the max of %d", 66)
+		return fmt.Errorf("bad request: secp256k1 public key must be exactly %d hex characters, got %d", 66, len(profile.EscrowPublicKey))
 	}
 	if profile.Stats != nil {
 		if profile.Stats.AverageRating > 5 {

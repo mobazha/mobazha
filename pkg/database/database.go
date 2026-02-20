@@ -13,6 +13,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// StandaloneTenantID is the fixed tenant identifier used in standalone
+// (single-node) mode. Using a non-empty sentinel avoids GORM's zero-value
+// primary-key detection, which would otherwise treat empty-string TenantID
+// as "new record" and always INSERT instead of UPDATE.
+const StandaloneTenantID = "_default"
+
 // PublicData is the interface for access to the node's IPFS public
 // data directory. This data is visible by other nodes on the network.
 type PublicData interface {

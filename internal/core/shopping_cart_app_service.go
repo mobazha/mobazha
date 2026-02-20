@@ -76,12 +76,16 @@ func (s *ShoppingCartAppService) AddToCart(vendorID peer.ID, inputItem models.Sh
 	cartRecord := models.StoreCartRecord{
 		VendorID: vendorID.String(),
 	}
+	recordExists := false
 	err := s.db.View(func(tx database.Tx) error {
 		return tx.Read().First(&cartRecord).Error
 	})
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		logger.LogErrorWithIDf(log, s.nodeID, "Find shopping cart by vendorID %s failed, %v", vendorID, err)
 		return err
+	}
+	if err == nil {
+		recordExists = true
 	}
 
 	var cartItems []models.ShoppingCartItem
@@ -112,6 +116,11 @@ func (s *ShoppingCartAppService) AddToCart(vendorID peer.ID, inputItem models.Sh
 			return fmt.Errorf("marshal purchase items failed, %v", err)
 		}
 		cartRecord.Items = itemsByte
+		if recordExists {
+			return tx.Read().Model(&models.StoreCartRecord{}).
+				Where("tenant_id = ? AND vendor_id = ?", cartRecord.TenantID, cartRecord.VendorID).
+				Update("items", cartRecord.Items).Error
+		}
 		return tx.Save(&cartRecord)
 	})
 
@@ -164,7 +173,9 @@ func (s *ShoppingCartAppService) RemoveCartItem(vendorID peer.ID, inputItem mode
 				return fmt.Errorf("marshal purchase items failed, %v", err)
 			}
 			cartRecord.Items = itemsByte
-			return tx.Save(&cartRecord)
+			return tx.Read().Model(&models.StoreCartRecord{}).
+				Where("tenant_id = ? AND vendor_id = ?", cartRecord.TenantID, cartRecord.VendorID).
+				Update("items", cartRecord.Items).Error
 		}
 		return tx.Delete("vendor_id", cartRecord.VendorID, nil, models.StoreCartRecord{})
 	})

@@ -16,8 +16,8 @@ type ReceivingAccount struct {
 	Name                     string            `gorm:"type:text" json:"name"`           // 账户名称
 	ChainType                iwallet.ChainType `gorm:"index" json:"chainType"`          // 区块链网络类型
 	Address                  string            `gorm:"index" json:"address"`            // 用户的收款钱包地址, 对于Stripe, 则是StripeAccountID
-	SerializedActiveTokens   []byte            `gorm:"type:bytes" json:"-"`             // 序列化的已激活代币列表
-	SerializedInactiveTokens []byte            `gorm:"type:bytes" json:"-"`             // 序列化的未激活代币列表
+	SerializedActiveTokens   []byte            `json:"-"`
+	SerializedInactiveTokens []byte            `json:"-"`
 	Source                   string            `json:"source,omitempty"`                // 来源
 	IsActive                 bool              `json:"isActive"`                        // 是否激活
 	Status                   string            `json:"status,omitempty"`                // 账户状态, 对于Stripe, 则是StripeStatus

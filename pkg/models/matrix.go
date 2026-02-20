@@ -55,7 +55,7 @@ type MatrixKeyBackup struct {
 	TenantID      string    `gorm:"column:tenant_id;uniqueIndex:idx_backup_tenant_device;default:''" json:"-"`
 	ID            uint      `gorm:"primaryKey" json:"id"`
 	DeviceID      string    `gorm:"uniqueIndex:idx_backup_tenant_device;not null" json:"deviceId"` // Matrix device ID
-	EncryptedKeys []byte    `gorm:"type:blob;not null" json:"-"`          // Encrypted room keys (not exposed in JSON)
+	EncryptedKeys []byte    `gorm:"not null" json:"-"`
 	KeyCount      int       `json:"keyCount"`                             // Number of keys in backup
 	Algorithm     string    `gorm:"size:50;not null;default:'aes-256-gcm'" json:"algorithm"`
 	CreatedAt     time.Time `json:"createdAt"`
@@ -99,7 +99,7 @@ type MatrixSecretsBundle struct {
 	TenantID         string    `gorm:"column:tenant_id;uniqueIndex:idx_secrets_tenant_device;default:''" json:"-"`
 	ID               uint      `gorm:"primaryKey" json:"id"`
 	DeviceID         string    `gorm:"uniqueIndex:idx_secrets_tenant_device;not null" json:"deviceId"` // Matrix device ID that created the backup
-	EncryptedSecrets []byte    `gorm:"type:blob;not null" json:"-"`          // Encrypted secrets bundle (not exposed in JSON)
+	EncryptedSecrets []byte    `gorm:"not null" json:"-"`
 	Algorithm        string    `gorm:"size:50;not null;default:'aes-256-gcm'" json:"algorithm"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`

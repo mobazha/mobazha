@@ -8,6 +8,7 @@ import (
 
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
+	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -61,6 +62,9 @@ func Test_processPaymentSentMessage(t *testing.T) {
 		OrderID:     "1234",
 		MessageType: npb.OrderMessage_PAYMENT_SENT,
 		Message:     paymentAny,
+	}
+	if err := utils.SignOrderMessage(orderMsg, op.signer); err != nil {
+		t.Fatal(err)
 	}
 
 	tests := []struct {

@@ -81,6 +81,7 @@ func setupMockNetDB(t *testing.T, nodes []*MobazhaNode) {
 	for _, node := range nodes {
 		ndb, _ := netdb.NewNetDB(server.URL, node.peerID.String(), node.ipfsNode.PrivateKey)
 		node.netDB = ndb
+		node.initListingService()
 	}
 }
 

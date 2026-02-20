@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -43,7 +42,7 @@ func TestMobazhaNode_Follow(t *testing.T) {
 	}
 
 	if following.Count() != 1 {
-		t.Errorf("Incorrect number of following returned. Expected %d, %d", 1, following.Count())
+		t.Fatalf("Incorrect number of following returned. Expected %d, got %d", 1, following.Count())
 	}
 
 	if following[0] != p.String() {
@@ -72,11 +71,11 @@ func TestMobazhaNode_Follow(t *testing.T) {
 	}
 
 	if following.Count() != 2 {
-		t.Errorf("Incorrect number of following returned. Expected %d, %d", 2, following.Count())
+		t.Fatalf("Incorrect number of following returned. Expected %d, got %d", 2, following.Count())
 	}
 
 	if following[1] != p2.String() {
-		t.Errorf("Incorrect following peer returned. Expected %s, got %s", p.String(), following[1])
+		t.Errorf("Incorrect following peer returned. Expected %s, got %s", p2.String(), following[1])
 	}
 
 	profile, err := node.Profile().GetMyProfile()
@@ -94,83 +93,126 @@ func TestMobazhaNode_Follow(t *testing.T) {
 }
 
 func TestMobazhaNode_GetFollowing(t *testing.T) {
-	mocknet, err := NewMocknet(2)
+	node, err := MockNode()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer mocknet.TearDown()
+	defer node.repo.DestroyRepo()
 
-	p, err := peer.Decode("12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN")
+	p1, err := peer.Decode("12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN")
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if err := mocknet.Nodes()[0].Social().FollowNode(p, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	done := make(chan struct{})
-	mocknet.Nodes()[0].Publish(done)
-
-	select {
-	case <-done:
-	case <-time.After(time.Second * 10):
-		t.Fatal("Timeout waiting on channel")
-	}
-
-	following, err := mocknet.Nodes()[1].Social().GetFollowing(context.Background(), mocknet.Nodes()[0].Identity(), nil, false)
+	p2, err := peer.Decode("12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi")
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	if err := node.Profile().SetProfile(&models.Profile{Name: "Ron Paul"}, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := node.Social().FollowNode(p1, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	following, err := node.Social().GetMyFollowing()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if following.Count() != 1 {
-		t.Errorf("Incorrect number of following returned. Expected %d, %d", 1, following.Count())
+		t.Fatalf("Incorrect number of following returned. Expected %d, got %d", 1, following.Count())
+	}
+	if following[0] != p1.String() {
+		t.Errorf("Incorrect following peer returned. Expected %s, got %s", p1.String(), following[0])
 	}
 
-	if following[0] != p.String() {
-		t.Errorf("Incorrect following peer returned. Expected %s, got %s", p.String(), following[0])
+	if err := node.Social().FollowNode(p2, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	following, err = node.Social().GetMyFollowing()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if following.Count() != 2 {
+		t.Fatalf("Incorrect number of following returned. Expected %d, got %d", 2, following.Count())
+	}
+
+	var dbFollowing models.Following
+	err = node.repo.DB().View(func(tx database.Tx) error {
+		var e error
+		dbFollowing, e = tx.GetFollowing()
+		return e
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dbFollowing.Count() != 2 {
+		t.Fatalf("DB following count mismatch. Expected 2, got %d", dbFollowing.Count())
 	}
 }
 
 func TestMobazhaNode_GetFollowers(t *testing.T) {
-	mocknet, err := NewMocknet(2)
+	node, err := MockNode()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer mocknet.TearDown()
+	defer node.repo.DestroyRepo()
 
-	p, err := peer.Decode("12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN")
+	p1, err := peer.Decode("12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p2, err := peer.Decode("12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = mocknet.Nodes()[0].repo.DB().Update(func(tx database.Tx) error {
-		return tx.SetFollowers(models.Followers{p.String()})
+	err = node.repo.DB().Update(func(tx database.Tx) error {
+		return tx.SetFollowers(models.Followers{p1.String()})
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	done := make(chan struct{})
-	mocknet.Nodes()[0].Publish(done)
-
-	select {
-	case <-done:
-	case <-time.After(time.Second * 10):
-		t.Fatal("Timeout waiting on channel")
+	followers, err := node.Social().GetMyFollowers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if followers.Count() != 1 {
+		t.Fatalf("Incorrect number of followers returned. Expected %d, got %d", 1, followers.Count())
+	}
+	if followers[0] != p1.String() {
+		t.Errorf("Incorrect follower peer returned. Expected %s, got %s", p1.String(), followers[0])
 	}
 
-	followers, err := mocknet.Nodes()[1].Social().GetFollowers(context.Background(), mocknet.Nodes()[0].Identity(), nil, false)
+	err = node.repo.DB().Update(func(tx database.Tx) error {
+		return tx.SetFollowers(models.Followers{p1.String(), p2.String()})
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if followers.Count() != 1 {
-		t.Errorf("Incorrect number of following returned. Expected %d, %d", 1, followers.Count())
+	followers, err = node.Social().GetMyFollowers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if followers.Count() != 2 {
+		t.Fatalf("Incorrect number of followers returned. Expected %d, got %d", 2, followers.Count())
 	}
 
-	if followers[0] != p.String() {
-		t.Errorf("Incorrect following peer returned. Expected %s, got %s", p.String(), followers[0])
+	var dbFollowers models.Followers
+	err = node.repo.DB().View(func(tx database.Tx) error {
+		var e error
+		dbFollowers, e = tx.GetFollowers()
+		return e
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dbFollowers.Count() != 2 {
+		t.Fatalf("DB followers count mismatch. Expected 2, got %d", dbFollowers.Count())
 	}
 }
 

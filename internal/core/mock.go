@@ -222,6 +222,7 @@ func MockNode() (*MobazhaNode, error) {
 	node.initChannelsService()
 	node.initListingService()
 	node.initShoppingCartService()
+	node.initPaymentService()
 	node.registerPaymentStrategies()
 	node.paymentRegistry.Register(iwallet.ChainMock, &adapters.UTXOAutoConfirmAdapter{
 		Multiwallet:    node.multiwallet,
@@ -447,6 +448,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		node.initChannelsService()
 		node.initListingService()
 		node.initShoppingCartService()
+		node.initPaymentService()
 		node.registerPaymentStrategies()
 		node.paymentRegistry.Register(iwallet.ChainMock, &adapters.UTXOAutoConfirmAdapter{
 			Multiwallet:    node.multiwallet,

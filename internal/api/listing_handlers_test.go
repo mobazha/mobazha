@@ -17,7 +17,7 @@ func TestListingHandlers(t *testing.T) {
 	runAPITests(t, apiTests{
 		{
 			name:   "Get my listing index",
-			path:   "/v1/listingindex",
+			path:   "/v1/listings/index",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyListingsFunc = func() (models.ListingIndex, error) {
@@ -44,7 +44,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get listing index no cache",
-			path:   "/v1/listingindex/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
+			path:   "/v1/listings/index/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -75,7 +75,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get listing index with cache",
-			path:   "/v1/listingindex/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi?usecache=true",
+			path:   "/v1/listings/index/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi?usecache=true",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getListingsFunc = func(ctx context.Context, pid peer.ID, useCache bool) (models.ListingIndex, error) {
@@ -112,7 +112,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Listing index invalid peer ID",
-			path:   "/v1/listingindex/adsfasdfad",
+			path:   "/v1/listings/index/adsfasdfad",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -132,7 +132,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Listing index not found",
-			path:   "/v1/listingindex/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
+			path:   "/v1/listings/index/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -148,7 +148,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Listing index internal error",
-			path:   "/v1/listingindex/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
+			path:   "/v1/listings/index/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -163,7 +163,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get listing by CID",
-			path:   "/v1/listing/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+			path:   "/v1/listings/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -188,7 +188,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get listing by slug",
-			path:   "/v1/listing/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/t-shirt",
+			path:   "/v1/listings/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/t-shirt",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -213,7 +213,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get listing by slug with usecache",
-			path:   "/v1/listing/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/t-shirt?usecache=true",
+			path:   "/v1/listings/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/t-shirt?usecache=true",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -249,7 +249,7 @@ func TestListingHandlers(t *testing.T) {
 			// When CID decode fails, handler falls back to GetMyListingBySlug as a slug lookup.
 			// If the slug is also not found, handler returns 404.
 			name:   "Get listing by invalid CID",
-			path:   "/v1/listing/asdfadf",
+			path:   "/v1/listings/asdfadf",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -264,7 +264,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get listing by slug invalid peerID",
-			path:   "/v1/listing/asdfadf/slug",
+			path:   "/v1/listings/asdfadf/slug",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -284,7 +284,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get listing not found",
-			path:   "/v1/listing/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+			path:   "/v1/listings/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -299,7 +299,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get listing internal error",
-			path:   "/v1/listing/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+			path:   "/v1/listings/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -314,7 +314,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get my listing by CID",
-			path:   "/v1/mylisting/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+			path:   "/v1/listings/mine/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -339,7 +339,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get my listing by slug",
-			path:   "/v1/mylisting/t-shirt",
+			path:   "/v1/listings/mine/t-shirt",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -364,7 +364,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get my listing not found",
-			path:   "/v1/mylisting/t-shirt",
+			path:   "/v1/listings/mine/t-shirt",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -379,7 +379,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get my listing internal error",
-			path:   "/v1/mylisting/t-shirt",
+			path:   "/v1/listings/mine/t-shirt",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -394,7 +394,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post listing",
-			path:   "/v1/listing",
+			path:   "/v1/listings",
 			method: http.MethodPost,
 			body:   []byte("{}"),
 			setNodeMethods: func(n *mockNode) {
@@ -415,7 +415,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post listing invalid JSON",
-			path:   "/v1/listing",
+			path:   "/v1/listings",
 			method: http.MethodPost,
 			body:   []byte("{"),
 			setNodeMethods: func(n *mockNode) {
@@ -433,7 +433,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post listing, listing exists",
-			path:   "/v1/listing",
+			path:   "/v1/listings",
 			method: http.MethodPost,
 			body:   []byte("{}"),
 			setNodeMethods: func(n *mockNode) {
@@ -451,7 +451,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post listing, bad request",
-			path:   "/v1/listing",
+			path:   "/v1/listings",
 			method: http.MethodPost,
 			body:   []byte("{}"),
 			setNodeMethods: func(n *mockNode) {
@@ -469,7 +469,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post listing, internal error",
-			path:   "/v1/listing",
+			path:   "/v1/listings",
 			method: http.MethodPost,
 			body:   []byte("{}"),
 			setNodeMethods: func(n *mockNode) {
@@ -487,7 +487,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Put listing",
-			path:   "/v1/listing",
+			path:   "/v1/listings",
 			method: http.MethodPut,
 			body:   []byte("{}"),
 			setNodeMethods: func(n *mockNode) {
@@ -508,7 +508,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Put listing invalid JSON",
-			path:   "/v1/listing",
+			path:   "/v1/listings",
 			method: http.MethodPut,
 			body:   []byte("{"),
 			setNodeMethods: func(n *mockNode) {
@@ -526,7 +526,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Put listing, listing does not exists",
-			path:   "/v1/listing",
+			path:   "/v1/listings",
 			method: http.MethodPut,
 			body:   []byte("{}"),
 			setNodeMethods: func(n *mockNode) {
@@ -544,7 +544,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Put listing, bad request",
-			path:   "/v1/listing",
+			path:   "/v1/listings",
 			method: http.MethodPut,
 			body:   []byte("{}"),
 			setNodeMethods: func(n *mockNode) {
@@ -562,7 +562,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Put listing, internal error",
-			path:   "/v1/listing",
+			path:   "/v1/listings",
 			method: http.MethodPut,
 			body:   []byte("{}"),
 			setNodeMethods: func(n *mockNode) {
@@ -580,7 +580,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Delete listing",
-			path:   "/v1/listing/t-shirt",
+			path:   "/v1/listings/t-shirt",
 			method: http.MethodDelete,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -595,7 +595,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Delete listing not found",
-			path:   "/v1/listing/t-shirt",
+			path:   "/v1/listings/t-shirt",
 			method: http.MethodDelete,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -610,7 +610,7 @@ func TestListingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Delete listing internal error",
-			path:   "/v1/listing/t-shirt",
+			path:   "/v1/listings/t-shirt",
 			method: http.MethodDelete,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {

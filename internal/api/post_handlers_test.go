@@ -15,7 +15,7 @@ func TestPostHandlers(t *testing.T) {
 	runAPITests(t, apiTests{
 		{
 			name:   "Get peer post by slug",
-			path:   "/v1/post/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/t-shirt",
+			path:   "/v1/posts/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/t-shirt",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -40,7 +40,7 @@ func TestPostHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get peer post by slug with usecache",
-			path:   "/v1/post/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/t-shirt?usecache=true",
+			path:   "/v1/posts/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/t-shirt?usecache=true",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -74,7 +74,7 @@ func TestPostHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get peer post by slug invalid peerID",
-			path:   "/v1/post/asdfadf/slug",
+			path:   "/v1/posts/asdfadf/slug",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -94,7 +94,7 @@ func TestPostHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get peer post not found",
-			path:   "/v1/post/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/slug",
+			path:   "/v1/posts/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/slug",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -109,7 +109,7 @@ func TestPostHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get peer post internal error",
-			path:   "/v1/post/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/slug",
+			path:   "/v1/posts/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/slug",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -124,7 +124,7 @@ func TestPostHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get my post by slug",
-			path:   "/v1/post/t-shirt",
+			path:   "/v1/posts/t-shirt",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -149,7 +149,7 @@ func TestPostHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get my post not found",
-			path:   "/v1/post/t-shirt",
+			path:   "/v1/posts/t-shirt",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -164,7 +164,7 @@ func TestPostHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get my post internal error",
-			path:   "/v1/post/t-shirt",
+			path:   "/v1/posts/t-shirt",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -179,7 +179,7 @@ func TestPostHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post post",
-			path:   "/v1/post",
+			path:   "/v1/posts",
 			method: http.MethodPost,
 			body:   []byte("{}"),
 			setNodeMethods: func(n *mockNode) {
@@ -200,7 +200,7 @@ func TestPostHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post post invalid JSON",
-			path:   "/v1/post",
+			path:   "/v1/posts",
 			method: http.MethodPost,
 			body:   []byte("{"),
 			setNodeMethods: func(n *mockNode) {
@@ -218,7 +218,7 @@ func TestPostHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post post, post exists",
-			path:   "/v1/post",
+			path:   "/v1/posts",
 			method: http.MethodPost,
 			body:   []byte("{\"slug\": \"test\"}"),
 			setNodeMethods: func(n *mockNode) {
@@ -236,7 +236,7 @@ func TestPostHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post post, bad request",
-			path:   "/v1/post",
+			path:   "/v1/posts",
 			method: http.MethodPost,
 			body:   []byte("{}"),
 			setNodeMethods: func(n *mockNode) {
@@ -254,7 +254,7 @@ func TestPostHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post post, internal error",
-			path:   "/v1/post",
+			path:   "/v1/posts",
 			method: http.MethodPost,
 			body:   []byte("{}"),
 			setNodeMethods: func(n *mockNode) {
@@ -272,7 +272,7 @@ func TestPostHandlers(t *testing.T) {
 		},
 		{
 			name:   "Delete post",
-			path:   "/v1/post/t-shirt",
+			path:   "/v1/posts/t-shirt",
 			method: http.MethodDelete,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -287,7 +287,7 @@ func TestPostHandlers(t *testing.T) {
 		},
 		{
 			name:   "Delete post not found",
-			path:   "/v1/post/t-shirt",
+			path:   "/v1/posts/t-shirt",
 			method: http.MethodDelete,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -302,7 +302,7 @@ func TestPostHandlers(t *testing.T) {
 		},
 		{
 			name:   "Delete post internal error",
-			path:   "/v1/post/t-shirt",
+			path:   "/v1/posts/t-shirt",
 			method: http.MethodDelete,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {

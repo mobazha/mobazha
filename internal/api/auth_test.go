@@ -97,7 +97,7 @@ func TestGateway_AuthenticationMiddleware(t *testing.T) {
 	}
 	for i, test := range tests {
 		gateway.config = test.config
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s/v1/profile", ts.URL), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s/v1/profiles", ts.URL), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

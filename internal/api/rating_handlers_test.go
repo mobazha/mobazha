@@ -18,7 +18,7 @@ func TestRatingHandlers(t *testing.T) {
 	runAPITests(t, apiTests{
 		{
 			name:   "Get my ratings index",
-			path:   "/v1/ratingindex",
+			path:   "/v1/ratings/index",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyRatingsFunc = func() (models.RatingIndex, error) {
@@ -42,7 +42,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get rating index no cache",
-			path:   "/v1/ratingindex/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
+			path:   "/v1/ratings/index/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -70,7 +70,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get rating index with cache",
-			path:   "/v1/ratingindex/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi?usecache=true",
+			path:   "/v1/ratings/index/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi?usecache=true",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getRatingsFunc = func(ctx context.Context, pid peer.ID, useCache bool) (models.RatingIndex, error) {
@@ -108,7 +108,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Rating index invalid peer ID (treated as slug)",
-			path:   "/v1/ratingindex/adsfasdfad",
+			path:   "/v1/ratings/index/adsfasdfad",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -125,7 +125,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Rating index not found",
-			path:   "/v1/ratingindex/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
+			path:   "/v1/ratings/index/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -141,7 +141,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Rating index internal error",
-			path:   "/v1/ratingindex/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
+			path:   "/v1/ratings/index/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -156,7 +156,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get rating",
-			path:   "/v1/rating/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+			path:   "/v1/ratings/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -177,7 +177,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get rating by invalid CID",
-			path:   "/v1/rating/asdfadf",
+			path:   "/v1/ratings/asdfadf",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -195,7 +195,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get rating not found",
-			path:   "/v1/rating/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+			path:   "/v1/ratings/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -210,7 +210,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get rating internal error",
-			path:   "/v1/rating/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+			path:   "/v1/ratings/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 			method: http.MethodGet,
 			body:   nil,
 			setNodeMethods: func(n *mockNode) {
@@ -225,7 +225,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Fetch ratings success",
-			path:   "/v1/fetchratings",
+			path:   "/v1/ratings/batch",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.getRatingFunc = func(ctx context.Context, id cid.Cid) (*pb.Rating, error) {
@@ -265,7 +265,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Fetch ratings invalid peerID",
-			path:   "/v1/fetchratings",
+			path:   "/v1/ratings/batch",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.getRatingFunc = func(ctx context.Context, id cid.Cid) (*pb.Rating, error) {
@@ -299,7 +299,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Fetch ratings invalid JSON",
-			path:   "/v1/fetchratings",
+			path:   "/v1/ratings/batch",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.getRatingFunc = func(ctx context.Context, id cid.Cid) (*pb.Rating, error) {
@@ -320,7 +320,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Fetch ratings one not found",
-			path:   "/v1/fetchratings",
+			path:   "/v1/ratings/batch",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.getRatingFunc = func(ctx context.Context, id cid.Cid) (*pb.Rating, error) {
@@ -351,7 +351,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Fetch ratings none found",
-			path:   "/v1/fetchratings",
+			path:   "/v1/ratings/batch",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.getRatingFunc = func(ctx context.Context, id cid.Cid) (*pb.Rating, error) {
@@ -366,7 +366,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get ratings",
-			path:   "/v1/ratingindex/12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN/tshirt",
+			path:   "/v1/ratings/index/12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN/tshirt",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getRatingsFunc = func(ctx context.Context, pid peer.ID, useCache bool) (models.RatingIndex, error) {
@@ -392,7 +392,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get my ratings",
-			path:   "/v1/ratingindex/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/tshirt",
+			path:   "/v1/ratings/index/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/tshirt",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.identityFunc = func() peer.ID {
@@ -422,7 +422,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get ratings use cache",
-			path:   "/v1/ratingindex/12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN/tshirt?usecache=true",
+			path:   "/v1/ratings/index/12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN/tshirt?usecache=true",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getRatingsFunc = func(ctx context.Context, pid peer.ID, useCache bool) (models.RatingIndex, error) {
@@ -451,7 +451,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get ratings invalid peerID",
-			path:   "/v1/ratingindex/adfaf/tshirt",
+			path:   "/v1/ratings/index/adfaf/tshirt",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getRatingsFunc = func(ctx context.Context, pid peer.ID, useCache bool) (models.RatingIndex, error) {
@@ -473,7 +473,7 @@ func TestRatingHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get ratings internal error",
-			path:   "/v1/ratingindex/12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN/tshirt",
+			path:   "/v1/ratings/index/12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN/tshirt",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getRatingsFunc = func(ctx context.Context, pid peer.ID, useCache bool) (models.RatingIndex, error) {

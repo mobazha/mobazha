@@ -262,12 +262,12 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/dispute/releaseAfterTimeout", g.handlePOSTReleaseEscrow).Methods("POST")
 
 		// Cart
-		r.HandleFunc("/v1/carts/itemsCount", g.handleGETCartsItemsCount).Methods("GET")
+		r.HandleFunc("/v1/carts/count", g.handleGETCartsItemsCount).Methods("GET")
 		r.HandleFunc("/v1/carts", g.handleGETCarts).Methods("GET")
 		r.HandleFunc("/v1/carts", g.handleClearCarts).Methods("DELETE")
-		r.HandleFunc("/v1/carts/{peerID}/add", g.handleAddToCart).Methods("POST")
-		r.HandleFunc("/v1/carts/{peerID}/update", g.handleAddToCart).Methods("POST")
-		r.HandleFunc("/v1/carts/{peerID}/remove", g.handleRemoveCartItem).Methods("POST")
+		r.HandleFunc("/v1/carts/{peerID}/items", g.handleAddToCart).Methods("POST")
+		r.HandleFunc("/v1/carts/{peerID}/items", g.handleAddToCart).Methods("PUT")
+		r.HandleFunc("/v1/carts/{peerID}/items", g.handleRemoveCartItem).Methods("DELETE")
 
 		// Following
 		r.HandleFunc("/v1/followsme/{peerID}", g.handleGETFollowsMe).Methods("GET")
@@ -275,10 +275,10 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/unfollow/{peerID}", g.handlePOSTUnFollow).Methods("POST")
 
 		// Listings
-		r.HandleFunc("/v1/mylisting/{slugOrCID}", g.handleGETMyListing).Methods("GET")
-		r.HandleFunc("/v1/listing", g.handlePOSTListing).Methods("POST")
-		r.HandleFunc("/v1/listing", g.handlePUTListing).Methods("PUT")
-		r.HandleFunc("/v1/listing/{slug}", g.handleDELETEListing).Methods("DELETE")
+		r.HandleFunc("/v1/listings/mine/{slugOrCID}", g.handleGETMyListing).Methods("GET")
+		r.HandleFunc("/v1/listings", g.handlePOSTListing).Methods("POST")
+		r.HandleFunc("/v1/listings", g.handlePUTListing).Methods("PUT")
+		r.HandleFunc("/v1/listings/{slug}", g.handleDELETEListing).Methods("DELETE")
 
 		// Listings Batch Import
 		r.HandleFunc("/v1/listings/import", g.handlePOSTListingsImport).Methods("POST")
@@ -293,17 +293,18 @@ func (g *Gateway) newV1Router() *mux.Router {
 		// File
 		r.HandleFunc("/v1/file", g.handlePOSTFile).Methods("POST")
 
-		// Profiles
-		r.HandleFunc("/v1/profile", g.handlePOSTProfile).Methods("POST")
-		r.HandleFunc("/v1/profile/{peerID}", g.handlePOSTProfile).Methods("POST")
-		r.HandleFunc("/v1/profile", g.handlePUTProfile).Methods("PUT")
-		r.HandleFunc("/v1/profile/{peerID}", g.handlePUTProfile).Methods("PUT")
+		// Profiles (batch before {peerID} to avoid gorilla/mux ambiguity)
+		r.HandleFunc("/v1/profiles/batch", g.handlePOSTFetchProfiles).Methods("GET", "POST")
+		r.HandleFunc("/v1/profiles", g.handlePOSTProfile).Methods("POST")
+		r.HandleFunc("/v1/profiles/{peerID}", g.handlePOSTProfile).Methods("POST")
+		r.HandleFunc("/v1/profiles", g.handlePUTProfile).Methods("PUT")
+		r.HandleFunc("/v1/profiles/{peerID}", g.handlePUTProfile).Methods("PUT")
 
 		// Ratings
 
 		// Posts
-		r.HandleFunc("/v1/post", g.handlePOSTPost).Methods("POST")
-		r.HandleFunc("/v1/post/{slug}", g.handleDELETEPost).Methods("DELETE")
+		r.HandleFunc("/v1/posts", g.handlePOSTPost).Methods("POST")
+		r.HandleFunc("/v1/posts/{slug}", g.handleDELETEPost).Methods("DELETE")
 
 		r.HandleFunc("/v1/signmessage", g.handlePOSTSignMessage).Methods("POST")
 		r.HandleFunc("/v1/verifymessage", g.handlePOSTVerifyMessage).Methods("POST")
@@ -346,28 +347,28 @@ func (g *Gateway) newV1Router() *mux.Router {
 	// File
 	r.HandleFunc("/v1/file/{fileID}", g.handleGETFile).Methods("GET")
 
-	// Listings
-	r.HandleFunc("/v1/listing/{listingID}", g.handleGETListing).Methods("GET")
-	r.HandleFunc("/v1/listing/{peerID}/{slug}", g.handleGETListing).Methods("GET")
-	r.HandleFunc("/v1/listingindex/{peerID}", g.handleGETListingIndex).Methods("GET")
-	r.HandleFunc("/v1/listingindex", g.handleGETListingIndex).Methods("GET")
+	// Listings (literal paths before variable paths to avoid gorilla/mux ambiguity)
+	r.HandleFunc("/v1/listings/index/{peerID}", g.handleGETListingIndex).Methods("GET")
+	r.HandleFunc("/v1/listings/index", g.handleGETListingIndex).Methods("GET")
 	r.HandleFunc("/v1/listings/template", g.handleGETListingsTemplate).Methods("GET") // Public: no auth required
+	r.HandleFunc("/v1/listings/{peerID}/{slug}", g.handleGETListing).Methods("GET")
+	r.HandleFunc("/v1/listings/{listingID}", g.handleGETListing).Methods("GET")
 
-	// Profiles
-	r.HandleFunc("/v1/profile/{peerID}", g.handleGETProfile).Methods("GET")
-	r.HandleFunc("/v1/profile", g.handleGETProfile).Methods("GET")
-	r.HandleFunc("/v1/fetchprofiles", g.handlePOSTFetchProfiles).Methods("GET", "POST")
+	// Profiles (literal paths before variable paths to avoid gorilla/mux ambiguity)
+	r.HandleFunc("/v1/profiles/batch", g.handlePOSTFetchProfiles).Methods("GET", "POST")
+	r.HandleFunc("/v1/profiles/{peerID}", g.handleGETProfile).Methods("GET")
+	r.HandleFunc("/v1/profiles", g.handleGETProfile).Methods("GET")
 
 	// Ratings
-	r.HandleFunc("/v1/ratingindex/{peerIDOrSlug}", g.handleGETRatingIndex).Methods("GET")
-	r.HandleFunc("/v1/ratingindex", g.handleGETMyRatingIndex).Methods("GET")
-	r.HandleFunc("/v1/ratingindex/{peerID}/{slug}", g.handleGETPeerRatingsBySlug).Methods("GET")
-	r.HandleFunc("/v1/rating/{ratingID}", g.handleGETRating).Methods("GET")
-	r.HandleFunc("/v1/fetchratings", g.handlePOSTFetchRatings).Methods("POST")
+	r.HandleFunc("/v1/ratings/index/{peerIDOrSlug}", g.handleGETRatingIndex).Methods("GET")
+	r.HandleFunc("/v1/ratings/index", g.handleGETMyRatingIndex).Methods("GET")
+	r.HandleFunc("/v1/ratings/index/{peerID}/{slug}", g.handleGETPeerRatingsBySlug).Methods("GET")
+	r.HandleFunc("/v1/ratings/{ratingID}", g.handleGETRating).Methods("GET")
+	r.HandleFunc("/v1/ratings/batch", g.handlePOSTFetchRatings).Methods("POST")
 
 	// Posts
-	r.HandleFunc("/v1/post/{slug}", g.handleGETMyPost).Methods("GET")
-	r.HandleFunc("/v1/post/{peerID}/{slug}", g.handleGETPost).Methods("GET")
+	r.HandleFunc("/v1/posts/{slug}", g.handleGETMyPost).Methods("GET")
+	r.HandleFunc("/v1/posts/{peerID}/{slug}", g.handleGETPost).Methods("GET")
 
 	// Following
 	r.HandleFunc("/v1/followers/{peerID}", g.handleGETFollowers).Methods("GET")

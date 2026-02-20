@@ -45,6 +45,46 @@ func WithHostService(hs coreiface.HostService) NodeOption {
 
 // applyOptions applies NodeOption functions and sets defaults for
 // fields that weren't explicitly overridden.
+//
+// App Service Initialization Dependency Graph
+// ============================================
+//
+// Each service depends on services above it. Services that reference
+// later-initialized services MUST use closures (not direct method values)
+// to defer evaluation until call time. See callback-safety-rules.mdc.
+//
+//  Step | Service              | Runtime deps (via closures)             | Direct deps (must be init'd before)
+//  ─────┼──────────────────────┼─────────────────────────────────────────┼─────────────────────────────────────
+//   1   │ paymentService       │ profileService, orderService            │ (none)
+//   2   │ orderService         │ paymentService, listingService,         │ (none)
+//       │                      │ moderationService                       │
+//   3   │ chatService          │                                         │ (none)
+//   4   │ matrixService        │                                         │ (none)
+//   5   │ preferencesService   │ listingService                          │ (none)
+//   6   │ mediaService         │                                         │ (none)
+//   7   │ ratingsService       │                                         │ (none)
+//   8   │ notificationService  │                                         │ (none)
+//   9   │ shoppingCartService  │                                         │ (none)
+//  10   │ profileService       │ paymentService                          │ (none)
+//  11   │ followService        │                                         │ profileService
+//  12   │ postsService         │                                         │ profileService
+//  13   │ moderationService    │ listingService                          │ profileService
+//  14   │ channelsService      │                                         │ preferencesService
+//  15   │ listingService       │                                         │ profileService
+//
+// "Runtime deps" = referenced via closures; safe even if the target is
+//   initialized later because the closure captures `n` (not the service).
+// "Direct deps" = the service pointer is read at init time (nil-guarded
+//   or used directly); MUST already be non-nil.
+//
+// ADDING A NEW APP SERVICE — Standard Procedure:
+//  1. Create init method: func (n *MobazhaNode) initXxxService()
+//  2. Determine dependencies:
+//     a. If depending on a service initialized AFTER this one → use closure
+//     b. If depending on a service initialized BEFORE → nil-guarded direct capture is OK
+//  3. Add the call to this function in the correct position
+//  4. Update the dependency graph table above
+//  5. Run: go build ./... && go test ./internal/core/...
 func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	for _, opt := range opts {
 		opt(n)
@@ -492,10 +532,12 @@ func (n *MobazhaNode) initModerationService() {
 		GetAcceptedCurrencies: func() ([]string, error) {
 			return n.paymentService.GetAcceptedCurrencies()
 		},
-		AnnounceAsModerator:   announceAsModerator,
-		RemoveAsModerator:     removeAsModerator,
-		FindModeratorsAsync:   findModeratorsAsync,
-		UpdateAllListings:     n.listingService.UpdateAllListings,
+		AnnounceAsModerator: announceAsModerator,
+		RemoveAsModerator:   removeAsModerator,
+		FindModeratorsAsync: findModeratorsAsync,
+		UpdateAllListings: func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error {
+			return n.listingService.UpdateAllListings(updateFunc, done)
+		},
 	})
 }
 
@@ -530,24 +572,26 @@ func (n *MobazhaNode) initListingService() {
 	}
 
 	var getMyProfile GetMyProfileFunc
+	var updateAndSaveProfile UpdateAndSaveProfileFunc
 	if n.profileService != nil {
 		getMyProfile = n.profileService.GetMyProfile
+		updateAndSaveProfile = n.profileService.UpdateAndSaveProfile
 	}
 
 	n.listingService = NewListingAppService(ListingAppServiceConfig{
-		DB:                 n.db,
-		Signer:             n.signer,
-		ContentStore:       n.contentStore,
-		NetDB:              n.netDB,
-		BanManager:         n.banManager,
-		Keys:               n.keyProvider,
-		FeatureManager:     n.featureManager,
-		LocalListingCrypto: n.localListingCrypto,
-		NodeID:             n.Identity(),
-		Testnet:            n.testnet,
-		Publish:            n.Publish,
-		FetchIPNSRecord:    n.fetchIPNSRecord,
-		GetMyProfile:       getMyProfile,
-		UpdateAndSaveProfile: n.profileService.UpdateAndSaveProfile,
+		DB:                   n.db,
+		Signer:               n.signer,
+		ContentStore:         n.contentStore,
+		NetDB:                n.netDB,
+		BanManager:           n.banManager,
+		Keys:                 n.keyProvider,
+		FeatureManager:       n.featureManager,
+		LocalListingCrypto:   n.localListingCrypto,
+		NodeID:               n.Identity(),
+		Testnet:              n.testnet,
+		Publish:              n.Publish,
+		FetchIPNSRecord:      n.fetchIPNSRecord,
+		GetMyProfile:         getMyProfile,
+		UpdateAndSaveProfile: updateAndSaveProfile,
 	})
 }

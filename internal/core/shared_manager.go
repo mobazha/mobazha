@@ -221,6 +221,13 @@ func (im *SharedManager) GetHTTPGateway() *api.Gateway {
 	return im.httpGateway
 }
 
+// SetHTTPGateway sets the HTTP gateway. Used by hosting to inject the
+// SharedRouter's Gateway so that builder.go's NotifyWebsockets integration
+// reaches the correct WebSocket hubs.
+func (im *SharedManager) SetHTTPGateway(gw *api.Gateway) {
+	im.httpGateway = gw
+}
+
 func (im *SharedManager) AddNode(nodeID string, node contracts.NodeService) {
 	im.mu.Lock()
 	defer im.mu.Unlock()

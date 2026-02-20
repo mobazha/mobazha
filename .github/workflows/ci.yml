@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: node
+
+      - uses: actions/checkout@v4
+        with:
+          repository: mobazha/mobazha-core
+          path: core
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: node/go.sum
+
+      - name: Create workspace
+        run: |
+          cat > go.work <<'EOF'
+          go 1.24.0
+
+          use (
+            ./node
+            ./core
+          )
+          EOF
+          sed -i 's/^          //' go.work
+
+      - name: Vet
+        run: go vet ./...
+        working-directory: node
+
+      - name: Test
+        run: go test -race -count=1 -timeout 10m ./...
+        working-directory: node
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: node
+
+      - uses: actions/checkout@v4
+        with:
+          repository: mobazha/mobazha-core
+          path: core
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: node/go.sum
+
+      - name: Create workspace
+        run: |
+          cat > go.work <<'EOF'
+          go 1.24.0
+
+          use (
+            ./node
+            ./core
+          )
+          EOF
+          sed -i 's/^          //' go.work
+
+      - name: Build
+        run: go build -o /dev/null .
+        working-directory: node

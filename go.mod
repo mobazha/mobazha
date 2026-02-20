@@ -4,26 +4,16 @@ go 1.24.0
 
 toolchain go1.24.5
 
-replace (
-	// Use local mobazha-core for development
-	github.com/mobazha/mobazha-core => /Users/mingfeng/dev/mobazha/core
-	// github.com/ipfs/kubo => /Users/mingfeng/go/src/github.com/mobazha/kubo
-
-	// github.com/multiformats/go-multiaddr => /Users/mingfeng/go/src/github.com/multiformats/go-multiaddr
-	github.com/nanmu42/etherscan-api => /Users/mingfeng/go/src/github.com/mobazha/etherscan-api
-	github.com/wlynxg/anet => /Users/mingfeng/go/src/github.com/wlynxg/anet
-)
+// Use local mobazha-core for development
+replace github.com/mobazha/mobazha-core => /Users/mingfeng/dev/mobazha/core
 
 require (
-	github.com/OpenBazaar/golang-socketio v0.0.0-20200109001351-4147b5f0d294
 	github.com/btcsuite/btcd v0.25.0
 	github.com/btcsuite/btcd/btcec/v2 v2.3.5
 	github.com/btcsuite/btcd/btcutil v1.1.5
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
-	github.com/btcsuite/btcwallet/wallet/txauthor v1.3.3
 	github.com/btcsuite/btcwallet/wallet/txrules v1.2.0
 	github.com/btcsuite/btcwallet/wallet/txsizes v1.2.3
-	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cretz/bine v0.2.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/ethereum/go-ethereum v1.16.8
@@ -61,7 +51,6 @@ require (
 	github.com/ltcsuite/ltcd v0.22.1-beta
 	github.com/ltcsuite/ltcd/btcec/v2 v2.1.0
 	github.com/ltcsuite/ltcd/ltcutil v1.1.0
-	github.com/ltcsuite/ltcwallet/wallet/txauthor v1.1.0
 	github.com/ltcsuite/ltcwallet/wallet/txrules v1.2.0
 	github.com/ltcsuite/ltcwallet/wallet/txsizes v1.1.0
 	github.com/martinboehm/btcd v0.0.0-20221101112928-408689e15809
@@ -86,7 +75,6 @@ require (
 	go.uber.org/fx v1.24.0
 	golang.org/x/crypto v0.47.0
 	golang.org/x/net v0.48.0
-	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
 	gorm.io/driver/sqlite v1.4.4
 	gorm.io/gorm v1.24.5
@@ -115,9 +103,9 @@ require (
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f // indirect
 	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd // indirect
-	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/caddyserver/certmagic v0.21.6 // indirect
 	github.com/caddyserver/zerossl v0.1.3 // indirect
+	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
 	github.com/ceramicnetwork/go-dag-jose v0.1.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -173,7 +161,6 @@ require (
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20250607225305-033d6d78b36a // indirect
 	github.com/gorilla/css v1.0.1 // indirect
-	github.com/gorilla/rpc v1.2.0 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1 // indirect
 	github.com/hashicorp/go-version v1.7.0 // indirect
@@ -361,6 +348,7 @@ require (
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.16.0 // indirect
 	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
+	google.golang.org/grpc v1.73.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect

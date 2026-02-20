@@ -885,11 +885,11 @@ func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Reque
 }
 
 // func RegisterOrderHandlers(r *mux.Router, g *Gateway) {
-// 	r.HandleFunc("/v1/ob/ordercancel", g.handlePOSTOrderCancel).Methods("POST")
-// 	r.HandleFunc("/v1/ob/orderconfirmation", g.handlePOSTOrderConfirmation).Methods("POST")
-// 	r.HandleFunc("/v1/ob/orderfulfillment", g.handlePOSTOrderFulfillment).Methods("POST")
-// 	r.HandleFunc("/v1/ob/order/confirm/instructions", g.handleGetConfirmOrderInstructions).Methods("GET")
-// 	r.HandleFunc("/v1/ob/order/reject/instructions", g.handleGetRefundOrderInstructions).Methods("GET")
+// 	r.HandleFunc("/v1/ordercancel", g.handlePOSTOrderCancel).Methods("POST")
+// 	r.HandleFunc("/v1/orderconfirmation", g.handlePOSTOrderConfirmation).Methods("POST")
+// 	r.HandleFunc("/v1/orderfulfillment", g.handlePOSTOrderFulfillment).Methods("POST")
+// 	r.HandleFunc("/v1/order/confirm/instructions", g.handleGetConfirmOrderInstructions).Methods("GET")
+// 	r.HandleFunc("/v1/order/reject/instructions", g.handleGetRefundOrderInstructions).Methods("GET")
 // }
 
 // PaymentRemainingResponse represents the response for payment remaining endpoint

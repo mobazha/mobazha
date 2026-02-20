@@ -162,25 +162,25 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/wallet/mnemonic", g.handleGETMnemonic).Methods("GET")
 
 		// Chat
-		r.HandleFunc("/v1/ob/chatmessage", g.handlePOSTSendChatMessage).Methods("POST")
-		r.HandleFunc("/v1/ob/groupchatmessage", g.handlePOSTSendGroupChatMessage).Methods("POST")
-		r.HandleFunc("/v1/ob/typingmessage", g.handlePOSTSendTypingMessage).Methods("POST")
-		r.HandleFunc("/v1/ob/grouptypingmessage", g.handlePOSTSendGroupTypingMessage).Methods("POST")
-		r.HandleFunc("/v1/ob/markchatasread", g.handlePOSTMarkChatMessageAsRead).Methods("POST")
-		r.HandleFunc("/v1/ob/chatconversations", g.handleGETChatConversations).Methods("GET")
-		r.HandleFunc("/v1/ob/orderconversations", g.handleGETOrderConversations).Methods("GET")
-		r.HandleFunc("/v1/ob/chatmessages/{peerID}", g.handleGETChatMessages).Methods("GET")
-		r.HandleFunc("/v1/ob/chatmessages", g.handleGETMyChatMessages).Methods("GET")
-		r.HandleFunc("/v1/ob/groupchatmessages/{orderID}", g.handleGETGroupChatMessages).Methods("GET")
-		r.HandleFunc("/v1/ob/chatmessage/{messageID}", g.handleDELETEChatMessages).Methods("DELETE")
-		r.HandleFunc("/v1/ob/groupchatmessages/{orderID}", g.handleDELETEGroupChatMessages).Methods("DELETE")
-		r.HandleFunc("/v1/ob/chatconversation/{peerID}", g.handleDELETEChatConversation).Methods("DELETE")
+		r.HandleFunc("/v1/chatmessage", g.handlePOSTSendChatMessage).Methods("POST")
+		r.HandleFunc("/v1/groupchatmessage", g.handlePOSTSendGroupChatMessage).Methods("POST")
+		r.HandleFunc("/v1/typingmessage", g.handlePOSTSendTypingMessage).Methods("POST")
+		r.HandleFunc("/v1/grouptypingmessage", g.handlePOSTSendGroupTypingMessage).Methods("POST")
+		r.HandleFunc("/v1/markchatasread", g.handlePOSTMarkChatMessageAsRead).Methods("POST")
+		r.HandleFunc("/v1/chatconversations", g.handleGETChatConversations).Methods("GET")
+		r.HandleFunc("/v1/orderconversations", g.handleGETOrderConversations).Methods("GET")
+		r.HandleFunc("/v1/chatmessages/{peerID}", g.handleGETChatMessages).Methods("GET")
+		r.HandleFunc("/v1/chatmessages", g.handleGETMyChatMessages).Methods("GET")
+		r.HandleFunc("/v1/groupchatmessages/{orderID}", g.handleGETGroupChatMessages).Methods("GET")
+		r.HandleFunc("/v1/chatmessage/{messageID}", g.handleDELETEChatMessages).Methods("DELETE")
+		r.HandleFunc("/v1/groupchatmessages/{orderID}", g.handleDELETEGroupChatMessages).Methods("DELETE")
+		r.HandleFunc("/v1/chatconversation/{peerID}", g.handleDELETEChatConversation).Methods("DELETE")
 
 		// Chat group
-		r.HandleFunc("/v1/ob/chatgroups", g.handleGetChatGroups).Methods("GET")
-		r.HandleFunc("/v1/ob/chatGroup", g.handleSaveChatGroup).Methods("POST")
-		r.HandleFunc("/v1/ob/chatGroup", g.handleGetChatGroup).Methods("GET")
-		r.HandleFunc("/v1/ob/chatGroup", g.handleDeleteChatGroup).Methods("DELETE")
+		r.HandleFunc("/v1/chatgroups", g.handleGetChatGroups).Methods("GET")
+		r.HandleFunc("/v1/chatGroup", g.handleSaveChatGroup).Methods("POST")
+		r.HandleFunc("/v1/chatGroup", g.handleGetChatGroup).Methods("GET")
+		r.HandleFunc("/v1/chatGroup", g.handleDeleteChatGroup).Methods("DELETE")
 
 		// Matrix E2EE Key Backup (stored locally, encrypted with wallet mnemonic)
 		r.HandleFunc("/v1/matrix/key-backup", g.handlePOSTMatrixKeyBackup).Methods("POST")
@@ -201,11 +201,11 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/matrix/secrets-bundle/info", g.handleGETMatrixSecretsBundleInfo).Methods("GET")
 
 		// Notification
-		r.HandleFunc("/v1/ob/notifications", g.handleGetNotifications).Methods("GET")
-		r.HandleFunc("/v1/ob/notifications/count", g.handleGetNotificationCount).Methods("GET")
-		r.HandleFunc("/v1/ob/notifications/batch", g.handleBatchNotifications).Methods("POST")
-		r.HandleFunc("/v1/ob/marknotificationasread/{notifID}", g.handlePOSTMarkNotificationMessageAsRead).Methods("POST")
-		r.HandleFunc("/v1/ob/marknotificationsasread", g.handlePOSTMarkNotificationsMessageAsRead).Methods("POST")
+		r.HandleFunc("/v1/notifications", g.handleGetNotifications).Methods("GET")
+		r.HandleFunc("/v1/notifications/count", g.handleGetNotificationCount).Methods("GET")
+		r.HandleFunc("/v1/notifications/batch", g.handleBatchNotifications).Methods("POST")
+		r.HandleFunc("/v1/marknotificationasread/{notifID}", g.handlePOSTMarkNotificationMessageAsRead).Methods("POST")
+		r.HandleFunc("/v1/marknotificationsasread", g.handlePOSTMarkNotificationsMessageAsRead).Methods("POST")
 
 		// Escrow
 		r.HandleFunc("/v1/instructions/order/payment", g.handleGetOrderPaymentInstructions).Methods("POST")
@@ -230,16 +230,16 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/stripe/webhook", g.HandleStripeWebhook).Methods("POST")
 
 		// Orders
-		r.HandleFunc("/v1/ob/purchases", g.handlePOSTPurchases).Methods("POST")
-		r.HandleFunc("/v1/ob/purchases", g.handleGETPurchases).Methods("GET")
-		r.HandleFunc("/v1/ob/sales", g.handleGETSales).Methods("GET")
-		r.HandleFunc("/v1/ob/sales", g.handlePostSales).Methods("POST")
-		r.HandleFunc("/v1/ob/cases", g.handleGETCases).Methods("GET")
-		r.HandleFunc("/v1/ob/cases", g.handlePostCases).Methods("POST")
+		r.HandleFunc("/v1/purchases", g.handlePOSTPurchases).Methods("POST")
+		r.HandleFunc("/v1/purchases", g.handleGETPurchases).Methods("GET")
+		r.HandleFunc("/v1/sales", g.handleGETSales).Methods("GET")
+		r.HandleFunc("/v1/sales", g.handlePostSales).Methods("POST")
+		r.HandleFunc("/v1/cases", g.handleGETCases).Methods("GET")
+		r.HandleFunc("/v1/cases", g.handlePostCases).Methods("POST")
 
-		r.HandleFunc("/v1/ob/case/{orderID}", g.handleGetCase).Methods("GET")
-		r.HandleFunc("/v1/ob/order/{orderID}", g.handleGETOrder).Methods("GET")
-		r.HandleFunc("/v1/ob/orderspend", g.handlePostSpendForOrder).Methods("POST")
+		r.HandleFunc("/v1/case/{orderID}", g.handleGetCase).Methods("GET")
+		r.HandleFunc("/v1/order/{orderID}", g.handleGETOrder).Methods("GET")
+		r.HandleFunc("/v1/orderspend", g.handlePostSpendForOrder).Methods("POST")
 		r.HandleFunc("/v1/order/{orderID}/payment/remaining", g.handleGETPaymentRemaining).Methods("GET")
 		r.HandleFunc("/v1/order/{orderID}/payment/cancel-partial", g.handlePOSTCancelPartialPayment).Methods("POST")
 		r.HandleFunc("/v1/order/{orderID}/payment/watch", g.handleDELETEPaymentWatch).Methods("DELETE")
@@ -252,8 +252,8 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/order/complete", g.handlePOSTOrderCompletion).Methods("POST")
 		r.HandleFunc("/v1/order/cancel", g.handlePOSTOrderCancel).Methods("POST")
 
-		r.HandleFunc("/v1/ob/estimatetotal", g.handlePOSTEstimateTotal).Methods("POST")
-		r.HandleFunc("/v1/ob/checkoutbreakdown", g.handlePOSTCheckoutBreakdown).Methods("POST")
+		r.HandleFunc("/v1/estimatetotal", g.handlePOSTEstimateTotal).Methods("POST")
+		r.HandleFunc("/v1/checkoutbreakdown", g.handlePOSTCheckoutBreakdown).Methods("POST")
 
 		// Moderation
 		r.HandleFunc("/v1/dispute/open", g.handlePOSTOpenDispute).Methods("POST")
@@ -262,123 +262,123 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/dispute/releaseAfterTimeout", g.handlePOSTReleaseEscrow).Methods("POST")
 
 		// Cart
-		r.HandleFunc("/v1/ob/carts/itemsCount", g.handleGETCartsItemsCount).Methods("GET")
-		r.HandleFunc("/v1/ob/carts", g.handleGETCarts).Methods("GET")
-		r.HandleFunc("/v1/ob/carts", g.handleClearCarts).Methods("DELETE")
-		r.HandleFunc("/v1/ob/carts/{peerID}/add", g.handleAddToCart).Methods("POST")
-		r.HandleFunc("/v1/ob/carts/{peerID}/update", g.handleAddToCart).Methods("POST")
-		r.HandleFunc("/v1/ob/carts/{peerID}/remove", g.handleRemoveCartItem).Methods("POST")
+		r.HandleFunc("/v1/carts/itemsCount", g.handleGETCartsItemsCount).Methods("GET")
+		r.HandleFunc("/v1/carts", g.handleGETCarts).Methods("GET")
+		r.HandleFunc("/v1/carts", g.handleClearCarts).Methods("DELETE")
+		r.HandleFunc("/v1/carts/{peerID}/add", g.handleAddToCart).Methods("POST")
+		r.HandleFunc("/v1/carts/{peerID}/update", g.handleAddToCart).Methods("POST")
+		r.HandleFunc("/v1/carts/{peerID}/remove", g.handleRemoveCartItem).Methods("POST")
 
 		// Following
-		r.HandleFunc("/v1/ob/followsme/{peerID}", g.handleGETFollowsMe).Methods("GET")
-		r.HandleFunc("/v1/ob/follow/{peerID}", g.handlePOSTFollow).Methods("POST")
-		r.HandleFunc("/v1/ob/unfollow/{peerID}", g.handlePOSTUnFollow).Methods("POST")
+		r.HandleFunc("/v1/followsme/{peerID}", g.handleGETFollowsMe).Methods("GET")
+		r.HandleFunc("/v1/follow/{peerID}", g.handlePOSTFollow).Methods("POST")
+		r.HandleFunc("/v1/unfollow/{peerID}", g.handlePOSTUnFollow).Methods("POST")
 
 		// Listings
-		r.HandleFunc("/v1/ob/mylisting/{slugOrCID}", g.handleGETMyListing).Methods("GET")
-		r.HandleFunc("/v1/ob/listing", g.handlePOSTListing).Methods("POST")
-		r.HandleFunc("/v1/ob/listing", g.handlePUTListing).Methods("PUT")
-		r.HandleFunc("/v1/ob/listing/{slug}", g.handleDELETEListing).Methods("DELETE")
+		r.HandleFunc("/v1/mylisting/{slugOrCID}", g.handleGETMyListing).Methods("GET")
+		r.HandleFunc("/v1/listing", g.handlePOSTListing).Methods("POST")
+		r.HandleFunc("/v1/listing", g.handlePUTListing).Methods("PUT")
+		r.HandleFunc("/v1/listing/{slug}", g.handleDELETEListing).Methods("DELETE")
 
 		// Listings Batch Import
-		r.HandleFunc("/v1/ob/listings/import", g.handlePOSTListingsImport).Methods("POST")
-		r.HandleFunc("/v1/ob/listings/import/json", g.handlePOSTListingsImportJSON).Methods("POST")
+		r.HandleFunc("/v1/listings/import", g.handlePOSTListingsImport).Methods("POST")
+		r.HandleFunc("/v1/listings/import/json", g.handlePOSTListingsImportJSON).Methods("POST")
 
 		// Images
-		r.HandleFunc("/v1/ob/avatar", g.handlePOSTAvatar).Methods("POST")
-		r.HandleFunc("/v1/ob/header", g.handlePOSTHeader).Methods("POST")
-		r.HandleFunc("/v1/ob/images", g.handlePOSTImages).Methods("POST")
-		r.HandleFunc("/v1/ob/productimages", g.handlePOSTProductImage).Methods("POST")
+		r.HandleFunc("/v1/avatar", g.handlePOSTAvatar).Methods("POST")
+		r.HandleFunc("/v1/header", g.handlePOSTHeader).Methods("POST")
+		r.HandleFunc("/v1/images", g.handlePOSTImages).Methods("POST")
+		r.HandleFunc("/v1/productimages", g.handlePOSTProductImage).Methods("POST")
 
 		// File
-		r.HandleFunc("/v1/ob/file", g.handlePOSTFile).Methods("POST")
+		r.HandleFunc("/v1/file", g.handlePOSTFile).Methods("POST")
 
 		// Profiles
-		r.HandleFunc("/v1/ob/profile", g.handlePOSTProfile).Methods("POST")
-		r.HandleFunc("/v1/ob/profile/{peerID}", g.handlePOSTProfile).Methods("POST")
-		r.HandleFunc("/v1/ob/profile", g.handlePUTProfile).Methods("PUT")
-		r.HandleFunc("/v1/ob/profile/{peerID}", g.handlePUTProfile).Methods("PUT")
+		r.HandleFunc("/v1/profile", g.handlePOSTProfile).Methods("POST")
+		r.HandleFunc("/v1/profile/{peerID}", g.handlePOSTProfile).Methods("POST")
+		r.HandleFunc("/v1/profile", g.handlePUTProfile).Methods("PUT")
+		r.HandleFunc("/v1/profile/{peerID}", g.handlePUTProfile).Methods("PUT")
 
 		// Ratings
 
 		// Posts
-		r.HandleFunc("/v1/ob/post", g.handlePOSTPost).Methods("POST")
-		r.HandleFunc("/v1/ob/post/{slug}", g.handleDELETEPost).Methods("DELETE")
+		r.HandleFunc("/v1/post", g.handlePOSTPost).Methods("POST")
+		r.HandleFunc("/v1/post/{slug}", g.handleDELETEPost).Methods("DELETE")
 
-		r.HandleFunc("/v1/ob/signmessage", g.handlePOSTSignMessage).Methods("POST")
-		r.HandleFunc("/v1/ob/verifymessage", g.handlePOSTVerifyMessage).Methods("POST")
-		r.HandleFunc("/v1/ob/hashmessage", g.handlePOSTHashMessage).Methods("POST")
+		r.HandleFunc("/v1/signmessage", g.handlePOSTSignMessage).Methods("POST")
+		r.HandleFunc("/v1/verifymessage", g.handlePOSTVerifyMessage).Methods("POST")
+		r.HandleFunc("/v1/hashmessage", g.handlePOSTHashMessage).Methods("POST")
 
 		// Moderator
-		r.HandleFunc("/v1/ob/moderator", g.handleSetModerator).Methods("POST")
-		r.HandleFunc("/v1/ob/moderator", g.handleUnsetModerator).Methods("DELETE")
-		r.HandleFunc("/v1/ob/moderators", g.handleGetModerators).Methods("GET")
+		r.HandleFunc("/v1/moderator", g.handleSetModerator).Methods("POST")
+		r.HandleFunc("/v1/moderator", g.handleUnsetModerator).Methods("DELETE")
+		r.HandleFunc("/v1/moderators", g.handleGetModerators).Methods("GET")
 
 		// Block a store
-		r.HandleFunc("/v1/ob/blocknode/{peerID}", g.handleBlockNode).Methods("POST")
-		r.HandleFunc("/v1/ob/blocknode/{peerID}", g.handleUnBlockNode).Methods("DELETE")
+		r.HandleFunc("/v1/blocknode/{peerID}", g.handleBlockNode).Methods("POST")
+		r.HandleFunc("/v1/blocknode/{peerID}", g.handleUnBlockNode).Methods("DELETE")
 
-		r.HandleFunc("/v1/ob/config", g.handleGETConfig).Methods("GET")
-		r.HandleFunc("/v1/ob/systemInfo", g.handleGETSystemInfo).Methods("GET")
+		r.HandleFunc("/v1/config", g.handleGETConfig).Methods("GET")
+		r.HandleFunc("/v1/systemInfo", g.handleGETSystemInfo).Methods("GET")
 		r.HandleFunc("/v1/wallet/currencies", g.handleGETCurrencies).Methods("GET")
 
 		// Preferences
-		r.HandleFunc("/v1/ob/preferences", g.handlePutUserPreferences).Methods("PUT")
-		r.HandleFunc("/v1/ob/preferences", g.handleGetUserPreferences).Methods("GET")
+		r.HandleFunc("/v1/preferences", g.handlePutUserPreferences).Methods("PUT")
+		r.HandleFunc("/v1/preferences", g.handleGetUserPreferences).Methods("GET")
 
-		r.HandleFunc("/v1/ob/bulkupdatecurrency", g.handlePOSTBulkUpdateCurrency).Methods("POST")
-		r.HandleFunc("/v1/ob/publish", g.handlePOSTPublish).Methods("POST")
-		r.HandleFunc("/v1/ob/purgecache", g.handlePOSTPurgeCache).Methods("POST")
-		r.HandleFunc("/v1/ob/shutdown", g.handlePOSTShutdown).Methods("POST")
+		r.HandleFunc("/v1/bulkupdatecurrency", g.handlePOSTBulkUpdateCurrency).Methods("POST")
+		r.HandleFunc("/v1/publish", g.handlePOSTPublish).Methods("POST")
+		r.HandleFunc("/v1/purgecache", g.handlePOSTPurgeCache).Methods("POST")
+		r.HandleFunc("/v1/shutdown", g.handlePOSTShutdown).Methods("POST")
 
 		// Channels
-		r.HandleFunc("/v1/ob/channelmessage", g.handlePOSTPublishChannelMessage).Methods("POST")
-		r.HandleFunc("/v1/ob/openchannel/{topic}", g.handlePOSTOpenChannel).Methods("POST")
-		r.HandleFunc("/v1/ob/closechannel/{topic}", g.handlePOSTCloseChannel).Methods("POST")
-		r.HandleFunc("/v1/ob/channels", g.handleGETListChannels).Methods("GET")
-		r.HandleFunc("/v1/ob/channelmessages/{topic}", g.handleGETChannelMessages).Methods("GET")
+		r.HandleFunc("/v1/channelmessage", g.handlePOSTPublishChannelMessage).Methods("POST")
+		r.HandleFunc("/v1/openchannel/{topic}", g.handlePOSTOpenChannel).Methods("POST")
+		r.HandleFunc("/v1/closechannel/{topic}", g.handlePOSTCloseChannel).Methods("POST")
+		r.HandleFunc("/v1/channels", g.handleGETListChannels).Methods("GET")
+		r.HandleFunc("/v1/channelmessages/{topic}", g.handleGETChannelMessages).Methods("GET")
 	}
 	// Images
-	r.HandleFunc("/v1/ob/image/{imageID}", g.handleGETImage).Methods("GET")
-	r.HandleFunc("/v1/ob/avatar/{peerID}/{size}", g.handleGETAvatar).Methods("GET")
-	r.HandleFunc("/v1/ob/header/{peerID}/{size}", g.handleGETHeader).Methods("GET")
+	r.HandleFunc("/v1/image/{imageID}", g.handleGETImage).Methods("GET")
+	r.HandleFunc("/v1/avatar/{peerID}/{size}", g.handleGETAvatar).Methods("GET")
+	r.HandleFunc("/v1/header/{peerID}/{size}", g.handleGETHeader).Methods("GET")
 
 	// File
-	r.HandleFunc("/v1/ob/file/{fileID}", g.handleGETFile).Methods("GET")
+	r.HandleFunc("/v1/file/{fileID}", g.handleGETFile).Methods("GET")
 
 	// Listings
-	r.HandleFunc("/v1/ob/listing/{listingID}", g.handleGETListing).Methods("GET")
-	r.HandleFunc("/v1/ob/listing/{peerID}/{slug}", g.handleGETListing).Methods("GET")
-	r.HandleFunc("/v1/ob/listingindex/{peerID}", g.handleGETListingIndex).Methods("GET")
-	r.HandleFunc("/v1/ob/listingindex", g.handleGETListingIndex).Methods("GET")
-	r.HandleFunc("/v1/ob/listings/template", g.handleGETListingsTemplate).Methods("GET") // Public: no auth required
+	r.HandleFunc("/v1/listing/{listingID}", g.handleGETListing).Methods("GET")
+	r.HandleFunc("/v1/listing/{peerID}/{slug}", g.handleGETListing).Methods("GET")
+	r.HandleFunc("/v1/listingindex/{peerID}", g.handleGETListingIndex).Methods("GET")
+	r.HandleFunc("/v1/listingindex", g.handleGETListingIndex).Methods("GET")
+	r.HandleFunc("/v1/listings/template", g.handleGETListingsTemplate).Methods("GET") // Public: no auth required
 
 	// Profiles
-	r.HandleFunc("/v1/ob/profile/{peerID}", g.handleGETProfile).Methods("GET")
-	r.HandleFunc("/v1/ob/profile", g.handleGETProfile).Methods("GET")
-	r.HandleFunc("/v1/ob/fetchprofiles", g.handlePOSTFetchProfiles).Methods("GET", "POST")
+	r.HandleFunc("/v1/profile/{peerID}", g.handleGETProfile).Methods("GET")
+	r.HandleFunc("/v1/profile", g.handleGETProfile).Methods("GET")
+	r.HandleFunc("/v1/fetchprofiles", g.handlePOSTFetchProfiles).Methods("GET", "POST")
 
 	// Ratings
-	r.HandleFunc("/v1/ob/ratingindex/{peerIDOrSlug}", g.handleGETRatingIndex).Methods("GET")
-	r.HandleFunc("/v1/ob/ratingindex", g.handleGETMyRatingIndex).Methods("GET")
-	r.HandleFunc("/v1/ob/ratingindex/{peerID}/{slug}", g.handleGETPeerRatingsBySlug).Methods("GET")
-	r.HandleFunc("/v1/ob/rating/{ratingID}", g.handleGETRating).Methods("GET")
-	r.HandleFunc("/v1/ob/fetchratings", g.handlePOSTFetchRatings).Methods("POST")
+	r.HandleFunc("/v1/ratingindex/{peerIDOrSlug}", g.handleGETRatingIndex).Methods("GET")
+	r.HandleFunc("/v1/ratingindex", g.handleGETMyRatingIndex).Methods("GET")
+	r.HandleFunc("/v1/ratingindex/{peerID}/{slug}", g.handleGETPeerRatingsBySlug).Methods("GET")
+	r.HandleFunc("/v1/rating/{ratingID}", g.handleGETRating).Methods("GET")
+	r.HandleFunc("/v1/fetchratings", g.handlePOSTFetchRatings).Methods("POST")
 
 	// Posts
-	r.HandleFunc("/v1/ob/post/{slug}", g.handleGETMyPost).Methods("GET")
-	r.HandleFunc("/v1/ob/post/{peerID}/{slug}", g.handleGETPost).Methods("GET")
+	r.HandleFunc("/v1/post/{slug}", g.handleGETMyPost).Methods("GET")
+	r.HandleFunc("/v1/post/{peerID}/{slug}", g.handleGETPost).Methods("GET")
 
 	// Following
-	r.HandleFunc("/v1/ob/followers/{peerID}", g.handleGETFollowers).Methods("GET")
-	r.HandleFunc("/v1/ob/followers", g.handleGETFollowers).Methods("GET")
-	r.HandleFunc("/v1/ob/following/{peerID}", g.handleGETFollowing).Methods("GET")
-	r.HandleFunc("/v1/ob/following", g.handleGETFollowing).Methods("GET")
+	r.HandleFunc("/v1/followers/{peerID}", g.handleGETFollowers).Methods("GET")
+	r.HandleFunc("/v1/followers", g.handleGETFollowers).Methods("GET")
+	r.HandleFunc("/v1/following/{peerID}", g.handleGETFollowing).Methods("GET")
+	r.HandleFunc("/v1/following", g.handleGETFollowing).Methods("GET")
 
-	r.HandleFunc("/v1/ob/exchangerates/{currencyCode}", g.handleGETExchangeRates).Methods("GET")
-	r.HandleFunc("/v1/ob/exchangerates", g.handleGETExchangeRates).Methods("GET")
+	r.HandleFunc("/v1/exchangerates/{currencyCode}", g.handleGETExchangeRates).Methods("GET")
+	r.HandleFunc("/v1/exchangerates", g.handleGETExchangeRates).Methods("GET")
 
-	r.HandleFunc("/v1/ob/peers", g.handleGETPeers).Methods("GET")
+	r.HandleFunc("/v1/peers", g.handleGETPeers).Methods("GET")
 	return r
 }
 

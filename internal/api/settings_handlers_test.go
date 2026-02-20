@@ -18,7 +18,7 @@ func TestSettingsHandlers(t *testing.T) {
 	runAPITests(t, apiTests{
 		{
 			name:   "Get config",
-			path:   "/v1/ob/config",
+			path:   "/v1/config",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.identityFunc = func() peer.ID {
@@ -51,7 +51,7 @@ func TestSettingsHandlers(t *testing.T) {
 		},
 		{
 			name:   "Put user preferences",
-			path:   "/v1/ob/preferences",
+			path:   "/v1/preferences",
 			method: http.MethodPut,
 			setNodeMethods: func(n *mockNode) {
 				n.getUserPreferencesFunc = func() (*models.UserPreferences, error) {
@@ -71,7 +71,7 @@ func TestSettingsHandlers(t *testing.T) {
 		},
 		{
 			name:   "Put user preferences bad request",
-			path:   "/v1/ob/preferences",
+			path:   "/v1/preferences",
 			method: http.MethodPut,
 			setNodeMethods: func(n *mockNode) {
 				n.saveUserPreferencesFunc = func(prefs *models.UserPreferences, done chan struct{}) error {
@@ -86,7 +86,7 @@ func TestSettingsHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get user preferences",
-			path:   "/v1/ob/preferences",
+			path:   "/v1/preferences",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getUserPreferencesFunc = func() (*models.UserPreferences, error) {
@@ -102,7 +102,7 @@ func TestSettingsHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get exchange rates",
-			path:   "/v1/ob/exchangerates",
+			path:   "/v1/exchangerates",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getAllRatesFunc = func(base models.CurrencyCode, breakCache bool) (map[models.CurrencyCode]iwallet.Amount, error) {

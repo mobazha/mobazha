@@ -18,7 +18,7 @@ func TestImageHandlers(t *testing.T) {
 	runAPITests(t, apiTests{
 		{
 			name:   "Get image by CID",
-			path:   "/v1/ob/image/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+			path:   "/v1/image/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getImageFunc = func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, error) {
@@ -32,7 +32,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get image invalid CID",
-			path:   "/v1/ob/image/adfadsf",
+			path:   "/v1/image/adfadsf",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getImageFunc = func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, error) {
@@ -46,7 +46,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get image not found",
-			path:   "/v1/ob/image/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+			path:   "/v1/image/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getImageFunc = func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, error) {
@@ -60,7 +60,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get image internal error",
-			path:   "/v1/ob/image/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
+			path:   "/v1/image/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getImageFunc = func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, error) {
@@ -74,7 +74,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get avatar",
-			path:   "/v1/ob/avatar/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/small",
+			path:   "/v1/avatar/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getAvatarFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
@@ -88,7 +88,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get avatar invalid peer ID",
-			path:   "/v1/ob/avatar/adfadsf/small",
+			path:   "/v1/avatar/adfadsf/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getAvatarFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
@@ -102,7 +102,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get avatar not found",
-			path:   "/v1/ob/avatar/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/small",
+			path:   "/v1/avatar/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getAvatarFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
@@ -116,7 +116,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get avatar internal error",
-			path:   "/v1/ob/avatar/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/small",
+			path:   "/v1/avatar/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getAvatarFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
@@ -130,7 +130,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get header",
-			path:   "/v1/ob/header/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/small",
+			path:   "/v1/header/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getHeaderFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
@@ -144,7 +144,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get header invalid peer ID",
-			path:   "/v1/ob/header/adfadsf/small",
+			path:   "/v1/header/adfadsf/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getHeaderFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
@@ -158,7 +158,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get header not found",
-			path:   "/v1/ob/header/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/small",
+			path:   "/v1/header/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getHeaderFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
@@ -172,7 +172,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get header internal error",
-			path:   "/v1/ob/header/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/small",
+			path:   "/v1/header/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi/small",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getHeaderFunc = func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
@@ -186,7 +186,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post avatar",
-			path:   "/v1/ob/avatar",
+			path:   "/v1/avatar",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setAvatarImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
@@ -209,7 +209,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post avatar bad data",
-			path:   "/v1/ob/avatar",
+			path:   "/v1/avatar",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setAvatarImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
@@ -226,7 +226,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post avatar bad request",
-			path:   "/v1/ob/avatar",
+			path:   "/v1/avatar",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setAvatarImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
@@ -241,7 +241,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post avatar internal error",
-			path:   "/v1/ob/avatar",
+			path:   "/v1/avatar",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setAvatarImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
@@ -256,7 +256,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post header",
-			path:   "/v1/ob/header",
+			path:   "/v1/header",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setHeaderImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
@@ -279,7 +279,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post header bad data",
-			path:   "/v1/ob/header",
+			path:   "/v1/header",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setHeaderImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
@@ -296,7 +296,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post header bad request",
-			path:   "/v1/ob/header",
+			path:   "/v1/header",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setHeaderImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
@@ -311,7 +311,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post header internal error",
-			path:   "/v1/ob/header",
+			path:   "/v1/header",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setHeaderImageFunc = func(b64ImageData string, done chan struct{}) (models.ImageHashes, error) {
@@ -326,7 +326,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post image",
-			path:   "/v1/ob/productimages",
+			path:   "/v1/productimages",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setProductImageFunc = func(b64ImageData string, filename string) (models.ImageHashes, error) {
@@ -354,7 +354,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post image bad data",
-			path:   "/v1/ob/productimages",
+			path:   "/v1/productimages",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setProductImageFunc = func(b64ImageData string, filename string) (models.ImageHashes, error) {
@@ -371,7 +371,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post image bad request",
-			path:   "/v1/ob/productimages",
+			path:   "/v1/productimages",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setProductImageFunc = func(b64ImageData string, filename string) (models.ImageHashes, error) {
@@ -386,7 +386,7 @@ func TestImageHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post image internal error",
-			path:   "/v1/ob/productimages",
+			path:   "/v1/productimages",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.setProductImageFunc = func(b64ImageData string, filename string) (models.ImageHashes, error) {

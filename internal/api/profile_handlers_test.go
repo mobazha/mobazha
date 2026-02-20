@@ -17,7 +17,7 @@ func TestProfileHandlers(t *testing.T) {
 	runAPITests(t, apiTests{
 		{
 			name:   "Get my profile",
-			path:   "/v1/ob/profile",
+			path:   "/v1/profile",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyProfileFunc = func() (*models.Profile, error) {
@@ -31,7 +31,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get my profile fail",
-			path:   "/v1/ob/profile",
+			path:   "/v1/profile",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyProfileFunc = func() (*models.Profile, error) {
@@ -45,7 +45,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get profile no cache",
-			path:   "/v1/ob/profile/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
+			path:   "/v1/profile/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getProfileFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error) {
@@ -65,7 +65,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get profile fail",
-			path:   "/v1/ob/profile/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
+			path:   "/v1/profile/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getProfileFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error) {
@@ -79,7 +79,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get profile invalid peerID",
-			path:   "/v1/ob/profile/xxx",
+			path:   "/v1/profile/xxx",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getProfileFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error) {
@@ -93,7 +93,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get my profile from cache",
-			path:   "/v1/ob/profile/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi?usecache=true",
+			path:   "/v1/profile/12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi?usecache=true",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getProfileFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error) {
@@ -113,7 +113,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Profile not found",
-			path:   "/v1/ob/profile/12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN",
+			path:   "/v1/profile/12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getProfileFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error) {
@@ -130,7 +130,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post profile success",
-			path:   "/v1/ob/profile",
+			path:   "/v1/profile",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyProfileFunc = func() (*models.Profile, error) {
@@ -148,7 +148,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post profile fail",
-			path:   "/v1/ob/profile",
+			path:   "/v1/profile",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyProfileFunc = func() (*models.Profile, error) {
@@ -166,7 +166,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post profile exists",
-			path:   "/v1/ob/profile",
+			path:   "/v1/profile",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyProfileFunc = func() (*models.Profile, error) {
@@ -184,7 +184,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post profile invalid JSON",
-			path:   "/v1/ob/profile",
+			path:   "/v1/profile",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyProfileFunc = func() (*models.Profile, error) {
@@ -202,7 +202,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Put profile success",
-			path:   "/v1/ob/profile",
+			path:   "/v1/profile",
 			method: http.MethodPut,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyProfileFunc = func() (*models.Profile, error) {
@@ -220,7 +220,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Put profile fail",
-			path:   "/v1/ob/profile",
+			path:   "/v1/profile",
 			method: http.MethodPut,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyProfileFunc = func() (*models.Profile, error) {
@@ -238,7 +238,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Put profile exists",
-			path:   "/v1/ob/profile",
+			path:   "/v1/profile",
 			method: http.MethodPut,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyProfileFunc = func() (*models.Profile, error) {
@@ -256,7 +256,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Put profile invalid JSON",
-			path:   "/v1/ob/profile",
+			path:   "/v1/profile",
 			method: http.MethodPut,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyProfileFunc = func() (*models.Profile, error) {
@@ -274,7 +274,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Fetch profiles success",
-			path:   "/v1/ob/fetchprofiles",
+			path:   "/v1/fetchprofiles",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.getProfileFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error) {
@@ -295,7 +295,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Fetch profiles invalid peerID",
-			path:   "/v1/ob/fetchprofiles",
+			path:   "/v1/fetchprofiles",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.getProfileFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error) {
@@ -316,7 +316,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Fetch profiles invalid JSON",
-			path:   "/v1/ob/fetchprofiles",
+			path:   "/v1/fetchprofiles",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.getProfileFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error) {
@@ -337,7 +337,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Fetch profiles one not found",
-			path:   "/v1/ob/fetchprofiles",
+			path:   "/v1/fetchprofiles",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.getProfileFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error) {
@@ -355,7 +355,7 @@ func TestProfileHandlers(t *testing.T) {
 		},
 		{
 			name:   "Fetch profiles none found",
-			path:   "/v1/ob/fetchprofiles",
+			path:   "/v1/fetchprofiles",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.getProfileFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error) {

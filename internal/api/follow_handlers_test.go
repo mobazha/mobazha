@@ -17,7 +17,7 @@ func TestFollowHandlers(t *testing.T) {
 	runAPITests(t, apiTests{
 		{
 			name:   "Get my followers",
-			path:   "/v1/ob/followers",
+			path:   "/v1/followers",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyFollowersFunc = func() (models.Followers, error) {
@@ -38,7 +38,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get my followers nil",
-			path:   "/v1/ob/followers",
+			path:   "/v1/followers",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyFollowersFunc = func() (models.Followers, error) {
@@ -52,7 +52,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get my followers fail",
-			path:   "/v1/ob/followers",
+			path:   "/v1/followers",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyFollowersFunc = func() (models.Followers, error) {
@@ -66,7 +66,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get my following",
-			path:   "/v1/ob/following",
+			path:   "/v1/following",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyFollowingFunc = func() (models.Following, error) {
@@ -87,7 +87,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get my following nil",
-			path:   "/v1/ob/following",
+			path:   "/v1/following",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyFollowingFunc = func() (models.Following, error) {
@@ -101,7 +101,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get my following fail",
-			path:   "/v1/ob/following",
+			path:   "/v1/following",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getMyFollowingFunc = func() (models.Following, error) {
@@ -115,7 +115,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get followers",
-			path:   "/v1/ob/followers/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
+			path:   "/v1/followers/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getFollowersFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (models.Followers, error) {
@@ -139,7 +139,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get followers invalid peerID",
-			path:   "/v1/ob/followers/xxx",
+			path:   "/v1/followers/xxx",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getFollowersFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (models.Followers, error) {
@@ -153,7 +153,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get followers not found",
-			path:   "/v1/ob/followers/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
+			path:   "/v1/followers/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getFollowersFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (models.Followers, error) {
@@ -167,7 +167,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get following",
-			path:   "/v1/ob/following/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
+			path:   "/v1/following/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getFollowingFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (models.Following, error) {
@@ -191,7 +191,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get following invalid peerID",
-			path:   "/v1/ob/following/xxx",
+			path:   "/v1/following/xxx",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getFollowingFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (models.Following, error) {
@@ -205,7 +205,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get following not found",
-			path:   "/v1/ob/following/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
+			path:   "/v1/following/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getFollowingFunc = func(ctx context.Context, peerID peer.ID, useCache bool) (models.Following, error) {
@@ -219,7 +219,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post follow",
-			path:   "/v1/ob/follow/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
+			path:   "/v1/follow/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.followNodeFunc = func(peerID peer.ID, done chan<- struct{}) error {
@@ -236,7 +236,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post follow fail",
-			path:   "/v1/ob/follow/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
+			path:   "/v1/follow/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.followNodeFunc = func(peerID peer.ID, done chan<- struct{}) error {
@@ -250,7 +250,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post follow invalid peerID",
-			path:   "/v1/ob/follow/xxx",
+			path:   "/v1/follow/xxx",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.followNodeFunc = func(peerID peer.ID, done chan<- struct{}) error {
@@ -264,7 +264,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post unfollow",
-			path:   "/v1/ob/unfollow/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
+			path:   "/v1/unfollow/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.unfollowNodeFunc = func(peerID peer.ID, done chan<- struct{}) error {
@@ -281,7 +281,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post unfollow fail",
-			path:   "/v1/ob/unfollow/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
+			path:   "/v1/unfollow/12D3KooWKLmVDz6sdzMyX1yQpEdCHB7dtxyEr91wPFNoCXEs2hkv",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.unfollowNodeFunc = func(peerID peer.ID, done chan<- struct{}) error {
@@ -295,7 +295,7 @@ func TestFollowHandlers(t *testing.T) {
 		},
 		{
 			name:   "Post unfollow invalid peerID",
-			path:   "/v1/ob/unfollow/xxx",
+			path:   "/v1/unfollow/xxx",
 			method: http.MethodPost,
 			setNodeMethods: func(n *mockNode) {
 				n.unfollowNodeFunc = func(peerID peer.ID, done chan<- struct{}) error {

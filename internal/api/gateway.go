@@ -161,26 +161,26 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/wallet/spend", g.handlePOSTSpend).Methods("POST")
 		r.HandleFunc("/v1/wallet/mnemonic", g.handleGETMnemonic).Methods("GET")
 
-		// Chat
-		r.HandleFunc("/v1/chatmessage", g.handlePOSTSendChatMessage).Methods("POST")
-		r.HandleFunc("/v1/groupchatmessage", g.handlePOSTSendGroupChatMessage).Methods("POST")
-		r.HandleFunc("/v1/typingmessage", g.handlePOSTSendTypingMessage).Methods("POST")
-		r.HandleFunc("/v1/grouptypingmessage", g.handlePOSTSendGroupTypingMessage).Methods("POST")
-		r.HandleFunc("/v1/markchatasread", g.handlePOSTMarkChatMessageAsRead).Methods("POST")
-		r.HandleFunc("/v1/chatconversations", g.handleGETChatConversations).Methods("GET")
-		r.HandleFunc("/v1/orderconversations", g.handleGETOrderConversations).Methods("GET")
-		r.HandleFunc("/v1/chatmessages/{peerID}", g.handleGETChatMessages).Methods("GET")
-		r.HandleFunc("/v1/chatmessages", g.handleGETMyChatMessages).Methods("GET")
-		r.HandleFunc("/v1/groupchatmessages/{orderID}", g.handleGETGroupChatMessages).Methods("GET")
-		r.HandleFunc("/v1/chatmessage/{messageID}", g.handleDELETEChatMessages).Methods("DELETE")
-		r.HandleFunc("/v1/groupchatmessages/{orderID}", g.handleDELETEGroupChatMessages).Methods("DELETE")
-		r.HandleFunc("/v1/chatconversation/{peerID}", g.handleDELETEChatConversation).Methods("DELETE")
+		// Chat (literal paths before variable paths)
+		r.HandleFunc("/v1/chat/messages", g.handlePOSTSendChatMessage).Methods("POST")
+		r.HandleFunc("/v1/chat/messages", g.handleGETMyChatMessages).Methods("GET")
+		r.HandleFunc("/v1/chat/messages/{messageID}", g.handleDELETEChatMessages).Methods("DELETE")
+		r.HandleFunc("/v1/chat/typing", g.handlePOSTSendTypingMessage).Methods("POST")
+		r.HandleFunc("/v1/chat/read", g.handlePOSTMarkChatMessageAsRead).Methods("POST")
+		r.HandleFunc("/v1/chat/conversations", g.handleGETChatConversations).Methods("GET")
+		r.HandleFunc("/v1/chat/order-conversations", g.handleGETOrderConversations).Methods("GET")
+		r.HandleFunc("/v1/chat/conversations/{peerID}/messages", g.handleGETChatMessages).Methods("GET")
+		r.HandleFunc("/v1/chat/conversations/{peerID}", g.handleDELETEChatConversation).Methods("DELETE")
+		r.HandleFunc("/v1/chat/groups/messages", g.handlePOSTSendGroupChatMessage).Methods("POST")
+		r.HandleFunc("/v1/chat/groups/typing", g.handlePOSTSendGroupTypingMessage).Methods("POST")
+		r.HandleFunc("/v1/chat/groups/{orderID}/messages", g.handleGETGroupChatMessages).Methods("GET")
+		r.HandleFunc("/v1/chat/groups/{orderID}/messages", g.handleDELETEGroupChatMessages).Methods("DELETE")
 
-		// Chat group
-		r.HandleFunc("/v1/chatgroups", g.handleGetChatGroups).Methods("GET")
-		r.HandleFunc("/v1/chatGroup", g.handleSaveChatGroup).Methods("POST")
-		r.HandleFunc("/v1/chatGroup", g.handleGetChatGroup).Methods("GET")
-		r.HandleFunc("/v1/chatGroup", g.handleDeleteChatGroup).Methods("DELETE")
+		// Chat group management
+		r.HandleFunc("/v1/chat/groups", g.handleGetChatGroups).Methods("GET")
+		r.HandleFunc("/v1/chat/group", g.handleSaveChatGroup).Methods("POST")
+		r.HandleFunc("/v1/chat/group", g.handleGetChatGroup).Methods("GET")
+		r.HandleFunc("/v1/chat/group", g.handleDeleteChatGroup).Methods("DELETE")
 
 		// Matrix E2EE Key Backup (stored locally, encrypted with wallet mnemonic)
 		r.HandleFunc("/v1/matrix/key-backup", g.handlePOSTMatrixKeyBackup).Methods("POST")
@@ -200,12 +200,12 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/matrix/secrets-bundle", g.handleDELETEMatrixSecretsBundle).Methods("DELETE")
 		r.HandleFunc("/v1/matrix/secrets-bundle/info", g.handleGETMatrixSecretsBundleInfo).Methods("GET")
 
-		// Notification
-		r.HandleFunc("/v1/notifications", g.handleGetNotifications).Methods("GET")
+		// Notifications (literal paths before {notifID})
 		r.HandleFunc("/v1/notifications/count", g.handleGetNotificationCount).Methods("GET")
 		r.HandleFunc("/v1/notifications/batch", g.handleBatchNotifications).Methods("POST")
-		r.HandleFunc("/v1/marknotificationasread/{notifID}", g.handlePOSTMarkNotificationMessageAsRead).Methods("POST")
-		r.HandleFunc("/v1/marknotificationsasread", g.handlePOSTMarkNotificationsMessageAsRead).Methods("POST")
+		r.HandleFunc("/v1/notifications/read", g.handlePOSTMarkNotificationsMessageAsRead).Methods("POST")
+		r.HandleFunc("/v1/notifications", g.handleGetNotifications).Methods("GET")
+		r.HandleFunc("/v1/notifications/{notifID}/read", g.handlePOSTMarkNotificationMessageAsRead).Methods("POST")
 
 		// Escrow
 		r.HandleFunc("/v1/instructions/order/payment", g.handleGetOrderPaymentInstructions).Methods("POST")
@@ -237,23 +237,22 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/cases", g.handleGETCases).Methods("GET")
 		r.HandleFunc("/v1/cases", g.handlePostCases).Methods("POST")
 
-		r.HandleFunc("/v1/case/{orderID}", g.handleGetCase).Methods("GET")
-		r.HandleFunc("/v1/order/{orderID}", g.handleGETOrder).Methods("GET")
-		r.HandleFunc("/v1/orderspend", g.handlePostSpendForOrder).Methods("POST")
-		r.HandleFunc("/v1/order/{orderID}/payment/remaining", g.handleGETPaymentRemaining).Methods("GET")
-		r.HandleFunc("/v1/order/{orderID}/payment/cancel-partial", g.handlePOSTCancelPartialPayment).Methods("POST")
-		r.HandleFunc("/v1/order/{orderID}/payment/watch", g.handleDELETEPaymentWatch).Methods("DELETE")
-
-		r.HandleFunc("/v1/order/purchase", g.handlePOSTPurchase).Methods("POST")
-		r.HandleFunc("/v1/order/payment", g.handlePOSTPayment).Methods("POST")
-		r.HandleFunc("/v1/order/confirm", g.handlePOSTOrderConfirmation).Methods("POST")
-		r.HandleFunc("/v1/order/fulfill", g.handlePOSTOrderFulfillment).Methods("POST")
-		r.HandleFunc("/v1/order/refund", g.handlePOSTOrderRefund).Methods("POST")
-		r.HandleFunc("/v1/order/complete", g.handlePOSTOrderCompletion).Methods("POST")
-		r.HandleFunc("/v1/order/cancel", g.handlePOSTOrderCancel).Methods("POST")
-
-		r.HandleFunc("/v1/estimatetotal", g.handlePOSTEstimateTotal).Methods("POST")
-		r.HandleFunc("/v1/checkoutbreakdown", g.handlePOSTCheckoutBreakdown).Methods("POST")
+		// Orders (literal paths before {orderID} to avoid gorilla/mux ambiguity)
+		r.HandleFunc("/v1/orders/spend", g.handlePostSpendForOrder).Methods("POST")
+		r.HandleFunc("/v1/orders/purchase", g.handlePOSTPurchase).Methods("POST")
+		r.HandleFunc("/v1/orders/payment", g.handlePOSTPayment).Methods("POST")
+		r.HandleFunc("/v1/orders/confirm", g.handlePOSTOrderConfirmation).Methods("POST")
+		r.HandleFunc("/v1/orders/fulfill", g.handlePOSTOrderFulfillment).Methods("POST")
+		r.HandleFunc("/v1/orders/refund", g.handlePOSTOrderRefund).Methods("POST")
+		r.HandleFunc("/v1/orders/complete", g.handlePOSTOrderCompletion).Methods("POST")
+		r.HandleFunc("/v1/orders/cancel", g.handlePOSTOrderCancel).Methods("POST")
+		r.HandleFunc("/v1/orders/estimate", g.handlePOSTEstimateTotal).Methods("POST")
+		r.HandleFunc("/v1/orders/checkout-breakdown", g.handlePOSTCheckoutBreakdown).Methods("POST")
+		r.HandleFunc("/v1/cases/{orderID}", g.handleGetCase).Methods("GET")
+		r.HandleFunc("/v1/orders/{orderID}", g.handleGETOrder).Methods("GET")
+		r.HandleFunc("/v1/orders/{orderID}/payment/remaining", g.handleGETPaymentRemaining).Methods("GET")
+		r.HandleFunc("/v1/orders/{orderID}/payment/cancel-partial", g.handlePOSTCancelPartialPayment).Methods("POST")
+		r.HandleFunc("/v1/orders/{orderID}/payment/watch", g.handleDELETEPaymentWatch).Methods("DELETE")
 
 		// Moderation
 		r.HandleFunc("/v1/dispute/open", g.handlePOSTOpenDispute).Methods("POST")
@@ -270,9 +269,9 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/carts/{peerID}/items", g.handleRemoveCartItem).Methods("DELETE")
 
 		// Following
-		r.HandleFunc("/v1/followsme/{peerID}", g.handleGETFollowsMe).Methods("GET")
-		r.HandleFunc("/v1/follow/{peerID}", g.handlePOSTFollow).Methods("POST")
-		r.HandleFunc("/v1/unfollow/{peerID}", g.handlePOSTUnFollow).Methods("POST")
+		r.HandleFunc("/v1/followers/{peerID}/check", g.handleGETFollowsMe).Methods("GET")
+		r.HandleFunc("/v1/following/{peerID}", g.handlePOSTFollow).Methods("PUT")
+		r.HandleFunc("/v1/following/{peerID}", g.handlePOSTUnFollow).Methods("DELETE")
 
 		// Listings
 		r.HandleFunc("/v1/listings/mine/{slugOrCID}", g.handleGETMyListing).Methods("GET")
@@ -284,14 +283,12 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/listings/import", g.handlePOSTListingsImport).Methods("POST")
 		r.HandleFunc("/v1/listings/import/json", g.handlePOSTListingsImportJSON).Methods("POST")
 
-		// Images
-		r.HandleFunc("/v1/avatar", g.handlePOSTAvatar).Methods("POST")
-		r.HandleFunc("/v1/header", g.handlePOSTHeader).Methods("POST")
-		r.HandleFunc("/v1/images", g.handlePOSTImages).Methods("POST")
-		r.HandleFunc("/v1/productimages", g.handlePOSTProductImage).Methods("POST")
-
-		// File
-		r.HandleFunc("/v1/file", g.handlePOSTFile).Methods("POST")
+		// Media
+		r.HandleFunc("/v1/media/avatar", g.handlePOSTAvatar).Methods("POST")
+		r.HandleFunc("/v1/media/header", g.handlePOSTHeader).Methods("POST")
+		r.HandleFunc("/v1/media/images", g.handlePOSTImages).Methods("POST")
+		r.HandleFunc("/v1/media/product-images", g.handlePOSTProductImage).Methods("POST")
+		r.HandleFunc("/v1/media/files", g.handlePOSTFile).Methods("POST")
 
 		// Profiles (batch before {peerID} to avoid gorilla/mux ambiguity)
 		r.HandleFunc("/v1/profiles/batch", g.handlePOSTFetchProfiles).Methods("GET", "POST")
@@ -306,9 +303,10 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/posts", g.handlePOSTPost).Methods("POST")
 		r.HandleFunc("/v1/posts/{slug}", g.handleDELETEPost).Methods("DELETE")
 
-		r.HandleFunc("/v1/signmessage", g.handlePOSTSignMessage).Methods("POST")
-		r.HandleFunc("/v1/verifymessage", g.handlePOSTVerifyMessage).Methods("POST")
-		r.HandleFunc("/v1/hashmessage", g.handlePOSTHashMessage).Methods("POST")
+		// Crypto
+		r.HandleFunc("/v1/crypto/sign", g.handlePOSTSignMessage).Methods("POST")
+		r.HandleFunc("/v1/crypto/verify", g.handlePOSTVerifyMessage).Methods("POST")
+		r.HandleFunc("/v1/crypto/hash", g.handlePOSTHashMessage).Methods("POST")
 
 		// Moderator
 		r.HandleFunc("/v1/moderator", g.handleSetModerator).Methods("POST")
@@ -316,36 +314,34 @@ func (g *Gateway) newV1Router() *mux.Router {
 		r.HandleFunc("/v1/moderators", g.handleGetModerators).Methods("GET")
 
 		// Block a store
-		r.HandleFunc("/v1/blocknode/{peerID}", g.handleBlockNode).Methods("POST")
-		r.HandleFunc("/v1/blocknode/{peerID}", g.handleUnBlockNode).Methods("DELETE")
+		r.HandleFunc("/v1/blocklist/{peerID}", g.handleBlockNode).Methods("PUT")
+		r.HandleFunc("/v1/blocklist/{peerID}", g.handleUnBlockNode).Methods("DELETE")
 
 		r.HandleFunc("/v1/config", g.handleGETConfig).Methods("GET")
-		r.HandleFunc("/v1/systemInfo", g.handleGETSystemInfo).Methods("GET")
+		r.HandleFunc("/v1/system/info", g.handleGETSystemInfo).Methods("GET")
 		r.HandleFunc("/v1/wallet/currencies", g.handleGETCurrencies).Methods("GET")
 
 		// Preferences
 		r.HandleFunc("/v1/preferences", g.handlePutUserPreferences).Methods("PUT")
 		r.HandleFunc("/v1/preferences", g.handleGetUserPreferences).Methods("GET")
 
-		r.HandleFunc("/v1/bulkupdatecurrency", g.handlePOSTBulkUpdateCurrency).Methods("POST")
-		r.HandleFunc("/v1/publish", g.handlePOSTPublish).Methods("POST")
-		r.HandleFunc("/v1/purgecache", g.handlePOSTPurgeCache).Methods("POST")
-		r.HandleFunc("/v1/shutdown", g.handlePOSTShutdown).Methods("POST")
+		r.HandleFunc("/v1/preferences/currency", g.handlePOSTBulkUpdateCurrency).Methods("POST")
+		r.HandleFunc("/v1/system/publish", g.handlePOSTPublish).Methods("POST")
+		r.HandleFunc("/v1/system/cache", g.handlePOSTPurgeCache).Methods("DELETE")
+		r.HandleFunc("/v1/system/shutdown", g.handlePOSTShutdown).Methods("POST")
 
-		// Channels
-		r.HandleFunc("/v1/channelmessage", g.handlePOSTPublishChannelMessage).Methods("POST")
-		r.HandleFunc("/v1/openchannel/{topic}", g.handlePOSTOpenChannel).Methods("POST")
-		r.HandleFunc("/v1/closechannel/{topic}", g.handlePOSTCloseChannel).Methods("POST")
+		// Channels (literal paths before {topic})
+		r.HandleFunc("/v1/channels/messages", g.handlePOSTPublishChannelMessage).Methods("POST")
 		r.HandleFunc("/v1/channels", g.handleGETListChannels).Methods("GET")
-		r.HandleFunc("/v1/channelmessages/{topic}", g.handleGETChannelMessages).Methods("GET")
+		r.HandleFunc("/v1/channels/{topic}/messages", g.handleGETChannelMessages).Methods("GET")
+		r.HandleFunc("/v1/channels/{topic}", g.handlePOSTOpenChannel).Methods("POST")
+		r.HandleFunc("/v1/channels/{topic}", g.handlePOSTCloseChannel).Methods("DELETE")
 	}
-	// Images
-	r.HandleFunc("/v1/image/{imageID}", g.handleGETImage).Methods("GET")
-	r.HandleFunc("/v1/avatar/{peerID}/{size}", g.handleGETAvatar).Methods("GET")
-	r.HandleFunc("/v1/header/{peerID}/{size}", g.handleGETHeader).Methods("GET")
-
-	// File
-	r.HandleFunc("/v1/file/{fileID}", g.handleGETFile).Methods("GET")
+	// Media (public GET)
+	r.HandleFunc("/v1/media/images/{imageID}", g.handleGETImage).Methods("GET")
+	r.HandleFunc("/v1/profiles/{peerID}/avatar/{size}", g.handleGETAvatar).Methods("GET")
+	r.HandleFunc("/v1/profiles/{peerID}/header/{size}", g.handleGETHeader).Methods("GET")
+	r.HandleFunc("/v1/media/files/{fileID}", g.handleGETFile).Methods("GET")
 
 	// Listings (literal paths before variable paths to avoid gorilla/mux ambiguity)
 	r.HandleFunc("/v1/listings/index/{peerID}", g.handleGETListingIndex).Methods("GET")

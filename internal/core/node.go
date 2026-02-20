@@ -114,9 +114,9 @@ type MobazhaNode struct {
 
 	mediaService *MediaAppService
 
-	ratingsService  *RatingsAppService
-	profileService *ProfileAppService
-	followService  *FollowAppService
+	ratingsService    *RatingsAppService
+	profileService    *ProfileAppService
+	followService     *FollowAppService
 	postsService      *PostsAppService
 	moderationService *ModerationAppService
 	channelsService   *ChannelsAppService
@@ -285,6 +285,13 @@ func (n *MobazhaNode) Start() {
 	}()
 
 	go n.bootstrapIPFS()
+
+	// Default node always starts the SharedManager (HTTP gateway) regardless of mode,
+	// because hosting proxies /v1/* requests to the internal API on port 5102.
+	if n.IsDefaultNode() {
+		go n.SharedManager().Start()
+	}
+
 	if !n.ipfsOnlyMode {
 		n.publishHandler()
 		go n.messenger.Start()
@@ -294,10 +301,6 @@ func (n *MobazhaNode) Start() {
 		go n.syncMessages()
 		go func() {
 			n.multiwallet.Start()
-
-			if n.IsDefaultNode() {
-				go n.SharedManager().Start()
-			}
 		}()
 
 		go n.notifier.Start()
@@ -354,6 +357,15 @@ func (n *MobazhaNode) checkRepoMigration() error {
 	version, err := n.repo.ReadVersion()
 	if err != nil {
 		return err
+	}
+
+	if n.ipfsOnlyMode {
+		if version != repo.DefaultRepoVersion {
+			if err := n.repo.WriteVersion(repo.DefaultRepoVersion); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	if version == 0 {
@@ -515,15 +527,16 @@ func (n *MobazhaNode) Stop(force bool) error {
 		return coreiface.ErrPublishingActive
 	}
 
+	if n.IsDefaultNode() {
+		n.SharedManager().Stop()
+	}
+
 	if !n.ipfsOnlyMode {
 		n.messenger.Stop()
 		n.networkService.Close()
 		n.orderProcessor.Stop()
 		n.followerTracker.Close()
 		n.multiwallet.Close()
-		if n.IsDefaultNode() {
-			n.SharedManager().Stop()
-		}
 		if n.notifier != nil {
 			n.notifier.Stop()
 		}

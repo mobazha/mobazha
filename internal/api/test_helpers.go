@@ -37,6 +37,9 @@ func runAPITests(t *testing.T, tests apiTests) {
 		identityFunc: func() peer.ID {
 			return identity.ID()
 		},
+		nodeIDFunc: func() string {
+			return identity.ID().String()
+		},
 	}
 	gateway := &Gateway{
 		nodeManager: &mockNodeManager{

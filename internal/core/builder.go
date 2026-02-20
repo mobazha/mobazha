@@ -391,6 +391,20 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			hostService:          hs,
 		}
 		sharedManager.AddNode(nodeID, obNode)
+
+		if isDefaultNode {
+			if _, err := sharedManager.initHTTPGateway(cfg); err != nil {
+				log.Warningf("Failed to init HTTP gateway for IPFSOnly default node: %v", err)
+			}
+
+			// Initialize SNF Proxy so lightweight tenant nodes can relay
+			// messages through the default node's IPFS host (which has
+			// SNF server addresses from bootstrap).
+			if err := sharedManager.InitSNFProxy(obNode.peerHost); err != nil {
+				log.Warningf("Failed to init SNF Proxy for IPFSOnly default node: %v", err)
+			}
+		}
+
 		obNode.applyOptions(nil)
 		return obNode, nil
 	}
@@ -1179,13 +1193,19 @@ func newLightweightNode(
 
 	sharedManager.AddNode(nodeID, obNode)
 
-	// Lightweight nodes always use the shared HTTP gateway
-	sharedManager.GetHTTPGateway().EnsureHubForUser(nodeID)
+	// Lightweight nodes use the shared HTTP gateway for websocket hubs
+	// when available. In hosting mode, httpGateway is nil because the
+	// hosting project manages its own HTTP gateway and websocket hubs.
+	var notifyWsFn func(any) error
+	if gw := sharedManager.GetHTTPGateway(); gw != nil {
+		gw.EnsureHubForUser(nodeID)
+		notifyWsFn = gw.NotifyWebsockets(nodeID)
+	}
 
 	obNode.notifier = notifications.NewNotifier(
 		bus,
 		obRepo.DB(),
-		sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID),
+		notifyWsFn,
 	)
 
 	// ── 7. Messenger (via SNF Proxy) ─────────────────────────────────

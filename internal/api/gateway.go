@@ -113,7 +113,9 @@ func (g *Gateway) Close() error {
 		}
 		g.hubsMtx.Unlock()
 
-		err = g.listener.Close()
+		if g.listener != nil {
+			err = g.listener.Close()
+		}
 	})
 	return err
 }

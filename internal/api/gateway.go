@@ -141,7 +141,13 @@ func (g *Gateway) NotifyWebsockets(nodeID string) func(message interface{}) erro
 }
 
 // Serve begins listening on the configured address.
+// When the Gateway is created by SharedRouter (hosting bridge mode), there is
+// no listener — hosting manages the HTTP server externally. In that case Serve
+// is a no-op.
 func (g *Gateway) Serve() error {
+	if g.listener == nil {
+		return nil
+	}
 	log.Infof("Gateway/API server listening on %s\n", g.listener.Addr())
 	var err error
 	if g.config.UseSSL {

@@ -143,14 +143,14 @@ func buildFilterClause(f contracts.OrderFilter) (string, []interface{}) {
 	}
 
 	if f.SearchTerm != "" && len(f.SearchColumns) > 0 {
-		searchClause := "("
+		searchClause := "LOWER("
 		for i, col := range f.SearchColumns {
 			searchClause += col
 			if i < len(f.SearchColumns)-1 {
 				searchClause += " || "
 			}
 		}
-		searchClause += ") like ?"
+		searchClause += ") LIKE LOWER(?)"
 
 		if stm != "" {
 			stm += " and " + searchClause

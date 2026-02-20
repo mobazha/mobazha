@@ -119,23 +119,26 @@ func (s *NotificationAppService) GetNotificationsTotalCount() (int64, error) {
 }
 
 // BatchMarkNotificationsAsRead marks multiple notifications as read by IDs.
-// NOTE: uses tx.Read().Update() which bypasses tenant-scoped writes — tech debt to fix later.
 func (s *NotificationAppService) BatchMarkNotificationsAsRead(ids []string) error {
 	if len(ids) == 0 {
 		return nil
 	}
 	return s.db.Update(func(tx database.Tx) error {
-		return tx.Read().Model(&models.NotificationRecord{}).Where("id IN ?", ids).Update("read", true).Error
+		return tx.Update("read", true, map[string]interface{}{"id IN ?": ids}, &models.NotificationRecord{})
 	})
 }
 
 // BatchDeleteNotifications deletes multiple notifications by IDs.
-// NOTE: uses tx.Read().Delete() which bypasses tenant-scoped writes — tech debt to fix later.
 func (s *NotificationAppService) BatchDeleteNotifications(ids []string) error {
 	if len(ids) == 0 {
 		return nil
 	}
 	return s.db.Update(func(tx database.Tx) error {
-		return tx.Read().Where("id IN ?", ids).Delete(&models.NotificationRecord{}).Error
+		for _, id := range ids {
+			if err := tx.Delete("id", id, nil, &models.NotificationRecord{}); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }

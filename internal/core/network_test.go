@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"runtime"
 	"testing"
 	"time"
 
@@ -130,7 +131,7 @@ func TestMobazhaNode_syncMessages(t *testing.T) {
 	}
 
 	// Reconnecting nodes should trigger node 1 to send the messages to node 0 again.
-	time.Sleep(1)
+	runtime.Gosched()
 	network.Nodes()[0].networkService = net.NewNetworkService(network.Nodes()[0].nodeID, network.Nodes()[0].ipfsNode.PeerHost, net.NewBanManager(nil, nil), true)
 	network.Nodes()[0].registerHandlers()
 

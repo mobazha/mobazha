@@ -30,7 +30,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/encryption"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/evm"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 )
 
@@ -359,165 +358,12 @@ func (n *MobazhaNode) checkRepoMigration() error {
 		return err
 	}
 
-	if n.ipfsOnlyMode {
-		if version != repo.DefaultRepoVersion {
-			if err := n.repo.WriteVersion(repo.DefaultRepoVersion); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	if version == 0 {
-		logger.LogInfoWithIDf(log, n.nodeID, "Migrate repo from version 0")
-		err = n.migrateRepoFromVersion0()
-		if err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "Migration error: %v", err)
-		}
-
-		logger.LogInfoWithIDf(log, n.nodeID, "Migrate repo from version 1")
-		err = n.migrateRepoFromVersion1()
-		if err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "Migration error: %v", err)
-		}
-	} else if version == 1 {
-		logger.LogInfoWithIDf(log, n.nodeID, "Migrate repo from version 1")
-		err = n.migrateRepoFromVersion1()
-		if err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "Migration error: %v", err)
-		}
-	} else if version == 2 || version == 3 {
-		logger.LogInfoWithIDf(log, n.nodeID, "Migrate repo from version 2")
-		err = n.migrateRepoWithListingsUpdate()
-		if err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "Migration error: %v", err)
-		}
-	} else if version == 5 {
-		logger.LogInfoWithIDf(log, n.nodeID, "Migrate repo from version 5")
-		err = n.migrateRepoFromVersion5()
-		if err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "Migration error: %v", err)
-		}
-	}
-
 	if version != repo.DefaultRepoVersion {
 		if err := n.repo.WriteVersion(repo.DefaultRepoVersion); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-// Do profile and listings migration with ETH pubKey adding
-func (n *MobazhaNode) migrateRepoFromVersion0() error {
-	done1 := make(chan struct{})
-	myProfile, err := n.profileService.GetMyProfile()
-	if err != nil {
-		return fmt.Errorf("get my profile failed, %v", err)
-	}
-	err = n.profileService.SetProfile(myProfile, done1)
-	if err != nil {
-		return fmt.Errorf("update profile failed, %v", err)
-	}
-
-	select {
-	case <-done1:
-		break
-	case <-time.After(time.Second * 300):
-		return errors.New("timeout waiting on profile update")
-	}
-
-	done2 := make(chan struct{})
-	err = n.listingService.UpdateAllListings(func(listing *pb.Listing) (bool, error) {
-		listing.VendorID.Pubkeys.Eth = n.ethMasterKey.PubKey().SerializeCompressed()
-		return true, nil
-	}, done2)
-	if err != nil {
-		return fmt.Errorf("update listings failed, %v", err)
-	}
-	select {
-	case <-done2:
-		return nil
-	case <-time.After(time.Second * 300):
-		return errors.New("timeout waiting on listing update")
-	}
-}
-
-// Do profile and listings migration with MATIC currencies update
-func (n *MobazhaNode) migrateRepoFromVersion1() error {
-	done := make(chan struct{})
-	myProfile, err := n.profileService.GetMyProfile()
-	if err != nil {
-		return fmt.Errorf("get my profile failed, %v", err)
-	}
-	myProfile.Currencies = []string{"MATIC", "MATICUSDT", "MATICUSDC"}
-	err = n.profileService.SetProfile(myProfile, done)
-	if err != nil {
-		return fmt.Errorf("update profile failed, %v", err)
-	}
-
-	select {
-	case <-done:
-		return nil
-	case <-time.After(time.Second * 300):
-		return errors.New("timeout waiting on profile update")
-	}
-}
-
-// Do listings migration about signature due to new fields added
-func (n *MobazhaNode) migrateRepoWithListingsUpdate() error {
-	done := make(chan struct{})
-	err := n.listingService.UpdateAllListings(func(listing *pb.Listing) (bool, error) {
-		// do nothing, just update the signature using existing flow
-		return true, nil
-	}, done)
-	if err != nil {
-		return fmt.Errorf("update listings failed, %v", err)
-	}
-
-	select {
-	case <-done:
-		return nil
-	case <-time.After(time.Second * 300):
-		return errors.New("timeout waiting on listing update")
-	}
-}
-
-// Do listings migration about signature due to new fields added
-func (n *MobazhaNode) migrateRepoFromVersion5() error {
-	// Add Solana pubkey to profile
-	done1 := make(chan struct{})
-	myProfile, err := n.profileService.GetMyProfile()
-	if err != nil {
-		return fmt.Errorf("get my profile failed, %v", err)
-	}
-	err = n.profileService.SetProfile(myProfile, done1)
-	if err != nil {
-		return fmt.Errorf("update profile failed, %v", err)
-	}
-
-	select {
-	case <-done1:
-		break
-	case <-time.After(time.Second * 300):
-		return errors.New("timeout waiting on profile update")
-	}
-
-	// Add Solana pubkey to listings
-	done2 := make(chan struct{})
-	err = n.listingService.UpdateAllListings(func(listing *pb.Listing) (bool, error) {
-		listing.VendorID.Pubkeys.Solana = n.solPrivKey.PublicKey().Bytes()
-		return true, nil
-	}, done2)
-	if err != nil {
-		return fmt.Errorf("update listings failed, %v", err)
-	}
-	select {
-	case <-done2:
-		return nil
-	case <-time.After(time.Second * 300):
-		return errors.New("timeout waiting on listing update")
-	}
 }
 
 // Stop cleanly shutsdown the MobazhaNode and signals to any

@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"crypto/rand"
+	"runtime"
 	"testing"
 	"time"
 
@@ -100,7 +101,7 @@ func TestMobazhaNode_CancelOrder(t *testing.T) {
 	t.Logf("payment amount: %s", paymentAmount.String())
 
 	// Reconnecting nodes should trigger node 1 to send the order to node 0 again.
-	time.Sleep(1)
+	runtime.Gosched()
 	sellerNode.networkService = net.NewNetworkService(sellerNode.nodeID, sellerNode.ipfsNode.PeerHost, net.NewBanManager(nil, nil), true)
 	sellerNode.registerHandlers()
 

@@ -89,6 +89,15 @@ type PublicData interface {
 	SetIntroVideo(introVideo models.IntroVideo) error
 }
 
+// PublicDataMaterializer is an optional interface implemented by Database
+// backends whose public data is not stored on the local filesystem (e.g.
+// DBPublicData in SaaS mode). When PublicDataPath() returns "", callers
+// should check for this interface and use it to materialize a directory
+// tree suitable for IPFS publishing.
+type PublicDataMaterializer interface {
+	MaterializePublicData(dir string) error
+}
+
 // Tx represents a database transaction. It can either be read-only or
 // read-write. The transaction provides access to a sql database interface
 // with an open transaction to use for writing generic data.

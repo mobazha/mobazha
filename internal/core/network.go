@@ -23,6 +23,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
@@ -125,15 +126,41 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 		}
 	}
 
-	// Add the directory to IPFS
-	stat, err := os.Lstat(n.db.PublicDataPath())
+	// Resolve public data directory for IPFS add.
+	// Standalone mode: PublicDataPath() returns the flat file directory.
+	// SaaS mode (DBPublicData): PublicDataPath() returns "" and data is
+	// materialized to a temp directory via PublicDataMaterializer.
+	publicDir := n.db.PublicDataPath()
+	if publicDir == "" {
+		if mat, ok := n.db.(pkgdb.PublicDataMaterializer); ok {
+			tmpDir, mkErr := os.MkdirTemp("", "publish-"+n.nodeID+"-")
+			if mkErr != nil {
+				logger.LogErrorWithIDf(log, n.nodeID, "Error creating temp dir for publish: %s", mkErr.Error())
+				publishErr = mkErr
+				return
+			}
+			defer os.RemoveAll(tmpDir)
+			if matErr := mat.MaterializePublicData(tmpDir); matErr != nil {
+				logger.LogErrorWithIDf(log, n.nodeID, "Error materializing public data: %s", matErr.Error())
+				publishErr = matErr
+				return
+			}
+			publicDir = tmpDir
+		} else {
+			publishErr = fmt.Errorf("no public data path and db does not support materialization")
+			logger.LogErrorWithIDf(log, n.nodeID, "%s", publishErr.Error())
+			return
+		}
+	}
+
+	stat, err := os.Lstat(publicDir)
 	if err != nil {
 		logger.LogErrorWithIDf(log, n.nodeID, "Error calling Lstat: %s", err.Error())
 		publishErr = err
 		return
 	}
 
-	f, err := files.NewSerialFile(n.db.PublicDataPath(), false, stat)
+	f, err := files.NewSerialFile(publicDir, false, stat)
 	if err != nil {
 		logger.LogErrorWithIDf(log, n.nodeID, "Error serializing file: %s", err.Error())
 		publishErr = err

@@ -41,6 +41,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/repo"
+	webhookinternal "github.com/mobazha/mobazha3.0/internal/webhook"
 	oniontransport "github.com/mobazha/mobazha3.0/libs/onion-transport"
 	"github.com/mobazha/mobazha3.0/libs/proxyclient"
 	storeandforward "github.com/mobazha/mobazha3.0/libs/store-and-forward"
@@ -53,6 +54,7 @@ import (
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/op/go-logging"
 	"github.com/tyler-smith/go-bip39"
@@ -405,6 +407,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			}
 		}
 
+		initWebhookSubsystem(obNode)
 		obNode.applyOptions(nil)
 		return obNode, nil
 	}
@@ -678,6 +681,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		StateValidator: &coreStateBridge{},
 	})
 
+	initWebhookSubsystem(obNode)
 	obNode.applyOptions(nil)
 	obNode.registerHandlers()
 	obNode.listenNetworkEvents()
@@ -1266,6 +1270,7 @@ func newLightweightNode(
 		StateValidator: &coreStateBridge{},
 	})
 
+	initWebhookSubsystem(obNode)
 	obNode.applyOptions(nil)
 	obNode.registerHandlers()
 	obNode.listenNetworkEvents()
@@ -1273,4 +1278,28 @@ func newLightweightNode(
 	success = true
 	logger.LogInfoWithIDf(log, nodeID, "Lightweight node created: PeerID=%s", nodePeerID)
 	return obNode, nil
+}
+
+// initWebhookSubsystem initializes the per-node webhook subsystem:
+// migrates DB models, creates store + engine + event bridge.
+func initWebhookSubsystem(obNode *MobazhaNode) {
+	if err := webhookinternal.MigrateModels(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "Webhook: failed to migrate models: %v", err)
+		return
+	}
+
+	store := webhookinternal.NewSQLiteStore(obNode.db)
+	engine := wh.NewEngine(store)
+
+	bridge, err := webhookinternal.NewBridge(obNode.eventBus, engine, obNode.nodeID)
+	if err != nil {
+		engine.Stop()
+		logger.LogErrorWithIDf(log, obNode.nodeID, "Webhook: failed to create bridge: %v", err)
+		return
+	}
+
+	obNode.webhookStore = store
+	obNode.webhookEngine = engine
+	obNode.webhookBridge = bridge
+	logger.LogInfoWithID(log, obNode.nodeID, "Webhook subsystem initialized")
 }

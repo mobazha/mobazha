@@ -6,10 +6,11 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
+	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	wallet "github.com/mobazha/mobazha3.0/internal/wallet"
+	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
 )
 
 // Service accessors implement contracts.NodeService's accessor pattern.
@@ -34,6 +35,10 @@ func (n *MobazhaNode) Preferences() contracts.PreferencesService   { return n.pr
 func (n *MobazhaNode) ShoppingCart() contracts.ShoppingCartService  { return n.shoppingCartService }
 func (n *MobazhaNode) Stripe() contracts.StripeService             { return n.paymentService }
 func (n *MobazhaNode) ExchangeRate() contracts.ExchangeRateService { return &exchangeRateAdapter{n.exchangeRates} }
+
+// WebhookProvider implementation — per-node webhook subsystem.
+func (n *MobazhaNode) WebhookStore() wh.EndpointStore { return n.webhookStore }
+func (n *MobazhaNode) WebhookEngine() *wh.Engine      { return n.webhookEngine }
 
 func (n *MobazhaNode) Order() contracts.OrderService {
 	return &orderServiceFacade{

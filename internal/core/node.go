@@ -23,6 +23,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
+	webhookinternal "github.com/mobazha/mobazha3.0/internal/webhook"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -31,6 +32,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/evm"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
+	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
 )
 
 // MobazhaNode holds all the components that make up a network node
@@ -126,6 +128,15 @@ type MobazhaNode struct {
 
 	// shoppingCartService encapsulates shopping cart business logic.
 	shoppingCartService *ShoppingCartAppService
+
+	// webhookStore persists webhook endpoints and delivery records.
+	webhookStore wh.EndpointStore
+
+	// webhookEngine manages background webhook delivery polling and retry.
+	webhookEngine *wh.Engine
+
+	// webhookBridge subscribes to EventBus events and forwards them to webhookEngine.
+	webhookBridge *webhookinternal.Bridge
 
 	// stripeAccountID represents the stripe account id of the node.
 	stripeAccountID string
@@ -389,6 +400,12 @@ func (n *MobazhaNode) Stop(force bool) error {
 		if n.channelsService != nil {
 			n.channelsService.CloseAll()
 		}
+	}
+	if n.webhookBridge != nil {
+		n.webhookBridge.Stop()
+	}
+	if n.webhookEngine != nil {
+		n.webhookEngine.Stop()
 	}
 	if n.shutdownTorFunc != nil {
 		n.shutdownTorFunc()

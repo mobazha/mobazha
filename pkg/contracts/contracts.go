@@ -26,6 +26,7 @@ import (
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"github.com/mobazha/mobazha3.0/pkg/webhook"
 	"github.com/stripe/stripe-go/v82"
 )
 
@@ -287,6 +288,13 @@ type ShoppingCartService interface {
 	RemoveCartItem(peerID peer.ID, item models.ShoppingCartItem) error
 	ClearCarts(vendorID peer.ID) error
 	ClearAllCarts() error
+}
+
+// WebhookProvider exposes the per-node webhook subsystem (store + engine).
+// Handlers obtain this via type assertion on NodeService.
+type WebhookProvider interface {
+	WebhookStore() webhook.EndpointStore
+	WebhookEngine() *webhook.Engine
 }
 
 // NodeService is the top-level aggregate interface that combines all domain services.

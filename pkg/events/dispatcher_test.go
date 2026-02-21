@@ -132,6 +132,34 @@ func TestDispatcher_MultipleEvents(t *testing.T) {
 	}
 }
 
+type concurrentMockSink struct {
+	mockSink
+	concurrency int
+}
+
+func (s *concurrentMockSink) Concurrency() int { return s.concurrency }
+
+func TestSinkWorkerCount_Default(t *testing.T) {
+	sink := &mockSink{name: "plain"}
+	if n := sinkWorkerCount(sink); n != 2 {
+		t.Errorf("expected default 2, got %d", n)
+	}
+}
+
+func TestSinkWorkerCount_ConcurrentSink(t *testing.T) {
+	sink := &concurrentMockSink{mockSink: mockSink{name: "conc"}, concurrency: 8}
+	if n := sinkWorkerCount(sink); n != 8 {
+		t.Errorf("expected 8, got %d", n)
+	}
+}
+
+func TestSinkWorkerCount_ConcurrentSinkZero(t *testing.T) {
+	sink := &concurrentMockSink{mockSink: mockSink{name: "zero"}, concurrency: 0}
+	if n := sinkWorkerCount(sink); n != 2 {
+		t.Errorf("expected fallback 2 for zero concurrency, got %d", n)
+	}
+}
+
 func waitFor(t *testing.T, cond func() bool, timeout time.Duration) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)

@@ -25,6 +25,10 @@ func NewWebhookSink(engine *wh.Engine, nodeID string) *WebhookSink {
 // Name implements events.EventSink.
 func (s *WebhookSink) Name() string { return "webhook" }
 
+// Concurrency implements events.ConcurrentSink.
+// Webhook delivery benefits from parallel workers for HTTP fan-out.
+func (s *WebhookSink) Concurrency() int { return 4 }
+
 // Accept implements events.EventSink.
 // Always returns true — Engine.Enqueue filters per-endpoint by EventTypes.
 func (s *WebhookSink) Accept(_ events.EventMeta) bool { return true }

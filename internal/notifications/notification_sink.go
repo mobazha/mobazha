@@ -5,12 +5,64 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"reflect"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/op/go-logging"
 )
+
+var log = logging.MustGetLogger("NOTF")
+
+type notificationWrapper struct {
+	Notification any `json:"notification"`
+}
+
+type shoppingCartWrapper struct {
+	ShoppingCart any `json:"shoppingCart"`
+}
+
+type channelMessageWrapper struct {
+	ChannelMessage any `json:"channelMessage"`
+}
+
+type chatMessageWrapper struct {
+	ChatMessage any `json:"chatMessage"`
+}
+
+type messageReadWrapper struct {
+	MessageRead any `json:"messageRead"`
+}
+
+type messageTypingWrapper struct {
+	MessageTyping any `json:"messageTyping"`
+}
+
+type walletWrapper struct {
+	Wallet any `json:"wallet"`
+}
+
+type partialPaymentWrapper struct {
+	PartialPayment any `json:"partialPaymentReceived"`
+}
+
+type statusWrapper struct {
+	Status any `json:"status"`
+}
+
+type chatGroupCreateWrapper struct {
+	ChatGroupCreate any `json:"chatGroupCreate"`
+}
+
+type chatGroupUpdateWrapper struct {
+	ChatGroupUpdate any `json:"chatGroupUpdate"`
+}
+
+type chatGroupDeleteWrapper struct {
+	ChatGroupDelete any `json:"chatGroupDelete"`
+}
 
 // NotificationSink is an EventSink that replaces the old Notifier for-select loop.
 // It handles two paths:
@@ -32,6 +84,10 @@ func NewNotificationSink(db database.Database, notifyFunc func(any) error) *Noti
 // Name implements events.EventSink.
 func (s *NotificationSink) Name() string { return "notification" }
 
+// Concurrency implements events.ConcurrentSink.
+// Notification requires sequential DB writes to preserve ordering.
+func (s *NotificationSink) Concurrency() int { return 1 }
+
 // Accept implements events.EventSink. Accepts all registered events.
 func (s *NotificationSink) Accept(_ events.EventMeta) bool { return true }
 
@@ -47,7 +103,10 @@ func (s *NotificationSink) Handle(_ context.Context, meta events.EventMeta, even
 // assign ID + type on the embedded Notification struct, persist to DB, push via WebSocket.
 func (s *NotificationSink) handlePersistentNotification(meta events.EventMeta, event interface{}) error {
 	r := make([]byte, 20)
-	rand.Read(r)
+	if _, err := rand.Read(r); err != nil {
+		log.Errorf("Error generating notification ID: %s", err)
+		return err
+	}
 	id := hex.EncodeToString(r)
 
 	setNotificationFields(event, id, meta.Legacy)
@@ -94,49 +153,22 @@ func (s *NotificationSink) handleWebSocketOnly(meta events.EventMeta, event inte
 }
 
 // setNotificationFields sets the ID and Type on events that embed events.Notification.
+// Uses reflection to find the embedded Notification struct, so new event types
+// that embed Notification are automatically supported without code changes.
 func setNotificationFields(event interface{}, id, typ string) {
-	switch e := event.(type) {
-	case *events.NewOrder:
-		e.ID, e.Typ = id, typ
-	case *events.OrderFunded:
-		e.ID, e.Typ = id, typ
-	case *events.OrderPaymentReceived:
-		e.ID, e.Typ = id, typ
-	case *events.OrderConfirmation:
-		e.ID, e.Typ = id, typ
-	case *events.OrderDeclined:
-		e.ID, e.Typ = id, typ
-	case *events.OrderCancel:
-		e.ID, e.Typ = id, typ
-	case *events.Refund:
-		e.ID, e.Typ = id, typ
-	case *events.OrderFulfillment:
-		e.ID, e.Typ = id, typ
-	case *events.OrderCompletion:
-		e.ID, e.Typ = id, typ
-	case *events.DisputeOpen:
-		e.ID, e.Typ = id, typ
-	case *events.CaseOpen:
-		e.ID, e.Typ = id, typ
-	case *events.CaseUpdate:
-		e.ID, e.Typ = id, typ
-	case *events.DisputeClose:
-		e.ID, e.Typ = id, typ
-	case *events.DisputeAccepted:
-		e.ID, e.Typ = id, typ
-	case *events.VendorFinalizedPayment:
-		e.ID, e.Typ = id, typ
-	case *events.Follow:
-		e.ID, e.Typ = id, typ
-	case *events.Unfollow:
-		e.ID, e.Typ = id, typ
-	case *events.PaymentLockedReceived:
-		e.ID, e.Typ = id, typ
-	case *events.PaymentExpiredNotification:
-		e.ID, e.Typ = id, typ
-	case *events.PaymentCancelledByBuyer:
-		e.ID, e.Typ = id, typ
+	v := reflect.ValueOf(event)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
 	}
+	if v.Kind() != reflect.Struct {
+		return
+	}
+	nf := v.FieldByName("Notification")
+	if !nf.IsValid() || nf.Type() != reflect.TypeOf(events.Notification{}) {
+		return
+	}
+	nf.FieldByName("ID").SetString(id)
+	nf.FieldByName("Typ").SetString(typ)
 }
 
 // wrapForWebSocket applies the type-specific JSON wrappers that the frontend expects.

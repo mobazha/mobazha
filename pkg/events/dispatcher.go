@@ -19,6 +19,7 @@ type Dispatcher struct {
 	sinks  []EventSink
 	sub    Subscription
 	done   chan struct{}
+	once   sync.Once
 	wg     sync.WaitGroup
 
 	// per-sink worker channels
@@ -51,7 +52,7 @@ func (d *Dispatcher) Start() error {
 	for _, sink := range d.sinks {
 		ch := make(chan dispatchItem, defaultSinkBuffer)
 		d.workers[sink.Name()] = ch
-		workers := sinkWorkerCount(sink.Name())
+		workers := sinkWorkerCount(sink)
 		for i := 0; i < workers; i++ {
 			d.wg.Add(1)
 			go d.sinkWorker(sink, ch)
@@ -64,14 +65,17 @@ func (d *Dispatcher) Start() error {
 }
 
 // Stop gracefully shuts down the dispatcher and waits for all workers to finish.
+// ManagedEscrow to call multiple times.
 func (d *Dispatcher) Stop() {
-	close(d.done)
-	if d.sub != nil {
-		d.sub.Close()
-	}
-	for _, ch := range d.workers {
-		close(ch)
-	}
+	d.once.Do(func() {
+		close(d.done)
+		if d.sub != nil {
+			d.sub.Close()
+		}
+		for _, ch := range d.workers {
+			close(ch)
+		}
+	})
 	d.wg.Wait()
 }
 
@@ -117,15 +121,14 @@ func (d *Dispatcher) sinkWorker(sink EventSink, ch <-chan dispatchItem) {
 	}
 }
 
-// sinkWorkerCount returns the recommended number of goroutines per sink.
-// Notification needs sequential DB writes; webhook benefits from parallelism.
-func sinkWorkerCount(name string) int {
-	switch name {
-	case "notification":
-		return 1
-	case "webhook":
-		return 4
-	default:
-		return 2
+// sinkWorkerCount returns the number of goroutines for a sink.
+// If the sink implements ConcurrentSink, its Concurrency() value is used.
+// Otherwise defaults to 2.
+func sinkWorkerCount(sink EventSink) int {
+	if cs, ok := sink.(ConcurrentSink); ok {
+		if n := cs.Concurrency(); n > 0 {
+			return n
+		}
 	}
+	return 2
 }

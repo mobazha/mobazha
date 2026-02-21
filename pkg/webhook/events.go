@@ -65,15 +65,6 @@ func BuildCloudEvent(tenantID, eventType string, data interface{}) ([]byte, erro
 	return json.Marshal(ce)
 }
 
-// WebhookBusEventTypes returns the Go event struct pointers that the EventBus should
-// subscribe to for webhook forwarding.
-//
-// Deprecated: Use events.AllSamples() directly. This function is kept for backward
-// compatibility and will be removed once Bridge is replaced by WebhookSink.
-func WebhookBusEventTypes() []interface{} {
-	return events.AllSamples()
-}
-
 // MatchEventFilter checks whether eventType matches a comma-separated filter string.
 // Supports exact match ("order.created") and wildcard ("order.*").
 func MatchEventFilter(filter, eventType string) bool {

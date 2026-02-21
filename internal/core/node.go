@@ -19,7 +19,6 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet/utxo"
 	"github.com/mobazha/mobazha3.0/internal/net"
-	"github.com/mobazha/mobazha3.0/internal/notifications"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
@@ -187,10 +186,6 @@ type MobazhaNode struct {
 	// exchangeRates is a provider of exchange rate data for various currencies.
 	exchangeRates *wallet.ExchangeRateProvider
 
-	// notifier is kept temporarily for backward compatibility during migration.
-	// Once eventDispatcher is fully operational, this field will be removed.
-	notifier *notifications.Notifier
-
 	// testnet is whether the this node is configured to use the test network (IPFS bootstrap).
 	testnet bool
 
@@ -317,8 +312,6 @@ func (n *MobazhaNode) Start() {
 			if err := n.eventDispatcher.Start(); err != nil {
 				logger.LogErrorWithIDf(log, n.nodeID, "Failed to start event dispatcher: %v", err)
 			}
-		} else if n.notifier != nil {
-			go n.notifier.Start()
 		}
 		go n.channelsService.OpenSavedChannels()
 
@@ -400,9 +393,6 @@ func (n *MobazhaNode) Stop(force bool) error {
 		n.orderProcessor.Stop()
 		n.followerTracker.Close()
 		n.multiwallet.Close()
-		if n.notifier != nil {
-			n.notifier.Stop()
-		}
 		if n.channelsService != nil {
 			n.channelsService.CloseAll()
 		}

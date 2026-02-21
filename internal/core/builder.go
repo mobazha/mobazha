@@ -613,11 +613,8 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		sharedManager.GetHTTPGateway().EnsureHubForUser(nodeID)
 	}
 
-	obNode.notifier = notifications.NewNotifier(
-		bus,
-		obRepo.DB(),
-		sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID),
-	)
+	notifyWsFn := sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID)
+	initEventDispatcher(obNode, notifyWsFn)
 
 	// Create messenger with appropriate SNF client
 	messengerCfg := &obnet.MessengerConfig{
@@ -1206,11 +1203,7 @@ func newLightweightNode(
 		notifyWsFn = gw.NotifyWebsockets(nodeID)
 	}
 
-	obNode.notifier = notifications.NewNotifier(
-		bus,
-		obRepo.DB(),
-		notifyWsFn,
-	)
+	initEventDispatcher(obNode, notifyWsFn)
 
 	// ── 7. Messenger (via SNF Proxy) ─────────────────────────────────
 	messengerCfg := &obnet.MessengerConfig{
@@ -1281,7 +1274,8 @@ func newLightweightNode(
 }
 
 // initWebhookSubsystem initializes the per-node webhook subsystem:
-// migrates DB models, creates store + engine + event bridge.
+// migrates DB models, creates store + engine.
+// The Engine is started here; the WebhookSink is plugged into the Dispatcher later.
 func initWebhookSubsystem(obNode *MobazhaNode) {
 	if err := webhookinternal.MigrateModels(obNode.db); err != nil {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "Webhook: failed to migrate models: %v", err)
@@ -1289,17 +1283,25 @@ func initWebhookSubsystem(obNode *MobazhaNode) {
 	}
 
 	store := webhookinternal.NewSQLiteStore(obNode.db)
-	engine := wh.NewEngine(store)
-
-	bridge, err := webhookinternal.NewBridge(obNode.eventBus, engine, obNode.nodeID)
-	if err != nil {
-		engine.Stop()
-		logger.LogErrorWithIDf(log, obNode.nodeID, "Webhook: failed to create bridge: %v", err)
-		return
-	}
+	engine := wh.NewEngine(store, wh.DefaultConfig())
 
 	obNode.webhookStore = store
 	obNode.webhookEngine = engine
-	obNode.webhookBridge = bridge
 	logger.LogInfoWithID(log, obNode.nodeID, "Webhook subsystem initialized")
+}
+
+// initEventDispatcher creates the unified EventDispatcher with NotificationSink
+// and (optionally) WebhookSink. This replaces the old Notifier goroutine and
+// webhook Bridge, providing error isolation between sinks.
+func initEventDispatcher(obNode *MobazhaNode, notifyWsFn func(any) error) {
+	notifSink := notifications.NewNotificationSink(obNode.db, notifyWsFn)
+	sinks := []events.EventSink{notifSink}
+
+	if obNode.webhookEngine != nil {
+		whSink := webhookinternal.NewWebhookSink(obNode.webhookEngine, obNode.nodeID)
+		sinks = append(sinks, whSink)
+	}
+
+	obNode.eventDispatcher = events.NewDispatcher(obNode.eventBus, sinks...)
+	logger.LogInfoWithIDf(log, obNode.nodeID, "Event dispatcher initialized with %d sinks", len(sinks))
 }

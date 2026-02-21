@@ -12,8 +12,6 @@ import (
 	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
 )
 
-const maxEndpointsPerNode = 20
-
 func getWebhookProvider(r *http.Request) (contracts.WebhookProvider, bool) {
 	wp, ok := getNodeService(r).(contracts.WebhookProvider)
 	return wp, ok
@@ -26,6 +24,7 @@ func (g *Gateway) handleCreateWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	store := wp.WebhookStore()
+	engine := wp.WebhookEngine()
 
 	var req struct {
 		URL        string `json:"url"`
@@ -47,13 +46,8 @@ func (g *Gateway) handleCreateWebhook(w http.ResponseWriter, r *http.Request) {
 		req.EventTypes = "order.*,dispute.*,chat.message"
 	}
 
-	count, err := store.CountEndpoints()
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if count >= maxEndpointsPerNode {
-		http.Error(w, "Maximum webhook endpoints reached", http.StatusConflict)
+	if err := engine.CheckEndpointQuota(); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 

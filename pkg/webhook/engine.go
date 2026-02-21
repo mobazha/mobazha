@@ -3,6 +3,7 @@ package webhook
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -11,29 +12,28 @@ import (
 )
 
 const (
-	defaultPollInterval = 5 * time.Second
-	defaultHTTPTimeout  = 10 * time.Second
-	defaultBatchSize    = 50
-	defaultMaxAttempts  = 5
-	cleanupInterval     = 1 * time.Hour
-	cleanupMaxAge       = 7 * 24 * time.Hour
+	defaultBatchSize = 50
+	cleanupInterval  = 1 * time.Hour
 )
 
 // Engine manages webhook enqueuing and background delivery.
 // It is tenant-agnostic: all tenant scoping is handled by the EndpointStore implementation.
 type Engine struct {
-	store    EndpointStore
-	client   *http.Client
+	store  EndpointStore
+	cfg    Config
+	client *http.Client
+
 	shutdown chan struct{}
 	once     sync.Once
 }
 
-// NewEngine creates a new Engine and starts the background delivery and cleanup workers.
-func NewEngine(store EndpointStore) *Engine {
+// NewEngine creates a new Engine with explicit config and starts background workers.
+func NewEngine(store EndpointStore, cfg Config) *Engine {
 	e := &Engine{
 		store: store,
+		cfg:   cfg,
 		client: &http.Client{
-			Timeout: defaultHTTPTimeout,
+			Timeout: cfg.httpTimeout(),
 		},
 		shutdown: make(chan struct{}),
 	}
@@ -47,6 +47,27 @@ func (e *Engine) Stop() {
 	e.once.Do(func() { close(e.shutdown) })
 }
 
+// Config returns the engine's current configuration (read-only snapshot).
+func (e *Engine) Config() Config {
+	return e.cfg
+}
+
+// CheckEndpointQuota returns an error if the node has reached its endpoint limit.
+// Returns nil if the limit is 0 (unlimited) or if the current count is below the limit.
+func (e *Engine) CheckEndpointQuota() error {
+	if e.cfg.MaxEndpoints <= 0 {
+		return nil
+	}
+	endpoints, err := e.store.ListActive()
+	if err != nil {
+		return fmt.Errorf("checking endpoint quota: %w", err)
+	}
+	if len(endpoints) >= e.cfg.MaxEndpoints {
+		return fmt.Errorf("endpoint limit reached (%d/%d)", len(endpoints), e.cfg.MaxEndpoints)
+	}
+	return nil
+}
+
 // Enqueue finds active endpoints matching the event type and creates delivery records.
 func (e *Engine) Enqueue(eventType string, payload []byte) {
 	endpoints, err := e.store.ListActive()
@@ -55,6 +76,7 @@ func (e *Engine) Enqueue(eventType string, payload []byte) {
 		return
 	}
 
+	maxRetries := e.cfg.maxRetries()
 	var deliveries []Delivery
 	now := time.Now()
 	for _, ep := range endpoints {
@@ -66,7 +88,7 @@ func (e *Engine) Enqueue(eventType string, payload []byte) {
 			EventType:   eventType,
 			Payload:     string(payload),
 			Status:      DeliveryStatusPending,
-			MaxAttempts: defaultMaxAttempts,
+			MaxAttempts: maxRetries,
 			CreatedAt:   now,
 		})
 	}
@@ -81,7 +103,7 @@ func (e *Engine) Enqueue(eventType string, payload []byte) {
 }
 
 func (e *Engine) deliveryWorker() {
-	ticker := time.NewTicker(defaultPollInterval)
+	ticker := time.NewTicker(e.cfg.pollInterval())
 	defer ticker.Stop()
 
 	for {
@@ -172,7 +194,7 @@ func (e *Engine) cleanupWorker() {
 		case <-e.shutdown:
 			return
 		case <-ticker.C:
-			deleted, err := e.store.CleanupOld(cleanupMaxAge)
+			deleted, err := e.store.CleanupOld(e.cfg.retentionAge())
 			if err != nil {
 				log.Printf("[webhook] Failed to cleanup old deliveries: %v", err)
 				continue

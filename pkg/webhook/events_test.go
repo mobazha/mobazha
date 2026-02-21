@@ -161,7 +161,17 @@ func TestMatchEventFilter_EmptyFilter(t *testing.T) {
 
 func TestAllWebhookEventTypes_ReturnsAll(t *testing.T) {
 	types := AllWebhookEventTypes()
-	if len(types) != 12 {
-		t.Errorf("expected 12 event types, got %d", len(types))
+	allNames := events.AllEventNames()
+	if len(types) != len(allNames) {
+		t.Errorf("expected %d event types (all registry events), got %d", len(allNames), len(types))
+	}
+}
+
+func TestClassifyEvent_UsesRegistry(t *testing.T) {
+	for _, m := range events.AllMeta() {
+		got := ClassifyEvent(m.Sample)
+		if got != m.Name {
+			t.Errorf("ClassifyEvent(%T) = %q, want %q", m.Sample, got, m.Name)
+		}
 	}
 }

@@ -23,7 +23,6 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
-	webhookinternal "github.com/mobazha/mobazha3.0/internal/webhook"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -135,8 +134,9 @@ type MobazhaNode struct {
 	// webhookEngine manages background webhook delivery polling and retry.
 	webhookEngine *wh.Engine
 
-	// webhookBridge subscribes to EventBus events and forwards them to webhookEngine.
-	webhookBridge *webhookinternal.Bridge
+	// eventDispatcher is the unified EventBus subscriber that fans out events
+	// to NotificationSink and WebhookSink. Replaces the old Notifier and Bridge.
+	eventDispatcher *events.Dispatcher
 
 	// stripeAccountID represents the stripe account id of the node.
 	stripeAccountID string
@@ -187,8 +187,8 @@ type MobazhaNode struct {
 	// exchangeRates is a provider of exchange rate data for various currencies.
 	exchangeRates *wallet.ExchangeRateProvider
 
-	// notifier listens to events coming off the bus, marshals them to notifications
-	// and sends them off to the websocket.
+	// notifier is kept temporarily for backward compatibility during migration.
+	// Once eventDispatcher is fully operational, this field will be removed.
 	notifier *notifications.Notifier
 
 	// testnet is whether the this node is configured to use the test network (IPFS bootstrap).
@@ -313,7 +313,13 @@ func (n *MobazhaNode) Start() {
 			n.multiwallet.Start()
 		}()
 
-		go n.notifier.Start()
+		if n.eventDispatcher != nil {
+			if err := n.eventDispatcher.Start(); err != nil {
+				logger.LogErrorWithIDf(log, n.nodeID, "Failed to start event dispatcher: %v", err)
+			}
+		} else if n.notifier != nil {
+			go n.notifier.Start()
+		}
 		go n.channelsService.OpenSavedChannels()
 
 		if err := n.profileService.UpdateSNFServers(); err != nil {
@@ -401,8 +407,8 @@ func (n *MobazhaNode) Stop(force bool) error {
 			n.channelsService.CloseAll()
 		}
 	}
-	if n.webhookBridge != nil {
-		n.webhookBridge.Stop()
+	if n.eventDispatcher != nil {
+		n.eventDispatcher.Stop()
 	}
 	if n.webhookEngine != nil {
 		n.webhookEngine.Stop()

@@ -9,6 +9,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 )
 
+// Event type constants kept for convenience. Values match events.EventMeta.Name.
 const (
 	EventOrderCreated         = "order.created"
 	EventOrderFunded          = "order.funded"
@@ -24,59 +25,19 @@ const (
 	EventChatMessage          = "chat.message"
 )
 
-var allWebhookEventTypes = []string{
-	EventOrderCreated,
-	EventOrderFunded,
-	EventOrderPaymentReceived,
-	EventOrderConfirmed,
-	EventOrderFulfilled,
-	EventOrderCompleted,
-	EventOrderCancelled,
-	EventOrderDeclined,
-	EventOrderRefunded,
-	EventDisputeOpened,
-	EventDisputeClosed,
-	EventChatMessage,
-}
-
-// AllWebhookEventTypes returns a copy of all supported webhook event types.
+// AllWebhookEventTypes returns all registered event names that webhooks can subscribe to.
 func AllWebhookEventTypes() []string {
-	cp := make([]string, len(allWebhookEventTypes))
-	copy(cp, allWebhookEventTypes)
-	return cp
+	return events.AllEventNames()
 }
 
-// ClassifyEvent maps a Go event value to a webhook event type string.
-// Returns empty string for unsupported event types.
+// ClassifyEvent maps a Go event value to a dot-separated event type string
+// using the Event Registry. Returns empty string for unregistered event types.
 func ClassifyEvent(evt interface{}) string {
-	switch evt.(type) {
-	case events.NewOrder, *events.NewOrder:
-		return EventOrderCreated
-	case events.OrderFunded, *events.OrderFunded:
-		return EventOrderFunded
-	case events.OrderPaymentReceived, *events.OrderPaymentReceived:
-		return EventOrderPaymentReceived
-	case events.OrderConfirmation, *events.OrderConfirmation:
-		return EventOrderConfirmed
-	case events.OrderFulfillment, *events.OrderFulfillment:
-		return EventOrderFulfilled
-	case events.OrderCompletion, *events.OrderCompletion:
-		return EventOrderCompleted
-	case events.OrderCancel, *events.OrderCancel:
-		return EventOrderCancelled
-	case events.OrderDeclined, *events.OrderDeclined:
-		return EventOrderDeclined
-	case events.Refund, *events.Refund:
-		return EventOrderRefunded
-	case events.DisputeOpen, *events.DisputeOpen:
-		return EventDisputeOpened
-	case events.DisputeClose, *events.DisputeClose:
-		return EventDisputeClosed
-	case events.ChatMessage, *events.ChatMessage:
-		return EventChatMessage
-	default:
+	meta := events.LookupEvent(evt)
+	if meta == nil {
 		return ""
 	}
+	return meta.Name
 }
 
 // CloudEvent represents a CloudEvents v1.0 structured-mode envelope.
@@ -105,22 +66,12 @@ func BuildCloudEvent(tenantID, eventType string, data interface{}) ([]byte, erro
 }
 
 // WebhookBusEventTypes returns the Go event struct pointers that the EventBus should
-// subscribe to for webhook forwarding. Bridge uses this to avoid duplicating the list.
+// subscribe to for webhook forwarding.
+//
+// Deprecated: Use events.AllSamples() directly. This function is kept for backward
+// compatibility and will be removed once Bridge is replaced by WebhookSink.
 func WebhookBusEventTypes() []interface{} {
-	return []interface{}{
-		new(events.NewOrder),
-		new(events.OrderFunded),
-		new(events.OrderPaymentReceived),
-		new(events.OrderConfirmation),
-		new(events.OrderFulfillment),
-		new(events.OrderCompletion),
-		new(events.OrderCancel),
-		new(events.OrderDeclined),
-		new(events.Refund),
-		new(events.DisputeOpen),
-		new(events.DisputeClose),
-		new(events.ChatMessage),
-	}
+	return events.AllSamples()
 }
 
 // MatchEventFilter checks whether eventType matches a comma-separated filter string.

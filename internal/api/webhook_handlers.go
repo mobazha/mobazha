@@ -215,6 +215,12 @@ func (g *Gateway) handleListWebhookDeliveries(w http.ResponseWriter, r *http.Req
 
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	if limit <= 0 || limit > 500 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
 	status := r.URL.Query().Get("status")
 
 	deliveries, total, err := store.ListDeliveries(endpointID, status, limit, offset)
@@ -249,7 +255,12 @@ func (g *Gateway) handleTestWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodeID := getIdentityService(r).GetNodeID()
+	idSvc := getIdentityService(r)
+	if idSvc == nil {
+		http.Error(w, "Identity service not available", http.StatusInternalServerError)
+		return
+	}
+	nodeID := idSvc.GetNodeID()
 	testData := map[string]string{
 		"message": "This is a test webhook event from Mobazha",
 	}

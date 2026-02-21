@@ -613,6 +613,8 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		sharedManager.GetHTTPGateway().EnsureHubForUser(nodeID)
 	}
 
+	initWebhookSubsystem(obNode)
+
 	notifyWsFn := sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID)
 	initEventDispatcher(obNode, notifyWsFn)
 
@@ -678,7 +680,6 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		StateValidator: &coreStateBridge{},
 	})
 
-	initWebhookSubsystem(obNode)
 	obNode.applyOptions(nil)
 	obNode.registerHandlers()
 	obNode.listenNetworkEvents()
@@ -1203,6 +1204,7 @@ func newLightweightNode(
 		notifyWsFn = gw.NotifyWebsockets(nodeID)
 	}
 
+	initWebhookSubsystem(obNode)
 	initEventDispatcher(obNode, notifyWsFn)
 
 	// ── 7. Messenger (via SNF Proxy) ─────────────────────────────────
@@ -1263,7 +1265,6 @@ func newLightweightNode(
 		StateValidator: &coreStateBridge{},
 	})
 
-	initWebhookSubsystem(obNode)
 	obNode.applyOptions(nil)
 	obNode.registerHandlers()
 	obNode.listenNetworkEvents()

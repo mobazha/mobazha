@@ -128,13 +128,13 @@ func (s *SQLiteStore) UpdateEndpoint(id string, updates map[string]interface{}) 
 			return err
 		}
 		if v, ok := updates["url"]; ok {
-			if s, ok := v.(string); ok {
-				rec.URL = s
+			if str, ok := v.(string); ok {
+				rec.URL = str
 			}
 		}
 		if v, ok := updates["event_types"]; ok {
-			if s, ok := v.(string); ok {
-				rec.EventTypes = s
+			if str, ok := v.(string); ok {
+				rec.EventTypes = str
 			}
 		}
 		if v, ok := updates["active"]; ok {

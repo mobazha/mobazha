@@ -12,9 +12,11 @@ import (
 )
 
 // WebhookEndpoint is the GORM model for webhook endpoint persistence.
+// ID is a UUID (globally unique), so a single-column primary key suffices.
+// TenantID is scoped via index for multi-tenant query isolation.
 type WebhookEndpoint struct {
 	ID         string     `gorm:"primaryKey;type:varchar(36)" json:"id"`
-	TenantID   string     `gorm:"primaryKey;type:varchar(255)" json:"-"`
+	TenantID   string     `gorm:"column:tenant_id;type:varchar(255);not null;default:'';index:idx_wh_ep_tenant" json:"-"`
 	URL        string     `gorm:"type:varchar(2048);not null" json:"url"`
 	Secret     string     `gorm:"type:varchar(255);not null" json:"-"`
 	EventTypes string     `gorm:"type:text;not null" json:"event_types"`
@@ -26,9 +28,11 @@ type WebhookEndpoint struct {
 func (WebhookEndpoint) TableName() string { return "webhook_endpoints" }
 
 // WebhookDelivery is the GORM model for webhook delivery tracking.
+// ID is a UUID (globally unique), so a single-column primary key suffices.
+// TenantID is scoped via index for multi-tenant query isolation.
 type WebhookDelivery struct {
 	ID             string     `gorm:"primaryKey;type:varchar(36)" json:"id"`
-	TenantID       string     `gorm:"primaryKey;type:varchar(255)" json:"-"`
+	TenantID       string     `gorm:"column:tenant_id;type:varchar(255);not null;default:'';index:idx_wh_del_tenant" json:"-"`
 	EndpointID     string     `gorm:"type:varchar(36);not null;index:idx_wh_del_ep" json:"endpoint_id"`
 	EventType      string     `gorm:"type:varchar(100);not null" json:"event_type"`
 	Payload        string     `gorm:"type:text;not null" json:"payload"`

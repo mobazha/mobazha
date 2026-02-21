@@ -6,7 +6,10 @@ import (
 	"sync"
 )
 
-// basicBus is a type-based event delivery system
+// basicBus is a type-based event delivery system.
+// Emit blocks if any subscriber's channel is full. The default buffer size (64)
+// is generous enough that blocking should not occur when consumers drain promptly.
+// Real backpressure isolation lives in the Dispatcher layer (per-sink non-blocking fan-out).
 type basicBus struct {
 	lk   sync.Mutex
 	subs map[reflect.Type][]*sub
@@ -76,8 +79,8 @@ func (s *sub) Out() <-chan interface{} {
 
 func (s *sub) Close() error {
 	go func() {
-		// drain the event channel, will return when closed and drained.
-		// this is necessary to unblock publishes to this channel.
+		// Drain the channel so any blocked Emit unblocks, allowing drop() to
+		// acquire the lock and remove this subscriber.
 		for range s.ch {
 		}
 	}()
@@ -91,8 +94,8 @@ func (s *sub) Close() error {
 
 var _ Subscription = (*sub)(nil)
 
-// Subscribe creates new subscription. Failing to drain the channel will cause
-// publishers to get blocked.
+// Subscribe creates a new subscription.
+// Failing to drain the channel may cause publishers to block.
 func (b *basicBus) Subscribe(evtTypes interface{}, opts ...SubscriptionOpt) (_ Subscription, err error) {
 	b.lk.Lock()
 	defer b.lk.Unlock()

@@ -6,7 +6,7 @@ type subSettings struct {
 }
 
 var subSettingsDefault = subSettings{
-	buffer: 16,
+	buffer: 64,
 }
 
 func BufSize(n int) func(interface{}) error {

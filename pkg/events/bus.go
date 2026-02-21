@@ -23,7 +23,7 @@ type Bus interface {
 	// eventType can be either a pointer to a single event type, or a slice of pointers to
 	// subscribe to multiple event types at once, under a single subscription (and channel).
 	//
-	// Failing to drain the channel may cause publishers to block.
+	// Failing to drain the channel may cause publishers to get blocked.
 	//
 	// Simple example
 	//
@@ -48,8 +48,8 @@ type Bus interface {
 	//  }
 	Subscribe(eventType interface{}, opts ...SubscriptionOpt) (Subscription, error)
 
-	// Emit emits an event onto the eventbus. If any channel subscribed to the topic is blocked,
-	// calls to Emit will block.
+	// Emit emits an event onto the eventbus. If any channel subscribed to the
+	// topic is blocked, calls to Emit will block.
 	//
 	// Calling this function with wrong event type will cause a panic.
 	Emit(evt interface{})

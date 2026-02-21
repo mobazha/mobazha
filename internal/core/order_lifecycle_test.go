@@ -147,6 +147,120 @@ func ingestPaymentToWallets(t *testing.T, paymentData *models.PaymentData, nodes
 	}
 }
 
+// ── Common Test Helpers ──────────────────────────────────────────────────
+//
+// These helpers reduce boilerplate across order lifecycle tests.
+// T0 helpers — used by T1-T5+ tests.
+
+// setupProfiles creates minimal profiles for all nodes via the Profile facade,
+// which publishes profiles through P2P (required for MODERATED flows where
+// other nodes need to fetch profile data like escrow keys).
+func setupProfiles(t *testing.T, nodes []*MobazhaNode) {
+	t.Helper()
+	for _, node := range nodes {
+		done := make(chan struct{})
+		if err := node.Profile().SetProfile(&models.Profile{
+			Name: "Test Store " + node.Identity().String()[:8],
+		}, done); err != nil {
+			t.Fatalf("setupProfiles: %v", err)
+		}
+		select {
+		case <-done:
+		case <-time.After(time.Second * 10):
+			t.Fatalf("setupProfiles: timeout for %s", node.Identity().String()[:8])
+		}
+	}
+}
+
+// setupModeratorNode configures a node as a moderator.
+func setupModeratorNode(t *testing.T, node *MobazhaNode, currencies []string) {
+	t.Helper()
+	modInfo := &models.ModeratorInfo{
+		AcceptedCurrencies: currencies,
+		Fee: models.ModeratorFee{
+			Percentage: 10,
+			FeeType:    models.PercentageFee,
+		},
+	}
+	done := make(chan struct{})
+	if err := node.Profile().SetSelfAsModerator(context.Background(), modInfo, done); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-done:
+	case <-time.After(time.Second * 10):
+		t.Fatal("Timeout setting moderator")
+	}
+}
+
+// createListingAndPurchase creates a listing on seller, buyer purchases it,
+// and waits for both nodes to have the order. Returns orderID and paymentAmount.
+func createListingAndPurchase(t *testing.T, seller, buyer *MobazhaNode) (models.OrderID, models.CurrencyValue) {
+	t.Helper()
+	listing := factory.NewPhysicalListing("tshirt")
+	done := make(chan struct{})
+	if err := seller.Listing().SaveListing(listing, done); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-done:
+	case <-time.After(time.Second * 10):
+		t.Fatal("Timeout saving listing")
+	}
+	index, err := seller.Listing().GetMyListings()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	orderSub, err := seller.eventBus.Subscribe(&events.NewOrder{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	orderAck, err := buyer.eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	purchase := factory.NewPurchase()
+	purchase.Items[0].ListingHash = index[0].CID
+	orderID, paymentAmount, err := buyer.Order().PurchaseListing(context.Background(), purchase)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-orderSub.Out():
+	case <-time.After(time.Second * 10):
+		t.Fatal("Timeout waiting for NewOrder")
+	}
+	select {
+	case <-orderAck.Out():
+	case <-time.After(time.Second * 10):
+		t.Fatal("Timeout waiting for order ACK")
+	}
+	return orderID, paymentAmount
+}
+
+// waitForEvent waits for an event with a descriptive message on timeout.
+func waitForEvent(t *testing.T, sub events.Subscription, eventName string) {
+	t.Helper()
+	select {
+	case <-sub.Out():
+	case <-time.After(time.Second * 10):
+		t.Fatalf("Timeout waiting for %s", eventName)
+	}
+}
+
+// waitForDone waits for a done channel with timeout.
+func waitForDone(t *testing.T, done chan struct{}, opName string) {
+	t.Helper()
+	select {
+	case <-done:
+	case <-time.After(time.Second * 10):
+		t.Fatalf("Timeout waiting for %s", opName)
+	}
+}
+
 // ── Registry-Driven Order Lifecycle Tests ────────────────────────────────
 //
 // These tests validate the full order lifecycle with the payment strategy
@@ -1082,4 +1196,216 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 	t.Log("  UTXO (BTC/BCH/LTC/ZEC/Mock): Monitored — backend auto-confirms, instructions=nil")
 	t.Log("  EVM (BSC/ETH/MATIC/BASE/CFX): ClientSigned — frontend signs, instructions!=nil")
 	t.Log("  Solana (SOL): ClientSigned — frontend signs, instructions!=nil")
+}
+
+// TestOrderLifecycle_Moderated_FullHappyPath tests the full moderated order lifecycle:
+//
+//	Purchase → MODERATED Payment → Seller Confirm → Fulfill → Complete
+//
+// This is the 3-node escrow path: Seller (node[0]), Buyer (node[1]), Moderator (node[2]).
+// Uses 2-of-3 multisig escrow so that either buyer+seller or moderator+one-party
+// can release funds. This test follows the happy path where no dispute is needed.
+func TestOrderLifecycle_Moderated_FullHappyPath(t *testing.T) {
+	network, err := NewMocknet(3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer network.TearDown()
+
+	go network.StartWalletNetwork()
+
+	sellerNode := network.Nodes()[0]
+	buyerNode := network.Nodes()[1]
+	moderatorNode := network.Nodes()[2]
+
+	// ── Setup ───────────────────────────────────────────────────
+	setupMockNetDB(t, network.Nodes())
+	setupMockReceivingAccounts(t, network.Nodes())
+	setupProfiles(t, network.Nodes())
+	setupModeratorNode(t, moderatorNode, []string{"MCK"})
+
+	sellerNode.registerPaymentStrategies()
+	sellerNode.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(sellerNode))
+
+	for _, node := range network.Nodes() {
+		go node.orderProcessor.Start()
+	}
+
+	// ── Step 1+2: Create Listing & Buyer Purchases ──────────────
+	orderID, _ := createListingAndPurchase(t, sellerNode, buyerNode)
+
+	// ── Step 3: Buyer Gets MODERATED Payment Info ───────────────
+	moderatorPeerID := moderatorNode.Identity().String()
+	paymentData, err := buyerNode.Wallet().GetUTXOPaymentInfo(
+		context.Background(),
+		orderID.String(),
+		moderatorPeerID,
+		iwallet.CtMock,
+	)
+	if err != nil {
+		t.Fatalf("GetUTXOPaymentInfo (MODERATED) failed: %v", err)
+	}
+	t.Logf("MODERATED payment: amount=%d, address=%s", paymentData.Amount, paymentData.ToAddress)
+
+	// ── Step 4: Ingest Payment & Process ────────────────────────
+	fundingSub, err := sellerNode.eventBus.Subscribe(&events.OrderFunded{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	paymentRecvSub, err := buyerNode.eventBus.Subscribe(&events.OrderPaymentReceived{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ratingSigAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ingestPaymentToWallets(t, paymentData, sellerNode, buyerNode)
+	if err := buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
+		t.Fatal(err)
+	}
+
+	waitForEvent(t, fundingSub, "OrderFunded on seller")
+	waitForEvent(t, paymentRecvSub, "OrderPaymentReceived on buyer")
+	waitForEvent(t, ratingSigAck, "MessageACK (rating sig) on seller")
+
+	// ── Step 5: Seller Confirms Order ───────────────────────────
+	confirmSub, err := buyerNode.eventBus.Subscribe(&events.OrderConfirmation{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	confirmAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	done5 := make(chan struct{})
+	if err := sellerNode.Order().ConfirmOrder(orderID, "", "mock-payout-addr", done5); err != nil {
+		t.Fatal(err)
+	}
+	waitForDone(t, done5, "ConfirmOrder")
+	waitForEvent(t, confirmSub, "OrderConfirmation on buyer")
+	waitForEvent(t, confirmAck, "MessageACK (confirm) on seller")
+
+	// ── Step 6: Seller Fulfills ─────────────────────────────────
+	fulfillSub, err := buyerNode.eventBus.Subscribe(&events.OrderFulfillment{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fulfillAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	done6 := make(chan struct{})
+	fulfillments := []models.Fulfillment{
+		{
+			ItemIndex: 0,
+			PhysicalDelivery: &models.PhysicalDelivery{
+				TrackingNumber: "TRACK-MOD-001",
+				Shipper:        "DHL",
+			},
+		},
+	}
+	if err := sellerNode.Order().FulfillOrder(orderID, fulfillments, done6); err != nil {
+		t.Fatal(err)
+	}
+	waitForDone(t, done6, "FulfillOrder")
+	waitForEvent(t, fulfillSub, "OrderFulfillment on buyer")
+	waitForEvent(t, fulfillAck, "MessageACK (fulfill) on seller")
+
+	// ── Step 7: Buyer Completes ─────────────────────────────────
+	completeSub, err := sellerNode.eventBus.Subscribe(&events.OrderCompletion{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	completeAck, err := buyerNode.eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	done7 := make(chan struct{})
+	ratings := []models.Rating{
+		{
+			Description:     5,
+			DeliverySpeed:   5,
+			CustomerService: 5,
+			Quality:         5,
+			Overall:         5,
+			Review:          "Moderated order completed perfectly!",
+		},
+	}
+	if err := buyerNode.Order().CompleteOrder(orderID, iwallet.TransactionID(""), ratings, true, done7); err != nil {
+		t.Fatal(err)
+	}
+	waitForDone(t, done7, "CompleteOrder")
+	waitForEvent(t, completeSub, "OrderCompletion on seller")
+	waitForEvent(t, completeAck, "MessageACK (complete) on buyer")
+
+	// ── Verify Final State ──────────────────────────────────────
+	var buyerOrder models.Order
+	err = buyerNode.repo.DB().View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID.String()).Last(&buyerOrder).Error
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if buyerOrder.SerializedOrderOpen == nil {
+		t.Error("Missing OrderOpen on buyer")
+	}
+	if buyerOrder.SerializedPaymentSent == nil {
+		t.Error("Missing PaymentSent on buyer")
+	}
+	if buyerOrder.SerializedOrderConfirmation == nil {
+		t.Error("Missing OrderConfirmation on buyer")
+	}
+	if buyerOrder.SerializedOrderFulfillments == nil {
+		t.Error("Missing OrderFulfillments on buyer")
+	}
+	if buyerOrder.SerializedOrderComplete == nil {
+		t.Error("Missing OrderComplete on buyer")
+	}
+
+	// Verify MODERATED payment method and moderator field
+	paymentSentMsg, err := buyerOrder.PaymentSentMessage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if paymentSentMsg.Method != pb.PaymentSent_MODERATED {
+		t.Errorf("Expected MODERATED payment method, got %s", paymentSentMsg.Method)
+	}
+	if paymentSentMsg.Moderator != moderatorPeerID {
+		t.Errorf("Expected moderator %s, got %s", moderatorPeerID, paymentSentMsg.Moderator)
+	}
+
+	// Verify ratings
+	complete, err := buyerOrder.OrderCompleteMessage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if complete.Ratings[0].Overall != 5 {
+		t.Errorf("Expected overall rating 5, got %d", complete.Ratings[0].Overall)
+	}
+
+	// Verify seller's order state
+	var sellerOrder models.Order
+	err = sellerNode.repo.DB().View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID.String()).Last(&sellerOrder).Error
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sellerOrder.SerializedOrderOpen == nil {
+		t.Error("Missing OrderOpen on seller")
+	}
+	if sellerOrder.SerializedOrderConfirmation == nil {
+		t.Error("Missing OrderConfirmation on seller")
+	}
+	if sellerOrder.SerializedOrderFulfillments == nil {
+		t.Error("Missing OrderFulfillments on seller")
+	}
+
+	t.Log("Moderated happy path completed: Purchase -> MODERATED Payment -> Confirm -> Fulfill -> Complete")
 }

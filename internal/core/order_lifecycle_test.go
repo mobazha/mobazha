@@ -1409,3 +1409,528 @@ func TestOrderLifecycle_Moderated_FullHappyPath(t *testing.T) {
 
 	t.Log("Moderated happy path completed: Purchase -> MODERATED Payment -> Confirm -> Fulfill -> Complete")
 }
+
+// TestOrderLifecycle_Moderated_Dispute_FullResolution tests the 3-node dispute flow:
+//
+//	Purchase → MODERATED Payment → Confirm → Buyer Disputes → Moderator Resolves (60/40) → Buyer Releases
+func TestOrderLifecycle_Moderated_Dispute_FullResolution(t *testing.T) {
+	network, err := NewMocknet(3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer network.TearDown()
+
+	go network.StartWalletNetwork()
+
+	sellerNode := network.Nodes()[0]
+	buyerNode := network.Nodes()[1]
+	moderatorNode := network.Nodes()[2]
+
+	setupMockNetDB(t, network.Nodes())
+	setupMockReceivingAccounts(t, network.Nodes())
+	setupProfiles(t, network.Nodes())
+	setupModeratorNode(t, moderatorNode, []string{"MCK"})
+
+	sellerNode.registerPaymentStrategies()
+	sellerNode.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(sellerNode))
+
+	for _, node := range network.Nodes() {
+		go node.orderProcessor.Start()
+	}
+
+	// ── Steps 1-2: Purchase ─────────────────────────────────────
+	orderID, _ := createListingAndPurchase(t, sellerNode, buyerNode)
+
+	// ── Step 3: MODERATED Payment ───────────────────────────────
+	moderatorPeerID := moderatorNode.Identity().String()
+	paymentData, err := buyerNode.Wallet().GetUTXOPaymentInfo(
+		context.Background(), orderID.String(), moderatorPeerID, iwallet.CtMock,
+	)
+	if err != nil {
+		t.Fatalf("GetUTXOPaymentInfo (MODERATED) failed: %v", err)
+	}
+
+	fundingSub, err := sellerNode.eventBus.Subscribe(&events.OrderFunded{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	paymentRecvSub, err := buyerNode.eventBus.Subscribe(&events.OrderPaymentReceived{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ratingSigAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ingestPaymentToWallets(t, paymentData, sellerNode, buyerNode)
+	if err := buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
+		t.Fatal(err)
+	}
+
+	waitForEvent(t, fundingSub, "OrderFunded on seller")
+	waitForEvent(t, paymentRecvSub, "OrderPaymentReceived on buyer")
+	waitForEvent(t, ratingSigAck, "MessageACK (rating sig) on seller")
+
+	// ── Step 4: Seller Confirms ─────────────────────────────────
+	confirmSub, err := buyerNode.eventBus.Subscribe(&events.OrderConfirmation{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	confirmAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	done4 := make(chan struct{})
+	if err := sellerNode.Order().ConfirmOrder(orderID, "", "mock-payout-addr", done4); err != nil {
+		t.Fatal(err)
+	}
+	waitForDone(t, done4, "ConfirmOrder")
+	waitForEvent(t, confirmSub, "OrderConfirmation on buyer")
+	waitForEvent(t, confirmAck, "MessageACK (confirm) on seller")
+
+	// ── Step 5: Buyer Opens Dispute ─────────────────────────────
+	caseOpenSub, err := moderatorNode.eventBus.Subscribe(&events.CaseOpen{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	caseUpdateSub, err := moderatorNode.eventBus.Subscribe(&events.CaseUpdate{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	caseUpdateAckSub, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	disputeOpenSub, err := sellerNode.eventBus.Subscribe(&events.DisputeOpen{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	disputeOpenAckMod, err := buyerNode.eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	disputeOpenAckVendor, err := buyerNode.eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	done5 := make(chan struct{})
+	if err := buyerNode.Order().OpenDispute(orderID, "Item not as described", done5); err != nil {
+		t.Fatal(err)
+	}
+	waitForDone(t, done5, "OpenDispute")
+	waitForEvent(t, disputeOpenSub, "DisputeOpen on seller")
+	waitForEvent(t, caseOpenSub, "CaseOpen on moderator")
+	waitForEvent(t, caseUpdateSub, "CaseUpdate on moderator")
+	waitForEvent(t, disputeOpenAckMod, "MessageACK (dispute→mod)")
+	waitForEvent(t, disputeOpenAckVendor, "MessageACK (dispute→vendor)")
+	waitForEvent(t, caseUpdateAckSub, "MessageACK (caseUpdate→seller)")
+
+	// Verify dispute state on all 3 nodes
+	var buyerOrder models.Order
+	err = buyerNode.repo.DB().View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID.String()).First(&buyerOrder).Error
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if buyerOrder.SerializedDisputeOpen == nil {
+		t.Error("Buyer dispute open is nil")
+	}
+
+	var sellerOrder models.Order
+	err = sellerNode.repo.DB().View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID.String()).First(&sellerOrder).Error
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sellerOrder.SerializedDisputeOpen == nil {
+		t.Error("Seller dispute open is nil")
+	}
+	if sellerOrder.SerializedDisputeUpdate == nil {
+		t.Error("Seller dispute update is nil")
+	}
+
+	var modCase models.Case
+	err = moderatorNode.repo.DB().View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID.String()).First(&modCase).Error
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if modCase.SerializedDisputeOpen == nil {
+		t.Error("Moderator dispute open is nil")
+	}
+	if modCase.SerializedBuyerContract == nil {
+		t.Error("Moderator buyer contract is nil")
+	}
+	if modCase.SerializedVendorContract == nil {
+		t.Error("Moderator vendor contract is nil")
+	}
+
+	// ── Step 6: Moderator Closes Dispute (60/40) ────────────────
+	disputeCloseBuyer, err := buyerNode.eventBus.Subscribe(&events.DisputeClose{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	disputeCloseSeller, err := sellerNode.eventBus.Subscribe(&events.DisputeClose{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	disputeCloseAck, err := moderatorNode.eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	done6 := make(chan struct{})
+	if err := moderatorNode.Order().CloseDispute(orderID, 60, 40, "Buyer gets 60%, seller gets 40%", done6); err != nil {
+		t.Fatal(err)
+	}
+	waitForDone(t, done6, "CloseDispute")
+	waitForEvent(t, disputeCloseBuyer, "DisputeClose on buyer")
+	waitForEvent(t, disputeCloseSeller, "DisputeClose on seller")
+	waitForEvent(t, disputeCloseAck, "MessageACK (disputeClose) on moderator")
+
+	// Verify dispute resolution data
+	err = sellerNode.repo.DB().View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID.String()).First(&sellerOrder).Error
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	disputeClose, err := sellerOrder.DisputeClosedMessage()
+	if err != nil {
+		t.Fatal("Failed to get DisputeClosedMessage")
+	}
+	if len(disputeClose.ReleaseInfo.Outpoints) == 0 {
+		t.Error("No outpoint in release info")
+	}
+	if len(disputeClose.ReleaseInfo.EscrowSignatures) == 0 {
+		t.Error("No moderator signature in release info")
+	}
+
+	// ── Step 7: Buyer Releases Funds ────────────────────────────
+	disputeAcceptSub, err := sellerNode.eventBus.Subscribe(&events.DisputeAccepted{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	disputeAcceptAck, err := buyerNode.eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	done7 := make(chan struct{})
+	if err := buyerNode.Order().ReleaseFunds(orderID, iwallet.TransactionID(""), done7); err != nil {
+		t.Fatal(err)
+	}
+	waitForDone(t, done7, "ReleaseFunds")
+	waitForEvent(t, disputeAcceptSub, "DisputeAccepted on seller")
+	waitForEvent(t, disputeAcceptAck, "MessageACK (release) on buyer")
+
+	network.WalletNetwork().GenerateBlock()
+
+	releaseInfo := disputeClose.ReleaseInfo
+	if releaseInfo.VendorAmount == "" || releaseInfo.VendorAmount == "0" {
+		t.Error("Expected non-zero vendor amount")
+	}
+	if releaseInfo.BuyerAmount == "" || releaseInfo.BuyerAmount == "0" {
+		t.Error("Expected non-zero buyer amount")
+	}
+	if releaseInfo.ModeratorAmount == "" || releaseInfo.ModeratorAmount == "0" {
+		t.Error("Expected non-zero moderator amount")
+	}
+
+	buyerAmt := iwallet.NewAmount(releaseInfo.BuyerAmount)
+	vendorAmt := iwallet.NewAmount(releaseInfo.VendorAmount)
+	modAmt := iwallet.NewAmount(releaseInfo.ModeratorAmount)
+	fee := iwallet.NewAmount(releaseInfo.TransactionFee)
+	totalDistributed := buyerAmt.Add(vendorAmt).Add(modAmt).Add(fee)
+	if totalDistributed.Cmp(iwallet.NewAmount(0)) <= 0 {
+		t.Error("Total distributed amount should be positive")
+	}
+
+	t.Logf("Dispute resolution (60/40): buyer=%s, vendor=%s, moderator=%s, fee=%s",
+		releaseInfo.BuyerAmount, releaseInfo.VendorAmount, releaseInfo.ModeratorAmount, releaseInfo.TransactionFee)
+	t.Log("Moderated dispute completed: Purchase -> Payment -> Confirm -> Dispute -> Resolve(60/40) -> Release")
+}
+
+// TestOrderLifecycle_SellerReject_AfterCancelablePayment tests seller rejecting
+// a funded CANCELABLE order, which should trigger an automatic refund.
+func TestOrderLifecycle_SellerReject_AfterCancelablePayment(t *testing.T) {
+	network, err := NewMocknet(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer network.TearDown()
+
+	go network.StartWalletNetwork()
+
+	sellerNode := network.Nodes()[0]
+	buyerNode := network.Nodes()[1]
+
+	setupMockNetDB(t, network.Nodes())
+	setupMockReceivingAccounts(t, network.Nodes())
+
+	sellerNode.registerPaymentStrategies()
+	sellerNode.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(sellerNode))
+
+	for _, node := range network.Nodes() {
+		go node.orderProcessor.Start()
+	}
+
+	// ── Step 1: Purchase ────────────────────────────────────────
+	orderID, _ := createListingAndPurchase(t, sellerNode, buyerNode)
+
+	// ── Step 2: CANCELABLE Payment ──────────────────────────────
+	paymentData, err := buyerNode.Wallet().GetUTXOPaymentInfo(
+		context.Background(), orderID.String(), "", iwallet.CtMock,
+	)
+	if err != nil {
+		t.Fatalf("GetUTXOPaymentInfo (CANCELABLE) failed: %v", err)
+	}
+
+	buyerWallet, err := buyerNode.multiwallet.WalletForCurrencyCode(iwallet.CtMock.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	refundAddr, err := buyerWallet.CurrentAddress()
+	if err != nil {
+		t.Fatal(err)
+	}
+	paymentData.PayerAddress = refundAddr.String()
+
+	fundingSub, err := sellerNode.eventBus.Subscribe(&events.OrderFunded{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	paymentRecvSub, err := buyerNode.eventBus.Subscribe(&events.OrderPaymentReceived{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ingestPaymentToWallets(t, paymentData, sellerNode, buyerNode)
+	if err := buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
+		t.Fatal(err)
+	}
+
+	waitForEvent(t, fundingSub, "OrderFunded on seller")
+	waitForEvent(t, paymentRecvSub, "OrderPaymentReceived on buyer")
+
+	// ── Step 3: Seller Rejects (funded — buyer releases CANCELABLE escrow inline) ──
+	rejectSub, err := buyerNode.eventBus.Subscribe(&events.OrderDeclined{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rejectAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan struct{})
+	if err := sellerNode.Order().RejectOrder(orderID, iwallet.TransactionID(""), "Damaged item", done); err != nil {
+		t.Fatal(err)
+	}
+	waitForDone(t, done, "RejectOrder")
+	waitForEvent(t, rejectSub, "OrderDeclined on buyer")
+	waitForEvent(t, rejectAck, "MessageACK (reject) on seller")
+
+	// ── Verify ──────────────────────────────────────────────────
+	var buyerOrder models.Order
+	err = buyerNode.repo.DB().View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID.String()).Last(&buyerOrder).Error
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if buyerOrder.SerializedOrderReject == nil {
+		t.Error("Buyer failed to save order reject")
+	}
+	if buyerOrder.Open {
+		t.Error("Order should be closed after reject")
+	}
+
+	t.Log("Seller reject (CANCELABLE funded) completed: Purchase -> Payment -> Reject")
+}
+
+// TestOrderLifecycle_CancelableConfirm_RefundBlocked verifies that a confirmed
+// CANCELABLE order cannot be automatically refunded, since funds have already
+// been released from the escrow to the seller's wallet.
+func TestOrderLifecycle_CancelableConfirm_RefundBlocked(t *testing.T) {
+	network, err := NewMocknet(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer network.TearDown()
+
+	go network.StartWalletNetwork()
+
+	sellerNode := network.Nodes()[0]
+	buyerNode := network.Nodes()[1]
+
+	setupMockNetDB(t, network.Nodes())
+	setupMockReceivingAccounts(t, network.Nodes())
+
+	sellerNode.registerPaymentStrategies()
+	sellerNode.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(sellerNode))
+
+	for _, node := range network.Nodes() {
+		go node.orderProcessor.Start()
+	}
+
+	// ── Steps 1-2: Purchase ─────────────────────────────────────
+	orderID, _ := createListingAndPurchase(t, sellerNode, buyerNode)
+
+	// ── Step 3: CANCELABLE Payment ──────────────────────────────
+	paymentData, err := buyerNode.Wallet().GetUTXOPaymentInfo(
+		context.Background(), orderID.String(), "", iwallet.CtMock,
+	)
+	if err != nil {
+		t.Fatalf("GetUTXOPaymentInfo (CANCELABLE) failed: %v", err)
+	}
+
+	buyerWallet, err := buyerNode.multiwallet.WalletForCurrencyCode(iwallet.CtMock.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	refundAddr, err := buyerWallet.CurrentAddress()
+	if err != nil {
+		t.Fatal(err)
+	}
+	paymentData.PayerAddress = refundAddr.String()
+
+	fundingSub, err := sellerNode.eventBus.Subscribe(&events.OrderFunded{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	paymentRecvSub, err := buyerNode.eventBus.Subscribe(&events.OrderPaymentReceived{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ratingSigAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ingestPaymentToWallets(t, paymentData, sellerNode, buyerNode)
+	if err := buyerNode.Order().ProcessOrderPayment(context.Background(), paymentData); err != nil {
+		t.Fatal(err)
+	}
+
+	waitForEvent(t, fundingSub, "OrderFunded on seller")
+	waitForEvent(t, paymentRecvSub, "OrderPaymentReceived on buyer")
+	waitForEvent(t, ratingSigAck, "MessageACK (rating sig) on seller")
+
+	// ── Step 4: Seller Confirms (releases escrow) ───────────────
+	sellerWallet, err := sellerNode.multiwallet.WalletForCurrencyCode(iwallet.CtMock.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	payoutAddr, err := sellerWallet.CurrentAddress()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	confirmSub, err := buyerNode.eventBus.Subscribe(&events.OrderConfirmation{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	confirmAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	done4 := make(chan struct{})
+	if err := sellerNode.Order().ConfirmOrder(orderID, "", payoutAddr.String(), done4); err != nil {
+		t.Fatal(err)
+	}
+	waitForDone(t, done4, "ConfirmOrder")
+	waitForEvent(t, confirmSub, "OrderConfirmation on buyer")
+	waitForEvent(t, confirmAck, "MessageACK (confirm) on seller")
+
+	// ── Step 5: RefundOrder should fail (escrow already released) ──
+	done5 := make(chan struct{})
+	err = sellerNode.Order().RefundOrder(orderID, "", done5)
+	if err == nil {
+		t.Fatal("Expected error when refunding confirmed CANCELABLE order, got nil")
+	}
+	t.Logf("RefundOrder correctly rejected: %v", err)
+
+	// ── Verify order is still in confirmed state ────────────────
+	var sellerOrder models.Order
+	err = sellerNode.repo.DB().View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID.String()).Last(&sellerOrder).Error
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sellerOrder.SerializedOrderConfirmation == nil {
+		t.Error("Order should still have confirmation")
+	}
+
+	t.Log("CANCELABLE confirm + refund-blocked: Purchase -> Payment -> Confirm -> RefundBlocked")
+}
+
+// TestOrderLifecycle_ClientSigned_InstructionMatrix validates all chains' instruction
+// behavior in a table-driven test. Pure memory — no Mocknet needed.
+func TestOrderLifecycle_ClientSigned_InstructionMatrix(t *testing.T) {
+	n := &MobazhaNode{nodeID: "test-instruction-matrix"}
+	n.registerPaymentStrategies()
+	n.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(n))
+
+	type chainTest struct {
+		chain    iwallet.ChainType
+		model    payment.PaymentModel
+		hasInstr bool
+	}
+
+	chains := []chainTest{
+		{iwallet.ChainBitcoin, payment.PaymentModelMonitored, false},
+		{iwallet.ChainLitecoin, payment.PaymentModelMonitored, false},
+		{iwallet.ChainBitcoinCash, payment.PaymentModelMonitored, false},
+		{iwallet.ChainZCash, payment.PaymentModelMonitored, false},
+		{iwallet.ChainMock, payment.PaymentModelMonitored, false},
+		{iwallet.ChainBSC, payment.PaymentModelClientSigned, true},
+		{iwallet.ChainEthereum, payment.PaymentModelClientSigned, true},
+		{iwallet.ChainPolygon, payment.PaymentModelClientSigned, true},
+		{iwallet.ChainBase, payment.PaymentModelClientSigned, true},
+		{iwallet.ChainConflux, payment.PaymentModelClientSigned, true},
+		{iwallet.ChainSolana, payment.PaymentModelClientSigned, true},
+	}
+
+	ctx := context.Background()
+
+	for _, tc := range chains {
+		t.Run(string(tc.chain), func(t *testing.T) {
+			strategy, err := n.paymentRegistry.ForChain(tc.chain)
+			if err != nil {
+				t.Fatalf("ForChain(%s) failed: %v", tc.chain, err)
+			}
+			if strategy.Model() != tc.model {
+				t.Errorf("Model = %s, want %s", strategy.Model(), tc.model)
+			}
+
+			if !tc.hasInstr {
+				params := payment.InstructionParams{}
+				methods := map[string]func(context.Context, payment.InstructionParams) (*payment.InstructionResult, error){
+					"Confirm":        strategy.GetConfirmInstructions,
+					"Cancel":         strategy.GetCancelInstructions,
+					"Complete":       strategy.GetCompleteInstructions,
+					"DisputeRelease": strategy.GetDisputeReleaseInstructions,
+				}
+				for name, fn := range methods {
+					result, err := fn(ctx, params)
+					if err != nil {
+						t.Errorf("%s should not error for UTXO chain, got: %v", name, err)
+						continue
+					}
+					if result.Instructions != nil {
+						t.Errorf("%s: UTXO should return nil instructions, got non-nil", name)
+					}
+				}
+			}
+		})
+	}
+}

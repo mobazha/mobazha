@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"gorm.io/gorm"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -121,6 +122,10 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 
 	order, err := orderSvc.GetOrder(orderID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			ErrorResponse(w, http.StatusNotFound, "order not found")
+			return
+		}
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
 		return
 	}
@@ -514,6 +519,10 @@ func (g *Gateway) handleGetCase(w http.ResponseWriter, r *http.Request) {
 
 	disputeCase, err := orderSvc.GetCase(orderID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			ErrorResponse(w, http.StatusNotFound, "case not found")
+			return
+		}
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
 		return
 	}

@@ -54,6 +54,7 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 	g.registerBusinessRoutes(r)
 
 	r.HandleFunc("/ws/{nodeID}", g.WebsocketNodeHandler())
+	r.HandleFunc("/ws", g.WebsocketDefaultHandler())
 
 	return &SharedRouter{handler: r, gateway: g}, nil
 }

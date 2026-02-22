@@ -247,6 +247,20 @@ func (g *Gateway) WebsocketNodeHandler() http.HandlerFunc {
 	}
 }
 
+// WebsocketDefaultHandler handles /ws connections where nodeID is resolved
+// from the request context (injected by the resolver middleware).
+func (g *Gateway) WebsocketDefaultHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		node := getNodeService(r)
+		nodeID := node.IdentityInfo().GetNodeID()
+		log.Debugf("Websocket default connection for node %s", nodeID)
+
+		hub := g.EnsureHubForUser(nodeID)
+		handler := newWebsocketHandler(hub)
+		handler.ServeHTTP(w, r)
+	}
+}
+
 // EnsureHubForUser ensures that a hub exists for the given user ID.
 func (g *Gateway) EnsureHubForUser(nodeID string) *hub {
 	g.hubsMtx.RLock()

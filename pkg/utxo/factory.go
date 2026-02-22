@@ -31,6 +31,35 @@ func NewMonitorWithDefaultSources(ctx context.Context, testnet bool) (*Monitor, 
 	return DefaultFactory.CreateMonitor(ctx, testnet)
 }
 
+// ElectrumOverride allows overriding the default Electrum servers for a chain.
+// Used in E2E tests to point at a local electrs instance on regtest.
+type ElectrumOverride struct {
+	Servers []string
+	UseTLS  bool
+}
+
+// MonitorFactoryWithOverrides extends MonitorFactory with the ability to
+// create monitors that connect to custom Electrum servers instead of the
+// hardcoded defaults. The hosting layer uses this for E2E testing with
+// local bitcoind-regtest + electrs.
+type MonitorFactoryWithOverrides interface {
+	MonitorFactory
+	CreateMonitorWithOverrides(ctx context.Context, testnet bool, overrides map[iwallet.ChainType]ElectrumOverride) (*Monitor, error)
+}
+
+// NewMonitorWithElectrumOverrides creates a monitor that connects to custom
+// Electrum servers for the chains specified in overrides. Chains without an
+// override fall back to the compiled-in default servers.
+func NewMonitorWithElectrumOverrides(ctx context.Context, testnet bool, overrides map[iwallet.ChainType]ElectrumOverride) (*Monitor, error) {
+	if DefaultFactory == nil {
+		return NewMonitor(DefaultMonitorConfig()), nil
+	}
+	if of, ok := DefaultFactory.(MonitorFactoryWithOverrides); ok {
+		return of.CreateMonitorWithOverrides(ctx, testnet, overrides)
+	}
+	return DefaultFactory.CreateMonitor(ctx, testnet)
+}
+
 // SourceConfig holds configuration for creating payment sources
 type SourceConfig struct {
 	Chain   iwallet.ChainType

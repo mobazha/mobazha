@@ -3,6 +3,7 @@ package api
 import (
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
@@ -70,6 +71,11 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 		if g.auth.isConfigured() {
 			username, password, ok := r.BasicAuth()
 			if !ok {
+				if tokenParam := r.URL.Query().Get("token"); strings.HasPrefix(tokenParam, "basic:") {
+					username, password, ok = parseBasicToken(tokenParam[6:])
+				}
+			}
+			if !ok {
 				w.Header().Set("WWW-Authenticate", `Basic realm="Mobazha"`)
 				ErrorResponse(w, http.StatusUnauthorized, "Authentication required")
 				return
@@ -86,6 +92,20 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// parseBasicToken decodes a base64-encoded "user:pass" string.
+// Used for WebSocket token query parameter fallback.
+func parseBasicToken(encoded string) (username, password string, ok bool) {
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return "", "", false
+	}
+	parts := strings.SplitN(string(decoded), ":", 2)
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	return parts[0], parts[1], true
 }
 
 type changePasswordRequest struct {

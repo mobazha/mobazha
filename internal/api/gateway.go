@@ -81,7 +81,10 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig, o
 		r.Use(g.CORSAllowAllOriginsMiddleware)
 	}
 	r.Use(mux.CORSMethodMiddleware(r))
-	r.Use(g.AuthenticationMiddleware)
+	// Auth is NOT applied globally — each private route is individually wrapped
+	// with AuthenticationMiddleware inside registerBusinessRoutes. Public
+	// storefront routes (listings, profiles, exchange rates, etc.) are served
+	// without auth so that buyers can read store data on standalone nodes.
 	r.Use(g.NodeSelectionMiddleware)
 
 	// Create default hub
@@ -90,7 +93,7 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig, o
 	g.hubs[defaultNodeID] = defaultHub
 	go defaultHub.run()
 
-	r.HandleFunc("/ws/{nodeID}", g.WebsocketNodeHandler())
+	r.Handle("/ws/{nodeID}", g.AuthenticationMiddleware(g.WebsocketNodeHandler()))
 	r.Handle("/ws", g.AuthenticationMiddleware(newWebsocketHandler(g.hubs[defaultNodeID])))
 
 	topMux.Handle("/v1/", r)

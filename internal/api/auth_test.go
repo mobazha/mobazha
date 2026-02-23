@@ -97,6 +97,10 @@ func TestGateway_AuthenticationMiddleware(t *testing.T) {
 	}
 	for i, test := range tests {
 		gateway.config = test.config
+		gateway.auth = authState{
+			username:     test.config.Username,
+			passwordHash: test.config.Password,
+		}
 		req, err := http.NewRequest("GET", fmt.Sprintf("%s/v1/profiles", ts.URL), nil)
 		if err != nil {
 			t.Fatal(err)
@@ -109,12 +113,13 @@ func TestGateway_AuthenticationMiddleware(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if test.forbidden && resp.StatusCode != http.StatusForbidden {
-			t.Errorf("Test %d: expected status forbidden, got %d", i, resp.StatusCode)
+		isRejected := resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized
+		if test.forbidden && !isRejected {
+			t.Errorf("Test %d: expected 401/403, got %d", i, resp.StatusCode)
 			continue
 		}
-		if !test.forbidden && resp.StatusCode == http.StatusForbidden {
-			t.Errorf("Test %d: unexpected forbidden status", i)
+		if !test.forbidden && isRejected {
+			t.Errorf("Test %d: unexpected rejection status %d", i, resp.StatusCode)
 			continue
 		}
 	}

@@ -1,0 +1,22 @@
+#!/bin/sh
+set -e
+
+echo "=== init-data: Initializing standalone store ==="
+
+mkdir -p /data
+
+# Generate Caddyfile from template
+/usr/local/bin/generate-caddyfile
+
+# If ADMIN_PASSWORD env var is set and no hash file exists, use it as initial password
+if [ -n "$ADMIN_PASSWORD" ] && [ ! -f /data/admin_password_hash ]; then
+    echo "$ADMIN_PASSWORD" > /data/admin_password
+    chmod 600 /data/admin_password
+    echo "init-data: Admin password set from environment"
+fi
+
+# Run database migrations (mobazha-node handles this at startup via embed.FS)
+
+# Wait for node to be ready to accept the healthcheck is handled by caddy dependency
+
+echo "=== init-data: Complete ==="

@@ -329,17 +329,41 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 		allowedIPs[ip] = true
 	}
 
+	// Credential priority chain:
+	//   1. Hash file on disk (survives password changes via API)
+	//   2. Config file / CLI flags (apiusername + apipassword)
+	//   3. Auto-generate (non-SaaS nodes with no auth at all)
+	username, passwordHash := api.LoadCredentials(cfg.DataDir, cfg.APIUsername, cfg.APIPassword)
+
+	var generatedPassword string
+	noBasicAuth := username == "" || passwordHash == ""
+	noCookieAuth := cfg.APICookie == ""
+	if !cfg.SaaSMode && cfg.DataDir != "" && noBasicAuth && noCookieAuth {
+		var err error
+		username, passwordHash, generatedPassword, err = api.EnsureStandaloneAuth(cfg.DataDir)
+		if err != nil {
+			return nil, fmt.Errorf("initializing standalone auth: %w", err)
+		}
+		if generatedPassword != "" {
+			log.Warningf("══════════════════════════════════════════")
+			log.Warningf("  Admin password (change after login): %s", generatedPassword)
+			log.Warningf("══════════════════════════════════════════")
+		}
+	}
+
 	config := &api.GatewayConfig{
 		Listener:        manet.NetListener(gwLis),
 		AllowAllOrigins: cfg.APIAllowAllOrigins,
 		UseSSL:          cfg.UseSSL,
 		SSLCert:         cfg.SSLCertFile,
 		SSLKey:          cfg.SSLKeyFile,
-		Username:        cfg.APIUsername,
-		Password:        cfg.APIPassword,
+		Username:        username,
+		Password:        passwordHash,
 		Cookie:          cfg.APICookie,
 		PublicOnly:      cfg.APIPublicGateway,
 		AllowedIPs:      allowedIPs,
+		HashFile:        api.HashFilePath(cfg.DataDir),
+		PlainFile:       api.PlainFilePath(cfg.DataDir),
 	}
 
 	im.httpGateway, err = api.NewGateway(im, config, opts...)

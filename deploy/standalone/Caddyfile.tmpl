@@ -1,0 +1,56 @@
+# Mobazha Standalone Store — Caddyfile Template
+#
+# Copied to /etc/caddy/Caddyfile by init-data (s6-overlay oneshot) at container
+# startup.  Caddy natively resolves {$VAR} and {$VAR:default} syntax.
+#
+# Required env vars:
+#   STORE_DOMAIN       — Domain name (e.g. "my-store.com") or empty for IP mode
+#   SAAS_API_URL       — SaaS backend URL (e.g. "https://store.mobazha.org")
+#   STANDALONE_API_KEY — API key for authenticating with SaaS
+#   NODE_PORT          — Local mobazha-node port (default: 5102)
+#
+# Modes:
+#   Domain mode (STORE_DOMAIN set):     Caddy obtains TLS automatically via ACME
+#   IP mode     (STORE_DOMAIN empty):   Caddy listens on :443 with self-signed TLS
+
+{$STORE_DOMAIN::443} {
+	encode gzip
+
+	# --- Buyer API proxy: strip /buyer-api prefix, forward to SaaS ---
+	handle /buyer-api/* {
+		uri strip_prefix /buyer-api
+		reverse_proxy {$SAAS_API_URL:https://store.mobazha.org} {
+			header_up X-Standalone-Store-Key {$STANDALONE_API_KEY}
+		}
+	}
+
+	# --- Node API: all /v1/* routes to local mobazha-node ---
+	handle /v1/* {
+		reverse_proxy localhost:{$NODE_PORT:5102}
+	}
+
+	# --- Admin routes: protected by BasicAuth on the node side ---
+	handle /admin/* {
+		reverse_proxy localhost:{$NODE_PORT:5102}
+	}
+
+	# --- Health check (unauthenticated) ---
+	handle /healthz {
+		reverse_proxy localhost:{$NODE_PORT:5102}
+	}
+
+	# --- WebSocket ---
+	handle /ws {
+		reverse_proxy localhost:{$NODE_PORT:5102}
+	}
+	handle /ws/* {
+		reverse_proxy localhost:{$NODE_PORT:5102}
+	}
+
+	# --- Frontend SPA: serve static files, fallback to index.html ---
+	handle {
+		root * /srv/www
+		try_files {path} /index.html
+		file_server
+	}
+}

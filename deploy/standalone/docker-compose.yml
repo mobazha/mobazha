@@ -1,0 +1,54 @@
+# Mobazha Standalone Store — Docker Compose
+#
+# Usage:
+#   1. Copy this file and .env.example to your server
+#   2. Edit .env with your configuration
+#   3. docker compose up -d
+#
+# Services:
+#   store      — All-in-one container (s6-overlay: Caddy + mobazha-node)
+#   watchtower — Automatic image updates (pulls mobazha/standalone:stable)
+
+services:
+  store:
+    image: mobazha/standalone:${TAG:-stable}
+    container_name: mobazha-store
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "4001:4001"     # IPFS swarm (P2P)
+      - "9005:9005"     # IPFS swarm (P2P)
+    volumes:
+      - store-data:/data
+      - caddy-data:/data/caddy
+    environment:
+      - STORE_DOMAIN=${STORE_DOMAIN:-}
+      - SAAS_API_URL=${SAAS_API_URL:-https://store.mobazha.org}
+      - STANDALONE_API_KEY=${STANDALONE_API_KEY}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5102/healthz"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: mobazha-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=3600
+      - WATCHTOWER_LABEL_ENABLE=true
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+volumes:
+  store-data:
+  caddy-data:

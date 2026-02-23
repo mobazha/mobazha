@@ -1,0 +1,97 @@
+# Mobazha Standalone Store — Multi-stage Dockerfile
+#
+# Produces a single container with:
+#   - s6-overlay (PID 1, service supervision)
+#   - Caddy (reverse proxy, auto-TLS)
+#   - mobazha-node (seller node)
+#   - Frontend static assets (placeholder until S3.4)
+#
+# Build:
+#   docker buildx build -f deploy/standalone/Dockerfile.standalone \
+#     -t mobazha/standalone:dev .
+#
+# Required build context: the mobazha3.0 repository root.
+# For local builds with go.work dependencies, prepare a build context
+# containing mobazha3.0/, mobazha-core/, etherscan-api/ (see E2E Dockerfile).
+
+ARG GO_VERSION=1.24
+ARG ALPINE_VERSION=3.20
+ARG S6_OVERLAY_VERSION=3.2.0.2
+ARG CADDY_VERSION=2.9
+
+# ============================================================
+# Stage 1: Go builder — compile mobazha-node
+# ============================================================
+FROM golang:${GO_VERSION}-bookworm AS go-builder
+
+RUN apt-get update -qq && apt-get install -qq -y gcc git >/dev/null 2>&1
+
+WORKDIR /src/mobazha3.0
+
+# Cache dependencies first
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+# Copy source and build
+COPY . .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=1 go build -ldflags="-s -w -X github.com/mobazha/mobazha3.0/internal/api.Version=$(git describe --tags --always 2>/dev/null || echo dev)" \
+    -o /out/mobazha .
+
+# ============================================================
+# Stage 2: Runtime — alpine + s6-overlay + Caddy + mobazha
+# ============================================================
+FROM alpine:${ALPINE_VERSION}
+
+ARG S6_OVERLAY_VERSION
+ARG CADDY_VERSION
+ARG TARGETARCH
+
+# s6-overlay
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp/
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${TARGETARCH}.tar.xz /tmp/
+RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
+    tar -C / -Jxpf /tmp/s6-overlay-${TARGETARCH}.tar.xz && \
+    rm -f /tmp/s6-overlay-*.tar.xz
+
+# Runtime dependencies
+RUN apk add --no-cache \
+    ca-certificates \
+    curl \
+    gettext \
+    caddy~=${CADDY_VERSION}
+
+# Copy mobazha binary
+COPY --from=go-builder /out/mobazha /usr/local/bin/mobazha
+
+# Copy Caddyfile template
+COPY deploy/standalone/Caddyfile.tmpl /etc/caddy/Caddyfile.tmpl
+COPY deploy/standalone/generate-caddyfile.sh /usr/local/bin/generate-caddyfile
+
+# Placeholder frontend (replaced by real build in S3.4)
+RUN mkdir -p /srv/www && \
+    echo '<!DOCTYPE html><html><body><h1>Mobazha Store</h1><p>Frontend not yet built (Phase S3)</p></body></html>' > /srv/www/index.html
+
+# Copy s6-overlay service definitions
+COPY deploy/standalone/s6/ /etc/s6-overlay/
+
+# Volumes
+VOLUME ["/data", "/data/caddy"]
+
+# Ports: HTTP (80) for ACME challenge, HTTPS (443), node API (5102 internal only)
+EXPOSE 80 443
+
+# Environment defaults
+ENV NODE_PORT=5102 \
+    STORE_DOMAIN="" \
+    SAAS_API_URL="https://store.mobazha.org" \
+    STANDALONE_API_KEY="" \
+    ADMIN_PASSWORD=""
+
+# s6-overlay as PID 1
+ENTRYPOINT ["/init"]
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -sf http://localhost:${NODE_PORT}/healthz || exit 1

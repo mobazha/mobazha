@@ -32,7 +32,9 @@ type GatewayConfig struct {
 	UseSSL          bool
 	SSLCert         string
 	SSLKey          string
-	PublicOnly      bool
+	PublicOnly    bool
+	HashFile     string // path to persist password hash for runtime changes (standalone)
+	PlainFile    string // first-run plaintext password file (standalone)
 }
 
 // Gateway represents an HTTP API gateway
@@ -41,6 +43,7 @@ type Gateway struct {
 	nodeManager    coreiface.NodeManagerIface
 	handler        http.Handler
 	config         *GatewayConfig
+	auth           authState
 	hubs           map[string]*hub
 	hubsMtx        sync.RWMutex
 	shutdown       chan struct{}
@@ -65,6 +68,13 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig, o
 		topMux = http.NewServeMux()
 	)
 
+	g.auth = authState{
+		username:     config.Username,
+		passwordHash: config.Password,
+		hashFile:     config.HashFile,
+		plainFile:    config.PlainFile,
+	}
+
 	r := g.newV1Router()
 
 	if config.AllowAllOrigins {
@@ -86,6 +96,8 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig, o
 	topMux.Handle("/v1/", r)
 	topMux.Handle("/ws/", r)
 	topMux.Handle("/ws", r)
+
+	topMux.HandleFunc("/healthz", g.handleHealthz)
 
 	var (
 		err error

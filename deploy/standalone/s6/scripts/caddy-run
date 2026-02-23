@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+
+echo "caddy: Waiting for mobazha-node to be healthy..."
+
+NODE_PORT="${NODE_PORT:-5102}"
+RETRIES=0
+MAX_RETRIES=60
+
+while ! wget -q -O /dev/null "http://localhost:${NODE_PORT}/healthz" 2>/dev/null; do
+    RETRIES=$((RETRIES + 1))
+    if [ "$RETRIES" -gt "$MAX_RETRIES" ]; then
+        echo "caddy: mobazha-node did not become healthy within ${MAX_RETRIES}s" >&2
+        exit 1
+    fi
+    sleep 1
+done
+
+echo "caddy: mobazha-node is healthy, starting Caddy..."
+
+exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile

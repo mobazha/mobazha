@@ -379,6 +379,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			repo:                 obRepo,
 			ipfsNode:             ipfsNode,
 			ipfsOnlyMode:         true,
+			exchangeRates:        sharedManager.ExchangeRateProvider,
 			testnet:              cfg.Testnet,
 			walletTestnet:        walletTestnet,
 			torOnly:              cfg.Tor,

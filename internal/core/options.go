@@ -148,10 +148,6 @@ func (n *MobazhaNode) initPreferencesService() {
 
 // initMediaService creates the MediaAppService with IPFS infrastructure callbacks.
 func (n *MobazhaNode) initMediaService() {
-	if n.ipfsOnlyMode {
-		return
-	}
-
 	var getIPFSFile GetIPFSFileFunc
 	if n.sharedManager != nil {
 		getIPFSFile = func(ctx context.Context, path ipath.Path) (io.ReadSeeker, error) {
@@ -169,6 +165,13 @@ func (n *MobazhaNode) initMediaService() {
 			}
 			return f, nil
 		}
+	}
+
+	if n.ipfsOnlyMode {
+		n.mediaService = NewMediaAppService(MediaAppServiceConfig{
+			GetIPFSFile: getIPFSFile,
+		})
+		return
 	}
 
 	n.mediaService = NewMediaAppService(MediaAppServiceConfig{

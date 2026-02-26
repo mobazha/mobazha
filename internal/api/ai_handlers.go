@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/op/go-logging"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 )
+
+var aiLog = logging.MustGetLogger("AI")
 
 type aiConfigProvider interface {
 	AIConfig() aipkg.Config
@@ -75,6 +78,7 @@ func (g *Gateway) handlePUTAIConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := p.SaveAIConfig(cfg); err != nil {
+		aiLog.Errorf("Failed to save AI config: %s", err)
 		http.Error(w, "Failed to save AI config", http.StatusInternalServerError)
 		return
 	}
@@ -133,6 +137,7 @@ func (g *Gateway) handlePOSTAITestConnection(w http.ResponseWriter, r *http.Requ
 
 	proxy := p.AIProxy()
 	if proxy == nil {
+		aiLog.Errorf("AI proxy not initialized")
 		http.Error(w, "AI proxy not initialized", http.StatusInternalServerError)
 		return
 	}
@@ -163,6 +168,8 @@ func (g *Gateway) handlePOSTAIGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
+
 	cfg := p.AIConfig()
 	if !cfg.IsValid() {
 		http.Error(w, "AI is not configured. Please set up your AI provider in Settings > Integrations.", http.StatusServiceUnavailable)
@@ -171,6 +178,7 @@ func (g *Gateway) handlePOSTAIGenerate(w http.ResponseWriter, r *http.Request) {
 
 	var req aipkg.GenerateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		aiLog.Errorf("Invalid AI generate request body: %s", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -181,12 +189,14 @@ func (g *Gateway) handlePOSTAIGenerate(w http.ResponseWriter, r *http.Request) {
 
 	proxy := p.AIProxy()
 	if proxy == nil {
+		aiLog.Errorf("AI proxy not initialized")
 		http.Error(w, "AI proxy not initialized", http.StatusInternalServerError)
 		return
 	}
 
 	result, err := proxy.Generate(cfg, req)
 	if err != nil {
+		aiLog.Errorf("AI generate failed: %s", err)
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}

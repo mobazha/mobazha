@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -189,6 +191,33 @@ func (p *Proxy) Generate(cfg Config, req GenerateRequest) (*GenerateResponse, er
 
 var fencedJSONRegexp = regexp.MustCompile("(?s)```(?:json)?\\s*(.*?)```")
 
+func validateImageURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid image URL: %w", err)
+	}
+	scheme := strings.ToLower(u.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return fmt.Errorf("image URL must use http or https scheme, got %q", scheme)
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0" ||
+		strings.HasPrefix(host, "10.") || strings.HasPrefix(host, "192.168.") ||
+		strings.HasPrefix(host, "169.254.") {
+		return fmt.Errorf("image URL must not point to private/local addresses")
+	}
+	// Check 172.16.0.0/12
+	if strings.HasPrefix(host, "172.") {
+		parts := strings.SplitN(host, ".", 4)
+		if len(parts) >= 2 {
+			if n, err := strconv.Atoi(parts[1]); err == nil && n >= 16 && n <= 31 {
+				return fmt.Errorf("image URL must not point to private addresses")
+			}
+		}
+	}
+	return nil
+}
+
 func extractJSON(text string) string {
 	m := fencedJSONRegexp.FindStringSubmatch(text)
 	if m != nil {
@@ -243,6 +272,9 @@ Return ONLY valid JSON, no markdown fences.`, langInstruction, contractType),
 			maxImages = len(req.Images)
 		}
 		for _, imgURL := range req.Images[:maxImages] {
+			if err := validateImageURL(imgURL); err != nil {
+				return nil, err
+			}
 			content = append(content, map[string]interface{}{
 				"type":      "image_url",
 				"image_url": map[string]string{"url": imgURL, "detail": "low"},

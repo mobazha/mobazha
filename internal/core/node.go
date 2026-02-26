@@ -2,8 +2,11 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"time"
 
@@ -17,6 +20,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/internal/notifier"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet/utxo"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/orders"
@@ -134,8 +138,12 @@ type MobazhaNode struct {
 	webhookEngine *wh.Engine
 
 	// eventDispatcher is the unified EventBus subscriber that fans out events
-	// to NotificationSink and WebhookSink. Replaces the old Notifier and Bridge.
+	// to NotificationSink, WebhookSink, and ChannelNotificationSink.
 	eventDispatcher *events.Dispatcher
+
+	// notifierSink dispatches events to external notification channels
+	// (Telegram, Discord, etc.) managed as a single EventSink.
+	notifierSink *notifier.ChannelNotificationSink
 
 	// stripeAccountID represents the stripe account id of the node.
 	stripeAccountID string
@@ -561,4 +569,37 @@ func (n *MobazhaNode) NetService() contracts.NetworkService {
 // NetConfig returns the network configuration.
 func (n *MobazhaNode) NetConfig() *config.NetConfig {
 	return n.netConfig
+}
+
+// NotifierSink returns the node's channel notification sink (may be nil).
+func (n *MobazhaNode) NotifierSink() *notifier.ChannelNotificationSink {
+	return n.notifierSink
+}
+
+// SaveNotificationChannels persists channel configs to a file in the data directory.
+func (n *MobazhaNode) SaveNotificationChannels(channels []notifier.ChannelConfig) error {
+	cfgPath := n.notificationChannelsPath()
+	data, err := json.MarshalIndent(channels, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal notification channels: %w", err)
+	}
+	return os.WriteFile(cfgPath, data, 0600)
+}
+
+// loadNotificationChannels reads the persisted channel configs from file.
+func (n *MobazhaNode) loadNotificationChannels() []notifier.ChannelConfig {
+	cfgPath := n.notificationChannelsPath()
+	data, err := os.ReadFile(cfgPath)
+	if err != nil {
+		return nil
+	}
+	var channels []notifier.ChannelConfig
+	if err := json.Unmarshal(data, &channels); err != nil {
+		return nil
+	}
+	return channels
+}
+
+func (n *MobazhaNode) notificationChannelsPath() string {
+	return filepath.Join(n.repo.DataDir(), "notification_channels.json")
 }

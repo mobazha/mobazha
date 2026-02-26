@@ -38,6 +38,7 @@ import (
 	solanaWal "github.com/mobazha/mobazha3.0/internal/multiwallet/coins/solana"
 	obnet "github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/notifications"
+	"github.com/mobazha/mobazha3.0/internal/notifier"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/repo"
@@ -1292,9 +1293,8 @@ func initWebhookSubsystem(obNode *MobazhaNode) {
 	logger.LogInfoWithID(log, obNode.nodeID, "Webhook subsystem initialized")
 }
 
-// initEventDispatcher creates the unified EventDispatcher with NotificationSink
-// and (optionally) WebhookSink. This replaces the old Notifier goroutine and
-// webhook Bridge, providing error isolation between sinks.
+// initEventDispatcher creates the unified EventDispatcher with NotificationSink,
+// WebhookSink, and ChannelNotificationSink. Provides error isolation between sinks.
 func initEventDispatcher(obNode *MobazhaNode, notifyWsFn func(any) error) {
 	notifSink := notifications.NewNotificationSink(obNode.db, notifyWsFn)
 	sinks := []events.EventSink{notifSink}
@@ -1303,6 +1303,15 @@ func initEventDispatcher(obNode *MobazhaNode, notifyWsFn func(any) error) {
 		whSink := webhookinternal.NewWebhookSink(obNode.webhookEngine, obNode.nodeID)
 		sinks = append(sinks, whSink)
 	}
+
+	channels := obNode.loadNotificationChannels()
+	obNode.notifierSink = notifier.NewChannelNotificationSink(channels, obNode.nodeID)
+	obNode.notifierSink.SetOnChanged(func(chs []notifier.ChannelConfig) {
+		if err := obNode.SaveNotificationChannels(chs); err != nil {
+			log.Errorf("Failed to persist notification channels: %v", err)
+		}
+	})
+	sinks = append(sinks, obNode.notifierSink)
 
 	obNode.eventDispatcher = events.NewDispatcher(obNode.eventBus, sinks...)
 	logger.LogInfoWithIDf(log, obNode.nodeID, "Event dispatcher initialized with %d sinks", len(sinks))

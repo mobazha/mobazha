@@ -3,13 +3,13 @@ package events
 import "reflect"
 
 // EventMeta holds unified metadata for a business event.
-// Legacy is the notification type string used by the existing frontend WebSocket protocol.
-// Empty Legacy means the event is WebSocket-only (no DB persistence in NotificationRecord).
+// Persistent events are saved to DB and pushed via WebSocket.
+// Non-persistent events are pushed via WebSocket only.
 type EventMeta struct {
-	Category string
-	Name     string
-	Legacy   string
-	Sample   interface{}
+	Category   string
+	Name       string
+	Persistent bool
+	Sample     interface{}
 }
 
 var registry []EventMeta
@@ -21,58 +21,60 @@ var typeIndex map[reflect.Type]*EventMeta
 func init() {
 	registry = []EventMeta{
 		// ── Order events (persistent + WebSocket) ──
-		{Category: "order", Name: "order.created", Legacy: "newOrder", Sample: new(NewOrder)},
-		{Category: "order", Name: "order.funded", Legacy: "orderFunded", Sample: new(OrderFunded)},
-		{Category: "order", Name: "order.payment_received", Legacy: "orderPaymentReceived", Sample: new(OrderPaymentReceived)},
-		{Category: "order", Name: "order.confirmed", Legacy: "orderConfirmation", Sample: new(OrderConfirmation)},
-		{Category: "order", Name: "order.fulfilled", Legacy: "orderFulfillment", Sample: new(OrderFulfillment)},
-		{Category: "order", Name: "order.completed", Legacy: "orderCompletion", Sample: new(OrderCompletion)},
-		{Category: "order", Name: "order.cancelled", Legacy: "orderCancel", Sample: new(OrderCancel)},
-		{Category: "order", Name: "order.declined", Legacy: "orderDeclined", Sample: new(OrderDeclined)},
-		{Category: "order", Name: "order.refunded", Legacy: "refund", Sample: new(Refund)},
-		{Category: "order", Name: "order.vendor_finalized", Legacy: "vendorFinalizedPayment", Sample: new(VendorFinalizedPayment)},
+		{Category: "order", Name: "order.created", Persistent: true, Sample: new(NewOrder)},
+		{Category: "order", Name: "order.funded", Persistent: true, Sample: new(OrderFunded)},
+		{Category: "order", Name: "order.payment_received", Persistent: true, Sample: new(OrderPaymentReceived)},
+		{Category: "order", Name: "order.confirmed", Persistent: true, Sample: new(OrderConfirmation)},
+		{Category: "order", Name: "order.fulfilled", Persistent: true, Sample: new(OrderFulfillment)},
+		{Category: "order", Name: "order.completed", Persistent: true, Sample: new(OrderCompletion)},
+		{Category: "order", Name: "order.cancelled", Persistent: true, Sample: new(OrderCancel)},
+		{Category: "order", Name: "order.declined", Persistent: true, Sample: new(OrderDeclined)},
+		{Category: "order", Name: "order.refunded", Persistent: true, Sample: new(Refund)},
+		{Category: "order", Name: "order.vendor_finalized", Persistent: true, Sample: new(VendorFinalizedPayment)},
 
 		// ── Dispute events (persistent + WebSocket) ──
-		{Category: "dispute", Name: "dispute.opened", Legacy: "disputeOpen", Sample: new(DisputeOpen)},
-		{Category: "dispute", Name: "dispute.closed", Legacy: "disputeClose", Sample: new(DisputeClose)},
-		{Category: "dispute", Name: "dispute.accepted", Legacy: "disputeAccepted", Sample: new(DisputeAccepted)},
-		{Category: "dispute", Name: "dispute.case_open", Legacy: "caseOpen", Sample: new(CaseOpen)},
-		{Category: "dispute", Name: "dispute.case_update", Legacy: "caseUpdate", Sample: new(CaseUpdate)},
+		{Category: "dispute", Name: "dispute.opened", Persistent: true, Sample: new(DisputeOpen)},
+		{Category: "dispute", Name: "dispute.closed", Persistent: true, Sample: new(DisputeClose)},
+		{Category: "dispute", Name: "dispute.accepted", Persistent: true, Sample: new(DisputeAccepted)},
+		{Category: "dispute", Name: "dispute.case_open", Persistent: true, Sample: new(CaseOpen)},
+		{Category: "dispute", Name: "dispute.case_update", Persistent: true, Sample: new(CaseUpdate)},
 
 		// ── Social events (persistent + WebSocket) ──
-		{Category: "social", Name: "social.follow", Legacy: "follow", Sample: new(Follow)},
-		{Category: "social", Name: "social.unfollow", Legacy: "unfollow", Sample: new(Unfollow)},
+		{Category: "social", Name: "social.follow", Persistent: true, Sample: new(Follow)},
+		{Category: "social", Name: "social.unfollow", Persistent: true, Sample: new(Unfollow)},
+		{Category: "social", Name: "social.moderator_add", Persistent: true, Sample: new(ModeratorAdd)},
+		{Category: "social", Name: "social.moderator_remove", Persistent: true, Sample: new(ModeratorRemove)},
 
 		// ── Chat events (WebSocket only) ──
-		{Category: "chat", Name: "chat.message", Legacy: "", Sample: new(ChatMessage)},
-		{Category: "chat", Name: "chat.read", Legacy: "", Sample: new(ChatRead)},
-		{Category: "chat", Name: "chat.typing", Legacy: "", Sample: new(ChatTyping)},
-		{Category: "chat", Name: "chat.channel", Legacy: "", Sample: new(ChannelMessage)},
+		{Category: "chat", Name: "chat.message", Sample: new(ChatMessage)},
+		{Category: "chat", Name: "chat.read", Sample: new(ChatRead)},
+		{Category: "chat", Name: "chat.typing", Sample: new(ChatTyping)},
+		{Category: "chat", Name: "chat.channel", Sample: new(ChannelMessage)},
 
 		// ── Chat group events (WebSocket only) ──
-		{Category: "chatgroup", Name: "chatgroup.created", Legacy: "", Sample: new(ChatGroupCreate)},
-		{Category: "chatgroup", Name: "chatgroup.updated", Legacy: "", Sample: new(ChatGroupUpdate)},
-		{Category: "chatgroup", Name: "chatgroup.deleted", Legacy: "", Sample: new(ChatGroupDelete)},
+		{Category: "chatgroup", Name: "chatgroup.created", Sample: new(ChatGroupCreate)},
+		{Category: "chatgroup", Name: "chatgroup.updated", Sample: new(ChatGroupUpdate)},
+		{Category: "chatgroup", Name: "chatgroup.deleted", Sample: new(ChatGroupDelete)},
 
 		// ── Wallet events (WebSocket only) ──
-		{Category: "wallet", Name: "wallet.block_received", Legacy: "", Sample: new(BlockReceived)},
-		{Category: "wallet", Name: "wallet.tx_received", Legacy: "", Sample: new(TransactionReceived)},
-		{Category: "wallet", Name: "wallet.spend_from_payment", Legacy: "", Sample: new(SpendFromPaymentAddress)},
-		{Category: "wallet", Name: "wallet.update", Legacy: "", Sample: new(WalletUpdate)},
+		{Category: "wallet", Name: "wallet.block_received", Sample: new(BlockReceived)},
+		{Category: "wallet", Name: "wallet.tx_received", Sample: new(TransactionReceived)},
+		{Category: "wallet", Name: "wallet.spend_from_payment", Sample: new(SpendFromPaymentAddress)},
+		{Category: "wallet", Name: "wallet.update", Sample: new(WalletUpdate)},
 
 		// ── Publish events (WebSocket only) ──
-		{Category: "publish", Name: "publish.started", Legacy: "", Sample: new(PublishStarted)},
-		{Category: "publish", Name: "publish.finished", Legacy: "", Sample: new(PublishFinished)},
-		{Category: "publish", Name: "publish.error", Legacy: "", Sample: new(PublishingError)},
+		{Category: "publish", Name: "publish.started", Sample: new(PublishStarted)},
+		{Category: "publish", Name: "publish.finished", Sample: new(PublishFinished)},
+		{Category: "publish", Name: "publish.error", Sample: new(PublishingError)},
 
 		// ── Shopping cart (WebSocket only) ──
-		{Category: "cart", Name: "cart.updated", Legacy: "", Sample: new(ShoppingCartUpdate)},
+		{Category: "cart", Name: "cart.updated", Sample: new(ShoppingCartUpdate)},
 
 		// ── Payment events (persistent + WebSocket) ──
-		{Category: "payment", Name: "payment.locked", Legacy: "paymentLocked", Sample: new(PaymentLockedReceived)},
-		{Category: "payment", Name: "payment.expired", Legacy: "paymentExpired", Sample: new(PaymentExpiredNotification)},
-		{Category: "payment", Name: "payment.cancelled", Legacy: "paymentCancelled", Sample: new(PaymentCancelledByBuyer)},
-		{Category: "payment", Name: "payment.partial", Legacy: "", Sample: new(PartialPaymentReceived)},
+		{Category: "payment", Name: "payment.locked", Persistent: true, Sample: new(PaymentLockedReceived)},
+		{Category: "payment", Name: "payment.expired", Persistent: true, Sample: new(PaymentExpiredNotification)},
+		{Category: "payment", Name: "payment.cancelled", Persistent: true, Sample: new(PaymentCancelledByBuyer)},
+		{Category: "payment", Name: "payment.partial", Sample: new(PartialPaymentReceived)},
 	}
 
 	typeIndex = make(map[reflect.Type]*EventMeta, len(registry)*2)

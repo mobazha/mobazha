@@ -66,7 +66,7 @@ type chatGroupDeleteWrapper struct {
 
 // NotificationSink is an EventSink that replaces the old Notifier for-select loop.
 // It handles two paths:
-//   - Persistent: events with Legacy != "" → DB persist + WebSocket push
+//   - Persistent: events with Persistent=true → DB persist + WebSocket push
 //   - WebSocket-only: everything else → type-specific JSON wrapper + WebSocket push
 type NotificationSink struct {
 	db         database.Database
@@ -93,7 +93,7 @@ func (s *NotificationSink) Accept(_ events.EventMeta) bool { return true }
 
 // Handle implements events.EventSink.
 func (s *NotificationSink) Handle(_ context.Context, meta events.EventMeta, event interface{}) error {
-	if meta.Legacy != "" {
+	if meta.Persistent {
 		return s.handlePersistentNotification(meta, event)
 	}
 	return s.handleWebSocketOnly(meta, event)
@@ -109,7 +109,7 @@ func (s *NotificationSink) handlePersistentNotification(meta events.EventMeta, e
 	}
 	id := hex.EncodeToString(r)
 
-	setNotificationFields(event, id, meta.Legacy)
+	setNotificationFields(event, id, meta.Name)
 
 	out, err := json.MarshalIndent(event, "", "    ")
 	if err != nil {
@@ -122,7 +122,7 @@ func (s *NotificationSink) handlePersistentNotification(meta events.EventMeta, e
 			ID:           id,
 			Timestamp:    time.Now(),
 			Read:         false,
-			Type:         meta.Legacy,
+			Type:         meta.Name,
 			Notification: out,
 		})
 	})

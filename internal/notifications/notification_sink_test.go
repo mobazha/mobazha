@@ -59,7 +59,7 @@ func TestNotificationSink_Name(t *testing.T) {
 
 func TestNotificationSink_AcceptAll(t *testing.T) {
 	sink := NewNotificationSink(nil, nil)
-	meta := events.EventMeta{Category: "order", Name: "order.created", Legacy: "newOrder"}
+	meta := events.EventMeta{Category: "order", Name: "order.created", Persistent: true}
 	if !sink.Accept(meta) {
 		t.Error("expected Accept to return true")
 	}
@@ -70,7 +70,7 @@ func TestNotificationSink_PersistentNotification(t *testing.T) {
 	cap := &notifyCapture{}
 	sink := NewNotificationSink(db, cap.notify)
 
-	meta := events.EventMeta{Category: "order", Name: "order.created", Legacy: "newOrder"}
+	meta := events.EventMeta{Category: "order", Name: "order.created", Persistent: true}
 	evt := &events.NewOrder{OrderID: "ord-1", Title: "Test"}
 
 	err := sink.Handle(context.Background(), meta, evt)
@@ -81,8 +81,8 @@ func TestNotificationSink_PersistentNotification(t *testing.T) {
 	if evt.ID == "" {
 		t.Error("expected notification ID to be set on event")
 	}
-	if evt.Typ != "newOrder" {
-		t.Errorf("expected Typ='newOrder', got %q", evt.Typ)
+	if evt.Typ != "order.created" {
+		t.Errorf("expected Typ='order.created', got %q", evt.Typ)
 	}
 
 	db.mu.Lock()
@@ -94,8 +94,8 @@ func TestNotificationSink_PersistentNotification(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *models.NotificationRecord, got %T", db.saved[0])
 	}
-	if rec.Type != "newOrder" {
-		t.Errorf("expected record type 'newOrder', got %q", rec.Type)
+	if rec.Type != "order.created" {
+		t.Errorf("expected record type 'order.created', got %q", rec.Type)
 	}
 	if rec.Read {
 		t.Error("expected record to be unread")
@@ -122,7 +122,7 @@ func TestNotificationSink_WebSocketOnly_Chat(t *testing.T) {
 	cap := &notifyCapture{}
 	sink := NewNotificationSink(nil, cap.notify)
 
-	meta := events.EventMeta{Category: "chat", Name: "chat.message", Legacy: ""}
+	meta := events.EventMeta{Category: "chat", Name: "chat.message"}
 	evt := &events.ChatMessage{PeerID: "peer-1", Message: "hello"}
 
 	err := sink.Handle(context.Background(), meta, evt)
@@ -151,7 +151,7 @@ func TestNotificationSink_WebSocketOnly_Wallet(t *testing.T) {
 	cap := &notifyCapture{}
 	sink := NewNotificationSink(nil, cap.notify)
 
-	meta := events.EventMeta{Category: "wallet", Name: "wallet.tx_received", Legacy: ""}
+	meta := events.EventMeta{Category: "wallet", Name: "wallet.tx_received"}
 	evt := &events.TransactionReceived{}
 
 	err := sink.Handle(context.Background(), meta, evt)
@@ -177,7 +177,7 @@ func TestNotificationSink_WebSocketOnly_Publish(t *testing.T) {
 	cap := &notifyCapture{}
 	sink := NewNotificationSink(nil, cap.notify)
 
-	meta := events.EventMeta{Category: "publish", Name: "publish.started", Legacy: ""}
+	meta := events.EventMeta{Category: "publish", Name: "publish.started"}
 	evt := &events.PublishStarted{}
 
 	err := sink.Handle(context.Background(), meta, evt)
@@ -203,7 +203,7 @@ func TestNotificationSink_WebSocketOnly_Cart(t *testing.T) {
 	cap := &notifyCapture{}
 	sink := NewNotificationSink(nil, cap.notify)
 
-	meta := events.EventMeta{Category: "cart", Name: "cart.updated", Legacy: ""}
+	meta := events.EventMeta{Category: "cart", Name: "cart.updated"}
 	evt := &events.ShoppingCartUpdate{}
 
 	err := sink.Handle(context.Background(), meta, evt)
@@ -229,7 +229,7 @@ func TestNotificationSink_UnknownCategory_NoPush(t *testing.T) {
 	cap := &notifyCapture{}
 	sink := NewNotificationSink(nil, cap.notify)
 
-	meta := events.EventMeta{Category: "unknown", Name: "unknown.event", Legacy: ""}
+	meta := events.EventMeta{Category: "unknown", Name: "unknown.event"}
 	err := sink.Handle(context.Background(), meta, struct{}{})
 	if err != nil {
 		t.Fatalf("Handle error: %v", err)
@@ -244,9 +244,9 @@ func TestNotificationSink_UnknownCategory_NoPush(t *testing.T) {
 
 func TestSetNotificationFields_Reflection(t *testing.T) {
 	evt := &events.NewOrder{OrderID: "ord-1"}
-	setNotificationFields(evt, "id-123", "newOrder")
-	if evt.ID != "id-123" || evt.Typ != "newOrder" {
-		t.Errorf("expected ID=id-123 Typ=newOrder, got ID=%s Typ=%s", evt.ID, evt.Typ)
+	setNotificationFields(evt, "id-123", "order.created")
+	if evt.ID != "id-123" || evt.Typ != "order.created" {
+		t.Errorf("expected ID=id-123 Typ=order.created, got ID=%s Typ=%s", evt.ID, evt.Typ)
 	}
 }
 
@@ -270,7 +270,7 @@ func TestNotificationSink_Concurrency(t *testing.T) {
 
 func TestNotificationSink_NilNotifyFunc(t *testing.T) {
 	sink := NewNotificationSink(nil, nil)
-	meta := events.EventMeta{Category: "chat", Name: "chat.message", Legacy: ""}
+	meta := events.EventMeta{Category: "chat", Name: "chat.message"}
 	evt := &events.ChatMessage{}
 	if err := sink.Handle(context.Background(), meta, evt); err != nil {
 		t.Fatalf("Handle with nil notify should not error: %v", err)

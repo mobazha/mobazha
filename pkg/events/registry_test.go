@@ -12,8 +12,8 @@ func TestLookupEvent_PointerType(t *testing.T) {
 	if meta.Name != "order.created" {
 		t.Errorf("expected order.created, got %s", meta.Name)
 	}
-	if meta.Legacy != "newOrder" {
-		t.Errorf("expected newOrder, got %s", meta.Legacy)
+	if !meta.Persistent {
+		t.Error("expected order.created to be persistent")
 	}
 }
 
@@ -104,31 +104,38 @@ func TestAllMeta_IsCopy(t *testing.T) {
 	}
 }
 
-func TestLegacyConsistency(t *testing.T) {
-	expected := map[string]string{
-		"order.created":          "newOrder",
-		"order.funded":           "orderFunded",
-		"order.payment_received": "orderPaymentReceived",
-		"order.confirmed":        "orderConfirmation",
-		"order.fulfilled":        "orderFulfillment",
-		"order.completed":        "orderCompletion",
-		"order.cancelled":        "orderCancel",
-		"order.declined":         "orderDeclined",
-		"order.refunded":         "refund",
-		"order.vendor_finalized": "vendorFinalizedPayment",
-		"dispute.opened":         "disputeOpen",
-		"dispute.closed":         "disputeClose",
-		"dispute.accepted":       "disputeAccepted",
-		"dispute.case_open":      "caseOpen",
-		"dispute.case_update":    "caseUpdate",
-		"social.follow":          "follow",
-		"social.unfollow":        "unfollow",
+func TestPersistentConsistency(t *testing.T) {
+	persistentNames := map[string]bool{
+		"order.created":          true,
+		"order.funded":           true,
+		"order.payment_received": true,
+		"order.confirmed":        true,
+		"order.fulfilled":        true,
+		"order.completed":        true,
+		"order.cancelled":        true,
+		"order.declined":         true,
+		"order.refunded":         true,
+		"order.vendor_finalized": true,
+		"dispute.opened":         true,
+		"dispute.closed":         true,
+		"dispute.accepted":       true,
+		"dispute.case_open":      true,
+		"dispute.case_update":    true,
+		"social.follow":          true,
+		"social.unfollow":        true,
+		"social.moderator_add":   true,
+		"social.moderator_remove": true,
+		"payment.locked":         true,
+		"payment.expired":        true,
+		"payment.cancelled":      true,
 	}
 	for _, m := range registry {
-		if want, ok := expected[m.Name]; ok {
-			if m.Legacy != want {
-				t.Errorf("%s: expected legacy %q, got %q", m.Name, want, m.Legacy)
+		if want, ok := persistentNames[m.Name]; ok {
+			if m.Persistent != want {
+				t.Errorf("%s: expected persistent=%v, got %v", m.Name, want, m.Persistent)
 			}
+		} else if m.Persistent {
+			t.Errorf("%s: unexpectedly persistent", m.Name)
 		}
 	}
 }

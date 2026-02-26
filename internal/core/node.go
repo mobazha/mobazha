@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sync/atomic"
 	"time"
 
@@ -17,17 +15,19 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
+	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/internal/notifier"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet/utxo"
 	"github.com/mobazha/mobazha3.0/internal/net"
+	"github.com/mobazha/mobazha3.0/internal/notifier"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/encryption"
@@ -144,6 +144,9 @@ type MobazhaNode struct {
 	// notifierSink dispatches events to external notification channels
 	// (Telegram, Discord, etc.) managed as a single EventSink.
 	notifierSink *notifier.ChannelNotificationSink
+
+	// aiProxy handles proxying AI requests to an OpenAI-compatible API.
+	aiProxy *aipkg.Proxy
 
 	// stripeAccountID represents the stripe account id of the node.
 	stripeAccountID string
@@ -576,30 +579,77 @@ func (n *MobazhaNode) NotifierSink() *notifier.ChannelNotificationSink {
 	return n.notifierSink
 }
 
-// SaveNotificationChannels persists channel configs to a file in the data directory.
+// SaveNotificationChannels persists channel configs to the database.
 func (n *MobazhaNode) SaveNotificationChannels(channels []notifier.ChannelConfig) error {
-	cfgPath := n.notificationChannelsPath()
-	data, err := json.MarshalIndent(channels, "", "  ")
+	data, err := json.Marshal(channels)
 	if err != nil {
 		return fmt.Errorf("marshal notification channels: %w", err)
 	}
-	return os.WriteFile(cfgPath, data, 0600)
+	return n.saveSetting(models.SettingsKeyNotificationChannels, string(data))
 }
 
-// loadNotificationChannels reads the persisted channel configs from file.
+// loadNotificationChannels reads the persisted channel configs from the database.
 func (n *MobazhaNode) loadNotificationChannels() []notifier.ChannelConfig {
-	cfgPath := n.notificationChannelsPath()
-	data, err := os.ReadFile(cfgPath)
-	if err != nil {
+	val, err := n.getSetting(models.SettingsKeyNotificationChannels)
+	if err != nil || val == "" {
 		return nil
 	}
 	var channels []notifier.ChannelConfig
-	if err := json.Unmarshal(data, &channels); err != nil {
+	if err := json.Unmarshal([]byte(val), &channels); err != nil {
 		return nil
 	}
 	return channels
 }
 
-func (n *MobazhaNode) notificationChannelsPath() string {
-	return filepath.Join(n.repo.DataDir(), "notification_channels.json")
+// AIProxy returns the node's AI proxy (may be nil).
+func (n *MobazhaNode) AIProxy() *aipkg.Proxy {
+	return n.aiProxy
+}
+
+// AIConfig reads the persisted AI configuration from the database.
+func (n *MobazhaNode) AIConfig() aipkg.Config {
+	val, err := n.getSetting(models.SettingsKeyAIConfig)
+	if err != nil || val == "" {
+		return aipkg.Config{}
+	}
+	var cfg aipkg.Config
+	if err := json.Unmarshal([]byte(val), &cfg); err != nil {
+		return aipkg.Config{}
+	}
+	return cfg
+}
+
+// SaveAIConfig persists AI configuration to the database.
+func (n *MobazhaNode) SaveAIConfig(cfg aipkg.Config) error {
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("marshal AI config: %w", err)
+	}
+	return n.saveSetting(models.SettingsKeyAIConfig, string(data))
+}
+
+// getSetting reads a single key from the node_settings table.
+func (n *MobazhaNode) getSetting(key string) (string, error) {
+	var setting models.NodeSettings
+	err := n.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("`key` = ?", key).First(&setting).Error
+	})
+	if err != nil {
+		return "", err
+	}
+	return setting.Value, nil
+}
+
+// saveSetting upserts a key-value pair in the node_settings table.
+func (n *MobazhaNode) saveSetting(key, value string) error {
+	return n.db.Update(func(tx database.Tx) error {
+		return tx.Save(&models.NodeSettings{Key: key, Value: value})
+	})
+}
+
+// MigrateNodeSettings creates the node_settings table if it doesn't exist.
+func MigrateNodeSettings(db database.Database) error {
+	return db.Update(func(tx database.Tx) error {
+		return tx.Migrate(&models.NodeSettings{})
+	})
 }

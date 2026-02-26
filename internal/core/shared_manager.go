@@ -14,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/mobazha/mobazha3.0/internal/ai"
 	"github.com/mobazha/mobazha3.0/internal/api"
 	mcfg "github.com/mobazha/mobazha3.0/internal/config"
 	obnet "github.com/mobazha/mobazha3.0/internal/net"
@@ -91,6 +92,12 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 		netConfig, err := mcfg.LoadNetConfig(endpoint)
 		if err != nil {
 			log.Infof("Failed to load net config: %s", err)
+		}
+
+		if aiJSON := netConfig.GetAIProviders(); aiJSON != "" {
+			if err := ai.LoadRemoteProviders(aiJSON); err != nil {
+				log.Warningf("Failed to load remote AI providers: %s", err)
+			}
 		}
 
 		// Store and forward client and server

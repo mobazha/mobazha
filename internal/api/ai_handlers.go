@@ -1,0 +1,196 @@
+package api
+
+import (
+	"encoding/json"
+	"net/http"
+
+	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
+)
+
+type aiConfigProvider interface {
+	AIConfig() aipkg.Config
+	SaveAIConfig(aipkg.Config) error
+	AIProxy() *aipkg.Proxy
+}
+
+func getAIProvider(r *http.Request) aiConfigProvider {
+	node := getNodeService(r)
+	if p, ok := node.(aiConfigProvider); ok {
+		return p
+	}
+	return nil
+}
+
+func (g *Gateway) handleGETAIConfig(w http.ResponseWriter, r *http.Request) {
+	p := getAIProvider(r)
+	if p == nil {
+		http.Error(w, "AI not available in this mode", http.StatusNotImplemented)
+		return
+	}
+
+	cfg := p.AIConfig()
+	resp := map[string]interface{}{
+		"provider":    cfg.Provider,
+		"model":       cfg.Model,
+		"base_url":    cfg.BaseURL,
+		"enabled":     cfg.Enabled,
+		"has_api_key": cfg.APIKey != "",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (g *Gateway) handlePUTAIConfig(w http.ResponseWriter, r *http.Request) {
+	p := getAIProvider(r)
+	if p == nil {
+		http.Error(w, "AI not available in this mode", http.StatusNotImplemented)
+		return
+	}
+
+	var input struct {
+		Provider string `json:"provider"`
+		APIKey   string `json:"api_key"`
+		Model    string `json:"model"`
+		BaseURL  string `json:"base_url"`
+		Enabled  bool   `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	existing := p.AIConfig()
+
+	cfg := aipkg.Config{
+		Provider: input.Provider,
+		Model:    input.Model,
+		BaseURL:  input.BaseURL,
+		Enabled:  input.Enabled,
+	}
+
+	if input.APIKey != "" {
+		cfg.APIKey = input.APIKey
+	} else {
+		cfg.APIKey = existing.APIKey
+	}
+
+	if err := p.SaveAIConfig(cfg); err != nil {
+		http.Error(w, "Failed to save AI config", http.StatusInternalServerError)
+		return
+	}
+
+	resp := map[string]interface{}{
+		"provider":    cfg.Provider,
+		"model":       cfg.Model,
+		"base_url":    cfg.BaseURL,
+		"enabled":     cfg.Enabled,
+		"has_api_key": cfg.APIKey != "",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (g *Gateway) handlePOSTAITestConnection(w http.ResponseWriter, r *http.Request) {
+	p := getAIProvider(r)
+	if p == nil {
+		http.Error(w, "AI not available in this mode", http.StatusNotImplemented)
+		return
+	}
+
+	var input struct {
+		Provider string `json:"provider"`
+		APIKey   string `json:"api_key"`
+		Model    string `json:"model"`
+		BaseURL  string `json:"base_url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	apiKey := input.APIKey
+	if apiKey == "" {
+		existing := p.AIConfig()
+		apiKey = existing.APIKey
+	}
+	if apiKey == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "API key is required",
+		})
+		return
+	}
+
+	cfg := aipkg.Config{
+		Provider: input.Provider,
+		APIKey:   apiKey,
+		Model:    input.Model,
+		BaseURL:  input.BaseURL,
+		Enabled:  true,
+	}
+
+	proxy := p.AIProxy()
+	if proxy == nil {
+		http.Error(w, "AI proxy not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	err := proxy.TestConnection(cfg)
+	w.Header().Set("Content-Type", "application/json")
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+	})
+}
+
+func (g *Gateway) handleGETAIProviders(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(aipkg.SupportedProviders())
+}
+
+func (g *Gateway) handlePOSTAIGenerate(w http.ResponseWriter, r *http.Request) {
+	p := getAIProvider(r)
+	if p == nil {
+		http.Error(w, "AI not available in this mode", http.StatusNotImplemented)
+		return
+	}
+
+	cfg := p.AIConfig()
+	if !cfg.IsValid() {
+		http.Error(w, "AI is not configured. Please set up your AI provider in Settings > Integrations.", http.StatusServiceUnavailable)
+		return
+	}
+
+	var req aipkg.GenerateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.Action == "" {
+		http.Error(w, "Missing action field", http.StatusBadRequest)
+		return
+	}
+
+	proxy := p.AIProxy()
+	if proxy == nil {
+		http.Error(w, "AI proxy not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	result, err := proxy.Generate(cfg, req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}

@@ -31,6 +31,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	coreorders "github.com/mobazha/mobazha-core/orders"
+	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
 	"github.com/mobazha/mobazha3.0/internal/contracts"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -613,6 +614,10 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		}
 	} else {
 		sharedManager.GetHTTPGateway().EnsureHubForUser(nodeID)
+	}
+
+	if err := MigrateNodeSettings(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, nodeID, "Failed to migrate node_settings: %v", err)
 	}
 
 	initWebhookSubsystem(obNode)
@@ -1206,6 +1211,10 @@ func newLightweightNode(
 		notifyWsFn = gw.NotifyWebsockets(nodeID)
 	}
 
+	if err := MigrateNodeSettings(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, nodeID, "Failed to migrate node_settings: %v", err)
+	}
+
 	initWebhookSubsystem(obNode)
 	initEventDispatcher(obNode, notifyWsFn)
 
@@ -1315,4 +1324,6 @@ func initEventDispatcher(obNode *MobazhaNode, notifyWsFn func(any) error) {
 
 	obNode.eventDispatcher = events.NewDispatcher(obNode.eventBus, sinks...)
 	logger.LogInfoWithIDf(log, obNode.nodeID, "Event dispatcher initialized with %d sinks", len(sinks))
+
+	obNode.aiProxy = aipkg.NewProxy(nil)
 }

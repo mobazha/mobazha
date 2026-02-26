@@ -106,6 +106,16 @@ func (config *NetConfig) GetNetDBEndpoint() string {
 	return "https://info.mobazha.org/api/netdb"
 }
 
+// GetAIProviders returns the remote AI provider presets JSON string from
+// the nodeConfig data map. Returns empty string if not configured.
+func (config *NetConfig) GetAIProviders() string {
+	val, ok := config.GetConfig("aiProviders")
+	if ok && len(val) > 0 {
+		return val
+	}
+	return ""
+}
+
 func (config *NetConfig) GetConfig(key string) (string, bool) {
 	config.dataMutex.RLock()
 	defer config.dataMutex.RUnlock()

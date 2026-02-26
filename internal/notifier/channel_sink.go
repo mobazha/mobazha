@@ -239,6 +239,16 @@ func (s *ChannelNotificationSink) SupportedTypes() []ChannelTypeInfo {
 	}
 }
 
+// TelegramSender returns the registered Telegram sender, or nil if not available.
+func (s *ChannelNotificationSink) TelegramSender() *TelegramSender {
+	if sender, ok := s.senders[ChannelTelegram]; ok {
+		if ts, ok := sender.(*TelegramSender); ok {
+			return ts
+		}
+	}
+	return nil
+}
+
 func generateID() string {
 	b := make([]byte, 8)
 	if _, err := rand.Read(b); err != nil {

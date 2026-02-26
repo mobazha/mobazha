@@ -1,6 +1,50 @@
 package api
 
-import "testing"
+import (
+	"sort"
+	"testing"
+)
+
+func TestExtractEventCategories(t *testing.T) {
+	cats := extractEventCategories()
+	if len(cats) == 0 {
+		t.Fatal("expected at least one event category")
+	}
+
+	expected := map[string]bool{
+		"order": true, "dispute": true, "social": true,
+		"chat": true, "wallet": true, "payment": true,
+		"publish": true, "cart": true, "chatgroup": true,
+	}
+	for _, cat := range cats {
+		if !expected[cat] {
+			t.Errorf("unexpected category: %q", cat)
+		}
+	}
+	for cat := range expected {
+		found := false
+		for _, c := range cats {
+			if c == cat {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("missing expected category: %q", cat)
+		}
+	}
+
+	sorted := make([]string, len(cats))
+	copy(sorted, cats)
+	sort.Strings(sorted)
+	unique := make(map[string]bool)
+	for _, c := range cats {
+		if unique[c] {
+			t.Errorf("duplicate category: %q", c)
+		}
+		unique[c] = true
+	}
+}
 
 func TestIsAllowedTelegramBaseURL(t *testing.T) {
 	tests := []struct {

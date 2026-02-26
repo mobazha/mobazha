@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/internal/notifier"
+	"github.com/mobazha/mobazha3.0/pkg/events"
 )
 
 var sensitiveSettingsKeys = map[string]bool{
@@ -138,8 +139,25 @@ func (g *Gateway) handleGETNotificationChannelTypes(w http.ResponseWriter, r *ht
 		return
 	}
 
+	cats := extractEventCategories()
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sink.SupportedTypes())
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"channel_types":    sink.SupportedTypes(),
+		"event_categories": cats,
+	})
+}
+
+func extractEventCategories() []string {
+	seen := map[string]bool{}
+	var cats []string
+	for _, m := range events.AllMeta() {
+		if !seen[m.Category] {
+			seen[m.Category] = true
+			cats = append(cats, m.Category)
+		}
+	}
+	return cats
 }
 
 func (g *Gateway) handlePOSTDetectTelegramChat(w http.ResponseWriter, r *http.Request) {

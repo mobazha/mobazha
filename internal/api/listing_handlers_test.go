@@ -39,7 +39,7 @@ func TestListingHandlers(t *testing.T) {
 					Slug: "t-shirt",
 					CID:  "h",
 				})
-				return marshalAndSanitizeJSON(i)
+				return wrapDataInEnvelope(i)
 			},
 		},
 		{
@@ -70,7 +70,7 @@ func TestListingHandlers(t *testing.T) {
 					Slug: "t-shirt",
 					CID:  "h",
 				})
-				return marshalAndSanitizeJSON(i)
+				return wrapDataInEnvelope(i)
 			},
 		},
 		{
@@ -107,7 +107,7 @@ func TestListingHandlers(t *testing.T) {
 					Slug: "t-shirt",
 					CID:  "h",
 				})
-				return marshalAndSanitizeJSON(i)
+				return wrapDataInEnvelope(i)
 			},
 		},
 		{
@@ -127,7 +127,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("invalid peer id: failed to parse peer ID: invalid cid: selected encoding not supported")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "invalid peer id: failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -143,7 +143,7 @@ func TestListingHandlers(t *testing.T) {
 			// Handler returns empty listing index (200) for ErrNotFound, not 404
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
-				return marshalAndSanitizeJSON(models.ListingIndex(nil))
+				return wrapDataInEnvelope(models.ListingIndex(nil))
 			},
 		},
 		{
@@ -158,7 +158,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("internal")), nil
+				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal")), nil
 			},
 		},
 		{
@@ -183,7 +183,11 @@ func TestListingHandlers(t *testing.T) {
 						Slug: "t-shirt",
 					},
 				}
-				return sanitizeProtobuf(l)
+				inner, err := sanitizeProtobuf(l)
+				if err != nil {
+					return nil, err
+				}
+				return append(append([]byte(`{"data": `), inner...), '}'), nil
 			},
 		},
 		{
@@ -208,7 +212,11 @@ func TestListingHandlers(t *testing.T) {
 						Slug: "t-shirt",
 					},
 				}
-				return sanitizeProtobuf(l)
+				inner, err := sanitizeProtobuf(l)
+				if err != nil {
+					return nil, err
+				}
+				return append(append([]byte(`{"data": `), inner...), '}'), nil
 			},
 		},
 		{
@@ -242,7 +250,11 @@ func TestListingHandlers(t *testing.T) {
 						Slug: "t-shirt",
 					},
 				}
-				return sanitizeProtobuf(l)
+				inner, err := sanitizeProtobuf(l)
+				if err != nil {
+					return nil, err
+				}
+				return append(append([]byte(`{"data": `), inner...), '}'), nil
 			},
 		},
 		{
@@ -259,7 +271,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("not found")), nil
+				return []byte(wrapPhaseGError(http.StatusNotFound, "not found")), nil
 			},
 		},
 		{
@@ -279,7 +291,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("invalid peer id: failed to parse peer ID: invalid cid: selected encoding not supported")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "invalid peer id: failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -294,7 +306,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("not found")), nil
+				return []byte(wrapPhaseGError(http.StatusNotFound, "not found")), nil
 			},
 		},
 		{
@@ -309,7 +321,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("internal")), nil
+				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal")), nil
 			},
 		},
 		{
@@ -334,7 +346,11 @@ func TestListingHandlers(t *testing.T) {
 						Slug: "t-shirt",
 					},
 				}
-				return sanitizeProtobuf(l)
+				inner, err := sanitizeProtobuf(l)
+				if err != nil {
+					return nil, err
+				}
+				return append(append([]byte(`{"data": `), inner...), '}'), nil
 			},
 		},
 		{
@@ -359,7 +375,11 @@ func TestListingHandlers(t *testing.T) {
 						Slug: "t-shirt",
 					},
 				}
-				return sanitizeProtobuf(l)
+				inner, err := sanitizeProtobuf(l)
+				if err != nil {
+					return nil, err
+				}
+				return append(append([]byte(`{"data": `), inner...), '}'), nil
 			},
 		},
 		{
@@ -374,7 +394,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("not found")), nil
+				return []byte(wrapPhaseGError(http.StatusNotFound, "not found")), nil
 			},
 		},
 		{
@@ -389,7 +409,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("internal")), nil
+				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal")), nil
 			},
 		},
 		{
@@ -410,7 +430,7 @@ func TestListingHandlers(t *testing.T) {
 				resp := struct {
 					Slug string `json:"slug"`
 				}{}
-				return marshalAndSanitizeJSON(resp)
+				return wrapDataInEnvelope(resp)
 			},
 		},
 		{
@@ -428,7 +448,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("error unmarshaling listing: proto: unexpected EOF")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "error unmarshaling listing: proto: unexpected EOF")), nil
 			},
 		},
 		{
@@ -446,7 +466,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusConflict,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("listing exists. use PUT to update")), nil
+				return []byte(wrapPhaseGError(http.StatusConflict, "listing exists. use PUT to update")), nil
 			},
 		},
 		{
@@ -464,7 +484,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("bad request")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "bad request")), nil
 			},
 		},
 		{
@@ -482,7 +502,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("internal")), nil
+				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal")), nil
 			},
 		},
 		{
@@ -503,7 +523,7 @@ func TestListingHandlers(t *testing.T) {
 				resp := struct {
 					Slug string `json:"slug"`
 				}{}
-				return marshalAndSanitizeJSON(resp)
+				return wrapDataInEnvelope(resp)
 			},
 		},
 		{
@@ -521,7 +541,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("error unmarshaling listing: proto: unexpected EOF")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "error unmarshaling listing: proto: unexpected EOF")), nil
 			},
 		},
 		{
@@ -539,7 +559,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusConflict,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("listing does not exist. use POST to create")), nil
+				return []byte(wrapPhaseGError(http.StatusConflict, "listing does not exist. use POST to create")), nil
 			},
 		},
 		{
@@ -557,7 +577,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("bad request")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "bad request")), nil
 			},
 		},
 		{
@@ -575,7 +595,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("internal")), nil
+				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal")), nil
 			},
 		},
 		{
@@ -590,7 +610,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
-				return nil, nil
+				return wrapDataInEnvelope(struct{}{})
 			},
 		},
 		{
@@ -605,7 +625,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("not found")), nil
+				return []byte(wrapPhaseGError(http.StatusNotFound, "not found")), nil
 			},
 		},
 		{
@@ -620,7 +640,7 @@ func TestListingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("internal")), nil
+				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal")), nil
 			},
 		},
 	})

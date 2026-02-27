@@ -14,6 +14,7 @@ import (
 	tnet "github.com/libp2p/go-libp2p-testing/net"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 )
 
 type apiTests []apiTest
@@ -26,6 +27,41 @@ type apiTest struct {
 	setNodeMethods   func(n *mockNode)
 	statusCode       int
 	expectedResponse func() ([]byte, error)
+}
+
+// wrapErrorMessage returns legacy error format. Kept for tests not yet migrated to Phase G.
+func wrapErrorMessage(reason string) string {
+	reason = strings.Replace(reason, `"`, `'`, -1)
+	result, _ := marshalAndSanitizeJSON(APIError{false, reason})
+	return string(result)
+}
+
+// wrapPhaseGError returns Phase G error envelope: {"error":{"code":"<CODE>","message":"<msg>"}}\n
+func wrapPhaseGError(statusCode int, message string) string {
+	code := responsePkg.HttpStatusToCode(statusCode)
+	env := map[string]interface{}{
+		"error": map[string]string{
+			"code":    code,
+			"message": message,
+		},
+	}
+	b, _ := json.Marshal(env)
+	return string(b) + "\n"
+}
+
+// wrapDataInEnvelope wraps data in Phase G success envelope: {"data": <raw>}
+func wrapDataInEnvelope(data interface{}) ([]byte, error) {
+	inner, err := marshalAndSanitizeJSON(data)
+	if err != nil {
+		return nil, err
+	}
+	return append(append([]byte(`{"data": `), inner...), '}'), nil
+}
+
+// wrapRawJSONInEnvelope wraps pre-marshaled JSON bytes in Phase G envelope.
+// Use for protobuf responses where sanitizeProtobuf (protojson) must be used.
+func wrapRawJSONInEnvelope(raw []byte) ([]byte, error) {
+	return append(append([]byte(`{"data": `), raw...), '}'), nil
 }
 
 func runAPITests(t *testing.T, tests apiTests) {

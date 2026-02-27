@@ -46,7 +46,7 @@ func TestSettingsHandlers(t *testing.T) {
 					Tor:     true,
 					Wallets: []string{"BTC"},
 				}
-				return marshalAndSanitizeJSON(&n)
+				return wrapDataInEnvelope(&n)
 			},
 		},
 		{
@@ -66,7 +66,7 @@ func TestSettingsHandlers(t *testing.T) {
 			body:       []byte(`{"RefundPolicy": "asdf"}`),
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(`{}`), nil
+				return wrapDataInEnvelope(map[string]interface{}{})
 			},
 		},
 		{
@@ -81,7 +81,7 @@ func TestSettingsHandlers(t *testing.T) {
 			body:       []byte(`{"RefundPolicy": "asdf"}`),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("bad request")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "bad request")), nil
 			},
 		},
 		{
@@ -97,7 +97,7 @@ func TestSettingsHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
-				return marshalAndSanitizeJSON(&models.UserPreferences{RefundPolicy: "asdf", UserAgent: version.UserAgent()})
+				return wrapDataInEnvelope(&models.UserPreferences{RefundPolicy: "asdf", UserAgent: version.UserAgent()})
 			},
 		},
 		{
@@ -123,7 +123,7 @@ func TestSettingsHandlers(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				return marshalAndSanitizeJSON(rates)
+				return wrapDataInEnvelope(rates)
 			},
 		},
 	})

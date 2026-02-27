@@ -35,7 +35,11 @@ func TestPostHandlers(t *testing.T) {
 						Slug: "t-shirt",
 					},
 				}
-				return sanitizeProtobuf(l)
+				raw, err := sanitizeProtobuf(l)
+				if err != nil {
+					return nil, err
+				}
+				return wrapRawJSONInEnvelope(raw)
 			},
 		},
 		{
@@ -69,7 +73,11 @@ func TestPostHandlers(t *testing.T) {
 						Slug: "t-shirt",
 					},
 				}
-				return sanitizeProtobuf(l)
+				raw, err := sanitizeProtobuf(l)
+				if err != nil {
+					return nil, err
+				}
+				return wrapRawJSONInEnvelope(raw)
 			},
 		},
 		{
@@ -89,7 +97,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("invalid peer id: failed to parse peer ID: invalid cid: selected encoding not supported")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "invalid peer id: failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -104,7 +112,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("not found")), nil
+				return []byte(wrapPhaseGError(http.StatusNotFound, "not found")), nil
 			},
 		},
 		{
@@ -119,7 +127,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("internal")), nil
+				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal")), nil
 			},
 		},
 		{
@@ -144,7 +152,11 @@ func TestPostHandlers(t *testing.T) {
 						Slug: "t-shirt",
 					},
 				}
-				return sanitizeProtobuf(l)
+				raw, err := sanitizeProtobuf(l)
+				if err != nil {
+					return nil, err
+				}
+				return wrapRawJSONInEnvelope(raw)
 			},
 		},
 		{
@@ -159,7 +171,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("not found")), nil
+				return []byte(wrapPhaseGError(http.StatusNotFound, "not found")), nil
 			},
 		},
 		{
@@ -174,7 +186,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("internal")), nil
+				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal")), nil
 			},
 		},
 		{
@@ -195,7 +207,7 @@ func TestPostHandlers(t *testing.T) {
 				resp := struct {
 					Slug string `json:"slug"`
 				}{}
-				return marshalAndSanitizeJSON(resp)
+				return wrapDataInEnvelope(resp)
 			},
 		},
 		{
@@ -213,7 +225,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("error unmarshaling post: proto: unexpected EOF")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "error unmarshaling post: proto: unexpected EOF")), nil
 			},
 		},
 		{
@@ -231,7 +243,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusConflict,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("post exists. use PUT to update")), nil
+				return []byte(wrapPhaseGError(http.StatusConflict, "post exists. use PUT to update")), nil
 			},
 		},
 		{
@@ -249,7 +261,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("bad request")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "bad request")), nil
 			},
 		},
 		{
@@ -267,7 +279,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("internal")), nil
+				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal")), nil
 			},
 		},
 		{
@@ -297,7 +309,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("not found")), nil
+				return []byte(wrapPhaseGError(http.StatusNotFound, "not found")), nil
 			},
 		},
 		{
@@ -312,7 +324,7 @@ func TestPostHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("internal")), nil
+				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal")), nil
 			},
 		},
 	})

@@ -33,7 +33,11 @@ func TestFollowHandlers(t *testing.T) {
 					"12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN",
 					"12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
 				}
-				return marshalAndSanitizeJSON(&followers)
+				raw, err := marshalAndSanitizeJSON(&followers)
+				if err != nil {
+					return nil, err
+				}
+				return []byte(`{"data":` + string(raw) + `}`), nil
 			},
 		},
 		{
@@ -47,7 +51,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(`[]`), nil
+				return []byte(`{"data":[]}`), nil
 			},
 		},
 		{
@@ -61,7 +65,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("not found: error")), nil
+				return []byte(wrapPhaseGError(http.StatusNotFound, "not found: error")), nil
 			},
 		},
 		{
@@ -82,7 +86,11 @@ func TestFollowHandlers(t *testing.T) {
 					"12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN",
 					"12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
 				}
-				return marshalAndSanitizeJSON(&following)
+				raw, err := marshalAndSanitizeJSON(&following)
+				if err != nil {
+					return nil, err
+				}
+				return []byte(`{"data":` + string(raw) + `}`), nil
 			},
 		},
 		{
@@ -96,7 +104,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(`[]`), nil
+				return []byte(`{"data":[]}`), nil
 			},
 		},
 		{
@@ -110,7 +118,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("not found: error")), nil
+				return []byte(wrapPhaseGError(http.StatusNotFound, "not found: error")), nil
 			},
 		},
 		{
@@ -134,7 +142,11 @@ func TestFollowHandlers(t *testing.T) {
 					"12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN",
 					"12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
 				}
-				return marshalAndSanitizeJSON(&followers)
+				raw, err := marshalAndSanitizeJSON(&followers)
+				if err != nil {
+					return nil, err
+				}
+				return []byte(`{"data":` + string(raw) + `}`), nil
 			},
 		},
 		{
@@ -148,7 +160,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("failed to parse peer ID: invalid cid: selected encoding not supported")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -162,7 +174,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("not found: error")), nil
+				return []byte(wrapPhaseGError(http.StatusNotFound, "not found: error")), nil
 			},
 		},
 		{
@@ -182,11 +194,15 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
-				followers := models.Following{
+				following := models.Following{
 					"12D3KooWLbTBv97L6jvaLkdSRpqhCX3w7PyPDWU7kwJsKJyztAUN",
 					"12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi",
 				}
-				return marshalAndSanitizeJSON(&followers)
+				raw, err := marshalAndSanitizeJSON(&following)
+				if err != nil {
+					return nil, err
+				}
+				return []byte(`{"data":` + string(raw) + `}`), nil
 			},
 		},
 		{
@@ -200,7 +216,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("failed to parse peer ID: invalid cid: selected encoding not supported")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -214,7 +230,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("not found: error")), nil
+				return []byte(wrapPhaseGError(http.StatusNotFound, "not found: error")), nil
 			},
 		},
 		{
@@ -245,7 +261,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("error")), nil
+				return []byte(wrapPhaseGError(http.StatusInternalServerError, "error")), nil
 			},
 		},
 		{
@@ -259,7 +275,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("failed to parse peer ID: invalid cid: selected encoding not supported")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -290,7 +306,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("error")), nil
+				return []byte(wrapPhaseGError(http.StatusInternalServerError, "error")), nil
 			},
 		},
 		{
@@ -304,7 +320,7 @@ func TestFollowHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("failed to parse peer ID: invalid cid: selected encoding not supported")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 	})

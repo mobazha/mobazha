@@ -120,7 +120,7 @@ func TestRatingHandlers(t *testing.T) {
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
 				// Handler returns empty RatingInfo when slug not found
-				return marshalAndSanitizeJSON(models.RatingInfo{})
+				return wrapDataInEnvelope(models.RatingInfo{})
 			},
 		},
 		{
@@ -136,7 +136,7 @@ func TestRatingHandlers(t *testing.T) {
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
 				// Handler returns empty RatingInfo for ErrNotFound (not 404)
-				return marshalAndSanitizeJSON(models.RatingInfo{})
+				return wrapDataInEnvelope(models.RatingInfo{})
 			},
 		},
 		{
@@ -151,7 +151,7 @@ func TestRatingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("internal")), nil
+				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal")), nil
 			},
 		},
 		{
@@ -172,7 +172,11 @@ func TestRatingHandlers(t *testing.T) {
 				l := &pb.Rating{
 					Review: "excellent",
 				}
-				return sanitizeProtobuf(l)
+				raw, err := sanitizeProtobuf(l)
+				if err != nil {
+					return nil, err
+				}
+				return wrapRawJSONInEnvelope(raw)
 			},
 		},
 		{
@@ -190,7 +194,7 @@ func TestRatingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("invalid rating id: invalid cid: selected encoding not supported")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "invalid rating id: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -205,7 +209,7 @@ func TestRatingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusNotFound,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("not found")), nil
+				return []byte(wrapPhaseGError(http.StatusNotFound, "not found")), nil
 			},
 		},
 		{
@@ -220,7 +224,7 @@ func TestRatingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("internal")), nil
+				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal")), nil
 			},
 		},
 		{
@@ -260,7 +264,7 @@ func TestRatingHandlers(t *testing.T) {
 						},
 					},
 				}
-				return marshalAndSanitizeJSON(ratings)
+				return wrapDataInEnvelope(ratings)
 			},
 		},
 		{
@@ -294,7 +298,7 @@ func TestRatingHandlers(t *testing.T) {
 						},
 					},
 				}
-				return marshalAndSanitizeJSON(ratings)
+				return wrapDataInEnvelope(ratings)
 			},
 		},
 		{
@@ -315,7 +319,7 @@ func TestRatingHandlers(t *testing.T) {
 			body:       []byte(`["QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7", "QmTvGbPiS1PaE7AAn4gEszNiYMgdrbMXwLkGnLKYSADs8K"`),
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("unexpected EOF")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "unexpected EOF")), nil
 			},
 		},
 		{
@@ -346,7 +350,7 @@ func TestRatingHandlers(t *testing.T) {
 						},
 					},
 				}
-				return marshalAndSanitizeJSON(ratings)
+				return wrapDataInEnvelope(ratings)
 			},
 		},
 		{
@@ -361,7 +365,7 @@ func TestRatingHandlers(t *testing.T) {
 			body:       []byte(`["QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7", "QmTvGbPiS1PaE7AAn4gEszNiYMgdrbMXwLkGnLKYSADs8K"]`),
 			statusCode: http.StatusOK,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(`[]`), nil
+				return wrapDataInEnvelope([]interface{}{})
 			},
 		},
 		{
@@ -387,7 +391,7 @@ func TestRatingHandlers(t *testing.T) {
 					"QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 					"QmTvGbPiS1PaE7AAn4gEszNiYMgdrbMXwLkGnLKYSADs8K",
 				}}
-				return marshalAndSanitizeJSON(ret)
+				return wrapDataInEnvelope(ret)
 			},
 		},
 		{
@@ -417,7 +421,7 @@ func TestRatingHandlers(t *testing.T) {
 					"QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 					"QmTvGbPiS1PaE7AAn4gEszNiYMgdrbMXwLkGnLKYSADs8K",
 				}}
-				return marshalAndSanitizeJSON(ret)
+				return wrapDataInEnvelope(ret)
 			},
 		},
 		{
@@ -446,7 +450,7 @@ func TestRatingHandlers(t *testing.T) {
 					"QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 					"QmTvGbPiS1PaE7AAn4gEszNiYMgdrbMXwLkGnLKYSADs8K",
 				}}
-				return marshalAndSanitizeJSON(ret)
+				return wrapDataInEnvelope(ret)
 			},
 		},
 		{
@@ -468,7 +472,7 @@ func TestRatingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusBadRequest,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("invalid peer id: failed to parse peer ID: invalid cid: selected encoding not supported")), nil
+				return []byte(wrapPhaseGError(http.StatusBadRequest, "invalid peer id: failed to parse peer ID: invalid cid: selected encoding not supported")), nil
 			},
 		},
 		{
@@ -482,7 +486,7 @@ func TestRatingHandlers(t *testing.T) {
 			},
 			statusCode: http.StatusInternalServerError,
 			expectedResponse: func() ([]byte, error) {
-				return []byte(wrapErrorMessage("internal")), nil
+				return []byte(wrapPhaseGError(http.StatusInternalServerError, "internal")), nil
 			},
 		},
 	})

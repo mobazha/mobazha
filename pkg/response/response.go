@@ -109,21 +109,15 @@ func HttpStatusToCode(status int) string {
 	}
 }
 
-type contextKey string
-
-const RequestIDKey contextKey = "request_id"
-
 // PanicRecovery recovers from panics and returns a 500 JSON error.
-// Register after RequestID middleware so the ID is available.
+// Register after RequestID middleware so the response header X-Request-ID
+// is already set and available for logging.
 func PanicRecovery(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				reqID, _ := r.Context().Value(RequestIDKey).(string)
+				reqID := w.Header().Get("X-Request-ID")
 				fmt.Printf("[PANIC] request_id=%s err=%v\n%s\n", reqID, err, debug.Stack())
-				if reqID != "" {
-					w.Header().Set("X-Request-ID", reqID)
-				}
 				Error(w, http.StatusInternalServerError, CodeInternalError, "An unexpected error occurred")
 			}
 		}()

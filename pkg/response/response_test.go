@@ -207,6 +207,28 @@ func TestPanicRecovery(t *testing.T) {
 	}
 }
 
+func TestPanicRecovery_PreservesRequestID(t *testing.T) {
+	panicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("boom")
+	})
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Request-ID", "req-123")
+		PanicRecovery(panicHandler).ServeHTTP(w, r)
+	})
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/test", nil)
+	handler.ServeHTTP(w, r)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500, got %d", w.Code)
+	}
+	if rid := w.Header().Get("X-Request-ID"); rid != "req-123" {
+		t.Errorf("expected request ID req-123, got %q", rid)
+	}
+}
+
 func TestSuccess_NilData(t *testing.T) {
 	w := httptest.NewRecorder()
 	Success(w, nil)

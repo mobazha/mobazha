@@ -67,5 +67,5 @@ func (r *Router) NotifyWebsockets(nodeID string) func(message interface{}) error
 // ErrorResponse writes a JSON error response. Re-exported from pkg/response
 // for external consumers that need a consistent error format.
 func ErrorResponse(w http.ResponseWriter, errorCode int, reason string) {
-	response.Error(w, errorCode, reason)
+	response.Error(w, errorCode, response.HttpStatusToCode(errorCode), reason)
 }

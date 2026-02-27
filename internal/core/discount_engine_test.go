@@ -76,6 +76,9 @@ func (m *mockDiscountService) RecordRedemption(_ context.Context, _ string, _ *s
 func (m *mockDiscountService) ListRedemptions(_ context.Context, _ string, _, _ int) ([]models.DiscountRedemption, int64, error) {
 	return nil, 0, nil
 }
+func (m *mockDiscountService) CalculateDiscounts(_ context.Context, _ contracts.CalculateDiscountsRequest) (*contracts.CalculateDiscountsResult, error) {
+	return nil, nil
+}
 
 // mockEngineStore implements the DiscountStore methods needed by the engine.
 type mockEngineStore struct {

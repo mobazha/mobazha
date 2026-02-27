@@ -135,6 +135,7 @@ func (s *GormDiscountStore) UpdateDiscount(_ context.Context, d *models.Discount
 			}
 			return err
 		}
+		d.UsageCount = existing.UsageCount
 		return tx.Save(d)
 	})
 }

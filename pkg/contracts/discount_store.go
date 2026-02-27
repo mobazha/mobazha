@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"context"
+	"math/big"
 
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
@@ -12,6 +13,35 @@ type ValidateCodeResult struct {
 	Discount *models.Discount     `json:"discount,omitempty"`
 	Code     *models.DiscountCode `json:"code,omitempty"`
 	Reason   string               `json:"reason,omitempty"`
+}
+
+// CalculateDiscountsRequest holds inputs for server-side discount calculation.
+type CalculateDiscountsRequest struct {
+	DiscountCodes   []string `json:"discountCodes,omitempty"`
+	ProductIDs      []string `json:"productIDs,omitempty"`
+	CustomerPeerID  string   `json:"customerPeerID,omitempty"`
+	Subtotal        string   `json:"subtotal"`
+	Currency        string   `json:"currency"`
+	ItemQuantity    int      `json:"itemQuantity,omitempty"`
+}
+
+// CalculateDiscountsResult holds outputs of server-side discount calculation.
+type CalculateDiscountsResult struct {
+	AppliedDiscounts []AppliedDiscountInfo `json:"appliedDiscounts,omitempty"`
+	DiscountsTotal   *big.Int             `json:"discountsTotal"`
+	ShippingDiscount bool                 `json:"shippingDiscount"`
+}
+
+// AppliedDiscountInfo represents a single applied discount in the calculation result.
+type AppliedDiscountInfo struct {
+	DiscountID string `json:"discountID"`
+	CodeID     string `json:"codeID,omitempty"`
+	Title      string `json:"title"`
+	Code       string `json:"code,omitempty"`
+	ValueType  string `json:"valueType"`
+	Value      string `json:"value"`
+	Amount     string `json:"amount"`
+	Auto       bool   `json:"auto,omitempty"`
 }
 
 // DiscountService is the business-level interface for discount operations.
@@ -31,6 +61,8 @@ type DiscountService interface {
 	ValidateCode(ctx context.Context, code string, customerPeerID string) (*ValidateCodeResult, error)
 	GetApplicableDiscounts(ctx context.Context, productIDs []string) ([]models.Discount, error)
 	RecordRedemption(ctx context.Context, discountID string, codeID *string, orderID, customerPeerID, discountAmount, currency string) error
+
+	CalculateDiscounts(ctx context.Context, req CalculateDiscountsRequest) (*CalculateDiscountsResult, error)
 
 	ListRedemptions(ctx context.Context, discountID string, page, pageSize int) ([]models.DiscountRedemption, int64, error)
 }

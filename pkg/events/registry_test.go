@@ -125,9 +125,13 @@ func TestPersistentConsistency(t *testing.T) {
 		"social.unfollow":        true,
 		"social.moderator_add":   true,
 		"social.moderator_remove": true,
-		"payment.locked":         true,
-		"payment.expired":        true,
-		"payment.cancelled":      true,
+		"payment.locked":                true,
+		"payment.expired":               true,
+		"payment.cancelled":             true,
+		"collection.created":            true,
+		"collection.updated":            true,
+		"collection.deleted":            true,
+		"collection.products_changed":   true,
 	}
 	for _, m := range registry {
 		if want, ok := persistentNames[m.Name]; ok {

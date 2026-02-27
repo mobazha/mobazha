@@ -43,12 +43,13 @@ type DiscountResult struct {
 
 // DiscountEngine calculates applicable discounts for a checkout.
 type DiscountEngine struct {
-	svc   contracts.DiscountService
-	store contracts.DiscountStore
+	svc             contracts.DiscountService
+	store           contracts.DiscountStore
+	collectionStore contracts.CollectionStore
 }
 
-func NewDiscountEngine(svc contracts.DiscountService, store contracts.DiscountStore) *DiscountEngine {
-	return &DiscountEngine{svc: svc, store: store}
+func NewDiscountEngine(svc contracts.DiscountService, store contracts.DiscountStore, collectionStore contracts.CollectionStore) *DiscountEngine {
+	return &DiscountEngine{svc: svc, store: store, collectionStore: collectionStore}
 }
 
 // Calculate evaluates all applicable discounts for the given context and returns
@@ -105,7 +106,7 @@ func (e *DiscountEngine) Calculate(ctx context.Context, dc DiscountContext) (*Di
 		if !e.checkMinPurchase(d, dc) {
 			continue
 		}
-		if !e.checkProductScope(d, dc.ProductIDs) {
+		if !e.checkProductScope(ctx, d, dc.ProductIDs) {
 			continue
 		}
 		valid = append(valid, c)
@@ -210,14 +211,23 @@ func (e *DiscountEngine) checkMinPurchase(d *models.Discount, dc DiscountContext
 	}
 }
 
-func (e *DiscountEngine) checkProductScope(d *models.Discount, productIDs []string) bool {
+func (e *DiscountEngine) checkProductScope(ctx context.Context, d *models.Discount, productIDs []string) bool {
 	switch d.AppliesTo {
 	case models.DiscountAppliesToAll:
 		return true
 	case models.DiscountAppliesToSpecificProducts:
 		return discountHasOverlap(d.ProductIDs, productIDs)
 	case models.DiscountAppliesToSpecificCollections:
-		return true
+		if e.collectionStore == nil || len(d.CollectionIDs) == 0 {
+			return false
+		}
+		for _, pid := range productIDs {
+			found, err := e.collectionStore.IsProductInCollections(ctx, d.CollectionIDs, pid)
+			if err == nil && found {
+				return true
+			}
+		}
+		return false
 	default:
 		return true
 	}

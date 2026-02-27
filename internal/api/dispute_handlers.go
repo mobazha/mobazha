@@ -5,14 +5,20 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 func (g *Gateway) handlePOSTOpenDispute(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
 	type dispute struct {
-		OrderID string `json:"orderID"`
-		Claim   string `json:"claim"`
+		Claim string `json:"claim"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	var d dispute
@@ -25,7 +31,7 @@ func (g *Gateway) handlePOSTOpenDispute(w http.ResponseWriter, r *http.Request) 
 	node := getOrderService(r)
 
 	done := make(chan struct{})
-	err = node.OpenDispute(models.OrderID(d.OrderID), d.Claim, done)
+	err = node.OpenDispute(models.OrderID(orderID), d.Claim, done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -42,8 +48,13 @@ func (g *Gateway) handlePOSTOpenDispute(w http.ResponseWriter, r *http.Request) 
 }
 
 func (g *Gateway) handlePOSTCloseDispute(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
 	type disputeParams struct {
-		OrderID          string  `json:"orderID"`
 		Resolution       string  `json:"resolution"`
 		BuyerPercentage  float32 `json:"buyerPercentage"`
 		VendorPercentage float32 `json:"vendorPercentage"`
@@ -59,7 +70,7 @@ func (g *Gateway) handlePOSTCloseDispute(w http.ResponseWriter, r *http.Request)
 	node := getOrderService(r)
 
 	done := make(chan struct{})
-	err = node.CloseDispute(models.OrderID(d.OrderID), d.BuyerPercentage, d.VendorPercentage, d.Resolution, done)
+	err = node.CloseDispute(models.OrderID(orderID), d.BuyerPercentage, d.VendorPercentage, d.Resolution, done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -76,9 +87,14 @@ func (g *Gateway) handlePOSTCloseDispute(w http.ResponseWriter, r *http.Request)
 }
 
 func (g *Gateway) handlePOSTReleaseFunds(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
 	type release struct {
-		OrderID string `json:"orderID"`
-		TxID    string `json:"txID"`
+		TxID string `json:"txID"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	var rel release
@@ -90,7 +106,7 @@ func (g *Gateway) handlePOSTReleaseFunds(w http.ResponseWriter, r *http.Request)
 
 	node := getOrderService(r)
 	done := make(chan struct{})
-	err = node.ReleaseFunds(models.OrderID(rel.OrderID), iwallet.TransactionID(rel.TxID), done)
+	err = node.ReleaseFunds(models.OrderID(orderID), iwallet.TransactionID(rel.TxID), done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -107,20 +123,15 @@ func (g *Gateway) handlePOSTReleaseFunds(w http.ResponseWriter, r *http.Request)
 }
 
 func (g *Gateway) handlePOSTReleaseEscrow(w http.ResponseWriter, r *http.Request) {
-	type release struct {
-		OrderID string `json:"orderID"`
-	}
-	decoder := json.NewDecoder(r.Body)
-	var rel release
-	err := decoder.Decode(&rel)
-	if err != nil {
-		ErrorResponse(w, http.StatusBadRequest, err.Error())
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
 		return
 	}
 
 	done := make(chan struct{})
 	node := getOrderService(r)
-	err = node.ReleaseFundsAfterTimeout(models.OrderID(rel.OrderID), done)
+	err := node.ReleaseFundsAfterTimeout(models.OrderID(orderID), done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -137,8 +148,13 @@ func (g *Gateway) handlePOSTReleaseEscrow(w http.ResponseWriter, r *http.Request
 }
 
 func (g *Gateway) handleGETReleaseFundsInstructions(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
 	type RequestParams struct {
-		OrderID          string `json:"orderID"`
 		InitiatorAddress string `json:"initiatorAddress"`
 	}
 	decoder := json.NewDecoder(r.Body)
@@ -150,7 +166,7 @@ func (g *Gateway) handleGETReleaseFundsInstructions(w http.ResponseWriter, r *ht
 	}
 
 	node := getOrderService(r)
-	coinType, instructions, err := node.GetReleaseFundsInstructions(models.OrderID(params.OrderID), params.InitiatorAddress)
+	coinType, instructions, err := node.GetReleaseFundsInstructions(models.OrderID(orderID), params.InitiatorAddress)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -169,7 +185,7 @@ func (g *Gateway) handleGETReleaseFundsInstructions(w http.ResponseWriter, r *ht
 	}
 
 	// 返回响应
-	// For UTXO chains, instructions is nil - frontend should call /v1/dispute/release directly
+	// For UTXO chains, instructions is nil - frontend should call /v1/disputes/{orderID}/release directly
 	response := InstructionsResponse{
 		HasInstructions: instructions != nil,
 		Instructions:    instructions,

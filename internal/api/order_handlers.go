@@ -156,6 +156,12 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 
 // handlePOSTPayment 处理支付结果通知
 func (g *Gateway) handlePOSTPayment(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
 	orderSvc := getOrderService(r)
 
 	var req struct {
@@ -164,6 +170,10 @@ func (g *Gateway) handlePOSTPayment(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "decode request body failed: "+err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	if req.PaymentData != nil {
+		req.PaymentData.OrderID = orderID
 	}
 
 	err := orderSvc.ProcessOrderPayment(r.Context(), req.PaymentData)
@@ -541,8 +551,13 @@ func (g *Gateway) handleGETOrderCancelInstructions(w http.ResponseWriter, r *htt
 }
 
 func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
 	type orderCancel struct {
-		OrderID       string `json:"orderID"`
 		TransactionID string `json:"transactionID"`
 	}
 	decoder := json.NewDecoder(r.Body)
@@ -558,9 +573,9 @@ func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) 
 	done := make(chan struct{})
 
 	if cancelParam.TransactionID != "" {
-		err = orderSvc.CancelOrder(models.OrderID(cancelParam.OrderID), iwallet.TransactionID(cancelParam.TransactionID), done)
+		err = orderSvc.CancelOrder(models.OrderID(orderID), iwallet.TransactionID(cancelParam.TransactionID), done)
 	} else {
-		err = orderSvc.CancelOrderViaRelay(models.OrderID(cancelParam.OrderID), done)
+		err = orderSvc.CancelOrderViaRelay(models.OrderID(orderID), done)
 	}
 	if err != nil {
 		orderActionErrorResponse(w, err)
@@ -579,7 +594,6 @@ func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) 
 
 func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, r *http.Request) {
 	type Params struct {
-		OrderID          string `json:"orderID"`
 		Reject           bool   `json:"reject"`
 		InitiatorAddress string `json:"initiatorAddress"`
 		PayoutAddress    string `json:"payoutAddress"`
@@ -592,9 +606,15 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 		return
 	}
 
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
 	orderSvc := getOrderService(r)
 
-	order, err := orderSvc.GetOrder(args.OrderID)
+	order, err := orderSvc.GetOrder(orderID)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
 		return
@@ -618,9 +638,9 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 	var coinType iwallet.CoinType
 	var instructions any
 	if args.Reject {
-		coinType, instructions, err = orderSvc.GetRefundOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress)
+		coinType, instructions, err = orderSvc.GetRefundOrderInstructions(models.OrderID(orderID), args.InitiatorAddress)
 	} else {
-		coinType, instructions, err = orderSvc.GetConfirmOrderInstructions(models.OrderID(args.OrderID), args.InitiatorAddress, args.PayoutAddress)
+		coinType, instructions, err = orderSvc.GetConfirmOrderInstructions(models.OrderID(orderID), args.InitiatorAddress, args.PayoutAddress)
 	}
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -657,8 +677,13 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 }
 
 func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
 	type orderConf struct {
-		OrderID       string `json:"orderID"`
 		TransactionID string `json:"transactionID"`
 		PayoutAddress string `json:"payoutAddress"`
 		Reject        bool   `json:"reject"`
@@ -676,12 +701,12 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 
 	done := make(chan struct{})
 	if !conf.Reject {
-		err = orderSvc.ConfirmOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TransactionID), conf.PayoutAddress, done)
+		err = orderSvc.ConfirmOrder(models.OrderID(orderID), iwallet.TransactionID(conf.TransactionID), conf.PayoutAddress, done)
 	} else {
 		if conf.TransactionID != "" {
-			err = orderSvc.RejectOrder(models.OrderID(conf.OrderID), iwallet.TransactionID(conf.TransactionID), conf.Reason, done)
+			err = orderSvc.RejectOrder(models.OrderID(orderID), iwallet.TransactionID(conf.TransactionID), conf.Reason, done)
 		} else {
-			err = orderSvc.RejectOrderViaRelay(models.OrderID(conf.OrderID), conf.Reason, done)
+			err = orderSvc.RejectOrderViaRelay(models.OrderID(orderID), conf.Reason, done)
 		}
 	}
 	if err != nil {
@@ -700,8 +725,13 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 }
 
 func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
 	type orderFulfillment struct {
-		OrderID                string                         `json:"orderID"`
 		ItemIndex              int                            `json:"itemIndex"`
 		Note                   string                         `json:"note"`
 		PhysicalDelivery       *models.PhysicalDelivery       `json:"physicalDelivery"`
@@ -718,7 +748,6 @@ func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// 如果 JSON 反序列化时未提供 ReceivingAccountID，使用默认值 -1
 	receivingAccountID := -1
 	if fulfillParam.ReceivingAccountID != nil {
 		receivingAccountID = *fulfillParam.ReceivingAccountID
@@ -744,7 +773,7 @@ func (g *Gateway) handlePOSTOrderFulfillment(w http.ResponseWriter, r *http.Requ
 	}
 
 	done := make(chan struct{})
-	err = orderSvc.FulfillOrder(models.OrderID(fulfillParam.OrderID), []models.Fulfillment{fulFillment}, done)
+	err = orderSvc.FulfillOrder(models.OrderID(orderID), []models.Fulfillment{fulFillment}, done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -767,8 +796,13 @@ func (g *Gateway) handleGETOrderRefundInstructions(w http.ResponseWriter, r *htt
 }
 
 func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
 	type orderRefund struct {
-		OrderID       string `json:"orderID"`
 		TransactionID string `json:"transactionID"`
 	}
 	decoder := json.NewDecoder(r.Body)
@@ -784,9 +818,9 @@ func (g *Gateway) handlePOSTOrderRefund(w http.ResponseWriter, r *http.Request) 
 	done := make(chan struct{})
 
 	if refundParam.TransactionID != "" {
-		err = orderSvc.RefundOrder(models.OrderID(refundParam.OrderID), iwallet.TransactionID(refundParam.TransactionID), done)
+		err = orderSvc.RefundOrder(models.OrderID(orderID), iwallet.TransactionID(refundParam.TransactionID), done)
 	} else {
-		err = orderSvc.RefundOrderViaRelay(models.OrderID(refundParam.OrderID), done)
+		err = orderSvc.RefundOrderViaRelay(models.OrderID(orderID), done)
 	}
 	if err != nil {
 		orderActionErrorResponse(w, err)
@@ -815,8 +849,13 @@ func (g *Gateway) handleOrderInstructions(
 	r *http.Request,
 	getInstructions func(contracts.OrderService, models.OrderID, string) (iwallet.CoinType, any, error),
 ) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
 	type Params struct {
-		OrderID          string `json:"orderID"`
 		InitiatorAddress string `json:"initiatorAddress"`
 	}
 
@@ -828,7 +867,7 @@ func (g *Gateway) handleOrderInstructions(
 	}
 
 	orderSvc := getOrderService(r)
-	coinType, instructions, err := getInstructions(orderSvc, models.OrderID(args.OrderID), args.InitiatorAddress)
+	coinType, instructions, err := getInstructions(orderSvc, models.OrderID(orderID), args.InitiatorAddress)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -859,8 +898,13 @@ func (g *Gateway) handleOrderInstructions(
 }
 
 func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
 	type orderCompletion struct {
-		OrderID   string          `json:"orderID"`
 		TxID      string          `json:"txID"`
 		Ratings   []models.Rating `json:"ratings"`
 		Anonymous bool            `json:"anonymous"`
@@ -877,7 +921,7 @@ func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Reque
 	orderSvc := getOrderService(r)
 
 	done := make(chan struct{})
-	err = orderSvc.CompleteOrder(models.OrderID(completeParam.OrderID), iwallet.TransactionID(completeParam.TxID), completeParam.Ratings, !completeParam.Anonymous, done)
+	err = orderSvc.CompleteOrder(models.OrderID(orderID), iwallet.TransactionID(completeParam.TxID), completeParam.Ratings, !completeParam.Anonymous, done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return

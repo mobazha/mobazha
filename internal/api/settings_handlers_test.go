@@ -102,7 +102,7 @@ func TestSettingsHandlers(t *testing.T) {
 		},
 		{
 			name:   "Get exchange rates",
-			path:   "/v1/exchangerates",
+			path:   "/v1/exchange-rates",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
 				n.getAllRatesFunc = func(base models.CurrencyCode, breakCache bool) (map[models.CurrencyCode]iwallet.Amount, error) {

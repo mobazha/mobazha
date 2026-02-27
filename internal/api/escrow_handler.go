@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet/utxo"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -64,11 +65,18 @@ type EVMPaymentInfoResponse struct {
 // handleGetOrderPaymentInstructions 获取订单支付指令
 // 通过 PaymentStrategy 分发，根据 PaymentModel 格式化响应
 func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
 	var params models.InitializeEscrowData
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	params.OrderID = orderID
 
 	orderSvc := getOrderService(r)
 	walletSvc := getWalletService(r)

@@ -411,6 +411,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		}
 
 		initWebhookSubsystem(obNode)
+		initDiscountSubsystem(obNode)
 		obNode.applyOptions(nil)
 		return obNode, nil
 	}
@@ -621,6 +622,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	}
 
 	initWebhookSubsystem(obNode)
+	initDiscountSubsystem(obNode)
 
 	notifyWsFn := sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID)
 	initEventDispatcher(obNode, notifyWsFn)
@@ -1216,6 +1218,7 @@ func newLightweightNode(
 	}
 
 	initWebhookSubsystem(obNode)
+	initDiscountSubsystem(obNode)
 	initEventDispatcher(obNode, notifyWsFn)
 
 	// ── 7. Messenger (via SNF Proxy) ─────────────────────────────────
@@ -1300,6 +1303,18 @@ func initWebhookSubsystem(obNode *MobazhaNode) {
 	obNode.webhookStore = store
 	obNode.webhookEngine = engine
 	logger.LogInfoWithID(log, obNode.nodeID, "Webhook subsystem initialized")
+}
+
+// initDiscountSubsystem initializes the per-node discount subsystem:
+// migrates DB models, creates DiscountStore, and wires up DiscountAppService.
+func initDiscountSubsystem(obNode *MobazhaNode) {
+	if err := database.MigrateDiscountModels(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "Discount: failed to migrate models: %v", err)
+		return
+	}
+	store := database.NewGormDiscountStore(obNode.db)
+	obNode.discountService = NewDiscountAppService(store, obNode.nodeID)
+	logger.LogInfoWithID(log, obNode.nodeID, "Discount subsystem initialized")
 }
 
 // initEventDispatcher creates the unified EventDispatcher with NotificationSink,

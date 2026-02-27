@@ -330,18 +330,6 @@ func Test_validateCryptocurrencyListing(t *testing.T) {
 			valid:     true,
 		},
 		{
-			// Should have no coupons
-			listing: factory.NewCryptoListing("test-listing"),
-			transform: func(listing *pb.Listing) {
-				listing.Coupons = []*pb.Listing_Coupon{
-					{
-						Title: "fads",
-					},
-				}
-			},
-			valid: false,
-		},
-		{
 			// Should have no variants
 			listing: factory.NewCryptoListing("test-listing"),
 			transform: func(listing *pb.Listing) {
@@ -1724,81 +1712,6 @@ func Test_validateListing(t *testing.T) {
 						TaxType:    "asdf",
 						TaxRegions: []string{"AL"},
 						Percentage: 101,
-					},
-				}
-			},
-			valid: false,
-		},
-		{
-			// Too many coupons
-			listing: factory.NewSignedListing(),
-			transform: func(sl *pb.SignedListing) {
-				sl.Listing.Coupons = []*pb.Listing_Coupon{}
-				for i := 0; i < MaxListItems+1; i++ {
-					sl.Listing.Coupons = append(sl.Listing.Coupons, &pb.Listing_Coupon{})
-				}
-			},
-			valid: false,
-		},
-		{
-			// Coupon title too long
-			listing: factory.NewSignedListing(),
-			transform: func(sl *pb.SignedListing) {
-				sl.Listing.Coupons = []*pb.Listing_Coupon{
-					{
-						Title: strings.Repeat("s", CouponTitleMaxCharacters+1),
-					},
-				}
-			},
-			valid: false,
-		},
-		{
-			// Coupon discount code too long
-			listing: factory.NewSignedListing(),
-			transform: func(sl *pb.SignedListing) {
-				sl.Listing.Coupons = []*pb.Listing_Coupon{
-					{
-						Title:        "asdf",
-						DiscountCode: strings.Repeat("s", CodeMaxCharacters+1),
-					},
-				}
-			},
-			valid: false,
-		},
-		{
-			// Percent discount > 100
-			listing: factory.NewSignedListing(),
-			transform: func(sl *pb.SignedListing) {
-				sl.Listing.Coupons = []*pb.Listing_Coupon{
-					{
-						Title:           "asdf",
-						PercentDiscount: 101,
-					},
-				}
-			},
-			valid: false,
-		},
-		{
-			// Price discount too long
-			listing: factory.NewSignedListing(),
-			transform: func(sl *pb.SignedListing) {
-				sl.Listing.Coupons = []*pb.Listing_Coupon{
-					{
-						Title:         "asdf",
-						PriceDiscount: strings.Repeat("1", SentenceMaxCharacters+1),
-					},
-				}
-			},
-			valid: false,
-		},
-		{
-			// Price discount is zero
-			listing: factory.NewSignedListing(),
-			transform: func(sl *pb.SignedListing) {
-				sl.Listing.Coupons = []*pb.Listing_Coupon{
-					{
-						Title:         "asdf",
-						PriceDiscount: "0",
 					},
 				}
 			},

@@ -3,9 +3,7 @@ package core
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,7 +28,6 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/database/ffsqlite"
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -39,7 +36,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
-	"github.com/multiformats/go-multihash"
 	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/gorm"
 
@@ -258,10 +254,6 @@ func (s *ListingAppService) DeleteListing(slugStr string, done chan<- struct{}) 
 	listing, _ := s.GetMyListingBySlug(slugStr)
 
 	err := s.db.Update(func(tx database.Tx) error {
-		if err := tx.Delete("slug", slugStr, nil, &models.Coupon{}); err != nil {
-			return err
-		}
-
 		index, err := tx.GetListingIndex()
 		if err != nil {
 			return fmt.Errorf("%w: listing index not found", coreiface.ErrNotFound)
@@ -369,7 +361,6 @@ func (s *ListingAppService) GetListings(ctx context.Context, peerID peer.ID, req
 func (s *ListingAppService) GetMyListingBySlug(slugStr string) (*pb.SignedListing, error) {
 	var (
 		listing *pb.SignedListing
-		coupons []models.Coupon
 		err     error
 	)
 	err = s.db.View(func(tx database.Tx) error {
@@ -415,10 +406,6 @@ func (s *ListingAppService) GetMyListingBySlug(slugStr string) (*pb.SignedListin
 		}
 		listing = &sl
 
-		if err := tx.Read().Where("slug = ?", slugStr).Find(&coupons).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-
 		listing.Cid = id.String()
 		return nil
 	})
@@ -426,16 +413,12 @@ func (s *ListingAppService) GetMyListingBySlug(slugStr string) (*pb.SignedListin
 		return nil, err
 	}
 
-	if listing.Listing.Coupons != nil {
-		swapCouponHashesWithDiscountCodes(listing, coupons)
-	}
 	return listing, nil
 }
 
 func (s *ListingAppService) GetMyListingByCID(c cid.Cid) (*pb.SignedListing, error) {
 	var (
 		listing *pb.SignedListing
-		coupons []models.Coupon
 		err     error
 	)
 	err = s.db.View(func(tx database.Tx) error {
@@ -451,17 +434,11 @@ func (s *ListingAppService) GetMyListingByCID(c cid.Cid) (*pb.SignedListing, err
 		if err != nil {
 			return fmt.Errorf("%w: listing not found", coreiface.ErrNotFound)
 		}
-		if err := tx.Read().Where("slug = ?", slugStr).Find(&coupons).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
 		listing.Cid = c.String()
 		return nil
 	})
 	if err != nil {
 		return nil, err
-	}
-	if listing.Listing.Coupons != nil {
-		swapCouponHashesWithDiscountCodes(listing, coupons)
 	}
 	return listing, nil
 }
@@ -701,38 +678,6 @@ func (s *ListingAppService) saveListingToDB(dbtx database.Tx, listing *pb.Listin
 	}
 	if profile != nil {
 		listing.VendorID.Handle = profile.Handle
-	}
-
-	var couponsToStore []models.Coupon
-	for i, coupon := range listing.Coupons {
-		hash := coupon.GetHash()
-		code := coupon.GetDiscountCode()
-
-		_, err := multihash.FromB58String(hash)
-		if err != nil {
-			couponMH, err := utils.MultihashSha256([]byte(code))
-			if err != nil {
-				return cid.Cid{}, err
-			}
-			listing.Coupons[i].Hash = couponMH.B58String()
-			hash = couponMH.B58String()
-		}
-
-		r := make([]byte, 20)
-		rand.Read(r)
-		id := hex.EncodeToString(r)
-		coupon := models.Coupon{ID: id, Slug: listing.Slug, Code: code, Hash: hash}
-		couponsToStore = append(couponsToStore, coupon)
-	}
-	if err := dbtx.Delete("slug", listing.Slug, nil, &models.Coupon{}); err != nil {
-		return cid.Cid{}, err
-	}
-	if len(couponsToStore) > 0 {
-		for _, coupon := range couponsToStore {
-			if err := dbtx.Save(&coupon); err != nil {
-				return cid.Cid{}, err
-			}
-		}
 	}
 
 	sl, err := s.signListing(listing)
@@ -1122,42 +1067,6 @@ func (s *ListingAppService) validateListing(sl *pb.SignedListing) (err error) {
 		}
 	}
 
-	if len(sl.Listing.Coupons) > MaxListItems {
-		return coreiface.ErrTooManyItems{"coupons", strconv.Itoa(MaxListItems)}
-	}
-	for _, coupon := range sl.Listing.Coupons {
-		if len(coupon.Title) > CouponTitleMaxCharacters {
-			return coreiface.ErrTooManyCharacters{"coupons.title", strconv.Itoa(SentenceMaxCharacters)}
-		}
-		if len(coupon.GetDiscountCode()) > CodeMaxCharacters {
-			return coreiface.ErrTooManyCharacters{"coupons.discountcode", strconv.Itoa(CodeMaxCharacters)}
-		}
-		if coupon.GetPercentDiscount() > 100 {
-			return errors.New("percent discount cannot be over 100 percent")
-		}
-		n, _ := new(big.Int).SetString(sl.Listing.Item.Price, 10)
-		discountVal := coupon.GetPriceDiscount()
-		flag := false
-		if discountVal != "" {
-			if len(discountVal) > SentenceMaxCharacters {
-				return coreiface.ErrTooManyCharacters{"coupons.pricediscount", strconv.Itoa(SentenceMaxCharacters)}
-			}
-			discount0, ok := new(big.Int).SetString(discountVal, 10)
-			if !ok {
-				return errors.New("invalid price discount")
-			}
-			if n.Cmp(discount0) < 0 {
-				return errors.New("price discount cannot be greater than the item price")
-			}
-			if discount0.Cmp(big.NewInt(0)) == 0 {
-				flag = true
-			}
-		}
-		if coupon.GetPercentDiscount() == 0 && flag {
-			return errors.New("coupons must have at least one positive discount value")
-		}
-	}
-
 	if len(sl.Listing.Moderators) > MaxListItems {
 		return coreiface.ErrTooManyItems{"moderators", strconv.Itoa(MaxListItems)}
 	}
@@ -1267,8 +1176,6 @@ func (s *ListingAppService) deserializeAndValidateListing(listingBytes []byte, c
 
 func (s *ListingAppService) validateCryptocurrencyListing(listing *pb.Listing) error {
 	switch {
-	case len(listing.Coupons) > 0:
-		return coreiface.ErrCryptocurrencyListingIllegalField("coupons")
 	case len(listing.Item.Options) > 0:
 		return coreiface.ErrCryptocurrencyListingIllegalField("item.options")
 	case len(listing.ShippingOptions) > 0:
@@ -1442,16 +1349,3 @@ func validShippingRegion(shippingOption *pb.Listing_ShippingOption) error {
 	return nil
 }
 
-func swapCouponHashesWithDiscountCodes(listing *pb.SignedListing, coupons []models.Coupon) *pb.SignedListing {
-	couponMap := make(map[string]string)
-	for _, coupon := range coupons {
-		couponMap[coupon.Hash] = coupon.Code
-	}
-	for i, listingCoupon := range listing.Listing.Coupons {
-		code, ok := couponMap[listingCoupon.GetHash()]
-		if ok {
-			listing.Listing.Coupons[i].DiscountCode = code
-		}
-	}
-	return listing
-}

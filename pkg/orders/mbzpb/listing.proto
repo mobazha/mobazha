@@ -12,7 +12,8 @@ message Listing {
     Item item                               = 4;
     repeated ShippingOption shippingOptions = 5;  // @deprecated: 旧版配送选项，保留以向后兼容
     repeated Tax taxes                      = 6;
-    repeated Coupon coupons                 = 7;
+    reserved 7;
+    reserved "coupons";
     repeated string moderators              = 8;
     string termsAndConditions               = 9;
     string refundPolicy                     = 10;
@@ -188,22 +189,6 @@ message Listing {
         float percentage                = 4;
     }
 
-    message Coupon {
-        string title                           = 1;
-        string hash                            = 2;   // 折扣码哈希
-        string discountCode                    = 3;   // 折扣码（明文）
-        enum DiscountType {
-            PERCENT = 0;
-            FIXED   = 1;
-        }
-        DiscountType discountType              = 4;   // 折扣类型
-        float percentDiscount                  = 5;   // 百分比折扣（0-99）
-        string priceDiscount                   = 6;   // 固定金额折扣（最小单位）
-        int32 usageLimit                       = 7;   // 最大使用次数，0 = 无限
-        google.protobuf.Timestamp startsAt     = 8;   // 生效时间
-        google.protobuf.Timestamp expiresAt    = 9;   // 过期时间
-        string minimumOrderAmount              = 10;  // 最低订单金额
-    }
 }
 
 message SignedListing {

@@ -137,6 +137,9 @@ type MobazhaNode struct {
 	// webhookEngine manages background webhook delivery polling and retry.
 	webhookEngine *wh.Engine
 
+	// discountService encapsulates discount business logic (CRUD, validation, codes).
+	discountService *DiscountAppService
+
 	// eventDispatcher is the unified EventBus subscriber that fans out events
 	// to NotificationSink, WebhookSink, and ChannelNotificationSink.
 	eventDispatcher *events.Dispatcher

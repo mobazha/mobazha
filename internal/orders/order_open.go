@@ -9,7 +9,6 @@ import (
 	"math"
 	"math/big"
 	"strings"
-	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -448,55 +447,8 @@ func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode strin
 
 		subTotal = subTotal.Add(itemTotal.Mul(itemQuantity))
 
-		// 对于非RWA Token，处理优惠券和税费
+		// 对于非RWA Token，处理税费（折扣在 DiscountEngine 中整体计算，不再 per-item）
 		if listing.Metadata.ContractType != pb.Listing_Metadata_RWA_TOKEN {
-			// Subtract any coupons
-			for _, couponCode := range item.CouponCodes {
-				couponHash, err := utils.MultihashSha256([]byte(couponCode))
-				if err != nil {
-					return models.OrderTotals{}, fmt.Errorf("hash coupon code: %s", err.Error())
-				}
-				for _, vendorCoupon := range listing.Coupons {
-					if couponCode == vendorCoupon.GetDiscountCode() || couponHash.B58String() == vendorCoupon.GetHash() {
-						// 检查优惠券有效期
-						now := time.Now()
-						if vendorCoupon.StartsAt != nil && vendorCoupon.StartsAt.AsTime().After(now) {
-							continue // 优惠券尚未生效
-						}
-						if vendorCoupon.ExpiresAt != nil && vendorCoupon.ExpiresAt.AsTime().Before(now) {
-							continue // 优惠券已过期
-						}
-					// 检查最低订单金额（使用行项目总金额 = 单价 × 数量）
-					if vendorCoupon.MinimumOrderAmount != "" && iwallet.NewAmount(vendorCoupon.MinimumOrderAmount).Cmp(iwallet.NewAmount(0)) > 0 {
-						lineTotal := itemTotal.Mul(itemQuantity)
-						if lineTotal.Cmp(iwallet.NewAmount(vendorCoupon.MinimumOrderAmount)) < 0 {
-							continue // 未达到最低订单金额
-						}
-					}
-						// 根据折扣类型计算折扣
-						switch vendorCoupon.DiscountType {
-						case pb.Listing_Coupon_FIXED:
-							if discount := vendorCoupon.GetPriceDiscount(); discount != "" && iwallet.NewAmount(discount).Cmp(iwallet.NewAmount(0)) > 0 {
-								price := models.NewCurrencyValue(discount, pricingCurrency)
-								discountAmount, err := wallet.ConvertCurrencyAmount(price, paymentCurrency, erp)
-								if err != nil {
-									return models.OrderTotals{}, err
-								}
-								itemTotal = itemTotal.Sub(discountAmount)
-								discountsTotal = discountsTotal.Sub(discountAmount)
-							}
-						case pb.Listing_Coupon_PERCENT:
-							if discount := vendorCoupon.GetPercentDiscount(); discount > 0 {
-								f, _ := new(big.Float).SetString(itemTotal.String())
-								f.Mul(f, big.NewFloat(float64(-discount/100)))
-								discountAmount, _ := f.Int(nil)
-								itemTotal = itemTotal.Add(iwallet.NewAmount(discountAmount))
-								discountsTotal = discountsTotal.Add(iwallet.NewAmount(discountAmount))
-							}
-						}
-					}
-				}
-			}
 			// Apply tax (case-insensitive comparison for region codes)
 			for _, tax := range listing.Taxes {
 				for _, taxRegion := range tax.TaxRegions {

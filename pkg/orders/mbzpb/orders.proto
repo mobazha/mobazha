@@ -36,7 +36,8 @@ message OrderOpen {
         repeated Option options             = 3;
         ShippingOption shippingOption       = 4;
         string memo                         = 5;
-        repeated string couponCodes         = 6;
+        reserved 6;
+        reserved "couponCodes";
         string paymentAddress               = 7;
         repeated string optionalFeatures    = 8;
 

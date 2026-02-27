@@ -40,6 +40,9 @@ func (n *MobazhaNode) ExchangeRate() contracts.ExchangeRateService { return &exc
 func (n *MobazhaNode) WebhookStore() wh.EndpointStore { return n.webhookStore }
 func (n *MobazhaNode) WebhookEngine() *wh.Engine      { return n.webhookEngine }
 
+// DiscountProvider implementation — per-node discount subsystem.
+func (n *MobazhaNode) Discount() contracts.DiscountService { return n.discountService }
+
 func (n *MobazhaNode) Order() contracts.OrderService {
 	return &orderServiceFacade{
 		OrderAppService: n.orderService,

@@ -32,7 +32,6 @@ type PurchaseItem struct {
 	Options          []PurchaseItemOption   `json:"options"`
 	Shipping         PurchaseShippingOption `json:"shipping"`
 	Memo             string                 `json:"memo"`
-	Coupons          []string               `json:"coupons"`
 	PaymentAddress   string                 `json:"paymentAddress"`
 	OptionalFeatures []string               `json:"optionalFeatures"`
 }

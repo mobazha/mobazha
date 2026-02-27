@@ -298,35 +298,6 @@ func TestCalculateOrderTotal(t *testing.T) {
 			expectedTotal: iwallet.NewAmount("9568425"),
 		},
 		{
-			// Coupons
-			transform: func(order *pb.OrderOpen) error {
-				order.Items[0].CouponCodes = []string{
-					"insider",
-				}
-				return nil
-			},
-			expectedTotal: iwallet.NewAmount("4784212"),
-		},
-		{
-			// Price Discount
-			transform: func(order *pb.OrderOpen) error {
-				order.Listings = append(order.Listings, order.Listings[0])
-				order.Listings[1].Listing.Item.Title = "abc"
-				order.Listings[1].Listing.Coupons[0].DiscountType = pb.Listing_Coupon_FIXED
-				order.Listings[1].Listing.Coupons[0].PriceDiscount = "5"
-				hash, err := utils.HashListing(order.Listings[1])
-				if err != nil {
-					return err
-				}
-				order.Items[0].ListingHash = hash.B58String()
-				order.Items[0].CouponCodes = []string{
-					"insider",
-				}
-				return nil
-			},
-			expectedTotal: iwallet.NewAmount("4784212"),
-		},
-		{
 			// Market price listing
 			transform: func(order *pb.OrderOpen) error {
 				order.Listings[0].Listing.Metadata.ContractType = pb.Listing_Metadata_CRYPTOCURRENCY
@@ -405,10 +376,9 @@ func TestFreeShippingThresholdUsesDiscountedSubtotal(t *testing.T) {
 			expectFree: false,
 		},
 		{
-			name: "discounts reduce eligible subtotal",
+			name: "subtotal below threshold",
 			transform: func(order *pb.OrderOpen) error {
 				order.PricingCoin = "USD"
-				order.Items[0].CouponCodes = []string{"insider"}
 				order.Listings[0].Listing.ShippingOptions[0].FreeShippingThreshold = &pb.Listing_ShippingOption_FreeShippingThreshold{
 					Enabled:   true,
 					MinAmount: "100",

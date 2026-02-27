@@ -21,8 +21,6 @@ const (
 	WordMaxCharacters = 40
 	// SentenceMaxCharacters - max chars for sentence
 	SentenceMaxCharacters = 70
-	// CouponTitleMaxCharacters - max length of a coupon title
-	CouponTitleMaxCharacters = 70
 	// PolicyMaxCharacters - max length for policy
 	PolicyMaxCharacters = 10000
 	// AboutMaxCharacters - max length for about

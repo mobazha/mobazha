@@ -117,14 +117,6 @@ func NewPhysicalListing(slug string) *pb.Listing {
 				},
 			},
 		},
-		Coupons: []*pb.Listing_Coupon{
-			{
-				Title:           "Insider's Discount",
-				DiscountCode:    "insider",
-				DiscountType:    pb.Listing_Coupon_PERCENT,
-				PercentDiscount: 5,
-			},
-		},
 	}
 }
 
@@ -170,14 +162,6 @@ func NewDigitalListing(slug string) *pb.Listing {
 				TaxRegions:  []string{"US"},
 			},
 		},
-		Coupons: []*pb.Listing_Coupon{
-			{
-				Title:           "Insider's Discount",
-				DiscountCode:    "insider",
-				DiscountType:    pb.Listing_Coupon_PERCENT,
-				PercentDiscount: 5,
-			},
-		},
 	}
 }
 
@@ -190,7 +174,6 @@ func NewCryptoListing(slug string) *pb.Listing {
 	listing.Item.Condition = ""
 	listing.Item.Options = nil
 	listing.Item.Price = "100"
-	listing.Coupons = nil
 	return listing
 }
 

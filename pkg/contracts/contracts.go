@@ -297,6 +297,12 @@ type WebhookProvider interface {
 	WebhookEngine() *webhook.Engine
 }
 
+// DiscountProvider exposes the per-node discount subsystem.
+// Handlers obtain this via type assertion on NodeService.
+type DiscountProvider interface {
+	Discount() DiscountService
+}
+
 // NodeService is the top-level aggregate interface that combines all domain services.
 // Both MobazhaNode (standalone) and TenantService (SaaS) implement this interface.
 //

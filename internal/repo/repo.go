@@ -712,7 +712,6 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.NotificationRecord{},
 		&models.FollowerStat{},
 		&models.FollowSequence{},
-		&models.Coupon{},
 		&models.Event{},
 		&models.Order{},
 		&models.TransactionMetadata{},
@@ -724,6 +723,9 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.MatrixKeyBackup{},
 		&models.MatrixCredentials{},
 		&models.MatrixSecretsBundle{},
+		&models.Discount{},
+		&models.DiscountCode{},
+		&models.DiscountRedemption{},
 	}
 
 	return db.Update(func(tx database.Tx) error {
@@ -803,7 +805,6 @@ func autoMigrateDatabaseManagedEscrow(db database.Database) error {
 		&models.NotificationRecord{},
 		&models.FollowerStat{},
 		&models.FollowSequence{},
-		&models.Coupon{},
 		&models.Event{},
 		&models.Order{},
 		&models.TransactionMetadata{},
@@ -816,6 +817,9 @@ func autoMigrateDatabaseManagedEscrow(db database.Database) error {
 		&models.MatrixCredentials{},
 		&models.MatrixSecretsBundle{},
 		&models.ReceivingAccount{},
+		&models.Discount{},
+		&models.DiscountCode{},
+		&models.DiscountRedemption{},
 	}
 
 	return db.Update(func(tx database.Tx) error {

@@ -1,13 +1,16 @@
 package core
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -98,9 +101,50 @@ func TestArchGuard_ModelsDoNotImportInternal(t *testing.T) {
 }
 
 func TestArchGuard_CollectionServiceInterface(t *testing.T) {
-	// Compile-time verification that CollectionAppService implements CollectionService.
-	// If this test compiles, the contract is satisfied.
 	var _ contracts.CollectionService = (*CollectionAppService)(nil)
+}
+
+func TestArchGuard_CollectionModelDesignCompliance(t *testing.T) {
+	typ := reflect.TypeOf(models.Collection{})
+
+	f, ok := typ.FieldByName("DeletedAt")
+	require.True(t, ok, "Collection must have DeletedAt field")
+	assert.Equal(t, "*time.Time", f.Type.String(),
+		"DeletedAt must be *time.Time, not gorm.DeletedAt")
+
+	f, ok = typ.FieldByName("TenantID")
+	require.True(t, ok, "Collection must have TenantID field")
+	assert.Equal(t, "-", f.Tag.Get("json"),
+		"TenantID json tag must be \"-\" to prevent API exposure")
+}
+
+func TestArchGuard_CollectionStoreAllMethodsHaveContext(t *testing.T) {
+	storeType := reflect.TypeOf((*contracts.CollectionStore)(nil)).Elem()
+	ctxType := reflect.TypeOf((*context.Context)(nil)).Elem()
+
+	for i := 0; i < storeType.NumMethod(); i++ {
+		m := storeType.Method(i)
+		require.True(t, m.Type.NumIn() > 0,
+			"method %s must have at least one parameter", m.Name)
+		assert.True(t, m.Type.In(0).Implements(ctxType),
+			"method %s first param must be context.Context, got %s",
+			m.Name, m.Type.In(0).String())
+	}
+}
+
+func TestArchGuard_CollectionStoreRequiredMethods(t *testing.T) {
+	storeType := reflect.TypeOf((*contracts.CollectionStore)(nil)).Elem()
+	required := []string{
+		"CreateCollection", "GetCollection", "ListCollections",
+		"UpdateCollection", "DeleteCollection",
+		"AddProducts", "RemoveProduct", "ReorderProducts",
+		"IsProductInCollections", "RemoveProductFromAllCollections",
+		"CountCollections", "CountCollectionProducts",
+	}
+	for _, name := range required {
+		_, ok := storeType.MethodByName(name)
+		assert.True(t, ok, "CollectionStore must have method %s", name)
+	}
 }
 
 func TestArchGuard_CollectionRoutesFollowConvention(t *testing.T) {

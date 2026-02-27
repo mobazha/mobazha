@@ -10,11 +10,12 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	"gorm.io/gorm"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"gorm.io/gorm"
 )
 
 type APIError struct {
@@ -24,13 +25,8 @@ type APIError struct {
 
 func ErrorResponse(w http.ResponseWriter, errorCode int, reason string) {
 	reason = strings.Replace(reason, `"`, `'`, -1)
-	apiErr := APIError{false, reason}
-
 	log.Errorf("ErrorResponse, errorCode: %d, reason: %s ", errorCode, reason)
-
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(errorCode)
-	sanitizedJSONResponse(w, apiErr)
+	responsePkg.Error(w, errorCode, responsePkg.HttpStatusToCode(errorCode), reason)
 }
 
 // orderActionErrorResponse maps order action errors to appropriate HTTP status codes.
@@ -168,7 +164,7 @@ func (g *Gateway) handlePOSTPayment(w http.ResponseWriter, r *http.Request) {
 		PaymentData *models.PaymentData `json:"paymentData"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "decode request body failed: "+err.Error(), http.StatusBadRequest)
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "decode request body failed: "+err.Error())
 		return
 	}
 
@@ -631,7 +627,7 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 		}{
 			HasInstructions: false,
 		}
-		json.NewEncoder(w).Encode(response)
+		responsePkg.Success(w, response)
 		return
 	}
 
@@ -657,7 +653,7 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 		response := ConfirmationResponse{
 			HasInstructions: false,
 		}
-		json.NewEncoder(w).Encode(response)
+		responsePkg.Success(w, response)
 		return
 	}
 
@@ -673,7 +669,7 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 		HasInstructions: true,
 		Instructions:    instructions,
 	}
-	json.NewEncoder(w).Encode(response)
+	responsePkg.Success(w, response)
 }
 
 func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Request) {
@@ -880,7 +876,7 @@ func (g *Gateway) handleOrderInstructions(
 	}
 
 	if instructions == nil {
-		json.NewEncoder(w).Encode(GenericResponse{HasInstructions: false})
+		responsePkg.Success(w, GenericResponse{HasInstructions: false})
 		return
 	}
 
@@ -890,7 +886,7 @@ func (g *Gateway) handleOrderInstructions(
 		return
 	}
 
-	json.NewEncoder(w).Encode(GenericResponse{
+	responsePkg.Success(w, GenericResponse{
 		PaymentChain:    coinInfo.Chain,
 		HasInstructions: true,
 		Instructions:    instructions,
@@ -1035,8 +1031,7 @@ func (g *Gateway) handleGETPaymentRemaining(w http.ResponseWriter, r *http.Reque
 		HasPartialPayment: paidAmount > 0 && remainingAmount > 0,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	responsePkg.Success(w, response)
 }
 
 // CancelPartialPaymentRequest represents the request for canceling partial payment
@@ -1091,8 +1086,7 @@ func (g *Gateway) handlePOSTCancelPartialPayment(w http.ResponseWriter, r *http.
 		RefundedAmount: refundedAmount,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	responsePkg.Success(w, response)
 }
 
 // handleDELETEPaymentWatch stops watching a payment address for an order
@@ -1112,6 +1106,5 @@ func (g *Gateway) handleDELETEPaymentWatch(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	responsePkg.Success(w, map[string]bool{"success": true})
 }

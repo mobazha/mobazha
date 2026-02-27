@@ -25,7 +25,7 @@ func sanitizedStringResponse(w http.ResponseWriter, response string) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	fmt.Fprint(w, string(ret))
+	fmt.Fprintf(w, `{"data":%s}`, ret)
 }
 
 func sanitizedJSONResponse(w http.ResponseWriter, i interface{}) {
@@ -41,7 +41,7 @@ func sanitizedJSONResponse(w http.ResponseWriter, i interface{}) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	fmt.Fprint(w, string(ret))
+	fmt.Fprintf(w, `{"data":%s}`, ret)
 }
 
 func sanitizedProtobufResponse(w http.ResponseWriter, m protoreflect.ProtoMessage) {
@@ -51,7 +51,7 @@ func sanitizedProtobufResponse(w http.ResponseWriter, m protoreflect.ProtoMessag
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	fmt.Fprint(w, string(out))
+	fmt.Fprintf(w, `{"data":%s}`, out)
 }
 
 func marshalAndSanitizeJSON(i interface{}) ([]byte, error) {

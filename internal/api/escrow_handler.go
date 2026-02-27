@@ -15,6 +15,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
+	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -73,7 +74,7 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 
 	var params models.InitializeEscrowData
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
 		return
 	}
 	params.OrderID = orderID
@@ -83,18 +84,18 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 
 	order, err := orderSvc.GetOrder(params.OrderID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 		return
 	}
 	orderOpen, err := order.OrderOpenMessage()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 		return
 	}
 	if len(orderOpen.Listings) > 0 && orderOpen.Listings[0].Listing.Metadata.ContractType == pb.Listing_Metadata_RWA_TOKEN {
 		coinInfo, err := params.CoinType.CoinInfo()
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 			return
 		}
 		g.handleGetRWATokenPaymentInfo(w, r, orderSvc, params, coinInfo)
@@ -113,14 +114,12 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 						PaidCoin:          paymentData.PaidCoin,
 						PaidAddress:       paymentData.PaidAddress,
 					}
-					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusConflict)
-					json.NewEncoder(w).Encode(response)
+					responsePkg.StatusWithData(w, http.StatusConflict, response)
 					return
 				}
 			}
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 		return
 	}
 
@@ -130,7 +129,7 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 	case payment.PaymentModelClientSigned:
 		g.formatClientSignedPaymentResponse(w, result)
 	default:
-		http.Error(w, fmt.Sprintf("unsupported payment model: %s", result.PaymentModel), http.StatusInternalServerError)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, fmt.Sprintf("unsupported payment model: %s", result.PaymentModel))
 	}
 }
 
@@ -141,13 +140,13 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 // handleGetRWATokenPaymentInfo 处理 RWA Token 支付（特殊产品类型，不走 PaymentStrategy）
 func (g *Gateway) handleGetRWATokenPaymentInfo(w http.ResponseWriter, r *http.Request, orderSvc contracts.OrderService, params models.InitializeEscrowData, coinInfo iwallet.CoinInfo) {
 	if !coinInfo.IsEthTypeChain() {
-		http.Error(w, "RWA Token only supports EVM chains", http.StatusBadRequest)
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "RWA Token only supports EVM chains")
 		return
 	}
 
 	orderInfo, err := orderSvc.GetOrderInfo(models.OrderID(params.OrderID), params.CoinType)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 		return
 	}
 
@@ -155,28 +154,26 @@ func (g *Gateway) handleGetRWATokenPaymentInfo(w http.ResponseWriter, r *http.Re
 		BuyerAddress:  orderInfo.BuyerAddress,
 		VendorAddress: orderInfo.VendorAddress,
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	responsePkg.Success(w, response)
 }
 
 // formatMonitoredPaymentResponse formats the response for Monitored (UTXO) payments.
 func (g *Gateway) formatMonitoredPaymentResponse(w http.ResponseWriter, params models.InitializeEscrowData, result *payment.PaymentSetupResult) {
-	w.Header().Set("Content-Type", "application/json")
 	paymentData, ok := result.PaymentData.(*models.PaymentData)
 	if !ok || paymentData == nil {
-		http.Error(w, "invalid payment data for monitored chain", http.StatusInternalServerError)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "invalid payment data for monitored chain")
 		return
 	}
 
 	coinInfo, err := params.CoinType.CoinInfo()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 		return
 	}
 
 	scriptPubKey, err := hex.DecodeString(paymentData.Script)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to decode script: %v", err), http.StatusInternalServerError)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, fmt.Sprintf("Failed to decode script: %v", err))
 		return
 	}
 
@@ -199,15 +196,14 @@ func (g *Gateway) formatMonitoredPaymentResponse(w http.ResponseWriter, params m
 		UnlockHours:    paymentData.UnlockHours,
 		ExpiresAt:      time.Now().Add(24 * time.Hour),
 	}
-	json.NewEncoder(w).Encode(response)
+	responsePkg.Success(w, response)
 }
 
 // formatClientSignedPaymentResponse formats the response for ClientSigned (EVM/Solana) payments.
 func (g *Gateway) formatClientSignedPaymentResponse(w http.ResponseWriter, result *payment.PaymentSetupResult) {
-	w.Header().Set("Content-Type", "application/json")
 	paymentData, ok := result.PaymentData.(*models.PaymentData)
 	if !ok || paymentData == nil {
-		http.Error(w, "invalid payment data for client-signed chain", http.StatusInternalServerError)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "invalid payment data for client-signed chain")
 		return
 	}
 
@@ -216,5 +212,5 @@ func (g *Gateway) formatClientSignedPaymentResponse(w http.ResponseWriter, resul
 		EscrowAccount: result.EscrowAddr,
 		Instructions:  result.Instructions,
 	}
-	json.NewEncoder(w).Encode(response)
+	responsePkg.Success(w, response)
 }

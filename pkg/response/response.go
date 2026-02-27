@@ -56,6 +56,11 @@ func Created(w http.ResponseWriter, data interface{}) {
 	writeJSON(w, http.StatusCreated, SuccessEnvelope{Data: data})
 }
 
+// StatusWithData writes status + {"data": T}. Used for success-like responses with non-200/201 status (e.g. 409 Conflict).
+func StatusWithData(w http.ResponseWriter, status int, data interface{}) {
+	writeJSON(w, status, SuccessEnvelope{Data: data})
+}
+
 // List writes 200 + {"data": T[], "meta": {...}}.
 func List(w http.ResponseWriter, data interface{}, meta Meta) {
 	writeJSON(w, http.StatusOK, SuccessEnvelope{Data: data, Meta: &meta})

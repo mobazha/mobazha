@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -191,5 +192,5 @@ func (g *Gateway) handleGETReleaseFundsInstructions(w http.ResponseWriter, r *ht
 		Instructions:    instructions,
 		PaymentChain:    chainType,
 	}
-	json.NewEncoder(w).Encode(response)
+	responsePkg.Success(w, response)
 }

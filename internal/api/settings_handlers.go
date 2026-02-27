@@ -13,6 +13,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/version"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	"github.com/mobazha/mobazha3.0/pkg/response"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -142,7 +143,7 @@ func (g *Gateway) handlePOSTPublish(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handlePOSTPurgeCache(w http.ResponseWriter, r *http.Request) {
 	node, ok := getCoreIface(r)
 	if !ok {
-		http.Error(w, "Not available in SaaS mode", http.StatusNotImplemented)
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented, "Not available in SaaS mode")
 		return
 	}
 
@@ -168,7 +169,7 @@ func (g *Gateway) handlePOSTPurgeCache(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handlePOSTShutdown(w http.ResponseWriter, r *http.Request) {
 	node, ok := getCoreIface(r)
 	if !ok {
-		http.Error(w, "Not available in SaaS mode", http.StatusNotImplemented)
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented, "Not available in SaaS mode")
 		return
 	}
 
@@ -181,7 +182,7 @@ func (g *Gateway) handlePOSTShutdown(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleGETPeers(w http.ResponseWriter, r *http.Request) {
 	node, ok := getCoreIface(r)
 	if !ok {
-		http.Error(w, "Not available in SaaS mode", http.StatusNotImplemented)
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented, "Not available in SaaS mode")
 		return
 	}
 

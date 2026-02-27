@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
 // SharedRouterConfig configures a SharedRouter.
@@ -43,7 +44,7 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			node, err := cfg.Resolver(req)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusUnauthorized)
+				response.Error(w, http.StatusUnauthorized, response.CodeUnauthorized, err.Error())
 				return
 			}
 			ctx := context.WithValue(req.Context(), nodeContextKey, node)

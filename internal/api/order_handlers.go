@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"path"
-	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -24,7 +23,6 @@ type APIError struct {
 }
 
 func ErrorResponse(w http.ResponseWriter, errorCode int, reason string) {
-	reason = strings.Replace(reason, `"`, `'`, -1)
 	log.Errorf("ErrorResponse, errorCode: %d, reason: %s ", errorCode, reason)
 	responsePkg.Error(w, errorCode, responsePkg.HttpStatusToCode(errorCode), reason)
 }

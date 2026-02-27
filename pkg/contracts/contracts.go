@@ -303,6 +303,12 @@ type DiscountProvider interface {
 	Discount() DiscountService
 }
 
+// CollectionProvider exposes the per-node collection subsystem.
+// Handlers obtain this via type assertion on NodeService.
+type CollectionProvider interface {
+	Collection() CollectionService
+}
+
 // NodeService is the top-level aggregate interface that combines all domain services.
 // Both MobazhaNode (standalone) and TenantService (SaaS) implement this interface.
 //

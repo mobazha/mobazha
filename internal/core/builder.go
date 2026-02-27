@@ -412,6 +412,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 		initWebhookSubsystem(obNode)
 		initDiscountSubsystem(obNode)
+		initCollectionSubsystem(obNode)
 		obNode.applyOptions(nil)
 		return obNode, nil
 	}
@@ -623,6 +624,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 	initWebhookSubsystem(obNode)
 	initDiscountSubsystem(obNode)
+	initCollectionSubsystem(obNode)
 
 	notifyWsFn := sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID)
 	initEventDispatcher(obNode, notifyWsFn)
@@ -1219,6 +1221,7 @@ func newLightweightNode(
 
 	initWebhookSubsystem(obNode)
 	initDiscountSubsystem(obNode)
+	initCollectionSubsystem(obNode)
 	initEventDispatcher(obNode, notifyWsFn)
 
 	// ── 7. Messenger (via SNF Proxy) ─────────────────────────────────
@@ -1303,6 +1306,30 @@ func initWebhookSubsystem(obNode *MobazhaNode) {
 	obNode.webhookStore = store
 	obNode.webhookEngine = engine
 	logger.LogInfoWithID(log, obNode.nodeID, "Webhook subsystem initialized")
+}
+
+// initCollectionSubsystem initializes the per-node collection subsystem:
+// migrates DB models, creates CollectionStore, and wires up CollectionAppService.
+func initCollectionSubsystem(obNode *MobazhaNode) {
+	if err := database.MigrateCollectionModels(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "Collection: failed to migrate models: %v", err)
+		return
+	}
+	store := database.NewGormCollectionStore(obNode.db)
+	obNode.collectionService = NewCollectionAppService(store, obNode.eventBus, obNode.nodeID)
+
+	// Wire listing delete → collection cleanup via closure (callback-safety-rules.mdc)
+	if obNode.listingService != nil {
+		obNode.listingService.onDeleteCleanup = func(slug string) {
+			if obNode.collectionService != nil {
+				if err := obNode.collectionService.RemoveProductFromAllCollections(context.Background(), slug); err != nil {
+					logger.LogErrorWithIDf(log, obNode.nodeID, "Collection: failed to remove product %s from collections: %v", slug, err)
+				}
+			}
+		}
+	}
+
+	logger.LogInfoWithID(log, obNode.nodeID, "Collection subsystem initialized")
 }
 
 // initDiscountSubsystem initializes the per-node discount subsystem:

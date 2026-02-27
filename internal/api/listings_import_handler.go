@@ -40,7 +40,7 @@ var columnsEN = map[string]int{
 	"pricingCurrency":    3,
 	"description":        4,
 	"shortDescription":   5,
-	"categories":         6,
+	"productType":        6,
 	"tags":               7,
 	"condition":          8,
 	"nsfw":               9,
@@ -124,7 +124,7 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 	if lang == "en" {
 		headers := []string{
 			"title", "contractType", "price", "pricingCurrency", "description",
-			"shortDescription", "categories", "tags", "condition", "nsfw",
+			"shortDescription", "productType", "tags", "condition", "nsfw",
 			"images", "introVideo", "processingTime", "grams", "termsAndConditions", "refundPolicy",
 		}
 		for i, h := range headers {
@@ -528,7 +528,7 @@ func (g *Gateway) normalizeColumnName(name string, lang string) string {
 		"定价货币":  "pricingCurrency",
 		"详细描述":  "description",
 		"简短描述":  "shortDescription",
-		"分类":    "categories",
+		"产品分类":  "productType",
 		"标签":    "tags",
 		"商品状态":  "condition",
 		"成人内容":  "nsfw",
@@ -583,15 +583,8 @@ func (g *Gateway) parseListingRow(row []string, columns map[string]int, lang str
 		}
 	}
 
-	// Parse categories and tags
-	categoriesStr := g.getCellValue(row, columns["categories"])
-	var categories []string
-	if categoriesStr != "" {
-		categories = strings.Split(categoriesStr, ",")
-		for i := range categories {
-			categories[i] = strings.TrimSpace(categories[i])
-		}
-	}
+	// Parse productType and tags
+	productType := strings.TrimSpace(g.getCellValue(row, columns["productType"]))
 
 	tagsStr := g.getCellValue(row, columns["tags"])
 	var tags []string
@@ -620,7 +613,7 @@ func (g *Gateway) parseListingRow(row []string, columns map[string]int, lang str
 			Condition:        g.getCellValue(row, columns["condition"]),
 			ProcessingTime:   g.getCellValue(row, columns["processingTime"]),
 			Nsfw:             nsfw,
-			Categories:       categories,
+			ProductType:      productType,
 			Tags:             tags,
 			Grams:            grams,
 		},
@@ -985,7 +978,7 @@ type JSONListingInput struct {
 	PricingCurrency    string             `json:"pricingCurrency"`
 	Description        string             `json:"description"`
 	ShortDescription   string             `json:"shortDescription"`
-	Categories         []string           `json:"categories"`
+	ProductType        string             `json:"productType"`
 	Tags               []string           `json:"tags"`
 	Condition          string             `json:"condition"`
 	NSFW               bool               `json:"nsfw"`
@@ -1278,7 +1271,7 @@ func (g *Gateway) parseJSONListing(input JSONListingInput) (*pb.Listing, error) 
 			Condition:        input.Condition,
 			ProcessingTime:   input.ProcessingTime,
 			Nsfw:             input.NSFW,
-			Categories:       input.Categories,
+			ProductType:      input.ProductType,
 			Tags:             input.Tags,
 			Grams:            input.Grams,
 		},

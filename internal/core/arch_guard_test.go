@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -94,6 +95,60 @@ func TestArchGuard_ModelsDoNotImportInternal(t *testing.T) {
 	assert.Empty(t, violations,
 		"pkg/models/ must not import internal/ — "+
 			"models are shared data structures; found: %v", violations)
+}
+
+func TestArchGuard_CollectionServiceInterface(t *testing.T) {
+	// Compile-time verification that CollectionAppService implements CollectionService.
+	// If this test compiles, the contract is satisfied.
+	var _ contracts.CollectionService = (*CollectionAppService)(nil)
+}
+
+func TestArchGuard_CollectionRoutesFollowConvention(t *testing.T) {
+	root := repoRoot(t)
+	routesFile := filepath.Join(root, "internal", "api", "routes.go")
+	data, err := os.ReadFile(routesFile)
+	require.NoError(t, err)
+
+	var violations []string
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.Contains(line, "/v1/collections") {
+			continue
+		}
+		// Extract path from route registration like: "/v1/collections/{collectionID}/products"
+		startIdx := strings.Index(line, `"/v1/collections`)
+		if startIdx < 0 {
+			continue
+		}
+		endIdx := strings.Index(line[startIdx+1:], `"`)
+		if endIdx < 0 {
+			continue
+		}
+		path := line[startIdx+1 : startIdx+1+endIdx]
+
+		// Check for camelCase segments (lowercase letter immediately followed by uppercase)
+		for i := 0; i < len(path)-1; i++ {
+			if path[i] >= 'a' && path[i] <= 'z' && path[i+1] >= 'A' && path[i+1] <= 'Z' {
+				// Skip mux variables like {collectionID}
+				if strings.Contains(path, "{") {
+					braceStart := strings.LastIndex(path[:i+1], "{")
+					braceEnd := strings.Index(path[i:], "}")
+					if braceStart >= 0 && braceEnd >= 0 {
+						continue
+					}
+				}
+				violations = append(violations, path)
+				break
+			}
+		}
+
+		// Check for /ob/ prefix (legacy, forbidden)
+		if strings.Contains(path, "/ob/") {
+			violations = append(violations, path+" (contains /ob/)")
+		}
+	}
+	assert.Empty(t, violations,
+		"Collection routes must use kebab-case, no camelCase segments; found: %v", violations)
 }
 
 func TestArchGuard_QueriesDoNotImportInternal(t *testing.T) {

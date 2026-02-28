@@ -35,6 +35,10 @@ func NewDiscountAppService(store contracts.DiscountStore, tenantID string) *Disc
 	}
 }
 
+func (s *DiscountAppService) Store() contracts.DiscountStore {
+	return s.store
+}
+
 func (s *DiscountAppService) CreateDiscount(ctx context.Context, d *models.Discount) error {
 	if err := s.validateDiscount(d); err != nil {
 		return err

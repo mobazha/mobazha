@@ -101,6 +101,7 @@ type Purchase struct {
 	Items                []PurchaseItem `json:"items"`
 	AlternateContactInfo string         `json:"alternateContactInfo"`
 	PricingCoin          string         `json:"pricingCoin"`
+	DiscountCodes        []string       `json:"discountCodes,omitempty"`
 }
 
 type PaymentData struct {

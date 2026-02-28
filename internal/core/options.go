@@ -297,6 +297,15 @@ func (n *MobazhaNode) initOrderService() {
 		RelayInstructions: func(orderID string, coinType iwallet.CoinType, instructions any) (string, error) {
 			return n.paymentService.RelayInstructions(orderID, coinType, instructions)
 		},
+		DiscountService: func() contracts.DiscountService {
+			return n.discountService
+		},
+		DiscountStore: func() contracts.DiscountStore {
+			if n.discountService != nil {
+				return n.discountService.Store()
+			}
+			return nil
+		},
 	})
 }
 

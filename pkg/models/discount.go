@@ -79,9 +79,9 @@ type Discount struct {
 	UsageLimit           int                     `json:"usageLimit" gorm:"column:usage_limit;type:integer;not null;default:0"`
 	UsageCount           int                     `json:"usageCount" gorm:"column:usage_count;type:integer;not null;default:0"`
 	PerCustomerLimit     int                     `json:"perCustomerLimit" gorm:"column:per_customer_limit;type:integer;not null;default:0"`
-	CombinesWithProduct  bool                    `json:"combinesWithProduct" gorm:"column:combines_with_product;type:integer;not null;default:1"`
-	CombinesWithOrder    bool                    `json:"combinesWithOrder" gorm:"column:combines_with_order;type:integer;not null;default:0"`
-	CombinesWithShipping bool                    `json:"combinesWithShipping" gorm:"column:combines_with_shipping;type:integer;not null;default:1"`
+	CombinesWithProduct  bool                    `json:"combinesWithProduct" gorm:"column:combines_with_product;not null;default:true"`
+	CombinesWithOrder    bool                    `json:"combinesWithOrder" gorm:"column:combines_with_order;not null;default:false"`
+	CombinesWithShipping bool                    `json:"combinesWithShipping" gorm:"column:combines_with_shipping;not null;default:true"`
 	StartsAt             time.Time               `json:"startsAt" gorm:"column:starts_at;not null"`
 	EndsAt               *time.Time              `json:"endsAt,omitempty" gorm:"column:ends_at"`
 	DeletedAt            *time.Time              `json:"deletedAt,omitempty" gorm:"column:deleted_at;index"`
@@ -97,6 +97,7 @@ func (Discount) TableName() string { return "discounts" }
 // One Discount can have multiple codes (e.g. batch-generated one-time codes).
 type DiscountCode struct {
 	ID         string    `json:"id" gorm:"primaryKey;type:text"`
+	TenantID   string    `json:"-" gorm:"column:tenant_id;type:text;not null;default:'_default'"`
 	DiscountID string    `json:"discountID" gorm:"column:discount_id;type:text;not null;index"`
 	Code       string    `json:"code" gorm:"type:text;not null"`
 	CodeHash   string    `json:"-" gorm:"column:code_hash;type:text;not null;uniqueIndex"`
@@ -110,6 +111,7 @@ func (DiscountCode) TableName() string { return "discount_codes" }
 // DiscountRedemption records a single use of a discount on an order.
 type DiscountRedemption struct {
 	ID             string    `json:"id" gorm:"primaryKey;type:text"`
+	TenantID       string    `json:"-" gorm:"column:tenant_id;type:text;not null;default:'_default'"`
 	DiscountID     string    `json:"discountID" gorm:"column:discount_id;type:text;not null;index"`
 	CodeID         *string   `json:"codeID,omitempty" gorm:"column:code_id;type:text"`
 	OrderID        string    `json:"orderID" gorm:"column:order_id;type:text;not null;index"`

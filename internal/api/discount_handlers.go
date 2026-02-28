@@ -124,6 +124,7 @@ func (g *Gateway) handleUpdateDiscount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	savedTenantID := existing.TenantID
 	savedUsageCount := existing.UsageCount
 	savedCodes := existing.Codes
 	savedCreatedAt := existing.CreatedAt
@@ -133,6 +134,7 @@ func (g *Gateway) handleUpdateDiscount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	existing.ID = id
+	existing.TenantID = savedTenantID
 	existing.UsageCount = savedUsageCount
 	existing.Codes = savedCodes
 	existing.CreatedAt = savedCreatedAt

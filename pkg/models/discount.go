@@ -60,7 +60,7 @@ const (
 // Discount is the core discount entity, independent of any listing.
 type Discount struct {
 	ID                   string                  `json:"id" gorm:"primaryKey;type:text"`
-	TenantID             string                  `json:"tenantID" gorm:"column:tenant_id;type:text;not null;default:'_default'"`
+	TenantID             string                  `json:"-" gorm:"column:tenant_id;type:text;not null;default:'_default'"`
 	Title                string                  `json:"title" gorm:"type:text;not null"`
 	Description          string                  `json:"description,omitempty" gorm:"type:text"`
 	Method               DiscountMethod          `json:"method" gorm:"type:text;not null"`

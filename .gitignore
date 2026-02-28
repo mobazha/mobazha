@@ -29,6 +29,10 @@ _testmain.go
 .gx/
 dist
 
+# Compiled binaries
+/mobazha
+/mobazha3.0
+
 # Development environment files
 .ackrc
 .vscode

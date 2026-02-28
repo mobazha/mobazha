@@ -143,6 +143,9 @@ type MobazhaNode struct {
 	// collectionService encapsulates collection business logic (CRUD, product management).
 	collectionService *CollectionAppService
 
+	// fiatPaymentService orchestrates fiat payment operations (Stripe, PayPal).
+	fiatPaymentService *FiatPaymentAppService
+
 	// eventDispatcher is the unified EventBus subscriber that fans out events
 	// to NotificationSink, WebhookSink, and ChannelNotificationSink.
 	eventDispatcher *events.Dispatcher

@@ -33,8 +33,13 @@ func (n *MobazhaNode) Media() contracts.MediaService               { return n.me
 func (n *MobazhaNode) Matrix() contracts.MatrixService             { return n.matrixService }
 func (n *MobazhaNode) Preferences() contracts.PreferencesService   { return n.preferencesService }
 func (n *MobazhaNode) ShoppingCart() contracts.ShoppingCartService  { return n.shoppingCartService }
+// Deprecated: Stripe returns the legacy StripeService backed by PaymentAppService.
+// New code should use FiatPaymentProviderAccessor via type assertion instead.
 func (n *MobazhaNode) Stripe() contracts.StripeService             { return n.paymentService }
 func (n *MobazhaNode) ExchangeRate() contracts.ExchangeRateService { return &exchangeRateAdapter{n.exchangeRates} }
+
+// FiatPaymentProviderAccessor implementation — generic fiat payment subsystem.
+func (n *MobazhaNode) Fiat() contracts.FiatService { return n.fiatPaymentService }
 
 // WebhookProvider implementation — per-node webhook subsystem.
 func (n *MobazhaNode) WebhookStore() wh.EndpointStore { return n.webhookStore }
@@ -170,3 +175,6 @@ func (a *identityInfoAdapter) IsGlobalBanned(peerID peer.ID) bool {
 	}
 	return a.listingService.IsGlobalBanned(peerID)
 }
+
+// Compile-time checks for optional accessor interfaces.
+var _ contracts.FiatPaymentProviderAccessor = (*MobazhaNode)(nil)

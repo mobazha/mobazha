@@ -1040,33 +1040,10 @@ func Test_validateListing(t *testing.T) {
 			valid: false,
 		},
 		{
-			// Too many categories
+			// ProductType too long
 			listing: factory.NewSignedListing(),
 			transform: func(sl *pb.SignedListing) {
-				sl.Listing.Item.Categories = []string{}
-				for i := 0; i < MaxListItems+1; i++ {
-					sl.Listing.Item.Categories = append(sl.Listing.Item.Categories, "asdf")
-				}
-			},
-			valid: false,
-		},
-		{
-			// Category is ""
-			listing: factory.NewSignedListing(),
-			transform: func(sl *pb.SignedListing) {
-				sl.Listing.Item.Categories = []string{
-					"",
-				}
-			},
-			valid: false,
-		},
-		{
-			// Category too long (validation limit is WordMaxCharacters*2)
-			listing: factory.NewSignedListing(),
-			transform: func(sl *pb.SignedListing) {
-				sl.Listing.Item.Categories = []string{
-					strings.Repeat("s", WordMaxCharacters*2+1),
-				}
+				sl.Listing.Item.ProductType = strings.Repeat("s", WordMaxCharacters*2+1)
 			},
 			valid: false,
 		},

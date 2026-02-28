@@ -24,14 +24,16 @@ const (
 )
 
 type DiscountAppService struct {
-	store    contracts.DiscountStore
-	tenantID string
+	store           contracts.DiscountStore
+	collectionStore contracts.CollectionStore
+	tenantID        string
 }
 
-func NewDiscountAppService(store contracts.DiscountStore, tenantID string) *DiscountAppService {
+func NewDiscountAppService(store contracts.DiscountStore, collectionStore contracts.CollectionStore, tenantID string) *DiscountAppService {
 	return &DiscountAppService{
-		store:    store,
-		tenantID: tenantID,
+		store:           store,
+		collectionStore: collectionStore,
+		tenantID:        tenantID,
 	}
 }
 
@@ -201,7 +203,7 @@ func (s *DiscountAppService) RecordRedemption(ctx context.Context, discountID st
 
 // CalculateDiscounts performs server-side discount calculation using DiscountEngine.
 func (s *DiscountAppService) CalculateDiscounts(ctx context.Context, req contracts.CalculateDiscountsRequest) (*contracts.CalculateDiscountsResult, error) {
-	engine := NewDiscountEngine(s, s.store)
+	engine := NewDiscountEngine(s, s.store, s.collectionStore)
 
 	subtotal := new(big.Int)
 	if _, ok := subtotal.SetString(req.Subtotal, 10); !ok {

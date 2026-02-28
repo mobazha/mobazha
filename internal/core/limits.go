@@ -9,8 +9,8 @@ const (
 	DescriptionMaxCharacters = 50000
 	// MaxTags - max permitted tags
 	MaxTags = 10
-	// MaxCategories - max permitted categories
-	MaxCategories = 10
+	// MaxProductTypeLength - max length for productType string
+	MaxProductTypeLength = WordMaxCharacters * 2
 	// MaxListItems - max items in a listing
 	MaxListItems = 30
 	// FilenameMaxCharacters - max filename size

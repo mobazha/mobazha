@@ -18,4 +18,5 @@ func (NodeSettings) TableName() string { return "node_settings" }
 const (
 	SettingsKeyNotificationChannels = "notification_channels"
 	SettingsKeyAIConfig             = "ai_config"
+	SettingsKeyStoreConfig          = "store_config"
 )

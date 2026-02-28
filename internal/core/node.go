@@ -634,6 +634,20 @@ func (n *MobazhaNode) SaveAIConfig(cfg aipkg.Config) error {
 	return n.saveSetting(models.SettingsKeyAIConfig, string(data))
 }
 
+// StoreConfig reads the storefront branding config from the database.
+func (n *MobazhaNode) StoreConfig() (json.RawMessage, error) {
+	val, err := n.getSetting(models.SettingsKeyStoreConfig)
+	if err != nil || val == "" {
+		return nil, nil
+	}
+	return json.RawMessage(val), nil
+}
+
+// SaveStoreConfig persists the storefront branding config.
+func (n *MobazhaNode) SaveStoreConfig(cfg json.RawMessage) error {
+	return n.saveSetting(models.SettingsKeyStoreConfig, string(cfg))
+}
+
 // getSetting reads a single key from the node_settings table.
 func (n *MobazhaNode) getSetting(key string) (string, error) {
 	var setting models.NodeSettings

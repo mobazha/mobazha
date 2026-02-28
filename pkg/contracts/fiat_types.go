@@ -33,6 +33,7 @@ type PaymentSession struct {
 	CaptureMode CaptureMode `json:"captureMode"`
 	ExpiresAt   time.Time   `json:"expiresAt"`
 	Status      string      `json:"status"`
+	ApproveURL  string      `json:"approveURL,omitempty"` // PayPal: URL for buyer to approve the order
 
 	Stripe *StripeSessionData `json:"stripe,omitempty"`
 	PayPal *PayPalSessionData `json:"paypal,omitempty"`

@@ -64,6 +64,7 @@ func (g *Gateway) handlePOSTFiatPayment(w http.ResponseWriter, r *http.Request) 
 		Currency    string `json:"currency"`
 		Description string `json:"description"`
 		ReturnURL   string `json:"returnURL"`
+		CancelURL   string `json:"cancelURL"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
@@ -80,6 +81,7 @@ func (g *Gateway) handlePOSTFiatPayment(w http.ResponseWriter, r *http.Request) 
 		Currency:    req.Currency,
 		Description: req.Description,
 		ReturnURL:   req.ReturnURL,
+		CancelURL:   req.CancelURL,
 	}
 
 	session, err := svc.CreatePayment(r.Context(), providerID, params)

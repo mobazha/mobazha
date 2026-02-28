@@ -7,6 +7,7 @@ import (
 
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/internal/payment/fiat/paypal"
 	"github.com/mobazha/mobazha3.0/internal/payment/fiat/stripe"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -405,6 +406,15 @@ func (s *FiatPaymentAppService) registerProviderFromConfig(providerID, secretKey
 		})
 		s.registry.Register(p)
 		logger.LogInfoWithIDf(log, s.nodeID, "registered Stripe provider (direct mode)")
+	case "paypal":
+		p := paypal.NewProvider(paypal.Config{
+			ClientID:     publishableKey,
+			ClientSecret: secretKey,
+			WebhookID:    webhookSecret,
+			Mode:         paypal.ModeDirect,
+		})
+		s.registry.Register(p)
+		logger.LogInfoWithIDf(log, s.nodeID, "registered PayPal provider (direct mode)")
 	default:
 		logger.LogErrorWithIDf(log, s.nodeID, "unknown fiat provider %q, cannot register", providerID)
 	}

@@ -70,6 +70,11 @@ func init() {
 		// ── Shopping cart (WebSocket only) ──
 		{Category: "cart", Name: "cart.updated", Sample: new(ShoppingCartUpdate)},
 
+		// ── Shipping events (WebSocket only) ──
+		{Category: "shipping", Name: "shipping.profile_updated", Sample: new(ShippingProfileUpdated)},
+		{Category: "shipping", Name: "shipping.profile_deleted", Sample: new(ShippingProfileDeleted)},
+		{Category: "shipping", Name: "shipping.snapshots_refreshed", Sample: new(ShippingSnapshotsRefreshed)},
+
 		// ── Payment events (persistent + WebSocket) ──
 		{Category: "payment", Name: "payment.locked", Persistent: true, Sample: new(PaymentLockedReceived)},
 		{Category: "payment", Name: "payment.expired", Persistent: true, Sample: new(PaymentExpiredNotification)},

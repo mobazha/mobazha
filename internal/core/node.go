@@ -140,6 +140,9 @@ type MobazhaNode struct {
 	// discountService encapsulates discount business logic (CRUD, validation, codes).
 	discountService *DiscountAppService
 
+	// shippingService encapsulates shipping profile and location management.
+	shippingService *ShippingAppService
+
 	// eventDispatcher is the unified EventBus subscriber that fans out events
 	// to NotificationSink, WebhookSink, and ChannelNotificationSink.
 	eventDispatcher *events.Dispatcher

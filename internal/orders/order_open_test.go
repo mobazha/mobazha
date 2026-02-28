@@ -268,9 +268,9 @@ func TestCalculateOrderTotal(t *testing.T) {
 			expectedTotal: iwallet.NewAmount("9152406"),
 		},
 		{
-			// Additional item shipping (FirstFreight="20" is same as factory default, so same as Quantity 2 test)
+			// Additional item shipping (Price="20" is same as factory default, so same as Quantity 2 test)
 			transform: func(order *pb.OrderOpen) error {
-				order.Listings[0].Listing.ShippingOptions[0].Services[0].FirstFreight = "20"
+				order.Listings[0].Listing.ShippingProfile.LocationGroups[0].Zones[0].Rates[0].Price = "20"
 				hash, err := utils.HashListing(order.Listings[0])
 				if err != nil {
 					return err
@@ -286,7 +286,7 @@ func TestCalculateOrderTotal(t *testing.T) {
 			transform: func(order *pb.OrderOpen) error {
 				order.Listings = append(order.Listings, order.Listings[0])
 				order.Listings[1].Listing.Item.Title = "abc"
-				order.Listings[1].Listing.ShippingOptions[0].Services[0].FirstFreight = "30"
+				order.Listings[1].Listing.ShippingProfile.LocationGroups[0].Zones[0].Rates[0].Price = "30"
 				hash, err := utils.HashListing(order.Listings[1])
 				if err != nil {
 					return err
@@ -303,7 +303,7 @@ func TestCalculateOrderTotal(t *testing.T) {
 				order.Listings[0].Listing.Metadata.ContractType = pb.Listing_Metadata_CRYPTOCURRENCY
 				order.Listings[0].Listing.Metadata.Format = pb.Listing_Metadata_MARKET_PRICE
 				order.Listings[0].Listing.Item.CryptoListingCurrencyCode = "BTC"
-				order.Listings[0].Listing.ShippingOptions = nil
+				order.Listings[0].Listing.ShippingProfile = nil
 				order.Listings[0].Listing.Taxes = nil
 				hash, err := utils.HashListing(order.Listings[0])
 				if err != nil {
@@ -362,7 +362,7 @@ func TestFreeShippingThresholdUsesDiscountedSubtotal(t *testing.T) {
 			name: "taxes excluded from threshold",
 			transform: func(order *pb.OrderOpen) error {
 				order.PricingCoin = "USD"
-				order.Listings[0].Listing.ShippingOptions[0].FreeShippingThreshold = &pb.Listing_ShippingOption_FreeShippingThreshold{
+				order.Listings[0].Listing.ShippingProfile.LocationGroups[0].Zones[0].Rates[0].FreeShippingThreshold = &pb.ShippingRate_FreeShippingThreshold{
 					Enabled:   true,
 					MinAmount: "101",
 				}
@@ -379,7 +379,9 @@ func TestFreeShippingThresholdUsesDiscountedSubtotal(t *testing.T) {
 			name: "subtotal below threshold",
 			transform: func(order *pb.OrderOpen) error {
 				order.PricingCoin = "USD"
-				order.Listings[0].Listing.ShippingOptions[0].FreeShippingThreshold = &pb.Listing_ShippingOption_FreeShippingThreshold{
+				order.Listings[0].Listing.Item.Price = "50"
+				order.Listings[0].Listing.Item.Skus[0].Price = "50" // SKU price for size=large, color=red
+				order.Listings[0].Listing.ShippingProfile.LocationGroups[0].Zones[0].Rates[0].FreeShippingThreshold = &pb.ShippingRate_FreeShippingThreshold{
 					Enabled:   true,
 					MinAmount: "100",
 				}
@@ -396,7 +398,7 @@ func TestFreeShippingThresholdUsesDiscountedSubtotal(t *testing.T) {
 			name: "eligible subtotal meets threshold",
 			transform: func(order *pb.OrderOpen) error {
 				order.PricingCoin = "USD"
-				order.Listings[0].Listing.ShippingOptions[0].FreeShippingThreshold = &pb.Listing_ShippingOption_FreeShippingThreshold{
+				order.Listings[0].Listing.ShippingProfile.LocationGroups[0].Zones[0].Rates[0].FreeShippingThreshold = &pb.ShippingRate_FreeShippingThreshold{
 					Enabled:   true,
 					MinAmount: "90",
 				}
@@ -558,7 +560,7 @@ func TestShippingRegionCaseInsensitive(t *testing.T) {
 		}
 
 		// Set up shipping region and country
-		order.Listings[0].Listing.ShippingOptions[0].Regions = []string{test.shippingRegion}
+		order.Listings[0].Listing.ShippingProfile.LocationGroups[0].Zones[0].Regions = []string{test.shippingRegion}
 		order.Shipping.Country = test.shippingCountry
 		order.PricingCoin = "USD"
 
@@ -589,67 +591,81 @@ func TestSameWeightSameFeeShippingCalculation(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// rateSpec defines a weight-based shipping rate
+	type rateSpec struct {
+		name       string
+		minGrams   uint32
+		maxGrams   uint32
+		priceCents string
+	}
 	tests := []struct {
 		name            string
 		itemGrams       uint32
-		services        []*pb.Listing_ShippingOption_Service
-		expectedFreight string // Expected freight in USD cents
+		rates           []rateSpec
+		selectedRate    string // rate name that matches item weight for this test
+		expectedFreight string
 	}{
 		{
-			name:      "weight matches first range",
-			itemGrams: 100,
-			services: []*pb.Listing_ShippingOption_Service{
-				{Name: "light", StartWeight: 0, EndWeight: 500, FirstFreight: "500", RegistrationFee: "0"},
-				{Name: "medium", StartWeight: 501, EndWeight: 1000, FirstFreight: "1000", RegistrationFee: "0"},
-				{Name: "heavy", StartWeight: 1001, EndWeight: 5000, FirstFreight: "2000", RegistrationFee: "0"},
+			name:         "weight matches first range",
+			itemGrams:    100,
+			selectedRate: "light",
+			rates: []rateSpec{
+				{"light", 0, 500, "500"},
+				{"medium", 501, 1000, "1000"},
+				{"heavy", 1001, 5000, "2000"},
 			},
 			expectedFreight: "500",
 		},
 		{
-			name:      "weight matches second range",
-			itemGrams: 800,
-			services: []*pb.Listing_ShippingOption_Service{
-				{Name: "light", StartWeight: 0, EndWeight: 500, FirstFreight: "500", RegistrationFee: "0"},
-				{Name: "medium", StartWeight: 501, EndWeight: 1000, FirstFreight: "1000", RegistrationFee: "0"},
-				{Name: "heavy", StartWeight: 1001, EndWeight: 5000, FirstFreight: "2000", RegistrationFee: "0"},
+			name:         "weight matches second range",
+			itemGrams:    800,
+			selectedRate: "medium",
+			rates: []rateSpec{
+				{"light", 0, 500, "500"},
+				{"medium", 501, 1000, "1000"},
+				{"heavy", 1001, 5000, "2000"},
 			},
 			expectedFreight: "1000",
 		},
 		{
-			name:      "weight matches third range",
-			itemGrams: 2000,
-			services: []*pb.Listing_ShippingOption_Service{
-				{Name: "light", StartWeight: 0, EndWeight: 500, FirstFreight: "500", RegistrationFee: "0"},
-				{Name: "medium", StartWeight: 501, EndWeight: 1000, FirstFreight: "1000", RegistrationFee: "0"},
-				{Name: "heavy", StartWeight: 1001, EndWeight: 5000, FirstFreight: "2000", RegistrationFee: "0"},
+			name:         "weight matches third range",
+			itemGrams:    2000,
+			selectedRate: "heavy",
+			rates: []rateSpec{
+				{"light", 0, 500, "500"},
+				{"medium", 501, 1000, "1000"},
+				{"heavy", 1001, 5000, "2000"},
 			},
 			expectedFreight: "2000",
 		},
 		{
-			name:      "weight at boundary (inclusive end)",
-			itemGrams: 500,
-			services: []*pb.Listing_ShippingOption_Service{
-				{Name: "light", StartWeight: 0, EndWeight: 500, FirstFreight: "500", RegistrationFee: "0"},
-				{Name: "medium", StartWeight: 501, EndWeight: 1000, FirstFreight: "1000", RegistrationFee: "0"},
+			name:         "weight at boundary (inclusive end)",
+			itemGrams:    500,
+			selectedRate: "light",
+			rates: []rateSpec{
+				{"light", 0, 500, "500"},
+				{"medium", 501, 1000, "1000"},
 			},
 			expectedFreight: "500",
 		},
 		{
-			name:      "weight at boundary (inclusive start)",
-			itemGrams: 501,
-			services: []*pb.Listing_ShippingOption_Service{
-				{Name: "light", StartWeight: 0, EndWeight: 500, FirstFreight: "500", RegistrationFee: "0"},
-				{Name: "medium", StartWeight: 501, EndWeight: 1000, FirstFreight: "1000", RegistrationFee: "0"},
+			name:         "weight at boundary (inclusive start)",
+			itemGrams:    501,
+			selectedRate: "medium",
+			rates: []rateSpec{
+				{"light", 0, 500, "500"},
+				{"medium", 501, 1000, "1000"},
 			},
 			expectedFreight: "1000",
 		},
 		{
-			name:      "with registration fee",
-			itemGrams: 100,
-			services: []*pb.Listing_ShippingOption_Service{
-				{Name: "standard", StartWeight: 0, EndWeight: 1000, FirstFreight: "500", RegistrationFee: "100"},
+			name:         "with registration fee",
+			itemGrams:    100,
+			selectedRate: "standard",
+			rates: []rateSpec{
+				{"standard", 0, 1000, "600"}, // 500 + 100
 			},
-			expectedFreight: "600", // 500 + 100
+			expectedFreight: "600",
 		},
 	}
 
@@ -659,15 +675,50 @@ func TestSameWeightSameFeeShippingCalculation(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Configure listing for SAME_WEIGHT_SAME_FEE
+		// Build ShippingProfile with weight-based rates
+		pbRates := make([]*pb.ShippingRate, len(test.rates))
+		for i, r := range test.rates {
+			pbRates[i] = &pb.ShippingRate{
+				Id:       "rate-" + r.name,
+				Name:     r.name,
+				Price:    r.priceCents,
+				Currency: "USD",
+				Condition: &pb.ShippingRate_RateCondition{
+					Type:     pb.ShippingRate_RateCondition_WEIGHT,
+					MinValue: r.minGrams,
+					MaxValue: r.maxGrams,
+				},
+			}
+		}
+		profile := &pb.ShippingProfile{
+			ProfileID: "weight-profile",
+			Name:      "Weight Based",
+			IsDefault: true,
+			LocationGroups: []*pb.LocationGroup{
+				{
+					Id: "default",
+					Zones: []*pb.ShippingZone{
+						{
+							Id:      "zone-1",
+							Name:    "Worldwide",
+							Regions: []string{"ALL"},
+							Rates:   pbRates,
+						},
+					},
+				},
+			},
+		}
+
 		order.Listings[0].Listing.Item.Grams = test.itemGrams
-		order.Listings[0].Listing.ShippingOptions[0].ServiceType = pb.Listing_ShippingOption_SAME_WEIGHT_SAME_FEE
-		order.Listings[0].Listing.ShippingOptions[0].Services = test.services
-		order.Listings[0].Listing.Taxes = nil // Remove taxes for cleaner test
+		order.Listings[0].Listing.ShippingProfile = profile
+		order.Listings[0].Listing.Taxes = nil
 		order.PricingCoin = "USD"
 
-		// Select first service (frontend selection, but backend should match by weight)
-		order.Items[0].ShippingOption.Service = test.services[0].Name
+		// Select the rate that matches item weight for this test case
+		order.Items[0].ShippingOption = &pb.OrderOpen_Item_ShippingOption{
+			Name:    "Worldwide",
+			Service: test.selectedRate,
+		}
 
 		hash, err := utils.HashListing(order.Listings[0])
 		if err != nil {
@@ -680,9 +731,6 @@ func TestSameWeightSameFeeShippingCalculation(t *testing.T) {
 			t.Fatalf("test %s: calculate totals error: %s", test.name, err)
 		}
 
-		// Convert expected freight to payment currency for comparison
-		// Since we're using USD pricing and MCK payment, we need to account for conversion
-		// For simplicity, just verify shipping is non-zero and reasonable
 		if totals.Shipping.Cmp(iwallet.NewAmount(0)) <= 0 {
 			t.Errorf("test %s: expected positive shipping cost but got %s", test.name, totals.Shipping.String())
 		}
@@ -1157,7 +1205,7 @@ func Test_validateOrderOpen(t *testing.T) {
 // ShippingProfile 模型测试（新版运费计算）
 // ============================================================================
 
-// makeProfileOrder 创建一个使用 ShippingProfile 的订单（清除旧版 ShippingOptions 和 Taxes）
+// makeProfileOrder 创建一个使用 ShippingProfile 的订单（清除 Taxes 简化测试）
 // 注意：所有对 listing 的修改都应在此函数内完成，因为函数末尾会重新计算 listing hash。
 // 如果调用后还需修改 listing，需要重新调用 utils.HashListing 更新 hash。
 func makeProfileOrder(profile *pb.ShippingProfile, zoneName, rateName string) (*pb.OrderOpen, error) {
@@ -1171,8 +1219,7 @@ func makeProfileOrderWithIDs(profile *pb.ShippingProfile, zoneName, rateName, zo
 		return nil, err
 	}
 
-	// 替换为新版 ShippingProfile，清除旧版
-	order.Listings[0].Listing.ShippingOptions = nil
+	// 替换为新版 ShippingProfile
 	order.Listings[0].Listing.ShippingProfile = profile
 	// 清除 Taxes 简化测试（避免测试后修改 listing 导致 hash 不匹配）
 	order.Listings[0].Listing.Taxes = nil
@@ -1732,53 +1779,6 @@ func TestValidateShippingFromProfile(t *testing.T) {
 	}
 }
 
-func TestValidateShippingFromLegacy(t *testing.T) {
-	options := []*pb.Listing_ShippingOption{
-		{
-			Name: "USPS",
-			Services: []*pb.Listing_ShippingOption_Service{
-				{Name: "standard"},
-				{Name: "priority"},
-			},
-		},
-		{
-			Name: "FedEx",
-			Services: []*pb.Listing_ShippingOption_Service{
-				{Name: "ground"},
-			},
-		},
-	}
-
-	tests := []struct {
-		name    string
-		option  string
-		service string
-		wantErr bool
-	}{
-		{name: "valid usps standard", option: "USPS", service: "standard", wantErr: false},
-		{name: "valid usps priority", option: "USPS", service: "priority", wantErr: false},
-		{name: "valid fedex ground", option: "FedEx", service: "ground", wantErr: false},
-		{name: "case insensitive option", option: "usps", service: "standard", wantErr: false},
-		{name: "case insensitive service", option: "USPS", service: "STANDARD", wantErr: false},
-		{name: "option not found", option: "DHL", service: "standard", wantErr: true},
-		{name: "service not found", option: "USPS", service: "overnight", wantErr: true},
-		{name: "service from wrong option", option: "FedEx", service: "priority", wantErr: true},
-	}
-
-	for _, test := range tests {
-		err := validateShippingFromLegacy(options, &pb.OrderOpen_Item_ShippingOption{
-			Name:    test.option,
-			Service: test.service,
-		})
-		if test.wantErr && err == nil {
-			t.Errorf("test %s: expected error but got nil", test.name)
-		}
-		if !test.wantErr && err != nil {
-			t.Errorf("test %s: unexpected error: %s", test.name, err)
-		}
-	}
-}
-
 // ============================================================================
 // LocationGroups 模式测试（多仓库配送）
 // ============================================================================
@@ -1794,8 +1794,7 @@ func makeLocationGroupProfileOrderWithIDs(profile *pb.ShippingProfile, zoneName,
 		return nil, err
 	}
 
-	// 替换为新版 ShippingProfile（使用 LocationGroups 模式，无直接 Zones）
-	order.Listings[0].Listing.ShippingOptions = nil
+	// 替换为新版 ShippingProfile（使用 LocationGroups 模式）
 	order.Listings[0].Listing.ShippingProfile = profile
 	order.Listings[0].Listing.Taxes = nil
 

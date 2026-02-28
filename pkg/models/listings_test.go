@@ -153,13 +153,21 @@ func TestNewListingMetadataFromListing(t *testing.T) {
 				Code: "BTC",
 			},
 		},
-		ShippingOptions: []*pb.Listing_ShippingOption{
-			{
-				Regions: []string{"AL"},
-				Services: []*pb.Listing_ShippingOption_Service{
-					{
-						Name:         "asdf",
-						FirstFreight: "0",
+		ShippingProfile: &pb.ShippingProfile{
+			ProfileID: "test-profile",
+			Name:      "Test Shipping",
+			LocationGroups: []*pb.LocationGroup{
+				{
+					Id: "lg-1",
+					Zones: []*pb.ShippingZone{
+						{
+							Id:      "zone-al",
+							Name:    "AL Shipping",
+							Regions: []string{"AL"},
+							Rates: []*pb.ShippingRate{
+								{Id: "rate-1", Name: "asdf", Price: "0", Currency: "USD"},
+							},
+						},
 					},
 				},
 			},

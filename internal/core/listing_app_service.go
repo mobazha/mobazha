@@ -45,6 +45,8 @@ import (
 // FetchIPNSRecordFunc, UpdateAndSaveProfileFunc are declared in other app service files.
 // No new type aliases needed here.
 
+var _ contracts.ListingPublisher = (*ListingAppService)(nil)
+
 // ListingAppService encapsulates listing CRUD, validation, signing, and network sync.
 type ListingAppService struct {
 	db                 database.Database
@@ -62,6 +64,8 @@ type ListingAppService struct {
 	fetchIPNSRecord       FetchIPNSRecordFunc
 	getMyProfile          GetMyProfileFunc
 	updateAndSaveProfile  UpdateAndSaveProfileFunc
+
+	shippingStore contracts.ShippingStore
 }
 
 type ListingAppServiceConfig struct {
@@ -80,6 +84,8 @@ type ListingAppServiceConfig struct {
 	FetchIPNSRecord       FetchIPNSRecordFunc
 	GetMyProfile          GetMyProfileFunc
 	UpdateAndSaveProfile  UpdateAndSaveProfileFunc
+
+	ShippingStore contracts.ShippingStore
 }
 
 func NewListingAppService(cfg ListingAppServiceConfig) *ListingAppService {
@@ -98,11 +104,53 @@ func NewListingAppService(cfg ListingAppServiceConfig) *ListingAppService {
 		fetchIPNSRecord:    cfg.FetchIPNSRecord,
 		getMyProfile:       cfg.GetMyProfile,
 		updateAndSaveProfile: cfg.UpdateAndSaveProfile,
+		shippingStore:      cfg.ShippingStore,
 	}
+}
+
+// SetShippingStore allows late injection of the ShippingStore, useful when the
+// shipping subsystem initializes after the listing service.
+func (s *ListingAppService) SetShippingStore(store contracts.ShippingStore) {
+	s.shippingStore = store
 }
 
 func (s *ListingAppService) IsGlobalBanned(peerID peer.ID) bool {
 	return s.banManager.IsGlobalBanned(peerID)
+}
+
+// resolveShippingProfile resolves the shipping profile entity for a physical listing.
+// If the listing specifies a profileID, that profile is fetched; otherwise the default
+// profile is used. Returns an error if no profile can be resolved.
+func (s *ListingAppService) resolveShippingProfile(listing *pb.Listing) (*models.ShippingProfileEntity, error) {
+	if s.shippingStore == nil {
+		return nil, fmt.Errorf("%w: shipping subsystem not initialized", coreiface.ErrBadRequest)
+	}
+	ctx := context.Background()
+
+	profileID := listing.GetShippingProfileId()
+	if profileID == "" && listing.ShippingProfile != nil {
+		profileID = listing.ShippingProfile.ProfileID
+	}
+
+	if profileID != "" {
+		entity, err := s.shippingStore.GetProfile(ctx, profileID)
+		if err != nil {
+			return nil, err
+		}
+		if entity == nil {
+			return nil, fmt.Errorf("%w: shipping profile not found: %s", coreiface.ErrNotFound, profileID)
+		}
+		return entity, nil
+	}
+
+	entity, err := s.shippingStore.GetDefaultProfile(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if entity == nil {
+		return nil, fmt.Errorf("%w: no default shipping profile configured", coreiface.ErrBadRequest)
+	}
+	return entity, nil
 }
 
 func (s *ListingAppService) SaveListing(listing *pb.Listing, done chan<- struct{}) error {
@@ -125,34 +173,16 @@ func (s *ListingAppService) SaveListing(listing *pb.Listing, done chan<- struct{
 			listing.Moderators = modStrs
 		}
 
+		var resolvedProfileID string
+		var resolvedProfileVersion int
 		if listing.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD {
-			if currentPrefs.HasShippingProfiles() {
-				var profile *models.ShippingProfile
-				if listing.ShippingProfile != nil && listing.ShippingProfile.ProfileID != "" {
-					profile, err = currentPrefs.GetShippingProfileByID(listing.ShippingProfile.ProfileID)
-					if err != nil {
-						return err
-					}
-					if profile == nil {
-						return fmt.Errorf("shipping profile not found: %s", listing.ShippingProfile.ProfileID)
-					}
-				} else {
-					profile, err = currentPrefs.GetDefaultShippingProfile()
-					if err != nil {
-						return err
-					}
-					if profile == nil {
-						return fmt.Errorf("%w: no default shipping profile configured", coreiface.ErrBadRequest)
-					}
-				}
-				listing.ShippingProfile = models.ConvertShippingProfileToProto(profile)
-			} else if listing.ShippingProfile == nil && len(listing.ShippingOptions) == 0 {
-				shippingOptions, err := currentPrefs.GetShippingOptions()
-				if err != nil {
-					return err
-				}
-				listing.ShippingOptions = models.ConvertShippingOptions(shippingOptions)
+			entity, resolveErr := s.resolveShippingProfile(listing)
+			if resolveErr != nil {
+				return resolveErr
 			}
+			listing.ShippingProfile = models.ConvertShippingEntityToProto(entity)
+			resolvedProfileID = entity.ID
+			resolvedProfileVersion = entity.Version
 		}
 
 		cid, err := s.saveListingToDB(tx, listing)
@@ -178,6 +208,23 @@ func (s *ListingAppService) SaveListing(listing *pb.Listing, done chan<- struct{
 		if err := s.updateAndSaveProfile(tx); err != nil {
 			return err
 		}
+
+		if s.shippingStore != nil && listing.Slug != "" {
+			if resolvedProfileID != "" {
+				ref := &models.ListingShippingRef{
+					ListingSlug:       listing.Slug,
+					ShippingProfileID: resolvedProfileID,
+					SnapshotVersion:   resolvedProfileVersion,
+					IsStale:           false,
+				}
+				if upsertErr := s.shippingStore.UpsertListingRef(context.Background(), ref); upsertErr != nil {
+					log.Errorf("failed to upsert shipping ref for listing %s: %v", listing.Slug, upsertErr)
+				}
+			} else {
+				_ = s.shippingStore.DeleteListingRef(context.Background(), listing.Slug)
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -208,6 +255,20 @@ func (s *ListingAppService) SaveListing(listing *pb.Listing, done chan<- struct{
 
 	s.publish(done)
 	return nil
+}
+
+// RepublishListing implements contracts.ListingPublisher.
+// It re-saves an existing listing, which triggers shipping profile snapshot refresh,
+// re-signing, and IPFS/network re-publication.
+func (s *ListingAppService) RepublishListing(ctx context.Context, slug string) error {
+	sl, err := s.GetMyListingBySlug(slug)
+	if err != nil {
+		return fmt.Errorf("get listing %s: %w", slug, err)
+	}
+	if sl.Listing == nil {
+		return fmt.Errorf("listing %s has no content", slug)
+	}
+	return s.SaveListing(sl.Listing, nil)
 }
 
 func (s *ListingAppService) UpdateAllListings(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error {
@@ -270,6 +331,11 @@ func (s *ListingAppService) DeleteListing(slugStr string, done chan<- struct{}) 
 		if err := s.updateAndSaveProfile(tx); err != nil {
 			return err
 		}
+
+		if s.shippingStore != nil {
+			_ = s.shippingStore.DeleteListingRef(context.Background(), slugStr)
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -626,10 +692,22 @@ func (s *ListingAppService) saveListingToDB(dbtx database.Tx, listing *pb.Listin
 			v.Name = sanitizer.Sanitize(v.Name)
 		}
 	}
-	for _, so := range listing.ShippingOptions {
-		so.Name = sanitizer.Sanitize(so.Name)
-		for _, serv := range so.Services {
-			serv.Name = sanitizer.Sanitize(serv.Name)
+	if listing.ShippingProfile != nil {
+		for _, lg := range listing.ShippingProfile.LocationGroups {
+			if lg == nil {
+				continue
+			}
+			for _, zone := range lg.Zones {
+				if zone == nil {
+					continue
+				}
+				zone.Name = sanitizer.Sanitize(zone.Name)
+				for _, rate := range zone.Rates {
+					if rate != nil {
+						rate.Name = sanitizer.Sanitize(rate.Name)
+					}
+				}
+			}
 		}
 	}
 
@@ -859,7 +937,7 @@ func (s *ListingAppService) validateListing(sl *pb.SignedListing) (err error) {
 		price.Cmp(big.NewInt(0)) == 0 {
 		return errors.New("zero price listings are not allowed")
 	}
-	if sl.Listing.Metadata.ContractType == pb.Listing_Metadata_CLASSIFIED && len(sl.Listing.ShippingOptions) > 0 {
+	if sl.Listing.Metadata.ContractType == pb.Listing_Metadata_CLASSIFIED && sl.Listing.ShippingProfile != nil {
 		return errors.New("classified listings can not have shipping")
 	}
 	if len(sl.Listing.Item.Title) > TitleMaxCharacters {
@@ -1178,8 +1256,8 @@ func (s *ListingAppService) validateCryptocurrencyListing(listing *pb.Listing) e
 	switch {
 	case len(listing.Item.Options) > 0:
 		return coreiface.ErrCryptocurrencyListingIllegalField("item.options")
-	case len(listing.ShippingOptions) > 0:
-		return coreiface.ErrCryptocurrencyListingIllegalField("shippingOptions")
+	case listing.ShippingProfile != nil:
+		return coreiface.ErrCryptocurrencyListingIllegalField("shippingProfile")
 	case len(listing.Item.Condition) > 0:
 		return coreiface.ErrCryptocurrencyListingIllegalField("item.condition")
 	}
@@ -1196,78 +1274,10 @@ func validatePhysicalListing(listing *pb.Listing) error {
 		return fmt.Errorf("number of options is greater than the max of %d", MaxListItems)
 	}
 
-	if listing.ShippingProfile != nil && listing.ShippingProfile.ProfileID != "" {
-		return validateShippingProfile(listing.ShippingProfile)
+	if listing.ShippingProfile == nil || listing.ShippingProfile.ProfileID == "" {
+		return coreiface.ErrMissingField("shippingProfile")
 	}
-
-	if len(listing.ShippingOptions) == 0 {
-		return coreiface.ErrMissingField("shippingoptions")
-	}
-	if len(listing.ShippingOptions) > MaxListItems {
-		return fmt.Errorf("number of shipping options is greater than the max of %d", MaxListItems)
-	}
-	var shippingTitles []string
-	for _, shippingOption := range listing.ShippingOptions {
-		if shippingOption.Name == "" {
-			return coreiface.ErrMissingField("shippingoptions.name")
-		}
-		if len(shippingOption.Name) > WordMaxCharacters {
-			return coreiface.ErrTooManyCharacters{"shippingoptions.name", strconv.Itoa(WordMaxCharacters)}
-		}
-		for _, t := range shippingTitles {
-			if t == shippingOption.Name {
-				return errors.New("shipping option titles must be unique")
-			}
-		}
-		shippingTitles = append(shippingTitles, shippingOption.Name)
-		if shippingOption.Type > pb.Listing_ShippingOption_FIXED_PRICE {
-			return errors.New("unknown shipping option type")
-		}
-		if len(shippingOption.Regions) == 0 {
-			return coreiface.ErrMissingField("shippingoptions.regions")
-		}
-		if err := validShippingRegion(shippingOption); err != nil {
-			return fmt.Errorf("invalid shipping option (%s): %s", shippingOption.String(), err.Error())
-		}
-		if len(shippingOption.Regions) > MaxCountryCodes {
-			return fmt.Errorf("number of shipping regions is greater than the max of %d", MaxCountryCodes)
-		}
-		if len(shippingOption.Services) == 0 && shippingOption.Type != pb.Listing_ShippingOption_LOCAL_PICKUP {
-			return errors.New("at least one service must be specified for a shipping option when not local pickup")
-		}
-		if len(shippingOption.Services) > MaxListItems {
-			return fmt.Errorf("number of shipping services is greater than the max of %d", MaxListItems)
-		}
-		var serviceTitles []string
-		for _, option := range shippingOption.Services {
-			if option.Name == "" {
-				return coreiface.ErrMissingField("shippingoptions.services.name")
-			}
-			if len(option.Name) > WordMaxCharacters {
-				return coreiface.ErrTooManyCharacters{"shippingoptions.services.name", strconv.Itoa(WordMaxCharacters)}
-			}
-			for _, t := range serviceTitles {
-				if t == option.Name {
-					return errors.New("shipping option services names must be unique")
-				}
-			}
-			serviceTitles = append(serviceTitles, option.Name)
-			if option.EstimatedDelivery == "" {
-				return coreiface.ErrMissingField("shippingoptions.services.estimateddelivery")
-			}
-			if len(option.EstimatedDelivery) > SentenceMaxCharacters {
-				return coreiface.ErrTooManyCharacters{"shippingoptions.services.estimateddelivery", strconv.Itoa(SentenceMaxCharacters)}
-			}
-			if len(option.FirstFreight) > WordMaxCharacters {
-				return coreiface.ErrTooManyCharacters{"shippingoptions.services.price", strconv.Itoa(WordMaxCharacters)}
-			}
-			if len(option.RenewalUnitPrice) > WordMaxCharacters {
-				return coreiface.ErrTooManyCharacters{"shippingoptions.services.price", strconv.Itoa(WordMaxCharacters)}
-			}
-		}
-	}
-
-	return nil
+	return validateShippingProfile(listing.ShippingProfile)
 }
 
 func validateMarketPriceListing(listing *pb.Listing) error {
@@ -1332,20 +1342,4 @@ func validateShippingZone(zone *pb.ShippingZone) error {
 	return nil
 }
 
-func validShippingRegion(shippingOption *pb.Listing_ShippingOption) error {
-	for _, region := range shippingOption.Regions {
-		if region == "" {
-			return coreiface.ErrMissingField("shippingoptions.regions")
-		}
-		if len(region) < 2 {
-			return fmt.Errorf("invalid shipping region code: %s (must be at least 2 characters)", region)
-		}
-		for _, c := range region {
-			if !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_') {
-				return fmt.Errorf("invalid shipping region code: %s (must contain only letters or underscores)", region)
-			}
-		}
-	}
-	return nil
-}
 

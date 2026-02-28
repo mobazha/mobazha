@@ -412,6 +412,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 		initWebhookSubsystem(obNode)
 		initDiscountSubsystem(obNode)
+		initShippingSubsystem(obNode)
 		obNode.applyOptions(nil)
 		return obNode, nil
 	}
@@ -623,6 +624,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 	initWebhookSubsystem(obNode)
 	initDiscountSubsystem(obNode)
+	initShippingSubsystem(obNode)
 
 	notifyWsFn := sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID)
 	initEventDispatcher(obNode, notifyWsFn)
@@ -1219,6 +1221,7 @@ func newLightweightNode(
 
 	initWebhookSubsystem(obNode)
 	initDiscountSubsystem(obNode)
+	initShippingSubsystem(obNode)
 	initEventDispatcher(obNode, notifyWsFn)
 
 	// ── 7. Messenger (via SNF Proxy) ─────────────────────────────────
@@ -1315,6 +1318,39 @@ func initDiscountSubsystem(obNode *MobazhaNode) {
 	store := database.NewGormDiscountStore(obNode.db)
 	obNode.discountService = NewDiscountAppService(store, obNode.nodeID)
 	logger.LogInfoWithID(log, obNode.nodeID, "Discount subsystem initialized")
+}
+
+// initShippingSubsystem initializes the per-node shipping subsystem:
+// migrates DB models, creates ShippingStore, and wires up ShippingAppService.
+// ListingPublisher is injected via closure to avoid nil receiver capture
+// (listingService may not be initialized yet at call time).
+func initShippingSubsystem(obNode *MobazhaNode) {
+	if err := database.MigrateShippingModels(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "Shipping: failed to migrate models: %v", err)
+		return
+	}
+	store := database.NewGormShippingStore(obNode.db)
+
+	if err := MigrateShippingFromPreferences(obNode.db, store); err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "Shipping: data migration failed (non-fatal): %v", err)
+	}
+
+	publisher := &lazyListingPublisher{node: obNode}
+	svc := NewShippingAppService(store, publisher)
+	svc.SetEventBus(obNode.eventBus)
+	obNode.shippingService = svc
+	logger.LogInfoWithID(log, obNode.nodeID, "Shipping subsystem initialized")
+}
+
+// lazyListingPublisher wraps MobazhaNode to implement contracts.ListingPublisher
+// using closure-style deferred evaluation. This avoids capturing a nil
+// listingService during initialization (callback-safety-rules).
+type lazyListingPublisher struct {
+	node *MobazhaNode
+}
+
+func (p *lazyListingPublisher) RepublishListing(ctx context.Context, slug string) error {
+	return p.node.listingService.RepublishListing(ctx, slug)
 }
 
 // initEventDispatcher creates the unified EventDispatcher with NotificationSink,

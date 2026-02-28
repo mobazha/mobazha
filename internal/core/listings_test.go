@@ -342,12 +342,26 @@ func Test_validateCryptocurrencyListing(t *testing.T) {
 			valid: false,
 		},
 		{
-			// Should have no shipping options
+			// Should have no shipping profile
 			listing: factory.NewCryptoListing("test-listing"),
 			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions = []*pb.Listing_ShippingOption{
-					{
-						Name: "fasdf",
+				listing.ShippingProfile = &pb.ShippingProfile{
+					ProfileID: "test-profile",
+					Name:      "Test Shipping",
+					LocationGroups: []*pb.LocationGroup{
+						{
+							Id: "lg-1",
+							Zones: []*pb.ShippingZone{
+								{
+									Id:      "zone-1",
+									Name:    "Worldwide",
+									Regions: []string{"ALL"},
+									Rates: []*pb.ShippingRate{
+										{Id: "rate-1", Name: "Standard", Price: "20", Currency: "USD"},
+									},
+								},
+							},
+						},
 					},
 				}
 			},
@@ -475,223 +489,58 @@ func Test_validatePhysicalListing(t *testing.T) {
 			valid: false,
 		},
 		{
-			// No shipping options
+			// No shipping profile
 			listing: factory.NewPhysicalListing("test-listing"),
 			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions = []*pb.Listing_ShippingOption{}
+				listing.ShippingProfile = nil
 			},
 			valid: false,
 		},
 		{
-			// Too many shipping options
+			// Shipping profile with empty ProfileID
 			listing: factory.NewPhysicalListing("test-listing"),
 			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions = []*pb.Listing_ShippingOption{}
-				for i := 0; i < MaxListItems+1; i++ {
-					listing.ShippingOptions = append(listing.ShippingOptions, &pb.Listing_ShippingOption{
-						Name: "fadsfa",
-					})
-				}
+				listing.ShippingProfile.ProfileID = ""
 			},
 			valid: false,
 		},
 		{
-			// Shipping option name is ""
+			// Shipping profile with empty LocationGroups
 			listing: factory.NewPhysicalListing("test-listing"),
 			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions[0].Name = ""
+				listing.ShippingProfile.LocationGroups = []*pb.LocationGroup{}
 			},
 			valid: false,
 		},
 		{
-			// Shipping option name too long
+			// Shipping profile with empty Zones
 			listing: factory.NewPhysicalListing("test-listing"),
 			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions[0].Name = strings.Repeat("s", WordMaxCharacters+1)
-				listing.ShippingOptions[0].Regions = []string{"AE"}
+				listing.ShippingProfile.LocationGroups[0].Zones = []*pb.ShippingZone{}
 			},
 			valid: false,
 		},
 		{
-			// Duplicate shipping region
+			// Shipping zone with empty Id
 			listing: factory.NewPhysicalListing("test-listing"),
 			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions = []*pb.Listing_ShippingOption{}
-				for i := 0; i < 2; i++ {
-					listing.ShippingOptions = append(listing.ShippingOptions, &pb.Listing_ShippingOption{
-						Name:    "fadsfa",
-						Regions: []string{"AE"},
-					})
-				}
+				listing.ShippingProfile.LocationGroups[0].Zones[0].Id = ""
 			},
 			valid: false,
 		},
 		{
-			// Shipping option type out of enum range
+			// Shipping zone with no regions
 			listing: factory.NewPhysicalListing("test-listing"),
 			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions[0].Name = "afsdf"
-				listing.ShippingOptions[0].Regions = []string{"AE"}
-				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE + 1
+				listing.ShippingProfile.LocationGroups[0].Zones[0].Regions = []string{}
 			},
 			valid: false,
 		},
 		{
-			// No regions selected
+			// Shipping zone with no rates
 			listing: factory.NewPhysicalListing("test-listing"),
 			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions[0].Name = "afsdf"
-				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Regions = []string{}
-			},
-			valid: false,
-		},
-		{
-			// Invalid country code (empty string)
-			listing: factory.NewPhysicalListing("test-listing"),
-			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions[0].Name = "afsdf"
-				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Regions = []string{""}
-			},
-			valid: false,
-		},
-		{
-			// Invalid region code (single char) - must be at least 2 characters
-			listing: factory.NewPhysicalListing("test-listing"),
-			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions[0].Name = "afsdf"
-				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Regions = []string{"X"}
-			},
-			valid: false,
-		},
-		{
-			// Too many regions
-			listing: factory.NewPhysicalListing("test-listing"),
-			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions[0].Name = "afsdf"
-				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Regions = []string{}
-				for i := 0; i < MaxCountryCodes+1; i++ {
-					listing.ShippingOptions[0].Regions = append(listing.ShippingOptions[0].Regions, "AF")
-				}
-			},
-			valid: false,
-		},
-		{
-			// No services
-			listing: factory.NewPhysicalListing("test-listing"),
-			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions[0].Name = "afsdf"
-				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Services = []*pb.Listing_ShippingOption_Service{}
-			},
-			valid: false,
-		},
-		{
-			// Too many services
-			listing: factory.NewPhysicalListing("test-listing"),
-			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions[0].Name = "afsdf"
-				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Services = []*pb.Listing_ShippingOption_Service{}
-				for i := 0; i < MaxListItems+1; i++ {
-					listing.ShippingOptions[0].Services = append(listing.ShippingOptions[0].Services, &pb.Listing_ShippingOption_Service{
-						Name: "afdsf",
-					})
-				}
-			},
-			valid: false,
-		},
-		{
-			// Name is ""
-			listing: factory.NewPhysicalListing("test-listing"),
-			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions[0].Name = "afsdf"
-				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Services = []*pb.Listing_ShippingOption_Service{
-					{
-						Name: "",
-					},
-				}
-			},
-			valid: false,
-		},
-		{
-			// Name too long
-			listing: factory.NewPhysicalListing("test-listing"),
-			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions[0].Name = "afsdf"
-				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Services = []*pb.Listing_ShippingOption_Service{
-					{
-						Name: strings.Repeat("s", WordMaxCharacters+1),
-					},
-				}
-			},
-			valid: false,
-		},
-		{
-			// Duplicate name
-			listing: factory.NewPhysicalListing("test-listing"),
-			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions[0].Name = "afsdf"
-				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Services = []*pb.Listing_ShippingOption_Service{
-					{
-						Name:              "asdf",
-						EstimatedDelivery: "adf",
-					},
-					{
-						Name: "asdf",
-					},
-				}
-			},
-			valid: false,
-		},
-		{
-			// Estimated delivery is ""
-			listing: factory.NewPhysicalListing("test-listing"),
-			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions[0].Name = "afsdf"
-				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Services = []*pb.Listing_ShippingOption_Service{
-					{
-						Name: "asdf",
-					},
-				}
-			},
-			valid: false,
-		},
-		{
-			// Estimated delivery too long
-			listing: factory.NewPhysicalListing("test-listing"),
-			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions[0].Name = "afsdf"
-				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Services = []*pb.Listing_ShippingOption_Service{
-					{
-						Name:              "asdf",
-						EstimatedDelivery: strings.Repeat("s", SentenceMaxCharacters+1),
-					},
-				}
-			},
-			valid: false,
-		},
-		{
-			// Price too long
-			listing: factory.NewPhysicalListing("test-listing"),
-			transform: func(listing *pb.Listing) {
-				listing.ShippingOptions[0].Name = "afsdf"
-				listing.ShippingOptions[0].Type = pb.Listing_ShippingOption_FIXED_PRICE
-				listing.ShippingOptions[0].Services = []*pb.Listing_ShippingOption_Service{
-					{
-						Name:              "asdf",
-						EstimatedDelivery: "asdf",
-						FirstFreight:      strings.Repeat("s", WordMaxCharacters+1),
-					},
-				}
+				listing.ShippingProfile.LocationGroups[0].Zones[0].Rates = []*pb.ShippingRate{}
 			},
 			valid: false,
 		},
@@ -1833,9 +1682,23 @@ func Test_validateListing(t *testing.T) {
 			listing: factory.NewSignedListing(),
 			transform: func(sl *pb.SignedListing) {
 				sl.Listing.Metadata.ContractType = pb.Listing_Metadata_CLASSIFIED
-				sl.Listing.ShippingOptions = []*pb.Listing_ShippingOption{
-					{
-						Name: "shipping",
+				sl.Listing.ShippingProfile = &pb.ShippingProfile{
+					ProfileID: "test-profile",
+					Name:      "Test Shipping",
+					LocationGroups: []*pb.LocationGroup{
+						{
+							Id: "lg-1",
+							Zones: []*pb.ShippingZone{
+								{
+									Id:      "zone-1",
+									Name:    "Worldwide",
+									Regions: []string{"ALL"},
+									Rates: []*pb.ShippingRate{
+										{Id: "rate-1", Name: "Standard", Price: "20", Currency: "USD"},
+									},
+								},
+							},
+						},
 					},
 				}
 			},

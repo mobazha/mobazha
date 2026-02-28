@@ -3,15 +3,12 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
-
-const maxPageSize = 100
 
 func getDiscountService(r *http.Request) (contracts.DiscountService, bool) {
 	dp, ok := getNodeService(r).(contracts.DiscountProvider)
@@ -321,17 +318,3 @@ func (g *Gateway) handleGetApplicableDiscounts(w http.ResponseWriter, r *http.Re
 	response.Success(w, summaries)
 }
 
-func intQueryParam(r *http.Request, key string, defaultVal int) int {
-	s := r.URL.Query().Get(key)
-	if s == "" {
-		return defaultVal
-	}
-	v, err := strconv.Atoi(s)
-	if err != nil || v < 1 {
-		return defaultVal
-	}
-	if key == "pageSize" && v > maxPageSize {
-		return maxPageSize
-	}
-	return v
-}

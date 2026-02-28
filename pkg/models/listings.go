@@ -168,18 +168,35 @@ func NewListingMetadataFromListing(listing *pb.Listing, cid cid.Cid) (*ListingMe
 
 	var shipsTo []string
 	var freeShipping []string
-	for _, shippingOption := range listing.ShippingOptions {
-		for _, region := range shippingOption.Regions {
-			if !contains(shipsTo, region) {
-				shipsTo = append(shipsTo, region)
+	if listing.ShippingProfile != nil {
+		for _, lg := range listing.ShippingProfile.LocationGroups {
+			if lg == nil {
+				continue
 			}
-			for _, service := range shippingOption.Services {
-				amt, success := new(big.Int).SetString(service.FirstFreight, 10)
-				if !success {
+			for _, zone := range lg.Zones {
+				if zone == nil {
 					continue
 				}
-				if amt.Cmp(big.NewInt(0)) == 0 && !contains(freeShipping, region) {
-					freeShipping = append(freeShipping, region)
+				for _, region := range zone.Regions {
+					if !contains(shipsTo, region) {
+						shipsTo = append(shipsTo, region)
+					}
+				}
+				for _, rate := range zone.Rates {
+					if rate == nil {
+						continue
+					}
+					amt, success := new(big.Int).SetString(rate.Price, 10)
+					if !success {
+						continue
+					}
+					if amt.Cmp(big.NewInt(0)) == 0 {
+						for _, region := range zone.Regions {
+							if !contains(freeShipping, region) {
+								freeShipping = append(freeShipping, region)
+							}
+						}
+					}
 				}
 			}
 		}

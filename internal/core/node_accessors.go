@@ -43,6 +43,11 @@ func (n *MobazhaNode) WebhookEngine() *wh.Engine      { return n.webhookEngine }
 // DiscountProvider implementation — per-node discount subsystem.
 func (n *MobazhaNode) Discount() contracts.DiscountService { return n.discountService }
 
+// ShippingProvider implementation — per-node shipping subsystem.
+var _ contracts.ShippingProvider = (*MobazhaNode)(nil)
+
+func (n *MobazhaNode) Shipping() contracts.ShippingService { return n.shippingService }
+
 func (n *MobazhaNode) Order() contracts.OrderService {
 	return &orderServiceFacade{
 		OrderAppService: n.orderService,

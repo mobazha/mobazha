@@ -581,6 +581,11 @@ func (n *MobazhaNode) initListingService() {
 		updateAndSaveProfile = n.profileService.UpdateAndSaveProfile
 	}
 
+	var shippingStore contracts.ShippingStore
+	if n.shippingService != nil {
+		shippingStore = n.shippingService.Store()
+	}
+
 	n.listingService = NewListingAppService(ListingAppServiceConfig{
 		DB:                   n.db,
 		Signer:               n.signer,
@@ -596,5 +601,6 @@ func (n *MobazhaNode) initListingService() {
 		FetchIPNSRecord:      n.fetchIPNSRecord,
 		GetMyProfile:         getMyProfile,
 		UpdateAndSaveProfile: updateAndSaveProfile,
+		ShippingStore:        shippingStore,
 	})
 }

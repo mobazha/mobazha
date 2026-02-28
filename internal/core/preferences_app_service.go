@@ -169,7 +169,6 @@ func (s *PreferencesAppService) SyncShippingProfilesToListings() error {
 		if l.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD {
 			if l.ShippingProfile == nil || l.ShippingProfile.ProfileID == "" {
 				l.ShippingProfile = pbDefaultProfile
-				l.ShippingOptions = nil
 				updated++
 				return true, nil
 			}
@@ -195,7 +194,6 @@ func (s *PreferencesAppService) SavePreferences(prefs *models.UserPreferences, d
 		return fmt.Errorf("%w: invalid moderator ID", coreiface.ErrBadRequest)
 	}
 
-	var shippingOptionsChanged bool
 	shippingOptions, err := prefs.GetShippingOptions()
 	if err != nil {
 		return fmt.Errorf("%w: invalid shipping options", coreiface.ErrBadRequest)
@@ -262,25 +260,6 @@ func (s *PreferencesAppService) SavePreferences(prefs *models.UserPreferences, d
 			}
 		}
 
-		shippingOptionsChanged = !bytes.Equal(prefs.ShippingOptions, currentPrefs.ShippingOptions)
-		if shippingOptionsChanged {
-			latestID := 0
-			currentOptions, _ := currentPrefs.GetShippingOptions()
-			for _, option := range currentOptions {
-				if latestID < option.ID {
-					latestID = option.ID
-				}
-			}
-
-			for i, option := range shippingOptions {
-				if option.ID <= 0 {
-					latestID += 1
-					option.ID = latestID
-					shippingOptions[i] = option
-				}
-			}
-		}
-
 		shippingProfilesChanged = !bytes.Equal(prefs.ShippingProfiles, currentPrefs.ShippingProfiles)
 
 		_, err = prefs.BlockedNodes()
@@ -309,12 +288,11 @@ func (s *PreferencesAppService) SavePreferences(prefs *models.UserPreferences, d
 		return err
 	}
 
-	if modsChanged || shippingOptionsChanged || shippingProfilesChanged {
+	if modsChanged || shippingProfilesChanged {
 		modStrs := make([]string, 0, len(mods))
 		for _, mod := range mods {
 			modStrs = append(modStrs, mod.String())
 		}
-		pbShippingOptions := models.ConvertShippingOptions(shippingOptions)
 
 		var defaultProfile *models.ShippingProfile
 		for _, profile := range shippingProfiles {
@@ -331,18 +309,13 @@ func (s *PreferencesAppService) SavePreferences(prefs *models.UserPreferences, d
 			if modsChanged {
 				l.Moderators = modStrs
 			}
-			if l.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD {
-				if shippingProfilesChanged {
-					if l.ShippingProfile != nil && l.ShippingProfile.ProfileID != "" {
-						if profile, ok := profileMap[l.ShippingProfile.ProfileID]; ok {
-							l.ShippingProfile = models.ConvertShippingProfileToProto(profile)
-						}
-					} else if defaultProfile != nil {
-						l.ShippingProfile = models.ConvertShippingProfileToProto(defaultProfile)
-						l.ShippingOptions = nil
+			if l.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD && shippingProfilesChanged {
+				if l.ShippingProfile != nil && l.ShippingProfile.ProfileID != "" {
+					if profile, ok := profileMap[l.ShippingProfile.ProfileID]; ok {
+						l.ShippingProfile = models.ConvertShippingProfileToProto(profile)
 					}
-				} else if shippingOptionsChanged && l.ShippingProfile == nil {
-					l.ShippingOptions = pbShippingOptions
+				} else if defaultProfile != nil {
+					l.ShippingProfile = models.ConvertShippingProfileToProto(defaultProfile)
 				}
 			}
 			return true, nil

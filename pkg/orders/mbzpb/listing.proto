@@ -10,7 +10,8 @@ message Listing {
     ID vendorID                             = 2;
     Metadata metadata                       = 3;
     Item item                               = 4;
-    repeated ShippingOption shippingOptions = 5;  // @deprecated: 旧版配送选项，保留以向后兼容
+    reserved 5;
+    reserved "shippingOptions";
     repeated Tax taxes                      = 6;
     reserved 7;
     reserved "coupons";
@@ -19,7 +20,8 @@ message Listing {
     string refundPolicy                     = 10;
     string status                           = 11; // "draft", "published", "private". Default is "published".
     bool featured                           = 12;
-    ShippingProfile shippingProfile         = 13; // Shopify 风格配送档案（包含完整配送信息）
+    ShippingProfile shippingProfile         = 13; // P2P/IPFS 发布时嵌入的配送档案快照
+    string shippingProfileId                = 14; // 内部引用的配送档案 ID，发布时由后端解析为快照
 
     message Metadata {
         uint32 version                     = 1;
@@ -138,47 +140,6 @@ message Listing {
             string surcharge           = 3;
             string skuID               = 4;
             repeated Image images      = 5;
-        }
-    }
-
-    message ShippingOption {
-        uint32 optionID              = 1;
-        string name                  = 2;
-        ShippingType type            = 3;
-        string currency              = 4;
-        ServiceType serviceType      = 5;
-        repeated string regions = 6;  // ISO 3166-1 alpha-2 codes: "CN", "US", "ALL"
-        repeated Service services    = 7;
-        FreeShippingThreshold freeShippingThreshold = 8;  // 满额免邮配置
-
-        enum ShippingType {
-            LOCAL_PICKUP = 0;
-            FIXED_PRICE  = 1;
-        }
-
-        enum ServiceType {
-            FIRST_RENEWAL_FEE = 0;
-            SAME_WEIGHT_SAME_FEE  = 1;
-        }
-
-        message Service {
-            string name              = 1;
-            string estimatedDelivery = 2;
-            uint32 startWeight       = 3;
-            uint32 endWeight         = 4;
-
-            uint32 firstWeight       = 5;
-            string firstFreight      = 6;
-            uint32 renewalUnitWeight = 7;
-            string renewalUnitPrice  = 8;
-
-            string registrationFee   = 9;
-        }
-
-        // 满额免邮配置
-        message FreeShippingThreshold {
-            bool enabled     = 1;  // 是否启用满额免邮
-            string minAmount = 2;  // 最低金额（最小单位）
         }
     }
 

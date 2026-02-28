@@ -41,6 +41,10 @@ func (n *MobazhaNode) ExchangeRate() contracts.ExchangeRateService { return &exc
 // FiatPaymentProviderAccessor implementation — generic fiat payment subsystem.
 func (n *MobazhaNode) Fiat() contracts.FiatService { return n.fiatPaymentService }
 
+// FiatRegistry returns the fiat provider registry for external provider registration.
+// Hosting (SaaS) uses this to register platform-level providers after node creation.
+func (n *MobazhaNode) FiatRegistry() contracts.FiatProviderRegistry { return n.fiatRegistry }
+
 // WebhookProvider implementation — per-node webhook subsystem.
 func (n *MobazhaNode) WebhookStore() wh.EndpointStore { return n.webhookStore }
 func (n *MobazhaNode) WebhookEngine() *wh.Engine      { return n.webhookEngine }
@@ -94,6 +98,13 @@ func (a *exchangeRateAdapter) GetAllRates(base models.CurrencyCode, breakCache b
 		return nil, fmt.Errorf("exchange rate provider not available")
 	}
 	return a.provider.GetAllRates(base, breakCache)
+}
+
+func (a *exchangeRateAdapter) GetRate(base models.CurrencyCode, to models.CurrencyCode, breakCache bool) (iwallet.Amount, error) {
+	if a.provider == nil {
+		return iwallet.NewAmount(0), fmt.Errorf("exchange rate provider not available")
+	}
+	return a.provider.GetRate(base, to, breakCache)
 }
 
 // listingServiceFacade composes ListingAppService + ModerationAppService

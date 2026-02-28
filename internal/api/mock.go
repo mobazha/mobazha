@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/ipfs/go-cid"
@@ -643,6 +644,18 @@ func (m *mockNode) GetAllRates(base models.CurrencyCode, breakCache bool) (map[m
 		return m.getAllRatesFunc(base, breakCache)
 	}
 	return nil, nil
+}
+
+func (m *mockNode) GetRate(base models.CurrencyCode, to models.CurrencyCode, breakCache bool) (iwallet.Amount, error) {
+	rates, err := m.GetAllRates(base, breakCache)
+	if err != nil {
+		return iwallet.NewAmount(0), err
+	}
+	amount, ok := rates[to]
+	if !ok {
+		return iwallet.NewAmount(0), fmt.Errorf("rate not found for %s -> %s", base, to)
+	}
+	return amount, nil
 }
 
 func (m *mockNode) AddPost(post *postsPb.Post, done chan<- struct{}) error {

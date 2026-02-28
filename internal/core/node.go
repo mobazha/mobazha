@@ -143,6 +143,10 @@ type MobazhaNode struct {
 	// collectionService encapsulates collection business logic (CRUD, product management).
 	collectionService *CollectionAppService
 
+	// fiatRegistry holds registered fiat payment providers. Hosting (SaaS) or
+	// node config (standalone) populates it with concrete providers.
+	fiatRegistry contracts.FiatProviderRegistry
+
 	// fiatPaymentService orchestrates fiat payment operations (Stripe, PayPal).
 	fiatPaymentService *FiatPaymentAppService
 

@@ -270,6 +270,10 @@ type ExchangeRateService interface {
 	// GetAllRates returns all exchange rates for the given base currency.
 	// If breakCache is true, forces a refresh from providers.
 	GetAllRates(base models.CurrencyCode, breakCache bool) (map[models.CurrencyCode]iwallet.Amount, error)
+
+	// GetRate returns the rate for a specific currency pair.
+	// Supports crypto-fiat, fiat-crypto, and fiat-fiat pairs.
+	GetRate(base models.CurrencyCode, to models.CurrencyCode, breakCache bool) (iwallet.Amount, error)
 }
 
 // StripeService handles Stripe payment integration.

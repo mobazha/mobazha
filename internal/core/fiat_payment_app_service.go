@@ -241,5 +241,126 @@ func (s *FiatPaymentAppService) markEventProcessed(eventID, providerID string) e
 	})
 }
 
+// --- Seller Configuration (standalone mode) ---
+
+// GetProviderConfig returns the (masked) fiat provider config for a standalone seller.
+func (s *FiatPaymentAppService) GetProviderConfig(providerID string) (*contracts.ProviderConfigView, error) {
+	var cfg models.FiatProviderConfig
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("provider_id = ?", providerID).First(&cfg).Error
+	})
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, contracts.ErrProviderNotFound
+		}
+		return nil, err
+	}
+	cfg.MaskSecrets()
+	return &contracts.ProviderConfigView{
+		ProviderID:    cfg.ProviderID,
+		AccountID:     cfg.AccountID,
+		PublicKey:     cfg.PublicKey,
+		SecretKey:     cfg.SecretKey,
+		WebhookSecret: cfg.WebhookSecret,
+		IsActive:      cfg.IsActive,
+	}, nil
+}
+
+// SaveProviderConfig stores/updates the fiat provider config (standalone mode).
+func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input contracts.ProviderConfigInput) error {
+	cfg := &models.FiatProviderConfig{
+		ProviderID:    providerID,
+		AccountID:     input.AccountID,
+		PublicKey:     input.PublicKey,
+		SecretKey:     input.SecretKey,
+		WebhookSecret: input.WebhookSecret,
+		IsActive:      true,
+	}
+	return s.db.Update(func(tx database.Tx) error {
+		return tx.Save(cfg)
+	})
+}
+
+// DeleteProviderConfig removes the fiat provider config and deactivates the receiving account.
+func (s *FiatPaymentAppService) DeleteProviderConfig(providerID string) error {
+	return s.db.Update(func(tx database.Tx) error {
+		if err := tx.Delete("provider_id", providerID, nil, &models.FiatProviderConfig{}); err != nil {
+			return err
+		}
+		chainType := "fiat:" + providerID
+		return tx.Delete("chain_type", chainType, nil, &models.ReceivingAccount{})
+	})
+}
+
+// VerifyProviderConfig tests the provider config by calling the provider's health check.
+func (s *FiatPaymentAppService) VerifyProviderConfig(providerID string) error {
+	provider, err := s.registry.ForProvider(providerID)
+	if err != nil {
+		return err
+	}
+
+	// Try getting account status as a connectivity test
+	var cfg models.FiatProviderConfig
+	if dbErr := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("provider_id = ?", providerID).First(&cfg).Error
+	}); dbErr != nil {
+		return fmt.Errorf("no config found for provider %s", providerID)
+	}
+
+	if onboarder, ok := provider.(contracts.FiatOnboardingProvider); ok && cfg.AccountID != "" {
+		_, err = onboarder.GetAccountStatus(context.Background(), cfg.AccountID)
+		return err
+	}
+	return nil
+}
+
+// GetProviderStatus returns the connection status for a specific provider.
+func (s *FiatPaymentAppService) GetProviderStatus(_ context.Context, providerID string) (*contracts.AccountStatus, error) {
+	provider, err := s.registry.ForProvider(providerID)
+	if err != nil {
+		return &contracts.AccountStatus{Status: "not_registered"}, nil
+	}
+
+	account, err := s.getActiveAccount(providerID)
+	if err != nil {
+		return &contracts.AccountStatus{Status: "not_connected"}, nil
+	}
+
+	if onboarder, ok := provider.(contracts.FiatOnboardingProvider); ok {
+		return onboarder.GetAccountStatus(context.Background(), account.Address)
+	}
+	return &contracts.AccountStatus{AccountID: account.Address, Status: "active", IsActive: true}, nil
+}
+
+// GetOnboardingURL delegates to the provider's FiatOnboardingProvider interface.
+func (s *FiatPaymentAppService) GetOnboardingURL(ctx context.Context, providerID string, params contracts.OnboardingParams) (string, error) {
+	provider, err := s.registry.ForProvider(providerID)
+	if err != nil {
+		return "", contracts.ErrProviderNotFound
+	}
+	onboarder, ok := provider.(contracts.FiatOnboardingProvider)
+	if !ok {
+		return "", fmt.Errorf("provider %s does not support onboarding", providerID)
+	}
+	return onboarder.GetOnboardingURL(ctx, params)
+}
+
+// HandleOnboardingCallback delegates to the provider, then fetches the full account status.
+func (s *FiatPaymentAppService) HandleOnboardingCallback(ctx context.Context, providerID string, params contracts.CallbackParams) (*contracts.AccountStatus, error) {
+	provider, err := s.registry.ForProvider(providerID)
+	if err != nil {
+		return nil, contracts.ErrProviderNotFound
+	}
+	onboarder, ok := provider.(contracts.FiatOnboardingProvider)
+	if !ok {
+		return nil, fmt.Errorf("provider %s does not support onboarding", providerID)
+	}
+	account, err := onboarder.HandleOnboardingCallback(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return onboarder.GetAccountStatus(ctx, account.AccountID)
+}
+
 // Compile-time check.
 var _ contracts.FiatService = (*FiatPaymentAppService)(nil)

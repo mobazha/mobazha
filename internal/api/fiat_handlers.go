@@ -174,3 +174,136 @@ func (g *Gateway) handlePOSTFiatWebhook(w http.ResponseWriter, r *http.Request) 
 
 	responsePkg.NoContent(w)
 }
+
+// --- Seller-side Fiat Provider Management ---
+
+func (g *Gateway) handleGETFiatProviderStatus(w http.ResponseWriter, r *http.Request) {
+	svc, ok := getFiatService(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Fiat payments not available")
+		return
+	}
+
+	providerID := mux.Vars(r)["providerID"]
+	if providerID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID is required")
+		return
+	}
+
+	status, err := svc.GetProviderStatus(r.Context(), providerID)
+	if err != nil {
+		if errors.Is(err, contracts.ErrProviderNotFound) {
+			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "Provider not found")
+			return
+		}
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+
+	responsePkg.Success(w, status)
+}
+
+func (g *Gateway) handleGETFiatProviderConfig(w http.ResponseWriter, r *http.Request) {
+	svc, ok := getFiatService(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Fiat payments not available")
+		return
+	}
+
+	providerID := mux.Vars(r)["providerID"]
+	if providerID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID is required")
+		return
+	}
+
+	cfg, err := svc.GetProviderConfig(providerID)
+	if err != nil {
+		if errors.Is(err, contracts.ErrProviderNotFound) {
+			responsePkg.Error(w, http.StatusNotFound, responsePkg.CodeNotFound, "Provider config not found")
+			return
+		}
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+
+	responsePkg.Success(w, cfg)
+}
+
+func (g *Gateway) handlePUTFiatProviderConfig(w http.ResponseWriter, r *http.Request) {
+	svc, ok := getFiatService(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Fiat payments not available")
+		return
+	}
+
+	providerID := mux.Vars(r)["providerID"]
+	if providerID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID is required")
+		return
+	}
+
+	var input contracts.ProviderConfigInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
+		return
+	}
+	if input.SecretKey == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "secretKey is required")
+		return
+	}
+
+	if err := svc.SaveProviderConfig(providerID, input); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+
+	view, err := svc.GetProviderConfig(providerID)
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+
+	responsePkg.Success(w, view)
+}
+
+func (g *Gateway) handlePOSTFiatProviderVerify(w http.ResponseWriter, r *http.Request) {
+	svc, ok := getFiatService(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Fiat payments not available")
+		return
+	}
+
+	providerID := mux.Vars(r)["providerID"]
+	if providerID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID is required")
+		return
+	}
+
+	if err := svc.VerifyProviderConfig(providerID); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "Provider verification failed: "+err.Error())
+		return
+	}
+
+	responsePkg.Success(w, map[string]bool{"verified": true})
+}
+
+func (g *Gateway) handleDELETEFiatProviderConfig(w http.ResponseWriter, r *http.Request) {
+	svc, ok := getFiatService(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Fiat payments not available")
+		return
+	}
+
+	providerID := mux.Vars(r)["providerID"]
+	if providerID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID is required")
+		return
+	}
+
+	if err := svc.DeleteProviderConfig(providerID); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+
+	responsePkg.NoContent(w)
+}

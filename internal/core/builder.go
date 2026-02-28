@@ -39,6 +39,7 @@ import (
 	solanaWal "github.com/mobazha/mobazha3.0/internal/multiwallet/coins/solana"
 	obnet "github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/notifications"
+	fiat "github.com/mobazha/mobazha3.0/internal/payment/fiat"
 	"github.com/mobazha/mobazha3.0/internal/notifier"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -413,6 +414,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		initWebhookSubsystem(obNode)
 		initDiscountSubsystem(obNode)
 		initCollectionSubsystem(obNode)
+		initFiatSubsystem(obNode)
 		obNode.applyOptions(nil)
 		return obNode, nil
 	}
@@ -625,6 +627,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	initWebhookSubsystem(obNode)
 	initDiscountSubsystem(obNode)
 	initCollectionSubsystem(obNode)
+	initFiatSubsystem(obNode)
 
 	notifyWsFn := sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID)
 	initEventDispatcher(obNode, notifyWsFn)
@@ -1222,6 +1225,7 @@ func newLightweightNode(
 	initWebhookSubsystem(obNode)
 	initDiscountSubsystem(obNode)
 	initCollectionSubsystem(obNode)
+	initFiatSubsystem(obNode)
 	initEventDispatcher(obNode, notifyWsFn)
 
 	// ── 7. Messenger (via SNF Proxy) ─────────────────────────────────
@@ -1334,6 +1338,19 @@ func initCollectionSubsystem(obNode *MobazhaNode) {
 	}
 
 	logger.LogInfoWithID(log, obNode.nodeID, "Collection subsystem initialized")
+}
+
+// initFiatSubsystem initializes the per-node fiat payment subsystem:
+// migrates DB models, creates FiatProviderRegistry and FiatPaymentAppService.
+// Providers are registered later by hosting (SaaS) or node config (standalone).
+func initFiatSubsystem(obNode *MobazhaNode) {
+	if err := database.MigrateFiatModels(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "Fiat: failed to migrate models: %v", err)
+		return
+	}
+	obNode.fiatRegistry = fiat.NewRegistry()
+	obNode.fiatPaymentService = NewFiatPaymentAppService(obNode.fiatRegistry, obNode.db, obNode.nodeID)
+	logger.LogInfoWithID(log, obNode.nodeID, "Fiat payment subsystem initialized")
 }
 
 // initDiscountSubsystem initializes the per-node discount subsystem:

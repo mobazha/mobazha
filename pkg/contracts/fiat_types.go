@@ -143,3 +143,21 @@ type ProviderInfo struct {
 	Status     string `json:"status"`    // "active", "not_connected", "pending", "restricted"
 	AccountID  string `json:"accountID"` // non-empty when connected
 }
+
+// ProviderConfigView is the API response for provider config (secrets masked).
+type ProviderConfigView struct {
+	ProviderID    string `json:"providerID"`
+	AccountID     string `json:"accountID,omitempty"`
+	PublicKey     string `json:"publicKey,omitempty"`
+	SecretKey     string `json:"secretKey"` // masked: "sk_l****ive"
+	WebhookSecret string `json:"webhookSecret,omitempty"` // masked: "****"
+	IsActive      bool   `json:"isActive"`
+}
+
+// ProviderConfigInput is the API request body for saving provider config.
+type ProviderConfigInput struct {
+	AccountID     string `json:"accountID"`
+	PublicKey     string `json:"publicKey"`
+	SecretKey     string `json:"secretKey"`
+	WebhookSecret string `json:"webhookSecret"`
+}

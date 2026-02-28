@@ -81,6 +81,33 @@ type FiatService interface {
 
 	// HandleWebhook processes a webhook event with idempotency guarantees.
 	HandleWebhook(ctx context.Context, providerID string, payload []byte, headers map[string]string) error
+
+	// --- Seller-side provider management (standalone mode) ---
+
+	// GetProviderConfig returns the provider config with secrets masked.
+	GetProviderConfig(providerID string) (*ProviderConfigView, error)
+
+	// SaveProviderConfig stores or updates provider API keys.
+	SaveProviderConfig(providerID string, cfg ProviderConfigInput) error
+
+	// DeleteProviderConfig removes the config and deactivates the receiving account.
+	DeleteProviderConfig(providerID string) error
+
+	// VerifyProviderConfig tests the stored config by calling the provider's health endpoint.
+	VerifyProviderConfig(providerID string) error
+
+	// GetProviderStatus returns connection status for a specific provider.
+	GetProviderStatus(ctx context.Context, providerID string) (*AccountStatus, error)
+
+	// --- SaaS onboarding (platform-level, delegates to FiatOnboardingProvider) ---
+
+	// GetOnboardingURL generates an OAuth/Account Link URL for seller onboarding.
+	// Returns ErrNotImplemented if the provider does not support onboarding.
+	GetOnboardingURL(ctx context.Context, providerID string, params OnboardingParams) (string, error)
+
+	// HandleOnboardingCallback processes the onboarding callback and returns account status.
+	// Returns ErrNotImplemented if the provider does not support onboarding.
+	HandleOnboardingCallback(ctx context.Context, providerID string, params CallbackParams) (*AccountStatus, error)
 }
 
 // FiatPaymentProviderAccessor exposes the fiat payment subsystem.

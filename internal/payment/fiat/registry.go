@@ -26,6 +26,12 @@ func (r *registry) Register(provider contracts.FiatPaymentProvider) {
 	r.providers[provider.ProviderID()] = provider
 }
 
+func (r *registry) Unregister(id string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.providers, id)
+}
+
 func (r *registry) ForProvider(id string) (contracts.FiatPaymentProvider, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

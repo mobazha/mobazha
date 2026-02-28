@@ -306,6 +306,15 @@ func (n *MobazhaNode) initOrderService() {
 			return nil
 		},
 	})
+
+	if n.fiatPaymentService != nil {
+		n.fiatPaymentService.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {
+			return n.orderService.ProcessOrderPayment(ctx, &models.PaymentData{
+				OrderID:       event.OrderID,
+				TransactionID: event.PaymentID,
+			})
+		})
+	}
 }
 
 // buildDiscountResolver returns a DiscountResolverFunc that resolves discounts

@@ -1345,6 +1345,7 @@ func initFiatSubsystem(obNode *MobazhaNode) {
 	}
 	obNode.fiatRegistry = fiat.NewRegistry()
 	obNode.fiatPaymentService = NewFiatPaymentAppService(obNode.fiatRegistry, obNode.db, obNode.nodeID)
+	obNode.fiatPaymentService.LoadAndRegisterProviders()
 	logger.LogInfoWithID(log, obNode.nodeID, "Fiat payment subsystem initialized")
 }
 

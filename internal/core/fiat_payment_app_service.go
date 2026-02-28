@@ -7,6 +7,7 @@ import (
 
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/internal/payment/fiat/stripe"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -143,23 +144,30 @@ func (s *FiatPaymentAppService) HandleWebhook(ctx context.Context, providerID st
 		return nil
 	}
 
+	var handled bool
 	switch event.Type {
 	case contracts.WebhookPaymentSucceeded:
 		if err := s.handlePaymentSucceeded(ctx, providerID, event); err != nil {
 			return err
 		}
+		handled = true
 	case contracts.WebhookPaymentFailed:
 		logger.LogInfoWithIDf(log, s.nodeID, "fiat payment failed: provider=%s payment=%s order=%s", providerID, event.PaymentID, event.OrderID)
+		handled = true
 	case contracts.WebhookDisputeOpened:
 		logger.LogInfoWithIDf(log, s.nodeID, "fiat dispute opened: provider=%s payment=%s", providerID, event.PaymentID)
+		handled = true
 	case contracts.WebhookRefundCreated:
 		logger.LogInfoWithIDf(log, s.nodeID, "fiat refund created: provider=%s payment=%s", providerID, event.PaymentID)
+		handled = true
 	default:
 		logger.LogDebugWithIDf(log, s.nodeID, "unhandled fiat webhook type: %s", event.Type)
 	}
 
-	if err := s.markEventProcessed(event.EventID, providerID); err != nil {
-		logger.LogErrorWithIDf(log, s.nodeID, "fiat webhook mark processed failed: %v", err)
+	if handled {
+		if err := s.markEventProcessed(event.EventID, providerID); err != nil {
+			return fmt.Errorf("mark event processed: %w", err)
+		}
 	}
 	return nil
 }
@@ -170,14 +178,13 @@ func (s *FiatPaymentAppService) handlePaymentSucceeded(ctx context.Context, prov
 
 	if event.OrderID == "" {
 		logger.LogErrorWithIDf(log, s.nodeID, "fiat payment succeeded but no order_id in metadata")
-		return nil
+		return fmt.Errorf("fiat payment succeeded but no order_id in metadata")
 	}
 
-	if s.webhookHandler != nil {
-		return s.webhookHandler(ctx, event)
+	if s.webhookHandler == nil {
+		return fmt.Errorf("no webhook handler registered, cannot process fiat payment for order %s", event.OrderID)
 	}
-	logger.LogErrorWithIDf(log, s.nodeID, "no webhook handler registered, payment event not processed: order=%s", event.OrderID)
-	return nil
+	return s.webhookHandler(ctx, event)
 }
 
 // --- helpers ---
@@ -266,7 +273,8 @@ func (s *FiatPaymentAppService) GetProviderConfig(providerID string) (*contracts
 	}, nil
 }
 
-// SaveProviderConfig stores/updates the fiat provider config (standalone mode).
+// SaveProviderConfig stores/updates the fiat provider config, creates a ReceivingAccount,
+// and registers the provider in the registry (standalone mode).
 func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input contracts.ProviderConfigInput) error {
 	cfg := &models.FiatProviderConfig{
 		ProviderID:    providerID,
@@ -276,20 +284,42 @@ func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input cont
 		WebhookSecret: input.WebhookSecret,
 		IsActive:      true,
 	}
-	return s.db.Update(func(tx database.Tx) error {
-		return tx.Save(cfg)
-	})
+
+	chainType := FiatChainType(providerID)
+	ra := &models.ReceivingAccount{
+		ChainType: chainType,
+		Address:   input.AccountID,
+		IsActive:  true,
+	}
+
+	if err := s.db.Update(func(tx database.Tx) error {
+		if err := tx.Save(cfg); err != nil {
+			return err
+		}
+		return tx.Save(ra)
+	}); err != nil {
+		return err
+	}
+
+	s.registerProviderFromConfig(providerID, input.SecretKey, input.PublicKey, input.WebhookSecret)
+	return nil
 }
 
-// DeleteProviderConfig removes the fiat provider config and deactivates the receiving account.
+// DeleteProviderConfig removes the fiat provider config, deactivates the receiving account,
+// and unregisters the provider from the registry.
 func (s *FiatPaymentAppService) DeleteProviderConfig(providerID string) error {
-	return s.db.Update(func(tx database.Tx) error {
+	err := s.db.Update(func(tx database.Tx) error {
 		if err := tx.Delete("provider_id", providerID, nil, &models.FiatProviderConfig{}); err != nil {
 			return err
 		}
 		chainType := "fiat:" + providerID
 		return tx.Delete("chain_type", chainType, nil, &models.ReceivingAccount{})
 	})
+	if err != nil {
+		return err
+	}
+	s.registry.Unregister(providerID)
+	return nil
 }
 
 // VerifyProviderConfig tests the provider config by calling the provider's health check.
@@ -360,6 +390,40 @@ func (s *FiatPaymentAppService) HandleOnboardingCallback(ctx context.Context, pr
 		return nil, err
 	}
 	return onboarder.GetAccountStatus(ctx, account.AccountID)
+}
+
+// registerProviderFromConfig creates and registers a provider instance using the given config.
+// Currently supports "stripe"; other providers can be added here.
+func (s *FiatPaymentAppService) registerProviderFromConfig(providerID, secretKey, publishableKey, webhookSecret string) {
+	switch providerID {
+	case "stripe":
+		p := stripe.NewProvider(stripe.Config{
+			SecretKey:      secretKey,
+			PublishableKey: publishableKey,
+			WebhookSecret:  webhookSecret,
+			Mode:           stripe.ModeDirect,
+		})
+		s.registry.Register(p)
+		logger.LogInfoWithIDf(log, s.nodeID, "registered Stripe provider (direct mode)")
+	default:
+		logger.LogErrorWithIDf(log, s.nodeID, "unknown fiat provider %q, cannot register", providerID)
+	}
+}
+
+// LoadAndRegisterProviders scans existing FiatProviderConfig records and registers
+// the corresponding providers. Called during node startup for standalone mode.
+func (s *FiatPaymentAppService) LoadAndRegisterProviders() {
+	var configs []models.FiatProviderConfig
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("is_active = ?", true).Find(&configs).Error
+	})
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "failed to load fiat provider configs: %v", err)
+		return
+	}
+	for _, cfg := range configs {
+		s.registerProviderFromConfig(cfg.ProviderID, cfg.SecretKey, cfg.PublicKey, cfg.WebhookSecret)
+	}
 }
 
 // Compile-time check.

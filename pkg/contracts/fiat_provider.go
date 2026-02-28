@@ -57,6 +57,9 @@ type FiatProviderRegistry interface {
 	// Register adds a provider to the registry. Called at startup.
 	Register(provider FiatPaymentProvider)
 
+	// Unregister removes a provider from the registry.
+	Unregister(id string)
+
 	// ForProvider looks up a registered provider by ID.
 	ForProvider(id string) (FiatPaymentProvider, error)
 

@@ -131,6 +131,9 @@ type MobazhaNode struct {
 	// shoppingCartService encapsulates shopping cart business logic.
 	shoppingCartService *ShoppingCartAppService
 
+	// wishlistService encapsulates buyer wishlist logic.
+	wishlistService *WishlistAppService
+
 	// webhookStore persists webhook endpoints and delivery records.
 	webhookStore wh.EndpointStore
 

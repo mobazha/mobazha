@@ -188,6 +188,7 @@ func (m *mockNode) Preferences() contracts.PreferencesService       { return m }
 func (m *mockNode) Stripe() contracts.StripeService                 { return m }
 func (m *mockNode) ExchangeRate() contracts.ExchangeRateService     { return m }
 func (m *mockNode) ShoppingCart() contracts.ShoppingCartService     { return m }
+func (m *mockNode) Wishlist() contracts.WishlistService             { return nil }
 
 func (m *mockNode) RequestAddress(ctx context.Context, to peer.ID, coinType iwallet.CoinType) (iwallet.Address, error) {
 	return m.requestAddressFunc(ctx, to, coinType)

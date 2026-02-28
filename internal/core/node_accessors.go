@@ -33,6 +33,7 @@ func (n *MobazhaNode) Media() contracts.MediaService               { return n.me
 func (n *MobazhaNode) Matrix() contracts.MatrixService             { return n.matrixService }
 func (n *MobazhaNode) Preferences() contracts.PreferencesService   { return n.preferencesService }
 func (n *MobazhaNode) ShoppingCart() contracts.ShoppingCartService  { return n.shoppingCartService }
+func (n *MobazhaNode) Wishlist() contracts.WishlistService          { return n.wishlistService }
 func (n *MobazhaNode) Stripe() contracts.StripeService             { return n.paymentService }
 func (n *MobazhaNode) ExchangeRate() contracts.ExchangeRateService { return &exchangeRateAdapter{n.exchangeRates} }
 

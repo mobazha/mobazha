@@ -15,6 +15,7 @@ package contracts
 
 import (
 	"context"
+	"errors"
 	"io"
 
 	"github.com/ipfs/go-cid"
@@ -280,6 +281,17 @@ type StripeService interface {
 	HandleStripeWebhook(payload []byte, signature string) error
 }
 
+// ErrWishlistFull is returned when the wishlist reaches its capacity limit.
+var ErrWishlistFull = errors.New("wishlist is full")
+
+// WishlistService handles buyer wishlist operations.
+type WishlistService interface {
+	GetWishlist() ([]models.WishlistItem, error)
+	AddToWishlist(item models.WishlistItem) (*models.WishlistItem, error)
+	RemoveFromWishlist(vendorPeerID, slug string) error
+	WishlistCount() (int, error)
+}
+
 // ShoppingCartService handles shopping cart operations.
 type ShoppingCartService interface {
 	GetCartsTotalItemsCount() (int, error)
@@ -328,6 +340,7 @@ type NodeService interface {
 	Stripe() StripeService
 	ExchangeRate() ExchangeRateService
 	ShoppingCart() ShoppingCartService
+	Wishlist() WishlistService
 
 	// Cross-cutting methods (kept directly on NodeService)
 

@@ -12,6 +12,7 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/kubo/core/coreapi"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -106,6 +107,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initRatingsService()
 	n.initNotificationService()
 	n.initShoppingCartService()
+	n.initWishlistService()
 	n.initProfileService()
 	n.initFollowService()
 	n.initPostsService()
@@ -223,6 +225,23 @@ func (n *MobazhaNode) initShoppingCartService() {
 		DB:       n.db,
 		EventBus: n.eventBus,
 		NodeID:   n.nodeID,
+	})
+}
+
+// initWishlistService creates the WishlistAppService and migrates the table.
+func (n *MobazhaNode) initWishlistService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+	if err := n.db.Update(func(tx database.Tx) error {
+		return tx.Migrate(&models.WishlistItem{})
+	}); err != nil {
+		logger.LogErrorWithIDf(log, n.nodeID, "Wishlist: failed to migrate models: %v", err)
+		return
+	}
+	n.wishlistService = NewWishlistAppService(WishlistAppServiceConfig{
+		DB:     n.db,
+		NodeID: n.nodeID,
 	})
 }
 

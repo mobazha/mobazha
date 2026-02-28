@@ -1,0 +1,100 @@
+package api
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+
+	"github.com/gorilla/mux"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/models"
+	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
+)
+
+func getWishlistService(r *http.Request) contracts.WishlistService {
+	return getNodeService(r).Wishlist()
+}
+
+func (g *Gateway) handleGETWishlists(w http.ResponseWriter, r *http.Request) {
+	svc := getWishlistService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Wishlist not available")
+		return
+	}
+	items, err := svc.GetWishlist()
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	if items == nil {
+		items = make([]models.WishlistItem, 0)
+	}
+	responsePkg.Success(w, items)
+}
+
+func (g *Gateway) handlePOSTWishlist(w http.ResponseWriter, r *http.Request) {
+	svc := getWishlistService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Wishlist not available")
+		return
+	}
+
+	var req struct {
+		PeerID    string `json:"peerID"`
+		Slug      string `json:"slug"`
+		Title     string `json:"title"`
+		Thumbnail string `json:"thumbnail"`
+		Price     string `json:"price"`
+		Currency  string `json:"currency"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "Invalid request body")
+		return
+	}
+	if req.PeerID == "" || req.Slug == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "peerID and slug are required")
+		return
+	}
+
+	item := models.WishlistItem{
+		VendorPeerID: req.PeerID,
+		Slug:         req.Slug,
+		Title:        req.Title,
+		Thumbnail:    req.Thumbnail,
+		Price:        req.Price,
+		Currency:     req.Currency,
+	}
+
+	created, err := svc.AddToWishlist(item)
+	if err != nil {
+		if errors.Is(err, contracts.ErrWishlistFull) {
+			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
+			return
+		}
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	responsePkg.Created(w, created)
+}
+
+func (g *Gateway) handleDELETEWishlist(w http.ResponseWriter, r *http.Request) {
+	svc := getWishlistService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Wishlist not available")
+		return
+	}
+
+	vars := mux.Vars(r)
+	peerID := vars["peerID"]
+	slug := vars["slug"]
+	if peerID == "" || slug == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeValidation, "peerID and slug are required")
+		return
+	}
+
+	if err := svc.RemoveFromWishlist(peerID, slug); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	responsePkg.NoContent(w)
+}

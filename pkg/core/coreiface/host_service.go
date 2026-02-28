@@ -2,6 +2,7 @@ package coreiface
 
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/relay"
 	"github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -53,4 +54,11 @@ type HostService interface {
 	// 由 HostService 启动时通过 ContractManager 查询并缓存
 	// 返回空字符串表示尚未初始化
 	GetSolanaEscrowProgramID() string
+
+	// GetDiscountAccessForPeer returns the DiscountService and DiscountStore
+	// scoped to the vendor identified by peerID. In SaaS mode this crosses
+	// tenant boundaries via the NodeManager, enabling buyer-side discount
+	// resolution (engine needs both svc + store) and redemption recording.
+	// Returns (nil, nil, error) if the vendor node is not found or not running.
+	GetDiscountAccessForPeer(peerID peer.ID) (contracts.DiscountService, contracts.DiscountStore, error)
 }

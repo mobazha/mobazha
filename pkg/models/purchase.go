@@ -101,6 +101,7 @@ type Purchase struct {
 	Items                []PurchaseItem `json:"items"`
 	AlternateContactInfo string         `json:"alternateContactInfo"`
 	PricingCoin          string         `json:"pricingCoin"`
+	DiscountCodes        []string       `json:"discountCodes,omitempty"`
 }
 
 type PaymentData struct {
@@ -245,13 +246,25 @@ func (p *PaymentData) BuildTransaction() (iwallet.Transaction, error) {
 	return tx, nil
 }
 
+// DiscountDetail describes a single applied discount for API responses.
+type DiscountDetail struct {
+	DiscountID string `json:"discountID"`
+	Title      string `json:"title"`
+	Code       string `json:"code,omitempty"`
+	ValueType  string `json:"valueType"`
+	Value      string `json:"value"`
+	Amount     string `json:"amount"`
+	Auto       bool   `json:"auto,omitempty"`
+}
+
 // OrderTotals represents a breakdown of the various charges of the order.
 type OrderTotals struct {
-	Subtotal  iwallet.Amount `json:"subtotal"`
-	Shipping  iwallet.Amount `json:"shipping"`
-	Discounts iwallet.Amount `json:"discounts"`
-	Taxes     iwallet.Amount `json:"taxes"`
-	Total     iwallet.Amount `json:"total"`
+	Subtotal        iwallet.Amount   `json:"subtotal"`
+	Shipping        iwallet.Amount   `json:"shipping"`
+	Discounts       iwallet.Amount   `json:"discounts"`
+	Taxes           iwallet.Amount   `json:"taxes"`
+	Total           iwallet.Amount   `json:"total"`
+	DiscountDetails []DiscountDetail `json:"discountDetails,omitempty"`
 }
 
 type StoreCart struct {

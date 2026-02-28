@@ -2152,6 +2152,133 @@ func TestLocationGroupFreeShippingThreshold(t *testing.T) {
 // TestShippingProfilePriceCondition 测试基于价格条件的运费计算
 // Shopify 风格设计：PRICE 条件是前端展示过滤器，后端直接收取选定费率的价格。
 // 条件校验由前端在下单前完成，后端不再重新校验。
+func TestCalculateOrderTotalWithDiscounts(t *testing.T) {
+	erp, err := wallet.NewMockExchangeRates()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name               string
+		transform          func(order *pb.OrderOpen) error
+		expectedDiscounts  iwallet.Amount
+		expectFreeShipping bool
+	}{
+		{
+			name: "single fixed discount",
+			transform: func(order *pb.OrderOpen) error {
+				order.AppliedDiscounts = []*pb.OrderOpen_AppliedDiscount{
+					{
+						DiscountID: "d1",
+						Title:      "10 off",
+						ValueType:  "fixed",
+						Value:      "10",
+						Amount:     "-388802",
+					},
+				}
+				return nil
+			},
+			expectedDiscounts: iwallet.NewAmount("-388802"),
+		},
+		{
+			name: "multiple fixed discounts",
+			transform: func(order *pb.OrderOpen) error {
+				order.AppliedDiscounts = []*pb.OrderOpen_AppliedDiscount{
+					{
+						DiscountID: "d1",
+						Title:      "5 off",
+						ValueType:  "fixed",
+						Value:      "5",
+						Amount:     "-194401",
+					},
+					{
+						DiscountID: "d2",
+						Title:      "3 off",
+						ValueType:  "fixed",
+						Value:      "3",
+						Amount:     "-116641",
+					},
+				}
+				return nil
+			},
+			expectedDiscounts: iwallet.NewAmount("-311042"),
+		},
+		{
+			name: "percentage discount",
+			transform: func(order *pb.OrderOpen) error {
+				order.AppliedDiscounts = []*pb.OrderOpen_AppliedDiscount{
+					{
+						DiscountID: "d1",
+						Title:      "10% off",
+						ValueType:  "percentage",
+						Value:      "10",
+						Amount:     "-416004",
+					},
+				}
+				return nil
+			},
+			expectedDiscounts: iwallet.NewAmount("-416004"),
+		},
+		{
+			name: "free_shipping discount offsets shipping via negative discount",
+			transform: func(order *pb.OrderOpen) error {
+				order.AppliedDiscounts = []*pb.OrderOpen_AppliedDiscount{
+					{
+						DiscountID: "d1",
+						Title:      "Free Shipping",
+						ValueType:  "free_shipping",
+						Value:      "0",
+						Amount:     "",
+						Auto:       true,
+					},
+				}
+				return nil
+			},
+			expectFreeShipping: true,
+		},
+		{
+			name: "no discounts",
+			transform: func(order *pb.OrderOpen) error {
+				return nil
+			},
+			expectedDiscounts: iwallet.NewAmount("0"),
+		},
+	}
+
+	for _, test := range tests {
+		order, _, err := factory.NewOrder()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := test.transform(order); err != nil {
+			t.Fatalf("test %s transform error: %s", test.name, err)
+		}
+		totals, err := CalculateOrderTotal(order, erp)
+		if err != nil {
+			t.Fatalf("test %s calculate error: %s", test.name, err)
+		}
+
+		if test.expectFreeShipping {
+			if totals.Shipping.Cmp(iwallet.NewAmount(0)) <= 0 {
+				t.Errorf("test %s: expected positive shipping (original value), got %s", test.name, totals.Shipping.String())
+			}
+			negShipping := iwallet.NewAmount(0).Sub(totals.Shipping)
+			if totals.Discounts.Cmp(negShipping) != 0 {
+				t.Errorf("test %s: expected discounts = -%s, got %s", test.name, totals.Shipping.String(), totals.Discounts.String())
+			}
+		} else if test.expectedDiscounts.Cmp(iwallet.NewAmount(0)) != 0 {
+			if totals.Discounts.Cmp(test.expectedDiscounts) != 0 {
+				t.Errorf("test %s: expected discounts %s, got %s", test.name, test.expectedDiscounts.String(), totals.Discounts.String())
+			}
+		}
+
+		calculatedTotal := totals.Subtotal.Add(totals.Shipping).Add(totals.Discounts).Add(totals.Taxes)
+		if calculatedTotal.Cmp(totals.Total) != 0 {
+			t.Errorf("test %s: calculated total %s != reported total %s", test.name, calculatedTotal.String(), totals.Total.String())
+		}
+	}
+}
+
 func TestShippingProfilePriceCondition(t *testing.T) {
 	erp, err := wallet.NewMockExchangeRates()
 	if err != nil {

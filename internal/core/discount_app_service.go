@@ -35,6 +35,12 @@ func NewDiscountAppService(store contracts.DiscountStore, tenantID string) *Disc
 	}
 }
 
+// Store returns the underlying DiscountStore for engine wiring (e.g., hosting
+// constructs a DiscountEngine with the vendor's store for cross-tenant resolution).
+func (s *DiscountAppService) Store() contracts.DiscountStore {
+	return s.store
+}
+
 func (s *DiscountAppService) CreateDiscount(ctx context.Context, d *models.Discount) error {
 	if err := s.validateDiscount(d); err != nil {
 		return err

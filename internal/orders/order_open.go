@@ -466,6 +466,20 @@ func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode strin
 		orderTotal = orderTotal.Add(itemTotal)
 	}
 
+	// Apply discounts from order proto (amounts are negative strings)
+	hasFreeShipping := false
+	for _, ad := range order.AppliedDiscounts {
+		if ad.ValueType == "free_shipping" {
+			hasFreeShipping = true
+			continue
+		}
+		if ad.Amount != "" {
+			amt := iwallet.NewAmount(ad.Amount)
+			discountsTotal = discountsTotal.Add(amt)
+			orderTotal = orderTotal.Add(amt)
+		}
+	}
+
 	// Add in shipping
 	// Note: Free shipping threshold should use discounted subtotal before taxes.
 	eligibleSubtotal := subTotal.Add(discountsTotal)
@@ -474,6 +488,11 @@ func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode strin
 		shippingTotal, err = calculateShippingTotalForListings(order, physicalGoods, paymentCurrency, erp, eligibleSubtotal)
 		if err != nil {
 			return models.OrderTotals{}, fmt.Errorf("shipping total: %s", err.Error())
+		}
+		if hasFreeShipping && shippingTotal.Cmp(iwallet.NewAmount(0)) > 0 {
+			shippingDiscount := iwallet.NewAmount(0).Sub(shippingTotal)
+			discountsTotal = discountsTotal.Add(shippingDiscount)
+			orderTotal = orderTotal.Add(shippingDiscount)
 		}
 		orderTotal = orderTotal.Add(shippingTotal)
 	}

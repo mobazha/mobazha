@@ -43,6 +43,15 @@ func (n *MobazhaNode) WebhookEngine() *wh.Engine      { return n.webhookEngine }
 // DiscountProvider implementation — per-node discount subsystem.
 func (n *MobazhaNode) Discount() contracts.DiscountService { return n.discountService }
 
+// DiscountStore exposes the underlying DiscountStore for cross-tenant wiring
+// (e.g., hosting constructs a DiscountEngine with the vendor's store).
+func (n *MobazhaNode) DiscountStore() contracts.DiscountStore {
+	if n.discountService == nil {
+		return nil
+	}
+	return n.discountService.Store()
+}
+
 // ShippingProvider implementation — per-node shipping subsystem.
 var _ contracts.ShippingProvider = (*MobazhaNode)(nil)
 

@@ -297,7 +297,62 @@ func (n *MobazhaNode) initOrderService() {
 		RelayInstructions: func(orderID string, coinType iwallet.CoinType, instructions any) (string, error) {
 			return n.paymentService.RelayInstructions(orderID, coinType, instructions)
 		},
+		DiscountResolver:          n.buildDiscountResolver(),
+		DiscountRedemptionRecorder: n.buildDiscountRecorder(),
 	})
+}
+
+// buildDiscountResolver returns a DiscountResolverFunc that resolves discounts
+// for a vendor. In SaaS mode it crosses tenant boundaries via HostService;
+// in standalone mode it uses the local node's DiscountAppService.
+func (n *MobazhaNode) buildDiscountResolver() DiscountResolverFunc {
+	if n.hostService != nil {
+		return func(ctx context.Context, vendorPeerID string, dc DiscountContext) (*DiscountResult, error) {
+			pid, err := peer.Decode(vendorPeerID)
+			if err != nil {
+				return nil, fmt.Errorf("invalid vendor peerID: %w", err)
+			}
+			svc, store, err := n.hostService.GetDiscountAccessForPeer(pid)
+			if err != nil {
+				return nil, err
+			}
+			return NewDiscountEngine(svc, store).Calculate(ctx, dc)
+		}
+	}
+	if n.discountService != nil {
+		return func(ctx context.Context, vendorPeerID string, dc DiscountContext) (*DiscountResult, error) {
+			store := n.discountService.Store()
+			if store == nil {
+				return nil, nil
+			}
+			return NewDiscountEngine(n.discountService, store).Calculate(ctx, dc)
+		}
+	}
+	return nil
+}
+
+// buildDiscountRecorder returns a DiscountRedemptionRecorderFunc that records
+// discount usage on the vendor's store. Uses the same SaaS/standalone split.
+func (n *MobazhaNode) buildDiscountRecorder() DiscountRedemptionRecorderFunc {
+	if n.hostService != nil {
+		return func(ctx context.Context, vendorPeerID string, discountID string, codeID *string, orderID, customerPeerID, amount, currency string) error {
+			pid, err := peer.Decode(vendorPeerID)
+			if err != nil {
+				return fmt.Errorf("invalid vendor peerID: %w", err)
+			}
+			svc, _, err := n.hostService.GetDiscountAccessForPeer(pid)
+			if err != nil {
+				return err
+			}
+			return svc.RecordRedemption(ctx, discountID, codeID, orderID, customerPeerID, amount, currency)
+		}
+	}
+	if n.discountService != nil {
+		return func(ctx context.Context, vendorPeerID string, discountID string, codeID *string, orderID, customerPeerID, amount, currency string) error {
+			return n.discountService.RecordRedemption(ctx, discountID, codeID, orderID, customerPeerID, amount, currency)
+		}
+	}
+	return nil
 }
 
 // initPaymentService creates the PaymentAppService if the necessary

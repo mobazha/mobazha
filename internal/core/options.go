@@ -316,9 +316,24 @@ func (n *MobazhaNode) initOrderService() {
 		RelayInstructions: func(orderID string, coinType iwallet.CoinType, instructions any) (string, error) {
 			return n.paymentService.RelayInstructions(orderID, coinType, instructions)
 		},
-		DiscountResolver:          n.buildDiscountResolver(),
+		DiscountResolver:           n.buildDiscountResolver(),
 		DiscountRedemptionRecorder: n.buildDiscountRecorder(),
+		CollectionStore: func() contracts.CollectionStore {
+			if n.collectionService != nil {
+				return n.collectionService.Store()
+			}
+			return nil
+		},
 	})
+
+	if n.fiatPaymentService != nil {
+		n.fiatPaymentService.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {
+			return n.orderService.ProcessOrderPayment(ctx, &models.PaymentData{
+				OrderID:       event.OrderID,
+				TransactionID: event.PaymentID,
+			})
+		})
+	}
 }
 
 // buildDiscountResolver returns a DiscountResolverFunc that resolves discounts
@@ -335,7 +350,7 @@ func (n *MobazhaNode) buildDiscountResolver() DiscountResolverFunc {
 			if err != nil {
 				return nil, err
 			}
-			return NewDiscountEngine(svc, store).Calculate(ctx, dc)
+			return NewDiscountEngine(svc, store, nil).Calculate(ctx, dc)
 		}
 	}
 	if n.discountService != nil {
@@ -344,7 +359,11 @@ func (n *MobazhaNode) buildDiscountResolver() DiscountResolverFunc {
 			if store == nil {
 				return nil, nil
 			}
-			return NewDiscountEngine(n.discountService, store).Calculate(ctx, dc)
+			var colStore contracts.CollectionStore
+			if n.collectionService != nil {
+				colStore = n.collectionService.Store()
+			}
+			return NewDiscountEngine(n.discountService, store, colStore).Calculate(ctx, dc)
 		}
 	}
 	return nil
@@ -677,4 +696,12 @@ func (n *MobazhaNode) initListingService() {
 		UpdateAndSaveProfile: updateAndSaveProfile,
 		ShippingStore:        shippingStore,
 	})
+
+	if n.collectionService != nil {
+		n.listingService.onDeleteCleanup = func(slug string) {
+			if err := n.collectionService.RemoveProductFromAllCollections(context.Background(), slug); err != nil {
+				log.Errorf("Collection: failed to remove product %s from collections: %v", slug, err)
+			}
+		}
+	}
 }

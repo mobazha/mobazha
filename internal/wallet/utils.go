@@ -10,14 +10,10 @@ import (
 )
 
 // ConvertCurrencyAmount converts the value of one currency into another using the exchange rate.
+// Supports crypto-to-fiat, fiat-to-crypto, and fiat-to-fiat conversions.
 func ConvertCurrencyAmount(value *models.CurrencyValue, paymentCurrency *models.Currency, erp *ExchangeRateProvider) (iwallet.Amount, error) {
-	// If both currency types are the same then just return the value.
 	if value.Currency.Equal(paymentCurrency) {
 		return value.Amount, nil
-	}
-
-	if paymentCurrency.CurrencyType != models.CurrencyTypeCrypto {
-		return value.Amount, errors.New("payment currency is not type crypto")
 	}
 
 	rate, err := erp.GetRate(paymentCurrency.Code, value.Currency.Code, true)
@@ -40,4 +36,32 @@ func ConvertCurrencyAmount(value *models.CurrencyValue, paymentCurrency *models.
 		return value.Amount, err
 	}
 	return converted.Amount, nil
+}
+
+// ConvertFiatAmount converts a fiat amount from one currency to another.
+// amount is in smallest currency units (e.g. cents). Returns in smallest units of target.
+func ConvertFiatAmount(amount int64, from, to string, erp *ExchangeRateProvider) (int64, error) {
+	if from == to {
+		return amount, nil
+	}
+
+	fromDef, err := models.CurrencyDefinitions.Lookup(from)
+	if err != nil {
+		return 0, err
+	}
+	toDef, err := models.CurrencyDefinitions.Lookup(to)
+	if err != nil {
+		return 0, err
+	}
+
+	value := models.CurrencyValue{
+		Amount:   iwallet.NewAmount(amount),
+		Currency: fromDef,
+	}
+
+	result, err := ConvertCurrencyAmount(&value, toDef, erp)
+	if err != nil {
+		return 0, err
+	}
+	return result.Int64(), nil
 }

@@ -24,14 +24,16 @@ const (
 )
 
 type DiscountAppService struct {
-	store    contracts.DiscountStore
-	tenantID string
+	store           contracts.DiscountStore
+	collectionStore contracts.CollectionStore
+	tenantID        string
 }
 
-func NewDiscountAppService(store contracts.DiscountStore, tenantID string) *DiscountAppService {
+func NewDiscountAppService(store contracts.DiscountStore, collectionStore contracts.CollectionStore, tenantID string) *DiscountAppService {
 	return &DiscountAppService{
-		store:    store,
-		tenantID: tenantID,
+		store:           store,
+		collectionStore: collectionStore,
+		tenantID:        tenantID,
 	}
 }
 
@@ -199,6 +201,50 @@ func (s *DiscountAppService) RecordRedemption(ctx context.Context, discountID st
 		RedeemedAt:     time.Now(),
 	}
 	return s.store.CreateRedemption(ctx, r)
+}
+
+// CalculateDiscounts performs server-side discount calculation using DiscountEngine.
+func (s *DiscountAppService) CalculateDiscounts(ctx context.Context, req contracts.CalculateDiscountsRequest) (*contracts.CalculateDiscountsResult, error) {
+	engine := NewDiscountEngine(s, s.store, s.collectionStore)
+
+	subtotal := new(big.Int)
+	if _, ok := subtotal.SetString(req.Subtotal, 10); !ok {
+		return nil, fmt.Errorf("invalid subtotal: %s", req.Subtotal)
+	}
+
+	dc := DiscountContext{
+		DiscountCodes:   req.DiscountCodes,
+		ProductIDs:      req.ProductIDs,
+		CustomerPeerID:  req.CustomerPeerID,
+		PaymentCurrency: req.Currency,
+		SubTotal:        subtotal,
+		ItemQuantity:    req.ItemQuantity,
+	}
+
+	result, err := engine.Calculate(ctx, dc)
+	if err != nil {
+		return nil, err
+	}
+
+	applied := make([]contracts.AppliedDiscountInfo, len(result.AppliedDiscounts))
+	for i, ad := range result.AppliedDiscounts {
+		applied[i] = contracts.AppliedDiscountInfo{
+			DiscountID: ad.DiscountID,
+			CodeID:     ad.CodeID,
+			Title:      ad.Title,
+			Code:       ad.Code,
+			ValueType:  ad.ValueType,
+			Value:      ad.Value,
+			Amount:     ad.Amount,
+			Auto:       ad.Auto,
+		}
+	}
+
+	return &contracts.CalculateDiscountsResult{
+		AppliedDiscounts: applied,
+		DiscountsTotal:   result.DiscountsTotal,
+		ShippingDiscount: result.ShippingDiscount,
+	}, nil
 }
 
 // --- internal helpers ---

@@ -1,12 +1,16 @@
 package core
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -94,6 +98,101 @@ func TestArchGuard_ModelsDoNotImportInternal(t *testing.T) {
 	assert.Empty(t, violations,
 		"pkg/models/ must not import internal/ — "+
 			"models are shared data structures; found: %v", violations)
+}
+
+func TestArchGuard_CollectionServiceInterface(t *testing.T) {
+	var _ contracts.CollectionService = (*CollectionAppService)(nil)
+}
+
+func TestArchGuard_CollectionModelDesignCompliance(t *testing.T) {
+	typ := reflect.TypeOf(models.Collection{})
+
+	f, ok := typ.FieldByName("DeletedAt")
+	require.True(t, ok, "Collection must have DeletedAt field")
+	assert.Equal(t, "*time.Time", f.Type.String(),
+		"DeletedAt must be *time.Time, not gorm.DeletedAt")
+
+	f, ok = typ.FieldByName("TenantID")
+	require.True(t, ok, "Collection must have TenantID field")
+	assert.Equal(t, "-", f.Tag.Get("json"),
+		"TenantID json tag must be \"-\" to prevent API exposure")
+}
+
+func TestArchGuard_CollectionStoreAllMethodsHaveContext(t *testing.T) {
+	storeType := reflect.TypeOf((*contracts.CollectionStore)(nil)).Elem()
+	ctxType := reflect.TypeOf((*context.Context)(nil)).Elem()
+
+	for i := 0; i < storeType.NumMethod(); i++ {
+		m := storeType.Method(i)
+		require.True(t, m.Type.NumIn() > 0,
+			"method %s must have at least one parameter", m.Name)
+		assert.True(t, m.Type.In(0).Implements(ctxType),
+			"method %s first param must be context.Context, got %s",
+			m.Name, m.Type.In(0).String())
+	}
+}
+
+func TestArchGuard_CollectionStoreRequiredMethods(t *testing.T) {
+	storeType := reflect.TypeOf((*contracts.CollectionStore)(nil)).Elem()
+	required := []string{
+		"CreateCollection", "GetCollection", "ListCollections",
+		"UpdateCollection", "DeleteCollection",
+		"AddProducts", "RemoveProduct", "ReorderProducts",
+		"IsProductInCollections", "RemoveProductFromAllCollections",
+		"CountCollections", "CountCollectionProducts",
+	}
+	for _, name := range required {
+		_, ok := storeType.MethodByName(name)
+		assert.True(t, ok, "CollectionStore must have method %s", name)
+	}
+}
+
+func TestArchGuard_CollectionRoutesFollowConvention(t *testing.T) {
+	root := repoRoot(t)
+	routesFile := filepath.Join(root, "internal", "api", "routes.go")
+	data, err := os.ReadFile(routesFile)
+	require.NoError(t, err)
+
+	var violations []string
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.Contains(line, "/v1/collections") {
+			continue
+		}
+		// Extract path from route registration like: "/v1/collections/{collectionID}/products"
+		startIdx := strings.Index(line, `"/v1/collections`)
+		if startIdx < 0 {
+			continue
+		}
+		endIdx := strings.Index(line[startIdx+1:], `"`)
+		if endIdx < 0 {
+			continue
+		}
+		path := line[startIdx+1 : startIdx+1+endIdx]
+
+		// Check for camelCase segments (lowercase letter immediately followed by uppercase)
+		for i := 0; i < len(path)-1; i++ {
+			if path[i] >= 'a' && path[i] <= 'z' && path[i+1] >= 'A' && path[i+1] <= 'Z' {
+				// Skip mux variables like {collectionID}
+				if strings.Contains(path, "{") {
+					braceStart := strings.LastIndex(path[:i+1], "{")
+					braceEnd := strings.Index(path[i:], "}")
+					if braceStart >= 0 && braceEnd >= 0 {
+						continue
+					}
+				}
+				violations = append(violations, path)
+				break
+			}
+		}
+
+		// Check for /ob/ prefix (legacy, forbidden)
+		if strings.Contains(path, "/ob/") {
+			violations = append(violations, path+" (contains /ob/)")
+		}
+	}
+	assert.Empty(t, violations,
+		"Collection routes must use kebab-case, no camelCase segments; found: %v", violations)
 }
 
 func TestArchGuard_QueriesDoNotImportInternal(t *testing.T) {

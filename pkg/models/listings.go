@@ -127,7 +127,7 @@ type ListingMetadata struct {
 	CID                     string           `json:"cid"`
 	Slug                    string           `json:"slug"`
 	Title                   string           `json:"title"`
-	Categories              []string         `json:"categories"`
+	ProductType             string           `json:"productType"`
 	NSFW                    bool             `json:"nsfw"`
 	ContractType            string           `json:"contractType"`
 	Description             string           `json:"description"`
@@ -218,7 +218,7 @@ func NewListingMetadataFromListing(listing *pb.Listing, cid cid.Cid) (*ListingMe
 		CID:          cid.String(),
 		Slug:         listing.Slug,
 		Title:        listing.Item.Title,
-		Categories:   listing.Item.Categories,
+		ProductType:  listing.Item.ProductType,
 		NSFW:         listing.Item.Nsfw,
 		CoinType:     listing.Metadata.PricingCurrency.Code,
 		ContractType: listing.Metadata.ContractType.String(),

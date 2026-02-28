@@ -64,6 +64,7 @@ type ListingAppService struct {
 	fetchIPNSRecord       FetchIPNSRecordFunc
 	getMyProfile          GetMyProfileFunc
 	updateAndSaveProfile  UpdateAndSaveProfileFunc
+	onDeleteCleanup func(slug string)
 
 	shippingStore contracts.ShippingStore
 }
@@ -341,6 +342,10 @@ func (s *ListingAppService) DeleteListing(slugStr string, done chan<- struct{}) 
 	if err != nil {
 		maybeCloseDone(done)
 		return err
+	}
+
+	if s.onDeleteCleanup != nil {
+		s.onDeleteCleanup(slugStr)
 	}
 
 	go func() {
@@ -997,16 +1002,8 @@ func (s *ListingAppService) validateListing(sl *pb.SignedListing) (err error) {
 			return coreiface.ErrTooManyCharacters{"item.images.alt", strconv.Itoa(SentenceMaxCharacters)}
 		}
 	}
-	if len(sl.Listing.Item.Categories) > MaxCategories {
-		return fmt.Errorf("number of categories must be less than max of %d", MaxCategories)
-	}
-	for _, category := range sl.Listing.Item.Categories {
-		if category == "" {
-			return coreiface.ErrMissingField("item.category")
-		}
-		if len(category) > WordMaxCharacters*2 {
-			return coreiface.ErrTooManyCharacters{"item.categories", strconv.Itoa(WordMaxCharacters)}
-		}
+	if len(sl.Listing.Item.ProductType) > WordMaxCharacters*2 {
+		return coreiface.ErrTooManyCharacters{"item.productType", strconv.Itoa(WordMaxCharacters * 2)}
 	}
 
 	maxCombos := 1

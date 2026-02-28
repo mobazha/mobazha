@@ -34,8 +34,17 @@ func (n *MobazhaNode) Matrix() contracts.MatrixService             { return n.ma
 func (n *MobazhaNode) Preferences() contracts.PreferencesService   { return n.preferencesService }
 func (n *MobazhaNode) ShoppingCart() contracts.ShoppingCartService  { return n.shoppingCartService }
 func (n *MobazhaNode) Wishlist() contracts.WishlistService          { return n.wishlistService }
+// Deprecated: Stripe returns the legacy StripeService backed by PaymentAppService.
+// New code should use FiatPaymentProviderAccessor via type assertion instead.
 func (n *MobazhaNode) Stripe() contracts.StripeService             { return n.paymentService }
 func (n *MobazhaNode) ExchangeRate() contracts.ExchangeRateService { return &exchangeRateAdapter{n.exchangeRates} }
+
+// FiatPaymentProviderAccessor implementation — generic fiat payment subsystem.
+func (n *MobazhaNode) Fiat() contracts.FiatService { return n.fiatPaymentService }
+
+// FiatRegistry returns the fiat provider registry for external provider registration.
+// Hosting (SaaS) uses this to register platform-level providers after node creation.
+func (n *MobazhaNode) FiatRegistry() contracts.FiatProviderRegistry { return n.fiatRegistry }
 
 // WebhookProvider implementation — per-node webhook subsystem.
 func (n *MobazhaNode) WebhookStore() wh.EndpointStore { return n.webhookStore }
@@ -43,6 +52,9 @@ func (n *MobazhaNode) WebhookEngine() *wh.Engine      { return n.webhookEngine }
 
 // DiscountProvider implementation — per-node discount subsystem.
 func (n *MobazhaNode) Discount() contracts.DiscountService { return n.discountService }
+
+// CollectionProvider implementation — per-node collection subsystem.
+func (n *MobazhaNode) Collection() contracts.CollectionService { return n.collectionService }
 
 // DiscountStore exposes the underlying DiscountStore for cross-tenant wiring
 // (e.g., hosting constructs a DiscountEngine with the vendor's store).
@@ -101,6 +113,13 @@ func (a *exchangeRateAdapter) GetAllRates(base models.CurrencyCode, breakCache b
 		return nil, fmt.Errorf("exchange rate provider not available")
 	}
 	return a.provider.GetAllRates(base, breakCache)
+}
+
+func (a *exchangeRateAdapter) GetRate(base models.CurrencyCode, to models.CurrencyCode, breakCache bool) (iwallet.Amount, error) {
+	if a.provider == nil {
+		return iwallet.NewAmount(0), fmt.Errorf("exchange rate provider not available")
+	}
+	return a.provider.GetRate(base, to, breakCache)
 }
 
 // listingServiceFacade composes ListingAppService + ModerationAppService
@@ -182,3 +201,6 @@ func (a *identityInfoAdapter) IsGlobalBanned(peerID peer.ID) bool {
 	}
 	return a.listingService.IsGlobalBanned(peerID)
 }
+
+// Compile-time checks for optional accessor interfaces.
+var _ contracts.FiatPaymentProviderAccessor = (*MobazhaNode)(nil)

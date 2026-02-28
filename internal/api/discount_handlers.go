@@ -3,12 +3,26 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
+
+func discountErrorResponse(w http.ResponseWriter, err error) {
+	msg := err.Error()
+	if strings.Contains(msg, "not found") {
+		response.Error(w, http.StatusNotFound, response.CodeNotFound, msg)
+		return
+	}
+	if strings.Contains(msg, "usage limit") || strings.Contains(msg, "maximum") {
+		response.Error(w, http.StatusConflict, response.CodeConflict, msg)
+		return
+	}
+	response.Error(w, http.StatusBadRequest, response.CodeBadRequest, msg)
+}
 
 func getDiscountService(r *http.Request) (contracts.DiscountService, bool) {
 	dp, ok := getNodeService(r).(contracts.DiscountProvider)
@@ -36,7 +50,7 @@ func (g *Gateway) handleCreateDiscount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := svc.CreateDiscount(r.Context(), &d); err != nil {
-		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, err.Error())
+		discountErrorResponse(w, err)
 		return
 	}
 	response.Created(w, d)
@@ -107,14 +121,23 @@ func (g *Gateway) handleUpdateDiscount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	savedTenantID := existing.TenantID
+	savedUsageCount := existing.UsageCount
+	savedCodes := existing.Codes
+	savedCreatedAt := existing.CreatedAt
+
 	if err := json.NewDecoder(r.Body).Decode(existing); err != nil {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")
 		return
 	}
 	existing.ID = id
+	existing.TenantID = savedTenantID
+	existing.UsageCount = savedUsageCount
+	existing.Codes = savedCodes
+	existing.CreatedAt = savedCreatedAt
 
 	if err := svc.UpdateDiscount(r.Context(), existing); err != nil {
-		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, err.Error())
+		discountErrorResponse(w, err)
 		return
 	}
 	response.Success(w, existing)
@@ -129,7 +152,7 @@ func (g *Gateway) handleDeleteDiscount(w http.ResponseWriter, r *http.Request) {
 
 	id := mux.Vars(r)["discountID"]
 	if err := svc.DeleteDiscount(r.Context(), id); err != nil {
-		response.Error(w, http.StatusNotFound, response.CodeNotFound, err.Error())
+		discountErrorResponse(w, err)
 		return
 	}
 	response.NoContent(w)
@@ -159,7 +182,7 @@ func (g *Gateway) handleAddDiscountCodes(w http.ResponseWriter, r *http.Request)
 	if req.Generate != nil {
 		codes, err := svc.GenerateCodes(r.Context(), discountID, req.Generate.Count, req.Generate.Prefix)
 		if err != nil {
-			response.Error(w, http.StatusBadRequest, response.CodeBadRequest, err.Error())
+			discountErrorResponse(w, err)
 			return
 		}
 		response.Created(w, codes)
@@ -171,7 +194,7 @@ func (g *Gateway) handleAddDiscountCodes(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if err := svc.AddCodes(r.Context(), discountID, req.Codes); err != nil {
-		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, err.Error())
+		discountErrorResponse(w, err)
 		return
 	}
 	response.Created(w, req.Codes)
@@ -202,7 +225,7 @@ func (g *Gateway) handleDeleteDiscountCode(w http.ResponseWriter, r *http.Reques
 
 	codeID := mux.Vars(r)["codeID"]
 	if err := svc.DeleteCode(r.Context(), codeID); err != nil {
-		response.Error(w, http.StatusNotFound, response.CodeNotFound, err.Error())
+		discountErrorResponse(w, err)
 		return
 	}
 	response.NoContent(w)
@@ -232,7 +255,7 @@ func (g *Gateway) handleListDiscountRedemptions(w http.ResponseWriter, r *http.R
 }
 
 // handleValidateDiscount is public: validates a discount code for the storefront.
-// customerPeerID for per-customer limit checking is deferred to P2.
+// customerPeerID is optional — when provided, per-customer usage limit is checked.
 func (g *Gateway) handleValidateDiscount(w http.ResponseWriter, r *http.Request) {
 	svc, ok := getDiscountService(r)
 	if !ok {
@@ -241,21 +264,22 @@ func (g *Gateway) handleValidateDiscount(w http.ResponseWriter, r *http.Request)
 	}
 
 	var req struct {
-		Code string `json:"code"`
+		Code           string `json:"code"`
+		CustomerPeerID string `json:"customerPeerID,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Code == "" {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "code is required")
 		return
 	}
 
-	result, err := svc.ValidateCode(r.Context(), req.Code, "")
+	result, err := svc.ValidateCode(r.Context(), req.Code, req.CustomerPeerID)
 	if err != nil {
-		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		response.Error(w, http.StatusNotFound, response.CodeNotFound, "Discount code not found")
 		return
 	}
 
 	if !result.Valid {
-		response.Error(w, http.StatusBadRequest, response.CodeValidation, result.Reason)
+		response.Error(w, http.StatusUnprocessableEntity, response.CodeValidation, result.Reason)
 		return
 	}
 
@@ -316,5 +340,61 @@ func (g *Gateway) handleGetApplicableDiscounts(w http.ResponseWriter, r *http.Re
 		summaries = append(summaries, s)
 	}
 	response.Success(w, summaries)
+}
+
+// handleCalculateDiscounts is public: server-side discount calculation for checkout.
+func (g *Gateway) handleCalculateDiscounts(w http.ResponseWriter, r *http.Request) {
+	svc, ok := getDiscountService(r)
+	if !ok {
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented, "Discounts not available")
+		return
+	}
+
+	var req contracts.CalculateDiscountsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")
+		return
+	}
+	if req.Subtotal == "" {
+		response.Error(w, http.StatusBadRequest, response.CodeValidation, "subtotal is required")
+		return
+	}
+
+	result, err := svc.CalculateDiscounts(r.Context(), req)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, err.Error())
+		return
+	}
+
+	type appliedItem struct {
+		DiscountID string `json:"discountID"`
+		CodeID     string `json:"codeID,omitempty"`
+		Title      string `json:"title"`
+		Code       string `json:"code,omitempty"`
+		ValueType  string `json:"valueType"`
+		Value      string `json:"value"`
+		Amount     string `json:"amount"`
+		Auto       bool   `json:"auto,omitempty"`
+	}
+	items := make([]appliedItem, len(result.AppliedDiscounts))
+	for i, ad := range result.AppliedDiscounts {
+		items[i] = appliedItem{
+			DiscountID: ad.DiscountID,
+			CodeID:     ad.CodeID,
+			Title:      ad.Title,
+			Code:       ad.Code,
+			ValueType:  ad.ValueType,
+			Value:      ad.Value,
+			Amount:     ad.Amount,
+			Auto:       ad.Auto,
+		}
+	}
+
+	resp := map[string]interface{}{
+		"appliedDiscounts": items,
+		"discountsTotal":   result.DiscountsTotal.String(),
+		"shippingDiscount": result.ShippingDiscount,
+	}
+	response.Success(w, resp)
 }
 

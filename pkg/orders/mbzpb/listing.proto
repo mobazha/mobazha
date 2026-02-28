@@ -65,7 +65,7 @@ message Listing {
         repeated string tags                        = 6;
         repeated Image images                       = 7;
         File introVideo                             = 8;
-        repeated string categories                  = 9;
+        string productType                          = 9;
         uint32 grams                                = 10;
         Dimensions dimensions                       = 11;
         string condition                            = 12;

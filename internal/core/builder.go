@@ -39,6 +39,7 @@ import (
 	solanaWal "github.com/mobazha/mobazha3.0/internal/multiwallet/coins/solana"
 	obnet "github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/notifications"
+	fiat "github.com/mobazha/mobazha3.0/internal/payment/fiat"
 	"github.com/mobazha/mobazha3.0/internal/notifier"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -412,8 +413,10 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 		initWebhookSubsystem(obNode)
 		initDiscountSubsystem(obNode)
-		initShippingSubsystem(obNode)
-		obNode.applyOptions(nil)
+	initCollectionSubsystem(obNode)
+	initFiatSubsystem(obNode)
+	initShippingSubsystem(obNode)
+	obNode.applyOptions(nil)
 		return obNode, nil
 	}
 
@@ -624,6 +627,8 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 	initWebhookSubsystem(obNode)
 	initDiscountSubsystem(obNode)
+	initCollectionSubsystem(obNode)
+	initFiatSubsystem(obNode)
 	initShippingSubsystem(obNode)
 
 	notifyWsFn := sharedManager.GetHTTPGateway().NotifyWebsockets(nodeID)
@@ -1221,6 +1226,8 @@ func newLightweightNode(
 
 	initWebhookSubsystem(obNode)
 	initDiscountSubsystem(obNode)
+	initCollectionSubsystem(obNode)
+	initFiatSubsystem(obNode)
 	initShippingSubsystem(obNode)
 	initEventDispatcher(obNode, notifyWsFn)
 
@@ -1308,6 +1315,40 @@ func initWebhookSubsystem(obNode *MobazhaNode) {
 	logger.LogInfoWithID(log, obNode.nodeID, "Webhook subsystem initialized")
 }
 
+// initCollectionSubsystem initializes the per-node collection subsystem:
+// migrates DB models, creates CollectionStore, and wires up CollectionAppService.
+func initCollectionSubsystem(obNode *MobazhaNode) {
+	if err := database.MigrateCollectionModels(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "Collection: failed to migrate models: %v", err)
+		return
+	}
+	store := database.NewGormCollectionStore(obNode.db)
+	obNode.collectionService = NewCollectionAppService(store, obNode.eventBus, obNode.nodeID)
+
+	if obNode.discountService != nil {
+		obNode.discountService.collectionStore = store
+	}
+
+	// NOTE: onDeleteCleanup wiring moved to options.go after listingService is created,
+	// because initCollectionSubsystem runs before applyOptions() where listingService is initialized.
+
+	logger.LogInfoWithID(log, obNode.nodeID, "Collection subsystem initialized")
+}
+
+// initFiatSubsystem initializes the per-node fiat payment subsystem:
+// migrates DB models, creates FiatProviderRegistry and FiatPaymentAppService.
+// Providers are registered later by hosting (SaaS) or node config (standalone).
+func initFiatSubsystem(obNode *MobazhaNode) {
+	if err := database.MigrateFiatModels(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "Fiat: failed to migrate models: %v", err)
+		return
+	}
+	obNode.fiatRegistry = fiat.NewRegistry()
+	obNode.fiatPaymentService = NewFiatPaymentAppService(obNode.fiatRegistry, obNode.db, obNode.nodeID)
+	obNode.fiatPaymentService.LoadAndRegisterProviders()
+	logger.LogInfoWithID(log, obNode.nodeID, "Fiat payment subsystem initialized")
+}
+
 // initDiscountSubsystem initializes the per-node discount subsystem:
 // migrates DB models, creates DiscountStore, and wires up DiscountAppService.
 func initDiscountSubsystem(obNode *MobazhaNode) {
@@ -1316,7 +1357,7 @@ func initDiscountSubsystem(obNode *MobazhaNode) {
 		return
 	}
 	store := database.NewGormDiscountStore(obNode.db)
-	obNode.discountService = NewDiscountAppService(store, obNode.nodeID)
+	obNode.discountService = NewDiscountAppService(store, nil, obNode.nodeID)
 	logger.LogInfoWithID(log, obNode.nodeID, "Discount subsystem initialized")
 }
 

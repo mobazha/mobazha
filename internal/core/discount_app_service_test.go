@@ -190,7 +190,7 @@ func (m *mockDiscountStore) CountDiscounts(_ context.Context) (int64, error) {
 
 func TestDiscountAppService_CreateDiscount_ValidPercentage(t *testing.T) {
 	store := newMockStore()
-	svc := NewDiscountAppService(store, "tenant1")
+	svc := NewDiscountAppService(store, nil, "tenant1")
 	ctx := context.Background()
 
 	d := &models.Discount{
@@ -207,7 +207,7 @@ func TestDiscountAppService_CreateDiscount_ValidPercentage(t *testing.T) {
 
 func TestDiscountAppService_CreateDiscount_InvalidPercentage(t *testing.T) {
 	store := newMockStore()
-	svc := NewDiscountAppService(store, "t1")
+	svc := NewDiscountAppService(store, nil, "t1")
 	ctx := context.Background()
 
 	tests := []struct {
@@ -234,7 +234,7 @@ func TestDiscountAppService_CreateDiscount_InvalidPercentage(t *testing.T) {
 
 func TestDiscountAppService_CreateDiscount_FixedAmountNeedsCurrency(t *testing.T) {
 	store := newMockStore()
-	svc := NewDiscountAppService(store, "t1")
+	svc := NewDiscountAppService(store, nil, "t1")
 	ctx := context.Background()
 
 	d := &models.Discount{
@@ -252,7 +252,7 @@ func TestDiscountAppService_CreateDiscount_FixedAmountNeedsCurrency(t *testing.T
 
 func TestDiscountAppService_CreateDiscount_TitleRequired(t *testing.T) {
 	store := newMockStore()
-	svc := NewDiscountAppService(store, "t1")
+	svc := NewDiscountAppService(store, nil, "t1")
 
 	d := &models.Discount{
 		Title: "", Method: models.DiscountMethodCode,
@@ -266,7 +266,7 @@ func TestDiscountAppService_CreateDiscount_TitleRequired(t *testing.T) {
 
 func TestDiscountAppService_CreateDiscount_EndsAtMustBeAfterStartsAt(t *testing.T) {
 	store := newMockStore()
-	svc := NewDiscountAppService(store, "t1")
+	svc := NewDiscountAppService(store, nil, "t1")
 
 	now := time.Now()
 	endsAt := now.Add(-time.Hour)
@@ -282,7 +282,7 @@ func TestDiscountAppService_CreateDiscount_EndsAtMustBeAfterStartsAt(t *testing.
 
 func TestDiscountAppService_ComputeStatus_Scheduled(t *testing.T) {
 	store := newMockStore()
-	svc := NewDiscountAppService(store, "t1")
+	svc := NewDiscountAppService(store, nil, "t1")
 
 	future := time.Now().Add(24 * time.Hour)
 	d := &models.Discount{
@@ -296,7 +296,7 @@ func TestDiscountAppService_ComputeStatus_Scheduled(t *testing.T) {
 
 func TestDiscountAppService_ComputeStatus_Active(t *testing.T) {
 	store := newMockStore()
-	svc := NewDiscountAppService(store, "t1")
+	svc := NewDiscountAppService(store, nil, "t1")
 
 	d := &models.Discount{
 		Title: "Active", Method: models.DiscountMethodAutomatic,
@@ -309,7 +309,7 @@ func TestDiscountAppService_ComputeStatus_Active(t *testing.T) {
 
 func TestDiscountAppService_ValidateCode_Valid(t *testing.T) {
 	store := newMockStore()
-	svc := NewDiscountAppService(store, "tenant1")
+	svc := NewDiscountAppService(store, nil, "tenant1")
 	ctx := context.Background()
 
 	d := &models.Discount{
@@ -332,7 +332,7 @@ func TestDiscountAppService_ValidateCode_Valid(t *testing.T) {
 
 func TestDiscountAppService_ValidateCode_CaseInsensitive(t *testing.T) {
 	store := newMockStore()
-	svc := NewDiscountAppService(store, "tenant1")
+	svc := NewDiscountAppService(store, nil, "tenant1")
 	ctx := context.Background()
 
 	d := &models.Discount{
@@ -352,7 +352,7 @@ func TestDiscountAppService_ValidateCode_CaseInsensitive(t *testing.T) {
 
 func TestDiscountAppService_ValidateCode_Invalid(t *testing.T) {
 	store := newMockStore()
-	svc := NewDiscountAppService(store, "t1")
+	svc := NewDiscountAppService(store, nil, "t1")
 
 	result, err := svc.ValidateCode(context.Background(), "NOPE", "")
 	require.NoError(t, err)
@@ -362,7 +362,7 @@ func TestDiscountAppService_ValidateCode_Invalid(t *testing.T) {
 
 func TestDiscountAppService_ValidateCode_Expired(t *testing.T) {
 	store := newMockStore()
-	svc := NewDiscountAppService(store, "t1")
+	svc := NewDiscountAppService(store, nil, "t1")
 	ctx := context.Background()
 
 	endedAt := time.Now().Add(-time.Hour)
@@ -385,7 +385,7 @@ func TestDiscountAppService_ValidateCode_Expired(t *testing.T) {
 
 func TestDiscountAppService_GenerateCodes(t *testing.T) {
 	store := newMockStore()
-	svc := NewDiscountAppService(store, "t1")
+	svc := NewDiscountAppService(store, nil, "t1")
 	ctx := context.Background()
 
 	d := &models.Discount{
@@ -407,7 +407,7 @@ func TestDiscountAppService_GenerateCodes(t *testing.T) {
 
 func TestDiscountAppService_RecordRedemption(t *testing.T) {
 	store := newMockStore()
-	svc := NewDiscountAppService(store, "t1")
+	svc := NewDiscountAppService(store, nil, "t1")
 	ctx := context.Background()
 
 	d := &models.Discount{
@@ -428,7 +428,7 @@ func TestDiscountAppService_RecordRedemption(t *testing.T) {
 
 func TestDiscountAppService_TenantQuota(t *testing.T) {
 	store := newMockStore()
-	svc := NewDiscountAppService(store, "t1")
+	svc := NewDiscountAppService(store, nil, "t1")
 	ctx := context.Background()
 
 	for i := 0; i < maxDiscountsPerTenant; i++ {

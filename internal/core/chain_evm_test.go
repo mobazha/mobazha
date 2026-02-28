@@ -8,6 +8,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet/base"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet/coins/eth"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/evm"
 	"github.com/mobazha/mobazha3.0/pkg/relay"
@@ -60,6 +61,9 @@ func (m *mockHostService) GetEVMChainClient(chain iwallet.ChainType) iwallet.Cha
 }
 func (m *mockHostService) GetSolanaChainClient() iwallet.ChainClient  { return nil }
 func (m *mockHostService) GetSolanaEscrowProgramID() string           { return "" }
+func (m *mockHostService) GetDiscountAccessForPeer(_ peer.ID) (contracts.DiscountService, contracts.DiscountStore, error) {
+	return nil, nil, nil
+}
 
 var _ coreiface.HostService = (*mockHostService)(nil)
 

@@ -37,6 +37,8 @@ func NewDiscountAppService(store contracts.DiscountStore, collectionStore contra
 	}
 }
 
+// Store returns the underlying DiscountStore for engine wiring (e.g., hosting
+// constructs a DiscountEngine with the vendor's store for cross-tenant resolution).
 func (s *DiscountAppService) Store() contracts.DiscountStore {
 	return s.store
 }

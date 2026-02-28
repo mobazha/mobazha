@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 
@@ -273,15 +272,8 @@ func (op *OrderProcessor) validateOrderOpen(dbtx database.Tx, order *pb.OrderOpe
 
 		// Validate shipping option
 		if item.ShippingOption != nil {
-			// 优先从新版 ShippingProfile 验证（新模型为主）
-			// 从 ShippingProfile 的 LocationGroups 中查找配送区域
 			if listing.ShippingProfile != nil && hasShippingZones(listing.ShippingProfile) {
 				if err := validateShippingFromProfile(listing.ShippingProfile, item.ShippingOption); err != nil {
-					return fmt.Errorf("item %d %s", i, err.Error())
-				}
-			} else if len(listing.ShippingOptions) > 0 {
-				// 回退到旧版 ShippingOptions 验证
-				if err := validateShippingFromLegacy(listing.ShippingOptions, item.ShippingOption); err != nil {
 					return fmt.Errorf("item %d %s", i, err.Error())
 				}
 			} else {
@@ -474,6 +466,20 @@ func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode strin
 		orderTotal = orderTotal.Add(itemTotal)
 	}
 
+	// Apply discounts from order proto (amounts are negative strings)
+	hasFreeShipping := false
+	for _, ad := range order.AppliedDiscounts {
+		if ad.ValueType == "free_shipping" {
+			hasFreeShipping = true
+			continue
+		}
+		if ad.Amount != "" {
+			amt := iwallet.NewAmount(ad.Amount)
+			discountsTotal = discountsTotal.Add(amt)
+			orderTotal = orderTotal.Add(amt)
+		}
+	}
+
 	// Add in shipping
 	// Note: Free shipping threshold should use discounted subtotal before taxes.
 	eligibleSubtotal := subTotal.Add(discountsTotal)
@@ -482,6 +488,11 @@ func CalculateOrderTotalInCurrency(order *pb.OrderOpen, targetCurrencyCode strin
 		shippingTotal, err = calculateShippingTotalForListings(order, physicalGoods, paymentCurrency, erp, eligibleSubtotal)
 		if err != nil {
 			return models.OrderTotals{}, fmt.Errorf("shipping total: %s", err.Error())
+		}
+		if hasFreeShipping && shippingTotal.Cmp(iwallet.NewAmount(0)) > 0 {
+			shippingDiscount := iwallet.NewAmount(0).Sub(shippingTotal)
+			discountsTotal = discountsTotal.Add(shippingDiscount)
+			orderTotal = orderTotal.Add(shippingDiscount)
 		}
 		orderTotal = orderTotal.Add(shippingTotal)
 	}
@@ -530,51 +541,25 @@ func validateShippingFromProfile(profile *pb.ShippingProfile, shippingOption *pb
 	return fmt.Errorf("shipping zone %q not found in listing", shippingOption.Name)
 }
 
-// validateShippingFromLegacy 从旧版 ShippingOptions 验证配送选项（向后兼容）
-func validateShippingFromLegacy(shippingOptions []*pb.Listing_ShippingOption, shippingOption *pb.OrderOpen_Item_ShippingOption) error {
-	for _, option := range shippingOptions {
-		if strings.EqualFold(option.Name, shippingOption.Name) {
-			for _, service := range option.Services {
-				if strings.EqualFold(service.Name, shippingOption.Service) {
-					return nil
-				}
-			}
-			return fmt.Errorf("shipping service %q not found in option %q", shippingOption.Service, shippingOption.Name)
-		}
-	}
-	return fmt.Errorf("shipping option %q not found in listing", shippingOption.Name)
-}
-
 // ============================================================================
-// 统一运费计算类型（以新版 ShippingProfile 为主，旧版 ShippingOption 向后兼容）
+// 统一运费计算类型
 // ============================================================================
 
-// shippingCalcInfo 统一运费计算信息（内部类型）
-// 新版 profile 和旧版 legacy 二选一，互斥
+// shippingCalcInfo 运费计算信息（内部类型）
 type shippingCalcInfo struct {
 	isLocalPickup         bool
 	currency              string
 	freeShippingEnabled   bool
 	freeShippingMinAmount string
-
-	// 新版 ShippingProfile 模型（主路径）
-	profile *profileRateInfo
-	// 旧版 ShippingOption 模型（向后兼容）
-	legacy *legacyShippingInfo
+	profile               *profileRateInfo
 }
 
-// profileRateInfo 新版 ShippingProfile 的费率信息
+// profileRateInfo ShippingProfile 的费率信息
 type profileRateInfo struct {
-	price             string // 价格（最小单位）
+	price             string
 	conditionType     pb.ShippingRate_RateCondition_ConditionType
 	conditionMinValue uint32
 	conditionMaxValue uint32
-}
-
-// legacyShippingInfo 旧版 ShippingOption 的配送信息
-type legacyShippingInfo struct {
-	option  *pb.Listing_ShippingOption
-	service *pb.Listing_ShippingOption_Service
 }
 
 // getAllZonesFromProfile 获取 ShippingProfile 中所有 LocationGroup 的 ShippingZone
@@ -604,8 +589,7 @@ func hasShippingZones(profile *pb.ShippingProfile) bool {
 	return false
 }
 
-// getShippingInfo 获取统一的运费计算信息
-// 优先从新版 ShippingProfile 查找，回退到旧版 ShippingOptions
+// getShippingInfo 获取运费计算信息
 func getShippingInfo(order *pb.OrderOpen, listings map[string]*pb.Listing) (*shippingCalcInfo, error) {
 	if len(order.Items) == 0 {
 		return nil, errors.New("no order item found")
@@ -618,17 +602,10 @@ func getShippingInfo(order *pb.OrderOpen, listings map[string]*pb.Listing) (*shi
 		return nil, errors.New("no listing found with item listingHash")
 	}
 
-	// 优先从新版 ShippingProfile 查找（从 LocationGroups 中获取配送区域）
-	if listing.ShippingProfile != nil && hasShippingZones(listing.ShippingProfile) {
-		return getShippingInfoFromProfile(order, listing, item)
+	if listing.ShippingProfile == nil || !hasShippingZones(listing.ShippingProfile) {
+		return nil, errors.New("no shipping profile found in listing")
 	}
-
-	// 回退到旧版 ShippingOptions（向后兼容）
-	if len(listing.ShippingOptions) > 0 {
-		return getShippingInfoFromLegacy(order, listing, item)
-	}
-
-	return nil, errors.New("no shipping profile or shipping options found in listing")
+	return getShippingInfoFromProfile(order, listing, item)
 }
 
 // getShippingInfoFromProfile 从新版 ShippingProfile 中查找配送信息
@@ -714,61 +691,6 @@ func getShippingInfoFromProfile(order *pb.OrderOpen, listing *pb.Listing, item *
 	if matchedRate.FreeShippingThreshold != nil {
 		info.freeShippingEnabled = matchedRate.FreeShippingThreshold.Enabled
 		info.freeShippingMinAmount = matchedRate.FreeShippingThreshold.MinAmount
-	}
-
-	return info, nil
-}
-
-// getShippingInfoFromLegacy 从旧版 ShippingOptions 中查找配送信息（向后兼容）
-func getShippingInfoFromLegacy(order *pb.OrderOpen, listing *pb.Listing, item *pb.OrderOpen_Item) (*shippingCalcInfo, error) {
-	// Check selected option exists
-	shippingOptions := make(map[string]*pb.Listing_ShippingOption)
-	for _, so := range listing.ShippingOptions {
-		shippingOptions[strings.ToLower(so.Name)] = so
-	}
-	option, ok := shippingOptions[strings.ToLower(item.ShippingOption.Name)]
-	if !ok {
-		return nil, errors.New("shipping option not found in listing")
-	}
-
-	if option.Type == pb.Listing_ShippingOption_LOCAL_PICKUP {
-		return &shippingCalcInfo{
-			isLocalPickup: true,
-			currency:      option.Currency,
-			legacy:        &legacyShippingInfo{option: option},
-		}, nil
-	}
-
-	// Check that this option ships to us (case-insensitive comparison)
-	regions := make(map[string]bool)
-	for _, country := range option.Regions {
-		regions[strings.ToUpper(country)] = true
-	}
-	_, shipsToMe := regions[strings.ToUpper(order.Shipping.Country)]
-	_, shipsToAll := regions["ALL"]
-	if !shipsToMe && !shipsToAll {
-		return nil, errors.New("listing does not ship to selected country")
-	}
-
-	// Check service exists
-	services := make(map[string]*pb.Listing_ShippingOption_Service)
-	for _, shippingService := range option.Services {
-		services[strings.ToLower(shippingService.Name)] = shippingService
-	}
-	service, ok := services[strings.ToLower(item.ShippingOption.Service)]
-	if !ok {
-		return nil, errors.New("shipping service not found in listing")
-	}
-
-	info := &shippingCalcInfo{
-		currency: option.Currency,
-		legacy:   &legacyShippingInfo{option: option, service: service},
-	}
-
-	// 提取满额免邮配置
-	if option.FreeShippingThreshold != nil {
-		info.freeShippingEnabled = option.FreeShippingThreshold.Enabled
-		info.freeShippingMinAmount = option.FreeShippingThreshold.MinAmount
 	}
 
 	return info, nil
@@ -884,39 +806,6 @@ func calculateShippingTotalForListings(order *pb.OrderOpen, listings map[string]
 			freight = iwallet.NewAmount(info.profile.price)
 		}
 
-	} else if info.legacy != nil {
-		// ============ 旧版 ShippingOption 模型（向后兼容） ============
-		option := info.legacy.option
-		service := info.legacy.service
-
-		// 旧版基于重量模式，gramsTotal == 0 时不收运费
-		if gramsTotal == 0 {
-			return shippingTotal, nil
-		}
-
-		if option.ServiceType == pb.Listing_ShippingOption_FIRST_RENEWAL_FEE {
-			// 首重+续重模式
-			renewalFee := iwallet.NewAmount(0)
-			if gramsTotal > service.FirstWeight {
-				renewalFee = iwallet.NewAmount(service.RenewalUnitPrice).Mul(
-					iwallet.NewAmount(math.Ceil(float64(gramsTotal-service.FirstWeight) / float64(service.RenewalUnitWeight))))
-			}
-			freight = iwallet.NewAmount(service.FirstFreight).Add(renewalFee).Add(iwallet.NewAmount(service.RegistrationFee))
-		} else {
-			// SAME_WEIGHT_SAME_FEE 模式：根据总重量匹配对应的服务区间
-			var matchedService *pb.Listing_ShippingOption_Service
-			for _, svc := range option.Services {
-				if gramsTotal >= svc.StartWeight && gramsTotal <= svc.EndWeight {
-					matchedService = svc
-					break
-				}
-			}
-			if matchedService == nil {
-				// 如果没有匹配的区间，使用前端选择的 service（向后兼容）
-				matchedService = service
-			}
-			freight = iwallet.NewAmount(matchedService.FirstFreight).Add(iwallet.NewAmount(matchedService.RegistrationFee))
-		}
 	}
 
 	pricingCurrency, err := models.CurrencyDefinitions.Lookup(info.currency)

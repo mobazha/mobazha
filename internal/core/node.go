@@ -150,6 +150,9 @@ type MobazhaNode struct {
 	// fiatPaymentService orchestrates fiat payment operations (Stripe, PayPal).
 	fiatPaymentService *FiatPaymentAppService
 
+	// shippingService encapsulates shipping profile and location management.
+	shippingService *ShippingAppService
+
 	// eventDispatcher is the unified EventBus subscriber that fans out events
 	// to NotificationSink, WebhookSink, and ChannelNotificationSink.
 	eventDispatcher *events.Dispatcher
@@ -639,6 +642,20 @@ func (n *MobazhaNode) SaveAIConfig(cfg aipkg.Config) error {
 		return fmt.Errorf("marshal AI config: %w", err)
 	}
 	return n.saveSetting(models.SettingsKeyAIConfig, string(data))
+}
+
+// StoreConfig reads the storefront branding config from the database.
+func (n *MobazhaNode) StoreConfig() (json.RawMessage, error) {
+	val, err := n.getSetting(models.SettingsKeyStoreConfig)
+	if err != nil || val == "" {
+		return nil, nil
+	}
+	return json.RawMessage(val), nil
+}
+
+// SaveStoreConfig persists the storefront branding config.
+func (n *MobazhaNode) SaveStoreConfig(cfg json.RawMessage) error {
+	return n.saveSetting(models.SettingsKeyStoreConfig, string(cfg))
 }
 
 // getSetting reads a single key from the node_settings table.

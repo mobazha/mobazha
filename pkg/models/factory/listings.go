@@ -101,18 +101,28 @@ func NewPhysicalListing(slug string) *pb.Listing {
 				TaxRegions:  []string{"US"},
 			},
 		},
-		ShippingOptions: []*pb.Listing_ShippingOption{
-			{
-				Name:        "usps",
-				Type:        pb.Listing_ShippingOption_FIXED_PRICE,
-				Currency:    "USD",
-				Regions:     []string{"ALL"},
-				ServiceType: pb.Listing_ShippingOption_SAME_WEIGHT_SAME_FEE,
-				Services: []*pb.Listing_ShippingOption_Service{
-					{
-						Name:              "standard",
-						EstimatedDelivery: "3 days",
-						FirstFreight:      "20",
+		ShippingProfile: &pb.ShippingProfile{
+			ProfileID: "factory-default-profile",
+			Name:      "Default Shipping",
+			IsDefault: true,
+			LocationGroups: []*pb.LocationGroup{
+				{
+					Id: "default-lg",
+					Zones: []*pb.ShippingZone{
+						{
+							Id:      "zone-all",
+							Name:    "Worldwide",
+							Regions: []string{"ALL"},
+							Rates: []*pb.ShippingRate{
+								{
+									Id:                "rate-standard",
+									Name:              "standard",
+									Price:             "20",
+									Currency:          "USD",
+									EstimatedDelivery: "3 days",
+								},
+							},
+						},
 					},
 				},
 			},
@@ -170,7 +180,7 @@ func NewCryptoListing(slug string) *pb.Listing {
 	listing.Item.CryptoListingCurrencyCode = "TETH"
 	listing.Metadata.ContractType = pb.Listing_Metadata_CRYPTOCURRENCY
 	listing.Item.Skus = []*pb.Listing_Item_Sku{{Quantity: "100000000"}}
-	listing.ShippingOptions = nil
+	listing.ShippingProfile = nil
 	listing.Item.Condition = ""
 	listing.Item.Options = nil
 	listing.Item.Price = "100"

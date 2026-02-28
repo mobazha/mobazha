@@ -726,6 +726,9 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.Discount{},
 		&models.DiscountCode{},
 		&models.DiscountRedemption{},
+		&models.ShippingProfileEntity{},
+		&models.ShippingLocationEntity{},
+		&models.ListingShippingRef{},
 	}
 
 	return db.Update(func(tx database.Tx) error {
@@ -820,6 +823,9 @@ func autoMigrateDatabaseManagedEscrow(db database.Database) error {
 		&models.Discount{},
 		&models.DiscountCode{},
 		&models.DiscountRedemption{},
+		&models.ShippingProfileEntity{},
+		&models.ShippingLocationEntity{},
+		&models.ListingShippingRef{},
 	}
 
 	return db.Update(func(tx database.Tx) error {

@@ -128,7 +128,7 @@ func NewOrder() (*pb.OrderOpen, *pb.PaymentSent, error) {
 					},
 				},
 				ShippingOption: &pb.OrderOpen_Item_ShippingOption{
-					Name:    "usps",
+					Name:    "Worldwide",
 					Service: "standard",
 				},
 			},

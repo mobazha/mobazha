@@ -52,6 +52,7 @@ type shippingAddress struct {
 	AddressNotes   string `json:"addressNotes"`
 }
 
+// ShippingOption_Service 旧版配送服务（仅用于反序列化 UserPreferences 中的历史 JSON 数据）
 type ShippingOption_Service struct {
 	Name              string `json:"name"`
 	EstimatedDelivery string `json:"estimatedDelivery"`
@@ -64,15 +65,16 @@ type ShippingOption_Service struct {
 	RegistrationFee   string `json:"registrationFee"`
 }
 
+// ShippingOption 旧版配送选项（仅用于反序列化 UserPreferences 中的历史 JSON 数据）
 type ShippingOption struct {
-	ID                    int                        `json:"id" gorm:"primaryKey"`
-	Name                  string                     `json:"name"`
-	Type                  string                     `json:"type"`
-	Currency              string                     `json:"currency"`
-	ServiceType           string                     `json:"serviceType"`
-	Regions               []string                   `json:"regions"`
-	Services              []*ShippingOption_Service  `json:"services"`
-	FreeShippingThreshold *FreeShippingThreshold     `json:"freeShippingThreshold,omitempty"`
+	ID                    int                       `json:"id" gorm:"primaryKey"`
+	Name                  string                    `json:"name"`
+	Type                  string                    `json:"type"`
+	Currency              string                    `json:"currency"`
+	ServiceType           string                    `json:"serviceType"`
+	Regions               []string                  `json:"regions"`
+	Services              []*ShippingOption_Service `json:"services"`
+	FreeShippingThreshold *FreeShippingThreshold    `json:"freeShippingThreshold,omitempty"`
 }
 
 // FreeShippingThreshold 满额免邮配置
@@ -143,71 +145,6 @@ func (p *ShippingProfile) GetAllZones() []*ShippingZone {
 		zones = append(zones, lg.Zones...)
 	}
 	return zones
-}
-
-func ConvertShippingOption(option ShippingOption) *pb.Listing_ShippingOption {
-	shippingOption := &pb.Listing_ShippingOption{
-		OptionID:    uint32(option.ID),
-		Name:        option.Name,
-		Type:        pb.Listing_ShippingOption_ShippingType(pb.Listing_ShippingOption_ShippingType_value[option.Type]),
-		Currency:    option.Currency,
-		ServiceType: pb.Listing_ShippingOption_ServiceType(pb.Listing_ShippingOption_ServiceType_value[option.ServiceType]),
-	}
-
-	for _, region := range option.Regions {
-		shippingOption.Regions = append(shippingOption.Regions, strings.ToUpper(region))
-	}
-
-	for _, service := range option.Services {
-		shippingOption.Services = append(shippingOption.Services, &pb.Listing_ShippingOption_Service{
-			Name:              service.Name,
-			EstimatedDelivery: service.EstimatedDelivery,
-			StartWeight:       service.StartWeight,
-			EndWeight:         service.EndWeight,
-			FirstWeight:       service.FirstWeight,
-			FirstFreight:      service.FirstFreight,
-			RenewalUnitWeight: service.RenewalUnitWeight,
-			RenewalUnitPrice:  service.RenewalUnitPrice,
-			RegistrationFee:   service.RegistrationFee,
-		})
-	}
-
-	// 处理满额免邮配置
-	if option.FreeShippingThreshold != nil {
-		shippingOption.FreeShippingThreshold = &pb.Listing_ShippingOption_FreeShippingThreshold{
-			Enabled:   option.FreeShippingThreshold.Enabled,
-			MinAmount: option.FreeShippingThreshold.MinAmount,
-		}
-	}
-
-	return shippingOption
-}
-
-func ConvertShippingOptions(options []ShippingOption) []*pb.Listing_ShippingOption {
-	shippingOptions := make([]*pb.Listing_ShippingOption, 0)
-	for _, option := range options {
-		shippingOptions = append(shippingOptions, ConvertShippingOption(option))
-	}
-	return shippingOptions
-}
-
-// ConvertShippingOptionFromPointer 从指针类型的 ShippingOption 转换
-func ConvertShippingOptionFromPointer(option *ShippingOption) *pb.Listing_ShippingOption {
-	if option == nil {
-		return nil
-	}
-	return ConvertShippingOption(*option)
-}
-
-// ConvertShippingOptionsFromPointers 从指针数组转换
-func ConvertShippingOptionsFromPointers(options []*ShippingOption) []*pb.Listing_ShippingOption {
-	shippingOptions := make([]*pb.Listing_ShippingOption, 0, len(options))
-	for _, option := range options {
-		if option != nil {
-			shippingOptions = append(shippingOptions, ConvertShippingOption(*option))
-		}
-	}
-	return shippingOptions
 }
 
 // ConvertShippingProfileToProto 将 JSON 格式的 ShippingProfile 转换为 protobuf 格式

@@ -16,10 +16,22 @@ message OrderOpen {
     repeated bytes ratingKeys           = 6;
     string alternateContactInfo         = 7;
     string chaincode                    = 8; // unique id for payment, 32
-    string pricingCoin                  = 9;  // 结算货币代码：USD, EUR, BNB, ETH（非 Provider 名）
-    string amount                       = 10; // Satoshis / cents (最小单位金额)
+    string pricingCoin                  = 9;
+    string amount                       = 10; // Satoshis / cents (smallest unit)
     repeated string discountCodes       = 11;
-    string fiatProvider                 = 22; // 法币 Provider ID："stripe" | "paypal" | ""（加密留空）
+    repeated AppliedDiscount appliedDiscounts = 12;
+    string fiatProvider                 = 22; // Fiat provider ID: "stripe" | "paypal" | "" (crypto)
+
+    message AppliedDiscount {
+        string discountID = 1;
+        string title      = 2;
+        string code       = 3;
+        string valueType  = 4;  // "percentage", "fixed", "free_shipping"
+        string value      = 5;
+        string amount     = 6;  // negative, in payment currency smallest unit
+        bool   auto       = 7;
+        string codeID     = 8;
+    }
 
     message Shipping {
         string shipTo       = 1;

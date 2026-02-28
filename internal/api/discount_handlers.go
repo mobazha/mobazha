@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -24,8 +23,6 @@ func discountErrorResponse(w http.ResponseWriter, err error) {
 	}
 	response.Error(w, http.StatusBadRequest, response.CodeBadRequest, msg)
 }
-
-const maxPageSize = 100
 
 func getDiscountService(r *http.Request) (contracts.DiscountService, bool) {
 	dp, ok := getNodeService(r).(contracts.DiscountProvider)
@@ -401,17 +398,3 @@ func (g *Gateway) handleCalculateDiscounts(w http.ResponseWriter, r *http.Reques
 	response.Success(w, resp)
 }
 
-func intQueryParam(r *http.Request, key string, defaultVal int) int {
-	s := r.URL.Query().Get(key)
-	if s == "" {
-		return defaultVal
-	}
-	v, err := strconv.Atoi(s)
-	if err != nil || v < 1 {
-		return defaultVal
-	}
-	if key == "pageSize" && v > maxPageSize {
-		return maxPageSize
-	}
-	return v
-}

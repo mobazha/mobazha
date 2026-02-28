@@ -55,6 +55,20 @@ func (n *MobazhaNode) Discount() contracts.DiscountService { return n.discountSe
 // CollectionProvider implementation — per-node collection subsystem.
 func (n *MobazhaNode) Collection() contracts.CollectionService { return n.collectionService }
 
+// DiscountStore exposes the underlying DiscountStore for cross-tenant wiring
+// (e.g., hosting constructs a DiscountEngine with the vendor's store).
+func (n *MobazhaNode) DiscountStore() contracts.DiscountStore {
+	if n.discountService == nil {
+		return nil
+	}
+	return n.discountService.Store()
+}
+
+// ShippingProvider implementation — per-node shipping subsystem.
+var _ contracts.ShippingProvider = (*MobazhaNode)(nil)
+
+func (n *MobazhaNode) Shipping() contracts.ShippingService { return n.shippingService }
+
 func (n *MobazhaNode) Order() contracts.OrderService {
 	return &orderServiceFacade{
 		OrderAppService: n.orderService,

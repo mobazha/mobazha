@@ -1318,6 +1318,10 @@ func initCollectionSubsystem(obNode *MobazhaNode) {
 	store := database.NewGormCollectionStore(obNode.db)
 	obNode.collectionService = NewCollectionAppService(store, obNode.eventBus, obNode.nodeID)
 
+	if obNode.discountService != nil {
+		obNode.discountService.collectionStore = store
+	}
+
 	// Wire listing delete → collection cleanup via closure (callback-safety-rules.mdc)
 	if obNode.listingService != nil {
 		obNode.listingService.onDeleteCleanup = func(slug string) {

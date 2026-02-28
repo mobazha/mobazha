@@ -32,6 +32,10 @@ func NewCollectionAppService(store contracts.CollectionStore, bus events.Bus, te
 	}
 }
 
+func (s *CollectionAppService) Store() contracts.CollectionStore {
+	return s.store
+}
+
 func (s *CollectionAppService) CreateCollection(ctx context.Context, c *models.Collection) error {
 	if c.Title == "" {
 		return database.ErrCollectionTitleRequired

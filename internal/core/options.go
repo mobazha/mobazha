@@ -306,6 +306,12 @@ func (n *MobazhaNode) initOrderService() {
 			}
 			return nil
 		},
+		CollectionStore: func() contracts.CollectionStore {
+			if n.collectionService != nil {
+				return n.collectionService.Store()
+			}
+			return nil
+		},
 	})
 }
 

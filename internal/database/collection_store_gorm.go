@@ -98,39 +98,35 @@ func (s *GormCollectionStore) ListCollections(_ context.Context, page, pageSize 
 func (s *GormCollectionStore) UpdateCollection(_ context.Context, c *models.Collection) error {
 	c.UpdatedAt = time.Now()
 	return s.db.Update(func(tx pkgdb.Tx) error {
-		result := tx.Read().Model(&models.Collection{}).
-			Where("id = ? AND deleted_at IS NULL", c.ID).
-			Updates(map[string]interface{}{
-				"title":       c.Title,
-				"description": c.Description,
-				"image":       c.Image,
-				"sort_order":  c.SortOrder,
-				"published":   c.Published,
-				"updated_at":  c.UpdatedAt,
-			})
-		if result.Error != nil {
-			return result.Error
+		var existing models.Collection
+		if err := tx.Read().Where("id = ? AND deleted_at IS NULL", c.ID).First(&existing).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrCollectionNotFound
+			}
+			return err
 		}
-		if result.RowsAffected == 0 {
-			return ErrCollectionNotFound
-		}
-		return nil
+		existing.Title = c.Title
+		existing.Description = c.Description
+		existing.Image = c.Image
+		existing.SortOrder = c.SortOrder
+		existing.Published = c.Published
+		existing.UpdatedAt = c.UpdatedAt
+		return tx.Save(&existing)
 	})
 }
 
 func (s *GormCollectionStore) DeleteCollection(_ context.Context, id string) error {
 	now := time.Now()
 	return s.db.Update(func(tx pkgdb.Tx) error {
-		result := tx.Read().Model(&models.Collection{}).
-			Where("id = ? AND deleted_at IS NULL", id).
-			Update("deleted_at", now)
-		if result.Error != nil {
-			return result.Error
+		var existing models.Collection
+		if err := tx.Read().Where("id = ? AND deleted_at IS NULL", id).First(&existing).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrCollectionNotFound
+			}
+			return err
 		}
-		if result.RowsAffected == 0 {
-			return ErrCollectionNotFound
-		}
-		return nil
+		existing.DeletedAt = &now
+		return tx.Save(&existing)
 	})
 }
 
@@ -166,19 +162,20 @@ func isUniqueConstraintErr(err error) bool {
 
 func (s *GormCollectionStore) RemoveProduct(_ context.Context, collectionID, slug string) error {
 	return s.db.Update(func(tx pkgdb.Tx) error {
-		return tx.Read().Where("collection_id = ? AND listing_slug = ?", collectionID, slug).
-			Delete(&models.CollectionProduct{}).Error
+		return tx.Delete("collection_id", collectionID, map[string]interface{}{
+			"listing_slug = ?": slug,
+		}, &models.CollectionProduct{})
 	})
 }
 
 func (s *GormCollectionStore) ReorderProducts(_ context.Context, collectionID string, orderedSlugs []string) error {
 	return s.db.Update(func(tx pkgdb.Tx) error {
 		for i, slug := range orderedSlugs {
-			result := tx.Read().Model(&models.CollectionProduct{}).
-				Where("collection_id = ? AND listing_slug = ?", collectionID, slug).
-				Update("position", i)
-			if result.Error != nil {
-				return result.Error
+			if err := tx.Update("position", i, map[string]interface{}{
+				"collection_id = ?": collectionID,
+				"listing_slug = ?":  slug,
+			}, &models.CollectionProduct{}); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -197,8 +194,7 @@ func (s *GormCollectionStore) IsProductInCollections(_ context.Context, collecti
 
 func (s *GormCollectionStore) RemoveProductFromAllCollections(_ context.Context, slug string) error {
 	return s.db.Update(func(tx pkgdb.Tx) error {
-		return tx.Read().Where("listing_slug = ?", slug).
-			Delete(&models.CollectionProduct{}).Error
+		return tx.Delete("listing_slug", slug, nil, &models.CollectionProduct{})
 	})
 }
 

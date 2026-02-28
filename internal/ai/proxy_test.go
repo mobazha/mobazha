@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -140,14 +141,28 @@ func TestProxy_Generate_EmptyResponse(t *testing.T) {
 }
 
 func TestProxy_Generate_AllActions(t *testing.T) {
+	listingJSON := `{"title": "T", "description": "D", "tags": ["a"], "categories": ["c"], "shortDescription": "S"}`
+	storeJSON := `{"version":1,"status":"published","theme":{"palette":"minimal","primaryColor":"#000","fontFamily":"inter","borderRadius":"md","headerStyle":"minimal"},"sections":[]}`
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var reqBody map[string]interface{}
+		json.NewDecoder(r.Body).Decode(&reqBody)
+
+		content := listingJSON
+		msgs, _ := reqBody["messages"].([]interface{})
+		if len(msgs) > 0 {
+			if lastMsg, ok := msgs[len(msgs)-1].(map[string]interface{}); ok {
+				if userContent, ok := lastMsg["content"].(string); ok {
+					if strings.Contains(userContent, "store design") {
+						content = storeJSON
+					}
+				}
+			}
+		}
+
 		resp := map[string]interface{}{
 			"choices": []map[string]interface{}{
-				{
-					"message": map[string]interface{}{
-						"content": `{"title": "T", "description": "D", "tags": ["a"], "categories": ["c"], "shortDescription": "S"}`,
-					},
-				},
+				{"message": map[string]interface{}{"content": content}},
 			},
 		}
 		json.NewEncoder(w).Encode(resp)
@@ -162,6 +177,7 @@ func TestProxy_Generate_AllActions(t *testing.T) {
 		{Action: "improve_title", Title: "Old Title", Description: "Some desc"},
 		{Action: "polish_description", Title: "Title", Description: "Old desc", Language: "en"},
 		{Action: "suggest_tags", Title: "Title"},
+		{Action: "generate_store", BrandName: "Test", BrandDesc: "A test store"},
 	}
 
 	for _, req := range actions {
@@ -287,6 +303,150 @@ func TestProxy_TestConnection_NoKey(t *testing.T) {
 	if err == nil || err.Error() != "API key is required" {
 		t.Errorf("expected 'API key is required', got %v", err)
 	}
+}
+
+func TestProxy_Generate_StoreAction_Success(t *testing.T) {
+	storeConfigJSON := `{"version":1,"status":"published","theme":{"palette":"ocean","primaryColor":"#1a3a5c","fontFamily":"inter","borderRadius":"md","headerStyle":"hero"},"sections":[{"id":"test-hero","type":"hero","props":{"title":"Welcome","height":"md","textAlign":"center"},"visible":true},{"id":"test-tabs","type":"store-tabs","props":{"tabs":["reviews","following","followers"]},"visible":true}]}`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var reqBody map[string]interface{}
+		json.NewDecoder(r.Body).Decode(&reqBody)
+
+		if maxTokens, ok := reqBody["max_tokens"].(float64); ok {
+			if maxTokens != 4096 {
+				t.Errorf("expected max_tokens 4096 for store action, got %v", maxTokens)
+			}
+		}
+
+		resp := map[string]interface{}{
+			"choices": []map[string]interface{}{
+				{"message": map[string]interface{}{"content": storeConfigJSON}},
+			},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	proxy := NewProxy(server.Client())
+	cfg := Config{APIKey: "k", BaseURL: server.URL, Enabled: true}
+
+	result, err := proxy.Generate(cfg, GenerateRequest{
+		Action:    "generate_store",
+		BrandName: "Luna Botanicals",
+		BrandDesc: "Organic skincare products",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.StoreConfig == nil {
+		t.Fatal("expected StoreConfig to be set")
+	}
+	if result.Title != "" {
+		t.Error("expected Title to be empty for store action")
+	}
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(result.StoreConfig, &parsed); err != nil {
+		t.Fatalf("StoreConfig is not valid JSON: %v", err)
+	}
+	if parsed["version"] != float64(1) {
+		t.Errorf("expected version 1, got %v", parsed["version"])
+	}
+}
+
+func TestProxy_Generate_StoreAction_InvalidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"choices": []map[string]interface{}{
+				{"message": map[string]interface{}{"content": "This is not JSON at all"}},
+			},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	proxy := NewProxy(server.Client())
+	cfg := Config{APIKey: "k", BaseURL: server.URL, Enabled: true}
+
+	_, err := proxy.Generate(cfg, GenerateRequest{
+		Action:    "generate_store",
+		BrandName: "Test",
+		BrandDesc: "Test",
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid JSON response")
+	}
+	if got := err.Error(); got != "invalid AI response: not valid JSON" {
+		t.Errorf("unexpected error message: %s", got)
+	}
+}
+
+func TestBuildPrompt_GenerateStore(t *testing.T) {
+	msgs, err := buildPrompt(GenerateRequest{
+		Action:    "generate_store",
+		BrandName: "Luna Botanicals",
+		BrandDesc: "Organic skincare",
+		Language:  "zh",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(msgs) != 2 {
+		t.Fatalf("expected 2 messages, got %d", len(msgs))
+	}
+	if msgs[0].Role != "system" {
+		t.Error("expected system role for first message")
+	}
+	sysContent, ok := msgs[0].Content.(string)
+	if !ok {
+		t.Fatal("expected string system content")
+	}
+	if !containsAll(sysContent, "StoreConfig Schema", "hero", "trust-badges", "store-tabs") {
+		t.Error("system prompt missing expected schema content")
+	}
+	userContent, ok := msgs[1].Content.(string)
+	if !ok {
+		t.Fatal("expected string user content")
+	}
+	if !containsAll(userContent, "Luna Botanicals", "Organic skincare", "Chinese") {
+		t.Error("user prompt missing brand info or language")
+	}
+}
+
+func TestBuildPrompt_GenerateStore_MissingBrandName(t *testing.T) {
+	_, err := buildPrompt(GenerateRequest{
+		Action:    "generate_store",
+		BrandDesc: "Some description",
+	})
+	if err == nil {
+		t.Fatal("expected error for missing brandName")
+	}
+}
+
+func TestBuildPrompt_RefineStore_MissingFields(t *testing.T) {
+	_, err := buildPrompt(GenerateRequest{
+		Action: "refine_store",
+	})
+	if err == nil {
+		t.Fatal("expected error for missing storeConfig")
+	}
+
+	_, err = buildPrompt(GenerateRequest{
+		Action:      "refine_store",
+		StoreConfig: json.RawMessage(`{}`),
+	})
+	if err == nil {
+		t.Fatal("expected error for missing instruction")
+	}
+}
+
+func containsAll(s string, substrs ...string) bool {
+	for _, sub := range substrs {
+		if !strings.Contains(s, sub) {
+			return false
+		}
+	}
+	return true
 }
 
 func TestExtractJSON(t *testing.T) {

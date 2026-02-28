@@ -21,15 +21,21 @@ type GenerateRequest struct {
 	Description  string   `json:"description,omitempty"`
 	ContractType string   `json:"contractType,omitempty"`
 	Language     string   `json:"language,omitempty"`
+	// generate_store / refine_store fields:
+	BrandName   string          `json:"brandName,omitempty"`
+	BrandDesc   string          `json:"brandDescription,omitempty"`
+	StoreConfig json.RawMessage `json:"storeConfig,omitempty"`
+	Instruction string          `json:"instruction,omitempty"`
 }
 
 // GenerateResponse mirrors the frontend AiGenerateResponse.
 type GenerateResponse struct {
-	Title            string   `json:"title,omitempty"`
-	Description      string   `json:"description,omitempty"`
-	Tags             []string `json:"tags,omitempty"`
-	Categories       []string `json:"categories,omitempty"`
-	ShortDescription string   `json:"shortDescription,omitempty"`
+	Title            string          `json:"title,omitempty"`
+	Description      string          `json:"description,omitempty"`
+	Tags             []string        `json:"tags,omitempty"`
+	Categories       []string        `json:"categories,omitempty"`
+	ShortDescription string          `json:"shortDescription,omitempty"`
+	StoreConfig      json.RawMessage `json:"storeConfig,omitempty"`
 }
 
 // Proxy handles proxying AI requests to an OpenAI-compatible API.
@@ -107,6 +113,10 @@ func (p *Proxy) TestConnection(cfg Config) error {
 	return nil
 }
 
+func isStoreAction(action string) bool {
+	return action == "generate_store" || action == "refine_store"
+}
+
 func (p *Proxy) Generate(cfg Config, req GenerateRequest) (*GenerateResponse, error) {
 	if !cfg.IsValid() {
 		return nil, fmt.Errorf("AI is not configured")
@@ -117,11 +127,16 @@ func (p *Proxy) Generate(cfg Config, req GenerateRequest) (*GenerateResponse, er
 		return nil, err
 	}
 
+	maxTokens := 1024
+	if isStoreAction(req.Action) {
+		maxTokens = 4096
+	}
+
 	body := map[string]interface{}{
 		"model":       cfg.EffectiveModel(),
 		"messages":    messages,
 		"temperature": 0.7,
-		"max_tokens":  1024,
+		"max_tokens":  maxTokens,
 	}
 
 	payload, err := json.Marshal(body)
@@ -183,8 +198,16 @@ func (p *Proxy) Generate(cfg Config, req GenerateRequest) (*GenerateResponse, er
 
 	content := extractJSON(apiResp.Choices[0].Message.Content)
 	var result GenerateResponse
-	if err := json.Unmarshal([]byte(content), &result); err != nil {
-		return nil, fmt.Errorf("invalid AI response format: %w", err)
+
+	if isStoreAction(req.Action) {
+		if !json.Valid([]byte(content)) {
+			return nil, fmt.Errorf("invalid AI response: not valid JSON")
+		}
+		result.StoreConfig = json.RawMessage(content)
+	} else {
+		if err := json.Unmarshal([]byte(content), &result); err != nil {
+			return nil, fmt.Errorf("invalid AI response format: %w", err)
+		}
 	}
 	return &result, nil
 }
@@ -227,6 +250,46 @@ func extractJSON(text string) string {
 }
 
 const systemPrompt = "You are an expert e-commerce product listing assistant. You help sellers create compelling, professional product listings. Always respond in valid JSON format. Do NOT wrap your response in markdown code fences."
+
+const storeBuilderSystemPrompt = `You are an expert e-commerce store designer. Create a complete store configuration as valid JSON.
+
+## StoreConfig Schema
+{
+  "version": 1,
+  "status": "published",
+  "theme": {
+    "palette": one of "minimal"|"ocean"|"forest"|"sunset"|"midnight"|"earth"|"lavender"|"rose"|"custom",
+    "primaryColor": "#hex6",
+    "secondaryColor": "#hex6",
+    "accentColor": "#hex6",
+    "fontFamily": one of "inter"|"dm-sans"|"space-grotesk"|"playfair"|"lora"|"merriweather"|"josefin-sans"|"poppins",
+    "borderRadius": one of "none"|"sm"|"md"|"lg"|"full",
+    "headerStyle": one of "minimal"|"classic"|"hero"
+  },
+  "sections": [/* 4-8 sections */]
+}
+
+## Available Section Types
+Each section: { "id": "unique-string", "type": "...", "props": {...}, "visible": true }
+
+- hero: { "title": str, "subtitle": str?, "ctaText": str?, "height": "sm"|"md"|"lg", "textAlign": "left"|"center"|"right", "overlayOpacity": 0-1 }
+- featured-products: { "title": str, "mode": "newest"|"popular"|"manual", "count": 3|4, "columns": 2|3|4 }
+- product-grid: { "title": str?, "showFilters": bool, "showSearch": bool, "columns": 2|3|4, "sortDefault": "newest"|"price-asc"|"price-desc"|"name" }
+- announcement-bar: { "text": str, "dismissible": bool }
+- trust-badges: { "badges": [{"icon": "escrow"|"crypto"|"selfHosted"|"p2p"|"privacy", "title": str, "description": str}], "layout": "horizontal"|"grid", "style": "minimal"|"card"|"illustrated" }
+- about: { "title": str, "text": str, "imagePosition": "left"|"right", "showContactInfo": bool }
+- testimonials: { "title": str, "mode": "latest"|"manual", "count": 3|4 }
+- faq: { "title": str, "items": [{"question": str, "answer": str}] }
+- store-tabs: { "tabs": ["reviews","following","followers"] }
+
+## Rules
+1. ALWAYS include exactly one store-tabs section as the LAST section
+2. Include 4-8 sections total (including store-tabs)
+3. Choose theme colors, fonts, and sections that match the brand description
+4. Each section id must be unique (use brand-related prefix like "brandname-hero")
+5. trust-badges should include 3-5 badges relevant to the store
+6. FAQ should have 2-4 relevant questions
+7. Return ONLY valid JSON, no markdown fences or explanations`
 
 type chatMessage struct {
 	Role    string      `json:"role"`
@@ -334,6 +397,39 @@ Product title: "%s"%s
 Return JSON: { "tags": ["tag1", "tag2", ...], "categories": ["category1", ...] }
 Tags should be lowercase, hyphenated, 5-10 items. Categories 1-3 items.
 Return ONLY valid JSON, no markdown fences.`, langInstruction, req.Title, descCtx)},
+		}, nil
+
+	case "generate_store":
+		if req.BrandName == "" {
+			return nil, fmt.Errorf("brandName is required for generate_store")
+		}
+		return []chatMessage{
+			{Role: "system", Content: storeBuilderSystemPrompt},
+			{Role: "user", Content: fmt.Sprintf(`Create a store design for this brand. %s
+
+Brand name: "%s"
+Brand description: "%s"
+
+Return ONLY valid JSON matching the StoreConfig schema above.`, langInstruction, req.BrandName, req.BrandDesc)},
+		}, nil
+
+	case "refine_store":
+		if len(req.StoreConfig) == 0 {
+			return nil, fmt.Errorf("storeConfig is required for refine_store")
+		}
+		if req.Instruction == "" {
+			return nil, fmt.Errorf("instruction is required for refine_store")
+		}
+		return []chatMessage{
+			{Role: "system", Content: storeBuilderSystemPrompt},
+			{Role: "user", Content: fmt.Sprintf(`Modify this store config according to the instruction. %s
+
+Current config:
+%s
+
+Instruction: "%s"
+
+Return the COMPLETE updated StoreConfig as valid JSON.`, langInstruction, string(req.StoreConfig), req.Instruction)},
 		}, nil
 
 	default:

@@ -30,7 +30,7 @@ type Collection struct {
 	Type        CollectionType      `json:"type" gorm:"type:text;not null;default:'manual'"`
 	Rules       *string             `json:"rules,omitempty" gorm:"type:text"`
 	SortOrder   CollectionSortOrder `json:"sortOrder" gorm:"column:sort_order;type:text;not null;default:'manual'"`
-	Published   bool                `json:"published" gorm:"type:integer;not null;default:1"`
+	Published   bool                `json:"published" gorm:"not null;default:true"`
 	CreatedAt   time.Time           `json:"createdAt" gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt   time.Time           `json:"updatedAt" gorm:"column:updated_at;autoUpdateTime"`
 	DeletedAt   *time.Time          `json:"deletedAt,omitempty" gorm:"column:deleted_at;index"`

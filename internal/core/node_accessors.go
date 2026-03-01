@@ -34,13 +34,14 @@ func (n *MobazhaNode) Matrix() contracts.MatrixService             { return n.ma
 func (n *MobazhaNode) Preferences() contracts.PreferencesService   { return n.preferencesService }
 func (n *MobazhaNode) ShoppingCart() contracts.ShoppingCartService  { return n.shoppingCartService }
 func (n *MobazhaNode) Wishlist() contracts.WishlistService          { return n.wishlistService }
+
 // Deprecated: Stripe returns the legacy StripeService backed by PaymentAppService.
 // New code should use FiatPaymentProviderAccessor via type assertion instead.
 func (n *MobazhaNode) Stripe() contracts.StripeService             { return n.paymentService }
 func (n *MobazhaNode) ExchangeRate() contracts.ExchangeRateService { return &exchangeRateAdapter{n.exchangeRates} }
 
 // FiatPaymentProviderAccessor implementation — generic fiat payment subsystem.
-func (n *MobazhaNode) Fiat() contracts.FiatService { return n.fiatPaymentService }
+func (n *MobazhaNode) Fiat() contracts.FiatService                  { return n.fiatPaymentService }
 
 // FiatRegistry returns the fiat provider registry for external provider registration.
 // Hosting (SaaS) uses this to register platform-level providers after node creation.
@@ -51,7 +52,7 @@ func (n *MobazhaNode) WebhookStore() wh.EndpointStore { return n.webhookStore }
 func (n *MobazhaNode) WebhookEngine() *wh.Engine      { return n.webhookEngine }
 
 // DiscountProvider implementation — per-node discount subsystem.
-func (n *MobazhaNode) Discount() contracts.DiscountService { return n.discountService }
+func (n *MobazhaNode) Discount() contracts.DiscountService     { return n.discountService }
 
 // CollectionProvider implementation — per-node collection subsystem.
 func (n *MobazhaNode) Collection() contracts.CollectionService { return n.collectionService }
@@ -71,6 +72,9 @@ var _ contracts.ShippingProvider = (*MobazhaNode)(nil)
 func (n *MobazhaNode) Shipping() contracts.ShippingService { return n.shippingService }
 
 func (n *MobazhaNode) Order() contracts.OrderService {
+	if n.orderService == nil {
+		return nil
+	}
 	return &orderServiceFacade{
 		OrderAppService: n.orderService,
 		payment:         n.paymentService,
@@ -78,6 +82,9 @@ func (n *MobazhaNode) Order() contracts.OrderService {
 }
 
 func (n *MobazhaNode) Listing() contracts.ListingService {
+	if n.listingService == nil {
+		return nil
+	}
 	return &listingServiceFacade{
 		ListingAppService: n.listingService,
 		moderation:        n.moderationService,
@@ -85,6 +92,9 @@ func (n *MobazhaNode) Listing() contracts.ListingService {
 }
 
 func (n *MobazhaNode) Profile() contracts.ProfileService {
+	if n.profileService == nil {
+		return nil
+	}
 	return &profileServiceFacade{
 		ProfileAppService: n.profileService,
 		moderation:        n.moderationService,
@@ -92,6 +102,9 @@ func (n *MobazhaNode) Profile() contracts.ProfileService {
 }
 
 func (n *MobazhaNode) Social() contracts.SocialService {
+	if n.followService == nil {
+		return nil
+	}
 	return &socialServiceFacade{
 		FollowAppService:   n.followService,
 		RatingsAppService:  n.ratingsService,

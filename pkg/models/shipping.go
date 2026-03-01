@@ -15,7 +15,7 @@ type ShippingLocationEntity struct {
 	TenantID  string    `json:"tenantID" gorm:"column:tenant_id;type:text;not null;default:'_default'"`
 	Name      string    `json:"name" gorm:"type:text;not null"`
 	Address   string    `json:"address,omitempty" gorm:"type:text;default:''"`
-	IsDefault bool      `json:"isDefault" gorm:"column:is_default;type:integer;not null;default:0"`
+	IsDefault bool      `json:"isDefault" gorm:"column:is_default;not null;default:false"`
 	CreatedAt time.Time `json:"createdAt" gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt time.Time `json:"updatedAt" gorm:"column:updated_at;autoUpdateTime"`
 }
@@ -28,7 +28,7 @@ type ShippingProfileEntity struct {
 	ID                 string    `json:"id" gorm:"primaryKey;type:text"`
 	TenantID           string    `json:"tenantID" gorm:"column:tenant_id;type:text;not null;default:'_default'"`
 	Name               string    `json:"name" gorm:"type:text;not null"`
-	IsDefault          bool      `json:"isDefault" gorm:"column:is_default;type:integer;not null;default:0"`
+	IsDefault          bool      `json:"isDefault" gorm:"column:is_default;not null;default:false"`
 	Version            int       `json:"version" gorm:"type:integer;not null;default:1"`
 	LocationGroupsJSON string    `json:"-" gorm:"column:location_groups;type:text;not null;default:'[]'"`
 	CreatedAt          time.Time `json:"createdAt" gorm:"column:created_at;autoCreateTime"`
@@ -89,7 +89,7 @@ type ListingShippingRef struct {
 	ListingSlug       string    `json:"listingSlug" gorm:"column:listing_slug;type:text;not null"`
 	ShippingProfileID string    `json:"shippingProfileID" gorm:"column:shipping_profile_id;type:text;not null"`
 	SnapshotVersion   int       `json:"snapshotVersion" gorm:"column:snapshot_version;type:integer;not null;default:0"`
-	IsStale           bool      `json:"isStale" gorm:"column:is_stale;type:integer;not null;default:0"`
+	IsStale           bool      `json:"isStale" gorm:"column:is_stale;not null;default:false"`
 	CreatedAt         time.Time `json:"createdAt" gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt         time.Time `json:"updatedAt" gorm:"column:updated_at;autoUpdateTime"`
 

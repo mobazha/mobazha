@@ -27,6 +27,10 @@ func (g *Gateway) handleGETProfile(w http.ResponseWriter, r *http.Request) {
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
 	prof := getProfileService(r)
+	if prof == nil {
+		ErrorResponse(w, http.StatusServiceUnavailable, "node services initializing")
+		return
+	}
 
 	var (
 		profile *models.Profile

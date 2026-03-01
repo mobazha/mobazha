@@ -48,6 +48,10 @@ func (g *Gateway) handleGETConfig(w http.ResponseWriter, r *http.Request) {
 
 func (g *Gateway) handlePutUserPreferences(w http.ResponseWriter, r *http.Request) {
 	prefsSvc := getPreferencesService(r)
+	if prefsSvc == nil {
+		ErrorResponse(w, http.StatusServiceUnavailable, "node services initializing")
+		return
+	}
 
 	currentPrefs, err := prefsSvc.GetPreferences()
 	if err != nil && !errors.Is(err, coreiface.ErrNotFound) {
@@ -91,6 +95,10 @@ func (g *Gateway) handlePutUserPreferences(w http.ResponseWriter, r *http.Reques
 
 func (g *Gateway) handleGetUserPreferences(w http.ResponseWriter, r *http.Request) {
 	prefsSvc := getPreferencesService(r)
+	if prefsSvc == nil {
+		ErrorResponse(w, http.StatusServiceUnavailable, "node services initializing")
+		return
+	}
 
 	prefs, err := prefsSvc.GetPreferences()
 	if err != nil {

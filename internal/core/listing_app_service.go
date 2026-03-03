@@ -155,6 +155,22 @@ func (s *ListingAppService) resolveShippingProfile(listing *pb.Listing) (*models
 }
 
 func (s *ListingAppService) SaveListing(listing *pb.Listing, done chan<- struct{}) error {
+	// Resolve shipping profile BEFORE the main transaction to avoid deadlock.
+	// GormShippingStore opens its own db.View() internally; calling it inside
+	// s.db.Update() would re-enter the same database.Database and deadlock.
+	var resolvedProfileID string
+	var resolvedProfileVersion int
+	if listing.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD {
+		entity, resolveErr := s.resolveShippingProfile(listing)
+		if resolveErr != nil {
+			maybeCloseDone(done)
+			return resolveErr
+		}
+		listing.ShippingProfile = models.ConvertShippingEntityToProto(entity)
+		resolvedProfileID = entity.ID
+		resolvedProfileVersion = entity.Version
+	}
+
 	err := s.db.Update(func(tx database.Tx) error {
 		var currentPrefs models.UserPreferences
 		err := tx.Read().First(&currentPrefs).Error
@@ -172,18 +188,6 @@ func (s *ListingAppService) SaveListing(listing *pb.Listing, done chan<- struct{
 				modStrs = append(modStrs, mod.String())
 			}
 			listing.Moderators = modStrs
-		}
-
-		var resolvedProfileID string
-		var resolvedProfileVersion int
-		if listing.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD {
-			entity, resolveErr := s.resolveShippingProfile(listing)
-			if resolveErr != nil {
-				return resolveErr
-			}
-			listing.ShippingProfile = models.ConvertShippingEntityToProto(entity)
-			resolvedProfileID = entity.ID
-			resolvedProfileVersion = entity.Version
 		}
 
 		cid, err := s.saveListingToDB(tx, listing)
@@ -210,27 +214,29 @@ func (s *ListingAppService) SaveListing(listing *pb.Listing, done chan<- struct{
 			return err
 		}
 
-		if s.shippingStore != nil && listing.Slug != "" {
-			if resolvedProfileID != "" {
-				ref := &models.ListingShippingRef{
-					ListingSlug:       listing.Slug,
-					ShippingProfileID: resolvedProfileID,
-					SnapshotVersion:   resolvedProfileVersion,
-					IsStale:           false,
-				}
-				if upsertErr := s.shippingStore.UpsertListingRef(context.Background(), ref); upsertErr != nil {
-					log.Errorf("failed to upsert shipping ref for listing %s: %v", listing.Slug, upsertErr)
-				}
-			} else {
-				_ = s.shippingStore.DeleteListingRef(context.Background(), listing.Slug)
-			}
-		}
-
 		return nil
 	})
 	if err != nil {
 		maybeCloseDone(done)
 		return err
+	}
+
+	// Upsert/delete shipping ref AFTER the main transaction for the same reason:
+	// shippingStore methods open their own transactions internally.
+	if s.shippingStore != nil && listing.Slug != "" {
+		if resolvedProfileID != "" {
+			ref := &models.ListingShippingRef{
+				ListingSlug:       listing.Slug,
+				ShippingProfileID: resolvedProfileID,
+				SnapshotVersion:   resolvedProfileVersion,
+				IsStale:           false,
+			}
+			if upsertErr := s.shippingStore.UpsertListingRef(context.Background(), ref); upsertErr != nil {
+				log.Errorf("failed to upsert shipping ref for listing %s: %v", listing.Slug, upsertErr)
+			}
+		} else {
+			_ = s.shippingStore.DeleteListingRef(context.Background(), listing.Slug)
+		}
 	}
 
 	if listing.Status == models.ListingStatusDraft {
@@ -333,15 +339,18 @@ func (s *ListingAppService) DeleteListing(slugStr string, done chan<- struct{}) 
 			return err
 		}
 
-		if s.shippingStore != nil {
-			_ = s.shippingStore.DeleteListingRef(context.Background(), slugStr)
-		}
-
 		return nil
 	})
+
 	if err != nil {
 		maybeCloseDone(done)
 		return err
+	}
+
+	// Delete shipping ref AFTER the main transaction: shippingStore methods
+	// open their own transactions internally, and TenantDB mutex is not reentrant.
+	if s.shippingStore != nil {
+		_ = s.shippingStore.DeleteListingRef(context.Background(), slugStr)
 	}
 
 	if s.onDeleteCleanup != nil {

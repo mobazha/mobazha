@@ -26,22 +26,79 @@ func (n *MobazhaNode) IdentityInfo() contracts.IdentityService {
 		listingService: n.listingService,
 	}
 }
-func (n *MobazhaNode) Chat() contracts.ChatService                 { return n.chatService }
-func (n *MobazhaNode) Notification() contracts.NotificationService { return n.notificationService }
-func (n *MobazhaNode) Wallet() contracts.WalletService             { return n.paymentService }
-func (n *MobazhaNode) Media() contracts.MediaService               { return n.mediaService }
-func (n *MobazhaNode) Matrix() contracts.MatrixService             { return n.matrixService }
-func (n *MobazhaNode) Preferences() contracts.PreferencesService   { return n.preferencesService }
-func (n *MobazhaNode) ShoppingCart() contracts.ShoppingCartService  { return n.shoppingCartService }
-func (n *MobazhaNode) Wishlist() contracts.WishlistService          { return n.wishlistService }
+
+// Nil guards below prevent the "typed nil interface" problem: when a concrete
+// pointer field is nil, returning it directly yields a non-nil interface value
+// that passes `== nil` checks but panics on method calls.
+
+func (n *MobazhaNode) Chat() contracts.ChatService {
+	if n.chatService == nil {
+		return nil
+	}
+	return n.chatService
+}
+func (n *MobazhaNode) Notification() contracts.NotificationService {
+	if n.notificationService == nil {
+		return nil
+	}
+	return n.notificationService
+}
+func (n *MobazhaNode) Wallet() contracts.WalletService {
+	if n.paymentService == nil {
+		return nil
+	}
+	return n.paymentService
+}
+func (n *MobazhaNode) Media() contracts.MediaService {
+	if n.mediaService == nil {
+		return nil
+	}
+	return n.mediaService
+}
+func (n *MobazhaNode) Matrix() contracts.MatrixService {
+	if n.matrixService == nil {
+		return nil
+	}
+	return n.matrixService
+}
+func (n *MobazhaNode) Preferences() contracts.PreferencesService {
+	if n.preferencesService == nil {
+		return nil
+	}
+	return n.preferencesService
+}
+func (n *MobazhaNode) ShoppingCart() contracts.ShoppingCartService {
+	if n.shoppingCartService == nil {
+		return nil
+	}
+	return n.shoppingCartService
+}
+func (n *MobazhaNode) Wishlist() contracts.WishlistService {
+	if n.wishlistService == nil {
+		return nil
+	}
+	return n.wishlistService
+}
 
 // Deprecated: Stripe returns the legacy StripeService backed by PaymentAppService.
 // New code should use FiatPaymentProviderAccessor via type assertion instead.
-func (n *MobazhaNode) Stripe() contracts.StripeService             { return n.paymentService }
-func (n *MobazhaNode) ExchangeRate() contracts.ExchangeRateService { return &exchangeRateAdapter{n.exchangeRates} }
+func (n *MobazhaNode) Stripe() contracts.StripeService {
+	if n.paymentService == nil {
+		return nil
+	}
+	return n.paymentService
+}
+func (n *MobazhaNode) ExchangeRate() contracts.ExchangeRateService {
+	return &exchangeRateAdapter{n.exchangeRates}
+}
 
 // FiatPaymentProviderAccessor implementation — generic fiat payment subsystem.
-func (n *MobazhaNode) Fiat() contracts.FiatService                  { return n.fiatPaymentService }
+func (n *MobazhaNode) Fiat() contracts.FiatService {
+	if n.fiatPaymentService == nil {
+		return nil
+	}
+	return n.fiatPaymentService
+}
 
 // FiatRegistry returns the fiat provider registry for external provider registration.
 // Hosting (SaaS) uses this to register platform-level providers after node creation.
@@ -52,10 +109,20 @@ func (n *MobazhaNode) WebhookStore() wh.EndpointStore { return n.webhookStore }
 func (n *MobazhaNode) WebhookEngine() *wh.Engine      { return n.webhookEngine }
 
 // DiscountProvider implementation — per-node discount subsystem.
-func (n *MobazhaNode) Discount() contracts.DiscountService     { return n.discountService }
+func (n *MobazhaNode) Discount() contracts.DiscountService {
+	if n.discountService == nil {
+		return nil
+	}
+	return n.discountService
+}
 
 // CollectionProvider implementation — per-node collection subsystem.
-func (n *MobazhaNode) Collection() contracts.CollectionService { return n.collectionService }
+func (n *MobazhaNode) Collection() contracts.CollectionService {
+	if n.collectionService == nil {
+		return nil
+	}
+	return n.collectionService
+}
 
 // DiscountStore exposes the underlying DiscountStore for cross-tenant wiring
 // (e.g., hosting constructs a DiscountEngine with the vendor's store).
@@ -69,7 +136,12 @@ func (n *MobazhaNode) DiscountStore() contracts.DiscountStore {
 // ShippingProvider implementation — per-node shipping subsystem.
 var _ contracts.ShippingProvider = (*MobazhaNode)(nil)
 
-func (n *MobazhaNode) Shipping() contracts.ShippingService { return n.shippingService }
+func (n *MobazhaNode) Shipping() contracts.ShippingService {
+	if n.shippingService == nil {
+		return nil
+	}
+	return n.shippingService
+}
 
 func (n *MobazhaNode) Order() contracts.OrderService {
 	if n.orderService == nil {
@@ -189,9 +261,9 @@ type identityInfoAdapter struct {
 	listingService *ListingAppService
 }
 
-func (a *identityInfoAdapter) GetNodeID() string    { return a.nodeID }
-func (a *identityInfoAdapter) Identity() peer.ID     { return a.peerID }
-func (a *identityInfoAdapter) UsingTestnet() bool    { return a.testnet }
+func (a *identityInfoAdapter) GetNodeID() string  { return a.nodeID }
+func (a *identityInfoAdapter) Identity() peer.ID  { return a.peerID }
+func (a *identityInfoAdapter) UsingTestnet() bool { return a.testnet }
 
 func (a *identityInfoAdapter) SignMessage(payload []byte) ([]byte, []byte, error) {
 	if a.signer == nil {

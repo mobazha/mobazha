@@ -122,7 +122,8 @@ func PanicRecovery(next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				reqID := w.Header().Get("X-Request-ID")
-				fmt.Printf("[PANIC] request_id=%s err=%v\n%s\n", reqID, err, debug.Stack())
+				fmt.Printf("[PANIC] request_id=%s method=%s path=%s err=%v\n%s\n",
+					reqID, r.Method, r.URL.Path, err, debug.Stack())
 				Error(w, http.StatusInternalServerError, CodeInternalError, "An unexpected error occurred")
 			}
 		}()

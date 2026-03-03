@@ -665,7 +665,7 @@ func (n *MobazhaNode) SaveStoreConfig(cfg json.RawMessage) error {
 func (n *MobazhaNode) getSetting(key string) (string, error) {
 	var setting models.NodeSettings
 	err := n.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("`key` = ?", key).First(&setting).Error
+		return tx.Read().Where("\"key\" = ?", key).First(&setting).Error
 	})
 	if err != nil {
 		return "", err

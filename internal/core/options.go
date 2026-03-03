@@ -54,29 +54,32 @@ func WithHostService(hs coreiface.HostService) NodeOption {
 // later-initialized services MUST use closures (not direct method values)
 // to defer evaluation until call time. See callback-safety-rules.mdc.
 //
-//  Step | Service              | Runtime deps (via closures)             | Direct deps (must be init'd before)
-//  ─────┼──────────────────────┼─────────────────────────────────────────┼─────────────────────────────────────
-//   1   │ paymentService       │ profileService, orderService            │ (none)
-//   2   │ orderService         │ paymentService, listingService,         │ (none)
-//       │                      │ moderationService                       │
-//   3   │ chatService          │                                         │ (none)
-//   4   │ matrixService        │                                         │ (none)
-//   5   │ preferencesService   │ listingService                          │ (none)
-//   6   │ mediaService         │                                         │ (none)
-//   7   │ ratingsService       │                                         │ (none)
-//   8   │ notificationService  │                                         │ (none)
-//   9   │ shoppingCartService  │                                         │ (none)
-//  10   │ profileService       │ paymentService                          │ (none)
-//  11   │ followService        │                                         │ profileService
-//  12   │ postsService         │                                         │ profileService
-//  13   │ moderationService    │ listingService                          │ profileService
-//  14   │ channelsService      │                                         │ preferencesService
-//  15   │ listingService       │                                         │ profileService
+//	Step | Service              | Runtime deps (via closures)             | Direct deps (must be init'd before)
+//	─────┼──────────────────────┼─────────────────────────────────────────┼─────────────────────────────────────
+//	 1   │ paymentService       │ profileService, orderService            │ (none)
+//	 2   │ orderService         │ paymentService, listingService,         │ (none)
+//	     │                      │ moderationService                       │
+//	 3   │ chatService          │                                         │ (none)
+//	 4   │ matrixService        │                                         │ (none)
+//	 5   │ preferencesService   │ listingService                          │ (none)
+//	 6   │ mediaService         │                                         │ (none)
+//	 7   │ ratingsService       │                                         │ (none)
+//	 8   │ notificationService  │                                         │ (none)
+//	 9   │ shoppingCartService  │                                         │ (none)
+//	10   │ profileService       │ paymentService                          │ (none)
+//	11   │ followService        │                                         │ profileService
+//	12   │ postsService         │                                         │ profileService
+//	13   │ moderationService    │ listingService                          │ profileService
+//	14   │ channelsService      │                                         │ preferencesService
+//	15   │ listingService       │                                         │ profileService
 //
 // "Runtime deps" = referenced via closures; safe even if the target is
-//   initialized later because the closure captures `n` (not the service).
+//
+//	initialized later because the closure captures `n` (not the service).
+//
 // "Direct deps" = the service pointer is read at init time (nil-guarded
-//   or used directly); MUST already be non-nil.
+//
+//	or used directly); MUST already be non-nil.
 //
 // ADDING A NEW APP SERVICE — Standard Procedure:
 //  1. Create init method: func (n *MobazhaNode) initXxxService()
@@ -270,18 +273,18 @@ func (n *MobazhaNode) initOrderService() {
 	}
 
 	n.orderService = NewOrderAppService(OrderAppServiceConfig{
-		DB:              n.db,
-		Multiwallet:     n.multiwallet,
-		Signer:          n.signer,
-		OrderProcessor:  n.orderProcessor,
-		Messenger:       n.messenger,
-		NetworkService:  n.networkService,
-		EventBus:        n.eventBus,
-		NodeID:          n.nodeID,
-		KeyProvider:     n.keyProvider,
-		PeerID:          n.Identity,
-		Testnet:         n.testnet,
-		ExchangeRates:   n.exchangeRates,
+		DB:             n.db,
+		Multiwallet:    n.multiwallet,
+		Signer:         n.signer,
+		OrderProcessor: n.orderProcessor,
+		Messenger:      n.messenger,
+		NetworkService: n.networkService,
+		EventBus:       n.eventBus,
+		NodeID:         n.nodeID,
+		KeyProvider:    n.keyProvider,
+		PeerID:         n.Identity,
+		Testnet:        n.testnet,
+		ExchangeRates:  n.exchangeRates,
 
 		GetPayoutAddr: func(coinType string) (iwallet.Address, error) {
 			return n.paymentService.GetPayoutAddress(coinType)
@@ -619,12 +622,12 @@ func (n *MobazhaNode) initModerationService() {
 	}
 
 	n.moderationService = NewModerationAppService(ModerationAppServiceConfig{
-		DB:                    n.db,
-		Publish:               n.Publish,
-		NodeID:                n.nodeID,
-		VerifiedModEndpoint:   verifiedModEndpoint,
-		ExchangeRates:         n.exchangeRates,
-		GetMyProfile:          getMyProfile,
+		DB:                  n.db,
+		Publish:             n.Publish,
+		NodeID:              n.nodeID,
+		VerifiedModEndpoint: verifiedModEndpoint,
+		ExchangeRates:       n.exchangeRates,
+		GetMyProfile:        getMyProfile,
 		GetAcceptedCurrencies: func() ([]string, error) {
 			return n.paymentService.GetAcceptedCurrencies()
 		},

@@ -50,9 +50,9 @@ type Config struct {
 	Multiwallet              pkgcontracts.WalletOperator
 	ExchangeRateProvider     *wallet.ExchangeRateProvider
 	EventBus                 events.Bus
-	CalcCIDFunc              func(file []byte) (cid.Cid, error)
-	GetStripeTransactionFunc func(txid iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error)
-	FeatureManager           *pkgconfig.FeatureManager
+	CalcCIDFunc         func(file []byte) (cid.Cid, error)
+	GetFiatPaymentFunc  func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
+	FeatureManager      *pkgconfig.FeatureManager
 
 	// StateValidator is an optional core state machine validator (typically OrderStateBridge).
 	// When set, the FSM becomes the authoritative source for order state transitions:
@@ -74,9 +74,9 @@ type OrderProcessor struct {
 	escrowPrivateKey         *btcec.PrivateKey
 	erp                      *wallet.ExchangeRateProvider
 	bus                      events.Bus
-	calcCIDFunc              func(file []byte) (cid.Cid, error)
-	getStripeTransactionFunc func(txid iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error)
-	featureManager           *pkgconfig.FeatureManager
+	calcCIDFunc        func(file []byte) (cid.Cid, error)
+	getFiatPaymentFunc func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
+	featureManager     *pkgconfig.FeatureManager
 	stateValidator           StateValidator
 }
 
@@ -92,20 +92,20 @@ func NewOrderProcessor(cfg *Config) *OrderProcessor {
 		escrowPrivateKey:         cfg.EscrowPrivateKey,
 		erp:                      cfg.ExchangeRateProvider,
 		bus:                      cfg.EventBus,
-		calcCIDFunc:              cfg.CalcCIDFunc,
-		getStripeTransactionFunc: cfg.GetStripeTransactionFunc,
-		featureManager:           cfg.FeatureManager,
+		calcCIDFunc:        cfg.CalcCIDFunc,
+		getFiatPaymentFunc: cfg.GetFiatPaymentFunc,
+		featureManager:     cfg.FeatureManager,
 		stateValidator:           cfg.StateValidator,
 	}
 }
 
-// GetStripeTransaction exposes the Stripe transaction lookup for use by the
-// payment verification loop in the core layer.
-func (op *OrderProcessor) GetStripeTransaction(txid iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error) {
-	if op.getStripeTransactionFunc == nil {
-		return nil, fmt.Errorf("stripe transaction function not configured")
+// GetFiatPayment retrieves fiat payment details via the registered provider.
+// Used by the payment verification loop in the core layer.
+func (op *OrderProcessor) GetFiatPayment(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error) {
+	if op.getFiatPaymentFunc == nil {
+		return nil, fmt.Errorf("fiat payment function not configured")
 	}
-	return op.getStripeTransactionFunc(txid, coinType)
+	return op.getFiatPaymentFunc(paymentID, providerID)
 }
 
 // Start begins listening for transactions from the wallets that pertain to our

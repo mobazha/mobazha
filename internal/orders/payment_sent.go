@@ -77,8 +77,24 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 	// If GetTransaction fails, the MobazhaNode-level payment verification loop will retry.
 	var tx *iwallet.Transaction
 	if !transactionKnown {
-		if iwallet.CoinType(paymentSent.Coin).IsStripeChain() {
-			tx, err = op.getStripeTransactionFunc(iwallet.TransactionID(paymentSent.TransactionID), iwallet.CoinType(paymentSent.Coin))
+		coinType := iwallet.CoinType(paymentSent.Coin)
+		if coinType.IsFiatPayment() {
+			detail, fiatErr := op.getFiatPaymentFunc(paymentSent.TransactionID, orderOpen.FiatProvider)
+			if fiatErr == nil && detail != nil && detail.Status == "succeeded" {
+				tx = &iwallet.Transaction{
+					ID:    iwallet.TransactionID(detail.PaymentID),
+					Value: iwallet.NewAmount(detail.Amount),
+					To: []iwallet.SpendInfo{{
+						Address: iwallet.NewAddress(detail.SellerAccountID, coinType),
+						Amount:  iwallet.NewAmount(detail.Amount),
+					}},
+				}
+			} else if fiatErr != nil {
+				err = fiatErr
+				logger.LogInfoWithIDf(log, op.nodeID,
+					"Fiat payment %s not yet confirmed for order %s, will retry in verification loop",
+					paymentSent.TransactionID, order.ID)
+			}
 		} else {
 			tx, err = wallet.GetTransaction(iwallet.TransactionID(paymentSent.TransactionID), iwallet.CoinType(paymentSent.Coin))
 			if err != nil {
@@ -88,16 +104,23 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 			}
 		}
 		if err == nil && tx != nil {
-			paymentAddress, err := order.GetPaymentAddress()
-			if err != nil {
-				return nil, err
-			}
-			for _, to := range tx.To {
-				if to.Address.String() == paymentAddress {
-					if err := op.ProcessOrderPayment(dbtx, order, message, *tx); err != nil {
-						return nil, err
+			if coinType.IsFiatPayment() {
+				if err := op.ProcessOrderPayment(dbtx, order, message, *tx); err != nil {
+					return nil, err
+				}
+				order.PaymentVerified = true
+			} else {
+				paymentAddress, err := order.GetPaymentAddress()
+				if err != nil {
+					return nil, err
+				}
+				for _, to := range tx.To {
+					if to.Address.String() == paymentAddress {
+						if err := op.ProcessOrderPayment(dbtx, order, message, *tx); err != nil {
+							return nil, err
+						}
+						order.PaymentVerified = true
 					}
-					order.PaymentVerified = true
 				}
 			}
 		}

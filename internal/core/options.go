@@ -310,9 +310,6 @@ func (n *MobazhaNode) initOrderService() {
 		GetListings: func(ctx context.Context, peerID peer.ID) (models.ListingIndex, error) {
 			return n.listingService.GetListings(ctx, peerID, nil, false)
 		},
-		ProcessStripePayment: func(paymentData *models.PaymentData) error {
-			return n.paymentService.ProcessStripePaymentData(paymentData)
-		},
 		FetchOrderByID: func(orderID string) (*models.Order, error) {
 			return n.paymentService.FetchOrderByID(orderID)
 		},
@@ -449,6 +446,13 @@ func (n *MobazhaNode) initPaymentService() {
 		},
 
 		ExchangeRates: n.exchangeRates,
+
+		GetFiatPayment: func(paymentID string, providerID string) (*contracts.PaymentDetail, error) {
+			if n.fiatPaymentService == nil {
+				return nil, fmt.Errorf("fiat payment service not initialized")
+			}
+			return n.fiatPaymentService.GetPayment(context.Background(), providerID, paymentID)
+		},
 
 		EVMRelayService: evmRelay,
 		RelayAPIURL:     n.relayAPIURL,

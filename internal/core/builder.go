@@ -690,8 +690,11 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		EventBus:             bus,
 		CalcCIDFunc:          obNode.contentStore.ComputeCID,
 		FeatureManager:       obNode.featureManager,
-		GetStripeTransactionFunc: func(txid iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error) {
-			return obNode.paymentService.GetStripeTransaction(txid, coinType)
+		GetFiatPaymentFunc: func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error) {
+			if obNode.fiatPaymentService == nil {
+				return nil, fmt.Errorf("fiat payment service not initialized")
+			}
+			return obNode.fiatPaymentService.GetPayment(context.Background(), providerID, paymentID)
 		},
 		StateValidator: &coreStateBridge{},
 	})
@@ -1283,8 +1286,11 @@ func newLightweightNode(
 		EventBus:             bus,
 		CalcCIDFunc:          obNode.contentStore.ComputeCID,
 		FeatureManager:       obNode.featureManager,
-		GetStripeTransactionFunc: func(txid iwallet.TransactionID, coinType iwallet.CoinType) (*iwallet.Transaction, error) {
-			return obNode.paymentService.GetStripeTransaction(txid, coinType)
+		GetFiatPaymentFunc: func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error) {
+			if obNode.fiatPaymentService == nil {
+				return nil, fmt.Errorf("fiat payment service not initialized")
+			}
+			return obNode.fiatPaymentService.GetPayment(context.Background(), providerID, paymentID)
 		},
 		StateValidator: &coreStateBridge{},
 	})

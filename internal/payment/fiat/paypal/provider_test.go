@@ -307,6 +307,7 @@ func TestProvider_ParseWebhook_PaymentSucceeded_PurchaseUnitsFallback(t *testing
 			"status": "COMPLETED",
 			"purchase_units": [{
 				"custom_id": "fallback-order-id",
+				"amount": {"currency_code": "EUR", "value": "49.99"},
 				"payee": {"merchant_id": "MERCH-999"}
 			}]
 		}
@@ -319,6 +320,10 @@ func TestProvider_ParseWebhook_PaymentSucceeded_PurchaseUnitsFallback(t *testing
 	assert.Equal(t, "CAP-XYZ", event.PaymentID)
 	assert.Equal(t, "fallback-order-id", event.OrderID)
 	assert.Equal(t, "MERCH-999", event.AccountID)
+	assert.Equal(t, "fiat:EUR", event.Coin)
+	assert.Equal(t, int64(4999), event.Amount)
+	assert.Equal(t, "EUR", event.Currency)
+	assert.Equal(t, "paypal", event.PaymentMethod.Type)
 }
 
 func TestProvider_ParseWebhook_PaymentFailed(t *testing.T) {

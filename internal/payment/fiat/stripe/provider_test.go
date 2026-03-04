@@ -261,6 +261,8 @@ func TestProvider_ParseWebhook_PaymentSucceeded(t *testing.T) {
 	piJSON, _ := json.Marshal(map[string]interface{}{
 		"id":       "pi_webhook",
 		"object":   "payment_intent",
+		"amount":   2999,
+		"currency": "usd",
 		"metadata": map[string]string{"order_id": "order_wh"},
 	})
 	eventPayload, _ := json.Marshal(map[string]interface{}{
@@ -280,6 +282,9 @@ func TestProvider_ParseWebhook_PaymentSucceeded(t *testing.T) {
 	assert.Equal(t, contracts.WebhookPaymentSucceeded, event.Type)
 	assert.Equal(t, "pi_webhook", event.PaymentID)
 	assert.Equal(t, "order_wh", event.OrderID)
+	assert.Equal(t, "fiat:USD", event.Coin)
+	assert.Equal(t, int64(2999), event.Amount)
+	assert.Equal(t, "USD", event.Currency)
 }
 
 func TestProvider_ParseWebhook_PaymentFailed(t *testing.T) {

@@ -90,6 +90,16 @@ func (ct CoinType) CoinInfo() (CoinInfo, error) {
 	return CoinInfoFromCoinType(ct)
 }
 
+// IsFiatPayment returns true if the CoinType represents a fiat payment
+// (e.g. "fiat:USD", "fiat:EUR"). Fiat payments are processed through
+// FiatPaymentAppService, not blockchain wallets.
+func (ct CoinType) IsFiatPayment() bool {
+	return strings.HasPrefix(strings.ToLower(string(ct)), "fiat:")
+}
+
+// Deprecated: use IsFiatPayment(). IsStripeChain was the legacy check for
+// Stripe-specific payment paths. New code should use IsFiatPayment() which
+// covers all fiat providers (Stripe, PayPal, etc.).
 func (ct CoinType) IsStripeChain() bool {
 	return strings.HasPrefix(strings.ToUpper(string(ct)), "STRIPE")
 }
@@ -415,7 +425,7 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 		return CtMockInfo, nil
 	}
 
-	if coinType.IsStripeChain() {
+	if coinType.IsFiatPayment() || coinType.IsStripeChain() {
 		return CtStripeInfo, nil
 	}
 

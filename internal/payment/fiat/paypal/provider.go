@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -352,11 +353,26 @@ func (p *Provider) extractResourceDetails(raw json.RawMessage, we *contracts.Web
 	we.PaymentID = res.ID
 	we.OrderID = res.CustomID
 
-	if we.OrderID == "" && len(res.PurchaseUnits) > 0 {
-		we.OrderID = res.PurchaseUnits[0].CustomID
-		if res.PurchaseUnits[0].Payee != nil {
-			we.AccountID = res.PurchaseUnits[0].Payee.MerchantID
+	if len(res.PurchaseUnits) > 0 {
+		pu := res.PurchaseUnits[0]
+		if we.OrderID == "" {
+			we.OrderID = pu.CustomID
 		}
+		if pu.Payee != nil {
+			we.AccountID = pu.Payee.MerchantID
+		}
+		if pu.Amount.CurrencyCode != "" {
+			we.Currency = strings.ToUpper(pu.Amount.CurrencyCode)
+			we.Coin = "fiat:" + we.Currency
+		}
+		if v, err := parseAmount(pu.Amount.Value); err == nil {
+			we.Amount = v
+		}
+	}
+
+	we.PaymentMethod = contracts.PaymentMethodInfo{
+		Type:  "paypal",
+		Brand: "paypal",
 	}
 }
 

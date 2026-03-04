@@ -89,6 +89,7 @@ type WebhookEvent struct {
 	Raw       interface{}      // original parsed event object
 
 	// Enriched fields (best-effort, may be zero-valued if provider API is unreachable)
+	Coin          string            // e.g. "fiat:USD" — used by PaymentSent to identify fiat payments
 	Amount        int64             // payment amount in minimal units (cents)
 	Currency      string            // ISO 4217 currency code
 	PaymentMethod PaymentMethodInfo // card/wallet details

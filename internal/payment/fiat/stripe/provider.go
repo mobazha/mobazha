@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	gostripe "github.com/stripe/stripe-go/v82"
@@ -151,6 +152,10 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 		}
 		we.PaymentID = pi.ID
 		we.OrderID = pi.Metadata["order_id"]
+		we.Coin = "fiat:" + strings.ToUpper(string(pi.Currency))
+		we.Amount = pi.Amount
+		we.Currency = strings.ToUpper(string(pi.Currency))
+		we.PaymentMethod = extractPaymentMethod(pi)
 		if we.AccountID == "" && pi.TransferData != nil && pi.TransferData.Destination != nil {
 			we.AccountID = pi.TransferData.Destination.ID
 		}
@@ -163,6 +168,9 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 		}
 		we.PaymentID = pi.ID
 		we.OrderID = pi.Metadata["order_id"]
+		we.Coin = "fiat:" + strings.ToUpper(string(pi.Currency))
+		we.Amount = pi.Amount
+		we.Currency = strings.ToUpper(string(pi.Currency))
 
 	case "charge.dispute.created":
 		we.Type = contracts.WebhookDisputeOpened

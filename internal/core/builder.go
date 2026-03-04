@@ -589,11 +589,10 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		featureManager:         pkgconfig.GetGlobalFeatureManager(),
 		initialBootstrapChan:   make(chan struct{}),
 		shutdown:               make(chan struct{}),
-		hostService:            hs,
-		stripeConfigCache:      netdb.NewStripeConfigCache(),
-		relayAPIURL:            cfg.RelayAPIURL,
-		evmChainConfigs:        evmConfigs,
-		solanaChainConfig:      solanaConfig,
+		hostService:       hs,
+		relayAPIURL:       cfg.RelayAPIURL,
+		evmChainConfigs:   evmConfigs,
+		solanaChainConfig: solanaConfig,
 	}
 	// Initialize content store with IPFS backend.
 	obNode.contentStore = newIPFSContentStore(
@@ -1199,9 +1198,8 @@ func newLightweightNode(
 		featureManager:         pkgconfig.GetGlobalFeatureManager(),
 		initialBootstrapChan:   make(chan struct{}),
 		shutdown:               make(chan struct{}),
-		hostService:            hs,
-		stripeConfigCache:      netdb.NewStripeConfigCache(),
-		relayAPIURL:            cfg.RelayAPIURL,
+		hostService: hs,
+		relayAPIURL: cfg.RelayAPIURL,
 	}
 
 	// Initialize content store — lightweight nodes use shared IPFS.

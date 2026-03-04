@@ -258,9 +258,6 @@ type MobazhaNode struct {
 	// monitorService provides unified UTXO monitoring operations
 	monitorService utxo.UTXOMonitorService
 
-	// Stripe 配置缓存
-	stripeConfigCache *netdb.StripeConfigCache
-
 	hostService coreiface.HostService
 
 	// Phase 2 加密相关服务

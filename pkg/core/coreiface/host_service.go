@@ -10,9 +10,6 @@ import (
 
 // HostService 定义托管服务的接口
 type HostService interface {
-	// GetStripeConfig 获取 Stripe 配置 (legacy, used by options.go → PaymentAppService)
-	GetStripeConfig() (publicKey, secretKey, webhookKey string, err error)
-
 	// GetUTXOMonitor 获取共享的 UTXO Monitor 服务
 	// 如果 HostService 不支持共享 Monitor，返回 nil
 	GetUTXOMonitor() utxo.UTXOMonitorService

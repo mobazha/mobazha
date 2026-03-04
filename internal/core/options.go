@@ -412,11 +412,6 @@ func (n *MobazhaNode) initPaymentService() {
 		evmRelay = n.hostService.GetEVMRelayService()
 	}
 
-	var getStripeConfigFromHost GetStripeConfigFromHostFunc
-	if n.hostService != nil {
-		getStripeConfigFromHost = n.hostService.GetStripeConfig
-	}
-
 	n.paymentService = NewPaymentAppService(PaymentAppServiceConfig{
 		DB:          n.db,
 		Multiwallet: n.multiwallet,
@@ -433,8 +428,6 @@ func (n *MobazhaNode) initPaymentService() {
 		FulfillOrder: func(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error {
 			return n.orderService.FulfillOrder(orderID, fulfillments, done)
 		},
-		GetStripeConfigFromHost: getStripeConfigFromHost,
-		StripeConfigCache:       n.stripeConfigCache,
 		ReleaseCancelable: func(order *models.Order, payoutAddress ...string) (*ReleaseResult, error) {
 			return n.orderService.releaseFromCancelableAddress(order, payoutAddress...)
 		},

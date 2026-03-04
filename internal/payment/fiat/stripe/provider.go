@@ -28,7 +28,7 @@ func NewProvider(cfg Config) *Provider {
 func (p *Provider) ProviderID() string { return providerID }
 
 func (p *Provider) CreatePayment(_ context.Context, params contracts.CreatePaymentParams) (*contracts.PaymentSession, error) {
-	api := newAPI(p.config.SecretKey)
+	api := newAPI(p.config.SecretKey, p.config.BackendURL)
 
 	piParams := &gostripe.PaymentIntentParams{
 		Amount:   gostripe.Int64(params.Amount),
@@ -73,7 +73,7 @@ func (p *Provider) CreatePayment(_ context.Context, params contracts.CreatePayme
 }
 
 func (p *Provider) CapturePayment(_ context.Context, sessionID string) (*contracts.PaymentResult, error) {
-	api := newAPI(p.config.SecretKey)
+	api := newAPI(p.config.SecretKey, p.config.BackendURL)
 
 	pi, err := api.PaymentIntents.Get(sessionID, nil)
 	if err != nil {
@@ -81,16 +81,16 @@ func (p *Provider) CapturePayment(_ context.Context, sessionID string) (*contrac
 	}
 
 	return &contracts.PaymentResult{
-		PaymentID: pi.ID,
-		Status:    mapStripeStatus(pi.Status),
-		Amount:    pi.Amount,
-		Currency:  string(pi.Currency),
+		PaymentID:     pi.ID,
+		Status:        mapStripeStatus(pi.Status),
+		Amount:        pi.Amount,
+		Currency:      string(pi.Currency),
 		PaymentMethod: extractPaymentMethod(pi),
 	}, nil
 }
 
 func (p *Provider) GetPayment(_ context.Context, paymentID string) (*contracts.PaymentDetail, error) {
-	api := newAPI(p.config.SecretKey)
+	api := newAPI(p.config.SecretKey, p.config.BackendURL)
 
 	params := &gostripe.PaymentIntentParams{}
 	params.AddExpand("payment_method")
@@ -175,7 +175,9 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 
 	case "account.updated":
 		we.Type = contracts.WebhookAccountUpdated
-		var acct struct{ ID string `json:"id"` }
+		var acct struct {
+			ID string `json:"id"`
+		}
 		if err := json.Unmarshal(event.Data.Raw, &acct); err == nil {
 			we.AccountID = acct.ID
 		}
@@ -194,7 +196,7 @@ func (p *Provider) GetOnboardingURL(_ context.Context, params contracts.Onboardi
 		return "", fmt.Errorf("stripe: AccountID (acct_xxx) is required for Account Link onboarding")
 	}
 
-	api := newAPI(p.config.SecretKey)
+	api := newAPI(p.config.SecretKey, p.config.BackendURL)
 
 	linkParams := &gostripe.AccountLinkParams{
 		Account:    gostripe.String(params.AccountID),
@@ -217,7 +219,7 @@ func (p *Provider) HandleOnboardingCallback(_ context.Context, params contracts.
 		return nil, fmt.Errorf("stripe: AccountID is required (the pre-created acct_xxx)")
 	}
 
-	api := newAPI(p.config.SecretKey)
+	api := newAPI(p.config.SecretKey, p.config.BackendURL)
 
 	acct, err := api.Accounts.GetByID(accountID, nil)
 	if err != nil {
@@ -240,7 +242,7 @@ func (p *Provider) HandleOnboardingCallback(_ context.Context, params contracts.
 }
 
 func (p *Provider) GetAccountStatus(_ context.Context, accountID string) (*contracts.AccountStatus, error) {
-	api := newAPI(p.config.SecretKey)
+	api := newAPI(p.config.SecretKey, p.config.BackendURL)
 
 	acct, err := api.Accounts.GetByID(accountID, nil)
 	if err != nil {
@@ -311,6 +313,6 @@ func mapStripeStatus(s gostripe.PaymentIntentStatus) string {
 
 // Compile-time interface compliance checks.
 var (
-	_ contracts.FiatPaymentProvider  = (*Provider)(nil)
+	_ contracts.FiatPaymentProvider    = (*Provider)(nil)
 	_ contracts.FiatOnboardingProvider = (*Provider)(nil)
 )

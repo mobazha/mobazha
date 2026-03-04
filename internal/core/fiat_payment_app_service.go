@@ -182,6 +182,22 @@ func (s *FiatPaymentAppService) handlePaymentSucceeded(ctx context.Context, prov
 		return fmt.Errorf("fiat payment succeeded but no order_id in metadata")
 	}
 
+	// Best-effort: enrich event with payment details from provider API.
+	// Failure here must not block webhook processing.
+	if event.PaymentID != "" {
+		provider, provErr := s.registry.ForProvider(providerID)
+		if provErr == nil {
+			detail, detailErr := provider.GetPayment(ctx, event.PaymentID)
+			if detailErr != nil {
+				logger.LogWarningWithIDf(log, s.nodeID, "best-effort payment detail fetch failed for %s: %v", event.PaymentID, detailErr)
+			} else if detail != nil {
+				event.Amount = detail.Amount
+				event.Currency = detail.Currency
+				event.PaymentMethod = detail.PaymentMethod
+			}
+		}
+	}
+
 	if s.webhookHandler == nil {
 		return fmt.Errorf("no webhook handler registered, cannot process fiat payment for order %s", event.OrderID)
 	}

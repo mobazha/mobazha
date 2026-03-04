@@ -87,6 +87,11 @@ type WebhookEvent struct {
 	OrderID   string           // extracted from metadata
 	AccountID string           // seller's account ID (for SaaS routing)
 	Raw       interface{}      // original parsed event object
+
+	// Enriched fields (best-effort, may be zero-valued if provider API is unreachable)
+	Amount        int64             // payment amount in minimal units (cents)
+	Currency      string            // ISO 4217 currency code
+	PaymentMethod PaymentMethodInfo // card/wallet details
 }
 
 // WebhookEventType is a standardized webhook event category.

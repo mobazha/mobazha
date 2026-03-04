@@ -399,3 +399,67 @@ func TestFiatService_EnabledProviders(t *testing.T) {
 	assert.Equal(t, "stripe", providers[0].ProviderID)
 	assert.Equal(t, "not_connected", providers[0].Status)
 }
+
+// --- Tests: Webhook PaymentData enrichment ---
+
+func TestFiatService_HandleWebhook_EnrichesPaymentData(t *testing.T) {
+	reg := newMockFiatRegistry()
+	reg.Register(&mockFiatProvider{
+		id: "stripe",
+		parsedEvent: &contracts.WebhookEvent{
+			EventID: "evt_enrich", Type: contracts.WebhookPaymentSucceeded,
+			PaymentID: "pi_enrich", OrderID: "order_enrich",
+		},
+		getResult: &contracts.PaymentDetail{
+			PaymentID: "pi_enrich",
+			Amount:    4999,
+			Currency:  "USD",
+			PaymentMethod: contracts.PaymentMethodInfo{
+				Type: "card", Brand: "visa", Last4: "4242",
+			},
+		},
+	})
+
+	svc, _ := newFiatTestService(t, reg)
+
+	var handledEvent *contracts.WebhookEvent
+	svc.SetWebhookHandler(func(_ context.Context, event *contracts.WebhookEvent) error {
+		handledEvent = event
+		return nil
+	})
+
+	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
+	require.NoError(t, err)
+	require.NotNil(t, handledEvent)
+	assert.Equal(t, int64(4999), handledEvent.Amount)
+	assert.Equal(t, "USD", handledEvent.Currency)
+	assert.Equal(t, "visa", handledEvent.PaymentMethod.Brand)
+	assert.Equal(t, "4242", handledEvent.PaymentMethod.Last4)
+}
+
+func TestFiatService_HandleWebhook_EnrichmentFailure_StillProcesses(t *testing.T) {
+	reg := newMockFiatRegistry()
+	reg.Register(&mockFiatProvider{
+		id: "stripe",
+		parsedEvent: &contracts.WebhookEvent{
+			EventID: "evt_enrich_fail", Type: contracts.WebhookPaymentSucceeded,
+			PaymentID: "pi_fail_detail", OrderID: "order_enrich_fail",
+		},
+		getErr: errors.New("stripe api unreachable"),
+	})
+
+	svc, _ := newFiatTestService(t, reg)
+
+	var handledEvent *contracts.WebhookEvent
+	svc.SetWebhookHandler(func(_ context.Context, event *contracts.WebhookEvent) error {
+		handledEvent = event
+		return nil
+	})
+
+	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
+	require.NoError(t, err, "webhook processing should succeed despite enrichment failure")
+	require.NotNil(t, handledEvent)
+	assert.Equal(t, "order_enrich_fail", handledEvent.OrderID)
+	assert.Equal(t, int64(0), handledEvent.Amount, "amount should remain zero when enrichment fails")
+	assert.Equal(t, "", handledEvent.Currency, "currency should remain empty when enrichment fails")
+}

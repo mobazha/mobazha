@@ -119,7 +119,7 @@ func TestProvider_CreatePayment_ConnectedMode(t *testing.T) {
 		BackendURL:     ts.URL,
 	})
 
-	_, err := p.CreatePayment(context.Background(), contracts.CreatePaymentParams{
+	session, err := p.CreatePayment(context.Background(), contracts.CreatePaymentParams{
 		OrderID:         "order_conn",
 		Amount:          1000,
 		Currency:        "usd",
@@ -127,6 +127,9 @@ func TestProvider_CreatePayment_ConnectedMode(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "acct_seller_123", gotStripeAccount)
+	require.NotNil(t, session.Stripe)
+	assert.Equal(t, "acct_seller_123", session.Stripe.ConnectedAccountID)
+	assert.Equal(t, "pk_test_platform", session.Stripe.PublishableKey)
 }
 
 func TestProvider_CreatePayment_Error(t *testing.T) {

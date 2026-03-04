@@ -59,17 +59,20 @@ func (p *Provider) CreatePayment(_ context.Context, params contracts.CreatePayme
 		return nil, fmt.Errorf("stripe: create payment intent: %w", err)
 	}
 
-	publishableKey := p.config.PublishableKey
+	sd := &contracts.StripeSessionData{
+		ClientSecret:   pi.ClientSecret,
+		PublishableKey: p.config.PublishableKey,
+	}
+	if p.config.Mode == ModeConnected && params.SellerAccountID != "" {
+		sd.ConnectedAccountID = params.SellerAccountID
+	}
 
 	return &contracts.PaymentSession{
 		SessionID:   pi.ID,
 		CaptureMode: contracts.CaptureAutomatic,
 		ExpiresAt:   time.Now().Add(30 * time.Minute),
 		Status:      string(pi.Status),
-		Stripe: &contracts.StripeSessionData{
-			ClientSecret:   pi.ClientSecret,
-			PublishableKey: publishableKey,
-		},
+		Stripe:      sd,
 	}, nil
 }
 

@@ -41,8 +41,9 @@ type PaymentSession struct {
 
 // StripeSessionData contains client-side data for Stripe Elements integration.
 type StripeSessionData struct {
-	ClientSecret   string `json:"clientSecret"`
-	PublishableKey string `json:"publishableKey"`
+	ClientSecret       string `json:"clientSecret"`
+	PublishableKey     string `json:"publishableKey"`
+	ConnectedAccountID string `json:"connectedAccountId,omitempty"`
 }
 
 // PayPalSessionData contains client-side data for PayPal JS SDK integration.

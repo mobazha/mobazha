@@ -116,6 +116,13 @@ type OnboardingParams struct {
 	Email      string // optional
 }
 
+// OnboardingResult is returned by GetOnboardingURL with the onboarding URL and
+// the provider account ID (which may have been auto-created during the call).
+type OnboardingResult struct {
+	URL       string `json:"url"`
+	AccountID string `json:"accountID,omitempty"`
+}
+
 // CallbackParams holds the data received from an onboarding callback.
 type CallbackParams struct {
 	AccountID    string // Provider account ID (for Account Link flow: acct_xxx)

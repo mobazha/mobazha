@@ -191,15 +191,32 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 
 // --- FiatOnboardingProvider (SaaS only) ---
 
-func (p *Provider) GetOnboardingURL(_ context.Context, params contracts.OnboardingParams) (string, error) {
-	if params.AccountID == "" {
-		return "", fmt.Errorf("stripe: AccountID (acct_xxx) is required for Account Link onboarding")
-	}
-
+func (p *Provider) GetOnboardingURL(_ context.Context, params contracts.OnboardingParams) (*contracts.OnboardingResult, error) {
 	api := newAPI(p.config.SecretKey, p.config.BackendURL)
 
+	accountID := params.AccountID
+	if accountID == "" {
+		acctParams := &gostripe.AccountParams{
+			Type: gostripe.String(string(gostripe.AccountTypeStandard)),
+		}
+		if params.Email != "" {
+			acctParams.Email = gostripe.String(params.Email)
+		}
+		if params.Country != "" {
+			acctParams.Country = gostripe.String(params.Country)
+		}
+		if params.SellerID != "" {
+			acctParams.Metadata = map[string]string{"seller_id": params.SellerID}
+		}
+		acct, err := api.Accounts.New(acctParams)
+		if err != nil {
+			return nil, fmt.Errorf("stripe: create connected account: %w", err)
+		}
+		accountID = acct.ID
+	}
+
 	linkParams := &gostripe.AccountLinkParams{
-		Account:    gostripe.String(params.AccountID),
+		Account:    gostripe.String(accountID),
 		Type:       gostripe.String("account_onboarding"),
 		Collect:    gostripe.String("currently_due"),
 		RefreshURL: gostripe.String(params.RefreshURL),
@@ -208,9 +225,12 @@ func (p *Provider) GetOnboardingURL(_ context.Context, params contracts.Onboardi
 
 	link, err := api.AccountLinks.New(linkParams)
 	if err != nil {
-		return "", fmt.Errorf("stripe: create account link: %w", err)
+		return nil, fmt.Errorf("stripe: create account link: %w", err)
 	}
-	return link.URL, nil
+	return &contracts.OnboardingResult{
+		URL:       link.URL,
+		AccountID: accountID,
+	}, nil
 }
 
 func (p *Provider) HandleOnboardingCallback(_ context.Context, params contracts.CallbackParams) (*contracts.ProviderAccount, error) {

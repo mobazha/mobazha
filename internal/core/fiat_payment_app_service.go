@@ -380,14 +380,14 @@ func (s *FiatPaymentAppService) GetProviderStatus(_ context.Context, providerID 
 }
 
 // GetOnboardingURL delegates to the provider's FiatOnboardingProvider interface.
-func (s *FiatPaymentAppService) GetOnboardingURL(ctx context.Context, providerID string, params contracts.OnboardingParams) (string, error) {
+func (s *FiatPaymentAppService) GetOnboardingURL(ctx context.Context, providerID string, params contracts.OnboardingParams) (*contracts.OnboardingResult, error) {
 	provider, err := s.registry.ForProvider(providerID)
 	if err != nil {
-		return "", contracts.ErrProviderNotFound
+		return nil, contracts.ErrProviderNotFound
 	}
 	onboarder, ok := provider.(contracts.FiatOnboardingProvider)
 	if !ok {
-		return "", fmt.Errorf("provider %s does not support onboarding", providerID)
+		return nil, fmt.Errorf("provider %s does not support onboarding", providerID)
 	}
 	return onboarder.GetOnboardingURL(ctx, params)
 }
@@ -409,28 +409,46 @@ func (s *FiatPaymentAppService) HandleOnboardingCallback(ctx context.Context, pr
 	return onboarder.GetAccountStatus(ctx, account.AccountID)
 }
 
-// registerProviderFromConfig creates and registers a provider instance using the given config.
-// Currently supports "stripe"; other providers can be added here.
+// RegisterPlatformProvider registers a provider using the platform's keys in Connected mode.
+// Called by the hosting layer after SaaS node creation to inject platform-level Stripe Connect keys.
+func (s *FiatPaymentAppService) RegisterPlatformProvider(providerID, secretKey, publishableKey, webhookSecret string) {
+	s.registerProvider(providerID, secretKey, publishableKey, webhookSecret, true)
+}
+
+// registerProviderFromConfig creates and registers a provider instance in Direct mode.
+// Used for standalone sellers who configure their own API keys.
 func (s *FiatPaymentAppService) registerProviderFromConfig(providerID, secretKey, publishableKey, webhookSecret string) {
+	s.registerProvider(providerID, secretKey, publishableKey, webhookSecret, false)
+}
+
+func (s *FiatPaymentAppService) registerProvider(providerID, secretKey, publishableKey, webhookSecret string, platformMode bool) {
 	switch providerID {
 	case "stripe":
+		mode := stripe.ModeDirect
+		if platformMode {
+			mode = stripe.ModeConnected
+		}
 		p := stripe.NewProvider(stripe.Config{
 			SecretKey:      secretKey,
 			PublishableKey: publishableKey,
 			WebhookSecret:  webhookSecret,
-			Mode:           stripe.ModeDirect,
+			Mode:           mode,
 		})
 		s.registry.Register(p)
-		logger.LogInfoWithIDf(log, s.nodeID, "registered Stripe provider (direct mode)")
+		logger.LogInfoWithIDf(log, s.nodeID, "registered Stripe provider (%s mode)", mode)
 	case "paypal":
+		mode := paypal.ModeDirect
+		if platformMode {
+			mode = paypal.ModePartner
+		}
 		p := paypal.NewProvider(paypal.Config{
 			ClientID:     publishableKey,
 			ClientSecret: secretKey,
 			WebhookID:    webhookSecret,
-			Mode:         paypal.ModeDirect,
+			Mode:         mode,
 		})
 		s.registry.Register(p)
-		logger.LogInfoWithIDf(log, s.nodeID, "registered PayPal provider (direct mode)")
+		logger.LogInfoWithIDf(log, s.nodeID, "registered PayPal provider (%s mode)", mode)
 	default:
 		logger.LogErrorWithIDf(log, s.nodeID, "unknown fiat provider %q, cannot register", providerID)
 	}
@@ -452,5 +470,6 @@ func (s *FiatPaymentAppService) LoadAndRegisterProviders() {
 	}
 }
 
-// Compile-time check.
+// Compile-time checks.
 var _ contracts.FiatService = (*FiatPaymentAppService)(nil)
+var _ contracts.FiatPlatformConfigurer = (*FiatPaymentAppService)(nil)

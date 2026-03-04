@@ -417,12 +417,12 @@ func TestProvider_GetOnboardingURL_Success(t *testing.T) {
 	ts, p := newTestServer(t, mux)
 	defer ts.Close()
 
-	url, err := p.GetOnboardingURL(context.Background(), contracts.OnboardingParams{
+	result, err := p.GetOnboardingURL(context.Background(), contracts.OnboardingParams{
 		SellerID:  "seller-001",
 		ReturnURL: "https://example.com/return",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "https://paypal.com/action/referral-123", url)
+	assert.Equal(t, "https://paypal.com/action/referral-123", result.URL)
 }
 
 func TestProvider_HandleOnboardingCallback_Success(t *testing.T) {

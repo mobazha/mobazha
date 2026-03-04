@@ -34,7 +34,7 @@ type mockFiatService struct {
 	saveErr        error
 	deleteErr      error
 	verifyErr      error
-	onboardURL     string
+	onboardResult  *contracts.OnboardingResult
 	onboardErr     error
 	onboardCBResult *contracts.AccountStatus
 	onboardCBErr   error
@@ -80,8 +80,8 @@ func (m *mockFiatService) VerifyProviderConfig(_ string) error {
 	return m.verifyErr
 }
 
-func (m *mockFiatService) GetOnboardingURL(_ context.Context, _ string, _ contracts.OnboardingParams) (string, error) {
-	return m.onboardURL, m.onboardErr
+func (m *mockFiatService) GetOnboardingURL(_ context.Context, _ string, _ contracts.OnboardingParams) (*contracts.OnboardingResult, error) {
+	return m.onboardResult, m.onboardErr
 }
 
 func (m *mockFiatService) HandleOnboardingCallback(_ context.Context, _ string, _ contracts.CallbackParams) (*contracts.AccountStatus, error) {

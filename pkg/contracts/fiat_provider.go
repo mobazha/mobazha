@@ -41,7 +41,8 @@ type FiatPaymentProvider interface {
 //	if onboarder, ok := provider.(FiatOnboardingProvider); ok { ... }
 type FiatOnboardingProvider interface {
 	// GetOnboardingURL generates an OAuth URL for seller onboarding.
-	GetOnboardingURL(ctx context.Context, params OnboardingParams) (string, error)
+	// If params.AccountID is empty, the provider may auto-create an account.
+	GetOnboardingURL(ctx context.Context, params OnboardingParams) (*OnboardingResult, error)
 
 	// HandleOnboardingCallback processes the OAuth callback and returns the connected account.
 	HandleOnboardingCallback(ctx context.Context, params CallbackParams) (*ProviderAccount, error)
@@ -106,11 +107,24 @@ type FiatService interface {
 
 	// GetOnboardingURL generates an OAuth/Account Link URL for seller onboarding.
 	// Returns ErrNotImplemented if the provider does not support onboarding.
-	GetOnboardingURL(ctx context.Context, providerID string, params OnboardingParams) (string, error)
+	GetOnboardingURL(ctx context.Context, providerID string, params OnboardingParams) (*OnboardingResult, error)
 
 	// HandleOnboardingCallback processes the onboarding callback and returns account status.
 	// Returns ErrNotImplemented if the provider does not support onboarding.
 	HandleOnboardingCallback(ctx context.Context, providerID string, params CallbackParams) (*AccountStatus, error)
+}
+
+// FiatPlatformConfigurer allows the hosting layer to inject platform-level
+// fiat providers into a tenant node's registry. Used in SaaS mode where
+// the platform owns the Stripe Connect keys (ModeConnected), not the seller.
+//
+// Hosting obtains this via type assertion on FiatService:
+//
+//	if configurer, ok := fiatService.(FiatPlatformConfigurer); ok {
+//	    configurer.RegisterPlatformProvider("stripe", secretKey, pubKey, webhookSecret)
+//	}
+type FiatPlatformConfigurer interface {
+	RegisterPlatformProvider(providerID, secretKey, publishableKey, webhookSecret string)
 }
 
 // FiatPaymentProviderAccessor exposes the fiat payment subsystem.

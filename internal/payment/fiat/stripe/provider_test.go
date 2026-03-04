@@ -362,11 +362,34 @@ func TestProvider_ParseWebhook_CaseInsensitiveHeader(t *testing.T) {
 	assert.Equal(t, contracts.WebhookRefundCreated, event.Type)
 }
 
-func TestProvider_GetOnboardingURL_MissingAccountID(t *testing.T) {
-	p := NewProvider(Config{SecretKey: "sk_test"})
-	_, err := p.GetOnboardingURL(context.Background(), contracts.OnboardingParams{})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "AccountID")
+func TestProvider_GetOnboardingURL_AutoCreateAccount(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/accounts", func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"id":   "acct_auto_created",
+			"type": "standard",
+		})
+	})
+	mux.HandleFunc("/v1/account_links", func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		body, _ := io.ReadAll(r.Body)
+		assert.Contains(t, string(body), "account=acct_auto_created")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"url":        "https://connect.stripe.com/setup/s/onboard-auto",
+			"expires_at": time.Now().Add(5 * time.Minute).Unix(),
+		})
+	})
+
+	_, p := newTestProvider(t, mux)
+	result, err := p.GetOnboardingURL(context.Background(), contracts.OnboardingParams{
+		SellerID:   "seller-123",
+		ReturnURL:  "https://app.com/return",
+		RefreshURL: "https://app.com/refresh",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://connect.stripe.com/setup/s/onboard-auto", result.URL)
+	assert.Equal(t, "acct_auto_created", result.AccountID)
 }
 
 func TestProvider_GetOnboardingURL_Success(t *testing.T) {
@@ -384,13 +407,14 @@ func TestProvider_GetOnboardingURL_Success(t *testing.T) {
 	})
 
 	_, p := newTestProvider(t, mux)
-	url, err := p.GetOnboardingURL(context.Background(), contracts.OnboardingParams{
+	result, err := p.GetOnboardingURL(context.Background(), contracts.OnboardingParams{
 		AccountID:  "acct_onboard",
 		ReturnURL:  "https://app.com/return",
 		RefreshURL: "https://app.com/refresh",
 	})
 	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(url, "https://connect.stripe.com/"))
+	assert.True(t, strings.HasPrefix(result.URL, "https://connect.stripe.com/"))
+	assert.Equal(t, "acct_onboard", result.AccountID)
 }
 
 func TestProvider_HandleOnboardingCallback_MissingAccountID(t *testing.T) {

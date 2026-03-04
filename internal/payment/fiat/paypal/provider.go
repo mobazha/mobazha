@@ -214,7 +214,7 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 
 // --- FiatOnboardingProvider (SaaS / PPCP Partner) ---
 
-func (p *Provider) GetOnboardingURL(ctx context.Context, params contracts.OnboardingParams) (string, error) {
+func (p *Provider) GetOnboardingURL(ctx context.Context, params contracts.OnboardingParams) (*contracts.OnboardingResult, error) {
 	reqBody := partnerReferralRequest{
 		TrackingID: params.SellerID,
 		Operations: []referralOperation{{
@@ -241,15 +241,15 @@ func (p *Provider) GetOnboardingURL(ctx context.Context, params contracts.Onboar
 
 	var resp partnerReferralResponse
 	if err := p.client.doJSON(ctx, "POST", "/v2/customer/partner-referrals", reqBody, &resp); err != nil {
-		return "", fmt.Errorf("paypal: create partner referral: %w", err)
+		return nil, fmt.Errorf("paypal: create partner referral: %w", err)
 	}
 
 	for _, l := range resp.Links {
 		if l.Rel == "action_url" {
-			return l.Href, nil
+			return &contracts.OnboardingResult{URL: l.Href}, nil
 		}
 	}
-	return "", fmt.Errorf("paypal: no action_url in partner referral response")
+	return nil, fmt.Errorf("paypal: no action_url in partner referral response")
 }
 
 func (p *Provider) HandleOnboardingCallback(ctx context.Context, params contracts.CallbackParams) (*contracts.ProviderAccount, error) {

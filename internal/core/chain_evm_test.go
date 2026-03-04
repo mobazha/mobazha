@@ -38,12 +38,6 @@ type mockHostService struct {
 func (m *mockHostService) RegisterStripeAccount(userID, stripeAccountID string) error {
 	return nil
 }
-func (m *mockHostService) GetStripeAccountIDByUserID(userID string) (string, error) {
-	return "", nil
-}
-func (m *mockHostService) GetUserIDByStripeAccountID(stripeAccountID string) (string, error) {
-	return "", nil
-}
 func (m *mockHostService) GetStripeConfig() (string, string, string, error) { return "", "", "", nil }
 func (m *mockHostService) GetUTXOMonitor() utxo.UTXOMonitorService       { return nil }
 func (m *mockHostService) GetEVMRelayService() relay.EVMRelayService     { return nil }

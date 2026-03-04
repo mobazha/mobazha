@@ -79,15 +79,6 @@ func (n *MobazhaNode) Wishlist() contracts.WishlistService {
 	}
 	return n.wishlistService
 }
-
-// Deprecated: Stripe returns the legacy StripeService backed by PaymentAppService.
-// New code should use FiatPaymentProviderAccessor via type assertion instead.
-func (n *MobazhaNode) Stripe() contracts.StripeService {
-	if n.paymentService == nil {
-		return nil
-	}
-	return n.paymentService
-}
 func (n *MobazhaNode) ExchangeRate() contracts.ExchangeRateService {
 	return &exchangeRateAdapter{n.exchangeRates}
 }

@@ -19,7 +19,6 @@ import (
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	"github.com/stripe/stripe-go/v82"
 )
 
 type mockNode struct {
@@ -151,7 +150,6 @@ type mockNode struct {
 	getReceivingAccountByIDFunc     func(id int) (*models.ReceivingAccount, error)
 	getActiveReceivingAccountFunc   func(chainType iwallet.ChainType) (*models.ReceivingAccount, error)
 	getReceivingAccountsByChainFunc func(chainType iwallet.ChainType) ([]models.ReceivingAccount, error)
-	getStripeConnectURLFunc         func() (string, error)
 
 	generatePaymentInstructionsFunc func(ctx context.Context, params models.InitializeEscrowData) (*payment.PaymentSetupResult, error)
 	buildInitEscrowInstructionsFunc func(ctx context.Context, params models.InitializeEscrowData) (*models.PaymentData, iwallet.Address, any, error)
@@ -167,11 +165,7 @@ type mockNode struct {
 	getMyPostsFunc    func() ([]models.PostData, error)
 	getPostsFunc      func(ctx context.Context, peerID peer.ID, useCache bool) ([]models.PostData, error)
 
-	// Stripe相关
-	getStripePublicKeyFunc        func() (string, error)
-	createStripePaymentIntentFunc func(ctx context.Context, orderID models.OrderID, amount int64, currency string) (*stripe.PaymentIntent, error)
-	handleStripeWebhookFunc       func(payload []byte, signature string) error
-	updateOrderPaymentStatusFunc  func(orderID models.OrderID, paymentIntentID, status string) error
+	updateOrderPaymentStatusFunc func(orderID models.OrderID, paymentIntentID, status string) error
 }
 
 // Service accessors — mockNode returns itself for each sub-interface.
@@ -186,7 +180,6 @@ func (m *mockNode) Media() contracts.MediaService                   { return m }
 func (m *mockNode) Social() contracts.SocialService                 { return m }
 func (m *mockNode) Matrix() contracts.MatrixService                 { return m }
 func (m *mockNode) Preferences() contracts.PreferencesService       { return m }
-func (m *mockNode) Stripe() contracts.StripeService                 { return m }
 func (m *mockNode) ExchangeRate() contracts.ExchangeRateService     { return m }
 func (m *mockNode) ShoppingCart() contracts.ShoppingCartService     { return m }
 func (m *mockNode) Wishlist() contracts.WishlistService             { return nil }
@@ -469,18 +462,6 @@ func (m *mockNode) UsingTestnet() bool {
 }
 func (m *mockNode) SignMessage(payload []byte) ([]byte, []byte, error) {
 	return nil, nil, nil
-}
-func (m *mockNode) GetStripePublicKey() (string, error) {
-	return "", nil
-}
-func (m *mockNode) GetStripeConnectURL() (string, error) {
-	return "", nil
-}
-func (m *mockNode) CreateStripePaymentIntent(_ context.Context, _ models.OrderID, _ int64, _ string) (*stripe.PaymentIntent, error) {
-	return nil, nil
-}
-func (m *mockNode) HandleStripeWebhook(_ []byte, _ string) error {
-	return nil
 }
 func (m *mockNode) UsingTorMode() bool {
 	return m.usingTorFunc()

@@ -214,7 +214,6 @@ func getPreferencesService(r *http.Request) contracts.PreferencesService {
 func getShoppingCartService(r *http.Request) contracts.ShoppingCartService {
 	return getNodeService(r).ShoppingCart()
 }
-func getStripeService(r *http.Request) contracts.StripeService { return getNodeService(r).Stripe() }
 func getExchangeRateService(r *http.Request) contracts.ExchangeRateService {
 	return getNodeService(r).ExchangeRate()
 }

@@ -28,7 +28,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/request"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/mobazha/mobazha3.0/pkg/webhook"
-	"github.com/stripe/stripe-go/v82"
 )
 
 // IdentityService provides node identity and lifecycle operations.
@@ -277,14 +276,6 @@ type ExchangeRateService interface {
 	GetRate(base models.CurrencyCode, to models.CurrencyCode, breakCache bool) (iwallet.Amount, error)
 }
 
-// StripeService handles Stripe payment integration.
-type StripeService interface {
-	GetStripePublicKey() (string, error)
-	GetStripeConnectURL() (string, error)
-	CreateStripePaymentIntent(ctx context.Context, orderID models.OrderID, amount int64, currency string) (*stripe.PaymentIntent, error)
-	HandleStripeWebhook(payload []byte, signature string) error
-}
-
 // ErrWishlistFull is returned when the wishlist reaches its capacity limit.
 var ErrWishlistFull = errors.New("wishlist is full")
 
@@ -347,7 +338,6 @@ type NodeService interface {
 	Social() SocialService
 	Matrix() MatrixService
 	Preferences() PreferencesService
-	Stripe() StripeService
 	ExchangeRate() ExchangeRateService
 	ShoppingCart() ShoppingCartService
 	Wishlist() WishlistService

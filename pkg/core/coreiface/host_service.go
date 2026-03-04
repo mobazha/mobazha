@@ -10,9 +10,6 @@ import (
 
 // HostService 定义托管服务的接口
 type HostService interface {
-	// RegisterStripeAccount 注册 Stripe 账户 (legacy, used by payment_app_service_stripe.go)
-	RegisterStripeAccount(userID, stripeAccountID string) error
-
 	// GetStripeConfig 获取 Stripe 配置 (legacy, used by options.go → PaymentAppService)
 	GetStripeConfig() (publicKey, secretKey, webhookKey string, err error)
 

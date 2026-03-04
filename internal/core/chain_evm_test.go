@@ -35,9 +35,6 @@ type mockHostService struct {
 	evmClients map[iwallet.ChainType]iwallet.ChainClient
 }
 
-func (m *mockHostService) RegisterStripeAccount(userID, stripeAccountID string) error {
-	return nil
-}
 func (m *mockHostService) GetStripeConfig() (string, string, string, error) { return "", "", "", nil }
 func (m *mockHostService) GetUTXOMonitor() utxo.UTXOMonitorService       { return nil }
 func (m *mockHostService) GetEVMRelayService() relay.EVMRelayService     { return nil }

@@ -409,17 +409,8 @@ func (n *MobazhaNode) initPaymentService() {
 	}
 
 	var getStripeConfigFromHost GetStripeConfigFromHostFunc
-	var registerStripeAccountFn RegisterStripeAccountFunc
 	if n.hostService != nil {
 		getStripeConfigFromHost = n.hostService.GetStripeConfig
-		registerStripeAccountFn = n.hostService.RegisterStripeAccount
-	}
-
-	var getStripeAccountIDFn GetStripeAccountIDFunc
-	if n.netDB != nil {
-		getStripeAccountIDFn = func(peerID string) (string, error) {
-			return n.netDB.GetStripeAccountID(peerID, nil)
-		}
 	}
 
 	n.paymentService = NewPaymentAppService(PaymentAppServiceConfig{
@@ -439,8 +430,6 @@ func (n *MobazhaNode) initPaymentService() {
 			return n.orderService.FulfillOrder(orderID, fulfillments, done)
 		},
 		GetStripeConfigFromHost: getStripeConfigFromHost,
-		RegisterStripeAccount:   registerStripeAccountFn,
-		GetStripeAccountID:      getStripeAccountIDFn,
 		StripeConfigCache:       n.stripeConfigCache,
 		ReleaseCancelable: func(order *models.Order, payoutAddress ...string) (*ReleaseResult, error) {
 			return n.orderService.releaseFromCancelableAddress(order, payoutAddress...)

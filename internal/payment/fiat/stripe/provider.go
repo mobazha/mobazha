@@ -279,6 +279,7 @@ func (p *Provider) GetAccountStatus(_ context.Context, accountID string) (*contr
 
 	status := &contracts.AccountStatus{
 		AccountID:      acct.ID,
+		Email:          acct.Email,
 		ChargesEnabled: acct.ChargesEnabled,
 		PayoutsEnabled: acct.PayoutsEnabled,
 	}

@@ -144,6 +144,7 @@ type ProviderAccount struct {
 // AccountStatus represents a seller's account status with a fiat provider.
 type AccountStatus struct {
 	AccountID      string   `json:"accountID"`
+	Email          string   `json:"email,omitempty"`
 	IsActive       bool     `json:"isActive"`
 	Status         string   `json:"status"`
 	ChargesEnabled bool     `json:"chargesEnabled"`

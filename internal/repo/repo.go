@@ -116,13 +116,8 @@ func NewRepoWithSharedDB(nodeID string, dataDir string, sharedDB *gorm.DB, ident
 		return nil, fmt.Errorf("nodeID must not be empty for shared DB mode")
 	}
 
-	// Ensure the per-tenant data directory exists (for flat-file public data)
-	publicDataDir := path.Join(dataDir, common.PublicDirName)
-	if err := os.MkdirAll(publicDataDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create public data dir: %w", err)
-	}
-
-	db, err := ffsqlite.NewTenantDB(sharedDB, nodeID, publicDataDir)
+	pd := ffsqlite.NewDBPublicData(sharedDB, nodeID)
+	db, err := ffsqlite.NewTenantDBWithPublicData(sharedDB, nodeID, pd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tenant DB: %w", err)
 	}

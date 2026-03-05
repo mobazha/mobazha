@@ -48,8 +48,6 @@ var columnsEN = map[string]int{
 	"introVideo":         11,
 	"processingTime":     12,
 	"grams":              13,
-	"termsAndConditions": 14,
-	"refundPolicy":       15,
 }
 
 // Column mappings for Chinese template
@@ -68,8 +66,6 @@ var columnsZH = map[string]int{
 	"介绍视频":  11,
 	"处理时间":  12,
 	"重量(克)": 13,
-	"销售条款":  14,
-	"退款政策":  15,
 }
 
 // ImportResult represents the result of a batch import operation
@@ -125,7 +121,7 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 		headers := []string{
 			"title", "contractType", "price", "pricingCurrency", "description",
 			"shortDescription", "productType", "tags", "condition", "nsfw",
-			"images", "introVideo", "processingTime", "grams", "termsAndConditions", "refundPolicy",
+			"images", "introVideo", "processingTime", "grams",
 		}
 		for i, h := range headers {
 			cell, _ := excelize.CoordinatesToCellName(i+1, 1)
@@ -138,7 +134,6 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 			"Product description here", "Short description",
 			"Electronics,Gadgets", "new,popular", "New", "false",
 			"image1.jpg,image2.png", "intro.mp4", "1-3 days", "500",
-			"Terms and conditions", "Refund policy",
 		}
 		for i, v := range exampleRow {
 			cell, _ := excelize.CoordinatesToCellName(i+1, 2)
@@ -172,7 +167,7 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 		headers := []string{
 			"商品标题", "商品类型", "价格", "定价货币", "详细描述",
 			"简短描述", "分类", "标签", "商品状态", "成人内容",
-			"图片文件名", "介绍视频", "处理时间", "重量(克)", "销售条款", "退款政策",
+			"图片文件名", "介绍视频", "处理时间", "重量(克)",
 		}
 		for i, h := range headers {
 			cell, _ := excelize.CoordinatesToCellName(i+1, 1)
@@ -185,7 +180,6 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 			"商品详细描述", "简短描述",
 			"电子产品,数码", "新品,热门", "New", "false",
 			"image1.jpg,image2.png", "intro.mp4", "1-3天", "500",
-			"销售条款内容", "退款政策内容",
 		}
 		for i, v := range exampleRow {
 			cell, _ := excelize.CoordinatesToCellName(i+1, 2)
@@ -217,7 +211,7 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Set column widths for better readability
-	f.SetColWidth(productsSheet, "A", "P", 18)
+	f.SetColWidth(productsSheet, "A", "N", 18)
 	f.SetColWidth(variantsSheet, "A", "F", 18)
 
 	// Create header style
@@ -225,7 +219,7 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 		Font: &excelize.Font{Bold: true},
 		Fill: excelize.Fill{Type: "pattern", Color: []string{"#E0E0E0"}, Pattern: 1},
 	})
-	f.SetCellStyle(productsSheet, "A1", "P1", style)
+	f.SetCellStyle(productsSheet, "A1", "N1", style)
 	f.SetCellStyle(variantsSheet, "A1", "F1", style)
 
 	// Write to response
@@ -536,8 +530,6 @@ func (g *Gateway) normalizeColumnName(name string, lang string) string {
 		"介绍视频":  "introVideo",
 		"处理时间":  "processingTime",
 		"重量(克)": "grams",
-		"销售条款":  "termsAndConditions",
-		"退款政策":  "refundPolicy",
 	}
 
 	if en, ok := mapping[name]; ok {
@@ -617,8 +609,6 @@ func (g *Gateway) parseListingRow(row []string, columns map[string]int, lang str
 			Tags:             tags,
 			Grams:            grams,
 		},
-		TermsAndConditions: g.getCellValue(row, columns["termsAndConditions"]),
-		RefundPolicy:       g.getCellValue(row, columns["refundPolicy"]),
 	}
 
 	return listing, nil
@@ -986,9 +976,7 @@ type JSONListingInput struct {
 	IntroVideo         string             `json:"introVideo"`
 	ProcessingTime     string             `json:"processingTime"`
 	Grams              uint32             `json:"grams"`
-	TermsAndConditions string             `json:"termsAndConditions"`
-	RefundPolicy       string             `json:"refundPolicy"`
-	Variants           []JSONVariantInput `json:"variants"`
+	Variants []JSONVariantInput `json:"variants"`
 	Quantity           string             `json:"quantity"`
 
 	// RWA Token fields
@@ -1275,8 +1263,6 @@ func (g *Gateway) parseJSONListing(input JSONListingInput) (*pb.Listing, error) 
 			Tags:             input.Tags,
 			Grams:            input.Grams,
 		},
-		TermsAndConditions: input.TermsAndConditions,
-		RefundPolicy:       input.RefundPolicy,
 	}
 
 	// Handle RWA Token fields

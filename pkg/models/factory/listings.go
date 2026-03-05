@@ -17,9 +17,7 @@ import (
 
 func NewPhysicalListing(slug string) *pb.Listing {
 	return &pb.Listing{
-		Slug:               slug,
-		TermsAndConditions: "Sample Terms and Conditions",
-		RefundPolicy:       "Sample Refund policy",
+		Slug: slug,
 		Metadata: &pb.Listing_Metadata{
 			Version: 1,
 			PricingCurrency: &pb.Currency{
@@ -132,9 +130,7 @@ func NewPhysicalListing(slug string) *pb.Listing {
 
 func NewDigitalListing(slug string) *pb.Listing {
 	return &pb.Listing{
-		Slug:               slug,
-		TermsAndConditions: "Sample Terms and Conditions",
-		RefundPolicy:       "Sample Refund policy",
+		Slug: slug,
 		Metadata: &pb.Listing_Metadata{
 			Version: 1,
 			PricingCurrency: &pb.Currency{

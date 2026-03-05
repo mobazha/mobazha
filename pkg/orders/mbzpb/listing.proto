@@ -16,8 +16,10 @@ message Listing {
     reserved 7;
     reserved "coupons";
     repeated string moderators              = 8;
-    string termsAndConditions               = 9;
-    string refundPolicy                     = 10;
+    reserved 9;
+    reserved "termsAndConditions";
+    reserved 10;
+    reserved "refundPolicy";
     string status                           = 11; // "draft", "published", "private". Default is "published".
     bool featured                           = 12;
     ShippingProfile shippingProfile         = 13; // P2P/IPFS 发布时嵌入的配送档案快照

@@ -1161,14 +1161,6 @@ func (s *ListingAppService) validateListing(sl *pb.SignedListing) (err error) {
 		}
 	}
 
-	if len(sl.Listing.TermsAndConditions) > PolicyMaxCharacters {
-		return coreiface.ErrTooManyCharacters{"termsandconditions", strconv.Itoa(PolicyMaxCharacters)}
-	}
-
-	if len(sl.Listing.RefundPolicy) > PolicyMaxCharacters {
-		return coreiface.ErrTooManyCharacters{"refundpolicy", strconv.Itoa(PolicyMaxCharacters)}
-	}
-
 	if sl.Listing.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD {
 		err := validatePhysicalListing(sl.Listing)
 		if err != nil {

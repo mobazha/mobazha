@@ -814,7 +814,7 @@ func Test_validateOrderOpen(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				order.Listings[0].Listing.RefundPolicy = "fasdf"
+				order.Listings[0].Listing.Moderators = append(order.Listings[0].Listing.Moderators, "invalid-moderator-id")
 				return order, nil
 			},
 			valid: false,

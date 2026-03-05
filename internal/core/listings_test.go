@@ -1565,22 +1565,6 @@ func Test_validateListing(t *testing.T) {
 			valid: false,
 		},
 		{
-			// Terms and conditions too long
-			listing: factory.NewSignedListing(),
-			transform: func(sl *pb.SignedListing) {
-				sl.Listing.TermsAndConditions = strings.Repeat("s", PolicyMaxCharacters+1)
-			},
-			valid: false,
-		},
-		{
-			// Refund policy too long
-			listing: factory.NewSignedListing(),
-			transform: func(sl *pb.SignedListing) {
-				sl.Listing.RefundPolicy = strings.Repeat("s", PolicyMaxCharacters+1)
-			},
-			valid: false,
-		},
-		{
 			// Vendor ID is nil
 			listing: factory.NewSignedListing(),
 			transform: func(sl *pb.SignedListing) {

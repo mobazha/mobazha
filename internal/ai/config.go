@@ -226,7 +226,10 @@ func (mc *MultiConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	if newFmt.Providers != nil && len(newFmt.Providers) > 0 {
+	// New format is identified by having providers map OR active_provider field.
+	// Legacy format uses "provider" (not "active_provider"), so the alias
+	// correctly distinguishes them via JSON tag names.
+	if newFmt.Providers != nil || newFmt.ActiveProvider != "" {
 		*mc = MultiConfig(newFmt)
 		return nil
 	}

@@ -229,6 +229,34 @@ func TestMultiConfig_UnmarshalJSON_EmptyJSON(t *testing.T) {
 	}
 }
 
+func TestMultiConfig_UnmarshalJSON_NewFormatWithoutProviders(t *testing.T) {
+	data := `{"enabled":true,"active_provider":"openai"}`
+	var mc MultiConfig
+	if err := json.Unmarshal([]byte(data), &mc); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if mc.ActiveProvider != "openai" {
+		t.Errorf("expected active_provider=openai, got %q", mc.ActiveProvider)
+	}
+	if !mc.Enabled {
+		t.Error("expected enabled=true")
+	}
+}
+
+func TestMultiConfig_UnmarshalJSON_NewFormatEmptyProviders(t *testing.T) {
+	data := `{"enabled":true,"active_provider":"anthropic","providers":{}}`
+	var mc MultiConfig
+	if err := json.Unmarshal([]byte(data), &mc); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if mc.ActiveProvider != "anthropic" {
+		t.Errorf("expected active_provider=anthropic, got %q", mc.ActiveProvider)
+	}
+	if mc.Providers == nil {
+		t.Error("expected non-nil providers map")
+	}
+}
+
 func TestMultiConfig_ActiveConfig(t *testing.T) {
 	mc := MultiConfig{
 		Enabled:        true,

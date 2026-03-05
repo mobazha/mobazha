@@ -199,11 +199,11 @@ func TestProxy_Generate_UnknownAction(t *testing.T) {
 }
 
 func TestConfig_Defaults(t *testing.T) {
-	cfg := Config{Provider: "zhipu"}
-	if url := cfg.EffectiveBaseURL(); url != "https://open.bigmodel.cn/api/paas/v4" {
+	cfg := Config{Provider: "anthropic"}
+	if url := cfg.EffectiveBaseURL(); url != "https://api.anthropic.com/v1" {
 		t.Errorf("unexpected base URL: %s", url)
 	}
-	if m := cfg.EffectiveModel(); m != "glm-4v-flash" {
+	if m := cfg.EffectiveModel(); m != "claude-sonnet-4-20250514" {
 		t.Errorf("unexpected model: %s", m)
 	}
 
@@ -229,7 +229,7 @@ func TestSupportedProviders(t *testing.T) {
 			t.Errorf("provider %s has empty label", p.ID)
 		}
 	}
-	for _, required := range []string{"openai", "zhipu", "custom"} {
+	for _, required := range []string{"openai", "anthropic", "custom"} {
 		if !ids[required] {
 			t.Errorf("missing required provider: %s", required)
 		}
@@ -243,7 +243,7 @@ func TestConfig_IsValid(t *testing.T) {
 		want   bool
 	}{
 		{"fully configured", Config{Enabled: true, APIKey: "k", BaseURL: "https://x.com/v1"}, true},
-		{"provider default base URL", Config{Enabled: true, APIKey: "k", Provider: "zhipu"}, true},
+		{"provider default base URL", Config{Enabled: true, APIKey: "k", Provider: "anthropic"}, true},
 		{"disabled", Config{Enabled: false, APIKey: "k", BaseURL: "https://x.com/v1"}, false},
 		{"no key", Config{Enabled: true, BaseURL: "https://x.com/v1"}, false},
 		{"custom no base URL falls back to openai", Config{Enabled: true, APIKey: "k", Provider: "custom"}, true},
@@ -447,6 +447,159 @@ func containsAll(s string, substrs ...string) bool {
 		}
 	}
 	return true
+}
+
+func TestProxy_Anthropic_Generate_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/messages" {
+			t.Errorf("expected /messages, got %s", r.URL.Path)
+		}
+		if r.Header.Get("x-api-key") != "test-key" {
+			t.Errorf("expected x-api-key header, got %q", r.Header.Get("x-api-key"))
+		}
+		if r.Header.Get("anthropic-version") == "" {
+			t.Error("expected anthropic-version header")
+		}
+		if r.Header.Get("Authorization") != "" {
+			t.Error("Anthropic should not send Authorization Bearer header")
+		}
+
+		var reqBody map[string]interface{}
+		json.NewDecoder(r.Body).Decode(&reqBody)
+		if reqBody["model"] != "claude-sonnet-4-20250514" {
+			t.Errorf("expected model claude-sonnet-4-20250514, got %v", reqBody["model"])
+		}
+		if _, ok := reqBody["system"]; !ok {
+			t.Error("expected top-level 'system' field for Anthropic")
+		}
+
+		resp := map[string]interface{}{
+			"content": []map[string]interface{}{
+				{"type": "text", "text": `{"title": "Claude Product", "tags": ["ai", "test"]}`},
+			},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	proxy := NewProxy(server.Client())
+	cfg := Config{
+		Provider: "anthropic",
+		APIKey:   "test-key",
+		Model:    "claude-sonnet-4-20250514",
+		BaseURL:  server.URL,
+		Enabled:  true,
+	}
+
+	result, err := proxy.Generate(cfg, GenerateRequest{
+		Action: "suggest_tags",
+		Title:  "Test Product",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Title != "Claude Product" {
+		t.Errorf("expected title 'Claude Product', got %q", result.Title)
+	}
+	if len(result.Tags) != 2 {
+		t.Errorf("expected 2 tags, got %d", len(result.Tags))
+	}
+}
+
+func TestProxy_Anthropic_TestConnection_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/messages" {
+			t.Errorf("expected /messages, got %s", r.URL.Path)
+		}
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"content": []map[string]interface{}{
+				{"type": "text", "text": "Hi"},
+			},
+		})
+	}))
+	defer server.Close()
+
+	proxy := NewProxy(&http.Client{})
+	cfg := Config{Provider: "anthropic", APIKey: "test-key", BaseURL: server.URL, Enabled: true}
+	if err := proxy.TestConnection(cfg); err != nil {
+		t.Errorf("expected nil error, got %v", err)
+	}
+}
+
+func TestProxy_Anthropic_AuthFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error": map[string]string{"message": "invalid x-api-key"},
+		})
+	}))
+	defer server.Close()
+
+	proxy := NewProxy(&http.Client{})
+	cfg := Config{Provider: "anthropic", APIKey: "bad-key", BaseURL: server.URL, Enabled: true}
+	err := proxy.TestConnection(cfg)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "authentication failed") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestConvertMessagesForAnthropic(t *testing.T) {
+	messages := []chatMessage{
+		{Role: "system", Content: "You are an assistant."},
+		{Role: "user", Content: "Hello"},
+		{Role: "assistant", Content: "Hi there!"},
+	}
+
+	system, msgs := convertMessagesForAnthropic(messages)
+	if system != "You are an assistant." {
+		t.Errorf("expected system prompt, got %q", system)
+	}
+	if len(msgs) != 2 {
+		t.Fatalf("expected 2 messages (no system), got %d", len(msgs))
+	}
+	if msgs[0]["role"] != "user" {
+		t.Errorf("expected user role, got %v", msgs[0]["role"])
+	}
+}
+
+func TestConvertMessagesForAnthropic_WithImages(t *testing.T) {
+	messages := []chatMessage{
+		{Role: "user", Content: []interface{}{
+			map[string]string{"type": "text", "text": "Describe this image"},
+			map[string]interface{}{
+				"type":      "image_url",
+				"image_url": map[string]string{"url": "https://example.com/img.jpg", "detail": "low"},
+			},
+		}},
+	}
+
+	_, msgs := convertMessagesForAnthropic(messages)
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(msgs))
+	}
+	blocks, ok := msgs[0]["content"].([]map[string]interface{})
+	if !ok {
+		t.Fatal("expected content to be []map[string]interface{}")
+	}
+	if len(blocks) != 2 {
+		t.Fatalf("expected 2 content blocks, got %d", len(blocks))
+	}
+	if blocks[0]["type"] != "text" {
+		t.Errorf("expected text block, got %v", blocks[0]["type"])
+	}
+	if blocks[1]["type"] != "image" {
+		t.Errorf("expected image block, got %v", blocks[1]["type"])
+	}
+	source, ok := blocks[1]["source"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected source map")
+	}
+	if source["type"] != "url" || source["url"] != "https://example.com/img.jpg" {
+		t.Errorf("unexpected image source: %v", source)
+	}
 }
 
 func TestExtractJSON(t *testing.T) {

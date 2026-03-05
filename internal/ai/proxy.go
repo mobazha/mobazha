@@ -38,7 +38,7 @@ type GenerateResponse struct {
 	StoreConfig      json.RawMessage `json:"storeConfig,omitempty"`
 }
 
-// Proxy handles proxying AI requests to an OpenAI-compatible API.
+// Proxy handles proxying AI requests to an OpenAI-compatible or Anthropic API.
 type Proxy struct {
 	client *http.Client
 }
@@ -50,67 +50,232 @@ func NewProxy(client *http.Client) *Proxy {
 	return &Proxy{client: client}
 }
 
+// callLLM dispatches to the correct provider backend and returns the raw text content.
+func (p *Proxy) callLLM(cfg Config, messages []chatMessage, maxTokens int, temperature float64, timeout time.Duration) (string, error) {
+	if IsAnthropicProvider(cfg.Provider) {
+		return p.doAnthropicRequest(cfg, messages, maxTokens, temperature, timeout)
+	}
+	return p.doOpenAIRequest(cfg, messages, maxTokens, temperature, timeout)
+}
+
+// doOpenAIRequest sends a request to an OpenAI-compatible /chat/completions endpoint.
+func (p *Proxy) doOpenAIRequest(cfg Config, messages []chatMessage, maxTokens int, temperature float64, timeout time.Duration) (string, error) {
+	body := map[string]interface{}{
+		"model":      cfg.EffectiveModel(),
+		"messages":   messages,
+		"max_tokens": maxTokens,
+	}
+	if temperature > 0 {
+		body["temperature"] = temperature
+	}
+
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return "", fmt.Errorf("marshal request: %w", err)
+	}
+
+	apiURL := strings.TrimSuffix(cfg.EffectiveBaseURL(), "/") + "/chat/completions"
+	httpReq, err := http.NewRequest("POST", apiURL, bytes.NewReader(payload))
+	if err != nil {
+		return "", fmt.Errorf("create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+
+	client := p.clientWithTimeout(timeout)
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return "", fmt.Errorf("connection failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
+	if err != nil {
+		return "", fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return "", fmt.Errorf("authentication failed: invalid API key")
+	}
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("%s", extractErrorMessage(respBody, resp.StatusCode))
+	}
+
+	var apiResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		return "", fmt.Errorf("parse AI response: %w", err)
+	}
+	if len(apiResp.Choices) == 0 || apiResp.Choices[0].Message.Content == "" {
+		return "", fmt.Errorf("empty AI response")
+	}
+	return apiResp.Choices[0].Message.Content, nil
+}
+
+// doAnthropicRequest sends a request to the Anthropic Messages API (/messages).
+func (p *Proxy) doAnthropicRequest(cfg Config, messages []chatMessage, maxTokens int, temperature float64, timeout time.Duration) (string, error) {
+	systemPromptText, anthropicMsgs := convertMessagesForAnthropic(messages)
+
+	body := map[string]interface{}{
+		"model":      cfg.EffectiveModel(),
+		"max_tokens": maxTokens,
+		"messages":   anthropicMsgs,
+	}
+	if systemPromptText != "" {
+		body["system"] = systemPromptText
+	}
+	if temperature > 0 {
+		body["temperature"] = temperature
+	}
+
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return "", fmt.Errorf("marshal request: %w", err)
+	}
+
+	apiURL := strings.TrimSuffix(cfg.EffectiveBaseURL(), "/") + "/messages"
+	httpReq, err := http.NewRequest("POST", apiURL, bytes.NewReader(payload))
+	if err != nil {
+		return "", fmt.Errorf("create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("x-api-key", cfg.APIKey)
+	httpReq.Header.Set("anthropic-version", "2023-06-01")
+
+	client := p.clientWithTimeout(timeout)
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return "", fmt.Errorf("connection failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
+	if err != nil {
+		return "", fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return "", fmt.Errorf("authentication failed: invalid API key")
+	}
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("%s", extractErrorMessage(respBody, resp.StatusCode))
+	}
+
+	var apiResp struct {
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		return "", fmt.Errorf("parse AI response: %w", err)
+	}
+
+	var parts []string
+	for _, block := range apiResp.Content {
+		if block.Type == "text" && block.Text != "" {
+			parts = append(parts, block.Text)
+		}
+	}
+	if len(parts) == 0 {
+		return "", fmt.Errorf("empty AI response")
+	}
+	return strings.Join(parts, ""), nil
+}
+
+// convertMessagesForAnthropic extracts the system prompt and converts OpenAI-style
+// message content (including vision blocks) to the Anthropic Messages API format.
+func convertMessagesForAnthropic(messages []chatMessage) (system string, msgs []map[string]interface{}) {
+	for _, msg := range messages {
+		if msg.Role == "system" {
+			if s, ok := msg.Content.(string); ok {
+				system = s
+			}
+			continue
+		}
+		am := map[string]interface{}{"role": msg.Role}
+
+		switch c := msg.Content.(type) {
+		case string:
+			am["content"] = c
+		case []interface{}:
+			var blocks []map[string]interface{}
+			for _, item := range c {
+				switch block := item.(type) {
+				case map[string]string:
+					if block["type"] == "text" {
+						blocks = append(blocks, map[string]interface{}{"type": "text", "text": block["text"]})
+					}
+				case map[string]interface{}:
+					switch block["type"] {
+					case "text":
+						blocks = append(blocks, map[string]interface{}{"type": "text", "text": block["text"]})
+					case "image_url":
+						if imgMap, ok := block["image_url"].(map[string]string); ok {
+							blocks = append(blocks, map[string]interface{}{
+								"type": "image",
+								"source": map[string]interface{}{
+									"type": "url",
+									"url":  imgMap["url"],
+								},
+							})
+						}
+					}
+				}
+			}
+			am["content"] = blocks
+		default:
+			am["content"] = c
+		}
+
+		msgs = append(msgs, am)
+	}
+	return
+}
+
+func (p *Proxy) clientWithTimeout(timeout time.Duration) *http.Client {
+	if timeout > 0 && p.client.Timeout != timeout {
+		return &http.Client{Timeout: timeout}
+	}
+	return p.client
+}
+
+func extractErrorMessage(body []byte, statusCode int) string {
+	var errObj struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+		Message string `json:"message"`
+	}
+	if json.Unmarshal(body, &errObj) == nil {
+		if errObj.Error.Message != "" {
+			return errObj.Error.Message
+		}
+		if errObj.Message != "" {
+			return errObj.Message
+		}
+	}
+	return fmt.Sprintf("provider returned status %d", statusCode)
+}
+
 // TestConnection sends a minimal request to verify the AI provider is reachable
 // and the API key is valid.
 func (p *Proxy) TestConnection(cfg Config) error {
 	if cfg.APIKey == "" {
 		return fmt.Errorf("API key is required")
 	}
-
-	baseURL := cfg.EffectiveBaseURL()
-	if baseURL == "" {
+	if cfg.EffectiveBaseURL() == "" {
 		return fmt.Errorf("base URL is required")
 	}
 
-	body := map[string]interface{}{
-		"model":      cfg.EffectiveModel(),
-		"messages":   []map[string]string{{"role": "user", "content": "Hi"}},
-		"max_tokens": 1,
-	}
-	payload, _ := json.Marshal(body)
-
-	url := strings.TrimSuffix(baseURL, "/") + "/chat/completions"
-	httpReq, err := http.NewRequest("POST", url, bytes.NewReader(payload))
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+cfg.APIKey)
-
-	client := p.client
-	if client.Timeout > 15*time.Second {
-		client = &http.Client{Timeout: 15 * time.Second}
-	}
-
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		return fmt.Errorf("connection failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		return fmt.Errorf("authentication failed: invalid API key")
-	}
-	if resp.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		var errObj struct {
-			Error struct {
-				Message string `json:"message"`
-			} `json:"error"`
-			Message string `json:"message"`
-		}
-		if json.Unmarshal(respBody, &errObj) == nil {
-			if errObj.Error.Message != "" {
-				return fmt.Errorf("%s", errObj.Error.Message)
-			}
-			if errObj.Message != "" {
-				return fmt.Errorf("%s", errObj.Message)
-			}
-		}
-		return fmt.Errorf("provider returned status %d", resp.StatusCode)
-	}
-
-	return nil
+	messages := []chatMessage{{Role: "user", Content: "Hi"}}
+	_, err := p.callLLM(cfg, messages, 1, 0, 15*time.Second)
+	return err
 }
 
 func isStoreAction(action string) bool {
@@ -132,71 +297,12 @@ func (p *Proxy) Generate(cfg Config, req GenerateRequest) (*GenerateResponse, er
 		maxTokens = 4096
 	}
 
-	body := map[string]interface{}{
-		"model":       cfg.EffectiveModel(),
-		"messages":    messages,
-		"temperature": 0.7,
-		"max_tokens":  maxTokens,
-	}
-
-	payload, err := json.Marshal(body)
+	rawContent, err := p.callLLM(cfg, messages, maxTokens, 0.7, 0)
 	if err != nil {
-		return nil, fmt.Errorf("marshal request: %w", err)
+		return nil, fmt.Errorf("AI upstream error: %s", err)
 	}
 
-	url := strings.TrimSuffix(cfg.EffectiveBaseURL(), "/") + "/chat/completions"
-	httpReq, err := http.NewRequest("POST", url, bytes.NewReader(payload))
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+cfg.APIKey)
-
-	resp, err := p.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("AI upstream request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		detail := fmt.Sprintf("%s: %d", cfg.EffectiveModel(), resp.StatusCode)
-		var errObj struct {
-			Error struct {
-				Message string `json:"message"`
-			} `json:"error"`
-			Message string `json:"message"`
-		}
-		if json.Unmarshal(respBody, &errObj) == nil {
-			if errObj.Error.Message != "" {
-				detail = errObj.Error.Message
-			} else if errObj.Message != "" {
-				detail = errObj.Message
-			}
-		}
-		return nil, fmt.Errorf("AI upstream error: %s", detail)
-	}
-
-	var apiResp struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		return nil, fmt.Errorf("parse AI response: %w", err)
-	}
-
-	if len(apiResp.Choices) == 0 || apiResp.Choices[0].Message.Content == "" {
-		return nil, fmt.Errorf("empty AI response")
-	}
-
-	content := extractJSON(apiResp.Choices[0].Message.Content)
+	content := extractJSON(rawContent)
 	var result GenerateResponse
 
 	if isStoreAction(req.Action) {

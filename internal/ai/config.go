@@ -19,23 +19,28 @@ type Config struct {
 var fallbackProviders = map[string]ProviderPreset{
 	"openai": {
 		Label: "OpenAI", DefaultModel: "gpt-4o", DefaultBaseURL: "https://api.openai.com/v1",
-		Models: []string{"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"},
+		Models:  []string{"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"},
+		HelpURL: "https://platform.openai.com/api-keys",
 	},
-	"zhipu": {
-		Label: "智谱 GLM", DefaultModel: "glm-4v-flash", DefaultBaseURL: "https://open.bigmodel.cn/api/paas/v4",
-		Models: []string{"glm-4v-flash", "glm-4-flash", "glm-4-plus", "glm-4"},
+	"anthropic": {
+		Label: "Anthropic Claude", DefaultModel: "claude-sonnet-4-20250514", DefaultBaseURL: "https://api.anthropic.com/v1",
+		Models:  []string{"claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022", "claude-3-haiku-20250131"},
+		HelpURL: "https://console.anthropic.com/settings/keys",
 	},
-	"siliconflow": {
-		Label: "SiliconFlow", DefaultModel: "Pro/Qwen/Qwen2.5-VL-32B-Instruct", DefaultBaseURL: "https://api.siliconflow.cn/v1",
-		Models: []string{"Pro/Qwen/Qwen2.5-VL-32B-Instruct", "Qwen/Qwen2.5-72B-Instruct", "deepseek-ai/DeepSeek-V3"},
+	"gemini": {
+		Label: "Google Gemini", DefaultModel: "gemini-2.0-flash", DefaultBaseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+		Models:  []string{"gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro", "gemini-1.5-flash"},
+		HelpURL: "https://aistudio.google.com/apikey",
 	},
 	"deepseek": {
 		Label: "DeepSeek", DefaultModel: "deepseek-chat", DefaultBaseURL: "https://api.deepseek.com/v1",
-		Models: []string{"deepseek-chat", "deepseek-reasoner"},
+		Models:  []string{"deepseek-chat", "deepseek-reasoner"},
+		HelpURL: "https://platform.deepseek.com/api_keys",
 	},
-	"moonshot": {
-		Label: "Moonshot / Kimi", DefaultModel: "moonshot-v1-auto", DefaultBaseURL: "https://api.moonshot.cn/v1",
-		Models: []string{"moonshot-v1-auto", "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"},
+	"qwen": {
+		Label: "Qwen (通义千问)", DefaultModel: "qwen-max", DefaultBaseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+		Models:  []string{"qwen-max", "qwen-plus", "qwen-turbo", "qwen-vl-max"},
+		HelpURL: "https://dashscope.console.aliyun.com/apiKey",
 	},
 	"custom": {Label: "Custom (OpenAI-compatible)", DefaultModel: "", DefaultBaseURL: ""},
 }
@@ -51,6 +56,7 @@ type ProviderPreset struct {
 	DefaultModel   string   `json:"default_model"`
 	DefaultBaseURL string   `json:"default_base_url"`
 	Models         []string `json:"models,omitempty"`
+	HelpURL        string   `json:"help_url,omitempty"`
 }
 
 // ProviderInfo is returned by the API for frontend form rendering.
@@ -60,6 +66,7 @@ type ProviderInfo struct {
 	DefaultModel   string   `json:"default_model"`
 	DefaultBaseURL string   `json:"default_base_url"`
 	Models         []string `json:"models,omitempty"`
+	HelpURL        string   `json:"help_url,omitempty"`
 }
 
 // LoadRemoteProviders parses the JSON string from nodeConfig.data.aiProviders
@@ -99,7 +106,7 @@ func SupportedProviders() []ProviderInfo {
 	}
 	remoteMu.RUnlock()
 
-	order := []string{"zhipu", "siliconflow", "deepseek", "moonshot", "openai", "custom"}
+	order := []string{"openai", "anthropic", "gemini", "deepseek", "qwen", "custom"}
 	result := make([]ProviderInfo, 0, len(order))
 	for _, id := range order {
 		p := fallbackProviders[id]
@@ -109,6 +116,7 @@ func SupportedProviders() []ProviderInfo {
 			DefaultModel:   p.DefaultModel,
 			DefaultBaseURL: p.DefaultBaseURL,
 			Models:         p.Models,
+			HelpURL:        p.HelpURL,
 		})
 	}
 	return result
@@ -126,6 +134,7 @@ func lookupProvider(providerID string) (ProviderPreset, bool) {
 				DefaultModel:   p.DefaultModel,
 				DefaultBaseURL: p.DefaultBaseURL,
 				Models:         p.Models,
+				HelpURL:        p.HelpURL,
 			}, true
 		}
 	}
@@ -133,6 +142,12 @@ func lookupProvider(providerID string) (ProviderPreset, bool) {
 
 	p, ok := fallbackProviders[providerID]
 	return p, ok
+}
+
+// IsAnthropicProvider returns true if the provider uses the Anthropic Messages API
+// instead of the OpenAI-compatible Chat Completions API.
+func IsAnthropicProvider(providerID string) bool {
+	return providerID == "anthropic"
 }
 
 func (c *Config) IsValid() bool {

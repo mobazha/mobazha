@@ -98,7 +98,7 @@ func TestFallbackProviders_WhenNoRemote(t *testing.T) {
 	for _, p := range providers {
 		ids[p.ID] = true
 	}
-	for _, expected := range []string{"openai", "zhipu", "deepseek", "custom"} {
+	for _, expected := range []string{"openai", "anthropic", "deepseek", "custom"} {
 		if !ids[expected] {
 			t.Errorf("fallback missing provider %q", expected)
 		}

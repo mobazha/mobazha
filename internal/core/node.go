@@ -622,24 +622,33 @@ func (n *MobazhaNode) AIProxy() *aipkg.Proxy {
 	return n.aiProxy
 }
 
-// AIConfig reads the persisted AI configuration from the database.
+// AIConfig returns the flat Config for the currently active provider.
+// Used by Generate/TestConnection handlers and proxy layer.
 func (n *MobazhaNode) AIConfig() aipkg.Config {
-	val, err := n.getSetting(models.SettingsKeyAIConfig)
-	if err != nil || val == "" {
-		return aipkg.Config{}
-	}
-	var cfg aipkg.Config
-	if err := json.Unmarshal([]byte(val), &cfg); err != nil {
-		return aipkg.Config{}
-	}
-	return cfg
+	mc := n.AIMultiConfig()
+	return mc.ActiveConfig()
 }
 
-// SaveAIConfig persists AI configuration to the database.
-func (n *MobazhaNode) SaveAIConfig(cfg aipkg.Config) error {
-	data, err := json.Marshal(cfg)
+// AIMultiConfig reads the full multi-provider config from the database.
+// Automatically handles migration from legacy single-provider format
+// via MultiConfig.UnmarshalJSON.
+func (n *MobazhaNode) AIMultiConfig() aipkg.MultiConfig {
+	val, err := n.getSetting(models.SettingsKeyAIConfig)
+	if err != nil || val == "" {
+		return aipkg.MultiConfig{}
+	}
+	var mc aipkg.MultiConfig
+	if err := json.Unmarshal([]byte(val), &mc); err != nil {
+		return aipkg.MultiConfig{}
+	}
+	return mc
+}
+
+// SaveAIMultiConfig persists the multi-provider AI config to the database.
+func (n *MobazhaNode) SaveAIMultiConfig(mc aipkg.MultiConfig) error {
+	data, err := json.Marshal(mc)
 	if err != nil {
-		return fmt.Errorf("marshal AI config: %w", err)
+		return fmt.Errorf("marshal AI multi config: %w", err)
 	}
 	return n.saveSetting(models.SettingsKeyAIConfig, string(data))
 }

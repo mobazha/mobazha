@@ -150,6 +150,117 @@ func IsAnthropicProvider(providerID string) bool {
 	return providerID == "anthropic"
 }
 
+// ---------------------------------------------------------------------------
+// MultiConfig — multi-provider storage format
+// ---------------------------------------------------------------------------
+
+// ProviderCredential stores per-provider configuration (API key, model override, base URL override).
+type ProviderCredential struct {
+	APIKey  string `json:"api_key"`
+	Model   string `json:"model,omitempty"`
+	BaseURL string `json:"base_url,omitempty"`
+}
+
+// MultiConfig supports multiple configured providers with one active.
+type MultiConfig struct {
+	Enabled        bool                          `json:"enabled"`
+	ActiveProvider string                        `json:"active_provider"`
+	Providers      map[string]ProviderCredential `json:"providers,omitempty"`
+}
+
+// ActiveConfig returns the flat Config for the currently active provider,
+// suitable for passing to Proxy.Generate / Proxy.TestConnection.
+func (mc *MultiConfig) ActiveConfig() Config {
+	if mc.Providers == nil {
+		return Config{Enabled: mc.Enabled}
+	}
+	cred, ok := mc.Providers[mc.ActiveProvider]
+	if !ok {
+		return Config{Enabled: mc.Enabled, Provider: mc.ActiveProvider}
+	}
+	return Config{
+		Provider: mc.ActiveProvider,
+		APIKey:   cred.APIKey,
+		Model:    cred.Model,
+		BaseURL:  cred.BaseURL,
+		Enabled:  mc.Enabled,
+	}
+}
+
+// SetProvider saves or updates credentials for a specific provider.
+func (mc *MultiConfig) SetProvider(id string, cred ProviderCredential) {
+	if mc.Providers == nil {
+		mc.Providers = make(map[string]ProviderCredential)
+	}
+	mc.Providers[id] = cred
+}
+
+// ProviderSummaryInfo is the per-provider info returned by GET (no raw API key).
+type ProviderSummaryInfo struct {
+	HasAPIKey bool   `json:"has_api_key"`
+	Model     string `json:"model"`
+	BaseURL   string `json:"base_url"`
+}
+
+// ProviderSummary returns a map of provider ID → summary for the GET response.
+func (mc *MultiConfig) ProviderSummary() map[string]ProviderSummaryInfo {
+	result := make(map[string]ProviderSummaryInfo, len(mc.Providers))
+	for id, cred := range mc.Providers {
+		result[id] = ProviderSummaryInfo{
+			HasAPIKey: cred.APIKey != "",
+			Model:     cred.Model,
+			BaseURL:   cred.BaseURL,
+		}
+	}
+	return result
+}
+
+// UnmarshalJSON handles both the legacy single-provider format and the new
+// multi-provider format. Legacy format is detected by presence of "api_key"
+// at the top level without a "providers" map.
+func (mc *MultiConfig) UnmarshalJSON(data []byte) error {
+	// Try new format first
+	type multiConfigAlias MultiConfig
+	var newFmt multiConfigAlias
+	if err := json.Unmarshal(data, &newFmt); err != nil {
+		return err
+	}
+
+	if newFmt.Providers != nil && len(newFmt.Providers) > 0 {
+		*mc = MultiConfig(newFmt)
+		return nil
+	}
+
+	// Detect legacy format: has "api_key" or "provider" at top level
+	var legacy struct {
+		Provider string `json:"provider"`
+		APIKey   string `json:"api_key"`
+		Model    string `json:"model"`
+		BaseURL  string `json:"base_url"`
+		Enabled  bool   `json:"enabled"`
+	}
+	if err := json.Unmarshal(data, &legacy); err != nil {
+		return err
+	}
+
+	mc.Enabled = legacy.Enabled
+	mc.ActiveProvider = legacy.Provider
+	mc.Providers = make(map[string]ProviderCredential)
+	if legacy.APIKey != "" || legacy.Provider != "" {
+		provider := legacy.Provider
+		if provider == "" {
+			provider = "openai"
+		}
+		mc.ActiveProvider = provider
+		mc.Providers[provider] = ProviderCredential{
+			APIKey:  legacy.APIKey,
+			Model:   legacy.Model,
+			BaseURL: legacy.BaseURL,
+		}
+	}
+	return nil
+}
+
 func (c *Config) IsValid() bool {
 	return c.Enabled && c.APIKey != "" && c.EffectiveBaseURL() != ""
 }

@@ -13,7 +13,8 @@ var aiLog = logging.MustGetLogger("AI")
 
 type aiConfigProvider interface {
 	AIConfig() aipkg.Config
-	SaveAIConfig(aipkg.Config) error
+	AIMultiConfig() aipkg.MultiConfig
+	SaveAIMultiConfig(aipkg.MultiConfig) error
 	AIProxy() *aipkg.Proxy
 }
 
@@ -32,13 +33,11 @@ func (g *Gateway) handleGETAIConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := p.AIConfig()
+	mc := p.AIMultiConfig()
 	resp := map[string]interface{}{
-		"provider":    cfg.Provider,
-		"model":       cfg.Model,
-		"base_url":    cfg.BaseURL,
-		"enabled":     cfg.Enabled,
-		"has_api_key": cfg.APIKey != "",
+		"enabled":         mc.Enabled,
+		"active_provider": mc.ActiveProvider,
+		"providers":       mc.ProviderSummary(),
 	}
 	responsePkg.Success(w, resp)
 }
@@ -62,33 +61,36 @@ func (g *Gateway) handlePUTAIConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	existing := p.AIConfig()
+	mc := p.AIMultiConfig()
+	mc.Enabled = input.Enabled
 
-	cfg := aipkg.Config{
-		Provider: input.Provider,
-		Model:    input.Model,
-		BaseURL:  input.BaseURL,
-		Enabled:  input.Enabled,
+	if input.Provider != "" {
+		existing, hasExisting := mc.Providers[input.Provider]
+
+		cred := aipkg.ProviderCredential{
+			Model:   input.Model,
+			BaseURL: input.BaseURL,
+		}
+		if input.APIKey != "" {
+			cred.APIKey = input.APIKey
+		} else if hasExisting {
+			cred.APIKey = existing.APIKey
+		}
+
+		mc.SetProvider(input.Provider, cred)
+		mc.ActiveProvider = input.Provider
 	}
 
-	if input.APIKey != "" {
-		cfg.APIKey = input.APIKey
-	} else {
-		cfg.APIKey = existing.APIKey
-	}
-
-	if err := p.SaveAIConfig(cfg); err != nil {
+	if err := p.SaveAIMultiConfig(mc); err != nil {
 		aiLog.Errorf("Failed to save AI config: %s", err)
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to save AI config")
 		return
 	}
 
 	resp := map[string]interface{}{
-		"provider":    cfg.Provider,
-		"model":       cfg.Model,
-		"base_url":    cfg.BaseURL,
-		"enabled":     cfg.Enabled,
-		"has_api_key": cfg.APIKey != "",
+		"enabled":         mc.Enabled,
+		"active_provider": mc.ActiveProvider,
+		"providers":       mc.ProviderSummary(),
 	}
 	responsePkg.Success(w, resp)
 }
@@ -113,8 +115,10 @@ func (g *Gateway) handlePOSTAITestConnection(w http.ResponseWriter, r *http.Requ
 
 	apiKey := input.APIKey
 	if apiKey == "" {
-		existing := p.AIConfig()
-		apiKey = existing.APIKey
+		mc := p.AIMultiConfig()
+		if cred, ok := mc.Providers[input.Provider]; ok {
+			apiKey = cred.APIKey
+		}
 	}
 	if apiKey == "" {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "API key is required")

@@ -54,10 +54,11 @@ func (s *GormCollectionStore) CreateCollection(_ context.Context, c *models.Coll
 func (s *GormCollectionStore) GetCollection(_ context.Context, id string) (*models.Collection, error) {
 	var c models.Collection
 	err := s.db.View(func(tx pkgdb.Tx) error {
-		return tx.Read().Where("id = ? AND deleted_at IS NULL", id).
-			Preload("Products", func(db *gorm.DB) *gorm.DB {
-				return db.Order("position ASC")
-			}).First(&c).Error
+		if err := tx.Read().Where("id = ? AND deleted_at IS NULL", id).First(&c).Error; err != nil {
+			return err
+		}
+		return tx.Read().Where("collection_id = ?", id).
+			Order("position ASC").Find(&c.Products).Error
 	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -73,21 +74,48 @@ func (s *GormCollectionStore) ListCollections(_ context.Context, page, pageSize 
 	var total int64
 
 	err := s.db.View(func(tx pkgdb.Tx) error {
-		q := tx.Read().Model(&models.Collection{}).Where("deleted_at IS NULL")
+		countQ := tx.Read().Model(&models.Collection{}).Where("deleted_at IS NULL")
 		if publishedOnly {
-			q = q.Where("published = ?", true)
+			countQ = countQ.Where("published = ?", true)
 		}
-
-		if err := q.Count(&total).Error; err != nil {
+		if err := countQ.Count(&total).Error; err != nil {
 			return err
 		}
 
+		findQ := tx.Read().Where("deleted_at IS NULL")
+		if publishedOnly {
+			findQ = findQ.Where("published = ?", true)
+		}
 		offset := (page - 1) * pageSize
-		return q.Order("created_at DESC").
+		if err := findQ.Order("created_at DESC").
 			Offset(offset).Limit(pageSize).
-			Preload("Products", func(db *gorm.DB) *gorm.DB {
-				return db.Order("position ASC")
-			}).Find(&collections).Error
+			Find(&collections).Error; err != nil {
+			return err
+		}
+
+		if len(collections) == 0 {
+			return nil
+		}
+
+		ids := make([]string, len(collections))
+		collMap := make(map[string]*models.Collection, len(collections))
+		for i, c := range collections {
+			ids[i] = c.ID
+			collMap[c.ID] = c
+		}
+
+		var products []models.CollectionProduct
+		if err := tx.Read().Where("collection_id IN ?", ids).
+			Order("position ASC").Find(&products).Error; err != nil {
+			return err
+		}
+		for i := range products {
+			if c, ok := collMap[products[i].CollectionID]; ok {
+				c.Products = append(c.Products, products[i])
+			}
+		}
+
+		return nil
 	})
 	if err != nil {
 		return nil, 0, err

@@ -41,6 +41,7 @@ type Collection struct {
 func (Collection) TableName() string { return "collections" }
 
 type CollectionProduct struct {
+	TenantID     string    `json:"-" gorm:"column:tenant_id;type:text;not null;default:'_default';index"`
 	CollectionID string    `json:"collectionId" gorm:"primaryKey;type:text"`
 	ListingSlug  string    `json:"listingSlug" gorm:"primaryKey;type:text"`
 	Position     int       `json:"position" gorm:"type:integer;not null;default:0"`

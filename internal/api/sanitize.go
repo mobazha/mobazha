@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/http"
 
 	"github.com/microcosm-cc/bluemonday"
@@ -89,13 +90,20 @@ func sanitizeProtobuf(m protoreflect.ProtoMessage) ([]byte, error) {
 	return sanitizeJSON([]byte(out))
 }
 
+// sanitizeString strips dangerous HTML tags via bluemonday, then unescapes
+// HTML entities so the JSON API returns raw text (e.g. "Dave's" not "Dave&#39;s").
+// React/frontend frameworks already escape text content when rendering.
+func sanitizeString(s string) string {
+	return html.UnescapeString(sanitizer.Sanitize(s))
+}
+
 func sanitize(data interface{}) {
 	switch d := data.(type) {
 	case map[string]interface{}:
 		for k, v := range d {
 			switch tv := v.(type) {
 			case string:
-				d[k] = sanitizer.Sanitize(tv)
+				d[k] = sanitizeString(tv)
 			case map[string]interface{}:
 				sanitize(tv)
 			case []interface{}:
@@ -109,7 +117,7 @@ func sanitize(data interface{}) {
 			switch d[0].(type) {
 			case string:
 				for i, s := range d {
-					d[i] = sanitizer.Sanitize(s.(string))
+					d[i] = sanitizeString(s.(string))
 				}
 			case map[string]interface{}:
 				for _, t := range d {

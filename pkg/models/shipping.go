@@ -65,6 +65,25 @@ func (p *ShippingProfileEntity) SetLocationGroups(groups []*LocationGroup) error
 	return nil
 }
 
+// UnmarshalJSON handles incoming API requests by populating LocationGroupsJSON
+// from the structured locationGroups field (since LocationGroupsJSON has json:"-").
+func (p *ShippingProfileEntity) UnmarshalJSON(data []byte) error {
+	type Alias ShippingProfileEntity
+	aux := &struct {
+		*Alias
+		LocationGroups json.RawMessage `json:"locationGroups,omitempty"`
+	}{
+		Alias: (*Alias)(p),
+	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	if len(aux.LocationGroups) > 0 && string(aux.LocationGroups) != "null" {
+		p.LocationGroupsJSON = string(aux.LocationGroups)
+	}
+	return nil
+}
+
 // MarshalJSON produces the API response including locationGroups as structured JSON.
 func (p ShippingProfileEntity) MarshalJSON() ([]byte, error) {
 	groups, err := p.GetLocationGroups()

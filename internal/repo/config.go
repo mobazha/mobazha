@@ -136,6 +136,19 @@ type Config struct {
 	// HTTPProxyLocalAddr is the local API address that the libp2p HTTP proxy
 	// handler forwards requests to. Defaults to "http://127.0.0.1:5102".
 	HTTPProxyLocalAddr string `long:"httpproxylocaladdr" description:"Local API address for libp2p HTTP proxy forwarding"`
+
+	// SaaSAPIURL is the SaaS platform URL for standalone stores to register
+	// and send heartbeats. When set together with StandaloneAPIKey, the node
+	// starts a heartbeat sender on boot.
+	SaaSAPIURL string `long:"saasapiurl" description:"SaaS platform URL for store registration and heartbeat"`
+
+	// StandaloneAPIKey is the API key obtained during store registration
+	// with the SaaS platform, used to authenticate heartbeat requests.
+	StandaloneAPIKey string `long:"standaloneapikey" description:"API key for SaaS platform authentication"`
+
+	// StandaloneConnectivity describes how this standalone store is reachable:
+	// "public" (direct HTTPS), "tunnel" (Cloudflare Tunnel), or "nat" (libp2p only).
+	StandaloneConnectivity string `long:"standaloneconnectivity" description:"Connectivity mode: public, tunnel, or nat"`
 }
 
 // LoadConfig initializes and parses the config using a config file and command

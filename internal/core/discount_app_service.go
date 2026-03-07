@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -12,7 +13,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
@@ -27,6 +30,7 @@ type DiscountAppService struct {
 	store           contracts.DiscountStore
 	collectionStore contracts.CollectionStore
 	tenantID        string
+	netDB           *netdb.NetDB
 }
 
 func NewDiscountAppService(store contracts.DiscountStore, collectionStore contracts.CollectionStore, tenantID string) *DiscountAppService {
@@ -35,6 +39,10 @@ func NewDiscountAppService(store contracts.DiscountStore, collectionStore contra
 		collectionStore: collectionStore,
 		tenantID:        tenantID,
 	}
+}
+
+func (s *DiscountAppService) SetNetDB(n *netdb.NetDB) {
+	s.netDB = n
 }
 
 // Store returns the underlying DiscountStore for engine wiring (e.g., hosting
@@ -70,7 +78,11 @@ func (s *DiscountAppService) CreateDiscount(ctx context.Context, d *models.Disco
 		d.Codes[i].CodeHash = s.hashCode(d.Codes[i].Code)
 	}
 
-	return s.store.CreateDiscount(ctx, d)
+	if err := s.store.CreateDiscount(ctx, d); err != nil {
+		return err
+	}
+	s.pushDiscountsToNetDB()
+	return nil
 }
 
 func (s *DiscountAppService) GetDiscount(ctx context.Context, id string) (*models.Discount, error) {
@@ -86,11 +98,19 @@ func (s *DiscountAppService) UpdateDiscount(ctx context.Context, d *models.Disco
 		return err
 	}
 	d.Status = s.computeInitialStatus(d)
-	return s.store.UpdateDiscount(ctx, d)
+	if err := s.store.UpdateDiscount(ctx, d); err != nil {
+		return err
+	}
+	s.pushDiscountsToNetDB()
+	return nil
 }
 
 func (s *DiscountAppService) DeleteDiscount(ctx context.Context, id string) error {
-	return s.store.SoftDeleteDiscount(ctx, id)
+	if err := s.store.SoftDeleteDiscount(ctx, id); err != nil {
+		return err
+	}
+	s.pushDiscountsToNetDB()
+	return nil
 }
 
 // AddCodes adds explicit codes to a discount.
@@ -344,4 +364,30 @@ func randomAlphanumeric(n int) string {
 		b[i] = chars[b[i]%byte(len(chars))]
 	}
 	return string(b)
+}
+
+func (s *DiscountAppService) pushDiscountsToNetDB() {
+	if s.netDB == nil {
+		return
+	}
+	go func() {
+		activeStatus := models.DiscountStatusActive
+		discounts, _, err := s.store.ListDiscounts(context.Background(), contracts.DiscountFilter{
+			Page:     1,
+			PageSize: maxDiscountsPerTenant,
+			Status:   &activeStatus,
+		})
+		if err != nil {
+			logger.LogDebugWithIDf(log, s.tenantID, "pushDiscountsToNetDB: list failed: %v", err)
+			return
+		}
+		data, err := json.Marshal(discounts)
+		if err != nil {
+			logger.LogDebugWithIDf(log, s.tenantID, "pushDiscountsToNetDB: marshal failed: %v", err)
+			return
+		}
+		if err := s.netDB.SetOwnStoreMetadata("discounts", data); err != nil {
+			logger.LogDebugWithIDf(log, s.tenantID, "pushDiscountsToNetDB: push failed: %v", err)
+		}
+	}()
 }

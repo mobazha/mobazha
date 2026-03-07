@@ -44,6 +44,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/repo"
+	nodeVersion "github.com/mobazha/mobazha3.0/internal/version"
 	webhookinternal "github.com/mobazha/mobazha3.0/internal/webhook"
 	oniontransport "github.com/mobazha/mobazha3.0/libs/onion-transport"
 	"github.com/mobazha/mobazha3.0/libs/proxyclient"
@@ -226,6 +227,13 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 	if cfg.Tor {
 		ipfsConfig.Swarm.DisableNatPortMap = true
+	}
+
+	// Enable relay client and hole punching for NAT-only standalone stores
+	// so the SaaS proxy can reach them via libp2p circuit relay + DCUtR.
+	if !cfg.SaaSMode && cfg.StandaloneConnectivity == "nat" {
+		ipfsConfig.Swarm.RelayClient.Enabled = config.True
+		ipfsConfig.Swarm.EnableHolePunching = config.True
 	}
 
 	// Load identity key: use external key from config if provided, otherwise load from DB.
@@ -726,6 +734,24 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			obnet.RegisterHTTPProxyOnHost(ipfsNode.PeerHost, proxyProto, trustedPeers, localAddr)
 			logger.LogInfoWithID(log, nodeID, "LibP2P HTTP proxy handler registered")
 		}
+	}
+
+	// Start heartbeat sender for standalone stores registered with SaaS.
+	if !cfg.SaaSMode && cfg.SaaSAPIURL != "" && cfg.StandaloneAPIKey != "" {
+		hbCfg := obnet.StoreHeartbeatConfig{
+			SaaSURL: cfg.SaaSAPIURL,
+			PeerID:  nodeID,
+			APIKey:  cfg.StandaloneAPIKey,
+			Version: nodeVersion.String(),
+		}
+		if cfg.StandaloneConnectivity == "public" || cfg.StandaloneConnectivity == "tunnel" {
+			if len(cfg.SwarmAddrs) > 0 {
+				hbCfg.EndpointURL = cfg.SwarmAddrs[0]
+			}
+		}
+		heartbeat := obnet.NewStoreHeartbeatSender(hbCfg)
+		heartbeat.Start(ctx)
+		logger.LogInfoWithID(log, nodeID, "Store heartbeat sender started")
 	}
 
 	obNode.applyOptions(nil)
@@ -1396,6 +1422,9 @@ func initDiscountSubsystem(obNode *MobazhaNode) {
 	}
 	store := database.NewGormDiscountStore(obNode.db)
 	obNode.discountService = NewDiscountAppService(store, nil, obNode.nodeID)
+	if obNode.netDB != nil {
+		obNode.discountService.SetNetDB(obNode.netDB)
+	}
 	logger.LogInfoWithID(log, obNode.nodeID, "Discount subsystem initialized")
 }
 

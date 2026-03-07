@@ -664,7 +664,17 @@ func (n *MobazhaNode) StoreConfig() (json.RawMessage, error) {
 
 // SaveStoreConfig persists the storefront branding config.
 func (n *MobazhaNode) SaveStoreConfig(cfg json.RawMessage) error {
-	return n.saveSetting(models.SettingsKeyStoreConfig, string(cfg))
+	if err := n.saveSetting(models.SettingsKeyStoreConfig, string(cfg)); err != nil {
+		return err
+	}
+	if n.netDB != nil {
+		go func() {
+			if err := n.netDB.SetOwnStoreMetadata("storefront", cfg); err != nil {
+				log.Debugf("pushStorefrontToNetDB: %v", err)
+			}
+		}()
+	}
+	return nil
 }
 
 // getSetting reads a single key from the node_settings table.

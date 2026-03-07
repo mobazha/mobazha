@@ -37,7 +37,7 @@ func TestAuthMiddleware_RejectsNoAuth(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/profile", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/profiles", nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -56,7 +56,7 @@ func TestAuthMiddleware_RejectsWrongPassword(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/profile", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/profiles", nil)
 	req.SetBasicAuth("admin", "wrongpass")
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -74,7 +74,7 @@ func TestAuthMiddleware_AcceptsCorrectCredentials(t *testing.T) {
 		w.Write([]byte("ok"))
 	}))
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/profile", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/profiles", nil)
 	req.SetBasicAuth("admin", "testpass")
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -97,7 +97,7 @@ func TestAuthMiddleware_SkipsWhenNoCredentials(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/profile", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/profiles", nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -376,7 +376,7 @@ func TestAuthMiddleware_CookieValidation(t *testing.T) {
 	}))
 
 	// Wrong cookie
-	req := httptest.NewRequest(http.MethodGet, "/v1/profile", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/profiles", nil)
 	req.AddCookie(&http.Cookie{Name: AuthCookieName, Value: "wrong"})
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -385,7 +385,7 @@ func TestAuthMiddleware_CookieValidation(t *testing.T) {
 	}
 
 	// Correct cookie
-	req2 := httptest.NewRequest(http.MethodGet, "/v1/profile", nil)
+	req2 := httptest.NewRequest(http.MethodGet, "/v1/profiles", nil)
 	req2.AddCookie(&http.Cookie{Name: AuthCookieName, Value: "secret-cookie-value"})
 	rr2 := httptest.NewRecorder()
 	handler.ServeHTTP(rr2, req2)

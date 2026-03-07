@@ -702,6 +702,32 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		StateValidator: &coreStateBridge{},
 	})
 
+	// Register libp2p HTTP proxy handler for standalone nodes so that the
+	// SaaS proxy can forward management requests via libp2p streams.
+	if !cfg.SaaSMode && len(cfg.HTTPProxyTrustedPeers) > 0 {
+		trustedPeers := make([]peer.ID, 0, len(cfg.HTTPProxyTrustedPeers))
+		for _, ps := range cfg.HTTPProxyTrustedPeers {
+			pid, err := peer.Decode(ps)
+			if err != nil {
+				logger.LogErrorWithIDf(log, nodeID, "Invalid HTTP proxy trusted peer %q: %v", ps, err)
+				continue
+			}
+			trustedPeers = append(trustedPeers, pid)
+		}
+		if len(trustedPeers) > 0 {
+			localAddr := cfg.HTTPProxyLocalAddr
+			if localAddr == "" {
+				localAddr = "http://127.0.0.1:5102"
+			}
+			proxyProto := protocol.ID(obnet.ProtocolHTTPProxyMainnet)
+			if cfg.Testnet {
+				proxyProto = protocol.ID(obnet.ProtocolHTTPProxyTestnet)
+			}
+			obnet.RegisterHTTPProxyOnHost(ipfsNode.PeerHost, proxyProto, trustedPeers, localAddr)
+			logger.LogInfoWithID(log, nodeID, "LibP2P HTTP proxy handler registered")
+		}
+	}
+
 	obNode.applyOptions(nil)
 	obNode.registerHandlers()
 	obNode.listenNetworkEvents()

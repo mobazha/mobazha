@@ -27,6 +27,8 @@ services:
       - SAAS_API_URL=${SAAS_API_URL:-https://store.mobazha.org}
       - STANDALONE_API_KEY=${STANDALONE_API_KEY}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - SAAS_PEER_ID=${SAAS_PEER_ID:-}
+      - CONNECTIVITY=${CONNECTIVITY:-nat}
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     healthcheck:

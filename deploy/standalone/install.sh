@@ -77,6 +77,19 @@ prompt_config() {
 
     read -rp "SaaS API URL [https://store.mobazha.org]: " SAAS_API_URL
     SAAS_API_URL="${SAAS_API_URL:-https://store.mobazha.org}"
+
+    echo ""
+    echo "Connectivity mode:"
+    echo "  public  — Store has a public IP/domain (direct HTTPS)"
+    echo "  tunnel  — Behind NAT with Cloudflare Tunnel"
+    echo "  nat     — Behind NAT, managed via SaaS P2P proxy"
+    read -rp "Connectivity mode [nat]: " CONNECTIVITY
+    CONNECTIVITY="${CONNECTIVITY:-nat}"
+
+    if [ "$CONNECTIVITY" = "nat" ] || [ "$CONNECTIVITY" = "tunnel" ]; then
+        read -rp "SaaS Default Node Peer ID (for remote management): " SAAS_PEER_ID
+        SAAS_PEER_ID="${SAAS_PEER_ID:-}"
+    fi
 }
 
 setup_files() {
@@ -98,6 +111,8 @@ STORE_DOMAIN=${STORE_DOMAIN}
 SAAS_API_URL=${SAAS_API_URL}
 STANDALONE_API_KEY=${STANDALONE_API_KEY}
 ADMIN_PASSWORD=${ADMIN_PASSWORD}
+SAAS_PEER_ID=${SAAS_PEER_ID:-}
+CONNECTIVITY=${CONNECTIVITY:-nat}
 TAG=stable
 EOF
     chmod 600 .env

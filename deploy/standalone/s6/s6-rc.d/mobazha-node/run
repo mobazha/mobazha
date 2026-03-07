@@ -1,2 +1,10 @@
-#!/command/execlineb -P
-/usr/local/bin/mobazha start -d /data
+#!/bin/sh
+exec 2>&1
+
+ARGS="start -d /data"
+
+if [ -n "$SAAS_PEER_ID" ]; then
+  ARGS="$ARGS --httpproxytrustedpeer=$SAAS_PEER_ID"
+fi
+
+exec /usr/local/bin/mobazha $ARGS

@@ -127,6 +127,15 @@ type Config struct {
 	// its own SQLite file. Used together with SaaSMode by mobazha_hosting.
 	// The value must be a *gorm.DB pointer.
 	SharedDB interface{} `no-flag:"true" description:"Shared GORM DB connection for multi-tenant mode"`
+
+	// HTTPProxyTrustedPeers is a list of peer IDs allowed to proxy HTTP
+	// requests to this node via the libp2p HTTP proxy protocol. Typically
+	// the SaaS default node's peer ID. Only used in standalone (non-SaaS) mode.
+	HTTPProxyTrustedPeers []string `long:"httpproxytrustedpeer" description:"Peer IDs trusted to proxy HTTP requests via libp2p"`
+
+	// HTTPProxyLocalAddr is the local API address that the libp2p HTTP proxy
+	// handler forwards requests to. Defaults to "http://127.0.0.1:5102".
+	HTTPProxyLocalAddr string `long:"httpproxylocaladdr" description:"Local API address for libp2p HTTP proxy forwarding"`
 }
 
 // LoadConfig initializes and parses the config using a config file and command

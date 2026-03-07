@@ -13,5 +13,8 @@ const (
 	ProtocolStoreAndForwardMainnet_Client = "/mobazha/store-and-forward/client/0.1.0"
 	ProtocolStoreAndForwardTestnet_Client = "/mobazha/store-and-forward/testnet/client/0.1.0"
 
+	ProtocolHTTPProxyMainnet = "/mobazha/http-proxy/1.0.0"
+	ProtocolHTTPProxyTestnet = "/mobazha/http-proxy/testnet/1.0.0"
+
 	TorDNSResover = "127.0.0.1:5353"
 )

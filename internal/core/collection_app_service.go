@@ -2,11 +2,14 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/mobazha/mobazha3.0/internal/database"
+	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
@@ -21,13 +24,15 @@ const (
 type CollectionAppService struct {
 	store    contracts.CollectionStore
 	bus      events.Bus
+	netDB    *netdb.NetDB
 	tenantID string
 }
 
-func NewCollectionAppService(store contracts.CollectionStore, bus events.Bus, tenantID string) *CollectionAppService {
+func NewCollectionAppService(store contracts.CollectionStore, bus events.Bus, ndb *netdb.NetDB, tenantID string) *CollectionAppService {
 	return &CollectionAppService{
 		store:    store,
 		bus:      bus,
+		netDB:    ndb,
 		tenantID: tenantID,
 	}
 }
@@ -72,6 +77,7 @@ func (s *CollectionAppService) CreateCollection(ctx context.Context, c *models.C
 			Type:         string(c.Type),
 		})
 	}
+	s.pushCollectionsToNetDB()
 	return nil
 }
 
@@ -99,6 +105,7 @@ func (s *CollectionAppService) UpdateCollection(ctx context.Context, c *models.C
 			Title:        c.Title,
 		})
 	}
+	s.pushCollectionsToNetDB()
 	return nil
 }
 
@@ -110,6 +117,7 @@ func (s *CollectionAppService) DeleteCollection(ctx context.Context, id string) 
 	if s.bus != nil {
 		s.bus.Emit(events.CollectionDeleted{CollectionID: id})
 	}
+	s.pushCollectionsToNetDB()
 	return nil
 }
 
@@ -137,6 +145,7 @@ func (s *CollectionAppService) AddProducts(ctx context.Context, collectionID str
 			Slugs:        slugs,
 		})
 	}
+	s.pushCollectionsToNetDB()
 	return nil
 }
 
@@ -152,6 +161,7 @@ func (s *CollectionAppService) RemoveProduct(ctx context.Context, collectionID, 
 			Slugs:        []string{slug},
 		})
 	}
+	s.pushCollectionsToNetDB()
 	return nil
 }
 
@@ -170,6 +180,7 @@ func (s *CollectionAppService) ReorderProducts(ctx context.Context, collectionID
 			Action:       events.CollectionProductActionReorder,
 		})
 	}
+	s.pushCollectionsToNetDB()
 	return nil
 }
 
@@ -184,6 +195,7 @@ func (s *CollectionAppService) RemoveProductFromAllCollections(ctx context.Conte
 			Slugs:  []string{slug},
 		})
 	}
+	s.pushCollectionsToNetDB()
 	return nil
 }
 
@@ -198,4 +210,27 @@ func normalizePageParams(page, pageSize int) (int, int) {
 		pageSize = maxCollectionPageSize
 	}
 	return page, pageSize
+}
+
+// pushCollectionsToNetDB asynchronously pushes the full collections snapshot
+// to the search service for offline fallback (cross-store routing).
+func (s *CollectionAppService) pushCollectionsToNetDB() {
+	if s.netDB == nil {
+		return
+	}
+	go func() {
+		collections, _, err := s.store.ListCollections(context.Background(), 1, maxCollectionsPerTenant, false)
+		if err != nil {
+			logger.LogDebugWithIDf(log, s.tenantID, "pushCollectionsToNetDB: list failed: %v", err)
+			return
+		}
+		data, err := json.Marshal(collections)
+		if err != nil {
+			logger.LogDebugWithIDf(log, s.tenantID, "pushCollectionsToNetDB: marshal failed: %v", err)
+			return
+		}
+		if err := s.netDB.SetOwnStoreMetadata("collections", data); err != nil {
+			logger.LogDebugWithIDf(log, s.tenantID, "pushCollectionsToNetDB: push failed: %v", err)
+		}
+	}()
 }

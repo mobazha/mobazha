@@ -1,5 +1,6 @@
 package netdb
 
+import "encoding/json"
 
 // Nounce For empty http body with TrackingID signature for verification
 type Nounce struct {
@@ -56,5 +57,12 @@ type RatingIndex struct {
 	SerializedIndex []byte
 
 	Sig []byte `gorm:"-"`
+}
+
+type StoreMetadata struct {
+	PeerID       string          `json:"PeerID"`
+	MetadataType string          `json:"MetadataType"`
+	Data         json.RawMessage `json:"Data"`
+	Sig          []byte          `json:"Sig"`
 }
 

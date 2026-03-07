@@ -460,3 +460,25 @@ func (ndb *NetDB) SetOwnRatingIndex(index models.RatingIndex) error {
 	return err
 }
 
+// SetOwnStoreMetadata pushes store metadata (collections, discounts, payment_methods, storefront)
+// to the search service for offline fallback.
+func (ndb *NetDB) SetOwnStoreMetadata(metadataType string, data json.RawMessage) error {
+	logger.LogInfoWithIDf(log, ndb.ownPeerID, "Set own store metadata: %s", metadataType)
+
+	sig, err := ndb.nodePrivateKey.Sign(data)
+	if err != nil {
+		return err
+	}
+
+	req := StoreMetadata{
+		PeerID:       ndb.ownPeerID,
+		MetadataType: metadataType,
+		Data:         data,
+		Sig:          sig,
+	}
+
+	_, err = ndb.restyClient.R().SetBody(req).Post(fmt.Sprintf("%s/store-metadata", ndb.endpoint))
+
+	return err
+}
+

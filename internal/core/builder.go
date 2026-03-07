@@ -1361,7 +1361,7 @@ func initCollectionSubsystem(obNode *MobazhaNode) {
 		return
 	}
 	store := database.NewGormCollectionStore(obNode.db)
-	obNode.collectionService = NewCollectionAppService(store, obNode.eventBus, obNode.nodeID)
+	obNode.collectionService = NewCollectionAppService(store, obNode.eventBus, obNode.netDB, obNode.nodeID)
 
 	if obNode.discountService != nil {
 		obNode.discountService.collectionStore = store

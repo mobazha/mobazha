@@ -37,7 +37,7 @@ func TestGenerateJson(t *testing.T) {
 }
 
 func TestLoadNetConfig(t *testing.T) {
-	netConfig, err := LoadNetConfig("https://mobazha.info/api/nodeConfig")
+	netConfig, err := LoadNetConfig("https://mobazha.info/search/v1/config")
 	if err != nil {
 		t.Fatal(err)
 	}

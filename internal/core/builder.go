@@ -360,8 +360,12 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	}
 
 	var netDB *netdb.NetDB
-	if len(netConfig.GetNetDBEndpoint()) > 0 {
-		netDB, _ = netdb.NewNetDB(netConfig.GetNetDBEndpoint(), ipfsNode.Identity.String(), ipfsNode.PrivateKey)
+	standaloneNetDBEndpoint := netConfig.GetNetDBEndpoint()
+	if cfg.NetDBEndpoint != "" {
+		standaloneNetDBEndpoint = cfg.NetDBEndpoint
+	}
+	if len(standaloneNetDBEndpoint) > 0 {
+		netDB, _ = netdb.NewNetDB(standaloneNetDBEndpoint, ipfsNode.Identity.String(), ipfsNode.PrivateKey)
 	}
 
 	// 使用 WalletTestnet（如果设置），否则回退到 Testnet
@@ -1035,8 +1039,12 @@ func newLightweightNode(
 
 	// ── 2. NetDB (optional) ──────────────────────────────────────────
 	var netDB *netdb.NetDB
-	if len(netConfig.GetNetDBEndpoint()) > 0 {
-		netDB, _ = netdb.NewNetDB(netConfig.GetNetDBEndpoint(), nodePeerID.String(), privKey)
+	netDBEndpoint := netConfig.GetNetDBEndpoint()
+	if cfg.NetDBEndpoint != "" {
+		netDBEndpoint = cfg.NetDBEndpoint
+	}
+	if len(netDBEndpoint) > 0 {
+		netDB, _ = netdb.NewNetDB(netDBEndpoint, nodePeerID.String(), privKey)
 	}
 
 	walletTestnet := cfg.Testnet

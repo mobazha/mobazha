@@ -97,7 +97,7 @@ func (ndb *NetDB) GetProfile(peerID string, ctx *request.Context) (*models.Profi
 	logger.LogInfoWithIDf(log, peerID, "Get profile for %s", peerID)
 
 	var netProfile Profile
-	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netProfile).Get(fmt.Sprintf("%s/profile/%s", ndb.endpoint, peerID))
+	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netProfile).Get(fmt.Sprintf("%s/profiles/%s", ndb.endpoint, peerID))
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (ndb *NetDB) SetOwnProfile(profile *models.Profile) error {
 		Sig:               sig,
 	}
 
-	_, err = ndb.restyClient.R().SetBody(netProfile).Post(fmt.Sprintf("%s/profile", ndb.endpoint))
+	_, err = ndb.restyClient.R().SetBody(netProfile).Post(fmt.Sprintf("%s/profiles", ndb.endpoint))
 
 	return err
 }
@@ -246,7 +246,7 @@ func (ndb *NetDB) SetOwnFollowing(following models.Following) error {
 func (ndb *NetDB) GetListingBySlug(peerID string, slug string, ctx *request.Context) (*pb.SignedListing, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get listing for %s by slug %s", peerID, slug)
 
-	requestPath := fmt.Sprintf("/listing/%s/%s", peerID, slug)
+	requestPath := fmt.Sprintf("/listings/%s/%s", peerID, slug)
 
 	// 创建带签名的请求
 	req, err := ndb.newSignedRequest(ctx)
@@ -276,7 +276,7 @@ func (ndb *NetDB) GetListingBySlug(peerID string, slug string, ctx *request.Cont
 func (ndb *NetDB) GetListingByCID(cid string, ctx *request.Context) (*pb.SignedListing, error) {
 	logger.LogInfoWithIDf(log, cid, "Get listing by cid %s", cid)
 
-	requestPath := fmt.Sprintf("/listing/%s", cid)
+	requestPath := fmt.Sprintf("/listings/%s", cid)
 
 	// 创建带签名的请求
 	req, err := ndb.newSignedRequest(ctx)
@@ -329,7 +329,7 @@ func (ndb *NetDB) SetOwnListing(sl *pb.SignedListing) error {
 		Sig:               sig,
 	}
 
-	_, err = ndb.restyClient.R().SetBody(netListing).Post(fmt.Sprintf("%s/listing", ndb.endpoint))
+	_, err = ndb.restyClient.R().SetBody(netListing).Post(fmt.Sprintf("%s/listings", ndb.endpoint))
 
 	return err
 }
@@ -348,7 +348,7 @@ func (ndb *NetDB) DeleteOwnListing(listingID string) error {
 		Sig:        sig,
 	}
 
-	_, err = ndb.restyClient.R().SetBody(nounce).Delete(fmt.Sprintf("%s/listing/%s", ndb.endpoint, listingID))
+	_, err = ndb.restyClient.R().SetBody(nounce).Delete(fmt.Sprintf("%s/listings/%s", ndb.endpoint, listingID))
 	return err
 }
 
@@ -356,7 +356,7 @@ func (ndb *NetDB) DeleteOwnListing(listingID string) error {
 func (ndb *NetDB) GetListingIndex(peerID string, ctx *request.Context) (models.ListingIndex, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get listing index for peerID %s", peerID)
 
-	requestPath := fmt.Sprintf("/listingindex/%s", peerID)
+	requestPath := fmt.Sprintf("/listing-indexes/%s", peerID)
 
 	// 创建带签名的请求
 	req, err := ndb.newSignedRequest(ctx)
@@ -401,7 +401,7 @@ func (ndb *NetDB) SetOwnListingIndex(index models.ListingIndex) error {
 		Sig:             sig,
 	}
 
-	_, err = ndb.restyClient.R().SetBody(netListingIndex).Post(fmt.Sprintf("%s/listingindex", ndb.endpoint))
+	_, err = ndb.restyClient.R().SetBody(netListingIndex).Post(fmt.Sprintf("%s/listing-indexes", ndb.endpoint))
 
 	return err
 }
@@ -410,7 +410,7 @@ func (ndb *NetDB) SetOwnListingIndex(index models.ListingIndex) error {
 func (ndb *NetDB) GetRatingIndex(peerID string, ctx *request.Context) (models.RatingIndex, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get rating index for peerID %s", peerID)
 
-	requestPath := fmt.Sprintf("/ratingindex/%s", peerID)
+	requestPath := fmt.Sprintf("/rating-indexes/%s", peerID)
 
 	// 创建带签名的请求
 	req, err := ndb.newSignedRequest(ctx)
@@ -455,22 +455,8 @@ func (ndb *NetDB) SetOwnRatingIndex(index models.RatingIndex) error {
 		Sig:             sig,
 	}
 
-	_, err = ndb.restyClient.R().SetBody(netRatingIndex).Post(fmt.Sprintf("%s/ratingindex", ndb.endpoint))
+	_, err = ndb.restyClient.R().SetBody(netRatingIndex).Post(fmt.Sprintf("%s/rating-indexes", ndb.endpoint))
 
 	return err
 }
 
-// GetStripeAccountID 通过 PeerID 获取 Stripe 账户 ID
-func (ndb *NetDB) GetStripeAccountID(peerID string, ctx *request.Context) (string, error) {
-	logger.LogInfoWithIDf(log, peerID, "Get stripe account ID for %s", peerID)
-
-	var result struct {
-		StripeAccountID string `json:"stripeAccountID"`
-	}
-	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&result).Get(fmt.Sprintf("%s/stripe/account/%s", ndb.endpoint, peerID))
-	if err != nil {
-		return "", err
-	}
-
-	return result.StripeAccountID, nil
-}

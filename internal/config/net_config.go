@@ -103,7 +103,7 @@ func (config *NetConfig) GetNetDBEndpoint() string {
 	if len(val) > 0 {
 		return val
 	}
-	return "https://info.mobazha.org/api/netdb"
+	return "https://info.mobazha.org/search/v1/netdb"
 }
 
 // GetAIProviders returns the remote AI provider presets JSON string from
@@ -181,7 +181,7 @@ func (config *NetConfig) GetVerifiedModEndpoint() string {
 	if len(val) > 0 {
 		return val
 	}
-	return "https://info.mobazha.org/api/search/filters/moderators"
+	return "https://info.mobazha.org/search/v1/moderators/verified"
 }
 
 func (config *NetConfig) GetFeeUrl(coinType iwallet.ChainType) string {

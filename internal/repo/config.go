@@ -107,6 +107,7 @@ type Config struct {
 	DualStack              bool     `long:"dualstack" description:"Listen for incoming connections via Tor in addition to via the clearnet. This mode is not private."`
 	DHTClientOnly          bool     `long:"dhtclientonly" description:"Disable participating in serving data in the DHT. This should be used if your node is undialable."`
 	NetConfigEndpoint      string   `long:"netconfigendpoint" description:"Override the default net config endpoint with the provided value"`
+	NetDBEndpoint          string   `long:"netdbendpoint" description:"Override the default NetDB endpoint for search index sync"`
 	RelayAPIURL            string   `long:"relayapiurl" description:"Platform Relay API URL for gas fee payment (EVM/Solana CANCELABLE payments)"`
 
 	// IdentityKey is an optional externally-provided identity key in libp2p marshaled format.

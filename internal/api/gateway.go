@@ -35,6 +35,14 @@ type GatewayConfig struct {
 	PublicOnly      bool
 	HashFile        string // path to persist password hash for runtime changes (standalone)
 	PlainFile       string // first-run plaintext password file (standalone)
+
+	// CasdoorCertificate is the PEM certificate from SaaS Casdoor.
+	// When set, the standalone node accepts JWT Bearer tokens in addition
+	// to Basic Auth. Requests from SaaS proxy (Mini App) carry JWTs.
+	CasdoorCertificate string
+	// LocalPeerID is this node's libp2p peer ID, used to verify that
+	// JWT holders are authorized to manage this specific store.
+	LocalPeerID string
 }
 
 // Gateway represents an HTTP API gateway
@@ -44,6 +52,7 @@ type Gateway struct {
 	handler        http.Handler
 	config         *GatewayConfig
 	auth           authState
+	jwtValidator   *JWTValidator // nil when no Casdoor cert configured
 	hubs           map[string]*hub
 	hubsMtx        sync.RWMutex
 	shutdown       chan struct{}
@@ -73,6 +82,16 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig, o
 		passwordHash: config.Password,
 		hashFile:     config.HashFile,
 		plainFile:    config.PlainFile,
+	}
+
+	if config.CasdoorCertificate != "" && config.LocalPeerID != "" {
+		jv, err := NewJWTValidator(config.CasdoorCertificate, config.LocalPeerID)
+		if err != nil {
+			log.Warningf("Failed to init JWT validator (JWT auth disabled): %v", err)
+		} else {
+			g.jwtValidator = jv
+			log.Infof("JWT authentication enabled for standalone store %s", config.LocalPeerID)
+		}
 	}
 
 	r := g.newV1Router()

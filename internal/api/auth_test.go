@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
@@ -123,4 +125,190 @@ func TestGateway_AuthenticationMiddleware(t *testing.T) {
 			continue
 		}
 	}
+}
+
+func TestGateway_JWTAuth(t *testing.T) {
+	const localPeerID = "QmLocalPeerID1234567890ABCDEF1234567890"
+
+	certPEM, privKey := generateTestRSACert()
+
+	validator, err := NewJWTValidator(certPEM, localPeerID)
+	if err != nil {
+		t.Fatalf("NewJWTValidator: %v", err)
+	}
+
+	gateway := &Gateway{
+		nodeManager: &mockNodeManager{
+			nodes: map[string]contracts.NodeService{
+				"test_peer_id": &mockNode{
+					getMyProfileFunc: func() (*models.Profile, error) { return nil, nil },
+				},
+			},
+		},
+		config:       &GatewayConfig{},
+		jwtValidator: validator,
+	}
+
+	r := gateway.newV1Router()
+	r.Use(gateway.AuthenticationMiddleware)
+	r.Use(gateway.NodeSelectionMiddleware)
+	ts := httptest.NewServer(r)
+	defer ts.Close()
+
+	t.Run("ValidJWT_AdminPeerID", func(t *testing.T) {
+		token := signToken(&JWTClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+				IssuedAt:  jwt.NewNumericDate(time.Now()),
+			},
+			Name:       "seller1",
+			Properties: map[string]string{"peerID": localPeerID},
+		}, privKey)
+
+		req, _ := http.NewRequest("GET", ts.URL+"/v1/profiles", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("X-Mobazha-Node", "test_user_id")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			t.Errorf("Expected auth success, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("ValidJWT_WrongPeerID_FallsThrough", func(t *testing.T) {
+		// Configure Basic Auth so the fallthrough triggers 401 instead of passthrough
+		gateway.auth = authState{
+			username:     "admin",
+			passwordHash: "1c8bfe8f801d79745c4631d09fff36c82aa37fc4cce4fc946683d7b336b63032",
+		}
+		defer func() { gateway.auth = authState{} }()
+
+		token := signToken(&JWTClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+				IssuedAt:  jwt.NewNumericDate(time.Now()),
+			},
+			Name:       "another-user",
+			Properties: map[string]string{"peerID": "QmWrongPeerIDDoesNotMatchLocalNode00000"},
+		}, privKey)
+
+		req, _ := http.NewRequest("GET", ts.URL+"/v1/profiles", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("X-Mobazha-Node", "test_user_id")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		// JWT valid but peerID mismatch → not admin → falls to Basic Auth → 401
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("Expected 401 (JWT peerID mismatch, falls to Basic Auth), got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("ExpiredJWT_FallsThrough", func(t *testing.T) {
+		gateway.auth = authState{
+			username:     "admin",
+			passwordHash: "1c8bfe8f801d79745c4631d09fff36c82aa37fc4cce4fc946683d7b336b63032",
+		}
+		defer func() { gateway.auth = authState{} }()
+
+		token := signToken(&JWTClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)),
+				IssuedAt:  jwt.NewNumericDate(time.Now().Add(-2 * time.Hour)),
+			},
+			Name:       "seller1",
+			Properties: map[string]string{"peerID": localPeerID},
+		}, privKey)
+
+		req, _ := http.NewRequest("GET", ts.URL+"/v1/profiles", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("X-Mobazha-Node", "test_user_id")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("Expected 401 for expired JWT (falls to Basic Auth), got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("InvalidBearerToken_FallsThrough", func(t *testing.T) {
+		gateway.auth = authState{
+			username:     "admin",
+			passwordHash: "1c8bfe8f801d79745c4631d09fff36c82aa37fc4cce4fc946683d7b336b63032",
+		}
+		defer func() { gateway.auth = authState{} }()
+
+		req, _ := http.NewRequest("GET", ts.URL+"/v1/profiles", nil)
+		req.Header.Set("Authorization", "Bearer not-a-valid-jwt")
+		req.Header.Set("X-Mobazha-Node", "test_user_id")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("Expected 401 for invalid Bearer (falls to Basic Auth), got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("NoValidator_JWTIgnored", func(t *testing.T) {
+		gateway.jwtValidator = nil
+		defer func() { gateway.jwtValidator = validator }()
+
+		token := signToken(&JWTClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+			},
+			Properties: map[string]string{"peerID": localPeerID},
+		}, privKey)
+
+		req, _ := http.NewRequest("GET", ts.URL+"/v1/profiles", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("X-Mobazha-Node", "test_user_id")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		// No validator → JWT ignored → no Basic Auth configured → passes through
+		if resp.StatusCode == http.StatusForbidden {
+			t.Errorf("Should not be forbidden when validator is nil, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("ValidJWT_AdminPeerID_WithBasicAuthConfigured", func(t *testing.T) {
+		gateway.auth = authState{
+			username:     "alice",
+			passwordHash: "1c8bfe8f801d79745c4631d09fff36c82aa37fc4cce4fc946683d7b336b63032",
+		}
+		defer func() { gateway.auth = authState{} }()
+
+		token := signToken(&JWTClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+				IssuedAt:  jwt.NewNumericDate(time.Now()),
+			},
+			Properties: map[string]string{"peerID": localPeerID},
+		}, privKey)
+
+		req, _ := http.NewRequest("GET", ts.URL+"/v1/profiles", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("X-Mobazha-Node", "test_user_id")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		// JWT admin match should succeed even when Basic Auth is also configured
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			t.Errorf("JWT admin should bypass Basic Auth, got %d", resp.StatusCode)
+		}
+	})
 }

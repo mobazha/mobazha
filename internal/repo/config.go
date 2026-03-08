@@ -149,6 +149,13 @@ type Config struct {
 	// StandaloneConnectivity describes how this standalone store is reachable:
 	// "public" (direct HTTPS), "tunnel" (Cloudflare Tunnel), or "nat" (libp2p only).
 	StandaloneConnectivity string `long:"standaloneconnectivity" description:"Connectivity mode: public, tunnel, or nat"`
+
+	// CasdoorCertificate is the PEM-encoded public certificate of the SaaS
+	// Casdoor instance. Used by standalone nodes to verify JWT tokens issued
+	// by SaaS Casdoor (for Mini App management via SaaS proxy). When empty,
+	// only Basic Auth is available. The certificate can be provided directly
+	// in the config file or fetched from SaaSAPIURL on first boot.
+	CasdoorCertificate string `long:"casdoorcertificate" description:"PEM certificate from SaaS Casdoor for JWT validation"`
 }
 
 // LoadConfig initializes and parses the config using a config file and command

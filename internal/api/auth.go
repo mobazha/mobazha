@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -48,13 +49,28 @@ func (s *authState) isConfigured() bool {
 	return s.username != "" && s.passwordHash != ""
 }
 
-// AuthenticationMiddleware checks IP allowlist, cookie, and basic-auth
-// credentials for every request on the /v1/* router.
+// AuthenticationMiddleware checks credentials for every request on protected
+// /v1/* routes. It supports two authentication modes:
+//
+//  1. JWT Bearer token (for SaaS proxy-mediated requests, e.g. Mini App):
+//     Authorization: Bearer <jwt-token>
+//     The JWT must be signed by SaaS Casdoor and the user's peerID property
+//     must match this node's peer ID (admin authorization).
+//
+//  2. Basic Auth (for direct admin access):
+//     Authorization: Basic <base64(user:pass)>
+//     Also supports ?token=basic:<base64> for WebSocket fallback.
+//
+// JWT is attempted first when a Bearer token is present AND the JWT validator
+// is configured. If JWT validation fails, it falls through to Basic Auth.
 func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if len(g.config.AllowedIPs) > 0 {
-			remoteAddr := strings.Split(r.RemoteAddr, ":")
-			if !g.config.AllowedIPs[remoteAddr[0]] {
+			host, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil {
+				host = r.RemoteAddr
+			}
+			if !g.config.AllowedIPs[host] {
 				ErrorResponse(w, http.StatusForbidden, "Forbidden")
 				return
 			}
@@ -64,6 +80,21 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 			cookie, err := r.Cookie(AuthCookieName)
 			if err != nil || subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(g.config.Cookie)) != 1 {
 				ErrorResponse(w, http.StatusForbidden, "Forbidden")
+				return
+			}
+		}
+
+		if g.tryJWTAuth(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// If a Bearer token was present but JWT auth failed, reject immediately
+		// instead of falling through to Basic Auth or unauthenticated access.
+		if g.jwtValidator != nil {
+			authHeader := r.Header.Get("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				ErrorResponse(w, http.StatusUnauthorized, "Invalid or expired token")
 				return
 			}
 		}
@@ -88,10 +119,35 @@ func (g *Gateway) AuthenticationMiddleware(next http.Handler) http.Handler {
 				ErrorResponse(w, http.StatusUnauthorized, "Invalid credentials")
 				return
 			}
+		} else if g.jwtValidator != nil {
+			// JWT validator configured but no Basic Auth: require authentication.
+			ErrorResponse(w, http.StatusUnauthorized, "Authentication required")
+			return
 		}
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// tryJWTAuth attempts JWT Bearer token authentication. Returns true if the
+// request carries a valid JWT from an authorized admin user.
+func (g *Gateway) tryJWTAuth(r *http.Request) bool {
+	if g.jwtValidator == nil {
+		return false
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return false
+	}
+	tokenStr := authHeader[7:]
+
+	claims, err := g.jwtValidator.ValidateToken(tokenStr)
+	if err != nil {
+		return false
+	}
+
+	return g.jwtValidator.IsAdmin(claims)
 }
 
 // parseBasicToken decodes a base64-encoded "user:pass" string.

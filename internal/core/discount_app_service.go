@@ -371,8 +371,10 @@ func (s *DiscountAppService) pushDiscountsToNetDB() {
 		return
 	}
 	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 		activeStatus := models.DiscountStatusActive
-		discounts, _, err := s.store.ListDiscounts(context.Background(), contracts.DiscountFilter{
+		discounts, _, err := s.store.ListDiscounts(ctx, contracts.DiscountFilter{
 			Page:     1,
 			PageSize: maxDiscountsPerTenant,
 			Status:   &activeStatus,
@@ -387,7 +389,7 @@ func (s *DiscountAppService) pushDiscountsToNetDB() {
 			return
 		}
 		if err := s.netDB.SetOwnStoreMetadata("discounts", data); err != nil {
-			logger.LogDebugWithIDf(log, s.tenantID, "pushDiscountsToNetDB: push failed: %v", err)
+			log.Warningf("[%s] pushDiscountsToNetDB: push failed: %v", s.tenantID, err)
 		}
 	}()
 }

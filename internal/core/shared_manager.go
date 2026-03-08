@@ -359,18 +359,20 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 	}
 
 	config := &api.GatewayConfig{
-		Listener:        manet.NetListener(gwLis),
-		AllowAllOrigins: cfg.APIAllowAllOrigins,
-		UseSSL:          cfg.UseSSL,
-		SSLCert:         cfg.SSLCertFile,
-		SSLKey:          cfg.SSLKeyFile,
-		Username:        username,
-		Password:        passwordHash,
-		Cookie:          cfg.APICookie,
-		PublicOnly:      cfg.APIPublicGateway,
-		AllowedIPs:      allowedIPs,
-		HashFile:        api.HashFilePath(cfg.DataDir),
-		PlainFile:       api.PlainFilePath(cfg.DataDir),
+		Listener:           manet.NetListener(gwLis),
+		AllowAllOrigins:    cfg.APIAllowAllOrigins,
+		UseSSL:             cfg.UseSSL,
+		SSLCert:            cfg.SSLCertFile,
+		SSLKey:             cfg.SSLKeyFile,
+		Username:           username,
+		Password:           passwordHash,
+		Cookie:             cfg.APICookie,
+		PublicOnly:         cfg.APIPublicGateway,
+		AllowedIPs:         allowedIPs,
+		HashFile:           api.HashFilePath(cfg.DataDir),
+		PlainFile:          api.PlainFilePath(cfg.DataDir),
+		CasdoorCertificate: cfg.CasdoorCertificate,
+		LocalPeerID:        ipfsConf.Identity.PeerID,
 	}
 
 	im.httpGateway, err = api.NewGateway(im, config, opts...)

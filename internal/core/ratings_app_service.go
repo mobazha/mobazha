@@ -22,25 +22,28 @@ import (
 type GetRatingIndexFromNetDBFunc func(peerID string, reqCtx *request.Context) (models.RatingIndex, error)
 
 type RatingsAppService struct {
-	db              database.Database
-	contentStore    contracts.ContentStore
-	fetchIPNSRecord FetchIPNSRecordFunc
-	getRatingIndex  GetRatingIndexFromNetDBFunc
+	db                 database.Database
+	contentStore       contracts.ContentStore
+	fetchIPNSRecord    FetchIPNSRecordFunc
+	getRatingIndex     GetRatingIndexFromNetDBFunc
+	coTenantPublicData contracts.CoTenantPublicDataFn
 }
 
 type RatingsAppServiceConfig struct {
-	DB              database.Database
-	ContentStore    contracts.ContentStore
-	FetchIPNSRecord FetchIPNSRecordFunc
-	GetRatingIndex  GetRatingIndexFromNetDBFunc
+	DB                 database.Database
+	ContentStore       contracts.ContentStore
+	FetchIPNSRecord    FetchIPNSRecordFunc
+	GetRatingIndex     GetRatingIndexFromNetDBFunc
+	CoTenantPublicData contracts.CoTenantPublicDataFn
 }
 
 func NewRatingsAppService(cfg RatingsAppServiceConfig) *RatingsAppService {
 	return &RatingsAppService{
-		db:              cfg.DB,
-		contentStore:    cfg.ContentStore,
-		fetchIPNSRecord: cfg.FetchIPNSRecord,
-		getRatingIndex:  cfg.GetRatingIndex,
+		db:                 cfg.DB,
+		contentStore:       cfg.ContentStore,
+		fetchIPNSRecord:    cfg.FetchIPNSRecord,
+		getRatingIndex:     cfg.GetRatingIndex,
+		coTenantPublicData: cfg.CoTenantPublicData,
 	}
 }
 
@@ -60,6 +63,14 @@ func (s *RatingsAppService) GetMyRatings() (models.RatingIndex, error) {
 }
 
 func (s *RatingsAppService) GetRatings(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.RatingIndex, error) {
+	if s.coTenantPublicData != nil {
+		if pd, err := s.coTenantPublicData(peerID); err == nil {
+			if index, err := pd.GetRatingIndex(); err == nil {
+				return index, nil
+			}
+		}
+	}
+
 	getDataFromIPNS := func() (models.RatingIndex, error) {
 		if s.fetchIPNSRecord == nil {
 			return nil, fmt.Errorf("IPNS resolution not available")

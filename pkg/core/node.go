@@ -5,8 +5,11 @@ import (
 
 	internalapi "github.com/mobazha/mobazha3.0/internal/api"
 	"github.com/mobazha/mobazha3.0/internal/core"
+	"github.com/mobazha/mobazha3.0/internal/database/ffsqlite"
+	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/repo"
+	"gorm.io/gorm"
 )
 
 type MobazhaNode = core.MobazhaNode
@@ -24,6 +27,13 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService c
 // TenantService or other NodeService implementations with the shared manager.
 func GetNodeManager() coreiface.NodeManagerIface {
 	return core.SharedManagerInstance
+}
+
+// NewDBPublicData creates a PublicData backed by the shared GORM database,
+// scoped to the given tenantID. Used by SaaS hosting to resolve co-tenant
+// public data directly from the shared DB.
+func NewDBPublicData(db *gorm.DB, tenantID string) pkgdb.PublicData {
+	return ffsqlite.NewDBPublicData(db, tenantID)
 }
 
 // SetSharedHTTPGateway registers a Gateway with the SharedManager so that

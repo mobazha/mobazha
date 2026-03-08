@@ -20,6 +20,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
+	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -29,6 +30,11 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/mobazha/mobazha3.0/pkg/webhook"
 )
+
+// CoTenantPublicDataFn resolves PublicData for a co-located tenant on the same
+// SaaS host. Returns an error if the peerID is not a co-tenant. When nil
+// (standalone mode), callers fall through to the normal NetDB/IPNS path.
+type CoTenantPublicDataFn func(peerID peer.ID) (pkgdb.PublicData, error)
 
 // IdentityService provides node identity and lifecycle operations.
 type IdentityService interface {

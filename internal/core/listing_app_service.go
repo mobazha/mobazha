@@ -66,6 +66,8 @@ type ListingAppService struct {
 	updateAndSaveProfile  UpdateAndSaveProfileFunc
 	onDeleteCleanup func(slug string)
 
+	coTenantPublicData contracts.CoTenantPublicDataFn
+
 	shippingStore contracts.ShippingStore
 }
 
@@ -86,26 +88,29 @@ type ListingAppServiceConfig struct {
 	GetMyProfile          GetMyProfileFunc
 	UpdateAndSaveProfile  UpdateAndSaveProfileFunc
 
+	CoTenantPublicData contracts.CoTenantPublicDataFn
+
 	ShippingStore contracts.ShippingStore
 }
 
 func NewListingAppService(cfg ListingAppServiceConfig) *ListingAppService {
 	return &ListingAppService{
-		db:                 cfg.DB,
-		signer:             cfg.Signer,
-		contentStore:       cfg.ContentStore,
-		netDB:              cfg.NetDB,
-		banManager:         cfg.BanManager,
-		keys:               cfg.Keys,
-		featureManager:     cfg.FeatureManager,
-		localListingCrypto: cfg.LocalListingCrypto,
-		nodeID:             cfg.NodeID,
-		testnet:            cfg.Testnet,
-		publish:            cfg.Publish,
-		fetchIPNSRecord:    cfg.FetchIPNSRecord,
-		getMyProfile:       cfg.GetMyProfile,
+		db:                   cfg.DB,
+		signer:               cfg.Signer,
+		contentStore:         cfg.ContentStore,
+		netDB:                cfg.NetDB,
+		banManager:           cfg.BanManager,
+		keys:                 cfg.Keys,
+		featureManager:       cfg.FeatureManager,
+		localListingCrypto:   cfg.LocalListingCrypto,
+		nodeID:               cfg.NodeID,
+		testnet:              cfg.Testnet,
+		publish:              cfg.Publish,
+		fetchIPNSRecord:      cfg.FetchIPNSRecord,
+		getMyProfile:         cfg.GetMyProfile,
 		updateAndSaveProfile: cfg.UpdateAndSaveProfile,
-		shippingStore:      cfg.ShippingStore,
+		coTenantPublicData:   cfg.CoTenantPublicData,
+		shippingStore:        cfg.ShippingStore,
 	}
 }
 
@@ -385,6 +390,14 @@ func (s *ListingAppService) GetMyListings() (models.ListingIndex, error) {
 }
 
 func (s *ListingAppService) GetListings(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.ListingIndex, error) {
+	if s.coTenantPublicData != nil {
+		if pd, err := s.coTenantPublicData(peerID); err == nil {
+			if index, err := pd.GetListingIndex(); err == nil {
+				return index, nil
+			}
+		}
+	}
+
 	getDatafromIPNS := func() (models.ListingIndex, error) {
 		record, err := s.fetchIPNSRecord(ctx, peerID, useCache)
 		if err != nil {
@@ -524,6 +537,14 @@ func (s *ListingAppService) GetMyListingByCID(c cid.Cid) (*pb.SignedListing, err
 }
 
 func (s *ListingAppService) GetListingBySlug(ctx context.Context, peerID peer.ID, slugStr string, reqCtx *request.Context, useCache bool) (*pb.SignedListing, error) {
+	if s.coTenantPublicData != nil {
+		if pd, err := s.coTenantPublicData(peerID); err == nil {
+			if sl, err := pd.GetListing(slugStr); err == nil {
+				return sl, nil
+			}
+		}
+	}
+
 	getDatafromIPNS := func() (*pb.SignedListing, error) {
 		record, err := s.fetchIPNSRecord(ctx, peerID, useCache)
 		if err != nil {

@@ -202,10 +202,11 @@ func (n *MobazhaNode) initRatingsService() {
 	}
 
 	n.ratingsService = NewRatingsAppService(RatingsAppServiceConfig{
-		DB:              n.db,
-		ContentStore:    n.contentStore,
-		FetchIPNSRecord: n.fetchIPNSRecord,
-		GetRatingIndex:  getRatingIndex,
+		DB:                 n.db,
+		ContentStore:       n.contentStore,
+		FetchIPNSRecord:    n.fetchIPNSRecord,
+		GetRatingIndex:     getRatingIndex,
+		CoTenantPublicData: n.coTenantPublicDataDeferred(),
 	})
 }
 
@@ -482,6 +483,7 @@ func (n *MobazhaNode) initProfileService() {
 		SolanaPubKeyStr:        solanaPubKeyStr,
 		StripeAccountID:        n.stripeAccountID,
 		StoreAndForwardServers: n.storeAndForwardServers,
+		CoTenantPublicData:     n.coTenantPublicDataDeferred(),
 		GetAcceptedCurrencies: func() ([]string, error) {
 			return n.paymentService.GetAcceptedCurrencies()
 		},
@@ -537,6 +539,7 @@ func (n *MobazhaNode) initFollowService() {
 		EventBus:             n.eventBus,
 		NodeID:               n.nodeID,
 		NetDB:                n.netDB,
+		CoTenantPublicData:   n.coTenantPublicDataDeferred(),
 		UpdateAndSaveProfile: updateProfile,
 		GetMyProfile:         getMyProfile,
 	})
@@ -690,6 +693,7 @@ func (n *MobazhaNode) initListingService() {
 		FetchIPNSRecord:      n.fetchIPNSRecord,
 		GetMyProfile:         getMyProfile,
 		UpdateAndSaveProfile: updateAndSaveProfile,
+		CoTenantPublicData:   n.coTenantPublicDataDeferred(),
 		ShippingStore:        shippingStore,
 	})
 

@@ -27,6 +27,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
@@ -155,6 +156,11 @@ type MobazhaNode struct {
 
 	// shippingService encapsulates shipping profile and location management.
 	shippingService *ShippingAppService
+
+	// coTenantPublicData resolves PublicData for co-located tenants on the
+	// same SaaS host, enabling direct DB reads instead of NetDB/IPNS lookups.
+	// nil in standalone mode.
+	coTenantPublicData contracts.CoTenantPublicDataFn
 
 	// eventDispatcher is the unified EventBus subscriber that fans out events
 	// to NotificationSink, WebhookSink, and ChannelNotificationSink.
@@ -290,6 +296,26 @@ type MobazhaNode struct {
 // IsDefaultNode returns whether this node is the default node.
 func (n *MobazhaNode) IsDefaultNode() bool {
 	return n.nodeID == repo.DefaultNodeID
+}
+
+// SetCoTenantPublicData injects a resolver for co-located tenant data on the
+// same SaaS host. Called after construction; the deferred wrappers created
+// during applyOptions will pick up the injected fn at call time.
+func (n *MobazhaNode) SetCoTenantPublicData(fn contracts.CoTenantPublicDataFn) {
+	n.coTenantPublicData = fn
+}
+
+// coTenantPublicDataDeferred returns a closure that forwards to
+// n.coTenantPublicData at call time. This allows App Services to be
+// initialized before SetCoTenantPublicData is called by hosting.
+func (n *MobazhaNode) coTenantPublicDataDeferred() contracts.CoTenantPublicDataFn {
+	return func(peerID peer.ID) (pkgdb.PublicData, error) {
+		fn := n.coTenantPublicData
+		if fn == nil {
+			return nil, fmt.Errorf("co-tenant resolver not configured")
+		}
+		return fn(peerID)
+	}
 }
 
 // Start gets the node up and running and listens for a signal interrupt.

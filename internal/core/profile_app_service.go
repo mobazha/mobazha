@@ -15,6 +15,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/database/ffsqlite"
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -40,6 +41,7 @@ type ProfileAppService struct {
 	stripeAccountID        string
 	storeAndForwardServers []string
 
+	coTenantPublicData    contracts.CoTenantPublicDataFn
 	getAcceptedCurrencies GetAcceptedCurrenciesFunc
 }
 
@@ -58,6 +60,7 @@ type ProfileAppServiceConfig struct {
 	StripeAccountID        string
 	StoreAndForwardServers []string
 
+	CoTenantPublicData    contracts.CoTenantPublicDataFn
 	GetAcceptedCurrencies GetAcceptedCurrenciesFunc
 }
 
@@ -75,6 +78,7 @@ func NewProfileAppService(cfg ProfileAppServiceConfig) *ProfileAppService {
 		solanaPubKeyStr:        cfg.SolanaPubKeyStr,
 		stripeAccountID:        cfg.StripeAccountID,
 		storeAndForwardServers: cfg.StoreAndForwardServers,
+		coTenantPublicData:     cfg.CoTenantPublicData,
 		getAcceptedCurrencies:  cfg.GetAcceptedCurrencies,
 	}
 }
@@ -167,6 +171,14 @@ func (s *ProfileAppService) GetMyProfile() (*models.Profile, error) {
 }
 
 func (s *ProfileAppService) GetProfile(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error) {
+	if s.coTenantPublicData != nil {
+		if pd, err := s.coTenantPublicData(peerID); err == nil {
+			if profile, err := pd.GetProfile(); err == nil {
+				return profile, nil
+			}
+		}
+	}
+
 	getDatafromIPNS := func() (*models.Profile, error) {
 		if s.fetchIPNSRecord == nil {
 			return nil, fmt.Errorf("IPNS resolver not available")

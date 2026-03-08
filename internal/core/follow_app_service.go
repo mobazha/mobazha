@@ -34,6 +34,7 @@ type FollowAppService struct {
 	nodeID          string
 	netDB           *netdb.NetDB
 
+	coTenantPublicData   contracts.CoTenantPublicDataFn
 	updateAndSaveProfile UpdateAndSaveProfileFunc
 	getMyProfile         GetMyProfileFunc
 }
@@ -47,6 +48,7 @@ type FollowAppServiceConfig struct {
 	NodeID          string
 	NetDB           *netdb.NetDB
 
+	CoTenantPublicData   contracts.CoTenantPublicDataFn
 	UpdateAndSaveProfile UpdateAndSaveProfileFunc
 	GetMyProfile         GetMyProfileFunc
 }
@@ -60,6 +62,7 @@ func NewFollowAppService(cfg FollowAppServiceConfig) *FollowAppService {
 		eventBus:             cfg.EventBus,
 		nodeID:               cfg.NodeID,
 		netDB:                cfg.NetDB,
+		coTenantPublicData:   cfg.CoTenantPublicData,
 		updateAndSaveProfile: cfg.UpdateAndSaveProfile,
 		getMyProfile:         cfg.GetMyProfile,
 	}
@@ -219,6 +222,14 @@ func (s *FollowAppService) GetMyFollowing() (models.Following, error) {
 }
 
 func (s *FollowAppService) GetFollowers(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.Followers, error) {
+	if s.coTenantPublicData != nil {
+		if pd, err := s.coTenantPublicData(peerID); err == nil {
+			if followers, err := pd.GetFollowers(); err == nil {
+				return followers, nil
+			}
+		}
+	}
+
 	getDatafromIPNS := func() (models.Followers, error) {
 		if s.fetchIPNSRecord == nil {
 			return nil, fmt.Errorf("IPNS resolver not available")
@@ -270,6 +281,14 @@ func (s *FollowAppService) GetFollowers(ctx context.Context, peerID peer.ID, req
 }
 
 func (s *FollowAppService) GetFollowing(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.Following, error) {
+	if s.coTenantPublicData != nil {
+		if pd, err := s.coTenantPublicData(peerID); err == nil {
+			if following, err := pd.GetFollowing(); err == nil {
+				return following, nil
+			}
+		}
+	}
+
 	getDatafromIPNS := func() (models.Following, error) {
 		if s.fetchIPNSRecord == nil {
 			return nil, fmt.Errorf("IPNS resolver not available")

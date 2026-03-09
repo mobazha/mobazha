@@ -3,13 +3,13 @@ package core
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"image"
 	"image/jpeg"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/disintegration/imaging"
 	ipath "github.com/ipfs/boxo/path"
@@ -32,22 +32,26 @@ type PublishFunc func(done chan<- struct{})
 
 type PublishFileFunc func(ctx context.Context, c cid.Cid, done chan<- struct{})
 
+const defaultMaxUploadBytes = 15 << 20 // 15 MB
+
 // ── MediaAppService ─────────────────────────────────────────────
 
 type MediaAppService struct {
 	db           database.Database
 	contentStore contracts.ContentStore
+	blobStore    contracts.BlobStore
 	nodeID       string
 
-	getIPFSFile      GetIPFSFileFunc
-	fetchIPNSRecord  FetchIPNSRecordFunc
-	publish          PublishFunc
-	publishFile      PublishFileFunc
+	getIPFSFile     GetIPFSFileFunc
+	fetchIPNSRecord FetchIPNSRecordFunc
+	publish         PublishFunc
+	publishFile     PublishFileFunc
 }
 
 type MediaAppServiceConfig struct {
 	DB           database.Database
 	ContentStore contracts.ContentStore
+	BlobStore    contracts.BlobStore
 	NodeID       string
 
 	GetIPFSFile     GetIPFSFileFunc
@@ -60,6 +64,7 @@ func NewMediaAppService(cfg MediaAppServiceConfig) *MediaAppService {
 	return &MediaAppService{
 		db:              cfg.DB,
 		contentStore:    cfg.ContentStore,
+		blobStore:       cfg.BlobStore,
 		nodeID:          cfg.NodeID,
 		getIPFSFile:     cfg.GetIPFSFile,
 		fetchIPNSRecord: cfg.FetchIPNSRecord,
@@ -68,63 +73,127 @@ func NewMediaAppService(cfg MediaAppServiceConfig) *MediaAppService {
 	}
 }
 
-// ── File Operations ─────────────────────────────────────────────
+// ── UploadMedia ─────────────────────────────────────────────────
 
-func (s *MediaAppService) getIPFSFileByCID(ctx context.Context, c cid.Cid) (io.ReadSeeker, error) {
-	if s.getIPFSFile == nil {
-		return nil, fmt.Errorf("IPFS file reader not available")
+func (s *MediaAppService) UploadMedia(ctx context.Context, data []byte, filename string, opts contracts.UploadOpts) (*contracts.UploadResult, error) {
+	maxBytes := opts.MaxBytes
+	if maxBytes <= 0 {
+		maxBytes = defaultMaxUploadBytes
 	}
-	pth := ipath.FromCid(c)
-	return s.getIPFSFile(ctx, pth)
+	if int64(len(data)) > maxBytes {
+		return nil, fmt.Errorf("%w: file exceeds %d bytes", coreiface.ErrBadRequest, maxBytes)
+	}
+
+	if opts.Variants {
+		return s.uploadWithVariants(ctx, data, filename)
+	}
+	return s.uploadSingle(ctx, data, filename)
 }
 
-func (s *MediaAppService) AddFile(fileData []byte, filename string) (models.FileHash, error) {
-	c, err := s.contentStore.ComputeCID(fileData)
+func (s *MediaAppService) uploadSingle(ctx context.Context, data []byte, filename string) (*contracts.UploadResult, error) {
+	c, err := s.contentStore.ComputeCID(data)
 	if err != nil {
-		return models.FileHash{}, err
+		return nil, err
 	}
-	ct := detectContentType(fileData, filename)
-	if err := s.db.Update(func(dbtx database.Tx) error {
-		if err := dbtx.SetUploadedFile(models.UploadedFile{
-			Name:      filename,
-			FileBytes: fileData,
-		}); err != nil {
-			return err
+	key := contracts.CanonicalCID(c)
+	ct := detectContentType(data, filename)
+
+	if s.blobStore != nil {
+		if err := s.blobStore.Put(ctx, key, data, ct); err != nil {
+			return nil, fmt.Errorf("blobstore put: %w", err)
 		}
-		return dbtx.IndexMediaCID(c.String(), "file", "", filename, ct)
-	}); err != nil {
-		return models.FileHash{}, err
+		if err := s.saveMetadataOnly(c.String(), "file", "", filename, ct); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := s.db.Update(func(dbtx database.Tx) error {
+			if err := dbtx.SetUploadedFile(models.UploadedFile{
+				Name:      filename,
+				FileBytes: data,
+			}); err != nil {
+				return err
+			}
+			return dbtx.IndexMediaCID(c.String(), "file", "", filename, ct)
+		}); err != nil {
+			return nil, err
+		}
 	}
+
 	if s.publishFile != nil {
 		s.publishFile(context.Background(), c, nil)
 	}
-	return models.FileHash{Hash: c.String(), Name: filename}, nil
+
+	return &contracts.UploadResult{
+		Hash:     c.String(),
+		Filename: filename,
+		CDNURL:   s.publicURL(key),
+	}, nil
 }
 
-func (s *MediaAppService) AddIntroVideo(fileData []byte, filename string) (models.FileHash, error) {
-	c, err := s.contentStore.ComputeCID(fileData)
+func (s *MediaAppService) uploadWithVariants(ctx context.Context, data []byte, filename string) (*contracts.UploadResult, error) {
+	img, err := decodeImageBytes(data)
 	if err != nil {
-		return models.FileHash{}, err
+		return nil, fmt.Errorf("%w: invalid image: %s", coreiface.ErrBadRequest, err.Error())
 	}
-	ct := detectContentType(fileData, filename)
-	err = s.db.Update(func(dbtx database.Tx) error {
-		if err := dbtx.SetIntroVideo(models.IntroVideo{
-			VideoBytes: fileData,
-			Name:       filename,
-		}); err != nil {
-			return err
-		}
-		return dbtx.IndexMediaCID(c.String(), "intro_video", "", filename, ct)
-	})
+
+	const baseWidth, baseHeight = 120, 120
+
+	t, err := s.storeResizedImage(ctx, img, 1*baseWidth, 1*baseHeight, filename, models.ImageSizeTiny)
 	if err != nil {
-		return models.FileHash{}, err
+		return nil, err
 	}
-	return models.FileHash{Hash: c.String(), Name: filename}, nil
+	sm, err := s.storeResizedImage(ctx, img, 2*baseWidth, 2*baseHeight, filename, models.ImageSizeSmall)
+	if err != nil {
+		return nil, err
+	}
+	m, err := s.storeResizedImage(ctx, img, 4*baseWidth, 4*baseHeight, filename, models.ImageSizeMedium)
+	if err != nil {
+		return nil, err
+	}
+	l, err := s.storeResizedImage(ctx, img, 8*baseWidth, 8*baseHeight, filename, models.ImageSizeLarge)
+	if err != nil {
+		return nil, err
+	}
+
+	var origBuf bytes.Buffer
+	if err := jpeg.Encode(&origBuf, img, nil); err != nil {
+		return nil, err
+	}
+	o, err := s.storeImageBytes(ctx, origBuf.Bytes(), filename, models.ImageSizeOriginal)
+	if err != nil {
+		return nil, err
+	}
+
+	hashes := &models.ImageHashes{
+		Tiny: t.String(), Small: sm.String(), Medium: m.String(),
+		Large: l.String(), Original: o.String(), Filename: filename,
+	}
+	return &contracts.UploadResult{
+		Hash:     o.String(),
+		Filename: filename,
+		Hashes:   hashes,
+		CDNURL:   s.publicURL(contracts.CanonicalCID(o)),
+	}, nil
 }
 
-// ── Media Read Operations ───────────────────────────────────────
+// ── GetMedia ────────────────────────────────────────────────────
 
 func (s *MediaAppService) GetMedia(ctx context.Context, c cid.Cid) (io.ReadSeeker, string, error) {
+	// Level 1: BlobStore
+	if s.blobStore != nil {
+		key := contracts.CanonicalCID(c)
+		rc, ct, err := s.blobStore.Get(ctx, key)
+		if err == nil {
+			data, readErr := io.ReadAll(rc)
+			rc.Close()
+			if readErr == nil {
+				return bytes.NewReader(data), ct, nil
+			}
+			log.Warningf("BlobStore read error for %s, falling back to DB/IPFS: %v", key, readErr)
+		}
+	}
+
+	// Level 2: DB (legacy)
 	var data []byte
 	var contentType string
 	dbErr := s.db.View(func(tx database.Tx) error {
@@ -136,9 +205,21 @@ func (s *MediaAppService) GetMedia(ctx context.Context, c cid.Cid) (io.ReadSeeke
 		if contentType == "" {
 			contentType = http.DetectContentType(data)
 		}
+		// Async backfill to BlobStore for future hits
+		if s.blobStore != nil {
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				key := contracts.CanonicalCID(c)
+				if err := s.blobStore.Put(ctx, key, data, contentType); err != nil {
+					log.Warningf("BlobStore backfill failed for %s: %v", key, err)
+				}
+			}()
+		}
 		return bytes.NewReader(data), contentType, nil
 	}
 
+	// Level 3: IPFS (legacy fallback)
 	reader, err := s.getIPFSFileByCID(ctx, c)
 	if err != nil {
 		if dbErr != nil {
@@ -149,18 +230,84 @@ func (s *MediaAppService) GetMedia(ctx context.Context, c cid.Cid) (io.ReadSeeke
 	return reader, "", nil
 }
 
-func (s *MediaAppService) GetAvatar(ctx context.Context, peerID peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
-	if peerID.String() == s.nodeID {
-		return s.getLocalImageByName(size, "avatar")
+// ── SetProfileMedia ─────────────────────────────────────────────
+
+func (s *MediaAppService) SetProfileMedia(ctx context.Context, slot contracts.ProfileSlot, imageData []byte) (*contracts.UploadResult, error) {
+	img, err := decodeImageBytes(imageData)
+	if err != nil {
+		return nil, fmt.Errorf("%w: invalid image: %s", coreiface.ErrBadRequest, err.Error())
 	}
-	return s.getIPFSImageByName(ctx, peerID, size, "avatar", useCache)
+
+	var baseW, baseH int
+	switch slot {
+	case contracts.SlotAvatar:
+		baseW, baseH = 60, 60
+	case contracts.SlotHeader:
+		baseW, baseH = 315, 90
+	default:
+		return nil, fmt.Errorf("%w: unknown profile slot: %s", coreiface.ErrBadRequest, slot)
+	}
+
+	name := string(slot)
+
+	var hashes models.ImageHashes
+	var profileUpdated bool
+
+	err = s.db.Update(func(tx database.Tx) error {
+		var innerErr error
+		hashes, innerErr = s.resizeAndStoreProfileImage(ctx, tx, img, name, baseW, baseH)
+		if innerErr != nil {
+			return innerErr
+		}
+		profile, pErr := tx.GetProfile()
+		if pErr != nil {
+			// Profile may not exist yet (initial setup). Images are stored;
+			// profile association will happen on next upload after profile creation.
+			return nil
+		}
+		switch slot {
+		case contracts.SlotAvatar:
+			profile.AvatarHashes = hashes
+		case contracts.SlotHeader:
+			profile.HeaderHashes = hashes
+		}
+		profileUpdated = true
+		return tx.SetProfile(profile)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if profileUpdated && s.publish != nil {
+		s.publish(nil)
+	}
+
+	return &contracts.UploadResult{
+		Hash:     hashes.Original,
+		Filename: name,
+		Hashes:   &hashes,
+		CDNURL:   s.publicURL(hashes.Original),
+	}, nil
 }
 
-func (s *MediaAppService) GetHeader(ctx context.Context, peerID peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
+// ── GetProfileMedia ─────────────────────────────────────────────
+
+func (s *MediaAppService) GetProfileMedia(ctx context.Context, peerID peer.ID, slot contracts.ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
+	name := string(slot)
 	if peerID.String() == s.nodeID {
-		return s.getLocalImageByName(size, "header")
+		return s.getLocalImageByName(size, name)
 	}
-	return s.getIPFSImageByName(ctx, peerID, size, "header", useCache)
+	return s.getIPFSImageByName(ctx, peerID, size, name, useCache)
+}
+
+// ── Internal Helpers ────────────────────────────────────────────
+
+func (s *MediaAppService) getIPFSFileByCID(ctx context.Context, c cid.Cid) (io.ReadSeeker, error) {
+	if s.getIPFSFile == nil {
+		return nil, fmt.Errorf("IPFS file reader not available")
+	}
+	pth := ipath.FromCid(c)
+	return s.getIPFSFile(ctx, pth)
 }
 
 func (s *MediaAppService) getLocalImageByName(size models.ImageSize, name string) (io.ReadSeeker, error) {
@@ -199,112 +346,20 @@ func (s *MediaAppService) getIPFSImageByName(ctx context.Context, peerID peer.ID
 	return nd, nil
 }
 
-// ── Image Write Operations ──────────────────────────────────────
-
-func (s *MediaAppService) SetAvatarImage(base64ImageData string, done chan struct{}) (models.ImageHashes, error) {
-	var (
-		hashes         models.ImageHashes
-		profileUpdated bool
-		err            error
-	)
-	err = s.db.Update(func(tx database.Tx) error {
-		hashes, err = s.resizeAndAddImage(tx, base64ImageData, "avatar", 60, 60)
-		if err != nil {
-			return err
-		}
-		profile, err := tx.GetProfile()
-		if err == nil {
-			profile.AvatarHashes = hashes
-			profileUpdated = true
-			return tx.SetProfile(profile)
-		}
-		return nil
-	})
-	if err != nil {
-		maybeCloseDone(done)
-		return models.ImageHashes{}, err
-	}
-	if profileUpdated && s.publish != nil {
-		s.publish(done)
-	}
-	return hashes, nil
-}
-
-func (s *MediaAppService) SetHeaderImage(base64ImageData string, done chan struct{}) (models.ImageHashes, error) {
-	var (
-		hashes         models.ImageHashes
-		err            error
-		profileUpdated bool
-	)
-	err = s.db.Update(func(tx database.Tx) error {
-		hashes, err = s.resizeAndAddImage(tx, base64ImageData, "header", 315, 90)
-		if err != nil {
-			return err
-		}
-		profile, err := tx.GetProfile()
-		if err == nil {
-			profile.HeaderHashes = hashes
-			profileUpdated = true
-			return tx.SetProfile(profile)
-		}
-		return nil
-	})
-	if err != nil {
-		maybeCloseDone(done)
-		return models.ImageHashes{}, err
-	}
-	if profileUpdated && s.publish != nil {
-		s.publish(done)
-	}
-	return hashes, nil
-}
-
-func (s *MediaAppService) SetImage(base64ImageData string, filename string) (models.FileHash, error) {
-	img, err := decodeImageData(base64ImageData)
-	if err != nil {
-		return models.FileHash{}, fmt.Errorf("%w: invalid image: %s", coreiface.ErrBadRequest, err.Error())
-	}
-	var buf bytes.Buffer
-	const maxImageSize = 10 * 1000 * 1000
-	if err := imageToJpeg(&buf, img, maxImageSize); err != nil {
-		return models.FileHash{}, err
-	}
-	return s.AddFile(buf.Bytes(), filename)
-}
-
-func (s *MediaAppService) SetProductImage(base64ImageData string, filename string) (models.ImageHashes, error) {
-	var (
-		hashes models.ImageHashes
-		err    error
-	)
-	err = s.db.Update(func(tx database.Tx) error {
-		hashes, err = s.resizeAndAddImage(tx, base64ImageData, filename, 120, 120)
-		return err
-	})
-	return hashes, err
-}
-
-// ── Internal Helpers ────────────────────────────────────────────
-
-func (s *MediaAppService) resizeAndAddImage(dbtx database.Tx, base64ImageData, filename string, baseWidth, baseHeight int) (models.ImageHashes, error) {
-	img, err := decodeImageData(base64ImageData)
-	if err != nil {
-		return models.ImageHashes{}, fmt.Errorf("%w: invalid image: %s", coreiface.ErrBadRequest, err.Error())
-	}
-
-	t, err := s.addResizedImage(dbtx, img, 1*baseWidth, 1*baseHeight, filename, models.ImageSizeTiny)
+func (s *MediaAppService) resizeAndStoreProfileImage(ctx context.Context, dbtx database.Tx, img image.Image, name string, baseW, baseH int) (models.ImageHashes, error) {
+	t, err := s.storeResizedProfileImage(ctx, dbtx, img, 1*baseW, 1*baseH, name, models.ImageSizeTiny)
 	if err != nil {
 		return models.ImageHashes{}, err
 	}
-	sm, err := s.addResizedImage(dbtx, img, 2*baseWidth, 2*baseHeight, filename, models.ImageSizeSmall)
+	sm, err := s.storeResizedProfileImage(ctx, dbtx, img, 2*baseW, 2*baseH, name, models.ImageSizeSmall)
 	if err != nil {
 		return models.ImageHashes{}, err
 	}
-	m, err := s.addResizedImage(dbtx, img, 4*baseWidth, 4*baseHeight, filename, models.ImageSizeMedium)
+	m, err := s.storeResizedProfileImage(ctx, dbtx, img, 4*baseW, 4*baseH, name, models.ImageSizeMedium)
 	if err != nil {
 		return models.ImageHashes{}, err
 	}
-	l, err := s.addResizedImage(dbtx, img, 8*baseWidth, 8*baseHeight, filename, models.ImageSizeLarge)
+	l, err := s.storeResizedProfileImage(ctx, dbtx, img, 8*baseW, 8*baseH, name, models.ImageSizeLarge)
 	if err != nil {
 		return models.ImageHashes{}, err
 	}
@@ -313,57 +368,122 @@ func (s *MediaAppService) resizeAndAddImage(dbtx database.Tx, base64ImageData, f
 	if err := jpeg.Encode(&buf, img, nil); err != nil {
 		return models.ImageHashes{}, err
 	}
-
-	o, err := s.addImage(dbtx, models.Image{
-		Name:       filename,
-		Size:       models.ImageSizeOriginal,
-		ImageBytes: buf.Bytes(),
-	})
+	o, err := s.storeProfileImageBytes(ctx, dbtx, buf.Bytes(), name, models.ImageSizeOriginal)
 	if err != nil {
 		return models.ImageHashes{}, err
 	}
 
-	return models.ImageHashes{Tiny: t.String(), Small: sm.String(), Medium: m.String(), Large: l.String(), Original: o.String(), Filename: filename}, nil
+	return models.ImageHashes{
+		Tiny: t.String(), Small: sm.String(), Medium: m.String(),
+		Large: l.String(), Original: o.String(), Filename: name,
+	}, nil
 }
 
-func (s *MediaAppService) addImage(dbtx database.Tx, img models.Image) (cid.Cid, error) {
-	if err := dbtx.SetImage(img); err != nil {
+// storeResizedImage resizes an image and stores it (BlobStore path, no dbtx needed).
+func (s *MediaAppService) storeResizedImage(ctx context.Context, img image.Image, w, h int, name string, size models.ImageSize) (cid.Cid, error) {
+	width, height := getImageAttributes(w, h, img.Bounds().Max.X, img.Bounds().Max.Y)
+	newImg := imaging.Resize(img, width, height, imaging.Lanczos)
+
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, newImg, &jpeg.Options{Quality: 100}); err != nil {
 		return cid.Cid{}, err
 	}
-	c, err := s.contentStore.ComputeCID(img.ImageBytes)
+	return s.storeImageBytes(ctx, buf.Bytes(), name, size)
+}
+
+// storeImageBytes computes CID and stores via BlobStore or DB.
+func (s *MediaAppService) storeImageBytes(ctx context.Context, data []byte, name string, size models.ImageSize) (cid.Cid, error) {
+	c, err := s.contentStore.ComputeCID(data)
 	if err != nil {
 		return cid.Cid{}, err
 	}
-	if err := dbtx.IndexMediaCID(c.String(), "image", string(img.Size), img.Name, "image/jpeg"); err != nil {
+
+	if s.blobStore != nil {
+		key := contracts.CanonicalCID(c)
+		if err := s.blobStore.Put(ctx, key, data, "image/jpeg"); err != nil {
+			return cid.Cid{}, fmt.Errorf("blobstore put: %w", err)
+		}
+		if err := s.saveMetadataOnly(c.String(), "image", string(size), name, "image/jpeg"); err != nil {
+			return cid.Cid{}, err
+		}
+	} else {
+		if err := s.db.Update(func(dbtx database.Tx) error {
+			if err := dbtx.SetImage(models.Image{
+				Name:       name,
+				Size:       size,
+				ImageBytes: data,
+			}); err != nil {
+				return err
+			}
+			return dbtx.IndexMediaCID(c.String(), "image", string(size), name, "image/jpeg")
+		}); err != nil {
+			return cid.Cid{}, err
+		}
+	}
+	return c, nil
+}
+
+// storeResizedProfileImage resizes and stores with a DB transaction (for profile updates).
+func (s *MediaAppService) storeResizedProfileImage(ctx context.Context, dbtx database.Tx, img image.Image, w, h int, name string, size models.ImageSize) (cid.Cid, error) {
+	width, height := getImageAttributes(w, h, img.Bounds().Max.X, img.Bounds().Max.Y)
+	newImg := imaging.Resize(img, width, height, imaging.Lanczos)
+
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, newImg, &jpeg.Options{Quality: 100}); err != nil {
+		return cid.Cid{}, err
+	}
+	return s.storeProfileImageBytes(ctx, dbtx, buf.Bytes(), name, size)
+}
+
+// storeProfileImageBytes stores a profile image variant within a DB transaction.
+func (s *MediaAppService) storeProfileImageBytes(ctx context.Context, dbtx database.Tx, data []byte, name string, size models.ImageSize) (cid.Cid, error) {
+	c, err := s.contentStore.ComputeCID(data)
+	if err != nil {
+		return cid.Cid{}, err
+	}
+
+	if s.blobStore != nil {
+		key := contracts.CanonicalCID(c)
+		if err := s.blobStore.Put(ctx, key, data, "image/jpeg"); err != nil {
+			return cid.Cid{}, fmt.Errorf("blobstore put: %w", err)
+		}
+	}
+
+	// Profile images always write to DB too (for local GetProfileMedia reads).
+	if err := dbtx.SetImage(models.Image{
+		Name:       name,
+		Size:       size,
+		ImageBytes: data,
+	}); err != nil {
+		return cid.Cid{}, err
+	}
+	if err := dbtx.IndexMediaCID(c.String(), "image", string(size), name, "image/jpeg"); err != nil {
 		return cid.Cid{}, err
 	}
 	return c, nil
 }
 
-func (s *MediaAppService) addResizedImage(dbtx database.Tx, img image.Image, w, h int, name string, size models.ImageSize) (cid.Cid, error) {
-	width, height := getImageAttributes(w, h, img.Bounds().Max.X, img.Bounds().Max.Y)
-	newImg := imaging.Resize(img, width, height, imaging.Lanczos)
-
-	var buf bytes.Buffer
-	q := &jpeg.Options{Quality: 100}
-	if err := jpeg.Encode(&buf, newImg, q); err != nil {
-		return cid.Cid{}, err
-	}
-
-	return s.addImage(dbtx, models.Image{
-		ImageBytes: buf.Bytes(),
-		Size:       size,
-		Name:       name,
+func (s *MediaAppService) saveMetadataOnly(cidStr, mediaType, sizeStr, name, contentType string) error {
+	return s.db.Update(func(dbtx database.Tx) error {
+		return dbtx.IndexMediaCID(cidStr, mediaType, sizeStr, name, contentType)
 	})
 }
 
-func decodeImageData(base64ImageData string) (image.Image, error) {
-	reader := base64.NewDecoder(base64.StdEncoding, strings.NewReader(base64ImageData))
-	img, err := imaging.Decode(reader, imaging.AutoOrientation(true))
+func (s *MediaAppService) publicURL(key string) string {
+	if s.blobStore != nil {
+		return s.blobStore.PublicURL(key)
+	}
+	return ""
+}
+
+// ── Utility Functions ───────────────────────────────────────────
+
+func decodeImageBytes(data []byte) (image.Image, error) {
+	img, err := imaging.Decode(bytes.NewReader(data), imaging.AutoOrientation(true))
 	if err != nil {
 		return nil, err
 	}
-	return img, err
+	return img, nil
 }
 
 func getImageAttributes(targetWidth, targetHeight, imgWidth, imgHeight int) (width, height int) {
@@ -400,4 +520,3 @@ func detectContentType(data []byte, filename string) string {
 	}
 	return http.DetectContentType(data)
 }
-

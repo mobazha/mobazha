@@ -13,8 +13,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/ipfs/go-cid"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
-	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
 func (g *Gateway) handleGETFile(w http.ResponseWriter, r *http.Request) {
@@ -50,35 +50,46 @@ func (g *Gateway) handleGETFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePOSTFile(w http.ResponseWriter, r *http.Request) {
-	// parse input, type multipart/form-data
-	r.Body = http.MaxBytesReader(w, r.Body, 15<<20) // limit your max input length! 15M
+	// Set max possible limit at HTTP layer; fine-grained checks in service layer.
+	r.Body = http.MaxBytesReader(w, r.Body, 50<<20)
 
-	// retrieve the file from form data
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			ErrorResponse(w, http.StatusRequestEntityTooLarge, "file exceeds maximum upload size")
+			return
+		}
+		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	defer file.Close()
 
 	buf := bytes.NewBuffer(nil)
 	if _, err := io.Copy(buf, file); err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			ErrorResponse(w, http.StatusRequestEntityTooLarge, "file exceeds maximum upload size")
+			return
+		}
+		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	node := getMediaService(r)
+	data := buf.Bytes()
 
 	fileType := r.FormValue("type")
-	var fileHash models.FileHash
+	opts := contracts.UploadOpts{}
 	if fileType == "introVideo" {
-		if !filetype.IsVideo(buf.Bytes()) {
+		if !filetype.IsVideo(data) {
 			ErrorResponse(w, http.StatusBadRequest, "Not video file")
+			return
 		}
-		fileHash, err = node.AddIntroVideo(buf.Bytes(), header.Filename)
-	} else {
-		fileHash, err = node.AddFile(buf.Bytes(), header.Filename)
+		opts.MaxBytes = 50 << 20
 	}
+
+	result, err := node.UploadMedia(r.Context(), data, header.Filename, opts)
 	if errors.Is(err, coreiface.ErrBadRequest) {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
@@ -87,5 +98,5 @@ func (g *Gateway) handlePOSTFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sanitizedJSONResponse(w, fileHash)
+	sanitizedJSONResponse(w, result)
 }

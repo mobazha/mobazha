@@ -3,7 +3,7 @@ package api
 import (
 	"archive/zip"
 	"bytes"
-	"encoding/base64"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -677,21 +677,22 @@ func (g *Gateway) processListingImages(mediaSvc contracts.MediaService, listing 
 			continue
 		}
 
-		// Upload image
-		base64Data := base64.StdEncoding.EncodeToString(imgData)
-		hashes, err := mediaSvc.SetProductImage(base64Data, imgName)
+		// Upload image with variants
+		result, err := mediaSvc.UploadMedia(context.Background(), imgData, imgName, contracts.UploadOpts{Variants: true})
 		if err != nil {
 			return fmt.Errorf("failed to upload image %s: %w", imgName, err)
 		}
 
-		listing.Item.Images = append(listing.Item.Images, &pb.Image{
-			Filename: imgName,
-			Original: hashes.Original,
-			Large:    hashes.Large,
-			Medium:   hashes.Medium,
-			Small:    hashes.Small,
-			Tiny:     hashes.Tiny,
-		})
+		if result.Hashes != nil {
+			listing.Item.Images = append(listing.Item.Images, &pb.Image{
+				Filename: imgName,
+				Original: result.Hashes.Original,
+				Large:    result.Hashes.Large,
+				Medium:   result.Hashes.Medium,
+				Small:    result.Hashes.Small,
+				Tiny:     result.Hashes.Tiny,
+			})
+		}
 	}
 
 	return nil
@@ -732,14 +733,14 @@ func (g *Gateway) processListingVideo(mediaSvc contracts.MediaService, listing *
 	}
 
 	// Upload video
-	hash, err := mediaSvc.AddIntroVideo(videoData, videoName)
+	result, err := mediaSvc.UploadMedia(context.Background(), videoData, videoName, contracts.UploadOpts{MaxBytes: maxVideoSize})
 	if err != nil {
 		return fmt.Errorf("failed to upload video %s: %w", videoName, err)
 	}
 
 	listing.Item.IntroVideo = &pb.File{
 		Filename: videoName,
-		Hash:     hash.Hash,
+		Hash:     result.Hash,
 	}
 
 	return nil
@@ -1335,21 +1336,22 @@ func (g *Gateway) processJSONListingImages(mediaSvc contracts.MediaService, list
 			continue
 		}
 
-		// Upload image
-		base64Data := base64.StdEncoding.EncodeToString(imgData)
-		hashes, err := mediaSvc.SetProductImage(base64Data, imgName)
+		// Upload image with variants
+		result, err := mediaSvc.UploadMedia(context.Background(), imgData, imgName, contracts.UploadOpts{Variants: true})
 		if err != nil {
 			return fmt.Errorf("failed to upload image %s: %w", imgName, err)
 		}
 
-		listing.Item.Images = append(listing.Item.Images, &pb.Image{
-			Filename: imgName,
-			Original: hashes.Original,
-			Large:    hashes.Large,
-			Medium:   hashes.Medium,
-			Small:    hashes.Small,
-			Tiny:     hashes.Tiny,
-		})
+		if result.Hashes != nil {
+			listing.Item.Images = append(listing.Item.Images, &pb.Image{
+				Filename: imgName,
+				Original: result.Hashes.Original,
+				Large:    result.Hashes.Large,
+				Medium:   result.Hashes.Medium,
+				Small:    result.Hashes.Small,
+				Tiny:     result.Hashes.Tiny,
+			})
+		}
 	}
 
 	return nil
@@ -1390,14 +1392,14 @@ func (g *Gateway) processJSONListingVideo(mediaSvc contracts.MediaService, listi
 	}
 
 	// Upload video
-	hash, err := mediaSvc.AddIntroVideo(videoData, videoName)
+	result, err := mediaSvc.UploadMedia(context.Background(), videoData, videoName, contracts.UploadOpts{MaxBytes: maxVideoSize})
 	if err != nil {
 		return fmt.Errorf("failed to upload video %s: %w", videoName, err)
 	}
 
 	listing.Item.IntroVideo = &pb.File{
 		Filename: videoName,
-		Hash:     hash.Hash,
+		Hash:     result.Hash,
 	}
 
 	return nil

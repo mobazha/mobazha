@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
@@ -61,7 +63,7 @@ func (g *Gateway) handleGETAvatar(w http.ResponseWriter, r *http.Request) {
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
 	node := getMediaService(r)
-	reader, err := node.GetAvatar(r.Context(), pid, models.ImageSize(sizeStr), useCache)
+	reader, err := node.GetProfileMedia(r.Context(), pid, contracts.SlotAvatar, models.ImageSize(sizeStr), useCache)
 	if errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusNotFound, err.Error())
 		return
@@ -86,7 +88,7 @@ func (g *Gateway) handleGETHeader(w http.ResponseWriter, r *http.Request) {
 	useCache, _ := strconv.ParseBool(r.URL.Query().Get("usecache"))
 
 	node := getMediaService(r)
-	reader, err := node.GetHeader(r.Context(), pid, models.ImageSize(sizeStr), useCache)
+	reader, err := node.GetProfileMedia(r.Context(), pid, contracts.SlotHeader, models.ImageSize(sizeStr), useCache)
 	if errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusNotFound, err.Error())
 		return
@@ -109,8 +111,18 @@ func (g *Gateway) handlePOSTAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	imgBytes, err := base64.StdEncoding.DecodeString(data.Avatar)
+	if err != nil {
+		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid base64: %s", err.Error()))
+		return
+	}
+	if len(imgBytes) == 0 {
+		ErrorResponse(w, http.StatusBadRequest, "avatar image data is empty")
+		return
+	}
+
 	node := getMediaService(r)
-	hashes, err := node.SetAvatarImage(data.Avatar, nil)
+	result, err := node.SetProfileMedia(r.Context(), contracts.SlotAvatar, imgBytes)
 	if errors.Is(err, coreiface.ErrBadRequest) {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
@@ -119,7 +131,7 @@ func (g *Gateway) handlePOSTAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sanitizedJSONResponse(w, hashes)
+	sanitizedJSONResponse(w, result.Hashes)
 }
 
 func (g *Gateway) handlePOSTHeader(w http.ResponseWriter, r *http.Request) {
@@ -133,8 +145,18 @@ func (g *Gateway) handlePOSTHeader(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	imgBytes, err := base64.StdEncoding.DecodeString(data.Header)
+	if err != nil {
+		ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid base64: %s", err.Error()))
+		return
+	}
+	if len(imgBytes) == 0 {
+		ErrorResponse(w, http.StatusBadRequest, "header image data is empty")
+		return
+	}
+
 	node := getMediaService(r)
-	hashes, err := node.SetHeaderImage(data.Header, nil)
+	result, err := node.SetProfileMedia(r.Context(), contracts.SlotHeader, imgBytes)
 	if errors.Is(err, coreiface.ErrBadRequest) {
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
@@ -143,7 +165,7 @@ func (g *Gateway) handlePOSTHeader(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sanitizedJSONResponse(w, hashes)
+	sanitizedJSONResponse(w, result.Hashes)
 }
 
 func (g *Gateway) handlePOSTImages(w http.ResponseWriter, r *http.Request) {
@@ -162,7 +184,16 @@ func (g *Gateway) handlePOSTImages(w http.ResponseWriter, r *http.Request) {
 	var imgs []models.FileHash
 
 	for _, img := range images {
-		hash, err := node.SetImage(img.Image, img.Filename)
+		imgBytes, err := base64.StdEncoding.DecodeString(img.Image)
+		if err != nil {
+			ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid base64 for %s: %s", img.Filename, err.Error()))
+			return
+		}
+		if len(imgBytes) == 0 {
+			ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("image data is empty for %s", img.Filename))
+			return
+		}
+		result, err := node.UploadMedia(r.Context(), imgBytes, img.Filename, contracts.UploadOpts{})
 		if errors.Is(err, coreiface.ErrBadRequest) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
@@ -170,7 +201,7 @@ func (g *Gateway) handlePOSTImages(w http.ResponseWriter, r *http.Request) {
 			ErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		imgs = append(imgs, hash)
+		imgs = append(imgs, models.FileHash{Hash: result.Hash, Name: result.Filename})
 	}
 
 	sanitizedJSONResponse(w, imgs)
@@ -192,7 +223,16 @@ func (g *Gateway) handlePOSTProductImage(w http.ResponseWriter, r *http.Request)
 	var imgs []models.ImageHashes
 
 	for _, img := range images {
-		hashes, err := node.SetProductImage(img.Image, img.Filename)
+		imgBytes, err := base64.StdEncoding.DecodeString(img.Image)
+		if err != nil {
+			ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid base64 for %s: %s", img.Filename, err.Error()))
+			return
+		}
+		if len(imgBytes) == 0 {
+			ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("image data is empty for %s", img.Filename))
+			return
+		}
+		result, err := node.UploadMedia(r.Context(), imgBytes, img.Filename, contracts.UploadOpts{Variants: true})
 		if errors.Is(err, coreiface.ErrBadRequest) {
 			ErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
@@ -200,7 +240,9 @@ func (g *Gateway) handlePOSTProductImage(w http.ResponseWriter, r *http.Request)
 			ErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		imgs = append(imgs, hashes)
+		if result.Hashes != nil {
+			imgs = append(imgs, *result.Hashes)
+		}
 	}
 
 	sanitizedJSONResponse(w, imgs)

@@ -191,19 +191,26 @@ type WalletService interface {
 	GetReceivingAccountsByChain(chainType iwallet.ChainType) ([]models.ReceivingAccount, error)
 }
 
-// MediaService handles images, videos, and files.
+// MediaService handles media (images, videos, files) storage and retrieval.
+//
+// Phase 1 refactored from 9 methods to 4. Handlers are responsible for
+// base64 decoding; this interface only accepts raw []byte.
 type MediaService interface {
-	// GetMedia retrieves any media by CID (DB-first, then IPFS fallback).
-	// Returns (reader, contentType, error). contentType may be empty if unknown.
+	// UploadMedia stores raw file bytes. When opts.Variants is true,
+	// 5 resized image copies (tiny/small/medium/large/original) are generated.
+	UploadMedia(ctx context.Context, data []byte, filename string, opts UploadOpts) (*UploadResult, error)
+
+	// GetMedia retrieves any media by CID.
+	// Three-level fallback: BlobStore → DB (legacy) → IPFS.
 	GetMedia(ctx context.Context, cid cid.Cid) (io.ReadSeeker, string, error)
-	GetAvatar(ctx context.Context, peerID peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
-	GetHeader(ctx context.Context, peerID peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
-	SetAvatarImage(base64ImageData string, done chan struct{}) (models.ImageHashes, error)
-	SetHeaderImage(base64ImageData string, done chan struct{}) (models.ImageHashes, error)
-	SetImage(base64ImageData string, filename string) (models.FileHash, error)
-	SetProductImage(base64ImageData string, filename string) (models.ImageHashes, error)
-	AddIntroVideo(fileData []byte, filename string) (models.FileHash, error)
-	AddFile(fileData []byte, filename string) (models.FileHash, error)
+
+	// SetProfileMedia uploads an image for a profile slot (avatar/header),
+	// generates variants, updates the profile record, and publishes.
+	SetProfileMedia(ctx context.Context, slot ProfileSlot, imageData []byte) (*UploadResult, error)
+
+	// GetProfileMedia retrieves a profile image (avatar/header) for the
+	// given peer at the requested size.
+	GetProfileMedia(ctx context.Context, peerID peer.ID, slot ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
 }
 
 // SocialService handles following, ratings, posts, and channels.

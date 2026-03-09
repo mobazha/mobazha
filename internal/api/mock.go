@@ -402,6 +402,9 @@ func (m *mockNode) ClearAllCarts() error {
 }
 
 func (m *mockNode) GetMedia(ctx context.Context, cid cid.Cid) (io.ReadSeeker, string, error) {
+	if m.getMediaFunc == nil {
+		return nil, "", coreiface.ErrNotFound
+	}
 	return m.getMediaFunc(ctx, cid)
 }
 func (m *mockNode) GetAvatar(ctx context.Context, peerID peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {

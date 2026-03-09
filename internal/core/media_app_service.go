@@ -84,7 +84,7 @@ func (s *MediaAppService) AddFile(fileData []byte, filename string) (models.File
 		return models.FileHash{}, err
 	}
 	ct := detectContentType(fileData, filename)
-	_ = s.db.Update(func(dbtx database.Tx) error {
+	if err := s.db.Update(func(dbtx database.Tx) error {
 		if err := dbtx.SetImage(models.Image{
 			Name:       filename,
 			Size:       models.ImageSizeOriginal,
@@ -93,7 +93,9 @@ func (s *MediaAppService) AddFile(fileData []byte, filename string) (models.File
 			return err
 		}
 		return dbtx.IndexMediaCID(c.String(), "image", string(models.ImageSizeOriginal), filename, ct)
-	})
+	}); err != nil {
+		return models.FileHash{}, err
+	}
 	if s.publishFile != nil {
 		s.publishFile(context.Background(), c, nil)
 	}
@@ -140,6 +142,9 @@ func (s *MediaAppService) GetMedia(ctx context.Context, c cid.Cid) (io.ReadSeeke
 
 	reader, err := s.getIPFSFileByCID(ctx, c)
 	if err != nil {
+		if dbErr != nil {
+			return nil, "", fmt.Errorf("db: %v; ipfs: %w", dbErr, err)
+		}
 		return nil, "", err
 	}
 	return reader, "", nil
@@ -330,7 +335,9 @@ func (s *MediaAppService) addImage(dbtx database.Tx, img models.Image) (cid.Cid,
 	if err != nil {
 		return cid.Cid{}, err
 	}
-	_ = dbtx.IndexMediaCID(c.String(), "image", string(img.Size), img.Name, "image/jpeg")
+	if err := dbtx.IndexMediaCID(c.String(), "image", string(img.Size), img.Name, "image/jpeg"); err != nil {
+		return cid.Cid{}, err
+	}
 	return c, nil
 }
 

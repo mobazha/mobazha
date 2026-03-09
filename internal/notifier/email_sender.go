@@ -20,11 +20,17 @@ import (
 //   - Resend API: when "api_key" is present (preferred for SaaS)
 //   - SMTP: when "smtp_server" is present (for standalone deployments)
 type EmailSender struct {
-	client *http.Client
+	client   *http.Client
+	storeURL string // base URL for action links, e.g. "https://mystore.mobazha.com"
 }
 
 func NewEmailSender(client *http.Client) *EmailSender {
 	return &EmailSender{client: client}
+}
+
+// SetStoreURL sets the base URL used to generate action links in emails.
+func (s *EmailSender) SetStoreURL(url string) {
+	s.storeURL = strings.TrimRight(url, "/")
 }
 
 func (s *EmailSender) Type() ChannelType { return ChannelEmail }
@@ -50,7 +56,7 @@ func (s *EmailSender) Send(cfg ChannelConfig, message string) error {
 }
 
 func (s *EmailSender) FormatEvent(meta events.EventMeta, event interface{}) string {
-	return formatEmailEvent(meta, event)
+	return formatEmailEvent(meta, event, s.storeURL)
 }
 
 func (s *EmailSender) TestMessage(cfg ChannelConfig) error {

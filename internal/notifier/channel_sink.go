@@ -51,6 +51,15 @@ func (s *ChannelNotificationSink) SetOnChanged(fn func([]ChannelConfig)) {
 	s.onChanged = fn
 }
 
+// SetStoreURL propagates the store's external URL to senders that support action links.
+func (s *ChannelNotificationSink) SetStoreURL(url string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if es, ok := s.senders[ChannelEmail].(*EmailSender); ok {
+		es.SetStoreURL(url)
+	}
+}
+
 // --- events.EventSink implementation ---
 
 func (s *ChannelNotificationSink) Name() string { return "notifier" }

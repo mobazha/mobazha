@@ -10,12 +10,14 @@ import (
 
 // formatEmailEvent produces a two-part string: first line is the subject,
 // remainder is an HTML body. The caller (EmailSender.Send) splits on "\n".
-func formatEmailEvent(meta events.EventMeta, event interface{}) string {
+// storeURL is the store's external base URL for generating action links.
+func formatEmailEvent(meta events.EventMeta, event interface{}, storeURL string) string {
 	title := eventTitle(meta.Name)
 	icon := categoryIcon(meta.Category)
 
 	var subject string
 	var rows []emailRow
+	var actionURL string
 
 	switch e := event.(type) {
 	case *events.NewOrder:
@@ -30,6 +32,7 @@ func formatEmailEvent(meta events.EventMeta, event interface{}) string {
 		if e.Price.Amount != "" {
 			rows = append(rows, emailRow{"Price", e.Price.Amount + " " + e.Price.CurrencyCode})
 		}
+		actionURL = orderActionURL(storeURL, e.OrderID)
 
 	case *events.OrderFunded:
 		subject = fmt.Sprintf("Payment Received: %s", e.Title)
@@ -40,6 +43,7 @@ func formatEmailEvent(meta events.EventMeta, event interface{}) string {
 		if e.Price.Amount != "" {
 			rows = append(rows, emailRow{"Amount", e.Price.Amount + " " + e.Price.CurrencyCode})
 		}
+		actionURL = orderActionURL(storeURL, e.OrderID)
 
 	case *events.OrderPaymentReceived:
 		subject = fmt.Sprintf("Payment Update for Order %s", truncateID(e.OrderID))
@@ -47,30 +51,37 @@ func formatEmailEvent(meta events.EventMeta, event interface{}) string {
 		if e.FundingTotal != "" {
 			rows = append(rows, emailRow{"Amount", e.FundingTotal + " " + e.CoinType})
 		}
+		actionURL = orderActionURL(storeURL, e.OrderID)
 
 	case *events.OrderConfirmation:
 		subject = fmt.Sprintf("Order Confirmed: %s", truncateID(e.OrderID))
 		rows = append(rows, emailRow{"Order ID", e.OrderID})
+		actionURL = orderActionURL(storeURL, e.OrderID)
 
 	case *events.OrderFulfillment:
 		subject = fmt.Sprintf("Order Shipped: %s", truncateID(e.OrderID))
 		rows = append(rows, emailRow{"Order ID", e.OrderID})
+		actionURL = orderActionURL(storeURL, e.OrderID)
 
 	case *events.OrderCompletion:
 		subject = fmt.Sprintf("Order Completed: %s", truncateID(e.OrderID))
 		rows = append(rows, emailRow{"Order ID", e.OrderID})
+		actionURL = orderActionURL(storeURL, e.OrderID)
 
 	case *events.OrderCancel:
 		subject = fmt.Sprintf("Order Cancelled: %s", truncateID(e.OrderID))
 		rows = append(rows, emailRow{"Order ID", e.OrderID})
+		actionURL = orderActionURL(storeURL, e.OrderID)
 
 	case *events.OrderDeclined:
 		subject = fmt.Sprintf("Order Declined: %s", truncateID(e.OrderID))
 		rows = append(rows, emailRow{"Order ID", e.OrderID})
+		actionURL = orderActionURL(storeURL, e.OrderID)
 
 	case *events.Refund:
 		subject = fmt.Sprintf("Refund Issued: %s", truncateID(e.OrderID))
 		rows = append(rows, emailRow{"Order ID", e.OrderID})
+		actionURL = orderActionURL(storeURL, e.OrderID)
 
 	case *events.DisputeOpen:
 		subject = fmt.Sprintf("Dispute Opened: %s", truncateID(e.OrderID))
@@ -78,10 +89,12 @@ func formatEmailEvent(meta events.EventMeta, event interface{}) string {
 		if e.DisputerHandle != "" {
 			rows = append(rows, emailRow{"Opened by", e.DisputerHandle})
 		}
+		actionURL = orderActionURL(storeURL, e.OrderID)
 
 	case *events.DisputeClose:
 		subject = fmt.Sprintf("Dispute Closed: %s", truncateID(e.OrderID))
 		rows = append(rows, emailRow{"Order ID", e.OrderID})
+		actionURL = orderActionURL(storeURL, e.OrderID)
 
 	case *events.ChatMessage:
 		subject = "New Message"
@@ -95,14 +108,24 @@ func formatEmailEvent(meta events.EventMeta, event interface{}) string {
 			}
 			rows = append(rows, emailRow{"Message", msg})
 		}
+		if storeURL != "" {
+			actionURL = storeURL + "/admin"
+		}
 
 	default:
 		subject = title
 		rows = append(rows, emailRow{"Event", meta.Name})
 	}
 
-	body := renderEmailHTML(icon, title, rows)
+	body := renderEmailHTML(icon, title, rows, actionURL)
 	return subject + "\n" + body
+}
+
+func orderActionURL(storeURL, orderID string) string {
+	if storeURL == "" || orderID == "" {
+		return ""
+	}
+	return storeURL + "/admin/orders/" + orderID
 }
 
 type emailRow struct {
@@ -110,7 +133,7 @@ type emailRow struct {
 	Value string
 }
 
-func renderEmailHTML(icon, title string, rows []emailRow) string {
+func renderEmailHTML(icon, title string, rows []emailRow, actionURL string) string {
 	var sb strings.Builder
 
 	sb.WriteString(`<html><body style="margin:0;padding:0;background-color:#f4f4f5">`)
@@ -133,6 +156,15 @@ func renderEmailHTML(icon, title string, rows []emailRow) string {
 			sb.WriteString(`</tr>`)
 		}
 		sb.WriteString(`</table>`)
+	}
+
+	if actionURL != "" {
+		sb.WriteString(`<div style="margin-top:20px;text-align:center">`)
+		sb.WriteString(fmt.Sprintf(
+			`<a href="%s" style="display:inline-block;padding:12px 28px;background:#00BCD4;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600">View Details</a>`,
+			html.EscapeString(actionURL),
+		))
+		sb.WriteString(`</div>`)
 	}
 
 	sb.WriteString(`<div style="margin-top:20px;padding-top:16px;border-top:1px solid #e4e4e7;text-align:center">`)

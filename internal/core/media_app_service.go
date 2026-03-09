@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/jpeg"
 	"io"
+	"net/http"
 	"strings"
 
 	"github.com/disintegration/imaging"
@@ -69,7 +70,7 @@ func NewMediaAppService(cfg MediaAppServiceConfig) *MediaAppService {
 
 // ── File Operations ─────────────────────────────────────────────
 
-func (s *MediaAppService) GetFile(ctx context.Context, c cid.Cid) (io.ReadSeeker, error) {
+func (s *MediaAppService) getIPFSFileByCID(ctx context.Context, c cid.Cid) (io.ReadSeeker, error) {
 	if s.getIPFSFile == nil {
 		return nil, fmt.Errorf("IPFS file reader not available")
 	}
@@ -82,6 +83,17 @@ func (s *MediaAppService) AddFile(fileData []byte, filename string) (models.File
 	if err != nil {
 		return models.FileHash{}, err
 	}
+	ct := detectContentType(fileData, filename)
+	_ = s.db.Update(func(dbtx database.Tx) error {
+		if err := dbtx.SetImage(models.Image{
+			Name:       filename,
+			Size:       models.ImageSizeOriginal,
+			ImageBytes: fileData,
+		}); err != nil {
+			return err
+		}
+		return dbtx.IndexMediaCID(c.String(), "image", string(models.ImageSizeOriginal), filename, ct)
+	})
 	if s.publishFile != nil {
 		s.publishFile(context.Background(), c, nil)
 	}
@@ -89,31 +101,75 @@ func (s *MediaAppService) AddFile(fileData []byte, filename string) (models.File
 }
 
 func (s *MediaAppService) AddIntroVideo(fileData []byte, filename string) (models.FileHash, error) {
-	err := s.db.Update(func(dbtx database.Tx) error {
-		return dbtx.SetIntroVideo(models.IntroVideo{
+	c, err := s.contentStore.ComputeCID(fileData)
+	if err != nil {
+		return models.FileHash{}, err
+	}
+	ct := detectContentType(fileData, filename)
+	err = s.db.Update(func(dbtx database.Tx) error {
+		if err := dbtx.SetIntroVideo(models.IntroVideo{
 			VideoBytes: fileData,
 			Name:       filename,
-		})
+		}); err != nil {
+			return err
+		}
+		return dbtx.IndexMediaCID(c.String(), "intro_video", "", filename, ct)
 	})
 	if err != nil {
 		return models.FileHash{}, err
 	}
-	c, err := s.contentStore.ComputeCID(fileData)
-	return models.FileHash{Hash: c.String(), Name: filename}, err
+	return models.FileHash{Hash: c.String(), Name: filename}, nil
 }
 
-// ── Image Read Operations ───────────────────────────────────────
+// ── Media Read Operations ───────────────────────────────────────
 
-func (s *MediaAppService) GetImage(ctx context.Context, c cid.Cid) (io.ReadSeeker, error) {
-	return s.GetFile(ctx, c)
+func (s *MediaAppService) GetMedia(ctx context.Context, c cid.Cid) (io.ReadSeeker, string, error) {
+	var data []byte
+	var contentType string
+	dbErr := s.db.View(func(tx database.Tx) error {
+		var err error
+		data, contentType, err = tx.GetMediaByCID(c.String())
+		return err
+	})
+	if dbErr == nil && len(data) > 0 {
+		if contentType == "" {
+			contentType = http.DetectContentType(data)
+		}
+		return bytes.NewReader(data), contentType, nil
+	}
+
+	reader, err := s.getIPFSFileByCID(ctx, c)
+	if err != nil {
+		return nil, "", err
+	}
+	return reader, "", nil
 }
 
 func (s *MediaAppService) GetAvatar(ctx context.Context, peerID peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
+	if peerID.String() == s.nodeID {
+		return s.getLocalImageByName(size, "avatar")
+	}
 	return s.getIPFSImageByName(ctx, peerID, size, "avatar", useCache)
 }
 
 func (s *MediaAppService) GetHeader(ctx context.Context, peerID peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
+	if peerID.String() == s.nodeID {
+		return s.getLocalImageByName(size, "header")
+	}
 	return s.getIPFSImageByName(ctx, peerID, size, "header", useCache)
+}
+
+func (s *MediaAppService) getLocalImageByName(size models.ImageSize, name string) (io.ReadSeeker, error) {
+	var data []byte
+	err := s.db.View(func(tx database.Tx) error {
+		var dbErr error
+		data, dbErr = tx.GetImageByName(size, name)
+		return dbErr
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s not found", coreiface.ErrNotFound, name)
+	}
+	return bytes.NewReader(data), nil
 }
 
 func (s *MediaAppService) getIPFSImageByName(ctx context.Context, peerID peer.ID, size models.ImageSize, name string, useCache bool) (io.ReadSeeker, error) {
@@ -270,7 +326,12 @@ func (s *MediaAppService) addImage(dbtx database.Tx, img models.Image) (cid.Cid,
 	if err := dbtx.SetImage(img); err != nil {
 		return cid.Cid{}, err
 	}
-	return s.contentStore.ComputeCID(img.ImageBytes)
+	c, err := s.contentStore.ComputeCID(img.ImageBytes)
+	if err != nil {
+		return cid.Cid{}, err
+	}
+	_ = dbtx.IndexMediaCID(c.String(), "image", string(img.Size), img.Name, "image/jpeg")
+	return c, nil
 }
 
 func (s *MediaAppService) addResizedImage(dbtx database.Tx, img image.Image, w, h int, name string, size models.ImageSize) (cid.Cid, error) {
@@ -311,5 +372,26 @@ func getImageAttributes(targetWidth, targetHeight, imgWidth, imgHeight int) (wid
 		h = float32(targetWidth) * (float32(imgHeight) / float32(imgWidth))
 	}
 	return int(w), int(h)
+}
+
+func detectContentType(data []byte, filename string) string {
+	lower := strings.ToLower(filename)
+	switch {
+	case strings.HasSuffix(lower, ".mp4"):
+		return "video/mp4"
+	case strings.HasSuffix(lower, ".webm"):
+		return "video/webm"
+	case strings.HasSuffix(lower, ".mov"):
+		return "video/quicktime"
+	case strings.HasSuffix(lower, ".jpg"), strings.HasSuffix(lower, ".jpeg"):
+		return "image/jpeg"
+	case strings.HasSuffix(lower, ".png"):
+		return "image/png"
+	case strings.HasSuffix(lower, ".gif"):
+		return "image/gif"
+	case strings.HasSuffix(lower, ".webp"):
+		return "image/webp"
+	}
+	return http.DetectContentType(data)
 }
 

@@ -30,7 +30,7 @@ func (g *Gateway) handleGETImage(w http.ResponseWriter, r *http.Request) {
 
 	node := getMediaService(r)
 
-	reader, err := node.GetImage(ctx, id)
+	reader, contentType, err := node.GetMedia(ctx, id)
 	if errors.Is(err, coreiface.ErrNotFound) {
 		ErrorResponse(w, http.StatusNotFound, err.Error())
 		return
@@ -40,7 +40,11 @@ func (g *Gateway) handleGETImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Cache-Control", "public, max-age=29030400, immutable")
-	w.Header().Del("Content-Type")
+	if contentType != "" {
+		w.Header().Set("Content-Type", contentType)
+	} else {
+		w.Header().Del("Content-Type")
+	}
 	http.ServeContent(w, r, id.String(), time.Now(), reader)
 }
 

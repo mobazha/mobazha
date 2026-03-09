@@ -84,7 +84,7 @@ type mockNode struct {
 	removeCartItemFunc                      func(peerID peer.ID, item models.ShoppingCartItem) error
 	clearCartsFunc                          func(vendorID peer.ID) error
 	clearAllCartsFunc                       func() error
-	getImageFunc                            func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, error)
+	getMediaFunc                            func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, string, error)
 	getAvatarFunc                           func(ctx context.Context, peerID peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
 	getHeaderFunc                           func(ctx context.Context, peerID peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
 	setAvatarImageFunc                      func(base64ImageData string, done chan struct{}) (models.ImageHashes, error)
@@ -93,7 +93,7 @@ type mockNode struct {
 	setProductImageFunc                     func(base64ImageData string, filename string) (models.ImageHashes, error)
 	addIntroVideoFunc                       func(fileData []byte, filename string) (models.FileHash, error)
 	addFileFunc                             func(fileData []byte, filename string) (models.FileHash, error)
-	getFileFunc                             func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, error)
+	// getFileFunc removed — merged into getMediaFunc
 	setSelfAsModeratorFunc                  func(ctx context.Context, modInfo *models.ModeratorInfo, done chan struct{}) error
 	setModeratorsOnListingsFunc             func(mods []peer.ID, done chan struct{}) error
 	removeSelfAsModeratorFunc               func(ctx context.Context, done chan<- struct{}) error
@@ -401,8 +401,8 @@ func (m *mockNode) ClearAllCarts() error {
 	return m.clearAllCartsFunc()
 }
 
-func (m *mockNode) GetImage(ctx context.Context, cid cid.Cid) (io.ReadSeeker, error) {
-	return m.getImageFunc(ctx, cid)
+func (m *mockNode) GetMedia(ctx context.Context, cid cid.Cid) (io.ReadSeeker, string, error) {
+	return m.getMediaFunc(ctx, cid)
 }
 func (m *mockNode) GetAvatar(ctx context.Context, peerID peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
 	return m.getAvatarFunc(ctx, peerID, size, useCache)
@@ -432,9 +432,7 @@ func (m *mockNode) AddIntroVideo(fileData []byte, filename string) (models.FileH
 func (m *mockNode) AddFile(fileData []byte, filename string) (models.FileHash, error) {
 	return m.addFileFunc(fileData, filename)
 }
-func (m *mockNode) GetFile(ctx context.Context, cid cid.Cid) (io.ReadSeeker, error) {
-	return m.getFileFunc(ctx, cid)
-}
+// GetFile removed — use GetMedia instead
 
 func (m *mockNode) SetSelfAsModerator(ctx context.Context, modInfo *models.ModeratorInfo, done chan struct{}) error {
 	return m.setSelfAsModeratorFunc(ctx, modInfo, done)

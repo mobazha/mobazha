@@ -193,7 +193,9 @@ type WalletService interface {
 
 // MediaService handles images, videos, and files.
 type MediaService interface {
-	GetImage(ctx context.Context, cid cid.Cid) (io.ReadSeeker, error)
+	// GetMedia retrieves any media by CID (DB-first, then IPFS fallback).
+	// Returns (reader, contentType, error). contentType may be empty if unknown.
+	GetMedia(ctx context.Context, cid cid.Cid) (io.ReadSeeker, string, error)
 	GetAvatar(ctx context.Context, peerID peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
 	GetHeader(ctx context.Context, peerID peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
 	SetAvatarImage(base64ImageData string, done chan struct{}) (models.ImageHashes, error)
@@ -202,7 +204,6 @@ type MediaService interface {
 	SetProductImage(base64ImageData string, filename string) (models.ImageHashes, error)
 	AddIntroVideo(fileData []byte, filename string) (models.FileHash, error)
 	AddFile(fileData []byte, filename string) (models.FileHash, error)
-	GetFile(ctx context.Context, cid cid.Cid) (io.ReadSeeker, error)
 }
 
 // SocialService handles following, ratings, posts, and channels.

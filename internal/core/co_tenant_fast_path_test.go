@@ -47,6 +47,11 @@ func (m *mockPublicData) DeletePost(string) error                         { retu
 func (m *mockPublicData) PostExist(string) bool                           { return false }
 func (m *mockPublicData) GetPost(string) (*postsPb.SignedPost, error)     { return nil, nil }
 func (m *mockPublicData) SetImage(models.Image) error                     { return nil }
+func (m *mockPublicData) GetImageByName(models.ImageSize, string) ([]byte, error) {
+	return nil, nil
+}
+func (m *mockPublicData) GetMediaByCID(string) ([]byte, string, error)    { return nil, "", nil }
+func (m *mockPublicData) IndexMediaCID(string, string, string, string, string) error { return nil }
 func (m *mockPublicData) SetIntroVideo(models.IntroVideo) error           { return nil }
 func (m *mockPublicData) SetListing(*pb.SignedListing) error              { return nil }
 func (m *mockPublicData) GetEncryptedListing(string) ([]byte, error)      { return nil, nil }

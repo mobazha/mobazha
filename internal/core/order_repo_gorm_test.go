@@ -96,8 +96,11 @@ func (t *testTx) AddPost(*postsPb.SignedPost) error                       { retu
 func (t *testTx) DeletePost(string) error                                  { return nil }
 func (t *testTx) PostExist(string) bool                                    { return false }
 func (t *testTx) GetPost(string) (*postsPb.SignedPost, error)             { return nil, nil }
-func (t *testTx) SetImage(models.Image) error                             { return nil }
-func (t *testTx) SetIntroVideo(models.IntroVideo) error                   { return nil }
+func (t *testTx) SetImage(models.Image) error                                    { return nil }
+func (t *testTx) GetImageByName(models.ImageSize, string) ([]byte, error)        { return nil, nil }
+func (t *testTx) GetMediaByCID(string) ([]byte, string, error)                   { return nil, "", nil }
+func (t *testTx) IndexMediaCID(string, string, string, string, string) error     { return nil }
+func (t *testTx) SetIntroVideo(models.IntroVideo) error                          { return nil }
 
 // ── Setup helpers ───────────────────────────────────────────────
 

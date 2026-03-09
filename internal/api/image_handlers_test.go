@@ -21,8 +21,8 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/media/images/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
-				n.getImageFunc = func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, error) {
-					return bytes.NewReader([]byte{0x00}), nil
+				n.getMediaFunc = func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, string, error) {
+					return bytes.NewReader([]byte{0x00}), "application/octet-stream", nil
 				}
 			},
 			statusCode: http.StatusOK,
@@ -35,8 +35,8 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/media/images/adfadsf",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
-				n.getImageFunc = func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, error) {
-					return bytes.NewReader([]byte{0x00}), nil
+				n.getMediaFunc = func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, string, error) {
+					return bytes.NewReader([]byte{0x00}), "application/octet-stream", nil
 				}
 			},
 			statusCode: http.StatusBadRequest,
@@ -49,8 +49,8 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/media/images/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
-				n.getImageFunc = func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, error) {
-					return nil, coreiface.ErrNotFound
+				n.getMediaFunc = func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, string, error) {
+					return nil, "", coreiface.ErrNotFound
 				}
 			},
 			statusCode: http.StatusNotFound,
@@ -63,8 +63,8 @@ func TestImageHandlers(t *testing.T) {
 			path:   "/v1/media/images/QmcUDmZK8PsPYWw5FRHKNZFjszm2K6e68BQSTpnJYUsML7",
 			method: http.MethodGet,
 			setNodeMethods: func(n *mockNode) {
-				n.getImageFunc = func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, error) {
-					return nil, errors.New("internal")
+				n.getMediaFunc = func(ctx context.Context, cid cid.Cid) (io.ReadSeeker, string, error) {
+					return nil, "", errors.New("internal")
 				}
 			},
 			statusCode: http.StatusInternalServerError,

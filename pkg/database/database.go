@@ -91,6 +91,18 @@ type PublicData interface {
 	// SetImage saves the given image.
 	SetImage(img models.Image) error
 
+	// GetImageByName retrieves image bytes by size and name (avatar/header).
+	GetImageByName(size models.ImageSize, name string) ([]byte, error)
+
+	// GetMediaByCID retrieves media bytes and content type by CID hash.
+	// Searches across all media types (image, intro_video, file).
+	GetMediaByCID(cidHash string) ([]byte, string, error)
+
+	// IndexMediaCID associates a CID hash with a stored media record.
+	// mediaType: "image", "intro_video", "file"
+	// contentType: MIME type e.g. "image/jpeg", "video/mp4"
+	IndexMediaCID(cidHash string, mediaType string, sizeTag string, name string, contentType string) error
+
 	// SetIntroVideo saves the given introVideo.
 	SetIntroVideo(introVideo models.IntroVideo) error
 }

@@ -180,9 +180,15 @@ func (n *MobazhaNode) initMediaService() {
 		return
 	}
 
+	var blobStore contracts.BlobStore
+	if n.hostService != nil {
+		blobStore = n.hostService.GetBlobStore()
+	}
+
 	n.mediaService = NewMediaAppService(MediaAppServiceConfig{
 		DB:              n.db,
 		ContentStore:    n.contentStore,
+		BlobStore:       blobStore,
 		NodeID:          n.nodeID,
 		GetIPFSFile:     getIPFSFile,
 		FetchIPNSRecord: n.fetchIPNSRecord,

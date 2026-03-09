@@ -54,6 +54,7 @@ func (m *mockHostService) GetSolanaEscrowProgramID() string           { return "
 func (m *mockHostService) GetDiscountAccessForPeer(_ peer.ID) (contracts.DiscountService, contracts.DiscountStore, error) {
 	return nil, nil, nil
 }
+func (m *mockHostService) GetBlobStore() contracts.BlobStore { return nil }
 
 var _ coreiface.HostService = (*mockHostService)(nil)
 

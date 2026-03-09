@@ -49,4 +49,9 @@ type HostService interface {
 	// resolution (engine needs both svc + store) and redemption recording.
 	// Returns (nil, nil, error) if the vendor node is not found or not running.
 	GetDiscountAccessForPeer(peerID peer.ID) (contracts.DiscountService, contracts.DiscountStore, error)
+
+	// GetBlobStore returns the shared BlobStore for media storage (R2 in SaaS,
+	// LocalFS in standalone). Returns nil when no BlobStore is configured
+	// (legacy mode — media bytes stored in DB/IPFS).
+	GetBlobStore() contracts.BlobStore
 }

@@ -105,7 +105,7 @@ func TestDispatchCancelablePayment_AllSupportedCoins(t *testing.T) {
 // by registerPaymentStrategies() and that ForCoin resolves as expected.
 
 func TestRegistryDispatch_UTXOChainsRegistered(t *testing.T) {
-	n := &MobazhaNode{nodeID: "test-registry"}
+	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-registry"}}
 	n.registerPaymentStrategies()
 
 	utxoChains := []struct {
@@ -131,7 +131,7 @@ func TestRegistryDispatch_UTXOChainsRegistered(t *testing.T) {
 }
 
 func TestRegistryDispatch_EVMChainsRegistered(t *testing.T) {
-	n := &MobazhaNode{nodeID: "test-registry"}
+	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-registry"}}
 	n.registerPaymentStrategies()
 
 	evmCoins := []iwallet.CoinType{
@@ -152,7 +152,7 @@ func TestRegistryDispatch_EVMChainsRegistered(t *testing.T) {
 }
 
 func TestRegistryDispatch_SolanaRegistered(t *testing.T) {
-	n := &MobazhaNode{nodeID: "test-registry"}
+	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-registry"}}
 	n.registerPaymentStrategies()
 
 	strategy, err := n.paymentRegistry.ForCoin(iwallet.CtSolana)
@@ -165,7 +165,7 @@ func TestRegistryDispatch_SolanaRegistered(t *testing.T) {
 }
 
 func TestRegistryDispatch_ChainCount(t *testing.T) {
-	n := &MobazhaNode{nodeID: "test-registry"}
+	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-registry"}}
 	n.registerPaymentStrategies()
 
 	chains := n.paymentRegistry.Chains()
@@ -176,7 +176,7 @@ func TestRegistryDispatch_ChainCount(t *testing.T) {
 }
 
 func TestRegistryDispatch_AllSupportedCoinsInRegistry(t *testing.T) {
-	n := &MobazhaNode{nodeID: "test-registry"}
+	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-registry"}}
 	n.registerPaymentStrategies()
 
 	// Every supported coin should resolve to a registered strategy
@@ -194,7 +194,7 @@ func TestRegistryDispatch_AllSupportedCoinsInRegistry(t *testing.T) {
 }
 
 func TestRegistryDispatch_UnknownCoinNotInRegistry(t *testing.T) {
-	n := &MobazhaNode{nodeID: "test-registry"}
+	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-registry"}}
 	n.registerPaymentStrategies()
 
 	_, err := n.paymentRegistry.ForCoin(iwallet.CoinType("INVALID_COIN"))
@@ -294,7 +294,7 @@ func TestDispatchCancelablePayment_NilRegistrySafety(t *testing.T) {
 }
 
 func TestDispatchCancelablePayment_UnknownCoinSafety(t *testing.T) {
-	n := &MobazhaNode{nodeID: "test-dispatch"}
+	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-dispatch"}}
 	n.registerPaymentStrategies()
 
 	svc := NewPaymentAppService(PaymentAppServiceConfig{

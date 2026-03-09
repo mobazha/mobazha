@@ -41,256 +41,153 @@ import (
 // MobazhaNode holds all the components that make up a network node
 // on the Mobazha network. It also exposes an exported API which can
 // be used to control the node.
+//
+// Fields are organized into logical groups via anonymous embedding.
+// Access remains flat: n.peerID, n.testnet, etc. Only struct literal
+// construction in builder.go needs nested syntax.
 type MobazhaNode struct {
-	nodeID string
-
 	sharedManager *SharedManager
 
-	// Identity fields — always available, independent of ipfsNode.
-	// For full nodes these are populated from ipfsNode; for lightweight
-	// nodes they come from a minimal libp2p Host.
+	identityFields
+	storageFields
+	cryptoFields
+	networkFields
+	walletFields
+	chainFields
+	ipnsFields
+	modeFlags
+	lifecycleFields
+	appServices
+
+	// Webhook subsystem
+	webhookStore  wh.EndpointStore
+	webhookEngine *wh.Engine
+
+	// Event subsystem
+	eventDispatcher *events.Dispatcher
+	notifierSink    *notifier.ChannelNotificationSink
+
+	// SaaS co-tenant fast path (nil in standalone mode)
+	coTenantPublicData contracts.CoTenantPublicDataFn
+
+	// AI proxy
+	aiProxy *aipkg.Proxy
+
+	// Stripe account
+	stripeAccountID string
+
+	// Phase 2 encryption
+	keyManager         *encryption.KeyManager
+	localListingCrypto *encryption.LocalListingCrypto
+
+	// Hosting interface
+	hostService coreiface.HostService
+}
+
+// identityFields groups node identity and lifecycle context.
+type identityFields struct {
+	nodeID     string
 	peerID     peer.ID
 	privKey    crypto.PrivKey
 	peerHost   host.Host
 	nodeCtx    context.Context
 	nodeCancel context.CancelFunc
+}
 
-	// ipfsNode is the IPFS instance that powers this node.
-	// May be nil for lightweight (non-default) nodes.
-	ipfsNode *core.IpfsNode
-
-	// signer is the contracts.Signer for signing order messages and other data.
-	signer corecontracts.Signer
-
-	// contentStore abstracts content-addressed storage (IPFS).
-	// Standalone: backed by a local/shared IPFS node.
-	// SaaS: backed by a shared IPFS gateway or HTTP API.
+// storageFields groups data storage dependencies.
+type storageFields struct {
+	ipfsNode     *core.IpfsNode
 	contentStore contracts.ContentStore
+	db           database.Database
+	repo         *repo.Repo
+}
 
-	// db is the injectable database interface. Both standalone (FFSqliteDB) and
-	// SaaS (TenantDB) modes provide an implementation. Business methods should
-	// use n.db instead of n.repo.DB() so that the dependency is explicit and
-	// injectable.
-	db database.Database
-
-	// repo holds the database and public data directory.
-	repo *repo.Repo
-
-	// ethMasterKey represents an secp256k1 private key, the
-	// public key of which is advertised by the node in its profile
-	// and in listings to be used when building eth escrow transactions.
-	ethMasterKey *btcec.PrivateKey
-
-	// escrowMasterKey represents an secp256k1 private key, the
-	// public key of which is advertised by the node in its profile
-	// and in listings to be used when building escrow transactions.
+// cryptoFields groups cryptographic key material and signing.
+type cryptoFields struct {
+	signer          corecontracts.Signer
+	ethMasterKey    *btcec.PrivateKey
 	escrowMasterKey *btcec.PrivateKey
-
-	// solPrivKey represents an ed25519 private key, the
-	// public key of which is advertised by the node in its profile
-	// and in listings to be used when building solana escrow transactions.
-	solPrivKey *solana.PrivateKey
-
-	// ratingMasterKey represents an secp256k1 private key that
-	// we used to generate rating keys to sign ratings with.
+	solPrivKey      *solana.PrivateKey
 	ratingMasterKey *btcec.PrivateKey
+	keyProvider     contracts.KeyProvider
+}
 
-	// keyProvider abstracts access to cryptographic master keys.
-	// Standalone: fileKeyProvider (reads from the fields above).
-	// SaaS: injected keyVaultProvider (reads from centralized KeyVault).
-	keyProvider contracts.KeyProvider
-
-	// paymentService is the extracted App Service for payment operations.
-	// Owns escrow instruction generation, cancelable payment dispatching, etc.
-	paymentService *PaymentAppService
-
-	// orderService encapsulates order lifecycle business logic (reject, refund, cancel).
-	orderService *OrderAppService
-
-	// chatService encapsulates chat and chat-group business logic.
-	chatService *ChatAppService
-
-	// matrixService encapsulates Matrix credential management and E2EE key backup logic.
-	matrixService *MatrixAppService
-
-	// preferencesService encapsulates user preferences and block-list management.
-	preferencesService *PreferencesAppService
-
-	mediaService *MediaAppService
-
-	ratingsService    *RatingsAppService
-	profileService    *ProfileAppService
-	followService     *FollowAppService
-	postsService      *PostsAppService
-	moderationService *ModerationAppService
-	channelsService   *ChannelsAppService
-	listingService    *ListingAppService
-
-	// notificationService encapsulates notification query and management logic.
-	notificationService *NotificationAppService
-
-	// shoppingCartService encapsulates shopping cart business logic.
-	shoppingCartService *ShoppingCartAppService
-
-	// wishlistService encapsulates buyer wishlist logic.
-	wishlistService *WishlistAppService
-
-	// webhookStore persists webhook endpoints and delivery records.
-	webhookStore wh.EndpointStore
-
-	// webhookEngine manages background webhook delivery polling and retry.
-	webhookEngine *wh.Engine
-
-	// discountService encapsulates discount business logic (CRUD, validation, codes).
-	discountService *DiscountAppService
-
-	// collectionService encapsulates collection business logic (CRUD, product management).
-	collectionService *CollectionAppService
-
-	// fiatRegistry holds registered fiat payment providers. Hosting (SaaS) or
-	// node config (standalone) populates it with concrete providers.
-	fiatRegistry contracts.FiatProviderRegistry
-
-	// fiatPaymentService orchestrates fiat payment operations (Stripe, PayPal).
-	fiatPaymentService *FiatPaymentAppService
-
-	// shippingService encapsulates shipping profile and location management.
-	shippingService *ShippingAppService
-
-	// coTenantPublicData resolves PublicData for co-located tenants on the
-	// same SaaS host, enabling direct DB reads instead of NetDB/IPNS lookups.
-	// nil in standalone mode.
-	coTenantPublicData contracts.CoTenantPublicDataFn
-
-	// eventDispatcher is the unified EventBus subscriber that fans out events
-	// to NotificationSink, WebhookSink, and ChannelNotificationSink.
-	eventDispatcher *events.Dispatcher
-
-	// notifierSink dispatches events to external notification channels
-	// (Telegram, Discord, etc.) managed as a single EventSink.
-	notifierSink *notifier.ChannelNotificationSink
-
-	// aiProxy handles proxying AI requests to an OpenAI-compatible API.
-	aiProxy *aipkg.Proxy
-
-	// stripeAccountID represents the stripe account id of the node.
-	stripeAccountID string
-
-	// ipnsQuorum is the size of the IPNS quorum to use. Smaller quorums
-	// resolve faster but run the risk of getting back older records.
-	ipnsQuorum uint
-
-	// ipnsResolver is the URL of a resolver that can be queried to resolve
-	// IPNS records. If this is empty we will use the p2p network.
-	ipnsResolver string
-
-	// netDB is the endpoint that can be queried for profile
-	// and listing data if it is not found in the p2p network.
-	netDB *netdb.NetDB
-
-	netConfig *config.NetConfig
-
-	// messenger is the primary object used to send messages to other peers.
-	// It ensures reliable delivery by persisting messages and retrying them.
-	// Generally you should always send messages using this and not the
-	// NetworkService as the later will only attempt to send direct messages
-	// and will not retry.
-	messenger contracts.Messenger
-
-	// networkService manages the sending and receiving of messages
-	// on the Mobazha protocol.
-	networkService contracts.NetworkService
-
-	// banManager holds a list of peers that have been banned by this node.
-	banManager *net.BanManager
-
-	// eventBus allows a subscriber to receive event notifications from the node.
-	eventBus events.Bus
-
-	// followerTracker tries to maintain connections to a minimum number of our
-	// followers so that we can use them to push data for redundancy.
-	followerTracker *FollowerTracker
-
-	// multiwallet abstracts multi-currency wallet operations.
-	// Standalone: backed by a real Multiwallet.
-	// SaaS: backed by KeyVault + shared chain services.
-	multiwallet contracts.WalletOperator
-
-	// orderProcessor is the engine we use for processing all orders.
-	orderProcessor *orders.OrderProcessor
-
-	// exchangeRates is a provider of exchange rate data for various currencies.
-	exchangeRates *wallet.ExchangeRateProvider
-
-	// testnet is whether the this node is configured to use the test network (IPFS bootstrap).
-	testnet bool
-
-	// walletTestnet is whether the this node is configured to use testnet for wallet transactions.
-	walletTestnet bool
-
-	// torOnly is whether the node is running in tor only mode.
-	torOnly bool
-
-	// publishActive is an atomic integer that represents the number of inflight
-	// publishes.
-	publishActive int32
-
-	// publishChan is used to signal to the republish loop that a publish
-	// has just completed and it should update it's last published time.
-	publishChan chan pubCloser
-
-	// ipfsOnlyMode signals that the node is running in IPFS only mode.
-	ipfsOnlyMode bool
-
-	// storeAndForwardServers is a list of string peerIDs of servers we use
-	// as our store and forward nodes.
+// networkFields groups P2P networking components.
+type networkFields struct {
+	messenger              contracts.Messenger
+	networkService         contracts.NetworkService
+	banManager             *net.BanManager
+	eventBus               events.Bus
+	followerTracker        *FollowerTracker
 	storeAndForwardServers []string
+	boostrapPeers          []peer.ID
+}
 
-	// boostrapPeers holds the peers we use to bootstrap the node.
-	boostrapPeers []peer.ID
-
-	featureManager *pkgconfig.FeatureManager
-
-	// shutdownTorFunc is used to shutdown the embedded Tor client.
-	shutdownTorFunc func() error
-
-	// initialBootstrapChan is closed after the initial IPFS bootstrap completes.
-	initialBootstrapChan chan struct{}
-
-	// shutdown is closed when the node is stopped. Any listening
-	// goroutines can use this to terminate.
-	shutdown chan struct{}
-
-	// monitorService provides unified UTXO monitoring operations
-	monitorService utxo.UTXOMonitorService
-
-	hostService coreiface.HostService
-
-	// Phase 2 加密相关服务
-	// keyManager 管理商品和产品组的加密密钥（HKDF 派生）
-	keyManager *encryption.KeyManager
-
-	// localListingCrypto 提供本地商品加密的核心服务（含加解密功能）
-	localListingCrypto *encryption.LocalListingCrypto
-
-	// relayAPIURL is the platform relay API URL for gas fee payment (EVM CANCELABLE payments)
-	// Note: Solana support requires additional relay service implementation
-	relayAPIURL string
-
-	// evmChainConfigs holds per-chain EVM client configs derived from the node's
-	// multiwallet ChainAPIs config. Used by startEVMChainClients() in standalone mode
-	// to create chain clients that respect user-configured RPC URLs (instead of
-	// compiled-in factory defaults). In SaaS mode this is nil (clients come from HostService).
-	evmChainConfigs []evm.EVMClientConfig
-
-	// solanaChainConfig holds Solana chain config derived from multiwallet ChainAPIs.
-	// Used by startSolanaChainClients() in standalone mode to create the SolanaClient
-	// and resolve the escrow program ID. In SaaS mode this is nil (clients come from HostService).
-	solanaChainConfig *SolanaChainConfig
-
-	// paymentRegistry maps ChainType to PaymentStrategy for dispatching
-	// chain-specific payment operations. Initialized in registerPaymentStrategies().
+// walletFields groups wallet and payment processing.
+type walletFields struct {
+	multiwallet     contracts.WalletOperator
+	orderProcessor  *orders.OrderProcessor
+	exchangeRates   *wallet.ExchangeRateProvider
 	paymentRegistry *payment.Registry
+	relayAPIURL     string
+}
+
+// chainFields groups blockchain client configuration.
+type chainFields struct {
+	evmChainConfigs   []evm.EVMClientConfig
+	solanaChainConfig *SolanaChainConfig
+	monitorService    utxo.UTXOMonitorService
+}
+
+// ipnsFields groups IPNS resolution and NetDB configuration.
+type ipnsFields struct {
+	ipnsQuorum   uint
+	ipnsResolver string
+	netDB        *netdb.NetDB
+	netConfig    *config.NetConfig
+}
+
+// modeFlags groups boolean mode switches.
+type modeFlags struct {
+	testnet       bool
+	walletTestnet bool
+	torOnly       bool
+	ipfsOnlyMode  bool
+}
+
+// lifecycleFields groups runtime lifecycle state.
+type lifecycleFields struct {
+	publishActive        int32
+	publishChan          chan pubCloser
+	featureManager       *pkgconfig.FeatureManager
+	shutdownTorFunc      func() error
+	initialBootstrapChan chan struct{}
+	shutdown             chan struct{}
+}
+
+// appServices groups all extracted App Service dependencies.
+type appServices struct {
+	paymentService      *PaymentAppService
+	orderService        *OrderAppService
+	chatService         *ChatAppService
+	matrixService       *MatrixAppService
+	preferencesService  *PreferencesAppService
+	mediaService        *MediaAppService
+	ratingsService      *RatingsAppService
+	profileService      *ProfileAppService
+	followService       *FollowAppService
+	postsService        *PostsAppService
+	moderationService   *ModerationAppService
+	channelsService     *ChannelsAppService
+	listingService      *ListingAppService
+	notificationService *NotificationAppService
+	shoppingCartService *ShoppingCartAppService
+	wishlistService     *WishlistAppService
+	discountService     *DiscountAppService
+	collectionService   *CollectionAppService
+	fiatRegistry        contracts.FiatProviderRegistry
+	fiatPaymentService  *FiatPaymentAppService
+	shippingService     *ShippingAppService
 }
 
 // IsDefaultNode returns whether this node is the default node.

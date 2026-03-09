@@ -28,7 +28,7 @@ func (s *spyNetworkService) Close()                                             
 
 func TestRegisterHandlers_CoversAllMessageTypes(t *testing.T) {
 	spy := newSpyNetworkService()
-	node := &MobazhaNode{networkService: spy}
+	node := &MobazhaNode{networkFields: networkFields{networkService: spy}}
 	node.registerHandlers()
 
 	// Every protobuf message type must have a handler.

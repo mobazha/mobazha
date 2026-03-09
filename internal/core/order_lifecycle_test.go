@@ -1079,7 +1079,7 @@ func TestOrderLifecycle_Cancelable_BuyerCancel(t *testing.T) {
 // payment registry covers all production chains and that ChainMock integrates
 // correctly alongside them.
 func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
-	n := &MobazhaNode{nodeID: "test-lifecycle-registry"}
+	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-lifecycle-registry"}}
 	n.registerPaymentStrategies()
 
 	// Register ChainMock (same as what happy path tests do)
@@ -1876,7 +1876,7 @@ func TestOrderLifecycle_CancelableConfirm_RefundBlocked(t *testing.T) {
 // TestOrderLifecycle_ClientSigned_InstructionMatrix validates all chains' instruction
 // behavior in a table-driven test. Pure memory — no Mocknet needed.
 func TestOrderLifecycle_ClientSigned_InstructionMatrix(t *testing.T) {
-	n := &MobazhaNode{nodeID: "test-instruction-matrix"}
+	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-instruction-matrix"}}
 	n.registerPaymentStrategies()
 	n.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(n))
 

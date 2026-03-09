@@ -141,31 +141,45 @@ func MockNode() (*MobazhaNode, error) {
 	}
 
 	node := &MobazhaNode{
-		nodeID:               repo.DefaultNodeID,
-		sharedManager:        sharedManager,
-		peerID:               ipfsNode.Identity,
-		privKey:              ipfsNode.PrivateKey,
-		peerHost:             ipfsNode.PeerHost,
-		nodeCtx:              ipfsNode.Context(),
-		ipfsNode:             ipfsNode,
-		db:                   r.DB(),
-		repo:                 r,
-		networkService:       service,
-		eventBus:             bus,
-		banManager:           banManager,
-		ipnsQuorum:           1,
-		netConfig:            config.DefaultNetConfig(),
-		shutdown:             make(chan struct{}),
-		ethMasterKey:         ethMasterKey,
-		escrowMasterKey:      escrowKey,
-		ratingMasterKey:      ratingKey,
-		solPrivKey:           &mockSolPrivKey,
-		multiwallet:          &mw,
-		followerTracker:      tracker,
-		exchangeRates:        erp,
-		initialBootstrapChan: make(chan struct{}),
-		publishChan:          make(chan pubCloser),
-		featureManager:       pkgconfig.GetGlobalFeatureManager(),
+		sharedManager: sharedManager,
+		identityFields: identityFields{
+			nodeID:   repo.DefaultNodeID,
+			peerID:   ipfsNode.Identity,
+			privKey:  ipfsNode.PrivateKey,
+			peerHost: ipfsNode.PeerHost,
+			nodeCtx:  ipfsNode.Context(),
+		},
+		storageFields: storageFields{
+			ipfsNode: ipfsNode,
+			db:       r.DB(),
+			repo:     r,
+		},
+		cryptoFields: cryptoFields{
+			ethMasterKey:    ethMasterKey,
+			escrowMasterKey: escrowKey,
+			ratingMasterKey: ratingKey,
+			solPrivKey:      &mockSolPrivKey,
+		},
+		networkFields: networkFields{
+			networkService:  service,
+			eventBus:        bus,
+			banManager:      banManager,
+			followerTracker: tracker,
+		},
+		walletFields: walletFields{
+			multiwallet:   &mw,
+			exchangeRates: erp,
+		},
+		ipnsFields: ipnsFields{
+			ipnsQuorum: 1,
+			netConfig:  config.DefaultNetConfig(),
+		},
+		lifecycleFields: lifecycleFields{
+			shutdown:             make(chan struct{}),
+			initialBootstrapChan: make(chan struct{}),
+			publishChan:          make(chan pubCloser),
+			featureManager:       pkgconfig.GetGlobalFeatureManager(),
+		},
 	}
 
 	// Initialize content store for mock node.
@@ -368,31 +382,45 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		}
 
 		node := &MobazhaNode{
-			nodeID:               nodeID,
-			sharedManager:        sharedManager,
-			peerID:               ipfsNode.Identity,
-			privKey:              ipfsNode.PrivateKey,
-			peerHost:             ipfsNode.PeerHost,
-			nodeCtx:              ipfsNode.Context(),
-			ipfsNode:             ipfsNode,
-			db:                   r.DB(),
-			repo:                 r,
-			networkService:       service,
-			eventBus:             bus,
-			banManager:           banManager,
-			ipnsQuorum:           1,
-			netConfig:            config.DefaultNetConfig(),
-			shutdown:             make(chan struct{}),
-			ethMasterKey:         ethMasterKey,
-			escrowMasterKey:      escrowKey,
-			ratingMasterKey:      ratingKey,
-			solPrivKey:           &mockSolPrivKey,
-			multiwallet:          &mw,
-			followerTracker:      tracker,
-			exchangeRates:        erp,
-			initialBootstrapChan: make(chan struct{}),
-			publishChan:          make(chan pubCloser),
-			featureManager:       pkgconfig.GetGlobalFeatureManager(),
+			sharedManager: sharedManager,
+			identityFields: identityFields{
+				nodeID:   nodeID,
+				peerID:   ipfsNode.Identity,
+				privKey:  ipfsNode.PrivateKey,
+				peerHost: ipfsNode.PeerHost,
+				nodeCtx:  ipfsNode.Context(),
+			},
+			storageFields: storageFields{
+				ipfsNode: ipfsNode,
+				db:       r.DB(),
+				repo:     r,
+			},
+			cryptoFields: cryptoFields{
+				ethMasterKey:    ethMasterKey,
+				escrowMasterKey: escrowKey,
+				ratingMasterKey: ratingKey,
+				solPrivKey:      &mockSolPrivKey,
+			},
+			networkFields: networkFields{
+				networkService:  service,
+				eventBus:        bus,
+				banManager:      banManager,
+				followerTracker: tracker,
+			},
+			walletFields: walletFields{
+				multiwallet:   &mw,
+				exchangeRates: erp,
+			},
+			ipnsFields: ipnsFields{
+				ipnsQuorum: 1,
+				netConfig:  config.DefaultNetConfig(),
+			},
+			lifecycleFields: lifecycleFields{
+				shutdown:             make(chan struct{}),
+				initialBootstrapChan: make(chan struct{}),
+				publishChan:          make(chan pubCloser),
+				featureManager:       pkgconfig.GetGlobalFeatureManager(),
+			},
 		}
 		// Initialize content store for mock node.
 		node.contentStore = newIPFSContentStore(

@@ -1,6 +1,9 @@
 package contracts
 
-import "testing"
+import (
+	"sort"
+	"testing"
+)
 
 func TestScope_IsValid(t *testing.T) {
 	tests := []struct {
@@ -110,5 +113,25 @@ func TestAllScopes_MatchesRegistry(t *testing.T) {
 		if !s.IsValid() {
 			t.Errorf("AllScopes() contains invalid scope: %q", s)
 		}
+	}
+}
+
+func TestAllScopes_StableSortOrder(t *testing.T) {
+	a := AllScopes()
+	b := AllScopes()
+	if len(a) != len(b) {
+		t.Fatal("different lengths")
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			t.Fatalf("AllScopes() not stable at index %d: %q vs %q", i, a[i], b[i])
+		}
+	}
+	strs := make([]string, len(a))
+	for i, s := range a {
+		strs[i] = string(s)
+	}
+	if !sort.StringsAreSorted(strs) {
+		t.Error("AllScopes() should return sorted results")
 	}
 }

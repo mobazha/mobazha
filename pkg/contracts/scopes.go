@@ -1,6 +1,9 @@
 package contracts
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 // Scope represents a fine-grained permission for API access.
 // Format: {domain}:{action}
@@ -24,8 +27,9 @@ const (
 	ScopePurchasesRead Scope = "purchases:read"
 
 	// Wallet
-	ScopeWalletRead  Scope = "wallet:read"
-	ScopeWalletSpend Scope = "wallet:spend"
+	ScopeWalletRead   Scope = "wallet:read"
+	ScopeWalletSpend  Scope = "wallet:spend"
+	ScopeWalletManage Scope = "wallet:manage"
 
 	// Chat
 	ScopeChatRead  Scope = "chat:read"
@@ -93,7 +97,7 @@ var allScopes = map[Scope]bool{
 	ScopeListingsRead: true, ScopeListingsWrite: true,
 	ScopeOrdersRead: true, ScopeOrdersManage: true,
 	ScopePurchasesRead: true,
-	ScopeWalletRead: true, ScopeWalletSpend: true,
+	ScopeWalletRead: true, ScopeWalletSpend: true, ScopeWalletManage: true,
 	ScopeChatRead: true, ScopeChatWrite: true,
 	ScopeProfilesRead: true, ScopeProfilesWrite: true,
 	ScopeNotificationsRead: true, ScopeNotificationsManage: true,
@@ -190,12 +194,13 @@ func (ss ScopeSet) HasAny(scopes ...Scope) bool {
 	return false
 }
 
-// AllScopes returns all recognized scopes.
+// AllScopes returns all recognized scopes in stable sorted order.
 func AllScopes() []Scope {
 	scopes := make([]Scope, 0, len(allScopes))
 	for s := range allScopes {
 		scopes = append(scopes, s)
 	}
+	sort.Slice(scopes, func(i, j int) bool { return scopes[i] < scopes[j] })
 	return scopes
 }
 

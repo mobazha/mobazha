@@ -35,6 +35,7 @@ func NewChannelNotificationSink(channels []ChannelConfig, nodeID string) *Channe
 	client := &http.Client{Timeout: 10 * time.Second}
 	senders := map[ChannelType]ChannelSender{
 		ChannelTelegram: NewTelegramSender(client),
+		ChannelEmail:    NewEmailSender(client),
 	}
 	return &ChannelNotificationSink{
 		channels: channels,
@@ -236,6 +237,7 @@ func (s *ChannelNotificationSink) TestChannel(id string) error {
 func (s *ChannelNotificationSink) SupportedTypes() []ChannelTypeInfo {
 	return []ChannelTypeInfo{
 		TelegramFieldSchema(),
+		EmailFieldSchema(),
 	}
 }
 

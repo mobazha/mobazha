@@ -9,7 +9,8 @@ type ChannelType string
 
 const (
 	ChannelTelegram ChannelType = "telegram"
-	// Future: ChannelDiscord, ChannelSlack, ChannelEmail
+	ChannelEmail    ChannelType = "email"
+	// Future: ChannelDiscord, ChannelSlack
 )
 
 // ChannelConfig is the unified, platform-agnostic configuration for one

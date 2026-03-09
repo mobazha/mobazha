@@ -118,6 +118,11 @@ type IntroVideo struct {
 	Name       string
 }
 
+type UploadedFile struct {
+	FileBytes []byte
+	Name      string
+}
+
 type FileHash struct {
 	Name string `json:"name"`
 	Hash string `json:"hash"`

@@ -85,14 +85,13 @@ func (s *MediaAppService) AddFile(fileData []byte, filename string) (models.File
 	}
 	ct := detectContentType(fileData, filename)
 	if err := s.db.Update(func(dbtx database.Tx) error {
-		if err := dbtx.SetImage(models.Image{
-			Name:       filename,
-			Size:       models.ImageSizeOriginal,
-			ImageBytes: fileData,
+		if err := dbtx.SetUploadedFile(models.UploadedFile{
+			Name:      filename,
+			FileBytes: fileData,
 		}); err != nil {
 			return err
 		}
-		return dbtx.IndexMediaCID(c.String(), "image", string(models.ImageSizeOriginal), filename, ct)
+		return dbtx.IndexMediaCID(c.String(), "file", "", filename, ct)
 	}); err != nil {
 		return models.FileHash{}, err
 	}

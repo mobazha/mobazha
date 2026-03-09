@@ -100,6 +100,7 @@ func (t *testTx) SetImage(models.Image) error                                   
 func (t *testTx) GetImageByName(models.ImageSize, string) ([]byte, error)        { return nil, nil }
 func (t *testTx) GetMediaByCID(string) ([]byte, string, error)                   { return nil, "", nil }
 func (t *testTx) IndexMediaCID(string, string, string, string, string) error     { return nil }
+func (t *testTx) SetUploadedFile(models.UploadedFile) error                      { return nil }
 func (t *testTx) SetIntroVideo(models.IntroVideo) error                          { return nil }
 
 // ── Setup helpers ───────────────────────────────────────────────

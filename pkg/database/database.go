@@ -103,6 +103,9 @@ type PublicData interface {
 	// contentType: MIME type e.g. "image/jpeg", "video/mp4"
 	IndexMediaCID(cidHash string, mediaType string, sizeTag string, name string, contentType string) error
 
+	// SetUploadedFile saves a generic uploaded file to the files/ directory.
+	SetUploadedFile(file models.UploadedFile) error
+
 	// SetIntroVideo saves the given introVideo.
 	SetIntroVideo(introVideo models.IntroVideo) error
 }

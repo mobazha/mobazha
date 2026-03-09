@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"github.com/mobazha/mobazha3.0/pkg/response"
 	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
 )
 
@@ -20,7 +21,7 @@ func getWebhookProvider(r *http.Request) (contracts.WebhookProvider, bool) {
 func (g *Gateway) handleCreateWebhook(w http.ResponseWriter, r *http.Request) {
 	wp, ok := getWebhookProvider(r)
 	if !ok {
-		http.Error(w, "Webhooks not available", http.StatusNotImplemented)
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented, "Webhooks not available")
 		return
 	}
 	store := wp.WebhookStore()
@@ -31,15 +32,15 @@ func (g *Gateway) handleCreateWebhook(w http.ResponseWriter, r *http.Request) {
 		EventTypes string `json:"event_types"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")
 		return
 	}
 	if req.URL == "" {
-		http.Error(w, "url is required", http.StatusBadRequest)
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "url is required")
 		return
 	}
 	if _, err := url.ParseRequestURI(req.URL); err != nil {
-		http.Error(w, "Invalid URL format", http.StatusBadRequest)
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid URL format")
 		return
 	}
 	if req.EventTypes == "" {
@@ -47,7 +48,7 @@ func (g *Gateway) handleCreateWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := engine.CheckEndpointQuota(); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		response.Error(w, http.StatusConflict, response.CodeConflict, err.Error())
 		return
 	}
 
@@ -57,7 +58,7 @@ func (g *Gateway) handleCreateWebhook(w http.ResponseWriter, r *http.Request) {
 		Active:     true,
 	}
 	if err := store.CreateEndpoint(ep); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Internal server error")
 		return
 	}
 
@@ -76,13 +77,13 @@ func (g *Gateway) handleCreateWebhook(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleListWebhooks(w http.ResponseWriter, r *http.Request) {
 	wp, ok := getWebhookProvider(r)
 	if !ok {
-		http.Error(w, "Webhooks not available", http.StatusNotImplemented)
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented, "Webhooks not available")
 		return
 	}
 
 	endpoints, err := wp.WebhookStore().ListEndpoints()
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Internal server error")
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -92,7 +93,7 @@ func (g *Gateway) handleListWebhooks(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleGetWebhook(w http.ResponseWriter, r *http.Request) {
 	wp, ok := getWebhookProvider(r)
 	if !ok {
-		http.Error(w, "Webhooks not available", http.StatusNotImplemented)
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented, "Webhooks not available")
 		return
 	}
 
@@ -100,10 +101,10 @@ func (g *Gateway) handleGetWebhook(w http.ResponseWriter, r *http.Request) {
 	ep, err := wp.WebhookStore().GetEndpoint(id)
 	if err != nil {
 		if errors.Is(err, wh.ErrEndpointNotFound) {
-			http.Error(w, "Not found", http.StatusNotFound)
+			response.Error(w, http.StatusNotFound, response.CodeNotFound, "Not found")
 		} else {
 			log.Errorf("GetEndpoint %s: %v", id, err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Internal server error")
 		}
 		return
 	}
@@ -114,7 +115,7 @@ func (g *Gateway) handleGetWebhook(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleUpdateWebhook(w http.ResponseWriter, r *http.Request) {
 	wp, ok := getWebhookProvider(r)
 	if !ok {
-		http.Error(w, "Webhooks not available", http.StatusNotImplemented)
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented, "Webhooks not available")
 		return
 	}
 	store := wp.WebhookStore()
@@ -122,16 +123,16 @@ func (g *Gateway) handleUpdateWebhook(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	if _, err := store.GetEndpoint(id); err != nil {
 		if errors.Is(err, wh.ErrEndpointNotFound) {
-			http.Error(w, "Not found", http.StatusNotFound)
+			response.Error(w, http.StatusNotFound, response.CodeNotFound, "Not found")
 		} else {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Internal server error")
 		}
 		return
 	}
 
 	var req map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")
 		return
 	}
 
@@ -139,7 +140,7 @@ func (g *Gateway) handleUpdateWebhook(w http.ResponseWriter, r *http.Request) {
 	if v, ok := req["url"]; ok {
 		if u, ok := v.(string); ok {
 			if _, err := url.ParseRequestURI(u); err != nil {
-				http.Error(w, "Invalid URL format", http.StatusBadRequest)
+				response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid URL format")
 				return
 			}
 			updates["url"] = u
@@ -157,12 +158,12 @@ func (g *Gateway) handleUpdateWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(updates) == 0 {
-		http.Error(w, "No valid fields to update", http.StatusBadRequest)
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "No valid fields to update")
 		return
 	}
 
 	if err := store.UpdateEndpoint(id, updates); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Internal server error")
 		return
 	}
 
@@ -173,7 +174,7 @@ func (g *Gateway) handleUpdateWebhook(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleDeleteWebhook(w http.ResponseWriter, r *http.Request) {
 	wp, ok := getWebhookProvider(r)
 	if !ok {
-		http.Error(w, "Webhooks not available", http.StatusNotImplemented)
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented, "Webhooks not available")
 		return
 	}
 	store := wp.WebhookStore()
@@ -181,15 +182,15 @@ func (g *Gateway) handleDeleteWebhook(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	if _, err := store.GetEndpoint(id); err != nil {
 		if errors.Is(err, wh.ErrEndpointNotFound) {
-			http.Error(w, "Not found", http.StatusNotFound)
+			response.Error(w, http.StatusNotFound, response.CodeNotFound, "Not found")
 		} else {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Internal server error")
 		}
 		return
 	}
 
 	if err := store.DeleteEndpoint(id); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Internal server error")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -198,7 +199,7 @@ func (g *Gateway) handleDeleteWebhook(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) handleListWebhookDeliveries(w http.ResponseWriter, r *http.Request) {
 	wp, ok := getWebhookProvider(r)
 	if !ok {
-		http.Error(w, "Webhooks not available", http.StatusNotImplemented)
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented, "Webhooks not available")
 		return
 	}
 	store := wp.WebhookStore()
@@ -206,9 +207,9 @@ func (g *Gateway) handleListWebhookDeliveries(w http.ResponseWriter, r *http.Req
 	endpointID := mux.Vars(r)["id"]
 	if _, err := store.GetEndpoint(endpointID); err != nil {
 		if errors.Is(err, wh.ErrEndpointNotFound) {
-			http.Error(w, "Not found", http.StatusNotFound)
+			response.Error(w, http.StatusNotFound, response.CodeNotFound, "Not found")
 		} else {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Internal server error")
 		}
 		return
 	}
@@ -225,7 +226,7 @@ func (g *Gateway) handleListWebhookDeliveries(w http.ResponseWriter, r *http.Req
 
 	deliveries, total, err := store.ListDeliveries(endpointID, status, limit, offset)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Internal server error")
 		return
 	}
 
@@ -239,7 +240,7 @@ func (g *Gateway) handleListWebhookDeliveries(w http.ResponseWriter, r *http.Req
 func (g *Gateway) handleTestWebhook(w http.ResponseWriter, r *http.Request) {
 	wp, ok := getWebhookProvider(r)
 	if !ok {
-		http.Error(w, "Webhooks not available", http.StatusNotImplemented)
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented, "Webhooks not available")
 		return
 	}
 	store := wp.WebhookStore()
@@ -248,16 +249,16 @@ func (g *Gateway) handleTestWebhook(w http.ResponseWriter, r *http.Request) {
 	endpointID := mux.Vars(r)["id"]
 	if _, err := store.GetEndpoint(endpointID); err != nil {
 		if errors.Is(err, wh.ErrEndpointNotFound) {
-			http.Error(w, "Not found", http.StatusNotFound)
+			response.Error(w, http.StatusNotFound, response.CodeNotFound, "Not found")
 		} else {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Internal server error")
 		}
 		return
 	}
 
 	idSvc := getIdentityService(r)
 	if idSvc == nil {
-		http.Error(w, "Identity service not available", http.StatusInternalServerError)
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Identity service not available")
 		return
 	}
 	nodeID := idSvc.GetNodeID()
@@ -267,7 +268,7 @@ func (g *Gateway) handleTestWebhook(w http.ResponseWriter, r *http.Request) {
 	payload, err := wh.BuildCloudEvent(nodeID, "test.ping", testData)
 	if err != nil {
 		log.Errorf("Failed to build test CloudEvent: %v", err)
-		http.Error(w, "Failed to build test event", http.StatusInternalServerError)
+		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Failed to build test event")
 		return
 	}
 	engine.Enqueue("test.ping", payload)

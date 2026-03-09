@@ -450,6 +450,8 @@ func (n *MobazhaNode) Stop(force bool) error {
 			n.channelsService.CloseAll()
 		}
 	}
+	// Shutdown order matters: EventDispatcher must stop before WebhookEngine
+	// so that WebhookSink stops emitting before the engine shuts down.
 	if n.eventDispatcher != nil {
 		n.eventDispatcher.Stop()
 	}

@@ -10,7 +10,8 @@ import (
 )
 
 // cancelableAutoConfirmInProgress tracks orders currently being auto-confirmed to prevent concurrent processing.
-// Shared across all chain types (UTXO, EVM, Solana).
+// Shared across all chain types (UTXO, EVM, Solana). Keys are "nodeID:orderID" to prevent
+// cross-tenant collisions in multi-tenant SaaS mode.
 var cancelableAutoConfirmInProgress sync.Map
 
 // ── Payment Strategy Registration ───────────────────────────────────────

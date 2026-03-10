@@ -75,12 +75,12 @@ func (g *Gateway) handlePOSTAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	store := p.ChatStore()
-	storeKey := fmt.Sprintf("%p", store)
-	if _, loaded := activeAIStreams.LoadOrStore(storeKey, true); loaded {
+	streamKey := fmt.Sprintf("ai-chat-%p", p)
+	if _, loaded := activeAIStreams.LoadOrStore(streamKey, true); loaded {
 		responsePkg.Error(w, http.StatusTooManyRequests, "TOO_MANY_REQUESTS", "Another AI chat request is still in progress. Please wait.")
 		return
 	}
-	defer activeAIStreams.Delete(storeKey)
+	defer activeAIStreams.Delete(streamKey)
 
 	var req aipkg.ChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

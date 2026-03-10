@@ -485,23 +485,13 @@ func (n *MobazhaNode) handleStoreMessage(from peer.ID, message *pb.Message) erro
 	}
 
 	var cids []cid.Cid
-	var failedCids []cid.Cid
 	for _, b := range store.Cids {
-		cid, err := cid.Cast(b)
+		c, err := cid.Cast(b)
 		if err != nil {
-			failedCids = append(failedCids, cid)
-			logger.LogErrorWithIDf(log, n.nodeID, "store handler cid cast error, %s, %s", cid.String(), err)
+			logger.LogErrorWithIDf(log, n.nodeID, "store handler cid cast error: %s", err)
 			continue
 		}
-		cids = append(cids, cid)
-		if err := n.contentStore.Pin(context.Background(), cid); err != nil {
-			failedCids = append(failedCids, cid)
-			logger.LogErrorWithIDf(log, n.nodeID, "store handler error pinning file, %s, %s", cid.String(), err)
-			continue
-		}
-	}
-	if len(failedCids) > 0 {
-		return fmt.Errorf("store handler error for %d cids", len(failedCids))
+		cids = append(cids, c)
 	}
 	n.eventBus.Emit(&events.MessageStore{
 		Peer: from,

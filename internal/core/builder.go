@@ -633,11 +633,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		},
 		hostService: hs,
 	}
-	// Initialize content store with IPFS backend.
-	obNode.contentStore = newIPFSContentStore(
-		sharedManager.GetIPFSNode,
-		obNode.shutdown,
-	)
+	obNode.contentStore = &cidContentStore{}
 
 	sharedManager.AddNode(nodeID, obNode)
 
@@ -1303,11 +1299,7 @@ func newLightweightNode(
 		hostService: hs,
 	}
 
-	// Initialize content store — lightweight nodes use shared IPFS.
-	obNode.contentStore = newIPFSContentStore(
-		sharedManager.GetIPFSNode,
-		obNode.shutdown,
-	)
+	obNode.contentStore = &cidContentStore{}
 
 	sharedManager.AddNode(nodeID, obNode)
 

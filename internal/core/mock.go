@@ -181,11 +181,7 @@ func MockNode() (*MobazhaNode, error) {
 		},
 	}
 
-	// Initialize content store for mock node.
-	node.contentStore = newIPFSContentStore(
-		func() *core.IpfsNode { return ipfsNode },
-		node.shutdown,
-	)
+	node.contentStore = &cidContentStore{}
 
 	sharedManager.AddNode(repo.DefaultNodeID, node)
 
@@ -418,11 +414,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 				featureManager:       pkgconfig.GetGlobalFeatureManager(),
 			},
 		}
-		// Initialize content store for mock node.
-		node.contentStore = newIPFSContentStore(
-			sharedManager.GetIPFSNode,
-			node.shutdown,
-		)
+		node.contentStore = &cidContentStore{}
 
 		sharedManager.AddNode(nodeID, node)
 

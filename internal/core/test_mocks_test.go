@@ -29,8 +29,6 @@ func (m *mockContentStore) ComputeCID(data []byte) (cid.Cid, error) {
 	return media.ComputeUnixFSCID(data)
 }
 
-func (m *mockContentStore) Pin(_ context.Context, _ cid.Cid) error { return nil }
-
 // ── mockMessenger ───────────────────────────────────────────────
 
 type mockMessenger struct {

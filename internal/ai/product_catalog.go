@@ -3,18 +3,19 @@ package ai
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 )
 
 const maxCatalogListings = 200
 
 // ListingSummary is a lightweight product info struct for AI context injection.
+// Price should be a human-readable amount (e.g. "25" not "2500" for $25 USD).
 type ListingSummary struct {
 	Slug        string
 	Title       string
 	Description string
 	Price       string
 	CoinType    string
-	Status      string
 	ProductType string
 }
 
@@ -33,7 +34,11 @@ func FormatProductCatalog(listings []ListingSummary) string {
 		shown = maxCatalogListings
 	}
 
-	b.WriteString(fmt.Sprintf("Your store's product catalog (%d items):\n", count))
+	if count == 1 {
+		b.WriteString("Your store's product catalog (1 item):\n")
+	} else {
+		b.WriteString(fmt.Sprintf("Your store's product catalog (%d items):\n", count))
+	}
 
 	for i := 0; i < shown; i++ {
 		l := &listings[i]
@@ -72,6 +77,27 @@ func FormatProductCatalog(listings []ListingSummary) string {
 	return b.String()
 }
 
+// FormatAmountForDisplay converts a raw amount string (in smallest currency unit)
+// to a human-readable decimal string using the given divisibility.
+// Example: FormatAmountForDisplay("2500", 2) => "25", FormatAmountForDisplay("10000000000000000", 18) => "0.01"
+func FormatAmountForDisplay(amountStr string, divisibility uint) string {
+	if divisibility == 0 || amountStr == "" || amountStr == "0" {
+		return amountStr
+	}
+	for uint(len(amountStr)) <= divisibility {
+		amountStr = "0" + amountStr
+	}
+	insertPos := len(amountStr) - int(divisibility)
+	whole := amountStr[:insertPos]
+	frac := strings.TrimRight(amountStr[insertPos:], "0")
+	if frac == "" {
+		return whole
+	}
+	return whole + "." + frac
+}
+
+// truncateDescription normalizes whitespace and truncates to maxLen runes,
+// breaking at a word boundary when possible. ManagedEscrow for multi-byte UTF-8.
 func truncateDescription(s string, maxLen int) string {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -84,11 +110,12 @@ func truncateDescription(s string, maxLen int) string {
 		return r
 	}, s)
 	s = strings.Join(strings.Fields(s), " ")
-	if len(s) <= maxLen {
+	if utf8.RuneCountInString(s) <= maxLen {
 		return s
 	}
-	truncated := s[:maxLen]
-	if idx := strings.LastIndexByte(truncated, ' '); idx > maxLen/2 {
+	runes := []rune(s)
+	truncated := string(runes[:maxLen])
+	if idx := strings.LastIndexByte(truncated, ' '); idx > len(string(runes[:maxLen/2])) {
 		truncated = truncated[:idx]
 	}
 	return truncated + "..."

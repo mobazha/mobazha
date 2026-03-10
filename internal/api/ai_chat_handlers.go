@@ -61,6 +61,37 @@ func getAuthToken(r *http.Request) string {
 // activeAIStreams enforces max 1 concurrent AI chat stream per tenant.
 var activeAIStreams sync.Map
 
+// catalogCache stores formatted product catalog text per provider with a short TTL
+// to avoid reading the full ListingIndex from DB on every chat message.
+var catalogCache sync.Map
+
+type catalogCacheEntry struct {
+	text      string
+	expiresAt time.Time
+}
+
+const catalogCacheTTL = 30 * time.Second
+
+func getCachedCatalog(p aiChatProvider) string {
+	key := fmt.Sprintf("catalog-%p", p)
+	if v, ok := catalogCache.Load(key); ok {
+		entry := v.(*catalogCacheEntry)
+		if time.Now().Before(entry.expiresAt) {
+			return entry.text
+		}
+	}
+	catalog := p.ProductCatalog()
+	text := ""
+	if len(catalog) > 0 {
+		text = aipkg.FormatProductCatalog(catalog)
+	}
+	catalogCache.Store(key, &catalogCacheEntry{
+		text:      text,
+		expiresAt: time.Now().Add(catalogCacheTTL),
+	})
+	return text
+}
+
 // handlePOSTAIChat handles POST /v1/ai/chat — streaming AI conversation.
 func (g *Gateway) handlePOSTAIChat(w http.ResponseWriter, r *http.Request) {
 	p, ok := getAIChatProvider(r)
@@ -120,10 +151,8 @@ func (g *Gateway) handlePOSTAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	systemPrompt := aipkg.BuildSystemPrompt(role, p.ProfileName(), req.Context)
-	if catalog := p.ProductCatalog(); len(catalog) > 0 {
-		if catalogCtx := aipkg.FormatProductCatalog(catalog); catalogCtx != "" {
-			systemPrompt += "\n\n" + catalogCtx
-		}
+	if catalogCtx := getCachedCatalog(p); catalogCtx != "" {
+		systemPrompt += "\n\n" + catalogCtx
 	}
 	messages := buildLLMMessages(systemPrompt, session.Messages, req.Message)
 

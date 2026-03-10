@@ -648,7 +648,8 @@ func (n *MobazhaNode) ProfileName() string {
 }
 
 // ProductCatalog returns a lightweight summary of all published listings
-// for AI context injection.
+// for AI context injection. Prices are converted to human-readable format
+// using the currency's divisibility.
 func (n *MobazhaNode) ProductCatalog() []aipkg.ListingSummary {
 	var index models.ListingIndex
 	err := n.db.View(func(tx database.Tx) error {
@@ -668,7 +669,7 @@ func (n *MobazhaNode) ProductCatalog() []aipkg.ListingSummary {
 		}
 		price := ""
 		if lm.Price.Currency != nil {
-			price = lm.Price.Amount.String()
+			price = aipkg.FormatAmountForDisplay(lm.Price.Amount.String(), lm.Price.Currency.Divisibility)
 		}
 		result = append(result, aipkg.ListingSummary{
 			Slug:        lm.Slug,
@@ -676,7 +677,6 @@ func (n *MobazhaNode) ProductCatalog() []aipkg.ListingSummary {
 			Description: lm.Description,
 			Price:       price,
 			CoinType:    lm.CoinType,
-			Status:      lm.Status,
 			ProductType: lm.ProductType,
 		})
 	}

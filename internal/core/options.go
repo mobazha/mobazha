@@ -186,14 +186,13 @@ func (n *MobazhaNode) initMediaService() {
 	}
 
 	n.mediaService = NewMediaAppService(MediaAppServiceConfig{
-		DB:              n.db,
-		ContentStore:    n.contentStore,
-		BlobStore:       blobStore,
-		NodeID:          n.nodeID,
-		GetIPFSFile:     getIPFSFile,
-		FetchIPNSRecord: n.fetchIPNSRecord,
-		Publish:         n.Publish,
-		PublishFile:     n.PublishFile,
+		DB:          n.db,
+		ContentStore: n.contentStore,
+		BlobStore:   blobStore,
+		NodeID:      n.nodeID,
+		GetIPFSFile: getIPFSFile,
+		Publish:     n.Publish,
+		PublishFile: n.PublishFile,
 	})
 }
 

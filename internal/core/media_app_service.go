@@ -13,7 +13,6 @@ import (
 
 	"github.com/disintegration/imaging"
 	ipath "github.com/ipfs/boxo/path"
-	"github.com/ipfs/boxo/ipns"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -25,8 +24,6 @@ import (
 // ── IPFS Callback Types ─────────────────────────────────────────
 
 type GetIPFSFileFunc func(ctx context.Context, path ipath.Path) (io.ReadSeeker, error)
-
-type FetchIPNSRecordFunc func(ctx context.Context, pid peer.ID, useCache bool) (*ipns.Record, error)
 
 type PublishFunc func(done chan<- struct{})
 
@@ -42,9 +39,8 @@ type MediaAppService struct {
 	blobStore    contracts.BlobStore
 	nodeID       string
 
-	getIPFSFile     GetIPFSFileFunc
-	fetchIPNSRecord FetchIPNSRecordFunc
-	publish         PublishFunc
+	getIPFSFile GetIPFSFileFunc
+	publish     PublishFunc
 	publishFile     PublishFileFunc
 }
 
@@ -54,9 +50,8 @@ type MediaAppServiceConfig struct {
 	BlobStore    contracts.BlobStore
 	NodeID       string
 
-	GetIPFSFile     GetIPFSFileFunc
-	FetchIPNSRecord FetchIPNSRecordFunc
-	Publish         PublishFunc
+	GetIPFSFile GetIPFSFileFunc
+	Publish     PublishFunc
 	PublishFile     PublishFileFunc
 }
 
@@ -66,9 +61,8 @@ func NewMediaAppService(cfg MediaAppServiceConfig) *MediaAppService {
 		contentStore:    cfg.ContentStore,
 		blobStore:       cfg.BlobStore,
 		nodeID:          cfg.NodeID,
-		getIPFSFile:     cfg.GetIPFSFile,
-		fetchIPNSRecord: cfg.FetchIPNSRecord,
-		publish:         cfg.Publish,
+		getIPFSFile: cfg.GetIPFSFile,
+		publish:     cfg.Publish,
 		publishFile:     cfg.PublishFile,
 	}
 }
@@ -292,12 +286,12 @@ func (s *MediaAppService) SetProfileMedia(ctx context.Context, slot contracts.Pr
 
 // ── GetProfileMedia ─────────────────────────────────────────────
 
-func (s *MediaAppService) GetProfileMedia(ctx context.Context, peerID peer.ID, slot contracts.ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error) {
+func (s *MediaAppService) GetProfileMedia(_ context.Context, peerID peer.ID, slot contracts.ProfileSlot, size models.ImageSize, _ bool) (io.ReadSeeker, error) {
 	name := string(slot)
 	if peerID.String() == s.nodeID {
 		return s.getLocalImageByName(size, name)
 	}
-	return s.getIPFSImageByName(ctx, peerID, size, name, useCache)
+	return nil, fmt.Errorf("%w: remote profile media not available (IPFS retired)", coreiface.ErrNotFound)
 }
 
 // ── Internal Helpers ────────────────────────────────────────────
@@ -321,29 +315,6 @@ func (s *MediaAppService) getLocalImageByName(size models.ImageSize, name string
 		return nil, fmt.Errorf("%w: %s not found", coreiface.ErrNotFound, name)
 	}
 	return bytes.NewReader(data), nil
-}
-
-func (s *MediaAppService) getIPFSImageByName(ctx context.Context, peerID peer.ID, size models.ImageSize, name string, useCache bool) (io.ReadSeeker, error) {
-	if s.fetchIPNSRecord == nil || s.getIPFSFile == nil {
-		return nil, fmt.Errorf("IPFS infrastructure not available")
-	}
-	record, err := s.fetchIPNSRecord(ctx, peerID, useCache)
-	if err != nil {
-		return nil, err
-	}
-	pth, err := record.Value()
-	if err != nil {
-		return nil, err
-	}
-	pth1, err := ipath.Join(pth, "images", string(size), name)
-	if err != nil {
-		return nil, err
-	}
-	nd, err := s.getIPFSFile(ctx, pth1)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %s not found", coreiface.ErrNotFound, name)
-	}
-	return nd, nil
 }
 
 func (s *MediaAppService) resizeAndStoreProfileImage(ctx context.Context, dbtx database.Tx, img image.Image, name string, baseW, baseH int) (models.ImageHashes, error) {

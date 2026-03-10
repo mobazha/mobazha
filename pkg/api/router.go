@@ -26,6 +26,11 @@ type RouterConfig struct {
 	Resolver       NodeResolver
 	FeatureManager *pkgconfig.FeatureManager
 	AllowCORS      bool
+
+	// PostResolverMiddleware is applied after the resolver has populated the
+	// request context but before route handlers. Use this for scope enforcement
+	// that depends on AuthIdentity set by the resolver.
+	PostResolverMiddleware func(http.Handler) http.Handler
 }
 
 // Router wraps the internal SharedRouter and exposes it as an http.Handler.
@@ -38,9 +43,10 @@ type Router struct {
 // eliminating the need for a reverse proxy.
 func NewRouter(cfg RouterConfig) (*Router, error) {
 	sr, err := internalapi.NewSharedRouter(internalapi.SharedRouterConfig{
-		Resolver:       cfg.Resolver,
-		FeatureManager: cfg.FeatureManager,
-		AllowCORS:      cfg.AllowCORS,
+		Resolver:               cfg.Resolver,
+		FeatureManager:         cfg.FeatureManager,
+		AllowCORS:              cfg.AllowCORS,
+		PostResolverMiddleware: cfg.PostResolverMiddleware,
 	})
 	if err != nil {
 		return nil, err

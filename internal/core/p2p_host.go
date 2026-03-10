@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 
@@ -35,29 +36,38 @@ type P2PInfra struct {
 }
 
 // Close tears down the P2P infrastructure in reverse dependency order.
+// Errors are aggregated so that all components are closed even if one fails.
 func (p *P2PInfra) Close() error {
+	var errs []error
+
 	if p.DHT != nil {
-		_ = p.DHT.Close()
+		if err := p.DHT.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close DHT: %w", err))
+		}
 	}
 	if p.Host != nil {
-		_ = p.Host.Close()
+		if err := p.Host.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close Host: %w", err))
+		}
 	}
 	if p.SNFStore != nil {
 		if c, ok := p.SNFStore.(interface{ Close() error }); ok {
-			_ = c.Close()
+			if err := c.Close(); err != nil {
+				errs = append(errs, fmt.Errorf("close SNFStore: %w", err))
+			}
 		}
 	}
-	// DHTStore is typically an in-memory MapDatastore (no Close needed),
-	// but we attempt Close if the concrete type supports it.
 	if p.DHTStore != nil {
 		if c, ok := p.DHTStore.(interface{ Close() error }); ok {
-			_ = c.Close()
+			if err := c.Close(); err != nil {
+				errs = append(errs, fmt.Errorf("close DHTStore: %w", err))
+			}
 		}
 	}
 	if p.Cancel != nil {
 		p.Cancel()
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // P2PConfig holds parameters for constructing a P2PInfra.

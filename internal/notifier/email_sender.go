@@ -11,6 +11,7 @@ import (
 	"net/smtp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/events"
 )
@@ -143,11 +144,55 @@ func (s *EmailSender) sendViaSMTP(settings map[string]string, to, subject, htmlB
 		return s.sendSMTPImplicitTLS(server, addr, from, to, username, password, msg.Bytes())
 	}
 
-	var auth smtp.Auth
-	if username != "" {
-		auth = smtp.PlainAuth("", username, password, server)
+	return s.sendSMTPStartTLS(server, addr, from, to, username, password, msg.Bytes())
+}
+
+// sendSMTPStartTLS handles port 587 (submission) which requires explicit STARTTLS.
+// Unlike smtp.SendMail which uses opportunistic STARTTLS, this enforces TLS upgrade.
+func (s *EmailSender) sendSMTPStartTLS(host, addr, from, to, username, password string, msg []byte) error {
+	conn, err := net.DialTimeout("tcp", addr, 15*time.Second)
+	if err != nil {
+		return fmt.Errorf("dial %s: %w", addr, err)
 	}
-	return smtp.SendMail(addr, auth, from, []string{to}, msg.Bytes())
+	defer conn.Close()
+
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return fmt.Errorf("SMTP client: %w", err)
+	}
+	defer client.Close()
+
+	if ok, _ := client.Extension("STARTTLS"); !ok {
+		return fmt.Errorf("SMTP server %s does not support STARTTLS", host)
+	}
+
+	tlsConfig := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
+	if err := client.StartTLS(tlsConfig); err != nil {
+		return fmt.Errorf("STARTTLS: %w", err)
+	}
+
+	if username != "" {
+		if err := client.Auth(smtp.PlainAuth("", username, password, host)); err != nil {
+			return fmt.Errorf("SMTP auth: %w", err)
+		}
+	}
+	if err := client.Mail(from); err != nil {
+		return fmt.Errorf("SMTP MAIL FROM: %w", err)
+	}
+	if err := client.Rcpt(to); err != nil {
+		return fmt.Errorf("SMTP RCPT TO: %w", err)
+	}
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("SMTP DATA: %w", err)
+	}
+	if _, err := w.Write(msg); err != nil {
+		return fmt.Errorf("SMTP write: %w", err)
+	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("SMTP close data: %w", err)
+	}
+	return client.Quit()
 }
 
 // sendSMTPImplicitTLS handles port 465 (SMTPS) which requires TLS from connection start.

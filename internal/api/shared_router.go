@@ -16,6 +16,12 @@ type SharedRouterConfig struct {
 	Resolver       func(r *http.Request) (contracts.NodeService, error)
 	FeatureManager *config.FeatureManager
 	AllowCORS      bool
+
+	// PostResolverMiddleware, if set, is applied after the resolver middleware
+	// has populated the request context (NodeService + AuthIdentity) but before
+	// the actual route handler. This is the correct place for scope enforcement
+	// in SaaS mode because the resolver sets AuthIdentity in the context.
+	PostResolverMiddleware func(http.Handler) http.Handler
 }
 
 // NewSharedRouter creates an HTTP router that can be used by both hosting (SaaS)
@@ -51,6 +57,10 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
+
+	if cfg.PostResolverMiddleware != nil {
+		r.Use(cfg.PostResolverMiddleware)
+	}
 
 	g.registerBusinessRoutes(r)
 

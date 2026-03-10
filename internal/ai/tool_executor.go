@@ -41,11 +41,11 @@ type toolRoute struct {
 }
 
 var toolRoutes = map[string]func(args map[string]interface{}) toolRoute{
-	"listings_list_mine":    func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/listings"} },
-	"listings_get":          func(a map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/listings/" + sanitizePathParam(a["slug"])} },
+	"listings_list_mine":    func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/listings/index"} },
+	"listings_get":          func(a map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/listings/mine/" + sanitizePathParam(a["slug"])} },
 	"listings_get_template": func(_ map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/listings/template"} },
 	"listings_create":       func(_ map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/listings"} },
-	"listings_update":       func(a map[string]interface{}) toolRoute { return toolRoute{"PUT", "/v1/listings/" + sanitizePathParam(a["slug"])} },
+	"listings_update":       func(_ map[string]interface{}) toolRoute { return toolRoute{"PUT", "/v1/listings"} },
 	"listings_delete":       func(a map[string]interface{}) toolRoute { return toolRoute{"DELETE", "/v1/listings/" + sanitizePathParam(a["slug"])} },
 	"orders_get_sales":      func(_ map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/sales"} },
 	"orders_get_detail":     func(a map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/orders/" + sanitizePathParam(a["orderId"])} },

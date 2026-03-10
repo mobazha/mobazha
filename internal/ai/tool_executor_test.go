@@ -94,7 +94,7 @@ func TestAppendQueryParams_ExistingQueryString(t *testing.T) {
 
 func TestToolExecutor_Execute_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/listings" {
+		if r.URL.Path != "/v1/listings/index" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		if r.Method != "GET" {

@@ -548,10 +548,10 @@ func TestMobazhaNode_createOrder(t *testing.T) {
 					return errors.New("incorrect shipping option service")
 				}
 
-				if order.BuyerID.PeerID != network.Nodes()[0].ipfsNode.Identity.String() {
+				if order.BuyerID.PeerID != network.Nodes()[0].peerID.String() {
 					return errors.New("incorrect buyer peer ID")
 				}
-				identityPubkey, err := crypto.MarshalPublicKey(network.Nodes()[0].ipfsNode.PrivateKey.GetPublic())
+				identityPubkey, err := crypto.MarshalPublicKey(network.Nodes()[0].privKey.GetPublic())
 				if err != nil {
 					return err
 				}

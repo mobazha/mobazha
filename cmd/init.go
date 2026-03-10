@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/ipfs/kubo/repo/fsrepo"
 	"github.com/mobazha/mobazha3.0/internal/core"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
 	"github.com/mobazha/mobazha3.0/internal/repo"
@@ -30,7 +29,7 @@ func (x *Init) Execute(args []string) error {
 		}
 	}
 
-	if fsrepo.IsInitialized(x.DataDir) && !x.Force {
+	if repo.IsRepoInitialized(x.DataDir) && !x.Force {
 		return errors.New("node is already initialized")
 	}
 

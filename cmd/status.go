@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/mobazha/mobazha3.0/internal/repo"
-	"github.com/ipfs/kubo/repo/fsrepo"
 )
 
 type Status struct {
@@ -25,7 +24,7 @@ func (x *Status) Execute(args []string) error {
 	torAvailable := false
 	isDBEncrypted := false
 
-	if fsrepo.IsInitialized(x.DataDir) {
+	if repo.IsRepoInitialized(x.DataDir) {
 
 		if isDBEncrypted {
 			if !torAvailable {

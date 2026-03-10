@@ -4,46 +4,15 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/base64"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha-core/identity"
 
-	config "github.com/ipfs/kubo/config"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 )
 
-// IdentityFromKey creates an IPFS config.Identity from marshaled private key bytes.
-// Uses mobazha-core for PeerID derivation, ensuring consistency across node and cloud.
-func IdentityFromKey(privkey []byte) (config.Identity, error) {
-	ident := config.Identity{}
-
-	// Use mobazha-core to reconstruct the key pair and derive PeerID
-	keyPair, err := identity.KeyPairFromMarshaledPrivateKey(privkey)
-	if err != nil {
-		return ident, err
-	}
-
-	// Marshal for IPFS config (base64-encoded libp2p format)
-	marshaledKey, err := keyPair.MarshalPrivateKey()
-	if err != nil {
-		return ident, err
-	}
-	ident.PrivKey = base64.StdEncoding.EncodeToString(marshaledKey)
-
-	// Derive PeerID via mobazha-core (same libp2p derivation under the hood)
-	peerID, err := identity.PeerIDFromPublicKey(keyPair.PubKey)
-	if err != nil {
-		return ident, err
-	}
-	ident.PeerID = peerID.String()
-
-	return ident, nil
-}
-
 // PrivKeyAndPeerIDFromKey parses marshaled identity key bytes and returns
-// the libp2p private key and derived peer ID. This is used by the lightweight
-// node path to create a minimal libp2p Host without going through IPFS config.
+// the libp2p private key and derived peer ID.
 func PrivKeyAndPeerIDFromKey(privkeyBytes []byte) (crypto.PrivKey, peer.ID, error) {
 	keyPair, err := identity.KeyPairFromMarshaledPrivateKey(privkeyBytes)
 	if err != nil {

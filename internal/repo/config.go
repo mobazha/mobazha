@@ -114,11 +114,11 @@ type Config struct {
 	IdentityKey []byte `no-flag:"true" description:"External identity key (libp2p marshaled format)"`
 
 	// SaaSMode marks this node as a SaaS tenant node. When true, the builder:
-	//   - Skips IPFS node creation (uses SharedManager's IPFS via minimal libp2p Host)
+	//   - Skips full P2P infrastructure (uses minimal libp2p Host for identity only)
 	//   - Uses SharedDB for multi-tenant data isolation (TenantDB)
 	//   - May use lighter alternatives where available
 	// Set by mobazha_hosting for non-default tenant nodes.
-	SaaSMode bool `no-flag:"true" description:"SaaS tenant node mode (lightweight IPFS, shared DB)"`
+	SaaSMode bool `no-flag:"true" description:"SaaS tenant node mode (lightweight P2P, shared DB)"`
 
 	// SharedDB is an optional *gorm.DB connection for multi-tenant shared database.
 	// When set, the node uses TenantDB (tenant-scoped wrapper) instead of creating

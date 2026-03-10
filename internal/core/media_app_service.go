@@ -177,7 +177,7 @@ func (s *MediaAppService) GetMedia(ctx context.Context, c cid.Cid) (io.ReadSeeke
 			if readErr == nil {
 				return bytes.NewReader(data), ct, nil
 			}
-			log.Warningf("BlobStore read error for %s, falling back to DB/IPFS: %v", key, readErr)
+			log.Warningf("BlobStore read error for %s, falling back to DB: %v", key, readErr)
 		}
 	}
 

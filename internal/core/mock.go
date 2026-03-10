@@ -3,29 +3,22 @@ package core
 import (
 	"context"
 	"fmt"
-	"path"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	solana "github.com/gagliardetto/solana-go"
-	"github.com/ipfs/boxo/bootstrap"
-	"github.com/ipfs/boxo/namesys"
-	"github.com/ipfs/kubo/core"
-	coremock "github.com/ipfs/kubo/core/mock"
-	nlibp2p "github.com/ipfs/kubo/core/node/libp2p"
-	"github.com/ipfs/kubo/repo/fsrepo"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
+	ma "github.com/multiformats/go-multiaddr"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/config"
-	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
+	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
@@ -35,25 +28,13 @@ import (
 )
 
 // MockNode builds a mock node with a temp data directory,
-// in-memory database, mock IPFS node, and mock network
+// in-memory database, mock libp2p host, and mock network
 // service.
 func MockNode() (*MobazhaNode, error) {
 	r, err := repo.MockRepo()
 	if err != nil {
 		return nil, err
 	}
-
-	ipfsRepo, err := fsrepo.Open(path.Join(r.DataDir(), repo.IPFSDirName))
-	if err != nil {
-		return nil, err
-	}
-
-	ipfsConfig, err := ipfsRepo.Config()
-	if err != nil {
-		return nil, err
-	}
-
-	ipfsConfig.Bootstrap = nil
 
 	var dbIdentityKey models.Key
 	err = r.DB().View(func(tx database.Tx) error {
@@ -63,7 +44,7 @@ func MockNode() (*MobazhaNode, error) {
 		return nil, err
 	}
 
-	ipfsConfig.Identity, err = repo.IdentityFromKey(dbIdentityKey.Value)
+	privKey, _, err := repo.PrivKeyAndPeerIDFromKey(dbIdentityKey.Value)
 	if err != nil {
 		return nil, err
 	}
@@ -71,23 +52,16 @@ func MockNode() (*MobazhaNode, error) {
 	ctx := context.Background()
 
 	mn := mocknet.New()
-
-	ipfsNode, err := core.NewNode(ctx, &core.BuildCfg{
-		Online: true,
-		Repo:   ipfsRepo,
-		Host:   coremock.MockHostOption(mn),
-		ExtraOpts: map[string]bool{
-			"pubsub": true,
-		},
-	})
+	h, err := mn.AddPeer(privKey, nil)
 	if err != nil {
 		return nil, err
 	}
+	mockListenAddr, _ := ma.NewMultiaddr("/ip4/127.0.0.1/tcp/10000")
+	h.Peerstore().AddAddrs(h.ID(), []ma.Multiaddr{mockListenAddr}, peerstore.PermanentAddrTTL)
 
 	banManager := net.NewBanManager(nil, nil)
-	service := net.NewNetworkService("", ipfsNode.PeerHost, banManager, true)
+	service := net.NewNetworkService("", h, banManager, true)
 
-	// Load the keys from the db
 	var (
 		dbBip44Key  models.Key
 		dbEscrowKey models.Key
@@ -116,7 +90,7 @@ func MockNode() (*MobazhaNode, error) {
 	mockSolPrivKey := solana.NewWallet().PrivateKey
 
 	bus := events.NewBus()
-	tracker := NewFollowerTracker(r, bus, ipfsNode.PeerHost)
+	tracker := NewFollowerTracker(r, bus, h)
 
 	w := wallet.NewMockWallet()
 	w.SetEventBus(bus)
@@ -144,15 +118,14 @@ func MockNode() (*MobazhaNode, error) {
 		sharedManager: sharedManager,
 		identityFields: identityFields{
 			nodeID:   repo.DefaultNodeID,
-			peerID:   ipfsNode.Identity,
-			privKey:  ipfsNode.PrivateKey,
-			peerHost: ipfsNode.PeerHost,
-			nodeCtx:  ipfsNode.Context(),
+			peerID:   h.ID(),
+			privKey:  privKey,
+			peerHost: h,
+			nodeCtx:  ctx,
 		},
 		storageFields: storageFields{
-			ipfsNode: ipfsNode,
-			db:       r.DB(),
-			repo:     r,
+			db:   r.DB(),
+			repo: r,
 		},
 		cryptoFields: cryptoFields{
 			ethMasterKey:    ethMasterKey,
@@ -186,10 +159,10 @@ func MockNode() (*MobazhaNode, error) {
 	sharedManager.AddNode(repo.DefaultNodeID, node)
 
 	node.messenger, err = net.NewMessenger(&net.MessengerConfig{
-		Privkey: ipfsNode.PrivateKey,
+		Privkey: privKey,
 		Service: service,
 		DB:      r.DB(),
-		Context: ipfsNode.Context(),
+		Context: ctx,
 	})
 	if err != nil {
 		return nil, err
@@ -201,7 +174,7 @@ func MockNode() (*MobazhaNode, error) {
 	node.signer = signer
 
 	node.orderProcessor = orders.NewOrderProcessor(&orders.Config{
-		Identity:             ipfsNode.Identity,
+		Identity:             h.ID(),
 		Signer:               signer,
 		Db:                   r.DB(),
 		Multiwallet:          node.multiwallet,
@@ -246,7 +219,7 @@ func MockNode() (*MobazhaNode, error) {
 // MockNet represents a network of connected mock nodes.
 type Mocknet struct {
 	nodes   []*MobazhaNode
-	ipfsNet mocknet.Mocknet
+	p2pNet mocknet.Mocknet
 	wn      *wallet.MockWalletNetwork
 }
 
@@ -279,18 +252,6 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			return nil, err
 		}
 
-		ipfsRepo, err := fsrepo.Open(path.Join(r.DataDir(), repo.IPFSDirName))
-		if err != nil {
-			return nil, err
-		}
-
-		ipfsConfig, err := ipfsRepo.Config()
-		if err != nil {
-			return nil, err
-		}
-
-		ipfsConfig.Bootstrap = nil
-
 		var dbIdentityKey models.Key
 		err = r.DB().View(func(tx database.Tx) error {
 			return tx.Read().Where("name = ?", "identity").First(&dbIdentityKey).Error
@@ -299,33 +260,21 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			return nil, err
 		}
 
-		ipfsConfig.Identity, err = repo.IdentityFromKey(dbIdentityKey.Value)
+		privKey, _, err := repo.PrivKeyAndPeerIDFromKey(dbIdentityKey.Value)
 		if err != nil {
 			return nil, err
 		}
 
-		ipfsNode, err := core.NewNode(ctx, &core.BuildCfg{
-			Online: true,
-			Repo:   ipfsRepo,
-			Host:   coremock.MockHostOption(mn),
-			ExtraOpts: map[string]bool{
-				"pubsub": true,
-			},
-			Routing: constructMockRouting,
-		})
+		h, err := mn.AddPeer(privKey, nil)
 		if err != nil {
 			return nil, err
 		}
-
-		ipfsNode.Namesys, err = namesys.NewNameSystem(ipfsNode.Routing, namesys.WithDatastore(ipfsNode.Repo.Datastore()))
-		if err != nil {
-			return nil, err
-		}
+		mockAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", 10000+i))
+		h.Peerstore().AddAddrs(h.ID(), []ma.Multiaddr{mockAddr}, peerstore.PermanentAddrTTL)
 
 		banManager := net.NewBanManager(nil, nil)
-		service := net.NewNetworkService("", ipfsNode.PeerHost, banManager, true)
+		service := net.NewNetworkService("", h, banManager, true)
 
-		// Load the keys from the db
 		var (
 			dbBip44Key  models.Key
 			dbEscrowKey models.Key
@@ -350,11 +299,10 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		escrowKey, _ := btcec.PrivKeyFromBytes(dbEscrowKey.Value)
 		ratingKey, _ := btcec.PrivKeyFromBytes(dbRatingKey.Value)
 
-		// Generate a mock Solana private key for testing
 		mockSolPrivKey := solana.NewWallet().PrivateKey
 
 		bus := events.NewBus()
-		tracker := NewFollowerTracker(r, bus, ipfsNode.PeerHost)
+		tracker := NewFollowerTracker(r, bus, h)
 
 		w := wn.Wallets()[i]
 		w.SetEventBus(bus)
@@ -377,15 +325,14 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			sharedManager: sharedManager,
 			identityFields: identityFields{
 				nodeID:   nodeID,
-				peerID:   ipfsNode.Identity,
-				privKey:  ipfsNode.PrivateKey,
-				peerHost: ipfsNode.PeerHost,
-				nodeCtx:  ipfsNode.Context(),
+				peerID:   h.ID(),
+				privKey:  privKey,
+				peerHost: h,
+				nodeCtx:  ctx,
 			},
 			storageFields: storageFields{
-				ipfsNode: ipfsNode,
-				db:       r.DB(),
-				repo:     r,
+				db:   r.DB(),
+				repo: r,
 			},
 			cryptoFields: cryptoFields{
 				ethMasterKey:    ethMasterKey,
@@ -418,10 +365,10 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		sharedManager.AddNode(nodeID, node)
 
 		node.messenger, err = net.NewMessenger(&net.MessengerConfig{
-			Privkey: ipfsNode.PrivateKey,
+			Privkey: privKey,
 			Service: service,
 			DB:      r.DB(),
-			Context: ipfsNode.Context(),
+			Context: ctx,
 		})
 		if err != nil {
 			return nil, err
@@ -433,7 +380,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		node.signer = signer
 
 		node.orderProcessor = orders.NewOrderProcessor(&orders.Config{
-			Identity:             ipfsNode.Identity,
+			Identity:             h.ID(),
 			Signer:               signer,
 			Db:                   r.DB(),
 			Messenger:            node.messenger,
@@ -479,17 +426,16 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 	if err := mn.LinkAll(); err != nil {
 		return nil, err
 	}
+	if err := mn.ConnectAllButSelf(); err != nil {
+		return nil, err
+	}
 
-	bsinf := bootstrap.BootstrapConfigWithPeers(
-		[]peer.AddrInfo{
-			nodes[0].ipfsNode.Peerstore.PeerInfo(nodes[0].Identity()),
-		},
-	)
-
+	firstPeerInfo := peer.AddrInfo{
+		ID:    nodes[0].Identity(),
+		Addrs: nodes[0].peerHost.Addrs(),
+	}
 	for _, n := range nodes[1:] {
-		if err := n.ipfsNode.Bootstrap(bsinf); err != nil {
-			return nil, err
-		}
+		n.peerHost.Peerstore().AddAddrs(firstPeerInfo.ID, firstPeerInfo.Addrs, peerstore.PermanentAddrTTL)
 	}
 
 	return &Mocknet{nodes, mn, wn}, nil
@@ -502,7 +448,7 @@ func (mn *Mocknet) Nodes() []*MobazhaNode {
 
 // Peers returns the peer IDs of the nodes in the network.
 func (mn *Mocknet) Peers() []peer.ID {
-	return mn.ipfsNet.Peers()
+	return mn.p2pNet.Peers()
 }
 
 // StartAll starts all nodes in the network.
@@ -533,16 +479,4 @@ func (mn *Mocknet) TearDown() error {
 		}
 	}
 	return nil
-}
-
-func constructMockRouting(args nlibp2p.RoutingOptionArgs) (routing.Routing, error) {
-	return dht.New(
-		args.Ctx, args.Host,
-		dht.Concurrency(10),
-		dht.Mode(dht.ModeServer),
-		dht.Datastore(args.Datastore),
-		dht.Validator(args.Validator),
-		dht.ProtocolPrefix(ProtocolDHT),
-		dht.MaxRecordAge(maxRecordAge),
-	)
 }

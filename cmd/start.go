@@ -62,12 +62,12 @@ func (x *Start) Execute(args []string) error {
 			log.Info("Mobazha shutting down...")
 			n.Stop(true)
 			os.Exit(1)
-		case coreiface.ErrIPFSDelayedShutdown:
-			sub, err := n.SubscribeEvent(&events.IPFSShutdown{})
+		case coreiface.ErrP2PDelayedShutdown:
+			sub, err := n.SubscribeEvent(&events.P2PShutdown{})
 			if err != nil {
 				return err
 			}
-			log.Info("IPFS node is shutting down. Press ctl+c again to force shutdown.")
+			log.Info("P2P node is shutting down. Press ctl+c again to force shutdown.")
 			select {
 			case <-c:
 			case <-sub.Out():

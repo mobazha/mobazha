@@ -5,31 +5,26 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/tyler-smith/go-bip39"
 )
 
 var keyHex = "08011240499228645d120d15b5008b1da0b9dba898df328001ea03c0be84a64c41d205ff1b8339a303cd8cf2945b66c89ac29fa90e79731d67000694284791af404eeb1f"
 
-func TestIdentityFromKey(t *testing.T) {
+func TestPrivKeyAndPeerIDFromKey(t *testing.T) {
 	keyBytes, err := hex.DecodeString(keyHex)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
-	identity, err := IdentityFromKey(keyBytes)
+	privKey, peerID, err := PrivKeyAndPeerIDFromKey(keyBytes)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	expected := "12D3KooWBfmETW1ZbkdZbKKPpE3jpjyQ5WBXoDF8y9oE8vMQPKLi"
-	if identity.PeerID != expected {
-		t.Errorf("Incorrect identity returned. Wanted %s, got %s", expected, identity.PeerID)
+	if peerID.String() != expected {
+		t.Errorf("Incorrect peer ID. Wanted %s, got %s", expected, peerID.String())
 	}
-	decodedKey, err := crypto.ConfigDecodeKey(identity.PrivKey)
-	if err != nil {
-		t.Error(err)
-	}
-	if !bytes.Equal(decodedKey, keyBytes) {
-		t.Error("Incorrect private key returned")
+	if privKey == nil {
+		t.Error("Private key should not be nil")
 	}
 }
 

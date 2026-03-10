@@ -23,7 +23,7 @@ func TestFollowerTracker_ConnectDisconnect(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ft := NewFollowerTracker(node.repo, node.eventBus, node.ipfsNode.PeerHost)
+	ft := NewFollowerTracker(node.repo, node.eventBus, node.peerHost)
 	ft.Start()
 
 	select {
@@ -108,7 +108,7 @@ func TestFollowerTracker_ConnectToFollowers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ft := NewFollowerTracker(mocknet.Nodes()[0].repo, mocknet.Nodes()[0].eventBus, mocknet.Nodes()[0].ipfsNode.PeerHost)
+	ft := NewFollowerTracker(mocknet.Nodes()[0].repo, mocknet.Nodes()[0].eventBus, mocknet.Nodes()[0].peerHost)
 	ft.Start()
 
 	ft.tryConnectFollowers()

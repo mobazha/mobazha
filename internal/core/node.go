@@ -9,7 +9,6 @@ import (
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/gagliardetto/solana-go"
-	"github.com/ipfs/kubo/core"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -95,7 +94,7 @@ type identityFields struct {
 
 // storageFields groups data storage dependencies.
 type storageFields struct {
-	ipfsNode     *core.IpfsNode
+	p2pInfra *P2PInfra
 	contentStore contracts.ContentStore
 	db           database.Database
 	repo         *repo.Repo
@@ -236,7 +235,7 @@ func (n *MobazhaNode) Start() {
 		}
 	}()
 
-	go n.bootstrapIPFS()
+	go n.bootstrapDHT()
 
 	// Default node always starts the SharedManager (HTTP gateway) regardless of mode,
 	// because hosting proxies /v1/* requests to the internal API on port 5102.
@@ -353,20 +352,19 @@ func (n *MobazhaNode) Stop(force bool) error {
 	close(n.shutdown)
 	n.repo.Close()
 
-	if n.ipfsNode != nil {
-		// Full node: close the IPFS node
+	if n.p2pInfra != nil {
+		// Full node: close the P2P infrastructure (Host, DHT, datastores)
 		stop := make(chan struct{})
 		go func() {
-			n.ipfsNode.Context().Done()
-			n.ipfsNode.Close()
+			n.p2pInfra.Close()
 			time.AfterFunc(time.Second, func() {
-				n.eventBus.Emit(&events.IPFSShutdown{})
+				n.eventBus.Emit(&events.P2PShutdown{})
 			})
 			close(stop)
 		}()
 		select {
 		case <-time.After(time.Second * 2):
-			return coreiface.ErrIPFSDelayedShutdown
+			return coreiface.ErrP2PDelayedShutdown
 		case <-stop:
 		}
 	} else {
@@ -377,13 +375,13 @@ func (n *MobazhaNode) Stop(force bool) error {
 		if n.nodeCancel != nil {
 			n.nodeCancel()
 		}
-		n.eventBus.Emit(&events.IPFSShutdown{})
+		n.eventBus.Emit(&events.P2PShutdown{})
 	}
 	return nil
 }
 
 // UsingTestnet returns whether or not this node is running on
-// the test network (IPFS bootstrap).
+// the test network.
 func (n *MobazhaNode) UsingTestnet() bool {
 	return n.testnet
 }
@@ -408,10 +406,6 @@ func (n *MobazhaNode) DestroyNode() {
 	n.repo.DestroyRepo()
 }
 
-// IPFSNode returns the underlying IPFS node instance.
-func (n *MobazhaNode) IPFSNode() *core.IpfsNode {
-	return n.ipfsNode
-}
 
 // Multiwallet returns the WalletOperator interface.
 // Internal callers that need concrete map access can type-assert to

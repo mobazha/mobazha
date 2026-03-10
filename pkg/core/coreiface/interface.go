@@ -1,7 +1,6 @@
 package coreiface
 
 import (
-	"github.com/ipfs/kubo/core"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
@@ -23,7 +22,6 @@ type CoreIface interface {
 
 	Start()
 	Stop(force bool) error
-	IPFSNode() *core.IpfsNode
 	PeerHost() host.Host
 	DestroyNode()
 

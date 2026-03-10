@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ipfs/boxo/bootstrap"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -500,15 +499,14 @@ func (n *MobazhaNode) syncMessages() {
 	}
 }
 
-// bootstrapIPFS bootstraps the IPFS node.
-// For lightweight nodes (ipfsNode == nil), skip bootstrap and signal ready immediately.
-func (n *MobazhaNode) bootstrapIPFS() error {
-	if n.ipfsNode == nil {
-		// Lightweight node: no IPFS to bootstrap; signal ready immediately.
+// bootstrapDHT starts the DHT bootstrap process.
+// For lightweight nodes (p2pInfra == nil), skip bootstrap and signal ready immediately.
+func (n *MobazhaNode) bootstrapDHT() error {
+	if n.p2pInfra == nil {
 		close(n.initialBootstrapChan)
 		return nil
 	}
-	if err := n.ipfsNode.Bootstrap(bootstrap.DefaultBootstrapConfig); err != nil {
+	if err := n.p2pInfra.DHT.Bootstrap(n.p2pInfra.Ctx); err != nil {
 		return err
 	}
 	close(n.initialBootstrapChan)

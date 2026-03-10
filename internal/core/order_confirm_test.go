@@ -225,7 +225,7 @@ func TestMobazhaNode_ConfirmOrder_Cancelable_Reconnect(t *testing.T) {
 	// to resend the order upon reconnection.
 	network.Nodes()[0].networkService.Close()
 	go network.Nodes()[1].syncMessages()
-	if err := network.ipfsNet.UnlinkPeers(network.Nodes()[0].Identity(), network.Nodes()[1].Identity()); err != nil {
+	if err := network.p2pNet.UnlinkPeers(network.Nodes()[0].Identity(), network.Nodes()[1].Identity()); err != nil {
 		t.Fatal(err)
 	}
 	orderID2, paymentAmount, err := network.Nodes()[1].Order().PurchaseListing(context.Background(), purchase)
@@ -250,10 +250,10 @@ func TestMobazhaNode_ConfirmOrder_Cancelable_Reconnect(t *testing.T) {
 
 	// Reconnecting nodes should trigger node 1 to send the order to node 0 again.
 	time.Sleep(10 * time.Millisecond)
-	network.Nodes()[0].networkService = net.NewNetworkService(network.Nodes()[0].nodeID, network.Nodes()[0].ipfsNode.PeerHost, net.NewBanManager(nil, nil), true)
+	network.Nodes()[0].networkService = net.NewNetworkService(network.Nodes()[0].nodeID, network.Nodes()[0].peerHost, net.NewBanManager(nil, nil), true)
 	network.Nodes()[0].registerHandlers()
 
-	if _, err := network.ipfsNet.LinkPeers(network.Nodes()[0].Identity(), network.Nodes()[1].Identity()); err != nil {
+	if _, err := network.p2pNet.LinkPeers(network.Nodes()[0].Identity(), network.Nodes()[1].Identity()); err != nil {
 		t.Fatal(err)
 	}
 

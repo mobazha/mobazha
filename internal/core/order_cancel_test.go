@@ -90,7 +90,7 @@ func TestMobazhaNode_CancelOrder(t *testing.T) {
 	// to resend the order upon reconnection.
 	// sellerNode.networkService.Close()
 	// go buyerNode.syncMessages()
-	if err := network.ipfsNet.UnlinkPeers(sellerNode.Identity(), buyerNode.Identity()); err != nil {
+	if err := network.p2pNet.UnlinkPeers(sellerNode.Identity(), buyerNode.Identity()); err != nil {
 		t.Fatal(err)
 	}
 	orderID2, paymentAmount, err := buyerNode.Order().PurchaseListing(context.Background(), purchase)
@@ -102,10 +102,10 @@ func TestMobazhaNode_CancelOrder(t *testing.T) {
 
 	// Reconnecting nodes should trigger node 1 to send the order to node 0 again.
 	runtime.Gosched()
-	sellerNode.networkService = net.NewNetworkService(sellerNode.nodeID, sellerNode.ipfsNode.PeerHost, net.NewBanManager(nil, nil), true)
+	sellerNode.networkService = net.NewNetworkService(sellerNode.nodeID, sellerNode.peerHost, net.NewBanManager(nil, nil), true)
 	sellerNode.registerHandlers()
 
-	if _, err := network.ipfsNet.LinkPeers(sellerNode.Identity(), buyerNode.Identity()); err != nil {
+	if _, err := network.p2pNet.LinkPeers(sellerNode.Identity(), buyerNode.Identity()); err != nil {
 		t.Fatal(err)
 	}
 

@@ -66,7 +66,7 @@ func TestMediaAppService_UploadMedia_SameDataSameCID(t *testing.T) {
 func TestMediaAppService_GetMedia_NilIPFS_NoDB(t *testing.T) {
 	svc := newTestMediaAppService(t, MediaAppServiceConfig{})
 	_, _, err := svc.GetMedia(context.Background(), testCID())
-	assert.Error(t, err, "should error when no DB hit and IPFS is nil")
+	assert.Error(t, err, "should error when no DB hit and no blob store")
 }
 
 func TestMediaAppService_SetProfileMedia_Avatar(t *testing.T) {

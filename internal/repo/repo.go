@@ -3,7 +3,6 @@ package repo
 import (
 	"crypto/ed25519"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -15,20 +14,14 @@ import (
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
-	config "github.com/ipfs/kubo/config"
-	"github.com/ipfs/kubo/plugin/loader"
-	"github.com/ipfs/kubo/repo/fsrepo"
 	"github.com/mobazha/mobazha3.0/internal/common"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/database/ffsqlite"
-	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/version"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/op/go-logging"
 	"github.com/tyler-smith/go-bip39"
 	"gorm.io/gorm"
-
-	mfsr "github.com/ipfs/fs-repo-migrations/tools/mfsr"
 )
 
 const (
@@ -59,11 +52,11 @@ var (
 	sharedDBMigrateErr  error
 )
 
-// Repo is a representation of an Mobazha data directory.
+// Repo is a representation of a Mobazha data directory.
 // In this we store:
-// - IPFS node data
 // - The mobazha.conf file
 // - The node's data root directory
+// - Keys and database
 // - The Mobazha database
 // - A wallet directory which holds wallet plugin data
 type Repo struct {
@@ -204,21 +197,24 @@ func (r *Repo) WriteVersion(version int) error {
 	return os.WriteFile(path.Join(r.dataDir, versionFileName), []byte(versionStr), os.ModePerm)
 }
 
+// IsRepoInitialized checks whether the data directory has been initialized
+// by looking for the version file. This replaces the previous fsrepo.IsInitialized check.
+func IsRepoInitialized(dataDir string) bool {
+	_, err := os.Stat(path.Join(dataDir, versionFileName))
+	return err == nil
+}
+
 func newRepo(nodeID string, dataDir, mnemonicSeed string, externalIdentityKey []byte, inMemoryDB bool, testnet bool) (*Repo, error) {
 	var (
 		keys  *nodeKeys
 		err   error
 		isNew bool
 	)
-	ipfsDir := path.Join(dataDir, IPFSDirName)
-
-	// Install IPFS database plugins. This is guarded by a sync.Once.
-	installDatabasePlugins(ipfsDir)
 
 	var torKey *models.Key
 
-	if !fsrepo.IsInitialized(ipfsDir) {
-		if err := checkWriteable(ipfsDir); err != nil {
+	if !IsRepoInitialized(dataDir) {
+		if err := checkWriteable(dataDir); err != nil {
 			return nil, err
 		}
 
@@ -227,49 +223,13 @@ func newRepo(nodeID string, dataDir, mnemonicSeed string, externalIdentityKey []
 			return nil, err
 		}
 
-		// Initialize IPFS repo with the identity key
-		identity, err := IdentityFromKey(keys.identityKey)
-		if err != nil {
-			return nil, err
-		}
-		conf := mustDefaultConfig(testnet)
-		conf.Identity = identity
-		if err := fsrepo.Init(ipfsDir, conf); err != nil {
-			return nil, err
-		}
-
-		// Generate Tor key (standalone nodes only, not needed for SaaS)
 		_, torPriv, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
 			return nil, err
 		}
 		torKey = &models.Key{Name: "tor", Value: torPriv.Seed()}
 
-		if err := cleanIdentityFromConfig(ipfsDir); err != nil {
-			return nil, err
-		}
 		isNew = true
-	} else {
-		// Existing IPFS repo — run version migrations
-		ipfsRepo := mfsr.RepoPath(path.Join(dataDir, IPFSDirName))
-		if err := ipfsRepo.CheckVersion("13"); err == nil {
-			logger.LogInfoWithIDf(log, nodeID, "update IPFS version file from 13 to 14")
-			if err = migrateIPFSRepoFrom13To14(dataDir); err == nil {
-				if err = ipfsRepo.WriteVersion("14"); err != nil {
-					logger.LogInfoWithIDf(log, nodeID, "failed to update version file to 14, %v", err)
-				}
-			} else {
-				logger.LogInfoWithIDf(log, nodeID, "migration failed, %v", err)
-			}
-		} else if err := ipfsRepo.CheckVersion("14"); err == nil {
-			if err := ipfsRepo.WriteVersion("16"); err != nil {
-				logger.LogInfoWithIDf(log, nodeID, "failed to update version file to 16, %v", err)
-			}
-		} else if err := ipfsRepo.CheckVersion("15"); err == nil {
-			if err := ipfsRepo.WriteVersion("16"); err != nil {
-				logger.LogInfoWithIDf(log, nodeID, "failed to update version file to 16, %v", err)
-			}
-		}
 	}
 
 	var db database.Database
@@ -536,102 +496,6 @@ func CreateHDKeys(seed []byte) (escrowKey, ratingKey *btcec.PrivateKey, bip44Key
 	return escrowKey, ratingKey, bip44Key, &solPriv, nil
 }
 
-func mustDefaultConfig(testnet bool) *config.Config {
-	bootstrapPeers, err := config.ParseBootstrapPeers([]string{}) // TODO:
-	if err != nil {
-		// BootstrapAddressesDefault are local and should never panic
-		panic(err)
-	}
-
-	conf, err := config.Init(&dummyWriter{}, 4096)
-	if err != nil {
-		panic(err)
-	}
-	conf.Discovery.MDNS.Enabled = true
-	conf.Addresses = config.Addresses{
-		Swarm: []string{
-			"/ip4/0.0.0.0/tcp/5101",
-			"/ip6/::/tcp/5101",
-			"/ip4/0.0.0.0/tcp/7105/ws",
-			"/ip6/::/tcp/7105/ws",
-		},
-		API:     []string{""},
-		Gateway: []string{"/ip4/127.0.0.1/tcp/5102"},
-	}
-	if testnet {
-		conf.Addresses = config.Addresses{
-			Swarm: []string{
-				"/ip4/0.0.0.0/tcp/4001",
-				"/ip6/::/tcp/4001",
-				"/ip4/0.0.0.0/tcp/9005/ws",
-				"/ip6/::/tcp/9005/ws",
-			},
-			API:     []string{""},
-			Gateway: []string{"/ip4/127.0.0.1/tcp/4002"},
-		}
-	}
-	conf.Bootstrap = config.BootstrapPeerStrings(bootstrapPeers)
-	conf.Swarm.EnableHolePunching = config.True
-	conf.Swarm.RelayClient.Enabled = config.True
-	conf.Swarm.ResourceMgr.Enabled = config.True
-
-	return conf
-}
-
-type dummyWriter struct{}
-
-func (d *dummyWriter) Write(p []byte) (n int, err error) { return 0, nil }
-
-var pluginOnce sync.Once
-
-// installDatabasePlugins installs the default database plugins
-// used by mobazha-go. This function is guarded by a sync.Once
-// so it isn't accidentally called more than once.
-func installDatabasePlugins(ipfsDir string) {
-	pluginOnce.Do(func() {
-		loader, err := loader.NewPluginLoader(ipfsDir)
-		if err != nil {
-			panic(err)
-		}
-		err = loader.Initialize()
-		if err != nil {
-			panic(err)
-		}
-
-		err = loader.Inject()
-		if err != nil {
-			panic(err)
-		}
-	})
-}
-
-// The IPFS config file holds the private key to the node. First we aren't
-// even using this key as we prefer to use one derived from a mnemonic, but
-// second we don't want it sitting in the config file anyway. So this function
-// removes the identity object from the config. The identity object will be
-// added back into the config with the correct key/identity by the MobazhaNode
-// builder.
-func cleanIdentityFromConfig(dataDir string) error {
-	configPath := path.Join(dataDir, "config")
-	configFile, err := os.ReadFile(configPath)
-	if err != nil {
-		return err
-	}
-	var cfgIface interface{}
-	if err := json.Unmarshal(configFile, &cfgIface); err != nil {
-		return err
-	}
-	cfg, ok := cfgIface.(map[string]interface{})
-	if !ok {
-		return errors.New("invalid config file")
-	}
-	delete(cfg, "Identity")
-	out, err := json.MarshalIndent(cfg, "", "    ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(configPath, out, os.ModePerm)
-}
 
 func autoMigrateDatabase(db database.Database) error {
 	dbModels := []interface{}{

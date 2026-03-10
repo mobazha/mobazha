@@ -51,9 +51,9 @@ type PublishingError struct {
 	Err error
 }
 
-// IPFSShutdown is an event that gets pushed when the IPFS node
+// P2PShutdown is an event that gets pushed when the P2P node
 // shuts down.
-type IPFSShutdown struct{}
+type P2PShutdown struct{}
 
 // PingReceived is an event that gets pushed when a node receives
 // a PING message.

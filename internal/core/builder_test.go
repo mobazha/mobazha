@@ -31,17 +31,16 @@ func TestNewNode(t *testing.T) {
 
 	defer node.DestroyNode()
 
-	// Load our identity key from the db and set it in the config.
 	var dbIdentityKey models.Key
 	err = node.repo.DB().View(func(tx database.Tx) error {
 		return tx.Read().Where("name = ?", "identity").First(&dbIdentityKey).Error
 	})
 
-	id, err := repo.IdentityFromKey(dbIdentityKey.Value)
+	_, expectedPeerID, err := repo.PrivKeyAndPeerIDFromKey(dbIdentityKey.Value)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if node.ipfsNode.Identity.String() != id.PeerID {
+	if node.Identity().String() != expectedPeerID.String() {
 		t.Error("Incorrect identity instantiated")
 	}
 }

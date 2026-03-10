@@ -35,7 +35,7 @@ func newMockUTXOAdapter(node *MobazhaNode) *adapters.UTXOAutoConfirmAdapter {
 // setupMockNetDB creates a mock HTTP server that serves listing index data
 // from the provided nodes' local databases, then creates and sets a NetDB
 // instance on each node. This mirrors the production path (netDB → HTTP →
-// mobazha.info) without any IPFS/IPNS dependency.
+// mobazha.info) without any content-routing dependency.
 //
 // In production: node.netDB → HTTP GET /listingindex/{peerID} → mobazha.info API
 // In test:       node.netDB → HTTP GET /listingindex/{peerID} → httptest.Server → node.GetMyListings()
@@ -79,7 +79,7 @@ func setupMockNetDB(t *testing.T, nodes []*MobazhaNode) {
 	t.Cleanup(server.Close)
 
 	for _, node := range nodes {
-		ndb, _ := netdb.NewNetDB(server.URL, node.peerID.String(), node.ipfsNode.PrivateKey)
+		ndb, _ := netdb.NewNetDB(server.URL, node.peerID.String(), node.privKey)
 		node.netDB = ndb
 		node.initListingService()
 	}
@@ -295,8 +295,8 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 	buyerNode := network.Nodes()[1]
 
 	// ── Mock NetDB Setup ────────────────────────────────────────
-	// Set up a mock HTTP server to serve listing index data, eliminating
-	// IPFS/IPNS dependency. This mirrors the production path where netDB
+	// Set up a mock HTTP server to serve listing index data. This mirrors
+	// the production path where netDB
 	// queries mobazha.info for listing data.
 	setupMockNetDB(t, network.Nodes())
 

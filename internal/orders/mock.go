@@ -2,13 +2,11 @@ package orders
 
 import (
 	"context"
-	"path"
 
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/kubo/core"
-	coremock "github.com/ipfs/kubo/core/mock"
-	"github.com/ipfs/kubo/repo/fsrepo"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
+	ma "github.com/multiformats/go-multiaddr"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/multiwallet"
@@ -28,49 +26,35 @@ func newMockOrderProcessor() (*OrderProcessor, func(), error) {
 		return nil, nil, err
 	}
 
-	ipfsRepo, err := fsrepo.Open(path.Join(r.DataDir(), repo.IPFSDirName))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	ipfsConfig, err := ipfsRepo.Config()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	ipfsConfig.Bootstrap = nil
-
 	var dbIdentityKey models.Key
 	err = r.DB().View(func(tx database.Tx) error {
 		return tx.Read().Where("name = ?", "identity").First(&dbIdentityKey).Error
 	})
-
-	ipfsConfig.Identity, err = repo.IdentityFromKey(dbIdentityKey.Value)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	ctx := context.Background()
+	privKey, peerID, err := repo.PrivKeyAndPeerIDFromKey(dbIdentityKey.Value)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	mn := mocknet.New()
-
-	ipfsNode, err := core.NewNode(ctx, &core.BuildCfg{
-		Online: true,
-		Repo:   ipfsRepo,
-		Host:   coremock.MockHostOption(mn),
-	})
+	h, err := mn.AddPeer(privKey, nil)
 	if err != nil {
 		return nil, nil, err
 	}
+	mockListenAddr, _ := ma.NewMultiaddr("/ip4/127.0.0.1/tcp/10000")
+	h.Peerstore().AddAddrs(h.ID(), []ma.Multiaddr{mockListenAddr}, peerstore.PermanentAddrTTL)
 
 	banManager := net.NewBanManager(nil, nil)
-	service := net.NewNetworkService("", ipfsNode.PeerHost, banManager, true)
+	service := net.NewNetworkService("", h, banManager, true)
 
 	messenger, err := net.NewMessenger(&net.MessengerConfig{
-		Privkey: ipfsNode.PrivateKey,
+		Privkey: privKey,
 		Service: service,
 		DB:      r.DB(),
-		Context: ipfsNode.Context(),
+		Context: context.Background(),
 	})
 	if err != nil {
 		return nil, nil, err
@@ -91,7 +75,7 @@ func newMockOrderProcessor() (*OrderProcessor, func(), error) {
 	}
 
 	return NewOrderProcessor(&Config{
-			Identity:             ipfsNode.Identity,
+			Identity:             peerID,
 			Signer:               signer,
 			Db:                   r.DB(),
 			Messenger:            messenger,
@@ -101,7 +85,7 @@ func newMockOrderProcessor() (*OrderProcessor, func(), error) {
 			CalcCIDFunc:          calcMockCID,
 			FeatureManager:       config.GetGlobalFeatureManager(),
 		}), func() {
-			ipfsNode.Close()
+			h.Close()
 			r.DestroyRepo()
 		}, nil
 }

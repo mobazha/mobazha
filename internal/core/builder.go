@@ -15,20 +15,10 @@ import (
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	solana "github.com/gagliardetto/solana-go"
-	config "github.com/ipfs/kubo/config"
-	"github.com/ipfs/kubo/core"
-	nlibp2p "github.com/ipfs/kubo/core/node/libp2p"
-	"github.com/ipfs/kubo/repo/fsrepo"
 	"github.com/libp2p/go-libp2p"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p-kad-dht/dual"
-	lcfg "github.com/libp2p/go-libp2p/config"
-	"github.com/libp2p/go-libp2p/core/host"
 	inet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/libp2p/go-libp2p/core/routing"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	coreorders "github.com/mobazha/mobazha-core/orders"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
@@ -62,7 +52,6 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/op/go-logging"
 	"github.com/tyler-smith/go-bip39"
-	"go.uber.org/fx"
 	"gorm.io/gorm"
 )
 
@@ -80,9 +69,6 @@ var (
 	fileLogFormat   = logging.MustStringFormatter(`%{time:15:04:05.000} [%{level}] [%{module}/%{shortfunc}] %{message}`)
 	ProtocolDHT     protocol.ID
 )
-
-// 创建共享的DHT实例
-var sharedDHT routing.Routing
 
 // NewNode constructs and returns an MobazhaNode using the given cfg.
 func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService ...coreiface.HostService) (*MobazhaNode, error) {
@@ -164,78 +150,14 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	}
 
 	// ── SaaS / lightweight node path ──────────────────────────────────
-	// When SaaSMode is enabled, skip IPFS node creation entirely.
+	// When SaaSMode is enabled, skip full P2P infrastructure creation.
 	// Instead create a minimal libp2p Host (identity only, no listen addrs)
-	// and share the default node's IPFS infrastructure for content ops.
+	// and share the default node's infrastructure for content ops.
 	if cfg.SaaSMode {
 		return newLightweightNode(ctx, cfg, nodeID, obRepo, sharedManager, shutdownTorFunc, hs)
 	}
 
 	// ── Full node path ─────────────────────────────────────────────────
-	// Load the IPFS Repo
-	ipfsRepo, err := fsrepo.Open(path.Join(repoPath, repo.IPFSDirName))
-	if err != nil {
-		return nil, err
-	}
-
-	ipfsConfig, err := ipfsRepo.Config()
-	if err != nil {
-		return nil, err
-	}
-
-	// Disable MDNS
-	ipfsConfig.Swarm.DisableNatPortMap = cfg.DisableNATPortMap
-
-	getBootstrapAddrs := func() []string {
-		// Merge the bootstrap addresses from the config with the ones from the net config.
-		bootstraps := append(netConfig.BootstrapAddrs, cfg.BoostrapAddrs...)
-		if cfg.Testnet {
-			bootstraps = append(bootstraps, repo.DefaultTestnetBootstrapAddrs...)
-		} else {
-			bootstraps = append(bootstraps, repo.DefaultMainnetBootstrapAddrs...)
-		}
-		// Add the default IPFS bootstrap addresses
-		bootstraps = append(bootstraps, config.DefaultBootstrapAddresses...)
-
-		bootstrapAddrMap := make(map[string]bool)
-		for _, addr := range bootstraps {
-			bootstrapAddrMap[addr] = true
-		}
-
-		addrs := []string{}
-		for addr := range bootstrapAddrMap {
-			addrs = append(addrs, addr)
-		}
-		return addrs
-	}
-	ipfsConfig.Bootstrap = getBootstrapAddrs()
-
-	// If swarm addresses were provided in the config, override the IPFS defaults.
-	if len(cfg.SwarmAddrs) > 0 {
-		ipfsConfig.Addresses.Swarm = cfg.SwarmAddrs
-	}
-	if cfg.Tor {
-		ipfsConfig.Addresses.Swarm = []string{fmt.Sprintf("/onion3/%s:9003", onionID)}
-	} else if cfg.DualStack {
-		ipfsConfig.Addresses.Swarm = append(ipfsConfig.Addresses.Swarm, fmt.Sprintf("/onion3/%s:9003", onionID))
-	}
-
-	// If a gateway address was provided in the config, override the IPFS default.
-	if cfg.GatewayAddr != "" {
-		ipfsConfig.Addresses.Gateway = config.Strings{cfg.GatewayAddr}
-	}
-
-	if cfg.Tor {
-		ipfsConfig.Swarm.DisableNatPortMap = true
-	}
-
-	// Enable relay client and hole punching for NAT-only standalone stores
-	// so the SaaS proxy can reach them via libp2p circuit relay + DCUtR.
-	if !cfg.SaaSMode && cfg.StandaloneConnectivity == "nat" {
-		ipfsConfig.Swarm.RelayClient.Enabled = config.True
-		ipfsConfig.Swarm.EnableHolePunching = config.True
-	}
-
 	// Load identity key: use external key from config if provided, otherwise load from DB.
 	var identityKeyBytes []byte
 	if len(cfg.IdentityKey) > 0 {
@@ -251,89 +173,53 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		identityKeyBytes = dbIdentityKey.Value
 	}
 
-	ipfsConfig.Identity, err = repo.IdentityFromKey(identityKeyBytes)
+	privKey, _, err := repo.PrivKeyAndPeerIDFromKey(identityKeyBytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse identity key: %w", err)
 	}
 
-	// Update the protocol IDs for Bitswap and the Kad-DHT. This is used to segregate the
-	// network from mainline IPFS.
+	// Set DHT protocol prefix for Mobazha network segregation.
 	if !cfg.Testnet {
 		ProtocolDHT = obnet.ProtocolPrefixMainnet
 	} else {
 		ProtocolDHT = obnet.ProtocolPrefixTestnet
 	}
 
-	constructPeerHost := func(id peer.ID, ps peerstore.Peerstore, options ...libp2p.Option) (host.Host, error) {
-		pkey := ps.PrivKey(id)
-		if pkey == nil {
-			return nil, fmt.Errorf("missing private key for node ID: %s", id)
-		}
-		options = append([]libp2p.Option{libp2p.Identity(pkey), libp2p.Peerstore(ps)}, options...)
-
-		config := &lcfg.Config{}
-		if err := config.Apply(options...); err != nil {
-			return nil, err
-		}
-		config.DisableMetrics = true
-
-		if cfg.Tor {
-			config.Transports = []fx.Option{}
-			if err := transportOpt(config); err != nil {
-				return nil, err
-			}
-		} else if cfg.DualStack {
-			if err := transportOpt(config); err != nil {
-				return nil, err
-			}
-		}
-		return config.NewNode()
-	}
-
-	// New IPFS build config
-	dhtMode := dht.ModeAuto
-	if cfg.DHTClientOnly {
-		dhtMode = dht.ModeClient
-	} else if isDefaultNode {
-		// 默认节点使用服务器模式
-		dhtMode = dht.ModeServer
+	// Merge bootstrap addresses from all sources (net config, CLI, defaults).
+	bootstraps := append(netConfig.BootstrapAddrs, cfg.BoostrapAddrs...)
+	if cfg.Testnet {
+		bootstraps = append(bootstraps, repo.DefaultTestnetBootstrapAddrs...)
 	} else {
-		// 其他节点使用客户端模式，减少开销
-		dhtMode = dht.ModeClient
+		bootstraps = append(bootstraps, repo.DefaultMainnetBootstrapAddrs...)
 	}
 
-	ncfg := &core.BuildCfg{
-		Repo:      ipfsRepo,
-		Online:    true,
-		Permanent: true,
-		ExtraOpts: map[string]bool{
-			"pubsub": true,
-		},
-		// 使用共享的DHT
-		Routing: func(args nlibp2p.RoutingOptionArgs) (routing.Routing, error) {
-			// 只在服务器模式下共享DHT
-			if dhtMode == dht.ModeServer && sharedDHT != nil {
-				return sharedDHT, nil
-			}
-
-			// 客户端模式或首次创建：每个节点使用自己的DHT
-			dhtInstance, err := constructDHTRouting(dhtMode)(args)
-			if err != nil {
-				return nil, err
-			}
-
-			// 只在服务器模式下保存共享引用
-			if dhtMode == dht.ModeServer {
-				sharedDHT = dhtInstance
-			}
-
-			return dhtInstance, nil
-		},
-		Host: constructPeerHost,
+	// Resolve swarm listen addresses.
+	swarmAddrs := cfg.SwarmAddrs
+	if len(swarmAddrs) == 0 {
+		swarmAddrs = []string{"/ip4/0.0.0.0/tcp/4001", "/ip6/::/tcp/4001"}
+	}
+	if cfg.Tor {
+		swarmAddrs = []string{fmt.Sprintf("/onion3/%s:9003", onionID)}
+	} else if cfg.DualStack {
+		swarmAddrs = append(swarmAddrs, fmt.Sprintf("/onion3/%s:9003", onionID))
 	}
 
-	// Construct IPFS node.
-	ipfsNode, err := core.NewNode(ctx, ncfg)
+	// Create the P2P infrastructure (libp2p Host + DHT + datastores).
+	infra, err := createP2PInfra(ctx, &P2PConfig{
+		PrivKey:           privKey,
+		SwarmAddrs:        swarmAddrs,
+		BootstrapAddrs:    bootstraps,
+		DataDir:           repoPath,
+		Testnet:           cfg.Testnet,
+		DHTClientOnly:     cfg.DHTClientOnly,
+		IsDefaultNode:     isDefaultNode,
+		DisableNATPortMap: cfg.DisableNATPortMap,
+		EnableSNFServer:   cfg.EnableSNFServer,
+		Tor:               cfg.Tor,
+		DualStack:         cfg.DualStack,
+		TransportOpt:      transportOpt,
+		NATConnectivity:   cfg.StandaloneConnectivity,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -350,18 +236,24 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		for _, serverStr := range cfg.SNFServerPeers {
 			server, err := peer.Decode(serverStr)
 			if err != nil {
+				infra.Close()
 				return nil, err
 			}
 			snfReplicationPeers = append(snfReplicationPeers, server)
+		}
+		snfDS := infra.SNFStore
+		if snfDS == nil {
+			snfDS = infra.DHTStore
 		}
 		serverOpts := []storeandforward.Option{
 			storeandforward.ServerProtocols(protocol.ID(snfServerProtocol)),
 			storeandforward.ClientProtocols(protocol.ID(snfClientProtocol)),
 			storeandforward.ReplicationPeers(snfReplicationPeers...),
-			storeandforward.Datastore(ipfsNode.Repo.Datastore()),
+			storeandforward.Datastore(snfDS),
 		}
-		_, err := storeandforward.NewServer(ipfsNode.Context(), ipfsNode.PeerHost, serverOpts...)
+		_, err := storeandforward.NewServer(infra.Ctx, infra.Host, serverOpts...)
 		if err != nil {
+			infra.Close()
 			return nil, err
 		}
 	}
@@ -372,7 +264,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		standaloneNetDBEndpoint = cfg.NetDBEndpoint
 	}
 	if len(standaloneNetDBEndpoint) > 0 {
-		netDB, _ = netdb.NewNetDB(standaloneNetDBEndpoint, ipfsNode.Identity.String(), ipfsNode.PrivateKey)
+		netDB, _ = netdb.NewNetDB(standaloneNetDBEndpoint, infra.PeerID.String(), infra.PrivKey)
 	}
 
 	// 使用 WalletTestnet（如果设置），否则回退到 Testnet
@@ -386,13 +278,13 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		sharedManager: sharedManager,
 			identityFields: identityFields{
 				nodeID:   nodeID,
-				peerID:   ipfsNode.Identity,
-				privKey:  ipfsNode.PrivateKey,
-				peerHost: ipfsNode.PeerHost,
-				nodeCtx:  ipfsNode.Context(),
+				peerID:   infra.PeerID,
+				privKey:  infra.PrivKey,
+				peerHost: infra.Host,
+				nodeCtx:  infra.Ctx,
 			},
 			storageFields: storageFields{
-				ipfsNode: ipfsNode,
+				p2pInfra: infra,
 				db:       obRepo.DB(),
 				repo:     obRepo,
 			},
@@ -423,14 +315,14 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 		if isDefaultNode {
 			if _, err := sharedManager.initHTTPGateway(cfg); err != nil {
-				log.Warningf("Failed to init HTTP gateway for IPFSOnly default node: %v", err)
+				log.Warningf("Failed to init HTTP gateway for infrastructure-only default node: %v", err)
 			}
 
 			// Initialize SNF Proxy so lightweight tenant nodes can relay
-			// messages through the default node's IPFS host (which has
+			// messages through the default node's P2P host (which has
 			// SNF server addresses from bootstrap).
 			if err := sharedManager.InitSNFProxy(obNode.peerHost); err != nil {
-				log.Warningf("Failed to init SNF Proxy for IPFSOnly default node: %v", err)
+				log.Warningf("Failed to init SNF Proxy for infrastructure-only default node: %v", err)
 			}
 		}
 
@@ -561,7 +453,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		return nil, err
 	}
 	bm := obnet.NewBanManager(globalBlockedIds, blocked)
-	service := obnet.NewNetworkService(nodeID, ipfsNode.PeerHost, bm, cfg.Testnet)
+	service := obnet.NewNetworkService(nodeID, infra.Host, bm, cfg.Testnet)
 	if hs != nil {
 		if ld, ok := any(hs).(obnet.LocalDeliverer); ok {
 			service.SetLocalDeliverer(ld)
@@ -569,7 +461,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	}
 
 	bus := events.NewBus()
-	tracker := NewFollowerTracker(obRepo, bus, ipfsNode.PeerHost)
+	tracker := NewFollowerTracker(obRepo, bus, infra.Host)
 
 	for _, server := range cfg.StoreAndForwardServers {
 		_, err := peer.Decode(server)
@@ -583,13 +475,13 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		sharedManager: sharedManager,
 		identityFields: identityFields{
 			nodeID:   nodeID,
-			peerID:   ipfsNode.Identity,
-			privKey:  ipfsNode.PrivateKey,
-			peerHost: ipfsNode.PeerHost,
-			nodeCtx:  ipfsNode.Context(),
+			peerID:   infra.PeerID,
+			privKey:  infra.PrivKey,
+			peerHost: infra.Host,
+			nodeCtx:  infra.Ctx,
 		},
 		storageFields: storageFields{
-			ipfsNode: ipfsNode,
+			p2pInfra: infra,
 			db:       obRepo.DB(),
 			repo:     obRepo,
 		},
@@ -755,7 +647,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			if cfg.Testnet {
 				proxyProto = protocol.ID(obnet.ProtocolHTTPProxyTestnet)
 			}
-			obnet.RegisterHTTPProxyOnHost(ipfsNode.PeerHost, proxyProto, trustedPeers, localAddr)
+			obnet.RegisterHTTPProxyOnHost(infra.Host, proxyProto, trustedPeers, localAddr)
 			logger.LogInfoWithID(log, nodeID, "LibP2P HTTP proxy handler registered")
 		}
 	}
@@ -906,42 +798,6 @@ func InitializeMultiwallet(mw multiwallet.Multiwallet, db database.Database, cre
 	return nil
 }
 
-// constructDHTRouting behaves exactly like the default constructDHTRouting function in the IPFS package
-// but sets the ProtocolPrefix and MaxRecordAge.
-func constructDHTRouting(mode dht.ModeOpt) func(args nlibp2p.RoutingOptionArgs) (routing.Routing, error) {
-	return func(args nlibp2p.RoutingOptionArgs) (routing.Routing, error) {
-		dhtOpts := []dht.Option{
-			dht.Concurrency(20),
-			dht.Mode(mode),
-			dht.Datastore(args.Datastore),
-			dht.Validator(args.Validator),
-			dht.ProtocolPrefix(ProtocolDHT),
-			dht.MaxRecordAge(maxRecordAge),
-			// 允许本地地址，支持共享端口场景
-			dht.AddressFilter(nil),
-		}
-		if args.OptimisticProvide {
-			dhtOpts = append(dhtOpts, dht.EnableOptimisticProvide())
-		}
-		if args.OptimisticProvideJobsPoolSize != 0 {
-			dhtOpts = append(dhtOpts, dht.OptimisticProvideJobsPoolSize(args.OptimisticProvideJobsPoolSize))
-		}
-		wanOptions := []dht.Option{
-			dht.BootstrapPeers(args.BootstrapPeers...),
-		}
-		lanOptions := []dht.Option{}
-		if args.LoopbackAddressesOnLanDHT {
-			lanOptions = append(lanOptions, dht.AddressFilter(nil))
-		}
-		return dual.New(
-			args.Ctx, args.Host,
-			dual.DHTOption(dhtOpts...),
-			dual.WanDHTOption(wanOptions...),
-			dual.LanDHTOption(lanOptions...),
-		)
-	}
-}
-
 func (n *MobazhaNode) registerHandlers() {
 	n.networkService.RegisterHandler(pb.Message_CHAT, func(from peer.ID, message *pb.Message) error {
 		if n.chatService != nil {
@@ -1030,16 +886,15 @@ func newMessageWithID() *pb.Message {
 	}
 }
 
-// newLightweightNode creates a non-default node without its own IPFS node.
+// newLightweightNode creates a non-default node without its own P2P infrastructure.
 // It creates a minimal libp2p Host for identity and messaging, and shares
-// the default node's IPFS infrastructure for content operations.
+// the default node's infrastructure for content operations.
 //
 // Skipped (compared to full node):
-//   - fsrepo.Open / core.NewNode (no IPFS repo or node)
-//   - DHT, Bitswap, Blockstore initialization
+//   - P2P infrastructure (Host, DHT, datastores)
 //   - Swarm/Gateway port allocation
 //   - SNF Server (only default node runs it)
-//   - bootstrapIPFS()
+//   - bootstrapDHT()
 //
 // Retained:
 //   - Mobazha repo (DB, keys) — already created by caller

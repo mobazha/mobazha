@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/kubo/core"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
@@ -97,7 +96,6 @@ type mockNode struct {
 	publishFunc                             func(done chan<- struct{})
 	usingTestnetFunc                        func() bool
 	usingTorFunc                            func() bool
-	ipfsNodeFunc                            func() *core.IpfsNode
 	multiwalletFunc                         func() contracts.WalletOperator
 	nodeIDFunc                              func() string
 	identityFunc                            func() peer.ID
@@ -445,9 +443,6 @@ func (m *mockNode) SignMessage(payload []byte) ([]byte, []byte, error) {
 func (m *mockNode) UsingTorMode() bool {
 	return m.usingTorFunc()
 }
-func (m *mockNode) IPFSNode() *core.IpfsNode {
-	return m.ipfsNodeFunc()
-}
 func (m *mockNode) Multiwallet() contracts.WalletOperator {
 	return m.multiwalletFunc()
 }
@@ -715,10 +710,6 @@ func (m *mockNodeManager) GetDefaultNode() coreiface.CoreIface {
 		return nil
 	}
 	return ci
-}
-
-func (m *mockNodeManager) GetIPFSNode() *core.IpfsNode {
-	return nil
 }
 
 func (m *mockNodeManager) GetNodes() map[string]contracts.NodeService {

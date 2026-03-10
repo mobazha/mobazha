@@ -16,8 +16,8 @@ var (
 	// ErrPublishingActive is returned if the node is still publishing during a shutdown.
 	ErrPublishingActive = errors.New("publishing active - use force to shutdown")
 
-	// ErrIPFSDelayedShutdown is returned if the IPFS is lagging during shutdown.
-	ErrIPFSDelayedShutdown = errors.New("ipfs node delayed shutdown")
+	// ErrP2PDelayedShutdown is returned if the P2P node is lagging during shutdown.
+	ErrP2PDelayedShutdown = errors.New("p2p node delayed shutdown")
 
 	// ErrPeerUnreachable is returned due to an inability to connect to a peer.
 	ErrPeerUnreachable = errors.New("peer unreachable")

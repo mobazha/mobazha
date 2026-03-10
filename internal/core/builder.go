@@ -667,6 +667,9 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	if err := MigrateNodeSettings(obNode.db); err != nil {
 		logger.LogErrorWithIDf(log, nodeID, "Failed to migrate node_settings: %v", err)
 	}
+	if err := aipkg.MigrateChatModels(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, nodeID, "Failed to migrate ai_chat_sessions: %v", err)
+	}
 
 	initWebhookSubsystem(obNode)
 	initDiscountSubsystem(obNode)
@@ -1330,6 +1333,9 @@ func newLightweightNode(
 
 	if err := MigrateNodeSettings(obNode.db); err != nil {
 		logger.LogErrorWithIDf(log, nodeID, "Failed to migrate node_settings: %v", err)
+	}
+	if err := aipkg.MigrateChatModels(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, nodeID, "Failed to migrate ai_chat_sessions: %v", err)
 	}
 
 	initWebhookSubsystem(obNode)

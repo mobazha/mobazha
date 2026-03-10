@@ -1,0 +1,196 @@
+package ai
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+func TestToolRoutes_Coverage(t *testing.T) {
+	tools := SellerTools()
+	for _, tool := range tools {
+		if _, ok := toolRoutes[tool.Name]; !ok {
+			t.Errorf("tool %s has no route mapping in toolRoutes", tool.Name)
+		}
+	}
+}
+
+func TestToolRoutes_PathsStartWithV1(t *testing.T) {
+	allArgs := map[string]interface{}{
+		"slug":       "test-slug",
+		"orderId":    "order-123",
+		"peerID":     "peer-abc",
+		"discountId": "discount-1",
+	}
+	for name, fn := range toolRoutes {
+		route := fn(allArgs)
+		if !strings.HasPrefix(route.Path, "/v1/") {
+			t.Errorf("tool %s path %q should start with /v1/", name, route.Path)
+		}
+	}
+}
+
+func TestBuildRequestBody_ListingCreate(t *testing.T) {
+	args := map[string]interface{}{
+		"listing": map[string]interface{}{"title": "Test Product"},
+	}
+	body, err := buildRequestBody("listings_create", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		t.Fatal(err)
+	}
+	if parsed["title"] != "Test Product" {
+		t.Errorf("expected listing body to be unwrapped, got %v", parsed)
+	}
+}
+
+func TestBuildRequestBody_DefaultFallback(t *testing.T) {
+	args := map[string]interface{}{"orderId": "order-1"}
+	body, err := buildRequestBody("orders_confirm", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		t.Fatal(err)
+	}
+	if parsed["orderId"] != "order-1" {
+		t.Error("default body should pass args through")
+	}
+}
+
+func TestAppendQueryParams_WithParams(t *testing.T) {
+	args := map[string]interface{}{"limit": 10, "offset": 5}
+	url := appendQueryParams("http://localhost/v1/listings", "listings_list_mine", args)
+	if !strings.Contains(url, "limit=10") {
+		t.Error("should contain limit param")
+	}
+	if !strings.Contains(url, "offset=5") {
+		t.Error("should contain offset param")
+	}
+}
+
+func TestAppendQueryParams_NoParams(t *testing.T) {
+	url := appendQueryParams("http://localhost/v1/profiles", "profile_get", nil)
+	if strings.Contains(url, "?") {
+		t.Error("should not add query params for profile_get")
+	}
+}
+
+func TestAppendQueryParams_ExistingQueryString(t *testing.T) {
+	args := map[string]interface{}{"limit": 5}
+	url := appendQueryParams("http://localhost/v1/listings?foo=bar", "listings_list_mine", args)
+	if !strings.Contains(url, "&limit=5") {
+		t.Errorf("should use & separator for existing query: %s", url)
+	}
+}
+
+func TestToolExecutor_Execute_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/listings" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != "GET" {
+			t.Errorf("unexpected method: %s", r.Method)
+		}
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			t.Errorf("unexpected auth header: %s", r.Header.Get("Authorization"))
+		}
+		w.WriteHeader(200)
+		w.Write([]byte(`{"data":[]}`))
+	}))
+	defer server.Close()
+
+	executor := NewToolExecutor(server.URL, "Bearer test-token")
+	result, err := executor.Execute(context.Background(), "listings_list_mine", `{"limit":10}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, `"data"`) {
+		t.Errorf("unexpected result: %s", result)
+	}
+}
+
+func TestToolExecutor_Execute_404(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+		w.Write([]byte(`{"error":"not found"}`))
+	}))
+	defer server.Close()
+
+	executor := NewToolExecutor(server.URL, "")
+	_, err := executor.Execute(context.Background(), "profile_get", `{}`)
+	if err == nil {
+		t.Error("expected error for 404 response")
+	}
+	if !strings.Contains(err.Error(), "returned 404") {
+		t.Errorf("error should mention 404: %s", err)
+	}
+}
+
+func TestToolExecutor_Execute_UnknownTool(t *testing.T) {
+	executor := NewToolExecutor("http://localhost", "")
+	_, err := executor.Execute(context.Background(), "nonexistent_tool", "{}")
+	if err == nil || !strings.Contains(err.Error(), "unknown tool") {
+		t.Errorf("expected unknown tool error, got: %v", err)
+	}
+}
+
+func TestToolExecutor_Execute_POSTBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var parsed map[string]interface{}
+		json.Unmarshal(body, &parsed)
+		if parsed["title"] != "New Product" {
+			t.Errorf("listing body not unwrapped: %s", string(body))
+		}
+		w.WriteHeader(200)
+		w.Write([]byte(`{"data":{"slug":"new-product"}}`))
+	}))
+	defer server.Close()
+
+	executor := NewToolExecutor(server.URL, "")
+	_, err := executor.Execute(context.Background(), "listings_create", `{"listing":{"title":"New Product"}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSanitizePathParam_PathTraversal(t *testing.T) {
+	tests := []struct {
+		input    interface{}
+		expected string
+	}{
+		{"normal-slug", "normal-slug"},
+		{"../../../etc/passwd", "etcpasswd"},
+		{"slug/with/slashes", "slugwithslashes"},
+		{"", ""},
+		{123, "123"},
+	}
+	for _, tt := range tests {
+		got := sanitizePathParam(tt.input)
+		if got != tt.expected {
+			t.Errorf("sanitizePathParam(%v) = %q, want %q", tt.input, got, tt.expected)
+		}
+	}
+}
+
+func TestTruncate(t *testing.T) {
+	if truncate("short", 10) != "short" {
+		t.Error("should not truncate short strings")
+	}
+	result := truncate("a very long string here", 10)
+	if len(result) != 13 { // 10 + "..."
+		t.Errorf("unexpected length: %d", len(result))
+	}
+	if !strings.HasSuffix(result, "...") {
+		t.Error("should end with ...")
+	}
+}

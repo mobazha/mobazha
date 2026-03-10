@@ -628,3 +628,21 @@ func MigrateNodeSettings(db database.Database) error {
 		return tx.Migrate(&models.NodeSettings{})
 	})
 }
+
+// ChatStore returns a chat store backed by this node's database.
+func (n *MobazhaNode) ChatStore() *aipkg.ChatStore {
+	return aipkg.NewChatStore(n.db)
+}
+
+// ProfileName returns the display name of this node's store profile.
+func (n *MobazhaNode) ProfileName() string {
+	ps := n.Profile()
+	if ps == nil {
+		return ""
+	}
+	profile, err := ps.GetMyProfile()
+	if err != nil || profile == nil {
+		return ""
+	}
+	return profile.Name
+}

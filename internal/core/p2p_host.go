@@ -47,6 +47,8 @@ func (p *P2PInfra) Close() error {
 			_ = c.Close()
 		}
 	}
+	// DHTStore is typically an in-memory MapDatastore (no Close needed),
+	// but we attempt Close if the concrete type supports it.
 	if p.DHTStore != nil {
 		if c, ok := p.DHTStore.(interface{ Close() error }); ok {
 			_ = c.Close()

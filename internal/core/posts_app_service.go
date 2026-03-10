@@ -145,7 +145,7 @@ func (s *PostsAppService) DeletePost(slug string, done chan<- struct{}) error {
 	err := s.db.Update(func(tx database.Tx) error {
 		err := tx.DeletePost(slug)
 		if err != nil {
-			return nil
+			return err
 		}
 
 		index, err := tx.GetPostIndex()

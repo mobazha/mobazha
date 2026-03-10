@@ -159,6 +159,7 @@ type lifecycleFields struct {
 	shutdownTorFunc      func() error
 	initialBootstrapChan chan struct{}
 	shutdown             chan struct{}
+	stopped              int32
 }
 
 // appServices groups all extracted App Service dependencies.
@@ -323,6 +324,9 @@ func (n *MobazhaNode) checkRepoMigration() error {
 func (n *MobazhaNode) Stop(force bool) error {
 	if atomic.LoadInt32(&n.publishActive) > 0 && !force {
 		return coreiface.ErrPublishingActive
+	}
+	if !atomic.CompareAndSwapInt32(&n.stopped, 0, 1) {
+		return nil
 	}
 
 	if n.IsDefaultNode() {

@@ -223,6 +223,12 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	if err != nil {
 		return nil, err
 	}
+	infraOwned := false
+	defer func() {
+		if !infraOwned {
+			infra.Close()
+		}
+	}()
 
 	snfServerProtocol := obnet.ProtocolStoreAndForwardMainnet_Server
 	snfClientProtocol := obnet.ProtocolStoreAndForwardMainnet_Client
@@ -236,7 +242,6 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		for _, serverStr := range cfg.SNFServerPeers {
 			server, err := peer.Decode(serverStr)
 			if err != nil {
-				infra.Close()
 				return nil, err
 			}
 			snfReplicationPeers = append(snfReplicationPeers, server)
@@ -253,7 +258,6 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		}
 		_, err := storeandforward.NewServer(infra.Ctx, infra.Host, serverOpts...)
 		if err != nil {
-			infra.Close()
 			return nil, err
 		}
 	}
@@ -332,6 +336,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	initFiatSubsystem(obNode)
 	initShippingSubsystem(obNode)
 	obNode.applyOptions(nil)
+		infraOwned = true
 		return obNode, nil
 	}
 
@@ -526,6 +531,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		hostService: hs,
 	}
 	obNode.contentStore = &cidContentStore{}
+	infraOwned = true
 
 	sharedManager.AddNode(nodeID, obNode)
 

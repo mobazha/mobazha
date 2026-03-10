@@ -223,8 +223,8 @@ type Mocknet struct {
 	wn      *wallet.MockWalletNetwork
 }
 
-// NewMocknet returns a new MockNet without the
-// nodes connected to each other.
+// NewMocknet returns a new MockNet with all nodes linked and connected.
+// LinkAll and ConnectAllButSelf are called during construction.
 func NewMocknet(numNodes int) (*Mocknet, error) {
 	ctx := context.Background()
 

@@ -52,6 +52,6 @@ type HostService interface {
 
 	// GetBlobStore returns the shared BlobStore for media storage (R2 in SaaS,
 	// LocalFS in standalone). Returns nil when no BlobStore is configured
-	// (legacy mode — media bytes stored in DB/IPFS).
+	// (legacy mode — media bytes stored in DB).
 	GetBlobStore() contracts.BlobStore
 }

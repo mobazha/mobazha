@@ -49,7 +49,7 @@ type IdentityService interface {
 
 	// SignMessage signs a payload with the node's identity key.
 	// Returns (signature, publicKeyBytes, error).
-	// Standalone: uses IPFS node private key.
+	// Standalone: uses libp2p identity private key.
 	// SaaS: delegates to KeyVault.
 	SignMessage(payload []byte) ([]byte, []byte, error)
 
@@ -201,7 +201,7 @@ type MediaService interface {
 	UploadMedia(ctx context.Context, data []byte, filename string, opts UploadOpts) (*UploadResult, error)
 
 	// GetMedia retrieves any media by CID.
-	// Three-level fallback: BlobStore → DB (legacy) → IPFS.
+	// Fallback: BlobStore → DB (legacy).
 	GetMedia(ctx context.Context, cid cid.Cid) (io.ReadSeeker, string, error)
 
 	// SetProfileMedia uploads an image for a profile slot (avatar/header),

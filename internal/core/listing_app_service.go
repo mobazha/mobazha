@@ -263,7 +263,7 @@ func (s *ListingAppService) SaveListing(listing *pb.Listing, done chan<- struct{
 
 // RepublishListing implements contracts.ListingPublisher.
 // It re-saves an existing listing, which triggers shipping profile snapshot refresh,
-// re-signing, and IPFS/network re-publication.
+// re-signing, and network re-publication.
 func (s *ListingAppService) RepublishListing(ctx context.Context, slug string) error {
 	sl, err := s.GetMyListingBySlug(slug)
 	if err != nil {

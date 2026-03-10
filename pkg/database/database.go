@@ -19,7 +19,7 @@ import (
 // as "new record" and always INSERT instead of UPDATE.
 const StandaloneTenantID = "_default"
 
-// PublicData is the interface for access to the node's IPFS public
+// PublicData is the interface for access to the node's public
 // data directory. This data is visible by other nodes on the network.
 type PublicData interface {
 	// GetProfile returns the profile.
@@ -114,7 +114,7 @@ type PublicData interface {
 // backends whose public data is not stored on the local filesystem (e.g.
 // DBPublicData in SaaS mode). When PublicDataPath() returns "", callers
 // should check for this interface and use it to materialize a directory
-// tree suitable for IPFS publishing.
+// tree suitable for CID computation and publishing.
 type PublicDataMaterializer interface {
 	MaterializePublicData(dir string) error
 }
@@ -176,7 +176,7 @@ type Tx interface {
 	// successfully.
 	RegisterCommitHook(fn func())
 
-	// PublicData provides atomic access to the IPFS data directory.
+	// PublicData provides atomic access to the public data directory.
 	PublicData
 }
 

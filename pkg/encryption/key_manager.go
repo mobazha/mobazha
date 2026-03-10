@@ -146,7 +146,7 @@ func (km *KeyManager) GetOrDeriveListingKey(slug string) ([]byte, error) {
 
 // RotateListingKey 轮换商品密钥
 // 递增版本号，使下次获取密钥时自动使用新版本
-// 注意：调用此方法后需要重新加密商品数据并上传到 IPFS
+// 注意：调用此方法后需要重新加密商品数据并重新上传
 //
 // 返回:
 //   - 新的密钥版本号

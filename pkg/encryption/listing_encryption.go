@@ -29,7 +29,7 @@ type LocalListingCrypto struct {
 }
 
 // NewLocalListingCrypto 创建本地商品加密服务
-// peerID: 当前节点的 Peer ID（从 IPFS 节点获取）
+// peerID: 当前节点的 Peer ID（从 libp2p 节点获取）
 func NewLocalListingCrypto(km *KeyManager, db database.Database, peerID string) *LocalListingCrypto {
 	return &LocalListingCrypto{
 		keyManager: km,
@@ -45,7 +45,7 @@ func NewLocalListingCrypto(km *KeyManager, db database.Database, peerID string) 
 
 // EncryptListing 加密商品数据
 // 注意：只加密数据并存储加密元数据，不存储 listing 本身
-// 返回: masterKey（用于同步到 hosting）, encryptedData（用于上传到 IPFS）, error
+// 返回: masterKey（用于同步到 hosting）, encryptedData（用于上传到 BlobStore）, error
 func (lc *LocalListingCrypto) EncryptListing(
 	signedListing *pb.SignedListing,
 ) (masterKey []byte, encryptedData []byte, err error) {
@@ -75,7 +75,7 @@ func (lc *LocalListingCrypto) EncryptListing(
 		return nil, nil, fmt.Errorf("failed to store encryption metadata: %w", err)
 	}
 
-	// 5. 返回密钥和加密数据，由调用方上传到 IPFS
+	// 5. 返回密钥和加密数据，由调用方上传到 BlobStore
 	// 注意：CID 由 ListingMetadata 或 IPNS 管理，不在加密元数据中存储
 	return masterKey, encryptedData, nil
 }
@@ -220,7 +220,7 @@ func (lc *LocalListingCrypto) IsListingEncrypted(slug string) bool {
 
 // RotateListingKey 轮换商品密钥
 // 递增密钥版本号，下次加密时自动使用新密钥
-// 注意：需要重新加密商品数据并上传到 IPFS
+// 注意：需要重新加密商品数据并重新上传
 //
 // 返回:
 //   - 新的密钥版本号

@@ -398,8 +398,14 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		}
 	}
 
-	bip44Key, _ := hdkeychain.NewKeyFromString(string(dbBip44Key.Value))
-	ethMasterKey, _ := utils.GenerateEthPrivateKey(bip44Key)
+	bip44Key, err := hdkeychain.NewKeyFromString(string(dbBip44Key.Value))
+	if err != nil {
+		return nil, fmt.Errorf("parse bip44 key: %w", err)
+	}
+	ethMasterKey, err := utils.GenerateEthPrivateKey(bip44Key)
+	if err != nil {
+		return nil, fmt.Errorf("derive eth master key: %w", err)
+	}
 
 	escrowKey, _ := btcec.PrivKeyFromBytes(dbEscrowKey.Value)
 	ratingKey, _ := btcec.PrivKeyFromBytes(dbRatingKey.Value)
@@ -1030,8 +1036,14 @@ func newLightweightNode(
 		}
 	}
 
-	bip44Key, _ := hdkeychain.NewKeyFromString(string(dbBip44Key.Value))
-	ethMasterKey, _ := utils.GenerateEthPrivateKey(bip44Key)
+	bip44Key, err := hdkeychain.NewKeyFromString(string(dbBip44Key.Value))
+	if err != nil {
+		return nil, fmt.Errorf("parse bip44 key: %w", err)
+	}
+	ethMasterKey, err := utils.GenerateEthPrivateKey(bip44Key)
+	if err != nil {
+		return nil, fmt.Errorf("derive eth master key: %w", err)
+	}
 	escrowKey, _ := btcec.PrivKeyFromBytes(dbEscrowKey.Value)
 	ratingKey, _ := btcec.PrivKeyFromBytes(dbRatingKey.Value)
 	solPrivKey := solana.PrivateKey(dbSolKey.Value)

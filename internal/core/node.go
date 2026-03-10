@@ -334,11 +334,21 @@ func (n *MobazhaNode) Stop(force bool) error {
 	}
 
 	if !n.infrastructureOnly {
-		n.messenger.Stop()
-		n.networkService.Close()
-		n.orderProcessor.Stop()
-		n.followerTracker.Close()
-		n.multiwallet.Close()
+		if n.messenger != nil {
+			n.messenger.Stop()
+		}
+		if n.networkService != nil {
+			n.networkService.Close()
+		}
+		if n.orderProcessor != nil {
+			n.orderProcessor.Stop()
+		}
+		if n.followerTracker != nil {
+			n.followerTracker.Close()
+		}
+		if n.multiwallet != nil {
+			n.multiwallet.Close()
+		}
 	}
 	// Shutdown order matters: EventDispatcher must stop before WebhookEngine
 	// so that WebhookSink stops emitting before the engine shuts down.
@@ -353,23 +363,30 @@ func (n *MobazhaNode) Stop(force bool) error {
 	}
 	// Stop UTXO payment monitor (unregister from shared service if applicable)
 	n.StopUTXOPaymentMonitor()
-	close(n.shutdown)
-	n.repo.Close()
+	if n.shutdown != nil {
+		close(n.shutdown)
+	}
+	if n.repo != nil {
+		n.repo.Close()
+	}
 
 	if n.p2pInfra != nil {
-		// Full node: close the P2P infrastructure (Host, DHT, datastores)
 		stop := make(chan struct{})
 		go func() {
 			n.p2pInfra.Close()
-			time.AfterFunc(time.Second, func() {
-				n.eventBus.Emit(&events.P2PShutdown{})
-			})
 			close(stop)
 		}()
 		select {
 		case <-time.After(time.Second * 2):
+			log.Warning("P2P infrastructure close timed out after 2s, proceeding with shutdown")
+			if n.eventBus != nil {
+				n.eventBus.Emit(&events.P2PShutdown{})
+			}
 			return coreiface.ErrP2PDelayedShutdown
 		case <-stop:
+			if n.eventBus != nil {
+				n.eventBus.Emit(&events.P2PShutdown{})
+			}
 		}
 	} else {
 		// Lightweight node: close the minimal libp2p host
@@ -379,7 +396,9 @@ func (n *MobazhaNode) Stop(force bool) error {
 		if n.nodeCancel != nil {
 			n.nodeCancel()
 		}
-		n.eventBus.Emit(&events.P2PShutdown{})
+		if n.eventBus != nil {
+			n.eventBus.Emit(&events.P2PShutdown{})
+		}
 	}
 	return nil
 }

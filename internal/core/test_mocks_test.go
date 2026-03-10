@@ -22,8 +22,7 @@ import (
 // ── mockContentStore ────────────────────────────────────────────
 
 type mockContentStore struct {
-	catFn     func(ctx context.Context, path string) ([]byte, error)
-	addFileFn func(ctx context.Context, filePath string) (cid.Cid, error)
+	catFn func(ctx context.Context, path string) ([]byte, error)
 }
 
 var _ contracts.ContentStore = (*mockContentStore)(nil)
@@ -35,19 +34,11 @@ func (m *mockContentStore) Cat(ctx context.Context, contentPath string) ([]byte,
 	return nil, nil
 }
 
-func (m *mockContentStore) AddFile(ctx context.Context, filePath string) (cid.Cid, error) {
-	if m.addFileFn != nil {
-		return m.addFileFn(ctx, filePath)
-	}
-	return testCID(), nil
-}
-
 func (m *mockContentStore) ComputeCID(data []byte) (cid.Cid, error) {
 	return media.ComputeUnixFSCID(data)
 }
 
-func (m *mockContentStore) Pin(_ context.Context, _ cid.Cid) error   { return nil }
-func (m *mockContentStore) Unpin(_ context.Context, _ cid.Cid) error { return nil }
+func (m *mockContentStore) Pin(_ context.Context, _ cid.Cid) error { return nil }
 
 // ── mockContentStorePort (subset for Profile/Follow) ────────────
 

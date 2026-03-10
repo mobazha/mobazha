@@ -21,37 +21,15 @@ import (
 
 // ── mockContentStore ────────────────────────────────────────────
 
-type mockContentStore struct {
-	catFn func(ctx context.Context, path string) ([]byte, error)
-}
+type mockContentStore struct{}
 
 var _ contracts.ContentStore = (*mockContentStore)(nil)
-
-func (m *mockContentStore) Cat(ctx context.Context, contentPath string) ([]byte, error) {
-	if m.catFn != nil {
-		return m.catFn(ctx, contentPath)
-	}
-	return nil, nil
-}
 
 func (m *mockContentStore) ComputeCID(data []byte) (cid.Cid, error) {
 	return media.ComputeUnixFSCID(data)
 }
 
 func (m *mockContentStore) Pin(_ context.Context, _ cid.Cid) error { return nil }
-
-// ── mockContentStorePort (subset for Profile/Follow) ────────────
-
-type mockContentStorePort struct {
-	catFn func(ctx context.Context, path string) ([]byte, error)
-}
-
-func (m *mockContentStorePort) Cat(ctx context.Context, contentPath string) ([]byte, error) {
-	if m.catFn != nil {
-		return m.catFn(ctx, contentPath)
-	}
-	return nil, nil
-}
 
 // ── mockMessenger ───────────────────────────────────────────────
 

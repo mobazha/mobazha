@@ -23,9 +23,6 @@ func newTestPostsAppService(t *testing.T, cfg PostsAppServiceConfig) *PostsAppSe
 	if cfg.Keys == nil {
 		cfg.Keys = &mockKeyProvider{}
 	}
-	if cfg.ContentStore == nil {
-		cfg.ContentStore = &mockContentStore{}
-	}
 	if cfg.PeerID == "" {
 		cfg.PeerID = mustPeerID(t, testVendorPeerID)
 	}

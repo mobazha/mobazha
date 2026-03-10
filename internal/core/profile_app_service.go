@@ -2,18 +2,15 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/database/ffsqlite"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -27,13 +24,11 @@ import (
 type GetAcceptedCurrenciesFunc func() ([]string, error)
 
 type ProfileAppService struct {
-	db              database.Database
-	contentStore    ContentStorePort
-	fetchIPNSRecord FetchIPNSRecordFunc
-	publish         PublishFunc
-	netDB           *netdb.NetDB
-	nodeID          string
-	peerID          peer.ID
+	db      database.Database
+	publish PublishFunc
+	netDB   *netdb.NetDB
+	nodeID  string
+	peerID  peer.ID
 
 	escrowPubKeyHex        string
 	ethPubKeyHex           string
@@ -46,13 +41,11 @@ type ProfileAppService struct {
 }
 
 type ProfileAppServiceConfig struct {
-	DB              database.Database
-	ContentStore    ContentStorePort
-	FetchIPNSRecord FetchIPNSRecordFunc
-	Publish         PublishFunc
-	NetDB           *netdb.NetDB
-	NodeID          string
-	PeerID          peer.ID
+	DB      database.Database
+	Publish PublishFunc
+	NetDB   *netdb.NetDB
+	NodeID  string
+	PeerID  peer.ID
 
 	EscrowPubKeyHex        string
 	ETHPubKeyHex           string
@@ -67,8 +60,6 @@ type ProfileAppServiceConfig struct {
 func NewProfileAppService(cfg ProfileAppServiceConfig) *ProfileAppService {
 	return &ProfileAppService{
 		db:                     cfg.DB,
-		contentStore:           cfg.ContentStore,
-		fetchIPNSRecord:        cfg.FetchIPNSRecord,
 		publish:                cfg.Publish,
 		netDB:                  cfg.NetDB,
 		nodeID:                 cfg.NodeID,
@@ -170,7 +161,7 @@ func (s *ProfileAppService) GetMyProfile() (*models.Profile, error) {
 	return profile, err
 }
 
-func (s *ProfileAppService) GetProfile(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error) {
+func (s *ProfileAppService) GetProfile(_ context.Context, peerID peer.ID, reqCtx *request.Context, _ bool) (*models.Profile, error) {
 	if s.coTenantPublicData != nil {
 		if pd, err := s.coTenantPublicData(peerID); err == nil {
 			if profile, err := pd.GetProfile(); err == nil {
@@ -179,66 +170,11 @@ func (s *ProfileAppService) GetProfile(ctx context.Context, peerID peer.ID, reqC
 		}
 	}
 
-	getDatafromIPNS := func() (*models.Profile, error) {
-		if s.fetchIPNSRecord == nil {
-			return nil, fmt.Errorf("IPNS resolver not available")
-		}
-		record, err := s.fetchIPNSRecord(ctx, peerID, useCache)
-		if err != nil {
-			return nil, err
-		}
-		pth, err := record.Value()
-		if err != nil {
-			return nil, err
-		}
-		pth1, err := path.Join(pth, ffsqlite.ProfileFile)
-		if err != nil {
-			return nil, err
-		}
-		profileBytes, err := s.contentStore.Cat(ctx, pth1.String())
-		if err != nil {
-			return nil, err
-		}
-		profile := new(models.Profile)
-		if err := json.Unmarshal(profileBytes, profile); err != nil {
-			return nil, err
-		}
-		if err := validateProfile(profile); err != nil {
-			return nil, fmt.Errorf("%w: %s", coreiface.ErrNotFound, err)
-		}
-		if len(profile.StoreAndForwardServers) > 0 {
-			err := s.db.Update(func(tx database.Tx) error {
-				pi := models.StoreAndForwardServers{
-					PeerID:      peerID.String(),
-					LastUpdated: time.Now(),
-				}
-				if err := pi.PutServers(profile.StoreAndForwardServers); err != nil {
-					return err
-				}
-				return tx.Save(&pi)
-			})
-			if err != nil {
-				return nil, err
-			}
-		}
-		return profile, nil
+	if s.netDB != nil {
+		return s.netDB.GetProfile(peerID.String(), reqCtx)
 	}
 
-	if preferIPNS || s.netDB == nil {
-		profile, err := getDatafromIPNS()
-		if err != nil && s.netDB != nil {
-			logger.LogDebugWithIDf(log, s.nodeID, "Failed to get profile from p2p network: %s, error: %s", peerID, err)
-			return s.netDB.GetProfile(peerID.String(), reqCtx)
-		}
-		return profile, err
-	}
-
-	profile, err := s.netDB.GetProfile(peerID.String(), reqCtx)
-	if err != nil {
-		return getDatafromIPNS()
-	}
-
-	return profile, err
+	return nil, fmt.Errorf("profile data not available for remote peer %s", peerID)
 }
 
 // UpdateAndSaveProfile loads the profile from disk, updates stats, and saves.
@@ -363,11 +299,6 @@ func (s *ProfileAppService) UpdateSNFServers() error {
 		s.publish(nil)
 	}
 	return nil
-}
-
-// ContentStorePort is the subset of contracts.ContentStore needed by profile/follow services.
-type ContentStorePort interface {
-	Cat(ctx context.Context, contentPath string) ([]byte, error)
 }
 
 // validateProfile checks each field to make sure they're formatted properly and/or

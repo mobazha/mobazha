@@ -2,15 +2,12 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 
-	"github.com/ipfs/boxo/path"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/database/ffsqlite"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
@@ -26,13 +23,11 @@ type UpdateAndSaveProfileFunc func(tx database.Tx) error
 type GetMyProfileFunc func() (*models.Profile, error)
 
 type FollowAppService struct {
-	db              database.Database
-	messenger       contracts.Messenger
-	contentStore    ContentStorePort
-	fetchIPNSRecord FetchIPNSRecordFunc
-	eventBus        events.Bus
-	nodeID          string
-	netDB           *netdb.NetDB
+	db       database.Database
+	messenger contracts.Messenger
+	eventBus  events.Bus
+	nodeID    string
+	netDB     *netdb.NetDB
 
 	coTenantPublicData   contracts.CoTenantPublicDataFn
 	updateAndSaveProfile UpdateAndSaveProfileFunc
@@ -40,13 +35,11 @@ type FollowAppService struct {
 }
 
 type FollowAppServiceConfig struct {
-	DB              database.Database
-	Messenger       contracts.Messenger
-	ContentStore    ContentStorePort
-	FetchIPNSRecord FetchIPNSRecordFunc
-	EventBus        events.Bus
-	NodeID          string
-	NetDB           *netdb.NetDB
+	DB       database.Database
+	Messenger contracts.Messenger
+	EventBus  events.Bus
+	NodeID    string
+	NetDB     *netdb.NetDB
 
 	CoTenantPublicData   contracts.CoTenantPublicDataFn
 	UpdateAndSaveProfile UpdateAndSaveProfileFunc
@@ -57,8 +50,6 @@ func NewFollowAppService(cfg FollowAppServiceConfig) *FollowAppService {
 	return &FollowAppService{
 		db:                   cfg.DB,
 		messenger:            cfg.Messenger,
-		contentStore:         cfg.ContentStore,
-		fetchIPNSRecord:      cfg.FetchIPNSRecord,
 		eventBus:             cfg.EventBus,
 		nodeID:               cfg.NodeID,
 		netDB:                cfg.NetDB,
@@ -221,7 +212,7 @@ func (s *FollowAppService) GetMyFollowing() (models.Following, error) {
 	return following, nil
 }
 
-func (s *FollowAppService) GetFollowers(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.Followers, error) {
+func (s *FollowAppService) GetFollowers(_ context.Context, peerID peer.ID, reqCtx *request.Context, _ bool) (models.Followers, error) {
 	if s.coTenantPublicData != nil {
 		if pd, err := s.coTenantPublicData(peerID); err == nil {
 			if followers, err := pd.GetFollowers(); err == nil {
@@ -230,57 +221,14 @@ func (s *FollowAppService) GetFollowers(ctx context.Context, peerID peer.ID, req
 		}
 	}
 
-	getDatafromIPNS := func() (models.Followers, error) {
-		if s.fetchIPNSRecord == nil {
-			return nil, fmt.Errorf("IPNS resolver not available")
-		}
-		record, err := s.fetchIPNSRecord(ctx, peerID, useCache)
-		if err != nil {
-			return nil, err
-		}
-		pth, err := record.Value()
-		if err != nil {
-			return nil, err
-		}
-		path1, err := path.Join(pth, ffsqlite.FollowersFile)
-		if err != nil {
-			return nil, err
-		}
-		followersBytes, err := s.contentStore.Cat(ctx, path1.String())
-		if errors.Is(err, coreiface.ErrNotFound) {
-			return models.Followers{}, nil
-		}
-		if err != nil {
-			return nil, err
-		}
-		var followers models.Followers
-		if err := json.Unmarshal(followersBytes, &followers); err != nil {
-			return nil, fmt.Errorf("%w: %s", coreiface.ErrNotFound, err)
-		}
-		for _, f := range followers {
-			if _, err := peer.Decode(f); err != nil {
-				return nil, fmt.Errorf("%w: %s", coreiface.ErrNotFound, err)
-			}
-		}
-		return followers, nil
+	if s.netDB != nil {
+		return s.netDB.GetFollowers(peerID.String(), reqCtx)
 	}
 
-	if preferIPNS || s.netDB == nil {
-		followers, err := getDatafromIPNS()
-		if err != nil && s.netDB != nil {
-			return s.netDB.GetFollowers(peerID.String(), reqCtx)
-		}
-		return followers, err
-	}
-
-	followers, err := s.netDB.GetFollowers(peerID.String(), reqCtx)
-	if err != nil {
-		return getDatafromIPNS()
-	}
-	return followers, err
+	return nil, fmt.Errorf("follower data not available for remote peer %s", peerID)
 }
 
-func (s *FollowAppService) GetFollowing(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.Following, error) {
+func (s *FollowAppService) GetFollowing(_ context.Context, peerID peer.ID, reqCtx *request.Context, _ bool) (models.Following, error) {
 	if s.coTenantPublicData != nil {
 		if pd, err := s.coTenantPublicData(peerID); err == nil {
 			if following, err := pd.GetFollowing(); err == nil {
@@ -289,54 +237,11 @@ func (s *FollowAppService) GetFollowing(ctx context.Context, peerID peer.ID, req
 		}
 	}
 
-	getDatafromIPNS := func() (models.Following, error) {
-		if s.fetchIPNSRecord == nil {
-			return nil, fmt.Errorf("IPNS resolver not available")
-		}
-		record, err := s.fetchIPNSRecord(ctx, peerID, useCache)
-		if err != nil {
-			return nil, err
-		}
-		pth, err := record.Value()
-		if err != nil {
-			return nil, err
-		}
-		path1, err := path.Join(pth, ffsqlite.FollowingFile)
-		if err != nil {
-			return nil, err
-		}
-		followersBytes, err := s.contentStore.Cat(ctx, path1.String())
-		if errors.Is(err, coreiface.ErrNotFound) {
-			return models.Following{}, nil
-		}
-		if err != nil {
-			return nil, err
-		}
-		var following models.Following
-		if err := json.Unmarshal(followersBytes, &following); err != nil {
-			return nil, fmt.Errorf("%w: %s", coreiface.ErrNotFound, err)
-		}
-		for _, f := range following {
-			if _, err := peer.Decode(f); err != nil {
-				return nil, fmt.Errorf("%w: %s", coreiface.ErrNotFound, err)
-			}
-		}
-		return following, nil
+	if s.netDB != nil {
+		return s.netDB.GetFollowing(peerID.String(), reqCtx)
 	}
 
-	if preferIPNS || s.netDB == nil {
-		following, err := getDatafromIPNS()
-		if err != nil && s.netDB != nil {
-			return s.netDB.GetFollowing(peerID.String(), reqCtx)
-		}
-		return following, err
-	}
-
-	following, err := s.netDB.GetFollowing(peerID.String(), reqCtx)
-	if err != nil {
-		return getDatafromIPNS()
-	}
-	return following, err
+	return nil, fmt.Errorf("following data not available for remote peer %s", peerID)
 }
 
 func (s *FollowAppService) HandleFollowMessage(from peer.ID, message *pb.Message) error {

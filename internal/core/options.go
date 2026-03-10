@@ -210,8 +210,6 @@ func (n *MobazhaNode) initRatingsService() {
 
 	n.ratingsService = NewRatingsAppService(RatingsAppServiceConfig{
 		DB:                 n.db,
-		ContentStore:       n.contentStore,
-		FetchIPNSRecord:    n.fetchIPNSRecord,
 		GetRatingIndex:     getRatingIndex,
 		CoTenantPublicData: n.coTenantPublicDataDeferred(),
 	})
@@ -479,8 +477,6 @@ func (n *MobazhaNode) initProfileService() {
 
 	n.profileService = NewProfileAppService(ProfileAppServiceConfig{
 		DB:                     n.db,
-		ContentStore:           n.contentStore,
-		FetchIPNSRecord:        n.fetchIPNSRecord,
 		Publish:                n.Publish,
 		NetDB:                  n.netDB,
 		NodeID:                 n.nodeID,
@@ -513,11 +509,9 @@ func (n *MobazhaNode) initPostsService() {
 
 	n.postsService = NewPostsAppService(PostsAppServiceConfig{
 		DB:                   n.db,
-		ContentStore:         n.contentStore,
 		Signer:               n.signer,
 		Keys:                 n.keyProvider,
 		PeerID:               n.peerID,
-		FetchIPNSRecord:      n.fetchIPNSRecord,
 		Publish:              n.Publish,
 		UpdateAndSaveProfile: updateProfile,
 		GetMyProfile:         getMyProfile,
@@ -541,8 +535,6 @@ func (n *MobazhaNode) initFollowService() {
 	n.followService = NewFollowAppService(FollowAppServiceConfig{
 		DB:                   n.db,
 		Messenger:            n.messenger,
-		ContentStore:         n.contentStore,
-		FetchIPNSRecord:      n.fetchIPNSRecord,
 		EventBus:             n.eventBus,
 		NodeID:               n.nodeID,
 		NetDB:                n.netDB,
@@ -697,7 +689,6 @@ func (n *MobazhaNode) initListingService() {
 		NodeID:               n.Identity(),
 		Testnet:              n.testnet,
 		Publish:              n.Publish,
-		FetchIPNSRecord:      n.fetchIPNSRecord,
 		GetMyProfile:         getMyProfile,
 		UpdateAndSaveProfile: updateAndSaveProfile,
 		CoTenantPublicData:   n.coTenantPublicDataDeferred(),

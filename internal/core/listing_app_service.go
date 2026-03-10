@@ -18,7 +18,6 @@ import (
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/gosimple/slug"
-	ipath "github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -26,7 +25,6 @@ import (
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha-core/identity"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/database/ffsqlite"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -41,9 +39,6 @@ import (
 
 	mbznet "github.com/mobazha/mobazha3.0/internal/net"
 )
-
-// FetchIPNSRecordFunc, UpdateAndSaveProfileFunc are declared in other app service files.
-// No new type aliases needed here.
 
 var _ contracts.ListingPublisher = (*ListingAppService)(nil)
 
@@ -60,9 +55,8 @@ type ListingAppService struct {
 	nodeID             peer.ID
 	testnet            bool
 
-	publish               PublishFunc
-	fetchIPNSRecord       FetchIPNSRecordFunc
-	getMyProfile          GetMyProfileFunc
+	publish              PublishFunc
+	getMyProfile         GetMyProfileFunc
 	updateAndSaveProfile  UpdateAndSaveProfileFunc
 	onDeleteCleanup func(slug string)
 
@@ -83,9 +77,8 @@ type ListingAppServiceConfig struct {
 	NodeID             peer.ID
 	Testnet            bool
 
-	Publish               PublishFunc
-	FetchIPNSRecord       FetchIPNSRecordFunc
-	GetMyProfile          GetMyProfileFunc
+	Publish              PublishFunc
+	GetMyProfile         GetMyProfileFunc
 	UpdateAndSaveProfile  UpdateAndSaveProfileFunc
 
 	CoTenantPublicData contracts.CoTenantPublicDataFn
@@ -106,7 +99,6 @@ func NewListingAppService(cfg ListingAppServiceConfig) *ListingAppService {
 		nodeID:               cfg.NodeID,
 		testnet:              cfg.Testnet,
 		publish:              cfg.Publish,
-		fetchIPNSRecord:      cfg.FetchIPNSRecord,
 		getMyProfile:         cfg.GetMyProfile,
 		updateAndSaveProfile: cfg.UpdateAndSaveProfile,
 		coTenantPublicData:   cfg.CoTenantPublicData,
@@ -389,7 +381,7 @@ func (s *ListingAppService) GetMyListings() (models.ListingIndex, error) {
 	return index, err
 }
 
-func (s *ListingAppService) GetListings(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.ListingIndex, error) {
+func (s *ListingAppService) GetListings(_ context.Context, peerID peer.ID, reqCtx *request.Context, _ bool) (models.ListingIndex, error) {
 	if s.coTenantPublicData != nil {
 		if pd, err := s.coTenantPublicData(peerID); err == nil {
 			if index, err := pd.GetListingIndex(); err == nil {
@@ -398,57 +390,11 @@ func (s *ListingAppService) GetListings(ctx context.Context, peerID peer.ID, req
 		}
 	}
 
-	getDatafromIPNS := func() (models.ListingIndex, error) {
-		record, err := s.fetchIPNSRecord(ctx, peerID, useCache)
-		if err != nil {
-			return nil, err
-		}
-		pth, err := record.Value()
-		if err != nil {
-			return nil, err
-		}
-		pth1, err := ipath.Join(pth, ffsqlite.ListingIndexFile)
-		if err != nil {
-			return nil, err
-		}
-		indexBytes, err := s.contentStore.Cat(ctx, pth1.String())
-		if err != nil {
-			return nil, err
-		}
-		var index models.ListingIndex
-		if err := json.Unmarshal(indexBytes, &index); err != nil {
-			return nil, err
-		}
-		return index, nil
+	if s.netDB != nil {
+		return s.netDB.GetListingIndex(peerID.String(), reqCtx)
 	}
 
-	if preferIPNS || s.netDB == nil {
-		index, err := getDatafromIPNS()
-		if err != nil && s.netDB != nil {
-			logger.LogDebugWithIDf(log, s.nodeID.String(), "Failed to get listings from p2p network: %s, error: %s", peerID, err)
-			return s.netDB.GetListingIndex(peerID.String(), reqCtx)
-		}
-		return index, err
-	}
-
-	index, err := s.netDB.GetListingIndex(peerID.String(), reqCtx)
-	if err != nil {
-		return getDatafromIPNS()
-	}
-
-	hasEmptyContractType := false
-	for _, listing := range index {
-		if listing.ContractType == "" {
-			hasEmptyContractType = true
-			break
-		}
-	}
-
-	if hasEmptyContractType {
-		return getDatafromIPNS()
-	}
-
-	return index, err
+	return nil, fmt.Errorf("listing data not available for remote peer %s", peerID)
 }
 
 func (s *ListingAppService) GetMyListingBySlug(slugStr string) (*pb.SignedListing, error) {
@@ -536,7 +482,7 @@ func (s *ListingAppService) GetMyListingByCID(c cid.Cid) (*pb.SignedListing, err
 	return listing, nil
 }
 
-func (s *ListingAppService) GetListingBySlug(ctx context.Context, peerID peer.ID, slugStr string, reqCtx *request.Context, useCache bool) (*pb.SignedListing, error) {
+func (s *ListingAppService) GetListingBySlug(_ context.Context, peerID peer.ID, slugStr string, reqCtx *request.Context, _ bool) (*pb.SignedListing, error) {
 	if s.coTenantPublicData != nil {
 		if pd, err := s.coTenantPublicData(peerID); err == nil {
 			if sl, err := pd.GetListing(slugStr); err == nil {
@@ -545,67 +491,19 @@ func (s *ListingAppService) GetListingBySlug(ctx context.Context, peerID peer.ID
 		}
 	}
 
-	getDatafromIPNS := func() (*pb.SignedListing, error) {
-		record, err := s.fetchIPNSRecord(ctx, peerID, useCache)
-		if err != nil {
-			return nil, err
-		}
-		pth, err := record.Value()
-		if err != nil {
-			return nil, err
-		}
-		pth1, err := ipath.Join(pth, "listings", slugStr+".json")
-		if err != nil {
-			return nil, err
-		}
-		listingBytes, err := s.contentStore.Cat(ctx, pth1.String())
-		if err != nil {
-			return nil, err
-		}
-		c, err := s.contentStore.ComputeCID(listingBytes)
-		if err != nil {
-			return nil, err
-		}
-		return s.deserializeAndValidateListing(listingBytes, c)
+	if s.netDB != nil {
+		return s.netDB.GetListingBySlug(peerID.String(), slugStr, reqCtx)
 	}
 
-	if preferIPNS || s.netDB == nil {
-		sl, err := getDatafromIPNS()
-		if err != nil && s.netDB != nil {
-			return s.netDB.GetListingBySlug(peerID.String(), slugStr, reqCtx)
-		}
-		return sl, err
-	}
-
-	sl, err := s.netDB.GetListingBySlug(peerID.String(), slugStr, reqCtx)
-	if err != nil {
-		return getDatafromIPNS()
-	}
-	return sl, err
+	return nil, fmt.Errorf("listing data not available for remote peer %s", peerID)
 }
 
-func (s *ListingAppService) GetListingByCID(ctx context.Context, c cid.Cid, reqCtx *request.Context) (*pb.SignedListing, error) {
-	getDatafromIPNS := func() (*pb.SignedListing, error) {
-		listingBytes, err := s.contentStore.Cat(ctx, ipath.FromCid(c).String())
-		if err != nil {
-			return nil, err
-		}
-		return s.deserializeAndValidateListing(listingBytes, c)
+func (s *ListingAppService) GetListingByCID(_ context.Context, c cid.Cid, reqCtx *request.Context) (*pb.SignedListing, error) {
+	if s.netDB != nil {
+		return s.netDB.GetListingByCID(c.String(), reqCtx)
 	}
 
-	if preferIPNS || s.netDB == nil {
-		sl, err := getDatafromIPNS()
-		if err != nil && s.netDB != nil {
-			return s.netDB.GetListingByCID(c.String(), reqCtx)
-		}
-		return sl, err
-	}
-
-	sl, err := s.netDB.GetListingByCID(c.String(), reqCtx)
-	if err != nil {
-		return getDatafromIPNS()
-	}
-	return sl, err
+	return nil, fmt.Errorf("listing data not available for CID %s", c)
 }
 
 // --- Private methods ---
@@ -1282,8 +1180,6 @@ func (s *ListingAppService) validateCryptocurrencyListing(listing *pb.Listing) e
 	}
 	return nil
 }
-
-const preferIPNS = false
 
 func validatePhysicalListing(listing *pb.Listing) error {
 	if len(listing.Item.Condition) > SentenceMaxCharacters {

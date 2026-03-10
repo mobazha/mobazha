@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -15,13 +14,11 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/gosimple/slug"
-	ipath "github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha-core/identity"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/database/ffsqlite"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -34,13 +31,11 @@ import (
 
 // PostsAppService encapsulates post CRUD and signing logic.
 type PostsAppService struct {
-	db              database.Database
-	contentStore    contracts.ContentStore
-	signer          corecontracts.Signer
-	keys            contracts.KeyProvider
-	peerID          peer.ID
-	fetchIPNSRecord FetchIPNSRecordFunc
-	publish         PublishFunc
+	db      database.Database
+	signer  corecontracts.Signer
+	keys    contracts.KeyProvider
+	peerID  peer.ID
+	publish PublishFunc
 
 	updateAndSaveProfile UpdateAndSaveProfileFunc
 	getMyProfile         GetMyProfileFunc
@@ -48,13 +43,11 @@ type PostsAppService struct {
 
 // PostsAppServiceConfig holds dependencies for constructing a PostsAppService.
 type PostsAppServiceConfig struct {
-	DB              database.Database
-	ContentStore    contracts.ContentStore
-	Signer          corecontracts.Signer
-	Keys            contracts.KeyProvider
-	PeerID          peer.ID
-	FetchIPNSRecord FetchIPNSRecordFunc
-	Publish         PublishFunc
+	DB      database.Database
+	Signer  corecontracts.Signer
+	Keys    contracts.KeyProvider
+	PeerID  peer.ID
+	Publish PublishFunc
 
 	UpdateAndSaveProfile UpdateAndSaveProfileFunc
 	GetMyProfile         GetMyProfileFunc
@@ -64,11 +57,9 @@ type PostsAppServiceConfig struct {
 func NewPostsAppService(cfg PostsAppServiceConfig) *PostsAppService {
 	return &PostsAppService{
 		db:                   cfg.DB,
-		contentStore:         cfg.ContentStore,
 		signer:               cfg.Signer,
 		keys:                 cfg.Keys,
 		peerID:               cfg.PeerID,
-		fetchIPNSRecord:      cfg.FetchIPNSRecord,
 		publish:              cfg.Publish,
 		updateAndSaveProfile: cfg.UpdateAndSaveProfile,
 		getMyProfile:         cfg.GetMyProfile,
@@ -146,28 +137,8 @@ func (s *PostsAppService) GetMyPosts() ([]models.PostData, error) {
 	return postIndex, err
 }
 
-func (s *PostsAppService) GetPosts(ctx context.Context, peerID peer.ID, useCache bool) ([]models.PostData, error) {
-	record, err := s.fetchIPNSRecord(ctx, peerID, useCache)
-	if err != nil {
-		return nil, err
-	}
-	pth, err := record.Value()
-	if err != nil {
-		return nil, err
-	}
-	pth1, err := ipath.Join(pth, ffsqlite.PostIndexFile)
-	if err != nil {
-		return nil, err
-	}
-	indexBytes, err := s.contentStore.Cat(ctx, pth1.String())
-	if err != nil {
-		return nil, err
-	}
-	var index []models.PostData
-	if err := json.Unmarshal(indexBytes, &index); err != nil {
-		return nil, err
-	}
-	return index, nil
+func (s *PostsAppService) GetPosts(_ context.Context, peerID peer.ID, _ bool) ([]models.PostData, error) {
+	return nil, fmt.Errorf("remote post listing not available for peer %s (IPFS retired)", peerID)
 }
 
 func (s *PostsAppService) DeletePost(slug string, done chan<- struct{}) error {
@@ -228,28 +199,8 @@ func (s *PostsAppService) GetMyPostBySlug(slug string) (*postsPb.SignedPost, err
 	return post, err
 }
 
-func (s *PostsAppService) GetPostBySlug(ctx context.Context, peerID peer.ID, slug string, useCache bool) (*postsPb.SignedPost, error) {
-	record, err := s.fetchIPNSRecord(ctx, peerID, useCache)
-	if err != nil {
-		return nil, err
-	}
-	pth, err := record.Value()
-	if err != nil {
-		return nil, err
-	}
-	pth1, err := ipath.Join(pth, "posts", slug+".json")
-	if err != nil {
-		return nil, err
-	}
-	postBytes, err := s.contentStore.Cat(ctx, pth1.String())
-	if err != nil {
-		return nil, err
-	}
-	c, err := s.contentStore.ComputeCID(postBytes)
-	if err != nil {
-		return nil, err
-	}
-	return deserializeAndValidatePost(postBytes, c)
+func (s *PostsAppService) GetPostBySlug(_ context.Context, peerID peer.ID, slug string, _ bool) (*postsPb.SignedPost, error) {
+	return nil, fmt.Errorf("remote post retrieval not available for peer %s slug %s (IPFS retired)", peerID, slug)
 }
 
 // signPost adds the peer's identity to the post and signs it.

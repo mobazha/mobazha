@@ -86,16 +86,6 @@ func (config *NetConfig) GetExchangeRateProviders() []string {
 	return config.ExchangeRateProviders
 }
 
-// GetIPNSResolver If a url is provided the node will resolve IPNS records by
-// querying this server instead of using the peer-to-peer network.
-func (config *NetConfig) GetIPNSResolver() string {
-	val, _ := config.GetConfig("ipnsResolver")
-	if len(val) > 0 {
-		return val
-	}
-	return "https://store.mobazha.org/api/ipns"
-}
-
 // GetNetDBEndpoint The endpoint to use for the network database, which is used
 // to backup and query profile and listing data here.
 func (config *NetConfig) GetNetDBEndpoint() string {

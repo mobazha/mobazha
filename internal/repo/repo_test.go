@@ -61,11 +61,6 @@ func TestRepo_mustDefaultConfig(t *testing.T) {
 		t.Errorf("Unexpected gateway address.\nExpected: %v\nGot: %v", expectedGateway, cfg.Addresses.Gateway)
 	}
 
-	// Verify IPNS record lifetime
-	if cfg.Ipns.RecordLifetime != "720h" {
-		t.Errorf("Unexpected IPNS record lifetime: %s", cfg.Ipns.RecordLifetime)
-	}
-
 	// Verify MDNS discovery is enabled
 	if !cfg.Discovery.MDNS.Enabled {
 		t.Error("MDNS discovery should be enabled")

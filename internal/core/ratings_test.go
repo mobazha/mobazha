@@ -45,7 +45,7 @@ func TestMobazhaNode_Ratings(t *testing.T) {
 		m := protojson.MarshalOptions{Indent: "    "}
 		out := m.Format(rating)
 
-		id, err = mockNet.Nodes()[0].cid([]byte(out))
+		id, err = mockNet.Nodes()[0].contentStore.ComputeCID([]byte(out))
 		if err != nil {
 			return err
 		}

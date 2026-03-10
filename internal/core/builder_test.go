@@ -20,7 +20,6 @@ func TestNewNode(t *testing.T) {
 	cfg := repo.Config{
 		DataDir:       dataDir,
 		Testnet:       true,
-		IPNSQuorum:    3,
 		BoostrapAddrs: []string{},
 		SwarmAddrs:    []string{fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", rand.Intn(65535))},
 	}

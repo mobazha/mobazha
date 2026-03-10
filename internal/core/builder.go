@@ -307,7 +307,6 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		Online:    true,
 		Permanent: true,
 		ExtraOpts: map[string]bool{
-			"ipnsps": !cfg.NoIPNSPubsub,
 			"pubsub": true,
 		},
 		// 使用共享的DHT
@@ -384,7 +383,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 	if cfg.IPFSOnly {
 		obNode := &MobazhaNode{
-			sharedManager: sharedManager,
+		sharedManager: sharedManager,
 			identityFields: identityFields{
 				nodeID:   nodeID,
 				peerID:   ipfsNode.Identity,
@@ -404,9 +403,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 				exchangeRates: sharedManager.ExchangeRateProvider,
 			},
 			ipnsFields: ipnsFields{
-				ipnsQuorum:   cfg.IPNSQuorum,
-				ipnsResolver: netConfig.GetIPNSResolver(),
-				netDB:        netDB,
+				netDB: netDB,
 			},
 			modeFlags: modeFlags{
 				ipfsOnlyMode:  true,
@@ -619,10 +616,8 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			solanaChainConfig: solanaConfig,
 		},
 		ipnsFields: ipnsFields{
-			ipnsQuorum:   cfg.IPNSQuorum,
-			ipnsResolver: netConfig.GetIPNSResolver(),
-			netDB:        netDB,
-			netConfig:    netConfig,
+			netDB:     netDB,
+			netConfig: netConfig,
 		},
 		modeFlags: modeFlags{
 			testnet:       cfg.Testnet,
@@ -640,9 +635,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	}
 	// Initialize content store with IPFS backend.
 	obNode.contentStore = newIPFSContentStore(
-		obNode.getIPFSNode,
 		sharedManager.GetIPFSNode,
-		obRepo.DataDir(),
 		obNode.shutdown,
 	)
 
@@ -1292,10 +1285,8 @@ func newLightweightNode(
 			relayAPIURL:   cfg.RelayAPIURL,
 		},
 		ipnsFields: ipnsFields{
-			ipnsQuorum:   cfg.IPNSQuorum,
-			ipnsResolver: netConfig.GetIPNSResolver(),
-			netDB:        netDB,
-			netConfig:    netConfig,
+			netDB:     netDB,
+			netConfig: netConfig,
 		},
 		modeFlags: modeFlags{
 			testnet:       cfg.Testnet,
@@ -1314,9 +1305,7 @@ func newLightweightNode(
 
 	// Initialize content store — lightweight nodes use shared IPFS.
 	obNode.contentStore = newIPFSContentStore(
-		obNode.getIPFSNode,
 		sharedManager.GetIPFSNode,
-		obRepo.DataDir(),
 		obNode.shutdown,
 	)
 

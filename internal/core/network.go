@@ -20,7 +20,6 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
@@ -31,20 +30,17 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gorm.io/gorm"
-
-	nameSysOpts "github.com/ipfs/boxo/namesys"
 )
 
 const (
 	// republishInterval is the amount of time to go between republishes.
+	// Used to batch-publish rating/follower changes that don't trigger
+	// an immediate publish.
 	republishInterval = time.Hour * 36
-
-	// nameValidTime is the amount of time an IPNS record is considered valid
-	// after publish.
-	nameValidTime = time.Hour * 24 * 30
 )
 
-// Publish will publish the current public data directory to IPNS.
+// Publish adds the current public data directory to IPFS and sends
+// STORE messages to followers and SNF servers for replication.
 // It will interrupt the publish if a shutdown happens during.
 //
 // This cannot be called with the database lock held.
@@ -110,10 +106,21 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 		return
 	}
 
-	currentRoot, err := n.ipnsRecordValue(ctx)
+	// Load last published root CID from database (replaces IPNS record lookup).
+	var currentRoot cid.Cid
+	_ = n.db.View(func(tx database.Tx) error {
+		var event models.Event
+		if err := tx.Read().Where("name = ?", "last_publish").First(&event).Error; err != nil {
+			return err
+		}
+		if event.Value != "" {
+			currentRoot, _ = cid.Decode(event.Value)
+		}
+		return nil
+	})
 
-	// First uppin old root hash
-	if err == nil {
+	// Unpin old root to reclaim IPFS storage.
+	if currentRoot.Defined() {
 		rp, _, err := api.ResolvePath(context.Background(), path.FromCid(currentRoot))
 		if err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID, "Error resolving path: %s", err.Error())
@@ -177,70 +184,27 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 		return
 	}
 
-	// If the state has not changed since last publish then just return.
-	// The IPNS republisher is responsible for keeping our current IPNS
-	// record alive.
-	if pth.RootCid() == currentRoot {
+	newRoot := pth.RootCid()
+
+	// No-change detection: if data hasn't changed, skip replication.
+	if newRoot == currentRoot {
 		return
 	}
 
-	record, err := n.ipnsRecord(cctx)
-	if err != nil {
-		logger.LogErrorWithIDf(log, n.nodeID, "Error getting ipns record: %s", err.Error())
-		publishErr = err
-		return
-	}
-
-	if len(n.ipnsResolver) > 0 {
-		err = net.SetIPNSRecordToResolver(cctx, n.ipnsResolver, n.Identity(), record)
-		if err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "Error setting ipns record to resolver: %s", err.Error())
-			publishErr = err
-		}
-	}
-
-	// Publish（带 5 分钟超时保护）
-	go func() {
-		publishCtx, publishCancel := context.WithTimeout(cctx, 5*time.Minute)
-		defer publishCancel()
-		logger.LogInfoWithIDf(log, n.nodeID, "Publishing to IPNS...")
-		eol := time.Now().Add(nameValidTime)
-		ipfsForIPNS, err := n.getIPFSNode()
-		if err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "No IPFS node available for IPNS publish")
-			publishErr = err
-			return
-		}
-		// Use the current node's private key (not the shared IPFS node's key)
-		// to publish the IPNS record under this node's PeerID.
-		if err := ipfsForIPNS.Namesys.Publish(publishCtx, n.privKey, pth, nameSysOpts.PublishWithEOL(eol)); err != nil {
-			if err != context.Canceled {
-				logger.LogErrorWithIDf(log, n.nodeID, "Error namesys publish: %s", err.Error())
-			}
-			publishErr = err
-			return
-		}
-	}()
-
-	// Publish to pubsub all records topic（带超时）
-	go func() {
-		pubsubCtx, pubsubCancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer pubsubCancel()
-		logger.LogInfoWithIDf(log, n.nodeID, "Going to publish to pubsub:")
-		if err := n.publishIPNSRecordToPubsub(pubsubCtx); err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "Error publishing IPNS record to pubsub: %s", err)
-		}
-	}()
-
+	// Persist new root CID and publish timestamp.
 	err = n.db.Update(func(tx database.Tx) error {
-		return tx.Save(&models.Event{Name: "last_publish", Time: time.Now()})
+		return tx.Save(&models.Event{
+			Name:  "last_publish",
+			Time:  time.Now(),
+			Value: newRoot.String(),
+		})
 	})
 	if err != nil {
-		logger.LogErrorWithIDf(log, n.nodeID, "Error saving last publish time to the db: %s", err.Error())
+		logger.LogErrorWithIDf(log, n.nodeID, "Error saving last publish to the db: %s", err.Error())
 	}
 
-	// Send the new graph to our connected followers.
-	graph, err := n.fetchGraph(cctx)
+	// Collect all CIDs and send STORE messages to followers/SNF servers.
+	graph, err := n.fetchGraph(cctx, newRoot)
 	if err != nil {
 		logger.LogErrorWithIDf(log, n.nodeID, "Error fetching graph: %s", err.Error())
 		publishErr = err
@@ -274,10 +238,9 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 	msg.MessageType = pb.Message_STORE
 	msg.Payload = any
 
-	// 有界并发发送消息给 followers 和 SNF servers（后台执行，不阻塞 Publish 返回）
 	go func() {
 		var wg sync.WaitGroup
-		sem := make(chan struct{}, 10) // 最多 10 个并发发送
+		sem := make(chan struct{}, 10)
 		sendCtx, sendCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer sendCancel()
 
@@ -624,13 +587,10 @@ type pubCloser struct {
 	done chan<- struct{}
 }
 
-// publishHandler is a loop that runs and handles IPNS record publishes and republishes. It shoots to
-// republish 36 hours from the last publish so as to not slam the network on startup every time.
-// If a current publish is active it will be canceled and the new publish will supersede it.
-//
-// The only reason we have this republish functionality at all is to publish ratings and followers/follows
-// that do not otherwise trigger an automatic publish. So we essentially batch and publish these
-// changes every 36 hours if the user does not trigger a publish in the interim.
+// publishHandler manages the publish loop. It periodically re-publishes
+// (every 36 hours) to batch-publish rating/follower changes that don't
+// otherwise trigger an immediate publish. If a new publish is requested
+// while one is active, the active publish is canceled.
 func (n *MobazhaNode) publishHandler() {
 	var lastPublish time.Time
 	err := n.db.View(func(tx database.Tx) error {
@@ -651,16 +611,10 @@ func (n *MobazhaNode) publishHandler() {
 	go func() {
 		for {
 			select {
-			case <-tick:
-				lastPublish = time.Now()
-				tick = time.After(republishInterval - time.Since(lastPublish))
-				err = n.db.Update(func(tx database.Tx) error {
-					return tx.Save(&models.Event{Name: "last_publish", Time: lastPublish})
-				})
-				if err != nil {
-					logger.LogErrorWithIDf(log, n.nodeID, "Error saving last publish time to the db: %s", err.Error())
-				}
-				go n.Publish(nil)
+		case <-tick:
+			lastPublish = time.Now()
+			tick = time.After(republishInterval - time.Since(lastPublish))
+			go n.Publish(nil)
 			case p := <-n.publishChan:
 				publishCancel()
 				publishCtx, publishCancel = context.WithCancel(context.Background())

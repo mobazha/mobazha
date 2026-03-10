@@ -17,7 +17,6 @@ type Config struct {
 	LogDir           string
 	UserAgentComment string
 	APICookie        string
-	IPNSResolver     string
 	GatewayAddress   string
 	Testnet          bool
 }
@@ -61,7 +60,6 @@ func NewNode(cfg *Config) (*Node, error) {
 	}
 
 	rcfg := &repo.Config{
-		IPNSQuorum:        2,
 		LogLevel:          logLevel,
 		DisableNATPortMap: true,
 		DataDir:           dataDir,

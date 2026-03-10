@@ -156,7 +156,6 @@ func newConfig(role, gatwayAddr, swarmAddr string) *repo.Config {
 		Testnet:            true,
 		BoostrapAddrs:      nil,
 		DisableNATPortMap:  true,
-		IPNSQuorum:         2,
 		LogLevel:           "info",
 		APIAllowAllOrigins: true,
 	}

@@ -171,8 +171,7 @@ func MockNode() (*MobazhaNode, error) {
 			exchangeRates: erp,
 		},
 		ipnsFields: ipnsFields{
-			ipnsQuorum: 1,
-			netConfig:  config.DefaultNetConfig(),
+			netConfig: config.DefaultNetConfig(),
 		},
 		lifecycleFields: lifecycleFields{
 			shutdown:             make(chan struct{}),
@@ -184,9 +183,7 @@ func MockNode() (*MobazhaNode, error) {
 
 	// Initialize content store for mock node.
 	node.contentStore = newIPFSContentStore(
-		func() (*core.IpfsNode, error) { return ipfsNode, nil },
 		func() *core.IpfsNode { return ipfsNode },
-		r.DataDir(),
 		node.shutdown,
 	)
 
@@ -412,8 +409,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 				exchangeRates: erp,
 			},
 			ipnsFields: ipnsFields{
-				ipnsQuorum: 1,
-				netConfig:  config.DefaultNetConfig(),
+				netConfig: config.DefaultNetConfig(),
 			},
 			lifecycleFields: lifecycleFields{
 				shutdown:             make(chan struct{}),
@@ -424,9 +420,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		}
 		// Initialize content store for mock node.
 		node.contentStore = newIPFSContentStore(
-			node.getIPFSNode,
 			sharedManager.GetIPFSNode,
-			r.DataDir(),
 			node.shutdown,
 		)
 

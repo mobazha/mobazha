@@ -86,8 +86,6 @@ type Config struct {
 	Testnet                bool     `short:"t" long:"testnet" description:"Use the test network"`
 	WalletTestnet          bool     `long:"wallettestnet" description:"Use testnet for wallet transactions (coins and chains)"`
 	DisableNATPortMap      bool     `long:"noupnp" description:"Disable use of upnp."`
-	IPNSQuorum             uint     `long:"ipnsquorum" description:"The size of the IPNS quorum to use. Smaller is faster but less up-to-date." default:"2"`
-	NoIPNSPubsub           bool     `long:"noipnsps" description:"Disable use of IPNS pubsub."`
 	UseSSL                 bool     `long:"ssl" description:"Use SSL on the API"`
 	SSLCertFile            string   `long:"sslcertfile" description:"Path to the SSL certificate file"`
 	SSLKeyFile             string   `long:"sslkeyfile" description:"Path to the SSL key file"`

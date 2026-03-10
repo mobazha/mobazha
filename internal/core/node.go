@@ -139,12 +139,10 @@ type chainFields struct {
 	monitorService    utxo.UTXOMonitorService
 }
 
-// ipnsFields groups IPNS resolution and NetDB configuration.
+// ipnsFields groups NetDB configuration (IPNS resolution retired).
 type ipnsFields struct {
-	ipnsQuorum   uint
-	ipnsResolver string
-	netDB        *netdb.NetDB
-	netConfig    *config.NetConfig
+	netDB     *netdb.NetDB
+	netConfig *config.NetConfig
 }
 
 // modeFlags groups boolean mode switches.
@@ -269,8 +267,6 @@ func (n *MobazhaNode) Start() {
 		if err := n.profileService.UpdateSNFServers(); err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID, "Error updating store and forward servers in profile: %s", err)
 		}
-
-		go n.listenPubsub()
 
 		// Start UTXO payment monitor for external wallet payments
 		go n.startUTXOPaymentMonitor()

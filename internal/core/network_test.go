@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-cid"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -225,7 +226,24 @@ func TestMobazhaNode_PublishToFollowers(t *testing.T) {
 		t.Fatal("Timeout waiting on channel")
 	}
 
-	graph, err := mocknet.Nodes()[0].fetchGraph(context.Background())
+	// Load the last published root CID from DB to call fetchGraph.
+	var lastPublishCID string
+	err = mocknet.Nodes()[0].repo.DB().View(func(tx database.Tx) error {
+		var event models.Event
+		if err := tx.Read().Where("name = ?", "last_publish").First(&event).Error; err != nil {
+			return err
+		}
+		lastPublishCID = event.Value
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootCID, err := cid.Decode(lastPublishCID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	graph, err := mocknet.Nodes()[0].fetchGraph(context.Background(), rootCID)
 	if err != nil {
 		t.Fatal(err)
 	}

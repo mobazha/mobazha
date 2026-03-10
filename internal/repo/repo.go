@@ -1,7 +1,6 @@
 package repo
 
 import (
-	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
@@ -17,7 +16,6 @@ import (
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
 	config "github.com/ipfs/kubo/config"
-	"github.com/ipfs/kubo/core"
 	"github.com/ipfs/kubo/plugin/loader"
 	"github.com/ipfs/kubo/repo/fsrepo"
 	"github.com/mobazha/mobazha3.0/internal/common"
@@ -30,11 +28,7 @@ import (
 	"github.com/tyler-smith/go-bip39"
 	"gorm.io/gorm"
 
-	ft "github.com/ipfs/boxo/ipld/unixfs"
-	nsys "github.com/ipfs/boxo/namesys"
-	goPath "github.com/ipfs/boxo/path"
 	mfsr "github.com/ipfs/fs-repo-migrations/tools/mfsr"
-	ci "github.com/libp2p/go-libp2p/core/crypto"
 )
 
 const (
@@ -241,9 +235,6 @@ func newRepo(nodeID string, dataDir, mnemonicSeed string, externalIdentityKey []
 		conf := mustDefaultConfig(testnet)
 		conf.Identity = identity
 		if err := fsrepo.Init(ipfsDir, conf); err != nil {
-			return nil, err
-		}
-		if err := initializeIpnsKeyspace(ipfsDir, keys.identityKey); err != nil {
 			return nil, err
 		}
 
@@ -545,58 +536,6 @@ func CreateHDKeys(seed []byte) (escrowKey, ratingKey *btcec.PrivateKey, bip44Key
 	return escrowKey, ratingKey, bip44Key, &solPriv, nil
 }
 
-// InitializeKeyspace sets the ipns record for the given key to
-// point to an empty directory.
-func InitializeKeyspace(n *core.IpfsNode, key ci.PrivKey) error {
-	ctx, cancel := context.WithCancel(n.Context())
-	defer cancel()
-
-	emptyDir := ft.EmptyDirNode()
-
-	err := n.Pinning.Pin(ctx, emptyDir, false, "")
-	if err != nil {
-		return err
-	}
-
-	err = n.Pinning.Flush(ctx)
-	if err != nil {
-		return err
-	}
-
-	pub := nsys.NewIPNSPublisher(n.Routing, n.Repo.Datastore())
-
-	return pub.Publish(ctx, key, goPath.FromCid(emptyDir.Cid()))
-}
-
-func initializeIpnsKeyspace(repoRoot string, privKeyBytes []byte) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	r, err := fsrepo.Open(repoRoot)
-	if err != nil { // NB: repo is owned by the node
-		return err
-	}
-
-	cfg, err := r.Config()
-	if err != nil {
-		return err
-	}
-	identity, err := IdentityFromKey(privKeyBytes)
-	if err != nil {
-		return err
-	}
-
-	cfg.Identity = identity
-
-	nd, err := core.NewNode(ctx, &core.BuildCfg{Repo: r})
-	if err != nil {
-		return err
-	}
-	defer nd.Close()
-
-	return InitializeKeyspace(nd, nd.PrivateKey)
-}
-
 func mustDefaultConfig(testnet bool) *config.Config {
 	bootstrapPeers, err := config.ParseBootstrapPeers([]string{}) // TODO:
 	if err != nil {
@@ -608,7 +547,6 @@ func mustDefaultConfig(testnet bool) *config.Config {
 	if err != nil {
 		panic(err)
 	}
-	conf.Ipns.RecordLifetime = "720h"
 	conf.Discovery.MDNS.Enabled = true
 	conf.Addresses = config.Addresses{
 		Swarm: []string{
@@ -698,8 +636,6 @@ func cleanIdentityFromConfig(dataDir string) error {
 func autoMigrateDatabase(db database.Database) error {
 	dbModels := []interface{}{
 		&models.Key{},
-		&models.CachedIPNSEntry{},
-		&models.CachedIPNSRecord{},
 		&models.OutgoingMessage{},
 		&models.IncomingMessage{},
 		&models.ChatMessage{},
@@ -794,8 +730,6 @@ func autoMigrateDatabase(db database.Database) error {
 func autoMigrateDatabaseManagedEscrow(db database.Database) error {
 	allModels := []interface{}{
 		&models.Key{},
-		&models.CachedIPNSEntry{},
-		&models.CachedIPNSRecord{},
 		&models.OutgoingMessage{},
 		&models.IncomingMessage{},
 		&models.ChatMessage{},

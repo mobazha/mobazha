@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	ipath "github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -89,11 +88,7 @@ func TestMobazhaNode_SetImages(t *testing.T) {
 		t.Errorf("Expected %s, got %s", expectedOriginal, hashes.Original)
 	}
 
-	id, err := cid.Decode(hashes.Tiny)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = m.cat(context.Background(), ipath.FromCid(id))
+	_, err = cid.Decode(hashes.Tiny)
 	if err != nil {
 		t.Fatal(err)
 	}

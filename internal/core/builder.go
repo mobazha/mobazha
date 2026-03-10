@@ -991,18 +991,6 @@ func (n *MobazhaNode) registerHandlers() {
 	n.networkService.RegisterHandler(pb.Message_DISPUTE, func(from peer.ID, message *pb.Message) error {
 		return n.orderService.handleDisputeMessage(from, message, n.isDuplicate, n.sendAckMessage)
 	})
-	n.networkService.RegisterHandler(pb.Message_CHANNEL_REQUEST, func(from peer.ID, message *pb.Message) error {
-		if n.channelsService != nil {
-			return n.channelsService.handleChannelRequest(from, message)
-		}
-		return fmt.Errorf("channels service not initialized")
-	})
-	n.networkService.RegisterHandler(pb.Message_CHANNEL_RESPONSE, func(from peer.ID, message *pb.Message) error {
-		if n.channelsService != nil {
-			return n.channelsService.handleChannelResponse(from, message)
-		}
-		return fmt.Errorf("channels service not initialized")
-	})
 }
 
 func (n *MobazhaNode) listenNetworkEvents() {

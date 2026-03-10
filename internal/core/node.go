@@ -176,7 +176,6 @@ type appServices struct {
 	followService       *FollowAppService
 	postsService        *PostsAppService
 	moderationService   *ModerationAppService
-	channelsService     *ChannelsAppService
 	listingService      *ListingAppService
 	notificationService *NotificationAppService
 	shoppingCartService *ShoppingCartAppService
@@ -262,8 +261,6 @@ func (n *MobazhaNode) Start() {
 				logger.LogErrorWithIDf(log, n.nodeID, "Failed to start event dispatcher: %v", err)
 			}
 		}
-		go n.channelsService.OpenSavedChannels()
-
 		if err := n.profileService.UpdateSNFServers(); err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID, "Error updating store and forward servers in profile: %s", err)
 		}
@@ -340,9 +337,6 @@ func (n *MobazhaNode) Stop(force bool) error {
 		n.orderProcessor.Stop()
 		n.followerTracker.Close()
 		n.multiwallet.Close()
-		if n.channelsService != nil {
-			n.channelsService.CloseAll()
-		}
 	}
 	// Shutdown order matters: EventDispatcher must stop before WebhookEngine
 	// so that WebhookSink stops emitting before the engine shuts down.

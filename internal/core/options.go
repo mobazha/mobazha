@@ -65,8 +65,7 @@ func WithHostService(hs coreiface.HostService) NodeOption {
 //	11   │ followService        │                                         │ profileService
 //	12   │ postsService         │                                         │ profileService
 //	13   │ moderationService    │ listingService                          │ profileService
-//	14   │ channelsService      │                                         │ preferencesService
-//	15   │ listingService       │                                         │ profileService
+//	14   │ listingService       │                                         │ profileService
 //
 // "Runtime deps" = referenced via closures; safe even if the target is
 //
@@ -110,7 +109,6 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initFollowService()
 	n.initPostsService()
 	n.initModerationService()
-	n.initChannelsService()
 	n.initListingService()
 	n.initAnalyticsService()
 }
@@ -546,31 +544,6 @@ func (n *MobazhaNode) initModerationService() {
 		UpdateAllListings: func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error {
 			return n.listingService.UpdateAllListings(updateFunc, done)
 		},
-	})
-}
-
-// initChannelsService creates the ChannelsAppService.
-// Must be called after initPreferencesService since it depends on preferences callbacks.
-func (n *MobazhaNode) initChannelsService() {
-	if n.ipfsOnlyMode {
-		return
-	}
-
-	var getPrefs GetPreferencesFunc
-	var savePrefs SavePreferencesFunc
-	if n.preferencesService != nil {
-		getPrefs = n.preferencesService.GetPreferences
-		savePrefs = n.preferencesService.SavePreferences
-	}
-
-	n.channelsService = NewChannelsAppService(ChannelsAppServiceConfig{
-		DB:                   n.db,
-		NetworkService:       n.networkService,
-		EventBus:             n.eventBus,
-		GetIPFSNode:          n.getIPFSNode,
-		GetPreferences:       getPrefs,
-		SavePreferences:      savePrefs,
-		InitialBootstrapChan: n.initialBootstrapChan,
 	})
 }
 

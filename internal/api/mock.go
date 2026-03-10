@@ -94,11 +94,6 @@ type mockNode struct {
 	getModeratorsFunc                       func(ctx context.Context) []peer.ID
 	getModeratorsAsyncFunc                  func(ctx context.Context) <-chan peer.ID
 	getVerifiedModeratorsFunc               func(ctx context.Context) []peer.ID
-	openChannel                             func(topic string) error
-	closeChannel                            func(topic string) error
-	listChannels                            func() []string
-	publishChannelMessage                   func(ctx context.Context, topic, message string) error
-	getChannelMessages                      func(ctx context.Context, topic string, from *cid.Cid, limit int) ([]models.ChannelMessage, error)
 	publishFunc                             func(done chan<- struct{})
 	usingTestnetFunc                        func() bool
 	usingTorFunc                            func() bool
@@ -515,21 +510,6 @@ func (m *mockNode) RejectOrder(orderID models.OrderID, txid iwallet.TransactionI
 }
 func (m *mockNode) RefundOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {
 	return m.refundOrderFunc(orderID, txid, done)
-}
-func (m *mockNode) OpenChannel(topic string) error {
-	return m.openChannel(topic)
-}
-func (m *mockNode) CloseChannel(topic string) error {
-	return m.closeChannel(topic)
-}
-func (m *mockNode) ListChannels() []string {
-	return m.listChannels()
-}
-func (m *mockNode) PublishChannelMessage(ctx context.Context, topic, message string) error {
-	return m.publishChannelMessage(ctx, topic, message)
-}
-func (m *mockNode) GetChannelMessages(ctx context.Context, topic string, from *cid.Cid, limit int) ([]models.ChannelMessage, error) {
-	return m.getChannelMessages(ctx, topic, from, limit)
 }
 func (m *mockNode) PingNode(ctx context.Context, peer peer.ID) error {
 	return m.pingNodeFunc(ctx, peer)

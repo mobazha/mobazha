@@ -213,7 +213,7 @@ type MediaService interface {
 	GetProfileMedia(ctx context.Context, peerID peer.ID, slot ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
 }
 
-// SocialService handles following, ratings, posts, and channels.
+// SocialService handles following, ratings, and posts.
 type SocialService interface {
 	// Following
 	FollowNode(peerID peer.ID, done chan<- struct{}) error
@@ -237,13 +237,6 @@ type SocialService interface {
 	GetMyPostBySlug(slug string) (*postsPb.SignedPost, error)
 	GetPostBySlug(ctx context.Context, peerID peer.ID, slug string, useCache bool) (*postsPb.SignedPost, error)
 	GetPosts(ctx context.Context, peerID peer.ID, useCache bool) ([]models.PostData, error)
-
-	// Channels
-	OpenChannel(topic string) error
-	CloseChannel(topic string) error
-	ListChannels() []string
-	PublishChannelMessage(ctx context.Context, topic, message string) error
-	GetChannelMessages(ctx context.Context, topic string, from *cid.Cid, limit int) ([]models.ChannelMessage, error)
 }
 
 // MatrixService handles Matrix chat integration (E2EE key backup, secrets, credentials).

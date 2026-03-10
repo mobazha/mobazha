@@ -177,10 +177,9 @@ func (n *MobazhaNode) Social() contracts.SocialService {
 		return nil
 	}
 	return &socialServiceFacade{
-		FollowAppService:   n.followService,
-		RatingsAppService:  n.ratingsService,
-		PostsAppService:    n.postsService,
-		ChannelsAppService: n.channelsService,
+		FollowAppService:  n.followService,
+		RatingsAppService: n.ratingsService,
+		PostsAppService:   n.postsService,
 	}
 }
 
@@ -240,14 +239,13 @@ func (f *profileServiceFacade) GetVerifiedModerators(ctx context.Context) []peer
 	return f.moderation.GetVerifiedModerators(ctx)
 }
 
-// socialServiceFacade composes Follow + Ratings + Posts + Channels App Services
-// to satisfy contracts.SocialService. All method names are unique across the four
+// socialServiceFacade composes Follow + Ratings + Posts App Services
+// to satisfy contracts.SocialService. All method names are unique across the three
 // embedded services, so Go struct embedding handles promotion automatically.
 type socialServiceFacade struct {
 	*FollowAppService
 	*RatingsAppService
 	*PostsAppService
-	*ChannelsAppService
 }
 
 // identityInfoAdapter composes infrastructure fields and ListingAppService

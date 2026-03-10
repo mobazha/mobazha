@@ -31,15 +31,24 @@ func TestRegisterHandlers_CoversAllMessageTypes(t *testing.T) {
 	node := &MobazhaNode{networkFields: networkFields{networkService: spy}}
 	node.registerHandlers()
 
-	// Every protobuf message type must have a handler.
-	// When a new Message_MessageType is added to the proto, this test
-	// forces the developer to wire a handler in registerHandlers().
-	allTypes := pb.Message_MessageType_name // map[int32]string from generated code
+	// Retired message types kept in proto for backward compatibility (reserved numbers).
+	// Phase 2g removed Channels handlers; the enum values remain to prevent reuse.
+	retiredTypes := map[pb.Message_MessageType]bool{
+		pb.Message_CHANNEL_REQUEST:  true,
+		pb.Message_CHANNEL_RESPONSE: true,
+	}
+
+	allTypes := pb.Message_MessageType_name
 	require.NotEmpty(t, allTypes, "protobuf enum map should not be empty")
 
+	activeCount := 0
 	var missing []string
 	for num, name := range allTypes {
 		mt := pb.Message_MessageType(num)
+		if retiredTypes[mt] {
+			continue
+		}
+		activeCount++
 		if !spy.registered[mt] {
 			missing = append(missing, name)
 		}
@@ -48,6 +57,6 @@ func TestRegisterHandlers_CoversAllMessageTypes(t *testing.T) {
 	assert.Empty(t, missing,
 		"these message types have no handler in registerHandlers(): %v", missing)
 
-	assert.Len(t, spy.registered, len(allTypes),
-		"handler count should match proto enum count")
+	assert.Len(t, spy.registered, activeCount,
+		"handler count should match active proto enum count")
 }

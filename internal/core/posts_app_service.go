@@ -221,6 +221,9 @@ func (s *PostsAppService) signPost(post *postsPb.Post) (*postsPb.SignedPost, err
 		return nil, err
 	}
 
+	if s.keys == nil {
+		return nil, fmt.Errorf("key provider not available")
+	}
 	escrowKey, err := s.keys.EscrowMasterKey()
 	if err != nil {
 		return nil, fmt.Errorf("escrow master key: %w", err)

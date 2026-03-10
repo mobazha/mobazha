@@ -73,7 +73,7 @@ type catalogCacheEntry struct {
 const catalogCacheTTL = 30 * time.Second
 
 func getCachedCatalog(p aiChatProvider) string {
-	key := fmt.Sprintf("catalog-%p", p)
+	key := "catalog-" + p.ProfileName()
 	if v, ok := catalogCache.Load(key); ok {
 		entry := v.(*catalogCacheEntry)
 		if time.Now().Before(entry.expiresAt) {
@@ -107,7 +107,7 @@ func (g *Gateway) handlePOSTAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	store := p.ChatStore()
-	streamKey := fmt.Sprintf("ai-chat-%p", p)
+	streamKey := "ai-chat-" + p.ProfileName()
 	if _, loaded := activeAIStreams.LoadOrStore(streamKey, true); loaded {
 		responsePkg.Error(w, http.StatusTooManyRequests, "TOO_MANY_REQUESTS", "Another AI chat request is still in progress. Please wait.")
 		return

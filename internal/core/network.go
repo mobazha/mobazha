@@ -502,7 +502,7 @@ func (n *MobazhaNode) syncMessages() {
 // bootstrapDHT starts the DHT bootstrap process.
 // For lightweight nodes (p2pInfra == nil), skip bootstrap and signal ready immediately.
 func (n *MobazhaNode) bootstrapDHT() error {
-	if n.p2pInfra == nil {
+	if n.p2pInfra == nil || n.p2pInfra.DHT == nil {
 		close(n.initialBootstrapChan)
 		return nil
 	}

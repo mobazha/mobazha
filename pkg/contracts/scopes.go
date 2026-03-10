@@ -166,6 +166,27 @@ func ScopeStrings(scopes []Scope) []string {
 	return strs
 }
 
+// scopeParents defines the hierarchy: child → parent.
+// Having the parent in a ScopeSet automatically grants the child.
+var scopeParents = map[Scope]Scope{
+	ScopeListingsRead:      ScopeListingsWrite,
+	ScopeOrdersRead:        ScopeOrdersManage,
+	ScopeWalletRead:        ScopeWalletManage,
+	ScopeWalletSpend:       ScopeWalletManage,
+	ScopeChatRead:          ScopeChatWrite,
+	ScopeProfilesRead:      ScopeProfilesWrite,
+	ScopeNotificationsRead: ScopeNotificationsManage,
+	ScopeMediaRead:         ScopeMediaWrite,
+	ScopeSettingsRead:      ScopeSettingsWrite,
+	ScopeDiscountsRead:     ScopeDiscountsWrite,
+	ScopeCollectionsRead:   ScopeCollectionsWrite,
+	ScopeShippingRead:      ScopeShippingWrite,
+	ScopeFiatRead:          ScopeFiatManage,
+	ScopeDisputesRead:      ScopeDisputesManage,
+	ScopeWishlistsRead:     ScopeWishlistsWrite,
+	ScopeCartsRead:         ScopeCartsWrite,
+}
+
 // ScopeSet is a set of scopes for fast lookup.
 type ScopeSet map[Scope]struct{}
 
@@ -178,16 +199,24 @@ func NewScopeSet(scopes []Scope) ScopeSet {
 	return ss
 }
 
-// Has returns whether the set contains the given scope.
+// Has returns whether the set contains the given scope,
+// respecting scope hierarchy: :manage implies :read and :write.
 func (ss ScopeSet) Has(s Scope) bool {
-	_, ok := ss[s]
-	return ok
+	if _, ok := ss[s]; ok {
+		return true
+	}
+	if parent, ok := scopeParents[s]; ok {
+		_, ok = ss[parent]
+		return ok
+	}
+	return false
 }
 
-// HasAny returns whether the set contains any of the given scopes.
+// HasAny returns whether the set contains any of the given scopes,
+// respecting scope hierarchy (same as Has).
 func (ss ScopeSet) HasAny(scopes ...Scope) bool {
 	for _, s := range scopes {
-		if _, ok := ss[s]; ok {
+		if ss.Has(s) {
 			return true
 		}
 	}

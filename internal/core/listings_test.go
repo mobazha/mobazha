@@ -192,6 +192,7 @@ func TestMobazhaNode_DeleteListing(t *testing.T) {
 }
 
 func TestMobazhaNode_ListingsGet(t *testing.T) {
+	t.Skip("requires cross-node IPFS content resolution, disabled post-IPFS retirement")
 	network, err := NewMocknet(2)
 	if err != nil {
 		t.Fatal(err)

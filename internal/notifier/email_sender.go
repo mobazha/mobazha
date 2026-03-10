@@ -129,8 +129,8 @@ func (s *EmailSender) sendViaSMTP(settings map[string]string, to, subject, htmlB
 	encodedSubject := mime.QEncoding.Encode("UTF-8", subject)
 
 	var msg bytes.Buffer
-	msg.WriteString("From: " + from + "\r\n")
-	msg.WriteString("To: " + to + "\r\n")
+	msg.WriteString("From: " + sanitizeEmailHeader(from) + "\r\n")
+	msg.WriteString("To: " + sanitizeEmailHeader(to) + "\r\n")
 	msg.WriteString("Subject: " + encodedSubject + "\r\n")
 	msg.WriteString("MIME-Version: 1.0\r\n")
 	msg.WriteString("Content-Type: text/html; charset=\"UTF-8\"\r\n")
@@ -187,6 +187,13 @@ func (s *EmailSender) sendSMTPImplicitTLS(host, addr, from, to, username, passwo
 		return fmt.Errorf("SMTP close data: %w", err)
 	}
 	return client.Quit()
+}
+
+// sanitizeEmailHeader strips CR/LF to prevent CRLF header injection.
+func sanitizeEmailHeader(s string) string {
+	s = strings.ReplaceAll(s, "\r", "")
+	s = strings.ReplaceAll(s, "\n", "")
+	return s
 }
 
 // splitEmailMessage splits the formatter output into subject (first line) and HTML body (rest).

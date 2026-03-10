@@ -78,6 +78,39 @@ func TestScopeSet_Has(t *testing.T) {
 	}
 }
 
+func TestScopeSet_Has_Hierarchy(t *testing.T) {
+	tests := []struct {
+		name    string
+		granted []Scope
+		check   Scope
+		want    bool
+	}{
+		{"manage grants read", []Scope{ScopeOrdersManage}, ScopeOrdersRead, true},
+		{"manage grants itself", []Scope{ScopeOrdersManage}, ScopeOrdersManage, true},
+		{"write grants read", []Scope{ScopeListingsWrite}, ScopeListingsRead, true},
+		{"read does not grant write", []Scope{ScopeListingsRead}, ScopeListingsWrite, false},
+		{"read does not grant manage", []Scope{ScopeOrdersRead}, ScopeOrdersManage, false},
+		{"wallet manage grants spend", []Scope{ScopeWalletManage}, ScopeWalletSpend, true},
+		{"wallet manage grants read", []Scope{ScopeWalletManage}, ScopeWalletRead, true},
+		{"fiat manage grants read", []Scope{ScopeFiatManage}, ScopeFiatRead, true},
+		{"disputes manage grants read", []Scope{ScopeDisputesManage}, ScopeDisputesRead, true},
+		{"discounts write grants read", []Scope{ScopeDiscountsWrite}, ScopeDiscountsRead, true},
+		{"collections write grants read", []Scope{ScopeCollectionsWrite}, ScopeCollectionsRead, true},
+		{"shipping write grants read", []Scope{ScopeShippingWrite}, ScopeShippingRead, true},
+		{"wishlists write grants read", []Scope{ScopeWishlistsWrite}, ScopeWishlistsRead, true},
+		{"carts write grants read", []Scope{ScopeCartsWrite}, ScopeCartsRead, true},
+		{"unrelated scope not granted", []Scope{ScopeOrdersManage}, ScopeWalletRead, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ss := NewScopeSet(tt.granted)
+			if got := ss.Has(tt.check); got != tt.want {
+				t.Errorf("Has(%q) = %v, want %v (granted: %v)", tt.check, got, tt.want, tt.granted)
+			}
+		})
+	}
+}
+
 func TestScopeSet_HasAny(t *testing.T) {
 	ss := NewScopeSet([]Scope{ScopeListingsRead})
 	if !ss.HasAny(ScopeOrdersRead, ScopeListingsRead) {
@@ -85,6 +118,16 @@ func TestScopeSet_HasAny(t *testing.T) {
 	}
 	if ss.HasAny(ScopeOrdersRead, ScopeWalletSpend) {
 		t.Error("unexpected HasAny match")
+	}
+}
+
+func TestScopeSet_HasAny_Hierarchy(t *testing.T) {
+	ss := NewScopeSet([]Scope{ScopeOrdersManage})
+	if !ss.HasAny(ScopeWalletRead, ScopeOrdersRead) {
+		t.Error("expected HasAny to match orders:read via orders:manage hierarchy")
+	}
+	if ss.HasAny(ScopeWalletRead, ScopeListingsWrite) {
+		t.Error("unexpected HasAny match for unrelated scopes")
 	}
 }
 

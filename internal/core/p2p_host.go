@@ -213,16 +213,21 @@ func parseBootstrapPeers(addrs []string) ([]peer.AddrInfo, error) {
 	for _, s := range addrs {
 		maddr, err := ma.NewMultiaddr(s)
 		if err != nil {
+			log.Warningf("skipping invalid bootstrap address %q: %v", s, err)
 			continue
 		}
 		pi, err := peer.AddrInfoFromP2pAddr(maddr)
 		if err != nil {
+			log.Warningf("skipping bootstrap address %q: %v", s, err)
 			continue
 		}
 		if !seen[pi.ID] {
 			seen[pi.ID] = true
 			peers = append(peers, *pi)
 		}
+	}
+	if len(addrs) > 0 && len(peers) == 0 {
+		return nil, fmt.Errorf("all %d bootstrap addresses were invalid", len(addrs))
 	}
 	return peers, nil
 }

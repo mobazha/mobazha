@@ -661,6 +661,9 @@ func (s *ListingAppService) saveListingToDB(dbtx database.Tx, listing *pb.Listin
 		return cid.Cid{}, err
 	}
 
+	if s.keys == nil {
+		return cid.Cid{}, fmt.Errorf("key provider not available")
+	}
 	escrowKey, err := s.keys.EscrowMasterKey()
 	if err != nil {
 		return cid.Cid{}, fmt.Errorf("failed to get escrow master key: %w", err)

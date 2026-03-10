@@ -11,8 +11,9 @@ import (
 )
 
 var sensitiveSettingsKeys = map[string]bool{
-	"bot_token": true,
-	"api_key":   true,
+	"bot_token":     true,
+	"api_key":       true,
+	"smtp_password": true,
 }
 
 func sanitizeChannelForResponse(ch notifier.ChannelConfig) map[string]interface{} {

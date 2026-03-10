@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
@@ -199,6 +200,8 @@ func MockNode() (*MobazhaNode, error) {
 	node.initFollowService()
 	node.initPostsService()
 	node.initModerationService()
+	initShippingSubsystem(node)
+	seedMockShippingProfile(node)
 	node.initListingService()
 	node.initShoppingCartService()
 	node.initPaymentService()
@@ -405,6 +408,8 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		node.initFollowService()
 		node.initPostsService()
 		node.initModerationService()
+		initShippingSubsystem(node)
+		seedMockShippingProfile(node)
 		node.initListingService()
 		node.initShoppingCartService()
 		node.initPaymentService()
@@ -465,6 +470,36 @@ func (mn *Mocknet) StartWalletNetwork() {
 // WalletNetwork returns the mock wallet network.
 func (mn *Mocknet) WalletNetwork() *wallet.MockWalletNetwork {
 	return mn.wn
+}
+
+// seedMockShippingProfile creates the default shipping profile that
+// factory.NewPhysicalListing references (ProfileID = "factory-default-profile").
+// Without this, listing tests fail with "shipping profile not found".
+func seedMockShippingProfile(node *MobazhaNode) {
+	if node.shippingService == nil {
+		return
+	}
+	groups := []*models.LocationGroup{{
+		ID: "default-lg",
+		Zones: []*models.ShippingZone{{
+			ID:      "zone-all",
+			Name:    "Worldwide",
+			Regions: []string{"ALL"},
+			Rates: []*models.ShippingRate{{
+				ID:       "rate-std",
+				Name:     "Standard",
+				Price:    "500",
+				Currency: "USD",
+			}},
+		}},
+	}}
+	groupsJSON, _ := json.Marshal(groups)
+	_ = node.shippingService.CreateProfile(context.Background(), &models.ShippingProfileEntity{
+		ID:                 "factory-default-profile",
+		Name:               "Default Shipping",
+		IsDefault:          true,
+		LocationGroupsJSON: string(groupsJSON),
+	})
 }
 
 // TearDown shutsdown the network and destroys the data directories.

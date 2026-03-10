@@ -23,6 +23,7 @@ import (
 
 // newMockUTXOAdapter creates a UTXOAutoConfirmAdapter wired to a MobazhaNode's
 // callbacks. Used in tests to register ChainMock with the payment registry.
+// Requires the node to have a fully initialized wallet (Mocknet nodes do).
 func newMockUTXOAdapter(node *MobazhaNode) *adapters.UTXOAutoConfirmAdapter {
 	return &adapters.UTXOAutoConfirmAdapter{
 		Multiwallet:    node.multiwallet,
@@ -30,6 +31,13 @@ func newMockUTXOAdapter(node *MobazhaNode) *adapters.UTXOAutoConfirmAdapter {
 		OnAutoConfirm:  node.handleCancelablePaymentForUTXO,
 		GetPaymentInfo: node.Wallet().GetUTXOPaymentInfo,
 	}
+}
+
+// newStubUTXOAdapter creates a minimal UTXOAutoConfirmAdapter for registry
+// coverage tests that only verify chain registration and instruction dispatch,
+// without requiring a live wallet or multiwallet.
+func newStubUTXOAdapter() *adapters.UTXOAutoConfirmAdapter {
+	return &adapters.UTXOAutoConfirmAdapter{}
 }
 
 // setupMockNetDB creates a mock HTTP server that serves listing index data
@@ -1082,8 +1090,8 @@ func TestOrderLifecycle_RegistryCoversAllProductionChains(t *testing.T) {
 	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-lifecycle-registry"}}
 	n.registerPaymentStrategies()
 
-	// Register ChainMock (same as what happy path tests do)
-	n.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(n))
+	// Register ChainMock with a stub adapter (no wallet needed for registry coverage)
+	n.paymentRegistry.Register(iwallet.ChainMock, newStubUTXOAdapter())
 
 	// Verify all expected chains are registered
 	chains := n.paymentRegistry.Chains()
@@ -1878,7 +1886,7 @@ func TestOrderLifecycle_CancelableConfirm_RefundBlocked(t *testing.T) {
 func TestOrderLifecycle_ClientSigned_InstructionMatrix(t *testing.T) {
 	n := &MobazhaNode{identityFields: identityFields{nodeID: "test-instruction-matrix"}}
 	n.registerPaymentStrategies()
-	n.paymentRegistry.Register(iwallet.ChainMock, newMockUTXOAdapter(n))
+	n.paymentRegistry.Register(iwallet.ChainMock, newStubUTXOAdapter())
 
 	type chainTest struct {
 		chain    iwallet.ChainType

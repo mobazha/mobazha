@@ -19,6 +19,7 @@ type aiChatProvider interface {
 	aiConfigProvider
 	ChatStore() *aipkg.ChatStore
 	ProfileName() string
+	ProductCatalog() []aipkg.ListingSummary
 }
 
 func getAIChatProvider(r *http.Request) (aiChatProvider, bool) {
@@ -119,6 +120,11 @@ func (g *Gateway) handlePOSTAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	systemPrompt := aipkg.BuildSystemPrompt(role, p.ProfileName(), req.Context)
+	if catalog := p.ProductCatalog(); len(catalog) > 0 {
+		if catalogCtx := aipkg.FormatProductCatalog(catalog); catalogCtx != "" {
+			systemPrompt += "\n\n" + catalogCtx
+		}
+	}
 	messages := buildLLMMessages(systemPrompt, session.Messages, req.Message)
 
 	localURL := getLocalAPIURL(r)

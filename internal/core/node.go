@@ -646,3 +646,39 @@ func (n *MobazhaNode) ProfileName() string {
 	}
 	return profile.Name
 }
+
+// ProductCatalog returns a lightweight summary of all published listings
+// for AI context injection.
+func (n *MobazhaNode) ProductCatalog() []aipkg.ListingSummary {
+	var index models.ListingIndex
+	err := n.db.View(func(tx database.Tx) error {
+		var e error
+		index, e = tx.GetListingIndex()
+		return e
+	})
+	if err != nil || len(index) == 0 {
+		return nil
+	}
+
+	var result []aipkg.ListingSummary
+	for i := range index {
+		lm := &index[i]
+		if lm.Status != models.ListingStatusPublished {
+			continue
+		}
+		price := ""
+		if lm.Price.Currency != nil {
+			price = lm.Price.Amount.String()
+		}
+		result = append(result, aipkg.ListingSummary{
+			Slug:        lm.Slug,
+			Title:       lm.Title,
+			Description: lm.Description,
+			Price:       price,
+			CoinType:    lm.CoinType,
+			Status:      lm.Status,
+			ProductType: lm.ProductType,
+		})
+	}
+	return result
+}

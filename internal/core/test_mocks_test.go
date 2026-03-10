@@ -14,6 +14,7 @@ import (
 	"github.com/mobazha/mobazha-core/identity"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/media"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	"github.com/multiformats/go-multihash"
 )
@@ -42,8 +43,7 @@ func (m *mockContentStore) AddFile(ctx context.Context, filePath string) (cid.Ci
 }
 
 func (m *mockContentStore) ComputeCID(data []byte) (cid.Cid, error) {
-	mh, _ := multihash.Sum(data, multihash.SHA2_256, -1)
-	return cid.NewCidV1(cid.Raw, mh), nil
+	return media.ComputeUnixFSCID(data)
 }
 
 func (m *mockContentStore) Pin(_ context.Context, _ cid.Cid) error   { return nil }

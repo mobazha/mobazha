@@ -322,6 +322,19 @@ type CollectionProvider interface {
 	Collection() CollectionService
 }
 
+// AnalyticsService handles visitor event tracking and stats aggregation.
+type AnalyticsService interface {
+	TrackEvent(evt models.AnalyticsEvent) error
+	TrackEvents(events []models.AnalyticsEvent) error
+	GetVisitorStats(days int) (any, error)
+}
+
+// AnalyticsProvider exposes the per-node analytics subsystem.
+// Handlers obtain this via type assertion on NodeService.
+type AnalyticsProvider interface {
+	Analytics() AnalyticsService
+}
+
 // NodeService is the top-level aggregate interface that combines all domain services.
 // Both MobazhaNode (standalone) and TenantService (SaaS) implement this interface.
 //

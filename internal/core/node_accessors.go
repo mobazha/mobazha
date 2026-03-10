@@ -83,6 +83,14 @@ func (n *MobazhaNode) ExchangeRate() contracts.ExchangeRateService {
 	return &exchangeRateAdapter{n.exchangeRates}
 }
 
+// Analytics returns the analytics service or nil if not initialized.
+func (n *MobazhaNode) Analytics() contracts.AnalyticsService {
+	if n.analyticsService == nil {
+		return nil
+	}
+	return n.analyticsService
+}
+
 // FiatPaymentProviderAccessor implementation — generic fiat payment subsystem.
 func (n *MobazhaNode) Fiat() contracts.FiatService {
 	if n.fiatPaymentService == nil {

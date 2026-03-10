@@ -117,6 +117,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initModerationService()
 	n.initChannelsService()
 	n.initListingService()
+	n.initAnalyticsService()
 }
 
 // initMatrixService creates the MatrixAppService.
@@ -704,4 +705,22 @@ func (n *MobazhaNode) initListingService() {
 			}
 		}
 	}
+}
+
+// initAnalyticsService creates the AnalyticsAppService and migrates the table.
+func (n *MobazhaNode) initAnalyticsService() {
+	if n.ipfsOnlyMode {
+		return
+	}
+	if err := n.db.Update(func(tx database.Tx) error {
+		return tx.Migrate(&models.AnalyticsEvent{})
+	}); err != nil {
+		logger.LogErrorWithIDf(log, n.nodeID, "Analytics: failed to migrate models: %v", err)
+		return
+	}
+	n.analyticsService = NewAnalyticsAppService(AnalyticsAppServiceConfig{
+		DB:       n.db,
+		NodeID:   n.nodeID,
+		Shutdown: n.shutdown,
+	})
 }

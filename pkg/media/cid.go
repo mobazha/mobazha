@@ -5,7 +5,11 @@ package media
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
 
 	bsrv "github.com/ipfs/boxo/blockservice"
 	"github.com/ipfs/boxo/blockstore"
@@ -17,6 +21,7 @@ import (
 	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
+	"github.com/multiformats/go-multihash"
 )
 
 // ComputeUnixFSCID calculates the IPFS-compatible CID for data using pure
@@ -58,4 +63,59 @@ func ComputeUnixFSCID(data []byte) (cid.Cid, error) {
 	}
 
 	return nd.Cid(), nil
+}
+
+// ComputeDirectoryHash computes a deterministic CID representing the content
+// state of a directory tree. Each file's content is SHA-256 hashed along with
+// its relative path; all entries are sorted lexicographically for determinism.
+// The combined hash is wrapped as a CIDv0 (dag-pb, SHA2-256).
+//
+// This is used by the publish flow for change detection (comparing with the
+// previously published root CID). Unlike ComputeUnixFSCID, this does NOT
+// produce a CID compatible with `ipfs add` for directory structures — it is
+// a content-addressable fingerprint for change detection only.
+func ComputeDirectoryHash(dir string) (cid.Cid, error) {
+	type entry struct {
+		relPath     string
+		contentHash [sha256.Size]byte
+	}
+
+	var entries []entry
+	err := filepath.Walk(dir, func(p string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
+		relPath, relErr := filepath.Rel(dir, p)
+		if relErr != nil {
+			return relErr
+		}
+		data, readErr := os.ReadFile(p)
+		if readErr != nil {
+			return readErr
+		}
+		entries = append(entries, entry{
+			relPath:     filepath.ToSlash(relPath),
+			contentHash: sha256.Sum256(data),
+		})
+		return nil
+	})
+	if err != nil {
+		return cid.Undef, fmt.Errorf("walk directory: %w", err)
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].relPath < entries[j].relPath
+	})
+
+	h := sha256.New()
+	for _, e := range entries {
+		h.Write([]byte(e.relPath))
+		h.Write(e.contentHash[:])
+	}
+
+	mh, err := multihash.Encode(h.Sum(nil), multihash.SHA2_256)
+	if err != nil {
+		return cid.Undef, fmt.Errorf("multihash encode: %w", err)
+	}
+	return cid.NewCidV0(mh), nil
 }

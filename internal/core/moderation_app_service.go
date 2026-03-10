@@ -17,13 +17,7 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-// DHT callback types abstract IPFS-specific moderator discovery operations.
-type (
-	DHTAnnounceModeratorFunc    func(ctx context.Context) error
-	DHTRemoveModeratorFunc      func(ctx context.Context) error
-	DHTFindModeratorsAsyncFunc  func(ctx context.Context, maxCount int) <-chan peer.ID
-	UpdateAllListingsFunc       func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error
-)
+type UpdateAllListingsFunc func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error
 
 // ModerationAppService encapsulates moderator management logic.
 type ModerationAppService struct {
@@ -35,9 +29,6 @@ type ModerationAppService struct {
 
 	getMyProfile          GetMyProfileFunc
 	getAcceptedCurrencies GetAcceptedCurrenciesFunc
-	announceAsModerator   DHTAnnounceModeratorFunc
-	removeAsModerator     DHTRemoveModeratorFunc
-	findModeratorsAsync   DHTFindModeratorsAsyncFunc
 	updateAllListings     UpdateAllListingsFunc
 }
 
@@ -51,9 +42,6 @@ type ModerationAppServiceConfig struct {
 
 	GetMyProfile          GetMyProfileFunc
 	GetAcceptedCurrencies GetAcceptedCurrenciesFunc
-	AnnounceAsModerator   DHTAnnounceModeratorFunc
-	RemoveAsModerator     DHTRemoveModeratorFunc
-	FindModeratorsAsync   DHTFindModeratorsAsyncFunc
 	UpdateAllListings     UpdateAllListingsFunc
 }
 
@@ -66,9 +54,6 @@ func NewModerationAppService(cfg ModerationAppServiceConfig) *ModerationAppServi
 		exchangeRates:         cfg.ExchangeRates,
 		getMyProfile:          cfg.GetMyProfile,
 		getAcceptedCurrencies: cfg.GetAcceptedCurrencies,
-		announceAsModerator:   cfg.AnnounceAsModerator,
-		removeAsModerator:     cfg.RemoveAsModerator,
-		findModeratorsAsync:   cfg.FindModeratorsAsync,
 		updateAllListings:     cfg.UpdateAllListings,
 	}
 }
@@ -107,14 +92,7 @@ func (s *ModerationAppService) SetSelfAsModerator(ctx context.Context, modInfo *
 		profile.ModeratorInfo = modInfo
 		profile.Moderator = true
 
-		if err := tx.SetProfile(profile); err != nil {
-			return err
-		}
-
-		if s.announceAsModerator != nil {
-			return s.announceAsModerator(ctx)
-		}
-		return nil
+		return tx.SetProfile(profile)
 	})
 	if err != nil {
 		maybeCloseDone(done)
@@ -132,14 +110,7 @@ func (s *ModerationAppService) RemoveSelfAsModerator(ctx context.Context, done c
 		}
 		profile.Moderator = false
 
-		if err := tx.SetProfile(profile); err != nil {
-			return err
-		}
-
-		if s.removeAsModerator != nil {
-			return s.removeAsModerator(ctx)
-		}
-		return nil
+		return tx.SetProfile(profile)
 	})
 	if err != nil {
 		maybeCloseDone(done)
@@ -193,18 +164,11 @@ func (s *ModerationAppService) GetVerifiedModerators(ctx context.Context) []peer
 	return mods
 }
 
-func (s *ModerationAppService) GetModerators(ctx context.Context) []peer.ID {
-	var mods []peer.ID
-	for mod := range s.GetModeratorsAsync(ctx) {
-		mods = append(mods, mod)
-	}
-	return mods
+func (s *ModerationAppService) GetModerators(_ context.Context) []peer.ID {
+	return []peer.ID{}
 }
 
-func (s *ModerationAppService) GetModeratorsAsync(ctx context.Context) <-chan peer.ID {
-	if s.findModeratorsAsync != nil {
-		return s.findModeratorsAsync(ctx, maxModerators)
-	}
+func (s *ModerationAppService) GetModeratorsAsync(_ context.Context) <-chan peer.ID {
 	ch := make(chan peer.ID)
 	close(ch)
 	return ch
@@ -272,8 +236,3 @@ func (s *ModerationAppService) calculateFixedFee(total iwallet.Amount, currencyC
 	return convertedModFee, nil
 }
 
-const (
-	moderatorTopic = "mobazha:moderators"
-	moderatorCid   = "QmbA5NkFQV6LxpWxJYXFtTq3J15WySojT9QWgxHYEostNY"
-	maxModerators  = 200
-)

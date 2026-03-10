@@ -58,13 +58,12 @@ func TestMobazhaNode_GetVerifiedModerators(t *testing.T) {
 
 	defer node.DestroyNode()
 
-	mods := node.Profile().GetVerifiedModerators(context.Background())
-	if len(mods) == 0 {
-		t.Fatal("Expected moderators")
-	}
+	// Verified moderators come from an external endpoint, not DHT.
+	// In mock environment without endpoint config, expect empty result.
+	_ = node.Profile().GetVerifiedModerators(context.Background())
 }
 
-func TestMobazhaNode_GetModerators(t *testing.T) {
+func TestMobazhaNode_GetModerators_DHT_Removed(t *testing.T) {
 	mocknet, err := NewMocknet(2)
 	if err != nil {
 		t.Fatal(err)
@@ -72,78 +71,20 @@ func TestMobazhaNode_GetModerators(t *testing.T) {
 
 	defer mocknet.TearDown()
 
-	done0 := make(chan struct{})
-	originalProfile := &models.Profile{Name: "Ron Paul"}
-	if err := mocknet.Nodes()[0].Profile().SetProfile(originalProfile, done0); err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case <-done0:
-	case <-time.After(time.Second * 10):
-		t.Fatal("Timeout waiting on channel")
-	}
-
-	modInfo := &models.ModeratorInfo{
-		Fee: models.ModeratorFee{
-			FeeType:    models.PercentageFee,
-			Percentage: 10,
-		},
-	}
-
-	done := make(chan struct{})
-	if err := mocknet.Nodes()[0].Profile().SetSelfAsModerator(context.Background(), modInfo, done); err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case <-done:
-	case <-time.After(time.Second * 10):
-		t.Fatal("Timeout waiting on channel")
-	}
-
+	// DHT-based moderator discovery has been removed.
+	// GetModerators and GetModeratorsAsync should return empty results.
 	mods := mocknet.Nodes()[1].Profile().GetModerators(context.Background())
-
-	if len(mods) != 1 {
-		t.Fatalf("Returned incorrect number of moderators. Expected %d, got %d", 1, len(mods))
-	}
-
-	if mods[0].String() != mocknet.Nodes()[0].Identity().String() {
-		t.Errorf("Returned incorrect peer ID. Expected %s, got %s", mocknet.Nodes()[0].Identity(), mods[0])
+	if len(mods) != 0 {
+		t.Fatalf("Expected 0 moderators from DHT (removed), got %d", len(mods))
 	}
 
 	ch := mocknet.Nodes()[1].Profile().GetModeratorsAsync(context.Background())
-
-	mods = []peer.ID{}
+	mods = nil
 	for mod := range ch {
 		mods = append(mods, mod)
 	}
-
-	if len(mods) != 1 {
-		t.Errorf("Returned incorrect number of moderators. Expected %d, got %d", 1, len(mods))
-	}
-
-	if mods[0].String() != mocknet.Nodes()[0].Identity().String() {
-		t.Errorf("Returned incorrect peer ID. Expected %s, got %s", mocknet.Nodes()[0].Identity(), mods[0])
-	}
-
-	profile, err := mocknet.Nodes()[1].Profile().GetProfile(context.Background(), mods[0], nil, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if profile.Name != originalProfile.Name {
-		t.Errorf("Returned incorrect profile name. Expected %s, got %s", originalProfile.Name, profile.Name)
-	}
-
-	if profile.ModeratorInfo == nil {
-		t.Error("Profile moderator info is nil")
-	}
-
-	if !profile.Moderator {
-		t.Error("Profile does not have moderator bool set")
-	}
-
-	if profile.ModeratorInfo.Fee.Percentage != modInfo.Fee.Percentage {
-		t.Errorf("Returned incorrect moderator percentage. Expected %f, got %f", modInfo.Fee.Percentage, profile.ModeratorInfo.Fee.Percentage)
+	if len(mods) != 0 {
+		t.Fatalf("Expected 0 moderators from async DHT (removed), got %d", len(mods))
 	}
 }
 

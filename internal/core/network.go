@@ -12,11 +12,7 @@ import (
 	"time"
 
 	"github.com/ipfs/boxo/bootstrap"
-	"github.com/ipfs/boxo/files"
-	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/kubo/core/coreapi"
-	"github.com/ipfs/kubo/core/coreiface/options"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -24,6 +20,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
+	"github.com/mobazha/mobazha3.0/pkg/media"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	opb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -39,8 +36,8 @@ const (
 	republishInterval = time.Hour * 36
 )
 
-// Publish adds the current public data directory to IPFS and sends
-// STORE messages to followers and SNF servers for replication.
+// Publish computes a content hash of the public data directory and sends
+// STORE messages to followers and SNF servers for replication notification.
 // It will interrupt the publish if a shutdown happens during.
 //
 // This cannot be called with the database lock held.
@@ -92,21 +89,7 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 		}
 	}()
 
-	ipfsNodeForContent, err := n.getIPFSNode()
-	if err != nil {
-		logger.LogErrorWithIDf(log, n.nodeID, "No IPFS node available for publishing")
-		publishErr = err
-		return
-	}
-
-	api, err := coreapi.NewCoreAPI(ipfsNodeForContent)
-	if err != nil {
-		logger.LogErrorWithIDf(log, n.nodeID, "Error building core API: %s", err.Error())
-		publishErr = err
-		return
-	}
-
-	// Load last published root CID from database (replaces IPNS record lookup).
+	// Load last published root CID from database.
 	var currentRoot cid.Cid
 	_ = n.db.View(func(tx database.Tx) error {
 		var event models.Event
@@ -119,21 +102,7 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 		return nil
 	})
 
-	// Unpin old root to reclaim IPFS storage.
-	if currentRoot.Defined() {
-		rp, _, err := api.ResolvePath(context.Background(), path.FromCid(currentRoot))
-		if err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "Error resolving path: %s", err.Error())
-			publishErr = err
-			return
-		}
-
-		if err := api.Pin().Rm(context.Background(), rp, options.Pin.RmRecursive(true)); err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "Error unpinning root: %s", err.Error())
-		}
-	}
-
-	// Resolve public data directory for IPFS add.
+	// Resolve public data directory.
 	// Standalone mode: PublicDataPath() returns the flat file directory.
 	// SaaS mode (DBPublicData): PublicDataPath() returns "" and data is
 	// materialized to a temp directory via PublicDataMaterializer.
@@ -160,31 +129,13 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 		}
 	}
 
-	stat, err := os.Lstat(publicDir)
+	// Compute directory content hash for change detection (pure in-memory, no IPFS).
+	newRoot, err := media.ComputeDirectoryHash(publicDir)
 	if err != nil {
-		logger.LogErrorWithIDf(log, n.nodeID, "Error calling Lstat: %s", err.Error())
+		logger.LogErrorWithIDf(log, n.nodeID, "Error computing directory hash: %s", err.Error())
 		publishErr = err
 		return
 	}
-
-	f, err := files.NewSerialFile(publicDir, false, stat)
-	if err != nil {
-		logger.LogErrorWithIDf(log, n.nodeID, "Error serializing file: %s", err.Error())
-		publishErr = err
-		return
-	}
-
-	opts := []options.UnixfsAddOption{
-		options.Unixfs.Pin(true),
-	}
-	pth, err := api.Unixfs().Add(cctx, files.ToDir(f), opts...)
-	if err != nil {
-		logger.LogErrorWithIDf(log, n.nodeID, "Error adding root: %s", err.Error())
-		publishErr = err
-		return
-	}
-
-	newRoot := pth.RootCid()
 
 	// No-change detection: if data hasn't changed, skip replication.
 	if newRoot == currentRoot {
@@ -203,18 +154,9 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 		logger.LogErrorWithIDf(log, n.nodeID, "Error saving last publish to the db: %s", err.Error())
 	}
 
-	// Collect all CIDs and send STORE messages to followers/SNF servers.
-	graph, err := n.fetchGraph(cctx, newRoot)
-	if err != nil {
-		logger.LogErrorWithIDf(log, n.nodeID, "Error fetching graph: %s", err.Error())
-		publishErr = err
-		return
-	}
-
+	// Send STORE message with root CID to followers/SNF servers for notification.
 	storeMsg := &pb.StoreMessage{}
-	for _, cid := range graph {
-		storeMsg.Cids = append(storeMsg.Cids, cid.Bytes())
-	}
+	storeMsg.Cids = append(storeMsg.Cids, newRoot.Bytes())
 
 	any := &anypb.Any{}
 	if err := any.MarshalFrom(storeMsg); err != nil {

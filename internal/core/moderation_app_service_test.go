@@ -65,15 +65,10 @@ func TestModerationAppService_SetSelfAsModerator(t *testing.T) {
 		Currencies: []string{"BTC", "ETH"},
 	})
 
-	announceCalled := false
 	svc := newTestModerationAppService(t, ModerationAppServiceConfig{
 		DB: db,
 		GetAcceptedCurrencies: func() ([]string, error) {
 			return []string{"BTC", "ETH"}, nil
-		},
-		AnnounceAsModerator: func(ctx context.Context) error {
-			announceCalled = true
-			return nil
 		},
 	})
 
@@ -89,7 +84,6 @@ func TestModerationAppService_SetSelfAsModerator(t *testing.T) {
 	require.NoError(t, err)
 
 	<-done
-	assert.True(t, announceCalled, "DHT announce should be called")
 
 	var profile *models.Profile
 	err = db.View(func(tx database.Tx) error {
@@ -125,13 +119,8 @@ func TestModerationAppService_RemoveSelfAsModerator(t *testing.T) {
 		Moderator: true,
 	})
 
-	removeCalled := false
 	svc := newTestModerationAppService(t, ModerationAppServiceConfig{
 		DB: db,
-		RemoveAsModerator: func(ctx context.Context) error {
-			removeCalled = true
-			return nil
-		},
 	})
 
 	done := make(chan struct{})
@@ -139,7 +128,6 @@ func TestModerationAppService_RemoveSelfAsModerator(t *testing.T) {
 	require.NoError(t, err)
 
 	<-done
-	assert.True(t, removeCalled)
 
 	var profile *models.Profile
 	err = db.View(func(tx database.Tx) error {

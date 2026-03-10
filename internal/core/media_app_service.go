@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/disintegration/imaging"
-	ipath "github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -21,9 +20,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 )
 
-// ── IPFS Callback Types ─────────────────────────────────────────
-
-type GetIPFSFileFunc func(ctx context.Context, path ipath.Path) (io.ReadSeeker, error)
+// ── Callback Types ──────────────────────────────────────────────
 
 type PublishFunc func(done chan<- struct{})
 
@@ -39,7 +36,6 @@ type MediaAppService struct {
 	blobStore    contracts.BlobStore
 	nodeID       string
 
-	getIPFSFile GetIPFSFileFunc
 	publish     PublishFunc
 	publishFile     PublishFileFunc
 }
@@ -50,7 +46,6 @@ type MediaAppServiceConfig struct {
 	BlobStore    contracts.BlobStore
 	NodeID       string
 
-	GetIPFSFile GetIPFSFileFunc
 	Publish     PublishFunc
 	PublishFile     PublishFileFunc
 }
@@ -61,7 +56,6 @@ func NewMediaAppService(cfg MediaAppServiceConfig) *MediaAppService {
 		contentStore:    cfg.ContentStore,
 		blobStore:       cfg.BlobStore,
 		nodeID:          cfg.NodeID,
-		getIPFSFile: cfg.GetIPFSFile,
 		publish:     cfg.Publish,
 		publishFile:     cfg.PublishFile,
 	}
@@ -213,15 +207,10 @@ func (s *MediaAppService) GetMedia(ctx context.Context, c cid.Cid) (io.ReadSeeke
 		return bytes.NewReader(data), contentType, nil
 	}
 
-	// Level 3: IPFS (legacy fallback)
-	reader, err := s.getIPFSFileByCID(ctx, c)
-	if err != nil {
-		if dbErr != nil {
-			return nil, "", fmt.Errorf("db: %v; ipfs: %w", dbErr, err)
-		}
-		return nil, "", err
+	if dbErr != nil {
+		return nil, "", fmt.Errorf("media not found (db error: %w)", dbErr)
 	}
-	return reader, "", nil
+	return nil, "", fmt.Errorf("%w: media %s not found in BlobStore or DB", coreiface.ErrNotFound, c)
 }
 
 // ── SetProfileMedia ─────────────────────────────────────────────
@@ -295,14 +284,6 @@ func (s *MediaAppService) GetProfileMedia(_ context.Context, peerID peer.ID, slo
 }
 
 // ── Internal Helpers ────────────────────────────────────────────
-
-func (s *MediaAppService) getIPFSFileByCID(ctx context.Context, c cid.Cid) (io.ReadSeeker, error) {
-	if s.getIPFSFile == nil {
-		return nil, fmt.Errorf("IPFS file reader not available")
-	}
-	pth := ipath.FromCid(c)
-	return s.getIPFSFile(ctx, pth)
-}
 
 func (s *MediaAppService) getLocalImageByName(size models.ImageSize, name string) (io.ReadSeeker, error) {
 	var data []byte

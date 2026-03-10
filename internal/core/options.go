@@ -4,13 +4,8 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"io"
-	"strings"
 
-	ipfsfiles "github.com/ipfs/boxo/files"
-	ipath "github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/kubo/core/coreapi"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -152,31 +147,10 @@ func (n *MobazhaNode) initPreferencesService() {
 	})
 }
 
-// initMediaService creates the MediaAppService with IPFS infrastructure callbacks.
+// initMediaService creates the MediaAppService with CDN-backed media storage.
 func (n *MobazhaNode) initMediaService() {
-	var getIPFSFile GetIPFSFileFunc
-	if n.sharedManager != nil {
-		getIPFSFile = func(ctx context.Context, path ipath.Path) (io.ReadSeeker, error) {
-			api, err := coreapi.NewCoreAPI(n.sharedManager.GetIPFSNode())
-			if err != nil {
-				return nil, err
-			}
-			nd, err := api.Unixfs().Get(ctx, path)
-			if err != nil {
-				return nil, err
-			}
-			f, ok := nd.(ipfsfiles.File)
-			if !ok {
-				return nil, fmt.Errorf("error asserting ipfs file type")
-			}
-			return f, nil
-		}
-	}
-
 	if n.ipfsOnlyMode {
-		n.mediaService = NewMediaAppService(MediaAppServiceConfig{
-			GetIPFSFile: getIPFSFile,
-		})
+		n.mediaService = NewMediaAppService(MediaAppServiceConfig{})
 		return
 	}
 
@@ -186,13 +160,12 @@ func (n *MobazhaNode) initMediaService() {
 	}
 
 	n.mediaService = NewMediaAppService(MediaAppServiceConfig{
-		DB:          n.db,
+		DB:           n.db,
 		ContentStore: n.contentStore,
-		BlobStore:   blobStore,
-		NodeID:      n.nodeID,
-		GetIPFSFile: getIPFSFile,
-		Publish:     n.Publish,
-		PublishFile: n.PublishFile,
+		BlobStore:    blobStore,
+		NodeID:       n.nodeID,
+		Publish:      n.Publish,
+		PublishFile:  n.PublishFile,
 	})
 }
 
@@ -555,61 +528,6 @@ func (n *MobazhaNode) initModerationService() {
 		getMyProfile = n.profileService.GetMyProfile
 	}
 
-	var announceAsModerator DHTAnnounceModeratorFunc
-	var removeAsModerator DHTRemoveModeratorFunc
-	var findModeratorsAsync DHTFindModeratorsAsyncFunc
-
-	announceAsModerator = func(ctx context.Context) error {
-		ipfsNode, err := n.getIPFSNode()
-		if err != nil {
-			return err
-		}
-		api, err := coreapi.NewCoreAPI(ipfsNode)
-		if err != nil {
-			return err
-		}
-		_, err = api.Block().Put(ctx, strings.NewReader(moderatorTopic))
-		return err
-	}
-
-	removeAsModerator = func(ctx context.Context) error {
-		ipfsNode, err := n.getIPFSNode()
-		if err != nil {
-			return err
-		}
-		api, err := coreapi.NewCoreAPI(ipfsNode)
-		if err != nil {
-			return err
-		}
-		pth, err := ipath.NewPath(moderatorCid)
-		if err != nil {
-			return err
-		}
-		return api.Block().Rm(ctx, pth)
-	}
-
-	findModeratorsAsync = func(ctx context.Context, maxCount int) <-chan peer.ID {
-		ch := make(chan peer.ID)
-		go func() {
-			defer close(ch)
-			c, err := cid.Decode(moderatorCid)
-			if err != nil {
-				logger.LogErrorWithIDf(log, n.nodeID, "Error decoding moderator cid: %s", err)
-				return
-			}
-			ipfsNode, err := n.getIPFSNode()
-			if err != nil {
-				logger.LogErrorWithIDf(log, n.nodeID, "No IPFS node available for moderator discovery")
-				return
-			}
-			provCh := ipfsNode.Routing.FindProvidersAsync(ctx, c, maxCount)
-			for prov := range provCh {
-				ch <- prov.ID
-			}
-		}()
-		return ch
-	}
-
 	var verifiedModEndpoint string
 	if n.netConfig != nil {
 		verifiedModEndpoint = n.netConfig.GetVerifiedModEndpoint()
@@ -625,9 +543,6 @@ func (n *MobazhaNode) initModerationService() {
 		GetAcceptedCurrencies: func() ([]string, error) {
 			return n.paymentService.GetAcceptedCurrencies()
 		},
-		AnnounceAsModerator: announceAsModerator,
-		RemoveAsModerator:   removeAsModerator,
-		FindModeratorsAsync: findModeratorsAsync,
 		UpdateAllListings: func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error {
 			return n.listingService.UpdateAllListings(updateFunc, done)
 		},

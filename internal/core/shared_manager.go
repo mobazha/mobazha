@@ -9,8 +9,6 @@ import (
 	"runtime/pprof"
 	"sync"
 
-	"github.com/ipfs/kubo/core"
-	"github.com/ipfs/kubo/core/corehttp"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -208,22 +206,6 @@ func (im *SharedManager) GetDefaultNode() coreiface.CoreIface {
 	return ci
 }
 
-func (im *SharedManager) GetIPFSNode() *core.IpfsNode {
-	im.mu.RLock()
-	defer im.mu.RUnlock()
-
-	node, ok := im.clients[repo.DefaultNodeID]
-	if !ok {
-		return nil
-	}
-	// Only MobazhaNode (CoreIface) has IPFSNode.
-	ci, ok := node.(coreiface.CoreIface)
-	if !ok {
-		return nil
-	}
-	return ci.IPFSNode()
-}
-
 func (im *SharedManager) GetHTTPGateway() *api.Gateway {
 	return im.httpGateway
 }
@@ -283,21 +265,15 @@ func (im *SharedManager) GetExchangeRateService() contracts.ExchangeRateService 
 }
 
 func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error) {
-	ipfsNode := im.GetIPFSNode()
-	if ipfsNode == nil {
-		return nil, fmt.Errorf("ipfs node not found")
+	// Resolve gateway listen address: CLI override > default.
+	gatewayAddr := cfg.GatewayAddr
+	if gatewayAddr == "" {
+		gatewayAddr = "/ip4/127.0.0.1/tcp/4002"
 	}
 
-	// Get API configuration
-	ipfsConf, err := ipfsNode.Repo.Config()
+	gatewayMaddr, err := ma.NewMultiaddr(gatewayAddr)
 	if err != nil {
-		return nil, err
-	}
-
-	// Create a network listener
-	gatewayMaddr, err := ma.NewMultiaddr(ipfsConf.Addresses.Gateway[0])
-	if err != nil {
-		return nil, fmt.Errorf("newHTTPGateway: invalid gateway address: %q (err: %s)", ipfsConf.Addresses.Gateway, err)
+		return nil, fmt.Errorf("newHTTPGateway: invalid gateway address: %q (err: %s)", gatewayAddr, err)
 	}
 	var gwLis manet.Listener
 	if cfg.UseSSL {
@@ -314,21 +290,6 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 		if err != nil {
 			return nil, fmt.Errorf("newHTTPGateway: manet.Listen(%s) failed: %s", gatewayMaddr, err)
 		}
-	}
-
-	// We might have listened to /tcp/0 - let's see what we are listing on
-	gatewayMaddr = gwLis.Multiaddr()
-
-	// Setup an options slice
-	var opts = []corehttp.ServeOption{
-		corehttp.MetricsCollectionOption("gateway"),
-		corehttp.VersionOption(),
-		corehttp.HostnameOption(),
-		corehttp.GatewayOption("/ipfs", "/ipns"),
-	}
-
-	if len(ipfsConf.Gateway.RootRedirect) > 0 {
-		opts = append(opts, corehttp.RedirectOption("", ipfsConf.Gateway.RootRedirect))
 	}
 
 	allowedIPs := make(map[string]bool)
@@ -358,7 +319,13 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 		}
 	}
 
-	config := &api.GatewayConfig{
+	// Resolve LocalPeerID from the default node.
+	var localPeerID string
+	if defaultNode := im.GetDefaultNode(); defaultNode != nil {
+		localPeerID = defaultNode.IdentityInfo().Identity().String()
+	}
+
+	gwConfig := &api.GatewayConfig{
 		Listener:           manet.NetListener(gwLis),
 		AllowAllOrigins:    cfg.APIAllowAllOrigins,
 		UseSSL:             cfg.UseSSL,
@@ -372,10 +339,10 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 		HashFile:           api.HashFilePath(cfg.DataDir),
 		PlainFile:          api.PlainFilePath(cfg.DataDir),
 		CasdoorCertificate: cfg.CasdoorCertificate,
-		LocalPeerID:        ipfsConf.Identity.PeerID,
+		LocalPeerID:        localPeerID,
 	}
 
-	im.httpGateway, err = api.NewGateway(im, config, opts...)
+	im.httpGateway, err = api.NewGateway(im, gwConfig)
 	if err != nil {
 		return nil, err
 	}

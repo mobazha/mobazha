@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"github.com/fatih/color"
-	ipfscore "github.com/ipfs/kubo/core"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/mobazha/mobazha3.0/internal/core"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/internal/version"
@@ -39,7 +39,7 @@ func (x *Start) Execute(args []string) error {
 	}
 	log.Infof("PeerID: %s", n.Identity())
 	n.Start()
-	printSwarmAddrs(n.IPFSNode())
+	printSwarmAddrs(n.PeerHost())
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -83,9 +83,12 @@ func (x *Start) Execute(args []string) error {
 	return nil
 }
 
-func printSwarmAddrs(node *ipfscore.IpfsNode) {
+func printSwarmAddrs(h host.Host) {
+	if h == nil {
+		return
+	}
 	var lisAddrs []string
-	ifaceAddrs, err := node.PeerHost.Network().InterfaceListenAddresses()
+	ifaceAddrs, err := h.Network().InterfaceListenAddresses()
 	if err != nil {
 		log.Errorf("failed to read listening addresses: %s", err)
 	}

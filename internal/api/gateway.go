@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/gorilla/mux"
-	"github.com/ipfs/kubo/core/corehttp"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -61,9 +60,8 @@ type Gateway struct {
 	featureManager *pkgconfig.FeatureManager
 }
 
-// NewGateway instantiates a new gateway. We multiplex the ob API along with the
-// IPFS gateway API.
-func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig, options ...corehttp.ServeOption) (*Gateway, error) {
+// NewGateway instantiates a new gateway.
+func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (*Gateway, error) {
 	var (
 		g = &Gateway{
 			nodeManager:    nodeManager,
@@ -121,16 +119,6 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig, o
 
 	topMux.HandleFunc("/healthz", g.handleHealthz)
 
-	var (
-		err error
-		mux = topMux
-	)
-	for _, option := range options {
-		mux, err = option(nodeManager.GetIPFSNode(), config.Listener, mux)
-		if err != nil {
-			return nil, err
-		}
-	}
 	g.handler = topMux
 	return g, nil
 }

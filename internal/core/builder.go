@@ -381,7 +381,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		walletTestnet = cfg.WalletTestnet
 	}
 
-	if cfg.IPFSOnly {
+	if cfg.InfrastructureOnly {
 		obNode := &MobazhaNode{
 		sharedManager: sharedManager,
 			identityFields: identityFields{
@@ -406,10 +406,10 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 				netDB: netDB,
 			},
 			modeFlags: modeFlags{
-				ipfsOnlyMode:  true,
-				testnet:       cfg.Testnet,
-				walletTestnet: walletTestnet,
-				torOnly:       cfg.Tor,
+				infrastructureOnly: true,
+				testnet:            cfg.Testnet,
+				walletTestnet:      walletTestnet,
+				torOnly:            cfg.Tor,
 			},
 			lifecycleFields: lifecycleFields{
 				shutdownTorFunc:      shutdownTorFunc,

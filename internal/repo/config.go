@@ -97,7 +97,7 @@ type Config struct {
 	APIPublicGateway       bool     `long:"publicgateway" description:"When this option is used only public GET methods will be allowed in the API"`
 	Profile                string   `long:"profile" description:"Enable HTTP profiling on given port -- NOTE port must be between 1024 and 65536"`
 	CPUProfile             string   `long:"cpuprofile" description:"Write CPU profile to the specified file"`
-	IPFSOnly               bool     `long:"ipfsonly" description:"Disable all Mobazha functionality except the IPFS networking."`
+	InfrastructureOnly     bool     `long:"infraonly" description:"Run as infrastructure-only node (P2P host, DHT, SNF) without business services."`
 	UserAgentComment       string   `long:"uacomment" description:"Comment to add to the user agent."`
 	EnableSNFServer        bool     `long:"enablesnfserver" description:"Enable this node to operate as a store-and-forward server."`
 	SNFServerPeers         []string `long:"snfpeer" description:"A list of other store-and-forward servers to replicate snf data to. This is only used when the snf server is enabled."`

@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -147,10 +146,10 @@ type ipnsFields struct {
 
 // modeFlags groups boolean mode switches.
 type modeFlags struct {
-	testnet       bool
-	walletTestnet bool
-	torOnly       bool
-	ipfsOnlyMode  bool
+	testnet            bool
+	walletTestnet      bool
+	torOnly            bool
+	infrastructureOnly bool
 }
 
 // lifecycleFields groups runtime lifecycle state.
@@ -245,7 +244,7 @@ func (n *MobazhaNode) Start() {
 		go n.SharedManager().Start()
 	}
 
-	if !n.ipfsOnlyMode {
+	if !n.infrastructureOnly {
 		n.publishHandler()
 		go n.messenger.Start()
 		go n.followerTracker.Start()
@@ -331,7 +330,7 @@ func (n *MobazhaNode) Stop(force bool) error {
 		n.SharedManager().Stop()
 	}
 
-	if !n.ipfsOnlyMode {
+	if !n.infrastructureOnly {
 		n.messenger.Stop()
 		n.networkService.Close()
 		n.orderProcessor.Stop()
@@ -470,19 +469,6 @@ func (n *MobazhaNode) SignMessage(payload []byte) ([]byte, []byte, error) {
 // PeerHost returns the libp2p host for this node.
 func (n *MobazhaNode) PeerHost() host.Host {
 	return n.peerHost
-}
-
-// getIPFSNode returns the IPFS node for content operations.
-// For full nodes, returns the node's own IPFS instance.
-// For lightweight nodes, falls back to the shared IPFS node.
-func (n *MobazhaNode) getIPFSNode() (*core.IpfsNode, error) {
-	if n.ipfsNode != nil {
-		return n.ipfsNode, nil
-	}
-	if shared := n.SharedManager().GetIPFSNode(); shared != nil {
-		return shared, nil
-	}
-	return nil, errors.New("no IPFS node available")
 }
 
 // SubscribeEvent returns a subscription to the provided event. The event argument

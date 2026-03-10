@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -149,26 +148,8 @@ func (g *Gateway) handlePOSTPublish(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handlePOSTPurgeCache(w http.ResponseWriter, r *http.Request) {
-	node, ok := getCoreIface(r)
-	if !ok {
-		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented, "Not available in SaaS mode")
-		return
-	}
+	node := getNodeService(r)
 
-	ctx := context.Background()
-	ch, err := node.IPFSNode().Blockstore.AllKeysChan(ctx)
-	if err != nil {
-		ErrorResponse(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	for id := range ch {
-		if err := node.IPFSNode().Blockstore.DeleteBlock(ctx, id); err != nil {
-			ErrorResponse(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-	}
-
-	// Republish to IPNS
 	node.Publish(nil)
 
 	sanitizedStringResponse(w, "{}")
@@ -194,7 +175,7 @@ func (g *Gateway) handleGETPeers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	peers := node.IPFSNode().PeerHost.Network().Peers()
+	peers := node.PeerHost().Network().Peers()
 
 	var ret []string
 	for _, p := range peers {

@@ -115,7 +115,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 
 // initMatrixService creates the MatrixAppService.
 func (n *MobazhaNode) initMatrixService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		return
 	}
 	if n.privKey == nil {
@@ -130,7 +130,7 @@ func (n *MobazhaNode) initMatrixService() {
 
 // initPreferencesService creates the PreferencesAppService.
 func (n *MobazhaNode) initPreferencesService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		return
 	}
 	n.preferencesService = NewPreferencesAppService(PreferencesAppServiceConfig{
@@ -147,7 +147,7 @@ func (n *MobazhaNode) initPreferencesService() {
 
 // initMediaService creates the MediaAppService with CDN-backed media storage.
 func (n *MobazhaNode) initMediaService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		n.mediaService = NewMediaAppService(MediaAppServiceConfig{})
 		return
 	}
@@ -169,7 +169,7 @@ func (n *MobazhaNode) initMediaService() {
 
 // initRatingsService creates the RatingsAppService.
 func (n *MobazhaNode) initRatingsService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		return
 	}
 
@@ -187,7 +187,7 @@ func (n *MobazhaNode) initRatingsService() {
 
 // initNotificationService creates the NotificationAppService.
 func (n *MobazhaNode) initNotificationService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		return
 	}
 	n.notificationService = NewNotificationAppService(NotificationAppServiceConfig{
@@ -197,7 +197,7 @@ func (n *MobazhaNode) initNotificationService() {
 
 // initShoppingCartService creates the ShoppingCartAppService.
 func (n *MobazhaNode) initShoppingCartService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		return
 	}
 	n.shoppingCartService = NewShoppingCartAppService(ShoppingCartAppServiceConfig{
@@ -209,7 +209,7 @@ func (n *MobazhaNode) initShoppingCartService() {
 
 // initWishlistService creates the WishlistAppService and migrates the table.
 func (n *MobazhaNode) initWishlistService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		return
 	}
 	if err := n.db.Update(func(tx database.Tx) error {
@@ -225,9 +225,9 @@ func (n *MobazhaNode) initWishlistService() {
 }
 
 // initChatService creates the ChatAppService if the necessary
-// dependencies are available. IPFSOnly nodes skip this.
+// dependencies are available. Infrastructure-only nodes skip this.
 func (n *MobazhaNode) initChatService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		return
 	}
 
@@ -242,9 +242,9 @@ func (n *MobazhaNode) initChatService() {
 }
 
 // initOrderService creates the OrderAppService if the necessary
-// dependencies are available. IPFSOnly nodes skip this.
+// dependencies are available. Infrastructure-only nodes skip this.
 func (n *MobazhaNode) initOrderService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		return
 	}
 
@@ -377,9 +377,9 @@ func (n *MobazhaNode) buildDiscountRecorder() DiscountRedemptionRecorderFunc {
 }
 
 // initPaymentService creates the PaymentAppService if the necessary
-// dependencies are available. IPFSOnly nodes skip this.
+// dependencies are available. Infrastructure-only nodes skip this.
 func (n *MobazhaNode) initPaymentService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		return
 	}
 
@@ -430,7 +430,7 @@ func (n *MobazhaNode) initPaymentService() {
 
 // initProfileService creates the ProfileAppService.
 func (n *MobazhaNode) initProfileService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		return
 	}
 
@@ -466,7 +466,7 @@ func (n *MobazhaNode) initProfileService() {
 // initPostsService creates the PostsAppService.
 // Must be called after initProfileService since it depends on profileService callbacks.
 func (n *MobazhaNode) initPostsService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		return
 	}
 
@@ -491,7 +491,7 @@ func (n *MobazhaNode) initPostsService() {
 // initFollowService creates the FollowAppService.
 // Must be called after initProfileService since it depends on profileService.
 func (n *MobazhaNode) initFollowService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		return
 	}
 
@@ -517,7 +517,7 @@ func (n *MobazhaNode) initFollowService() {
 // initModerationService creates the ModerationAppService.
 // Must be called after initProfileService since it depends on profileService.GetMyProfile.
 func (n *MobazhaNode) initModerationService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		return
 	}
 
@@ -548,7 +548,7 @@ func (n *MobazhaNode) initModerationService() {
 }
 
 func (n *MobazhaNode) initListingService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		return
 	}
 
@@ -593,7 +593,7 @@ func (n *MobazhaNode) initListingService() {
 
 // initAnalyticsService creates the AnalyticsAppService and migrates the table.
 func (n *MobazhaNode) initAnalyticsService() {
-	if n.ipfsOnlyMode {
+	if n.infrastructureOnly {
 		return
 	}
 	if err := n.db.Update(func(tx database.Tx) error {

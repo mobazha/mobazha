@@ -2,6 +2,7 @@ package coreiface
 
 import (
 	"github.com/ipfs/kubo/core"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -23,6 +24,7 @@ type CoreIface interface {
 	Start()
 	Stop(force bool) error
 	IPFSNode() *core.IpfsNode
+	PeerHost() host.Host
 	DestroyNode()
 
 	// DB returns the internal database handle.
@@ -45,12 +47,11 @@ type CoreIface interface {
 // AddNode/GetNode/GetNodes use contracts.NodeService to support both
 // MobazhaNode (CoreIface) and TenantService (NodeService only).
 // GetDefaultNode returns CoreIface because the default node is always
-// a full MobazhaNode — callers needing IPFSNode/DB/Multiwallet use this.
+// a full MobazhaNode — callers needing DB/Multiwallet/PeerHost use this.
 type NodeManagerIface interface {
 	// GetDefaultNode returns the default node as CoreIface.
 	// The default node is always a MobazhaNode (full node).
 	GetDefaultNode() CoreIface
-	GetIPFSNode() *core.IpfsNode
 
 	// AddNode registers a node (MobazhaNode or TenantService) by ID.
 	AddNode(nodeID string, node contracts.NodeService)

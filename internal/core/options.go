@@ -51,7 +51,7 @@ func WithHostService(hs coreiface.HostService) NodeOption {
 //	 1   │ profileService       │                                         │
 //	 2   │ moderationService    │                                         │
 //	 3   │ listingService       │                                         │
-//	 4   │ paymentService       │ profileService (PeerProfileReader)       │ orderService (OrderLifecycle)
+//	 4   │ paymentService       │ profileService (PeerProfileReader)       │ orderService (CancelableReleaser)
 //	     │                      │                                         │ fiatPaymentService (FiatPaymentQuery)
 //	 5   │ orderService         │ paymentService (EscrowOperations)        │
 //	     │                      │ listingService (ListingQuery)            │
@@ -109,7 +109,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 // via setter injection, after all primary services are constructed.
 func (n *MobazhaNode) wireServiceSetters() {
 	if n.paymentService != nil && n.orderService != nil {
-		n.paymentService.SetOrderLifecycle(n.orderService)
+		n.paymentService.SetCancelableReleaser(n.orderService)
 	}
 	if n.paymentService != nil && n.fiatPaymentService != nil {
 		n.paymentService.SetFiatPaymentQuery(n.fiatPaymentService)
@@ -259,6 +259,7 @@ func (n *MobazhaNode) initOrderService() {
 		Testnet:        n.testnet,
 		ExchangeRates:  n.exchangeRates,
 		OrderLockMgr:   n.orderLockManager,
+		Shutdown:       n.shutdown,
 
 		Escrow:     n.paymentService,
 		Listings:   n.listingService,
@@ -346,7 +347,7 @@ func (n *MobazhaNode) buildDiscountRecorder() DiscountRedemptionRecorderFunc {
 // initPaymentService creates the PaymentAppService if the necessary
 // dependencies are available. Infrastructure-only nodes skip this.
 //
-// Note: OrderLifecycle and FiatPaymentQuery are wired via setters in
+// Note: CancelableReleaser and FiatPaymentQuery are wired via setters in
 // wireServiceSetters() to resolve circular/late-init dependencies.
 func (n *MobazhaNode) initPaymentService() {
 	if n.infrastructureOnly {

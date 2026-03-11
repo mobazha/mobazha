@@ -272,9 +272,9 @@ func (n *MobazhaNode) Start() {
 		// This handles UTXO, EVM, and (future) Solana chains via event dispatch
 		n.paymentService.StartCancelablePaymentMonitor()
 
-		// Start RWA instant buy monitor for auto-confirmation
-		// This handles RWA instant buy (atomic swap) orders that complete on-chain
-		n.startRwaInstantBuyMonitor()
+		// Start event-driven monitors for payment→order decoupling
+		// Handles auto-confirm, UTXO payment detection, and RWA instant buy via EventBus
+		n.startPaymentEventMonitors()
 	}
 
 	// Add log to verify connection reuse

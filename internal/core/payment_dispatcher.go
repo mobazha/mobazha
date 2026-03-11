@@ -5,6 +5,7 @@ import (
 
 	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -75,5 +76,11 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	if n.orderService != nil {
 		n.orderService.SetRegistry(n.paymentRegistry)
 	}
+}
+
+// ── Thin delegates for strategy callbacks ────────────────────────────────
+
+func (n *MobazhaNode) handleCancelablePaymentForEVM(event *events.CancelablePaymentReady, chainType string) {
+	n.paymentService.HandleCancelablePaymentForEVM(event, chainType)
 }
 

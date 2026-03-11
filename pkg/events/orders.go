@@ -232,10 +232,10 @@ type CancelablePaymentReady struct {
 	Amount        uint64 `json:"amount"`
 }
 
-// RwaInstantBuyCompleted is emitted when an RWA instant buy (atomic swap) has completed on-chain
-// This is triggered when the seller receives PAYMENT_SENT with method=RWA_INSTANT_BUY
-// The atomic swap has already transferred tokens, so this just triggers the order confirmation
-// Handled by handleRwaInstantBuyCompleted() in payment_rwa.go
+// RwaInstantBuyCompleted is emitted when an RWA instant buy (atomic swap) has completed on-chain.
+// This is triggered when the seller receives PAYMENT_SENT with method=RWA_INSTANT_BUY.
+// The atomic swap has already transferred tokens, so this just triggers the order confirmation.
+// Handled by OrderAppService.handleRwaAutoComplete() in order_app_service_events.go.
 type RwaInstantBuyCompleted struct {
 	OrderID       string `json:"orderID"`
 	TransactionID string `json:"transactionID"`
@@ -270,4 +270,34 @@ type PaymentVerificationExpired struct {
 	TransactionID string `json:"transactionID"`
 	Coin          string `json:"coin"`
 	Reason        string `json:"reason"` // "timeout" or "address_mismatch"
+}
+
+// ── Internal domain events (PaymentAppService → OrderAppService) ──────
+
+// OrderAutoConfirmRequest is emitted by PaymentAppService when a CANCELABLE
+// payment should be auto-confirmed (UTXO or EVM). OrderAppService subscribes
+// and calls ConfirmOrder. This replaces the direct cross-service method call.
+type OrderAutoConfirmRequest struct {
+	OrderID       string `json:"orderID"`
+	TxID          string `json:"txID"`
+	PayoutAddress string `json:"payoutAddress"`
+}
+
+// UTXOPaymentDetected is emitted by PaymentAppService when a buyer's UTXO
+// payment reaches the expected amount. OrderAppService subscribes and calls
+// ProcessOrderPayment. This replaces the direct cross-service method call.
+type UTXOPaymentDetected struct {
+	OrderID          string `json:"orderID"`
+	TransactionID    string `json:"transactionID"`
+	Coin             string `json:"coin"`
+	Method           int32  `json:"method"`
+	Amount           uint64 `json:"amount"`
+	ToAddress        string `json:"toAddress"`
+	Timestamp        int64  `json:"timestamp"`
+	Script           string `json:"script"`
+	PayerAddress     string `json:"payerAddress"`
+	RefundAddress    string `json:"refundAddress"`
+	Moderator        string `json:"moderator"`
+	ModeratorAddress string `json:"moderatorAddress"`
+	UnlockHours      uint32 `json:"unlockHours"`
 }

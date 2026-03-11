@@ -300,7 +300,7 @@ func TestMobazhaNode_releaseFromCancelableAddress(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := node.orderService.releaseFromCancelableAddress(order)
+	result, err := node.orderService.ReleaseFromCancelableAddress(order)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +325,7 @@ func TestMobazhaNode_releaseFromCancelableAddress(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = node.orderService.releaseFromCancelableAddress(order)
+	_, err = node.orderService.ReleaseFromCancelableAddress(order)
 	if err == nil {
 		t.Fatal("Expected error spending non-existent coins")
 	}

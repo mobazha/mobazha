@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"os"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -15,21 +16,17 @@ import (
 type PreferencesAppService struct {
 	db         database.Database
 	banManager *obnet.BanManager
-
-	GetMyListingsFunc func() (models.ListingIndex, error)
 }
 
 type PreferencesAppServiceConfig struct {
-	DB                database.Database
-	BanManager        *obnet.BanManager
-	GetMyListingsFunc func() (models.ListingIndex, error)
+	DB         database.Database
+	BanManager *obnet.BanManager
 }
 
 func NewPreferencesAppService(cfg PreferencesAppServiceConfig) *PreferencesAppService {
 	return &PreferencesAppService{
-		db:                cfg.DB,
-		banManager:        cfg.BanManager,
-		GetMyListingsFunc: cfg.GetMyListingsFunc,
+		db:         cfg.DB,
+		banManager: cfg.BanManager,
 	}
 }
 
@@ -166,18 +163,21 @@ func (s *PreferencesAppService) UnblockNode(peerID string) (bool, error) {
 }
 
 func (s *PreferencesAppService) countPhysicalGoods() (int, error) {
-	if s.GetMyListingsFunc == nil {
-		return 0, fmt.Errorf("GetMyListingsFunc not configured")
-	}
-	index, err := s.GetMyListingsFunc()
-	if err != nil {
-		return 0, err
-	}
-	count := 0
-	for _, listing := range index {
-		if listing.ContractType == "PHYSICAL_GOOD" {
-			count++
+	var count int
+	err := s.db.View(func(tx database.Tx) error {
+		index, err := tx.GetListingIndex()
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
 		}
-	}
-	return count, nil
+		for _, listing := range index {
+			if listing.ContractType == "PHYSICAL_GOOD" {
+				count++
+			}
+		}
+		return nil
+	})
+	return count, err
 }

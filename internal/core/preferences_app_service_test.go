@@ -179,14 +179,14 @@ func TestPreferencesAppService_SavePreferences_RejectRemoveShippingWithPhysicalG
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	svc := newTestPreferencesAppService(t, PreferencesAppServiceConfig{
-		DB: db,
-		GetMyListingsFunc: func() (models.ListingIndex, error) {
-			return models.ListingIndex{
-				{ContractType: "PHYSICAL_GOOD"},
-			}, nil
-		},
+	err = db.Update(func(tx database.Tx) error {
+		return tx.SetListingIndex(models.ListingIndex{
+			{Slug: "physical-item", ContractType: "PHYSICAL_GOOD"},
+		})
 	})
+	require.NoError(t, err)
+
+	svc := newTestPreferencesAppService(t, PreferencesAppServiceConfig{DB: db})
 
 	shippingOpts, _ := json.Marshal([]models.ShippingOption{
 		{ID: 1, Name: "Standard"},

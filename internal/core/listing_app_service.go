@@ -681,7 +681,7 @@ func (s *ListingAppService) saveListingToDB(dbtx database.Tx, listing *pb.Listin
 		return cid.Cid{}, err
 	}
 
-	if err := s.validateListing(sl); err != nil {
+	if err := s.ValidateListing(sl); err != nil {
 		if errors.Is(err, coreiface.ErrInternalServer) {
 			return cid.Cid{}, err
 		}
@@ -747,7 +747,7 @@ func (s *ListingAppService) signListing(listing *pb.Listing) (*pb.SignedListing,
 	return &pb.SignedListing{Listing: listing, Signature: sig}, nil
 }
 
-func (s *ListingAppService) validateListing(sl *pb.SignedListing) (err error) {
+func (s *ListingAppService) ValidateListing(sl *pb.SignedListing) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			switch x := r.(type) {
@@ -1147,7 +1147,7 @@ func (s *ListingAppService) deserializeAndValidateListing(listingBytes []byte, c
 	if err := (protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}).Unmarshal(listingBytes, signedListing); err != nil {
 		return nil, fmt.Errorf("%w: %s", coreiface.ErrNotFound, err)
 	}
-	if err := s.validateListing(signedListing); err != nil {
+	if err := s.ValidateListing(signedListing); err != nil {
 		return nil, fmt.Errorf("%w: %s", coreiface.ErrNotFound, err)
 	}
 	signedListing.Cid = c.String()

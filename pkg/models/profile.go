@@ -37,8 +37,6 @@ type Profile struct {
 	StoreAndForwardServers []string `json:"storeAndForwardServers"`
 
 	LastModified time.Time `json:"lastModified"`
-
-	Currencies []string `json:"currencies,omitempty"`
 }
 
 // ProfileContactInfo is the user contact info.

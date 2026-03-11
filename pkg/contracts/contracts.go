@@ -150,6 +150,7 @@ type ListingService interface {
 type ProfileService interface {
 	SetProfile(profile *models.Profile, done chan<- struct{}) error
 	GetMyProfile() (*models.Profile, error)
+	GetProfileStats() (*models.ProfileStats, error)
 	GetProfile(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error)
 
 	// Moderation

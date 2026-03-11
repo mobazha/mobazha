@@ -140,7 +140,7 @@ func Test_updateProfileStats(t *testing.T) {
 			return err
 		}
 
-		return node.profileService.updateProfileStats(tx, profile)
+		return computeProfileStats(tx, profile)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -163,7 +163,7 @@ func Test_updateProfileStats(t *testing.T) {
 	}
 }
 
-func Test_updateAndSaveProfile(t *testing.T) {
+func Test_lazyProfileStats(t *testing.T) {
 	node, err := MockNode()
 	if err != nil {
 		t.Fatal(err)
@@ -183,11 +183,7 @@ func Test_updateAndSaveProfile(t *testing.T) {
 			return err
 		}
 
-		if err := tx.SetFollowing(models.Following{"QmfQkD8pBSBCBxWEwFSu4XaDVSWK6bjnNuaWZjMyQbyDub"}); err != nil {
-			return err
-		}
-
-		return node.listingService.updateAndSaveProfile(tx)
+		return tx.SetFollowing(models.Following{"QmfQkD8pBSBCBxWEwFSu4XaDVSWK6bjnNuaWZjMyQbyDub"})
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -202,16 +198,21 @@ func Test_updateAndSaveProfile(t *testing.T) {
 		t.Errorf("Incorrect profile name. Expected %s got %s", name, ret.Name)
 	}
 
-	if ret.Stats == nil {
-		t.Error("Profile stats is nil")
+	if ret.Stats != nil {
+		t.Error("GetMyProfile should not return stats")
 	}
 
-	if ret.Stats.FollowerCount != 1 {
-		t.Errorf("Incorrect follower count. Expected 1 got %d", ret.Stats.FollowerCount)
+	stats, err := node.Profile().GetProfileStats()
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	if ret.Stats.FollowingCount != 1 {
-		t.Errorf("Incorrect following count. Expected 1 got %d", ret.Stats.FollowingCount)
+	if stats.FollowerCount != 1 {
+		t.Errorf("Incorrect follower count. Expected 1 got %d", stats.FollowerCount)
+	}
+
+	if stats.FollowingCount != 1 {
+		t.Errorf("Incorrect following count. Expected 1 got %d", stats.FollowingCount)
 	}
 }
 

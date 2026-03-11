@@ -18,10 +18,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
-	"gorm.io/gorm"
 )
-
-type GetAcceptedCurrenciesFunc func() ([]string, error)
 
 type ProfileAppService struct {
 	db      database.Database
@@ -36,8 +33,7 @@ type ProfileAppService struct {
 	stripeAccountID        string
 	storeAndForwardServers []string
 
-	coTenantPublicData    contracts.CoTenantPublicDataFn
-	getAcceptedCurrencies GetAcceptedCurrenciesFunc
+	coTenantPublicData contracts.CoTenantPublicDataFn
 }
 
 type ProfileAppServiceConfig struct {
@@ -53,8 +49,7 @@ type ProfileAppServiceConfig struct {
 	StripeAccountID        string
 	StoreAndForwardServers []string
 
-	CoTenantPublicData    contracts.CoTenantPublicDataFn
-	GetAcceptedCurrencies GetAcceptedCurrenciesFunc
+	CoTenantPublicData contracts.CoTenantPublicDataFn
 }
 
 func NewProfileAppService(cfg ProfileAppServiceConfig) *ProfileAppService {
@@ -70,7 +65,6 @@ func NewProfileAppService(cfg ProfileAppServiceConfig) *ProfileAppService {
 		stripeAccountID:        cfg.StripeAccountID,
 		storeAndForwardServers: cfg.StoreAndForwardServers,
 		coTenantPublicData:     cfg.CoTenantPublicData,
-		getAcceptedCurrencies:  cfg.GetAcceptedCurrencies,
 	}
 }
 
@@ -90,40 +84,8 @@ func (s *ProfileAppService) SetProfile(profile *models.Profile, done chan<- stru
 		return fmt.Errorf("%w: %s", coreiface.ErrBadRequest, err)
 	}
 
-	var enabledCoins []string
-	if s.getAcceptedCurrencies != nil {
-		enabledCoins, _ = s.getAcceptedCurrencies()
-	}
-
 	err := s.db.Update(func(tx database.Tx) error {
-		var prefs models.UserPreferences
-		if err := tx.Read().First(&prefs).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-
-		currencies, err := prefs.PreferredCurrencies()
-		if err != nil {
-			return err
-		}
-		if len(currencies) == 0 {
-			currencies = append(currencies, enabledCoins...)
-		}
-
-		if len(profile.Currencies) == 0 {
-			profile.Currencies = currencies
-		}
-
-		if profile.Moderator && profile.ModeratorInfo != nil {
-			profile.ModeratorInfo.AcceptedCurrencies = profile.Currencies
-		}
-
-		if err := s.updateProfileStats(tx, profile); err != nil {
-			return err
-		}
-		if err := tx.SetProfile(profile); err != nil {
-			return err
-		}
-		return nil
+		return tx.SetProfile(profile)
 	})
 	if err != nil {
 		maybeCloseDone(done)
@@ -161,6 +123,19 @@ func (s *ProfileAppService) GetMyProfile() (*models.Profile, error) {
 	return profile, err
 }
 
+func (s *ProfileAppService) GetProfileStats() (*models.ProfileStats, error) {
+	var stats *models.ProfileStats
+	err := s.db.View(func(tx database.Tx) error {
+		var p models.Profile
+		if err := computeProfileStats(tx, &p); err != nil {
+			return err
+		}
+		stats = p.Stats
+		return nil
+	})
+	return stats, err
+}
+
 func (s *ProfileAppService) GetProfile(_ context.Context, peerID peer.ID, reqCtx *request.Context, _ bool) (*models.Profile, error) {
 	if s.coTenantPublicData != nil {
 		if pd, err := s.coTenantPublicData(peerID); err == nil {
@@ -177,23 +152,21 @@ func (s *ProfileAppService) GetProfile(_ context.Context, peerID peer.ID, reqCtx
 	return nil, fmt.Errorf("profile data not available for remote peer %s", peerID)
 }
 
-// UpdateAndSaveProfile loads the profile from disk, updates stats, and saves.
-// Exposed for cross-domain callers (FollowAppService, PostsAppService).
-func (s *ProfileAppService) UpdateAndSaveProfile(tx database.Tx) error {
-	profile, err := tx.GetProfile()
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	if profile == nil {
+func getProfileWithStats(db database.Database) (*models.Profile, error) {
+	var profile *models.Profile
+	err := db.View(func(tx database.Tx) error {
+		var err error
+		profile, err = tx.GetProfile()
+		if err != nil {
+			return err
+		}
+		_ = computeProfileStats(tx, profile)
 		return nil
-	}
-	if err := s.updateProfileStats(tx, profile); err != nil {
-		return err
-	}
-	return tx.SetProfile(profile)
+	})
+	return profile, err
 }
 
-func (s *ProfileAppService) updateProfileStats(tx database.Tx, profile *models.Profile) error {
+func computeProfileStats(tx database.Tx, profile *models.Profile) error {
 	followers, err := tx.GetFollowers()
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -281,9 +254,6 @@ func (s *ProfileAppService) UpdateSNFServers() error {
 		if !equal(profile.StoreAndForwardServers, s.storeAndForwardServers) {
 			profile.StoreAndForwardServers = s.storeAndForwardServers
 
-			if err := s.updateProfileStats(tx, profile); err != nil {
-				return err
-			}
 			if err := tx.SetProfile(profile); err != nil {
 				return err
 			}
@@ -347,44 +317,6 @@ func validateProfile(profile *models.Profile) error {
 	if profile.Moderator && profile.ModeratorInfo == nil {
 		return errors.New("moderatorinfo must be included if moderator boolean is set")
 	}
-	if profile.ModeratorInfo != nil {
-		if (profile.ModeratorInfo.Fee.FeeType == models.FixedFee || profile.ModeratorInfo.Fee.FeeType == models.FixedPlusPercentageFee) && profile.ModeratorInfo.Fee.FixedFee == nil {
-			return errors.New("moderator fee type must be set if using fixed fee or fixed plus percentage")
-		}
-		if len(profile.ModeratorInfo.Description) > AboutMaxCharacters {
-			return coreiface.ErrTooManyCharacters{"moderatorinfo.description", strconv.Itoa(AboutMaxCharacters)}
-		}
-		if len(profile.ModeratorInfo.TermsAndConditions) > PolicyMaxCharacters {
-			return coreiface.ErrTooManyCharacters{"moderatorinfo.termsandconditions", strconv.Itoa(PolicyMaxCharacters)}
-		}
-		if len(profile.ModeratorInfo.Languages) > MaxListItems {
-			return coreiface.ErrTooManyItems{"moderatorinfo.languages", strconv.Itoa(MaxListItems)}
-		}
-		for _, l := range profile.ModeratorInfo.Languages {
-			if len(l) > WordMaxCharacters {
-				return coreiface.ErrTooManyCharacters{"moderatorinfo.languages", strconv.Itoa(WordMaxCharacters)}
-			}
-		}
-		for _, l := range profile.ModeratorInfo.AcceptedCurrencies {
-			if len(l) > WordMaxCharacters {
-				return coreiface.ErrTooManyCharacters{"moderatorinfo.acceptedCurrencies", strconv.Itoa(WordMaxCharacters)}
-			}
-		}
-		if len(profile.ModeratorInfo.AcceptedCurrencies) > MaxListItems {
-			return coreiface.ErrTooManyItems{"moderatorinfo.acceptedCurrencies"}
-		}
-		if profile.ModeratorInfo.Fee.FixedFee != nil {
-			if len(profile.ModeratorInfo.Fee.FixedFee.Currency.Name) > WordMaxCharacters {
-				return coreiface.ErrTooManyCharacters{"moderatorinfo.fee.fixedfee.currency.name", strconv.Itoa(WordMaxCharacters)}
-			}
-			if len(string(profile.ModeratorInfo.Fee.FixedFee.Currency.CurrencyType)) > WordMaxCharacters {
-				return coreiface.ErrTooManyCharacters{"moderatorinfo.fee.fixedfee.currency.currencytype", strconv.Itoa(WordMaxCharacters)}
-			}
-			if len(profile.ModeratorInfo.Fee.FixedFee.Currency.Code.String()) > WordMaxCharacters {
-				return coreiface.ErrTooManyCharacters{"moderatorinfo.fee.fixedfee.currency.code", strconv.Itoa(WordMaxCharacters)}
-			}
-		}
-	}
 	if profile.AvatarHashes.Large != "" || profile.AvatarHashes.Medium != "" ||
 		profile.AvatarHashes.Small != "" || profile.AvatarHashes.Tiny != "" || profile.AvatarHashes.Original != "" {
 		_, err := cid.Decode(profile.AvatarHashes.Tiny)
@@ -442,11 +374,6 @@ func validateProfile(profile *models.Profile) error {
 	}
 	if len(profile.EscrowPublicKey) != 66 {
 		return fmt.Errorf("bad request: secp256k1 public key must be exactly %d hex characters, got %d", 66, len(profile.EscrowPublicKey))
-	}
-	if profile.Stats != nil {
-		if profile.Stats.AverageRating > 5 {
-			return fmt.Errorf("average rating cannot be greater than %d", 5)
-		}
 	}
 	return nil
 }

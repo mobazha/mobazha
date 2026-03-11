@@ -106,6 +106,7 @@ type mockNode struct {
 	stopFunc                                func(force bool) error
 	setProfileFunc                          func(profile *models.Profile, done chan<- struct{}) error
 	getMyProfileFunc                        func() (*models.Profile, error)
+	getProfileStatsFunc                     func() (*models.ProfileStats, error)
 	getProfileFunc                          func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error)
 	getMyRatingsFunc                        func() (models.RatingIndex, error)
 	getRatingsFunc                          func(ctx context.Context, peerID peer.ID, useCache bool) (models.RatingIndex, error)
@@ -471,6 +472,12 @@ func (m *mockNode) SetProfile(profile *models.Profile, done chan<- struct{}) err
 }
 func (m *mockNode) GetMyProfile() (*models.Profile, error) {
 	return m.getMyProfileFunc()
+}
+func (m *mockNode) GetProfileStats() (*models.ProfileStats, error) {
+	if m.getProfileStatsFunc != nil {
+		return m.getProfileStatsFunc()
+	}
+	return nil, nil
 }
 func (m *mockNode) GetProfile(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error) {
 	return m.getProfileFunc(ctx, peerID, useCache)

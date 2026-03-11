@@ -55,9 +55,7 @@ type ListingAppService struct {
 	nodeID             peer.ID
 	testnet            bool
 
-	publish              PublishFunc
-	getMyProfile         GetMyProfileFunc
-	updateAndSaveProfile  UpdateAndSaveProfileFunc
+	publish         PublishFunc
 	onDeleteCleanup func(slug string)
 
 	coTenantPublicData contracts.CoTenantPublicDataFn
@@ -77,9 +75,7 @@ type ListingAppServiceConfig struct {
 	NodeID             peer.ID
 	Testnet            bool
 
-	Publish              PublishFunc
-	GetMyProfile         GetMyProfileFunc
-	UpdateAndSaveProfile  UpdateAndSaveProfileFunc
+	Publish PublishFunc
 
 	CoTenantPublicData contracts.CoTenantPublicDataFn
 
@@ -97,11 +93,9 @@ func NewListingAppService(cfg ListingAppServiceConfig) *ListingAppService {
 		featureManager:       cfg.FeatureManager,
 		localListingCrypto:   cfg.LocalListingCrypto,
 		nodeID:               cfg.NodeID,
-		testnet:              cfg.Testnet,
-		publish:              cfg.Publish,
-		getMyProfile:         cfg.GetMyProfile,
-		updateAndSaveProfile: cfg.UpdateAndSaveProfile,
-		coTenantPublicData:   cfg.CoTenantPublicData,
+		testnet:            cfg.Testnet,
+		publish:            cfg.Publish,
+		coTenantPublicData: cfg.CoTenantPublicData,
 		shippingStore:        cfg.ShippingStore,
 	}
 }
@@ -203,15 +197,7 @@ func (s *ListingAppService) SaveListing(listing *pb.Listing, done chan<- struct{
 		}
 		index.UpdateListing(*lmd)
 
-		if err := tx.SetListingIndex(index); err != nil {
-			return err
-		}
-
-		if err := s.updateAndSaveProfile(tx); err != nil {
-			return err
-		}
-
-		return nil
+		return tx.SetListingIndex(index)
 	})
 	if err != nil {
 		maybeCloseDone(done)
@@ -305,7 +291,7 @@ func (s *ListingAppService) UpdateAllListings(updateFunc func(l *pb.Listing) (bo
 				}
 			}
 
-			if profile, err := s.getMyProfile(); err == nil {
+			if profile, err := getProfileWithStats(s.db); err == nil {
 				s.netDB.SetOwnProfile(profile)
 			}
 		}
@@ -330,10 +316,6 @@ func (s *ListingAppService) DeleteListing(slugStr string, done chan<- struct{}) 
 
 		if err := tx.DeleteListing(slugStr); err != nil {
 			return fmt.Errorf("%w: listing not found", coreiface.ErrNotFound)
-		}
-
-		if err := s.updateAndSaveProfile(tx); err != nil {
-			return err
 		}
 
 		return nil
@@ -594,7 +576,7 @@ func (s *ListingAppService) updateAllListings(tx database.Tx, updateFunc func(l 
 		return true, err
 	}
 
-	return true, s.updateAndSaveProfile(tx)
+	return true, nil
 }
 
 func (s *ListingAppService) saveListingToDB(dbtx database.Tx, listing *pb.Listing) (cid.Cid, error) {

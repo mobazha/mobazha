@@ -72,12 +72,12 @@ func TestMobazhaNode_AddPost(t *testing.T) {
 		t.Errorf("Returned incorrect number of posts. Expected %d, got %d", 1, len(index))
 	}
 
-	profile, err := node.Profile().GetMyProfile()
+	stats, err := node.Profile().GetProfileStats()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if profile.Stats.PostCount != 1 {
-		t.Errorf("Returned incorrect number of post count in profile stats. Expected %d, got %d", 1, profile.Stats.PostCount)
+	if stats.PostCount != 1 {
+		t.Errorf("Returned incorrect number of post count in profile stats. Expected %d, got %d", 1, stats.PostCount)
 	}
 
 	done2 := make(chan struct{})
@@ -99,12 +99,12 @@ func TestMobazhaNode_AddPost(t *testing.T) {
 		t.Errorf("Returned incorrect number of posts. Expected %d, got %d", 0, len(index))
 	}
 
-	profile, err = node.Profile().GetMyProfile()
+	stats, err = node.Profile().GetProfileStats()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if profile.Stats.PostCount != 0 {
-		t.Errorf("Returned incorrect number of post count in profile stats. Expected %d, got %d", 0, profile.Stats.PostCount)
+	if stats.PostCount != 0 {
+		t.Errorf("Returned incorrect number of post count in profile stats. Expected %d, got %d", 0, stats.PostCount)
 	}
 }
 

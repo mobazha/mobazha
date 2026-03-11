@@ -447,73 +447,44 @@ func (n *MobazhaNode) initProfileService() {
 		StripeAccountID:        n.stripeAccountID,
 		StoreAndForwardServers: n.storeAndForwardServers,
 		CoTenantPublicData:     n.coTenantPublicDataDeferred(),
-		GetAcceptedCurrencies: func() ([]string, error) {
-			return n.paymentService.GetAcceptedCurrencies()
-		},
 	})
 }
 
 // initPostsService creates the PostsAppService.
-// Must be called after initProfileService since it depends on profileService callbacks.
 func (n *MobazhaNode) initPostsService() {
 	if n.infrastructureOnly {
 		return
 	}
 
-	var updateProfile UpdateAndSaveProfileFunc
-	var getMyProfile GetMyProfileFunc
-	if n.profileService != nil {
-		updateProfile = n.profileService.UpdateAndSaveProfile
-		getMyProfile = n.profileService.GetMyProfile
-	}
-
 	n.postsService = NewPostsAppService(PostsAppServiceConfig{
-		DB:                   n.db,
-		Signer:               n.signer,
-		Keys:                 n.keyProvider,
-		PeerID:               n.peerID,
-		Publish:              n.Publish,
-		UpdateAndSaveProfile: updateProfile,
-		GetMyProfile:         getMyProfile,
+		DB:      n.db,
+		Signer:  n.signer,
+		Keys:    n.keyProvider,
+		PeerID:  n.peerID,
+		Publish: n.Publish,
 	})
 }
 
 // initFollowService creates the FollowAppService.
-// Must be called after initProfileService since it depends on profileService.
 func (n *MobazhaNode) initFollowService() {
 	if n.infrastructureOnly {
 		return
 	}
 
-	var updateProfile UpdateAndSaveProfileFunc
-	var getMyProfile GetMyProfileFunc
-	if n.profileService != nil {
-		updateProfile = n.profileService.UpdateAndSaveProfile
-		getMyProfile = n.profileService.GetMyProfile
-	}
-
 	n.followService = NewFollowAppService(FollowAppServiceConfig{
-		DB:                   n.db,
-		Messenger:            n.messenger,
-		EventBus:             n.eventBus,
-		NodeID:               n.nodeID,
-		NetDB:                n.netDB,
-		CoTenantPublicData:   n.coTenantPublicDataDeferred(),
-		UpdateAndSaveProfile: updateProfile,
-		GetMyProfile:         getMyProfile,
+		DB:                 n.db,
+		Messenger:          n.messenger,
+		EventBus:           n.eventBus,
+		NodeID:             n.nodeID,
+		NetDB:              n.netDB,
+		CoTenantPublicData: n.coTenantPublicDataDeferred(),
 	})
 }
 
 // initModerationService creates the ModerationAppService.
-// Must be called after initProfileService since it depends on profileService.GetMyProfile.
 func (n *MobazhaNode) initModerationService() {
 	if n.infrastructureOnly {
 		return
-	}
-
-	var getMyProfile GetMyProfileFunc
-	if n.profileService != nil {
-		getMyProfile = n.profileService.GetMyProfile
 	}
 
 	var verifiedModEndpoint string
@@ -527,10 +498,6 @@ func (n *MobazhaNode) initModerationService() {
 		NodeID:              n.nodeID,
 		VerifiedModEndpoint: verifiedModEndpoint,
 		ExchangeRates:       n.exchangeRates,
-		GetMyProfile:        getMyProfile,
-		GetAcceptedCurrencies: func() ([]string, error) {
-			return n.paymentService.GetAcceptedCurrencies()
-		},
 	})
 }
 
@@ -539,34 +506,25 @@ func (n *MobazhaNode) initListingService() {
 		return
 	}
 
-	var getMyProfile GetMyProfileFunc
-	var updateAndSaveProfile UpdateAndSaveProfileFunc
-	if n.profileService != nil {
-		getMyProfile = n.profileService.GetMyProfile
-		updateAndSaveProfile = n.profileService.UpdateAndSaveProfile
-	}
-
 	var shippingStore contracts.ShippingStore
 	if n.shippingService != nil {
 		shippingStore = n.shippingService.Store()
 	}
 
 	n.listingService = NewListingAppService(ListingAppServiceConfig{
-		DB:                   n.db,
-		Signer:               n.signer,
-		ContentStore:         n.contentStore,
-		NetDB:                n.netDB,
-		BanManager:           n.banManager,
-		Keys:                 n.keyProvider,
-		FeatureManager:       n.featureManager,
-		LocalListingCrypto:   n.localListingCrypto,
-		NodeID:               n.Identity(),
-		Testnet:              n.testnet,
-		Publish:              n.Publish,
-		GetMyProfile:         getMyProfile,
-		UpdateAndSaveProfile: updateAndSaveProfile,
-		CoTenantPublicData:   n.coTenantPublicDataDeferred(),
-		ShippingStore:        shippingStore,
+		DB:                 n.db,
+		Signer:             n.signer,
+		ContentStore:       n.contentStore,
+		NetDB:              n.netDB,
+		BanManager:         n.banManager,
+		Keys:               n.keyProvider,
+		FeatureManager:     n.featureManager,
+		LocalListingCrypto: n.localListingCrypto,
+		NodeID:             n.Identity(),
+		Testnet:            n.testnet,
+		Publish:            n.Publish,
+		CoTenantPublicData: n.coTenantPublicDataDeferred(),
+		ShippingStore:      shippingStore,
 	})
 
 	if n.collectionService != nil {

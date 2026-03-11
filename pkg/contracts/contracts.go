@@ -138,7 +138,6 @@ type ListingService interface {
 	SaveListing(listing *pb.Listing, done chan<- struct{}) error
 	UpdateAllListings(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error
 	DeleteListing(slug string, done chan<- struct{}) error
-	SetModeratorsOnListings(mods []peer.ID, done chan struct{}) error
 	GetMyListings() (models.ListingIndex, error)
 	GetListings(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.ListingIndex, error)
 	GetMyListingBySlug(slug string) (*pb.SignedListing, error)

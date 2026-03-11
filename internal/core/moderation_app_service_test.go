@@ -7,7 +7,6 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -136,23 +135,6 @@ func TestModerationAppService_RemoveSelfAsModerator(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.False(t, profile.Moderator)
-}
-
-func TestModerationAppService_SetModeratorsOnListings(t *testing.T) {
-	updateCalled := false
-	svc := newTestModerationAppService(t, ModerationAppServiceConfig{
-		UpdateAllListings: func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error {
-			updateCalled = true
-			maybeCloseDone(done)
-			return nil
-		},
-	})
-
-	done := make(chan struct{})
-	err := svc.SetModeratorsOnListings(nil, done)
-	require.NoError(t, err)
-	<-done
-	assert.True(t, updateCalled, "updateAllListings should be called")
 }
 
 func TestModerationAppService_GetVerifiedModerators_EmptyEndpoint(t *testing.T) {

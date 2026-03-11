@@ -13,11 +13,8 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/libs/proxyclient"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
-
-type UpdateAllListingsFunc func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error
 
 // ModerationAppService encapsulates moderator management logic.
 type ModerationAppService struct {
@@ -29,7 +26,6 @@ type ModerationAppService struct {
 
 	getMyProfile          GetMyProfileFunc
 	getAcceptedCurrencies GetAcceptedCurrenciesFunc
-	updateAllListings     UpdateAllListingsFunc
 }
 
 // ModerationAppServiceConfig holds dependencies for constructing a ModerationAppService.
@@ -42,7 +38,6 @@ type ModerationAppServiceConfig struct {
 
 	GetMyProfile          GetMyProfileFunc
 	GetAcceptedCurrencies GetAcceptedCurrenciesFunc
-	UpdateAllListings     UpdateAllListingsFunc
 }
 
 func NewModerationAppService(cfg ModerationAppServiceConfig) *ModerationAppService {
@@ -54,7 +49,6 @@ func NewModerationAppService(cfg ModerationAppServiceConfig) *ModerationAppServi
 		exchangeRates:         cfg.ExchangeRates,
 		getMyProfile:          cfg.GetMyProfile,
 		getAcceptedCurrencies: cfg.GetAcceptedCurrencies,
-		updateAllListings:     cfg.UpdateAllListings,
 	}
 }
 
@@ -172,18 +166,6 @@ func (s *ModerationAppService) GetModeratorsAsync(_ context.Context) <-chan peer
 	ch := make(chan peer.ID)
 	close(ch)
 	return ch
-}
-
-func (s *ModerationAppService) SetModeratorsOnListings(mods []peer.ID, done chan struct{}) error {
-	modStrs := make([]string, 0, len(mods))
-	for _, mod := range mods {
-		modStrs = append(modStrs, mod.String())
-	}
-
-	return s.updateAllListings(func(listing *pb.Listing) (bool, error) {
-		listing.Moderators = modStrs
-		return true, nil
-	}, done)
 }
 
 func (s *ModerationAppService) GetModeratorFee(total iwallet.Amount, currencyCode string) (iwallet.Amount, error) {

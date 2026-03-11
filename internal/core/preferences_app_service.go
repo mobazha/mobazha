@@ -1,19 +1,14 @@
 package core
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	obnet "github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	"gorm.io/gorm"
 )
 
 // PreferencesAppService encapsulates user preferences and block-list management.
@@ -21,24 +16,20 @@ type PreferencesAppService struct {
 	db         database.Database
 	banManager *obnet.BanManager
 
-	// Cross-domain callbacks injected at construction time.
-	UpdateAllListingsFunc func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error
-	GetMyListingsFunc     func() (models.ListingIndex, error)
+	GetMyListingsFunc func() (models.ListingIndex, error)
 }
 
 type PreferencesAppServiceConfig struct {
-	DB                    database.Database
-	BanManager            *obnet.BanManager
-	UpdateAllListingsFunc func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error
-	GetMyListingsFunc     func() (models.ListingIndex, error)
+	DB                database.Database
+	BanManager        *obnet.BanManager
+	GetMyListingsFunc func() (models.ListingIndex, error)
 }
 
 func NewPreferencesAppService(cfg PreferencesAppServiceConfig) *PreferencesAppService {
 	return &PreferencesAppService{
-		db:                    cfg.DB,
-		banManager:            cfg.BanManager,
-		UpdateAllListingsFunc: cfg.UpdateAllListingsFunc,
-		GetMyListingsFunc:     cfg.GetMyListingsFunc,
+		db:                cfg.DB,
+		banManager:        cfg.BanManager,
+		GetMyListingsFunc: cfg.GetMyListingsFunc,
 	}
 }
 
@@ -53,144 +44,8 @@ func (s *PreferencesAppService) GetPreferences() (*models.UserPreferences, error
 	return &prefs, nil
 }
 
-func (s *PreferencesAppService) MigrateShippingOptionsToProfiles(done chan<- struct{}) error {
-	prefs, err := s.GetPreferences()
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			maybeCloseDone(done)
-			return nil
-		}
-		maybeCloseDone(done)
-		return err
-	}
-
-	if !prefs.NeedsMigrationFromLegacy() {
-		maybeCloseDone(done)
-		return nil
-	}
-
-	profileID := uuid.New().String()
-	profileName := "Default Shipping"
-	locationID := uuid.New().String()
-	locationName := "Default Location"
-
-	err = prefs.MigrateFromLegacyShippingOptions(profileID, profileName, locationID, locationName)
-	if err != nil {
-		maybeCloseDone(done)
-		return fmt.Errorf("failed to migrate shipping options to profiles: %w", err)
-	}
-
-	err = s.db.Update(func(tx database.Tx) error {
-		prefs.ID = 1
-		return tx.Save(prefs)
-	})
-	if err != nil {
-		maybeCloseDone(done)
-		return fmt.Errorf("failed to save migrated preferences: %w", err)
-	}
-
-	defaultProfile, err := prefs.GetDefaultShippingProfile()
-	if err != nil || defaultProfile == nil {
-		maybeCloseDone(done)
-		return nil
-	}
-
-	pbShippingProfile := models.ConvertShippingProfileToProto(defaultProfile)
-
-	return s.UpdateAllListingsFunc(func(l *pb.Listing) (bool, error) {
-		if l.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD {
-			l.ShippingProfile = pbShippingProfile
-			return true, nil
-		}
-		return false, nil
-	}, done)
-}
-
-func (s *PreferencesAppService) CheckAndMigrateShippingProfiles() error {
-	prefs, err := s.GetPreferences()
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
-		return err
-	}
-
-	if prefs.NeedsMigrationFromLegacy() {
-		log.Info("Migrating shipping options to shipping profiles...")
-		err := s.MigrateShippingOptionsToProfiles(nil)
-		if err != nil {
-			log.Errorf("Failed to migrate shipping profiles: %v", err)
-			return err
-		}
-		log.Info("Shipping profiles migration completed (publishing in background)")
-	}
-	return nil
-}
-
-func (s *PreferencesAppService) SyncShippingProfilesToListings() error {
-	prefs, err := s.GetPreferences()
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
-		return err
-	}
-
-	shippingProfiles, err := prefs.GetShippingProfiles()
-	if err != nil || len(shippingProfiles) == 0 {
-		return nil
-	}
-
-	var defaultProfile *models.ShippingProfile
-	for _, profile := range shippingProfiles {
-		if profile.IsDefault {
-			defaultProfile = profile
-			break
-		}
-	}
-	if defaultProfile == nil {
-		defaultProfile = shippingProfiles[0]
-	}
-
-	allZones := defaultProfile.GetAllZones()
-	if len(allZones) == 0 {
-		return nil
-	}
-
-	pbDefaultProfile := models.ConvertShippingProfileToProto(defaultProfile)
-
-	done := make(chan struct{})
-	go func() {
-		<-done
-	}()
-
-	var updated int
-	err = s.UpdateAllListingsFunc(func(l *pb.Listing) (bool, error) {
-		if l.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD {
-			if l.ShippingProfile == nil || l.ShippingProfile.ProfileID == "" {
-				l.ShippingProfile = pbDefaultProfile
-				updated++
-				return true, nil
-			}
-		}
-		return false, nil
-	}, done)
-
-	if err != nil {
-		return err
-	}
-
-	if updated > 0 {
-		log.Infof("Synced shipping profile to %d physical goods", updated)
-	}
-
-	return nil
-}
-
 func (s *PreferencesAppService) SavePreferences(prefs *models.UserPreferences, done chan struct{}) error {
-	var modsChanged bool
-	mods, err := prefs.StoreModerators()
-	if err != nil {
+	if _, err := prefs.StoreModerators(); err != nil {
 		return fmt.Errorf("%w: invalid moderator ID", coreiface.ErrBadRequest)
 	}
 
@@ -199,15 +54,9 @@ func (s *PreferencesAppService) SavePreferences(prefs *models.UserPreferences, d
 		return fmt.Errorf("%w: invalid shipping options", coreiface.ErrBadRequest)
 	}
 
-	var shippingProfilesChanged bool
 	shippingProfiles, err := prefs.GetShippingProfiles()
 	if err != nil {
 		return fmt.Errorf("%w: invalid shipping profiles", coreiface.ErrBadRequest)
-	}
-
-	profileMap := make(map[string]*models.ShippingProfile)
-	for _, profile := range shippingProfiles {
-		profileMap[profile.ProfileID] = profile
 	}
 
 	if len(shippingOptions) == 0 && len(shippingProfiles) == 0 {
@@ -230,39 +79,7 @@ func (s *PreferencesAppService) SavePreferences(prefs *models.UserPreferences, d
 	}
 
 	err = s.db.Update(func(tx database.Tx) error {
-		var (
-			currentPrefs  models.UserPreferences
-			currentModMap = make(map[peer.ID]bool)
-			newModMap     = make(map[peer.ID]bool)
-		)
-		err := tx.Read().First(&currentPrefs).Error
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-
-		currentMods, err := currentPrefs.StoreModerators()
-		if err != nil {
-			return err
-		}
-		for _, mod := range currentMods {
-			currentModMap[mod] = true
-		}
-
-		for _, mod := range mods {
-			newModMap[mod] = true
-			if !currentModMap[mod] {
-				modsChanged = true
-			}
-		}
-		for _, mod := range currentMods {
-			if !newModMap[mod] {
-				modsChanged = true
-			}
-		}
-
-		shippingProfilesChanged = !bytes.Equal(prefs.ShippingProfiles, currentPrefs.ShippingProfiles)
-
-		_, err = prefs.BlockedNodes()
+		_, err := prefs.BlockedNodes()
 		if err != nil {
 			return fmt.Errorf("%w: invalid block node ID", coreiface.ErrBadRequest)
 		}
@@ -277,51 +94,14 @@ func (s *PreferencesAppService) SavePreferences(prefs *models.UserPreferences, d
 			}
 		}
 		prefs.ID = 1
-		if err := tx.Save(prefs); err != nil {
-			return err
-		}
-
-		return nil
+		return tx.Save(prefs)
 	})
 	if err != nil {
 		maybeCloseDone(done)
 		return err
 	}
 
-	if modsChanged || shippingProfilesChanged {
-		modStrs := make([]string, 0, len(mods))
-		for _, mod := range mods {
-			modStrs = append(modStrs, mod.String())
-		}
-
-		var defaultProfile *models.ShippingProfile
-		for _, profile := range shippingProfiles {
-			if profile.IsDefault {
-				defaultProfile = profile
-				break
-			}
-		}
-		if defaultProfile == nil && len(shippingProfiles) > 0 {
-			defaultProfile = shippingProfiles[0]
-		}
-
-		return s.UpdateAllListingsFunc(func(l *pb.Listing) (bool, error) {
-			if modsChanged {
-				l.Moderators = modStrs
-			}
-			if l.Metadata.ContractType == pb.Listing_Metadata_PHYSICAL_GOOD && shippingProfilesChanged {
-				if l.ShippingProfile != nil && l.ShippingProfile.ProfileID != "" {
-					if profile, ok := profileMap[l.ShippingProfile.ProfileID]; ok {
-						l.ShippingProfile = models.ConvertShippingProfileToProto(profile)
-					}
-				} else if defaultProfile != nil {
-					l.ShippingProfile = models.ConvertShippingProfileToProto(defaultProfile)
-				}
-			}
-			return true, nil
-		}, done)
-	}
-
+	maybeCloseDone(done)
 	return nil
 }
 

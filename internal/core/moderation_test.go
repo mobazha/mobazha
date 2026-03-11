@@ -5,9 +5,7 @@ import (
 	"testing"
 	"time"
 
-	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	"github.com/mobazha/mobazha3.0/pkg/models/factory"
 )
 
 func TestMobazhaNode_SetAndRemoveSelfAsModerator(t *testing.T) {
@@ -88,56 +86,3 @@ func TestMobazhaNode_GetModerators_DHT_Removed(t *testing.T) {
 	}
 }
 
-func TestMobazhaNode_SetModeratorsOnListings(t *testing.T) {
-	l1 := factory.NewPhysicalListing("tshirt")
-	l1.Moderators = []string{}
-	l2 := factory.NewPhysicalListing("shoes")
-	l2.Moderators = []string{}
-
-	n, err := MockNode()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := n.Listing().SaveListing(l1, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := n.Listing().SaveListing(l2, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	modID := "12D3KooW9qYCthfQAwxnuW62ZTN8uoKBfRkt5a2bcKJWR5aDwta6"
-	pid, err := peer.Decode(modID)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	mods := []peer.ID{pid}
-
-	if err := n.Listing().SetModeratorsOnListings(mods, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	ls, err := n.Listing().GetMyListings()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(ls) != 2 {
-		t.Errorf("Expected 2 listings got %d", len(ls))
-	}
-
-	for _, l := range ls {
-		if l.ModeratorIDs[0] != modID {
-			t.Errorf("Expected mod ID %s, got %s", modID, l.ModeratorIDs[0])
-		}
-		listing, err := n.Listing().GetMyListingBySlug(l.Slug)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if listing.Listing.Moderators[0] != modID {
-			t.Errorf("Expected mod ID %s, got %s", modID, listing.Listing.Moderators[0])
-		}
-	}
-}

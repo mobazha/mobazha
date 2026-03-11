@@ -136,9 +136,6 @@ func (n *MobazhaNode) initPreferencesService() {
 	n.preferencesService = NewPreferencesAppService(PreferencesAppServiceConfig{
 		DB:         n.db,
 		BanManager: n.banManager,
-		UpdateAllListingsFunc: func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error {
-			return n.listingService.UpdateAllListings(updateFunc, done)
-		},
 		GetMyListingsFunc: func() (models.ListingIndex, error) {
 			return n.listingService.GetMyListings()
 		},
@@ -287,20 +284,11 @@ func (n *MobazhaNode) initOrderService() {
 		GetListings: func(ctx context.Context, peerID peer.ID) (models.ListingIndex, error) {
 			return n.listingService.GetListings(ctx, peerID, nil, false)
 		},
-		FetchOrderByID: func(orderID string) (*models.Order, error) {
-			return n.paymentService.FetchOrderByID(orderID)
-		},
 		RelayInstructions: func(orderID string, coinType iwallet.CoinType, instructions any) (string, error) {
 			return n.paymentService.RelayInstructions(orderID, coinType, instructions)
 		},
 		DiscountResolver:           n.buildDiscountResolver(),
 		DiscountRedemptionRecorder: n.buildDiscountRecorder(),
-		CollectionStore: func() contracts.CollectionStore {
-			if n.collectionService != nil {
-				return n.collectionService.Store()
-			}
-			return nil
-		},
 	})
 
 	if n.fiatPaymentService != nil {
@@ -542,9 +530,6 @@ func (n *MobazhaNode) initModerationService() {
 		GetMyProfile:        getMyProfile,
 		GetAcceptedCurrencies: func() ([]string, error) {
 			return n.paymentService.GetAcceptedCurrencies()
-		},
-		UpdateAllListings: func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error {
-			return n.listingService.UpdateAllListings(updateFunc, done)
 		},
 	})
 }

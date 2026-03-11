@@ -88,7 +88,6 @@ type mockNode struct {
 	setProfileMediaFunc  func(ctx context.Context, slot contracts.ProfileSlot, imageData []byte) (*contracts.UploadResult, error)
 	getProfileMediaFunc  func(ctx context.Context, peerID peer.ID, slot contracts.ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
 	setSelfAsModeratorFunc                  func(ctx context.Context, modInfo *models.ModeratorInfo, done chan struct{}) error
-	setModeratorsOnListingsFunc             func(mods []peer.ID, done chan struct{}) error
 	removeSelfAsModeratorFunc               func(ctx context.Context, done chan<- struct{}) error
 	getModeratorsFunc                       func(ctx context.Context) []peer.ID
 	getModeratorsAsyncFunc                  func(ctx context.Context) <-chan peer.ID
@@ -427,9 +426,6 @@ func (m *mockNode) GetModeratorsAsync(ctx context.Context) <-chan peer.ID {
 }
 func (m *mockNode) GetVerifiedModerators(ctx context.Context) []peer.ID {
 	return m.getVerifiedModeratorsFunc(ctx)
-}
-func (m *mockNode) SetModeratorsOnListings(mods []peer.ID, done chan struct{}) error {
-	return m.setModeratorsOnListingsFunc(mods, done)
 }
 func (m *mockNode) Publish(done chan<- struct{}) {
 	m.publishFunc(done)

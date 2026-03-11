@@ -119,6 +119,7 @@ func seedRepoOrder(t *testing.T, db *testDatabase, id string, role string, state
 		Open:   true,
 		Read:   false,
 	}
+	order.TenantID = database.StandaloneTenantID
 	order.SetFSMState(state)
 	require.NoError(t, db.gormDB.Create(order).Error)
 	return order
@@ -248,6 +249,7 @@ func TestGormOrderRepo_Save_CreateAndUpdate(t *testing.T) {
 	ctx := context.Background()
 
 	order := &models.Order{ID: "save-1", MyRole: "buyer", Open: true}
+	order.TenantID = database.StandaloneTenantID
 	order.SetFSMState(models.OrderState_PENDING)
 	require.NoError(t, repo.Save(ctx, order))
 

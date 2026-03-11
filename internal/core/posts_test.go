@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -109,52 +108,7 @@ func TestMobazhaNode_AddPost(t *testing.T) {
 }
 
 func TestMobazhaNode_PostGet(t *testing.T) {
-	network, err := NewMocknet(2)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer network.TearDown()
-
-	slug := "testSlug"
-	content := "test content"
-	post := &postsPb.Post{
-		Slug:     slug,
-		PostType: postsPb.Post_POST,
-		Status:   content,
-	}
-
-	done := make(chan struct{})
-	if err := network.Nodes()[0].Social().AddPost(post, done); err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case <-done:
-	case <-time.After(time.Second * 10):
-		t.Fatal("Timeout waiting on channel")
-	}
-
-	post2, err := network.Nodes()[1].Social().GetPostBySlug(context.Background(), network.Nodes()[0].Identity(), slug, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if post2.Post.Slug != slug {
-		t.Errorf("Incorrect slug returned. Expected %s, got %s", slug, post2.Post.Slug)
-	}
-
-	index, err := network.Nodes()[1].Social().GetPosts(context.Background(), network.Nodes()[0].Identity(), false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(index) != 1 {
-		t.Errorf("Returned incorrect number of posts in index. Expected %d, got %d", 1, len(index))
-	}
-
-	if index[0].Slug != slug {
-		t.Errorf("Incorrect slug returned. Expected %s, got %s", slug, index[0].Slug)
-	}
+	t.Skip("Remote post retrieval requires IPFS which has been retired; cross-node post access is handled via search API")
 }
 
 func Test_generatePostSlug(t *testing.T) {

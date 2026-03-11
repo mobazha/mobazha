@@ -51,8 +51,7 @@ func WithHostService(hs coreiface.HostService) NodeOption {
 //	 1   │ profileService       │                                         │
 //	 2   │ moderationService    │                                         │
 //	 3   │ listingService       │                                         │
-//	 4   │ paymentService       │ profileService (PeerProfileReader)       │ orderService (CancelableReleaser)
-//	     │                      │                                         │ fiatPaymentService (FiatPaymentQuery)
+//	 4   │ paymentService       │ profileService (PeerProfileReader)       │ fiatPaymentService (FiatPaymentQuery)
 //	 5   │ orderService         │ paymentService (EscrowOperations)        │
 //	     │                      │ listingService (ListingQuery)            │
 //	     │                      │ moderationService (ModeratorQuery)       │
@@ -105,12 +104,9 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initAnalyticsService()
 }
 
-// wireServiceSetters resolves circular dependencies and late-init wiring
-// via setter injection, after all primary services are constructed.
+// wireServiceSetters resolves late-init wiring via setter injection,
+// after all primary services are constructed.
 func (n *MobazhaNode) wireServiceSetters() {
-	if n.paymentService != nil && n.orderService != nil {
-		n.paymentService.SetCancelableReleaser(n.orderService)
-	}
 	if n.paymentService != nil && n.fiatPaymentService != nil {
 		n.paymentService.SetFiatPaymentQuery(n.fiatPaymentService)
 	}
@@ -347,8 +343,8 @@ func (n *MobazhaNode) buildDiscountRecorder() DiscountRedemptionRecorderFunc {
 // initPaymentService creates the PaymentAppService if the necessary
 // dependencies are available. Infrastructure-only nodes skip this.
 //
-// Note: CancelableReleaser and FiatPaymentQuery are wired via setters in
-// wireServiceSetters() to resolve circular/late-init dependencies.
+// Note: FiatPaymentQuery is wired via setter in wireServiceSetters()
+// to resolve late-init dependency.
 func (n *MobazhaNode) initPaymentService() {
 	if n.infrastructureOnly {
 		return

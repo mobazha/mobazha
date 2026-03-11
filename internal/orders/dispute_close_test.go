@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -134,10 +135,49 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 		},
 	}
 
+	buyerPayerAddr := "123"
 	paymentSent := &pb.PaymentSent{
-		Coin:      iwallet.CtMock.String(),
-		Moderator: "12D3KooWHnpVyu9XDeFoAVayqr9hvc9xPqSSHtCSFLEkKgcz5Wro",
-		Method:    pb.PaymentSent_MODERATED,
+		Coin:         iwallet.CtMock.String(),
+		Moderator:    "12D3KooWHnpVyu9XDeFoAVayqr9hvc9xPqSSHtCSFLEkKgcz5Wro",
+		Method:       pb.PaymentSent_MODERATED,
+		PayerAddress: buyerPayerAddr,
+	}
+
+	orderConfirmation := &pb.OrderConfirmation{
+		PayoutAddress: vendorAddress.String(),
+	}
+
+	disputeOpen := &pb.DisputeOpen{
+		OpenedBy:      pb.DisputeOpen_BUYER,
+		Reason:        "item not as described",
+		PayoutAddress: buyerPayerAddr,
+	}
+
+	setupNormal := func(order *models.Order) error {
+		order.ID = models.OrderID(orderID)
+		order.SetRole(models.RoleVendor)
+		if err := order.PutMessage(&npb.OrderMessage{
+			Signature: []byte("abc"), Message: mustBuildAny(orderOpen),
+			MessageType: npb.OrderMessage_ORDER_OPEN,
+		}); err != nil {
+			return err
+		}
+		if err := order.PutMessage(&npb.OrderMessage{
+			Signature: []byte("abc"), Message: mustBuildAny(paymentSent),
+			MessageType: npb.OrderMessage_PAYMENT_SENT,
+		}); err != nil {
+			return err
+		}
+		if err := order.PutMessage(&npb.OrderMessage{
+			Signature: []byte("abc"), Message: mustBuildAny(orderConfirmation),
+			MessageType: npb.OrderMessage_ORDER_CONFIRMATION,
+		}); err != nil {
+			return err
+		}
+		return order.PutMessage(&npb.OrderMessage{
+			Signature: []byte("abc"), Message: mustBuildAny(disputeOpen),
+			MessageType: npb.OrderMessage_DISPUTE_OPEN,
+		})
 	}
 
 	tests := []struct {
@@ -146,25 +186,8 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 		expectedEvent interface{}
 	}{
 		{
-			// Normal case where order open exists.
-			setup: func(order *models.Order) error {
-				order.ID = models.OrderID(orderID)
-				order.SetRole(models.RoleVendor)
-
-				err := order.PutMessage(&npb.OrderMessage{
-					Signature:   []byte("abc"),
-					Message:     mustBuildAny(orderOpen),
-					MessageType: npb.OrderMessage_ORDER_OPEN,
-				})
-				if err != nil {
-					return err
-				}
-				return order.PutMessage(&npb.OrderMessage{
-					Signature:   []byte("abc"),
-					Message:     mustBuildAny(paymentSent),
-					MessageType: npb.OrderMessage_PAYMENT_SENT,
-				})
-			},
+			// Normal case with valid addresses from payment + confirmation + dispute.
+			setup: setupNormal,
 			expectedError: nil,
 			expectedEvent: &events.DisputeClose{
 				OrderID: orderID,
@@ -302,5 +325,264 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error executing db update in test %d: %s", i, err)
 		}
+	}
+}
+
+func TestValidateDisputeResolution_AddressCheck(t *testing.T) {
+	op, teardown, err := newMockOrderProcessor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown()
+
+	wal, err := op.multiwallet.WalletForCurrencyCode(iwallet.CtMock.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	vendorAddr, err := wal.CurrentAddress()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const (
+		buyerPayerAddr  = "buyer_payer_addr"
+		buyerRefundAddr = "buyer_refund_addr"
+	)
+
+	baseRelease := func() *pb.DisputeClose_ModeratedEscrowRelease {
+		return &pb.DisputeClose_ModeratedEscrowRelease{
+			EscrowSignatures: []*pb.Signature{{From: []byte{0x00}, Signature: []byte{0x01}, Index: 0}},
+			Outpoints:        []*pb.Outpoint{{FromID: []byte{0x00}, Value: "10000"}},
+			BuyerAddress:     buyerPayerAddr,
+			BuyerAmount:      "5000",
+			VendorAddress:    vendorAddr.String(),
+			VendorAmount:     "4500",
+			ModeratorAddress: "mod_addr",
+			ModeratorAmount:  "500",
+		}
+	}
+
+	buildOrder := func(
+		payerAddr, refundAddr string,
+		confPayoutAddr string,
+		disputeOpener pb.DisputeOpen_Party,
+		disputePayoutAddr string,
+		disputeUpdatePayoutAddr string,
+	) *models.Order {
+		order := &models.Order{}
+		order.ID = "test-addr-check"
+
+		ps := &pb.PaymentSent{
+			Coin:          iwallet.CtMock.String(),
+			Moderator:     "12D3KooWHnpVyu9XDeFoAVayqr9hvc9xPqSSHtCSFLEkKgcz5Wro",
+			Method:        pb.PaymentSent_MODERATED,
+			PayerAddress:  payerAddr,
+			RefundAddress: refundAddr,
+		}
+		order.PutMessage(&npb.OrderMessage{
+			Signature: []byte("s"), Message: mustBuildAny(ps),
+			MessageType: npb.OrderMessage_PAYMENT_SENT,
+		})
+
+		if confPayoutAddr != "" {
+			conf := &pb.OrderConfirmation{PayoutAddress: confPayoutAddr}
+			order.PutMessage(&npb.OrderMessage{
+				Signature: []byte("s"), Message: mustBuildAny(conf),
+				MessageType: npb.OrderMessage_ORDER_CONFIRMATION,
+			})
+		}
+
+		if disputePayoutAddr != "" {
+			dOpen := &pb.DisputeOpen{
+				OpenedBy:      disputeOpener,
+				Reason:        "test",
+				PayoutAddress: disputePayoutAddr,
+			}
+			order.PutMessage(&npb.OrderMessage{
+				Signature: []byte("s"), Message: mustBuildAny(dOpen),
+				MessageType: npb.OrderMessage_DISPUTE_OPEN,
+			})
+		}
+
+		if disputeUpdatePayoutAddr != "" {
+			dUpdate := &pb.DisputeUpdate{
+				PayoutAddress: disputeUpdatePayoutAddr,
+			}
+			order.PutMessage(&npb.OrderMessage{
+				Signature: []byte("s"), Message: mustBuildAny(dUpdate),
+				MessageType: npb.OrderMessage_DISPUTE_UPDATE,
+			})
+		}
+		return order
+	}
+
+	tests := []struct {
+		name      string
+		order     *models.Order
+		release   *pb.DisputeClose_ModeratedEscrowRelease
+		wantErr   string
+	}{
+		{
+			name: "valid — buyer from PayerAddress, vendor from OrderConfirmation",
+			order: buildOrder(
+				buyerPayerAddr, buyerRefundAddr,
+				vendorAddr.String(),
+				pb.DisputeOpen_BUYER, buyerPayerAddr, vendorAddr.String(),
+			),
+			release: baseRelease(),
+			wantErr: "",
+		},
+		{
+			name: "valid — buyer from RefundAddress",
+			order: buildOrder(
+				"other_payer", buyerRefundAddr,
+				vendorAddr.String(),
+				pb.DisputeOpen_BUYER, "other_payer", vendorAddr.String(),
+			),
+			release: func() *pb.DisputeClose_ModeratedEscrowRelease {
+				r := baseRelease()
+				r.BuyerAddress = buyerRefundAddr
+				return r
+			}(),
+			wantErr: "",
+		},
+		{
+			name: "valid — vendor from DisputeUpdate (buyer opened)",
+			order: buildOrder(
+				buyerPayerAddr, "",
+				"",
+				pb.DisputeOpen_BUYER, buyerPayerAddr, vendorAddr.String(),
+			),
+			release: baseRelease(),
+			wantErr: "",
+		},
+		{
+			name: "valid — buyer from DisputeUpdate (vendor opened)",
+			order: buildOrder(
+				"", "",
+				vendorAddr.String(),
+				pb.DisputeOpen_VENDOR, vendorAddr.String(), buyerPayerAddr,
+			),
+			release: baseRelease(),
+			wantErr: "",
+		},
+		{
+			name: "reject — unknown buyer address",
+			order: buildOrder(
+				buyerPayerAddr, buyerRefundAddr,
+				vendorAddr.String(),
+				pb.DisputeOpen_BUYER, buyerPayerAddr, vendorAddr.String(),
+			),
+			release: func() *pb.DisputeClose_ModeratedEscrowRelease {
+				r := baseRelease()
+				r.BuyerAddress = "attacker_addr"
+				return r
+			}(),
+			wantErr: "buyer payout address attacker_addr not in allowed set",
+		},
+		{
+			name: "reject — unknown vendor address",
+			order: buildOrder(
+				buyerPayerAddr, "",
+				vendorAddr.String(),
+				pb.DisputeOpen_BUYER, buyerPayerAddr, vendorAddr.String(),
+			),
+			release: func() *pb.DisputeClose_ModeratedEscrowRelease {
+				r := baseRelease()
+				r.VendorAddress = "attacker_vendor"
+				return r
+			}(),
+			wantErr: "vendor payout address attacker_vendor not in allowed set",
+		},
+		{
+			name: "exempt — zero buyer amount skips buyer address check",
+			order: buildOrder(
+				buyerPayerAddr, "",
+				vendorAddr.String(),
+				pb.DisputeOpen_BUYER, buyerPayerAddr, vendorAddr.String(),
+			),
+			release: func() *pb.DisputeClose_ModeratedEscrowRelease {
+				r := baseRelease()
+				r.BuyerAddress = "any_garbage"
+				r.BuyerAmount = "0"
+				return r
+			}(),
+			wantErr: "",
+		},
+		{
+			name: "exempt — zero vendor amount skips vendor address check",
+			order: buildOrder(
+				buyerPayerAddr, "",
+				vendorAddr.String(),
+				pb.DisputeOpen_BUYER, buyerPayerAddr, "",
+			),
+			release: func() *pb.DisputeClose_ModeratedEscrowRelease {
+				r := baseRelease()
+				r.VendorAddress = "any_garbage"
+				r.VendorAmount = "0"
+				return r
+			}(),
+			wantErr: "",
+		},
+		{
+			name: "reject — nil release info",
+			order: buildOrder(
+				buyerPayerAddr, "",
+				vendorAddr.String(),
+				pb.DisputeOpen_BUYER, buyerPayerAddr, vendorAddr.String(),
+			),
+			release: nil,
+			wantErr: "missing release info",
+		},
+		{
+			name: "reject — no outpoints",
+			order: buildOrder(
+				buyerPayerAddr, "",
+				vendorAddr.String(),
+				pb.DisputeOpen_BUYER, buyerPayerAddr, vendorAddr.String(),
+			),
+			release: func() *pb.DisputeClose_ModeratedEscrowRelease {
+				r := baseRelease()
+				r.Outpoints = nil
+				return r
+			}(),
+			wantErr: "no tx input",
+		},
+		{
+			name: "reject — no moderator signature",
+			order: buildOrder(
+				buyerPayerAddr, "",
+				vendorAddr.String(),
+				pb.DisputeOpen_BUYER, buyerPayerAddr, vendorAddr.String(),
+			),
+			release: func() *pb.DisputeClose_ModeratedEscrowRelease {
+				r := baseRelease()
+				r.EscrowSignatures = nil
+				return r
+			}(),
+			wantErr: "no moderator signature",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dc := &pb.DisputeClose{
+				Verdict:     "test",
+				ReleaseInfo: tt.release,
+			}
+			err := op.validateDisputeResolution(dc, tt.order)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("expected no error, got: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("expected error containing %q, got: %v", tt.wantErr, err)
+				}
+			}
+		})
 	}
 }

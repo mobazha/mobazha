@@ -616,6 +616,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		return nil, fmt.Errorf("failed to create signer: %w", err)
 	}
 	obNode.signer = signer
+	obNode.orderLockManager = NewOrderLockManager()
 
 	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
 		NodeID:               nodeID,
@@ -1226,6 +1227,7 @@ func newLightweightNode(
 		return nil, fmt.Errorf("lightweight: failed to create signer: %w", err)
 	}
 	obNode.signer = signer
+	obNode.orderLockManager = NewOrderLockManager()
 
 	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
 		NodeID:                   nodeID,

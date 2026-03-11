@@ -93,9 +93,12 @@ func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *mo
 	return event, order.PutMessage(message)
 }
 
-// validateDisputeResolution - validate dispute resolution
+// validateDisputeResolution validates the dispute resolution including payout address integrity.
 func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClose, order *models.Order) error {
 	releaseInfo := disputeClose.ReleaseInfo
+	if releaseInfo == nil {
+		return errors.New("dispute resolution missing release info")
+	}
 
 	if len(releaseInfo.Outpoints) == 0 {
 		return errors.New("no tx input in dispute resolution")
@@ -115,6 +118,56 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 	_, err = op.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
 	if err != nil {
 		return fmt.Errorf("cannot validate order. coin not supported. %w", err)
+	}
+
+	buyerAddrs := newAddressSet(paymentSent.Coin)
+	buyerAddrs.Add(paymentSent.PayerAddress)
+	buyerAddrs.Add(paymentSent.RefundAddress)
+
+	vendorAddrs := newAddressSet(paymentSent.Coin)
+	if conf, err := order.OrderConfirmationMessage(); err == nil {
+		vendorAddrs.Add(conf.PayoutAddress)
+	}
+	if ffs, err := order.OrderFulfillmentMessages(); err == nil {
+		for _, ff := range ffs {
+			if ff.ReleaseInfo != nil {
+				vendorAddrs.Add(ff.ReleaseInfo.ToAddress)
+			}
+		}
+	}
+
+	if disputeOpen, err := order.DisputeOpenMessage(); err == nil {
+		switch disputeOpen.OpenedBy {
+		case pb.DisputeOpen_BUYER:
+			buyerAddrs.Add(disputeOpen.PayoutAddress)
+		case pb.DisputeOpen_VENDOR:
+			vendorAddrs.Add(disputeOpen.PayoutAddress)
+		default:
+			return fmt.Errorf("unknown dispute opener: %v", disputeOpen.OpenedBy)
+		}
+
+		if disputeUpdate, err := order.DisputeUpdateMessage(); err == nil {
+			switch disputeOpen.OpenedBy {
+			case pb.DisputeOpen_BUYER:
+				vendorAddrs.Add(disputeUpdate.PayoutAddress)
+			case pb.DisputeOpen_VENDOR:
+				buyerAddrs.Add(disputeUpdate.PayoutAddress)
+			}
+		}
+	}
+
+	if !isZeroAmount(releaseInfo.BuyerAmount) {
+		if !buyerAddrs.Contains(releaseInfo.BuyerAddress) {
+			return fmt.Errorf("buyer payout address %s not in allowed set for order %s",
+				releaseInfo.BuyerAddress, order.ID)
+		}
+	}
+
+	if !isZeroAmount(releaseInfo.VendorAmount) {
+		if !vendorAddrs.Contains(releaseInfo.VendorAddress) {
+			return fmt.Errorf("vendor payout address %s not in allowed set for order %s",
+				releaseInfo.VendorAddress, order.ID)
+		}
 	}
 
 	return nil

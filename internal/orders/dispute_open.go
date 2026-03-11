@@ -114,7 +114,6 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 			// For buyer, the payout address is the payer address
 			payoutAddress = iwallet.NewAddress(paymentSent.PayerAddress, iwallet.CoinType(paymentSent.Coin))
 		} else {
-			// For vendor, the payout address is the payout address of the order confirmation
 			orderConfirmation, err := order.OrderConfirmationMessage()
 			if err != nil {
 				logger.LogErrorWithIDf(log, op.nodeID, "Failed to get order confirmation message: %v", err)
@@ -122,10 +121,19 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 				payoutAddress = iwallet.NewAddress(orderConfirmation.PayoutAddress, iwallet.CoinType(paymentSent.Coin))
 			}
 
-			// If order fulfillment exists, the payout address is the to address of the first order fulfillment
 			orderFulfillments, err := order.OrderFulfillmentMessages()
 			if len(orderFulfillments) > 0 && err == nil {
 				payoutAddress = iwallet.NewAddress(orderFulfillments[0].ReleaseInfo.ToAddress, iwallet.CoinType(paymentSent.Coin))
+			}
+
+			if payoutAddress.String() == "" {
+				addr, err := op.GetPayoutAddress(dbtx, paymentSent.Coin)
+				if err == nil {
+					payoutAddress = addr
+				} else {
+					logger.LogErrorWithIDf(log, op.nodeID,
+						"Vendor has no payout address for dispute update, order: %s", order.ID)
+				}
 			}
 		}
 

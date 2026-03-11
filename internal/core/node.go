@@ -160,6 +160,7 @@ type lifecycleFields struct {
 	initialBootstrapChan chan struct{}
 	shutdown             chan struct{}
 	stopped              int32
+	orderLockManager     *OrderLockManager
 }
 
 // appServices groups all extracted App Service dependencies.
@@ -342,6 +343,9 @@ func (n *MobazhaNode) Stop(force bool) error {
 		}
 		if n.orderProcessor != nil {
 			n.orderProcessor.Stop()
+		}
+		if n.orderLockManager != nil {
+			n.orderLockManager.Stop()
 		}
 		if n.followerTracker != nil {
 			n.followerTracker.Close()

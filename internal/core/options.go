@@ -261,6 +261,7 @@ func (n *MobazhaNode) initOrderService() {
 		PeerID:         n.Identity,
 		Testnet:        n.testnet,
 		ExchangeRates:  n.exchangeRates,
+		OrderLockMgr:   n.orderLockManager,
 
 		GetPayoutAddr: func(coinType string) (iwallet.Address, error) {
 			return n.paymentService.GetPayoutAddress(coinType)

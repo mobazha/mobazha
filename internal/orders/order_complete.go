@@ -44,6 +44,11 @@ func (op *OrderProcessor) processOrderCompleteMessage(dbtx database.Tx, order *m
 		return nil, err
 	}
 
+	if len(order.SerializedOrderFulfillments) == 0 {
+		logger.LogInfoWithIDf(log, op.nodeID, "Parking ORDER_COMPLETE for order %s: awaiting fulfillment", order.ID)
+		return nil, order.ParkMessage(message)
+	}
+
 	if len(complete.Ratings) != len(orderOpen.Items) {
 		return nil, errors.New("number of ratings does not equal number of items in the order")
 	}

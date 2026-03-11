@@ -348,6 +348,13 @@ func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) erro
 		return err
 	}
 
+	if n.orderLockManager != nil {
+		if err := n.orderLockManager.Lock(n.nodeCtx, n.nodeID, orderMsg.OrderID); err != nil {
+			return fmt.Errorf("failed to acquire order lock for %s: %w", orderMsg.OrderID, err)
+		}
+		defer n.orderLockManager.Unlock(n.nodeID, orderMsg.OrderID)
+	}
+
 	var event interface{}
 	var order models.Order
 	err := n.db.Update(func(tx database.Tx) error {

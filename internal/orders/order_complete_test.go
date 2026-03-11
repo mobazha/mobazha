@@ -196,13 +196,15 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 		Chaincode: hex.EncodeToString(chaincode),
 	}
 
+	fulfillment := &pb.OrderFulfillment{}
+
 	tests := []struct {
 		setup         func(order *models.Order) error
 		expectedError error
 		expectedEvent interface{}
 	}{
 		{
-			// Normal case where order open exists.
+			// Normal case where order open and fulfillment exist.
 			setup: func(order *models.Order) error {
 				order.SetRole(models.RoleVendor)
 				order.ID = models.OrderID(orderID)
@@ -213,10 +215,17 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				return order.PutMessage(&npb.OrderMessage{
+				if err := order.PutMessage(&npb.OrderMessage{
 					Signature:   []byte("abc"),
 					Message:     mustBuildAny(paymentSent),
 					MessageType: npb.OrderMessage_PAYMENT_SENT,
+				}); err != nil {
+					return err
+				}
+				return order.PutMessage(&npb.OrderMessage{
+					Signature:   []byte("abc"),
+					Message:     mustBuildAny(fulfillment),
+					MessageType: npb.OrderMessage_ORDER_FULFILLMENT,
 				})
 			},
 			expectedError: nil,
@@ -270,6 +279,27 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 			setup: func(order *models.Order) error {
 				order.SerializedOrderOpen = nil
 				return nil
+			},
+			expectedError: nil,
+			expectedEvent: nil,
+		},
+		{
+			// Missing fulfillment — should park the message.
+			setup: func(order *models.Order) error {
+				order.SetRole(models.RoleVendor)
+				order.ID = models.OrderID(orderID)
+				err := order.PutMessage(&npb.OrderMessage{
+					Signature: []byte("abc"),
+					Message:   mustBuildAny(orderOpen),
+				})
+				if err != nil {
+					return err
+				}
+				return order.PutMessage(&npb.OrderMessage{
+					Signature:   []byte("abc"),
+					Message:     mustBuildAny(paymentSent),
+					MessageType: npb.OrderMessage_PAYMENT_SENT,
+				})
 			},
 			expectedError: nil,
 			expectedEvent: nil,

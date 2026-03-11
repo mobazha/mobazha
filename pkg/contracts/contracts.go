@@ -97,7 +97,7 @@ type OrderService interface {
 	EstimateOrderTotal(ctx context.Context, purchase *models.Purchase) (models.OrderTotals, error)
 	GetOrderInfo(orderID models.OrderID, coinType iwallet.CoinType) (*models.OrderInfo, error)
 	ProcessOrderPayment(ctx context.Context, paymentData *models.PaymentData) error
-	RejectOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
+	DeclineOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
 	RefundOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error
 	GetConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string, payoutAddress string) (coinType iwallet.CoinType, instructions any, err error)
@@ -113,7 +113,7 @@ type OrderService interface {
 	// For EVM/Solana, these build instructions, relay via platform gas wallet, then complete the action.
 	// Returns ErrRelayNotAvailable if relay service is not configured.
 	RefundOrderViaRelay(orderID models.OrderID, done chan struct{}) error
-	RejectOrderViaRelay(orderID models.OrderID, reason string, done chan struct{}) error
+	DeclineOrderViaRelay(orderID models.OrderID, reason string, done chan struct{}) error
 	CancelOrderViaRelay(orderID models.OrderID, done chan struct{}) error
 
 	GetOrder(orderID string) (*models.Order, error)

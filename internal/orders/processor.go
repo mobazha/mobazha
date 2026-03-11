@@ -132,7 +132,7 @@ func (op *OrderProcessor) Stop() {
 // ## Handler Guards (FSM-Covered)
 //
 // Individual handlers still contain their own state guards (e.g., checking if
-// SerializedOrderConfirmation != nil before processing ORDER_REJECT). These guards
+// SerializedOrderConfirmation != nil before processing ORDER_DECLINE). These guards
 // are now redundant with the FSM validation but are retained as defense-in-depth
 // during the transition period. They are marked with "FSM-covered" comments and
 // can be progressively removed once the FSM has proven stable in production.
@@ -232,8 +232,8 @@ func (op *OrderProcessor) ProcessACK(tx database.Tx, om *models.OutgoingMessage)
 	switch orderMessage.MessageType {
 	case npb.OrderMessage_ORDER_OPEN:
 		key = "order_open_acked"
-	case npb.OrderMessage_ORDER_REJECT:
-		key = "order_reject_acked"
+	case npb.OrderMessage_ORDER_DECLINE:
+		key = "order_decline_acked"
 	case npb.OrderMessage_ORDER_CANCEL:
 		key = "order_cancel_acked"
 	case npb.OrderMessage_ORDER_CONFIRMATION:
@@ -347,8 +347,8 @@ func (op *OrderProcessor) processMessage(dbtx database.Tx, order *models.Order, 
 		event, err = op.processPaymentSentMessage(dbtx, order, message)
 	case npb.OrderMessage_RATING_SIGNATURES:
 		event, err = op.processRatingSignaturesMessage(dbtx, order, message)
-	case npb.OrderMessage_ORDER_REJECT:
-		event, err = op.processOrderRejectMessage(dbtx, order, message)
+	case npb.OrderMessage_ORDER_DECLINE:
+		event, err = op.processOrderDeclineMessage(dbtx, order, message)
 	case npb.OrderMessage_ORDER_CONFIRMATION:
 		event, err = op.processOrderConfirmationMessage(dbtx, order, message)
 	case npb.OrderMessage_ORDER_CANCEL:

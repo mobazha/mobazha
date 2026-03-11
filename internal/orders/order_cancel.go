@@ -30,8 +30,8 @@ func (op *OrderProcessor) processOrderCancelMessage(dbtx database.Tx, order *mod
 		return nil, nil
 	}
 
-	if order.SerializedOrderReject != nil {
-		logger.LogInfoWithIDf(log, op.nodeID, "Possible race: Received ORDER_CANCEL message for order %s after ORDER_REJECT", order.ID)
+	if order.SerializedOrderDecline != nil {
+		logger.LogInfoWithIDf(log, op.nodeID, "Possible race: Received ORDER_CANCEL message for order %s after ORDER_DECLINE", order.ID)
 	}
 
 	if order.SerializedOrderConfirmation != nil {
@@ -115,7 +115,7 @@ func (op *OrderProcessor) releaseFromCancelableAddress(tx database.Tx, order *mo
 	var toAddress iwallet.Address
 
 	if order.Role() == models.RoleBuyer {
-		// Buyer receiving ORDER_REJECT or ORDER_CANCEL: refund to refund address
+		// Buyer receiving ORDER_DECLINE or ORDER_CANCEL: refund to refund address
 		if paymentSent.PayerAddress == "" {
 			return nil, "", errors.New("refund address is empty")
 		}

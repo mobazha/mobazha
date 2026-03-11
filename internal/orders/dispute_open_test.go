@@ -167,9 +167,9 @@ func TestOrderProcessor_processDisputeOpenMessage(t *testing.T) {
 			expectedEvent: nil,
 		},
 		{
-			// OrderReject already exists.
+			// OrderDecline already exists.
 			setup: func(order *models.Order) error {
-				order.SerializedOrderReject = []byte{0x00}
+				order.SerializedOrderDecline = []byte{0x00}
 				return nil
 			},
 			expectedError: ErrUnexpectedMessage,

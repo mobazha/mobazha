@@ -47,8 +47,8 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 		return nil, ErrUnexpectedMessage
 	}
 
-	if order.SerializedOrderReject != nil {
-		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_OPEN message for order %s after ORDER_REJECT", order.ID)
+	if order.SerializedOrderDecline != nil {
+		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_OPEN message for order %s after ORDER_DECLINE", order.ID)
 		return nil, ErrUnexpectedMessage
 	}
 

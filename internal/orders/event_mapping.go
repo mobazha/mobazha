@@ -31,9 +31,9 @@ func MessageTypeToEvent(
 		// Vendor confirms/accepts the order.
 		return coreorders.EventVendorConfirm
 
-	case npb.OrderMessage_ORDER_REJECT:
-		// Vendor rejects the order.
-		return coreorders.EventVendorReject
+	case npb.OrderMessage_ORDER_DECLINE:
+		// Vendor declines the order.
+		return coreorders.EventVendorDecline
 
 	case npb.OrderMessage_ORDER_CANCEL:
 		return mapCancelEvent(order, senderPeerID)

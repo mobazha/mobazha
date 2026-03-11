@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.5
 
 // Use local mobazha-core for development
-replace github.com/mobazha/mobazha-core => /Users/mingfeng/dev/mobazha/core
+replace github.com/mobazha/mobazha-core => /home/mingfeng/dev/mobazha/core
 
 require (
 	github.com/btcsuite/btcd v0.25.0

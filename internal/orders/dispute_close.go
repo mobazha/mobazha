@@ -38,8 +38,8 @@ func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *mo
 		return nil, ErrUnexpectedMessage
 	}
 
-	if order.SerializedOrderReject != nil {
-		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_CLOSE message for order %s after ORDER_REJECT", order.ID)
+	if order.SerializedOrderDecline != nil {
+		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_CLOSE message for order %s after ORDER_DECLINE", order.ID)
 		return nil, ErrUnexpectedMessage
 	}
 

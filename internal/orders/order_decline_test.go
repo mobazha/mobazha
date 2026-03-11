@@ -3,32 +3,20 @@ package orders
 import (
 	"crypto/rand"
 	"fmt"
-
-	"github.com/mobazha/mobazha3.0/internal/database"
-
 	"reflect"
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
-	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func mustBuildAny(msg protoreflect.ProtoMessage) *anypb.Any {
-	a := &anypb.Any{}
-	if err := a.MarshalFrom(msg); err != nil {
-		panic(err)
-	}
-	return a
-}
-
-func TestOrderProcessor_processCancelMessage(t *testing.T) {
+func TestOrderProcessor_processOrderDeclineMessage(t *testing.T) {
 	op, teardown, err := newMockOrderProcessor()
 	if err != nil {
 		t.Fatal(err)
@@ -43,29 +31,27 @@ func TestOrderProcessor_processCancelMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	remotePeer, err := peer.IDFromPublicKey(pub)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	orderID := "1234"
 
-	cancelMsg := &pb.OrderCancel{}
+	orderDecline := &pb.OrderDecline{
+		Type:   pb.OrderDecline_VALIDATION_ERROR,
+		Reason: "Test",
+	}
 
-	cancelAny := &anypb.Any{}
-	if err := cancelAny.MarshalFrom(cancelMsg); err != nil {
+	declineAny := &anypb.Any{}
+	if err := declineAny.MarshalFrom(orderDecline); err != nil {
 		t.Fatal(err)
 	}
 
 	orderMsg := &npb.OrderMessage{
 		OrderID:     orderID,
-		MessageType: npb.OrderMessage_ORDER_CANCEL,
-		Message:     cancelAny,
+		MessageType: npb.OrderMessage_ORDER_DECLINE,
+		Message:     declineAny,
 	}
 
 	var (
-		buyerPeerID    = remotePeer.String()
-		buyerHandle    = "abc"
+		vendorPeerID   = "xyz"
+		vendorHandle   = "abc"
 		smallImageHash = "aaaa"
 		tinyImageHash  = "bbbb"
 	)
@@ -73,6 +59,13 @@ func TestOrderProcessor_processCancelMessage(t *testing.T) {
 		Listings: []*pb.SignedListing{
 			{
 				Listing: &pb.Listing{
+					VendorID: &pb.ID{
+						PeerID: vendorPeerID,
+						Handle: vendorHandle,
+						Pubkeys: &pb.ID_Pubkeys{
+							Identity: pubkeyBytes,
+						},
+					},
 					Item: &pb.Listing_Item{
 						Images: []*pb.Image{
 							{
@@ -84,15 +77,7 @@ func TestOrderProcessor_processCancelMessage(t *testing.T) {
 				},
 			},
 		},
-		BuyerID: &pb.ID{
-			PeerID: buyerPeerID,
-			Handle: buyerHandle,
-			Pubkeys: &pb.ID_Pubkeys{
-				Identity: pubkeyBytes,
-			},
-		},
 	}
-
 	paymentSent := &pb.PaymentSent{
 		Coin: iwallet.CtMock.String(),
 	}
@@ -105,12 +90,10 @@ func TestOrderProcessor_processCancelMessage(t *testing.T) {
 		{
 			// Normal case where order open exists.
 			setup: func(order *models.Order) error {
-				order.ID = models.OrderID(orderID)
-
+				order.ID = "1234"
 				err := order.PutMessage(&npb.OrderMessage{
-					Signature:   []byte("abc"),
-					Message:     mustBuildAny(orderOpen),
-					MessageType: npb.OrderMessage_ORDER_OPEN,
+					Signature: []byte("abc"),
+					Message:   mustBuildAny(orderOpen),
 				})
 				if err != nil {
 					return err
@@ -122,24 +105,15 @@ func TestOrderProcessor_processCancelMessage(t *testing.T) {
 				})
 			},
 			expectedError: nil,
-			expectedEvent: &events.OrderCancel{
-				OrderID: orderID,
+			expectedEvent: &events.OrderDeclined{
+				OrderID: "1234",
 				Thumbnail: events.Thumbnail{
 					Tiny:  tinyImageHash,
 					Small: smallImageHash,
 				},
-				BuyerHandle: buyerHandle,
-				BuyerID:     buyerPeerID,
+				VendorHandle: vendorHandle,
+				VendorID:     vendorPeerID,
 			},
-		},
-		{
-			// Order decline already exists.
-			setup: func(order *models.Order) error {
-				order.SerializedOrderDecline = []byte{0x00}
-				return nil
-			},
-			expectedError: nil,
-			expectedEvent: nil,
 		},
 		{
 			// Order confirmation already exists.
@@ -148,19 +122,43 @@ func TestOrderProcessor_processCancelMessage(t *testing.T) {
 				order.SerializedOrderConfirmation = []byte{0x00}
 				return nil
 			},
+			expectedError: ErrUnexpectedMessage,
+			expectedEvent: nil,
+		},
+		{
+			// Order cancel already exists.
+			setup: func(order *models.Order) error {
+				order.SerializedOrderDecline = nil
+				order.SerializedOrderCancel = []byte{0x00}
+				return nil
+			},
 			expectedError: nil,
 			expectedEvent: nil,
 		},
 		{
-			// Duplicate order cancel.
+			// Duplicate order decline.
 			setup: func(order *models.Order) error {
 				return order.PutMessage(&npb.OrderMessage{
 					Signature:   []byte("abc"),
-					Message:     mustBuildAny(cancelMsg),
-					MessageType: npb.OrderMessage_ORDER_CANCEL,
+					Message:     mustBuildAny(orderDecline),
+					MessageType: npb.OrderMessage_ORDER_DECLINE,
 				})
 			},
 			expectedError: nil,
+			expectedEvent: nil,
+		},
+		{
+			// Duplicate but different.
+			setup: func(order *models.Order) error {
+				msg2 := *orderDecline
+				msg2.Type = pb.OrderDecline_USER_DECLINE
+				return order.PutMessage(&npb.OrderMessage{
+					Signature:   []byte("abc"),
+					Message:     mustBuildAny(&msg2),
+					MessageType: npb.OrderMessage_ORDER_DECLINE,
+				})
+			},
+			expectedError: ErrChangedMessage,
 			expectedEvent: nil,
 		},
 		{
@@ -181,7 +179,7 @@ func TestOrderProcessor_processCancelMessage(t *testing.T) {
 			continue
 		}
 		err := op.db.Update(func(tx database.Tx) error {
-			event, err := op.processOrderCancelMessage(tx, order, orderMsg)
+			event, err := op.processOrderDeclineMessage(tx, order, orderMsg)
 			if err != test.expectedError {
 				return fmt.Errorf("incorrect error returned. Expected %t, got %t", test.expectedError, err)
 			}

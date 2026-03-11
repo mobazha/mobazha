@@ -231,7 +231,7 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 					MessageType: npb.OrderMessage_ORDER_OPEN,
 				})
 
-				order.SerializedOrderReject = []byte{0x00}
+				order.SerializedOrderDecline = []byte{0x00}
 				return err
 			},
 			expectedError: ErrUnexpectedMessage,

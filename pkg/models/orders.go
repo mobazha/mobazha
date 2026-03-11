@@ -118,9 +118,9 @@ type Order struct {
 	PaymentSentSignature  string
 	PaymentVerified       bool // chain-verified; gates financial operations (auto-confirm, funded events)
 
-	SerializedOrderReject []byte
-	OrderRejectSignature  string
-	OrderRejectAcked      bool
+	SerializedOrderDecline []byte
+	OrderDeclineSignature  string
+	OrderDeclineAcked      bool
 
 	SerializedOrderCancel []byte
 	OrderCancelSignature  string
@@ -412,16 +412,16 @@ func (o *Order) ClearPendingPaymentInfo() {
 	// Keep PaymentAddress for reference (e.g., for displaying in UI)
 }
 
-// OrderRejectMessage returns the unmarshalled proto object if it exists in the order.
-func (o *Order) OrderRejectMessage() (*pb.OrderReject, error) {
-	if len(o.SerializedOrderReject) == 0 {
+// OrderDeclineMessage returns the unmarshalled proto object if it exists in the order.
+func (o *Order) OrderDeclineMessage() (*pb.OrderDecline, error) {
+	if len(o.SerializedOrderDecline) == 0 {
 		return nil, ErrMessageDoesNotExist
 	}
-	orderReject := new(pb.OrderReject)
-	if err := unmarshaler.Unmarshal(o.SerializedOrderReject, orderReject); err != nil {
+	orderDecline := new(pb.OrderDecline)
+	if err := unmarshaler.Unmarshal(o.SerializedOrderDecline, orderDecline); err != nil {
 		return nil, err
 	}
-	return orderReject, nil
+	return orderDecline, nil
 }
 
 // OrderCancelMessage returns the unmarshalled proto object if it exists in the order.
@@ -590,10 +590,10 @@ func (o *Order) PutMessage(message *npb.OrderMessage) error {
 		msg = new(pb.OrderOpen)
 		setMessage = func(ser []byte) { o.SerializedOrderOpen = ser }
 		o.OrderOpenSignature = sig
-	case npb.OrderMessage_ORDER_REJECT:
-		msg = new(pb.OrderReject)
-		setMessage = func(ser []byte) { o.SerializedOrderReject = ser }
-		o.OrderRejectSignature = sig
+	case npb.OrderMessage_ORDER_DECLINE:
+		msg = new(pb.OrderDecline)
+		setMessage = func(ser []byte) { o.SerializedOrderDecline = ser }
+		o.OrderDeclineSignature = sig
 	case npb.OrderMessage_ORDER_CANCEL:
 		msg = new(pb.OrderCancel)
 		setMessage = func(ser []byte) { o.SerializedOrderCancel = ser }
@@ -801,22 +801,22 @@ func (o *Order) GetErroredMessages() (*npb.OrderList, error) {
 	return erroredMessages, nil
 }
 
-// CanReject returns whether or not this order is in a state where the user can
-// reject the order.
-func (o *Order) CanReject() bool {
+// CanDecline returns whether or not this order is in a state where the user can
+// decline the order.
+func (o *Order) CanDecline() bool {
 	// OrderOpen must exist.
 	_, err := o.OrderOpenMessage()
 	if err != nil {
 		return false
 	}
 
-	// Only vendors can reject.
+	// Only vendors can decline.
 	if o.Role() != RoleVendor {
 		return false
 	}
 
 	// Cannot cancel if the order has progressed passed order open.
-	if o.SerializedOrderReject != nil || o.SerializedOrderCancel != nil ||
+	if o.SerializedOrderDecline != nil || o.SerializedOrderCancel != nil ||
 		o.SerializedOrderConfirmation != nil || o.SerializedOrderFulfillments != nil ||
 		o.SerializedOrderComplete != nil || o.SerializedDisputeOpen != nil ||
 		o.SerializedDisputeUpdate != nil || o.SerializedDisputeClosed != nil ||
@@ -847,7 +847,7 @@ func (o *Order) CanConfirm() bool {
 	}
 
 	// Cannot confirm if the order has progressed passed order open.
-	if o.SerializedOrderReject != nil || o.SerializedOrderCancel != nil ||
+	if o.SerializedOrderDecline != nil || o.SerializedOrderCancel != nil ||
 		o.SerializedOrderConfirmation != nil || o.SerializedOrderFulfillments != nil ||
 		o.SerializedOrderComplete != nil || o.SerializedDisputeOpen != nil ||
 		o.SerializedDisputeUpdate != nil || o.SerializedDisputeClosed != nil ||
@@ -873,7 +873,7 @@ func (o *Order) CanCancel() bool {
 	}
 
 	// Cannot cancel if the order has progressed passed order open.
-	if o.SerializedOrderReject != nil || o.SerializedOrderCancel != nil ||
+	if o.SerializedOrderDecline != nil || o.SerializedOrderCancel != nil ||
 		o.SerializedOrderConfirmation != nil || o.SerializedOrderFulfillments != nil ||
 		o.SerializedOrderComplete != nil || o.SerializedDisputeOpen != nil ||
 		o.SerializedDisputeUpdate != nil || o.SerializedDisputeClosed != nil ||
@@ -1056,7 +1056,7 @@ func (o *Order) DeriveState() OrderState {
 		return OrderState_CANCELED
 	}
 
-	if cloneOrder.SerializedOrderReject != nil {
+	if cloneOrder.SerializedOrderDecline != nil {
 		return OrderState_DECLINED
 	}
 
@@ -1246,7 +1246,7 @@ func (o *Order) toProtobuf() (*pb.Contract, error) {
 	if err != nil && !errors.Is(err, ErrMessageDoesNotExist) {
 		return nil, err
 	}
-	contract.OrderReject, err = o.OrderRejectMessage()
+	contract.OrderDecline, err = o.OrderDeclineMessage()
 	if err != nil && !errors.Is(err, ErrMessageDoesNotExist) {
 		return nil, err
 	}
@@ -1347,7 +1347,7 @@ func (o *Order) toProtobuf() (*pb.Contract, error) {
 	contract.Transactions = transactions
 
 	contract.OrderOpenAcked = o.OrderOpenAcked
-	contract.OrderRejectAcked = o.OrderRejectAcked
+	contract.OrderDeclineAcked = o.OrderDeclineAcked
 	contract.OrderCancelAcked = o.OrderCancelAcked
 	contract.OrderConfirmationAcked = o.OrderConfirmationAcked
 	contract.OrderCompleteAcked = o.OrderCompleteAcked

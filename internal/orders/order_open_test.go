@@ -162,8 +162,8 @@ func TestOrderProcessor_processOrderOpenMessage(t *testing.T) {
 				}
 			}
 
-			if test.errorResponseSent && order.SerializedOrderReject == nil {
-				t.Errorf("Test %d: failed to save order reject message", i)
+			if test.errorResponseSent && order.SerializedOrderDecline == nil {
+				t.Errorf("Test %d: failed to save order decline message", i)
 			}
 			if test.errorResponseSent && event != nil {
 				t.Errorf("Test %d: event returned when validation failed", i)

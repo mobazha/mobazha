@@ -54,7 +54,7 @@ type mockNode struct {
 	completeOrderFunc                       func(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	cancelOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	refundOrderViaRelayFunc                 func(orderID models.OrderID, done chan struct{}) error
-	rejectOrderViaRelayFunc                 func(orderID models.OrderID, reason string, done chan struct{}) error
+	declineOrderViaRelayFunc                 func(orderID models.OrderID, reason string, done chan struct{}) error
 	cancelOrderViaRelayFunc                 func(orderID models.OrderID, done chan struct{}) error
 	openDisputeFunc                         func(orderID models.OrderID, reason string, done chan struct{}) error
 	closeDisputeFunc                        func(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
@@ -115,7 +115,7 @@ type mockNode struct {
 	estimateOrderTotalFunc                  func(ctx context.Context, purchase *models.Purchase) (models.OrderTotals, error)
 	getOrderInfoFunc                        func(orderID models.OrderID, coinType iwallet.CoinType) (*models.OrderInfo, error)
 	processOrderPaymentFunc                 func(ctx context.Context, paymentData *models.PaymentData) error
-	rejectOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
+	declineOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
 	refundOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	pingNodeFunc                            func(ctx context.Context, peer peer.ID) error
 	getUserPreferencesFunc                  func() (*models.UserPreferences, error)
@@ -291,9 +291,9 @@ func (m *mockNode) RefundOrderViaRelay(orderID models.OrderID, done chan struct{
 	}
 	return nil
 }
-func (m *mockNode) RejectOrderViaRelay(orderID models.OrderID, reason string, done chan struct{}) error {
-	if m.rejectOrderViaRelayFunc != nil {
-		return m.rejectOrderViaRelayFunc(orderID, reason, done)
+func (m *mockNode) DeclineOrderViaRelay(orderID models.OrderID, reason string, done chan struct{}) error {
+	if m.declineOrderViaRelayFunc != nil {
+		return m.declineOrderViaRelayFunc(orderID, reason, done)
 	}
 	return nil
 }
@@ -500,8 +500,8 @@ func (m *mockNode) GetOrderInfo(orderID models.OrderID, coinType iwallet.CoinTyp
 func (m *mockNode) ProcessOrderPayment(ctx context.Context, paymentData *models.PaymentData) error {
 	return m.processOrderPaymentFunc(ctx, paymentData)
 }
-func (m *mockNode) RejectOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error {
-	return m.rejectOrderFunc(orderID, txid, reason, done)
+func (m *mockNode) DeclineOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error {
+	return m.declineOrderFunc(orderID, txid, reason, done)
 }
 func (m *mockNode) RefundOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {
 	return m.refundOrderFunc(orderID, txid, done)

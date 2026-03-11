@@ -160,7 +160,7 @@ func TestOrder_Transactions(t *testing.T) {
 func TestOrder_PutAndGet(t *testing.T) {
 	messages := []proto.Message{
 		&pb.OrderOpen{},
-		&pb.OrderReject{},
+		&pb.OrderDecline{},
 		&pb.OrderCancel{},
 		&pb.OrderConfirmation{},
 		&pb.RatingSignatures{},
@@ -190,14 +190,14 @@ func TestOrder_PutAndGet(t *testing.T) {
 	if order.OrderOpenSignature == "" {
 		t.Error("signature is empty")
 	}
-	orderReject, err := order.OrderRejectMessage()
+	orderDecline, err := order.OrderDeclineMessage()
 	if err != nil {
 		t.Errorf("Get failed: %s", err)
 	}
-	if orderReject == nil {
+	if orderDecline == nil {
 		t.Error("Message is nil")
 	}
-	if order.OrderRejectSignature == "" {
+	if order.OrderDeclineSignature == "" {
 		t.Error("signature is empty")
 	}
 	orderCancel, err := order.OrderCancelMessage()
@@ -300,7 +300,7 @@ func TestOrder_PutAndGet(t *testing.T) {
 	if err != ErrMessageDoesNotExist {
 		t.Errorf("Get failed to return correct error: %s", err)
 	}
-	orderReject, err = order.OrderRejectMessage()
+	orderDecline, err = order.OrderDeclineMessage()
 	if err != ErrMessageDoesNotExist {
 		t.Errorf("Get failed to return correct error: %s", err)
 	}
@@ -562,7 +562,7 @@ func TestOrder_ParkedMessages(t *testing.T) {
 		}
 
 		msg2 = &npb.OrderMessage{
-			MessageType: npb.OrderMessage_ORDER_REJECT,
+			MessageType: npb.OrderMessage_ORDER_DECLINE,
 			Message:     m2,
 		}
 	)
@@ -598,7 +598,7 @@ func TestOrder_ParkedMessages(t *testing.T) {
 		t.Errorf("Expected %s message type got %s", msg2.MessageType.String(), msgs.Messages[1].MessageType.String())
 	}
 
-	if err := order.DeleteParkedMessage(npb.OrderMessage_ORDER_REJECT); err != nil {
+	if err := order.DeleteParkedMessage(npb.OrderMessage_ORDER_DECLINE); err != nil {
 		t.Fatal(err)
 	}
 
@@ -645,9 +645,9 @@ func TestOrder_CanCancel(t *testing.T) {
 			canCancel: false,
 		},
 		{
-			// Non nil reject
+			// Non nil decline
 			setup: func(order *Order) error {
-				order.SerializedOrderReject = []byte{0x00}
+				order.SerializedOrderDecline = []byte{0x00}
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
@@ -768,7 +768,7 @@ func TestOrder_ErroredMessages(t *testing.T) {
 		}
 
 		msg2 = &npb.OrderMessage{
-			MessageType: npb.OrderMessage_ORDER_REJECT,
+			MessageType: npb.OrderMessage_ORDER_DECLINE,
 		}
 	)
 
@@ -801,11 +801,11 @@ func TestOrder_ErroredMessages(t *testing.T) {
 	}
 }
 
-func TestOrder_CanReject(t *testing.T) {
+func TestOrder_CanDecline(t *testing.T) {
 	tests := []struct {
-		setup     func(order *Order) error
-		ourRole   OrderRole
-		canReject bool
+		setup      func(order *Order) error
+		ourRole    OrderRole
+		canDecline bool
 	}{
 		{
 			// Success
@@ -813,8 +813,8 @@ func TestOrder_CanReject(t *testing.T) {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
-			ourRole:   RoleVendor,
-			canReject: true,
+			ourRole:    RoleVendor,
+			canDecline: true,
 		},
 		{
 			// Is buyer
@@ -822,26 +822,26 @@ func TestOrder_CanReject(t *testing.T) {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
-			ourRole:   RoleBuyer,
-			canReject: false,
+			ourRole:    RoleBuyer,
+			canDecline: false,
 		},
 		{
 			// Order is nil
 			setup: func(order *Order) error {
 				return nil
 			},
-			ourRole:   RoleVendor,
-			canReject: false,
+			ourRole:    RoleVendor,
+			canDecline: false,
 		},
 		{
-			// Non nil reject
+			// Non nil decline
 			setup: func(order *Order) error {
-				order.SerializedOrderReject = []byte{0x00}
+				order.SerializedOrderDecline = []byte{0x00}
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
-			ourRole:   RoleVendor,
-			canReject: false,
+			ourRole:    RoleVendor,
+			canDecline: false,
 		},
 		{
 			// Non nil cancel
@@ -851,7 +851,7 @@ func TestOrder_CanReject(t *testing.T) {
 				return err
 			},
 			ourRole:   RoleVendor,
-			canReject: false,
+			canDecline: false,
 		},
 		{
 			// Non nil confirmation
@@ -861,7 +861,7 @@ func TestOrder_CanReject(t *testing.T) {
 				return err
 			},
 			ourRole:   RoleVendor,
-			canReject: false,
+			canDecline: false,
 		},
 		{
 			// Non nil fulfillment
@@ -871,7 +871,7 @@ func TestOrder_CanReject(t *testing.T) {
 				return err
 			},
 			ourRole:   RoleVendor,
-			canReject: false,
+			canDecline: false,
 		},
 		{
 			// Non nil complete
@@ -881,7 +881,7 @@ func TestOrder_CanReject(t *testing.T) {
 				return err
 			},
 			ourRole:   RoleVendor,
-			canReject: false,
+			canDecline: false,
 		},
 		{
 			// Non nil dispute open
@@ -891,7 +891,7 @@ func TestOrder_CanReject(t *testing.T) {
 				return err
 			},
 			ourRole:   RoleVendor,
-			canReject: false,
+			canDecline: false,
 		},
 		{
 			// Non nil dispute close
@@ -901,7 +901,7 @@ func TestOrder_CanReject(t *testing.T) {
 				return err
 			},
 			ourRole:   RoleVendor,
-			canReject: false,
+			canDecline: false,
 		},
 		{
 			// Non nil dispute update
@@ -911,7 +911,7 @@ func TestOrder_CanReject(t *testing.T) {
 				return err
 			},
 			ourRole:   RoleVendor,
-			canReject: false,
+			canDecline: false,
 		},
 		{
 			// Non nil refund
@@ -921,7 +921,7 @@ func TestOrder_CanReject(t *testing.T) {
 				return err
 			},
 			ourRole:   RoleVendor,
-			canReject: false,
+			canDecline: false,
 		},
 		{
 			// Non nil payment finalized
@@ -931,7 +931,7 @@ func TestOrder_CanReject(t *testing.T) {
 				return err
 			},
 			ourRole:   RoleVendor,
-			canReject: false,
+			canDecline: false,
 		},
 	}
 
@@ -942,9 +942,9 @@ func TestOrder_CanReject(t *testing.T) {
 		}
 		order.SetRole(test.ourRole)
 
-		canReject := order.CanReject()
-		if canReject != test.canReject {
-			t.Errorf("Test %d: Got incorrect result. Expected %t, got %t", i, test.canReject, canReject)
+		canDecline := order.CanDecline()
+		if canDecline != test.canDecline {
+			t.Errorf("Test %d: Got incorrect result. Expected %t, got %t", i, test.canDecline, canDecline)
 		}
 	}
 }
@@ -1128,7 +1128,7 @@ func TestOrder_CanRefund(t *testing.T) {
 		{
 			// Cancelable - vendor can refund from 1-of-2 address
 			setup: func(order *Order) error {
-				order.SerializedOrderReject = []byte{0x00}
+				order.SerializedOrderDecline = []byte{0x00}
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				if err != nil {
 					return err
@@ -1329,7 +1329,7 @@ func TestOrder_CanFulfill(t *testing.T) {
 		{
 			// Nil order confirmation
 			setup: func(order *Order) error {
-				order.SerializedOrderReject = []byte{0x00}
+				order.SerializedOrderDecline = []byte{0x00}
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{
 					Items: []*pb.OrderOpen_Item{
 						{
@@ -1480,9 +1480,9 @@ func TestOrder_CanConfirm(t *testing.T) {
 			canConfirm: false,
 		},
 		{
-			// Non nil reject
+			// Non nil decline
 			setup: func(order *Order) error {
-				order.SerializedOrderReject = []byte{0x00}
+				order.SerializedOrderDecline = []byte{0x00}
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},

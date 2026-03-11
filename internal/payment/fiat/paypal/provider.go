@@ -181,8 +181,9 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 	}
 
 	we := &contracts.WebhookEvent{
-		EventID: event.ID,
-		Raw:     &event,
+		EventID:    event.ID,
+		ProviderID: "paypal",
+		Raw:        &event,
 	}
 
 	switch event.EventType {

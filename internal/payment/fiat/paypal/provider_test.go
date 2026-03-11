@@ -291,6 +291,7 @@ func TestProvider_ParseWebhook_PaymentSucceeded_ResourceLevel(t *testing.T) {
 
 	assert.Equal(t, "WH-001", event.EventID)
 	assert.Equal(t, contracts.WebhookPaymentSucceeded, event.Type)
+	assert.Equal(t, "paypal", event.ProviderID)
 	assert.Equal(t, "ORDER-ABC", event.PaymentID)
 	assert.Equal(t, "my-order-id", event.OrderID)
 }
@@ -317,6 +318,7 @@ func TestProvider_ParseWebhook_PaymentSucceeded_PurchaseUnitsFallback(t *testing
 	require.NoError(t, err)
 
 	assert.Equal(t, contracts.WebhookPaymentSucceeded, event.Type)
+	assert.Equal(t, "paypal", event.ProviderID)
 	assert.Equal(t, "CAP-XYZ", event.PaymentID)
 	assert.Equal(t, "fallback-order-id", event.OrderID)
 	assert.Equal(t, "MERCH-999", event.AccountID)

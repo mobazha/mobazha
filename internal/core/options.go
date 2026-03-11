@@ -315,6 +315,7 @@ func (n *MobazhaNode) initOrderService() {
 				Coin:          coin,
 				Amount:        uint64(event.Amount),
 				Method:        pb.PaymentSent_FIAT,
+				ProviderID:    event.ProviderID,
 			})
 		})
 	}

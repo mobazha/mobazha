@@ -283,6 +283,7 @@ func TestProvider_ParseWebhook_PaymentSucceeded(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "evt_test_1", event.EventID)
 	assert.Equal(t, contracts.WebhookPaymentSucceeded, event.Type)
+	assert.Equal(t, "stripe", event.ProviderID)
 	assert.Equal(t, "pi_webhook", event.PaymentID)
 	assert.Equal(t, "order_wh", event.OrderID)
 	assert.Equal(t, "fiat:USD", event.Coin)

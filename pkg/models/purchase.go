@@ -101,6 +101,7 @@ type Purchase struct {
 	Items                []PurchaseItem `json:"items"`
 	AlternateContactInfo string         `json:"alternateContactInfo"`
 	PricingCoin          string         `json:"pricingCoin"`
+	FiatProvider         string         `json:"fiatProvider,omitempty"`
 	DiscountCodes        []string       `json:"discountCodes,omitempty"`
 }
 
@@ -109,6 +110,7 @@ type PaymentData struct {
 	TransactionID    string                `json:"transactionID"`
 	Coin             iwallet.CoinType      `json:"coin"`
 	Method           pb.PaymentSent_Method `json:"method"`
+	ProviderID       string                `json:"providerID,omitempty"`
 	ContractAddress  string                `json:"contractAddress"`
 	PayerAddress     string                `json:"payerAddress"`
 	Moderator        string                `json:"moderator"`

@@ -82,12 +82,13 @@ type PaymentDetail struct {
 
 // WebhookEvent is the standardized representation of a provider webhook event.
 type WebhookEvent struct {
-	EventID   string           // original event ID (for idempotency dedup)
-	Type      WebhookEventType // standardized event type
-	PaymentID string           // provider's payment ID
-	OrderID   string           // extracted from metadata
-	AccountID string           // seller's account ID (for SaaS routing)
-	Raw       interface{}      // original parsed event object
+	EventID    string           // original event ID (for idempotency dedup)
+	Type       WebhookEventType // standardized event type
+	ProviderID string           // fiat provider: "stripe" | "paypal"
+	PaymentID  string           // provider's payment ID
+	OrderID    string           // extracted from metadata
+	AccountID  string           // seller's account ID (for SaaS routing)
+	Raw        interface{}      // original parsed event object
 
 	// Enriched fields (best-effort, may be zero-valued if provider API is unreachable)
 	Coin          string            // e.g. "fiat:USD" — used by PaymentSent to identify fiat payments

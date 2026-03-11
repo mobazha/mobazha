@@ -7,6 +7,7 @@
 package database
 
 import (
+	"github.com/ipfs/go-cid"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	postsPb "github.com/mobazha/mobazha3.0/pkg/posts/pb"
@@ -110,15 +111,6 @@ type PublicData interface {
 	SetIntroVideo(introVideo models.IntroVideo) error
 }
 
-// PublicDataMaterializer is an optional interface implemented by Database
-// backends whose public data is not stored on the local filesystem (e.g.
-// DBPublicData in SaaS mode). When PublicDataPath() returns "", callers
-// should check for this interface and use it to materialize a directory
-// tree suitable for CID computation and publishing.
-type PublicDataMaterializer interface {
-	MaterializePublicData(dir string) error
-}
-
 // Tx represents a database transaction. It can either be read-only or
 // read-write. The transaction provides access to a sql database interface
 // with an open transaction to use for writing generic data.
@@ -201,8 +193,9 @@ type Database interface {
 	// user-supplied function will result in a panic.
 	Update(fn func(tx Tx) error) error
 
-	// PublicDataPath returns the path to the public data directory.
-	PublicDataPath() string
+	// ComputePublicDataHash returns a CID-compatible hash of all structured
+	// public data, used by the publish flow for change detection.
+	ComputePublicDataHash() (cid.Cid, error)
 
 	// Close cleanly shuts down the database and syncs all data. It will
 	// block until all database transactions have been finalized (rolled

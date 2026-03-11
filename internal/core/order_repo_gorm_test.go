@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-cid"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -44,8 +45,10 @@ func (d *testDatabase) Update(fn func(database.Tx) error) error {
 	})
 }
 
-func (d *testDatabase) PublicDataPath() string { return "" }
-func (d *testDatabase) Close() error           { return nil }
+func (d *testDatabase) ComputePublicDataHash() (cid.Cid, error) {
+	return cid.Undef, nil
+}
+func (d *testDatabase) Close() error { return nil }
 
 // testTx implements database.Tx with the minimum set of methods
 // needed by GormOrderRepo (Read, Save, Update).

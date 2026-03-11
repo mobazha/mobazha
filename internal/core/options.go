@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"path/filepath"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/internal/storage"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -148,6 +150,14 @@ func (n *MobazhaNode) initMediaService() {
 	var blobStore contracts.BlobStore
 	if n.hostService != nil {
 		blobStore = n.hostService.GetBlobStore()
+	}
+	if blobStore == nil && n.repo != nil {
+		blobDir := filepath.Join(n.repo.DataDir(), "blobs")
+		if bs, err := storage.NewLocalFSAdapter(blobDir); err != nil {
+			log.Errorf("Failed to create local blob store at %s: %v", blobDir, err)
+		} else {
+			blobStore = bs
+		}
 	}
 
 	n.mediaService = NewMediaAppService(MediaAppServiceConfig{

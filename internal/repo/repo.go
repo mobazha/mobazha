@@ -26,7 +26,7 @@ import (
 
 const (
 	// DefaultRepoVersion is the current repo version used for migrations.
-	DefaultRepoVersion = 5
+	DefaultRepoVersion = 6
 
 	// versionFileName is the name of the version file.
 	versionFileName = "version"
@@ -335,7 +335,8 @@ func GetKeysFromDB(tx database.Tx) (dbEscrowKey, dbBip44Key, dbSolKey, dbRatingK
 }
 
 func (r *Repo) WriteUserAgent(comment string) error {
-	return os.WriteFile(path.Join(r.db.PublicDataPath(), "user_agent"), []byte(fmt.Sprintf("%s%s", version.UserAgent(), comment)), os.ModePerm)
+	uaPath := path.Join(r.dataDir, "user_agent")
+	return os.WriteFile(uaPath, []byte(fmt.Sprintf("%s%s", version.UserAgent(), comment)), os.ModePerm)
 }
 
 func checkWriteable(dir string) error {
@@ -496,7 +497,6 @@ func CreateHDKeys(seed []byte) (escrowKey, ratingKey *btcec.PrivateKey, bip44Key
 	return escrowKey, ratingKey, bip44Key, &solPriv, nil
 }
 
-
 func autoMigrateDatabase(db database.Database) error {
 	dbModels := []interface{}{
 		&models.Key{},
@@ -524,6 +524,8 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.ShippingProfileEntity{},
 		&models.ShippingLocationEntity{},
 		&models.ListingShippingRef{},
+		&ffsqlite.PublicDataRecord{},
+		&ffsqlite.PublicMediaRecord{},
 	}
 
 	return db.Update(func(tx database.Tx) error {
@@ -647,10 +649,8 @@ func CheckAndMigrateRepo(dataDir string) error {
 		return err
 	}
 
-	// In version 5, the repo structure is changed to nodes structure.
-	repoUpdateVersion := 5
-	if version < repoUpdateVersion {
-		log.Infof("Migrating repo from version %d to %d", version, repoUpdateVersion)
+	if version < 5 {
+		log.Infof("Migrating repo from version %d to %d", version, 5)
 		if err := migrateRepoToNodesStructure(dataDir); err != nil {
 			return fmt.Errorf("migration failed: %v", err)
 		}

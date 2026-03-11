@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // newMockUTXOAdapter creates a UTXOAutoConfirmAdapter wired to a MobazhaNode's
@@ -55,34 +57,149 @@ func setupMockNetDB(t *testing.T, nodes []*MobazhaNode) {
 		nodeMap[n.peerID.String()] = n
 	}
 
+	var mu sync.Mutex
+	listingStore := make(map[string]netdb.Listing) // CID → Listing
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")
-		if len(parts) != 2 || parts[0] != "listingindex" {
+
+		switch {
+		case len(parts) == 2 && parts[0] == "listing-indexes" && r.Method == http.MethodGet:
+			peerID := parts[1]
+			node, ok := nodeMap[peerID]
+			if !ok {
+				http.Error(w, "peer not found", http.StatusNotFound)
+				return
+			}
+			index, err := node.Listing().GetMyListings()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			serializedIndex, _ := json.Marshal(index)
+			resp := netdb.ListingIndex{
+				PeerID:          peerID,
+				SerializedIndex: serializedIndex,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(resp)
+
+		case len(parts) == 1 && parts[0] == "listing-indexes" && r.Method == http.MethodPost:
+			w.WriteHeader(http.StatusOK)
+
+		case len(parts) == 1 && parts[0] == "listings" && r.Method == http.MethodPost:
+			var listing netdb.Listing
+			if err := json.NewDecoder(r.Body).Decode(&listing); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			mu.Lock()
+			listingStore[listing.CID] = listing
+			mu.Unlock()
+			w.WriteHeader(http.StatusOK)
+
+		case len(parts) == 2 && parts[0] == "listings" && r.Method == http.MethodGet:
+			cidStr := parts[1]
+			mu.Lock()
+			listing, ok := listingStore[cidStr]
+			mu.Unlock()
+			if !ok {
+				// Fallback: async SetOwnListing may not have arrived yet;
+				// search local nodes directly (simulates eventual consistency).
+				for _, node := range nodeMap {
+					index, err := node.Listing().GetMyListings()
+					if err != nil {
+						continue
+					}
+					for _, entry := range index {
+						if entry.CID == cidStr {
+							sl, err := node.Listing().GetMyListingBySlug(entry.Slug)
+							if err != nil {
+								continue
+							}
+							raw, err := protojson.Marshal(sl)
+							if err != nil {
+								continue
+							}
+							listing = netdb.Listing{CID: cidStr, SerializedListing: raw}
+							ok = true
+							break
+						}
+					}
+					if ok {
+						break
+					}
+				}
+			}
+			if !ok {
+				http.Error(w, "listing not found", http.StatusNotFound)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(listing)
+
+		case len(parts) == 2 && parts[0] == "profiles" && r.Method == http.MethodGet:
+			peerID := parts[1]
+			node, ok := nodeMap[peerID]
+			if !ok {
+				http.Error(w, "peer not found", http.StatusNotFound)
+				return
+			}
+			var profile *models.Profile
+			_ = node.repo.DB().View(func(tx database.Tx) error {
+				p, err := tx.GetProfile()
+				if err != nil {
+					return err
+				}
+				profile = p
+				return nil
+			})
+			if profile == nil {
+				http.Error(w, "profile not found", http.StatusNotFound)
+				return
+			}
+			serialized, _ := json.Marshal(profile)
+			resp := netdb.Profile{PeerID: peerID, SerializedProfile: serialized}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(resp)
+
+		case len(parts) == 1 && parts[0] == "profiles" && r.Method == http.MethodPost:
+			w.WriteHeader(http.StatusOK)
+
+		case len(parts) == 2 && parts[0] == "rating-indexes" && r.Method == http.MethodGet:
+			peerID := parts[1]
+			node, ok := nodeMap[peerID]
+			if !ok {
+				http.Error(w, "peer not found", http.StatusNotFound)
+				return
+			}
+			var index models.RatingIndex
+			viewErr := node.repo.DB().View(func(tx database.Tx) error {
+				idx, err := tx.GetRatingIndex()
+				if err != nil {
+					return err
+				}
+				index = idx
+				return nil
+			})
+			if viewErr != nil {
+				http.Error(w, viewErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			if index == nil {
+				index = models.RatingIndex{}
+			}
+			serialized, _ := json.Marshal(index)
+			resp := netdb.RatingIndex{PeerID: peerID, SerializedIndex: serialized}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(resp)
+
+		case len(parts) == 1 && parts[0] == "rating-indexes" && r.Method == http.MethodPost:
+			w.WriteHeader(http.StatusOK)
+
+		default:
 			http.NotFound(w, r)
-			return
 		}
-		peerID := parts[1]
-
-		node, ok := nodeMap[peerID]
-		if !ok {
-			http.Error(w, "peer not found", http.StatusNotFound)
-			return
-		}
-
-		index, err := node.Listing().GetMyListings()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		serializedIndex, _ := json.Marshal(index)
-		resp := netdb.ListingIndex{
-			PeerID:          peerID,
-			SerializedIndex: serializedIndex,
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
 	}))
 	t.Cleanup(server.Close)
 
@@ -90,6 +207,8 @@ func setupMockNetDB(t *testing.T, nodes []*MobazhaNode) {
 		ndb, _ := netdb.NewNetDB(server.URL, node.peerID.String(), node.privKey)
 		node.netDB = ndb
 		node.initListingService()
+		node.initProfileService()
+		node.initRatingsService()
 	}
 }
 

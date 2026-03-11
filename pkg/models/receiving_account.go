@@ -12,7 +12,7 @@ import (
 // ReceivingAccount 表示用户的收款账户信息
 type ReceivingAccount struct {
 	TenantMixin
-	ID                       int               `gorm:"primaryKey" json:"id"`
+	ID                       int               `gorm:"primaryKey;autoIncrement:false" json:"id"`
 	Name                     string            `gorm:"type:text" json:"name"`           // 账户名称
 	ChainType                iwallet.ChainType `gorm:"index" json:"chainType"`          // 区块链网络类型
 	Address                  string            `gorm:"index" json:"address"`            // 用户的收款钱包地址, 对于Stripe, 则是StripeAccountID

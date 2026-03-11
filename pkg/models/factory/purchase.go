@@ -27,8 +27,8 @@ func NewPurchase() *models.Purchase {
 					},
 				},
 				Shipping: models.PurchaseShippingOption{
-					Name:    "usps",
-					Service: "standard",
+					Name:    "Worldwide",
+					Service: "Standard",
 				},
 				Memo: "I want it fast!",
 			},

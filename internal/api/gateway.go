@@ -46,6 +46,12 @@ type GatewayConfig struct {
 	// store_registry.owner_user_id. When set, JWT admin authorization
 	// uses claims.Id == OwnerUserID instead of Properties["peerID"].
 	OwnerUserID string
+
+	// SaaSAPIURL is the SaaS platform base URL for standalone → SaaS calls
+	// (e.g. store claim). Empty in SaaS mode.
+	SaaSAPIURL string
+	// StandaloneAPIKey is the API key for authenticating with the SaaS platform.
+	StandaloneAPIKey string
 }
 
 // Gateway represents an HTTP API gateway

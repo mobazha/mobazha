@@ -341,6 +341,8 @@ func (im *SharedManager) initHTTPGateway(cfg *repo.Config) (*api.Gateway, error)
 		CasdoorCertificate: cfg.CasdoorCertificate,
 		LocalPeerID:        localPeerID,
 		OwnerUserID:        cfg.OwnerUserID,
+		SaaSAPIURL:         cfg.SaaSAPIURL,
+		StandaloneAPIKey:   cfg.StandaloneAPIKey,
 	}
 
 	im.httpGateway, err = api.NewGateway(im, gwConfig)

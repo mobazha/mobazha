@@ -7,7 +7,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	eth "github.com/mobazha/mobazha3.0/internal/multiwallet/coins/eth"
+	evm "github.com/mobazha/mobazha3.0/internal/chains/evm"
 	evmpayment "github.com/mobazha/mobazha3.0/internal/payment/evm"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -95,12 +95,12 @@ func (o *EVMChainOps) VerifyDeposit(ctx context.Context, params payment.DepositV
 		return nil
 	}
 
-	ethWallet, ok := wallet.(*eth.ETHWallet)
+	ethWallet, ok := wallet.(*evm.ETHWallet)
 	if !ok || ethWallet.ChainClient == nil {
 		return nil
 	}
 
-	fetcher, ok := ethWallet.ChainClient.(eth.EVMReceiptFetcher)
+	fetcher, ok := ethWallet.ChainClient.(evm.EVMReceiptFetcher)
 	if !ok {
 		return nil
 	}
@@ -113,12 +113,12 @@ func (o *EVMChainOps) VerifyDeposit(ctx context.Context, params payment.DepositV
 		return fmt.Errorf("decode script hex: %w", err)
 	}
 
-	script, err := eth.DeserializeEthScript(scriptBytes)
+	script, err := evm.DeserializeEthScript(scriptBytes)
 	if err != nil {
 		return fmt.Errorf("deserialize escrow script: %w", err)
 	}
 
-	escrowHash, _, err := eth.CalculateRedeemScriptHash(script)
+	escrowHash, _, err := evm.CalculateRedeemScriptHash(script)
 	if err != nil {
 		return fmt.Errorf("calculate escrow hash: %w", err)
 	}
@@ -130,7 +130,7 @@ func (o *EVMChainOps) VerifyDeposit(ctx context.Context, params payment.DepositV
 
 	expectedAddr := common.HexToAddress(params.ContractAddr)
 
-	return eth.VerifyDeposit(ctx, fetcher, eth.DepositVerification{
+	return evm.VerifyDeposit(ctx, fetcher, evm.DepositVerification{
 		TxHash:       params.TxHash,
 		EscrowHash:   escrowHash,
 		ExpectedAddr: expectedAddr,

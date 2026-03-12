@@ -8,7 +8,7 @@ import (
 	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	ethWal "github.com/mobazha/mobazha3.0/internal/multiwallet/coins/eth"
+	ethWal "github.com/mobazha/mobazha3.0/internal/chains/evm"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"

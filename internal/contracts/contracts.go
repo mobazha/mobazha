@@ -4,19 +4,19 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
+	"github.com/mobazha/mobazha3.0/internal/chains"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 type Contracts struct {
-	cfg         multiwallet.Config
+	cfg         chains.Config
 	rpcEndpoint string
 	client      *ethclient.Client
 }
 
-func NewContracts(opts ...multiwallet.Option) (*Contracts, error) {
-	var cfg multiwallet.Config
-	if err := cfg.Apply(append([]multiwallet.Option{multiwallet.Defaults}, opts...)...); err != nil {
+func NewContracts(opts ...chains.Option) (*Contracts, error) {
+	var cfg chains.Config
+	if err := cfg.Apply(append([]chains.Option{chains.Defaults}, opts...)...); err != nil {
 		return nil, err
 	}
 

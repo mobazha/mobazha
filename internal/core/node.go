@@ -17,7 +17,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet/utxo"
+	"github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/notifier"
 	"github.com/mobazha/mobazha3.0/internal/orders"
@@ -421,7 +421,7 @@ func (n *MobazhaNode) DestroyNode() {
 
 // Multiwallet returns the WalletOperator interface.
 // Internal callers that need concrete map access can type-assert to
-// *multiwallet.Multiwallet.
+// *chains.Multiwallet.
 func (n *MobazhaNode) Multiwallet() contracts.WalletOperator {
 	return n.multiwallet
 }

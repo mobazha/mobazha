@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
-	walletbase "github.com/mobazha/mobazha3.0/internal/multiwallet/base"
+	walletbase "github.com/mobazha/mobazha3.0/internal/chains/base"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/wallet"

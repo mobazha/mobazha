@@ -37,7 +37,7 @@ func newMockUTXOAdapter(node *MobazhaNode) *adapters.UTXOAutoConfirmAdapter {
 
 // newStubUTXOAdapter creates a minimal UTXOAutoConfirmAdapter for registry
 // coverage tests that only verify chain registration and instruction dispatch,
-// without requiring a live wallet or multiwallet.
+// without requiring a live wallet or Multiwallet.
 func newStubUTXOAdapter() *adapters.UTXOAutoConfirmAdapter {
 	return &adapters.UTXOAutoConfirmAdapter{}
 }

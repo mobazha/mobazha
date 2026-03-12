@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
+	"github.com/mobazha/mobazha3.0/internal/chains"
 	"github.com/mobazha/mobazha3.0/internal/version"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
@@ -32,7 +32,7 @@ func TestSettingsHandlers(t *testing.T) {
 					return true
 				}
 			n.multiwalletFunc = func() contracts.WalletOperator {
-				m := multiwallet.Multiwallet{
+				m := chains.Multiwallet{
 					iwallet.ChainBitcoin: nil,
 				}
 				return &m

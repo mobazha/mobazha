@@ -15,7 +15,7 @@ import (
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
+	"github.com/mobazha/mobazha3.0/internal/chains"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -96,7 +96,7 @@ func MockNode() (*MobazhaNode, error) {
 	w := wallet.NewMockWallet()
 	w.SetEventBus(bus)
 
-	mw := multiwallet.Multiwallet{
+	mw := chains.Multiwallet{
 		iwallet.ChainMock: w,
 	}
 
@@ -311,7 +311,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		w := wn.Wallets()[i]
 		w.SetEventBus(bus)
 
-		mw := multiwallet.Multiwallet{
+		mw := chains.Multiwallet{
 			iwallet.ChainMock: w,
 		}
 

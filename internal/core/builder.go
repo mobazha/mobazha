@@ -25,8 +25,8 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/contracts"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
-	solanaWal "github.com/mobazha/mobazha3.0/internal/multiwallet/coins/solana"
+	"github.com/mobazha/mobazha3.0/internal/chains"
+	solanaWal "github.com/mobazha/mobazha3.0/internal/chains/solana"
 	obnet "github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/notifications"
 	fiat "github.com/mobazha/mobazha3.0/internal/payment/fiat"
@@ -416,16 +416,16 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 	erp := sharedManager.ExchangeRateProvider
 
-	opts := []multiwallet.Option{
-		multiwallet.NodeID(nodeID),
-		multiwallet.DataDir(repoPath),
-		multiwallet.LogDir(cfg.LogDir),
-		multiwallet.Chains(enabledChains),
-		multiwallet.LogLevel(repo.LogLevelMap[strings.ToLower(cfg.LogLevel)]),
-		multiwallet.NetConfig(netConfig),
-		multiwallet.Testnet(walletTestnet),
+	opts := []chains.Option{
+		chains.NodeID(nodeID),
+		chains.DataDir(repoPath),
+		chains.LogDir(cfg.LogDir),
+		chains.Chains(enabledChains),
+		chains.LogLevel(repo.LogLevelMap[strings.ToLower(cfg.LogLevel)]),
+		chains.NetConfig(netConfig),
+		chains.Testnet(walletTestnet),
 	}
-	mw, err := multiwallet.NewMultiwallet(opts...)
+	mw, err := chains.NewMultiwallet(opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -437,8 +437,8 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	// Extract EVM chain configs from multiwallet ChainAPIs for standalone client creation.
 	// This is done here (not in Start()) so the node stores user-configured RPC URLs.
 	// Must prepend Defaults (same as NewMultiwallet does internally) to populate ChainAPIs.
-	var mwCfg multiwallet.Config
-	_ = mwCfg.Apply(append([]multiwallet.Option{multiwallet.Defaults}, opts...)...)
+	var mwCfg chains.Config
+	_ = mwCfg.Apply(append([]chains.Option{chains.Defaults}, opts...)...)
 	evmConfigs := extractEVMConfigs(mwCfg.ChainAPIs, walletTestnet)
 	solanaConfig := extractSolanaConfig(mwCfg.ChainAPIs, walletTestnet)
 
@@ -744,7 +744,7 @@ func (d *dummyListener) Close() error {
 	return nil
 }
 
-func InitializeMultiwallet(mw multiwallet.Multiwallet, db database.Database, creationDate time.Time) error {
+func InitializeMultiwallet(mw chains.Multiwallet, db database.Database, creationDate time.Time) error {
 	var bip44ModelKey models.Key
 	err := db.View(func(tx database.Tx) error {
 		return tx.Read().Where("name = ?", "bip44").First(&bip44ModelKey).Error
@@ -1058,17 +1058,17 @@ func newLightweightNode(
 	//   - Standalone: per-node clients from ChainAPIs config or defaults
 	// This eliminates 5+ RPC connections per tenant while preserving signing.
 	enabledChains := iwallet.GetAllSupportedChainTypes()
-	opts := []multiwallet.Option{
-		multiwallet.NodeID(nodeID),
-		multiwallet.DataDir(path.Join(cfg.DataDir, "nodes", nodeID)),
-		multiwallet.LogDir(cfg.LogDir),
-		multiwallet.Chains(enabledChains),
-		multiwallet.LogLevel(repo.LogLevelMap[strings.ToLower(cfg.LogLevel)]),
-		multiwallet.NetConfig(netConfig),
-		multiwallet.Testnet(walletTestnet),
+	opts := []chains.Option{
+		chains.NodeID(nodeID),
+		chains.DataDir(path.Join(cfg.DataDir, "nodes", nodeID)),
+		chains.LogDir(cfg.LogDir),
+		chains.Chains(enabledChains),
+		chains.LogLevel(repo.LogLevelMap[strings.ToLower(cfg.LogLevel)]),
+		chains.NetConfig(netConfig),
+		chains.Testnet(walletTestnet),
 	}
 
-	mw, err := multiwallet.NewMultiwallet(opts...)
+	mw, err := chains.NewMultiwallet(opts...)
 	if err != nil {
 		return nil, err
 	}

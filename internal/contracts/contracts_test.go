@@ -3,12 +3,12 @@ package contracts
 import (
 	"testing"
 
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
+	"github.com/mobazha/mobazha3.0/internal/chains"
 )
 
 func TestContracts_GetBlockedIds(t *testing.T) {
-	opts := []multiwallet.Option{
-		multiwallet.Testnet(true),
+	opts := []chains.Option{
+		chains.Testnet(true),
 	}
 
 	contracts, err := NewContracts(opts...)

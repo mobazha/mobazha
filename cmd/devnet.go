@@ -13,7 +13,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/internal/core"
 	"github.com/mobazha/mobazha3.0/internal/repo"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
+	"github.com/mobazha/mobazha3.0/internal/chains"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -54,9 +54,9 @@ func (x *DevNet) Execute(args []string) error {
 
 	// Build the mock wallet network and set the mock wallet in each node.
 	walletNet := wallet.NewMockWalletNetwork(3)
-	buyerMW := buyer.Multiwallet().(*multiwallet.Multiwallet)
-	vendorMW := vendor.Multiwallet().(*multiwallet.Multiwallet)
-	moderatorMW := moderator.Multiwallet().(*multiwallet.Multiwallet)
+	buyerMW := buyer.Multiwallet().(*chains.Multiwallet)
+	vendorMW := vendor.Multiwallet().(*chains.Multiwallet)
+	moderatorMW := moderator.Multiwallet().(*chains.Multiwallet)
 	(*buyerMW)[iwallet.ChainMock] = walletNet.Wallets()[0]
 	(*vendorMW)[iwallet.ChainMock] = walletNet.Wallets()[1]
 	(*moderatorMW)[iwallet.ChainMock] = walletNet.Wallets()[2]

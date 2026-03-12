@@ -9,7 +9,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
+	"github.com/mobazha/mobazha3.0/internal/chains"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
 	"github.com/mobazha/mobazha3.0/internal/repo"
@@ -60,7 +60,7 @@ func newMockOrderProcessor() (*OrderProcessor, func(), error) {
 		return nil, nil, err
 	}
 
-	mw := multiwallet.Multiwallet{
+	mw := chains.Multiwallet{
 		iwallet.ChainMock: wallet.NewMockWallet(),
 	}
 

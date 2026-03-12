@@ -2,8 +2,8 @@ package core
 
 import (
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet/base"
+	"github.com/mobazha/mobazha3.0/internal/chains"
+	"github.com/mobazha/mobazha3.0/internal/chains/base"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/evm"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -22,7 +22,7 @@ var evmChains = []iwallet.ChainType{
 // This bridges the multiwallet config (which has richer data like WSS URLs, multiple
 // RPC fallbacks) to the simpler EVMClientConfig needed for chain client creation.
 // The first RPC URL in the list is used as the primary endpoint.
-func extractEVMConfigs(chainAPIs map[iwallet.ChainType]multiwallet.APIUrls, testnet bool) []evm.EVMClientConfig {
+func extractEVMConfigs(chainAPIs map[iwallet.ChainType]chains.APIUrls, testnet bool) []evm.EVMClientConfig {
 	var configs []evm.EVMClientConfig
 	for _, chain := range evmChains {
 		api, ok := chainAPIs[chain]

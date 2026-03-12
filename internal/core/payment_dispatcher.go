@@ -78,6 +78,7 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	}
 	if n.orderService != nil {
 		n.orderService.SetRegistry(n.paymentRegistry)
+		n.orderService.SetReceiptVerifier(adapters.NewEVMReceiptVerifier(n.multiwallet))
 	}
 
 	// Wire verifyDepositFunc to OrderProcessor via PaymentRegistry.

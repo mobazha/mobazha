@@ -276,6 +276,8 @@ func (n *MobazhaNode) Start() {
 		// Start event-driven monitors for payment→order decoupling
 		// Handles auto-confirm, UTXO payment detection, and RWA instant buy via EventBus
 		n.startPaymentEventMonitors()
+
+		go n.orderService.StartOrderTimeoutScheduler()
 	}
 
 	// Add log to verify connection reuse

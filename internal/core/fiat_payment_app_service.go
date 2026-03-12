@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -224,6 +225,33 @@ func (s *FiatPaymentAppService) handlePaymentSucceeded(ctx context.Context, prov
 		return fmt.Errorf("fiat payment succeeded but no order_id in metadata")
 	}
 
+	// Race condition handling: check if order exists and its state before processing.
+	// Scenario 1: Webhook arrives before ORDER_OPEN P2P message → order not yet created.
+	// Scenario 2: Buyer canceled the order but payment was already captured.
+	if s.orderRepo != nil {
+		order, err := s.orderRepo.FindByID(ctx, event.OrderID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				logger.LogWarningWithIDf(log, s.nodeID,
+					"fiat webhook for order %s arrived before ORDER_OPEN, requesting retry",
+					event.OrderID)
+				return &contracts.RetryableError{
+					Err:        fmt.Errorf("order %s not yet created", event.OrderID),
+					RetryAfter: 30 * time.Second,
+				}
+			}
+			return fmt.Errorf("find order %s for webhook race check: %w", event.OrderID, err)
+		}
+
+		if order.State == models.OrderState_CANCELED {
+			logger.LogInfoWithIDf(log, s.nodeID,
+				"order %s already CANCELED, auto-refunding fiat payment %s",
+				event.OrderID, event.PaymentID)
+			s.autoRefundCanceledOrder(ctx, providerID, event)
+			return nil
+		}
+	}
+
 	// Best-effort: enrich event with payment details from provider API.
 	// Failure here must not block webhook processing.
 	if event.PaymentID != "" {
@@ -244,6 +272,38 @@ func (s *FiatPaymentAppService) handlePaymentSucceeded(ctx context.Context, prov
 		return fmt.Errorf("no webhook handler registered, cannot process fiat payment for order %s", event.OrderID)
 	}
 	return s.webhookHandler(ctx, event)
+}
+
+// autoRefundCanceledOrder attempts a full refund for a payment on a canceled order.
+// Failure is logged but not returned — the webhook is marked as processed to avoid
+// an infinite retry loop. Admin can manually refund via the provider dashboard.
+func (s *FiatPaymentAppService) autoRefundCanceledOrder(ctx context.Context, providerID string, event *contracts.WebhookEvent) {
+	if event.PaymentID == "" {
+		logger.LogWarningWithIDf(log, s.nodeID, "cannot auto-refund order %s: no payment ID", event.OrderID)
+		return
+	}
+
+	provider, err := s.registry.ForProvider(providerID)
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "auto-refund: provider %s not found: %v", providerID, err)
+		return
+	}
+
+	_, err = provider.RefundPayment(ctx, contracts.RefundParams{
+		PaymentID: event.PaymentID,
+		Reason:    "order_canceled",
+		Metadata:  map[string]string{"orderID": event.OrderID},
+	})
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID,
+			"auto-refund failed for canceled order %s (payment %s): %v — manual refund required",
+			event.OrderID, event.PaymentID, err)
+		return
+	}
+
+	logger.LogInfoWithIDf(log, s.nodeID,
+		"auto-refund succeeded for canceled order %s (payment %s)",
+		event.OrderID, event.PaymentID)
 }
 
 func (s *FiatPaymentAppService) handlePaymentFailed(_ context.Context, event *contracts.WebhookEvent) error {

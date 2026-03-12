@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -168,6 +169,12 @@ func (g *Gateway) handlePOSTFiatWebhook(w http.ResponseWriter, r *http.Request) 
 	if err := svc.HandleWebhook(r.Context(), providerID, payload, headers); err != nil {
 		if errors.Is(err, contracts.ErrWebhookSignature) {
 			responsePkg.Error(w, http.StatusUnauthorized, responsePkg.CodeUnauthorized, "Invalid webhook signature")
+			return
+		}
+		var retryErr *contracts.RetryableError
+		if errors.As(err, &retryErr) {
+			w.Header().Set("Retry-After", fmt.Sprintf("%d", int(retryErr.RetryAfter.Seconds())))
+			responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, retryErr.Error())
 			return
 		}
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Webhook processing failed")

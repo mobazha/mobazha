@@ -15,6 +15,7 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 // --- Mock provider ---
@@ -29,6 +30,9 @@ type mockFiatProvider struct {
 	captureErr    error
 	getResult     *contracts.PaymentDetail
 	getErr        error
+	refundResult  *contracts.RefundResult
+	refundErr     error
+	refundCalls   []contracts.RefundParams
 }
 
 func (m *mockFiatProvider) ProviderID() string { return m.id }
@@ -45,8 +49,9 @@ func (m *mockFiatProvider) GetPayment(_ context.Context, _ string) (*contracts.P
 	return m.getResult, m.getErr
 }
 
-func (m *mockFiatProvider) RefundPayment(_ context.Context, _ contracts.RefundParams) (*contracts.RefundResult, error) {
-	return nil, nil
+func (m *mockFiatProvider) RefundPayment(_ context.Context, params contracts.RefundParams) (*contracts.RefundResult, error) {
+	m.refundCalls = append(m.refundCalls, params)
+	return m.refundResult, m.refundErr
 }
 
 func (m *mockFiatProvider) ParseWebhook(_ context.Context, _ []byte, _ map[string]string) (*contracts.WebhookEvent, error) {
@@ -768,4 +773,105 @@ func TestFiatService_HandleWebhook_AccountUpdated_LogsOnly(t *testing.T) {
 
 	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
 	require.NoError(t, err, "AccountUpdated should not return error")
+}
+
+// --- S3-4: Webhook race condition handling tests ---
+
+func TestFiatService_WebhookRace_OrderNotCreated_ReturnsRetryableError(t *testing.T) {
+	reg := newMockFiatRegistry()
+	reg.Register(&mockFiatProvider{
+		id: "stripe",
+		parsedEvent: &contracts.WebhookEvent{
+			EventID:   "evt_race_notfound",
+			Type:      contracts.WebhookPaymentSucceeded,
+			PaymentID: "pi_race_notfound",
+			OrderID:   "order_not_yet_created",
+		},
+	})
+
+	svc, _ := newFiatTestService(t, reg)
+	svc.SetWebhookHandler(func(_ context.Context, _ *contracts.WebhookEvent) error {
+		t.Fatal("webhook handler should NOT be called when order not found")
+		return nil
+	})
+
+	orderRepo := newMockOrderRepo()
+	orderRepo.findByIDErr = gorm.ErrRecordNotFound
+	svc.SetOrderRepo(orderRepo)
+
+	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
+	require.Error(t, err)
+
+	var retryErr *contracts.RetryableError
+	require.True(t, errors.As(err, &retryErr), "error should be RetryableError")
+	assert.Equal(t, 30*time.Second, retryErr.RetryAfter)
+	assert.Contains(t, retryErr.Error(), "not yet created")
+}
+
+func TestFiatService_WebhookRace_OrderCanceled_AutoRefund(t *testing.T) {
+	provider := &mockFiatProvider{
+		id: "stripe",
+		parsedEvent: &contracts.WebhookEvent{
+			EventID:   "evt_race_canceled",
+			Type:      contracts.WebhookPaymentSucceeded,
+			PaymentID: "pi_race_canceled",
+			OrderID:   "order_already_canceled",
+		},
+		refundResult: &contracts.RefundResult{RefundID: "re_auto_123"},
+	}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+
+	svc, _ := newFiatTestService(t, reg)
+	svc.SetWebhookHandler(func(_ context.Context, _ *contracts.WebhookEvent) error {
+		t.Fatal("webhook handler should NOT be called for canceled orders")
+		return nil
+	})
+
+	orderRepo := newMockOrderRepo()
+	orderRepo.addOrder(&models.Order{
+		ID:    "order_already_canceled",
+		State: models.OrderState_CANCELED,
+	})
+	svc.SetOrderRepo(orderRepo)
+
+	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
+	require.NoError(t, err, "canceled order webhook should succeed (auto-refund)")
+
+	require.Len(t, provider.refundCalls, 1, "should call RefundPayment once")
+	assert.Equal(t, "pi_race_canceled", provider.refundCalls[0].PaymentID)
+	assert.Equal(t, "order_canceled", provider.refundCalls[0].Reason)
+}
+
+func TestFiatService_WebhookRace_AutoRefundFails_NoRetryLoop(t *testing.T) {
+	provider := &mockFiatProvider{
+		id: "stripe",
+		parsedEvent: &contracts.WebhookEvent{
+			EventID:   "evt_race_refund_fail",
+			Type:      contracts.WebhookPaymentSucceeded,
+			PaymentID: "pi_refund_fail",
+			OrderID:   "order_canceled_refund_fail",
+		},
+		refundErr: errors.New("stripe refund API unreachable"),
+	}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+
+	svc, _ := newFiatTestService(t, reg)
+	svc.SetWebhookHandler(func(_ context.Context, _ *contracts.WebhookEvent) error {
+		t.Fatal("webhook handler should NOT be called for canceled orders")
+		return nil
+	})
+
+	orderRepo := newMockOrderRepo()
+	orderRepo.addOrder(&models.Order{
+		ID:    "order_canceled_refund_fail",
+		State: models.OrderState_CANCELED,
+	})
+	svc.SetOrderRepo(orderRepo)
+
+	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
+	require.NoError(t, err, "should return nil even when auto-refund fails, to avoid retry loop")
+
+	require.Len(t, provider.refundCalls, 1, "should attempt refund once")
 }

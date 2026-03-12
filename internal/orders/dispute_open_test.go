@@ -205,6 +205,19 @@ func TestOrderProcessor_processDisputeOpenMessage(t *testing.T) {
 			expectedError: nil,
 			expectedEvent: nil,
 		},
+		{
+			// PaymentSent missing — should park message instead of error.
+			setup: func(order *models.Order) error {
+				order.ID = models.OrderID(orderID)
+				return order.PutMessage(&npb.OrderMessage{
+					Signature:   []byte("abc"),
+					Message:     mustBuildAny(orderOpen),
+					MessageType: npb.OrderMessage_ORDER_OPEN,
+				})
+			},
+			expectedError: nil,
+			expectedEvent: nil,
+		},
 	}
 
 	for i, test := range tests {

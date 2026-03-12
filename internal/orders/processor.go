@@ -249,6 +249,10 @@ func (op *OrderProcessor) ProcessMessage(dbtx database.Tx, message *npb.OrderMes
 			if err := order.PutErrorMessage(parked); err != nil {
 				logger.LogInfoWithIDf(log, op.nodeID, "Error saving errored message for order %s: %s", order.ID.String(), err)
 			}
+		} else {
+			if delErr := order.DeleteParkedMessage(parked.MessageType); delErr != nil {
+				logger.LogInfoWithIDf(log, op.nodeID, "Error deleting processed parked message for order %s: %s", order.ID.String(), delErr)
+			}
 		}
 	}
 

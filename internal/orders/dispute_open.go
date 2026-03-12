@@ -66,6 +66,9 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 	}
 
 	paymentSent, err := order.PaymentSentMessage()
+	if models.IsMessageNotExistError(err) {
+		return nil, order.ParkMessage(message)
+	}
 	if err != nil {
 		return nil, err
 	}

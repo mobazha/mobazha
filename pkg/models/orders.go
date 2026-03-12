@@ -174,6 +174,11 @@ type Order struct {
 	UnreadChatMessages int
 	CreatedAt          time.Time `gorm:"index:idx_order_listing,priority:3,sort:desc"`
 
+	// ExpiresAt is set when the order enters AWAITING_PAYMENT.
+	// Fiat orders: CreatedAt + 1h; crypto orders: CreatedAt + 24h.
+	// The OrderTimeoutScheduler cancels orders past this deadline.
+	ExpiresAt *time.Time `gorm:"index"`
+
 	// Fiat payment fields — populated when a fiat webhook event is processed
 	PaymentTransactionID string `gorm:"index"` // provider payment ID (Stripe PaymentIntent / PayPal Capture)
 	FiatMetadata         []byte // JSON-encoded map[string]string for fiat-specific data (disputes, etc.)

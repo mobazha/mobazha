@@ -3,6 +3,7 @@ package contracts
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 // Sentinel errors for typed error handling in handlers.
@@ -11,6 +12,17 @@ var (
 	ErrProviderNotFound = errors.New("fiat: provider not found")
 	ErrAlreadyRefunded  = errors.New("fiat: payment already refunded")
 )
+
+// RetryableError signals that a webhook should be retried later.
+// The HTTP handler translates this to 503 + Retry-After header,
+// causing Stripe/PayPal to retry automatically.
+type RetryableError struct {
+	Err        error
+	RetryAfter time.Duration
+}
+
+func (e *RetryableError) Error() string { return e.Err.Error() }
+func (e *RetryableError) Unwrap() error { return e.Err }
 
 // FiatPaymentProvider is the core payment interface that all fiat providers must implement.
 // Implementations live in internal/payment/fiat/{stripe,paypal}/.

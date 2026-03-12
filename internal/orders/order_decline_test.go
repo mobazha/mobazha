@@ -83,12 +83,13 @@ func TestOrderProcessor_processOrderDeclineMessage(t *testing.T) {
 	}
 
 	tests := []struct {
+		name          string
 		setup         func(order *models.Order) error
 		expectedError error
 		expectedEvent interface{}
 	}{
 		{
-			// Normal case where order open exists.
+			name: "funded order decline",
 			setup: func(order *models.Order) error {
 				order.ID = "1234"
 				err := order.PutMessage(&npb.OrderMessage{
@@ -116,7 +117,28 @@ func TestOrderProcessor_processOrderDeclineMessage(t *testing.T) {
 			},
 		},
 		{
-			// Order confirmation already exists.
+			name: "unfunded order decline (AWAITING_PAYMENT, no PaymentSent)",
+			setup: func(order *models.Order) error {
+				order.ID = "1234"
+				order.SetFSMState(models.OrderState_AWAITING_PAYMENT)
+				return order.PutMessage(&npb.OrderMessage{
+					Signature: []byte("abc"),
+					Message:   mustBuildAny(orderOpen),
+				})
+			},
+			expectedError: nil,
+			expectedEvent: &events.OrderDeclined{
+				OrderID: "1234",
+				Thumbnail: events.Thumbnail{
+					Tiny:  tinyImageHash,
+					Small: smallImageHash,
+				},
+				VendorHandle: vendorHandle,
+				VendorID:     vendorPeerID,
+			},
+		},
+		{
+			name: "order confirmation already exists",
 			setup: func(order *models.Order) error {
 				order.SerializedOrderDecline = nil
 				order.SerializedOrderConfirmation = []byte{0x00}
@@ -126,7 +148,7 @@ func TestOrderProcessor_processOrderDeclineMessage(t *testing.T) {
 			expectedEvent: nil,
 		},
 		{
-			// Order cancel already exists.
+			name: "order cancel already exists",
 			setup: func(order *models.Order) error {
 				order.SerializedOrderDecline = nil
 				order.SerializedOrderCancel = []byte{0x00}
@@ -136,7 +158,7 @@ func TestOrderProcessor_processOrderDeclineMessage(t *testing.T) {
 			expectedEvent: nil,
 		},
 		{
-			// Duplicate order decline.
+			name: "duplicate order decline",
 			setup: func(order *models.Order) error {
 				return order.PutMessage(&npb.OrderMessage{
 					Signature:   []byte("abc"),
@@ -148,7 +170,7 @@ func TestOrderProcessor_processOrderDeclineMessage(t *testing.T) {
 			expectedEvent: nil,
 		},
 		{
-			// Duplicate but different.
+			name: "duplicate but different",
 			setup: func(order *models.Order) error {
 				msg2 := *orderDecline
 				msg2.Type = pb.OrderDecline_USER_DECLINE
@@ -162,7 +184,7 @@ func TestOrderProcessor_processOrderDeclineMessage(t *testing.T) {
 			expectedEvent: nil,
 		},
 		{
-			// Out of order.
+			name: "out of order (no OrderOpen)",
 			setup: func(order *models.Order) error {
 				order.SerializedOrderOpen = nil
 				return nil
@@ -172,24 +194,25 @@ func TestOrderProcessor_processOrderDeclineMessage(t *testing.T) {
 		},
 	}
 
-	for i, test := range tests {
-		order := &models.Order{}
-		if err := test.setup(order); err != nil {
-			t.Errorf("Test %d setup error: %s", i, err)
-			continue
-		}
-		err := op.db.Update(func(tx database.Tx) error {
-			event, err := op.processOrderDeclineMessage(tx, order, orderMsg)
-			if err != test.expectedError {
-				return fmt.Errorf("incorrect error returned. Expected %t, got %t", test.expectedError, err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			order := &models.Order{}
+			if err := test.setup(order); err != nil {
+				t.Fatalf("setup error: %s", err)
 			}
-			if !reflect.DeepEqual(event, test.expectedEvent) {
-				return fmt.Errorf("incorrect event returned")
+			err := op.db.Update(func(tx database.Tx) error {
+				event, err := op.processOrderDeclineMessage(tx, order, orderMsg)
+				if err != test.expectedError {
+					return fmt.Errorf("incorrect error returned. Expected %v, got %v", test.expectedError, err)
+				}
+				if !reflect.DeepEqual(event, test.expectedEvent) {
+					return fmt.Errorf("incorrect event returned. Expected %v, got %v", test.expectedEvent, event)
+				}
+				return nil
+			})
+			if err != nil {
+				t.Errorf("Error executing db update: %s", err)
 			}
-			return nil
 		})
-		if err != nil {
-			t.Errorf("Error executing db update in test %d: %s", i, err)
-		}
 	}
 }

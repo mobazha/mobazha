@@ -117,6 +117,12 @@ type OrderCancel struct {
 	BuyerID     string    `json:"buyerID"`
 }
 
+type OrderExpired struct {
+	Notification
+	OrderID string `json:"orderID"`
+	Reason  string `json:"reason"` // e.g. "payment_timeout"
+}
+
 type Refund struct {
 	Notification
 	OrderID      string    `json:"orderID"`

@@ -47,12 +47,17 @@ func (op *OrderProcessor) processOrderDeclineMessage(dbtx database.Tx, order *mo
 		return nil, err
 	}
 
-	paymentSent, err := order.PaymentSentMessage()
-	if models.IsMessageNotExistError(err) {
-		return nil, order.ParkMessage(message)
-	}
-	if err != nil {
-		return nil, err
+	unfunded := order.State == models.OrderState_AWAITING_PAYMENT
+
+	var paymentSent *pb.PaymentSent
+	if !unfunded {
+		paymentSent, err = order.PaymentSentMessage()
+		if models.IsMessageNotExistError(err) {
+			return nil, order.ParkMessage(message)
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	event := &events.OrderDeclined{
@@ -66,39 +71,43 @@ func (op *OrderProcessor) processOrderDeclineMessage(dbtx database.Tx, order *mo
 	}
 
 	if order.Role() == models.RoleBuyer {
-		logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_DECLINE message for order %s", order.ID)
-
-		coinType := iwallet.CoinType(paymentSent.Coin)
-
-		if coinType.IsFiatPayment() || coinType.IsStripeChain() {
-			if op.fiatRefundOnDeclineFunc != nil {
-				providerID := orderOpen.FiatProvider
-				if providerID == "" {
-					providerID = "stripe"
-				}
-				if err := op.fiatRefundOnDeclineFunc(
-					order.ID.String(),
-					paymentSent.TransactionID,
-					providerID,
-					orderOpen.PricingCoin,
-				); err != nil {
-					logger.LogErrorWithIDf(log, op.nodeID, "Fiat auto-refund on decline failed for order %s: %v", order.ID, err)
-					return nil, fmt.Errorf("fiat refund failed for order %s, decline aborted: %w", order.ID, err)
-				}
-			}
+		if unfunded {
+			logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_DECLINE for unfunded order %s (AWAITING_PAYMENT)", order.ID)
 		} else {
-			coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
-			if err != nil {
-				return nil, err
-			}
+			logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_DECLINE message for order %s", order.ID)
 
-			if coinInfo.Chain != iwallet.ChainSolana && !coinInfo.IsEthTypeChain() {
-				if order.CanCancel() && paymentSent.Method == pb.PaymentSent_CANCELABLE {
-					wTx, _, err := op.releaseFromCancelableAddress(dbtx, order)
-					if err != nil {
-						return nil, err
+			coinType := iwallet.CoinType(paymentSent.Coin)
+
+			if coinType.IsFiatPayment() || coinType.IsStripeChain() {
+				if op.fiatRefundOnDeclineFunc != nil {
+					providerID := orderOpen.FiatProvider
+					if providerID == "" {
+						providerID = "stripe"
 					}
-					wTx.Commit()
+					if err := op.fiatRefundOnDeclineFunc(
+						order.ID.String(),
+						paymentSent.TransactionID,
+						providerID,
+						orderOpen.PricingCoin,
+					); err != nil {
+						logger.LogErrorWithIDf(log, op.nodeID, "Fiat auto-refund on decline failed for order %s: %v", order.ID, err)
+						return nil, fmt.Errorf("fiat refund failed for order %s, decline aborted: %w", order.ID, err)
+					}
+				}
+			} else {
+				coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
+				if err != nil {
+					return nil, err
+				}
+
+				if coinInfo.Chain != iwallet.ChainSolana && !coinInfo.IsEthTypeChain() {
+					if order.CanCancel() && paymentSent.Method == pb.PaymentSent_CANCELABLE {
+						wTx, _, err := op.releaseFromCancelableAddress(dbtx, order)
+						if err != nil {
+							return nil, err
+						}
+						wTx.Commit()
+					}
 				}
 			}
 		}

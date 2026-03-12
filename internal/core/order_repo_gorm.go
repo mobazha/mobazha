@@ -51,6 +51,7 @@ func (r *GormOrderRepo) FindSales(_ context.Context, filter contracts.OrderFilte
 
 func (r *GormOrderRepo) findOrders(role string, filter contracts.OrderFilter) ([]models.Order, int64, error) {
 	var orders []models.Order
+	var total int64
 
 	stm, args := buildFilterClause(filter)
 	if len(stm) > 0 {
@@ -61,17 +62,25 @@ func (r *GormOrderRepo) findOrders(role string, filter contracts.OrderFilter) ([
 	args = append(args, role)
 
 	err := r.db.View(func(tx database.Tx) error {
+		base := tx.Read().Model(&models.Order{}).Where(stm, args...)
+		if err := base.Count(&total).Error; err != nil {
+			return err
+		}
+
 		q := tx.Read().Where(stm, args...)
 		q = applySortOrder(q, filter)
 		if filter.Limit > 0 {
 			q = q.Limit(filter.Limit)
+		}
+		if filter.Offset > 0 {
+			q = q.Offset(filter.Offset)
 		}
 		return q.Find(&orders).Error
 	})
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, 0, err
 	}
-	return orders, int64(len(orders)), nil
+	return orders, total, nil
 }
 
 func (r *GormOrderRepo) FindUnverifiedPaymentOrders(_ context.Context) ([]models.Order, error) {

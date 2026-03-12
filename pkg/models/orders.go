@@ -102,7 +102,7 @@ type Order struct {
 
 	Transactions []byte
 
-	MyRole string
+	MyRole string `gorm:"index:idx_order_listing,priority:1"`
 
 	Open bool `gorm:"index"`
 
@@ -168,11 +168,11 @@ type Order struct {
 	ParkedMessages  []byte
 	ErroredMessages []byte
 
-	State              OrderState
-	fsmStateSet        bool `gorm:"-"` // transient: true if State was set by FSM (not persisted)
+	State              OrderState `gorm:"index:idx_order_listing,priority:2"`
+	fsmStateSet        bool       `gorm:"-"` // transient: true if State was set by FSM (not persisted)
 	Read               bool
 	UnreadChatMessages int
-	CreatedAt          time.Time
+	CreatedAt          time.Time `gorm:"index:idx_order_listing,priority:3,sort:desc"`
 }
 
 func (o *Order) BeforeSave(tx *gorm.DB) (err error) {

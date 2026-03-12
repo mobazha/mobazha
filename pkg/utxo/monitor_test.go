@@ -90,6 +90,107 @@ func (m *mockPaymentSource) BroadcastTransaction(ctx context.Context, txHex stri
 	return "mock_txid", nil
 }
 
+// failingBroadcastSource fails N times then succeeds
+type failingBroadcastSource struct {
+	mockPaymentSource
+	failCount int
+	callCount int
+	mu        sync.Mutex
+}
+
+func newFailingSource(failCount int) *failingBroadcastSource {
+	return &failingBroadcastSource{
+		mockPaymentSource: mockPaymentSource{
+			healthy: true,
+			chain:   iwallet.ChainBitcoin,
+			txByID:  make(map[string]*iwallet.Transaction),
+		},
+		failCount: failCount,
+	}
+}
+
+func (f *failingBroadcastSource) BroadcastTransaction(ctx context.Context, txHex string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.callCount++
+	if f.callCount <= f.failCount {
+		return "", errors.New("broadcast rejected by network")
+	}
+	return "success_txid", nil
+}
+
+func (f *failingBroadcastSource) IsHealthy() bool { return true }
+
+func TestBroadcastRetry_FailThenSucceed(t *testing.T) {
+	m := NewMonitor(&MonitorConfig{
+		BroadcastMaxRetries: 3,
+		BroadcastBaseDelay:  1 * time.Millisecond,
+	})
+
+	src := newFailingSource(2) // fail twice, succeed on 3rd
+	m.AddSource(iwallet.ChainBitcoin, src)
+
+	txid, err := m.BroadcastTransaction(iwallet.ChainBitcoin, "rawtx_hex")
+	if err != nil {
+		t.Fatalf("Expected success after retries, got: %v", err)
+	}
+	if txid != "success_txid" {
+		t.Errorf("Expected success_txid, got %s", txid)
+	}
+	src.mu.Lock()
+	calls := src.callCount
+	src.mu.Unlock()
+	if calls != 3 {
+		t.Errorf("Expected 3 calls (2 fail + 1 success), got %d", calls)
+	}
+}
+
+func TestBroadcastRetry_AllFail(t *testing.T) {
+	m := NewMonitor(&MonitorConfig{
+		BroadcastMaxRetries: 2,
+		BroadcastBaseDelay:  1 * time.Millisecond,
+	})
+
+	src := newFailingSource(100) // always fail
+	m.AddSource(iwallet.ChainBitcoin, src)
+
+	_, err := m.BroadcastTransaction(iwallet.ChainBitcoin, "rawtx_hex")
+	if err == nil {
+		t.Fatal("Expected error when all retries fail")
+	}
+	src.mu.Lock()
+	calls := src.callCount
+	src.mu.Unlock()
+	// 1 initial + 2 retries = 3 total attempts
+	if calls != 3 {
+		t.Errorf("Expected 3 total attempts (1 initial + 2 retries), got %d", calls)
+	}
+}
+
+func TestBroadcastRetry_NoRetryOnFirstSuccess(t *testing.T) {
+	m := NewMonitor(&MonitorConfig{
+		BroadcastMaxRetries: 3,
+		BroadcastBaseDelay:  1 * time.Millisecond,
+	})
+
+	src := newFailingSource(0) // succeed immediately
+	m.AddSource(iwallet.ChainBitcoin, src)
+
+	txid, err := m.BroadcastTransaction(iwallet.ChainBitcoin, "rawtx_hex")
+	if err != nil {
+		t.Fatalf("Expected success, got: %v", err)
+	}
+	if txid != "success_txid" {
+		t.Errorf("Expected success_txid, got %s", txid)
+	}
+	src.mu.Lock()
+	calls := src.callCount
+	src.mu.Unlock()
+	if calls != 1 {
+		t.Errorf("Expected 1 call (no retry needed), got %d", calls)
+	}
+}
+
 func TestDefaultMonitorConfig(t *testing.T) {
 	config := DefaultMonitorConfig()
 

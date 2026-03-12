@@ -1,7 +1,9 @@
 package wallet
 
 import (
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -230,4 +232,153 @@ func TestChainlinkProviderClose(t *testing.T) {
 	}
 
 	t.Log("Chainlink provider closed successfully")
+}
+
+type mockProvider struct {
+	rates map[models.CurrencyCode]iwallet.Amount
+	err   error
+}
+
+func (m *mockProvider) fetchRates(_ models.CurrencyCode) (map[models.CurrencyCode]iwallet.Amount, error) {
+	return m.rates, m.err
+}
+
+func TestGetRate_StaleFallback(t *testing.T) {
+	goodRates := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(6000000),
+	}
+	mock := &mockProvider{rates: goodRates}
+
+	e := &ExchangeRateProvider{
+		cache:       make(map[models.CurrencyCode]map[models.CurrencyCode]iwallet.Amount),
+		lastQueried: make(map[models.CurrencyCode]time.Time),
+		providers:   []provider{mock},
+	}
+
+	rate, err := e.GetRate("BTC", "USD", false)
+	if err != nil {
+		t.Fatalf("unexpected error on first call: %v", err)
+	}
+	if rate.Int64() != 6000000 {
+		t.Fatalf("expected 6000000, got %d", rate.Int64())
+	}
+
+	mock.rates = nil
+	mock.err = errors.New("provider down")
+
+	e.lastQueried["BTC"] = time.Now().Add(-20 * time.Minute)
+
+	rate, err = e.GetRate("BTC", "USD", false)
+	if err != nil {
+		t.Fatalf("expected stale fallback, got error: %v", err)
+	}
+	if rate.Int64() != 6000000 {
+		t.Fatalf("expected stale value 6000000, got %d", rate.Int64())
+	}
+}
+
+func TestGetRate_NoCacheFails(t *testing.T) {
+	mock := &mockProvider{err: errors.New("provider down")}
+	e := &ExchangeRateProvider{
+		cache:       make(map[models.CurrencyCode]map[models.CurrencyCode]iwallet.Amount),
+		lastQueried: make(map[models.CurrencyCode]time.Time),
+		providers:   []provider{mock},
+	}
+
+	_, err := e.GetRate("BTC", "USD", false)
+	if err == nil {
+		t.Fatal("expected error when no cache and provider fails")
+	}
+}
+
+func TestGetRate_BreakCacheStaleFallback(t *testing.T) {
+	goodRates := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(6000000),
+	}
+	mock := &mockProvider{rates: goodRates}
+
+	e := &ExchangeRateProvider{
+		cache:       make(map[models.CurrencyCode]map[models.CurrencyCode]iwallet.Amount),
+		lastQueried: make(map[models.CurrencyCode]time.Time),
+		providers:   []provider{mock},
+	}
+
+	_, err := e.GetRate("BTC", "USD", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	mock.rates = nil
+	mock.err = errors.New("provider down")
+
+	rate, err := e.GetRate("BTC", "USD", true)
+	if err != nil {
+		t.Fatalf("breakCache=true should still fallback to stale, got error: %v", err)
+	}
+	if rate.Int64() != 6000000 {
+		t.Fatalf("expected stale value 6000000, got %d", rate.Int64())
+	}
+}
+
+func TestGetAllRates_BreakCacheStaleFallback(t *testing.T) {
+	goodRates := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(6000000),
+	}
+	mock := &mockProvider{rates: goodRates}
+
+	e := &ExchangeRateProvider{
+		cache:       make(map[models.CurrencyCode]map[models.CurrencyCode]iwallet.Amount),
+		lastQueried: make(map[models.CurrencyCode]time.Time),
+		providers:   []provider{mock},
+	}
+
+	_, err := e.GetAllRates("BTC", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	mock.rates = nil
+	mock.err = errors.New("provider down")
+
+	rates, err := e.GetAllRates("BTC", true)
+	if err != nil {
+		t.Fatalf("breakCache=true should still fallback to stale, got error: %v", err)
+	}
+	if len(rates) != 1 {
+		t.Fatalf("expected 1 stale rate, got %d", len(rates))
+	}
+}
+
+func TestGetAllRates_StaleFallback(t *testing.T) {
+	goodRates := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(6000000),
+		"EUR": iwallet.NewAmount(5500000),
+	}
+	mock := &mockProvider{rates: goodRates}
+
+	e := &ExchangeRateProvider{
+		cache:       make(map[models.CurrencyCode]map[models.CurrencyCode]iwallet.Amount),
+		lastQueried: make(map[models.CurrencyCode]time.Time),
+		providers:   []provider{mock},
+	}
+
+	rates, err := e.GetAllRates("BTC", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(rates) != 2 {
+		t.Fatalf("expected 2 rates, got %d", len(rates))
+	}
+
+	mock.rates = nil
+	mock.err = errors.New("provider down")
+	e.lastQueried["BTC"] = time.Now().Add(-20 * time.Minute)
+
+	rates, err = e.GetAllRates("BTC", false)
+	if err != nil {
+		t.Fatalf("expected stale fallback, got error: %v", err)
+	}
+	if len(rates) != 2 {
+		t.Fatalf("expected 2 stale rates, got %d", len(rates))
+	}
 }

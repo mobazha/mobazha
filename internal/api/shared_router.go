@@ -40,6 +40,7 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 
 	r := mux.NewRouter()
 	r.Methods("OPTIONS")
+	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
 
 	if cfg.AllowCORS {
 		r.Use(g.CORSAllowAllOriginsMiddleware)

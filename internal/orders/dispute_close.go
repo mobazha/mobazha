@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -117,16 +118,17 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 		return errors.New(errMsg)
 	}
 
-	_, err = iwallet.CoinInfoFromCoinType(iwallet.CoinType(paymentSent.Coin))
+	normalizedCoin := strings.ToUpper(paymentSent.Coin)
+	_, err = iwallet.CoinInfoFromCoinType(iwallet.CoinType(normalizedCoin))
 	if err != nil {
 		return fmt.Errorf("cannot validate order. coin not supported. %w", err)
 	}
 
-	buyerAddrs := newAddressSet(paymentSent.Coin)
+	buyerAddrs := newAddressSet(normalizedCoin)
 	buyerAddrs.Add(paymentSent.PayerAddress)
 	buyerAddrs.Add(paymentSent.RefundAddress)
 
-	vendorAddrs := newAddressSet(paymentSent.Coin)
+	vendorAddrs := newAddressSet(normalizedCoin)
 	if conf, err := order.OrderConfirmationMessage(); err == nil {
 		vendorAddrs.Add(conf.PayoutAddress)
 	}

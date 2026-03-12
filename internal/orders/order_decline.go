@@ -46,9 +46,8 @@ func (op *OrderProcessor) processOrderDeclineMessage(dbtx database.Tx, order *mo
 
 	unfunded := order.State == models.OrderState_AWAITING_PAYMENT
 
-	var paymentSent *pb.PaymentSent
 	if !unfunded {
-		paymentSent, err = order.PaymentSentMessage()
+		_, err = order.PaymentSentMessage()
 		if models.IsMessageNotExistError(err) {
 			return nil, order.ParkMessage(message)
 		}

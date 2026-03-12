@@ -199,6 +199,7 @@ func (g *Gateway) Serve() error {
 func (g *Gateway) newV1Router() *mux.Router {
 	r := mux.NewRouter()
 	r.Methods("OPTIONS")
+	r.Use(maxBodySizeMiddleware(defaultMaxBodySize))
 	g.registerBusinessRoutes(r)
 	return r
 }

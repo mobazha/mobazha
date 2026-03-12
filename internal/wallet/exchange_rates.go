@@ -76,31 +76,40 @@ func NewExchangeRateProvider(sources []string) *ExchangeRateProvider {
 }
 
 // GetRate returns the rate for a given currency converting from the provided base currency.
+// Uses stale-while-revalidate: if providers fail, returns the last known rate from cache.
 func (e *ExchangeRateProvider) GetRate(base models.CurrencyCode, to models.CurrencyCode, breakCache bool) (iwallet.Amount, error) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
 	base = models.CurrencyCode(strings.TrimPrefix(strings.ToUpper(base.String()), "T"))
 
-	// 尝试获取 base 的 Symbol，不同链上相同 Symbol 的汇率是相同的
 	baseForQuery := base
 	if coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(base)); err == nil {
 		baseForQuery = models.CurrencyCode(coinInfo.Symbol)
 	}
 
 	lastQueried := e.lastQueried[baseForQuery]
+	cachedRates, hasCached := e.cache[baseForQuery]
 
-	rates, ok := e.cache[baseForQuery]
-	if breakCache || !ok || lastQueried.Add(time.Minute*10).Before(time.Now()) {
-		var err error
-		rates, err = e.fetchRatesFromProviders(baseForQuery)
+	if breakCache || !hasCached || lastQueried.Add(time.Minute*10).Before(time.Now()) {
+		freshRates, err := e.fetchRatesFromProviders(baseForQuery)
 		if err != nil {
+			if hasCached {
+				staleness := time.Since(lastQueried)
+				fmt.Printf("exchange rate provider failed, using stale cache (age %s) for %s: %v\n", staleness.Round(time.Second), baseForQuery, err)
+				amount, ok := cachedRates[to]
+				if !ok {
+					return amount, errors.New("rate not found")
+				}
+				return amount, nil
+			}
 			return iwallet.NewAmount(0), err
 		}
-		e.cache[baseForQuery] = rates
+		e.cache[baseForQuery] = freshRates
 		e.lastQueried[baseForQuery] = time.Now()
+		cachedRates = freshRates
 	}
-	amount, ok := rates[to]
+	amount, ok := cachedRates[to]
 	if !ok {
 		return amount, errors.New("rate not found")
 	}
@@ -113,29 +122,34 @@ func (e *ExchangeRateProvider) GetUSDRate(coinType iwallet.CoinType) (iwallet.Am
 }
 
 // GetAllRates returns a map of all exchange rates for the provided base currency.
+// Uses stale-while-revalidate: if providers fail, returns the last known rates from cache.
 func (e *ExchangeRateProvider) GetAllRates(base models.CurrencyCode, breakCache bool) (map[models.CurrencyCode]iwallet.Amount, error) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
-	// 尝试获取 base 的 Symbol，不同链上相同 Symbol 的汇率是相同的
 	baseForQuery := base
 	if coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(base)); err == nil {
 		baseForQuery = models.CurrencyCode(coinInfo.Symbol)
 	}
 
 	lastQueried := e.lastQueried[baseForQuery]
+	cachedRates, hasCached := e.cache[baseForQuery]
 
-	rates, ok := e.cache[baseForQuery]
-	if breakCache || !ok || lastQueried.Add(time.Minute*10).Before(time.Now()) {
-		var err error
-		rates, err = e.fetchRatesFromProviders(baseForQuery)
+	if breakCache || !hasCached || lastQueried.Add(time.Minute*10).Before(time.Now()) {
+		freshRates, err := e.fetchRatesFromProviders(baseForQuery)
 		if err != nil {
+			if hasCached {
+				staleness := time.Since(lastQueried)
+				fmt.Printf("exchange rate provider failed, using stale cache (age %s) for %s: %v\n", staleness.Round(time.Second), baseForQuery, err)
+				return cachedRates, nil
+			}
 			return nil, err
 		}
-		e.cache[baseForQuery] = rates
+		e.cache[baseForQuery] = freshRates
 		e.lastQueried[baseForQuery] = time.Now()
+		cachedRates = freshRates
 	}
-	return rates, nil
+	return cachedRates, nil
 }
 
 // fetchRatesFromProviders queries the exchange rate sources serially until it gets a response back.

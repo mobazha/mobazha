@@ -43,7 +43,8 @@ const (
 	CodeConflict       = "CONFLICT"
 	CodeInternalError  = "INTERNAL_ERROR"
 	CodeNotImplemented = "NOT_IMPLEMENTED"
-	CodeServiceUnavail = "SERVICE_UNAVAILABLE"
+	CodeServiceUnavail  = "SERVICE_UNAVAILABLE"
+	CodePayloadTooLarge = "PAYLOAD_TOO_LARGE"
 )
 
 // Success writes 200 + {"data": T}.
@@ -107,6 +108,8 @@ func HttpStatusToCode(status int) string {
 		return CodeConflict
 	case http.StatusNotImplemented:
 		return CodeNotImplemented
+	case http.StatusRequestEntityTooLarge:
+		return CodePayloadTooLarge
 	case http.StatusServiceUnavailable:
 		return CodeServiceUnavail
 	default:

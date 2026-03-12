@@ -82,20 +82,22 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	// Wire verifyDepositFunc to OrderProcessor via PaymentRegistry.
 	// The closure captures the registry and dispatches to the chain-specific
 	// adapter's VerifyDeposit (EVM checks receipt+Funded, UTXO/Solana noop).
-	reg := n.paymentRegistry
-	n.orderService.OrderProcessor().SetVerifyDepositFunc(func(params orders.DepositVerifyParams) error {
-		strategy, err := reg.ForCoin(params.CoinType)
-		if err != nil {
-			return nil
-		}
-		return strategy.VerifyDeposit(context.Background(), payment.DepositVerifyParams{
-			CoinType:     params.CoinType,
-			TxHash:       params.TxHash,
-			Script:       params.Script,
-			ContractAddr: params.ContractAddr,
-			OrderAmount:  params.OrderAmount,
+	if n.orderService != nil {
+		reg := n.paymentRegistry
+		n.orderService.OrderProcessor().SetVerifyDepositFunc(func(params orders.DepositVerifyParams) error {
+			strategy, err := reg.ForCoin(params.CoinType)
+			if err != nil {
+				return nil
+			}
+			return strategy.VerifyDeposit(context.Background(), payment.DepositVerifyParams{
+				CoinType:     params.CoinType,
+				TxHash:       params.TxHash,
+				Script:       params.Script,
+				ContractAddr: params.ContractAddr,
+				OrderAmount:  params.OrderAmount,
+			})
 		})
-	})
+	}
 }
 
 // ── Thin delegates for strategy callbacks ────────────────────────────────

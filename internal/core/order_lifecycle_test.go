@@ -206,8 +206,19 @@ func setupMockNetDB(t *testing.T, nodes []*MobazhaNode) {
 	for _, node := range nodes {
 		ndb, _ := netdb.NewNetDB(server.URL, node.peerID.String(), node.privKey)
 		node.netDB = ndb
-		node.initListingService()
-		node.initProfileService()
+		// Patch netDB into existing service instances rather than re-creating
+		// them, so cross-service references (e.g. OrderAppService.listings)
+		// remain valid.
+		if node.listingService != nil {
+			node.listingService.netDB = ndb
+		} else {
+			node.initListingService()
+		}
+		if node.profileService != nil {
+			node.profileService.netDB = ndb
+		} else {
+			node.initProfileService()
+		}
 		node.initRatingsService()
 	}
 }

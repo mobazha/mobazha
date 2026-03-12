@@ -279,4 +279,37 @@ type PaymentStrategy interface {
 	// Params used: OrderID, InitiatorAddr, PaymentCoin, PaymentAmount,
 	// Chaincode, Script.
 	GetDisputeReleaseInstructions(ctx context.Context, params InstructionParams) (*InstructionResult, error)
+
+	// ── Deposit Verification ──────────────────────────────
+	//
+	// VerifyDeposit checks that the buyer's deposit is valid on-chain.
+	//
+	// Monitored (UTXO): noop — Electrum handles deposit detection.
+	// ClientSigned (EVM): checks receipt status + Funded event + escrow hash + amount.
+	// ClientSigned (Solana): noop for now (Batch 2).
+	//
+	// Returns nil if verification succeeds or is not applicable.
+	// Returns a sentinel error (ErrDepositReverted, etc.) for permanent failures.
+	VerifyDeposit(ctx context.Context, params DepositVerifyParams) error
+}
+
+// ── Deposit Verification Params ─────────────────────────────────
+
+// DepositVerifyParams provides chain-agnostic parameters for on-chain
+// deposit verification. Each chain adapter extracts the subset it needs.
+type DepositVerifyParams struct {
+	// CoinType identifies the payment coin (for chain resolution).
+	CoinType iwallet.CoinType
+
+	// TxHash is the transaction hash reported by the buyer.
+	TxHash string
+
+	// Script is the hex-encoded escrow script (EVM: serialized EthRedeemScript).
+	Script string
+
+	// ContractAddr is the escrow contract address.
+	ContractAddr string
+
+	// OrderAmount is the expected payment amount in minimal units (wei, lamports).
+	OrderAmount string
 }

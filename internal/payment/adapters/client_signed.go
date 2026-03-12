@@ -21,6 +21,11 @@ type ChainOps interface {
 	BuildCancelableRelease(order *models.Order, initiator, receiver string) (any, error)
 	BuildCompleteEscrow(order *models.Order, initiator string, release *pb.EscrowRelease) (any, error)
 	BuildDisputeRelease(order *models.Order, initiator string) (any, error)
+
+	// VerifyDeposit verifies that the buyer's deposit transaction is valid on-chain.
+	// For EVM: checks receipt status, Funded event, escrow hash, and minimum amount.
+	// For Solana: noop (Batch 2).
+	VerifyDeposit(ctx context.Context, params payment.DepositVerifyParams) error
 }
 
 // BuildInitEscrowFn builds escrow initialization instructions.
@@ -152,4 +157,10 @@ func (a *ClientSignedAdapter) GetDisputeReleaseInstructions(_ context.Context, p
 		return nil, err
 	}
 	return &payment.InstructionResult{Instructions: instructions}, nil
+}
+
+// ── Deposit Verification ────────────────────────────────────────
+
+func (a *ClientSignedAdapter) VerifyDeposit(ctx context.Context, params payment.DepositVerifyParams) error {
+	return a.ops.VerifyDeposit(ctx, params)
 }

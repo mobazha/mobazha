@@ -120,3 +120,8 @@ func (a *UTXOAutoConfirmAdapter) GetCompleteInstructions(_ context.Context, _ pa
 func (a *UTXOAutoConfirmAdapter) GetDisputeReleaseInstructions(_ context.Context, _ payment.InstructionParams) (*payment.InstructionResult, error) {
 	return &payment.InstructionResult{Instructions: nil}, nil
 }
+
+// VerifyDeposit is a noop for UTXO — Electrum handles deposit detection.
+func (a *UTXOAutoConfirmAdapter) VerifyDeposit(_ context.Context, _ payment.DepositVerifyParams) error {
+	return nil
+}

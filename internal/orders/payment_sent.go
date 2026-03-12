@@ -1,6 +1,7 @@
 package orders
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -10,6 +11,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -101,6 +103,25 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 				logger.LogInfoWithIDf(log, op.nodeID,
 					"Payment tx %s not yet on-chain for order %s, will retry in verification loop",
 					paymentSent.TransactionID, order.ID)
+			}
+			if err == nil && tx != nil && op.verifyDepositFunc != nil {
+				if verifyErr := op.verifyDepositFunc(DepositVerifyParams{
+					CoinType:     coinType,
+					TxHash:       paymentSent.TransactionID,
+					Script:       paymentSent.Script,
+					ContractAddr: order.PaymentAddress,
+					OrderAmount:  orderOpen.Amount,
+				}); verifyErr != nil {
+					if errors.Is(verifyErr, payment.ErrDepositReverted) ||
+						errors.Is(verifyErr, payment.ErrDepositEventNotFound) ||
+						errors.Is(verifyErr, payment.ErrDepositTargetInvalid) {
+						return nil, fmt.Errorf("deposit verification failed for order %s: %w", order.ID, verifyErr)
+					}
+					logger.LogInfoWithIDf(log, op.nodeID,
+						"Deposit verification pending for order %s: %v", order.ID, verifyErr)
+					tx = nil
+					err = verifyErr
+				}
 			}
 		}
 		if err == nil && tx != nil {

@@ -1,8 +1,13 @@
 package adapters
 
 import (
+	"context"
+	"encoding/hex"
 	"fmt"
+	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
+	eth "github.com/mobazha/mobazha3.0/internal/multiwallet/coins/eth"
 	evmpayment "github.com/mobazha/mobazha3.0/internal/payment/evm"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -75,4 +80,60 @@ func (o *EVMChainOps) BuildDisputeRelease(order *models.Order, initiator string)
 		return nil, fmt.Errorf("failed to get EVM master key: %w", err)
 	}
 	return evmpayment.BuildDisputeReleaseInstructions(order, o.Multiwallet, ethKey, initiator, o.BuildReleaseTxn)
+}
+
+// VerifyDeposit checks the buyer's EVM deposit on-chain:
+// receipt status, Funded event, escrow hash match, and minimum amount.
+func (o *EVMChainOps) VerifyDeposit(ctx context.Context, params payment.DepositVerifyParams) error {
+	coinInfo, err := iwallet.CoinInfoFromCoinType(params.CoinType)
+	if err != nil || !coinInfo.IsEthTypeChain() {
+		return nil
+	}
+
+	wallet, ok := o.Multiwallet.WalletForChain(coinInfo.Chain)
+	if !ok {
+		return nil
+	}
+
+	ethWallet, ok := wallet.(*eth.ETHWallet)
+	if !ok || ethWallet.ChainClient == nil {
+		return nil
+	}
+
+	fetcher, ok := ethWallet.ChainClient.(eth.EVMReceiptFetcher)
+	if !ok {
+		return nil
+	}
+
+	if params.Script == "" {
+		return nil
+	}
+	scriptBytes, err := hex.DecodeString(params.Script)
+	if err != nil {
+		return fmt.Errorf("decode script hex: %w", err)
+	}
+
+	script, err := eth.DeserializeEthScript(scriptBytes)
+	if err != nil {
+		return fmt.Errorf("deserialize escrow script: %w", err)
+	}
+
+	escrowHash, _, err := eth.CalculateRedeemScriptHash(script)
+	if err != nil {
+		return fmt.Errorf("calculate escrow hash: %w", err)
+	}
+
+	amount := new(big.Int)
+	if params.OrderAmount != "" {
+		amount.SetString(params.OrderAmount, 10)
+	}
+
+	expectedAddr := common.HexToAddress(params.ContractAddr)
+
+	return eth.VerifyDeposit(ctx, fetcher, eth.DepositVerification{
+		TxHash:       params.TxHash,
+		EscrowHash:   escrowHash,
+		ExpectedAddr: expectedAddr,
+		MinAmount:    amount,
+	})
 }

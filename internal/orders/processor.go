@@ -32,6 +32,17 @@ var (
 	ErrUnexpectedMessage = errors.New("unexpected message")
 )
 
+// DepositVerifyParams holds chain-agnostic parameters for on-chain deposit verification.
+// The OrderProcessor receives these via verifyDepositFunc, which routes through
+// PaymentRegistry to the appropriate chain adapter (EVM, Solana, UTXO noop).
+type DepositVerifyParams struct {
+	CoinType     iwallet.CoinType
+	TxHash       string
+	Script       string
+	ContractAddr string
+	OrderAmount  string
+}
+
 // StateValidator is the interface for validating order state transitions using mobazha-core.
 // This allows the processor to validate transitions without hard-depending on the bridge package.
 type StateValidator interface {
@@ -51,8 +62,8 @@ type Config struct {
 	ExchangeRateProvider     *wallet.ExchangeRateProvider
 	EventBus                 events.Bus
 	CalcCIDFunc         func(file []byte) (cid.Cid, error)
-	GetFiatPaymentFunc  func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
-	FeatureManager      *pkgconfig.FeatureManager
+	GetFiatPaymentFunc   func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
+	FeatureManager       *pkgconfig.FeatureManager
 
 	// StateValidator is an optional core state machine validator (typically OrderStateBridge).
 	// When set, the FSM becomes the authoritative source for order state transitions:
@@ -76,6 +87,7 @@ type OrderProcessor struct {
 	bus                      events.Bus
 	calcCIDFunc        func(file []byte) (cid.Cid, error)
 	getFiatPaymentFunc func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
+	verifyDepositFunc  func(params DepositVerifyParams) error
 	featureManager     *pkgconfig.FeatureManager
 	stateValidator           StateValidator
 }
@@ -97,6 +109,12 @@ func NewOrderProcessor(cfg *Config) *OrderProcessor {
 		featureManager:     cfg.FeatureManager,
 		stateValidator:           cfg.StateValidator,
 	}
+}
+
+// SetVerifyDepositFunc sets the chain-agnostic deposit verification function.
+// Called from registerPaymentStrategies() after the PaymentRegistry is ready.
+func (op *OrderProcessor) SetVerifyDepositFunc(fn func(params DepositVerifyParams) error) {
+	op.verifyDepositFunc = fn
 }
 
 // GetFiatPayment retrieves fiat payment details via the registered provider.

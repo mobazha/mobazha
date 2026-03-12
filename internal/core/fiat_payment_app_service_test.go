@@ -45,6 +45,10 @@ func (m *mockFiatProvider) GetPayment(_ context.Context, _ string) (*contracts.P
 	return m.getResult, m.getErr
 }
 
+func (m *mockFiatProvider) RefundPayment(_ context.Context, _ contracts.RefundParams) (*contracts.RefundResult, error) {
+	return nil, nil
+}
+
 func (m *mockFiatProvider) ParseWebhook(_ context.Context, _ []byte, _ map[string]string) (*contracts.WebhookEvent, error) {
 	if m.parseErr != nil {
 		return nil, m.parseErr

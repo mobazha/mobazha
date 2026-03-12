@@ -154,6 +154,12 @@ type Config struct {
 	// only Basic Auth is available. The certificate can be provided directly
 	// in the config file or fetched from SaaSAPIURL on first boot.
 	CasdoorCertificate string `long:"casdoorcertificate" description:"PEM certificate from SaaS Casdoor for JWT validation"`
+
+	// OwnerUserID is the Casdoor User ID of the store owner, used for
+	// JWT admin authorization in standalone mode. Typically fetched from
+	// SaaS store_registry.owner_user_id during startup. When empty,
+	// JWT auth falls back to peerID-based comparison (legacy behavior).
+	OwnerUserID string `long:"owneruserid" description:"Casdoor User ID of the store owner for JWT admin auth"`
 }
 
 // LoadConfig initializes and parses the config using a config file and command

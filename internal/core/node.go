@@ -17,7 +17,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet/utxo"
+	"github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/notifier"
 	"github.com/mobazha/mobazha3.0/internal/orders"
@@ -160,6 +160,7 @@ type lifecycleFields struct {
 	initialBootstrapChan chan struct{}
 	shutdown             chan struct{}
 	stopped              int32
+	orderLockManager     *OrderLockManager
 }
 
 // appServices groups all extracted App Service dependencies.
@@ -184,7 +185,8 @@ type appServices struct {
 	fiatRegistry        contracts.FiatProviderRegistry
 	fiatPaymentService  *FiatPaymentAppService
 	shippingService     *ShippingAppService
-	analyticsService    *AnalyticsAppService
+	analyticsService           *AnalyticsAppService
+	paymentVerificationService *PaymentVerificationService
 }
 
 // IsDefaultNode returns whether this node is the default node.
@@ -218,21 +220,6 @@ func (n *MobazhaNode) Start() {
 	go func() {
 		if err := n.checkRepoMigration(); err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID, "checkRepoMigration failed, %v", err)
-		}
-	}()
-
-	// Migrate and sync shipping profiles at startup
-	// 1. CheckAndMigrateShippingProfiles: For users who haven't migrated yet (have shippingOptions but no shippingProfiles)
-	// 2. SyncShippingProfilesToListings: For users who migrated via frontend but listings weren't updated
-	go func() {
-		if n.preferencesService == nil {
-			return
-		}
-		if err := n.preferencesService.CheckAndMigrateShippingProfiles(); err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "CheckAndMigrateShippingProfiles failed, %v", err)
-		}
-		if err := n.preferencesService.SyncShippingProfilesToListings(); err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "SyncShippingProfilesToListings failed, %v", err)
 		}
 	}()
 
@@ -286,9 +273,9 @@ func (n *MobazhaNode) Start() {
 		// This handles UTXO, EVM, and (future) Solana chains via event dispatch
 		n.paymentService.StartCancelablePaymentMonitor()
 
-		// Start RWA instant buy monitor for auto-confirmation
-		// This handles RWA instant buy (atomic swap) orders that complete on-chain
-		n.startRwaInstantBuyMonitor()
+		// Start event-driven monitors for payment→order decoupling
+		// Handles auto-confirm, UTXO payment detection, and RWA instant buy via EventBus
+		n.startPaymentEventMonitors()
 	}
 
 	// Add log to verify connection reuse
@@ -342,6 +329,9 @@ func (n *MobazhaNode) Stop(force bool) error {
 		}
 		if n.orderProcessor != nil {
 			n.orderProcessor.Stop()
+		}
+		if n.orderLockManager != nil {
+			n.orderLockManager.Stop()
 		}
 		if n.followerTracker != nil {
 			n.followerTracker.Close()
@@ -432,7 +422,7 @@ func (n *MobazhaNode) DestroyNode() {
 
 // Multiwallet returns the WalletOperator interface.
 // Internal callers that need concrete map access can type-assert to
-// *multiwallet.Multiwallet.
+// *chains.Multiwallet.
 func (n *MobazhaNode) Multiwallet() contracts.WalletOperator {
 	return n.multiwallet
 }

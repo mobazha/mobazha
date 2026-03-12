@@ -19,9 +19,6 @@ import (
 	"gorm.io/gorm"
 )
 
-type UpdateAndSaveProfileFunc func(tx database.Tx) error
-type GetMyProfileFunc func() (*models.Profile, error)
-
 type FollowAppService struct {
 	db       database.Database
 	messenger contracts.Messenger
@@ -29,9 +26,7 @@ type FollowAppService struct {
 	nodeID    string
 	netDB     *netdb.NetDB
 
-	coTenantPublicData   contracts.CoTenantPublicDataFn
-	updateAndSaveProfile UpdateAndSaveProfileFunc
-	getMyProfile         GetMyProfileFunc
+	coTenantPublicData contracts.CoTenantPublicDataFn
 }
 
 type FollowAppServiceConfig struct {
@@ -41,21 +36,17 @@ type FollowAppServiceConfig struct {
 	NodeID    string
 	NetDB     *netdb.NetDB
 
-	CoTenantPublicData   contracts.CoTenantPublicDataFn
-	UpdateAndSaveProfile UpdateAndSaveProfileFunc
-	GetMyProfile         GetMyProfileFunc
+	CoTenantPublicData contracts.CoTenantPublicDataFn
 }
 
 func NewFollowAppService(cfg FollowAppServiceConfig) *FollowAppService {
 	return &FollowAppService{
-		db:                   cfg.DB,
-		messenger:            cfg.Messenger,
-		eventBus:             cfg.EventBus,
-		nodeID:               cfg.NodeID,
-		netDB:                cfg.NetDB,
-		coTenantPublicData:   cfg.CoTenantPublicData,
-		updateAndSaveProfile: cfg.UpdateAndSaveProfile,
-		getMyProfile:         cfg.GetMyProfile,
+		db:                 cfg.DB,
+		messenger:          cfg.Messenger,
+		eventBus:           cfg.EventBus,
+		nodeID:             cfg.NodeID,
+		netDB:              cfg.NetDB,
+		coTenantPublicData: cfg.CoTenantPublicData,
 	}
 }
 
@@ -86,12 +77,6 @@ func (s *FollowAppService) FollowNode(peerID peer.ID, done chan<- struct{}) erro
 
 		if err := tx.SetFollowing(following); err != nil {
 			return err
-		}
-
-		if s.updateAndSaveProfile != nil {
-			if err := s.updateAndSaveProfile(tx); err != nil {
-				return err
-			}
 		}
 
 		msg := newMessageWithID()
@@ -144,12 +129,6 @@ func (s *FollowAppService) UnfollowNode(peerID peer.ID, done chan<- struct{}) er
 
 		if err := tx.SetFollowing(following); err != nil {
 			return err
-		}
-
-		if s.updateAndSaveProfile != nil {
-			if err := s.updateAndSaveProfile(tx); err != nil {
-				return err
-			}
 		}
 
 		msg := newMessageWithID()
@@ -266,13 +245,7 @@ func (s *FollowAppService) HandleFollowMessage(from peer.ID, message *pb.Message
 		}
 		followers = append(followers, from.String())
 
-		err = tx.SetFollowers(followers)
-
-		if s.updateAndSaveProfile != nil {
-			s.updateAndSaveProfile(tx)
-		}
-
-		return err
+		return tx.SetFollowers(followers)
 	})
 
 	if err != nil && err != ErrAlreadyFollowing {
@@ -320,13 +293,7 @@ func (s *FollowAppService) HandleUnFollowMessage(from peer.ID, message *pb.Messa
 			return ErrNotFollowing
 		}
 
-		err = tx.SetFollowers(followers)
-
-		if s.updateAndSaveProfile != nil {
-			s.updateAndSaveProfile(tx)
-		}
-
-		return err
+		return tx.SetFollowers(followers)
 	})
 	if err != nil && err != ErrNotFollowing {
 		return err
@@ -349,10 +316,8 @@ func (s *FollowAppService) syncFollowingToNetDB() {
 			if following, err := s.GetMyFollowing(); err == nil {
 				s.netDB.SetOwnFollowing(following)
 			}
-			if s.getMyProfile != nil {
-				if profile, err := s.getMyProfile(); err == nil {
-					s.netDB.SetOwnProfile(profile)
-				}
+			if profile, err := getProfileWithStats(s.db); err == nil {
+				s.netDB.SetOwnProfile(profile)
 			}
 		}
 	}()
@@ -364,10 +329,8 @@ func (s *FollowAppService) syncFollowersToNetDB() {
 			if followers, err := s.GetMyFollowers(); err == nil {
 				s.netDB.SetOwnFollowers(followers)
 			}
-			if s.getMyProfile != nil {
-				if profile, err := s.getMyProfile(); err == nil {
-					s.netDB.SetOwnProfile(profile)
-				}
+			if profile, err := getProfileWithStats(s.db); err == nil {
+				s.netDB.SetOwnProfile(profile)
 			}
 		}
 	}()

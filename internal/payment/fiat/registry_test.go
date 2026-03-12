@@ -25,6 +25,9 @@ func (s *stubProvider) GetPayment(_ context.Context, _ string) (*contracts.Payme
 func (s *stubProvider) ParseWebhook(_ context.Context, _ []byte, _ map[string]string) (*contracts.WebhookEvent, error) {
 	return nil, nil
 }
+func (s *stubProvider) RefundPayment(_ context.Context, _ contracts.RefundParams) (*contracts.RefundResult, error) {
+	return nil, nil
+}
 
 func TestRegistry_RegisterAndLookup(t *testing.T) {
 	reg := NewRegistry()

@@ -2,9 +2,6 @@ package paypal
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -40,15 +37,17 @@ type Config struct {
 // Provider implements contracts.FiatPaymentProvider and contracts.FiatOnboardingProvider
 // for PayPal Commerce Platform (PPCP) Partner and Direct modes.
 type Provider struct {
-	config Config
-	client *apiClient
+	config   Config
+	client   *apiClient
+	sigCache *signatureCache
 }
 
 // NewProvider creates a new PayPal provider with the given configuration.
 func NewProvider(cfg Config) *Provider {
 	return &Provider{
-		config: cfg,
-		client: newAPIClient(cfg.ClientID, cfg.ClientSecret, cfg.Sandbox),
+		config:   cfg,
+		client:   newAPIClient(cfg.ClientID, cfg.ClientSecret, cfg.Sandbox),
+		sigCache: newSignatureCache(),
 	}
 }
 
@@ -170,8 +169,8 @@ func (p *Provider) GetPayment(ctx context.Context, paymentID string) (*contracts
 	return detail, nil
 }
 
-func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[string]string) (*contracts.WebhookEvent, error) {
-	if err := p.verifyWebhookSignature(payload, headers); err != nil {
+func (p *Provider) ParseWebhook(ctx context.Context, payload []byte, headers map[string]string) (*contracts.WebhookEvent, error) {
+	if err := p.verifyWebhookViaAPI(ctx, payload, headers); err != nil {
 		return nil, fmt.Errorf("%w: %v", contracts.ErrWebhookSignature, err)
 	}
 
@@ -181,8 +180,9 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 	}
 
 	we := &contracts.WebhookEvent{
-		EventID: event.ID,
-		Raw:     &event,
+		EventID:    event.ID,
+		ProviderID: providerID,
+		Raw:        &event,
 	}
 
 	switch event.EventType {
@@ -211,6 +211,57 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 	}
 
 	return we, nil
+}
+
+func (p *Provider) RefundPayment(ctx context.Context, params contracts.RefundParams) (*contracts.RefundResult, error) {
+	// PayPal Capture Refund API: POST /v2/payments/captures/{captureID}/refund
+	path := fmt.Sprintf("/v2/payments/captures/%s/refund", params.PaymentID)
+
+	body := make(map[string]interface{})
+	if params.Amount != nil {
+		body["amount"] = map[string]string{
+			"value":         formatAmount(*params.Amount, params.Currency),
+			"currency_code": strings.ToUpper(params.Currency),
+		}
+	}
+	if params.Reason != "" {
+		body["note_to_payer"] = params.Reason
+	}
+
+	var resp refundResponse
+	if err := p.client.doJSON(ctx, "POST", path, body, &resp); err != nil {
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "422") && strings.Contains(errMsg, "CAPTURE_FULLY_REFUNDED") {
+			return nil, contracts.ErrAlreadyRefunded
+		}
+		return nil, fmt.Errorf("paypal refund: %w", err)
+	}
+
+	result := &contracts.RefundResult{
+		RefundID: resp.ID,
+		Status:   mapRefundStatus(resp.Status),
+	}
+	if resp.Amount.Value != "" {
+		if v, err := parseAmount(resp.Amount.Value); err == nil {
+			result.Amount = v
+		}
+		result.Currency = strings.ToUpper(resp.Amount.CurrencyCode)
+	}
+
+	return result, nil
+}
+
+func mapRefundStatus(status string) string {
+	switch status {
+	case "COMPLETED":
+		return "succeeded"
+	case "PENDING":
+		return "pending"
+	case "CANCELLED":
+		return "failed"
+	default:
+		return "pending"
+	}
 }
 
 // --- FiatOnboardingProvider (SaaS / PPCP Partner) ---
@@ -309,40 +360,6 @@ func (p *Provider) GetAccountStatus(ctx context.Context, accountID string) (*con
 
 // --- Helpers ---
 
-func (p *Provider) verifyWebhookSignature(payload []byte, headers map[string]string) error {
-	if p.config.WebhookID == "" {
-		return nil
-	}
-
-	transmissionID := getHeader(headers, "Paypal-Transmission-Id")
-	transmissionTime := getHeader(headers, "Paypal-Transmission-Time")
-	transmissionSig := getHeader(headers, "Paypal-Transmission-Sig")
-
-	if transmissionID == "" || transmissionTime == "" || transmissionSig == "" {
-		return fmt.Errorf("missing required PayPal webhook headers")
-	}
-
-	// HMAC-SHA256 verification: H(transmissionID|transmissionTime|webhookID|CRC32(payload))
-	mac := hmac.New(sha256.New, []byte(p.config.WebhookID))
-	mac.Write([]byte(transmissionID))
-	mac.Write([]byte("|"))
-	mac.Write([]byte(transmissionTime))
-	mac.Write([]byte("|"))
-	mac.Write([]byte(p.config.WebhookID))
-	mac.Write([]byte("|"))
-	mac.Write(payload)
-	expected := hex.EncodeToString(mac.Sum(nil))
-
-	if !hmac.Equal([]byte(expected), []byte(transmissionSig)) {
-		// PayPal webhook verification is complex (uses certificate-based verification).
-		// For production, the recommended approach is to call PayPal's verify-webhook-signature API.
-		// For now, we accept the event if basic headers are present and let the
-		// idempotency layer handle any replay concerns.
-		// TODO: Implement full certificate-based verification via POST /v1/notifications/verify-webhook-signature
-	}
-
-	return nil
-}
 
 func (p *Provider) extractResourceDetails(raw json.RawMessage, we *contracts.WebhookEvent) {
 	var res webhookResource

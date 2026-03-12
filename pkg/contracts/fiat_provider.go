@@ -9,6 +9,7 @@ import (
 var (
 	ErrWebhookSignature = errors.New("fiat: invalid webhook signature")
 	ErrProviderNotFound = errors.New("fiat: provider not found")
+	ErrAlreadyRefunded  = errors.New("fiat: payment already refunded")
 )
 
 // FiatPaymentProvider is the core payment interface that all fiat providers must implement.
@@ -33,6 +34,12 @@ type FiatPaymentProvider interface {
 	// ParseWebhook validates the webhook signature and parses the event payload
 	// into a standardized WebhookEvent.
 	ParseWebhook(ctx context.Context, payload []byte, headers map[string]string) (*WebhookEvent, error)
+
+	// RefundPayment issues a full or partial refund for a previously captured payment.
+	//   Stripe: creates a Refund on the PaymentIntent
+	//   PayPal: calls POST /v2/payments/captures/{captureID}/refund
+	// Pass nil Amount for a full refund.
+	RefundPayment(ctx context.Context, params RefundParams) (*RefundResult, error)
 }
 
 // FiatOnboardingProvider is an optional extension for SaaS OAuth-based seller onboarding.

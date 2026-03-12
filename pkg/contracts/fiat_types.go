@@ -82,12 +82,13 @@ type PaymentDetail struct {
 
 // WebhookEvent is the standardized representation of a provider webhook event.
 type WebhookEvent struct {
-	EventID   string           // original event ID (for idempotency dedup)
-	Type      WebhookEventType // standardized event type
-	PaymentID string           // provider's payment ID
-	OrderID   string           // extracted from metadata
-	AccountID string           // seller's account ID (for SaaS routing)
-	Raw       interface{}      // original parsed event object
+	EventID    string           // original event ID (for idempotency dedup)
+	Type       WebhookEventType // standardized event type
+	ProviderID string           // fiat provider: "stripe" | "paypal"
+	PaymentID  string           // provider's payment ID
+	OrderID    string           // extracted from metadata
+	AccountID  string           // seller's account ID (for SaaS routing)
+	Raw        interface{}      // original parsed event object
 
 	// Enriched fields (best-effort, may be zero-valued if provider API is unreachable)
 	Coin          string            // e.g. "fiat:USD" — used by PaymentSent to identify fiat payments
@@ -176,4 +177,47 @@ type ProviderConfigInput struct {
 	PublicKey     string `json:"publicKey"`
 	SecretKey     string `json:"secretKey"`
 	WebhookSecret string `json:"webhookSecret"`
+}
+
+// RefundParams holds the parameters for refunding a fiat payment.
+type RefundParams struct {
+	// PaymentID is the original payment identifier.
+	//   Stripe: PaymentIntent ID (pi_xxx)
+	//   PayPal: Capture ID
+	PaymentID string
+
+	// Amount is the refund amount in smallest currency unit (e.g. cents).
+	// nil = full refund; non-nil = partial refund.
+	Amount *int64
+
+	// Currency is the ISO 4217 code (e.g. "USD", "EUR").
+	Currency string
+
+	// Reason describes why the refund is issued.
+	//   Stripe: "requested_by_customer" | "duplicate" | "fraudulent"
+	//   PayPal: free-text note_to_payer
+	Reason string
+
+	// Metadata holds additional key-value pairs (e.g. orderID).
+	Metadata map[string]string
+}
+
+// RefundResult holds the outcome of a refund operation.
+type RefundResult struct {
+	// RefundID is the provider-assigned refund identifier.
+	//   Stripe: re_xxx
+	//   PayPal: refund ID
+	RefundID string
+
+	// Status indicates the refund state:
+	//   "succeeded" — refund completed
+	//   "pending"   — refund in progress (PayPal may be async)
+	//   "failed"    — refund failed
+	Status string
+
+	// Amount is the actual refunded amount in smallest currency unit.
+	Amount int64
+
+	// Currency is the ISO 4217 currency code.
+	Currency string
 }

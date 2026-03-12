@@ -77,15 +77,19 @@ func TestMobazhaNode_SavePreferences(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sl, err := node.Listing().GetMyListingBySlug("ron-swanson-shirt")
+	savedPrefs2, err := node.Preferences().GetPreferences()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(sl.Listing.GetModerators()) != 1 {
-		t.Errorf("Expected 1 mod got %d", len(sl.Listing.GetModerators()))
+	savedMods, err := savedPrefs2.StoreModerators()
+	if err != nil {
+		t.Fatal(err)
 	}
-	if sl.Listing.GetModerators()[0] != mods[0] {
-		t.Errorf("Expected moderator %s, got %s", mods[0], sl.Listing.GetModerators()[0])
+	if len(savedMods) != 1 {
+		t.Fatalf("Expected 1 mod in preferences, got %d", len(savedMods))
+	}
+	if savedMods[0].String() != mods[0] {
+		t.Errorf("Expected moderator %s, got %s", mods[0], savedMods[0].String())
 	}
 }
 

@@ -86,6 +86,10 @@ func init() {
 		{Category: "payment", Name: "payment.expired", Persistent: true, Sample: new(PaymentExpiredNotification)},
 		{Category: "payment", Name: "payment.cancelled", Persistent: true, Sample: new(PaymentCancelledByBuyer)},
 		{Category: "payment", Name: "payment.partial", Sample: new(PartialPaymentReceived)},
+
+		// ── Internal domain events (non-persistent, no WebSocket push) ──
+		{Category: "internal", Name: "internal.order_auto_confirm", Sample: new(OrderAutoConfirmRequest)},
+		{Category: "internal", Name: "internal.utxo_payment_detected", Sample: new(UTXOPaymentDetected)},
 	}
 
 	typeIndex = make(map[reflect.Type]*EventMeta, len(registry)*2)

@@ -1,6 +1,8 @@
 package orders
 
 import (
+	"context"
+	"errors"
 	"fmt"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -10,6 +12,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -38,18 +41,13 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 
-	wallet, err := op.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
-	if err != nil {
-		return nil, fmt.Errorf("cannot validate paymentSent. coin not supported. %w", err)
-	}
+	coinType := iwallet.CoinType(paymentSent.Coin)
 
-	if err := utils.ValidatePayment(orderOpen, paymentSent, paymentSent.EscrowTimeoutHours, wallet); err != nil {
+	if err := op.validatePaymentSent(coinType, orderOpen, paymentSent); err != nil {
 		logger.LogInfoWithIDf(log, op.nodeID, "Failed to validate payment sent message: %s", err)
 		return nil, err
 	}
 
-	// Set payment address from PaymentSent message for future reference
-	// This is needed by refund, cancel, and other operations that need to match addresses
 	order.PaymentAddress = paymentSent.ToAddress
 
 	err = order.PutMessage(message)
@@ -62,8 +60,6 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 
-	// Check if transaction is already known
-	// If known, skip fetching/recording but continue to event emission logic
 	transactionKnown := false
 	for _, tx := range txs {
 		if tx.ID.String() == paymentSent.TransactionID {
@@ -73,67 +69,173 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		}
 	}
 
-	// ADR-7: Chain Verification First — only record transaction if wallet confirms it on-chain.
-	// If GetTransaction fails, the MobazhaNode-level payment verification loop will retry.
-	var tx *iwallet.Transaction
+	var verifiedTx *iwallet.Transaction
 	if !transactionKnown {
-		coinType := iwallet.CoinType(paymentSent.Coin)
-		if coinType.IsFiatPayment() {
-			detail, fiatErr := op.getFiatPaymentFunc(paymentSent.TransactionID, orderOpen.FiatProvider)
-			if fiatErr == nil && detail != nil && detail.Status == "succeeded" {
-				tx = &iwallet.Transaction{
-					ID:    iwallet.TransactionID(detail.PaymentID),
-					Value: iwallet.NewAmount(detail.Amount),
-					To: []iwallet.SpendInfo{{
-						Address: iwallet.NewAddress(detail.SellerAccountID, coinType),
-						Amount:  iwallet.NewAmount(detail.Amount),
-					}},
-				}
-			} else if fiatErr != nil {
-				err = fiatErr
-				logger.LogInfoWithIDf(log, op.nodeID,
-					"Fiat payment %s not yet confirmed for order %s, will retry in verification loop",
-					paymentSent.TransactionID, order.ID)
-			}
-		} else {
-			tx, err = wallet.GetTransaction(iwallet.TransactionID(paymentSent.TransactionID), iwallet.CoinType(paymentSent.Coin))
-			if err != nil {
-				logger.LogInfoWithIDf(log, op.nodeID,
-					"Payment tx %s not yet on-chain for order %s, will retry in verification loop",
-					paymentSent.TransactionID, order.ID)
-			}
-		}
-		if err == nil && tx != nil {
-			if coinType.IsFiatPayment() {
-				if err := op.ProcessOrderPayment(dbtx, order, message, *tx); err != nil {
-					return nil, err
-				}
-				order.PaymentVerified = true
-			} else {
-				paymentAddress, err := order.GetPaymentAddress()
-				if err != nil {
-					return nil, err
-				}
-				for _, to := range tx.To {
-					if to.Address.String() == paymentAddress {
-						if err := op.ProcessOrderPayment(dbtx, order, message, *tx); err != nil {
-							return nil, err
-						}
-						order.PaymentVerified = true
-					}
-				}
-			}
-		}
+		verifiedTx, _ = op.attemptSyncVerification(dbtx, order, orderOpen, paymentSent, message)
 	} else {
 		order.PaymentVerified = true
 	}
 
-	// Check if order is funded and handle role-specific logic
+	op.emitPaymentSentEvents(dbtx, order, orderOpen, paymentSent, verifiedTx)
+
+	logger.LogInfoWithIDf(log, op.nodeID, "Received PAYMENT_SENT message for order %s", order.ID)
+
+	return &events.PaymentSentReceived{
+		OrderID: order.ID.String(),
+		Txid:    paymentSent.TransactionID,
+	}, nil
+}
+
+// validatePaymentSent dispatches to the injected validatePaymentFunc (via
+// PaymentVerificationService) if available, otherwise falls back to the legacy
+// wallet-based utils.ValidatePayment.
+func (op *OrderProcessor) validatePaymentSent(coinType iwallet.CoinType, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent) error {
+	if op.validatePaymentFunc != nil {
+		return op.validatePaymentFunc(coinType, orderOpen, paymentSent, paymentSent.EscrowTimeoutHours)
+	}
+	wallet, err := op.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
+	if err != nil {
+		return fmt.Errorf("cannot validate paymentSent. coin not supported. %w", err)
+	}
+	return utils.ValidatePayment(orderOpen, paymentSent, paymentSent.EscrowTimeoutHours, wallet)
+}
+
+// attemptSyncVerification tries to fetch and verify the payment transaction
+// synchronously. If the injected fetchAndVerifyFunc is available, it delegates
+// there; otherwise falls back to the legacy inline I/O. Returns the verified
+// transaction (nil if not yet confirmed).
+func (op *OrderProcessor) attemptSyncVerification(
+	dbtx database.Tx,
+	order *models.Order,
+	orderOpen *pb.OrderOpen,
+	paymentSent *pb.PaymentSent,
+	message *npb.OrderMessage,
+) (*iwallet.Transaction, error) {
+	coinType := iwallet.CoinType(paymentSent.Coin)
+
+	if op.fetchAndVerifyFunc != nil {
+		tx, isFatal, err := op.fetchAndVerifyFunc(
+			context.Background(), orderOpen, paymentSent, order.PaymentAddress)
+		if err != nil {
+			if isFatal {
+				return nil, fmt.Errorf("deposit verification failed for order %s: %w", order.ID, err)
+			}
+			logger.LogInfoWithIDf(log, op.nodeID,
+				"Payment tx %s not yet verified for order %s, will retry: %v",
+				paymentSent.TransactionID, order.ID, err)
+			return nil, nil
+		}
+		if tx != nil {
+			if err := op.ProcessOrderPayment(dbtx, order, message, *tx); err != nil {
+				return nil, err
+			}
+			order.PaymentVerified = true
+		}
+		return tx, nil
+	}
+
+	return op.legacySyncVerification(dbtx, order, orderOpen, paymentSent, coinType, message)
+}
+
+// TECHDEBT(TD-001): legacySyncVerification is the old inline I/O path, preserved for backward
+// compatibility until all callers inject fetchAndVerifyFunc.
+// 清除条件: OrderProcessor Phase 6 全面纯化完成
+func (op *OrderProcessor) legacySyncVerification(
+	dbtx database.Tx,
+	order *models.Order,
+	orderOpen *pb.OrderOpen,
+	paymentSent *pb.PaymentSent,
+	coinType iwallet.CoinType,
+	message *npb.OrderMessage,
+) (*iwallet.Transaction, error) {
+	var tx *iwallet.Transaction
+	var err error
+
+	if coinType.IsFiatPayment() {
+		detail, fiatErr := op.getFiatPaymentFunc(paymentSent.TransactionID, orderOpen.FiatProvider)
+		if fiatErr == nil && detail != nil && detail.Status == "succeeded" {
+			tx = &iwallet.Transaction{
+				ID:    iwallet.TransactionID(detail.PaymentID),
+				Value: iwallet.NewAmount(detail.Amount),
+				To: []iwallet.SpendInfo{{
+					Address: iwallet.NewAddress(detail.SellerAccountID, coinType),
+					Amount:  iwallet.NewAmount(detail.Amount),
+				}},
+			}
+		} else if fiatErr != nil {
+			err = fiatErr
+			logger.LogInfoWithIDf(log, op.nodeID,
+				"Fiat payment %s not yet confirmed for order %s, will retry in verification loop",
+				paymentSent.TransactionID, order.ID)
+		}
+	} else {
+		wallet, walletErr := op.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
+		if walletErr != nil {
+			return nil, walletErr
+		}
+		tx, err = wallet.GetTransaction(iwallet.TransactionID(paymentSent.TransactionID), coinType)
+		if err != nil {
+			logger.LogInfoWithIDf(log, op.nodeID,
+				"Payment tx %s not yet on-chain for order %s, will retry in verification loop",
+				paymentSent.TransactionID, order.ID)
+		}
+		if err == nil && tx != nil && op.verifyDepositFunc != nil {
+			if verifyErr := op.verifyDepositFunc(DepositVerifyParams{
+				CoinType:     coinType,
+				TxHash:       paymentSent.TransactionID,
+				Script:       paymentSent.Script,
+				ContractAddr: order.PaymentAddress,
+				OrderAmount:  orderOpen.Amount,
+			}); verifyErr != nil {
+				if errors.Is(verifyErr, payment.ErrDepositReverted) ||
+					errors.Is(verifyErr, payment.ErrDepositEventNotFound) ||
+					errors.Is(verifyErr, payment.ErrDepositTargetInvalid) {
+					return nil, fmt.Errorf("deposit verification failed for order %s: %w", order.ID, verifyErr)
+				}
+				logger.LogInfoWithIDf(log, op.nodeID,
+					"Deposit verification pending for order %s: %v", order.ID, verifyErr)
+				tx = nil
+				err = verifyErr
+			}
+		}
+	}
+
+	if err == nil && tx != nil {
+		if coinType.IsFiatPayment() {
+			if err := op.ProcessOrderPayment(dbtx, order, message, *tx); err != nil {
+				return nil, err
+			}
+			order.PaymentVerified = true
+		} else {
+			paymentAddress, err := order.GetPaymentAddress()
+			if err != nil {
+				return nil, err
+			}
+			for _, to := range tx.To {
+				if to.Address.String() == paymentAddress {
+					if err := op.ProcessOrderPayment(dbtx, order, message, *tx); err != nil {
+						return nil, err
+					}
+					order.PaymentVerified = true
+				}
+			}
+		}
+	}
+	return tx, nil
+}
+
+// emitPaymentSentEvents registers commit hooks for payment-related events.
+func (op *OrderProcessor) emitPaymentSentEvents(
+	dbtx database.Tx,
+	order *models.Order,
+	orderOpen *pb.OrderOpen,
+	paymentSent *pb.PaymentSent,
+	verifiedTx *iwallet.Transaction,
+) {
 	funded, _ := order.IsFunded()
 
 	switch order.Role() {
 	case models.RoleBuyer:
-		// Buyer: emit OrderPaymentReceived event
 		if funded {
 			fundingTotal, err := order.FundingTotal()
 			if err == nil {
@@ -149,9 +251,6 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		}
 
 	case models.RoleVendor:
-		// ADR-7: Financial operations are gated behind PaymentVerified.
-		// If not verified, the MobazhaNode verification loop will retry GetTransaction
-		// and emit these events once chain confirmation succeeds.
 		if funded && order.PaymentVerified {
 			if err := op.sendRatingSignatures(dbtx, order, orderOpen); err != nil {
 				logger.LogInfoWithIDf(log, op.nodeID, "Error sending rating signatures: %s", err)
@@ -181,8 +280,8 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 
 		if paymentSent.Method == pb.PaymentSent_CANCELABLE && order.PaymentVerified {
 			var amount uint64
-			if tx != nil {
-				amount = uint64(tx.Value.Int64())
+			if verifiedTx != nil {
+				amount = uint64(verifiedTx.Value.Int64())
 			}
 			dbtx.RegisterCommitHook(func() {
 				op.bus.Emit(&events.CancelablePaymentReady{
@@ -210,12 +309,30 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 			logger.LogInfoWithIDf(log, op.nodeID, "Order %s: PaymentSent received but not yet chain-verified, financial events deferred", order.ID)
 		}
 	}
+}
 
-	logger.LogInfoWithIDf(log, op.nodeID, "Received PAYMENT_SENT message for order %s", order.ID)
-
-	event := &events.PaymentSentReceived{
-		OrderID: order.ID.String(),
-		Txid:    paymentSent.TransactionID,
+// RecordVerifiedPayment records a pre-verified payment transaction into the
+// order. Called by the async verification loop after FetchAndVerify succeeds.
+// Pure DB + event emission — no network I/O.
+func (op *OrderProcessor) RecordVerifiedPayment(
+	dbtx database.Tx,
+	order *models.Order,
+	tx iwallet.Transaction,
+) error {
+	if err := op.ProcessOrderPayment(dbtx, order, nil, tx); err != nil {
+		return err
 	}
-	return event, nil
+	order.PaymentVerified = true
+
+	paymentSent, err := order.PaymentSentMessage()
+	if err != nil {
+		return nil
+	}
+	orderOpen, err := order.OrderOpenMessage()
+	if err != nil {
+		return nil
+	}
+
+	op.emitPaymentSentEvents(dbtx, order, orderOpen, paymentSent, &tx)
+	return nil
 }

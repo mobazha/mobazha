@@ -246,8 +246,16 @@ type partnerReferralResponse struct {
 }
 
 type merchantIntegration struct {
-	MerchantID       string `json:"merchant_id"`
-	TrackingID       string `json:"tracking_id"`
-	PaymentsReceivable bool   `json:"payments_receivable"`
-	PrimaryEmailConfirmed bool `json:"primary_email_confirmed"`
+	MerchantID            string `json:"merchant_id"`
+	TrackingID            string `json:"tracking_id"`
+	PaymentsReceivable    bool   `json:"payments_receivable"`
+	PrimaryEmailConfirmed bool   `json:"primary_email_confirmed"`
+}
+
+// --- Refund API types ---
+
+type refundResponse struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+	Amount amount `json:"amount"`
 }

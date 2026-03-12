@@ -13,81 +13,109 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/libs/proxyclient"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-type UpdateAllListingsFunc func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error
-
 // ModerationAppService encapsulates moderator management logic.
 type ModerationAppService struct {
-	db                    database.Database
-	publish               PublishFunc
-	nodeID                string
-	verifiedModEndpoint   string
-	exchangeRates         *wallet.ExchangeRateProvider
-
-	getMyProfile          GetMyProfileFunc
-	getAcceptedCurrencies GetAcceptedCurrenciesFunc
-	updateAllListings     UpdateAllListingsFunc
+	db                  database.Database
+	publish             PublishFunc
+	nodeID              string
+	verifiedModEndpoint string
+	exchangeRates       *wallet.ExchangeRateProvider
 }
 
 // ModerationAppServiceConfig holds dependencies for constructing a ModerationAppService.
 type ModerationAppServiceConfig struct {
-	DB                    database.Database
-	Publish               PublishFunc
-	NodeID                string
-	VerifiedModEndpoint   string
-	ExchangeRates         *wallet.ExchangeRateProvider
-
-	GetMyProfile          GetMyProfileFunc
-	GetAcceptedCurrencies GetAcceptedCurrenciesFunc
-	UpdateAllListings     UpdateAllListingsFunc
+	DB                  database.Database
+	Publish             PublishFunc
+	NodeID              string
+	VerifiedModEndpoint string
+	ExchangeRates       *wallet.ExchangeRateProvider
 }
 
 func NewModerationAppService(cfg ModerationAppServiceConfig) *ModerationAppService {
 	return &ModerationAppService{
-		db:                    cfg.DB,
-		publish:               cfg.Publish,
-		nodeID:                cfg.NodeID,
-		verifiedModEndpoint:   cfg.VerifiedModEndpoint,
-		exchangeRates:         cfg.ExchangeRates,
-		getMyProfile:          cfg.GetMyProfile,
-		getAcceptedCurrencies: cfg.GetAcceptedCurrencies,
-		updateAllListings:     cfg.UpdateAllListings,
+		db:                  cfg.DB,
+		publish:             cfg.Publish,
+		nodeID:              cfg.NodeID,
+		verifiedModEndpoint: cfg.VerifiedModEndpoint,
+		exchangeRates:       cfg.ExchangeRates,
 	}
 }
 
-func (s *ModerationAppService) SetSelfAsModerator(ctx context.Context, modInfo *models.ModeratorInfo, done chan struct{}) error {
-	if (int(modInfo.Fee.FeeType) == 0 || int(modInfo.Fee.FeeType) == 2) && modInfo.Fee.FixedFee == nil {
-		maybeCloseDone(done)
+func validateModeratorInfo(modInfo *models.ModeratorInfo) error {
+	if modInfo == nil {
+		return errors.New("moderator info is required")
+	}
+	if (modInfo.Fee.FeeType == models.FixedFee || modInfo.Fee.FeeType == models.FixedPlusPercentageFee) && modInfo.Fee.FixedFee == nil {
 		return errors.New("fixed fee must be set when using a fixed fee type")
 	}
+	if len(modInfo.Description) > AboutMaxCharacters {
+		return fmt.Errorf("moderatorinfo description exceeds %d characters", AboutMaxCharacters)
+	}
+	if len(modInfo.TermsAndConditions) > PolicyMaxCharacters {
+		return fmt.Errorf("moderatorinfo termsandconditions exceeds %d characters", PolicyMaxCharacters)
+	}
+	if len(modInfo.Languages) > MaxListItems {
+		return fmt.Errorf("moderatorinfo languages exceeds %d items", MaxListItems)
+	}
+	for _, l := range modInfo.Languages {
+		if len(l) > WordMaxCharacters {
+			return fmt.Errorf("moderatorinfo language exceeds %d characters", WordMaxCharacters)
+		}
+	}
+	if len(modInfo.AcceptedCurrencies) > MaxListItems {
+		return fmt.Errorf("moderatorinfo acceptedCurrencies exceeds %d items", MaxListItems)
+	}
+	for _, c := range modInfo.AcceptedCurrencies {
+		if len(c) > WordMaxCharacters {
+			return fmt.Errorf("moderatorinfo acceptedCurrency exceeds %d characters", WordMaxCharacters)
+		}
+	}
+	if modInfo.Fee.FixedFee != nil {
+		if len(modInfo.Fee.FixedFee.Currency.Name) > WordMaxCharacters {
+			return fmt.Errorf("moderatorinfo fee currency name exceeds %d characters", WordMaxCharacters)
+		}
+		if len(string(modInfo.Fee.FixedFee.Currency.CurrencyType)) > WordMaxCharacters {
+			return fmt.Errorf("moderatorinfo fee currency type exceeds %d characters", WordMaxCharacters)
+		}
+		if len(modInfo.Fee.FixedFee.Currency.Code.String()) > WordMaxCharacters {
+			return fmt.Errorf("moderatorinfo fee currency code exceeds %d characters", WordMaxCharacters)
+		}
+	}
+	return nil
+}
 
-	enabledCoins, _ := s.getAcceptedCurrencies()
+func (s *ModerationAppService) SetSelfAsModerator(ctx context.Context, modInfo *models.ModeratorInfo, done chan struct{}) error {
+	if err := validateModeratorInfo(modInfo); err != nil {
+		maybeCloseDone(done)
+		return err
+	}
+
+	enabledCoins, _ := s.queryAcceptedCurrencies()
+
+	validCurrencies := map[string]bool{}
+	for _, c := range enabledCoins {
+		validCurrencies[normalizeCurrencyCode(c)] = true
+	}
+
+	var accepted []string
+	for _, cc := range modInfo.AcceptedCurrencies {
+		if validCurrencies[normalizeCurrencyCode(cc)] {
+			accepted = append(accepted, normalizeCurrencyCode(cc))
+		}
+	}
+	if len(accepted) == 0 {
+		accepted = enabledCoins
+	}
+	modInfo.AcceptedCurrencies = accepted
+
 	err := s.db.Update(func(tx database.Tx) error {
 		profile, err := tx.GetProfile()
 		if err != nil {
 			return err
 		}
-
-		validCurrencies := map[string]bool{}
-		for _, currency := range profile.Currencies {
-			validCurrencies[currency] = true
-		}
-
-		var currencies []string
-		currencies = profile.Currencies
-		for _, cc := range modInfo.AcceptedCurrencies {
-			if _, ok := validCurrencies[normalizeCurrencyCode(cc)]; ok {
-				currencies = append(currencies, normalizeCurrencyCode(cc))
-			}
-		}
-
-		if len(currencies) == 0 {
-			currencies = append(currencies, enabledCoins...)
-		}
-		modInfo.AcceptedCurrencies = currencies
 
 		profile.ModeratorInfo = modInfo
 		profile.Moderator = true
@@ -121,11 +149,11 @@ func (s *ModerationAppService) RemoveSelfAsModerator(ctx context.Context, done c
 }
 
 func (s *ModerationAppService) IsModerator() bool {
-	myProfile, err := s.getMyProfile()
+	profile, err := s.getProfile()
 	if err != nil {
 		return false
 	}
-	return myProfile.Moderator
+	return profile.Moderator
 }
 
 func (s *ModerationAppService) GetVerifiedModerators(ctx context.Context) []peer.ID {
@@ -174,24 +202,12 @@ func (s *ModerationAppService) GetModeratorsAsync(_ context.Context) <-chan peer
 	return ch
 }
 
-func (s *ModerationAppService) SetModeratorsOnListings(mods []peer.ID, done chan struct{}) error {
-	modStrs := make([]string, 0, len(mods))
-	for _, mod := range mods {
-		modStrs = append(modStrs, mod.String())
-	}
-
-	return s.updateAllListings(func(listing *pb.Listing) (bool, error) {
-		listing.Moderators = modStrs
-		return true, nil
-	}, done)
-}
-
 func (s *ModerationAppService) GetModeratorFee(total iwallet.Amount, currencyCode string) (iwallet.Amount, error) {
-	myProfile, err := s.getMyProfile()
+	profile, err := s.getProfile()
 	if err != nil {
 		return iwallet.NewAmount(0), fmt.Errorf("failed to get my profile, %s", err)
 	}
-	moderatorInfo := myProfile.ModeratorInfo
+	moderatorInfo := profile.ModeratorInfo
 
 	switch moderatorInfo.Fee.FeeType {
 	case models.PercentageFee:
@@ -234,5 +250,30 @@ func (s *ModerationAppService) calculateFixedFee(total iwallet.Amount, currencyC
 		return iwallet.NewAmount(0), errors.New("fixed moderator fee exceeds transaction amount")
 	}
 	return convertedModFee, nil
+}
+
+func (s *ModerationAppService) getProfile() (*models.Profile, error) {
+	var profile *models.Profile
+	err := s.db.View(func(tx database.Tx) error {
+		var err error
+		profile, err = tx.GetProfile()
+		return err
+	})
+	return profile, err
+}
+
+func (s *ModerationAppService) queryAcceptedCurrencies() ([]string, error) {
+	var records []models.ReceivingAccount
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Find(&records).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	var currencies []string
+	for _, record := range records {
+		currencies = append(currencies, record.AcceptedCurrencies()...)
+	}
+	return currencies, nil
 }
 

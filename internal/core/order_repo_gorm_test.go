@@ -2,9 +2,11 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-cid"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -44,8 +46,10 @@ func (d *testDatabase) Update(fn func(database.Tx) error) error {
 	})
 }
 
-func (d *testDatabase) PublicDataPath() string { return "" }
-func (d *testDatabase) Close() error           { return nil }
+func (d *testDatabase) ComputePublicDataHash() (cid.Cid, error) {
+	return cid.Undef, nil
+}
+func (d *testDatabase) Close() error { return nil }
 
 // testTx implements database.Tx with the minimum set of methods
 // needed by GormOrderRepo (Read, Save, Update).
@@ -113,12 +117,19 @@ func newTestRepo(t *testing.T) (*GormOrderRepo, *testDatabase) {
 
 func seedRepoOrder(t *testing.T, db *testDatabase, id string, role string, state models.OrderState) *models.Order {
 	t.Helper()
+	return seedRepoOrderAt(t, db, id, role, state, time.Time{})
+}
+
+func seedRepoOrderAt(t *testing.T, db *testDatabase, id string, role string, state models.OrderState, createdAt time.Time) *models.Order {
+	t.Helper()
 	order := &models.Order{
-		ID:     models.OrderID(id),
-		MyRole: role,
-		Open:   true,
-		Read:   false,
+		ID:        models.OrderID(id),
+		MyRole:    role,
+		Open:      true,
+		Read:      false,
+		CreatedAt: createdAt,
 	}
+	order.TenantID = database.StandaloneTenantID
 	order.SetFSMState(state)
 	require.NoError(t, db.gormDB.Create(order).Error)
 	return order
@@ -193,6 +204,86 @@ func TestGormOrderRepo_FindPurchases_Empty(t *testing.T) {
 	assert.Equal(t, int64(0), count)
 }
 
+func TestGormOrderRepo_FindPurchases_OffsetPagination(t *testing.T) {
+	repo, db := newTestRepo(t)
+	base := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < 5; i++ {
+		seedRepoOrderAt(t, db, fmt.Sprintf("p-%d", i), "buyer", models.OrderState_PENDING,
+			base.Add(time.Duration(i)*time.Hour))
+	}
+
+	// Page 1: first 2
+	orders, total, err := repo.FindPurchases(context.Background(), contracts.OrderFilter{
+		Limit:         2,
+		SortAscending: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), total)
+	assert.Len(t, orders, 2)
+	assert.Equal(t, models.OrderID("p-0"), orders[0].ID)
+	assert.Equal(t, models.OrderID("p-1"), orders[1].ID)
+
+	// Page 2: next 2
+	orders, total, err = repo.FindPurchases(context.Background(), contracts.OrderFilter{
+		Limit:         2,
+		Offset:        2,
+		SortAscending: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), total)
+	assert.Len(t, orders, 2)
+	assert.Equal(t, models.OrderID("p-2"), orders[0].ID)
+	assert.Equal(t, models.OrderID("p-3"), orders[1].ID)
+
+	// Page 3: last 1
+	orders, total, err = repo.FindPurchases(context.Background(), contracts.OrderFilter{
+		Limit:         2,
+		Offset:        4,
+		SortAscending: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), total)
+	assert.Len(t, orders, 1)
+	assert.Equal(t, models.OrderID("p-4"), orders[0].ID)
+}
+
+func TestGormOrderRepo_FindSales_OffsetWithStateFilter(t *testing.T) {
+	repo, db := newTestRepo(t)
+	base := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < 4; i++ {
+		seedRepoOrderAt(t, db, fmt.Sprintf("s-%d", i), "vendor", models.OrderState_AWAITING_FULFILLMENT,
+			base.Add(time.Duration(i)*time.Hour))
+	}
+	seedRepoOrderAt(t, db, "s-completed", "vendor", models.OrderState_COMPLETED,
+		base.Add(10*time.Hour))
+
+	orders, total, err := repo.FindSales(context.Background(), contracts.OrderFilter{
+		StateFilter:   []models.OrderState{models.OrderState_AWAITING_FULFILLMENT},
+		Limit:         2,
+		Offset:        1,
+		SortAscending: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(4), total)
+	assert.Len(t, orders, 2)
+	assert.Equal(t, models.OrderID("s-1"), orders[0].ID)
+	assert.Equal(t, models.OrderID("s-2"), orders[1].ID)
+}
+
+func TestGormOrderRepo_FindPurchases_TotalCountWithLimit(t *testing.T) {
+	repo, db := newTestRepo(t)
+	for i := 0; i < 10; i++ {
+		seedRepoOrder(t, db, fmt.Sprintf("tc-%d", i), "buyer", models.OrderState_PENDING)
+	}
+
+	orders, total, err := repo.FindPurchases(context.Background(), contracts.OrderFilter{
+		Limit: 3,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(10), total)
+	assert.Len(t, orders, 3)
+}
+
 // ═══════════════════════════════════════════════════════════════
 // FindUnverifiedPaymentOrders
 // ═══════════════════════════════════════════════════════════════
@@ -248,6 +339,7 @@ func TestGormOrderRepo_Save_CreateAndUpdate(t *testing.T) {
 	ctx := context.Background()
 
 	order := &models.Order{ID: "save-1", MyRole: "buyer", Open: true}
+	order.TenantID = database.StandaloneTenantID
 	order.SetFSMState(models.OrderState_PENDING)
 	require.NoError(t, repo.Save(ctx, order))
 

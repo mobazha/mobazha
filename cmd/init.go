@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/core"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
+	"github.com/mobazha/mobazha3.0/internal/chains"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -49,12 +49,12 @@ func (x *Init) Execute(args []string) error {
 
 	enabledChains := iwallet.GetAllSupportedChainTypes()
 
-	opts := []multiwallet.Option{
-		multiwallet.DataDir(cfg.DataDir),
-		multiwallet.Chains(enabledChains),
-		multiwallet.Testnet(x.Testnet),
+	opts := []chains.Option{
+		chains.DataDir(cfg.DataDir),
+		chains.Chains(enabledChains),
+		chains.Testnet(x.Testnet),
 	}
-	mw, err := multiwallet.NewMultiwallet(opts...)
+	mw, err := chains.NewMultiwallet(opts...)
 	if err != nil {
 		return err
 	}

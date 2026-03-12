@@ -124,6 +124,27 @@ func (s *FiatPaymentAppService) GetPayment(ctx context.Context, providerID strin
 	return provider.GetPayment(ctx, paymentID)
 }
 
+func (s *FiatPaymentAppService) RefundPayment(
+	ctx context.Context,
+	providerID string,
+	params contracts.RefundParams,
+) (*contracts.RefundResult, error) {
+	provider, err := s.registry.ForProvider(providerID)
+	if err != nil {
+		return nil, fmt.Errorf("unknown fiat provider %q: %w", providerID, err)
+	}
+
+	result, err := provider.RefundPayment(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("fiat refund via %s: %w", providerID, err)
+	}
+
+	logger.LogInfoWithIDf(log, s.nodeID, "fiat refund %s via %s: status=%s amount=%d %s",
+		result.RefundID, providerID, result.Status, result.Amount, result.Currency)
+
+	return result, nil
+}
+
 func (s *FiatPaymentAppService) HandleWebhook(ctx context.Context, providerID string, payload []byte, headers map[string]string) error {
 	provider, err := s.registry.ForProvider(providerID)
 	if err != nil {
@@ -225,8 +246,9 @@ func (s *FiatPaymentAppService) getActiveAccount(providerID string) (*models.Rec
 	return &record, nil
 }
 
-// getActiveAccountLegacy looks up accounts with the legacy "Stripe" chain type
+// TECHDEBT(TD-003): getActiveAccountLegacy looks up accounts with the legacy "Stripe" chain type
 // for backward compatibility during migration.
+// 清除条件: 所有生产租户 ReceivingAccount 记录迁移到 fiat:provider_name 格式
 func (s *FiatPaymentAppService) getActiveAccountLegacy() (*models.ReceivingAccount, error) {
 	var record models.ReceivingAccount
 	err := s.db.View(func(tx database.Tx) error {

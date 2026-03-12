@@ -15,7 +15,7 @@ import (
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
+	"github.com/mobazha/mobazha3.0/internal/chains"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
@@ -96,7 +96,7 @@ func MockNode() (*MobazhaNode, error) {
 	w := wallet.NewMockWallet()
 	w.SetEventBus(bus)
 
-	mw := multiwallet.Multiwallet{
+	mw := chains.Multiwallet{
 		iwallet.ChainMock: w,
 	}
 
@@ -189,22 +189,23 @@ func MockNode() (*MobazhaNode, error) {
 
 	node.keyProvider = newFileKeyProvider(node.ethMasterKey, node.escrowMasterKey, node.ratingMasterKey, node.solPrivKey)
 
+	node.initProfileService()
+	node.initModerationService()
+	initShippingSubsystem(node)
+	seedMockShippingProfile(node)
+	node.initListingService()
+	node.initPaymentService()
 	node.initOrderService()
+	node.wireServiceSetters()
 	node.initChatService()
 	node.initMatrixService()
 	node.initPreferencesService()
 	node.initMediaService()
 	node.initRatingsService()
 	node.initNotificationService()
-	node.initProfileService()
 	node.initFollowService()
 	node.initPostsService()
-	node.initModerationService()
-	initShippingSubsystem(node)
-	seedMockShippingProfile(node)
-	node.initListingService()
 	node.initShoppingCartService()
-	node.initPaymentService()
 	node.registerPaymentStrategies()
 	node.paymentRegistry.Register(iwallet.ChainMock, &adapters.UTXOAutoConfirmAdapter{
 		Multiwallet:    node.multiwallet,
@@ -310,7 +311,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		w := wn.Wallets()[i]
 		w.SetEventBus(bus)
 
-		mw := multiwallet.Multiwallet{
+		mw := chains.Multiwallet{
 			iwallet.ChainMock: w,
 		}
 
@@ -397,22 +398,23 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 
 		node.keyProvider = newFileKeyProvider(node.ethMasterKey, node.escrowMasterKey, node.ratingMasterKey, node.solPrivKey)
 
+		node.initProfileService()
+		node.initModerationService()
+		initShippingSubsystem(node)
+		seedMockShippingProfile(node)
+		node.initListingService()
+		node.initPaymentService()
 		node.initOrderService()
+		node.wireServiceSetters()
 		node.initChatService()
 		node.initMatrixService()
 		node.initPreferencesService()
 		node.initMediaService()
 		node.initRatingsService()
 		node.initNotificationService()
-		node.initProfileService()
 		node.initFollowService()
 		node.initPostsService()
-		node.initModerationService()
-		initShippingSubsystem(node)
-		seedMockShippingProfile(node)
-		node.initListingService()
 		node.initShoppingCartService()
-		node.initPaymentService()
 		node.registerPaymentStrategies()
 		node.paymentRegistry.Register(iwallet.ChainMock, &adapters.UTXOAutoConfirmAdapter{
 			Multiwallet:    node.multiwallet,

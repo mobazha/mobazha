@@ -212,10 +212,6 @@ type listingServiceFacade struct {
 	moderation *ModerationAppService
 }
 
-func (f *listingServiceFacade) SetModeratorsOnListings(mods []peer.ID, done chan struct{}) error {
-	return f.moderation.SetModeratorsOnListings(mods, done)
-}
-
 // profileServiceFacade composes ProfileAppService + ModerationAppService
 // to satisfy contracts.ProfileService.
 type profileServiceFacade struct {

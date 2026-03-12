@@ -25,8 +25,8 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/contracts"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
-	solanaWal "github.com/mobazha/mobazha3.0/internal/multiwallet/coins/solana"
+	"github.com/mobazha/mobazha3.0/internal/chains"
+	solanaWal "github.com/mobazha/mobazha3.0/internal/chains/solana"
 	obnet "github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/notifications"
 	fiat "github.com/mobazha/mobazha3.0/internal/payment/fiat"
@@ -46,6 +46,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	orderpb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
@@ -416,16 +417,16 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 	erp := sharedManager.ExchangeRateProvider
 
-	opts := []multiwallet.Option{
-		multiwallet.NodeID(nodeID),
-		multiwallet.DataDir(repoPath),
-		multiwallet.LogDir(cfg.LogDir),
-		multiwallet.Chains(enabledChains),
-		multiwallet.LogLevel(repo.LogLevelMap[strings.ToLower(cfg.LogLevel)]),
-		multiwallet.NetConfig(netConfig),
-		multiwallet.Testnet(walletTestnet),
+	opts := []chains.Option{
+		chains.NodeID(nodeID),
+		chains.DataDir(repoPath),
+		chains.LogDir(cfg.LogDir),
+		chains.Chains(enabledChains),
+		chains.LogLevel(repo.LogLevelMap[strings.ToLower(cfg.LogLevel)]),
+		chains.NetConfig(netConfig),
+		chains.Testnet(walletTestnet),
 	}
-	mw, err := multiwallet.NewMultiwallet(opts...)
+	mw, err := chains.NewMultiwallet(opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -437,8 +438,8 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	// Extract EVM chain configs from multiwallet ChainAPIs for standalone client creation.
 	// This is done here (not in Start()) so the node stores user-configured RPC URLs.
 	// Must prepend Defaults (same as NewMultiwallet does internally) to populate ChainAPIs.
-	var mwCfg multiwallet.Config
-	_ = mwCfg.Apply(append([]multiwallet.Option{multiwallet.Defaults}, opts...)...)
+	var mwCfg chains.Config
+	_ = mwCfg.Apply(append([]chains.Option{chains.Defaults}, opts...)...)
 	evmConfigs := extractEVMConfigs(mwCfg.ChainAPIs, walletTestnet)
 	solanaConfig := extractSolanaConfig(mwCfg.ChainAPIs, walletTestnet)
 
@@ -616,6 +617,9 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		return nil, fmt.Errorf("failed to create signer: %w", err)
 	}
 	obNode.signer = signer
+	obNode.orderLockManager = NewOrderLockManager()
+
+	pvs := NewPaymentVerificationService(obNode.paymentRegistry, obNode.multiwallet, nil)
 
 	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
 		NodeID:               nodeID,
@@ -635,8 +639,18 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			}
 			return obNode.fiatPaymentService.GetPayment(context.Background(), providerID, paymentID)
 		},
+		ValidatePaymentFunc: pvs.ValidateMessage,
+		FetchAndVerifyFunc: func(ctx context.Context, orderOpen *orderpb.OrderOpen, paymentSent *orderpb.PaymentSent, paymentAddress string) (*iwallet.Transaction, bool, error) {
+			vp, err := pvs.FetchAndVerify(ctx, orderOpen, paymentSent, paymentAddress)
+			if err != nil {
+				isFatal := errors.Is(err, ErrPaymentAddressMiss)
+				return nil, isFatal, err
+			}
+			return &vp.Transaction, false, nil
+		},
 		StateValidator: &coreStateBridge{},
 	})
+	obNode.paymentVerificationService = pvs
 
 	// Register libp2p HTTP proxy handler for standalone nodes so that the
 	// SaaS proxy can forward management requests via libp2p streams.
@@ -743,7 +757,7 @@ func (d *dummyListener) Close() error {
 	return nil
 }
 
-func InitializeMultiwallet(mw multiwallet.Multiwallet, db database.Database, creationDate time.Time) error {
+func InitializeMultiwallet(mw chains.Multiwallet, db database.Database, creationDate time.Time) error {
 	var bip44ModelKey models.Key
 	err := db.View(func(tx database.Tx) error {
 		return tx.Read().Where("name = ?", "bip44").First(&bip44ModelKey).Error
@@ -1057,17 +1071,17 @@ func newLightweightNode(
 	//   - Standalone: per-node clients from ChainAPIs config or defaults
 	// This eliminates 5+ RPC connections per tenant while preserving signing.
 	enabledChains := iwallet.GetAllSupportedChainTypes()
-	opts := []multiwallet.Option{
-		multiwallet.NodeID(nodeID),
-		multiwallet.DataDir(path.Join(cfg.DataDir, "nodes", nodeID)),
-		multiwallet.LogDir(cfg.LogDir),
-		multiwallet.Chains(enabledChains),
-		multiwallet.LogLevel(repo.LogLevelMap[strings.ToLower(cfg.LogLevel)]),
-		multiwallet.NetConfig(netConfig),
-		multiwallet.Testnet(walletTestnet),
+	opts := []chains.Option{
+		chains.NodeID(nodeID),
+		chains.DataDir(path.Join(cfg.DataDir, "nodes", nodeID)),
+		chains.LogDir(cfg.LogDir),
+		chains.Chains(enabledChains),
+		chains.LogLevel(repo.LogLevelMap[strings.ToLower(cfg.LogLevel)]),
+		chains.NetConfig(netConfig),
+		chains.Testnet(walletTestnet),
 	}
 
-	mw, err := multiwallet.NewMultiwallet(opts...)
+	mw, err := chains.NewMultiwallet(opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1226,6 +1240,7 @@ func newLightweightNode(
 		return nil, fmt.Errorf("lightweight: failed to create signer: %w", err)
 	}
 	obNode.signer = signer
+	obNode.orderLockManager = NewOrderLockManager()
 
 	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
 		NodeID:                   nodeID,
@@ -1305,6 +1320,24 @@ func initFiatSubsystem(obNode *MobazhaNode) {
 	obNode.fiatRegistry = fiat.NewRegistry()
 	obNode.fiatPaymentService = NewFiatPaymentAppService(obNode.fiatRegistry, obNode.db, obNode.nodeID)
 	obNode.fiatPaymentService.LoadAndRegisterProviders()
+
+	if obNode.orderService != nil {
+		obNode.orderService.SetFiatRefundFunc(obNode.fiatPaymentService.RefundPayment)
+
+		fiatSvc := obNode.fiatPaymentService
+		obNode.orderService.OrderProcessor().SetFiatRefundOnDeclineFunc(
+			func(orderID, paymentID, providerID, currency string) error {
+				_, err := fiatSvc.RefundPayment(context.Background(), providerID, pkgcontracts.RefundParams{
+					PaymentID: paymentID,
+					Currency:  currency,
+					Reason:    "requested_by_customer",
+					Metadata:  map[string]string{"orderID": orderID},
+				})
+				return err
+			},
+		)
+	}
+
 	logger.LogInfoWithID(log, obNode.nodeID, "Fiat payment subsystem initialized")
 }
 

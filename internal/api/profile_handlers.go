@@ -45,6 +45,9 @@ func (g *Gateway) handleGETProfile(w http.ResponseWriter, r *http.Request) {
 			ErrorResponse(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		if stats, err := prof.GetProfileStats(); err == nil {
+			profile.Stats = stats
+		}
 	} else {
 		pid, err := peer.Decode(peerIDStr)
 		if err != nil {

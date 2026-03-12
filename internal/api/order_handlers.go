@@ -588,7 +588,7 @@ func (g *Gateway) handlePOSTOrderCancel(w http.ResponseWriter, r *http.Request) 
 
 func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, r *http.Request) {
 	type Params struct {
-		Reject           bool   `json:"reject"`
+		Decline          bool   `json:"decline"`
 		InitiatorAddress string `json:"initiatorAddress"`
 		PayoutAddress    string `json:"payoutAddress"`
 	}
@@ -631,7 +631,7 @@ func (g *Gateway) handleGETOrderConfirmationInstructions(w http.ResponseWriter, 
 
 	var coinType iwallet.CoinType
 	var instructions any
-	if args.Reject {
+	if args.Decline {
 		coinType, instructions, err = orderSvc.GetRefundOrderInstructions(models.OrderID(orderID), args.InitiatorAddress)
 	} else {
 		coinType, instructions, err = orderSvc.GetConfirmOrderInstructions(models.OrderID(orderID), args.InitiatorAddress, args.PayoutAddress)
@@ -680,7 +680,7 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 	type orderConf struct {
 		TransactionID string `json:"transactionID"`
 		PayoutAddress string `json:"payoutAddress"`
-		Reject        bool   `json:"reject"`
+		Decline       bool   `json:"decline"`
 		Reason        string `json:"reason"`
 	}
 	decoder := json.NewDecoder(r.Body)
@@ -694,13 +694,13 @@ func (g *Gateway) handlePOSTOrderConfirmation(w http.ResponseWriter, r *http.Req
 	orderSvc := getOrderService(r)
 
 	done := make(chan struct{})
-	if !conf.Reject {
+	if !conf.Decline {
 		err = orderSvc.ConfirmOrder(models.OrderID(orderID), iwallet.TransactionID(conf.TransactionID), conf.PayoutAddress, done)
 	} else {
 		if conf.TransactionID != "" {
-			err = orderSvc.RejectOrder(models.OrderID(orderID), iwallet.TransactionID(conf.TransactionID), conf.Reason, done)
+			err = orderSvc.DeclineOrder(models.OrderID(orderID), iwallet.TransactionID(conf.TransactionID), conf.Reason, done)
 		} else {
-			err = orderSvc.RejectOrderViaRelay(models.OrderID(orderID), conf.Reason, done)
+			err = orderSvc.DeclineOrderViaRelay(models.OrderID(orderID), conf.Reason, done)
 		}
 	}
 	if err != nil {
@@ -936,7 +936,7 @@ func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Reque
 // 	r.HandleFunc("/v1/orderconfirmation", g.handlePOSTOrderConfirmation).Methods("POST")
 // 	r.HandleFunc("/v1/orderfulfillment", g.handlePOSTOrderFulfillment).Methods("POST")
 // 	r.HandleFunc("/v1/order/confirm/instructions", g.handleGetConfirmOrderInstructions).Methods("GET")
-// 	r.HandleFunc("/v1/order/reject/instructions", g.handleGetRefundOrderInstructions).Methods("GET")
+// 	r.HandleFunc("/v1/order/decline/instructions", g.handleGetRefundOrderInstructions).Methods("GET")
 // }
 
 // PaymentRemainingResponse represents the response for payment remaining endpoint

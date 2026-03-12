@@ -16,6 +16,7 @@ type OrderFilter struct {
 	SortByRead    bool
 	SortAscending bool
 	Limit         int
+	Offset        int
 }
 
 // OrderRepo abstracts order-specific database access.

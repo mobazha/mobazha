@@ -19,8 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	ethWal "github.com/mobazha/mobazha3.0/internal/multiwallet/coins/eth"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet/coins/eth/contract"
+	ethWal "github.com/mobazha/mobazha3.0/internal/chains/evm"
+	"github.com/mobazha/mobazha3.0/internal/chains/evm/contract"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 

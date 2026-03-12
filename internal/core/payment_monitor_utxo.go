@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet/base"
-	internalutxo "github.com/mobazha/mobazha3.0/internal/multiwallet/utxo"
+	"github.com/mobazha/mobazha3.0/internal/chains/base"
+	internalutxo "github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/utxo"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -122,5 +122,27 @@ func (n *MobazhaNode) WatchPaymentAddress(orderID string, address string, chainT
 
 func (n *MobazhaNode) StopWatchingPayment(orderID string) error {
 	return n.paymentService.StopWatchingPayment(orderID)
+}
+
+// ── Payment verification & event monitors ───────────────────────────────
+
+func (n *MobazhaNode) startPaymentVerificationLoop() {
+	if n.paymentService != nil {
+		n.paymentService.StartPaymentVerificationLoop()
+	}
+}
+
+func (n *MobazhaNode) verifyPendingPayments() {
+	if n.paymentService != nil {
+		n.paymentService.verifyPendingPayments()
+	}
+}
+
+// startPaymentEventMonitors starts all event-driven monitors for payment→order decoupling.
+// OrderAppService subscribes to payment events (auto-confirm, UTXO detection, RWA completion).
+func (n *MobazhaNode) startPaymentEventMonitors() {
+	if n.orderService != nil {
+		n.orderService.StartPaymentEventMonitor()
+	}
 }
 

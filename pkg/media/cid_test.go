@@ -2,8 +2,6 @@ package media
 
 import (
 	"crypto/rand"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/ipfs/go-cid"
@@ -136,124 +134,6 @@ func BenchmarkComputeUnixFSCID_5MB(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		ComputeUnixFSCID(data)
-	}
-}
-
-// ── ComputeDirectoryHash Tests ──────────────────────────────────
-
-func TestComputeDirectoryHash_Deterministic(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, dir, "a.json", `{"name":"alice"}`)
-	writeFile(t, dir, "b.json", `{"name":"bob"}`)
-
-	c1, err := ComputeDirectoryHash(dir)
-	if err != nil {
-		t.Fatalf("first call: %v", err)
-	}
-	c2, err := ComputeDirectoryHash(dir)
-	if err != nil {
-		t.Fatalf("second call: %v", err)
-	}
-	if !c1.Equals(c2) {
-		t.Errorf("non-deterministic: %s != %s", c1, c2)
-	}
-	assertCIDv0Properties(t, c1)
-}
-
-func TestComputeDirectoryHash_ContentChange(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, dir, "profile.json", `{"name":"v1"}`)
-
-	c1, err := ComputeDirectoryHash(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	writeFile(t, dir, "profile.json", `{"name":"v2"}`)
-	c2, err := ComputeDirectoryHash(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if c1.Equals(c2) {
-		t.Error("content change should produce different CID")
-	}
-}
-
-func TestComputeDirectoryHash_FileAddRemove(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, dir, "a.json", `{"a":1}`)
-
-	c1, _ := ComputeDirectoryHash(dir)
-
-	writeFile(t, dir, "b.json", `{"b":2}`)
-	c2, _ := ComputeDirectoryHash(dir)
-
-	if c1.Equals(c2) {
-		t.Error("adding a file should change CID")
-	}
-}
-
-func TestComputeDirectoryHash_EmptyDir(t *testing.T) {
-	dir := t.TempDir()
-
-	c, err := ComputeDirectoryHash(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	assertCIDv0Properties(t, c)
-
-	c2, _ := ComputeDirectoryHash(dir)
-	if !c.Equals(c2) {
-		t.Error("empty dir should be deterministic")
-	}
-}
-
-func TestComputeDirectoryHash_NestedDirs(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, dir, "top.json", `{"level":"top"}`)
-	writeFile(t, dir, "sub/nested.json", `{"level":"nested"}`)
-
-	c, err := ComputeDirectoryHash(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertCIDv0Properties(t, c)
-
-	cFlat := t.TempDir()
-	writeFile(t, cFlat, "top.json", `{"level":"top"}`)
-	writeFile(t, cFlat, "sub/nested.json", `{"level":"nested"}`)
-
-	c2, _ := ComputeDirectoryHash(cFlat)
-	if !c.Equals(c2) {
-		t.Error("identical nested structure should produce same CID")
-	}
-}
-
-func TestComputeDirectoryHash_PathOrdering(t *testing.T) {
-	dir1 := t.TempDir()
-	writeFile(t, dir1, "z.json", `1`)
-	writeFile(t, dir1, "a.json", `2`)
-
-	dir2 := t.TempDir()
-	writeFile(t, dir2, "a.json", `2`)
-	writeFile(t, dir2, "z.json", `1`)
-
-	c1, _ := ComputeDirectoryHash(dir1)
-	c2, _ := ComputeDirectoryHash(dir2)
-	if !c1.Equals(c2) {
-		t.Error("file creation order should not affect CID")
-	}
-}
-
-func writeFile(t *testing.T, dir, relPath, content string) {
-	t.Helper()
-	full := filepath.Join(dir, relPath)
-	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
 	}
 }
 

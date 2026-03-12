@@ -50,7 +50,7 @@ var toolRoutes = map[string]func(args map[string]interface{}) toolRoute{
 	"orders_get_sales":      func(_ map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/sales"} },
 	"orders_get_detail":     func(a map[string]interface{}) toolRoute { return toolRoute{"GET", "/v1/orders/" + sanitizePathParam(a["orderId"])} },
 	"orders_confirm":        func(a map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/confirm"} },
-	"orders_reject":         func(a map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/cancel"} },
+	"orders_decline":         func(a map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/cancel"} },
 	"orders_fulfill":        func(a map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/fulfill"} },
 	"orders_refund":         func(a map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/refund"} },
 	"orders_complete":       func(a map[string]interface{}) toolRoute { return toolRoute{"POST", "/v1/orders/" + sanitizePathParam(a["orderId"]) + "/complete"} },

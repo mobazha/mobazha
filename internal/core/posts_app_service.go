@@ -36,9 +36,6 @@ type PostsAppService struct {
 	keys    contracts.KeyProvider
 	peerID  peer.ID
 	publish PublishFunc
-
-	updateAndSaveProfile UpdateAndSaveProfileFunc
-	getMyProfile         GetMyProfileFunc
 }
 
 // PostsAppServiceConfig holds dependencies for constructing a PostsAppService.
@@ -48,21 +45,16 @@ type PostsAppServiceConfig struct {
 	Keys    contracts.KeyProvider
 	PeerID  peer.ID
 	Publish PublishFunc
-
-	UpdateAndSaveProfile UpdateAndSaveProfileFunc
-	GetMyProfile         GetMyProfileFunc
 }
 
 // NewPostsAppService constructs a PostsAppService from the given config.
 func NewPostsAppService(cfg PostsAppServiceConfig) *PostsAppService {
 	return &PostsAppService{
-		db:                   cfg.DB,
-		signer:               cfg.Signer,
-		keys:                 cfg.Keys,
-		peerID:               cfg.PeerID,
-		publish:              cfg.Publish,
-		updateAndSaveProfile: cfg.UpdateAndSaveProfile,
-		getMyProfile:         cfg.GetMyProfile,
+		db:      cfg.DB,
+		signer:  cfg.Signer,
+		keys:    cfg.Keys,
+		peerID:  cfg.PeerID,
+		publish: cfg.Publish,
 	}
 }
 
@@ -112,12 +104,7 @@ func (s *PostsAppService) AddPost(post *postsPb.Post, done chan<- struct{}) erro
 			index = append(index, postData)
 		}
 
-		err = tx.SetPostIndex(index)
-		if err != nil {
-			return err
-		}
-
-		return s.updateAndSaveProfile(tx)
+		return tx.SetPostIndex(index)
 	})
 	if err != nil {
 		maybeCloseDone(done)
@@ -165,12 +152,7 @@ func (s *PostsAppService) DeletePost(slug string, done chan<- struct{}) error {
 			return nil
 		}
 
-		err = tx.SetPostIndex(index)
-		if err != nil {
-			return err
-		}
-
-		return s.updateAndSaveProfile(tx)
+		return tx.SetPostIndex(index)
 	})
 	if err != nil {
 		maybeCloseDone(done)
@@ -249,10 +231,12 @@ func (s *PostsAppService) signPost(post *postsPb.Post) (*postsPb.SignedPost, err
 		},
 		Sig: sig.Serialize(),
 	}
-	profile, err := s.getMyProfile()
-	if err == nil {
-		id.Handle = profile.Handle
-	}
+	s.db.View(func(tx database.Tx) error {
+		if p, err := tx.GetProfile(); err == nil {
+			id.Handle = p.Handle
+		}
+		return nil
+	})
 
 	post.VendorID = id
 

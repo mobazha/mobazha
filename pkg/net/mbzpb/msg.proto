@@ -85,7 +85,7 @@ message OrderMessage {
 
     enum MessageType {
         ORDER_OPEN         = 0;
-        ORDER_REJECT       = 1;
+        ORDER_DECLINE      = 1;
         ORDER_CANCEL       = 2;
         ORDER_CONFIRMATION = 3;
         RATING_SIGNATURES  = 4;

@@ -2,6 +2,7 @@ package orders
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -19,6 +20,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/op/go-logging"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -31,6 +33,17 @@ var (
 	ErrChangedMessage    = errors.New("different duplicate message")
 	ErrUnexpectedMessage = errors.New("unexpected message")
 )
+
+// DepositVerifyParams holds chain-agnostic parameters for on-chain deposit verification.
+// The OrderProcessor receives these via verifyDepositFunc, which routes through
+// PaymentRegistry to the appropriate chain adapter (EVM, Solana, UTXO noop).
+type DepositVerifyParams struct {
+	CoinType     iwallet.CoinType
+	TxHash       string
+	Script       string
+	ContractAddr string
+	OrderAmount  string
+}
 
 // StateValidator is the interface for validating order state transitions using mobazha-core.
 // This allows the processor to validate transitions without hard-depending on the bridge package.
@@ -50,9 +63,11 @@ type Config struct {
 	Multiwallet              pkgcontracts.WalletOperator
 	ExchangeRateProvider     *wallet.ExchangeRateProvider
 	EventBus                 events.Bus
-	CalcCIDFunc         func(file []byte) (cid.Cid, error)
-	GetFiatPaymentFunc  func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
-	FeatureManager      *pkgconfig.FeatureManager
+	CalcCIDFunc          func(file []byte) (cid.Cid, error)
+	GetFiatPaymentFunc   func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
+	ValidatePaymentFunc  func(coinType iwallet.CoinType, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTimeoutHours uint32) error
+	FetchAndVerifyFunc   func(ctx context.Context, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, paymentAddress string) (*iwallet.Transaction, bool, error)
+	FeatureManager       *pkgconfig.FeatureManager
 
 	// StateValidator is an optional core state machine validator (typically OrderStateBridge).
 	// When set, the FSM becomes the authoritative source for order state transitions:
@@ -74,9 +89,13 @@ type OrderProcessor struct {
 	escrowPrivateKey         *btcec.PrivateKey
 	erp                      *wallet.ExchangeRateProvider
 	bus                      events.Bus
-	calcCIDFunc        func(file []byte) (cid.Cid, error)
-	getFiatPaymentFunc func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
-	featureManager     *pkgconfig.FeatureManager
+	calcCIDFunc          func(file []byte) (cid.Cid, error)
+	getFiatPaymentFunc   func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
+	verifyDepositFunc    func(params DepositVerifyParams) error
+	validatePaymentFunc  func(coinType iwallet.CoinType, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTimeoutHours uint32) error
+	fetchAndVerifyFunc   func(ctx context.Context, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, paymentAddress string) (*iwallet.Transaction, bool, error)
+	fiatRefundOnDeclineFunc func(orderID string, paymentID string, providerID string, currency string) error
+	featureManager       *pkgconfig.FeatureManager
 	stateValidator           StateValidator
 }
 
@@ -92,11 +111,23 @@ func NewOrderProcessor(cfg *Config) *OrderProcessor {
 		escrowPrivateKey:         cfg.EscrowPrivateKey,
 		erp:                      cfg.ExchangeRateProvider,
 		bus:                      cfg.EventBus,
-		calcCIDFunc:        cfg.CalcCIDFunc,
-		getFiatPaymentFunc: cfg.GetFiatPaymentFunc,
-		featureManager:     cfg.FeatureManager,
-		stateValidator:           cfg.StateValidator,
+		calcCIDFunc:         cfg.CalcCIDFunc,
+		getFiatPaymentFunc:  cfg.GetFiatPaymentFunc,
+		validatePaymentFunc: cfg.ValidatePaymentFunc,
+		fetchAndVerifyFunc:  cfg.FetchAndVerifyFunc,
+		featureManager:      cfg.FeatureManager,
+		stateValidator:      cfg.StateValidator,
 	}
+}
+
+// SetVerifyDepositFunc sets the chain-agnostic deposit verification function.
+// Called from registerPaymentStrategies() after the PaymentRegistry is ready.
+func (op *OrderProcessor) SetVerifyDepositFunc(fn func(params DepositVerifyParams) error) {
+	op.verifyDepositFunc = fn
+}
+
+func (op *OrderProcessor) SetFiatRefundOnDeclineFunc(fn func(orderID string, paymentID string, providerID string, currency string) error) {
+	op.fiatRefundOnDeclineFunc = fn
 }
 
 // GetFiatPayment retrieves fiat payment details via the registered provider.
@@ -132,7 +163,7 @@ func (op *OrderProcessor) Stop() {
 // ## Handler Guards (FSM-Covered)
 //
 // Individual handlers still contain their own state guards (e.g., checking if
-// SerializedOrderConfirmation != nil before processing ORDER_REJECT). These guards
+// SerializedOrderConfirmation != nil before processing ORDER_DECLINE). These guards
 // are now redundant with the FSM validation but are retained as defense-in-depth
 // during the transition period. They are marked with "FSM-covered" comments and
 // can be progressively removed once the FSM has proven stable in production.
@@ -232,8 +263,8 @@ func (op *OrderProcessor) ProcessACK(tx database.Tx, om *models.OutgoingMessage)
 	switch orderMessage.MessageType {
 	case npb.OrderMessage_ORDER_OPEN:
 		key = "order_open_acked"
-	case npb.OrderMessage_ORDER_REJECT:
-		key = "order_reject_acked"
+	case npb.OrderMessage_ORDER_DECLINE:
+		key = "order_decline_acked"
 	case npb.OrderMessage_ORDER_CANCEL:
 		key = "order_cancel_acked"
 	case npb.OrderMessage_ORDER_CONFIRMATION:
@@ -347,8 +378,8 @@ func (op *OrderProcessor) processMessage(dbtx database.Tx, order *models.Order, 
 		event, err = op.processPaymentSentMessage(dbtx, order, message)
 	case npb.OrderMessage_RATING_SIGNATURES:
 		event, err = op.processRatingSignaturesMessage(dbtx, order, message)
-	case npb.OrderMessage_ORDER_REJECT:
-		event, err = op.processOrderRejectMessage(dbtx, order, message)
+	case npb.OrderMessage_ORDER_DECLINE:
+		event, err = op.processOrderDeclineMessage(dbtx, order, message)
 	case npb.OrderMessage_ORDER_CONFIRMATION:
 		event, err = op.processOrderConfirmationMessage(dbtx, order, message)
 	case npb.OrderMessage_ORDER_CANCEL:

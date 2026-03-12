@@ -87,9 +87,11 @@ type Monitor struct {
 	sources             map[iwallet.ChainType][]PaymentSource
 	watching            map[string]*WatchedAddress
 	watchMu             sync.RWMutex
-	pollInterval        time.Duration
-	gracePeriod         time.Duration
-	subscribeAllSources bool // If true, subscribe to all sources; if false, use first successful only
+	pollInterval         time.Duration
+	gracePeriod          time.Duration
+	subscribeAllSources  bool // If true, subscribe to all sources; if false, use first successful only
+	broadcastMaxRetries  int
+	broadcastBaseDelay   time.Duration
 	shutdown            chan struct{}
 	wg                  sync.WaitGroup
 	stopOnce            sync.Once // Ensures Stop() is only executed once
@@ -120,6 +122,9 @@ type MonitorConfig struct {
 	PollInterval        time.Duration
 	GracePeriod         time.Duration // How long to keep monitoring after expiry
 	SubscribeAllSources bool          // If true, subscribe to all sources for redundancy; if false, use first successful only
+
+	BroadcastMaxRetries int           // Max retry rounds (0 = no retry). Default: 3
+	BroadcastBaseDelay  time.Duration // Base delay for exponential backoff. Default: 2s
 }
 
 // DefaultMonitorConfig returns default configuration
@@ -128,6 +133,8 @@ func DefaultMonitorConfig() *MonitorConfig {
 		PollInterval:        30 * time.Second,
 		GracePeriod:         2 * time.Hour, // Continue monitoring 2 hours after expiry
 		SubscribeAllSources: false,         // Default: use first successful source only
+		BroadcastMaxRetries: 3,
+		BroadcastBaseDelay:  2 * time.Second,
 	}
 }
 
@@ -138,15 +145,17 @@ func NewMonitor(config *MonitorConfig) *Monitor {
 	}
 
 	return &Monitor{
-		sources:             make(map[iwallet.ChainType][]PaymentSource),
-		watching:            make(map[string]*WatchedAddress),
-		pollInterval:        config.PollInterval,
-		gracePeriod:         config.GracePeriod,
-		subscribeAllSources: config.SubscribeAllSources,
-		shutdown:            make(chan struct{}),
-		subscribers:         make([]chan iwallet.Transaction, 0),
-		nodeCallbacks:       make(map[string]func(tx iwallet.Transaction, wa *WatchedAddress)),
-		seenTxs:             make(map[string]time.Time),
+		sources:              make(map[iwallet.ChainType][]PaymentSource),
+		watching:             make(map[string]*WatchedAddress),
+		pollInterval:         config.PollInterval,
+		gracePeriod:          config.GracePeriod,
+		subscribeAllSources:  config.SubscribeAllSources,
+		broadcastMaxRetries:  config.BroadcastMaxRetries,
+		broadcastBaseDelay:   config.BroadcastBaseDelay,
+		shutdown:             make(chan struct{}),
+		subscribers:          make([]chan iwallet.Transaction, 0),
+		nodeCallbacks:        make(map[string]func(tx iwallet.Transaction, wa *WatchedAddress)),
+		seenTxs:              make(map[string]time.Time),
 	}
 }
 
@@ -766,39 +775,56 @@ type Broadcaster interface {
 	BroadcastTransaction(ctx context.Context, txHex string) (string, error)
 }
 
-// BroadcastTransaction broadcasts a raw transaction via the available sources
+// BroadcastTransaction broadcasts a raw transaction via the available sources.
+// If all sources fail on the first attempt, it retries with exponential backoff
+// up to BroadcastMaxRetries times before giving up.
 func (m *Monitor) BroadcastTransaction(chain iwallet.ChainType, txHex string) (string, error) {
 	sources := m.sources[chain]
 	if len(sources) == 0 {
 		return "", errors.New("no sources available for chain")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	maxRetries := m.broadcastMaxRetries
+	baseDelay := m.broadcastBaseDelay
+	timeout := 30*time.Second + baseDelay*time.Duration(1<<maxRetries)
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	var lastErr error
-	// Try each source until one succeeds
-	for _, source := range sources {
-		if !source.IsHealthy() {
-			continue
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			delay := baseDelay << (attempt - 1)
+			log.Warningf("Broadcast attempt %d/%d failed, retrying in %v...", attempt, maxRetries+1, delay)
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				return "", ctx.Err()
+			}
 		}
 
-		bc, ok := source.(Broadcaster)
-		if !ok {
-			continue
-		}
+		for _, source := range sources {
+			if !source.IsHealthy() {
+				continue
+			}
+			bc, ok := source.(Broadcaster)
+			if !ok {
+				continue
+			}
 
-		txid, err := bc.BroadcastTransaction(ctx, txHex)
-		if err != nil {
-			log.Warningf("Failed to broadcast transaction via source: %v", err)
-			lastErr = err
-			continue
-		}
+			txid, err := bc.BroadcastTransaction(ctx, txHex)
+			if err != nil {
+				log.Warningf("Failed to broadcast transaction via source (attempt %d): %v", attempt+1, err)
+				lastErr = err
+				continue
+			}
 
-		log.Infof("Successfully broadcast transaction %s", txid)
-		return txid, nil
+			log.Infof("Successfully broadcast transaction %s (attempt %d)", txid, attempt+1)
+			return txid, nil
+		}
 	}
 
+	log.Errorf("broadcast failed after %d retries: %v", maxRetries, lastErr)
 	if lastErr != nil {
 		return "", lastErr
 	}

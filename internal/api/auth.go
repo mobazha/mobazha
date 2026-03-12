@@ -54,8 +54,8 @@ func (s *authState) isConfigured() bool {
 //
 //  1. JWT Bearer token (for SaaS proxy-mediated requests, e.g. Mini App):
 //     Authorization: Bearer <jwt-token>
-//     The JWT must be signed by SaaS Casdoor and the user's peerID property
-//     must match this node's peer ID (admin authorization).
+//     The JWT must be signed by SaaS Casdoor and the user must be the store
+//     owner (via claims.Id == ownerUserID, or legacy peerID fallback).
 //
 //  2. Basic Auth (for direct admin access):
 //     Authorization: Basic <base64(user:pass)>

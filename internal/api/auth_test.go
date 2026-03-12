@@ -132,7 +132,7 @@ func TestGateway_JWTAuth(t *testing.T) {
 
 	certPEM, privKey := generateTestRSACert()
 
-	validator, err := NewJWTValidator(certPEM, localPeerID)
+	validator, err := NewJWTValidator(certPEM, localPeerID, "")
 	if err != nil {
 		t.Fatalf("NewJWTValidator: %v", err)
 	}

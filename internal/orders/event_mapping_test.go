@@ -35,9 +35,9 @@ func TestMessageTypeToEvent_AllMappings(t *testing.T) {
 			isTransition: true,
 		},
 		{
-			name:         "ORDER_REJECT -> EventVendorReject",
-			msgType:      npb.OrderMessage_ORDER_REJECT,
-			wantEvent:    coreorders.EventVendorReject,
+			name:         "ORDER_DECLINE -> EventVendorDecline",
+			msgType:      npb.OrderMessage_ORDER_DECLINE,
+			wantEvent:    coreorders.EventVendorDecline,
 			isTransition: true,
 		},
 		{

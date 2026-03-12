@@ -97,7 +97,7 @@ type OrderService interface {
 	EstimateOrderTotal(ctx context.Context, purchase *models.Purchase) (models.OrderTotals, error)
 	GetOrderInfo(orderID models.OrderID, coinType iwallet.CoinType) (*models.OrderInfo, error)
 	ProcessOrderPayment(ctx context.Context, paymentData *models.PaymentData) error
-	RejectOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
+	DeclineOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
 	RefundOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	ConfirmOrder(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error
 	GetConfirmOrderInstructions(orderID models.OrderID, initiatorAddress string, payoutAddress string) (coinType iwallet.CoinType, instructions any, err error)
@@ -113,7 +113,7 @@ type OrderService interface {
 	// For EVM/Solana, these build instructions, relay via platform gas wallet, then complete the action.
 	// Returns ErrRelayNotAvailable if relay service is not configured.
 	RefundOrderViaRelay(orderID models.OrderID, done chan struct{}) error
-	RejectOrderViaRelay(orderID models.OrderID, reason string, done chan struct{}) error
+	DeclineOrderViaRelay(orderID models.OrderID, reason string, done chan struct{}) error
 	CancelOrderViaRelay(orderID models.OrderID, done chan struct{}) error
 
 	GetOrder(orderID string) (*models.Order, error)
@@ -138,7 +138,6 @@ type ListingService interface {
 	SaveListing(listing *pb.Listing, done chan<- struct{}) error
 	UpdateAllListings(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error
 	DeleteListing(slug string, done chan<- struct{}) error
-	SetModeratorsOnListings(mods []peer.ID, done chan struct{}) error
 	GetMyListings() (models.ListingIndex, error)
 	GetListings(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (models.ListingIndex, error)
 	GetMyListingBySlug(slug string) (*pb.SignedListing, error)
@@ -151,6 +150,7 @@ type ListingService interface {
 type ProfileService interface {
 	SetProfile(profile *models.Profile, done chan<- struct{}) error
 	GetMyProfile() (*models.Profile, error)
+	GetProfileStats() (*models.ProfileStats, error)
 	GetProfile(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error)
 
 	// Moderation

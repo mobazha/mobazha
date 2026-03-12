@@ -7,7 +7,6 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,20 +37,22 @@ func seedProfile(t *testing.T, db database.Database, profile *models.Profile) {
 }
 
 func TestModerationAppService_IsModerator_False(t *testing.T) {
-	svc := newTestModerationAppService(t, ModerationAppServiceConfig{
-		GetMyProfile: func() (*models.Profile, error) {
-			return &models.Profile{Name: "Test", Moderator: false}, nil
-		},
-	})
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	seedProfile(t, db, &models.Profile{Name: "Test", Moderator: false})
+	svc := newTestModerationAppService(t, ModerationAppServiceConfig{DB: db})
 	assert.False(t, svc.IsModerator())
 }
 
 func TestModerationAppService_IsModerator_True(t *testing.T) {
-	svc := newTestModerationAppService(t, ModerationAppServiceConfig{
-		GetMyProfile: func() (*models.Profile, error) {
-			return &models.Profile{Name: "Test", Moderator: true}, nil
-		},
-	})
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	seedProfile(t, db, &models.Profile{Name: "Test", Moderator: true})
+	svc := newTestModerationAppService(t, ModerationAppServiceConfig{DB: db})
 	assert.True(t, svc.IsModerator())
 }
 
@@ -61,15 +62,11 @@ func TestModerationAppService_SetSelfAsModerator(t *testing.T) {
 	t.Cleanup(func() { _ = db.Close() })
 
 	seedProfile(t, db, &models.Profile{
-		Name:       "Test Store",
-		Currencies: []string{"BTC", "ETH"},
+		Name: "Test Store",
 	})
 
 	svc := newTestModerationAppService(t, ModerationAppServiceConfig{
 		DB: db,
-		GetAcceptedCurrencies: func() ([]string, error) {
-			return []string{"BTC", "ETH"}, nil
-		},
 	})
 
 	modInfo := &models.ModeratorInfo{
@@ -136,23 +133,6 @@ func TestModerationAppService_RemoveSelfAsModerator(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.False(t, profile.Moderator)
-}
-
-func TestModerationAppService_SetModeratorsOnListings(t *testing.T) {
-	updateCalled := false
-	svc := newTestModerationAppService(t, ModerationAppServiceConfig{
-		UpdateAllListings: func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error {
-			updateCalled = true
-			maybeCloseDone(done)
-			return nil
-		},
-	})
-
-	done := make(chan struct{})
-	err := svc.SetModeratorsOnListings(nil, done)
-	require.NoError(t, err)
-	<-done
-	assert.True(t, updateCalled, "updateAllListings should be called")
 }
 
 func TestModerationAppService_GetVerifiedModerators_EmptyEndpoint(t *testing.T) {

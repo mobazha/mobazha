@@ -37,7 +37,7 @@ func newMockUTXOAdapter(node *MobazhaNode) *adapters.UTXOAutoConfirmAdapter {
 
 // newStubUTXOAdapter creates a minimal UTXOAutoConfirmAdapter for registry
 // coverage tests that only verify chain registration and instruction dispatch,
-// without requiring a live wallet or multiwallet.
+// without requiring a live wallet or Multiwallet.
 func newStubUTXOAdapter() *adapters.UTXOAutoConfirmAdapter {
 	return &adapters.UTXOAutoConfirmAdapter{}
 }
@@ -206,8 +206,19 @@ func setupMockNetDB(t *testing.T, nodes []*MobazhaNode) {
 	for _, node := range nodes {
 		ndb, _ := netdb.NewNetDB(server.URL, node.peerID.String(), node.privKey)
 		node.netDB = ndb
-		node.initListingService()
-		node.initProfileService()
+		// Patch netDB into existing service instances rather than re-creating
+		// them, so cross-service references (e.g. OrderAppService.listings)
+		// remain valid.
+		if node.listingService != nil {
+			node.listingService.netDB = ndb
+		} else {
+			node.initListingService()
+		}
+		if node.profileService != nil {
+			node.profileService.netDB = ndb
+		} else {
+			node.initProfileService()
+		}
 		node.initRatingsService()
 	}
 }
@@ -760,6 +771,9 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 
 	// Start the cancelable payment monitor (key for auto-confirm)
 	sellerNode.paymentService.StartCancelablePaymentMonitor()
+
+	// Start the order event monitor so OrderAutoConfirmRequest is handled
+	sellerNode.orderService.StartPaymentEventMonitor()
 
 	// Start order processors for message handling
 	for _, node := range network.Nodes() {
@@ -1784,9 +1798,9 @@ func TestOrderLifecycle_Moderated_Dispute_FullResolution(t *testing.T) {
 	t.Log("Moderated dispute completed: Purchase -> Payment -> Confirm -> Dispute -> Resolve(60/40) -> Release")
 }
 
-// TestOrderLifecycle_SellerReject_AfterCancelablePayment tests seller rejecting
+// TestOrderLifecycle_SellerDecline_AfterCancelablePayment tests seller declining
 // a funded CANCELABLE order, which should trigger an automatic refund.
-func TestOrderLifecycle_SellerReject_AfterCancelablePayment(t *testing.T) {
+func TestOrderLifecycle_SellerDecline_AfterCancelablePayment(t *testing.T) {
 	network, err := NewMocknet(2)
 	if err != nil {
 		t.Fatal(err)
@@ -1846,23 +1860,23 @@ func TestOrderLifecycle_SellerReject_AfterCancelablePayment(t *testing.T) {
 	waitForEvent(t, fundingSub, "OrderFunded on seller")
 	waitForEvent(t, paymentRecvSub, "OrderPaymentReceived on buyer")
 
-	// ── Step 3: Seller Rejects (funded — buyer releases CANCELABLE escrow inline) ──
-	rejectSub, err := buyerNode.eventBus.Subscribe(&events.OrderDeclined{})
+	// ── Step 3: Seller Declines (funded — buyer releases CANCELABLE escrow inline) ──
+	declineSub, err := buyerNode.eventBus.Subscribe(&events.OrderDeclined{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	rejectAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
+	declineAck, err := sellerNode.eventBus.Subscribe(&events.MessageACK{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	done := make(chan struct{})
-	if err := sellerNode.Order().RejectOrder(orderID, iwallet.TransactionID(""), "Damaged item", done); err != nil {
+	if err := sellerNode.Order().DeclineOrder(orderID, iwallet.TransactionID(""), "Damaged item", done); err != nil {
 		t.Fatal(err)
 	}
-	waitForDone(t, done, "RejectOrder")
-	waitForEvent(t, rejectSub, "OrderDeclined on buyer")
-	waitForEvent(t, rejectAck, "MessageACK (reject) on seller")
+	waitForDone(t, done, "DeclineOrder")
+	waitForEvent(t, declineSub, "OrderDeclined on buyer")
+	waitForEvent(t, declineAck, "MessageACK (decline) on seller")
 
 	// ── Verify ──────────────────────────────────────────────────
 	var buyerOrder models.Order
@@ -1872,14 +1886,14 @@ func TestOrderLifecycle_SellerReject_AfterCancelablePayment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if buyerOrder.SerializedOrderReject == nil {
-		t.Error("Buyer failed to save order reject")
+	if buyerOrder.SerializedOrderDecline == nil {
+		t.Error("Buyer failed to save order decline")
 	}
 	if buyerOrder.Open {
-		t.Error("Order should be closed after reject")
+		t.Error("Order should be closed after decline")
 	}
 
-	t.Log("Seller reject (CANCELABLE funded) completed: Purchase -> Payment -> Reject")
+	t.Log("Seller decline (CANCELABLE funded) completed: Purchase -> Payment -> Decline")
 }
 
 // TestOrderLifecycle_CancelableConfirm_RefundBlocked verifies that a confirmed

@@ -1,10 +1,13 @@
 package core
 
 import (
+	"context"
 	"sync"
 
 	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/internal/orders"
+	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -75,5 +78,31 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	if n.orderService != nil {
 		n.orderService.SetRegistry(n.paymentRegistry)
 	}
+
+	// Wire verifyDepositFunc to OrderProcessor via PaymentRegistry.
+	// The closure captures the registry and dispatches to the chain-specific
+	// adapter's VerifyDeposit (EVM checks receipt+Funded, UTXO/Solana noop).
+	if n.orderService != nil {
+		reg := n.paymentRegistry
+		n.orderService.OrderProcessor().SetVerifyDepositFunc(func(params orders.DepositVerifyParams) error {
+			strategy, err := reg.ForCoin(params.CoinType)
+			if err != nil {
+				return nil
+			}
+			return strategy.VerifyDeposit(context.Background(), payment.DepositVerifyParams{
+				CoinType:     params.CoinType,
+				TxHash:       params.TxHash,
+				Script:       params.Script,
+				ContractAddr: params.ContractAddr,
+				OrderAmount:  params.OrderAmount,
+			})
+		})
+	}
+}
+
+// ── Thin delegates for strategy callbacks ────────────────────────────────
+
+func (n *MobazhaNode) handleCancelablePaymentForEVM(event *events.CancelablePaymentReady, chainType string) {
+	n.paymentService.HandleCancelablePaymentForEVM(event, chainType)
 }
 

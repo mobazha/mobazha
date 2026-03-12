@@ -78,17 +78,17 @@ func TestMobazhaNode_Follow(t *testing.T) {
 		t.Errorf("Incorrect following peer returned. Expected %s, got %s", p2.String(), following[1])
 	}
 
-	profile, err := node.Profile().GetMyProfile()
+	stats, err := node.Profile().GetProfileStats()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if profile.Stats == nil {
+	if stats == nil {
 		t.Fatal("Profile stats is nil")
 	}
 
-	if profile.Stats.FollowingCount != uint32(following.Count()) {
-		t.Errorf("Following count in profile incorrect. Expected %d, got %d", following.Count(), profile.Stats.FollowingCount)
+	if stats.FollowingCount != uint32(following.Count()) {
+		t.Errorf("Following count in profile incorrect. Expected %d, got %d", following.Count(), stats.FollowingCount)
 	}
 }
 

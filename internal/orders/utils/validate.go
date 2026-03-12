@@ -174,7 +174,7 @@ func ValidatePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTim
 	if wal.CoinCategory() == iwallet.CoinCategorySolana || wal.CoinCategory() == iwallet.CoinCategoryEthereum {
 		return validateEscrowPayment(order, paymentSent, wal)
 	} else if wal.CoinCategory() == iwallet.CoinCategoryStripe {
-		return validateStripePayment(order, paymentSent, chaincode, wal, escrowTimeoutHours)
+		return validateFiatPayment(order, paymentSent)
 	} else {
 		return validateBTCLikePayment(order, paymentSent, chaincode, wal, escrowTimeoutHours)
 	}
@@ -210,9 +210,15 @@ func validateBTCLikePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, ch
 	return nil
 }
 
+var ErrPaymentAmountInsufficient = errors.New("payment amount is less than order amount")
+
 func validateEscrowPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal iwallet.Wallet) error {
 	if order.Listings[0].Listing.Metadata.ContractType == pb.Listing_Metadata_RWA_TOKEN {
 		return nil
+	}
+
+	if err := ValidatePaymentAmount(order.Amount, paymentSent.Amount); err != nil {
+		return err
 	}
 
 	escrowInfo, err := GetOrderEscrowInfo(order, paymentSent, wal.IsTestnet())
@@ -233,7 +239,18 @@ func validateEscrowPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal
 	return nil
 }
 
-func validateStripePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, chaincode []byte, wal iwallet.Wallet, escrowTimeoutHours uint32) error {
+func ValidatePaymentAmount(orderAmount, paidAmount string) error {
+	expected, ok := new(big.Int).SetString(orderAmount, 10)
+	if !ok || expected.Sign() <= 0 {
+		return fmt.Errorf("invalid order amount: %q", orderAmount)
+	}
+	paid, ok := new(big.Int).SetString(paidAmount, 10)
+	if !ok || paid.Sign() < 0 {
+		return fmt.Errorf("invalid payment amount: %q", paidAmount)
+	}
+	if paid.Cmp(expected) < 0 {
+		return fmt.Errorf("%w: paid %s < expected %s", ErrPaymentAmountInsufficient, paidAmount, orderAmount)
+	}
 	return nil
 }
 

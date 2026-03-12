@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet/base"
-	"github.com/mobazha/mobazha3.0/internal/multiwallet/coins/eth"
+	"github.com/mobazha/mobazha3.0/internal/chains"
+	"github.com/mobazha/mobazha3.0/internal/chains/base"
+	ethWal "github.com/mobazha/mobazha3.0/internal/chains/evm"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/evm"
@@ -113,7 +113,7 @@ func TestConfigureEVMWallets_NilInputs(t *testing.T) {
 // ── extractEVMConfigs tests ─────────────────────────────────────────────
 
 func TestExtractEVMConfigs_FromChainAPIs(t *testing.T) {
-	chainAPIs := map[iwallet.ChainType]multiwallet.APIUrls{
+	chainAPIs := map[iwallet.ChainType]chains.APIUrls{
 		iwallet.ChainBSC: {
 			MainnetRpc:             []string{"https://bsc-custom.example.com", "https://bsc-fallback.example.com"},
 			MainnetRegistryAddress: "0xBSCRegistry",
@@ -180,7 +180,7 @@ func TestExtractEVMConfigs_EmptyChainAPIs(t *testing.T) {
 		t.Errorf("expected 0 configs for nil ChainAPIs, got %d", len(configs))
 	}
 
-	configs = extractEVMConfigs(map[iwallet.ChainType]multiwallet.APIUrls{}, true)
+	configs = extractEVMConfigs(map[iwallet.ChainType]chains.APIUrls{}, true)
 	if len(configs) != 0 {
 		t.Errorf("expected 0 configs for empty ChainAPIs, got %d", len(configs))
 	}
@@ -346,9 +346,9 @@ func TestEVMWallet_BusinessRoundtrip_SetChainClient_TypeManagedEscrow(t *testing
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-func newTestETHWallet(t *testing.T, chain iwallet.ChainType) *eth.ETHWallet {
+func newTestETHWallet(t *testing.T, chain iwallet.ChainType) *ethWal.ETHWallet {
 	t.Helper()
-	w, err := eth.NewETHWallet(iwallet.CoinType(chain), nil, &base.WalletConfig{
+	w, err := ethWal.NewETHWallet(iwallet.CoinType(chain), nil, &base.WalletConfig{
 		Testnet: true,
 	})
 	if err != nil {

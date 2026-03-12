@@ -4,16 +4,16 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"path/filepath"
 
-	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
+	"github.com/mobazha/mobazha3.0/internal/storage"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	"github.com/mobazha/mobazha3.0/pkg/request"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
@@ -45,41 +45,33 @@ func WithHostService(hs coreiface.HostService) NodeOption {
 // App Service Initialization Dependency Graph
 // ============================================
 //
-// Each service depends on services above it. Services that reference
-// later-initialized services MUST use closures (not direct method values)
-// to defer evaluation until call time. See callback-safety-rules.mdc.
+// Services are wired via narrow interfaces (role interfaces). Circular
+// dependencies and late-init services use setter injection.
 //
-//	Step | Service              | Runtime deps (via closures)             | Direct deps (must be init'd before)
-//	─────┼──────────────────────┼─────────────────────────────────────────┼─────────────────────────────────────
-//	 1   │ paymentService       │ profileService, orderService            │ (none)
-//	 2   │ orderService         │ paymentService, listingService,         │ (none)
-//	     │                      │ moderationService                       │
-//	 3   │ chatService          │                                         │ (none)
-//	 4   │ matrixService        │                                         │ (none)
-//	 5   │ preferencesService   │ listingService                          │ (none)
-//	 6   │ mediaService         │                                         │ (none)
-//	 7   │ ratingsService       │                                         │ (none)
-//	 8   │ notificationService  │                                         │ (none)
-//	 9   │ shoppingCartService  │                                         │ (none)
-//	10   │ profileService       │ paymentService                          │ (none)
-//	11   │ followService        │                                         │ profileService
-//	12   │ postsService         │                                         │ profileService
-//	13   │ moderationService    │ listingService                          │ profileService
-//	14   │ listingService       │                                         │ profileService
-//
-// "Runtime deps" = referenced via closures; safe even if the target is
-//
-//	initialized later because the closure captures `n` (not the service).
-//
-// "Direct deps" = the service pointer is read at init time (nil-guarded
-//
-//	or used directly); MUST already be non-nil.
+//	Step | Service              | Injected via constructor                | Injected via setter (after init)
+//	─────┼──────────────────────┼─────────────────────────────────────────┼──────────────────────────────────────
+//	 1   │ profileService       │                                         │
+//	 2   │ moderationService    │                                         │
+//	 3   │ listingService       │                                         │
+//	 4   │ paymentService       │ profileService (PeerProfileReader)       │ fiatPaymentService (FiatPaymentQuery)
+//	 5   │ orderService         │ paymentService (EscrowOperations)        │
+//	     │                      │ listingService (ListingQuery)            │
+//	     │                      │ moderationService (ModeratorQuery)       │
+//	 6   │ chatService          │                                         │
+//	 7   │ matrixService        │                                         │
+//	 8   │ preferencesService   │                                         │
+//	 9   │ mediaService         │                                         │
+//	10   │ ratingsService       │                                         │
+//	11   │ notificationService  │                                         │
+//	12   │ shoppingCartService  │                                         │
+//	13   │ followService        │                                         │
+//	14   │ postsService         │                                         │
 //
 // ADDING A NEW APP SERVICE — Standard Procedure:
 //  1. Create init method: func (n *MobazhaNode) initXxxService()
 //  2. Determine dependencies:
-//     a. If depending on a service initialized AFTER this one → use closure
-//     b. If depending on a service initialized BEFORE → nil-guarded direct capture is OK
+//     a. If depending on a service initialized BEFORE → pass via constructor (narrow interface)
+//     b. If circular dependency → use setter injection after both are initialized
 //  3. Add the call to this function in the correct position
 //  4. Update the dependency graph table above
 //  5. Run: go build ./... && go test ./internal/core/...
@@ -95,8 +87,12 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 			n.solPrivKey,
 		)
 	}
+	n.initProfileService()
+	n.initModerationService()
+	n.initListingService()
 	n.initPaymentService()
 	n.initOrderService()
+	n.wireServiceSetters()
 	n.initChatService()
 	n.initMatrixService()
 	n.initPreferencesService()
@@ -105,12 +101,20 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initNotificationService()
 	n.initShoppingCartService()
 	n.initWishlistService()
-	n.initProfileService()
 	n.initFollowService()
 	n.initPostsService()
-	n.initModerationService()
-	n.initListingService()
 	n.initAnalyticsService()
+}
+
+// wireServiceSetters resolves late-init wiring via setter injection,
+// after all primary services are constructed.
+func (n *MobazhaNode) wireServiceSetters() {
+	if n.paymentService != nil && n.fiatPaymentService != nil {
+		n.paymentService.SetFiatPaymentQuery(n.fiatPaymentService)
+	}
+	if n.paymentService != nil && n.paymentVerificationService != nil {
+		n.paymentService.SetVerificationService(n.paymentVerificationService)
+	}
 }
 
 // initMatrixService creates the MatrixAppService.
@@ -136,12 +140,6 @@ func (n *MobazhaNode) initPreferencesService() {
 	n.preferencesService = NewPreferencesAppService(PreferencesAppServiceConfig{
 		DB:         n.db,
 		BanManager: n.banManager,
-		UpdateAllListingsFunc: func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error {
-			return n.listingService.UpdateAllListings(updateFunc, done)
-		},
-		GetMyListingsFunc: func() (models.ListingIndex, error) {
-			return n.listingService.GetMyListings()
-		},
 	})
 }
 
@@ -155,6 +153,14 @@ func (n *MobazhaNode) initMediaService() {
 	var blobStore contracts.BlobStore
 	if n.hostService != nil {
 		blobStore = n.hostService.GetBlobStore()
+	}
+	if blobStore == nil && n.repo != nil {
+		blobDir := filepath.Join(n.repo.DataDir(), "blobs")
+		if bs, err := storage.NewLocalFSAdapter(blobDir); err != nil {
+			log.Errorf("Failed to create local blob store at %s: %v", blobDir, err)
+		} else {
+			blobStore = bs
+		}
 	}
 
 	n.mediaService = NewMediaAppService(MediaAppServiceConfig{
@@ -261,45 +267,15 @@ func (n *MobazhaNode) initOrderService() {
 		PeerID:         n.Identity,
 		Testnet:        n.testnet,
 		ExchangeRates:  n.exchangeRates,
+		OrderLockMgr:   n.orderLockManager,
+		Shutdown:       n.shutdown,
 
-		GetPayoutAddr: func(coinType string) (iwallet.Address, error) {
-			return n.paymentService.GetPayoutAddress(coinType)
-		},
-		ReleaseCancelableWithParams: func(order *models.Order, params releaseFromCancelableAddressParams) (iwallet.Tx, *iwallet.Transaction, error) {
-			return n.paymentService.ReleaseFromCancelableAddressWithParams(order, params)
-		},
-		ReleaseCancelableFunds: func(order *models.Order, payoutAddress string) (iwallet.TransactionID, string, error) {
-			if n.paymentService != nil {
-				return n.paymentService.ReleaseCancelableFunds(order, payoutAddress)
-			}
-			return "", "", nil
-		},
-		ValidateListing: func(sl *pb.SignedListing) error {
-			return n.listingService.validateListing(sl)
-		},
-		GetModeratorFee: func(totalOut iwallet.Amount, coinCode string) (iwallet.Amount, error) {
-			return n.moderationService.GetModeratorFee(totalOut, coinCode)
-		},
-		GetListingByCID: func(ctx context.Context, c cid.Cid, reqCtx interface{}) (*pb.SignedListing, error) {
-			return n.listingService.GetListingByCID(ctx, c, nil)
-		},
-		GetListings: func(ctx context.Context, peerID peer.ID) (models.ListingIndex, error) {
-			return n.listingService.GetListings(ctx, peerID, nil, false)
-		},
-		FetchOrderByID: func(orderID string) (*models.Order, error) {
-			return n.paymentService.FetchOrderByID(orderID)
-		},
-		RelayInstructions: func(orderID string, coinType iwallet.CoinType, instructions any) (string, error) {
-			return n.paymentService.RelayInstructions(orderID, coinType, instructions)
-		},
+		Escrow:     n.paymentService,
+		Listings:   n.listingService,
+		Moderators: n.moderationService,
+
 		DiscountResolver:           n.buildDiscountResolver(),
 		DiscountRedemptionRecorder: n.buildDiscountRecorder(),
-		CollectionStore: func() contracts.CollectionStore {
-			if n.collectionService != nil {
-				return n.collectionService.Store()
-			}
-			return nil
-		},
 	})
 
 	if n.fiatPaymentService != nil {
@@ -314,6 +290,7 @@ func (n *MobazhaNode) initOrderService() {
 				Coin:          coin,
 				Amount:        uint64(event.Amount),
 				Method:        pb.PaymentSent_FIAT,
+				ProviderID:    event.ProviderID,
 			})
 		})
 	}
@@ -378,6 +355,9 @@ func (n *MobazhaNode) buildDiscountRecorder() DiscountRedemptionRecorderFunc {
 
 // initPaymentService creates the PaymentAppService if the necessary
 // dependencies are available. Infrastructure-only nodes skip this.
+//
+// Note: FiatPaymentQuery is wired via setter in wireServiceSetters()
+// to resolve late-init dependency.
 func (n *MobazhaNode) initPaymentService() {
 	if n.infrastructureOnly {
 		return
@@ -395,33 +375,11 @@ func (n *MobazhaNode) initPaymentService() {
 		NodeID:      n.nodeID,
 		Shutdown:    n.shutdown,
 
-		GetProfile: func(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error) {
-			return n.profileService.GetProfile(ctx, peerID, reqCtx, useCache)
-		},
-		ConfirmOrder: func(orderID models.OrderID, txid iwallet.TransactionID, payoutAddress string, done chan struct{}) error {
-			return n.orderService.ConfirmOrder(orderID, txid, payoutAddress, done)
-		},
-		FulfillOrder: func(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error {
-			return n.orderService.FulfillOrder(orderID, fulfillments, done)
-		},
-		ReleaseCancelable: func(order *models.Order, payoutAddress ...string) (*ReleaseResult, error) {
-			return n.orderService.releaseFromCancelableAddress(order, payoutAddress...)
-		},
+		Profiles:           n.profileService,
 		EscrowMasterPubKey: n.escrowMasterKey.PubKey(),
 
-		Keys: n.keyProvider,
-		ProcessOrderPayment: func(ctx context.Context, paymentData *models.PaymentData) error {
-			return n.orderService.ProcessOrderPayment(ctx, paymentData)
-		},
-
+		Keys:          n.keyProvider,
 		ExchangeRates: n.exchangeRates,
-
-		GetFiatPayment: func(paymentID string, providerID string) (*contracts.PaymentDetail, error) {
-			if n.fiatPaymentService == nil {
-				return nil, fmt.Errorf("fiat payment service not initialized")
-			}
-			return n.fiatPaymentService.GetPayment(context.Background(), providerID, paymentID)
-		},
 
 		EVMRelayService: evmRelay,
 		RelayAPIURL:     n.relayAPIURL,
@@ -457,73 +415,44 @@ func (n *MobazhaNode) initProfileService() {
 		StripeAccountID:        n.stripeAccountID,
 		StoreAndForwardServers: n.storeAndForwardServers,
 		CoTenantPublicData:     n.coTenantPublicDataDeferred(),
-		GetAcceptedCurrencies: func() ([]string, error) {
-			return n.paymentService.GetAcceptedCurrencies()
-		},
 	})
 }
 
 // initPostsService creates the PostsAppService.
-// Must be called after initProfileService since it depends on profileService callbacks.
 func (n *MobazhaNode) initPostsService() {
 	if n.infrastructureOnly {
 		return
 	}
 
-	var updateProfile UpdateAndSaveProfileFunc
-	var getMyProfile GetMyProfileFunc
-	if n.profileService != nil {
-		updateProfile = n.profileService.UpdateAndSaveProfile
-		getMyProfile = n.profileService.GetMyProfile
-	}
-
 	n.postsService = NewPostsAppService(PostsAppServiceConfig{
-		DB:                   n.db,
-		Signer:               n.signer,
-		Keys:                 n.keyProvider,
-		PeerID:               n.peerID,
-		Publish:              n.Publish,
-		UpdateAndSaveProfile: updateProfile,
-		GetMyProfile:         getMyProfile,
+		DB:      n.db,
+		Signer:  n.signer,
+		Keys:    n.keyProvider,
+		PeerID:  n.peerID,
+		Publish: n.Publish,
 	})
 }
 
 // initFollowService creates the FollowAppService.
-// Must be called after initProfileService since it depends on profileService.
 func (n *MobazhaNode) initFollowService() {
 	if n.infrastructureOnly {
 		return
 	}
 
-	var updateProfile UpdateAndSaveProfileFunc
-	var getMyProfile GetMyProfileFunc
-	if n.profileService != nil {
-		updateProfile = n.profileService.UpdateAndSaveProfile
-		getMyProfile = n.profileService.GetMyProfile
-	}
-
 	n.followService = NewFollowAppService(FollowAppServiceConfig{
-		DB:                   n.db,
-		Messenger:            n.messenger,
-		EventBus:             n.eventBus,
-		NodeID:               n.nodeID,
-		NetDB:                n.netDB,
-		CoTenantPublicData:   n.coTenantPublicDataDeferred(),
-		UpdateAndSaveProfile: updateProfile,
-		GetMyProfile:         getMyProfile,
+		DB:                 n.db,
+		Messenger:          n.messenger,
+		EventBus:           n.eventBus,
+		NodeID:             n.nodeID,
+		NetDB:              n.netDB,
+		CoTenantPublicData: n.coTenantPublicDataDeferred(),
 	})
 }
 
 // initModerationService creates the ModerationAppService.
-// Must be called after initProfileService since it depends on profileService.GetMyProfile.
 func (n *MobazhaNode) initModerationService() {
 	if n.infrastructureOnly {
 		return
-	}
-
-	var getMyProfile GetMyProfileFunc
-	if n.profileService != nil {
-		getMyProfile = n.profileService.GetMyProfile
 	}
 
 	var verifiedModEndpoint string
@@ -537,13 +466,6 @@ func (n *MobazhaNode) initModerationService() {
 		NodeID:              n.nodeID,
 		VerifiedModEndpoint: verifiedModEndpoint,
 		ExchangeRates:       n.exchangeRates,
-		GetMyProfile:        getMyProfile,
-		GetAcceptedCurrencies: func() ([]string, error) {
-			return n.paymentService.GetAcceptedCurrencies()
-		},
-		UpdateAllListings: func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error {
-			return n.listingService.UpdateAllListings(updateFunc, done)
-		},
 	})
 }
 
@@ -552,34 +474,25 @@ func (n *MobazhaNode) initListingService() {
 		return
 	}
 
-	var getMyProfile GetMyProfileFunc
-	var updateAndSaveProfile UpdateAndSaveProfileFunc
-	if n.profileService != nil {
-		getMyProfile = n.profileService.GetMyProfile
-		updateAndSaveProfile = n.profileService.UpdateAndSaveProfile
-	}
-
 	var shippingStore contracts.ShippingStore
 	if n.shippingService != nil {
 		shippingStore = n.shippingService.Store()
 	}
 
 	n.listingService = NewListingAppService(ListingAppServiceConfig{
-		DB:                   n.db,
-		Signer:               n.signer,
-		ContentStore:         n.contentStore,
-		NetDB:                n.netDB,
-		BanManager:           n.banManager,
-		Keys:                 n.keyProvider,
-		FeatureManager:       n.featureManager,
-		LocalListingCrypto:   n.localListingCrypto,
-		NodeID:               n.Identity(),
-		Testnet:              n.testnet,
-		Publish:              n.Publish,
-		GetMyProfile:         getMyProfile,
-		UpdateAndSaveProfile: updateAndSaveProfile,
-		CoTenantPublicData:   n.coTenantPublicDataDeferred(),
-		ShippingStore:        shippingStore,
+		DB:                 n.db,
+		Signer:             n.signer,
+		ContentStore:       n.contentStore,
+		NetDB:              n.netDB,
+		BanManager:         n.banManager,
+		Keys:               n.keyProvider,
+		FeatureManager:     n.featureManager,
+		LocalListingCrypto: n.localListingCrypto,
+		NodeID:             n.Identity(),
+		Testnet:            n.testnet,
+		Publish:            n.Publish,
+		CoTenantPublicData: n.coTenantPublicDataDeferred(),
+		ShippingStore:      shippingStore,
 	})
 
 	if n.collectionService != nil {

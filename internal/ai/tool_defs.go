@@ -52,9 +52,9 @@ func SellerTools() []ToolDefinition {
 			Parameters:  mustJSON(`{"type":"object","properties":{"orderId":{"type":"string","description":"Order ID to confirm"}},"required":["orderId"]}`),
 		},
 		{
-			Name:        "orders_reject",
-			Description: "Reject (decline) a pending order.",
-			Parameters:  mustJSON(`{"type":"object","properties":{"orderId":{"type":"string","description":"Order ID to reject"},"reason":{"type":"string","description":"Rejection reason"}},"required":["orderId"]}`),
+			Name:        "orders_decline",
+			Description: "Decline a pending order.",
+			Parameters:  mustJSON(`{"type":"object","properties":{"orderId":{"type":"string","description":"Order ID to decline"},"reason":{"type":"string","description":"Decline reason"}},"required":["orderId"]}`),
 		},
 		{
 			Name:        "orders_fulfill",

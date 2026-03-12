@@ -7,7 +7,6 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/models"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -110,32 +109,6 @@ func TestPreferencesAppService_SavePreferences_InvalidCurrency(t *testing.T) {
 	assert.Contains(t, err.Error(), "not valid")
 }
 
-// ── SavePreferences triggers UpdateAllListings on mod change ────
-
-func TestPreferencesAppService_SavePreferences_ModeratorChangeTriggersUpdate(t *testing.T) {
-	updateCalled := false
-	db, err := repo.MockDB()
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
-
-	svc := newTestPreferencesAppService(t, PreferencesAppServiceConfig{
-		DB: db,
-		UpdateAllListingsFunc: func(updateFunc func(l *pb.Listing) (bool, error), done chan<- struct{}) error {
-			updateCalled = true
-			maybeCloseDone(done)
-			return nil
-		},
-	})
-	seedPreferences(t, db, &models.UserPreferences{})
-
-	mods, _ := json.Marshal([]string{testVendorPeerID})
-	prefs := &models.UserPreferences{
-		Mods: mods,
-	}
-	require.NoError(t, svc.SavePreferences(prefs, nil))
-	assert.True(t, updateCalled)
-}
-
 // ── BlockNode / UnblockNode ─────────────────────────────────────
 
 func TestPreferencesAppService_BlockNode(t *testing.T) {
@@ -199,19 +172,6 @@ func TestPreferencesAppService_UnblockNode_NotBlocked(t *testing.T) {
 	assert.False(t, removed)
 }
 
-// ── CheckAndMigrateShippingProfiles ─────────────────────────────
-
-func TestPreferencesAppService_CheckAndMigrateShippingProfiles_NoPrefs(t *testing.T) {
-	svc := newTestPreferencesAppService(t)
-	require.NoError(t, svc.CheckAndMigrateShippingProfiles())
-}
-
-func TestPreferencesAppService_CheckAndMigrateShippingProfiles_NoMigrationNeeded(t *testing.T) {
-	svc := newTestPreferencesAppService(t)
-	seedPreferences(t, svc.db, &models.UserPreferences{})
-	require.NoError(t, svc.CheckAndMigrateShippingProfiles())
-}
-
 // ── countPhysicalGoods blocks shipping removal ──────────────────
 
 func TestPreferencesAppService_SavePreferences_RejectRemoveShippingWithPhysicalGoods(t *testing.T) {
@@ -219,14 +179,14 @@ func TestPreferencesAppService_SavePreferences_RejectRemoveShippingWithPhysicalG
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	svc := newTestPreferencesAppService(t, PreferencesAppServiceConfig{
-		DB: db,
-		GetMyListingsFunc: func() (models.ListingIndex, error) {
-			return models.ListingIndex{
-				{ContractType: "PHYSICAL_GOOD"},
-			}, nil
-		},
+	err = db.Update(func(tx database.Tx) error {
+		return tx.SetListingIndex(models.ListingIndex{
+			{Slug: "physical-item", ContractType: "PHYSICAL_GOOD"},
+		})
 	})
+	require.NoError(t, err)
+
+	svc := newTestPreferencesAppService(t, PreferencesAppServiceConfig{DB: db})
 
 	shippingOpts, _ := json.Marshal([]models.ShippingOption{
 		{ID: 1, Name: "Standard"},

@@ -54,7 +54,7 @@ type mockNode struct {
 	completeOrderFunc                       func(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	cancelOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	refundOrderViaRelayFunc                 func(orderID models.OrderID, done chan struct{}) error
-	rejectOrderViaRelayFunc                 func(orderID models.OrderID, reason string, done chan struct{}) error
+	declineOrderViaRelayFunc                 func(orderID models.OrderID, reason string, done chan struct{}) error
 	cancelOrderViaRelayFunc                 func(orderID models.OrderID, done chan struct{}) error
 	openDisputeFunc                         func(orderID models.OrderID, reason string, done chan struct{}) error
 	closeDisputeFunc                        func(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
@@ -88,7 +88,6 @@ type mockNode struct {
 	setProfileMediaFunc  func(ctx context.Context, slot contracts.ProfileSlot, imageData []byte) (*contracts.UploadResult, error)
 	getProfileMediaFunc  func(ctx context.Context, peerID peer.ID, slot contracts.ProfileSlot, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
 	setSelfAsModeratorFunc                  func(ctx context.Context, modInfo *models.ModeratorInfo, done chan struct{}) error
-	setModeratorsOnListingsFunc             func(mods []peer.ID, done chan struct{}) error
 	removeSelfAsModeratorFunc               func(ctx context.Context, done chan<- struct{}) error
 	getModeratorsFunc                       func(ctx context.Context) []peer.ID
 	getModeratorsAsyncFunc                  func(ctx context.Context) <-chan peer.ID
@@ -107,6 +106,7 @@ type mockNode struct {
 	stopFunc                                func(force bool) error
 	setProfileFunc                          func(profile *models.Profile, done chan<- struct{}) error
 	getMyProfileFunc                        func() (*models.Profile, error)
+	getProfileStatsFunc                     func() (*models.ProfileStats, error)
 	getProfileFunc                          func(ctx context.Context, peerID peer.ID, useCache bool) (*models.Profile, error)
 	getMyRatingsFunc                        func() (models.RatingIndex, error)
 	getRatingsFunc                          func(ctx context.Context, peerID peer.ID, useCache bool) (models.RatingIndex, error)
@@ -115,7 +115,7 @@ type mockNode struct {
 	estimateOrderTotalFunc                  func(ctx context.Context, purchase *models.Purchase) (models.OrderTotals, error)
 	getOrderInfoFunc                        func(orderID models.OrderID, coinType iwallet.CoinType) (*models.OrderInfo, error)
 	processOrderPaymentFunc                 func(ctx context.Context, paymentData *models.PaymentData) error
-	rejectOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
+	declineOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error
 	refundOrderFunc                         func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 	pingNodeFunc                            func(ctx context.Context, peer peer.ID) error
 	getUserPreferencesFunc                  func() (*models.UserPreferences, error)
@@ -291,9 +291,9 @@ func (m *mockNode) RefundOrderViaRelay(orderID models.OrderID, done chan struct{
 	}
 	return nil
 }
-func (m *mockNode) RejectOrderViaRelay(orderID models.OrderID, reason string, done chan struct{}) error {
-	if m.rejectOrderViaRelayFunc != nil {
-		return m.rejectOrderViaRelayFunc(orderID, reason, done)
+func (m *mockNode) DeclineOrderViaRelay(orderID models.OrderID, reason string, done chan struct{}) error {
+	if m.declineOrderViaRelayFunc != nil {
+		return m.declineOrderViaRelayFunc(orderID, reason, done)
 	}
 	return nil
 }
@@ -428,9 +428,6 @@ func (m *mockNode) GetModeratorsAsync(ctx context.Context) <-chan peer.ID {
 func (m *mockNode) GetVerifiedModerators(ctx context.Context) []peer.ID {
 	return m.getVerifiedModeratorsFunc(ctx)
 }
-func (m *mockNode) SetModeratorsOnListings(mods []peer.ID, done chan struct{}) error {
-	return m.setModeratorsOnListingsFunc(mods, done)
-}
 func (m *mockNode) Publish(done chan<- struct{}) {
 	m.publishFunc(done)
 }
@@ -476,6 +473,12 @@ func (m *mockNode) SetProfile(profile *models.Profile, done chan<- struct{}) err
 func (m *mockNode) GetMyProfile() (*models.Profile, error) {
 	return m.getMyProfileFunc()
 }
+func (m *mockNode) GetProfileStats() (*models.ProfileStats, error) {
+	if m.getProfileStatsFunc != nil {
+		return m.getProfileStatsFunc()
+	}
+	return nil, nil
+}
 func (m *mockNode) GetProfile(ctx context.Context, peerID peer.ID, reqCtx *request.Context, useCache bool) (*models.Profile, error) {
 	return m.getProfileFunc(ctx, peerID, useCache)
 }
@@ -500,8 +503,8 @@ func (m *mockNode) GetOrderInfo(orderID models.OrderID, coinType iwallet.CoinTyp
 func (m *mockNode) ProcessOrderPayment(ctx context.Context, paymentData *models.PaymentData) error {
 	return m.processOrderPaymentFunc(ctx, paymentData)
 }
-func (m *mockNode) RejectOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error {
-	return m.rejectOrderFunc(orderID, txid, reason, done)
+func (m *mockNode) DeclineOrder(orderID models.OrderID, txid iwallet.TransactionID, reason string, done chan struct{}) error {
+	return m.declineOrderFunc(orderID, txid, reason, done)
 }
 func (m *mockNode) RefundOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {
 	return m.refundOrderFunc(orderID, txid, done)

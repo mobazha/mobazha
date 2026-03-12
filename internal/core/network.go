@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,9 +16,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
-	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/events"
-	"github.com/mobazha/mobazha3.0/pkg/media"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	opb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
@@ -35,8 +32,8 @@ const (
 	republishInterval = time.Hour * 36
 )
 
-// Publish computes a content hash of the public data directory and sends
-// STORE messages to followers and SNF servers for replication notification.
+// Publish computes a content hash of public data records in the database and
+// sends STORE messages to followers and SNF servers for replication notification.
 // It will interrupt the publish if a shutdown happens during.
 //
 // This cannot be called with the database lock held.
@@ -101,37 +98,10 @@ func (n *MobazhaNode) publish(ctx context.Context, done chan<- struct{}) {
 		return nil
 	})
 
-	// Resolve public data directory.
-	// Standalone mode: PublicDataPath() returns the flat file directory.
-	// SaaS mode (DBPublicData): PublicDataPath() returns "" and data is
-	// materialized to a temp directory via PublicDataMaterializer.
-	publicDir := n.db.PublicDataPath()
-	if publicDir == "" {
-		if mat, ok := n.db.(pkgdb.PublicDataMaterializer); ok {
-			tmpDir, mkErr := os.MkdirTemp("", "publish-"+n.nodeID+"-")
-			if mkErr != nil {
-				logger.LogErrorWithIDf(log, n.nodeID, "Error creating temp dir for publish: %s", mkErr.Error())
-				publishErr = mkErr
-				return
-			}
-			defer os.RemoveAll(tmpDir)
-			if matErr := mat.MaterializePublicData(tmpDir); matErr != nil {
-				logger.LogErrorWithIDf(log, n.nodeID, "Error materializing public data: %s", matErr.Error())
-				publishErr = matErr
-				return
-			}
-			publicDir = tmpDir
-		} else {
-			publishErr = fmt.Errorf("no public data path and db does not support materialization")
-			logger.LogErrorWithIDf(log, n.nodeID, "%s", publishErr.Error())
-			return
-		}
-	}
-
-	// Compute directory content hash for change detection (pure in-memory, no IPFS).
-	newRoot, err := media.ComputeDirectoryHash(publicDir)
+	// Compute public data content hash directly from DB for change detection.
+	newRoot, err := n.db.ComputePublicDataHash()
 	if err != nil {
-		logger.LogErrorWithIDf(log, n.nodeID, "Error computing directory hash: %s", err.Error())
+		logger.LogErrorWithIDf(log, n.nodeID, "Error computing public data hash: %s", err.Error())
 		publishErr = err
 		return
 	}
@@ -346,6 +316,13 @@ func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) erro
 	orderMsg := new(pb.OrderMessage)
 	if err := message.Payload.UnmarshalTo(orderMsg); err != nil {
 		return err
+	}
+
+	if n.orderLockManager != nil {
+		if err := n.orderLockManager.Lock(n.nodeCtx, n.nodeID, orderMsg.OrderID); err != nil {
+			return fmt.Errorf("failed to acquire order lock for %s: %w", orderMsg.OrderID, err)
+		}
+		defer n.orderLockManager.Unlock(n.nodeID, orderMsg.OrderID)
 	}
 
 	var event interface{}

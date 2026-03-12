@@ -68,14 +68,14 @@ message OrderOpen {
     }
 }
 
-message OrderReject {
-    RejectType type                     = 1;
+message OrderDecline {
+    DeclineType type                    = 1;
     string reason                       = 2;
     google.protobuf.Timestamp timestamp = 3;
     string transactionID                = 4;
 
-    enum RejectType {
-        USER_REJECT      = 0;
+    enum DeclineType {
+        USER_DECLINE     = 0;
         VALIDATION_ERROR = 1;
     }
 }
@@ -323,8 +323,8 @@ message Contract {
     OrderOpen orderOpen = 3;
     bool orderOpenAcked = 4;
 
-    OrderReject orderReject = 5;
-    bool orderRejectAcked   = 6;
+    OrderDecline orderDecline = 5;
+    bool orderDeclineAcked    = 6;
 
     OrderCancel orderCancel = 7;
     bool orderCancelAcked   = 8;

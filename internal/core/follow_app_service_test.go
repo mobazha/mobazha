@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/stretchr/testify/assert"
@@ -27,9 +26,6 @@ func newTestFollowAppService(t *testing.T, cfg FollowAppServiceConfig) *FollowAp
 	}
 	if cfg.NodeID == "" {
 		cfg.NodeID = "test-follow-svc"
-	}
-	if cfg.UpdateAndSaveProfile == nil {
-		cfg.UpdateAndSaveProfile = func(tx database.Tx) error { return nil }
 	}
 	return NewFollowAppService(cfg)
 }

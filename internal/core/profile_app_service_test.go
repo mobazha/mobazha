@@ -41,11 +41,7 @@ func TestProfileAppService_GetMyProfile_NotFound(t *testing.T) {
 }
 
 func TestProfileAppService_SetProfile_Basic(t *testing.T) {
-	svc := newTestProfileAppService(t, ProfileAppServiceConfig{
-		GetAcceptedCurrencies: func() ([]string, error) {
-			return []string{"BTC", "ETH"}, nil
-		},
-	})
+	svc := newTestProfileAppService(t, ProfileAppServiceConfig{})
 
 	profile := &models.Profile{
 		Name: "Test Store",
@@ -60,29 +56,8 @@ func TestProfileAppService_SetProfile_Basic(t *testing.T) {
 	assert.Equal(t, svc.escrowPubKeyHex, got.EscrowPublicKey)
 }
 
-func TestProfileAppService_SetProfile_FillsCurrencies(t *testing.T) {
-	svc := newTestProfileAppService(t, ProfileAppServiceConfig{
-		GetAcceptedCurrencies: func() ([]string, error) {
-			return []string{"BTC", "ETH"}, nil
-		},
-	})
-
-	profile := &models.Profile{Name: "Test"}
-	err := svc.SetProfile(profile, nil)
-	require.NoError(t, err)
-
-	got, err := svc.GetMyProfile()
-	require.NoError(t, err)
-	assert.Contains(t, got.Currencies, "BTC")
-	assert.Contains(t, got.Currencies, "ETH")
-}
-
 func TestProfileAppService_SetProfile_Update(t *testing.T) {
-	svc := newTestProfileAppService(t, ProfileAppServiceConfig{
-		GetAcceptedCurrencies: func() ([]string, error) {
-			return []string{"BTC"}, nil
-		},
-	})
+	svc := newTestProfileAppService(t, ProfileAppServiceConfig{})
 
 	err := svc.SetProfile(&models.Profile{Name: "V1"}, nil)
 	require.NoError(t, err)
@@ -97,11 +72,7 @@ func TestProfileAppService_SetProfile_Update(t *testing.T) {
 }
 
 func TestProfileAppService_SetProfile_DoneChannelClosed(t *testing.T) {
-	svc := newTestProfileAppService(t, ProfileAppServiceConfig{
-		GetAcceptedCurrencies: func() ([]string, error) {
-			return []string{"BTC"}, nil
-		},
-	})
+	svc := newTestProfileAppService(t, ProfileAppServiceConfig{})
 
 	done := make(chan struct{})
 	err := svc.SetProfile(&models.Profile{Name: "Test"}, done)
@@ -115,11 +86,7 @@ func TestProfileAppService_SetProfile_DoneChannelClosed(t *testing.T) {
 }
 
 func TestProfileAppService_SetProfile_InvalidName(t *testing.T) {
-	svc := newTestProfileAppService(t, ProfileAppServiceConfig{
-		GetAcceptedCurrencies: func() ([]string, error) {
-			return []string{"BTC"}, nil
-		},
-	})
+	svc := newTestProfileAppService(t, ProfileAppServiceConfig{})
 
 	longName := make([]byte, 300)
 	for i := range longName {
@@ -132,11 +99,7 @@ func TestProfileAppService_SetProfile_InvalidName(t *testing.T) {
 }
 
 func TestProfileAppService_UpdateSNFServers(t *testing.T) {
-	svc := newTestProfileAppService(t, ProfileAppServiceConfig{
-		GetAcceptedCurrencies: func() ([]string, error) {
-			return []string{"BTC"}, nil
-		},
-	})
+	svc := newTestProfileAppService(t, ProfileAppServiceConfig{})
 
 	err := svc.SetProfile(&models.Profile{Name: "Test"}, nil)
 	require.NoError(t, err)

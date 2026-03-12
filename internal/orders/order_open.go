@@ -58,26 +58,26 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 	order.Open = true
 
 	var validationError bool
-	// If the validation fails and we are the vendor, we send a REJECT message back
-	// to the buyer. The reject message also gets saved with this order.
+	// If the validation fails and we are the vendor, we send a DECLINE message back
+	// to the buyer. The decline message also gets saved with this order.
 	if err := op.validateOrderOpen(dbtx, orderOpen, order.ID, order.Role()); err != nil {
 		logger.LogInfoWithIDf(log, op.nodeID, "ORDER_OPEN message for order %s from %s failed to validate: %s", order.ID, orderOpen.BuyerID.PeerID, err)
 		if order.Role() == models.RoleVendor {
-			reject := pb.OrderReject{
-				Type:      pb.OrderReject_VALIDATION_ERROR,
+			decline := pb.OrderDecline{
+				Type:      pb.OrderDecline_VALIDATION_ERROR,
 				Reason:    err.Error(),
 				Timestamp: timestamppb.Now(),
 			}
 
-			rejectAny := &anypb.Any{}
-			if err := rejectAny.MarshalFrom(&reject); err != nil {
+			declineAny := &anypb.Any{}
+			if err := declineAny.MarshalFrom(&decline); err != nil {
 				return nil, err
 			}
 
 			resp := npb.OrderMessage{
 				OrderID:     order.ID.String(),
-				MessageType: npb.OrderMessage_ORDER_REJECT,
-				Message:     rejectAny,
+				MessageType: npb.OrderMessage_ORDER_DECLINE,
+				Message:     declineAny,
 			}
 
 			if err := utils.SignOrderMessage(&resp, op.signer); err != nil {

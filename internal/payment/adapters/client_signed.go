@@ -21,6 +21,21 @@ type ChainOps interface {
 	BuildCancelableRelease(order *models.Order, initiator, receiver string) (any, error)
 	BuildCompleteEscrow(order *models.Order, initiator string, release *pb.EscrowRelease) (any, error)
 	BuildDisputeRelease(order *models.Order, initiator string) (any, error)
+
+	// VerifyDeposit verifies that the buyer's deposit transaction is valid on-chain.
+	// For EVM: checks receipt status, Funded event, escrow hash, and minimum amount.
+	// For Solana: noop (Batch 2).
+	VerifyDeposit(ctx context.Context, params payment.DepositVerifyParams) error
+
+	// ValidatePaymentMessage validates PaymentSent message structure per chain.
+	// For EVM: escrow address reconstruction + amount verification.
+	// For Solana: noop (Batch 2).
+	ValidatePaymentMessage(params payment.PaymentMessageParams) error
+
+	// VerifyPreRelease performs chain-specific safety checks before escrow release.
+	// For EVM: receipt status + Funded event on-chain verification.
+	// For Solana: noop (Batch 2).
+	VerifyPreRelease(ctx context.Context, params payment.PreReleaseParams) error
 }
 
 // BuildInitEscrowFn builds escrow initialization instructions.
@@ -152,4 +167,22 @@ func (a *ClientSignedAdapter) GetDisputeReleaseInstructions(_ context.Context, p
 		return nil, err
 	}
 	return &payment.InstructionResult{Instructions: instructions}, nil
+}
+
+// ── Deposit Verification ────────────────────────────────────────
+
+func (a *ClientSignedAdapter) VerifyDeposit(ctx context.Context, params payment.DepositVerifyParams) error {
+	return a.ops.VerifyDeposit(ctx, params)
+}
+
+// ── Payment Message Validation ──────────────────────────────────
+
+func (a *ClientSignedAdapter) ValidatePaymentMessage(params payment.PaymentMessageParams) error {
+	return a.ops.ValidatePaymentMessage(params)
+}
+
+// ── Pre-Release Verification ────────────────────────────────────
+
+func (a *ClientSignedAdapter) VerifyPreRelease(ctx context.Context, params payment.PreReleaseParams) error {
+	return a.ops.VerifyPreRelease(ctx, params)
 }

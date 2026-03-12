@@ -1671,7 +1671,7 @@ func Test_validateListing(t *testing.T) {
 	for i, test := range tests {
 		savedTestnet := node.testnet
 		test.transform(test.listing)
-		err := node.listingService.validateListing(test.listing)
+		err := node.listingService.ValidateListing(test.listing)
 		node.testnet = savedTestnet // restore after each test to prevent side effects
 		if test.valid && err != nil {
 			t.Errorf("Test %d failed when it should not have: %s", i, err)

@@ -3,6 +3,7 @@ package orders
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -38,8 +39,8 @@ func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *mo
 		return nil, ErrUnexpectedMessage
 	}
 
-	if order.SerializedOrderReject != nil {
-		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_CLOSE message for order %s after ORDER_REJECT", order.ID)
+	if order.SerializedOrderDecline != nil {
+		logger.LogInfoWithIDf(log, op.nodeID, "Received DISPUTE_CLOSE message for order %s after ORDER_DECLINE", order.ID)
 		return nil, ErrUnexpectedMessage
 	}
 
@@ -93,9 +94,12 @@ func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *mo
 	return event, order.PutMessage(message)
 }
 
-// validateDisputeResolution - validate dispute resolution
+// validateDisputeResolution validates the dispute resolution including payout address integrity.
 func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClose, order *models.Order) error {
 	releaseInfo := disputeClose.ReleaseInfo
+	if releaseInfo == nil {
+		return errors.New("dispute resolution missing release info")
+	}
 
 	if len(releaseInfo.Outpoints) == 0 {
 		return errors.New("no tx input in dispute resolution")
@@ -117,5 +121,82 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 		return fmt.Errorf("cannot validate order. coin not supported. %w", err)
 	}
 
+	buyerAddrs := newAddressSet(paymentSent.Coin)
+	buyerAddrs.Add(paymentSent.PayerAddress)
+	buyerAddrs.Add(paymentSent.RefundAddress)
+
+	vendorAddrs := newAddressSet(paymentSent.Coin)
+	if conf, err := order.OrderConfirmationMessage(); err == nil {
+		vendorAddrs.Add(conf.PayoutAddress)
+	}
+	if ffs, err := order.OrderFulfillmentMessages(); err == nil {
+		for _, ff := range ffs {
+			if ff.ReleaseInfo != nil {
+				vendorAddrs.Add(ff.ReleaseInfo.ToAddress)
+			}
+		}
+	}
+
+	if disputeOpen, err := order.DisputeOpenMessage(); err == nil {
+		switch disputeOpen.OpenedBy {
+		case pb.DisputeOpen_BUYER:
+			buyerAddrs.Add(disputeOpen.PayoutAddress)
+		case pb.DisputeOpen_VENDOR:
+			vendorAddrs.Add(disputeOpen.PayoutAddress)
+		default:
+			return fmt.Errorf("unknown dispute opener: %v", disputeOpen.OpenedBy)
+		}
+
+		if disputeUpdate, err := order.DisputeUpdateMessage(); err == nil {
+			switch disputeOpen.OpenedBy {
+			case pb.DisputeOpen_BUYER:
+				vendorAddrs.Add(disputeUpdate.PayoutAddress)
+			case pb.DisputeOpen_VENDOR:
+				buyerAddrs.Add(disputeUpdate.PayoutAddress)
+			}
+		}
+	}
+
+	if err := validatePayoutAmountsNonNegative(releaseInfo); err != nil {
+		return err
+	}
+
+	if !isZeroAmount(releaseInfo.BuyerAmount) {
+		if !buyerAddrs.Contains(releaseInfo.BuyerAddress) {
+			return fmt.Errorf("buyer payout address %s not in allowed set for order %s",
+				releaseInfo.BuyerAddress, order.ID)
+		}
+	}
+
+	if !isZeroAmount(releaseInfo.VendorAmount) {
+		if !vendorAddrs.Contains(releaseInfo.VendorAddress) {
+			return fmt.Errorf("vendor payout address %s not in allowed set for order %s",
+				releaseInfo.VendorAddress, order.ID)
+		}
+	}
+
+	return nil
+}
+
+func validatePayoutAmountsNonNegative(r *pb.DisputeClose_ModeratedEscrowRelease) error {
+	for _, pair := range []struct {
+		label  string
+		amount string
+	}{
+		{"buyer", r.BuyerAmount},
+		{"vendor", r.VendorAmount},
+		{"moderator", r.ModeratorAmount},
+	} {
+		if isZeroAmount(pair.amount) {
+			continue
+		}
+		val, ok := new(big.Int).SetString(pair.amount, 10)
+		if !ok {
+			return fmt.Errorf("invalid %s payout amount: %q", pair.label, pair.amount)
+		}
+		if val.Sign() < 0 {
+			return fmt.Errorf("%s payout amount is negative: %s", pair.label, pair.amount)
+		}
+	}
 	return nil
 }

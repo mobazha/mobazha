@@ -772,6 +772,9 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 	// Start the cancelable payment monitor (key for auto-confirm)
 	sellerNode.paymentService.StartCancelablePaymentMonitor()
 
+	// Start the order event monitor so OrderAutoConfirmRequest is handled
+	sellerNode.orderService.StartPaymentEventMonitor()
+
 	// Start order processors for message handling
 	for _, node := range network.Nodes() {
 		go node.orderProcessor.Start()

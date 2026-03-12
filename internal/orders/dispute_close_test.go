@@ -562,6 +562,48 @@ func TestValidateDisputeResolution_AddressCheck(t *testing.T) {
 			}(),
 			wantErr: "no moderator signature",
 		},
+		{
+			name: "reject — negative buyer amount",
+			order: buildOrder(
+				buyerPayerAddr, "",
+				vendorAddr.String(),
+				pb.DisputeOpen_BUYER, buyerPayerAddr, vendorAddr.String(),
+			),
+			release: func() *pb.DisputeClose_ModeratedEscrowRelease {
+				r := baseRelease()
+				r.BuyerAmount = "-1000"
+				return r
+			}(),
+			wantErr: "buyer payout amount is negative",
+		},
+		{
+			name: "reject — negative vendor amount",
+			order: buildOrder(
+				buyerPayerAddr, "",
+				vendorAddr.String(),
+				pb.DisputeOpen_BUYER, buyerPayerAddr, vendorAddr.String(),
+			),
+			release: func() *pb.DisputeClose_ModeratedEscrowRelease {
+				r := baseRelease()
+				r.VendorAmount = "-500"
+				return r
+			}(),
+			wantErr: "vendor payout amount is negative",
+		},
+		{
+			name: "reject — negative moderator amount",
+			order: buildOrder(
+				buyerPayerAddr, "",
+				vendorAddr.String(),
+				pb.DisputeOpen_BUYER, buyerPayerAddr, vendorAddr.String(),
+			),
+			release: func() *pb.DisputeClose_ModeratedEscrowRelease {
+				r := baseRelease()
+				r.ModeratorAmount = "-100"
+				return r
+			}(),
+			wantErr: "moderator payout amount is negative",
+		},
 	}
 
 	for _, tt := range tests {

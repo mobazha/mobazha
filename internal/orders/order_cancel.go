@@ -35,7 +35,8 @@ func (op *OrderProcessor) processOrderCancelMessage(dbtx database.Tx, order *mod
 	}
 
 	if order.SerializedOrderConfirmation != nil {
-		logger.LogInfoWithIDf(log, op.nodeID, "Possible race: Received ORDER_CANCEL message for order %s after ORDER_CONFIRMATION", order.ID)
+		logger.LogInfoWithIDf(log, op.nodeID, "Rejected ORDER_CANCEL message for order %s: already confirmed", order.ID)
+		return nil, ErrUnexpectedMessage
 	}
 
 	orderOpen, err := order.OrderOpenMessage()

@@ -142,13 +142,13 @@ func TestOrderProcessor_processCancelMessage(t *testing.T) {
 			expectedEvent: nil,
 		},
 		{
-			// Order confirmation already exists.
+			// Order confirmation already exists — cancel must be rejected.
 			setup: func(order *models.Order) error {
 				order.SerializedOrderDecline = nil
 				order.SerializedOrderConfirmation = []byte{0x00}
 				return nil
 			},
-			expectedError: nil,
+			expectedError: ErrUnexpectedMessage,
 			expectedEvent: nil,
 		},
 		{

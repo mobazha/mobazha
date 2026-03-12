@@ -3,6 +3,7 @@ package orders
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -156,6 +157,10 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 		}
 	}
 
+	if err := validatePayoutAmountsNonNegative(releaseInfo); err != nil {
+		return err
+	}
+
 	if !isZeroAmount(releaseInfo.BuyerAmount) {
 		if !buyerAddrs.Contains(releaseInfo.BuyerAddress) {
 			return fmt.Errorf("buyer payout address %s not in allowed set for order %s",
@@ -170,5 +175,28 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 		}
 	}
 
+	return nil
+}
+
+func validatePayoutAmountsNonNegative(r *pb.DisputeClose_ModeratedEscrowRelease) error {
+	for _, pair := range []struct {
+		label  string
+		amount string
+	}{
+		{"buyer", r.BuyerAmount},
+		{"vendor", r.VendorAmount},
+		{"moderator", r.ModeratorAmount},
+	} {
+		if isZeroAmount(pair.amount) {
+			continue
+		}
+		val, ok := new(big.Int).SetString(pair.amount, 10)
+		if !ok {
+			return fmt.Errorf("invalid %s payout amount: %q", pair.label, pair.amount)
+		}
+		if val.Sign() < 0 {
+			return fmt.Errorf("%s payout amount is negative: %s", pair.label, pair.amount)
+		}
+	}
 	return nil
 }

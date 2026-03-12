@@ -527,6 +527,137 @@ func TestProvider_GetAccountStatus_Restricted(t *testing.T) {
 	assert.Contains(t, status.Requirements, "identity_verification_required")
 }
 
+func TestProvider_RefundPayment_FullRefund(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/refunds", func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		body, _ := io.ReadAll(r.Body)
+		vals := string(body)
+		assert.Contains(t, vals, "payment_intent=pi_refund_test")
+		assert.Contains(t, vals, "reason=requested_by_customer")
+		assert.NotContains(t, vals, "amount=", "full refund should not send amount")
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"id":       "re_test_001",
+			"object":   "refund",
+			"amount":   2500,
+			"currency": "usd",
+			"status":   "succeeded",
+		})
+	})
+
+	_, p := newTestProvider(t, mux)
+	result, err := p.RefundPayment(context.Background(), contracts.RefundParams{
+		PaymentID: "pi_refund_test",
+		Amount:    nil,
+		Currency:  "usd",
+		Reason:    "requested_by_customer",
+		Metadata:  map[string]string{"orderID": "order_rf_1"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "re_test_001", result.RefundID)
+	assert.Equal(t, "succeeded", result.Status)
+	assert.Equal(t, int64(2500), result.Amount)
+	assert.Equal(t, "usd", result.Currency)
+}
+
+func TestProvider_RefundPayment_PartialRefund(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/refunds", func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		vals := string(body)
+		assert.Contains(t, vals, "amount=1000")
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"id":       "re_partial_001",
+			"object":   "refund",
+			"amount":   1000,
+			"currency": "usd",
+			"status":   "succeeded",
+		})
+	})
+
+	_, p := newTestProvider(t, mux)
+	partialAmount := int64(1000)
+	result, err := p.RefundPayment(context.Background(), contracts.RefundParams{
+		PaymentID: "pi_partial_test",
+		Amount:    &partialAmount,
+		Currency:  "usd",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "re_partial_001", result.RefundID)
+	assert.Equal(t, int64(1000), result.Amount)
+}
+
+func TestProvider_RefundPayment_ConnectedAccount(t *testing.T) {
+	var gotStripeAccount string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/refunds", func(w http.ResponseWriter, r *http.Request) {
+		gotStripeAccount = r.Header.Get("Stripe-Account")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"id":       "re_conn_001",
+			"object":   "refund",
+			"amount":   3000,
+			"currency": "eur",
+			"status":   "succeeded",
+		})
+	})
+
+	ts := httptest.NewServer(mux)
+	t.Cleanup(ts.Close)
+	p := NewProvider(Config{
+		SecretKey:      "sk_test_platform",
+		PublishableKey: "pk_test_platform",
+		WebhookSecret:  "whsec_test",
+		Mode:           ModeConnected,
+		BackendURL:     ts.URL,
+	})
+
+	result, err := p.RefundPayment(context.Background(), contracts.RefundParams{
+		PaymentID: "pi_conn_refund",
+		Currency:  "eur",
+		Metadata: map[string]string{
+			"orderID":            "order_conn_rf",
+			"connectedAccountID": "acct_seller_rf",
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "acct_seller_rf", gotStripeAccount)
+	assert.Equal(t, "re_conn_001", result.RefundID)
+}
+
+func TestProvider_RefundPayment_Error(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/refunds", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error": map[string]interface{}{
+				"type":    "invalid_request_error",
+				"message": "Charge ch_xxx has already been refunded",
+			},
+		})
+	})
+
+	_, p := newTestProvider(t, mux)
+	_, err := p.RefundPayment(context.Background(), contracts.RefundParams{
+		PaymentID: "pi_already_refunded",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "stripe refund")
+}
+
+func TestMapRefundReason(t *testing.T) {
+	assert.Equal(t, "duplicate", mapRefundReason("duplicate"))
+	assert.Equal(t, "fraudulent", mapRefundReason("fraudulent"))
+	assert.Equal(t, "requested_by_customer", mapRefundReason("requested_by_customer"))
+	assert.Equal(t, "requested_by_customer", mapRefundReason("order_declined"))
+	assert.Equal(t, "requested_by_customer", mapRefundReason(""))
+}
+
 func TestProvider_MapStripeStatus(t *testing.T) {
 	tests := []struct {
 		name   string

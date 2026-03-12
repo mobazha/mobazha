@@ -1320,6 +1320,24 @@ func initFiatSubsystem(obNode *MobazhaNode) {
 	obNode.fiatRegistry = fiat.NewRegistry()
 	obNode.fiatPaymentService = NewFiatPaymentAppService(obNode.fiatRegistry, obNode.db, obNode.nodeID)
 	obNode.fiatPaymentService.LoadAndRegisterProviders()
+
+	if obNode.orderService != nil {
+		obNode.orderService.SetFiatRefundFunc(obNode.fiatPaymentService.RefundPayment)
+
+		fiatSvc := obNode.fiatPaymentService
+		obNode.orderService.OrderProcessor().SetFiatRefundOnDeclineFunc(
+			func(orderID, paymentID, providerID, currency string) error {
+				_, err := fiatSvc.RefundPayment(context.Background(), providerID, pkgcontracts.RefundParams{
+					PaymentID: paymentID,
+					Currency:  currency,
+					Reason:    "requested_by_customer",
+					Metadata:  map[string]string{"orderID": orderID},
+				})
+				return err
+			},
+		)
+	}
+
 	logger.LogInfoWithID(log, obNode.nodeID, "Fiat payment subsystem initialized")
 }
 

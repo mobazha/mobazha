@@ -94,6 +94,7 @@ type OrderProcessor struct {
 	verifyDepositFunc    func(params DepositVerifyParams) error
 	validatePaymentFunc  func(coinType iwallet.CoinType, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTimeoutHours uint32) error
 	fetchAndVerifyFunc   func(ctx context.Context, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, paymentAddress string) (*iwallet.Transaction, bool, error)
+	fiatRefundOnDeclineFunc func(orderID string, paymentID string, providerID string, currency string) error
 	featureManager       *pkgconfig.FeatureManager
 	stateValidator           StateValidator
 }
@@ -123,6 +124,10 @@ func NewOrderProcessor(cfg *Config) *OrderProcessor {
 // Called from registerPaymentStrategies() after the PaymentRegistry is ready.
 func (op *OrderProcessor) SetVerifyDepositFunc(fn func(params DepositVerifyParams) error) {
 	op.verifyDepositFunc = fn
+}
+
+func (op *OrderProcessor) SetFiatRefundOnDeclineFunc(fn func(orderID string, paymentID string, providerID string, currency string) error) {
+	op.fiatRefundOnDeclineFunc = fn
 }
 
 // GetFiatPayment retrieves fiat payment details via the registered provider.

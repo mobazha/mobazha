@@ -201,6 +201,62 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 	return we, nil
 }
 
+func (p *Provider) RefundPayment(_ context.Context, params contracts.RefundParams) (*contracts.RefundResult, error) {
+	api := newAPI(p.config.SecretKey, p.config.BackendURL)
+
+	rp := &gostripe.RefundParams{
+		PaymentIntent: gostripe.String(params.PaymentID),
+	}
+
+	if params.Amount != nil {
+		rp.Amount = params.Amount
+	}
+
+	if params.Reason != "" {
+		rp.Reason = gostripe.String(mapRefundReason(params.Reason))
+	}
+
+	if params.Metadata != nil {
+		rp.Metadata = params.Metadata
+	}
+
+	if p.config.Mode == ModeConnected {
+		if ra := p.connectedAccountFromMetadata(params.Metadata); ra != "" {
+			rp.SetStripeAccount(ra)
+		}
+	}
+
+	refund, err := api.Refunds.New(rp)
+	if err != nil {
+		return nil, fmt.Errorf("stripe refund: %w", err)
+	}
+
+	return &contracts.RefundResult{
+		RefundID: refund.ID,
+		Status:   string(refund.Status),
+		Amount:   refund.Amount,
+		Currency: string(refund.Currency),
+	}, nil
+}
+
+func (p *Provider) connectedAccountFromMetadata(meta map[string]string) string {
+	if meta == nil {
+		return ""
+	}
+	return meta["connectedAccountID"]
+}
+
+func mapRefundReason(reason string) string {
+	switch reason {
+	case "duplicate":
+		return string(gostripe.RefundReasonDuplicate)
+	case "fraudulent":
+		return string(gostripe.RefundReasonFraudulent)
+	default:
+		return string(gostripe.RefundReasonRequestedByCustomer)
+	}
+}
+
 // --- FiatOnboardingProvider (SaaS only) ---
 
 func (p *Provider) GetOnboardingURL(_ context.Context, params contracts.OnboardingParams) (*contracts.OnboardingResult, error) {

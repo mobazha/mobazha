@@ -213,6 +213,57 @@ func (p *Provider) ParseWebhook(ctx context.Context, payload []byte, headers map
 	return we, nil
 }
 
+func (p *Provider) RefundPayment(ctx context.Context, params contracts.RefundParams) (*contracts.RefundResult, error) {
+	// PayPal Capture Refund API: POST /v2/payments/captures/{captureID}/refund
+	path := fmt.Sprintf("/v2/payments/captures/%s/refund", params.PaymentID)
+
+	body := make(map[string]interface{})
+	if params.Amount != nil {
+		body["amount"] = map[string]string{
+			"value":         formatAmount(*params.Amount, params.Currency),
+			"currency_code": strings.ToUpper(params.Currency),
+		}
+	}
+	if params.Reason != "" {
+		body["note_to_payer"] = params.Reason
+	}
+
+	var resp refundResponse
+	if err := p.client.doJSON(ctx, "POST", path, body, &resp); err != nil {
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "422") && strings.Contains(errMsg, "CAPTURE_FULLY_REFUNDED") {
+			return nil, contracts.ErrAlreadyRefunded
+		}
+		return nil, fmt.Errorf("paypal refund: %w", err)
+	}
+
+	result := &contracts.RefundResult{
+		RefundID: resp.ID,
+		Status:   mapRefundStatus(resp.Status),
+	}
+	if resp.Amount.Value != "" {
+		if v, err := parseAmount(resp.Amount.Value); err == nil {
+			result.Amount = v
+		}
+		result.Currency = strings.ToUpper(resp.Amount.CurrencyCode)
+	}
+
+	return result, nil
+}
+
+func mapRefundStatus(status string) string {
+	switch status {
+	case "COMPLETED":
+		return "succeeded"
+	case "PENDING":
+		return "pending"
+	case "CANCELLED":
+		return "failed"
+	default:
+		return "pending"
+	}
+}
+
 // --- FiatOnboardingProvider (SaaS / PPCP Partner) ---
 
 func (p *Provider) GetOnboardingURL(ctx context.Context, params contracts.OnboardingParams) (*contracts.OnboardingResult, error) {

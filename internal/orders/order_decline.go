@@ -1,6 +1,8 @@
 package orders
 
 import (
+	"fmt"
+
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -66,23 +68,39 @@ func (op *OrderProcessor) processOrderDeclineMessage(dbtx database.Tx, order *mo
 	if order.Role() == models.RoleBuyer {
 		logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_DECLINE message for order %s", order.ID)
 
-		coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(paymentSent.Coin))
-		if err != nil {
-			return nil, err
-		}
+		coinType := iwallet.CoinType(paymentSent.Coin)
 
-		// For UTXO chains with CANCELABLE method, release funds here
-		// For MODERATED orders, the REFUND message handles the escrow release
-		// For ETH/Solana, the order is handled on-chain
-		if coinInfo.Chain != iwallet.ChainSolana && !coinInfo.IsEthTypeChain() {
-			if order.CanCancel() && paymentSent.Method == pb.PaymentSent_CANCELABLE {
-				wTx, _, err := op.releaseFromCancelableAddress(dbtx, order)
-				if err != nil {
-					return nil, err
+		if coinType.IsFiatPayment() || coinType.IsStripeChain() {
+			if op.fiatRefundOnDeclineFunc != nil {
+				providerID := orderOpen.FiatProvider
+				if providerID == "" {
+					providerID = "stripe"
 				}
-				wTx.Commit()
+				if err := op.fiatRefundOnDeclineFunc(
+					order.ID.String(),
+					paymentSent.TransactionID,
+					providerID,
+					orderOpen.PricingCoin,
+				); err != nil {
+					logger.LogErrorWithIDf(log, op.nodeID, "Fiat auto-refund on decline failed for order %s: %v", order.ID, err)
+					return nil, fmt.Errorf("fiat refund failed for order %s, decline aborted: %w", order.ID, err)
+				}
 			}
-			// For MODERATED orders, the accompanying REFUND message will handle the escrow release
+		} else {
+			coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
+			if err != nil {
+				return nil, err
+			}
+
+			if coinInfo.Chain != iwallet.ChainSolana && !coinInfo.IsEthTypeChain() {
+				if order.CanCancel() && paymentSent.Method == pb.PaymentSent_CANCELABLE {
+					wTx, _, err := op.releaseFromCancelableAddress(dbtx, order)
+					if err != nil {
+						return nil, err
+					}
+					wTx.Commit()
+				}
+			}
 		}
 	} else if order.Role() == models.RoleVendor {
 		logger.LogInfoWithIDf(log, op.nodeID, "Processed own ORDER_DECLINE for orderID: %s", order.ID)

@@ -555,6 +555,141 @@ func TestProvider_GetAccountStatus_PartnerMode(t *testing.T) {
 	assert.Equal(t, "active", status.Status)
 }
 
+// --- Refund tests ---
+
+func TestProvider_RefundPayment_FullRefund(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v2/payments/captures/CAP-001/refund", func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+
+		var body map[string]interface{}
+		json.NewDecoder(r.Body).Decode(&body)
+		assert.Empty(t, body["amount"], "full refund should not include amount")
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(refundResponse{
+			ID:     "REFUND-PPL-001",
+			Status: "COMPLETED",
+			Amount: amount{CurrencyCode: "USD", Value: "29.99"},
+		})
+	})
+
+	ts, p := newTestServer(t, mux)
+	defer ts.Close()
+
+	result, err := p.RefundPayment(context.Background(), contracts.RefundParams{
+		PaymentID: "CAP-001",
+		Amount:    nil,
+		Currency:  "USD",
+		Reason:    "Seller initiated refund",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "REFUND-PPL-001", result.RefundID)
+	assert.Equal(t, "succeeded", result.Status)
+	assert.Equal(t, int64(2999), result.Amount)
+	assert.Equal(t, "USD", result.Currency)
+}
+
+func TestProvider_RefundPayment_PartialRefund(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v2/payments/captures/CAP-002/refund", func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]interface{}
+		json.NewDecoder(r.Body).Decode(&body)
+		amt, ok := body["amount"].(map[string]interface{})
+		require.True(t, ok, "partial refund must include amount")
+		assert.Equal(t, "10.00", amt["value"])
+		assert.Equal(t, "USD", amt["currency_code"])
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(refundResponse{
+			ID:     "REFUND-PPL-PARTIAL",
+			Status: "COMPLETED",
+			Amount: amount{CurrencyCode: "USD", Value: "10.00"},
+		})
+	})
+
+	ts, p := newTestServer(t, mux)
+	defer ts.Close()
+
+	partialAmount := int64(1000)
+	result, err := p.RefundPayment(context.Background(), contracts.RefundParams{
+		PaymentID: "CAP-002",
+		Amount:    &partialAmount,
+		Currency:  "USD",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "REFUND-PPL-PARTIAL", result.RefundID)
+	assert.Equal(t, int64(1000), result.Amount)
+}
+
+func TestProvider_RefundPayment_AlreadyRefunded(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v2/payments/captures/CAP-003/refund", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Write([]byte(`{"name":"UNPROCESSABLE_ENTITY","details":[{"issue":"CAPTURE_FULLY_REFUNDED"}],"message":"The captured payment is already fully refunded"}`))
+	})
+
+	ts, p := newTestServer(t, mux)
+	defer ts.Close()
+
+	_, err := p.RefundPayment(context.Background(), contracts.RefundParams{
+		PaymentID: "CAP-003",
+		Currency:  "USD",
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, contracts.ErrAlreadyRefunded)
+}
+
+func TestProvider_RefundPayment_Pending(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v2/payments/captures/CAP-004/refund", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(refundResponse{
+			ID:     "REFUND-PPL-PENDING",
+			Status: "PENDING",
+			Amount: amount{CurrencyCode: "EUR", Value: "50.00"},
+		})
+	})
+
+	ts, p := newTestServer(t, mux)
+	defer ts.Close()
+
+	result, err := p.RefundPayment(context.Background(), contracts.RefundParams{
+		PaymentID: "CAP-004",
+		Currency:  "EUR",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "REFUND-PPL-PENDING", result.RefundID)
+	assert.Equal(t, "pending", result.Status)
+	assert.Equal(t, int64(5000), result.Amount)
+	assert.Equal(t, "EUR", result.Currency)
+}
+
+func TestProvider_RefundPayment_ServerError(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v2/payments/captures/CAP-ERR/refund", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"name":"INTERNAL_SERVER_ERROR"}`))
+	})
+
+	ts, p := newTestServer(t, mux)
+	defer ts.Close()
+
+	_, err := p.RefundPayment(context.Background(), contracts.RefundParams{
+		PaymentID: "CAP-ERR",
+		Currency:  "USD",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "paypal refund")
+}
+
+func TestMapRefundStatus(t *testing.T) {
+	assert.Equal(t, "succeeded", mapRefundStatus("COMPLETED"))
+	assert.Equal(t, "pending", mapRefundStatus("PENDING"))
+	assert.Equal(t, "failed", mapRefundStatus("CANCELLED"))
+	assert.Equal(t, "pending", mapRefundStatus("UNKNOWN"))
+}
+
 // --- Helper function tests ---
 
 func TestFormatAmount(t *testing.T) {

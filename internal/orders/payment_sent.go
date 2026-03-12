@@ -137,8 +137,9 @@ func (op *OrderProcessor) attemptSyncVerification(
 	return op.legacySyncVerification(dbtx, order, orderOpen, paymentSent, coinType, message)
 }
 
-// legacySyncVerification is the old inline I/O path, preserved for backward
+// TECHDEBT(TD-001): legacySyncVerification is the old inline I/O path, preserved for backward
 // compatibility until all callers inject fetchAndVerifyFunc.
+// 清除条件: OrderProcessor Phase 6 全面纯化完成
 func (op *OrderProcessor) legacySyncVerification(
 	dbtx database.Tx,
 	order *models.Order,

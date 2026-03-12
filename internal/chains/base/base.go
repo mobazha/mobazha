@@ -1,7 +1,6 @@
 package base
 
 import (
-	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -9,9 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/btcutil/coinset"
 	hd "github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/gcash/bchd/wire"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/chains/database"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
@@ -391,48 +388,3 @@ func (w *WalletBase) Unlock(pw []byte, howLong time.Duration) error {
 	return w.Keychain.Unlock(pw, howLong)
 }
 
-// GatherCoins returns the full list of spendable coins in the wallet along
-// with the key needed to spend. The wallet must be unlocked to use this
-// function.
-func (w *WalletBase) GatherCoins(dbtx database.Tx) (map[coinset.Coin]*hd.ExtendedKey, error) {
-	var utxoRecords []database.UtxoRecord
-	if err := dbtx.Read().Where("coin = ?", w.CoinType.CurrencyCode()).Find(&utxoRecords).Error; err != nil {
-		return nil, err
-	}
-
-	bcInfo, err := w.BlockchainInfo()
-	if err != nil {
-		return nil, err
-	}
-
-	m := make(map[coinset.Coin]*hd.ExtendedKey)
-	for _, u := range utxoRecords {
-		var confirmations int64
-		if u.Height > 0 {
-			confirmations = int64(bcInfo.Height-u.Height) + 1
-		}
-
-		var op wire.OutPoint
-		ser, err := hex.DecodeString(u.Outpoint)
-		if err != nil {
-			return nil, err
-		}
-		if err := op.Deserialize(bytes.NewReader(ser)); err != nil {
-			return nil, err
-		}
-
-		addr := iwallet.NewAddress(u.Address, w.CoinType)
-		c, err := NewCoin(iwallet.TransactionID(op.Hash.String()), op.Index, iwallet.NewAmount(u.Amount), confirmations, addr)
-		if err != nil {
-			continue
-		}
-
-		key, err := w.Keychain.KeyForAddress(dbtx, addr, nil)
-		if err != nil {
-			continue
-		}
-
-		m[c] = key
-	}
-	return m, nil
-}

@@ -264,6 +264,10 @@ func mapRefundStatus(status string) string {
 	}
 }
 
+func (p *Provider) CancelPayment(_ context.Context, _ string) error {
+	return nil
+}
+
 // --- FiatOnboardingProvider (SaaS / PPCP Partner) ---
 
 func (p *Provider) GetOnboardingURL(ctx context.Context, params contracts.OnboardingParams) (*contracts.OnboardingResult, error) {

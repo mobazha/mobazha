@@ -239,6 +239,16 @@ func (p *Provider) RefundPayment(_ context.Context, params contracts.RefundParam
 	}, nil
 }
 
+func (p *Provider) CancelPayment(_ context.Context, paymentID string) error {
+	api := newAPI(p.config.SecretKey, p.config.BackendURL)
+	params := &gostripe.PaymentIntentCancelParams{}
+	_, err := api.PaymentIntents.Cancel(paymentID, params)
+	if err != nil {
+		return fmt.Errorf("stripe cancel payment intent %s: %w", paymentID, err)
+	}
+	return nil
+}
+
 func (p *Provider) connectedAccountFromMetadata(meta map[string]string) string {
 	if meta == nil {
 		return ""

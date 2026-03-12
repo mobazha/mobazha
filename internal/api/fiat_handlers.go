@@ -309,7 +309,11 @@ func (g *Gateway) handleDELETEFiatProviderConfig(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := svc.DeleteProviderConfig(providerID); err != nil {
+	if err := svc.DisconnectProvider(r.Context(), providerID); err != nil {
+		if errors.Is(err, contracts.ErrActiveOrdersExist) {
+			responsePkg.Error(w, http.StatusConflict, responsePkg.CodeConflict, err.Error())
+			return
+		}
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 		return
 	}

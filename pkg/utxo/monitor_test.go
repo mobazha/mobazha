@@ -12,16 +12,17 @@ import (
 
 // mockPaymentSource is a mock implementation of PaymentSource for testing
 type mockPaymentSource struct {
-	healthy      bool
-	chain        iwallet.ChainType
-	txs          []*iwallet.Transaction
-	txByID       map[string]*iwallet.Transaction
-	feeRate      uint64
-	feeRateSet   bool
-	broadcastTx  string
-	subscribeErr error
-	transactions []*iwallet.Transaction
-	mu           sync.RWMutex
+	healthy        bool
+	chain          iwallet.ChainType
+	txs            []*iwallet.Transaction
+	txByID         map[string]*iwallet.Transaction
+	feeRate        uint64
+	feeRateSet     bool
+	broadcastTx    string
+	subscribeErr   error
+	transactions   []*iwallet.Transaction
+	subscribeCalls []string // tracks addresses passed to Subscribe
+	mu             sync.RWMutex
 }
 
 func newMockPaymentSource(healthy bool) *mockPaymentSource {
@@ -33,8 +34,9 @@ func newMockPaymentSource(healthy bool) *mockPaymentSource {
 }
 
 func (m *mockPaymentSource) Subscribe(ctx context.Context, address string, scriptPubKey []byte, callback func(tx *iwallet.Transaction)) error {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.subscribeCalls = append(m.subscribeCalls, address)
 	return m.subscribeErr
 }
 
@@ -64,6 +66,12 @@ func (m *mockPaymentSource) IsHealthy() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.healthy
+}
+
+func (m *mockPaymentSource) setHealthy(h bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.healthy = h
 }
 
 func (m *mockPaymentSource) Chain() iwallet.ChainType {
@@ -887,5 +895,127 @@ func TestMonitorPollAllAddresses_RemovesExpired(t *testing.T) {
 	}
 	if !validExists {
 		t.Error("Valid address should not be removed")
+	}
+}
+
+func TestMonitor_SourceHealthRecovery_ResubscribesAddresses(t *testing.T) {
+	source := newMockPaymentSource(true)
+	config := DefaultMonitorConfig()
+	config.PollInterval = 50 * time.Millisecond
+	m := NewMonitor(config)
+	m.AddSource(iwallet.ChainBitcoin, source)
+
+	wa := &WatchedAddress{
+		Address:   "recovery_addr_1",
+		ChainType: iwallet.ChainBitcoin,
+		CreatedAt: time.Now(),
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+	}
+	if err := m.WatchAddress(wa); err != nil {
+		t.Fatalf("WatchAddress failed: %v", err)
+	}
+
+	// Clear subscribe calls from initial WatchAddress
+	source.mu.Lock()
+	source.subscribeCalls = nil
+	source.mu.Unlock()
+
+	// Simulate source going unhealthy then recovering
+	source.setHealthy(false)
+	m.checkSourceHealth() // records unhealthy state
+
+	// Mark address as un-subscribed (simulates subscription lost during disconnect)
+	m.watchMu.Lock()
+	wa.Subscribed = false
+	m.watchMu.Unlock()
+
+	source.setHealthy(true)
+	m.checkSourceHealth() // detects recovery → re-subscribes
+
+	// Verify re-subscription happened
+	source.mu.RLock()
+	calls := source.subscribeCalls
+	source.mu.RUnlock()
+
+	if len(calls) != 1 || calls[0] != "recovery_addr_1" {
+		t.Errorf("Expected 1 re-subscribe call for recovery_addr_1, got %v", calls)
+	}
+
+	m.watchMu.RLock()
+	subscribed := wa.Subscribed
+	m.watchMu.RUnlock()
+
+	if !subscribed {
+		t.Error("WatchedAddress should be marked as Subscribed after recovery")
+	}
+}
+
+func TestMonitor_SourceHealthRecovery_SkipsAlreadySubscribed(t *testing.T) {
+	source := newMockPaymentSource(true)
+	config := DefaultMonitorConfig()
+	m := NewMonitor(config)
+	m.AddSource(iwallet.ChainBitcoin, source)
+
+	wa := &WatchedAddress{
+		Address:    "already_sub_addr",
+		ChainType:  iwallet.ChainBitcoin,
+		Subscribed: true,
+		CreatedAt:  time.Now(),
+		ExpiresAt:  time.Now().Add(24 * time.Hour),
+	}
+	m.watchMu.Lock()
+	m.watching[wa.Address] = wa
+	m.watchMu.Unlock()
+
+	source.mu.Lock()
+	source.subscribeCalls = nil
+	source.mu.Unlock()
+
+	// Simulate unhealthy → healthy transition
+	source.setHealthy(false)
+	m.checkSourceHealth()
+	source.setHealthy(true)
+	m.checkSourceHealth()
+
+	source.mu.RLock()
+	calls := source.subscribeCalls
+	source.mu.RUnlock()
+
+	if len(calls) != 0 {
+		t.Errorf("Should not re-subscribe already-subscribed addresses, got %d calls", len(calls))
+	}
+}
+
+func TestMonitor_SourceHealthRecovery_NoTransitionNoResubscribe(t *testing.T) {
+	source := newMockPaymentSource(true)
+	config := DefaultMonitorConfig()
+	m := NewMonitor(config)
+	m.AddSource(iwallet.ChainBitcoin, source)
+
+	wa := &WatchedAddress{
+		Address:    "stable_addr",
+		ChainType:  iwallet.ChainBitcoin,
+		Subscribed: false,
+		CreatedAt:  time.Now(),
+		ExpiresAt:  time.Now().Add(24 * time.Hour),
+	}
+	m.watchMu.Lock()
+	m.watching[wa.Address] = wa
+	m.watchMu.Unlock()
+
+	source.mu.Lock()
+	source.subscribeCalls = nil
+	source.mu.Unlock()
+
+	// Source stays healthy — no transition
+	m.checkSourceHealth() // first check: records healthy
+	m.checkSourceHealth() // second check: healthy→healthy, no transition
+
+	source.mu.RLock()
+	calls := source.subscribeCalls
+	source.mu.RUnlock()
+
+	if len(calls) != 0 {
+		t.Errorf("Should not re-subscribe when no unhealthy→healthy transition, got %d calls", len(calls))
 	}
 }

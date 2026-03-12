@@ -105,6 +105,13 @@ func (s *FiatPaymentAppService) CreatePayment(ctx context.Context, providerID st
 		return nil, fmt.Errorf("create %s payment: %w", providerID, err)
 	}
 
+	if s.orderRepo != nil && params.OrderID != "" && session.SessionID != "" {
+		_ = s.orderRepo.MergeFiatMetadata(ctx, params.OrderID, map[string]string{
+			"fiat_provider":   providerID,
+			"fiat_session_id": session.SessionID,
+		})
+	}
+
 	logger.LogInfoWithIDf(log, s.nodeID, "fiat payment created: provider=%s session=%s order=%s", providerID, session.SessionID, params.OrderID)
 	return session, nil
 }
@@ -556,9 +563,9 @@ func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input cont
 	return nil
 }
 
-// DeleteProviderConfig removes the fiat provider config, deactivates the receiving account,
-// and unregisters the provider from the registry.
-func (s *FiatPaymentAppService) DeleteProviderConfig(providerID string) error {
+// deleteProviderConfig removes the fiat provider config, deactivates the receiving account,
+// and unregisters the provider from the registry. Called internally by DisconnectProvider.
+func (s *FiatPaymentAppService) deleteProviderConfig(providerID string) error {
 	err := s.db.Update(func(tx database.Tx) error {
 		if err := tx.Delete("provider_id", providerID, nil, &models.FiatProviderConfig{}); err != nil {
 			return err
@@ -571,6 +578,76 @@ func (s *FiatPaymentAppService) DeleteProviderConfig(providerID string) error {
 	}
 	s.registry.Unregister(providerID)
 	return nil
+}
+
+// DisconnectProvider safely disconnects a fiat provider after verifying no active orders depend on it.
+// Orders in fulfillment/dispute states block disconnect. AWAITING_PAYMENT sessions are canceled.
+func (s *FiatPaymentAppService) DisconnectProvider(ctx context.Context, providerID string) error {
+	if s.orderRepo == nil {
+		return s.deleteProviderConfig(providerID)
+	}
+
+	blockingStates := []models.OrderState{
+		models.OrderState_AWAITING_FULFILLMENT,
+		models.OrderState_PARTIALLY_FULFILLED,
+		models.OrderState_DISPUTED,
+		models.OrderState_DECIDED,
+	}
+
+	var blockingOrders []models.Order
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().
+			Where("payment_transaction_id != '' AND state IN ?", blockingStates).
+			Find(&blockingOrders).Error
+	}); err != nil {
+		return fmt.Errorf("query active fiat orders: %w", err)
+	}
+
+	fiatBlockingCount := 0
+	for _, order := range blockingOrders {
+		meta, _ := order.GetFiatMetadata()
+		if meta["fiat_provider"] == providerID {
+			fiatBlockingCount++
+		}
+	}
+	if fiatBlockingCount > 0 {
+		return fmt.Errorf("%w: %d active orders using %s", contracts.ErrActiveOrdersExist, fiatBlockingCount, providerID)
+	}
+
+	var awaitingPaymentOrders []models.Order
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().
+			Where("state = ? AND fiat_metadata IS NOT NULL AND length(fiat_metadata) > 2", models.OrderState_AWAITING_PAYMENT).
+			Find(&awaitingPaymentOrders).Error
+	}); err != nil {
+		logger.LogWarningWithIDf(log, s.nodeID, "query awaiting-payment fiat orders: %v", err)
+	}
+
+	provider, _ := s.registry.ForProvider(providerID)
+	for _, order := range awaitingPaymentOrders {
+		meta, err := order.GetFiatMetadata()
+		if err != nil {
+			continue
+		}
+		if p := meta["fiat_provider"]; p != providerID {
+			continue
+		}
+		sessionID := meta["fiat_session_id"]
+		if sessionID == "" {
+			continue
+		}
+		if provider != nil {
+			if err := provider.CancelPayment(ctx, sessionID); err != nil {
+				logger.LogWarningWithIDf(log, s.nodeID,
+					"cancel fiat session %s for order %s: %v", sessionID, order.ID, err)
+			} else {
+				logger.LogInfoWithIDf(log, s.nodeID,
+					"canceled fiat session %s for order %s during provider disconnect", sessionID, order.ID)
+			}
+		}
+	}
+
+	return s.deleteProviderConfig(providerID)
 }
 
 // VerifyProviderConfig tests the provider config by calling the provider's health check.

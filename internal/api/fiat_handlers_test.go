@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -32,8 +33,8 @@ type mockFiatService struct {
 	configResult   *contracts.ProviderConfigView
 	configErr      error
 	saveErr        error
-	deleteErr      error
-	verifyErr      error
+	disconnectErr   error
+	verifyErr       error
 	onboardResult  *contracts.OnboardingResult
 	onboardErr     error
 	onboardCBResult *contracts.AccountStatus
@@ -72,8 +73,8 @@ func (m *mockFiatService) SaveProviderConfig(_ string, _ contracts.ProviderConfi
 	return m.saveErr
 }
 
-func (m *mockFiatService) DeleteProviderConfig(_ string) error {
-	return m.deleteErr
+func (m *mockFiatService) DisconnectProvider(_ context.Context, _ string) error {
+	return m.disconnectErr
 }
 
 func (m *mockFiatService) VerifyProviderConfig(_ string) error {
@@ -345,7 +346,7 @@ func TestHandleDELETEFiatConfig_Success(t *testing.T) {
 }
 
 func TestHandleDELETEFiatConfig_Error(t *testing.T) {
-	svc := &mockFiatService{deleteErr: errors.New("delete failed")}
+	svc := &mockFiatService{disconnectErr: errors.New("delete failed")}
 	g := &Gateway{}
 	w := httptest.NewRecorder()
 	r := newFiatHandlerRequest(t, "DELETE", "/v1/fiat/stripe/config", nil,
@@ -353,6 +354,19 @@ func TestHandleDELETEFiatConfig_Error(t *testing.T) {
 
 	g.handleDELETEFiatProviderConfig(w, r)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestHandleDELETEFiatConfig_ActiveOrders(t *testing.T) {
+	svc := &mockFiatService{
+		disconnectErr: fmt.Errorf("%w: 2 active orders using stripe", contracts.ErrActiveOrdersExist),
+	}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	r := newFiatHandlerRequest(t, "DELETE", "/v1/fiat/stripe/config", nil,
+		map[string]string{"providerID": "stripe"}, svc)
+
+	g.handleDELETEFiatProviderConfig(w, r)
+	assert.Equal(t, http.StatusConflict, w.Code)
 }
 
 // --- GET /v1/fiat/{providerID}/status ---

@@ -3,6 +3,7 @@ package utxo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -115,6 +116,11 @@ type Monitor struct {
 	// Used to prevent duplicate notifications when multiple sources detect same transaction
 	seenTxs   map[string]time.Time
 	seenTxsMu sync.RWMutex
+
+	// Source health tracking: key = "chainType:sourceIndex", value = was healthy last check.
+	// Used to detect unhealthy→healthy transitions and re-subscribe watched addresses.
+	sourceHealthPrev   map[string]bool
+	sourceHealthPrevMu sync.Mutex
 }
 
 // MonitorConfig holds configuration for the transaction monitor
@@ -156,6 +162,7 @@ func NewMonitor(config *MonitorConfig) *Monitor {
 		subscribers:          make([]chan iwallet.Transaction, 0),
 		nodeCallbacks:        make(map[string]func(tx iwallet.Transaction, wa *WatchedAddress)),
 		seenTxs:              make(map[string]time.Time),
+		sourceHealthPrev:     make(map[string]bool),
 	}
 }
 
@@ -436,6 +443,7 @@ func (m *Monitor) pollLoop() {
 		case <-m.shutdown:
 			return
 		case <-ticker.C:
+			m.checkSourceHealth()
 			m.pollAllAddresses()
 		}
 	}
@@ -829,4 +837,66 @@ func (m *Monitor) BroadcastTransaction(chain iwallet.ChainType, txHex string) (s
 		return "", lastErr
 	}
 	return "", errors.New("no sources available for broadcasting")
+}
+
+// checkSourceHealth detects sources that transitioned from unhealthy to healthy
+// and re-subscribes watched addresses that lost their subscriptions.
+func (m *Monitor) checkSourceHealth() {
+	m.sourceHealthPrevMu.Lock()
+	defer m.sourceHealthPrevMu.Unlock()
+
+	for chain, sources := range m.sources {
+		for i, source := range sources {
+			key := fmt.Sprintf("%s:%d", chain, i)
+			healthy := source.IsHealthy()
+			wasHealthy, tracked := m.sourceHealthPrev[key]
+
+			if tracked && !wasHealthy && healthy {
+				log.Infof("Source %s recovered, re-subscribing watched addresses for chain %s", key, chain)
+				m.resubscribeChain(chain, source)
+			}
+
+			m.sourceHealthPrev[key] = healthy
+		}
+	}
+}
+
+// resubscribeChain re-subscribes all un-subscribed watched addresses for a chain
+// via the given (recovered) source.
+func (m *Monitor) resubscribeChain(chain iwallet.ChainType, source PaymentSource) {
+	m.watchMu.RLock()
+	var toResubscribe []*WatchedAddress
+	for _, wa := range m.watching {
+		if wa.ChainType == chain && !wa.Subscribed {
+			toResubscribe = append(toResubscribe, wa)
+		}
+	}
+	m.watchMu.RUnlock()
+
+	if len(toResubscribe) == 0 {
+		return
+	}
+
+	ctx := context.Background()
+	resubscribed := 0
+	for _, wa := range toResubscribe {
+		err := source.Subscribe(ctx, wa.Address, wa.ScriptPubKey, func(tx *iwallet.Transaction) {
+			m.handleTransaction(wa, tx)
+		})
+		if err != nil {
+			log.Warningf("Failed to re-subscribe address %s after source recovery: %v", wa.Address, err)
+			continue
+		}
+		resubscribed++
+	}
+
+	if resubscribed > 0 {
+		m.watchMu.Lock()
+		for _, wa := range toResubscribe {
+			wa.Subscribed = true
+		}
+		m.watchMu.Unlock()
+		log.Infof("Re-subscribed %d/%d addresses for chain %s after source recovery",
+			resubscribed, len(toResubscribe), chain)
+	}
 }

@@ -33,6 +33,8 @@ type mockFiatProvider struct {
 	refundResult  *contracts.RefundResult
 	refundErr     error
 	refundCalls   []contracts.RefundParams
+	cancelErr     error
+	cancelCalls   []string
 }
 
 func (m *mockFiatProvider) ProviderID() string { return m.id }
@@ -52,6 +54,11 @@ func (m *mockFiatProvider) GetPayment(_ context.Context, _ string) (*contracts.P
 func (m *mockFiatProvider) RefundPayment(_ context.Context, params contracts.RefundParams) (*contracts.RefundResult, error) {
 	m.refundCalls = append(m.refundCalls, params)
 	return m.refundResult, m.refundErr
+}
+
+func (m *mockFiatProvider) CancelPayment(_ context.Context, paymentID string) error {
+	m.cancelCalls = append(m.cancelCalls, paymentID)
+	return m.cancelErr
 }
 
 func (m *mockFiatProvider) ParseWebhook(_ context.Context, _ []byte, _ map[string]string) (*contracts.WebhookEvent, error) {
@@ -295,7 +302,7 @@ func TestFiatService_SaveProviderConfig_CreatesReceivingAccount(t *testing.T) {
 	assert.Contains(t, reg.Registered(), "stripe", "provider should be registered")
 }
 
-func TestFiatService_DeleteProviderConfig_UnregistersProvider(t *testing.T) {
+func TestFiatService_deleteProviderConfig_UnregistersProvider(t *testing.T) {
 	reg := newMockFiatRegistry()
 	svc, _ := newFiatTestService(t, reg)
 
@@ -304,7 +311,7 @@ func TestFiatService_DeleteProviderConfig_UnregistersProvider(t *testing.T) {
 	}))
 	assert.NotEmpty(t, reg.Registered())
 
-	require.NoError(t, svc.DeleteProviderConfig("stripe"))
+	require.NoError(t, svc.deleteProviderConfig("stripe"))
 	assert.Empty(t, reg.Registered(), "provider should be unregistered after delete")
 }
 
@@ -874,4 +881,169 @@ func TestFiatService_WebhookRace_AutoRefundFails_NoRetryLoop(t *testing.T) {
 	require.NoError(t, err, "should return nil even when auto-refund fails, to avoid retry loop")
 
 	require.Len(t, provider.refundCalls, 1, "should attempt refund once")
+}
+
+// --- Tests: DisconnectProvider ---
+
+func newFiatTestDBWithOrders(t *testing.T) database.Database {
+	t.Helper()
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	require.NoError(t, database.MigrateFiatModels(db))
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		if err := tx.Migrate(&models.Order{}); err != nil {
+			return err
+		}
+		return tx.Migrate(&models.ReceivingAccount{})
+	}))
+	return db
+}
+
+func newFiatTestServiceWithOrders(t *testing.T, reg contracts.FiatProviderRegistry) (*FiatPaymentAppService, database.Database) {
+	t.Helper()
+	db := newFiatTestDBWithOrders(t)
+	svc := NewFiatPaymentAppService(reg, db, "test-node")
+	return svc, db
+}
+
+func seedFiatOrder(t *testing.T, db database.Database, order *models.Order, state models.OrderState) {
+	t.Helper()
+	order.SetFSMState(state)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(order)
+	}))
+}
+
+func TestDisconnectProvider_NoActiveOrders_Success(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe"}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+
+	svc, db := newFiatTestServiceWithOrders(t, reg)
+
+	seedFiatOrder(t, db, &models.Order{
+		ID:                   "completed-order",
+		PaymentTransactionID: "pi_completed_123",
+		FiatMetadata:         []byte(`{"fiat_provider":"stripe"}`),
+	}, models.OrderState_COMPLETED)
+
+	svc.SetOrderRepo(newMockOrderRepo())
+
+	ra := &models.ReceivingAccount{
+		ChainType: FiatChainType("stripe"),
+		Address:   "acct_test",
+		IsActive:  true,
+	}
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(ra)
+	}))
+	cfg := &models.FiatProviderConfig{
+		ProviderID: "stripe",
+		IsActive:   true,
+	}
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(cfg)
+	}))
+
+	err := svc.DisconnectProvider(context.Background(), "stripe")
+	require.NoError(t, err)
+
+	var count int64
+	_ = db.View(func(tx database.Tx) error {
+		return tx.Read().Model(&models.ReceivingAccount{}).
+			Where("chain_type = ?", FiatChainType("stripe")).Count(&count).Error
+	})
+	assert.Equal(t, int64(0), count, "ReceivingAccount should be deleted")
+}
+
+func TestDisconnectProvider_ActiveOrders_ReturnsError(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe"}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+
+	svc, db := newFiatTestServiceWithOrders(t, reg)
+
+	seedFiatOrder(t, db, &models.Order{
+		ID:                   "fulfillment-order",
+		PaymentTransactionID: "pi_fulfill_123",
+		FiatMetadata:         []byte(`{"fiat_provider":"stripe"}`),
+	}, models.OrderState_AWAITING_FULFILLMENT)
+
+	svc.SetOrderRepo(newMockOrderRepo())
+
+	err := svc.DisconnectProvider(context.Background(), "stripe")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, contracts.ErrActiveOrdersExist)
+}
+
+func TestDisconnectProvider_AwaitingPayment_CancelsSession(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe"}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+
+	svc, db := newFiatTestServiceWithOrders(t, reg)
+
+	seedFiatOrder(t, db, &models.Order{
+		ID:           "awaiting-payment-order",
+		FiatMetadata: []byte(`{"fiat_provider":"stripe","fiat_session_id":"pi_session_abc"}`),
+	}, models.OrderState_AWAITING_PAYMENT)
+
+	svc.SetOrderRepo(newMockOrderRepo())
+
+	ra := &models.ReceivingAccount{
+		ChainType: FiatChainType("stripe"),
+		Address:   "acct_test",
+		IsActive:  true,
+	}
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(ra)
+	}))
+	cfg := &models.FiatProviderConfig{
+		ProviderID: "stripe",
+		IsActive:   true,
+	}
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(cfg)
+	}))
+
+	err := svc.DisconnectProvider(context.Background(), "stripe")
+	require.NoError(t, err)
+
+	require.Len(t, provider.cancelCalls, 1)
+	assert.Equal(t, "pi_session_abc", provider.cancelCalls[0])
+}
+
+func TestDisconnectProvider_CryptoOrderDoesNotBlock(t *testing.T) {
+	provider := &mockFiatProvider{id: "stripe"}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+
+	svc, db := newFiatTestServiceWithOrders(t, reg)
+
+	seedFiatOrder(t, db, &models.Order{
+		ID:                   "crypto-order",
+		PaymentTransactionID: "0xabc123",
+	}, models.OrderState_AWAITING_FULFILLMENT)
+
+	svc.SetOrderRepo(newMockOrderRepo())
+
+	ra := &models.ReceivingAccount{
+		ChainType: FiatChainType("stripe"),
+		Address:   "acct_test",
+		IsActive:  true,
+	}
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(ra)
+	}))
+	cfg := &models.FiatProviderConfig{
+		ProviderID: "stripe",
+		IsActive:   true,
+	}
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		return tx.Save(cfg)
+	}))
+
+	err := svc.DisconnectProvider(context.Background(), "stripe")
+	require.NoError(t, err, "crypto orders should not block fiat provider disconnect")
 }

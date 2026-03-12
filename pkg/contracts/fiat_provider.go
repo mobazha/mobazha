@@ -8,9 +8,10 @@ import (
 
 // Sentinel errors for typed error handling in handlers.
 var (
-	ErrWebhookSignature = errors.New("fiat: invalid webhook signature")
-	ErrProviderNotFound = errors.New("fiat: provider not found")
-	ErrAlreadyRefunded  = errors.New("fiat: payment already refunded")
+	ErrWebhookSignature  = errors.New("fiat: invalid webhook signature")
+	ErrProviderNotFound  = errors.New("fiat: provider not found")
+	ErrAlreadyRefunded   = errors.New("fiat: payment already refunded")
+	ErrActiveOrdersExist = errors.New("fiat: cannot disconnect provider with active orders")
 )
 
 // RetryableError signals that a webhook should be retried later.
@@ -52,6 +53,12 @@ type FiatPaymentProvider interface {
 	//   PayPal: calls POST /v2/payments/captures/{captureID}/refund
 	// Pass nil Amount for a full refund.
 	RefundPayment(ctx context.Context, params RefundParams) (*RefundResult, error)
+
+	// CancelPayment cancels an uncaptured payment session.
+	//   Stripe: calls PaymentIntent.Cancel()
+	//   PayPal: no-op (orders auto-expire)
+	// Used during provider disconnect to clean up pending payments.
+	CancelPayment(ctx context.Context, paymentID string) error
 }
 
 // FiatOnboardingProvider is an optional extension for SaaS OAuth-based seller onboarding.
@@ -113,8 +120,10 @@ type FiatService interface {
 	// SaveProviderConfig stores or updates provider API keys.
 	SaveProviderConfig(providerID string, cfg ProviderConfigInput) error
 
-	// DeleteProviderConfig removes the config and deactivates the receiving account.
-	DeleteProviderConfig(providerID string) error
+	// DisconnectProvider safely disconnects a fiat provider after checking for active orders.
+	// Returns ErrActiveOrdersExist if orders in fulfillment/dispute states exist.
+	// Cancels any AWAITING_PAYMENT sessions before cleaning up config.
+	DisconnectProvider(ctx context.Context, providerID string) error
 
 	// VerifyProviderConfig tests the stored config by calling the provider's health endpoint.
 	VerifyProviderConfig(providerID string) error

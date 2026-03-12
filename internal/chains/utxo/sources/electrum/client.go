@@ -440,11 +440,14 @@ func (c *Client) handleDisconnect() {
 }
 
 func (c *Client) reconnect() {
-	for {
+	const maxDelay = 2 * time.Minute
+	delay := c.reconnectDelay
+
+	for attempt := 1; ; attempt++ {
 		select {
 		case <-c.shutdown:
 			return
-		case <-time.After(c.reconnectDelay):
+		case <-time.After(delay):
 		}
 
 		c.mu.Lock()
@@ -453,12 +456,10 @@ func (c *Client) reconnect() {
 			return
 		}
 		c.connecting = true
-		// Close old broken connection to release file descriptor before
-		// establishing a new one. Without this, the old conn leaks until GC.
 		c.closeConnection()
 		c.mu.Unlock()
 
-		log.Infof("[%s] Attempting to reconnect...", c.chain)
+		log.Infof("[%s] Reconnect attempt %d (backoff %v)...", c.chain, attempt, delay)
 		ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 		err := c.connectWithoutLock(ctx)
 		cancel()
@@ -468,12 +469,17 @@ func (c *Client) reconnect() {
 		c.mu.Unlock()
 
 		if err == nil {
-			// Resubscribe to all scripthashes
+			log.Infof("[%s] Reconnected successfully after %d attempt(s)", c.chain, attempt)
 			c.resubscribeAll()
 			return
 		}
 
-		log.Warningf("[%s] Reconnect failed: %v", c.chain, err)
+		log.Warningf("[%s] Reconnect attempt %d failed: %v", c.chain, attempt, err)
+
+		delay *= 2
+		if delay > maxDelay {
+			delay = maxDelay
+		}
 	}
 }
 

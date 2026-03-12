@@ -58,7 +58,7 @@ func TestJWTValidator_RSA_ValidToken(t *testing.T) {
 	certPEM, privKey := generateTestRSACert()
 	localPeer := "12D3KooWTestPeerID"
 
-	v, err := NewJWTValidator(certPEM, localPeer)
+	v, err := NewJWTValidator(certPEM, localPeer, "")
 	if err != nil {
 		t.Fatalf("NewJWTValidator: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestJWTValidator_RSA_ValidToken(t *testing.T) {
 		t.Errorf("PeerID() = %q, want %q", parsed.PeerID(), localPeer)
 	}
 	if !v.IsAdmin(parsed) {
-		t.Error("IsAdmin should be true when peerID matches")
+		t.Error("IsAdmin should be true when peerID matches (legacy fallback)")
 	}
 }
 
@@ -93,7 +93,7 @@ func TestJWTValidator_ECDSA_ValidToken(t *testing.T) {
 	certPEM, privKey := generateTestECDSACert()
 	localPeer := "12D3KooWECTestPeer"
 
-	v, err := NewJWTValidator(certPEM, localPeer)
+	v, err := NewJWTValidator(certPEM, localPeer, "")
 	if err != nil {
 		t.Fatalf("NewJWTValidator: %v", err)
 	}
@@ -112,14 +112,100 @@ func TestJWTValidator_ECDSA_ValidToken(t *testing.T) {
 		t.Fatalf("ValidateToken: %v", err)
 	}
 	if !v.IsAdmin(parsed) {
-		t.Error("IsAdmin should be true for ECDSA signed token")
+		t.Error("IsAdmin should be true for ECDSA signed token (legacy fallback)")
+	}
+}
+
+func TestJWTValidator_OwnerUserID_Primary(t *testing.T) {
+	certPEM, privKey := generateTestRSACert()
+	ownerUserID := "casdoor-user-abc123"
+
+	v, err := NewJWTValidator(certPEM, "12D3KooWAnyPeer", ownerUserID)
+	if err != nil {
+		t.Fatalf("NewJWTValidator: %v", err)
+	}
+
+	claims := &JWTClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   ownerUserID,
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+		},
+		Id:         ownerUserID,
+		Properties: map[string]string{"peerID": "12D3KooWDifferentPeer"},
+	}
+	tokenStr := signToken(claims, privKey)
+
+	parsed, err := v.ValidateToken(tokenStr)
+	if err != nil {
+		t.Fatalf("ValidateToken: %v", err)
+	}
+	if !v.IsAdmin(parsed) {
+		t.Error("IsAdmin should be true when claims.Id matches ownerUserID, even with wrong peerID")
+	}
+}
+
+func TestJWTValidator_OwnerUserID_WrongUser(t *testing.T) {
+	certPEM, privKey := generateTestRSACert()
+	ownerUserID := "casdoor-user-abc123"
+
+	v, err := NewJWTValidator(certPEM, "12D3KooWAnyPeer", ownerUserID)
+	if err != nil {
+		t.Fatalf("NewJWTValidator: %v", err)
+	}
+
+	claims := &JWTClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "other-user-xyz",
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+		},
+		Id: "other-user-xyz",
+	}
+	tokenStr := signToken(claims, privKey)
+
+	parsed, err := v.ValidateToken(tokenStr)
+	if err != nil {
+		t.Fatalf("ValidateToken: %v", err)
+	}
+	if v.IsAdmin(parsed) {
+		t.Error("IsAdmin should be false when claims.Id does not match ownerUserID")
+	}
+}
+
+func TestJWTValidator_UpdateOwnerUserID(t *testing.T) {
+	certPEM, privKey := generateTestRSACert()
+
+	v, err := NewJWTValidator(certPEM, "12D3KooWAnyPeer", "")
+	if err != nil {
+		t.Fatalf("NewJWTValidator: %v", err)
+	}
+
+	claims := &JWTClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "user-123",
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+		},
+		Id: "user-123",
+	}
+	tokenStr := signToken(claims, privKey)
+
+	parsed, err := v.ValidateToken(tokenStr)
+	if err != nil {
+		t.Fatalf("ValidateToken: %v", err)
+	}
+	if v.IsAdmin(parsed) {
+		t.Error("IsAdmin should be false before UpdateOwnerUserID (no peerID, no ownerUserID)")
+	}
+
+	v.UpdateOwnerUserID("user-123")
+	if !v.IsAdmin(parsed) {
+		t.Error("IsAdmin should be true after UpdateOwnerUserID matches claims.Id")
 	}
 }
 
 func TestJWTValidator_ExpiredToken(t *testing.T) {
 	certPEM, privKey := generateTestRSACert()
 
-	v, err := NewJWTValidator(certPEM, "some-peer")
+	v, err := NewJWTValidator(certPEM, "some-peer", "")
 	if err != nil {
 		t.Fatalf("NewJWTValidator: %v", err)
 	}
@@ -142,7 +228,7 @@ func TestJWTValidator_WrongSignature(t *testing.T) {
 	certPEM, _ := generateTestRSACert()
 	_, otherPrivKey := generateTestRSACert()
 
-	v, err := NewJWTValidator(certPEM, "some-peer")
+	v, err := NewJWTValidator(certPEM, "some-peer", "")
 	if err != nil {
 		t.Fatalf("NewJWTValidator: %v", err)
 	}
@@ -165,7 +251,7 @@ func TestJWTValidator_IsAdmin_WrongPeerID(t *testing.T) {
 	certPEM, privKey := generateTestRSACert()
 	localPeer := "12D3KooWMyStore"
 
-	v, err := NewJWTValidator(certPEM, localPeer)
+	v, err := NewJWTValidator(certPEM, localPeer, "")
 	if err != nil {
 		t.Fatalf("NewJWTValidator: %v", err)
 	}
@@ -191,7 +277,7 @@ func TestJWTValidator_IsAdmin_WrongPeerID(t *testing.T) {
 func TestJWTValidator_IsAdmin_NoPeerID(t *testing.T) {
 	certPEM, privKey := generateTestRSACert()
 
-	v, err := NewJWTValidator(certPEM, "12D3KooWMyStore")
+	v, err := NewJWTValidator(certPEM, "12D3KooWMyStore", "")
 	if err != nil {
 		t.Fatalf("NewJWTValidator: %v", err)
 	}
@@ -214,7 +300,7 @@ func TestJWTValidator_IsAdmin_NoPeerID(t *testing.T) {
 }
 
 func TestJWTValidator_InvalidCertPEM(t *testing.T) {
-	_, err := NewJWTValidator("not-a-valid-pem", "peer")
+	_, err := NewJWTValidator("not-a-valid-pem", "peer", "")
 	if err == nil {
 		t.Fatal("Expected error for invalid PEM, got nil")
 	}
@@ -225,7 +311,7 @@ func TestJWTValidator_UpdateCertificate(t *testing.T) {
 	certPEM2, privKey2 := generateTestRSACert()
 	localPeer := "12D3KooWRotate"
 
-	v, err := NewJWTValidator(certPEM1, localPeer)
+	v, err := NewJWTValidator(certPEM1, localPeer, "")
 	if err != nil {
 		t.Fatalf("NewJWTValidator: %v", err)
 	}

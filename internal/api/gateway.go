@@ -39,9 +39,13 @@ type GatewayConfig struct {
 	// When set, the standalone node accepts JWT Bearer tokens in addition
 	// to Basic Auth. Requests from SaaS proxy (Mini App) carry JWTs.
 	CasdoorCertificate string
-	// LocalPeerID is this node's libp2p peer ID, used to verify that
-	// JWT holders are authorized to manage this specific store.
+	// LocalPeerID is this node's libp2p peer ID, used as legacy fallback
+	// for admin authorization when OwnerUserID is not configured.
 	LocalPeerID string
+	// OwnerUserID is the Casdoor User ID of the store owner, from
+	// store_registry.owner_user_id. When set, JWT admin authorization
+	// uses claims.Id == OwnerUserID instead of Properties["peerID"].
+	OwnerUserID string
 }
 
 // Gateway represents an HTTP API gateway
@@ -83,12 +87,16 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 	}
 
 	if config.CasdoorCertificate != "" && config.LocalPeerID != "" {
-		jv, err := NewJWTValidator(config.CasdoorCertificate, config.LocalPeerID)
+		jv, err := NewJWTValidator(config.CasdoorCertificate, config.LocalPeerID, config.OwnerUserID)
 		if err != nil {
 			log.Warningf("Failed to init JWT validator (JWT auth disabled): %v", err)
 		} else {
 			g.jwtValidator = jv
-			log.Infof("JWT authentication enabled for standalone store %s", config.LocalPeerID)
+			authMode := "peerID (legacy)"
+			if config.OwnerUserID != "" {
+				authMode = "ownerUserID"
+			}
+			log.Infof("JWT authentication enabled for standalone store %s (mode: %s)", config.LocalPeerID, authMode)
 		}
 	}
 

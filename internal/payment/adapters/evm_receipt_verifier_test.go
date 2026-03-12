@@ -34,6 +34,13 @@ func (m *mockReceiptFetcher) TransactionReceipt(_ context.Context, _ common.Hash
 func (m *mockReceiptFetcher) TransactionByHash(_ context.Context, _ common.Hash) (*types.Transaction, bool, error) {
 	return nil, false, nil
 }
+func (m *mockReceiptFetcher) GetTransaction(_ iwallet.TransactionID, _ iwallet.CoinType) (*iwallet.Transaction, error) {
+	return nil, nil
+}
+func (m *mockReceiptFetcher) EstimateFee(_ int) (map[iwallet.FeeLevel]iwallet.EstimateFeeRes, error) {
+	return nil, nil
+}
+func (m *mockReceiptFetcher) Broadcast(_ []byte) error { return nil }
 
 type delayedReceiptFetcher struct {
 	receipt   *types.Receipt
@@ -52,6 +59,13 @@ func (d *delayedReceiptFetcher) TransactionReceipt(_ context.Context, _ common.H
 func (d *delayedReceiptFetcher) TransactionByHash(_ context.Context, _ common.Hash) (*types.Transaction, bool, error) {
 	return nil, false, nil
 }
+func (d *delayedReceiptFetcher) GetTransaction(_ iwallet.TransactionID, _ iwallet.CoinType) (*iwallet.Transaction, error) {
+	return nil, nil
+}
+func (d *delayedReceiptFetcher) EstimateFee(_ int) (map[iwallet.FeeLevel]iwallet.EstimateFeeRes, error) {
+	return nil, nil
+}
+func (d *delayedReceiptFetcher) Broadcast(_ []byte) error { return nil }
 
 // ── Mock multiwallet ────────────────────────────────────────────────────
 
@@ -89,7 +103,7 @@ func revertedReceipt() *types.Receipt {
 	return &types.Receipt{Status: types.ReceiptStatusFailed}
 }
 
-func makeVerifier(fetcher evm.EVMReceiptFetcher) *EVMReceiptVerifier {
+func makeVerifier(fetcher iwallet.ChainClient) *EVMReceiptVerifier {
 	ethWallet := &evm.ETHWallet{}
 	ethWallet.ChainClient = fetcher
 	mw := &mockMultiwalletForReceipt{wallet: ethWallet}
@@ -100,13 +114,13 @@ func makeVerifier(fetcher evm.EVMReceiptFetcher) *EVMReceiptVerifier {
 
 func TestVerifyTransactionReceipt_Success(t *testing.T) {
 	v := makeVerifier(&mockReceiptFetcher{receipt: successReceipt()})
-	err := v.VerifyTransactionReceipt(context.Background(), "TETH", "0xabc123")
+	err := v.VerifyTransactionReceipt(context.Background(), "ETH", "0xabc123")
 	require.NoError(t, err)
 }
 
 func TestVerifyTransactionReceipt_Reverted(t *testing.T) {
 	v := makeVerifier(&mockReceiptFetcher{receipt: revertedReceipt()})
-	err := v.VerifyTransactionReceipt(context.Background(), "TETH", "0xabc123")
+	err := v.VerifyTransactionReceipt(context.Background(), "ETH", "0xabc123")
 	assert.ErrorIs(t, err, payment.ErrTransactionReverted)
 }
 
@@ -118,7 +132,7 @@ func TestVerifyTransactionReceipt_NonEVM(t *testing.T) {
 
 func TestVerifyTransactionReceipt_RPCError(t *testing.T) {
 	v := makeVerifier(&mockReceiptFetcher{receiptErr: errors.New("RPC timeout")})
-	err := v.VerifyTransactionReceipt(context.Background(), "TETH", "0xabc123")
+	err := v.VerifyTransactionReceipt(context.Background(), "ETH", "0xabc123")
 	require.NoError(t, err, "RPC errors are best-effort — should return nil")
 }
 
@@ -126,7 +140,7 @@ func TestVerifyTransactionReceipt_RPCError(t *testing.T) {
 
 func TestWaitAndVerifyReceipt_Success(t *testing.T) {
 	v := makeVerifier(&delayedReceiptFetcher{receipt: successReceipt(), maxFails: 2})
-	err := v.WaitAndVerifyReceipt(context.Background(), "TETH", "0xabc123")
+	err := v.WaitAndVerifyReceipt(context.Background(), "ETH", "0xabc123")
 	require.NoError(t, err)
 }
 
@@ -135,13 +149,13 @@ func TestWaitAndVerifyReceipt_Timeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	err := v.WaitAndVerifyReceipt(ctx, "TETH", "0xabc123")
+	err := v.WaitAndVerifyReceipt(ctx, "ETH", "0xabc123")
 	require.Error(t, err)
 }
 
 func TestWaitAndVerifyReceipt_Reverted(t *testing.T) {
 	v := makeVerifier(&mockReceiptFetcher{receipt: revertedReceipt()})
-	err := v.WaitAndVerifyReceipt(context.Background(), "TETH", "0xabc123")
+	err := v.WaitAndVerifyReceipt(context.Background(), "ETH", "0xabc123")
 	assert.ErrorIs(t, err, payment.ErrTransactionReverted)
 }
 

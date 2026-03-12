@@ -28,6 +28,7 @@ func (s *stubProvider) ParseWebhook(_ context.Context, _ []byte, _ map[string]st
 func (s *stubProvider) RefundPayment(_ context.Context, _ contracts.RefundParams) (*contracts.RefundResult, error) {
 	return nil, nil
 }
+func (s *stubProvider) CancelPayment(_ context.Context, _ string) error { return nil }
 
 func TestRegistry_RegisterAndLookup(t *testing.T) {
 	reg := NewRegistry()

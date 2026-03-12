@@ -92,10 +92,10 @@ func TestOrderStateBridge_InvalidTransition(t *testing.T) {
 func TestOrderStateBridge_AllowedEvents(t *testing.T) {
 	bridge := NewOrderStateBridge()
 
-	// AwaitingPayment should only have PaymentSent
+	// AwaitingPayment allows PaymentSent + OrderTimeout + VendorDecline
 	allowed := bridge.GetAllowedEvents(int(orders.StateAwaitingPayment))
-	if len(allowed) != 1 {
-		t.Errorf("Expected 1 allowed event for AwaitingPayment, got %d: %v", len(allowed), allowed)
+	if len(allowed) != 3 {
+		t.Errorf("Expected 3 allowed events for AwaitingPayment, got %d: %v", len(allowed), allowed)
 	}
 
 	// Pending should have 6 allowed events

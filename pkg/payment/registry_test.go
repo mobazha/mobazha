@@ -39,6 +39,13 @@ func (m *mockStrategy) GetCompleteInstructions(_ context.Context, _ payment.Inst
 func (m *mockStrategy) GetDisputeReleaseInstructions(_ context.Context, _ payment.InstructionParams) (*payment.InstructionResult, error) {
 	return &payment.InstructionResult{Instructions: nil}, nil
 }
+func (m *mockStrategy) VerifyDeposit(_ context.Context, _ payment.DepositVerifyParams) error {
+	return nil
+}
+func (m *mockStrategy) ValidatePaymentMessage(_ payment.PaymentMessageParams) error { return nil }
+func (m *mockStrategy) VerifyPreRelease(_ context.Context, _ payment.PreReleaseParams) error {
+	return nil
+}
 
 func TestRegistry_Register_And_Lookup(t *testing.T) {
 	r := payment.NewRegistry()

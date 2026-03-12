@@ -139,7 +139,7 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 
 	we := &contracts.WebhookEvent{
 		EventID:    event.ID,
-		ProviderID: "stripe",
+		ProviderID: providerID,
 		Raw:        &event,
 	}
 

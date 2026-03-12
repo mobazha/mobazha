@@ -34,8 +34,31 @@ func newTestServer(t *testing.T, handler http.Handler) (*httptest.Server, *Provi
 			accessToken:  "test-access-token",
 			tokenExpiry:  time.Now().Add(1 * time.Hour),
 		},
+		sigCache: newSignatureCache(),
 	}
 	return ts, p
+}
+
+// newWebhookTestProvider creates a Provider backed by a mock server that auto-approves
+// webhook signature verification. Use for tests focused on event parsing logic.
+func newWebhookTestProvider(t *testing.T) (*httptest.Server, *Provider) {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/notifications/verify-webhook-signature", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(webhookVerifyResponse{VerificationStatus: "SUCCESS"})
+	})
+	return newTestServer(t, mux)
+}
+
+// validWebhookHeaders returns headers that satisfy the required PayPal webhook header checks.
+func validWebhookHeaders() map[string]string {
+	return map[string]string{
+		"Paypal-Transmission-Id":   "test-transmission-id",
+		"Paypal-Transmission-Sig":  "test-sig",
+		"Paypal-Transmission-Time": "2026-03-11T00:00:00Z",
+		"Paypal-Auth-Algo":         "SHA256withRSA",
+		"Paypal-Cert-Url":          "https://api.paypal.com/cert.pem",
+	}
 }
 
 func TestProvider_ProviderID(t *testing.T) {
@@ -274,7 +297,8 @@ func TestProvider_GetPayment_Success(t *testing.T) {
 }
 
 func TestProvider_ParseWebhook_PaymentSucceeded_ResourceLevel(t *testing.T) {
-	p := NewProvider(Config{})
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
 
 	payload := `{
 		"id": "WH-001",
@@ -286,7 +310,7 @@ func TestProvider_ParseWebhook_PaymentSucceeded_ResourceLevel(t *testing.T) {
 		}
 	}`
 
-	event, err := p.ParseWebhook(context.Background(), []byte(payload), map[string]string{})
+	event, err := p.ParseWebhook(context.Background(), []byte(payload), validWebhookHeaders())
 	require.NoError(t, err)
 
 	assert.Equal(t, "WH-001", event.EventID)
@@ -297,9 +321,9 @@ func TestProvider_ParseWebhook_PaymentSucceeded_ResourceLevel(t *testing.T) {
 }
 
 func TestProvider_ParseWebhook_PaymentSucceeded_PurchaseUnitsFallback(t *testing.T) {
-	p := NewProvider(Config{})
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
 
-	// resource.custom_id is empty; OrderID comes from purchase_units[0].custom_id
 	payload := `{
 		"id": "WH-002",
 		"event_type": "PAYMENT.CAPTURE.COMPLETED",
@@ -314,7 +338,7 @@ func TestProvider_ParseWebhook_PaymentSucceeded_PurchaseUnitsFallback(t *testing
 		}
 	}`
 
-	event, err := p.ParseWebhook(context.Background(), []byte(payload), map[string]string{})
+	event, err := p.ParseWebhook(context.Background(), []byte(payload), validWebhookHeaders())
 	require.NoError(t, err)
 
 	assert.Equal(t, contracts.WebhookPaymentSucceeded, event.Type)
@@ -329,7 +353,8 @@ func TestProvider_ParseWebhook_PaymentSucceeded_PurchaseUnitsFallback(t *testing
 }
 
 func TestProvider_ParseWebhook_PaymentFailed(t *testing.T) {
-	p := NewProvider(Config{})
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
 
 	payload := `{
 		"id": "WH-FAIL",
@@ -341,7 +366,7 @@ func TestProvider_ParseWebhook_PaymentFailed(t *testing.T) {
 		}
 	}`
 
-	event, err := p.ParseWebhook(context.Background(), []byte(payload), map[string]string{})
+	event, err := p.ParseWebhook(context.Background(), []byte(payload), validWebhookHeaders())
 	require.NoError(t, err)
 	assert.Equal(t, contracts.WebhookPaymentFailed, event.Type)
 	assert.Equal(t, "CAP-FAIL", event.PaymentID)
@@ -349,59 +374,74 @@ func TestProvider_ParseWebhook_PaymentFailed(t *testing.T) {
 }
 
 func TestProvider_ParseWebhook_DisputeCreated(t *testing.T) {
-	p := NewProvider(Config{})
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
+
 	payload := `{"id": "WH-DISPUTE", "event_type": "CUSTOMER.DISPUTE.CREATED", "resource": {"id": "DISP-001"}}`
 
-	event, err := p.ParseWebhook(context.Background(), []byte(payload), map[string]string{})
+	event, err := p.ParseWebhook(context.Background(), []byte(payload), validWebhookHeaders())
 	require.NoError(t, err)
 	assert.Equal(t, contracts.WebhookDisputeOpened, event.Type)
 }
 
 func TestProvider_ParseWebhook_DisputeResolved(t *testing.T) {
-	p := NewProvider(Config{})
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
+
 	payload := `{"id": "WH-DR", "event_type": "CUSTOMER.DISPUTE.RESOLVED", "resource": {"id": "DISP-002"}}`
 
-	event, err := p.ParseWebhook(context.Background(), []byte(payload), map[string]string{})
+	event, err := p.ParseWebhook(context.Background(), []byte(payload), validWebhookHeaders())
 	require.NoError(t, err)
 	assert.Equal(t, contracts.WebhookDisputeResolved, event.Type)
 }
 
 func TestProvider_ParseWebhook_Refund(t *testing.T) {
-	p := NewProvider(Config{})
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
+
 	payload := `{"id": "WH-REFUND", "event_type": "PAYMENT.CAPTURE.REFUNDED", "resource": {"id": "REFUND-001"}}`
 
-	event, err := p.ParseWebhook(context.Background(), []byte(payload), map[string]string{})
+	event, err := p.ParseWebhook(context.Background(), []byte(payload), validWebhookHeaders())
 	require.NoError(t, err)
 	assert.Equal(t, contracts.WebhookRefundCreated, event.Type)
 }
 
 func TestProvider_ParseWebhook_AccountUpdated(t *testing.T) {
-	p := NewProvider(Config{})
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
+
 	payload := `{"id": "WH-ONBOARD", "event_type": "MERCHANT.ONBOARDING.COMPLETED", "resource": {"merchant_id": "M-001"}}`
 
-	event, err := p.ParseWebhook(context.Background(), []byte(payload), map[string]string{})
+	event, err := p.ParseWebhook(context.Background(), []byte(payload), validWebhookHeaders())
 	require.NoError(t, err)
 	assert.Equal(t, contracts.WebhookAccountUpdated, event.Type)
 }
 
 func TestProvider_ParseWebhook_UnknownType(t *testing.T) {
-	p := NewProvider(Config{})
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
+
 	payload := `{"id": "WH-UNKNOWN", "event_type": "SOME.UNKNOWN.EVENT", "resource": {}}`
 
-	event, err := p.ParseWebhook(context.Background(), []byte(payload), map[string]string{})
+	event, err := p.ParseWebhook(context.Background(), []byte(payload), validWebhookHeaders())
 	require.NoError(t, err)
 	assert.Equal(t, contracts.WebhookEventType("SOME.UNKNOWN.EVENT"), event.Type)
 }
 
 func TestProvider_ParseWebhook_InvalidJSON(t *testing.T) {
-	p := NewProvider(Config{})
-	_, err := p.ParseWebhook(context.Background(), []byte("not-json"), map[string]string{})
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
+
+	// Invalid JSON fails during webhook signature verification (marshaling the raw payload)
+	// or during event parsing. Either way, an error is expected.
+	_, err := p.ParseWebhook(context.Background(), []byte("not-json"), validWebhookHeaders())
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unmarshal")
 }
 
 func TestProvider_ParseWebhook_SignatureVerification_MissingHeaders(t *testing.T) {
-	p := NewProvider(Config{WebhookID: "wh-secret-id"})
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
+
 	payload := `{"id": "WH-SIG", "event_type": "PAYMENT.CAPTURE.COMPLETED", "resource": {}}`
 
 	_, err := p.ParseWebhook(context.Background(), []byte(payload), map[string]string{})

@@ -95,6 +95,26 @@ type WebhookEvent struct {
 	Amount        int64             // payment amount in minimal units (cents)
 	Currency      string            // ISO 4217 currency code
 	PaymentMethod PaymentMethodInfo // card/wallet details
+
+	// Refund fields (WebhookRefundCreated)
+	RefundID string
+
+	// Dispute fields (WebhookDisputeOpened / WebhookDisputeResolved)
+	DisputeID      string
+	DisputeReason  string
+	DisputeOutcome string // "won" | "lost"
+
+	// Payment failure fields (WebhookPaymentFailed)
+	FailureReason string
+
+	// Account update fields (WebhookAccountUpdated)
+	WebhookAccountStatus *WebhookAccountStatus
+}
+
+// WebhookAccountStatus represents account capability changes received via webhook.
+type WebhookAccountStatus struct {
+	ChargesEnabled bool
+	PayoutsEnabled bool
 }
 
 // WebhookEventType is a standardized webhook event category.

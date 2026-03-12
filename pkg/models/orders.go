@@ -173,6 +173,10 @@ type Order struct {
 	Read               bool
 	UnreadChatMessages int
 	CreatedAt          time.Time `gorm:"index:idx_order_listing,priority:3,sort:desc"`
+
+	// Fiat payment fields — populated when a fiat webhook event is processed
+	PaymentTransactionID string `gorm:"index"` // provider payment ID (Stripe PaymentIntent / PayPal Capture)
+	FiatMetadata         []byte // JSON-encoded map[string]string for fiat-specific data (disputes, etc.)
 }
 
 func (o *Order) BeforeSave(tx *gorm.DB) (err error) {
@@ -410,6 +414,35 @@ func (o *Order) GetPendingPaymentInfo() (*PendingUTXOPaymentInfo, error) {
 func (o *Order) ClearPendingPaymentInfo() {
 	o.PendingPaymentInfo = nil
 	// Keep PaymentAddress for reference (e.g., for displaying in UI)
+}
+
+// GetFiatMetadata returns the fiat metadata map, or an empty map if none.
+func (o *Order) GetFiatMetadata() (map[string]string, error) {
+	if len(o.FiatMetadata) == 0 {
+		return map[string]string{}, nil
+	}
+	var m map[string]string
+	if err := json.Unmarshal(o.FiatMetadata, &m); err != nil {
+		return nil, fmt.Errorf("unmarshal fiat metadata: %w", err)
+	}
+	return m, nil
+}
+
+// MergeFiatMetadata merges the given key-value pairs into the existing fiat metadata.
+func (o *Order) MergeFiatMetadata(kv map[string]string) error {
+	existing, err := o.GetFiatMetadata()
+	if err != nil {
+		existing = map[string]string{}
+	}
+	for k, v := range kv {
+		existing[k] = v
+	}
+	data, err := json.Marshal(existing)
+	if err != nil {
+		return fmt.Errorf("marshal fiat metadata: %w", err)
+	}
+	o.FiatMetadata = data
+	return nil
 }
 
 // OrderDeclineMessage returns the unmarshalled proto object if it exists in the order.

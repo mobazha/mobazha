@@ -467,3 +467,305 @@ func TestFiatService_HandleWebhook_EnrichmentFailure_StillProcesses(t *testing.T
 	assert.Equal(t, int64(0), handledEvent.Amount, "amount should remain zero when enrichment fails")
 	assert.Equal(t, "", handledEvent.Currency, "currency should remain empty when enrichment fails")
 }
+
+// --- Mock OrderRepo for webhook handler tests ---
+
+type mockOrderRepo struct {
+	orders       map[string]*models.Order // keyed by OrderID
+	byPaymentTx  map[string]*models.Order // keyed by PaymentTransactionID
+	savedOrders  []*models.Order          // track Save calls
+	mergedMeta   map[string]map[string]string
+	findByIDErr  error
+	findByTxErr  error
+	saveErr      error
+	mergeMetaErr error
+}
+
+func newMockOrderRepo() *mockOrderRepo {
+	return &mockOrderRepo{
+		orders:      make(map[string]*models.Order),
+		byPaymentTx: make(map[string]*models.Order),
+		mergedMeta:  make(map[string]map[string]string),
+	}
+}
+
+func (m *mockOrderRepo) addOrder(o *models.Order) {
+	m.orders[string(o.ID)] = o
+	if o.PaymentTransactionID != "" {
+		m.byPaymentTx[o.PaymentTransactionID] = o
+	}
+}
+
+func (m *mockOrderRepo) FindByID(_ context.Context, orderID string) (*models.Order, error) {
+	if m.findByIDErr != nil {
+		return nil, m.findByIDErr
+	}
+	o, ok := m.orders[orderID]
+	if !ok {
+		return nil, fmt.Errorf("order %s not found", orderID)
+	}
+	return o, nil
+}
+
+func (m *mockOrderRepo) FindByPaymentTransactionID(_ context.Context, txID string) (*models.Order, error) {
+	if m.findByTxErr != nil {
+		return nil, m.findByTxErr
+	}
+	o, ok := m.byPaymentTx[txID]
+	if !ok {
+		return nil, fmt.Errorf("order with payment tx %s not found", txID)
+	}
+	return o, nil
+}
+
+func (m *mockOrderRepo) Save(_ context.Context, order *models.Order) error {
+	if m.saveErr != nil {
+		return m.saveErr
+	}
+	m.savedOrders = append(m.savedOrders, order)
+	m.orders[string(order.ID)] = order
+	return nil
+}
+
+func (m *mockOrderRepo) MergeFiatMetadata(_ context.Context, orderID string, kv map[string]string) error {
+	if m.mergeMetaErr != nil {
+		return m.mergeMetaErr
+	}
+	existing, ok := m.mergedMeta[orderID]
+	if !ok {
+		existing = make(map[string]string)
+	}
+	for k, v := range kv {
+		existing[k] = v
+	}
+	m.mergedMeta[orderID] = existing
+	return nil
+}
+
+func (m *mockOrderRepo) SetPaymentTransactionID(_ context.Context, orderID string, txID string) error {
+	o, ok := m.orders[orderID]
+	if ok {
+		o.PaymentTransactionID = txID
+		m.byPaymentTx[txID] = o
+	}
+	return nil
+}
+
+func (m *mockOrderRepo) FindPurchases(_ context.Context, _ contracts.OrderFilter) ([]models.Order, int64, error) {
+	return nil, 0, nil
+}
+func (m *mockOrderRepo) FindSales(_ context.Context, _ contracts.OrderFilter) ([]models.Order, int64, error) {
+	return nil, 0, nil
+}
+func (m *mockOrderRepo) FindUnverifiedPaymentOrders(_ context.Context) ([]models.Order, error) {
+	return nil, nil
+}
+func (m *mockOrderRepo) MarkAsRead(_ context.Context, _ string) error { return nil }
+func (m *mockOrderRepo) UpdateState(_ context.Context, _ string, _ models.OrderState) error {
+	return nil
+}
+func (m *mockOrderRepo) UpdateLastCheckTime(_ context.Context, _ string, _ time.Time) error {
+	return nil
+}
+func (m *mockOrderRepo) ExpirePaymentVerification(_ context.Context, _ string, _ time.Time) error {
+	return nil
+}
+
+// Compile-time interface check
+var _ contracts.OrderRepo = (*mockOrderRepo)(nil)
+
+// --- Tests: Webhook event handlers (S2-11) ---
+
+func TestFiatService_HandleWebhook_PaymentFailed_NoAutoCancel(t *testing.T) {
+	reg := newMockFiatRegistry()
+	reg.Register(&mockFiatProvider{
+		id: "stripe",
+		parsedEvent: &contracts.WebhookEvent{
+			EventID:       "evt_pf_001",
+			Type:          contracts.WebhookPaymentFailed,
+			ProviderID:    "stripe",
+			PaymentID:     "pi_failed_001",
+			OrderID:       "order_pf_001",
+			FailureReason: "card_declined",
+		},
+	})
+
+	svc, _ := newFiatTestService(t, reg)
+	repo := newMockOrderRepo()
+	repo.addOrder(&models.Order{ID: "order_pf_001", State: models.OrderState_AWAITING_PAYMENT})
+	svc.SetOrderRepo(repo)
+
+	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
+	require.NoError(t, err, "PaymentFailed should not return error")
+
+	order := repo.orders["order_pf_001"]
+	assert.Equal(t, models.OrderState_AWAITING_PAYMENT, order.State,
+		"order state should NOT change on PaymentFailed — buyer may retry")
+	assert.Empty(t, repo.savedOrders, "no Save call expected for PaymentFailed")
+}
+
+func TestFiatService_HandleWebhook_RefundCreated_TransitionsToRefunded(t *testing.T) {
+	reg := newMockFiatRegistry()
+	reg.Register(&mockFiatProvider{
+		id: "stripe",
+		parsedEvent: &contracts.WebhookEvent{
+			EventID:    "evt_rf_001",
+			Type:       contracts.WebhookRefundCreated,
+			ProviderID: "stripe",
+			PaymentID:  "pi_refund_001",
+			OrderID:    "order_rf_001",
+			RefundID:   "re_001",
+		},
+	})
+
+	svc, _ := newFiatTestService(t, reg)
+	repo := newMockOrderRepo()
+	repo.addOrder(&models.Order{ID: "order_rf_001", State: models.OrderState_FULFILLED})
+	svc.SetOrderRepo(repo)
+
+	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
+	require.NoError(t, err)
+
+	require.Len(t, repo.savedOrders, 1, "should Save order once")
+	assert.Equal(t, models.OrderState_REFUNDED, repo.savedOrders[0].State,
+		"order should transition to REFUNDED")
+}
+
+func TestFiatService_HandleWebhook_RefundCreated_AlreadyRefunded_Idempotent(t *testing.T) {
+	reg := newMockFiatRegistry()
+	reg.Register(&mockFiatProvider{
+		id: "stripe",
+		parsedEvent: &contracts.WebhookEvent{
+			EventID:    "evt_rf_dup",
+			Type:       contracts.WebhookRefundCreated,
+			ProviderID: "stripe",
+			PaymentID:  "pi_refund_dup",
+			OrderID:    "order_rf_dup",
+			RefundID:   "re_dup",
+		},
+	})
+
+	svc, _ := newFiatTestService(t, reg)
+	repo := newMockOrderRepo()
+	repo.addOrder(&models.Order{ID: "order_rf_dup", State: models.OrderState_REFUNDED})
+	svc.SetOrderRepo(repo)
+
+	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
+	require.NoError(t, err)
+
+	assert.Empty(t, repo.savedOrders, "should NOT Save when already REFUNDED (idempotent)")
+}
+
+func TestFiatService_HandleWebhook_DisputeOpened_StoresMetadata(t *testing.T) {
+	reg := newMockFiatRegistry()
+	reg.Register(&mockFiatProvider{
+		id: "stripe",
+		parsedEvent: &contracts.WebhookEvent{
+			EventID:       "evt_do_001",
+			Type:          contracts.WebhookDisputeOpened,
+			ProviderID:    "stripe",
+			PaymentID:     "pi_dispute_001",
+			OrderID:       "order_do_001",
+			DisputeID:     "dp_001",
+			DisputeReason: "product_not_received",
+		},
+	})
+
+	svc, _ := newFiatTestService(t, reg)
+	repo := newMockOrderRepo()
+	repo.addOrder(&models.Order{ID: "order_do_001", State: models.OrderState_FULFILLED})
+	svc.SetOrderRepo(repo)
+
+	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
+	require.NoError(t, err)
+
+	meta, ok := repo.mergedMeta["order_do_001"]
+	require.True(t, ok, "MergeFiatMetadata should have been called")
+	assert.Equal(t, "opened", meta["fiat_dispute_status"])
+	assert.Equal(t, "dp_001", meta["fiat_dispute_id"])
+	assert.Equal(t, "product_not_received", meta["fiat_dispute_reason"])
+	assert.NotEmpty(t, meta["fiat_dispute_opened_at"])
+	assert.Empty(t, repo.savedOrders, "DisputeOpened should not change order state")
+}
+
+func TestFiatService_HandleWebhook_DisputeResolved_Lost_TransitionsToRefunded(t *testing.T) {
+	reg := newMockFiatRegistry()
+	reg.Register(&mockFiatProvider{
+		id: "stripe",
+		parsedEvent: &contracts.WebhookEvent{
+			EventID:        "evt_dr_lost",
+			Type:           contracts.WebhookDisputeResolved,
+			ProviderID:     "stripe",
+			PaymentID:      "pi_dispute_lost",
+			OrderID:        "order_dr_lost",
+			DisputeID:      "dp_lost",
+			DisputeOutcome: "lost",
+		},
+	})
+
+	svc, _ := newFiatTestService(t, reg)
+	repo := newMockOrderRepo()
+	repo.addOrder(&models.Order{ID: "order_dr_lost", State: models.OrderState_FULFILLED})
+	svc.SetOrderRepo(repo)
+
+	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
+	require.NoError(t, err)
+
+	meta, ok := repo.mergedMeta["order_dr_lost"]
+	require.True(t, ok, "MergeFiatMetadata should have been called")
+	assert.Equal(t, "resolved", meta["fiat_dispute_status"])
+	assert.Equal(t, "lost", meta["fiat_dispute_outcome"])
+	assert.NotEmpty(t, meta["fiat_dispute_resolved_at"])
+
+	require.Len(t, repo.savedOrders, 1, "should Save order when dispute lost")
+	assert.Equal(t, models.OrderState_REFUNDED, repo.savedOrders[0].State,
+		"dispute lost → REFUNDED")
+}
+
+func TestFiatService_HandleWebhook_DisputeResolved_Lost_SaveFails_ReturnsError(t *testing.T) {
+	reg := newMockFiatRegistry()
+	reg.Register(&mockFiatProvider{
+		id: "stripe",
+		parsedEvent: &contracts.WebhookEvent{
+			EventID:        "evt_dr_save_fail",
+			Type:           contracts.WebhookDisputeResolved,
+			ProviderID:     "stripe",
+			PaymentID:      "pi_dispute_sf",
+			OrderID:        "order_dr_sf",
+			DisputeID:      "dp_sf",
+			DisputeOutcome: "lost",
+		},
+	})
+
+	svc, _ := newFiatTestService(t, reg)
+	repo := newMockOrderRepo()
+	repo.addOrder(&models.Order{ID: "order_dr_sf", State: models.OrderState_FULFILLED})
+	repo.saveErr = errors.New("db connection lost")
+	svc.SetOrderRepo(repo)
+
+	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
+	require.Error(t, err, "should propagate Save error so event is NOT marked processed")
+	assert.Contains(t, err.Error(), "REFUNDED sync failed")
+}
+
+func TestFiatService_HandleWebhook_AccountUpdated_LogsOnly(t *testing.T) {
+	reg := newMockFiatRegistry()
+	reg.Register(&mockFiatProvider{
+		id: "stripe",
+		parsedEvent: &contracts.WebhookEvent{
+			EventID:    "evt_au_001",
+			Type:       contracts.WebhookAccountUpdated,
+			ProviderID: "stripe",
+			AccountID:  "acct_test_001",
+			WebhookAccountStatus: &contracts.WebhookAccountStatus{
+				ChargesEnabled: true,
+				PayoutsEnabled: false,
+			},
+		},
+	})
+
+	svc, _ := newFiatTestService(t, reg)
+
+	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
+	require.NoError(t, err, "AccountUpdated should not return error")
+}

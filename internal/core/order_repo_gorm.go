@@ -140,6 +140,43 @@ func (r *GormOrderRepo) ExpirePaymentVerification(_ context.Context, orderID str
 	})
 }
 
+func (r *GormOrderRepo) FindByPaymentTransactionID(_ context.Context, txID string) (*models.Order, error) {
+	var order models.Order
+	err := r.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("payment_transaction_id = ?", txID).First(&order).Error
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("order with payment tx %s not found: %w", txID, err)
+		}
+		return nil, err
+	}
+	return &order, nil
+}
+
+func (r *GormOrderRepo) SetPaymentTransactionID(_ context.Context, orderID string, txID string) error {
+	return r.db.Update(func(tx database.Tx) error {
+		return tx.Update("payment_transaction_id", txID,
+			map[string]interface{}{"id = ?": orderID},
+			&models.Order{})
+	})
+}
+
+func (r *GormOrderRepo) MergeFiatMetadata(ctx context.Context, orderID string, kv map[string]string) error {
+	order, err := r.FindByID(ctx, orderID)
+	if err != nil {
+		return err
+	}
+	if err := order.MergeFiatMetadata(kv); err != nil {
+		return err
+	}
+	return r.db.Update(func(tx database.Tx) error {
+		return tx.Update("fiat_metadata", order.FiatMetadata,
+			map[string]interface{}{"id = ?": orderID},
+			&models.Order{})
+	})
+}
+
 // ── Query building helpers ──────────────────────────────────────
 
 func buildFilterClause(f contracts.OrderFilter) (string, []interface{}) {

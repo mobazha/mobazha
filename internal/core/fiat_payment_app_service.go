@@ -31,6 +31,7 @@ type FiatPaymentAppService struct {
 	db             database.Database
 	nodeID         string
 	webhookHandler FiatWebhookHandler
+	orderRepo      contracts.OrderRepo
 }
 
 func NewFiatPaymentAppService(
@@ -49,6 +50,12 @@ func NewFiatPaymentAppService(
 // Must be called during node initialization before any webhooks are processed.
 func (s *FiatPaymentAppService) SetWebhookHandler(h FiatWebhookHandler) {
 	s.webhookHandler = h
+}
+
+// SetOrderRepo sets the order repository for webhook event handlers that need
+// direct order access (refund, dispute, etc.).
+func (s *FiatPaymentAppService) SetOrderRepo(repo contracts.OrderRepo) {
+	s.orderRepo = repo
 }
 
 func (s *FiatPaymentAppService) EnabledProviders(ctx context.Context) ([]contracts.ProviderInfo, error) {
@@ -174,13 +181,27 @@ func (s *FiatPaymentAppService) HandleWebhook(ctx context.Context, providerID st
 		}
 		handled = true
 	case contracts.WebhookPaymentFailed:
-		logger.LogInfoWithIDf(log, s.nodeID, "fiat payment failed: provider=%s payment=%s order=%s", providerID, event.PaymentID, event.OrderID)
-		handled = true
-	case contracts.WebhookDisputeOpened:
-		logger.LogInfoWithIDf(log, s.nodeID, "fiat dispute opened: provider=%s payment=%s", providerID, event.PaymentID)
+		if err := s.handlePaymentFailed(ctx, event); err != nil {
+			return err
+		}
 		handled = true
 	case contracts.WebhookRefundCreated:
-		logger.LogInfoWithIDf(log, s.nodeID, "fiat refund created: provider=%s payment=%s", providerID, event.PaymentID)
+		if err := s.handleRefundCreated(ctx, event); err != nil {
+			return err
+		}
+		handled = true
+	case contracts.WebhookDisputeOpened:
+		if err := s.handleDisputeOpened(ctx, event); err != nil {
+			return err
+		}
+		handled = true
+	case contracts.WebhookDisputeResolved:
+		if err := s.handleDisputeResolved(ctx, event); err != nil {
+			return err
+		}
+		handled = true
+	case contracts.WebhookAccountUpdated:
+		s.handleAccountUpdated(event)
 		handled = true
 	default:
 		logger.LogDebugWithIDf(log, s.nodeID, "unhandled fiat webhook type: %s", event.Type)
@@ -223,6 +244,137 @@ func (s *FiatPaymentAppService) handlePaymentSucceeded(ctx context.Context, prov
 		return fmt.Errorf("no webhook handler registered, cannot process fiat payment for order %s", event.OrderID)
 	}
 	return s.webhookHandler(ctx, event)
+}
+
+func (s *FiatPaymentAppService) handlePaymentFailed(_ context.Context, event *contracts.WebhookEvent) error {
+	logger.LogInfoWithIDf(log, s.nodeID,
+		"fiat payment failed: provider=%s payment=%s order=%s reason=%s",
+		event.ProviderID, event.PaymentID, event.OrderID, event.FailureReason)
+	// Design decision: do not auto-cancel — buyer may retry with a different payment method.
+	// Order timeout (S3-1) handles cleanup.
+	return nil
+}
+
+func (s *FiatPaymentAppService) handleRefundCreated(ctx context.Context, event *contracts.WebhookEvent) error {
+	logger.LogInfoWithIDf(log, s.nodeID,
+		"fiat refund created: provider=%s payment=%s refund=%s",
+		event.ProviderID, event.PaymentID, event.RefundID)
+
+	if s.orderRepo == nil {
+		logger.LogWarningWithIDf(log, s.nodeID, "orderRepo not set, cannot process refund webhook")
+		return nil
+	}
+
+	order, err := s.findOrderForWebhook(ctx, event)
+	if err != nil {
+		return err
+	}
+
+	if order.State == models.OrderState_REFUNDED {
+		logger.LogInfoWithIDf(log, s.nodeID, "order %s already REFUNDED, skipping refund webhook", order.ID)
+		return nil
+	}
+
+	order.SetFSMState(models.OrderState_REFUNDED)
+	if err := s.orderRepo.Save(ctx, order); err != nil {
+		return fmt.Errorf("update order %s to REFUNDED: %w", order.ID, err)
+	}
+
+	logger.LogInfoWithIDf(log, s.nodeID, "order %s → REFUNDED via %s refund %s",
+		order.ID, event.ProviderID, event.RefundID)
+	return nil
+}
+
+func (s *FiatPaymentAppService) handleDisputeOpened(ctx context.Context, event *contracts.WebhookEvent) error {
+	logger.LogInfoWithIDf(log, s.nodeID,
+		"fiat dispute opened: provider=%s payment=%s dispute=%s reason=%s",
+		event.ProviderID, event.PaymentID, event.DisputeID, event.DisputeReason)
+
+	if s.orderRepo == nil {
+		logger.LogWarningWithIDf(log, s.nodeID, "orderRepo not set, cannot process dispute webhook")
+		return nil
+	}
+
+	order, err := s.findOrderForWebhook(ctx, event)
+	if err != nil {
+		return err
+	}
+
+	metadata := map[string]string{
+		"fiat_dispute_status":    "opened",
+		"fiat_dispute_id":       event.DisputeID,
+		"fiat_dispute_reason":   event.DisputeReason,
+		"fiat_dispute_opened_at": time.Now().UTC().Format(time.RFC3339),
+	}
+	if err := s.orderRepo.MergeFiatMetadata(ctx, string(order.ID), metadata); err != nil {
+		return fmt.Errorf("update dispute metadata for order %s: %w", order.ID, err)
+	}
+
+	logger.LogInfoWithIDf(log, s.nodeID, "order %s marked with fiat dispute %s",
+		order.ID, event.DisputeID)
+	return nil
+}
+
+func (s *FiatPaymentAppService) handleDisputeResolved(ctx context.Context, event *contracts.WebhookEvent) error {
+	outcome := event.DisputeOutcome
+	logger.LogInfoWithIDf(log, s.nodeID,
+		"fiat dispute resolved: provider=%s payment=%s dispute=%s outcome=%s",
+		event.ProviderID, event.PaymentID, event.DisputeID, outcome)
+
+	if s.orderRepo == nil {
+		logger.LogWarningWithIDf(log, s.nodeID, "orderRepo not set, cannot process dispute resolved webhook")
+		return nil
+	}
+
+	order, err := s.findOrderForWebhook(ctx, event)
+	if err != nil {
+		return err
+	}
+
+	metadata := map[string]string{
+		"fiat_dispute_status":      "resolved",
+		"fiat_dispute_outcome":     outcome,
+		"fiat_dispute_resolved_at": time.Now().UTC().Format(time.RFC3339),
+	}
+	if err := s.orderRepo.MergeFiatMetadata(ctx, string(order.ID), metadata); err != nil {
+		return fmt.Errorf("update dispute resolved metadata for order %s: %w", order.ID, err)
+	}
+
+	if outcome == "lost" {
+		order.SetFSMState(models.OrderState_REFUNDED)
+		if err := s.orderRepo.Save(ctx, order); err != nil {
+			return fmt.Errorf("dispute lost but REFUNDED sync failed for order %s: %w", order.ID, err)
+		}
+		logger.LogInfoWithIDf(log, s.nodeID, "order %s → REFUNDED (dispute lost)", order.ID)
+	}
+
+	return nil
+}
+
+func (s *FiatPaymentAppService) handleAccountUpdated(event *contracts.WebhookEvent) {
+	if event.WebhookAccountStatus != nil {
+		logger.LogInfoWithIDf(log, s.nodeID,
+			"fiat account %s updated: charges=%v payouts=%v",
+			event.AccountID, event.WebhookAccountStatus.ChargesEnabled, event.WebhookAccountStatus.PayoutsEnabled)
+	} else {
+		logger.LogInfoWithIDf(log, s.nodeID, "fiat account updated: provider=%s account=%s",
+			event.ProviderID, event.AccountID)
+	}
+}
+
+// findOrderForWebhook locates the order associated with a webhook event,
+// trying PaymentTransactionID first, then falling back to OrderID from metadata.
+func (s *FiatPaymentAppService) findOrderForWebhook(ctx context.Context, event *contracts.WebhookEvent) (*models.Order, error) {
+	if event.PaymentID != "" {
+		order, err := s.orderRepo.FindByPaymentTransactionID(ctx, event.PaymentID)
+		if err == nil {
+			return order, nil
+		}
+	}
+	if event.OrderID != "" {
+		return s.orderRepo.FindByID(ctx, event.OrderID)
+	}
+	return nil, fmt.Errorf("webhook event %s has no PaymentID or OrderID", event.EventID)
 }
 
 // --- helpers ---

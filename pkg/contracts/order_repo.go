@@ -60,4 +60,14 @@ type OrderRepo interface {
 	// ExpirePaymentVerification marks an order's payment as expired
 	// (sets open = false and last_check_for_payments to the given reason marker).
 	ExpirePaymentVerification(ctx context.Context, orderID string, marker time.Time) error
+
+	// FindByPaymentTransactionID looks up an order by its fiat payment transaction ID
+	// (e.g. Stripe PaymentIntent ID or PayPal Capture ID).
+	FindByPaymentTransactionID(ctx context.Context, txID string) (*models.Order, error)
+
+	// SetPaymentTransactionID stores the fiat payment transaction ID on the order.
+	SetPaymentTransactionID(ctx context.Context, orderID string, txID string) error
+
+	// MergeFiatMetadata merges key-value pairs into the order's FiatMetadata JSON field.
+	MergeFiatMetadata(ctx context.Context, orderID string, kv map[string]string) error
 }

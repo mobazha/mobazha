@@ -291,6 +291,34 @@ type PaymentStrategy interface {
 	// Returns nil if verification succeeds or is not applicable.
 	// Returns a sentinel error (ErrDepositReverted, etc.) for permanent failures.
 	VerifyDeposit(ctx context.Context, params DepositVerifyParams) error
+
+	// ── Payment Message Validation ───────────────────────
+	//
+	// ValidatePaymentMessage validates the PaymentSent message structure and
+	// amounts against the OrderOpen. Purely computational — no network I/O.
+	//
+	// Each chain adapter knows its own validation rules:
+	//   - UTXO: escrow pubkey derivation + multisig script verification + amount check
+	//   - EVM/Solana: escrow address reconstruction + amount check
+	//
+	// Fiat payments are not routed through the Registry and are validated
+	// separately by PaymentVerificationService.
+	//
+	// Returns nil if validation passes. Default noop for incremental adoption.
+	ValidatePaymentMessage(params PaymentMessageParams) error
+
+	// ── Pre-Release Verification ─────────────────────────
+	//
+	// VerifyPreRelease performs chain-specific safety checks before escrow
+	// fund release. Called from PaymentAppService before signing/broadcasting.
+	//
+	// Monitored (UTXO): queries chain to verify UTXOs are still unspent.
+	// ClientSigned (EVM): verifies receipt status + Funded event on-chain.
+	// ClientSigned (Solana): noop (Batch 2).
+	//
+	// Best-effort: implementations should log warnings and return nil if the
+	// underlying service is unavailable, to avoid blocking releases.
+	VerifyPreRelease(ctx context.Context, params PreReleaseParams) error
 }
 
 // ── Deposit Verification Params ─────────────────────────────────
@@ -312,4 +340,46 @@ type DepositVerifyParams struct {
 
 	// OrderAmount is the expected payment amount in minimal units (wei, lamports).
 	OrderAmount string
+}
+
+// ── Payment Message Validation Params ───────────────────────────
+
+// PaymentMessageParams provides parameters for validating a PaymentSent
+// message against the original OrderOpen. Each chain adapter type-asserts
+// the any fields to their concrete protobuf types.
+type PaymentMessageParams struct {
+	// OrderOpen is the original order opening message.
+	// Concrete type: *pb.OrderOpen (pkg/orders/mbzpb.OrderOpen).
+	OrderOpen any
+
+	// PaymentSent is the payment sent message to validate.
+	// Concrete type: *pb.PaymentSent (pkg/orders/mbzpb.PaymentSent).
+	PaymentSent any
+
+	// EscrowTimeoutHours is the configured escrow timeout.
+	EscrowTimeoutHours uint32
+}
+
+// ── Pre-Release Verification Params ─────────────────────────────
+
+// PreReleaseParams provides parameters for chain-specific pre-release
+// safety checks before escrow fund release.
+type PreReleaseParams struct {
+	// CoinType identifies the payment coin (for chain resolution).
+	CoinType iwallet.CoinType
+
+	// PaymentAddress is the escrow/payment address.
+	PaymentAddress string
+
+	// ExpectedUTXOs lists the UTXOs expected to be unspent (UTXO chains only).
+	ExpectedUTXOs []iwallet.SpendInfo
+
+	// TxHash is the deposit transaction hash (EVM only).
+	TxHash string
+
+	// Script is the hex-encoded escrow script (EVM only).
+	Script string
+
+	// ContractAddr is the escrow contract address (EVM only).
+	ContractAddr string
 }

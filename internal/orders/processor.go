@@ -2,6 +2,7 @@ package orders
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -19,6 +20,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/op/go-logging"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -61,8 +63,10 @@ type Config struct {
 	Multiwallet              pkgcontracts.WalletOperator
 	ExchangeRateProvider     *wallet.ExchangeRateProvider
 	EventBus                 events.Bus
-	CalcCIDFunc         func(file []byte) (cid.Cid, error)
+	CalcCIDFunc          func(file []byte) (cid.Cid, error)
 	GetFiatPaymentFunc   func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
+	ValidatePaymentFunc  func(coinType iwallet.CoinType, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTimeoutHours uint32) error
+	FetchAndVerifyFunc   func(ctx context.Context, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, paymentAddress string) (*iwallet.Transaction, bool, error)
 	FeatureManager       *pkgconfig.FeatureManager
 
 	// StateValidator is an optional core state machine validator (typically OrderStateBridge).
@@ -85,10 +89,12 @@ type OrderProcessor struct {
 	escrowPrivateKey         *btcec.PrivateKey
 	erp                      *wallet.ExchangeRateProvider
 	bus                      events.Bus
-	calcCIDFunc        func(file []byte) (cid.Cid, error)
-	getFiatPaymentFunc func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
-	verifyDepositFunc  func(params DepositVerifyParams) error
-	featureManager     *pkgconfig.FeatureManager
+	calcCIDFunc          func(file []byte) (cid.Cid, error)
+	getFiatPaymentFunc   func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
+	verifyDepositFunc    func(params DepositVerifyParams) error
+	validatePaymentFunc  func(coinType iwallet.CoinType, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTimeoutHours uint32) error
+	fetchAndVerifyFunc   func(ctx context.Context, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, paymentAddress string) (*iwallet.Transaction, bool, error)
+	featureManager       *pkgconfig.FeatureManager
 	stateValidator           StateValidator
 }
 
@@ -104,10 +110,12 @@ func NewOrderProcessor(cfg *Config) *OrderProcessor {
 		escrowPrivateKey:         cfg.EscrowPrivateKey,
 		erp:                      cfg.ExchangeRateProvider,
 		bus:                      cfg.EventBus,
-		calcCIDFunc:        cfg.CalcCIDFunc,
-		getFiatPaymentFunc: cfg.GetFiatPaymentFunc,
-		featureManager:     cfg.FeatureManager,
-		stateValidator:           cfg.StateValidator,
+		calcCIDFunc:         cfg.CalcCIDFunc,
+		getFiatPaymentFunc:  cfg.GetFiatPaymentFunc,
+		validatePaymentFunc: cfg.ValidatePaymentFunc,
+		fetchAndVerifyFunc:  cfg.FetchAndVerifyFunc,
+		featureManager:      cfg.FeatureManager,
+		stateValidator:      cfg.StateValidator,
 	}
 }
 

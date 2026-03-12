@@ -120,6 +120,15 @@ func (s *stubChainOps) BuildCompleteEscrow(_ *models.Order, _ string, _ *pb.Escr
 func (s *stubChainOps) BuildDisputeRelease(_ *models.Order, _ string) (any, error) {
 	return s.disputeReleaseResult, s.disputeReleaseErr
 }
+func (s *stubChainOps) VerifyDeposit(_ context.Context, _ payment.DepositVerifyParams) error {
+	return nil
+}
+func (s *stubChainOps) ValidatePaymentMessage(_ payment.PaymentMessageParams) error {
+	return nil
+}
+func (s *stubChainOps) VerifyPreRelease(_ context.Context, _ payment.PreReleaseParams) error {
+	return nil
+}
 
 // ═══════════════════════════════════════════════════════════════
 // ClientSignedAdapter Tests

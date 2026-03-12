@@ -217,7 +217,7 @@ func validateEscrowPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal
 		return nil
 	}
 
-	if err := validatePaymentAmount(order.Amount, paymentSent.Amount); err != nil {
+	if err := ValidatePaymentAmount(order.Amount, paymentSent.Amount); err != nil {
 		return err
 	}
 
@@ -239,7 +239,7 @@ func validateEscrowPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal
 	return nil
 }
 
-func validatePaymentAmount(orderAmount, paidAmount string) error {
+func ValidatePaymentAmount(orderAmount, paidAmount string) error {
 	expected, ok := new(big.Int).SetString(orderAmount, 10)
 	if !ok || expected.Sign() <= 0 {
 		return fmt.Errorf("invalid order amount: %q", orderAmount)

@@ -46,6 +46,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
+	orderpb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
@@ -618,6 +619,8 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	obNode.signer = signer
 	obNode.orderLockManager = NewOrderLockManager()
 
+	pvs := NewPaymentVerificationService(obNode.paymentRegistry, obNode.multiwallet, nil)
+
 	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
 		NodeID:               nodeID,
 		Identity:             obNode.peerID,
@@ -636,8 +639,18 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			}
 			return obNode.fiatPaymentService.GetPayment(context.Background(), providerID, paymentID)
 		},
+		ValidatePaymentFunc: pvs.ValidateMessage,
+		FetchAndVerifyFunc: func(ctx context.Context, orderOpen *orderpb.OrderOpen, paymentSent *orderpb.PaymentSent, paymentAddress string) (*iwallet.Transaction, bool, error) {
+			vp, err := pvs.FetchAndVerify(ctx, orderOpen, paymentSent, paymentAddress)
+			if err != nil {
+				isFatal := errors.Is(err, ErrPaymentAddressMiss)
+				return nil, isFatal, err
+			}
+			return &vp.Transaction, false, nil
+		},
 		StateValidator: &coreStateBridge{},
 	})
+	obNode.paymentVerificationService = pvs
 
 	// Register libp2p HTTP proxy handler for standalone nodes so that the
 	// SaaS proxy can forward management requests via libp2p streams.

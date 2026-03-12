@@ -112,6 +112,9 @@ func (n *MobazhaNode) wireServiceSetters() {
 	if n.paymentService != nil && n.fiatPaymentService != nil {
 		n.paymentService.SetFiatPaymentQuery(n.fiatPaymentService)
 	}
+	if n.paymentService != nil && n.paymentVerificationService != nil {
+		n.paymentService.SetVerificationService(n.paymentVerificationService)
+	}
 }
 
 // initMatrixService creates the MatrixAppService.

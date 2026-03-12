@@ -185,7 +185,8 @@ type appServices struct {
 	fiatRegistry        contracts.FiatProviderRegistry
 	fiatPaymentService  *FiatPaymentAppService
 	shippingService     *ShippingAppService
-	analyticsService    *AnalyticsAppService
+	analyticsService           *AnalyticsAppService
+	paymentVerificationService *PaymentVerificationService
 }
 
 // IsDefaultNode returns whether this node is the default node.

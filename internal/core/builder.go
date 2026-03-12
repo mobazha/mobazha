@@ -46,7 +46,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
-	orderpb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha3.0/pkg/request"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
@@ -628,26 +627,10 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		Db:                   obRepo.DB(),
 		Multiwallet:          obNode.multiwallet,
 		Messenger:            obNode.messenger,
-		EscrowPrivateKey:     escrowKey,
 		ExchangeRateProvider: erp,
 		EventBus:             bus,
-		CalcCIDFunc:          obNode.contentStore.ComputeCID,
-		FeatureManager:       obNode.featureManager,
-		GetFiatPaymentFunc: func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error) {
-			if obNode.fiatPaymentService == nil {
-				return nil, fmt.Errorf("fiat payment service not initialized")
-			}
-			return obNode.fiatPaymentService.GetPayment(context.Background(), providerID, paymentID)
-		},
-		ValidatePaymentFunc: pvs.ValidateMessage,
-		FetchAndVerifyFunc: func(ctx context.Context, orderOpen *orderpb.OrderOpen, paymentSent *orderpb.PaymentSent, paymentAddress string) (*iwallet.Transaction, bool, error) {
-			vp, err := pvs.FetchAndVerify(ctx, orderOpen, paymentSent, paymentAddress)
-			if err != nil {
-				isFatal := errors.Is(err, ErrPaymentAddressMiss)
-				return nil, isFatal, err
-			}
-			return &vp.Transaction, false, nil
-		},
+		CalcCIDFunc:    obNode.contentStore.ComputeCID,
+		FeatureManager: obNode.featureManager,
 		StateValidator: &coreStateBridge{},
 	})
 	obNode.paymentVerificationService = pvs
@@ -1249,17 +1232,10 @@ func newLightweightNode(
 		Db:                   obRepo.DB(),
 		Multiwallet:          obNode.multiwallet,
 		Messenger:            obNode.messenger,
-		EscrowPrivateKey:     escrowKey,
 		ExchangeRateProvider: erp,
 		EventBus:             bus,
-		CalcCIDFunc:          obNode.contentStore.ComputeCID,
-		FeatureManager:       obNode.featureManager,
-		GetFiatPaymentFunc: func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error) {
-			if obNode.fiatPaymentService == nil {
-				return nil, fmt.Errorf("fiat payment service not initialized")
-			}
-			return obNode.fiatPaymentService.GetPayment(context.Background(), providerID, paymentID)
-		},
+		CalcCIDFunc:    obNode.contentStore.ComputeCID,
+		FeatureManager: obNode.featureManager,
 		StateValidator: &coreStateBridge{},
 	})
 
@@ -1323,19 +1299,6 @@ func initFiatSubsystem(obNode *MobazhaNode) {
 
 	if obNode.orderService != nil {
 		obNode.orderService.SetFiatRefundFunc(obNode.fiatPaymentService.RefundPayment)
-
-		fiatSvc := obNode.fiatPaymentService
-		obNode.orderService.OrderProcessor().SetFiatRefundOnDeclineFunc(
-			func(orderID, paymentID, providerID, currency string) error {
-				_, err := fiatSvc.RefundPayment(context.Background(), providerID, pkgcontracts.RefundParams{
-					PaymentID: paymentID,
-					Currency:  currency,
-					Reason:    "requested_by_customer",
-					Metadata:  map[string]string{"orderID": orderID},
-				})
-				return err
-			},
-		)
 	}
 
 	logger.LogInfoWithID(log, obNode.nodeID, "Fiat payment subsystem initialized")

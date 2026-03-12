@@ -2,12 +2,10 @@ package orders
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"sort"
 
-	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ipfs/go-cid"
 	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha-core/contracts"
@@ -20,7 +18,6 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
-	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 	"github.com/op/go-logging"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -35,8 +32,8 @@ var (
 )
 
 // DepositVerifyParams holds chain-agnostic parameters for on-chain deposit verification.
-// The OrderProcessor receives these via verifyDepositFunc, which routes through
-// PaymentRegistry to the appropriate chain adapter (EVM, Solana, UTXO noop).
+// Used by PaymentVerificationService (orchestration layer) to dispatch to the appropriate
+// chain adapter (EVM, Solana, UTXO noop) via PaymentRegistry.
 type DepositVerifyParams struct {
 	CoinType     iwallet.CoinType
 	TxHash       string
@@ -58,16 +55,12 @@ type Config struct {
 	Identity             libp2ppeer.ID
 	Db                   database.Database
 	Signer               contracts.Signer
-	EscrowPrivateKey     *btcec.PrivateKey
 	Messenger            pkgcontracts.Messenger
 	Multiwallet          pkgcontracts.WalletOperator
 	ExchangeRateProvider *wallet.ExchangeRateProvider
 	EventBus             events.Bus
 	CalcCIDFunc          func(file []byte) (cid.Cid, error)
-	GetFiatPaymentFunc   func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
-	ValidatePaymentFunc  func(coinType iwallet.CoinType, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTimeoutHours uint32) error
-	FetchAndVerifyFunc   func(ctx context.Context, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, paymentAddress string) (*iwallet.Transaction, bool, error)
-	FeatureManager       *pkgconfig.FeatureManager
+	FeatureManager *pkgconfig.FeatureManager
 
 	// StateValidator is an optional core state machine validator (typically OrderStateBridge).
 	// When set, the FSM becomes the authoritative source for order state transitions:
@@ -86,16 +79,9 @@ type OrderProcessor struct {
 	db                       database.Database
 	messenger                pkgcontracts.Messenger
 	multiwallet              pkgcontracts.WalletOperator
-	escrowPrivateKey         *btcec.PrivateKey
 	erp                      *wallet.ExchangeRateProvider
 	bus                      events.Bus
-	calcCIDFunc              func(file []byte) (cid.Cid, error)
-	getFiatPaymentFunc       func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
-	verifyDepositFunc        func(params DepositVerifyParams) error
-	validatePaymentFunc      func(coinType iwallet.CoinType, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTimeoutHours uint32) error
-	fetchAndVerifyFunc       func(ctx context.Context, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, paymentAddress string) (*iwallet.Transaction, bool, error)
-	fiatRefundOnDeclineFunc  func(orderID string, paymentID string, providerID string, currency string) error
-	verifyConfirmReceiptFunc func(coinCode string, txHash string) error
+	calcCIDFunc             func(file []byte) (cid.Cid, error)
 	featureManager           *pkgconfig.FeatureManager
 	stateValidator           StateValidator
 }
@@ -109,43 +95,12 @@ func NewOrderProcessor(cfg *Config) *OrderProcessor {
 		db:                  cfg.Db,
 		messenger:           cfg.Messenger,
 		multiwallet:         cfg.Multiwallet,
-		escrowPrivateKey:    cfg.EscrowPrivateKey,
 		erp:                 cfg.ExchangeRateProvider,
 		bus:                 cfg.EventBus,
-		calcCIDFunc:         cfg.CalcCIDFunc,
-		getFiatPaymentFunc:  cfg.GetFiatPaymentFunc,
-		validatePaymentFunc: cfg.ValidatePaymentFunc,
-		fetchAndVerifyFunc:  cfg.FetchAndVerifyFunc,
-		featureManager:      cfg.FeatureManager,
+		calcCIDFunc:    cfg.CalcCIDFunc,
+		featureManager: cfg.FeatureManager,
 		stateValidator:      cfg.StateValidator,
 	}
-}
-
-// SetVerifyDepositFunc sets the chain-agnostic deposit verification function.
-// Called from registerPaymentStrategies() after the PaymentRegistry is ready.
-func (op *OrderProcessor) SetVerifyDepositFunc(fn func(params DepositVerifyParams) error) {
-	op.verifyDepositFunc = fn
-}
-
-func (op *OrderProcessor) SetFiatRefundOnDeclineFunc(fn func(orderID string, paymentID string, providerID string, currency string) error) {
-	op.fiatRefundOnDeclineFunc = fn
-}
-
-// SetVerifyConfirmReceiptFunc sets the EVM confirm receipt verification function.
-// Called from registerPaymentStrategies() after the PaymentRegistry is ready.
-// The closure verifies that an OrderConfirmation's txHash has a successful on-chain receipt,
-// rejecting reverted transactions while treating RPC errors as best-effort (non-fatal).
-func (op *OrderProcessor) SetVerifyConfirmReceiptFunc(fn func(coinCode string, txHash string) error) {
-	op.verifyConfirmReceiptFunc = fn
-}
-
-// GetFiatPayment retrieves fiat payment details via the registered provider.
-// Used by the payment verification loop in the core layer.
-func (op *OrderProcessor) GetFiatPayment(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error) {
-	if op.getFiatPaymentFunc == nil {
-		return nil, fmt.Errorf("fiat payment function not configured")
-	}
-	return op.getFiatPaymentFunc(paymentID, providerID)
 }
 
 // Start begins listening for transactions from the wallets that pertain to our

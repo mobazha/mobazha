@@ -9,8 +9,10 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-// processOutgoingPayment processes payments coming out of an order's payment address.
-func (op *OrderProcessor) processOutgoingPayment(dbtx database.Tx, order *models.Order, tx iwallet.Transaction) error {
+// RecordOutgoingTransaction records a payment coming out of an order's payment address.
+// Called by the orchestration layer (OrderAppService) after ProcessMessage to persist
+// chain transaction data that the handler no longer fetches.
+func (op *OrderProcessor) RecordOutgoingTransaction(dbtx database.Tx, order *models.Order, tx iwallet.Transaction) error {
 	err := order.PutTransaction(tx)
 	if models.IsDuplicateTransactionError(err) {
 		logger.LogInfoWithIDf(log, op.nodeID, "Received duplicate transaction %s", tx.ID.String())

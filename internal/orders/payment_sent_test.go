@@ -1,7 +1,6 @@
 package orders
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -75,6 +74,8 @@ func Test_processPaymentSentMessage(t *testing.T) {
 	}{
 		{
 			// Normal case where order open exists.
+			// Note: processPaymentSentMessage no longer records transactions inline;
+			// that is handled by the orchestration layer (postProcessPaymentSentInTx).
 			setup: func(order *models.Order) error {
 				order.ID = "1234"
 				order.PaymentAddress = addr.String()
@@ -90,16 +91,6 @@ func Test_processPaymentSentMessage(t *testing.T) {
 				Txid:    txs[0].ID.String(),
 			},
 			checkTxs: func(order *models.Order) error {
-				orderTxs, err := order.GetTransactions()
-				if err != nil {
-					return err
-				}
-				if len(orderTxs) == 0 {
-					return errors.New("failed to record tx")
-				}
-				if orderTxs[0].ID != txs[0].ID {
-					return errors.New("failed to record tx")
-				}
 				return nil
 			},
 		},

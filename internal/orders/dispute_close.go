@@ -11,6 +11,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *models.Order, message *npb.OrderMessage) (interface{}, error) {
@@ -116,7 +117,7 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 		return errors.New(errMsg)
 	}
 
-	_, err = op.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
+	_, err = iwallet.CoinInfoFromCoinType(iwallet.CoinType(paymentSent.Coin))
 	if err != nil {
 		return fmt.Errorf("cannot validate order. coin not supported. %w", err)
 	}

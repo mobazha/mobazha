@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -301,8 +300,10 @@ func (n *MobazhaNode) handleAckMessage(from peer.ID, message *pb.Message) error 
 	return nil
 }
 
-// handleOrderMessage is the handler for the ORDER message. It sends it off to the order
-// order processor for processing.
+// handleOrderMessage is the handler for the ORDER message. It delegates to
+// OrderAppService.HandleIncomingOrderMessage which orchestrates per-order
+// locking, pre-processing I/O, deterministic ProcessMessage, and
+// post-processing within a single DB transaction.
 func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) error {
 	defer n.sendAckMessage(message.MessageID, from)
 
@@ -318,22 +319,7 @@ func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) erro
 		return err
 	}
 
-	if n.orderLockManager != nil {
-		if err := n.orderLockManager.Lock(n.nodeCtx, n.nodeID, orderMsg.OrderID); err != nil {
-			return fmt.Errorf("failed to acquire order lock for %s: %w", orderMsg.OrderID, err)
-		}
-		defer n.orderLockManager.Unlock(n.nodeID, orderMsg.OrderID)
-	}
-
-	var event interface{}
-	var order models.Order
-	err := n.db.Update(func(tx database.Tx) error {
-		tx.Read().Where("id = ?", orderMsg.OrderID).First(&order)
-
-		var err error
-		event, err = n.orderProcessor.ProcessMessage(tx, orderMsg)
-		return err
-	})
+	event, order, err := n.orderService.HandleIncomingOrderMessage(n.nodeCtx, orderMsg)
 	if err != nil {
 		return err
 	}

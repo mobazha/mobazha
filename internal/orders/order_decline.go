@@ -1,15 +1,12 @@
 package orders
 
 import (
-	"fmt"
-
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	npb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 func (op *OrderProcessor) processOrderDeclineMessage(dbtx database.Tx, order *models.Order, message *npb.OrderMessage) (interface{}, error) {
@@ -75,41 +72,8 @@ func (op *OrderProcessor) processOrderDeclineMessage(dbtx database.Tx, order *mo
 			logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_DECLINE for unfunded order %s (AWAITING_PAYMENT)", order.ID)
 		} else {
 			logger.LogInfoWithIDf(log, op.nodeID, "Received ORDER_DECLINE message for order %s", order.ID)
-
-			coinType := iwallet.CoinType(paymentSent.Coin)
-
-			if coinType.IsFiatPayment() || coinType.IsStripeChain() {
-				if op.fiatRefundOnDeclineFunc != nil {
-					providerID := orderOpen.FiatProvider
-					if providerID == "" {
-						providerID = "stripe"
-					}
-					if err := op.fiatRefundOnDeclineFunc(
-						order.ID.String(),
-						paymentSent.TransactionID,
-						providerID,
-						orderOpen.PricingCoin,
-					); err != nil {
-						logger.LogErrorWithIDf(log, op.nodeID, "Fiat auto-refund on decline failed for order %s: %v", order.ID, err)
-						return nil, fmt.Errorf("fiat refund failed for order %s, decline aborted: %w", order.ID, err)
-					}
-				}
-			} else {
-				coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
-				if err != nil {
-					return nil, err
-				}
-
-				if coinInfo.Chain != iwallet.ChainSolana && !coinInfo.IsEthTypeChain() {
-					if order.CanCancel() && paymentSent.Method == pb.PaymentSent_CANCELABLE {
-						wTx, _, err := op.releaseFromCancelableAddress(dbtx, order)
-						if err != nil {
-							return nil, err
-						}
-						wTx.Commit()
-					}
-				}
-			}
+			// Fiat refund and UTXO CANCELABLE escrow release have been moved to
+			// preProcessOrderDecline in the orchestration layer (OrderAppService).
 		}
 	} else if order.Role() == models.RoleVendor {
 		logger.LogInfoWithIDf(log, op.nodeID, "Processed own ORDER_DECLINE for orderID: %s", order.ID)

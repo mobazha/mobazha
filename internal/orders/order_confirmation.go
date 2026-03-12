@@ -1,6 +1,8 @@
 package orders
 
 import (
+	"fmt"
+
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/pkg/events"
@@ -59,12 +61,21 @@ func (op *OrderProcessor) processOrderConfirmationMessage(dbtx database.Tx, orde
 	}
 
 	if orderConfirmation.TransactionID != "" && paymentSent.Method == pb.PaymentSent_CANCELABLE {
+		// Verify on-chain receipt for EVM confirm transactions (H-ESC-4).
+		// A reverted tx is FATAL — reject the confirmation message.
+		// RPC errors are TRANSIENT and handled as best-effort inside the closure.
+		coinInfo, coinErr := iwallet.CoinType(paymentSent.Coin).CoinInfo()
+		if coinErr == nil && coinInfo.IsEthTypeChain() && op.verifyConfirmReceiptFunc != nil {
+			if verifyErr := op.verifyConfirmReceiptFunc(paymentSent.Coin, orderConfirmation.TransactionID); verifyErr != nil {
+				return nil, fmt.Errorf("confirm tx receipt verification failed: %w", verifyErr)
+			}
+		}
+
 		// Best-effort: record the outgoing release transaction for bookkeeping.
 		// Failure is acceptable — the funds have already moved on-chain; this
 		// only affects the local transaction ledger display.
 		tx, err := wallet.GetTransaction(iwallet.TransactionID(orderConfirmation.TransactionID), iwallet.CoinType(paymentSent.Coin))
 		if err == nil && tx != nil {
-			coinInfo, coinErr := iwallet.CoinType(paymentSent.Coin).CoinInfo()
 			if coinErr == nil && coinInfo.IsEthTypeChain() {
 				// For EVM chains: the escrow Executed event has different address structure:
 				// - tx.From = script hash (not contract address)

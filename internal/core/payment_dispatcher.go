@@ -4,9 +4,9 @@ import (
 	"context"
 	"sync"
 
-	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/internal/logger"
 	"github.com/mobazha/mobazha3.0/internal/orders"
+	adapters "github.com/mobazha/mobazha3.0/internal/payment/adapters"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -71,9 +71,10 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 
 	logger.LogInfoWithIDf(log, n.nodeID, "Registered payment strategies for %d chains", len(n.paymentRegistry.Chains()))
 
-	// Wire the registry to App Services
+	// Wire the registry and receipt verifier to App Services
 	if n.paymentService != nil {
 		n.paymentService.SetRegistry(n.paymentRegistry)
+		n.paymentService.SetReceiptVerifier(adapters.NewEVMReceiptVerifier(n.multiwallet))
 	}
 	if n.orderService != nil {
 		n.orderService.SetRegistry(n.paymentRegistry)
@@ -97,6 +98,12 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 				OrderAmount:  params.OrderAmount,
 			})
 		})
+
+		// Wire verifyConfirmReceiptFunc to OrderProcessor via PaymentAppService.
+		// Verifies on-chain receipt status for EVM OrderConfirmation txHash (H-ESC-4).
+		n.orderService.OrderProcessor().SetVerifyConfirmReceiptFunc(
+			n.paymentService.VerifyEVMConfirmReceipt,
+		)
 	}
 }
 
@@ -105,4 +112,3 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 func (n *MobazhaNode) handleCancelablePaymentForEVM(event *events.CancelablePaymentReady, chainType string) {
 	n.paymentService.HandleCancelablePaymentForEVM(event, chainType)
 }
-

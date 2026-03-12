@@ -54,15 +54,15 @@ type StateValidator interface {
 
 // Config holds the objects needed to instantiate a new OrderProcessor.
 type Config struct {
-	NodeID                   string
-	Identity                 libp2ppeer.ID
-	Db                       database.Database
-	Signer                   contracts.Signer
-	EscrowPrivateKey         *btcec.PrivateKey
-	Messenger                pkgcontracts.Messenger
-	Multiwallet              pkgcontracts.WalletOperator
-	ExchangeRateProvider     *wallet.ExchangeRateProvider
-	EventBus                 events.Bus
+	NodeID               string
+	Identity             libp2ppeer.ID
+	Db                   database.Database
+	Signer               contracts.Signer
+	EscrowPrivateKey     *btcec.PrivateKey
+	Messenger            pkgcontracts.Messenger
+	Multiwallet          pkgcontracts.WalletOperator
+	ExchangeRateProvider *wallet.ExchangeRateProvider
+	EventBus             events.Bus
 	CalcCIDFunc          func(file []byte) (cid.Cid, error)
 	GetFiatPaymentFunc   func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
 	ValidatePaymentFunc  func(coinType iwallet.CoinType, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTimeoutHours uint32) error
@@ -89,28 +89,29 @@ type OrderProcessor struct {
 	escrowPrivateKey         *btcec.PrivateKey
 	erp                      *wallet.ExchangeRateProvider
 	bus                      events.Bus
-	calcCIDFunc          func(file []byte) (cid.Cid, error)
-	getFiatPaymentFunc   func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
-	verifyDepositFunc    func(params DepositVerifyParams) error
-	validatePaymentFunc  func(coinType iwallet.CoinType, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTimeoutHours uint32) error
-	fetchAndVerifyFunc   func(ctx context.Context, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, paymentAddress string) (*iwallet.Transaction, bool, error)
-	fiatRefundOnDeclineFunc func(orderID string, paymentID string, providerID string, currency string) error
-	featureManager       *pkgconfig.FeatureManager
+	calcCIDFunc              func(file []byte) (cid.Cid, error)
+	getFiatPaymentFunc       func(paymentID string, providerID string) (*pkgcontracts.PaymentDetail, error)
+	verifyDepositFunc        func(params DepositVerifyParams) error
+	validatePaymentFunc      func(coinType iwallet.CoinType, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTimeoutHours uint32) error
+	fetchAndVerifyFunc       func(ctx context.Context, orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, paymentAddress string) (*iwallet.Transaction, bool, error)
+	fiatRefundOnDeclineFunc  func(orderID string, paymentID string, providerID string, currency string) error
+	verifyConfirmReceiptFunc func(coinCode string, txHash string) error
+	featureManager           *pkgconfig.FeatureManager
 	stateValidator           StateValidator
 }
 
 // NewOrderProcessor initializes and returns a new OrderProcessor
 func NewOrderProcessor(cfg *Config) *OrderProcessor {
 	return &OrderProcessor{
-		nodeID:                   cfg.NodeID,
-		identity:                 cfg.Identity,
-		signer:                   cfg.Signer,
-		db:                       cfg.Db,
-		messenger:                cfg.Messenger,
-		multiwallet:              cfg.Multiwallet,
-		escrowPrivateKey:         cfg.EscrowPrivateKey,
-		erp:                      cfg.ExchangeRateProvider,
-		bus:                      cfg.EventBus,
+		nodeID:              cfg.NodeID,
+		identity:            cfg.Identity,
+		signer:              cfg.Signer,
+		db:                  cfg.Db,
+		messenger:           cfg.Messenger,
+		multiwallet:         cfg.Multiwallet,
+		escrowPrivateKey:    cfg.EscrowPrivateKey,
+		erp:                 cfg.ExchangeRateProvider,
+		bus:                 cfg.EventBus,
 		calcCIDFunc:         cfg.CalcCIDFunc,
 		getFiatPaymentFunc:  cfg.GetFiatPaymentFunc,
 		validatePaymentFunc: cfg.ValidatePaymentFunc,
@@ -128,6 +129,14 @@ func (op *OrderProcessor) SetVerifyDepositFunc(fn func(params DepositVerifyParam
 
 func (op *OrderProcessor) SetFiatRefundOnDeclineFunc(fn func(orderID string, paymentID string, providerID string, currency string) error) {
 	op.fiatRefundOnDeclineFunc = fn
+}
+
+// SetVerifyConfirmReceiptFunc sets the EVM confirm receipt verification function.
+// Called from registerPaymentStrategies() after the PaymentRegistry is ready.
+// The closure verifies that an OrderConfirmation's txHash has a successful on-chain receipt,
+// rejecting reverted transactions while treating RPC errors as best-effort (non-fatal).
+func (op *OrderProcessor) SetVerifyConfirmReceiptFunc(fn func(coinCode string, txHash string) error) {
+	op.verifyConfirmReceiptFunc = fn
 }
 
 // GetFiatPayment retrieves fiat payment details via the registered provider.

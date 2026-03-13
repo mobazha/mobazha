@@ -71,13 +71,14 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	logger.LogInfoWithIDf(log, n.nodeID, "Registered payment strategies for %d chains", len(n.paymentRegistry.Chains()))
 
 	// Wire the registry and receipt verifier to App Services
+	compositeVerifier := adapters.NewCompositeReceiptVerifier(n.multiwallet)
 	if n.paymentService != nil {
 		n.paymentService.SetRegistry(n.paymentRegistry)
-		n.paymentService.SetReceiptVerifier(adapters.NewEVMReceiptVerifier(n.multiwallet))
+		n.paymentService.SetReceiptVerifier(compositeVerifier)
 	}
 	if n.orderService != nil {
 		n.orderService.SetRegistry(n.paymentRegistry)
-		n.orderService.SetReceiptVerifier(adapters.NewEVMReceiptVerifier(n.multiwallet))
+		n.orderService.SetReceiptVerifier(compositeVerifier)
 	}
 
 }

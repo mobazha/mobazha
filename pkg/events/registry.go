@@ -105,6 +105,17 @@ func init() {
 	}
 }
 
+// LookupByName finds the EventMeta for a dot-separated event name
+// (e.g. "order.expired"). Returns nil for unregistered names.
+func LookupByName(name string) *EventMeta {
+	for i := range registry {
+		if registry[i].Name == name {
+			return &registry[i]
+		}
+	}
+	return nil
+}
+
 // LookupEvent finds the EventMeta for a Go event value.
 // Accepts both value and pointer types. Returns nil for unregistered events.
 func LookupEvent(evt interface{}) *EventMeta {

@@ -105,6 +105,7 @@ type OrderService interface {
 	FulfillOrder(orderID models.OrderID, fulfillments []models.Fulfillment, done chan struct{}) error
 	GetCompleteOrderInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	CompleteOrder(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
+	RateOrder(orderID models.OrderID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	CancelOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
 
 	// ViaRelay methods: combine get-instructions + relay-execute + action into a single call.

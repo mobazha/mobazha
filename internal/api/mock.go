@@ -282,6 +282,9 @@ func (m *mockNode) FulfillOrder(orderID models.OrderID, fulfillments []models.Fu
 func (m *mockNode) CompleteOrder(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error {
 	return m.completeOrderFunc(orderID, txid, ratings, includeIDInRating, done)
 }
+func (m *mockNode) RateOrder(orderID models.OrderID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error {
+	return nil
+}
 func (m *mockNode) CancelOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {
 	return m.cancelOrderFunc(orderID, txid, done)
 }

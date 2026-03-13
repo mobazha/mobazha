@@ -43,6 +43,10 @@ type HostService interface {
 	// 返回空字符串表示尚未初始化
 	GetSolanaEscrowProgramID() string
 
+	// GetSolanaRelayService 获取共享的 Solana Relay 服务（代付 fee）
+	// 返回 nil 表示 Solana Relay 不支持或尚未初始化
+	GetSolanaRelayService() relay.SolanaRelayService
+
 	// GetDiscountAccessForPeer returns the DiscountService and DiscountStore
 	// scoped to the vendor identified by peerID. In SaaS mode this crosses
 	// tenant boundaries via the NodeManager, enabling buyer-side discount

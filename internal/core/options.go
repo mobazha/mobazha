@@ -367,8 +367,10 @@ func (n *MobazhaNode) initPaymentService() {
 	}
 
 	var evmRelay EVMRelayService
+	var solanaRelay SolanaRelayService
 	if n.hostService != nil {
 		evmRelay = n.hostService.GetEVMRelayService()
+		solanaRelay = n.hostService.GetSolanaRelayService()
 	}
 
 	n.paymentService = NewPaymentAppService(PaymentAppServiceConfig{
@@ -384,8 +386,9 @@ func (n *MobazhaNode) initPaymentService() {
 		Keys:          n.keyProvider,
 		ExchangeRates: n.exchangeRates,
 
-		EVMRelayService: evmRelay,
-		RelayAPIURL:     n.relayAPIURL,
+		EVMRelayService:    evmRelay,
+		SolanaRelayService: solanaRelay,
+		RelayAPIURL:        n.relayAPIURL,
 	})
 }
 

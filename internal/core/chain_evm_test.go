@@ -49,8 +49,9 @@ func (m *mockHostService) GetEVMChainClient(chain iwallet.ChainType) iwallet.Cha
 	}
 	return client
 }
-func (m *mockHostService) GetSolanaChainClient() iwallet.ChainClient  { return nil }
-func (m *mockHostService) GetSolanaEscrowProgramID() string           { return "" }
+func (m *mockHostService) GetSolanaChainClient() iwallet.ChainClient       { return nil }
+func (m *mockHostService) GetSolanaEscrowProgramID() string               { return "" }
+func (m *mockHostService) GetSolanaRelayService() relay.SolanaRelayService { return nil }
 func (m *mockHostService) GetDiscountAccessForPeer(_ peer.ID) (contracts.DiscountService, contracts.DiscountStore, error) {
 	return nil, nil, nil
 }

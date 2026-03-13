@@ -63,6 +63,7 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 		Keys:            n.keyProvider,
 		Multiwallet:     n.multiwallet,
 		BuildReleaseTxn: n.orderService.buildDisputeReleaseTransaction,
+		OnAutoConfirm:   n.handleCancelablePaymentForSolana,
 		NodeID:          n.nodeID,
 	}
 	n.paymentRegistry.Register(iwallet.ChainSolana, adapters.NewClientSignedAdapter(solOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions))
@@ -85,4 +86,8 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 
 func (n *MobazhaNode) handleCancelablePaymentForEVM(event *events.CancelablePaymentReady, chainType string) {
 	n.paymentService.HandleCancelablePaymentForEVM(event, chainType)
+}
+
+func (n *MobazhaNode) handleCancelablePaymentForSolana(event *events.CancelablePaymentReady) {
+	n.paymentService.HandleCancelablePaymentForSolana(event)
 }

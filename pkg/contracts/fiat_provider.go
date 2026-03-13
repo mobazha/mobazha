@@ -156,6 +156,7 @@ type FiatService interface {
 //	}
 type FiatPlatformConfigurer interface {
 	RegisterPlatformProvider(providerID, secretKey, publishableKey, webhookSecret string)
+	DisconnectProvider(ctx context.Context, providerID string) error
 }
 
 // FiatPaymentProviderAccessor exposes the fiat payment subsystem.

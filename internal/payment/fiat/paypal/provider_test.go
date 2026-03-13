@@ -384,6 +384,66 @@ func TestProvider_ParseWebhook_DisputeCreated(t *testing.T) {
 	assert.Equal(t, contracts.WebhookDisputeOpened, event.Type)
 }
 
+func TestProvider_ParseWebhook_DisputeCreated_ExtractsDetails(t *testing.T) {
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
+
+	payload := `{
+		"id": "WH-DISP-DETAIL",
+		"event_type": "CUSTOMER.DISPUTE.CREATED",
+		"resource": {
+			"dispute_id": "PP-D-12345",
+			"reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+			"status": "OPEN",
+			"disputed_transactions": [{
+				"seller_transaction_id": "CAP-SELLER-001",
+				"buyer_transaction_id": "CAP-BUYER-001",
+				"custom": "my-order-id-001"
+			}],
+			"dispute_amount": {
+				"currency_code": "USD",
+				"value": "29.99"
+			}
+		}
+	}`
+
+	event, err := p.ParseWebhook(context.Background(), []byte(payload), validWebhookHeaders())
+	require.NoError(t, err)
+	assert.Equal(t, contracts.WebhookDisputeOpened, event.Type)
+	assert.Equal(t, "PP-D-12345", event.DisputeID)
+	assert.Equal(t, "MERCHANDISE_OR_SERVICE_NOT_RECEIVED", event.DisputeReason)
+	assert.Equal(t, "CAP-SELLER-001", event.PaymentID)
+	assert.Equal(t, "my-order-id-001", event.OrderID)
+	assert.Equal(t, "USD", event.Currency)
+	assert.Equal(t, "fiat:USD", event.Coin)
+	assert.Equal(t, int64(2999), event.Amount)
+}
+
+func TestProvider_ParseWebhook_DisputeCreated_BuyerTransactionFallback(t *testing.T) {
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
+
+	payload := `{
+		"id": "WH-DISP-BT",
+		"event_type": "CUSTOMER.DISPUTE.CREATED",
+		"resource": {
+			"dispute_id": "PP-D-BT",
+			"reason": "UNAUTHORIZED",
+			"disputed_transactions": [{
+				"seller_transaction_id": "",
+				"buyer_transaction_id": "CAP-BUYER-ONLY",
+				"custom": "order-bt"
+			}],
+			"dispute_amount": {"currency_code": "EUR", "value": "10.00"}
+		}
+	}`
+
+	event, err := p.ParseWebhook(context.Background(), []byte(payload), validWebhookHeaders())
+	require.NoError(t, err)
+	assert.Equal(t, "CAP-BUYER-ONLY", event.PaymentID)
+	assert.Equal(t, "order-bt", event.OrderID)
+}
+
 func TestProvider_ParseWebhook_DisputeResolved(t *testing.T) {
 	ts, p := newWebhookTestProvider(t)
 	defer ts.Close()
@@ -395,6 +455,60 @@ func TestProvider_ParseWebhook_DisputeResolved(t *testing.T) {
 	assert.Equal(t, contracts.WebhookDisputeResolved, event.Type)
 }
 
+func TestProvider_ParseWebhook_DisputeResolved_SellerWon(t *testing.T) {
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
+
+	payload := `{
+		"id": "WH-DR-WON",
+		"event_type": "CUSTOMER.DISPUTE.RESOLVED",
+		"resource": {
+			"dispute_id": "PP-D-WON",
+			"reason": "MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED",
+			"dispute_outcome": {"outcome_code": "RESOLVED_SELLER_FAVOUR"},
+			"disputed_transactions": [{
+				"seller_transaction_id": "CAP-WON-001",
+				"custom": "order-won"
+			}],
+			"dispute_amount": {"currency_code": "GBP", "value": "50.00"}
+		}
+	}`
+
+	event, err := p.ParseWebhook(context.Background(), []byte(payload), validWebhookHeaders())
+	require.NoError(t, err)
+	assert.Equal(t, contracts.WebhookDisputeResolved, event.Type)
+	assert.Equal(t, "PP-D-WON", event.DisputeID)
+	assert.Equal(t, "won", event.DisputeOutcome)
+	assert.Equal(t, "CAP-WON-001", event.PaymentID)
+	assert.Equal(t, "order-won", event.OrderID)
+}
+
+func TestProvider_ParseWebhook_DisputeResolved_BuyerWon(t *testing.T) {
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
+
+	payload := `{
+		"id": "WH-DR-LOST",
+		"event_type": "CUSTOMER.DISPUTE.RESOLVED",
+		"resource": {
+			"dispute_id": "PP-D-LOST",
+			"reason": "UNAUTHORIZED",
+			"dispute_outcome": {"outcome_code": "RESOLVED_BUYER_FAVOUR"},
+			"disputed_transactions": [{
+				"seller_transaction_id": "CAP-LOST-001",
+				"custom": "order-lost"
+			}],
+			"dispute_amount": {"currency_code": "USD", "value": "25.00"}
+		}
+	}`
+
+	event, err := p.ParseWebhook(context.Background(), []byte(payload), validWebhookHeaders())
+	require.NoError(t, err)
+	assert.Equal(t, contracts.WebhookDisputeResolved, event.Type)
+	assert.Equal(t, "PP-D-LOST", event.DisputeID)
+	assert.Equal(t, "lost", event.DisputeOutcome)
+}
+
 func TestProvider_ParseWebhook_Refund(t *testing.T) {
 	ts, p := newWebhookTestProvider(t)
 	defer ts.Close()
@@ -404,6 +518,59 @@ func TestProvider_ParseWebhook_Refund(t *testing.T) {
 	event, err := p.ParseWebhook(context.Background(), []byte(payload), validWebhookHeaders())
 	require.NoError(t, err)
 	assert.Equal(t, contracts.WebhookRefundCreated, event.Type)
+}
+
+func TestProvider_ParseWebhook_CaptureRefunded_ExtractsDetails(t *testing.T) {
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
+
+	payload := `{
+		"id": "WH-REF-DETAIL",
+		"event_type": "PAYMENT.CAPTURE.REFUNDED",
+		"resource": {
+			"id": "REFUND-ABC",
+			"status": "COMPLETED",
+			"amount": {"currency_code": "USD", "value": "15.50"},
+			"links": [
+				{"href": "https://api.paypal.com/v2/payments/captures/CAP-PARENT-001", "rel": "up"}
+			]
+		}
+	}`
+
+	event, err := p.ParseWebhook(context.Background(), []byte(payload), validWebhookHeaders())
+	require.NoError(t, err)
+	assert.Equal(t, contracts.WebhookRefundCreated, event.Type)
+	assert.Equal(t, "REFUND-ABC", event.RefundID)
+	assert.Equal(t, "CAP-PARENT-001", event.PaymentID)
+	assert.Equal(t, "USD", event.Currency)
+	assert.Equal(t, "fiat:USD", event.Coin)
+	assert.Equal(t, int64(1550), event.Amount)
+}
+
+func TestProvider_ParseWebhook_SaleRefunded(t *testing.T) {
+	ts, p := newWebhookTestProvider(t)
+	defer ts.Close()
+
+	payload := `{
+		"id": "WH-SALE-REF",
+		"event_type": "PAYMENT.SALE.REFUNDED",
+		"resource": {
+			"id": "SALE-REF-001",
+			"status": "COMPLETED",
+			"amount": {"currency_code": "EUR", "value": "9.99"},
+			"links": [
+				{"href": "https://api.paypal.com/v2/payments/captures/CAP-SALE-001", "rel": "up"}
+			]
+		}
+	}`
+
+	event, err := p.ParseWebhook(context.Background(), []byte(payload), validWebhookHeaders())
+	require.NoError(t, err)
+	assert.Equal(t, contracts.WebhookRefundCreated, event.Type)
+	assert.Equal(t, "SALE-REF-001", event.RefundID)
+	assert.Equal(t, "CAP-SALE-001", event.PaymentID)
+	assert.Equal(t, int64(999), event.Amount)
+	assert.Equal(t, "EUR", event.Currency)
 }
 
 func TestProvider_ParseWebhook_AccountUpdated(t *testing.T) {

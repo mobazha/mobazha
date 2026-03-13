@@ -35,6 +35,8 @@ type mockFiatService struct {
 	saveErr        error
 	disconnectErr   error
 	verifyErr       error
+	refundResult    *contracts.RefundResult
+	refundErr       error
 	onboardResult  *contracts.OnboardingResult
 	onboardErr     error
 	onboardCBResult *contracts.AccountStatus
@@ -55,6 +57,10 @@ func (m *mockFiatService) CapturePayment(_ context.Context, _ string, _ string) 
 
 func (m *mockFiatService) GetPayment(_ context.Context, _ string, _ string) (*contracts.PaymentDetail, error) {
 	return m.getResult, m.getErr
+}
+
+func (m *mockFiatService) RefundPayment(_ context.Context, _ string, _ contracts.RefundParams) (*contracts.RefundResult, error) {
+	return m.refundResult, m.refundErr
 }
 
 func (m *mockFiatService) HandleWebhook(_ context.Context, _ string, _ []byte, _ map[string]string) error {
@@ -408,5 +414,67 @@ func TestHandlePOSTFiatProviderVerify_Failed(t *testing.T) {
 		map[string]string{"providerID": "stripe"}, svc)
 
 	g.handlePOSTFiatProviderVerify(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+// --- POST /v1/fiat/{providerID}/payments/{paymentID}/refund ---
+
+func TestHandlePOSTFiatRefund_Success(t *testing.T) {
+	svc := &mockFiatService{
+		refundResult: &contracts.RefundResult{
+			RefundID: "re_test_123",
+			Status:   "succeeded",
+			Amount:   1500,
+			Currency: "usd",
+		},
+	}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	body := map[string]interface{}{
+		"amount":   15.00,
+		"currency": "usd",
+		"reason":   "requested_by_customer",
+	}
+	r := newFiatHandlerRequest(t, "POST", "/v1/fiat/stripe/payments/pi_test/refund", body,
+		map[string]string{"providerID": "stripe", "paymentID": "pi_test"}, svc)
+
+	g.handlePOSTFiatRefund(w, r)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp map[string]interface{}
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	data, ok := resp["data"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "re_test_123", data["refundId"])
+}
+
+func TestHandlePOSTFiatRefund_ServiceError(t *testing.T) {
+	svc := &mockFiatService{
+		refundErr: fmt.Errorf("stripe: card declined"),
+	}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	r := newFiatHandlerRequest(t, "POST", "/v1/fiat/stripe/payments/pi_test/refund", nil,
+		map[string]string{"providerID": "stripe", "paymentID": "pi_test"}, svc)
+
+	g.handlePOSTFiatRefund(w, r)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+	var resp map[string]interface{}
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	errObj, ok := resp["error"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "refund request failed", errObj["message"])
+	assert.NotContains(t, errObj["message"], "stripe")
+}
+
+func TestHandlePOSTFiatRefund_MissingPaymentID(t *testing.T) {
+	svc := &mockFiatService{}
+	g := &Gateway{}
+	w := httptest.NewRecorder()
+	r := newFiatHandlerRequest(t, "POST", "/v1/fiat/stripe/payments//refund", nil,
+		map[string]string{"providerID": "stripe", "paymentID": ""}, svc)
+
+	g.handlePOSTFiatRefund(w, r)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }

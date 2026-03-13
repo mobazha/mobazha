@@ -333,6 +333,157 @@ func TestProvider_ParseWebhook_Dispute(t *testing.T) {
 	assert.Equal(t, contracts.WebhookDisputeOpened, event.Type)
 }
 
+func TestProvider_ParseWebhook_DisputeCreated_ExtractsDetails(t *testing.T) {
+	secret := "whsec_dispute_detail"
+	disputeJSON, _ := json.Marshal(map[string]interface{}{
+		"id":     "dp_test_123",
+		"object": "dispute",
+		"reason": "fraudulent",
+		"status": "needs_response",
+		"payment_intent": map[string]interface{}{
+			"id":       "pi_disputed",
+			"metadata": map[string]string{"order_id": "order_disp_001"},
+		},
+	})
+	eventPayload, _ := json.Marshal(map[string]interface{}{
+		"id":          "evt_disp_detail",
+		"type":        "charge.dispute.created",
+		"api_version": testAPIVersion,
+		"data":        map[string]interface{}{"object": json.RawMessage(disputeJSON)},
+	})
+	sig := signWebhookPayload(eventPayload, secret)
+
+	p := NewProvider(Config{WebhookSecret: secret})
+	event, err := p.ParseWebhook(context.Background(), eventPayload, map[string]string{
+		"Stripe-Signature": sig,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, contracts.WebhookDisputeOpened, event.Type)
+	assert.Equal(t, "dp_test_123", event.DisputeID)
+	assert.Equal(t, "fraudulent", event.DisputeReason)
+	assert.Equal(t, "pi_disputed", event.PaymentID)
+	assert.Equal(t, "order_disp_001", event.OrderID)
+}
+
+func TestProvider_ParseWebhook_DisputeClosed_Won(t *testing.T) {
+	secret := "whsec_dispute_won"
+	disputeJSON, _ := json.Marshal(map[string]interface{}{
+		"id":     "dp_won_123",
+		"object": "dispute",
+		"reason": "product_not_received",
+		"status": "won",
+		"payment_intent": map[string]interface{}{
+			"id":       "pi_won",
+			"metadata": map[string]string{"order_id": "order_won_001"},
+		},
+	})
+	eventPayload, _ := json.Marshal(map[string]interface{}{
+		"id":          "evt_disp_won",
+		"type":        "charge.dispute.closed",
+		"api_version": testAPIVersion,
+		"data":        map[string]interface{}{"object": json.RawMessage(disputeJSON)},
+	})
+	sig := signWebhookPayload(eventPayload, secret)
+
+	p := NewProvider(Config{WebhookSecret: secret})
+	event, err := p.ParseWebhook(context.Background(), eventPayload, map[string]string{
+		"Stripe-Signature": sig,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, contracts.WebhookDisputeResolved, event.Type)
+	assert.Equal(t, "dp_won_123", event.DisputeID)
+	assert.Equal(t, "won", event.DisputeOutcome)
+	assert.Equal(t, "pi_won", event.PaymentID)
+	assert.Equal(t, "order_won_001", event.OrderID)
+}
+
+func TestProvider_ParseWebhook_DisputeClosed_Lost(t *testing.T) {
+	secret := "whsec_dispute_lost"
+	disputeJSON, _ := json.Marshal(map[string]interface{}{
+		"id":     "dp_lost_123",
+		"object": "dispute",
+		"reason": "general",
+		"status": "lost",
+		"payment_intent": map[string]interface{}{
+			"id":       "pi_lost",
+			"metadata": map[string]string{"order_id": "order_lost_001"},
+		},
+	})
+	eventPayload, _ := json.Marshal(map[string]interface{}{
+		"id":          "evt_disp_lost",
+		"type":        "charge.dispute.closed",
+		"api_version": testAPIVersion,
+		"data":        map[string]interface{}{"object": json.RawMessage(disputeJSON)},
+	})
+	sig := signWebhookPayload(eventPayload, secret)
+
+	p := NewProvider(Config{WebhookSecret: secret})
+	event, err := p.ParseWebhook(context.Background(), eventPayload, map[string]string{
+		"Stripe-Signature": sig,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, contracts.WebhookDisputeResolved, event.Type)
+	assert.Equal(t, "dp_lost_123", event.DisputeID)
+	assert.Equal(t, "lost", event.DisputeOutcome)
+}
+
+func TestProvider_ParseWebhook_ChargeRefunded_ExtractsDetails(t *testing.T) {
+	secret := "whsec_refund_detail"
+	chargeJSON, _ := json.Marshal(map[string]interface{}{
+		"id":              "ch_refund_123",
+		"object":          "charge",
+		"amount_refunded": 1500,
+		"currency":        "eur",
+		"payment_intent": map[string]interface{}{
+			"id":       "pi_refund",
+			"metadata": map[string]string{"order_id": "order_refund_001"},
+		},
+		"refunds": map[string]interface{}{
+			"data": []map[string]interface{}{
+				{"id": "re_first_123", "amount": 1500, "currency": "eur"},
+			},
+		},
+	})
+	eventPayload, _ := json.Marshal(map[string]interface{}{
+		"id":          "evt_refund_detail",
+		"type":        "charge.refunded",
+		"api_version": testAPIVersion,
+		"data":        map[string]interface{}{"object": json.RawMessage(chargeJSON)},
+	})
+	sig := signWebhookPayload(eventPayload, secret)
+
+	p := NewProvider(Config{WebhookSecret: secret})
+	event, err := p.ParseWebhook(context.Background(), eventPayload, map[string]string{
+		"Stripe-Signature": sig,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, contracts.WebhookRefundCreated, event.Type)
+	assert.Equal(t, "pi_refund", event.PaymentID)
+	assert.Equal(t, "order_refund_001", event.OrderID)
+	assert.Equal(t, "re_first_123", event.RefundID)
+	assert.Equal(t, int64(1500), event.Amount)
+	assert.Equal(t, "EUR", event.Currency)
+	assert.Equal(t, "fiat:EUR", event.Coin)
+}
+
+func TestMapDisputeStatus(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  gostripe.DisputeStatus
+		expect string
+	}{
+		{"won", gostripe.DisputeStatusWon, "won"},
+		{"lost", gostripe.DisputeStatusLost, "lost"},
+		{"needs_response maps to raw", gostripe.DisputeStatusNeedsResponse, "needs_response"},
+		{"warning_needs_response maps to raw", gostripe.DisputeStatusWarningNeedsResponse, "warning_needs_response"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expect, mapDisputeStatus(tt.input))
+		})
+	}
+}
+
 func TestProvider_ParseWebhook_AccountUpdated(t *testing.T) {
 	secret := "whsec_test_acct"
 	eventPayload, _ := json.Marshal(map[string]interface{}{

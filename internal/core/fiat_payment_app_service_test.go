@@ -1047,3 +1047,59 @@ func TestDisconnectProvider_CryptoOrderDoesNotBlock(t *testing.T) {
 	err := svc.DisconnectProvider(context.Background(), "stripe")
 	require.NoError(t, err, "crypto orders should not block fiat provider disconnect")
 }
+
+// --- Tests: CleanupProcessedEvents ---
+
+func TestFiatService_CleanupProcessedEvents_DeletesOldRecords(t *testing.T) {
+	reg := newMockFiatRegistry()
+	svc, db := newFiatTestService(t, reg)
+
+	old := &models.ProcessedFiatEvent{
+		EventID:     "evt_old",
+		ProviderID:  "stripe",
+		ProcessedAt: time.Now().Add(-48 * time.Hour),
+	}
+	recent := &models.ProcessedFiatEvent{
+		EventID:     "evt_recent",
+		ProviderID:  "stripe",
+		ProcessedAt: time.Now().Add(-1 * time.Hour),
+	}
+	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Save(old) }))
+	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Save(recent) }))
+
+	deleted, err := svc.CleanupProcessedEvents(24 * time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), deleted)
+
+	var remaining []models.ProcessedFiatEvent
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Find(&remaining).Error
+	}))
+	require.Len(t, remaining, 1)
+	assert.Equal(t, "evt_recent", remaining[0].EventID)
+}
+
+func TestFiatService_CleanupProcessedEvents_NoOldRecords(t *testing.T) {
+	reg := newMockFiatRegistry()
+	svc, db := newFiatTestService(t, reg)
+
+	recent := &models.ProcessedFiatEvent{
+		EventID:     "evt_fresh",
+		ProviderID:  "paypal",
+		ProcessedAt: time.Now().Add(-30 * time.Minute),
+	}
+	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Save(recent) }))
+
+	deleted, err := svc.CleanupProcessedEvents(24 * time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), deleted)
+}
+
+func TestFiatService_CleanupProcessedEvents_EmptyTable(t *testing.T) {
+	reg := newMockFiatRegistry()
+	svc, _ := newFiatTestService(t, reg)
+
+	deleted, err := svc.CleanupProcessedEvents(24 * time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), deleted)
+}

@@ -179,6 +179,15 @@ type Order struct {
 	// The OrderTimeoutScheduler cancels orders past this deadline.
 	ExpiresAt *time.Time `gorm:"index"`
 
+	// LastStateChangeAt records when the order last transitioned to its
+	// current State via SetFSMState. Used by the timeout scheduler to
+	// detect stale PENDING / AWAITING_FULFILLMENT / DISPUTED orders.
+	LastStateChangeAt *time.Time `gorm:"index"`
+
+	// TimeoutWarnedAt tracks whether a stale-order warning has already
+	// been emitted for the current state, preventing duplicate alerts.
+	TimeoutWarnedAt *time.Time
+
 	// Fiat payment fields — populated when a fiat webhook event is processed
 	PaymentTransactionID string `gorm:"index"` // provider payment ID (Stripe PaymentIntent / PayPal Capture)
 	FiatMetadata         []byte // JSON-encoded map[string]string for fiat-specific data (disputes, etc.)
@@ -201,6 +210,9 @@ func (o *Order) BeforeSave(tx *gorm.DB) (err error) {
 func (o *Order) SetFSMState(state OrderState) {
 	o.State = state
 	o.fsmStateSet = true
+	now := time.Now()
+	o.LastStateChangeAt = &now
+	o.TimeoutWarnedAt = nil
 }
 
 // Role returns the role of the user for this order.

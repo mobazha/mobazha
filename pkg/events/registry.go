@@ -29,6 +29,7 @@ func init() {
 		{Category: "order", Name: "order.completed", Persistent: true, Sample: new(OrderCompletion)},
 		{Category: "order", Name: "order.cancelled", Persistent: true, Sample: new(OrderCancel)},
 		{Category: "order", Name: "order.expired", Persistent: true, Sample: new(OrderExpired)},
+		{Category: "order", Name: "order.stale_warning", Persistent: true, Sample: new(OrderStaleWarning)},
 		{Category: "order", Name: "order.declined", Persistent: true, Sample: new(OrderDeclined)},
 		{Category: "order", Name: "order.refunded", Persistent: true, Sample: new(Refund)},
 		{Category: "order", Name: "order.vendor_finalized", Persistent: true, Sample: new(VendorFinalizedPayment)},

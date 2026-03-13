@@ -66,7 +66,7 @@ func (t *testTx) Update(key string, value interface{}, where map[string]interfac
 	for k, v := range where {
 		q = q.Where(k, v)
 	}
-	return q.Update(key, value).Error
+	return q.UpdateColumn(key, value).Error
 }
 
 func (t *testTx) Commit() error                              { panic("managed tx") }

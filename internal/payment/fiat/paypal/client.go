@@ -208,6 +208,31 @@ type webhookResource struct {
 	PurchaseUnits []puResponse `json:"purchase_units"`
 }
 
+type disputeResource struct {
+	DisputeID      string `json:"dispute_id"`
+	Reason         string `json:"reason"`
+	Status         string `json:"status"`
+	DisputeOutcome *struct {
+		OutcomeCode string `json:"outcome_code"`
+	} `json:"dispute_outcome,omitempty"`
+	DisputedTransactions []struct {
+		BuyerTransactionID  string `json:"buyer_transaction_id"`
+		SellerTransactionID string `json:"seller_transaction_id"`
+		CustomField         string `json:"custom"`
+	} `json:"disputed_transactions,omitempty"`
+	DisputeAmount amount `json:"dispute_amount"`
+}
+
+type refundResource struct {
+	ID             string `json:"id"`
+	Status         string `json:"status"`
+	Amount         amount `json:"amount"`
+	SellerPayableBreakdown *struct {
+		TotalRefundedAmount amount `json:"total_refunded_amount"`
+	} `json:"seller_payable_breakdown,omitempty"`
+	Links []link `json:"links"`
+}
+
 // --- Partner Referral (PPCP onboarding) ---
 
 type partnerReferralRequest struct {

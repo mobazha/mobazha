@@ -278,6 +278,10 @@ func (n *MobazhaNode) Start() {
 		n.startPaymentEventMonitors()
 
 		go n.orderService.StartOrderTimeoutScheduler()
+
+		if n.fiatPaymentService != nil {
+			n.fiatPaymentService.StartPeriodicCleanup(n.nodeCtx, 24*time.Hour, 7*24*time.Hour)
+		}
 	}
 
 	// Add log to verify connection reuse

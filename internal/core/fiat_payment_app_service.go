@@ -371,14 +371,22 @@ func (s *FiatPaymentAppService) handleDisputeOpened(ctx context.Context, event *
 		"fiat_dispute_status":    "opened",
 		"fiat_dispute_id":       event.DisputeID,
 		"fiat_dispute_reason":   event.DisputeReason,
+		"fiat_dispute_provider":  event.ProviderID,
 		"fiat_dispute_opened_at": time.Now().UTC().Format(time.RFC3339),
 	}
 	if err := s.orderRepo.MergeFiatMetadata(ctx, string(order.ID), metadata); err != nil {
 		return fmt.Errorf("update dispute metadata for order %s: %w", order.ID, err)
 	}
 
-	logger.LogInfoWithIDf(log, s.nodeID, "order %s marked with fiat dispute %s",
-		order.ID, event.DisputeID)
+	if order.State != models.OrderState_DISPUTED {
+		order.SetFSMState(models.OrderState_DISPUTED)
+		if err := s.orderRepo.Save(ctx, order); err != nil {
+			return fmt.Errorf("update order %s to DISPUTED: %w", order.ID, err)
+		}
+	}
+
+	logger.LogInfoWithIDf(log, s.nodeID, "order %s → DISPUTED via %s dispute %s (reason: %s)",
+		order.ID, event.ProviderID, event.DisputeID, event.DisputeReason)
 	return nil
 }
 
@@ -407,12 +415,21 @@ func (s *FiatPaymentAppService) handleDisputeResolved(ctx context.Context, event
 		return fmt.Errorf("update dispute resolved metadata for order %s: %w", order.ID, err)
 	}
 
-	if outcome == "lost" {
+	switch outcome {
+	case "lost":
 		order.SetFSMState(models.OrderState_REFUNDED)
 		if err := s.orderRepo.Save(ctx, order); err != nil {
 			return fmt.Errorf("dispute lost but REFUNDED sync failed for order %s: %w", order.ID, err)
 		}
 		logger.LogInfoWithIDf(log, s.nodeID, "order %s → REFUNDED (dispute lost)", order.ID)
+	case "won":
+		order.SetFSMState(models.OrderState_RESOLVED)
+		if err := s.orderRepo.Save(ctx, order); err != nil {
+			return fmt.Errorf("dispute won but RESOLVED sync failed for order %s: %w", order.ID, err)
+		}
+		logger.LogInfoWithIDf(log, s.nodeID, "order %s → RESOLVED (dispute won)", order.ID)
+	default:
+		logger.LogInfoWithIDf(log, s.nodeID, "order %s dispute resolved with outcome=%s, no state change", order.ID, outcome)
 	}
 
 	return nil
@@ -779,6 +796,52 @@ func (s *FiatPaymentAppService) LoadAndRegisterProviders() {
 	for _, cfg := range configs {
 		s.registerProviderFromConfig(cfg.ProviderID, cfg.SecretKey, cfg.PublicKey, cfg.WebhookSecret)
 	}
+}
+
+// CleanupProcessedEvents deletes ProcessedFiatEvent records older than the given TTL.
+// Should be called periodically (e.g. daily) to prevent unbounded table growth.
+//
+// TECHDEBT(TD-048): Uses tx.Read().Delete() because the Tx.Delete interface does not
+// support range-based bulk deletes (processed_at < ?). This is safe for DELETE operations
+// because tx.Read() already provides tenant-scoped WHERE clause. See db-transaction-rules.mdc.
+// 清除条件: Tx interface supports arbitrary WHERE conditions for Delete
+func (s *FiatPaymentAppService) CleanupProcessedEvents(ttl time.Duration) (int64, error) {
+	cutoff := time.Now().Add(-ttl)
+	var deleted int64
+	err := s.db.Update(func(tx database.Tx) error {
+		result := tx.Read().Where("processed_at < ?", cutoff).Delete(&models.ProcessedFiatEvent{})
+		if result.Error != nil {
+			return result.Error
+		}
+		deleted = result.RowsAffected
+		return nil
+	})
+	if err != nil {
+		return 0, fmt.Errorf("cleanup processed fiat events: %w", err)
+	}
+	if deleted > 0 {
+		logger.LogInfoWithIDf(log, s.nodeID, "cleaned up %d processed fiat events older than %v", deleted, ttl)
+	}
+	return deleted, nil
+}
+
+// StartPeriodicCleanup launches a background goroutine that cleans up old
+// ProcessedFiatEvent records every interval. Stop it by canceling the context.
+func (s *FiatPaymentAppService) StartPeriodicCleanup(ctx context.Context, interval, ttl time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if _, err := s.CleanupProcessedEvents(ttl); err != nil {
+					logger.LogErrorWithIDf(log, s.nodeID, "fiat event cleanup failed: %v", err)
+				}
+			}
+		}
+	}()
 }
 
 // Compile-time checks.

@@ -109,6 +109,9 @@ type FiatService interface {
 	// GetPayment retrieves payment details.
 	GetPayment(ctx context.Context, providerID string, paymentID string) (*PaymentDetail, error)
 
+	// RefundPayment issues a full or partial refund for a captured payment.
+	RefundPayment(ctx context.Context, providerID string, params RefundParams) (*RefundResult, error)
+
 	// HandleWebhook processes a webhook event with idempotency guarantees.
 	HandleWebhook(ctx context.Context, providerID string, payload []byte, headers map[string]string) error
 

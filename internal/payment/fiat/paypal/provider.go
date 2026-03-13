@@ -116,9 +116,11 @@ func (p *Provider) CapturePayment(ctx context.Context, sessionID string) (*contr
 		return nil, fmt.Errorf("paypal: capture order: %w", err)
 	}
 
+	// Use the Capture ID (not Order ID) as PaymentID so RefundPayment works correctly.
+	// PayPal Refund API requires: POST /v2/payments/captures/{captureID}/refund
+	paymentID := resp.ID
 	result := &contracts.PaymentResult{
-		PaymentID: resp.ID,
-		Status:    mapPayPalStatus(resp.Status),
+		Status: mapPayPalStatus(resp.Status),
 		PaymentMethod: contracts.PaymentMethodInfo{
 			Type:  "paypal",
 			Brand: "paypal",
@@ -131,7 +133,11 @@ func (p *Provider) CapturePayment(ctx context.Context, sessionID string) (*contr
 		if v, err := parseAmount(pu.Amount.Value); err == nil {
 			result.Amount = v
 		}
+		if pu.Payments != nil && len(pu.Payments.Captures) > 0 {
+			paymentID = pu.Payments.Captures[0].ID
+		}
 	}
+	result.PaymentID = paymentID
 
 	return result, nil
 }
@@ -196,12 +202,15 @@ func (p *Provider) ParseWebhook(ctx context.Context, payload []byte, headers map
 
 	case "CUSTOMER.DISPUTE.CREATED":
 		we.Type = contracts.WebhookDisputeOpened
+		p.extractDisputeDetails(event.Resource, we)
 
 	case "CUSTOMER.DISPUTE.RESOLVED":
 		we.Type = contracts.WebhookDisputeResolved
+		p.extractDisputeDetails(event.Resource, we)
 
 	case "PAYMENT.SALE.REFUNDED", "PAYMENT.CAPTURE.REFUNDED":
 		we.Type = contracts.WebhookRefundCreated
+		p.extractRefundDetails(event.Resource, we)
 
 	case "MERCHANT.ONBOARDING.COMPLETED":
 		we.Type = contracts.WebhookAccountUpdated
@@ -364,6 +373,71 @@ func (p *Provider) GetAccountStatus(ctx context.Context, accountID string) (*con
 
 // --- Helpers ---
 
+
+func (p *Provider) extractDisputeDetails(raw json.RawMessage, we *contracts.WebhookEvent) {
+	var res disputeResource
+	if err := json.Unmarshal(raw, &res); err != nil {
+		return
+	}
+
+	we.DisputeID = res.DisputeID
+	we.DisputeReason = res.Reason
+
+	if res.DisputeOutcome != nil {
+		switch res.DisputeOutcome.OutcomeCode {
+		case "RESOLVED_BUYER_FAVOUR":
+			we.DisputeOutcome = "lost"
+		case "RESOLVED_SELLER_FAVOUR":
+			we.DisputeOutcome = "won"
+		default:
+			we.DisputeOutcome = res.DisputeOutcome.OutcomeCode
+		}
+	}
+
+	if len(res.DisputedTransactions) > 0 {
+		tx := res.DisputedTransactions[0]
+		we.PaymentID = tx.SellerTransactionID
+		if we.PaymentID == "" {
+			we.PaymentID = tx.BuyerTransactionID
+		}
+		we.OrderID = tx.CustomField
+	}
+
+	if res.DisputeAmount.CurrencyCode != "" {
+		we.Currency = strings.ToUpper(res.DisputeAmount.CurrencyCode)
+		we.Coin = "fiat:" + we.Currency
+	}
+	if v, err := parseAmount(res.DisputeAmount.Value); err == nil {
+		we.Amount = v
+	}
+}
+
+func (p *Provider) extractRefundDetails(raw json.RawMessage, we *contracts.WebhookEvent) {
+	var res refundResource
+	if err := json.Unmarshal(raw, &res); err != nil {
+		return
+	}
+
+	we.RefundID = res.ID
+
+	// Extract the capture ID from the "up" link (parent capture)
+	for _, l := range res.Links {
+		if l.Rel == "up" && strings.Contains(l.Href, "/captures/") {
+			parts := strings.Split(l.Href, "/captures/")
+			if len(parts) == 2 {
+				we.PaymentID = parts[1]
+			}
+		}
+	}
+
+	if res.Amount.CurrencyCode != "" {
+		we.Currency = strings.ToUpper(res.Amount.CurrencyCode)
+		we.Coin = "fiat:" + we.Currency
+	}
+	if v, err := parseAmount(res.Amount.Value); err == nil {
+		we.Amount = v
+	}
+}
 
 func (p *Provider) extractResourceDetails(raw json.RawMessage, we *contracts.WebhookEvent) {
 	var res webhookResource

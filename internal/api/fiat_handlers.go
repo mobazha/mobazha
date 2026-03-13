@@ -117,6 +117,47 @@ func (g *Gateway) handlePOSTFiatCapture(w http.ResponseWriter, r *http.Request) 
 	responsePkg.Success(w, result)
 }
 
+func (g *Gateway) handlePOSTFiatRefund(w http.ResponseWriter, r *http.Request) {
+	svc, ok := getFiatService(r)
+	if !ok {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Fiat payments not available")
+		return
+	}
+
+	providerID := mux.Vars(r)["providerID"]
+	paymentID := mux.Vars(r)["paymentID"]
+	if providerID == "" || paymentID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "providerID and paymentID are required")
+		return
+	}
+
+	var body struct {
+		Amount   *int64 `json:"amount"`
+		Currency string `json:"currency"`
+		Reason   string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err.Error() != "EOF" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid request body")
+		return
+	}
+
+	params := contracts.RefundParams{
+		PaymentID: paymentID,
+		Amount:    body.Amount,
+		Currency:  body.Currency,
+		Reason:    body.Reason,
+	}
+
+	result, err := svc.RefundPayment(r.Context(), providerID, params)
+	if err != nil {
+		log.Errorf("fiat refund failed for %s/%s: %v", providerID, paymentID, err)
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "refund request failed")
+		return
+	}
+
+	responsePkg.Success(w, result)
+}
+
 func (g *Gateway) handleGETFiatPayment(w http.ResponseWriter, r *http.Request) {
 	svc, ok := getFiatService(r)
 	if !ok {

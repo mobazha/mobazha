@@ -178,12 +178,41 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 
 	case "charge.dispute.created":
 		we.Type = contracts.WebhookDisputeOpened
+		if d, err := extractDispute(event.Data.Raw); err == nil {
+			we.DisputeID = d.ID
+			we.DisputeReason = string(d.Reason)
+			if d.PaymentIntent != nil {
+				we.PaymentID = d.PaymentIntent.ID
+				we.OrderID = d.PaymentIntent.Metadata["order_id"]
+			}
+		}
 
 	case "charge.dispute.closed":
 		we.Type = contracts.WebhookDisputeResolved
+		if d, err := extractDispute(event.Data.Raw); err == nil {
+			we.DisputeID = d.ID
+			we.DisputeReason = string(d.Reason)
+			we.DisputeOutcome = mapDisputeStatus(d.Status)
+			if d.PaymentIntent != nil {
+				we.PaymentID = d.PaymentIntent.ID
+				we.OrderID = d.PaymentIntent.Metadata["order_id"]
+			}
+		}
 
 	case "charge.refunded":
 		we.Type = contracts.WebhookRefundCreated
+		if ch, err := extractCharge(event.Data.Raw); err == nil {
+			if ch.PaymentIntent != nil {
+				we.PaymentID = ch.PaymentIntent.ID
+				we.OrderID = ch.PaymentIntent.Metadata["order_id"]
+			}
+			we.Amount = ch.AmountRefunded
+			we.Currency = strings.ToUpper(string(ch.Currency))
+			we.Coin = "fiat:" + we.Currency
+			if len(ch.Refunds.Data) > 0 {
+				we.RefundID = ch.Refunds.Data[0].ID
+			}
+		}
 
 	case "account.updated":
 		we.Type = contracts.WebhookAccountUpdated
@@ -383,6 +412,33 @@ func extractPaymentIntent(raw json.RawMessage) (*gostripe.PaymentIntent, error) 
 		return nil, fmt.Errorf("stripe: unmarshal payment intent: %w", err)
 	}
 	return &pi, nil
+}
+
+func extractDispute(raw json.RawMessage) (*gostripe.Dispute, error) {
+	var d gostripe.Dispute
+	if err := json.Unmarshal(raw, &d); err != nil {
+		return nil, fmt.Errorf("stripe: unmarshal dispute: %w", err)
+	}
+	return &d, nil
+}
+
+func extractCharge(raw json.RawMessage) (*gostripe.Charge, error) {
+	var ch gostripe.Charge
+	if err := json.Unmarshal(raw, &ch); err != nil {
+		return nil, fmt.Errorf("stripe: unmarshal charge: %w", err)
+	}
+	return &ch, nil
+}
+
+func mapDisputeStatus(s gostripe.DisputeStatus) string {
+	switch s {
+	case gostripe.DisputeStatusLost:
+		return "lost"
+	case gostripe.DisputeStatusWon:
+		return "won"
+	default:
+		return string(s)
+	}
 }
 
 func extractPaymentMethod(pi *gostripe.PaymentIntent) contracts.PaymentMethodInfo {

@@ -63,7 +63,7 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 		exp := now.Add(1 * time.Hour)
 		order.ExpiresAt = &exp
 	} else {
-		exp := now.Add(24 * time.Hour)
+		exp := now.Add(1 * time.Hour)
 		order.ExpiresAt = &exp
 	}
 

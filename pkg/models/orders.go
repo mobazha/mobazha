@@ -175,7 +175,7 @@ type Order struct {
 	CreatedAt          time.Time `gorm:"index:idx_order_listing,priority:3,sort:desc"`
 
 	// ExpiresAt is set when the order enters AWAITING_PAYMENT.
-	// Fiat orders: CreatedAt + 1h; crypto orders: CreatedAt + 24h.
+	// Both fiat and crypto orders: CreatedAt + 1h.
 	// The OrderTimeoutScheduler cancels orders past this deadline.
 	ExpiresAt *time.Time `gorm:"index"`
 

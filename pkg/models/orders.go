@@ -195,10 +195,15 @@ type Order struct {
 
 func (o *Order) BeforeSave(tx *gorm.DB) (err error) {
 	if !o.fsmStateSet {
-		// Legacy path: derive state from serialized message fields.
 		o.State = o.DeriveState()
+	} else {
+		// Phase 1 monitoring: compare FSM-authoritative state with legacy DeriveState.
+		// Mismatches are logged but FSM wins. ManagedEscrow to remove DeriveState once
+		// monitoring confirms zero mismatches over a full release cycle.
+		if derived := o.DeriveState(); derived != o.State {
+			log.Warningf("[DeriveState-mismatch] order=%s FSM=%s Derived=%s", o.ID, o.State, derived)
+		}
 	}
-	// When fsmStateSet is true, o.State was already set by SetFSMState().
 
 	tx.Statement.SetColumn("State", o.State)
 	return nil

@@ -348,3 +348,523 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestOrderComplete_WithoutRatings(t *testing.T) {
+	op, teardown, err := newMockOrderProcessor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown()
+
+	vendorPriv, vendorPub, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = vendorPriv
+	pubkeyBytes, err := crypto.MarshalPublicKey(vendorPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vendor, err := peer.IDFromPublicKey(vendorPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, buyerPub, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buyerPubkeyBytes, err := crypto.MarshalPublicKey(buyerPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buyer, err := peer.IDFromPublicKey(buyerPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	op.identity = vendor
+
+	orderID := "complete-no-rating"
+
+	chaincode := make([]byte, 32)
+	rand.Read(chaincode)
+
+	vendorPeerID := vendor.String()
+	tinyImageHash := "tiny1"
+	smallImageHash := "small1"
+
+	orderComplete := &pb.OrderComplete{
+		Timestamp: timestamppb.Now(),
+	}
+
+	completeAny := &anypb.Any{}
+	if err := completeAny.MarshalFrom(orderComplete); err != nil {
+		t.Fatal(err)
+	}
+
+	orderMsg := &npb.OrderMessage{
+		OrderID:     orderID,
+		MessageType: npb.OrderMessage_ORDER_COMPLETE,
+		Message:     completeAny,
+	}
+
+	orderOpen := &pb.OrderOpen{
+		Listings: []*pb.SignedListing{
+			{
+				Listing: &pb.Listing{
+					Slug: "abc",
+					VendorID: &pb.ID{
+						PeerID: vendorPeerID,
+						Pubkeys: &pb.ID_Pubkeys{
+							Identity: pubkeyBytes,
+						},
+					},
+					Item: &pb.Listing_Item{
+						Images: []*pb.Image{
+							{
+								Small: smallImageHash,
+								Tiny:  tinyImageHash,
+							},
+						},
+					},
+				},
+			},
+		},
+		Items: []*pb.OrderOpen_Item{
+			{ListingHash: "1234"},
+		},
+		BuyerID: &pb.ID{
+			PeerID: buyer.String(),
+			Pubkeys: &pb.ID_Pubkeys{
+				Identity: buyerPubkeyBytes,
+			},
+		},
+	}
+
+	paymentSent := &pb.PaymentSent{
+		Coin:      iwallet.CtMock.String(),
+		Chaincode: hex.EncodeToString(chaincode),
+	}
+
+	fulfillment := &pb.OrderFulfillment{}
+
+	order := &models.Order{}
+	order.SetRole(models.RoleVendor)
+	order.ID = models.OrderID(orderID)
+	if err := order.PutMessage(&npb.OrderMessage{
+		Signature: []byte("abc"),
+		Message:   mustBuildAny(orderOpen),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := order.PutMessage(&npb.OrderMessage{
+		Signature:   []byte("abc"),
+		Message:     mustBuildAny(paymentSent),
+		MessageType: npb.OrderMessage_PAYMENT_SENT,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := order.PutMessage(&npb.OrderMessage{
+		Signature:   []byte("abc"),
+		Message:     mustBuildAny(fulfillment),
+		MessageType: npb.OrderMessage_ORDER_FULFILLMENT,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	err = op.db.Update(func(tx database.Tx) error {
+		event, err := op.processOrderCompleteMessage(tx, order, orderMsg)
+		if err != nil {
+			return fmt.Errorf("unexpected error: %s", err)
+		}
+		completion, ok := event.(*events.OrderCompletion)
+		if !ok {
+			return fmt.Errorf("expected *events.OrderCompletion, got %T", event)
+		}
+		if completion.OrderID != orderID {
+			return fmt.Errorf("expected orderID %s, got %s", orderID, completion.OrderID)
+		}
+		if order.Open {
+			return fmt.Errorf("order should be closed")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestOrderComplete_RatingSupplement(t *testing.T) {
+	op, teardown, err := newMockOrderProcessor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown()
+
+	vendorPriv, vendorPub, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubkeyBytes, err := crypto.MarshalPublicKey(vendorPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vendor, err := peer.IDFromPublicKey(vendorPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	buyerPriv, buyerPub, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buyerPubkeyBytes, err := crypto.MarshalPublicKey(buyerPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buyer, err := peer.IDFromPublicKey(buyerPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	op.identity = vendor
+
+	orderID := "supplement-rating"
+
+	chaincode := make([]byte, 32)
+	rand.Read(chaincode)
+
+	ratingMaster, err := btcec.NewPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ratingKeys, err := utils.GenerateRatingPrivateKeys(ratingMaster, 1, chaincode)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vendorSig := &pb.RatingSignature{
+		Slug:      "abc",
+		RatingKey: ratingKeys[0].PubKey().SerializeCompressed(),
+	}
+	ser, err := proto.Marshal(vendorSig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sig, err := vendorPriv.Sign(ser)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vendorSig.VendorSignature = sig
+
+	vendorPeerID := vendor.String()
+
+	hashedRatingKey := sha256.Sum256(ratingKeys[0].PubKey().SerializeCompressed())
+	buyerSig, err := buyerPriv.Sign(hashedRatingKey[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	orderOpen := &pb.OrderOpen{
+		Listings: []*pb.SignedListing{
+			{
+				Listing: &pb.Listing{
+					Slug: "abc",
+					VendorID: &pb.ID{
+						PeerID: vendorPeerID,
+						Pubkeys: &pb.ID_Pubkeys{
+							Identity: pubkeyBytes,
+						},
+					},
+					Item: &pb.Listing_Item{
+						Images: []*pb.Image{
+							{Small: "s", Tiny: "t"},
+						},
+					},
+				},
+			},
+		},
+		RatingKeys: [][]byte{
+			ratingKeys[0].PubKey().SerializeCompressed(),
+		},
+		Items: []*pb.OrderOpen_Item{
+			{ListingHash: "1234"},
+		},
+		BuyerID: &pb.ID{
+			PeerID: buyer.String(),
+			Pubkeys: &pb.ID_Pubkeys{
+				Identity: buyerPubkeyBytes,
+			},
+		},
+	}
+
+	paymentSent := &pb.PaymentSent{
+		Coin:      iwallet.CtMock.String(),
+		Chaincode: hex.EncodeToString(chaincode),
+	}
+
+	fulfillment := &pb.OrderFulfillment{}
+
+	// Step 1: Complete without ratings
+	noRatingComplete := &pb.OrderComplete{Timestamp: timestamppb.Now()}
+	completeAny := &anypb.Any{}
+	if err := completeAny.MarshalFrom(noRatingComplete); err != nil {
+		t.Fatal(err)
+	}
+
+	order := &models.Order{}
+	order.SetRole(models.RoleVendor)
+	order.ID = models.OrderID(orderID)
+	if err := order.PutMessage(&npb.OrderMessage{
+		Signature: []byte("abc"),
+		Message:   mustBuildAny(orderOpen),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := order.PutMessage(&npb.OrderMessage{
+		Signature:   []byte("abc"),
+		Message:     mustBuildAny(paymentSent),
+		MessageType: npb.OrderMessage_PAYMENT_SENT,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := order.PutMessage(&npb.OrderMessage{
+		Signature:   []byte("abc"),
+		Message:     mustBuildAny(fulfillment),
+		MessageType: npb.OrderMessage_ORDER_FULFILLMENT,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	err = op.db.Update(func(tx database.Tx) error {
+		event, err := op.processOrderCompleteMessage(tx, order, &npb.OrderMessage{
+			OrderID:     orderID,
+			MessageType: npb.OrderMessage_ORDER_COMPLETE,
+			Message:     completeAny,
+		})
+		if err != nil {
+			return fmt.Errorf("step 1: unexpected error: %s", err)
+		}
+		if event == nil {
+			return fmt.Errorf("step 1: expected OrderCompletion event")
+		}
+		if order.Open {
+			return fmt.Errorf("step 1: order should be closed")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Step 2: Send rating supplement
+	ratingPB := &pb.Rating{
+		Timestamp: timestamppb.Now(),
+		VendorSig: vendorSig,
+		VendorID: &pb.ID{
+			PeerID: vendorPeerID,
+			Pubkeys: &pb.ID_Pubkeys{
+				Identity: pubkeyBytes,
+			},
+		},
+		BuyerID: &pb.ID{
+			PeerID: buyer.String(),
+			Pubkeys: &pb.ID_Pubkeys{
+				Identity: buyerPubkeyBytes,
+			},
+		},
+		BuyerSig:        buyerSig,
+		Overall:         4,
+		DeliverySpeed:   3,
+		Description:     5,
+		CustomerService: 4,
+		Quality:         3,
+		Review:          "good stuff",
+	}
+	ser, err = proto.Marshal(ratingPB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hashed := sha256.Sum256(ser)
+	ratingSig := ecdsa.Sign(ratingKeys[0], hashed[:])
+	ratingPB.RatingSignature = ratingSig.Serialize()
+
+	supplementComplete := &pb.OrderComplete{
+		Timestamp: noRatingComplete.Timestamp,
+		Ratings:   []*pb.Rating{ratingPB},
+	}
+	supplementAny := &anypb.Any{}
+	if err := supplementAny.MarshalFrom(supplementComplete); err != nil {
+		t.Fatal(err)
+	}
+
+	err = op.db.Update(func(tx database.Tx) error {
+		event, err := op.processOrderCompleteMessage(tx, order, &npb.OrderMessage{
+			OrderID:     orderID,
+			MessageType: npb.OrderMessage_ORDER_COMPLETE,
+			Message:     supplementAny,
+		})
+		if err != nil {
+			return fmt.Errorf("step 2: unexpected error: %s", err)
+		}
+		if event != nil {
+			return fmt.Errorf("step 2: expected nil event for supplement, got %T", event)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify ratings were saved
+	err = op.db.View(func(tx database.Tx) error {
+		index, err := tx.GetRatingIndex()
+		if err != nil {
+			return err
+		}
+		if len(index) != 1 {
+			return fmt.Errorf("expected 1 rating in index, got %d", len(index))
+		}
+		if index[0].Average != 4 {
+			return fmt.Errorf("expected average 4, got %f", index[0].Average)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestOrderComplete_SupplementRejectedWhenAlreadyRated(t *testing.T) {
+	op, teardown, err := newMockOrderProcessor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer teardown()
+
+	vendorPriv, vendorPub, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubkeyBytes, err := crypto.MarshalPublicKey(vendorPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vendor, err := peer.IDFromPublicKey(vendorPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	buyerPriv, buyerPub, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buyerPubkeyBytes, err := crypto.MarshalPublicKey(buyerPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buyer, err := peer.IDFromPublicKey(buyerPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	op.identity = vendor
+
+	orderID := "already-rated"
+
+	chaincode := make([]byte, 32)
+	rand.Read(chaincode)
+
+	ratingMaster, err := btcec.NewPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ratingKeys, err := utils.GenerateRatingPrivateKeys(ratingMaster, 1, chaincode)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vendorSig := &pb.RatingSignature{
+		Slug:      "abc",
+		RatingKey: ratingKeys[0].PubKey().SerializeCompressed(),
+	}
+	ser, err := proto.Marshal(vendorSig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sig, err := vendorPriv.Sign(ser)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vendorSig.VendorSignature = sig
+
+	vendorPeerID := vendor.String()
+
+	hashedRatingKey := sha256.Sum256(ratingKeys[0].PubKey().SerializeCompressed())
+	buyerSig, err := buyerPriv.Sign(hashedRatingKey[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ratingPB := &pb.Rating{
+		Timestamp:       timestamppb.Now(),
+		VendorSig:       vendorSig,
+		VendorID:        &pb.ID{PeerID: vendorPeerID, Pubkeys: &pb.ID_Pubkeys{Identity: pubkeyBytes}},
+		BuyerID:         &pb.ID{PeerID: buyer.String(), Pubkeys: &pb.ID_Pubkeys{Identity: buyerPubkeyBytes}},
+		BuyerSig:        buyerSig,
+		Overall:         5,
+		DeliverySpeed:   5,
+		Description:     5,
+		CustomerService: 5,
+		Quality:         5,
+		Review:          "great",
+	}
+	ser, err = proto.Marshal(ratingPB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hashed := sha256.Sum256(ser)
+	ratingSig := ecdsa.Sign(ratingKeys[0], hashed[:])
+	ratingPB.RatingSignature = ratingSig.Serialize()
+
+	// Simulate an order that was completed WITH ratings
+	existingComplete := &pb.OrderComplete{
+		Timestamp: timestamppb.Now(),
+		Ratings:   []*pb.Rating{ratingPB},
+	}
+
+	order := &models.Order{}
+	order.ID = models.OrderID(orderID)
+	if err := order.PutMessage(&npb.OrderMessage{
+		Signature:   []byte("abc"),
+		Message:     mustBuildAny(existingComplete),
+		MessageType: npb.OrderMessage_ORDER_COMPLETE,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Try to send a different ORDER_COMPLETE with different ratings
+	ratingPB2 := proto.Clone(ratingPB).(*pb.Rating)
+	ratingPB2.Review = "changed review"
+	newComplete := &pb.OrderComplete{
+		Timestamp: existingComplete.Timestamp,
+		Ratings:   []*pb.Rating{ratingPB2},
+	}
+	newAny := &anypb.Any{}
+	if err := newAny.MarshalFrom(newComplete); err != nil {
+		t.Fatal(err)
+	}
+
+	err = op.db.Update(func(tx database.Tx) error {
+		_, err := op.processOrderCompleteMessage(tx, order, &npb.OrderMessage{
+			OrderID:     orderID,
+			MessageType: npb.OrderMessage_ORDER_COMPLETE,
+			Message:     newAny,
+		})
+		if err != ErrChangedMessage {
+			return fmt.Errorf("expected ErrChangedMessage, got %v", err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

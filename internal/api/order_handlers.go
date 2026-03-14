@@ -931,6 +931,49 @@ func (g *Gateway) handlePOSTOrderCompletion(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+func (g *Gateway) handlePOSTOrderRate(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
+	type rateRequest struct {
+		Ratings   []models.Rating `json:"ratings"`
+		Anonymous bool            `json:"anonymous"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	var req rateRequest
+	if err := decoder.Decode(&req); err != nil {
+		ErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if len(req.Ratings) == 0 {
+		ErrorResponse(w, http.StatusBadRequest, "ratings cannot be empty")
+		return
+	}
+
+	orderSvc := getOrderService(r)
+
+	done := make(chan struct{})
+	err := orderSvc.RateOrder(models.OrderID(orderID), req.Ratings, !req.Anonymous, done)
+	if err != nil {
+		ErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	select {
+	case <-done:
+		sanitizedStringResponse(w, `{}`)
+		return
+	case <-time.After(time.Second * 10):
+		ErrorResponse(w, http.StatusInternalServerError, "timeout waiting on channel")
+		return
+	}
+}
+
 // func RegisterOrderHandlers(r *mux.Router, g *Gateway) {
 // 	r.HandleFunc("/v1/ordercancel", g.handlePOSTOrderCancel).Methods("POST")
 // 	r.HandleFunc("/v1/orderconfirmation", g.handlePOSTOrderConfirmation).Methods("POST")

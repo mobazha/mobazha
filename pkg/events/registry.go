@@ -29,6 +29,7 @@ func init() {
 		{Category: "order", Name: "order.completed", Persistent: true, Sample: new(OrderCompletion)},
 		{Category: "order", Name: "order.cancelled", Persistent: true, Sample: new(OrderCancel)},
 		{Category: "order", Name: "order.expired", Persistent: true, Sample: new(OrderExpired)},
+		{Category: "order", Name: "order.stale_warning", Persistent: true, Sample: new(OrderStaleWarning)},
 		{Category: "order", Name: "order.declined", Persistent: true, Sample: new(OrderDeclined)},
 		{Category: "order", Name: "order.refunded", Persistent: true, Sample: new(Refund)},
 		{Category: "order", Name: "order.vendor_finalized", Persistent: true, Sample: new(VendorFinalizedPayment)},
@@ -102,6 +103,17 @@ func init() {
 			typeIndex[t.Elem()] = m
 		}
 	}
+}
+
+// LookupByName finds the EventMeta for a dot-separated event name
+// (e.g. "order.expired"). Returns nil for unregistered names.
+func LookupByName(name string) *EventMeta {
+	for i := range registry {
+		if registry[i].Name == name {
+			return &registry[i]
+		}
+	}
+	return nil
 }
 
 // LookupEvent finds the EventMeta for a Go event value.

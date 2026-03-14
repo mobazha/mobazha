@@ -66,12 +66,18 @@ func (t *testTx) Update(key string, value interface{}, where map[string]interfac
 	for k, v := range where {
 		q = q.Where(k, v)
 	}
-	return q.Update(key, value).Error
+	return q.UpdateColumn(key, value).Error
 }
 
 func (t *testTx) Commit() error                              { panic("managed tx") }
 func (t *testTx) Rollback() error                            { panic("managed tx") }
-func (t *testTx) Delete(string, interface{}, map[string]interface{}, interface{}) error { return nil }
+func (t *testTx) Delete(key string, value interface{}, where map[string]interface{}, model interface{}) error {
+	q := t.db.Where(key, value)
+	for k, v := range where {
+		q = q.Where(k, v)
+	}
+	return q.Delete(model).Error
+}
 func (t *testTx) DeleteAll(interface{}) error                 { return nil }
 func (t *testTx) Migrate(interface{}) error                   { return nil }
 func (t *testTx) RegisterCommitHook(func())                   {}

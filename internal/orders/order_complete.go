@@ -20,15 +20,27 @@ func (op *OrderProcessor) processOrderCompleteMessage(dbtx database.Tx, order *m
 		return nil, err
 	}
 
-	dup, err := isDuplicate(complete, order.SerializedOrderComplete)
-	if err != nil {
-		return nil, err
-	}
-	if order.SerializedOrderComplete != nil && !dup {
-		logger.LogInfoWithIDf(log, op.nodeID, "Duplicate ORDER_COMPLETE message does not match original for order: %s", order.ID)
-		return nil, ErrChangedMessage
-	} else if dup {
-		return nil, nil
+	isRatingSupplement := false
+
+	if order.SerializedOrderComplete != nil {
+		dup, err := isDuplicate(complete, order.SerializedOrderComplete)
+		if err != nil {
+			return nil, err
+		}
+		if dup {
+			return nil, nil
+		}
+		// Allow a "rating supplement": existing has no ratings, new has ratings.
+		existing := new(pb.OrderComplete)
+		if err := protojson.Unmarshal(order.SerializedOrderComplete, existing); err != nil {
+			return nil, err
+		}
+		if len(existing.Ratings) == 0 && len(complete.Ratings) > 0 {
+			isRatingSupplement = true
+		} else {
+			logger.LogInfoWithIDf(log, op.nodeID, "Duplicate ORDER_COMPLETE message does not match original for order: %s", order.ID)
+			return nil, ErrChangedMessage
+		}
 	}
 
 	if order.SerializedOrderCancel != nil {
@@ -44,20 +56,18 @@ func (op *OrderProcessor) processOrderCompleteMessage(dbtx database.Tx, order *m
 		return nil, err
 	}
 
-	if len(order.SerializedOrderFulfillments) == 0 {
+	if !isRatingSupplement && len(order.SerializedOrderFulfillments) == 0 {
 		logger.LogInfoWithIDf(log, op.nodeID, "Parking ORDER_COMPLETE for order %s: awaiting fulfillment", order.ID)
 		return nil, order.ParkMessage(message)
 	}
 
-	if len(complete.Ratings) != len(orderOpen.Items) {
+	if len(complete.Ratings) > 0 && len(complete.Ratings) != len(orderOpen.Items) {
 		return nil, errors.New("number of ratings does not equal number of items in the order")
 	}
 
-	if len(complete.Ratings) > 0 {
-		for _, rating := range complete.Ratings {
-			if err := utils.ValidateRating(rating); err != nil {
-				return nil, err
-			}
+	for _, rating := range complete.Ratings {
+		if err := utils.ValidateRating(rating); err != nil {
+			return nil, err
 		}
 	}
 	if order.Role() == models.RoleVendor && len(complete.Ratings) > 0 {
@@ -93,6 +103,11 @@ func (op *OrderProcessor) processOrderCompleteMessage(dbtx database.Tx, order *m
 				return nil, err
 			}
 		}
+	}
+
+	if isRatingSupplement {
+		logger.LogInfoWithIDf(log, op.nodeID, "Processed rating supplement for completed order %s", order.ID)
+		return nil, order.PutMessage(message)
 	}
 
 	if order.Role() == models.RoleVendor {

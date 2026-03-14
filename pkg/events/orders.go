@@ -123,6 +123,15 @@ type OrderExpired struct {
 	Reason  string `json:"reason"` // e.g. "payment_timeout"
 }
 
+// OrderStaleWarning is emitted when an order has been stuck in a state
+// longer than the warning threshold (e.g. PENDING > 7d, AWAITING_FULFILLMENT > 14d).
+type OrderStaleWarning struct {
+	Notification
+	OrderID  string `json:"orderID"`
+	State    string `json:"state"`    // current order state
+	StuckFor string `json:"stuckFor"` // human-readable duration (e.g. "7d")
+}
+
 type Refund struct {
 	Notification
 	OrderID      string    `json:"orderID"`

@@ -38,7 +38,10 @@ func (op *OrderProcessor) processOrderConfirmationMessage(dbtx database.Tx, orde
 
 	orderOpen, err := order.OrderOpenMessage()
 	if models.IsMessageNotExistError(err) {
-		return nil, order.ParkMessage(message)
+		if parkErr := order.ParkMessage(message); parkErr != nil {
+			return nil, parkErr
+		}
+		return nil, ErrMessageParked
 	}
 	if err != nil {
 		return nil, err
@@ -46,7 +49,10 @@ func (op *OrderProcessor) processOrderConfirmationMessage(dbtx database.Tx, orde
 
 	paymentSent, err := order.PaymentSentMessage()
 	if models.IsMessageNotExistError(err) {
-		return nil, order.ParkMessage(message)
+		if parkErr := order.ParkMessage(message); parkErr != nil {
+			return nil, parkErr
+		}
+		return nil, ErrMessageParked
 	}
 	if err != nil {
 		return nil, err

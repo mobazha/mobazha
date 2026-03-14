@@ -50,7 +50,10 @@ func (op *OrderProcessor) processOrderCompleteMessage(dbtx database.Tx, order *m
 
 	orderOpen, err := order.OrderOpenMessage()
 	if models.IsMessageNotExistError(err) {
-		return nil, order.ParkMessage(message)
+		if parkErr := order.ParkMessage(message); parkErr != nil {
+			return nil, parkErr
+		}
+		return nil, ErrMessageParked
 	}
 	if err != nil {
 		return nil, err
@@ -58,7 +61,10 @@ func (op *OrderProcessor) processOrderCompleteMessage(dbtx database.Tx, order *m
 
 	if !isRatingSupplement && len(order.SerializedOrderFulfillments) == 0 {
 		logger.LogInfoWithIDf(log, op.nodeID, "Parking ORDER_COMPLETE for order %s: awaiting fulfillment", order.ID)
-		return nil, order.ParkMessage(message)
+		if parkErr := order.ParkMessage(message); parkErr != nil {
+			return nil, parkErr
+		}
+		return nil, ErrMessageParked
 	}
 
 	if len(complete.Ratings) > 0 && len(complete.Ratings) != len(orderOpen.Items) {

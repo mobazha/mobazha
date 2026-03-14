@@ -22,7 +22,10 @@ func (op *OrderProcessor) processRefundMessage(dbtx database.Tx, order *models.O
 
 	orderOpen, err := order.OrderOpenMessage()
 	if models.IsMessageNotExistError(err) {
-		return nil, order.ParkMessage(message)
+		if parkErr := order.ParkMessage(message); parkErr != nil {
+			return nil, parkErr
+		}
+		return nil, ErrMessageParked
 	}
 	if err != nil {
 		return nil, err
@@ -30,7 +33,10 @@ func (op *OrderProcessor) processRefundMessage(dbtx database.Tx, order *models.O
 
 	paymentSent, err := order.PaymentSentMessage()
 	if models.IsMessageNotExistError(err) {
-		return nil, order.ParkMessage(message)
+		if parkErr := order.ParkMessage(message); parkErr != nil {
+			return nil, parkErr
+		}
+		return nil, ErrMessageParked
 	}
 	if err != nil {
 		return nil, err

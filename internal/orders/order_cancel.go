@@ -36,7 +36,10 @@ func (op *OrderProcessor) processOrderCancelMessage(dbtx database.Tx, order *mod
 
 	orderOpen, err := order.OrderOpenMessage()
 	if models.IsMessageNotExistError(err) {
-		return nil, order.ParkMessage(message)
+		if parkErr := order.ParkMessage(message); parkErr != nil {
+			return nil, parkErr
+		}
+		return nil, ErrMessageParked
 	}
 	if err != nil {
 		return nil, err
@@ -44,7 +47,10 @@ func (op *OrderProcessor) processOrderCancelMessage(dbtx database.Tx, order *mod
 
 	paymentSent, err := order.PaymentSentMessage()
 	if models.IsMessageNotExistError(err) {
-		return nil, order.ParkMessage(message)
+		if parkErr := order.ParkMessage(message); parkErr != nil {
+			return nil, parkErr
+		}
+		return nil, ErrMessageParked
 	}
 	if err != nil {
 		return nil, err

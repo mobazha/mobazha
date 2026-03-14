@@ -1,6 +1,7 @@
 package orders
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -111,7 +112,7 @@ func Test_processPaymentSentMessage(t *testing.T) {
 				order.SerializedOrderOpen = nil
 				return nil
 			},
-			expectedError: nil,
+			expectedError: ErrMessageParked,
 			expectedEvent: nil,
 			checkTxs: func(order *models.Order) error {
 				return nil
@@ -127,8 +128,8 @@ func Test_processPaymentSentMessage(t *testing.T) {
 		}
 		err := op.db.Update(func(tx database.Tx) error {
 			event, err := op.processPaymentSentMessage(tx, order, orderMsg)
-			if err != test.expectedError {
-				return fmt.Errorf("incorrect error returned. Expected %t, got %t", test.expectedError, err)
+			if !errors.Is(err, test.expectedError) {
+				return fmt.Errorf("incorrect error returned. Expected %v, got %v", test.expectedError, err)
 			}
 			if !reflect.DeepEqual(event, test.expectedEvent) {
 				return fmt.Errorf("incorrect event returned")

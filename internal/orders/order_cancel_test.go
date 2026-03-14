@@ -2,12 +2,12 @@ package orders
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
-
-	"github.com/mobazha/mobazha3.0/internal/database"
-
 	"reflect"
 	"testing"
+
+	"github.com/mobazha/mobazha3.0/internal/database"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -138,7 +138,7 @@ func TestOrderProcessor_processCancelMessage(t *testing.T) {
 				order.SerializedOrderDecline = []byte{0x00}
 				return nil
 			},
-			expectedError: nil,
+			expectedError: ErrMessageParked,
 			expectedEvent: nil,
 		},
 		{
@@ -169,7 +169,7 @@ func TestOrderProcessor_processCancelMessage(t *testing.T) {
 				order.SerializedOrderOpen = nil
 				return nil
 			},
-			expectedError: nil,
+			expectedError: ErrMessageParked,
 			expectedEvent: nil,
 		},
 	}
@@ -182,8 +182,8 @@ func TestOrderProcessor_processCancelMessage(t *testing.T) {
 		}
 		err := op.db.Update(func(tx database.Tx) error {
 			event, err := op.processOrderCancelMessage(tx, order, orderMsg)
-			if err != test.expectedError {
-				return fmt.Errorf("incorrect error returned. Expected %t, got %t", test.expectedError, err)
+			if !errors.Is(err, test.expectedError) {
+				return fmt.Errorf("incorrect error returned. Expected %v, got %v", test.expectedError, err)
 			}
 			if !reflect.DeepEqual(event, test.expectedEvent) {
 				return fmt.Errorf("incorrect event returned")

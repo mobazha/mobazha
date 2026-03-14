@@ -2,6 +2,7 @@ package orders
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -202,7 +203,7 @@ func TestOrderProcessor_processDisputeOpenMessage(t *testing.T) {
 				order.SerializedOrderOpen = nil
 				return nil
 			},
-			expectedError: nil,
+			expectedError: ErrMessageParked,
 			expectedEvent: nil,
 		},
 		{
@@ -215,7 +216,7 @@ func TestOrderProcessor_processDisputeOpenMessage(t *testing.T) {
 					MessageType: npb.OrderMessage_ORDER_OPEN,
 				})
 			},
-			expectedError: nil,
+			expectedError: ErrMessageParked,
 			expectedEvent: nil,
 		},
 	}
@@ -228,8 +229,8 @@ func TestOrderProcessor_processDisputeOpenMessage(t *testing.T) {
 		}
 		err := op.db.Update(func(tx database.Tx) error {
 			event, err := op.processDisputeOpenMessage(tx, order, orderMsg)
-			if err != test.expectedError {
-				return fmt.Errorf("incorrect error returned. Expected %t, got %t", test.expectedError, err)
+			if !errors.Is(err, test.expectedError) {
+				return fmt.Errorf("incorrect error returned. Expected %v, got %v", test.expectedError, err)
 			}
 			if !reflect.DeepEqual(event, test.expectedEvent) {
 				fmt.Println(event)

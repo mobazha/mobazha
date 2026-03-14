@@ -29,6 +29,9 @@ var (
 	log                  = logging.MustGetLogger("ORDR")
 	ErrChangedMessage    = errors.New("different duplicate message")
 	ErrUnexpectedMessage = errors.New("unexpected message")
+	// ErrMessageParked is returned by handlers when a message is parked
+	// (dependencies not yet available). The FSM transition should be skipped.
+	ErrMessageParked = errors.New("message parked")
 )
 
 // DepositVerifyParams holds chain-agnostic parameters for on-chain deposit verification.
@@ -199,6 +202,9 @@ func (op *OrderProcessor) ProcessMessage(dbtx database.Tx, message *npb.OrderMes
 			continue
 		}
 		_, err = op.processMessage(dbtx, &order, parked)
+		if errors.Is(err, ErrMessageParked) {
+			continue
+		}
 		if err != nil {
 			logger.LogInfoWithIDf(log, op.nodeID, "Error processing parked message for order %s: %s", order.ID.String(), err)
 			if err := order.PutErrorMessage(parked); err != nil {
@@ -368,6 +374,9 @@ func (op *OrderProcessor) processMessage(dbtx database.Tx, order *models.Order, 
 		event, err = op.processPaymentFinalizeMessage(dbtx, order, message)
 	default:
 		return nil, errors.New("unknown order message type")
+	}
+	if errors.Is(err, ErrMessageParked) {
+		return nil, nil
 	}
 	if err != nil {
 		return nil, err

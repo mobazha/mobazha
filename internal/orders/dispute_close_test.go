@@ -2,6 +2,7 @@ package orders
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -294,12 +295,12 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 			expectedEvent: nil,
 		},
 		{
-			// Out of order.
+			// Out of order — message parked until dependencies available.
 			setup: func(order *models.Order) error {
 				order.SerializedOrderOpen = nil
 				return nil
 			},
-			expectedError: nil,
+			expectedError: ErrMessageParked,
 			expectedEvent: nil,
 		},
 	}
@@ -312,8 +313,8 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 		}
 		err := op.db.Update(func(tx database.Tx) error {
 			event, err := op.processDisputeCloseMessage(tx, order, orderMsg)
-			if err != test.expectedError {
-				return fmt.Errorf("incorrect error returned. Expected %t, got %t", test.expectedError, err)
+			if !errors.Is(err, test.expectedError) {
+				return fmt.Errorf("incorrect error returned. Expected %v, got %v", test.expectedError, err)
 			}
 			if !reflect.DeepEqual(event, test.expectedEvent) {
 				fmt.Println(event)

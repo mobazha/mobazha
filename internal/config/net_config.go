@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"net/http"
 	"strconv"
 	"sync"
 
@@ -20,10 +19,6 @@ type NetConfig struct {
 
 	PlatformAddrs     map[iwallet.ChainType]string `json:"platformAddrs,omitempty"`
 	platformAddrMutex sync.RWMutex                 `json:"-"`
-
-	// ExtraFeesPerByte 从测试看，从一些fee provider拿到的fee比实际的fee要低，所以需要额外加一些fee
-	ExtraFeesPerByte      map[iwallet.ChainType]int32 `json:"extraFeesPerByte,omitempty"`
-	extraFeesPerByteMutex sync.RWMutex                `json:"-"`
 
 	dataMutex sync.RWMutex      `json:"-"`
 	Data      map[string]string `json:"data,omitempty"`
@@ -43,14 +38,6 @@ var defaultMainnetPlatformAddrs = map[iwallet.ChainType]string{
 
 var defaultTestnetPlatformAddrs = map[iwallet.ChainType]string{}
 
-var defaultExtraFeesPerByte = map[iwallet.ChainType]int32{
-	iwallet.ChainBitcoin:     0,
-	iwallet.ChainEthereum:    0,
-	iwallet.ChainBitcoinCash: 3,
-	iwallet.ChainLitecoin:    3,
-	iwallet.ChainZCash:       0,
-}
-
 func DefaultNetConfig() *NetConfig {
 	return &NetConfig{
 		dataMutex: sync.RWMutex{},
@@ -58,8 +45,6 @@ func DefaultNetConfig() *NetConfig {
 
 		platformAddrMutex: sync.RWMutex{},
 		Testnet:           true,
-
-		extraFeesPerByteMutex: sync.RWMutex{},
 	}
 }
 
@@ -74,7 +59,6 @@ func LoadNetConfig(endpoint string) (*NetConfig, error) {
 	}
 	config.dataMutex = sync.RWMutex{}
 	config.platformAddrMutex = sync.RWMutex{}
-	config.extraFeesPerByteMutex = sync.RWMutex{}
 
 	return &config, nil
 }
@@ -154,17 +138,6 @@ func (config *NetConfig) GetCommissionInfo(coinType iwallet.CoinType) (iwallet.A
 	return iwallet.NewAddress(addr, coinType), commission
 }
 
-func (config *NetConfig) GetExtraFeesPerByte(chainType iwallet.ChainType) iwallet.Amount {
-	config.extraFeesPerByteMutex.RLock()
-	defer config.extraFeesPerByteMutex.RUnlock()
-
-	val, ok := config.ExtraFeesPerByte[chainType]
-	if ok {
-		return iwallet.NewAmount(val)
-	}
-	return iwallet.NewAmount(defaultExtraFeesPerByte[chainType])
-}
-
 // GetVerifiedModEndpoint API URL to get verified moderator IDs.
 func (config *NetConfig) GetVerifiedModEndpoint() string {
 	val, _ := config.GetConfig("verifiedModEndpoint")
@@ -192,21 +165,6 @@ func (config *NetConfig) GetFeeUrl(coinType iwallet.ChainType) string {
 		url = "https://mobazha.info/api/ticker/fees"
 	}
 	return fmt.Sprintf(url+"?protocol=%s", protocol)
-}
-
-func (config *NetConfig) GetBlockbookWebsocketHeader() http.Header {
-	origin, _ := config.GetConfig("blockbookOrigin")
-	if len(origin) == 0 {
-		origin = "https://node.trezor.io"
-	}
-	userAgent, _ := config.GetConfig("blockbookUserAgent")
-	if len(userAgent) == 0 {
-		userAgent = "Trezor Suite v24.9.2"
-	}
-	return http.Header{
-		"Origin":     []string{origin},
-		"User-Agent": []string{userAgent},
-	}
 }
 
 // GetMaxImportZipSize returns the maximum size for batch import ZIP files in bytes.

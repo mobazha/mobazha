@@ -48,10 +48,4 @@ func TestLoadNetConfig(t *testing.T) {
 
 	btcAddr := netConfig.GetPlatformAddr(iwallet.ChainBitcoin)
 	t.Logf("btcAddr is %s", btcAddr)
-
-	t.Logf("GetExtraFeesPerByte: %s", netConfig.GetExtraFeesPerByte(iwallet.ChainBitcoinCash))
-}
-
-func TestNetConfig_GetExtraFeesPerByte(t *testing.T) {
-	t.Log(DefaultNetConfig().GetExtraFeesPerByte(iwallet.ChainBitcoinCash))
 }

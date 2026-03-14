@@ -84,6 +84,7 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 				Logger:    logger,
 				DB:        db,
 				Testnet:   cfg.UseTestnet,
+				Regtest:   cfg.UseRegtest,
 				NetConfig: cfg.NetConfig,
 			})
 			if err != nil {
@@ -97,6 +98,7 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 				Logger:    logger,
 				DB:        db,
 				Testnet:   cfg.UseTestnet,
+				Regtest:   cfg.UseRegtest,
 				NetConfig: cfg.NetConfig,
 			})
 			if err != nil {
@@ -110,6 +112,7 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 				Logger:    logger,
 				DB:        db,
 				Testnet:   cfg.UseTestnet,
+				Regtest:   cfg.UseRegtest,
 				NetConfig: cfg.NetConfig,
 			})
 			if err != nil {
@@ -123,6 +126,7 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 				Logger:    logger,
 				DB:        db,
 				Testnet:   cfg.UseTestnet,
+				Regtest:   cfg.UseRegtest,
 				NetConfig: cfg.NetConfig,
 			})
 			if err != nil {

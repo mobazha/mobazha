@@ -424,6 +424,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		chains.LogLevel(repo.LogLevelMap[strings.ToLower(cfg.LogLevel)]),
 		chains.NetConfig(netConfig),
 		chains.Testnet(walletTestnet),
+		chains.Regtest(cfg.Regtest),
 	}
 	mw, err := chains.NewMultiwallet(opts...)
 	if err != nil {
@@ -1058,6 +1059,7 @@ func newLightweightNode(
 		chains.LogLevel(repo.LogLevelMap[strings.ToLower(cfg.LogLevel)]),
 		chains.NetConfig(netConfig),
 		chains.Testnet(walletTestnet),
+		chains.Regtest(cfg.Regtest),
 	}
 
 	mw, err := chains.NewMultiwallet(opts...)

@@ -85,6 +85,7 @@ type Config struct {
 	StoreAndForwardServers []string `long:"snfserver" description:"A peerID of a store and forward server to use for receiving messages while offline."`
 	Testnet                bool     `short:"t" long:"testnet" description:"Use the test network"`
 	WalletTestnet          bool     `long:"wallettestnet" description:"Use testnet for wallet transactions (coins and chains)"`
+	Regtest                bool     `long:"regtest" description:"Use the regtest network for UTXO wallets (generates bcrt1q addresses for BTC)"`
 	DisableNATPortMap      bool     `long:"noupnp" description:"Disable use of upnp."`
 	UseSSL                 bool     `long:"ssl" description:"Use SSL on the API"`
 	SSLCertFile            string   `long:"sslcertfile" description:"Path to the SSL certificate file"`

@@ -23,6 +23,7 @@ type Config struct {
 	Chains     []iwallet.ChainType
 	ChainAPIs  map[iwallet.ChainType]APIUrls
 	UseTestnet bool
+	UseRegtest bool
 	DataDir    string
 	LogDir     string
 	LogLevel   logging.Level
@@ -192,6 +193,15 @@ func LogDir(logDir string) Option {
 func Testnet(testnet bool) Option {
 	return func(cfg *Config) error {
 		cfg.UseTestnet = testnet
+		return nil
+	}
+}
+
+// Regtest configures the multiwallet to use the regtest network for UTXO coins.
+// When true, UTXO wallets generate regtest-compatible addresses (e.g. bcrt1q for BTC).
+func Regtest(regtest bool) Option {
+	return func(cfg *Config) error {
+		cfg.UseRegtest = regtest
 		return nil
 	}
 }

@@ -36,6 +36,7 @@ var _ = iwallet.UTXODirectPayment(&BitcoinWallet{})
 type BitcoinWallet struct { // nolint
 	base.WalletBase
 	testnet bool
+	regtest bool
 }
 
 // NewBitcoinWallet returns a new BitcoinWallet.
@@ -44,6 +45,7 @@ type BitcoinWallet struct { // nolint
 func NewBitcoinWallet(cfg *base.WalletConfig) (*BitcoinWallet, error) {
 	w := &BitcoinWallet{
 		testnet: cfg.Testnet,
+		regtest: cfg.Regtest,
 	}
 	w.Init()
 
@@ -429,6 +431,9 @@ func (w *BitcoinWallet) ReleaseFundsAfterTimeout(wtx iwallet.Tx, txn iwallet.Tra
 }
 
 func (w *BitcoinWallet) params() *chaincfg.Params {
+	if w.regtest {
+		return &chaincfg.RegressionNetParams
+	}
 	if w.testnet {
 		return &chaincfg.TestNet3Params
 	}

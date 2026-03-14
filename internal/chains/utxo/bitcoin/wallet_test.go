@@ -66,6 +66,111 @@ func newTestWallet() (*BitcoinWallet, error) {
 	return w, nil
 }
 
+func TestBitcoinWallet_Params_NetworkSelection(t *testing.T) {
+	tests := []struct {
+		name        string
+		testnet     bool
+		regtest     bool
+		wantName    string
+		wantBech32  string
+	}{
+		{
+			name:       "mainnet",
+			testnet:    false,
+			regtest:    false,
+			wantName:   "mainnet",
+			wantBech32: "bc",
+		},
+		{
+			name:       "testnet",
+			testnet:    true,
+			regtest:    false,
+			wantName:   "testnet3",
+			wantBech32: "tb",
+		},
+		{
+			name:       "regtest",
+			testnet:    false,
+			regtest:    true,
+			wantName:   "regtest",
+			wantBech32: "bcrt",
+		},
+		{
+			name:       "regtest takes precedence over testnet",
+			testnet:    true,
+			regtest:    true,
+			wantName:   "regtest",
+			wantBech32: "bcrt",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &BitcoinWallet{
+				testnet: tt.testnet,
+				regtest: tt.regtest,
+			}
+			p := w.params()
+			if p.Name != tt.wantName {
+				t.Errorf("params().Name = %q, want %q", p.Name, tt.wantName)
+			}
+			if p.Bech32HRPSegwit != tt.wantBech32 {
+				t.Errorf("params().Bech32HRPSegwit = %q, want %q", p.Bech32HRPSegwit, tt.wantBech32)
+			}
+		})
+	}
+}
+
+func TestNewBitcoinWallet_PropagatesRegtest(t *testing.T) {
+	tests := []struct {
+		name       string
+		cfgRegtest bool
+		cfgTestnet bool
+		wantNet    string
+	}{
+		{"regtest propagated", true, false, "regtest"},
+		{"testnet propagated", false, true, "testnet3"},
+		{"mainnet by default", false, false, "mainnet"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w, err := NewBitcoinWallet(&base.WalletConfig{
+				Testnet:   tt.cfgTestnet,
+				Regtest:   tt.cfgRegtest,
+				NetConfig: config.DefaultNetConfig(),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			p := w.params()
+			if p.Name != tt.wantNet {
+				t.Errorf("NewBitcoinWallet(Regtest=%v, Testnet=%v): params().Name = %q, want %q",
+					tt.cfgRegtest, tt.cfgTestnet, p.Name, tt.wantNet)
+			}
+		})
+	}
+}
+
+func TestBitcoinWallet_CreateMultisigAddress_RegtestPrefix(t *testing.T) {
+	w := &BitcoinWallet{regtest: true}
+	w.Init()
+	w.CoinType = iwallet.CtBitcoin
+
+	key1Bytes, _ := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
+	key2Bytes, _ := hex.DecodeString("c68ab7796c52952a062b4c875c758ae3831448240fb58c152cc58a224d6ad3b8")
+	key1, _ := btcec.PrivKeyFromBytes(key1Bytes)
+	key2, _ := btcec.PrivKeyFromBytes(key2Bytes)
+
+	addr, _, err := w.CreateMultisigAddress([]btcec.PublicKey{*key1.PubKey(), *key2.PubKey()}, []byte{}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(addr.String()) < 4 || addr.String()[:4] != "bcrt" {
+		t.Errorf("Expected bcrt prefix for regtest, got address: %s", addr.String())
+	}
+}
+
 func TestBitcoinWallet_ValidateAddress(t *testing.T) {
 	tests := []struct {
 		address iwallet.Address

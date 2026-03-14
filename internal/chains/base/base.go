@@ -24,6 +24,7 @@ type WalletConfig struct {
 	DB        database.Database
 	Logger    *logging.Logger
 	Testnet   bool
+	Regtest   bool
 	NetConfig *config.NetConfig
 }
 

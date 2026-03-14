@@ -618,8 +618,6 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	obNode.signer = signer
 	obNode.orderLockManager = NewOrderLockManager()
 
-	pvs := NewPaymentVerificationService(obNode.paymentRegistry, obNode.multiwallet, nil)
-
 	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
 		NodeID:               nodeID,
 		Identity:             obNode.peerID,
@@ -633,8 +631,6 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		FeatureManager: obNode.featureManager,
 		StateValidator: &coreStateBridge{},
 	})
-	obNode.paymentVerificationService = pvs
-
 	// Register libp2p HTTP proxy handler for standalone nodes so that the
 	// SaaS proxy can forward management requests via libp2p streams.
 	if !cfg.SaaSMode && len(cfg.HTTPProxyTrustedPeers) > 0 {

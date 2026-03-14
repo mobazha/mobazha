@@ -70,8 +70,11 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 
 	logger.LogInfoWithIDf(log, n.nodeID, "Registered payment strategies for %d chains", len(n.paymentRegistry.Chains()))
 
-	// Wire the registry and receipt verifier to App Services
+	// Wire the registry and receipt verifier to App Services and PVS
 	compositeVerifier := adapters.NewCompositeReceiptVerifier(n.multiwallet)
+	if n.paymentVerificationService != nil {
+		n.paymentVerificationService.SetRegistry(n.paymentRegistry)
+	}
 	if n.paymentService != nil {
 		n.paymentService.SetRegistry(n.paymentRegistry)
 		n.paymentService.SetReceiptVerifier(compositeVerifier)

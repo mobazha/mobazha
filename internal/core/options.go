@@ -91,6 +91,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initModerationService()
 	n.initListingService()
 	n.initPaymentService()
+	n.initPaymentVerificationService()
 	n.initOrderService()
 	n.wireServiceSetters()
 	n.initChatService()
@@ -104,6 +105,23 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initFollowService()
 	n.initPostsService()
 	n.initAnalyticsService()
+}
+
+// initPaymentVerificationService creates the PaymentVerificationService.
+// Registry is nil at construction time; wired later by registerPaymentStrategies()
+// during Start(). multiwallet is available from the builder.
+func (n *MobazhaNode) initPaymentVerificationService() {
+	if n.infrastructureOnly {
+		return
+	}
+	if n.paymentVerificationService != nil {
+		return
+	}
+	n.paymentVerificationService = NewPaymentVerificationService(
+		n.paymentRegistry,
+		n.multiwallet,
+		nil,
+	)
 }
 
 // wireServiceSetters resolves late-init wiring via setter injection,

@@ -550,28 +550,29 @@ func (s *FiatPaymentAppService) GetProviderConfig(providerID string) (*contracts
 
 // SaveProviderConfig stores/updates the fiat provider config, creates a ReceivingAccount,
 // and registers the provider in the registry (standalone mode).
+// Uses upsert semantics: updates existing config if (tenant_id, provider_id) already exists.
 func (s *FiatPaymentAppService) SaveProviderConfig(providerID string, input contracts.ProviderConfigInput) error {
-	cfg := &models.FiatProviderConfig{
-		ProviderID:    providerID,
-		AccountID:     input.AccountID,
-		PublicKey:     input.PublicKey,
-		SecretKey:     input.SecretKey,
-		WebhookSecret: input.WebhookSecret,
-		IsActive:      true,
-	}
-
 	chainType := FiatChainType(providerID)
-	ra := &models.ReceivingAccount{
-		ChainType: chainType,
-		Address:   input.AccountID,
-		IsActive:  true,
-	}
 
 	if err := s.db.Update(func(tx database.Tx) error {
-		if err := tx.Save(cfg); err != nil {
+		cfg := &models.FiatProviderConfig{
+			ProviderID:    providerID,
+			AccountID:     input.AccountID,
+			PublicKey:     input.PublicKey,
+			SecretKey:     input.SecretKey,
+			WebhookSecret: input.WebhookSecret,
+			IsActive:      true,
+		}
+		if err := database.SaveByBusinessKey(tx, cfg, "provider_id = ?", providerID); err != nil {
 			return err
 		}
-		return tx.Save(ra)
+
+		ra := &models.ReceivingAccount{
+			ChainType: chainType,
+			Address:   input.AccountID,
+			IsActive:  true,
+		}
+		return database.SaveByBusinessKey(tx, ra, "chain_type = ?", chainType)
 	}); err != nil {
 		return err
 	}

@@ -103,6 +103,10 @@ func NewRepoWithSharedDB(nodeID string, dataDir string, sharedDB *gorm.DB, ident
 		return nil, fmt.Errorf("nodeID must not be empty for shared DB mode")
 	}
 
+	if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
+		return nil, fmt.Errorf("failed to create data directory %s: %w", dataDir, err)
+	}
+
 	pd := ffsqlite.NewDBPublicData(sharedDB, nodeID)
 	db, err := ffsqlite.NewTenantDBWithPublicData(sharedDB, nodeID, pd)
 	if err != nil {

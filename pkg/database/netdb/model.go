@@ -2,6 +2,11 @@ package netdb
 
 import "encoding/json"
 
+// dataEnvelope wraps responses from the search API which uses {"data": ...} envelope format.
+type dataEnvelope[T any] struct {
+	Data T `json:"data"`
+}
+
 // Nounce For empty http body with TrackingID signature for verification
 type Nounce struct {
 	PeerID string

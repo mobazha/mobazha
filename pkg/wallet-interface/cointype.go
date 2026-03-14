@@ -34,9 +34,7 @@ func (chaintype ChainType) String() string {
 
 func GetAllSupportedChainTypes() []ChainType {
 	return []ChainType{
-		// UTXO chains (external wallet payment)
-		// ChainBitcoin, ChainLitecoin,
-		// EVM and Solana chains (AppKit wallet)
+		ChainBitcoin, ChainLitecoin,
 		ChainSolana, ChainStripe, ChainEthereum, ChainBSC, ChainBase,
 	}
 }
@@ -492,6 +490,7 @@ func IsSPLTokenCoinType(coinType CoinType) bool {
 
 func GetAllSupportedCoinTypes() []CoinType {
 	return []CoinType{
+		CtBitcoin, CtLitecoin,
 		CtSolana, CtBNB, CtPolygon, CtBaseETH,
 		CtBEP20USDT, CtBEP20USDC, CtBaseUSDT, CtBaseUSDC, CtPolygonUSDT, CtPolygonUSDC, CtSPLUSDT, CtSPLUSDC,
 	}

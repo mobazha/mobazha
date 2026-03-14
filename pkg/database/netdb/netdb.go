@@ -96,14 +96,14 @@ func (ndb *NetDB) newSignedRequest(ctx *request.Context) (*resty.Request, error)
 func (ndb *NetDB) GetProfile(peerID string, ctx *request.Context) (*models.Profile, error) {
 	logger.LogInfoWithIDf(log, peerID, "Get profile for %s", peerID)
 
-	var netProfile Profile
-	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&netProfile).Get(fmt.Sprintf("%s/profiles/%s", ndb.endpoint, peerID))
+	var envelope dataEnvelope[Profile]
+	_, err := ndb.restyClient.R().ForceContentType("application/json").SetResult(&envelope).Get(fmt.Sprintf("%s/profiles/%s", ndb.endpoint, peerID))
 	if err != nil {
 		return nil, err
 	}
 
 	profile := new(models.Profile)
-	err = json.Unmarshal(netProfile.SerializedProfile, profile)
+	err = json.Unmarshal(envelope.Data.SerializedProfile, profile)
 	if err != nil {
 		return nil, err
 	}
@@ -146,16 +146,16 @@ func (ndb *NetDB) GetFollowers(peerID string, ctx *request.Context) (models.Foll
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
 
-	var netFollowers Followers
+	var envelope dataEnvelope[Followers]
 	_, err = req.
-		SetResult(&netFollowers).
+		SetResult(&envelope).
 		Get(fmt.Sprintf("%s%s", ndb.endpoint, requestPath))
 	if err != nil {
 		return nil, err
 	}
 
 	followers := models.Followers{}
-	err = json.Unmarshal(netFollowers.SerializedFollowers, &followers)
+	err = json.Unmarshal(envelope.Data.SerializedFollowers, &followers)
 	if err != nil {
 		return nil, err
 	}
@@ -200,16 +200,16 @@ func (ndb *NetDB) GetFollowing(peerID string, ctx *request.Context) (models.Foll
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
 
-	var netFollowing Following
+	var envelope dataEnvelope[Following]
 	_, err = req.
-		SetResult(&netFollowing).
+		SetResult(&envelope).
 		Get(fmt.Sprintf("%s%s", ndb.endpoint, requestPath))
 	if err != nil {
 		return nil, err
 	}
 
 	following := models.Following{}
-	err = json.Unmarshal(netFollowing.SerializedFollowing, &following)
+	err = json.Unmarshal(envelope.Data.SerializedFollowing, &following)
 	if err != nil {
 		return nil, err
 	}
@@ -254,20 +254,20 @@ func (ndb *NetDB) GetListingBySlug(peerID string, slug string, ctx *request.Cont
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
 
-	var netListing Listing
+	var envelope dataEnvelope[Listing]
 	_, err = req.
-		SetResult(&netListing).
+		SetResult(&envelope).
 		Get(fmt.Sprintf("%s%s", ndb.endpoint, requestPath))
 	if err != nil {
 		return nil, err
 	}
 
 	var sl pb.SignedListing
-	err = (protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}).Unmarshal(netListing.SerializedListing, &sl)
+	err = (protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}).Unmarshal(envelope.Data.SerializedListing, &sl)
 	if err != nil {
 		return nil, err
 	}
-	sl.Cid = netListing.CID
+	sl.Cid = envelope.Data.CID
 
 	return &sl, nil
 }
@@ -284,22 +284,21 @@ func (ndb *NetDB) GetListingByCID(cid string, ctx *request.Context) (*pb.SignedL
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
 
-	var netListing Listing
+	var envelope dataEnvelope[Listing]
 	_, err = req.
-		SetResult(&netListing).
+		SetResult(&envelope).
 		Get(fmt.Sprintf("%s%s", ndb.endpoint, requestPath))
 	if err != nil {
 		return nil, err
 	}
 
 	var sl pb.SignedListing
-	err = (protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}).Unmarshal(netListing.SerializedListing, &sl)
+	err = (protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}).Unmarshal(envelope.Data.SerializedListing, &sl)
 	if err != nil {
 		return nil, err
 	}
 
-	// 设置从 API 返回的 CID（SerializedListing 中不包含 CID）
-	sl.Cid = netListing.CID
+	sl.Cid = envelope.Data.CID
 
 	return &sl, nil
 }
@@ -364,16 +363,16 @@ func (ndb *NetDB) GetListingIndex(peerID string, ctx *request.Context) (models.L
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
 
-	var netListingIndex ListingIndex
+	var envelope dataEnvelope[ListingIndex]
 	_, err = req.
-		SetResult(&netListingIndex).
+		SetResult(&envelope).
 		Get(fmt.Sprintf("%s%s", ndb.endpoint, requestPath))
 	if err != nil {
 		return nil, err
 	}
 
 	listingIndex := models.ListingIndex{}
-	err = json.Unmarshal(netListingIndex.SerializedIndex, &listingIndex)
+	err = json.Unmarshal(envelope.Data.SerializedIndex, &listingIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -418,16 +417,16 @@ func (ndb *NetDB) GetRatingIndex(peerID string, ctx *request.Context) (models.Ra
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
 
-	var netRatingIndex RatingIndex
+	var envelope dataEnvelope[RatingIndex]
 	_, err = req.
-		SetResult(&netRatingIndex).
+		SetResult(&envelope).
 		Get(fmt.Sprintf("%s%s", ndb.endpoint, requestPath))
 	if err != nil {
 		return nil, err
 	}
 
 	ratingIndex := models.RatingIndex{}
-	err = json.Unmarshal(netRatingIndex.SerializedIndex, &ratingIndex)
+	err = json.Unmarshal(envelope.Data.SerializedIndex, &ratingIndex)
 	if err != nil {
 		return nil, err
 	}

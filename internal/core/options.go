@@ -118,6 +118,9 @@ func (n *MobazhaNode) wireServiceSetters() {
 	if n.orderService != nil && n.paymentVerificationService != nil {
 		n.orderService.SetPaymentVerifier(n.paymentVerificationService)
 	}
+	if n.paymentService != nil && n.orderProcessor != nil {
+		n.paymentService.SetPaymentRecorder(n.orderProcessor)
+	}
 }
 
 // initMatrixService creates the MatrixAppService.

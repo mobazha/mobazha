@@ -1099,6 +1099,17 @@ func (o *Order) CanDispute() bool {
 func (o *Order) DeriveState() OrderState {
 	cloneOrder := *o
 
+	// Terminal states (decline/cancel) must be checked before funded, because
+	// unfunded orders can be declined by the vendor (e.g., before buyer pays).
+	// Without this, DeriveState would return AWAITING_PAYMENT for declined
+	// unfunded orders, causing the state to appear wrong in SaaS P2P mode.
+	if cloneOrder.SerializedOrderDecline != nil {
+		return OrderState_DECLINED
+	}
+	if cloneOrder.SerializedOrderCancel != nil {
+		return OrderState_CANCELED
+	}
+
 	funded, _ := cloneOrder.IsFunded()
 	if !funded {
 		return OrderState_AWAITING_PAYMENT
@@ -1107,14 +1118,6 @@ func (o *Order) DeriveState() OrderState {
 	cloneOrder.MyRole = string(RoleVendor)
 	if cloneOrder.CanConfirm() {
 		return OrderState_PENDING
-	}
-
-	if cloneOrder.SerializedOrderCancel != nil {
-		return OrderState_CANCELED
-	}
-
-	if cloneOrder.SerializedOrderDecline != nil {
-		return OrderState_DECLINED
 	}
 
 	fulfillments, err := o.OrderFulfillmentMessages()

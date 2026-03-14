@@ -20,14 +20,11 @@ import (
 // WalletConfig is struct that can be used pass into the constructor
 // for each coin's wallet.
 type WalletConfig struct {
-	NodeID          string
-	DB              database.Database
-	Logger          *logging.Logger
-	Testnet         bool
-	ClientURL       []string
-	RegistryAddress string
-	FeeURL          string
-	NetConfig       *config.NetConfig
+	NodeID    string
+	DB        database.Database
+	Logger    *logging.Logger
+	Testnet   bool
+	NetConfig *config.NetConfig
 }
 
 // DBTx satisfies the iwallet.Tx interface.

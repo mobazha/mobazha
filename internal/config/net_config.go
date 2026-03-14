@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"strconv"
 	"sync"
 
@@ -145,26 +144,6 @@ func (config *NetConfig) GetVerifiedModEndpoint() string {
 		return val
 	}
 	return "https://info.mobazha.org/search/v1/moderators/verified"
-}
-
-func (config *NetConfig) GetFeeUrl(coinType iwallet.ChainType) string {
-	protocol := "bitcoin"
-	switch coinType {
-	case iwallet.ChainBitcoin:
-		protocol = "bitcoin"
-	case iwallet.ChainLitecoin:
-		protocol = "litecoin"
-	case iwallet.ChainBitcoinCash:
-		protocol = "bitcoincash"
-	case iwallet.ChainZCash:
-		protocol = "zcash"
-	}
-
-	url, _ := config.GetConfig("feeUrl")
-	if len(url) == 0 {
-		url = "https://mobazha.info/api/ticker/fees"
-	}
-	return fmt.Sprintf(url+"?protocol=%s", protocol)
 }
 
 // GetMaxImportZipSize returns the maximum size for batch import ZIP files in bytes.

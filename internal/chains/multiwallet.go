@@ -79,17 +79,11 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 	for _, chain := range cfg.Chains {
 		switch chain {
 		case iwallet.ChainBitcoinCash:
-			clientURL := cfg.ChainAPIs[chain].MainnetWss
-			if cfg.UseTestnet {
-				clientURL = cfg.ChainAPIs[chain].TestnetWss
-			}
 			w, err := bitcoincash.NewBitcoinCashWallet(&base.WalletConfig{
 				NodeID:    cfg.NodeID,
 				Logger:    logger,
 				DB:        db,
-				ClientURL: clientURL,
 				Testnet:   cfg.UseTestnet,
-				FeeURL:    cfg.NetConfig.GetFeeUrl(chain),
 				NetConfig: cfg.NetConfig,
 			})
 			if err != nil {
@@ -98,17 +92,11 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 
 			multiwallet[chain] = w
 		case iwallet.ChainBitcoin:
-			clientURL := cfg.ChainAPIs[chain].MainnetWss
-			if cfg.UseTestnet {
-				clientURL = cfg.ChainAPIs[chain].TestnetWss
-			}
 			w, err := bitcoin.NewBitcoinWallet(&base.WalletConfig{
 				NodeID:    cfg.NodeID,
 				Logger:    logger,
 				DB:        db,
-				ClientURL: clientURL,
 				Testnet:   cfg.UseTestnet,
-				FeeURL:    cfg.NetConfig.GetFeeUrl(chain),
 				NetConfig: cfg.NetConfig,
 			})
 			if err != nil {
@@ -117,17 +105,11 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 
 			multiwallet[chain] = w
 		case iwallet.ChainLitecoin:
-			clientURL := cfg.ChainAPIs[chain].MainnetWss
-			if cfg.UseTestnet {
-				clientURL = cfg.ChainAPIs[chain].TestnetWss
-			}
 			w, err := litecoin.NewLitecoinWallet(&base.WalletConfig{
 				NodeID:    cfg.NodeID,
 				Logger:    logger,
 				DB:        db,
-				ClientURL: clientURL,
 				Testnet:   cfg.UseTestnet,
-				FeeURL:    cfg.NetConfig.GetFeeUrl(chain),
 				NetConfig: cfg.NetConfig,
 			})
 			if err != nil {
@@ -136,15 +118,10 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 
 			multiwallet[chain] = w
 		case iwallet.ChainZCash:
-			clientURL := cfg.ChainAPIs[chain].MainnetWss
-			if cfg.UseTestnet {
-				clientURL = cfg.ChainAPIs[chain].TestnetWss
-			}
 			w, err := zcash.NewZCashWallet(&base.WalletConfig{
 				NodeID:    cfg.NodeID,
 				Logger:    logger,
 				DB:        db,
-				ClientURL: clientURL,
 				Testnet:   cfg.UseTestnet,
 				NetConfig: cfg.NetConfig,
 			})

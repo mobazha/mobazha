@@ -88,7 +88,6 @@ func init() {
 type ZCashWallet struct { // nolint
 	base.WalletBase
 	testnet     bool
-	feeURL      string
 	feeProvider base.FeeProvider
 }
 
@@ -98,7 +97,6 @@ type ZCashWallet struct { // nolint
 func NewZCashWallet(cfg *base.WalletConfig) (*ZCashWallet, error) {
 	w := &ZCashWallet{
 		testnet: cfg.Testnet,
-		feeURL:  cfg.FeeURL,
 	}
 	w.Init()
 

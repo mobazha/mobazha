@@ -82,7 +82,7 @@ func setupMockNetDB(t *testing.T, nodes []*MobazhaNode) {
 				SerializedIndex: serializedIndex,
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(resp)
+			json.NewEncoder(w).Encode(map[string]interface{}{"data": resp})
 
 		case len(parts) == 1 && parts[0] == "listing-indexes" && r.Method == http.MethodPost:
 			w.WriteHeader(http.StatusOK)
@@ -136,7 +136,7 @@ func setupMockNetDB(t *testing.T, nodes []*MobazhaNode) {
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(listing)
+			json.NewEncoder(w).Encode(map[string]interface{}{"data": listing})
 
 		case len(parts) == 2 && parts[0] == "profiles" && r.Method == http.MethodGet:
 			peerID := parts[1]
@@ -161,7 +161,7 @@ func setupMockNetDB(t *testing.T, nodes []*MobazhaNode) {
 			serialized, _ := json.Marshal(profile)
 			resp := netdb.Profile{PeerID: peerID, SerializedProfile: serialized}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(resp)
+			json.NewEncoder(w).Encode(map[string]interface{}{"data": resp})
 
 		case len(parts) == 1 && parts[0] == "profiles" && r.Method == http.MethodPost:
 			w.WriteHeader(http.StatusOK)
@@ -192,7 +192,7 @@ func setupMockNetDB(t *testing.T, nodes []*MobazhaNode) {
 			serialized, _ := json.Marshal(index)
 			resp := netdb.RatingIndex{PeerID: peerID, SerializedIndex: serialized}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(resp)
+			json.NewEncoder(w).Encode(map[string]interface{}{"data": resp})
 
 		case len(parts) == 1 && parts[0] == "rating-indexes" && r.Method == http.MethodPost:
 			w.WriteHeader(http.StatusOK)

@@ -10,7 +10,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/chains"
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -60,9 +59,6 @@ func TestOrderProcessor_processRefundMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	mw := op.multiwallet.(*chains.Multiwallet)
-	(*mw)[iwallet.ChainMock] = wn.Wallets()[0]
 
 	_, pub, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
@@ -170,16 +166,9 @@ func TestOrderProcessor_processRefundMessage(t *testing.T) {
 				VendorID:     vendorPeerID,
 			},
 			checkTxs: func(order *models.Order) error {
-				orderTxs, err := order.GetTransactions()
-				if err != nil {
-					return err
-				}
-				if len(orderTxs) == 0 {
-					return errors.New("failed to record any tx")
-				}
-				if orderTxs[0].ID != txs[0].ID {
-					return errors.New("failed to record tx")
-				}
+				// Wallet I/O (GetTransaction + PutTransaction) has been moved to
+				// the orchestration layer (OrderAppService). The handler only stores
+				// the refund message; transaction recording is no longer its responsibility.
 				return nil
 			},
 		},

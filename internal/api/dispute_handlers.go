@@ -2,10 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/ipfs/go-cid"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
@@ -19,7 +21,8 @@ func (g *Gateway) handlePOSTOpenDispute(w http.ResponseWriter, r *http.Request) 
 	}
 
 	type dispute struct {
-		Claim string `json:"claim"`
+		Claim          string   `json:"claim"`
+		EvidenceHashes []string `json:"evidenceHashes"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	var d dispute
@@ -29,10 +32,22 @@ func (g *Gateway) handlePOSTOpenDispute(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	const maxEvidenceImages = 10
+	if len(d.EvidenceHashes) > maxEvidenceImages {
+		ErrorResponse(w, http.StatusBadRequest, "too many evidence images")
+		return
+	}
+	for _, h := range d.EvidenceHashes {
+		if _, err := cid.Decode(h); err != nil {
+			ErrorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid evidence CID %q: %s", h, err.Error()))
+			return
+		}
+	}
+
 	node := getOrderService(r)
 
 	done := make(chan struct{})
-	err = node.OpenDispute(models.OrderID(orderID), d.Claim, done)
+	err = node.OpenDispute(models.OrderID(orderID), d.Claim, d.EvidenceHashes, done)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return

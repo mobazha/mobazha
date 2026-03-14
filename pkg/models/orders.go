@@ -182,6 +182,8 @@ type Order struct {
 	// Fiat payment fields — populated when a fiat webhook event is processed
 	PaymentTransactionID string `gorm:"index"` // provider payment ID (Stripe PaymentIntent / PayPal Capture)
 	FiatMetadata         []byte // JSON-encoded map[string]string for fiat-specific data (disputes, etc.)
+
+	DisputeEvidenceHashes StringSlice `gorm:"type:text"` // image CIDs uploaded as dispute evidence
 }
 
 func (o *Order) BeforeSave(tx *gorm.DB) (err error) {

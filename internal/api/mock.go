@@ -56,7 +56,7 @@ type mockNode struct {
 	refundOrderViaRelayFunc                 func(orderID models.OrderID, done chan struct{}) error
 	declineOrderViaRelayFunc                 func(orderID models.OrderID, reason string, done chan struct{}) error
 	cancelOrderViaRelayFunc                 func(orderID models.OrderID, done chan struct{}) error
-	openDisputeFunc                         func(orderID models.OrderID, reason string, done chan struct{}) error
+	openDisputeFunc                         func(orderID models.OrderID, reason string, evidenceHashes []string, done chan struct{}) error
 	closeDisputeFunc                        func(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
 	getReleaseFundsInstructionsFunc         func(orderID models.OrderID, initiatorAddress string) (iwallet.CoinType, any, error)
 	releaseFundsFunc                        func(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
@@ -303,8 +303,8 @@ func (m *mockNode) CancelOrderViaRelay(orderID models.OrderID, done chan struct{
 	}
 	return nil
 }
-func (m *mockNode) OpenDispute(orderID models.OrderID, reason string, done chan struct{}) error {
-	return m.openDisputeFunc(orderID, reason, done)
+func (m *mockNode) OpenDispute(orderID models.OrderID, reason string, evidenceHashes []string, done chan struct{}) error {
+	return m.openDisputeFunc(orderID, reason, evidenceHashes, done)
 }
 func (m *mockNode) CloseDispute(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error {
 	return m.closeDisputeFunc(orderID, buyerPercentage, vendorPercentage, resolution, done)

@@ -1658,7 +1658,7 @@ func TestOrderLifecycle_Moderated_Dispute_FullResolution(t *testing.T) {
 	}
 
 	done5 := make(chan struct{})
-	if err := buyerNode.Order().OpenDispute(orderID, "Item not as described", done5); err != nil {
+	if err := buyerNode.Order().OpenDispute(orderID, "Item not as described", nil, done5); err != nil {
 		t.Fatal(err)
 	}
 	waitForDone(t, done5, "OpenDispute")

@@ -867,14 +867,15 @@ func (x *Rating) GetRatingSignature() []byte {
 }
 
 type DisputeOpen struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	OpenedBy      DisputeOpen_Party      `protobuf:"varint,1,opt,name=openedBy,proto3,enum=mbzpb.DisputeOpen_Party" json:"openedBy,omitempty"`
-	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
-	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	Contract      []byte                 `protobuf:"bytes,4,opt,name=contract,proto3" json:"contract,omitempty"`
-	PayoutAddress string                 `protobuf:"bytes,5,opt,name=payoutAddress,proto3" json:"payoutAddress,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OpenedBy       DisputeOpen_Party      `protobuf:"varint,1,opt,name=openedBy,proto3,enum=mbzpb.DisputeOpen_Party" json:"openedBy,omitempty"`
+	Reason         string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	Timestamp      *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Contract       []byte                 `protobuf:"bytes,4,opt,name=contract,proto3" json:"contract,omitempty"`
+	PayoutAddress  string                 `protobuf:"bytes,5,opt,name=payoutAddress,proto3" json:"payoutAddress,omitempty"`
+	EvidenceHashes []string               `protobuf:"bytes,6,rep,name=evidenceHashes,proto3" json:"evidenceHashes,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *DisputeOpen) Reset() {
@@ -940,6 +941,13 @@ func (x *DisputeOpen) GetPayoutAddress() string {
 		return x.PayoutAddress
 	}
 	return ""
+}
+
+func (x *DisputeOpen) GetEvidenceHashes() []string {
+	if x != nil {
+		return x.EvidenceHashes
+	}
+	return nil
 }
 
 type DisputeUpdate struct {
@@ -3434,13 +3442,14 @@ const file_orders_proto_rawDesc = "" +
 	" \x01(\rR\rdeliverySpeed\x12(\n" +
 	"\x0fcustomerService\x18\v \x01(\rR\x0fcustomerService\x12\x16\n" +
 	"\x06review\x18\f \x01(\tR\x06review\x12(\n" +
-	"\x0fratingSignature\x18\r \x01(\fR\x0fratingSignature\"\xf7\x01\n" +
+	"\x0fratingSignature\x18\r \x01(\fR\x0fratingSignature\"\x9f\x02\n" +
 	"\vDisputeOpen\x124\n" +
 	"\bopenedBy\x18\x01 \x01(\x0e2\x18.mbzpb.DisputeOpen.PartyR\bopenedBy\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x128\n" +
 	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x1a\n" +
 	"\bcontract\x18\x04 \x01(\fR\bcontract\x12$\n" +
-	"\rpayoutAddress\x18\x05 \x01(\tR\rpayoutAddress\"\x1e\n" +
+	"\rpayoutAddress\x18\x05 \x01(\tR\rpayoutAddress\x12&\n" +
+	"\x0eevidenceHashes\x18\x06 \x03(\tR\x0eevidenceHashes\"\x1e\n" +
 	"\x05Party\x12\t\n" +
 	"\x05BUYER\x10\x00\x12\n" +
 	"\n" +

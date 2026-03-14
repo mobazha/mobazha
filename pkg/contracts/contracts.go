@@ -123,7 +123,7 @@ type OrderService interface {
 	GetCases(stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) ([]models.Case, int64, error)
 
 	// Disputes
-	OpenDispute(orderID models.OrderID, reason string, done chan struct{}) error
+	OpenDispute(orderID models.OrderID, reason string, evidenceHashes []string, done chan struct{}) error
 	CloseDispute(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
 	GetReleaseFundsInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	ReleaseFunds(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error

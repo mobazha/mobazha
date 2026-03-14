@@ -169,6 +169,7 @@ message DisputeOpen {
     google.protobuf.Timestamp timestamp = 3;
     bytes contract                      = 4;
     string payoutAddress                = 5;
+    repeated string evidenceHashes      = 6;
 
     enum Party {
         BUYER  = 0;

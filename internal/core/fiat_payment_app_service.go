@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -163,6 +164,30 @@ func (s *FiatPaymentAppService) RefundPayment(
 	return result, nil
 }
 
+// CancelPayment cancels a fiat payment session via the provider registry.
+// Implements contracts.FiatPaymentOperations.
+func (s *FiatPaymentAppService) CancelPayment(ctx context.Context, providerID string, paymentID string) error {
+	provider, err := s.registry.ForProvider(providerID)
+	if err != nil {
+		return err
+	}
+	return provider.CancelPayment(ctx, paymentID)
+}
+
+// GetPaymentStatus returns the normalized status of a fiat payment session.
+// Implements contracts.FiatPaymentOperations.
+func (s *FiatPaymentAppService) GetPaymentStatus(ctx context.Context, providerID string, paymentID string) (string, error) {
+	provider, err := s.registry.ForProvider(providerID)
+	if err != nil {
+		return "", err
+	}
+	detail, err := provider.GetPayment(ctx, paymentID)
+	if err != nil {
+		return "", err
+	}
+	return detail.Status, nil
+}
+
 func (s *FiatPaymentAppService) HandleWebhook(ctx context.Context, providerID string, payload []byte, headers map[string]string) error {
 	provider, err := s.registry.ForProvider(providerID)
 	if err != nil {
@@ -208,6 +233,11 @@ func (s *FiatPaymentAppService) HandleWebhook(ctx context.Context, providerID st
 		handled = true
 	case contracts.WebhookDisputeResolved:
 		if err := s.handleDisputeResolved(ctx, event); err != nil {
+			return err
+		}
+		handled = true
+	case contracts.WebhookPaymentCanceled:
+		if err := s.handlePaymentCanceled(ctx, event); err != nil {
 			return err
 		}
 		handled = true
@@ -381,15 +411,8 @@ func (s *FiatPaymentAppService) handleDisputeOpened(ctx context.Context, event *
 		return fmt.Errorf("update dispute metadata for order %s: %w", order.ID, err)
 	}
 
-	if order.State != models.OrderState_DISPUTED {
-		order.SetFSMState(models.OrderState_DISPUTED)
-		if err := s.orderRepo.Save(ctx, order); err != nil {
-			return fmt.Errorf("update order %s to DISPUTED: %w", order.ID, err)
-		}
-	}
-
-	logger.LogInfoWithIDf(log, s.nodeID, "order %s → DISPUTED via %s dispute %s (reason: %s)",
-		order.ID, event.ProviderID, event.DisputeID, event.DisputeReason)
+	logger.LogInfoWithIDf(log, s.nodeID, "order %s: fiat dispute %s opened via %s (reason: %s), order state unchanged",
+		order.ID, event.DisputeID, event.ProviderID, event.DisputeReason)
 	return nil
 }
 
@@ -435,6 +458,13 @@ func (s *FiatPaymentAppService) handleDisputeResolved(ctx context.Context, event
 		logger.LogInfoWithIDf(log, s.nodeID, "order %s dispute resolved with outcome=%s, no state change", order.ID, outcome)
 	}
 
+	return nil
+}
+
+func (s *FiatPaymentAppService) handlePaymentCanceled(_ context.Context, event *contracts.WebhookEvent) error {
+	logger.LogInfoWithIDf(log, s.nodeID,
+		"fiat payment canceled: provider=%s payment=%s order=%s",
+		event.ProviderID, event.PaymentID, event.OrderID)
 	return nil
 }
 
@@ -803,6 +833,97 @@ func (s *FiatPaymentAppService) LoadAndRegisterProviders() {
 	}
 }
 
+// ReconcileFiatOrders checks AWAITING_PAYMENT orders with fiat metadata against
+// the payment provider. If the provider reports the payment as succeeded but the
+// order is still AWAITING_PAYMENT (missed webhook), it triggers the payment flow.
+// If the provider reports canceled/failed, it's a no-op (order timeout handles cancellation).
+func (s *FiatPaymentAppService) ReconcileFiatOrders(ctx context.Context) {
+	if s.webhookHandler == nil {
+		return
+	}
+
+	var orders []models.Order
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().
+			Where("state = ? AND open = ? AND fiat_metadata IS NOT NULL AND length(fiat_metadata) > 2",
+				int32(models.OrderState_AWAITING_PAYMENT), true).
+			Find(&orders).Error
+	})
+	if err != nil {
+		logger.LogErrorWithIDf(log, s.nodeID, "fiat reconciliation: query failed: %v", err)
+		return
+	}
+	if len(orders) == 0 {
+		return
+	}
+
+	logger.LogInfoWithIDf(log, s.nodeID, "fiat reconciliation: checking %d AWAITING_PAYMENT orders", len(orders))
+
+	for i := range orders {
+		order := &orders[i]
+		meta, err := order.GetFiatMetadata()
+		if err != nil {
+			continue
+		}
+		providerID := meta["fiat_provider"]
+		sessionID := meta["fiat_session_id"]
+		if providerID == "" || sessionID == "" {
+			continue
+		}
+
+		provider, err := s.registry.ForProvider(providerID)
+		if err != nil {
+			continue
+		}
+
+		detail, err := provider.GetPayment(ctx, sessionID)
+		if err != nil {
+			logger.LogDebugWithIDf(log, s.nodeID, "fiat reconciliation: GetPayment(%s) for order %s: %v",
+				sessionID, order.ID, err)
+			continue
+		}
+
+		if detail.Status == "succeeded" {
+			logger.LogInfoWithIDf(log, s.nodeID,
+				"fiat reconciliation: order %s has succeeded payment %s (missed webhook), triggering payment flow",
+				order.ID, sessionID)
+
+			coin := iwallet.CoinType("fiat:" + providerID + ":" + strings.ToUpper(detail.Currency))
+			if err := s.webhookHandler(ctx, &contracts.WebhookEvent{
+				EventID:       "reconcile_" + sessionID,
+				Type:          contracts.WebhookPaymentSucceeded,
+				ProviderID:    providerID,
+				PaymentID:     sessionID,
+				OrderID:       string(order.ID),
+				Coin:          string(coin),
+				Amount:        detail.Amount,
+				Currency:      detail.Currency,
+				PaymentMethod: detail.PaymentMethod,
+			}); err != nil {
+				logger.LogErrorWithIDf(log, s.nodeID,
+					"fiat reconciliation: ProcessOrderPayment for order %s failed: %v", order.ID, err)
+			}
+		}
+	}
+}
+
+// StartReconciliationScheduler launches a background goroutine that periodically
+// checks AWAITING_PAYMENT fiat orders against the payment provider.
+func (s *FiatPaymentAppService) StartReconciliationScheduler(ctx context.Context, interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				s.ReconcileFiatOrders(ctx)
+			}
+		}
+	}()
+}
+
 // CleanupProcessedEvents deletes ProcessedFiatEvent records older than the given TTL.
 // Should be called periodically (e.g. daily) to prevent unbounded table growth.
 //
@@ -852,3 +973,4 @@ func (s *FiatPaymentAppService) StartPeriodicCleanup(ctx context.Context, interv
 // Compile-time checks.
 var _ contracts.FiatService = (*FiatPaymentAppService)(nil)
 var _ contracts.FiatPlatformConfigurer = (*FiatPaymentAppService)(nil)
+var _ contracts.FiatPaymentOperations = (*FiatPaymentAppService)(nil)

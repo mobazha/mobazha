@@ -1296,7 +1296,7 @@ func initFiatSubsystem(obNode *MobazhaNode) {
 	obNode.fiatPaymentService.LoadAndRegisterProviders()
 
 	if obNode.orderService != nil {
-		obNode.orderService.SetFiatRefundFunc(obNode.fiatPaymentService.RefundPayment)
+		obNode.orderService.SetFiatOps(obNode.fiatPaymentService)
 	}
 
 	logger.LogInfoWithID(log, obNode.nodeID, "Fiat payment subsystem initialized")

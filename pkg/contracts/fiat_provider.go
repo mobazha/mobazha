@@ -159,6 +159,15 @@ type FiatPlatformConfigurer interface {
 	DisconnectProvider(ctx context.Context, providerID string) error
 }
 
+// FiatPaymentOperations is the narrow port that OrderAppService depends on
+// for order-level fiat payment actions (refund, cancel, status check).
+// Satisfied by FiatPaymentAppService; decouples order logic from fiat internals.
+type FiatPaymentOperations interface {
+	RefundPayment(ctx context.Context, providerID string, params RefundParams) (*RefundResult, error)
+	CancelPayment(ctx context.Context, providerID string, paymentID string) error
+	GetPaymentStatus(ctx context.Context, providerID string, paymentID string) (string, error)
+}
+
 // FiatPaymentProviderAccessor exposes the fiat payment subsystem.
 // Handlers obtain this via type assertion on NodeService:
 //

@@ -127,15 +127,20 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 	unreadChatMsgCount, _ := getChatService(r).GetChatMessagesUnreadCountByOrderID(order.ID)
 
 	type OrderRespApi struct {
-		Contract           *models.Order `json:"contract,omitempty"`
-		State              string        `json:"state,omitempty"`
-		Read               bool          `json:"read,omitempty"`
-		UnreadChatMessages int64         `json:"unreadChatMessages,omitempty"`
-		Funded             bool          `json:"funded,omitempty"`
-		Completable        bool          `json:"completable,omitempty"`
+		Contract           *models.Order     `json:"contract,omitempty"`
+		State              string            `json:"state,omitempty"`
+		Read               bool              `json:"read,omitempty"`
+		UnreadChatMessages int64             `json:"unreadChatMessages,omitempty"`
+		Funded             bool              `json:"funded,omitempty"`
+		Completable        bool              `json:"completable,omitempty"`
+		FiatMetadata       map[string]string `json:"fiatMetadata,omitempty"`
 	}
 
 	isFunded, _ := order.IsFunded()
+	fiatMeta, _ := order.GetFiatMetadata()
+	if len(fiatMeta) == 0 {
+		fiatMeta = nil
+	}
 
 	ret := OrderRespApi{
 		Contract:           order,
@@ -143,6 +148,7 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 		UnreadChatMessages: unreadChatMsgCount,
 		Funded:             isFunded,
 		Completable:        order.CanComplete(),
+		FiatMetadata:       fiatMeta,
 	}
 
 	sanitizedJSONResponse(w, ret)

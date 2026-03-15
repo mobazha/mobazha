@@ -51,6 +51,14 @@ func NewProvider(cfg Config) *Provider {
 	}
 }
 
+// OverrideBaseURL replaces the API client's base URL and pre-fills an access
+// token so OAuth is skipped. Use only in integration tests.
+func (p *Provider) OverrideBaseURL(url string) {
+	p.client.baseURL = url
+	p.client.accessToken = "test-access-token"
+	p.client.tokenExpiry = time.Now().Add(1 * time.Hour)
+}
+
 func (p *Provider) ProviderID() string { return providerID }
 
 func (p *Provider) CreatePayment(ctx context.Context, params contracts.CreatePaymentParams) (*contracts.PaymentSession, error) {

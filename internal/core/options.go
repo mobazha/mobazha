@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"path/filepath"
+	"strconv"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -138,6 +139,55 @@ func (n *MobazhaNode) wireServiceSetters() {
 	}
 	if n.paymentService != nil && n.orderProcessor != nil {
 		n.paymentService.SetPaymentRecorder(n.orderProcessor)
+	}
+	if n.orderService != nil && n.hostService != nil {
+		n.orderService.SetNodeLookupFunc(func(pid peer.ID) contracts.NodeService {
+			return n.hostService.GetNodeServiceByPeerID(pid)
+		})
+	}
+	if n.paymentService != nil && n.orderService != nil {
+		n.paymentService.SetPaymentVerifiedHandler(func(orderID string, paymentSent *pb.PaymentSent) {
+			amount, _ := strconv.ParseUint(paymentSent.Amount, 10, 64)
+			pd := &models.PaymentData{
+				OrderID:       orderID,
+				TransactionID: paymentSent.TransactionID,
+				Coin:          iwallet.CoinType(paymentSent.Coin),
+				Amount:        amount,
+				Method:        paymentSent.Method,
+			}
+			n.orderService.RelayPaymentToBuyer(context.Background(), orderID, pd)
+		})
+	}
+	if n.fiatPaymentService != nil && n.orderService != nil {
+		n.fiatPaymentService.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {
+			pd := buildFiatPaymentData(event)
+			if err := n.orderService.ProcessOrderPayment(ctx, pd); err != nil {
+				return err
+			}
+			go n.orderService.RelayPaymentToBuyer(context.Background(), event.OrderID, pd)
+			return nil
+		})
+	}
+}
+
+// buildFiatPaymentData converts a fiat WebhookEvent into a PaymentData struct.
+// Extracted from the webhook handler closure to keep wiring logic thin.
+func buildFiatPaymentData(event *contracts.WebhookEvent) *models.PaymentData {
+	coin := iwallet.CoinType(event.Coin)
+	if coin == "" && event.Currency != "" {
+		if event.ProviderID != "" {
+			coin = iwallet.CoinType("fiat:" + event.ProviderID + ":" + event.Currency)
+		} else {
+			coin = iwallet.CoinType("fiat:" + event.Currency)
+		}
+	}
+	return &models.PaymentData{
+		OrderID:       event.OrderID,
+		TransactionID: event.PaymentID,
+		Coin:          coin,
+		Amount:        uint64(event.Amount),
+		Method:        pb.PaymentSent_FIAT,
+		ProviderID:    event.ProviderID,
 	}
 }
 
@@ -301,27 +351,6 @@ func (n *MobazhaNode) initOrderService() {
 		DiscountResolver:           n.buildDiscountResolver(),
 		DiscountRedemptionRecorder: n.buildDiscountRecorder(),
 	})
-
-	if n.fiatPaymentService != nil {
-		n.fiatPaymentService.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {
-			coin := iwallet.CoinType(event.Coin)
-			if coin == "" && event.Currency != "" {
-				if event.ProviderID != "" {
-					coin = iwallet.CoinType("fiat:" + event.ProviderID + ":" + event.Currency)
-				} else {
-					coin = iwallet.CoinType("fiat:" + event.Currency)
-				}
-			}
-			return n.orderService.ProcessOrderPayment(ctx, &models.PaymentData{
-				OrderID:       event.OrderID,
-				TransactionID: event.PaymentID,
-				Coin:          coin,
-				Amount:        uint64(event.Amount),
-				Method:        pb.PaymentSent_FIAT,
-				ProviderID:    event.ProviderID,
-			})
-		})
-	}
 }
 
 // buildDiscountResolver returns a DiscountResolverFunc that resolves discounts

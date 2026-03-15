@@ -56,6 +56,7 @@ func (m *mockHostService) GetDiscountAccessForPeer(_ peer.ID) (contracts.Discoun
 	return nil, nil, nil
 }
 func (m *mockHostService) GetBlobStore() contracts.BlobStore { return nil }
+func (m *mockHostService) GetNodeServiceByPeerID(_ peer.ID) contracts.NodeService { return nil }
 
 var _ coreiface.HostService = (*mockHostService)(nil)
 

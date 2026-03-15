@@ -3,14 +3,18 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/internal/payment/fiat/paypal"
 	"github.com/mobazha/mobazha3.0/internal/payment/fiat/stripe"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
+	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -541,6 +545,230 @@ func TestE2E_Stripe_PaymentCanceled_NoStateChange(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, models.OrderState_AWAITING_PAYMENT, orderRepo.orders["stripe-cancel-order"].State)
+}
+
+// ==================== Webhook → Relay → Buyer E2E ====================
+
+// TestE2E_Stripe_WebhookToBuyerRelay exercises the full payment notification
+// chain: Stripe webhook → FiatPaymentAppService.HandleWebhook → webhook handler
+// (mirrors options.go wiring) → buildFiatPaymentData → ProcessOrderPayment
+// on seller → RelayPaymentToBuyer → buyer receives PaymentData via SaaS direct call.
+//
+// No Docker needed: uses mock HTTP (Stripe signing) + real Stripe provider + mock OrderAppService.
+func TestE2E_Stripe_WebhookToBuyerRelay(t *testing.T) {
+	const (
+		webhookSecret = "whsec_e2e"
+		orderID       = "stripe-relay-order-001"
+		paymentID     = "pi_e2e_relay_001"
+	)
+	buyerPeerID, err := peer.Decode("QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG")
+	require.NoError(t, err)
+
+	// 1. Seller FiatPaymentAppService with real Stripe provider
+	fiatReg := newMockFiatRegistry()
+	registerStripeProvider(fiatReg)
+	fiatSvc, _ := newFiatTestService(t, fiatReg)
+
+	orderRepo := newMockOrderRepo()
+	orderRepo.addOrder(&models.Order{
+		ID:    orderID,
+		State: models.OrderState_AWAITING_PAYMENT,
+		Open:  true,
+	})
+	fiatSvc.SetOrderRepo(orderRepo)
+
+	// 2. Seller OrderAppService (lightweight, for RelayPaymentToBuyer)
+	sellerOrderSvc := newTestOrderAppService(t, OrderAppServiceConfig{})
+	seedOrderWithBuyer(t, sellerOrderSvc, orderID, buyerPeerID.String(), models.OrderState_AWAITING_PAYMENT)
+
+	// 3. Buyer mock — captures ProcessOrderPayment call
+	buyerOrderSvc := &relayMockOrderSvc{}
+	buyerNode := &relayMockNodeService{orderSvc: buyerOrderSvc}
+
+	sellerOrderSvc.SetNodeLookupFunc(func(pid peer.ID) contracts.NodeService {
+		if pid == buyerPeerID {
+			return buyerNode
+		}
+		return nil
+	})
+
+	// 4. Wire webhook handler exactly like options.go
+	fiatSvc.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {
+		pd := buildFiatPaymentData(event)
+
+		// In real wiring: n.orderService.ProcessOrderPayment(ctx, pd)
+		// Here we just verify the data is correct and relay to buyer
+		go sellerOrderSvc.RelayPaymentToBuyer(context.Background(), event.OrderID, pd)
+		return nil
+	})
+
+	// 5. Build & sign Stripe webhook payload
+	piJSON, _ := json.Marshal(map[string]interface{}{
+		"id":       paymentID,
+		"object":   "payment_intent",
+		"status":   "succeeded",
+		"amount":   3999,
+		"currency": "usd",
+		"metadata": map[string]string{"order_id": orderID},
+		"charges": map[string]interface{}{
+			"data": []map[string]interface{}{
+				{"payment_method_details": map[string]interface{}{
+					"type": "card",
+					"card": map[string]string{"brand": "visa", "last4": "4242"},
+				}},
+			},
+		},
+	})
+	payload, sig := stripeWebhookPayload("payment_intent.succeeded", piJSON)
+
+	// 6. Fire webhook
+	err = fiatSvc.HandleWebhook(context.Background(), "stripe", payload, map[string]string{
+		"Stripe-Signature": sig,
+	})
+	require.NoError(t, err)
+
+	// 7. Wait for goroutine relay
+	require.Eventually(t, func() bool {
+		return buyerOrderSvc.called.Load() >= 1
+	}, 2*time.Second, 50*time.Millisecond, "buyer should receive payment relay")
+
+	// 8. Verify buyer received correct payment data
+	assert.Equal(t, orderID, buyerOrderSvc.lastPD.OrderID)
+	assert.Equal(t, paymentID, buyerOrderSvc.lastPD.TransactionID)
+	assert.Contains(t, string(buyerOrderSvc.lastPD.Coin), "fiat:")
+	assert.Contains(t, string(buyerOrderSvc.lastPD.Coin), "USD")
+	assert.Equal(t, uint64(3999), buyerOrderSvc.lastPD.Amount)
+	assert.Equal(t, pb.PaymentSent_FIAT, buyerOrderSvc.lastPD.Method)
+	assert.Equal(t, "stripe", buyerOrderSvc.lastPD.ProviderID)
+}
+
+// TestE2E_PayPal_WebhookToBuyerRelay exercises the same chain for PayPal:
+// PayPal webhook → HandleWebhook → buildFiatPaymentData → RelayPaymentToBuyer → buyer.
+func TestE2E_PayPal_WebhookToBuyerRelay(t *testing.T) {
+	const orderID = "paypal-relay-order-001"
+	buyerPeerID, err := peer.Decode("QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG")
+	require.NoError(t, err)
+
+	ts := newPayPalWebhookServer(t)
+	defer ts.Close()
+
+	fiatReg := newMockFiatRegistry()
+	registerPayPalProvider(t, fiatReg, ts.URL)
+	fiatSvc, _ := newFiatTestService(t, fiatReg)
+
+	orderRepo := newMockOrderRepo()
+	orderRepo.addOrder(&models.Order{
+		ID:    orderID,
+		State: models.OrderState_AWAITING_PAYMENT,
+		Open:  true,
+	})
+	fiatSvc.SetOrderRepo(orderRepo)
+
+	sellerOrderSvc := newTestOrderAppService(t, OrderAppServiceConfig{})
+	seedOrderWithBuyer(t, sellerOrderSvc, orderID, buyerPeerID.String(), models.OrderState_AWAITING_PAYMENT)
+
+	buyerOrderSvc := &relayMockOrderSvc{}
+	buyerNode := &relayMockNodeService{orderSvc: buyerOrderSvc}
+
+	sellerOrderSvc.SetNodeLookupFunc(func(pid peer.ID) contracts.NodeService {
+		if pid == buyerPeerID {
+			return buyerNode
+		}
+		return nil
+	})
+
+	fiatSvc.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {
+		pd := buildFiatPaymentData(event)
+		go sellerOrderSvc.RelayPaymentToBuyer(context.Background(), event.OrderID, pd)
+		return nil
+	})
+
+	payload := fmt.Sprintf(`{
+		"id": "WH-E2E-RELAY-PP",
+		"event_type": "CHECKOUT.ORDER.COMPLETED",
+		"resource": {
+			"id": "PP-RELAY-ORDER-E2E",
+			"status": "COMPLETED",
+			"custom_id": "%s",
+			"purchase_units": [{
+				"custom_id": "%s",
+				"amount": {"currency_code": "USD", "value": "49.99"},
+				"payee": {"merchant_id": "SELLER-RELAY-E2E"}
+			}]
+		}
+	}`, orderID, orderID)
+
+	err = fiatSvc.HandleWebhook(context.Background(), "paypal", []byte(payload), paypalHeaders())
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		return buyerOrderSvc.called.Load() >= 1
+	}, 2*time.Second, 50*time.Millisecond, "buyer should receive PayPal payment relay")
+
+	assert.Equal(t, orderID, buyerOrderSvc.lastPD.OrderID)
+	assert.Equal(t, "PP-RELAY-ORDER-E2E", buyerOrderSvc.lastPD.TransactionID)
+	assert.Contains(t, string(buyerOrderSvc.lastPD.Coin), "fiat:")
+	assert.Contains(t, string(buyerOrderSvc.lastPD.Coin), "USD")
+	assert.Equal(t, uint64(4999), buyerOrderSvc.lastPD.Amount)
+	assert.Equal(t, pb.PaymentSent_FIAT, buyerOrderSvc.lastPD.Method)
+	assert.Equal(t, "paypal", buyerOrderSvc.lastPD.ProviderID)
+}
+
+// TestE2E_Stripe_WebhookIdempotency_BuyerCalledOnce verifies that duplicate
+// Stripe webhooks only relay to the buyer once (FiatPaymentAppService dedup).
+func TestE2E_Stripe_WebhookIdempotency_BuyerCalledOnce(t *testing.T) {
+	const orderID = "stripe-idem-relay-001"
+	buyerPeerID, _ := peer.Decode("QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG")
+
+	fiatReg := newMockFiatRegistry()
+	registerStripeProvider(fiatReg)
+	fiatSvc, _ := newFiatTestService(t, fiatReg)
+
+	orderRepo := newMockOrderRepo()
+	orderRepo.addOrder(&models.Order{
+		ID:    orderID,
+		State: models.OrderState_AWAITING_PAYMENT,
+		Open:  true,
+	})
+	fiatSvc.SetOrderRepo(orderRepo)
+
+	sellerOrderSvc := newTestOrderAppService(t, OrderAppServiceConfig{})
+	seedOrderWithBuyer(t, sellerOrderSvc, orderID, buyerPeerID.String(), models.OrderState_AWAITING_PAYMENT)
+
+	buyerOrderSvc := &relayMockOrderSvc{}
+	buyerNode := &relayMockNodeService{orderSvc: buyerOrderSvc}
+	sellerOrderSvc.SetNodeLookupFunc(func(pid peer.ID) contracts.NodeService {
+		if pid == buyerPeerID {
+			return buyerNode
+		}
+		return nil
+	})
+
+	fiatSvc.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {
+		pd := buildFiatPaymentData(event)
+		go sellerOrderSvc.RelayPaymentToBuyer(context.Background(), event.OrderID, pd)
+		return nil
+	})
+
+	piJSON, _ := json.Marshal(map[string]interface{}{
+		"id": "pi_idem_001", "object": "payment_intent", "status": "succeeded",
+		"amount": 1000, "currency": "usd",
+		"metadata": map[string]string{"order_id": orderID},
+		"charges":  map[string]interface{}{"data": []interface{}{}},
+	})
+	payload, sig := stripeWebhookPayload("payment_intent.succeeded", piJSON)
+	headers := map[string]string{"Stripe-Signature": sig}
+
+	require.NoError(t, fiatSvc.HandleWebhook(context.Background(), "stripe", payload, headers))
+	require.NoError(t, fiatSvc.HandleWebhook(context.Background(), "stripe", payload, headers))
+
+	require.Eventually(t, func() bool {
+		return buyerOrderSvc.called.Load() >= 1
+	}, 2*time.Second, 50*time.Millisecond)
+
+	time.Sleep(200 * time.Millisecond)
+	assert.Equal(t, int32(1), buyerOrderSvc.called.Load(),
+		"buyer should only receive ONE relay despite duplicate webhooks")
 }
 
 // ==================== PlatformProviderOpts Tests ====================

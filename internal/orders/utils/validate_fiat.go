@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	pb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 var (
@@ -26,7 +27,8 @@ func validateFiatPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent) error
 	orderCoin := strings.ToUpper(order.PricingCoin)
 	paidCoin := strings.ToUpper(paymentSent.Coin)
 
-	if orderCoin != paidCoin {
+	if orderCoin != paidCoin &&
+		iwallet.CoinType(orderCoin).FiatBaseCurrency() != iwallet.CoinType(paidCoin).FiatBaseCurrency() {
 		return fmt.Errorf("%w: order=%q paid=%q", ErrFiatCurrencyMismatch, order.PricingCoin, paymentSent.Coin)
 	}
 

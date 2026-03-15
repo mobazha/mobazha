@@ -134,22 +134,27 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 			}
 
 			dbtx.RegisterCommitHook(func() {
+				listing := orderOpen.Listings[0].Listing
+				var thumb events.Thumbnail
+				if len(listing.Item.Images) > 0 {
+					thumb = events.Thumbnail{
+						Tiny:  listing.Item.Images[0].Tiny,
+						Small: listing.Item.Images[0].Small,
+					}
+				}
 				op.bus.Emit(&events.OrderFunded{
 					BuyerHandle: orderOpen.BuyerID.Handle,
 					BuyerID:     orderOpen.BuyerID.PeerID,
-					ListingType: orderOpen.Listings[0].Listing.Metadata.ContractType.String(),
+					ListingType: listing.Metadata.ContractType.String(),
 					OrderID:     order.ID.String(),
 					Price: events.ListingPrice{
 						Amount:        orderOpen.Amount,
 						CurrencyCode:  orderOpen.PricingCoin,
-						PriceModifier: orderOpen.Listings[0].Listing.Item.CryptoListingPriceModifier,
+						PriceModifier: listing.Item.CryptoListingPriceModifier,
 					},
-					Slug: orderOpen.Listings[0].Listing.Slug,
-					Thumbnail: events.Thumbnail{
-						Tiny:  orderOpen.Listings[0].Listing.Item.Images[0].Tiny,
-						Small: orderOpen.Listings[0].Listing.Item.Images[0].Small,
-					},
-					Title: orderOpen.Listings[0].Listing.Item.Title,
+					Slug:      listing.Slug,
+					Thumbnail: thumb,
+					Title:     listing.Item.Title,
 				})
 			})
 			logger.LogInfoWithIDf(log, op.nodeID, "Payment detected and chain-verified: Order %s fully funded", order.ID)

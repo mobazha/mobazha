@@ -248,7 +248,24 @@ type CurrencyDictionary map[string]*Currency
 // LookupCurrencyDefinition returns the CurrencyDefinition out of the loaded dictionary.
 // Lookup normalizes the code before lookup and recommends using CurrencyDefinition.Code
 // from the response as a normalized code.
+//
+// Fiat payment compound codes (e.g. "fiat:stripe:USD", "fiat:paypal:EUR") are
+// resolved by extracting the trailing ISO currency code and looking that up.
 func (c CurrencyDictionary) Lookup(code string) (*Currency, error) {
+	// Handle fiat payment compound codes: "fiat:stripe:USD" (3-seg) or "fiat:USD" (2-seg)
+	if strings.HasPrefix(strings.ToLower(code), "fiat:") {
+		parts := strings.Split(code, ":")
+		if len(parts) >= 2 {
+			baseCode := strings.ToUpper(parts[len(parts)-1])
+			def, ok := c[baseCode]
+			if !ok {
+				log.Errorf("CurrencyDefinition undefined for fiat base currency: %s (from %s)", baseCode, code)
+				return nil, ErrCurrencyDefinitionUndefined
+			}
+			return def, nil
+		}
+	}
+
 	var (
 		upcase    = strings.ToUpper(code)
 		isTestnet = strings.HasPrefix(upcase, "T")

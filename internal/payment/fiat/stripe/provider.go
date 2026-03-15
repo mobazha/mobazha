@@ -132,7 +132,9 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 		return nil, fmt.Errorf("%w: missing Stripe-Signature header", contracts.ErrWebhookSignature)
 	}
 
-	event, err := webhook.ConstructEvent(payload, sig, p.config.WebhookSecret)
+	event, err := webhook.ConstructEventWithOptions(payload, sig, p.config.WebhookSecret, webhook.ConstructEventOptions{
+		IgnoreAPIVersionMismatch: true,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", contracts.ErrWebhookSignature, err)
 	}

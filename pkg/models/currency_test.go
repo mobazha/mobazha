@@ -140,6 +140,53 @@ func TestCurrencyDictionaryLookup(t *testing.T) {
 	}
 }
 
+func TestCurrencyDictionaryLookup_FiatCompoundCodes(t *testing.T) {
+	usd := &Currency{Name: "US Dollar", Code: "USD", CurrencyType: CurrencyTypeFiat, Divisibility: 2}
+	eur := &Currency{Name: "Euro", Code: "EUR", CurrencyType: CurrencyTypeFiat, Divisibility: 2}
+	dict := CurrencyDictionary{
+		"USD": usd,
+		"EUR": eur,
+	}
+
+	tests := []struct {
+		code        string
+		wantCode    CurrencyCode
+		wantDiv     uint
+		wantErr     bool
+	}{
+		{"fiat:stripe:USD", "USD", 2, false},
+		{"fiat:paypal:USD", "USD", 2, false},
+		{"fiat:stripe:EUR", "EUR", 2, false},
+		{"FIAT:STRIPE:USD", "USD", 2, false},
+		{"Fiat:Stripe:usd", "USD", 2, false},
+		{"fiat:USD", "USD", 2, false},   // 2-segment format
+		{"fiat:EUR", "EUR", 2, false},   // 2-segment format
+		{"FIAT:USD", "USD", 2, false},   // 2-segment uppercase
+		{"fiat:stripe:INVALID", "", 0, true},
+		{"fiat:INVALID", "", 0, true},   // 2-segment unknown currency
+	}
+
+	for _, tt := range tests {
+		def, err := dict.Lookup(tt.code)
+		if tt.wantErr {
+			if err == nil {
+				t.Errorf("Lookup(%q): expected error, got %v", tt.code, def)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("Lookup(%q): unexpected error: %v", tt.code, err)
+			continue
+		}
+		if def.Code != tt.wantCode {
+			t.Errorf("Lookup(%q): code = %s, want %s", tt.code, def.Code, tt.wantCode)
+		}
+		if def.Divisibility != tt.wantDiv {
+			t.Errorf("Lookup(%q): divisibility = %d, want %d", tt.code, def.Divisibility, tt.wantDiv)
+		}
+	}
+}
+
 func mustNewCurrencyValue(t *testing.T, amount, currencyCode string) *CurrencyValue {
 	var (
 		def = newCurrency(currencyCode)

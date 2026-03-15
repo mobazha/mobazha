@@ -306,7 +306,11 @@ func (n *MobazhaNode) initOrderService() {
 		n.fiatPaymentService.SetWebhookHandler(func(ctx context.Context, event *contracts.WebhookEvent) error {
 			coin := iwallet.CoinType(event.Coin)
 			if coin == "" && event.Currency != "" {
-				coin = iwallet.CoinType("fiat:" + event.Currency)
+				if event.ProviderID != "" {
+					coin = iwallet.CoinType("fiat:" + event.ProviderID + ":" + event.Currency)
+				} else {
+					coin = iwallet.CoinType("fiat:" + event.Currency)
+				}
 			}
 			return n.orderService.ProcessOrderPayment(ctx, &models.PaymentData{
 				OrderID:       event.OrderID,

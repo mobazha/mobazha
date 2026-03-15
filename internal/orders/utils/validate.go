@@ -163,6 +163,11 @@ func ValidatePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTim
 	if ok := validateBigString(paymentSent.Amount); !ok {
 		return errors.New("payment amount not valid")
 	}
+
+	if wal.CoinCategory() == iwallet.CoinCategoryStripe {
+		return validateFiatPayment(order, paymentSent)
+	}
+
 	if paymentSent.ToAddress == "" {
 		return errors.New("order payment address is empty")
 	}
@@ -173,11 +178,8 @@ func ValidatePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTim
 
 	if wal.CoinCategory() == iwallet.CoinCategorySolana || wal.CoinCategory() == iwallet.CoinCategoryEthereum {
 		return validateEscrowPayment(order, paymentSent, wal)
-	} else if wal.CoinCategory() == iwallet.CoinCategoryStripe {
-		return validateFiatPayment(order, paymentSent)
-	} else {
-		return validateBTCLikePayment(order, paymentSent, chaincode, wal, escrowTimeoutHours)
 	}
+	return validateBTCLikePayment(order, paymentSent, chaincode, wal, escrowTimeoutHours)
 }
 
 // validateBTCLikePayment 验证BTC类支付

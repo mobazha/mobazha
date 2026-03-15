@@ -95,6 +95,13 @@ func (ct CoinType) IsFiatPayment() bool {
 	return strings.HasPrefix(strings.ToLower(string(ct)), "fiat:")
 }
 
+// FiatBaseCurrency extracts the ISO currency code from fiat coin strings.
+// "fiat:stripe:USD" → "USD", "fiat:USD" → "USD", "USD" → "USD".
+func (ct CoinType) FiatBaseCurrency() string {
+	parts := strings.Split(string(ct), ":")
+	return parts[len(parts)-1]
+}
+
 // Deprecated: use IsFiatPayment(). IsStripeChain was the legacy check for
 // Stripe-specific payment paths. New code should use IsFiatPayment() which
 // covers all fiat providers (Stripe, PayPal, etc.).

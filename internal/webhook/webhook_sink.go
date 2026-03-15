@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
@@ -34,7 +35,13 @@ func (s *WebhookSink) Concurrency() int { return 4 }
 func (s *WebhookSink) Accept(_ events.EventMeta) bool { return true }
 
 // Handle implements events.EventSink.
-func (s *WebhookSink) Handle(_ context.Context, meta events.EventMeta, event interface{}) error {
+func (s *WebhookSink) Handle(_ context.Context, meta events.EventMeta, event interface{}) (retErr error) {
+	defer func() {
+		if r := recover(); r != nil {
+			sinkLog.Errorf("Recovered panic in webhook sink for event %s: %v", meta.Name, r)
+			retErr = fmt.Errorf("panic building CloudEvent for %s: %v", meta.Name, r)
+		}
+	}()
 	payload, err := wh.BuildCloudEvent(s.nodeID, meta.Name, event)
 	if err != nil {
 		sinkLog.Errorf("Failed to build CloudEvent for %s: %v", meta.Name, err)

@@ -76,6 +76,20 @@ func TestValidateFiatPayment_CurrencyMatch(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestValidateFiatPayment_CurrencyMatch_ProviderPrefix(t *testing.T) {
+	order := makeOrder("5000", "fiat:stripe:USD", "stripe")
+	payment := makePayment("5000", "fiat:USD", "pi_123")
+	require.NoError(t, validateFiatPayment(order, payment))
+
+	order2 := makeOrder("5000", "fiat:USD", "stripe")
+	payment2 := makePayment("5000", "fiat:stripe:USD", "pi_123")
+	require.NoError(t, validateFiatPayment(order2, payment2))
+
+	order3 := makeOrder("5000", "fiat:stripe:USD", "stripe")
+	payment3 := makePayment("5000", "fiat:stripe:USD", "pi_123")
+	require.NoError(t, validateFiatPayment(order3, payment3))
+}
+
 func TestValidateFiatPayment_CurrencyMismatch(t *testing.T) {
 	order := makeOrder("5000", "fiat:USD", "stripe")
 	payment := makePayment("5000", "fiat:EUR", "pi_123")

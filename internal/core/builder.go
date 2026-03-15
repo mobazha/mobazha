@@ -1292,7 +1292,7 @@ func initFiatSubsystem(obNode *MobazhaNode) {
 		return
 	}
 	obNode.fiatRegistry = fiat.NewRegistry()
-	obNode.fiatPaymentService = NewFiatPaymentAppService(obNode.fiatRegistry, obNode.db, obNode.nodeID)
+	obNode.fiatPaymentService = NewFiatPaymentAppService(obNode.fiatRegistry, obNode.db, obNode.nodeID, obNode.walletTestnet)
 	obNode.fiatPaymentService.LoadAndRegisterProviders()
 
 	if obNode.orderService != nil {

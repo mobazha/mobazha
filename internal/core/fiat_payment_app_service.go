@@ -31,6 +31,7 @@ type FiatPaymentAppService struct {
 	registry       contracts.FiatProviderRegistry
 	db             database.Database
 	nodeID         string
+	testnet        bool
 	webhookHandler FiatWebhookHandler
 	orderRepo      contracts.OrderRepo
 }
@@ -39,11 +40,13 @@ func NewFiatPaymentAppService(
 	registry contracts.FiatProviderRegistry,
 	db database.Database,
 	nodeID string,
+	testnet bool,
 ) *FiatPaymentAppService {
 	return &FiatPaymentAppService{
 		registry: registry,
 		db:       db,
 		nodeID:   nodeID,
+		testnet:  testnet,
 	}
 }
 
@@ -775,6 +778,7 @@ func (s *FiatPaymentAppService) registerProvider(providerID, secretKey, publisha
 			ClientSecret: secretKey,
 			WebhookID:    webhookSecret,
 			Mode:         mode,
+			Sandbox:      s.testnet,
 		})
 		s.registry.Register(p)
 		logger.LogInfoWithIDf(log, s.nodeID, "registered PayPal provider (%s mode)", mode)

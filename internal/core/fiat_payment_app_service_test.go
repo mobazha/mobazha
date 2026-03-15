@@ -125,7 +125,7 @@ func newFiatTestDB(t *testing.T) database.Database {
 func newFiatTestService(t *testing.T, reg contracts.FiatProviderRegistry) (*FiatPaymentAppService, database.Database) {
 	t.Helper()
 	db := newFiatTestDB(t)
-	svc := NewFiatPaymentAppService(reg, db, "test-node")
+	svc := NewFiatPaymentAppService(reg, db, "test-node", false)
 	return svc, db
 }
 
@@ -397,7 +397,7 @@ func TestFiatService_LoadAndRegisterProviders(t *testing.T) {
 		})
 	}))
 
-	svc := NewFiatPaymentAppService(reg, db, "test-node")
+	svc := NewFiatPaymentAppService(reg, db, "test-node", false)
 	svc.LoadAndRegisterProviders()
 
 	ids := reg.Registered()
@@ -903,7 +903,7 @@ func newFiatTestDBWithOrders(t *testing.T) database.Database {
 func newFiatTestServiceWithOrders(t *testing.T, reg contracts.FiatProviderRegistry) (*FiatPaymentAppService, database.Database) {
 	t.Helper()
 	db := newFiatTestDBWithOrders(t)
-	svc := NewFiatPaymentAppService(reg, db, "test-node")
+	svc := NewFiatPaymentAppService(reg, db, "test-node", false)
 	return svc, db
 }
 

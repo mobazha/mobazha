@@ -771,19 +771,19 @@ func (s *FiatPaymentAppService) HandleOnboardingCallback(ctx context.Context, pr
 	return onboarder.GetAccountStatus(ctx, account.AccountID)
 }
 
-// RegisterPlatformProvider registers a provider using the platform's keys in Connected mode.
-// Called by the hosting layer after SaaS node creation to inject platform-level Stripe Connect keys.
-func (s *FiatPaymentAppService) RegisterPlatformProvider(providerID, secretKey, publishableKey, webhookSecret string) {
-	s.registerProvider(providerID, secretKey, publishableKey, webhookSecret, true)
+// RegisterPlatformProvider registers a provider using the platform's keys in Connected/Partner mode.
+// Called by the hosting layer after SaaS node creation to inject platform-level keys.
+func (s *FiatPaymentAppService) RegisterPlatformProvider(providerID, secretKey, publishableKey, webhookSecret string, opts *contracts.PlatformProviderOpts) {
+	s.registerProvider(providerID, secretKey, publishableKey, webhookSecret, true, opts)
 }
 
 // registerProviderFromConfig creates and registers a provider instance in Direct mode.
 // Used for standalone sellers who configure their own API keys.
 func (s *FiatPaymentAppService) registerProviderFromConfig(providerID, secretKey, publishableKey, webhookSecret string) {
-	s.registerProvider(providerID, secretKey, publishableKey, webhookSecret, false)
+	s.registerProvider(providerID, secretKey, publishableKey, webhookSecret, false, nil)
 }
 
-func (s *FiatPaymentAppService) registerProvider(providerID, secretKey, publishableKey, webhookSecret string, platformMode bool) {
+func (s *FiatPaymentAppService) registerProvider(providerID, secretKey, publishableKey, webhookSecret string, platformMode bool, opts *contracts.PlatformProviderOpts) {
 	switch providerID {
 	case "stripe":
 		mode := stripe.ModeDirect
@@ -803,15 +803,19 @@ func (s *FiatPaymentAppService) registerProvider(providerID, secretKey, publisha
 		if platformMode {
 			mode = paypal.ModePartner
 		}
-		p := paypal.NewProvider(paypal.Config{
+		cfg := paypal.Config{
 			ClientID:     publishableKey,
 			ClientSecret: secretKey,
 			WebhookID:    webhookSecret,
 			Mode:         mode,
 			Sandbox:      s.testnet,
-		})
+		}
+		if opts != nil && opts.PayPalPartnerID != "" {
+			cfg.PartnerID = opts.PayPalPartnerID
+		}
+		p := paypal.NewProvider(cfg)
 		s.registry.Register(p)
-		logger.LogInfoWithIDf(log, s.nodeID, "registered PayPal provider (%s mode)", mode)
+		logger.LogInfoWithIDf(log, s.nodeID, "registered PayPal provider (%s mode, partnerID=%q)", mode, cfg.PartnerID)
 	default:
 		logger.LogErrorWithIDf(log, s.nodeID, "unknown fiat provider %q, cannot register", providerID)
 	}

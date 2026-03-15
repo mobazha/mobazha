@@ -145,6 +145,12 @@ type FiatService interface {
 	HandleOnboardingCallback(ctx context.Context, providerID string, params CallbackParams) (*AccountStatus, error)
 }
 
+// PlatformProviderOpts holds provider-specific platform configuration
+// that varies by payment provider (e.g., PayPal Partner ID).
+type PlatformProviderOpts struct {
+	PayPalPartnerID string
+}
+
 // FiatPlatformConfigurer allows the hosting layer to inject platform-level
 // fiat providers into a tenant node's registry. Used in SaaS mode where
 // the platform owns the Stripe Connect keys (ModeConnected), not the seller.
@@ -152,10 +158,10 @@ type FiatService interface {
 // Hosting obtains this via type assertion on FiatService:
 //
 //	if configurer, ok := fiatService.(FiatPlatformConfigurer); ok {
-//	    configurer.RegisterPlatformProvider("stripe", secretKey, pubKey, webhookSecret)
+//	    configurer.RegisterPlatformProvider("stripe", secretKey, pubKey, webhookSecret, nil)
 //	}
 type FiatPlatformConfigurer interface {
-	RegisterPlatformProvider(providerID, secretKey, publishableKey, webhookSecret string)
+	RegisterPlatformProvider(providerID, secretKey, publishableKey, webhookSecret string, opts *PlatformProviderOpts)
 	DisconnectProvider(ctx context.Context, providerID string) error
 }
 

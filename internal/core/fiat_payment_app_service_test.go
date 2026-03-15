@@ -1103,3 +1103,140 @@ func TestFiatService_CleanupProcessedEvents_EmptyTable(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), deleted)
 }
+
+// --- Tests: Payment Canceled webhook (P3) ---
+
+func TestFiatService_HandleWebhook_PaymentCanceled_LogsOnly(t *testing.T) {
+	reg := newMockFiatRegistry()
+	reg.Register(&mockFiatProvider{
+		id: "stripe",
+		parsedEvent: &contracts.WebhookEvent{
+			EventID:    "evt_pc_001",
+			Type:       contracts.WebhookPaymentCanceled,
+			ProviderID: "stripe",
+			PaymentID:  "pi_canceled_001",
+			OrderID:    "order_pc_001",
+		},
+	})
+
+	svc, _ := newFiatTestService(t, reg)
+
+	err := svc.HandleWebhook(context.Background(), "stripe", []byte("p"), nil)
+	require.NoError(t, err, "PaymentCanceled should not return error")
+}
+
+// --- Tests: Fiat Reconciliation (P0) ---
+
+func TestFiatService_ReconcileFiatOrders_SucceededPayment_TriggersHandler(t *testing.T) {
+	provider := &mockFiatProvider{
+		id: "stripe",
+		getResult: &contracts.PaymentDetail{
+			PaymentID: "pi_reconcile_001",
+			Status:    "succeeded",
+			Amount:    5000,
+			Currency:  "USD",
+			PaymentMethod: contracts.PaymentMethodInfo{
+				Type: "card", Brand: "visa", Last4: "4242",
+			},
+		},
+	}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+
+	svc, db := newFiatTestServiceWithOrders(t, reg)
+
+	seedFiatOrder(t, db, &models.Order{
+		ID:           "order_reconcile_001",
+		Open:         true,
+		FiatMetadata: []byte(`{"fiat_provider":"stripe","fiat_session_id":"pi_reconcile_001"}`),
+	}, models.OrderState_AWAITING_PAYMENT)
+
+	var handledEvent *contracts.WebhookEvent
+	svc.SetWebhookHandler(func(_ context.Context, event *contracts.WebhookEvent) error {
+		handledEvent = event
+		return nil
+	})
+
+	svc.ReconcileFiatOrders(context.Background())
+
+	require.NotNil(t, handledEvent, "webhook handler should be called for succeeded payment")
+	assert.Equal(t, "order_reconcile_001", handledEvent.OrderID)
+	assert.Equal(t, "pi_reconcile_001", handledEvent.PaymentID)
+	assert.Equal(t, int64(5000), handledEvent.Amount)
+	assert.Equal(t, contracts.WebhookPaymentSucceeded, handledEvent.Type)
+}
+
+func TestFiatService_ReconcileFiatOrders_PendingPayment_NoAction(t *testing.T) {
+	provider := &mockFiatProvider{
+		id: "stripe",
+		getResult: &contracts.PaymentDetail{
+			PaymentID: "pi_pending_001",
+			Status:    "requires_payment_method",
+			Amount:    3000,
+			Currency:  "USD",
+		},
+	}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+
+	svc, db := newFiatTestServiceWithOrders(t, reg)
+
+	seedFiatOrder(t, db, &models.Order{
+		ID:           "order_pending_recon",
+		Open:         true,
+		FiatMetadata: []byte(`{"fiat_provider":"stripe","fiat_session_id":"pi_pending_001"}`),
+	}, models.OrderState_AWAITING_PAYMENT)
+
+	var handlerCalled bool
+	svc.SetWebhookHandler(func(_ context.Context, _ *contracts.WebhookEvent) error {
+		handlerCalled = true
+		return nil
+	})
+
+	svc.ReconcileFiatOrders(context.Background())
+
+	assert.False(t, handlerCalled, "webhook handler should NOT be called for non-succeeded payment")
+}
+
+func TestFiatService_ReconcileFiatOrders_NoOrders_NoAction(t *testing.T) {
+	reg := newMockFiatRegistry()
+	svc, _ := newFiatTestServiceWithOrders(t, reg)
+
+	svc.SetWebhookHandler(func(_ context.Context, _ *contracts.WebhookEvent) error {
+		t.Fatal("webhook handler should not be called when no orders exist")
+		return nil
+	})
+
+	svc.ReconcileFiatOrders(context.Background())
+}
+
+func TestFiatService_ReconcileFiatOrders_ProviderAPIError_ContinuesOthers(t *testing.T) {
+	provider := &mockFiatProvider{
+		id:     "stripe",
+		getErr: errors.New("stripe API timeout"),
+	}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+
+	svc, db := newFiatTestServiceWithOrders(t, reg)
+
+	seedFiatOrder(t, db, &models.Order{
+		ID:           "order_api_err",
+		Open:         true,
+		FiatMetadata: []byte(`{"fiat_provider":"stripe","fiat_session_id":"pi_api_err"}`),
+	}, models.OrderState_AWAITING_PAYMENT)
+
+	svc.SetWebhookHandler(func(_ context.Context, _ *contracts.WebhookEvent) error {
+		t.Fatal("webhook handler should not be called on API error")
+		return nil
+	})
+
+	svc.ReconcileFiatOrders(context.Background())
+}
+
+func TestFiatService_ReconcileFiatOrders_NoWebhookHandler_NoAction(t *testing.T) {
+	reg := newMockFiatRegistry()
+	svc, _ := newFiatTestServiceWithOrders(t, reg)
+
+	svc.ReconcileFiatOrders(context.Background())
+}

@@ -123,6 +123,7 @@ type WebhookEventType string
 const (
 	WebhookPaymentSucceeded WebhookEventType = "payment.succeeded"
 	WebhookPaymentFailed    WebhookEventType = "payment.failed"
+	WebhookPaymentCanceled  WebhookEventType = "payment.canceled"
 	WebhookDisputeOpened    WebhookEventType = "dispute.opened"
 	WebhookDisputeResolved  WebhookEventType = "dispute.resolved"
 	WebhookRefundCreated    WebhookEventType = "refund.created"

@@ -211,10 +211,22 @@ func (p *Provider) ParseWebhook(_ context.Context, payload []byte, headers map[s
 			we.Amount = ch.AmountRefunded
 			we.Currency = strings.ToUpper(string(ch.Currency))
 			we.Coin = "fiat:" + we.Currency
-			if len(ch.Refunds.Data) > 0 {
+			if ch.Refunds != nil && len(ch.Refunds.Data) > 0 {
 				we.RefundID = ch.Refunds.Data[0].ID
 			}
 		}
+
+	case "payment_intent.canceled":
+		we.Type = contracts.WebhookPaymentCanceled
+		pi, err := extractPaymentIntent(event.Data.Raw)
+		if err != nil {
+			return nil, err
+		}
+		we.PaymentID = pi.ID
+		we.OrderID = pi.Metadata["order_id"]
+		we.Coin = "fiat:" + strings.ToUpper(string(pi.Currency))
+		we.Amount = pi.Amount
+		we.Currency = strings.ToUpper(string(pi.Currency))
 
 	case "account.updated":
 		we.Type = contracts.WebhookAccountUpdated

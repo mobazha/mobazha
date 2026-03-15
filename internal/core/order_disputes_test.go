@@ -232,7 +232,7 @@ func TestMobazhaNode_Dispute(t *testing.T) {
 	}
 
 	done5 := make(chan struct{})
-	if err := network.Nodes()[1].Order().OpenDispute(orderID, "Got scammed", done5); err != nil {
+	if err := network.Nodes()[1].Order().OpenDispute(orderID, "Got scammed", nil, done5); err != nil {
 		t.Fatal(err)
 	}
 
@@ -690,7 +690,7 @@ func TestMobazhaNode_ReleaseFundsAfterTimeout(t *testing.T) {
 	}
 
 	done5 := make(chan struct{})
-	if err := network.Nodes()[1].Order().OpenDispute(orderID, "Got scammed", done5); err != nil {
+	if err := network.Nodes()[1].Order().OpenDispute(orderID, "Got scammed", nil, done5); err != nil {
 		t.Fatal(err)
 	}
 

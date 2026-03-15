@@ -14,10 +14,10 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
+	"github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	"github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/notifier"
 	"github.com/mobazha/mobazha3.0/internal/orders"
@@ -25,13 +25,13 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/wallet"
 	pkgconfig "github.com/mobazha/mobazha3.0/pkg/config"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
-	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
-	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/database/netdb"
 	"github.com/mobazha/mobazha3.0/pkg/encryption"
 	"github.com/mobazha/mobazha3.0/pkg/events"
 	"github.com/mobazha/mobazha3.0/pkg/evm"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/payment"
 	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
 )
@@ -94,7 +94,7 @@ type identityFields struct {
 
 // storageFields groups data storage dependencies.
 type storageFields struct {
-	p2pInfra *P2PInfra
+	p2pInfra     *P2PInfra
 	contentStore contracts.ContentStore
 	db           database.Database
 	repo         *repo.Repo
@@ -165,26 +165,26 @@ type lifecycleFields struct {
 
 // appServices groups all extracted App Service dependencies.
 type appServices struct {
-	paymentService      *PaymentAppService
-	orderService        *OrderAppService
-	chatService         *ChatAppService
-	matrixService       *MatrixAppService
-	preferencesService  *PreferencesAppService
-	mediaService        *MediaAppService
-	ratingsService      *RatingsAppService
-	profileService      *ProfileAppService
-	followService       *FollowAppService
-	postsService        *PostsAppService
-	moderationService   *ModerationAppService
-	listingService      *ListingAppService
-	notificationService *NotificationAppService
-	shoppingCartService *ShoppingCartAppService
-	wishlistService     *WishlistAppService
-	discountService     *DiscountAppService
-	collectionService   *CollectionAppService
-	fiatRegistry        contracts.FiatProviderRegistry
-	fiatPaymentService  *FiatPaymentAppService
-	shippingService     *ShippingAppService
+	paymentService             *PaymentAppService
+	orderService               *OrderAppService
+	chatService                *ChatAppService
+	matrixService              *MatrixAppService
+	preferencesService         *PreferencesAppService
+	mediaService               *MediaAppService
+	ratingsService             *RatingsAppService
+	profileService             *ProfileAppService
+	followService              *FollowAppService
+	postsService               *PostsAppService
+	moderationService          *ModerationAppService
+	listingService             *ListingAppService
+	notificationService        *NotificationAppService
+	shoppingCartService        *ShoppingCartAppService
+	wishlistService            *WishlistAppService
+	discountService            *DiscountAppService
+	collectionService          *CollectionAppService
+	fiatRegistry               contracts.FiatProviderRegistry
+	fiatPaymentService         *FiatPaymentAppService
+	shippingService            *ShippingAppService
 	analyticsService           *AnalyticsAppService
 	paymentVerificationService *PaymentVerificationService
 }
@@ -278,9 +278,11 @@ func (n *MobazhaNode) Start() {
 		n.startPaymentEventMonitors()
 
 		go n.orderService.StartOrderTimeoutScheduler()
+		go n.orderService.StartOutboxPoller()
 
 		if n.fiatPaymentService != nil {
 			n.fiatPaymentService.StartPeriodicCleanup(n.nodeCtx, 24*time.Hour, 7*24*time.Hour)
+			n.fiatPaymentService.StartReconciliationScheduler(n.nodeCtx, 2*time.Minute)
 		}
 	}
 
@@ -424,7 +426,6 @@ func (n *MobazhaNode) DestroyNode() {
 	n.Stop(true)
 	n.repo.DestroyRepo()
 }
-
 
 // Multiwallet returns the WalletOperator interface.
 // Internal callers that need concrete map access can type-assert to

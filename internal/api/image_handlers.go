@@ -107,6 +107,9 @@ func (g *Gateway) handlePOSTAvatar(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	data := new(ImgData)
 	if err := decoder.Decode(&data); err != nil {
+		if handleMaxBytesError(w, err) {
+			return
+		}
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -141,6 +144,9 @@ func (g *Gateway) handlePOSTHeader(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	data := new(ImgData)
 	if err := decoder.Decode(&data); err != nil {
+		if handleMaxBytesError(w, err) {
+			return
+		}
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -175,6 +181,9 @@ func (g *Gateway) handlePOSTImages(w http.ResponseWriter, r *http.Request) {
 	}
 	var images []ImgData
 	if err := json.NewDecoder(r.Body).Decode(&images); err != nil {
+		if handleMaxBytesError(w, err) {
+			return
+		}
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -214,6 +223,9 @@ func (g *Gateway) handlePOSTProductImage(w http.ResponseWriter, r *http.Request)
 	}
 	var images []ImgData
 	if err := json.NewDecoder(r.Body).Decode(&images); err != nil {
+		if handleMaxBytesError(w, err) {
+			return
+		}
 		ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}

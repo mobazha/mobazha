@@ -9,11 +9,19 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/response"
 )
 
-const defaultMaxBodySize int64 = 1 << 20 // 1 MB
+const defaultMaxBodySize int64 = 1 << 20  // 1 MB
+const mediaMaxBodySize int64 = 15 << 20 // 15 MB — base64 JSON image uploads (10 MB raw × 1.34 base64 + JSON overhead)
+
+// largeBodyPaths lists URL path prefixes that carry base64-encoded media
+// inside JSON bodies and therefore need a higher body size limit.
+var largeBodyPaths = []string{
+	"/v1/media/",
+}
 
 // maxBodySizeMiddleware limits request body size for non-multipart requests.
 // Multipart requests (file uploads, ZIP imports) are exempt because their
 // handlers manage limits individually — some need up to 300 MB.
+// Paths in largeBodyPaths get a higher limit to accommodate base64 image payloads.
 func maxBodySizeMiddleware(limit int64) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -29,7 +37,15 @@ func maxBodySizeMiddleware(limit int64) mux.MiddlewareFunc {
 				return
 			}
 
-			r.Body = http.MaxBytesReader(w, r.Body, limit)
+			effectiveLimit := limit
+			for _, prefix := range largeBodyPaths {
+				if strings.HasPrefix(r.URL.Path, prefix) {
+					effectiveLimit = mediaMaxBodySize
+					break
+				}
+			}
+
+			r.Body = http.MaxBytesReader(w, r.Body, effectiveLimit)
 			next.ServeHTTP(w, r)
 		})
 	}

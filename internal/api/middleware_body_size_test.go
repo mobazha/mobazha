@@ -97,6 +97,60 @@ func TestMaxBodySizeMiddleware_GET_NoLimit(t *testing.T) {
 	}
 }
 
+func TestMaxBodySizeMiddleware_MediaPath_HigherLimit(t *testing.T) {
+	r := mux.NewRouter()
+	r.Use(maxBodySizeMiddleware(1024)) // 1 KB default
+	r.HandleFunc("/v1/media/product-images", func(w http.ResponseWriter, r *http.Request) {
+		buf := new(bytes.Buffer)
+		if _, err := buf.ReadFrom(r.Body); err != nil {
+			if handleMaxBytesError(w, err) {
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}).Methods("POST")
+
+	// 2 KB body exceeds default 1 KB but is under mediaMaxBodySize
+	body := bytes.Repeat([]byte("a"), 2048)
+	req := httptest.NewRequest("POST", "/v1/media/product-images", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200 for media path with higher limit, got %d", rr.Code)
+	}
+}
+
+func TestMaxBodySizeMiddleware_NonMediaPath_DefaultLimit(t *testing.T) {
+	r := mux.NewRouter()
+	r.Use(maxBodySizeMiddleware(1024)) // 1 KB default
+	r.HandleFunc("/v1/orders", func(w http.ResponseWriter, r *http.Request) {
+		buf := new(bytes.Buffer)
+		if _, err := buf.ReadFrom(r.Body); err != nil {
+			if handleMaxBytesError(w, err) {
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}).Methods("POST")
+
+	// 2 KB body exceeds default 1 KB — non-media path should be rejected
+	body := bytes.Repeat([]byte("a"), 2048)
+	req := httptest.NewRequest("POST", "/v1/orders", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("expected 413 for non-media path over default limit, got %d", rr.Code)
+	}
+}
+
 func TestIsMaxBytesError(t *testing.T) {
 	if isMaxBytesError(nil) {
 		t.Error("expected false for nil error")

@@ -26,7 +26,7 @@ type PublishFunc func(done chan<- struct{})
 
 type PublishFileFunc func(ctx context.Context, c cid.Cid, done chan<- struct{})
 
-const defaultMaxUploadBytes = 15 << 20 // 15 MB
+const defaultMaxUploadBytes = 10 << 20 // 10 MB — client should resize to ≤2048px before upload
 
 // ── MediaAppService ─────────────────────────────────────────────
 

@@ -58,9 +58,4 @@ type HostService interface {
 	// LocalFS in standalone). Returns nil when no BlobStore is configured
 	// (legacy mode — media bytes stored in DB).
 	GetBlobStore() contracts.BlobStore
-
-	// GetNodeServiceByPeerID returns the NodeService for a tenant identified by peerID.
-	// Used for cross-tenant payment relay in SaaS mode (direct in-process calls).
-	// Returns nil if the peer is not found or not running.
-	GetNodeServiceByPeerID(peerID peer.ID) contracts.NodeService
 }

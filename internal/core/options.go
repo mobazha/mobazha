@@ -140,11 +140,6 @@ func (n *MobazhaNode) wireServiceSetters() {
 	if n.paymentService != nil && n.orderProcessor != nil {
 		n.paymentService.SetPaymentRecorder(n.orderProcessor)
 	}
-	if n.orderService != nil && n.hostService != nil {
-		n.orderService.SetNodeLookupFunc(func(pid peer.ID) contracts.NodeService {
-			return n.hostService.GetNodeServiceByPeerID(pid)
-		})
-	}
 	if n.paymentService != nil && n.orderService != nil {
 		n.paymentService.SetPaymentVerifiedHandler(func(orderID string, paymentSent *pb.PaymentSent) {
 			amount, _ := strconv.ParseUint(paymentSent.Amount, 10, 64)

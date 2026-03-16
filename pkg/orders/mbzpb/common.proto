@@ -17,6 +17,8 @@ message ID {
     string handle       = 2;
     Pubkeys pubkeys     = 3;
     bytes sig           = 4; // secp256k1 signature covering peerID
+    string name         = 5; // display name snapshot at order creation
+    string avatarTiny   = 6; // tiny avatar hash snapshot for compact display
 
     message Pubkeys {
         bytes identity   = 1; // IPFS public key

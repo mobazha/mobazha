@@ -1,13 +1,16 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"path"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -20,6 +23,65 @@ import (
 type APIError struct {
 	Success bool   `json:"success"`
 	Reason  string `json:"reason"`
+}
+
+const profileResolveConcurrency = 10
+
+type profileDisplayInfo struct {
+	Name   string `json:"name"`
+	Avatar string `json:"avatar"`
+}
+
+// resolveProfileDisplayInfo looks up display names and avatars for a set of
+// peerIDs in parallel. Returns a best-effort map; lookup failures are silently
+// skipped so a single unreachable peer never blocks the entire list response.
+func resolveProfileDisplayInfo(ctx context.Context, profileSvc contracts.ProfileService, peerIDs []string) map[string]profileDisplayInfo {
+	unique := make(map[string]struct{}, len(peerIDs))
+	for _, id := range peerIDs {
+		if id != "" {
+			unique[id] = struct{}{}
+		}
+	}
+	if len(unique) == 0 {
+		return nil
+	}
+
+	result := make(map[string]profileDisplayInfo, len(unique))
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, profileResolveConcurrency)
+
+	for idStr := range unique {
+		pid, err := peer.Decode(idStr)
+		if err != nil {
+			continue
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(peerIDStr string, peerID peer.ID) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			profile, err := profileSvc.GetProfile(ctx, peerID, nil, true)
+			if err != nil || profile == nil {
+				return
+			}
+			name := profile.Name
+			if name == "" {
+				name = profile.Handle
+			}
+			avatar := profile.AvatarHashes.Small
+			if avatar == "" {
+				avatar = profile.AvatarHashes.Tiny
+			}
+			if name != "" || avatar != "" {
+				mu.Lock()
+				result[peerIDStr] = profileDisplayInfo{Name: name, Avatar: avatar}
+				mu.Unlock()
+			}
+		}(idStr, pid)
+	}
+	wg.Wait()
+	return result
 }
 
 func ErrorResponse(w http.ResponseWriter, errorCode int, reason string) {
@@ -191,7 +253,7 @@ func (g *Gateway) handlePOSTPayment(w http.ResponseWriter, r *http.Request) {
 	sanitizedJSONResponse(w, response)
 }
 
-func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, orderSvc contracts.OrderService, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
+func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, ctx context.Context, orderSvc contracts.OrderService, profileSvc contracts.ProfileService, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
 	orders, total, err := orderSvc.GetPurchases(stateFilters, searchTerm, sortByAscending, sortByRead, limit, exclude)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
@@ -207,6 +269,8 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, orderSvc contracts.Ord
 		Total              models.CurrencyValue `json:"total"`
 		VendorID           string               `json:"vendorID"`
 		VendorHandle       string               `json:"vendorHandle"`
+		VendorName         string               `json:"vendorName"`
+		VendorAvatar       string               `json:"vendorAvatar"`
 		ShippingName       string               `json:"shippingName"`
 		ShippingAddress    string               `json:"shippingAddress"`
 		CoinType           string               `json:"coinType"`
@@ -218,6 +282,7 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, orderSvc contracts.Ord
 	}
 
 	purchases := []purchaseInfo{}
+	vendorIDs := make([]string, 0, len(orders))
 	for _, order := range orders {
 		orderOpen, err := order.OrderOpenMessage()
 		if err != nil {
@@ -241,6 +306,9 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, orderSvc contracts.Ord
 			continue
 		}
 
+		vendorID := listingInfo.VendorID.PeerID
+		vendorIDs = append(vendorIDs, vendorID)
+
 		info := purchaseInfo{
 			OrderID:   order.ID.String(),
 			Slug:      listingInfo.Slug,
@@ -251,7 +319,7 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, orderSvc contracts.Ord
 				orderOpen.Amount,
 				models.CurrencyDefinitions[orderOpen.PricingCoin],
 			),
-			VendorID:           listingInfo.VendorID.PeerID,
+			VendorID:           vendorID,
 			VendorHandle:       listingInfo.VendorID.Handle,
 			ShippingName:       orderOpen.Shipping.ShipTo,
 			ShippingAddress:    orderOpen.Shipping.Address,
@@ -263,6 +331,16 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, orderSvc contracts.Ord
 		}
 
 		purchases = append(purchases, info)
+	}
+
+	if profileSvc != nil && len(vendorIDs) > 0 {
+		infoMap := resolveProfileDisplayInfo(ctx, profileSvc, vendorIDs)
+		for i := range purchases {
+			if info, ok := infoMap[purchases[i].VendorID]; ok {
+				purchases[i].VendorName = info.Name
+				purchases[i].VendorAvatar = info.Avatar
+			}
+		}
 	}
 
 	type purchasesResponse struct {
@@ -284,8 +362,9 @@ func (g *Gateway) handlePOSTPurchases(w http.ResponseWriter, r *http.Request) {
 	}
 
 	orderSvc := getOrderService(r)
+	profileSvc := getProfileService(r)
 
-	g.getPurchasesImpl(w, orderSvc, convertOrderStates(query.OrderStates), query.SearchTerm, query.SortByAscending, query.SortByRead, query.Limit, query.Exclude)
+	g.getPurchasesImpl(w, r.Context(), orderSvc, profileSvc, convertOrderStates(query.OrderStates), query.SearchTerm, query.SortByAscending, query.SortByRead, query.Limit, query.Exclude)
 }
 
 func (g *Gateway) handleGETPurchases(w http.ResponseWriter, r *http.Request) {
@@ -296,11 +375,12 @@ func (g *Gateway) handleGETPurchases(w http.ResponseWriter, r *http.Request) {
 	}
 
 	orderSvc := getOrderService(r)
+	profileSvc := getProfileService(r)
 
-	g.getPurchasesImpl(w, orderSvc, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
+	g.getPurchasesImpl(w, r.Context(), orderSvc, profileSvc, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
 }
 
-func (g *Gateway) getSalesImpl(w http.ResponseWriter, orderSvc contracts.OrderService, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
+func (g *Gateway) getSalesImpl(w http.ResponseWriter, ctx context.Context, orderSvc contracts.OrderService, profileSvc contracts.ProfileService, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
 	orders, total, err := orderSvc.GetSales(stateFilters, searchTerm, sortByAscending, sortByRead, limit, exclude)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
@@ -316,6 +396,8 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, orderSvc contracts.OrderSe
 		Total              models.CurrencyValue `json:"total"`
 		BuyerID            string               `json:"buyerID"`
 		BuyerHandle        string               `json:"buyerHandle"`
+		BuyerName          string               `json:"buyerName"`
+		BuyerAvatar        string               `json:"buyerAvatar"`
 		ShippingName       string               `json:"shippingName"`
 		ShippingAddress    string               `json:"shippingAddress"`
 		CoinType           string               `json:"coinType"`
@@ -327,6 +409,7 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, orderSvc contracts.OrderSe
 	}
 
 	sales := []saleInfo{}
+	buyerIDs := make([]string, 0, len(orders))
 	for _, order := range orders {
 		orderOpen, err := order.OrderOpenMessage()
 		if err != nil {
@@ -350,6 +433,9 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, orderSvc contracts.OrderSe
 			continue
 		}
 
+		buyerID := orderOpen.BuyerID.PeerID
+		buyerIDs = append(buyerIDs, buyerID)
+
 		info := saleInfo{
 			OrderID:   order.ID.String(),
 			Slug:      listingInfo.Slug,
@@ -360,7 +446,7 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, orderSvc contracts.OrderSe
 				orderOpen.Amount,
 				models.CurrencyDefinitions[orderOpen.PricingCoin],
 			),
-			BuyerID:            orderOpen.BuyerID.PeerID,
+			BuyerID:            buyerID,
 			BuyerHandle:        orderOpen.BuyerID.Handle,
 			ShippingName:       orderOpen.Shipping.ShipTo,
 			ShippingAddress:    orderOpen.Shipping.Address,
@@ -372,6 +458,16 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, orderSvc contracts.OrderSe
 		}
 
 		sales = append(sales, info)
+	}
+
+	if profileSvc != nil && len(buyerIDs) > 0 {
+		infoMap := resolveProfileDisplayInfo(ctx, profileSvc, buyerIDs)
+		for i := range sales {
+			if info, ok := infoMap[sales[i].BuyerID]; ok {
+				sales[i].BuyerName = info.Name
+				sales[i].BuyerAvatar = info.Avatar
+			}
+		}
 	}
 
 	type salesResponse struct {
@@ -391,8 +487,9 @@ func (g *Gateway) handleGETSales(w http.ResponseWriter, r *http.Request) {
 	}
 
 	orderSvc := getOrderService(r)
+	profileSvc := getProfileService(r)
 
-	g.getSalesImpl(w, orderSvc, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
+	g.getSalesImpl(w, r.Context(), orderSvc, profileSvc, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
 }
 
 func (g *Gateway) handlePostSales(w http.ResponseWriter, r *http.Request) {
@@ -405,11 +502,12 @@ func (g *Gateway) handlePostSales(w http.ResponseWriter, r *http.Request) {
 	}
 
 	orderSvc := getOrderService(r)
+	profileSvc := getProfileService(r)
 
-	g.getSalesImpl(w, orderSvc, convertOrderStates(query.OrderStates), query.SearchTerm, query.SortByAscending, query.SortByRead, query.Limit, query.Exclude)
+	g.getSalesImpl(w, r.Context(), orderSvc, profileSvc, convertOrderStates(query.OrderStates), query.SearchTerm, query.SortByAscending, query.SortByRead, query.Limit, query.Exclude)
 }
 
-func (g *Gateway) getCasesImpl(w http.ResponseWriter, orderSvc contracts.OrderService, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
+func (g *Gateway) getCasesImpl(w http.ResponseWriter, ctx context.Context, orderSvc contracts.OrderService, profileSvc contracts.ProfileService, stateFilters []models.OrderState, searchTerm string, sortByAscending bool, sortByRead bool, limit int, exclude []string) {
 	cases, total, err := orderSvc.GetCases(stateFilters, searchTerm, sortByAscending, sortByRead, limit, exclude)
 	if err != nil {
 		ErrorResponse(w, http.StatusInternalServerError, wrapError(err))
@@ -425,8 +523,12 @@ func (g *Gateway) getCasesImpl(w http.ResponseWriter, orderSvc contracts.OrderSe
 		Total              models.CurrencyValue `json:"total"`
 		BuyerID            string               `json:"buyerID"`
 		BuyerHandle        string               `json:"buyerHandle"`
+		BuyerName          string               `json:"buyerName"`
+		BuyerAvatar        string               `json:"buyerAvatar"`
 		VendorID           string               `json:"vendorID"`
 		VendorHandle       string               `json:"vendorHandle"`
+		VendorName         string               `json:"vendorName"`
+		VendorAvatar       string               `json:"vendorAvatar"`
 		CoinType           string               `json:"coinType"`
 		PaymentCoin        string               `json:"paymentCoin"`
 		BuyerOpened        bool                 `json:"buyerOpened"`
@@ -436,6 +538,7 @@ func (g *Gateway) getCasesImpl(w http.ResponseWriter, orderSvc contracts.OrderSe
 	}
 
 	casesInfo := []caseInfo{}
+	allPeerIDs := make([]string, 0, len(cases)*2)
 	for _, aCase := range cases {
 		disputeOpen, err := aCase.DisuteOpenMessage()
 		if err != nil {
@@ -463,6 +566,10 @@ func (g *Gateway) getCasesImpl(w http.ResponseWriter, orderSvc contracts.OrderSe
 			continue
 		}
 
+		buyerID := orderOpen.BuyerID.PeerID
+		vendorID := listingInfo.VendorID.PeerID
+		allPeerIDs = append(allPeerIDs, buyerID, vendorID)
+
 		info := caseInfo{
 			CaseID:    aCase.ID.String(),
 			Slug:      listingInfo.Slug,
@@ -473,9 +580,9 @@ func (g *Gateway) getCasesImpl(w http.ResponseWriter, orderSvc contracts.OrderSe
 				paymentSent.Amount,
 				models.CurrencyDefinitions[paymentSent.Coin],
 			),
-			BuyerID:            orderOpen.BuyerID.PeerID,
+			BuyerID:            buyerID,
 			BuyerHandle:        orderOpen.BuyerID.Handle,
-			VendorID:           listingInfo.VendorID.PeerID,
+			VendorID:           vendorID,
 			VendorHandle:       listingInfo.VendorID.Handle,
 			PaymentCoin:        paymentSent.Coin,
 			BuyerOpened:        disputeOpen.OpenedBy == pb.DisputeOpen_BUYER,
@@ -485,6 +592,20 @@ func (g *Gateway) getCasesImpl(w http.ResponseWriter, orderSvc contracts.OrderSe
 		}
 
 		casesInfo = append(casesInfo, info)
+	}
+
+	if profileSvc != nil && len(allPeerIDs) > 0 {
+		infoMap := resolveProfileDisplayInfo(ctx, profileSvc, allPeerIDs)
+		for i := range casesInfo {
+			if info, ok := infoMap[casesInfo[i].BuyerID]; ok {
+				casesInfo[i].BuyerName = info.Name
+				casesInfo[i].BuyerAvatar = info.Avatar
+			}
+			if info, ok := infoMap[casesInfo[i].VendorID]; ok {
+				casesInfo[i].VendorName = info.Name
+				casesInfo[i].VendorAvatar = info.Avatar
+			}
+		}
 	}
 
 	type casesResponse struct {
@@ -504,8 +625,9 @@ func (g *Gateway) handleGETCases(w http.ResponseWriter, r *http.Request) {
 	}
 
 	orderSvc := getOrderService(r)
+	profileSvc := getProfileService(r)
 
-	g.getCasesImpl(w, orderSvc, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
+	g.getCasesImpl(w, r.Context(), orderSvc, profileSvc, orderStates, searchTerm, sortByAscending, sortByRead, limit, nil)
 }
 
 func (g *Gateway) handlePostCases(w http.ResponseWriter, r *http.Request) {
@@ -518,8 +640,9 @@ func (g *Gateway) handlePostCases(w http.ResponseWriter, r *http.Request) {
 	}
 
 	orderSvc := getOrderService(r)
+	profileSvc := getProfileService(r)
 
-	g.getCasesImpl(w, orderSvc, convertOrderStates(query.OrderStates), query.SearchTerm, query.SortByAscending, query.SortByRead, query.Limit, query.Exclude)
+	g.getCasesImpl(w, r.Context(), orderSvc, profileSvc, convertOrderStates(query.OrderStates), query.SearchTerm, query.SortByAscending, query.SortByRead, query.Limit, query.Exclude)
 }
 
 func (g *Gateway) handleGetCase(w http.ResponseWriter, r *http.Request) {

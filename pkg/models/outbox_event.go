@@ -9,7 +9,7 @@ type OutboxEvent struct {
 	ID          uint64     `gorm:"primaryKey;autoIncrement"`
 	TenantID    string     `gorm:"index:idx_outbox_pending,priority:1"`
 	EventName   string     `gorm:"size:128;not null"`
-	Payload     []byte     `gorm:"type:blob;not null"`
+	Payload     []byte     `gorm:"not null"`
 	CreatedAt   time.Time  `gorm:"not null"`
 	DeliveredAt *time.Time `gorm:"index:idx_outbox_pending,priority:2"`
 }

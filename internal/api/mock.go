@@ -312,6 +312,9 @@ func (m *mockNode) CancelOrderViaRelay(orderID models.OrderID, done chan struct{
 func (m *mockNode) OpenDispute(orderID models.OrderID, reason string, evidenceHashes []string, done chan struct{}) error {
 	return m.openDisputeFunc(orderID, reason, evidenceHashes, done)
 }
+func (m *mockNode) OpenAfterSaleDispute(orderID models.OrderID, reason string, description string) error {
+	return nil
+}
 func (m *mockNode) CloseDispute(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error {
 	return m.closeDisputeFunc(orderID, buyerPercentage, vendorPercentage, resolution, done)
 }

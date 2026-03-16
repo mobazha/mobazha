@@ -138,6 +138,32 @@ func (g *Gateway) handlePOSTReleaseFunds(w http.ResponseWriter, r *http.Request)
 	}
 }
 
+func (g *Gateway) handlePOSTOpenAfterSaleDispute(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
+	type afterSaleDispute struct {
+		Reason      string `json:"reason"`
+		Description string `json:"description"`
+	}
+	var d afterSaleDispute
+	if err := json.NewDecoder(r.Body).Decode(&d); err != nil {
+		ErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	orderSvc := getOrderService(r)
+	if err := orderSvc.OpenAfterSaleDispute(models.OrderID(orderID), d.Reason, d.Description); err != nil {
+		ErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	responsePkg.NoContent(w)
+}
+
 func (g *Gateway) handlePOSTReleaseEscrow(w http.ResponseWriter, r *http.Request) {
 	orderID := mux.Vars(r)["orderID"]
 	if orderID == "" {

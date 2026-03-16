@@ -361,6 +361,25 @@ type OrderProtectionReminder struct {
 	Title         string    `json:"title"`
 }
 
+// AfterSaleDisputeOpened is emitted when a buyer opens a dispute on a
+// COMPLETED order within the after-sale window. Unlike on-chain disputes,
+// after-sale disputes are application-level: funds are already released, so
+// resolution depends on seller voluntary refund or platform mediation.
+type AfterSaleDisputeOpened struct {
+	Notification
+	OrderID      string    `json:"orderID"`
+	Reason       string    `json:"reason"`      // e.g. "NOT_RECEIVED", "NOT_AS_DESCRIBED", "QUALITY_ISSUE", "OTHER"
+	Description  string    `json:"description"`
+	BuyerName    string    `json:"buyerName"`
+	BuyerID      string    `json:"buyerID"`
+	BuyerAvatar  string    `json:"buyerAvatar"`
+	VendorName   string    `json:"vendorName"`
+	VendorID     string    `json:"vendorID"`
+	VendorAvatar string    `json:"vendorAvatar"`
+	Thumbnail    Thumbnail `json:"thumbnail"`
+	Title        string    `json:"title"`
+}
+
 // ── Internal domain events (PaymentAppService → OrderAppService) ──────
 
 // OrderAutoConfirmRequest is emitted by PaymentAppService when a CANCELABLE

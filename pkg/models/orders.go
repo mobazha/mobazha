@@ -1127,6 +1127,30 @@ func (o *Order) CanDispute() bool {
 	return true
 }
 
+// CanRequestAfterSale returns whether the order is COMPLETED/PAYMENT_FINALIZED
+// and still within the after-sale dispute window. Only buyers can initiate.
+func (o *Order) CanRequestAfterSale(now time.Time) bool {
+	if o.Role() != RoleBuyer {
+		return false
+	}
+
+	if o.State != OrderState_COMPLETED && o.State != OrderState_PAYMENT_FINALIZED {
+		return false
+	}
+
+	if o.CompletedAt == nil {
+		return false
+	}
+
+	if o.IsDisputeOpened() {
+		return false
+	}
+
+	policy := DefaultProtectionPolicy(o.ContractType())
+	afterSaleEnd := o.CompletedAt.Add(policy.AfterSaleWindowDuration())
+	return now.Before(afterSaleEnd)
+}
+
 // DeriveState computes the order state by examining the serialized message fields.
 // This is the legacy state derivation logic retained for comparison and fallback.
 // In the FSM-authoritative flow, the processor calls SetFSMState() instead.

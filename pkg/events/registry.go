@@ -43,6 +43,7 @@ func init() {
 		{Category: "dispute", Name: "dispute.accepted", Persistent: true, Sample: new(DisputeAccepted)},
 		{Category: "dispute", Name: "dispute.case_open", Persistent: true, Sample: new(CaseOpen)},
 		{Category: "dispute", Name: "dispute.case_update", Persistent: true, Sample: new(CaseUpdate)},
+		{Category: "dispute", Name: "dispute.after_sale_opened", Persistent: true, Sample: new(AfterSaleDisputeOpened)},
 
 		// ── Social events (persistent + WebSocket) ──
 		{Category: "social", Name: "social.follow", Persistent: true, Sample: new(Follow)},

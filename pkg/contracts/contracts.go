@@ -126,6 +126,7 @@ type OrderService interface {
 
 	// Disputes
 	OpenDispute(orderID models.OrderID, reason string, evidenceHashes []string, done chan struct{}) error
+	OpenAfterSaleDispute(orderID models.OrderID, reason string, description string) error
 	CloseDispute(orderID models.OrderID, buyerPercentage, vendorPercentage float32, resolution string, done chan struct{}) error
 	GetReleaseFundsInstructions(orderID models.OrderID, initiatorAddress string) (coinType iwallet.CoinType, instructions any, err error)
 	ReleaseFunds(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error

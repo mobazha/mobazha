@@ -320,6 +320,7 @@ type PaymentVerificationExpired struct {
 // after the protection period expires without buyer action.
 type OrderAutoCompleted struct {
 	OrderID      string    `json:"orderID"`
+	Reason       string    `json:"reason,omitempty"` // "protection_expired" | "unfulfilled_cancelable"
 	BuyerName    string    `json:"buyerName"`
 	BuyerID      string    `json:"buyerID"`
 	BuyerAvatar  string    `json:"buyerAvatar"`

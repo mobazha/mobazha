@@ -66,6 +66,7 @@ func TestOrderProcessor_processOrderConfirmationMessage(t *testing.T) {
 					VendorID: &pb.ID{
 						PeerID: vendorPeerID,
 						Handle: vendorHandle,
+						Name:   vendorHandle,
 						Pubkeys: &pb.ID_Pubkeys{
 							Identity: pubkeyBytes,
 						},
@@ -116,8 +117,8 @@ func TestOrderProcessor_processOrderConfirmationMessage(t *testing.T) {
 					Tiny:  tinyImageHash,
 					Small: smallImageHash,
 				},
-				VendorHandle: vendorHandle,
-				VendorID:     vendorPeerID,
+				VendorName: vendorHandle,
+				VendorID:   vendorPeerID,
 			},
 		},
 		{

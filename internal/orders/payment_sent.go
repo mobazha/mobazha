@@ -143,7 +143,8 @@ func (op *OrderProcessor) emitPaymentSentEvents(
 					}
 				}
 				op.bus.Emit(&events.OrderFunded{
-					BuyerHandle: orderOpen.BuyerID.Handle,
+					BuyerName:   orderOpen.BuyerID.DisplayName(),
+					BuyerAvatar: orderOpen.BuyerID.DisplayAvatar(),
 					BuyerID:     orderOpen.BuyerID.PeerID,
 					ListingType: listing.Metadata.ContractType.String(),
 					OrderID:     order.ID.String(),

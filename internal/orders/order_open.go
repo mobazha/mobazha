@@ -129,7 +129,8 @@ func (op *OrderProcessor) processOrderOpenMessage(dbtx database.Tx, order *model
 	// TODO: do we want to emit an event in the case of a validation error?
 	if !validationError && op.identity != senderPeer {
 		event = &events.NewOrder{
-			BuyerHandle: orderOpen.BuyerID.Handle,
+			BuyerName:   orderOpen.BuyerID.DisplayName(),
+			BuyerAvatar: orderOpen.BuyerID.DisplayAvatar(),
 			BuyerID:     orderOpen.BuyerID.PeerID,
 			ListingType: orderOpen.Listings[0].Listing.Metadata.ContractType.String(),
 			OrderID:     message.OrderID,

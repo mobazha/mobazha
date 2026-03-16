@@ -33,7 +33,7 @@ func TestHashListing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := "Qmbr1zi4EhCeV7XBm2xkTedDGe45vJGybAkrhaK7ADhsbF"
+	expected := "QmdF12WMr1VzNmV9YRTQaoHxqKvVcZodYmEq29WoQpBqTH"
 	if mh.B58String() != expected {
 		t.Errorf("Incorrect hash returned expected %s, got %s", expected, mh.B58String())
 	}

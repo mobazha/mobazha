@@ -76,11 +76,13 @@ func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *mo
 
 	var (
 		otherPartyID     = orderOpen.Listings[0].Listing.VendorID.PeerID
-		otherPartyHandle = orderOpen.Listings[0].Listing.VendorID.Handle
+		otherPartyName   = orderOpen.Listings[0].Listing.VendorID.DisplayName()
+		otherPartyAvatar = orderOpen.Listings[0].Listing.VendorID.DisplayAvatar()
 	)
 	if order.Role() == models.RoleVendor {
 		otherPartyID = orderOpen.BuyerID.PeerID
-		otherPartyHandle = orderOpen.BuyerID.Handle
+		otherPartyName = orderOpen.BuyerID.DisplayName()
+		otherPartyAvatar = orderOpen.BuyerID.DisplayAvatar()
 	}
 
 	event := &events.DisputeClose{
@@ -90,7 +92,8 @@ func (op *OrderProcessor) processDisputeCloseMessage(dbtx database.Tx, order *mo
 			Small: orderOpen.Listings[0].Listing.Item.Images[0].Small,
 		},
 		OtherPartyID:     otherPartyID,
-		OtherPartyHandle: otherPartyHandle,
+		OtherPartyName:   otherPartyName,
+		OtherPartyAvatar: otherPartyAvatar,
 		Buyer:            orderOpen.BuyerID.PeerID,
 	}
 

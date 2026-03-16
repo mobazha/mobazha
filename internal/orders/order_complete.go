@@ -128,7 +128,8 @@ func (op *OrderProcessor) processOrderCompleteMessage(dbtx database.Tx, order *m
 			Tiny:  orderOpen.Listings[0].Listing.Item.Images[0].Tiny,
 			Small: orderOpen.Listings[0].Listing.Item.Images[0].Small,
 		},
-		BuyerHandle: orderOpen.BuyerID.Handle,
+		BuyerName:   orderOpen.BuyerID.DisplayName(),
+		BuyerAvatar: orderOpen.BuyerID.DisplayAvatar(),
 		BuyerID:     orderOpen.BuyerID.PeerID,
 	}
 

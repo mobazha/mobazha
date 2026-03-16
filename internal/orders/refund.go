@@ -68,7 +68,8 @@ func (op *OrderProcessor) processRefundMessage(dbtx database.Tx, order *models.O
 			Tiny:  orderOpen.Listings[0].Listing.Item.Images[0].Tiny,
 			Small: orderOpen.Listings[0].Listing.Item.Images[0].Small,
 		},
-		VendorHandle: orderOpen.Listings[0].Listing.VendorID.Handle,
+		VendorName:   orderOpen.Listings[0].Listing.VendorID.DisplayName(),
+		VendorAvatar: orderOpen.Listings[0].Listing.VendorID.DisplayAvatar(),
 		VendorID:     orderOpen.Listings[0].Listing.VendorID.PeerID,
 	}
 	return event, nil

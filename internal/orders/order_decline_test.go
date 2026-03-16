@@ -63,6 +63,7 @@ func TestOrderProcessor_processOrderDeclineMessage(t *testing.T) {
 					VendorID: &pb.ID{
 						PeerID: vendorPeerID,
 						Handle: vendorHandle,
+						Name:   vendorHandle,
 						Pubkeys: &pb.ID_Pubkeys{
 							Identity: pubkeyBytes,
 						},
@@ -113,7 +114,7 @@ func TestOrderProcessor_processOrderDeclineMessage(t *testing.T) {
 					Tiny:  tinyImageHash,
 					Small: smallImageHash,
 				},
-				VendorHandle: vendorHandle,
+				VendorName: vendorHandle,
 				VendorID:     vendorPeerID,
 			},
 		},
@@ -134,7 +135,7 @@ func TestOrderProcessor_processOrderDeclineMessage(t *testing.T) {
 					Tiny:  tinyImageHash,
 					Small: smallImageHash,
 				},
-				VendorHandle: vendorHandle,
+				VendorName: vendorHandle,
 				VendorID:     vendorPeerID,
 			},
 		},

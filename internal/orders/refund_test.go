@@ -105,6 +105,7 @@ func TestOrderProcessor_processRefundMessage(t *testing.T) {
 					VendorID: &pb.ID{
 						PeerID: vendorPeerID,
 						Handle: vendorHandle,
+						Name:   vendorHandle,
 					},
 					Item: &pb.Listing_Item{
 						Images: []*pb.Image{
@@ -162,7 +163,7 @@ func TestOrderProcessor_processRefundMessage(t *testing.T) {
 					Tiny:  tinyImageHash,
 					Small: smallImageHash,
 				},
-				VendorHandle: vendorHandle,
+				VendorName: vendorHandle,
 				VendorID:     vendorPeerID,
 			},
 			checkTxs: func(order *models.Order) error {

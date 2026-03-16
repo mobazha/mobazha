@@ -42,17 +42,20 @@ func (op *OrderProcessor) processDisputeAcceptMessage(dbtx database.Tx, order *m
 
 	var (
 		otherPartyID     = ""
-		otherPartyHandle = ""
+		otherPartyName   = ""
+		otherPartyAvatar = ""
 	)
 
 	// SenderPeerID is set by SignOrderMessage
 	senderPeerID := message.SenderPeerID
 	if orderOpen.Listings[0].Listing.VendorID.PeerID == senderPeerID {
 		otherPartyID = orderOpen.Listings[0].Listing.VendorID.PeerID
-		otherPartyHandle = orderOpen.Listings[0].Listing.VendorID.Handle
+		otherPartyName = orderOpen.Listings[0].Listing.VendorID.DisplayName()
+		otherPartyAvatar = orderOpen.Listings[0].Listing.VendorID.DisplayAvatar()
 	} else if orderOpen.BuyerID.PeerID == senderPeerID {
 		otherPartyID = orderOpen.BuyerID.PeerID
-		otherPartyHandle = orderOpen.BuyerID.Handle
+		otherPartyName = orderOpen.BuyerID.DisplayName()
+		otherPartyAvatar = orderOpen.BuyerID.DisplayAvatar()
 	} else {
 		return nil, errors.New("message from unexpected peer, not buyer and vendor")
 	}
@@ -64,7 +67,8 @@ func (op *OrderProcessor) processDisputeAcceptMessage(dbtx database.Tx, order *m
 			Small: orderOpen.Listings[0].Listing.Item.Images[0].Small,
 		},
 		OtherPartyID:     otherPartyID,
-		OtherPartyHandle: otherPartyHandle,
+		OtherPartyName:   otherPartyName,
+		OtherPartyAvatar: otherPartyAvatar,
 		Buyer:            orderOpen.BuyerID.PeerID,
 	}
 

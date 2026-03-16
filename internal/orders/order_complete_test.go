@@ -108,6 +108,7 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 				VendorID: &pb.ID{
 					PeerID: vendorPeerID,
 					Handle: vendorHandle,
+					Name:   vendorHandle,
 					Pubkeys: &pb.ID_Pubkeys{
 						Identity: pubkeyBytes,
 					},
@@ -116,6 +117,7 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 				BuyerID: &pb.ID{
 					PeerID: buyer.String(),
 					Handle: "aaa",
+					Name:   "aaa",
 					Pubkeys: &pb.ID_Pubkeys{
 						Identity: buyerPubkeyBytes,
 					},
@@ -160,6 +162,7 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 					VendorID: &pb.ID{
 						PeerID: vendorPeerID,
 						Handle: vendorHandle,
+						Name:   vendorHandle,
 						Pubkeys: &pb.ID_Pubkeys{
 							Identity: pubkeyBytes,
 						},
@@ -186,6 +189,7 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 		BuyerID: &pb.ID{
 			PeerID: buyer.String(),
 			Handle: "aaa",
+			Name:   "aaa",
 			Pubkeys: &pb.ID_Pubkeys{
 				Identity: buyerPubkeyBytes,
 			},
@@ -236,8 +240,8 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 					Tiny:  tinyImageHash,
 					Small: smallImageHash,
 				},
-				BuyerHandle: "aaa",
-				BuyerID:     buyer.String(),
+				BuyerName: "aaa",
+				BuyerID:   buyer.String(),
 			},
 		},
 		{

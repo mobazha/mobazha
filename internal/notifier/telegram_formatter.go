@@ -18,8 +18,8 @@ func formatTelegramEvent(meta events.EventMeta, event interface{}) string {
 	switch e := event.(type) {
 	case *events.NewOrder:
 		fmt.Fprintf(&sb, "Order: `%s`\n", e.OrderID)
-		if e.BuyerHandle != "" {
-			fmt.Fprintf(&sb, "Buyer: %s\n", escapeTelegramMarkdown(e.BuyerHandle))
+		if e.BuyerName != "" {
+			fmt.Fprintf(&sb, "Buyer: %s\n", escapeTelegramMarkdown(e.BuyerName))
 		}
 		if e.Title != "" {
 			fmt.Fprintf(&sb, "Item: %s\n", escapeTelegramMarkdown(e.Title))
@@ -51,8 +51,8 @@ func formatTelegramEvent(meta events.EventMeta, event interface{}) string {
 
 	case *events.DisputeOpen:
 		fmt.Fprintf(&sb, "Order: `%s`\n", e.OrderID)
-		if e.DisputerHandle != "" {
-			fmt.Fprintf(&sb, "Disputer: %s\n", escapeTelegramMarkdown(e.DisputerHandle))
+		if e.DisputerName != "" {
+			fmt.Fprintf(&sb, "Disputer: %s\n", escapeTelegramMarkdown(e.DisputerName))
 		}
 
 	case *events.DisputeClose:

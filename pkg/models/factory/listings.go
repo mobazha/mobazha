@@ -198,6 +198,7 @@ func NewSignedListing() *pb.SignedListing {
 	listing := NewPhysicalListing("ron-swanson-shirt")
 	listing.VendorID = &pb.ID{
 		PeerID: pid.String(),
+		Name:   "Test Vendor",
 		Pubkeys: &pb.ID_Pubkeys{
 			Identity: pubkeyBytes,
 			Escrow:   escrowPubkey.SerializeCompressed(),

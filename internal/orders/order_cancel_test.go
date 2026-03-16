@@ -87,6 +87,7 @@ func TestOrderProcessor_processCancelMessage(t *testing.T) {
 		BuyerID: &pb.ID{
 			PeerID: buyerPeerID,
 			Handle: buyerHandle,
+			Name:   buyerHandle,
 			Pubkeys: &pb.ID_Pubkeys{
 				Identity: pubkeyBytes,
 			},
@@ -128,8 +129,8 @@ func TestOrderProcessor_processCancelMessage(t *testing.T) {
 					Tiny:  tinyImageHash,
 					Small: smallImageHash,
 				},
-				BuyerHandle: buyerHandle,
-				BuyerID:     buyerPeerID,
+				BuyerName: buyerHandle,
+				BuyerID:   buyerPeerID,
 			},
 		},
 		{

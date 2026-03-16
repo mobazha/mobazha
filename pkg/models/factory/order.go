@@ -106,6 +106,7 @@ func NewOrder() (*pb.OrderOpen, *pb.PaymentSent, error) {
 		BuyerID: &pb.ID{
 			PeerID: pid.String(),
 			Handle: "@assman",
+			Name:   "Ass Man",
 			Pubkeys: &pb.ID_Pubkeys{
 				Identity: pubkeyBytes,
 				Escrow:   escrowPubkey.SerializeCompressed(),

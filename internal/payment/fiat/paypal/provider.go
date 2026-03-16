@@ -138,7 +138,7 @@ func (p *Provider) CapturePayment(ctx context.Context, sessionID string) (*contr
 	if len(resp.PurchaseUnits) > 0 {
 		pu := resp.PurchaseUnits[0]
 		result.Currency = pu.Amount.CurrencyCode
-		if v, err := parseAmount(pu.Amount.Value); err == nil {
+		if v, err := parseAmount(pu.Amount.Value, pu.Amount.CurrencyCode); err == nil {
 			result.Amount = v
 		}
 		if pu.Payments != nil && len(pu.Payments.Captures) > 0 {
@@ -172,7 +172,7 @@ func (p *Provider) GetPayment(ctx context.Context, paymentID string) (*contracts
 	if len(resp.PurchaseUnits) > 0 {
 		pu := resp.PurchaseUnits[0]
 		detail.Currency = pu.Amount.CurrencyCode
-		if v, err := parseAmount(pu.Amount.Value); err == nil {
+		if v, err := parseAmount(pu.Amount.Value, pu.Amount.CurrencyCode); err == nil {
 			detail.Amount = v
 		}
 		if pu.Payee != nil {
@@ -259,7 +259,7 @@ func (p *Provider) RefundPayment(ctx context.Context, params contracts.RefundPar
 		Status:   mapRefundStatus(resp.Status),
 	}
 	if resp.Amount.Value != "" {
-		if v, err := parseAmount(resp.Amount.Value); err == nil {
+		if v, err := parseAmount(resp.Amount.Value, resp.Amount.CurrencyCode); err == nil {
 			result.Amount = v
 		}
 		result.Currency = strings.ToUpper(resp.Amount.CurrencyCode)
@@ -415,7 +415,7 @@ func (p *Provider) extractDisputeDetails(raw json.RawMessage, we *contracts.Webh
 		we.Currency = strings.ToUpper(res.DisputeAmount.CurrencyCode)
 		we.Coin = "fiat:" + we.Currency
 	}
-	if v, err := parseAmount(res.DisputeAmount.Value); err == nil {
+	if v, err := parseAmount(res.DisputeAmount.Value, res.DisputeAmount.CurrencyCode); err == nil {
 		we.Amount = v
 	}
 }
@@ -442,7 +442,7 @@ func (p *Provider) extractRefundDetails(raw json.RawMessage, we *contracts.Webho
 		we.Currency = strings.ToUpper(res.Amount.CurrencyCode)
 		we.Coin = "fiat:" + we.Currency
 	}
-	if v, err := parseAmount(res.Amount.Value); err == nil {
+	if v, err := parseAmount(res.Amount.Value, res.Amount.CurrencyCode); err == nil {
 		we.Amount = v
 	}
 }
@@ -468,7 +468,7 @@ func (p *Provider) extractResourceDetails(raw json.RawMessage, we *contracts.Web
 			we.Currency = strings.ToUpper(pu.Amount.CurrencyCode)
 			we.Coin = "fiat:" + we.Currency
 		}
-		if v, err := parseAmount(pu.Amount.Value); err == nil {
+		if v, err := parseAmount(pu.Amount.Value, pu.Amount.CurrencyCode); err == nil {
 			we.Amount = v
 		}
 	}
@@ -520,13 +520,19 @@ func formatAmount(cents int64, currency string) string {
 	}
 }
 
-// parseAmount converts a decimal string back to cents.
-func parseAmount(s string) (int64, error) {
+// parseAmount converts a PayPal amount string to the smallest currency unit (cents).
+// Zero-decimal currencies (JPY, KRW, etc.) are returned as-is.
+func parseAmount(s string, currency string) (int64, error) {
 	f, err := strconv.ParseFloat(s, 64)
 	if err != nil {
 		return 0, err
 	}
-	return int64(math.Round(f * 100)), nil
+	switch strings.ToUpper(currency) {
+	case "JPY", "KRW", "VND", "HUF", "TWD":
+		return int64(math.Round(f)), nil
+	default:
+		return int64(math.Round(f * 100)), nil
+	}
 }
 
 func mapPayPalStatus(s string) string {

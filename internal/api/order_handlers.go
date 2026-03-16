@@ -268,7 +268,6 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, ctx context.Context, o
 		Thumbnail          string               `json:"thumbnail"`
 		Total              models.CurrencyValue `json:"total"`
 		VendorID           string               `json:"vendorID"`
-		VendorHandle       string               `json:"vendorHandle"`
 		VendorName         string               `json:"vendorName"`
 		VendorAvatar       string               `json:"vendorAvatar"`
 		ShippingName       string               `json:"shippingName"`
@@ -320,7 +319,8 @@ func (g *Gateway) getPurchasesImpl(w http.ResponseWriter, ctx context.Context, o
 				models.CurrencyDefinitions[orderOpen.PricingCoin],
 			),
 			VendorID:           vendorID,
-			VendorHandle:       listingInfo.VendorID.Handle,
+			VendorName:         listingInfo.VendorID.DisplayName(),
+			VendorAvatar:       listingInfo.VendorID.DisplayAvatar(),
 			ShippingName:       orderOpen.Shipping.ShipTo,
 			ShippingAddress:    orderOpen.Shipping.Address,
 			PaymentCoin:        paymentCoin,
@@ -395,7 +395,6 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, ctx context.Context, order
 		Thumbnail          string               `json:"thumbnail"`
 		Total              models.CurrencyValue `json:"total"`
 		BuyerID            string               `json:"buyerID"`
-		BuyerHandle        string               `json:"buyerHandle"`
 		BuyerName          string               `json:"buyerName"`
 		BuyerAvatar        string               `json:"buyerAvatar"`
 		ShippingName       string               `json:"shippingName"`
@@ -447,7 +446,8 @@ func (g *Gateway) getSalesImpl(w http.ResponseWriter, ctx context.Context, order
 				models.CurrencyDefinitions[orderOpen.PricingCoin],
 			),
 			BuyerID:            buyerID,
-			BuyerHandle:        orderOpen.BuyerID.Handle,
+			BuyerName:          orderOpen.BuyerID.DisplayName(),
+			BuyerAvatar:        orderOpen.BuyerID.DisplayAvatar(),
 			ShippingName:       orderOpen.Shipping.ShipTo,
 			ShippingAddress:    orderOpen.Shipping.Address,
 			PaymentCoin:        paymentCoin,
@@ -522,11 +522,9 @@ func (g *Gateway) getCasesImpl(w http.ResponseWriter, ctx context.Context, order
 		Thumbnail          string               `json:"thumbnail"`
 		Total              models.CurrencyValue `json:"total"`
 		BuyerID            string               `json:"buyerID"`
-		BuyerHandle        string               `json:"buyerHandle"`
 		BuyerName          string               `json:"buyerName"`
 		BuyerAvatar        string               `json:"buyerAvatar"`
 		VendorID           string               `json:"vendorID"`
-		VendorHandle       string               `json:"vendorHandle"`
 		VendorName         string               `json:"vendorName"`
 		VendorAvatar       string               `json:"vendorAvatar"`
 		CoinType           string               `json:"coinType"`
@@ -581,9 +579,11 @@ func (g *Gateway) getCasesImpl(w http.ResponseWriter, ctx context.Context, order
 				models.CurrencyDefinitions[paymentSent.Coin],
 			),
 			BuyerID:            buyerID,
-			BuyerHandle:        orderOpen.BuyerID.Handle,
+			BuyerName:          orderOpen.BuyerID.DisplayName(),
+			BuyerAvatar:        orderOpen.BuyerID.DisplayAvatar(),
 			VendorID:           vendorID,
-			VendorHandle:       listingInfo.VendorID.Handle,
+			VendorName:         listingInfo.VendorID.DisplayName(),
+			VendorAvatar:       listingInfo.VendorID.DisplayAvatar(),
 			PaymentCoin:        paymentSent.Coin,
 			BuyerOpened:        disputeOpen.OpenedBy == pb.DisputeOpen_BUYER,
 			Read:               aCase.Read,

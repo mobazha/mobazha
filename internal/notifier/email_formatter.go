@@ -26,8 +26,8 @@ func formatEmailEvent(meta events.EventMeta, event interface{}, storeURL string)
 			emailRow{"Order ID", e.OrderID},
 			emailRow{"Item", e.Title},
 		)
-		if e.BuyerHandle != "" {
-			rows = append(rows, emailRow{"Buyer", e.BuyerHandle})
+		if e.BuyerName != "" {
+			rows = append(rows, emailRow{"Buyer", e.BuyerName})
 		}
 		if e.Price.Amount != "" {
 			rows = append(rows, emailRow{"Price", e.Price.Amount + " " + e.Price.CurrencyCode})
@@ -86,8 +86,8 @@ func formatEmailEvent(meta events.EventMeta, event interface{}, storeURL string)
 	case *events.DisputeOpen:
 		subject = fmt.Sprintf("Dispute Opened: %s", truncateID(e.OrderID))
 		rows = append(rows, emailRow{"Order ID", e.OrderID})
-		if e.DisputerHandle != "" {
-			rows = append(rows, emailRow{"Opened by", e.DisputerHandle})
+		if e.DisputerName != "" {
+			rows = append(rows, emailRow{"Opened by", e.DisputerName})
 		}
 		actionURL = orderActionURL(storeURL, e.OrderID)
 

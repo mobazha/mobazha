@@ -882,26 +882,50 @@ func TestFormatAmount(t *testing.T) {
 func TestParseAmount(t *testing.T) {
 	tests := []struct {
 		input    string
+		currency string
 		expected int64
 	}{
-		{"29.99", 2999},
-		{"1.00", 100},
-		{"0.01", 1},
-		{"100.50", 10050},
-		{"0.10", 10},
-		{"999.99", 99999},
+		{"29.99", "USD", 2999},
+		{"1.00", "USD", 100},
+		{"0.01", "EUR", 1},
+		{"100.50", "GBP", 10050},
+		{"0.10", "USD", 10},
+		{"999.99", "USD", 99999},
+		{"1000", "JPY", 1000},
+		{"5000", "KRW", 5000},
+		{"10000", "VND", 10000},
+		{"500", "HUF", 500},
+		{"250", "TWD", 250},
 	}
 
 	for _, tt := range tests {
-		got, err := parseAmount(tt.input)
+		got, err := parseAmount(tt.input, tt.currency)
 		require.NoError(t, err)
-		assert.Equal(t, tt.expected, got, "parseAmount(%s)", tt.input)
+		assert.Equal(t, tt.expected, got, "parseAmount(%s, %s)", tt.input, tt.currency)
 	}
 }
 
 func TestParseAmount_Error(t *testing.T) {
-	_, err := parseAmount("not-a-number")
+	_, err := parseAmount("not-a-number", "USD")
 	require.Error(t, err)
+}
+
+func TestParseAmount_FormatAmount_RoundTrip(t *testing.T) {
+	currencies := []struct {
+		currency string
+		cents    int64
+	}{
+		{"USD", 2999},
+		{"JPY", 1000},
+		{"KRW", 5000},
+		{"EUR", 150},
+	}
+	for _, tt := range currencies {
+		s := formatAmount(tt.cents, tt.currency)
+		got, err := parseAmount(s, tt.currency)
+		require.NoError(t, err)
+		assert.Equal(t, tt.cents, got, "round-trip %s %d", tt.currency, tt.cents)
+	}
 }
 
 func TestMapPayPalStatus(t *testing.T) {

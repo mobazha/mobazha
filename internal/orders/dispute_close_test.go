@@ -120,6 +120,7 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 					VendorID: &pb.ID{
 						PeerID: localPeer.String(),
 						Handle: localHandle,
+						Name:   localHandle,
 						Pubkeys: &pb.ID_Pubkeys{
 							Identity: localPubkeyBytes,
 						},
@@ -130,6 +131,7 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 		BuyerID: &pb.ID{
 			PeerID: buyerPeerID,
 			Handle: buyerHandle,
+			Name:   buyerHandle,
 			Pubkeys: &pb.ID_Pubkeys{
 				Identity: pubkeyBytes,
 			},
@@ -197,7 +199,7 @@ func TestOrderProcessor_processDisputeCloseMessage(t *testing.T) {
 					Small: smallImageHash,
 				},
 				OtherPartyID:     buyerPeerID,
-				OtherPartyHandle: buyerHandle,
+				OtherPartyName: buyerHandle,
 				Buyer:            orderOpen.BuyerID.PeerID,
 			},
 		},

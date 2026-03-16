@@ -85,15 +85,19 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 
 	var (
 		disputer       = orderOpen.BuyerID.PeerID
-		disputerHandle = orderOpen.BuyerID.Handle
+		disputerName   = orderOpen.BuyerID.DisplayName()
+		disputerAvatar = orderOpen.BuyerID.DisplayAvatar()
 		disputee       = orderOpen.Listings[0].Listing.VendorID.PeerID
-		disputeeHandle = orderOpen.Listings[0].Listing.VendorID.Handle
+		disputeeName   = orderOpen.Listings[0].Listing.VendorID.DisplayName()
+		disputeeAvatar = orderOpen.Listings[0].Listing.VendorID.DisplayAvatar()
 	)
 	if disputeOpen.OpenedBy == pb.DisputeOpen_VENDOR {
 		disputer = orderOpen.Listings[0].Listing.VendorID.PeerID
-		disputerHandle = orderOpen.Listings[0].Listing.VendorID.Handle
+		disputerName = orderOpen.Listings[0].Listing.VendorID.DisplayName()
+		disputerAvatar = orderOpen.Listings[0].Listing.VendorID.DisplayAvatar()
 		disputee = orderOpen.BuyerID.PeerID
-		disputeeHandle = orderOpen.BuyerID.Handle
+		disputeeName = orderOpen.BuyerID.DisplayName()
+		disputeeAvatar = orderOpen.BuyerID.DisplayAvatar()
 	}
 
 	event := &events.DisputeOpen{
@@ -103,9 +107,11 @@ func (op *OrderProcessor) processDisputeOpenMessage(dbtx database.Tx, order *mod
 			Small: orderOpen.Listings[0].Listing.Item.Images[0].Small,
 		},
 		DisputerID:     disputer,
-		DisputerHandle: disputerHandle,
+		DisputerName:   disputerName,
+		DisputerAvatar: disputerAvatar,
 		DisputeeID:     disputee,
-		DisputeeHandle: disputeeHandle,
+		DisputeeName:   disputeeName,
+		DisputeeAvatar: disputeeAvatar,
 	}
 
 	if (order.Role() == models.RoleBuyer && disputeOpen.OpenedBy == pb.DisputeOpen_BUYER) ||

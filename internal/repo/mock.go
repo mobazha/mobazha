@@ -7,14 +7,14 @@ import (
 	"strconv"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/database/ffsqlite"
+	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 )
 
 // MockDB returns an in-memory sqlite db.
 func MockDB() (database.Database, error) {
 	n := rand.Uint32()
 	dataDir := path.Join(os.TempDir(), "mobazha-test", strconv.Itoa(int(n)))
-	db, err := ffsqlite.NewFFMemoryDB(dataDir)
+	db, err := dbstore.NewMemoryDB(dataDir)
 	if err != nil {
 		return nil, err
 	}

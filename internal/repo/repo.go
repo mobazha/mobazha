@@ -16,7 +16,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/mobazha/mobazha3.0/internal/common"
 	"github.com/mobazha/mobazha3.0/internal/database"
-	"github.com/mobazha/mobazha3.0/internal/database/ffsqlite"
+	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	"github.com/mobazha/mobazha3.0/internal/version"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/op/go-logging"
@@ -107,8 +107,8 @@ func NewRepoWithSharedDB(nodeID string, dataDir string, sharedDB *gorm.DB, ident
 		return nil, fmt.Errorf("failed to create data directory %s: %w", dataDir, err)
 	}
 
-	pd := ffsqlite.NewDBPublicData(sharedDB, nodeID)
-	db, err := ffsqlite.NewTenantDBWithPublicData(sharedDB, nodeID, pd)
+	pd := dbstore.NewDBPublicData(sharedDB, nodeID)
+	db, err := dbstore.NewTenantDBWithPublicData(sharedDB, nodeID, pd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tenant DB: %w", err)
 	}
@@ -238,9 +238,9 @@ func newRepo(nodeID string, dataDir, mnemonicSeed string, externalIdentityKey []
 
 	var db database.Database
 	if inMemoryDB {
-		db, err = ffsqlite.NewFFMemoryDB(dataDir)
+		db, err = dbstore.NewMemoryDB(dataDir)
 	} else {
-		db, err = ffsqlite.NewFFSqliteDB(dataDir)
+		db, err = dbstore.NewSqliteDB(dataDir)
 	}
 	if err != nil {
 		return nil, err
@@ -528,8 +528,8 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.ShippingProfileEntity{},
 		&models.ShippingLocationEntity{},
 		&models.ListingShippingRef{},
-		&ffsqlite.PublicDataRecord{},
-		&ffsqlite.PublicMediaRecord{},
+		&dbstore.PublicDataRecord{},
+		&dbstore.PublicMediaRecord{},
 	}
 
 	return db.Update(func(tx database.Tx) error {

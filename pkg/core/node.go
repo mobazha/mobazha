@@ -5,7 +5,7 @@ import (
 
 	internalapi "github.com/mobazha/mobazha3.0/internal/api"
 	"github.com/mobazha/mobazha3.0/internal/core"
-	"github.com/mobazha/mobazha3.0/internal/database/ffsqlite"
+	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/repo"
@@ -33,7 +33,7 @@ func GetNodeManager() coreiface.NodeManagerIface {
 // scoped to the given tenantID. Used by SaaS hosting to resolve co-tenant
 // public data directly from the shared DB.
 func NewDBPublicData(db *gorm.DB, tenantID string) pkgdb.PublicData {
-	return ffsqlite.NewDBPublicData(db, tenantID)
+	return dbstore.NewDBPublicData(db, tenantID)
 }
 
 // SetSharedHTTPGateway registers a Gateway with the SharedManager so that

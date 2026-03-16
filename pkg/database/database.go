@@ -2,8 +2,8 @@
 // standalone MobazhaNode and SaaS TenantService.
 //
 // Implementations:
-//   - FFSqliteDB  (standalone mode)  — internal/database/ffsqlite/
-//   - TenantDB    (SaaS mode)        — internal/database/ffsqlite/
+//   - SqliteDB    (standalone mode)  — internal/database/dbstore/
+//   - TenantDB    (SaaS mode)        — internal/database/dbstore/
 package database
 
 import (

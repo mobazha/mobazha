@@ -115,3 +115,231 @@ func TestOrderProtectionPolicy_DurationHelpers(t *testing.T) {
 		t.Errorf("AfterSaleWindowDuration = %v, want %v", got, 7*24*time.Hour)
 	}
 }
+
+// ── ComputeProtection tests ──────────────────────────────────────────────
+
+func TestComputeProtection_NilForInapplicableStates(t *testing.T) {
+	for _, state := range []OrderState{
+		OrderState_PENDING,
+		OrderState_AWAITING_PAYMENT,
+		OrderState_CANCELED,
+		OrderState_DECLINED,
+		OrderState_REFUNDED,
+		OrderState_RESOLVED,
+		OrderState_PROCESSING_ERROR,
+	} {
+		o := &Order{State: state}
+		if got := o.ComputeProtection(time.Now()); got != nil {
+			t.Errorf("state=%s: expected nil, got %+v", state, got)
+		}
+	}
+}
+
+func TestComputeProtection_AwaitingFulfillment(t *testing.T) {
+	o := &Order{State: OrderState_AWAITING_FULFILLMENT}
+	info := o.ComputeProtection(time.Now())
+	if info == nil {
+		t.Fatal("expected non-nil protection info")
+	}
+	if info.Stage != ProtectionStageEscrowed {
+		t.Errorf("stage = %s, want %s", info.Stage, ProtectionStageEscrowed)
+	}
+	if info.DaysRemaining != 0 {
+		t.Errorf("daysRemaining = %d, want 0", info.DaysRemaining)
+	}
+	if info.Extendable {
+		t.Error("extendable should be false for ESCROWED")
+	}
+	if info.AfterSaleWindowDays != 7 {
+		t.Errorf("afterSaleWindowDays = %d, want 7", info.AfterSaleWindowDays)
+	}
+}
+
+func TestComputeProtection_Fulfilled_WithTimestamp(t *testing.T) {
+	fulfilledAt := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	o := &Order{
+		State:       OrderState_FULFILLED,
+		FulfilledAt: &fulfilledAt,
+	}
+
+	now := time.Date(2026, 3, 5, 12, 0, 0, 0, time.UTC)
+	info := o.ComputeProtection(now)
+	if info == nil {
+		t.Fatal("expected non-nil protection info")
+	}
+	if info.Stage != ProtectionStageProtectionPeriod {
+		t.Errorf("stage = %s, want %s", info.Stage, ProtectionStageProtectionPeriod)
+	}
+	if info.DaysRemaining != 10 {
+		t.Errorf("daysRemaining = %d, want 10 (14 - 4 days elapsed)", info.DaysRemaining)
+	}
+	if info.AutoCompleteAt == nil {
+		t.Fatal("autoCompleteAt should not be nil")
+	}
+	expectedDeadline := fulfilledAt.Add(14 * 24 * time.Hour)
+	if !info.AutoCompleteAt.Equal(expectedDeadline) {
+		t.Errorf("autoCompleteAt = %v, want %v", info.AutoCompleteAt, expectedDeadline)
+	}
+	if !info.Extendable {
+		t.Error("physical goods should be extendable")
+	}
+}
+
+func TestComputeProtection_Fulfilled_WithoutTimestamp(t *testing.T) {
+	o := &Order{
+		State:       OrderState_FULFILLED,
+		FulfilledAt: nil,
+	}
+	info := o.ComputeProtection(time.Now())
+	if info == nil {
+		t.Fatal("expected non-nil")
+	}
+	if info.DaysRemaining != 14 {
+		t.Errorf("daysRemaining = %d, want 14 (fallback to full policy)", info.DaysRemaining)
+	}
+	if info.AutoCompleteAt != nil {
+		t.Error("autoCompleteAt should be nil when fulfilledAt is missing")
+	}
+}
+
+func TestComputeProtection_Fulfilled_DeadlinePassed(t *testing.T) {
+	fulfilledAt := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	o := &Order{
+		State:       OrderState_FULFILLED,
+		FulfilledAt: &fulfilledAt,
+	}
+	now := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	info := o.ComputeProtection(now)
+	if info.DaysRemaining != 0 {
+		t.Errorf("daysRemaining = %d, want 0 (deadline passed)", info.DaysRemaining)
+	}
+}
+
+func TestComputeProtection_Completed_InAfterSaleWindow(t *testing.T) {
+	completedAt := time.Date(2026, 3, 10, 12, 0, 0, 0, time.UTC)
+	o := &Order{
+		State:       OrderState_COMPLETED,
+		CompletedAt: &completedAt,
+	}
+	now := time.Date(2026, 3, 14, 12, 0, 0, 0, time.UTC)
+	info := o.ComputeProtection(now)
+	if info == nil {
+		t.Fatal("expected non-nil")
+	}
+	if info.Stage != ProtectionStageAfterSaleWindow {
+		t.Errorf("stage = %s, want %s", info.Stage, ProtectionStageAfterSaleWindow)
+	}
+	if info.DaysRemaining != 3 {
+		t.Errorf("daysRemaining = %d, want 3 (7 - 4 elapsed)", info.DaysRemaining)
+	}
+}
+
+func TestComputeProtection_Completed_PastAfterSaleWindow(t *testing.T) {
+	completedAt := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	o := &Order{
+		State:       OrderState_COMPLETED,
+		CompletedAt: &completedAt,
+	}
+	now := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	info := o.ComputeProtection(now)
+	if info.Stage != ProtectionStageCompleted {
+		t.Errorf("stage = %s, want %s", info.Stage, ProtectionStageCompleted)
+	}
+	if info.DaysRemaining != 0 {
+		t.Errorf("daysRemaining = %d, want 0", info.DaysRemaining)
+	}
+}
+
+func TestComputeProtection_Completed_NoTimestamp(t *testing.T) {
+	o := &Order{
+		State:       OrderState_COMPLETED,
+		CompletedAt: nil,
+	}
+	info := o.ComputeProtection(time.Now())
+	if info.Stage != ProtectionStageCompleted {
+		t.Errorf("stage = %s, want %s", info.Stage, ProtectionStageCompleted)
+	}
+}
+
+func TestComputeProtection_Disputed(t *testing.T) {
+	o := &Order{State: OrderState_DISPUTED}
+	info := o.ComputeProtection(time.Now())
+	if info == nil {
+		t.Fatal("expected non-nil")
+	}
+	if info.Stage != ProtectionStageDisputed {
+		t.Errorf("stage = %s, want %s", info.Stage, ProtectionStageDisputed)
+	}
+}
+
+func TestComputeProtection_Decided(t *testing.T) {
+	o := &Order{State: OrderState_DECIDED}
+	info := o.ComputeProtection(time.Now())
+	if info == nil {
+		t.Fatal("expected non-nil")
+	}
+	if info.Stage != ProtectionStageDisputed {
+		t.Errorf("stage = %s, want %s", info.Stage, ProtectionStageDisputed)
+	}
+}
+
+func TestComputeProtection_PaymentFinalized(t *testing.T) {
+	completedAt := time.Date(2026, 3, 10, 12, 0, 0, 0, time.UTC)
+	o := &Order{
+		State:       OrderState_PAYMENT_FINALIZED,
+		CompletedAt: &completedAt,
+	}
+	now := time.Date(2026, 3, 12, 12, 0, 0, 0, time.UTC)
+	info := o.ComputeProtection(now)
+	if info.Stage != ProtectionStageAfterSaleWindow {
+		t.Errorf("stage = %s, want %s", info.Stage, ProtectionStageAfterSaleWindow)
+	}
+}
+
+func TestDaysUntil(t *testing.T) {
+	tests := []struct {
+		name     string
+		now      time.Time
+		deadline time.Time
+		want     int
+	}{
+		{
+			"exactly 3 days",
+			time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
+			time.Date(2026, 3, 4, 0, 0, 0, 0, time.UTC),
+			3,
+		},
+		{
+			"3 days and 1 hour rounds up to 4",
+			time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
+			time.Date(2026, 3, 4, 1, 0, 0, 0, time.UTC),
+			4,
+		},
+		{
+			"1 hour remaining rounds up to 1",
+			time.Date(2026, 3, 1, 23, 0, 0, 0, time.UTC),
+			time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC),
+			1,
+		},
+		{
+			"deadline passed",
+			time.Date(2026, 3, 5, 0, 0, 0, 0, time.UTC),
+			time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
+			0,
+		},
+		{
+			"deadline is now",
+			time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
+			time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
+			0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := daysUntil(tt.now, tt.deadline)
+			if got != tt.want {
+				t.Errorf("daysUntil() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}

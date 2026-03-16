@@ -107,6 +107,7 @@ type OrderService interface {
 	CompleteOrder(orderID models.OrderID, txid iwallet.TransactionID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	RateOrder(orderID models.OrderID, ratings []models.Rating, includeIDInRating bool, done chan struct{}) error
 	CancelOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error
+	ExtendProtection(orderID models.OrderID) (*models.OrderProtectionInfo, error)
 
 	// ViaRelay methods: combine get-instructions + relay-execute + action into a single call.
 	// Used by hosting mode where there is no frontend wallet (AppKit) to sign transactions.

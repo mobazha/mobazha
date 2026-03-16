@@ -116,23 +116,32 @@ func (o *Order) ComputeProtection(now time.Time) *OrderProtectionInfo {
 		}
 
 	case OrderState_FULFILLED:
+		extended := o.ProtectionExtendedAt != nil
+		totalDuration := policy.AutoCompleteDuration()
+		if extended {
+			totalDuration += time.Duration(policy.ExtendProtectionDays) * 24 * time.Hour
+		}
 		if o.FulfilledAt == nil {
+			totalDays := policy.AutoCompleteAfterShipDays
+			if extended {
+				totalDays += policy.ExtendProtectionDays
+			}
 			return &OrderProtectionInfo{
 				Stage:               ProtectionStageProtectionPeriod,
-				DaysRemaining:       policy.AutoCompleteAfterShipDays,
-				Extendable:          policy.ExtendProtectionDays > 0,
-				Extended:            false,
+				DaysRemaining:       totalDays,
+				Extendable:          !extended && policy.ExtendProtectionDays > 0,
+				Extended:            extended,
 				AfterSaleWindowDays: policy.AfterSaleWindowDays,
 			}
 		}
-		deadline := o.FulfilledAt.Add(policy.AutoCompleteDuration())
+		deadline := o.FulfilledAt.Add(totalDuration)
 		daysLeft := daysUntil(now, deadline)
 		return &OrderProtectionInfo{
 			Stage:               ProtectionStageProtectionPeriod,
 			DaysRemaining:       daysLeft,
 			AutoCompleteAt:      &deadline,
-			Extendable:          policy.ExtendProtectionDays > 0,
-			Extended:            false,
+			Extendable:          !extended && policy.ExtendProtectionDays > 0,
+			Extended:            extended,
 			AfterSaleWindowDays: policy.AfterSaleWindowDays,
 		}
 

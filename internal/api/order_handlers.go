@@ -1111,6 +1111,29 @@ func (g *Gateway) handlePOSTOrderRate(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (g *Gateway) handlePOSTExtendProtection(w http.ResponseWriter, r *http.Request) {
+	orderID := mux.Vars(r)["orderID"]
+	if orderID == "" {
+		ErrorResponse(w, http.StatusBadRequest, "missing orderID")
+		return
+	}
+
+	orderSvc := getOrderService(r)
+
+	info, err := orderSvc.ExtendProtection(models.OrderID(orderID))
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			ErrorResponse(w, http.StatusNotFound, "order not found")
+		default:
+			ErrorResponse(w, http.StatusBadRequest, err.Error())
+		}
+		return
+	}
+
+	sanitizedJSONResponse(w, info)
+}
+
 // func RegisterOrderHandlers(r *mux.Router, g *Gateway) {
 // 	r.HandleFunc("/v1/ordercancel", g.handlePOSTOrderCancel).Methods("POST")
 // 	r.HandleFunc("/v1/orderconfirmation", g.handlePOSTOrderConfirmation).Methods("POST")

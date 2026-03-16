@@ -296,6 +296,80 @@ func TestComputeProtection_PaymentFinalized(t *testing.T) {
 	}
 }
 
+// ── Extended Protection tests ──────────────────────────────────────────
+
+func TestComputeProtection_Fulfilled_Extended_WithTimestamp(t *testing.T) {
+	fulfilledAt := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	extendedAt := time.Date(2026, 3, 5, 12, 0, 0, 0, time.UTC)
+	o := &Order{
+		State:                OrderState_FULFILLED,
+		FulfilledAt:          &fulfilledAt,
+		ProtectionExtendedAt: &extendedAt,
+	}
+
+	now := time.Date(2026, 3, 10, 12, 0, 0, 0, time.UTC)
+	info := o.ComputeProtection(now)
+	if info == nil {
+		t.Fatal("expected non-nil protection info")
+	}
+	if info.Stage != ProtectionStageProtectionPeriod {
+		t.Errorf("stage = %s, want %s", info.Stage, ProtectionStageProtectionPeriod)
+	}
+	// 14 base + 14 extended = 28 days total from fulfilledAt
+	// 28 - 9 elapsed = 19 days remaining
+	if info.DaysRemaining != 19 {
+		t.Errorf("daysRemaining = %d, want 19 (28 - 9 days elapsed)", info.DaysRemaining)
+	}
+	expectedDeadline := fulfilledAt.Add(28 * 24 * time.Hour)
+	if info.AutoCompleteAt == nil || !info.AutoCompleteAt.Equal(expectedDeadline) {
+		t.Errorf("autoCompleteAt = %v, want %v", info.AutoCompleteAt, expectedDeadline)
+	}
+	if info.Extendable {
+		t.Error("should not be extendable after extension")
+	}
+	if !info.Extended {
+		t.Error("extended should be true")
+	}
+}
+
+func TestComputeProtection_Fulfilled_Extended_WithoutTimestamp(t *testing.T) {
+	extendedAt := time.Date(2026, 3, 5, 12, 0, 0, 0, time.UTC)
+	o := &Order{
+		State:                OrderState_FULFILLED,
+		FulfilledAt:          nil,
+		ProtectionExtendedAt: &extendedAt,
+	}
+	info := o.ComputeProtection(time.Now())
+	if info == nil {
+		t.Fatal("expected non-nil")
+	}
+	// 14 + 14 = 28 total days when no timestamp
+	if info.DaysRemaining != 28 {
+		t.Errorf("daysRemaining = %d, want 28 (14 base + 14 extended)", info.DaysRemaining)
+	}
+	if info.Extendable {
+		t.Error("should not be extendable after extension")
+	}
+	if !info.Extended {
+		t.Error("extended should be true")
+	}
+}
+
+func TestComputeProtection_Fulfilled_NotExtended_Extendable(t *testing.T) {
+	fulfilledAt := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	o := &Order{
+		State:       OrderState_FULFILLED,
+		FulfilledAt: &fulfilledAt,
+	}
+	info := o.ComputeProtection(time.Date(2026, 3, 5, 12, 0, 0, 0, time.UTC))
+	if !info.Extendable {
+		t.Error("physical goods should be extendable when not yet extended")
+	}
+	if info.Extended {
+		t.Error("extended should be false when not extended")
+	}
+}
+
 func TestDaysUntil(t *testing.T) {
 	tests := []struct {
 		name     string

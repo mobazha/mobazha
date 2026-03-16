@@ -205,6 +205,10 @@ type Order struct {
 	// CompletedAt records when the order transitioned to COMPLETED (buyer confirm or auto-complete).
 	// Used to calculate afterSaleWindowDays expiry.
 	CompletedAt *time.Time
+
+	// ProtectionExtendedAt records when the buyer extended the protection period.
+	// When set, autoCompleteAfterShipDays is increased by ExtendProtectionDays.
+	ProtectionExtendedAt *time.Time
 }
 
 func (o *Order) BeforeSave(tx *gorm.DB) (err error) {

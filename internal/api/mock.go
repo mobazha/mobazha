@@ -288,6 +288,9 @@ func (m *mockNode) RateOrder(orderID models.OrderID, ratings []models.Rating, in
 func (m *mockNode) CancelOrder(orderID models.OrderID, txid iwallet.TransactionID, done chan struct{}) error {
 	return m.cancelOrderFunc(orderID, txid, done)
 }
+func (m *mockNode) ExtendProtection(orderID models.OrderID) (*models.OrderProtectionInfo, error) {
+	return nil, nil
+}
 func (m *mockNode) RefundOrderViaRelay(orderID models.OrderID, done chan struct{}) error {
 	if m.refundOrderViaRelayFunc != nil {
 		return m.refundOrderViaRelayFunc(orderID, done)

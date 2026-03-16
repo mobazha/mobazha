@@ -54,15 +54,15 @@ func TestLookupEvent_AllRegistered(t *testing.T) {
 
 func TestEventsByCategory_Order(t *testing.T) {
 	samples := EventsByCategory("order")
-	if len(samples) != 11 {
-		t.Errorf("expected 11 order events, got %d", len(samples))
+	if len(samples) != 12 {
+		t.Errorf("expected 12 order events, got %d", len(samples))
 	}
 }
 
 func TestEventsByCategory_Multiple(t *testing.T) {
 	samples := EventsByCategory("order", "dispute")
-	if len(samples) != 16 {
-		t.Errorf("expected 16 events for order+dispute, got %d", len(samples))
+	if len(samples) != 17 {
+		t.Errorf("expected 17 events for order+dispute, got %d", len(samples))
 	}
 }
 
@@ -122,6 +122,7 @@ func TestPersistentConsistency(t *testing.T) {
 		"dispute.case_open":      true,
 		"dispute.case_update":    true,
 		"order.expired":          true,
+		"order.stale_warning":    true,
 		"social.follow":          true,
 		"social.unfollow":        true,
 		"social.moderator_add":   true,

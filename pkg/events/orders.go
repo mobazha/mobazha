@@ -18,8 +18,9 @@ type ListingPrice struct {
 
 type NewOrder struct {
 	Notification
-	BuyerHandle string       `json:"buyerHandle"`
+	BuyerName   string       `json:"buyerName"`
 	BuyerID     string       `json:"buyerID"`
+	BuyerAvatar string       `json:"buyerAvatar,omitempty"`
 	ListingType string       `json:"listingType"`
 	OrderID     string       `json:"orderID"`
 	Price       ListingPrice `json:"price"`
@@ -30,8 +31,9 @@ type NewOrder struct {
 
 type OrderFunded struct {
 	Notification
-	BuyerHandle string       `json:"buyerHandle"`
+	BuyerName   string       `json:"buyerName"`
 	BuyerID     string       `json:"buyerID"`
+	BuyerAvatar string       `json:"buyerAvatar,omitempty"`
 	ListingType string       `json:"listingType"`
 	OrderID     string       `json:"orderID"`
 	Price       ListingPrice `json:"price"`
@@ -52,13 +54,12 @@ type PaymentSentReceived struct {
 	Txid    string `json:"transactionID"`
 }
 
-// PaymentLockedReceived is emitted when the vendor receives a PaymentLocked message
-// for RWA confirm-required orders. The buyer has locked payment in the escrow contract.
 type PaymentLockedReceived struct {
 	Notification
 	OrderID         string    `json:"orderID"`
-	BuyerHandle     string    `json:"buyerHandle"`
+	BuyerName       string    `json:"buyerName"`
 	BuyerID         string    `json:"buyerID"`
+	BuyerAvatar     string    `json:"buyerAvatar,omitempty"`
 	Slug            string    `json:"slug"`
 	Thumbnail       Thumbnail `json:"thumbnail"`
 	Title           string    `json:"title"`
@@ -68,8 +69,6 @@ type PaymentLockedReceived struct {
 	ExpiresAt       uint64    `json:"expiresAt"`
 }
 
-// PaymentExpiredNotification is emitted when an escrow payment expires
-// and funds are returned to the buyer
 type PaymentExpiredNotification struct {
 	Notification
 	OrderID   string    `json:"orderID"`
@@ -78,13 +77,13 @@ type PaymentExpiredNotification struct {
 	Coin      string    `json:"coin"`
 }
 
-// PaymentCancelledByBuyer is emitted when buyer cancels an escrow payment
 type PaymentCancelledByBuyer struct {
 	Notification
 	OrderID     string    `json:"orderID"`
 	Thumbnail   Thumbnail `json:"thumbnail"`
-	BuyerHandle string    `json:"buyerHandle"`
+	BuyerName   string    `json:"buyerName"`
 	BuyerID     string    `json:"buyerID"`
+	BuyerAvatar string    `json:"buyerAvatar,omitempty"`
 	Amount      string    `json:"amount"`
 	Coin        string    `json:"coin"`
 }
@@ -97,63 +96,77 @@ type OrderConfirmation struct {
 	Notification
 	OrderID      string    `json:"orderID"`
 	Thumbnail    Thumbnail `json:"thumbnail"`
-	VendorHandle string    `json:"vendorHandle"`
+	VendorName   string    `json:"vendorName"`
 	VendorID     string    `json:"vendorID"`
+	VendorAvatar string    `json:"vendorAvatar,omitempty"`
 }
 
 type OrderDeclined struct {
 	Notification
 	OrderID      string    `json:"orderID"`
 	Thumbnail    Thumbnail `json:"thumbnail"`
-	VendorHandle string    `json:"vendorHandle"`
+	VendorName   string    `json:"vendorName"`
 	VendorID     string    `json:"vendorID"`
+	VendorAvatar string    `json:"vendorAvatar,omitempty"`
 }
 
 type OrderCancel struct {
 	Notification
 	OrderID     string    `json:"orderID"`
 	Thumbnail   Thumbnail `json:"thumbnail"`
-	BuyerHandle string    `json:"buyerHandle"`
+	BuyerName   string    `json:"buyerName"`
 	BuyerID     string    `json:"buyerID"`
+	BuyerAvatar string    `json:"buyerAvatar,omitempty"`
 }
 
 type OrderExpired struct {
 	Notification
-	OrderID string `json:"orderID"`
-	Reason  string `json:"reason"` // e.g. "payment_timeout"
+	OrderID     string    `json:"orderID"`
+	Reason      string    `json:"reason"`
+	BuyerName   string    `json:"buyerName,omitempty"`
+	BuyerID     string    `json:"buyerID,omitempty"`
+	BuyerAvatar string    `json:"buyerAvatar,omitempty"`
+	Thumbnail   Thumbnail `json:"thumbnail,omitempty"`
+	Title       string    `json:"title,omitempty"`
 }
 
-// OrderStaleWarning is emitted when an order has been stuck in a state
-// longer than the warning threshold (e.g. PENDING > 7d, AWAITING_FULFILLMENT > 14d).
 type OrderStaleWarning struct {
 	Notification
-	OrderID  string `json:"orderID"`
-	State    string `json:"state"`    // current order state
-	StuckFor string `json:"stuckFor"` // human-readable duration (e.g. "7d")
+	OrderID     string    `json:"orderID"`
+	State       string    `json:"state"`
+	StuckFor    string    `json:"stuckFor"`
+	BuyerName   string    `json:"buyerName,omitempty"`
+	BuyerID     string    `json:"buyerID,omitempty"`
+	BuyerAvatar string    `json:"buyerAvatar,omitempty"`
+	Thumbnail   Thumbnail `json:"thumbnail,omitempty"`
+	Title       string    `json:"title,omitempty"`
 }
 
 type Refund struct {
 	Notification
 	OrderID      string    `json:"orderID"`
 	Thumbnail    Thumbnail `json:"thumbnail"`
-	VendorHandle string    `json:"vendorHandle"`
+	VendorName   string    `json:"vendorName"`
 	VendorID     string    `json:"vendorID"`
+	VendorAvatar string    `json:"vendorAvatar,omitempty"`
 }
 
 type OrderFulfillment struct {
 	Notification
 	OrderID      string    `json:"orderID"`
 	Thumbnail    Thumbnail `json:"thumbnail"`
-	VendorHandle string    `json:"vendorHandle"`
+	VendorName   string    `json:"vendorName"`
 	VendorID     string    `json:"vendorID"`
+	VendorAvatar string    `json:"vendorAvatar,omitempty"`
 }
 
 type OrderCompletion struct {
 	Notification
 	OrderID     string    `json:"orderID"`
 	Thumbnail   Thumbnail `json:"thumbnail"`
-	BuyerHandle string    `json:"buyerHandle"`
+	BuyerName   string    `json:"buyerName"`
 	BuyerID     string    `json:"buyerID"`
+	BuyerAvatar string    `json:"buyerAvatar,omitempty"`
 }
 
 type DisputeOpen struct {
@@ -161,9 +174,11 @@ type DisputeOpen struct {
 	OrderID        string    `json:"orderID"`
 	Thumbnail      Thumbnail `json:"thumbnail"`
 	DisputerID     string    `json:"disputerID"`
-	DisputerHandle string    `json:"disputerHandle"`
+	DisputerName   string    `json:"disputerName"`
+	DisputerAvatar string    `json:"disputerAvatar,omitempty"`
 	DisputeeID     string    `json:"disputeeID"`
-	DisputeeHandle string    `json:"disputeeHandle"`
+	DisputeeName   string    `json:"disputeeName"`
+	DisputeeAvatar string    `json:"disputeeAvatar,omitempty"`
 }
 
 type CaseOpen struct {
@@ -171,9 +186,11 @@ type CaseOpen struct {
 	CaseID         string    `json:"caseID"`
 	Thumbnail      Thumbnail `json:"thumbnail"`
 	DisputerID     string    `json:"disputerID"`
-	DisputerHandle string    `json:"disputerHandle"`
+	DisputerName   string    `json:"disputerName"`
+	DisputerAvatar string    `json:"disputerAvatar,omitempty"`
 	DisputeeID     string    `json:"disputeeID"`
-	DisputeeHandle string    `json:"disputeeHandle"`
+	DisputeeName   string    `json:"disputeeName"`
+	DisputeeAvatar string    `json:"disputeeAvatar,omitempty"`
 }
 
 type CaseUpdate struct {
@@ -181,9 +198,11 @@ type CaseUpdate struct {
 	CaseID         string    `json:"caseID"`
 	Thumbnail      Thumbnail `json:"thumbnail"`
 	DisputerID     string    `json:"disputerID"`
-	DisputerHandle string    `json:"disputerHandle"`
+	DisputerName   string    `json:"disputerName"`
+	DisputerAvatar string    `json:"disputerAvatar,omitempty"`
 	DisputeeID     string    `json:"disputeeID"`
-	DisputeeHandle string    `json:"disputeeHandle"`
+	DisputeeName   string    `json:"disputeeName"`
+	DisputeeAvatar string    `json:"disputeeAvatar,omitempty"`
 }
 
 type DisputeClose struct {
@@ -191,7 +210,8 @@ type DisputeClose struct {
 	OrderID          string    `json:"orderID"`
 	Thumbnail        Thumbnail `json:"thumbnail"`
 	OtherPartyID     string    `json:"otherPartyID"`
-	OtherPartyHandle string    `json:"otherPartyHandle"`
+	OtherPartyName   string    `json:"otherPartyName"`
+	OtherPartyAvatar string    `json:"otherPartyAvatar,omitempty"`
 	Buyer            string    `json:"buyer"`
 }
 
@@ -200,7 +220,8 @@ type DisputeAccepted struct {
 	OrderID          string    `json:"orderID"`
 	Thumbnail        Thumbnail `json:"thumbnail"`
 	OtherPartyID     string    `json:"otherPartyID"`
-	OtherPartyHandle string    `json:"otherPartyHandle"`
+	OtherPartyName   string    `json:"otherPartyName"`
+	OtherPartyAvatar string    `json:"otherPartyAvatar,omitempty"`
 	Buyer            string    `json:"buyer"`
 }
 

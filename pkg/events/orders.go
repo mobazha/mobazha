@@ -121,25 +121,31 @@ type OrderCancel struct {
 
 type OrderExpired struct {
 	Notification
-	OrderID     string    `json:"orderID"`
-	Reason      string    `json:"reason"`
-	BuyerName   string    `json:"buyerName,omitempty"`
-	BuyerID     string    `json:"buyerID,omitempty"`
-	BuyerAvatar string    `json:"buyerAvatar,omitempty"`
-	Thumbnail   Thumbnail `json:"thumbnail,omitempty"`
-	Title       string    `json:"title,omitempty"`
+	OrderID      string    `json:"orderID"`
+	Reason       string    `json:"reason"`
+	BuyerName    string    `json:"buyerName,omitempty"`
+	BuyerID      string    `json:"buyerID,omitempty"`
+	BuyerAvatar  string    `json:"buyerAvatar,omitempty"`
+	VendorName   string    `json:"vendorName,omitempty"`
+	VendorID     string    `json:"vendorID,omitempty"`
+	VendorAvatar string    `json:"vendorAvatar,omitempty"`
+	Thumbnail    Thumbnail `json:"thumbnail,omitempty"`
+	Title        string    `json:"title,omitempty"`
 }
 
 type OrderStaleWarning struct {
 	Notification
-	OrderID     string    `json:"orderID"`
-	State       string    `json:"state"`
-	StuckFor    string    `json:"stuckFor"`
-	BuyerName   string    `json:"buyerName,omitempty"`
-	BuyerID     string    `json:"buyerID,omitempty"`
-	BuyerAvatar string    `json:"buyerAvatar,omitempty"`
-	Thumbnail   Thumbnail `json:"thumbnail,omitempty"`
-	Title       string    `json:"title,omitempty"`
+	OrderID      string    `json:"orderID"`
+	State        string    `json:"state"`
+	StuckFor     string    `json:"stuckFor"`
+	BuyerName    string    `json:"buyerName,omitempty"`
+	BuyerID      string    `json:"buyerID,omitempty"`
+	BuyerAvatar  string    `json:"buyerAvatar,omitempty"`
+	VendorName   string    `json:"vendorName,omitempty"`
+	VendorID     string    `json:"vendorID,omitempty"`
+	VendorAvatar string    `json:"vendorAvatar,omitempty"`
+	Thumbnail    Thumbnail `json:"thumbnail,omitempty"`
+	Title        string    `json:"title,omitempty"`
 }
 
 type Refund struct {

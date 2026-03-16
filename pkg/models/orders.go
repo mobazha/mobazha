@@ -209,6 +209,17 @@ type Order struct {
 	// ProtectionExtendedAt records when the buyer extended the protection period.
 	// When set, autoCompleteAfterShipDays is increased by ExtendProtectionDays.
 	ProtectionExtendedAt *time.Time
+
+	// AfterSaleDisputeReason stores the reason for an application-level dispute
+	// filed after order completion (e.g. "NOT_RECEIVED", "QUALITY_ISSUE").
+	AfterSaleDisputeReason string `json:"afterSaleDisputeReason"`
+
+	// AfterSaleDisputeDesc stores the buyer's description of the issue.
+	AfterSaleDisputeDesc string `json:"afterSaleDisputeDesc"`
+
+	// AfterSaleDisputeAt records when the after-sale dispute was opened.
+	// Non-nil means a dispute has been filed; used for deduplication.
+	AfterSaleDisputeAt *time.Time `json:"afterSaleDisputeAt"`
 }
 
 func (o *Order) BeforeSave(tx *gorm.DB) (err error) {
@@ -1143,6 +1154,10 @@ func (o *Order) CanRequestAfterSale(now time.Time) bool {
 	}
 
 	if o.IsDisputeOpened() {
+		return false
+	}
+
+	if o.AfterSaleDisputeAt != nil {
 		return false
 	}
 

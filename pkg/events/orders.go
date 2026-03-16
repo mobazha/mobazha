@@ -380,6 +380,19 @@ type AfterSaleDisputeOpened struct {
 	Title        string    `json:"title"`
 }
 
+// AfterSaleDisputeReceived is emitted on the seller's node when a P2P
+// after-sale dispute message is received from the buyer.
+type AfterSaleDisputeReceived struct {
+	Notification
+	OrderID     string    `json:"orderID"`
+	Reason      string    `json:"reason"`
+	Description string    `json:"description"`
+	BuyerName   string    `json:"buyerName"`
+	BuyerID     string    `json:"buyerID"`
+	Thumbnail   Thumbnail `json:"thumbnail"`
+	Title       string    `json:"title"`
+}
+
 // ── Internal domain events (PaymentAppService → OrderAppService) ──────
 
 // OrderAutoConfirmRequest is emitted by PaymentAppService when a CANCELABLE

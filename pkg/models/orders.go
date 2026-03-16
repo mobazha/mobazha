@@ -290,6 +290,26 @@ func (o *Order) Moderator() (peer.ID, error) {
 	return peer.Decode(paymentSent.Moderator)
 }
 
+// ContractType extracts the listing contract type from the serialized OrderOpen.
+// Falls back to PHYSICAL_GOOD on any parse error.
+func (o *Order) ContractType() pb.Listing_Metadata_ContractType {
+	oo, err := o.OrderOpenMessage()
+	if err != nil || len(oo.Listings) == 0 || oo.Listings[0].Listing == nil || oo.Listings[0].Listing.Metadata == nil {
+		return pb.Listing_Metadata_PHYSICAL_GOOD
+	}
+	return oo.Listings[0].Listing.Metadata.ContractType
+}
+
+// PaymentMethod returns the payment method (DIRECT, CANCELABLE, MODERATED) from
+// the serialized PaymentSent message. Returns DIRECT on any parse error.
+func (o *Order) PaymentMethod() pb.PaymentSent_Method {
+	ps, err := o.PaymentSentMessage()
+	if err != nil {
+		return pb.PaymentSent_DIRECT
+	}
+	return ps.Method
+}
+
 // Timestamp returns the timestamp at which this order was opened.
 func (o *Order) Timestamp() (time.Time, error) {
 	orderOpen, err := o.OrderOpenMessage()

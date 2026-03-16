@@ -21,6 +21,8 @@ type OrderProtectionPolicy struct {
 	DisputeNegotiationDays int
 	// DisputeResolutionDays: platform arbitration period.
 	DisputeResolutionDays int
+	// ReminderBeforeDays: send countdown reminders at these remaining-day marks.
+	ReminderBeforeDays []int
 }
 
 // AutoCompleteDuration returns AutoCompleteAfterShipDays as time.Duration.
@@ -46,6 +48,7 @@ var defaultProtectionPolicies = map[pb.Listing_Metadata_ContractType]OrderProtec
 		ExtendProtectionDays:      14,
 		DisputeNegotiationDays:    7,
 		DisputeResolutionDays:     7,
+		ReminderBeforeDays:        []int{3, 1},
 	},
 	pb.Listing_Metadata_DIGITAL_GOOD: {
 		AutoCompleteAfterShipDays: 3,
@@ -54,6 +57,7 @@ var defaultProtectionPolicies = map[pb.Listing_Metadata_ContractType]OrderProtec
 		ExtendProtectionDays:      0,
 		DisputeNegotiationDays:    7,
 		DisputeResolutionDays:     7,
+		ReminderBeforeDays:        []int{1},
 	},
 	pb.Listing_Metadata_SERVICE: {
 		AutoCompleteAfterShipDays: 7,
@@ -62,6 +66,7 @@ var defaultProtectionPolicies = map[pb.Listing_Metadata_ContractType]OrderProtec
 		ExtendProtectionDays:      0,
 		DisputeNegotiationDays:    7,
 		DisputeResolutionDays:     7,
+		ReminderBeforeDays:        []int{1},
 	},
 }
 

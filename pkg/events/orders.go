@@ -314,6 +314,53 @@ type PaymentVerificationExpired struct {
 	Reason        string `json:"reason"` // "timeout" or "address_mismatch"
 }
 
+// ── S6 Buyer-protection lifecycle events ──────────────────────────────
+
+// OrderAutoCompleted is emitted when a fulfilled order is automatically completed
+// after the protection period expires without buyer action.
+type OrderAutoCompleted struct {
+	OrderID      string    `json:"orderID"`
+	BuyerName    string    `json:"buyerName"`
+	BuyerID      string    `json:"buyerID"`
+	BuyerAvatar  string    `json:"buyerAvatar"`
+	VendorName   string    `json:"vendorName"`
+	VendorID     string    `json:"vendorID"`
+	VendorAvatar string    `json:"vendorAvatar"`
+	Thumbnail    Thumbnail `json:"thumbnail"`
+	Title        string    `json:"title"`
+}
+
+// OrderAutoCancelled is emitted when an order is automatically cancelled because
+// the vendor did not fulfill within maxFulfillDays after payment.
+type OrderAutoCancelled struct {
+	OrderID      string    `json:"orderID"`
+	Reason       string    `json:"reason"` // "fulfillment_overdue"
+	BuyerName    string    `json:"buyerName"`
+	BuyerID      string    `json:"buyerID"`
+	BuyerAvatar  string    `json:"buyerAvatar"`
+	VendorName   string    `json:"vendorName"`
+	VendorID     string    `json:"vendorID"`
+	VendorAvatar string    `json:"vendorAvatar"`
+	Thumbnail    Thumbnail `json:"thumbnail"`
+	Title        string    `json:"title"`
+}
+
+// OrderProtectionReminder is emitted as a countdown warning before an order
+// auto-completes or auto-cancels.
+type OrderProtectionReminder struct {
+	OrderID       string    `json:"orderID"`
+	Type          string    `json:"type"` // "auto_complete" or "auto_cancel"
+	DaysRemaining int       `json:"daysRemaining"`
+	BuyerName     string    `json:"buyerName"`
+	BuyerID       string    `json:"buyerID"`
+	BuyerAvatar   string    `json:"buyerAvatar"`
+	VendorName    string    `json:"vendorName"`
+	VendorID      string    `json:"vendorID"`
+	VendorAvatar  string    `json:"vendorAvatar"`
+	Thumbnail     Thumbnail `json:"thumbnail"`
+	Title         string    `json:"title"`
+}
+
 // ── Internal domain events (PaymentAppService → OrderAppService) ──────
 
 // OrderAutoConfirmRequest is emitted by PaymentAppService when a CANCELABLE

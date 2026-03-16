@@ -49,7 +49,12 @@ func TestDefaultProtectionPolicy_Service(t *testing.T) {
 func TestDefaultProtectionPolicy_UnknownFallsBackToPhysical(t *testing.T) {
 	p := DefaultProtectionPolicy(pb.Listing_Metadata_ContractType(99))
 	expected := DefaultProtectionPolicy(pb.Listing_Metadata_PHYSICAL_GOOD)
-	if p != expected {
+	if p.AutoCompleteAfterShipDays != expected.AutoCompleteAfterShipDays ||
+		p.MaxFulfillDays != expected.MaxFulfillDays ||
+		p.AfterSaleWindowDays != expected.AfterSaleWindowDays ||
+		p.ExtendProtectionDays != expected.ExtendProtectionDays ||
+		p.DisputeNegotiationDays != expected.DisputeNegotiationDays ||
+		p.DisputeResolutionDays != expected.DisputeResolutionDays {
 		t.Errorf("unknown contract type should fall back to PHYSICAL_GOOD defaults")
 	}
 }
@@ -70,6 +75,31 @@ func TestDefaultProtectionPolicy_SharedValues(t *testing.T) {
 		if p.DisputeResolutionDays != 7 {
 			t.Errorf("ct=%v: DisputeResolutionDays = %d, want 7", ct, p.DisputeResolutionDays)
 		}
+	}
+}
+
+func TestDefaultProtectionPolicy_ReminderBeforeDays(t *testing.T) {
+	tests := []struct {
+		name     string
+		ct       pb.Listing_Metadata_ContractType
+		wantDays []int
+	}{
+		{"physical", pb.Listing_Metadata_PHYSICAL_GOOD, []int{3, 1}},
+		{"digital", pb.Listing_Metadata_DIGITAL_GOOD, []int{1}},
+		{"service", pb.Listing_Metadata_SERVICE, []int{1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := DefaultProtectionPolicy(tt.ct)
+			if len(p.ReminderBeforeDays) != len(tt.wantDays) {
+				t.Fatalf("ReminderBeforeDays len = %d, want %d", len(p.ReminderBeforeDays), len(tt.wantDays))
+			}
+			for i, d := range p.ReminderBeforeDays {
+				if d != tt.wantDays[i] {
+					t.Errorf("ReminderBeforeDays[%d] = %d, want %d", i, d, tt.wantDays[i])
+				}
+			}
+		})
 	}
 }
 

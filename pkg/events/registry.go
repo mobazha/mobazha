@@ -33,6 +33,9 @@ func init() {
 		{Category: "order", Name: "order.declined", Persistent: true, Sample: new(OrderDeclined)},
 		{Category: "order", Name: "order.refunded", Persistent: true, Sample: new(Refund)},
 		{Category: "order", Name: "order.vendor_finalized", Persistent: true, Sample: new(VendorFinalizedPayment)},
+		{Category: "order", Name: "order.auto_completed", Persistent: true, Sample: new(OrderAutoCompleted)},
+		{Category: "order", Name: "order.auto_cancelled", Persistent: true, Sample: new(OrderAutoCancelled)},
+		{Category: "order", Name: "order.protection_reminder", Persistent: true, Sample: new(OrderProtectionReminder)},
 
 		// ── Dispute events (persistent + WebSocket) ──
 		{Category: "dispute", Name: "dispute.opened", Persistent: true, Sample: new(DisputeOpen)},

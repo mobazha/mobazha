@@ -54,15 +54,15 @@ func TestLookupEvent_AllRegistered(t *testing.T) {
 
 func TestEventsByCategory_Order(t *testing.T) {
 	samples := EventsByCategory("order")
-	if len(samples) != 12 {
-		t.Errorf("expected 12 order events, got %d", len(samples))
+	if len(samples) != 15 {
+		t.Errorf("expected 15 order events, got %d", len(samples))
 	}
 }
 
 func TestEventsByCategory_Multiple(t *testing.T) {
 	samples := EventsByCategory("order", "dispute")
-	if len(samples) != 17 {
-		t.Errorf("expected 17 events for order+dispute, got %d", len(samples))
+	if len(samples) != 20 {
+		t.Errorf("expected 20 events for order+dispute, got %d", len(samples))
 	}
 }
 
@@ -134,6 +134,9 @@ func TestPersistentConsistency(t *testing.T) {
 		"collection.updated":            true,
 		"collection.deleted":            true,
 		"collection.products_changed":   true,
+		"order.auto_completed":          true,
+		"order.auto_cancelled":          true,
+		"order.protection_reminder":     true,
 	}
 	for _, m := range registry {
 		if want, ok := persistentNames[m.Name]; ok {

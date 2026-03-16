@@ -3,6 +3,7 @@ package orders
 import (
 	"errors"
 	"os"
+	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -135,5 +136,14 @@ func (op *OrderProcessor) processOrderCompleteMessage(dbtx database.Tx, order *m
 
 	order.Open = false
 
-	return event, order.PutMessage(message)
+	if err := order.PutMessage(message); err != nil {
+		return nil, err
+	}
+
+	if order.CompletedAt == nil {
+		now := time.Now()
+		order.CompletedAt = &now
+	}
+
+	return event, nil
 }

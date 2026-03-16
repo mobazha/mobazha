@@ -3,6 +3,7 @@ package orders
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -72,6 +73,10 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 
 	if transactionKnown {
 		order.PaymentVerified = true
+		if order.PaidAt == nil {
+			now := time.Now()
+			order.PaidAt = &now
+		}
 	}
 	// Sync verification (FetchAndVerify) is now handled by the orchestration
 	// layer: preProcessPaymentSent + postProcessPaymentSentInTx. When the tx
@@ -212,6 +217,10 @@ func (op *OrderProcessor) RecordVerifiedPayment(
 		}
 	}
 	order.PaymentVerified = true
+	if order.PaidAt == nil {
+		now := time.Now()
+		order.PaidAt = &now
+	}
 
 	paymentSent, err := order.PaymentSentMessage()
 	if err != nil {

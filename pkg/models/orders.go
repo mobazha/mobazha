@@ -193,6 +193,18 @@ type Order struct {
 	FiatMetadata         []byte // JSON-encoded map[string]string for fiat-specific data (disputes, etc.)
 
 	DisputeEvidenceHashes StringSlice `gorm:"type:text"` // image CIDs uploaded as dispute evidence
+
+	// PaidAt records when the payment was verified (chain-confirmed or fiat-captured).
+	// Used by OrderAutoRefundJob to enforce maxFulfillDays deadline.
+	PaidAt *time.Time `gorm:"index"`
+
+	// FulfilledAt records when all items were fulfilled (vendor shipped).
+	// Used by OrderAutoCompleteJob to enforce autoCompleteAfterShipDays deadline.
+	FulfilledAt *time.Time `gorm:"index"`
+
+	// CompletedAt records when the order transitioned to COMPLETED (buyer confirm or auto-complete).
+	// Used to calculate afterSaleWindowDays expiry.
+	CompletedAt *time.Time
 }
 
 func (o *Order) BeforeSave(tx *gorm.DB) (err error) {

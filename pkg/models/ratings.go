@@ -78,10 +78,7 @@ type RatingInfo struct {
 
 // Rating holds the review information for a listing.
 type Rating struct {
-	Overall         uint8  `json:"overall"`
-	Quality         uint8  `json:"quality"`
-	Description     uint8  `json:"description"`
-	DeliverySpeed   uint8  `json:"deliverySpeed"`
-	CustomerService uint8  `json:"customerService"`
-	Review          string `json:"review"`
+	Overall     uint8    `json:"overall"`
+	Review      string   `json:"review"`
+	ImageHashes []string `json:"imageHashes,omitempty"`
 }

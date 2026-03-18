@@ -639,12 +639,8 @@ func TestOrderLifecycle_RegistryDriven_FullHappyPath(t *testing.T) {
 	done6 := make(chan struct{})
 	ratings := []models.Rating{
 		{
-			Description:     5,
-			DeliverySpeed:   5,
-			CustomerService: 5,
-			Quality:         5,
-			Overall:         5,
-			Review:          "Great product — full lifecycle with registry works!",
+			Overall: 5,
+			Review:  "Great product — full lifecycle with registry works!",
 		},
 	}
 	if err := buyerNode.Order().CompleteOrder(orderID, iwallet.TransactionID(""), ratings, true, done6); err != nil {
@@ -932,12 +928,8 @@ func TestOrderLifecycle_Cancelable_AutoConfirm(t *testing.T) {
 	done6 := make(chan struct{})
 	ratings := []models.Rating{
 		{
-			Description:     5,
-			DeliverySpeed:   5,
-			CustomerService: 5,
-			Quality:         5,
-			Overall:         5,
-			Review:          "CANCELABLE auto-confirm lifecycle works perfectly!",
+			Overall: 5,
+			Review:  "CANCELABLE auto-confirm lifecycle works perfectly!",
 		},
 	}
 	if err := buyerNode.Order().CompleteOrder(orderID, iwallet.TransactionID(""), ratings, true, done6); err != nil {
@@ -1469,12 +1461,8 @@ func TestOrderLifecycle_Moderated_FullHappyPath(t *testing.T) {
 	done7 := make(chan struct{})
 	ratings := []models.Rating{
 		{
-			Description:     5,
-			DeliverySpeed:   5,
-			CustomerService: 5,
-			Quality:         5,
-			Overall:         5,
-			Review:          "Moderated order completed perfectly!",
+			Overall: 5,
+			Review:  "Moderated order completed perfectly!",
 		},
 	}
 	if err := buyerNode.Order().CompleteOrder(orderID, iwallet.TransactionID(""), ratings, true, done7); err != nil {

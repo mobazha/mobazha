@@ -125,12 +125,8 @@ func TestOrderProcessor_processOrderCompleteMessage(t *testing.T) {
 				BuyerName: "Ernie",
 				BuyerSig:  buyerSig,
 
-				Overall:         5,
-				DeliverySpeed:   4,
-				Description:     3,
-				CustomerService: 2,
-				Quality:         1,
-				Review:          "sucked",
+				Overall: 5,
+				Review:  "sucked",
 			},
 		},
 	}
@@ -678,12 +674,8 @@ func TestOrderComplete_RatingSupplement(t *testing.T) {
 			},
 		},
 		BuyerSig:        buyerSig,
-		Overall:         4,
-		DeliverySpeed:   3,
-		Description:     5,
-		CustomerService: 4,
-		Quality:         3,
-		Review:          "good stuff",
+		Overall: 4,
+		Review:  "good stuff",
 	}
 	ser, err = proto.Marshal(ratingPB)
 	if err != nil {
@@ -815,12 +807,8 @@ func TestOrderComplete_SupplementRejectedWhenAlreadyRated(t *testing.T) {
 		VendorID:        &pb.ID{PeerID: vendorPeerID, Pubkeys: &pb.ID_Pubkeys{Identity: pubkeyBytes}},
 		BuyerID:         &pb.ID{PeerID: buyer.String(), Pubkeys: &pb.ID_Pubkeys{Identity: buyerPubkeyBytes}},
 		BuyerSig:        buyerSig,
-		Overall:         5,
-		DeliverySpeed:   5,
-		Description:     5,
-		CustomerService: 5,
-		Quality:         5,
-		Review:          "great",
+		Overall: 5,
+		Review:  "great",
 	}
 	ser, err = proto.Marshal(ratingPB)
 	if err != nil {

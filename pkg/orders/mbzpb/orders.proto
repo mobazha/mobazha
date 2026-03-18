@@ -153,13 +153,12 @@ message Rating {
     google.protobuf.Timestamp timestamp = 6;
 
     uint32 overall                      = 7;
-    uint32 quality                      = 8;
-    uint32 description                  = 9;
-    uint32 deliverySpeed                = 10;
-    uint32 customerService              = 11;
+    reserved 8, 9, 10, 11;
     string review                       = 12;
 
     bytes ratingSignature               = 13;
+
+    repeated string image_hashes        = 14;
 }
 
 

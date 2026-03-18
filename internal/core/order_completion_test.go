@@ -256,12 +256,8 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 	done6 := make(chan struct{})
 	ratings := []models.Rating{
 		{
-			Description:     5,
-			DeliverySpeed:   5,
-			CustomerService: 5,
-			Quality:         5,
-			Overall:         5,
-			Review:          "Excellent",
+			Overall: 5,
+			Review:  "Excellent",
 		},
 	}
 	if err := network.Nodes()[1].Order().CompleteOrder(orderID, iwallet.TransactionID(""), ratings, true, done6); err != nil {
@@ -299,18 +295,6 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 	}
 	if complete.Ratings[0].Overall != uint32(ratings[0].Overall) {
 		t.Errorf("Expected rating %d got %d", uint32(ratings[0].Overall), complete.Ratings[0].Overall)
-	}
-	if complete.Ratings[0].Quality != uint32(ratings[0].Quality) {
-		t.Errorf("Expected rating %d got %d", uint32(ratings[0].Quality), complete.Ratings[0].Quality)
-	}
-	if complete.Ratings[0].CustomerService != uint32(ratings[0].CustomerService) {
-		t.Errorf("Expected rating %d got %d", uint32(ratings[0].CustomerService), complete.Ratings[0].CustomerService)
-	}
-	if complete.Ratings[0].DeliverySpeed != uint32(ratings[0].DeliverySpeed) {
-		t.Errorf("Expected rating %d got %d", uint32(ratings[0].DeliverySpeed), complete.Ratings[0].DeliverySpeed)
-	}
-	if complete.Ratings[0].Description != uint32(ratings[0].Description) {
-		t.Errorf("Expected rating %d got %d", uint32(ratings[0].Description), complete.Ratings[0].Description)
 	}
 	if complete.Ratings[0].Review != ratings[0].Review {
 		t.Errorf("Expected review %s got %s", ratings[0].Review, complete.Ratings[0].Review)
@@ -514,12 +498,8 @@ func TestMobazhaNode_CompleteOrder(t *testing.T) {
 	done6 = make(chan struct{})
 	ratings = []models.Rating{
 		{
-			Description:     5,
-			DeliverySpeed:   5,
-			CustomerService: 5,
-			Quality:         5,
-			Overall:         5,
-			Review:          "Excellent",
+			Overall: 5,
+			Review:  "Excellent",
 		},
 	}
 	if err := network.Nodes()[1].Order().CompleteOrder(orderID, iwallet.TransactionID(""), ratings, true, done6); err != nil {

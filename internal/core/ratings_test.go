@@ -188,12 +188,8 @@ func newTestRating() (*pb.Rating, error) {
 		},
 		BuyerSig: buyerIDSig,
 
-		Overall:         uint32(5),
-		Quality:         uint32(4),
-		CustomerService: uint32(3),
-		Description:     uint32(2),
-		DeliverySpeed:   uint32(1),
-		Review:          "excellent",
+		Overall: uint32(5),
+		Review:  "excellent",
 
 		BuyerName: "Bob",
 	}

@@ -91,12 +91,8 @@ func TestValidateRating(t *testing.T) {
 		BuyerName: "Frank",
 		BuyerSig:  buyerSig,
 
-		Quality:         5,
-		CustomerService: 5,
-		Description:     5,
-		DeliverySpeed:   5,
-		Overall:         5,
-		Review:          "asdf",
+		Overall: 5,
+		Review:  "asdf",
 	}
 
 	ser, err = proto.Marshal(rating)
@@ -174,78 +170,6 @@ func TestValidateRating(t *testing.T) {
 			setup: func() *pb.Rating {
 				cpy := proto.Clone(rating)
 				cpy.(*pb.Rating).Overall = 6
-				return cpy.(*pb.Rating)
-			},
-			valid: false,
-		},
-		{
-			name: "quality less than zero",
-			setup: func() *pb.Rating {
-				cpy := proto.Clone(rating)
-				cpy.(*pb.Rating).Quality = 0
-				return cpy.(*pb.Rating)
-			},
-			valid: false,
-		},
-		{
-			name: "quality greater than five",
-			setup: func() *pb.Rating {
-				cpy := proto.Clone(rating)
-				cpy.(*pb.Rating).Quality = 6
-				return cpy.(*pb.Rating)
-			},
-			valid: false,
-		},
-		{
-			name: "description less than zero",
-			setup: func() *pb.Rating {
-				cpy := proto.Clone(rating)
-				cpy.(*pb.Rating).Quality = 0
-				return cpy.(*pb.Rating)
-			},
-			valid: false,
-		},
-		{
-			name: "description greater than five",
-			setup: func() *pb.Rating {
-				cpy := proto.Clone(rating)
-				cpy.(*pb.Rating).Description = 6
-				return cpy.(*pb.Rating)
-			},
-			valid: false,
-		},
-		{
-			name: "customer service less than zero",
-			setup: func() *pb.Rating {
-				cpy := proto.Clone(rating)
-				cpy.(*pb.Rating).CustomerService = 0
-				return cpy.(*pb.Rating)
-			},
-			valid: false,
-		},
-		{
-			name: "customer service greater than five",
-			setup: func() *pb.Rating {
-				cpy := proto.Clone(rating)
-				cpy.(*pb.Rating).CustomerService = 6
-				return cpy.(*pb.Rating)
-			},
-			valid: false,
-		},
-		{
-			name: "delivery speed less than zero",
-			setup: func() *pb.Rating {
-				cpy := proto.Clone(rating)
-				cpy.(*pb.Rating).DeliverySpeed = 0
-				return cpy.(*pb.Rating)
-			},
-			valid: false,
-		},
-		{
-			name: "delivery speed greater than five",
-			setup: func() *pb.Rating {
-				cpy := proto.Clone(rating)
-				cpy.(*pb.Rating).DeliverySpeed = 6
 				return cpy.(*pb.Rating)
 			},
 			valid: false,

@@ -33,18 +33,6 @@ func ValidateRating(rating *pb.Rating) error {
 	if rating.Overall < 1 || rating.Overall > 5 {
 		return errors.New("overall rating out of range")
 	}
-	if rating.Quality < 1 || rating.Quality > 5 {
-		return errors.New("quality rating out of range")
-	}
-	if rating.Description < 1 || rating.Description > 5 {
-		return errors.New("description rating out of range")
-	}
-	if rating.DeliverySpeed < 1 || rating.DeliverySpeed > 5 {
-		return errors.New("delivery speed rating out of range")
-	}
-	if rating.CustomerService < 1 || rating.CustomerService > 5 {
-		return errors.New("customer service rating out of range")
-	}
 	if len(rating.Review) > 10000 {
 		return errors.New("review greater than max characters")
 	}

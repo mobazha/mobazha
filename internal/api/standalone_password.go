@@ -17,6 +17,7 @@ const (
 	passwordCharset     = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	adminPasswordFile   = "admin_password"
 	adminHashFile       = "admin_password_hash"
+	setupCompleteFile   = "setup_complete"
 )
 
 // HashFilePath returns the path to the admin password hash file within dataDir.
@@ -33,6 +34,14 @@ func PlainFilePath(dataDir string) string {
 		return ""
 	}
 	return filepath.Join(dataDir, adminPasswordFile)
+}
+
+// SetupCompleteFilePath returns the path to the setup_complete flag file within dataDir.
+func SetupCompleteFilePath(dataDir string) string {
+	if dataDir == "" {
+		return ""
+	}
+	return filepath.Join(dataDir, setupCompleteFile)
 }
 
 // LoadCredentials implements the credential priority chain:

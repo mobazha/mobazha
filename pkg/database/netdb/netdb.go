@@ -459,6 +459,28 @@ func (ndb *NetDB) SetOwnRatingIndex(index models.RatingIndex) error {
 	return err
 }
 
+// SetOwnRating pushes an individual rating to the search service.
+// Each rating is a JSON object containing the buyer's review, scores, and signatures.
+// The search service stores it in the ratings table for per-item rating queries.
+func (ndb *NetDB) SetOwnRating(vendorPeerID string, ratingJSON json.RawMessage) error {
+	logger.LogInfoWithIDf(log, ndb.ownPeerID, "Push individual rating for vendor %s", vendorPeerID)
+
+	req := IndividualRating{
+		PeerID: vendorPeerID,
+		Data:   ratingJSON,
+	}
+
+	resp, err := ndb.restyClient.R().SetBody(req).Post(fmt.Sprintf("%s/ratings", ndb.endpoint))
+	if err != nil {
+		return fmt.Errorf("failed to push rating: %w", err)
+	}
+	if resp.IsError() {
+		return fmt.Errorf("push rating returned %d: %s", resp.StatusCode(), resp.String())
+	}
+
+	return nil
+}
+
 // SetOwnStoreMetadata pushes store metadata (collections, discounts, payment_methods, storefront)
 // to the search service for offline fallback.
 func (ndb *NetDB) SetOwnStoreMetadata(metadataType string, data json.RawMessage) error {

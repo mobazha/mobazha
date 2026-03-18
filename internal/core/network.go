@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math"
 	"math/rand"
@@ -19,6 +20,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	pb "github.com/mobazha/mobazha3.0/pkg/net/mbzpb"
 	opb "github.com/mobazha/mobazha3.0/pkg/orders/mbzpb"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"gorm.io/gorm"
@@ -333,6 +335,7 @@ func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) erro
 					if ratingIndex, err := n.ratingsService.GetMyRatings(); err == nil {
 						n.netDB.SetOwnRatingIndex(ratingIndex)
 					}
+					n.pushIndividualRatings(complete.Ratings)
 				}
 			}
 		}
@@ -342,6 +345,30 @@ func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) erro
 		n.eventBus.Emit(event)
 	}
 	return nil
+}
+
+// pushIndividualRatings serializes each protobuf Rating to JSON and pushes it
+// to the search service for per-item rating queries.
+func (n *MobazhaNode) pushIndividualRatings(ratings []*opb.Rating) {
+	marshaler := protojson.MarshalOptions{EmitUnpopulated: false}
+	for _, r := range ratings {
+		vendorPeerID := ""
+		if r.VendorID != nil {
+			vendorPeerID = r.VendorID.PeerID
+		}
+		if vendorPeerID == "" {
+			continue
+		}
+
+		ratingBytes, err := marshaler.Marshal(r)
+		if err != nil {
+			log.Errorf("Failed to marshal rating to JSON: %s", err)
+			continue
+		}
+		if err := n.netDB.SetOwnRating(vendorPeerID, json.RawMessage(ratingBytes)); err != nil {
+			log.Errorf("Failed to push individual rating: %s", err)
+		}
+	}
 }
 
 func (n *MobazhaNode) isSelfDefaultSNFServer() bool {

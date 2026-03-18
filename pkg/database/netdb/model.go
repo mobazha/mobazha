@@ -64,6 +64,11 @@ type RatingIndex struct {
 	Sig []byte `gorm:"-"`
 }
 
+type IndividualRating struct {
+	PeerID string          `json:"PeerID"`
+	Data   json.RawMessage `json:"Data"`
+}
+
 type StoreMetadata struct {
 	PeerID       string          `json:"PeerID"`
 	MetadataType string          `json:"MetadataType"`

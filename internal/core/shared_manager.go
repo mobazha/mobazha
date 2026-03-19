@@ -130,7 +130,7 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			return addrs
 		}()
 
-		erp := wallet.NewExchangeRateProvider(netConfig.GetExchangeRateProviders())
+		erp := wallet.NewExchangeRateProvider(nil)
 
 		SharedManagerInstance = &SharedManager{
 			ExchangeRateProvider: erp,

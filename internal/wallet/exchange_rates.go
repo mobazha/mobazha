@@ -1,12 +1,8 @@
 package wallet
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
-	"math/big"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -17,11 +13,10 @@ import (
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
-// ReserveCurrency is the currency used to calculate the exchange rates
-// for all other currencies. In this case it's BTC. If you want to know
-// the USD price of BCH we first get the USD price of BTC, then get the
-// ratio of BTC/BCH and use it to calculate the BCH USD price.
-const ReserveCurrency = models.CurrencyCode("BTC")
+// ReserveCurrency is the internal base currency for all exchange rate calculations.
+// All rates are normalized to USD internally. To get the price of any crypto or fiat
+// currency, we derive it from its USD price.
+const ReserveCurrency = models.CurrencyCode("USD")
 
 // ExchangeRateProvider provides exchange rate data to be used by OpenBazaar.
 // It gives the exchange rate from any listed cryptocurrency into any other
@@ -31,24 +26,34 @@ type ExchangeRateProvider struct {
 	lastQueried map[models.CurrencyCode]time.Time
 	mtx         sync.Mutex
 	providers   []provider
+	cacheTTL    time.Duration
 }
 
-// NewExchangeRateProvider returns a new ExchangeRateProvider. If proxy is
-// not nil the http connection to the API server will use the proxy. The
-// provided sources must conform to the BitcoinAverage API specification.
+// NewExchangeRateProvider returns a new ExchangeRateProvider.
+// The sources parameter is deprecated and ignored; CoinGecko is the primary data source.
 func NewExchangeRateProvider(sources []string) *ExchangeRateProvider {
+	cfg := config.GetGlobalExchangeRateConfig()
+
 	e := ExchangeRateProvider{
 		cache:       make(map[models.CurrencyCode]map[models.CurrencyCode]iwallet.Amount),
 		lastQueried: make(map[models.CurrencyCode]time.Time),
 		mtx:         sync.Mutex{},
+		cacheTTL:    cfg.GetCacheTTL(),
 	}
 
-	// 获取配置
-	cfg := config.GetGlobalExchangeRateConfig()
 	client := proxyclient.NewHttpClient()
-	client.Timeout = time.Duration(cfg.GetCacheTimeoutMinutes()) * time.Minute
+	client.Timeout = 15 * time.Second
 
-	// 如果启用Chainlink，添加Chainlink预言机provider作为主要数据源
+	if cfg.IsCoinGeckoEnabled() {
+		cgProvider := newCoinGeckoProvider(
+			cfg.GetCoinGeckoBaseURL(),
+			cfg.GetCoinGeckoAPIKey(),
+			client,
+			cfg.GetCacheTTL(),
+		)
+		e.providers = append(e.providers, cgProvider)
+	}
+
 	if cfg.IsChainlinkEnabled() {
 		chainlinkProvider, err := NewChainlinkProvider(cfg.GetChainlinkRPCURL())
 		if err == nil {
@@ -56,19 +61,6 @@ func NewExchangeRateProvider(sources []string) *ExchangeRateProvider {
 			fmt.Printf("Chainlink provider initialized successfully\n")
 		} else {
 			fmt.Printf("Failed to initialize Chainlink provider: %v\n", err)
-		}
-	}
-
-	// 如果启用传统API，添加传统的API providers作为补充数据源
-	if cfg.IsTraditionalAPIEnabled() {
-		// 使用配置中的源，如果没有则使用传入的sources
-		apiSources := cfg.GetTraditionalAPISources()
-		if len(apiSources) == 0 {
-			apiSources = sources
-		}
-
-		for _, src := range apiSources {
-			e.providers = append(e.providers, &openBazaarAPI{src, client})
 		}
 	}
 
@@ -91,7 +83,7 @@ func (e *ExchangeRateProvider) GetRate(base models.CurrencyCode, to models.Curre
 	lastQueried := e.lastQueried[baseForQuery]
 	cachedRates, hasCached := e.cache[baseForQuery]
 
-	if breakCache || !hasCached || lastQueried.Add(time.Minute*10).Before(time.Now()) {
+	if breakCache || !hasCached || lastQueried.Add(e.cacheTTL).Before(time.Now()) {
 		freshRates, err := e.fetchRatesFromProviders(baseForQuery)
 		if err != nil {
 			if hasCached {
@@ -135,7 +127,7 @@ func (e *ExchangeRateProvider) GetAllRates(base models.CurrencyCode, breakCache 
 	lastQueried := e.lastQueried[baseForQuery]
 	cachedRates, hasCached := e.cache[baseForQuery]
 
-	if breakCache || !hasCached || lastQueried.Add(time.Minute*10).Before(time.Now()) {
+	if breakCache || !hasCached || lastQueried.Add(e.cacheTTL).Before(time.Now()) {
 		freshRates, err := e.fetchRatesFromProviders(baseForQuery)
 		if err != nil {
 			if hasCached {
@@ -153,9 +145,11 @@ func (e *ExchangeRateProvider) GetAllRates(base models.CurrencyCode, breakCache 
 }
 
 // fetchRatesFromProviders queries the exchange rate sources serially until it gets a response back.
+// The first provider (CoinGecko) is treated as primary; subsequent providers fill in
+// currencies that the primary didn't cover.
 func (e *ExchangeRateProvider) fetchRatesFromProviders(base models.CurrencyCode) (map[models.CurrencyCode]iwallet.Amount, error) {
 	var combinedRates map[models.CurrencyCode]iwallet.Amount
-	var chainlinkRates map[models.CurrencyCode]iwallet.Amount
+	var primaryRates map[models.CurrencyCode]iwallet.Amount
 
 	for i, provider := range e.providers {
 		rates, err := provider.fetchRates(base)
@@ -164,24 +158,18 @@ func (e *ExchangeRateProvider) fetchRatesFromProviders(base models.CurrencyCode)
 			continue
 		}
 
-		// 检查是否是Chainlink provider（第一个provider）
-		if i == 0 && len(e.providers) > 1 {
-			// 保存Chainlink的数据
-			chainlinkRates = rates
+		if i == 0 {
+			primaryRates = rates
 			combinedRates = make(map[models.CurrencyCode]iwallet.Amount)
-			// 复制Chainlink的所有数据
 			for currency, rate := range rates {
 				combinedRates[currency] = rate
 			}
 		} else {
-			// 对于其他provider，只添加Chainlink中没有的币种
 			if combinedRates == nil {
 				combinedRates = make(map[models.CurrencyCode]iwallet.Amount)
 			}
-
 			for currency, rate := range rates {
-				// 如果Chainlink中没有这个币种，则添加
-				if chainlinkRates == nil || chainlinkRates[currency].Int64() == 0 {
+				if primaryRates == nil || primaryRates[currency].Int64() == 0 {
 					combinedRates[currency] = rate
 				}
 			}
@@ -198,87 +186,4 @@ func (e *ExchangeRateProvider) fetchRatesFromProviders(base models.CurrencyCode)
 // provider is an interface to a specific exchange rate API.
 type provider interface {
 	fetchRates(baseCurrency models.CurrencyCode) (map[models.CurrencyCode]iwallet.Amount, error)
-}
-
-// openBazaarAPI is an implementation of the provider interface which connects to the openbazaar.org API.
-type openBazaarAPI struct {
-	url    string
-	client *http.Client
-}
-
-type apiRate struct {
-	Last float64 `json:"last"`
-}
-
-// fetchRates returns a rate map for the given base currency as does the conversion from the
-// reserve currency as necessary.
-func (b *openBazaarAPI) fetchRates(base models.CurrencyCode) (map[models.CurrencyCode]iwallet.Amount, error) {
-	_, ok := models.CurrencyDefinitions[ReserveCurrency.String()]
-	if !ok {
-		return nil, fmt.Errorf("reserve currency %s is not in map", ReserveCurrency.String())
-	}
-
-	_, ok = models.CurrencyDefinitions[base.String()]
-	if !ok {
-		return nil, fmt.Errorf("base currency %s is not in map", base.String())
-	}
-
-	rates := make(map[string]apiRate)
-
-	resp, err := b.client.Get(b.url)
-	if err != nil {
-		return nil, err
-	}
-
-	decoder := json.NewDecoder(resp.Body)
-	if err := decoder.Decode(&rates); err != nil {
-		return nil, err
-	}
-
-	reserveMap := make(map[models.CurrencyCode]*big.Float)
-	for cc, rate := range rates {
-		_, ok := models.CurrencyDefinitions[cc]
-		if !ok {
-			continue
-		}
-
-		if rate.Last <= 0 {
-			continue
-		}
-
-		reserveMap[models.CurrencyCode(cc)] = new(big.Float).SetFloat64(rate.Last)
-	}
-	if base.String() == ReserveCurrency.String() {
-		result := map[models.CurrencyCode]iwallet.Amount{}
-		for currency, val := range reserveMap {
-			def := models.CurrencyDefinitions[currency.String()]
-
-			divisity := new(big.Float).SetFloat64(math.Pow10(int(def.Divisibility)))
-			convertedInt, _ := new(big.Float).Mul(val, divisity).Int(nil)
-
-			result[currency] = iwallet.NewAmount(convertedInt)
-		}
-		return result, nil
-	}
-
-	baseMap := make(map[models.CurrencyCode]iwallet.Amount)
-
-	reserveFloat := new(big.Float).SetInt64(1)
-	baseFloat, ok := reserveMap[base]
-	if !ok {
-		return nil, errors.New("base currency not found in API rates")
-	}
-	conversionFloat := new(big.Float).Quo(reserveFloat, baseFloat)
-
-	for currency, rate := range reserveMap {
-		convertedFloat := new(big.Float).Mul(rate, conversionFloat)
-
-		def := models.CurrencyDefinitions[currency.String()]
-		divisity := new(big.Float).SetFloat64(math.Pow10(int(def.Divisibility)))
-		convertedInt, _ := new(big.Float).Mul(convertedFloat, divisity).Int(nil)
-
-		baseMap[currency] = iwallet.NewAmount(convertedInt)
-	}
-
-	return baseMap, nil
 }

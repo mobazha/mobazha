@@ -81,19 +81,19 @@ func NewChainlinkProvider(rpcURL string) (*ChainlinkProvider, error) {
 	}, nil
 }
 
-// fetchRates 实现provider接口，获取汇率数据
+// fetchRates implements the provider interface, returning rates from Chainlink oracles.
+// All Chainlink price feeds return crypto/USD prices. The function normalizes rates
+// so that the result is: 1 unit of base = X smallest-units of target.
 func (c *ChainlinkProvider) fetchRates(base models.CurrencyCode) (map[models.CurrencyCode]iwallet.Amount, error) {
-	// 验证基础货币是否支持
 	_, ok := models.CurrencyDefinitions[base.String()]
 	if !ok {
 		return nil, fmt.Errorf("base currency %s is not supported", base.String())
 	}
 
-	// 获取所有支持的币种对USD的汇率
+	// rates stores crypto → USD price (e.g., BTC → 65000.0, ETH → 3500.0)
 	rates := make(map[models.CurrencyCode]*big.Float)
 
 	for symbol, address := range c.feeds {
-		// 对于稳定币，直接设置为1
 		if c.isStablecoin(symbol) {
 			rates[models.CurrencyCode(symbol)] = new(big.Float).SetFloat64(1.0)
 			continue
@@ -101,7 +101,6 @@ func (c *ChainlinkProvider) fetchRates(base models.CurrencyCode) (map[models.Cur
 
 		rate, err := c.getPriceFromChainlink(address)
 		if err != nil {
-			// 记录错误但继续处理其他币种
 			fmt.Printf("Failed to get price for %s: %v\n", symbol, err)
 			continue
 		}
@@ -111,55 +110,44 @@ func (c *ChainlinkProvider) fetchRates(base models.CurrencyCode) (map[models.Cur
 		}
 	}
 
-	// 如果基础货币是BTC，需要计算1个BTC能换多少其他币种
-	if base.String() == ReserveCurrency.String() {
+	if len(rates) == 0 {
+		return nil, fmt.Errorf("no rates available from Chainlink")
+	}
+
+	// Handle USD base: 1 USD = (1 / cryptoUSD) units of each crypto
+	if base.String() == "USD" {
 		result := make(map[models.CurrencyCode]iwallet.Amount)
-
-		// 获取BTC对USD的价格
-		btcPrice, ok := rates[models.CurrencyCode("BTC")]
-		if !ok {
-			return nil, fmt.Errorf("BTC price not found in Chainlink feeds")
-		}
-
 		for currency, usdPrice := range rates {
-			// 计算1个BTC能换多少该币种
-			// 如果BTC价格是btcPrice USD，该币种价格是usdPrice USD
-			// 那么1 BTC = btcPrice / usdPrice 个该币种
-			btcToCurrency := new(big.Float).Quo(btcPrice, usdPrice)
+			usdToCurrency := new(big.Float).SetPrec(256).Quo(
+				new(big.Float).SetPrec(256).SetFloat64(1.0),
+				usdPrice,
+			)
 
 			def := models.CurrencyDefinitions[currency.String()]
-			divisibility := new(big.Float).SetFloat64(math.Pow10(int(def.Divisibility)))
-			convertedInt, _ := new(big.Float).Mul(btcToCurrency, divisibility).Int(nil)
+			divisibility := new(big.Float).SetPrec(256).SetFloat64(math.Pow10(int(def.Divisibility)))
+			convertedInt, _ := new(big.Float).SetPrec(256).Mul(usdToCurrency, divisibility).Int(nil)
 			result[currency] = iwallet.NewAmount(convertedInt)
 		}
 		return result, nil
 	}
 
-	// 如果基础货币不是BTC，需要进行转换
-	baseMap := make(map[models.CurrencyCode]iwallet.Amount)
-
-	// 获取基础货币对USD的汇率
+	// For any other base (crypto): 1 base = (baseUSD / targetUSD) units of target
 	baseFloat, ok := rates[base]
 	if !ok {
 		return nil, fmt.Errorf("base currency %s not found in Chainlink feeds", base.String())
 	}
 
-	// 使用与exchange_rates.go相同的逻辑
-	// 计算转换比例：1个基础货币能换多少其他币种
-
+	result := make(map[models.CurrencyCode]iwallet.Amount)
 	for currency, usdPrice := range rates {
-		// 计算1个基础货币能换多少该币种
-		// 如果基础货币价格是baseFloat USD，该币种价格是usdPrice USD
-		// 那么1个基础货币 = baseFloat / usdPrice 个该币种
-		baseToCurrency := new(big.Float).Quo(baseFloat, usdPrice)
+		baseToCurrency := new(big.Float).SetPrec(256).Quo(baseFloat, usdPrice)
 
 		def := models.CurrencyDefinitions[currency.String()]
-		divisibility := new(big.Float).SetFloat64(math.Pow10(int(def.Divisibility)))
-		convertedInt, _ := new(big.Float).Mul(baseToCurrency, divisibility).Int(nil)
-		baseMap[currency] = iwallet.NewAmount(convertedInt)
+		divisibility := new(big.Float).SetPrec(256).SetFloat64(math.Pow10(int(def.Divisibility)))
+		convertedInt, _ := new(big.Float).SetPrec(256).Mul(baseToCurrency, divisibility).Int(nil)
+		result[currency] = iwallet.NewAmount(convertedInt)
 	}
 
-	return baseMap, nil
+	return result, nil
 }
 
 // getPriceFromChainlink 从Chainlink预言机获取价格

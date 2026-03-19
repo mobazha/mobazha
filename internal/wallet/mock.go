@@ -1154,46 +1154,120 @@ func (w *MockWallet) BuildAndSend(tx iwallet.Tx, txn iwallet.Transaction, signat
 }
 
 // NewMockExchangeRates returns a mock exchange rate provider that returns
-// mock data.
+// mock data via CoinGecko-format responses. Uses USD as reserve currency.
 func NewMockExchangeRates() (*ExchangeRateProvider, error) {
 	mockedHTTPClient := http.Client{}
 	httpmock.ActivateNonDefault(&mockedHTTPClient)
 
-	// Mock all possible exchange rate API endpoints
-	mockURLs := []string{
-		"https://testrates.com/api",
-		"https://info.mobazha.org/api/ticker",
-	}
+	httpmock.RegisterResponder(http.MethodGet, `=~^https://api\.coingecko\.com/api/v3/simple/price`,
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(http.StatusOK, MockCoinGeckoResponse)
+		},
+	)
 
-	for _, url := range mockURLs {
-		httpmock.RegisterResponder(http.MethodGet, url,
-			func(req *http.Request) (*http.Response, error) {
-				return httpmock.NewJsonResponse(http.StatusOK, MockExchangeRateResponse)
-			},
-		)
-	}
-
-	provider := NewExchangeRateProvider([]string{"https://testrates.com/api"})
-	// Find and configure ALL openBazaarAPI providers with mocked client
+	provider := NewExchangeRateProvider(nil)
 	for _, p := range provider.providers {
-		if obAPI, ok := p.(*openBazaarAPI); ok {
-			obAPI.client = &mockedHTTPClient
+		if cgProvider, ok := p.(*coinGeckoProvider); ok {
+			cgProvider.client = &mockedHTTPClient
 		}
 	}
 
 	return provider, nil
 }
 
-// MockExchangeRateResponse is a mock response from an exchange rate API.
-var MockExchangeRateResponse = map[string]apiRate{
-	"BTC": {Last: 1},
-	"BCH": {Last: 31.588915},
-	"LTC": {Last: 112.163246},
-	"ZEC": {Last: 128.77109},
-	"ETH": {Last: 42.35316},
-	"USD": {Last: 12863.08},
-	"EUR": {Last: 11444.58},
-	"JPY": {Last: 1398311.17},
-	"CNY": {Last: 88439.82},
-	"MCK": {Last: 500},
+// MockCoinGeckoResponse is a mock CoinGecko /simple/price response.
+// Prices are realistic approximations for testing.
+// BTC=65000 USD, ETH=3500, BCH=400, LTC=80, ZEC=30, SOL=150, BNB=600, etc.
+var MockCoinGeckoResponse = map[string]map[string]float64{
+	"bitcoin": {
+		"usd": 65000,
+		"eur": 60000,
+		"jpy": 9500000,
+		"cny": 470000,
+		"gbp": 52000,
+	},
+	"ethereum": {
+		"usd": 3500,
+		"eur": 3231,
+		"jpy": 511000,
+		"cny": 25308,
+		"gbp": 2800,
+	},
+	"bitcoin-cash": {
+		"usd": 400,
+		"eur": 369,
+		"jpy": 58462,
+		"cny": 2892,
+		"gbp": 320,
+	},
+	"litecoin": {
+		"usd": 80,
+		"eur": 73.8,
+		"jpy": 11692,
+		"cny": 578.5,
+		"gbp": 64,
+	},
+	"zcash": {
+		"usd": 30,
+		"eur": 27.7,
+		"jpy": 4385,
+		"cny": 216.9,
+		"gbp": 24,
+	},
+	"solana": {
+		"usd": 150,
+		"eur": 138.5,
+		"jpy": 21923,
+		"cny": 1084.6,
+		"gbp": 120,
+	},
+	"binancecoin": {
+		"usd": 600,
+		"eur": 553.8,
+		"jpy": 87692,
+		"cny": 4338.5,
+		"gbp": 480,
+	},
+	"tether": {
+		"usd": 1.0,
+		"eur": 0.923,
+		"jpy": 146.15,
+		"cny": 7.23,
+		"gbp": 0.8,
+	},
+	"usd-coin": {
+		"usd": 1.0,
+		"eur": 0.923,
+		"jpy": 146.15,
+		"cny": 7.23,
+		"gbp": 0.8,
+	},
+	"external_payment": {
+		"usd": 160,
+		"eur": 147.7,
+		"jpy": 23385,
+		"cny": 1156.9,
+		"gbp": 128,
+	},
+	"matic-network": {
+		"usd": 0.5,
+		"eur": 0.4615,
+		"jpy": 73.08,
+		"cny": 3.615,
+		"gbp": 0.4,
+	},
+	"dash": {
+		"usd": 25,
+		"eur": 23.08,
+		"jpy": 3654,
+		"cny": 180.8,
+		"gbp": 20,
+	},
+	"tron": {
+		"usd": 0.12,
+		"eur": 0.1108,
+		"jpy": 17.54,
+		"cny": 0.868,
+		"gbp": 0.096,
+	},
 }

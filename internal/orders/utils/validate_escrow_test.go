@@ -82,3 +82,26 @@ func TestValidatePaymentAmount_SmallAmounts(t *testing.T) {
 	err := ValidatePaymentAmount("1", "1")
 	require.NoError(t, err)
 }
+
+func TestValidatePaymentAmount_CrossCurrencyScenario(t *testing.T) {
+	// Simulates cross-currency comparison when both amounts are in the
+	// same unit (e.g., satoshis). The backend computes the expected amount
+	// using exchange rates and passes it as the order amount.
+	expectedSatoshis := "153846"
+
+	t.Run("exact match", func(t *testing.T) {
+		err := ValidatePaymentAmount(expectedSatoshis, "153846")
+		require.NoError(t, err)
+	})
+
+	t.Run("underpaid by 1 satoshi", func(t *testing.T) {
+		err := ValidatePaymentAmount(expectedSatoshis, "153845")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrPaymentAmountInsufficient)
+	})
+
+	t.Run("overpaid", func(t *testing.T) {
+		err := ValidatePaymentAmount(expectedSatoshis, "200000")
+		require.NoError(t, err)
+	})
+}

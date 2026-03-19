@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo"
+	wallet "github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
@@ -100,6 +102,46 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 		}
 		g.handleGetRWATokenPaymentInfo(w, r, orderSvc, params, coinInfo)
 		return
+	}
+
+	// Server-side amount computation: orderOpen.Amount is the finalized total
+	// in pricingCoin's smallest unit (calculated at OrderOpen time). For cross-
+	// currency payments, convert that total to the payment currency. For same-
+	// currency, use directly. UTXO adapters compute amount internally.
+	orderAmount := iwallet.NewAmount(orderOpen.Amount)
+	pricingCoin := strings.ToUpper(orderOpen.PricingCoin)
+	paymentCoinCode := strings.ToUpper(params.CoinType.CurrencyCode())
+	if pricingCoin != "" && pricingCoin != paymentCoinCode {
+		pricingCurrency, err := models.CurrencyDefinitions.Lookup(pricingCoin)
+		if err != nil {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest,
+				fmt.Sprintf("unknown pricing currency: %s", pricingCoin))
+			return
+		}
+		paymentCurrency, err := models.CurrencyDefinitions.Lookup(paymentCoinCode)
+		if err != nil {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest,
+				fmt.Sprintf("unknown payment currency: %s", paymentCoinCode))
+			return
+		}
+		ci, ok := getCoreIface(r)
+		if !ok {
+			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "exchange rates unavailable")
+			return
+		}
+		converted, err := wallet.ConvertCurrencyAmount(
+			&models.CurrencyValue{Amount: orderAmount, Currency: pricingCurrency},
+			paymentCurrency,
+			ci.ExchangeRates(),
+		)
+		if err != nil {
+			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError,
+				fmt.Sprintf("convert payment amount: %v", err))
+			return
+		}
+		params.Amount = converted.Uint64()
+	} else {
+		params.Amount = orderAmount.Uint64()
 	}
 
 	result, err := walletSvc.GeneratePaymentInstructions(r.Context(), params)

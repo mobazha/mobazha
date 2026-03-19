@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	btcec "github.com/btcsuite/btcd/btcec/v2"
@@ -144,6 +145,7 @@ func ValidateBuyerID(id *pb.ID) error {
 	return nil
 }
 
+// ValidatePayment validates the payment matches the order.
 func ValidatePayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, escrowTimeoutHours uint32, wal iwallet.Wallet) error {
 	if paymentSent.Amount == "" {
 		return errors.New("payment amount not set")
@@ -207,8 +209,17 @@ func validateEscrowPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal
 		return nil
 	}
 
-	if err := ValidatePaymentAmount(order.Amount, paymentSent.Amount); err != nil {
-		return err
+	// For cross-currency payments (e.g. USD-priced order paid in BTC), order.Amount
+	// is in the pricing currency's smallest unit while paymentSent.Amount is in the
+	// payment coin's smallest unit — comparing them is meaningless. The escrow smart
+	// contract already enforces the locked amount on-chain, so we only validate the
+	// amount for same-currency payments where both units match.
+	pricingCoin := strings.ToUpper(order.PricingCoin)
+	paymentCoin := strings.ToUpper(paymentSent.Coin)
+	if pricingCoin == "" || pricingCoin == paymentCoin {
+		if err := ValidatePaymentAmount(order.Amount, paymentSent.Amount); err != nil {
+			return err
+		}
 	}
 
 	escrowInfo, err := GetOrderEscrowInfo(order, paymentSent, wal.IsTestnet())

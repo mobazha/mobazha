@@ -62,6 +62,11 @@ func LoadNetConfig(endpoint string) (*NetConfig, error) {
 	return &config, nil
 }
 
+// GetExchangeRateProviders returns the configured exchange rate provider URLs.
+// Deprecated: The main exchange rate system now uses CoinGecko directly (EXR-1a)
+// and Hub-and-Spoke for standalone sites (EXR-1b). This method is only used by
+// the ZCash wallet adapter's legacy DefaultExchangeRateProvider.
+// TECHDEBT(TD-031): Migrate ZCash adapter to use the shared ExchangeRateProvider.
 func (config *NetConfig) GetExchangeRateProviders() []string {
 	if len(config.ExchangeRateProviders) == 0 {
 		return []string{"https://info.mobazha.org/api/ticker"}

@@ -44,6 +44,12 @@ func NewExchangeRateProvider(sources []string) *ExchangeRateProvider {
 	client := proxyclient.NewHttpClient()
 	client.Timeout = 15 * time.Second
 
+	if cfg.GetRemoteSaaSURL() != "" {
+		rp := NewRemoteProvider(cfg.GetRemoteSaaSURL(), client, cfg.GetCacheTTL())
+		e.providers = append(e.providers, rp)
+		fmt.Printf("Remote exchange rate provider initialized (SaaS URL: %s)\n", cfg.GetRemoteSaaSURL())
+	}
+
 	if cfg.IsCoinGeckoEnabled() {
 		cgProvider := newCoinGeckoProvider(
 			cfg.GetCoinGeckoBaseURL(),

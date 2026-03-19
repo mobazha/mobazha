@@ -130,6 +130,10 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			return addrs
 		}()
 
+		if !cfg.SaaSMode && cfg.SaaSAPIURL != "" {
+			mcfg.GetGlobalExchangeRateConfig().SetRemoteSaaSURL(cfg.SaaSAPIURL)
+		}
+
 		erp := wallet.NewExchangeRateProvider(nil)
 
 		SharedManagerInstance = &SharedManager{

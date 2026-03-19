@@ -25,7 +25,12 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService c
 // GetNodeManager returns the global NodeManagerIface instance.
 // This allows external packages (e.g., mobazha_hosting) to register
 // TenantService or other NodeService implementations with the shared manager.
+// Returns a proper nil interface when SharedManagerInstance is not yet initialized,
+// avoiding the Go typed-nil-pointer-in-interface pitfall.
 func GetNodeManager() coreiface.NodeManagerIface {
+	if core.SharedManagerInstance == nil {
+		return nil
+	}
 	return core.SharedManagerInstance
 }
 

@@ -9,7 +9,12 @@ import (
 type ExchangeRateConfig struct {
 	mu sync.RWMutex
 
-	// CoinGecko configuration (primary provider)
+	// RemoteSaaSURL is the SaaS platform URL for standalone stores to fetch
+	// exchange rates via Hub-and-Spoke distribution. When set, a RemoteProvider
+	// is added as the primary provider (no CoinGecko API key needed).
+	RemoteSaaSURL string
+
+	// CoinGecko configuration (primary provider for SaaS, fallback for standalone)
 	CoinGeckoAPIKey  string
 	CoinGeckoBaseURL string
 	CoinGeckoEnabled bool
@@ -41,6 +46,20 @@ func DefaultExchangeRateConfig() *ExchangeRateConfig {
 		CacheTTL:              30 * time.Second,
 		MaxRetries:            3,
 	}
+}
+
+// GetRemoteSaaSURL returns the SaaS URL for remote rate fetching.
+func (c *ExchangeRateConfig) GetRemoteSaaSURL() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.RemoteSaaSURL
+}
+
+// SetRemoteSaaSURL sets the SaaS URL for remote rate fetching.
+func (c *ExchangeRateConfig) SetRemoteSaaSURL(url string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.RemoteSaaSURL = url
 }
 
 // GetCoinGeckoAPIKey returns the CoinGecko API key.

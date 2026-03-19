@@ -75,6 +75,13 @@ func NewExchangeRateProvider(sources []string) *ExchangeRateProvider {
 		e.providerHealth = append(e.providerHealth, providerHealth{name: "coingecko"})
 	}
 
+	if cfg.IsBinanceEnabled() {
+		bp := newBinanceProvider(cfg.GetBinanceBaseURL(), client, cfg.GetCacheTTL())
+		e.providers = append(e.providers, bp)
+		e.providerHealth = append(e.providerHealth, providerHealth{name: "binance"})
+		fmt.Printf("Binance provider initialized (URL: %s)\n", cfg.GetBinanceBaseURL())
+	}
+
 	if cfg.IsChainlinkEnabled() {
 		chainlinkProvider, err := NewChainlinkProvider(cfg.GetChainlinkRPCURL())
 		if err == nil {

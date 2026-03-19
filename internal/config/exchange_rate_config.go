@@ -19,7 +19,11 @@ type ExchangeRateConfig struct {
 	CoinGeckoBaseURL string
 	CoinGeckoEnabled bool
 
-	// Chainlink configuration (secondary validation source)
+	// Binance configuration (secondary verification source — zero-config, no API key)
+	BinanceBaseURL string
+	BinanceEnabled bool
+
+	// Chainlink configuration (tertiary validation source, requires Polygon RPC)
 	ChainlinkRPCURL  string
 	ChainlinkEnabled bool
 
@@ -39,6 +43,8 @@ func DefaultExchangeRateConfig() *ExchangeRateConfig {
 		CoinGeckoAPIKey:       "",
 		CoinGeckoBaseURL:      "https://api.coingecko.com/api/v3",
 		CoinGeckoEnabled:      true,
+		BinanceBaseURL:        "https://api.binance.com",
+		BinanceEnabled:        false,
 		ChainlinkRPCURL:       "https://polygon-rpc.com",
 		ChainlinkEnabled:      false,
 		TraditionalAPIEnabled: false,
@@ -105,6 +111,37 @@ func (c *ExchangeRateConfig) SetCoinGeckoEnabled(enabled bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.CoinGeckoEnabled = enabled
+}
+
+// GetBinanceBaseURL returns the Binance API base URL.
+func (c *ExchangeRateConfig) GetBinanceBaseURL() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.BinanceBaseURL == "" {
+		return "https://api.binance.com"
+	}
+	return c.BinanceBaseURL
+}
+
+// SetBinanceBaseURL sets the Binance API base URL.
+func (c *ExchangeRateConfig) SetBinanceBaseURL(url string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.BinanceBaseURL = url
+}
+
+// IsBinanceEnabled checks if Binance provider is enabled.
+func (c *ExchangeRateConfig) IsBinanceEnabled() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.BinanceEnabled
+}
+
+// SetBinanceEnabled sets Binance enabled state.
+func (c *ExchangeRateConfig) SetBinanceEnabled(enabled bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.BinanceEnabled = enabled
 }
 
 // GetChainlinkRPCURL returns the Chainlink RPC URL.

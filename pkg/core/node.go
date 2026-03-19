@@ -79,3 +79,12 @@ func SetExchangeRateConfig(apiKey string, enabled *bool, cacheTTLSeconds int) {
 		cfg.SetCacheTTL(time.Duration(cacheTTLSeconds) * time.Second)
 	}
 }
+
+// SetBinanceConfig allows hosting to enable/disable the Binance secondary provider.
+func SetBinanceConfig(enabled *bool) {
+	if enabled == nil {
+		return
+	}
+	cfg := config.GetGlobalExchangeRateConfig()
+	cfg.SetBinanceEnabled(*enabled)
+}

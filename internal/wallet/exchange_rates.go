@@ -3,6 +3,7 @@ package wallet
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -150,9 +151,14 @@ func (e *ExchangeRateProvider) GetAllRates(base models.CurrencyCode, breakCache 
 	return cachedRates, nil
 }
 
+// DivergenceThreshold is the maximum acceptable percentage difference between
+// primary and secondary exchange rate providers before a warning is logged.
+const DivergenceThreshold = 0.05 // 5%
+
 // fetchRatesFromProviders queries the exchange rate sources serially until it gets a response back.
 // The first provider (CoinGecko) is treated as primary; subsequent providers fill in
-// currencies that the primary didn't cover.
+// currencies that the primary didn't cover. When both primary and secondary providers
+// return rates for the same currency, a divergence check (>5%) is performed.
 func (e *ExchangeRateProvider) fetchRatesFromProviders(base models.CurrencyCode) (map[models.CurrencyCode]iwallet.Amount, error) {
 	var combinedRates map[models.CurrencyCode]iwallet.Amount
 	var primaryRates map[models.CurrencyCode]iwallet.Amount
@@ -174,6 +180,9 @@ func (e *ExchangeRateProvider) fetchRatesFromProviders(base models.CurrencyCode)
 			if combinedRates == nil {
 				combinedRates = make(map[models.CurrencyCode]iwallet.Amount)
 			}
+			if primaryRates != nil {
+				checkRateDivergence(base, primaryRates, rates, provider)
+			}
 			for currency, rate := range rates {
 				if primaryRates == nil || primaryRates[currency].Int64() == 0 {
 					combinedRates[currency] = rate
@@ -187,6 +196,28 @@ func (e *ExchangeRateProvider) fetchRatesFromProviders(base models.CurrencyCode)
 	}
 
 	return combinedRates, nil
+}
+
+// checkRateDivergence compares overlapping currency rates between primary and secondary
+// providers. Logs a warning for each currency where the divergence exceeds DivergenceThreshold.
+func checkRateDivergence(base models.CurrencyCode, primary, secondary map[models.CurrencyCode]iwallet.Amount, secondaryProvider provider) {
+	for currency, primaryRate := range primary {
+		secondaryRate, ok := secondary[currency]
+		if !ok {
+			continue
+		}
+		pVal := primaryRate.Int64()
+		sVal := secondaryRate.Int64()
+		if pVal == 0 || sVal == 0 {
+			continue
+		}
+		diff := math.Abs(float64(pVal - sVal))
+		pct := diff / float64(pVal)
+		if pct > DivergenceThreshold {
+			fmt.Printf("WARN: exchange rate divergence %s/%s: primary=%d secondary(%T)=%d (%.1f%%)\n",
+				base, currency, pVal, secondaryProvider, sVal, pct*100)
+		}
+	}
 }
 
 // provider is an interface to a specific exchange rate API.

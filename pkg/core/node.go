@@ -2,8 +2,10 @@ package core
 
 import (
 	"context"
+	"time"
 
 	internalapi "github.com/mobazha/mobazha3.0/internal/api"
+	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/core"
 	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
 	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
@@ -47,5 +49,20 @@ func NewDBPublicData(db *gorm.DB, tenantID string) pkgdb.PublicData {
 func SetSharedHTTPGateway(gw *APIGateway) {
 	if core.SharedManagerInstance != nil {
 		core.SharedManagerInstance.SetHTTPGateway(gw)
+	}
+}
+
+// SetExchangeRateConfig allows hosting to override exchange rate configuration
+// from DB-backed runtime config before SharedManager creates the provider.
+func SetExchangeRateConfig(apiKey string, enabled *bool, cacheTTLSeconds int) {
+	cfg := config.GetGlobalExchangeRateConfig()
+	if apiKey != "" {
+		cfg.SetCoinGeckoAPIKey(apiKey)
+	}
+	if enabled != nil {
+		cfg.SetCoinGeckoEnabled(*enabled)
+	}
+	if cacheTTLSeconds > 0 {
+		cfg.SetCacheTTL(time.Duration(cacheTTLSeconds) * time.Second)
 	}
 }

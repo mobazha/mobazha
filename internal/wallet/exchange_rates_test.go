@@ -290,6 +290,142 @@ func TestGetAllRates_StaleFallback(t *testing.T) {
 	}
 }
 
+func TestFetchRates_DivergenceDetection(t *testing.T) {
+	primaryRates := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(6500000),
+		"EUR": iwallet.NewAmount(6000000),
+	}
+	secondaryRates := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(6500000),
+		"EUR": iwallet.NewAmount(6000000),
+	}
+	primary := &mockProvider{rates: primaryRates}
+	secondary := &mockProvider{rates: secondaryRates}
+
+	e := &ExchangeRateProvider{
+		cache:       make(map[models.CurrencyCode]map[models.CurrencyCode]iwallet.Amount),
+		lastQueried: make(map[models.CurrencyCode]time.Time),
+		providers:   []provider{primary, secondary},
+		cacheTTL:    30 * time.Second,
+	}
+
+	rates, err := e.GetRate("BTC", "USD", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rates.Int64() != 6500000 {
+		t.Fatalf("expected 6500000, got %d", rates.Int64())
+	}
+}
+
+func TestFetchRates_DivergenceAboveThreshold(t *testing.T) {
+	primaryRates := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(6500000),
+	}
+	// 10% divergence
+	secondaryRates := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(5850000),
+	}
+	primary := &mockProvider{rates: primaryRates}
+	secondary := &mockProvider{rates: secondaryRates}
+
+	e := &ExchangeRateProvider{
+		cache:       make(map[models.CurrencyCode]map[models.CurrencyCode]iwallet.Amount),
+		lastQueried: make(map[models.CurrencyCode]time.Time),
+		providers:   []provider{primary, secondary},
+		cacheTTL:    30 * time.Second,
+	}
+
+	rates, err := e.GetRate("BTC", "USD", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Primary rate should be used even when divergence is detected
+	if rates.Int64() != 6500000 {
+		t.Fatalf("expected primary rate 6500000, got %d", rates.Int64())
+	}
+}
+
+func TestCheckRateDivergence_NoWarningWithinThreshold(t *testing.T) {
+	primary := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(6500000),
+	}
+	// 2% divergence — within 5% threshold
+	secondary := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(6370000),
+	}
+	// Should not panic or produce unexpected behavior
+	checkRateDivergence("BTC", primary, secondary, &mockProvider{})
+}
+
+func TestCheckRateDivergence_WarningAboveThreshold(t *testing.T) {
+	primary := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(6500000),
+	}
+	// 8% divergence — above 5% threshold
+	secondary := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(5980000),
+	}
+	// Should not panic; the warning is logged to stdout
+	checkRateDivergence("BTC", primary, secondary, &mockProvider{})
+}
+
+func TestCheckRateDivergence_SkipsZeroValues(t *testing.T) {
+	primary := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(0),
+	}
+	secondary := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(6500000),
+	}
+	// Should skip zero-value primary rates without panicking
+	checkRateDivergence("BTC", primary, secondary, &mockProvider{})
+}
+
+func TestCheckRateDivergence_SkipsMissingCurrencies(t *testing.T) {
+	primary := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(6500000),
+		"EUR": iwallet.NewAmount(6000000),
+	}
+	secondary := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(6500000),
+	}
+	// EUR missing in secondary — should skip without error
+	checkRateDivergence("BTC", primary, secondary, &mockProvider{})
+}
+
+func TestFetchRates_SecondaryFillsMissingCurrencies(t *testing.T) {
+	primaryRates := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(6500000),
+	}
+	secondaryRates := map[models.CurrencyCode]iwallet.Amount{
+		"USD": iwallet.NewAmount(6490000),
+		"EUR": iwallet.NewAmount(6000000),
+	}
+	primary := &mockProvider{rates: primaryRates}
+	secondary := &mockProvider{rates: secondaryRates}
+
+	e := &ExchangeRateProvider{
+		cache:       make(map[models.CurrencyCode]map[models.CurrencyCode]iwallet.Amount),
+		lastQueried: make(map[models.CurrencyCode]time.Time),
+		providers:   []provider{primary, secondary},
+		cacheTTL:    30 * time.Second,
+	}
+
+	rates, err := e.GetAllRates("BTC", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Primary USD should be used
+	if rates["USD"].Int64() != 6500000 {
+		t.Errorf("expected primary USD rate 6500000, got %d", rates["USD"].Int64())
+	}
+	// EUR should come from secondary
+	if rates["EUR"].Int64() != 6000000 {
+		t.Errorf("expected secondary EUR rate 6000000, got %d", rates["EUR"].Int64())
+	}
+}
+
 func TestCacheTTLFromConfig(t *testing.T) {
 	cfg := config.GetGlobalExchangeRateConfig()
 	cfg.SetCacheTTL(45 * time.Second)

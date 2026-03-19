@@ -10,10 +10,10 @@ import (
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/internal/version"
+	"github.com/mobazha/mobazha3.0/internal/wallet"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/mobazha/mobazha3.0/pkg/response"
-	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
 
 type nodeConfig struct {
@@ -122,7 +122,7 @@ func (g *Gateway) handleGETExchangeRates(w http.ResponseWriter, r *http.Request)
 		}
 		base = *def.CurrencyCode()
 	} else {
-		base = models.CurrencyCode(iwallet.CtBitcoin)
+		base = wallet.ReserveCurrency
 	}
 
 	forceRefresh := r.URL.Query().Get("refresh") == "true"

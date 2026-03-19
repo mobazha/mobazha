@@ -119,7 +119,7 @@ func TestSettingsHandlers(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				rates, err := erp.GetAllRates(models.CurrencyCode(iwallet.CtBitcoin), false)
+				rates, err := erp.GetAllRates(wallet.ReserveCurrency, false)
 				if err != nil {
 					return nil, err
 				}

@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -284,6 +285,16 @@ type ExchangeRateService interface {
 	// GetRate returns the rate for a specific currency pair.
 	// Supports crypto-fiat, fiat-crypto, and fiat-fiat pairs.
 	GetRate(base models.CurrencyCode, to models.CurrencyCode, breakCache bool) (iwallet.Amount, error)
+}
+
+// ProviderHealthInfo contains health metrics for an exchange rate provider.
+type ProviderHealthInfo struct {
+	Name         string    `json:"name"`
+	LastSuccess  time.Time `json:"last_success"`
+	LastError    string    `json:"last_error,omitempty"`
+	LastErrorAt  time.Time `json:"last_error_at,omitempty"`
+	SuccessCount int64     `json:"success_count"`
+	ErrorCount   int64     `json:"error_count"`
 }
 
 // ErrWishlistFull is returned when the wishlist reaches its capacity limit.

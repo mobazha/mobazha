@@ -8,8 +8,9 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/core"
 	"github.com/mobazha/mobazha3.0/internal/database/dbstore"
-	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/core/coreiface"
+	pkgdb "github.com/mobazha/mobazha3.0/pkg/database"
 	"github.com/mobazha/mobazha3.0/pkg/repo"
 	"gorm.io/gorm"
 )
@@ -50,6 +51,18 @@ func SetSharedHTTPGateway(gw *APIGateway) {
 	if core.SharedManagerInstance != nil {
 		core.SharedManagerInstance.SetHTTPGateway(gw)
 	}
+}
+
+// GetExchangeRateProviderHealth returns health metrics for all exchange rate
+// providers. Returns nil if SharedManager or the provider is not initialized.
+func GetExchangeRateProviderHealth() []contracts.ProviderHealthInfo {
+	if core.SharedManagerInstance == nil {
+		return nil
+	}
+	if core.SharedManagerInstance.ExchangeRateProvider == nil {
+		return nil
+	}
+	return core.SharedManagerInstance.ExchangeRateProvider.GetProviderHealth()
 }
 
 // SetExchangeRateConfig allows hosting to override exchange rate configuration

@@ -10,6 +10,7 @@ import (
 
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/libs/proxyclient"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/models"
 	iwallet "github.com/mobazha/mobazha3.0/pkg/wallet-interface"
 )
@@ -28,6 +29,17 @@ type ExchangeRateProvider struct {
 	mtx         sync.Mutex
 	providers   []provider
 	cacheTTL    time.Duration
+
+	providerHealth []providerHealth
+}
+
+type providerHealth struct {
+	name         string
+	lastSuccess  time.Time
+	lastError    string
+	lastErrorAt  time.Time
+	successCount int64
+	errorCount   int64
 }
 
 // NewExchangeRateProvider returns a new ExchangeRateProvider.
@@ -48,6 +60,7 @@ func NewExchangeRateProvider(sources []string) *ExchangeRateProvider {
 	if cfg.GetRemoteSaaSURL() != "" {
 		rp := NewRemoteProvider(cfg.GetRemoteSaaSURL(), client, cfg.GetCacheTTL())
 		e.providers = append(e.providers, rp)
+		e.providerHealth = append(e.providerHealth, providerHealth{name: "remote_saas"})
 		fmt.Printf("Remote exchange rate provider initialized (SaaS URL: %s)\n", cfg.GetRemoteSaaSURL())
 	}
 
@@ -59,12 +72,14 @@ func NewExchangeRateProvider(sources []string) *ExchangeRateProvider {
 			cfg.GetCacheTTL(),
 		)
 		e.providers = append(e.providers, cgProvider)
+		e.providerHealth = append(e.providerHealth, providerHealth{name: "coingecko"})
 	}
 
 	if cfg.IsChainlinkEnabled() {
 		chainlinkProvider, err := NewChainlinkProvider(cfg.GetChainlinkRPCURL())
 		if err == nil {
 			e.providers = append(e.providers, chainlinkProvider)
+			e.providerHealth = append(e.providerHealth, providerHealth{name: "chainlink"})
 			fmt.Printf("Chainlink provider initialized successfully\n")
 		} else {
 			fmt.Printf("Failed to initialize Chainlink provider: %v\n", err)
@@ -167,7 +182,16 @@ func (e *ExchangeRateProvider) fetchRatesFromProviders(base models.CurrencyCode)
 		rates, err := provider.fetchRates(base)
 		if err != nil {
 			fmt.Printf("fetch rate failed for provider %T: %v\n", provider, err)
+			if i < len(e.providerHealth) {
+				e.providerHealth[i].lastError = err.Error()
+				e.providerHealth[i].lastErrorAt = time.Now()
+				e.providerHealth[i].errorCount++
+			}
 			continue
+		}
+		if i < len(e.providerHealth) {
+			e.providerHealth[i].lastSuccess = time.Now()
+			e.providerHealth[i].successCount++
 		}
 
 		if i == 0 {
@@ -218,6 +242,25 @@ func checkRateDivergence(base models.CurrencyCode, primary, secondary map[models
 				base, currency, pVal, secondaryProvider, sVal, pct*100)
 		}
 	}
+}
+
+// GetProviderHealth returns health metrics for all configured providers.
+func (e *ExchangeRateProvider) GetProviderHealth() []contracts.ProviderHealthInfo {
+	e.mtx.Lock()
+	defer e.mtx.Unlock()
+
+	result := make([]contracts.ProviderHealthInfo, len(e.providerHealth))
+	for i, h := range e.providerHealth {
+		result[i] = contracts.ProviderHealthInfo{
+			Name:         h.name,
+			LastSuccess:  h.lastSuccess,
+			LastError:    h.lastError,
+			LastErrorAt:  h.lastErrorAt,
+			SuccessCount: h.successCount,
+			ErrorCount:   h.errorCount,
+		}
+	}
+	return result
 }
 
 // provider is an interface to a specific exchange rate API.

@@ -74,6 +74,7 @@ var (
 		"LEO":   {Name: "UNUS SED LEO", Code: CurrencyCode("LEO"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18},
 		"ADA":   {Name: "Cardano", Code: CurrencyCode("ADA"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, Bip44Code: 1815},
 		"TRX":   {Name: "Tron", Code: CurrencyCode("TRX"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, Bip44Code: 195},
+		"TRXUSDT": {Name: "Tether", Code: CurrencyCode("TRXUSDT"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, BlockInterval: time.Second * 3},
 		"LINK":  {Name: "Chainlink", Code: CurrencyCode("LINK"), CurrencyType: CurrencyTypeCrypto, Divisibility: 18},
 		"XTZ":   {Name: "Tezos", Code: CurrencyCode("XTZ"), CurrencyType: CurrencyTypeCrypto, Divisibility: 6, Bip44Code: 1729},
 		"NEO":   {Name: "NEO", Code: CurrencyCode("NEO"), CurrencyType: CurrencyTypeCrypto, Divisibility: 8, Bip44Code: 888},

@@ -407,6 +407,11 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		return nil, fmt.Errorf("derive eth master key: %w", err)
 	}
 
+	tronMasterKey, err := utils.GenerateTRONPrivateKey(bip44Key)
+	if err != nil {
+		return nil, fmt.Errorf("derive tron master key: %w", err)
+	}
+
 	escrowKey, _ := btcec.PrivKeyFromBytes(dbEscrowKey.Value)
 	ratingKey, _ := btcec.PrivKeyFromBytes(dbRatingKey.Value)
 
@@ -442,6 +447,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	_ = mwCfg.Apply(append([]chains.Option{chains.Defaults}, opts...)...)
 	evmConfigs := extractEVMConfigs(mwCfg.ChainAPIs, walletTestnet)
 	solanaConfig := extractSolanaConfig(mwCfg.ChainAPIs, walletTestnet)
+	tronConfig := extractTronConfig(mwCfg.ChainAPIs, walletTestnet)
 
 	globalBlockedIds := []peer.ID{}
 	contracts, err := contracts.NewContracts(opts...)
@@ -502,6 +508,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 			escrowMasterKey: escrowKey,
 			ratingMasterKey: ratingKey,
 			solPrivKey:      &solPrivKey,
+			tronMasterKey:   tronMasterKey,
 		},
 		networkFields: networkFields{
 			networkService:         service,
@@ -518,6 +525,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		chainFields: chainFields{
 			evmChainConfigs:   evmConfigs,
 			solanaChainConfig: solanaConfig,
+			tronChainConfig:   tronConfig,
 		},
 		ipnsFields: ipnsFields{
 			netDB:     netDB,
@@ -1038,6 +1046,10 @@ func newLightweightNode(
 	if err != nil {
 		return nil, fmt.Errorf("derive eth master key: %w", err)
 	}
+	tronMasterKey, err := utils.GenerateTRONPrivateKey(bip44Key)
+	if err != nil {
+		return nil, fmt.Errorf("derive tron master key: %w", err)
+	}
 	escrowKey, _ := btcec.PrivKeyFromBytes(dbEscrowKey.Value)
 	ratingKey, _ := btcec.PrivKeyFromBytes(dbRatingKey.Value)
 	solPrivKey := solana.PrivateKey(dbSolKey.Value)
@@ -1123,6 +1135,7 @@ func newLightweightNode(
 			escrowMasterKey: escrowKey,
 			ratingMasterKey: ratingKey,
 			solPrivKey:      &solPrivKey,
+			tronMasterKey:   tronMasterKey,
 		},
 		networkFields: networkFields{
 			networkService:         service,

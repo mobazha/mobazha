@@ -24,6 +24,7 @@ type stubKeyProvider struct {
 	solKey    *solana.PrivateKey
 	escrowKey *btcec.PrivateKey
 	ratingKey *btcec.PrivateKey
+	tronKey   *btcec.PrivateKey
 	err       error
 }
 
@@ -31,17 +32,20 @@ func (s *stubKeyProvider) EVMMasterKey() (*btcec.PrivateKey, error)     { return
 func (s *stubKeyProvider) SolanaMasterKey() (*solana.PrivateKey, error) { return s.solKey, s.err }
 func (s *stubKeyProvider) EscrowMasterKey() (*btcec.PrivateKey, error)  { return s.escrowKey, s.err }
 func (s *stubKeyProvider) RatingMasterKey() (*btcec.PrivateKey, error)  { return s.ratingKey, s.err }
+func (s *stubKeyProvider) TRONMasterKey() (*btcec.PrivateKey, error)    { return s.tronKey, s.err }
 
 func newTestKeyProvider() *stubKeyProvider {
 	ethKey, _ := btcec.NewPrivateKey()
 	escrowKey, _ := btcec.NewPrivateKey()
 	ratingKey, _ := btcec.NewPrivateKey()
+	tronKey, _ := btcec.NewPrivateKey()
 	solKey := solana.NewWallet().PrivateKey
 	return &stubKeyProvider{
 		ethKey:    ethKey,
 		solKey:    &solKey,
 		escrowKey: escrowKey,
 		ratingKey: ratingKey,
+		tronKey:   tronKey,
 	}
 }
 

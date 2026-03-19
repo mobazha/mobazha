@@ -68,6 +68,17 @@ func (n *MobazhaNode) registerPaymentStrategies() {
 	}
 	n.paymentRegistry.Register(iwallet.ChainSolana, adapters.NewClientSignedAdapter(solOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions))
 
+	// ── TRON ──────────────────────────────────────────────────
+	tronOps := &adapters.TRONChainOps{
+		Keys:            n.keyProvider,
+		Multiwallet:     n.multiwallet,
+		BuildReleaseTxn: n.orderService.buildDisputeReleaseTransaction,
+		OnAutoConfirm:   n.handleCancelablePaymentForTRON,
+		TronClient:      n.tronClient,
+		NodeID:          n.nodeID,
+	}
+	n.paymentRegistry.Register(iwallet.ChainTRON, adapters.NewClientSignedAdapter(tronOps, n.paymentService.BuildInitEscrowInstructions, n.orderService.GetEscrowReleaseInstructions))
+
 	logger.LogInfoWithIDf(log, n.nodeID, "Registered payment strategies for %d chains", len(n.paymentRegistry.Chains()))
 
 	// Wire the registry and receipt verifier to App Services and PVS
@@ -94,4 +105,8 @@ func (n *MobazhaNode) handleCancelablePaymentForEVM(event *events.CancelablePaym
 
 func (n *MobazhaNode) handleCancelablePaymentForSolana(event *events.CancelablePaymentReady) {
 	n.paymentService.HandleCancelablePaymentForSolana(event)
+}
+
+func (n *MobazhaNode) handleCancelablePaymentForTRON(event *events.CancelablePaymentReady) {
+	n.paymentService.HandleCancelablePaymentForTRON(event)
 }

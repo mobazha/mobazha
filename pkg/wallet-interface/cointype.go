@@ -22,6 +22,7 @@ const (
 	ChainBase        ChainType = "BASE"
 	ChainConflux     ChainType = "CFX"
 	ChainSolana      ChainType = "SOL"
+	ChainTRON        ChainType = "TRX"
 	ChainExternalPayment      ChainType = "EXTERNAL_PAYMENT"
 	ChainDash        ChainType = "DASH"
 
@@ -35,7 +36,7 @@ func (chaintype ChainType) String() string {
 func GetAllSupportedChainTypes() []ChainType {
 	return []ChainType{
 		ChainBitcoin, ChainLitecoin,
-		ChainSolana, ChainStripe, ChainEthereum, ChainBSC, ChainBase,
+		ChainSolana, ChainTRON, ChainStripe, ChainEthereum, ChainBSC, ChainBase,
 	}
 }
 
@@ -68,6 +69,8 @@ const (
 	CtPolygonUSDC CoinType = "MATICUSDC"
 	CtSPLUSDT     CoinType = "SOLUSDT"
 	CtSPLUSDC     CoinType = "SOLUSDC"
+	CtTRON        CoinType = CoinType(ChainTRON)
+	CtTRC20USDT   CoinType = "TRXUSDT"
 
 	CtMBZ CoinType = "MBZ"
 
@@ -222,6 +225,14 @@ var (
 		Description: "Solana",
 	}
 
+	CtTRONInfo = CoinInfo{
+		Chain:       ChainTRON,
+		Symbol:      "TRX",
+		IsNative:    true,
+		Decimals:    6,
+		Description: "TRON",
+	}
+
 	CtStripeInfo = CoinInfo{
 		Chain:       ChainStripe,
 		Symbol:      "Stripe",
@@ -324,6 +335,16 @@ var (
 		Decimals:    6,
 		Description: "USD Coin on Polygon",
 	}
+
+	TRC20USDTInfo = CoinInfo{
+		Chain:           ChainTRON,
+		Symbol:          "USDT",
+		IsNative:        false,
+		Contract:        "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+		TestnetContract: "",
+		Decimals:        6,
+		Description:     "Tether USD on TRON",
+	}
 )
 
 // 链配置
@@ -342,6 +363,7 @@ var ChainConfigs = map[ChainType]struct {
 	ChainPolygon:     {time.Second * 2, "Polygon"},
 	ChainConflux:     {time.Second * 1, "Conflux"},
 	ChainSolana:      {time.Second * 1, "Solana"},
+	ChainTRON:        {time.Second * 3, "TRON"},
 }
 
 // NewCoinInfo 创建新的币种
@@ -410,6 +432,8 @@ func (ct CoinInfo) NativeCoinType() CoinType {
 		return CtConflux
 	case ChainSolana:
 		return CtSolana
+	case ChainTRON:
+		return CtTRON
 	default:
 		return CoinType(ct.Chain)
 	}
@@ -452,7 +476,7 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 				CtMockInfo, // Mock chain for testing
 				CtBitcoinInfo, CtBitcoinCashInfo, CtLitecoinInfo, CtZCashInfo,
 				CtEthereumInfo, CtBNBInfo, CtBaseInfo, CtPolygonInfo, CtConfluxInfo,
-				CtSolanaInfo,
+				CtSolanaInfo, CtTRONInfo,
 			} {
 				if token.Chain == chain && token.IsNative {
 					return token, nil
@@ -473,6 +497,7 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 				BEP20USDTInfo, BEP20USDCInfo,
 				PolygonUSDTInfo, PolygonUSDCInfo,
 				SPLUSDTInfo, SPLUSDCInfo,
+				TRC20USDTInfo,
 			} {
 				if token.Chain == chain && token.Symbol == tokenSymbol {
 					return token, nil
@@ -499,6 +524,7 @@ func GetAllSupportedCoinTypes() []CoinType {
 	return []CoinType{
 		CtBitcoin, CtLitecoin,
 		CtSolana, CtBNB, CtPolygon, CtBaseETH,
+		CtTRON, CtTRC20USDT,
 		CtBEP20USDT, CtBEP20USDC, CtBaseUSDT, CtBaseUSDC, CtPolygonUSDT, CtPolygonUSDC, CtSPLUSDT, CtSPLUSDC,
 	}
 }

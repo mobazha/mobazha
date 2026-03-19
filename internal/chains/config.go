@@ -142,6 +142,10 @@ var Defaults = func(cfg *Config) error {
 			TestnetRpc:             []string{"https://api.devnet.solana.com"},
 			TestnetRegistryAddress: "6LmWMjAMAfVdc8mpgPjHvFLa2sbcudiLiJT3bAGRYMMD",
 		},
+		iwallet.ChainTRON: {
+			MainnetRpc: []string{"https://api.trongrid.io", "https://api.tronstack.io"},
+			TestnetRpc: []string{"https://api.shasta.trongrid.io"},
+		},
 	}
 	cfg.LogLevel = logging.INFO
 	cfg.DataDir = DefaultHomeDir

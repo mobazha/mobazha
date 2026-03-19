@@ -186,7 +186,7 @@ func MockNode() (*MobazhaNode, error) {
 		FeatureManager:       node.featureManager,
 	})
 
-	node.keyProvider = newFileKeyProvider(node.ethMasterKey, node.escrowMasterKey, node.ratingMasterKey, node.solPrivKey)
+	node.keyProvider = newFileKeyProvider(node.ethMasterKey, node.escrowMasterKey, node.ratingMasterKey, node.solPrivKey, node.tronMasterKey)
 
 	node.initProfileService()
 	node.initModerationService()
@@ -394,7 +394,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 			FeatureManager:       node.featureManager,
 		})
 
-		node.keyProvider = newFileKeyProvider(node.ethMasterKey, node.escrowMasterKey, node.ratingMasterKey, node.solPrivKey)
+		node.keyProvider = newFileKeyProvider(node.ethMasterKey, node.escrowMasterKey, node.ratingMasterKey, node.solPrivKey, node.tronMasterKey)
 
 		node.initProfileService()
 		node.initModerationService()

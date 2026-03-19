@@ -27,7 +27,7 @@ var coinGeckoIDMap = map[string][]string{
 	"solana":            {"SOL"},
 	"binancecoin":       {"BNB"},
 	"matic-network":     {"MATIC"},
-	"tether":            {"USDT", "ETHUSDT", "BSCUSDT", "BASEUSDT", "MATICUSDT", "CFXUSDT", "SOLUSDT"},
+	"tether":            {"USDT", "ETHUSDT", "BSCUSDT", "BASEUSDT", "MATICUSDT", "CFXUSDT", "SOLUSDT", "TRXUSDT"},
 	"usd-coin":          {"USDC", "ETHUSDC", "BSCUSDC", "BASEUSDC", "MATICUSDC", "CFXUSDC", "SOLUSDC"},
 	"dash":              {"DASH"},
 	"ripple":            {"XRP"},

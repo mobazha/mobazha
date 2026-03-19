@@ -14,6 +14,7 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
+	tronchain "github.com/mobazha/mobazha3.0/internal/chains/tron"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo"
 	"github.com/mobazha/mobazha3.0/internal/config"
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -107,6 +108,7 @@ type cryptoFields struct {
 	escrowMasterKey *btcec.PrivateKey
 	solPrivKey      *solana.PrivateKey
 	ratingMasterKey *btcec.PrivateKey
+	tronMasterKey   *btcec.PrivateKey
 	keyProvider     contracts.KeyProvider
 }
 
@@ -134,6 +136,8 @@ type walletFields struct {
 type chainFields struct {
 	evmChainConfigs   []evm.EVMClientConfig
 	solanaChainConfig *SolanaChainConfig
+	tronChainConfig   *TronChainConfig
+	tronClient        *tronchain.TronClient
 	monitorService    utxo.UTXOMonitorService
 }
 
@@ -264,6 +268,9 @@ func (n *MobazhaNode) Start() {
 		// Inject Solana chain client into wallet (symmetric with EVM and UTXO above)
 		// SaaS: shared client from HostService; Standalone: per-node client + escrow resolution
 		n.startSolanaChainClients()
+
+		// Inject TRON chain client into wallet (symmetric with Solana/EVM above)
+		n.startTRONChainClients()
 
 		// Register payment strategies for all supported chains.
 		// Must be called before startCancelablePaymentMonitor which uses the registry.

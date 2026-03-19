@@ -86,6 +86,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 			n.escrowMasterKey,
 			n.ratingMasterKey,
 			n.solPrivKey,
+			n.tronMasterKey,
 		)
 	}
 	n.initProfileService()

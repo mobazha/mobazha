@@ -161,3 +161,29 @@ func GenerateEthPrivateKey(bip44Masterkey *hdkeychain.ExtendedKey) (*btcec.Priva
 
 	return addressKey.ECPrivKey()
 }
+
+// GenerateTRONPrivateKey derives a TRON master key using BIP-44 path m/44'/195'/0'/0/0.
+// Coin type 195 is the registered BIP-44 coin type for TRON.
+// Independent HD path ensures key isolation from EVM keys and prevents cross-chain replay.
+func GenerateTRONPrivateKey(bip44Masterkey *hdkeychain.ExtendedKey) (*btcec.PrivateKey, error) {
+	coinTypeKey, err := bip44Masterkey.Derive(hdkeychain.HardenedKeyStart + 195)
+	if err != nil {
+		return nil, err
+	}
+
+	accountKey, err := coinTypeKey.Derive(hdkeychain.HardenedKeyStart + 0)
+	if err != nil {
+		return nil, err
+	}
+
+	changeKey, err := accountKey.Derive(0)
+	if err != nil {
+		return nil, err
+	}
+	addressKey, err := changeKey.Derive(0)
+	if err != nil {
+		return nil, err
+	}
+
+	return addressKey.ECPrivKey()
+}

@@ -131,6 +131,11 @@ func (m *mockKeyProvider) RatingMasterKey() (*btcec.PrivateKey, error) {
 	return k, nil
 }
 
+func (m *mockKeyProvider) TRONMasterKey() (*btcec.PrivateKey, error) {
+	k, _ := btcec.NewPrivateKey()
+	return k, nil
+}
+
 // ── helpers ─────────────────────────────────────────────────────
 
 func testCID() cid.Cid {

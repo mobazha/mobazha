@@ -12,6 +12,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/chains/evm"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/litecoin"
 	"github.com/mobazha/mobazha3.0/internal/chains/solana"
+	tronWal "github.com/mobazha/mobazha3.0/internal/chains/tron"
 	"github.com/mobazha/mobazha3.0/internal/chains/fiat/stripe"
 	"github.com/mobazha/mobazha3.0/internal/chains/utxo/zcash"
 	"github.com/mobazha/mobazha3.0/internal/chains/database"
@@ -158,6 +159,20 @@ func NewMultiwallet(opts ...Option) (Multiwallet, error) {
 			//   - Standalone: creates own SolanaClient + resolves escrow from ContractManager
 			//   - SaaS: gets shared SolanaClient + pre-resolved escrow from HostService
 			w, err := solana.NewSolanaWallet(&base.WalletConfig{
+				NodeID:    cfg.NodeID,
+				Logger:    logger,
+				DB:        db,
+				Testnet:   cfg.UseTestnet,
+				NetConfig: cfg.NetConfig,
+			})
+			if err != nil {
+				return nil, err
+			}
+			multiwallet[chain] = w
+		case iwallet.ChainTRON:
+			// TronClient nil at construction — injected during MobazhaNode.Start()
+			// via startTRONChainClients(), symmetric with Solana/EVM pattern.
+			w, err := tronWal.NewTronWallet(&base.WalletConfig{
 				NodeID:    cfg.NodeID,
 				Logger:    logger,
 				DB:        db,

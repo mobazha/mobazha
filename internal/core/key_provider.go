@@ -15,14 +15,16 @@ type fileKeyProvider struct {
 	solKey    *solana.PrivateKey
 	escrowKey *btcec.PrivateKey
 	ratingKey *btcec.PrivateKey
+	tronKey   *btcec.PrivateKey
 }
 
-func newFileKeyProvider(ethKey, escrowKey, ratingKey *btcec.PrivateKey, solKey *solana.PrivateKey) *fileKeyProvider {
+func newFileKeyProvider(ethKey, escrowKey, ratingKey *btcec.PrivateKey, solKey *solana.PrivateKey, tronKey *btcec.PrivateKey) *fileKeyProvider {
 	return &fileKeyProvider{
 		ethKey:    ethKey,
 		solKey:    solKey,
 		escrowKey: escrowKey,
 		ratingKey: ratingKey,
+		tronKey:   tronKey,
 	}
 }
 
@@ -30,3 +32,4 @@ func (p *fileKeyProvider) EVMMasterKey() (*btcec.PrivateKey, error)      { retur
 func (p *fileKeyProvider) SolanaMasterKey() (*solana.PrivateKey, error)  { return p.solKey, nil }
 func (p *fileKeyProvider) EscrowMasterKey() (*btcec.PrivateKey, error)   { return p.escrowKey, nil }
 func (p *fileKeyProvider) RatingMasterKey() (*btcec.PrivateKey, error)   { return p.ratingKey, nil }
+func (p *fileKeyProvider) TRONMasterKey() (*btcec.PrivateKey, error)     { return p.tronKey, nil }

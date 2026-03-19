@@ -30,4 +30,9 @@ type KeyProvider interface {
 	// RatingMasterKey returns the secp256k1 private key used for
 	// generating per-order rating signing keys.
 	RatingMasterKey() (*btcec.PrivateKey, error)
+
+	// TRONMasterKey returns the secp256k1 private key used for TRON
+	// escrow operations. Derived from an independent HD path
+	// (m/44'/195'/0'/0/0) to avoid cross-chain key reuse with EVM.
+	TRONMasterKey() (*btcec.PrivateKey, error)
 }

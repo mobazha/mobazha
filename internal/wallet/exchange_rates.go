@@ -102,7 +102,7 @@ func (e *ExchangeRateProvider) GetRate(base models.CurrencyCode, to models.Curre
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
-	base = models.CurrencyCode(strings.TrimPrefix(strings.ToUpper(base.String()), "T"))
+	base = models.CurrencyCode(strings.ToUpper(base.String()))
 
 	baseForQuery := base
 	if coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(base)); err == nil {

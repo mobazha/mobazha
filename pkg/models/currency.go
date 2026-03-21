@@ -267,37 +267,13 @@ func (c CurrencyDictionary) Lookup(code string) (*Currency, error) {
 		}
 	}
 
-	var (
-		upcase    = strings.ToUpper(code)
-		isTestnet = strings.HasPrefix(upcase, "T")
-
-		def *Currency
-		ok  bool
-	)
-	if isTestnet {
-		def, ok = c[strings.TrimPrefix(upcase, "T")]
-	} else {
-		def, ok = c[upcase]
-	}
+	upcase := strings.ToUpper(code)
+	def, ok := c[upcase]
 	if !ok {
 		log.Errorf("CurrencyDefinition undefined: %s", upcase)
 		return nil, ErrCurrencyDefinitionUndefined
 	}
-	if isTestnet {
-		return convertToTestnet(def), nil
-	}
 	return def, nil
-}
-
-// convertToTestnet converts a Currency object to its
-// testnet counterpart.
-func convertToTestnet(def *Currency) *Currency {
-	return &Currency{
-		Name:         def.Name,
-		Code:         CurrencyCode(fmt.Sprintf("T%s", def.Code)),
-		Divisibility: def.Divisibility,
-		CurrencyType: def.CurrencyType,
-	}
 }
 
 // CurrencyType represents a type of current. Currently either
@@ -356,9 +332,7 @@ func (c *Currency) Equal(other *Currency) bool {
 	if c == nil || other == nil {
 		return false
 	}
-	code := strings.TrimPrefix(c.Code.String(), "T")
-	otherCode := strings.TrimPrefix(other.Code.String(), "T")
-	if code != otherCode {
+	if c.Code != other.Code {
 		return false
 	}
 	if c.Divisibility != other.Divisibility {

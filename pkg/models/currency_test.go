@@ -105,10 +105,10 @@ func TestCurrencyDictionaryLookup(t *testing.T) {
 				expected:    expected,
 				expectedErr: nil,
 			},
-			{ // testnet lookup
+			{ // TABC no longer auto-maps to ABC
 				lookup:      "TABC",
-				expected:    newCurrency("TABC"),
-				expectedErr: nil,
+				expected:    nil,
+				expectedErr: ErrCurrencyDefinitionUndefined,
 			},
 			{ // undefined key
 				lookup:      "FAIL",

@@ -48,6 +48,11 @@ var columnsEN = map[string]int{
 	"introVideo":         11,
 	"processingTime":     12,
 	"grams":              13,
+	"quantity":           14,
+	"brand":              15,
+	"weightUnit":         16,
+	"status":             17,
+	"regularPrice":       18,
 }
 
 // Column mappings for Chinese template
@@ -60,12 +65,17 @@ var columnsZH = map[string]int{
 	"简短描述":  5,
 	"分类":    6,
 	"标签":    7,
-	"商品状态":  8,
+	"新旧状态":  8,
 	"成人内容":  9,
 	"图片文件名": 10,
 	"介绍视频":  11,
 	"处理时间":  12,
 	"重量(克)": 13,
+	"库存数量":  14,
+	"品牌":    15,
+	"重量单位":  16,
+	"发布状态":  17,
+	"原价":    18,
 }
 
 // ImportResult represents the result of a batch import operation
@@ -122,6 +132,7 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 			"title", "contractType", "price", "pricingCurrency", "description",
 			"shortDescription", "productType", "tags", "condition", "nsfw",
 			"images", "introVideo", "processingTime", "grams",
+			"quantity", "brand", "weightUnit", "status", "regularPrice",
 		}
 		for i, h := range headers {
 			cell, _ := excelize.CoordinatesToCellName(i+1, 1)
@@ -134,6 +145,7 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 			"Product description here", "Short description",
 			"Electronics,Gadgets", "new,popular", "New", "false",
 			"image1.jpg,image2.png", "intro.mp4", "1-3 days", "500",
+			"100", "BrandName", "g", "published", "129.99",
 		}
 		for i, v := range exampleRow {
 			cell, _ := excelize.CoordinatesToCellName(i+1, 2)
@@ -141,7 +153,7 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 		}
 
 		// Variants sheet headers - selections format: "Option1:Value1,Option2:Value2"
-		variantHeaders := []string{"productTitle", "selections", "price", "quantity", "productID"}
+		variantHeaders := []string{"productTitle", "selections", "price", "quantity", "productID", "barcode"}
 		for i, h := range variantHeaders {
 			cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 			f.SetCellValue(variantsSheet, cell, h)
@@ -149,12 +161,12 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 
 		// Add variant examples - Color x Size combinations
 		variantExamples := [][]interface{}{
-			{"Example Product", "Color:Red,Size:S", "2999", "50", "SKU-RED-S"},
-			{"Example Product", "Color:Red,Size:M", "2999", "60", "SKU-RED-M"},
-			{"Example Product", "Color:Red,Size:L", "3499", "40", "SKU-RED-L"},
-			{"Example Product", "Color:Blue,Size:S", "0", "30", "SKU-BLUE-S"},
-			{"Example Product", "Color:Blue,Size:M", "0", "80", "SKU-BLUE-M"},
-			{"Example Product", "Color:Blue,Size:L", "10", "25", "SKU-BLUE-L"},
+			{"Example Product", "Color:Red,Size:S", "2999", "50", "SKU-RED-S", ""},
+			{"Example Product", "Color:Red,Size:M", "2999", "60", "SKU-RED-M", ""},
+			{"Example Product", "Color:Red,Size:L", "3499", "40", "SKU-RED-L", ""},
+			{"Example Product", "Color:Blue,Size:S", "0", "30", "SKU-BLUE-S", ""},
+			{"Example Product", "Color:Blue,Size:M", "0", "80", "SKU-BLUE-M", ""},
+			{"Example Product", "Color:Blue,Size:L", "10", "25", "SKU-BLUE-L", ""},
 		}
 		for rowIdx, example := range variantExamples {
 			for colIdx, v := range example {
@@ -166,8 +178,9 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 		// Chinese headers
 		headers := []string{
 			"商品标题", "商品类型", "价格", "定价货币", "详细描述",
-			"简短描述", "分类", "标签", "商品状态", "成人内容",
+			"简短描述", "分类", "标签", "新旧状态", "成人内容",
 			"图片文件名", "介绍视频", "处理时间", "重量(克)",
+			"库存数量", "品牌", "重量单位", "发布状态", "原价",
 		}
 		for i, h := range headers {
 			cell, _ := excelize.CoordinatesToCellName(i+1, 1)
@@ -180,6 +193,7 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 			"商品详细描述", "简短描述",
 			"电子产品,数码", "新品,热门", "New", "false",
 			"image1.jpg,image2.png", "intro.mp4", "1-3天", "500",
+			"100", "品牌名", "g", "published", "129.99",
 		}
 		for i, v := range exampleRow {
 			cell, _ := excelize.CoordinatesToCellName(i+1, 2)
@@ -187,7 +201,7 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 		}
 
 		// Variants sheet headers - selections format: "选项1:值1,选项2:值2"
-		variantHeaders := []string{"关联商品标题", "选项组合", "价格", "库存数量", "SKU编号"}
+		variantHeaders := []string{"关联商品标题", "选项组合", "价格", "库存数量", "SKU编号", "条码"}
 		for i, h := range variantHeaders {
 			cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 			f.SetCellValue(variantsSheet, cell, h)
@@ -195,12 +209,12 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 
 		// Add variant examples - 颜色 x 尺码 组合
 		variantExamples := [][]interface{}{
-			{"示例商品", "颜色:红色,尺码:S", "0", "50", "SKU-RED-S"},
-			{"示例商品", "颜色:红色,尺码:M", "0", "60", "SKU-RED-M"},
-			{"示例商品", "颜色:红色,尺码:L", "10", "40", "SKU-RED-L"},
-			{"示例商品", "颜色:蓝色,尺码:S", "0", "30", "SKU-BLUE-S"},
-			{"示例商品", "颜色:蓝色,尺码:M", "0", "80", "SKU-BLUE-M"},
-			{"示例商品", "颜色:蓝色,尺码:L", "10", "25", "SKU-BLUE-L"},
+			{"示例商品", "颜色:红色,尺码:S", "0", "50", "SKU-RED-S", ""},
+			{"示例商品", "颜色:红色,尺码:M", "0", "60", "SKU-RED-M", ""},
+			{"示例商品", "颜色:红色,尺码:L", "10", "40", "SKU-RED-L", ""},
+			{"示例商品", "颜色:蓝色,尺码:S", "0", "30", "SKU-BLUE-S", ""},
+			{"示例商品", "颜色:蓝色,尺码:M", "0", "80", "SKU-BLUE-M", ""},
+			{"示例商品", "颜色:蓝色,尺码:L", "10", "25", "SKU-BLUE-L", ""},
 		}
 		for rowIdx, example := range variantExamples {
 			for colIdx, v := range example {
@@ -211,7 +225,7 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Set column widths for better readability
-	f.SetColWidth(productsSheet, "A", "N", 18)
+	f.SetColWidth(productsSheet, "A", "S", 18)
 	f.SetColWidth(variantsSheet, "A", "F", 18)
 
 	// Create header style
@@ -219,7 +233,7 @@ func (g *Gateway) handleGETListingsTemplate(w http.ResponseWriter, r *http.Reque
 		Font: &excelize.Font{Bold: true},
 		Fill: excelize.Fill{Type: "pattern", Color: []string{"#E0E0E0"}, Pattern: 1},
 	})
-	f.SetCellStyle(productsSheet, "A1", "N1", style)
+	f.SetCellStyle(productsSheet, "A1", "S1", style)
 	f.SetCellStyle(variantsSheet, "A1", "F1", style)
 
 	// Write to response
@@ -430,6 +444,14 @@ func (g *Gateway) processListingsImport(listingSvc contracts.ListingService, med
 		// Process variants
 		g.processListingVariants(listing, listing.Item.Title, variants)
 
+		// For non-variant items, set quantity via a default SKU if provided
+		quantityStr := g.getCellValue(row, columns["quantity"])
+		if quantityStr != "" && len(listing.Item.Skus) == 0 {
+			listing.Item.Skus = append(listing.Item.Skus, &pb.Listing_Item_Sku{
+				Quantity: quantityStr,
+			})
+		}
+
 		// Validate: at least one image is required
 		if len(listing.Item.Images) == 0 {
 			result.Errors = append(result.Errors, ImportError{
@@ -522,14 +544,19 @@ func (g *Gateway) normalizeColumnName(name string, lang string) string {
 		"定价货币":  "pricingCurrency",
 		"详细描述":  "description",
 		"简短描述":  "shortDescription",
-		"产品分类":  "productType",
+		"分类":    "productType",
 		"标签":    "tags",
-		"商品状态":  "condition",
+		"新旧状态":  "condition",
 		"成人内容":  "nsfw",
 		"图片文件名": "images",
 		"介绍视频":  "introVideo",
 		"处理时间":  "processingTime",
 		"重量(克)": "grams",
+		"库存数量":  "quantity",
+		"品牌":    "brand",
+		"重量单位":  "weightUnit",
+		"发布状态":  "status",
+		"原价":    "regularPrice",
 	}
 
 	if en, ok := mapping[name]; ok {
@@ -587,6 +614,23 @@ func (g *Gateway) parseListingRow(row []string, columns map[string]int, lang str
 		}
 	}
 
+	// Parse optional new fields
+	brand := strings.TrimSpace(g.getCellValue(row, columns["brand"]))
+	weightUnit := strings.TrimSpace(g.getCellValue(row, columns["weightUnit"]))
+	status := strings.TrimSpace(g.getCellValue(row, columns["status"]))
+	if status == "" {
+		status = "published"
+	}
+
+	var regularPriceInt string
+	regularPriceStr := g.getCellValue(row, columns["regularPrice"])
+	if regularPriceStr != "" {
+		rp, rpErr := g.convertPriceToInt(regularPriceStr, 2)
+		if rpErr == nil {
+			regularPriceInt = rp
+		}
+	}
+
 	listing := &pb.Listing{
 		Metadata: &pb.Listing_Metadata{
 			ContractType: contractType,
@@ -595,19 +639,23 @@ func (g *Gateway) parseListingRow(row []string, columns map[string]int, lang str
 				Code:         strings.ToUpper(currency),
 				Divisibility: 2,
 			},
-			Expiry: timestamppb.New(time.Date(2037, 12, 31, 0, 0, 0, 0, time.UTC)), // "Never" expire (before 2038 unix bug)
+			Expiry: timestamppb.New(time.Date(2037, 12, 31, 0, 0, 0, 0, time.UTC)),
 		},
+		Status: status,
 		Item: &pb.Listing_Item{
 			Title:            title,
 			Description:      g.getCellValue(row, columns["description"]),
 			ShortDescription: g.getCellValue(row, columns["shortDescription"]),
-			Price:            priceInt, // Integer string (e.g., "9999" for $99.99)
+			Price:            priceInt,
+			RegularPrice:     regularPriceInt,
 			Condition:        g.getCellValue(row, columns["condition"]),
 			ProcessingTime:   g.getCellValue(row, columns["processingTime"]),
 			Nsfw:             nsfw,
 			ProductType:      productType,
 			Tags:             tags,
 			Grams:            grams,
+			Brand:            brand,
+			WeightUnit:       weightUnit,
 		},
 	}
 
@@ -759,6 +807,7 @@ type VariantData struct {
 	Price        string      // 变体绝对价格（Shopify 风格）
 	Quantity     string
 	ProductID    string
+	Barcode      string
 }
 
 // parseSelections parses "Color:Red,Size:S" format into []Selection
@@ -806,6 +855,8 @@ func (g *Gateway) readVariants(xlsx *excelize.File, sheetName string, lang strin
 			columns["quantity"] = i
 		case "productID", "SKU编号":
 			columns["productID"] = i
+		case "barcode", "条码":
+			columns["barcode"] = i
 		}
 	}
 
@@ -824,6 +875,7 @@ func (g *Gateway) readVariants(xlsx *excelize.File, sheetName string, lang strin
 			Price:        g.getCellValue(row, columns["price"]),
 			Quantity:     g.getCellValue(row, columns["quantity"]),
 			ProductID:    g.getCellValue(row, columns["productID"]),
+			Barcode:      g.getCellValue(row, columns["barcode"]),
 		}
 
 		if variant.ProductTitle != "" && len(variant.Selections) > 0 {
@@ -896,6 +948,7 @@ func (g *Gateway) processListingVariants(listing *pb.Listing, productTitle strin
 			ProductID:  v.ProductID,
 			Price:      skuPrice,
 			Quantity:   v.Quantity,
+			Barcode:    v.Barcode,
 			Selections: selections,
 		}
 

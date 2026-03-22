@@ -19,6 +19,8 @@ type Profile struct {
 	Moderator bool `json:"moderator"`
 	Private   bool `json:"private"`
 
+	StorePaused bool `json:"storePaused"`
+
 	ModeratorInfo *ModeratorInfo      `json:"moderatorInfo,omitempty"`
 	ContactInfo   *ProfileContactInfo `json:"contactInfo,omitempty"`
 

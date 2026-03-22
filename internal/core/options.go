@@ -343,6 +343,7 @@ func (n *MobazhaNode) initOrderService() {
 		Escrow:     n.paymentService,
 		Listings:   n.listingService,
 		Moderators: n.moderationService,
+		Profiles:   n.profileService,
 
 		DiscountResolver:           n.buildDiscountResolver(),
 		DiscountRedemptionRecorder: n.buildDiscountRecorder(),

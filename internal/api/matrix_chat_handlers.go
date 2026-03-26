@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 )
 
@@ -433,6 +434,45 @@ func (g *Gateway) handleGETMatrixChatPresence(w http.ResponseWriter, r *http.Req
 	responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "presence not yet implemented")
 }
 
+func (g *Gateway) handleGETMatrixChatSettings(w http.ResponseWriter, r *http.Request) {
+	svc := getMatrixChatService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
+		return
+	}
+	settings, err := svc.GetChatSettings(r.Context())
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	responsePkg.Success(w, settings)
+}
+
+func (g *Gateway) handlePUTMatrixChatSettings(w http.ResponseWriter, r *http.Request) {
+	svc := getMatrixChatService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
+		return
+	}
+
+	var req struct {
+		InvitePolicy string `json:"invitePolicy"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid request body")
+		return
+	}
+
+	settings := &contracts.ChatSettings{
+		InvitePolicy: contracts.InvitePolicy(req.InvitePolicy),
+	}
+	if err := svc.SetChatSettings(r.Context(), settings); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
+		return
+	}
+	responsePkg.Success(w, settings)
+}
+
 func (g *Gateway) handleGETMatrixChatStatus(w http.ResponseWriter, r *http.Request) {
 	svc := getMatrixChatService(r)
 	if svc == nil {
@@ -444,4 +484,105 @@ func (g *Gateway) handleGETMatrixChatStatus(w http.ResponseWriter, r *http.Reque
 	}
 	status := svc.GetStatus()
 	responsePkg.Success(w, status)
+}
+
+// ===================== Verification Handlers =====================
+
+func (g *Gateway) handlePOSTMatrixChatVerificationRequest(w http.ResponseWriter, r *http.Request) {
+	svc := getMatrixChatService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
+		return
+	}
+
+	var req struct {
+		UserID string `json:"userId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid request body")
+		return
+	}
+	if req.UserID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "userId is required")
+		return
+	}
+
+	txnID, err := svc.StartVerification(r.Context(), req.UserID)
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	responsePkg.Created(w, map[string]string{"transactionId": txnID})
+}
+
+func (g *Gateway) handlePOSTMatrixChatVerificationAccept(w http.ResponseWriter, r *http.Request) {
+	svc := getMatrixChatService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
+		return
+	}
+	txnID := mux.Vars(r)["txnId"]
+	if txnID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "txnId is required")
+		return
+	}
+	if err := svc.AcceptVerification(r.Context(), txnID); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	responsePkg.NoContent(w)
+}
+
+func (g *Gateway) handlePOSTMatrixChatVerificationStartSAS(w http.ResponseWriter, r *http.Request) {
+	svc := getMatrixChatService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
+		return
+	}
+	txnID := mux.Vars(r)["txnId"]
+	if txnID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "txnId is required")
+		return
+	}
+	if err := svc.StartSAS(r.Context(), txnID); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	responsePkg.NoContent(w)
+}
+
+func (g *Gateway) handlePOSTMatrixChatVerificationConfirm(w http.ResponseWriter, r *http.Request) {
+	svc := getMatrixChatService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
+		return
+	}
+	txnID := mux.Vars(r)["txnId"]
+	if txnID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "txnId is required")
+		return
+	}
+	if err := svc.ConfirmSAS(r.Context(), txnID); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	responsePkg.NoContent(w)
+}
+
+func (g *Gateway) handlePOSTMatrixChatVerificationCancel(w http.ResponseWriter, r *http.Request) {
+	svc := getMatrixChatService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
+		return
+	}
+	txnID := mux.Vars(r)["txnId"]
+	if txnID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "txnId is required")
+		return
+	}
+	if err := svc.CancelVerification(r.Context(), txnID); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	responsePkg.NoContent(w)
 }

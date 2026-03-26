@@ -25,6 +25,7 @@ import (
 	"maunium.net/go/mautrix"
 	mxcrypto "maunium.net/go/mautrix/crypto"
 	"maunium.net/go/mautrix/crypto/cryptohelper"
+	"maunium.net/go/mautrix/crypto/verificationhelper"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 )
@@ -76,6 +77,10 @@ type mautrixChatService struct {
 	lastActivity atomic.Int64
 	parentCtx    context.Context
 	idleCancel   context.CancelFunc
+
+	chatSettings contracts.ChatSettings
+
+	verifyHelper *verificationhelper.VerificationHelper
 
 	mu sync.RWMutex
 }
@@ -223,7 +228,19 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 	}
 	log.Infof("Matrix crypto initialized: user=%s device=%s dbDSN=%s ShareKeysMinTrust=CrossSignedTOFU", s.client.UserID, s.client.DeviceID, dbDSN)
 
+	vh := verificationhelper.NewVerificationHelper(
+		s.client, mach, nil, &verificationCallbacks{svc: s},
+		false, false, true,
+	)
+	if err := vh.Init(ctx); err != nil {
+		log.Warningf("Failed to init verification helper: %v (verification features unavailable)", err)
+	} else {
+		s.verifyHelper = vh
+		s.client.Verification = vh
+	}
+
 	s.registerEventHandlers()
+	s.loadChatSettings(ctx)
 
 	s.parentCtx = context.Background()
 	s.syncCtx, s.syncCancel = context.WithCancel(s.parentCtx)
@@ -555,14 +572,8 @@ func (s *mautrixChatService) registerEventHandlers() {
 	syncer.OnEventType(event.StateMember, func(ctx context.Context, evt *event.Event) {
 		content := evt.Content.AsMember()
 		log.Infof("StateMember: room=%s sender=%s stateKey=%s membership=%s", evt.RoomID, evt.Sender, evt.GetStateKey(), content.Membership)
-		if content.Membership == event.MembershipInvite {
-			s.broadcast(contracts.MatrixChatEvent{
-				Type: "chat.invite",
-				Data: map[string]string{
-					"roomId":  evt.RoomID.String(),
-					"inviter": evt.Sender.String(),
-				},
-			})
+		if content.Membership == event.MembershipInvite && evt.GetStateKey() == s.client.UserID.String() {
+			s.handleInvite(ctx, evt)
 		}
 		s.broadcast(contracts.MatrixChatEvent{
 			Type: "chat.room_member",
@@ -805,6 +816,257 @@ func synapseRegistrationMAC(nonce, username, password string, admin bool, secret
 	h := hmac.New(sha1.New, []byte(secret))
 	h.Write([]byte(msg))
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// --- Chat Settings (Invite Policy) ---
+
+const chatSettingsAccountDataType = "org.mobazha.chat_settings"
+
+// loadChatSettings loads persisted settings from Matrix account data.
+// Failures are non-fatal; defaults to auto_mobazha.
+func (s *mautrixChatService) loadChatSettings(ctx context.Context) {
+	s.chatSettings = contracts.ChatSettings{InvitePolicy: contracts.InvitePolicyAutoMobazha}
+
+	var raw map[string]interface{}
+	err := s.client.GetAccountData(ctx, chatSettingsAccountDataType, &raw)
+	if err != nil {
+		log.Debugf("No persisted chat settings, using defaults: %v", err)
+		return
+	}
+
+	if policy, ok := raw["invitePolicy"].(string); ok {
+		switch contracts.InvitePolicy(policy) {
+		case contracts.InvitePolicyAutoAll, contracts.InvitePolicyAutoMobazha, contracts.InvitePolicyAlwaysConfirm:
+			s.chatSettings.InvitePolicy = contracts.InvitePolicy(policy)
+		}
+	}
+	log.Infof("Loaded chat settings: invitePolicy=%s", s.chatSettings.InvitePolicy)
+}
+
+func (s *mautrixChatService) GetChatSettings(ctx context.Context) (*contracts.ChatSettings, error) {
+	if err := s.ensureReady(ctx); err != nil {
+		return nil, err
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	cp := s.chatSettings
+	return &cp, nil
+}
+
+func (s *mautrixChatService) SetChatSettings(ctx context.Context, settings *contracts.ChatSettings) error {
+	if err := s.ensureReady(ctx); err != nil {
+		return err
+	}
+	s.touchActivity()
+
+	switch settings.InvitePolicy {
+	case contracts.InvitePolicyAutoAll, contracts.InvitePolicyAutoMobazha, contracts.InvitePolicyAlwaysConfirm:
+	default:
+		return fmt.Errorf("invalid invite policy: %s", settings.InvitePolicy)
+	}
+
+	err := s.client.SetAccountData(ctx, chatSettingsAccountDataType, map[string]interface{}{
+		"invitePolicy": string(settings.InvitePolicy),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to persist chat settings: %w", err)
+	}
+
+	s.mu.Lock()
+	s.chatSettings = *settings
+	s.mu.Unlock()
+
+	log.Infof("Chat settings updated: invitePolicy=%s", settings.InvitePolicy)
+	return nil
+}
+
+// handleInvite applies the invite policy when the node user is invited to a room.
+func (s *mautrixChatService) handleInvite(ctx context.Context, evt *event.Event) {
+	roomID := evt.RoomID.String()
+	inviter := evt.Sender.String()
+
+	s.mu.RLock()
+	policy := s.chatSettings.InvitePolicy
+	s.mu.RUnlock()
+
+	switch policy {
+	case contracts.InvitePolicyAutoAll:
+		go s.autoJoinInvite(roomID, inviter)
+		return
+
+	case contracts.InvitePolicyAutoMobazha:
+		if isMobazhaUser(inviter) {
+			go s.autoJoinInvite(roomID, inviter)
+			return
+		}
+	}
+
+	s.broadcast(contracts.MatrixChatEvent{
+		Type: "chat.invite",
+		Data: map[string]string{
+			"roomId":  roomID,
+			"inviter": inviter,
+		},
+	})
+}
+
+func (s *mautrixChatService) autoJoinInvite(roomID, inviter string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	_, err := s.client.JoinRoomByID(ctx, id.RoomID(roomID))
+	if err != nil {
+		log.Warningf("Auto-join room %s from %s failed: %v", roomID, inviter, err)
+		return
+	}
+	log.Infof("Auto-joined room %s (invited by %s)", roomID, inviter)
+}
+
+// isMobazhaUser checks if a Matrix user ID follows the Mobazha naming convention (@peer_xxx:server).
+func isMobazhaUser(userID string) bool {
+	// Strip leading '@' then check localpart prefix
+	if len(userID) > 1 && userID[0] == '@' {
+		localpart := userID[1:]
+		idx := strings.Index(localpart, ":")
+		if idx > 0 {
+			localpart = localpart[:idx]
+		}
+		return strings.HasPrefix(localpart, "peer_")
+	}
+	return false
+}
+
+// ===================== SAS Verification =====================
+
+// verificationCallbacks bridges mautrix-go VerificationHelper callbacks to
+// WebSocket events so the frontend can drive the interactive SAS flow.
+type verificationCallbacks struct {
+	svc *mautrixChatService
+}
+
+var _ verificationhelper.RequiredCallbacks = (*verificationCallbacks)(nil)
+var _ verificationhelper.ShowSASCallbacks = (*verificationCallbacks)(nil)
+
+func (c *verificationCallbacks) VerificationRequested(_ context.Context, txnID id.VerificationTransactionID, from id.UserID, fromDevice id.DeviceID) {
+	c.svc.broadcast(contracts.MatrixChatEvent{
+		Type: "chat.verification.request",
+		Data: map[string]string{
+			"transactionId": string(txnID),
+			"userId":        from.String(),
+			"deviceId":      fromDevice.String(),
+		},
+	})
+}
+
+func (c *verificationCallbacks) VerificationReady(_ context.Context, txnID id.VerificationTransactionID, otherDeviceID id.DeviceID, supportsSAS, _ bool, _ *verificationhelper.QRCode) {
+	c.svc.broadcast(contracts.MatrixChatEvent{
+		Type: "chat.verification.ready",
+		Data: map[string]interface{}{
+			"transactionId": string(txnID),
+			"deviceId":      otherDeviceID.String(),
+			"supportsSAS":   supportsSAS,
+		},
+	})
+}
+
+func (c *verificationCallbacks) VerificationCancelled(_ context.Context, txnID id.VerificationTransactionID, code event.VerificationCancelCode, reason string) {
+	c.svc.broadcast(contracts.MatrixChatEvent{
+		Type: "chat.verification.cancelled",
+		Data: map[string]string{
+			"transactionId": string(txnID),
+			"code":          string(code),
+			"reason":        reason,
+		},
+	})
+}
+
+func (c *verificationCallbacks) VerificationDone(_ context.Context, txnID id.VerificationTransactionID, _ event.VerificationMethod) {
+	c.svc.broadcast(contracts.MatrixChatEvent{
+		Type: "chat.verification.done",
+		Data: map[string]string{
+			"transactionId": string(txnID),
+		},
+	})
+}
+
+func (c *verificationCallbacks) ShowSAS(_ context.Context, txnID id.VerificationTransactionID, emojis []rune, emojiDescriptions []string, decimals []int) {
+	emojiList := make([]map[string]interface{}, len(emojis))
+	for i, e := range emojis {
+		desc := ""
+		if i < len(emojiDescriptions) {
+			desc = emojiDescriptions[i]
+		}
+		emojiList[i] = map[string]interface{}{
+			"emoji":       string(e),
+			"description": desc,
+		}
+	}
+	c.svc.broadcast(contracts.MatrixChatEvent{
+		Type: "chat.verification.show_sas",
+		Data: map[string]interface{}{
+			"transactionId": string(txnID),
+			"emojis":        emojiList,
+			"decimals":      decimals,
+		},
+	})
+}
+
+func (s *mautrixChatService) StartVerification(ctx context.Context, userID string) (string, error) {
+	if err := s.ensureReady(ctx); err != nil {
+		return "", err
+	}
+	if s.verifyHelper == nil {
+		return "", fmt.Errorf("verification not available")
+	}
+	txnID, err := s.verifyHelper.StartVerification(ctx, id.UserID(userID))
+	if err != nil {
+		return "", fmt.Errorf("failed to start verification: %w", err)
+	}
+	s.touchActivity()
+	return string(txnID), nil
+}
+
+func (s *mautrixChatService) AcceptVerification(ctx context.Context, txnID string) error {
+	if err := s.ensureReady(ctx); err != nil {
+		return err
+	}
+	if s.verifyHelper == nil {
+		return fmt.Errorf("verification not available")
+	}
+	s.touchActivity()
+	return s.verifyHelper.AcceptVerification(ctx, id.VerificationTransactionID(txnID))
+}
+
+func (s *mautrixChatService) StartSAS(ctx context.Context, txnID string) error {
+	if err := s.ensureReady(ctx); err != nil {
+		return err
+	}
+	if s.verifyHelper == nil {
+		return fmt.Errorf("verification not available")
+	}
+	s.touchActivity()
+	return s.verifyHelper.StartSAS(ctx, id.VerificationTransactionID(txnID))
+}
+
+func (s *mautrixChatService) ConfirmSAS(ctx context.Context, txnID string) error {
+	if err := s.ensureReady(ctx); err != nil {
+		return err
+	}
+	if s.verifyHelper == nil {
+		return fmt.Errorf("verification not available")
+	}
+	s.touchActivity()
+	return s.verifyHelper.ConfirmSAS(ctx, id.VerificationTransactionID(txnID))
+}
+
+func (s *mautrixChatService) CancelVerification(ctx context.Context, txnID string) error {
+	if err := s.ensureReady(ctx); err != nil {
+		return err
+	}
+	if s.verifyHelper == nil {
+		return fmt.Errorf("verification not available")
+	}
+	s.touchActivity()
+	return s.verifyHelper.CancelVerification(ctx, id.VerificationTransactionID(txnID), event.VerificationCancelCodeUser, "user cancelled")
 }
 
 // Ensure mautrixChatService implements contracts.MatrixChatService.

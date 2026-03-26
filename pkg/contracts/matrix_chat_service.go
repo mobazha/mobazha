@@ -80,6 +80,27 @@ type MatrixChatService interface {
 	// Returns the reader, content type, and content length.
 	DownloadMedia(ctx context.Context, serverName, mediaID string) (io.ReadCloser, string, int64, error)
 
+	// --- Settings ---
+
+	// GetChatSettings returns the current chat settings (invite policy, etc.).
+	GetChatSettings(ctx context.Context) (*ChatSettings, error)
+	// SetChatSettings updates chat settings and persists to Matrix account data.
+	SetChatSettings(ctx context.Context, settings *ChatSettings) error
+
+	// --- Verification ---
+
+	// StartVerification sends a verification request to the given Matrix user.
+	// Returns the transaction ID for tracking the verification flow.
+	StartVerification(ctx context.Context, userID string) (string, error)
+	// AcceptVerification accepts an incoming verification request.
+	AcceptVerification(ctx context.Context, txnID string) error
+	// StartSAS initiates the SAS (emoji) verification for an accepted transaction.
+	StartSAS(ctx context.Context, txnID string) error
+	// ConfirmSAS confirms the displayed SAS emoji/decimals match.
+	ConfirmSAS(ctx context.Context, txnID string) error
+	// CancelVerification cancels a pending or in-progress verification.
+	CancelVerification(ctx context.Context, txnID string) error
+
 	// --- Status ---
 
 	// GetStatus returns the current connection status.
@@ -139,6 +160,20 @@ type MatrixMediaInfo struct {
 type MatrixChatEvent struct {
 	Type string      `json:"type"` // "chat.message", "chat.typing", "chat.read_receipt", etc.
 	Data interface{} `json:"data"`
+}
+
+// InvitePolicy controls how room invitations are handled.
+type InvitePolicy string
+
+const (
+	InvitePolicyAutoAll      InvitePolicy = "auto_all"
+	InvitePolicyAutoMobazha  InvitePolicy = "auto_mobazha"
+	InvitePolicyAlwaysConfirm InvitePolicy = "always_confirm"
+)
+
+// ChatSettings holds user-configurable chat preferences.
+type ChatSettings struct {
+	InvitePolicy InvitePolicy `json:"invitePolicy"`
 }
 
 // MatrixChatStatus represents the connection status.

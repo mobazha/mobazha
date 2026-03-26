@@ -433,6 +433,167 @@ func TestTouchActivity_UpdatesTimestamp(t *testing.T) {
 	}
 }
 
+// ──────────────────── ChatSettings cache ─────────────────────────────────────
+
+func TestGetChatSettings_ReturnsDefaultWhenUnset(t *testing.T) {
+	s := newTestService()
+	s.ready.Store(true)
+
+	settings, err := s.GetChatSettings(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if settings.InvitePolicy != "" {
+		t.Errorf("expected empty default policy, got %q", settings.InvitePolicy)
+	}
+}
+
+func TestGetChatSettings_ReturnsStoredValue(t *testing.T) {
+	s := newTestService()
+	s.ready.Store(true)
+	s.chatSettings = contracts.ChatSettings{InvitePolicy: contracts.InvitePolicyAutoAll}
+
+	settings, err := s.GetChatSettings(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if settings.InvitePolicy != contracts.InvitePolicyAutoAll {
+		t.Errorf("expected auto_all, got %q", settings.InvitePolicy)
+	}
+}
+
+func TestGetChatSettings_ReturnsCopy(t *testing.T) {
+	s := newTestService()
+	s.ready.Store(true)
+	s.chatSettings = contracts.ChatSettings{InvitePolicy: contracts.InvitePolicyAutoMobazha}
+
+	settings, err := s.GetChatSettings(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	settings.InvitePolicy = contracts.InvitePolicyAutoAll
+	if s.chatSettings.InvitePolicy != contracts.InvitePolicyAutoMobazha {
+		t.Error("GetChatSettings should return a copy; original was mutated")
+	}
+}
+
+func TestGetChatSettings_FailsWhenNotReady(t *testing.T) {
+	s := newTestService()
+	s.ready.Store(false)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	_, err := s.GetChatSettings(ctx)
+	if err == nil {
+		t.Fatal("expected error when service not ready")
+	}
+}
+
+// ──────────────────── Verification callbacks broadcast ────────────────────────
+
+func TestVerificationCallbacks_BroadcastsRequestEvent(t *testing.T) {
+	s := newTestService()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := s.Subscribe(ctx)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+
+	cb := &verificationCallbacks{svc: s}
+	cb.VerificationRequested(context.Background(), id.VerificationTransactionID("txn_001"), id.UserID("@alice:test"), id.DeviceID("DEVICE_A"))
+
+	select {
+	case evt := <-ch:
+		if evt.Type != "chat.verification.request" {
+			t.Errorf("expected chat.verification.request, got %s", evt.Type)
+		}
+		data, ok := evt.Data.(map[string]string)
+		if !ok {
+			t.Fatalf("expected map[string]string, got %T", evt.Data)
+		}
+		if data["transactionId"] != "txn_001" {
+			t.Errorf("transactionId: got %s", data["transactionId"])
+		}
+		if data["userId"] != "@alice:test" {
+			t.Errorf("userId: got %s", data["userId"])
+		}
+		if data["deviceId"] != "DEVICE_A" {
+			t.Errorf("deviceId: got %s", data["deviceId"])
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for verification request event")
+	}
+}
+
+func TestVerificationCallbacks_BroadcastsDoneEvent(t *testing.T) {
+	s := newTestService()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := s.Subscribe(ctx)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+
+	cb := &verificationCallbacks{svc: s}
+	cb.VerificationDone(context.Background(), id.VerificationTransactionID("txn_002"), "")
+
+	select {
+	case evt := <-ch:
+		if evt.Type != "chat.verification.done" {
+			t.Errorf("expected chat.verification.done, got %s", evt.Type)
+		}
+		data, ok := evt.Data.(map[string]string)
+		if !ok {
+			t.Fatalf("expected map[string]string, got %T", evt.Data)
+		}
+		if data["transactionId"] != "txn_002" {
+			t.Errorf("transactionId: got %s", data["transactionId"])
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for verification done event")
+	}
+}
+
+func TestVerificationCallbacks_BroadcastsCancelledEvent(t *testing.T) {
+	s := newTestService()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch, err := s.Subscribe(ctx)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+
+	cb := &verificationCallbacks{svc: s}
+	cb.VerificationCancelled(context.Background(), id.VerificationTransactionID("txn_003"), event.VerificationCancelCode("m.user"), "User cancelled")
+
+	select {
+	case evt := <-ch:
+		if evt.Type != "chat.verification.cancelled" {
+			t.Errorf("expected chat.verification.cancelled, got %s", evt.Type)
+		}
+		data, ok := evt.Data.(map[string]string)
+		if !ok {
+			t.Fatalf("expected map[string]string, got %T", evt.Data)
+		}
+		if data["transactionId"] != "txn_003" {
+			t.Errorf("transactionId: got %s", data["transactionId"])
+		}
+		if data["code"] != "m.user" {
+			t.Errorf("code: got %s", data["code"])
+		}
+		if data["reason"] != "User cancelled" {
+			t.Errorf("reason: got %s", data["reason"])
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for verification cancelled event")
+	}
+}
+
 // ──────────────────── Concurrent safety ─────────────────────────────────────
 
 func TestSubscribeBroadcast_ConcurrentSafety(t *testing.T) {

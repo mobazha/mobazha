@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -147,6 +148,44 @@ func (m *mockMatrixChatService) DownloadMedia(_ context.Context, _, _ string) (i
 	return body, "image/png", 16, m.err
 }
 
+func (m *mockMatrixChatService) GetChatSettings(_ context.Context) (*contracts.ChatSettings, error) {
+	return &contracts.ChatSettings{InvitePolicy: contracts.InvitePolicyAutoMobazha}, m.err
+}
+
+func (m *mockMatrixChatService) SetChatSettings(_ context.Context, _ *contracts.ChatSettings) error {
+	return m.err
+}
+
+func (m *mockMatrixChatService) StartVerification(_ context.Context, userID string) (string, error) {
+	m.lastCall = "StartVerification"
+	m.lastArgs = map[string]interface{}{"userID": userID}
+	return "txn_123", m.err
+}
+
+func (m *mockMatrixChatService) AcceptVerification(_ context.Context, txnID string) error {
+	m.lastCall = "AcceptVerification"
+	m.lastArgs = map[string]interface{}{"txnID": txnID}
+	return m.err
+}
+
+func (m *mockMatrixChatService) StartSAS(_ context.Context, txnID string) error {
+	m.lastCall = "StartSAS"
+	m.lastArgs = map[string]interface{}{"txnID": txnID}
+	return m.err
+}
+
+func (m *mockMatrixChatService) ConfirmSAS(_ context.Context, txnID string) error {
+	m.lastCall = "ConfirmSAS"
+	m.lastArgs = map[string]interface{}{"txnID": txnID}
+	return m.err
+}
+
+func (m *mockMatrixChatService) CancelVerification(_ context.Context, txnID string) error {
+	m.lastCall = "CancelVerification"
+	m.lastArgs = map[string]interface{}{"txnID": txnID}
+	return m.err
+}
+
 func (m *mockMatrixChatService) GetStatus() contracts.MatrixChatStatus {
 	return contracts.MatrixChatStatus{Connected: true, SyncRunning: true, UserID: "@peer_abc:matrix.mobazha.org"}
 }
@@ -188,6 +227,13 @@ func newTestRouterWithChatMock(chatSvc *mockMatrixChatService) (*mux.Router, *Ga
 	r.HandleFunc("/v1/chat/rooms/{roomID}/settings", g.handleGETMatrixChatRoomSettings).Methods("GET")
 	r.HandleFunc("/v1/chat/rooms/{roomID}/settings", g.handlePUTMatrixChatRoomSettings).Methods("PUT")
 	r.HandleFunc("/v1/chat/media/{serverName}/{mediaID}", g.handleGETMatrixChatMediaDownload).Methods("GET")
+	r.HandleFunc("/v1/chat/settings", g.handleGETMatrixChatSettings).Methods("GET")
+	r.HandleFunc("/v1/chat/settings", g.handlePUTMatrixChatSettings).Methods("PUT")
+	r.HandleFunc("/v1/chat/verification/request", g.handlePOSTMatrixChatVerificationRequest).Methods("POST")
+	r.HandleFunc("/v1/chat/verification/{txnId}/accept", g.handlePOSTMatrixChatVerificationAccept).Methods("POST")
+	r.HandleFunc("/v1/chat/verification/{txnId}/start-sas", g.handlePOSTMatrixChatVerificationStartSAS).Methods("POST")
+	r.HandleFunc("/v1/chat/verification/{txnId}/confirm", g.handlePOSTMatrixChatVerificationConfirm).Methods("POST")
+	r.HandleFunc("/v1/chat/verification/{txnId}/cancel", g.handlePOSTMatrixChatVerificationCancel).Methods("POST")
 
 	return r, g
 }
@@ -748,5 +794,229 @@ func TestMatrixChat_GetStatus_ServiceUnavailable(t *testing.T) {
 	}
 	if resp.Data["connected"] != false {
 		t.Errorf("expected connected=false when service nil, got %v", resp.Data["connected"])
+	}
+}
+
+// ===================== Chat Settings Tests (F-002) =====================
+
+func TestMatrixChat_GetSettings(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("GET", "/v1/chat/settings", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Data map[string]interface{} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Data["invitePolicy"] != "auto_mobazha" {
+		t.Errorf("expected invitePolicy=auto_mobazha, got %v", resp.Data["invitePolicy"])
+	}
+}
+
+func TestMatrixChat_PutSettings_ValidPolicy(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"invitePolicy":"auto_all"}`
+	req := httptest.NewRequest("PUT", "/v1/chat/settings", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMatrixChat_PutSettings_InvalidJSON(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("PUT", "/v1/chat/settings", strings.NewReader("{bad"))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400 for bad JSON, got %d", w.Code)
+	}
+}
+
+func TestMatrixChat_PutSettings_ServiceError(t *testing.T) {
+	chatSvc := &mockMatrixChatService{err: fmt.Errorf("invalid invite policy: bad_value")}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"invitePolicy":"bad_value"}`
+	req := httptest.NewRequest("PUT", "/v1/chat/settings", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400 for invalid policy, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// ===================== Verification Handler Tests (F-001) =====================
+
+func TestMatrixChat_VerificationRequest_Success(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"userId":"@alice:test"}`
+	req := httptest.NewRequest("POST", "/v1/chat/verification/request", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 201 {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "StartVerification" {
+		t.Errorf("expected StartVerification, got %s", chatSvc.lastCall)
+	}
+	if chatSvc.lastArgs["userID"] != "@alice:test" {
+		t.Errorf("expected userID @alice:test, got %v", chatSvc.lastArgs["userID"])
+	}
+	var resp struct {
+		Data map[string]string `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Data["transactionId"] != "txn_123" {
+		t.Errorf("expected transactionId=txn_123, got %s", resp.Data["transactionId"])
+	}
+}
+
+func TestMatrixChat_VerificationRequest_EmptyUserID(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"userId":""}`
+	req := httptest.NewRequest("POST", "/v1/chat/verification/request", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400 for empty userId, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMatrixChat_VerificationRequest_MissingBody(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("POST", "/v1/chat/verification/request", strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400 for missing userId, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMatrixChat_VerificationAccept_Success(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("POST", "/v1/chat/verification/txn_abc/accept", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "AcceptVerification" {
+		t.Errorf("expected AcceptVerification, got %s", chatSvc.lastCall)
+	}
+	if chatSvc.lastArgs["txnID"] != "txn_abc" {
+		t.Errorf("expected txnID=txn_abc, got %v", chatSvc.lastArgs["txnID"])
+	}
+}
+
+func TestMatrixChat_VerificationStartSAS_Success(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("POST", "/v1/chat/verification/txn_abc/start-sas", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "StartSAS" {
+		t.Errorf("expected StartSAS, got %s", chatSvc.lastCall)
+	}
+}
+
+func TestMatrixChat_VerificationConfirm_Success(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("POST", "/v1/chat/verification/txn_abc/confirm", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "ConfirmSAS" {
+		t.Errorf("expected ConfirmSAS, got %s", chatSvc.lastCall)
+	}
+}
+
+func TestMatrixChat_VerificationCancel_Success(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("POST", "/v1/chat/verification/txn_abc/cancel", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "CancelVerification" {
+		t.Errorf("expected CancelVerification, got %s", chatSvc.lastCall)
+	}
+}
+
+func TestMatrixChat_VerificationAccept_ServiceError(t *testing.T) {
+	chatSvc := &mockMatrixChatService{err: fmt.Errorf("verification not found")}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("POST", "/v1/chat/verification/txn_bad/accept", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 500 {
+		t.Fatalf("expected 500 on service error, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMatrixChat_VerificationRequest_ServiceError(t *testing.T) {
+	chatSvc := &mockMatrixChatService{err: fmt.Errorf("user not found")}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"userId":"@unknown:test"}`
+	req := httptest.NewRequest("POST", "/v1/chat/verification/request", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 500 {
+		t.Fatalf("expected 500 on service error, got %d: %s", w.Code, w.Body.String())
 	}
 }

@@ -73,6 +73,19 @@ func (m *bridgeMockChatService) SetAvatar(_ context.Context, _ io.Reader, _ stri
 func (m *bridgeMockChatService) DownloadMedia(_ context.Context, _, _ string) (io.ReadCloser, string, int64, error) {
 	return nil, "", 0, nil
 }
+func (m *bridgeMockChatService) GetChatSettings(context.Context) (*contracts.ChatSettings, error) {
+	return &contracts.ChatSettings{InvitePolicy: contracts.InvitePolicyAutoMobazha}, nil
+}
+func (m *bridgeMockChatService) SetChatSettings(context.Context, *contracts.ChatSettings) error {
+	return nil
+}
+func (m *bridgeMockChatService) StartVerification(context.Context, string) (string, error) {
+	return "", nil
+}
+func (m *bridgeMockChatService) AcceptVerification(context.Context, string) error  { return nil }
+func (m *bridgeMockChatService) StartSAS(context.Context, string) error            { return nil }
+func (m *bridgeMockChatService) ConfirmSAS(context.Context, string) error          { return nil }
+func (m *bridgeMockChatService) CancelVerification(context.Context, string) error  { return nil }
 func (m *bridgeMockChatService) GetStatus() contracts.MatrixChatStatus {
 	return contracts.MatrixChatStatus{Connected: true}
 }

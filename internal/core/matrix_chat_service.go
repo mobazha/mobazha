@@ -354,6 +354,13 @@ func (s *mautrixChatService) resetCryptoDB(ctx context.Context, dbDSN string) er
 		_ = os.Remove(dbPath + suffix)
 	}
 
+	// Reset client's StateStore so NewCryptoHelper creates a fresh managed
+	// state store with properly initialized tables (mx_room_state, mx_user_profile).
+	// Without this, NewCryptoHelper sees the stale StateStore from the previous
+	// init and skips table creation, leaving the new DB without state tables.
+	s.client.StateStore = nil
+	s.client.Store = nil
+
 	cryptoHelper, err := cryptohelper.NewCryptoHelper(s.client, s.pickleKey, dbDSN)
 	if err != nil {
 		return fmt.Errorf("failed to recreate crypto helper: %w", err)
@@ -362,6 +369,7 @@ func (s *mautrixChatService) resetCryptoDB(ctx context.Context, dbDSN string) er
 	if err := s.cryptoHelper.Init(ctx); err != nil {
 		return fmt.Errorf("failed to init fresh crypto helper: %w", err)
 	}
+	s.client.Crypto = s.cryptoHelper
 	log.Infof("Crypto DB reset successful, new device keys established")
 	return nil
 }
@@ -1074,7 +1082,7 @@ func (s *mautrixChatService) StartVerification(ctx context.Context, userID strin
 		return "", err
 	}
 	if s.verifyHelper == nil {
-		return "", fmt.Errorf("verification not available")
+		return "", contracts.ErrVerificationUnavailable
 	}
 	txnID, err := s.verifyHelper.StartVerification(ctx, id.UserID(userID))
 	if err != nil {
@@ -1089,7 +1097,7 @@ func (s *mautrixChatService) AcceptVerification(ctx context.Context, txnID strin
 		return err
 	}
 	if s.verifyHelper == nil {
-		return fmt.Errorf("verification not available")
+		return contracts.ErrVerificationUnavailable
 	}
 	s.touchActivity()
 	return s.verifyHelper.AcceptVerification(ctx, id.VerificationTransactionID(txnID))
@@ -1100,7 +1108,7 @@ func (s *mautrixChatService) StartSAS(ctx context.Context, txnID string) error {
 		return err
 	}
 	if s.verifyHelper == nil {
-		return fmt.Errorf("verification not available")
+		return contracts.ErrVerificationUnavailable
 	}
 	s.touchActivity()
 	return s.verifyHelper.StartSAS(ctx, id.VerificationTransactionID(txnID))
@@ -1111,7 +1119,7 @@ func (s *mautrixChatService) ConfirmSAS(ctx context.Context, txnID string) error
 		return err
 	}
 	if s.verifyHelper == nil {
-		return fmt.Errorf("verification not available")
+		return contracts.ErrVerificationUnavailable
 	}
 	s.touchActivity()
 	return s.verifyHelper.ConfirmSAS(ctx, id.VerificationTransactionID(txnID))
@@ -1122,7 +1130,7 @@ func (s *mautrixChatService) CancelVerification(ctx context.Context, txnID strin
 		return err
 	}
 	if s.verifyHelper == nil {
-		return fmt.Errorf("verification not available")
+		return contracts.ErrVerificationUnavailable
 	}
 	s.touchActivity()
 	return s.verifyHelper.CancelVerification(ctx, id.VerificationTransactionID(txnID), event.VerificationCancelCodeUser, "user cancelled")

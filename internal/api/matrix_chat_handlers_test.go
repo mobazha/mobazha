@@ -44,6 +44,11 @@ func (m *mockMatrixChatService) GetRoom(_ context.Context, roomID string) (*cont
 	return &contracts.MatrixRoom{RoomID: roomID}, m.err
 }
 
+func (m *mockMatrixChatService) GetInvitedRooms(_ context.Context) ([]contracts.MatrixRoom, error) {
+	m.lastCall = "GetInvitedRooms"
+	return nil, m.err
+}
+
 func (m *mockMatrixChatService) CreateDirectRoom(_ context.Context, userID string) (string, error) {
 	m.lastCall = "CreateDirectRoom"
 	m.lastArgs = map[string]interface{}{"userID": userID}

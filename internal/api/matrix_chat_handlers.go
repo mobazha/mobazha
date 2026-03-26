@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -20,6 +21,21 @@ func (g *Gateway) handleGETMatrixChatRooms(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	rooms, err := svc.GetRooms(r.Context())
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	responsePkg.Success(w, rooms)
+}
+
+func (g *Gateway) handleGETMatrixChatInvites(w http.ResponseWriter, r *http.Request) {
+	svc := getMatrixChatService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
+		return
+	}
+
+	rooms, err := svc.GetInvitedRooms(r.Context())
 	if err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 		return
@@ -511,7 +527,9 @@ func (g *Gateway) handleGETMatrixChatMediaDownload(w http.ResponseWriter, r *htt
 	}
 	w.Header().Set("Cache-Control", "private, max-age=86400, immutable")
 	w.WriteHeader(http.StatusOK)
-	io.Copy(w, reader)
+	if _, err := io.Copy(w, reader); err != nil {
+		log.Warningf("media proxy: incomplete copy for %s/%s: %v", serverName, mediaID, err)
+	}
 }
 
 // isValidMatrixServerName validates a Matrix server name for SSRF prevention.
@@ -669,6 +687,10 @@ func (g *Gateway) handlePOSTMatrixChatVerificationRequest(w http.ResponseWriter,
 
 	txnID, err := svc.StartVerification(r.Context(), req.UserID)
 	if err != nil {
+		if errors.Is(err, contracts.ErrVerificationUnavailable) {
+			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, err.Error())
+			return
+		}
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 		return
 	}
@@ -687,6 +709,10 @@ func (g *Gateway) handlePOSTMatrixChatVerificationAccept(w http.ResponseWriter, 
 		return
 	}
 	if err := svc.AcceptVerification(r.Context(), txnID); err != nil {
+		if errors.Is(err, contracts.ErrVerificationUnavailable) {
+			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, err.Error())
+			return
+		}
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 		return
 	}
@@ -705,6 +731,10 @@ func (g *Gateway) handlePOSTMatrixChatVerificationStartSAS(w http.ResponseWriter
 		return
 	}
 	if err := svc.StartSAS(r.Context(), txnID); err != nil {
+		if errors.Is(err, contracts.ErrVerificationUnavailable) {
+			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, err.Error())
+			return
+		}
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 		return
 	}
@@ -723,6 +753,10 @@ func (g *Gateway) handlePOSTMatrixChatVerificationConfirm(w http.ResponseWriter,
 		return
 	}
 	if err := svc.ConfirmSAS(r.Context(), txnID); err != nil {
+		if errors.Is(err, contracts.ErrVerificationUnavailable) {
+			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, err.Error())
+			return
+		}
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 		return
 	}
@@ -741,6 +775,10 @@ func (g *Gateway) handlePOSTMatrixChatVerificationCancel(w http.ResponseWriter, 
 		return
 	}
 	if err := svc.CancelVerification(r.Context(), txnID); err != nil {
+		if errors.Is(err, contracts.ErrVerificationUnavailable) {
+			responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, err.Error())
+			return
+		}
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 		return
 	}

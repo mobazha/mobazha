@@ -2,9 +2,13 @@ package contracts
 
 import (
 	"context"
+	"errors"
 	"io"
 	"time"
 )
+
+// ErrVerificationUnavailable is returned when SAS/device verification is not wired (e.g. no crypto helper).
+var ErrVerificationUnavailable = errors.New("verification not available")
 
 // MatrixChatService provides full Matrix chat capabilities via the node backend.
 // The frontend communicates only through REST API and WebSocket events; all Matrix
@@ -25,6 +29,8 @@ type MatrixChatService interface {
 	GetRooms(ctx context.Context) ([]MatrixRoom, error)
 	// GetRoom returns detailed info for a single room.
 	GetRoom(ctx context.Context, roomID string) (*MatrixRoom, error)
+	// GetInvitedRooms returns rooms where the user has a pending invite.
+	GetInvitedRooms(ctx context.Context) ([]MatrixRoom, error)
 	// CreateDirectRoom creates or retrieves a 1:1 DM room with the given Matrix user.
 	CreateDirectRoom(ctx context.Context, userID string) (string, error)
 	// CreateGroupRoom creates a new group chat room.

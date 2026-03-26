@@ -60,6 +60,60 @@ func (s *mautrixChatService) GetRoom(ctx context.Context, roomID string) (*contr
 	return s.buildRoomSummary(ctx, id.RoomID(roomID))
 }
 
+// GetInvitedRooms returns rooms where the user has a pending invite.
+// Uses a lightweight one-shot sync with timeout=0 to retrieve the current invite list.
+func (s *mautrixChatService) GetInvitedRooms(ctx context.Context) ([]contracts.MatrixRoom, error) {
+	if err := s.ensureReady(ctx); err != nil {
+		return nil, err
+	}
+	s.touchActivity()
+
+	inviteFilter := `{"room":{"timeline":{"limit":0},"state":{"lazy_load_members":true}},"presence":{"limit":0}}`
+	resp, err := s.client.FullSyncRequest(ctx, mautrix.ReqSync{
+		Timeout:     0,
+		FilterID:    inviteFilter,
+		SetPresence: event.PresenceOffline,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("sync for invites: %w", err)
+	}
+
+	rooms := make([]contracts.MatrixRoom, 0, len(resp.Rooms.Invite))
+	for roomID, inviteRoom := range resp.Rooms.Invite {
+		if inviteRoom == nil {
+			continue
+		}
+		room := contracts.MatrixRoom{
+			RoomID: roomID.String(),
+		}
+		for _, evt := range inviteRoom.State.Events {
+			if evt == nil {
+				continue
+			}
+			_ = evt.Content.ParseRaw(evt.Type)
+			switch evt.Type {
+			case event.StateRoomName:
+				if c, ok := evt.Content.Parsed.(*event.RoomNameEventContent); ok {
+					room.Name = c.Name
+				}
+			case event.StateEncryption:
+				room.Encrypted = true
+			case event.StateMember:
+				if c, ok := evt.Content.Parsed.(*event.MemberEventContent); ok {
+					room.Members = append(room.Members, contracts.MatrixMember{
+						UserID:      evt.GetStateKey(),
+						DisplayName: c.Displayname,
+						AvatarURL:   string(c.AvatarURL),
+						Membership:  string(c.Membership),
+					})
+				}
+			}
+		}
+		rooms = append(rooms, room)
+	}
+	return rooms, nil
+}
+
 // CreateDirectRoom creates or retrieves a 1:1 DM room with the given Matrix user.
 func (s *mautrixChatService) CreateDirectRoom(ctx context.Context, userID string) (string, error) {
 	if err := s.ensureReady(ctx); err != nil {

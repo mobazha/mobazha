@@ -49,9 +49,9 @@ func (m *mockMatrixChatService) CreateDirectRoom(_ context.Context, userID strin
 	return m.createdRoom, m.err
 }
 
-func (m *mockMatrixChatService) CreateGroupRoom(_ context.Context, name string, memberIDs []string) (string, error) {
+func (m *mockMatrixChatService) CreateGroupRoom(_ context.Context, name string, memberIDs []string, metadata map[string]string) (string, error) {
 	m.lastCall = "CreateGroupRoom"
-	m.lastArgs = map[string]interface{}{"name": name, "memberIDs": memberIDs}
+	m.lastArgs = map[string]interface{}{"name": name, "memberIDs": memberIDs, "metadata": metadata}
 	return m.createdRoom, m.err
 }
 

@@ -93,7 +93,7 @@ func (s *mautrixChatService) CreateDirectRoom(ctx context.Context, userID string
 }
 
 // CreateGroupRoom creates a new group chat room.
-func (s *mautrixChatService) CreateGroupRoom(ctx context.Context, name string, memberIDs []string) (string, error) {
+func (s *mautrixChatService) CreateGroupRoom(ctx context.Context, name string, memberIDs []string, metadata map[string]string) (string, error) {
 	if err := s.ensureReady(ctx); err != nil {
 		return "", err
 	}
@@ -124,6 +124,10 @@ func (s *mautrixChatService) CreateGroupRoom(ctx context.Context, name string, m
 	}
 
 	s.sendPeerIDStateEvent(ctx, resp.RoomID, s.matrixUserID.String(), s.config.PeerID.String())
+
+	if len(metadata) > 0 {
+		s.sendRoomMetadataStateEvent(ctx, resp.RoomID, metadata)
+	}
 
 	return resp.RoomID.String(), nil
 }
@@ -191,7 +195,6 @@ func (s *mautrixChatService) buildRoomSummary(ctx context.Context, roomID id.Roo
 		}
 		room.Members = memberList
 		room.IsDirect = len(members.Joined) == 2
-		room.RoomType = s.classifyRoom(ctx, roomID, len(members.Joined))
 	}
 
 	stateMap, err := s.client.State(ctx, roomID)
@@ -234,6 +237,22 @@ func (s *mautrixChatService) buildRoomSummary(ctx context.Context, roomID id.Roo
 				room.Members[i].PeerID = pid
 			}
 		}
+
+		if metaEvts, ok := stateMap[roomMetadataEventType]; ok {
+			if evt, ok := metaEvts[""]; ok && evt.Content.Raw != nil {
+				meta := make(map[string]string)
+				for k, v := range evt.Content.Raw {
+					if s, ok := v.(string); ok {
+						meta[k] = s
+					}
+				}
+				if len(meta) > 0 {
+					room.Metadata = meta
+				}
+			}
+		}
+
+		room.RoomType = classifyRoomFromState(stateMap, len(room.Members))
 	}
 
 	if room.Name == "" && room.IsDirect {
@@ -282,7 +301,10 @@ func (s *mautrixChatService) fetchLastMessage(ctx context.Context, roomID id.Roo
 	return nil
 }
 
-var peerIDEventType = event.NewEventType("mobazha.peer.id")
+var (
+	peerIDEventType       = event.NewEventType("mobazha.peer.id")
+	roomMetadataEventType = event.NewEventType("mobazha.room.metadata")
+)
 
 // sendPeerIDStateEvent stores the original (case-sensitive) PeerID as a room
 // state event so it can be recovered from room members later.
@@ -295,26 +317,24 @@ func (s *mautrixChatService) sendPeerIDStateEvent(ctx context.Context, roomID id
 	}
 }
 
-// classifyRoom determines the room type based on room state.
-func (s *mautrixChatService) classifyRoom(ctx context.Context, roomID id.RoomID, memberCount int) string {
-	stateEvts, err := s.client.State(ctx, roomID)
+// sendRoomMetadataStateEvent stores room metadata (type, orderId, storeId, etc.)
+// as a single mobazha.room.metadata state event. classifyRoomFromState reads
+// the "type" field from this same event for room classification.
+func (s *mautrixChatService) sendRoomMetadataStateEvent(ctx context.Context, roomID id.RoomID, metadata map[string]string) {
+	_, err := s.client.SendStateEvent(ctx, roomID, roomMetadataEventType, "", metadata)
 	if err != nil {
-		if memberCount == 2 {
-			return "direct"
-		}
-		return "group"
+		log.Warningf("Failed to send mobazha.room.metadata state event in %s: %v", roomID, err)
 	}
+}
 
-	customType := event.NewEventType("mobazha.room.type")
-	if stateKeyMap, ok := stateEvts[customType]; ok {
-		for _, evt := range stateKeyMap {
-			raw := evt.Content.Raw
-			if rt, ok := raw["type"].(string); ok {
+// classifyRoomFromState determines the room type from an already-fetched state map.
+func classifyRoomFromState(stateMap mautrix.RoomStateMap, memberCount int) string {
+	if stateKeyMap, ok := stateMap[roomMetadataEventType]; ok {
+		if evt, ok := stateKeyMap[""]; ok {
+			if rt, ok := evt.Content.Raw["type"].(string); ok {
 				switch rt {
-				case "store":
-					return "store"
-				case "order":
-					return "order"
+				case "store", "order", "moderator", "community":
+					return rt
 				}
 			}
 		}

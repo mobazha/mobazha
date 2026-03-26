@@ -37,7 +37,7 @@ func (m *bridgeMockChatService) GetRoom(context.Context, string) (*contracts.Mat
 func (m *bridgeMockChatService) CreateDirectRoom(context.Context, string) (string, error) {
 	return "", nil
 }
-func (m *bridgeMockChatService) CreateGroupRoom(context.Context, string, []string) (string, error) {
+func (m *bridgeMockChatService) CreateGroupRoom(context.Context, string, []string, map[string]string) (string, error) {
 	return "", nil
 }
 func (m *bridgeMockChatService) JoinRoom(context.Context, string) error  { return nil }

@@ -28,7 +28,8 @@ type MatrixChatService interface {
 	// CreateDirectRoom creates or retrieves a 1:1 DM room with the given Matrix user.
 	CreateDirectRoom(ctx context.Context, userID string) (string, error)
 	// CreateGroupRoom creates a new group chat room.
-	CreateGroupRoom(ctx context.Context, name string, memberIDs []string) (string, error)
+	// metadata is optional key-value pairs stored as room state events (e.g. room type, order ID).
+	CreateGroupRoom(ctx context.Context, name string, memberIDs []string, metadata map[string]string) (string, error)
 	// JoinRoom joins an existing room by ID or alias.
 	JoinRoom(ctx context.Context, roomID string) error
 	// LeaveRoom leaves a room.

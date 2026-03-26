@@ -452,12 +452,16 @@ func (s *mautrixChatService) syncLoop() {
 	log.Infof("Matrix sync loop started")
 	backoff := minBackoff
 	for {
+		syncStart := time.Now()
 		err := s.client.SyncWithContext(s.syncCtx)
 		if s.syncCtx.Err() != nil {
 			break
 		}
 		if err == nil {
 			break
+		}
+		if time.Since(syncStart) > maxBackoff {
+			backoff = minBackoff
 		}
 		log.Errorf("Matrix sync error (retrying in %v): %v", backoff, err)
 		s.broadcast(contracts.MatrixChatEvent{
@@ -608,9 +612,13 @@ func (s *mautrixChatService) eventToMessage(evt *event.Event) contracts.MatrixMe
 		}
 		if content.URL != "" {
 			mediaInfo.URL = string(content.URL)
+		} else if content.File != nil && content.File.URL != "" {
+			mediaInfo.URL = string(content.File.URL)
 		}
 		if content.GetInfo().ThumbnailURL != "" {
 			mediaInfo.ThumbnailURL = string(content.GetInfo().ThumbnailURL)
+		} else if content.GetInfo().ThumbnailFile != nil && content.GetInfo().ThumbnailFile.URL != "" {
+			mediaInfo.ThumbnailURL = string(content.GetInfo().ThumbnailFile.URL)
 		}
 		msg.Media = mediaInfo
 	}
@@ -659,8 +667,9 @@ func (s *mautrixChatService) DownloadMedia(ctx context.Context, serverName, medi
 	if err != nil {
 		return nil, "", 0, fmt.Errorf("failed to download media: %w", err)
 	}
+	contentType := http.DetectContentType(data)
 	reader := io.NopCloser(bytes.NewReader(data))
-	return reader, "application/octet-stream", int64(len(data)), nil
+	return reader, contentType, int64(len(data)), nil
 }
 
 // ── Auto-registration ─────────────────────────────────────────

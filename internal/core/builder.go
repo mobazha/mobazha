@@ -278,14 +278,16 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	}
 
 	if cfg.InfrastructureOnly {
+		infraOnlyCtx, infraOnlyCancel := context.WithCancel(infra.Ctx)
 		obNode := &MobazhaNode{
 		sharedManager: sharedManager,
 			identityFields: identityFields{
-				nodeID:   nodeID,
-				peerID:   infra.PeerID,
-				privKey:  infra.PrivKey,
-				peerHost: infra.Host,
-				nodeCtx:  infra.Ctx,
+				nodeID:     nodeID,
+				peerID:     infra.PeerID,
+				privKey:    infra.PrivKey,
+				peerHost:   infra.Host,
+				nodeCtx:    infraOnlyCtx,
+				nodeCancel: infraOnlyCancel,
 			},
 			storageFields: storageFields{
 				p2pInfra: infra,
@@ -489,14 +491,16 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	}
 
 	// Construct our Mobazha node.repo object
+	saasCtx, saasCancel := context.WithCancel(infra.Ctx)
 	obNode := &MobazhaNode{
 		sharedManager: sharedManager,
 		identityFields: identityFields{
-			nodeID:   nodeID,
-			peerID:   infra.PeerID,
-			privKey:  infra.PrivKey,
-			peerHost: infra.Host,
-			nodeCtx:  infra.Ctx,
+			nodeID:     nodeID,
+			peerID:     infra.PeerID,
+			privKey:    infra.PrivKey,
+			peerHost:   infra.Host,
+			nodeCtx:    saasCtx,
+			nodeCancel: saasCancel,
 		},
 		storageFields: storageFields{
 			p2pInfra: infra,

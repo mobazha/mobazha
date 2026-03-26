@@ -374,6 +374,12 @@ func (n *MobazhaNode) Stop(force bool) error {
 		n.repo.Close()
 	}
 
+	// Cancel node-scoped context so goroutines watching node.Context()
+	// (e.g. MatrixChatEventBridge, Subscribe cleanup) exit promptly.
+	if n.nodeCancel != nil {
+		n.nodeCancel()
+	}
+
 	if n.p2pInfra != nil {
 		stop := make(chan struct{})
 		go func() {
@@ -396,9 +402,6 @@ func (n *MobazhaNode) Stop(force bool) error {
 		// Lightweight node: close the minimal libp2p host
 		if n.peerHost != nil {
 			n.peerHost.Close()
-		}
-		if n.nodeCancel != nil {
-			n.nodeCancel()
 		}
 		if n.eventBus != nil {
 			n.eventBus.Emit(&events.P2PShutdown{})

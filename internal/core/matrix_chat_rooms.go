@@ -1,0 +1,327 @@
+package core
+
+import (
+	"context"
+	"fmt"
+	"sort"
+
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
+	"maunium.net/go/mautrix"
+	"maunium.net/go/mautrix/event"
+	"maunium.net/go/mautrix/id"
+)
+
+// GetRooms returns all joined rooms with summary metadata.
+func (s *mautrixChatService) GetRooms(ctx context.Context) ([]contracts.MatrixRoom, error) {
+	if err := s.ensureReady(ctx); err != nil {
+		return nil, err
+	}
+	s.touchActivity()
+
+	resp, err := s.client.JoinedRooms(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get joined rooms: %w", err)
+	}
+
+	rooms := make([]contracts.MatrixRoom, 0, len(resp.JoinedRooms))
+	for _, roomID := range resp.JoinedRooms {
+		room, err := s.buildRoomSummary(ctx, roomID)
+		if err != nil {
+			continue
+		}
+		rooms = append(rooms, *room)
+	}
+
+	sort.Slice(rooms, func(i, j int) bool {
+		ti := rooms[i].LastMessage
+		tj := rooms[j].LastMessage
+		if ti == nil && tj == nil {
+			return false
+		}
+		if ti == nil {
+			return false
+		}
+		if tj == nil {
+			return true
+		}
+		return ti.Timestamp.After(tj.Timestamp)
+	})
+
+	return rooms, nil
+}
+
+// GetRoom returns detailed info for a single room.
+func (s *mautrixChatService) GetRoom(ctx context.Context, roomID string) (*contracts.MatrixRoom, error) {
+	if err := s.ensureReady(ctx); err != nil {
+		return nil, err
+	}
+	s.touchActivity()
+	return s.buildRoomSummary(ctx, id.RoomID(roomID))
+}
+
+// CreateDirectRoom creates or retrieves a 1:1 DM room with the given Matrix user.
+func (s *mautrixChatService) CreateDirectRoom(ctx context.Context, userID string) (string, error) {
+	if err := s.ensureReady(ctx); err != nil {
+		return "", err
+	}
+	s.touchActivity()
+
+	targetUserID := id.UserID(userID)
+
+	resp, err := s.client.CreateRoom(ctx, &mautrix.ReqCreateRoom{
+		Preset:   "trusted_private_chat",
+		IsDirect: true,
+		Invite:   []id.UserID{targetUserID},
+		InitialState: []*event.Event{
+			{
+				Type: event.StateEncryption,
+				Content: event.Content{
+					Parsed: &event.EncryptionEventContent{
+						Algorithm: id.AlgorithmMegolmV1,
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to create direct room: %w", err)
+	}
+
+	s.sendPeerIDStateEvent(ctx, resp.RoomID, s.matrixUserID.String(), s.config.PeerID.String())
+
+	return resp.RoomID.String(), nil
+}
+
+// CreateGroupRoom creates a new group chat room.
+func (s *mautrixChatService) CreateGroupRoom(ctx context.Context, name string, memberIDs []string) (string, error) {
+	if err := s.ensureReady(ctx); err != nil {
+		return "", err
+	}
+	s.touchActivity()
+
+	invites := make([]id.UserID, len(memberIDs))
+	for i, mid := range memberIDs {
+		invites[i] = id.UserID(mid)
+	}
+
+	resp, err := s.client.CreateRoom(ctx, &mautrix.ReqCreateRoom{
+		Name:   name,
+		Preset: "private_chat",
+		Invite: invites,
+		InitialState: []*event.Event{
+			{
+				Type: event.StateEncryption,
+				Content: event.Content{
+					Parsed: &event.EncryptionEventContent{
+						Algorithm: id.AlgorithmMegolmV1,
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to create group room: %w", err)
+	}
+
+	s.sendPeerIDStateEvent(ctx, resp.RoomID, s.matrixUserID.String(), s.config.PeerID.String())
+
+	return resp.RoomID.String(), nil
+}
+
+// JoinRoom joins an existing room by ID or alias.
+func (s *mautrixChatService) JoinRoom(ctx context.Context, roomID string) error {
+	if err := s.ensureReady(ctx); err != nil {
+		return err
+	}
+	s.touchActivity()
+	_, err := s.client.JoinRoomByID(ctx, id.RoomID(roomID))
+	return err
+}
+
+// LeaveRoom leaves a room.
+func (s *mautrixChatService) LeaveRoom(ctx context.Context, roomID string) error {
+	if err := s.ensureReady(ctx); err != nil {
+		return err
+	}
+	s.touchActivity()
+	_, err := s.client.LeaveRoom(ctx, id.RoomID(roomID))
+	return err
+}
+
+// InviteToRoom invites a Matrix user to a room.
+func (s *mautrixChatService) InviteToRoom(ctx context.Context, roomID, userID string) error {
+	if err := s.ensureReady(ctx); err != nil {
+		return err
+	}
+	s.touchActivity()
+	_, err := s.client.InviteUser(ctx, id.RoomID(roomID), &mautrix.ReqInviteUser{
+		UserID: id.UserID(userID),
+	})
+	return err
+}
+
+// SetRoomName changes the display name of a room.
+func (s *mautrixChatService) SetRoomName(ctx context.Context, roomID, name string) error {
+	if err := s.ensureReady(ctx); err != nil {
+		return err
+	}
+	s.touchActivity()
+	_, err := s.client.SendStateEvent(ctx, id.RoomID(roomID), event.StateRoomName, "", &event.RoomNameEventContent{
+		Name: name,
+	})
+	return err
+}
+
+// buildRoomSummary fetches room state and builds a MatrixRoom summary.
+func (s *mautrixChatService) buildRoomSummary(ctx context.Context, roomID id.RoomID) (*contracts.MatrixRoom, error) {
+	room := &contracts.MatrixRoom{
+		RoomID: roomID.String(),
+	}
+
+	members, err := s.client.JoinedMembers(ctx, roomID)
+	if err == nil {
+		memberList := make([]contracts.MatrixMember, 0, len(members.Joined))
+		for uid, member := range members.Joined {
+			memberList = append(memberList, contracts.MatrixMember{
+				UserID:      uid.String(),
+				DisplayName: member.DisplayName,
+				AvatarURL:   member.AvatarURL,
+				Membership:  "join",
+			})
+		}
+		room.Members = memberList
+		room.IsDirect = len(members.Joined) == 2
+		room.RoomType = s.classifyRoom(ctx, roomID, len(members.Joined))
+	}
+
+	stateMap, err := s.client.State(ctx, roomID)
+	if err == nil {
+		if nameEvts, ok := stateMap[event.StateRoomName]; ok {
+			if evt, ok := nameEvts[""]; ok {
+				if content, ok := evt.Content.Parsed.(*event.RoomNameEventContent); ok {
+					room.Name = content.Name
+				}
+			}
+		}
+		if topicEvts, ok := stateMap[event.StateTopic]; ok {
+			if evt, ok := topicEvts[""]; ok {
+				if content, ok := evt.Content.Parsed.(*event.TopicEventContent); ok {
+					room.Topic = content.Topic
+				}
+			}
+		}
+		if avatarEvts, ok := stateMap[event.StateRoomAvatar]; ok {
+			if evt, ok := avatarEvts[""]; ok {
+				if content, ok := evt.Content.Parsed.(*event.RoomAvatarEventContent); ok {
+					room.AvatarURL = string(content.URL)
+				}
+			}
+		}
+		if _, ok := stateMap[event.StateEncryption]; ok {
+			room.Encrypted = true
+		}
+
+		peerIDMap := make(map[string]string)
+		if peerEvts, ok := stateMap[peerIDEventType]; ok {
+			for stateKey, evt := range peerEvts {
+				if pid, ok := evt.Content.Raw["peer_id"].(string); ok {
+					peerIDMap[stateKey] = pid
+				}
+			}
+		}
+		for i := range room.Members {
+			if pid, ok := peerIDMap[room.Members[i].UserID]; ok {
+				room.Members[i].PeerID = pid
+			}
+		}
+	}
+
+	if room.Name == "" && room.IsDirect {
+		for _, m := range room.Members {
+			if m.UserID != s.matrixUserID.String() {
+				room.Name = m.DisplayName
+				if room.Name == "" {
+					room.Name = m.UserID
+				}
+				break
+			}
+		}
+	}
+
+	if lastMsg := s.fetchLastMessage(ctx, roomID); lastMsg != nil {
+		room.LastMessage = lastMsg
+	}
+
+	return room, nil
+}
+
+// fetchLastMessage retrieves the most recent message event from a room
+// for display in the room list. Silently returns nil on any error.
+func (s *mautrixChatService) fetchLastMessage(ctx context.Context, roomID id.RoomID) *contracts.MatrixMessage {
+	resp, err := s.client.Messages(ctx, roomID, "", "", mautrix.DirectionBackward, nil, 5)
+	if err != nil {
+		return nil
+	}
+	for _, evt := range resp.Chunk {
+		if evt.Type == event.EventEncrypted && s.client.Crypto != nil {
+			if err := evt.Content.ParseRaw(evt.Type); err != nil {
+				continue
+			}
+			decrypted, err := s.client.Crypto.Decrypt(ctx, evt)
+			if err != nil {
+				continue
+			}
+			evt = decrypted
+		}
+		if evt.Type != event.EventMessage {
+			continue
+		}
+		msg := s.eventToMessage(evt)
+		return &msg
+	}
+	return nil
+}
+
+var peerIDEventType = event.NewEventType("mobazha.peer.id")
+
+// sendPeerIDStateEvent stores the original (case-sensitive) PeerID as a room
+// state event so it can be recovered from room members later.
+func (s *mautrixChatService) sendPeerIDStateEvent(ctx context.Context, roomID id.RoomID, matrixUID, peerID string) {
+	_, err := s.client.SendStateEvent(ctx, roomID, peerIDEventType, matrixUID, map[string]string{
+		"peer_id": peerID,
+	})
+	if err != nil {
+		log.Warningf("Failed to send mobazha.peer.id state event for %s in %s: %v", matrixUID, roomID, err)
+	}
+}
+
+// classifyRoom determines the room type based on room state.
+func (s *mautrixChatService) classifyRoom(ctx context.Context, roomID id.RoomID, memberCount int) string {
+	stateEvts, err := s.client.State(ctx, roomID)
+	if err != nil {
+		if memberCount == 2 {
+			return "direct"
+		}
+		return "group"
+	}
+
+	customType := event.NewEventType("mobazha.room.type")
+	if stateKeyMap, ok := stateEvts[customType]; ok {
+		for _, evt := range stateKeyMap {
+			raw := evt.Content.Raw
+			if rt, ok := raw["type"].(string); ok {
+				switch rt {
+				case "store":
+					return "store"
+				case "order":
+					return "order"
+				}
+			}
+		}
+	}
+
+	if memberCount == 2 {
+		return "direct"
+	}
+	return "group"
+}

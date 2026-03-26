@@ -153,6 +153,14 @@ type mockNode struct {
 	getPostsFunc      func(ctx context.Context, peerID peer.ID, useCache bool) ([]models.PostData, error)
 
 	updateOrderPaymentStatusFunc func(orderID models.OrderID, paymentIntentID, status string) error
+
+	// TECHDEBT(TD-030): legacy image handler stubs — kept for image_handlers_test.go compilation.
+	// 清除条件: image_handlers_test.go 迁移到 MediaService 接口后删除
+	getAvatarFunc       func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
+	getHeaderFunc       func(ctx context.Context, pid peer.ID, size models.ImageSize, useCache bool) (io.ReadSeeker, error)
+	setAvatarImageFunc  func(b64ImageData string, done chan struct{}) (models.ImageHashes, error)
+	setHeaderImageFunc  func(b64ImageData string, done chan struct{}) (models.ImageHashes, error)
+	setProductImageFunc func(b64ImageData string, filename string) (models.ImageHashes, error)
 }
 
 // Service accessors — mockNode returns itself for each sub-interface.
@@ -165,7 +173,7 @@ func (m *mockNode) Profile() contracts.ProfileService               { return m }
 func (m *mockNode) Wallet() contracts.WalletService                 { return m }
 func (m *mockNode) Media() contracts.MediaService                   { return m }
 func (m *mockNode) Social() contracts.SocialService                 { return m }
-func (m *mockNode) Matrix() contracts.MatrixService                 { return m }
+func (m *mockNode) MatrixChat() contracts.MatrixChatService         { return nil }
 func (m *mockNode) Preferences() contracts.PreferencesService       { return m }
 func (m *mockNode) ExchangeRate() contracts.ExchangeRateService     { return m }
 func (m *mockNode) ShoppingCart() contracts.ShoppingCartService     { return m }
@@ -634,66 +642,6 @@ func (m *mockNode) GetPosts(ctx context.Context, peerID peer.ID, useCache bool) 
 }
 func (m *mockNode) IsGlobalBanned(peerID peer.ID) bool {
 	return false
-}
-
-// Matrix E2EE Key Backup mock implementations
-func (m *mockNode) SaveMatrixKeyBackup(deviceID string, keysJSON string) error {
-	return nil
-}
-
-func (m *mockNode) GetMatrixKeyBackup(deviceID string) (*models.MatrixKeyBackupResponse, error) {
-	return nil, nil
-}
-
-func (m *mockNode) GetMatrixKeyBackupInfo(deviceID string) (*models.MatrixKeyBackupInfo, error) {
-	return nil, nil
-}
-
-func (m *mockNode) DeleteMatrixKeyBackup(deviceID string) error {
-	return nil
-}
-
-func (m *mockNode) ListMatrixKeyBackups() ([]models.MatrixKeyBackupInfo, error) {
-	return nil, nil
-}
-
-func (m *mockNode) GetMatrixCredentials() (*models.MatrixCredentialsResponse, error) {
-	return &models.MatrixCredentialsResponse{
-		MatrixUserID:  "@mock_user:matrix.mobazha.org",
-		Password:      "mock_password",
-		ServerName:    "matrix.mobazha.org",
-		HomeserverURL: "https://matrix.mobazha.org",
-		Registered:    true,
-	}, nil
-}
-
-func (m *mockNode) SaveMatrixCredentials(matrixUserID, serverName string) error {
-	return nil
-}
-
-func (m *mockNode) IsMatrixRegistered() (bool, error) {
-	return true, nil
-}
-
-func (m *mockNode) GetDerivedMatrixPassword() (string, error) {
-	return "mock_derived_password", nil
-}
-
-// Matrix Secrets Bundle mock implementations
-func (m *mockNode) SaveMatrixSecretsBundle(deviceID string, secretsJSON string) error {
-	return nil
-}
-
-func (m *mockNode) GetMatrixSecretsBundle() (*models.MatrixSecretsBundleResponse, error) {
-	return nil, nil
-}
-
-func (m *mockNode) GetMatrixSecretsBundleInfo() (*models.MatrixSecretsBundleInfo, error) {
-	return &models.MatrixSecretsBundleInfo{Exists: false}, nil
-}
-
-func (m *mockNode) DeleteMatrixSecretsBundle() error {
-	return nil
 }
 
 type mockNodeManager struct {

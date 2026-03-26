@@ -243,28 +243,6 @@ type SocialService interface {
 	GetPosts(ctx context.Context, peerID peer.ID, useCache bool) ([]models.PostData, error)
 }
 
-// MatrixService handles Matrix chat integration (E2EE key backup, secrets, credentials).
-type MatrixService interface {
-	// Key Backup
-	SaveMatrixKeyBackup(deviceID string, keysJSON string) error
-	GetMatrixKeyBackup(deviceID string) (*models.MatrixKeyBackupResponse, error)
-	GetMatrixKeyBackupInfo(deviceID string) (*models.MatrixKeyBackupInfo, error)
-	DeleteMatrixKeyBackup(deviceID string) error
-	ListMatrixKeyBackups() ([]models.MatrixKeyBackupInfo, error)
-
-	// Secrets Bundle
-	SaveMatrixSecretsBundle(deviceID string, secretsJSON string) error
-	GetMatrixSecretsBundle() (*models.MatrixSecretsBundleResponse, error)
-	GetMatrixSecretsBundleInfo() (*models.MatrixSecretsBundleInfo, error)
-	DeleteMatrixSecretsBundle() error
-
-	// Credentials
-	GetMatrixCredentials() (*models.MatrixCredentialsResponse, error)
-	SaveMatrixCredentials(matrixUserID, serverName string) error
-	IsMatrixRegistered() (bool, error)
-	GetDerivedMatrixPassword() (string, error)
-}
-
 // PreferencesService handles user preferences.
 type PreferencesService interface {
 	GetPreferences() (*models.UserPreferences, error)
@@ -370,7 +348,7 @@ type NodeService interface {
 	Wallet() WalletService
 	Media() MediaService
 	Social() SocialService
-	Matrix() MatrixService
+	MatrixChat() MatrixChatService
 	Preferences() PreferencesService
 	ExchangeRate() ExchangeRateService
 	ShoppingCart() ShoppingCartService

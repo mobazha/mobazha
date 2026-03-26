@@ -171,8 +171,7 @@ type lifecycleFields struct {
 type appServices struct {
 	paymentService             *PaymentAppService
 	orderService               *OrderAppService
-	chatService                *ChatAppService
-	matrixService              *MatrixAppService
+	matrixChatService *mautrixChatService
 	preferencesService         *PreferencesAppService
 	mediaService               *MediaAppService
 	ratingsService             *RatingsAppService

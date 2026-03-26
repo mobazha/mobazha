@@ -813,18 +813,8 @@ func InitializeMultiwallet(mw chains.Multiwallet, db database.Database, creation
 }
 
 func (n *MobazhaNode) registerHandlers() {
-	n.networkService.RegisterHandler(pb.Message_CHAT, func(from peer.ID, message *pb.Message) error {
-		if n.chatService != nil {
-			return n.chatService.HandleChatMessage(from, message)
-		}
-		return fmt.Errorf("chat service not initialized")
-	})
-	n.networkService.RegisterHandler(pb.Message_CHAT_GROUP, func(from peer.ID, message *pb.Message) error {
-		if n.chatService != nil {
-			return n.chatService.HandleChatGroupMessage(from, message)
-		}
-		return fmt.Errorf("chat service not initialized")
-	})
+	// P2P chat message handlers removed; chat is Matrix-based (mautrix-go).
+
 	n.networkService.RegisterHandler(pb.Message_ACK, func(from peer.ID, message *pb.Message) error {
 		return n.handleAckMessage(from, message)
 	})

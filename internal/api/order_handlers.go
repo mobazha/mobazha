@@ -186,7 +186,8 @@ func (g *Gateway) handleGETOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	unreadChatMsgCount, _ := getChatService(r).GetChatMessagesUnreadCountByOrderID(order.ID)
+	// Legacy P2P chat unread count removed; Matrix order-scoped unread is client/Matrix room metadata.
+	unreadChatMsgCount := int64(0)
 
 	type OrderRespApi struct {
 		Contract           *models.Order                `json:"contract,omitempty"`

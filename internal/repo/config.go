@@ -161,6 +161,12 @@ type Config struct {
 	// SaaS store_registry.owner_user_id during startup. When empty,
 	// JWT auth falls back to peerID-based comparison (legacy behavior).
 	OwnerUserID string `long:"owneruserid" description:"Casdoor User ID of the store owner for JWT admin auth"`
+
+	// Matrix homeserver configuration (injected by hosting in SaaS mode).
+	// These override the corresponding NetConfig fields loaded from the remote endpoint.
+	MatrixInternalURL        string `no-flag:"true"`
+	MatrixServerName         string `no-flag:"true"`
+	MatrixRegistrationSecret string `no-flag:"true"`
 }
 
 // LoadConfig initializes and parses the config using a config file and command

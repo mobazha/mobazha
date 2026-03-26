@@ -134,6 +134,17 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			mcfg.GetGlobalExchangeRateConfig().SetRemoteSaaSURL(cfg.SaaSAPIURL)
 		}
 
+		// Hosting injects Matrix config via repo.Config; override remote NetConfig values.
+		if cfg.MatrixInternalURL != "" {
+			netConfig.MatrixInternalURL = cfg.MatrixInternalURL
+		}
+		if cfg.MatrixServerName != "" {
+			netConfig.MatrixServerName = cfg.MatrixServerName
+		}
+		if cfg.MatrixRegistrationSecret != "" {
+			netConfig.MatrixRegistrationSecret = cfg.MatrixRegistrationSecret
+		}
+
 		erp := wallet.NewExchangeRateProvider(nil)
 
 		SharedManagerInstance = &SharedManager{

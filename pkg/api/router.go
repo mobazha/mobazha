@@ -4,6 +4,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	internalapi "github.com/mobazha/mobazha3.0/internal/api"
@@ -68,6 +69,13 @@ func (r *Router) Gateway() *Gateway {
 // NotifyWebsockets returns the WS push function for the given node.
 func (r *Router) NotifyWebsockets(nodeID string) func(message interface{}) error {
 	return r.inner.NotifyWebsockets(nodeID)
+}
+
+// StartMatrixChatEventBridge subscribes to Matrix chat events from the given
+// MatrixChatService and forwards them to WebSocket clients identified by nodeID.
+// This must be called once per node creation (not per request).
+func (r *Router) StartMatrixChatEventBridge(ctx context.Context, nodeID string, svc contracts.MatrixChatService) {
+	r.inner.Gateway().StartMatrixChatEventBridge(ctx, nodeID, svc)
 }
 
 // ErrorResponse writes a JSON error response. Re-exported from pkg/response

@@ -22,6 +22,11 @@ type NetConfig struct {
 	dataMutex sync.RWMutex      `json:"-"`
 	Data      map[string]string `json:"data,omitempty"`
 
+	// Matrix homeserver configuration (injected by hosting in SaaS mode)
+	MatrixInternalURL          string `json:"matrixInternalURL,omitempty"`
+	MatrixServerName           string `json:"matrixServerName,omitempty"`
+	MatrixRegistrationSecret   string `json:"matrixRegistrationSecret,omitempty"`
+
 	Testnet bool `json:"-"`
 }
 

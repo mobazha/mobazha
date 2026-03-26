@@ -97,7 +97,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initOrderService()
 	n.wireServiceSetters()
 	n.initChatService()
-	n.initMatrixService()
+	n.initMatrixChatService()
 	n.initPreferencesService()
 	n.initMediaService()
 	n.initRatingsService()
@@ -187,19 +187,57 @@ func buildFiatPaymentData(event *contracts.WebhookEvent) *models.PaymentData {
 	}
 }
 
-// initMatrixService creates the MatrixAppService.
-func (n *MobazhaNode) initMatrixService() {
+// initMatrixChatService creates the mautrix-go backed Matrix chat service.
+// The service is created but not started here; Start() is called during node startup
+// or lazily on first use (SaaS mode). Matrix config (homeserver URL, server name)
+// is provided via SharedManager in SaaS mode or repo config in standalone mode.
+func (n *MobazhaNode) initMatrixChatService() {
 	if n.infrastructureOnly {
+		logger.LogInfoWithID(log, n.nodeID, "Matrix chat: skipped (infrastructure-only)")
 		return
 	}
 	if n.privKey == nil {
+		logger.LogWarningWithID(log, n.nodeID, "Matrix chat: skipped (privKey is nil)")
 		return
 	}
-	n.matrixService = NewMatrixAppService(MatrixAppServiceConfig{
-		DB:      n.db,
-		PrivKey: n.privKey,
-		PeerID:  n.peerID,
+
+	var homeserverURL, serverName, dbPath, registrationSecret string
+
+	if n.sharedManager != nil && n.sharedManager.NetConfig != nil {
+		homeserverURL = n.sharedManager.NetConfig.MatrixInternalURL
+		serverName = n.sharedManager.NetConfig.MatrixServerName
+		registrationSecret = n.sharedManager.NetConfig.MatrixRegistrationSecret
+	}
+
+	if homeserverURL == "" {
+		homeserverURL = "https://matrix.mobazha.org"
+	}
+	if serverName == "" {
+		serverName = "matrix.mobazha.org"
+	}
+
+	if n.repo != nil {
+		dbPath = filepath.Join(n.repo.DataDir(), "mautrix_crypto.db")
+	}
+
+	logger.LogInfoWithIDf(log, n.nodeID, "Matrix chat: creating service (homeserver=%s, server=%s, regSecret=%v)",
+		homeserverURL, serverName, registrationSecret != "")
+
+	svc, err := NewMautrixChatService(MautrixChatServiceConfig{
+		DB:                 n.db,
+		PrivKey:            n.privKey,
+		PeerID:             n.peerID,
+		HomeserverURL:      homeserverURL,
+		ServerName:         serverName,
+		DBPath:             dbPath,
+		RegistrationSecret: registrationSecret,
 	})
+	if err != nil {
+		log.Errorf("Failed to create matrix chat service: %v", err)
+		return
+	}
+	n.matrixChatService = svc
+	logger.LogInfoWithIDf(log, n.nodeID, "Matrix chat: service created (userID=%s)", svc.matrixUserID)
 }
 
 // initPreferencesService creates the PreferencesAppService.
@@ -300,22 +338,9 @@ func (n *MobazhaNode) initWishlistService() {
 	})
 }
 
-// initChatService creates the ChatAppService if the necessary
-// dependencies are available. Infrastructure-only nodes skip this.
-func (n *MobazhaNode) initChatService() {
-	if n.infrastructureOnly {
-		return
-	}
-
-	n.chatService = NewChatAppService(ChatAppServiceConfig{
-		DB:             n.db,
-		Messenger:      n.messenger,
-		NetworkService: n.networkService,
-		EventBus:       n.eventBus,
-		NodeID:         n.nodeID,
-		PeerID:         n.peerID,
-	})
-}
+// initChatService is a no-op placeholder. The old P2P ChatAppService was removed
+// in the Phase Chat migration; all chat is now handled by mautrixChatService.
+func (n *MobazhaNode) initChatService() {}
 
 // initOrderService creates the OrderAppService if the necessary
 // dependencies are available. Infrastructure-only nodes skip this.

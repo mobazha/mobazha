@@ -1,0 +1,752 @@
+package api
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/mobazha/mobazha3.0/pkg/contracts"
+)
+
+type mockMatrixChatService struct {
+	rooms       []contracts.MatrixRoom
+	messages    []contracts.MatrixMessage
+	nextToken   string
+	createdRoom string
+	lastCall    string
+	lastArgs    map[string]interface{}
+	err         error
+}
+
+func (m *mockMatrixChatService) Start(_ context.Context) error { return nil }
+func (m *mockMatrixChatService) Stop() error                   { return nil }
+func (m *mockMatrixChatService) IsReady() bool                 { return true }
+
+func (m *mockMatrixChatService) GetRooms(_ context.Context) ([]contracts.MatrixRoom, error) {
+	m.lastCall = "GetRooms"
+	return m.rooms, m.err
+}
+
+func (m *mockMatrixChatService) GetRoom(_ context.Context, roomID string) (*contracts.MatrixRoom, error) {
+	m.lastCall = "GetRoom"
+	for i := range m.rooms {
+		if m.rooms[i].RoomID == roomID {
+			return &m.rooms[i], nil
+		}
+	}
+	return &contracts.MatrixRoom{RoomID: roomID}, m.err
+}
+
+func (m *mockMatrixChatService) CreateDirectRoom(_ context.Context, userID string) (string, error) {
+	m.lastCall = "CreateDirectRoom"
+	m.lastArgs = map[string]interface{}{"userID": userID}
+	return m.createdRoom, m.err
+}
+
+func (m *mockMatrixChatService) CreateGroupRoom(_ context.Context, name string, memberIDs []string) (string, error) {
+	m.lastCall = "CreateGroupRoom"
+	m.lastArgs = map[string]interface{}{"name": name, "memberIDs": memberIDs}
+	return m.createdRoom, m.err
+}
+
+func (m *mockMatrixChatService) JoinRoom(_ context.Context, roomID string) error {
+	m.lastCall = "JoinRoom"
+	m.lastArgs = map[string]interface{}{"roomID": roomID}
+	return m.err
+}
+
+func (m *mockMatrixChatService) LeaveRoom(_ context.Context, roomID string) error {
+	m.lastCall = "LeaveRoom"
+	m.lastArgs = map[string]interface{}{"roomID": roomID}
+	return m.err
+}
+
+func (m *mockMatrixChatService) InviteToRoom(_ context.Context, roomID, userID string) error {
+	m.lastCall = "InviteToRoom"
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "userID": userID}
+	return m.err
+}
+
+func (m *mockMatrixChatService) SetRoomName(_ context.Context, roomID, name string) error {
+	m.lastCall = "SetRoomName"
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "name": name}
+	return m.err
+}
+
+func (m *mockMatrixChatService) SendMessage(_ context.Context, roomID, content string) (string, error) {
+	m.lastCall = "SendMessage"
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "content": content}
+	return "$evt123", m.err
+}
+
+func (m *mockMatrixChatService) SendImage(_ context.Context, roomID string, _ io.Reader, filename string, _ int64) (string, error) {
+	m.lastCall = "SendImage"
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "filename": filename}
+	return "$img456", m.err
+}
+
+func (m *mockMatrixChatService) SendFile(_ context.Context, roomID string, _ io.Reader, filename string, _ int64) (string, error) {
+	m.lastCall = "SendFile"
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "filename": filename}
+	return "$file789", m.err
+}
+
+func (m *mockMatrixChatService) GetMessages(_ context.Context, roomID string, limit int, before string) ([]contracts.MatrixMessage, string, error) {
+	m.lastCall = "GetMessages"
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "limit": limit, "before": before}
+	return m.messages, m.nextToken, m.err
+}
+
+func (m *mockMatrixChatService) EditMessage(_ context.Context, roomID, eventID, newContent string) error {
+	m.lastCall = "EditMessage"
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "eventID": eventID, "newContent": newContent}
+	return m.err
+}
+
+func (m *mockMatrixChatService) RedactMessage(_ context.Context, roomID, eventID string) error {
+	m.lastCall = "RedactMessage"
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "eventID": eventID}
+	return m.err
+}
+
+func (m *mockMatrixChatService) SendTyping(_ context.Context, roomID string, typing bool) error {
+	m.lastCall = "SendTyping"
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "typing": typing}
+	return m.err
+}
+
+func (m *mockMatrixChatService) MarkAsRead(_ context.Context, roomID, eventID string) error {
+	m.lastCall = "MarkAsRead"
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "eventID": eventID}
+	return m.err
+}
+
+func (m *mockMatrixChatService) Subscribe(_ context.Context) (<-chan contracts.MatrixChatEvent, error) {
+	ch := make(chan contracts.MatrixChatEvent)
+	return ch, m.err
+}
+
+func (m *mockMatrixChatService) SetDisplayName(_ context.Context, _ string) error {
+	m.lastCall = "SetDisplayName"
+	return m.err
+}
+
+func (m *mockMatrixChatService) SetAvatar(_ context.Context, _ io.Reader, _ string) error {
+	return m.err
+}
+
+func (m *mockMatrixChatService) DownloadMedia(_ context.Context, _, _ string) (io.ReadCloser, string, int64, error) {
+	m.lastCall = "DownloadMedia"
+	body := io.NopCloser(strings.NewReader("fake-media-bytes"))
+	return body, "image/png", 16, m.err
+}
+
+func (m *mockMatrixChatService) GetStatus() contracts.MatrixChatStatus {
+	return contracts.MatrixChatStatus{Connected: true, SyncRunning: true, UserID: "@peer_abc:matrix.mobazha.org"}
+}
+
+// mockNodeWithMatrixChat wraps mockNode and overrides MatrixChat() to return a real mock.
+type mockNodeWithMatrixChat struct {
+	mockNode
+	chatSvc *mockMatrixChatService
+}
+
+func (m *mockNodeWithMatrixChat) MatrixChat() contracts.MatrixChatService {
+	return m.chatSvc
+}
+
+func newTestRouterWithChatMock(chatSvc *mockMatrixChatService) (*mux.Router, *Gateway) {
+	node := &mockNodeWithMatrixChat{chatSvc: chatSvc}
+	g := &Gateway{}
+	r := mux.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
+			next.ServeHTTP(w, req.WithContext(ctx))
+		})
+	})
+
+	r.HandleFunc("/v1/chat/status", g.handleGETMatrixChatStatus).Methods("GET")
+	r.HandleFunc("/v1/chat/rooms", g.handleGETMatrixChatRooms).Methods("GET")
+	r.HandleFunc("/v1/chat/rooms", g.handlePOSTMatrixChatRoom).Methods("POST")
+	r.HandleFunc("/v1/chat/rooms/{roomID}/join", g.handlePOSTMatrixChatRoomJoin).Methods("POST")
+	r.HandleFunc("/v1/chat/rooms/{roomID}/leave", g.handlePOSTMatrixChatRoomLeave).Methods("POST")
+	r.HandleFunc("/v1/chat/rooms/{roomID}/messages", g.handleGETMatrixChatRoomMessages).Methods("GET")
+	r.HandleFunc("/v1/chat/rooms/{roomID}/messages", g.handlePOSTMatrixChatRoomMessage).Methods("POST")
+	r.HandleFunc("/v1/chat/rooms/{roomID}/messages/{eventID}", g.handlePUTMatrixChatRoomMessage).Methods("PUT")
+	r.HandleFunc("/v1/chat/rooms/{roomID}/messages/{eventID}", g.handleDELETEMatrixChatRoomMessage).Methods("DELETE")
+	r.HandleFunc("/v1/chat/rooms/{roomID}/typing", g.handlePOSTMatrixChatRoomTyping).Methods("POST")
+	r.HandleFunc("/v1/chat/rooms/{roomID}/read", g.handlePOSTMatrixChatRoomRead).Methods("POST")
+	r.HandleFunc("/v1/chat/rooms/{roomID}/members", g.handleGETMatrixChatRoomMembers).Methods("GET")
+	r.HandleFunc("/v1/chat/rooms/{roomID}/invite", g.handlePOSTMatrixChatRoomInvite).Methods("POST")
+	r.HandleFunc("/v1/chat/rooms/{roomID}/settings", g.handleGETMatrixChatRoomSettings).Methods("GET")
+	r.HandleFunc("/v1/chat/rooms/{roomID}/settings", g.handlePUTMatrixChatRoomSettings).Methods("PUT")
+	r.HandleFunc("/v1/chat/media/{serverName}/{mediaID}", g.handleGETMatrixChatMediaDownload).Methods("GET")
+
+	return r, g
+}
+
+func TestMatrixChat_GetStatus(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("GET", "/v1/chat/status", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	data, ok := resp["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("response missing data envelope")
+	}
+	if data["connected"] != true {
+		t.Errorf("expected connected=true, got %v", data["connected"])
+	}
+	if data["syncRunning"] != true {
+		t.Errorf("expected syncRunning=true, got %v", data["syncRunning"])
+	}
+}
+
+func TestMatrixChat_GetRooms_ReturnsJSON(t *testing.T) {
+	chatSvc := &mockMatrixChatService{
+		rooms: []contracts.MatrixRoom{
+			{RoomID: "!room1:test", Name: "Test Room", IsDirect: true, Encrypted: true},
+			{RoomID: "!room2:test", Name: "Group", IsDirect: false, Members: []contracts.MatrixMember{
+				{UserID: "@peer_abc:test", DisplayName: "Alice", PeerID: "QmAlice123"},
+			}},
+		},
+	}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("GET", "/v1/chat/rooms", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Data []contracts.MatrixRoom `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Data) != 2 {
+		t.Fatalf("expected 2 rooms, got %d", len(resp.Data))
+	}
+	if resp.Data[0].RoomID != "!room1:test" {
+		t.Errorf("room[0].roomId = %q, want !room1:test", resp.Data[0].RoomID)
+	}
+	if !resp.Data[0].IsDirect {
+		t.Errorf("room[0].isDirect should be true")
+	}
+	if resp.Data[1].Members[0].PeerID != "QmAlice123" {
+		t.Errorf("room[1].members[0].peerID = %q, want QmAlice123", resp.Data[1].Members[0].PeerID)
+	}
+}
+
+func TestMatrixChat_CreateDirectRoom(t *testing.T) {
+	chatSvc := &mockMatrixChatService{createdRoom: "!dm123:test"}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"userID":"@peer_abc:test","isDM":true}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 201 {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Data map[string]string `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Data["roomId"] != "!dm123:test" {
+		t.Errorf("roomId = %v, want !dm123:test", resp.Data["roomId"])
+	}
+	if chatSvc.lastCall != "CreateDirectRoom" {
+		t.Errorf("expected CreateDirectRoom, got %s", chatSvc.lastCall)
+	}
+}
+
+func TestMatrixChat_CreateGroupRoom(t *testing.T) {
+	chatSvc := &mockMatrixChatService{createdRoom: "!grp456:test"}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"name":"Test Group","memberIDs":["@peer_a:test","@peer_b:test"],"isDM":false}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 201 {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "CreateGroupRoom" {
+		t.Errorf("expected CreateGroupRoom, got %s", chatSvc.lastCall)
+	}
+	if chatSvc.lastArgs["name"] != "Test Group" {
+		t.Errorf("name = %v", chatSvc.lastArgs["name"])
+	}
+}
+
+func TestMatrixChat_SendMessage_RequiresBody(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"body":""}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms/!room1:test/messages", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400 for empty body, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMatrixChat_SendMessage_Success(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"body":"Hello, world!"}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms/!room1:test/messages", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 201 {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Data map[string]string `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Data["eventId"] != "$evt123" {
+		t.Errorf("eventId = %v, want $evt123", resp.Data["eventId"])
+	}
+	if chatSvc.lastArgs["content"] != "Hello, world!" {
+		t.Errorf("content mismatch: %v", chatSvc.lastArgs["content"])
+	}
+}
+
+func TestMatrixChat_EditMessage(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"body":"Updated content"}`
+	req := httptest.NewRequest("PUT", "/v1/chat/rooms/!room1:test/messages/$evt123", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "EditMessage" {
+		t.Errorf("expected EditMessage, got %s", chatSvc.lastCall)
+	}
+	if chatSvc.lastArgs["newContent"] != "Updated content" {
+		t.Errorf("newContent mismatch: %v", chatSvc.lastArgs["newContent"])
+	}
+}
+
+func TestMatrixChat_RedactMessage(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("DELETE", "/v1/chat/rooms/!room1:test/messages/$evt123", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "RedactMessage" {
+		t.Errorf("expected RedactMessage, got %s", chatSvc.lastCall)
+	}
+}
+
+func TestMatrixChat_GetMessages_Pagination(t *testing.T) {
+	now := time.Now()
+	chatSvc := &mockMatrixChatService{
+		messages: []contracts.MatrixMessage{
+			{EventID: "$msg1", RoomID: "!room1:test", Sender: "@peer_abc:test", Content: "Hi", MsgType: "m.text", Timestamp: now},
+		},
+		nextToken: "tok_abc",
+	}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("GET", "/v1/chat/rooms/!room1:test/messages?limit=20&before=tok_prev", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Data struct {
+			Messages []contracts.MatrixMessage `json:"messages"`
+			End      string                    `json:"end"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Data.End != "tok_abc" {
+		t.Errorf("end = %v, want tok_abc", resp.Data.End)
+	}
+	if len(resp.Data.Messages) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(resp.Data.Messages))
+	}
+	if chatSvc.lastArgs["limit"] != 20 {
+		t.Errorf("limit = %v, want 20", chatSvc.lastArgs["limit"])
+	}
+	if chatSvc.lastArgs["before"] != "tok_prev" {
+		t.Errorf("before = %v, want tok_prev", chatSvc.lastArgs["before"])
+	}
+}
+
+func TestMatrixChat_MarkAsRead_RequiresEventId(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms/!room1:test/read", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMatrixChat_MarkAsRead_Success(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"eventId":"$evt999"}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms/!room1:test/read", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastArgs["eventID"] != "$evt999" {
+		t.Errorf("eventID = %v, want $evt999", chatSvc.lastArgs["eventID"])
+	}
+}
+
+func TestMatrixChat_InviteToRoom_RequiresUserID(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms/!room1:test/invite", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMatrixChat_JoinRoom(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("POST", "/v1/chat/rooms/!room1:test/join", strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "JoinRoom" {
+		t.Errorf("expected JoinRoom, got %s", chatSvc.lastCall)
+	}
+}
+
+func TestMatrixChat_LeaveRoom(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("POST", "/v1/chat/rooms/!room1:test/leave", strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "LeaveRoom" {
+		t.Errorf("expected LeaveRoom, got %s", chatSvc.lastCall)
+	}
+}
+
+func TestMatrixChat_MediaDownload(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("GET", "/v1/chat/media/matrix.mobazha.org/abc123", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if w.Header().Get("Content-Type") != "image/png" {
+		t.Errorf("Content-Type = %s, want image/png", w.Header().Get("Content-Type"))
+	}
+	if w.Header().Get("Cache-Control") != "private, max-age=86400, immutable" {
+		t.Errorf("Cache-Control = %q, want 'private, max-age=86400, immutable'", w.Header().Get("Cache-Control"))
+	}
+	if chatSvc.lastCall != "DownloadMedia" {
+		t.Errorf("expected DownloadMedia, got %s", chatSvc.lastCall)
+	}
+}
+
+func TestMatrixChat_RoomSettings_Get(t *testing.T) {
+	chatSvc := &mockMatrixChatService{
+		rooms: []contracts.MatrixRoom{
+			{RoomID: "!room1:test", Name: "My Room", Topic: "Hello", Encrypted: true, RoomType: "direct"},
+		},
+	}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("GET", "/v1/chat/rooms/!room1:test/settings", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Data map[string]interface{} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Data["name"] != "My Room" {
+		t.Errorf("name = %v, want My Room", resp.Data["name"])
+	}
+	if resp.Data["encrypted"] != true {
+		t.Errorf("encrypted should be true")
+	}
+}
+
+func TestMatrixChat_RoomSettings_Update(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"name":"New Name"}`
+	req := httptest.NewRequest("PUT", "/v1/chat/rooms/!room1:test/settings", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "SetRoomName" {
+		t.Errorf("expected SetRoomName, got %s", chatSvc.lastCall)
+	}
+	if chatSvc.lastArgs["name"] != "New Name" {
+		t.Errorf("name = %v, want New Name", chatSvc.lastArgs["name"])
+	}
+}
+
+func TestMatrixChat_Typing(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"typing":true}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms/!room1:test/typing", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "SendTyping" {
+		t.Errorf("expected SendTyping, got %s", chatSvc.lastCall)
+	}
+}
+
+func TestMatrixChat_GetRoomMembers(t *testing.T) {
+	chatSvc := &mockMatrixChatService{
+		rooms: []contracts.MatrixRoom{
+			{
+				RoomID: "!room1:test",
+				Members: []contracts.MatrixMember{
+					{UserID: "@peer_abc:test", DisplayName: "Alice", PeerID: "QmAlice123", Membership: "join"},
+					{UserID: "@peer_def:test", DisplayName: "Bob", PeerID: "QmBob456", Membership: "join"},
+				},
+			},
+		},
+	}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("GET", "/v1/chat/rooms/!room1:test/members", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Data []contracts.MatrixMember `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Data) != 2 {
+		t.Fatalf("expected 2 members, got %d", len(resp.Data))
+	}
+	if resp.Data[0].PeerID != "QmAlice123" {
+		t.Errorf("members[0].peerID = %q, want QmAlice123", resp.Data[0].PeerID)
+	}
+}
+
+// Verify JSON field casing matches frontend expectations (camelCase).
+func TestMatrixChat_JSONFieldCasing(t *testing.T) {
+	now := time.Now()
+	room := contracts.MatrixRoom{
+		RoomID:   "!r1:test",
+		Name:     "Test",
+		IsDirect: true,
+		Members: []contracts.MatrixMember{
+			{UserID: "@peer_abc:test", DisplayName: "Alice", AvatarURL: "mxc://test/abc", PeerID: "QmAbc123", Membership: "join"},
+		},
+		LastMessage: &contracts.MatrixMessage{
+			EventID:   "$evt1",
+			RoomID:    "!r1:test",
+			Sender:    "@peer_abc:test",
+			Content:   "Hello",
+			MsgType:   "m.text",
+			Timestamp: now,
+		},
+		UnreadCount: 3,
+		Encrypted:   true,
+	}
+
+	b, err := json.Marshal(room)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	raw := string(b)
+	expectedFields := []string{
+		`"roomId"`, `"isDirect"`, `"unreadCount"`, `"encrypted"`,
+		`"userId"`, `"displayName"`, `"avatarUrl"`, `"peerID"`, `"membership"`,
+		`"msgType"`, `"sender"`, `"content"`,
+		`"id"`, // MatrixMessage.EventID uses json tag "id"
+	}
+	for _, field := range expectedFields {
+		if !strings.Contains(raw, field) {
+			t.Errorf("JSON missing camelCase field %s in:\n%s", field, raw)
+		}
+	}
+
+	forbiddenFields := []string{
+		`"RoomID"`, `"IsDirect"`, `"UnreadCount"`, `"UserID"`,
+		`"DisplayName"`, `"AvatarURL"`, `"PeerID"`, `"MsgType"`, `"EventID"`,
+	}
+	for _, field := range forbiddenFields {
+		if strings.Contains(raw, field) {
+			t.Errorf("JSON contains PascalCase field %s — frontend expects camelCase", field)
+		}
+	}
+}
+
+// Ensure service-unavailable returns 503 when MatrixChat() returns nil.
+func TestMatrixChat_ServiceUnavailable(t *testing.T) {
+	node := &mockNode{}
+	g := &Gateway{}
+	r := mux.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
+			next.ServeHTTP(w, req.WithContext(ctx))
+		})
+	})
+	r.HandleFunc("/v1/chat/rooms", g.handleGETMatrixChatRooms).Methods("GET")
+
+	req := httptest.NewRequest("GET", "/v1/chat/rooms", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 503 {
+		t.Fatalf("expected 503 when MatrixChat() is nil, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMatrixChat_EditMessage_EmptyBody(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"body":""}`
+	req := httptest.NewRequest("PUT", "/v1/chat/rooms/!room1:test/messages/$evt123", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400 for empty body, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMatrixChat_GetStatus_ServiceUnavailable(t *testing.T) {
+	node := &mockNode{}
+	g := &Gateway{}
+	r := mux.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			ctx := context.WithValue(req.Context(), nodeContextKey, contracts.NodeService(node))
+			next.ServeHTTP(w, req.WithContext(ctx))
+		})
+	})
+	r.HandleFunc("/v1/chat/status", g.handleGETMatrixChatStatus).Methods("GET")
+
+	req := httptest.NewRequest("GET", "/v1/chat/status", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("status should return 200 even when service is nil, got %d", w.Code)
+	}
+	var resp struct {
+		Data map[string]interface{} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Data["connected"] != false {
+		t.Errorf("expected connected=false when service nil, got %v", resp.Data["connected"])
+	}
+}

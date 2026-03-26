@@ -228,8 +228,10 @@ func getListingService(r *http.Request) contracts.ListingService { return getNod
 func getProfileService(r *http.Request) contracts.ProfileService { return getNodeService(r).Profile() }
 func getSocialService(r *http.Request) contracts.SocialService   { return getNodeService(r).Social() }
 func getWalletService(r *http.Request) contracts.WalletService   { return getNodeService(r).Wallet() }
-func getMediaService(r *http.Request) contracts.MediaService     { return getNodeService(r).Media() }
-func getMatrixService(r *http.Request) contracts.MatrixService   { return getNodeService(r).Matrix() }
+func getMediaService(r *http.Request) contracts.MediaService { return getNodeService(r).Media() }
+func getMatrixChatService(r *http.Request) contracts.MatrixChatService {
+	return getNodeService(r).MatrixChat()
+}
 func getPreferencesService(r *http.Request) contracts.PreferencesService {
 	return getNodeService(r).Preferences()
 }

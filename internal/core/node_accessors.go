@@ -13,6 +13,16 @@ import (
 	wh "github.com/mobazha/mobazha3.0/pkg/webhook"
 )
 
+// Context returns the node's lifecycle context. It is cancelled when
+// the node is stopped (via Stop or LRU eviction). External goroutines
+// tied to this node should select on this context to avoid leaking.
+func (n *MobazhaNode) Context() context.Context {
+	if n.nodeCtx != nil {
+		return n.nodeCtx
+	}
+	return context.Background()
+}
+
 // Service accessors implement contracts.NodeService's accessor pattern.
 // Each returns the corresponding App Service (or a thin facade that
 // composes multiple App Services when a domain spans several).

@@ -3,8 +3,10 @@ package api
 import (
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -94,6 +96,7 @@ func (g *Gateway) handleGETMatrixChatRoomMessages(w http.ResponseWriter, r *http
 	roomID := mux.Vars(r)["roomID"]
 	limitStr := r.URL.Query().Get("limit")
 	before := r.URL.Query().Get("before")
+	after := r.URL.Query().Get("after")
 	since := r.URL.Query().Get("since")
 
 	limit := 50
@@ -103,12 +106,25 @@ func (g *Gateway) handleGETMatrixChatRoomMessages(w http.ResponseWriter, r *http
 		}
 	}
 
-	token := before
-	if token == "" {
-		token = since
+	if before != "" && after != "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "cannot specify both before and after")
+		return
 	}
 
-	messages, nextToken, err := svc.GetMessages(r.Context(), roomID, limit, token)
+	var token, dir string
+	switch {
+	case before != "":
+		token, dir = before, "b"
+	case after != "":
+		token, dir = after, "f"
+	case since != "":
+		token, dir = since, "b"
+		w.Header().Set("X-Deprecated", "since parameter is deprecated; use before or after")
+	default:
+		dir = "b"
+	}
+
+	messages, nextToken, err := svc.GetMessages(r.Context(), roomID, limit, token, dir)
 	if err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 		return
@@ -197,8 +213,9 @@ func (g *Gateway) handlePOSTMatrixChatRoomReaction(w http.ResponseWriter, r *htt
 		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
 		return
 	}
-	_ = mux.Vars(r)["roomID"]
-	_ = mux.Vars(r)["eventID"]
+	vars := mux.Vars(r)
+	roomID := vars["roomID"]
+	eventID := vars["eventID"]
 
 	var req struct {
 		Key string `json:"key"`
@@ -207,9 +224,17 @@ func (g *Gateway) handlePOSTMatrixChatRoomReaction(w http.ResponseWriter, r *htt
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
 		return
 	}
-	_ = svc
-	_ = req
-	responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "reactions not yet implemented")
+	if req.Key == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "key is required")
+		return
+	}
+
+	reactionEventID, err := svc.SendReaction(r.Context(), roomID, eventID, req.Key)
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	responsePkg.Created(w, map[string]string{"eventId": reactionEventID})
 }
 
 func (g *Gateway) handlePOSTMatrixChatRoomTyping(w http.ResponseWriter, r *http.Request) {
@@ -302,8 +327,29 @@ func (g *Gateway) handlePOSTMatrixChatRoomInvite(w http.ResponseWriter, r *http.
 }
 
 func (g *Gateway) handlePOSTMatrixChatRoomKick(w http.ResponseWriter, r *http.Request) {
-	_ = getMatrixChatService(r)
-	responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "kick not yet implemented")
+	svc := getMatrixChatService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
+		return
+	}
+	roomID := mux.Vars(r)["roomID"]
+	var req struct {
+		UserID string `json:"userID"`
+		Reason string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
+		return
+	}
+	if req.UserID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "userID is required")
+		return
+	}
+	if err := svc.KickUser(r.Context(), roomID, req.UserID, req.Reason); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	responsePkg.NoContent(w)
 }
 
 func (g *Gateway) handleGETMatrixChatRoomSettings(w http.ResponseWriter, r *http.Request) {
@@ -336,7 +382,8 @@ func (g *Gateway) handlePUTMatrixChatRoomSettings(w http.ResponseWriter, r *http
 	}
 	roomID := mux.Vars(r)["roomID"]
 	var req struct {
-		Name string `json:"name"`
+		Name  string  `json:"name"`
+		Topic *string `json:"topic"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
@@ -347,6 +394,42 @@ func (g *Gateway) handlePUTMatrixChatRoomSettings(w http.ResponseWriter, r *http
 			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 			return
 		}
+	}
+	if req.Topic != nil {
+		if err := svc.SetRoomTopic(r.Context(), roomID, *req.Topic); err != nil {
+			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+			return
+		}
+	}
+	responsePkg.NoContent(w)
+}
+
+func (g *Gateway) handlePOSTMatrixChatRoomAvatar(w http.ResponseWriter, r *http.Request) {
+	svc := getMatrixChatService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
+		return
+	}
+	roomID := mux.Vars(r)["roomID"]
+
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "file too large or invalid form")
+		return
+	}
+	file, header, err := r.FormFile("avatar")
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "avatar field is required")
+		return
+	}
+	defer file.Close()
+
+	contentType := header.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	if err := svc.SetRoomAvatar(r.Context(), roomID, file, contentType); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
 	}
 	responsePkg.NoContent(w)
 }
@@ -406,6 +489,15 @@ func (g *Gateway) handleGETMatrixChatMediaDownload(w http.ResponseWriter, r *htt
 	serverName := vars["serverName"]
 	mediaID := vars["mediaID"]
 
+	if !isValidMatrixServerName(serverName) {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid server name")
+		return
+	}
+	if strings.ContainsAny(mediaID, "/\\") {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid media ID")
+		return
+	}
+
 	reader, contentType, size, err := svc.DownloadMedia(r.Context(), serverName, mediaID)
 	if err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
@@ -422,12 +514,80 @@ func (g *Gateway) handleGETMatrixChatMediaDownload(w http.ResponseWriter, r *htt
 	io.Copy(w, reader)
 }
 
+// isValidMatrixServerName validates a Matrix server name for SSRF prevention.
+// Rejects IP addresses, port suffixes, path separators, and localhost.
+func isValidMatrixServerName(s string) bool {
+	if s == "" || len(s) > 255 {
+		return false
+	}
+	if strings.ContainsAny(s, "/\\@") {
+		return false
+	}
+	host := s
+	if idx := strings.LastIndex(s, ":"); idx != -1 {
+		host = s[:idx]
+	}
+	if net.ParseIP(host) != nil {
+		return false
+	}
+	lower := strings.ToLower(host)
+	if lower == "localhost" || strings.HasSuffix(lower, ".localhost") {
+		return false
+	}
+	if !strings.Contains(host, ".") {
+		return false
+	}
+	return true
+}
+
 func (g *Gateway) handlePOSTMatrixChatUserBlock(w http.ResponseWriter, r *http.Request) {
-	responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "block not yet implemented")
+	svc := getMatrixChatService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
+		return
+	}
+	userID := mux.Vars(r)["userID"]
+	if userID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "userID is required")
+		return
+	}
+	if err := svc.BlockUser(r.Context(), userID); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	responsePkg.NoContent(w)
 }
 
 func (g *Gateway) handleDELETEMatrixChatUserBlock(w http.ResponseWriter, r *http.Request) {
-	responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "unblock not yet implemented")
+	svc := getMatrixChatService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
+		return
+	}
+	userID := mux.Vars(r)["userID"]
+	if userID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "userID is required")
+		return
+	}
+	if err := svc.UnblockUser(r.Context(), userID); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	responsePkg.NoContent(w)
+}
+
+func (g *Gateway) handleGETMatrixChatBlockedUsers(w http.ResponseWriter, r *http.Request) {
+	svc := getMatrixChatService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
+		return
+	}
+	users, err := svc.GetBlockedUsers(r.Context())
+	if err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	responsePkg.Success(w, users)
 }
 
 func (g *Gateway) handleGETMatrixChatPresence(w http.ResponseWriter, r *http.Request) {

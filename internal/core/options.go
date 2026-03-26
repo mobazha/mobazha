@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 
@@ -219,6 +220,10 @@ func (n *MobazhaNode) initMatrixChatService() {
 		registrationSecret = n.sharedManager.NetConfig.MatrixRegistrationSecret
 	}
 
+	if registrationSecret == "" {
+		registrationSecret = os.Getenv("MATRIX_REGISTRATION_SECRET")
+	}
+
 	if homeserverURL == "" {
 		homeserverURL = "https://matrix.mobazha.org"
 	}
@@ -237,6 +242,7 @@ func (n *MobazhaNode) initMatrixChatService() {
 		DB:                 n.db,
 		PrivKey:            n.privKey,
 		PeerID:             n.peerID,
+		NodeCtx:            n.nodeCtx,
 		HomeserverURL:      homeserverURL,
 		ServerName:         serverName,
 		DBPath:             dbPath,

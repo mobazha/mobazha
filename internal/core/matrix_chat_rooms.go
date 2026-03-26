@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"io"
 	"sort"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -164,6 +165,19 @@ func (s *mautrixChatService) InviteToRoom(ctx context.Context, roomID, userID st
 	return err
 }
 
+// KickUser removes a user from a room with an optional reason.
+func (s *mautrixChatService) KickUser(ctx context.Context, roomID, userID, reason string) error {
+	if err := s.ensureReady(ctx); err != nil {
+		return err
+	}
+	s.touchActivity()
+	_, err := s.client.SendStateEvent(ctx, id.RoomID(roomID), event.StateMember, userID, &event.MemberEventContent{
+		Membership: event.MembershipLeave,
+		Reason:     reason,
+	})
+	return err
+}
+
 // SetRoomName changes the display name of a room.
 func (s *mautrixChatService) SetRoomName(ctx context.Context, roomID, name string) error {
 	if err := s.ensureReady(ctx); err != nil {
@@ -172,6 +186,43 @@ func (s *mautrixChatService) SetRoomName(ctx context.Context, roomID, name strin
 	s.touchActivity()
 	_, err := s.client.SendStateEvent(ctx, id.RoomID(roomID), event.StateRoomName, "", &event.RoomNameEventContent{
 		Name: name,
+	})
+	return err
+}
+
+// SetRoomTopic changes the topic of a room.
+func (s *mautrixChatService) SetRoomTopic(ctx context.Context, roomID, topic string) error {
+	if err := s.ensureReady(ctx); err != nil {
+		return err
+	}
+	s.touchActivity()
+	_, err := s.client.SendStateEvent(ctx, id.RoomID(roomID), event.StateTopic, "", &event.TopicEventContent{
+		Topic: topic,
+	})
+	return err
+}
+
+// SetRoomAvatar uploads an image and sets it as the room avatar.
+func (s *mautrixChatService) SetRoomAvatar(ctx context.Context, roomID string, reader io.Reader, contentType string) error {
+	if err := s.ensureReady(ctx); err != nil {
+		return err
+	}
+	s.touchActivity()
+	limited := io.LimitReader(reader, maxMediaUploadSize+1)
+	data, err := io.ReadAll(limited)
+	if err != nil {
+		return fmt.Errorf("failed to read room avatar data: %w", err)
+	}
+	if int64(len(data)) > maxMediaUploadSize {
+		return errMediaTooLarge
+	}
+
+	resp, err := s.client.UploadBytes(ctx, data, contentType)
+	if err != nil {
+		return fmt.Errorf("failed to upload room avatar: %w", err)
+	}
+	_, err = s.client.SendStateEvent(ctx, id.RoomID(roomID), event.StateRoomAvatar, "", &event.RoomAvatarEventContent{
+		URL: resp.ContentURI.CUString(),
 	})
 	return err
 }

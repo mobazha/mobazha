@@ -36,8 +36,14 @@ type MatrixChatService interface {
 	LeaveRoom(ctx context.Context, roomID string) error
 	// InviteToRoom invites a Matrix user to a room.
 	InviteToRoom(ctx context.Context, roomID, userID string) error
+	// KickUser removes a user from a room with an optional reason.
+	KickUser(ctx context.Context, roomID, userID, reason string) error
 	// SetRoomName changes the display name of a room.
 	SetRoomName(ctx context.Context, roomID, name string) error
+	// SetRoomTopic changes the topic of a room.
+	SetRoomTopic(ctx context.Context, roomID, topic string) error
+	// SetRoomAvatar uploads an image and sets it as the room avatar.
+	SetRoomAvatar(ctx context.Context, roomID string, reader io.Reader, contentType string) error
 
 	// --- Messages ---
 
@@ -48,11 +54,15 @@ type MatrixChatService interface {
 	// SendFile uploads and sends a file message. Returns the event ID.
 	SendFile(ctx context.Context, roomID string, reader io.Reader, filename string, size int64) (string, error)
 	// GetMessages returns paginated messages for a room.
-	GetMessages(ctx context.Context, roomID string, limit int, before string) ([]MatrixMessage, string, error)
+	// `token` is an opaque pagination token. `dir` controls direction:
+	//   "b" (default) = backward (older messages), "f" = forward (newer messages).
+	GetMessages(ctx context.Context, roomID string, limit int, token string, dir string) ([]MatrixMessage, string, error)
 	// EditMessage edits a previously sent message.
 	EditMessage(ctx context.Context, roomID, eventID, newContent string) error
 	// RedactMessage redacts (deletes) a message.
 	RedactMessage(ctx context.Context, roomID, eventID string) error
+	// SendReaction sends an emoji reaction to a message. Returns the reaction event ID.
+	SendReaction(ctx context.Context, roomID, eventID, key string) (string, error)
 
 	// --- Real-time ---
 
@@ -79,6 +89,15 @@ type MatrixChatService interface {
 	// DownloadMedia downloads a media file from the Matrix homeserver.
 	// Returns the reader, content type, and content length.
 	DownloadMedia(ctx context.Context, serverName, mediaID string) (io.ReadCloser, string, int64, error)
+
+	// --- Block ---
+
+	// BlockUser adds a user to the ignore list (m.ignored_user_list).
+	BlockUser(ctx context.Context, userID string) error
+	// UnblockUser removes a user from the ignore list.
+	UnblockUser(ctx context.Context, userID string) error
+	// GetBlockedUsers returns the list of blocked Matrix user IDs.
+	GetBlockedUsers(ctx context.Context) ([]string, error)
 
 	// --- Settings ---
 

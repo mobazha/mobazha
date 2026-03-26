@@ -74,9 +74,27 @@ func (m *mockMatrixChatService) InviteToRoom(_ context.Context, roomID, userID s
 	return m.err
 }
 
+func (m *mockMatrixChatService) KickUser(_ context.Context, roomID, userID, reason string) error {
+	m.lastCall = "KickUser"
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "userID": userID, "reason": reason}
+	return m.err
+}
+
 func (m *mockMatrixChatService) SetRoomName(_ context.Context, roomID, name string) error {
 	m.lastCall = "SetRoomName"
 	m.lastArgs = map[string]interface{}{"roomID": roomID, "name": name}
+	return m.err
+}
+
+func (m *mockMatrixChatService) SetRoomTopic(_ context.Context, roomID, topic string) error {
+	m.lastCall = "SetRoomTopic"
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "topic": topic}
+	return m.err
+}
+
+func (m *mockMatrixChatService) SetRoomAvatar(_ context.Context, roomID string, reader io.Reader, contentType string) error {
+	m.lastCall = "SetRoomAvatar"
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "contentType": contentType}
 	return m.err
 }
 
@@ -98,9 +116,9 @@ func (m *mockMatrixChatService) SendFile(_ context.Context, roomID string, _ io.
 	return "$file789", m.err
 }
 
-func (m *mockMatrixChatService) GetMessages(_ context.Context, roomID string, limit int, before string) ([]contracts.MatrixMessage, string, error) {
+func (m *mockMatrixChatService) GetMessages(_ context.Context, roomID string, limit int, token string, dir string) ([]contracts.MatrixMessage, string, error) {
 	m.lastCall = "GetMessages"
-	m.lastArgs = map[string]interface{}{"roomID": roomID, "limit": limit, "before": before}
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "limit": limit, "token": token, "dir": dir}
 	return m.messages, m.nextToken, m.err
 }
 
@@ -114,6 +132,29 @@ func (m *mockMatrixChatService) RedactMessage(_ context.Context, roomID, eventID
 	m.lastCall = "RedactMessage"
 	m.lastArgs = map[string]interface{}{"roomID": roomID, "eventID": eventID}
 	return m.err
+}
+
+func (m *mockMatrixChatService) SendReaction(_ context.Context, roomID, eventID, key string) (string, error) {
+	m.lastCall = "SendReaction"
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "eventID": eventID, "key": key}
+	return "$reaction001", m.err
+}
+
+func (m *mockMatrixChatService) BlockUser(_ context.Context, userID string) error {
+	m.lastCall = "BlockUser"
+	m.lastArgs = map[string]interface{}{"userID": userID}
+	return m.err
+}
+
+func (m *mockMatrixChatService) UnblockUser(_ context.Context, userID string) error {
+	m.lastCall = "UnblockUser"
+	m.lastArgs = map[string]interface{}{"userID": userID}
+	return m.err
+}
+
+func (m *mockMatrixChatService) GetBlockedUsers(_ context.Context) ([]string, error) {
+	m.lastCall = "GetBlockedUsers"
+	return []string{"@blocked:test"}, m.err
 }
 
 func (m *mockMatrixChatService) SendTyping(_ context.Context, roomID string, typing bool) error {
@@ -220,13 +261,19 @@ func newTestRouterWithChatMock(chatSvc *mockMatrixChatService) (*mux.Router, *Ga
 	r.HandleFunc("/v1/chat/rooms/{roomID}/messages", g.handlePOSTMatrixChatRoomMessage).Methods("POST")
 	r.HandleFunc("/v1/chat/rooms/{roomID}/messages/{eventID}", g.handlePUTMatrixChatRoomMessage).Methods("PUT")
 	r.HandleFunc("/v1/chat/rooms/{roomID}/messages/{eventID}", g.handleDELETEMatrixChatRoomMessage).Methods("DELETE")
+	r.HandleFunc("/v1/chat/rooms/{roomID}/messages/{eventID}/reactions", g.handlePOSTMatrixChatRoomReaction).Methods("POST")
 	r.HandleFunc("/v1/chat/rooms/{roomID}/typing", g.handlePOSTMatrixChatRoomTyping).Methods("POST")
 	r.HandleFunc("/v1/chat/rooms/{roomID}/read", g.handlePOSTMatrixChatRoomRead).Methods("POST")
 	r.HandleFunc("/v1/chat/rooms/{roomID}/members", g.handleGETMatrixChatRoomMembers).Methods("GET")
 	r.HandleFunc("/v1/chat/rooms/{roomID}/invite", g.handlePOSTMatrixChatRoomInvite).Methods("POST")
+	r.HandleFunc("/v1/chat/rooms/{roomID}/kick", g.handlePOSTMatrixChatRoomKick).Methods("POST")
 	r.HandleFunc("/v1/chat/rooms/{roomID}/settings", g.handleGETMatrixChatRoomSettings).Methods("GET")
 	r.HandleFunc("/v1/chat/rooms/{roomID}/settings", g.handlePUTMatrixChatRoomSettings).Methods("PUT")
+	r.HandleFunc("/v1/chat/rooms/{roomID}/avatar", g.handlePOSTMatrixChatRoomAvatar).Methods("POST")
 	r.HandleFunc("/v1/chat/media/{serverName}/{mediaID}", g.handleGETMatrixChatMediaDownload).Methods("GET")
+	r.HandleFunc("/v1/chat/users/{userID}/block", g.handlePOSTMatrixChatUserBlock).Methods("POST")
+	r.HandleFunc("/v1/chat/users/{userID}/block", g.handleDELETEMatrixChatUserBlock).Methods("DELETE")
+	r.HandleFunc("/v1/chat/blocked-users", g.handleGETMatrixChatBlockedUsers).Methods("GET")
 	r.HandleFunc("/v1/chat/settings", g.handleGETMatrixChatSettings).Methods("GET")
 	r.HandleFunc("/v1/chat/settings", g.handlePUTMatrixChatSettings).Methods("PUT")
 	r.HandleFunc("/v1/chat/verification/request", g.handlePOSTMatrixChatVerificationRequest).Methods("POST")
@@ -467,8 +514,58 @@ func TestMatrixChat_GetMessages_Pagination(t *testing.T) {
 	if chatSvc.lastArgs["limit"] != 20 {
 		t.Errorf("limit = %v, want 20", chatSvc.lastArgs["limit"])
 	}
-	if chatSvc.lastArgs["before"] != "tok_prev" {
-		t.Errorf("before = %v, want tok_prev", chatSvc.lastArgs["before"])
+	if chatSvc.lastArgs["token"] != "tok_prev" {
+		t.Errorf("token = %v, want tok_prev", chatSvc.lastArgs["token"])
+	}
+	if chatSvc.lastArgs["dir"] != "b" {
+		t.Errorf("dir = %v, want b", chatSvc.lastArgs["dir"])
+	}
+}
+
+func TestMatrixChat_GetMessages_AfterParam(t *testing.T) {
+	chatSvc := &mockMatrixChatService{
+		messages:  []contracts.MatrixMessage{},
+		nextToken: "tok_next",
+	}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("GET", "/v1/chat/rooms/!room1:test/messages?after=tok_start", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastArgs["token"] != "tok_start" {
+		t.Errorf("token = %v, want tok_start", chatSvc.lastArgs["token"])
+	}
+	if chatSvc.lastArgs["dir"] != "f" {
+		t.Errorf("dir = %v, want f", chatSvc.lastArgs["dir"])
+	}
+}
+
+func TestMatrixChat_GetMessages_SinceDeprecated(t *testing.T) {
+	chatSvc := &mockMatrixChatService{
+		messages:  []contracts.MatrixMessage{},
+		nextToken: "",
+	}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("GET", "/v1/chat/rooms/!room1:test/messages?since=tok_old", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastArgs["token"] != "tok_old" {
+		t.Errorf("token = %v, want tok_old", chatSvc.lastArgs["token"])
+	}
+	if chatSvc.lastArgs["dir"] != "b" {
+		t.Errorf("dir = %v, want b (since is backward-compat alias for before)", chatSvc.lastArgs["dir"])
+	}
+	if w.Header().Get("X-Deprecated") == "" {
+		t.Error("expected X-Deprecated header for since param")
 	}
 }
 
@@ -576,6 +673,46 @@ func TestMatrixChat_MediaDownload(t *testing.T) {
 	}
 }
 
+func TestMatrixChat_MediaDownload_SSRF_RejectsIP(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	for _, server := range []string{"127.0.0.1", "192.168.1.1", "10.0.0.1", "::1"} {
+		req := httptest.NewRequest("GET", "/v1/chat/media/"+server+"/abc123", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != 400 {
+			t.Errorf("server=%q: expected 400, got %d", server, w.Code)
+		}
+	}
+}
+
+func TestMatrixChat_MediaDownload_SSRF_RejectsLocalhost(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	for _, server := range []string{"localhost", "sub.localhost"} {
+		req := httptest.NewRequest("GET", "/v1/chat/media/"+server+"/abc123", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != 400 {
+			t.Errorf("server=%q: expected 400, got %d", server, w.Code)
+		}
+	}
+}
+
+func TestMatrixChat_MediaDownload_SSRF_RejectsSingleLabel(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("GET", "/v1/chat/media/intranet/abc123", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != 400 {
+		t.Errorf("expected 400 for single-label hostname, got %d", w.Code)
+	}
+}
+
 func TestMatrixChat_RoomSettings_Get(t *testing.T) {
 	chatSvc := &mockMatrixChatService{
 		rooms: []contracts.MatrixRoom{
@@ -623,6 +760,75 @@ func TestMatrixChat_RoomSettings_Update(t *testing.T) {
 	}
 	if chatSvc.lastArgs["name"] != "New Name" {
 		t.Errorf("name = %v, want New Name", chatSvc.lastArgs["name"])
+	}
+}
+
+func TestMatrixChat_RoomSettings_UpdateTopic(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"topic":"New Topic"}`
+	req := httptest.NewRequest("PUT", "/v1/chat/rooms/!room1:test/settings", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "SetRoomTopic" {
+		t.Errorf("expected SetRoomTopic, got %s", chatSvc.lastCall)
+	}
+	if chatSvc.lastArgs["topic"] != "New Topic" {
+		t.Errorf("topic = %v, want New Topic", chatSvc.lastArgs["topic"])
+	}
+}
+
+func TestMatrixChat_RoomSettings_ClearTopic(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"topic":""}`
+	req := httptest.NewRequest("PUT", "/v1/chat/rooms/!room1:test/settings", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "SetRoomTopic" {
+		t.Errorf("expected SetRoomTopic, got %s", chatSvc.lastCall)
+	}
+	if chatSvc.lastArgs["topic"] != "" {
+		t.Errorf("topic = %v, want empty string", chatSvc.lastArgs["topic"])
+	}
+}
+
+func TestMatrixChat_RoomAvatar(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := &strings.Reader{}
+	_ = body
+	var buf strings.Builder
+	boundary := "----TestBoundary"
+	buf.WriteString("------TestBoundary\r\n")
+	buf.WriteString("Content-Disposition: form-data; name=\"avatar\"; filename=\"avatar.png\"\r\n")
+	buf.WriteString("Content-Type: image/png\r\n\r\n")
+	buf.WriteString("fake-png-data")
+	buf.WriteString("\r\n------TestBoundary--\r\n")
+
+	req := httptest.NewRequest("POST", "/v1/chat/rooms/!room1:test/avatar", strings.NewReader(buf.String()))
+	req.Header.Set("Content-Type", "multipart/form-data; boundary="+boundary)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "SetRoomAvatar" {
+		t.Errorf("expected SetRoomAvatar, got %s", chatSvc.lastCall)
 	}
 }
 
@@ -752,6 +958,69 @@ func TestMatrixChat_ServiceUnavailable(t *testing.T) {
 	}
 }
 
+func TestMatrixChat_SendReaction_Success(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"key":"👍"}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms/!room1:test/messages/$evt123/reactions", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 201 {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "SendReaction" {
+		t.Errorf("expected SendReaction, got %s", chatSvc.lastCall)
+	}
+	if chatSvc.lastArgs["key"] != "👍" {
+		t.Errorf("key = %v, want 👍", chatSvc.lastArgs["key"])
+	}
+	if chatSvc.lastArgs["eventID"] != "$evt123" {
+		t.Errorf("eventID = %v, want $evt123", chatSvc.lastArgs["eventID"])
+	}
+	var resp struct {
+		Data map[string]string `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Data["eventId"] != "$reaction001" {
+		t.Errorf("eventId = %v, want $reaction001", resp.Data["eventId"])
+	}
+}
+
+func TestMatrixChat_SendReaction_EmptyKey(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"key":""}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms/!room1:test/messages/$evt123/reactions", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400 for empty key, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMatrixChat_SendReaction_ServiceError(t *testing.T) {
+	chatSvc := &mockMatrixChatService{err: fmt.Errorf("reaction failed")}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"key":"❤️"}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms/!room1:test/messages/$evt123/reactions", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 500 {
+		t.Fatalf("expected 500 on service error, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestMatrixChat_EditMessage_EmptyBody(t *testing.T) {
 	chatSvc := &mockMatrixChatService{}
 	router, _ := newTestRouterWithChatMock(chatSvc)
@@ -794,6 +1063,127 @@ func TestMatrixChat_GetStatus_ServiceUnavailable(t *testing.T) {
 	}
 	if resp.Data["connected"] != false {
 		t.Errorf("expected connected=false when service nil, got %v", resp.Data["connected"])
+	}
+}
+
+// ===================== Block/Unblock Tests (M-002) =====================
+
+func TestMatrixChat_BlockUser_Success(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("POST", "/v1/chat/users/@bad:test/block", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "BlockUser" {
+		t.Errorf("expected BlockUser, got %s", chatSvc.lastCall)
+	}
+	if chatSvc.lastArgs["userID"] != "@bad:test" {
+		t.Errorf("userID = %v, want @bad:test", chatSvc.lastArgs["userID"])
+	}
+}
+
+func TestMatrixChat_UnblockUser_Success(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("DELETE", "/v1/chat/users/@bad:test/block", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "UnblockUser" {
+		t.Errorf("expected UnblockUser, got %s", chatSvc.lastCall)
+	}
+}
+
+func TestMatrixChat_GetBlockedUsers_Success(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	req := httptest.NewRequest("GET", "/v1/chat/blocked-users", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "GetBlockedUsers" {
+		t.Errorf("expected GetBlockedUsers, got %s", chatSvc.lastCall)
+	}
+	var resp struct {
+		Data []string `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Data) != 1 || resp.Data[0] != "@blocked:test" {
+		t.Errorf("unexpected blocked users: %v", resp.Data)
+	}
+}
+
+// ===================== Kick Tests =====================
+
+func TestMatrixChat_KickUser_Success(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"userID":"@spam:test","reason":"spam"}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms/!room1:test/kick", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "KickUser" {
+		t.Errorf("expected KickUser, got %s", chatSvc.lastCall)
+	}
+	if chatSvc.lastArgs["roomID"] != "!room1:test" {
+		t.Errorf("unexpected roomID: %v", chatSvc.lastArgs["roomID"])
+	}
+	if chatSvc.lastArgs["userID"] != "@spam:test" {
+		t.Errorf("unexpected userID: %v", chatSvc.lastArgs["userID"])
+	}
+	if chatSvc.lastArgs["reason"] != "spam" {
+		t.Errorf("unexpected reason: %v", chatSvc.lastArgs["reason"])
+	}
+}
+
+func TestMatrixChat_KickUser_MissingUserID(t *testing.T) {
+	chatSvc := &mockMatrixChatService{}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"reason":"spam"}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms/!room1:test/kick", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMatrixChat_KickUser_ServiceError(t *testing.T) {
+	chatSvc := &mockMatrixChatService{err: fmt.Errorf("no permission")}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"userID":"@spam:test"}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms/!room1:test/kick", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 500 {
+		t.Fatalf("expected 500, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

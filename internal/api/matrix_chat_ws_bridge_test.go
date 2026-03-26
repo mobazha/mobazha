@@ -45,7 +45,14 @@ func (m *bridgeMockChatService) LeaveRoom(context.Context, string) error { retur
 func (m *bridgeMockChatService) InviteToRoom(context.Context, string, string) error {
 	return nil
 }
+func (m *bridgeMockChatService) KickUser(context.Context, string, string, string) error { return nil }
 func (m *bridgeMockChatService) SetRoomName(context.Context, string, string) error {
+	return nil
+}
+func (m *bridgeMockChatService) SetRoomTopic(context.Context, string, string) error {
+	return nil
+}
+func (m *bridgeMockChatService) SetRoomAvatar(context.Context, string, io.Reader, string) error {
 	return nil
 }
 func (m *bridgeMockChatService) SendMessage(context.Context, string, string) (string, error) {
@@ -57,13 +64,21 @@ func (m *bridgeMockChatService) SendImage(_ context.Context, _ string, _ io.Read
 func (m *bridgeMockChatService) SendFile(_ context.Context, _ string, _ io.Reader, _ string, _ int64) (string, error) {
 	return "", nil
 }
-func (m *bridgeMockChatService) GetMessages(context.Context, string, int, string) ([]contracts.MatrixMessage, string, error) {
+func (m *bridgeMockChatService) GetMessages(context.Context, string, int, string, string) ([]contracts.MatrixMessage, string, error) {
 	return nil, "", nil
 }
 func (m *bridgeMockChatService) EditMessage(context.Context, string, string, string) error {
 	return nil
 }
 func (m *bridgeMockChatService) RedactMessage(context.Context, string, string) error { return nil }
+func (m *bridgeMockChatService) SendReaction(context.Context, string, string, string) (string, error) {
+	return "", nil
+}
+func (m *bridgeMockChatService) BlockUser(context.Context, string) error       { return nil }
+func (m *bridgeMockChatService) UnblockUser(context.Context, string) error     { return nil }
+func (m *bridgeMockChatService) GetBlockedUsers(context.Context) ([]string, error) {
+	return nil, nil
+}
 func (m *bridgeMockChatService) SendTyping(context.Context, string, bool) error      { return nil }
 func (m *bridgeMockChatService) MarkAsRead(context.Context, string, string) error    { return nil }
 func (m *bridgeMockChatService) SetDisplayName(context.Context, string) error        { return nil }

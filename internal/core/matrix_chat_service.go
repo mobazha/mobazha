@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -43,11 +44,12 @@ type MautrixChatServiceConfig struct {
 	DB                 database.Database
 	PrivKey            crypto.PrivKey
 	PeerID             peer.ID
-	HomeserverURL      string // e.g. "https://matrix.mobazha.org" or internal URL
-	ServerName         string // e.g. "matrix.mobazha.org"
-	DBPath             string // path for crypto state DB (SQLite) in standalone mode
-	RegistrationSecret string // Synapse shared secret for auto-registering Matrix users
-	Debug              bool   // enables debug-level logging for mautrix-go client
+	NodeCtx            context.Context // node lifecycle context; sync/idle goroutines exit when cancelled
+	HomeserverURL      string          // e.g. "https://matrix.mobazha.org" or internal URL
+	ServerName         string          // e.g. "matrix.mobazha.org"
+	DBPath             string          // path for crypto state DB (SQLite) in standalone mode
+	RegistrationSecret string          // Synapse shared secret for auto-registering Matrix users
+	Debug              bool            // enables debug-level logging for mautrix-go client
 }
 
 // mautrixChatService implements contracts.MatrixChatService using mautrix-go.
@@ -242,7 +244,10 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 	s.registerEventHandlers()
 	s.loadChatSettings(ctx)
 
-	s.parentCtx = context.Background()
+	s.parentCtx = s.config.NodeCtx
+	if s.parentCtx == nil {
+		s.parentCtx = context.Background()
+	}
 	s.syncCtx, s.syncCancel = context.WithCancel(s.parentCtx)
 	go s.syncLoop()
 
@@ -318,9 +323,8 @@ func (s *mautrixChatService) idleStop() {
 	})
 }
 
-// resetCryptoDB removes the crypto store DB and reinitializes the crypto helper.
-// This is necessary when the device ID changes (e.g., after container restart)
-// and the old crypto store has a mismatching device ID.
+// resetCryptoDB backs up then removes the crypto store DB and reinitializes the
+// crypto helper. Backup allows forensic recovery of old E2EE keys if needed.
 func (s *mautrixChatService) resetCryptoDB(ctx context.Context, dbDSN string) error {
 	dbPath := dbDSN
 	if strings.HasPrefix(dbPath, "file:") {
@@ -329,6 +333,23 @@ func (s *mautrixChatService) resetCryptoDB(ctx context.Context, dbDSN string) er
 	if idx := strings.Index(dbPath, "?"); idx >= 0 {
 		dbPath = dbPath[:idx]
 	}
+
+	backupDir := dbPath + ".backup." + time.Now().Format("20060102-150405")
+	if err := os.MkdirAll(backupDir, 0700); err != nil {
+		log.Warningf("Failed to create crypto DB backup dir %s: %v", backupDir, err)
+	} else {
+		for _, suffix := range []string{"", "-wal", "-shm"} {
+			src := dbPath + suffix
+			if _, statErr := os.Stat(src); statErr == nil {
+				dst := filepath.Join(backupDir, filepath.Base(src))
+				if cpErr := copyFile(src, dst); cpErr != nil {
+					log.Warningf("Failed to backup %s → %s: %v", src, dst, cpErr)
+				}
+			}
+		}
+		log.Infof("Crypto DB backed up to %s before reset", backupDir)
+	}
+
 	for _, suffix := range []string{"", "-wal", "-shm"} {
 		_ = os.Remove(dbPath + suffix)
 	}
@@ -343,6 +364,23 @@ func (s *mautrixChatService) resetCryptoDB(ctx context.Context, dbDSN string) er
 	}
 	log.Infof("Crypto DB reset successful, new device keys established")
 	return nil
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	if _, err := io.Copy(out, in); err != nil {
+		return err
+	}
+	return out.Sync()
 }
 
 // idleWatcher periodically checks if the service has been idle longer than
@@ -520,6 +558,27 @@ func (s *mautrixChatService) registerEventHandlers() {
 		s.broadcast(contracts.MatrixChatEvent{
 			Type: "chat.message",
 			Data: msg,
+		})
+	})
+
+	syncer.OnEventType(event.EventReaction, func(ctx context.Context, evt *event.Event) {
+		if evt.Content.Parsed == nil {
+			_ = evt.Content.ParseRaw(evt.Type)
+		}
+		reaction := evt.Content.AsReaction()
+		if reaction == nil || reaction.RelatesTo.EventID == "" {
+			return
+		}
+		s.broadcast(contracts.MatrixChatEvent{
+			Type: "chat.reaction",
+			Data: map[string]string{
+				"roomId":    evt.RoomID.String(),
+				"eventId":   evt.ID.String(),
+				"sender":    evt.Sender.String(),
+				"targetId":  reaction.RelatesTo.EventID.String(),
+				"key":       reaction.RelatesTo.Key,
+				"timestamp": fmt.Sprintf("%d", evt.Timestamp),
+			},
 		})
 	})
 

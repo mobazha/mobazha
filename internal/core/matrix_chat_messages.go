@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -11,6 +12,10 @@ import (
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 )
+
+const maxMediaUploadSize = 50 << 20 // 50 MiB
+
+var errMediaTooLarge = errors.New("media exceeds maximum upload size of 50 MiB")
 
 // SendMessage sends a text message to a room. Returns the event ID.
 func (s *mautrixChatService) SendMessage(ctx context.Context, roomID, content string) (string, error) {
@@ -41,9 +46,13 @@ func (s *mautrixChatService) SendImage(ctx context.Context, roomID string, reade
 	}
 	s.touchActivity()
 
-	data, err := io.ReadAll(reader)
+	limited := io.LimitReader(reader, maxMediaUploadSize+1)
+	data, err := io.ReadAll(limited)
 	if err != nil {
 		return "", fmt.Errorf("failed to read image data: %w", err)
+	}
+	if int64(len(data)) > maxMediaUploadSize {
+		return "", errMediaTooLarge
 	}
 
 	contentType := "image/jpeg"
@@ -84,9 +93,13 @@ func (s *mautrixChatService) SendFile(ctx context.Context, roomID string, reader
 	}
 	s.touchActivity()
 
-	data, err := io.ReadAll(reader)
+	limited := io.LimitReader(reader, maxMediaUploadSize+1)
+	data, err := io.ReadAll(limited)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file data: %w", err)
+	}
+	if int64(len(data)) > maxMediaUploadSize {
+		return "", errMediaTooLarge
 	}
 
 	uploadResp, err := s.client.UploadBytes(ctx, data, "application/octet-stream")
@@ -111,7 +124,7 @@ func (s *mautrixChatService) SendFile(ctx context.Context, roomID string, reader
 
 // GetMessages returns paginated messages for a room.
 // Returns messages, a pagination token for the next page, and an error.
-func (s *mautrixChatService) GetMessages(ctx context.Context, roomID string, limit int, before string) ([]contracts.MatrixMessage, string, error) {
+func (s *mautrixChatService) GetMessages(ctx context.Context, roomID string, limit int, token string, dir string) ([]contracts.MatrixMessage, string, error) {
 	if err := s.ensureReady(ctx); err != nil {
 		return nil, "", err
 	}
@@ -120,7 +133,12 @@ func (s *mautrixChatService) GetMessages(ctx context.Context, roomID string, lim
 		limit = 50
 	}
 
-	resp, err := s.client.Messages(ctx, id.RoomID(roomID), before, "", mautrix.DirectionBackward, nil, limit)
+	direction := mautrix.DirectionBackward
+	if dir == "f" {
+		direction = mautrix.DirectionForward
+	}
+
+	resp, err := s.client.Messages(ctx, id.RoomID(roomID), token, "", direction, nil, limit)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get messages: %w", err)
 	}
@@ -201,6 +219,26 @@ func (s *mautrixChatService) RedactMessage(ctx context.Context, roomID, eventID 
 	s.touchActivity()
 	_, err := s.client.RedactEvent(ctx, id.RoomID(roomID), id.EventID(eventID))
 	return err
+}
+
+// SendReaction sends an emoji reaction to a message. Returns the reaction event ID.
+func (s *mautrixChatService) SendReaction(ctx context.Context, roomID, eventID, key string) (string, error) {
+	if err := s.ensureReady(ctx); err != nil {
+		return "", err
+	}
+	s.touchActivity()
+
+	resp, err := s.client.SendMessageEvent(ctx, id.RoomID(roomID), event.EventReaction, &event.ReactionEventContent{
+		RelatesTo: event.RelatesTo{
+			Type:    event.RelAnnotation,
+			EventID: id.EventID(eventID),
+			Key:     key,
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to send reaction: %w", err)
+	}
+	return resp.EventID.String(), nil
 }
 
 // SendTyping sends a typing notification to a room.

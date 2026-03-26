@@ -167,6 +167,14 @@ type Config struct {
 	MatrixInternalURL        string `no-flag:"true"`
 	MatrixServerName         string `no-flag:"true"`
 	MatrixRegistrationSecret string `no-flag:"true"`
+
+	// MatrixChatServiceOverride allows hosting (SaaS) to inject an external
+	// MatrixChatService implementation (e.g. AS mode) for this specific tenant.
+	// When non-nil, initMatrixChatService() uses this instead of creating the
+	// default mautrixChatService. The field is typed as interface{} because
+	// internal/repo cannot import pkg/contracts (dependency direction), and is
+	// type-asserted to contracts.MatrixChatService in shared_manager.go.
+	MatrixChatServiceOverride interface{} `no-flag:"true"`
 }
 
 // LoadConfig initializes and parses the config using a config file and command

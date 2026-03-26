@@ -1160,6 +1160,12 @@ func newLightweightNode(
 
 	obNode.contentStore = &cidContentStore{}
 
+	// Pre-inject MatrixChatService override from config (e.g. AS mode facade).
+	// Must be set before applyOptions() which calls initMatrixChatService().
+	if override, ok := cfg.MatrixChatServiceOverride.(pkgcontracts.MatrixChatService); ok {
+		obNode.matrixChatService = override
+	}
+
 	sharedManager.AddNode(nodeID, obNode)
 
 	// Lightweight nodes use the shared HTTP gateway for websocket hubs

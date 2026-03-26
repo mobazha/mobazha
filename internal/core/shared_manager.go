@@ -145,6 +145,24 @@ func NewSharedManager(ctx context.Context, cfg *repo.Config) (*SharedManager, er
 			netConfig.MatrixRegistrationSecret = cfg.MatrixRegistrationSecret
 		}
 
+		// Fallback: info-api wraps nodeConfig in {"data": ...} which maps
+		// to NetConfig.Data (map[string]string) instead of struct fields.
+		if netConfig.MatrixInternalURL == "" {
+			if v, ok := netConfig.Data["matrixInternalURL"]; ok && v != "" {
+				netConfig.MatrixInternalURL = v
+			}
+		}
+		if netConfig.MatrixServerName == "" {
+			if v, ok := netConfig.Data["matrixServerName"]; ok && v != "" {
+				netConfig.MatrixServerName = v
+			}
+		}
+		if netConfig.MatrixRegistrationSecret == "" {
+			if v, ok := netConfig.Data["matrixRegistrationSecret"]; ok && v != "" {
+				netConfig.MatrixRegistrationSecret = v
+			}
+		}
+
 		erp := wallet.NewExchangeRateProvider(nil)
 
 		SharedManagerInstance = &SharedManager{

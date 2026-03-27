@@ -291,6 +291,14 @@ func (n *MobazhaNode) Start() {
 			n.fiatPaymentService.StartPeriodicCleanup(n.nodeCtx, 24*time.Hour, 7*24*time.Hour)
 			n.fiatPaymentService.StartReconciliationScheduler(n.nodeCtx, 2*time.Minute)
 		}
+
+		if n.matrixChatService != nil {
+			go func() {
+				if err := n.matrixChatService.Start(n.nodeCtx); err != nil {
+					logger.LogErrorWithIDf(log, n.nodeID, "Matrix chat service start failed: %v", err)
+				}
+			}()
+		}
 	}
 
 	// Add log to verify connection reuse
@@ -371,6 +379,12 @@ func (n *MobazhaNode) Stop(force bool) error {
 	if n.shutdown != nil {
 		close(n.shutdown)
 	}
+	if n.matrixChatService != nil {
+		if err := n.matrixChatService.Stop(); err != nil {
+			log.Errorf("Matrix chat service stop error: %v", err)
+		}
+	}
+
 	if n.repo != nil {
 		n.repo.Close()
 	}

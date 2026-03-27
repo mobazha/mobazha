@@ -7,6 +7,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -75,9 +76,8 @@ type mautrixChatService struct {
 	serverName   string
 	pickleKey    []byte
 
-	eventCh   chan contracts.MatrixChatEvent
-	subs      []chan contracts.MatrixChatEvent
-	subsMu    sync.Mutex
+	subs   []chan contracts.MatrixChatEvent
+	subsMu sync.Mutex
 
 	syncCtx    context.Context
 	syncCancel context.CancelFunc
@@ -128,7 +128,6 @@ func NewMautrixChatService(cfg MautrixChatServiceConfig) (*mautrixChatService, e
 		password:     password,
 		pickleKey:    pickleKey,
 		serverName:   serverName,
-		eventCh:      make(chan contracts.MatrixChatEvent, matrixEventBufSize),
 	}, nil
 }
 
@@ -600,7 +599,8 @@ func (s *mautrixChatService) syncLoop() {
 			break
 		}
 		if err == nil {
-			break
+			backoff = minBackoff
+			continue
 		}
 		if time.Since(syncStart) > maxBackoff {
 			backoff = minBackoff
@@ -629,6 +629,7 @@ func (s *mautrixChatService) registerEventHandlers() {
 	syncer := s.client.Syncer.(*mautrix.DefaultSyncer)
 
 	syncer.OnEventType(event.EventMessage, func(ctx context.Context, evt *event.Event) {
+		log.Debugf("EventMessage received: room=%s sender=%s eventID=%s", evt.RoomID, evt.Sender, evt.ID)
 		msg := s.eventToMessage(evt)
 		content := evt.Content.AsMessage()
 		if content != nil && content.RelatesTo != nil && content.RelatesTo.Type == event.RelReplace {
@@ -738,6 +739,14 @@ func (s *mautrixChatService) eventToMessage(evt *event.Event) contracts.MatrixMe
 		_ = evt.Content.ParseRaw(evt.Type)
 	}
 	content := evt.Content.AsMessage()
+	if content == nil {
+		return contracts.MatrixMessage{
+			EventID:   evt.ID.String(),
+			RoomID:    evt.RoomID.String(),
+			Sender:    evt.Sender.String(),
+			Timestamp: time.UnixMilli(evt.Timestamp),
+		}
+	}
 	msg := contracts.MatrixMessage{
 		EventID:   evt.ID.String(),
 		RoomID:    evt.RoomID.String(),
@@ -834,6 +843,16 @@ func (s *mautrixChatService) DownloadMedia(ctx context.Context, serverName, medi
 // isForbiddenOrNotFound returns true if the error indicates that the Matrix user
 // doesn't exist or has an invalid password (eligible for auto-registration).
 func isForbiddenOrNotFound(err error) bool {
+	var respErr mautrix.RespError
+	if errors.As(err, &respErr) {
+		code := respErr.ErrCode
+		return code == "M_FORBIDDEN" || code == "M_USER_DEACTIVATED" || code == "M_NOT_FOUND"
+	}
+	var httpErr mautrix.HTTPError
+	if errors.As(err, &httpErr) && httpErr.RespError != nil {
+		code := httpErr.RespError.ErrCode
+		return code == "M_FORBIDDEN" || code == "M_USER_DEACTIVATED" || code == "M_NOT_FOUND"
+	}
 	s := err.Error()
 	return strings.Contains(s, "M_FORBIDDEN") || strings.Contains(s, "M_USER_DEACTIVATED") || strings.Contains(s, "M_NOT_FOUND")
 }

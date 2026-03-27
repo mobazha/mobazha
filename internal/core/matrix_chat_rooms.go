@@ -19,6 +19,8 @@ func (s *mautrixChatService) GetRooms(ctx context.Context) ([]contracts.MatrixRo
 	}
 	s.touchActivity()
 
+	unreadCounts := s.fetchUnreadCounts(ctx)
+
 	resp, err := s.client.JoinedRooms(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get joined rooms: %w", err)
@@ -29,6 +31,9 @@ func (s *mautrixChatService) GetRooms(ctx context.Context) ([]contracts.MatrixRo
 		room, err := s.buildRoomSummary(ctx, roomID)
 		if err != nil {
 			continue
+		}
+		if count, ok := unreadCounts[roomID]; ok {
+			room.UnreadCount = count
 		}
 		rooms = append(rooms, *room)
 	}
@@ -377,6 +382,27 @@ func (s *mautrixChatService) buildRoomSummary(ctx context.Context, roomID id.Roo
 	}
 
 	return room, nil
+}
+
+// fetchUnreadCounts performs a lightweight one-shot sync (timeout=0, no timeline)
+// to retrieve unread_notifications.notification_count for each joined room.
+func (s *mautrixChatService) fetchUnreadCounts(ctx context.Context) map[id.RoomID]int {
+	syncFilter := `{"room":{"timeline":{"limit":0},"state":{"limit":0}},"presence":{"limit":0}}`
+	resp, err := s.client.FullSyncRequest(ctx, mautrix.ReqSync{
+		Timeout:     0,
+		FilterID:    syncFilter,
+		SetPresence: event.PresenceOffline,
+	})
+	if err != nil || resp == nil {
+		return nil
+	}
+	counts := make(map[id.RoomID]int, len(resp.Rooms.Join))
+	for roomID, joined := range resp.Rooms.Join {
+		if joined != nil {
+			counts[roomID] = joined.UnreadNotifications.NotificationCount
+		}
+	}
+	return counts
 }
 
 // fetchLastMessage retrieves the most recent message event from a room

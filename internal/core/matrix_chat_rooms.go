@@ -384,25 +384,20 @@ func (s *mautrixChatService) buildRoomSummary(ctx context.Context, roomID id.Roo
 	return room, nil
 }
 
-// fetchUnreadCounts performs a lightweight one-shot sync (timeout=0, no timeline)
-// to retrieve unread_notifications.notification_count for each joined room.
-func (s *mautrixChatService) fetchUnreadCounts(ctx context.Context) map[id.RoomID]int {
-	syncFilter := `{"room":{"timeline":{"limit":0},"state":{"limit":0}},"presence":{"limit":0}}`
-	resp, err := s.client.FullSyncRequest(ctx, mautrix.ReqSync{
-		Timeout:     0,
-		FilterID:    syncFilter,
-		SetPresence: event.PresenceOffline,
-	})
-	if err != nil || resp == nil {
+// fetchUnreadCounts returns the cached per-room notification counts collected
+// from the background sync loop. The counts are updated on every /sync
+// response by handleSyncResponse, so no extra HTTP call is needed.
+func (s *mautrixChatService) fetchUnreadCounts(_ context.Context) map[id.RoomID]int {
+	s.unreadCountsMu.RLock()
+	defer s.unreadCountsMu.RUnlock()
+	if s.unreadCounts == nil {
 		return nil
 	}
-	counts := make(map[id.RoomID]int, len(resp.Rooms.Join))
-	for roomID, joined := range resp.Rooms.Join {
-		if joined != nil {
-			counts[roomID] = joined.UnreadNotifications.NotificationCount
-		}
+	out := make(map[id.RoomID]int, len(s.unreadCounts))
+	for k, v := range s.unreadCounts {
+		out[k] = v
 	}
-	return counts
+	return out
 }
 
 // fetchLastMessage retrieves the most recent message event from a room

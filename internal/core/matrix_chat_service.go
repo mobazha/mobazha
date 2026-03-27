@@ -93,6 +93,11 @@ type mautrixChatService struct {
 
 	verifyHelper *verificationhelper.VerificationHelper
 
+	// unreadCounts tracks per-room notification counts from the sync loop.
+	// Updated on every /sync response; read by GetRooms.
+	unreadCounts   map[id.RoomID]int
+	unreadCountsMu sync.RWMutex
+
 	mu sync.RWMutex
 }
 
@@ -628,6 +633,8 @@ func (s *mautrixChatService) syncLoop() {
 func (s *mautrixChatService) registerEventHandlers() {
 	syncer := s.client.Syncer.(*mautrix.DefaultSyncer)
 
+	syncer.OnSync(s.handleSyncResponse)
+
 	syncer.OnEventType(event.EventMessage, func(ctx context.Context, evt *event.Event) {
 		log.Debugf("EventMessage received: room=%s sender=%s eventID=%s", evt.RoomID, evt.Sender, evt.ID)
 		msg := s.eventToMessage(evt)
@@ -731,6 +738,30 @@ func (s *mautrixChatService) registerEventHandlers() {
 			},
 		})
 	})
+}
+
+// handleSyncResponse extracts unread_notifications from each /sync response.
+// Called by DefaultSyncer.OnSync before individual event handlers.
+func (s *mautrixChatService) handleSyncResponse(_ context.Context, resp *mautrix.RespSync, _ string) bool {
+	s.unreadCountsMu.Lock()
+	defer s.unreadCountsMu.Unlock()
+	if s.unreadCounts == nil {
+		s.unreadCounts = make(map[id.RoomID]int, len(resp.Rooms.Join))
+	}
+	for roomID, joined := range resp.Rooms.Join {
+		if joined == nil {
+			continue
+		}
+		if joined.UnreadNotifications != nil {
+			s.unreadCounts[roomID] = joined.UnreadNotifications.NotificationCount
+		} else {
+			s.unreadCounts[roomID] = 0
+		}
+	}
+	for roomID := range resp.Rooms.Leave {
+		delete(s.unreadCounts, roomID)
+	}
+	return true
 }
 
 // eventToMessage converts a mautrix event to our MatrixMessage type.

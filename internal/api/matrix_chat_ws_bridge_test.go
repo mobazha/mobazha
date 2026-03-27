@@ -104,7 +104,7 @@ func (m *bridgeMockChatService) AcceptVerification(context.Context, string) erro
 func (m *bridgeMockChatService) StartSAS(context.Context, string) error            { return nil }
 func (m *bridgeMockChatService) ConfirmSAS(context.Context, string) error          { return nil }
 func (m *bridgeMockChatService) CancelVerification(context.Context, string) error  { return nil }
-func (m *bridgeMockChatService) GetStatus() contracts.MatrixChatStatus {
+func (m *bridgeMockChatService) GetStatus(context.Context) contracts.MatrixChatStatus {
 	return contracts.MatrixChatStatus{Connected: true}
 }
 

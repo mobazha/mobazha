@@ -684,7 +684,7 @@ func (g *Gateway) handleGETMatrixChatStatus(w http.ResponseWriter, r *http.Reque
 		})
 		return
 	}
-	status := svc.GetStatus()
+	status := svc.GetStatus(r.Context())
 	responsePkg.Success(w, status)
 }
 

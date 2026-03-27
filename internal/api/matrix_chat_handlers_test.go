@@ -232,7 +232,7 @@ func (m *mockMatrixChatService) CancelVerification(_ context.Context, txnID stri
 	return m.err
 }
 
-func (m *mockMatrixChatService) GetStatus() contracts.MatrixChatStatus {
+func (m *mockMatrixChatService) GetStatus(context.Context) contracts.MatrixChatStatus {
 	return contracts.MatrixChatStatus{Connected: true, SyncRunning: true, UserID: "@peer_abc:matrix.mobazha.org"}
 }
 

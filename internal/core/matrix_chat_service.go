@@ -538,8 +538,13 @@ func (s *mautrixChatService) IsReady() bool {
 	return s.ready.Load()
 }
 
-// GetStatus returns the current connection status.
-func (s *mautrixChatService) GetStatus() contracts.MatrixChatStatus {
+// GetStatus attempts to resume the service if idle-paused, then returns the
+// current connection status. This ensures that a status poll from the frontend
+// wakes a sleeping service rather than permanently reporting "not connected".
+func (s *mautrixChatService) GetStatus(ctx context.Context) contracts.MatrixChatStatus {
+	if !s.ready.Load() && !s.stopped.Load() {
+		_ = s.ensureReady(ctx)
+	}
 	if !s.ready.Load() || s.client == nil {
 		return contracts.MatrixChatStatus{Connected: false}
 	}

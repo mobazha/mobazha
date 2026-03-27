@@ -129,7 +129,8 @@ type MatrixChatService interface {
 	// --- Status ---
 
 	// GetStatus returns the current connection status.
-	GetStatus() MatrixChatStatus
+	// If the service is idle-paused, it will attempt to resume before returning status.
+	GetStatus(ctx context.Context) MatrixChatStatus
 }
 
 // MatrixRoom represents a Matrix room with summary metadata.

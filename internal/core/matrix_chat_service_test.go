@@ -214,7 +214,7 @@ func TestStop_Idempotent(t *testing.T) {
 
 func TestGetStatus_NotReady(t *testing.T) {
 	s := newTestService()
-	status := s.GetStatus()
+	status := s.GetStatus(context.Background())
 	if status.Connected {
 		t.Error("expected Connected=false when not ready")
 	}
@@ -225,7 +225,7 @@ func TestGetStatus_Ready(t *testing.T) {
 	s.ready.Store(true)
 	// Simulate a client with known fields (cannot create real mautrix.Client
 	// without a server, so we only test the not-ready path thoroughly).
-	status := s.GetStatus()
+	status := s.GetStatus(context.Background())
 	// client is nil → falls into !ready branch despite ready=true.
 	if status.Connected {
 		t.Log("Connected=false because client is nil (expected in unit test without Synapse)")

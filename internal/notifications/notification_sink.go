@@ -16,8 +16,14 @@ import (
 
 var log = logging.MustGetLogger("NOTF")
 
-type notificationWrapper struct {
+type notificationPushMessage struct {
+	Type string                `json:"type"`
+	Data notificationPushData `json:"data"`
+}
+
+type notificationPushData struct {
 	Notification any `json:"notification"`
+	Unread       int `json:"unread"`
 }
 
 type shoppingCartWrapper struct {
@@ -131,11 +137,32 @@ func (s *NotificationSink) handlePersistentNotification(meta events.EventMeta, e
 		return err
 	}
 
-	if err := s.notifyFunc(notificationWrapper{event}); err != nil {
+	unread := s.getUnreadCount()
+
+	if err := s.notifyFunc(notificationPushMessage{
+		Type: "notification",
+		Data: notificationPushData{
+			Notification: event,
+			Unread:       unread,
+		},
+	}); err != nil {
 		log.Errorf("Error sending notification: %s", err)
 		return err
 	}
 	return nil
+}
+
+// getUnreadCount queries the unread notification count from DB.
+func (s *NotificationSink) getUnreadCount() int {
+	var count int64
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Model(&models.NotificationRecord{}).Where("read = ?", false).Count(&count).Error
+	})
+	if err != nil {
+		log.Warningf("Error querying unread count for WS push: %s", err)
+		return 0
+	}
+	return int(count)
 }
 
 // handleWebSocketOnly replicates the old Notifier's non-persistent paths

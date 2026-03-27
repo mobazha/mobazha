@@ -612,6 +612,30 @@ func (g *Gateway) handleGETMatrixChatPresence(w http.ResponseWriter, r *http.Req
 	responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "presence not yet implemented")
 }
 
+func (g *Gateway) handlePOSTMatrixChatPresence(w http.ResponseWriter, r *http.Request) {
+	svc := getMatrixChatService(r)
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail, "matrix chat service not available")
+		return
+	}
+	var req struct {
+		DisplayName string `json:"displayName"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid request body")
+		return
+	}
+	if req.DisplayName == "" {
+		responsePkg.NoContent(w)
+		return
+	}
+	if err := svc.SetDisplayName(r.Context(), req.DisplayName); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
+		return
+	}
+	responsePkg.NoContent(w)
+}
+
 func (g *Gateway) handleGETMatrixChatSettings(w http.ResponseWriter, r *http.Request) {
 	svc := getMatrixChatService(r)
 	if svc == nil {

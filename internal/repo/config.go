@@ -175,6 +175,12 @@ type Config struct {
 	// internal/repo cannot import pkg/contracts (dependency direction), and is
 	// type-asserted to contracts.MatrixChatService in shared_manager.go.
 	MatrixChatServiceOverride interface{} `no-flag:"true"`
+
+	// MatrixCryptoStore allows hosting (SaaS Client mode) to inject a shared
+	// PostgreSQL *dbutil.Database for mautrix-go crypto state. When non-nil,
+	// mautrixChatService uses this instead of a per-tenant SQLite file.
+	// Tenant isolation is via CryptoHelper.DBAccountID = peerID.
+	MatrixCryptoStore interface{} `no-flag:"true"`
 }
 
 // LoadConfig initializes and parses the config using a config file and command

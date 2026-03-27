@@ -23,6 +23,7 @@ import (
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/encryption"
 	"github.com/rs/zerolog"
+	"go.mau.fi/util/dbutil"
 	"maunium.net/go/mautrix"
 	mxcrypto "maunium.net/go/mautrix/crypto"
 	"maunium.net/go/mautrix/crypto/cryptohelper"
@@ -50,6 +51,14 @@ type MautrixChatServiceConfig struct {
 	DBPath             string          // path for crypto state DB (SQLite) in standalone mode
 	RegistrationSecret string          // Synapse shared secret for auto-registering Matrix users
 	Debug              bool            // enables debug-level logging for mautrix-go client
+
+	// CryptoStore overrides the default SQLite crypto store when non-nil.
+	// Accepts *dbutil.Database for shared PostgreSQL (SaaS multi-tenant).
+	// When nil, falls back to SQLite at DBPath.
+	CryptoStore interface{}
+	// CryptoDBAccountID isolates crypto state per tenant in shared PG.
+	// Typically set to peerID when CryptoStore is non-nil.
+	CryptoDBAccountID string
 }
 
 // mautrixChatService implements contracts.MatrixChatService using mautrix-go.
@@ -164,6 +173,8 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 		}
 	}()
 
+	stableDeviceID := id.DeviceID("MBZ_" + s.config.PeerID.String())
+
 	_, err = s.client.Login(ctx, &mautrix.ReqLogin{
 		Type: mautrix.AuthTypePassword,
 		Identifier: mautrix.UserIdentifier{
@@ -171,6 +182,7 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 			User: s.matrixUserID.String(),
 		},
 		Password:         s.password,
+		DeviceID:         stableDeviceID,
 		StoreCredentials: true,
 	})
 	if err != nil {
@@ -186,6 +198,7 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 					User: s.matrixUserID.String(),
 				},
 				Password:         s.password,
+				DeviceID:         stableDeviceID,
 				StoreCredentials: true,
 			})
 		}
@@ -194,21 +207,32 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 		}
 	}
 
-	dbDSN := s.config.DBPath
-	if dbDSN == "" {
-		dbDSN = "mautrix_crypto.db"
+	var cryptoStoreArg interface{}
+	useSharedPG := s.config.CryptoStore != nil
+	if useSharedPG {
+		cryptoStoreArg = s.config.CryptoStore
+	} else {
+		dbDSN := s.config.DBPath
+		if dbDSN == "" {
+			dbDSN = "mautrix_crypto.db"
+		}
+		cryptoStoreArg = dbDSN
 	}
 
-	cryptoHelper, err := cryptohelper.NewCryptoHelper(s.client, s.pickleKey, dbDSN)
+	cryptoHelper, err := cryptohelper.NewCryptoHelper(s.client, s.pickleKey, cryptoStoreArg)
 	if err != nil {
 		return fmt.Errorf("failed to create crypto helper: %w", err)
+	}
+	if s.config.CryptoDBAccountID != "" {
+		cryptoHelper.DBAccountID = s.config.CryptoDBAccountID
 	}
 	s.cryptoHelper = cryptoHelper
 
 	if err := s.cryptoHelper.Init(ctx); err != nil {
 		if strings.Contains(err.Error(), "mismatching device ID") {
-			log.Warningf("Crypto store device ID mismatch, resetting crypto DB: %v", err)
-			if resetErr := s.resetCryptoDB(ctx, dbDSN); resetErr != nil {
+			log.Warningf("Crypto store device ID mismatch (device=%s, account=%s), resetting crypto state: %v",
+				stableDeviceID, s.config.CryptoDBAccountID, err)
+			if resetErr := s.resetCryptoDB(ctx, cryptoStoreArg); resetErr != nil {
 				return fmt.Errorf("failed to reset crypto DB after device mismatch: %w (original: %v)", resetErr, err)
 			}
 		} else {
@@ -228,7 +252,11 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 		}
 		return &mxcrypto.KeyShareRejectNoResponse
 	}
-	log.Infof("Matrix crypto initialized: user=%s device=%s dbDSN=%s ShareKeysMinTrust=CrossSignedTOFU", s.client.UserID, s.client.DeviceID, dbDSN)
+	storeDesc := "SQLite"
+	if useSharedPG {
+		storeDesc = fmt.Sprintf("shared-PG(account=%s)", s.config.CryptoDBAccountID)
+	}
+	log.Infof("Matrix crypto initialized: user=%s device=%s store=%s ShareKeysMinTrust=CrossSignedTOFU", s.client.UserID, s.client.DeviceID, storeDesc)
 
 	vh := verificationhelper.NewVerificationHelper(
 		s.client, mach, nil, &verificationCallbacks{svc: s},
@@ -325,7 +353,18 @@ func (s *mautrixChatService) idleStop() {
 
 // resetCryptoDB backs up then removes the crypto store DB and reinitializes the
 // crypto helper. Backup allows forensic recovery of old E2EE keys if needed.
-func (s *mautrixChatService) resetCryptoDB(ctx context.Context, dbDSN string) error {
+func (s *mautrixChatService) resetCryptoDB(ctx context.Context, cryptoStoreArg interface{}) error {
+	switch v := cryptoStoreArg.(type) {
+	case string:
+		return s.resetCryptoDBSQLite(ctx, v)
+	default:
+		return s.resetCryptoDBSharedPG(ctx, cryptoStoreArg)
+	}
+}
+
+// resetCryptoDBSQLite backs up and deletes the local SQLite crypto database,
+// then recreates it fresh. Used in standalone mode.
+func (s *mautrixChatService) resetCryptoDBSQLite(ctx context.Context, dbDSN string) error {
 	dbPath := dbDSN
 	if strings.HasPrefix(dbPath, "file:") {
 		dbPath = strings.TrimPrefix(dbPath, "file:")
@@ -354,10 +393,6 @@ func (s *mautrixChatService) resetCryptoDB(ctx context.Context, dbDSN string) er
 		_ = os.Remove(dbPath + suffix)
 	}
 
-	// Reset client's StateStore so NewCryptoHelper creates a fresh managed
-	// state store with properly initialized tables (mx_room_state, mx_user_profile).
-	// Without this, NewCryptoHelper sees the stale StateStore from the previous
-	// init and skips table creation, leaving the new DB without state tables.
 	s.client.StateStore = nil
 	s.client.Store = nil
 
@@ -370,7 +405,51 @@ func (s *mautrixChatService) resetCryptoDB(ctx context.Context, dbDSN string) er
 		return fmt.Errorf("failed to init fresh crypto helper: %w", err)
 	}
 	s.client.Crypto = s.cryptoHelper
-	log.Infof("Crypto DB reset successful, new device keys established")
+	log.Infof("Crypto DB reset successful (SQLite), new device keys established")
+	return nil
+}
+
+// resetCryptoDBSharedPG clears crypto state for this tenant in the shared
+// PostgreSQL database, then recreates the CryptoHelper. Used in SaaS Client mode.
+func (s *mautrixChatService) resetCryptoDBSharedPG(ctx context.Context, cryptoStoreArg interface{}) error {
+	if db, ok := cryptoStoreArg.(*dbutil.Database); ok {
+		accountID := s.config.CryptoDBAccountID
+		if accountID == "" {
+			accountID = s.matrixUserID.String()
+		}
+		tables := []string{
+			"crypto_account",
+			"crypto_olm_session",
+			"crypto_megolm_inbound_session",
+			"crypto_megolm_outbound_session",
+			"crypto_olm_message_hash",
+		}
+		for _, table := range tables {
+			if _, err := db.RawDB.ExecContext(ctx, "DELETE FROM "+table+" WHERE account_id=$1", accountID); err != nil {
+				log.Warningf("Failed to clear %s for account %s (may not exist): %v", table, accountID, err)
+			}
+		}
+		log.Infof("Cleared crypto state for account %s from shared PG", accountID)
+	} else {
+		log.Warningf("Cannot clear shared PG crypto state: unexpected store type %T, will attempt clean reinit", cryptoStoreArg)
+	}
+
+	s.client.StateStore = nil
+	s.client.Store = nil
+
+	cryptoHelper, err := cryptohelper.NewCryptoHelper(s.client, s.pickleKey, cryptoStoreArg)
+	if err != nil {
+		return fmt.Errorf("failed to recreate crypto helper: %w", err)
+	}
+	if s.config.CryptoDBAccountID != "" {
+		cryptoHelper.DBAccountID = s.config.CryptoDBAccountID
+	}
+	s.cryptoHelper = cryptoHelper
+	if err := s.cryptoHelper.Init(ctx); err != nil {
+		return fmt.Errorf("failed to init fresh crypto helper on shared PG: %w", err)
+	}
+	s.client.Crypto = s.cryptoHelper
+	log.Infof("Crypto DB reset successful (shared PG, account=%s), new device keys established", s.config.CryptoDBAccountID)
 	return nil
 }
 

@@ -1169,6 +1169,10 @@ func newLightweightNode(
 	if override, ok := cfg.MatrixChatServiceOverride.(pkgcontracts.MatrixChatService); ok {
 		obNode.matrixChatService = override
 	}
+	// Pass shared CryptoStore (SaaS Client mode) for initMatrixChatService().
+	if cfg.MatrixCryptoStore != nil {
+		obNode.matrixCryptoStore = cfg.MatrixCryptoStore
+	}
 
 	sharedManager.AddNode(nodeID, obNode)
 

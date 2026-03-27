@@ -195,6 +195,10 @@ func buildFiatPaymentData(event *contracts.WebhookEvent) *models.PaymentData {
 //
 // When matrixChatService is already set (pre-injected via cfg.MatrixChatServiceOverride
 // in the builder), the existing service is used as-is (AS mode for SaaS).
+//
+// When matrixCryptoStore is set (SaaS Client mode), the default mautrixChatService
+// is created but uses a shared PostgreSQL *dbutil.Database instead of per-tenant SQLite.
+// Tenant isolation is via CryptoHelper.DBAccountID = peerID.
 func (n *MobazhaNode) initMatrixChatService() {
 	if n.infrastructureOnly {
 		logger.LogInfoWithID(log, n.nodeID, "Matrix chat: skipped (infrastructure-only)")
@@ -235,10 +239,7 @@ func (n *MobazhaNode) initMatrixChatService() {
 		dbPath = filepath.Join(n.repo.DataDir(), "mautrix_crypto.db")
 	}
 
-	logger.LogInfoWithIDf(log, n.nodeID, "Matrix chat: creating service (homeserver=%s, server=%s, regSecret=%v)",
-		homeserverURL, serverName, registrationSecret != "")
-
-	svc, err := NewMautrixChatService(MautrixChatServiceConfig{
+	cfg := MautrixChatServiceConfig{
 		DB:                 n.db,
 		PrivKey:            n.privKey,
 		PeerID:             n.peerID,
@@ -247,7 +248,19 @@ func (n *MobazhaNode) initMatrixChatService() {
 		ServerName:         serverName,
 		DBPath:             dbPath,
 		RegistrationSecret: registrationSecret,
-	})
+	}
+
+	if n.matrixCryptoStore != nil {
+		cfg.CryptoStore = n.matrixCryptoStore
+		cfg.CryptoDBAccountID = n.peerID.String()
+		logger.LogInfoWithIDf(log, n.nodeID, "Matrix chat: creating service (homeserver=%s, server=%s, regSecret=%v, cryptoStore=shared-PG)",
+			homeserverURL, serverName, registrationSecret != "")
+	} else {
+		logger.LogInfoWithIDf(log, n.nodeID, "Matrix chat: creating service (homeserver=%s, server=%s, regSecret=%v, cryptoStore=SQLite)",
+			homeserverURL, serverName, registrationSecret != "")
+	}
+
+	svc, err := NewMautrixChatService(cfg)
 	if err != nil {
 		log.Errorf("Failed to create matrix chat service: %v", err)
 		return

@@ -193,11 +193,8 @@ func buildFiatPaymentData(event *contracts.WebhookEvent) *models.PaymentData {
 // or lazily on first use (SaaS mode). Matrix config (homeserver URL, server name)
 // is provided via SharedManager in SaaS mode or repo config in standalone mode.
 //
-// When matrixChatService is already set (pre-injected via cfg.MatrixChatServiceOverride
-// in the builder), the existing service is used as-is (AS mode for SaaS).
-//
-// When matrixCryptoStore is set (SaaS Client mode), the default mautrixChatService
-// is created but uses a shared PostgreSQL *dbutil.Database instead of per-tenant SQLite.
+// When matrixCryptoStore is set (SaaS multi-tenant), the mautrixChatService
+// uses a shared PostgreSQL *dbutil.Database instead of per-tenant SQLite.
 // Tenant isolation is via CryptoHelper.DBAccountID = peerID.
 func (n *MobazhaNode) initMatrixChatService() {
 	if n.infrastructureOnly {
@@ -206,13 +203,6 @@ func (n *MobazhaNode) initMatrixChatService() {
 	}
 	if n.privKey == nil {
 		logger.LogWarningWithID(log, n.nodeID, "Matrix chat: skipped (privKey is nil)")
-		return
-	}
-
-	// Pre-injected: hosting sets matrixChatService via cfg.MatrixChatServiceOverride
-	// in the builder (e.g. AS mode per-tenant facade). Skip default creation.
-	if n.matrixChatService != nil {
-		logger.LogInfoWithID(log, n.nodeID, "Matrix chat: using pre-injected service (AS mode)")
 		return
 	}
 

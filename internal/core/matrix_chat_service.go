@@ -410,7 +410,7 @@ func (s *mautrixChatService) resetCryptoDBSQLite(ctx context.Context, dbDSN stri
 }
 
 // resetCryptoDBSharedPG clears crypto state for this tenant in the shared
-// PostgreSQL database, then recreates the CryptoHelper. Used in SaaS Client mode.
+// PostgreSQL database, then recreates the CryptoHelper. Used in SaaS multi-tenant mode.
 func (s *mautrixChatService) resetCryptoDBSharedPG(ctx context.Context, cryptoStoreArg interface{}) error {
 	if db, ok := cryptoStoreArg.(*dbutil.Database); ok {
 		accountID := s.config.CryptoDBAccountID

@@ -172,7 +172,7 @@ type appServices struct {
 	paymentService             *PaymentAppService
 	orderService               *OrderAppService
 	matrixChatService  contracts.MatrixChatService
-	matrixCryptoStore  interface{} // shared *dbutil.Database for SaaS Client mode; nil = SQLite
+	matrixCryptoStore  interface{} // shared *dbutil.Database for SaaS multi-tenant; nil = SQLite
 	preferencesService *PreferencesAppService
 	mediaService               *MediaAppService
 	ratingsService             *RatingsAppService

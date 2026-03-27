@@ -1164,12 +1164,7 @@ func newLightweightNode(
 
 	obNode.contentStore = &cidContentStore{}
 
-	// Pre-inject MatrixChatService override from config (e.g. AS mode facade).
-	// Must be set before applyOptions() which calls initMatrixChatService().
-	if override, ok := cfg.MatrixChatServiceOverride.(pkgcontracts.MatrixChatService); ok {
-		obNode.matrixChatService = override
-	}
-	// Pass shared CryptoStore (SaaS Client mode) for initMatrixChatService().
+	// Pass shared CryptoStore (SaaS multi-tenant) for initMatrixChatService().
 	if cfg.MatrixCryptoStore != nil {
 		obNode.matrixCryptoStore = cfg.MatrixCryptoStore
 	}

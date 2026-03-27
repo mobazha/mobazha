@@ -55,10 +55,9 @@ type MatrixChatService interface {
 
 	// SendMessage sends a text message to a room. Returns the event ID.
 	SendMessage(ctx context.Context, roomID, content string) (string, error)
-	// SendImage uploads and sends an image message. Returns the event ID.
-	SendImage(ctx context.Context, roomID string, reader io.Reader, filename string, size int64) (string, error)
-	// SendFile uploads and sends a file message. Returns the event ID.
-	SendFile(ctx context.Context, roomID string, reader io.Reader, filename string, size int64) (string, error)
+	// SendMedia uploads and sends a media message (image/video/audio/file).
+	// The Matrix msgType is inferred from contentType (e.g. "image/" → m.image).
+	SendMedia(ctx context.Context, roomID string, reader io.Reader, filename string, size int64, contentType string) (string, error)
 	// GetMessages returns paginated messages for a room.
 	// `token` is an opaque pagination token. `dir` controls direction:
 	//   "b" (default) = backward (older messages), "f" = forward (newer messages).

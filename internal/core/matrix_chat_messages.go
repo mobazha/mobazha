@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
@@ -39,8 +40,10 @@ func (s *mautrixChatService) SendMessage(ctx context.Context, roomID, content st
 	return resp.EventID.String(), nil
 }
 
-// SendImage uploads and sends an image message. Returns the event ID.
-func (s *mautrixChatService) SendImage(ctx context.Context, roomID string, reader io.Reader, filename string, size int64) (string, error) {
+// SendMedia uploads and sends a media message. The Matrix msgType is inferred
+// from contentType: image/* → m.image, video/* → m.video, audio/* → m.audio,
+// everything else → m.file. For images, magic-byte detection refines the MIME.
+func (s *mautrixChatService) SendMedia(ctx context.Context, roomID string, reader io.Reader, filename string, size int64, contentType string) (string, error) {
 	if err := s.ensureReady(ctx); err != nil {
 		return "", err
 	}
@@ -49,30 +52,24 @@ func (s *mautrixChatService) SendImage(ctx context.Context, roomID string, reade
 	limited := io.LimitReader(reader, maxMediaUploadSize+1)
 	data, err := io.ReadAll(limited)
 	if err != nil {
-		return "", fmt.Errorf("failed to read image data: %w", err)
+		return "", fmt.Errorf("failed to read media data: %w", err)
 	}
 	if int64(len(data)) > maxMediaUploadSize {
 		return "", errMediaTooLarge
 	}
 
-	contentType := "image/jpeg"
-	if len(data) > 8 {
-		if data[0] == 0x89 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G' {
-			contentType = "image/png"
-		} else if data[0] == 'G' && data[1] == 'I' && data[2] == 'F' {
-			contentType = "image/gif"
-		} else if data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F' {
-			contentType = "image/webp"
-		}
+	msgType := mediaMsgType(contentType)
+	if msgType == event.MsgImage {
+		contentType = detectImageContentType(data)
 	}
 
 	uploadResp, err := s.client.UploadBytes(ctx, data, contentType)
 	if err != nil {
-		return "", fmt.Errorf("failed to upload image: %w", err)
+		return "", fmt.Errorf("failed to upload media: %w", err)
 	}
 
 	resp, err := s.client.SendMessageEvent(ctx, id.RoomID(roomID), event.EventMessage, &event.MessageEventContent{
-		MsgType: event.MsgImage,
+		MsgType: msgType,
 		Body:    filename,
 		URL:     uploadResp.ContentURI.CUString(),
 		Info: &event.FileInfo{
@@ -81,45 +78,36 @@ func (s *mautrixChatService) SendImage(ctx context.Context, roomID string, reade
 		},
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to send image message: %w", err)
+		return "", fmt.Errorf("failed to send media message: %w", err)
 	}
 	return resp.EventID.String(), nil
 }
 
-// SendFile uploads and sends a file message. Returns the event ID.
-func (s *mautrixChatService) SendFile(ctx context.Context, roomID string, reader io.Reader, filename string, size int64) (string, error) {
-	if err := s.ensureReady(ctx); err != nil {
-		return "", err
+func mediaMsgType(contentType string) event.MessageType {
+	switch {
+	case strings.HasPrefix(contentType, "image/"):
+		return event.MsgImage
+	case strings.HasPrefix(contentType, "video/"):
+		return event.MsgVideo
+	case strings.HasPrefix(contentType, "audio/"):
+		return event.MsgAudio
+	default:
+		return event.MsgFile
 	}
-	s.touchActivity()
+}
 
-	limited := io.LimitReader(reader, maxMediaUploadSize+1)
-	data, err := io.ReadAll(limited)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file data: %w", err)
+func detectImageContentType(data []byte) string {
+	if len(data) > 8 {
+		switch {
+		case data[0] == 0x89 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G':
+			return "image/png"
+		case data[0] == 'G' && data[1] == 'I' && data[2] == 'F':
+			return "image/gif"
+		case data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F':
+			return "image/webp"
+		}
 	}
-	if int64(len(data)) > maxMediaUploadSize {
-		return "", errMediaTooLarge
-	}
-
-	uploadResp, err := s.client.UploadBytes(ctx, data, "application/octet-stream")
-	if err != nil {
-		return "", fmt.Errorf("failed to upload file: %w", err)
-	}
-
-	resp, err := s.client.SendMessageEvent(ctx, id.RoomID(roomID), event.EventMessage, &event.MessageEventContent{
-		MsgType: event.MsgFile,
-		Body:    filename,
-		URL:     uploadResp.ContentURI.CUString(),
-		Info: &event.FileInfo{
-			MimeType: "application/octet-stream",
-			Size:     int(size),
-		},
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to send file message: %w", err)
-	}
-	return resp.EventID.String(), nil
+	return "image/jpeg"
 }
 
 // GetMessages returns paginated messages for a room.

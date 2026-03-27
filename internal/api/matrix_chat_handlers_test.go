@@ -109,16 +109,10 @@ func (m *mockMatrixChatService) SendMessage(_ context.Context, roomID, content s
 	return "$evt123", m.err
 }
 
-func (m *mockMatrixChatService) SendImage(_ context.Context, roomID string, _ io.Reader, filename string, _ int64) (string, error) {
-	m.lastCall = "SendImage"
-	m.lastArgs = map[string]interface{}{"roomID": roomID, "filename": filename}
-	return "$img456", m.err
-}
-
-func (m *mockMatrixChatService) SendFile(_ context.Context, roomID string, _ io.Reader, filename string, _ int64) (string, error) {
-	m.lastCall = "SendFile"
-	m.lastArgs = map[string]interface{}{"roomID": roomID, "filename": filename}
-	return "$file789", m.err
+func (m *mockMatrixChatService) SendMedia(_ context.Context, roomID string, _ io.Reader, filename string, _ int64, contentType string) (string, error) {
+	m.lastCall = "SendMedia"
+	m.lastArgs = map[string]interface{}{"roomID": roomID, "filename": filename, "contentType": contentType}
+	return "$media456", m.err
 }
 
 func (m *mockMatrixChatService) GetMessages(_ context.Context, roomID string, limit int, token string, dir string) ([]contracts.MatrixMessage, string, error) {

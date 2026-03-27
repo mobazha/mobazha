@@ -61,10 +61,7 @@ func (m *bridgeMockChatService) SetRoomAvatar(context.Context, string, io.Reader
 func (m *bridgeMockChatService) SendMessage(context.Context, string, string) (string, error) {
 	return "", nil
 }
-func (m *bridgeMockChatService) SendImage(_ context.Context, _ string, _ io.Reader, _ string, _ int64) (string, error) {
-	return "", nil
-}
-func (m *bridgeMockChatService) SendFile(_ context.Context, _ string, _ io.Reader, _ string, _ int64) (string, error) {
+func (m *bridgeMockChatService) SendMedia(_ context.Context, _ string, _ io.Reader, _ string, _ int64, _ string) (string, error) {
 	return "", nil
 }
 func (m *bridgeMockChatService) GetMessages(context.Context, string, int, string, string) ([]contracts.MatrixMessage, string, error) {

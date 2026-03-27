@@ -479,15 +479,7 @@ func (g *Gateway) handlePOSTMatrixChatMediaUpload(w http.ResponseWriter, r *http
 		contentType = "application/octet-stream"
 	}
 
-	isImage := contentType == "image/jpeg" || contentType == "image/png" ||
-		contentType == "image/gif" || contentType == "image/webp"
-
-	var eventID string
-	if isImage {
-		eventID, err = svc.SendImage(r.Context(), roomID, file, header.Filename, header.Size)
-	} else {
-		eventID, err = svc.SendFile(r.Context(), roomID, file, header.Filename, header.Size)
-	}
+	eventID, err := svc.SendMedia(r.Context(), roomID, file, header.Filename, header.Size, contentType)
 	if err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, err.Error())
 		return

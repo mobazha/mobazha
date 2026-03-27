@@ -17,6 +17,7 @@ func (s *mautrixChatService) GetRooms(ctx context.Context) ([]contracts.MatrixRo
 	if err := s.ensureReady(ctx); err != nil {
 		return nil, err
 	}
+	s.awaitFirstSync(ctx)
 	s.touchActivity()
 
 	unreadCounts := s.fetchUnreadCounts(ctx)

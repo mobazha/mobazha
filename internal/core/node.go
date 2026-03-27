@@ -298,6 +298,13 @@ func (n *MobazhaNode) Start() {
 					logger.LogErrorWithIDf(log, n.nodeID, "Matrix chat service start failed: %v", err)
 				}
 			}()
+			// In SaaS mode, hosting starts the WS bridge via onNodeCreated callback.
+			// Standalone nodes must start it here to enable real-time chat over WS.
+			if n.hostService == nil {
+				if gw := n.SharedManager().GetHTTPGateway(); gw != nil {
+					go gw.StartMatrixChatEventBridge(n.nodeCtx, n.nodeID, n.matrixChatService)
+				}
+			}
 		}
 	}
 

@@ -98,6 +98,11 @@ type mautrixChatService struct {
 	unreadCounts   map[id.RoomID]int
 	unreadCountsMu sync.RWMutex
 
+	// firstSyncCh is created when the service resumes from idle and closed
+	// once the first /sync response is processed. ensureReady() waits on
+	// this channel so that GetRooms() always reads fresh unreadCounts.
+	firstSyncCh chan struct{}
+
 	mu sync.RWMutex
 }
 
@@ -317,6 +322,7 @@ func (s *mautrixChatService) ensureReady(ctx context.Context) error {
 	}
 
 	if s.client != nil && s.parentCtx != nil {
+		s.firstSyncCh = make(chan struct{})
 		s.syncCtx, s.syncCancel = context.WithCancel(s.parentCtx)
 		go s.syncLoop()
 		s.ready.Store(true)
@@ -326,6 +332,24 @@ func (s *mautrixChatService) ensureReady(ctx context.Context) error {
 	}
 
 	return s.startLocked(ctx)
+}
+
+// awaitFirstSync blocks until the first /sync response has been processed
+// after an idle resume, or until the context is cancelled / timeout. This
+// guarantees that unreadCounts are fresh before GetRooms reads them.
+func (s *mautrixChatService) awaitFirstSync(ctx context.Context) {
+	s.mu.RLock()
+	ch := s.firstSyncCh
+	s.mu.RUnlock()
+	if ch == nil {
+		return
+	}
+	select {
+	case <-ch:
+	case <-ctx.Done():
+	case <-time.After(10 * time.Second):
+		log.Warningf("Matrix idle-resume first sync timed out for %s", s.matrixUserID)
+	}
 }
 
 // touchActivity updates the last activity timestamp.
@@ -347,6 +371,7 @@ func (s *mautrixChatService) idleStop() {
 	if s.syncCancel != nil {
 		s.syncCancel()
 	}
+	s.firstSyncCh = nil
 
 	log.Infof("Matrix chat service idle-paused for %s", s.matrixUserID)
 	s.broadcast(contracts.MatrixChatEvent{
@@ -749,7 +774,6 @@ func (s *mautrixChatService) registerEventHandlers() {
 // Called by DefaultSyncer.OnSync before individual event handlers.
 func (s *mautrixChatService) handleSyncResponse(_ context.Context, resp *mautrix.RespSync, _ string) bool {
 	s.unreadCountsMu.Lock()
-	defer s.unreadCountsMu.Unlock()
 	if s.unreadCounts == nil {
 		s.unreadCounts = make(map[id.RoomID]int, len(resp.Rooms.Join))
 	}
@@ -766,6 +790,15 @@ func (s *mautrixChatService) handleSyncResponse(_ context.Context, resp *mautrix
 	for roomID := range resp.Rooms.Leave {
 		delete(s.unreadCounts, roomID)
 	}
+	s.unreadCountsMu.Unlock()
+
+	s.mu.Lock()
+	if s.firstSyncCh != nil {
+		close(s.firstSyncCh)
+		s.firstSyncCh = nil
+	}
+	s.mu.Unlock()
+
 	return true
 }
 

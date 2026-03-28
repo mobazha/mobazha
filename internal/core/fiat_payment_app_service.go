@@ -301,6 +301,9 @@ func (s *FiatPaymentAppService) handlePaymentSucceeded(ctx context.Context, prov
 			if detailErr != nil {
 				logger.LogWarningWithIDf(log, s.nodeID, "best-effort payment detail fetch failed for %s: %v", event.PaymentID, detailErr)
 			} else if detail != nil {
+				if detail.PaymentID != "" {
+					event.PaymentID = detail.PaymentID
+				}
 				event.Amount = detail.Amount
 				event.Currency = detail.Currency
 				event.PaymentMethod = detail.PaymentMethod
@@ -402,8 +405,8 @@ func (s *FiatPaymentAppService) handleDisputeOpened(ctx context.Context, event *
 
 	metadata := map[string]string{
 		"fiat_dispute_status":    "opened",
-		"fiat_dispute_id":       event.DisputeID,
-		"fiat_dispute_reason":   event.DisputeReason,
+		"fiat_dispute_id":        event.DisputeID,
+		"fiat_dispute_reason":    event.DisputeReason,
 		"fiat_dispute_provider":  event.ProviderID,
 		"fiat_dispute_opened_at": time.Now().UTC().Format(time.RFC3339),
 	}
@@ -888,16 +891,20 @@ func (s *FiatPaymentAppService) ReconcileFiatOrders(ctx context.Context) {
 		}
 
 		if detail.Status == "succeeded" {
+			paymentID := sessionID
+			if detail.PaymentID != "" {
+				paymentID = detail.PaymentID
+			}
 			logger.LogInfoWithIDf(log, s.nodeID,
 				"fiat reconciliation: order %s has succeeded payment %s (missed webhook), triggering payment flow",
-				order.ID, sessionID)
+				order.ID, paymentID)
 
 			coin := iwallet.CoinType("fiat:" + providerID + ":" + strings.ToUpper(detail.Currency))
 			if err := s.webhookHandler(ctx, &contracts.WebhookEvent{
 				EventID:       "reconcile_" + sessionID,
 				Type:          contracts.WebhookPaymentSucceeded,
 				ProviderID:    providerID,
-				PaymentID:     sessionID,
+				PaymentID:     paymentID,
 				OrderID:       string(order.ID),
 				Coin:          string(coin),
 				Amount:        detail.Amount,

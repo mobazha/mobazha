@@ -302,7 +302,7 @@ func TestGormOrderRepo_FindUnverifiedPaymentOrders(t *testing.T) {
 		ID:                    "unverified-1",
 		MyRole:                "vendor",
 		Open:                  true,
-		PaymentVerified:       false,
+		OrderPaymentState:     models.OrderPaymentState{PaymentVerified: false},
 		SerializedPaymentSent: []byte("some-data"),
 	}
 	o1.SetFSMState(models.OrderState_AWAITING_FULFILLMENT)
@@ -313,7 +313,7 @@ func TestGormOrderRepo_FindUnverifiedPaymentOrders(t *testing.T) {
 		ID:                    "verified-1",
 		MyRole:                "vendor",
 		Open:                  true,
-		PaymentVerified:       true,
+		OrderPaymentState:     models.OrderPaymentState{PaymentVerified: true},
 		SerializedPaymentSent: []byte("some-data"),
 	}
 	o2.SetFSMState(models.OrderState_AWAITING_FULFILLMENT)
@@ -324,7 +324,7 @@ func TestGormOrderRepo_FindUnverifiedPaymentOrders(t *testing.T) {
 		ID:                    "buyer-1",
 		MyRole:                "buyer",
 		Open:                  true,
-		PaymentVerified:       false,
+		OrderPaymentState:     models.OrderPaymentState{PaymentVerified: false},
 		SerializedPaymentSent: []byte("some-data"),
 	}
 	o3.SetFSMState(models.OrderState_PENDING)

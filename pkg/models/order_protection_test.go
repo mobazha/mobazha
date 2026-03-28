@@ -158,8 +158,8 @@ func TestComputeProtection_AwaitingFulfillment(t *testing.T) {
 func TestComputeProtection_Fulfilled_WithTimestamp(t *testing.T) {
 	fulfilledAt := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	o := &Order{
-		State:       OrderState_FULFILLED,
-		FulfilledAt: &fulfilledAt,
+		State:          OrderState_FULFILLED,
+		OrderLifecycle: OrderLifecycle{FulfilledAt: &fulfilledAt},
 	}
 
 	now := time.Date(2026, 3, 5, 12, 0, 0, 0, time.UTC)
@@ -187,8 +187,8 @@ func TestComputeProtection_Fulfilled_WithTimestamp(t *testing.T) {
 
 func TestComputeProtection_Fulfilled_WithoutTimestamp(t *testing.T) {
 	o := &Order{
-		State:       OrderState_FULFILLED,
-		FulfilledAt: nil,
+		State:          OrderState_FULFILLED,
+		OrderLifecycle: OrderLifecycle{FulfilledAt: nil},
 	}
 	info := o.ComputeProtection(time.Now())
 	if info == nil {
@@ -205,8 +205,8 @@ func TestComputeProtection_Fulfilled_WithoutTimestamp(t *testing.T) {
 func TestComputeProtection_Fulfilled_DeadlinePassed(t *testing.T) {
 	fulfilledAt := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	o := &Order{
-		State:       OrderState_FULFILLED,
-		FulfilledAt: &fulfilledAt,
+		State:          OrderState_FULFILLED,
+		OrderLifecycle: OrderLifecycle{FulfilledAt: &fulfilledAt},
 	}
 	now := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
 	info := o.ComputeProtection(now)
@@ -218,8 +218,8 @@ func TestComputeProtection_Fulfilled_DeadlinePassed(t *testing.T) {
 func TestComputeProtection_Completed_InAfterSaleWindow(t *testing.T) {
 	completedAt := time.Date(2026, 3, 10, 12, 0, 0, 0, time.UTC)
 	o := &Order{
-		State:       OrderState_COMPLETED,
-		CompletedAt: &completedAt,
+		State:          OrderState_COMPLETED,
+		OrderLifecycle: OrderLifecycle{CompletedAt: &completedAt},
 	}
 	now := time.Date(2026, 3, 14, 12, 0, 0, 0, time.UTC)
 	info := o.ComputeProtection(now)
@@ -237,8 +237,8 @@ func TestComputeProtection_Completed_InAfterSaleWindow(t *testing.T) {
 func TestComputeProtection_Completed_PastAfterSaleWindow(t *testing.T) {
 	completedAt := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	o := &Order{
-		State:       OrderState_COMPLETED,
-		CompletedAt: &completedAt,
+		State:          OrderState_COMPLETED,
+		OrderLifecycle: OrderLifecycle{CompletedAt: &completedAt},
 	}
 	now := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
 	info := o.ComputeProtection(now)
@@ -252,8 +252,8 @@ func TestComputeProtection_Completed_PastAfterSaleWindow(t *testing.T) {
 
 func TestComputeProtection_Completed_NoTimestamp(t *testing.T) {
 	o := &Order{
-		State:       OrderState_COMPLETED,
-		CompletedAt: nil,
+		State:          OrderState_COMPLETED,
+		OrderLifecycle: OrderLifecycle{CompletedAt: nil},
 	}
 	info := o.ComputeProtection(time.Now())
 	if info.Stage != ProtectionStageCompleted {
@@ -286,8 +286,8 @@ func TestComputeProtection_Decided(t *testing.T) {
 func TestComputeProtection_PaymentFinalized(t *testing.T) {
 	completedAt := time.Date(2026, 3, 10, 12, 0, 0, 0, time.UTC)
 	o := &Order{
-		State:       OrderState_PAYMENT_FINALIZED,
-		CompletedAt: &completedAt,
+		State:          OrderState_PAYMENT_FINALIZED,
+		OrderLifecycle: OrderLifecycle{CompletedAt: &completedAt},
 	}
 	now := time.Date(2026, 3, 12, 12, 0, 0, 0, time.UTC)
 	info := o.ComputeProtection(now)
@@ -302,9 +302,11 @@ func TestComputeProtection_Fulfilled_Extended_WithTimestamp(t *testing.T) {
 	fulfilledAt := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	extendedAt := time.Date(2026, 3, 5, 12, 0, 0, 0, time.UTC)
 	o := &Order{
-		State:                OrderState_FULFILLED,
-		FulfilledAt:          &fulfilledAt,
-		ProtectionExtendedAt: &extendedAt,
+		State: OrderState_FULFILLED,
+		OrderLifecycle: OrderLifecycle{
+			FulfilledAt:          &fulfilledAt,
+			ProtectionExtendedAt: &extendedAt,
+		},
 	}
 
 	now := time.Date(2026, 3, 10, 12, 0, 0, 0, time.UTC)
@@ -335,9 +337,11 @@ func TestComputeProtection_Fulfilled_Extended_WithTimestamp(t *testing.T) {
 func TestComputeProtection_Fulfilled_Extended_WithoutTimestamp(t *testing.T) {
 	extendedAt := time.Date(2026, 3, 5, 12, 0, 0, 0, time.UTC)
 	o := &Order{
-		State:                OrderState_FULFILLED,
-		FulfilledAt:          nil,
-		ProtectionExtendedAt: &extendedAt,
+		State: OrderState_FULFILLED,
+		OrderLifecycle: OrderLifecycle{
+			FulfilledAt:          nil,
+			ProtectionExtendedAt: &extendedAt,
+		},
 	}
 	info := o.ComputeProtection(time.Now())
 	if info == nil {
@@ -358,8 +362,8 @@ func TestComputeProtection_Fulfilled_Extended_WithoutTimestamp(t *testing.T) {
 func TestComputeProtection_Fulfilled_NotExtended_Extendable(t *testing.T) {
 	fulfilledAt := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	o := &Order{
-		State:       OrderState_FULFILLED,
-		FulfilledAt: &fulfilledAt,
+		State:          OrderState_FULFILLED,
+		OrderLifecycle: OrderLifecycle{FulfilledAt: &fulfilledAt},
 	}
 	info := o.ComputeProtection(time.Date(2026, 3, 5, 12, 0, 0, 0, time.UTC))
 	if !info.Extendable {

@@ -22,17 +22,17 @@ import (
 	corecontracts "github.com/mobazha/mobazha-core/contracts"
 	coreorders "github.com/mobazha/mobazha-core/orders"
 	aipkg "github.com/mobazha/mobazha3.0/internal/ai"
+	"github.com/mobazha/mobazha3.0/internal/chains"
+	solanaWal "github.com/mobazha/mobazha3.0/internal/chains/solana"
 	"github.com/mobazha/mobazha3.0/internal/contracts"
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
-	"github.com/mobazha/mobazha3.0/internal/chains"
-	solanaWal "github.com/mobazha/mobazha3.0/internal/chains/solana"
 	obnet "github.com/mobazha/mobazha3.0/internal/net"
 	"github.com/mobazha/mobazha3.0/internal/notifications"
-	fiat "github.com/mobazha/mobazha3.0/internal/payment/fiat"
 	"github.com/mobazha/mobazha3.0/internal/notifier"
 	"github.com/mobazha/mobazha3.0/internal/orders"
 	"github.com/mobazha/mobazha3.0/internal/orders/utils"
+	fiat "github.com/mobazha/mobazha3.0/internal/payment/fiat"
 	"github.com/mobazha/mobazha3.0/internal/repo"
 	nodeVersion "github.com/mobazha/mobazha3.0/internal/version"
 	webhookinternal "github.com/mobazha/mobazha3.0/internal/webhook"
@@ -280,7 +280,7 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 	if cfg.InfrastructureOnly {
 		infraOnlyCtx, infraOnlyCancel := context.WithCancel(infra.Ctx)
 		obNode := &MobazhaNode{
-		sharedManager: sharedManager,
+			sharedManager: sharedManager,
 			identityFields: identityFields{
 				nodeID:     nodeID,
 				peerID:     infra.PeerID,
@@ -334,10 +334,10 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 
 		initWebhookSubsystem(obNode)
 		initDiscountSubsystem(obNode)
-	initCollectionSubsystem(obNode)
-	initFiatSubsystem(obNode)
-	initShippingSubsystem(obNode)
-	obNode.applyOptions(nil)
+		initCollectionSubsystem(obNode)
+		initFiatSubsystem(obNode)
+		initShippingSubsystem(obNode)
+		obNode.applyOptions(nil)
 		infraOwned = true
 		return obNode, nil
 	}
@@ -640,9 +640,9 @@ func NewNode(ctx context.Context, cfg *repo.Config, nodeID string, hostService .
 		Messenger:            obNode.messenger,
 		ExchangeRateProvider: erp,
 		EventBus:             bus,
-		CalcCIDFunc:    obNode.contentStore.ComputeCID,
-		FeatureManager: obNode.featureManager,
-		StateValidator: &coreStateBridge{},
+		CalcCIDFunc:          obNode.contentStore.ComputeCID,
+		FeatureManager:       obNode.featureManager,
+		StateValidator:       &coreStateBridge{},
 	})
 	// Register libp2p HTTP proxy handler for standalone nodes so that the
 	// SaaS proxy can forward management requests via libp2p streams.
@@ -1236,17 +1236,17 @@ func newLightweightNode(
 	obNode.orderLockManager = NewOrderLockManager()
 
 	obNode.orderProcessor = orders.NewOrderProcessor(&orders.Config{
-		NodeID:                   nodeID,
-		Identity:                 nodePeerID,
+		NodeID:               nodeID,
+		Identity:             nodePeerID,
 		Signer:               signer,
 		Db:                   obRepo.DB(),
 		Multiwallet:          obNode.multiwallet,
 		Messenger:            obNode.messenger,
 		ExchangeRateProvider: erp,
 		EventBus:             bus,
-		CalcCIDFunc:    obNode.contentStore.ComputeCID,
-		FeatureManager: obNode.featureManager,
-		StateValidator: &coreStateBridge{},
+		CalcCIDFunc:          obNode.contentStore.ComputeCID,
+		FeatureManager:       obNode.featureManager,
+		StateValidator:       &coreStateBridge{},
 	})
 
 	obNode.applyOptions(nil)
@@ -1305,6 +1305,7 @@ func initFiatSubsystem(obNode *MobazhaNode) {
 	}
 	obNode.fiatRegistry = fiat.NewRegistry()
 	obNode.fiatPaymentService = NewFiatPaymentAppService(obNode.fiatRegistry, obNode.db, obNode.nodeID, obNode.walletTestnet)
+	obNode.fiatPaymentService.SetOrderRepo(NewGormOrderRepo(obNode.db))
 	obNode.fiatPaymentService.LoadAndRegisterProviders()
 
 	if obNode.orderService != nil {

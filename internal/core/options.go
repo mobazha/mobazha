@@ -139,6 +139,9 @@ func (n *MobazhaNode) wireServiceSetters() {
 	if n.orderService != nil && n.paymentVerificationService != nil {
 		n.orderService.SetPaymentVerifier(n.paymentVerificationService)
 	}
+	if n.orderService != nil && n.fiatPaymentService != nil {
+		n.orderService.SetFiatOps(n.fiatPaymentService)
+	}
 	if n.paymentService != nil && n.orderProcessor != nil {
 		n.paymentService.SetPaymentRecorder(n.orderProcessor)
 	}

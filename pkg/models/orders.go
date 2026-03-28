@@ -85,6 +85,70 @@ type PendingUTXOPaymentInfo struct {
 	UnlockHours     uint32 `json:"unlockHours,omitempty"`     // Escrow timeout hours for MODERATED
 }
 
+// AfterSaleDispute groups app-level dispute fields for completed orders.
+// It is embedded in Order and persisted to dedicated columns.
+type AfterSaleDispute struct {
+	Reason string `gorm:"column:after_sale_dispute_reason" json:"reason,omitempty"`
+
+	Description string `gorm:"column:after_sale_dispute_desc" json:"description,omitempty"`
+
+	OpenedAt *time.Time `gorm:"column:after_sale_dispute_at" json:"openedAt,omitempty"`
+}
+
+// OrderTimeoutState groups scheduler-related timeout timestamps.
+type OrderTimeoutState struct {
+	// ExpiresAt is set when the order enters AWAITING_PAYMENT.
+	// Both fiat and crypto orders: CreatedAt + 1h.
+	// The OrderTimeoutScheduler cancels orders past this deadline.
+	ExpiresAt *time.Time `gorm:"index"`
+
+	// LastStateChangeAt records when the order last transitioned to its
+	// current State via SetFSMState. Used by the timeout scheduler to
+	// detect stale PENDING / AWAITING_FULFILLMENT / DISPUTED orders.
+	LastStateChangeAt *time.Time `gorm:"index"`
+
+	// TimeoutWarnedAt tracks whether a stale-order warning has already
+	// been emitted for the current state, preventing duplicate alerts.
+	TimeoutWarnedAt *time.Time
+}
+
+// OrderLifecycle groups payment/fulfillment/completion timestamps.
+type OrderLifecycle struct {
+	// PaidAt records when the payment was verified (chain-confirmed or fiat-captured).
+	// Used by OrderAutoRefundJob to enforce maxFulfillDays deadline.
+	PaidAt *time.Time `gorm:"index"`
+
+	// FulfilledAt records when all items were fulfilled (vendor shipped).
+	// Used by OrderAutoCompleteJob to enforce autoCompleteAfterShipDays deadline.
+	FulfilledAt *time.Time `gorm:"index"`
+
+	// CompletedAt records when the order transitioned to COMPLETED (buyer confirm or auto-complete).
+	// Used to calculate afterSaleWindowDays expiry.
+	CompletedAt *time.Time
+
+	// ProtectionExtendedAt records when the buyer extended the protection period.
+	// When set, autoCompleteAfterShipDays is increased by ExtendProtectionDays.
+	ProtectionExtendedAt *time.Time
+}
+
+// FiatPaymentState groups fiat-provider specific payment state.
+type FiatPaymentState struct {
+	// PaymentTransactionID stores provider payment ID
+	// (Stripe PaymentIntent / PayPal Capture).
+	PaymentTransactionID string `gorm:"column:payment_transaction_id;index"`
+
+	// FiatMetadata stores provider-specific key-value data (JSON-encoded).
+	FiatMetadata []byte `gorm:"column:fiat_metadata"`
+}
+
+// OrderPaymentState groups payment verification state across payment methods.
+// PaymentVerified is the common gate used by both crypto and fiat flows.
+type OrderPaymentState struct {
+	PaymentVerified bool `gorm:"column:payment_verified"`
+
+	FiatPaymentState `gorm:"embedded"`
+}
+
 // Order holds the state of all orders. This model is saved in the
 // database indexed by the order ID.
 type Order struct {
@@ -116,7 +180,8 @@ type Order struct {
 	SerializedPaymentSent []byte
 	PaymentSentAcked      bool
 	PaymentSentSignature  string
-	PaymentVerified       bool // chain-verified; gates financial operations (auto-confirm, funded events)
+
+	OrderPaymentState `gorm:"embedded"`
 
 	SerializedOrderDecline []byte
 	OrderDeclineSignature  string
@@ -174,52 +239,13 @@ type Order struct {
 	UnreadChatMessages int
 	CreatedAt          time.Time `gorm:"index:idx_order_listing,priority:3,sort:desc"`
 
-	// ExpiresAt is set when the order enters AWAITING_PAYMENT.
-	// Both fiat and crypto orders: CreatedAt + 1h.
-	// The OrderTimeoutScheduler cancels orders past this deadline.
-	ExpiresAt *time.Time `gorm:"index"`
-
-	// LastStateChangeAt records when the order last transitioned to its
-	// current State via SetFSMState. Used by the timeout scheduler to
-	// detect stale PENDING / AWAITING_FULFILLMENT / DISPUTED orders.
-	LastStateChangeAt *time.Time `gorm:"index"`
-
-	// TimeoutWarnedAt tracks whether a stale-order warning has already
-	// been emitted for the current state, preventing duplicate alerts.
-	TimeoutWarnedAt *time.Time
-
-	// Fiat payment fields — populated when a fiat webhook event is processed
-	PaymentTransactionID string `gorm:"index"` // provider payment ID (Stripe PaymentIntent / PayPal Capture)
-	FiatMetadata         []byte // JSON-encoded map[string]string for fiat-specific data (disputes, etc.)
+	OrderTimeoutState `gorm:"embedded"`
 
 	DisputeEvidenceHashes StringSlice `gorm:"type:text"` // image CIDs uploaded as dispute evidence
 
-	// PaidAt records when the payment was verified (chain-confirmed or fiat-captured).
-	// Used by OrderAutoRefundJob to enforce maxFulfillDays deadline.
-	PaidAt *time.Time `gorm:"index"`
+	OrderLifecycle `gorm:"embedded"`
 
-	// FulfilledAt records when all items were fulfilled (vendor shipped).
-	// Used by OrderAutoCompleteJob to enforce autoCompleteAfterShipDays deadline.
-	FulfilledAt *time.Time `gorm:"index"`
-
-	// CompletedAt records when the order transitioned to COMPLETED (buyer confirm or auto-complete).
-	// Used to calculate afterSaleWindowDays expiry.
-	CompletedAt *time.Time
-
-	// ProtectionExtendedAt records when the buyer extended the protection period.
-	// When set, autoCompleteAfterShipDays is increased by ExtendProtectionDays.
-	ProtectionExtendedAt *time.Time
-
-	// AfterSaleDisputeReason stores the reason for an application-level dispute
-	// filed after order completion (e.g. "NOT_RECEIVED", "QUALITY_ISSUE").
-	AfterSaleDisputeReason string `json:"afterSaleDisputeReason"`
-
-	// AfterSaleDisputeDesc stores the buyer's description of the issue.
-	AfterSaleDisputeDesc string `json:"afterSaleDisputeDesc"`
-
-	// AfterSaleDisputeAt records when the after-sale dispute was opened.
-	// Non-nil means a dispute has been filed; used for deduplication.
-	AfterSaleDisputeAt *time.Time `json:"afterSaleDisputeAt"`
+	AfterSaleDispute AfterSaleDispute `gorm:"embedded" json:"afterSaleDispute"`
 }
 
 func (o *Order) BeforeSave(tx *gorm.DB) (err error) {
@@ -1157,7 +1183,7 @@ func (o *Order) CanRequestAfterSale(now time.Time) bool {
 		return false
 	}
 
-	if o.AfterSaleDisputeAt != nil {
+	if o.AfterSaleDispute.OpenedAt != nil {
 		return false
 	}
 
@@ -1366,8 +1392,18 @@ func (o *Order) MarshalJSON() ([]byte, error) {
 	}
 
 	out := marshaler.Format(contract)
+	var payload map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+		return nil, err
+	}
 
-	return []byte(out), nil
+	// After-sale disputes are stored on the SQL model, not in the legacy
+	// protobuf contract shape, so surface them explicitly in API responses.
+	if o.AfterSaleDispute.Reason != "" || o.AfterSaleDispute.Description != "" || o.AfterSaleDispute.OpenedAt != nil {
+		payload["afterSaleDispute"] = o.AfterSaleDispute
+	}
+
+	return json.Marshal(payload)
 }
 
 func (o *Order) toProtobuf() (*pb.Contract, error) {

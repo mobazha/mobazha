@@ -160,9 +160,13 @@ func TestE2E_PayPal_CaptureRefunded_OrderTransition(t *testing.T) {
 
 	orderRepo := newMockOrderRepo()
 	orderRepo.addOrder(&models.Order{
-		ID:                   "pp-refund-order",
-		State:                models.OrderState_FULFILLED,
-		PaymentTransactionID: "CAP-E2E",
+		ID:    "pp-refund-order",
+		State: models.OrderState_FULFILLED,
+		OrderPaymentState: models.OrderPaymentState{
+			FiatPaymentState: models.FiatPaymentState{
+				PaymentTransactionID: "CAP-E2E",
+			},
+		},
 	})
 	svc.SetOrderRepo(orderRepo)
 
@@ -351,9 +355,13 @@ func TestE2E_PayPal_SaleRefunded_OrderTransition(t *testing.T) {
 
 	orderRepo := newMockOrderRepo()
 	orderRepo.addOrder(&models.Order{
-		ID:                   "pp-sale-refund-order",
-		State:                models.OrderState_FULFILLED,
-		PaymentTransactionID: "CAP-SALE-E2E",
+		ID:    "pp-sale-refund-order",
+		State: models.OrderState_FULFILLED,
+		OrderPaymentState: models.OrderPaymentState{
+			FiatPaymentState: models.FiatPaymentState{
+				PaymentTransactionID: "CAP-SALE-E2E",
+			},
+		},
 	})
 	svc.SetOrderRepo(orderRepo)
 

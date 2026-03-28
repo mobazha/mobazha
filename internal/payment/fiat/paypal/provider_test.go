@@ -296,6 +296,41 @@ func TestProvider_GetPayment_Success(t *testing.T) {
 	assert.False(t, detail.CreatedAt.IsZero(), "CreatedAt should be parsed")
 }
 
+func TestProvider_GetPayment_CapturedOrder_UsesCaptureID(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v2/checkout/orders/ORDER-CAPTURED", func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		json.NewEncoder(w).Encode(orderResponse{
+			ID:         "ORDER-CAPTURED",
+			Status:     "COMPLETED",
+			CreateTime: "2026-02-28T12:00:00Z",
+			PurchaseUnits: []puResponse{{
+				Amount: amount{CurrencyCode: "USD", Value: "50.00"},
+				Payee:  &payee{MerchantID: "SELLER-MID"},
+				Payments: &struct {
+					Captures []captureDetail `json:"captures"`
+				}{
+					Captures: []captureDetail{{
+						ID:     "CAP-DETAIL-001",
+						Status: "COMPLETED",
+						Amount: amount{CurrencyCode: "USD", Value: "50.00"},
+					}},
+				},
+			}},
+		})
+	})
+
+	ts, p := newTestServer(t, mux)
+	defer ts.Close()
+
+	detail, err := p.GetPayment(context.Background(), "ORDER-CAPTURED")
+	require.NoError(t, err)
+	assert.Equal(t, "CAP-DETAIL-001", detail.PaymentID)
+	assert.Equal(t, "succeeded", detail.Status)
+	assert.Equal(t, int64(5000), detail.Amount)
+	assert.Equal(t, "USD", detail.Currency)
+}
+
 func TestProvider_ParseWebhook_PaymentSucceeded_ResourceLevel(t *testing.T) {
 	ts, p := newWebhookTestProvider(t)
 	defer ts.Close()

@@ -1,13 +1,19 @@
 package models
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
 
 func TestCanRequestAfterSale_BuyerInWindow(t *testing.T) {
 	completedAt := time.Now().Add(-3 * 24 * time.Hour)
-	order := Order{State: OrderState_COMPLETED, CompletedAt: &completedAt}
+	order := Order{
+		State: OrderState_COMPLETED,
+		OrderLifecycle: OrderLifecycle{
+			CompletedAt: &completedAt,
+		},
+	}
 	order.SetRole(RoleBuyer)
 
 	if !order.CanRequestAfterSale(time.Now()) {
@@ -17,7 +23,12 @@ func TestCanRequestAfterSale_BuyerInWindow(t *testing.T) {
 
 func TestCanRequestAfterSale_PaymentFinalizedInWindow(t *testing.T) {
 	completedAt := time.Now().Add(-3 * 24 * time.Hour)
-	order := Order{State: OrderState_PAYMENT_FINALIZED, CompletedAt: &completedAt}
+	order := Order{
+		State: OrderState_PAYMENT_FINALIZED,
+		OrderLifecycle: OrderLifecycle{
+			CompletedAt: &completedAt,
+		},
+	}
 	order.SetRole(RoleBuyer)
 
 	if !order.CanRequestAfterSale(time.Now()) {
@@ -27,7 +38,12 @@ func TestCanRequestAfterSale_PaymentFinalizedInWindow(t *testing.T) {
 
 func TestCanRequestAfterSale_WindowExpired(t *testing.T) {
 	completedAt := time.Now().Add(-8 * 24 * time.Hour)
-	order := Order{State: OrderState_COMPLETED, CompletedAt: &completedAt}
+	order := Order{
+		State: OrderState_COMPLETED,
+		OrderLifecycle: OrderLifecycle{
+			CompletedAt: &completedAt,
+		},
+	}
 	order.SetRole(RoleBuyer)
 
 	if order.CanRequestAfterSale(time.Now()) {
@@ -37,7 +53,12 @@ func TestCanRequestAfterSale_WindowExpired(t *testing.T) {
 
 func TestCanRequestAfterSale_VendorRejected(t *testing.T) {
 	completedAt := time.Now().Add(-1 * 24 * time.Hour)
-	order := Order{State: OrderState_COMPLETED, CompletedAt: &completedAt}
+	order := Order{
+		State: OrderState_COMPLETED,
+		OrderLifecycle: OrderLifecycle{
+			CompletedAt: &completedAt,
+		},
+	}
 	order.SetRole(RoleVendor)
 
 	if order.CanRequestAfterSale(time.Now()) {
@@ -55,7 +76,12 @@ func TestCanRequestAfterSale_WrongState(t *testing.T) {
 		OrderState_DISPUTED,
 	}
 	for _, state := range states {
-		order := Order{State: state, CompletedAt: &completedAt}
+		order := Order{
+			State: state,
+			OrderLifecycle: OrderLifecycle{
+				CompletedAt: &completedAt,
+			},
+		}
 		order.SetRole(RoleBuyer)
 
 		if order.CanRequestAfterSale(time.Now()) {
@@ -76,9 +102,9 @@ func TestCanRequestAfterSale_NilCompletedAt(t *testing.T) {
 func TestCanRequestAfterSale_DisputeOpened(t *testing.T) {
 	completedAt := time.Now().Add(-1 * 24 * time.Hour)
 	order := Order{
-		State:                  OrderState_COMPLETED,
-		CompletedAt:            &completedAt,
-		SerializedDisputeOpen:  []byte("dispute-data"),
+		State:                 OrderState_COMPLETED,
+		OrderLifecycle:        OrderLifecycle{CompletedAt: &completedAt},
+		SerializedDisputeOpen: []byte("dispute-data"),
 	}
 	order.SetRole(RoleBuyer)
 
@@ -91,9 +117,11 @@ func TestCanRequestAfterSale_AlreadyHasAfterSale(t *testing.T) {
 	completedAt := time.Now().Add(-1 * 24 * time.Hour)
 	disputeAt := time.Now()
 	order := Order{
-		State:              OrderState_COMPLETED,
-		CompletedAt:        &completedAt,
-		AfterSaleDisputeAt: &disputeAt,
+		State:          OrderState_COMPLETED,
+		OrderLifecycle: OrderLifecycle{CompletedAt: &completedAt},
+		AfterSaleDispute: AfterSaleDispute{
+			OpenedAt: &disputeAt,
+		},
 	}
 	order.SetRole(RoleBuyer)
 
@@ -105,7 +133,12 @@ func TestCanRequestAfterSale_AlreadyHasAfterSale(t *testing.T) {
 func TestCanRequestAfterSale_BoundaryExactExpiry(t *testing.T) {
 	now := time.Date(2026, 3, 16, 12, 0, 0, 0, time.UTC)
 	completedAt := now.Add(-7 * 24 * time.Hour)
-	order := Order{State: OrderState_COMPLETED, CompletedAt: &completedAt}
+	order := Order{
+		State: OrderState_COMPLETED,
+		OrderLifecycle: OrderLifecycle{
+			CompletedAt: &completedAt,
+		},
+	}
 	order.SetRole(RoleBuyer)
 
 	if order.CanRequestAfterSale(now) {
@@ -116,10 +149,57 @@ func TestCanRequestAfterSale_BoundaryExactExpiry(t *testing.T) {
 func TestCanRequestAfterSale_BoundaryOneSecondBefore(t *testing.T) {
 	now := time.Date(2026, 3, 16, 12, 0, 0, 0, time.UTC)
 	completedAt := now.Add(-7*24*time.Hour + time.Second)
-	order := Order{State: OrderState_COMPLETED, CompletedAt: &completedAt}
+	order := Order{
+		State: OrderState_COMPLETED,
+		OrderLifecycle: OrderLifecycle{
+			CompletedAt: &completedAt,
+		},
+	}
 	order.SetRole(RoleBuyer)
 
 	if !order.CanRequestAfterSale(now) {
 		t.Error("one second before 7-day boundary should be accepted")
+	}
+}
+
+func TestOrderMarshalJSON_IncludesAfterSaleDisputeFields(t *testing.T) {
+	completedAt := time.Date(2026, 3, 20, 12, 0, 0, 0, time.UTC)
+	disputeAt := time.Date(2026, 3, 21, 9, 30, 0, 0, time.UTC)
+	order := Order{
+		ID:    "order-after-sale-json",
+		State: OrderState_COMPLETED,
+		OrderLifecycle: OrderLifecycle{
+			CompletedAt: &completedAt,
+		},
+		AfterSaleDispute: AfterSaleDispute{
+			Reason:      "QUALITY_ISSUE",
+			Description: "broken item",
+			OpenedAt:    &disputeAt,
+		},
+	}
+	order.SetRole(RoleBuyer)
+
+	raw, err := json.Marshal(&order)
+	if err != nil {
+		t.Fatalf("json.Marshal(order): %v", err)
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		t.Fatalf("json.Unmarshal(payload): %v", err)
+	}
+
+	nested, ok := payload["afterSaleDispute"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("afterSaleDispute should be an object, got %#v", payload["afterSaleDispute"])
+	}
+	if got, _ := nested["reason"].(string); got != "QUALITY_ISSUE" {
+		t.Fatalf("afterSaleDispute.reason = %q, want %q", got, "QUALITY_ISSUE")
+	}
+	if got, _ := nested["description"].(string); got != "broken item" {
+		t.Fatalf("afterSaleDispute.description = %q, want %q", got, "broken item")
+	}
+	if got, _ := nested["openedAt"].(string); got == "" {
+		t.Fatal("afterSaleDispute.openedAt should be present in marshaled JSON")
 	}
 }

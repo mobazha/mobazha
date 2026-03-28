@@ -63,7 +63,7 @@ type Config struct {
 	ExchangeRateProvider *wallet.ExchangeRateProvider
 	EventBus             events.Bus
 	CalcCIDFunc          func(file []byte) (cid.Cid, error)
-	FeatureManager *pkgconfig.FeatureManager
+	FeatureManager       *pkgconfig.FeatureManager
 
 	// StateValidator is an optional core state machine validator (typically OrderStateBridge).
 	// When set, the FSM becomes the authoritative source for order state transitions:
@@ -76,33 +76,33 @@ type Config struct {
 
 // OrderProcessor is used to deterministically process orders.
 type OrderProcessor struct {
-	nodeID                   string
-	identity                 libp2ppeer.ID
-	signer                   contracts.Signer
-	db                       database.Database
-	messenger                pkgcontracts.Messenger
-	multiwallet              pkgcontracts.WalletOperator
-	erp                      *wallet.ExchangeRateProvider
-	bus                      events.Bus
-	calcCIDFunc             func(file []byte) (cid.Cid, error)
-	featureManager           *pkgconfig.FeatureManager
-	stateValidator           StateValidator
+	nodeID         string
+	identity       libp2ppeer.ID
+	signer         contracts.Signer
+	db             database.Database
+	messenger      pkgcontracts.Messenger
+	multiwallet    pkgcontracts.WalletOperator
+	erp            *wallet.ExchangeRateProvider
+	bus            events.Bus
+	calcCIDFunc    func(file []byte) (cid.Cid, error)
+	featureManager *pkgconfig.FeatureManager
+	stateValidator StateValidator
 }
 
 // NewOrderProcessor initializes and returns a new OrderProcessor
 func NewOrderProcessor(cfg *Config) *OrderProcessor {
 	return &OrderProcessor{
-		nodeID:              cfg.NodeID,
-		identity:            cfg.Identity,
-		signer:              cfg.Signer,
-		db:                  cfg.Db,
-		messenger:           cfg.Messenger,
-		multiwallet:         cfg.Multiwallet,
-		erp:                 cfg.ExchangeRateProvider,
-		bus:                 cfg.EventBus,
+		nodeID:         cfg.NodeID,
+		identity:       cfg.Identity,
+		signer:         cfg.Signer,
+		db:             cfg.Db,
+		messenger:      cfg.Messenger,
+		multiwallet:    cfg.Multiwallet,
+		erp:            cfg.ExchangeRateProvider,
+		bus:            cfg.EventBus,
 		calcCIDFunc:    cfg.CalcCIDFunc,
 		featureManager: cfg.FeatureManager,
-		stateValidator:      cfg.StateValidator,
+		stateValidator: cfg.StateValidator,
 	}
 }
 

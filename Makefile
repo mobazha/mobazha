@@ -4,7 +4,7 @@ build: ## 构建项目
 	go build -o mobazha
 
 test: ## 运行测试
-	go test ./...
+	bash ./scripts/with-libolm-env.sh go test ./...
 
 clean: ## 清理构建文件
 	rm -f mobazha

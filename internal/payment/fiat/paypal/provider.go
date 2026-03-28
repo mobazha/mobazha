@@ -26,12 +26,12 @@ const (
 
 // Config holds PayPal provider configuration.
 type Config struct {
-	ClientID      string
-	ClientSecret  string
-	WebhookID     string // PayPal webhook ID for signature verification
-	Mode          Mode
-	Sandbox       bool
-	PartnerID     string // PayPal partner merchant ID (SaaS only)
+	ClientID     string
+	ClientSecret string
+	WebhookID    string // PayPal webhook ID for signature verification
+	Mode         Mode
+	Sandbox      bool
+	PartnerID    string // PayPal partner merchant ID (SaaS only)
 }
 
 // Provider implements contracts.FiatPaymentProvider and contracts.FiatOnboardingProvider
@@ -177,6 +177,21 @@ func (p *Provider) GetPayment(ctx context.Context, paymentID string) (*contracts
 		}
 		if pu.Payee != nil {
 			detail.SellerAccountID = pu.Payee.MerchantID
+		}
+		if pu.Payments != nil && len(pu.Payments.Captures) > 0 {
+			capture := pu.Payments.Captures[0]
+			if capture.ID != "" {
+				detail.PaymentID = capture.ID
+			}
+			if capture.Status != "" {
+				detail.Status = mapPayPalStatus(capture.Status)
+			}
+			if capture.Amount.Value != "" {
+				detail.Currency = capture.Amount.CurrencyCode
+				if v, err := parseAmount(capture.Amount.Value, capture.Amount.CurrencyCode); err == nil {
+					detail.Amount = v
+				}
+			}
 		}
 	}
 
@@ -381,7 +396,6 @@ func (p *Provider) GetAccountStatus(ctx context.Context, accountID string) (*con
 
 // --- Helpers ---
 
-
 func (p *Provider) extractDisputeDetails(raw json.RawMessage, we *contracts.WebhookEvent) {
 	var res disputeResource
 	if err := json.Unmarshal(raw, &res); err != nil {
@@ -550,6 +564,6 @@ func mapPayPalStatus(s string) string {
 
 // Compile-time interface compliance checks.
 var (
-	_ contracts.FiatPaymentProvider   = (*Provider)(nil)
+	_ contracts.FiatPaymentProvider    = (*Provider)(nil)
 	_ contracts.FiatOnboardingProvider = (*Provider)(nil)
 )

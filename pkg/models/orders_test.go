@@ -850,7 +850,7 @@ func TestOrder_CanDecline(t *testing.T) {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
-			ourRole:   RoleVendor,
+			ourRole:    RoleVendor,
 			canDecline: false,
 		},
 		{
@@ -860,7 +860,7 @@ func TestOrder_CanDecline(t *testing.T) {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
-			ourRole:   RoleVendor,
+			ourRole:    RoleVendor,
 			canDecline: false,
 		},
 		{
@@ -870,7 +870,7 @@ func TestOrder_CanDecline(t *testing.T) {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
-			ourRole:   RoleVendor,
+			ourRole:    RoleVendor,
 			canDecline: false,
 		},
 		{
@@ -880,7 +880,7 @@ func TestOrder_CanDecline(t *testing.T) {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
-			ourRole:   RoleVendor,
+			ourRole:    RoleVendor,
 			canDecline: false,
 		},
 		{
@@ -890,7 +890,7 @@ func TestOrder_CanDecline(t *testing.T) {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
-			ourRole:   RoleVendor,
+			ourRole:    RoleVendor,
 			canDecline: false,
 		},
 		{
@@ -900,7 +900,7 @@ func TestOrder_CanDecline(t *testing.T) {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
-			ourRole:   RoleVendor,
+			ourRole:    RoleVendor,
 			canDecline: false,
 		},
 		{
@@ -910,7 +910,7 @@ func TestOrder_CanDecline(t *testing.T) {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
-			ourRole:   RoleVendor,
+			ourRole:    RoleVendor,
 			canDecline: false,
 		},
 		{
@@ -920,7 +920,7 @@ func TestOrder_CanDecline(t *testing.T) {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
-			ourRole:   RoleVendor,
+			ourRole:    RoleVendor,
 			canDecline: false,
 		},
 		{
@@ -930,7 +930,7 @@ func TestOrder_CanDecline(t *testing.T) {
 				err := order.PutMessage(utils.MustWrapOrderMessage(&pb.OrderOpen{}))
 				return err
 			},
-			ourRole:   RoleVendor,
+			ourRole:    RoleVendor,
 			canDecline: false,
 		},
 	}

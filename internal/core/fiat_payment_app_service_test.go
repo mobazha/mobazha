@@ -923,9 +923,13 @@ func TestDisconnectProvider_NoActiveOrders_Success(t *testing.T) {
 	svc, db := newFiatTestServiceWithOrders(t, reg)
 
 	seedFiatOrder(t, db, &models.Order{
-		ID:                   "completed-order",
-		PaymentTransactionID: "pi_completed_123",
-		FiatMetadata:         []byte(`{"fiat_provider":"stripe"}`),
+		ID: "completed-order",
+		OrderPaymentState: models.OrderPaymentState{
+			FiatPaymentState: models.FiatPaymentState{
+				PaymentTransactionID: "pi_completed_123",
+				FiatMetadata:         []byte(`{"fiat_provider":"stripe"}`),
+			},
+		},
 	}, models.OrderState_COMPLETED)
 
 	svc.SetOrderRepo(newMockOrderRepo())
@@ -965,9 +969,13 @@ func TestDisconnectProvider_ActiveOrders_ReturnsError(t *testing.T) {
 	svc, db := newFiatTestServiceWithOrders(t, reg)
 
 	seedFiatOrder(t, db, &models.Order{
-		ID:                   "fulfillment-order",
-		PaymentTransactionID: "pi_fulfill_123",
-		FiatMetadata:         []byte(`{"fiat_provider":"stripe"}`),
+		ID: "fulfillment-order",
+		OrderPaymentState: models.OrderPaymentState{
+			FiatPaymentState: models.FiatPaymentState{
+				PaymentTransactionID: "pi_fulfill_123",
+				FiatMetadata:         []byte(`{"fiat_provider":"stripe"}`),
+			},
+		},
 	}, models.OrderState_AWAITING_FULFILLMENT)
 
 	svc.SetOrderRepo(newMockOrderRepo())
@@ -985,8 +993,12 @@ func TestDisconnectProvider_AwaitingPayment_CancelsSession(t *testing.T) {
 	svc, db := newFiatTestServiceWithOrders(t, reg)
 
 	seedFiatOrder(t, db, &models.Order{
-		ID:           "awaiting-payment-order",
-		FiatMetadata: []byte(`{"fiat_provider":"stripe","fiat_session_id":"pi_session_abc"}`),
+		ID: "awaiting-payment-order",
+		OrderPaymentState: models.OrderPaymentState{
+			FiatPaymentState: models.FiatPaymentState{
+				FiatMetadata: []byte(`{"fiat_provider":"stripe","fiat_session_id":"pi_session_abc"}`),
+			},
+		},
 	}, models.OrderState_AWAITING_PAYMENT)
 
 	svc.SetOrderRepo(newMockOrderRepo())
@@ -1022,8 +1034,12 @@ func TestDisconnectProvider_CryptoOrderDoesNotBlock(t *testing.T) {
 	svc, db := newFiatTestServiceWithOrders(t, reg)
 
 	seedFiatOrder(t, db, &models.Order{
-		ID:                   "crypto-order",
-		PaymentTransactionID: "0xabc123",
+		ID: "crypto-order",
+		OrderPaymentState: models.OrderPaymentState{
+			FiatPaymentState: models.FiatPaymentState{
+				PaymentTransactionID: "0xabc123",
+			},
+		},
 	}, models.OrderState_AWAITING_FULFILLMENT)
 
 	svc.SetOrderRepo(newMockOrderRepo())
@@ -1146,9 +1162,13 @@ func TestFiatService_ReconcileFiatOrders_SucceededPayment_TriggersHandler(t *tes
 	svc, db := newFiatTestServiceWithOrders(t, reg)
 
 	seedFiatOrder(t, db, &models.Order{
-		ID:           "order_reconcile_001",
-		Open:         true,
-		FiatMetadata: []byte(`{"fiat_provider":"stripe","fiat_session_id":"pi_reconcile_001"}`),
+		ID:   "order_reconcile_001",
+		Open: true,
+		OrderPaymentState: models.OrderPaymentState{
+			FiatPaymentState: models.FiatPaymentState{
+				FiatMetadata: []byte(`{"fiat_provider":"stripe","fiat_session_id":"pi_reconcile_001"}`),
+			},
+		},
 	}, models.OrderState_AWAITING_PAYMENT)
 
 	var handledEvent *contracts.WebhookEvent
@@ -1164,6 +1184,48 @@ func TestFiatService_ReconcileFiatOrders_SucceededPayment_TriggersHandler(t *tes
 	assert.Equal(t, "pi_reconcile_001", handledEvent.PaymentID)
 	assert.Equal(t, int64(5000), handledEvent.Amount)
 	assert.Equal(t, contracts.WebhookPaymentSucceeded, handledEvent.Type)
+}
+
+func TestFiatService_ReconcileFiatOrders_UsesResolvedPaymentID(t *testing.T) {
+	provider := &mockFiatProvider{
+		id: "paypal",
+		getResult: &contracts.PaymentDetail{
+			PaymentID: "CAP-RECON-001",
+			Status:    "succeeded",
+			Amount:    5000,
+			Currency:  "USD",
+			PaymentMethod: contracts.PaymentMethodInfo{
+				Type: "paypal", Brand: "paypal",
+			},
+		},
+	}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+
+	svc, db := newFiatTestServiceWithOrders(t, reg)
+
+	seedFiatOrder(t, db, &models.Order{
+		ID:   "order_reconcile_capture",
+		Open: true,
+		OrderPaymentState: models.OrderPaymentState{
+			FiatPaymentState: models.FiatPaymentState{
+				FiatMetadata: []byte(`{"fiat_provider":"paypal","fiat_session_id":"ORDER-RECON-001"}`),
+			},
+		},
+	}, models.OrderState_AWAITING_PAYMENT)
+
+	var handledEvent *contracts.WebhookEvent
+	svc.SetWebhookHandler(func(_ context.Context, event *contracts.WebhookEvent) error {
+		handledEvent = event
+		return nil
+	})
+
+	svc.ReconcileFiatOrders(context.Background())
+
+	require.NotNil(t, handledEvent)
+	assert.Equal(t, "CAP-RECON-001", handledEvent.PaymentID)
+	assert.Equal(t, "order_reconcile_capture", handledEvent.OrderID)
+	assert.Equal(t, "paypal", handledEvent.ProviderID)
 }
 
 func TestFiatService_ReconcileFiatOrders_PendingPayment_NoAction(t *testing.T) {
@@ -1182,9 +1244,13 @@ func TestFiatService_ReconcileFiatOrders_PendingPayment_NoAction(t *testing.T) {
 	svc, db := newFiatTestServiceWithOrders(t, reg)
 
 	seedFiatOrder(t, db, &models.Order{
-		ID:           "order_pending_recon",
-		Open:         true,
-		FiatMetadata: []byte(`{"fiat_provider":"stripe","fiat_session_id":"pi_pending_001"}`),
+		ID:   "order_pending_recon",
+		Open: true,
+		OrderPaymentState: models.OrderPaymentState{
+			FiatPaymentState: models.FiatPaymentState{
+				FiatMetadata: []byte(`{"fiat_provider":"stripe","fiat_session_id":"pi_pending_001"}`),
+			},
+		},
 	}, models.OrderState_AWAITING_PAYMENT)
 
 	var handlerCalled bool
@@ -1221,9 +1287,13 @@ func TestFiatService_ReconcileFiatOrders_ProviderAPIError_ContinuesOthers(t *tes
 	svc, db := newFiatTestServiceWithOrders(t, reg)
 
 	seedFiatOrder(t, db, &models.Order{
-		ID:           "order_api_err",
-		Open:         true,
-		FiatMetadata: []byte(`{"fiat_provider":"stripe","fiat_session_id":"pi_api_err"}`),
+		ID:   "order_api_err",
+		Open: true,
+		OrderPaymentState: models.OrderPaymentState{
+			FiatPaymentState: models.FiatPaymentState{
+				FiatMetadata: []byte(`{"fiat_provider":"stripe","fiat_session_id":"pi_api_err"}`),
+			},
+		},
 	}, models.OrderState_AWAITING_PAYMENT)
 
 	svc.SetWebhookHandler(func(_ context.Context, _ *contracts.WebhookEvent) error {

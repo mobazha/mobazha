@@ -104,6 +104,8 @@ type mautrixChatService struct {
 	// this channel so that GetRooms() always reads fresh unreadCounts.
 	firstSyncCh chan struct{}
 
+	directRoomCreateMu sync.Mutex
+
 	mu sync.RWMutex
 }
 

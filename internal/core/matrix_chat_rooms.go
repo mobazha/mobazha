@@ -136,6 +136,16 @@ func (s *mautrixChatService) CreateDirectRoom(ctx context.Context, target contra
 		return "", err
 	}
 
+	s.directRoomCreateMu.Lock()
+	defer s.directRoomCreateMu.Unlock()
+
+	existingRoomID, findErr := s.findExistingDirectRoom(ctx, targetUserID, targetPeerID)
+	if findErr != nil {
+		log.Warningf("Failed to search existing direct room for %s: %v", targetUserID, findErr)
+	} else if existingRoomID != "" {
+		return existingRoomID, nil
+	}
+
 	resp, err := s.client.CreateRoom(ctx, &mautrix.ReqCreateRoom{
 		Preset:   "trusted_private_chat",
 		IsDirect: true,
@@ -167,6 +177,49 @@ func (s *mautrixChatService) CreateDirectRoom(ctx context.Context, target contra
 	s.sendRoomMetadataStateEvent(ctx, resp.RoomID, metadata)
 
 	return resp.RoomID.String(), nil
+}
+
+func (s *mautrixChatService) findExistingDirectRoom(
+	ctx context.Context,
+	targetUserID id.UserID,
+	targetPeerID string,
+) (string, error) {
+	rooms, err := s.GetRooms(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	selfUserID := s.matrixUserID.String()
+	targetUserIDStr := targetUserID.String()
+	for _, room := range rooms {
+		if !room.IsDirect && room.RoomType != "direct" {
+			continue
+		}
+		if len(room.Members) != 2 {
+			continue
+		}
+
+		hasSelf := false
+		hasTarget := false
+		targetMemberPeerID := ""
+		for _, member := range room.Members {
+			if member.UserID == selfUserID {
+				hasSelf = true
+			}
+			if member.UserID == targetUserIDStr {
+				hasTarget = true
+				targetMemberPeerID = strings.TrimSpace(member.PeerID)
+			}
+		}
+		if !hasSelf || !hasTarget {
+			continue
+		}
+		if targetPeerID != "" && targetMemberPeerID != "" && targetMemberPeerID != targetPeerID {
+			continue
+		}
+		return room.RoomID, nil
+	}
+	return "", nil
 }
 
 func (s *mautrixChatService) resolveDirectRoomTarget(

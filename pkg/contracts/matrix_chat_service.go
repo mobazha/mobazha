@@ -10,6 +10,13 @@ import (
 // ErrVerificationUnavailable is returned when SAS/device verification is not wired (e.g. no crypto helper).
 var ErrVerificationUnavailable = errors.New("verification not available")
 
+// MatrixDirectRoomTarget describes who a direct chat should be created with.
+// Exactly one of TargetUserID or TargetPeerID should be provided.
+type MatrixDirectRoomTarget struct {
+	TargetUserID string `json:"targetUserID,omitempty"`
+	TargetPeerID string `json:"targetPeerID,omitempty"`
+}
+
 // MatrixChatService provides full Matrix chat capabilities via the node backend.
 // The frontend communicates only through REST API and WebSocket events; all Matrix
 // protocol interaction (including E2EE) is handled by the node.
@@ -31,8 +38,10 @@ type MatrixChatService interface {
 	GetRoom(ctx context.Context, roomID string) (*MatrixRoom, error)
 	// GetInvitedRooms returns rooms where the user has a pending invite.
 	GetInvitedRooms(ctx context.Context) ([]MatrixRoom, error)
-	// CreateDirectRoom creates or retrieves a 1:1 DM room with the given Matrix user.
-	CreateDirectRoom(ctx context.Context, userID string) (string, error)
+	// CreateDirectRoom creates or retrieves a 1:1 DM room with the given target.
+	// For Mobazha users, callers should pass TargetPeerID.
+	// For external Matrix users, callers should pass TargetUserID.
+	CreateDirectRoom(ctx context.Context, target MatrixDirectRoomTarget) (string, error)
 	// CreateGroupRoom creates a new group chat room.
 	// metadata is optional key-value pairs stored as room state events (e.g. room type, order ID).
 	CreateGroupRoom(ctx context.Context, name string, memberIDs []string, metadata map[string]string) (string, error)
@@ -172,12 +181,12 @@ type MatrixMessage struct {
 
 // MatrixMediaInfo holds media attachment metadata.
 type MatrixMediaInfo struct {
-	URL         string `json:"url"`
-	MimeType    string `json:"mimeType"`
-	Size        int64  `json:"size"`
-	Width       int    `json:"width,omitempty"`
-	Height      int    `json:"height,omitempty"`
-	Filename    string `json:"filename"`
+	URL          string `json:"url"`
+	MimeType     string `json:"mimeType"`
+	Size         int64  `json:"size"`
+	Width        int    `json:"width,omitempty"`
+	Height       int    `json:"height,omitempty"`
+	Filename     string `json:"filename"`
 	ThumbnailURL string `json:"thumbnailUrl,omitempty"`
 }
 
@@ -191,8 +200,8 @@ type MatrixChatEvent struct {
 type InvitePolicy string
 
 const (
-	InvitePolicyAutoAll      InvitePolicy = "auto_all"
-	InvitePolicyAutoMobazha  InvitePolicy = "auto_mobazha"
+	InvitePolicyAutoAll       InvitePolicy = "auto_all"
+	InvitePolicyAutoMobazha   InvitePolicy = "auto_mobazha"
 	InvitePolicyAlwaysConfirm InvitePolicy = "always_confirm"
 )
 

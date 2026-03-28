@@ -23,6 +23,7 @@ import (
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	"github.com/mobazha/mobazha3.0/pkg/encryption"
+	"github.com/mobazha/mobazha3.0/pkg/models"
 	"github.com/rs/zerolog"
 	"go.mau.fi/util/dbutil"
 	"maunium.net/go/mautrix"
@@ -215,10 +216,10 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 			return fmt.Errorf("matrix login failed: %w", err)
 		}
 	}
+	s.persistMatrixCredentials()
 
 	var cryptoStoreArg interface{}
-	useSharedPG := s.config.CryptoStore != nil
-	if useSharedPG {
+	if s.usesSharedCryptoStore() {
 		cryptoStoreArg = s.config.CryptoStore
 	} else {
 		dbDSN := s.config.DBPath
@@ -262,7 +263,7 @@ func (s *mautrixChatService) startLocked(ctx context.Context) error {
 		return &mxcrypto.KeyShareRejectNoResponse
 	}
 	storeDesc := "SQLite"
-	if useSharedPG {
+	if s.usesSharedCryptoStore() {
 		storeDesc = fmt.Sprintf("shared-PG(account=%s)", s.config.CryptoDBAccountID)
 	}
 	log.Infof("Matrix crypto initialized: user=%s device=%s store=%s ShareKeysMinTrust=CrossSignedTOFU", s.client.UserID, s.client.DeviceID, storeDesc)
@@ -520,6 +521,14 @@ func (s *mautrixChatService) idleWatcher(ctx context.Context) {
 	}
 }
 
+func (s *mautrixChatService) usesSharedCryptoStore() bool {
+	return s.config.CryptoStore != nil
+}
+
+func (s *mautrixChatService) ownsCryptoStore() bool {
+	return !s.usesSharedCryptoStore()
+}
+
 // Stop gracefully shuts down the sync loop, crypto helper, and idle watcher.
 // This is a permanent stop used during node shutdown.
 func (s *mautrixChatService) Stop() error {
@@ -541,7 +550,7 @@ func (s *mautrixChatService) Stop() error {
 		s.syncCancel()
 	}
 
-	if s.cryptoHelper != nil {
+	if s.cryptoHelper != nil && s.ownsCryptoStore() {
 		if err := s.cryptoHelper.Close(); err != nil {
 			log.Errorf("Failed to close crypto helper: %v", err)
 		}
@@ -556,6 +565,28 @@ func (s *mautrixChatService) Stop() error {
 
 	log.Infof("Matrix chat service stopped for %s", s.matrixUserID)
 	return nil
+}
+
+func (s *mautrixChatService) persistMatrixCredentials() {
+	if s.config.DB == nil {
+		return
+	}
+
+	record := &models.MatrixCredentials{
+		PeerID:       s.config.PeerID.String(),
+		MatrixUserID: s.matrixUserID.String(),
+		ServerName:   s.serverName,
+		Registered:   true,
+	}
+	if record.PeerID == "" || record.MatrixUserID == "" {
+		return
+	}
+
+	if err := s.config.DB.Update(func(tx database.Tx) error {
+		return database.SaveByBusinessKey(tx, record, "peer_id = ?", record.PeerID)
+	}); err != nil {
+		log.Warningf("Failed to persist Matrix credentials for %s: %v", s.matrixUserID, err)
+	}
 }
 
 // IsReady returns true when the client is logged in and syncing.
@@ -1152,6 +1183,9 @@ func (s *mautrixChatService) autoJoinInvite(roomID, inviter string) {
 		log.Warningf("Auto-join room %s from %s failed: %v", roomID, inviter, err)
 		return
 	}
+	// Matrix forbids setting custom state on behalf of other members, so each
+	// user must publish their own canonical peerID after they successfully join.
+	s.publishPeerIDState(ctx, id.RoomID(roomID), s.selfPeerIDAssignments())
 	log.Infof("Auto-joined room %s (invited by %s)", roomID, inviter)
 }
 

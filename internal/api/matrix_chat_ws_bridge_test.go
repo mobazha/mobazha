@@ -25,9 +25,9 @@ func (m *bridgeMockChatService) Subscribe(_ context.Context) (<-chan contracts.M
 	return m.ch, nil
 }
 
-func (m *bridgeMockChatService) Start(context.Context) error              { return nil }
-func (m *bridgeMockChatService) Stop() error                              { return nil }
-func (m *bridgeMockChatService) IsReady() bool                            { return true }
+func (m *bridgeMockChatService) Start(context.Context) error { return nil }
+func (m *bridgeMockChatService) Stop() error                 { return nil }
+func (m *bridgeMockChatService) IsReady() bool               { return true }
 func (m *bridgeMockChatService) GetRooms(context.Context) ([]contracts.MatrixRoom, error) {
 	return nil, nil
 }
@@ -37,7 +37,7 @@ func (m *bridgeMockChatService) GetRoom(context.Context, string) (*contracts.Mat
 func (m *bridgeMockChatService) GetInvitedRooms(context.Context) ([]contracts.MatrixRoom, error) {
 	return nil, nil
 }
-func (m *bridgeMockChatService) CreateDirectRoom(context.Context, string) (string, error) {
+func (m *bridgeMockChatService) CreateDirectRoom(context.Context, contracts.MatrixDirectRoomTarget) (string, error) {
 	return "", nil
 }
 func (m *bridgeMockChatService) CreateGroupRoom(context.Context, string, []string, map[string]string) (string, error) {
@@ -74,14 +74,14 @@ func (m *bridgeMockChatService) RedactMessage(context.Context, string, string) e
 func (m *bridgeMockChatService) SendReaction(context.Context, string, string, string) (string, error) {
 	return "", nil
 }
-func (m *bridgeMockChatService) BlockUser(context.Context, string) error       { return nil }
-func (m *bridgeMockChatService) UnblockUser(context.Context, string) error     { return nil }
+func (m *bridgeMockChatService) BlockUser(context.Context, string) error   { return nil }
+func (m *bridgeMockChatService) UnblockUser(context.Context, string) error { return nil }
 func (m *bridgeMockChatService) GetBlockedUsers(context.Context) ([]string, error) {
 	return nil, nil
 }
-func (m *bridgeMockChatService) SendTyping(context.Context, string, bool) error      { return nil }
-func (m *bridgeMockChatService) MarkAsRead(context.Context, string, string) error    { return nil }
-func (m *bridgeMockChatService) SetDisplayName(context.Context, string) error        { return nil }
+func (m *bridgeMockChatService) SendTyping(context.Context, string, bool) error   { return nil }
+func (m *bridgeMockChatService) MarkAsRead(context.Context, string, string) error { return nil }
+func (m *bridgeMockChatService) SetDisplayName(context.Context, string) error     { return nil }
 func (m *bridgeMockChatService) SetAvatar(_ context.Context, _ io.Reader, _ string) error {
 	return nil
 }
@@ -97,10 +97,10 @@ func (m *bridgeMockChatService) SetChatSettings(context.Context, *contracts.Chat
 func (m *bridgeMockChatService) StartVerification(context.Context, string) (string, error) {
 	return "", nil
 }
-func (m *bridgeMockChatService) AcceptVerification(context.Context, string) error  { return nil }
-func (m *bridgeMockChatService) StartSAS(context.Context, string) error            { return nil }
-func (m *bridgeMockChatService) ConfirmSAS(context.Context, string) error          { return nil }
-func (m *bridgeMockChatService) CancelVerification(context.Context, string) error  { return nil }
+func (m *bridgeMockChatService) AcceptVerification(context.Context, string) error { return nil }
+func (m *bridgeMockChatService) StartSAS(context.Context, string) error           { return nil }
+func (m *bridgeMockChatService) ConfirmSAS(context.Context, string) error         { return nil }
+func (m *bridgeMockChatService) CancelVerification(context.Context, string) error { return nil }
 func (m *bridgeMockChatService) GetStatus(context.Context) contracts.MatrixChatStatus {
 	return contracts.MatrixChatStatus{Connected: true}
 }

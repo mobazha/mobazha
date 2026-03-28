@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha3.0/pkg/contracts"
 	responsePkg "github.com/mobazha/mobazha3.0/pkg/response"
 )
@@ -50,21 +51,47 @@ func (g *Gateway) handlePOSTMatrixChatRoom(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	var req struct {
-		UserID    string            `json:"userID"`
-		Name      string            `json:"name"`
-		MemberIDs []string          `json:"memberIDs"`
-		IsDM      bool              `json:"isDM"`
-		Metadata  map[string]string `json:"metadata"`
+		TargetUserID string            `json:"targetUserID"`
+		TargetPeerID string            `json:"targetPeerID"`
+		Name         string            `json:"name"`
+		MemberIDs    []string          `json:"memberIDs"`
+		IsDM         bool              `json:"isDM"`
+		Metadata     map[string]string `json:"metadata"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, err.Error())
 		return
 	}
+	req.TargetUserID = strings.TrimSpace(req.TargetUserID)
+	req.TargetPeerID = strings.TrimSpace(req.TargetPeerID)
+	if req.IsDM {
+		if req.TargetUserID == "" && req.TargetPeerID == "" {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "targetUserID or targetPeerID is required for direct chat")
+			return
+		}
+		if req.TargetUserID != "" && req.TargetPeerID != "" {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "only one direct target is allowed")
+			return
+		}
+		if req.TargetPeerID != "" {
+			if _, err := libp2ppeer.Decode(req.TargetPeerID); err != nil {
+				responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid targetPeerID")
+				return
+			}
+		}
+		if req.TargetUserID != "" && !looksLikeMatrixUserID(req.TargetUserID) {
+			responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "invalid targetUserID")
+			return
+		}
+	}
 
 	var roomID string
 	var err error
-	if req.IsDM && req.UserID != "" {
-		roomID, err = svc.CreateDirectRoom(r.Context(), req.UserID)
+	if req.IsDM {
+		roomID, err = svc.CreateDirectRoom(r.Context(), contracts.MatrixDirectRoomTarget{
+			TargetUserID: req.TargetUserID,
+			TargetPeerID: req.TargetPeerID,
+		})
 	} else {
 		roomID, err = svc.CreateGroupRoom(r.Context(), req.Name, req.MemberIDs, req.Metadata)
 	}
@@ -73,6 +100,17 @@ func (g *Gateway) handlePOSTMatrixChatRoom(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	responsePkg.Created(w, map[string]string{"roomId": roomID})
+}
+
+func looksLikeMatrixUserID(userID string) bool {
+	if !strings.HasPrefix(userID, "@") {
+		return false
+	}
+	colon := strings.IndexByte(userID, ':')
+	if colon <= 1 || colon >= len(userID)-1 {
+		return false
+	}
+	return strings.IndexByte(userID[colon+1:], ':') == -1
 }
 
 func (g *Gateway) handlePOSTMatrixChatRoomJoin(w http.ResponseWriter, r *http.Request) {

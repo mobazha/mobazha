@@ -210,6 +210,24 @@ func TestStop_Idempotent(t *testing.T) {
 	}
 }
 
+func TestOwnsCryptoStore(t *testing.T) {
+	s := newTestService()
+	if !s.ownsCryptoStore() {
+		t.Fatal("expected service without injected crypto store to own its crypto store")
+	}
+	if s.usesSharedCryptoStore() {
+		t.Fatal("expected service without injected crypto store to not use shared crypto store")
+	}
+
+	s.config.CryptoStore = struct{}{}
+	if s.ownsCryptoStore() {
+		t.Fatal("expected service with injected shared crypto store to not own it")
+	}
+	if !s.usesSharedCryptoStore() {
+		t.Fatal("expected service with injected shared crypto store to report shared usage")
+	}
+}
+
 // ──────────────────── GetStatus ─────────────────────────────────────────────
 
 func TestGetStatus_NotReady(t *testing.T) {

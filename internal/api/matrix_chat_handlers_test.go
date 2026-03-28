@@ -49,9 +49,12 @@ func (m *mockMatrixChatService) GetInvitedRooms(_ context.Context) ([]contracts.
 	return nil, m.err
 }
 
-func (m *mockMatrixChatService) CreateDirectRoom(_ context.Context, userID string) (string, error) {
+func (m *mockMatrixChatService) CreateDirectRoom(_ context.Context, target contracts.MatrixDirectRoomTarget) (string, error) {
 	m.lastCall = "CreateDirectRoom"
-	m.lastArgs = map[string]interface{}{"userID": userID}
+	m.lastArgs = map[string]interface{}{
+		"targetUserID": target.TargetUserID,
+		"targetPeerID": target.TargetPeerID,
+	}
 	return m.createdRoom, m.err
 }
 
@@ -353,8 +356,9 @@ func TestMatrixChat_GetRooms_ReturnsJSON(t *testing.T) {
 func TestMatrixChat_CreateDirectRoom(t *testing.T) {
 	chatSvc := &mockMatrixChatService{createdRoom: "!dm123:test"}
 	router, _ := newTestRouterWithChatMock(chatSvc)
+	const targetPeerID = "12D3KooWBkkycUCusJiLHXogEfiHghmMy3kDgtSovn58zy9uwikB"
 
-	body := `{"userID":"@peer_abc:test","isDM":true}`
+	body := `{"targetPeerID":"` + targetPeerID + `","isDM":true}`
 	req := httptest.NewRequest("POST", "/v1/chat/rooms", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -374,6 +378,100 @@ func TestMatrixChat_CreateDirectRoom(t *testing.T) {
 	}
 	if chatSvc.lastCall != "CreateDirectRoom" {
 		t.Errorf("expected CreateDirectRoom, got %s", chatSvc.lastCall)
+	}
+	if chatSvc.lastArgs["targetPeerID"] != targetPeerID {
+		t.Errorf("expected targetPeerID %s, got %v", targetPeerID, chatSvc.lastArgs["targetPeerID"])
+	}
+}
+
+func TestMatrixChat_CreateDirectRoom_AllowTargetUserIDForExternalUser(t *testing.T) {
+	chatSvc := &mockMatrixChatService{createdRoom: "!dm123:test"}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"targetUserID":"@alice:matrix.org","isDM":true}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 201 {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "CreateDirectRoom" {
+		t.Fatalf("expected CreateDirectRoom, got %s", chatSvc.lastCall)
+	}
+	if got, _ := chatSvc.lastArgs["targetPeerID"].(string); got != "" {
+		t.Fatalf("expected empty targetPeerID, got %q", got)
+	}
+	if got, _ := chatSvc.lastArgs["targetUserID"].(string); got != "@alice:matrix.org" {
+		t.Fatalf("expected targetUserID @alice:matrix.org, got %q", got)
+	}
+}
+
+func TestMatrixChat_CreateDirectRoom_InvalidTargetPeerID(t *testing.T) {
+	chatSvc := &mockMatrixChatService{createdRoom: "!dm123:test"}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"targetPeerID":"invalid-peer-id","isDM":true}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "" {
+		t.Fatalf("expected service not to be called, got %s", chatSvc.lastCall)
+	}
+}
+
+func TestMatrixChat_CreateDirectRoom_RequireSingleTarget(t *testing.T) {
+	chatSvc := &mockMatrixChatService{createdRoom: "!dm123:test"}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"isDM":true}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "" {
+		t.Fatalf("expected service not to be called, got %s", chatSvc.lastCall)
+	}
+
+	body = `{"targetUserID":"@alice:matrix.org","targetPeerID":"12D3KooWBkkycUCusJiLHXogEfiHghmMy3kDgtSovn58zy9uwikB","isDM":true}`
+	req = httptest.NewRequest("POST", "/v1/chat/rooms", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "" {
+		t.Fatalf("expected service not to be called, got %s", chatSvc.lastCall)
+	}
+}
+
+func TestMatrixChat_CreateDirectRoom_InvalidTargetUserID(t *testing.T) {
+	chatSvc := &mockMatrixChatService{createdRoom: "!dm123:test"}
+	router, _ := newTestRouterWithChatMock(chatSvc)
+
+	body := `{"targetUserID":"alice-no-prefix","isDM":true}`
+	req := httptest.NewRequest("POST", "/v1/chat/rooms", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if chatSvc.lastCall != "" {
+		t.Fatalf("expected service not to be called, got %s", chatSvc.lastCall)
 	}
 }
 

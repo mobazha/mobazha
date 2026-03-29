@@ -24,6 +24,26 @@ func (ct CoinType) IsCanonicalCryptoAssetID() bool {
 	return assetid.IsCanonical(raw)
 }
 
+// IsCanonicalPaymentCoin reports whether coin can be used in payment flows.
+// It accepts canonical fiat IDs, canonical crypto asset IDs, and test-only coins.
+func (ct CoinType) IsCanonicalPaymentCoin() bool {
+	if ct.IsFiatPayment() {
+		return true
+	}
+	if ct == CtMock || ct == CtTestCoin {
+		return true
+	}
+	return ct.IsCanonicalCryptoAssetID()
+}
+
+// ValidateCanonicalPaymentCoin returns error when coin is not canonical for payment.
+func (ct CoinType) ValidateCanonicalPaymentCoin() error {
+	if ct.IsCanonicalPaymentCoin() {
+		return nil
+	}
+	return fmt.Errorf("coin must be canonical payment coin (crypto:* / fiat:*), got %q", ct)
+}
+
 // PricingCurrencyCode returns the pricing/exchange currency code used by
 // CurrencyDefinitions and exchange-rate lookup (e.g. BTC, BSCUSDT, USD).
 func (ct CoinType) PricingCurrencyCode() (string, error) {

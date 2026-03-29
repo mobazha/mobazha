@@ -66,3 +66,31 @@ func TestCoinType_IsCanonicalCryptoAssetID(t *testing.T) {
 		t.Fatal("legacy coin code should be false")
 	}
 }
+
+func TestCoinType_IsCanonicalPaymentCoin(t *testing.T) {
+	tests := []struct {
+		coin     CoinType
+		expected bool
+	}{
+		{"crypto:eip155:1:native", true},
+		{"fiat:stripe:USD", true},
+		{CtMock, true},
+		{CtTestCoin, true},
+		{"ETHUSDT", false},
+	}
+	for _, tt := range tests {
+		got := tt.coin.IsCanonicalPaymentCoin()
+		if got != tt.expected {
+			t.Fatalf("IsCanonicalPaymentCoin(%s)=%v, want %v", tt.coin, got, tt.expected)
+		}
+	}
+}
+
+func TestCoinType_ValidateCanonicalPaymentCoin(t *testing.T) {
+	if err := CoinType("crypto:tron:mainnet:trc20:TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t").ValidateCanonicalPaymentCoin(); err != nil {
+		t.Fatalf("unexpected error for canonical coin: %v", err)
+	}
+	if err := CoinType("TRXUSDT").ValidateCanonicalPaymentCoin(); err == nil {
+		t.Fatalf("expected error for legacy payment coin")
+	}
+}

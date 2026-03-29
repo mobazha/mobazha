@@ -124,6 +124,9 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 	}
 
 	normalizedCoin := paymentSent.Coin
+	if err := iwallet.CoinType(normalizedCoin).ValidateCanonicalPaymentCoin(); err != nil {
+		return fmt.Errorf("cannot validate order. invalid payment coin: %w", err)
+	}
 	_, err = iwallet.CoinInfoFromCoinType(iwallet.CoinType(normalizedCoin))
 	if err != nil {
 		return fmt.Errorf("cannot validate order. coin not supported. %w", err)

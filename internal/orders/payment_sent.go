@@ -43,6 +43,10 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 	}
 
 	coinType := iwallet.CoinType(paymentSent.Coin)
+	if err := coinType.ValidateCanonicalPaymentCoin(); err != nil {
+		logger.LogInfoWithIDf(log, op.nodeID, "Invalid payment coin: %v", err)
+		return nil, err
+	}
 
 	if err := op.validatePaymentSent(coinType, orderOpen, paymentSent); err != nil {
 		logger.LogInfoWithIDf(log, op.nodeID, "Failed to validate payment sent message: %s", err)

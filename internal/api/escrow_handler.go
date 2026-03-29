@@ -81,12 +81,12 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 	}
 	params.OrderID = orderID
 
-	if !params.CoinType.IsFiatPayment() && !params.CoinType.IsCanonicalCryptoAssetID() {
+	if err := params.CoinType.ValidateCanonicalPaymentCoin(); err != nil {
 		responsePkg.Error(
 			w,
 			http.StatusBadRequest,
 			responsePkg.CodeBadRequest,
-			fmt.Sprintf("coinType must be canonical crypto assetID (crypto:*), got %q", params.CoinType),
+			fmt.Sprintf("invalid coinType: %v", err),
 		)
 		return
 	}

@@ -81,6 +81,16 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 	}
 	params.OrderID = orderID
 
+	if !params.CoinType.IsFiatPayment() && !params.CoinType.IsCanonicalCryptoAssetID() {
+		responsePkg.Error(
+			w,
+			http.StatusBadRequest,
+			responsePkg.CodeBadRequest,
+			fmt.Sprintf("coinType must be canonical crypto assetID (crypto:*), got %q", params.CoinType),
+		)
+		return
+	}
+
 	orderSvc := getOrderService(r)
 	walletSvc := getWalletService(r)
 
@@ -110,7 +120,11 @@ func (g *Gateway) handleGetOrderPaymentInstructions(w http.ResponseWriter, r *ht
 	// currency, use directly. UTXO adapters compute amount internally.
 	orderAmount := iwallet.NewAmount(orderOpen.Amount)
 	pricingCoin := strings.ToUpper(orderOpen.PricingCoin)
-	paymentCoinCode := strings.ToUpper(params.CoinType.CurrencyCode())
+	paymentCoinCode, err := params.CoinType.PricingCurrencyCode()
+	if err != nil {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, fmt.Sprintf("invalid coinType: %v", err))
+		return
+	}
 	if pricingCoin != "" && pricingCoin != paymentCoinCode {
 		pricingCurrency, err := models.CurrencyDefinitions.Lookup(pricingCoin)
 		if err != nil {

@@ -2,7 +2,6 @@ package orders
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
@@ -43,7 +42,7 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 
-	coinType := iwallet.CoinType(strings.ToUpper(paymentSent.Coin))
+	coinType := iwallet.CoinType(paymentSent.Coin)
 
 	if err := op.validatePaymentSent(coinType, orderOpen, paymentSent); err != nil {
 		logger.LogInfoWithIDf(log, op.nodeID, "Failed to validate payment sent message: %s", err)
@@ -99,7 +98,7 @@ func (op *OrderProcessor) validatePaymentSent(coinType iwallet.CoinType, orderOp
 	if op.multiwallet == nil {
 		return nil
 	}
-	wallet, err := op.multiwallet.WalletForCurrencyCode(strings.ToUpper(paymentSent.Coin))
+	wallet, err := op.multiwallet.WalletForCurrencyCode(paymentSent.Coin)
 	if err != nil {
 		return fmt.Errorf("cannot validate paymentSent. coin not supported. %w", err)
 	}

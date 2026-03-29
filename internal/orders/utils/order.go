@@ -3,7 +3,6 @@ package utils
 import (
 	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
@@ -30,7 +29,7 @@ func GetOrderEscrowInfo(orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, te
 
 	escrowInfo.ContractAddress = paymentSent.ContractAddress
 
-	coinType := iwallet.CoinType(strings.ToUpper(paymentSent.Coin))
+	coinType := iwallet.CoinType(paymentSent.Coin)
 	if !iwallet.IsValidCoinType(coinType) {
 		return iwallet.EscrowInfo{}, fmt.Errorf("invalid coin type: %v", coinType)
 	}
@@ -79,4 +78,3 @@ func GetOrderEscrowInfo(orderOpen *pb.OrderOpen, paymentSent *pb.PaymentSent, te
 
 	return escrowInfo, nil
 }
-

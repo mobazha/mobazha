@@ -458,6 +458,10 @@ func CoinInfoFromCoinType(coinType CoinType) (CoinInfo, error) {
 		return CtStripeInfo, nil
 	}
 
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(s)), "crypto:") {
+		return coinInfoFromCanonicalAssetID(coinType)
+	}
+
 	// 特殊处理：CoinType 和 ChainType 不一致的原生币
 	switch coinType {
 	case CtBaseETH:

@@ -214,8 +214,11 @@ func validateEscrowPayment(order *pb.OrderOpen, paymentSent *pb.PaymentSent, wal
 	// payment coin's smallest unit — comparing them is meaningless. The escrow smart
 	// contract already enforces the locked amount on-chain, so we only validate the
 	// amount for same-currency payments where both units match.
-	pricingCoin := strings.ToUpper(order.PricingCoin)
-	paymentCoin := strings.ToUpper(paymentSent.Coin)
+	pricingCoin := strings.ToUpper(strings.TrimSpace(order.PricingCoin))
+	paymentCoin, err := iwallet.CoinType(paymentSent.Coin).PricingCurrencyCode()
+	if err != nil {
+		return fmt.Errorf("invalid payment coin: %w", err)
+	}
 	if pricingCoin == "" || pricingCoin == paymentCoin {
 		if err := ValidatePaymentAmount(order.Amount, paymentSent.Amount); err != nil {
 			return err

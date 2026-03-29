@@ -97,6 +97,21 @@ func TestRegistry_ForCoin_TokensResolveToPlatformChain(t *testing.T) {
 	}
 }
 
+func TestRegistry_ForCoin_CanonicalAssetID_ResolvesChain(t *testing.T) {
+	r := payment.NewRegistry()
+	bscStrategy := &mockStrategy{model: payment.PaymentModelClientSigned}
+	r.Register(iwallet.ChainBSC, bscStrategy)
+
+	coin := iwallet.CoinType("crypto:eip155:56:erc20:0x55d398326f99059ff775485246999027b3197955")
+	got, err := r.ForCoin(coin)
+	if err != nil {
+		t.Fatalf("ForCoin(%s): unexpected error: %v", coin, err)
+	}
+	if got != bscStrategy {
+		t.Fatalf("ForCoin(%s) returned wrong strategy", coin)
+	}
+}
+
 func TestRegistry_ForChain_UnknownReturnsError(t *testing.T) {
 	r := payment.NewRegistry()
 

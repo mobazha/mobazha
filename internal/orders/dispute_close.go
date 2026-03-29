@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"strings"
 
 	"github.com/mobazha/mobazha3.0/internal/database"
 	"github.com/mobazha/mobazha3.0/internal/logger"
@@ -124,7 +123,7 @@ func (op *OrderProcessor) validateDisputeResolution(disputeClose *pb.DisputeClos
 		return errors.New(errMsg)
 	}
 
-	normalizedCoin := strings.ToUpper(paymentSent.Coin)
+	normalizedCoin := paymentSent.Coin
 	_, err = iwallet.CoinInfoFromCoinType(iwallet.CoinType(normalizedCoin))
 	if err != nil {
 		return fmt.Errorf("cannot validate order. coin not supported. %w", err)
